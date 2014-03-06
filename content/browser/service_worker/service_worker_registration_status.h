@@ -6,7 +6,7 @@
 #define CONTENT_BROWSER_SERVICE_WORKER_SERVICE_WORKER_REGISTRATION_STATUS_H_
 
 #include "base/strings/string16.h"
-#include "content/common/service_worker/service_worker_status_code.h"
+#include "content/public/common/service_worker_status_code.h"
 #include "third_party/WebKit/public/platform/WebServiceWorkerError.h"
 
 namespace content {

@@ -14,7 +14,7 @@
 #include "base/memory/ref_counted.h"
 #include "base/observer_list.h"
 #include "content/common/content_export.h"
-#include "content/common/service_worker/service_worker_status_code.h"
+#include "content/public/common/service_worker_status_code.h"
 
 class GURL;
 

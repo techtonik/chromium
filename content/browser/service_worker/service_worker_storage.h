@@ -13,7 +13,7 @@
 #include "base/gtest_prod_util.h"
 #include "base/memory/scoped_vector.h"
 #include "content/common/content_export.h"
-#include "content/common/service_worker/service_worker_status_code.h"
+#include "content/public/common/service_worker_status_code.h"
 #include "url/gurl.h"
 
 namespace quota {

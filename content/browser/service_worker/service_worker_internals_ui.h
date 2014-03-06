@@ -9,8 +9,8 @@
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "content/common/service_worker/service_worker_status_code.h"
 #include "content/public/browser/web_ui_controller.h"
+#include "content/public/common/service_worker_status_code.h"
 
 namespace base {
 class ListValue;

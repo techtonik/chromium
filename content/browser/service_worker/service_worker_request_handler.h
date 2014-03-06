@@ -10,7 +10,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/supports_user_data.h"
 #include "content/common/content_export.h"
-#include "content/common/service_worker/service_worker_status_code.h"
+#include "content/public/common/service_worker_status_code.h"
 #include "net/url_request/url_request_job_factory.h"
 #include "webkit/common/resource_type.h"
 

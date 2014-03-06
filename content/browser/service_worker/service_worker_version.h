@@ -15,8 +15,8 @@
 #include "base/memory/scoped_ptr.h"
 #include "content/browser/service_worker/embedded_worker_instance.h"
 #include "content/common/content_export.h"
-#include "content/common/service_worker/service_worker_status_code.h"
 #include "content/common/service_worker/service_worker_types.h"
+#include "content/public/common/service_worker_status_code.h"
 
 class GURL;
 
