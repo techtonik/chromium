@@ -81,6 +81,7 @@
 #include "extensions/browser/process_manager.h"
 #include "extensions/browser/process_map.h"
 #include "extensions/browser/runtime_data.h"
+#include "extensions/browser/service_worker_manager.h"
 #include "extensions/browser/update_observer.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/error_utils.h"
@@ -111,6 +112,7 @@
 using content::BrowserContext;
 using content::BrowserThread;
 using content::DevToolsAgentHost;
+using extensions::BackgroundInfo;
 using extensions::CrxInstaller;
 using extensions::Extension;
 using extensions::ExtensionIdSet;
@@ -124,6 +126,7 @@ using extensions::Manifest;
 using extensions::PermissionMessage;
 using extensions::PermissionMessages;
 using extensions::PermissionSet;
+using extensions::ServiceWorkerManager;
 using extensions::SharedModuleInfo;
 using extensions::UnloadedExtensionInfo;
 
@@ -1035,6 +1038,10 @@ void ExtensionService::DisableExtension(
   // Move it over to the disabled list. Don't send a second unload notification
   // for terminated extensions being disabled.
   registry_->AddDisabled(make_scoped_refptr(extension));
+
+  if (BackgroundInfo::HasServiceWorker(extension))
+    ServiceWorkerManager::Get(profile_)->UnregisterExtension(extension);
+
   if (registry_->enabled_extensions().Contains(extension->id())) {
     registry_->RemoveEnabled(extension->id());
     NotifyExtensionUnloaded(extension, UnloadedExtensionInfo::REASON_DISABLE);
@@ -1145,6 +1152,9 @@ void ExtensionService::NotifyExtensionLoaded(const Extension* extension) {
       }
     }
   }
+
+  if (BackgroundInfo::HasServiceWorker(extension))
+    ServiceWorkerManager::Get(profile_)->RegisterExtension(extension);
 
   // Tell subsystems that use the EXTENSION_LOADED notification about the new
   // extension.
@@ -1624,6 +1634,19 @@ void ExtensionService::UnloadExtension(
   } else {
     // Remove the extension from the enabled list.
     registry_->RemoveEnabled(extension->id());
+
+    if (BackgroundInfo::HasServiceWorker(extension)) {
+      switch (reason) {
+        case UnloadedExtensionInfo::REASON_DISABLE:
+        case UnloadedExtensionInfo::REASON_UNINSTALL:
+        case UnloadedExtensionInfo::REASON_BLACKLIST:
+          ServiceWorkerManager::Get(profile_)->UnregisterExtension(extension);
+          break;
+        case UnloadedExtensionInfo::REASON_UPDATE:
+        case UnloadedExtensionInfo::REASON_TERMINATE:
+          break;
+      }
+    }
     NotifyExtensionUnloaded(extension.get(), reason);
   }
 

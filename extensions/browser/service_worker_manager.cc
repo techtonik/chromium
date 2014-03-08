@@ -4,15 +4,14 @@
 
 #include "extensions/browser/service_worker_manager.h"
 
-#include "base/callback.h"
 #include "base/bind.h"
+#include "base/callback.h"
 #include "components/browser_context_keyed_service/browser_context_dependency_manager.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/browser/service_worker/service_worker_context_wrapper.h"
 #include "content/public/browser/browser_context.h"
-#include "content/public/browser/storage_partition.h"
 #include "content/public/browser/browser_thread.h"
-
+#include "content/public/browser/storage_partition.h"
 #include "extensions/browser/extensions_browser_client.h"
 #include "extensions/common/manifest_handlers/background_info.h"
 
@@ -77,8 +76,9 @@ ServiceWorkerManager::GetSWContext(const Extension* ext) const {
   return GetStoragePartition(ext)->GetServiceWorkerContext();
 }
 
-template<typename Arg1>
-static void RunCallback1(const Callback<void(Arg1)>& callback, const Arg1& arg1) {
+template <typename Arg1>
+static void RunCallback1(const Callback<void(Arg1)>& callback,
+                         const Arg1& arg1) {
   callback.Run(arg1);
 }
 
@@ -90,8 +90,7 @@ static void FinishRegister(
   BrowserThread::PostTask(
       BrowserThread::UI,
       FROM_HERE,
-      base::Bind(
-          &RunCallback1<ServiceWorkerStatusCode>, continuation, status));
+      base::Bind(&RunCallback1<ServiceWorkerStatusCode>, continuation, status));
 }
 
 static void DoRegister(
@@ -145,7 +144,7 @@ void ServiceWorkerManager::FinishRegistration(const ExtensionId& extension_id,
 
   DCHECK_EQ(ext_state.registration, REGISTERING);
   std::vector<Closure> to_run;
-  switch(result) {
+  switch (result) {
     case content::SERVICE_WORKER_OK:
       ext_state.registration = REGISTERED;
       to_run.swap(ext_state.registration_succeeded);
@@ -172,8 +171,7 @@ static void FinishUnregister(
   BrowserThread::PostTask(
       BrowserThread::UI,
       FROM_HERE,
-      base::Bind(
-          &RunCallback1<ServiceWorkerStatusCode>, continuation, status));
+      base::Bind(&RunCallback1<ServiceWorkerStatusCode>, continuation, status));
 }
 
 static void DoUnregister(
@@ -227,7 +225,7 @@ void ServiceWorkerManager::FinishUnregistration(
 
   DCHECK_EQ(ext_state.registration, UNREGISTERING);
   std::vector<Closure> to_run;
-  switch(result) {
+  switch (result) {
     case content::SERVICE_WORKER_OK:
       to_run.swap(ext_state.unregistration_succeeded);
       states_.erase(extension_id);

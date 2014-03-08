@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "base/memory/weak_ptr.h"
-#include "base/memory/singleton.h"
 #include "base/callback_forward.h"
+#include "base/memory/singleton.h"
+#include "base/memory/weak_ptr.h"
 #include "components/browser_context_keyed_service/browser_context_keyed_service.h"
 #include "components/browser_context_keyed_service/browser_context_keyed_service_factory.h"
 #include "content/common/service_worker/service_worker_status_code.h"
@@ -24,7 +24,9 @@ namespace extensions {
 // This class lives on the UI thread despite interacting with the
 // ServiceWorkerContextCore that lives on the IO thread.
 //
-// See https://docs.google.com/document/d/1szeOHrr_qEJGSNbDtEqeKcGDkLmwvftqTV731kQw2rM/edit for more details.
+// See
+// https://docs.google.com/document/d/1szeOHrr_qEJGSNbDtEqeKcGDkLmwvftqTV731kQw2rM/edit
+// for more details.
 class ServiceWorkerManager : public BrowserContextKeyedService {
  public:
   // Convenience function to get the ServiceWorkerManager for a BrowserContext.
@@ -86,12 +88,13 @@ class ServiceWorkerManager : public BrowserContextKeyedService {
 
 class ServiceWorkerManagerFactory : public BrowserContextKeyedServiceFactory {
  public:
-  static ServiceWorkerManager* GetForBrowserContext(content::BrowserContext* context);
+  static ServiceWorkerManager* GetForBrowserContext(
+      content::BrowserContext* context);
 
   static ServiceWorkerManagerFactory* GetInstance();
 
-  void SetInstanceForTesting(
-      content::BrowserContext* context, ServiceWorkerManager* prefs);
+  void SetInstanceForTesting(content::BrowserContext* context,
+                             ServiceWorkerManager* prefs);
 
  private:
   friend struct DefaultSingletonTraits<ServiceWorkerManagerFactory>;
