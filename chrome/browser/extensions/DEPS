@@ -15,4 +15,6 @@ include_rules = [
 
   # For access to testing command line switches.
   "+ppapi/shared_impl",
+
+  "+content",
 ]
