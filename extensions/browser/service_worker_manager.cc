@@ -76,12 +76,6 @@ ServiceWorkerManager::GetSWContext(const Extension* ext) const {
   return GetStoragePartition(ext)->GetServiceWorkerContext();
 }
 
-template <typename Arg1>
-static void RunCallback1(const Callback<void(Arg1)>& callback,
-                         const Arg1& arg1) {
-  callback.Run(arg1);
-}
-
 static void FinishRegister(
     const Callback<void(ServiceWorkerStatusCode)>& continuation,
     content::ServiceWorkerStatusCode status,
@@ -90,7 +84,7 @@ static void FinishRegister(
   BrowserThread::PostTask(
       BrowserThread::UI,
       FROM_HERE,
-      base::Bind(&RunCallback1<ServiceWorkerStatusCode>, continuation, status));
+      base::Bind(continuation, status));
 }
 
 static void DoRegister(
