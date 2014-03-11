@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "content/common/service_worker/service_worker_status_code.h"
+#include "content/public/common/service_worker_status_code.h"
 
 #include "base/logging.h"
 

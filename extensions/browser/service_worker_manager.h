@@ -7,11 +7,11 @@
 #include "base/memory/weak_ptr.h"
 #include "components/browser_context_keyed_service/browser_context_keyed_service.h"
 #include "components/browser_context_keyed_service/browser_context_keyed_service_factory.h"
-#include "content/common/service_worker/service_worker_status_code.h"
+#include "content/public/common/service_worker_status_code.h"
 #include "extensions/common/extension.h"
 
 namespace content {
-class ServiceWorkerContextWrapper;
+class ServiceWorkerContext;
 class ServiceWorkerRegistration;
 class StoragePartition;
 }
@@ -50,7 +50,7 @@ class ServiceWorkerManager : public BrowserContextKeyedService {
 
   inline content::StoragePartition* GetStoragePartition(
       const Extension* ext) const;
-  inline scoped_refptr<content::ServiceWorkerContextWrapper> GetSWContext(
+  inline content::ServiceWorkerContext* GetSWContext(
       const Extension* ext) const;
   inline base::WeakPtr<ServiceWorkerManager> WeakThis();
 

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "base/bind_helpers.h"
+#include "base/callback_helpers.h"
 #include "chrome/browser/extensions/extension_browsertest.h"
 #include "chrome/browser/extensions/test_extension_dir.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
@@ -33,9 +34,8 @@ class ExtensionServiceWorkerBrowserTest : public ExtensionBrowserTest {
   TestExtensionDir ext_dir_;
 };
 
-scoped_refptr<content::ServiceWorkerContextWrapper> GetSWContext(
-    content::BrowserContext* context,
-    const ExtensionId& ext_id) {
+content::ServiceWorkerContext* GetSWContext(content::BrowserContext* context,
+                                            const ExtensionId& ext_id) {
   return content::BrowserContext::GetStoragePartitionForSite(
              context, Extension::GetBaseURLFromExtensionId(ext_id))
       ->GetServiceWorkerContext();
@@ -74,6 +74,9 @@ class IOThreadInstallUninstallTest {
       const base::Closure& continuation,
       content::ServiceWorkerStatusCode status,
       const scoped_refptr<content::ServiceWorkerRegistration>& registration) {
+    base::ScopedClosureRunner at_exit(continuation);
+    ASSERT_TRUE(registration);
+    EXPECT_EQ(content::SERVICE_WORKER_OK, status);
     EXPECT_EQ(GURL("chrome-extension://" + ext_id_ + "/service_worker.js"),
               registration->script_url());
     EXPECT_EQ(GURL("chrome-extension://" + ext_id_ + "/*"),
@@ -82,8 +85,6 @@ class IOThreadInstallUninstallTest {
     content::ServiceWorkerVersion* active_version =
         registration->active_version();
     EXPECT_TRUE(active_version);
-    EXPECT_EQ(content::ServiceWorkerVersion::RUNNING, active_version->status());
-    continuation.Run();
   }
 
   const scoped_refptr<ServiceWorkerContextWrapper> service_worker_context_;
@@ -101,7 +102,9 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
   ASSERT_TRUE(extension.get());
 
   IOThreadInstallUninstallTest test_obj(
-      GetSWContext(profile(), extension->id()), extension->id());
+      static_cast<ServiceWorkerContextWrapper*>(
+          GetSWContext(profile(), extension->id())),
+      extension->id());
   scoped_refptr<content::MessageLoopRunner> runner =
       new content::MessageLoopRunner;
   BrowserThread::PostTask(BrowserThread::IO,

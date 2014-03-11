@@ -7,10 +7,9 @@
 #include "base/bind.h"
 #include "base/callback.h"
 #include "components/browser_context_keyed_service/browser_context_dependency_manager.h"
-#include "content/browser/service_worker/service_worker_context_core.h"
-#include "content/browser/service_worker/service_worker_context_wrapper.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/service_worker_context.h"
 #include "content/public/browser/storage_partition.h"
 #include "extensions/browser/extensions_browser_client.h"
 #include "extensions/common/manifest_handlers/background_info.h"
@@ -23,35 +22,6 @@ using base::WeakPtr;
 using content::BrowserContext;
 using content::BrowserThread;
 using content::ServiceWorkerStatusCode;
-
-static const char* CurrentBrowserThreadName() {
-  BrowserThread::ID id;
-  if (BrowserThread::GetCurrentThreadIdentifier(&id)) {
-    switch (id) {
-      case BrowserThread::UI:
-        return "UI";
-      case BrowserThread::DB:
-        return "DB";
-      case BrowserThread::FILE:
-        return "FILE";
-      case BrowserThread::FILE_USER_BLOCKING:
-        return "FILE_USER_BLOCKING";
-      case BrowserThread::PROCESS_LAUNCHER:
-        return "PROCESS_LAUNCHER";
-      case BrowserThread::CACHE:
-        return "CACHE";
-      case BrowserThread::IO:
-        return "IO";
-      default:
-        break;
-    }
-  }
-  return "Unknown";
-}
-
-static void DCheckCurrentlyOn(BrowserThread::ID thread) {
-  DCHECK(BrowserThread::CurrentlyOn(thread)) << CurrentBrowserThreadName();
-}
 
 ServiceWorkerManager::State::State() {}
 ServiceWorkerManager::State::~State() {}
@@ -71,42 +41,17 @@ content::StoragePartition* ServiceWorkerManager::GetStoragePartition(
       context_, Extension::GetBaseURLFromExtensionId(ext->id()));
 }
 
-scoped_refptr<content::ServiceWorkerContextWrapper>
-ServiceWorkerManager::GetSWContext(const Extension* ext) const {
+content::ServiceWorkerContext* ServiceWorkerManager::GetSWContext(
+    const Extension* ext) const {
   return GetStoragePartition(ext)->GetServiceWorkerContext();
 }
 
-static void FinishRegister(
-    const Callback<void(ServiceWorkerStatusCode)>& continuation,
-    content::ServiceWorkerStatusCode status,
-    int64 registration_id) {
-  DCheckCurrentlyOn(BrowserThread::IO);
-  BrowserThread::PostTask(
-      BrowserThread::UI,
-      FROM_HERE,
-      base::Bind(continuation, status));
-}
-
-static void DoRegister(
-    const scoped_refptr<content::ServiceWorkerContextWrapper>&
-        service_worker_context,
-    const ExtensionId& extension_id,
-    const GURL& service_worker_script,
-    const Callback<void(ServiceWorkerStatusCode)>& continuation) {
-  DCheckCurrentlyOn(BrowserThread::IO);
-  service_worker_context->context()->RegisterServiceWorker(
-      Extension::GetBaseURLFromExtensionId(extension_id).Resolve("/*"),
-      service_worker_script,
-      -1,
-      base::Bind(&FinishRegister, continuation));
-}
-
 // alecflett says that if we send a series of RegisterServiceWorker and
-// UnregisterServiceWorker calls to a ServiceWorkerContextCore, we're guaranteed
-// that the callbacks come back in the same order, and that the last one will be
-// the final state.
+// UnregisterServiceWorker calls on the same scope to a
+// ServiceWorkerContextCore, we're guaranteed that the callbacks come back in
+// the same order, and that the last one will be the final state.
 void ServiceWorkerManager::RegisterExtension(const Extension* extension) {
-  DCheckCurrentlyOn(BrowserThread::UI);
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   CHECK(BackgroundInfo::HasServiceWorker(extension));
   State& ext_state = states_[extension->id()];
   if (ext_state.registration == REGISTERING ||
@@ -114,22 +59,19 @@ void ServiceWorkerManager::RegisterExtension(const Extension* extension) {
     return;
   ext_state.registration = REGISTERING;
   ++ext_state.outstanding_state_changes;
-  BrowserThread::PostTask(
-      BrowserThread::IO,
-      FROM_HERE,
-      base::Bind(&DoRegister,
-                 GetSWContext(extension),
-                 extension->id(),
-                 extension->GetResourceURL(
-                     BackgroundInfo::GetServiceWorkerScript(extension)),
-                 base::Bind(&ServiceWorkerManager::FinishRegistration,
-                            WeakThis(),
-                            extension->id())));
+  GetSWContext(extension)->RegisterServiceWorker(
+      extension->GetResourceURL("/*"),
+      extension->GetResourceURL(
+          BackgroundInfo::GetServiceWorkerScript(extension)),
+      -1,
+      base::Bind(&ServiceWorkerManager::FinishRegistration,
+                 WeakThis(),
+                 extension->id()));
 }
 
 void ServiceWorkerManager::FinishRegistration(const ExtensionId& extension_id,
                                               ServiceWorkerStatusCode result) {
-  DCheckCurrentlyOn(BrowserThread::UI);
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   State& ext_state = states_[extension_id];
   --ext_state.outstanding_state_changes;
   DCHECK_GE(ext_state.outstanding_state_changes, 0);
@@ -158,30 +100,8 @@ void ServiceWorkerManager::FinishRegistration(const ExtensionId& extension_id,
   }
 }
 
-static void FinishUnregister(
-    const Callback<void(ServiceWorkerStatusCode)>& continuation,
-    content::ServiceWorkerStatusCode status) {
-  DCheckCurrentlyOn(BrowserThread::IO);
-  BrowserThread::PostTask(
-      BrowserThread::UI,
-      FROM_HERE,
-      base::Bind(&RunCallback1<ServiceWorkerStatusCode>, continuation, status));
-}
-
-static void DoUnregister(
-    const scoped_refptr<content::ServiceWorkerContextWrapper>&
-        service_worker_context,
-    const ExtensionId& extension_id,
-    const Callback<void(ServiceWorkerStatusCode)>& continuation) {
-  DCheckCurrentlyOn(BrowserThread::IO);
-  service_worker_context->context()->UnregisterServiceWorker(
-      Extension::GetBaseURLFromExtensionId(extension_id).Resolve("/*"),
-      -1,
-      base::Bind(&FinishUnregister, continuation));
-}
-
 void ServiceWorkerManager::UnregisterExtension(const Extension* extension) {
-  DCheckCurrentlyOn(BrowserThread::UI);
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   CHECK(BackgroundInfo::HasServiceWorker(extension));
 
   base::hash_map<ExtensionId, State>::iterator it =
@@ -196,21 +116,18 @@ void ServiceWorkerManager::UnregisterExtension(const Extension* extension) {
 
   ext_state.registration = UNREGISTERING;
   ++ext_state.outstanding_state_changes;
-  BrowserThread::PostTask(
-      BrowserThread::IO,
-      FROM_HERE,
-      base::Bind(&DoUnregister,
-                 GetSWContext(extension),
-                 extension->id(),
-                 base::Bind(&ServiceWorkerManager::FinishUnregistration,
-                            WeakThis(),
-                            extension->id())));
+  GetSWContext(extension)->UnregisterServiceWorker(
+      extension->GetResourceURL("/*"),
+      -1,
+      base::Bind(&ServiceWorkerManager::FinishUnregistration,
+                 WeakThis(),
+                 extension->id()));
 }
 
 void ServiceWorkerManager::FinishUnregistration(
     const ExtensionId& extension_id,
     ServiceWorkerStatusCode result) {
-  DCheckCurrentlyOn(BrowserThread::UI);
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   State& ext_state = states_[extension_id];
   --ext_state.outstanding_state_changes;
   DCHECK_GE(ext_state.outstanding_state_changes, 0);
