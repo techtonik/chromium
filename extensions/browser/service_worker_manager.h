@@ -49,11 +49,14 @@ class ServiceWorkerManager : public BrowserContextKeyedService {
   virtual ~ServiceWorkerManager();
 
   inline content::StoragePartition* GetStoragePartition(
-      const Extension* ext) const;
+      const ExtensionId& ext_id) const;
   inline content::ServiceWorkerContext* GetSWContext(
-      const Extension* ext) const;
+      const ExtensionId& ext_id) const;
   inline base::WeakPtr<ServiceWorkerManager> WeakThis();
 
+  void ContinueRegistrationWithExtensionHost(const ExtensionId& extension_id,
+                                             const GURL& scope,
+                                             const GURL& service_worker_script);
   void FinishRegistration(const ExtensionId& extension_id,
                           content::ServiceWorkerStatusCode result);
   void FinishUnregistration(const ExtensionId& extension_id,

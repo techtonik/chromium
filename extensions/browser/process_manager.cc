@@ -99,7 +99,8 @@ class IncognitoProcessManager : public ProcessManager {
                           ProcessManager* original_manager);
   virtual ~IncognitoProcessManager() {}
   virtual bool CreateBackgroundHost(const Extension* extension,
-                                    const GURL& url) OVERRIDE;
+                                    const GURL& url,
+                                    const base::Closure& continuation) OVERRIDE;
   virtual SiteInstance* GetSiteInstanceForURL(const GURL& url) OVERRIDE;
 
  private:
@@ -283,7 +284,8 @@ const ProcessManager::ViewSet ProcessManager::GetAllViews() const {
 }
 
 bool ProcessManager::CreateBackgroundHost(const Extension* extension,
-                                          const GURL& url) {
+                                          const GURL& url,
+                                          const base::Closure& continuation) {
   // Hosted apps are taken care of from BackgroundContentsService. Ignore them
   // here.
   if (extension->is_hosted_app() ||
@@ -293,13 +295,16 @@ bool ProcessManager::CreateBackgroundHost(const Extension* extension,
   }
 
   // Don't create multiple background hosts for an extension.
-  if (GetBackgroundHostForExtension(extension->id()))
+  if (GetBackgroundHostForExtension(extension->id())) {
+    if (!continuation.is_null())
+      continuation.Run();
     return true;  // TODO(kalman): return false here? It might break things...
+  }
 
   ExtensionHost* host =
       new ExtensionHost(extension, GetSiteInstanceForURL(url), url,
                         VIEW_TYPE_EXTENSION_BACKGROUND_PAGE);
-  host->CreateRenderViewSoon();
+  host->CreateRenderViewSoon(continuation);
   OnBackgroundHostCreated(host);
   return true;
 }
@@ -890,12 +895,14 @@ IncognitoProcessManager::IncognitoProcessManager(
                     content::Source<BrowserContext>(original_context));
 }
 
-bool IncognitoProcessManager::CreateBackgroundHost(const Extension* extension,
-                                                   const GURL& url) {
+bool IncognitoProcessManager::CreateBackgroundHost(
+    const Extension* extension,
+    const GURL& url,
+    const base::Closure& continuation) {
   if (IncognitoInfo::IsSplitMode(extension)) {
     if (ExtensionsBrowserClient::Get()->IsExtensionIncognitoEnabled(
             extension->id(), GetBrowserContext()))
-      return ProcessManager::CreateBackgroundHost(extension, url);
+      return ProcessManager::CreateBackgroundHost(extension, url, continuation);
   } else {
     // Do nothing. If an extension is spanning, then its original-profile
     // background page is shared with incognito, so we don't create another.

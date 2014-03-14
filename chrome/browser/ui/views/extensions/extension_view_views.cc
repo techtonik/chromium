@@ -141,7 +141,7 @@ void ExtensionViewViews::CreateWidgetHostView() {
   DCHECK(!initialized_);
   initialized_ = true;
   Attach(host_->host_contents()->GetView()->GetNativeView());
-  host_->CreateRenderViewSoon();
+  host_->CreateRenderViewSoon(base::Closure());
   SetVisible(false);
 }
 
