@@ -7,7 +7,7 @@
 #include "base/bind.h"
 #include "base/callback.h"
 #include "chrome/browser/extensions/extension_host.h"
-#include "components/browser_context_keyed_service/browser_context_dependency_manager.h"
+#include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/render_process_host.h"
@@ -213,8 +213,7 @@ ServiceWorkerManagerFactory::ServiceWorkerManagerFactory()
 
 ServiceWorkerManagerFactory::~ServiceWorkerManagerFactory() {}
 
-BrowserContextKeyedService*
-ServiceWorkerManagerFactory::BuildServiceInstanceFor(
+KeyedService* ServiceWorkerManagerFactory::BuildServiceInstanceFor(
     content::BrowserContext* context) const {
   return new ServiceWorkerManager(context);
 }

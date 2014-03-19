@@ -5,8 +5,8 @@
 #include "base/callback_forward.h"
 #include "base/memory/singleton.h"
 #include "base/memory/weak_ptr.h"
-#include "components/browser_context_keyed_service/browser_context_keyed_service.h"
-#include "components/browser_context_keyed_service/browser_context_keyed_service_factory.h"
+#include "components/keyed_service/content/browser_context_keyed_service_factory.h"
+#include "components/keyed_service/core/keyed_service.h"
 #include "content/public/common/service_worker_status_code.h"
 #include "extensions/common/extension.h"
 
@@ -27,7 +27,7 @@ namespace extensions {
 // See
 // https://docs.google.com/document/d/1szeOHrr_qEJGSNbDtEqeKcGDkLmwvftqTV731kQw2rM/edit
 // for more details.
-class ServiceWorkerManager : public BrowserContextKeyedService {
+class ServiceWorkerManager : public KeyedService {
  public:
   // Convenience function to get the ServiceWorkerManager for a BrowserContext.
   static ServiceWorkerManager* Get(content::BrowserContext* context);
@@ -105,7 +105,7 @@ class ServiceWorkerManagerFactory : public BrowserContextKeyedServiceFactory {
   ServiceWorkerManagerFactory();
   virtual ~ServiceWorkerManagerFactory();
 
-  virtual BrowserContextKeyedService* BuildServiceInstanceFor(
+  virtual KeyedService* BuildServiceInstanceFor(
       content::BrowserContext* context) const OVERRIDE;
   virtual content::BrowserContext* GetBrowserContextToUse(
       content::BrowserContext* context) const OVERRIDE;
