@@ -57,6 +57,8 @@ class ServiceWorkerManager : public KeyedService {
   void ContinueRegistrationWithExtensionHost(const ExtensionId& extension_id,
                                              const GURL& scope,
                                              const GURL& service_worker_script);
+  void ContinueUnregistrationWithExtensionHost(const ExtensionId& extension_id,
+                                               const GURL& scope);
   void FinishRegistration(const ExtensionId& extension_id,
                           content::ServiceWorkerStatusCode result);
   void FinishUnregistration(const ExtensionId& extension_id,

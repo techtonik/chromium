@@ -144,12 +144,37 @@ void ServiceWorkerManager::UnregisterExtension(const Extension* extension) {
 
   ext_state.registration = UNREGISTERING;
   ++ext_state.outstanding_state_changes;
-  GetSWContext(extension->id())->UnregisterServiceWorker(
-      extension->GetResourceURL("/*"),
-      -1,
+
+  const GURL service_worker_script = extension->GetResourceURL(
+      BackgroundInfo::GetServiceWorkerScript(extension));
+  // TODO(jyasskin): Create the extension process in a cleaner way. We don't
+  // need a view, for instance. Using the service_worker_script as the
+  // background host is just totally horrible.
+  extensions::ProcessManager* process_manager =
+      ExtensionSystem::Get(context_)->process_manager();
+  CHECK(process_manager->CreateBackgroundHost(
+      extension,
+      service_worker_script,
+      base::Bind(&ServiceWorkerManager::ContinueUnregistrationWithExtensionHost,
+                 WeakThis(),
+                 extension->id(),
+                 extension->GetResourceURL("/*"))));
+}
+
+void ServiceWorkerManager::ContinueUnregistrationWithExtensionHost(
+    const ExtensionId& extension_id,
+    const GURL& scope) {
+  extensions::ProcessManager* process_manager =
+      ExtensionSystem::Get(context_)->process_manager();
+  ExtensionHost* host =
+      process_manager->GetBackgroundHostForExtension(extension_id);
+
+  GetSWContext(extension_id)->UnregisterServiceWorker(
+      scope,
+      host->render_process_host()->GetID(),
       base::Bind(&ServiceWorkerManager::FinishUnregistration,
                  WeakThis(),
-                 extension->id()));
+                 extension_id));
 }
 
 void ServiceWorkerManager::FinishUnregistration(
