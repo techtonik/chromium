@@ -99,7 +99,7 @@ class IOThreadInstallUninstallTest {
 // and uninstalling it unregisters the ServiceWorker.
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
   ext_dir_.WriteManifest(kServiceWorkerManifest);
-  ext_dir_.WriteFile("service_worker.js", "");
+  ext_dir_.WriteFile(FILE_PATH_LITERAL("service_worker.js"), "");
 
   scoped_refptr<const Extension> extension =
       LoadExtension(ext_dir_.unpacked_path());

@@ -69,9 +69,13 @@ class ServiceWorkerManager : public KeyedService {
   enum RegistrationState {
     // Represented by not being in the map.
     UNREGISTERED,
-    // Between a call to RegisterExtension and the response from
+    // Between a call to RegisterExtension and the response from the
+    // ServiceWorkerContext.
     REGISTERING,
+    // Steady state when we can send messages to the extension.
     REGISTERED,
+    // Between a call to UnregisterExtension and the response from the
+    // ServiceWorkerContext.
     UNREGISTERING,
   };
   struct State {
