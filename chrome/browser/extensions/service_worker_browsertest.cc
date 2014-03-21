@@ -74,7 +74,11 @@ class IOThreadInstallUninstallTest {
       const base::Closure& continuation,
       content::ServiceWorkerStatusCode status,
       const scoped_refptr<content::ServiceWorkerRegistration>& registration) {
-    base::ScopedClosureRunner at_exit(continuation);
+    base::ScopedClosureRunner at_exit(
+        base::Bind(base::IgnoreResult(&BrowserThread::PostTask),
+                   BrowserThread::UI,
+                   FROM_HERE,
+                   continuation));
     ASSERT_TRUE(registration);
     EXPECT_EQ(content::SERVICE_WORKER_OK, status);
     EXPECT_EQ(GURL("chrome-extension://" + ext_id_ + "/service_worker.js"),
