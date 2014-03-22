@@ -187,7 +187,7 @@ class TestStoragePartition : public StoragePartition {
   virtual content::IndexedDBContext* GetIndexedDBContext() OVERRIDE {
     return NULL;
   }
-  virtual content::ServiceWorkerContextWrapper*
+  virtual content::ServiceWorkerContext*
   GetServiceWorkerContext() OVERRIDE {
     return NULL;
   }
