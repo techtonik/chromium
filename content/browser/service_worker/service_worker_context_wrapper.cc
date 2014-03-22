@@ -86,10 +86,8 @@ void ServiceWorkerContextWrapper::FinishRegistrationOnIO(
     ServiceWorkerStatusCode status,
     int64 registration_id) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
-  base::Bind(&BrowserThread::PostTask,
-             BrowserThread::UI,
-             FROM_HERE,
-             base::Bind(continuation, status));
+  BrowserThread::PostTask(
+      BrowserThread::UI, FROM_HERE, base::Bind(continuation, status));
 }
 
 void ServiceWorkerContextWrapper::UnregisterServiceWorker(
@@ -124,10 +122,8 @@ void ServiceWorkerContextWrapper::FinishUnregistrationOnIO(
     const RegistrationCallback& continuation,
     ServiceWorkerStatusCode status) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
-  base::Bind(&BrowserThread::PostTask,
-             BrowserThread::UI,
-             FROM_HERE,
-             base::Bind(continuation, status));
+  BrowserThread::PostTask(
+      BrowserThread::UI, FROM_HERE, base::Bind(continuation, status));
 }
 
 }  // namespace content
