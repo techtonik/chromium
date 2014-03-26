@@ -44,8 +44,6 @@
 #include "net/base/net_util.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
 #include "ui/aura/client/aura_constants.h"
-#include "ui/aura/client/drag_drop_client.h"
-#include "ui/aura/client/drag_drop_delegate.h"
 #include "ui/aura/client/window_tree_client.h"
 #include "ui/aura/env.h"
 #include "ui/aura/window.h"
@@ -68,6 +66,8 @@
 #include "ui/gfx/image/image_png_rep.h"
 #include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/screen.h"
+#include "ui/wm/public/drag_drop_client.h"
+#include "ui/wm/public/drag_drop_delegate.h"
 
 namespace content {
 WebContentsViewPort* CreateWebContentsView(
@@ -327,6 +327,7 @@ void PrepareDragForDownload(
 void PrepareDragData(const DropData& drop_data,
                      ui::OSExchangeData::Provider* provider,
                      WebContentsImpl* web_contents) {
+  provider->MarkOriginatedFromRenderer();
 #if defined(OS_WIN)
   // Put download before file contents to prefer the download of a image over
   // its thumbnail link.
@@ -367,6 +368,8 @@ void PrepareDragData(const DropData& drop_data,
 
 // Utility to fill a DropData object from ui::OSExchangeData.
 void PrepareDropData(DropData* drop_data, const ui::OSExchangeData& data) {
+  drop_data->did_originate_from_renderer = data.DidOriginateFromRenderer();
+
   base::string16 plain_text;
   data.GetString(&plain_text);
   if (!plain_text.empty())
@@ -601,7 +604,8 @@ class WebContentsViewAura::WindowObserver
     }
   }
 
-  virtual void OnWindowRemovingFromRootWindow(aura::Window* window) OVERRIDE {
+  virtual void OnWindowRemovingFromRootWindow(aura::Window* window,
+                                              aura::Window* new_root) OVERRIDE {
     if (window == view_->window_) {
       window->GetHost()->RemoveObserver(this);
 #if defined(OS_WIN)
@@ -1152,17 +1156,6 @@ void WebContentsViewAura::ShowContextMenu(RenderFrameHost* render_frame_host,
     delegate_->ShowContextMenu(render_frame_host, params);
     // WARNING: we may have been deleted during the call to ShowContextMenu().
   }
-}
-
-void WebContentsViewAura::ShowPopupMenu(const gfx::Rect& bounds,
-                                        int item_height,
-                                        double item_font_size,
-                                        int selected_item,
-                                        const std::vector<MenuItem>& items,
-                                        bool right_aligned,
-                                        bool allow_multiple_selection) {
-  // External popup menus are only used on Mac and Android.
-  NOTIMPLEMENTED();
 }
 
 void WebContentsViewAura::StartDragging(

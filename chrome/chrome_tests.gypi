@@ -144,8 +144,6 @@
         'browser/extensions/extension_function_test_utils.cc',
         'browser/extensions/extension_commands_global_registry_apitest.cc',
         'browser/extensions/extension_keybinding_apitest.cc',
-        'browser/extensions/extension_test_message_listener.cc',
-        'browser/extensions/extension_test_message_listener.h',
         'browser/extensions/notifications_apitest.cc',
         'browser/extensions/updater/extension_cache_fake.h',
         'browser/extensions/updater/extension_cache_fake.cc',
@@ -572,12 +570,6 @@
         'test/chromedriver/chrome/web_view.h',
         'test/chromedriver/chrome/web_view_impl.cc',
         'test/chromedriver/chrome/web_view_impl.h',
-        'test/chromedriver/chrome/zip.cc',
-        'test/chromedriver/chrome/zip.h',
-        'test/chromedriver/chrome/zip_internal.cc',
-        'test/chromedriver/chrome/zip_internal.h',
-        'test/chromedriver/chrome/zip_reader.cc',
-        'test/chromedriver/chrome/zip_reader.h',
         'test/chromedriver/net/adb_client_socket.cc',
         'test/chromedriver/net/adb_client_socket.h',
         'test/chromedriver/net/net_util.cc',
@@ -683,6 +675,7 @@
         '../crypto/crypto.gyp:crypto',
         '../net/net.gyp:http_server',
         '../net/net.gyp:net',
+        '../third_party/zlib/google/zip.gyp:zip',
         '../ui/base/ui_base.gyp:ui_base',
         '../ui/events/events.gyp:events_base',
         '../ui/gfx/gfx.gyp:gfx',
@@ -912,8 +905,8 @@
         '../third_party/libjingle/libjingle.gyp:peerconnection_server',
         '../third_party/safe_browsing/safe_browsing.gyp:safe_browsing',
         '../third_party/widevine/cdm/widevine_cdm.gyp:widevine_cdm_version_h',
-        '../ui/base/ui_base.gyp:webui_test_support',
         '../ui/compositor/compositor.gyp:compositor_test_support',
+        '../ui/resources/ui_resources.gyp:ui_resources',
         '../ui/web_dialogs/web_dialogs.gyp:web_dialogs_test_support',
         '../v8/tools/gyp/v8.gyp:v8',
         # Runtime dependencies
@@ -1055,6 +1048,7 @@
         'browser/chromeos/login/user_image_manager_browsertest.cc',
         'browser/chromeos/login/user_image_manager_test_util.cc',
         'browser/chromeos/login/user_image_manager_test_util.h',
+        'browser/chromeos/login/wallpaper_manager_policy_browsertest.cc',
         'browser/chromeos/login/wizard_controller_browsertest.cc',
         'browser/chromeos/login/wizard_in_process_browser_test.cc',
         'browser/chromeos/login/wizard_in_process_browser_test.h',
@@ -1145,7 +1139,6 @@
         'browser/extensions/api/management/management_browsertest.cc',
         'browser/extensions/api/mdns/mdns_apitest.cc',
         'browser/extensions/api/media_galleries/media_galleries_apitest.cc',
-        'browser/extensions/api/media_galleries_private/media_galleries_private_apitest.cc',
         'browser/extensions/api/media_galleries_private/media_galleries_watch_apitest.cc',
         'browser/extensions/api/messaging/native_messaging_apitest.cc',
         'browser/extensions/api/metrics_private/metrics_apitest.cc',
@@ -1242,8 +1235,6 @@
         'browser/extensions/extension_startup_browsertest.cc',
         'browser/extensions/extension_storage_apitest.cc',
         'browser/extensions/extension_tabs_apitest.cc',
-        'browser/extensions/extension_test_message_listener.cc',
-        'browser/extensions/extension_test_message_listener.h',
         'browser/extensions/extension_toolbar_model_browsertest.cc',
         'browser/extensions/extension_url_rewrite_browsertest.cc',
         'browser/extensions/extension_view_host_factory_browsertest.cc',
@@ -1883,7 +1874,6 @@
             # for win aura builds.
             # TODO: enable these for win_ash browser tests.
             'browser/chromeos/system/tray_accessibility_browsertest.cc',
-            'browser/ui/ash/accelerator_commands_browsertest.cc',
             'browser/ui/ash/launcher/chrome_launcher_controller_browsertest.cc',
             'browser/ui/ash/launcher/launcher_favicon_loader_browsertest.cc',
             'browser/ui/ash/shelf_browsertest.cc',
@@ -2402,6 +2392,8 @@
         'browser/sync/test/integration/sync_datatype_helper.h',
         'browser/sync/test/integration/sync_extension_helper.cc',
         'browser/sync/test/integration/sync_extension_helper.h',
+        'browser/sync/test/integration/sync_integration_test_util.cc',
+        'browser/sync/test/integration/sync_integration_test_util.h',
         'browser/sync/test/integration/sync_test.cc',
         'browser/sync/test/integration/sync_test.h',
         'browser/sync/test/integration/themes_helper.cc',
@@ -3238,6 +3230,13 @@
           'sources': [
             'tools/service_discovery_sniffer/service_discovery_sniffer.h',
             'tools/service_discovery_sniffer/service_discovery_sniffer.cc',
+          ],
+          'conditions': [
+            ['enable_webrtc==1', {
+              'dependencies': [
+                '../third_party/libjingle/libjingle.gyp:libjingle_webrtc'
+              ]
+            }],
           ],
         }]
     }],

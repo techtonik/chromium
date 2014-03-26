@@ -311,6 +311,27 @@ IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, RestoreForeignSessionInvalidId) {
       browser_), "Invalid session id: \"tag3.0\"."));
 }
 
+IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, RestoreInIncognito) {
+  CreateSessionModels();
+
+  EXPECT_TRUE(MatchPattern(utils::RunFunctionAndReturnError(
+      CreateFunction<SessionsRestoreFunction>(true).get(),
+      "[\"1\"]",
+      CreateIncognitoBrowser()),
+      "Can not restore sessions in incognito mode."));
+}
+
+IN_PROC_BROWSER_TEST_F(ExtensionSessionsTest, GetRecentlyClosedIncognito) {
+  scoped_ptr<base::ListValue> result(utils::ToList(
+      utils::RunFunctionAndReturnSingleResult(
+          CreateFunction<SessionsGetRecentlyClosedFunction>(true).get(),
+          "[]",
+          CreateIncognitoBrowser())));
+  ASSERT_TRUE(result);
+  base::ListValue* sessions = result.get();
+  EXPECT_EQ(0u, sessions->GetSize());
+}
+
 // Flaky on ChromeOS, times out on OSX Debug http://crbug.com/251199
 #if defined(OS_CHROMEOS) || (defined(OS_MACOSX) && !defined(NDEBUG))
 #define MAYBE_SessionsApis DISABLED_SessionsApis

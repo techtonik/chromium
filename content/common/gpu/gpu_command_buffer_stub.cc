@@ -166,7 +166,7 @@ GpuMemoryManager* GpuCommandBufferStub::GetMemoryManager() const {
 }
 
 bool GpuCommandBufferStub::OnMessageReceived(const IPC::Message& message) {
-  devtools_gpu_instrumentation::ScopedGpuTask task(this);
+  devtools_gpu_instrumentation::ScopedGpuTask task(channel());
   FastSetActiveURL(active_url_, active_url_hash_);
 
   // Ensure the appropriate GL context is current before handling any IPC
@@ -687,7 +687,6 @@ void GpuCommandBufferStub::OnRegisterTransferBuffer(
     uint32 size) {
   TRACE_EVENT0("gpu", "GpuCommandBufferStub::OnRegisterTransferBuffer");
   base::SharedMemory shared_memory(transfer_buffer, false);
-
   if (command_buffer_)
     command_buffer_->RegisterTransferBuffer(id, &shared_memory, size);
 }
@@ -707,19 +706,21 @@ void GpuCommandBufferStub::OnGetTransferBuffer(
     base::SharedMemoryHandle transfer_buffer = base::SharedMemoryHandle();
     uint32 size = 0;
 
-    gpu::Buffer buffer = command_buffer_->GetTransferBuffer(id);
-    if (buffer.shared_memory) {
+    scoped_refptr<gpu::Buffer> buffer = command_buffer_->GetTransferBuffer(id);
+    if (buffer && buffer->shared_memory()) {
 #if defined(OS_WIN)
       transfer_buffer = NULL;
-      BrokerDuplicateHandle(buffer.shared_memory->handle(),
-          channel_->renderer_pid(), &transfer_buffer, FILE_MAP_READ |
-          FILE_MAP_WRITE, 0);
+      BrokerDuplicateHandle(buffer->shared_memory()->handle(),
+                            channel_->renderer_pid(),
+                            &transfer_buffer,
+                            FILE_MAP_READ | FILE_MAP_WRITE,
+                            0);
       DCHECK(transfer_buffer != NULL);
 #else
-      buffer.shared_memory->ShareToProcess(channel_->renderer_pid(),
-                                           &transfer_buffer);
+      buffer->shared_memory()->ShareToProcess(channel_->renderer_pid(),
+                                              &transfer_buffer);
 #endif
-      size = buffer.size;
+      size = buffer->size();
     }
 
     GpuCommandBufferMsg_GetTransferBuffer::WriteReplyParams(reply_message,

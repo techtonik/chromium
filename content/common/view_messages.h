@@ -273,8 +273,8 @@ IPC_STRUCT_BEGIN(ViewHostMsg_CreateWindow_Params)
   // has been specified).
   IPC_STRUCT_MEMBER(base::string16, frame_name)
 
-  // The frame identifier of the frame initiating the open.
-  IPC_STRUCT_MEMBER(int64, opener_frame_id)
+  // The routing id of the frame initiating the open.
+  IPC_STRUCT_MEMBER(int, opener_render_frame_id)
 
   // The URL of the frame initiating the open.
   IPC_STRUCT_MEMBER(GURL, opener_url)
@@ -829,12 +829,6 @@ IPC_MESSAGE_ROUTED3(ViewMsg_SetCompositionFromExistingText,
     int /* end */,
     std::vector<blink::WebCompositionUnderline> /* underlines */)
 
-// Selects between the given start and end offsets in the currently focused
-// editable field.
-IPC_MESSAGE_ROUTED2(ViewMsg_SetEditableSelectionOffsets,
-                    int /* start */,
-                    int /* end */)
-
 // Deletes the current selection plus the specified number of characters before
 // and after the selection or caret.
 IPC_MESSAGE_ROUTED2(ViewMsg_ExtendSelectionAndDelete,
@@ -1202,9 +1196,12 @@ IPC_MESSAGE_ROUTED0(ViewHostMsg_UpdateScreenRects_ACK)
 IPC_MESSAGE_ROUTED1(ViewHostMsg_RequestMove,
                     gfx::Rect /* position */)
 
-// Message to show a popup menu using native cocoa controls (Mac only).
+#if defined(OS_MACOSX) || defined(OS_ANDROID)
+// Message to show/hide a popup menu using native controls.
 IPC_MESSAGE_ROUTED1(ViewHostMsg_ShowPopup,
                     ViewHostMsg_ShowPopup_Params)
+IPC_MESSAGE_ROUTED0(ViewHostMsg_HidePopup)
+#endif
 
 // Response from ViewMsg_ScriptEvalRequest. The ID is the parameter supplied
 // to ViewMsg_ScriptEvalRequest. The result has the value returned by the

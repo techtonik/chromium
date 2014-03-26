@@ -25,6 +25,9 @@ namespace ui {
 namespace {
 
 const char kDndSelection[] = "XdndSelection";
+const char kRendererTaint[] = "chromium/x-renderer-taint";
+
+const char kNetscapeURL[] = "_NETSCAPE_URL";
 
 const char* kAtomsToCache[] = {
   kString,
@@ -33,7 +36,9 @@ const char* kAtomsToCache[] = {
   kDndSelection,
   Clipboard::kMimeTypeURIList,
   kMimeTypeMozillaURL,
+  kNetscapeURL,
   Clipboard::kMimeTypeText,
+  kRendererTaint,
   NULL
 };
 
@@ -108,6 +113,18 @@ OSExchangeData::Provider* OSExchangeDataProviderAuraX11::Clone() const {
   return ret;
 }
 
+void OSExchangeDataProviderAuraX11::MarkOriginatedFromRenderer() {
+  std::string empty;
+  format_map_.Insert(atom_cache_.GetAtom(kRendererTaint),
+                     scoped_refptr<base::RefCountedMemory>(
+                         base::RefCountedString::TakeString(&empty)));
+}
+
+bool OSExchangeDataProviderAuraX11::DidOriginateFromRenderer() const {
+  return format_map_.find(atom_cache_.GetAtom(kRendererTaint)) !=
+         format_map_.end();
+}
+
 void OSExchangeDataProviderAuraX11::SetString(const base::string16& text_data) {
   std::string utf8 = base::UTF16ToUTF8(text_data);
   scoped_refptr<base::RefCountedMemory> mem(
@@ -121,8 +138,10 @@ void OSExchangeDataProviderAuraX11::SetString(const base::string16& text_data) {
 
 void OSExchangeDataProviderAuraX11::SetURL(const GURL& url,
                                            const base::string16& title) {
-  // Mozilla's URL format: (UTF16: URL, newline, title)
+  // TODO(dcheng): The original GTK code tries very hard to avoid writing out an
+  // empty title. Is this necessary?
   if (url.is_valid()) {
+    // Mozilla's URL format: (UTF16: URL, newline, title)
     base::string16 spec = base::UTF8ToUTF16(url.spec());
 
     std::vector<unsigned char> data;
@@ -134,6 +153,18 @@ void OSExchangeDataProviderAuraX11::SetURL(const GURL& url,
 
     format_map_.Insert(atom_cache_.GetAtom(kMimeTypeMozillaURL), mem);
 
+    // Set _NETSCAPE_URL as well, since some file managers like Nautilus use it
+    // to create a link to the URL. Setting text/uri-list doesn't work as well,
+    // because Nautilus tries to fetch the contents of the URL instead.
+    // Format is UTF8: URL + "\n" + title.
+    std::string netscape_url = url.spec();
+    netscape_url += "\n";
+    netscape_url += base::UTF16ToUTF8(title);
+    format_map_.Insert(atom_cache_.GetAtom(kNetscapeURL),
+                       scoped_refptr<base::RefCountedMemory>(
+                           base::RefCountedString::TakeString(&netscape_url)));
+
+    // And finally a string fallback as well.
     SetString(spec);
   }
 }

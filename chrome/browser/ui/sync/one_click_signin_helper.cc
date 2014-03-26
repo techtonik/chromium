@@ -61,10 +61,10 @@
 #include "chrome/common/url_constants.h"
 #include "components/autofill/core/common/password_form.h"
 #include "components/password_manager/core/browser/password_manager.h"
-#include "components/signin/core/profile_oauth2_token_service.h"
-#include "components/signin/core/signin_client.h"
-#include "components/signin/core/signin_error_controller.h"
-#include "components/signin/core/signin_manager_cookie_helper.h"
+#include "components/signin/core/browser/profile_oauth2_token_service.h"
+#include "components/signin/core/browser/signin_client.h"
+#include "components/signin/core/browser/signin_error_controller.h"
+#include "components/signin/core/browser/signin_manager_cookie_helper.h"
 #include "components/sync_driver/sync_prefs.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/navigation_entry.h"
@@ -253,7 +253,7 @@ void StartSync(const OneClickSigninHelper::StartSyncArgs& args,
     return;
   }
 
-  // The wrapper deletes itself once its done.
+  // The wrapper deletes itself once it's done.
   OneClickSigninHelper::SyncStarterWrapper* wrapper =
       new OneClickSigninHelper::SyncStarterWrapper(args, start_mode);
   wrapper->Start();
@@ -331,10 +331,10 @@ void ClearPendingEmailOnIOThread(content::ResourceContext* context) {
   io_data->set_reverse_autologin_pending_email(std::string());
 }
 
-// Determines the source of the sign in and the continue URL.  Its either one
-// of the known sign in access point (first run, NTP, Apps page, menu, settings)
-// or its an implicit sign in via another Google property.  In the former case,
-// "service" is also checked to make sure its "chromiumsync".
+// Determines the source of the sign in and the continue URL.  It's either one
+// of the known sign-in access points (first run, NTP, Apps page, menu, or
+// settings) or it's an implicit sign in via another Google property.  In the
+// former case, "service" is also checked to make sure its "chromiumsync".
 signin::Source GetSigninSource(const GURL& url, GURL* continue_url) {
   DCHECK(url.is_valid());
   std::string value;
@@ -662,7 +662,7 @@ void
 OneClickSigninHelper::SyncStarterWrapper::StartOneClickSigninSyncStarter(
     const std::string& email,
     const std::string& refresh_token) {
-  // The starter deletes itself once its done.
+  // The starter deletes itself once it's done.
   new OneClickSigninSyncStarter(args_.profile, args_.browser,
                                 email, args_.password,
                                 refresh_token, start_mode_,
@@ -903,7 +903,7 @@ OneClickSigninHelper::Offer OneClickSigninHelper::CanOfferOnIOThreadImpl(
   if (io_data->IsOffTheRecord())
     return DONT_OFFER;
 
-  if (!SigninManager::IsSigninAllowedOnIOThread(io_data))
+  if (!io_data->signin_allowed()->GetValue())
     return DONT_OFFER;
 
   if (!io_data->reverse_autologin_enabled()->GetValue())

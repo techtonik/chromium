@@ -15,9 +15,6 @@ const char kAppOemManifestFile[]            = "app-mode-oem-manifest";
 // Possible values: parallel|postpone. Default: parallel.
 const char kAshWebUIInit[]                  = "ash-webui-init";
 
-// Enables overriding the path for the default authentication extension.
-const char kAuthExtensionPath[]             = "auth-ext-path";
-
 // Forces the stub implementation of dbus clients.
 const char kDbusStub[] = "dbus-stub";
 
@@ -156,6 +153,9 @@ const char kOobeSkipPostLogin[]             = "oobe-skip-postlogin";
 
 // Interval at which we check for total time on OOBE.
 const char kOobeTimerInterval[]             = "oobe-timer-interval";
+
+// Indicates that a guest session has been started before OOBE completion.
+const char kOobeGuestSession[]              = "oobe-guest-session";
 
 // Specifies power stub behavior:
 //  'cycle=2' - Cycles power states every 2 seconds.

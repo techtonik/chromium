@@ -474,10 +474,6 @@ bool RenderWidgetHostImpl::OnMessageReceived(const IPC::Message &msg) {
                         OnUpdateScreenRectsAck)
     IPC_MESSAGE_HANDLER(ViewHostMsg_RequestMove, OnRequestMove)
     IPC_MESSAGE_HANDLER(ViewHostMsg_SetTooltipText, OnSetTooltipText)
-#if defined(OS_MACOSX)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_CompositorSurfaceBuffersSwapped,
-                        OnCompositorSurfaceBuffersSwapped)
-#endif
     IPC_MESSAGE_HANDLER_GENERIC(ViewHostMsg_SwapCompositorFrame,
                                 msg_is_ok = OnSwapCompositorFrame(msg))
     IPC_MESSAGE_HANDLER(ViewHostMsg_DidOverscroll, OnOverscrolled)
@@ -497,13 +493,20 @@ bool RenderWidgetHostImpl::OnMessageReceived(const IPC::Message &msg) {
     IPC_MESSAGE_HANDLER(ViewHostMsg_UnlockMouse, OnUnlockMouse)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ShowDisambiguationPopup,
                         OnShowDisambiguationPopup)
+    IPC_MESSAGE_HANDLER(ViewHostMsg_SelectionChanged, OnSelectionChanged)
+    IPC_MESSAGE_HANDLER(ViewHostMsg_SelectionBoundsChanged,
+                        OnSelectionBoundsChanged)
+    IPC_MESSAGE_HANDLER(ViewHostMsg_Snapshot, OnSnapshot)
 #if defined(OS_WIN)
     IPC_MESSAGE_HANDLER(ViewHostMsg_WindowlessPluginDummyWindowCreated,
                         OnWindowlessPluginDummyWindowCreated)
     IPC_MESSAGE_HANDLER(ViewHostMsg_WindowlessPluginDummyWindowDestroyed,
                         OnWindowlessPluginDummyWindowDestroyed)
 #endif
-    IPC_MESSAGE_HANDLER(ViewHostMsg_Snapshot, OnSnapshot)
+#if defined(OS_MACOSX)
+    IPC_MESSAGE_HANDLER(ViewHostMsg_CompositorSurfaceBuffersSwapped,
+                        OnCompositorSurfaceBuffersSwapped)
+#endif
 #if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ImeCompositionRangeChanged,
                         OnImeCompositionRangeChanged)
@@ -784,6 +787,22 @@ bool RenderWidgetHostImpl::CopyFromBackingStoreToCGContext(
   return true;
 }
 #endif
+
+void RenderWidgetHostImpl::PauseForPendingResizeOrRepaints() {
+  TRACE_EVENT0("browser",
+      "RenderWidgetHostImpl::PauseForPendingResizeOrRepaints");
+
+  // Do not pause if the view is hidden.
+  if (is_hidden())
+    return;
+
+  // Do not pause if there is not a paint or resize already coming.
+  if (!repaint_ack_pending_ && !resize_ack_pending_ && !view_being_painted_)
+    return;
+
+  // Waiting for a backing store will do the wait for us.
+  ignore_result(GetBackingStore(true));
+}
 
 bool RenderWidgetHostImpl::TryGetBackingStore(const gfx::Size& desired_size,
                                               BackingStore** backing_store) {
@@ -1233,6 +1252,20 @@ void RenderWidgetHostImpl::GetSnapshotFromRenderer(
 
   gfx::Rect copy_rect_in_pixel = ConvertViewRectToPixel(view_, copy_rect);
   Send(new ViewMsg_Snapshot(GetRoutingID(), copy_rect_in_pixel));
+}
+
+void RenderWidgetHostImpl::OnSelectionChanged(const base::string16& text,
+                                              size_t offset,
+                                              const gfx::Range& range) {
+  if (view_)
+    view_->SelectionChanged(text, offset, range);
+}
+
+void RenderWidgetHostImpl::OnSelectionBoundsChanged(
+    const ViewHostMsg_SelectionBounds_Params& params) {
+  if (view_) {
+    view_->SelectionBoundsChanged(params);
+  }
 }
 
 void RenderWidgetHostImpl::OnSnapshot(bool success,
@@ -2224,51 +2257,8 @@ void RenderWidgetHostImpl::ScrollFocusedEditableNodeIntoRect(
   Send(new InputMsg_ScrollFocusedEditableNodeIntoRect(GetRoutingID(), rect));
 }
 
-void RenderWidgetHostImpl::SelectRange(const gfx::Point& start,
-                                       const gfx::Point& end) {
-  Send(new InputMsg_SelectRange(GetRoutingID(), start, end));
-}
-
 void RenderWidgetHostImpl::MoveCaret(const gfx::Point& point) {
   Send(new InputMsg_MoveCaret(GetRoutingID(), point));
-}
-
-void RenderWidgetHostImpl::Undo() {
-  Send(new InputMsg_Undo(GetRoutingID()));
-  RecordAction(base::UserMetricsAction("Undo"));
-}
-
-void RenderWidgetHostImpl::Redo() {
-  Send(new InputMsg_Redo(GetRoutingID()));
-  RecordAction(base::UserMetricsAction("Redo"));
-}
-
-void RenderWidgetHostImpl::CopyToFindPboard() {
-#if defined(OS_MACOSX)
-  // Windows/Linux don't have the concept of a find pasteboard.
-  Send(new InputMsg_CopyToFindPboard(GetRoutingID()));
-  RecordAction(base::UserMetricsAction("CopyToFindPboard"));
-#endif
-}
-
-void RenderWidgetHostImpl::PasteAndMatchStyle() {
-  Send(new InputMsg_PasteAndMatchStyle(GetRoutingID()));
-  RecordAction(base::UserMetricsAction("PasteAndMatchStyle"));
-}
-
-void RenderWidgetHostImpl::Delete() {
-  Send(new InputMsg_Delete(GetRoutingID()));
-  RecordAction(base::UserMetricsAction("DeleteSelection"));
-}
-
-void RenderWidgetHostImpl::SelectAll() {
-  Send(new InputMsg_SelectAll(GetRoutingID()));
-  RecordAction(base::UserMetricsAction("SelectAll"));
-}
-
-void RenderWidgetHostImpl::Unselect() {
-  Send(new InputMsg_Unselect(GetRoutingID()));
-  RecordAction(base::UserMetricsAction("Unselect"));
 }
 
 bool RenderWidgetHostImpl::GotResponseToLockMouseRequest(bool allowed) {

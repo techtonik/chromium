@@ -13,7 +13,6 @@
 
 #include "base/compiler_specific.h"
 #include "base/time/time.h"
-#include "ui/gfx/native_widget_types.h"
 #include "ui/gfx/size.h"
 #include "ui/gfx/vsync_provider.h"
 #include "ui/gl/gl_bindings.h"
@@ -50,7 +49,7 @@ class GL_EXPORT GLSurfaceEGL : public GLSurface {
 // Encapsulates an EGL surface bound to a view.
 class GL_EXPORT NativeViewGLSurfaceEGL : public GLSurfaceEGL {
  public:
-  explicit NativeViewGLSurfaceEGL(gfx::AcceleratedWidget window);
+  explicit NativeViewGLSurfaceEGL(EGLNativeWindowType window);
 
   // Implement GLSurface.
   virtual EGLConfig GetConfig() OVERRIDE;
@@ -62,7 +61,7 @@ class GL_EXPORT NativeViewGLSurfaceEGL : public GLSurfaceEGL {
   virtual bool SwapBuffers() OVERRIDE;
   virtual gfx::Size GetSize() OVERRIDE;
   virtual EGLSurface GetHandle() OVERRIDE;
-  virtual std::string GetExtensions() OVERRIDE;
+  virtual bool SupportsPostSubBuffer() OVERRIDE;
   virtual bool PostSubBuffer(int x, int y, int width, int height) OVERRIDE;
   virtual VSyncProvider* GetVSyncProvider() OVERRIDE;
 
@@ -75,7 +74,7 @@ class GL_EXPORT NativeViewGLSurfaceEGL : public GLSurfaceEGL {
   void SetHandle(EGLSurface surface);
 
  private:
-  gfx::AcceleratedWidget window_;
+  EGLNativeWindowType window_;
   EGLSurface surface_;
   bool supports_post_sub_buffer_;
   EGLConfig config_;

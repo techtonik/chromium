@@ -367,9 +367,10 @@ class RenderWidgetHostViewMac : public RenderWidgetHostViewBase,
                              const std::vector<ui::LatencyInfo>& latency_info);
 
   // Draw the IOSurface by making its context current to this view.
-  bool DrawIOSurfaceWithoutCoreAnimation();
+  void DrawIOSurfaceWithoutCoreAnimation();
 
-  // Called when a GPU error is detected. Deletes all compositing state.
+  // Called when a GPU error is detected. Posts a task to destroy all
+  // compositing state.
   void GotAcceleratedCompositingError();
 
   // Sets the overlay view, which should be drawn in the same IOSurface
@@ -415,25 +416,8 @@ class RenderWidgetHostViewMac : public RenderWidgetHostViewBase,
   // someone (other than superview) has retained |cocoa_view_|.
   RenderWidgetHostImpl* render_widget_host_;
 
-  // This is true when we are currently painting. In the legacy renderer, this
-  // means we should handle extra paint requests by expanding the invalid rect
-  // rather than actually painting. In hardware compositing it means that we
-  // are inside a draw callback and should not wait for frames to draw before
-  // acknowledging them.
-  bool about_to_validate_and_paint_;
-
-  // This is true when we have already scheduled a call to
-  // |-callSetNeedsDisplayInRect:| but it has not been fulfilled yet.  Used to
-  // prevent us from scheduling multiple calls.
-  bool call_set_needs_display_in_rect_pending_;
-
   // Whether last rendered frame was accelerated.
   bool last_frame_was_accelerated_;
-
-  // The invalid rect that needs to be painted by callSetNeedsDisplayInRect.
-  // This value is only meaningful when
-  // |call_set_needs_display_in_rect_pending_| is true.
-  NSRect invalid_rect_;
 
   // The time at which this view started displaying white pixels as a result of
   // not having anything to paint (empty backing store from renderer). This
@@ -522,6 +506,8 @@ class RenderWidgetHostViewMac : public RenderWidgetHostViewBase,
 
   void SendPendingSwapAck();
 
+  void PauseForPendingResizeOrRepaintsAndDraw();
+
  private:
   friend class RenderWidgetHostView;
   friend class RenderWidgetHostViewMacTest;
@@ -550,11 +536,11 @@ class RenderWidgetHostViewMac : public RenderWidgetHostViewBase,
   // invoke it from the message loop.
   void ShutdownHost();
 
-  void CreateSoftwareLayer();
+  void EnsureSoftwareLayer();
   void DestroySoftwareLayer();
 
-  bool CreateCompositedIOSurface();
-  bool CreateCompositedIOSurfaceLayer();
+  bool EnsureCompositedIOSurface() WARN_UNUSED_RESULT;
+  void EnsureCompositedIOSurfaceLayer();
   enum DestroyContextBehavior {
     kLeaveContextBoundToView,
     kDestroyContext,
@@ -562,6 +548,8 @@ class RenderWidgetHostViewMac : public RenderWidgetHostViewBase,
   void DestroyCompositedIOSurfaceLayer();
   void DestroyCompositedIOSurfaceAndLayer(DestroyContextBehavior
       destroy_context_behavior);
+
+  void DestroyCompositingStateOnError();
 
   // Unbind the GL context (if any) that is bound to |cocoa_view_|.
   void ClearBoundContextDrawable();

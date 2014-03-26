@@ -5,15 +5,16 @@
 #include "chrome/browser/managed_mode/managed_user_signin_manager_wrapper.h"
 
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/signin/signin_manager_base.h"
+#include "components/signin/core/browser/signin_manager_base.h"
 
 #if defined(ENABLE_MANAGED_USERS)
 #include "chrome/browser/managed_mode/managed_user_constants.h"
 #endif
 
 ManagedUserSigninManagerWrapper::ManagedUserSigninManagerWrapper(
-    SigninManagerBase* original) : original_(original) {
-}
+    Profile* profile,
+    SigninManagerBase* original)
+    : profile_(profile), original_(original) {}
 
 ManagedUserSigninManagerWrapper::~ManagedUserSigninManagerWrapper() {
 }
@@ -23,7 +24,7 @@ SigninManagerBase* ManagedUserSigninManagerWrapper::GetOriginal() {
 }
 
 std::string ManagedUserSigninManagerWrapper::GetEffectiveUsername() const {
-  if (original_->profile()->IsManaged()) {
+  if (profile_->IsManaged()) {
 #if defined(ENABLE_MANAGED_USERS)
     DCHECK_EQ(std::string(), original_->GetAuthenticatedUsername());
     return managed_users::kManagedUserPseudoEmail;
@@ -36,7 +37,7 @@ std::string ManagedUserSigninManagerWrapper::GetEffectiveUsername() const {
 }
 
 std::string ManagedUserSigninManagerWrapper::GetAccountIdToUse() const {
-  if (original_->profile()->IsManaged()) {
+  if (profile_->IsManaged()) {
 #if defined(ENABLE_MANAGED_USERS)
     return managed_users::kManagedUserPseudoEmail;
 #else

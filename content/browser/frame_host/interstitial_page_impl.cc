@@ -77,6 +77,7 @@ class InterstitialPageImpl::InterstitialPageRVHDelegateView
   explicit InterstitialPageRVHDelegateView(InterstitialPageImpl* page);
 
   // RenderViewHostDelegateView implementation:
+#if defined(OS_MACOSX) || defined(OS_ANDROID)
   virtual void ShowPopupMenu(const gfx::Rect& bounds,
                              int item_height,
                              double item_font_size,
@@ -84,6 +85,8 @@ class InterstitialPageImpl::InterstitialPageRVHDelegateView
                              const std::vector<MenuItem>& items,
                              bool right_aligned,
                              bool allow_multiple_selection) OVERRIDE;
+  virtual void HidePopupMenu() OVERRIDE;
+#endif
   virtual void StartDragging(const DropData& drop_data,
                              WebDragOperationsMask operations_allowed,
                              const gfx::ImageSkia& image,
@@ -846,6 +849,7 @@ InterstitialPageImpl::InterstitialPageRVHDelegateView::
     : interstitial_page_(page) {
 }
 
+#if defined(OS_MACOSX) || defined(OS_ANDROID)
 void InterstitialPageImpl::InterstitialPageRVHDelegateView::ShowPopupMenu(
     const gfx::Rect& bounds,
     int item_height,
@@ -856,6 +860,11 @@ void InterstitialPageImpl::InterstitialPageRVHDelegateView::ShowPopupMenu(
     bool allow_multiple_selection) {
   NOTREACHED() << "InterstitialPage does not support showing popup menus.";
 }
+
+void InterstitialPageImpl::InterstitialPageRVHDelegateView::HidePopupMenu() {
+  NOTREACHED() << "InterstitialPage does not support showing popup menus.";
+}
+#endif
 
 void InterstitialPageImpl::InterstitialPageRVHDelegateView::StartDragging(
     const DropData& drop_data,

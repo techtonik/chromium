@@ -47,15 +47,11 @@
 #include "third_party/WebKit/public/platform/WebScreenInfo.h"
 #include "third_party/WebKit/public/web/WebCompositionUnderline.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
-#include "ui/aura/client/activation_client.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/client/cursor_client.h"
 #include "ui/aura/client/cursor_client_observer.h"
 #include "ui/aura/client/focus_client.h"
-#include "ui/aura/client/scoped_tooltip_disabler.h"
 #include "ui/aura/client/screen_position_client.h"
-#include "ui/aura/client/tooltip_client.h"
-#include "ui/aura/client/transient_window_client.h"
 #include "ui/aura/client/window_tree_client.h"
 #include "ui/aura/env.h"
 #include "ui/aura/window.h"
@@ -78,6 +74,10 @@
 #include "ui/gfx/screen.h"
 #include "ui/gfx/size_conversions.h"
 #include "ui/gfx/skia_util.h"
+#include "ui/wm/public/activation_client.h"
+#include "ui/wm/public/scoped_tooltip_disabler.h"
+#include "ui/wm/public/tooltip_client.h"
+#include "ui/wm/public/transient_window_client.h"
 #include "ui/wm/public/window_types.h"
 
 #if defined(OS_WIN)
@@ -448,7 +448,8 @@ class RenderWidgetHostViewAura::WindowObserver : public aura::WindowObserver {
       view_->AddedToRootWindow();
   }
 
-  virtual void OnWindowRemovingFromRootWindow(aura::Window* window) OVERRIDE {
+  virtual void OnWindowRemovingFromRootWindow(aura::Window* window,
+                                              aura::Window* new_root) OVERRIDE {
     if (window == view_->window_)
       view_->RemovingFromRootWindow();
   }

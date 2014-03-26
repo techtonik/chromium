@@ -709,12 +709,6 @@ void RenderProcessHostImpl::CreateMessageFilters() {
   AddFilter(new IndexedDBDispatcherHost(
       storage_partition_impl_->GetIndexedDBContext()));
 
-  scoped_refptr<ServiceWorkerDispatcherHost> service_worker_filter =
-      new ServiceWorkerDispatcherHost(GetID());
-  service_worker_filter->Init(
-      storage_partition_impl_->GetServiceWorkerContext());
-  AddFilter(service_worker_filter);
-
   if (IsGuest()) {
     if (!g_browser_plugin_geolocation_context.Get().get()) {
       g_browser_plugin_geolocation_context.Get() =
@@ -738,8 +732,8 @@ void RenderProcessHostImpl::CreateMessageFilters() {
       GetID(),
       browser_context->GetResourceContext()->GetMediaDeviceIDSalt(),
       media_stream_manager));
-  AddFilter(
-      new DeviceRequestMessageFilter(resource_context, media_stream_manager));
+  AddFilter(new DeviceRequestMessageFilter(
+      resource_context, media_stream_manager, GetID()));
   AddFilter(new MediaStreamTrackMetricsHost());
 #endif
 #if defined(ENABLE_PLUGINS)
@@ -764,7 +758,9 @@ void RenderProcessHostImpl::CreateMessageFilters() {
 #if defined(OS_MACOSX)
   AddFilter(new TextInputClientMessageFilter(GetID()));
 #elif defined(OS_WIN)
-  channel_->AddFilter(new FontCacheDispatcher());
+  // The FontCacheDispatcher is required only when we're using GDI rendering.
+  if (!ShouldUseDirectWrite())
+    channel_->AddFilter(new FontCacheDispatcher());
 #elif defined(OS_ANDROID)
   browser_demuxer_android_ = new BrowserDemuxerAndroid();
   AddFilter(browser_demuxer_android_);
@@ -791,6 +787,12 @@ void RenderProcessHostImpl::CreateMessageFilters() {
       base::Bind(&RenderWidgetHelper::GetNextRoutingID,
                  base::Unretained(widget_helper_.get())));
   AddFilter(message_port_message_filter_);
+
+  scoped_refptr<ServiceWorkerDispatcherHost> service_worker_filter =
+      new ServiceWorkerDispatcherHost(GetID(), message_port_message_filter_);
+  service_worker_filter->Init(
+      storage_partition_impl_->GetServiceWorkerContext());
+  AddFilter(service_worker_filter);
 
   // If "--enable-embedded-shared-worker" is set, we use
   // SharedWorkerMessageFilter in stead of WorkerMessageFilter.
@@ -966,13 +968,16 @@ StoragePartition* RenderProcessHostImpl::GetStoragePartition() const {
 }
 
 static void AppendGpuCommandLineFlags(CommandLine* command_line) {
-  if (content::IsThreadedCompositingEnabled())
+  if (IsThreadedCompositingEnabled())
     command_line->AppendSwitch(switches::kEnableThreadedCompositing);
 
-  if (content::IsDelegatedRendererEnabled())
+  if (IsForceCompositingModeEnabled())
+    command_line->AppendSwitch(switches::kForceCompositingMode);
+
+  if (IsDelegatedRendererEnabled())
     command_line->AppendSwitch(switches::kEnableDelegatedRenderer);
 
-  if (content::IsImplSidePaintingEnabled())
+  if (IsImplSidePaintingEnabled())
     command_line->AppendSwitch(switches::kEnableImplSidePainting);
 
   // Appending disable-gpu-feature switches due to software rendering list.
@@ -1038,9 +1043,9 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableCompositingForFixedPosition,
     switches::kDisableCompositingForTransition,
     switches::kDisableDatabases,
-    switches::kDisableDelegatedRenderer,
     switches::kDisableDesktopNotifications,
     switches::kDisableDirectNPAPIRequests,
+    switches::kDisableFastTextAutosizing,
     switches::kDisableFileSystem,
     switches::kDisableFiltersOverIPC,
     switches::kDisableGpu,
@@ -1049,7 +1054,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableGpuVsync,
     switches::kDisableLowResTiling,
     switches::kDisableHistogramCustomizer,
-    switches::kDisableImplSidePainting,
     switches::kDisableLCDText,
     switches::kDisableLayerSquashing,
     switches::kDisableLocalStorage,
@@ -1063,7 +1067,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableSessionStorage,
     switches::kDisableSharedWorkers,
     switches::kDisableSpeechInput,
-    switches::kDisableThreadedCompositing,
     switches::kDisableTouchAdjustment,
     switches::kDisableTouchDragDrop,
     switches::kDisableTouchEditing,
@@ -1081,7 +1084,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableCompositingForFixedPosition,
     switches::kEnableCompositingForTransition,
     switches::kEnableDeferredImageDecoding,
-    switches::kEnableDelegatedRenderer,
     switches::kEnableEncryptedMedia,
     switches::kEnableExperimentalCanvasFeatures,
     switches::kEnableExperimentalWebPlatformFeatures,
@@ -1094,12 +1096,10 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableHighDpiCompositingForFixedPosition,
     switches::kEnableHTMLImports,
     switches::kEnableLowResTiling,
-    switches::kEnableImplSidePainting,
     switches::kEnableInbandTextTracks,
     switches::kEnableLCDText,
     switches::kEnableLayerSquashing,
     switches::kEnableLogging,
-    switches::kEnableMP3StreamParser,
     switches::kEnableMapImage,
     switches::kEnableMemoryBenchmarking,
     switches::kEnableOverlayFullscreenVideo,
@@ -1115,7 +1115,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableStatsTable,
     switches::kEnableStrictSiteIsolation,
     switches::kEnableTargetedStyleRecalc,
-    switches::kEnableThreadedCompositing,
     switches::kEnableUniversalAcceleratedOverflowScroll,
     switches::kEnableTouchDragDrop,
     switches::kEnableTouchEditing,
@@ -1223,7 +1222,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kChildCleanExit,
 #endif
 #if defined(OS_WIN)
-    switches::kEnableDirectWrite,
     switches::kEnableHighResolutionTime,
     switches::kHighDPISupport,
 #endif

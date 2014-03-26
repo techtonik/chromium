@@ -35,6 +35,7 @@
 #include "chrome/browser/extensions/api/web_request/web_request_api.h"
 #include "chrome/browser/extensions/browser_permissions_policy_delegate.h"
 #include "chrome/browser/extensions/extension_service.h"
+#include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/extension_web_ui.h"
 #include "chrome/browser/extensions/extension_webkit_preferences.h"
 #include "chrome/browser/extensions/suggest_permission_util.h"
@@ -90,7 +91,6 @@
 #include "chrome/common/env_vars.h"
 #include "chrome/common/extensions/extension_process_policy.h"
 #include "chrome/common/extensions/manifest_handlers/app_isolation_info.h"
-#include "chrome/common/extensions/permissions/socket_permission.h"
 #include "chrome/common/logging_chrome.h"
 #include "chrome/common/pepper_permission_util.h"
 #include "chrome/common/pref_names.h"
@@ -138,6 +138,7 @@
 #include "extensions/common/manifest_handlers/shared_module_info.h"
 #include "extensions/common/manifest_handlers/web_accessible_resources_info.h"
 #include "extensions/common/permissions/permissions_data.h"
+#include "extensions/common/permissions/socket_permission.h"
 #include "extensions/common/switches.h"
 #include "grit/generated_resources.h"
 #include "grit/ui_resources.h"
@@ -785,18 +786,8 @@ void ChromeContentBrowserClient::GetStoragePartitionConfigForSite(
     // ExtensionService.
     bool is_isolated = !can_be_default;
     if (can_be_default) {
-      const Extension* extension = NULL;
-      Profile* profile = Profile::FromBrowserContext(browser_context);
-      ExtensionService* extension_service =
-          extensions::ExtensionSystem::Get(profile)->extension_service();
-      if (extension_service) {
-        extension =
-            extension_service->extensions()->GetExtensionOrAppByURL(site);
-        if (extension &&
-            extensions::AppIsolationInfo::HasIsolatedStorage(extension)) {
-          is_isolated = true;
-        }
-      }
+      if (extensions::util::SiteHasIsolatedStorage(site, browser_context))
+        is_isolated = true;
     }
 
     if (is_isolated) {
@@ -1567,7 +1558,6 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
       autofill::switches::kLocalHeuristicsOnlyForPasswordGeneration,
       extensions::switches::kAllowHTTPBackgroundPage,
       extensions::switches::kAllowLegacyExtensionManifests,
-      extensions::switches::kAllowScriptingGallery,
       extensions::switches::kEnableExperimentalExtensionApis,
       extensions::switches::kExtensionsOnChromeURLs,
       // TODO(victorhsieh): remove the following flag once we move PPAPI FileIO

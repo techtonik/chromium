@@ -27,10 +27,10 @@ class QuicCryptoClientStreamTest : public ::testing::Test {
  public:
   QuicCryptoClientStreamTest()
       : connection_(new PacketSavingConnection(false)),
-        session_(new TestSession(connection_, DefaultQuicConfig())),
-        server_key_(kServerHostname, kServerPort, false),
-        stream_(new QuicCryptoClientStream(server_key_, session_.get(), NULL,
-                                           &crypto_config_)) {
+        session_(new TestClientSession(connection_, DefaultQuicConfig())),
+        server_key_(kServerHostname, kServerPort, false, kPrivacyModeDisabled),
+        stream_(new QuicCryptoClientStream(
+            server_key_, session_.get(), NULL, &crypto_config_)) {
     session_->SetCryptoStream(stream_.get());
     session_->config()->SetDefaults();
     crypto_config_.SetDefaults();
@@ -47,7 +47,7 @@ class QuicCryptoClientStreamTest : public ::testing::Test {
   }
 
   PacketSavingConnection* connection_;
-  scoped_ptr<TestSession> session_;
+  scoped_ptr<TestClientSession> session_;
   QuicSessionKey server_key_;
   scoped_ptr<QuicCryptoClientStream> stream_;
   CryptoHandshakeMessage message_;
@@ -106,7 +106,7 @@ TEST_F(QuicCryptoClientStreamTest, NegotiatedParameters) {
 }
 
 TEST_F(QuicCryptoClientStreamTest, InvalidHostname) {
-  QuicSessionKey server_key("invalid", 80, false);
+  QuicSessionKey server_key("invalid", 80, false, kPrivacyModeDisabled);
   stream_.reset(new QuicCryptoClientStream(server_key, session_.get(), NULL,
                                            &crypto_config_));
   session_->SetCryptoStream(stream_.get());
@@ -121,7 +121,7 @@ TEST_F(QuicCryptoClientStreamTest, ExpiredServerConfig) {
   CompleteCryptoHandshake();
 
   connection_ = new PacketSavingConnection(true);
-  session_.reset(new TestSession(connection_, DefaultQuicConfig()));
+  session_.reset(new TestClientSession(connection_, DefaultQuicConfig()));
   stream_.reset(new QuicCryptoClientStream(server_key_, session_.get(), NULL,
                                            &crypto_config_));
 

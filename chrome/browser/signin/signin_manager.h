@@ -17,7 +17,7 @@
 
 #if defined(OS_CHROMEOS)
 // On Chrome OS, SigninManagerBase is all that exists.
-#include "chrome/browser/signin/signin_manager_base.h"
+#include "components/signin/core/browser/signin_manager_base.h"
 
 #else
 
@@ -32,16 +32,14 @@
 #include "base/prefs/pref_change_registrar.h"
 #include "base/prefs/pref_member.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/signin/signin_internals_util.h"
-#include "chrome/browser/signin/signin_manager_base.h"
 #include "components/keyed_service/core/keyed_service.h"
+#include "components/signin/core/browser/signin_internals_util.h"
+#include "components/signin/core/browser/signin_manager_base.h"
 #include "content/public/browser/render_process_host_observer.h"
 #include "google_apis/gaia/google_service_auth_error.h"
 #include "google_apis/gaia/merge_session_helper.h"
 #include "net/cookies/canonical_cookie.h"
 
-class CookieSettings;
-class ProfileIOData;
 class PrefService;
 class SigninAccountIdHelper;
 class SigninClient;
@@ -135,11 +133,6 @@ class SigninManager : public SigninManagerBase,
   // ignored).
   bool IsSignoutProhibited() const;
 
-  // Checks if signin is allowed for the profile that owns |io_data|. This must
-  // be invoked on the IO thread, and can be used to check if signin is enabled
-  // on that thread.
-  static bool IsSigninAllowedOnIOThread(ProfileIOData* io_data);
-
   // Allows the SigninManager to track the privileged signin process
   // identified by |host_id| so that we can later ask (via IsSigninProcess)
   // if it is safe to sign the user in from the current context (see
@@ -157,6 +150,10 @@ class SigninManager : public SigninManagerBase,
   void RemoveMergeSessionObserver(MergeSessionHelper::Observer* observer);
 
  protected:
+  // Pointer to parent profile (protected so FakeSigninManager can access
+  // it).
+  Profile* profile_;
+
   // Flag saying whether signing out is allowed.
   bool prohibit_signout_;
 

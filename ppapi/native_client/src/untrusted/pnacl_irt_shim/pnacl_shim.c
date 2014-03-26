@@ -190,7 +190,7 @@ static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_Testing_Private_1_0;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_UDPSocket_Private_0_2;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_UDPSocket_Private_0_3;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_UDPSocket_Private_0_4;
-static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_UMA_Private_0_2;
+static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_UMA_Private_0_3;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_VideoDestination_Private_0_1;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_VideoSource_Private_0_1;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_X509Certificate_Private_0_1;
@@ -2020,8 +2020,6 @@ static int32_t Pnacl_M19_PPB_FileChooser_Dev_Show(PP_Resource chooser, struct PP
 
 /* End wrapper methods for PPB_FileChooser_Dev_0_6 */
 
-/* Not generating wrapper methods for PPB_Find_Dev_0_3 */
-
 /* Begin wrapper methods for PPB_Font_Dev_0_6 */
 
 static void Pnacl_M14_PPB_Font_Dev_GetFontFamilies(struct PP_Var* _struct_result, PP_Instance instance) {
@@ -2402,8 +2400,6 @@ static void Pnacl_M14_PPB_VideoDecoder_Dev_Destroy(PP_Resource video_decoder) {
 
 /* Not generating wrapper methods for PPB_Zoom_Dev_0_2 */
 
-/* Not generating wrapper methods for PPP_Find_Dev_0_3 */
-
 /* Not generating wrapper methods for PPP_NetworkState_Dev_0_1 */
 
 /* Not generating wrapper methods for PPP_Printing_Dev_0_6 */
@@ -2544,6 +2540,8 @@ static void Pnacl_M15_PPB_FileRefPrivate_GetAbsolutePath(struct PP_Var* _struct_
 }
 
 /* End wrapper methods for PPB_FileRefPrivate_0_1 */
+
+/* Not generating wrapper methods for PPB_Find_Private_0_3 */
 
 /* Begin wrapper methods for PPB_Flash_12_4 */
 
@@ -3166,6 +3164,11 @@ static void Pnacl_M25_PPB_NaCl_Private_SetReadOnlyProperty(PP_Instance instance,
 static void Pnacl_M25_PPB_NaCl_Private_ReportLoadError(PP_Instance instance, PP_NaClError error, const char* error_message, const char* console_message, PP_Bool is_installed) {
   const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
   iface->ReportLoadError(instance, error, error_message, console_message, is_installed);
+}
+
+static void Pnacl_M25_PPB_NaCl_Private_InstanceCreated(PP_Instance instance) {
+  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
+  iface->InstanceCreated(instance);
 }
 
 static void Pnacl_M25_PPB_NaCl_Private_InstanceDestroyed(PP_Instance instance) {
@@ -3839,24 +3842,29 @@ static void Pnacl_M23_PPB_UDPSocket_Private_Close(PP_Resource udp_socket) {
 
 /* End wrapper methods for PPB_UDPSocket_Private_0_4 */
 
-/* Begin wrapper methods for PPB_UMA_Private_0_2 */
+/* Begin wrapper methods for PPB_UMA_Private_0_3 */
 
-static void Pnacl_M33_PPB_UMA_Private_HistogramCustomTimes(PP_Instance instance, struct PP_Var* name, int64_t sample, int64_t min, int64_t max, uint32_t bucket_count) {
-  const struct PPB_UMA_Private_0_2 *iface = Pnacl_WrapperInfo_PPB_UMA_Private_0_2.real_iface;
+static void Pnacl_M35_PPB_UMA_Private_HistogramCustomTimes(PP_Instance instance, struct PP_Var* name, int64_t sample, int64_t min, int64_t max, uint32_t bucket_count) {
+  const struct PPB_UMA_Private_0_3 *iface = Pnacl_WrapperInfo_PPB_UMA_Private_0_3.real_iface;
   iface->HistogramCustomTimes(instance, *name, sample, min, max, bucket_count);
 }
 
-static void Pnacl_M33_PPB_UMA_Private_HistogramCustomCounts(PP_Instance instance, struct PP_Var* name, int32_t sample, int32_t min, int32_t max, uint32_t bucket_count) {
-  const struct PPB_UMA_Private_0_2 *iface = Pnacl_WrapperInfo_PPB_UMA_Private_0_2.real_iface;
+static void Pnacl_M35_PPB_UMA_Private_HistogramCustomCounts(PP_Instance instance, struct PP_Var* name, int32_t sample, int32_t min, int32_t max, uint32_t bucket_count) {
+  const struct PPB_UMA_Private_0_3 *iface = Pnacl_WrapperInfo_PPB_UMA_Private_0_3.real_iface;
   iface->HistogramCustomCounts(instance, *name, sample, min, max, bucket_count);
 }
 
-static void Pnacl_M33_PPB_UMA_Private_HistogramEnumeration(PP_Instance instance, struct PP_Var* name, int32_t sample, int32_t boundary_value) {
-  const struct PPB_UMA_Private_0_2 *iface = Pnacl_WrapperInfo_PPB_UMA_Private_0_2.real_iface;
+static void Pnacl_M35_PPB_UMA_Private_HistogramEnumeration(PP_Instance instance, struct PP_Var* name, int32_t sample, int32_t boundary_value) {
+  const struct PPB_UMA_Private_0_3 *iface = Pnacl_WrapperInfo_PPB_UMA_Private_0_3.real_iface;
   iface->HistogramEnumeration(instance, *name, sample, boundary_value);
 }
 
-/* End wrapper methods for PPB_UMA_Private_0_2 */
+static int32_t Pnacl_M35_PPB_UMA_Private_IsCrashReportingEnabled(PP_Instance instance, struct PP_CompletionCallback* callback) {
+  const struct PPB_UMA_Private_0_3 *iface = Pnacl_WrapperInfo_PPB_UMA_Private_0_3.real_iface;
+  return iface->IsCrashReportingEnabled(instance, *callback);
+}
+
+/* End wrapper methods for PPB_UMA_Private_0_3 */
 
 /* Begin wrapper methods for PPB_VideoDestination_Private_0_1 */
 
@@ -4020,6 +4028,8 @@ static void Pnacl_M34_PPP_ContentDecryptor_Private_DecryptAndDecode(PP_Instance 
 }
 
 /* End wrapper methods for PPP_ContentDecryptor_Private_0_11 */
+
+/* Not generating wrapper methods for PPP_Find_Private_0_3 */
 
 /* Not generating wrapper methods for PPP_Flash_BrowserOperations_1_0 */
 
@@ -4743,8 +4753,6 @@ static const struct PPB_FileChooser_Dev_0_6 Pnacl_Wrappers_PPB_FileChooser_Dev_0
     .Show = (int32_t (*)(PP_Resource chooser, struct PP_ArrayOutput output, struct PP_CompletionCallback callback))&Pnacl_M19_PPB_FileChooser_Dev_Show
 };
 
-/* Not generating wrapper interface for PPB_Find_Dev_0_3 */
-
 static const struct PPB_Font_Dev_0_6 Pnacl_Wrappers_PPB_Font_Dev_0_6 = {
     .GetFontFamilies = (struct PP_Var (*)(PP_Instance instance))&Pnacl_M14_PPB_Font_Dev_GetFontFamilies,
     .Create = (PP_Resource (*)(PP_Instance instance, const struct PP_FontDescription_Dev* description))&Pnacl_M14_PPB_Font_Dev_Create,
@@ -4860,8 +4868,6 @@ static const struct PPB_VideoDecoder_Dev_0_16 Pnacl_Wrappers_PPB_VideoDecoder_De
 
 /* Not generating wrapper interface for PPB_Zoom_Dev_0_2 */
 
-/* Not generating wrapper interface for PPP_Find_Dev_0_3 */
-
 /* Not generating wrapper interface for PPP_NetworkState_Dev_0_1 */
 
 /* Not generating wrapper interface for PPP_Printing_Dev_0_6 */
@@ -4916,6 +4922,8 @@ static const struct PPB_FileIO_Private_0_1 Pnacl_Wrappers_PPB_FileIO_Private_0_1
 static const struct PPB_FileRefPrivate_0_1 Pnacl_Wrappers_PPB_FileRefPrivate_0_1 = {
     .GetAbsolutePath = (struct PP_Var (*)(PP_Resource file_ref))&Pnacl_M15_PPB_FileRefPrivate_GetAbsolutePath
 };
+
+/* Not generating wrapper interface for PPB_Find_Private_0_3 */
 
 static const struct PPB_Flash_12_4 Pnacl_Wrappers_PPB_Flash_12_4 = {
     .SetInstanceAlwaysOnTop = (void (*)(PP_Instance instance, PP_Bool on_top))&Pnacl_M21_PPB_Flash_SetInstanceAlwaysOnTop,
@@ -5081,6 +5089,7 @@ static const struct PPB_NaCl_Private_1_0 Pnacl_Wrappers_PPB_NaCl_Private_1_0 = {
     .DispatchEvent = (void (*)(PP_Instance instance, PP_NaClEventType event_type, const char* resource_url, PP_Bool length_is_computable, uint64_t loaded_bytes, uint64_t total_bytes))&Pnacl_M25_PPB_NaCl_Private_DispatchEvent,
     .SetReadOnlyProperty = (void (*)(PP_Instance instance, struct PP_Var key, struct PP_Var value))&Pnacl_M25_PPB_NaCl_Private_SetReadOnlyProperty,
     .ReportLoadError = (void (*)(PP_Instance instance, PP_NaClError error, const char* error_message, const char* console_message, PP_Bool is_installed))&Pnacl_M25_PPB_NaCl_Private_ReportLoadError,
+    .InstanceCreated = (void (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_InstanceCreated,
     .InstanceDestroyed = (void (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_InstanceDestroyed,
     .NaClDebugStubEnabled = (PP_Bool (*)(void))&Pnacl_M25_PPB_NaCl_Private_NaClDebugStubEnabled,
     .GetSandboxArch = (const char* (*)(void))&Pnacl_M25_PPB_NaCl_Private_GetSandboxArch,
@@ -5252,10 +5261,11 @@ static const struct PPB_UDPSocket_Private_0_4 Pnacl_Wrappers_PPB_UDPSocket_Priva
     .Close = (void (*)(PP_Resource udp_socket))&Pnacl_M23_PPB_UDPSocket_Private_Close
 };
 
-static const struct PPB_UMA_Private_0_2 Pnacl_Wrappers_PPB_UMA_Private_0_2 = {
-    .HistogramCustomTimes = (void (*)(PP_Instance instance, struct PP_Var name, int64_t sample, int64_t min, int64_t max, uint32_t bucket_count))&Pnacl_M33_PPB_UMA_Private_HistogramCustomTimes,
-    .HistogramCustomCounts = (void (*)(PP_Instance instance, struct PP_Var name, int32_t sample, int32_t min, int32_t max, uint32_t bucket_count))&Pnacl_M33_PPB_UMA_Private_HistogramCustomCounts,
-    .HistogramEnumeration = (void (*)(PP_Instance instance, struct PP_Var name, int32_t sample, int32_t boundary_value))&Pnacl_M33_PPB_UMA_Private_HistogramEnumeration
+static const struct PPB_UMA_Private_0_3 Pnacl_Wrappers_PPB_UMA_Private_0_3 = {
+    .HistogramCustomTimes = (void (*)(PP_Instance instance, struct PP_Var name, int64_t sample, int64_t min, int64_t max, uint32_t bucket_count))&Pnacl_M35_PPB_UMA_Private_HistogramCustomTimes,
+    .HistogramCustomCounts = (void (*)(PP_Instance instance, struct PP_Var name, int32_t sample, int32_t min, int32_t max, uint32_t bucket_count))&Pnacl_M35_PPB_UMA_Private_HistogramCustomCounts,
+    .HistogramEnumeration = (void (*)(PP_Instance instance, struct PP_Var name, int32_t sample, int32_t boundary_value))&Pnacl_M35_PPB_UMA_Private_HistogramEnumeration,
+    .IsCrashReportingEnabled = (int32_t (*)(PP_Instance instance, struct PP_CompletionCallback callback))&Pnacl_M35_PPB_UMA_Private_IsCrashReportingEnabled
 };
 
 static const struct PPB_VideoDestination_Private_0_1 Pnacl_Wrappers_PPB_VideoDestination_Private_0_1 = {
@@ -5294,6 +5304,8 @@ static const struct PPP_ContentDecryptor_Private_0_11 Pnacl_Wrappers_PPP_Content
     .ResetDecoder = &Pnacl_M34_PPP_ContentDecryptor_Private_ResetDecoder,
     .DecryptAndDecode = &Pnacl_M34_PPP_ContentDecryptor_Private_DecryptAndDecode
 };
+
+/* Not generating wrapper interface for PPP_Find_Private_0_3 */
 
 /* Not generating wrapper interface for PPP_Flash_BrowserOperations_1_0 */
 
@@ -5922,9 +5934,9 @@ static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_UDPSocket_Private_0_4 = {
   .real_iface = NULL
 };
 
-static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_UMA_Private_0_2 = {
-  .iface_macro = PPB_UMA_PRIVATE_INTERFACE_0_2,
-  .wrapped_iface = (const void *) &Pnacl_Wrappers_PPB_UMA_Private_0_2,
+static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_UMA_Private_0_3 = {
+  .iface_macro = PPB_UMA_PRIVATE_INTERFACE_0_3,
+  .wrapped_iface = (const void *) &Pnacl_Wrappers_PPB_UMA_Private_0_3,
   .real_iface = NULL
 };
 
@@ -6065,7 +6077,7 @@ static struct __PnaclWrapperInfo *s_ppb_wrappers[] = {
   &Pnacl_WrapperInfo_PPB_UDPSocket_Private_0_2,
   &Pnacl_WrapperInfo_PPB_UDPSocket_Private_0_3,
   &Pnacl_WrapperInfo_PPB_UDPSocket_Private_0_4,
-  &Pnacl_WrapperInfo_PPB_UMA_Private_0_2,
+  &Pnacl_WrapperInfo_PPB_UMA_Private_0_3,
   &Pnacl_WrapperInfo_PPB_VideoDestination_Private_0_1,
   &Pnacl_WrapperInfo_PPB_VideoSource_Private_0_1,
   &Pnacl_WrapperInfo_PPB_X509Certificate_Private_0_1,

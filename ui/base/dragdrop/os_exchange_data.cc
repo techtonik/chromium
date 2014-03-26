@@ -36,6 +36,14 @@ OSExchangeData::OSExchangeData(Provider* provider) : provider_(provider) {
 OSExchangeData::~OSExchangeData() {
 }
 
+void OSExchangeData::MarkOriginatedFromRenderer() {
+  provider_->MarkOriginatedFromRenderer();
+}
+
+bool OSExchangeData::DidOriginateFromRenderer() const {
+  return provider_->DidOriginateFromRenderer();
+}
+
 void OSExchangeData::SetString(const base::string16& data) {
   provider_->SetString(data);
 }
@@ -136,10 +144,6 @@ bool OSExchangeData::GetFileContents(base::FilePath* filename,
 
 void OSExchangeData::SetDownloadFileInfo(const DownloadFileInfo& download) {
   provider_->SetDownloadFileInfo(download);
-}
-
-void OSExchangeData::SetInDragLoop(bool in_drag_loop) {
-  provider_->SetInDragLoop(in_drag_loop);
 }
 #endif
 

@@ -62,7 +62,7 @@
 #include "net/base/mime_util.h"
 #include "net/base/request_priority.h"
 #include "net/cookies/canonical_cookie.h"
-#include "net/cookies/cookie_monster.h"
+#include "net/cookies/cookie_store.h"
 #include "net/http/http_cache.h"
 #include "net/url_request/url_request_context.h"
 #include "net/url_request/url_request_context_getter.h"
@@ -84,6 +84,7 @@
 #endif
 #if defined(OS_WIN)
 #include "content/common/font_cache_dispatcher_win.h"
+#include "content/common/sandbox_win.h"
 #endif
 #if defined(OS_ANDROID)
 #include "media/base/android/webaudio_media_codec_bridge.h"
@@ -594,7 +595,7 @@ void RenderMessageFilter::OnSetCookie(int render_frame_id,
     net::CookieStore* cookie_store = GetCookieStoreForURL(url);
     // Pass a null callback since we don't care about when the 'set' completes.
     cookie_store->SetCookieWithOptionsAsync(
-        url, cookie, options, net::CookieMonster::SetCookiesCallback());
+        url, cookie, options, net::CookieStore::SetCookiesCallback());
   }
 }
 
@@ -616,8 +617,7 @@ void RenderMessageFilter::OnGetCookies(int render_frame_id,
   base::debug::Alias(url_buf);
 
   net::CookieStore* cookie_store = GetCookieStoreForURL(url);
-  net::CookieMonster* cookie_monster = cookie_store->GetCookieMonster();
-  cookie_monster->GetAllCookiesForURLAsync(
+  cookie_store->GetAllCookiesForURLAsync(
       url, base::Bind(&RenderMessageFilter::CheckPolicyForCookies, this,
                       render_frame_id, url, first_party_for_cookies,
                       reply_msg));
@@ -643,8 +643,7 @@ void RenderMessageFilter::OnGetRawCookies(
   // be applied to outbound requests for the given URL.  Since this cookie info
   // is visible in the developer tools, it is helpful to make it match reality.
   net::CookieStore* cookie_store = GetCookieStoreForURL(url);
-  net::CookieMonster* cookie_monster = cookie_store->GetCookieMonster();
-  cookie_monster->GetAllCookiesForURLAsync(
+  cookie_store->GetAllCookiesForURLAsync(
       url, base::Bind(&RenderMessageFilter::SendGetRawCookiesResponse,
                       this, reply_msg));
 }
@@ -1201,6 +1200,9 @@ void RenderMessageFilter::OnDidLose3DContext(
 #if defined(OS_WIN)
 void RenderMessageFilter::OnPreCacheFontCharacters(const LOGFONT& font,
                                                    const base::string16& str) {
+  // TODO(scottmg): Move this to FontCacheDispatcher, http://crbug.com/356346.
+  if (!ShouldUseDirectWrite())
+    return;
   // First, comments from FontCacheDispatcher::OnPreCacheFont do apply here too.
   // Except that for True Type fonts,
   // GetTextMetrics will not load the font in memory.

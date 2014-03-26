@@ -12,13 +12,14 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/test/base/testing_profile.h"
-#include "components/signin/core/profile_oauth2_token_service.h"
+#include "components/signin/core/browser/profile_oauth2_token_service.h"
 
 ProfileSyncServiceMock::ProfileSyncServiceMock(Profile* profile)
     : ProfileSyncService(
           NULL,
           profile,
           new ManagedUserSigninManagerWrapper(
+              profile,
               SigninManagerFactory::GetForProfile(profile)),
           ProfileOAuth2TokenServiceFactory::GetForProfile(profile),
           browser_sync::MANUAL_START) {}

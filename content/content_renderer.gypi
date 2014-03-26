@@ -135,8 +135,6 @@
     'renderer/dom_storage/webstoragenamespace_impl.h',
     'renderer/drop_data_builder.cc',
     'renderer/drop_data_builder.h',
-    'renderer/external_popup_menu.cc',
-    'renderer/external_popup_menu.h',
     'renderer/fetchers/image_resource_fetcher.cc',
     'renderer/fetchers/image_resource_fetcher.h',
     'renderer/fetchers/multi_resolution_image_resource_fetcher.cc',
@@ -275,6 +273,8 @@
     'renderer/media/video_capture_impl_manager.h',
     'renderer/media/video_capture_message_filter.cc',
     'renderer/media/video_capture_message_filter.h',
+    'renderer/media/video_frame_compositor.cc',
+    'renderer/media/video_frame_compositor.h',
     'renderer/media/video_frame_provider.cc',
     'renderer/media/video_frame_provider.h',
     'renderer/media/webaudiosourceprovider_impl.cc',
@@ -565,6 +565,10 @@
         'renderer/webscrollbarbehavior_impl_gtkoraura.cc',
         'renderer/webscrollbarbehavior_impl_gtkoraura.h',
       ],
+      'sources': [
+        'renderer/external_popup_menu.cc',
+        'renderer/external_popup_menu.h',
+      ],
     }, {
       'sources!': [
         'renderer/webscrollbarbehavior_impl_mac.mm',
@@ -595,10 +599,14 @@
     }],
     ['OS=="android"', {
       'sources!': [
-        'renderer/accessibility/renderer_accessibility_focus_only.cc'
+        'renderer/accessibility/renderer_accessibility_focus_only.cc',
         'renderer/media/audio_decoder.cc',
         'renderer/media/filter_helpers.cc',
         'renderer/media/webmediaplayer_impl.cc',
+      ],
+      'sources': [
+        'renderer/external_popup_menu.cc',
+        'renderer/external_popup_menu.h',
       ],
       'dependencies': [
         '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber',

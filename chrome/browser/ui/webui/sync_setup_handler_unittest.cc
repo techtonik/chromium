@@ -26,7 +26,7 @@
 #include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
-#include "components/signin/core/profile_oauth2_token_service.h"
+#include "components/signin/core/browser/profile_oauth2_token_service.h"
 #include "components/sync_driver/sync_prefs.h"
 #include "content/public/browser/web_ui.h"
 #include "content/public/test/test_browser_thread.h"
@@ -209,7 +209,8 @@ class TestWebUI : public content::WebUI {
     return 0;
   }
   virtual void SetBindings(int bindings) OVERRIDE {}
-  virtual void SetFrameXPath(const std::string& xpath) OVERRIDE {}
+  virtual void OverrideJavaScriptFrame(
+      const std::string& frame_name) OVERRIDE {}
   virtual void AddMessageHandler(
       content::WebUIMessageHandler* handler) OVERRIDE {}
   virtual void RegisterMessageCallback(

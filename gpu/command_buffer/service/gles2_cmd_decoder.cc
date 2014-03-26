@@ -581,6 +581,10 @@ class GLES2DecoderImpl : public GLES2Decoder,
       const ContextState* prev_state) const OVERRIDE {
     state_.RestoreAllTextureUnitBindings(prev_state);
   }
+  virtual void RestoreActiveTextureUnitBinding(
+      unsigned int target) const OVERRIDE {
+    state_.RestoreActiveTextureUnitBinding(target);
+  }
   virtual void RestoreAttribute(unsigned index) const OVERRIDE {
     state_.RestoreAttribute(index);
   }
@@ -1702,6 +1706,7 @@ class GLES2DecoderImpl : public GLES2Decoder,
   bool has_robustness_extension_;
   GLenum reset_status_;
   bool reset_by_robustness_extension_;
+  bool supports_post_sub_buffer_;
 
   // These flags are used to override the state of the shared feature_info_
   // member.  Because the same FeatureInfo instance may be shared among many
@@ -2207,6 +2212,7 @@ GLES2DecoderImpl::GLES2DecoderImpl(ContextGroup* group)
       has_robustness_extension_(false),
       reset_status_(GL_NO_ERROR),
       reset_by_robustness_extension_(false),
+      supports_post_sub_buffer_(false),
       force_webgl_glsl_validation_(false),
       derivatives_explicitly_enabled_(false),
       frag_depth_explicitly_enabled_(false),
@@ -2567,6 +2573,12 @@ bool GLES2DecoderImpl::Initialize(
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
   }
 
+  supports_post_sub_buffer_ = surface->SupportsPostSubBuffer();
+  if (feature_info_->workarounds()
+          .disable_post_sub_buffers_for_onscreen_surfaces &&
+      !surface->IsOffscreen())
+    supports_post_sub_buffer_ = false;
+
   if (feature_info_->workarounds().reverse_point_sprite_coord_origin) {
     glPointParameteri(GL_POINT_SPRITE_COORD_ORIGIN, GL_LOWER_LEFT);
   }
@@ -2619,7 +2631,7 @@ Capabilities GLES2DecoderImpl::GetCapabilities() {
   caps.iosurface = true;
 #endif
 
-  caps.post_sub_buffer = surface_->HasExtension("GL_CHROMIUM_post_sub_buffer");
+  caps.post_sub_buffer = supports_post_sub_buffer_;
 
   return caps;
 }
@@ -7433,7 +7445,7 @@ error::Error GLES2DecoderImpl::HandlePixelStorei(
 error::Error GLES2DecoderImpl::HandlePostSubBufferCHROMIUM(
     uint32 immediate_data_size, const cmds::PostSubBufferCHROMIUM& c) {
   TRACE_EVENT0("gpu", "GLES2DecoderImpl::HandlePostSubBufferCHROMIUM");
-  if (!surface_->HasExtension("GL_CHROMIUM_post_sub_buffer")) {
+  if (!supports_post_sub_buffer_) {
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION,
         "glPostSubBufferCHROMIUM", "command not supported by surface");
@@ -7627,9 +7639,8 @@ error::Error GLES2DecoderImpl::HandleGetString(
         } else {
           extensions = feature_info_->extensions().c_str();
         }
-        std::string surface_extensions = surface_->GetExtensions();
-        if (!surface_extensions.empty())
-          extensions += " " + surface_extensions;
+        if (supports_post_sub_buffer_)
+          extensions += " GL_CHROMIUM_post_sub_buffer";
         str = extensions.c_str();
       }
       break;
@@ -10383,9 +10394,9 @@ error::Error GLES2DecoderImpl::HandleAsyncTexImage2DCHROMIUM(
 
   // We know the memory/size is safe, so get the real shared memory since
   // it might need to be duped to prevent use-after-free of the memory.
-  gpu::Buffer buffer = GetSharedMemoryBuffer(c.pixels_shm_id);
-  base::SharedMemory* shared_memory = buffer.shared_memory;
-  uint32 shm_size = buffer.size;
+  scoped_refptr<gpu::Buffer> buffer = GetSharedMemoryBuffer(c.pixels_shm_id);
+  base::SharedMemory* shared_memory = buffer->shared_memory();
+  uint32 shm_size = buffer->size();
   uint32 shm_data_offset = c.pixels_shm_offset;
   uint32 shm_data_size = pixels_size;
 
@@ -10473,9 +10484,9 @@ error::Error GLES2DecoderImpl::HandleAsyncTexSubImage2DCHROMIUM(
 
   // We know the memory/size is safe, so get the real shared memory since
   // it might need to be duped to prevent use-after-free of the memory.
-  gpu::Buffer buffer = GetSharedMemoryBuffer(c.data_shm_id);
-  base::SharedMemory* shared_memory = buffer.shared_memory;
-  uint32 shm_size = buffer.size;
+  scoped_refptr<gpu::Buffer> buffer = GetSharedMemoryBuffer(c.data_shm_id);
+  base::SharedMemory* shared_memory = buffer->shared_memory();
+  uint32 shm_size = buffer->size();
   uint32 shm_data_offset = c.data_shm_offset;
   uint32 shm_data_size = data_size;
 

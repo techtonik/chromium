@@ -42,6 +42,11 @@ class PrefRegistrySimple;
 class Profile;
 class TemplateURLService;
 
+namespace {
+class CrashesDOMHandler;
+class FlashDOMHandler;
+}
+
 namespace base {
 class DictionaryValue;
 class MessageLoopProxy;
@@ -60,6 +65,11 @@ struct WebPluginInfo;
 namespace extensions {
 class ExtensionDownloader;
 class ManifestFetchData;
+class MetricsPrivateGetIsCrashReportingEnabledFunction;
+}
+
+namespace metrics {
+class ClonedInstallDetector;
 }
 
 namespace net {
@@ -68,6 +78,10 @@ class URLFetcher;
 
 namespace prerender {
 bool IsOmniboxEnabled(Profile* profile);
+}
+
+namespace system_logs {
+class ChromeInternalLogSource;
 }
 
 namespace tracked_objects {
@@ -273,6 +287,11 @@ class MetricsService
   // in must not correspond to any real field trial in the code.
   // To use this method, SyntheticTrialGroup should friend your class.
   void RegisterSyntheticFieldTrial(const SyntheticTrialGroup& trial_group);
+
+  // Check if this install was cloned or imaged from another machine. If a
+  // clone is detected, reset the client id and low entropy source. This
+  // should not be called more than once.
+  void CheckForClonedInstall();
 
  private:
   // The MetricsService has a lifecycle that is stored as a state.
@@ -612,6 +631,8 @@ class MetricsService
   // Field trial groups that map to Chrome configuration states.
   SyntheticTrialGroups synthetic_trial_groups_;
 
+  scoped_ptr<metrics::ClonedInstallDetector> cloned_install_detector_;
+
   FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, ClientIdCorrectlyFormatted);
   FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, IsPluginProcess);
   FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, LowEntropySource0NotReset);
@@ -626,17 +647,29 @@ class MetricsService
   DISALLOW_COPY_AND_ASSIGN(MetricsService);
 };
 
-// This class limits and documents access to the IsMetricsReportingEnabled()
-// method. Since the method is private, each user has to be explicitly declared
-// as a 'friend' below.
+// This class limits and documents access to the IsMetricsReportingEnabled() and
+// IsCrashReportingEnabled() methods. Since these methods are private, each user
+// has to be explicitly declared as a 'friend' below.
 class MetricsServiceHelper {
  private:
   friend bool prerender::IsOmniboxEnabled(Profile* profile);
+  friend class ChromeRenderMessageFilter;
+  friend class ::CrashesDOMHandler;
   friend class extensions::ExtensionDownloader;
   friend class extensions::ManifestFetchData;
+  friend class extensions::MetricsPrivateGetIsCrashReportingEnabledFunction;
+  friend class ::FlashDOMHandler;
+  friend class system_logs::ChromeInternalLogSource;
+  FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, MetricsReportingEnabled);
+  FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, CrashReportingEnabled);
 
   // Returns true if prefs::kMetricsReportingEnabled is set.
   static bool IsMetricsReportingEnabled();
+
+  // Returns true if crash reporting is enabled.  This is set at the platform
+  // level for Android and ChromeOS, and otherwise is the same as
+  // IsMetricsReportingEnabled for desktop Chrome.
+  static bool IsCrashReportingEnabled();
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(MetricsServiceHelper);
 };

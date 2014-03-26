@@ -532,6 +532,7 @@ cr.define('options', function() {
       if (cr.isChromeOS) {
         $('factory-reset-restart').onclick = function(event) {
           OptionsPage.navigateToPage('factoryResetData');
+          chrome.send('onPowerwashDialogShow');
         };
       }
 
@@ -915,6 +916,7 @@ cr.define('options', function() {
         $('sync-general').insertBefore($('sync-status').nextSibling,
                                        $('enable-auto-login-checkbox'));
       }
+      $('enable-auto-login-checkbox').hidden = !syncData.autoLoginVisible;
     },
 
     /**

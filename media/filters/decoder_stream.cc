@@ -375,6 +375,7 @@ void DecoderStream<StreamType>::OnBufferReady(
 
   if (status == DemuxerStream::kConfigChanged) {
     FUNCTION_DVLOG(2) << ": " << "ConfigChanged";
+    DCHECK(stream_->SupportsConfigChanges());
     state_ = STATE_FLUSHING_DECODER;
     if (!reset_cb_.is_null()) {
       AbortRead();
@@ -401,6 +402,11 @@ void DecoderStream<StreamType>::OnBufferReady(
   if (status == DemuxerStream::kAborted) {
     SatisfyRead(DEMUXER_READ_ABORTED, NULL);
     return;
+  }
+
+  if (!splice_observer_cb_.is_null() && !buffer->end_of_stream() &&
+      buffer->splice_timestamp() != kNoTimestamp()) {
+    splice_observer_cb_.Run(buffer->splice_timestamp());
   }
 
   DCHECK(status == DemuxerStream::kOk) << status;

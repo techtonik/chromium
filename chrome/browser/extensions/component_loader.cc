@@ -287,6 +287,11 @@ void ComponentLoader::AddFileManagerExtension() {
 #endif  // defined(OS_CHROMEOS)
 }
 
+void ComponentLoader::AddVideoPlayerExtension() {
+  Add(IDR_VIDEOPLAYER_MANIFEST,
+      base::FilePath(FILE_PATH_LITERAL("video_player")));
+}
+
 void ComponentLoader::AddHangoutServicesExtension() {
 #if defined(GOOGLE_CHROME_BUILD) || defined(ENABLE_HANGOUT_SERVICES_EXTENSION)
   Add(IDR_HANGOUT_SERVICES_MANIFEST,
@@ -435,6 +440,9 @@ void ComponentLoader::AddDefaultComponentExtensionsForKioskMode(
     return;
 
   // Component extensions needed for kiosk apps.
+  // Note: Video player should be avove the file manager, since the video
+  // player is the default app for video files by default.
+  AddVideoPlayerExtension();
   AddFileManagerExtension();
 
   // Add virtual keyboard.
@@ -465,7 +473,11 @@ void ComponentLoader::AddDefaultComponentExtensionsWithBackgroundPages(
 #endif
 
   if (!skip_session_components) {
+    // Note: Video player should be avove the file manager, since the video
+    // player is the default app for video files by default.
+    AddVideoPlayerExtension();
     AddFileManagerExtension();
+
     AddHangoutServicesExtension();
     AddHotwordHelperExtension();
     AddImageLoaderExtension();

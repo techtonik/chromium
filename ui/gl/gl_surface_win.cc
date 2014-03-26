@@ -12,6 +12,7 @@
 #include "base/win/windows_version.h"
 #include "third_party/mesa/src/include/GL/osmesa.h"
 #include "ui/gfx/frame_time.h"
+#include "ui/gfx/native_widget_types.h"
 #include "ui/gl/gl_bindings.h"
 #include "ui/gl/gl_implementation.h"
 #include "ui/gl/gl_surface_egl.h"
@@ -33,7 +34,7 @@ class NativeViewGLSurfaceOSMesa : public GLSurfaceOSMesa {
   virtual void Destroy() OVERRIDE;
   virtual bool IsOffscreen() OVERRIDE;
   virtual bool SwapBuffers() OVERRIDE;
-  virtual std::string GetExtensions() OVERRIDE;
+  virtual bool SupportsPostSubBuffer() OVERRIDE;
   virtual bool PostSubBuffer(int x, int y, int width, int height) OVERRIDE;
 
  private:
@@ -171,11 +172,8 @@ bool NativeViewGLSurfaceOSMesa::SwapBuffers() {
   return true;
 }
 
-std::string NativeViewGLSurfaceOSMesa::GetExtensions() {
-  std::string extensions = gfx::GLSurfaceOSMesa::GetExtensions();
-  extensions += extensions.empty() ? "" : " ";
-  extensions += "GL_CHROMIUM_post_sub_buffer";
-  return extensions;
+bool NativeViewGLSurfaceOSMesa::SupportsPostSubBuffer() {
+  return true;
 }
 
 bool NativeViewGLSurfaceOSMesa::PostSubBuffer(
@@ -228,6 +226,7 @@ scoped_refptr<GLSurface> GLSurface::CreateViewGLSurface(
       return surface;
     }
     case kGLImplementationEGLGLES2: {
+      DCHECK(window != gfx::kNullAcceleratedWidget);
       scoped_refptr<NativeViewGLSurfaceEGL> surface(
           new NativeViewGLSurfaceEGL(window));
       scoped_ptr<VSyncProvider> sync_provider;

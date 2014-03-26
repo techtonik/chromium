@@ -170,6 +170,7 @@ _BANNED_CPP_FUNCTIONS = (
         r"^components[\\\/]breakpad[\\\/]app[\\\/]breakpad_mac\.mm$",
         r"^content[\\\/]shell[\\\/]browser[\\\/]shell_browser_main\.cc$",
         r"^content[\\\/]shell[\\\/]browser[\\\/]shell_message_filter\.cc$",
+        r"^mojo[\\\/]system[\\\/]raw_shared_buffer_posix\.cc$",
         r"^net[\\\/]disk_cache[\\\/]cache_util\.cc$",
       ),
     ),
@@ -905,6 +906,7 @@ def _CheckSpamLogging(input_api, output_api):
                      r"logging_native_handler\.cc$",
                  r"^content[\\\/]common[\\\/]gpu[\\\/]client[\\\/]"
                      r"gl_helper_benchmark\.cc$",
+                 r"^native_client_sdk[\\\/]",
                  r"^remoting[\\\/]base[\\\/]logging\.h$",
                  r"^remoting[\\\/]host[\\\/].*",
                  r"^sandbox[\\\/]linux[\\\/].*",

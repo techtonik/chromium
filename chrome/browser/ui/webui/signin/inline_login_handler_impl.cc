@@ -24,8 +24,8 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
-#include "components/signin/core/profile_oauth2_token_service.h"
-#include "components/signin/core/signin_error_controller.h"
+#include "components/signin/core/browser/profile_oauth2_token_service.h"
+#include "components/signin/core/browser/signin_error_controller.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_ui.h"
@@ -199,7 +199,7 @@ void InlineLoginHandlerImpl::SetExtraInitParams(base::DictionaryValue& params) {
     // Drop the leading slash in the path.
     params.SetString("gaiaPath",
         GaiaUrls::GetInstance()->embedded_signin_url().path().substr(1));
-}
+  }
 
   params.SetString("service", "chromiumsync");
   params.SetString("continueUrl",

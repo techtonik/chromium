@@ -26,13 +26,6 @@
         [ 'android_webview_build==0', {
           'product_prefix': 'libstandalone',
         }],
-        # The general approach is to allow the executable target to choose
-        # the allocator, but as in the WebView case we are building a library
-        # only, put the dependency on the allocator here
-        [ 'android_webview_build==1 and android_use_tcmalloc==1', {
-          'dependencies': [
-            '../base/allocator/allocator.gyp:allocator', ],
-        }],
         [ 'android_webview_build==1 and use_system_skia==0', {
           # When not using the system skia there are linker warnings about
           # overriden hidden symbols which there's no easy way to eliminate;
@@ -197,8 +190,6 @@
         'common/aw_hit_test_data.cc',
         'common/aw_hit_test_data.h',
         'common/aw_resource.h',
-        'common/aw_switches.cc',
-        'common/aw_switches.h',
         'common/devtools_instrumentation.h',
         'common/print_messages.cc',
         'common/print_messages.h',

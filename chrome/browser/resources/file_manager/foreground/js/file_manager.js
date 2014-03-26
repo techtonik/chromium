@@ -464,6 +464,10 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
         event.preventDefault();
       };
 
+      var minimizeButton = this.dialogDom_.querySelector('#minimize-button');
+      minimizeButton.addEventListener('click', this.onMinimize.bind(this));
+      minimizeButton.addEventListener('mousedown', preventFocus);
+
       var maximizeButton = this.dialogDom_.querySelector('#maximize-button');
       maximizeButton.addEventListener('click', this.onMaximize.bind(this));
       maximizeButton.addEventListener('mousedown', preventFocus);
@@ -485,6 +489,10 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
         e.stopPropagation();
       });
     }
+  };
+
+  FileManager.prototype.onMinimize = function() {
+    chrome.app.window.current().minimize();
   };
 
   FileManager.prototype.onMaximize = function() {
@@ -2161,8 +2169,16 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
 
   /**
    * Called when a dialog is shown or hidden.
-   * @param {boolean} flag True if a dialog is shown, false if hidden.   */
+   * @param {boolean} flag True if a dialog is shown, false if hidden.
+   */
   FileManager.prototype.onDialogShownOrHidden = function(show) {
+    if (show) {
+      // If a dialog is shown, activate the window.
+      var appWindow = chrome.app.window.current();
+      if (appWindow)
+        appWindow.focus();
+    }
+
     // Set/unset a flag to disable dragging on the title area.
     this.dialogContainer_.classList.toggle('disable-header-drag', show);
   };

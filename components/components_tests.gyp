@@ -18,6 +18,15 @@
           'type': '<(gtest_target_type)',
           'sources': [
             'auto_login_parser/auto_login_parser_unittest.cc',
+            'autofill/content/browser/content_autofill_driver_unittest.cc',
+            'autofill/content/browser/request_autocomplete_manager_unittest.cc',
+            'autofill/content/browser/wallet/full_wallet_unittest.cc',
+            'autofill/content/browser/wallet/instrument_unittest.cc',
+            'autofill/content/browser/wallet/wallet_address_unittest.cc',
+            'autofill/content/browser/wallet/wallet_client_unittest.cc',
+            'autofill/content/browser/wallet/wallet_items_unittest.cc',
+            'autofill/content/browser/wallet/wallet_service_url_unittest.cc',
+            'autofill/content/browser/wallet/wallet_signin_helper_unittest.cc',
             'autofill/core/browser/address_field_unittest.cc',
             'autofill/core/browser/address_unittest.cc',
             'autofill/core/browser/android/auxiliary_profile_unittest_android.cc',
@@ -65,9 +74,12 @@
             'dom_distiller/core/task_tracker_unittest.cc',
             'dom_distiller/core/url_utils_unittest.cc',
             'domain_reliability/context_unittest.cc',
+            'domain_reliability/dispatcher_unittest.cc',
             'domain_reliability/monitor_unittest.cc',
+            'domain_reliability/scheduler_unittest.cc',
             'domain_reliability/test_util.cc',
             'domain_reliability/test_util.h',
+            'domain_reliability/uploader_unittest.cc',
             'domain_reliability/util_unittest.cc',
             'json_schema/json_schema_validator_unittest.cc',
             'json_schema/json_schema_validator_unittest_base.cc',
@@ -98,7 +110,7 @@
             'rappor/rappor_metric_unittest.cc',
             'rappor/rappor_service_unittest.cc',
             'sessions/serialized_navigation_entry_unittest.cc',
-            'signin/core/webdata/token_service_table_unittest.cc',
+            'signin/core/browser/webdata/token_service_table_unittest.cc',
             'storage_monitor/image_capture_device_manager_unittest.mm',
             'storage_monitor/media_storage_util_unittest.cc',
             'storage_monitor/media_transfer_protocol_device_observer_linux_unittest.cc',
@@ -198,7 +210,7 @@
             'components.gyp:rappor',
 
             # Dependencies of signin
-            'components.gyp:signin_core',
+            'components.gyp:signin_core_browser',
 
             # Dependencies of sync_driver
             'components.gyp:sync_driver_test_support',
@@ -217,6 +229,10 @@
                 'dom_distiller/content/dom_distiller_viewer_source_unittest.cc',
               ],
               'dependencies': [
+                # Dependencies of autofill
+                'components.gyp:autofill_content_browser',
+                'components.gyp:autofill_content_test_support',
+
                 # Dependencies of dom_distiller
                 'components.gyp:dom_distiller_content',
 
@@ -259,7 +275,7 @@
                 ['exclude', '\\.mm$'],
                 ['include', '^test/run_all_unittests\\.cc$'],
                 ['include', '^auto_login_parser/'],
-                ['include', '^autofill/'],
+                ['include', '^autofill/core/'],
                 ['include', '^dom_distiller/'],
                 ['include', '^json_schema/'],
                 ['include', '^keyed_service/core/'],

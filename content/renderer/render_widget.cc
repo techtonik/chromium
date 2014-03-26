@@ -552,11 +552,13 @@ void RenderWidget::SetScreenMetricsEmulationParameters(
   NOTREACHED();
 }
 
+#if defined(OS_MACOSX) || defined(OS_ANDROID)
 void RenderWidget::SetExternalPopupOriginAdjustmentsForEmulation(
     ExternalPopupMenu* popup, ScreenMetricsEmulator* emulator) {
   popup->SetOriginScaleAndOffsetForEmulation(
       emulator->scale(), emulator->offset());
 }
+#endif
 
 void RenderWidget::OnShowHostContextMenu(ContextMenuParams* params) {
   if (screen_metrics_emulator_)
@@ -904,6 +906,14 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
   }
 
   uint32 output_surface_id = next_output_surface_id_++;
+  if (command_line.HasSwitch(switches::kEnableDelegatedRenderer)) {
+    DCHECK(is_threaded_compositing_enabled_);
+    return scoped_ptr<cc::OutputSurface>(
+        new DelegatedCompositorOutputSurface(
+            routing_id(),
+            output_surface_id,
+            context_provider));
+  }
   if (!context_provider.get()) {
     if (!command_line.HasSwitch(switches::kEnableSoftwareCompositing))
       return scoped_ptr<cc::OutputSurface>();
@@ -919,16 +929,6 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
         true));
   }
 
-  if (command_line.HasSwitch(switches::kEnableDelegatedRenderer) &&
-      !command_line.HasSwitch(switches::kDisableDelegatedRenderer)) {
-    DCHECK(is_threaded_compositing_enabled_);
-    return scoped_ptr<cc::OutputSurface>(
-        new DelegatedCompositorOutputSurface(
-            routing_id(),
-            output_surface_id,
-            context_provider,
-            scoped_ptr<cc::SoftwareOutputDevice>()));
-  }
   if (command_line.HasSwitch(cc::switches::kCompositeToMailbox)) {
     DCHECK(is_threaded_compositing_enabled_);
     cc::ResourceFormat format = cc::RGBA_8888;

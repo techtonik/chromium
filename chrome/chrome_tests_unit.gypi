@@ -100,6 +100,8 @@
         'browser/chromeos/login/test/oobe_screen_waiter.h',
         'browser/chromeos/login/test/js_checker.cc',
         'browser/chromeos/login/test/js_checker.h',
+        'browser/chromeos/net/network_portal_detector_test_utils.cc',
+        'browser/chromeos/net/network_portal_detector_test_utils.h',
         'browser/chromeos/policy/cloud_external_data_manager_base_test_util.cc',
         'browser/chromeos/policy/cloud_external_data_manager_base_test_util.h',
         'browser/chromeos/policy/device_policy_builder.cc',
@@ -125,6 +127,8 @@
         'browser/extensions/api/messaging/native_messaging_test_util.h',
         'browser/extensions/extension_notification_observer.cc',
         'browser/extensions/extension_notification_observer.h',
+        'browser/extensions/extension_test_message_listener.cc',
+        'browser/extensions/extension_test_message_listener.h',
         'browser/extensions/fake_safe_browsing_database_manager.cc',
         'browser/extensions/fake_safe_browsing_database_manager.h',
         'browser/extensions/mock_extension_special_storage_policy.cc',
@@ -173,8 +177,8 @@
         'browser/sessions/session_service_test_helper.h',
         'browser/signin/fake_profile_oauth2_token_service.cc',
         'browser/signin/fake_profile_oauth2_token_service.h',
-        'browser/signin/fake_profile_oauth2_token_service_wrapper.cc',
-        'browser/signin/fake_profile_oauth2_token_service_wrapper.h',
+        'browser/signin/fake_profile_oauth2_token_service_builder.cc',
+        'browser/signin/fake_profile_oauth2_token_service_builder.h',
         'browser/signin/fake_signin_manager.cc',
         'browser/signin/fake_signin_manager.h',
         'browser/ssl/ssl_client_auth_requestor_mock.cc',
@@ -760,7 +764,6 @@
         'browser/chromeos/policy/device_cloud_policy_store_chromeos_unittest.cc',
         'browser/chromeos/policy/device_local_account_policy_service_unittest.cc',
         'browser/chromeos/policy/enterprise_install_attributes_unittest.cc',
-        'browser/chromeos/policy/login_screen_power_management_policy_unittest.cc',
         'browser/chromeos/policy/network_configuration_updater_unittest.cc',
         'browser/chromeos/policy/recommendation_restorer_unittest.cc',
         'browser/chromeos/policy/user_cloud_policy_manager_chromeos_unittest.cc',
@@ -914,6 +917,7 @@
         'browser/extensions/app_sync_data_unittest.cc',
         'browser/extensions/blacklist_unittest.cc',
         'browser/extensions/blacklist_state_fetcher_unittest.cc',
+        'browser/extensions/bookmark_app_helper_unittest.cc',
         'browser/extensions/browser_permissions_policy_delegate_unittest.cc',
         'browser/extensions/chrome_app_sorting_unittest.cc',
         'browser/extensions/component_loader_unittest.cc',
@@ -940,6 +944,7 @@
         'browser/extensions/extension_service_unittest.h',
         'browser/extensions/extension_special_storage_policy_unittest.cc',
         'browser/extensions/extension_sync_data_unittest.cc',
+        'browser/extensions/extension_test_message_listener_unittest.cc',
         'browser/extensions/extension_ui_unittest.cc',
         'browser/extensions/extension_warning_badge_service_unittest.cc',
         'browser/extensions/extension_warning_service_unittest.cc',
@@ -956,7 +961,6 @@
         'browser/extensions/policy_handlers_unittest.cc',
         'browser/extensions/sandboxed_unpacker_unittest.cc',
         'browser/extensions/standard_management_policy_provider_unittest.cc',
-        'browser/extensions/tab_helper_unittest.cc',
         'browser/extensions/token_cache/token_cache_service_unittest.cc',
         'browser/extensions/updater/extension_cache_fake.h',
         'browser/extensions/updater/extension_cache_fake.cc',
@@ -1053,6 +1057,7 @@
         'browser/media/desktop_media_list_ash_unittest.cc',
         'browser/media/native_desktop_media_list_unittest.cc',
         'browser/media/webrtc_log_uploader_unittest.cc',
+        'browser/media/webrtc_log_util_unittest.cc',
         'browser/media_galleries/fileapi/native_media_file_util_unittest.cc',
         'browser/media_galleries/linux/mtp_device_object_enumerator_unittest.cc',
         'browser/media_galleries/mac/mtp_device_delegate_impl_mac_unittest.mm',
@@ -1067,8 +1072,10 @@
         'browser/media_galleries/media_galleries_scan_result_dialog_controller_unittest.cc',
         'browser/media_galleries/media_scan_manager_unittest.cc',
         'browser/media_galleries/win/mtp_device_object_enumerator_unittest.cc',
+        'browser/metrics/cloned_install_detector_unittest.cc',
         'browser/metrics/compression_utils_unittest.cc',
         'browser/metrics/extension_metrics_unittest.cc',
+        'browser/metrics/machine_id_provider_win_unittest.cc',
         'browser/metrics/metrics_log_unittest.cc',
         'browser/metrics/metrics_log_serializer_unittest.cc',
         'browser/metrics/metrics_reporting_scheduler_unittest.cc',
@@ -1150,6 +1157,7 @@
         'browser/prefs/pref_hash_filter_unittest.cc',
         'browser/prefs/pref_hash_store_impl_unittest.cc',
         'browser/prefs/pref_model_associator_unittest.cc',
+        'browser/prefs/profile_pref_store_manager_unittest.cc',
         'browser/prefs/proxy_config_dictionary_unittest.cc',
         'browser/prefs/proxy_policy_unittest.cc',
         'browser/prefs/proxy_prefs_unittest.cc',
@@ -1206,6 +1214,7 @@
         'browser/resources/print_preview/print_preview_utils_unittest.gtestjs',
         'browser/resources_util_unittest.cc',
         'browser/rlz/rlz_unittest.cc',
+        'browser/safe_browsing/binary_feature_extractor_win_unittest.cc',
         'browser/safe_browsing/browser_feature_extractor_unittest.cc',
         'browser/safe_browsing/chunk_range_unittest.cc',
         'browser/safe_browsing/client_side_detection_host_unittest.cc',
@@ -1216,6 +1225,7 @@
         'browser/safe_browsing/download_protection_service_unittest.cc',
         'browser/safe_browsing/local_two_phase_testserver.cc',
         'browser/safe_browsing/malware_details_unittest.cc',
+        'browser/safe_browsing/pe_image_reader_win_unittest.cc',
         'browser/safe_browsing/ping_manager_unittest.cc',
         'browser/safe_browsing/prefix_set_unittest.cc',
         'browser/safe_browsing/protocol_manager_unittest.cc',
@@ -1225,7 +1235,6 @@
         'browser/safe_browsing/safe_browsing_store_file_unittest.cc',
         'browser/safe_browsing/safe_browsing_store_unittest.cc',
         'browser/safe_browsing/safe_browsing_util_unittest.cc',
-        'browser/safe_browsing/signature_util_win_unittest.cc',
         'browser/safe_browsing/two_phase_uploader_unittest.cc',
         'browser/search/hotword_service_unittest.cc',
         'browser/search/iframe_source_unittest.cc',
@@ -1943,18 +1952,6 @@
         # unit_tests than in base_unittests.
         '../base/path_service_unittest.cc',
 
-        # TODO(joi): Move to //components/components_tests.gypi once
-        # remaining dependencies back to //chrome are eliminated.
-        '../components/autofill/content/browser/content_autofill_driver_unittest.cc',
-        '../components/autofill/content/browser/request_autocomplete_manager_unittest.cc',
-        '../components/autofill/content/browser/wallet/full_wallet_unittest.cc',
-        '../components/autofill/content/browser/wallet/instrument_unittest.cc',
-        '../components/autofill/content/browser/wallet/wallet_address_unittest.cc',
-        '../components/autofill/content/browser/wallet/wallet_client_unittest.cc',
-        '../components/autofill/content/browser/wallet/wallet_items_unittest.cc',
-        '../components/autofill/content/browser/wallet/wallet_service_url_unittest.cc',
-        '../components/autofill/content/browser/wallet/wallet_signin_helper_unittest.cc',
-
         # TODO(yael): Move to //components/components_tests.gypi once
         # nacl_defines is moved out of chrome.gyp into a common place.
         '../components/nacl/loader/nacl_ipc_adapter_unittest.cc',
@@ -2171,9 +2168,6 @@
         }],
         ['chromeos==0', {
           'sources!': [
-            # TODO(zturner): Enable this on Windows.  See
-            # BrowserWithTestWindowTest::SetUp() for a comment explaining why
-            # this is broken.
             'browser/ui/views/frame/immersive_mode_controller_ash_unittest.cc',
             'browser/ui/views/select_file_dialog_extension_unittest.cc',
           ],
@@ -2274,6 +2268,7 @@
         ['enable_webrtc==0', {
           'sources!': [
             'browser/media/webrtc_log_uploader_unittest.cc',
+            'browser/media/webrtc_log_util_unittest.cc',
             'renderer/media/chrome_webrtc_log_message_delegate_unittest.cc',
           ],
         }],
@@ -2530,6 +2525,7 @@
             'browser/browser_commands_unittest.cc',
             'browser/download/download_shelf_unittest.cc',
             'browser/extensions/extension_message_bubble_controller_unittest.cc',
+            'browser/extensions/extension_test_message_listener_unittest.cc',
             'browser/policy/policy_path_parser_unittest.cc',
             'browser/profiles/off_the_record_profile_impl_unittest.cc',
             'browser/profiles/profile_list_desktop_unittest.cc',

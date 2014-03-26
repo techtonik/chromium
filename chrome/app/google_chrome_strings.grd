@@ -787,6 +787,14 @@ For Google Chrome, processes used to display diagnostics information (such as th
 • Manage your Google Accounts
       </message>
 
+      <!-- Account removal view in the avatar menu bubble -->
+      <message name="IDS_PROFILES_ACCOUNT_REMOVAL_TEXT" desc="Main text of the account removal view when removing a secondary account.">
+        To remove your account, Chrome needs to restart. Make sure you've saved any open work before continuing.
+      </message>
+      <message name="IDS_PROFILES_PRIMARY_ACCOUNT_REMOVAL_TEXT" desc="Main text of the account removal view when removing a primary account.">
+        You're using <ph name="PROFILE_EMAIL">$1<ex>jessica@gmail.com</ex></ph> to sync your Chrome stuff. To update your sync preference or to use Chrome without a Google account, visit settings.
+      </message>
+
       <!-- Sync Promo New Tab Page bubble strings -->
       <message name="IDS_SYNC_PROMO_NTP_BUBBLE_MESSAGE_NEW" desc="The body of the sync promo NTP bubble.">
         Now that you're signed in, you can get your tabs, bookmarks and other Chrome stuff across your laptop, phone and tablet. You will also receive more relevant suggestions and features on Google services.
@@ -1083,6 +1091,30 @@ Signing in anyway will merge Chrome information like bookmarks, history, and oth
           Add yourself to Chrome
         </message>
       </if>
+
+      <!-- Update bubble -->
+      <message name="IDS_REINSTALL_APP" desc="Text for the button the user clicks to reinstall the app.">
+        Reinstall Chrome
+      </message>
+      <if expr="use_titlecase">
+        <message name="IDS_UPGRADE_BUBBLE_MENU_ITEM" desc="In Title Case: Text for the Chrome menu option replacing Update required.">
+          Chrome is Out of Date
+        </message>
+      </if>
+      <if expr="not use_titlecase">
+        <message name="IDS_UPGRADE_BUBBLE_MENU_ITEM" desc="Text for the Chrome menu option replacing Update required.">
+          Chrome is out of date
+        </message>
+      </if>
+      <message name="IDS_UPGRADE_BUBBLE_TITLE" desc="Text for the title of the upgrade bubble view.">
+        Chrome is out of date
+      </message>
+      <message name="IDS_UPGRADE_BUBBLE_TEXT" desc="Text for the upgrade bubble view full description.">
+        Chrome could not update itself to the latest version, so you are missing out on awesome new features and security fixes. You need to manually reinstall Chrome.
+      </message>
+      <message name="IDS_UPGRADE_BUBBLE_REENABLE_TEXT" desc="Text for the upgrade bubble view full description.">
+        Chrome could not update itself to the latest version, so you are missing out on awesome new features and security fixes. You need to update Chrome.
+      </message>
 
       <!-- chrome://ntp -->
       <if expr="not is_android">

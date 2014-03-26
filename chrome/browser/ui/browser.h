@@ -588,7 +588,7 @@ class Browser : public TabStripModelObserver,
       const std::string& partition_id,
       content::SessionStorageNamespace* session_storage_namespace) OVERRIDE;
   virtual void WebContentsCreated(content::WebContents* source_contents,
-                                  int64 source_frame_id,
+                                  int opener_render_frame_id,
                                   const base::string16& frame_name,
                                   const GURL& target_url,
                                   content::WebContents* new_contents) OVERRIDE;
@@ -768,6 +768,9 @@ class Browser : public TabStripModelObserver,
 
   // Shared code between Reload() and ReloadIgnoringCache().
   void ReloadInternal(WindowOpenDisposition disposition, bool ignore_cache);
+
+  // Returns true if the Browser window should show the location bar.
+  bool ShouldShowLocationBar() const;
 
   // Implementation of SupportsWindowFeature and CanSupportWindowFeature. If
   // |check_fullscreen| is true, the set of features reflect the actual state of

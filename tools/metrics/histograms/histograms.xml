@@ -233,6 +233,21 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="AndroidTabCloseUndo.Toast"
+    enum="AndroidTabCloseUndoToastEvent">
+  <owner>dtrainor@chromium.org</owner>
+  <summary>
+    When a user closes a tab an undo toast will popup on certain devices giving
+    the user the chance to undo closing that tab.  This stat tracks how the user
+    interacts with that UI and what actions they take.  A cold start means that
+    the undo bar wasn't showing when it was triggered to show again.  A warm
+    start means that it was.  Warm starts can happen when the user closes
+    multiple tabs close together.  When the undo bar is dismissed, all closes
+    that were queued up to be undone are committed.  This can happen either by a
+    timeout or by an action by the user to move to another part of the UI.
+  </summary>
+</histogram>
+
 <histogram name="AppBanners.DismissEvent" enum="AppBannersDismissEvent">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -1736,6 +1751,23 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="CaptivePortal.Notification.Status"
+    enum="CaptivePortalNotificationStatus">
+  <owner>ygorshenin@chromium.org</owner>
+  <summary>
+    Count of displayed and not displayed due to errors notifications about
+    captive portal.
+  </summary>
+</histogram>
+
+<histogram name="CaptivePortal.Notification.UserAction"
+    enum="CaptivePortalNotificationUserAction">
+  <owner>ygorshenin@chromium.org</owner>
+  <summary>
+    Count of clicked, closed and ignored captive portal notifications.
+  </summary>
+</histogram>
+
 <histogram name="Cast.Sender.CastButtonShown" enum="BooleanEnabled">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -2084,6 +2116,153 @@ other types of suffix sets.
   <summary>
     Counts how often the user writes or reads from the clipboard and whether the
     write was from an incognito window or not.
+  </summary>
+</histogram>
+
+<histogram name="CloudPrint.AuthEvent" enum="CloudPrintAuthEventType">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Event counts in CloudPrintAuth.</summary>
+</histogram>
+
+<histogram name="CloudPrint.AvailablePrinters">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The number of printers availible for registration.</summary>
+</histogram>
+
+<histogram name="CloudPrint.AvailablePrintersList">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The number of printers availible for registration in Windows Service.
+  </summary>
+</histogram>
+
+<histogram name="CloudPrint.JobHandlerEvent"
+    enum="CloudPrintJobHandlerEventType">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Event counts in PrinterJobHandler.</summary>
+</histogram>
+
+<histogram name="CloudPrint.JobsDonePerInterval">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The number of jobs successfully completed per hour.</summary>
+</histogram>
+
+<histogram name="CloudPrint.JobsStartedPerInterval">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The number of jobs started per hour.</summary>
+</histogram>
+
+<histogram name="CloudPrint.JobStatus" enum="CloudPrintJobStatusType">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Then number of job completion statuses.</summary>
+</histogram>
+
+<histogram name="CloudPrint.NativeJobStatus"
+    enum="CloudPrintNativeJobStatusType">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Event counts in PrintSystem.</summary>
+</histogram>
+
+<histogram name="CloudPrint.PrepareTime" units="ms">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The amount of time needed to prepare job for spooling.</summary>
+</histogram>
+
+<histogram name="CloudPrint.PrinterBlacklistSize">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The number of printers user has blacklisted.</summary>
+</histogram>
+
+<histogram name="CloudPrint.PrinterWhitelistSize">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The number of printers user has whitelisted.</summary>
+</histogram>
+
+<histogram name="CloudPrint.PrintingTime" units="ms">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The amount of time needed to finish print job.</summary>
+</histogram>
+
+<histogram name="CloudPrint.ServiceEvents" enum="ServiceProcessEventType">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Event counts in ServiceProcessControl.</summary>
+</histogram>
+
+<histogram name="CloudPrint.ServiceUtilityCapsFailTime" units="ms">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The amount of time used to fail to collect printer capabilities.
+  </summary>
+</histogram>
+
+<histogram name="CloudPrint.ServiceUtilityCapsTime" units="ms">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The amount of time used to collect printer capabilities.</summary>
+</histogram>
+
+<histogram name="CloudPrint.ServiceUtilityDisconnectTime" units="ms">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The amount of time the utility process runs before disconnect.
+  </summary>
+</histogram>
+
+<histogram name="CloudPrint.ServiceUtilityMetafileFailTime" units="ms">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The amount of time used to fail to generate metafile.</summary>
+</histogram>
+
+<histogram name="CloudPrint.ServiceUtilityMetafileTime" units="ms">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The amount of time used to generate metafile.</summary>
+</histogram>
+
+<histogram name="CloudPrint.ServiceUtilityProcessHostEvent"
+    enum="ServiceUtilityProcessHostEventType">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Event counts in ServiceUtilityProcessHost.</summary>
+</histogram>
+
+<histogram name="CloudPrint.SpoolingTime" units="ms">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The amount of time needed to spool print job.</summary>
+</histogram>
+
+<histogram name="CloudPrint.UnregisterPrinters">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The number of printers to unregister.</summary>
+</histogram>
+
+<histogram name="CloudPrint.UrlFetcherDownloadSize" units="KB">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The amount of data downloaded on cloud print request.</summary>
+</histogram>
+
+<histogram name="CloudPrint.UrlFetcherRequestTime" units="ms">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The amount of time needed for cloud print request.</summary>
+</histogram>
+
+<histogram name="CloudPrint.UrlFetcherRequestType"
+    enum="CloudPrintUrlFetcherRequestType">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Request counts to cloud print service.</summary>
+</histogram>
+
+<histogram name="CloudPrint.UrlFetcherRetries">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The number of retries used to complete cloud print request.</summary>
+</histogram>
+
+<histogram name="CloudPrint.UrlFetcherUploadSize" units="KB">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>The amount of data uploaded with cloud print request.</summary>
+</histogram>
+
+<histogram name="CloudPrint.XmppPingTry">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Number of tries before successfull ping. 99 means giving up.
   </summary>
 </histogram>
 
@@ -6561,9 +6740,19 @@ other types of suffix sets.
   <summary>Status code of the outcome of a GCM checkin request.</summary>
 </histogram>
 
+<histogram name="GCM.ConnectedViaProxy" enum="Boolean">
+  <owner>zea@chromium.org</owner>
+  <summary>Whether the GCM connection was made via a proxy or not.</summary>
+</histogram>
+
 <histogram name="GCM.ConnectionDisconnectErrorCode" enum="NetErrorCodes">
   <owner>zea@chromium.org</owner>
   <summary>Net error results from GCM disconnect events.</summary>
+</histogram>
+
+<histogram name="GCM.ConnectionEndpoint" enum="GCMEndpoints">
+  <owner>zea@chromium.org</owner>
+  <summary>Number of connections made to each specific MCS endpoint.</summary>
 </histogram>
 
 <histogram name="GCM.ConnectionFailureErrorCode" enum="NetErrorCodes">
@@ -6576,7 +6765,7 @@ other types of suffix sets.
   <summary>Reasons for GCM connection resets.</summary>
 </histogram>
 
-<histogram name="GCM.ConnectionSuccessRate">
+<histogram name="GCM.ConnectionSuccessRate" enum="BooleanSuccess">
   <owner>zea@chromium.org</owner>
   <summary>
     GCM connection success rate. Does not take into account login success. See
@@ -6601,6 +6790,9 @@ other types of suffix sets.
 </histogram>
 
 <histogram name="GCM.NumUsers">
+  <obsolete>
+    Deprecated as of 3/2014.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>
     Number of GCM users associated with this client at startup time.
@@ -6626,6 +6818,13 @@ other types of suffix sets.
   <summary>
     Number of pending outgoing messages restored from the persistent store at
     startup.
+  </summary>
+</histogram>
+
+<histogram name="GCM.RestoredRegistrations">
+  <owner>jianli@chromium.org</owner>
+  <summary>
+    Number of registrations restored from the persistent store at startup.
   </summary>
 </histogram>
 
@@ -6663,6 +6862,22 @@ other types of suffix sets.
     enum="GCMUnregistrationRequestStatus">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>Status code of the outcome of a GCM unregistration request.</summary>
+</histogram>
+
+<histogram name="GCMInvalidations.IncomingMessageStatus"
+    enum="GCMInvalidationsIncomingMessageStatus">
+  <owner>pavely@chromium.org</owner>
+  <summary>
+    Status of parsing incoming invalidations message from GCM channel.
+  </summary>
+</histogram>
+
+<histogram name="GCMInvalidations.OutgoingMessageStatus"
+    enum="GCMInvalidationsOutgoingMessageStatus">
+  <owner>pavely@chromium.org</owner>
+  <summary>
+    Status of sending outgoing invalidations message through GCM.
+  </summary>
 </histogram>
 
 <histogram name="GData.AuthSuccess" enum="GDataAuthResult">
@@ -6955,6 +7170,15 @@ other types of suffix sets.
     older than in History page. Last bucket is any entry of that value or
     higher. Confirmed removal is not guaranteed, just an initiation of 'Remove
     selected items'.
+  </summary>
+</histogram>
+
+<histogram name="Hotword.AudioLoggingEnabled" enum="BooleanEnabled">
+  <summary>
+    The state of the hotword audio logging preference. This value is emitted
+    each time the hotword availability is requested by the extension if the user
+    is also opted in to hotword voice search. This check typically happens each
+    time a hotword search is initiated.
   </summary>
 </histogram>
 
@@ -7718,6 +7942,12 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="Invalidations.NetworkChannel"
+    enum="InvalidationNetworkChannel">
+  <owner>pavely@chromium.org</owner>
+  <summary>Network channel used for invalidations.</summary>
+</histogram>
+
 <histogram name="Keyboard.KeystrokeDeltas" units="milliseconds">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -7961,6 +8191,37 @@ other types of suffix sets.
   <summary>The version of glibc used. (Linux only)</summary>
 </histogram>
 
+<histogram name="LocalDiscovery.ClientRestartAttempts">
+  <owner>noamsml@chromium.org</owner>
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Records number of attempts to start local discovery.</summary>
+</histogram>
+
+<histogram name="LocalDiscovery.DetectorRestartTime" units="milliseconds">
+  <owner>noamsml@chromium.org</owner>
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Time between detector restarts.</summary>
+</histogram>
+
+<histogram name="LocalDiscovery.DetectorTriggerTime" units="milliseconds">
+  <owner>noamsml@chromium.org</owner>
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Time before detector trigger notifications.</summary>
+</histogram>
+
+<histogram name="LocalDiscovery.DevicesPage" enum="DevicesPageEvents">
+  <owner>noamsml@chromium.org</owner>
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Records events related to devices page.</summary>
+</histogram>
+
+<histogram name="LocalDiscovery.PrivetNotificationsEvent"
+    enum="PrivetNotificationsEvent">
+  <owner>noamsml@chromium.org</owner>
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Records events related to local discovery notifications.</summary>
+</histogram>
+
 <histogram name="Login.ConsumerNewUsersAllowed" enum="LoginConsumerWhitelist">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -8100,6 +8361,14 @@ other types of suffix sets.
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     Audio samples per second in HTML5 media (atypical values, in Hz).
+  </summary>
+</histogram>
+
+<histogram name="Media.AudioTrackProcessingStates"
+    enum="AudioTrackProcessingStates">
+  <summary>
+    State of the media stream audio track processing, sampled once during the
+    life time of a MediaStreamAudioProcessor.
   </summary>
 </histogram>
 
@@ -9278,6 +9547,19 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="MobileStartup.MobileMultiWindowInstances">
+  <owner>dtrainor@chromium.org</owner>
+  <summary>
+    Android: Number of instances of Chrome currently open during a MultiWindow
+    session.  Emitted every time Chrome is paused.  Only emitted on Android
+    MultiWindow devices.
+
+    A MultiWindow session is any period of time that Chrome was not used in a
+    full screen mode but together with another Activity that is visible at the
+    same time. This is only supported in a few Android models.
+  </summary>
+</histogram>
+
 <histogram name="MobileStartup.MobileMultiWindowSession" units="percent">
   <owner>miguelg@chromium.org</owner>
   <summary>
@@ -9995,6 +10277,57 @@ other types of suffix sets.
 <histogram name="Net.AuthGenerateToken_ntlm" units="milliseconds">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The time to generate an NTLM HTTP authentication token.</summary>
+</histogram>
+
+<histogram name="Net.AutoReload.CountAtStop">
+  <owner>ellyjones@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
+  <owner>cbentzel@chromium.org</owner>
+  <summary>
+    Number of times auto-reload has been attempted before auto-reload stopped
+    without succeeding, either because the stop button was pressed or because
+    the renderer was destroyed.
+  </summary>
+</histogram>
+
+<histogram name="Net.AutoReload.CountAtSuccess">
+  <owner>ellyjones@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
+  <owner>cbentzel@chromium.org</owner>
+  <summary>
+    Number of times auto-reload had to attempt to reload a page before
+    succeeding.
+  </summary>
+</histogram>
+
+<histogram name="Net.AutoReload.ErrorAtFirstSuccess" enum="NetErrorCodes">
+  <owner>ellyjones@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
+  <owner>cbentzel@chromium.org</owner>
+  <summary>
+    Original error code that started an auto-reload which then succeeded on the
+    first attempt.
+  </summary>
+</histogram>
+
+<histogram name="Net.AutoReload.ErrorAtStop" enum="NetErrorCodes">
+  <owner>ellyjones@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
+  <owner>cbentzel@chromium.org</owner>
+  <summary>
+    Error code, if any, when auto-reload stopped without succeeding, either
+    because the stop button was pressed or because the renderer was destroyed.
+  </summary>
+</histogram>
+
+<histogram name="Net.AutoReload.ErrorAtSuccess" enum="NetErrorCodes">
+  <owner>ellyjones@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
+  <owner>cbentzel@chromium.org</owner>
+  <summary>
+    Original error code that started an auto-reload which then eventually
+    succeeded.
+  </summary>
 </histogram>
 
 <histogram name="Net.CertCommonNameFallback" enum="BooleanCommonNameMatch">
@@ -12103,6 +12436,14 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="Net.QuicSession.CreationError" enum="QuicSessionErrorCodes">
+  <owner>jar@chromium.org</owner>
+  <summary>
+    Count of errors during attempts to create a QUIC session (before even using
+    the session).
+  </summary>
+</histogram>
+
 <histogram name="Net.QuicSession.FinalTcpCwnd">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -12229,6 +12570,14 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="Net.QuicSession.SecureResourceSecureSession">
+  <owner>rch@chromium.org.</owner>
+  <summary>
+    The number of request for secure resources over QUIC sessions. True if the
+    session is secure, false if it is not.
+  </summary>
+</histogram>
+
 <histogram name="Net.QuicSession.TruncatedAcksReceived">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The number of truncated ACK frames received.</summary>
@@ -12300,6 +12649,14 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="Net.SocketReceiveBufferUnchangeable" units="Bytes">
+  <owner>jar@chromium.org</owner>
+  <summary>
+    The size of a socket's receive buffer when the attempt to change it via
+    setsockopt failed.
+  </summary>
+</histogram>
+
 <histogram name="Net.SocketRequestTime">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -12362,6 +12719,14 @@ other types of suffix sets.
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The counts of the type of sockets returned by the socket pools.
+  </summary>
+</histogram>
+
+<histogram name="Net.SocketUnchangeableSendBuffer" units="Bytes">
+  <owner>jar@chromium.org</owner>
+  <summary>
+    The size of a socket's send buffer when the attempt to change it via
+    setsockopt failed.
   </summary>
 </histogram>
 
@@ -15764,8 +16129,22 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="PasswordManager.ActionsTakenV3"
+    enum="PasswordManagerActionsTakenV3">
+  <owner>dubroy@chromium.org</owner>
+  <owner>vabr@chromium.org</owner>
+  <owner>yfriedman@chromium.org</owner>
+  <summary>
+    Stats documenting how we handle every form containing a password, bucketed
+    by the actions taken.
+  </summary>
+</histogram>
+
 <histogram name="PasswordManager.ActionsTakenWithPsl"
     enum="PasswordManagerActionsTakenWithPsl">
+  <obsolete>
+    Deprecated as of 3/18/2014. See PasswordManagerActionsTakenV3.
+  </obsolete>
   <owner>dubroy@chromium.org</owner>
   <owner>vabr@chromium.org</owner>
   <owner>yfriedman@chromium.org</owner>
@@ -17710,9 +18089,19 @@ other types of suffix sets.
   <summary>Record usage of PPB_Flash.Navigate() Pepper API.</summary>
 </histogram>
 
+<histogram name="Plugin.PpapiBrokerLoadErrorCode" units="code">
+  <owner>xhwang@chromium.org</owner>
+  <summary>The error code of a PPAPI broker load failure.</summary>
+</histogram>
+
 <histogram name="Plugin.PpapiBrokerLoadResult" enum="PluginLoadResult">
   <owner>xhwang@chromium.org</owner>
   <summary>The result from an attempt to load a PPAPI broker.</summary>
+</histogram>
+
+<histogram name="Plugin.PpapiPluginLoadErrorCode" units="code">
+  <owner>xhwang@chromium.org</owner>
+  <summary>The error code of a PPAPI plugin load failure.</summary>
 </histogram>
 
 <histogram name="Plugin.PpapiPluginLoadResult" enum="PluginLoadResult">
@@ -19005,6 +19394,197 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="PrinterService.PrinterServiceEvent"
+    enum="PrinterServiceEventType">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Count of events in PrinterService on ChromeOS related to USB printers.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.DestinationAction"
+    enum="PrintPreviewPrintDestinationBuckets">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Actions performed by the user when the print destination search widget is
+    shown to the user.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.FontType" enum="PrintPreviewFontTypeType">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Count of font file formats embeeded in print preview PDFs. These numbers are
+    biased by what the platforms supports in terms of detection.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.GcpPromo" enum="PrintPreviewGcpPromoBuckets">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Actions performed by the user when the Google Cloud Print add-printers
+    promotion is shown to the user.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.InitialDisplayTime" units="milliseconds">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Time from when print preview is intiated until the intial preview is sent to
+    the preview tab for rendering.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.InitializationTime" units="milliseconds">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Time from when print preview is intiated until the preview PDF generation is
+    started.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.ManagePrinters">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Count the number of requests received to show the manage printers dialog.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.NumberOfPrinters">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Count the total number of printers shown in destination drop down list.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.PageCount.Initial">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The page count of the initial print preview, a.k.a. the total number of
+    pages in documents to be printed.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.PageCount.PrintToCloudPrint">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The final page count (after page selection) of documents printed to a cloud
+    printer.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.PageCount.PrintToCloudPrintWebDialog">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The final page count (after page selection) of documents printed to a cloud
+    printer using web dialog.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.PageCount.PrintToPDF">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The final page count (after page selection) of documents printed to PDF.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.PageCount.PrintToPrinter">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The final page count (after page selection) of documents printed to a
+    printer.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.PageCount.SystemDialog">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The final page count (after page selection) of documents printed using
+    system dialog.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.PreviewEvent" enum="PrintPreviewHelperEvents">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Print preview events.</summary>
+</histogram>
+
+<histogram name="PrintPreview.PrintSettings" enum="PrintSettings">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Track the popularity of print settings. (Settings when printing to PDF are
+    excluded from this statistic.)
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.RegeneratePreviewRequest.BeforeCancel">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The number of times regenerate preview requests received before the user
+    clicked the cancel button.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.RegeneratePreviewRequest.BeforeFirstData">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The number of times regenerate preview requests received before the first
+    preview data is availible.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.RegeneratePreviewRequest.BeforePrint">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    The number of times regenerate preview requests received before the user
+    clicked the print button.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.RenderAndGeneratePDFTime" units="milliseconds">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Time taken to render and generate PDF for print preview. (Includes time to
+    reflow the page back to normal, but not the time to reflow the page to
+    prepare for printing.)
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.RenderAndGeneratePDFTimeAvgPerPage"
+    units="milliseconds">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Time taken to render and generate PDF for print preview divided by the
+    number of pages. (Includes time to reflow the page back to normal, but not
+    the time to reflow the page to prepare for printing.)
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.RendererError" enum="PrintPreviewFailureType">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Count how frequently a set of pre-defined print preview errors occur.
+  </summary>
+</histogram>
+
+<histogram name="PrintPreview.RenderPDFPageTime" units="milliseconds">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Time taken to render each PDF page for print preview.</summary>
+</histogram>
+
+<histogram name="PrintPreview.RenderToPDFTime" units="milliseconds">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Time taken to render to PDF for print preview.</summary>
+</histogram>
+
+<histogram name="PrintPreview.UserAction" enum="PrintPreviewUserActionType">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Action taken by the user in the preview tab such as print, cancel, print to
+    pdf and show advanced print settings dialog.
+  </summary>
+</histogram>
+
 <histogram name="Profile.AddNewUser" enum="ProfileAddNewUser">
   <owner>bcwhite@chromium.org</owner>
   <owner>rlp@chromium.org</owner>
@@ -20107,6 +20687,18 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="RenderViewContextMenu.Shown" enum="RenderViewContextMenuItem">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>Count of renderer view context menu items shown.</summary>
+</histogram>
+
+<histogram name="RenderViewContextMenu.Used" enum="RenderViewContextMenuItem">
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Count of renderer view context menu items (Only commands now) used.
+  </summary>
+</histogram>
+
 <histogram name="RequestAutocomplete.DismissalState"
     enum="AutofillDialogDismissalState">
   <owner>estade@chromium.org</owner>
@@ -20193,6 +20785,15 @@ other types of suffix sets.
   <summary>
     Measures the frequency of required user actions returned by the Google
     Online Wallet server.
+  </summary>
+</histogram>
+
+<histogram name="Reset.ChromeOS.PowerwashDialogShown"
+    enum="PowerwashDialogViewType">
+  <owner>merkulova@chromium.org</owner>
+  <summary>
+    Records the number of times the factory reset dialog was shown. Grouped by
+    the viewtype.
   </summary>
 </histogram>
 
@@ -21031,6 +21632,14 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="SBClientDownload.ExtractImageHeadersTime" units="milliseconds">
+  <owner>grt@chromium.org</owner>
+  <summary>
+    Records the time it takes for the SafeBrowsing download service to extract
+    image headers from a downloaded binary.
+  </summary>
+</histogram>
+
 <histogram name="SBClientDownload.ExtractSignatureFeaturesTime"
     units="milliseconds">
   <owner>mattm@chromium.org</owner>
@@ -21447,6 +22056,15 @@ other types of suffix sets.
     The type of the default search engine that is loaded when a profile is
     opened or after a profile reset.  Note that at least one profile is opened
     on startup.
+  </summary>
+</histogram>
+
+<histogram name="ServicesCustomization.LoadResult"
+    enum="ServicesCustomizationLoadResult">
+  <owner>dpolukhin@chromium.org</owner>
+  <summary>
+    Records result of fetching and parsing OEM customization manifest. See
+    ServicesCustomizationDocument class for more info. Used only on Chrome OS.
   </summary>
 </histogram>
 
@@ -26462,6 +27080,38 @@ other types of suffix sets.
   </summary>
 </histogram>
 
+<histogram name="TimeZone.TimeZoneRequest.Event" enum="TimeZoneRequestEvent">
+  <summary>Events in TimeZoneRequest.</summary>
+</histogram>
+
+<histogram name="TimeZone.TimeZoneRequest.ResponseCode" enum="HttpResponseCode">
+  <summary>Http response codes in TimeZoneRequest.</summary>
+</histogram>
+
+<histogram name="TimeZone.TimeZoneRequest.ResponseFailureTime"
+    units="milliseconds">
+  <summary>
+    The time elapsed between the sending of the first API request and the time
+    the final (failed) response was recorded. Includes all retries.
+  </summary>
+</histogram>
+
+<histogram name="TimeZone.TimeZoneRequest.ResponseSuccessTime"
+    units="milliseconds">
+  <summary>
+    The time elapsed between the sending of the first API request and the time
+    the final (successfull) response was recorded. Includes all retries.
+  </summary>
+</histogram>
+
+<histogram name="TimeZone.TimeZoneRequest.Result" enum="TimeZoneRequestResult">
+  <summary>Result of TimeZoneRequest.</summary>
+</histogram>
+
+<histogram name="TimeZone.TimeZoneRequest.Retries">
+  <summary>Number of retries until the final response was recorded.</summary>
+</histogram>
+
 <histogram name="TopSites.NumberOfApplyBlacklist">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The number of times TopSitesImpl::ApplyBlacklist is called.</summary>
@@ -26918,6 +27568,15 @@ other types of suffix sets.
     Distribution of the low entropy source value used for field trial
     randomization, recorded on startup.
   </summary>
+</histogram>
+
+<histogram name="UMA.MachineIdState" enum="UmaMachineIdState">
+  <sumary>
+    Tracks if the machine ID is generated successfully and if it changes from
+    one run to the next. The machine ID is a 24-bit hash of machine
+    characteristics. It is expected to change if an install of Chrome is copied
+    to multiple machines. This check happens once per browser startup.
+  </sumary>
 </histogram>
 
 <histogram name="UMA.Perf.GetData" enum="GetPerfDataOutcome">
@@ -28441,6 +29100,14 @@ other types of suffix sets.
   <int value="3" label="LowMemory"/>
 </enum>
 
+<enum name="AndroidTabCloseUndoToastEvent" type="int">
+  <int value="0" label="Undo Shown (Cold)"/>
+  <int value="1" label="Undo Shown (Warm)"/>
+  <int value="2" label="Undo Pressed"/>
+  <int value="3" label="Undos Dismissed (Timeout)"/>
+  <int value="4" label="Undos Dismissed (Action)"/>
+</enum>
+
 <enum name="AppBannersDismissEvent" type="int">
   <int value="41" label="Error/unknown reason for dismissal"/>
   <int value="42" label="User opened the application after installing it"/>
@@ -28717,6 +29384,12 @@ other types of suffix sets.
   <int value="8" label="k88200Hz"/>
   <int value="9" label="k176400Hz"/>
   <int value="10" label="k192000Hz"/>
+</enum>
+
+<enum name="AudioTrackProcessingStates" type="int">
+  <int value="0" label="Enabled"/>
+  <int value="1" label="Disabled"/>
+  <int value="2" label="Processing in WebRTC"/>
 </enum>
 
 <enum name="AutocheckoutBubble" type="int">
@@ -29133,6 +29806,20 @@ other types of suffix sets.
   <int value="3" label="webgl"/>
 </enum>
 
+<enum name="CaptivePortalNotificationStatus" type="int">
+  <int value="0" label="UNKNOWN"/>
+  <int value="1" label="OFFLINE"/>
+  <int value="2" label="ONLINE"/>
+  <int value="3" label="PORTAL"/>
+  <int value="4" label="PROXY_AUTH_REQUIRED"/>
+</enum>
+
+<enum name="CaptivePortalNotificationUserAction" type="int">
+  <int value="0" label="CLICKED"/>
+  <int value="1" label="CLOSED"/>
+  <int value="2" label="IGNORED"/>
+</enum>
+
 <enum name="CapturePixelFormat" type="int">
   <int value="0" label="UNKNOWN"/>
   <int value="1" label="I420"/>
@@ -29263,6 +29950,65 @@ other types of suffix sets.
   <int value="0" label="Write from non-Incognito"/>
   <int value="1" label="Write from Incognito"/>
   <int value="2" label="Read Text"/>
+</enum>
+
+<enum name="CloudPrintAuthEventType" type="int">
+  <int value="0" label="AUTH_EVENT_ROBO_CREATE"/>
+  <int value="1" label="AUTH_EVENT_ROBO_SUCCEEDED"/>
+  <int value="2" label="AUTH_EVENT_ROBO_FAILED"/>
+  <int value="3" label="AUTH_EVENT_ROBO_JSON_ERROR"/>
+  <int value="4" label="AUTH_EVENT_ROBO_AUTH_ERROR"/>
+  <int value="5" label="AUTH_EVENT_AUTH_WITH_TOKEN"/>
+  <int value="6" label="AUTH_EVENT_AUTH_WITH_CODE"/>
+  <int value="7" label="AUTH_EVENT_TOKEN_RESPONSE"/>
+  <int value="8" label="AUTH_EVENT_REFRESH_REQUEST"/>
+  <int value="9" label="AUTH_EVENT_REFRESH_RESPONSE"/>
+  <int value="10" label="AUTH_EVENT_AUTH_ERROR"/>
+  <int value="11" label="AUTH_EVENT_NET_ERROR"/>
+</enum>
+
+<enum name="CloudPrintJobHandlerEventType" type="int">
+  <int value="0" label="JOB_HANDLER_CHECK_FOR_JOBS"/>
+  <int value="1" label="JOB_HANDLER_START"/>
+  <int value="2" label="JOB_HANDLER_PENDING_TASK"/>
+  <int value="3" label="JOB_HANDLER_PRINTER_UPDATE"/>
+  <int value="4" label="JOB_HANDLER_JOB_CHECK"/>
+  <int value="5" label="JOB_HANDLER_JOB_STARTED"/>
+  <int value="6" label="JOB_HANDLER_VALID_TICKET"/>
+  <int value="7" label="JOB_HANDLER_DATA"/>
+  <int value="8" label="JOB_HANDLER_SET_IN_PROGRESS"/>
+  <int value="9" label="JOB_HANDLER_SET_START_PRINTING"/>
+  <int value="10" label="JOB_HANDLER_START_SPOOLING"/>
+  <int value="11" label="JOB_HANDLER_SPOOLED"/>
+  <int value="12" label="JOB_HANDLER_JOB_COMPLETED"/>
+  <int value="13" label="JOB_HANDLER_INVALID_TICKET"/>
+  <int value="14" label="JOB_HANDLER_INVALID_DATA"/>
+</enum>
+
+<enum name="CloudPrintJobStatusType" type="int">
+  <int value="0" label="JOB_SUCCESS"/>
+  <int value="1" label="JOB_DOWNLOAD_FAILED"/>
+  <int value="2" label="JOB_VALIDATE_TICKET_FAILED"/>
+  <int value="3" label="JOB_FAILED"/>
+</enum>
+
+<enum name="CloudPrintNativeJobStatusType" type="int">
+  <int value="0" label="PRINT_JOB_STATUS_INVALID"/>
+  <int value="1" label="PRINT_JOB_STATUS_IN_PROGRESS"/>
+  <int value="2" label="PRINT_JOB_STATUS_ERROR"/>
+  <int value="3" label="PRINT_JOB_STATUS_COMPLETED"/>
+</enum>
+
+<enum name="CloudPrintUrlFetcherRequestType" type="int">
+  <int value="0" label="REQUEST_AUTH_CODE"/>
+  <int value="1" label="REQUEST_REGISTER"/>
+  <int value="2" label="REQUEST_UNREGISTER"/>
+  <int value="3" label="REQUEST_UPDATE_PRINTER"/>
+  <int value="4" label="REQUEST_UPDATE_JOB"/>
+  <int value="5" label="REQUEST_USER_MESSAGE"/>
+  <int value="6" label="REQUEST_TICKET"/>
+  <int value="7" label="REQUEST_DATA"/>
+  <int value="8" label="REQUEST_JOB_FETCH"/>
 </enum>
 
 <enum name="CoalescePotentialPackets" type="int">
@@ -29517,6 +30263,22 @@ other types of suffix sets.
   <int value="1" label="AllowHttp"/>
   <int value="2" label="Deny"/>
   <int value="3" label="Cancel"/>
+</enum>
+
+<enum name="DevicesPageEvents" type="int">
+  <int value="0" label="OPENED"/>
+  <int value="1" label="LOG_IN_STARTED_FROM_REGISTER_PROMO"/>
+  <int value="2" label="LOG_IN_STARTED_FROM_DEVICE_LIST_PROMO"/>
+  <int value="3" label="ADD_PRINTER_CLICKED"/>
+  <int value="4" label="REGISTER_CLICKED"/>
+  <int value="5" label="REGISTER_CONFIRMED"/>
+  <int value="6" label="REGISTER_SUCCESS"/>
+  <int value="7" label="REGISTER_CANCEL"/>
+  <int value="8" label="REGISTER_FAILURE"/>
+  <int value="9" label="MANAGE_CLICKED"/>
+  <int value="10" label="REGISTER_CANCEL_ON_PRINTER"/>
+  <int value="11" label="REGISTER_TIMEOUT"/>
+  <int value="12" label="LOG_IN_STARTED_FROM_REGISTER_OVERLAY_PROMO"/>
 </enum>
 
 <enum name="DiagnosticsRecoveryRun" type="int">
@@ -31556,6 +32318,71 @@ other types of suffix sets.
   <int value="28" label="SOCKET_SPECIFIC_HOSTS"/>
 </enum>
 
+<enum name="ExtensionPermission2" type="int">
+<!-- Generated from ../../../extensions/common/permissions/permission_message.h -->
+
+  <int value="0" label="kUnknown"/>
+  <int value="1" label="kNone"/>
+  <int value="2" label="kBookmarks"/>
+  <int value="3" label="kGeolocation"/>
+  <int value="4" label="kBrowsingHistory"/>
+  <int value="5" label="kTabs"/>
+  <int value="6" label="kManagement"/>
+  <int value="7" label="kDebugger"/>
+  <int value="8" label="kDesktopCapture"/>
+  <int value="9" label="kHid"/>
+  <int value="10" label="kHosts1"/>
+  <int value="11" label="kHosts2"/>
+  <int value="12" label="kHosts3"/>
+  <int value="13" label="kHosts4OrMore"/>
+  <int value="14" label="kHostsAll"/>
+  <int value="15" label="kFullAccess"/>
+  <int value="16" label="kClipboard"/>
+  <int value="17" label="kTtsEngine"/>
+  <int value="18" label="kContentSettings"/>
+  <int value="19" label="kPrivacy"/>
+  <int value="20" label="kManagedMode"/>
+  <int value="21" label="kInput"/>
+  <int value="22" label="kAudioCapture"/>
+  <int value="23" label="kVideoCapture"/>
+  <int value="24" label="kDownloads"/>
+  <int value="25" label="kFileSystemWrite"/>
+  <int value="26" label="kMediaGalleriesAllGalleriesRead"/>
+  <int value="27" label="kSerial"/>
+  <int value="28" label="kSocketAnyHost"/>
+  <int value="29" label="kSocketDomainHosts"/>
+  <int value="30" label="kSocketSpecificHosts"/>
+  <int value="31" label="kBluetooth"/>
+  <int value="32" label="kUsb"/>
+  <int value="33" label="kSystemIndicator"/>
+  <int value="34" label="kUsbDevice"/>
+  <int value="35" label="kMediaGalleriesAllGalleriesCopyTo"/>
+  <int value="36" label="kSystemInfoDisplay"/>
+  <int value="37" label="kNativeMessaging"/>
+  <int value="38" label="kSyncFileSystem"/>
+  <int value="39" label="kAudio"/>
+  <int value="40" label="kFavicon"/>
+  <int value="41" label="kMusicManagerPrivate"/>
+  <int value="42" label="kWebConnectable"/>
+  <int value="43" label="kActivityLogPrivate"/>
+  <int value="44" label="kBluetoothDevices"/>
+  <int value="45" label="kDownloadsOpen"/>
+  <int value="46" label="kNetworkingPrivate"/>
+  <int value="47" label="kDeclarativeWebRequest"/>
+  <int value="48" label="kFileSystemDirectory"/>
+  <int value="49" label="kFileSystemWriteDirectory"/>
+  <int value="50" label="kSignedInDevices"/>
+  <int value="51" label="kWallpaper"/>
+  <int value="52" label="kNetworkState"/>
+  <int value="53" label="kHomepage"/>
+  <int value="54" label="kSearchProvider"/>
+  <int value="55" label="kStartupPages"/>
+  <int value="56" label="kMediaGalleriesAllGalleriesDelete"/>
+  <int value="57" label="kScreenlockPrivate"/>
+  <int value="58" label="kOverrideBookmarksUI"/>
+  <int value="59" label="kAutomation"/>
+</enum>
+
 <enum name="ExtensionServiceVerifyAllSuccess" type="int">
   <int value="0" label="VERIFY_ALL_BOOTSTRAP_SUCCESS"/>
   <int value="1" label="VERIFY_ALL_BOOTSTRAP_FAILURE"/>
@@ -32455,6 +33282,25 @@ other types of suffix sets.
   <int value="3" label="Socket failure"/>
 </enum>
 
+<enum name="GCMEndpoints" type="int">
+  <int value="0" label="mtalk.google.com:5228"/>
+  <int value="1" label="mtalk.google.com:443"/>
+</enum>
+
+<enum name="GCMInvalidationsIncomingMessageStatus" type="int">
+  <int value="0" label="Success"/>
+  <int value="1" label="GCM message's content missing or empty"/>
+  <int value="2" label="Base64Decode failed"/>
+  <int value="3" label="Parsing protobuf failed"/>
+</enum>
+
+<enum name="GCMInvalidationsOutgoingMessageStatus" type="int">
+  <int value="0" label="Success"/>
+  <int value="1" label="Message was discarded"/>
+  <int value="2" label="Access token request failed"/>
+  <int value="3" label="HTTP Post failed"/>
+</enum>
+
 <enum name="GCMRegistrationRequestStatus" type="int">
   <int value="0" label="Success (this is not logged currently)"/>
   <int value="1" label="Invalid parameters"/>
@@ -32599,6 +33445,9 @@ other types of suffix sets.
   <int value="8" label="DELETED_SHOW_WELCOME_TOAST"/>
   <int value="9" label="STOPPED"/>
   <int value="10" label="DELETED_USER_SUPPRESSED"/>
+  <int value="11" label="SIGNED_OUT"/>
+  <int value="12" label="NOTIFICATION_DISABLED"/>
+  <int value="13" label="GOOGLE_NOW_DISABLED"/>
 </enum>
 
 <enum name="GoogleServiceAuthError" type="int">
@@ -33075,6 +33924,11 @@ other types of suffix sets.
   <int value="40" label="USER_CANCELED"/>
   <int value="41" label="USER_SHUTDOWN"/>
   <int value="50" label="CRASH"/>
+</enum>
+
+<enum name="InvalidationNetworkChannel" type="int">
+  <int value="0" label="PushClientChannel"/>
+  <int value="1" label="GCMNetworkChannel"/>
 </enum>
 
 <enum name="IPV6ProbeResult" type="int">
@@ -33845,12 +34699,27 @@ other types of suffix sets.
 
 <enum name="ManagedUserPasswordChange" type="int">
   <int value="0" label="OK_MANAGER">Changed in manager session</int>
-  <int value="1" label="OK_MANGED">Changed in managed user session</int>
+  <int value="1" label="OK_MANGED">Changed in supervised user session</int>
   <int value="2" label="FAILED_NO_MASTER_KEY">Master key not found</int>
-  <int value="3" label="FAILED_NO_SIGNATURE_KEY">Signature key not found</int>
+  <int value="3" label="FAILED_NO_SIGNATURE_KEY">
+    Signature or encryption key not found
+  </int>
   <int value="4" label="FAILED_NO_PASSWORD_DATA">Password data not found</int>
   <int value="5" label="FAILED_MASTER_KEY_FAILURE">
     Manager key authorization failed
+  </int>
+  <int value="6" label="FAILED_LOAD_DATA_FAILURE">
+    Could not load new password data upon supervised user signin
+  </int>
+  <int value="7" label="FAILED_INCOMPLETE_DATA_FAILURE">
+    Incomplete password data loaded upon supervised user signin.
+  </int>
+  <int value="8" label="FAILED_AUTHENTICATION_FAILURE">
+    Authentication failure while changing password during supervised user
+    signin.
+  </int>
+  <int value="9" label="FAILED_STORE_DATA">
+    Could not store new password data for supervised user.
   </int>
 </enum>
 
@@ -35876,7 +36745,149 @@ other types of suffix sets.
              / form submit succeeded"/>
 </enum>
 
+<enum name="PasswordManagerActionsTakenV3" type="int">
+  <summary>
+    The value is a combination of three different options - what did the
+    password manager do, what did the user do, and was the form submitted (and
+    submitted successfully or not). The meaning of each value can be determined
+    from the values in chrome/browser/password_manager/password_form_manager.h
+  </summary>
+  <int value="0"
+      label="manager did nothing / user did nothing / form not submitted"/>
+  <int value="1"
+      label="manager did nothing / user chose a value / form not submitted"/>
+  <int value="2"
+      label="manager did nothing / user chose a value from PSL / form not
+             submitted"/>
+  <int value="3"
+      label="manager did nothing / user typed in password / form not
+             submitted"/>
+  <int value="4"
+      label="manager did nothing / user typed in username and password / form
+             not submitted"/>
+  <int value="5"
+      label="manager filled the fields / user did nothing / form not
+             submitted"/>
+  <int value="6"
+      label="manager filled the fields / user chose a value / form not
+             submitted"/>
+  <int value="7"
+      label="manager filled the fields / user chose a value from PSL / form
+             not submitted"/>
+  <int value="8"
+      label="manager filled the fields / user typed in password / form not
+             submitted"/>
+  <int value="9"
+      label="manager filled the fields / user typed in username and password
+             / form not submitted"/>
+  <int value="10"
+      label="manager did nothing (site was blacklisted) / user did nothing /
+             form not submitted"/>
+  <int value="11"
+      label="manager did nothing (site was blacklisted) / user chose a value
+             / form not submitted (this value shouldn't be possible)"/>
+  <int value="12"
+      label="manager did nothing (site was blacklisted) / user chose a value
+             from PSL / form not submitted (this value shouldn't be possible)"/>
+  <int value="13"
+      label="manager did nothing (site was blacklisted) / user typed in
+             password / form not submitted"/>
+  <int value="14"
+      label="manager did nothing (site was blacklisted) / user typed in
+             username and password / form not submitted"/>
+  <int value="15"
+      label="manager did nothing / user did nothing / form submit failed"/>
+  <int value="16"
+      label="manager did nothing / user chose a value / form submit failed"/>
+  <int value="17"
+      label="manager did nothing / user chose a value from psl / form submit
+             failed"/>
+  <int value="18"
+      label="manager did nothing / user typed in password / form submit
+             failed"/>
+  <int value="19"
+      label="manager did nothing / user typed in username and password / form
+             submit failed"/>
+  <int value="20"
+      label="manager filled the fields / user did nothing / form submit
+             failed"/>
+  <int value="21"
+      label="manager filled the fields / user chose a value / form submit
+             failed"/>
+  <int value="22"
+      label="manager filled the fields / user chose a value from psl / form
+             submit failed"/>
+  <int value="23"
+      label="manager filled the fields / user typed in pasword / form submit
+             failed"/>
+  <int value="24"
+      label="manager filled the fields / user typed in username and pasword /
+             form submit failed"/>
+  <int value="25"
+      label="manager did nothing (site was blacklisted) / user did nothing /
+             form submit failed"/>
+  <int value="26"
+      label="manager did nothing (site was blacklisted) / user chose a value
+             / form submit failed (this value shouldn't be possible)"/>
+  <int value="27"
+      label="manager did nothing (site was blacklisted) / user chose a value
+             from psl / form submit failed (this value shouldn't be possible)"/>
+  <int value="28"
+      label="manager did nothing (site was blacklisted) / user typed in
+             password / form submit failed"/>
+  <int value="29"
+      label="manager did nothing (site was blacklisted) / user typed in
+             username and password / form submit failed"/>
+  <int value="30"
+      label="manager did nothing / user did nothing / form submit succeeded"/>
+  <int value="31"
+      label="manager did nothing / user chose a value / form submit succeeded"/>
+  <int value="32"
+      label="manager did nothing / user chose a value from psl / form submit
+             succeeded"/>
+  <int value="33"
+      label="manager did nothing / user typed in password / form submit
+             succeeded"/>
+  <int value="34"
+      label="manager did nothing / user typed in username and password / form
+             submit succeeded"/>
+  <int value="35"
+      label="manager filled the fields / user did nothing / form submit
+             succeeded"/>
+  <int value="36"
+      label="manager filled the fields / user chose a value / form submit
+             succeeded"/>
+  <int value="37"
+      label="manager filled the fields / user chose a value from psl / form
+             submit succeeded"/>
+  <int value="38"
+      label="manager filled the fields / user typed in password / form submit
+             succeeded"/>
+  <int value="39"
+      label="manager filled the fields / user typed in username and password
+             / form submit succeeded"/>
+  <int value="40"
+      label="manager did nothing (site was blacklisted) / user did nothing /
+             form submit succeeded"/>
+  <int value="41"
+      label="manager did nothing (site was blacklisted) / user chose a value
+             / form submit succeeded (this value shouldn't be possible)"/>
+  <int value="42"
+      label="manager did nothing (site was blacklisted) / user chose a value
+             from psl / form submit succeeded (this value shouldn't be
+             possible)"/>
+  <int value="43"
+      label="manager did nothing (site was blacklisted) / user typed in
+             password / form submit succeeded"/>
+  <int value="44"
+      label="manager did nothing (site was blacklisted) / user typed in
+             username and password / form submit succeeded"/>
+</enum>
+
 <enum name="PasswordManagerActionsTakenWithPsl" type="int">
+  <obsolete>
+    Deprecated as of 3/18/2014. See PasswordManagerActionsTakenV3.
+  </obsolete>
   <summary>
     The value is a combination of three different options - what did the
     password manager do, what did the user do, and was the form submitted (and
@@ -36059,9 +37070,11 @@ other types of suffix sets.
   <int value="138418890" label="PPB_Memory(Dev);0.1"/>
   <int value="153443470" label="PPB_URLResponseInfo;1.0"/>
   <int value="153532707" label="PPB_Buffer(Dev);0.4"/>
+  <int value="156766028" label="PPB_UMA_Private;0.3"/>
   <int value="162107265" label="PPB_NetworkMonitor;1.0"/>
   <int value="180906214" label="PPB_Instance_Private;0.1"/>
   <int value="221802429" label="PPB_URLUtil(Dev);0.7"/>
+  <int value="225125520" label="PPB_Find(Private);0.3"/>
   <int value="226206264" label="PPB_FileRef;1.1"/>
   <int value="229560990" label="PPB_Var(Deprecated);0.3"/>
   <int value="250764663" label="PPB_Graphics2D(Dev);0.2"/>
@@ -36343,6 +37356,14 @@ other types of suffix sets.
   <int value="2" label="USB Charger"/>
   <int value="3" label="Unconfirmed Spring Charger"/>
   <int value="4" label="Safe Spring Charger"/>
+</enum>
+
+<enum name="PowerwashDialogViewType" type="int">
+  <int value="0" label="Invoked on settings page"/>
+  <int value="1" label="Shortcut. Confirmation for powerwash only."/>
+  <int value="2" label="Shortcut. Confirmation for powerwash and rollback."/>
+  <int value="3" label="Shortcut. Offer. Rollback unavailable."/>
+  <int value="4" label="Shortcut. Offer. Rollback available."/>
 </enum>
 
 <enum name="PreconnectedNavigation" type="int">
@@ -36689,6 +37710,95 @@ other types of suffix sets.
   <int value="1" label="tapdown"/>
   <int value="2" label="tapunconfirmed"/>
   <int value="3" label="tapdown + tapunconfirmed"/>
+</enum>
+
+<enum name="PrinterServiceEventType" type="int">
+  <int value="0" label="Printer added"/>
+  <int value="1" label="Page displayed"/>
+</enum>
+
+<enum name="PrintPreviewFailureType" type="int">
+  <int value="0" label="No error"/>
+  <int value="1" label="Bad settings from print preview tab"/>
+  <int value="2" label="Copy metadata failed"/>
+  <int value="3" label="Metafile init failed"/>
+  <int value="4" label="0-page preview"/>
+  <int value="5" label="Mac draft metafile init failed"/>
+  <int value="6" label="PreviewPageRendered with no metafile"/>
+  <int value="7" label="UpdatePrintSettings failed"/>
+  <int value="8" label="Received bad printer settings"/>
+</enum>
+
+<enum name="PrintPreviewFontTypeType" type="int">
+  <int value="0" label="TYPE1"/>
+  <int value="1" label="TYPE1_CID"/>
+  <int value="2" label="CFF"/>
+  <int value="3" label="TRUETYPE"/>
+  <int value="4" label="OTHER"/>
+  <int value="5" label="NOT_EMBEDDABLE"/>
+</enum>
+
+<enum name="PrintPreviewGcpPromoBuckets" type="int">
+  <int value="0" label="PROMO_SHOWN"/>
+  <int value="1" label="PROMO_CLOSED"/>
+  <int value="2" label="GCP_PROMO_BUCKET_BOUNDARY"/>
+</enum>
+
+<enum name="PrintPreviewHelperEvents" type="int">
+  <int value="0" label="PREVIEW_EVENT_REQUESTED"/>
+  <int value="1" label="PREVIEW_EVENT_CACHE_HIT"/>
+  <int value="2" label="PREVIEW_EVENT_CREATE_DOCUMENT"/>
+  <int value="3" label="PREVIEW_EVENT_NEW_SETTINGS"/>
+</enum>
+
+<enum name="PrintPreviewPrintDestinationBuckets" type="int">
+  <int value="0" label="DESTINATION_SHOWN"/>
+  <int value="1" label="DESTINATION_CLOSED_CHANGED"/>
+  <int value="2" label="DESTINATION_CLOSED_UNCHANGED"/>
+  <int value="3" label="SIGNIN_PROMPT"/>
+  <int value="4" label="SIGNIN_TRIGGERED"/>
+  <int value="5" label="PRIVET_DUPLICATE_SELECTED"/>
+  <int value="6" label="CLOUD_DUPLICATE_SELECTED"/>
+  <int value="7" label="REGISTER_PROMO_SHOWN"/>
+  <int value="8" label="REGISTER_PROMO_SELECTED"/>
+</enum>
+
+<enum name="PrintPreviewUserActionType" type="int">
+  <int value="0" label="PRINT_TO_PRINTER"/>
+  <int value="1" label="PRINT_TO_PDF"/>
+  <int value="2" label="CANCEL"/>
+  <int value="3" label="FALLBACK_TO_ADVANCED_SETTINGS_DIALOG"/>
+  <int value="4" label="PREVIEW_FAILED"/>
+  <int value="5" label="PREVIEW_STARTED"/>
+  <int value="6" label="INITIATOR_TAB_CRASHED"/>
+  <int value="7" label="INITIATOR_TAB_CLOSED"/>
+  <int value="8" label="PRINT_WITH_CLOUD_PRINT"/>
+  <int value="9" label="PRINT_WITH_PRIVET"/>
+</enum>
+
+<enum name="PrintSettings" type="int">
+  <int value="0" label="LANDSCAPE"/>
+  <int value="1" label="PORTRAIT"/>
+  <int value="2" label="COLOR"/>
+  <int value="3" label="BLACK_AND_WHITE"/>
+  <int value="4" label="COLLATE"/>
+  <int value="5" label="SIMPLEX"/>
+  <int value="6" label="DUPLEX"/>
+  <int value="7" label="TOTAL"/>
+  <int value="8" label="HEADERS_AND_FOOTERS"/>
+  <int value="9" label="CSS_BACKGROUND"/>
+  <int value="10" label="SELECTION_ONLY"/>
+</enum>
+
+<enum name="PrivetNotificationsEvent" type="int">
+  <int value="0" label="PRIVET_SERVICE_STARTED"/>
+  <int value="1" label="PRIVET_LISTER_STARTED"/>
+  <int value="2" label="PRIVET_DEVICE_CHANGED"/>
+  <int value="3" label="PRIVET_INFO_DONE"/>
+  <int value="4" label="PRIVET_NOTIFICATION_SHOWN"/>
+  <int value="5" label="PRIVET_NOTIFICATION_CANCELED"/>
+  <int value="6" label="PRIVET_NOTIFICATION_CLICKED"/>
+  <int value="7" label="PRIVET_DISABLE_NOTIFICATIONS_CLICKED"/>
 </enum>
 
 <enum name="ProfileAddNewUser" type="int">
@@ -37088,6 +38198,12 @@ other types of suffix sets.
   <int value="6" label="CANCELLED"/>
 </enum>
 
+<enum name="QuicSessionErrorCodes" type="int">
+  <int value="0" label="CONNECTING_SOCKET"/>
+  <int value="1" label="SETTING_RECEIVE_BUFFER"/>
+  <int value="2" label="SETTING_SEND_BUFFER"/>
+</enum>
+
 <enum name="RapporDiscardReason" type="int">
   <int value="0" label="Upload Success"/>
   <int value="1" label="Upload Rejected"/>
@@ -37099,6 +38215,67 @@ other types of suffix sets.
   <int value="1" label="Other Device Tab"/>
   <int value="2" label="Restore Window"/>
   <int value="3" label="Show More"/>
+</enum>
+
+<enum name="RenderViewContextMenuItem" type="int">
+  <int value="0" label="IDC_CONTENT_CONTEXT_CUSTOM_FIRST"/>
+  <int value="1" label="IDC_EXTENSIONS_CONTEXT_CUSTOM_FIRST"/>
+  <int value="2" label="IDC_CONTENT_CONTEXT_PROTOCOL_HANDLER_FIRST"/>
+  <int value="3" label="IDC_CONTENT_CONTEXT_OPENLINKNEWTAB"/>
+  <int value="4" label="IDC_CONTENT_CONTEXT_OPENLINKNEWWINDOW"/>
+  <int value="5" label="IDC_CONTENT_CONTEXT_OPENLINKOFFTHERECORD"/>
+  <int value="6" label="IDC_CONTENT_CONTEXT_SAVELINKAS"/>
+  <int value="7" label="IDC_CONTENT_CONTEXT_SAVEAVAS"/>
+  <int value="8" label="IDC_CONTENT_CONTEXT_SAVEIMAGEAS"/>
+  <int value="9" label="IDC_CONTENT_CONTEXT_COPYLINKLOCATION"/>
+  <int value="10" label="IDC_CONTENT_CONTEXT_COPYIMAGELOCATION"/>
+  <int value="11" label="IDC_CONTENT_CONTEXT_COPYAVLOCATION"/>
+  <int value="12" label="IDC_CONTENT_CONTEXT_COPYIMAGE"/>
+  <int value="13" label="IDC_CONTENT_CONTEXT_OPENIMAGENEWTAB"/>
+  <int value="14" label="IDC_CONTENT_CONTEXT_OPENAVNEWTAB"/>
+  <int value="15" label="IDC_CONTENT_CONTEXT_PLAYPAUSE"/>
+  <int value="16" label="IDC_CONTENT_CONTEXT_MUTE"/>
+  <int value="17" label="IDC_CONTENT_CONTEXT_LOOP"/>
+  <int value="18" label="IDC_CONTENT_CONTEXT_CONTROLS"/>
+  <int value="19" label="IDC_CONTENT_CONTEXT_ROTATECW"/>
+  <int value="20" label="IDC_CONTENT_CONTEXT_ROTATECCW"/>
+  <int value="21" label="IDC_BACK"/>
+  <int value="22" label="IDC_FORWARD"/>
+  <int value="23" label="IDC_SAVE_PAGE"/>
+  <int value="24" label="IDC_RELOAD"/>
+  <int value="25" label="IDC_CONTENT_CONTEXT_RELOAD_PACKAGED_APP"/>
+  <int value="26" label="IDC_CONTENT_CONTEXT_RESTART_PACKAGED_APP"/>
+  <int value="27" label="IDC_PRINT"/>
+  <int value="28" label="IDC_VIEW_SOURCE"/>
+  <int value="29" label="IDC_CONTENT_CONTEXT_INSPECTELEMENT"/>
+  <int value="30" label="IDC_CONTENT_CONTEXT_INSPECTBACKGROUNDPAGE"/>
+  <int value="31" label="IDC_CONTENT_CONTEXT_VIEWPAGEINFO"/>
+  <int value="32" label="IDC_CONTENT_CONTEXT_TRANSLATE"/>
+  <int value="33" label="IDC_CONTENT_CONTEXT_RELOADFRAME"/>
+  <int value="34" label="IDC_CONTENT_CONTEXT_VIEWFRAMESOURCE"/>
+  <int value="35" label="IDC_CONTENT_CONTEXT_VIEWFRAMEINFO"/>
+  <int value="36" label="IDC_CONTENT_CONTEXT_UNDO"/>
+  <int value="37" label="IDC_CONTENT_CONTEXT_REDO"/>
+  <int value="38" label="IDC_CONTENT_CONTEXT_CUT"/>
+  <int value="39" label="IDC_CONTENT_CONTEXT_COPY"/>
+  <int value="40" label="IDC_CONTENT_CONTEXT_PASTE"/>
+  <int value="41" label="IDC_CONTENT_CONTEXT_PASTE_AND_MATCH_STYLE"/>
+  <int value="42" label="IDC_CONTENT_CONTEXT_DELETE"/>
+  <int value="43" label="IDC_CONTENT_CONTEXT_SELECTALL"/>
+  <int value="44" label="IDC_CONTENT_CONTEXT_SEARCHWEBFOR"/>
+  <int value="45" label="IDC_CONTENT_CONTEXT_GOTOURL"/>
+  <int value="46" label="IDC_CONTENT_CONTEXT_LANGUAGE_SETTINGS"/>
+  <int value="47" label="IDC_CONTENT_CONTEXT_PROTOCOL_HANDLER_SETTINGS"/>
+  <int value="48" label="IDC_CONTENT_CONTEXT_ADDSEARCHENGINE"/>
+  <int value="49" label="IDC_CONTENT_CONTEXT_SPEECH_INPUT_FILTER_PROFANITIES"/>
+  <int value="50" label="IDC_CONTENT_CONTEXT_SPEECH_INPUT_ABOUT"/>
+  <int value="51" label="IDC_SPEECH_INPUT_MENU"/>
+  <int value="52" label="IDC_CONTENT_CONTEXT_OPENLINKWITH"/>
+  <int value="53" label="IDC_CHECK_SPELLING_WHILE_TYPING"/>
+  <int value="54" label="IDC_SPELLCHECK_MENU"/>
+  <int value="55" label="IDC_CONTENT_CONTEXT_SPELLING_TOGGLE"/>
+  <int value="56" label="IDC_SPELLCHECK_LANGUAGES_FIRST"/>
+  <int value="57" label="IDC_CONTENT_CONTEXT_SEARCHWEBFORIMAGE"/>
 </enum>
 
 <enum name="ResolutionCategory" type="int">
@@ -37477,6 +38654,46 @@ other types of suffix sets.
   <int value="31" label="ZOZNAM"/>
   <int value="32" label="YAHOOQC"/>
   <int value="33" label="NONE"/>
+</enum>
+
+<enum name="ServiceProcessEventType" type="int">
+  <int value="0" label="SERVICE_EVENT_INITIALIZE"/>
+  <int value="1" label="SERVICE_EVENT_ENABLED_ON_LAUNCH"/>
+  <int value="2" label="SERVICE_EVENT_ENABLE"/>
+  <int value="3" label="SERVICE_EVENT_DISABLE"/>
+  <int value="4" label="SERVICE_EVENT_DISABLE_BY_POLICY"/>
+  <int value="5" label="SERVICE_EVENT_LAUNCH"/>
+  <int value="6" label="SERVICE_EVENT_LAUNCHED"/>
+  <int value="7" label="SERVICE_EVENT_LAUNCH_FAILED"/>
+  <int value="8" label="SERVICE_EVENT_CHANNEL_CONNECTED"/>
+  <int value="9" label="SERVICE_EVENT_CHANNEL_ERROR"/>
+  <int value="10" label="SERVICE_EVENT_INFO_REQUEST"/>
+  <int value="11" label="SERVICE_EVENT_INFO_REPLY"/>
+  <int value="12" label="SERVICE_EVENT_HISTOGRAMS_REQUEST"/>
+  <int value="13" label="SERVICE_EVENT_HISTOGRAMS_REPLY"/>
+  <int value="14" label="SERVICE_PRINTERS_REQUEST"/>
+  <int value="15" label="SERVICE_PRINTERS_REPLY"/>
+</enum>
+
+<enum name="ServicesCustomizationLoadResult" type="int">
+  <int value="0" label="Manifest loaded successfully"/>
+  <int value="1" label="Manifest not found on server"/>
+  <int value="2" label="Manifest parsing error"/>
+  <int value="3" label="Failed to load manifest after N retries"/>
+</enum>
+
+<enum name="ServiceUtilityProcessHostEventType" type="int">
+  <int value="0" label="SERVICE_UTILITY_STARTED"/>
+  <int value="1" label="SERVICE_UTILITY_DISCONNECTED"/>
+  <int value="2" label="SERVICE_UTILITY_METAFILE_REQUEST"/>
+  <int value="3" label="SERVICE_UTILITY_METAFILE_SUCCEEDED"/>
+  <int value="4" label="SERVICE_UTILITY_METAFILE_FAILED"/>
+  <int value="5" label="SERVICE_UTILITY_CAPS_REQUEST"/>
+  <int value="6" label="SERVICE_UTILITY_CAPS_SUCCEEDED"/>
+  <int value="7" label="SERVICE_UTILITY_CAPS_FAILED"/>
+  <int value="8" label="SERVICE_UTILITY_SEMANTIC_CAPS_REQUEST"/>
+  <int value="9" label="SERVICE_UTILITY_SEMANTIC_CAPS_SUCCEEDED"/>
+  <int value="10" label="SERVICE_UTILITY_SEMANTIC_CAPS_FAILED"/>
 </enum>
 
 <enum name="SessionStartupPref" type="int">
@@ -38765,6 +39982,21 @@ other types of suffix sets.
   <int value="9" label="No syn data + probe failed"/>
 </enum>
 
+<enum name="TimeZoneRequestEvent" type="int">
+  <int value="0" label="Request start"/>
+  <int value="1" label="Response success"/>
+  <int value="2" label="Response not OK"/>
+  <int value="3" label="Response empty"/>
+  <int value="4" label="Response malformed"/>
+</enum>
+
+<enum name="TimeZoneRequestResult" type="int">
+  <int value="0" label="Success"/>
+  <int value="1" label="Failure"/>
+  <int value="2" label="Server error"/>
+  <int value="3" label="Request is cancelled."/>
+</enum>
+
 <enum name="TLSRenegotiationPatched" type="int">
   <int value="0" label="Not renegotiation patched"/>
   <int value="1" label="Renegotiation patched"/>
@@ -38907,6 +40139,13 @@ other types of suffix sets.
 <enum name="UmaInitSequence" type="int">
   <int value="0" label="Timer fired first"/>
   <int value="1" label="Init task completed first"/>
+</enum>
+
+<enum name="UmaMachineIdState" type="int">
+  <int value="0" label="ID generation failed"/>
+  <int value="1" label="No stored value"/>
+  <int value="2" label="Machine ID changed"/>
+  <int value="3" label="Machine ID unchanged"/>
 </enum>
 
 <enum name="UmaUploadResponseStatus" type="int">
@@ -39543,6 +40782,17 @@ other types of suffix sets.
   <affected-histogram name="CertificateType.NonBR"/>
   <affected-histogram name="CertificateType2.BR"/>
   <affected-histogram name="CertificateType2.NonBR"/>
+</fieldtrial>
+
+<fieldtrial name="CloudPrintRequests" separator=".">
+  <group name="Register" label="Register request"/>
+  <group name="UpdatePrinter" label="Update printer request"/>
+  <group name="DownloadData" label="Download data request"/>
+  <group name="Other" label="Other requests"/>
+  <affected-histogram name="CloudPrint.UrlFetcherDownloadSize"/>
+  <affected-histogram name="CloudPrint.UrlFetcherRequestTime"/>
+  <affected-histogram name="CloudPrint.UrlFetcherRetries"/>
+  <affected-histogram name="CloudPrint.UrlFetcherUploadSize"/>
 </fieldtrial>
 
 <fieldtrial name="ConnCountImpact">
@@ -41596,7 +42846,9 @@ other types of suffix sets.
   <group name="PepperFlashPlayer.plugin" label="Flash player on Mac"/>
   <group name="widevinecdmadapter.dll" label="Widevine CDM on Windows"/>
   <group name="widevinecdmadapter.plugin" label="Widevine CDM on Mac"/>
+  <affected-histogram name="Plugin.PpapiBrokerLoadErrorCode"/>
   <affected-histogram name="Plugin.PpapiBrokerLoadResult"/>
+  <affected-histogram name="Plugin.PpapiPluginLoadErrorCode"/>
   <affected-histogram name="Plugin.PpapiPluginLoadResult"/>
 </fieldtrial>
 

@@ -14,10 +14,12 @@
 #include "content/browser/frame_host/frame_tree_node.h"
 #include "content/browser/frame_host/navigator.h"
 #include "content/browser/frame_host/render_frame_host_delegate.h"
+#include "content/browser/renderer_host/input/input_router.h"
 #include "content/browser/renderer_host/render_view_host_impl.h"
 #include "content/common/frame_messages.h"
 #include "content/common/input_messages.h"
 #include "content/common/inter_process_time_ticks_converter.h"
+#include "content/common/swapped_out_messages.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/render_process_host.h"
@@ -182,6 +184,16 @@ void RenderFrameHostImpl::ExecuteCustomContextMenuCommand(
   Send(new FrameMsg_CustomContextMenuAction(routing_id_, context, action));
 }
 
+void RenderFrameHostImpl::Undo() {
+  Send(new InputMsg_Undo(routing_id_));
+  RecordAction(base::UserMetricsAction("Undo"));
+}
+
+void RenderFrameHostImpl::Redo() {
+  Send(new InputMsg_Redo(routing_id_));
+  RecordAction(base::UserMetricsAction("Redo"));
+}
+
 void RenderFrameHostImpl::Cut() {
   Send(new InputMsg_Cut(routing_id_));
   RecordAction(base::UserMetricsAction("Cut"));
@@ -192,9 +204,37 @@ void RenderFrameHostImpl::Copy() {
   RecordAction(base::UserMetricsAction("Copy"));
 }
 
+void RenderFrameHostImpl::CopyToFindPboard() {
+#if defined(OS_MACOSX)
+  // Windows/Linux don't have the concept of a find pasteboard.
+  Send(new InputMsg_CopyToFindPboard(routing_id_));
+  RecordAction(base::UserMetricsAction("CopyToFindPboard"));
+#endif
+}
+
 void RenderFrameHostImpl::Paste() {
   Send(new InputMsg_Paste(routing_id_));
   RecordAction(base::UserMetricsAction("Paste"));
+}
+
+void RenderFrameHostImpl::PasteAndMatchStyle() {
+  Send(new InputMsg_PasteAndMatchStyle(routing_id_));
+  RecordAction(base::UserMetricsAction("PasteAndMatchStyle"));
+}
+
+void RenderFrameHostImpl::Delete() {
+  Send(new InputMsg_Delete(routing_id_));
+  RecordAction(base::UserMetricsAction("DeleteSelection"));
+}
+
+void RenderFrameHostImpl::SelectAll() {
+  Send(new InputMsg_SelectAll(routing_id_));
+  RecordAction(base::UserMetricsAction("SelectAll"));
+}
+
+void RenderFrameHostImpl::Unselect() {
+  Send(new InputMsg_Unselect(routing_id_));
+  RecordAction(base::UserMetricsAction("Unselect"));
 }
 
 void RenderFrameHostImpl::InsertCSS(const std::string& css) {
@@ -224,10 +264,35 @@ RenderViewHost* RenderFrameHostImpl::GetRenderViewHost() {
 }
 
 bool RenderFrameHostImpl::Send(IPC::Message* message) {
+  if (IPC_MESSAGE_ID_CLASS(message->type()) == InputMsgStart) {
+    return render_view_host_->input_router()->SendInput(
+        make_scoped_ptr(message));
+  }
+
   return GetProcess()->Send(message);
 }
 
 bool RenderFrameHostImpl::OnMessageReceived(const IPC::Message &msg) {
+  // Filter out most IPC messages if this renderer is swapped out.
+  // We still want to handle certain ACKs to keep our state consistent.
+  // TODO(nasko): Only check RenderViewHost state, as this object's own state
+  // isn't yet properly updated. Transition this check once the swapped out
+  // state is correct in RenderFrameHost itself.
+  if (render_view_host_->IsSwappedOut()) {
+    if (!SwappedOutMessages::CanHandleWhileSwappedOut(msg)) {
+      // If this is a synchronous message and we decided not to handle it,
+      // we must send an error reply, or else the renderer will be stuck
+      // and won't respond to future requests.
+      if (msg.is_sync()) {
+        IPC::Message* reply = IPC::SyncMessage::GenerateReply(&msg);
+        reply->set_reply_error();
+        Send(reply);
+      }
+      // Don't continue looking for someone to handle it.
+      return true;
+    }
+  }
+
   if (delegate_->OnMessageReceived(this, msg))
     return true;
 
@@ -302,10 +367,9 @@ void RenderFrameHostImpl::OnOpenURL(
 
 void RenderFrameHostImpl::OnDidStartProvisionalLoadForFrame(
     int parent_routing_id,
-    bool is_main_frame,
     const GURL& url) {
   frame_tree_node_->navigator()->DidStartProvisionalLoad(
-      this, parent_routing_id, is_main_frame, url);
+      this, parent_routing_id, url);
 }
 
 void RenderFrameHostImpl::OnDidFailProvisionalLoadWithError(
@@ -315,15 +379,13 @@ void RenderFrameHostImpl::OnDidFailProvisionalLoadWithError(
 
 void RenderFrameHostImpl::OnDidFailLoadWithError(
     const GURL& url,
-    bool is_main_frame,
     int error_code,
     const base::string16& error_description) {
   GURL validated_url(url);
   GetProcess()->FilterURL(false, &validated_url);
 
   frame_tree_node_->navigator()->DidFailLoadWithError(
-      this, validated_url, is_main_frame, error_code,
-      error_description);
+      this, validated_url, error_code, error_description);
 }
 
 void RenderFrameHostImpl::OnDidRedirectProvisionalLoad(
@@ -615,6 +677,11 @@ void RenderFrameHostImpl::NavigateToURL(const GURL& url) {
   params.transition = PAGE_TRANSITION_LINK;
   params.navigation_type = FrameMsg_Navigate_Type::NORMAL;
   Navigate(params);
+}
+
+void RenderFrameHostImpl::SelectRange(const gfx::Point& start,
+                                      const gfx::Point& end) {
+  Send(new InputMsg_SelectRange(routing_id_, start, end));
 }
 
 }  // namespace content

@@ -210,29 +210,29 @@ ResourceProvider::Resource::Resource()
       lock_for_read_count(0),
       imported_count(0),
       exported_count(0),
+      dirty_image(false),
       locked_for_write(false),
-      origin(Internal),
+      lost(false),
       marked_for_deletion(false),
       pending_set_pixels(false),
       set_pixels_completion_forced(false),
       allocated(false),
       enable_read_lock_fences(false),
+      has_shared_bitmap_id(false),
+      allow_overlay(false),
       read_lock_fence(NULL),
       size(),
+      origin(Internal),
       target(0),
       original_filter(0),
       filter(0),
       image_id(0),
       bound_image_id(0),
-      dirty_image(false),
       texture_pool(0),
       wrap_mode(0),
-      lost(false),
       hint(TextureUsageAny),
       type(InvalidType),
       format(RGBA_8888),
-      has_shared_bitmap_id(false),
-      allow_overlay(false),
       shared_bitmap(NULL) {}
 
 ResourceProvider::Resource::~Resource() {}
@@ -255,28 +255,29 @@ ResourceProvider::Resource::Resource(GLuint texture_id,
       lock_for_read_count(0),
       imported_count(0),
       exported_count(0),
+      dirty_image(false),
       locked_for_write(false),
-      origin(origin),
+      lost(false),
       marked_for_deletion(false),
       pending_set_pixels(false),
       set_pixels_completion_forced(false),
       allocated(false),
       enable_read_lock_fences(false),
+      has_shared_bitmap_id(false),
+      allow_overlay(false),
       read_lock_fence(NULL),
       size(size),
+      origin(origin),
       target(target),
       original_filter(filter),
       filter(filter),
       image_id(0),
       bound_image_id(0),
-      dirty_image(false),
       texture_pool(texture_pool),
       wrap_mode(wrap_mode),
-      lost(false),
       hint(hint),
       type(GLTexture),
       format(format),
-      has_shared_bitmap_id(false),
       shared_bitmap(NULL) {
   DCHECK(wrap_mode == GL_CLAMP_TO_EDGE || wrap_mode == GL_REPEAT);
   DCHECK_EQ(origin == Internal, !!texture_pool);
@@ -297,28 +298,29 @@ ResourceProvider::Resource::Resource(uint8_t* pixels,
       lock_for_read_count(0),
       imported_count(0),
       exported_count(0),
+      dirty_image(false),
       locked_for_write(false),
-      origin(origin),
+      lost(false),
       marked_for_deletion(false),
       pending_set_pixels(false),
       set_pixels_completion_forced(false),
       allocated(false),
       enable_read_lock_fences(false),
+      has_shared_bitmap_id(!!bitmap),
+      allow_overlay(false),
       read_lock_fence(NULL),
       size(size),
+      origin(origin),
       target(0),
       original_filter(filter),
       filter(filter),
       image_id(0),
       bound_image_id(0),
-      dirty_image(false),
       texture_pool(0),
       wrap_mode(wrap_mode),
-      lost(false),
       hint(TextureUsageAny),
       type(Bitmap),
       format(RGBA_8888),
-      has_shared_bitmap_id(!!bitmap),
       shared_bitmap(bitmap) {
   DCHECK(wrap_mode == GL_CLAMP_TO_EDGE || wrap_mode == GL_REPEAT);
   DCHECK(origin == Delegated || pixels);
@@ -340,28 +342,29 @@ ResourceProvider::Resource::Resource(const SharedBitmapId& bitmap_id,
       lock_for_read_count(0),
       imported_count(0),
       exported_count(0),
+      dirty_image(false),
       locked_for_write(false),
-      origin(origin),
+      lost(false),
       marked_for_deletion(false),
       pending_set_pixels(false),
       set_pixels_completion_forced(false),
       allocated(false),
       enable_read_lock_fences(false),
+      has_shared_bitmap_id(true),
+      allow_overlay(false),
       read_lock_fence(NULL),
       size(size),
+      origin(origin),
       target(0),
       original_filter(filter),
       filter(filter),
       image_id(0),
       bound_image_id(0),
-      dirty_image(false),
       texture_pool(0),
       wrap_mode(wrap_mode),
-      lost(false),
       hint(TextureUsageAny),
       type(Bitmap),
       format(RGBA_8888),
-      has_shared_bitmap_id(true),
       shared_bitmap_id(bitmap_id),
       shared_bitmap(NULL) {
   DCHECK(wrap_mode == GL_CLAMP_TO_EDGE || wrap_mode == GL_REPEAT);
@@ -449,10 +452,8 @@ skia::RefPtr<SkSurface> ResourceProvider::DirectRasterBuffer::CreateSurface() {
       DCHECK_EQ(RGBA_8888, resource()->format);
       SkImageInfo image_info = SkImageInfo::MakeN32Premul(
           resource()->size.width(), resource()->size.height());
-      size_t row_bytes = SkBitmap::ComputeRowBytes(SkBitmap::kARGB_8888_Config,
-                                                   resource()->size.width());
       surface = skia::AdoptRef(SkSurface::NewRasterDirect(
-          image_info, resource()->pixels, row_bytes));
+          image_info, resource()->pixels, image_info.minRowBytes()));
       break;
     }
     default:
@@ -483,19 +484,18 @@ SkCanvas* ResourceProvider::BitmapRasterBuffer::DoLockForWrite() {
     case RGBA_4444:
       // Use the default stride if we will eventually convert this
       // bitmap to 4444.
-      raster_bitmap_.setConfig(SkBitmap::kARGB_8888_Config,
-                               resource()->size.width(),
-                               resource()->size.height());
-      raster_bitmap_.allocPixels();
+      raster_bitmap_.allocN32Pixels(resource()->size.width(),
+                                    resource()->size.height());
       break;
     case RGBA_8888:
-    case BGRA_8888:
-      raster_bitmap_.setConfig(SkBitmap::kARGB_8888_Config,
-                               resource()->size.width(),
-                               resource()->size.height(),
-                               stride);
-      raster_bitmap_.setPixels(mapped_buffer_);
+    case BGRA_8888: {
+      SkImageInfo info = SkImageInfo::MakeN32Premul(resource()->size.width(),
+                                                    resource()->size.height());
+      if (0 == stride)
+        stride = info.minRowBytes();
+      raster_bitmap_.installPixels(info, mapped_buffer_, stride);
       break;
+    }
     case LUMINANCE_8:
     case RGB_565:
     case ETC1:
@@ -933,21 +933,20 @@ void ResourceProvider::SetPixels(ResourceId id,
     DCHECK_EQ(Bitmap, resource->type);
     DCHECK(resource->allocated);
     DCHECK_EQ(RGBA_8888, resource->format);
-    SkBitmap src_full;
-    src_full.setConfig(
-        SkBitmap::kARGB_8888_Config, image_rect.width(), image_rect.height());
-    src_full.setPixels(const_cast<uint8_t*>(image));
-    SkBitmap src_subset;
-    SkIRect sk_source_rect = SkIRect::MakeXYWH(source_rect.x(),
-                                               source_rect.y(),
-                                               source_rect.width(),
-                                               source_rect.height());
-    sk_source_rect.offset(-image_rect.x(), -image_rect.y());
-    src_full.extractSubset(&src_subset, sk_source_rect);
+    DCHECK(source_rect.x() >= image_rect.x());
+    DCHECK(source_rect.y() >= image_rect.y());
+    DCHECK(source_rect.right() <= image_rect.right());
+    DCHECK(source_rect.bottom() <= image_rect.bottom());
+    SkImageInfo source_info =
+        SkImageInfo::MakeN32Premul(source_rect.width(), source_rect.height());
+    size_t image_row_bytes = image_rect.width() * 4;
+    gfx::Vector2d source_offset = source_rect.origin() - image_rect.origin();
+    image += source_offset.y() * image_row_bytes + source_offset.x() * 4;
 
     ScopedWriteLockSoftware lock(this, id);
     SkCanvas* dest = lock.sk_canvas();
-    dest->writePixels(src_subset, dest_offset.x(), dest_offset.y());
+    dest->writePixels(
+        source_info, image, image_row_bytes, dest_offset.x(), dest_offset.y());
   }
 }
 
@@ -1175,10 +1174,9 @@ ResourceProvider::ScopedWriteLockGL::~ScopedWriteLockGL() {
 void ResourceProvider::PopulateSkBitmapWithResource(
     SkBitmap* sk_bitmap, const Resource* resource) {
   DCHECK_EQ(RGBA_8888, resource->format);
-  sk_bitmap->setConfig(SkBitmap::kARGB_8888_Config,
-                       resource->size.width(),
-                       resource->size.height());
-  sk_bitmap->setPixels(resource->pixels);
+  SkImageInfo info = SkImageInfo::MakeN32Premul(resource->size.width(),
+                                                resource->size.height());
+  sk_bitmap->installPixels(info, resource->pixels, info.minRowBytes());
 }
 
 ResourceProvider::ScopedReadLockSoftware::ScopedReadLockSoftware(

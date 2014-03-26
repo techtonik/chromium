@@ -8,7 +8,7 @@
 #include "base/basictypes.h"
 #include "base/compiler_specific.h"
 #include "components/keyed_service/core/keyed_service.h"
-#include "components/signin/core/signin_client.h"
+#include "components/signin/core/browser/signin_client.h"
 
 class CookieSettings;
 class Profile;
@@ -23,6 +23,7 @@ class ChromeSigninClient : public SigninClient, public KeyedService {
   static bool SettingsAllowSigninCookies(CookieSettings* cookie_settings);
 
   // SigninClient implementation.
+  virtual PrefService* GetPrefs() OVERRIDE;
   virtual scoped_refptr<TokenWebData> GetDatabase() OVERRIDE;
   virtual bool CanRevokeCredentials() OVERRIDE;
   virtual net::URLRequestContextGetter* GetURLRequestContext() OVERRIDE;

@@ -5,15 +5,18 @@
 #ifndef CHROME_BROWSER_INVALIDATION_TICL_INVALIDATION_SERVICE_H_
 #define CHROME_BROWSER_INVALIDATION_TICL_INVALIDATION_SERVICE_H_
 
+#include <string>
+
 #include "base/memory/scoped_ptr.h"
+#include "base/prefs/pref_change_registrar.h"
 #include "base/threading/non_thread_safe.h"
 #include "base/timer/timer.h"
+#include "chrome/browser/invalidation/invalidation_auth_provider.h"
 #include "chrome/browser/invalidation/invalidation_logger.h"
 #include "chrome/browser/invalidation/invalidation_service.h"
 #include "chrome/browser/invalidation/invalidator_storage.h"
-#include "chrome/browser/signin/signin_manager.h"
 #include "components/keyed_service/core/keyed_service.h"
-#include "components/signin/core/profile_oauth2_token_service.h"
+#include "components/signin/core/browser/profile_oauth2_token_service.h"
 #include "google_apis/gaia/oauth2_token_service.h"
 #include "net/base/backoff_entry.h"
 #include "sync/notifier/invalidation_handler.h"
@@ -34,11 +37,19 @@ class TiclInvalidationService : public base::NonThreadSafe,
                                 public InvalidationService,
                                 public OAuth2TokenService::Consumer,
                                 public OAuth2TokenService::Observer,
-                                public SigninManagerBase::Observer,
+                                public InvalidationAuthProvider::Observer,
                                 public syncer::InvalidationHandler {
  public:
-  TiclInvalidationService(SigninManagerBase* signin,
-                          ProfileOAuth2TokenService* oauth2_token_service,
+  enum InvalidationNetworkChannel {
+    PUSH_CLIENT_CHANNEL = 0,
+    GCM_NETWORK_CHANNEL = 1,
+
+    // This enum is used in UMA_HISTOGRAM_ENUMERATION. Insert new values above
+    // this line.
+    NETWORK_CHANNELS_COUNT = 2
+  };
+
+  TiclInvalidationService(scoped_ptr<InvalidationAuthProvider> auth_provider,
                           Profile* profile);
   virtual ~TiclInvalidationService();
 
@@ -57,7 +68,8 @@ class TiclInvalidationService : public base::NonThreadSafe,
   virtual std::string GetInvalidatorClientId() const OVERRIDE;
   virtual InvalidationLogger* GetInvalidationLogger() OVERRIDE;
   virtual void RequestDetailedStatus(
-      base::Callback<void(const base::DictionaryValue&)> caller) OVERRIDE;
+      base::Callback<void(const base::DictionaryValue&)> caller) const OVERRIDE;
+  virtual InvalidationAuthProvider* GetInvalidationAuthProvider() OVERRIDE;
 
   void RequestAccessToken();
 
@@ -74,8 +86,8 @@ class TiclInvalidationService : public base::NonThreadSafe,
   virtual void OnRefreshTokenAvailable(const std::string& account_id) OVERRIDE;
   virtual void OnRefreshTokenRevoked(const std::string& account_id) OVERRIDE;
 
-  // SigninManagerBase::Observer implementation.
-  virtual void GoogleSignedOut(const std::string& username) OVERRIDE;
+  // InvalidationAuthProvider::Observer implementation.
+  virtual void OnInvalidationAuthLogout() OVERRIDE;
 
   // syncer::InvalidationHandler implementation.
   virtual void OnInvalidatorStateChange(
@@ -92,24 +104,19 @@ class TiclInvalidationService : public base::NonThreadSafe,
   void InitForTest(syncer::Invalidator* invalidator);
 
   friend class TiclInvalidationServiceTestDelegate;
+  friend class TiclInvalidationServiceChannelTest;
 
  private:
-  enum InvalidationNetworkChannel {
-    PUSH_CLIENT_CHANNEL = 0,
-    GCM_NETWORK_CHANNEL = 1
-  };
-
   bool IsReadyToStart();
   bool IsStarted();
 
   void StartInvalidator(InvalidationNetworkChannel network_channel);
+  void UpdateInvalidationNetworkChannel();
   void UpdateInvalidatorCredentials();
   void StopInvalidator();
-  void Logout();
 
   Profile *const profile_;
-  SigninManagerBase *const signin_manager_;
-  ProfileOAuth2TokenService *const oauth2_token_service_;
+  scoped_ptr<InvalidationAuthProvider> auth_provider_;
 
   scoped_ptr<syncer::InvalidatorRegistrar> invalidator_registrar_;
   scoped_ptr<InvalidatorStorage> invalidator_storage_;
@@ -125,6 +132,8 @@ class TiclInvalidationService : public base::NonThreadSafe,
   base::OneShotTimer<TiclInvalidationService> request_access_token_retry_timer_;
   net::BackoffEntry request_access_token_backoff_;
 
+  PrefChangeRegistrar pref_change_registrar_;
+  InvalidationNetworkChannel network_channel_type_;
   scoped_ptr<GCMInvalidationBridge> gcm_invalidation_bridge_;
 
   // The invalidation logger object we use to record state changes

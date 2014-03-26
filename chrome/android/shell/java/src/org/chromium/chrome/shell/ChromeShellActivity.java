@@ -26,6 +26,7 @@ import org.chromium.chrome.browser.appmenu.AppMenuHandler;
 import org.chromium.chrome.browser.appmenu.AppMenuPropertiesDelegate;
 import org.chromium.chrome.browser.printing.PrintingControllerFactory;
 import org.chromium.chrome.browser.printing.TabPrinter;
+import org.chromium.chrome.browser.share.ShareHelper;
 import org.chromium.chrome.shell.sync.SyncController;
 import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
 import org.chromium.content.browser.ActivityContentVideoViewClient;
@@ -291,6 +292,11 @@ public class ChromeShellActivity extends Activity implements AppMenuPropertiesDe
                     activeTab.goForward();
                 }
                 return true;
+            case R.id.share_menu_id:
+            case R.id.direct_share_menu_id:
+                ShareHelper.share(item.getItemId() == R.id.direct_share_menu_id, this,
+                        activeTab.getTitle(), activeTab.getUrl(), null);
+                return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
@@ -315,13 +321,16 @@ public class ChromeShellActivity extends Activity implements AppMenuPropertiesDe
 
     @Override
     public void prepareMenu(Menu menu) {
+        menu.setGroupVisible(R.id.MAIN_MENU, true);
+        ChromeShellTab activeTab = getActiveTab();
+
         // Disable the "Back" menu item if there is no page to go to.
         MenuItem backMenuItem = menu.findItem(R.id.back_menu_id);
-        backMenuItem.setEnabled(getActiveTab().canGoBack());
+        backMenuItem.setEnabled(activeTab != null ? activeTab.canGoBack() : false);
 
         // Disable the "Forward" menu item if there is no page to go to.
         MenuItem forwardMenuItem = menu.findItem(R.id.forward_menu_id);
-        forwardMenuItem.setEnabled(getActiveTab().canGoForward());
+        forwardMenuItem.setEnabled(activeTab != null ? activeTab.canGoForward() : false);
 
         // ChromeShell does not know about bookmarks yet
         menu.findItem(R.id.bookmark_this_page_id).setEnabled(true);
@@ -335,10 +344,16 @@ public class ChromeShellActivity extends Activity implements AppMenuPropertiesDe
 
         menu.findItem(R.id.print).setVisible(ApiCompatibilityUtils.isPrintingSupported());
 
-        menu.findItem(R.id.distill_page).setVisible(
-                CommandLine.getInstance().hasSwitch(ChromeShellSwitches.ENABLE_DOM_DISTILLER));
-
-        menu.setGroupVisible(R.id.MAIN_MENU, true);
+        MenuItem distillPageItem = menu.findItem(R.id.distill_page);
+        if (CommandLine.getInstance().hasSwitch(ChromeShellSwitches.ENABLE_DOM_DISTILLER)) {
+            String url = activeTab != null ? activeTab.getUrl() : null;
+            distillPageItem.setEnabled(!TextUtils.isEmpty(url) &&
+                    !url.startsWith(CHROME_DISTILLER_SCHEME));
+            distillPageItem.setVisible(true);
+        } else {
+            distillPageItem.setVisible(false);
+        }
+        ShareHelper.configureDirectShareMenuItem(this, menu.findItem(R.id.direct_share_menu_id));
     }
 
     @VisibleForTesting

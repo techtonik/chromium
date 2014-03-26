@@ -102,6 +102,9 @@ class UI_BASE_EXPORT OSExchangeData {
 
     virtual Provider* Clone() const = 0;
 
+    virtual void MarkOriginatedFromRenderer() = 0;
+    virtual bool DidOriginateFromRenderer() const = 0;
+
     virtual void SetString(const base::string16& data) = 0;
     virtual void SetURL(const GURL& url, const base::string16& title) = 0;
     virtual void SetFilename(const base::FilePath& path) = 0;
@@ -132,7 +135,6 @@ class UI_BASE_EXPORT OSExchangeData {
                                  std::string* file_contents) const = 0;
     virtual bool HasFileContents() const = 0;
     virtual void SetDownloadFileInfo(const DownloadFileInfo& download) = 0;
-    virtual void SetInDragLoop(bool in_drag_loop) = 0;
 #endif
 
 #if defined(OS_WIN) || defined(USE_AURA)
@@ -162,6 +164,12 @@ class UI_BASE_EXPORT OSExchangeData {
   // Returns the Provider, which actually stores and manages the data.
   const Provider& provider() const { return *provider_; }
   Provider& provider() { return *provider_; }
+
+  // Marks drag data as tainted if it originates from the renderer. This is used
+  // to avoid granting privileges to a renderer when dragging in tainted data,
+  // since it could allow potential escalation of privileges.
+  void MarkOriginatedFromRenderer();
+  bool DidOriginateFromRenderer() const;
 
   // These functions add data to the OSExchangeData object of various Chrome
   // types. The OSExchangeData object takes care of translating the data into
@@ -219,8 +227,6 @@ class UI_BASE_EXPORT OSExchangeData {
 
   // Adds a download file with full path (CF_HDROP).
   void SetDownloadFileInfo(const DownloadFileInfo& download);
-
-  void SetInDragLoop(bool in_drag_loop);
 #endif
 
 #if defined(OS_WIN) || defined(USE_AURA)

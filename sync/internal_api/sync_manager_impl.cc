@@ -899,7 +899,6 @@ void SyncManagerImpl::RequestNudgeForDataTypes(
   base::TimeDelta nudge_delay = NudgeStrategy::GetNudgeDelayTimeDelta(
       types.First().Get(),
       this);
-  allstatus_.IncrementNudgeCounter(NUDGE_SOURCE_LOCAL);
   scheduler_->ScheduleLocalNudge(nudge_delay,
                                  types,
                                  nudge_location);
@@ -941,6 +940,11 @@ void SyncManagerImpl::OnMigrationRequested(ModelTypeSet types) {
   FOR_EACH_OBSERVER(
       SyncManager::Observer, observers_,
       OnMigrationRequested(types));
+}
+
+void SyncManagerImpl::OnProtocolEvent(const ProtocolEvent& event) {
+  FOR_EACH_OBSERVER(SyncManager::Observer, observers_,
+                    OnProtocolEvent(event));
 }
 
 void SyncManagerImpl::SetJsEventHandler(
@@ -1029,11 +1033,9 @@ void SyncManagerImpl::OnIncomingInvalidation(
   if (invalidation_map.Empty()) {
     LOG(WARNING) << "Sync received invalidation without any type information.";
   } else {
-    allstatus_.IncrementNudgeCounter(NUDGE_SOURCE_NOTIFICATION);
     scheduler_->ScheduleInvalidationNudge(
         TimeDelta::FromMilliseconds(kSyncSchedulerDelayMsec),
         invalidation_map, FROM_HERE);
-    allstatus_.IncrementNotificationsReceived();
     debug_info_event_listener_.OnIncomingNotification(invalidation_map);
   }
 }
@@ -1045,7 +1047,6 @@ void SyncManagerImpl::RefreshTypes(ModelTypeSet types) {
   if (types.Empty()) {
     LOG(WARNING) << "Sync received refresh request with no types specified.";
   } else {
-    allstatus_.IncrementNudgeCounter(NUDGE_SOURCE_LOCAL_REFRESH);
     scheduler_->ScheduleLocalRefreshRequest(
         TimeDelta::FromMilliseconds(kSyncRefreshDelayMsec),
         types, FROM_HERE);
@@ -1126,6 +1127,18 @@ bool SyncManagerImpl::ReceivedExperiment(Experiments* experiments) {
           enhanced_bookmarks.extension_id();
     }
     found_experiment = true;
+  }
+
+  ReadNode gcm_invalidations_node(&trans);
+  if (gcm_invalidations_node.InitByClientTagLookup(
+          syncer::EXPERIMENTS, syncer::kGCMInvalidationsTag) ==
+      BaseNode::INIT_OK) {
+    const sync_pb::GcmInvalidationsFlags& gcm_invalidations =
+        gcm_invalidations_node.GetExperimentsSpecifics().gcm_invalidations();
+    if (gcm_invalidations.has_enabled()) {
+      experiments->gcm_invalidations_enabled = gcm_invalidations.enabled();
+      found_experiment = true;
+    }
   }
 
   return found_experiment;

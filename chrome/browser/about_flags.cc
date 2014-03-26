@@ -407,9 +407,11 @@ const Experiment::Choice kTouchScrollingModeChoices[] = {
 // comment to the end of the feature name, like so:
 //   "my-special-feature",  // FLAGS:RECORD_UMA
 //
-// After doing that, run //tools/metrics/actions/extract_actions.py (see
-// instructions at the top of that file for details) to update the
-// chromeactions.txt file, which will enable UMA to record your feature flag.
+// After doing that, run
+//   tools/metrics/actions/extract_actions.py
+// to add the metric to actions.xml (which will enable UMA to record your
+// feature flag), then update the <owner>s and <description> sections. Make sure
+// to include the actions.xml file when you upload your code for review!
 //
 // After your feature has shipped under a flag, you can locate the metrics under
 // the action name AboutFlags_internal-action-name. Actions are recorded once
@@ -760,6 +762,13 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_SAVE_PAGE_AS_MHTML_DESCRIPTION,
     kOsMac | kOsWin | kOsLinux,
     SINGLE_VALUE_TYPE(switches::kSavePageAsMHTML)
+  },
+  {
+    "enable-autologin",
+    IDS_FLAGS_ENABLE_AUTOLOGIN_NAME,
+    IDS_FLAGS_ENABLE_AUTOLOGIN_DESCRIPTION,
+    kOsMac | kOsWin | kOsLinux,
+    SINGLE_VALUE_TYPE(switches::kEnableAutologin)
   },
   {
     "enable-quic",
@@ -1209,23 +1218,6 @@ const Experiment kExperiments[] = {
                               switches::kDisableTouchEditing)
   },
   {
-    "enable-rich-notifications",
-    IDS_FLAGS_ENABLE_RICH_NOTIFICATIONS_NAME,
-    IDS_FLAGS_ENABLE_RICH_NOTIFICATIONS_DESCRIPTION,
-    kOsWin | kOsMac,
-    ENABLE_DISABLE_VALUE_TYPE(
-        message_center::switches::kEnableRichNotifications,
-        message_center::switches::kDisableRichNotifications)
-  },
-  {
-    "enable-experimental-notification-ui",
-    IDS_FLAGS_ENABLE_EXPERIMENTAL_NOTIFICATION_UI_NAME,
-    IDS_FLAGS_ENABLE_EXPERIMENTAL_NOTIFICATION_UI_DESCRIPTION,
-    kOsDesktop,
-    SINGLE_VALUE_TYPE(
-        message_center::switches::kEnableExperimentalNotificationUI)
-  },
-  {
     "enable-sync-synced-notifications",
     IDS_FLAGS_ENABLE_SYNCED_NOTIFICATIONS_NAME,
     IDS_FLAGS_ENABLE_SYNCED_NOTIFICATIONS_DESCRIPTION,
@@ -1358,6 +1350,14 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_SWIPE_SELECTION_DESCRIPTION,
     kOsCrOS,
     SINGLE_VALUE_TYPE(keyboard::switches::kEnableSwipeSelection)
+  },
+  {
+    "enable-input-view",
+    IDS_FLAGS_ENABLE_INPUT_VIEW_NAME,
+    IDS_FLAGS_ENABLE_INPUT_VIEW_DESCRIPTION,
+    kOsCrOS,
+    ENABLE_DISABLE_VALUE_TYPE(keyboard::switches::kEnableInputView,
+                              keyboard::switches::kDisableInputView)
   },
 #endif
   {
@@ -1499,6 +1499,13 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kNewProfileManagement)
   },
   {
+    "enable-fast-user-switching",
+    IDS_FLAGS_ENABLE_FAST_USER_SWITCHING_NAME,
+    IDS_FLAGS_ENABLE_FAST_USER_SWITCHING_DESCRIPTION,
+    kOsMac | kOsWin | kOsLinux,
+    SINGLE_VALUE_TYPE(switches::kFastUserSwitching)
+  },
+  {
     "enable-web-based-signin",
     IDS_FLAGS_ENABLE_WEB_BASED_SIGNIN_NAME,
     IDS_FLAGS_ENABLE_WEB_BASED_SIGNIN_DESCRIPTION,
@@ -1520,13 +1527,6 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kResetAppListInstallState)
   },
 #if defined(ENABLE_APP_LIST)
-  {
-    "enable-app-launcher-start-page",
-    IDS_FLAGS_ENABLE_APP_LIST_START_PAGE_NAME,
-    IDS_FLAGS_ENABLE_APP_LIST_START_PAGE_DESCRIPTION,
-    kOsWin | kOsCrOS,
-    SINGLE_VALUE_TYPE(switches::kShowAppListStartPage)
-  },
 #if defined(OS_LINUX)
   {
     // This is compiled out on non-Linux platforms because otherwise it would be
@@ -1790,7 +1790,8 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_FAST_TEXT_AUTOSIZING_NAME,
     IDS_FLAGS_ENABLE_FAST_TEXT_AUTOSIZING_DESCRIPTION,
     kOsAndroid,
-    SINGLE_VALUE_TYPE(switches::kEnableFastTextAutosizing)
+    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableFastTextAutosizing,
+                              switches::kDisableFastTextAutosizing)
   },
   {
     "disable-cast",
@@ -1834,9 +1835,25 @@ const Experiment kExperiments[] = {
     "bleeding-edge-renderer-mode",
     IDS_FLAGS_BLEEDING_RENDERER_NAME,
     IDS_FLAGS_BLEEDING_RENDERER_DESCRIPTION,
-    kOsAll,
+    kOsAndroid,
     SINGLE_VALUE_TYPE(switches::kEnableBleedingEdgeRenderingFastPaths)
   },
+  {
+    "enable-settings-window",
+    IDS_FLAGS_ENABLE_SETTINGS_WINDOW_NAME,
+    IDS_FLAGS_ENABLE_SETTINGS_WINDOW_DESCRIPTION,
+    kOsDesktop,
+    SINGLE_VALUE_TYPE(switches::kEnableSettingsWindow)
+  },
+#if defined(OS_ANDROID)
+  {
+    "enable-instant-search-clicks",
+    IDS_FLAGS_ENABLE_INSTANT_SEARCH_CLICKS_NAME,
+    IDS_FLAGS_ENABLE_INSTANT_SEARCH_CLICKS_DESCRIPTION,
+    kOsAndroid,
+    SINGLE_VALUE_TYPE(switches::kEnableInstantSearchClicks)
+  },
+#endif
 };
 
 const Experiment* experiments = kExperiments;

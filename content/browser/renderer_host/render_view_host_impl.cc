@@ -414,9 +414,7 @@ WebPreferences RenderViewHostImpl::GetWebkitPrefs(const GURL& url) {
   prefs.accelerated_compositing_enabled =
       GpuProcessHost::gpu_enabled() &&
       !command_line.HasSwitch(switches::kDisableAcceleratedCompositing);
-  prefs.force_compositing_mode =
-      content::IsForceCompositingModeEnabled() &&
-      !command_line.HasSwitch(switches::kDisableForceCompositingMode);
+  prefs.force_compositing_mode = content::IsForceCompositingModeEnabled();
   prefs.accelerated_2d_canvas_enabled =
       GpuProcessHost::gpu_enabled() &&
       !command_line.HasSwitch(switches::kDisableAccelerated2dCanvas);
@@ -577,6 +575,11 @@ void RenderViewHostImpl::SuppressDialogsUntilSwapOut() {
 }
 
 void RenderViewHostImpl::SwapOut() {
+  // If this RenderViewHost is not in the default state, it must have already
+  // gone through this, therefore just return.
+  if (rvh_state_ != STATE_DEFAULT)
+    return;
+
   SetState(STATE_WAITING_FOR_UNLOAD_ACK);
   unload_event_monitor_timeout_->Start(
       base::TimeDelta::FromMilliseconds(kUnloadTimeoutMS));
@@ -749,6 +752,9 @@ void RenderViewHostImpl::DragTargetDragEnter(
   // and can't be interpreted as a capability.
   DropData filtered_data(drop_data);
   GetProcess()->FilterURL(true, &filtered_data.url);
+  if (drop_data.did_originate_from_renderer) {
+    filtered_data.filenames.clear();
+  }
 
   // The filenames vector, on the other hand, does represent a capability to
   // access the given files.
@@ -1122,9 +1128,6 @@ bool RenderViewHostImpl::OnMessageReceived(const IPC::Message& msg) {
     IPC_MESSAGE_HANDLER(ViewHostMsg_AddMessageToConsole, OnAddMessageToConsole)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ClosePage_ACK, OnClosePageACK)
     IPC_MESSAGE_HANDLER(ViewHostMsg_SwapOut_ACK, OnSwapOutACK)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_SelectionChanged, OnSelectionChanged)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_SelectionBoundsChanged,
-                        OnSelectionBoundsChanged)
 #if defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(ViewHostMsg_SelectionRootBoundsChanged,
                         OnSelectionRootBoundsChanged)
@@ -1139,6 +1142,7 @@ bool RenderViewHostImpl::OnMessageReceived(const IPC::Message& msg) {
                         OnCancelDesktopNotification)
 #if defined(OS_MACOSX) || defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ShowPopup, OnShowPopup)
+    IPC_MESSAGE_HANDLER(ViewHostMsg_HidePopup, OnHidePopup)
 #endif
     IPC_MESSAGE_HANDLER(ViewHostMsg_RunFileChooser, OnRunFileChooser)
     IPC_MESSAGE_HANDLER(ViewHostMsg_DidAccessInitialDocument,
@@ -1389,20 +1393,6 @@ void RenderViewHostImpl::OnDidChangeScrollOffsetPinningForMainFrame(
 }
 
 void RenderViewHostImpl::OnDidChangeNumWheelEvents(int count) {
-}
-
-void RenderViewHostImpl::OnSelectionChanged(const base::string16& text,
-                                            size_t offset,
-                                            const gfx::Range& range) {
-  if (view_)
-    view_->SelectionChanged(text, offset, range);
-}
-
-void RenderViewHostImpl::OnSelectionBoundsChanged(
-    const ViewHostMsg_SelectionBounds_Params& params) {
-  if (view_) {
-    view_->SelectionBoundsChanged(params);
-  }
 }
 
 #if defined(OS_ANDROID)
@@ -1892,6 +1882,12 @@ void RenderViewHostImpl::OnShowPopup(
                         params.right_aligned,
                         params.allow_multiple_selection);
   }
+}
+
+void RenderViewHostImpl::OnHidePopup() {
+  RenderViewHostDelegateView* view = delegate_->GetDelegateView();
+  if (view)
+    view->HidePopupMenu();
 }
 #endif
 

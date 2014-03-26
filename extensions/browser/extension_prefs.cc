@@ -179,6 +179,14 @@ const char kPrefGeometryCache[] = "geometry_cache";
 // A preference that indicates when an extension is last launched.
 const char kPrefLastLaunchTime[] = "last_launch_time";
 
+// A preference that marks an ephemeral app that was evicted from the cache.
+// Their data is retained and garbage collected when inactive for a long period
+// of time.
+const char kPrefEvictedEphemeralApp[] = "evicted_ephemeral_app";
+
+// Am installation parameter bundled with an extension.
+const char kPrefInstallParam[] = "install_parameter";
+
 // A list of installed ids and a signature.
 const char kInstallSignature[] = "extensions.install_signature";
 
@@ -221,6 +229,11 @@ std::string JoinPrefs(const std::string& parent, const char* child) {
 bool IsBlacklistBitSet(const base::DictionaryValue* ext) {
   bool bool_value;
   return ext->GetBoolean(kPrefBlacklist, &bool_value) && bool_value;
+}
+
+bool IsEvictedEphemeralApp(const base::DictionaryValue* ext) {
+  bool bool_value;
+  return ext->GetBoolean(kPrefEvictedEphemeralApp, &bool_value) && bool_value;
 }
 
 }  // namespace
@@ -1107,12 +1120,17 @@ void ExtensionPrefs::OnExtensionInstalled(
     const Extension* extension,
     Extension::State initial_state,
     bool blacklisted_for_malware,
-    const syncer::StringOrdinal& page_ordinal) {
+    const syncer::StringOrdinal& page_ordinal,
+    const std::string& install_parameter) {
   ScopedExtensionPrefUpdate update(prefs_, extension->id());
   base::DictionaryValue* extension_dict = update.Get();
   const base::Time install_time = time_provider_->GetCurrentTime();
-  PopulateExtensionInfoPrefs(extension, install_time, initial_state,
-                             blacklisted_for_malware, extension_dict);
+  PopulateExtensionInfoPrefs(extension,
+                             install_time,
+                             initial_state,
+                             blacklisted_for_malware,
+                             install_parameter,
+                             extension_dict);
   FinishExtensionInfoPrefs(extension->id(), install_time,
                            extension->RequiresSortOrdinal(),
                            page_ordinal, extension_dict);
@@ -1134,7 +1152,14 @@ void ExtensionPrefs::OnExtensionUninstalled(const std::string& extension_id,
     extension_pref_value_map_->SetExtensionState(extension_id, false);
     content_settings_store_->SetExtensionState(extension_id, false);
   } else {
-    DeleteExtensionPrefs(extension_id);
+    int creation_flags = GetCreationFlags(extension_id);
+    if (creation_flags & Extension::IS_EPHEMERAL) {
+      // Keep ephemeral apps around, but mark them as evicted.
+      UpdateExtensionPref(extension_id, kPrefEvictedEphemeralApp,
+                          new base::FundamentalValue(true));
+    } else {
+      DeleteExtensionPrefs(extension_id);
+    }
   }
 }
 
@@ -1267,6 +1292,11 @@ scoped_ptr<ExtensionInfo> ExtensionPrefs::GetInstalledExtensionInfo(
     return scoped_ptr<ExtensionInfo>();
   }
 
+  if (IsEvictedEphemeralApp(ext)) {
+    // Hide evicted ephemeral apps.
+    return scoped_ptr<ExtensionInfo>();
+  }
+
   return GetInstalledInfoHelper(extension_id, ext);
 }
 
@@ -1318,10 +1348,14 @@ void ExtensionPrefs::SetDelayedInstallInfo(
     Extension::State initial_state,
     bool blacklisted_for_malware,
     DelayReason delay_reason,
-    const syncer::StringOrdinal& page_ordinal) {
+    const syncer::StringOrdinal& page_ordinal,
+    const std::string& install_parameter) {
   base::DictionaryValue* extension_dict = new base::DictionaryValue();
-  PopulateExtensionInfoPrefs(extension, time_provider_->GetCurrentTime(),
-                             initial_state, blacklisted_for_malware,
+  PopulateExtensionInfoPrefs(extension,
+                             time_provider_->GetCurrentTime(),
+                             initial_state,
+                             blacklisted_for_malware,
+                             install_parameter,
                              extension_dict);
 
   // Add transient data that is needed by FinishDelayedInstallInfo(), but
@@ -1437,6 +1471,54 @@ scoped_ptr<ExtensionPrefs::ExtensionsInfo> ExtensionPrefs::
   }
 
   return extensions_info.Pass();
+}
+
+scoped_ptr<ExtensionPrefs::ExtensionsInfo>
+ExtensionPrefs::GetEvictedEphemeralAppsInfo() const {
+  scoped_ptr<ExtensionsInfo> extensions_info(new ExtensionsInfo);
+
+  const base::DictionaryValue* extensions =
+      prefs_->GetDictionary(pref_names::kExtensions);
+  for (base::DictionaryValue::Iterator extension_id(*extensions);
+       !extension_id.IsAtEnd(); extension_id.Advance()) {
+    const base::DictionaryValue* ext = NULL;
+    if (!Extension::IdIsValid(extension_id.key()) ||
+        !extension_id.value().GetAsDictionary(&ext)) {
+      continue;
+    }
+
+    if (!IsEvictedEphemeralApp(ext))
+      continue;
+
+    scoped_ptr<ExtensionInfo> info =
+        GetInstalledInfoHelper(extension_id.key(), ext);
+    if (info)
+      extensions_info->push_back(linked_ptr<ExtensionInfo>(info.release()));
+  }
+
+  return extensions_info.Pass();
+}
+
+scoped_ptr<ExtensionInfo> ExtensionPrefs::GetEvictedEphemeralAppInfo(
+    const std::string& extension_id) const {
+  const base::DictionaryValue* extension_prefs = GetExtensionPref(extension_id);
+  if (!extension_prefs)
+    return scoped_ptr<ExtensionInfo>();
+
+  if (!IsEvictedEphemeralApp(extension_prefs))
+    return scoped_ptr<ExtensionInfo>();
+
+  return GetInstalledInfoHelper(extension_id, extension_prefs);
+}
+
+void ExtensionPrefs::RemoveEvictedEphemeralApp(
+    const std::string& extension_id) {
+  bool evicted_ephemeral_app = false;
+  if (ReadPrefAsBoolean(extension_id,
+                        kPrefEvictedEphemeralApp,
+                        &evicted_ephemeral_app) && evicted_ephemeral_app) {
+    DeleteExtensionPrefs(extension_id);
+  }
 }
 
 bool ExtensionPrefs::WasAppDraggedByUser(const std::string& extension_id) {
@@ -1697,6 +1779,25 @@ void ExtensionPrefs::SetInstallSignature(
   }
 }
 
+std::string ExtensionPrefs::GetInstallParam(
+    const std::string& extension_id) const {
+  const base::DictionaryValue* extension = GetExtensionPref(extension_id);
+  if (!extension) {
+    NOTREACHED();
+    return std::string();
+  }
+  std::string install_parameter;
+  if (!extension->GetString(kPrefInstallParam, &install_parameter))
+    return std::string();
+  return install_parameter;
+}
+
+void ExtensionPrefs::SetInstallParam(const std::string& extension_id,
+                                     const std::string& install_parameter) {
+  UpdateExtensionPref(extension_id,
+                      kPrefInstallParam,
+                      new base::StringValue(install_parameter));
+}
 
 ExtensionPrefs::ExtensionPrefs(
     PrefService* prefs,
@@ -1832,6 +1933,7 @@ void ExtensionPrefs::PopulateExtensionInfoPrefs(
     const base::Time install_time,
     Extension::State initial_state,
     bool blacklisted_for_malware,
+    const std::string& install_parameter,
     base::DictionaryValue* extension_dict) {
   // Leave the state blank for component extensions so that old chrome versions
   // loading new profiles do not fail in GetInstalledExtensionInfo. Older
@@ -1862,6 +1964,10 @@ void ExtensionPrefs::PopulateExtensionInfoPrefs(
   base::FilePath::StringType path = MakePathRelative(install_directory_,
                                                      extension->path());
   extension_dict->Set(kPrefPath, new base::StringValue(path));
+  if (!install_parameter.empty()) {
+    extension_dict->Set(kPrefInstallParam,
+                        new base::StringValue(install_parameter));
+  }
   // We store prefs about LOAD extensions, but don't cache their manifest
   // since it may change on disk.
   if (!Manifest::IsUnpackedLocation(extension->location())) {
@@ -1906,6 +2012,9 @@ void ExtensionPrefs::FinishExtensionInfoPrefs(
 
   // Clear state that may be registered from a previous install.
   extension_dict->Remove(EventRouter::kRegisteredEvents, NULL);
+
+  // When evicted ephemeral apps are re-installed, this flag must be reset.
+  extension_dict->Remove(kPrefEvictedEphemeralApp, NULL);
 
   // FYI, all code below here races on sudden shutdown because |extension_dict|,
   // |app_sorting_|, |extension_pref_value_map_|, and |content_settings_store_|

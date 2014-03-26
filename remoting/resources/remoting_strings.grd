@@ -396,6 +396,9 @@
         <message desc="Message displayed to the user if there are no hosts registered to their account" name="IDS_HOST_LIST_EMPTY_ANDROID" formatter_data="android_java">
           You have no computers registered.
         </message>
+        <message desc="Message displayed to the user if there are no hosts registered to their account. This is styled to look like a hyperlink. When a user activates the link, they are taken to a web page that explains how to set up a Chromoting host." name="IDS_HOST_SETUP_LINK_ANDROID" formatter_data="android_java">
+          Learn how to set up a computer for remote access.
+        </message>
         <message desc="Title of the authentication dialog" name="IDS_TITLE_AUTHENTICATE" formatter_data="android_java">
           Authenticate to host
         </message>
@@ -416,6 +419,9 @@
         </message>
         <message desc="Error that is shown if a network error occurs, including the case where the device is off-line." name="IDS_ERROR_NETWORK_ERROR" formatter_data="android_java">
           A network error occurred. Please check that your device is on-line and try again.
+        </message>
+        <message desc="Text shown in tooltip when user touches an offline host on the device." name="IDS_HOST_OFFLINE_TOOLTIP" formatter_data="android_java">
+          Host is offline.
         </message>
       </if>
 
@@ -708,7 +714,7 @@
         Why is this safe?
       </message>
       <message desc="Check-box displayed when the user enters their PIN to connect to a host allowing them to 'pair' the client and host, avoiding the need to enter the PIN each time." name="IDS_REMEMBER_PIN" formatter_data="android_java">
-        Don't ask for a PIN again when connecting to this host from this computer.
+        Don't ask for a PIN again when connecting to this host from this device.
       </message>
       <message name="IDS_HANGOUTS_INVITATION" desc="Text for the invitation to try Remote Desktop app in Hangouts.">
         Want to help someone while having a video chat with them too? Try <ph name="LINK_BEGIN">$1<ex>&lt;a href=https://plus.google.com/hangouts&gt;</ex></ph> Remote Desktop in Google Hangouts<ph name="LINK_END">$2<ex>&lt;/a&gt;</ex></ph>.

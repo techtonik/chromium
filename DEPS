@@ -23,19 +23,19 @@ vars = {
   "libcxxabi_revision": "197063",
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
   "nacl_trunk": "http://src.chromium.org/native_client/trunk",
-  "webkit_revision": "169622",
+  "webkit_revision": "169949",
   "chromium_git": "https://chromium.googlesource.com",
   "chromiumos_git": "https://chromium.googlesource.com/chromiumos",
   "skia_git": "https://skia.googlesource.com",
   "swig_revision": "230490",
-  "nacl_revision": "12892",
+  "nacl_revision": "12927",
   # After changing nacl_revision, run 'glient sync' and check native_client/DEPS
   # to update other nacl_*_revision's.
   "nacl_tools_revision": "12760",  # native_client/DEPS: tools_rev
   "google_toolbox_for_mac_revision": "662",
   "libaddressinput_revision": "176",
   "libphonenumber_revision": "621",
-  "libvpx_revision": "257501",
+  "libvpx_revision": "259324",
   "lss_revision": "24",
 
   # These two FFmpeg variables must be updated together.  One is used for SVN
@@ -45,19 +45,19 @@ vars = {
 
   "sfntly_revision": "228",
   "lighttpd_revision": "33737",
-  "skia_revision": "13854",
-  "skia_hash": "36048534886f9dd626e0e2bc112c8716c7be2ad8",
+  "skia_revision": "13928",
+  "skia_hash": "6e4eb21d9c4cf10585b705d1a0ded8cafef29adc",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   "v8_branch": "trunk",
-  "v8_revision": "20094",
+  "v8_revision": "20258",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
-  "webrtc_revision": "5721",
+  "webrtc_revision": "5762",
   "jsoncpp_revision": "248",
-  "nss_revision": "257452",
+  "nss_revision": "258808",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
@@ -137,7 +137,7 @@ deps = {
     (Var("googlecode_url") % "grit-i18n") + "/trunk@156",
 
   "src/tools/gyp":
-    (Var("googlecode_url") % "gyp") + "/trunk@1879",
+    (Var("googlecode_url") % "gyp") + "/trunk@1880",
 
   "src/tools/swarming_client":
     Var("chromium_git") + "/external/swarming.client.git@" +
@@ -172,7 +172,7 @@ deps = {
 
   "src/third_party/brotli/src":
     Var("chromium_git") +
-    "/external/font-compression-reference.git@7f848593bd2ec83f4537b6d494a5bf55b9bd4456",
+    "/external/font-compression-reference.git@0829e37293abc2523a1d2b0f4d68ff7b5fcd8e01",
 
   "src/tools/page_cycler/acid3":
     "/trunk/deps/page_cycler/acid3@171600",
@@ -253,7 +253,7 @@ deps = {
         "/trunk/jsoncpp/src/lib_json@" + Var("jsoncpp_revision"),
 
   "src/third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@985",
+    (Var("googlecode_url") % "libyuv") + "/trunk@986",
 
   "src/third_party/smhasher/src":
     (Var("googlecode_url") % "smhasher") + "/trunk@151",
@@ -285,10 +285,10 @@ deps = {
     (Var("googlecode_url") % "web-page-replay") + "/trunk@544",
 
   "src/third_party/pywebsocket/src":
-    (Var("googlecode_url") % "pywebsocket") + "/trunk/src@662",
+    (Var("googlecode_url") % "pywebsocket") + "/trunk/src@790",
 
   "src/third_party/opus/src":
-    "/trunk/deps/third_party/opus@237544",
+    "/trunk/deps/third_party/opus@256783",
 
   "src/media/cdm/ppapi/api":
     "/trunk/deps/cdm@249141",
@@ -480,12 +480,12 @@ deps_os = {
     # Used on Linux only. CrOS already has a copy.
     "src/third_party/cros_dbus_cplusplus/source":
       Var("chromiumos_git") + "/third_party/dbus-cplusplus.git" +
-      "@e4120532bbf3ca9f743b0be1f539381a54d16867",
+      "@f78453e0ba9f3d1584e8873aa3c7437cec861ce0",
 
     # For Linux and Chromium OS.
     "src/third_party/cros_system_api":
       Var("chromiumos_git") + "/platform/system_api.git" +
-      "@26a32fcb2afed4a3ec12070388d752dd795dac8e",
+      "@844a42e5f5c7a106807b09b6c2ac6b00b166c1cc",
 
     # Note that this is different from Android's freetype repo.
     "src/third_party/freetype2/src":
@@ -495,7 +495,7 @@ deps_os = {
     # Build tools for targeting ChromeOS.
     "src/third_party/chromite":
       Var("chromiumos_git") + "/chromite.git" +
-      "@1ee2901d33ae698d1f2a1d95e9f3fd5bbd5f13f9",
+      "@473f7ab6baf1781618f379a7680b56048b5e0ec1",
 
     # Dependency of chromite.git.
     "src/third_party/pyelftools":
@@ -517,7 +517,7 @@ deps_os = {
   "android": {
     "src/third_party/android_tools":
       Var("chromium_git") + "/android_tools.git" +
-      "@0582bdc17b4829beb522975441546a4eb99b11b5",
+      "@ca35676f4f652fa97964c488313720f55efd4405",
 
     "src/third_party/aosp":
       "/trunk/deps/third_party/aosp@148330",

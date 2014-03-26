@@ -153,10 +153,9 @@ RenderWidgetHostViewAndroid::RenderWidgetHostViewAndroid(
                                         widget_host->GetRoutingID()) != NULL),
       frame_evictor_(new DelegatedFrameEvictor(this)),
       using_delegated_renderer_(CommandLine::ForCurrentProcess()->HasSwitch(
-                                    switches::kEnableDelegatedRenderer) &&
-                                !CommandLine::ForCurrentProcess()->HasSwitch(
-                                    switches::kDisableDelegatedRenderer)),
-      locks_on_frame_count_(0) {
+                                    switches::kEnableDelegatedRenderer)),
+      locks_on_frame_count_(0),
+      root_window_destroyed_(false) {
   if (!using_delegated_renderer_) {
     texture_layer_ = cc::TextureLayer::Create(NULL);
     layer_ = texture_layer_;
@@ -609,6 +608,9 @@ void RenderWidgetHostViewAndroid::SelectionBoundsChanged(
 
 void RenderWidgetHostViewAndroid::SelectionRootBoundsChanged(
     const gfx::Rect& bounds) {
+  if (content_view_core_) {
+    content_view_core_->OnSelectionRootBoundsChanged(bounds);
+  }
 }
 
 void RenderWidgetHostViewAndroid::ScrollOffsetChanged() {
@@ -1300,12 +1302,6 @@ void RenderWidgetHostViewAndroid::SendGestureEvent(
     host_->ForwardGestureEventWithLatencyInfo(event, CreateLatencyInfo(event));
 }
 
-void RenderWidgetHostViewAndroid::SelectRange(const gfx::Point& start,
-                                              const gfx::Point& end) {
-  if (host_)
-    host_->SelectRange(start, end);
-}
-
 void RenderWidgetHostViewAndroid::MoveCaret(const gfx::Point& point) {
   if (host_)
     host_->MoveCaret(point);
@@ -1339,8 +1335,14 @@ void RenderWidgetHostViewAndroid::SetContentViewCore(
   RunAckCallbacks();
 
   RemoveLayers();
-  if (content_view_core_ && !using_synchronous_compositor_)
+  // TODO: crbug.com/324341
+  // WindowAndroid and Compositor should outlive all WebContents.
+  // Allowing this here at runtime is a bandaid.
+  DCHECK(!root_window_destroyed_);
+  if (content_view_core_ && !root_window_destroyed_ &&
+      !using_synchronous_compositor_) {
     content_view_core_->GetWindowAndroid()->RemoveObserver(this);
+  }
 
   if (content_view_core != content_view_core_)
     ReleaseLocksOnSurface();
@@ -1356,8 +1358,10 @@ void RenderWidgetHostViewAndroid::SetContentViewCore(
   }
 
   AttachLayers();
-  if (content_view_core_ && !using_synchronous_compositor_)
+  if (content_view_core_ && !root_window_destroyed_ &&
+      !using_synchronous_compositor_) {
     content_view_core_->GetWindowAndroid()->AddObserver(this);
+  }
 }
 
 void RenderWidgetHostViewAndroid::RunAckCallbacks() {
@@ -1374,6 +1378,7 @@ void RenderWidgetHostViewAndroid::OnCompositingDidCommit() {
 void RenderWidgetHostViewAndroid::OnDetachCompositor() {
   DCHECK(content_view_core_);
   DCHECK(!using_synchronous_compositor_);
+  root_window_destroyed_ = true;
   RunAckCallbacks();
 }
 

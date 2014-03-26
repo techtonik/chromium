@@ -14,6 +14,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/chrome_switches.h"
 #include "content/public/test/browser_test_utils.h"
+#include "testing/gtest/include/gtest/gtest-spi.h"
 #if defined(OS_ANDROID)
 #include "base/android/build_info.h"
 #endif
@@ -457,9 +458,7 @@ INSTANTIATE_TEST_CASE_P(SRC_ExternalClearKey_Prefixed,
                         Combine(Values(kExternalClearKeyKeySystem),
                                 Values(SRC),
                                 Values(PREFIXED)));
-// TODO(jrummell): Enable unprefixed tests once the CDM can be loaded using
-// MediaKeys.
-INSTANTIATE_TEST_CASE_P(DISABLED_SRC_ExternalClearKey,
+INSTANTIATE_TEST_CASE_P(SRC_ExternalClearKey,
                         EncryptedMediaTest,
                         Combine(Values(kExternalClearKeyKeySystem),
                                 Values(SRC),
@@ -469,9 +468,7 @@ INSTANTIATE_TEST_CASE_P(MSE_ExternalClearKey_Prefixed,
                         Combine(Values(kExternalClearKeyKeySystem),
                                 Values(MSE),
                                 Values(PREFIXED)));
-// TODO(jrummell): Enable unprefixed tests once the CDM can be loaded using
-// MediaKeys.
-INSTANTIATE_TEST_CASE_P(DISABLED_MSE_ExternalClearKey,
+INSTANTIATE_TEST_CASE_P(MSE_ExternalClearKey,
                         EncryptedMediaTest,
                         Combine(Values(kExternalClearKeyKeySystem),
                                 Values(MSE),
@@ -482,9 +479,7 @@ INSTANTIATE_TEST_CASE_P(MSE_ExternalClearKeyDecryptOnly_Prefixed,
                         Combine(Values(kExternalClearKeyDecryptOnlyKeySystem),
                                 Values(MSE),
                                 Values(PREFIXED)));
-// TODO(jrummell): Enable unprefixed tests once the CDM can be loaded using
-// MediaKeys.
-INSTANTIATE_TEST_CASE_P(DISABLED_MSE_ExternalClearKeyDecryptOnly,
+INSTANTIATE_TEST_CASE_P(MSE_ExternalClearKeyDecryptOnly,
                         EncryptedMediaTest,
                         Combine(Values(kExternalClearKeyDecryptOnlyKeySystem),
                                 Values(MSE),
@@ -500,9 +495,7 @@ INSTANTIATE_TEST_CASE_P(MSE_Widevine_Prefixed,
                         Combine(Values(kWidevineKeySystem),
                                 Values(MSE),
                                 Values(PREFIXED)));
-// TODO(jrummell): Enable unprefixed tests once the CDM can be loaded using
-// MediaKeys.
-INSTANTIATE_TEST_CASE_P(DISABLED_MSE_Widevine,
+INSTANTIATE_TEST_CASE_P(MSE_Widevine,
                         EncryptedMediaTest,
                         Combine(Values(kWidevineKeySystem),
                                 Values(MSE),
@@ -626,7 +619,16 @@ IN_PROC_BROWSER_TEST_F(ECKEncryptedMediaTest, InitializeCDMFail) {
 
 // When CDM crashes, we should still get a decode error.
 IN_PROC_BROWSER_TEST_F(ECKEncryptedMediaTest, CDMCrashDuringDecode) {
+  IgnorePluginCrash();
   TestNonPlaybackCases(kExternalClearKeyCrashKeySystem, kError);
+}
+
+// Testing that the media browser test does fail on plugin crash.
+IN_PROC_BROWSER_TEST_F(ECKEncryptedMediaTest, CDMExpectedCrash) {
+  // Plugin crash is not ignored by default, the test is expected to fail.
+  EXPECT_NONFATAL_FAILURE(
+      TestNonPlaybackCases(kExternalClearKeyCrashKeySystem, kError),
+      "plugin crash");
 }
 
 IN_PROC_BROWSER_TEST_F(ECKEncryptedMediaTest, FileIOTest) {

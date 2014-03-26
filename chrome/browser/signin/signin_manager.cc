@@ -14,19 +14,15 @@
 #include "base/time/time.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/profiles/profile_io_data.h"
-#include "chrome/browser/signin/about_signin_internals.h"
-#include "chrome/browser/signin/about_signin_internals_factory.h"
 #include "chrome/browser/signin/local_auth.h"
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
 #include "chrome/browser/signin/signin_account_id_helper.h"
-#include "chrome/browser/signin/signin_internals_util.h"
-#include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/profile_management_switches.h"
-#include "components/signin/core/profile_oauth2_token_service.h"
-#include "components/signin/core/signin_client.h"
-#include "components/signin/core/signin_manager_cookie_helper.h"
-#include "content/public/browser/browser_thread.h"
+#include "components/signin/core/browser/profile_oauth2_token_service.h"
+#include "components/signin/core/browser/signin_client.h"
+#include "components/signin/core/browser/signin_internals_util.h"
+#include "components/signin/core/browser/signin_manager_cookie_helper.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/common/child_process_host.h"
@@ -37,7 +33,6 @@
 
 using namespace signin_internals_util;
 
-using content::BrowserThread;
 using content::ChildProcessHost;
 using content::RenderProcessHost;
 
@@ -73,7 +68,9 @@ bool SigninManager::IsWebBasedSigninFlowURL(const GURL& url) {
 }
 
 SigninManager::SigninManager(SigninClient* client)
-    : prohibit_signout_(false),
+    : SigninManagerBase(client),
+      profile_(NULL),
+      prohibit_signout_(false),
       type_(SIGNIN_TYPE_NONE),
       weak_pointer_factory_(this),
       signin_host_id_(ChildProcessHost::kInvalidUniqueID),
@@ -280,6 +277,7 @@ void SigninManager::SignOut() {
 }
 
 void SigninManager::Initialize(Profile* profile, PrefService* local_state) {
+  profile_ = profile;
   SigninManagerBase::Initialize(profile, local_state);
 
   // local_state can be null during unit tests.
@@ -303,7 +301,7 @@ void SigninManager::Initialize(Profile* profile, PrefService* local_state) {
   }
 
   InitTokenService();
-  account_id_helper_.reset(new SigninAccountIdHelper(this));
+  account_id_helper_.reset(new SigninAccountIdHelper(profile_, this));
 }
 
 void SigninManager::Shutdown() {
@@ -326,12 +324,6 @@ void SigninManager::OnGoogleServicesUsernamePatternChanged() {
 
 bool SigninManager::IsSigninAllowed() const {
   return signin_allowed_.GetValue();
-}
-
-// static
-bool SigninManager::IsSigninAllowedOnIOThread(ProfileIOData* io_data) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::IO));
-  return io_data->signin_allowed()->GetValue();
 }
 
 void SigninManager::OnSigninAllowedPrefChanged() {

@@ -188,7 +188,9 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/io_thread.h"
 #include "chrome/browser/memory_details.h"
+#include "chrome/browser/metrics/cloned_install_detector.h"
 #include "chrome/browser/metrics/compression_utils.h"
+#include "chrome/browser/metrics/machine_id_provider.h"
 #include "chrome/browser/metrics/metrics_log.h"
 #include "chrome/browser/metrics/metrics_log_serializer.h"
 #include "chrome/browser/metrics/metrics_reporting_scheduler.h"
@@ -233,6 +235,7 @@
 
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/external_metrics.h"
+#include "chrome/browser/chromeos/settings/cros_settings.h"
 #include "chromeos/system/statistics_provider.h"
 #endif
 
@@ -1858,6 +1861,21 @@ void MetricsService::RegisterSyntheticFieldTrial(
   synthetic_trial_groups_.push_back(trial_group);
 }
 
+void MetricsService::CheckForClonedInstall() {
+  DCHECK(!cloned_install_detector_);
+
+  metrics::MachineIdProvider* provider =
+      metrics::MachineIdProvider::CreateInstance();
+  if (!provider)
+    return;
+
+  cloned_install_detector_.reset(
+      new metrics::ClonedInstallDetector(provider));
+
+  PrefService* local_state = g_browser_process->local_state();
+  cloned_install_detector_->CheckForClonedInstall(local_state);
+}
+
 void MetricsService::GetCurrentSyntheticFieldTrials(
     std::vector<chrome_variations::ActiveGroupId>* synthetic_trials) {
   DCHECK(synthetic_trials);
@@ -2067,4 +2085,23 @@ bool MetricsServiceHelper::IsMetricsReportingEnabled() {
     }
   }
   return result;
+}
+
+bool MetricsServiceHelper::IsCrashReportingEnabled() {
+#if defined(GOOGLE_CHROME_BUILD)
+#if defined(OS_CHROMEOS)
+  bool reporting_enabled = false;
+  chromeos::CrosSettings::Get()->GetBoolean(chromeos::kStatsReportingPref,
+                                            &reporting_enabled);
+  return reporting_enabled;
+#elif defined(OS_ANDROID)
+  // Android has its own settings for metrics / crash uploading.
+  const PrefService* prefs = g_browser_process->local_state();
+  return prefs->GetBoolean(prefs::kCrashReportingEnabled);
+#else
+  return MetricsServiceHelper::IsMetricsReportingEnabled();
+#endif
+#else
+  return false;
+#endif
 }
