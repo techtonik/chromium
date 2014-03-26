@@ -456,7 +456,8 @@ class ServiceWorkerBlackBoxBrowserTest : public ServiceWorkerBrowserTest {
         base::Bind(&ServiceWorkerBlackBoxBrowserTest::FindRegistrationOnIO2,
                    this,
                    status,
-                   script_url, continuation));
+                   script_url,
+                   continuation));
   }
 
   void FindRegistrationOnIO2(

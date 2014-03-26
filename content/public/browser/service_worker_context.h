@@ -20,19 +20,16 @@ class ServiceWorkerContext {
   // roughly, must be of the form "<origin>/<path>/*".
   typedef GURL Scope;
 
-  typedef base::Callback<void(ServiceWorkerStatusCode status)>
-      RegistrationCallback;
+  typedef base::Callback<void(ServiceWorkerStatusCode status)> StatusCallback;
+
   virtual void RegisterServiceWorker(const Scope& pattern,
                                      const GURL& script_url,
                                      int source_process_id,
-                                     const RegistrationCallback& callback) = 0;
+                                     const StatusCallback& callback) = 0;
 
-  typedef base::Callback<void(ServiceWorkerStatusCode status)>
-      UnregistrationCallback;
-  virtual void UnregisterServiceWorker(
-      const GURL& pattern,
-      int source_process_id,
-      const UnregistrationCallback& callback) = 0;
+  virtual void UnregisterServiceWorker(const GURL& pattern,
+                                       int source_process_id,
+                                       const StatusCallback& callback) = 0;
 
   // TODO(jyasskin): Provide a way to SendMessage to a Scope.
 
