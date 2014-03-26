@@ -47,30 +47,17 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
   virtual void RegisterServiceWorker(const GURL& pattern,
                                      const GURL& script_url,
                                      int source_process_id,
-                                     const RegistrationCallback& continuation)
+                                     const StatusCallback& continuation)
       OVERRIDE;
 
-  virtual void UnregisterServiceWorker(
-      const GURL& pattern,
-      int source_process_id,
-      const UnregistrationCallback& continuation) OVERRIDE;
+  virtual void UnregisterServiceWorker(const GURL& pattern,
+                                       int source_process_id,
+                                       const StatusCallback& continuation)
+      OVERRIDE;
 
  private:
   friend class base::RefCountedThreadSafe<ServiceWorkerContextWrapper>;
   virtual ~ServiceWorkerContextWrapper();
-
-  void RegisterServiceWorkerOnIO(const GURL& pattern,
-                                 const GURL& script_url,
-                                 int source_process_id,
-                                 const RegistrationCallback& continuation);
-  void FinishRegistrationOnIO(const RegistrationCallback& continuation,
-                              ServiceWorkerStatusCode status,
-                              int64 registration_id);
-  void UnregisterServiceWorkerOnIO(const GURL& pattern,
-                                   int source_process_id,
-                                   const UnregistrationCallback& continuation);
-  void FinishUnregistrationOnIO(const RegistrationCallback& continuation,
-                                ServiceWorkerStatusCode status);
 
   scoped_ptr<ServiceWorkerContextCore> context_core_;
 };
