@@ -5,8 +5,6 @@
 #ifndef CONTENT_PUBLIC_COMMON_SERVICE_WORKER_RESULT_CODE_H_
 #define CONTENT_PUBLIC_COMMON_SERVICE_WORKER_RESULT_CODE_H_
 
-#include "content/common/content_export.h"
-
 namespace content {
 
 // Possible results from the public service worker API.
