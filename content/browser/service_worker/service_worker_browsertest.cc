@@ -14,6 +14,7 @@
 #include "content/browser/service_worker/service_worker_test_utils.h"
 #include "content/browser/service_worker/service_worker_version.h"
 #include "content/common/service_worker/service_worker_messages.h"
+#include "content/common/service_worker/service_worker_status_code.h"
 #include "content/common/service_worker/service_worker_types.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
@@ -21,7 +22,7 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_switches.h"
-#include "content/public/common/service_worker_status_code.h"
+#include "content/public/common/service_worker_result_code.h"
 #include "content/shell/browser/shell.h"
 #include "content/test/content_browser_test.h"
 #include "content/test/content_browser_test_utils.h"
@@ -436,9 +437,9 @@ class ServiceWorkerBlackBoxBrowserTest : public ServiceWorkerBrowserTest {
  public:
   typedef ServiceWorkerBlackBoxBrowserTest self;
 
-  static void ExpectStatusAndRun(ServiceWorkerStatusCode expected,
+  static void ExpectResultAndRun(ServiceWorkerResultCode expected,
                                  const base::Closure& continuation,
-                                 ServiceWorkerStatusCode actual) {
+                                 ServiceWorkerResultCode actual) {
     EXPECT_EQ(expected, actual);
     continuation.Run();
   }
@@ -484,8 +485,8 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL(kWorkerUrl),
         RenderProcessID(),
-        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectStatusAndRun,
-                   SERVICE_WORKER_OK,
+        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
+                   SERVICE_WORKER_SUCCEEDED,
                    run_loop.QuitClosure()));
     run_loop.Run();
   }
@@ -506,8 +507,8 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
     public_context()->UnregisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         RenderProcessID(),
-        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectStatusAndRun,
-                   SERVICE_WORKER_OK,
+        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
+                   SERVICE_WORKER_SUCCEEDED,
                    run_loop.QuitClosure()));
     run_loop.Run();
   }

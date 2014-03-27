@@ -5,8 +5,8 @@
 // Message definition file, included multiple times, hence no include guard.
 
 #include "base/strings/string16.h"
+#include "content/common/service_worker/service_worker_status_code.h"
 #include "content/common/service_worker/service_worker_types.h"
-#include "content/public/common/service_worker_status_code.h"
 #include "ipc/ipc_message_macros.h"
 #include "ipc/ipc_param_traits.h"
 #include "third_party/WebKit/public/platform/WebServiceWorkerError.h"

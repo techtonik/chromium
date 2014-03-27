@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef CONTENT_PUBLIC_COMMON_SERVICE_WORKER_STATUS_CODE_H_
-#define CONTENT_PUBLIC_COMMON_SERVICE_WORKER_STATUS_CODE_H_
+#ifndef CONTENT_COMMON_SERVICE_WORKER_SERVICE_WORKER_STATUS_CODE_H_
+#define CONTENT_COMMON_SERVICE_WORKER_SERVICE_WORKER_STATUS_CODE_H_
 
 #include "content/common/content_export.h"
 
 namespace content {
 
 // Generic service worker operation statuses.
+// See content/public/common/service_worker_result_code.h for public result
+// codes.
 enum ServiceWorkerStatusCode {
   // Operation succeeded.
   SERVICE_WORKER_OK,
@@ -49,4 +51,4 @@ CONTENT_EXPORT const char* ServiceWorkerStatusToString(
 
 }  // namespace content
 
-#endif  // CONTENT_PUBLIC_COMMON_SERVICE_WORKER_STATUS_CODE_H_
+#endif  // CONTENT_COMMON_SERVICE_WORKER_SERVICE_WORKER_STATUS_CODE_H_

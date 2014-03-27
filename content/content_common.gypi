@@ -95,7 +95,7 @@
     'public/common/sandboxed_process_launcher_delegate.cc',
     'public/common/sandboxed_process_launcher_delegate.h',
     'public/common/security_style.h',
-    'public/common/service_worker_status_code.h',
+    'public/common/service_worker_result_code.h',
     'public/common/show_desktop_notification_params.cc',
     'public/common/show_desktop_notification_params.h',
     'public/common/signed_certificate_timestamp_id_and_status.cc',

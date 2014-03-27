@@ -7,7 +7,7 @@
 
 #include "base/basictypes.h"
 #include "base/callback_forward.h"
-#include "content/public/common/service_worker_status_code.h"
+#include "content/public/common/service_worker_result_code.h"
 #include "url/gurl.h"
 
 namespace content {
@@ -20,25 +20,40 @@ class ServiceWorkerContext {
   // roughly, must be of the form "<origin>/<path>/*".
   typedef GURL Scope;
 
-  typedef base::Callback<void(ServiceWorkerStatusCode status)> StatusCallback;
+  typedef base::Callback<void(ServiceWorkerResultCode status)> ResultCallback;
 
+  // Equivalent to calling navigator.serviceWorker.register(script_url, {scope:
+  // pattern}) from a renderer in |source_process_id|, except that |pattern| is
+  // an absolute URL instead of relative to some current origin.  |callback| is
+  // passed SUCCEEDED when the JS promise is fulfilled or FAILED when the JS
+  // promise is rejected.
+  //
+  // The registration can fail if:
+  //  * |script_url| is on a different origin from |pattern|
+  //  * Fetching |script_url| fails.
+  //  * Something unexpected goes wrong, like a renderer crash.
   virtual void RegisterServiceWorker(const Scope& pattern,
                                      const GURL& script_url,
                                      int source_process_id,
-                                     const StatusCallback& callback) = 0;
+                                     const ResultCallback& callback) = 0;
 
-  virtual void UnregisterServiceWorker(const GURL& pattern,
+  // Equivalent to calling navigator.serviceWorker.unregister(pattern) from a
+  // renderer in |source_process_id|, except that |pattern| is an absolute URL
+  // instead of relative to some current origin.  |callback| is passed SUCCEEDED
+  // when the JS promise is fulfilled or FAILED when the JS promise is rejected.
+  //
+  // Unregistration can fail if:
+  //  * No Service Worker was registered for |pattern|.
+  //  * Something unexpected goes wrong, like a renderer crash.
+  virtual void UnregisterServiceWorker(const Scope& pattern,
                                        int source_process_id,
-                                       const StatusCallback& callback) = 0;
+                                       const ResultCallback& callback) = 0;
 
   // TODO(jyasskin): Provide a way to SendMessage to a Scope.
 
  protected:
   ServiceWorkerContext() {}
   virtual ~ServiceWorkerContext() {}
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(ServiceWorkerContext);
 };
 
 }  // namespace content
