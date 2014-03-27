@@ -14,7 +14,7 @@ enum ServiceWorkerResultCode {
   // Operation succeeded.
   SERVICE_WORKER_SUCCEEDED,
 
-  // The operation failed. (more specific error codes may be added in the
+  // The operation failed. (More specific error codes may be added in the
   // future.)
   SERVICE_WORKER_FAILED,
 };

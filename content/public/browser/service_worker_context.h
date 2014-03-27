@@ -31,7 +31,9 @@ class ServiceWorkerContext {
   // The registration can fail if:
   //  * |script_url| is on a different origin from |pattern|
   //  * Fetching |script_url| fails.
-  //  * Something unexpected goes wrong, like a renderer crash.
+  //  * |script_url| fails to parse or its top-level execution fails.
+  //    TODO: The error message for this needs to be available to developers.
+  //  * Something unexpected goes wrong, like a renderer crash or a full disk.
   virtual void RegisterServiceWorker(const Scope& pattern,
                                      const GURL& script_url,
                                      int source_process_id,
