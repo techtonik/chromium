@@ -7,7 +7,6 @@
 
 #include "base/basictypes.h"
 #include "base/callback_forward.h"
-#include "content/public/common/service_worker_result_code.h"
 #include "url/gurl.h"
 
 namespace content {
@@ -20,12 +19,12 @@ class ServiceWorkerContext {
   // roughly, must be of the form "<origin>/<path>/*".
   typedef GURL Scope;
 
-  typedef base::Callback<void(ServiceWorkerResultCode status)> ResultCallback;
+  typedef base::Callback<void(bool success)> ResultCallback;
 
   // Equivalent to calling navigator.serviceWorker.register(script_url, {scope:
   // pattern}) from a renderer in |source_process_id|, except that |pattern| is
   // an absolute URL instead of relative to some current origin.  |callback| is
-  // passed SUCCEEDED when the JS promise is fulfilled or FAILED when the JS
+  // passed true when the JS promise is fulfilled or false when the JS
   // promise is rejected.
   //
   // The registration can fail if:
@@ -41,8 +40,8 @@ class ServiceWorkerContext {
 
   // Equivalent to calling navigator.serviceWorker.unregister(pattern) from a
   // renderer in |source_process_id|, except that |pattern| is an absolute URL
-  // instead of relative to some current origin.  |callback| is passed SUCCEEDED
-  // when the JS promise is fulfilled or FAILED when the JS promise is rejected.
+  // instead of relative to some current origin.  |callback| is passed true
+  // when the JS promise is fulfilled or false when the JS promise is rejected.
   //
   // Unregistration can fail if:
   //  * No Service Worker was registered for |pattern|.

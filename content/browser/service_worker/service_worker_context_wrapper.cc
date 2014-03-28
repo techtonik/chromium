@@ -54,11 +54,10 @@ static void FinishRegistrationOnIO(
     ServiceWorkerStatusCode status,
     int64 registration_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  ServiceWorkerResultCode result = SERVICE_WORKER_FAILED;
-  if (status == SERVICE_WORKER_OK)
-    result = SERVICE_WORKER_SUCCEEDED;
   BrowserThread::PostTask(
-      BrowserThread::UI, FROM_HERE, base::Bind(continuation, result));
+      BrowserThread::UI,
+      FROM_HERE,
+      base::Bind(continuation, status == SERVICE_WORKER_OK));
 }
 
 void ServiceWorkerContextWrapper::RegisterServiceWorker(
@@ -90,11 +89,10 @@ static void FinishUnregistrationOnIO(
     const ServiceWorkerContext::ResultCallback& continuation,
     ServiceWorkerStatusCode status) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  ServiceWorkerResultCode result = SERVICE_WORKER_FAILED;
-  if (status == SERVICE_WORKER_OK)
-    result = SERVICE_WORKER_SUCCEEDED;
   BrowserThread::PostTask(
-      BrowserThread::UI, FROM_HERE, base::Bind(continuation, result));
+      BrowserThread::UI,
+      FROM_HERE,
+      base::Bind(continuation, status == SERVICE_WORKER_OK));
 }
 
 void ServiceWorkerContextWrapper::UnregisterServiceWorker(

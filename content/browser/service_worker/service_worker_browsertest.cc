@@ -22,7 +22,6 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_switches.h"
-#include "content/public/common/service_worker_result_code.h"
 #include "content/shell/browser/shell.h"
 #include "content/test/content_browser_test.h"
 #include "content/test/content_browser_test_utils.h"
@@ -437,9 +436,9 @@ class ServiceWorkerBlackBoxBrowserTest : public ServiceWorkerBrowserTest {
  public:
   typedef ServiceWorkerBlackBoxBrowserTest self;
 
-  static void ExpectResultAndRun(ServiceWorkerResultCode expected,
+  static void ExpectResultAndRun(bool expected,
                                  const base::Closure& continuation,
-                                 ServiceWorkerResultCode actual) {
+                                 bool actual) {
     EXPECT_EQ(expected, actual);
     continuation.Run();
   }
@@ -486,7 +485,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
         embedded_test_server()->GetURL(kWorkerUrl),
         RenderProcessID(),
         base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
-                   SERVICE_WORKER_SUCCEEDED,
+                   true,
                    run_loop.QuitClosure()));
     run_loop.Run();
   }
@@ -508,7 +507,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
         embedded_test_server()->GetURL("/*"),
         RenderProcessID(),
         base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
-                   SERVICE_WORKER_SUCCEEDED,
+                   true,
                    run_loop.QuitClosure()));
     run_loop.Run();
   }

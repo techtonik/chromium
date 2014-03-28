@@ -10,8 +10,6 @@
 namespace content {
 
 // Generic service worker operation statuses.
-// See content/public/common/service_worker_result_code.h for public result
-// codes.
 enum ServiceWorkerStatusCode {
   // Operation succeeded.
   SERVICE_WORKER_OK,
