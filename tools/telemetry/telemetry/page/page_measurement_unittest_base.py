@@ -8,6 +8,7 @@ from telemetry.core import util
 from telemetry.page import page_runner
 from telemetry.page import page as page_module
 from telemetry.page import page_set
+from telemetry.page import page_test
 from telemetry.page import test_expectations
 from telemetry.unittest import options_for_unittests
 
@@ -52,3 +53,37 @@ class PageMeasurementUnitTestBase(unittest.TestCase):
     page_runner.ProcessCommandLineArgs(temp_parser, options)
     measurement.ProcessCommandLineArgs(temp_parser, options)
     return page_runner.Run(measurement, ps, expectations, options)
+
+  def TestTracingCleanedUp(self, measurement_class, options=None):
+    ps = self.CreatePageSetFromFileInUnittestDataDir('blank.html')
+    start_tracing_called = [False]
+    stop_tracing_called = [False]
+
+    class BuggyMeasurement(measurement_class):
+      def __init__(self, *args, **kwargs):
+        measurement_class.__init__(self, *args, **kwargs)
+
+      # Inject fake tracing methods to browser
+      def TabForPage(self, page, browser):
+        ActualStartTracing = browser.StartTracing
+        def FakeStartTracing(*args, **kwargs):
+          ActualStartTracing(*args, **kwargs)
+          start_tracing_called[0] = True
+          raise Exception('Intentional exception')
+        browser.StartTracing = FakeStartTracing
+
+        ActualStopTracing = browser.StopTracing
+        def FakeStopTracing(*args, **kwargs):
+          ActualStopTracing(*args, **kwargs)
+          stop_tracing_called[0] = True
+        browser.StopTracing = FakeStopTracing
+
+        return measurement_class.TabForPage(self, page, browser)
+
+    measurement = BuggyMeasurement()
+    try:
+      self.RunMeasurement(measurement, ps, options=options)
+    except page_test.TestNotSupportedOnPlatformFailure:
+      pass
+    if start_tracing_called[0]:
+      self.assertTrue(stop_tracing_called[0])

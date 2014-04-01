@@ -31,6 +31,7 @@
 #include "media/base/media_switches.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/ui_base_switches.h"
+#include "ui/display/display_switches.h"
 #include "ui/events/event_switches.h"
 #include "ui/gfx/switches.h"
 #include "ui/gl/gl_switches.h"
@@ -570,15 +571,6 @@ const Experiment kExperiments[] = {
   },
 #endif
 #if defined(OS_ANDROID)
-#if defined(ARCH_CPU_X86)
-  {
-      "enable-webaudio",
-      IDS_FLAGS_ENABLE_WEBAUDIO_NAME,
-      IDS_FLAGS_ENABLE_WEBAUDIO_DESCRIPTION,
-      kOsAndroid,
-      SINGLE_VALUE_TYPE(switches::kEnableWebAudio)
-  },
-#else
   {
     "disable-webaudio",
     IDS_FLAGS_DISABLE_WEBAUDIO_NAME,
@@ -586,7 +578,6 @@ const Experiment kExperiments[] = {
     kOsAndroid,
     SINGLE_VALUE_TYPE(switches::kDisableWebAudio)
   },
-#endif
 #endif
   {
     "fixed-position-creates-stacking-context",
@@ -1076,6 +1067,13 @@ const Experiment kExperiments[] = {
     kOsCrOS,
     SINGLE_VALUE_TYPE(switches::kMultiProfiles),
   },
+  {
+    "disable-display-color-calibration",
+    IDS_FLAGS_DISABLE_DISPLAY_COLOR_CALIBRATION_NAME,
+    IDS_FLAGS_DISABLE_DISPLAY_COLOR_CALIBRATION_DESCRIPTION,
+    kOsCrOS,
+    SINGLE_VALUE_TYPE(ui::switches::kDisableDisplayColorCalibration),
+  },
 #endif  // defined(OS_CHROMEOS)
   { "disable-accelerated-video-decode",
     IDS_FLAGS_DISABLE_ACCELERATED_VIDEO_DECODE_NAME,
@@ -1104,13 +1102,6 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ASH_ENABLE_TOUCH_VIEW_TESTING_DESCRIPTION,
     kOsCrOS,
     SINGLE_VALUE_TYPE(ash::switches::kAshEnableTouchViewTesting),
-  },
-  {
-    "ash-enable-brightness-control",
-    IDS_FLAGS_ASH_ENABLE_BRIGHTNESS_CONTROL_NAME,
-    IDS_FLAGS_ASH_ENABLE_BRIGHTNESS_CONTROL_DESCRIPTION,
-    kOsCrOS,
-    SINGLE_VALUE_TYPE(ash::switches::kAshEnableBrightnessControl)
   },
 #endif
 #if defined(OS_CHROMEOS)
@@ -1364,7 +1355,7 @@ const Experiment kExperiments[] = {
     "enable-simple-cache-backend",
     IDS_FLAGS_ENABLE_SIMPLE_CACHE_BACKEND_NAME,
     IDS_FLAGS_ENABLE_SIMPLE_CACHE_BACKEND_DESCRIPTION,
-    kOsAll,
+    kOsWin | kOsMac | kOsLinux | kOsCrOS,
     MULTI_VALUE_TYPE(kSimpleCacheBackendChoices)
   },
   {
@@ -1586,12 +1577,14 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnableAccessibilityTabSwitcher)
   },
   {
-    "disable-accessibility-script-injection",
-    IDS_FLAGS_DISABLE_ACCESSIBILITY_SCRIPT_INJECTION_NAME,
-    IDS_FLAGS_DISABLE_ACCESSIBILITY_SCRIPT_INJECTION_DESCRIPTION,
+    // TODO(dmazzoni): remove this flag when native android accessibility
+    // ships in the stable channel. http://crbug.com/356775
+    "enable-accessibility-script-injection",
+    IDS_FLAGS_ENABLE_ACCESSIBILITY_SCRIPT_INJECTION_NAME,
+    IDS_FLAGS_ENABLE_ACCESSIBILITY_SCRIPT_INJECTION_DESCRIPTION,
     kOsAndroid,
-    // Java-only switch: ContentSwitches.DISABLE_ACCESSIBILITY_SCRIPT_INJECTION.
-    SINGLE_VALUE_TYPE("disable-accessibility-script-injection")
+    // Java-only switch: ContentSwitches.ENABLE_ACCESSIBILITY_SCRIPT_INJECTION.
+    SINGLE_VALUE_TYPE("enable-accessibility-script-injection")
   },
 #endif
   {
@@ -1756,13 +1749,6 @@ const Experiment kExperiments[] = {
   },
 #if defined(USE_AURA) || defined(OS_WIN)
   {
-    "enable-save-password-bubble",
-    IDS_FLAGS_ENABLE_PASSWORD_BUBBLE_NAME,
-    IDS_FLAGS_ENABLE_PASSWORD_BUBBLE_DESCRIPTION,
-    kOsWin | kOsCrOS,
-    SINGLE_VALUE_TYPE(switches::kEnableSavePasswordBubble)
-  },
-  {
     "enable-permissions-bubbles",
     IDS_FLAGS_ENABLE_PERMISSIONS_BUBBLES_NAME,
     IDS_FLAGS_ENABLE_PERMISSIONS_BUBBLES_DESCRIPTION,
@@ -1853,6 +1839,22 @@ const Experiment kExperiments[] = {
     kOsAndroid,
     SINGLE_VALUE_TYPE(switches::kEnableInstantSearchClicks)
   },
+#endif
+  {
+    "enable-save-password-bubble",
+    IDS_FLAGS_ENABLE_SAVE_PASSWORD_BUBBLE_NAME,
+    IDS_FLAGS_ENABLE_SAVE_PASSWORD_BUBBLE_DESCRIPTION,
+    kOsWin | kOsLinux | kOsCrOS,
+    SINGLE_VALUE_TYPE(switches::kEnableSavePasswordBubble)
+  },
+#if defined(GOOGLE_CHROME_BUILD)
+  {
+    "enable-easy-unlock",
+    IDS_FLAGS_ENABLE_EASY_UNLOCK_NAME,
+    IDS_FLAGS_ENABLE_EASY_UNLOCK_DESCRIPTION,
+    kOsCrOS,
+    SINGLE_VALUE_TYPE(switches::kEnableEasyUnlock)
+  }
 #endif
 };
 

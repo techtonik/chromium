@@ -332,7 +332,6 @@ void FileSystem::ResetComponents() {
       blocking_task_runner_.get(),
       resource_metadata_,
       scheduler_,
-      drive_service_,
       about_resource_loader_.get(),
       loader_controller_.get()));
   directory_loader_->AddObserver(this);
@@ -612,7 +611,7 @@ void FileSystem::GetFileForSaving(const base::FilePath& file_path,
   get_file_for_saving_operation_->GetFileForSaving(file_path, callback);
 }
 
-void FileSystem::GetFileContent(
+base::Closure FileSystem::GetFileContent(
     const base::FilePath& file_path,
     const GetFileContentInitializedCallback& initialized_callback,
     const google_apis::GetContentCallback& get_content_callback,
@@ -622,7 +621,7 @@ void FileSystem::GetFileContent(
   DCHECK(!get_content_callback.is_null());
   DCHECK(!completion_callback.is_null());
 
-  download_operation_->EnsureFileDownloadedByPath(
+  return download_operation_->EnsureFileDownloadedByPath(
       file_path,
       ClientContext(USER_INITIATED),
       initialized_callback,

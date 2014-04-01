@@ -6,13 +6,16 @@
 #define UI_GFX_OZONE_DRI_DRI_SURFACE_FACTORY_H_
 
 #include "base/memory/scoped_ptr.h"
+#include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/gfx/ozone/surface_factory_ozone.h"
+#include "ui/gfx/ozone/surface_ozone.h"
 
 namespace gfx {
 
 class DriSurface;
 class DriWrapper;
 class HardwareDisplayController;
+class SurfaceOzone;
 
 // SurfaceFactoryOzone implementation on top of DRM/KMS using dumb buffers.
 // This implementation is used in conjunction with the software rendering
@@ -26,23 +29,20 @@ class GFX_EXPORT DriSurfaceFactory : public SurfaceFactoryOzone {
   virtual void ShutdownHardware() OVERRIDE;
 
   virtual gfx::AcceleratedWidget GetAcceleratedWidget() OVERRIDE;
-  virtual gfx::AcceleratedWidget RealizeAcceleratedWidget(
+
+  virtual scoped_ptr<SurfaceOzone> CreateSurfaceForWidget(
       gfx::AcceleratedWidget w) OVERRIDE;
 
   virtual bool LoadEGLGLES2Bindings(
       AddGLLibraryCallback add_gl_library,
       SetGLGetProcAddressProcCallback set_gl_get_proc_address) OVERRIDE;
 
-  virtual bool AttemptToResizeAcceleratedWidget(
-      gfx::AcceleratedWidget w,
-      const gfx::Rect& bounds) OVERRIDE;
+  virtual bool SchedulePageFlip(gfx::AcceleratedWidget w);
 
-  virtual bool SchedulePageFlip(gfx::AcceleratedWidget w) OVERRIDE;
-
-  virtual SkCanvas* GetCanvasForWidget(gfx::AcceleratedWidget w) OVERRIDE;
+  virtual SkCanvas* GetCanvasForWidget(gfx::AcceleratedWidget w);
 
   virtual scoped_ptr<gfx::VSyncProvider> CreateVSyncProvider(
-      gfx::AcceleratedWidget w) OVERRIDE;
+      gfx::AcceleratedWidget w);
 
   void SetHardwareCursor(AcceleratedWidget window,
                          const SkBitmap& image,
@@ -67,6 +67,9 @@ class GFX_EXPORT DriSurfaceFactory : public SurfaceFactoryOzone {
   // pending frame.
   virtual void WaitForPageFlipEvent(int fd);
 
+  // Draw the last set cursor & update the cursor plane.
+  void ResetCursor();
+
   scoped_ptr<DriWrapper> drm_;
 
   HardwareState state_;
@@ -75,6 +78,9 @@ class GFX_EXPORT DriSurfaceFactory : public SurfaceFactoryOzone {
   scoped_ptr<HardwareDisplayController> controller_;
 
   scoped_ptr<DriSurface> cursor_surface_;
+
+  SkBitmap cursor_bitmap_;
+  gfx::Point cursor_location_;
 
   DISALLOW_COPY_AND_ASSIGN(DriSurfaceFactory);
 };

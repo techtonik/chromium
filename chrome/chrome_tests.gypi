@@ -88,7 +88,6 @@
         'chrome_resources.gyp:chrome_strings',
         'chrome_resources.gyp:packed_extra_resources',
         'chrome_resources.gyp:packed_resources',
-        'common/extensions/api/api.gyp:chrome_api',
         'debugger',
         'renderer',
         'test_support_common',
@@ -876,6 +875,7 @@
         'test/perf/perf_test.gyp:*',
         'test_support_common',
         'test_support_sync_integration',
+        '../apps/common/api/api.gyp:apps_api',
         '../base/base.gyp:base',
         '../base/base.gyp:base_i18n',
         '../base/base.gyp:test_support_base',
@@ -983,6 +983,7 @@
         'browser/chromeos/drive/drive_integration_service_browsertest.cc',
         'browser/chromeos/drive/test_util.cc',
         'browser/chromeos/drive/test_util.h',
+        'browser/chromeos/extensions/accessibility_features_apitest.cc',
         'browser/chromeos/extensions/screenlock_private_apitest.cc',
         'browser/chromeos/extensions/echo_private_apitest.cc',
         'browser/chromeos/extensions/file_manager/file_browser_handler_api_test.cc',
@@ -1007,6 +1008,7 @@
         'browser/chromeos/kiosk_mode/mock_kiosk_mode_settings.h',
         'browser/chromeos/login/captive_portal_window_browsertest.cc',
         'browser/chromeos/login/crash_restore_browsertest.cc',
+        'browser/chromeos/login/demo_mode/demo_app_launcher_browsertest.cc',
         'browser/chromeos/login/enrollment/enrollment_screen_browsertest.cc',
         'browser/chromeos/login/enrollment/mock_enrollment_screen.cc',
         'browser/chromeos/login/enrollment/mock_enrollment_screen.h',
@@ -1040,6 +1042,8 @@
         'browser/chromeos/login/screens/network_screen_browsertest.cc',
         'browser/chromeos/login/screens/update_screen_browsertest.cc',
         'browser/chromeos/login/simple_web_view_dialog_browsertest.cc',
+        'browser/chromeos/login/test/app_window_waiter.cc',
+        'browser/chromeos/login/test/app_window_waiter.h',
         'browser/chromeos/login/test/https_forwarder.cc',
         'browser/chromeos/login/test/https_forwarder.h',
         'browser/chromeos/login/test_login_utils.cc',
@@ -1097,6 +1101,8 @@
         'browser/extensions/api/bluetooth/bluetooth_apitest.cc',
         'browser/extensions/api/bookmark_manager_private/bookmark_manager_private_apitest.cc',
         'browser/extensions/api/braille_display_private/braille_display_private_apitest.cc',
+        'browser/extensions/api/braille_display_private/mock_braille_controller.cc',
+        'browser/extensions/api/braille_display_private/mock_braille_controller.h',
         'browser/extensions/api/bookmarks/bookmark_apitest.cc',
         'browser/extensions/api/browsing_data/browsing_data_test.cc',
         'browser/extensions/api/cast_channel/cast_channel_apitest.cc',
@@ -1399,6 +1405,7 @@
         'browser/ui/ash/accelerator_commands_browsertest.cc',
         'browser/ui/ash/launcher/chrome_launcher_controller_browsertest.cc',
         'browser/ui/ash/launcher/launcher_favicon_loader_browsertest.cc',
+        'browser/ui/ash/keyboard_controller_browsertest.cc',
         'browser/ui/ash/shelf_browsertest.cc',
         'browser/ui/ash/volume_controller_browsertest_chromeos.cc',
         'browser/ui/autofill/autofill_dialog_controller_browsertest.cc',
@@ -1673,6 +1680,11 @@
             'browser/ui/sync/one_click_signin_bubble_links_delegate_browsertest.cc',
           ]
         }],
+        [ 'OS == "android"', {
+          'sources!': [
+            'browser/autofill/risk/fingerprint_browsertest.cc',
+          ]
+        }],
         ['enable_autofill_dialog==0', {
           'sources!': [
             'browser/ui/autofill/autofill_dialog_controller_browsertest.cc',
@@ -1710,6 +1722,7 @@
                     '../third_party/liblouis/nacl_wrapper/liblouis_wrapper_browsertest.cc',
                   ],
                   'dependencies': [
+                    'browser_chromeos',
                     '../third_party/liblouis/liblouis_nacl.gyp:liblouis_test_data',
                   ],
                 }],
@@ -1771,6 +1784,7 @@
             'browser/extensions/api/terminal/terminal_private_apitest.cc',
             'browser/net/nss_context_chromeos_browsertest.cc',
             'browser/notifications/login_state_notification_blocker_chromeos_browsertest.cc',
+            'browser/ui/ash/keyboard_controller_browsertest.cc',
             'browser/ui/views/select_file_dialog_extension_browsertest.cc',
             'test/data/webui/certificate_viewer_dialog_test.js',
             'test/data/webui/certificate_viewer_ui_test-inl.h',
@@ -2114,6 +2128,7 @@
         'test/base/chrome_render_view_test.h',
         'test/perf/browser_perf_test.cc',
         'test/perf/browser_perf_test.h',
+        'test/perf/mach_ports_performancetest.cc',
       ],
       'rules': [
         {
@@ -2210,6 +2225,10 @@
           'dependencies': [
             'chrome',
             '../components/components.gyp:breakpad_stubs',
+          ],
+        }, {  # OS!="mac"
+          'sources!': [
+            'test/perf/mach_ports_performancetest.cc',
           ],
         }],
         ['os_posix == 1 and OS != "mac" and OS != "android"', {
@@ -2364,6 +2383,8 @@
         'browser/sync/test/integration/extension_settings_helper.h',
         'browser/sync/test/integration/extensions_helper.cc',
         'browser/sync/test/integration/extensions_helper.h',
+        'browser/sync/test/integration/multi_client_status_change_checker.cc',
+        'browser/sync/test/integration/multi_client_status_change_checker.h',
         'browser/sync/test/integration/passwords_helper.cc',
         'browser/sync/test/integration/passwords_helper.h',
         'browser/sync/test/integration/p2p_invalidation_forwarder.cc',
@@ -2430,7 +2451,6 @@
         'chrome_resources.gyp:packed_extra_resources',
         'chrome_resources.gyp:packed_resources',
         'common',
-        'common/extensions/api/api.gyp:chrome_api',
         'renderer',
         'test_support_sync_integration',
         '../sync/sync.gyp:sync',
@@ -2583,7 +2603,6 @@
       'target_name': 'sync_performance_tests',
       'type': 'executable',
       'dependencies': [
-        'common/extensions/api/api.gyp:chrome_api',
         'test/perf/perf_test.gyp:*',
         'test_support_sync_integration',
         '../sync/sync.gyp:sync',

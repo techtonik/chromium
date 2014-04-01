@@ -27,7 +27,7 @@ class ChunkDemuxerStream : public DemuxerStream {
  public:
   typedef std::deque<scoped_refptr<StreamParserBuffer> > BufferQueue;
 
-  explicit ChunkDemuxerStream(Type type);
+  explicit ChunkDemuxerStream(Type type, bool splice_frames_enabled);
   virtual ~ChunkDemuxerStream();
 
   // ChunkDemuxerStream control methods.
@@ -117,6 +117,7 @@ class ChunkDemuxerStream : public DemuxerStream {
   mutable base::Lock lock_;
   State state_;
   ReadCB read_cb_;
+  const bool splice_frames_enabled_;
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(ChunkDemuxerStream);
 };
@@ -139,9 +140,13 @@ class MEDIA_EXPORT ChunkDemuxer : public Demuxer {
   //   otherwise ignore them.
   // |log_cb| Run when parsing error messages need to be logged to the error
   //   console.
+  // |splice_frames_enabled| Indicates that it's okay to generate splice frames
+  //   per the MSE specification.  Renderers must understand DecoderBuffer's
+  //   splice_timestamp() field.
   ChunkDemuxer(const base::Closure& open_cb,
                const NeedKeyCB& need_key_cb,
-               const LogCB& log_cb);
+               const LogCB& log_cb,
+               bool splice_frames_enabled);
   virtual ~ChunkDemuxer();
 
   // Demuxer implementation.
@@ -290,12 +295,8 @@ class MEDIA_EXPORT ChunkDemuxer : public Demuxer {
   // Returns true if |source_id| is valid, false otherwise.
   bool IsValidId(const std::string& source_id) const;
 
-  // Increases |duration_| if |last_appended_buffer_timestamp| exceeds the
-  // current  |duration_|. The |duration_| is set to the end buffered timestamp
-  // of |stream|.
-  void IncreaseDurationIfNecessary(
-      base::TimeDelta last_appended_buffer_timestamp,
-      ChunkDemuxerStream* stream);
+  // Increases |duration_| to |new_duration|, if |new_duration| is higher.
+  void IncreaseDurationIfNecessary(base::TimeDelta new_duration);
 
   // Decreases |duration_| if the buffered region is less than |duration_| when
   // EndOfStream() is called.
@@ -366,6 +367,9 @@ class MEDIA_EXPORT ChunkDemuxer : public Demuxer {
   // removed with RemoveID() but can not be re-added (yet).
   std::string source_id_audio_;
   std::string source_id_video_;
+
+  // Indicates that splice frame generation is enabled.
+  const bool splice_frames_enabled_;
 
   DISALLOW_COPY_AND_ASSIGN(ChunkDemuxer);
 };

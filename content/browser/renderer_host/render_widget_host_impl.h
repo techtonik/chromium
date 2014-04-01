@@ -146,6 +146,9 @@ class CONTENT_EXPORT RenderWidgetHostImpl : virtual public RenderWidgetHost,
                                                CGContextRef target) OVERRIDE;
 #endif
   virtual void EnableFullAccessibilityMode() OVERRIDE;
+  virtual bool IsFullAccessibilityModeForTesting() OVERRIDE;
+  virtual void EnableTreeOnlyAccessibilityMode() OVERRIDE;
+  virtual bool IsTreeOnlyAccessibilityModeForTesting() OVERRIDE;
   virtual void ForwardMouseEvent(
       const blink::WebMouseEvent& mouse_event) OVERRIDE;
   virtual void ForwardWheelEvent(
@@ -359,10 +362,6 @@ class CONTENT_EXPORT RenderWidgetHostImpl : virtual public RenderWidgetHost,
 
   // Cancels an ongoing composition.
   void ImeCancelComposition();
-
-  // Deletes the current selection plus the specified number of characters
-  // before and after the selection or caret.
-  void ExtendSelectionAndDelete(size_t before, size_t after);
 
   // This is for derived classes to give us access to the resizer rect.
   // And to also expose it to the RenderWidgetHostView.

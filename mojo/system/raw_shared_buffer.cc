@@ -21,14 +21,12 @@ RawSharedBuffer* RawSharedBuffer::Create(size_t num_bytes) {
   return rv;
 }
 
-scoped_ptr<RawSharedBuffer::Mapping> RawSharedBuffer::Map(size_t offset,
-                                                          size_t length) {
+scoped_ptr<RawSharedBufferMapping> RawSharedBuffer::Map(size_t offset,
+                                                        size_t length) {
   if (!IsValidMap(offset, length))
-    return scoped_ptr<Mapping>();
+    return scoped_ptr<RawSharedBufferMapping>();
 
   return MapNoCheck(offset, length);
-  base::AutoLock locker(lock_);
-  return MapImplNoLock(offset, length);
 }
 
 bool RawSharedBuffer::IsValidMap(size_t offset, size_t length) {
@@ -43,9 +41,8 @@ bool RawSharedBuffer::IsValidMap(size_t offset, size_t length) {
   return true;
 }
 
-scoped_ptr<RawSharedBuffer::Mapping> RawSharedBuffer::MapNoCheck(
-    size_t offset,
-    size_t length) {
+scoped_ptr<RawSharedBufferMapping> RawSharedBuffer::MapNoCheck(size_t offset,
+                                                               size_t length) {
   DCHECK(IsValidMap(offset, length));
 
   base::AutoLock locker(lock_);

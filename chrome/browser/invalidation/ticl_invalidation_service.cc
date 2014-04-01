@@ -183,8 +183,10 @@ TiclInvalidationService::GetInvalidationAuthProvider() {
 
 void TiclInvalidationService::RequestDetailedStatus(
     base::Callback<void(const base::DictionaryValue&)> return_callback) const {
-  return_callback.Run(network_channel_options_);
-  invalidator_->RequestDetailedStatus(return_callback);
+  if (IsStarted()) {
+    return_callback.Run(network_channel_options_);
+    invalidator_->RequestDetailedStatus(return_callback);
+  }
 }
 
 void TiclInvalidationService::RequestAccessToken() {
@@ -355,7 +357,7 @@ bool TiclInvalidationService::IsReadyToStart() {
   return true;
 }
 
-bool TiclInvalidationService::IsStarted() {
+bool TiclInvalidationService::IsStarted() const {
   return invalidator_.get() != NULL;
 }
 
@@ -429,8 +431,6 @@ void TiclInvalidationService::StartInvalidator(
 
 void TiclInvalidationService::UpdateInvalidationNetworkChannel() {
   InvalidationNetworkChannel network_channel_type = PUSH_CLIENT_CHANNEL;
-// For now don't use GCM on iOS.
-#if !defined(OS_IOS)
   if (gcm::GCMProfileService::GetGCMEnabledState(profile_) ==
           gcm::GCMProfileService::ALWAYS_ENABLED &&
       (profile_->GetPrefs()->GetBoolean(
@@ -439,7 +439,6 @@ void TiclInvalidationService::UpdateInvalidationNetworkChannel() {
            switches::kInvalidationUseGCMChannel))) {
     network_channel_type = GCM_NETWORK_CHANNEL;
   }
-#endif
   if (network_channel_type_ == network_channel_type)
     return;
   network_channel_type_ = network_channel_type;

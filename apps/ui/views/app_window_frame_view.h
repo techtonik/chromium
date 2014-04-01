@@ -7,11 +7,14 @@
 
 #include <string>
 
+#include "third_party/skia/include/core/SkColor.h"
 #include "ui/gfx/path.h"
 #include "ui/gfx/rect.h"
 #include "ui/gfx/size.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/window/non_client_view.h"
+
+class SkRegion;
 
 namespace gfx {
 class Canvas;
@@ -37,13 +40,17 @@ class AppWindowFrameView : public views::NonClientFrameView,
  public:
   static const char kViewClassName[];
 
-  explicit AppWindowFrameView(NativeAppWindow* window);
+  explicit AppWindowFrameView();
   virtual ~AppWindowFrameView();
 
   // Initializes this for |widget|. Sets the number of pixels for which a click
   // is interpreted as a resize for the inner and outer border of the window
-  // and the lower-right corner resize handle.
+  // and the lower-right corner resize handle. If |draw_frame|, the view draws
+  // its own window title area and controls, using |frame_color| (otherwise
+  // |frame_color| is ignored).
   void Init(views::Widget* widget,
+            NativeAppWindow* window,
+            bool draw_frame,
             const SkColor& frame_color,
             int resize_inside_bounds_size,
             int resize_outside_bounds_size,
@@ -74,8 +81,9 @@ class AppWindowFrameView : public views::NonClientFrameView,
   virtual void ButtonPressed(views::Button* sender,
                              const ui::Event& event) OVERRIDE;
 
-  NativeAppWindow* window_;
   views::Widget* widget_;
+  NativeAppWindow* window_;
+  bool draw_frame_;
   SkColor frame_color_;
   views::ImageButton* close_button_;
   views::ImageButton* maximize_button_;

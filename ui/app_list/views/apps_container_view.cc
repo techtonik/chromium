@@ -54,6 +54,11 @@ AppsContainerView::~AppsContainerView() {
 }
 
 void AppsContainerView::ShowActiveFolder(AppListFolderItem* folder_item) {
+  // Prevent new animations from starting if there are currently animations
+  // pending. This fixes crbug.com/357099.
+  if (top_icon_animation_pending_count_)
+    return;
+
   app_list_folder_view_->SetAppListFolderItem(folder_item);
   SetShowState(SHOW_ACTIVE_FOLDER, false);
 
@@ -61,9 +66,18 @@ void AppsContainerView::ShowActiveFolder(AppListFolderItem* folder_item) {
 }
 
 void AppsContainerView::ShowApps(AppListFolderItem* folder_item) {
+  if (top_icon_animation_pending_count_)
+    return;
+
   PrepareToShowApps(folder_item);
   SetShowState(SHOW_APPS,
                true);  /* show apps with animation */
+}
+
+void AppsContainerView::ResetForShowApps() {
+  SetShowState(SHOW_APPS, false /* show apps without animation */);
+  folder_background_view_->UpdateFolderContainerBubble(
+      FolderBackgroundView::NO_BUBBLE);
 }
 
 void AppsContainerView::SetDragAndDropHostOfCurrentAppList(
@@ -75,6 +89,9 @@ void AppsContainerView::SetDragAndDropHostOfCurrentAppList(
 
 void AppsContainerView::ReparentFolderItemTransit(
     AppListFolderItem* folder_item) {
+  if (top_icon_animation_pending_count_)
+    return;
+
   PrepareToShowApps(folder_item);
   SetShowState(SHOW_ITEM_REPARENT, false);
 }
@@ -145,7 +162,7 @@ void AppsContainerView::SetShowState(ShowState show_state,
         apps_grid_view_->ScheduleShowHideAnimation(true);
       } else {
         app_list_folder_view_->HideViewImmediately();
-        apps_grid_view_->SetVisible(true);
+        apps_grid_view_->ResetForShowApps();
       }
       break;
     case SHOW_ACTIVE_FOLDER:

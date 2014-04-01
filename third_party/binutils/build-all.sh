@@ -1,4 +1,7 @@
 #!/bin/sh
+# Copyright 2014 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
 
 # Script to build binutils for both i386 and AMD64 Linux architectures.
 # Must be run on an AMD64 supporting machine which has debootstrap and sudo
@@ -59,7 +62,7 @@ for ARCH in i386 amd64; do
         lucid lucid-chroot-$ARCH
     echo "============================="
   fi
- 
+
   BUILDDIR=lucid-chroot-$ARCH/build
 
   # Clean up any previous failed build attempts inside chroot

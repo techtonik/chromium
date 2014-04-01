@@ -18,7 +18,7 @@ const char kAshWebUIInit[]                  = "ash-webui-init";
 // Forces the stub implementation of dbus clients.
 const char kDbusStub[] = "dbus-stub";
 
-// Time before a machine at OOBE is considered derelict
+// Time before a machine at OOBE is considered derelict.
 const char kDerelictDetectionTimeout[] = "derelict-detection-timeout";
 
 // Time before a derelict machines starts demo mode.
@@ -57,11 +57,6 @@ const char kDisableVolumeAdjustSound[] = "disable-volume-adjust-sound";
 // Disables notifications about captive portals in session.
 const char kDisableNetworkPortalNotification[] =
     "disable-network-portal-notification";
-
-// Disables portal detection and network error handling before auto
-// update.
-const char kDisableOOBEBlockingUpdate[] =
-    "disable-oobe-blocking-update";
 
 // Enables overriding the path for the default echo component extension.
 // Useful for testing.

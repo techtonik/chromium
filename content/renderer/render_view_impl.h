@@ -195,7 +195,7 @@ class CONTENT_EXPORT RenderViewImpl
                                 bool hidden,
                                 int32 next_page_id,
                                 const blink::WebScreenInfo& screen_info,
-                                unsigned int accessibility_mode);
+                                AccessibilityMode accessibility_mode);
 
   // Used by content_layouttest_support to hook into the creation of
   // RenderViewImpls.
@@ -229,6 +229,10 @@ class CONTENT_EXPORT RenderViewImpl
 
   MediaStreamDispatcher* media_stream_dispatcher() {
     return media_stream_dispatcher_;
+  }
+
+  AccessibilityMode accessibility_mode() {
+    return accessibility_mode_;
   }
 
   RendererAccessibility* renderer_accessibility() {
@@ -433,11 +437,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual bool enumerateChosenDirectory(
       const blink::WebString& path,
       blink::WebFileChooserCompletion* chooser_completion);
-  // DEPRECATED
-  virtual void didStartLoading(bool to_different_document);
-  // DEPRECATED
-  virtual void didStopLoading();
-
   virtual void didCancelCompositionOnSelectionChange();
   virtual void didExecuteCommand(const blink::WebString& command_name);
   virtual bool handleCurrentKeyboardEvent();
@@ -761,8 +760,6 @@ class CONTENT_EXPORT RenderViewImpl
   FRIEND_TEST_ALL_PREFIXES(ExternalPopupMenuRemoveTest, RemoveOnChange);
   FRIEND_TEST_ALL_PREFIXES(ExternalPopupMenuTest, NormalCase);
   FRIEND_TEST_ALL_PREFIXES(ExternalPopupMenuTest, ShowPopupThenNavigate);
-  FRIEND_TEST_ALL_PREFIXES(RendererAccessibilityTest,
-                           AccessibilityMessagesQueueWhileSwappedOut);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, DecideNavigationPolicyForWebUI);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest,
                            DidFailProvisionalLoadWithErrorForError);
@@ -774,14 +771,12 @@ class CONTENT_EXPORT RenderViewImpl
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, InsertCharacters);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, JSBlockSentAfterPageLoad);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, LastCommittedUpdateState);
-  FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, OnExtendSelectionAndDelete);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, OnHandleKeyboardEvent);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, OnImeTypeChanged);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, OnNavStateChanged);
+  FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, OnSetAccessibilityMode);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, OnSetTextDirection);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, OnUpdateWebPreferences);
-  FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, SendSwapOutACK);
-  FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, ReloadWhileSwappedOut);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest,
                            SetEditableSelectionAndComposition);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, StaleNavigationsIgnored);
@@ -904,7 +899,6 @@ class CONTENT_EXPORT RenderViewImpl
   void OnDisableAutoResize(const gfx::Size& new_size);
   void OnEnumerateDirectoryResponse(int id,
                                     const std::vector<base::FilePath>& paths);
-  void OnExtendSelectionAndDelete(int before, int after);
   void OnFileChooserResponse(
       const std::vector<ui::SelectedFileInfo>& files);
   void OnFind(int request_id,
@@ -923,18 +917,14 @@ class CONTENT_EXPORT RenderViewImpl
   void OnMoveOrResizeStarted();
   void OnPostMessageEvent(const ViewMsg_PostMessage_Params& params);
   void OnReleaseDisambiguationPopupDIB(TransportDIB::Handle dib_handle);
-  void OnReloadFrame();
   void OnResetPageEncodingToDefault();
   void OnScriptEvalRequest(const base::string16& frame_xpath,
                            const base::string16& jscript,
                            int id,
                            bool notify_result);
-  void OnSetAccessibilityMode(unsigned int new_mode);
+  void OnSetAccessibilityMode(AccessibilityMode new_mode);
   void OnSetActive(bool active);
   void OnSetBackground(const SkBitmap& background);
-  void OnSetCompositionFromExistingText(
-      int start, int end,
-      const std::vector<blink::WebCompositionUnderline>& underlines);
   void OnExitFullscreen();
   void OnSetHistoryLengthAndPrune(int history_length, int32 minimum_page_id);
   void OnSetInitialFocus(bool reverse);
@@ -946,7 +936,6 @@ class CONTENT_EXPORT RenderViewImpl
   void OnStop();
   void OnStopFinding(StopFindAction action);
   void OnSuppressDialogsUntilSwapOut();
-  void OnSwapOut();
   void OnThemeChanged();
   void OnUpdateTargetURLAck();
   void OnUpdateWebPreferences(const WebPreferences& prefs);
@@ -1019,7 +1008,8 @@ class CONTENT_EXPORT RenderViewImpl
   // RenderFrameObserver.
   void OnNavigate(const FrameMsg_Navigate_Params& params);
 
-  // Make this RenderView show an empty, unscriptable page.
+  // Make the given |frame| show an empty, unscriptable page.
+  // TODO(creis): Move this to RenderFrame.
   void NavigateToSwappedOutURL(blink::WebFrame* frame);
 
   // If we initiated a navigation, this function will populate |document_state|
@@ -1310,7 +1300,7 @@ class CONTENT_EXPORT RenderViewImpl
   DevToolsAgent* devtools_agent_;
 
   // The current accessibility mode.
-  unsigned int accessibility_mode_;
+  AccessibilityMode accessibility_mode_;
 
   // Only valid if |accessibility_mode_| is anything other than
   // AccessibilityModeOff.

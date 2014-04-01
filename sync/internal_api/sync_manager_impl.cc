@@ -32,6 +32,7 @@
 #include "sync/internal_api/public/util/experiments.h"
 #include "sync/internal_api/public/write_node.h"
 #include "sync/internal_api/public/write_transaction.h"
+#include "sync/internal_api/sync_core.h"
 #include "sync/internal_api/syncapi_internal.h"
 #include "sync/internal_api/syncapi_server_connection_manager.h"
 #include "sync/js/js_arg_list.h"
@@ -409,6 +410,8 @@ void SyncManagerImpl::Init(
   allstatus_.SetInvalidatorClientId(invalidator_client_id);
 
   model_type_registry_.reset(new ModelTypeRegistry(workers, directory()));
+
+  sync_core_.reset(new SyncCore(model_type_registry_.get()));
 
   // Build a SyncSessionContext and store the worker in it.
   DVLOG(1) << "Sync is bringing up SyncSessionContext.";
@@ -943,6 +946,7 @@ void SyncManagerImpl::OnMigrationRequested(ModelTypeSet types) {
 }
 
 void SyncManagerImpl::OnProtocolEvent(const ProtocolEvent& event) {
+  protocol_event_buffer_.RecordProtocolEvent(event);
   FOR_EACH_OBSERVER(SyncManager::Observer, observers_,
                     OnProtocolEvent(event));
 }
@@ -1066,6 +1070,11 @@ UserShare* SyncManagerImpl::GetUserShare() {
   return &share_;
 }
 
+syncer::SyncCore* SyncManagerImpl::GetSyncCore() {
+  DCHECK(initialized_);
+  return sync_core_.get();
+}
+
 const std::string SyncManagerImpl::cache_guid() {
   DCHECK(initialized_);
   return directory()->cache_guid();
@@ -1151,6 +1160,11 @@ bool SyncManagerImpl::HasUnsyncedItems() {
 
 SyncEncryptionHandler* SyncManagerImpl::GetEncryptionHandler() {
   return sync_encryption_handler_.get();
+}
+
+ScopedVector<syncer::ProtocolEvent>
+    SyncManagerImpl::GetBufferedProtocolEvents() {
+  return protocol_event_buffer_.GetBufferedProtocolEvents();
 }
 
 // static.

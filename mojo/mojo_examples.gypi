@@ -12,10 +12,11 @@
         '../ui/gfx/gfx.gyp:gfx',
         '../ui/gfx/gfx.gyp:gfx_geometry',
         '../ui/gl/gl.gyp:gl',
+        'mojo_bindings',
         'mojo_environment_standalone',
         'mojo_gles2',
         'mojo_native_viewport_bindings',
-        'mojo_shell_bindings',
+        'mojo_shell_client',
         'mojo_system',
         'mojo_utility',
       ],
@@ -63,7 +64,7 @@
         'mojo_environment_chromium',
         'mojo_gles2',
         'mojo_native_viewport_bindings',
-        'mojo_shell_bindings',
+        'mojo_shell_client',
         'mojo_system',
       ],
       'sources': [
@@ -85,12 +86,13 @@
       'dependencies': [
         '../base/base.gyp:base',
         '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
+        '../gpu/gpu.gyp:command_buffer_common',
         '../ppapi/ppapi.gyp:ppapi_c',
         '../ppapi/ppapi_internal.gyp:ppapi_example_gles2_spinning_cube',
         'mojo_environment_chromium',
         'mojo_gles2',
         'mojo_native_viewport_bindings',
-        'mojo_shell_bindings',
+        'mojo_shell_client',
         'mojo_system',
       ],
       'defines': [
@@ -211,7 +213,7 @@
             'mojo_common_lib',
             'mojo_environment_chromium',
             'mojo_gles2',
-            'mojo_shell_bindings',
+            'mojo_shell_client',
             'mojo_system',
           ],
           'sources': [
@@ -231,6 +233,9 @@
           'sources': [
             'examples/launcher/launcher.mojom',
           ],
+          'variables': {
+            'mojom_base_output_dir': 'mojo',
+          },
           'includes': [ 'public/bindings/mojom_bindings_generator.gypi' ],
           'export_dependent_settings': [
             'mojo_bindings',
@@ -259,7 +264,7 @@
             'mojo_environment_chromium',
             'mojo_gles2',
             'mojo_launcher_bindings',
-            'mojo_shell_bindings',
+            'mojo_shell_client',
             'mojo_system',
           ],
           'sources': [
@@ -279,6 +284,9 @@
           'sources': [
             'examples/view_manager/view_manager.mojom',
           ],
+          'variables': {
+            'mojom_base_output_dir': 'mojo',
+          },
           'includes': [ 'public/bindings/mojom_bindings_generator.gypi' ],
           'export_dependent_settings': [
             'mojo_bindings',
@@ -299,7 +307,7 @@
             'mojo_environment_chromium',
             'mojo_launcher_bindings',
             'mojo_native_viewport_bindings',
-            'mojo_shell_bindings',
+            'mojo_shell_client',
             'mojo_system',
             'mojo_view_manager_bindings',
           ],

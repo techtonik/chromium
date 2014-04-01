@@ -12,6 +12,7 @@
 #include "base/callback_forward.h"
 #include "base/files/file_path.h"
 #include "base/memory/ref_counted.h"
+#include "base/memory/scoped_vector.h"
 #include "base/task_runner.h"
 #include "base/threading/thread_checker.h"
 #include "sync/base/sync_export.h"
@@ -35,19 +36,20 @@ class EncryptedData;
 namespace syncer {
 
 class BaseTransaction;
+class CancelationSignal;
 class DataTypeDebugInfoListener;
 class Encryptor;
-struct Experiments;
 class ExtensionsActivity;
 class HttpPostProviderFactory;
 class InternalComponentsFactory;
 class JsBackend;
 class JsEventHandler;
+class SyncCore;
 class SyncEncryptionHandler;
 class ProtocolEvent;
 class SyncScheduler;
+struct Experiments;
 struct UserShare;
-class CancelationSignal;
 
 namespace sessions {
 class SyncSessionSnapshot;
@@ -331,6 +333,9 @@ class SYNC_EXPORT SyncManager : public syncer::InvalidationHandler {
   // May be called from any thread.
   virtual UserShare* GetUserShare() = 0;
 
+  // Returns an instance of the main interface for non-blocking sync types.
+  virtual syncer::SyncCore* GetSyncCore() = 0;
+
   // Returns the cache_guid of the currently open database.
   // Requires that the SyncManager be initialized.
   virtual const std::string cache_guid() = 0;
@@ -349,6 +354,9 @@ class SYNC_EXPORT SyncManager : public syncer::InvalidationHandler {
 
   // Ask the SyncManager to fetch updates for the given types.
   virtual void RefreshTypes(ModelTypeSet types) = 0;
+
+  // Returns any buffered protocol events.  Does not clear the buffer.
+  virtual ScopedVector<syncer::ProtocolEvent> GetBufferedProtocolEvents() = 0;
 };
 
 }  // namespace syncer

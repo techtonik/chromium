@@ -190,6 +190,9 @@
           <message desc="Message shown in popup dialog on Android when there are no Google accounts on the device" name="IDS_NOACCOUNTS_MESSAGE" formatter_data="android_java">
           To use Chrome Remote Desktop, you'll need to add a Google Account to your device.
           </message>
+          <message desc="The product name, as displayed on Android devices. Ideally this would be 'Chrome Remote Desktop', but that name is too long to be displayed in the Android Launcher. Try to keep the translation below 16 characters if possible." name="IDS_PRODUCT_NAME_ANDROID" formatter_data="android_java">
+            Remote Desktop
+          </message>
         </if>
 
         <message desc="Message shown when the Chrome Remote Desktop client tab is closed while a connection is active." name="IDS_CLOSE_PROMPT">
@@ -243,7 +246,7 @@
         <message desc="Message displayed when the client or host has disconnected." name="IDS_MESSAGE_SESSION_FINISHED">
           Your Chrome Remote Desktop session has ended.
         </message>
-        <message desc="The product name. Displayed in various Chrome pages, including the New Tab page, and displayed prominently on the app's main page." name="IDS_PRODUCT_NAME" formatter_data="android_java">
+        <message desc="The product name. Displayed in various Chrome pages, including the New Tab page, and displayed prominently on the app's main page." name="IDS_PRODUCT_NAME">
           Chrome Remote Desktop
         </message>
         <message desc="Message displayed at the bottom of the client connect dialog if Chrome Remote Desktop is running in the wrong start-up mode." name="IDS_WARNING_NOT_WINDOWED">
@@ -290,7 +293,10 @@
       <if expr="not _google_chrome">
         <if expr="is_android">
           <message desc="Message shown in popup dialog on Android when there are no Google accounts on the device" name="IDS_NOACCOUNTS_MESSAGE" formatter_data="android_java">
-          To use Chromoting, you'll need to add a Google Account to your device.
+            To use Chromoting, you'll need to add a Google Account to your device.
+          </message>
+          <message desc="The product name, as displayed on Android devices. Try to keep the translation below 16 characters if possible." name="IDS_PRODUCT_NAME_ANDROID" formatter_data="android_java">
+            Chromoting
           </message>
         </if>
 
@@ -345,7 +351,7 @@
         <message desc="Message displayed when the client or host has disconnected." name="IDS_MESSAGE_SESSION_FINISHED">
           Your Chromoting session has ended.
         </message>
-        <message desc="The product name. Displayed in various Chrome pages, including the New Tab page, and displayed prominently on the app's main page." name="IDS_PRODUCT_NAME" formatter_data="android_java">
+        <message desc="The product name. Displayed in various Chrome pages, including the New Tab page, and displayed prominently on the app's main page." name="IDS_PRODUCT_NAME">
           Chromoting
         </message>
         <message desc="Message displayed at the bottom of the client connect dialog if Chromoting is running in the wrong start-up mode." name="IDS_WARNING_NOT_WINDOWED">
@@ -422,6 +428,38 @@
         </message>
         <message desc="Text shown in tooltip when user touches an offline host on the device." name="IDS_HOST_OFFLINE_TOOLTIP" formatter_data="android_java">
           Host is offline.
+        </message>
+
+<!-- Play Store listings text. These Android-specific strings are not marked
+     with formatter_data="android_java" since they are used only for the Play
+     Store listings, and should not be bundled in the APK.
+-->
+        <message name="IDS_PLAY_STORE_TITLE" desc="Play Store title of the Chrome Remote Desktop app for Android. [CHAR-LIMIT=30] [NAME=play_store_title]">
+          Chrome Remote Desktop
+        </message>
+        <message name="IDS_PLAY_STORE_TAGLINE" desc="Play Store tagline for the Chrome Remote Desktop app for Android. [CHAR-LIMIT=80] [NAME=play_store_tagline]">
+          Securely access your computers from your Android device.
+        </message>
+        <message name="IDS_PLAY_STORE_DESCRIPTION" desc="Play Store description of the Chrome Remote Desktop app for Android. [CHAR-LIMIT=4000] [NAME=play_store_description]">
+Securely access your computers from your Android device.
+
+• On each of your computers, set up remote access using the Chrome Remote Desktop app from Chrome Web Store: https://chrome.google.com/remotedesktop
+• On your Android device, open the app and tap on any of your online computers to connect.
+
+For information about privacy, please see the Google Privacy Policy (http://goo.gl/SyrVzj) and the Chrome Privacy Policy (http://goo.gl/0uXE5d).
+        </message>
+        <message name="IDS_PLAY_STORE_DESCRIPTION_ALTERNATE" desc="Play Store description of the Chrome Remote Desktop app for Android. [CHAR-LIMIT=4000] [NAME=play_store_description_alternate]">
+Securely access your computers from your Android device.
+
+• On each of your computers, set up remote access using the Chrome Remote Desktop app from Chrome Web Store: https://chrome.google.com/remotedesktop
+• On your Android device, open the app and tap on any of your online computers to connect.
+
+Remote computers with non US-English keyboards may receive incorrect text input. Support for other keyboard layouts is coming soon!
+
+For information about privacy, please see the Google Privacy Policy (http://goo.gl/SyrVzj) and the Chrome Privacy Policy (http://goo.gl/0uXE5d).
+        </message>
+        <message name="IDS_PLAY_STORE_CHANGES" desc="List of what's changed in this release of Chrome Remote Desktop for Android. [CHAR-LIMIT=500] [NAME=play_store_changes]">
+First release of Chrome Remote Desktop for Android.
         </message>
       </if>
 

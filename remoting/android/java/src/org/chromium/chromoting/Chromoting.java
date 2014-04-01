@@ -61,6 +61,9 @@ public class Chromoting extends Activity implements JniInterface.ConnectionListe
     /** List of accounts on the system. */
     private Account[] mAccounts;
 
+    /** SpinnerAdapter used in the action bar for selecting accounts. */
+    private AccountsAdapter mAccountsAdapter;
+
     /** Account auth token. */
     private String mToken;
 
@@ -155,6 +158,16 @@ public class Chromoting extends Activity implements JniInterface.ConnectionListe
 
         // Bring native components online.
         JniInterface.loadLibrary(this);
+    }
+
+    /**
+     * Called when the activity becomes visible. This happens on initial launch and whenever the
+     * user switches to the activity, for example, by using the window-switcher or when coming from
+     * the device's lock screen.
+     */
+    @Override
+    public void onStart() {
+        super.onStart();
 
         mAccounts = AccountManager.get(this).getAccountsByType(ACCOUNT_TYPE);
         if (mAccounts.length == 0) {
@@ -178,12 +191,14 @@ public class Chromoting extends Activity implements JniInterface.ConnectionListe
 
         if (mAccounts.length == 1) {
             getActionBar().setDisplayShowTitleEnabled(true);
+            getActionBar().setNavigationMode(ActionBar.NAVIGATION_MODE_STANDARD);
             getActionBar().setTitle(R.string.mode_me2me);
             getActionBar().setSubtitle(mAccount.name);
         } else {
-            AccountsAdapter adapter = new AccountsAdapter(this, mAccounts);
+            mAccountsAdapter = new AccountsAdapter(this, mAccounts);
+            getActionBar().setDisplayShowTitleEnabled(false);
             getActionBar().setNavigationMode(ActionBar.NAVIGATION_MODE_LIST);
-            getActionBar().setListNavigationCallbacks(adapter, this);
+            getActionBar().setListNavigationCallbacks(mAccountsAdapter, this);
             getActionBar().setSelectedNavigationItem(index);
         }
 
@@ -205,8 +220,7 @@ public class Chromoting extends Activity implements JniInterface.ConnectionListe
         // Reload the spinner resources, since the font sizes are dependent on the screen
         // orientation.
         if (mAccounts.length != 1) {
-            AccountsAdapter adapter = new AccountsAdapter(this, mAccounts);
-            getActionBar().setListNavigationCallbacks(adapter, this);
+            mAccountsAdapter.notifyDataSetChanged();
         }
     }
 

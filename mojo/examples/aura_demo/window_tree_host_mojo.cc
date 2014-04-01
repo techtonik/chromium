@@ -6,7 +6,7 @@
 
 #include "mojo/examples/aura_demo/demo_context_factory.h"
 #include "mojo/public/bindings/allocation_scope.h"
-#include "mojo/public/gles2/gles2.h"
+#include "mojo/public/c/gles2/gles2.h"
 #include "mojo/services/native_viewport/geometry_conversions.h"
 #include "ui/aura/env.h"
 #include "ui/aura/window.h"
@@ -166,10 +166,8 @@ void WindowTreeHostMojo::OnDestroyed() {
   base::MessageLoop::current()->Quit();
 }
 
-void WindowTreeHostMojo::OnEvent(const Event& event) {
-  if (!event.location().is_null())
-    native_viewport_->AckEvent(event);
-
+void WindowTreeHostMojo::OnEvent(const Event& event,
+                                 const mojo::Callback<void()>& callback) {
   switch (event.action()) {
     case ui::ET_MOUSE_PRESSED:
     case ui::ET_MOUSE_DRAGGED:
@@ -194,6 +192,7 @@ void WindowTreeHostMojo::OnEvent(const Event& event) {
     }
     // TODO(beng): touch, etc.
   }
+  callback.Run();
 };
 
 }  // namespace examples

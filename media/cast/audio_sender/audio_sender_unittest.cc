@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <stdint.h>
+
 #include "base/bind.h"
 #include "base/bind_helpers.h"
 #include "base/memory/scoped_ptr.h"
@@ -20,7 +22,7 @@
 namespace media {
 namespace cast {
 
-static const int64 kStartMillisecond = GG_INT64_C(12345678900000);
+static const int64 kStartMillisecond = INT64_C(12345678900000);
 
 class TestPacketSender : public transport::PacketSender {
  public:
@@ -54,13 +56,11 @@ class AudioSenderTest : public ::testing::Test {
     testing_clock_->Advance(
         base::TimeDelta::FromMilliseconds(kStartMillisecond));
     task_runner_ = new test::FakeSingleThreadTaskRunner(testing_clock_);
-    CastLoggingConfig logging_config = GetDefaultCastSenderLoggingConfig();
     cast_environment_ =
         new CastEnvironment(scoped_ptr<base::TickClock>(testing_clock_).Pass(),
                             task_runner_,
                             task_runner_,
-                            task_runner_,
-                            logging_config);
+                            task_runner_);
     audio_config_.codec = transport::kOpus;
     audio_config_.use_external_encoder = false;
     audio_config_.frequency = kDefaultAudioSamplingRate;
@@ -77,7 +77,6 @@ class AudioSenderTest : public ::testing::Test {
         NULL,
         testing_clock_,
         dummy_endpoint,
-        logging_config,
         base::Bind(&UpdateCastTransportStatus),
         transport::BulkRawEventsCallback(),
         base::TimeDelta(),

@@ -42,8 +42,7 @@
 #include "net/http/http_status_code.h"
 #include "ui/base/l10n/l10n_util.h"
 
-#if defined(ENABLE_FULL_PRINTING) && !defined(OS_CHROMEOS) && \
-  !defined(OS_MACOSX)
+#if defined(ENABLE_FULL_PRINTING) && !defined(OS_CHROMEOS)
 #define CLOUD_PRINT_CONNECTOR_UI_AVAILABLE
 #endif
 
@@ -64,12 +63,12 @@ LocalDiscoveryUIHandler::LocalDiscoveryUIHandler() : is_visible_(false) {
   cloud_print_connector_ui_enabled_ =
       CommandLine::ForCurrentProcess()->HasSwitch(
       switches::kEnableCloudPrintProxy);
-#elif !defined(OS_CHROMEOS)
+#else
   // Always enabled for Linux and Google Chrome Windows builds.
   // Never enabled for Chrome OS, we don't even need to indicate it.
   cloud_print_connector_ui_enabled_ = true;
 #endif
-#endif  // !defined(OS_MACOSX)
+#endif  // defined(CLOUD_PRINT_CONNECTOR_UI_AVAILABLE)
 }
 
 LocalDiscoveryUIHandler::~LocalDiscoveryUIHandler() {
@@ -137,6 +136,11 @@ void LocalDiscoveryUIHandler::HandleStart(const base::ListValue* args) {
     privet_http_factory_ =
         PrivetHTTPAsynchronousFactory::CreateInstance(
             service_discovery_client_.get(), profile->GetRequestContext());
+
+    SigninManagerBase* signin_manager =
+        SigninManagerFactory::GetInstance()->GetForProfile(profile);
+    if (signin_manager)
+      signin_manager->AddObserver(this);
   }
 
   privet_lister_->Start();
@@ -147,11 +151,6 @@ void LocalDiscoveryUIHandler::HandleStart(const base::ListValue* args) {
 #endif
 
   CheckUserLoggedIn();
-
-  SigninManagerBase* signin_manager =
-      SigninManagerFactory::GetInstance()->GetForProfile(profile);
-  if (signin_manager)
-    signin_manager->AddObserver(this);
 }
 
 void LocalDiscoveryUIHandler::HandleIsVisible(const base::ListValue* args) {

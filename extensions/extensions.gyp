@@ -11,7 +11,6 @@
       'target_name': 'extensions_common',
       'type': 'static_library',
       'dependencies': [
-        'common/api/api.gyp:extensions_api',
         '../third_party/re2/re2.gyp:re2',
         # TODO(benwells): figure out what to do with the api target and
         # api resources compiled into the chrome resource bundle.
@@ -29,6 +28,12 @@
       ],
       'sources': [
         'common/api/messaging/message.h',
+        'common/api/sockets/sockets_manifest_handler.cc',
+        'common/api/sockets/sockets_manifest_handler.h',
+        'common/api/sockets/sockets_manifest_data.cc',
+        'common/api/sockets/sockets_manifest_data.h',
+        'common/api/sockets/sockets_manifest_permission.cc',
+        'common/api/sockets/sockets_manifest_permission.h',
         'common/common_manifest_handlers.cc',
         'common/common_manifest_handlers.h',
         'common/crx_file.cc',
@@ -175,6 +180,7 @@
       'type': 'static_library',
       'dependencies': [
         'extensions_common',
+        'common/api/api.gyp:extensions_api',
         # TODO(jamescook|derat): Pull strings into extensions module.
         '../chrome/chrome_resources.gyp:chrome_strings',
         '../chrome/common/extensions/api/api.gyp:chrome_api',
@@ -206,8 +212,6 @@
         'browser/api/dns/host_resolver_wrapper.h',
         'browser/api/extensions_api_client.cc',
         'browser/api/extensions_api_client.h',
-        'browser/api/runtime/runtime_event_router.cc',
-        'browser/api/runtime/runtime_event_router.h',
         'browser/api/socket/socket.cc',
         'browser/api/socket/socket.h',
         'browser/api/socket/socket_api.cc',
@@ -313,6 +317,7 @@
         'browser/pref_names.h',
         'browser/process_manager.cc',
         'browser/process_manager.h',
+        'browser/process_manager_observer.h',
         'browser/process_map.cc',
         'browser/process_map.h',
         'browser/process_map_factory.cc',

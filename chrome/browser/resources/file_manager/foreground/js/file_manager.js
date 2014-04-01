@@ -1582,7 +1582,9 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
       // Handle restoring after crash, or the gallery action.
       // TODO(mtomasz): Use the gallery action instead of just the gallery
       //     field.
-      if (this.params_.gallery || this.params_.action === 'gallery') {
+      if (this.params_.gallery ||
+          this.params_.action === 'gallery' ||
+          this.params_.action === 'gallery-video') {
         if (!opt_selectionEntry) {
           // Non-existent file or a directory.
           // Reloading while the Gallery is open with empty or multiple
@@ -2462,13 +2464,13 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
       event.stopPropagation();
     }
 
-    switch (util.getKeyModifiers(event) + event.keyCode) {
-      case '27':  // Escape
+    switch (util.getKeyModifiers(event) + event.keyIdentifier) {
+      case 'U+001B':  // Escape
         this.cancelRename_();
         event.preventDefault();
         break;
 
-      case '13':  // Enter
+      case 'Enter':
         this.commitRename_();
         event.preventDefault();
         break;

@@ -14,10 +14,7 @@
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/synchronization/lock.h"
-#include "mojo/public/system/core.h"
-// TODO(vtl): We need this since we can't forward declare
-// |RawSharedBuffer::Mapping|. Maybe fix this.
-#include "mojo/system/raw_shared_buffer.h"
+#include "mojo/public/c/system/core.h"
 #include "mojo/system/system_impl_export.h"
 
 namespace mojo {
@@ -27,9 +24,11 @@ class Channel;
 class CoreImpl;
 class Dispatcher;
 class DispatcherTransport;
+class HandleTable;
 class LocalMessagePipeEndpoint;
 class MessageInTransit;
 class ProxyMessagePipeEndpoint;
+class RawSharedBufferMapping;
 class Waiter;
 
 namespace test {
@@ -106,7 +105,7 @@ class MOJO_SYSTEM_IMPL_EXPORT Dispatcher :
   MojoResult MapBuffer(uint64_t offset,
                        uint64_t num_bytes,
                        MojoMapBufferFlags flags,
-                       scoped_ptr<RawSharedBuffer::Mapping>* mapping);
+                       scoped_ptr<RawSharedBufferMapping>* mapping);
 
   // Adds a waiter to this dispatcher. The waiter will be woken up when this
   // object changes state to satisfy |flags| with result |wake_result| (which
@@ -126,16 +125,17 @@ class MOJO_SYSTEM_IMPL_EXPORT Dispatcher :
   void RemoveWaiter(Waiter* waiter);
 
   // A dispatcher must be put into a special state in order to be sent across a
-  // message pipe. Outside of tests, only |CoreImplAccess| is allowed to do
+  // message pipe. Outside of tests, only |HandleTableAccess| is allowed to do
   // this, since there are requirements on the handle table (see below).
   //
   // In this special state, only a restricted set of operations is allowed.
   // These are the ones available as |DispatcherTransport| methods. Other
   // |Dispatcher| methods must not be called until |DispatcherTransport::End()|
   // has been called.
-  class CoreImplAccess {
+  class HandleTableAccess {
    private:
     friend class CoreImpl;
+    friend class HandleTable;
     // Tests also need this, to avoid needing |CoreImpl|.
     friend DispatcherTransport test::DispatcherTryStartTransport(Dispatcher*);
 
@@ -227,7 +227,7 @@ class MOJO_SYSTEM_IMPL_EXPORT Dispatcher :
       uint64_t offset,
       uint64_t num_bytes,
       MojoMapBufferFlags flags,
-      scoped_ptr<RawSharedBuffer::Mapping>* mapping);
+      scoped_ptr<RawSharedBufferMapping>* mapping);
   virtual MojoResult AddWaiterImplNoLock(Waiter* waiter,
                                          MojoWaitFlags flags,
                                          MojoResult wake_result);
@@ -300,8 +300,8 @@ class MOJO_SYSTEM_IMPL_EXPORT Dispatcher :
 };
 
 // Wrapper around a |Dispatcher| pointer, while it's being processed to be
-// passed in a message pipe. See the comment about |Dispatcher::CoreImplAccess|
-// for more details.
+// passed in a message pipe. See the comment about
+// |Dispatcher::HandleTableAccess| for more details.
 //
 // Note: This class is deliberately "thin" -- no more expensive than a
 // |Dispatcher*|.
@@ -324,7 +324,7 @@ class MOJO_SYSTEM_IMPL_EXPORT DispatcherTransport {
   Dispatcher* dispatcher() { return dispatcher_; }
 
  private:
-  friend class Dispatcher::CoreImplAccess;
+  friend class Dispatcher::HandleTableAccess;
 
   explicit DispatcherTransport(Dispatcher* dispatcher)
       : dispatcher_(dispatcher) {}

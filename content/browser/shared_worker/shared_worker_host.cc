@@ -4,11 +4,13 @@
 
 #include "content/browser/shared_worker/shared_worker_host.h"
 
+#include "base/metrics/histogram.h"
 #include "content/browser/frame_host/render_frame_host_delegate.h"
 #include "content/browser/frame_host/render_frame_host_impl.h"
 #include "content/browser/message_port_service.h"
 #include "content/browser/shared_worker/shared_worker_instance.h"
 #include "content/browser/shared_worker/shared_worker_message_filter.h"
+#include "content/browser/worker_host/worker_document_set.h"
 #include "content/common/view_messages.h"
 #include "content/common/worker_messages.h"
 #include "content/public/browser/browser_thread.h"
@@ -30,17 +32,23 @@ void WorkerCrashCallback(int render_process_unique_id, int render_frame_id) {
 
 SharedWorkerHost::SharedWorkerHost(SharedWorkerInstance* instance)
     : instance_(instance),
+      worker_document_set_(new WorkerDocumentSet()),
       container_render_filter_(NULL),
-      worker_route_id_(MSG_ROUTING_NONE) {
+      worker_route_id_(MSG_ROUTING_NONE),
+      load_failed_(false),
+      closed_(false),
+      creation_time_(base::TimeTicks::Now()) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
 }
 
 SharedWorkerHost::~SharedWorkerHost() {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
+  UMA_HISTOGRAM_LONG_TIMES("SharedWorker.TimeToDeleted",
+                           base::TimeTicks::Now() - creation_time_);
   // If we crashed, tell the RenderViewHosts.
-  if (instance_ && !instance_->load_failed()) {
+  if (instance_ && !load_failed_) {
     const WorkerDocumentSet::DocumentInfoSet& parents =
-        instance_->worker_document_set()->documents();
+        worker_document_set_->documents();
     for (WorkerDocumentSet::DocumentInfoSet::const_iterator parent_iter =
              parents.begin();
          parent_iter != parents.end();
@@ -76,9 +84,8 @@ void SharedWorkerHost::Init(SharedWorkerMessageFilter* filter) {
   params.route_id = worker_route_id_;
   Send(new WorkerProcessMsg_CreateWorker(params));
 
-  for (SharedWorkerInstance::FilterList::const_iterator i =
-           instance_->filters().begin();
-       i != instance_->filters().end(); ++i) {
+  for (FilterList::const_iterator i = filters_.begin(); i != filters_.end();
+       ++i) {
     i->filter()->Send(new ViewMsg_WorkerCreated(i->route_id()));
   }
 }
@@ -88,8 +95,7 @@ bool SharedWorkerHost::FilterMessage(const IPC::Message& message,
   if (!instance_)
     return false;
 
-  if (!instance_->closed() &&
-      instance_->HasFilter(filter, message.routing_id())) {
+  if (!closed_ && HasFilter(filter, message.routing_id())) {
     RelayMessage(message, filter);
     return true;
   }
@@ -100,9 +106,9 @@ bool SharedWorkerHost::FilterMessage(const IPC::Message& message,
 void SharedWorkerHost::FilterShutdown(SharedWorkerMessageFilter* filter) {
   if (!instance_)
     return;
-  instance_->RemoveFilters(filter);
-  instance_->worker_document_set()->RemoveAll(filter);
-  if (instance_->worker_document_set()->IsEmpty()) {
+  RemoveFilters(filter);
+  worker_document_set_->RemoveAll(filter);
+  if (worker_document_set_->IsEmpty()) {
     // This worker has no more associated documents - shut it down.
     Send(new WorkerMsg_TerminateWorkerContext(worker_route_id_));
   }
@@ -113,8 +119,8 @@ void SharedWorkerHost::DocumentDetached(SharedWorkerMessageFilter* filter,
   if (!instance_)
     return;
   // Walk all instances and remove the document from their document set.
-  instance_->worker_document_set()->Remove(filter, document_id);
-  if (instance_->worker_document_set()->IsEmpty()) {
+  worker_document_set_->Remove(filter, document_id);
+  if (worker_document_set_->IsEmpty()) {
     // This worker has no more associated documents - shut it down.
     Send(new WorkerMsg_TerminateWorkerContext(worker_route_id_));
   }
@@ -126,26 +132,30 @@ void SharedWorkerHost::WorkerContextClosed() {
   // Set the closed flag - this will stop any further messages from
   // being sent to the worker (messages can still be sent from the worker,
   // for exception reporting, etc).
-  instance_->set_closed(true);
+  closed_ = true;
 }
 
 void SharedWorkerHost::WorkerContextDestroyed() {
   if (!instance_)
     return;
   instance_.reset();
+  worker_document_set_ = NULL;
 }
 
 void SharedWorkerHost::WorkerScriptLoaded() {
   // TODO(horo): implement this.
+  UMA_HISTOGRAM_TIMES("SharedWorker.TimeToScriptLoaded",
+                      base::TimeTicks::Now() - creation_time_);
 }
 
 void SharedWorkerHost::WorkerScriptLoadFailed() {
+  UMA_HISTOGRAM_TIMES("SharedWorker.TimeToScriptLoadFailed",
+                      base::TimeTicks::Now() - creation_time_);
   if (!instance_)
     return;
-  instance_->set_load_failed(true);
-  for (SharedWorkerInstance::FilterList::const_iterator i =
-           instance_->filters().begin();
-       i != instance_->filters().end(); ++i) {
+  load_failed_ = true;
+  for (FilterList::const_iterator i = filters_.begin(); i != filters_.end();
+       ++i) {
     i->filter()->Send(new ViewMsg_WorkerScriptLoadFailed(i->route_id()));
   }
 }
@@ -153,9 +163,8 @@ void SharedWorkerHost::WorkerScriptLoadFailed() {
 void SharedWorkerHost::WorkerConnected(int message_port_id) {
   if (!instance_)
     return;
-  for (SharedWorkerInstance::FilterList::const_iterator i =
-           instance_->filters().begin();
-       i != instance_->filters().end(); ++i) {
+  for (FilterList::const_iterator i = filters_.begin(); i != filters_.end();
+       ++i) {
     if (i->message_port_id() != message_port_id)
       continue;
     i->filter()->Send(new ViewMsg_WorkerConnected(i->route_id()));
@@ -215,9 +224,8 @@ void SharedWorkerHost::RelayMessage(
         sent_message_port_id,
         container_render_filter_->message_port_message_filter(),
         new_routing_id);
-    instance_->SetMessagePortID(incoming_filter,
-                                message.routing_id(),
-                                sent_message_port_id);
+    SetMessagePortID(
+        incoming_filter, message.routing_id(), sent_message_port_id);
     // Resend the message with the new routing id.
     Send(new WorkerMsg_Connect(
         worker_route_id_, sent_message_port_id, new_routing_id));
@@ -243,7 +251,7 @@ SharedWorkerHost::GetRenderFrameIDsForWorker() {
   if (!instance_)
     return result;
   const WorkerDocumentSet::DocumentInfoSet& documents =
-      instance_->worker_document_set()->documents();
+      worker_document_set_->documents();
   for (WorkerDocumentSet::DocumentInfoSet::const_iterator doc =
            documents.begin();
        doc != documents.end();
@@ -252,6 +260,45 @@ SharedWorkerHost::GetRenderFrameIDsForWorker() {
         std::make_pair(doc->render_process_id(), doc->render_frame_id()));
   }
   return result;
+}
+
+void SharedWorkerHost::AddFilter(SharedWorkerMessageFilter* filter,
+                                 int route_id) {
+  CHECK(filter);
+  if (!HasFilter(filter, route_id)) {
+    FilterInfo info(filter, route_id);
+    filters_.push_back(info);
+  }
+}
+
+void SharedWorkerHost::RemoveFilters(SharedWorkerMessageFilter* filter) {
+  for (FilterList::iterator i = filters_.begin(); i != filters_.end();) {
+    if (i->filter() == filter)
+      i = filters_.erase(i);
+    else
+      ++i;
+  }
+}
+
+bool SharedWorkerHost::HasFilter(SharedWorkerMessageFilter* filter,
+                                 int route_id) const {
+  for (FilterList::const_iterator i = filters_.begin(); i != filters_.end();
+       ++i) {
+    if (i->filter() == filter && i->route_id() == route_id)
+      return true;
+  }
+  return false;
+}
+
+void SharedWorkerHost::SetMessagePortID(SharedWorkerMessageFilter* filter,
+                                        int route_id,
+                                        int message_port_id) {
+  for (FilterList::iterator i = filters_.begin(); i != filters_.end(); ++i) {
+    if (i->filter() == filter && i->route_id() == route_id) {
+      i->set_message_port_id(message_port_id);
+      return;
+    }
+  }
 }
 
 }  // namespace content

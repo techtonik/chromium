@@ -70,6 +70,7 @@ class ScrollView;
 class Widget;
 
 namespace internal {
+class PreEventDispatchHandler;
 class PostEventDispatchHandler;
 class RootView;
 }
@@ -322,9 +323,6 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   // View creates the Layer only when it exists in a Widget with a non-NULL
   // Compositor.
   void SetPaintToLayer(bool paint_to_layer);
-
-  // Overriden from ui:LayerOwner:
-  virtual scoped_ptr<ui::Layer> RecreateLayer() OVERRIDE;
 
   // RTL positioning -----------------------------------------------------------
 
@@ -714,7 +712,7 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   virtual void OnKeyEvent(ui::KeyEvent* event) OVERRIDE;
   virtual void OnMouseEvent(ui::MouseEvent* event) OVERRIDE;
   virtual void OnScrollEvent(ui::ScrollEvent* event) OVERRIDE;
-  virtual void OnTouchEvent(ui::TouchEvent* event) OVERRIDE;
+  virtual void OnTouchEvent(ui::TouchEvent* event) OVERRIDE FINAL;
   virtual void OnGestureEvent(ui::GestureEvent* event) OVERRIDE;
 
   // Accelerators --------------------------------------------------------------
@@ -1213,6 +1211,7 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
 #endif
 
  private:
+  friend class internal::PreEventDispatchHandler;
   friend class internal::PostEventDispatchHandler;
   friend class internal::RootView;
   friend class FocusManager;

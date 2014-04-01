@@ -40,7 +40,7 @@ extensions::ComponentLoader* GetComponentLoader(BrowserContext* context) {
 }
 
 void LoadGaiaAuthExtension(BrowserContext* context) {
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
 
   extensions::ComponentLoader* component_loader = GetComponentLoader(context);
   const CommandLine* command_line = CommandLine::ForCurrentProcess();
@@ -71,7 +71,7 @@ void LoadGaiaAuthExtension(BrowserContext* context) {
     manifest_resource_id = IDR_GAIA_AUTH_SAML_MANIFEST;
   }
 #else
-  int manifest_resource_id = IDR_GAIA_AUTH_DESKTOP_MANIFEST;
+  int manifest_resource_id = IDR_GAIA_AUTH_SAML_MANIFEST;
 #endif
 
   component_loader->Add(manifest_resource_id,
@@ -79,7 +79,7 @@ void LoadGaiaAuthExtension(BrowserContext* context) {
 }
 
 void UnloadGaiaAuthExtension(BrowserContext* context) {
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
 
   content::StoragePartition* partition =
       content::BrowserContext::GetStoragePartitionForSite(

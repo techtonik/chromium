@@ -5,9 +5,9 @@
 #include "chrome/browser/ui/webui/options/options_ui_browsertest.h"
 
 #include "base/prefs/pref_service.h"
+#include "base/scoped_observer.h"
 #include "base/strings/string16.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/signin/signin_manager.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/ui/browser.h"
@@ -17,7 +17,6 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/test/base/ui_test_utils.h"
-#include "content/public/browser/notification_service.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/test_utils.h"
@@ -46,6 +45,40 @@ using content::MessageLoopRunner;
 namespace options {
 
 namespace {
+
+class SignOutWaiter : public SigninManagerBase::Observer {
+ public:
+  SignOutWaiter(SigninManagerBase* signin_manager)
+      : seen_(false), running_(false), scoped_observer_(this) {
+    scoped_observer_.Add(signin_manager);
+  }
+  virtual ~SignOutWaiter() {}
+
+  void Wait() {
+    if (seen_)
+      return;
+
+    running_ = true;
+    message_loop_runner_ = new MessageLoopRunner;
+    message_loop_runner_->Run();
+    EXPECT_TRUE(seen_);
+  }
+
+  virtual void GoogleSignedOut(const std::string& username) OVERRIDE {
+    seen_ = true;
+    if (!running_)
+      return;
+
+    message_loop_runner_->Quit();
+    running_ = false;
+  }
+
+ private:
+  bool seen_;
+  bool running_;
+  ScopedObserver<SigninManagerBase, SignOutWaiter> scoped_observer_;
+  scoped_refptr<MessageLoopRunner> message_loop_runner_;
+};
 
 #if !defined(OS_CHROMEOS)
 void RunClosureWhenProfileInitialized(const base::Closure& closure,
@@ -113,72 +146,7 @@ IN_PROC_BROWSER_TEST_F(OptionsUIBrowserTest, LoadOptionsByURL) {
   VerifyNavbar();
 }
 
-// Flaky on win_rel http://crbug.com/352546
-#if defined(OS_WIN)
-#define MAYBE_VerifyManagedSignout DISABLED_VerifyManagedSignout
-#else
-#define MAYBE_VerifyManagedSignout VerifyManagedSignout
-#endif
-
 #if !defined(OS_CHROMEOS)
-IN_PROC_BROWSER_TEST_F(OptionsUIBrowserTest, MAYBE_VerifyManagedSignout) {
-  SigninManager* signin =
-      SigninManagerFactory::GetForProfile(browser()->profile());
-  signin->OnExternalSigninCompleted("test@example.com");
-  signin->ProhibitSignout(true);
-
-  NavigateToSettingsFrame();
-
-  // This script simulates a click on the "Disconnect your Google Account"
-  // button and returns true if the hidden flag of the appropriate dialog gets
-  // flipped.
-  bool result = false;
-  ASSERT_TRUE(content::ExecuteScriptAndExtractBool(
-      browser()->tab_strip_model()->GetActiveWebContents(),
-      "var dialog = $('manage-profile-overlay-disconnect-managed');"
-      "var original_status = dialog.hidden;"
-      "$('start-stop-sync').click();"
-      "domAutomationController.send(original_status && !dialog.hidden);",
-      &result));
-
-  EXPECT_TRUE(result);
-
-  base::FilePath profile_dir = browser()->profile()->GetPath();
-  ProfileInfoCache& profile_info_cache =
-      g_browser_process->profile_manager()->GetProfileInfoCache();
-
-  EXPECT_TRUE(DirectoryExists(profile_dir));
-  EXPECT_TRUE(profile_info_cache.GetIndexOfProfileWithPath(profile_dir) !=
-              std::string::npos);
-
-  content::WindowedNotificationObserver wait_for_profile_deletion(
-      chrome::NOTIFICATION_PROFILE_CACHED_INFO_CHANGED,
-      content::NotificationService::AllSources());
-
-#if defined(OS_MACOSX)
-  // TODO(kaliamoorthi): Get the macos problem fixed and remove this code.
-  // Deleting the Profile also destroys all browser windows of that Profile.
-  // Wait for the current browser to close before resuming, otherwise
-  // the browser_tests shutdown code will be confused on the Mac.
-  content::WindowedNotificationObserver wait_for_browser_closed(
-      chrome::NOTIFICATION_BROWSER_CLOSED,
-      content::NotificationService::AllSources());
-#endif
-
-  ASSERT_TRUE(content::ExecuteScript(
-      browser()->tab_strip_model()->GetActiveWebContents(),
-      "$('disconnect-managed-profile-ok').click();"));
-
-  wait_for_profile_deletion.Wait();
-
-  EXPECT_TRUE(profile_info_cache.GetIndexOfProfileWithPath(profile_dir) ==
-              std::string::npos);
-
-#if defined(OS_MACOSX)
-  wait_for_browser_closed.Wait();
-#endif
-}
-
 IN_PROC_BROWSER_TEST_F(OptionsUIBrowserTest, VerifyUnmanagedSignout) {
   SigninManager* signin =
       SigninManagerFactory::GetForProfile(browser()->profile());
@@ -201,15 +169,13 @@ IN_PROC_BROWSER_TEST_F(OptionsUIBrowserTest, VerifyUnmanagedSignout) {
 
   EXPECT_TRUE(result);
 
-  content::WindowedNotificationObserver wait_for_signout(
-      chrome::NOTIFICATION_GOOGLE_SIGNED_OUT,
-      content::NotificationService::AllSources());
+  SignOutWaiter sign_out_waiter(signin);
 
   ASSERT_TRUE(content::ExecuteScript(
       browser()->tab_strip_model()->GetActiveWebContents(),
       "$('stop-syncing-ok').click();"));
 
-  wait_for_signout.Wait();
+  sign_out_waiter.Wait();
 
   EXPECT_TRUE(browser()->profile()->GetProfileName() != user);
   EXPECT_TRUE(signin->GetAuthenticatedUsername().empty());

@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from copy import deepcopy
+from copy import copy
 import logging
 import re
 
@@ -60,21 +60,6 @@ class ReferenceResolver(object):
   # Matches after a $ref: that doesn't have []s.
   _bare_ref = re.compile('\w+(\.\w+)*')
 
-  class Factory(object):
-    def __init__(self,
-                 api_data_source_factory,
-                 api_models,
-                 object_store_creator):
-      self._api_data_source_factory = api_data_source_factory
-      self._api_models = api_models
-      self._object_store_creator = object_store_creator
-
-    def Create(self):
-      return ReferenceResolver(
-          self._api_data_source_factory.Create(None),
-          self._api_models,
-          self._object_store_creator.Create(ReferenceResolver))
-
   def __init__(self, api_data_source, api_models, object_store):
     self._api_data_source = api_data_source
     self._api_models = api_models
@@ -114,8 +99,10 @@ class ReferenceResolver(object):
       category, node_name = node_info
       if namespace is not None and text.startswith('%s.' % namespace):
         text = text[len('%s.' % namespace):]
+      api_model = self._api_models.GetModel(api_name).Get()
+      filename = api_model.documentation_options.get('documented_in', api_name)
       return {
-        'href': '%s.html#%s-%s' % (api_name, category, name.replace('.', '-')),
+        'href': '%s#%s-%s' % (filename, category, name.replace('.', '-')),
         'text': text,
         'name': node_name
       }
@@ -125,7 +112,7 @@ class ReferenceResolver(object):
     # to other APIs.
     if ref in api_list:
       return {
-        'href': '%s.html' % ref,
+        'href': '%s' % ref,
         'text': ref,
         'name': ref
       }
@@ -147,10 +134,11 @@ class ReferenceResolver(object):
       if link is None:
         return None
       self._object_store.Set(db_key, link)
-    else:
-      link = deepcopy(link)
+
     if title is not None:
+      link = copy(link)
       link['text'] = title
+
     return link
 
   def SafeGetLink(self, ref, namespace=None, title=None):

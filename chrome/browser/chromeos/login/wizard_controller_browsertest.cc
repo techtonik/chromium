@@ -51,6 +51,8 @@
 #include "chromeos/dbus/fake_dbus_thread_manager.h"
 #include "chromeos/dbus/fake_session_manager_client.h"
 #include "chromeos/network/network_state_handler.h"
+#include "chromeos/system/mock_statistics_provider.h"
+#include "chromeos/system/statistics_provider.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/test_utils.h"
 #include "grit/generated_resources.h"
@@ -62,6 +64,7 @@
 #include "ui/base/l10n/l10n_util.h"
 
 using ::testing::Exactly;
+using ::testing::Invoke;
 using ::testing::Return;
 
 namespace chromeos {
@@ -384,8 +387,7 @@ IN_PROC_BROWSER_TEST_F(WizardControllerFlowTest, ControlFlowSkipUpdateEnroll) {
   WizardController::default_controller()->SkipUpdateEnrollAfterEula();
   EXPECT_CALL(*mock_enrollment_screen_->actor(),
               SetParameters(mock_enrollment_screen_,
-                            false,  // is_auto_enrollment
-                            true,   // can_exit_enrollment
+                            EnrollmentScreenActor::ENROLLMENT_MODE_MANUAL,
                             ""))
       .Times(1);
   EXPECT_CALL(*mock_enrollment_screen_, Show()).Times(1);
@@ -427,8 +429,7 @@ IN_PROC_BROWSER_TEST_F(WizardControllerFlowTest,
   EXPECT_CALL(*mock_update_screen_, StartNetworkCheck()).Times(0);
   EXPECT_CALL(*mock_enrollment_screen_->actor(),
               SetParameters(mock_enrollment_screen_,
-                            false,  // is_auto_enrollment
-                            true,   // can_exit_enrollment
+                            EnrollmentScreenActor::ENROLLMENT_MODE_MANUAL,
                             ""))
       .Times(1);
   EXPECT_CALL(*mock_enrollment_screen_, Show()).Times(1);
@@ -516,15 +517,57 @@ IN_PROC_BROWSER_TEST_F(WizardControllerFlowTest,
   EXPECT_FALSE(ExistingUserController::current_controller() == NULL);
 }
 
-IN_PROC_BROWSER_TEST_F(WizardControllerFlowTest,
-                       ControlFlowForcedReEnrollment) {
-  CommandLine::ForCurrentProcess()->AppendSwitch(
-      switches::kEnterpriseEnableForcedReEnrollment);
-  CommandLine::ForCurrentProcess()->AppendSwitchASCII(
-      switches::kEnterpriseEnrollmentInitialModulus, "1");
-  CommandLine::ForCurrentProcess()->AppendSwitchASCII(
-      switches::kEnterpriseEnrollmentModulusLimit, "2");
+class WizardControllerEnrollmentFlowTest : public WizardControllerFlowTest {
+ protected:
+  WizardControllerEnrollmentFlowTest() {}
 
+  virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
+    WizardControllerFlowTest::SetUpCommandLine(command_line);
+
+    command_line->AppendSwitch(
+        switches::kEnterpriseEnableForcedReEnrollment);
+    command_line->AppendSwitchASCII(
+        switches::kEnterpriseEnrollmentInitialModulus, "1");
+    command_line->AppendSwitchASCII(
+        switches::kEnterpriseEnrollmentModulusLimit, "2");
+  }
+
+  virtual void SetUpInProcessBrowserTestFixture() OVERRIDE {
+    WizardControllerFlowTest::SetUpInProcessBrowserTestFixture();
+    system::StatisticsProvider::SetTestProvider(&statistics_provider_);
+    EXPECT_CALL(statistics_provider_, StartLoadingMachineStatistics(_, _));
+    EXPECT_CALL(statistics_provider_, GetMachineStatistic(_, _)).WillRepeatedly(
+        Invoke(this, &WizardControllerEnrollmentFlowTest::GetMachineStatistic));
+    EXPECT_CALL(statistics_provider_, GetMachineFlag(_, _)).WillRepeatedly(
+        Return(false));
+    EXPECT_CALL(statistics_provider_, Shutdown());
+  }
+
+  virtual void TearDownInProcessBrowserTestFixture() OVERRIDE {
+    system::StatisticsProvider::SetTestProvider(NULL);
+    WizardControllerFlowTest::TearDownInProcessBrowserTestFixture();
+  }
+
+  bool GetMachineStatistic(const std::string& name, std::string* result) {
+    if (name == system::kDiskSerialNumber) {
+      *result = "fake-disk-serial-number";
+      return true;
+    } else if (name == "serial_number") {
+      *result = "fake-machine-serial-number";
+      return true;
+    }
+
+    return false;
+  }
+
+ private:
+  system::MockStatisticsProvider statistics_provider_;
+
+  DISALLOW_COPY_AND_ASSIGN(WizardControllerEnrollmentFlowTest);
+};
+
+IN_PROC_BROWSER_TEST_F(WizardControllerEnrollmentFlowTest,
+                       ControlFlowForcedReEnrollment) {
   EXPECT_EQ(WizardController::default_controller()->GetNetworkScreen(),
             WizardController::default_controller()->current_screen());
   EXPECT_CALL(*mock_network_screen_, Hide()).Times(1);
@@ -560,8 +603,7 @@ IN_PROC_BROWSER_TEST_F(WizardControllerFlowTest,
   EXPECT_CALL(*mock_enrollment_screen_, Show()).Times(1);
   EXPECT_CALL(*mock_enrollment_screen_->actor(),
               SetParameters(mock_enrollment_screen_,
-                            false,  // auto_start_enrollmetn
-                            false,  // can_exit_enrollment
+                            EnrollmentScreenActor::ENROLLMENT_MODE_FORCED,
                             "")).Times(1);
   OnExit(ScreenObserver::ENTERPRISE_AUTO_ENROLLMENT_CHECK_COMPLETED);
 
@@ -749,8 +791,7 @@ IN_PROC_BROWSER_TEST_F(WizardControllerKioskFlowTest,
                        ControlFlowKioskForcedEnrollment) {
   EXPECT_CALL(*mock_enrollment_screen_->actor(),
               SetParameters(mock_enrollment_screen_,
-                            false,  // is_auto_enrollment
-                            false,  // can_exit_enrollment
+                            EnrollmentScreenActor::ENROLLMENT_MODE_FORCED,
                             ""))
       .Times(1);
 
@@ -793,8 +834,7 @@ IN_PROC_BROWSER_TEST_F(WizardControllerKioskFlowTest,
 
   EXPECT_CALL(*mock_enrollment_screen_->actor(),
               SetParameters(mock_enrollment_screen_,
-                            false,  // is_auto_enrollment
-                            false,  // can_exit_enrollment
+                            EnrollmentScreenActor::ENROLLMENT_MODE_FORCED,
                             ""))
       .Times(1);
 

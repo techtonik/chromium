@@ -716,6 +716,44 @@ TEST_F(SharedCryptoTest, DigestSampleSets) {
   }
 }
 
+TEST_F(SharedCryptoTest, DigestSampleSetsInChunks) {
+  scoped_ptr<base::ListValue> tests;
+  ASSERT_TRUE(ReadJsonTestFileToList("digest.json", &tests));
+
+  for (size_t test_index = 0; test_index < tests->GetSize(); ++test_index) {
+    SCOPED_TRACE(test_index);
+    base::DictionaryValue* test;
+    ASSERT_TRUE(tests->GetDictionary(test_index, &test));
+
+    blink::WebCryptoAlgorithm test_algorithm =
+        GetDigestAlgorithm(test, "algorithm");
+    std::vector<uint8> test_input = GetBytesFromHexString(test, "input");
+    std::vector<uint8> test_output = GetBytesFromHexString(test, "output");
+
+    // Test the chunk version of the digest functions. Test with 129 byte chunks
+    // because the SHA-512 chunk size is 128 bytes.
+    unsigned char* output;
+    unsigned int output_length;
+    static const size_t kChunkSizeBytes = 129;
+    size_t length = test_input.size();
+    scoped_ptr<blink::WebCryptoDigestor> digestor(
+        CreateDigestor(test_algorithm.id()));
+    std::vector<uint8>::iterator begin = test_input.begin();
+    size_t chunk_index = 0;
+    while (begin != test_input.end()) {
+      size_t chunk_length = std::min(kChunkSizeBytes, length - chunk_index);
+      std::vector<uint8> chunk(begin, begin + chunk_length);
+      ASSERT_TRUE(chunk.size() > 0);
+      EXPECT_TRUE(digestor->consume(&chunk.front(), chunk.size()));
+      chunk_index = chunk_index + chunk_length;
+      begin = begin + chunk_length;
+    }
+    EXPECT_TRUE(digestor->finish(output, output_length));
+    ExpectVectorMatches(test_output,
+                        std::vector<uint8>(output, output + output_length));
+  }
+}
+
 TEST_F(SharedCryptoTest, HMACSampleSets) {
   scoped_ptr<base::ListValue> tests;
   ASSERT_TRUE(ReadJsonTestFileToList("hmac.json", &tests));
@@ -1895,7 +1933,7 @@ TEST_F(SharedCryptoTest, MAYBE(GenerateKeyPairRsa)) {
       CreateRsaKeyGenAlgorithm(blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5,
                                modulus_length,
                                public_exponent);
-  bool extractable = false;
+  bool extractable = true;
   const blink::WebCryptoKeyUsageMask usage_mask = 0;
   blink::WebCryptoKey public_key = blink::WebCryptoKey::createNull();
   blink::WebCryptoKey private_key = blink::WebCryptoKey::createNull();
@@ -1909,6 +1947,36 @@ TEST_F(SharedCryptoTest, MAYBE(GenerateKeyPairRsa)) {
   EXPECT_EQ(extractable, private_key.extractable());
   EXPECT_EQ(usage_mask, public_key.usages());
   EXPECT_EQ(usage_mask, private_key.usages());
+
+  // Try exporting the generated key pair, and then re-importing to verify that
+  // the exported data was valid.
+  blink::WebArrayBuffer public_key_spki;
+  EXPECT_STATUS_SUCCESS(
+      ExportKey(blink::WebCryptoKeyFormatSpki, public_key, &public_key_spki));
+  public_key = blink::WebCryptoKey::createNull();
+  EXPECT_STATUS_SUCCESS(
+      ImportKey(blink::WebCryptoKeyFormatSpki,
+                CryptoData(public_key_spki),
+                CreateAlgorithm(blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5),
+                true,
+                usage_mask,
+                &public_key));
+  EXPECT_EQ(modulus_length,
+            public_key.algorithm().rsaParams()->modulusLengthBits());
+
+  blink::WebArrayBuffer private_key_pkcs8;
+  EXPECT_STATUS_SUCCESS(ExportKey(
+      blink::WebCryptoKeyFormatPkcs8, private_key, &private_key_pkcs8));
+  private_key = blink::WebCryptoKey::createNull();
+  EXPECT_STATUS_SUCCESS(
+      ImportKey(blink::WebCryptoKeyFormatPkcs8,
+                CryptoData(private_key_pkcs8),
+                CreateAlgorithm(blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5),
+                true,
+                usage_mask,
+                &private_key));
+  EXPECT_EQ(modulus_length,
+            private_key.algorithm().rsaParams()->modulusLengthBits());
 
   // Fail with bad modulus.
   algorithm = CreateRsaKeyGenAlgorithm(

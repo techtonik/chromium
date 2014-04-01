@@ -7,16 +7,39 @@
 #include "cc/output/software_frame_data.h"
 #include "content/browser/compositor/software_output_device_ozone.h"
 #include "testing/gtest/include/gtest/gtest.h"
-#include "third_party/skia/include/core/SkBitmapDevice.h"
+#include "third_party/skia/include/core/SkSurface.h"
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/test/context_factories_for_test.h"
 #include "ui/gfx/ozone/surface_factory_ozone.h"
+#include "ui/gfx/ozone/surface_ozone_base.h"
 #include "ui/gfx/size.h"
 #include "ui/gfx/skia_util.h"
 #include "ui/gfx/vsync_provider.h"
 #include "ui/gl/gl_implementation.h"
 
 namespace {
+
+class MockSurfaceOzone : public gfx::SurfaceOzoneBase {
+ public:
+  MockSurfaceOzone() {}
+  virtual ~MockSurfaceOzone() {}
+
+  // gfx::SurfaceOzoneBase overrides:
+  virtual bool InitializeCanvas() { return true; }
+  virtual bool ResizeCanvas(const gfx::Size& size) {
+    surface_ = skia::AdoptRef(SkSurface::NewRaster(
+        SkImageInfo::MakeN32Premul(size.width(), size.height())));
+    return true;
+  }
+  virtual skia::RefPtr<SkCanvas> GetCanvas() {
+    return skia::SharePtr(surface_->getCanvas());
+  }
+
+ private:
+  skia::RefPtr<SkSurface> surface_;
+
+  DISALLOW_COPY_AND_ASSIGN(MockSurfaceOzone);
+};
 
 class MockSurfaceFactoryOzone : public gfx::SurfaceFactoryOzone {
  public:
@@ -29,33 +52,21 @@ class MockSurfaceFactoryOzone : public gfx::SurfaceFactoryOzone {
 
   virtual void ShutdownHardware() OVERRIDE {}
   virtual gfx::AcceleratedWidget GetAcceleratedWidget() OVERRIDE { return 1; }
-  virtual gfx::AcceleratedWidget RealizeAcceleratedWidget(
-      gfx::AcceleratedWidget w) OVERRIDE { return w; }
   virtual bool LoadEGLGLES2Bindings(
       AddGLLibraryCallback add_gl_library,
       SetGLGetProcAddressProcCallback set_gl_get_proc_address) OVERRIDE {
     return false;
   }
-  virtual bool AttemptToResizeAcceleratedWidget(
-      gfx::AcceleratedWidget w, const gfx::Rect& bounds) OVERRIDE {
-    device_ = skia::AdoptRef(new SkBitmapDevice(SkBitmap::kARGB_8888_Config,
-                                                bounds.width(),
-                                                bounds.height(),
-                                                true));
-    canvas_ = skia::AdoptRef(new SkCanvas(device_.get()));
-    return true;
-  }
-  virtual SkCanvas* GetCanvasForWidget(gfx::AcceleratedWidget w) OVERRIDE {
-    return canvas_.get();
+  virtual scoped_ptr<gfx::SurfaceOzone> CreateSurfaceForWidget(
+      gfx::AcceleratedWidget widget) OVERRIDE {
+    return make_scoped_ptr<gfx::SurfaceOzone>(new MockSurfaceOzone());
   }
   virtual scoped_ptr<gfx::VSyncProvider> CreateVSyncProvider(
       gfx::AcceleratedWidget w) OVERRIDE {
     return scoped_ptr<gfx::VSyncProvider>();
   }
- private:
-  skia::RefPtr<SkBitmapDevice> device_;
-  skia::RefPtr<SkCanvas> canvas_;
 
+ private:
   DISALLOW_COPY_AND_ASSIGN(MockSurfaceFactoryOzone);
 };
 

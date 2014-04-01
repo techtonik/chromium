@@ -321,6 +321,24 @@ IPC_MESSAGE_ROUTED2(FrameMsg_SetEditableSelectionOffsets,
                     int /* start */,
                     int /* end */)
 
+// Sets the text composition to be between the given start and end offsets in
+// the currently focused editable field.
+IPC_MESSAGE_ROUTED3(FrameMsg_SetCompositionFromExistingText,
+    int /* start */,
+    int /* end */,
+    std::vector<blink::WebCompositionUnderline> /* underlines */)
+
+// Deletes the current selection plus the specified number of characters before
+// and after the selection or caret.
+IPC_MESSAGE_ROUTED2(FrameMsg_ExtendSelectionAndDelete,
+                    int /* before */,
+                    int /* after */)
+
+// Tells the renderer to reload the frame, optionally ignoring the cache while
+// doing so.
+IPC_MESSAGE_ROUTED1(FrameMsg_Reload,
+                    bool /* ignore_cache */)
+
 // -----------------------------------------------------------------------------
 // Messages sent from the renderer to the browser.
 
@@ -372,7 +390,10 @@ IPC_MESSAGE_ROUTED3(FrameHostMsg_DidFailLoadWithError,
 // Sent when the renderer starts loading the page. This corresponds to
 // Blink's notion of the throbber starting. Note that sometimes you may get
 // duplicates of these during a single load.
-IPC_MESSAGE_ROUTED0(FrameHostMsg_DidStartLoading)
+// |to_different_document| will be true unless the load is a fragment
+// navigation, or triggered by history.pushState/replaceState.
+IPC_MESSAGE_ROUTED1(FrameHostMsg_DidStartLoading,
+                    bool /* to_different_document */)
 
 // Sent when the renderer is done loading a page. This corresponds to Blink's
 // notion of the throbber stopping.

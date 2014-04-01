@@ -5,6 +5,7 @@
 #include "ui/display/chromeos/output_configurator.h"
 
 #include "base/bind.h"
+#include "base/command_line.h"
 #include "base/logging.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
@@ -12,8 +13,16 @@
 #include "base/time/time.h"
 #include "ui/display/chromeos/display_mode.h"
 #include "ui/display/chromeos/display_snapshot.h"
+#include "ui/display/chromeos/native_display_delegate.h"
+#include "ui/display/display_switches.h"
+
+#if defined(USE_OZONE)
+#include "ui/display/chromeos/ozone/native_display_delegate_ozone.h"
+#include "ui/display/chromeos/ozone/touchscreen_delegate_ozone.h"
+#elif defined(USE_X11)
 #include "ui/display/chromeos/x11/native_display_delegate_x11.h"
 #include "ui/display/chromeos/x11/touchscreen_delegate_x11.h"
+#endif
 
 namespace ui {
 
@@ -23,7 +32,7 @@ typedef std::vector<const DisplayMode*> DisplayModeList;
 
 // The delay to perform configuration after RRNotify.  See the comment
 // in |Dispatch()|.
-const int64 kConfigureDelayMs = 500;
+const int kConfigureDelayMs = 500;
 
 // Returns a string describing |state|.
 std::string DisplayPowerStateToString(chromeos::DisplayPowerState state) {
@@ -189,15 +198,28 @@ void OutputConfigurator::Init(bool is_panel_fitting_enabled) {
     return;
 
   if (!native_display_delegate_) {
+#if defined(USE_OZONE)
+    native_display_delegate_.reset(new NativeDisplayDelegateOzone());
+#elif defined(USE_X11)
     native_display_delegate_.reset(new NativeDisplayDelegateX11());
+#else
+    NOTREACHED();
+#endif
     native_display_delegate_->AddObserver(this);
   }
 
-  if (!touchscreen_delegate_)
+  if (!touchscreen_delegate_) {
+#if defined(USE_OZONE)
+    touchscreen_delegate_.reset(new TouchscreenDelegateOzone());
+#elif defined(USE_X11)
     touchscreen_delegate_.reset(new TouchscreenDelegateX11());
+#else
+    NOTREACHED();
+#endif
+  }
 }
 
-void OutputConfigurator::ForceInitialConfigure(uint32 background_color_argb) {
+void OutputConfigurator::ForceInitialConfigure(uint32_t background_color_argb) {
   if (!configure_display_)
     return;
 
@@ -285,7 +307,7 @@ void OutputConfigurator::UnregisterOutputProtectionClient(
 
 bool OutputConfigurator::QueryOutputProtectionStatus(
     OutputProtectionClientId client_id,
-    int64 display_id,
+    int64_t display_id,
     uint32_t* link_mask,
     uint32_t* protection_mask) {
   if (!configure_display_)
@@ -342,7 +364,7 @@ bool OutputConfigurator::QueryOutputProtectionStatus(
 
 bool OutputConfigurator::EnableOutputProtection(
     OutputProtectionClientId client_id,
-    int64 display_id,
+    int64_t display_id,
     uint32_t desired_method_mask) {
   if (!configure_display_)
     return false;
@@ -381,12 +403,15 @@ bool OutputConfigurator::EnableOutputProtection(
 
 std::vector<ui::ColorCalibrationProfile>
 OutputConfigurator::GetAvailableColorCalibrationProfiles(
-    int64 display_id) {
-  for (size_t i = 0; i < cached_outputs_.size(); ++i) {
-    if (cached_outputs_[i].display &&
-        cached_outputs_[i].display->display_id() == display_id) {
-      return native_display_delegate_->GetAvailableColorCalibrationProfiles(
-          *cached_outputs_[i].display);
+    int64_t display_id) {
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kDisableDisplayColorCalibration)) {
+    for (size_t i = 0; i < cached_outputs_.size(); ++i) {
+      if (cached_outputs_[i].display &&
+          cached_outputs_[i].display->display_id() == display_id) {
+        return native_display_delegate_->GetAvailableColorCalibrationProfiles(
+            *cached_outputs_[i].display);
+      }
     }
   }
 
@@ -394,7 +419,7 @@ OutputConfigurator::GetAvailableColorCalibrationProfiles(
 }
 
 bool OutputConfigurator::SetColorCalibrationProfile(
-    int64 display_id,
+    int64_t display_id,
     ui::ColorCalibrationProfile new_profile) {
   for (size_t i = 0; i < cached_outputs_.size(); ++i) {
     if (cached_outputs_[i].display &&
@@ -916,7 +941,7 @@ OutputState OutputConfigurator::ChooseOutputState(
           return OUTPUT_STATE_DUAL_EXTENDED;
         // With either both outputs on or both outputs off, use one of the
         // dual modes.
-        std::vector<int64> display_ids;
+        std::vector<int64_t> display_ids;
         for (size_t i = 0; i < cached_outputs_.size(); ++i) {
           // If display id isn't available, switch to extended mode.
           if (!cached_outputs_[i].display->has_proper_display_id())

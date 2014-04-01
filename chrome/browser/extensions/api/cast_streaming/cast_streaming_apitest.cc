@@ -14,6 +14,7 @@
 #include "chrome/browser/extensions/extension_apitest.h"
 #include "chrome/common/chrome_switches.h"
 #include "content/public/common/content_switches.h"
+#include "extensions/common/switches.h"
 #include "media/base/bind_to_current_loop.h"
 #include "media/base/video_frame.h"
 #include "media/cast/cast_config.h"
@@ -34,8 +35,9 @@ class CastStreamingApiTest : public ExtensionApiTest {
  public:
   virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
     ExtensionApiTest::SetUpCommandLine(command_line);
-    command_line->AppendSwitchASCII(switches::kWhitelistedExtensionID,
-                                    "ddchlicdkolnonkihahngkmmmjnjlkkf");
+    command_line->AppendSwitchASCII(
+        extensions::switches::kWhitelistedExtensionID,
+        "ddchlicdkolnonkihahngkmmmjnjlkkf");
   }
 };
 
@@ -267,7 +269,7 @@ class CastStreamingApiTestWithPixelOutput : public CastStreamingApiTest {
   }
 
   virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
-    command_line->AppendSwitchASCII(switches::kWindowSize, "128,128");
+    command_line->AppendSwitchASCII(::switches::kWindowSize, "128,128");
     CastStreamingApiTest::SetUpCommandLine(command_line);
   }
 };
@@ -304,8 +306,7 @@ IN_PROC_BROWSER_TEST_F(CastStreamingApiTestWithPixelOutput, DISABLED_EndToEnd) {
   // Start the in-process receiver that examines audio/video for the expected
   // test patterns.
   const scoped_refptr<media::cast::StandaloneCastEnvironment> cast_environment(
-      new media::cast::StandaloneCastEnvironment(
-          media::cast::CastLoggingConfig()));
+      new media::cast::StandaloneCastEnvironment());
   TestPatternReceiver* const receiver =
       new TestPatternReceiver(cast_environment, receiver_end_point);
   receiver->Start();

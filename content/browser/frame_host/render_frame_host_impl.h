@@ -125,9 +125,14 @@ class CONTENT_EXPORT RenderFrameHostImpl : public RenderFrameHost {
       PageTransition page_transition,
       bool should_replace_current_entry);
 
-  // Hack to get this subframe to swap out, without yet moving over all the
-  // SwapOut state and machinery from RenderViewHost.
+  // Tells the renderer that this RenderFrame is being swapped out for one in a
+  // different renderer process.  It should run its unload handler and move to
+  // a blank document.  The renderer should preserve the Frame object until it
+  // exits, in case we come back.  The renderer can exit if it has no other
+  // active RenderFrames, but not until WasSwappedOut is called (when it is no
+  // longer visible).
   void SwapOut();
+
   void OnSwappedOut(bool timed_out);
   bool is_swapped_out() { return is_swapped_out_; }
   void set_swapped_out(bool is_swapped_out) {
@@ -140,7 +145,9 @@ class CONTENT_EXPORT RenderFrameHostImpl : public RenderFrameHost {
 
   // TODO(nasko): This method is public so RenderViewHostImpl::Navigate can
   // call it directly. It should be made private once Navigate moves here.
-  void OnDidStartLoading();
+  // |to_different_document| will be true unless the load is a fragment
+  // navigation, or triggered by history.pushState/replaceState.
+  void OnDidStartLoading(bool to_different_document);
 
   // Sends the given navigation message. Use this rather than sending it
   // yourself since this does the internal bookkeeping described below. This
@@ -156,6 +163,10 @@ class CONTENT_EXPORT RenderFrameHostImpl : public RenderFrameHost {
 
   // Requests the renderer to select the region between two points.
   void SelectRange(const gfx::Point& start, const gfx::Point& end);
+
+  // Deletes the current selection plus the specified number of characters
+  // before and after the selection or caret.
+  void ExtendSelectionAndDelete(size_t before, size_t after);
 
  protected:
   friend class RenderFrameHostFactory;

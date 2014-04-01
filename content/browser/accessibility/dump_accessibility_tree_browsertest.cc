@@ -23,10 +23,10 @@
 #include "content/public/common/content_paths.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/url_constants.h"
+#include "content/public/test/content_browser_test.h"
+#include "content/public/test/content_browser_test_utils.h"
 #include "content/shell/browser/shell.h"
 #include "content/test/accessibility_browser_test_utils.h"
-#include "content/test/content_browser_test.h"
-#include "content/test/content_browser_test_utils.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 // TODO(aboxhall): Create expectations on Android for these
@@ -450,13 +450,17 @@ IN_PROC_BROWSER_TEST_F(DumpAccessibilityTreeTest,
   RunTest(FILE_PATH_LITERAL("modal-dialog-opened.html"));
 }
 
+// TODO(dmazzoni): rebaseline after Blink change lands.
+// http://crbug.com/347464
 IN_PROC_BROWSER_TEST_F(DumpAccessibilityTreeTest,
-                       AccessibilityModalDialogInIframeClosed) {
+                       DISABLED_AccessibilityModalDialogInIframeClosed) {
   RunTest(FILE_PATH_LITERAL("modal-dialog-in-iframe-closed.html"));
 }
 
+// TODO(dmazzoni): fix this test after Blink change that broke it lands.
+// http://crbug.com/353067
 IN_PROC_BROWSER_TEST_F(DumpAccessibilityTreeTest,
-                       AccessibilityModalDialogInIframeOpened) {
+                       DISABLED_AccessibilityModalDialogInIframeOpened) {
   RunTest(FILE_PATH_LITERAL("modal-dialog-in-iframe-opened.html"));
 }
 

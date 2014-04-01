@@ -92,6 +92,7 @@
 #include "skia/ext/platform_device.h"
 #include "third_party/WebKit/public/platform/WebCursorInfo.h"
 #include "third_party/WebKit/public/platform/WebGamepads.h"
+#include "third_party/WebKit/public/platform/WebRect.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebURL.h"
 #include "third_party/WebKit/public/platform/WebURLError.h"
@@ -1504,6 +1505,29 @@ bool PepperPluginInstanceImpl::LoadZoomInterface() {
   return !!plugin_zoom_interface_;
 }
 
+void PepperPluginInstanceImpl::UpdateLayerTransform() {
+  if (!bound_graphics_2d_platform_ || !texture_layer_) {
+    // Currently the transform is only applied for Graphics2D.
+    return;
+  }
+  // Set the UV coordinates of the texture based on the size of the Graphics2D
+  // context. By default a texture gets scaled to the size of the layer. But
+  // if the size of the Graphics2D context doesn't match the size of the plugin
+  // then it will be incorrectly stretched. This also affects how the plugin
+  // is painted when it is being resized. If the Graphics2D contents are
+  // stretched when a plugin is resized while waiting for a new frame from the
+  // plugin to be rendered, then flickering behavior occurs as in
+  // crbug.com/353453.
+  gfx::Size graphics_2d_size(bound_graphics_2d_platform_->Size());
+  float scale = bound_graphics_2d_platform_->GetScale();
+  gfx::SizeF plugin_size(view_data_.rect.size.width * scale,
+                         view_data_.rect.size.height * scale);
+  texture_layer_->SetUV(
+      gfx::PointF(0.0f, 0.0f),
+      gfx::PointF(plugin_size.width() / graphics_2d_size.width(),
+                  plugin_size.height() / graphics_2d_size.height()));
+}
+
 bool PepperPluginInstanceImpl::PluginHasFocus() const {
   return flash_fullscreen_ || (has_webkit_focus_ && has_content_area_focus_);
 }
@@ -1576,8 +1600,7 @@ void PepperPluginInstanceImpl::SendDidChangeView() {
       (new PPB_View_Shared(ppapi::OBJECT_IS_IMPL,
                            pp_instance(), view_data_))->GetReference());
 
-  if (bound_graphics_2d_platform_)
-    bound_graphics_2d_platform_->DidChangeView(view_data_);
+  UpdateLayerTransform();
 
   // It's possible that Delete() has been called but the renderer hasn't
   // released its reference to this object yet.
@@ -1950,6 +1973,7 @@ void PepperPluginInstanceImpl::UpdateLayer() {
   if ((want_layer == !!texture_layer_.get()) &&
       (want_3d_layer == layer_is_hardware_) &&
       layer_bound_to_fullscreen_ == !!fullscreen_container_) {
+    UpdateLayerTransform();
     return;
   }
 
@@ -1990,6 +2014,7 @@ void PepperPluginInstanceImpl::UpdateLayer() {
   }
   layer_bound_to_fullscreen_ = !!fullscreen_container_;
   layer_is_hardware_ = want_3d_layer;
+  UpdateLayerTransform();
 }
 
 unsigned PepperPluginInstanceImpl::PrepareTexture() {
@@ -2418,6 +2443,24 @@ void PepperPluginInstanceImpl::SelectedFindResultChanged(PP_Instance instance,
     render_frame_->reportFindInPageSelection(
         find_identifier_, index + 1, blink::WebRect());
   }
+}
+
+void PepperPluginInstanceImpl::SetTickmarks(PP_Instance instance,
+                                            const PP_Rect* tickmarks,
+                                            uint32_t count) {
+  if (!render_frame_ || !render_frame_->GetWebFrame())
+    return;
+
+  blink::WebVector<blink::WebRect> tickmarks_converted(
+      static_cast<size_t>(count));
+  for (uint32 i = 0; i < count; ++i) {
+    tickmarks_converted[i] = blink::WebRect(tickmarks[i].point.x,
+                                            tickmarks[i].point.y,
+                                            tickmarks[i].size.width,
+                                            tickmarks[i].size.height);;
+  }
+  blink::WebFrame* frame = render_frame_->GetWebFrame();
+  frame->setTickmarks(tickmarks_converted);
 }
 
 PP_Bool PepperPluginInstanceImpl::IsFullscreen(PP_Instance instance) {

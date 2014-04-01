@@ -48,7 +48,7 @@ base::LazyInstance<GURL> g_override_content_url = LAZY_INSTANCE_INITIALIZER;
 const float kUsabilityKeyboardHeightRatio = 1.0f;
 
 // The default ratio between the height of the keyboard and the screen.
-const float kDefaultKeyboardHeightRatio = 0.45f;
+const float kDefaultKeyboardHeightRatio = 0.41f;
 
 // The ratio between the height of the keyboard and the screen when using the
 // accessibility keyboard.
@@ -120,7 +120,7 @@ bool IsInputViewEnabled() {
   if (CommandLine::ForCurrentProcess()->HasSwitch(switches::kDisableInputView))
     return false;
   // Default value if no command line flags specified.
-  return true;
+  return false;
 }
 
 bool InsertText(const base::string16& text, aura::Window* root_window) {

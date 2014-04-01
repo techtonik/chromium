@@ -102,6 +102,7 @@
 #include "extensions/common/manifest_constants.h"
 #include "extensions/common/manifest_handlers/background_info.h"
 #include "extensions/common/permissions/permission_set.h"
+#include "extensions/common/switches.h"
 #include "extensions/common/url_pattern.h"
 #include "extensions/common/value_builder.h"
 #include "gpu/config/gpu_info.h"
@@ -4136,12 +4137,14 @@ TEST_F(ExtensionServiceTest, DisableTerminatedExtension) {
 
   InstallCRX(data_dir_.AppendASCII("good.crx"), INSTALL_NEW);
   TerminateExtension(good_crx);
-  EXPECT_TRUE(service_->GetTerminatedExtension(good_crx));
+  EXPECT_TRUE(registry_->GetExtensionById(
+      good_crx, extensions::ExtensionRegistry::TERMINATED));
 
   // Disable it.
   service_->DisableExtension(good_crx, Extension::DISABLE_USER_ACTION);
 
-  EXPECT_FALSE(service_->GetTerminatedExtension(good_crx));
+  EXPECT_FALSE(registry_->GetExtensionById(
+      good_crx, extensions::ExtensionRegistry::TERMINATED));
   EXPECT_TRUE(service_->GetExtensionById(good_crx, true));
 
   EXPECT_EQ(0u, registry_->enabled_extensions().size());
@@ -6534,7 +6537,7 @@ TEST_F(ExtensionServiceTest, ConcurrentExternalLocalFile) {
 TEST_F(ExtensionServiceTest, InstallWhitelistedExtension) {
   std::string test_id = "hdkklepkcpckhnpgjnmbdfhehckloojk";
   CommandLine::ForCurrentProcess()->AppendSwitchASCII(
-      switches::kWhitelistedExtensionID, test_id);
+      extensions::switches::kWhitelistedExtensionID, test_id);
 
   InitializeEmptyExtensionService();
   base::FilePath path = data_dir_

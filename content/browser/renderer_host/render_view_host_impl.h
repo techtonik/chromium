@@ -219,7 +219,6 @@ class CONTENT_EXPORT RenderViewHostImpl
   virtual SiteInstance* GetSiteInstance() const OVERRIDE;
   virtual bool IsRenderViewLive() const OVERRIDE;
   virtual void NotifyMoveOrResizeStarted() OVERRIDE;
-  virtual void ReloadFrame() OVERRIDE;
   virtual void SetWebUIProperty(const std::string& name,
                                 const std::string& value) OVERRIDE;
   virtual void Zoom(PageZoom zoom) OVERRIDE;
@@ -237,6 +236,10 @@ class CONTENT_EXPORT RenderViewHostImpl
                                          float y) OVERRIDE;
   virtual void RequestFindMatchRects(int current_version) OVERRIDE;
   virtual void DisableFullscreenEncryptedMediaPlayback() OVERRIDE;
+#endif
+
+#if defined(USE_MOJO)
+  virtual void SetWebUIHandle(mojo::ScopedMessagePipeHandle handle) OVERRIDE;
 #endif
 
   void set_delegate(RenderViewHostDelegate* d) {
@@ -320,14 +323,6 @@ class CONTENT_EXPORT RenderViewHostImpl
   // separately so that the PageGroupLoadDeferrers of any current dialogs are no
   // longer on the stack when we attempt to swap it out.
   void SuppressDialogsUntilSwapOut();
-
-  // Tells the renderer that this RenderView is being swapped out for one in a
-  // different renderer process.  It should run its unload handler and move to
-  // a blank document.  The renderer should preserve the Frame object until it
-  // exits, in case we come back.  The renderer can exit if it has no other
-  // active RenderViews, but not until WasSwappedOut is called (when it is no
-  // longer visible).
-  void SwapOut();
 
   // Called when either the SwapOut request has been acknowledged or has timed
   // out.
@@ -573,7 +568,6 @@ class CONTENT_EXPORT RenderViewHostImpl
   void OnUpdateInspectorSetting(const std::string& key,
                                 const std::string& value);
   void OnClosePageACK();
-  void OnSwapOutACK();
   void OnAccessibilityEvents(
       const std::vector<AccessibilityHostMsg_EventParams>& params);
   void OnAccessibilityLocationChanges(

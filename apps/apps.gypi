@@ -16,6 +16,7 @@
       'dependencies': [
         'browser_extensions',
         'common/extensions/api/api.gyp:chrome_api',
+        '../apps/common/api/api.gyp:apps_api',
         '../skia/skia.gyp:skia',
       ],
       'include_dirs': [
@@ -47,6 +48,10 @@
         'apps_client.h',
         'browser_context_keyed_service_factories.cc',
         'browser_context_keyed_service_factories.h',
+        'browser/api/app_runtime/app_runtime_api.cc',
+        'browser/api/app_runtime/app_runtime_api.h',
+        'browser/file_handler_util.cc',
+        'browser/file_handler_util.h',
         'launcher.cc',
         'launcher.h',
         'metrics_names.h',
@@ -117,9 +122,6 @@
             '../ui/base/strings/ui_strings.gyp:ui_strings',
             '../ui/resources/ui_resources.gyp:ui_resources',
           ],
-          'variables': {
-            'repack_path': '<(DEPTH)/tools/grit/grit/format/repack.py',
-          },
           'actions': [
             {
               'action_name': 'repack_app_shell_pack',
@@ -139,16 +141,9 @@
                   '<(SHARED_INTERMEDIATE_DIR)/ui/ui_strings/ui_strings_en-US.pak',
                   '<(SHARED_INTERMEDIATE_DIR)/webkit/devtools_resources.pak',
                 ],
+                'pak_output': '<(PRODUCT_DIR)/app_shell.pak',
               },
-              'inputs': [
-                '<(repack_path)',
-                '<@(pak_inputs)',
-              ],
-              'outputs': [
-                '<(PRODUCT_DIR)/app_shell.pak',
-              ],
-              'action': ['python', '<(repack_path)', '<@(_outputs)',
-                         '<@(pak_inputs)'],
+             'includes': [ '../build/repack_action.gypi' ],
             },
           ],
         },
@@ -162,11 +157,13 @@
           'dependencies': [
             'app_shell_pak',
             'apps',
+            'common/extensions/api/api.gyp:chrome_api',
             'test_support_common',
             '../base/base.gyp:base',
             '../base/base.gyp:base_prefs_test_support',
             '../content/content.gyp:content',
             '../content/content_shell_and_tests.gyp:content_shell_lib',
+            '../extensions/common/api/api.gyp:extensions_api',
             '../skia/skia.gyp:skia',
             '../ui/views/views.gyp:views',
             '../ui/wm/wm.gyp:wm_test_support',
@@ -256,6 +253,7 @@
           'defines': [
             'HAS_OUT_OF_PROC_TEST_RUNNER',
           ],
+          'msvs_large_pdb': 1,
           'sources': [
             # TODO(yoz): Refactor once we have a second test target.
             'test/app_shell_test.h',

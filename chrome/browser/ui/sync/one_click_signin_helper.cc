@@ -36,6 +36,7 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/search/search.h"
 #include "chrome/browser/signin/chrome_signin_client.h"
+#include "chrome/browser/signin/chrome_signin_client_factory.h"
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
 #include "chrome/browser/signin/signin_manager.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
@@ -1112,10 +1113,10 @@ void OneClickSigninHelper::ShowInfoBarUIThread(
   // show a modal dialog asking the user to confirm.
   Profile* profile =
       Profile::FromBrowserContext(web_contents->GetBrowserContext());
-  SigninManager* manager = profile ?
-      SigninManagerFactory::GetForProfile(profile) : NULL;
+  ChromeSigninClient* signin_client =
+      profile ? ChromeSigninClientFactory::GetForProfile(profile) : NULL;
   helper->untrusted_confirmation_required_ |=
-      (manager && !manager->IsSigninProcess(child_id));
+      (signin_client && !signin_client->IsSigninProcess(child_id));
 
   if (continue_url.is_valid()) {
     // Set |original_continue_url_| if it is currently empty. |continue_url|
@@ -1199,6 +1200,12 @@ bool OneClickSigninHelper::HandleCrossAccountError(
 // static
 void OneClickSigninHelper::RedirectToNtpOrAppsPage(
     content::WebContents* contents, signin::Source source) {
+  // Do nothing if a navigation is pending, since this call can be triggered
+  // from DidStartLoading. This avoids deleting the pending entry while we are
+  // still navigating to it. See crbug/346632.
+  if (contents->GetController().GetPendingEntry())
+    return;
+
   VLOG(1) << "RedirectToNtpOrAppsPage";
   // Redirect to NTP/Apps page and display a confirmation bubble
   GURL url(source == signin::SOURCE_APPS_PAGE_LINK ?
@@ -1307,11 +1314,11 @@ void OneClickSigninHelper::DidNavigateMainFrame(
     // sign-in process when a navigation to a non-sign-in URL occurs.
     Profile* profile =
         Profile::FromBrowserContext(web_contents()->GetBrowserContext());
-    SigninManager* manager = profile ?
-        SigninManagerFactory::GetForProfile(profile) : NULL;
+    ChromeSigninClient* signin_client =
+        profile ? ChromeSigninClientFactory::GetForProfile(profile) : NULL;
     int process_id = web_contents()->GetRenderProcessHost()->GetID();
-    if (manager && manager->IsSigninProcess(process_id))
-      manager->ClearSigninProcess();
+    if (signin_client && signin_client->IsSigninProcess(process_id))
+      signin_client->ClearSigninProcess();
 
     // If the navigation to a non-sign-in URL hasn't been triggered by the web
     // contents, the sign in flow has been aborted and the state must be
@@ -1474,7 +1481,7 @@ void OneClickSigninHelper::DidStopLoading(
     case AUTO_ACCEPT_ACCEPTED:
       LogOneClickHistogramValue(one_click_signin::HISTOGRAM_ACCEPTED);
       LogOneClickHistogramValue(one_click_signin::HISTOGRAM_WITH_DEFAULTS);
-      SigninManager::DisableOneClickSignIn(profile);
+      SigninManager::DisableOneClickSignIn(profile->GetPrefs());
       // Start syncing with the default settings - prompt the user to sign in
       // first.
       if (!do_not_start_sync_for_testing_) {
@@ -1490,7 +1497,7 @@ void OneClickSigninHelper::DidStopLoading(
     case AUTO_ACCEPT_CONFIGURE:
       LogOneClickHistogramValue(one_click_signin::HISTOGRAM_ACCEPTED);
       LogOneClickHistogramValue(one_click_signin::HISTOGRAM_WITH_ADVANCED);
-      SigninManager::DisableOneClickSignIn(profile);
+      SigninManager::DisableOneClickSignIn(profile->GetPrefs());
       // Display the extra confirmation (even in the SAML case) in case this
       // was an untrusted renderer.
       if (!do_not_start_sync_for_testing_) {

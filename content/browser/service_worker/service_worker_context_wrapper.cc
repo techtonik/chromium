@@ -50,19 +50,21 @@ ServiceWorkerContextCore* ServiceWorkerContextWrapper::context() {
 }
 
 static void FinishRegistrationOnIO(
-    const ServiceWorkerContext::StatusCallback& continuation,
+    const ServiceWorkerContext::ResultCallback& continuation,
     ServiceWorkerStatusCode status,
     int64 registration_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   BrowserThread::PostTask(
-      BrowserThread::UI, FROM_HERE, base::Bind(continuation, status));
+      BrowserThread::UI,
+      FROM_HERE,
+      base::Bind(continuation, status == SERVICE_WORKER_OK));
 }
 
 void ServiceWorkerContextWrapper::RegisterServiceWorker(
     const GURL& pattern,
     const GURL& script_url,
     int source_process_id,
-    const StatusCallback& continuation) {
+    const ResultCallback& continuation) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
     BrowserThread::PostTask(
         BrowserThread::IO,
@@ -84,17 +86,19 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
 }
 
 static void FinishUnregistrationOnIO(
-    const ServiceWorkerContext::StatusCallback& continuation,
+    const ServiceWorkerContext::ResultCallback& continuation,
     ServiceWorkerStatusCode status) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   BrowserThread::PostTask(
-      BrowserThread::UI, FROM_HERE, base::Bind(continuation, status));
+      BrowserThread::UI,
+      FROM_HERE,
+      base::Bind(continuation, status == SERVICE_WORKER_OK));
 }
 
 void ServiceWorkerContextWrapper::UnregisterServiceWorker(
     const GURL& pattern,
     int source_process_id,
-    const StatusCallback& continuation) {
+    const ResultCallback& continuation) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
     BrowserThread::PostTask(
         BrowserThread::IO,

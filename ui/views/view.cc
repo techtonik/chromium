@@ -20,7 +20,6 @@
 #include "ui/base/cursor/cursor.h"
 #include "ui/base/dragdrop/drag_drop_types.h"
 #include "ui/base/ui_base_switches_util.h"
-#include "ui/compositor/clone_layer.h"
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animator.h"
@@ -41,6 +40,7 @@
 #include "ui/views/border.h"
 #include "ui/views/context_menu_controller.h"
 #include "ui/views/drag_controller.h"
+#include "ui/views/focus/view_storage.h"
 #include "ui/views/layout/layout_manager.h"
 #include "ui/views/rect_based_targeting_utils.h"
 #include "ui/views/views_delegate.h"
@@ -170,6 +170,8 @@ View::View()
 View::~View() {
   if (parent_)
     parent_->RemoveChildView(this);
+
+  ViewStorage::GetInstance()->ViewRemoved(this);
 
   for (Views::const_iterator i(children_.begin()); i != children_.end(); ++i) {
     (*i)->parent_ = NULL;
@@ -504,10 +506,6 @@ void View::SetPaintToLayer(bool paint_to_layer) {
   } else if (!paint_to_layer_ && layer()) {
     DestroyLayer();
   }
-}
-
-scoped_ptr<ui::Layer> View::RecreateLayer() {
-  return ui::CloneLayer(this);
 }
 
 // RTL positioning -------------------------------------------------------------
@@ -1050,6 +1048,7 @@ void View::OnScrollEvent(ui::ScrollEvent* event) {
 }
 
 void View::OnTouchEvent(ui::TouchEvent* event) {
+  NOTREACHED() << "Views should not receive touch events.";
 }
 
 void View::OnGestureEvent(ui::GestureEvent* event) {

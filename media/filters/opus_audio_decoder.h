@@ -35,16 +35,10 @@ class MEDIA_EXPORT OpusAudioDecoder : public AudioDecoder {
                           const PipelineStatusCB& status_cb) OVERRIDE;
   virtual void Decode(const scoped_refptr<DecoderBuffer>& buffer,
                       const DecodeCB& decode_cb) OVERRIDE;
-  virtual int bits_per_channel() OVERRIDE;
-  virtual ChannelLayout channel_layout() OVERRIDE;
-  virtual int samples_per_second() OVERRIDE;
   virtual void Reset(const base::Closure& closure) OVERRIDE;
-  virtual void Stop(const base::Closure& closure) OVERRIDE;
+  virtual void Stop() OVERRIDE;
 
  private:
-  void DoReset();
-  void DoStop();
-
   // Reads from the demuxer stream with corresponding callback method.
   void ReadFromDemuxerStream();
   void DecodeBuffer(const scoped_refptr<DecoderBuffer>& input,
@@ -60,12 +54,6 @@ class MEDIA_EXPORT OpusAudioDecoder : public AudioDecoder {
 
   AudioDecoderConfig config_;
   OpusMSDecoder* opus_decoder_;
-
-  // Decoded audio format.
-  ChannelLayout channel_layout_;
-  int samples_per_second_;
-  const SampleFormat sample_format_;
-  const int bits_per_channel_;
 
   // Used for computing output timestamps.
   scoped_ptr<AudioTimestampHelper> output_timestamp_helper_;

@@ -17,6 +17,7 @@
 #include "base/auto_reset.h"
 #include "base/command_line.h"
 #include "base/logging.h"
+#include "base/metrics/histogram.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/stringprintf.h"
@@ -453,7 +454,7 @@ void DisplayManager::SetDisplayResolution(int64 display_id,
     return;
   }
   display_modes_[display_id] = *iter;
-#if defined(OS_CHROMEOS) && defined(USE_X11)
+#if defined(OS_CHROMEOS)
   if (base::SysInfo::IsRunningOnChromeOS())
     Shell::GetInstance()->output_configurator()->OnConfigurationChanged();
 #endif
@@ -516,6 +517,8 @@ void DisplayManager::SetColorCalibrationProfile(
   if (Shell::GetInstance()->output_configurator()->SetColorCalibrationProfile(
           display_id, profile)) {
     display_info_[display_id].SetColorProfile(profile);
+    UMA_HISTOGRAM_ENUMERATION(
+        "ChromeOS.Display.ColorProfile", profile, ui::NUM_COLOR_PROFILES);
   }
   if (delegate_)
     delegate_->PostDisplayConfigurationChange();

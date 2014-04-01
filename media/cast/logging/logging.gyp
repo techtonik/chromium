@@ -2,6 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 {
+  'variables': {
+    'chromium_code': 1,
+  },
   'targets': [
     {
       'target_name': 'cast_common_logging',
@@ -23,11 +26,13 @@
         'logging_impl.h',
         'logging_raw.cc',
         'logging_raw.h',
-        'logging_stats.cc',
-        'logging_stats.h',
         'raw_event_subscriber.h',
         'simple_event_subscriber.cc',
         'simple_event_subscriber.h',
+        'stats_event_subscriber.cc',
+        'stats_event_subscriber.h',
+        'stats_util.cc',
+        'stats_util.h',
       ], # source
     },
     {

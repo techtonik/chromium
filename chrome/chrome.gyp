@@ -22,7 +22,6 @@
     'allocator_target': '../base/allocator/allocator.gyp:allocator',
     'grit_out_dir': '<(SHARED_INTERMEDIATE_DIR)/chrome',
     'protoc_out_dir': '<(SHARED_INTERMEDIATE_DIR)/protoc_out',
-    'repack_locales_cmd': ['python', 'tools/build/repack_locales.py'],
     'conditions': [
       ['OS!="ios"', {
         'chromium_browser_dependencies': [
@@ -312,6 +311,9 @@
           'include_dirs': [
             '..',
             '<(grit_out_dir)',
+          ],
+          'export_dependent_settings': [
+            'common/extensions/api/api.gyp:chrome_api',
           ],
           'conditions': [
             ['toolkit_uses_gtk == 1', {

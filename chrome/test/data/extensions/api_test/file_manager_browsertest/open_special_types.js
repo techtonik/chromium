@@ -58,46 +58,6 @@ function galleryOpen(path) {
 }
 
 /**
- * Tests if the audio player shows up for the selected image and that the audio
- * is loaded successfully.
- *
- * @param {string} path Directory path to be tested.
- */
-function audioOpen(path) {
-  var appId;
-  var audioAppId;
-  StepsRunner.run([
-    function() {
-      setupAndWaitUntilReady(null, path, this.next);
-    },
-    // Select the song.
-    function(inAppId) {
-      appId = inAppId;
-      callRemoteTestUtil(
-          'openFile', appId, ['Beautiful Song.ogg'], this.next);
-    },
-    // Wait for the audio player.
-    function(result) {
-      chrome.test.assertTrue(result);
-      waitForWindow('audio_player.html').then(this.next);
-    },
-    // Wait for the audio tag and verify the source.
-    function(inAppId) {
-      audioAppId = inAppId;
-      waitForElement(audioAppId, 'audio-player[playing]').then(this.next);
-    },
-    // Get the title tag.
-    function(element) {
-      chrome.test.assertEq(
-          'filesystem:chrome-extension://hhaomjibdihmijegdhdafkllkbggdgoj/' +
-              'external' + path + '/Beautiful%20Song.ogg',
-          element.attributes.currenttrackurl);
-      checkIfNoErrorsOccured(this.next);
-    }
-  ]);
-}
-
-/**
  * Tests if we can open and unmount a zip file.
  * @param {string} path Directory path to be tested.
  */
@@ -168,16 +128,8 @@ testcase.galleryOpenDownloads = function() {
   galleryOpen(RootPath.DOWNLOADS);
 };
 
-testcase.audioOpenDownloads = function() {
-  audioOpen(RootPath.DOWNLOADS);
-};
-
 testcase.galleryOpenDrive = function() {
   galleryOpen(RootPath.DRIVE);
-};
-
-testcase.audioOpenDrive = function() {
-  audioOpen(RootPath.DRIVE);
 };
 
 testcase.zipOpenDownloads = function() {

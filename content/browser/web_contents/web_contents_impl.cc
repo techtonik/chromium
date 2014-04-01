@@ -170,12 +170,12 @@ const char kWebContentsAndroidKey[] = "web_contents_android";
 base::LazyInstance<std::vector<WebContentsImpl::CreatedCallback> >
 g_created_callbacks = LAZY_INSTANCE_INITIALIZER;
 
-static int StartDownload(content::RenderViewHost* rvh,
+static int StartDownload(content::RenderFrameHost* rfh,
                          const GURL& url,
                          bool is_favicon,
                          uint32_t max_bitmap_size) {
   static int g_next_image_download_id = 0;
-  rvh->Send(new ImageMsg_DownloadImage(rvh->GetRoutingID(),
+  rfh->Send(new ImageMsg_DownloadImage(rfh->GetRoutingID(),
                                        ++g_next_image_download_id,
                                        url,
                                        is_favicon,
@@ -332,6 +332,8 @@ WebContentsImpl::WebContentsImpl(
       minimum_zoom_percent_(static_cast<int>(kMinimumZoomFactor * 100)),
       maximum_zoom_percent_(static_cast<int>(kMaximumZoomFactor * 100)),
       temporary_zoom_settings_(false),
+      totalPinchGestureAmount_(0),
+      currentPinchZoomStepDelta_(0),
       color_chooser_identifier_(0),
       render_view_message_source_(NULL),
       fullscreen_widget_routing_id_(MSG_ROUTING_NONE),
@@ -1215,6 +1217,44 @@ bool WebContentsImpl::PreHandleGestureEvent(
   return delegate_ && delegate_->PreHandleGestureEvent(this, event);
 }
 
+bool WebContentsImpl::HandleGestureEvent(
+    const blink::WebGestureEvent& event) {
+  // Some platforms (eg. Mac) send GesturePinch events for trackpad pinch-zoom.
+  // Use them to implement browser zoom, as for HandleWheelEvent above.
+  if (event.type == blink::WebInputEvent::GesturePinchUpdate &&
+      event.sourceDevice == blink::WebGestureEvent::Touchpad) {
+    // The scale difference necessary to trigger a zoom action. Derived from
+    // experimentation to find a value that feels reasonable.
+    const float kZoomStepValue = 0.6f;
+
+    // Find the (absolute) thresholds on either side of the current zoom factor,
+    // then convert those to actual numbers to trigger a zoom in or out.
+    // This logic deliberately makes the range around the starting zoom value
+    // for the gesture twice as large as the other ranges (i.e., the notches are
+    // at ..., -3*step, -2*step, -step, step, 2*step, 3*step, ... but not at 0)
+    // so that it's easier to get back to your starting point than it is to
+    // overshoot.
+    float nextStep = (abs(currentPinchZoomStepDelta_) + 1) * kZoomStepValue;
+    float backStep = abs(currentPinchZoomStepDelta_) * kZoomStepValue;
+    float zoomInThreshold = (currentPinchZoomStepDelta_ >= 0) ? nextStep
+        : -backStep;
+    float zoomOutThreshold = (currentPinchZoomStepDelta_ <= 0) ? -nextStep
+        : backStep;
+
+    totalPinchGestureAmount_ += event.data.pinchUpdate.scale;
+    if (totalPinchGestureAmount_ > zoomInThreshold) {
+      currentPinchZoomStepDelta_++;
+      delegate_->ContentsZoomChange(true);
+    } else if (totalPinchGestureAmount_ < zoomOutThreshold) {
+      currentPinchZoomStepDelta_--;
+      delegate_->ContentsZoomChange(false);
+    }
+    return true;
+  }
+
+  return false;
+}
+
 #if defined(OS_WIN)
 gfx::NativeViewAccessible WebContentsImpl::GetParentNativeViewAccessible() {
   return accessible_parent_;
@@ -1734,6 +1774,10 @@ void WebContentsImpl::SetHistoryLengthAndPrune(
                                             minimum_page_id));
 }
 
+void WebContentsImpl::ReloadFocusedFrame(bool ignore_cache) {
+  Send(new FrameMsg_Reload(GetFocusedFrame()->GetRoutingID(), ignore_cache));
+}
+
 void WebContentsImpl::FocusThroughTabTraversal(bool reverse) {
   if (ShowingInterstitialPage()) {
     GetRenderManager()->interstitial_page()->FocusThroughTabTraversal(reverse);
@@ -2021,8 +2065,7 @@ int WebContentsImpl::DownloadImage(const GURL& url,
                                    bool is_favicon,
                                    uint32_t max_bitmap_size,
                                    const ImageDownloadCallback& callback) {
-  RenderViewHost* host = GetRenderViewHost();
-  int id = StartDownload(host, url, is_favicon, max_bitmap_size);
+  int id = StartDownload(GetMainFrame(), url, is_favicon, max_bitmap_size);
   image_download_map_[id] = callback;
   return id;
 }
@@ -2614,6 +2657,7 @@ void WebContentsImpl::ActivateAndShowRepostFormWarningDialog() {
 // loading, or done loading.
 void WebContentsImpl::SetIsLoading(RenderViewHost* render_view_host,
                                    bool is_loading,
+                                   bool to_different_document,
                                    LoadNotificationDetails* details) {
   if (is_loading == is_loading_)
     return;
@@ -2632,7 +2676,7 @@ void WebContentsImpl::SetIsLoading(RenderViewHost* render_view_host,
   waiting_for_response_ = is_loading;
 
   if (delegate_)
-    delegate_->LoadingStateChanged(this);
+    delegate_->LoadingStateChanged(this, to_different_document);
   NotifyNavigationStateChanged(INVALIDATE_TYPE_LOAD);
 
   std::string url = (details ? details->url.possibly_invalid_spec() : "NULL");
@@ -2902,7 +2946,7 @@ void WebContentsImpl::RenderViewTerminated(RenderViewHost* rvh,
     dialog_manager_->CancelActiveAndPendingDialogs(this);
 
   ClearPowerSaveBlockers(rvh);
-  SetIsLoading(rvh, false, NULL);
+  SetIsLoading(rvh, false, true, NULL);
   NotifyDisconnected();
   SetIsCrashed(status, error_code);
   GetView()->OnTabCrashed(GetCrashedStatus(), crashed_error_code_);
@@ -3007,23 +3051,20 @@ void WebContentsImpl::Close(RenderViewHost* rvh) {
     delegate_->CloseContents(this);
 }
 
-void WebContentsImpl::SwappedOut(RenderViewHost* rvh) {
-  if (rvh == GetRenderViewHost()) {
+void WebContentsImpl::SwappedOut(RenderFrameHost* rfh) {
+  // TODO(creis): Handle subframes that go fullscreen.
+  if (rfh->GetRenderViewHost() == GetRenderViewHost()) {
     // Exit fullscreen mode before the current RVH is swapped out.  For numerous
     // cases, there is no guarantee the renderer would/could initiate an exit.
     // Example: http://crbug.com/347232
     if (IsFullscreenForCurrentTab()) {
-      if (rvh)
-        rvh->ExitFullscreen();
+      rfh->GetRenderViewHost()->ExitFullscreen();
       DCHECK(!IsFullscreenForCurrentTab());
     }
 
     if (delegate_)
       delegate_->SwappedOut(this);
   }
-
-  // Allow the navigation to proceed.
-  GetRenderManager()->SwappedOut(rvh);
 }
 
 void WebContentsImpl::RequestMove(const gfx::Rect& new_bounds) {
@@ -3031,8 +3072,10 @@ void WebContentsImpl::RequestMove(const gfx::Rect& new_bounds) {
     delegate_->MoveContents(this, new_bounds);
 }
 
-void WebContentsImpl::DidStartLoading(RenderFrameHost* render_frame_host) {
-  SetIsLoading(render_frame_host->GetRenderViewHost(), true, NULL);
+void WebContentsImpl::DidStartLoading(RenderFrameHost* render_frame_host,
+                                      bool to_different_document) {
+  SetIsLoading(render_frame_host->GetRenderViewHost(), true,
+               to_different_document, NULL);
 }
 
 void WebContentsImpl::DidStopLoading(RenderFrameHost* render_frame_host) {
@@ -3057,7 +3100,8 @@ void WebContentsImpl::DidStopLoading(RenderFrameHost* render_frame_host) {
         controller_.GetCurrentEntryIndex()));
   }
 
-  SetIsLoading(render_frame_host->GetRenderViewHost(), false, details.get());
+  SetIsLoading(render_frame_host->GetRenderViewHost(), false, true,
+               details.get());
 }
 
 void WebContentsImpl::DidCancelLoading() {

@@ -78,6 +78,7 @@ bool EmbeddedWorkerTestHelper::OnSendMessageToWorker(
     const IPC::Message& message) {
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(EmbeddedWorkerTestHelper, message)
+    IPC_MESSAGE_HANDLER(ServiceWorkerMsg_ActivateEvent, OnActivateEventStub)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_InstallEvent, OnInstallEventStub)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_FetchEvent, OnFetchEventStub)
     IPC_MESSAGE_UNHANDLED(handled = false)
@@ -87,14 +88,23 @@ bool EmbeddedWorkerTestHelper::OnSendMessageToWorker(
   return handled;
 }
 
-void EmbeddedWorkerTestHelper::OnInstallEvent(
-    int embedded_worker_id,
-    int request_id,
-    int active_version_embedded_worker_id) {
+void EmbeddedWorkerTestHelper::OnActivateEvent(int embedded_worker_id,
+                                               int request_id) {
   SimulateSendMessageToBrowser(
       embedded_worker_id,
       request_id,
-      ServiceWorkerHostMsg_InstallEventFinished());
+      ServiceWorkerHostMsg_ActivateEventFinished(
+          blink::WebServiceWorkerEventResultCompleted));
+}
+
+void EmbeddedWorkerTestHelper::OnInstallEvent(int embedded_worker_id,
+                                              int request_id,
+                                              int active_version_id) {
+  SimulateSendMessageToBrowser(
+      embedded_worker_id,
+      request_id,
+      ServiceWorkerHostMsg_InstallEventFinished(
+          blink::WebServiceWorkerEventResultCompleted));
 }
 
 void EmbeddedWorkerTestHelper::OnFetchEvent(
@@ -179,15 +189,23 @@ void EmbeddedWorkerTestHelper::OnSendMessageToWorkerStub(
           message));
 }
 
-void EmbeddedWorkerTestHelper::OnInstallEventStub(
-    int active_version_embedded_worker_id) {
+void EmbeddedWorkerTestHelper::OnActivateEventStub() {
+  base::MessageLoopProxy::current()->PostTask(
+      FROM_HERE,
+      base::Bind(&EmbeddedWorkerTestHelper::OnActivateEvent,
+                 weak_factory_.GetWeakPtr(),
+                 current_embedded_worker_id_,
+                 current_request_id_));
+}
+
+void EmbeddedWorkerTestHelper::OnInstallEventStub(int active_version_id) {
   base::MessageLoopProxy::current()->PostTask(
       FROM_HERE,
       base::Bind(&EmbeddedWorkerTestHelper::OnInstallEvent,
                  weak_factory_.GetWeakPtr(),
                  current_embedded_worker_id_,
                  current_request_id_,
-                 active_version_embedded_worker_id));
+                 active_version_id));
 }
 
 void EmbeddedWorkerTestHelper::OnFetchEventStub(

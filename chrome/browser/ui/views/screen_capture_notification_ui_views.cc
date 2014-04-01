@@ -24,18 +24,23 @@
 #include "ui/views/widget/widget_delegate.h"
 #include "ui/wm/core/shadow_types.h"
 
+#if defined(OS_WIN)
+#include "ui/views/win/hwnd_util.h"
+#endif
+
 namespace {
 
 const int kMinimumWidth = 460;
 const int kMaximumWidth = 1000;
 const int kHorizontalMargin = 10;
-const int kPadding = 5;
-const int kPaddingLeft = 10;
+const float kWindowAlphaValue = 0.85f;
+const int kPaddingVertical = 5;
+const int kPaddingHorizontal = 10;
 
 namespace {
 
 // A ClientView that overrides NonClientHitTest() so that the whole window area
-// acts as a window caption, except a rect specified using SetClientRect().
+// acts as a window caption, except a rect specified using set_client_rect().
 // ScreenCaptureNotificationUIViews uses this class to make the notification bar
 // draggable.
 class NotificationBarClientView : public views::ClientView {
@@ -45,9 +50,7 @@ class NotificationBarClientView : public views::ClientView {
   }
   virtual ~NotificationBarClientView() {}
 
-  void SetClientRect(const gfx::Rect& rect) {
-    rect_ = rect;
-  }
+  void set_client_rect(const gfx::Rect& rect) { rect_ = rect; }
 
   // views::ClientView overrides.
   virtual int NonClientHitTest(const gfx::Point& point) OVERRIDE  {
@@ -79,7 +82,8 @@ class ScreenCaptureNotificationUIViews
   virtual ~ScreenCaptureNotificationUIViews();
 
   // ScreenCaptureNotificationUI interface.
-  virtual void OnStarted(const base::Closure& stop_callback) OVERRIDE;
+  virtual gfx::NativeViewId OnStarted(const base::Closure& stop_callback)
+      OVERRIDE;
 
   // views::View overrides.
   virtual gfx::Size GetPreferredSize() OVERRIDE;
@@ -128,9 +132,6 @@ ScreenCaptureNotificationUIViews::ScreenCaptureNotificationUIViews(
       hide_link_(NULL) {
   set_owned_by_client();
 
-  set_background(views::Background::CreateSolidBackground(GetNativeTheme()->
-      GetSystemColor(ui::NativeTheme::kColorId_DialogBackground)));
-
   gripper_ = new views::ImageView();
   gripper_->SetImage(
       ui::ResourceBundle::GetSharedInstance().GetImageSkiaNamed(
@@ -150,6 +151,7 @@ ScreenCaptureNotificationUIViews::ScreenCaptureNotificationUIViews(
   hide_link_ = new views::Link(
       l10n_util::GetStringUTF16(IDS_PASSWORDS_PAGE_VIEW_HIDE_BUTTON));
   hide_link_->set_listener(this);
+  hide_link_->SetUnderline(false);
   AddChildView(hide_link_);
 }
 
@@ -158,7 +160,7 @@ ScreenCaptureNotificationUIViews::~ScreenCaptureNotificationUIViews() {
   delete GetWidget();
 }
 
-void ScreenCaptureNotificationUIViews::OnStarted(
+gfx::NativeViewId ScreenCaptureNotificationUIViews::OnStarted(
     const base::Closure& stop_callback) {
   stop_callback_ = stop_callback;
 
@@ -190,6 +192,9 @@ void ScreenCaptureNotificationUIViews::OnStarted(
   widget->Init(params);
   widget->SetAlwaysOnTop(true);
 
+  set_background(views::Background::CreateSolidBackground(GetNativeTheme()->
+      GetSystemColor(ui::NativeTheme::kColorId_DialogBackground)));
+
   gfx::Screen* screen = gfx::Screen::GetNativeScreen();
   // TODO(sergeyu): Move the notification to the display being captured when
   // per-display screen capture is supported.
@@ -202,8 +207,14 @@ void ScreenCaptureNotificationUIViews::OnStarted(
       work_area.y() + work_area.height() - size.height(),
       size.width(), size.height());
   widget->SetBounds(bounds);
-
+  widget->SetOpacity(0xFF * kWindowAlphaValue);
   widget->Show();
+
+#if defined(OS_WIN)
+  return gfx::NativeViewId(views::HWNDForWidget(widget));
+#else
+  return 0;
+#endif
 }
 
 gfx::Size ScreenCaptureNotificationUIViews::GetPreferredSize() {
@@ -243,7 +254,7 @@ void ScreenCaptureNotificationUIViews::Layout() {
   label_rect.set_height(bounds().height());
   label_->SetBoundsRect(label_rect);
 
-  client_view_->SetClientRect(gfx::Rect(
+  client_view_->set_client_rect(gfx::Rect(
       stop_button_rect.x(), stop_button_rect.y(),
       stop_button_rect.width() + kHorizontalMargin + hide_link_rect.width(),
       std::max(stop_button_rect.height(), hide_link_rect.height())));
@@ -268,7 +279,10 @@ views::NonClientFrameView*
 ScreenCaptureNotificationUIViews::CreateNonClientFrameView(
     views::Widget* widget) {
   views::BubbleFrameView* frame = new views::BubbleFrameView(
-      gfx::Insets(kPadding, kPaddingLeft, kPadding, kPadding));
+      gfx::Insets(kPaddingVertical,
+                  kPaddingHorizontal,
+                  kPaddingVertical,
+                  kPaddingHorizontal));
   SkColor color = widget->GetNativeTheme()->GetSystemColor(
       ui::NativeTheme::kColorId_DialogBackground);
   frame->SetBubbleBorder(scoped_ptr<views::BubbleBorder>(

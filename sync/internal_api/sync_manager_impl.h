@@ -19,6 +19,7 @@
 #include "sync/internal_api/js_mutation_event_observer.h"
 #include "sync/internal_api/js_sync_encryption_handler_observer.h"
 #include "sync/internal_api/js_sync_manager_observer.h"
+#include "sync/internal_api/protocol_event_buffer.h"
 #include "sync/internal_api/public/sync_manager.h"
 #include "sync/internal_api/public/user_share.h"
 #include "sync/internal_api/sync_encryption_handler_impl.h"
@@ -110,10 +111,13 @@ class SYNC_EXPORT_PRIVATE SyncManagerImpl :
   virtual void SaveChanges() OVERRIDE;
   virtual void ShutdownOnSyncThread() OVERRIDE;
   virtual UserShare* GetUserShare() OVERRIDE;
+  virtual syncer::SyncCore* GetSyncCore() OVERRIDE;
   virtual const std::string cache_guid() OVERRIDE;
   virtual bool ReceivedExperiment(Experiments* experiments) OVERRIDE;
   virtual bool HasUnsyncedItems() OVERRIDE;
   virtual SyncEncryptionHandler* GetEncryptionHandler() OVERRIDE;
+  virtual ScopedVector<syncer::ProtocolEvent>
+      GetBufferedProtocolEvents() OVERRIDE;
 
   // SyncEncryptionHandler::Observer implementation.
   virtual void OnPassphraseRequired(
@@ -311,6 +315,9 @@ class SYNC_EXPORT_PRIVATE SyncManagerImpl :
   // This state changes when entering or exiting a configuration cycle.
   scoped_ptr<ModelTypeRegistry> model_type_registry_;
 
+  // The main interface for non-blocking sync types.
+  scoped_ptr<SyncCore> sync_core_;
+
   // A container of various bits of information used by the SyncScheduler to
   // create SyncSessions.  Must outlive the SyncScheduler.
   scoped_ptr<sessions::SyncSessionContext> session_context_;
@@ -354,6 +361,7 @@ class SYNC_EXPORT_PRIVATE SyncManagerImpl :
   // This is for keeping track of client events to send to the server.
   DebugInfoEventListener debug_info_event_listener_;
 
+  ProtocolEventBuffer protocol_event_buffer_;
   TrafficRecorder traffic_recorder_;
 
   Encryptor* encryptor_;

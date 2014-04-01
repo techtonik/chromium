@@ -32,6 +32,7 @@
 #include "content/browser/android/in_process/synchronous_compositor_impl.h"
 #include "content/browser/android/overscroll_glow.h"
 #include "content/browser/devtools/render_view_devtools_agent_host.h"
+#include "content/browser/gpu/compositor_util.h"
 #include "content/browser/gpu/gpu_data_manager_impl.h"
 #include "content/browser/gpu/gpu_process_host_ui_shim.h"
 #include "content/browser/gpu/gpu_surface_tracker.h"
@@ -152,8 +153,7 @@ RenderWidgetHostViewAndroid::RenderWidgetHostViewAndroid(
                                         widget_host->GetProcess()->GetID(),
                                         widget_host->GetRoutingID()) != NULL),
       frame_evictor_(new DelegatedFrameEvictor(this)),
-      using_delegated_renderer_(CommandLine::ForCurrentProcess()->HasSwitch(
-                                    switches::kEnableDelegatedRenderer)),
+      using_delegated_renderer_(IsDelegatedRendererEnabled()),
       locks_on_frame_count_(0),
       root_window_destroyed_(false) {
   if (!using_delegated_renderer_) {
@@ -417,6 +417,7 @@ void RenderWidgetHostViewAndroid::ReleaseLocksOnSurface() {
   while (locks_on_frame_count_ > 0) {
     UnlockCompositingSurface();
   }
+  RunAckCallbacks();
 }
 
 gfx::Rect RenderWidgetHostViewAndroid::GetViewBounds() const {
@@ -728,6 +729,7 @@ void RenderWidgetHostViewAndroid::OnAcceleratedCompositingStateChange() {
 
 void RenderWidgetHostViewAndroid::SendDelegatedFrameAck(
     uint32 output_surface_id) {
+  DCHECK(host_);
   cc::CompositorFrameAck ack;
   if (resource_collection_.get())
     resource_collection_->TakeUnusedResourcesForChildCompositor(&ack.resources);
@@ -1332,8 +1334,6 @@ void RenderWidgetHostViewAndroid::DidStopFlinging() {
 
 void RenderWidgetHostViewAndroid::SetContentViewCore(
     ContentViewCoreImpl* content_view_core) {
-  RunAckCallbacks();
-
   RemoveLayers();
   // TODO: crbug.com/324341
   // WindowAndroid and Compositor should outlive all WebContents.
@@ -1389,7 +1389,7 @@ void RenderWidgetHostViewAndroid::OnLostResources() {
   if (delegated_renderer_layer_.get())
     DestroyDelegatedContent();
   texture_id_in_layer_ = 0;
-  RunAckCallbacks();
+  DCHECK(ack_callbacks_.empty());
 }
 
 // static

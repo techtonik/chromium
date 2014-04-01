@@ -27,7 +27,6 @@
 #include "ui/views/drag_utils.h"
 #include "ui/views/ime/input_method_bridge.h"
 #include "ui/views/views_delegate.h"
-#include "ui/views/widget/desktop_aura/desktop_native_widget_aura.h"
 #include "ui/views/widget/drop_helper.h"
 #include "ui/views/widget/native_widget_delegate.h"
 #include "ui/views/widget/root_view.h"
@@ -53,6 +52,7 @@
 #endif
 
 #if !defined(OS_CHROMEOS)
+#include "ui/views/widget/desktop_aura/desktop_native_widget_aura.h"
 #include "ui/views/widget/desktop_aura/desktop_window_tree_host.h"
 #endif
 
@@ -811,10 +811,6 @@ void NativeWidgetAura::GetHitTestMask(gfx::Path* mask) const {
   delegate_->GetHitTestMask(mask);
 }
 
-void NativeWidgetAura::DidRecreateLayer(ui::Layer *old_layer,
-                                        ui::Layer *new_layer) {
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // NativeWidgetAura, ui::EventHandler implementation:
 
@@ -852,12 +848,6 @@ void NativeWidgetAura::OnMouseEvent(ui::MouseEvent* event) {
 
 void NativeWidgetAura::OnScrollEvent(ui::ScrollEvent* event) {
   delegate_->OnScrollEvent(event);
-}
-
-void NativeWidgetAura::OnTouchEvent(ui::TouchEvent* event) {
-  DCHECK(window_);
-  DCHECK(window_->IsVisible() || event->IsEndingEvent());
-  delegate_->OnTouchEvent(event);
 }
 
 void NativeWidgetAura::OnGestureEvent(ui::GestureEvent* event) {

@@ -203,8 +203,6 @@ bool GpuCommandBufferStub::OnMessageReceived(const IPC::Message& message) {
                         OnRegisterTransferBuffer);
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_DestroyTransferBuffer,
                         OnDestroyTransferBuffer);
-    IPC_MESSAGE_HANDLER_DELAY_REPLY(GpuCommandBufferMsg_GetTransferBuffer,
-                                    OnGetTransferBuffer);
     IPC_MESSAGE_HANDLER_DELAY_REPLY(GpuCommandBufferMsg_CreateVideoDecoder,
                                     OnCreateVideoDecoder)
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_SetSurfaceVisible,
@@ -686,9 +684,18 @@ void GpuCommandBufferStub::OnRegisterTransferBuffer(
     base::SharedMemoryHandle transfer_buffer,
     uint32 size) {
   TRACE_EVENT0("gpu", "GpuCommandBufferStub::OnRegisterTransferBuffer");
-  base::SharedMemory shared_memory(transfer_buffer, false);
+
+  // Take ownership of the memory and map it into this process.
+  // This validates the size.
+  scoped_ptr<base::SharedMemory> shared_memory(
+      new base::SharedMemory(transfer_buffer, false));
+  if (!shared_memory->Map(size)) {
+    DVLOG(0) << "Failed to map shared memory.";
+    return;
+  }
+
   if (command_buffer_)
-    command_buffer_->RegisterTransferBuffer(id, &shared_memory, size);
+    command_buffer_->RegisterTransferBuffer(id, shared_memory.Pass(), size);
 }
 
 void GpuCommandBufferStub::OnDestroyTransferBuffer(int32 id) {
@@ -696,40 +703,6 @@ void GpuCommandBufferStub::OnDestroyTransferBuffer(int32 id) {
 
   if (command_buffer_)
     command_buffer_->DestroyTransferBuffer(id);
-}
-
-void GpuCommandBufferStub::OnGetTransferBuffer(
-    int32 id,
-    IPC::Message* reply_message) {
-  TRACE_EVENT0("gpu", "GpuCommandBufferStub::OnGetTransferBuffer");
-  if (command_buffer_) {
-    base::SharedMemoryHandle transfer_buffer = base::SharedMemoryHandle();
-    uint32 size = 0;
-
-    scoped_refptr<gpu::Buffer> buffer = command_buffer_->GetTransferBuffer(id);
-    if (buffer && buffer->shared_memory()) {
-#if defined(OS_WIN)
-      transfer_buffer = NULL;
-      BrokerDuplicateHandle(buffer->shared_memory()->handle(),
-                            channel_->renderer_pid(),
-                            &transfer_buffer,
-                            FILE_MAP_READ | FILE_MAP_WRITE,
-                            0);
-      DCHECK(transfer_buffer != NULL);
-#else
-      buffer->shared_memory()->ShareToProcess(channel_->renderer_pid(),
-                                              &transfer_buffer);
-#endif
-      size = buffer->size();
-    }
-
-    GpuCommandBufferMsg_GetTransferBuffer::WriteReplyParams(reply_message,
-                                                            transfer_buffer,
-                                                            size);
-  } else {
-    reply_message->set_reply_error();
-  }
-  Send(reply_message);
 }
 
 void GpuCommandBufferStub::OnCommandProcessed() {
@@ -871,6 +844,15 @@ void GpuCommandBufferStub::OnRegisterGpuMemoryBuffer(
     uint32 height,
     uint32 internalformat) {
   TRACE_EVENT0("gpu", "GpuCommandBufferStub::OnRegisterGpuMemoryBuffer");
+#if defined(OS_ANDROID)
+  // Verify that renderer is not trying to use a surface texture it doesn't own.
+  if (gpu_memory_buffer.type == gfx::SURFACE_TEXTURE_BUFFER &&
+      gpu_memory_buffer.surface_texture_id.secondary_id !=
+          channel()->client_id()) {
+    LOG(ERROR) << "Illegal surface texture ID for renderer.";
+    return;
+  }
+#endif
   if (gpu_control_) {
     gpu_control_->RegisterGpuMemoryBuffer(id,
                                           gpu_memory_buffer,

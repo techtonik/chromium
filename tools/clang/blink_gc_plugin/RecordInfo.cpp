@@ -16,6 +16,8 @@ RecordInfo::RecordInfo(CXXRecordDecl* record, RecordCache* cache)
       bases_(0),
       fields_(0),
       is_stack_allocated_(kNotComputed),
+      is_non_newable_(kNotComputed),
+      is_only_placement_newable_(kNotComputed),
       determined_trace_methods_(false),
       trace_method_(0),
       trace_dispatch_method_(0),
@@ -142,7 +144,7 @@ RecordInfo* RecordCache::Lookup(CXXRecordDecl* record) {
   if (it != cache_.end())
     return &it->second;
   return &cache_.insert(std::make_pair(record, RecordInfo(record, this)))
-      .first->second;
+              .first->second;
 }
 
 bool RecordInfo::IsStackAllocated() {
@@ -168,6 +170,43 @@ bool RecordInfo::IsStackAllocated() {
     }
   }
   return is_stack_allocated_;
+}
+
+bool RecordInfo::IsNonNewable() {
+  if (is_non_newable_ == kNotComputed) {
+    bool deleted = false;
+    bool all_deleted = true;
+    for (CXXRecordDecl::method_iterator it = record_->method_begin();
+         it != record_->method_end();
+         ++it) {
+      if (it->getNameAsString() == kNewOperatorName) {
+        deleted = it->isDeleted();
+        all_deleted = all_deleted && deleted;
+      }
+    }
+    is_non_newable_ = (deleted && all_deleted) ? kTrue : kFalse;
+  }
+  return is_non_newable_;
+}
+
+bool RecordInfo::IsOnlyPlacementNewable() {
+  if (is_only_placement_newable_ == kNotComputed) {
+    bool placement = false;
+    bool new_deleted = false;
+    for (CXXRecordDecl::method_iterator it = record_->method_begin();
+         it != record_->method_end();
+         ++it) {
+      if (it->getNameAsString() == kNewOperatorName) {
+        if (it->getNumParams() == 1) {
+          new_deleted = it->isDeleted();
+        } else if (it->getNumParams() == 2) {
+          placement = !it->isDeleted();
+        }
+      }
+    }
+    is_only_placement_newable_ = (placement && new_deleted) ? kTrue : kFalse;
+  }
+  return is_only_placement_newable_;
 }
 
 // An object requires a tracing method if it has any fields that need tracing.
@@ -281,8 +320,8 @@ RecordInfo::Fields* RecordInfo::CollectFields() {
     if (Config::IsIgnoreAnnotated(field))
       continue;
     if (Edge* edge = CreateEdge(field->getType().getTypePtrOrNull())) {
-      fields->insert(std::make_pair(field, FieldPoint(field, edge)));
       fields_status = fields_status.LUB(edge->NeedsTracing(Edge::kRecursive));
+      fields->insert(std::make_pair(field, FieldPoint(field, edge)));
     }
   }
   fields_need_tracing_ = fields_status;
@@ -308,7 +347,7 @@ void RecordInfo::DetermineTracingMethods() {
         trace = *it;
       }
     } else if (it->getNameAsString() == kFinalizeName) {
-        finalize_dispatch_method_ = *it;
+      finalize_dispatch_method_ = *it;
     }
   }
   if (traceAfterDispatch) {
@@ -330,7 +369,7 @@ void RecordInfo::DetermineTracingMethods() {
       trace_dispatch_method_ = dispatch;
     }
     if (CXXMethodDecl* dispatch =
-        it->second.info()->GetFinalizeDispatchMethod()) {
+            it->second.info()->GetFinalizeDispatchMethod()) {
       assert(!finalize_dispatch_method_ &&
              "Multiple finalize dispatching methods");
       finalize_dispatch_method_ = dispatch;

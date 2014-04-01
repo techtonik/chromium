@@ -3,6 +3,9 @@
 # found in the LICENSE file.
 
 {
+  'variables': {
+    'chromium_code': 1,
+  },
   'targets': [
     {
       'target_name': 'cast_test_utility',
@@ -36,6 +39,8 @@
         'standalone_cast_environment.h',
         'video_utility.cc',
         'video_utility.h',
+        'udp_proxy.cc',
+        'udp_proxy.h',
       ], # source
     },
     {
@@ -66,6 +71,20 @@
       ],
       'sources': [
         '<(DEPTH)/media/cast/test/utility/generate_timecode_audio.cc',
+      ],
+    },
+    {
+      'target_name': 'udp_proxy',
+      'type': 'executable',
+      'include_dirs': [
+        '<(DEPTH)/',
+      ],
+      'dependencies': [
+        '<(DEPTH)/media/media.gyp:media',
+        '<(DEPTH)/media/cast/test/utility/utility.gyp:cast_test_utility',
+      ],
+      'sources': [
+        '<(DEPTH)/media/cast/test/utility/udp_proxy_main.cc',
       ],
     },
   ],

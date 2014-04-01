@@ -63,14 +63,6 @@ TEST_F(DownloadOperationTest,
   // attribute is notified.
   EXPECT_EQ(1U, observer()->get_changed_paths().size());
   EXPECT_EQ(1U, observer()->get_changed_paths().count(file_in_root.DirName()));
-
-  // Verify that readable permission is set.
-  int permission = 0;
-  EXPECT_TRUE(base::GetPosixFilePermissions(file_path, &permission));
-  EXPECT_EQ(base::FILE_PERMISSION_READ_BY_USER |
-            base::FILE_PERMISSION_WRITE_BY_USER |
-            base::FILE_PERMISSION_READ_BY_GROUP |
-            base::FILE_PERMISSION_READ_BY_OTHERS, permission);
 }
 
 TEST_F(DownloadOperationTest,
@@ -298,27 +290,24 @@ TEST_F(DownloadOperationTest,
     FileError initialized_error = FILE_ERROR_FAILED;
     scoped_ptr<ResourceEntry> entry, entry_dontcare;
     base::FilePath local_path, local_path_dontcare;
-    base::Closure cancel_download;
     google_apis::test_util::TestGetContentCallback get_content_callback;
-
     FileError completion_error = FILE_ERROR_FAILED;
-
-    operation_->EnsureFileDownloadedByPath(
+    base::Closure cancel_download = operation_->EnsureFileDownloadedByPath(
         file_in_root,
         ClientContext(USER_INITIATED),
         google_apis::test_util::CreateCopyResultCallback(
-            &initialized_error, &entry, &local_path, &cancel_download),
+            &initialized_error, &local_path, &entry),
         get_content_callback.callback(),
         google_apis::test_util::CreateCopyResultCallback(
             &completion_error, &local_path_dontcare, &entry_dontcare));
     test_util::RunBlockingPoolTask();
 
     // For the first time, file is downloaded from the remote server.
-    // In this case, |local_path| is empty while |cancel_download| is not.
+    // In this case, |local_path| is empty.
     EXPECT_EQ(FILE_ERROR_OK, initialized_error);
     ASSERT_TRUE(entry);
     ASSERT_TRUE(local_path.empty());
-    EXPECT_TRUE(!cancel_download.is_null());
+    EXPECT_FALSE(cancel_download.is_null());
     // Content is available through the second callback argument.
     EXPECT_EQ(static_cast<size_t>(entry->file_info().size()),
               get_content_callback.GetConcatenatedData().size());
@@ -335,27 +324,24 @@ TEST_F(DownloadOperationTest,
     FileError initialized_error = FILE_ERROR_FAILED;
     scoped_ptr<ResourceEntry> entry, entry_dontcare;
     base::FilePath local_path, local_path_dontcare;
-    base::Closure cancel_download;
     google_apis::test_util::TestGetContentCallback get_content_callback;
-
     FileError completion_error = FILE_ERROR_FAILED;
-
-    operation_->EnsureFileDownloadedByPath(
+    base::Closure cancel_download = operation_->EnsureFileDownloadedByPath(
         file_in_root,
         ClientContext(USER_INITIATED),
         google_apis::test_util::CreateCopyResultCallback(
-            &initialized_error, &entry, &local_path, &cancel_download),
+            &initialized_error, &local_path, &entry),
         get_content_callback.callback(),
         google_apis::test_util::CreateCopyResultCallback(
             &completion_error, &local_path_dontcare, &entry_dontcare));
     test_util::RunBlockingPoolTask();
 
     // Try second download. In this case, the file should be cached, so
-    // |local_path| should not be empty while |cancel_download| is empty.
+    // |local_path| should not be empty.
     EXPECT_EQ(FILE_ERROR_OK, initialized_error);
     ASSERT_TRUE(entry);
     ASSERT_TRUE(!local_path.empty());
-    EXPECT_TRUE(cancel_download.is_null());
+    EXPECT_FALSE(cancel_download.is_null());
     // The content is available from the cache file.
     EXPECT_TRUE(get_content_callback.data().empty());
     int64 local_file_size = 0;
@@ -439,15 +425,13 @@ TEST_F(DownloadOperationTest, EnsureFileDownloadedByPath_DirtyCache) {
   FileError init_error;
   base::FilePath init_path;
   scoped_ptr<ResourceEntry> init_entry;
-  base::Closure cancel_callback;
-
   base::FilePath file_path;
   scoped_ptr<ResourceEntry> entry;
-  operation_->EnsureFileDownloadedByPath(
+  base::Closure cancel_callback = operation_->EnsureFileDownloadedByPath(
       file_in_root,
       ClientContext(USER_INITIATED),
       google_apis::test_util::CreateCopyResultCallback(
-          &init_error, &init_entry, &init_path, &cancel_callback),
+          &init_error, &init_path, &init_entry),
       google_apis::GetContentCallback(),
       google_apis::test_util::CreateCopyResultCallback(
           &error, &file_path, &entry));
@@ -500,6 +484,31 @@ TEST_F(DownloadOperationTest, EnsureFileDownloadedByPath_LocallyCreatedFile) {
   EXPECT_EQ(static_cast<int64>(0), cache_file_size);
   ASSERT_TRUE(entry);
   EXPECT_EQ(cache_file_size, entry->file_info().size());
+}
+
+TEST_F(DownloadOperationTest, CancelBeforeDownloadStarts) {
+  base::FilePath file_in_root(FILE_PATH_LITERAL("drive/root/File 1.txt"));
+  ResourceEntry src_entry;
+  ASSERT_EQ(FILE_ERROR_OK, GetLocalResourceEntry(file_in_root, &src_entry));
+
+  // Start operation.
+  FileError error = FILE_ERROR_OK;
+  base::FilePath file_path;
+  scoped_ptr<ResourceEntry> entry;
+  base::Closure cancel_closure = operation_->EnsureFileDownloadedByLocalId(
+      GetLocalId(file_in_root),
+      ClientContext(USER_INITIATED),
+      GetFileContentInitializedCallback(),
+      google_apis::GetContentCallback(),
+      google_apis::test_util::CreateCopyResultCallback(
+          &error, &file_path, &entry));
+
+  // Cancel immediately.
+  ASSERT_FALSE(cancel_closure.is_null());
+  cancel_closure.Run();
+  test_util::RunBlockingPoolTask();
+
+  EXPECT_EQ(FILE_ERROR_ABORT, error);
 }
 
 }  // namespace file_system

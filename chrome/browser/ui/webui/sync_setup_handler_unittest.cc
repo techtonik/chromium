@@ -12,7 +12,6 @@
 #include "base/prefs/pref_service.h"
 #include "base/stl_util.h"
 #include "base/values.h"
-#include "chrome/browser/signin/fake_auth_status_provider.h"
 #include "chrome/browser/signin/fake_signin_manager.h"
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
 #include "chrome/browser/signin/signin_manager.h"
@@ -26,6 +25,7 @@
 #include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_profile.h"
+#include "components/signin/core/browser/fake_auth_status_provider.h"
 #include "components/signin/core/browser/profile_oauth2_token_service.h"
 #include "components/sync_driver/sync_prefs.h"
 #include "content/public/browser/web_ui.h"
@@ -280,13 +280,19 @@ class SyncSetupHandlerTest : public testing::Test {
   SyncSetupHandlerTest() : error_(GoogleServiceAuthError::NONE) {}
   virtual void SetUp() OVERRIDE {
     error_ = GoogleServiceAuthError::AuthErrorNone();
-    profile_.reset(ProfileSyncServiceMock::MakeSignedInTestingProfile());
 
+    TestingProfile::Builder builder;
+    builder.AddTestingFactory(SigninManagerFactory::GetInstance(),
+                              FakeSigninManagerBase::Build);
+    profile_ = builder.Build();
+
+    // Sign in the user.
     mock_signin_ = static_cast<SigninManagerBase*>(
-        SigninManagerFactory::GetInstance()->SetTestingFactoryAndUse(
-            profile_.get(), FakeSigninManagerBase::Build));
-    profile_->GetPrefs()->SetString(
-        prefs::kGoogleServicesUsername, GetTestUser());
+        SigninManagerFactory::GetForProfile(profile_.get()));
+    mock_signin_->SetAuthenticatedUsername(GetTestUser());
+    profile_->GetPrefs()->SetString(prefs::kGoogleServicesUsername,
+                                    GetTestUser());
+
     mock_pss_ = static_cast<ProfileSyncServiceMock*>(
         ProfileSyncServiceFactory::GetInstance()->SetTestingFactoryAndUse(
             profile_.get(),

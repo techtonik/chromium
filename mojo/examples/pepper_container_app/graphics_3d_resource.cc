@@ -7,7 +7,7 @@
 #include "base/logging.h"
 #include "mojo/examples/pepper_container_app/mojo_ppapi_globals.h"
 #include "mojo/examples/pepper_container_app/plugin_instance.h"
-#include "mojo/public/gles2/gles2.h"
+#include "mojo/public/c/gles2/gles2.h"
 #include "ppapi/c/pp_errors.h"
 
 namespace mojo {
@@ -91,19 +91,14 @@ gpu::CommandBuffer::State Graphics3DResource::GetState() {
   return GetErrorState();
 }
 
-int32_t Graphics3DResource::CreateTransferBuffer(uint32_t size) {
+scoped_refptr<gpu::Buffer> Graphics3DResource::CreateTransferBuffer(
+    uint32_t size,
+    int32* id) {
   NOTIMPLEMENTED();
-  return PP_FALSE;
+  return NULL;
 }
 
 PP_Bool Graphics3DResource::DestroyTransferBuffer(int32_t id) {
-  NOTIMPLEMENTED();
-  return PP_FALSE;
-}
-
-PP_Bool Graphics3DResource::GetTransferBuffer(int32_t id,
-                                              int* shm_handle,
-                                              uint32_t* shm_size) {
   NOTIMPLEMENTED();
   return PP_FALSE;
 }

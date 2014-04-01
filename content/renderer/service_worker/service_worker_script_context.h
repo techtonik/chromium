@@ -11,6 +11,7 @@
 #include "base/strings/string16.h"
 
 #include "content/common/service_worker/service_worker_types.h"
+#include "third_party/WebKit/public/platform/WebServiceWorkerEventResult.h"
 
 namespace blink {
 class WebServiceWorkerContextProxy;
@@ -37,7 +38,10 @@ class ServiceWorkerScriptContext {
 
   void OnMessageReceived(int request_id, const IPC::Message& message);
 
-  void DidHandleInstallEvent(int request_id);
+  void DidHandleActivateEvent(int request_id,
+                              blink::WebServiceWorkerEventResult);
+  void DidHandleInstallEvent(int request_id,
+                             blink::WebServiceWorkerEventResult result);
   void DidHandleFetchEvent(int request_id,
                            ServiceWorkerFetchEventResult result,
                            const ServiceWorkerResponse& response);
@@ -46,7 +50,8 @@ class ServiceWorkerScriptContext {
   // Send message back to the browser.
   void Send(int request_id, const IPC::Message& message);
 
-  void OnInstallEvent(int active_version_embedded_worker_id);
+  void OnActivateEvent();
+  void OnInstallEvent(int active_version_id);
   void OnFetchEvent(const ServiceWorkerFetchRequest& request);
   void OnPostMessage(const base::string16& message,
                      const std::vector<int>& sent_message_port_ids,

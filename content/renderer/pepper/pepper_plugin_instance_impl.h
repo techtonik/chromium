@@ -398,6 +398,9 @@ class CONTENT_EXPORT PepperPluginInstanceImpl
                                           PP_Bool final_result) OVERRIDE;
   virtual void SelectedFindResultChanged(PP_Instance instance,
                                          int32_t index) OVERRIDE;
+  virtual void SetTickmarks(PP_Instance instance,
+                            const PP_Rect* tickmarks,
+                            uint32_t count) OVERRIDE;
   virtual PP_Bool IsFullscreen(PP_Instance instance) OVERRIDE;
   virtual PP_Bool SetFullscreen(PP_Instance instance,
                                 PP_Bool fullscreen) OVERRIDE;
@@ -582,6 +585,9 @@ class CONTENT_EXPORT PepperPluginInstanceImpl
   bool LoadSelectionInterface();
   bool LoadTextInputInterface();
   bool LoadZoomInterface();
+
+  // Update any transforms that should be applied to the texture layer.
+  void UpdateLayerTransform();
 
   // Determines if we think the plugin has focus, both content area and webkit
   // (see has_webkit_focus_ below).

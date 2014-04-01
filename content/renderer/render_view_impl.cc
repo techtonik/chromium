@@ -81,7 +81,6 @@
 #include "content/renderer/geolocation_dispatcher.h"
 #include "content/renderer/gpu/render_widget_compositor.h"
 #include "content/renderer/idle_user_detector.h"
-#include "content/renderer/image_loading_helper.h"
 #include "content/renderer/ime_event_guard.h"
 #include "content/renderer/input/input_handler_manager.h"
 #include "content/renderer/input_tag_speech_dispatcher.h"
@@ -236,6 +235,10 @@
 
 #if defined(ENABLE_WEBRTC)
 #include "content/renderer/media/rtc_peer_connection_handler.h"
+#endif
+
+#if defined(USE_MOJO)
+#include "content/renderer/web_ui_mojo.h"
 #endif
 
 using blink::WebAXObject;
@@ -604,14 +607,14 @@ WebDragData DropDataToWebDragData(const DropData& drop_data) {
     item_list.push_back(item);
   }
 
-  for (std::vector<DropData::FileInfo>::const_iterator it =
+  for (std::vector<ui::FileInfo>::const_iterator it =
            drop_data.filenames.begin();
        it != drop_data.filenames.end();
        ++it) {
     WebDragData::Item item;
     item.storageType = WebDragData::Item::StorageTypeFilename;
-    item.filenameData = it->path;
-    item.displayNameData = it->display_name;
+    item.filenameData = it->path.AsUTF16Unsafe();
+    item.displayNameData = it->display_name.AsUTF16Unsafe();
     item_list.push_back(item);
   }
 
@@ -812,7 +815,6 @@ void RenderViewImpl::Initialize(RenderViewImplParams* params) {
     webview()->devToolsAgent()->setLayerTreeId(rwc->GetLayerTreeId());
   }
   mouse_lock_dispatcher_ = new RenderViewMouseLockDispatcher(this);
-  new ImageLoadingHelper(this);
 
   // Create renderer_accessibility_ if needed.
   OnSetAccessibilityMode(params->accessibility_mode);
@@ -925,7 +927,7 @@ RenderViewImpl* RenderViewImpl::Create(
     bool hidden,
     int32 next_page_id,
     const blink::WebScreenInfo& screen_info,
-    unsigned int accessibility_mode) {
+    AccessibilityMode accessibility_mode) {
   DCHECK(routing_id != MSG_ROUTING_NONE);
   RenderViewImplParams params(opener_id,
                               renderer_prefs,
@@ -1077,12 +1079,7 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
                         OnSetEditCommandsForNextKeyEvent)
     IPC_MESSAGE_HANDLER(FrameMsg_Navigate, OnNavigate)
     IPC_MESSAGE_HANDLER(ViewMsg_Stop, OnStop)
-    IPC_MESSAGE_HANDLER(ViewMsg_ReloadFrame, OnReloadFrame)
     IPC_MESSAGE_HANDLER(ViewMsg_SetName, OnSetName)
-    IPC_MESSAGE_HANDLER(ViewMsg_SetCompositionFromExistingText,
-                        OnSetCompositionFromExistingText)
-    IPC_MESSAGE_HANDLER(ViewMsg_ExtendSelectionAndDelete,
-                        OnExtendSelectionAndDelete)
     IPC_MESSAGE_HANDLER(ViewMsg_CopyImageAt, OnCopyImageAt)
     IPC_MESSAGE_HANDLER(ViewMsg_Find, OnFind)
     IPC_MESSAGE_HANDLER(ViewMsg_StopFinding, OnStopFinding)
@@ -1111,7 +1108,6 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ViewMsg_RunFileChooserResponse, OnFileChooserResponse)
     IPC_MESSAGE_HANDLER(ViewMsg_SuppressDialogsUntilSwapOut,
                         OnSuppressDialogsUntilSwapOut)
-    IPC_MESSAGE_HANDLER(ViewMsg_SwapOut, OnSwapOut)
     IPC_MESSAGE_HANDLER(ViewMsg_ClosePage, OnClosePage)
     IPC_MESSAGE_HANDLER(ViewMsg_ThemeChanged, OnThemeChanged)
     IPC_MESSAGE_HANDLER(ViewMsg_MoveOrResizeStarted, OnMoveOrResizeStarted)
@@ -1227,17 +1223,6 @@ void RenderViewImpl::OnStop() {
   main_render_frame_->OnStop();
 }
 
-// Reload current focused frame.
-// E.g. called by right-clicking on the frame and picking "reload this frame".
-void RenderViewImpl::OnReloadFrame() {
-  if (webview() && webview()->focusedFrame()) {
-    // We always obey the cache (ignore_cache=false) here.
-    // TODO(evanm): perhaps we could allow shift-clicking the menu item to do
-    // a cache-ignoring reload of the frame.
-    webview()->focusedFrame()->reload(false);
-  }
-}
-
 void RenderViewImpl::OnCopyImageAt(int x, int y) {
   webview()->copyImageAt(WebPoint(x, y));
 }
@@ -1317,22 +1302,6 @@ void RenderViewImpl::OnSetName(const std::string& name) {
     return;
 
   webview()->mainFrame()->setName(WebString::fromUTF8(name));
-}
-
-void RenderViewImpl::OnSetCompositionFromExistingText(
-    int start, int end,
-    const std::vector<blink::WebCompositionUnderline>& underlines) {
-  if (!ShouldHandleImeEvent())
-    return;
-  ImeEventGuard guard(this);
-  webview()->setCompositionFromExistingText(start, end, underlines);
-}
-
-void RenderViewImpl::OnExtendSelectionAndDelete(int before, int after) {
-  if (!ShouldHandleImeEvent())
-    return;
-  ImeEventGuard guard(this);
-  webview()->extendSelectionAndDelete(before, after);
 }
 
 void RenderViewImpl::OnSetHistoryLengthAndPrune(int history_length,
@@ -1544,7 +1513,7 @@ WebView* RenderViewImpl::createView(
       RenderFrameImpl::FromWebFrame(creator)->GetRoutingID();
   params.opener_url = creator->document().url();
   params.opener_top_level_frame_url = creator->top()->document().url();
-  GURL security_url(creator->document().securityOrigin().toString().utf8());
+  GURL security_url(creator->document().securityOrigin().toString());
   if (!security_url.is_valid())
     security_url = GURL();
   params.opener_security_origin = security_url;
@@ -1722,14 +1691,6 @@ bool RenderViewImpl::enumerateChosenDirectory(
       routing_id_,
       id,
       base::FilePath::FromUTF16Unsafe(path)));
-}
-
-void RenderViewImpl::didStartLoading(bool to_different_document) {
-  main_render_frame_->didStartLoading(to_different_document);
-}
-
-void RenderViewImpl::didStopLoading() {
-  main_render_frame_->didStopLoading();
 }
 
 void RenderViewImpl::FrameDidStartLoading(WebFrame* frame) {
@@ -3521,7 +3482,12 @@ void RenderViewImpl::OnPostMessageEvent(
 void RenderViewImpl::OnAllowBindings(int enabled_bindings_flags) {
   if ((enabled_bindings_flags & BINDINGS_POLICY_WEB_UI) &&
       !(enabled_bindings_ & BINDINGS_POLICY_WEB_UI)) {
+    // WebUIExtensionData deletes itself when we're destroyed.
     new WebUIExtensionData(this);
+#if defined(USE_MOJO)
+    // WebUIMojo deletes itself when we're destroyed.
+    new WebUIMojo(this);
+#endif
   }
 
   enabled_bindings_ |= enabled_bindings_flags;
@@ -3803,45 +3769,6 @@ void RenderViewImpl::OnSuppressDialogsUntilSwapOut() {
   suppress_dialogs_until_swap_out_ = true;
 }
 
-void RenderViewImpl::OnSwapOut() {
-  // Only run unload if we're not swapped out yet, but send the ack either way.
-  if (!is_swapped_out_) {
-    // Swap this RenderView out so the tab can navigate to a page rendered by a
-    // different process.  This involves running the unload handler and clearing
-    // the page.  Once WasSwappedOut is called, we also allow this process to
-    // exit if there are no other active RenderViews in it.
-
-    // Send an UpdateState message before we get swapped out.
-    SyncNavigationState();
-
-    // Synchronously run the unload handler before sending the ACK.
-    webview()->dispatchUnloadEvent();
-
-    // Swap out and stop sending any IPC messages that are not ACKs.
-    SetSwappedOut(true);
-
-    // Now that we're swapped out and filtering IPC messages, stop loading to
-    // ensure that no other in-progress navigation continues.  We do this here
-    // to avoid sending a DidStopLoading message to the browser process.
-    OnStop();
-
-    // Replace the page with a blank dummy URL. The unload handler will not be
-    // run a second time, thanks to a check in FrameLoader::stopLoading.
-    // TODO(creis): Need to add a better way to do this that avoids running the
-    // beforeunload handler. For now, we just run it a second time silently.
-    NavigateToSwappedOutURL(webview()->mainFrame());
-
-    // Let WebKit know that this view is hidden so it can drop resources and
-    // stop compositing.
-    webview()->setVisibilityState(blink::WebPageVisibilityStateHidden, false);
-  }
-
-  // It is now safe to show modal dialogs again.
-  suppress_dialogs_until_swap_out_ = false;
-
-  Send(new ViewHostMsg_SwapOut_ACK(routing_id_));
-}
-
 void RenderViewImpl::NavigateToSwappedOutURL(blink::WebFrame* frame) {
   // We use loadRequest instead of loadHTMLString because the former commits
   // synchronously.  Otherwise a new navigation can interrupt the navigation
@@ -4018,7 +3945,7 @@ void RenderViewImpl::OnSetBackground(const SkBitmap& background) {
   SetBackground(background);
 }
 
-void RenderViewImpl::OnSetAccessibilityMode(unsigned int new_mode) {
+void RenderViewImpl::OnSetAccessibilityMode(AccessibilityMode new_mode) {
   if (accessibility_mode_ == new_mode)
     return;
   accessibility_mode_ = new_mode;
@@ -4029,7 +3956,7 @@ void RenderViewImpl::OnSetAccessibilityMode(unsigned int new_mode) {
   if (accessibility_mode_ == AccessibilityModeOff)
     return;
 
-  if (accessibility_mode_ & AccessibilityModeFlagPlatformFullTree)
+  if (accessibility_mode_ & AccessibilityModeFlagFullTree)
     renderer_accessibility_ = new RendererAccessibilityComplete(this);
 #if !defined(OS_ANDROID)
   else

@@ -12,6 +12,7 @@
 #include "media/base/video_frame.h"
 #include "media/base/video_util.h"
 #include "media/cast/cast_defines.h"
+#include "media/cast/logging/logging_defines.h"
 #include "media/cast/transport/cast_transport_config.h"
 #include "media/video/video_encode_accelerator.h"
 
@@ -22,15 +23,15 @@ class LocalVideoEncodeAcceleratorClient;
 }  // namespace media
 
 namespace {
-static const int kOutputBufferCount = 3;
+static const size_t kOutputBufferCount = 3;
 
-void LogFrameEncodedEvent(media::cast::CastEnvironment* const cast_environment,
-                          const base::TimeTicks& capture_time) {
+void LogFrameEncodedEvent(
+    const scoped_refptr<media::cast::CastEnvironment>& cast_environment,
+    base::TimeTicks event_time,
+    media::cast::RtpTimestamp rtp_timestamp,
+    uint32 frame_id) {
   cast_environment->Logging()->InsertFrameEvent(
-      cast_environment->Clock()->NowTicks(),
-      media::cast::kVideoFrameEncoded,
-      media::cast::GetVideoRtpTimestamp(capture_time),
-      media::cast::kFrameIdUnknown);
+      event_time, media::cast::kVideoFrameEncoded, rtp_timestamp, frame_id);
 }
 
 // Proxy this call to ExternalVideoEncoder on the cast main thread.
@@ -180,7 +181,7 @@ class LocalVideoEncodeAcceleratorClient
     DCHECK(encoder_task_runner_->RunsTasksOnCurrentThread());
     DCHECK(video_encode_accelerator_);
 
-    for (int j = 0; j < kOutputBufferCount; ++j) {
+    for (size_t j = 0; j < kOutputBufferCount; ++j) {
       create_video_encode_memory_cb_.Run(
           output_buffer_size,
           base::Bind(&LocalVideoEncodeAcceleratorClient::OnCreateSharedMemory,
@@ -237,9 +238,11 @@ class LocalVideoEncodeAcceleratorClient
     cast_environment_->PostTask(
         CastEnvironment::MAIN,
         FROM_HERE,
-        base::Bind(LogFrameEncodedEvent,
+        base::Bind(&LogFrameEncodedEvent,
                    cast_environment_,
-                   encoded_frame_data_storage_.front().capture_time));
+                   cast_environment_->Clock()->NowTicks(),
+                   encoded_frame->rtp_timestamp,
+                   encoded_frame->frame_id));
 
     cast_environment_->PostTask(
         CastEnvironment::MAIN,

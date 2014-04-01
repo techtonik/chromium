@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <stdint.h>
+
 #include <vector>
 
 #include "base/bind.h"
@@ -25,7 +27,7 @@ namespace media {
 namespace cast {
 
 namespace {
-static const int64 kStartMillisecond = GG_INT64_C(12345678900000);
+static const int64 kStartMillisecond = INT64_C(12345678900000);
 static const uint8 kPixelValue = 123;
 static const int kWidth = 320;
 static const int kHeight = 240;
@@ -101,21 +103,17 @@ class VideoSenderTest : public ::testing::Test {
     testing_clock_->Advance(
         base::TimeDelta::FromMilliseconds(kStartMillisecond));
     task_runner_ = new test::FakeSingleThreadTaskRunner(testing_clock_);
-    CastLoggingConfig logging_config =
-        GetLoggingConfigWithRawEventsAndStatsEnabled();
     cast_environment_ =
         new CastEnvironment(scoped_ptr<base::TickClock>(testing_clock_).Pass(),
                             task_runner_,
                             task_runner_,
-                            task_runner_,
-                            logging_config);
+                            task_runner_);
     transport::CastTransportVideoConfig transport_config;
     net::IPEndPoint dummy_endpoint;
     transport_sender_.reset(new transport::CastTransportSenderImpl(
         NULL,
         testing_clock_,
         dummy_endpoint,
-        logging_config,
         base::Bind(&UpdateCastTransportStatus),
         transport::BulkRawEventsCallback(),
         base::TimeDelta(),

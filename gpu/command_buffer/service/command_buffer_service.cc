@@ -88,10 +88,12 @@ void CommandBufferService::Flush(int32 put_offset) {
 void CommandBufferService::SetGetBuffer(int32 transfer_buffer_id) {
   DCHECK_EQ(-1, ring_buffer_id_);
   DCHECK_EQ(put_offset_, get_offset_);  // Only if it's empty.
+  // If the buffer is invalid we handle it gracefully.
+  // This means ring_buffer_ can be NULL.
   ring_buffer_ = GetTransferBuffer(transfer_buffer_id);
-  DCHECK(ring_buffer_);
   ring_buffer_id_ = transfer_buffer_id;
-  num_entries_ = ring_buffer_->size() / sizeof(CommandBufferEntry);
+  int32 size = ring_buffer_ ? ring_buffer_->size() : 0;
+  num_entries_ = size / sizeof(CommandBufferEntry);
   put_offset_ = 0;
   SetGetOffset(0);
   if (!get_buffer_change_callback_.is_null()) {
@@ -123,14 +125,14 @@ scoped_refptr<Buffer> CommandBufferService::CreateTransferBuffer(size_t size,
                                                                  int32* id) {
   *id = -1;
 
-  SharedMemory buffer;
-  if (!buffer.CreateAnonymous(size))
+  scoped_ptr<SharedMemory> shared_memory(new SharedMemory());
+  if (!shared_memory->CreateAndMapAnonymous(size))
     return NULL;
 
   static int32 next_id = 1;
   *id = next_id++;
 
-  if (!RegisterTransferBuffer(*id, &buffer, size)) {
+  if (!RegisterTransferBuffer(*id, shared_memory.Pass(), size)) {
     *id = -1;
     return NULL;
   }
@@ -155,11 +157,10 @@ scoped_refptr<Buffer> CommandBufferService::GetTransferBuffer(int32 id) {
 
 bool CommandBufferService::RegisterTransferBuffer(
     int32 id,
-    base::SharedMemory* shared_memory,
+    scoped_ptr<base::SharedMemory> shared_memory,
     size_t size) {
-  return transfer_buffer_manager_->RegisterTransferBuffer(id,
-                                                          shared_memory,
-                                                          size);
+  return transfer_buffer_manager_->RegisterTransferBuffer(
+      id, shared_memory.Pass(), size);
 }
 
 void CommandBufferService::SetToken(int32 token) {

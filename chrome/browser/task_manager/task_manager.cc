@@ -20,9 +20,10 @@
 #include "chrome/browser/task_manager/background_information.h"
 #include "chrome/browser/task_manager/browser_process_resource_provider.h"
 #include "chrome/browser/task_manager/child_process_resource_provider.h"
-#include "chrome/browser/task_manager/extension_process_resource_provider.h"
+#include "chrome/browser/task_manager/extension_information.h"
 #include "chrome/browser/task_manager/guest_information.h"
 #include "chrome/browser/task_manager/panel_information.h"
+#include "chrome/browser/task_manager/printing_information.h"
 #include "chrome/browser/task_manager/resource_provider.h"
 #include "chrome/browser/task_manager/tab_contents_resource_provider.h"
 #include "chrome/browser/task_manager/web_contents_resource_provider.h"
@@ -257,11 +258,17 @@ TaskManagerModel::TaskManagerModel(TaskManager* task_manager)
   AddResourceProvider(new task_manager::WebContentsResourceProvider(
       task_manager,
       scoped_ptr<WebContentsInformation>(
+          new task_manager::PrintingInformation())));
+  AddResourceProvider(new task_manager::WebContentsResourceProvider(
+      task_manager,
+      scoped_ptr<WebContentsInformation>(
           new task_manager::PanelInformation())));
   AddResourceProvider(
       new task_manager::ChildProcessResourceProvider(task_manager));
-  AddResourceProvider(
-      new task_manager::ExtensionProcessResourceProvider(task_manager));
+  AddResourceProvider(new task_manager::WebContentsResourceProvider(
+      task_manager,
+      scoped_ptr<WebContentsInformation>(
+          new task_manager::ExtensionInformation())));
   AddResourceProvider(new task_manager::WebContentsResourceProvider(
       task_manager,
       scoped_ptr<WebContentsInformation>(
@@ -899,6 +906,10 @@ int TaskManagerModel::CompareValues(int row1, int row2, int col_id) const {
       GetUSERHandles(row2, &current2, &peak2);
       return ValueCompare(current1, current2);
     }
+
+    case IDS_TASK_MANAGER_IDLE_WAKEUPS_COLUMN:
+      return ValueCompare(GetIdleWakeupsPerSecond(row1),
+                          GetIdleWakeupsPerSecond(row2));
 
     case IDS_TASK_MANAGER_WEBCORE_IMAGE_CACHE_COLUMN:
     case IDS_TASK_MANAGER_WEBCORE_SCRIPTS_CACHE_COLUMN:

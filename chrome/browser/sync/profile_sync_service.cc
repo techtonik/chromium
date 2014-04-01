@@ -26,7 +26,6 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/defaults.h"
-#include "chrome/browser/managed_mode/managed_user_signin_manager_wrapper.h"
 #include "chrome/browser/net/chrome_cookie_notification_details.h"
 #include "chrome/browser/prefs/pref_service_syncable.h"
 #include "chrome/browser/profiles/profile.h"
@@ -49,10 +48,11 @@
 #include "chrome/browser/sync/glue/sync_start_util.h"
 #include "chrome/browser/sync/glue/synced_device_tracker.h"
 #include "chrome/browser/sync/glue/typed_url_data_type_controller.h"
+#include "chrome/browser/sync/managed_user_signin_manager_wrapper.h"
 #include "chrome/browser/sync/profile_sync_components_factory_impl.h"
 #include "chrome/browser/sync/sessions2/notification_service_sessions_router.h"
 #include "chrome/browser/sync/sessions2/sessions_sync_manager.h"
-#include "chrome/browser/sync/sync_global_error.h"
+#include "chrome/browser/sync/sync_error_controller.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window.h"
@@ -274,20 +274,18 @@ void ProfileSyncService::Initialize() {
   last_synced_time_ = sync_prefs_.GetLastSyncedTime();
 
 #if defined(OS_CHROMEOS)
-   std::string bootstrap_token = sync_prefs_.GetEncryptionBootstrapToken();
-   if (bootstrap_token.empty()) {
-     sync_prefs_.SetEncryptionBootstrapToken(
-         sync_prefs_.GetSpareBootstrapToken());
-   }
+  std::string bootstrap_token = sync_prefs_.GetEncryptionBootstrapToken();
+  if (bootstrap_token.empty()) {
+    sync_prefs_.SetEncryptionBootstrapToken(
+        sync_prefs_.GetSpareBootstrapToken());
+  }
 #endif
 
 #if !defined(OS_ANDROID)
-   if (!sync_global_error_) {
-     sync_global_error_.reset(new SyncGlobalError(this, signin()));
-     GlobalErrorServiceFactory::GetForProfile(profile_)->AddGlobalError(
-         sync_global_error_.get());
-     AddObserver(sync_global_error_.get());
-   }
+  DCHECK(sync_error_controller_ == NULL)
+      << "Initialize() called more than once.";
+  sync_error_controller_.reset(new SyncErrorController(this));
+  AddObserver(sync_error_controller_.get());
 #endif
 
   startup_controller_.Reset(GetRegisteredDataTypes());
@@ -703,14 +701,12 @@ void ProfileSyncService::OnRefreshTokensLoaded() {
 void ProfileSyncService::Shutdown() {
   UnregisterAuthNotifications();
 
-  if (sync_global_error_) {
-    GlobalErrorServiceFactory::GetForProfile(profile_)->RemoveGlobalError(
-        sync_global_error_.get());
-    RemoveObserver(sync_global_error_.get());
-    sync_global_error_.reset(NULL);
-  }
-
   ShutdownImpl(browser_sync::SyncBackendHost::STOP);
+  if (sync_error_controller_) {
+    // Destroy the SyncErrorController when the service shuts down for good.
+    RemoveObserver(sync_error_controller_.get());
+    sync_error_controller_.reset();
+  }
 
   if (sync_thread_)
     sync_thread_->Stop();
@@ -940,7 +936,7 @@ void ProfileSyncService::OnBackendInitialized(
   debug_info_listener_ = debug_info_listener;
 
   if (protocol_event_observers_.might_have_observers()) {
-    backend_->SetForwardProtocolEvents(true);
+    backend_->RequestBufferedProtocolEventsAndEnableForwarding();
   }
 
   // If we have a cached passphrase use it to decrypt/encrypt data now that the
@@ -2071,17 +2067,15 @@ void ProfileSyncService::AddProtocolEventObserver(
     browser_sync::ProtocolEventObserver* observer) {
   protocol_event_observers_.AddObserver(observer);
   if (backend_) {
-    backend_->SetForwardProtocolEvents(
-        protocol_event_observers_.might_have_observers());
+    backend_->RequestBufferedProtocolEventsAndEnableForwarding();
   }
 }
 
 void ProfileSyncService::RemoveProtocolEventObserver(
     browser_sync::ProtocolEventObserver* observer) {
   protocol_event_observers_.RemoveObserver(observer);
-  if (backend_) {
-    backend_->SetForwardProtocolEvents(
-        protocol_event_observers_.might_have_observers());
+  if (backend_ && !protocol_event_observers_.might_have_observers()) {
+    backend_->DisableProtocolEventForwarding();
   }
 }
 

@@ -21,10 +21,9 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_switches.h"
-#include "content/public/common/service_worker_status_code.h"
+#include "content/public/test/content_browser_test.h"
+#include "content/public/test/content_browser_test_utils.h"
 #include "content/shell/browser/shell.h"
-#include "content/test/content_browser_test.h"
-#include "content/test/content_browser_test_utils.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 
 namespace content {
@@ -233,7 +232,8 @@ class ServiceWorkerVersionBrowserTest : public ServiceWorkerBrowserTest {
     }
   }
 
-  void InstallTestHelper(const std::string& worker_url) {
+  void InstallTestHelper(const std::string& worker_url,
+                         ServiceWorkerStatusCode expected_status) {
     RunOnIOThread(base::Bind(&self::SetUpRegistrationOnIOThread, this,
                              worker_url));
 
@@ -245,7 +245,7 @@ class ServiceWorkerVersionBrowserTest : public ServiceWorkerBrowserTest {
                                        install_run_loop.QuitClosure(),
                                        &status));
     install_run_loop.Run();
-    ASSERT_EQ(SERVICE_WORKER_OK, status);
+    ASSERT_EQ(expected_status, status);
 
     // Stop the worker.
     status = SERVICE_WORKER_ERROR_FAILED;
@@ -256,6 +256,23 @@ class ServiceWorkerVersionBrowserTest : public ServiceWorkerBrowserTest {
                                        &status));
     stop_run_loop.Run();
     ASSERT_EQ(SERVICE_WORKER_OK, status);
+  }
+
+  void ActivateTestHelper(
+      const std::string& worker_url,
+      ServiceWorkerStatusCode expected_status) {
+    RunOnIOThread(
+        base::Bind(&self::SetUpRegistrationOnIOThread, this, worker_url));
+    version_->SetStatus(ServiceWorkerVersion::INSTALLED);
+    ServiceWorkerStatusCode status = SERVICE_WORKER_ERROR_FAILED;
+    base::RunLoop run_loop;
+    BrowserThread::PostTask(
+        BrowserThread::IO,
+        FROM_HERE,
+        base::Bind(
+            &self::ActivateOnIOThread, this, run_loop.QuitClosure(), &status));
+    run_loop.Run();
+    ASSERT_EQ(expected_status, status);
   }
 
   void FetchTestHelper(const std::string& worker_url,
@@ -303,6 +320,14 @@ class ServiceWorkerVersionBrowserTest : public ServiceWorkerBrowserTest {
     ASSERT_TRUE(BrowserThread::CurrentlyOn(BrowserThread::IO));
     version_->DispatchInstallEvent(
         -1, CreateReceiver(BrowserThread::UI, done, result));
+  }
+
+  void ActivateOnIOThread(const base::Closure& done,
+                          ServiceWorkerStatusCode* result) {
+    ASSERT_TRUE(BrowserThread::CurrentlyOn(BrowserThread::IO));
+    version_->SetStatus(ServiceWorkerVersion::INSTALLED);
+    version_->DispatchActivateEvent(
+        CreateReceiver(BrowserThread::UI, done, result));
   }
 
   void FetchOnIOThread(const base::Closure& done, FetchResult* result) {
@@ -389,19 +414,30 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest, StartNotFound) {
 }
 
 IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest, Install) {
-  InstallTestHelper("/service_worker/worker.js");
+  InstallTestHelper("/service_worker/worker.js", SERVICE_WORKER_OK);
 }
 
 IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest,
                        InstallWithWaitUntil_Fulfilled) {
-  InstallTestHelper("/service_worker/worker_install_fulfilled.js");
+  InstallTestHelper("/service_worker/worker_install_fulfilled.js",
+                    SERVICE_WORKER_OK);
+}
+
+IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest,
+                       Activate_NoEventListener) {
+  ActivateTestHelper("/service_worker/worker.js", SERVICE_WORKER_OK);
+  ASSERT_EQ(ServiceWorkerVersion::ACTIVE, version_->status());
+}
+
+IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest, Activate_Rejected) {
+  ActivateTestHelper("/service_worker/worker_activate_rejected.js",
+                     SERVICE_WORKER_ERROR_ACTIVATE_WORKER_FAILED);
 }
 
 IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest,
                        InstallWithWaitUntil_Rejected) {
-  // TODO(kinuko): This should also report back an error, but we
-  // don't have plumbing for it yet.
-  InstallTestHelper("/service_worker/worker_install_rejected.js");
+  InstallTestHelper("/service_worker/worker_install_rejected.js",
+                    SERVICE_WORKER_ERROR_INSTALL_WORKER_FAILED);
 }
 
 IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest, FetchEvent_Response) {
@@ -436,9 +472,9 @@ class ServiceWorkerBlackBoxBrowserTest : public ServiceWorkerBrowserTest {
  public:
   typedef ServiceWorkerBlackBoxBrowserTest self;
 
-  static void ExpectStatusAndRun(ServiceWorkerStatusCode expected,
+  static void ExpectResultAndRun(bool expected,
                                  const base::Closure& continuation,
-                                 ServiceWorkerStatusCode actual) {
+                                 bool actual) {
     EXPECT_EQ(expected, actual);
     continuation.Run();
   }
@@ -484,8 +520,8 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL(kWorkerUrl),
         RenderProcessID(),
-        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectStatusAndRun,
-                   SERVICE_WORKER_OK,
+        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
+                   true,
                    run_loop.QuitClosure()));
     run_loop.Run();
   }
@@ -506,8 +542,8 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
     public_context()->UnregisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         RenderProcessID(),
-        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectStatusAndRun,
-                   SERVICE_WORKER_OK,
+        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
+                   true,
                    run_loop.QuitClosure()));
     run_loop.Run();
   }

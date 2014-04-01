@@ -8223,12 +8223,16 @@ TEST_F(GLES2DecoderManualInitTest, AsyncPixelTransfers) {
   // Tex(Sub)Image2D upload commands.
   AsyncTexImage2DCHROMIUM teximage_cmd;
   teximage_cmd.Init(GL_TEXTURE_2D, 0, GL_RGBA, 8, 8, 0, GL_RGBA,
-                    GL_UNSIGNED_BYTE, kSharedMemoryId, kSharedMemoryOffset);
+                    GL_UNSIGNED_BYTE, kSharedMemoryId, kSharedMemoryOffset,
+                    0, 0, 0);
   AsyncTexSubImage2DCHROMIUM texsubimage_cmd;
   texsubimage_cmd.Init(GL_TEXTURE_2D, 0, 0, 0, 8, 8, GL_RGBA,
-                      GL_UNSIGNED_BYTE, kSharedMemoryId, kSharedMemoryOffset);
+                      GL_UNSIGNED_BYTE, kSharedMemoryId, kSharedMemoryOffset,
+                      0, 0, 0);
   WaitAsyncTexImage2DCHROMIUM wait_cmd;
   wait_cmd.Init(GL_TEXTURE_2D);
+  WaitAllAsyncTexImage2DCHROMIUM wait_all_cmd;
+  wait_all_cmd.Init();
 
   // No transfer state exists initially.
   EXPECT_FALSE(
@@ -8354,13 +8358,15 @@ TEST_F(GLES2DecoderManualInitTest, AsyncPixelTransfers) {
     EXPECT_FALSE(
         decoder_->GetAsyncPixelTransferManager()->GetPixelTransferDelegate(
             texture_ref));
+    texture = NULL;
+    texture_ref = NULL;
     delegate = NULL;
   }
 
   // WaitAsyncTexImage2D
   {
     // Get a fresh texture since the existing texture cannot be respecified
-    // asynchronously and AsyncTexSubImage2D does not involved binding.
+    // asynchronously and AsyncTexSubImage2D does not involve binding.
     EXPECT_CALL(*gl_, GenTextures(1, _))
         .WillOnce(SetArgumentPointee<1>(kServiceTextureId));
     DoBindTexture(GL_TEXTURE_2D, client_texture_id_, kServiceTextureId);
@@ -8389,6 +8395,47 @@ TEST_F(GLES2DecoderManualInitTest, AsyncPixelTransfers) {
     EXPECT_EQ(error::kNoError, ExecuteCmd(wait_cmd));
     EXPECT_EQ(GL_NO_ERROR, GetGLError());
   }
+
+  // WaitAllAsyncTexImage2D
+  EXPECT_CALL(*delegate, Destroy()).RetiresOnSaturation();
+  DoDeleteTexture(client_texture_id_, kServiceTextureId);
+  EXPECT_FALSE(
+      decoder_->GetAsyncPixelTransferManager()->GetPixelTransferDelegate(
+          texture_ref));
+  texture = NULL;
+  texture_ref = NULL;
+  delegate = NULL;
+  {
+    // Get a fresh texture since the existing texture cannot be respecified
+    // asynchronously and AsyncTexSubImage2D does not involve binding.
+    EXPECT_CALL(*gl_, GenTextures(1, _))
+        .WillOnce(SetArgumentPointee<1>(kServiceTextureId));
+    DoBindTexture(GL_TEXTURE_2D, client_texture_id_, kServiceTextureId);
+    texture_ref = GetTexture(client_texture_id_);
+    texture = texture_ref->texture();
+    texture->SetImmutable(false);
+    // Create transfer state since it doesn't exist.
+    EXPECT_CALL(*manager, CreatePixelTransferDelegateImpl(texture_ref, _))
+        .WillOnce(Return(
+            delegate = new StrictMock<gpu::MockAsyncPixelTransferDelegate>))
+        .RetiresOnSaturation();
+    EXPECT_CALL(*delegate, AsyncTexImage2D(_, _, _))
+        .RetiresOnSaturation();
+    // Start async transfer.
+    EXPECT_EQ(error::kNoError, ExecuteCmd(teximage_cmd));
+    EXPECT_EQ(GL_NO_ERROR, GetGLError());
+    EXPECT_EQ(
+        delegate,
+        decoder_->GetAsyncPixelTransferManager()->GetPixelTransferDelegate(
+            texture_ref));
+
+    EXPECT_TRUE(texture->IsImmutable());
+    // Wait for completion of all uploads.
+    EXPECT_CALL(*manager, WaitAllAsyncTexImage2D()).RetiresOnSaturation();
+    EXPECT_CALL(*manager, BindCompletedAsyncTransfers());
+    EXPECT_EQ(error::kNoError, ExecuteCmd(wait_all_cmd));
+    EXPECT_EQ(GL_NO_ERROR, GetGLError());
+  }
 }
 
 TEST_F(GLES2DecoderManualInitTest, AsyncPixelTransferManager) {
@@ -8412,7 +8459,8 @@ TEST_F(GLES2DecoderManualInitTest, AsyncPixelTransferManager) {
 
   AsyncTexImage2DCHROMIUM teximage_cmd;
   teximage_cmd.Init(GL_TEXTURE_2D, 0, GL_RGBA, 8, 8, 0, GL_RGBA,
-                    GL_UNSIGNED_BYTE, kSharedMemoryId, kSharedMemoryOffset);
+                    GL_UNSIGNED_BYTE, kSharedMemoryId, kSharedMemoryOffset,
+                    0, 0, 0);
 
   // No transfer delegate exists initially.
   EXPECT_FALSE(
@@ -9202,6 +9250,137 @@ TEST_F(GLES2DecoderManualInitTest, TexImage2DFloatConvertsFormatDesktop) {
   DoTexImage2DConvertInternalFormat(GL_TEXTURE_2D, 0, GL_LUMINANCE_ALPHA, 16,
                                     17, 0, GL_LUMINANCE_ALPHA, GL_FLOAT, 0, 0,
                                     GL_LUMINANCE_ALPHA32F_ARB);
+}
+
+TEST_F(GLES2DecoderManualInitTest, ReadFormatExtension) {
+  InitDecoder(
+      "GL_OES_read_format",  // extensions
+      "2.1",   // gl version
+      false,   // has alpha
+      false,   // has depth
+      false,   // has stencil
+      false,   // request alpha
+      false,   // request depth
+      false,   // request stencil
+      true);   // bind generates resource
+
+  EXPECT_CALL(*gl_, GetError())
+      .WillOnce(Return(GL_NO_ERROR))
+      .WillOnce(Return(GL_NO_ERROR))
+      .WillOnce(Return(GL_NO_ERROR))
+      .WillOnce(Return(GL_NO_ERROR))
+      .RetiresOnSaturation();
+  EXPECT_CALL(*gl_, GetError())
+      .Times(6)
+      .RetiresOnSaturation();
+
+  typedef GetIntegerv::Result Result;
+  Result* result = static_cast<Result*>(shared_memory_address_);
+  GetIntegerv cmd;
+  const GLuint kFBOClientTextureId = 4100;
+  const GLuint kFBOServiceTextureId = 4101;
+
+  // Register a texture id.
+  EXPECT_CALL(*gl_, GenTextures(_, _))
+      .WillOnce(SetArgumentPointee<1>(kFBOServiceTextureId))
+      .RetiresOnSaturation();
+  GenHelper<GenTexturesImmediate>(kFBOClientTextureId);
+
+  // Setup "render to" texture.
+  DoBindTexture(GL_TEXTURE_2D, kFBOClientTextureId, kFBOServiceTextureId);
+  DoTexImage2D(
+      GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0, 0);
+  DoBindFramebuffer(
+      GL_FRAMEBUFFER, client_framebuffer_id_, kServiceFramebufferId);
+  DoFramebufferTexture2D(
+      GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+      kFBOClientTextureId, kFBOServiceTextureId, 0, GL_NO_ERROR);
+
+  result->size = 0;
+  EXPECT_CALL(*gl_, GetIntegerv(_, _))
+      .Times(1)
+      .RetiresOnSaturation();
+  cmd.Init(
+      GL_IMPLEMENTATION_COLOR_READ_FORMAT,
+      shared_memory_id_, shared_memory_offset_);
+  EXPECT_EQ(error::kNoError, ExecuteCmd(cmd));
+  EXPECT_EQ(1, result->GetNumResults());
+  EXPECT_EQ(GL_NO_ERROR, GetGLError());
+
+  result->size = 0;
+  EXPECT_CALL(*gl_, GetIntegerv(_, _))
+      .Times(1)
+      .RetiresOnSaturation();
+  cmd.Init(
+      GL_IMPLEMENTATION_COLOR_READ_TYPE,
+      shared_memory_id_, shared_memory_offset_);
+  EXPECT_EQ(error::kNoError, ExecuteCmd(cmd));
+  EXPECT_EQ(1, result->GetNumResults());
+  EXPECT_EQ(GL_NO_ERROR, GetGLError());
+}
+
+TEST_F(GLES2DecoderManualInitTest, NoReadFormatExtension) {
+  InitDecoder(
+      "",  // extensions
+      "2.1",   // gl version
+      false,   // has alpha
+      false,   // has depth
+      false,   // has stencil
+      false,   // request alpha
+      false,   // request depth
+      false,   // request stencil
+      true);   // bind generates resource
+
+  EXPECT_CALL(*gl_, GetError())
+      .WillOnce(Return(GL_NO_ERROR))
+      .WillOnce(Return(GL_NO_ERROR))
+      .WillOnce(Return(GL_NO_ERROR))
+      .WillOnce(Return(GL_NO_ERROR))
+      .RetiresOnSaturation();
+
+  typedef GetIntegerv::Result Result;
+  Result* result = static_cast<Result*>(shared_memory_address_);
+  GetIntegerv cmd;
+  const GLuint kFBOClientTextureId = 4100;
+  const GLuint kFBOServiceTextureId = 4101;
+
+  // Register a texture id.
+  EXPECT_CALL(*gl_, GenTextures(_, _))
+      .WillOnce(SetArgumentPointee<1>(kFBOServiceTextureId))
+      .RetiresOnSaturation();
+  GenHelper<GenTexturesImmediate>(kFBOClientTextureId);
+
+  // Setup "render to" texture.
+  DoBindTexture(GL_TEXTURE_2D, kFBOClientTextureId, kFBOServiceTextureId);
+  DoTexImage2D(
+      GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0, 0);
+  DoBindFramebuffer(
+      GL_FRAMEBUFFER, client_framebuffer_id_, kServiceFramebufferId);
+  DoFramebufferTexture2D(
+      GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+      kFBOClientTextureId, kFBOServiceTextureId, 0, GL_NO_ERROR);
+
+  result->size = 0;
+  EXPECT_CALL(*gl_, GetIntegerv(_, _))
+      .Times(0)
+      .RetiresOnSaturation();
+  cmd.Init(
+      GL_IMPLEMENTATION_COLOR_READ_FORMAT,
+      shared_memory_id_, shared_memory_offset_);
+  EXPECT_EQ(error::kNoError, ExecuteCmd(cmd));
+  EXPECT_EQ(1, result->GetNumResults());
+  EXPECT_EQ(GL_NO_ERROR, GetGLError());
+
+  result->size = 0;
+  EXPECT_CALL(*gl_, GetIntegerv(_, _))
+      .Times(0)
+      .RetiresOnSaturation();
+  cmd.Init(
+      GL_IMPLEMENTATION_COLOR_READ_TYPE,
+      shared_memory_id_, shared_memory_offset_);
+  EXPECT_EQ(error::kNoError, ExecuteCmd(cmd));
+  EXPECT_EQ(1, result->GetNumResults());
+  EXPECT_EQ(GL_NO_ERROR, GetGLError());
 }
 
 // TODO(gman): Complete this test.

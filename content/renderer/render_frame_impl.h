@@ -101,6 +101,8 @@ class CONTENT_EXPORT RenderFrameImpl
   // TODO(nasko): Those are page-level methods at this time and come from
   // WebViewClient. We should move them to be WebFrameClient calls and put
   // logic in the browser side to balance starts/stops.
+  // |to_different_document| will be true unless the load is a fragment
+  // navigation, or triggered by history.pushState/replaceState.
   virtual void didStartLoading(bool to_different_document);
   virtual void didStopLoading();
   virtual void didChangeLoadProgress(double load_progress);
@@ -234,13 +236,6 @@ class CONTENT_EXPORT RenderFrameImpl
       blink::WebNavigationType type,
       blink::WebNavigationPolicy default_policy,
       bool is_redirect);
-  // DEPRECATED
-  virtual blink::WebNavigationPolicy decidePolicyForNavigation(
-      blink::WebFrame* frame,
-      const blink::WebURLRequest& request,
-      blink::WebNavigationType type,
-      blink::WebNavigationPolicy default_policy,
-      bool is_redirect);
   virtual void willSendSubmitEvent(blink::WebFrame* frame,
                                    const blink::WebFormElement& form);
   virtual void willSubmitForm(blink::WebFrame* frame,
@@ -348,10 +343,14 @@ class CONTENT_EXPORT RenderFrameImpl
 
  private:
   friend class RenderFrameObserver;
-  FRIEND_TEST_ALL_PREFIXES(RenderFrameImplTest,
+  FRIEND_TEST_ALL_PREFIXES(RendererAccessibilityTest,
+                           AccessibilityMessagesQueueWhileSwappedOut);
+    FRIEND_TEST_ALL_PREFIXES(RenderFrameImplTest,
                            ShouldUpdateSelectionTextFromContextMenuParams);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest,
                            OnExtendSelectionAndDelete);
+  FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, ReloadWhileSwappedOut);
+  FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, SendSwapOutACK);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest,
                            SetEditableSelectionAndComposition);
 
@@ -395,6 +394,11 @@ class CONTENT_EXPORT RenderFrameImpl
                                   int id,
                                   bool notify_result);
   void OnSetEditableSelectionOffsets(int start, int end);
+  void OnSetCompositionFromExistingText(
+      int start, int end,
+      const std::vector<blink::WebCompositionUnderline>& underlines);
+  void OnExtendSelectionAndDelete(int before, int after);
+  void OnReload(bool ignore_cache);
 #if defined(OS_MACOSX)
   void OnCopyToFindPboard();
 #endif

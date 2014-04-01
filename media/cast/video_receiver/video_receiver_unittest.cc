@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <stdint.h>
+
 #include "base/bind.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
@@ -15,7 +17,7 @@
 #include "testing/gmock/include/gmock/gmock.h"
 
 static const int kPacketSize = 1500;
-static const int64 kStartMillisecond = GG_INT64_C(12345678900000);
+static const int64 kStartMillisecond = INT64_C(12345678900000);
 
 namespace media {
 namespace cast {
@@ -56,19 +58,6 @@ class TestVideoReceiverCallback
 };
 }  // namespace
 
-class PeerVideoReceiver : public VideoReceiver {
- public:
-  PeerVideoReceiver(scoped_refptr<CastEnvironment> cast_environment,
-                    const VideoReceiverConfig& video_config,
-                    transport::PacedPacketSender* const packet_sender,
-                    const SetTargetDelayCallback& target_delay_cb)
-      : VideoReceiver(cast_environment,
-                      video_config,
-                      packet_sender,
-                      target_delay_cb) {}
-  using VideoReceiver::IncomingParsedRtpPacket;
-};
-
 class VideoReceiverTest : public ::testing::Test {
  protected:
   VideoReceiverTest() {
@@ -81,9 +70,8 @@ class VideoReceiverTest : public ::testing::Test {
         new CastEnvironment(scoped_ptr<base::TickClock>(testing_clock_).Pass(),
                             task_runner_,
                             task_runner_,
-                            task_runner_,
-                            GetLoggingConfigWithRawEventsAndStatsEnabled());
-    receiver_.reset(new PeerVideoReceiver(
+                            task_runner_);
+    receiver_.reset(new VideoReceiver(
         cast_environment_, config_, &mock_transport_, target_delay_cb_));
     testing_clock_->Advance(
         base::TimeDelta::FromMilliseconds(kStartMillisecond));
@@ -105,7 +93,7 @@ class VideoReceiverTest : public ::testing::Test {
 
   transport::MockPacedPacketSender mock_transport_;
   VideoReceiverConfig config_;
-  scoped_ptr<PeerVideoReceiver> receiver_;
+  scoped_ptr<VideoReceiver> receiver_;
   std::vector<uint8> payload_;
   RtpCastHeader rtp_header_;
   base::SimpleTestTickClock* testing_clock_;  // Owned by CastEnvironment.
@@ -121,7 +109,7 @@ class VideoReceiverTest : public ::testing::Test {
 TEST_F(VideoReceiverTest, GetOnePacketEncodedframe) {
   EXPECT_CALL(mock_transport_, SendRtcpPacket(_))
       .WillRepeatedly(testing::Return(true));
-  receiver_->IncomingParsedRtpPacket(
+  receiver_->OnReceivedPayloadData(
       payload_.data(), payload_.size(), rtp_header_);
 
   VideoFrameEncodedCallback frame_to_decode_callback = base::Bind(
@@ -139,14 +127,14 @@ TEST_F(VideoReceiverTest, MultiplePackets) {
   EXPECT_CALL(mock_transport_, SendRtcpPacket(_))
       .WillRepeatedly(testing::Return(true));
   rtp_header_.max_packet_id = 2;
-  receiver_->IncomingParsedRtpPacket(
+  receiver_->OnReceivedPayloadData(
       payload_.data(), payload_.size(), rtp_header_);
   ++rtp_header_.packet_id;
   ++rtp_header_.webrtc.header.sequenceNumber;
-  receiver_->IncomingParsedRtpPacket(
+  receiver_->OnReceivedPayloadData(
       payload_.data(), payload_.size(), rtp_header_);
   ++rtp_header_.packet_id;
-  receiver_->IncomingParsedRtpPacket(
+  receiver_->OnReceivedPayloadData(
       payload_.data(), payload_.size(), rtp_header_);
 
   VideoFrameEncodedCallback frame_to_decode_callback = base::Bind(
@@ -171,7 +159,7 @@ TEST_F(VideoReceiverTest, MultiplePackets) {
 TEST_F(VideoReceiverTest, GetOnePacketRawframe) {
   EXPECT_CALL(mock_transport_, SendRtcpPacket(_))
       .WillRepeatedly(testing::Return(true));
-  receiver_->IncomingParsedRtpPacket(
+  receiver_->OnReceivedPayloadData(
       payload_.data(), payload_.size(), rtp_header_);
   // Decode error - requires legal input.
   VideoFrameDecodedCallback frame_decoded_callback = base::Bind(

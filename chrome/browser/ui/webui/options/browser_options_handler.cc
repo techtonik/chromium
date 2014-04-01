@@ -51,6 +51,7 @@
 #include "chrome/browser/search_engines/template_url.h"
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
+#include "chrome/browser/signin/easy_unlock.h"
 #include "chrome/browser/signin/signin_manager.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/sync/profile_sync_service.h"
@@ -621,6 +622,7 @@ void BrowserOptionsHandler::RegisterCloudPrintValues(
 #endif
 
   values->SetBoolean("showSetDefault", ShouldShowSetDefaultBrowser());
+  values->SetBoolean("allowAdvancedSettings", ShouldAllowAdvancedSettings());
 }
 #endif  // defined(ENABLE_FULL_PRINTING)
 
@@ -994,6 +996,15 @@ bool BrowserOptionsHandler::ShouldShowMultiProfilesUserList() {
   if (profile->IsGuestSession())
     return false;
   return profiles::IsMultipleProfilesEnabled();
+#endif
+}
+
+bool BrowserOptionsHandler::ShouldAllowAdvancedSettings() {
+#if defined(OS_CHROMEOS)
+  // ChromeOS handles guest-mode restrictions in a different manner.
+  return true;
+#else
+  return !Profile::FromWebUI(web_ui())->IsGuestSession();
 #endif
 }
 
@@ -1623,20 +1634,14 @@ void BrowserOptionsHandler::HandleRequestHotwordAvailable(
   Profile* profile = Profile::FromWebUI(web_ui());
   std::string group = base::FieldTrialList::FindFullName("VoiceTrigger");
   if (group != "" && group != "Disabled") {
-    if (HotwordServiceFactory::IsServiceAvailable(profile)) {
+    if (HotwordServiceFactory::IsServiceAvailable(profile))
       web_ui()->CallJavascriptFunction("BrowserOptions.showHotwordSection");
-    } else if (HotwordServiceFactory::IsHotwordAllowed(profile)) {
-      base::StringValue error_message(l10n_util::GetStringUTF16(
-          IDS_HOTWORD_GENERIC_ERROR_MESSAGE));
-      web_ui()->CallJavascriptFunction("BrowserOptions.showHotwordSection",
-                                       error_message);
-    }
   }
 }
 
 void BrowserOptionsHandler::HandleLaunchEasyUnlockSetup(
     const base::ListValue* args) {
-  // TODO(tengs): launch Easy Unlock setup flow.
+  easy_unlock::LaunchEasyUnlockSetup(Profile::FromWebUI(web_ui()));
 }
 
 void BrowserOptionsHandler::HandleRequestHotwordSetupRetry(

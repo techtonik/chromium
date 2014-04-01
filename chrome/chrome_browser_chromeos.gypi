@@ -41,7 +41,6 @@
         'installer_util',
         'safe_browsing_proto',
         'safe_browsing_report_proto',
-        '../third_party/re2/re2.gyp:re2',
         '../breakpad/breakpad.gyp:breakpad_client',
         '../build/linux/system.gyp:dbus',
         '../chromeos/chromeos.gyp:chromeos',
@@ -84,6 +83,7 @@
         '../third_party/npapi/npapi.gyp:npapi',
         '../third_party/protobuf/protobuf.gyp:protobuf_lite',
         '../third_party/protobuf/protobuf.gyp:protoc#host',
+        '../third_party/re2/re2.gyp:re2',
         '../third_party/zlib/zlib.gyp:zlib',
         '../ui/base/strings/ui_strings.gyp:ui_strings',
         '../ui/base/ui_base.gyp:ui_base',
@@ -110,6 +110,7 @@
         ],
       },
       'export_dependent_settings': [
+        'common/extensions/api/api.gyp:chrome_api',
         '../sync/sync.gyp:sync',
       ],
       'include_dirs': [
@@ -369,6 +370,13 @@
         'browser/chromeos/file_manager/volume_manager_observer.h',
         'browser/chromeos/file_manager/zip_file_creator.cc',
         'browser/chromeos/file_manager/zip_file_creator.h',
+        'browser/chromeos/file_system_provider/observer.h',
+        'browser/chromeos/file_system_provider/provided_file_system.cc',
+        'browser/chromeos/file_system_provider/provided_file_system.h',
+        'browser/chromeos/file_system_provider/service.cc',
+        'browser/chromeos/file_system_provider/service.h',
+        'browser/chromeos/file_system_provider/service_factory.cc',
+        'browser/chromeos/file_system_provider/service_factory.h',
         'browser/chromeos/fileapi/file_access_permissions.cc',
         'browser/chromeos/fileapi/file_access_permissions.h',
         'browser/chromeos/fileapi/file_system_backend.cc',
@@ -1000,7 +1008,6 @@
           'dependencies': [
             '../build/linux/system.gyp:dbus',
             '../build/linux/system.gyp:fontconfig',
-            '../build/linux/system.gyp:x11',
             '../ui/views/views.gyp:views',
           ],
           'include_dirs': [
@@ -1010,6 +1017,11 @@
           'sources/': [
             ['include', '^browser/chromeos/status/memory_menu_button.cc'],
             ['include', '^browser/chromeos/status/memory_menu_button.h'],
+          ],
+        }],
+        ['use_aura==1 and use_x11==1', {
+          'dependencies': [
+            '../build/linux/system.gyp:x11',
           ],
         }],
         ['enable_printing != 0', {

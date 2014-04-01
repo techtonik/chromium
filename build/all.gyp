@@ -362,7 +362,7 @@
             'chromium_swarm_tests',
           ],
         }],
-        ['OS!="android" and OS!="ios"', {
+        ['OS!="android"', {
           'dependencies': [
             '../google_apis/gcm/gcm.gyp:gcm_unit_tests',
           ],
@@ -446,15 +446,6 @@
             }],
           ],
         }, # target_name: blink_tests
-        {
-          # TODO(jochen): Eventually remove this target after everybody and
-          # the bots started to use blink_tests only.
-          'target_name': 'all_webkit',
-          'type': 'none',
-          'dependencies': [
-            'blink_tests',
-          ],
-        }, # target_name: all_webkit
       ],
     }], # OS!=ios
     ['OS!="ios" and OS!="android"', {

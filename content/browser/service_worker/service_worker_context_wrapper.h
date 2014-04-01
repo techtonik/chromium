@@ -47,12 +47,12 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
   virtual void RegisterServiceWorker(const GURL& pattern,
                                      const GURL& script_url,
                                      int source_process_id,
-                                     const StatusCallback& continuation)
+                                     const ResultCallback& continuation)
       OVERRIDE;
 
   virtual void UnregisterServiceWorker(const GURL& pattern,
                                        int source_process_id,
-                                       const StatusCallback& continuation)
+                                       const ResultCallback& continuation)
       OVERRIDE;
 
  private:

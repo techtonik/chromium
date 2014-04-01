@@ -54,7 +54,13 @@ ContentVideoView::ContentVideoView(
 
 ContentVideoView::~ContentVideoView() {
   DCHECK(g_content_video_view);
-  DestroyContentVideoView(true);
+  JNIEnv* env = AttachCurrentThread();
+  ScopedJavaLocalRef<jobject> content_video_view = GetJavaObject(env);
+  if (!content_video_view.is_null()) {
+    Java_ContentVideoView_destroyContentVideoView(env,
+        content_video_view.obj(), true);
+    j_content_video_view_.reset();
+  }
   g_content_video_view = NULL;
 }
 
@@ -107,10 +113,8 @@ void ContentVideoView::OnPlaybackComplete() {
 void ContentVideoView::OnExitFullscreen() {
   JNIEnv* env = AttachCurrentThread();
   ScopedJavaLocalRef<jobject> content_video_view = GetJavaObject(env);
-  if (!content_video_view.is_null()) {
+  if (!content_video_view.is_null())
     Java_ContentVideoView_onExitFullscreen(env, content_video_view.obj());
-    j_content_video_view_.reset();
-  }
 }
 
 void ContentVideoView::UpdateMediaMetadata() {
@@ -219,6 +223,11 @@ JavaObjectWeakGlobalRef ContentVideoView::CreateJavaObject() {
 }
 
 void ContentVideoView::CreatePowerSaveBlocker() {
+  if (!CommandLine::ForCurrentProcess()->HasSwitch(
+      switches::kDisableOverlayFullscreenVideoSubtitle)) {
+    return;
+  }
+
   if (power_save_blocker_) return;
 
   power_save_blocker_ = PowerSaveBlocker::Create(
@@ -226,15 +235,5 @@ void ContentVideoView::CreatePowerSaveBlocker() {
       "Playing video").Pass();
   static_cast<PowerSaveBlockerImpl*>(power_save_blocker_.get())->
       InitDisplaySleepBlocker(GetNativeView());
-}
-
-void ContentVideoView::DestroyContentVideoView(bool native_view_destroyed) {
-  JNIEnv* env = AttachCurrentThread();
-  ScopedJavaLocalRef<jobject> content_video_view = GetJavaObject(env);
-  if (!content_video_view.is_null()) {
-    Java_ContentVideoView_destroyContentVideoView(env,
-        content_video_view.obj(), native_view_destroyed);
-    j_content_video_view_.reset();
-  }
 }
 }  // namespace content

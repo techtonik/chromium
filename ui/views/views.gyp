@@ -5,13 +5,6 @@
   'variables': {
     'chromium_code': 1,
   },
-  'target_defaults': {
-    'conditions': [
-      ['OS!="linux" or chromeos==1', {
-        'sources/': [ ['exclude', '_linux\\.(h|cc)$'] ],
-      }],
-    ],
-  },
   'targets': [
     {
       'target_name': 'views',
@@ -124,10 +117,13 @@
         'controls/menu/menu_config_win.cc',
         'controls/menu/menu_controller.cc',
         'controls/menu/menu_controller.h',
-        'controls/menu/menu_controller_aura.cc',
         'controls/menu/menu_controller_delegate.h',
         'controls/menu/menu_delegate.cc',
         'controls/menu/menu_delegate.h',
+        'controls/menu/menu_message_pump_dispatcher.cc',
+        'controls/menu/menu_message_pump_dispatcher.h',
+        'controls/menu/menu_message_pump_dispatcher_linux.cc',
+        'controls/menu/menu_message_pump_dispatcher_win.cc',
         'controls/menu/menu_host.cc',
         'controls/menu/menu_host.h',
         'controls/menu/menu_host_root_view.cc',

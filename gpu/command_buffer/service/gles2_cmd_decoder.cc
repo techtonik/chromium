@@ -15,10 +15,12 @@
 
 #include "base/at_exit.h"
 #include "base/bind.h"
+#include "base/callback_helpers.h"
 #include "base/command_line.h"
 #include "base/debug/trace_event.h"
 #include "base/debug/trace_event_synthetic_delay.h"
 #include "base/memory/scoped_ptr.h"
+#include "base/numerics/safe_math.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "build/build_config.h"
@@ -518,6 +520,29 @@ struct FenceCallback {
   scoped_ptr<gfx::GLFence> fence;
 };
 
+class AsyncUploadTokenCompletionObserver
+    : public AsyncPixelTransferCompletionObserver {
+ public:
+  explicit AsyncUploadTokenCompletionObserver(uint32 async_upload_token)
+      : async_upload_token_(async_upload_token) {
+  }
+
+  virtual void DidComplete(const AsyncMemoryParams& mem_params) OVERRIDE {
+    DCHECK(mem_params.buffer());
+    void* data = mem_params.GetDataAddress();
+    AsyncUploadSync* sync = static_cast<AsyncUploadSync*>(data);
+    sync->SetAsyncUploadToken(async_upload_token_);
+  }
+
+ private:
+  virtual ~AsyncUploadTokenCompletionObserver() {
+  }
+
+  uint32 async_upload_token_;
+
+  DISALLOW_COPY_AND_ASSIGN(AsyncUploadTokenCompletionObserver);
+};
+
 // }  // anonymous namespace.
 
 bool GLES2Decoder::GetServiceTextureId(uint32 client_texture_id,
@@ -712,6 +737,13 @@ class GLES2DecoderImpl : public GLES2Decoder,
   void DeleteQueriesEXTHelper(GLsizei n, const GLuint* client_ids);
   bool GenVertexArraysOESHelper(GLsizei n, const GLuint* client_ids);
   void DeleteVertexArraysOESHelper(GLsizei n, const GLuint* client_ids);
+
+  // Helper for async upload token completion notification callback.
+  base::Closure AsyncUploadTokenCompletionClosure(uint32 async_upload_token,
+                                                  uint32 sync_data_shm_id,
+                                                  uint32 sync_data_shm_offset);
+
+
 
   // Workarounds
   void OnFboChanged() const;
@@ -4177,7 +4209,25 @@ bool GLES2DecoderImpl::GetHelper(
     switch (pname) {
       case GL_IMPLEMENTATION_COLOR_READ_FORMAT:
         *num_written = 1;
+        // Return the GL implementation's preferred format and (see below type)
+        // if we have the GL extension that exposes this. This allows the GPU
+        // client to use the implementation's preferred format for glReadPixels
+        // for optimisation.
+        //
+        // A conflicting extension (GL_ARB_ES2_compatibility) specifies an error
+        // case when requested on integer/floating point buffers but which is
+        // acceptable on GLES2 and with the GL_OES_read_format extension.
+        //
+        // Therefore if an error occurs we swallow the error and use the
+        // internal implementation.
         if (params) {
+          if (context_->HasExtension("GL_OES_read_format")) {
+            ScopedGLErrorSuppressor suppressor("GLES2DecoderImpl::GetHelper",
+                                               GetErrorState());
+            glGetIntegerv(pname, params);
+            if (glGetError() == GL_NO_ERROR)
+              return true;
+          }
           *params = GLES2Util::GetPreferredGLReadPixelsFormat(
               GetBoundReadFrameBufferInternalFormat());
         }
@@ -4185,6 +4235,13 @@ bool GLES2DecoderImpl::GetHelper(
       case GL_IMPLEMENTATION_COLOR_READ_TYPE:
         *num_written = 1;
         if (params) {
+          if (context_->HasExtension("GL_OES_read_format")) {
+            ScopedGLErrorSuppressor suppressor("GLES2DecoderImpl::GetHelper",
+                                               GetErrorState());
+            glGetIntegerv(pname, params);
+            if (glGetError() == GL_NO_ERROR)
+              return true;
+          }
           *params = GLES2Util::GetPreferredGLReadPixelsType(
               GetBoundReadFrameBufferInternalFormat(),
               GetBoundReadFrameBufferTextureType());
@@ -7234,6 +7291,7 @@ void GLES2DecoderImpl::FinishReadPixels(
 
 error::Error GLES2DecoderImpl::HandleReadPixels(
     uint32 immediate_data_size, const cmds::ReadPixels& c) {
+  TRACE_EVENT0("gpu", "GLES2DecoderImpl::HandleReadPixels");
   error::Error fbo_error = WillAccessBoundFramebufferForRead();
   if (fbo_error != error::kNoError)
     return fbo_error;
@@ -10329,6 +10387,29 @@ bool GLES2DecoderImpl::ValidateAsyncTransfer(
   return true;
 }
 
+base::Closure GLES2DecoderImpl::AsyncUploadTokenCompletionClosure(
+    uint32 async_upload_token,
+    uint32 sync_data_shm_id,
+    uint32 sync_data_shm_offset) {
+  scoped_refptr<gpu::Buffer> buffer = GetSharedMemoryBuffer(sync_data_shm_id);
+  if (!buffer || !buffer->GetDataAddress(sync_data_shm_offset,
+                                         sizeof(AsyncUploadSync)))
+    return base::Closure();
+
+  AsyncMemoryParams mem_params(buffer,
+                               sync_data_shm_offset,
+                               sizeof(AsyncUploadSync));
+
+  scoped_refptr<AsyncUploadTokenCompletionObserver> observer(
+      new AsyncUploadTokenCompletionObserver(async_upload_token));
+
+  return base::Bind(
+      &AsyncPixelTransferManager::AsyncNotifyCompletion,
+      base::Unretained(GetAsyncPixelTransferManager()),
+      mem_params,
+      observer);
+}
+
 error::Error GLES2DecoderImpl::HandleAsyncTexImage2DCHROMIUM(
     uint32 immediate_data_size, const cmds::AsyncTexImage2DCHROMIUM& c) {
   TRACE_EVENT0("gpu", "GLES2DecoderImpl::HandleAsyncTexImage2DCHROMIUM");
@@ -10345,6 +10426,21 @@ error::Error GLES2DecoderImpl::HandleAsyncTexImage2DCHROMIUM(
   uint32 pixels_shm_id = static_cast<uint32>(c.pixels_shm_id);
   uint32 pixels_shm_offset = static_cast<uint32>(c.pixels_shm_offset);
   uint32 pixels_size;
+  uint32 async_upload_token = static_cast<uint32>(c.async_upload_token);
+  uint32 sync_data_shm_id = static_cast<uint32>(c.sync_data_shm_id);
+  uint32 sync_data_shm_offset = static_cast<uint32>(c.sync_data_shm_offset);
+
+  base::ScopedClosureRunner scoped_completion_callback;
+  if (async_upload_token) {
+    base::Closure completion_closure =
+        AsyncUploadTokenCompletionClosure(async_upload_token,
+                                          sync_data_shm_id,
+                                          sync_data_shm_offset);
+    if (completion_closure.is_null())
+      return error::kInvalidArguments;
+
+    scoped_completion_callback.Reset(completion_closure);
+  }
 
   // TODO(epenner): Move this and copies of this memory validation
   // into ValidateTexImage2D step.
@@ -10392,20 +10488,12 @@ error::Error GLES2DecoderImpl::HandleAsyncTexImage2DCHROMIUM(
     return error::kNoError;
   }
 
-  // We know the memory/size is safe, so get the real shared memory since
-  // it might need to be duped to prevent use-after-free of the memory.
-  scoped_refptr<gpu::Buffer> buffer = GetSharedMemoryBuffer(c.pixels_shm_id);
-  base::SharedMemory* shared_memory = buffer->shared_memory();
-  uint32 shm_size = buffer->size();
-  uint32 shm_data_offset = c.pixels_shm_offset;
-  uint32 shm_data_size = pixels_size;
-
   // Setup the parameters.
   AsyncTexImage2DParams tex_params = {
       target, level, static_cast<GLenum>(internal_format),
       width, height, border, format, type};
-  AsyncMemoryParams mem_params = {
-      shared_memory, shm_size, shm_data_offset, shm_data_size};
+  AsyncMemoryParams mem_params(
+      GetSharedMemoryBuffer(c.pixels_shm_id), c.pixels_shm_offset, pixels_size);
 
   // Set up the async state if needed, and make the texture
   // immutable so the async state stays valid. The level info
@@ -10439,6 +10527,21 @@ error::Error GLES2DecoderImpl::HandleAsyncTexSubImage2DCHROMIUM(
   GLsizei height = static_cast<GLsizei>(c.height);
   GLenum format = static_cast<GLenum>(c.format);
   GLenum type = static_cast<GLenum>(c.type);
+  uint32 async_upload_token = static_cast<uint32>(c.async_upload_token);
+  uint32 sync_data_shm_id = static_cast<uint32>(c.sync_data_shm_id);
+  uint32 sync_data_shm_offset = static_cast<uint32>(c.sync_data_shm_offset);
+
+  base::ScopedClosureRunner scoped_completion_callback;
+  if (async_upload_token) {
+    base::Closure completion_closure =
+        AsyncUploadTokenCompletionClosure(async_upload_token,
+                                          sync_data_shm_id,
+                                          sync_data_shm_offset);
+    if (completion_closure.is_null())
+      return error::kInvalidArguments;
+
+    scoped_completion_callback.Reset(completion_closure);
+  }
 
   // TODO(epenner): Move this and copies of this memory validation
   // into ValidateTexSubImage2D step.
@@ -10482,19 +10585,11 @@ error::Error GLES2DecoderImpl::HandleAsyncTexSubImage2DCHROMIUM(
     }
   }
 
-  // We know the memory/size is safe, so get the real shared memory since
-  // it might need to be duped to prevent use-after-free of the memory.
-  scoped_refptr<gpu::Buffer> buffer = GetSharedMemoryBuffer(c.data_shm_id);
-  base::SharedMemory* shared_memory = buffer->shared_memory();
-  uint32 shm_size = buffer->size();
-  uint32 shm_data_offset = c.data_shm_offset;
-  uint32 shm_data_size = data_size;
-
   // Setup the parameters.
   AsyncTexSubImage2DParams tex_params = {target, level, xoffset, yoffset,
                                               width, height, format, type};
-  AsyncMemoryParams mem_params = {shared_memory, shm_size,
-                                       shm_data_offset, shm_data_size};
+  AsyncMemoryParams mem_params(
+      GetSharedMemoryBuffer(c.data_shm_id), c.data_shm_offset, data_size);
   AsyncPixelTransferDelegate* delegate =
       async_pixel_transfer_manager_->GetPixelTransferDelegate(texture_ref);
   if (!delegate) {
@@ -10545,6 +10640,15 @@ error::Error GLES2DecoderImpl::HandleWaitAsyncTexImage2DCHROMIUM(
     return error::kNoError;
   }
   delegate->WaitForTransferCompletion();
+  ProcessFinishedAsyncTransfers();
+  return error::kNoError;
+}
+
+error::Error GLES2DecoderImpl::HandleWaitAllAsyncTexImage2DCHROMIUM(
+    uint32 immediate_data_size, const cmds::WaitAllAsyncTexImage2DCHROMIUM& c) {
+  TRACE_EVENT0("gpu", "GLES2DecoderImpl::HandleWaitAsyncTexImage2DCHROMIUM");
+
+  GetAsyncPixelTransferManager()->WaitAllAsyncTexImage2D();
   ProcessFinishedAsyncTransfers();
   return error::kNoError;
 }

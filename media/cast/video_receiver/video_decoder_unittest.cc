@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <stdint.h>
+
 #include "base/bind.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/test/simple_test_tick_clock.h"
@@ -20,7 +22,7 @@ namespace cast {
 using testing::_;
 
 // Random frame size for testing.
-static const int64 kStartMillisecond = GG_INT64_C(1245);
+static const int64 kStartMillisecond = INT64_C(1245);
 
 namespace {
 class DecodeTestFrameCallback
@@ -50,8 +52,7 @@ class VideoDecoderTest : public ::testing::Test {
             new CastEnvironment(scoped_ptr<base::TickClock>(testing_clock_),
                                 task_runner_,
                                 task_runner_,
-                                task_runner_,
-                                GetDefaultCastReceiverLoggingConfig())),
+                                task_runner_)),
         test_callback_(new DecodeTestFrameCallback()) {
     // Configure to vp8.
     config_.codec = transport::kVp8;

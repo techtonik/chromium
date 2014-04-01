@@ -16,6 +16,7 @@
 #include "base/stl_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "content/public/common/content_switches.h"
+#include "content/renderer/media/media_stream.h"
 #include "content/renderer/media/media_stream_audio_source.h"
 #include "content/renderer/media/media_stream_dependency_factory.h"
 #include "content/renderer/media/media_stream_track.h"
@@ -26,6 +27,7 @@
 #include "content/renderer/media/rtc_media_constraints.h"
 #include "content/renderer/media/webrtc_audio_capturer.h"
 #include "content/renderer/media/webrtc_audio_device_impl.h"
+#include "content/renderer/media/webrtc_uma_histograms.h"
 #include "content/renderer/render_thread_impl.h"
 #include "third_party/WebKit/public/platform/WebMediaConstraints.h"
 #include "third_party/WebKit/public/platform/WebMediaStreamSource.h"
@@ -552,6 +554,11 @@ bool RTCPeerConnectionHandler::addStream(
     peer_connection_tracker_->TrackAddStream(
         this, stream, PeerConnectionTracker::SOURCE_LOCAL);
 
+  PerSessionWebRTCAPIMetrics::GetInstance()->IncrementStreamCounter();
+
+  track_metrics_.AddStream(MediaStreamTrackMetrics::SENT_STREAM,
+                           MediaStream::GetAdapter(stream));
+
   // A media stream is connected to a peer connection, enable the
   // peer connection mode for the sources.
   blink::WebVector<blink::WebMediaStreamTrack> audio_tracks;
@@ -587,6 +594,9 @@ void RTCPeerConnectionHandler::removeStream(
   if (peer_connection_tracker_)
     peer_connection_tracker_->TrackRemoveStream(
         this, stream, PeerConnectionTracker::SOURCE_LOCAL);
+  PerSessionWebRTCAPIMetrics::GetInstance()->DecrementStreamCounter();
+  track_metrics_.RemoveStream(MediaStreamTrackMetrics::SENT_STREAM,
+                              MediaStream::GetAdapter(stream));
 }
 
 void RTCPeerConnectionHandler::getStats(
@@ -720,6 +730,7 @@ void RTCPeerConnectionHandler::OnSignalingChange(
 // Called any time the IceConnectionState changes
 void RTCPeerConnectionHandler::OnIceConnectionChange(
     webrtc::PeerConnectionInterface::IceConnectionState new_state) {
+  track_metrics_.IceConnectionChange(new_state);
   blink::WebRTCPeerConnectionHandlerClient::ICEConnectionState state =
       GetWebKitIceConnectionState(new_state);
   if (peer_connection_tracker_)
@@ -760,6 +771,11 @@ void RTCPeerConnectionHandler::OnAddStream(
         this, remote_stream->webkit_stream(),
         PeerConnectionTracker::SOURCE_REMOTE);
 
+  PerSessionWebRTCAPIMetrics::GetInstance()->IncrementStreamCounter();
+
+  track_metrics_.AddStream(MediaStreamTrackMetrics::RECEIVED_STREAM,
+                           stream_interface);
+
   client_->didAddRemoteStream(remote_stream->webkit_stream());
 }
 
@@ -771,6 +787,10 @@ void RTCPeerConnectionHandler::OnRemoveStream(
     NOTREACHED() << "Stream not found";
     return;
   }
+
+  track_metrics_.RemoveStream(MediaStreamTrackMetrics::RECEIVED_STREAM,
+                              stream_interface);
+  PerSessionWebRTCAPIMetrics::GetInstance()->DecrementStreamCounter();
 
   scoped_ptr<RemoteMediaStreamImpl> remote_stream(it->second);
   const blink::WebMediaStream& webkit_stream = remote_stream->webkit_stream();

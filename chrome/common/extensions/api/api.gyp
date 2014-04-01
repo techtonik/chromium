@@ -38,7 +38,6 @@
               'activity_log_private.json',
               'alarms.idl',
               'app_current_window_internal.idl',
-              'app_runtime.idl',
               'app_window.idl',
               'audio.idl',
               'automation_internal.idl',
@@ -133,7 +132,6 @@
                 # These should be eliminated. See crbug.com/305852.
                 'activity_log_private.json',
                 'alarms.idl',
-                'app_runtime.idl',
                 'app_window.idl',
                 'context_menus.json',
                 'downloads.idl',
@@ -156,6 +154,7 @@
           }],
           ['chromeos==1', {
             'schema_files': [
+              'accessibility_features.json',
               'diagnostics.idl',
               'file_browser_handler_internal.json',
               'first_run_private.json',

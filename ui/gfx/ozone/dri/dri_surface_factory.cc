@@ -17,6 +17,7 @@
 #include "ui/gfx/ozone/dri/dri_vsync_provider.h"
 #include "ui/gfx/ozone/dri/dri_wrapper.h"
 #include "ui/gfx/ozone/dri/hardware_display_controller.h"
+#include "ui/gfx/ozone/surface_ozone_base.h"
 
 namespace gfx {
 
@@ -114,6 +115,37 @@ void UpdateCursorImage(DriSurface* cursor, const SkBitmap& image) {
   canvas->drawBitmapRectToRect(image, &damage, damage);
 }
 
+// Adapter from SurfaceOzone to DriSurfaceFactory
+//
+// This class is derived from SurfaceOzone and owned by the compositor.
+//
+// For DRI the hadware surface & canvas are owned by the platform, so
+// the compositor merely owns this proxy object.
+//
+// TODO(spang): Should the compositor own any bits of the DriSurface?
+class DriSurfaceAdapter : public SurfaceOzoneBase {
+ public:
+  DriSurfaceAdapter(gfx::AcceleratedWidget w, DriSurfaceFactory* dri)
+      : widget_(w), dri_(dri) {}
+  virtual ~DriSurfaceAdapter() {}
+
+  // SurfaceOzone:
+  virtual bool InitializeCanvas() OVERRIDE { return true; }
+  virtual skia::RefPtr<SkCanvas> GetCanvas() OVERRIDE {
+    return skia::SharePtr(dri_->GetCanvasForWidget(widget_));
+  }
+  virtual bool PresentCanvas() OVERRIDE {
+    return dri_->SchedulePageFlip(widget_);
+  }
+  virtual scoped_ptr<gfx::VSyncProvider> CreateVSyncProvider() OVERRIDE {
+    return dri_->CreateVSyncProvider(widget_);
+  }
+
+ private:
+  gfx::AcceleratedWidget widget_;
+  DriSurfaceFactory* dri_;
+};
+
 }  // namespace
 
 DriSurfaceFactory::DriSurfaceFactory()
@@ -176,7 +208,7 @@ gfx::AcceleratedWidget DriSurfaceFactory::GetAcceleratedWidget() {
   return kDefaultWidgetHandle;
 }
 
-gfx::AcceleratedWidget DriSurfaceFactory::RealizeAcceleratedWidget(
+scoped_ptr<SurfaceOzone> DriSurfaceFactory::CreateSurfaceForWidget(
     gfx::AcceleratedWidget w) {
   CHECK(state_ == INITIALIZED);
   // TODO(dnicoara) Once we can handle multiple displays this needs to be
@@ -190,7 +222,7 @@ gfx::AcceleratedWidget DriSurfaceFactory::RealizeAcceleratedWidget(
   // hardware display.
   if (!InitializeControllerForPrimaryDisplay(drm_.get(), controller_.get())) {
     LOG(ERROR) << "Failed to initialize controller";
-    return gfx::kNullAcceleratedWidget;
+    return scoped_ptr<SurfaceOzone>();
   }
 
   // Create a surface suitable for the current controller.
@@ -200,7 +232,7 @@ gfx::AcceleratedWidget DriSurfaceFactory::RealizeAcceleratedWidget(
 
   if (!surface->Initialize()) {
     LOG(ERROR) << "Failed to initialize surface";
-    return gfx::kNullAcceleratedWidget;
+    return scoped_ptr<SurfaceOzone>();
   }
 
   // Bind the surface to the controller. This will register the backing buffers
@@ -208,21 +240,18 @@ gfx::AcceleratedWidget DriSurfaceFactory::RealizeAcceleratedWidget(
   // takes ownership of the surface.
   if (!controller_->BindSurfaceToController(surface.Pass())) {
     LOG(ERROR) << "Failed to bind surface to controller";
-    return gfx::kNullAcceleratedWidget;
+    return scoped_ptr<SurfaceOzone>();
   }
 
-  return reinterpret_cast<gfx::AcceleratedWidget>(controller_->get_surface());
+  // Initial cursor set.
+  ResetCursor();
+
+  return make_scoped_ptr<SurfaceOzone>(new DriSurfaceAdapter(w, this));
 }
 
 bool DriSurfaceFactory::LoadEGLGLES2Bindings(
       AddGLLibraryCallback add_gl_library,
       SetGLGetProcAddressProcCallback set_gl_get_proc_address) {
-  return false;
-}
-
-bool DriSurfaceFactory::AttemptToResizeAcceleratedWidget(
-    gfx::AcceleratedWidget w,
-    const gfx::Rect& bounds) {
   return false;
 }
 
@@ -261,7 +290,8 @@ bool DriSurfaceFactory::SchedulePageFlip(gfx::AcceleratedWidget w) {
 SkCanvas* DriSurfaceFactory::GetCanvasForWidget(
     gfx::AcceleratedWidget w) {
   CHECK(state_ == INITIALIZED);
-  return reinterpret_cast<DriSurface*>(w)->GetDrawableForWidget();
+  CHECK_EQ(kDefaultWidgetHandle, w);
+  return controller_->get_surface()->GetDrawableForWidget();
 }
 
 scoped_ptr<gfx::VSyncProvider> DriSurfaceFactory::CreateVSyncProvider(
@@ -273,17 +303,19 @@ scoped_ptr<gfx::VSyncProvider> DriSurfaceFactory::CreateVSyncProvider(
 void DriSurfaceFactory::SetHardwareCursor(gfx::AcceleratedWidget window,
                                           const SkBitmap& image,
                                           const gfx::Point& location) {
+  cursor_bitmap_ = image;
+  cursor_location_ = location;
+
   if (state_ != INITIALIZED)
     return;
 
-  UpdateCursorImage(cursor_surface_.get(), image);
-  controller_->MoveCursor(location);
-  controller_->SetCursor(*cursor_surface_.get());
-  cursor_surface_->SwapBuffers();
+  ResetCursor();
 }
 
 void DriSurfaceFactory::MoveHardwareCursor(gfx::AcceleratedWidget window,
                                            const gfx::Point& location) {
+  cursor_location_ = location;
+
   if (state_ != INITIALIZED)
     return;
 
@@ -291,10 +323,12 @@ void DriSurfaceFactory::MoveHardwareCursor(gfx::AcceleratedWidget window,
 }
 
 void DriSurfaceFactory::UnsetHardwareCursor(gfx::AcceleratedWidget window) {
+  cursor_bitmap_.reset();
+
   if (state_ != INITIALIZED)
     return;
 
-  controller_->UnsetCursor();
+  ResetCursor();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -366,5 +400,20 @@ void DriSurfaceFactory::WaitForPageFlipEvent(int fd) {
   // Wait for the page-flip to complete.
   drmHandleEvent(fd, &drm_event);
 }
+
+void DriSurfaceFactory::ResetCursor() {
+  if (!cursor_bitmap_.empty()) {
+    // Draw new cursor into backbuffer.
+    UpdateCursorImage(cursor_surface_.get(), cursor_bitmap_);
+
+    // Reset location & buffer.
+    controller_->MoveCursor(cursor_location_);
+    controller_->SetCursor(cursor_surface_.get());
+  } else {
+    // No cursor set.
+    controller_->UnsetCursor();
+  }
+}
+
 
 }  // namespace gfx

@@ -253,8 +253,6 @@ class EmptyWindowDelegate : public aura::WindowDelegate {
     return false;
   }
   virtual void GetHitTestMask(gfx::Path* mask) const OVERRIDE {}
-  virtual void DidRecreateLayer(ui::Layer* old_layer,
-                                ui::Layer* new_layer) OVERRIDE {}
 
  private:
   DISALLOW_COPY_AND_ASSIGN(EmptyWindowDelegate);
@@ -650,6 +648,12 @@ void RootWindowController::DeactivateKeyboard(
       keyboard_controller->RemoveObserver(docked_layout_manager_);
     }
   }
+}
+
+bool RootWindowController::IsVirtualKeyboardWindow(aura::Window* window) {
+  aura::Window* parent = GetContainer(
+      kShellWindowId_VirtualKeyboardParentContainer);
+  return parent ? parent->Contains(window) : false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

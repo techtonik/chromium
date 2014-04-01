@@ -105,6 +105,7 @@ class ToolbarView : public views::AccessiblePaneView,
   LocationBarView* location_bar() const { return location_bar_; }
   ToolbarOriginChipView* origin_chip() const { return origin_chip_view_; }
   views::MenuButton* app_menu() const;
+  HomeButton* home_button() const { return home_; }
 
   // Overridden from AccessiblePaneView
   virtual bool SetPaneFocus(View* initial_focus) OVERRIDE;
@@ -139,8 +140,6 @@ class ToolbarView : public views::AccessiblePaneView,
   // Overridden from views::WidgetObserver:
   virtual void OnWidgetVisibilityChanged(views::Widget* widget,
                                          bool visible) OVERRIDE;
-  virtual void OnWidgetActivationChanged(views::Widget* widget,
-                                         bool active) OVERRIDE;
 
   // Overridden from content::NotificationObserver:
   virtual void Observe(int type,
@@ -213,7 +212,8 @@ class ToolbarView : public views::AccessiblePaneView,
   void ShowCriticalNotification();
 
   // Shows the outdated install notification bubble against the wrench menu.
-  void ShowOutdatedInstallNotification();
+  // |auto_update_enabled| is set to true when auto-upate is on.
+  void ShowOutdatedInstallNotification(bool auto_update_enabled);
 
   // Updates the badge and the accessible name of the app menu (Wrench).
   void UpdateAppMenuState();

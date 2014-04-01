@@ -1362,26 +1362,40 @@ const char kDisableSSLRecordSplitting[] = "ssl.ssl_record_splitting.disabled";
 const char kEulaAccepted[] = "EulaAccepted";
 
 // The metrics client GUID, entropy source and session ID.
-const char kMetricsClientID[] = "user_experience_metrics.client_id";
+// Note: The names client_id2 and low_entropy_source2 are a result of creating
+// new prefs to do a one-time reset of the previous values.
+const char kMetricsClientID[] = "user_experience_metrics.client_id2";
 const char kMetricsSessionID[] = "user_experience_metrics.session_id";
 const char kMetricsLowEntropySource[] =
-    "user_experience_metrics.low_entropy_source";
+    "user_experience_metrics.low_entropy_source2";
 const char kMetricsPermutedEntropyCache[] =
     "user_experience_metrics.permuted_entropy_cache";
 
-// Date/time when the current metrics profile ID was created
-// (which hopefully corresponds to first run).
-const char kMetricsClientIDTimestamp[] =
-    "user_experience_metrics.client_id_timestamp";
+// Old client id and low entropy source values, cleared the first time this
+// version is launched.
+// TODO(asvitkine): Delete these after a few releases have gone by and old
+// values have been cleaned up. http://crbug.com/357704
+const char kMetricsOldClientID[] = "user_experience_metrics.client_id";
+const char kMetricsOldLowEntropySource[] =
+    "user_experience_metrics.low_entropy_source";
 
 // Boolean that specifies whether or not crash reporting and metrics reporting
 // are sent over the network for analysis.
 const char kMetricsReportingEnabled[] =
     "user_experience_metrics.reporting_enabled";
+// Date/time when the user opted in to UMA and generated the client id for the
+// very first time (local machine time, stored as a 64-bit time_t value).
+const char kMetricsReportingEnabledTimestamp[] =
+    "user_experience_metrics.client_id_timestamp";
 
 // A machine ID used to detect when underlying hardware changes. It is only
 // stored locally and never transmitted in metrics reports.
 const char kMetricsMachineId[] = "user_experience_metrics.machine_id";
+
+// Boolean that indicates a cloned install has been detected and the metrics
+// client id and low entropy source should be reset.
+const char kMetricsResetIds[] =
+    "user_experience_metrics.reset_metrics_ids";
 
 // Boolean that specifies whether or not crash reports are sent
 // over the network for analysis.
@@ -1835,16 +1849,6 @@ const char kInvalidatorSavedInvalidations[] = "invalidator.saved_invalidations";
 // False or lack of settings means XMPPPushClient channel.
 const char kInvalidationServiceUseGCMChannel[] =
     "invalidation_service.use_gcm_channel";
-
-// Obfuscated account ID that identifies the current user logged into sync and
-// other google services.
-const char kGoogleServicesUserAccountId[] = "google.services.user_account_id";
-
-// Local state pref containing a string regex that restricts which accounts
-// can be used to log in to chrome (e.g. "*@google.com"). If missing or blank,
-// all accounts are allowed (no restrictions).
-const char kGoogleServicesUsernamePattern[] =
-    "google.services.username_pattern";
 
 // Local hash of authentication password, used for off-line authentication
 // when on-line authentication is not available.
@@ -2360,6 +2364,13 @@ const char kRecoveryComponentVersion[] = "recovery_component.version";
 // String that stores the component updater last known state. This is used for
 // troubleshooting.
 const char kComponentUpdaterState[] = "component_updater.state";
+
+// A boolean where true means that the browser has previously attempted to
+// enable autoupdate and failed, so the next out-of-date browser start should
+// not prompt the user to enable autoupdate, it should offer to reinstall Chrome
+// instead.
+const char kAttemptedToEnableAutoupdate[] =
+    "browser.attempted_to_enable_autoupdate";
 
 // The next media gallery ID to assign.
 const char kMediaGalleriesUniqueId[] = "media_galleries.gallery_id";

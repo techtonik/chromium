@@ -285,7 +285,7 @@ RenderWidgetHost* RenderWidgetHost::FromID(
 RenderWidgetHostImpl* RenderWidgetHostImpl::FromID(
     int32 process_id,
     int32 routing_id) {
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   RoutingIDWidgetMap* widgets = g_routing_id_widget_map.Pointer();
   RoutingIDWidgetMap::iterator it = widgets->find(
       RenderWidgetHostID(process_id, routing_id));
@@ -958,6 +958,18 @@ void RenderWidgetHostImpl::EnableFullAccessibilityMode() {
   AddAccessibilityMode(AccessibilityModeComplete);
 }
 
+bool RenderWidgetHostImpl::IsFullAccessibilityModeForTesting() {
+  return accessibility_mode() == AccessibilityModeComplete;
+}
+
+void RenderWidgetHostImpl::EnableTreeOnlyAccessibilityMode() {
+  AddAccessibilityMode(AccessibilityModeTreeOnly);
+}
+
+bool RenderWidgetHostImpl::IsTreeOnlyAccessibilityModeForTesting() {
+  return accessibility_mode() == AccessibilityModeTreeOnly;
+}
+
 void RenderWidgetHostImpl::ForwardMouseEvent(const WebMouseEvent& mouse_event) {
   ForwardMouseEventWithLatencyInfo(mouse_event, ui::LatencyInfo());
 }
@@ -1389,12 +1401,6 @@ void RenderWidgetHostImpl::ImeCancelComposition() {
             std::vector<blink::WebCompositionUnderline>(), 0, 0));
 }
 
-void RenderWidgetHostImpl::ExtendSelectionAndDelete(
-    size_t before,
-    size_t after) {
-  Send(new ViewMsg_ExtendSelectionAndDelete(GetRoutingID(), before, after));
-}
-
 gfx::Rect RenderWidgetHostImpl::GetRootWindowResizerRect() const {
   return gfx::Rect();
 }
@@ -1779,6 +1785,14 @@ void RenderWidgetHostImpl::DidUpdateBackingStore(
 
 void RenderWidgetHostImpl::OnQueueSyntheticGesture(
     const SyntheticGesturePacket& gesture_packet) {
+  // Only allow untrustworthy gestures if explicitly enabled.
+  if (!CommandLine::ForCurrentProcess()->HasSwitch(
+          cc::switches::kEnableGpuBenchmarking)) {
+    RecordAction(base::UserMetricsAction("BadMessageTerminate_RWH7"));
+    GetProcess()->ReceivedBadMessage();
+    return;
+  }
+
   QueueSyntheticGesture(
         SyntheticGesture::Create(*gesture_packet.gesture_params()),
         base::Bind(&RenderWidgetHostImpl::OnSyntheticGestureCompleted,
@@ -2118,6 +2132,11 @@ void RenderWidgetHostImpl::OnGestureEventAck(
     ui::LatencyInfo latency = event.latency;
     latency.AddLatencyNumber(
         ui::INPUT_EVENT_LATENCY_TERMINATED_GESTURE_COMPONENT, 0 ,0);
+  }
+
+  if (ack_result != INPUT_EVENT_ACK_STATE_CONSUMED) {
+    if (delegate_->HandleGestureEvent(event.event))
+      ack_result = INPUT_EVENT_ACK_STATE_CONSUMED;
   }
 
   if (view_)

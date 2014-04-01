@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <gtest/gtest.h>
+#include <stdint.h>
 
 #include "base/bind.h"
 #include "base/bind_helpers.h"
@@ -21,7 +22,7 @@ namespace media {
 namespace cast {
 namespace transport {
 
-static const int64 kStartMillisecond = GG_INT64_C(12345678900000);
+static const int64 kStartMillisecond = INT64_C(12345678900000);
 
 class FakePacketSender : public transport::PacketSender {
  public:
@@ -46,7 +47,6 @@ class CastTransportSenderImplTest : public ::testing::Test {
         new CastTransportSenderImpl(NULL,
                                     &testing_clock_,
                                     net::IPEndPoint(),
-                                    GetDefaultCastSenderLoggingConfig(),
                                     base::Bind(&UpdateCastTransportStatus),
                                     BulkRawEventsCallback(),
                                     base::TimeDelta(),
@@ -60,7 +60,6 @@ class CastTransportSenderImplTest : public ::testing::Test {
         NULL,
         &testing_clock_,
         net::IPEndPoint(),
-        GetLoggingConfigWithRawEventsAndStatsEnabled(),
         base::Bind(&UpdateCastTransportStatus),
         base::Bind(&CastTransportSenderImplTest::LogRawEvents,
                    base::Unretained(this)),

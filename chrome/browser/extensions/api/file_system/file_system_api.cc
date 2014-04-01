@@ -6,6 +6,7 @@
 
 #include "apps/app_window.h"
 #include "apps/app_window_registry.h"
+#include "apps/browser/file_handler_util.h"
 #include "apps/saved_files_service.h"
 #include "base/bind.h"
 #include "base/file_util.h"
@@ -284,7 +285,7 @@ FileSystemEntryFunction::FileSystemEntryFunction()
 
 void FileSystemEntryFunction::CheckWritableFiles(
     const std::vector<base::FilePath>& paths) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   app_file_handler_util::CheckWritableFiles(
       paths,
       GetProfile(),
@@ -297,7 +298,7 @@ void FileSystemEntryFunction::CheckWritableFiles(
 
 void FileSystemEntryFunction::RegisterFileSystemsAndSendResponse(
     const std::vector<base::FilePath>& paths) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   if (!render_view_host_)
     return;
 
@@ -322,7 +323,7 @@ void FileSystemEntryFunction::AddEntryToResponse(
     const base::FilePath& path,
     const std::string& id_override) {
   DCHECK(response_);
-  extensions::app_file_handler_util::GrantedFileEntry file_entry =
+  apps::file_handler_util::GrantedFileEntry file_entry =
       extensions::app_file_handler_util::CreateFileEntry(
           GetProfile(),
           GetExtension(),
@@ -346,7 +347,7 @@ void FileSystemEntryFunction::AddEntryToResponse(
 
 void FileSystemEntryFunction::HandleWritableFileError(
     const base::FilePath& error_path) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   error_ = base::StringPrintf(kWritableFileErrorFormat,
                               error_path.BaseName().AsUTF8Unsafe().c_str());
   SendResponse(false);
@@ -383,7 +384,7 @@ bool FileSystemGetWritableEntryFunction::RunImpl() {
 }
 
 void FileSystemGetWritableEntryFunction::CheckPermissionAndSendResponse() {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   if (is_directory_ &&
       !extension_->HasAPIPermission(APIPermission::kFileSystemDirectory)) {
     error_ = kRequiresFileSystemDirectoryError;
@@ -395,7 +396,7 @@ void FileSystemGetWritableEntryFunction::CheckPermissionAndSendResponse() {
 }
 
 void FileSystemGetWritableEntryFunction::SetIsDirectoryOnFileThread() {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::FILE));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::FILE);
   if (base::DirectoryExists(path_)) {
     is_directory_ = true;
   }
@@ -639,7 +640,7 @@ void FileSystemChooseEntryFunction::RegisterTempExternalFileSystemForTest(
 void FileSystemChooseEntryFunction::SetInitialPathOnFileThread(
     const base::FilePath& suggested_name,
     const base::FilePath& previous_path) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::FILE));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::FILE);
   if (!previous_path.empty() && base::DirectoryExists(previous_path)) {
     initial_path_ = previous_path.Append(suggested_name);
   } else {

@@ -49,6 +49,7 @@
 #include "content/renderer/child_frame_compositing_helper.h"
 #include "content/renderer/context_menu_params_builder.h"
 #include "content/renderer/dom_automation_controller.h"
+#include "content/renderer/image_loading_helper.h"
 #include "content/renderer/ime_event_guard.h"
 #include "content/renderer/internal_document_state_data.h"
 #include "content/renderer/java/java_bridge_dispatcher.h"
@@ -176,7 +177,7 @@ NOINLINE static void CrashIntentionally() {
   *zero = 0;
 }
 
-#if defined(ADDRESS_SANITIZER)
+#if defined(ADDRESS_SANITIZER) || defined(SYZYASAN)
 NOINLINE static void MaybeTriggerAsanError(const GURL& url) {
   // NOTE(rogerm): We intentionally perform an invalid heap access here in
   //     order to trigger an Address Sanitizer (ASAN) error report.
@@ -208,7 +209,7 @@ NOINLINE static void MaybeTriggerAsanError(const GURL& url) {
   // Make sure the assignments to the dummy value aren't optimized away.
   base::debug::Alias(&dummy);
 }
-#endif  // ADDRESS_SANITIZER
+#endif  // ADDRESS_SANITIZER || SYZYASAN
 
 static void MaybeHandleDebugURL(const GURL& url) {
   if (!url.SchemeIs(kChromeUIScheme))
@@ -225,9 +226,9 @@ static void MaybeHandleDebugURL(const GURL& url) {
     base::PlatformThread::Sleep(base::TimeDelta::FromSeconds(20));
   }
 
-#if defined(ADDRESS_SANITIZER)
+#if defined(ADDRESS_SANITIZER) || defined(SYZYASAN)
   MaybeTriggerAsanError(url);
-#endif  // ADDRESS_SANITIZER
+#endif  // ADDRESS_SANITIZER || SYZYASAN
 }
 
 // Returns false unless this is a top-level navigation.
@@ -341,6 +342,9 @@ void RenderFrameImpl::SetWebFrame(blink::WebFrame* web_frame) {
   new PepperBrowserConnection(this);
 #endif
   new SharedWorkerRepository(this);
+
+  if (!frame_->parent())
+    new ImageLoadingHelper(this);
 
   // We delay calling this until we have the WebFrame so that any observer or
   // embedder can call GetWebFrame on any RenderFrame.
@@ -578,9 +582,14 @@ bool RenderFrameImpl::OnMessageReceived(const IPC::Message& msg) {
                         OnJavaScriptExecuteRequest)
     IPC_MESSAGE_HANDLER(FrameMsg_SetEditableSelectionOffsets,
                         OnSetEditableSelectionOffsets)
+    IPC_MESSAGE_HANDLER(FrameMsg_SetCompositionFromExistingText,
+                        OnSetCompositionFromExistingText)
+    IPC_MESSAGE_HANDLER(FrameMsg_ExtendSelectionAndDelete,
+                        OnExtendSelectionAndDelete)
 #if defined(OS_MACOSX)
     IPC_MESSAGE_HANDLER(InputMsg_CopyToFindPboard, OnCopyToFindPboard)
 #endif
+    IPC_MESSAGE_HANDLER(FrameMsg_Reload, OnReload)
   IPC_END_MESSAGE_MAP_EX()
 
   if (!msg_is_ok) {
@@ -775,13 +784,13 @@ void RenderFrameImpl::OnNavigate(const FrameMsg_Navigate_Params& params) {
 }
 
 void RenderFrameImpl::OnBeforeUnload() {
-  // TODO(creis): Move dispatchBeforeUnloadEvent to WebFrame.  Until then, this
-  // should only be called on the main frame.  Eventually, the browser process
-  // should dispatch it to every frame that needs it.
+  // TODO(creis): Right now, this is only called on the main frame.  Make the
+  // browser process send dispatchBeforeUnloadEvent to every frame that needs
+  // it.
   CHECK(!frame_->parent());
 
   base::TimeTicks before_unload_start_time = base::TimeTicks::Now();
-  bool proceed = render_view_->webview()->dispatchBeforeUnloadEvent();
+  bool proceed = frame_->dispatchBeforeUnloadEvent();
   base::TimeTicks before_unload_end_time = base::TimeTicks::Now();
   Send(new FrameHostMsg_BeforeUnload_ACK(routing_id_, proceed,
                                          before_unload_start_time,
@@ -790,19 +799,24 @@ void RenderFrameImpl::OnBeforeUnload() {
 
 void RenderFrameImpl::OnSwapOut() {
   // Only run unload if we're not swapped out yet, but send the ack either way.
-  if (!is_swapped_out_) {
-    // Swap this RenderView out so the tab can navigate to a page rendered by a
-    // different process.  This involves running the unload handler and clearing
-    // the page.  Once WasSwappedOut is called, we also allow this process to
-    // exit if there are no other active RenderViews in it.
+  if (!is_swapped_out_ || !render_view_->is_swapped_out_) {
+    // Swap this RenderFrame out so the frame can navigate to a page rendered by
+    // a different process.  This involves running the unload handler and
+    // clearing the page.  Once WasSwappedOut is called, we also allow this
+    // process to exit if there are no other active RenderFrames in it.
 
     // Send an UpdateState message before we get swapped out.
     render_view_->SyncNavigationState();
 
     // Synchronously run the unload handler before sending the ACK.
-    // TODO(creis): Add a WebFrame::dispatchUnloadEvent and call it here.
+    // TODO(creis): Move WebView::dispatchUnloadEvent to WebFrame and call it
+    // here to support unload on subframes as well.
+    if (!frame_->parent())
+      render_view_->webview()->dispatchUnloadEvent();
 
     // Swap out and stop sending any IPC messages that are not ACKs.
+    if (!frame_->parent())
+      render_view_->SetSwappedOut(true);
     is_swapped_out_ = true;
 
     // Now that we're swapped out and filtering IPC messages, stop loading to
@@ -811,9 +825,15 @@ void RenderFrameImpl::OnSwapOut() {
     // TODO(creis): Should we be stopping all frames here and using
     // StopAltErrorPageFetcher with RenderView::OnStop, or just stopping this
     // frame?
-    frame_->stopLoading();
+    if (!frame_->parent())
+      render_view_->OnStop();
+    else
+      frame_->stopLoading();
 
-    frame_->setIsRemote(true);
+    // Let subframes know that the frame is now rendered remotely, for the
+    // purposes of compositing and input events.
+    if (frame_->parent())
+      frame_->setIsRemote(true);
 
     // Replace the page with a blank dummy URL. The unload handler will not be
     // run a second time, thanks to a check in FrameLoader::stopLoading.
@@ -821,8 +841,22 @@ void RenderFrameImpl::OnSwapOut() {
     // beforeunload handler. For now, we just run it a second time silently.
     render_view_->NavigateToSwappedOutURL(frame_);
 
-    render_view_->RegisterSwappedOutChildFrame(this);
+    if (frame_->parent())
+      render_view_->RegisterSwappedOutChildFrame(this);
+
+    // Let WebKit know that this view is hidden so it can drop resources and
+    // stop compositing.
+    // TODO(creis): Support this for subframes as well.
+    if (!frame_->parent()) {
+      render_view_->webview()->setVisibilityState(
+          blink::WebPageVisibilityStateHidden, false);
+    }
   }
+
+  // It is now safe to show modal dialogs again.
+  // TODO(creis): Deal with modal dialogs from subframes.
+  if (!frame_->parent())
+    render_view_->suppress_dialogs_until_swap_out_ = false;
 
   Send(new FrameHostMsg_SwapOut_ACK(routing_id_));
 }
@@ -995,8 +1029,28 @@ void RenderFrameImpl::OnSetEditableSelectionOffsets(int start, int end) {
   if (!GetRenderWidget()->ShouldHandleImeEvent())
     return;
   ImeEventGuard guard(GetRenderWidget());
-  // TODO(jam): move this method to WebFrame since it uses the focused frame.
-  render_view_->webview()->setEditableSelectionOffsets(start, end);
+  frame_->setEditableSelectionOffsets(start, end);
+}
+
+void RenderFrameImpl::OnSetCompositionFromExistingText(
+    int start, int end,
+    const std::vector<blink::WebCompositionUnderline>& underlines) {
+  if (!GetRenderWidget()->ShouldHandleImeEvent())
+    return;
+  ImeEventGuard guard(GetRenderWidget());
+  frame_->setCompositionFromExistingText(start, end, underlines);
+}
+
+void RenderFrameImpl::OnExtendSelectionAndDelete(int before, int after) {
+  if (!GetRenderWidget()->ShouldHandleImeEvent())
+    return;
+  ImeEventGuard guard(GetRenderWidget());
+  frame_->extendSelectionAndDelete(before, after);
+}
+
+
+void RenderFrameImpl::OnReload(bool ignore_cache) {
+  frame_->reload(ignore_cache);
 }
 
 bool RenderFrameImpl::ShouldUpdateSelectionTextFromContextMenuParams(
@@ -1351,18 +1405,6 @@ blink::WebNavigationPolicy RenderFrameImpl::decidePolicyForNavigation(
   DCHECK(!frame_ || frame_ == frame);
   return DecidePolicyForNavigation(
       this, frame, extra_data, request, type, default_policy, is_redirect);
-}
-
-blink::WebNavigationPolicy RenderFrameImpl::decidePolicyForNavigation(
-    blink::WebFrame* frame,
-    const blink::WebURLRequest& request,
-    blink::WebNavigationType type,
-    blink::WebNavigationPolicy default_policy,
-    bool is_redirect) {
-  DCHECK(!frame_ || frame_ == frame);
-  return decidePolicyForNavigation(frame,
-                                   frame->provisionalDataSource()->extraData(),
-                                   request, type, default_policy, is_redirect);
 }
 
 void RenderFrameImpl::willSendSubmitEvent(blink::WebFrame* frame,
@@ -1756,6 +1798,8 @@ void RenderFrameImpl::didFinishDocumentLoad(blink::WebFrame* frame) {
   // TODO(nasko): Remove once we have RenderFrameObserver for this method.
   render_view_->didFinishDocumentLoad(frame);
 
+  FOR_EACH_OBSERVER(RenderFrameObserver, observers_, DidFinishDocumentLoad());
+
   // Check whether we have new encoding name.
   render_view_->UpdateEncoding(frame, frame->view()->pageEncoding().utf8());
 }
@@ -1898,7 +1942,7 @@ void RenderFrameImpl::showContextMenu(const blink::WebContextMenuData& data) {
 #if defined(OS_ANDROID)
   gfx::Rect start_rect;
   gfx::Rect end_rect;
-  render_view_->GetSelectionBounds(&start_rect, &end_rect);
+  GetRenderWidget()->GetSelectionBounds(&start_rect, &end_rect);
   params.selection_start = gfx::Point(start_rect.x(), start_rect.bottom());
   params.selection_end = gfx::Point(end_rect.right(), end_rect.bottom());
 #endif
@@ -2581,7 +2625,7 @@ void RenderFrameImpl::didStartLoading(bool to_different_document) {
   render_view_->FrameDidStartLoading(frame_);
 
   if (!view_was_loading)
-    Send(new FrameHostMsg_DidStartLoading(routing_id_));
+    Send(new FrameHostMsg_DidStartLoading(routing_id_, to_different_document));
 }
 
 void RenderFrameImpl::didStopLoading() {
@@ -2879,12 +2923,14 @@ void RenderFrameImpl::SyncSelectionIfRequired() {
 #endif
   {
     size_t location, length;
-    if (!render_view_->webview()->caretOrSelectionRange(&location, &length))
+    if (!GetRenderWidget()->webwidget()->caretOrSelectionRange(
+            &location, &length)) {
       return;
+    }
 
     range = gfx::Range(location, location + length);
 
-    if (render_view_->webview()->textInputInfo().type !=
+    if (GetRenderWidget()->webwidget()->textInputInfo().type !=
             blink::WebTextInputTypeNone) {
       // If current focused element is editable, we will send 100 more chars
       // before and after selection. It is for input method surrounding text
@@ -2903,7 +2949,7 @@ void RenderFrameImpl::SyncSelectionIfRequired() {
       text = frame_->selectionAsText();
       // http://crbug.com/101435
       // In some case, frame->selectionAsText() returned text's length is not
-      // equal to the length returned from webview()->caretOrSelectionRange().
+      // equal to the length returned from webwidget()->caretOrSelectionRange().
       // So we have to set the range according to text.length().
       range.set_end(range.start() + text.length());
     }

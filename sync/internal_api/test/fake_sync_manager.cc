@@ -218,6 +218,10 @@ UserShare* FakeSyncManager::GetUserShare() {
   return test_user_share_.user_share();
 }
 
+syncer::SyncCore* FakeSyncManager::GetSyncCore() {
+  return NULL;
+}
+
 const std::string FakeSyncManager::cache_guid() {
   return test_user_share_.user_share()->directory->cache_guid();
 }
@@ -233,6 +237,11 @@ bool FakeSyncManager::HasUnsyncedItems() {
 
 SyncEncryptionHandler* FakeSyncManager::GetEncryptionHandler() {
   return fake_encryption_handler_.get();
+}
+
+ScopedVector<syncer::ProtocolEvent>
+FakeSyncManager::GetBufferedProtocolEvents() {
+  return ScopedVector<syncer::ProtocolEvent>();
 }
 
 void FakeSyncManager::RefreshTypes(ModelTypeSet types) {

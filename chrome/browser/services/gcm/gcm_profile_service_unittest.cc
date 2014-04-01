@@ -25,7 +25,6 @@
 #include "chrome/browser/signin/chrome_signin_client_factory.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/ui/browser.h"
-#include "chrome/common/extensions/features/feature_channel.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/os_crypt/os_crypt.h"
@@ -42,6 +41,8 @@
 #include "chrome/browser/chromeos/login/user_manager.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
 #include "chrome/browser/chromeos/settings/device_settings_service.h"
+#else
+#include "chrome/browser/signin/signin_manager.h"
 #endif
 
 using namespace extensions;
@@ -288,12 +289,15 @@ class GCMProfileServiceTestConsumer {
         has_persisted_registration_info_(false),
         send_result_(GCMClient::SUCCESS) {
     // Create a new profile.
-    profile_.reset(new TestingProfile);
+    TestingProfile::Builder builder;
+    builder.AddTestingFactory(
+        SigninManagerFactory::GetInstance(),
+        GCMProfileServiceTestConsumer::BuildFakeSigninManager);
+    profile_ = builder.Build();
 
-    // Use a fake version of SigninManager.
-    signin_manager_ = static_cast<FakeSigninManager*>(
-        SigninManagerFactory::GetInstance()->SetTestingFactoryAndUse(
-            profile(), &GCMProfileServiceTestConsumer::BuildFakeSigninManager));
+    SigninManagerBase* signin_manager =
+        SigninManagerFactory::GetInstance()->GetForProfile(profile_.get());
+    signin_manager_ = static_cast<FakeSigninManager*>(signin_manager);
 
     // Create extension service in order to uninstall the extension.
     extensions::TestExtensionSystem* extension_system(
@@ -333,8 +337,6 @@ class GCMProfileServiceTestConsumer {
     permission_list->Append(base::Value::CreateStringValue("gcm"));
     manifest.Set(manifest_keys::kPermissions, permission_list);
 
-    // TODO(jianli): Once the GCM API enters stable, remove |channel|.
-    ScopedCurrentChannel channel(chrome::VersionInfo::CHANNEL_UNKNOWN);
     std::string error;
     scoped_refptr<Extension> extension =
         Extension::Create(path.AppendASCII(kTestExtensionName),

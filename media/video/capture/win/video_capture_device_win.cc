@@ -102,27 +102,28 @@ bool PinMatchesCategory(IPin* pin, REFGUID category) {
 }
 
 // Finds a IPin on a IBaseFilter given the direction an category.
-HRESULT GetPin(IBaseFilter* filter, PIN_DIRECTION pin_dir, REFGUID category,
-               IPin** pin) {
-  DCHECK(pin);
+ScopedComPtr<IPin> GetPin(IBaseFilter* filter, PIN_DIRECTION pin_dir,
+                          REFGUID category) {
+  ScopedComPtr<IPin> pin;
   ScopedComPtr<IEnumPins> pin_emum;
   HRESULT hr = filter->EnumPins(pin_emum.Receive());
   if (pin_emum == NULL)
-    return hr;
+    return pin;
 
   // Get first unconnected pin.
   hr = pin_emum->Reset();  // set to first pin
-  while ((hr = pin_emum->Next(1, pin, NULL)) == S_OK) {
+  while ((hr = pin_emum->Next(1, pin.Receive(), NULL)) == S_OK) {
     PIN_DIRECTION this_pin_dir = static_cast<PIN_DIRECTION>(-1);
-    hr = (*pin)->QueryDirection(&this_pin_dir);
+    hr = pin->QueryDirection(&this_pin_dir);
     if (pin_dir == this_pin_dir) {
-      if (category == GUID_NULL || PinMatchesCategory(*pin, category))
-        return S_OK;
+      if (category == GUID_NULL || PinMatchesCategory(pin, category))
+        return pin;
     }
-    (*pin)->Release();
+    pin.Release();
   }
 
-  return E_FAIL;
+  DCHECK(!pin);
+  return pin;
 }
 
 // Release the format block for a media type.
@@ -149,6 +150,34 @@ void DeleteMediaType(AM_MEDIA_TYPE* mt) {
     CoTaskMemFree(mt);
   }
 }
+
+// A utility class that wraps the AM_MEDIA_TYPE type and guarantees that
+// we free the structure when exiting the scope.  DCHECKing is also done to
+// avoid memory leaks.
+class ScopedMediaType {
+ public:
+  ScopedMediaType() : media_type_(NULL) {}
+  ~ScopedMediaType() { Free(); }
+
+  AM_MEDIA_TYPE* operator->() { return media_type_; }
+  AM_MEDIA_TYPE* get() { return media_type_; }
+
+  void Free() {
+    if (!media_type_)
+      return;
+
+    DeleteMediaType(media_type_);
+    media_type_= NULL;
+  }
+
+  AM_MEDIA_TYPE** Receive() {
+    DCHECK(!media_type_);
+    return &media_type_;
+  }
+
+ private:
+  AM_MEDIA_TYPE* media_type_;
+};
 
 VideoPixelFormat TranslateMediaSubtypeToPixelFormat(const GUID& sub_type) {
   static struct {
@@ -355,9 +384,8 @@ void VideoCaptureDeviceWin::GetDeviceSupportedFormats(const Name& device,
       return;
     }
 
-    base::win::ScopedComPtr<IPin> output_capture_pin;
-    hr = GetPin(capture_filter, PINDIR_OUTPUT, PIN_CATEGORY_CAPTURE,
-                output_capture_pin.Receive());
+    base::win::ScopedComPtr<IPin> output_capture_pin(
+        GetPin(capture_filter, PINDIR_OUTPUT, PIN_CATEGORY_CAPTURE));
     if (!output_capture_pin) {
       DVLOG(2) << "Failed to get capture output pin";
       return;
@@ -378,10 +406,10 @@ void VideoCaptureDeviceWin::GetDeviceSupportedFormats(const Name& device,
       return;
     }
 
-    AM_MEDIA_TYPE* media_type = NULL;
     scoped_ptr<BYTE[]> caps(new BYTE[size]);
     for (int i = 0; i < count; ++i) {
-      hr = stream_config->GetStreamCaps(i, &media_type, caps.get());
+      ScopedMediaType media_type;
+      hr = stream_config->GetStreamCaps(i, media_type.Receive(), caps.get());
       // GetStreamCaps() may return S_FALSE, so don't use FAILED() or SUCCEED()
       // macros here since they'll trigger incorrectly.
       if (hr != S_OK) {
@@ -391,21 +419,21 @@ void VideoCaptureDeviceWin::GetDeviceSupportedFormats(const Name& device,
 
       if (media_type->majortype == MEDIATYPE_Video &&
           media_type->formattype == FORMAT_VideoInfo) {
-          VIDEOINFOHEADER* h =
-              reinterpret_cast<VIDEOINFOHEADER*>(media_type->pbFormat);
-          VideoCaptureFormat format;
-          format.frame_size.SetSize(h->bmiHeader.biWidth,
-                                    h->bmiHeader.biHeight);
-          // Trust the frame rate from the VIDEOINFOHEADER.
-          format.frame_rate = (h->AvgTimePerFrame > 0) ?
-              static_cast<int>(kSecondsToReferenceTime / h->AvgTimePerFrame) :
-              0;
-          format.pixel_format =
-              TranslateMediaSubtypeToPixelFormat(media_type->subtype);
-          formats->push_back(format);
-          DVLOG(1) << device.name() << " resolution: "
-               << format.frame_size.ToString() << ", fps: " << format.frame_rate
-               << ", pixel format: " << format.pixel_format;
+        VIDEOINFOHEADER* h =
+            reinterpret_cast<VIDEOINFOHEADER*>(media_type->pbFormat);
+        VideoCaptureFormat format;
+        format.frame_size.SetSize(h->bmiHeader.biWidth,
+                                  h->bmiHeader.biHeight);
+        // Trust the frame rate from the VIDEOINFOHEADER.
+        format.frame_rate = (h->AvgTimePerFrame > 0) ?
+            static_cast<int>(kSecondsToReferenceTime / h->AvgTimePerFrame) :
+            0;
+        format.pixel_format =
+            TranslateMediaSubtypeToPixelFormat(media_type->subtype);
+        formats->push_back(format);
+        DVLOG(1) << device.name() << " resolution: "
+             << format.frame_size.ToString() << ", fps: " << format.frame_rate
+             << ", pixel format: " << format.pixel_format;
       }
     }
   }
@@ -444,8 +472,8 @@ bool VideoCaptureDeviceWin::Init() {
     return false;
   }
 
-  hr = GetPin(capture_filter_, PINDIR_OUTPUT, PIN_CATEGORY_CAPTURE,
-              output_capture_pin_.Receive());
+  output_capture_pin_ =
+      GetPin(capture_filter_, PINDIR_OUTPUT, PIN_CATEGORY_CAPTURE);
   if (!output_capture_pin_) {
     DVLOG(2) << "Failed to get capture output pin";
     return false;
@@ -524,22 +552,23 @@ void VideoCaptureDeviceWin::AllocateAndStart(
     return;
   }
 
-  AM_MEDIA_TYPE* pmt = NULL;
   scoped_ptr<BYTE[]> caps(new BYTE[size]);
+  ScopedMediaType media_type;
 
   // Get the windows capability from the capture device.
   hr = stream_config->GetStreamCaps(
-      found_capability.stream_index, &pmt, caps.get());
+      found_capability.stream_index, media_type.Receive(), caps.get());
   if (SUCCEEDED(hr)) {
-    if (pmt->formattype == FORMAT_VideoInfo) {
-      VIDEOINFOHEADER* h = reinterpret_cast<VIDEOINFOHEADER*>(pmt->pbFormat);
+    if (media_type->formattype == FORMAT_VideoInfo) {
+      VIDEOINFOHEADER* h =
+          reinterpret_cast<VIDEOINFOHEADER*>(media_type->pbFormat);
       if (format.frame_rate > 0)
         h->AvgTimePerFrame = kSecondsToReferenceTime / format.frame_rate;
     }
     // Set the sink filter to request this format.
     sink_filter_->SetRequestedMediaFormat(format);
     // Order the capture device to use this format.
-    hr = stream_config->SetFormat(pmt);
+    hr = stream_config->SetFormat(media_type.get());
   }
 
   if (FAILED(hr))
@@ -550,9 +579,8 @@ void VideoCaptureDeviceWin::AllocateAndStart(
     hr = mjpg_filter_.CreateInstance(CLSID_MjpegDec, NULL, CLSCTX_INPROC);
 
     if (SUCCEEDED(hr)) {
-      GetPin(mjpg_filter_, PINDIR_INPUT, GUID_NULL, input_mjpg_pin_.Receive());
-      GetPin(mjpg_filter_, PINDIR_OUTPUT, GUID_NULL,
-             output_mjpg_pin_.Receive());
+      input_mjpg_pin_ = GetPin(mjpg_filter_, PINDIR_INPUT, GUID_NULL);
+      output_mjpg_pin_ = GetPin(mjpg_filter_, PINDIR_OUTPUT, GUID_NULL);
       hr = graph_builder_->AddFilter(mjpg_filter_, NULL);
     }
 
@@ -658,10 +686,10 @@ bool VideoCaptureDeviceWin::CreateCapabilityMap() {
     return false;
   }
 
-  AM_MEDIA_TYPE* media_type = NULL;
   scoped_ptr<BYTE[]> caps(new BYTE[size]);
   for (int i = 0; i < count; ++i) {
-    hr = stream_config->GetStreamCaps(i, &media_type, caps.get());
+    ScopedMediaType media_type;
+    hr = stream_config->GetStreamCaps(i, media_type.Receive(), caps.get());
     // GetStreamCaps() may return S_FALSE, so don't use FAILED() or SUCCEED()
     // macros here since they'll trigger incorrectly.
     if (hr != S_OK) {
@@ -716,8 +744,6 @@ bool VideoCaptureDeviceWin::CreateCapabilityMap() {
           TranslateMediaSubtypeToPixelFormat(media_type->subtype);
       capabilities_.Add(capability);
     }
-    DeleteMediaType(media_type);
-    media_type = NULL;
   }
 
   return !capabilities_.empty();

@@ -49,6 +49,17 @@ void HistogramEnumerate(const std::string& name,
   counter->Add(sample);
 }
 
+void HistogramEnumerateLoadStatus(PP_NaClError error_code,
+                                  bool is_installed) {
+  HistogramEnumerate("NaCl.LoadStatus.Plugin", error_code, PP_NACL_ERROR_MAX);
+
+  // Gather data to see if being installed changes load outcomes.
+  const char* name = is_installed ?
+      "NaCl.LoadStatus.Plugin.InstalledApp" :
+      "NaCl.LoadStatus.Plugin.NotInstalledApp";
+  HistogramEnumerate(name, error_code, PP_NACL_ERROR_MAX);
+}
+
 blink::WebString EventTypeToString(PP_NaClEventType event_type) {
   switch (event_type) {
     case PP_NACL_EVENT_LOADSTART:
@@ -87,6 +98,8 @@ namespace nacl {
 NexeLoadManager::NexeLoadManager(
     PP_Instance pp_instance)
     : pp_instance_(pp_instance),
+      nacl_ready_state_(PP_NACL_READY_STATE_UNSENT),
+      nexe_error_reported_(false),
       plugin_instance_(content::PepperPluginInstance::Get(pp_instance)),
       weak_factory_(this) {
 }
@@ -94,9 +107,37 @@ NexeLoadManager::NexeLoadManager(
 NexeLoadManager::~NexeLoadManager() {
 }
 
+void NexeLoadManager::ReportLoadSuccess(const std::string& url,
+                                        uint64_t loaded_bytes,
+                                        uint64_t total_bytes) {
+  // Check that we are on the main renderer thread.
+  DCHECK(content::RenderThread::Get());
+  set_nacl_ready_state(PP_NACL_READY_STATE_DONE);
+
+  // Inform JavaScript that loading was successful and is complete.
+  ProgressEvent load_event(pp_instance_, PP_NACL_EVENT_LOAD, url, true,
+      loaded_bytes, total_bytes);
+  ppapi::PpapiGlobals::Get()->GetMainThreadMessageLoop()->PostTask(
+      FROM_HERE,
+      base::Bind(&NexeLoadManager::DispatchEvent,
+                 weak_factory_.GetWeakPtr(),
+                 load_event));
+
+  ProgressEvent loadend_event(pp_instance_, PP_NACL_EVENT_LOADEND, url, true,
+      loaded_bytes, total_bytes);
+  ppapi::PpapiGlobals::Get()->GetMainThreadMessageLoop()->PostTask(
+      FROM_HERE,
+      base::Bind(&NexeLoadManager::DispatchEvent,
+                 weak_factory_.GetWeakPtr(),
+                 loadend_event));
+
+  // UMA
+  HistogramEnumerateLoadStatus(PP_NACL_ERROR_LOAD_SUCCESS, is_installed_);
+}
+
 void NexeLoadManager::ReportLoadError(PP_NaClError error,
                                       const std::string& error_message,
-                                      bool is_installed) {
+                                      const std::string& console_message) {
   // Check that we are on the main renderer thread.
   DCHECK(content::RenderThread::Get());
 
@@ -107,9 +148,8 @@ void NexeLoadManager::ReportLoadError(PP_NaClError error,
     sender->Send(
         new NaClHostMsg_MissingArchError(GetRoutingID(pp_instance_)));
   }
-  // TODO(dmichael): Move the following actions here:
-  // - Set ready state to DONE.
-  // - Print error message to JavaScript console.
+  set_nacl_ready_state(PP_NACL_READY_STATE_DONE);
+  nexe_error_reported_ = true;
 
   // We must set all properties before calling DispatchEvent so that when an
   // event handler runs, the properties reflect the current load state.
@@ -134,10 +174,12 @@ void NexeLoadManager::ReportLoadError(PP_NaClError error,
 
   HistogramEnumerate("NaCl.LoadStatus.Plugin", error,
                      PP_NACL_ERROR_MAX);
-  std::string uma_name = is_installed ?
+  std::string uma_name = is_installed_ ?
                          "NaCl.LoadStatus.Plugin.InstalledApp" :
                          "NaCl.LoadStatus.Plugin.NotInstalledApp";
   HistogramEnumerate(uma_name, error, PP_NACL_ERROR_MAX);
+
+  LogToConsole(console_message);
 }
 
 void NexeLoadManager::DispatchEvent(const ProgressEvent &event) {
@@ -180,6 +222,33 @@ void NexeLoadManager::DispatchEvent(const ProgressEvent &event) {
 void NexeLoadManager::set_trusted_plugin_channel(
     scoped_ptr<TrustedPluginChannel> channel) {
   trusted_plugin_channel_ = channel.Pass();
+}
+
+bool NexeLoadManager::nexe_error_reported() {
+  return nexe_error_reported_;
+}
+
+void NexeLoadManager::set_nexe_error_reported(bool error_reported) {
+  nexe_error_reported_ = error_reported;
+}
+
+PP_NaClReadyState NexeLoadManager::nacl_ready_state() {
+  return nacl_ready_state_;
+}
+
+void NexeLoadManager::set_nacl_ready_state(PP_NaClReadyState ready_state) {
+  nacl_ready_state_ = ready_state;
+  SetReadOnlyProperty(ppapi::StringVar::StringToPPVar("readyState"),
+                      PP_MakeInt32(ready_state));
+}
+
+void NexeLoadManager::SetReadOnlyProperty(PP_Var key, PP_Var value) {
+  plugin_instance_->SetEmbedProperty(key, value);
+}
+
+void NexeLoadManager::LogToConsole(const std::string& message) {
+  ppapi::PpapiGlobals::Get()->LogWithSource(
+      pp_instance_, PP_LOGLEVEL_LOG, std::string("NativeClient"), message);
 }
 
 }  // namespace nacl

@@ -133,6 +133,8 @@
     'common/android/device_telephony_info.h',
     'common/android/hash_set.cc',
     'common/android/hash_set.h',
+    'common/android/surface_texture_lookup.cc',
+    'common/android/surface_texture_lookup.h',
     'common/android/surface_texture_peer.cc',
     'common/android/surface_texture_peer.h',
     'common/appcache_messages.h',
@@ -504,15 +506,6 @@
         'content.gyp:webkit_version',
       ],
     }],
-    # Work around for bug in linker used on ia32 and mipsel machines (gold is
-    # not used on ia32 and mipsel machines). See bug 353273.
-    ['use_mojo==1 and OS=="linux" and (target_arch=="ia32" or target_arch=="mipsel") and component=="static_library"', {
-      'link_settings': {
-        'libraries': [
-          '<(PRODUCT_DIR)/lib/libmojo_system.so',
-        ],
-      },
-    }],
     ['use_mojo==0', {
       'sources!': [
         'common/mojo/mojo_channel_init.cc',
@@ -523,7 +516,7 @@
         '../mojo/mojo.gyp:mojo_environment_chromium',
         '../mojo/mojo.gyp:mojo_system',
         '../mojo/mojo.gyp:mojo_system_impl',
-      ],
+     ],
     }],
     ['OS=="mac"', {
       'dependencies': [
@@ -543,6 +536,10 @@
       },
     }],
     ['OS=="android"',{
+      'sources': [
+        'common/gpu/client/gpu_memory_buffer_impl_surface_texture.cc',
+        'common/gpu/client/gpu_memory_buffer_impl_surface_texture.h',
+      ],
       'link_settings': {
         'libraries': [
           '-landroid',  # ANativeWindow
@@ -618,6 +615,8 @@
         'common/gpu/media/exynos_v4l2_video_device.h',
         'common/gpu/media/exynos_video_encode_accelerator.cc',
         'common/gpu/media/exynos_video_encode_accelerator.h',
+        'common/gpu/media/tegra_v4l2_video_device.cc',
+        'common/gpu/media/tegra_v4l2_video_device.h',
         'common/gpu/media/v4l2_video_decode_accelerator.cc',
         'common/gpu/media/v4l2_video_decode_accelerator.h',
         'common/gpu/media/v4l2_video_device.cc',

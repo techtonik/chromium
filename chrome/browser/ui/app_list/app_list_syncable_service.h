@@ -138,8 +138,9 @@ class AppListSyncableService : public syncer::SyncableService,
   // Removes sync item matching |id|.
   void RemoveSyncItem(const std::string& id);
 
-  // Updates folder items that may get created during initial sync.
-  void ResolveFolderPositions();
+  // Updates folder items that may get created during initial sync. If
+  // oem_at_end is true then move any OEM folder to the end of the list.
+  void ResolveFolderPositions(bool move_oem_to_end);
 
   // Removes any empty SyncItem folders and deletes them from sync. Called
   // after a sync item is removed (which may result in an empty folder).
@@ -178,6 +179,10 @@ class AppListSyncableService : public syncer::SyncableService,
   // Creates the OEM folder and sets its name if necessary. Returns the OEM
   // folder id.
   std::string FindOrCreateOemFolder();
+
+  // Returns true if an extension matching |id| exists and was installed by
+  // an OEM (extension->was_installed_by_oem() is true).
+  bool AppIsOem(const std::string& id);
 
   Profile* profile_;
   extensions::ExtensionSystem* extension_system_;

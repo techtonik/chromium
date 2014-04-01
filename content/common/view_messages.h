@@ -42,7 +42,6 @@
 #include "third_party/WebKit/public/platform/WebFloatPoint.h"
 #include "third_party/WebKit/public/platform/WebFloatRect.h"
 #include "third_party/WebKit/public/platform/WebScreenInfo.h"
-#include "third_party/WebKit/public/web/WebCompositionUnderline.h"
 #include "third_party/WebKit/public/web/WebFindOptions.h"
 #include "third_party/WebKit/public/web/WebMediaPlayerAction.h"
 #include "third_party/WebKit/public/web/WebPluginAction.h"
@@ -99,13 +98,6 @@ IPC_STRUCT_TRAITS_BEGIN(FontDescriptor)
   IPC_STRUCT_TRAITS_MEMBER(font_point_size)
 IPC_STRUCT_TRAITS_END()
 #endif
-
-IPC_STRUCT_TRAITS_BEGIN(blink::WebCompositionUnderline)
-  IPC_STRUCT_TRAITS_MEMBER(startOffset)
-  IPC_STRUCT_TRAITS_MEMBER(endOffset)
-  IPC_STRUCT_TRAITS_MEMBER(color)
-  IPC_STRUCT_TRAITS_MEMBER(thick)
-IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(blink::WebFindOptions)
   IPC_STRUCT_TRAITS_MEMBER(forward)
@@ -671,9 +663,6 @@ IPC_MESSAGE_ROUTED1(ViewMsg_ShowContextMenu,
 
 IPC_MESSAGE_ROUTED0(ViewMsg_Stop)
 
-// Tells the renderer to reload the current focused frame
-IPC_MESSAGE_ROUTED0(ViewMsg_ReloadFrame)
-
 // Sent when the user wants to search for a word on the page (find in page).
 IPC_MESSAGE_ROUTED3(ViewMsg_Find,
                     int /* request_id */,
@@ -822,19 +811,6 @@ IPC_MESSAGE_ROUTED3(ViewMsg_ImeConfirmComposition,
                     gfx::Range /* replacement_range */,
                     bool /* keep_selection */)
 
-// Sets the text composition to be between the given start and end offsets
-// in the currently focused editable field.
-IPC_MESSAGE_ROUTED3(ViewMsg_SetCompositionFromExistingText,
-    int /* start */,
-    int /* end */,
-    std::vector<blink::WebCompositionUnderline> /* underlines */)
-
-// Deletes the current selection plus the specified number of characters before
-// and after the selection or caret.
-IPC_MESSAGE_ROUTED2(ViewMsg_ExtendSelectionAndDelete,
-                    int /* before */,
-                    int /* after */)
-
 // Used to notify the render-view that we have received a target URL. Used
 // to prevent target URLs spamming the browser.
 IPC_MESSAGE_ROUTED0(ViewMsg_UpdateTargetURL_ACK)
@@ -862,11 +838,6 @@ IPC_MESSAGE_ROUTED0(ViewMsg_CantFocus)
 // corresponding ViewMsg_SwapOut message.  This ensures that no
 // PageGroupLoadDeferrer is on the stack for SwapOut.
 IPC_MESSAGE_ROUTED0(ViewMsg_SuppressDialogsUntilSwapOut)
-
-// Instructs the renderer to swap out for a cross-site transition, including
-// running the unload event handler. Expects a SwapOut_ACK message when
-// finished.
-IPC_MESSAGE_ROUTED0(ViewMsg_SwapOut)
 
 // Instructs the renderer to close the current page, including running the
 // onunload event handler.
@@ -1223,10 +1194,6 @@ IPC_MESSAGE_ROUTED5(ViewHostMsg_Find_Reply,
                     gfx::Rect /* selection_rect */,
                     int /* active_match_ordinal */,
                     bool /* final_update */)
-
-// Indicates that the current renderer has swapped out, after a SwapOut
-// message.
-IPC_MESSAGE_ROUTED0(ViewHostMsg_SwapOut_ACK)
 
 // Indicates that the current page has been closed, after a ClosePage
 // message.

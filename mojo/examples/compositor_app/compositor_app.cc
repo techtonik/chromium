@@ -10,11 +10,10 @@
 #include "mojo/examples/compositor_app/compositor_host.h"
 #include "mojo/public/bindings/allocation_scope.h"
 #include "mojo/public/bindings/remote_ptr.h"
-#include "mojo/public/gles2/gles2_cpp.h"
-#include "mojo/public/shell/application.h"
-#include "mojo/public/shell/shell.mojom.h"
-#include "mojo/public/system/core.h"
-#include "mojo/public/system/macros.h"
+#include "mojo/public/cpp/gles2/gles2.h"
+#include "mojo/public/cpp/shell/application.h"
+#include "mojo/public/cpp/system/core.h"
+#include "mojo/public/interfaces/shell/shell.mojom.h"
 #include "mojo/services/native_viewport/geometry_conversions.h"
 #include "mojo/services/native_viewport/native_viewport.mojom.h"
 #include "ui/gfx/rect.h"
@@ -63,10 +62,9 @@ class SampleApp : public Application, public NativeViewportClient {
     host_->SetSize(bounds.size());
   }
 
-  virtual void OnEvent(const Event& event) OVERRIDE {
-    if (!event.location().is_null()) {
-      viewport_->AckEvent(event);
-    }
+  virtual void OnEvent(const Event& event,
+                       const mojo::Callback<void()>& callback) OVERRIDE {
+    callback.Run();
   }
 
  private:

@@ -18,3 +18,11 @@ include_rules = [
 
   "+content",
 ]
+
+specific_include_rules = {
+  # The extensions client interface is the master arbiter of which
+  # API functions exist, so it needs to know about app APIs.
+  "chrome_extensions_browser_client\.cc": [
+     "+apps/common/api/generated_api.h",
+  ],
+}

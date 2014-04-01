@@ -4,6 +4,8 @@
 
 #include "media/cast/transport/rtp_sender/rtp_packetizer/rtp_packetizer.h"
 
+#include <stdint.h>
+
 #include "base/memory/scoped_ptr.h"
 #include "base/test/simple_test_tick_clock.h"
 #include "media/cast/logging/simple_event_subscriber.h"
@@ -25,7 +27,7 @@ static const int kMaxPacketLength = 1500;
 static const int kSsrc = 0x12345;
 static const unsigned int kFrameSize = 5000;
 static const int kMaxPacketStorageTimeMs = 300;
-static const uint32 kStartFrameId = GG_UINT32_C(0xffffffff);
+static const uint32 kStartFrameId = UINT32_C(0xffffffff);
 }
 
 class TestRtpPacketTransport : public PacketSender {
@@ -100,8 +102,7 @@ class RtpPacketizerTest : public ::testing::Test {
   RtpPacketizerTest()
       : task_runner_(new test::FakeSingleThreadTaskRunner(&testing_clock_)),
         video_frame_(),
-        packet_storage_(&testing_clock_, kMaxPacketStorageTimeMs),
-        logging_(GetLoggingConfigWithRawEventsAndStatsEnabled()) {
+        packet_storage_(&testing_clock_, kMaxPacketStorageTimeMs) {
     logging_.AddRawEventSubscriber(&subscriber_);
     config_.sequence_number = kSeqNum;
     config_.ssrc = kSsrc;

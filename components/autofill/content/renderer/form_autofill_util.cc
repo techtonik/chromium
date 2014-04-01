@@ -533,19 +533,16 @@ void FillFormField(const FormFieldData& data,
   field->setAutofilled(true);
 
   WebInputElement* input_element = toWebInputElement(field);
-  if (IsTextInput(input_element) || IsMonthInput(input_element)) {
-    // If the maxlength attribute contains a negative value, maxLength()
-    // returns the default maxlength value.
-    input_element->setValue(
-        data.value.substr(0, input_element->maxLength()), true);
-  } else if (IsTextAreaElement(*field) || IsSelectElement(*field)) {
-    if (field->value() != data.value) {
-      field->setValue(data.value);
-      field->dispatchFormControlChangeEvent();
-    }
-  } else {
-    DCHECK(IsCheckableElement(input_element));
+  if (IsCheckableElement(input_element)) {
     input_element->setChecked(data.is_checked, true);
+  } else {
+    base::string16 value = data.value;
+    if (IsTextInput(input_element) || IsMonthInput(input_element)) {
+      // If the maxlength attribute contains a negative value, maxLength()
+      // returns the default maxlength value.
+      value = value.substr(0, input_element->maxLength());
+    }
+    field->setValue(value, true);
   }
 
   if (is_initiating_node &&
@@ -567,9 +564,9 @@ void PreviewFormField(const FormFieldData& data,
   if (data.value.empty())
     return;
 
-  // Preview input and textarea fields. For input fields, excludes checkboxes
-  // and radio buttons, as there is no provision for setSuggestedCheckedValue
-  // in WebInputElement.
+  // Preview input, textarea and select fields. For input fields, excludes
+  // checkboxes and radio buttons, as there is no provision for
+  // setSuggestedCheckedValue in WebInputElement.
   WebInputElement* input_element = toWebInputElement(field);
   if (IsTextInput(input_element) || IsMonthInput(input_element)) {
     // If the maxlength attribute contains a negative value, maxLength()
@@ -577,7 +574,7 @@ void PreviewFormField(const FormFieldData& data,
     input_element->setSuggestedValue(
       data.value.substr(0, input_element->maxLength()));
     input_element->setAutofilled(true);
-  } else if (IsTextAreaElement(*field)) {
+  } else if (IsTextAreaElement(*field) || IsSelectElement(*field)) {
     field->setSuggestedValue(data.value);
     field->setAutofilled(true);
   }
@@ -1056,11 +1053,12 @@ bool ClearPreviewedFormWithElement(const WebFormControlElement& element,
     // want to reset the auto-filled status for fields that were previewed.
     WebFormControlElement control_element = control_elements[i];
 
-    // Only text input and textarea elements can be previewed.
+    // Only text input, textarea and select elements can be previewed.
     WebInputElement* input_element = toWebInputElement(&control_element);
     if (!IsTextInput(input_element) &&
         !IsMonthInput(input_element) &&
-        !IsTextAreaElement(control_element))
+        !IsTextAreaElement(control_element) &&
+        !IsSelectElement(control_element))
       continue;
 
     // If the element is not auto-filled, we did not preview it,
@@ -1070,7 +1068,8 @@ bool ClearPreviewedFormWithElement(const WebFormControlElement& element,
 
     if ((IsTextInput(input_element) ||
          IsMonthInput(input_element) ||
-         IsTextAreaElement(control_element)) &&
+         IsTextAreaElement(control_element) ||
+         IsSelectElement(control_element)) &&
         control_element.suggestedValue().isEmpty())
       continue;
 
@@ -1090,6 +1089,9 @@ bool ClearPreviewedFormWithElement(const WebFormControlElement& element,
       } else {
         control_element.setAutofilled(false);
       }
+    } else if (IsSelectElement(control_element)) {
+      control_element.setSuggestedValue(WebString());
+      control_element.setAutofilled(false);
     }
   }
 

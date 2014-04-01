@@ -466,6 +466,9 @@ const char kDnsPrefetchDisable[]            = "dns-prefetch-disable";
 // given file. The file is overwritten if it exists.
 const char kDumpBrowserHistograms[]         = "dump-browser-histograms";
 
+// Overrides the path of Easy Unlock component app.
+extern const char kEasyUnlockAppPath[]      = "easy-unlock-app-path";
+
 // Enables the <adview> tag in packaged apps.
 const char kEnableAdview[]                  = "enable-adview";
 
@@ -795,10 +798,6 @@ const char kGoogleBaseURL[]                 = "google-base-url";
 
 // Enables using GAIA information to populate profile name and icon.
 const char kGoogleProfileInfo[]             = "google-profile-info";
-
-// Specifies an alternate URL to use for retrieving the search domain for
-// Google. Useful for testing.
-const char kGoogleSearchDomainCheckURL[]    = "google-search-domain-check-url";
 
 // Specifies a custom name for the GSSAPI library to load.
 const char kGSSAPILibraryName[]             = "gssapi-library-name";
@@ -1223,6 +1222,9 @@ const char kSimulateCriticalUpdate[]        = "simulate-critical-update";
 // Simulates that current version is outdated.
 const char kSimulateOutdated[]               = "simulate-outdated";
 
+// Simulates that current version is outdated and auto-update is off.
+const char kSimulateOutdatedNoAU[]           = "simulate-outdated-no-au";
+
 // Replaces the buffered data source for <audio> and <video> with a simplified
 // resource loader that downloads the entire resource into memory.
 
@@ -1370,9 +1372,6 @@ const char kVariationsServerURL[]           = "variations-server-url";
 
 // Prints version information and quits.
 const char kVersion[]                       = "version";
-
-// Adds the given extension ID to all the permission whitelists.
-const char kWhitelistedExtensionID[]        = "whitelisted-extension-id";
 
 // Specify the initial window position: --window-position=x,y
 const char kWindowPosition[]                = "window-position";

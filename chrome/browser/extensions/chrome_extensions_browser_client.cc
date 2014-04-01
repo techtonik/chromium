@@ -4,6 +4,7 @@
 
 #include "chrome/browser/extensions/chrome_extensions_browser_client.h"
 
+#include "apps/common/api/generated_api.h"
 #include "base/command_line.h"
 #include "base/version.h"
 #include "chrome/browser/app_mode/app_mode_utils.h"
@@ -11,7 +12,6 @@
 #include "chrome/browser/extensions/activity_log/activity_log.h"
 #include "chrome/browser/extensions/api/preference/chrome_direct_setting.h"
 #include "chrome/browser/extensions/api/preference/preference_api.h"
-#include "chrome/browser/extensions/api/runtime/runtime_api.h"
 #include "chrome/browser/extensions/api/web_request/web_request_api.h"
 #include "chrome/browser/extensions/chrome_app_sorting.h"
 #include "chrome/browser/extensions/chrome_extension_host_delegate.h"
@@ -229,15 +229,11 @@ void ChromeExtensionsBrowserClient::RegisterExtensionFunctions(
   registry->RegisterFunction<
       extensions::chromedirectsetting::ClearDirectSettingFunction>();
 
-  // Runtime.
-  registry->RegisterFunction<extensions::RuntimeGetBackgroundPageFunction>();
-  registry->RegisterFunction<extensions::RuntimeSetUninstallURLFunction>();
-  registry->RegisterFunction<extensions::RuntimeReloadFunction>();
-  registry->RegisterFunction<extensions::RuntimeRequestUpdateCheckFunction>();
-  registry->RegisterFunction<extensions::RuntimeRestartFunction>();
-
-  // Generated APIs.
+  // Generated APIs from lower-level modules.
   extensions::core_api::GeneratedFunctionRegistry::RegisterAll(registry);
+  apps::api::GeneratedFunctionRegistry::RegisterAll(registry);
+
+  // Generated APIs from Chrome.
   extensions::api::GeneratedFunctionRegistry::RegisterAll(registry);
 #endif
 }

@@ -1085,8 +1085,10 @@
     'browser/renderer_host/render_message_filter.h',
     'browser/renderer_host/render_process_host_impl.cc',
     'browser/renderer_host/render_process_host_impl.h',
+    'browser/renderer_host/render_process_host_mojo_impl.cc',
+    'browser/renderer_host/render_process_host_mojo_impl.h',
     'browser/renderer_host/render_sandbox_host_linux.cc',
-    'browser/renderer_host/render_sandbox_host_linux.h',
+    'browser/renderer_host/render_process_host_impl.h',
     'browser/renderer_host/render_view_host_delegate.cc',
     'browser/renderer_host/render_view_host_delegate.h',
     'browser/renderer_host/render_view_host_factory.cc',
@@ -1390,7 +1392,14 @@
     }],
     ['use_mojo==1', {
       'dependencies': [
+        '../mojo/mojo.gyp:mojo_bindings',
         '../mojo/mojo.gyp:mojo_system',
+        'content_common_mojo_bindings',
+      ],
+    }, {  # use_mojo==0
+      'sources!': [
+        'browser/renderer_host/render_process_host_mojo_impl.cc',
+        'browser/renderer_host/render_process_host_mojo_impl.h',
       ],
     }],
     ['OS=="ios"', {
@@ -1634,6 +1643,7 @@
     ['chromeos==1', {
       'dependencies': [
         '../build/linux/system.gyp:dbus',
+        '../chromeos/chromeos.gyp:power_manager_proto',
       ],
       'sources!': [
         'browser/geolocation/wifi_data_provider_linux.cc',

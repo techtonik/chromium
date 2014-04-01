@@ -416,13 +416,13 @@ are declared in build/common.gypi.
       </message>
 
       <message name="IDS_PERMISSIONS_BUBBLE_PROMPT" desc="The label that is used to introduce permission request details to the user in a papup.">
-        This site would like to:
+        <ph name="SITE_NAME">$1<ex>google.com</ex></ph> would like to use your:
       </message>
       <message name="IDS_PERMISSION_ALLOW" desc="Label on button to allow a permissions request.">
         Allow
       </message>
       <message name="IDS_PERMISSION_DENY" desc="Label on button to deny a permissions request.">
-        Deny
+        Block
       </message>
       <message name="IDS_PERMISSION_CUSTOMIZE" desc="Label on text button to allow the user to customize a permissions request.">
         Customize
@@ -3789,6 +3789,9 @@ Make sure you do not expose any sensitive information.
         <message name="IDS_TASK_MANAGER_WEBVIEW_TAG_PREFIX" desc="The prefix for a guest page loaded in webview tag in the Task Manager">
           Webview: <ph name="WEBVIEW_TAG_NAME">$1<ex>Google</ex></ph>
         </message>
+        <message name="IDS_TASK_MANAGER_PRINT_PREFIX" desc="The prefix for a print preview process row in the Task Manager">
+          Print: <ph name="PRINT_NAME">$1<ex>Google Maps</ex></ph>
+        </message>
       </if>
 
       <if expr="not is_android">
@@ -4566,6 +4569,12 @@ Make sure you do not expose any sensitive information.
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_NETWORK_STATE" desc="Permission string for network list access.">
         Access list of network connections
+      </message>
+      <message name="IDS_EXTENSION_PROMPT_WARNING_ACCESSIBILITY_FEATURES_MODIFY" desc="Permission string for modifying acccessibility settings via extension API shown when an extension utilizing the API is installed.">
+        Modify your accessibility settings
+      </message>
+      <message name="IDS_EXTENSION_PROMPT_WARNING_ACCESSIBILITY_FEATURES_READ" desc="Permission string for modifying acccessibility settings via extension API shown when a extension utilizing the API is installed.">
+        Read your accessibility settings
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_SEARCH_SETTINGS_OVERRIDE" desc="Permission string for search settings override.">
         Change your search settings to: <ph name="SEARCH_HOST">$1<ex>url.search.com</ex></ph>
@@ -5395,6 +5404,69 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Extensions running in developer mode can harm your computer. If you're not a developer, you should disable these extensions running in developer mode to stay safe.
       </message>
 
+      <!-- Settings API bubble -->
+      <message name="IDS_EXTENSIONS_DISABLE_EXTENSIONS" desc="Text for the Disable Extensions (note: plural) button">
+        Disable Extensions
+      </message>
+      <if expr="use_titlecase">
+        <message name="IDS_EXTENSIONS_SETTINGS_API_TITLE_HOME_PAGE_BUBBLE" desc="In Title Case: Title of a bubble warning users that an extension has overridden their home page setting">
+         Is This the Home Page You Were Expecting?
+        </message>
+      </if>
+      <if expr="not use_titlecase">
+        <message name="IDS_EXTENSIONS_SETTINGS_API_TITLE_HOME_PAGE_BUBBLE" desc="Title of a bubble warning users that an extension has overridden their home page setting">
+          Is this the home page you were expecting?
+        </message>
+      </if>
+      <if expr="use_titlecase">
+        <message name="IDS_EXTENSIONS_SETTINGS_API_TITLE_STARTUP_PAGES_BUBBLE" desc="In Title Case: Title of a bubble warning users that an extension has overridden their startup pages setting">
+          Is This the Startup Page You Were Expecting?
+        </message>
+      </if>
+      <if expr="not use_titlecase">
+        <message name="IDS_EXTENSIONS_SETTINGS_API_TITLE_STARTUP_PAGES_BUBBLE" desc="Title of a bubble warning users that an extension has overridden their startup pages setting">
+          Is this the startup page you were expecting?
+        </message>
+      </if>
+      <if expr="use_titlecase">
+        <message name="IDS_EXTENSIONS_SETTINGS_API_TITLE_SEARCH_ENGINE_BUBBLE" desc="In Title Case: Title of a bubble warning users that an extension has overridden their default search engine setting">
+          Is This the Search Page You Were Expecting?
+        </message>
+      </if>
+      <if expr="not use_titlecase">
+        <message name="IDS_EXTENSIONS_SETTINGS_API_TITLE_SEARCH_ENGINE_BUBBLE" desc="Title of a bubble warning users that an extension has overridden their default search engine setting">
+          Is this the search page you were expecting?
+        </message>
+      </if>
+
+      <message name="IDS_EXTENSIONS_SETTINGS_API_FIRST_LINE_SEARCH_ENGINE" desc="Text displayed in the Settings API bubble as first line when an extension has changed the search engine.">
+        An extension has changed what page is shown when you search from the Omnibox.
+      </message>
+      <message name="IDS_EXTENSIONS_SETTINGS_API_FIRST_LINE_HOME_PAGE" desc="Text displayed in the Settings API bubble as first line when an extension has changed the home page.">
+        An extension has changed what page is shown when you click the Home button.
+      </message>
+
+      <message name="IDS_EXTENSIONS_SETTINGS_API_SECOND_LINE_SEARCH_ENGINE" desc="Second line in the Settings API bubble. Only shown if the secondary change by the extension was just the search engine. The triple single quotes are needed to preserve the space before and after the sentence which is needed when the language (Chrome is being translated to) uses space as word separator. Please preserve them, unless the language being translated to does not use space as word separator.">
+        ''' It also controls what page is shown when you search from the Omnibox.'''
+      </message>
+      <message name="IDS_EXTENSIONS_SETTINGS_API_SECOND_LINE_HOME_PAGE" desc="Second line in the Settings API bubble. Only shown if the secondary change by the extension was the just home page. See IDS_EXTENSIONS_SETTINGS_API_SECOND_LINE_SEARCH_ENGINE for reason for triple quotes.">
+        ''' It also controls what page is shown when you click the Home button. '''
+      </message>
+      <message name="IDS_EXTENSIONS_SETTINGS_API_SECOND_LINE_HOME_AND_SEARCH" desc="Second line in the Settings API bubble. Only shown if the secondary change by the extension was both the home page and the search engine. See IDS_EXTENSIONS_SETTINGS_API_SECOND_LINE_SEARCH_ENGINE for reason for triple quotes.">
+        ''' It also controls what page is shown when you click the Home button or search from the Omnibox. '''
+      </message>
+
+      <message name="IDS_EXTENSIONS_SETTINGS_API_THIRD_LINE_CONFIRMATION" desc="Third line in the Settings API bubble, always appended after the first (and optional second) line to make one paragraph. See IDS_EXTENSIONS_SETTINGS_API_SECOND_LINE_SEARCH_ENGINE for reason for triple quotes.">
+        ''' If you didn't want these changes, you can restore your previous settings.'''
+      </message>
+
+      <message name="IDS_EXTENSIONS_SETTINGS_API_RESTORE_SETTINGS" desc="The button in the Settings API bubble that reverts the settings changes made by the extension and restores what the user had before.">
+        Restore settings
+      </message>
+      <message name="IDS_EXTENSIONS_SETTINGS_API_KEEP_CHANGES" desc="The button in the Settings API bubble that cancels the bubble without action.">
+        Keep changes
+      </message>
+
       <!-- chrome://settings-frame/options_settings_app.html for the App Launcher Settings App -->
       <if expr="enable_settings_app">
         <message name="IDS_SETTINGS_APP_LAUNCHER_PRODUCT_NAME" desc="Product name to use when referring to applications running in the App Launcher inside the non-browser Settings App">
@@ -5656,6 +5728,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_TOUCH_OPTIMIZED_UI_DESCRIPTION" desc="Description of the touch-optimized UI flag.">
         Enables experimental layout refinements to improve user experience with touch screens.
       </message>
+      <message name="IDS_FLAGS_ENABLE_SAVE_PASSWORD_BUBBLE_NAME">
+        Enable Save Password Bubble UI
+      </message>
+      <message name="IDS_FLAGS_ENABLE_SAVE_PASSWORD_BUBBLE_DESCRIPTION">
+        Enable experimental bubble-based UI for saving passwords; replaces the existing infobar.
+      </message>
       <message name="IDS_FLAGS_ENABLE_SCROLL_PREDICTION_NAME" desc="Title of the flag which enables scroll prediction.">
         Enable scroll prediction
       </message>
@@ -5669,11 +5747,11 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_FLAGS_ENABLE_ACCESSIBILITY_TAB_SWITCHER_DESCRIPTION" desc="Description of the flag to enable the accessibility tab switcher.">
           Enable the accessibility tab switcher for Android.
         </message>
-        <message name="IDS_FLAGS_DISABLE_ACCESSIBILITY_SCRIPT_INJECTION_NAME" desc="Name of the flag to disable script injection for accessibility.">
-          Disable Script Injection For Accessibility.
+        <message name="IDS_FLAGS_ENABLE_ACCESSIBILITY_SCRIPT_INJECTION_NAME" desc="Name of the flag to enable script injection for accessibility.">
+          Enable Script Injection For Accessibility.
         </message>
-        <message name="IDS_FLAGS_DISABLE_ACCESSIBILITY_SCRIPT_INJECTION_DESCRIPTION" desc="Description of the flag to disable script injection for accessibility.">
-          Disable script injection, enabling native Android accessibility instead.
+        <message name="IDS_FLAGS_ENABLE_ACCESSIBILITY_SCRIPT_INJECTION_DESCRIPTION" desc="Description of the flag to enable script injection for accessibility.">
+          Enable script injection instead of native Android accessibility.
         </message>
         <message name="IDS_FLAGS_ENABLE_FAST_TEXT_AUTOSIZING_NAME" desc="Name of the flag to enable fast text autosizing.">
           Enable fast text autosizing
@@ -6267,12 +6345,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_ASH_ENABLE_TOUCH_VIEW_TESTING_DESCRIPTION" desc="Description for the flag to enable the TouchView testing mode.">
         Enable Ctrl+Alt+Shift+D to toggle the TouchView maximizing mode.
-      </message>
-      <message name="IDS_FLAGS_ASH_ENABLE_BRIGHTNESS_CONTROL_NAME" desc="Title for the flag which can be used to enable brightness control of external displays.">
-        Enable brightness control of external displays
-      </message>
-      <message name="IDS_FLAGS_ASH_ENABLE_BRIGHTNESS_CONTROL_DESCRIPTION" desc="Description for the flag to enable brightness control of external displays.">
-        Make the brightness keys adjust external displays' brightness levels on devices that don't have internal displays.
       </message>
       <message name="IDS_FLAGS_ENABLE_FULL_MULTI_PROFILE_MODE" desc="Title for the full multi profile mode flag.">
         Enable side-by-side multi profile mode
@@ -6944,6 +7016,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Use bleeding-edge code to make Chrome draw content faster. The changes
         behind this path are very likely to break lots of content.
       </message>
+      <message name="IDS_FLAGS_ENABLE_EASY_UNLOCK_NAME" desc="Name for Enable Easy Unlock flag.">
+        Enable Easy Unlock.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_EASY_UNLOCK_DESCRIPTION" desc="Description for flag to Enable Easy Unlock.">
+        Easy Unlock allows you to unlock your Chromebook when in proximity to your phone.
+      </message>
 
       <!-- Crashes -->
       <message name="IDS_CRASHES_TITLE" desc="Title for the chrome://crashes page.">
@@ -7026,7 +7104,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Enable "Ok Google" to start a voice search
       </message>
       <message name="IDS_HOTWORD_SEARCH_PREF_DESCRIPTION" desc="Description of the hotword  search preference">
-        When you say "Ok Google", Chrome will search for what you say next.
+        When you say "Ok Google," Chrome will search for what you say next.
       </message>
       <message name="IDS_HOTWORD_CONFIRM_BUBBLE_TITLE" desc="The title text for the bubble to enable the hotword voice search trigger.">
         Ok Google
@@ -7044,7 +7122,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Retry
       </message>
       <message name="IDS_HOTWORD_AUDIO_LOGGING_ENABLE" desc="A checkbox in the hotword confirm dialog that allows for sending audio of 'Ok, Google' plus a few seconds before back to Google to improve voice search.">
-        Improve voice search by sending the sound of "Ok Google", and a few seconds before, to Google.
+        Improve voice search by sending the sound of "Ok Google," and a few seconds before, to Google.
       </message>
 
       <!-- Conflicts page -->
@@ -8617,6 +8695,12 @@ The following plug-in is unresponsive: <ph name="PLUGIN_NAME">$1
         </message>
         <message name="IDS_PRINT_PREVIEW_USER_INFO" desc="Message describing which user's destinations are being shown.">
           Showing destinations for <ph name="EMAIL">$1<ex>testing@gmail.com</ex></ph>
+        </message>
+        <message name="IDS_PRINT_PREVIEW_ACCOUNT_SELECT_TITLE" desc="Title of the user's account selection control, to choose the account destinations are being shown for.">
+          Showing destinations for
+        </message>
+        <message name="IDS_PRINT_PREVIEW_ADD_ACCOUNT_TITLE" desc="Title of the selection control item to let user to sign into another account.">
+          Add account...
         </message>
         <message name="IDS_PRINT_PREVIEW_CLOUD_PRINT_PROMOTION" desc="Message describing features of Google Cloud Print.">
           Print to Google Docs and other cloud destinations. <ph name="BEGIN_LINK">$1<ex>&lt;span&gt;</ex></ph>Sign in<ph name="END_LINK">$2<ex>&lt;/span&gt;</ex></ph> to print to Google Cloud Print.
@@ -12243,11 +12327,11 @@ Some features may be unavailable.  Please check that the profile exists and you 
       <message name="IDS_SIGNIN_ERROR_BUBBLE_VIEW_TITLE" desc="Title in the sign-in error bubble view/notification.">
         Sign-in Error
       </message>
-      <message name="IDS_SYNC_ERROR_BUBBLE_VIEW_TITLE" desc="Title in the sync error bubble view.">
+      <message name="IDS_SYNC_ERROR_BUBBLE_VIEW_TITLE" desc="Title in the sync error bubble view/notification.">
         Sync Error
       </message>
-      <message name="IDS_SIGNIN_ERROR_NOTIFICATION_TITLE_MULTIPROFILE" desc="Title in the sign-in error notification when multiple users are logged in.">
-        Sign-in Error: <ph name="USER_NAME">$1<ex>foo@example.com</ex></ph>
+      <message name="IDS_SYNC_NOTIFICATION_ACCEPT" desc="A button label shown in the sync error notification when the passphrase needs to be updated.">
+        Update sync passphrase
       </message>
 
       <if expr="not use_titlecase">
@@ -12261,7 +12345,7 @@ Some features may be unavailable.  Please check that the profile exists and you 
           Sync Error: Update Sync passphrase...
         </message>
         <if expr="chromeos">
-          <message name="IDS_SYNC_SIGN_IN_ERROR_BUBBLE_VIEW_ACCEPT" desc="The accept button in the sync error bubble view when the user needs to sign out and sign in again to Chrome OS.">
+          <message name="IDS_SYNC_SIGN_IN_ERROR_BUBBLE_VIEW_ACCEPT" desc="The accept button in the sync error bubble view/notification when the user needs to sign out and sign in again to Chrome OS.">
             Sign out then sign in again...
           </message>
           <message name="IDS_SYNC_SIGN_IN_ERROR_WRENCH_MENU_ITEM" desc="The sync error wrench menu item when the user needs to sign out and sign in again to Chrome OS.">
@@ -12798,7 +12882,7 @@ Some features may be unavailable.  Please check that the profile exists and you 
           Allow <ph name="site">$1<ex>mail.google.com</ex></ph> to show desktop notifications?
         </message>
         <message name="IDS_NOTIFICATION_PERMISSIONS_FRAGMENT" desc="Permission sentence fragment to show following the prompt 'This site would like to:' in a permissions request">
-          show desktop notifications
+          Desktop notifications
         </message>
         <message name="IDS_NOTIFICATION_PERMISSION_YES" desc="The label of the 'allow' button on the notification permission infobar.">
           Allow
@@ -13272,7 +13356,7 @@ Some features may be unavailable.  Please check that the profile exists and you 
       </message>
     </if>
     <message name="IDS_GEOLOCATION_INFOBAR_PERMISSION_FRAGMENT" desc="Permission fragment used in the permission bubble, after 'This site would like to:' asking for permission to access the user's physical location.">
-      use your device's location.
+      Location
     </message>
     <message name="IDS_GEOLOCATION_ALLOW_BUTTON" desc="A button in geolocation infobar for allowing access to geolocation for a given domain.">
       Allow
@@ -13321,7 +13405,7 @@ Some features may be unavailable.  Please check that the profile exists and you 
       </ph> wants to get full control of your MIDI devices.
     </message>
     <message name="IDS_MIDI_SYSEX_PERMISSION_FRAGMENT" desc="Permission asked in the permission bubble when a URL wants to access MIDI devices with system exclusive messages, along with other permissions requests. Preceded by the prompt 'This site would like to:'">
-      fully control your MIDI devices.
+      MIDI (sound) devices
     </message>
     <message name="IDS_MIDI_SYSEX_ALLOW_BUTTON" desc="A button in MIDI access infobar for allowing full access to MIDI devices for a given domain.">
       Allow
@@ -13652,10 +13736,10 @@ Some features may be unavailable.  Please check that the profile exists and you 
       Allow <ph name="HANDLER_TITLE">$1<ex>Google Search</ex></ph> (<ph name="HANDLER_HOSTNAME">$2<ex>google.com</ex></ph>) to open all <ph name="PROTOCOL">$3<ex>search</ex></ph> links instead of <ph name="REPLACED_HANDLER_TITLE">$4<ex>Elgoog Search</ex></ph>?
     </message>
     <message name="IDS_REGISTER_PROTOCOL_HANDLER_CONFIRM_FRAGMENT" desc="The permission fragment to display when asking a user to confirm the registration of a protocol handler in a permission bubble. Follows a prompt 'This site would like to:'.">
-      open all <ph name="PROTOCOL">$3<ex>search</ex></ph> links?
+      <ph name="PROTOCOL">$3<ex>search</ex></ph> links
     </message>
     <message name="IDS_REGISTER_PROTOCOL_HANDLER_CONFIRM_REPLACE_FRAGMENT" desc="The permission fragment to display when asking a user to confirm the registration of a protocol handler. Follows a prompt 'This site would like to:'.">
-      open all <ph name="PROTOCOL">$3<ex>search</ex></ph> links instead of <ph name="REPLACED_HANDLER_TITLE">$4<ex>Elgoog Search</ex></ph>?
+      <ph name="PROTOCOL">$3<ex>search</ex></ph> links instead of <ph name="REPLACED_HANDLER_TITLE">$4<ex>Elgoog Search</ex></ph>
     </message>
     <message name="IDS_REGISTER_PROTOCOL_HANDLER_ACCEPT" desc="Text to show for the accept button for the register protocol handler request infobar.">
       Use <ph name="HANDLER_TITLE">$1<ex>Google Search</ex></ph>
@@ -13724,13 +13808,13 @@ Some features may be unavailable.  Please check that the profile exists and you 
       <ph name="HOST">$1<ex>html5rocks.com</ex></ph> wants to use your camera.
     </message>
     <message name="IDS_MEDIA_CAPTURE_AUDIO_AND_VIDEO_PERMISSION_FRAGMENT" desc="Permission fragment shown in the permissions bubble when a web page requests access to the computer's microphone and camera.">
-      use your camera and microphone.
+      Camera and Microphone
     </message>
     <message name="IDS_MEDIA_CAPTURE_AUDIO_ONLY_PERMISSION_FRAGMENT" desc="Permission fragment shown in the permissions bubble when a web page requests access to the computer's microphone.">
-      use your microphone.
+      Microphone
     </message>
     <message name="IDS_MEDIA_CAPTURE_VIDEO_ONLY_PERMISSION_FRAGMENT" desc="Permission fragment shown in the permissions bubble when a web page requests access to the computer's camera.">
-      use your camera.
+      Camera
     </message>
     <message name="IDS_MEDIA_CAPTURE_ALLOW" desc="Label for a button that grants access to a web page, so they can use a camera and/or a microphone.">
       Allow
@@ -13765,7 +13849,7 @@ Some features may be unavailable.  Please check that the profile exists and you 
       </message>
     </if>
     <message name="IDS_REQUEST_QUOTA_PERMISSION_FRAGMENT" desc="Permission fragment presented in the permission bubble when the webapp requests new larger quota to persistently store data on the device. Follows a 'This site would like to:' prompt.">
-      permanently store data on your device.
+      Local data storage
     </message>
 
     <!-- Android does not support multiple profiles and managed users -->

@@ -33,6 +33,8 @@ class Vector2d;
 
 namespace ui {
 
+struct FileInfo;
+
 ///////////////////////////////////////////////////////////////////////////////
 //
 // OSExchangeData
@@ -82,17 +84,6 @@ class UI_BASE_EXPORT OSExchangeData {
     scoped_refptr<DownloadFileProvider> downloader;
   };
 
-  // Encapsulates the info about a file.
-  struct UI_BASE_EXPORT FileInfo {
-    FileInfo(const base::FilePath& path, const base::FilePath& display_name);
-    ~FileInfo();
-
-    // The path of the file.
-    base::FilePath path;
-    // The display name of the file. This field is optional.
-    base::FilePath display_name;
-  };
-
   // Provider defines the platform specific part of OSExchangeData that
   // interacts with the native system.
   class UI_BASE_EXPORT Provider {
@@ -128,9 +119,11 @@ class UI_BASE_EXPORT OSExchangeData {
     virtual bool HasFile() const = 0;
     virtual bool HasCustomFormat(const CustomFormat& format) const = 0;
 
-#if defined(OS_WIN)
+#if (!defined(OS_CHROMEOS) && defined(USE_X11)) || defined(OS_WIN)
     virtual void SetFileContents(const base::FilePath& filename,
                                  const std::string& file_contents) = 0;
+#endif
+#if defined(OS_WIN)
     virtual bool GetFileContents(base::FilePath* filename,
                                  std::string* file_contents) const = 0;
     virtual bool HasFileContents() const = 0;
@@ -219,7 +212,8 @@ class UI_BASE_EXPORT OSExchangeData {
                      const std::set<CustomFormat>& custom_formats) const;
 
 #if defined(OS_WIN)
-  // Adds the bytes of a file (CFSTR_FILECONTENTS and CFSTR_FILEDESCRIPTOR).
+  // Adds the bytes of a file (CFSTR_FILECONTENTS and CFSTR_FILEDESCRIPTOR on
+  // Windows).
   void SetFileContents(const base::FilePath& filename,
                        const std::string& file_contents);
   bool GetFileContents(base::FilePath* filename,

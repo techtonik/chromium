@@ -230,25 +230,25 @@ void Plugin::HistogramEnumerateOsArch(const std::string& sandbox_isa) {
   HistogramEnumerate("NaCl.Client.OSArch", os_arch, kNaClOSArchMax, -1);
 }
 
-void Plugin::HistogramEnumerateLoadStatus(PP_NaClError error_code,
-                                          bool is_installed) {
+void Plugin::HistogramEnumerateLoadStatus(PP_NaClError error_code) {
   HistogramEnumerate("NaCl.LoadStatus.Plugin", error_code, PP_NACL_ERROR_MAX,
                      PP_NACL_ERROR_UNKNOWN);
 
   // Gather data to see if being installed changes load outcomes.
-  const char* name = is_installed ? "NaCl.LoadStatus.Plugin.InstalledApp" :
+  const char* name = nacl_interface_->GetIsInstalled(pp_instance()) ?
+      "NaCl.LoadStatus.Plugin.InstalledApp" :
       "NaCl.LoadStatus.Plugin.NotInstalledApp";
   HistogramEnumerate(name, error_code, PP_NACL_ERROR_MAX,
                      PP_NACL_ERROR_UNKNOWN);
 }
 
-void Plugin::HistogramEnumerateSelLdrLoadStatus(NaClErrorCode error_code,
-                                                bool is_installed) {
+void Plugin::HistogramEnumerateSelLdrLoadStatus(NaClErrorCode error_code) {
   HistogramEnumerate("NaCl.LoadStatus.SelLdr", error_code,
                      NACL_ERROR_CODE_MAX, LOAD_STATUS_UNKNOWN);
 
   // Gather data to see if being installed changes load outcomes.
-  const char* name = is_installed ? "NaCl.LoadStatus.SelLdr.InstalledApp" :
+  const char* name = nacl_interface_->GetIsInstalled(pp_instance()) ?
+      "NaCl.LoadStatus.SelLdr.InstalledApp" :
       "NaCl.LoadStatus.SelLdr.NotInstalledApp";
   HistogramEnumerate(name, error_code, NACL_ERROR_CODE_MAX,
                      LOAD_STATUS_UNKNOWN);
@@ -589,10 +589,8 @@ Plugin::Plugin(PP_Instance pp_instance)
     : pp::Instance(pp_instance),
       main_subprocess_("main subprocess", NULL, NULL),
       uses_nonsfi_mode_(false),
-      nexe_error_reported_(false),
       wrapper_factory_(NULL),
       enable_dev_interfaces_(false),
-      is_installed_(false),
       init_time_(0),
       ready_time_(0),
       nexe_size_(0),
@@ -610,8 +608,6 @@ Plugin::Plugin(PP_Instance pp_instance)
   // Notify PPB_NaCl_Private that the instance is created before altering any
   // state that it tracks.
   nacl_interface_->InstanceCreated(pp_instance);
-
-  set_nacl_ready_state(UNSENT);
   set_last_error_string("");
   // We call set_exit_status() here to ensure that the 'exitStatus' property is
   // set. This can only be called when nacl_interface_ is not NULL.
@@ -627,7 +623,7 @@ Plugin::~Plugin() {
   // Destroy the coordinator while the rest of the data is still there
   pnacl_coordinator_.reset(NULL);
 
-  if (!nexe_error_reported()) {
+  if (!nacl_interface_->GetNexeErrorReported(pp_instance())) {
     HistogramTimeLarge(
         "NaCl.ModuleUptime.Normal",
         (shutdown_start - ready_time_) / NACL_MICROS_PER_MILLI);
@@ -713,7 +709,7 @@ void Plugin::NexeFileDidOpen(int32_t pp_error) {
   PLUGIN_PRINTF(("Plugin::NexeFileDidOpen (file_desc=%" NACL_PRId32 ")\n",
                  info.get_desc()));
   HistogramHTTPStatusCode(
-      is_installed_ ?
+      nacl_interface_->GetIsInstalled(pp_instance()) ?
           "NaCl.HttpStatusCodeClass.Nexe.InstalledApp" :
           "NaCl.HttpStatusCodeClass.Nexe.NotInstalledApp",
       nexe_downloader_.status_code());
@@ -796,7 +792,7 @@ void Plugin::NexeFileDidOpenContinuation(int32_t pp_error) {
         "NaCl.Perf.StartupTime.Total",
         static_cast<float>(ready_time_ - init_time_) / NACL_MICROS_PER_MILLI);
 
-    ReportLoadSuccess(LENGTH_IS_COMPUTABLE, nexe_size_, nexe_size_);
+    ReportLoadSuccess(nexe_size_, nexe_size_);
   } else {
     NaClLog(4, "NexeFileDidOpenContinuation: failed.");
     ReportLoadError(error_info);
@@ -847,11 +843,12 @@ void Plugin::NexeDidCrash(int32_t pp_error) {
   // that fits into our load progress event grammar.  If the crash
   // occurs after loaded/loadend, then we use ReportDeadNexe to send a
   // "crash" event.
-  if (nexe_error_reported()) {
+  if (nacl_interface_->GetNexeErrorReported(pp_instance())) {
     PLUGIN_PRINTF(("Plugin::NexeDidCrash: error already reported;"
                    " suppressing\n"));
   } else {
-    if (nacl_ready_state_ == DONE) {
+    if (nacl_interface_->GetNaClReadyState(pp_instance()) ==
+        PP_NACL_READY_STATE_DONE) {
       ReportDeadNexe();
     } else {
       ErrorInfo error_info;
@@ -905,7 +902,7 @@ void Plugin::BitcodeDidTranslateContinuation(int32_t pp_error) {
     int64_t loaded;
     int64_t total;
     pnacl_coordinator_->GetCurrentProgress(&loaded, &total);
-    ReportLoadSuccess(LENGTH_IS_COMPUTABLE, loaded, total);
+    ReportLoadSuccess(loaded, total);
   } else {
     ReportLoadError(error_info);
   }
@@ -914,7 +911,10 @@ void Plugin::BitcodeDidTranslateContinuation(int32_t pp_error) {
 void Plugin::ReportDeadNexe() {
   PLUGIN_PRINTF(("Plugin::ReportDeadNexe\n"));
 
-  if (nacl_ready_state_ == DONE && !nexe_error_reported()) {  // After loadEnd.
+  PP_NaClReadyState ready_state =
+      nacl_interface_->GetNaClReadyState(pp_instance());
+  if (ready_state == PP_NACL_READY_STATE_DONE &&  // After loadEnd
+      !nacl_interface_->GetNexeErrorReported(pp_instance())) {
     int64_t crash_time = NaClGetTimeOfDayMicroseconds();
     // Crashes will be more likely near startup, so use a medium histogram
     // instead of a large one.
@@ -927,7 +927,7 @@ void Plugin::ReportDeadNexe() {
     nacl_interface()->LogToConsole(pp_instance(), message.c_str());
 
     EnqueueProgressEvent(PP_NACL_EVENT_CRASH);
-    set_nexe_error_reported(true);
+    nacl_interface_->SetNexeErrorReported(pp_instance(), PP_TRUE);
   }
   // else ReportLoadError() and ReportAbortError() will be used by loading code
   // to provide error handling.
@@ -975,7 +975,7 @@ void Plugin::NaClManifestFileDidOpen(int32_t pp_error) {
   HistogramTimeSmall("NaCl.Perf.StartupTime.ManifestDownload",
                      nexe_downloader_.TimeSinceOpenMilliseconds());
   HistogramHTTPStatusCode(
-      is_installed_ ?
+      nacl_interface_->GetIsInstalled(pp_instance()) ?
           "NaCl.HttpStatusCodeClass.Manifest.InstalledApp" :
           "NaCl.HttpStatusCodeClass.Manifest.NotInstalledApp",
       nexe_downloader_.status_code());
@@ -1053,10 +1053,14 @@ void Plugin::ProcessNaClManifest(const nacl::string& manifest_json) {
   if (manifest_->GetProgramURL(
           &program_url, &pnacl_options, &uses_nonsfi_mode, &error_info)) {
     pp::Var program_url_var(program_url);
-    is_installed_ = (nacl_interface_->GetUrlScheme(program_url_var.pp_var()) ==
-                     PP_SCHEME_CHROME_EXTENSION);
+    nacl_interface_->SetIsInstalled(
+        pp_instance(),
+        PP_FromBool(
+            nacl_interface_->GetUrlScheme(program_url_var.pp_var()) ==
+            PP_SCHEME_CHROME_EXTENSION));
     uses_nonsfi_mode_ = uses_nonsfi_mode;
-    set_nacl_ready_state(LOADING);
+    nacl_interface_->SetNaClReadyState(pp_instance(),
+                                       PP_NACL_READY_STATE_LOADING);
     // Inform JavaScript that we found a nexe URL to load.
     EnqueueProgressEvent(PP_NACL_EVENT_PROGRESS);
     if (pnacl_options.translate()) {
@@ -1110,11 +1114,14 @@ void Plugin::RequestNaClManifest(const nacl::string& url) {
   }
   PLUGIN_PRINTF(("Plugin::RequestNaClManifest (resolved url='%s')\n",
                  nmf_resolved_url.AsString().c_str()));
-  is_installed_ = (nacl_interface_->GetUrlScheme(nmf_resolved_url.pp_var()) ==
-                   PP_SCHEME_CHROME_EXTENSION);
+  nacl_interface_->SetIsInstalled(
+      pp_instance(),
+      PP_FromBool(
+          nacl_interface_->GetUrlScheme(nmf_resolved_url.pp_var()) ==
+          PP_SCHEME_CHROME_EXTENSION));
   set_manifest_base_url(nmf_resolved_url.AsString());
   // Inform JavaScript that a load is starting.
-  set_nacl_ready_state(OPENED);
+  nacl_interface_->SetNaClReadyState(pp_instance(), PP_NACL_READY_STATE_OPENED);
   EnqueueProgressEvent(PP_NACL_EVENT_LOADSTART);
   bool is_data_uri =
       (nacl_interface_->GetUrlScheme(nmf_resolved_url.pp_var()) ==
@@ -1153,7 +1160,8 @@ bool Plugin::SetManifestObject(const nacl::string& manifest_json,
   bool is_pnacl = (mime_type() == kPnaclMIMEType);
   bool nonsfi_mode_enabled =
       PP_ToBool(nacl_interface_->IsNonSFIModeEnabled());
-  bool pnacl_debug = GetNaClInterface()->NaClDebugStubEnabled();
+  bool pnacl_debug = GetNaClInterface()->NaClDebugEnabledForURL(
+      manifest_base_url().c_str());
   const char* sandbox_isa = nacl_interface_->GetSandboxArch();
   nacl::scoped_ptr<JsonManifest> json_manifest(
       new JsonManifest(url_util_,
@@ -1168,9 +1176,10 @@ bool Plugin::SetManifestObject(const nacl::string& manifest_json,
   return true;
 }
 
-void Plugin::UrlDidOpenForStreamAsFile(int32_t pp_error,
-                                       FileDownloader*& url_downloader,
-                                       PP_CompletionCallback callback) {
+void Plugin::UrlDidOpenForStreamAsFile(
+    int32_t pp_error,
+    FileDownloader* url_downloader,
+    pp::CompletionCallback callback) {
   PLUGIN_PRINTF(("Plugin::UrlDidOpen (pp_error=%" NACL_PRId32
                  ", url_downloader=%p)\n", pp_error,
                  static_cast<void*>(url_downloader)));
@@ -1180,7 +1189,7 @@ void Plugin::UrlDidOpenForStreamAsFile(int32_t pp_error,
   NaClFileInfoAutoCloser *info = new NaClFileInfoAutoCloser(&tmp_info);
 
   if (pp_error != PP_OK) {
-    PP_RunCompletionCallback(&callback, pp_error);
+    callback.Run(pp_error);
     delete info;
   } else if (info->get_desc() > NACL_NO_FILE_DESC) {
     std::map<nacl::string, NaClFileInfoAutoCloser*>::iterator it =
@@ -1189,9 +1198,9 @@ void Plugin::UrlDidOpenForStreamAsFile(int32_t pp_error,
       delete it->second;
     }
     url_file_info_map_[url_downloader->url()] = info;
-    PP_RunCompletionCallback(&callback, PP_OK);
+    callback.Run(PP_OK);
   } else {
-    PP_RunCompletionCallback(&callback, PP_ERROR_FAILED);
+    callback.Run(PP_ERROR_FAILED);
     delete info;
   }
 }
@@ -1211,7 +1220,7 @@ struct NaClFileInfo Plugin::GetFileInfo(const nacl::string& url) {
 }
 
 bool Plugin::StreamAsFile(const nacl::string& url,
-                          PP_CompletionCallback callback) {
+                          const pp::CompletionCallback& callback) {
   PLUGIN_PRINTF(("Plugin::StreamAsFile (url='%s')\n", url.c_str()));
   FileDownloader* downloader = new FileDownloader();
   downloader->Initialize(this);
@@ -1245,43 +1254,26 @@ bool Plugin::StreamAsFile(const nacl::string& url,
 }
 
 
-void Plugin::ReportLoadSuccess(LengthComputable length_computable,
-                               uint64_t loaded_bytes,
-                               uint64_t total_bytes) {
-  // Set the readyState attribute to indicate loaded.
-  set_nacl_ready_state(DONE);
-  // Inform JavaScript that loading was successful and is complete.
+void Plugin::ReportLoadSuccess(uint64_t loaded_bytes, uint64_t total_bytes) {
   const nacl::string& url = nexe_downloader_.url();
-  EnqueueProgressEvent(
-      PP_NACL_EVENT_LOAD, url, length_computable, loaded_bytes, total_bytes);
-  EnqueueProgressEvent(
-      PP_NACL_EVENT_LOADEND, url, length_computable, loaded_bytes, total_bytes);
-
-  // UMA
-  HistogramEnumerateLoadStatus(PP_NACL_ERROR_LOAD_SUCCESS, is_installed_);
+  nacl_interface_->ReportLoadSuccess(
+      pp_instance(), url.c_str(), loaded_bytes, total_bytes);
 }
 
 
 void Plugin::ReportLoadError(const ErrorInfo& error_info) {
-  PLUGIN_PRINTF(("Plugin::ReportLoadError (error='%s')\n",
-                 error_info.message().c_str()));
-  // Set the readyState attribute to indicate we need to start over.
-  set_nacl_ready_state(DONE);
-  set_nexe_error_reported(true);
-
   nacl_interface_->ReportLoadError(pp_instance(),
                                    error_info.error_code(),
                                    error_info.message().c_str(),
-                                   error_info.console_message().c_str(),
-                                   PP_FromBool(is_installed_));
+                                   error_info.console_message().c_str());
 }
 
 
 void Plugin::ReportLoadAbort() {
   PLUGIN_PRINTF(("Plugin::ReportLoadAbort\n"));
   // Set the readyState attribute to indicate we need to start over.
-  set_nacl_ready_state(DONE);
-  set_nexe_error_reported(true);
+  nacl_interface()->SetNaClReadyState(pp_instance(), PP_NACL_READY_STATE_DONE);
+  nacl_interface()->SetNexeErrorReported(pp_instance(), PP_TRUE);
   // Report an error in lastError and on the JavaScript console.
   nacl::string error_string("NaCl module load failed: user aborted");
   set_last_error_string(error_string);
@@ -1291,7 +1283,7 @@ void Plugin::ReportLoadAbort() {
   EnqueueProgressEvent(PP_NACL_EVENT_LOADEND);
 
   // UMA
-  HistogramEnumerateLoadStatus(PP_NACL_ERROR_LOAD_ABORTED, is_installed_);
+  HistogramEnumerateLoadStatus(PP_NACL_ERROR_LOAD_ABORTED);
 }
 
 void Plugin::UpdateDownloadProgress(
@@ -1349,8 +1341,7 @@ const FileDownloader* Plugin::FindFileDownloader(
 }
 
 void Plugin::ReportSelLdrLoadStatus(int status) {
-  HistogramEnumerateSelLdrLoadStatus(static_cast<NaClErrorCode>(status),
-                                     is_installed_);
+  HistogramEnumerateSelLdrLoadStatus(static_cast<NaClErrorCode>(status));
 }
 
 void Plugin::EnqueueProgressEvent(PP_NaClEventType event_type) {
@@ -1423,14 +1414,6 @@ void Plugin::set_last_error_string(const nacl::string& error) {
   nacl_interface_->SetReadOnlyProperty(pp_instance(),
                                        pp::Var("lastError").pp_var(),
                                        pp::Var(error).pp_var());
-}
-
-void Plugin::set_nacl_ready_state(ReadyState state) {
-  nacl_ready_state_ = state;
-  DCHECK(nacl_interface_);
-  nacl_interface_->SetReadOnlyProperty(pp_instance(),
-                                       pp::Var("readyState").pp_var(),
-                                       pp::Var(state).pp_var());
 }
 
 void Plugin::set_exit_status(int exit_status) {

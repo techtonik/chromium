@@ -14,6 +14,10 @@
 #include "content/public/common/page_zoom.h"
 #include "third_party/WebKit/public/web/WebDragOperation.h"
 
+#if defined(USE_MOJO)
+#include "mojo/public/cpp/system/core.h"
+#endif
+
 class GURL;
 struct WebPreferences;
 
@@ -203,9 +207,6 @@ class CONTENT_EXPORT RenderViewHost : virtual public RenderWidgetHost {
   // started.
   virtual void NotifyMoveOrResizeStarted() = 0;
 
-  // Reloads the current focused frame.
-  virtual void ReloadFrame() = 0;
-
   // Sets a property with the given name and value on the Web UI binding object.
   // Must call AllowWebUIBindings() on this renderer first.
   virtual void SetWebUIProperty(const std::string& name,
@@ -246,6 +247,11 @@ class CONTENT_EXPORT RenderViewHost : virtual public RenderWidgetHost {
 
   // Disables fullscreen media playback for encrypted video.
   virtual void DisableFullscreenEncryptedMediaPlayback() = 0;
+#endif
+
+#if defined(USE_MOJO)
+  // Sets the mojo handle for WebUI pages.
+  virtual void SetWebUIHandle(mojo::ScopedMessagePipeHandle handle) = 0;
 #endif
 
  private:

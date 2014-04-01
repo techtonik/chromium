@@ -119,10 +119,13 @@ class FakeSyncManager : public SyncManager {
   virtual void SaveChanges() OVERRIDE;
   virtual void ShutdownOnSyncThread() OVERRIDE;
   virtual UserShare* GetUserShare() OVERRIDE;
+  virtual syncer::SyncCore* GetSyncCore() OVERRIDE;
   virtual const std::string cache_guid() OVERRIDE;
   virtual bool ReceivedExperiment(Experiments* experiments) OVERRIDE;
   virtual bool HasUnsyncedItems() OVERRIDE;
   virtual SyncEncryptionHandler* GetEncryptionHandler() OVERRIDE;
+  virtual ScopedVector<syncer::ProtocolEvent>
+      GetBufferedProtocolEvents() OVERRIDE;
   virtual void RefreshTypes(ModelTypeSet types) OVERRIDE;
 
  private:

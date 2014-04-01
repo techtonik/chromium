@@ -18,10 +18,10 @@
 #include "cc/layers/video_layer.h"
 #include "content/public/common/content_client.h"
 #include "content/public/renderer/render_frame.h"
-#include "content/renderer/media/android/proxy_media_keys.h"
 #include "content/renderer/media/android/renderer_demuxer_android.h"
 #include "content/renderer/media/android/renderer_media_player_manager.h"
 #include "content/renderer/media/crypto/key_systems.h"
+#include "content/renderer/media/webcontentdecryptionmodule_impl.h"
 #include "content/renderer/media/webmediaplayer_delegate.h"
 #include "content/renderer/media/webmediaplayer_util.h"
 #include "content/renderer/render_frame_impl.h"
@@ -31,6 +31,8 @@
 #include "gpu/command_buffer/common/mailbox_holder.h"
 #include "media/base/android/media_player_android.h"
 #include "media/base/bind_to_current_loop.h"
+// TODO(xhwang): Remove when we remove prefixed EME implementation.
+#include "media/base/media_keys.h"
 #include "media/base/media_switches.h"
 #include "media/base/video_frame.h"
 #include "net/base/mime_util.h"
@@ -40,6 +42,7 @@
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebFrame.h"
 #include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
+#include "third_party/WebKit/public/web/WebSecurityOrigin.h"
 #include "third_party/WebKit/public/web/WebView.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkCanvas.h"
@@ -106,6 +109,7 @@ WebMediaPlayerAndroid::WebMediaPlayerAndroid(
       current_time_(0),
       is_remote_(false),
       media_log_(media_log),
+      web_cdm_(NULL),
       weak_factory_(this) {
   DCHECK(manager_);
 
@@ -430,28 +434,46 @@ bool WebMediaPlayerAndroid::copyVideoTextureToPlatformTexture(
     unsigned int type,
     bool premultiply_alpha,
     bool flip_y) {
-  if (is_remote_ || !texture_id_)
+  // Don't allow clients to copy an encrypted video frame.
+  if (needs_external_surface_)
     return false;
+
+  scoped_refptr<VideoFrame> video_frame;
+  {
+    base::AutoLock auto_lock(current_frame_lock_);
+    video_frame = current_frame_;
+  }
+
+  if (!video_frame ||
+      video_frame->format() != media::VideoFrame::NATIVE_TEXTURE)
+    return false;
+  DCHECK((!is_remote_ && texture_id_) ||
+         (is_remote_ && remote_playback_texture_id_));
+  gpu::MailboxHolder* mailbox_holder = video_frame->mailbox_holder();
+  DCHECK((texture_id_ &&
+          mailbox_holder->texture_target == GL_TEXTURE_EXTERNAL_OES) ||
+         (remote_playback_texture_id_ &&
+          mailbox_holder->texture_target == GL_TEXTURE_2D));
 
   // For hidden video element (with style "display:none"), ensure the texture
   // size is set.
-  if (cached_stream_texture_size_.width != natural_size_.width ||
-      cached_stream_texture_size_.height != natural_size_.height) {
+  if (!is_remote_ &&
+      (cached_stream_texture_size_.width != natural_size_.width ||
+       cached_stream_texture_size_.height != natural_size_.height)) {
     stream_texture_factory_->SetStreamTextureSize(
         stream_id_, gfx::Size(natural_size_.width, natural_size_.height));
     cached_stream_texture_size_ = natural_size_;
   }
 
   uint32 source_texture = web_graphics_context->createTexture();
-  // This is strictly not necessary, because we flush when we create the
-  // one and only stream texture.
-  web_graphics_context->waitSyncPoint(texture_mailbox_sync_point_);
+  web_graphics_context->waitSyncPoint(mailbox_holder->sync_point);
 
   // Ensure the target of texture is set before copyTextureCHROMIUM, otherwise
   // an invalid texture target may be used for copy texture.
-  web_graphics_context->bindTexture(GL_TEXTURE_EXTERNAL_OES, source_texture);
-  web_graphics_context->consumeTextureCHROMIUM(GL_TEXTURE_EXTERNAL_OES,
-                                               texture_mailbox_.name);
+  web_graphics_context->bindTexture(mailbox_holder->texture_target,
+                                    source_texture);
+  web_graphics_context->consumeTextureCHROMIUM(mailbox_holder->texture_target,
+                                               mailbox_holder->mailbox.name);
 
   // The video is stored in an unmultiplied format, so premultiply if
   // necessary.
@@ -470,7 +492,10 @@ bool WebMediaPlayerAndroid::copyVideoTextureToPlatformTexture(
   web_graphics_context->pixelStorei(GL_UNPACK_PREMULTIPLY_ALPHA_CHROMIUM,
                                     false);
 
-  web_graphics_context->bindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
+  if (mailbox_holder->texture_target == GL_TEXTURE_EXTERNAL_OES)
+    web_graphics_context->bindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
+  else
+    web_graphics_context->bindTexture(GL_TEXTURE_2D, texture);
   web_graphics_context->deleteTexture(source_texture);
   web_graphics_context->flush();
   return true;
@@ -1242,14 +1267,7 @@ WebMediaPlayerAndroid::GenerateKeyRequestInternal(
   if (current_key_system_.empty()) {
     if (!proxy_decryptor_) {
       proxy_decryptor_.reset(new ProxyDecryptor(
-#if defined(ENABLE_PEPPER_CDMS)
-          client_,
-          frame_,
-#else
           manager_,
-          player_id_,  // TODO(xhwang): Use cdm_id when MediaKeys are
-                       // separated from WebMediaPlayer.
-#endif  // defined(ENABLE_PEPPER_CDMS)
           base::Bind(&WebMediaPlayerAndroid::OnKeyAdded,
                      weak_factory_.GetWeakPtr()),
           base::Bind(&WebMediaPlayerAndroid::OnKeyError,
@@ -1258,16 +1276,16 @@ WebMediaPlayerAndroid::GenerateKeyRequestInternal(
                      weak_factory_.GetWeakPtr())));
     }
 
-    if (!proxy_decryptor_->InitializeCDM(key_system,
-                                         frame_->document().url())) {
+    GURL security_origin(frame_->document().securityOrigin().toString());
+    if (!proxy_decryptor_->InitializeCDM(key_system, security_origin))
       return WebMediaPlayer::MediaKeyExceptionKeySystemNotSupported;
-    }
 
-    if (proxy_decryptor_ && !decryptor_ready_cb_.is_null()) {
+    if (!decryptor_ready_cb_.is_null()) {
       base::ResetAndReturn(&decryptor_ready_cb_)
           .Run(proxy_decryptor_->GetDecryptor());
     }
 
+    manager_->SetCdm(player_id_, proxy_decryptor_->GetCdmId());
     current_key_system_ = key_system;
   } else if (key_system != current_key_system_) {
     return WebMediaPlayer::MediaKeyExceptionInvalidPlayerState;
@@ -1367,6 +1385,24 @@ WebMediaPlayerAndroid::CancelKeyRequestInternal(const std::string& key_system,
   return WebMediaPlayer::MediaKeyExceptionNoError;
 }
 
+void WebMediaPlayerAndroid::setContentDecryptionModule(
+    blink::WebContentDecryptionModule* cdm) {
+  DCHECK(main_thread_checker_.CalledOnValidThread());
+
+  // TODO(xhwang): Support setMediaKeys(0) if necessary: http://crbug.com/330324
+  if (!cdm)
+    return;
+
+  web_cdm_ = ToWebContentDecryptionModuleImpl(cdm);
+  if (!web_cdm_)
+    return;
+
+  if (!decryptor_ready_cb_.is_null())
+    base::ResetAndReturn(&decryptor_ready_cb_).Run(web_cdm_->GetDecryptor());
+
+  manager_->SetCdm(player_id_, web_cdm_->GetCdmId());
+}
+
 void WebMediaPlayerAndroid::OnKeyAdded(const std::string& session_id) {
   EmeUMAHistogramCounts(current_key_system_, "KeyAdded", 1);
 
@@ -1455,13 +1491,18 @@ void WebMediaPlayerAndroid::SetDecryptorReadyCB(
   // detail.
   DCHECK(decryptor_ready_cb_.is_null());
 
+  // Mixed use of prefixed and unprefixed EME APIs is disallowed by Blink.
+  DCHECK(!proxy_decryptor_ || !web_cdm_);
+
   if (proxy_decryptor_) {
     decryptor_ready_cb.Run(proxy_decryptor_->GetDecryptor());
     return;
   }
 
-  // TODO(xhwang): Also notify |web_cdm_| when we implement
-  // setContentDecryptionModule(). See: http://crbug.com/224786
+  if (web_cdm_) {
+    decryptor_ready_cb.Run(web_cdm_->GetDecryptor());
+    return;
+  }
 
   decryptor_ready_cb_ = decryptor_ready_cb;
 }

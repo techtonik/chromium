@@ -40,6 +40,7 @@
 #include "gpu/GLES2/gl2extchromium.h"
 #include "gpu/command_buffer/common/mailbox_holder.h"
 #include "media/audio/null_audio_sink.h"
+#include "media/base/audio_hardware_config.h"
 #include "media/base/bind_to_current_loop.h"
 #include "media/base/filter_collection.h"
 #include "media/base/limits.h"
@@ -66,6 +67,7 @@
 #include "third_party/WebKit/public/platform/WebURL.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
+#include "third_party/WebKit/public/web/WebSecurityOrigin.h"
 #include "third_party/WebKit/public/web/WebView.h"
 #include "v8/include/v8.h"
 #include "webkit/renderer/compositor_bindings/web_layer_impl.h"
@@ -436,19 +438,19 @@ void WebMediaPlayerImpl::setPreload(WebMediaPlayer::Preload preload) {
 bool WebMediaPlayerImpl::hasVideo() const {
   DCHECK(main_loop_->BelongsToCurrentThread());
 
-  return pipeline_.HasVideo();
+  return pipeline_metadata_.has_video;
 }
 
 bool WebMediaPlayerImpl::hasAudio() const {
   DCHECK(main_loop_->BelongsToCurrentThread());
 
-  return pipeline_.HasAudio();
+  return pipeline_metadata_.has_audio;
 }
 
 blink::WebSize WebMediaPlayerImpl::naturalSize() const {
   DCHECK(main_loop_->BelongsToCurrentThread());
 
-  return blink::WebSize(natural_size_);
+  return blink::WebSize(pipeline_metadata_.natural_size);
 }
 
 bool WebMediaPlayerImpl::paused() const {
@@ -576,7 +578,7 @@ unsigned WebMediaPlayerImpl::droppedFrameCount() const {
   unsigned frames_dropped = stats.video_frames_dropped;
 
   frames_dropped += const_cast<VideoFrameCompositor&>(compositor_)
-                        .GetFramesDroppedBeforeComposite();
+                        .GetFramesDroppedBeforeCompositorWasNotified();
 
   DCHECK_LE(frames_dropped, stats.video_frames_decoded);
   return frames_dropped;
@@ -778,7 +780,8 @@ WebMediaPlayerImpl::GenerateKeyRequestInternal(const std::string& key_system,
           BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnKeyMessage)));
     }
 
-    if (!proxy_decryptor_->InitializeCDM(key_system, frame_->document().url()))
+    GURL security_origin(frame_->document().securityOrigin().toString());
+    if (!proxy_decryptor_->InitializeCDM(key_system, security_origin))
       return WebMediaPlayer::MediaKeyExceptionKeySystemNotSupported;
 
     if (proxy_decryptor_ && !decryptor_ready_cb_.is_null()) {
@@ -958,38 +961,39 @@ void WebMediaPlayerImpl::OnPipelineError(PipelineStatus error) {
   InvalidateOnMainThread();
 }
 
-void WebMediaPlayerImpl::OnPipelineBufferingState(
-    media::Pipeline::BufferingState buffering_state) {
-  DVLOG(1) << "OnPipelineBufferingState(" << buffering_state << ")";
+void WebMediaPlayerImpl::OnPipelineMetadata(
+    media::PipelineMetadata metadata) {
+  DVLOG(1) << "OnPipelineMetadata";
 
-  switch (buffering_state) {
-    case media::Pipeline::kHaveMetadata:
-      // TODO(scherkus): Would be better to have a metadata changed callback
-      // that contained the size information as well whether audio/video is
-      // present. Doing so would let us remove more methods off Pipeline.
-      natural_size_ = pipeline_.GetInitialNaturalSize();
+  pipeline_metadata_ = metadata;
 
-      SetReadyState(WebMediaPlayer::ReadyStateHaveMetadata);
+  SetReadyState(WebMediaPlayer::ReadyStateHaveMetadata);
 
-      if (hasVideo()) {
-        DCHECK(!video_weblayer_);
-        video_weblayer_.reset(new webkit::WebLayerImpl(
-            cc::VideoLayer::Create(compositor_.GetVideoFrameProvider())));
-        client_->setWebLayer(video_weblayer_.get());
-      }
-      break;
-    case media::Pipeline::kPrerollCompleted:
-      // Only transition to ReadyStateHaveEnoughData if we don't have
-      // any pending seeks because the transition can cause Blink to
-      // report that the most recent seek has completed.
-      if (!pending_seek_)
-        SetReadyState(WebMediaPlayer::ReadyStateHaveEnoughData);
-      break;
+  if (hasVideo()) {
+    DCHECK(!video_weblayer_);
+    video_weblayer_.reset(new webkit::WebLayerImpl(
+        cc::VideoLayer::Create(compositor_.GetVideoFrameProvider())));
+    client_->setWebLayer(video_weblayer_.get());
   }
 
   // TODO(scherkus): This should be handled by HTMLMediaElement and controls
   // should know when to invalidate themselves http://crbug.com/337015
   InvalidateOnMainThread();
+}
+
+void WebMediaPlayerImpl::OnPipelinePrerollCompleted() {
+  DVLOG(1) << "OnPipelinePrerollCompleted";
+
+  // Only transition to ReadyStateHaveEnoughData if we don't have
+  // any pending seeks because the transition can cause Blink to
+  // report that the most recent seek has completed.
+  if (!pending_seek_) {
+    SetReadyState(WebMediaPlayer::ReadyStateHaveEnoughData);
+
+    // TODO(scherkus): This should be handled by HTMLMediaElement and controls
+    // should know when to invalidate themselves http://crbug.com/337015
+    InvalidateOnMainThread();
+  }
 }
 
 void WebMediaPlayerImpl::OnDemuxerOpened() {
@@ -1147,7 +1151,8 @@ void WebMediaPlayerImpl::StartPipeline() {
     chunk_demuxer_ = new media::ChunkDemuxer(
         BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnDemuxerOpened),
         BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnNeedKey),
-        base::Bind(&LogMediaSourceError, media_log_));
+        base::Bind(&LogMediaSourceError, media_log_),
+        false);
     demuxer_.reset(chunk_demuxer_);
   }
 
@@ -1163,11 +1168,12 @@ void WebMediaPlayerImpl::StartPipeline() {
   audio_decoders.push_back(new media::FFmpegAudioDecoder(media_loop_));
   audio_decoders.push_back(new media::OpusAudioDecoder(media_loop_));
 
-  scoped_ptr<media::AudioRenderer> audio_renderer(
-      new media::AudioRendererImpl(media_loop_,
-                                   audio_source_provider_.get(),
-                                   audio_decoders.Pass(),
-                                   set_decryptor_ready_cb));
+  scoped_ptr<media::AudioRenderer> audio_renderer(new media::AudioRendererImpl(
+      media_loop_,
+      audio_source_provider_.get(),
+      audio_decoders.Pass(),
+      set_decryptor_ready_cb,
+      RenderThreadImpl::current()->GetAudioHardwareConfig()));
   filter_collection->SetAudioRenderer(audio_renderer.Pass());
 
   // Create our video decoders and renderer.
@@ -1210,7 +1216,8 @@ void WebMediaPlayerImpl::StartPipeline() {
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineEnded),
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineError),
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineSeek),
-      BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineBufferingState),
+      BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineMetadata),
+      BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelinePrerollCompleted),
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnDurationChange));
 }
 
@@ -1272,7 +1279,7 @@ void WebMediaPlayerImpl::OnNaturalSizeChange(gfx::Size size) {
 
   media_log_->AddEvent(
       media_log_->CreateVideoSizeSetEvent(size.width(), size.height()));
-  natural_size_ = size;
+  pipeline_metadata_.natural_size = size;
 
   client_->sizeChanged();
 }
@@ -1301,7 +1308,7 @@ void WebMediaPlayerImpl::SetDecryptorReadyCB(
   DCHECK(decryptor_ready_cb_.is_null());
 
   // Mixed use of prefixed and unprefixed EME APIs is disallowed by Blink.
-  DCHECK(!(proxy_decryptor_ && web_cdm_));
+  DCHECK(!proxy_decryptor_ || !web_cdm_);
 
   if (proxy_decryptor_) {
     decryptor_ready_cb.Run(proxy_decryptor_->GetDecryptor());

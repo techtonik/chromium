@@ -27,6 +27,7 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/signin/signin_error_notifier_factory_ash.h"
 #include "chrome/browser/speech/tts_controller.h"
+#include "chrome/browser/sync/sync_error_notifier_factory_ash.h"
 #include "chrome/browser/ui/ash/chrome_new_window_delegate_chromeos.h"
 #include "chrome/browser/ui/ash/session_state_delegate_chromeos.h"
 #include "chrome/browser/ui/ash/system_tray_delegate_chromeos.h"
@@ -144,6 +145,11 @@ class AccessibilityDelegateImpl : public ash::AccessibilityDelegate {
     DCHECK(chromeos::AccessibilityManager::Get());
     return chromeos::AccessibilityManager::Get()->
         ShouldShowAccessibilityMenu();
+  }
+
+  virtual bool IsBrailleDisplayConnected() const OVERRIDE {
+    DCHECK(chromeos::AccessibilityManager::Get());
+    return chromeos::AccessibilityManager::Get()->IsBrailleDisplayConnected();
   }
 
   virtual void SilenceSpokenFeedback() const OVERRIDE {
@@ -271,8 +277,9 @@ void ChromeShellDelegate::Observe(int type,
       Profile* profile = content::Details<Profile>(details).ptr();
       if (!chromeos::ProfileHelper::IsSigninProfile(profile) &&
           !profile->IsGuestSession() && !profile->IsManaged()) {
-        // Start the error notifier service to show auth notifications.
+        // Start the error notifier services to show auth/sync notifications.
         SigninErrorNotifierFactory::GetForProfile(profile);
+        SyncErrorNotifierFactory::GetForProfile(profile);
       }
       ash::Shell::GetInstance()->OnLoginUserProfilePrepared();
       break;

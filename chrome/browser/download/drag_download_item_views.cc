@@ -12,8 +12,10 @@
 #include "net/base/net_util.h"
 #include "ui/base/dragdrop/drag_drop_types.h"
 #include "ui/base/dragdrop/drag_utils.h"
+#include "ui/base/dragdrop/file_info.h"
 #include "ui/base/dragdrop/os_exchange_data.h"
 #include "ui/gfx/image/image.h"
+#include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/point.h"
 #include "ui/gfx/screen.h"
 #include "ui/views/widget/widget.h"
@@ -38,10 +40,10 @@ void DragDownloadItem(const content::DownloadItem* download,
   // Set up our OLE machinery
   ui::OSExchangeData data;
 
-  if (icon) {
-    drag_utils::CreateDragImageForFile(
-        download->GetFileNameToReportUser(), icon->ToImageSkia(), &data);
-  }
+  drag_utils::CreateDragImageForFile(
+      download->GetFileNameToReportUser(),
+      icon ? icon->AsImageSkia() : gfx::ImageSkia(),
+      &data);
 
   base::FilePath full_path = download->GetTargetFilePath();
 #if defined(OS_CHROMEOS)
@@ -53,14 +55,10 @@ void DragDownloadItem(const content::DownloadItem* download,
       drive_download_handler->IsDriveDownload(download))
     full_path = drive_download_handler->GetCacheFilePath(download);
 #endif
-  std::vector<ui::OSExchangeData::FileInfo> file_infos;
-  file_infos.push_back(ui::OSExchangeData::FileInfo(
-      full_path, download->GetFileNameToReportUser()));
+  std::vector<ui::FileInfo> file_infos;
+  file_infos.push_back(
+      ui::FileInfo(full_path, download->GetFileNameToReportUser()));
   data.SetFilenames(file_infos);
-
-  // Add URL so that we can load supported files when dragged to WebContents.
-  data.SetURL(net::FilePathToFileURL(full_path),
-              download->GetFileNameToReportUser().LossyDisplayName());
 
 #if !defined(TOOLKIT_GTK)
 #if defined(USE_AURA)

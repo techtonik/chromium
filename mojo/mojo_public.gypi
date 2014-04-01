@@ -2,7 +2,7 @@
   'targets': [
     {
       'target_name': 'mojo_system',
-      'type': 'shared_library',
+      'type': '<(component)',
       'defines': [
         'MOJO_SYSTEM_IMPLEMENTATION',
       ],
@@ -15,13 +15,12 @@
         ],
       },
       'sources': [
-        'public/system/async_waiter.h',
-        'public/system/core.h',
-        'public/system/core_cpp.h',
+        'public/c/system/async_waiter.h',
+        'public/c/system/core.h',
+        'public/c/system/macros.h',
+        'public/c/system/system_export.h',
         'public/system/core_private.cc',
         'public/system/core_private.h',
-        'public/system/macros.h',
-        'public/system/system_export.h',
       ],
       'conditions': [
         ['OS=="mac"', {
@@ -60,8 +59,8 @@
         ],
       },
       'sources': [
-        'public/gles2/gles2.h',
-        'public/gles2/gles2_export.h',
+        'public/c/gles2/gles2.h',
+        'public/c/gles2/gles2_export.h',
         'public/gles2/gles2_private.cc',
         'public/gles2/gles2_private.h',
       ],
@@ -95,10 +94,10 @@
         ],
       },
       'sources': [
-        'public/tests/test_support.h',
+        'public/c/test_support/test_support.h',
+        'public/c/test_support/test_support_export.h',
         'public/tests/test_support_private.cc',
         'public/tests/test_support_private.h',
-        'public/tests/test_support_export.h',
       ],
       'conditions': [
         ['OS=="mac"', {
@@ -125,10 +124,11 @@
         'mojo_test_support',
       ],
       'sources': [
-        'public/tests/test_utils.cc',
-        'public/tests/test_utils.h',
+        'public/cpp/test_support/lib/test_utils.cc',
+        'public/cpp/test_support/test_utils.h',
       ],
     },
+    # TODO(vtl): Reorganize the mojo_public_*_unittests.
     {
       'target_name': 'mojo_public_bindings_unittests',
       'type': 'executable',
@@ -157,6 +157,9 @@
         'public/bindings/tests/test_structs.mojom',
         'public/bindings/tests/type_conversion_unittest.cc',
       ],
+      'variables': {
+        'mojom_base_output_dir': 'mojo',
+      },
       'includes': [ 'public/bindings/mojom_bindings_generator.gypi' ],
     },
     {
@@ -172,7 +175,7 @@
         'mojo_utility',
       ],
       'sources': [
-        'public/environment/tests/async_waiter_unittest.cc',
+        'public/cpp/environment/tests/async_waiter_unittest.cc',
       ],
     },
     {
@@ -187,10 +190,11 @@
         'mojo_system',
       ],
       'sources': [
-        'public/tests/system/core_cpp_unittest.cc',
-        'public/tests/system/core_unittest.cc',
-        'public/tests/system/core_unittest_pure_c.c',
-        'public/tests/system/macros_unittest.cc',
+        'public/c/system/tests/core_unittest.cc',
+        'public/c/system/tests/core_unittest_pure_c.c',
+        'public/c/system/tests/macros_unittest.cc',
+        'public/cpp/system/tests/core_unittest.cc',
+        'public/cpp/system/tests/macros_unittest.cc',
       ],
     },
     {
@@ -206,16 +210,16 @@
         'mojo_utility',
       ],
       'sources': [
-        'public/utility/tests/mutex_unittest.cc',
-        'public/utility/tests/run_loop_unittest.cc',
-        'public/utility/tests/thread_unittest.cc',
+        'public/cpp/utility/tests/mutex_unittest.cc',
+        'public/cpp/utility/tests/run_loop_unittest.cc',
+        'public/cpp/utility/tests/thread_unittest.cc',
       ],
       'conditions': [
         # See crbug.com/342893:
         ['OS=="win"', {
           'sources!': [
-            'public/utility/tests/mutex_unittest.cc',
-            'public/utility/tests/thread_unittest.cc',
+            'public/cpp/utility/tests/mutex_unittest.cc',
+            'public/cpp/utility/tests/thread_unittest.cc',
           ],
         }],
       ],
@@ -232,7 +236,7 @@
         'mojo_utility',
       ],
       'sources': [
-        'public/tests/system/core_perftest.cc',
+        'public/c/system/tests/core_perftest.cc',
       ],
     },
     {
@@ -248,6 +252,8 @@
         'public/bindings/callback.h',
         'public/bindings/error_handler.h',
         'public/bindings/interface.h',
+        'public/bindings/js/constants.cc',
+        'public/bindings/js/constants.h',
         'public/bindings/message.h',
         'public/bindings/passable.h',
         'public/bindings/remote_ptr.h',
@@ -289,6 +295,9 @@
         'public/bindings/tests/sample_import.mojom',
         'public/bindings/tests/sample_import2.mojom',
       ],
+      'variables': {
+        'mojom_base_output_dir': 'mojo',
+      },
       'includes': [ 'public/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
         'mojo_bindings',
@@ -303,13 +312,13 @@
       'target_name': 'mojo_environment_standalone',
       'type': 'static_library',
       'sources': [
-        'public/environment/buffer_tls.h',
-        'public/environment/default_async_waiter.h',
-        'public/environment/environment.h',
-        'public/environment/lib/default_async_waiter.cc',
-        'public/environment/lib/buffer_tls.cc',
-        'public/environment/lib/buffer_tls_setup.h',
-        'public/environment/lib/environment.cc',
+        'public/cpp/environment/buffer_tls.h',
+        'public/cpp/environment/default_async_waiter.h',
+        'public/cpp/environment/environment.h',
+        'public/cpp/environment/lib/default_async_waiter.cc',
+        'public/cpp/environment/lib/buffer_tls.cc',
+        'public/cpp/environment/lib/buffer_tls_setup.h',
+        'public/cpp/environment/lib/environment.cc',
       ],
       'include_dirs': [
         '..',
@@ -319,25 +328,25 @@
       'target_name': 'mojo_utility',
       'type': 'static_library',
       'sources': [
-        'public/utility/mutex.h',
-        'public/utility/run_loop.h',
-        'public/utility/run_loop_handler.h',
-        'public/utility/thread.h',
-        'public/utility/lib/mutex.cc',
-        'public/utility/lib/run_loop.cc',
-        'public/utility/lib/thread.cc',
-        'public/utility/lib/thread_local.h',
-        'public/utility/lib/thread_local_posix.cc',
-        'public/utility/lib/thread_local_win.cc',
+        'public/cpp/utility/mutex.h',
+        'public/cpp/utility/run_loop.h',
+        'public/cpp/utility/run_loop_handler.h',
+        'public/cpp/utility/thread.h',
+        'public/cpp/utility/lib/mutex.cc',
+        'public/cpp/utility/lib/run_loop.cc',
+        'public/cpp/utility/lib/thread.cc',
+        'public/cpp/utility/lib/thread_local.h',
+        'public/cpp/utility/lib/thread_local_posix.cc',
+        'public/cpp/utility/lib/thread_local_win.cc',
       ],
       'conditions': [
         # See crbug.com/342893:
         ['OS=="win"', {
           'sources!': [
-            'public/utility/mutex.h',
-            'public/utility/thread.h',
-            'public/utility/lib/mutex.cc',
-            'public/utility/lib/thread.cc',
+            'public/cpp/utility/mutex.h',
+            'public/cpp/utility/thread.h',
+            'public/cpp/utility/lib/mutex.cc',
+            'public/cpp/utility/lib/thread.cc',
           ],
         }],
       ],
@@ -349,12 +358,11 @@
       'target_name': 'mojo_shell_bindings',
       'type': 'static_library',
       'sources': [
-        'public/shell/lib/application.cc',
-        'public/shell/lib/service.cc',
-        'public/shell/application.h',
-        'public/shell/service.h',
-        'public/shell/shell.mojom',
+        'public/interfaces/shell/shell.mojom',
       ],
+      'variables': {
+        'mojom_base_output_dir': 'mojo',
+      },
       'includes': [ 'public/bindings/mojom_bindings_generator.gypi' ],
       'dependencies': [
         'mojo_bindings',
@@ -362,7 +370,22 @@
       ],
       'export_dependent_settings': [
         'mojo_bindings',
-        'mojo_system',
+      ],
+    },
+    {
+      'target_name': 'mojo_shell_client',
+      'type': 'static_library',
+      'sources': [
+        'public/cpp/shell/application.h',
+        'public/cpp/shell/service.h',
+        'public/cpp/shell/lib/application.cc',
+        'public/cpp/shell/lib/service.cc',
+      ],
+      'dependencies': [
+        'mojo_shell_bindings',
+      ],
+      'export_dependent_settings': [
+        'mojo_shell_bindings',
       ],
     },
   ],

@@ -35,9 +35,6 @@
 
 namespace {
 
-// Forward declare LogToConsole() we can use it in other functions here.
-void LogToConsole(PP_Instance instance, const char* message);
-
 base::LazyInstance<scoped_refptr<PnaclTranslationResourceHost> >
     g_pnacl_resource_host = LAZY_INSTANCE_INITIALIZER;
 
@@ -438,22 +435,27 @@ void DispatchEventOnMainThread(PP_Instance instance,
 void SetReadOnlyProperty(PP_Instance instance,
                          struct PP_Var key,
                          struct PP_Var value) {
-  content::PepperPluginInstance* plugin_instance =
-      content::PepperPluginInstance::Get(instance);
-  plugin_instance->SetEmbedProperty(key, value);
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  if (load_manager)
+    load_manager->SetReadOnlyProperty(key, value);
+}
+
+void ReportLoadSuccess(PP_Instance instance,
+                       const char* url,
+                       uint64_t loaded_bytes,
+                       uint64_t total_bytes) {
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  if (load_manager)
+    load_manager->ReportLoadSuccess(url, loaded_bytes, total_bytes);
 }
 
 void ReportLoadError(PP_Instance instance,
                      PP_NaClError error,
                      const char* error_message,
-                     const char* console_message,
-                     PP_Bool is_installed) {
+                     const char* console_message) {
   nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
-  if (load_manager) {
-    load_manager->ReportLoadError(error, error_message,
-                                  PP_ToBool(is_installed));
-  }
-  LogToConsole(instance, console_message);
+  if (load_manager)
+    load_manager->ReportLoadError(error, error_message, console_message);
 }
 
 void InstanceCreated(PP_Instance instance) {
@@ -470,9 +472,18 @@ void InstanceDestroyed(PP_Instance instance) {
   map.erase(instance);
 }
 
-PP_Bool NaClDebugStubEnabled() {
-  return PP_FromBool(CommandLine::ForCurrentProcess()->HasSwitch(
-                         switches::kEnableNaClDebug));
+PP_Bool NaClDebugEnabledForURL(const char* alleged_nmf_url) {
+  if (!CommandLine::ForCurrentProcess()->HasSwitch(switches::kEnableNaClDebug))
+    return PP_FALSE;
+  bool should_debug;
+  IPC::Sender* sender = content::RenderThread::Get();
+  DCHECK(sender);
+  if(!sender->Send(new NaClHostMsg_NaClDebugEnabledForURL(
+         GURL(alleged_nmf_url),
+         &should_debug))) {
+    return PP_FALSE;
+  }
+  return PP_FromBool(should_debug);
 }
 
 const char* GetSandboxArch() {
@@ -493,11 +504,55 @@ PP_UrlSchemeType GetUrlScheme(PP_Var url) {
 }
 
 void LogToConsole(PP_Instance instance, const char* message) {
-  std::string source("NativeClient");
-  ppapi::PpapiGlobals::Get()->LogWithSource(instance,
-                                            PP_LOGLEVEL_LOG,
-                                            source,
-                                            std::string(message));
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  DCHECK(load_manager);
+  if (load_manager)
+    load_manager->LogToConsole(std::string(message));
+}
+
+PP_Bool GetNexeErrorReported(PP_Instance instance) {
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  DCHECK(load_manager);
+  if (load_manager)
+    return PP_FromBool(load_manager->nexe_error_reported());
+  return PP_FALSE;
+}
+
+void SetNexeErrorReported(PP_Instance instance, PP_Bool error_reported) {
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  DCHECK(load_manager);
+  if (load_manager)
+    load_manager->set_nexe_error_reported(PP_ToBool(error_reported));
+}
+
+PP_NaClReadyState GetNaClReadyState(PP_Instance instance) {
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  DCHECK(load_manager);
+  if (load_manager)
+    return load_manager->nacl_ready_state();
+  return PP_NACL_READY_STATE_UNSENT;
+}
+
+void SetNaClReadyState(PP_Instance instance, PP_NaClReadyState ready_state) {
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  DCHECK(load_manager);
+  if (load_manager)
+    load_manager->set_nacl_ready_state(ready_state);
+}
+
+PP_Bool GetIsInstalled(PP_Instance instance) {
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  DCHECK(load_manager);
+  if (load_manager)
+    return PP_FromBool(load_manager->is_installed());
+  return PP_FALSE;
+}
+
+void SetIsInstalled(PP_Instance instance, PP_Bool installed) {
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  DCHECK(load_manager);
+  if (load_manager)
+    load_manager->set_is_installed(PP_ToBool(installed));
 }
 
 const PPB_NaCl_Private nacl_interface = {
@@ -515,13 +570,20 @@ const PPB_NaCl_Private nacl_interface = {
   &OpenNaClExecutable,
   &DispatchEvent,
   &SetReadOnlyProperty,
+  &ReportLoadSuccess,
   &ReportLoadError,
   &InstanceCreated,
   &InstanceDestroyed,
-  &NaClDebugStubEnabled,
+  &NaClDebugEnabledForURL,
   &GetSandboxArch,
   &GetUrlScheme,
-  &LogToConsole
+  &LogToConsole,
+  &GetNexeErrorReported,
+  &SetNexeErrorReported,
+  &GetNaClReadyState,
+  &SetNaClReadyState,
+  &GetIsInstalled,
+  &SetIsInstalled
 };
 
 }  // namespace

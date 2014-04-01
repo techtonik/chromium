@@ -110,6 +110,8 @@
             'rappor/rappor_metric_unittest.cc',
             'rappor/rappor_service_unittest.cc',
             'sessions/serialized_navigation_entry_unittest.cc',
+            'signin/core/browser/mutable_profile_oauth2_token_service_unittest.cc',
+            'signin/core/browser/signin_error_controller_unittest.cc',
             'signin/core/browser/webdata/token_service_table_unittest.cc',
             'storage_monitor/image_capture_device_manager_unittest.mm',
             'storage_monitor/media_storage_util_unittest.cc',
@@ -211,6 +213,8 @@
 
             # Dependencies of signin
             'components.gyp:signin_core_browser',
+            'components.gyp:signin_core_browser_test_support',
+            '../google_apis/google_apis.gyp:google_apis_test_support',
 
             # Dependencies of sync_driver
             'components.gyp:sync_driver_test_support',
@@ -335,6 +339,7 @@
             }],
             ['OS == "android"', {
               'sources!': [
+                'signin/core/browser/mutable_profile_oauth2_token_service_unittest.cc',
                 'storage_monitor/media_storage_util_unittest.cc',
                 'storage_monitor/storage_info_unittest.cc',
                 'storage_monitor/storage_monitor_unittest.cc',
@@ -549,7 +554,6 @@
             'HAS_OUT_OF_PROC_TEST_RUNNER',
           ],
           'sources': [
-            '../content/test/content_test_launcher.cc',
             'dom_distiller/content/distiller_page_web_contents_browsertest.cc',
 
             # content_extractor is a standalone content extraction tool built as
@@ -560,21 +564,13 @@
             {
               'action_name': 'repack_components_pack',
               'variables': {
-                'repack_path': '<(DEPTH)/tools/grit/grit/format/repack.py',
                 'pak_inputs': [
                   '<(SHARED_INTERMEDIATE_DIR)/components/component_resources.pak',
                   '<(SHARED_INTERMEDIATE_DIR)/components/strings/component_strings_en-US.pak',
                 ],
+                'pak_output': '<(PRODUCT_DIR)/components_resources.pak',
               },
-              'inputs': [
-                '<(repack_path)',
-                '<@(pak_inputs)',
-              ],
-              'outputs': [
-                '<(PRODUCT_DIR)/components_resources.pak',
-              ],
-              'action': ['python', '<(repack_path)', '<@(_outputs)',
-                         '<@(pak_inputs)'],
+              'includes': [ '../build/repack_action.gypi' ],
             },
           ],
           'conditions': [

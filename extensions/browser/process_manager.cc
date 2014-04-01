@@ -28,11 +28,11 @@
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/browser/web_contents_user_data.h"
 #include "content/public/common/renderer_preferences.h"
-#include "extensions/browser/api/runtime/runtime_event_router.h"
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/extensions_browser_client.h"
+#include "extensions/browser/process_manager_observer.h"
 #include "extensions/browser/view_type_utils.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_messages.h"
@@ -281,6 +281,14 @@ const ProcessManager::ViewSet ProcessManager::GetAllViews() const {
     result.insert(iter->first);
   }
   return result;
+}
+
+void ProcessManager::AddObserver(ProcessManagerObserver* observer) {
+  observer_list_.AddObserver(observer);
+}
+
+void ProcessManager::RemoveObserver(ProcessManagerObserver* observer) {
+  observer_list_.RemoveObserver(observer);
 }
 
 bool ProcessManager::CreateBackgroundHost(const Extension* extension,
@@ -776,11 +784,9 @@ void ProcessManager::CreateBackgroundHostsForProfileStartup() {
        ++extension) {
     CreateBackgroundHostForExtensionLoad(this, extension->get());
 
-#if defined(ENABLE_EXTENSIONS)
-    // Android cannot call API implementations.
-    RuntimeEventRouter::DispatchOnStartupEvent(GetBrowserContext(),
-                                               (*extension)->id());
-#endif
+    FOR_EACH_OBSERVER(ProcessManagerObserver,
+                      observer_list_,
+                      OnBackgroundHostStartup(*extension));
   }
   startup_background_hosts_created_ = true;
 

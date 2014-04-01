@@ -1,4 +1,4 @@
-// Copyright (c) 2012 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 //
@@ -31,21 +31,19 @@
 #include "base/observer_list.h"
 #include "base/prefs/pref_change_registrar.h"
 #include "base/prefs/pref_member.h"
-#include "chrome/browser/profiles/profile.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/signin/core/browser/signin_internals_util.h"
 #include "components/signin/core/browser/signin_manager_base.h"
-#include "content/public/browser/render_process_host_observer.h"
 #include "google_apis/gaia/google_service_auth_error.h"
 #include "google_apis/gaia/merge_session_helper.h"
 #include "net/cookies/canonical_cookie.h"
 
 class PrefService;
+class ProfileOAuth2TokenService;
 class SigninAccountIdHelper;
 class SigninClient;
 
-class SigninManager : public SigninManagerBase,
-                      public content::RenderProcessHostObserver {
+class SigninManager : public SigninManagerBase {
  public:
   // The callback invoked once the OAuth token has been fetched during signin,
   // but before the profile transitions to the "signed-in" state. This allows
@@ -64,7 +62,7 @@ class SigninManager : public SigninManagerBase,
   // OneClickSigninHelper.
   static const char kChromeSigninEffectiveSite[];
 
-  explicit SigninManager(SigninClient* client);
+  SigninManager(SigninClient* client, ProfileOAuth2TokenService* token_service);
   virtual ~SigninManager();
 
   // Returns true if the username is allowed based on the policy string.
@@ -117,13 +115,10 @@ class SigninManager : public SigninManagerBase,
   // authenticated. Returns an empty string if no auth is in progress.
   const std::string& GetUsernameForAuthInProgress() const;
 
-  // Set the profile preference to turn off one-click sign-in so that it won't
-  // ever show it again in this profile (even if the user tries a new account).
-  static void DisableOneClickSignIn(Profile* profile);
-
-  // content::RenderProcessHostObserver
-  virtual void RenderProcessHostDestroyed(
-      content::RenderProcessHost* host) OVERRIDE;
+  // Set the preference to turn off one-click sign-in so that it won't ever
+  // show it again for the user associated with |prefs| (even if the user tries
+  // a new account).
+  static void DisableOneClickSignIn(PrefService* prefs);
 
   // Tells the SigninManager whether to prohibit signout for this profile.
   // If |prohibit_signout| is true, then signout will be prohibited.
@@ -132,18 +127,6 @@ class SigninManager : public SigninManagerBase,
   // If true, signout is prohibited for this profile (calls to SignOut() are
   // ignored).
   bool IsSignoutProhibited() const;
-
-  // Allows the SigninManager to track the privileged signin process
-  // identified by |host_id| so that we can later ask (via IsSigninProcess)
-  // if it is safe to sign the user in from the current context (see
-  // OneClickSigninHelper).  All of this tracking state is reset once the
-  // renderer process terminates.
-  //
-  // N.B. This is the id returned by RenderProcessHost::GetID().
-  void SetSigninProcess(int host_id);
-  void ClearSigninProcess();
-  bool IsSigninProcess(int host_id) const;
-  bool HasSigninProcess() const;
 
   // Add or remove observers for the merge session notification.
   void AddMergeSessionObserver(MergeSessionHelper::Observer* observer);
@@ -216,16 +199,13 @@ class SigninManager : public SigninManagerBase,
 
   base::WeakPtrFactory<SigninManager> weak_pointer_factory_;
 
-  // See SetSigninProcess.  Tracks the currently active signin process
-  // by ID, if there is one.
-  int signin_host_id_;
-
-  // The RenderProcessHosts being observed.
-  std::set<content::RenderProcessHost*> signin_hosts_observed_;
-
   // The SigninClient object associated with this object. Must outlive this
   // object.
   SigninClient* client_;
+
+  // The ProfileOAuth2TokenService instance associated with this object. Must
+  // outlive this object.
+  ProfileOAuth2TokenService* token_service_;
 
   // Helper object to listen for changes to signin preferences stored in non-
   // profile-specific local prefs (like kGoogleServicesUsernamePattern).

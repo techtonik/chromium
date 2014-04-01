@@ -1058,6 +1058,12 @@ Press any key to continue exploring.
   <message name="IDS_FLAGS_DISABLE_QUICKOFFICE_COMPONENT_APP_DESCRIPTION" desc="Description for the flag to disable Chrome Office component extension.">
     Disable Quickoffice component extension for testing purposes.
   </message>
+  <message name="IDS_FLAGS_DISABLE_DISPLAY_COLOR_CALIBRATION_NAME" desc="Name for the flag to disable the color calibration of the display.">
+    Disable the color calibration of the display.
+  </message>
+  <message name="IDS_FLAGS_DISABLE_DISPLAY_COLOR_CALIBRATION_DESCRIPTION" desc="Description for the flag to disable the color calibration of the display.">
+    Disable calibrating the color of the display even if the display supports the feature.
+  </message>
   <message name="IDS_OFFERS_CONSENT_INFOBAR_LABEL_LEARN_MORE" desc="Text of the Learn More link in the echo dialog.">
     Learn More
   </message>
@@ -2064,8 +2070,11 @@ Press any key to continue exploring.
   <message name="IDS_OPTIONS_SETTINGS_OTHER_CELLULAR_NETWORKS" desc="In the settings tab, the text on the button to display other cellular networks.">
     Other mobile network...
   </message>
-  <message name="IDS_OPTIONS_SETTINGS_JOIN_WIFI_NETWORKS" desc="The title for the dialog to join a wifi network.">
+  <message name="IDS_OPTIONS_SETTINGS_JOIN_WIFI_NETWORKS" desc="The title for the dialog to configure and connect to a wifi network.">
     Join Wi-Fi network
+  </message>
+  <message name="IDS_OPTIONS_SETTINGS_CONFIGURE_ETHERNET" desc="The title for the dialog to configure an ethernet network.">
+    Configure Ethernet network
   </message>
   <message name="IDS_OPTIONS_SETTINGS_JOIN_WIMAX_NETWORKS" desc="The title for the dialog to join a wimax network.">
     Join WiMAX network
@@ -4753,6 +4762,12 @@ Battery full
   <message name="IDS_KIOSK_OFFLINE_MESSAGE" desc="An offline message that shows up when a kiosk app can't launch without network connectivity.">
     Please connect to the Internet to launch your app in kiosk mode.
   </message>
+  <message name="IDS_LOGIN_NETWORK_RESTORED_TITLE" desc="An message title shown when network connectivity is restored during kiosk app launch.">
+    Network connectivity restored
+  </message>
+  <message name="IDS_KIOSK_ONLINE_MESSAGE" desc="An message that shows up when a kiosk app is ready to launch after established network connectivity.">
+    Your network connectivity is restored. Please select a different network or press 'Continue' button below to launch your kiosk app.
+  </message>
   <message name="IDS_UPDATE_OFFLINE_MESSAGE" desc="An offline message that shows up in the OOBE update screen.">
     Please connect to the Internet to update your Chromebook.
   </message>
@@ -4794,6 +4809,9 @@ Battery full
   </message>
   <message name="IDS_LOGIN_CONFIRM_KIOSK_DIAGNOSTIC_FORMAT" desc="Text to be shown on a dialog to confirm launching kiosk app in diagnostic mode.">
     Are you sure you want to launch "<ph name="APP_NAME">$1<ex>Kiosk App</ex></ph>" in diagnostic mode?
+  </message>
+  <message name="IDS_LOGIN_GUEST_SIGNIN_FIX_NETWORK">
+    You may also try to <ph name="GUEST_SIGNIN_LINK_START">$1<ex>&gt;a&lt;</ex></ph>browse as guest<ph name="GUEST_SIGNIN_LINK_END">$2<ex>&gt;/a&lt;</ex></ph> to fix this network error.
   </message>
   <message name="IDS_LOGIN_CONNECTING_INDICATOR_TEXT" desc="A message to show telling the user that the device is attempting to re-connect to the network.">
     Connecting and verifying<ph name="ANIMATED_ELLIPSIS">$1<ex>...</ex></ph>
@@ -4881,10 +4899,10 @@ All users must sign out to continue.
     Howdy.
   </message>
   <message name="IDS_FIRST_RUN_GREETING_STEP_TEXT_1" desc="First part of message shown on the first dialog of firsr-run tutorial.">
-    Welcome to the Chromebook family. This is no ordinary computer.
+    Welcome to the <ph name="SHORT_PRODUCT_NAME">$1<ex>Chrome</ex></ph> family. This is no ordinary computer.
   </message>
   <message name="IDS_FIRST_RUN_GREETING_STEP_TEXT_2" desc="Second part of message shown on the first dialog of firsr-run tutorial.">
-    This Chromebook was designed to deliver the best experience of the web to you.
+    This <ph name="SHORT_PRODUCT_NAME">$1<ex>Chrome</ex></ph> device was designed to deliver the best experience of the web to you.
   </message>
   <message name="IDS_FIRST_RUN_GREETING_STEP_BUTTON" desc="Text on the button located on the first dialog of first-run tutorial.">
     Take a tour
@@ -4908,7 +4926,7 @@ All users must sign out to continue.
     Have fun! We're here for you.
   </message>
   <message name="IDS_FIRST_RUN_HELP_STEP_TEXT_1" desc="First part of text shown on the first-run tutorial bubble pointing to help button in system tray.">
-    Enjoy your Chromebook. Questions? You can always get help by clicking the "?" in the status tray.
+    Enjoy your <ph name="SHORT_PRODUCT_NAME">$1<ex>Chrome</ex></ph> device. Questions? You can always get help by clicking the "?" in the status tray.
   </message>
   <message name="IDS_FIRST_RUN_HELP_STEP_TEXT_2" desc="Second part of text shown on the first-run tutorial bubble pointing to help button in system tray.">
     Want to discover more awesome features?
@@ -5232,8 +5250,17 @@ All users must sign out to continue.
   <message name="IDS_ENTERPRISE_ENROLLMENT_DEPROVISIONED_ERROR" desc="Error message to show when enrollment fails because the administrator has deprovisioned the device on the server side.">
     This device has been placed into a deprovisioned state by the administrator. To enable it for enrollment, please have your administrator place the device into a pending state.
   </message>
+  <message name="IDS_ENTERPRISE_ENROLLMENT_DOMAIN_MISMATCH_ERROR" desc="Error message shown when the device doesn't belong to the domain the user tried to enroll it to.">
+    This device cannot be enrolled to the domain your account belongs to because the device is marked for management by a different domain.
+  </message>
   <message name="IDS_ENTERPRISE_ENROLLMENT_SCREEN_TITLE" desc="The title on the enterprise enrollment dialog.">
     Enterprise enrollment
+  </message>
+  <message name="IDS_ENTERPRISE_ENROLLMENT_DESCRIPTION" desc="Short description of enterprise enrollment.">
+    Sign in with the username given to you by your organization to enroll your device for enterprise management.
+  </message>
+  <message name="IDS_ENTERPRISE_ENROLLMENT_RE_ENROLLMENT_TEXT" desc="Paragraph explaining previous association of the device with a domain.">
+    This device has been marked for enterprise management by <ph name="MANAGEMENT_DOMAIN">$1<ex>example.com</ex></ph>.
   </message>
   <message name="IDS_ENTERPRISE_ENROLLMENT_RETRY" desc="Label for the retry button on the error step in the enterprise enrollment dialog.">
     Try again

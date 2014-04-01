@@ -180,19 +180,6 @@ class ExtensionService
   // Initialize and start all installed extensions.
   void Init();
 
-  // See if we need to bootstrap the install verifier.
-  void MaybeBootstrapVerifier();
-
-  // Attempts to verify all extensions using the InstallVerifier. The
-  // |bootstrap| parameter indicates whether we're doing this because the
-  // InstallVerifier needed to be bootstrapped (otherwise it's for another
-  // reason, e.g. extension install/uninstall).
-  void VerifyAllExtensions(bool bootstrap);
-
-  // Once the verifier work is finished, we may want to re-check management
-  // policy if |success| indicates the verifier got a new signature back.
-  void FinishVerifyAllExtensions(bool bootstrap, bool success);
-
   // Called when the associated Profile is going to be destroyed.
   void Shutdown();
 
@@ -200,12 +187,6 @@ class ExtensionService
   // extensions.
   virtual const extensions::Extension* GetExtensionById(
       const std::string& id, bool include_disabled) const OVERRIDE;
-
-  // Looks up a terminated (crashed) extension by ID.
-  // DEPRECATED: Replace with:
-  // ExtensionRegistry::GetExtensionById(id, ExtensionRegistry::TERMINATED).
-  const extensions::Extension*
-      GetTerminatedExtension(const std::string& id) const;
 
   // Looks up an extension by ID, regardless of whether it's enabled,
   // disabled, blacklisted, or terminated.
@@ -292,11 +273,6 @@ class ExtensionService
 
   // Scan the extension directory and clean up the cruft.
   void GarbageCollectExtensions();
-
-  // Returns true if |url| should get extension api bindings and be permitted
-  // to make api calls. Note that this is independent of what extension
-  // permissions the given extension has been granted.
-  bool ExtensionBindingsAllowed(const GURL& url);
 
   // Called when the initial extensions load has completed.
   virtual void OnLoadedInstalledExtensions();

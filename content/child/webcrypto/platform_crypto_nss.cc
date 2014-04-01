@@ -8,12 +8,12 @@
 #include <pk11pub.h>
 #include <secerr.h>
 #include <sechash.h>
-#include <secoid.h>
 
 #include <vector>
 
 #include "base/lazy_instance.h"
 #include "base/logging.h"
+#include "base/memory/scoped_ptr.h"
 #include "content/child/webcrypto/crypto_data.h"
 #include "content/child/webcrypto/status.h"
 #include "content/child/webcrypto/webcrypto_util.h"
@@ -26,6 +26,7 @@
 
 #if defined(USE_NSS)
 #include <dlfcn.h>
+#include <secoid.h>
 #endif
 
 // At the time of this writing:
@@ -546,6 +547,10 @@ void CopySECItemToVector(const SECItem& item, std::vector<uint8>* out) {
   out->assign(item.data, item.data + item.len);
 }
 
+// The system NSS library doesn't have the new PK11_ExportDERPrivateKeyInfo
+// function yet (https://bugzilla.mozilla.org/show_bug.cgi?id=519255). So we
+// provide a fallback implementation.
+#if defined(USE_NSS)
 // From PKCS#1 [http://tools.ietf.org/html/rfc3447]:
 //
 //    RSAPrivateKey ::= SEQUENCE {
@@ -655,8 +660,97 @@ struct FreeRsaPrivateKey {
     SECITEM_FreeItem(&out->coefficient, PR_FALSE);
   }
 };
+#endif  // defined(USE_NSS)
 
 }  // namespace
+
+class DigestorNSS : public blink::WebCryptoDigestor {
+ public:
+  explicit DigestorNSS(blink::WebCryptoAlgorithmId algorithm_id)
+      : hash_context_(NULL), algorithm_id_(algorithm_id) {}
+
+  virtual ~DigestorNSS() {
+    if (!hash_context_)
+      return;
+
+    HASH_Destroy(hash_context_);
+    hash_context_ = NULL;
+  }
+
+  virtual bool consume(const unsigned char* data, unsigned int size) {
+    return ConsumeWithStatus(data, size).IsSuccess();
+  }
+
+  Status ConsumeWithStatus(const unsigned char* data, unsigned int size) {
+    // Initialize everything if the object hasn't been initialized yet.
+    if (!hash_context_) {
+      Status error = Init();
+      if (!error.IsSuccess())
+        return error;
+    }
+
+    HASH_Update(hash_context_, data, size);
+
+    return Status::Success();
+  }
+
+  virtual bool finish(unsigned char*& result_data,
+                      unsigned int& result_data_size) {
+    Status error = FinishInternal(result_, &result_data_size);
+    if (!error.IsSuccess())
+      return false;
+    result_data = result_;
+    return true;
+  }
+
+  Status FinishWithWebArrayAndStatus(blink::WebArrayBuffer* result) {
+    if (!hash_context_)
+      return Status::ErrorUnexpected();
+
+    unsigned int result_length = HASH_ResultLenContext(hash_context_);
+    *result = blink::WebArrayBuffer::create(result_length, 1);
+    unsigned char* digest = reinterpret_cast<unsigned char*>(result->data());
+    unsigned int digest_size;  // ignored
+    return FinishInternal(digest, &digest_size);
+  }
+
+ private:
+  Status Init() {
+    HASH_HashType hash_type = WebCryptoAlgorithmToNSSHashType(algorithm_id_);
+
+    if (hash_type == HASH_AlgNULL)
+      return Status::ErrorUnsupported();
+
+    hash_context_ = HASH_Create(hash_type);
+    if (!hash_context_)
+      return Status::Error();
+
+    HASH_Begin(hash_context_);
+
+    return Status::Success();
+  }
+
+  Status FinishInternal(unsigned char* result, unsigned int* result_size) {
+    if (!hash_context_) {
+      Status error = Init();
+      if (!error.IsSuccess())
+        return error;
+    }
+
+    unsigned int hash_result_length = HASH_ResultLenContext(hash_context_);
+    DCHECK_LE(hash_result_length, static_cast<size_t>(HASH_LENGTH_MAX));
+
+    HASH_End(hash_context_, result, result_size, hash_result_length);
+
+    if (*result_size != hash_result_length)
+      return Status::ErrorUnexpected();
+    return Status::Success();
+  }
+
+  HASHContext* hash_context_;
+  blink::WebCryptoAlgorithmId algorithm_id_;
+  unsigned char result_[HASH_LENGTH_MAX];
+};
 
 Status ImportKeyRaw(const blink::WebCryptoAlgorithm& algorithm,
                     const CryptoData& key_data,
@@ -821,6 +915,8 @@ Status ExportKeyPkcs8(PrivateKey* key,
       key_algorithm.id() != blink::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5)
     return Status::ErrorUnsupported();
 
+#if defined(USE_NSS)
+  // PK11_ExportDERPrivateKeyInfo isn't available. Use our fallback code.
   const SECOidTag algorithm = SEC_OID_PKCS1_RSA_ENCRYPTION;
   const int kPrivateKeyInfoVersion = 0;
 
@@ -856,6 +952,10 @@ Status ExportKeyPkcs8(PrivateKey* key,
                          NULL,
                          &private_key_info,
                          SEC_ASN1_GET(SECKEY_PrivateKeyInfoTemplate)));
+#else  // defined(USE_NSS)
+  crypto::ScopedSECItem encoded_key(
+      PK11_ExportDERPrivateKeyInfo(key->key(), NULL));
+#endif  // defined(USE_NSS)
 
   if (!encoded_key.get())
     return Status::Error();
@@ -1153,7 +1253,11 @@ Status GenerateRsaKeyPair(const blink::WebCryptoAlgorithm& algorithm,
   }
   const CK_FLAGS operation_flags_mask =
       CKF_ENCRYPT | CKF_DECRYPT | CKF_SIGN | CKF_VERIFY | CKF_WRAP | CKF_UNWRAP;
-  const PK11AttrFlags attribute_flags = 0;  // Default all PK11_ATTR_ flags.
+
+  // The private key must be marked as insensitive and extractable, otherwise it
+  // cannot later be exported in unencrypted form or structured-cloned.
+  const PK11AttrFlags attribute_flags =
+      PK11_ATTR_INSENSITIVE | PK11_ATTR_EXTRACTABLE;
 
   // Note: NSS does not generate an sec_public_key if the call below fails,
   // so there is no danger of a leaked sec_public_key.
@@ -1195,33 +1299,16 @@ void Init() { crypto::EnsureNSSInit(); }
 Status DigestSha(blink::WebCryptoAlgorithmId algorithm,
                  const CryptoData& data,
                  blink::WebArrayBuffer* buffer) {
-  HASH_HashType hash_type = WebCryptoAlgorithmToNSSHashType(algorithm);
-  if (hash_type == HASH_AlgNULL)
-    return Status::ErrorUnsupported();
+  DigestorNSS digestor(algorithm);
+  Status error = digestor.ConsumeWithStatus(data.bytes(), data.byte_length());
+  if (!error.IsSuccess())
+    return error;
+  return digestor.FinishWithWebArrayAndStatus(buffer);
+}
 
-  HASHContext* context = HASH_Create(hash_type);
-  if (!context)
-    return Status::Error();
-
-  HASH_Begin(context);
-
-  HASH_Update(context, data.bytes(), data.byte_length());
-
-  unsigned int hash_result_length = HASH_ResultLenContext(context);
-  DCHECK_LE(hash_result_length, static_cast<size_t>(HASH_LENGTH_MAX));
-
-  *buffer = blink::WebArrayBuffer::create(hash_result_length, 1);
-
-  unsigned char* digest = reinterpret_cast<unsigned char*>(buffer->data());
-
-  unsigned int result_length = 0;
-  HASH_End(context, digest, &result_length, hash_result_length);
-
-  HASH_Destroy(context);
-
-  if (result_length != hash_result_length)
-    return Status::ErrorUnexpected();
-  return Status::Success();
+scoped_ptr<blink::WebCryptoDigestor> CreateDigestor(
+    blink::WebCryptoAlgorithmId algorithm_id) {
+  return scoped_ptr<blink::WebCryptoDigestor>(new DigestorNSS(algorithm_id));
 }
 
 Status GenerateSecretKey(const blink::WebCryptoAlgorithm& algorithm,

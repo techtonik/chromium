@@ -210,6 +210,8 @@
         'base/audio_buffer_queue.cc',
         'base/audio_buffer_queue.h',
         'base/audio_capturer_source.h',
+        'base/audio_buffer_converter.cc',
+        'base/audio_buffer_converter.h',
         'base/audio_converter.cc',
         'base/audio_converter.h',
         'base/audio_decoder.cc',
@@ -448,6 +450,8 @@
         'midi/usb_midi_output_stream.h',
         'video/capture/android/video_capture_device_android.cc',
         'video/capture/android/video_capture_device_android.h',
+        'video/capture/android/video_capture_device_factory_android.cc',
+        'video/capture/android/video_capture_device_factory_android.h',
         'video/capture/fake_video_capture_device.cc',
         'video/capture/fake_video_capture_device.h',
         'video/capture/file_video_capture_device.cc',
@@ -873,6 +877,13 @@
             'formats/mpeg/mpeg_audio_stream_parser_base.cc',
             'formats/mpeg/mpeg_audio_stream_parser_base.h',
           ],
+          'conditions': [
+            ['enable_mpeg2ts_stream_parser==1', {
+              'defines': [
+                'ENABLE_MPEG2TS_STREAM_PARSER',
+              ],
+            }],
+          ],
         }],
         ['toolkit_uses_gtk==1', {
           'dependencies': [
@@ -950,6 +961,7 @@
         'base/android/media_codec_bridge_unittest.cc',
         'base/android/media_drm_bridge_unittest.cc',
         'base/android/media_source_player_unittest.cc',
+        'base/audio_buffer_converter_unittest.cc',
         'base/audio_buffer_unittest.cc',
         'base/audio_buffer_queue_unittest.cc',
         'base/audio_bus_unittest.cc',
@@ -1455,6 +1467,7 @@
           'type': 'executable',
           'dependencies': [
             'media',
+	    'shared_memory_support',
             '../base/base.gyp:base',
             '../ui/gl/gl.gyp:gl',
             '../ui/gfx/gfx.gyp:gfx',
@@ -1544,6 +1557,7 @@
           'type': 'none',
           'sources': [
             'base/android/java/src/org/chromium/media/VideoCapture.java',
+            'base/android/java/src/org/chromium/media/VideoCaptureFactory.java',
           ],
           'variables': {
             'jni_gen_package': 'media',
@@ -1669,6 +1683,7 @@
             '../testing/gmock.gyp:gmock',
             '../testing/gtest.gyp:gtest',
             '../third_party/ffmpeg/ffmpeg.gyp:ffmpeg',
+            '../ui/gfx/gfx.gyp:gfx_geometry',
             'media',
             'media_test_support',
           ],

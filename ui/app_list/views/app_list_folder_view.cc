@@ -56,7 +56,7 @@ AppListFolderView::AppListFolderView(AppsContainerView* container_view,
 
   items_grid_view_ =
       new AppsGridView(app_list_main_view_, pagination_model_.get());
-  items_grid_view_->set_is_root_level(false);
+  items_grid_view_->set_folder_delegate(this);
   items_grid_view_->SetLayout(
       kPreferredIconDimension,
       container_view->apps_grid_view()->cols(),
@@ -226,7 +226,7 @@ void AppListFolderView::UpdateFolderNameVisibility(bool visible) {
   folder_header_view_->UpdateFolderNameVisibility(visible);
 }
 
-bool AppListFolderView::IsPointOutsideOfFolderBoundray(
+bool AppListFolderView::IsPointOutsideOfFolderBoundary(
     const gfx::Point& point) {
   if (!GetLocalBounds().Contains(point))
     return true;
@@ -262,8 +262,11 @@ void AppListFolderView::ReparentItem(
 
 void AppListFolderView::DispatchDragEventForReparent(
     AppsGridView::Pointer pointer,
-    const ui::LocatedEvent& event) {
-  container_view_->apps_grid_view()->UpdateDragFromReparentItem(pointer, event);
+    const gfx::Point& drag_point_in_folder_grid) {
+  AppsGridView* root_grid = container_view_->apps_grid_view();
+  gfx::Point drag_point_in_root_grid = drag_point_in_folder_grid;
+  ConvertPointToTarget(items_grid_view_, root_grid, &drag_point_in_root_grid);
+  root_grid->UpdateDragFromReparentItem(pointer, drag_point_in_folder_grid);
 }
 
 void AppListFolderView::DispatchEndDragEventForReparent(

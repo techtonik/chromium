@@ -435,9 +435,12 @@ extern const char kMetricsClientID[];
 extern const char kMetricsSessionID[];
 extern const char kMetricsLowEntropySource[];
 extern const char kMetricsPermutedEntropyCache[];
-extern const char kMetricsClientIDTimestamp[];
+extern const char kMetricsOldClientID[];
+extern const char kMetricsOldLowEntropySource[];
 extern const char kMetricsReportingEnabled[];
+extern const char kMetricsReportingEnabledTimestamp[];
 extern const char kMetricsMachineId[];
+extern const char kMetricsResetIds[];
 // Android has it's own metric / crash reporting implemented in Android
 // Java code so kMetricsReportingEnabled doesn't make sense. We use this
 // to inform crashes_ui that we have enabled crash reporting.
@@ -602,8 +605,6 @@ extern const char kSpdyProxyAuthEnabled[];
 extern const char kSpdyProxyAuthWasEnabledBefore[];
 #endif  // defined(OS_ANDROID) || defined(OS_IOS)
 
-extern const char kGoogleServicesUserAccountId[];
-extern const char kGoogleServicesUsernamePattern[];
 extern const char kGoogleServicesPasswordHash[];
 
 extern const char kInvalidatorClientId[];
@@ -800,6 +801,7 @@ extern const char kMessageCenterShowedFirstRunBalloon[];
 
 extern const char kRecoveryComponentVersion[];
 extern const char kComponentUpdaterState[];
+extern const char kAttemptedToEnableAutoupdate[];
 
 extern const char kMediaGalleriesUniqueId[];
 extern const char kMediaGalleriesRememberedGalleries[];
