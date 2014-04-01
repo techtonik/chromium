@@ -98,7 +98,7 @@ void ServiceWorkerManager::ContinueRegistrationWithExtensionHost(
 }
 
 void ServiceWorkerManager::FinishRegistration(const ExtensionId& extension_id,
-                                              ServiceWorkerStatusCode result) {
+                                              bool success) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   State& ext_state = states_[extension_id];
   --ext_state.outstanding_state_changes;
@@ -108,19 +108,15 @@ void ServiceWorkerManager::FinishRegistration(const ExtensionId& extension_id,
 
   DCHECK_EQ(ext_state.registration, REGISTERING);
   std::vector<Closure> to_run;
-  switch (result) {
-    case content::SERVICE_WORKER_OK:
-      ext_state.registration = REGISTERED;
-      to_run.swap(ext_state.registration_succeeded);
-      ext_state.registration_failed.clear();
-      break;
-    default:
-      LOG(ERROR) << "Service Worker Registration failed for extension "
-                 << extension_id << ": "
-                 << content::ServiceWorkerStatusToString(result);
-      to_run.swap(ext_state.registration_failed);
-      states_.erase(extension_id);
-      break;
+  if (success) {
+    ext_state.registration = REGISTERED;
+    to_run.swap(ext_state.registration_succeeded);
+    ext_state.registration_failed.clear();
+  } else {
+    LOG(ERROR) << "Service Worker Registration failed for extension "
+               << extension_id;
+    to_run.swap(ext_state.registration_failed);
+    states_.erase(extension_id);
   }
 
   for (size_t i = 0; i < to_run.size(); ++i) {
@@ -177,9 +173,8 @@ void ServiceWorkerManager::ContinueUnregistrationWithExtensionHost(
                  extension_id));
 }
 
-void ServiceWorkerManager::FinishUnregistration(
-    const ExtensionId& extension_id,
-    ServiceWorkerStatusCode result) {
+void ServiceWorkerManager::FinishUnregistration(const ExtensionId& extension_id,
+                                                bool success) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   State& ext_state = states_[extension_id];
   --ext_state.outstanding_state_changes;
@@ -189,19 +184,15 @@ void ServiceWorkerManager::FinishUnregistration(
 
   DCHECK_EQ(ext_state.registration, UNREGISTERING);
   std::vector<Closure> to_run;
-  switch (result) {
-    case content::SERVICE_WORKER_OK:
-      to_run.swap(ext_state.unregistration_succeeded);
-      states_.erase(extension_id);
-      break;
-    default:
-      LOG(ERROR) << "Service Worker Unregistration failed for extension "
-                 << extension_id << ": "
-                 << content::ServiceWorkerStatusToString(result);
-      ext_state.registration = REGISTERED;
-      to_run.swap(ext_state.unregistration_failed);
-      ext_state.unregistration_succeeded.clear();
-      break;
+  if (success) {
+    to_run.swap(ext_state.unregistration_succeeded);
+    states_.erase(extension_id);
+  } else {
+    LOG(ERROR) << "Service Worker Unregistration failed for extension "
+               << extension_id;
+    ext_state.registration = REGISTERED;
+    to_run.swap(ext_state.unregistration_failed);
+    ext_state.unregistration_succeeded.clear();
   }
 
   for (size_t i = 0; i < to_run.size(); ++i) {

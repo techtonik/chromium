@@ -60,9 +60,9 @@ class ServiceWorkerManager : public KeyedService {
   void ContinueUnregistrationWithExtensionHost(const ExtensionId& extension_id,
                                                const GURL& scope);
   void FinishRegistration(const ExtensionId& extension_id,
-                          content::ServiceWorkerStatusCode result);
+                          bool success);
   void FinishUnregistration(const ExtensionId& extension_id,
-                            content::ServiceWorkerStatusCode result);
+                            bool success);
 
   content::BrowserContext* const context_;
 
