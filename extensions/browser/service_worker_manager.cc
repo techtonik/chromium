@@ -25,7 +25,6 @@ using base::Closure;
 using base::WeakPtr;
 using content::BrowserContext;
 using content::BrowserThread;
-using content::ServiceWorkerStatusCode;
 
 ServiceWorkerManager::State::State() {}
 ServiceWorkerManager::State::~State() {}

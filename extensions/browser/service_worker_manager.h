@@ -7,7 +7,6 @@
 #include "base/memory/weak_ptr.h"
 #include "components/keyed_service/content/browser_context_keyed_service_factory.h"
 #include "components/keyed_service/core/keyed_service.h"
-#include "content/public/common/service_worker_status_code.h"
 #include "extensions/common/extension.h"
 
 namespace content {

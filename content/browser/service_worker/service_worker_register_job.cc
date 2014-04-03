@@ -145,7 +145,7 @@ void ServiceWorkerRegisterJob::StartWorkerAndContinue(
 
 void ServiceWorkerRegisterJob::Complete(ServiceWorkerStatusCode status) {
   if (status == SERVICE_WORKER_OK)
-    DCHECK(type_ == UNREGISTER || registration_);
+    DCHECK(registration_);
   else
     registration_ = NULL;
 
