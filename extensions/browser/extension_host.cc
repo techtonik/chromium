@@ -188,6 +188,14 @@ void ExtensionHost::CreateRenderViewSoon(const base::Closure& continuation) {
   }
 }
 
+static void RunAll(const std::vector<base::Closure>& callbacks) {
+  for (std::vector<base::Closure>::const_iterator it = callbacks.begin();
+       it != callbacks.end();
+       ++it) {
+    it->Run();
+  }
+}
+
 void ExtensionHost::CreateRenderViewNow() {
   LoadInitialURL();
   if (IsBackgroundPage()) {
@@ -197,11 +205,10 @@ void ExtensionHost::CreateRenderViewNow() {
   }
   std::vector<base::Closure> running;
   running.swap(when_render_view_created_);
-  for (std::vector<base::Closure>::const_iterator it = running.begin();
-       it != running.end();
-       ++it) {
-    it->Run();
-  }
+  base::MessageLoop::current()->PostDelayedTask(
+      FROM_HERE,
+      base::Bind(&RunAll, running),
+      base::TimeDelta::FromMilliseconds(10));
 }
 
 const GURL& ExtensionHost::GetURL() const {
