@@ -91,7 +91,7 @@ void ServiceWorkerContextCore::RegistrationComplete(
     ServiceWorkerStatusCode status,
     const scoped_refptr<ServiceWorkerRegistration>& registration) {
   if (status != SERVICE_WORKER_OK) {
-    DCHECK(!registration);
+    DCHECK(!registration) << ServiceWorkerStatusToString(status);
     callback.Run(status, -1L);
   }
 

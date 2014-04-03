@@ -183,6 +183,11 @@ void ServiceWorkerRegisterJob::UnregisterPatternAndContinue(
 }
 
 void ServiceWorkerRegisterJob::Complete(ServiceWorkerStatusCode status) {
+  if (status == SERVICE_WORKER_OK)
+    DCHECK(type_ == UNREGISTER || registration_);
+  else
+    registration_ = NULL;
+
   for (std::vector<RegistrationCallback>::iterator it = callbacks_.begin();
        it != callbacks_.end();
        ++it) {

@@ -16,8 +16,9 @@ namespace content {
 
 namespace {
 
-void RunSoon(const base::Closure& closure) {
-  base::MessageLoop::current()->PostTask(FROM_HERE, closure);
+void RunSoon(const tracked_objects::Location& from_here,
+             const base::Closure& closure) {
+  base::MessageLoop::current()->PostTask(from_here, closure);
 }
 
 const base::FilePath::CharType kServiceWorkerDirectory[] =
@@ -57,7 +58,7 @@ void ServiceWorkerStorage::FindRegistrationForPattern(
     found = match->second;
   }
   // Always simulate asynchronous call for now.
-  RunSoon(base::Bind(callback, status, found));
+  RunSoon(FROM_HERE, base::Bind(callback, status, found));
 }
 
 void ServiceWorkerStorage::FindRegistrationForDocument(
@@ -79,7 +80,7 @@ void ServiceWorkerStorage::FindRegistrationForDocument(
     }
   }
   // Always simulate asynchronous call for now.
-  RunSoon(base::Bind(callback, status, found));
+  RunSoon(FROM_HERE, base::Bind(callback, status, found));
 }
 
 void ServiceWorkerStorage::GetAllRegistrations(
@@ -112,7 +113,7 @@ void ServiceWorkerStorage::FindRegistrationForId(
       break;
     }
   }
-  RunSoon(base::Bind(callback, status, found));
+  RunSoon(FROM_HERE, base::Bind(callback, status, found));
 }
 
 void ServiceWorkerStorage::StoreRegistration(
@@ -124,14 +125,14 @@ void ServiceWorkerStorage::StoreRegistration(
       registration_by_pattern_.find(registration->pattern()));
   if (current != registration_by_pattern_.end() &&
       current->second->script_url() != registration->script_url()) {
-    RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_EXISTS));
+    RunSoon(FROM_HERE, base::Bind(callback, SERVICE_WORKER_ERROR_EXISTS));
     return;
   }
 
   // This may update the existing registration information.
   registration_by_pattern_[registration->pattern()] = registration;
 
-  RunSoon(base::Bind(callback, SERVICE_WORKER_OK));
+  RunSoon(FROM_HERE, base::Bind(callback, SERVICE_WORKER_OK));
 }
 
 void ServiceWorkerStorage::DeleteRegistration(
@@ -140,11 +141,11 @@ void ServiceWorkerStorage::DeleteRegistration(
   PatternToRegistrationMap::iterator match =
       registration_by_pattern_.find(pattern);
   if (match == registration_by_pattern_.end()) {
-    RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_NOT_FOUND));
+    RunSoon(FROM_HERE, base::Bind(callback, SERVICE_WORKER_ERROR_NOT_FOUND));
     return;
   }
   registration_by_pattern_.erase(match);
-  RunSoon(base::Bind(callback, SERVICE_WORKER_OK));
+  RunSoon(FROM_HERE, base::Bind(callback, SERVICE_WORKER_OK));
 }
 
 int64 ServiceWorkerStorage::NewRegistrationId() {
