@@ -16,8 +16,11 @@
 #include "ui/app_list/signin_delegate.h"
 #include "ui/app_list/speech_ui_model.h"
 #include "ui/app_list/views/app_list_background.h"
+#include "ui/app_list/views/app_list_folder_view.h"
 #include "ui/app_list/views/app_list_main_view.h"
 #include "ui/app_list/views/app_list_view_observer.h"
+#include "ui/app_list/views/apps_container_view.h"
+#include "ui/app_list/views/contents_view.h"
 #include "ui/app_list/views/search_box_view.h"
 #include "ui/app_list/views/signin_view.h"
 #include "ui/app_list/views/speech_view.h"
@@ -50,8 +53,7 @@ namespace app_list {
 
 namespace {
 
-// For UMA and testing. If non-null, triggered when the app list is painted.
-base::Closure g_next_paint_callback;
+void (*g_next_paint_callback)();
 
 // The margin from the edge to the speech UI.
 const int kSpeechUIMargin = 12;
@@ -200,9 +202,9 @@ gfx::Size AppListView::GetPreferredSize() {
 
 void AppListView::Paint(gfx::Canvas* canvas) {
   views::BubbleDelegateView::Paint(canvas);
-  if (!g_next_paint_callback.is_null()) {
-    g_next_paint_callback.Run();
-    g_next_paint_callback.Reset();
+  if (g_next_paint_callback) {
+    g_next_paint_callback();
+    g_next_paint_callback = NULL;
   }
 }
 
@@ -244,7 +246,7 @@ void AppListView::RemoveObserver(AppListViewObserver* observer) {
 }
 
 // static
-void AppListView::SetNextPaintCallback(const base::Closure& callback) {
+void AppListView::SetNextPaintCallback(void (*callback)()) {
   g_next_paint_callback = callback;
 }
 
@@ -386,6 +388,14 @@ bool AppListView::AcceleratorPressed(const ui::Accelerator& accelerator) {
   if (accelerator.key_code() == ui::VKEY_ESCAPE) {
     if (app_list_main_view_->search_box_view()->HasSearch()) {
       app_list_main_view_->search_box_view()->ClearSearch();
+    } else if (app_list_main_view_->contents_view()
+                   ->apps_container_view()
+                   ->IsInFolderView()) {
+      app_list_main_view_->contents_view()
+          ->apps_container_view()
+          ->app_list_folder_view()
+          ->CloseFolderPage();
+      return true;
     } else {
       GetWidget()->Deactivate();
       Close();

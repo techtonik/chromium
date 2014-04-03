@@ -206,7 +206,7 @@ void CreateAppListShortcuts(
     const base::FilePath& user_data_dir,
     const base::string16& app_model_id,
     const ShellIntegration::ShortcutLocations& creation_locations) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::FILE));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::FILE);
 
   // Shortcut paths under which to create shortcuts.
   std::vector<base::FilePath> shortcut_paths =
@@ -403,7 +403,7 @@ void AppListServiceWin::OnLoadProfileForWarmup(Profile* initial_profile) {
 }
 
 void AppListServiceWin::SetAppListNextPaintCallback(void (*callback)()) {
-  app_list::AppListView::SetNextPaintCallback(base::Bind(callback));
+  app_list::AppListView::SetNextPaintCallback(callback);
 }
 
 void AppListServiceWin::HandleFirstRun() {

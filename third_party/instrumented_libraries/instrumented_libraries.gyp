@@ -87,6 +87,7 @@
         '<(_sanitizer_type)-libcap2',
         '<(_sanitizer_type)-libudev0',
         '<(_sanitizer_type)-libtasn1-3',
+        '<(_sanitizer_type)-libgnome-keyring0',
       ],
       'conditions': [
         ['asan==1', {
@@ -166,7 +167,6 @@
         '--with-add-fonts=/usr/X11R6/lib/X11/fonts,/usr/local/share/fonts',
       ],
       'run_before_build': 'libfontconfig.sh',
-      'destdir_build': 1,
       'includes': ['standard_instrumented_library_target.gypi'],
     },
     {
@@ -384,6 +384,17 @@
     },
     {
       'library_name': 'libtasn1-3',
+      'dependencies=': [],
+      'includes': ['standard_instrumented_library_target.gypi'],
+    },
+    {
+      'library_name': 'libgnome-keyring0',
+      'custom_configure_flags': [
+          # Build static libs (from debian/rules).
+          '--enable-static',
+          '--enable-tests=no',
+      ],
+      'custom_linker_flags': '-Wl,--as-needed',
       'dependencies=': [],
       'includes': ['standard_instrumented_library_target.gypi'],
     },

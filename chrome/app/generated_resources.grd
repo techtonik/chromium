@@ -262,7 +262,7 @@ are declared in build/common.gypi.
       <part file="bookmarks_strings.grdp" />
 
       <!-- ChromeOS-specific strings -->
-      <if expr="pp_ifdef('chromeos')">
+      <if expr="chromeos">
         <part file="chromeos_strings.grdp" />
       </if>
 
@@ -4567,6 +4567,9 @@ Make sure you do not expose any sensitive information.
       <message name="IDS_EXTENSION_PROMPT_WARNING_DECLARATIVE_WEB_REQUEST" desc="Permission string for Declarative Web Request API.">
         Block parts of web pages
       </message>
+      <message name="IDS_EXTENSION_PROMPT_WARNING_BLUETOOTH_PRIVATE" desc="Permission string for Bluetooth Private API.">
+        Control Bluetooth adapter state and pairing.
+      </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_NETWORK_STATE" desc="Permission string for network list access.">
         Access list of network connections
       </message>
@@ -6157,12 +6160,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_WEBGL_DESCRIPTION" desc="Description for the flag to enable WebGL.">
         Enabling this option allows web applications to access the WebGL API.
       </message>
-      <message name="IDS_FLAGS_ENABLE_D3D11_NAME" desc="Name of the 'Enable D3D11' lab.">
-        Enable D3D11
-      </message>
-      <message name="IDS_FLAGS_ENABLE_D3D11_DESCRIPTION" desc="Description for the flag to enable D3D11.">
-        Enabling this option allows the use of Direct3D 11 on configurations that support it.
-      </message>
       <message name="IDS_FLAGS_ENABLE_WEBGL_DRAFT_EXTENSIONS_NAME" desc="Name of the 'Enable WebGL Draft Extensions' flag.">
         Enable WebGL Draft Extensions
       </message>
@@ -7044,6 +7041,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_CRASHES_DISABLED_HEADER" desc="The header for chrome://crashes when crash reporting is disabled">
         Crash reporting is disabled.
+      </message>
+      <message name="IDS_CRASHES_UPLOAD_MESSAGE" desc="Link text for triggering crash uploading on chrome://crashes">
+        Start uploading crashes
       </message>
 
       <!-- WebRTC logs -->
@@ -10062,6 +10062,12 @@ Would you like to start <ph name="CONTROL_PANEL_APPLET_NAME">$1<ex>Add/Remove Pr
             Proxy
           </message>
         </if>
+        <message name="IDS_OPTIONS_TAB_EXTENSION_CONTROLLED" desc="The label in the bubble showing which extension is controlling a particular setting.">
+          An extension, <ph name="EXTENSION_NAME">$1<ex>MyFirstExtension</ex></ph>, is controlling this setting.
+        </message>
+        <message name="IDS_OPTIONS_TAB_EXTENSION_CONTROLLED_DISABLE" desc="The 'Disable Extension' button label in the bubble showing which extension is controlling a particular setting.">
+          Disable extension
+        </message>
         <message name="IDS_OPTIONS_TAB_TITLE" desc="The format of the title on the browser tab for an options subpage, e.g. Settings - Basics">
           <ph name="OPTIONS_TITLE">$1<ex>Settings</ex></ph> - <ph name="SUBPAGE_TITLE">$2<ex>Under the Hood</ex></ph>
         </message>
@@ -14231,12 +14237,6 @@ Do you accept?
     </message>
     <message name="IDS_FLAGS_ENABLE_GOOGLE_PROFILE_INFO_DESCRIPTION" desc="Description for the flag to enable the google profile information">
       Enables using Google information to populate the profile name and icon in the avatar menu.
-    </message>
-    <message name="IDS_FLAGS_ENABLE_GOOGLE_NOW_INTEGRATION_NAME" desc="Name of about:flags option to turn on Google Now integration">
-      Google Now
-    </message>
-    <message name="IDS_FLAGS_ENABLE_GOOGLE_NOW_INTEGRATION_DESCRIPTION" desc="Description of about:flags option to turn on Google Now integration">
-      Enable Google Now notifications support.
     </message>
     <message name="IDS_FLAGS_ENABLE_OFFLINE_MODE_NAME" desc="Name of the flag to make reads in offline mode come from the cache even if it's stale">
       Enable Offline Cache Mode

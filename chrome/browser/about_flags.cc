@@ -530,13 +530,6 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kDisableExperimentalWebGL)
   },
   {
-    "enable-d3d11",
-    IDS_FLAGS_ENABLE_D3D11_NAME,
-    IDS_FLAGS_ENABLE_D3D11_DESCRIPTION,
-    kOsWin,
-    SINGLE_VALUE_TYPE(switches::kEnableD3D11)
-  },
-  {
     "disable-webrtc",
     IDS_FLAGS_DISABLE_WEBRTC_NAME,
     IDS_FLAGS_DISABLE_WEBRTC_DESCRIPTION,
@@ -1314,17 +1307,6 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_DISABLE_GESTURE_REQUIREMENT_FOR_MEDIA_PLAYBACK_DESCRIPTION,
     kOsAndroid,
     SINGLE_VALUE_TYPE(switches::kDisableGestureRequirementForMediaPlayback)
-  },
-#endif
-#if defined(ENABLE_GOOGLE_NOW)
-  {
-    "enable-google-now",
-    IDS_FLAGS_ENABLE_GOOGLE_NOW_INTEGRATION_NAME,
-    IDS_FLAGS_ENABLE_GOOGLE_NOW_INTEGRATION_DESCRIPTION,
-    kOsDesktop,
-    ENABLE_DISABLE_VALUE_TYPE(
-        switches::kEnableGoogleNowIntegration,
-        switches::kDisableGoogleNowIntegration)
   },
 #endif
 #if defined(OS_CHROMEOS)

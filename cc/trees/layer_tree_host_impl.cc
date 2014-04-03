@@ -221,6 +221,7 @@ LayerTreeHostImpl::LayerTreeHostImpl(
       did_lock_scrolling_layer_(false),
       should_bubble_scrolls_(false),
       wheel_scrolling_(false),
+      scroll_affects_scroll_handler_(false),
       scroll_layer_id_when_mouse_over_scrollbar_(0),
       tile_priorities_dirty_(false),
       root_layer_scroll_offset_delegate_(NULL),
@@ -1465,6 +1466,13 @@ bool LayerTreeHostImpl::SwapBuffers(const LayerTreeHostImpl::FrameData& frame) {
   }
   CompositorFrameMetadata metadata = MakeCompositorFrameMetadata();
   active_tree()->FinishSwapPromises(&metadata);
+  for (size_t i = 0; i < metadata.latency_info.size(); i++) {
+    TRACE_EVENT_FLOW_STEP0(
+        "input",
+        "LatencyInfo.Flow",
+        TRACE_ID_DONT_MANGLE(metadata.latency_info[i].trace_id),
+        "SwapBuffers");
+  }
   renderer_->SwapBuffers(metadata);
   return true;
 }
@@ -2030,7 +2038,9 @@ static LayerImpl* NextScrollLayer(LayerImpl* layer) {
 LayerImpl* LayerTreeHostImpl::FindScrollLayerForDeviceViewportPoint(
     const gfx::PointF& device_viewport_point,
     InputHandler::ScrollInputType type,
-    LayerImpl* layer_impl, bool* scroll_on_main_thread) const {
+    LayerImpl* layer_impl,
+    bool* scroll_on_main_thread,
+    bool* has_ancestor_scroll_handler) const {
   DCHECK(scroll_on_main_thread);
 
   // Walk up the hierarchy and look for a scrollable layer.
@@ -2054,6 +2064,10 @@ LayerImpl* LayerTreeHostImpl::FindScrollLayerForDeviceViewportPoint(
       *scroll_on_main_thread = true;
       return NULL;
     }
+
+    if (has_ancestor_scroll_handler &&
+        scroll_layer_impl->have_scroll_event_handlers())
+      *has_ancestor_scroll_handler = true;
 
     if (status == ScrollStarted && !potentially_scrolling_layer_impl)
       potentially_scrolling_layer_impl = scroll_layer_impl;
@@ -2083,8 +2097,11 @@ InputHandler::ScrollStatus LayerTreeHostImpl::ScrollBegin(
       active_tree_->RenderSurfaceLayerList());
   bool scroll_on_main_thread = false;
   LayerImpl* potentially_scrolling_layer_impl =
-      FindScrollLayerForDeviceViewportPoint(device_viewport_point, type,
-          layer_impl, &scroll_on_main_thread);
+      FindScrollLayerForDeviceViewportPoint(device_viewport_point,
+                                            type,
+                                            layer_impl,
+                                            &scroll_on_main_thread,
+                                            &scroll_affects_scroll_handler_);
 
   if (scroll_on_main_thread) {
     UMA_HISTOGRAM_BOOLEAN("TryScroll.SlowScroll", true);
@@ -2383,6 +2400,7 @@ void LayerTreeHostImpl::OnRootLayerDelegatedScrollOffsetChanged() {
 void LayerTreeHostImpl::ClearCurrentlyScrollingLayer() {
   active_tree_->ClearCurrentlyScrollingLayer();
   did_lock_scrolling_layer_ = false;
+  scroll_affects_scroll_handler_ = false;
   accumulated_root_overscroll_ = gfx::Vector2dF();
   current_fling_velocity_ = gfx::Vector2dF();
 }
@@ -2468,9 +2486,12 @@ void LayerTreeHostImpl::MouseMoveAt(const gfx::Point& viewport_point) {
   }
 
   bool scroll_on_main_thread = false;
-  LayerImpl* scroll_layer_impl = FindScrollLayerForDeviceViewportPoint(
-      device_viewport_point, InputHandler::Gesture, layer_impl,
-      &scroll_on_main_thread);
+  LayerImpl* scroll_layer_impl =
+      FindScrollLayerForDeviceViewportPoint(device_viewport_point,
+                                            InputHandler::Gesture,
+                                            layer_impl,
+                                            &scroll_on_main_thread,
+                                            NULL);
   if (scroll_on_main_thread || !scroll_layer_impl)
     return;
 

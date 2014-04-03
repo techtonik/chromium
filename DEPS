@@ -23,19 +23,19 @@ vars = {
   "libcxxabi_revision": "197063",
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
   "nacl_trunk": "http://src.chromium.org/native_client/trunk",
-  "webkit_revision": "170429",
+  "webkit_revision": "170648",
   "chromium_git": "https://chromium.googlesource.com",
   "chromiumos_git": "https://chromium.googlesource.com/chromiumos",
   "skia_git": "https://skia.googlesource.com",
   "swig_revision": "230490",
-  "nacl_revision": "12952",
+  "nacl_revision": "12966",
   # After changing nacl_revision, run 'glient sync' and check native_client/DEPS
   # to update other nacl_*_revision's.
   "nacl_tools_revision": "12760",  # native_client/DEPS: tools_rev
   "google_toolbox_for_mac_revision": "662",
   "libaddressinput_revision": "176",
   "libphonenumber_revision": "621",
-  "libvpx_revision": "260583",
+  "libvpx_revision": "260795",
   "lss_revision": "24",
 
   # These two FFmpeg variables must be updated together.  One is used for SVN
@@ -45,13 +45,13 @@ vars = {
 
   "sfntly_revision": "228",
   "lighttpd_revision": "33737",
-  "skia_revision": "13966",
-  "skia_hash": "c94a028ff836f8f0af41ec33ceb1f4bc140841bf",
+  "skia_revision": "14021",
+  "skia_hash": "c282ba85bababb903d8cd43320508790195a98f9",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   "v8_branch": "trunk",
-  "v8_revision": "20359",
+  "v8_revision": "20418",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
@@ -74,7 +74,7 @@ vars = {
 
 deps = {
   "src/breakpad/src":
-    (Var("googlecode_url") % "google-breakpad") + "/trunk/src@1289",
+    (Var("googlecode_url") % "google-breakpad") + "/trunk/src@1295",
 
   "src/sdch/open-vcdiff":
     (Var("googlecode_url") % "open-vcdiff") + "/trunk@42",
@@ -89,7 +89,7 @@ deps = {
     Var("chromium_git") + "/angle/angle.git@" + Var("angle_revision"),
 
   "src/third_party/trace-viewer":
-    (Var("googlecode_url") % "trace-viewer") + "/trunk@1221",
+    (Var("googlecode_url") % "trace-viewer") + "/trunk@1227",
 
   "src/third_party/WebKit":
     Var("webkit_trunk") + "@" + Var("webkit_revision"),
@@ -469,19 +469,6 @@ deps_os = {
     "src/third_party/gold":
       "/trunk/deps/third_party/gold@228995",
 
-    "src/third_party/libmtp":
-      "/trunk/deps/third_party/libmtp@206535",
-
-    # Used on Linux only. CrOS already has a copy.
-    "src/third_party/mtpd/source":
-      Var("chromiumos_git") + "/platform/mtpd.git" +
-      "@f9759da3a7cd95080414a7da0d899c47cad794f2",
-
-    # Used on Linux only. CrOS already has a copy.
-    "src/third_party/cros_dbus_cplusplus/source":
-      Var("chromiumos_git") + "/third_party/dbus-cplusplus.git" +
-      "@f78453e0ba9f3d1584e8873aa3c7437cec861ce0",
-
     # For Linux and Chromium OS.
     "src/third_party/cros_system_api":
       Var("chromiumos_git") + "/platform/system_api.git" +
@@ -517,7 +504,7 @@ deps_os = {
   "android": {
     "src/third_party/android_tools":
       Var("chromium_git") + "/android_tools.git" +
-      "@ca35676f4f652fa97964c488313720f55efd4405",
+      "@9086a711deef9b1f85bf9290b7b9598be32458d5",
 
     "src/third_party/aosp":
       "/trunk/deps/third_party/aosp@148330",

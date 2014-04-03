@@ -32603,6 +32603,10 @@ other types of suffix sets.
   <int value="703" label="FILEBROWSERPRIVATE_REQUESTDRIVESHARE"/>
   <int value="704" label="METRICSPRIVATE_RECORDSPARSEVALUE"/>
   <int value="705" label="HOTWORDPRIVATE_SETAUDIOLOGGINGENABLED"/>
+  <int value="706" label="BLUETOOTHPRIVATE_SETADAPTERSTATE"/>
+  <int value="707" label="BLUETOOTHPRIVATE_ENABLEPAIRING"/>
+  <int value="708" label="BLUETOOTHPRIVATE_DISABLEPAIRING"/>
+  <int value="709" label="BLUETOOTHPRIVATE_SETPAIRINGRESPONSE"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -40654,6 +40658,9 @@ other types of suffix sets.
   <int value="40" label="kErrorCodeOmahaUpdateDeferredForBackoff"/>
   <int value="41" label="kErrorCodePostinstallPowerwashError"/>
   <int value="42" label="kErrorCodeUpdateCanceledByChannelChange"/>
+  <int value="43" label="kErrorCodePostinstallFirmwareRONotUpdatable"/>
+  <int value="44" label="kErrorCodeUnsupportedMajorPayloadVersion"/>
+  <int value="45" label="kErrorCodeUnsupportedMinorPayloadVersion"/>
 </enum>
 
 <enum name="UpdateEngineInstallDateProvisioningSource" type="int">

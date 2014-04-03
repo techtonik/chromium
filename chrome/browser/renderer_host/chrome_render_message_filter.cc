@@ -202,18 +202,10 @@ void ChromeRenderMessageFilter::OnFPS(int routing_id, float fps) {
     return;
   }
 
-  base::ProcessId renderer_id = peer_pid();
-
 #if defined(ENABLE_TASK_MANAGER)
   TaskManager::GetInstance()->model()->NotifyFPS(
-      renderer_id, routing_id, fps);
+      peer_pid(), routing_id, fps);
 #endif  // defined(ENABLE_TASK_MANAGER)
-
-  FPSDetails details(routing_id, fps);
-  content::NotificationService::current()->Notify(
-      chrome::NOTIFICATION_RENDERER_FPS_COMPUTED,
-      content::Source<const base::ProcessId>(&renderer_id),
-      content::Details<const FPSDetails>(&details));
 }
 
 void ChromeRenderMessageFilter::OnV8HeapStats(int v8_memory_allocated,
