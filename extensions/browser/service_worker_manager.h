@@ -42,6 +42,22 @@ class ServiceWorkerManager : public KeyedService {
   // in-flight calls as RegisterExtension.
   void UnregisterExtension(const Extension* extension);
 
+  // Calls |success| when |extension| finishes getting registered.  If
+  // |extension| is not being registered or starts being unregistered before its
+  // registration completes, calls |failure| instead.
+  void WhenRegistered(const Extension* extension,
+                      const tracked_objects::Location& from_here,
+                      const base::Closure& success,
+                      const base::Closure& failure);
+
+  // Calls |success| when |extension| finishes getting unregistered.  If
+  // |extension| is not being unregistered or starts being registered again
+  // before its unregistration completes, calls |failure| instead.
+  void WhenUnregistered(const Extension* extension,
+                        const tracked_objects::Location& from_here,
+                        const base::Closure& success,
+                        const base::Closure& failure);
+
  private:
   friend class ServiceWorkerManagerFactory;
 

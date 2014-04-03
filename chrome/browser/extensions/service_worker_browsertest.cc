@@ -12,6 +12,7 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/test_utils.h"
+#include "extensions/browser/service_worker_manager.h"
 
 namespace extensions {
 namespace {
@@ -95,6 +96,11 @@ class IOThreadInstallUninstallTest {
   const ExtensionId ext_id_;
 };
 
+static void FailTest(const std::string& message,
+                     const base::Closure& continuation) {
+  ADD_FAILURE() << message;
+}
+
 // Test that installing a ServiceWorker-enabled app registers the ServiceWorker,
 // and uninstalling it unregisters the ServiceWorker.
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
@@ -104,6 +110,16 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
   scoped_refptr<const Extension> extension =
       LoadExtension(ext_dir_.unpacked_path());
   ASSERT_TRUE(extension.get());
+
+  base::RunLoop run_loop;
+  ServiceWorkerManager::Get(profile())
+      ->WhenRegistered(extension.get(),
+                       FROM_HERE,
+                       run_loop.QuitClosure(),
+                       base::Bind(FailTest,
+                                  "Extension wasn't being registered",
+                                  run_loop.QuitClosure()));
+  run_loop.Run();
 
   IOThreadInstallUninstallTest test_obj(
       static_cast<ServiceWorkerContextWrapper*>(

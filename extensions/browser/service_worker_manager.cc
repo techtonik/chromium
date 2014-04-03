@@ -200,6 +200,58 @@ void ServiceWorkerManager::FinishUnregistration(const ExtensionId& extension_id,
   }
 }
 
+void ServiceWorkerManager::WhenRegistered(
+    const Extension* extension,
+    const tracked_objects::Location& from_here,
+    const base::Closure& success,
+    const base::Closure& failure) {
+  base::hash_map<ExtensionId, State>::iterator it =
+      states_.find(extension->id());
+  if (it == states_.end())
+    base::MessageLoop::current()->PostTask(from_here, failure);
+
+  State& state = it->second;
+  switch (state.registration) {
+    case UNREGISTERED:
+    case UNREGISTERING:
+      base::MessageLoop::current()->PostTask(from_here, failure);
+      break;
+    case REGISTERED:
+      base::MessageLoop::current()->PostTask(from_here, success);
+      break;
+    case REGISTERING:
+      state.registration_succeeded.push_back(success);
+      state.registration_failed.push_back(failure);
+      break;
+  }
+}
+
+void ServiceWorkerManager::WhenUnregistered(
+    const Extension* extension,
+    const tracked_objects::Location& from_here,
+    const base::Closure& success,
+    const base::Closure& failure) {
+  base::hash_map<ExtensionId, State>::iterator it =
+      states_.find(extension->id());
+  if (it == states_.end())
+    base::MessageLoop::current()->PostTask(from_here, success);
+
+  State& state = it->second;
+  switch(state.registration) {
+    case REGISTERED:
+    case REGISTERING:
+      base::MessageLoop::current()->PostTask(from_here, failure);
+      break;
+    case UNREGISTERED:
+      base::MessageLoop::current()->PostTask(from_here, success);
+      break;
+    case UNREGISTERING:
+      state.unregistration_succeeded.push_back(success);
+      state.unregistration_failed.push_back(failure);
+      break;
+  }
+}
+
 WeakPtr<ServiceWorkerManager> ServiceWorkerManager::WeakThis() {
   return weak_this_factory_.GetWeakPtr();
 }
