@@ -6,6 +6,7 @@
 #include "base/callback_helpers.h"
 #include "chrome/browser/extensions/extension_browsertest.h"
 #include "chrome/browser/extensions/test_extension_dir.h"
+#include "content/browser/service_worker/embedded_worker_registry.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/browser/service_worker/service_worker_context_wrapper.h"
 #include "content/browser/service_worker/service_worker_registration.h"
@@ -101,6 +102,11 @@ static void FailTest(const std::string& message,
   ADD_FAILURE() << message;
 }
 
+static void ShutdownWorkers(
+    const scoped_refptr<ServiceWorkerContextWrapper>& wrapper) {
+  wrapper->context()->embedded_worker_registry()->Shutdown();
+}
+
 // Test that installing a ServiceWorker-enabled app registers the ServiceWorker,
 // and uninstalling it unregisters the ServiceWorker.
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
@@ -111,15 +117,17 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
       LoadExtension(ext_dir_.unpacked_path());
   ASSERT_TRUE(extension.get());
 
-  base::RunLoop run_loop;
-  ServiceWorkerManager::Get(profile())
-      ->WhenRegistered(extension.get(),
-                       FROM_HERE,
-                       run_loop.QuitClosure(),
-                       base::Bind(FailTest,
-                                  "Extension wasn't being registered",
-                                  run_loop.QuitClosure()));
-  run_loop.Run();
+  {
+    base::RunLoop run_loop;
+    ServiceWorkerManager::Get(profile())
+        ->WhenRegistered(extension.get(),
+                         FROM_HERE,
+                         run_loop.QuitClosure(),
+                         base::Bind(FailTest,
+                                    "Extension wasn't being registered",
+                                    run_loop.QuitClosure()));
+    run_loop.Run();
+  }
 
   IOThreadInstallUninstallTest test_obj(
       static_cast<ServiceWorkerContextWrapper*>(
@@ -134,8 +142,36 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
                                      runner->QuitClosure()));
   runner->Run();
 
+  {
+    // Shut down active workers so they don't keep RPHs alive through profile
+    // shutdown. This needs to happen before the app is unloaded so that its
+    // StoragePartition still exists.
+    base::RunLoop run_loop;
+    BrowserThread::PostTaskAndReply(
+        BrowserThread::IO,
+        FROM_HERE,
+        base::Bind(&ShutdownWorkers,
+                   make_scoped_refptr(static_cast<ServiceWorkerContextWrapper*>(
+                       GetSWContext(profile(), extension->id())))),
+        run_loop.QuitClosure());
+
+    run_loop.Run();
+  }
+
   // Unload the extension.
   UnloadExtension(extension->id());
+
+  {
+    base::RunLoop run_loop;
+    ServiceWorkerManager::Get(profile())
+        ->WhenUnregistered(extension.get(),
+                           FROM_HERE,
+                           run_loop.QuitClosure(),
+                           base::Bind(FailTest,
+                                      "Extension wasn't being unregistered",
+                                      run_loop.QuitClosure()));
+    run_loop.Run();
+  }
 }
 
 }  // namespace

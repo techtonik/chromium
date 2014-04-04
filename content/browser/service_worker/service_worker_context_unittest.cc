@@ -83,6 +83,7 @@ TEST_F(ServiceWorkerContextTest, Register) {
       GURL("http://www.example.com/*"),
       GURL("http://www.example.com/service_worker.js"),
       render_process_id_,
+      NULL,
       MakeRegisteredCallback(&called, &registration_id));
 
   ASSERT_FALSE(called);
@@ -103,6 +104,7 @@ TEST_F(ServiceWorkerContextTest, Unregister) {
       pattern,
       GURL("http://www.example.com/service_worker.js"),
       render_process_id_,
+      NULL,
       MakeRegisteredCallback(&called, &registration_id));
 
   ASSERT_FALSE(called);
@@ -129,6 +131,7 @@ TEST_F(ServiceWorkerContextTest, RegisterNewScript) {
       pattern,
       GURL("http://www.example.com/service_worker.js"),
       render_process_id_,
+      NULL,
       MakeRegisteredCallback(&called, &old_registration_id));
 
   ASSERT_FALSE(called);
@@ -141,6 +144,7 @@ TEST_F(ServiceWorkerContextTest, RegisterNewScript) {
       pattern,
       GURL("http://www.example.com/service_worker_new.js"),
       render_process_id_,
+      NULL,
       MakeRegisteredCallback(&called, &new_registration_id));
 
   ASSERT_FALSE(called);
@@ -162,6 +166,7 @@ TEST_F(ServiceWorkerContextTest, RegisterDuplicateScript) {
       pattern,
       script_url,
       render_process_id_,
+      NULL,
       MakeRegisteredCallback(&called, &old_registration_id));
 
   ASSERT_FALSE(called);
@@ -174,6 +179,7 @@ TEST_F(ServiceWorkerContextTest, RegisterDuplicateScript) {
       pattern,
       script_url,
       render_process_id_,
+      NULL,
       MakeRegisteredCallback(&called, &new_registration_id));
 
   ASSERT_FALSE(called);

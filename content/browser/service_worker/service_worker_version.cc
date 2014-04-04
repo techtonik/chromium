@@ -210,7 +210,21 @@ ServiceWorkerVersionInfo ServiceWorkerVersion::GetInfo() {
                                   embedded_worker()->thread_id());
 }
 
-void ServiceWorkerVersion::StartWorker(const StatusCallback& callback) {
+// |alive| lets us know if |start_callbacks| has died.
+static void QueueStartWorkerCallback(
+    const base::WeakPtr<ServiceWorkerVersion>& alive,
+    std::vector<StatusCallback>* start_callbacks,
+    const StatusCallback& callback,
+    ServiceWorkerStatusCode status) {
+  if (!alive || status != SERVICE_WORKER_OK) {
+    RunSoon(base::Bind(callback, status));
+    return;
+  }
+  start_callbacks->push_back(callback);
+}
+
+void ServiceWorkerVersion::StartWorker(const StatusCallback& callback,
+                                       int possible_process_id) {
   DCHECK(!is_shutdown_);
   DCHECK(embedded_worker_);
   DCHECK(registration_);
@@ -223,13 +237,14 @@ void ServiceWorkerVersion::StartWorker(const StatusCallback& callback) {
     return;
   }
   if (start_callbacks_.empty()) {
-    ServiceWorkerStatusCode status = embedded_worker_->Start(
-        version_id_,
-        registration_->script_url());
-    if (status != SERVICE_WORKER_OK) {
-      RunSoon(base::Bind(callback, status));
-      return;
-    }
+    embedded_worker_->Start(version_id_,
+                            registration_->script_url(),
+                            possible_process_id,
+                            base::Bind(&QueueStartWorkerCallback,
+                                       weak_factory_.GetWeakPtr(),
+                                       &start_callbacks_,
+                                       callback));
+    return;
   }
   start_callbacks_.push_back(callback);
 }

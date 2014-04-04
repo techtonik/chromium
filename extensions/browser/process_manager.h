@@ -61,10 +61,8 @@ class ProcessManager : public content::NotificationObserver {
   // displayed anywhere.  Returns false if no background host can be created,
   // for example for hosted apps and extensions that aren't enabled in
   // Incognito.
-  virtual bool CreateBackgroundHost(
-      const Extension* extension,
-      const GURL& url,
-      const base::Closure& continuation = base::Closure());
+  virtual bool CreateBackgroundHost(const Extension* extension,
+                                    const GURL& url);
 
   // Gets the ExtensionHost for the background page for an extension, or NULL if
   // the extension isn't running or doesn't have a background page.

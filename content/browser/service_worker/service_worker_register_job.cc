@@ -9,6 +9,8 @@
 #include "content/browser/service_worker/service_worker_job_coordinator.h"
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/browser/service_worker/service_worker_storage.h"
+#include "content/public/browser/browser_thread.h"
+#include "content/public/browser/site_instance.h"
 
 namespace content {
 
@@ -25,20 +27,33 @@ ServiceWorkerRegisterJob::ServiceWorkerRegisterJob(
       coordinator_(coordinator),
       pattern_(pattern),
       script_url_(script_url),
+      pending_process_id_(-1),
+      site_instance_(NULL),
       weak_factory_(this) {}
 
 ServiceWorkerRegisterJob::~ServiceWorkerRegisterJob() {}
 
 void ServiceWorkerRegisterJob::AddCallback(const RegistrationCallback& callback,
-                                           int process_id) {
+                                           int process_id,
+                                           SiteInstance* site_instance) {
   // If we've created a pending version, associate source_provider it with
   // that, otherwise queue it up.
   callbacks_.push_back(callback);
-  DCHECK_NE(-1, process_id);
-  if (pending_version_) {
-    pending_version_->AddProcessToWorker(process_id);
-  } else {
-    pending_process_ids_.push_back(process_id);
+  if (!pending_version_) {
+    if (process_id != -1)
+      pending_process_id_ = process_id;
+    if (site_instance != NULL){
+      if (site_instance_ == NULL) {
+        // Save the first SiteInstance we receive.
+        site_instance_ = site_instance;
+      } else {
+        // Release the reference to any further SiteInstances.
+        BrowserThread::PostTask(BrowserThread::UI,
+                                FROM_HERE,
+                                base::Bind(&SiteInstance::Release,
+                                           base::Unretained(site_instance)));
+      }
+    }
   }
 }
 
@@ -125,17 +140,16 @@ void ServiceWorkerRegisterJob::StartWorkerAndContinue(
   pending_version_ = new ServiceWorkerVersion(
       registration_, worker_registry_,
       storage_->NewVersionId());
-  for (std::vector<int>::const_iterator it = pending_process_ids_.begin();
-       it != pending_process_ids_.end();
-       ++it)
-    pending_version_->AddProcessToWorker(*it);
+
+  pending_version_->embedded_worker()->SetSiteInstance(site_instance_);
 
   // The callback to watch "installation" actually fires as soon as
   // the worker is up and running, just before the install event is
   // dispatched. The job will continue to run even though the main
   // callback has executed.
   pending_version_->StartWorker(base::Bind(&ServiceWorkerRegisterJob::Complete,
-                                           weak_factory_.GetWeakPtr()));
+                                           weak_factory_.GetWeakPtr()),
+                                pending_process_id_);
 
   // TODO(falken): Don't set the active version until just before
   // the activate event is dispatched.

@@ -45,10 +45,14 @@ class ServiceWorkerRegisterJob : public ServiceWorkerRegisterJobBase {
   virtual ~ServiceWorkerRegisterJob();
 
   // Registers a callback to be called when the job completes (whether
-  // successfully or not). Multiple callbacks may be registered. |process_id| is
-  // added via AddProcessToWorker to the ServiceWorkerVersion created by the
-  // registration job.
-  void AddCallback(const RegistrationCallback& callback, int process_id);
+  // successfully or not). Multiple callbacks may be registered. |process_id|
+  // and |site_instance| are potentially used to create the Service Worker
+  // instance if there are no other clients.  If not NULL, |site_instance| must
+  // have been AddRef()ed on the UI thread and is retained to create future
+  // Service Worker instances.
+  void AddCallback(const RegistrationCallback& callback,
+                   int process_id,
+                   SiteInstance* site_instance);
 
   // ServiceWorkerRegisterJobBase implementation:
   virtual void Start() OVERRIDE;
@@ -72,7 +76,8 @@ class ServiceWorkerRegisterJob : public ServiceWorkerRegisterJobBase {
   const GURL pattern_;
   const GURL script_url_;
   std::vector<RegistrationCallback> callbacks_;
-  std::vector<int> pending_process_ids_;
+  int pending_process_id_;
+  SiteInstance* site_instance_;
   base::WeakPtrFactory<ServiceWorkerRegisterJob> weak_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(ServiceWorkerRegisterJob);

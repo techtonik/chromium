@@ -28,12 +28,14 @@
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/browser/web_contents_user_data.h"
 #include "content/public/common/renderer_preferences.h"
+#include "content/public/common/url_constants.h"
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/extensions_browser_client.h"
 #include "extensions/browser/process_manager_observer.h"
 #include "extensions/browser/view_type_utils.h"
+#include "extensions/common/constants.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_messages.h"
 #include "extensions/common/manifest_handlers/background_info.h"
@@ -58,11 +60,18 @@ namespace {
 
 std::string GetExtensionID(RenderViewHost* render_view_host) {
   // This works for both apps and extensions because the site has been
-  // normalized to the extension URL for apps.
-  if (!render_view_host->GetSiteInstance())
+  // normalized to the extension URL for hosted apps.
+  content::SiteInstance* site_instance = render_view_host->GetSiteInstance();
+  if (!site_instance)
     return std::string();
 
-  return render_view_host->GetSiteInstance()->GetSiteURL().host();
+  const GURL& site_url = site_instance->GetSiteURL();
+
+  if (!site_url.SchemeIs(kExtensionScheme) &&
+      !site_url.SchemeIs(content::kGuestScheme))
+    return std::string();
+
+  return site_url.host();
 }
 
 std::string GetExtensionIDFromFrame(
@@ -99,8 +108,7 @@ class IncognitoProcessManager : public ProcessManager {
                           ProcessManager* original_manager);
   virtual ~IncognitoProcessManager() {}
   virtual bool CreateBackgroundHost(const Extension* extension,
-                                    const GURL& url,
-                                    const base::Closure& continuation) OVERRIDE;
+                                    const GURL& url) OVERRIDE;
   virtual SiteInstance* GetSiteInstanceForURL(const GURL& url) OVERRIDE;
 
  private:
@@ -292,8 +300,7 @@ void ProcessManager::RemoveObserver(ProcessManagerObserver* observer) {
 }
 
 bool ProcessManager::CreateBackgroundHost(const Extension* extension,
-                                          const GURL& url,
-                                          const base::Closure& continuation) {
+                                          const GURL& url) {
   // Hosted apps are taken care of from BackgroundContentsService. Ignore them
   // here.
   if (extension->is_hosted_app() ||
@@ -303,16 +310,13 @@ bool ProcessManager::CreateBackgroundHost(const Extension* extension,
   }
 
   // Don't create multiple background hosts for an extension.
-  if (GetBackgroundHostForExtension(extension->id())) {
-    if (!continuation.is_null())
-      continuation.Run();
+  if (GetBackgroundHostForExtension(extension->id()))
     return true;  // TODO(kalman): return false here? It might break things...
-  }
 
   ExtensionHost* host =
       new ExtensionHost(extension, GetSiteInstanceForURL(url), url,
                         VIEW_TYPE_EXTENSION_BACKGROUND_PAGE);
-  host->CreateRenderViewSoon(continuation);
+  host->CreateRenderViewSoon();
   OnBackgroundHostCreated(host);
   return true;
 }
@@ -904,14 +908,12 @@ IncognitoProcessManager::IncognitoProcessManager(
                     content::Source<BrowserContext>(original_context));
 }
 
-bool IncognitoProcessManager::CreateBackgroundHost(
-    const Extension* extension,
-    const GURL& url,
-    const base::Closure& continuation) {
+bool IncognitoProcessManager::CreateBackgroundHost(const Extension* extension,
+                                                   const GURL& url) {
   if (IncognitoInfo::IsSplitMode(extension)) {
     if (ExtensionsBrowserClient::Get()->IsExtensionIncognitoEnabled(
             extension->id(), GetBrowserContext()))
-      return ProcessManager::CreateBackgroundHost(extension, url, continuation);
+      return ProcessManager::CreateBackgroundHost(extension, url);
   } else {
     // Do nothing. If an extension is spanning, then its original-profile
     // background page is shared with incognito, so we don't create another.

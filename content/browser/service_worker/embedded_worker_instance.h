@@ -25,6 +25,7 @@ class Message;
 namespace content {
 
 class EmbeddedWorkerRegistry;
+class SiteInstance;
 struct ServiceWorkerFetchRequest;
 
 // This gives an interface to control one EmbeddedWorker instance, which
@@ -32,6 +33,7 @@ struct ServiceWorkerFetchRequest;
 // AddProcessReference().
 class CONTENT_EXPORT EmbeddedWorkerInstance {
  public:
+  typedef base::Callback<void(ServiceWorkerStatusCode)> StatusCallback;
   enum Status {
     STOPPED,
     STARTING,
@@ -52,8 +54,10 @@ class CONTENT_EXPORT EmbeddedWorkerInstance {
 
   // Starts the worker. It is invalid to call this when the worker is
   // not in STOPPED status.
-  ServiceWorkerStatusCode Start(int64 service_worker_version_id,
-                                const GURL& script_url);
+  void Start(int64 service_worker_version_id,
+             const GURL& script_url,
+             int possible_process_id,
+             const StatusCallback& callback);
 
   // Stops the worker. It is invalid to call this when the worker is
   // not in STARTING or RUNNING status.
@@ -74,6 +78,12 @@ class CONTENT_EXPORT EmbeddedWorkerInstance {
   void AddProcessReference(int process_id);
   void ReleaseProcessReference(int process_id);
 
+  // If the instance needs to be started, and has no process references, it will
+  // use |site_instance| to create a process.  We assume that a reference to
+  // |site_instance| was added on the UI thread, and send the matching Release()
+  // back to the UI thread on destruction.
+  void SetSiteInstance(SiteInstance* site_instance);
+
   int embedded_worker_id() const { return embedded_worker_id_; }
   Status status() const { return status_; }
   int process_id() const { return process_id_; }
@@ -93,6 +103,11 @@ class CONTENT_EXPORT EmbeddedWorkerInstance {
   EmbeddedWorkerInstance(EmbeddedWorkerRegistry* registry,
                          int embedded_worker_id);
 
+  // Called back from EmbeddedWorkerRegistry after Start() passes control to the
+  // UI thread to create an entirely new process.
+  void RecordStartedProcessId(int process_id,
+                              ServiceWorkerStatusCode status);
+
   // Called back from Registry when the worker instance has ack'ed that
   // its WorkerGlobalScope is actually started on |thread_id| in the
   // child process.
@@ -109,9 +124,10 @@ class CONTENT_EXPORT EmbeddedWorkerInstance {
   // to the browser (i.e. EmbeddedWorker observers).
   void OnMessageReceived(int request_id, const IPC::Message& message);
 
-  // Chooses a process to start this worker and populate process_id_.
-  // Returns false when no process is available.
-  bool ChooseProcess();
+  // Chooses a process to start this worker and populate process_id_.  Uses
+  // |possible_process_id| if no process is available.
+  // Returns false when no process is available and |possible_process_id| is -1.
+  bool ChooseProcess(int possible_process_id);
 
   scoped_refptr<EmbeddedWorkerRegistry> registry_;
   const int embedded_worker_id_;
@@ -120,6 +136,8 @@ class CONTENT_EXPORT EmbeddedWorkerInstance {
   // Current running information. -1 indicates the worker is not running.
   int process_id_;
   int thread_id_;
+
+  SiteInstance* site_instance_;
 
   ProcessRefMap process_refs_;
   ObserverList<Observer> observer_list_;

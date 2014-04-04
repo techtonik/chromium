@@ -29,6 +29,7 @@ class CONTENT_EXPORT ServiceWorkerJobCoordinator {
   void Register(const GURL& pattern,
                 const GURL& script_url,
                 int source_process_id,
+                SiteInstance* site_instance,
                 const ServiceWorkerRegisterJob::RegistrationCallback& callback);
 
   void Unregister(

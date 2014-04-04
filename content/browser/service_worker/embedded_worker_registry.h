@@ -26,6 +26,7 @@ namespace content {
 
 class EmbeddedWorkerInstance;
 class ServiceWorkerContextCore;
+class SiteInstance;
 
 // Acts as a thin stub between MessageFilter and each EmbeddedWorkerInstance,
 // which sends/receives messages to/from each EmbeddedWorker in child process.
@@ -35,6 +36,14 @@ class ServiceWorkerContextCore;
 class CONTENT_EXPORT EmbeddedWorkerRegistry
     : public NON_EXPORTED_BASE(base::RefCounted<EmbeddedWorkerRegistry>) {
  public:
+  typedef base::Callback<void(ServiceWorkerStatusCode)> StatusCallback;
+  // Used in StartWorker(SiteInstance) to return the process ID from the UI
+  // thread.
+  struct StatusCodeAndProcessId {
+    ServiceWorkerStatusCode status;
+    int process_id;
+  };
+
   explicit EmbeddedWorkerRegistry(
       base::WeakPtr<ServiceWorkerContextCore> context);
 
@@ -47,8 +56,16 @@ class CONTENT_EXPORT EmbeddedWorkerRegistry
                                       int embedded_worker_id,
                                       int64 service_worker_version_id,
                                       const GURL& script_url);
+  void StartWorker(SiteInstance* site_instance,
+                   int embedded_worker_id,
+                   int64 service_worker_version_id,
+                   const GURL& script_url,
+                   const StatusCallback& callback);
   ServiceWorkerStatusCode StopWorker(int process_id,
                                      int embedded_worker_id);
+
+  // Stop all active workers, even if they're handling events.
+  void Shutdown();
 
   // Called back from EmbeddedWorker in the child process, relayed via
   // ServiceWorkerDispatcherHost.
@@ -75,6 +92,11 @@ class CONTENT_EXPORT EmbeddedWorkerRegistry
   typedef std::map<int, IPC::Sender*> ProcessToSenderMap;
 
   ~EmbeddedWorkerRegistry();
+
+  void RecordStartedProcessId(int embedded_worker_id,
+                              const StatusCallback& callback,
+                              StatusCodeAndProcessId result);
+
   ServiceWorkerStatusCode Send(int process_id, IPC::Message* message);
 
   // RemoveWorker is called when EmbeddedWorkerInstance is destructed.

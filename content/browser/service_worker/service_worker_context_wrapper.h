@@ -46,7 +46,7 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
   // ServiceWorkerContext implementation:
   virtual void RegisterServiceWorker(const GURL& pattern,
                                      const GURL& script_url,
-                                     int source_process_id,
+                                     SiteInstance* site_instance,
                                      const ResultCallback& continuation)
       OVERRIDE;
 

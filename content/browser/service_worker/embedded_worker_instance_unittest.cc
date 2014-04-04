@@ -47,6 +47,13 @@ class EmbeddedWorkerInstanceTest : public testing::Test {
   DISALLOW_COPY_AND_ASSIGN(EmbeddedWorkerInstanceTest);
 };
 
+static void SaveStatusAndCall(ServiceWorkerStatusCode* out,
+                              const base::Closure& callback,
+                              ServiceWorkerStatusCode status) {
+  *out = status;
+  callback.Run();
+}
+
 TEST_F(EmbeddedWorkerInstanceTest, StartAndStop) {
   scoped_ptr<EmbeddedWorkerInstance> worker =
       embedded_worker_registry()->CreateWorker();
@@ -56,17 +63,17 @@ TEST_F(EmbeddedWorkerInstanceTest, StartAndStop) {
   const int64 service_worker_version_id = 55L;
   const GURL url("http://example.com/worker.js");
 
-  // This fails as we have no available process yet.
-  EXPECT_EQ(SERVICE_WORKER_ERROR_PROCESS_NOT_FOUND,
-            worker->Start(service_worker_version_id, url));
-  EXPECT_EQ(EmbeddedWorkerInstance::STOPPED, worker->status());
-
   // Simulate adding one process to the worker.
   helper_->SimulateAddProcessToWorker(embedded_worker_id, kRenderProcessId);
 
   // Start should succeed.
-  EXPECT_EQ(SERVICE_WORKER_OK,
-            worker->Start(service_worker_version_id, url));
+  ServiceWorkerStatusCode status;
+  worker->Start(
+      service_worker_version_id,
+      url,
+      -1,
+      base::Bind(&SaveStatusAndCall, &status, base::Bind(&base::DoNothing)));
+  EXPECT_EQ(SERVICE_WORKER_OK, status);
   EXPECT_EQ(EmbeddedWorkerInstance::STARTING, worker->status());
   base::RunLoop().RunUntilIdle();
 
@@ -105,8 +112,13 @@ TEST_F(EmbeddedWorkerInstanceTest, ChooseProcess) {
   helper_->SimulateAddProcessToWorker(embedded_worker_id, 3);
 
   // Process 3 has the biggest # of references and it should be chosen.
-  EXPECT_EQ(SERVICE_WORKER_OK,
-            worker->Start(1L, GURL("http://example.com/worker.js")));
+  ServiceWorkerStatusCode status;
+  worker->Start(
+      1L,
+      GURL("http://example.com/worker.js"),
+      -1,
+      base::Bind(&SaveStatusAndCall, &status, base::Bind(&base::DoNothing)));
+  EXPECT_EQ(SERVICE_WORKER_OK, status);
   EXPECT_EQ(EmbeddedWorkerInstance::STARTING, worker->status());
   EXPECT_EQ(3, worker->process_id());
 

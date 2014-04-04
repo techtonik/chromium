@@ -65,6 +65,7 @@ void ServiceWorkerContextCore::RegisterServiceWorker(
     const GURL& pattern,
     const GURL& script_url,
     int source_process_id,
+    SiteInstance* site_instance,
     const RegistrationCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
 
@@ -72,6 +73,7 @@ void ServiceWorkerContextCore::RegisterServiceWorker(
       pattern,
       script_url,
       source_process_id,
+      site_instance,
       base::Bind(&ServiceWorkerContextCore::RegistrationComplete,
                  AsWeakPtr(),
                  callback));

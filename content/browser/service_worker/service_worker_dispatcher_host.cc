@@ -131,6 +131,7 @@ void ServiceWorkerDispatcherHost::OnRegisterServiceWorker(
       pattern,
       script_url,
       render_process_id_,
+      NULL,
       base::Bind(&ServiceWorkerDispatcherHost::RegistrationComplete,
                  this,
                  thread_id,

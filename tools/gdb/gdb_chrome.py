@@ -205,8 +205,7 @@ class IpcMessagePrinter(Printer):
 
     def children(self):
         yield ('header_', self.header().dereference())
-        yield ('capacity_', self.val['capacity_'])
-        yield ('variable_buffer_offset_', self.val['variable_buffer_offset_'])
+        yield ('capacity_after_header_', self.val['capacity_after_header_'])
         for field in self.val.type.fields():
             if field.is_base_class:
                 continue
@@ -279,8 +278,9 @@ class RenderProcessHostImplPrinter(object):
 
     def children(self):
         yield ('id_', self.val['id_'])
-        yield ('render_widget_hosts_',
-               self.val['render_widget_hosts_']['data_'])
+        yield ('listeners_',
+               self.val['listeners_']['data_'])
+        yield ('worker_ref_count_', self.val['worker_ref_count_'])
         yield ('fast_shutdown_started_', self.val['fast_shutdown_started_'])
         yield ('deleting_soon_', self.val['deleting_soon_'])
         yield ('pending_views_', self.val['pending_views_'])

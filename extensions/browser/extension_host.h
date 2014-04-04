@@ -73,7 +73,7 @@ class ExtensionHost : public content::WebContentsDelegate,
   // Prepares to initializes our RenderViewHost by creating its RenderView and
   // navigating to this host's url. Uses host_view for the RenderViewHost's view
   // (can be NULL). This happens delayed to avoid locking the UI.
-  void CreateRenderViewSoon(const base::Closure& continuation);
+  void CreateRenderViewSoon();
 
   // content::WebContentsObserver
   virtual bool OnMessageReceived(const IPC::Message& message) OVERRIDE;
@@ -176,9 +176,6 @@ class ExtensionHost : public content::WebContentsDelegate,
 
   // Used to measure how long it's been since the host was created.
   base::ElapsedTimer since_created_;
-
-  // Called when the RenderView is created.
-  std::vector<base::Closure> when_render_view_created_;
 
   DISALLOW_COPY_AND_ASSIGN(ExtensionHost);
 };

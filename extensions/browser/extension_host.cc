@@ -173,26 +173,14 @@ bool ExtensionHost::IsRenderViewLive() const {
   return render_view_host()->IsRenderViewLive();
 }
 
-void ExtensionHost::CreateRenderViewSoon(const base::Closure& continuation) {
+void ExtensionHost::CreateRenderViewSoon() {
   if ((render_process_host() && render_process_host()->HasConnection())) {
     // If the process is already started, go ahead and initialize the RenderView
     // synchronously. The process creation is the real meaty part that we want
     // to defer.
     CreateRenderViewNow();
-    if (!continuation.is_null())
-      continuation.Run();
   } else {
-    if (!continuation.is_null())
-      when_render_view_created_.push_back(continuation);
     ProcessCreationQueue::GetInstance()->CreateSoon(this);
-  }
-}
-
-static void RunAll(const std::vector<base::Closure>& callbacks) {
-  for (std::vector<base::Closure>::const_iterator it = callbacks.begin();
-       it != callbacks.end();
-       ++it) {
-    it->Run();
   }
 }
 
@@ -203,12 +191,6 @@ void ExtensionHost::CreateRenderViewNow() {
     // Connect orphaned dev-tools instances.
     delegate_->OnRenderViewCreatedForBackgroundPage(this);
   }
-  std::vector<base::Closure> running;
-  running.swap(when_render_view_created_);
-  base::MessageLoop::current()->PostDelayedTask(
-      FROM_HERE,
-      base::Bind(&RunAll, running),
-      base::TimeDelta::FromMilliseconds(10));
 }
 
 const GURL& ExtensionHost::GetURL() const {

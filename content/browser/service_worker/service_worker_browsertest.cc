@@ -163,9 +163,13 @@ class EmbeddedWorkerBrowserTest : public ServiceWorkerBrowserTest,
     const int64 service_worker_version_id = 33L;
     const GURL script_url = embedded_test_server()->GetURL(
         "/service_worker/worker.js");
-    ServiceWorkerStatusCode status = worker_->Start(
-        service_worker_version_id, script_url);
-
+    worker_->Start(
+        service_worker_version_id,
+        script_url,
+        shell()->web_contents()->GetRenderProcessHost()->GetID(),
+        base::Bind(&EmbeddedWorkerBrowserTest::StartOnIOThread2, this));
+  }
+  void StartOnIOThread2(ServiceWorkerStatusCode status) {
     last_worker_status_ = worker_->status();
     EXPECT_EQ(SERVICE_WORKER_OK, status);
     EXPECT_EQ(EmbeddedWorkerInstance::STARTING, last_worker_status_);
@@ -557,7 +561,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
     public_context()->RegisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL(kWorkerUrl),
-        RenderProcessID(),
+        shell()->web_contents()->GetSiteInstance(),
         base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
                    true,
                    run_loop.QuitClosure()));

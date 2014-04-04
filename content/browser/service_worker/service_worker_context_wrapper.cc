@@ -7,6 +7,7 @@
 #include "base/files/file_path.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/site_instance.h"
 #include "webkit/browser/quota/quota_manager_proxy.h"
 
 namespace content {
@@ -54,6 +55,8 @@ static void FinishRegistrationOnIO(
     ServiceWorkerStatusCode status,
     int64 registration_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  if (status != SERVICE_WORKER_OK)
+    LOG(ERROR) << ServiceWorkerStatusToString(status);
   BrowserThread::PostTask(
       BrowserThread::UI,
       FROM_HERE,
@@ -63,9 +66,11 @@ static void FinishRegistrationOnIO(
 void ServiceWorkerContextWrapper::RegisterServiceWorker(
     const GURL& pattern,
     const GURL& script_url,
-    int source_process_id,
+    SiteInstance* site_instance,
     const ResultCallback& continuation) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
+    DCHECK_CURRENTLY_ON(BrowserThread::UI);
+    site_instance->AddRef();
     BrowserThread::PostTask(
         BrowserThread::IO,
         FROM_HERE,
@@ -73,7 +78,7 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
                    this,
                    pattern,
                    script_url,
-                   source_process_id,
+                   base::Unretained(site_instance),
                    continuation));
     return;
   }
@@ -81,7 +86,8 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
   context()->RegisterServiceWorker(
       pattern,
       script_url,
-      source_process_id,
+      -1,
+      site_instance,
       base::Bind(&FinishRegistrationOnIO, continuation));
 }
 
@@ -89,6 +95,8 @@ static void FinishUnregistrationOnIO(
     const ServiceWorkerContext::ResultCallback& continuation,
     ServiceWorkerStatusCode status) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  if (status != SERVICE_WORKER_OK)
+    LOG(ERROR) << ServiceWorkerStatusToString(status);
   BrowserThread::PostTask(
       BrowserThread::UI,
       FROM_HERE,

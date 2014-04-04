@@ -70,6 +70,7 @@ class CONTENT_EXPORT ServiceWorkerContextCore
   void RegisterServiceWorker(const GURL& pattern,
                              const GURL& script_url,
                              int source_process_id,
+                             SiteInstance* site_instance,
                              const RegistrationCallback& callback);
 
   // The callback will be called on the IO thread.
