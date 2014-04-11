@@ -93,20 +93,8 @@ class CONTENT_EXPORT ServiceWorkerContextCore
                                ServiceWorkerProviderHost* provider_host,
                                const UnregistrationCallback& callback);
 
-  // Finds the active worker for |pattern| and calls
-  // ServiceWorkerVersion::SendMessage.
-  void SendMessage(const GURL& pattern,
-                   const IPC::Message& message,
-                   const StatusCallback& callback);
-
-  // Finds the active worker for |pattern| and calls
-  // ServiceWorkerVersion::SendMessageAndRegisterCallback.
-  void SendMessageAndRegisterCallback(const GURL& pattern,
-                                      const IPC::Message& message,
-                                      const MessageCallback& callback);
-
   // This class maintains collections of live instances, this class
-  // does not own these object or influence their lifetime.
+  // does not own these objects or influence their lifetime.
   ServiceWorkerRegistration* GetLiveRegistration(int64 registration_id);
   void AddLiveRegistration(ServiceWorkerRegistration* registration);
   void RemoveLiveRegistration(int64 registration_id);

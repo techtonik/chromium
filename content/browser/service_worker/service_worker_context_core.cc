@@ -99,52 +99,6 @@ void ServiceWorkerContextCore::UnregisterServiceWorker(
   job_coordinator_->Unregister(pattern, source_process_id, callback);
 }
 
-static void SendMessageAfterFind(
-    const IPC::Message& message,
-    const ServiceWorkerContextCore::StatusCallback& callback,
-    ServiceWorkerStatusCode status,
-    const scoped_refptr<ServiceWorkerRegistration>& registration) {
-  if (status != SERVICE_WORKER_OK) {
-    callback.Run(status);
-  } else if (!registration->active_version()) {
-    callback.Run(SERVICE_WORKER_ERROR_FAILED);
-  }
-  registration->active_version()->SendMessage(message, callback);
-}
-
-void ServiceWorkerContextCore::SendMessage(const GURL& pattern,
-                                           const IPC::Message& message,
-                                           const StatusCallback& callback) {
-  DCHECK_CURRENTLY_ON(BrowserThread::IO);
-
-  storage_->FindRegistrationForPattern(
-      pattern, base::Bind(&SendMessageAfterFind, message, callback));
-}
-
-static void SendMessageAndRegisterAfterFind(
-    const IPC::Message& message,
-    const ServiceWorkerContextCore::MessageCallback& callback,
-    ServiceWorkerStatusCode status,
-    const scoped_refptr<ServiceWorkerRegistration>& registration) {
-  if (status != SERVICE_WORKER_OK) {
-    callback.Run(status, IPC::Message());
-  } else if (!registration->active_version()) {
-    callback.Run(SERVICE_WORKER_ERROR_FAILED, IPC::Message());
-  }
-  registration->active_version()->SendMessageAndRegisterCallback(message,
-                                                                 callback);
-}
-
-void ServiceWorkerContextCore::SendMessageAndRegisterCallback(
-    const GURL& pattern,
-    const IPC::Message& message,
-    const MessageCallback& callback) {
-  DCHECK_CURRENTLY_ON(BrowserThread::IO);
-
-  storage_->FindRegistrationForPattern(
-      pattern, base::Bind(&SendMessageAndRegisterAfterFind, message, callback));
-}
-
 void ServiceWorkerContextCore::RegistrationComplete(
     const ServiceWorkerContextCore::RegistrationCallback& callback,
     ServiceWorkerStatusCode status,

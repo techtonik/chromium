@@ -6,6 +6,7 @@
 
 #include "base/files/file_path.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
+#include "content/browser/service_worker/service_worker_registration.h"
 #include "content/public/browser/browser_thread.h"
 #include "ipc/ipc_message.h"
 #include "webkit/browser/quota/quota_manager_proxy.h"
@@ -121,10 +122,22 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
       base::Bind(&PostResultToUIFromStatusOnIO, continuation));
 }
 
-void ServiceWorkerContextWrapper::SendMessage(
-    const GURL& pattern,
+static void SendMessageAfterFind(
     const IPC::Message& message,
-    const ResultCallback& continuation) {
+    const ServiceWorkerContext::ResultCallback& callback,
+    ServiceWorkerStatusCode status,
+    const scoped_refptr<ServiceWorkerRegistration>& registration) {
+  if (status != SERVICE_WORKER_OK || !registration->active_version()) {
+    callback.Run(false);
+    return;
+  }
+  registration->active_version()->SendMessage(
+      message, base::Bind(&PostResultToUIFromStatusOnIO, callback));
+}
+
+void ServiceWorkerContextWrapper::SendMessage(const GURL& pattern,
+                                              const IPC::Message& message,
+                                              const ResultCallback& callback) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
     BrowserThread::PostTask(
         BrowserThread::IO,
@@ -133,14 +146,12 @@ void ServiceWorkerContextWrapper::SendMessage(
                    this,
                    pattern,
                    message,
-                   continuation));
+                   callback));
     return;
   }
 
-  context()->SendMessage(
-      pattern,
-      message,
-      base::Bind(&PostResultToUIFromStatusOnIO, continuation));
+  context()->storage()->FindRegistrationForPattern(
+      pattern, base::Bind(&SendMessageAfterFind, message, callback));
 }
 
 static void PostMessageToUIFromStatusMessageOnIO(
@@ -154,10 +165,23 @@ static void PostMessageToUIFromStatusMessageOnIO(
       base::Bind(continuation, status == SERVICE_WORKER_OK, message));
 }
 
+static void SendMessageAndRegisterAfterFind(
+    const IPC::Message& message,
+    const ServiceWorkerContext::MessageCallback& callback,
+    ServiceWorkerStatusCode status,
+    const scoped_refptr<ServiceWorkerRegistration>& registration) {
+  if (status != SERVICE_WORKER_OK || !registration->active_version()) {
+    callback.Run(false, IPC::Message());
+    return;
+  }
+  registration->active_version()->SendMessageAndRegisterCallback(
+      message, base::Bind(&PostMessageToUIFromStatusMessageOnIO, callback));
+}
+
 void ServiceWorkerContextWrapper::SendMessageAndRegisterCallback(
     const GURL& pattern,
     const IPC::Message& message,
-    const MessageCallback& continuation) {
+    const MessageCallback& callback) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
     BrowserThread::PostTask(
         BrowserThread::IO,
@@ -166,14 +190,12 @@ void ServiceWorkerContextWrapper::SendMessageAndRegisterCallback(
                    this,
                    pattern,
                    message,
-                   continuation));
+                   callback));
     return;
   }
 
-  context()->SendMessageAndRegisterCallback(
-      pattern,
-      message,
-      base::Bind(&PostMessageToUIFromStatusMessageOnIO, continuation));
+  context()->storage()->FindRegistrationForPattern(
+      pattern, base::Bind(&SendMessageAndRegisterAfterFind, message, callback));
 }
 
 }  // namespace content
