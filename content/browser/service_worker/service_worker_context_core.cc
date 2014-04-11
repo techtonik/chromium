@@ -14,7 +14,6 @@
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/browser/service_worker/service_worker_storage.h"
 #include "content/public/browser/browser_thread.h"
-#include "ipc/ipc_message.h"
 #include "url/gurl.h"
 
 namespace content {

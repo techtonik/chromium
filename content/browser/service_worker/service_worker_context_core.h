@@ -51,9 +51,6 @@ class CONTENT_EXPORT ServiceWorkerContextCore
                               int64 version_id)> RegistrationCallback;
   typedef base::Callback<
       void(ServiceWorkerStatusCode status)> UnregistrationCallback;
-  typedef base::Callback<void(ServiceWorkerStatusCode)> StatusCallback;
-  typedef base::Callback<void(ServiceWorkerStatusCode,
-                              const IPC::Message& message)> MessageCallback;
 
   // This is owned by the StoragePartition, which will supply it with
   // the local path on disk. Given an empty |user_data_directory|,
