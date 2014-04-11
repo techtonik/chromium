@@ -9,6 +9,10 @@
 #include "base/callback_forward.h"
 #include "url/gurl.h"
 
+namespace IPC {
+class Message;
+}  // namespace IPC
+
 namespace content {
 
 // Represents the per-StoragePartition ServiceWorker data.  Must be used from
