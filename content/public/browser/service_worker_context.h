@@ -56,7 +56,7 @@ class ServiceWorkerContext {
                                        int source_process_id,
                                        const ResultCallback& callback) = 0;
 
-  // Sends an IPC message to the worker.
+  // Sends an IPC message to the ServiceWorker whose scope is |pattern|.
   // If the worker is not running this first tries to start it.
   // |callback| can be null if the sender does not need to know if the
   // message is successfully sent or not.
@@ -66,8 +66,8 @@ class ServiceWorkerContext {
                            const IPC::Message& message,
                            const ResultCallback& callback) = 0;
 
-  // Sends an IPC message to the worker and registers |callback| to
-  // be notified when a response message is received.
+  // Sends an IPC message to the ServiceWorker whose scope is |pattern| and
+  // registers |callback| to be notified when a response message is received.
   // The |callback| will be also fired with an error code if the worker
   // is unexpectedly (being) stopped.
   // If the worker is not running this first tries to start it by
