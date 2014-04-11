@@ -20,6 +20,8 @@ class ServiceWorkerContext {
   typedef GURL Scope;
 
   typedef base::Callback<void(bool success)> ResultCallback;
+  typedef base::Callback<void(bool success, const IPC::Message& message)>
+      MessageCallback;
 
   // Equivalent to calling navigator.serviceWorker.register(script_url, {scope:
   // pattern}) from a renderer in |source_process_id|, except that |pattern| is
@@ -50,7 +52,26 @@ class ServiceWorkerContext {
                                        int source_process_id,
                                        const ResultCallback& callback) = 0;
 
-  // TODO(jyasskin): Provide a way to SendMessage to a Scope.
+  // Sends an IPC message to the worker.
+  // If the worker is not running this first tries to start it.
+  // |callback| can be null if the sender does not need to know if the
+  // message is successfully sent or not.
+  // (If the sender expects the receiver to respond please use
+  // SendMessageAndRegisterCallback instead)
+  virtual void SendMessage(const Scope& pattern,
+                           const IPC::Message& message,
+                           const ResultCallback& callback) = 0;
+
+  // Sends an IPC message to the worker and registers |callback| to
+  // be notified when a response message is received.
+  // The |callback| will be also fired with an error code if the worker
+  // is unexpectedly (being) stopped.
+  // If the worker is not running this first tries to start it by
+  // calling StartWorker internally.
+  virtual void SendMessageAndRegisterCallback(
+      const Scope& pattern,
+      const IPC::Message& message,
+      const MessageCallback& callback) = 0;
 
  protected:
   ServiceWorkerContext() {}

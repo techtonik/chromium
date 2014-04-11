@@ -51,6 +51,9 @@ class CONTENT_EXPORT ServiceWorkerContextCore
                               int64 version_id)> RegistrationCallback;
   typedef base::Callback<
       void(ServiceWorkerStatusCode status)> UnregistrationCallback;
+  typedef base::Callback<void(ServiceWorkerStatusCode)> StatusCallback;
+  typedef base::Callback<void(ServiceWorkerStatusCode,
+                              const IPC::Message& message)> MessageCallback;
 
   // This is owned by the StoragePartition, which will supply it with
   // the local path on disk. Given an empty |user_data_directory|,
@@ -89,6 +92,18 @@ class CONTENT_EXPORT ServiceWorkerContextCore
                                int source_process_id,
                                ServiceWorkerProviderHost* provider_host,
                                const UnregistrationCallback& callback);
+
+  // Finds the active worker for |pattern| and calls
+  // ServiceWorkerVersion::SendMessage.
+  void SendMessage(const GURL& pattern,
+                   const IPC::Message& message,
+                   const StatusCallback& callback);
+
+  // Finds the active worker for |pattern| and calls
+  // ServiceWorkerVersion::SendMessageAndRegisterCallback.
+  void SendMessageAndRegisterCallback(const GURL& pattern,
+                                      const IPC::Message& message,
+                                      const MessageCallback& callback);
 
   // This class maintains collections of live instances, this class
   // does not own these object or influence their lifetime.

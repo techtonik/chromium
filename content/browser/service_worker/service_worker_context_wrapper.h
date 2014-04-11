@@ -49,10 +49,16 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
                                      int source_process_id,
                                      const ResultCallback& continuation)
       OVERRIDE;
-
   virtual void UnregisterServiceWorker(const GURL& pattern,
                                        int source_process_id,
                                        const ResultCallback& continuation)
+      OVERRIDE;
+  virtual void SendMessage(const GURL& pattern,
+                           const IPC::Message& message,
+                           const ResultCallback& callback) OVERRIDE;
+  virtual void SendMessageAndRegisterCallback(const GURL& pattern,
+                                              const IPC::Message& message,
+                                              const MessageCallback& callback)
       OVERRIDE;
 
  private:

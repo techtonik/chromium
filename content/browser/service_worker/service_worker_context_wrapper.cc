@@ -7,6 +7,7 @@
 #include "base/files/file_path.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/public/browser/browser_thread.h"
+#include "ipc/ipc_message.h"
 #include "webkit/browser/quota/quota_manager_proxy.h"
 
 namespace content {
@@ -87,7 +88,7 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
       base::Bind(&FinishRegistrationOnIO, continuation));
 }
 
-static void FinishUnregistrationOnIO(
+static void PostResultToUIFromStatusOnIO(
     const ServiceWorkerContext::ResultCallback& continuation,
     ServiceWorkerStatusCode status) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
@@ -117,7 +118,62 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
       pattern,
       source_process_id,
       NULL /* provider_host */,
-      base::Bind(&FinishUnregistrationOnIO, continuation));
+      base::Bind(&PostResultToUIFromStatusOnIO, continuation));
+}
+
+void ServiceWorkerContextWrapper::SendMessage(
+    const GURL& pattern,
+    const IPC::Message& message,
+    const ResultCallback& continuation) {
+  if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
+    BrowserThread::PostTask(
+        BrowserThread::IO,
+        FROM_HERE,
+        base::Bind(&ServiceWorkerContextWrapper::SendMessage,
+                   this,
+                   pattern,
+                   message,
+                   continuation));
+    return;
+  }
+
+  context()->SendMessage(
+      pattern,
+      message,
+      base::Bind(&PostResultToUIFromStatusOnIO, continuation));
+}
+
+static void PostMessageToUIFromStatusMessageOnIO(
+    const ServiceWorkerContext::MessageCallback& continuation,
+    ServiceWorkerStatusCode status,
+    const IPC::Message& message) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  BrowserThread::PostTask(
+      BrowserThread::UI,
+      FROM_HERE,
+      base::Bind(continuation, status == SERVICE_WORKER_OK, message));
+}
+
+void ServiceWorkerContextWrapper::SendMessageAndRegisterCallback(
+    const GURL& pattern,
+    const IPC::Message& message,
+    const MessageCallback& continuation) {
+  if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
+    BrowserThread::PostTask(
+        BrowserThread::IO,
+        FROM_HERE,
+        base::Bind(&ServiceWorkerContextWrapper::SendMessageAndRegisterCallback,
+                   this,
+                   pattern,
+                   message,
+                   continuation));
+    return;
+  }
+
+  context()->SendMessageAndRegisterCallback(
+      pattern,
+      message,
+      base::Bind(&PostMessageToUIFromStatusMessageOnIO, continuation));
 }
 
 }  // namespace content
