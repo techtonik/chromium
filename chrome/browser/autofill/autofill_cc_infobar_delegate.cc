@@ -66,7 +66,7 @@ InfoBarDelegate::Type AutofillCCInfoBarDelegate::GetInfoBarType() const {
 }
 
 bool AutofillCCInfoBarDelegate::ShouldExpireInternal(
-    const content::LoadCommittedDetails& details) const {
+    const NavigationDetails& details) const {
   // The user has submitted a form, causing the page to navigate elsewhere. We
   // don't want the infobar to be expired at this point, because the user won't
   // get a chance to answer the question.
@@ -100,10 +100,11 @@ base::string16 AutofillCCInfoBarDelegate::GetLinkText() const {
 }
 
 bool AutofillCCInfoBarDelegate::LinkClicked(WindowOpenDisposition disposition) {
-  web_contents()->OpenURL(content::OpenURLParams(
-      GURL(autofill::kHelpURL), content::Referrer(),
-      (disposition == CURRENT_TAB) ? NEW_FOREGROUND_TAB : disposition,
-      content::PAGE_TRANSITION_LINK, false));
+  InfoBarService::WebContentsFromInfoBar(infobar())->OpenURL(
+      content::OpenURLParams(
+          GURL(autofill::kHelpURL), content::Referrer(),
+          (disposition == CURRENT_TAB) ? NEW_FOREGROUND_TAB : disposition,
+          content::PAGE_TRANSITION_LINK, false));
   return false;
 }
 

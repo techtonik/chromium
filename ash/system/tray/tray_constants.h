@@ -42,6 +42,7 @@ extern const int kTrayPopupAutoCloseDelayForTextInSeconds;
 extern const int kTrayPopupPaddingHorizontal;
 extern const int kTrayPopupPaddingBetweenItems;
 extern const int kTrayPopupTextSpacingVertical;
+extern const int kTrayPopupUserCardVerticalPadding;
 
 extern const int kTrayPopupItemHeight;
 extern const int kTrayPopupDetailsIconWidth;
@@ -71,6 +72,9 @@ extern const int kNotificationIconWidth;
 extern const int kNotificationButtonWidth;
 extern const int kTrayNotificationContentsWidth;
 
+extern const int kTrayAvatarCornerRadius;
+extern const int kTrayAvatarSize;
+
 // Returns kTraySpacing or kAlternateTraySpacing as applicable
 // (Determined by ash::switches::UseAlternateShelfLayout).
 int GetTraySpacing();
@@ -78,6 +82,11 @@ int GetTraySpacing();
 // Returns kShelfItemHeight or kAlternateShelfItemHeight as applicable
 // (Determined by ash::switches::UseAlternateShelfLayout).
 int GetShelfItemHeight();
+
+namespace test {
+const int kSettingsTrayItemViewId = 10000;
+const int kAccessibilityTrayItemViewId = 10001;
+}  // namespace test
 
 }  // namespace ash
 

@@ -141,6 +141,13 @@ pp_set.add_printer('tracked_objects::Location', '^tracked_objects::Location$',
                    LocationPrinter)
 
 
+class PendingTaskPrinter(Printer):
+    def to_string(self):
+        return 'From %s' % (self.val['posted_from'],)
+pp_set.add_printer('base::PendingTask', '^base::PendingTask$',
+                   PendingTaskPrinter)
+
+
 class LockPrinter(Printer):
     def to_string(self):
         try:

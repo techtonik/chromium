@@ -24,8 +24,11 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/content_settings/host_content_settings_map.h"
+#include "chrome/browser/download/download_service.h"
+#include "chrome/browser/download/download_service_factory.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
 #include "chrome/browser/profiles/bookmark_model_loaded_observer.h"
+#include "chrome/browser/profiles/profile_avatar_icon_util.h"
 #include "chrome/browser/profiles/profile_destroyer.h"
 #include "chrome/browser/profiles/profile_info_cache.h"
 #include "chrome/browser/profiles/profile_metrics.h"
@@ -390,7 +393,7 @@ void ProfileManager::CreateProfileAsync(
     // Get the icon index from the user's icon url
     size_t icon_index;
     std::string icon_url_std = base::UTF16ToASCII(icon_url);
-    if (cache.IsDefaultAvatarIconUrl(icon_url_std, &icon_index)) {
+    if (profiles::IsDefaultAvatarIconUrl(icon_url_std, &icon_index)) {
       // add profile to cache with user selected name and avatar
       cache.AddProfileToCache(profile_path, name, base::string16(), icon_index,
                               managed_user_id);
@@ -632,6 +635,17 @@ void ProfileManager::ScheduleProfileForDeletion(
     const base::FilePath& profile_dir,
     const CreateCallback& callback) {
   DCHECK(profiles::IsMultipleProfilesEnabled());
+
+  // Cancel all in-progress downloads before deleting the profile to prevent a
+  // "Do you want to exit Google Chrome and cancel the downloads?" prompt
+  // (crbug.com/336725).
+  Profile* profile = GetProfileByPath(profile_dir);
+  if (profile) {
+    DownloadService* service =
+        DownloadServiceFactory::GetForBrowserContext(profile);
+    service->CancelDownloads();
+  }
+
   PrefService* local_state = g_browser_process->local_state();
   ProfileInfoCache& cache = GetProfileInfoCache();
 
@@ -1071,6 +1085,10 @@ void ProfileManager::FinishDeletingProfile(const base::FilePath& profile_dir) {
   Profile* profile = GetProfileByPath(profile_dir);
 
   if (profile) {
+    // By this point, all in-progress downloads for the profile being deleted
+    // must have been canceled (crbug.com/336725).
+    DCHECK(DownloadServiceFactory::GetForBrowserContext(profile)->
+           NonMaliciousDownloadCount() == 0);
     BrowserList::CloseAllBrowsersWithProfile(profile);
 
     // Disable sync for doomed profile.
@@ -1140,6 +1158,8 @@ void ProfileManager::AddProfileToCache(Profile* profile) {
 void ProfileManager::SetGuestProfilePrefs(Profile* profile) {
   PrefService* prefs = profile->GetPrefs();
   prefs->SetBoolean(prefs::kSigninAllowed, false);
+  prefs->SetBoolean(prefs::kEditBookmarksEnabled, false);
+  prefs->SetBoolean(prefs::kShowBookmarkBar, false);
   // This can be removed in the future but needs to be present through
   // a release (or two) so that any existing installs get switched to
   // the new state and away from the previous "forced" state.

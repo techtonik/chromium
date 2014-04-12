@@ -12,7 +12,7 @@
 #include "grit/renderer_resources.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/web/WebDOMFileSystem.h"
-#include "third_party/WebKit/public/web/WebFrame.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 
 namespace extensions {
 
@@ -33,8 +33,8 @@ void FileBrowserPrivateCustomBindings::GetFileSystem(
   std::string name(*v8::String::Utf8Value(args[0]));
   std::string root_url(*v8::String::Utf8Value(args[1]));
 
-  blink::WebFrame* webframe =
-      blink::WebFrame::frameForContext(context()->v8_context());
+  blink::WebLocalFrame* webframe =
+      blink::WebLocalFrame::frameForContext(context()->v8_context());
   DCHECK(webframe);
   args.GetReturnValue().Set(
       blink::WebDOMFileSystem::create(

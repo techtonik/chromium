@@ -9,7 +9,7 @@
 #include "base/debug/trace_event.h"
 #include "base/files/file_path.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/message_loop/message_pump_ozone.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "ui/events/ozone/evdev/device_manager_evdev.h"
 #include "ui/events/ozone/evdev/event_factory_evdev.h"
@@ -101,6 +101,10 @@ bool UdevEnumerateInputDevices(struct udev* udev,
     if (!path)
       continue;
 
+    // Filter non-evdev device notes.
+    if (!StartsWithASCII(path, "/dev/input/event", true))
+      continue;
+
     // Found input device node; attach.
     device_callback.Run(base::FilePath(path));
   }
@@ -184,8 +188,8 @@ class DeviceManagerUdev : public DeviceManagerEvdev,
     device_removed_ = device_removed;
 
     // Watch for incoming events on monitor socket.
-    return base::MessagePumpOzone::Current()->WatchFileDescriptor(
-        fd, true, base::MessagePumpOzone::WATCH_READ, &controller_, this);
+    return base::MessageLoopForUI::current()->WatchFileDescriptor(
+        fd, true, base::MessagePumpLibevent::WATCH_READ, &controller_, this);
   }
 
   // Udev daemon connection.

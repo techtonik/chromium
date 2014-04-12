@@ -19,7 +19,6 @@
 #include "chrome/browser/chrome_page_zoom.h"
 #include "chrome/browser/devtools/devtools_window.h"
 #include "chrome/browser/extensions/api/commands/command_service.h"
-#include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/tab_helper.h"
 #include "chrome/browser/favicon/favicon_tab_helper.h"
 #include "chrome/browser/google/google_util.h"
@@ -78,7 +77,9 @@
 #include "content/public/common/url_constants.h"
 #include "content/public/common/url_utils.h"
 #include "content/public/common/user_agent.h"
-#include "extensions/browser/extension_system.h"
+#include "extensions/browser/extension_registry.h"
+#include "extensions/common/extension.h"
+#include "extensions/common/extension_set.h"
 #include "net/base/escape.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 
@@ -140,15 +141,11 @@ bool GetBookmarkOverrideCommand(
 
   extensions::CommandService* command_service =
       extensions::CommandService::Get(profile);
-  ExtensionService* extension_service =
-      extensions::ExtensionSystem::Get(profile)->extension_service();
-  // Extension service may be NULL during test execution.
-  if (!extension_service)
-    return false;
-  const extensions::ExtensionSet* extension_set =
-      extension_service->extensions();
-  for (extensions::ExtensionSet::const_iterator i = extension_set->begin();
-       i != extension_set->end(); ++i) {
+  const extensions::ExtensionSet& extension_set =
+      extensions::ExtensionRegistry::Get(profile)->enabled_extensions();
+  for (extensions::ExtensionSet::const_iterator i = extension_set.begin();
+       i != extension_set.end();
+       ++i) {
     extensions::Command prospective_command;
     extensions::CommandService::ExtensionCommandType prospective_command_type;
     if (command_service->GetBoundExtensionCommand((*i)->id(),
@@ -448,7 +445,7 @@ void Home(Browser* browser, WindowOpenDisposition disposition) {
   content::RecordAction(UserMetricsAction("Home"));
 
   std::string extra_headers;
-#if defined(ENABLE_RLZ)
+#if defined(ENABLE_RLZ) && !defined(OS_IOS)
   // If the home page is a Google home page, add the RLZ header to the request.
   PrefService* pref_service = browser->profile()->GetPrefs();
   if (pref_service) {
@@ -458,20 +455,18 @@ void Home(Browser* browser, WindowOpenDisposition disposition) {
           RLZTracker::CHROME_HOME_PAGE);
     }
   }
-#endif
+#endif  // defined(ENABLE_RLZ) && !defined(OS_IOS)
 
   GURL url = browser->profile()->GetHomePage();
 
   // Streamlined hosted apps should return to their launch page when the home
   // button is pressed.
   if (browser->is_app()) {
-    const ExtensionService* service = browser->profile()->GetExtensionService();
-    if (!service)
-      return;
-
     const extensions::Extension* extension =
-        service->GetInstalledExtension(
-            web_app::GetExtensionIdFromApplicationName(browser->app_name()));
+        extensions::ExtensionRegistry::Get(browser->profile())
+            ->GetExtensionById(
+                web_app::GetExtensionIdFromApplicationName(browser->app_name()),
+                extensions::ExtensionRegistry::EVERYTHING);
     if (!extension)
       return;
 
@@ -526,7 +521,8 @@ void OpenCurrentURL(Browser* browser) {
 
   DCHECK(browser->profile()->GetExtensionService());
   const extensions::Extension* extension =
-      browser->profile()->GetExtensionService()->GetInstalledApp(url);
+      extensions::ExtensionRegistry::Get(browser->profile())
+          ->enabled_extensions().GetAppByURL(url);
   if (extension) {
     CoreAppLauncherHandler::RecordAppLaunchType(
         extension_misc::APP_LAUNCH_OMNIBOX_LOCATION,
@@ -782,12 +778,12 @@ void Translate(Browser* browser) {
   TranslateTabHelper* translate_tab_helper =
       TranslateTabHelper::FromWebContents(web_contents);
 
-  TranslateTabHelper::TranslateStep step = TranslateTabHelper::BEFORE_TRANSLATE;
+  translate::TranslateStep step = translate::TRANSLATE_STEP_BEFORE_TRANSLATE;
   if (translate_tab_helper) {
     if (translate_tab_helper->GetLanguageState().translation_pending())
-      step = TranslateTabHelper::TRANSLATING;
+      step = translate::TRANSLATE_STEP_TRANSLATING;
     else if (translate_tab_helper->GetLanguageState().IsPageTranslated())
-      step = TranslateTabHelper::AFTER_TRANSLATE;
+      step = translate::TRANSLATE_STEP_AFTER_TRANSLATE;
   }
   browser->window()->ShowTranslateBubble(
       web_contents, step, TranslateErrors::NONE);
@@ -1236,7 +1232,7 @@ void CreateApplicationShortcuts(Browser* browser) {
           CreateApplicationShortcuts();
 }
 
-void CreateHostedAppFromCurrentWebContents(Browser* browser) {
+void CreateBookmarkAppFromCurrentWebContents(Browser* browser) {
   content::RecordAction(UserMetricsAction("CreateHostedApp"));
   extensions::TabHelper::FromWebContents(
       browser->tab_strip_model()->GetActiveWebContents())->
@@ -1247,6 +1243,12 @@ bool CanCreateApplicationShortcuts(const Browser* browser) {
   return extensions::TabHelper::FromWebContents(
       browser->tab_strip_model()->GetActiveWebContents())->
           CanCreateApplicationShortcuts();
+}
+
+bool CanCreateBookmarkApp(const Browser* browser) {
+  return extensions::TabHelper::FromWebContents(
+             browser->tab_strip_model()->GetActiveWebContents())
+      ->CanCreateBookmarkApp();
 }
 
 void ConvertTabToAppWindow(Browser* browser,

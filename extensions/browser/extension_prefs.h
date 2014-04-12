@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "base/basictypes.h"
 #include "base/memory/linked_ptr.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/observer_list.h"
@@ -38,7 +39,7 @@ class PrefRegistrySyncable;
 namespace extensions {
 
 class AppSorting;
-class ContentSettingsStore;
+class ExtensionPrefsObserver;
 class ExtensionPrefsUninstallExtension;
 class URLPatternSet;
 
@@ -123,24 +124,19 @@ class ExtensionPrefs : public ExtensionScopedPrefs, public KeyedService {
   typedef ScopedUpdate<base::ListValue, base::Value::TYPE_LIST>
       ScopedListUpdate;
 
-  class Observer {
-   public:
-    // Called when the reasons for an extension being disabled have changed.
-    virtual void OnExtensionDisableReasonsChanged(
-        const std::string& extension_id,
-        int disabled_reasons) = 0;
-  };
-
-  // Creates and initializes an ExtensionPrefs object.
-  // Does not take ownership of |prefs| and |extension_pref_value_map|.
+  // Creates an ExtensionPrefs object.
+  // Does not take ownership of |prefs| or |extension_pref_value_map|.
   // If |extensions_disabled| is true, extension controlled preferences and
-  // content settings do not become effective.
+  // content settings do not become effective. ExtensionPrefsObservers should be
+  // included in |early_observers| if they need to observe events which occur
+  // during initialization of the ExtensionPrefs object.
   static ExtensionPrefs* Create(
       PrefService* prefs,
       const base::FilePath& root_dir,
       ExtensionPrefValueMap* extension_pref_value_map,
       scoped_ptr<AppSorting> app_sorting,
-      bool extensions_disabled);
+      bool extensions_disabled,
+      const std::vector<ExtensionPrefsObserver*>& early_observers);
 
   // A version of Create which allows injection of a custom base::Time provider.
   // Use this as needed for testing.
@@ -150,6 +146,7 @@ class ExtensionPrefs : public ExtensionScopedPrefs, public KeyedService {
       ExtensionPrefValueMap* extension_pref_value_map,
       scoped_ptr<AppSorting> app_sorting,
       bool extensions_disabled,
+      const std::vector<ExtensionPrefsObserver*>& early_observers,
       scoped_ptr<TimeProvider> time_provider);
 
   virtual ~ExtensionPrefs();
@@ -163,8 +160,8 @@ class ExtensionPrefs : public ExtensionScopedPrefs, public KeyedService {
   static ExtensionIdList GetExtensionsFrom(const PrefService* pref_service);
 
   // Add or remove an observer from the ExtensionPrefs.
-  void AddObserver(Observer* observer);
-  void RemoveObserver(Observer* observer);
+  void AddObserver(ExtensionPrefsObserver* observer);
+  void RemoveObserver(ExtensionPrefsObserver* observer);
 
   // Returns true if the specified external extension was uninstalled by the
   // user.
@@ -515,10 +512,6 @@ class ExtensionPrefs : public ExtensionScopedPrefs, public KeyedService {
 
   bool extensions_disabled() const { return extensions_disabled_; }
 
-  ContentSettingsStore* content_settings_store() {
-    return content_settings_store_.get();
-  }
-
   // The underlying PrefService.
   PrefService* pref_service() const { return prefs_; }
 
@@ -552,6 +545,19 @@ class ExtensionPrefs : public ExtensionScopedPrefs, public KeyedService {
   void SetInstallParam(const std::string& extension_id,
                        const std::string& install_parameter);
 
+  // Gets/sets the next threshold for displaying a notification if an extension
+  // or app consumes excessive disk space. Returns 0 if the initial threshold
+  // has not yet been reached.
+  int64 GetNextStorageThreshold(const std::string& extension_id) const;
+  void SetNextStorageThreshold(const std::string& extension_id,
+                               int64 next_threshold);
+
+  // Gets/sets whether notifications should be shown if an extension or app
+  // consumes too much disk space.
+  bool IsStorageNotificationEnabled(const std::string& extension_id) const;
+  void SetStorageNotificationEnabled(const std::string& extension_id,
+                                     bool enable_notifications);
+
  private:
   friend class ExtensionPrefsBlacklistedExtensions;  // Unit test.
   friend class ExtensionPrefsUninstallExtension;     // Unit test.
@@ -568,7 +574,8 @@ class ExtensionPrefs : public ExtensionScopedPrefs, public KeyedService {
                  ExtensionPrefValueMap* extension_pref_value_map,
                  scoped_ptr<AppSorting> app_sorting,
                  scoped_ptr<TimeProvider> time_provider,
-                 bool extensions_disabled);
+                 bool extensions_disabled,
+                 const std::vector<ExtensionPrefsObserver*>& early_observers);
 
   // Converts absolute paths in the pref to paths relative to the
   // install_directory_.
@@ -669,6 +676,8 @@ class ExtensionPrefs : public ExtensionScopedPrefs, public KeyedService {
                                   const std::string& install_parameter,
                                   base::DictionaryValue* extension_dict);
 
+  void InitExtensionControlledPrefs(ExtensionPrefValueMap* value_map);
+
   // Helper function to complete initialization of the values in
   // |extension_dict| for an extension install. Also see
   // PopulateExtensionInfoPrefs().
@@ -693,13 +702,11 @@ class ExtensionPrefs : public ExtensionScopedPrefs, public KeyedService {
   // properties.
   scoped_ptr<AppSorting> app_sorting_;
 
-  scoped_refptr<ContentSettingsStore> content_settings_store_;
-
   scoped_ptr<TimeProvider> time_provider_;
 
   bool extensions_disabled_;
 
-  ObserverList<Observer> observer_list_;
+  ObserverList<ExtensionPrefsObserver> observer_list_;
 
   DISALLOW_COPY_AND_ASSIGN(ExtensionPrefs);
 };

@@ -119,10 +119,6 @@ const char kDisableApplicationCache[]       = "disable-application-cache";
 // users with many windows/tabs and lots of memory.
 const char kDisableBackingStoreLimit[]      = "disable-backing-store-limit";
 
-// Disable browser plugin compositing experiment.
-const char kDisableBrowserPluginCompositing[] =
-    "disable-browser-plugin-compositing";
-
 // See comment for kEnableCompositingForFixedPosition.
 const char kDisableCompositingForFixedPosition[] =
      "disable-fixed-position-compositing";
@@ -364,6 +360,9 @@ const char kEnableLCDText[]                 = "enable-lcd-text";
 const char kEnableLayerSquashing[] =
     "enable-layer-squashing";
 
+// Enable experimental container node culling.
+const char kEnableContainerCulling[]        = "enable-container-culling";
+
 // Turns on extremely verbose logging of accessibility events.
 const char kEnableAccessibilityLogging[]    = "enable-accessibility-logging";
 
@@ -420,9 +419,6 @@ const char kEnableExperimentalCanvasFeatures[] =
 const char kEnableExperimentalWebPlatformFeatures[] =
     "enable-experimental-web-platform-features";
 
-// Enable an experimental WebSocket implementation.
-const char kEnableExperimentalWebSocket[]   = "enable-experimental-websocket";
-
 // By default, cookies are not allowed on file://. They are needed for testing,
 // for example page cycler and layout tests. See bug 1157243.
 const char kEnableFileCookies[]             = "enable-file-cookies";
@@ -463,9 +459,6 @@ const char kEnableDirectWrite[]             = "enable-direct-write";
 const char kEnableHighResolutionTime[]      = "enable-high-resolution-time";
 #endif
 
-// Enable HTML Imports
-extern const char kEnableHTMLImports[]      = "enable-html-imports";
-
 // Paint content on the compositor thread instead of the main thread.
 const char kEnableImplSidePainting[]        = "enable-impl-side-painting";
 
@@ -481,6 +474,12 @@ const char kEnableMapImage[]                = "enable-map-image";
 
 // Enables the memory benchmarking extension
 const char kEnableMemoryBenchmarking[]      = "enable-memory-benchmarking";
+
+// Make the values returned to window.performance.memory more granular and more
+// up to date in shared worker. Without this flag, the memory information is
+// still available, but it is bucketized and updated less frequently.
+const char kEnableSharedWorkerMemoryInfo[] =
+    "enable-shared-worker-memory-info";
 
 // On Windows, converts the page to the currently-installed monitor profile.
 // This does NOT enable color management for images. The source is still
@@ -526,6 +525,11 @@ const char kEnableTargetedStyleRecalc[] =
 // Cause the OS X sandbox write to syslog every time an access to a resource
 // is denied by the sandbox.
 const char kEnableSandboxLogging[]          = "enable-sandbox-logging";
+
+// Enables seccomp-bpf support for Android. Requires experimental kernel
+// support. <http://crbug.com/166704>
+const char kEnableSeccompFilterSandbox[] =
+    "enable-seccomp-filter-sandbox";
 
 // Enables the Skia benchmarking extension
 const char kEnableSkiaBenchmarking[]        = "enable-skia-benchmarking";
@@ -984,9 +988,6 @@ const char kDisableWebRtcEncryption[]      = "disable-webrtc-encryption";
 
 // Disables HW encode acceleration for WebRTC.
 const char kDisableWebRtcHWEncoding[]       = "disable-webrtc-hw-encoding";
-
-// Enables WebRTC AEC recordings.
-const char kEnableWebRtcAecRecordings[]     = "enable-webrtc-aec-recordings";
 
 // Enables WebRTC to open TCP server sockets.
 const char kEnableWebRtcTcpServerSocket[]   = "enable-webrtc-tcp-server-socket";

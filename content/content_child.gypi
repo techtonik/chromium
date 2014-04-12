@@ -116,7 +116,6 @@
     'child/npapi/webplugin_delegate_impl.h',
     'child/npapi/webplugin_delegate_impl_android.cc',
     'child/npapi/webplugin_delegate_impl_aura.cc',
-    'child/npapi/webplugin_delegate_impl_gtk.cc',
     'child/npapi/webplugin_delegate_impl_mac.mm',
     'child/npapi/webplugin_delegate_impl_win.cc',
     'child/npapi/webplugin_ime_win.cc',
@@ -217,6 +216,7 @@
     'child/worker_thread_task_runner.cc',
     'child/worker_thread_task_runner.h',
     'public/child/image_decoder_utils.h',
+    'public/child/request_peer.h',
     'public/child/resource_dispatcher_delegate.h',
   ],
   'conditions': [

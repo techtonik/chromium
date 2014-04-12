@@ -94,38 +94,47 @@ void PrefHashFilter::ClearResetTime(PrefService* user_prefs) {
 
 void PrefHashFilter::MigrateValues(PersistentPrefStore* source,
                                    PersistentPrefStore* destination) {
+  bool commit_source = false;
+  bool commit_destination = false;
+
   scoped_ptr<PrefHashStoreTransaction> transaction =
       pref_hash_store_->BeginTransaction();
   for (TrackedPreferencesMap::const_iterator it = tracked_paths_.begin();
        it != tracked_paths_.end();
        ++it) {
     const base::Value* source_value = NULL;
-    if (source->GetValue(it->first, &source_value) &&
-        !destination->GetValue(it->first, NULL)) {
-      base::DictionaryValue temp_dictionary;
-      // Copy the value from |source| into a suitable place for a
-      // TrackedPreference to act on it.
-      temp_dictionary.Set(it->first, source_value->DeepCopy());
-      // Check whether the value is correct according to our MAC. May remove the
-      //  value from |temp_dictionary|.
-      it->second->EnforceAndReport(&temp_dictionary, transaction.get());
-      // Now take the value as it appears in |temp_dictionary| and put it in
-      // |destination|.
-      scoped_ptr<base::Value> checked_value;
-      if (temp_dictionary.Remove(it->first, &checked_value))
-        destination->SetValue(it->first, checked_value.release());
+    if (source->GetValue(it->first, &source_value)) {
+      if (!destination->GetValue(it->first, NULL)) {
+        base::DictionaryValue temp_dictionary;
+        // Copy the value from |source| into a suitable place for a
+        // TrackedPreference to act on it.
+        temp_dictionary.Set(it->first, source_value->DeepCopy());
+        // Check whether the value is correct according to our MAC. May remove
+        // the value from |temp_dictionary|.
+        it->second->EnforceAndReport(&temp_dictionary, transaction.get());
+        // Now take the value as it appears in |temp_dictionary| and put it in
+        // |destination|.
+        scoped_ptr<base::Value> checked_value;
+        if (temp_dictionary.Remove(it->first, &checked_value)) {
+          destination->SetValue(it->first, checked_value.release());
+          commit_destination = true;
+        }
+      }
+      source->RemoveValue(it->first);
+      commit_source = true;
     }
-    source->RemoveValue(it->first);
   }
 
   // Order these such that a crash at any point is still recoverable. We assume
   // that they are configured such that the writes will occur on worker threads
   // in the order that we asked for them.
-  destination->CommitPendingWrite();
+  if (commit_destination)
+    destination->CommitPendingWrite();
   transaction.reset();
   // If we crash here, we will just delete the values from |source| in a future
   // invocation of MigrateValues.
-  source->CommitPendingWrite();
+  if (commit_source)
+    source->CommitPendingWrite();
 }
 
 void PrefHashFilter::Initialize(const PrefStore& pref_store) {
@@ -143,7 +152,7 @@ void PrefHashFilter::Initialize(const PrefStore& pref_store) {
 
 // Validates loaded preference values according to stored hashes, reports
 // validation results via UMA, and updates hashes in case of mismatch.
-void PrefHashFilter::FilterOnLoad(base::DictionaryValue* pref_store_contents) {
+bool PrefHashFilter::FilterOnLoad(base::DictionaryValue* pref_store_contents) {
   DCHECK(pref_store_contents);
   base::TimeTicks checkpoint = base::TimeTicks::Now();
 
@@ -171,6 +180,8 @@ void PrefHashFilter::FilterOnLoad(base::DictionaryValue* pref_store_contents) {
   // significantly affect startup.
   UMA_HISTOGRAM_TIMES("Settings.FilterOnLoadTime",
                       base::TimeTicks::Now() - checkpoint);
+
+  return did_reset;
 }
 
 // Marks |path| has having changed if it is part of |tracked_paths_|. A new hash
@@ -207,4 +218,19 @@ void PrefHashFilter::FilterSerializeData(
     UMA_HISTOGRAM_TIMES("Settings.FilterSerializeDataTime",
                         base::TimeTicks::Now() - checkpoint);
   }
+
+  // Flush the |pref_hash_store_| to disk if it has pending writes. This is done
+  // here in an effort to flush the hash store to disk as close as possible to
+  // its matching value store (currently being flushed) to reduce the likelihood
+  // of MAC corruption in race condition scenarios where a crash occurs in the
+  // 10 seconds window where it would typically be possible that only one
+  // of the two stores has been flushed to disk (this now explicitly makes this
+  // race window as small as possible).
+  // Note that, if the |pref_hash_store_| has pending writes, this call will
+  // force serialization of its store to disk. As FilterSerializeData is already
+  // intercepting the serialization of its value store this would result in an
+  // infinite loop should the hash store also be the value store -- thus this
+  // should be removed when we move to such a model (where it will no longer be
+  // necessary anyways).
+  pref_hash_store_->CommitPendingWrite();
 }

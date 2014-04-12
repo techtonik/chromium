@@ -125,8 +125,6 @@
         'canvas.cc',
         'canvas.h',
         'canvas_android.cc',
-        'canvas_paint_gtk.cc',
-        'canvas_paint_gtk.h',
         'canvas_paint_mac.h',
         'canvas_paint_mac.mm',
         'canvas_paint_win.cc',
@@ -202,8 +200,9 @@
         'native_widget_types.h',
         'nine_image_painter.cc',
         'nine_image_painter.h',
-        'ozone/dri/dri_skbitmap.cc',
-        'ozone/dri/dri_skbitmap.h',
+        'overlay_transform.h',
+        'ozone/dri/dri_buffer.cc',
+        'ozone/dri/dri_buffer.h',
         'ozone/dri/dri_surface.cc',
         'ozone/dri/dri_surface.h',
         'ozone/dri/dri_surface_factory.cc',
@@ -218,9 +217,8 @@
         'ozone/impl/file_surface_factory.h',
         'ozone/surface_factory_ozone.cc',
         'ozone/surface_factory_ozone.h',
-        'ozone/surface_ozone_base.cc',
-        'ozone/surface_ozone_base.h',
-        'ozone/surface_ozone.h',
+        'ozone/surface_ozone_egl.h',
+        'ozone/surface_ozone_canvas.h',
         'ozone/overlay_candidates_ozone.cc',
         'ozone/overlay_candidates_ozone.h',
         'pango_util.cc',
@@ -228,7 +226,6 @@
         'path.cc',
         'path.h',
         'path_aura.cc',
-        'path_gtk.cc',
         'path_win.cc',
         'path_win.h',
         'path_x11.cc',
@@ -267,7 +264,6 @@
         'screen.h',
         'screen_android.cc',
         'screen_aura.cc',
-        'screen_gtk.cc',
         'screen_ios.mm',
         'screen_mac.mm',
         'screen_win.cc',
@@ -284,8 +280,6 @@
         'skbitmap_operations.h',
         'skia_util.cc',
         'skia_util.h',
-        'skia_utils_gtk.cc',
-        'skia_utils_gtk.h',
         'switches.cc',
         'switches.h',
         'sys_color_change_listener.cc',
@@ -493,7 +487,7 @@
     },
     {
       'target_name': 'gfx_unittests',
-      'type': 'executable',
+      'type': '<(gtest_target_type)',
       'sources': [
         'geometry/box_unittest.cc',
         'geometry/cubic_bezier_unittest.cc',
@@ -507,7 +501,9 @@
         'geometry/size_unittest.cc',
         'geometry/vector2d_unittest.cc',
         'geometry/vector3d_unittest.cc',
+        'range/range_mac_unittest.mm',
         'range/range_unittest.cc',
+        'range/range_win_unittest.cc',
       ],
       'dependencies': [
         '<(DEPTH)/base/base.gyp:base',
@@ -537,6 +533,24 @@
          'includes': [ '../../build/jni_generator.gypi' ],
        },
      ],
+    }],
+    # Special target to wrap a gtest_target_type==shared_library
+    # gfx_unittests into an android apk for execution.
+    # See base.gyp for TODO(jrg)s about this strategy.
+    ['OS == "android" and gtest_target_type == "shared_library"', {
+      'targets': [
+        {
+          'target_name': 'gfx_unittests_apk',
+          'type': 'none',
+          'dependencies': [
+            'gfx_unittests',
+          ],
+          'variables': {
+            'test_suite_name': 'gfx_unittests',
+          },
+          'includes': [ '../../build/apk_test.gypi' ],
+        },
+      ],
     }],
   ],
 }

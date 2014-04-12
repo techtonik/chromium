@@ -10,13 +10,13 @@
 #include "chrome/browser/infobars/infobar.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/translate/translate_infobar_delegate.h"
-#include "chrome/browser/translate/translate_manager.h"
 #include "chrome/browser/translate/translate_service.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/test_switches.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/translate/core/browser/translate_manager.h"
 #include "components/translate/core/browser/translate_script.h"
 #include "components/translate/core/common/translate_switches.h"
 #include "content/public/browser/notification_service.h"
@@ -92,19 +92,19 @@ class TranslateBrowserTest : public InProcessBrowserTest {
     }
 
     TranslateInfoBarDelegate* delegate = NULL;
-    InfoBarManager* infobar_manager = infobar_service_->infobar_manager();
-    for (size_t i = 0; i < infobar_manager->infobar_count(); ++i) {
+    for (size_t i = 0; i < infobar_service_->infobar_count(); ++i) {
       // Check if the shown infobar is a confirm infobar coming from the
       // |kTranslateSecurityOrigin| flag specified in SetUpCommandLine().
       // This infobar appears in all tests of TranslateBrowserTest and can be
       // ignored here.
-      ConfirmInfoBarDelegate* confirm = infobar_manager->infobar_at(i)
-          ->delegate()->AsConfirmInfoBarDelegate();
-      if (confirm)
+      if (infobar_service_->infobar_at(i)->delegate()->
+              AsConfirmInfoBarDelegate()) {
         continue;
+      }
 
-      TranslateInfoBarDelegate* translate = infobar_manager->infobar_at(i)
-          ->delegate()->AsTranslateInfoBarDelegate();
+      TranslateInfoBarDelegate* translate =
+          infobar_service_->infobar_at(i)->delegate()->
+              AsTranslateInfoBarDelegate();
       if (translate) {
         EXPECT_FALSE(delegate) << "multiple infobars are shown unexpectedly";
         delegate = translate;

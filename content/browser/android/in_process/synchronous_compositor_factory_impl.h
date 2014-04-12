@@ -8,7 +8,7 @@
 #include "base/synchronization/lock.h"
 #include "content/browser/android/in_process/synchronous_input_event_filter.h"
 #include "content/renderer/android/synchronous_compositor_factory.h"
-#include "content/renderer/media/android/stream_texture_factory_android_synchronous_impl.h"
+#include "content/renderer/media/android/stream_texture_factory_synchronous_impl.h"
 #include "gpu/command_buffer/service/in_process_command_buffer.h"
 #include "webkit/common/gpu/context_provider_web_context.h"
 
@@ -40,7 +40,7 @@ class SynchronousCompositorFactoryImpl : public SynchronousCompositorFactory {
       OVERRIDE;
   virtual InputHandlerManagerClient* GetInputHandlerManagerClient() OVERRIDE;
   virtual scoped_refptr<webkit::gpu::ContextProviderWebContext>
-      GetOffscreenContextProviderForMainThread() OVERRIDE;
+      GetSharedOffscreenContextProviderForMainThread() OVERRIDE;
   // This is called on both renderer main thread (offscreen context creation
   // path shared between cross-process and in-process platforms) and renderer
   // compositor impl thread (InitializeHwDraw) in order to support Android
@@ -51,6 +51,8 @@ class SynchronousCompositorFactoryImpl : public SynchronousCompositorFactory {
       GetOffscreenContextProviderForCompositorThread() OVERRIDE;
   virtual scoped_refptr<StreamTextureFactory> CreateStreamTextureFactory(
       int view_id) OVERRIDE;
+  virtual blink::WebGraphicsContext3D* CreateOffscreenGraphicsContext3D(
+      const blink::WebGraphicsContext3D::Attributes& attributes) OVERRIDE;
 
   SynchronousInputEventFilter* synchronous_input_event_filter() {
     return &synchronous_input_event_filter_;

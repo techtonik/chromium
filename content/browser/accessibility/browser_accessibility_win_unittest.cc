@@ -235,7 +235,7 @@ TEST_F(BrowserAccessibilityTest, TestChildrenChange) {
   text2.SetName("old text");
   AccessibilityHostMsg_EventParams param;
   param.event_type = ui::AX_EVENT_CHILDREN_CHANGED;
-  param.nodes.push_back(text2);
+  param.update.nodes.push_back(text2);
   param.id = text2.id;
   std::vector<AccessibilityHostMsg_EventParams> events;
   events.push_back(param);
@@ -307,7 +307,7 @@ TEST_F(BrowserAccessibilityTest, TestChildrenChangeNoLeaks) {
   root.child_ids.clear();
   AccessibilityHostMsg_EventParams param;
   param.event_type = ui::AX_EVENT_CHILDREN_CHANGED;
-  param.nodes.push_back(root);
+  param.update.nodes.push_back(root);
   param.id = root.id;
   std::vector<AccessibilityHostMsg_EventParams> events;
   events.push_back(param);
@@ -618,9 +618,9 @@ TEST_F(BrowserAccessibilityTest, TestCreateEmptyDocument) {
 
   // Verify the root is as we expect by default.
   BrowserAccessibility* root = manager->GetRoot();
-  EXPECT_EQ(0, root->renderer_id());
-  EXPECT_EQ(ui::AX_ROLE_ROOT_WEB_AREA, root->role());
-  EXPECT_EQ(busy_state | readonly_state | enabled_state, root->state());
+  EXPECT_EQ(0, root->GetId());
+  EXPECT_EQ(ui::AX_ROLE_ROOT_WEB_AREA, root->GetRole());
+  EXPECT_EQ(busy_state | readonly_state | enabled_state, root->GetState());
 
   // Tree with a child textfield.
   ui::AXNodeData tree1_1;
@@ -637,8 +637,8 @@ TEST_F(BrowserAccessibilityTest, TestCreateEmptyDocument) {
   params.push_back(AccessibilityHostMsg_EventParams());
   AccessibilityHostMsg_EventParams* msg = &params[0];
   msg->event_type = ui::AX_EVENT_LOAD_COMPLETE;
-  msg->nodes.push_back(tree1_1);
-  msg->nodes.push_back(tree1_2);
+  msg->update.nodes.push_back(tree1_1);
+  msg->update.nodes.push_back(tree1_2);
   msg->id = tree1_1.id;
   manager->OnAccessibilityEvents(params);
 
@@ -649,8 +649,8 @@ TEST_F(BrowserAccessibilityTest, TestCreateEmptyDocument) {
   EXPECT_NE(root, manager->GetRoot());
 
   // And the proper child remains.
-  EXPECT_EQ(ui::AX_ROLE_TEXT_FIELD, acc1_2->role());
-  EXPECT_EQ(2, acc1_2->renderer_id());
+  EXPECT_EQ(ui::AX_ROLE_TEXT_FIELD, acc1_2->GetRole());
+  EXPECT_EQ(2, acc1_2->GetId());
 
   // Tree with a child button.
   ui::AXNodeData tree2_1;
@@ -662,9 +662,9 @@ TEST_F(BrowserAccessibilityTest, TestCreateEmptyDocument) {
   tree2_2.id = 3;
   tree2_2.role = ui::AX_ROLE_BUTTON;
 
-  msg->nodes.clear();
-  msg->nodes.push_back(tree2_1);
-  msg->nodes.push_back(tree2_2);
+  msg->update.nodes.clear();
+  msg->update.nodes.push_back(tree2_1);
+  msg->update.nodes.push_back(tree2_2);
   msg->id = tree2_1.id;
 
   // Fire another load complete.
@@ -676,8 +676,8 @@ TEST_F(BrowserAccessibilityTest, TestCreateEmptyDocument) {
   EXPECT_NE(root, manager->GetRoot());
 
   // And the new child exists.
-  EXPECT_EQ(ui::AX_ROLE_BUTTON, acc2_2->role());
-  EXPECT_EQ(3, acc2_2->renderer_id());
+  EXPECT_EQ(ui::AX_ROLE_BUTTON, acc2_2->GetRole());
+  EXPECT_EQ(3, acc2_2->GetId());
 
   // Ensure we properly cleaned up.
   manager.reset();

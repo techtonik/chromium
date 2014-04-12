@@ -86,18 +86,14 @@ BrowserAccessibility* BrowserAccessibilityManager::GetFromRendererID(
   return NULL;
 }
 
-void BrowserAccessibilityManager::GotFocus(bool touch_event_context) {
-  if (!touch_event_context)
-    osk_state_ = OSK_DISALLOWED_BECAUSE_TAB_JUST_APPEARED;
-
-  if (!focus_)
-    return;
-
-  NotifyAccessibilityEvent(ui::AX_EVENT_FOCUS, focus_);
+void BrowserAccessibilityManager::OnWindowFocused() {
+  if (focus_)
+    NotifyAccessibilityEvent(ui::AX_EVENT_FOCUS, focus_);
 }
 
-void BrowserAccessibilityManager::WasHidden() {
-  osk_state_ = OSK_DISALLOWED_BECAUSE_TAB_HIDDEN;
+void BrowserAccessibilityManager::OnWindowBlurred() {
+  if (focus_)
+    NotifyAccessibilityEvent(ui::AX_EVENT_BLUR, focus_);
 }
 
 void BrowserAccessibilityManager::GotMouseDown() {
@@ -120,7 +116,7 @@ bool BrowserAccessibilityManager::UseRootScrollOffsetsWhenComputingBounds() {
 void BrowserAccessibilityManager::RemoveNode(BrowserAccessibility* node) {
   if (node == focus_)
     SetFocus(root_, false);
-  int renderer_id = node->renderer_id();
+  int renderer_id = node->GetId();
   renderer_id_map_.erase(renderer_id);
 }
 
@@ -131,7 +127,7 @@ void BrowserAccessibilityManager::OnAccessibilityEvents(
   // Process all changes to the accessibility tree first.
   for (uint32 index = 0; index < params.size(); index++) {
     const AccessibilityHostMsg_EventParams& param = params[index];
-    if (!UpdateNodes(param.nodes))
+    if (!UpdateNodes(param.update.nodes))
       return;
 
     // Set initial focus when a page is loaded.
@@ -202,31 +198,31 @@ void BrowserAccessibilityManager::SetFocus(
     focus_ = node;
 
   if (notify && node && delegate_)
-    delegate_->SetAccessibilityFocus(node->renderer_id());
+    delegate_->SetAccessibilityFocus(node->GetId());
 }
 
 void BrowserAccessibilityManager::SetRoot(BrowserAccessibility* node) {
   root_ = node;
-  NotifyRootChanged();
+  OnRootChanged();
 }
 
 void BrowserAccessibilityManager::DoDefaultAction(
     const BrowserAccessibility& node) {
   if (delegate_)
-    delegate_->AccessibilityDoDefaultAction(node.renderer_id());
+    delegate_->AccessibilityDoDefaultAction(node.GetId());
 }
 
 void BrowserAccessibilityManager::ScrollToMakeVisible(
     const BrowserAccessibility& node, gfx::Rect subfocus) {
   if (delegate_) {
-    delegate_->AccessibilityScrollToMakeVisible(node.renderer_id(), subfocus);
+    delegate_->AccessibilityScrollToMakeVisible(node.GetId(), subfocus);
   }
 }
 
 void BrowserAccessibilityManager::ScrollToPoint(
     const BrowserAccessibility& node, gfx::Point point) {
   if (delegate_) {
-    delegate_->AccessibilityScrollToPoint(node.renderer_id(), point);
+    delegate_->AccessibilityScrollToPoint(node.GetId(), point);
   }
 }
 
@@ -234,7 +230,7 @@ void BrowserAccessibilityManager::SetTextSelection(
     const BrowserAccessibility& node, int start_offset, int end_offset) {
   if (delegate_) {
     delegate_->AccessibilitySetTextSelection(
-        node.renderer_id(), start_offset, end_offset);
+        node.GetId(), start_offset, end_offset);
   }
 }
 
@@ -252,12 +248,12 @@ BrowserAccessibility* BrowserAccessibilityManager::NextInTreeOrder(
   if (node->PlatformChildCount() > 0)
     return node->PlatformGetChild(0);
   while (node) {
-    if (node->parent() &&
-        node->index_in_parent() <
-            static_cast<int>(node->parent()->PlatformChildCount()) - 1) {
-      return node->parent()->PlatformGetChild(node->index_in_parent() + 1);
+    if (node->GetParent() &&
+        node->GetIndexInParent() <
+            static_cast<int>(node->GetParent()->PlatformChildCount()) - 1) {
+      return node->GetParent()->PlatformGetChild(node->GetIndexInParent() + 1);
     }
-    node = node->parent();
+    node = node->GetParent();
   }
 
   return NULL;
@@ -268,14 +264,14 @@ BrowserAccessibility* BrowserAccessibilityManager::PreviousInTreeOrder(
   if (!node)
     return NULL;
 
-  if (node->parent() && node->index_in_parent() > 0) {
-    node = node->parent()->PlatformGetChild(node->index_in_parent() - 1);
+  if (node->GetParent() && node->GetIndexInParent() > 0) {
+    node = node->GetParent()->PlatformGetChild(node->GetIndexInParent() - 1);
     while (node->PlatformChildCount() > 0)
       node = node->PlatformGetChild(node->PlatformChildCount() - 1);
     return node;
   }
 
-  return node->parent();
+  return node->GetParent();
 }
 
 void BrowserAccessibilityManager::UpdateNodesForTesting(
@@ -367,7 +363,7 @@ BrowserAccessibility* BrowserAccessibilityManager::CreateNode(
 }
 
 void BrowserAccessibilityManager::AddNodeToMap(BrowserAccessibility* node) {
-  renderer_id_map_[node->renderer_id()] = node;
+  renderer_id_map_[node->GetId()] = node;
 }
 
 bool BrowserAccessibilityManager::UpdateNode(const ui::AXNodeData& src) {
@@ -412,9 +408,10 @@ bool BrowserAccessibilityManager::UpdateNode(const ui::AXNodeData& src) {
   // parent and new parent, which could lead to a double-free.
   // If a node is reparented, the renderer will always send us a fresh
   // copy of the node.
-  const std::vector<BrowserAccessibility*>& old_children = instance->children();
+  const std::vector<BrowserAccessibility*>& old_children =
+      instance->deprecated_children();
   for (size_t i = 0; i < old_children.size(); ++i) {
-    int old_id = old_children[i]->renderer_id();
+    int old_id = old_children[i]->GetId();
     if (new_child_ids.find(old_id) == new_child_ids.end())
       old_children[i]->Destroy();
   }
@@ -428,7 +425,7 @@ bool BrowserAccessibilityManager::UpdateNode(const ui::AXNodeData& src) {
     int32 index_in_parent = static_cast<int32>(i);
     BrowserAccessibility* child = GetFromRendererID(child_renderer_id);
     if (child) {
-      if (child->parent() != instance) {
+      if (child->GetParent() != instance) {
         // This is a serious error - nodes should never be reparented.
         // If this case occurs, continue so this node isn't left in an
         // inconsistent state, but return failure at the end.
@@ -447,7 +444,7 @@ bool BrowserAccessibilityManager::UpdateNode(const ui::AXNodeData& src) {
 
   // Handle the case where this node is the new root of the tree.
   if (src.role == ui::AX_ROLE_ROOT_WEB_AREA &&
-      (!root_ || root_->renderer_id() != src.id)) {
+      (!root_ || root_->GetId() != src.id)) {
     if (root_)
       root_->Destroy();
     if (focus_ == root_)

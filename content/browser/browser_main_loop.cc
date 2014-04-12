@@ -70,6 +70,7 @@
 #include "base/android/jni_android.h"
 #include "content/browser/android/browser_startup_controller.h"
 #include "content/browser/android/surface_texture_peer_browser_impl.h"
+#include "content/browser/android/tracing_controller_android.h"
 #include "ui/gl/gl_surface.h"
 #endif
 
@@ -96,10 +97,6 @@
 #include "content/browser/device_monitor_udev.h"
 #elif defined(OS_MACOSX) && !defined(OS_IOS)
 #include "content/browser/device_monitor_mac.h"
-#endif
-
-#if defined(TOOLKIT_GTK)
-#include "ui/gfx/gtk_util.h"
 #endif
 
 #if defined(OS_POSIX) && !defined(OS_MACOSX)
@@ -257,6 +254,10 @@ static void SetUpGLibLogHandler() {
 }
 #endif
 
+void OnStoppedStartupTracing(const base::FilePath& trace_file) {
+  LOG(INFO) << "Completed startup tracing to " << trace_file.value();
+}
+
 }  // namespace
 
 // The currently-running BrowserMainLoop.  There can be one or zero.
@@ -382,10 +383,6 @@ void BrowserMainLoop::EarlyInitialization() {
   // definitely harmless, so retained as a reminder of this
   // requirement for gconf.
   g_type_init();
-#endif
-
-#if !defined(USE_AURA)
-  gfx::GtkInitFromCommandLine(parsed_command_line_);
 #endif
 
   SetUpGLibLogHandler();
@@ -1103,8 +1100,12 @@ void BrowserMainLoop::InitStartupTracing(const CommandLine& command_line) {
     return;
 
   if (trace_file.empty()) {
+#if defined(OS_ANDROID)
+    TracingControllerAndroid::GenerateTracingFilePath(&trace_file);
+#else
     // Default to saving the startup trace into the current dir.
     trace_file = base::FilePath().AppendASCII("chrometrace.log");
+#endif
   }
 
   std::string delay_str = command_line.GetSwitchValueASCII(
@@ -1126,7 +1127,7 @@ void BrowserMainLoop::InitStartupTracing(const CommandLine& command_line) {
 void BrowserMainLoop::EndStartupTracing(const base::FilePath& trace_file) {
   is_tracing_startup_ = false;
   TracingController::GetInstance()->DisableRecording(
-      trace_file, TracingController::TracingFileResultCallback());
+      trace_file, base::Bind(&OnStoppedStartupTracing));
 }
 
 }  // namespace content

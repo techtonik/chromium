@@ -39,19 +39,22 @@ Directory::PersistedKernelInfo::PersistedKernelInfo()
   ModelTypeSet protocol_types = ProtocolTypes();
   for (ModelTypeSet::Iterator iter = protocol_types.First(); iter.Good();
        iter.Inc()) {
-    reset_download_progress(iter.Get());
+    ResetDownloadProgress(iter.Get());
     transaction_version[iter.Get()] = 0;
   }
 }
 
 Directory::PersistedKernelInfo::~PersistedKernelInfo() {}
 
-void Directory::PersistedKernelInfo::reset_download_progress(
+void Directory::PersistedKernelInfo::ResetDownloadProgress(
     ModelType model_type) {
+  // Clear everything except the data type id field.
+  download_progress[model_type].Clear();
   download_progress[model_type].set_data_type_id(
       GetSpecificsFieldNumberFromModelType(model_type));
-  // An empty-string token indicates no prior knowledge.
-  download_progress[model_type].set_token(std::string());
+
+  // Explicitly set an empty token field to denote no progress.
+  download_progress[model_type].set_token("");
 }
 
 Directory::SaveChangesSnapshot::SaveChangesSnapshot()
@@ -716,12 +719,50 @@ bool Directory::PurgeEntriesWithTypeIn(ModelTypeSet disabled_types,
            it.Good(); it.Inc()) {
         kernel_->persisted_info.transaction_version[it.Get()] = 0;
 
-        // Don't discard progress markers for unapplied types.
-        if (!types_to_unapply.Has(it.Get()))
-          kernel_->persisted_info.reset_download_progress(it.Get());
+        // Don't discard progress markers or context for unapplied types.
+        if (!types_to_unapply.Has(it.Get())) {
+          kernel_->persisted_info.ResetDownloadProgress(it.Get());
+          kernel_->persisted_info.datatype_context[it.Get()].Clear();
+        }
       }
+
+      kernel_->info_status = KERNEL_SHARE_INFO_DIRTY;
     }
   }
+  return true;
+}
+
+bool Directory::ResetVersionsForType(BaseWriteTransaction* trans,
+                                     ModelType type) {
+  if (!ProtocolTypes().Has(type))
+    return false;
+  DCHECK_NE(type, BOOKMARKS) << "Only non-hierarchical types are supported";
+
+  EntryKernel* type_root = GetEntryByServerTag(ModelTypeToRootTag(type));
+  if (!type_root)
+    return false;
+
+  ScopedKernelLock lock(this);
+  const Id& type_root_id = type_root->ref(ID);
+  Directory::Metahandles children;
+  AppendChildHandles(lock, type_root_id, &children);
+
+  for (Metahandles::iterator it = children.begin(); it != children.end();
+       ++it) {
+    EntryKernel* entry = GetEntryByHandle(*it, &lock);
+    if (!entry)
+      continue;
+    if (entry->ref(BASE_VERSION) > 1)
+      entry->put(BASE_VERSION, 1);
+    if (entry->ref(SERVER_VERSION) > 1)
+      entry->put(SERVER_VERSION, 1);
+
+    // Note that we do not unset IS_UNSYNCED or IS_UNAPPLIED_UPDATE in order
+    // to ensure no in-transit data is lost.
+
+    entry->mark_dirty(&kernel_->dirty_metahandles);
+  }
+
   return true;
 }
 
@@ -790,6 +831,22 @@ int64 Directory::GetTransactionVersion(ModelType type) const {
 void Directory::IncrementTransactionVersion(ModelType type) {
   kernel_->transaction_mutex.AssertAcquired();
   kernel_->persisted_info.transaction_version[type]++;
+}
+
+void Directory::GetDataTypeContext(BaseTransaction* trans,
+                                   ModelType type,
+                                   sync_pb::DataTypeContext* context) const {
+  ScopedKernelLock lock(this);
+  context->CopyFrom(kernel_->persisted_info.datatype_context[type]);
+}
+
+void Directory::SetDataTypeContext(
+    BaseWriteTransaction* trans,
+    ModelType type,
+    const sync_pb::DataTypeContext& context) {
+  ScopedKernelLock lock(this);
+  kernel_->persisted_info.datatype_context[type].CopyFrom(context);
+  kernel_->info_status = KERNEL_SHARE_INFO_DIRTY;
 }
 
 ModelTypeSet Directory::InitialSyncEndedTypes() {
@@ -934,13 +991,18 @@ void Directory::CollectMetaHandleCounts(
   }
 }
 
-scoped_ptr<base::ListValue> Directory::GetAllNodeDetails(
-    BaseTransaction* trans) {
+scoped_ptr<base::ListValue> Directory::GetNodeDetailsForType(
+    BaseTransaction* trans,
+    ModelType type) {
   scoped_ptr<base::ListValue> nodes(new base::ListValue());
 
   ScopedKernelLock lock(this);
   for (MetahandlesMap::iterator it = kernel_->metahandles_map.begin();
        it != kernel_->metahandles_map.end(); ++it) {
+    if (GetModelTypeFromSpecifics(it->second->ref(SPECIFICS)) != type) {
+      continue;
+    }
+
     EntryKernel* kernel = it->second;
     scoped_ptr<base::DictionaryValue> node(
         kernel->ToValue(GetCryptographer(trans)));

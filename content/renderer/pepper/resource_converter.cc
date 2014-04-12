@@ -20,7 +20,7 @@
 #include "third_party/WebKit/public/platform/WebMediaStreamSource.h"
 #include "third_party/WebKit/public/web/WebDOMFileSystem.h"
 #include "third_party/WebKit/public/web/WebDOMMediaStreamTrack.h"
-#include "third_party/WebKit/public/web/WebFrame.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "webkit/common/fileapi/file_system_util.h"
 
 using ppapi::ResourceVar;
@@ -96,11 +96,13 @@ bool DOMFileSystemToResource(
       WebFileSystemTypeToPPAPI(dom_file_system.type());
   GURL root_url = dom_file_system.rootURL();
 
-  // External file systems are not currently supported. (Without this check,
-  // there would be a CHECK-fail in FileRefResource.)
-  // TODO(mgiuca): Support external file systems.
-  if (file_system_type == PP_FILESYSTEMTYPE_EXTERNAL)
+  // Raw external file system access is not allowed, but external file system
+  // access through fileapi is allowed. (Without this check, there would be a
+  // CHECK failure in FileRefResource.)
+  if ((file_system_type == PP_FILESYSTEMTYPE_EXTERNAL) &&
+      (!root_url.is_valid())) {
     return false;
+  }
 
   *pending_renderer_id = host->GetPpapiHost()->AddPendingResourceHost(
       scoped_ptr<ppapi::host::ResourceHost>(
@@ -132,7 +134,7 @@ bool ResourceHostToDOMFileSystem(
   blink::WebFileSystemType blink_type;
   if (!FileApiFileSystemTypeToWebFileSystemType(type, &blink_type))
     return false;
-  blink::WebFrame* frame = blink::WebFrame::frameForContext(context);
+  blink::WebLocalFrame* frame = blink::WebLocalFrame::frameForContext(context);
   blink::WebDOMFileSystem web_dom_file_system = blink::WebDOMFileSystem::create(
       frame,
       blink_type,

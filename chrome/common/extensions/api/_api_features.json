@@ -18,6 +18,10 @@
     "dependencies": ["permission:accessibilityFeatures.read"],
     "contexts": ["blessed_extension"]
   }],
+  "accessibilityPrivate": {
+    "dependencies": ["permission:accessibilityPrivate"],
+    "contexts": ["blessed_extension"]
+  },
   "activityLogPrivate": {
     "dependencies": ["permission:activityLogPrivate"],
     "contexts": ["blessed_extension"]
@@ -280,10 +284,6 @@
     "contexts": "all",
     "matches": ["<all_urls>"]
   },
-  "experimental.accessibility": {
-    "dependencies": ["permission:experimental"],
-    "contexts": ["blessed_extension"]
-  },
   "experimental.devtools.audits": {
     "dependencies": ["permission:experimental", "manifest:devtools_page"],
     "extension_types": ["platform_app"],
@@ -371,6 +371,11 @@
     "contexts": ["blessed_extension"]
   },
   "fileSystemProvider": {
+    "dependencies": ["permission:fileSystemProvider"],
+    "contexts": ["blessed_extension"]
+  },
+  "fileSystemProviderInternal": {
+    "internal": true,
     "dependencies": ["permission:fileSystemProvider"],
     "contexts": ["blessed_extension"]
   },
@@ -766,7 +771,7 @@
   "webRequestInternal": {
     "internal": true,
     "channel": "stable",
-    "contexts": ["blessed_extension", "unblessed_extension", "content_script"]
+    "contexts": ["blessed_extension", "unblessed_extension"]
   },
   "webrtcAudioPrivate": {
     "dependencies": ["permission:webrtcAudioPrivate"],

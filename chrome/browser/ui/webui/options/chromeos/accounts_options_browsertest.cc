@@ -57,7 +57,6 @@ class AccountsOptionsTest : public LoginManagerTest {
 
   virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
     LoginManagerTest::SetUpCommandLine(command_line);
-    command_line->AppendSwitch(::switches::kMultiProfiles);
   }
 
  protected:
@@ -90,7 +89,7 @@ class AccountsOptionsTest : public LoginManagerTest {
         "var e = document.getElementById('allowBwsiCheck');"
         "window.domAutomationController.send(!e.disabled);",
         &guest_option_enabled));
-    ASSERT_EQ(is_owner, guest_option_enabled);
+    EXPECT_EQ(is_owner, guest_option_enabled);
 
     bool user_pods_enabled;
     ASSERT_TRUE(content::ExecuteScriptAndExtractBool(
@@ -98,7 +97,7 @@ class AccountsOptionsTest : public LoginManagerTest {
         "var e = document.getElementById('showUserNamesCheck');"
         "window.domAutomationController.send(!e.disabled);",
         &user_pods_enabled));
-    ASSERT_EQ(is_owner, user_pods_enabled);
+    EXPECT_EQ(is_owner, user_pods_enabled);
 
     bool whitelist_enabled;
     ASSERT_TRUE(content::ExecuteScriptAndExtractBool(
@@ -106,7 +105,7 @@ class AccountsOptionsTest : public LoginManagerTest {
         "var e = document.getElementById('useWhitelistCheck');"
         "window.domAutomationController.send(!e.disabled);",
         &whitelist_enabled));
-    ASSERT_EQ(is_owner, whitelist_enabled);
+    EXPECT_EQ(is_owner, whitelist_enabled);
   }
 
   StubCrosSettingsProvider stub_settings_provider_;

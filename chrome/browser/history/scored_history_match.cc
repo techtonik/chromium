@@ -12,6 +12,7 @@
 
 #include <math.h>
 
+#include "base/logging.h"
 #include "base/metrics/histogram.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -34,7 +35,6 @@ float* ScoredHistoryMatch::raw_term_score_to_topicality_score_ = NULL;
 float* ScoredHistoryMatch::days_ago_to_recency_score_ = NULL;
 bool ScoredHistoryMatch::initialized_ = false;
 int ScoredHistoryMatch::bookmark_value_ = 1;
-bool ScoredHistoryMatch::discount_frecency_when_few_visits_ = false;
 bool ScoredHistoryMatch::allow_tld_matches_ = false;
 bool ScoredHistoryMatch::allow_scheme_matches_ = false;
 bool ScoredHistoryMatch::also_do_hup_like_scoring_ = false;
@@ -46,14 +46,16 @@ ScoredHistoryMatch::ScoredHistoryMatch()
   Init();
 }
 
-ScoredHistoryMatch::ScoredHistoryMatch(const URLRow& row,
-                                       const VisitInfoVector& visits,
-                                       const std::string& languages,
-                                       const base::string16& lower_string,
-                                       const String16Vector& terms,
-                                       const RowWordStarts& word_starts,
-                                       const base::Time now,
-                                       BookmarkService* bookmark_service)
+ScoredHistoryMatch::ScoredHistoryMatch(
+    const URLRow& row,
+    const VisitInfoVector& visits,
+    const std::string& languages,
+    const base::string16& lower_string,
+    const String16Vector& terms,
+    const WordStarts& terms_to_word_starts_offsets,
+    const RowWordStarts& word_starts,
+    const base::Time now,
+    BookmarkService* bookmark_service)
     : HistoryMatch(row, 0, false, false),
       raw_score_(0),
       can_inline_(false) {
@@ -146,8 +148,8 @@ ScoredHistoryMatch::ScoredHistoryMatch(const URLRow& row,
         num_components_in_best_prefix);
   }
 
-  const float topicality_score =
-      GetTopicalityScore(terms.size(), url, word_starts);
+  const float topicality_score = GetTopicalityScore(
+      terms.size(), url, terms_to_word_starts_offsets, word_starts);
   const float frecency_score = GetFrecency(
       now, (bookmark_service && bookmark_service->IsBookmarked(gurl)), visits);
   raw_score_ = GetFinalRelevancyScore(topicality_score, frecency_score);
@@ -250,6 +252,7 @@ bool ScoredHistoryMatch::MatchScoreGreater(const ScoredHistoryMatch& m1,
 // static
 TermMatches ScoredHistoryMatch::FilterTermMatchesByWordStarts(
     const TermMatches& term_matches,
+    const WordStarts& terms_to_word_starts_offsets,
     const WordStarts& word_starts,
     size_t start_pos,
     size_t end_pos) {
@@ -261,10 +264,11 @@ TermMatches ScoredHistoryMatch::FilterTermMatchesByWordStarts(
   WordStarts::const_iterator end_word_starts = word_starts.end();
   for (TermMatches::const_iterator iter = term_matches.begin();
        iter != term_matches.end(); ++iter) {
-    // Advance next_word_starts until it's >= the position of the term
-    // we're considering.
+    const size_t term_offset = terms_to_word_starts_offsets[iter->term_num];
+    // Advance next_word_starts until it's >= the position of the term we're
+    // considering (adjusted for where the word begins within the term).
     while ((next_word_starts != end_word_starts) &&
-           (*next_word_starts < iter->offset))
+           (*next_word_starts < (iter->offset + term_offset)))
       ++next_word_starts;
     // Add the match if it's before the position we start filtering at or
     // after the position we stop filtering at (assuming we have a position
@@ -272,7 +276,7 @@ TermMatches ScoredHistoryMatch::FilterTermMatchesByWordStarts(
     if ((iter->offset < start_pos) ||
         ((end_pos != std::string::npos) && (iter->offset >= end_pos)) ||
         ((next_word_starts != end_word_starts) &&
-         (*next_word_starts == iter->offset)))
+         (*next_word_starts == iter->offset + term_offset)))
       filtered_matches.push_back(*iter);
   }
   return filtered_matches;
@@ -281,6 +285,7 @@ TermMatches ScoredHistoryMatch::FilterTermMatchesByWordStarts(
 float ScoredHistoryMatch::GetTopicalityScore(
     const int num_terms,
     const base::string16& url,
+    const WordStarts& terms_to_word_starts_offsets,
     const RowWordStarts& word_starts) {
   // Because the below thread is not thread safe, we check that we're
   // only calling it from one thread: the UI thread.  Specifically,
@@ -324,23 +329,26 @@ float ScoredHistoryMatch::GetTopicalityScore(
   // First, filter all matches not at a word boundary and in the path (or
   // later).
   url_matches_ = FilterTermMatchesByWordStarts(
-      url_matches_, word_starts.url_word_starts_, end_of_hostname_pos,
+      url_matches_, terms_to_word_starts_offsets, word_starts.url_word_starts_,
+      end_of_hostname_pos,
       std::string::npos);
   if (colon_pos != std::string::npos) {
     // Also filter matches not at a word boundary and in the scheme.
     url_matches_ = FilterTermMatchesByWordStarts(
-        url_matches_, word_starts.url_word_starts_, 0, colon_pos);
+        url_matches_, terms_to_word_starts_offsets,
+        word_starts.url_word_starts_, 0, colon_pos);
   }
   for (TermMatches::const_iterator iter = url_matches_.begin();
        iter != url_matches_.end(); ++iter) {
-    // Advance next_word_starts until it's >= the position of the term
-    // we're considering.
+    const size_t term_offset = terms_to_word_starts_offsets[iter->term_num];
+    // Advance next_word_starts until it's >= the position of the term we're
+    // considering (adjusted for where the word begins within the term).
     while ((next_word_starts != end_word_starts) &&
-           (*next_word_starts < iter->offset)) {
+           (*next_word_starts < (iter->offset + term_offset))) {
       ++next_word_starts;
     }
     const bool at_word_boundary = (next_word_starts != end_word_starts) &&
-        (*next_word_starts == iter->offset);
+        (*next_word_starts == iter->offset + term_offset);
     if ((question_mark_pos != std::string::npos) &&
         (iter->offset > question_mark_pos)) {
       // The match is in a CGI ?... fragment.
@@ -379,19 +387,22 @@ float ScoredHistoryMatch::GetTopicalityScore(
   end_word_starts = word_starts.title_word_starts_.end();
   int word_num = 0;
   title_matches_ = FilterTermMatchesByWordStarts(
-      title_matches_, word_starts.title_word_starts_, 0, std::string::npos);
+      title_matches_, terms_to_word_starts_offsets,
+      word_starts.title_word_starts_, 0, std::string::npos);
   for (TermMatches::const_iterator iter = title_matches_.begin();
        iter != title_matches_.end(); ++iter) {
-    // Advance next_word_starts until it's >= the position of the term
-    // we're considering.
+    const size_t term_offset = terms_to_word_starts_offsets[iter->term_num];
+    // Advance next_word_starts until it's >= the position of the term we're
+    // considering (adjusted for where the word begins within the term).
     while ((next_word_starts != end_word_starts) &&
-           (*next_word_starts < iter->offset)) {
+           (*next_word_starts < (iter->offset + term_offset))) {
       ++next_word_starts;
       ++word_num;
     }
     if (word_num >= 10) break;  // only count the first ten words
-    DCHECK((next_word_starts != end_word_starts) &&
-        (*next_word_starts == iter->offset)) << "not at word boundary";
+    DCHECK(next_word_starts != end_word_starts);
+    DCHECK_EQ(*next_word_starts, iter->offset + term_offset)
+        << "not at word boundary";
     term_scores[iter->term_num] += 8;
   }
   // TODO(mpearson): Restore logic for penalizing out-of-order matches.
@@ -508,11 +519,8 @@ float ScoredHistoryMatch::GetFrecency(const base::Time& now,
   // kMaxVisitsToScore as the denominator for the average regardless of
   // how many visits there were in order to penalize a match that has
   // fewer visits than kMaxVisitsToScore.
-  const int total_sampled_visits = std::min(visits.size(), kMaxVisitsToScore);
-  if (total_sampled_visits == 0)
-    return 0.0f;
   float summed_visit_points = 0;
-  for (int i = 0; i < total_sampled_visits; ++i) {
+  for (size_t i = 0; i < std::min(visits.size(), kMaxVisitsToScore); ++i) {
     int value_of_transition =
         (visits[i].second == content::PAGE_TRANSITION_TYPED) ? 20 : 1;
     if (bookmarked)
@@ -521,9 +529,7 @@ float ScoredHistoryMatch::GetFrecency(const base::Time& now,
         GetRecencyScore((now - visits[i].first).InDays());
     summed_visit_points += (value_of_transition * bucket_weight);
   }
-  return visits.size() * summed_visit_points /
-      (discount_frecency_when_few_visits_ ?
-          kMaxVisitsToScore : total_sampled_visits);
+  return visits.size() * summed_visit_points / kMaxVisitsToScore;
 }
 
 // static
@@ -585,8 +591,6 @@ void ScoredHistoryMatch::Init() {
         HistoryURLProvider::kScoreForBestInlineableResult - 1;
   }
   bookmark_value_ = OmniboxFieldTrial::HQPBookmarkValue();
-  discount_frecency_when_few_visits_ =
-      OmniboxFieldTrial::HQPDiscountFrecencyWhenFewVisits();
   allow_tld_matches_ = OmniboxFieldTrial::HQPAllowMatchInTLDValue();
   allow_scheme_matches_ = OmniboxFieldTrial::HQPAllowMatchInSchemeValue();
   initialized_ = true;

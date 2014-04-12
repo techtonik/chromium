@@ -5,10 +5,10 @@
 #include "chrome/browser/media/webrtc_browsertest_base.h"
 
 #include "base/lazy_instance.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/infobars/infobar.h"
-#include "chrome/browser/infobars/infobar_manager.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/media/media_stream_infobar_delegate.h"
 #include "chrome/browser/media/webrtc_browsertest_common.h"
@@ -22,9 +22,21 @@
 
 const char WebRtcTestBase::kAudioVideoCallConstraints[] =
     "'{audio: true, video: true}'";
+const char WebRtcTestBase::kAudioVideoCallConstraintsQVGA[] =
+   "'{audio: true, video: {mandatory: {minWidth: 320, maxWidth: 320, "
+   " minHeight: 240, maxHeight: 240}}}'";
 const char WebRtcTestBase::kAudioVideoCallConstraints360p[] =
    "'{audio: true, video: {mandatory: {minWidth: 640, maxWidth: 640, "
    " minHeight: 360, maxHeight: 360}}}'";
+const char WebRtcTestBase::kAudioVideoCallConstraintsVGA[] =
+   "'{audio: true, video: {mandatory: {minWidth: 640, maxWidth: 640, "
+   " minHeight: 480, maxHeight: 480}}}'";
+const char WebRtcTestBase::kAudioVideoCallConstraints720p[] =
+   "'{audio: true, video: {mandatory: {minWidth: 1280, maxWidth: 1280, "
+   " minHeight: 720, maxHeight: 720}}}'";
+const char WebRtcTestBase::kAudioVideoCallConstraints1080p[] =
+    "'{audio: true, video: {mandatory: {minWidth: 1920, maxWidth: 1920, "
+    " minHeight: 1080, maxHeight: 1080}}}'";
 const char WebRtcTestBase::kAudioOnlyCallConstraints[] = "'{audio: true}'";
 const char WebRtcTestBase::kVideoOnlyCallConstraints[] = "'{video: true}'";
 const char WebRtcTestBase::kFailedWithPermissionDeniedError[] =
@@ -209,11 +221,17 @@ void WebRtcTestBase::CloseInfoBarInTab(
       chrome::NOTIFICATION_TAB_CONTENTS_INFOBAR_REMOVED,
       content::NotificationService::AllSources());
 
-  InfoBarManager* infobar_manager =
-      InfoBarService::FromWebContents(tab_contents)->infobar_manager();
-  infobar_manager->RemoveInfoBar(infobar);
+  InfoBarService* infobar_service =
+      InfoBarService::FromWebContents(tab_contents);
+  infobar_service->RemoveInfoBar(infobar);
 
   infobar_removed.Wait();
+}
+
+void WebRtcTestBase::CloseLastLocalStream(
+    content::WebContents* tab_contents) const {
+  EXPECT_EQ("ok-stopped",
+            ExecuteJavascript("stopLocalStream();", tab_contents));
 }
 
 // Convenience method which executes the provided javascript in the context
@@ -281,4 +299,21 @@ void WebRtcTestBase::WaitForVideoToPlay(
     content::WebContents* tab_contents) const {
   EXPECT_TRUE(test::PollingWaitUntil("isVideoPlaying()", "video-playing",
                                      tab_contents));
+}
+
+std::string WebRtcTestBase::GetStreamSize(
+    content::WebContents* tab_contents,
+    const std::string& video_element) const {
+  std::string javascript =
+      base::StringPrintf("getStreamSize('%s')", video_element.c_str());
+  std::string result = ExecuteJavascript(javascript, tab_contents);
+  EXPECT_TRUE(StartsWithASCII(result, "ok-", true));
+  return result.substr(3);
+}
+
+bool WebRtcTestBase::HasWebcamAvailableOnSystem(
+    content::WebContents* tab_contents) const {
+  std::string result =
+      ExecuteJavascript("HasVideoSourceOnSystem();", tab_contents);
+  return result == "has-video-source";
 }

@@ -84,7 +84,7 @@ void BrowserAccessibilityManagerWin::MaybeCallNotifyWinEvent(DWORD event,
 void BrowserAccessibilityManagerWin::AddNodeToMap(BrowserAccessibility* node) {
   BrowserAccessibilityManager::AddNodeToMap(node);
   LONG unique_id_win = node->ToBrowserAccessibilityWin()->unique_id_win();
-  unique_id_to_renderer_id_map_[unique_id_win] = node->renderer_id();
+  unique_id_to_renderer_id_map_[unique_id_win] = node->GetId();
 }
 
 void BrowserAccessibilityManagerWin::RemoveNode(BrowserAccessibility* node) {
@@ -97,10 +97,24 @@ void BrowserAccessibilityManagerWin::RemoveNode(BrowserAccessibility* node) {
   }
 }
 
+void BrowserAccessibilityManagerWin::OnWindowFocused() {
+  // Fire a focus event on the root first and then the focused node.
+  if (focus_ != root_)
+    NotifyAccessibilityEvent(ui::AX_EVENT_FOCUS, root_);
+  BrowserAccessibilityManager::OnWindowFocused();
+}
+
+void BrowserAccessibilityManagerWin::OnWindowBlurred() {
+  // Fire a blur event on the focused node first and then the root.
+  BrowserAccessibilityManager::OnWindowBlurred();
+  if (focus_ != root_)
+    NotifyAccessibilityEvent(ui::AX_EVENT_BLUR, root_);
+}
+
 void BrowserAccessibilityManagerWin::NotifyAccessibilityEvent(
     ui::AXEvent event_type,
     BrowserAccessibility* node) {
-  if (node->role() == ui::AX_ROLE_INLINE_TEXT_BOX)
+  if (node->GetRole() == ui::AX_ROLE_INLINE_TEXT_BOX)
     return;
 
   LONG event_id = EVENT_MIN;
@@ -206,6 +220,11 @@ void BrowserAccessibilityManagerWin::NotifyAccessibilityEvent(
     tracked_scroll_object_->Release();
     tracked_scroll_object_ = NULL;
   }
+}
+
+void BrowserAccessibilityManagerWin::OnRootChanged() {
+  if (delegate_ && delegate_->HasFocus())
+    NotifyAccessibilityEvent(ui::AX_EVENT_FOCUS, root_);
 }
 
 void BrowserAccessibilityManagerWin::TrackScrollingObject(

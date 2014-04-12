@@ -53,7 +53,8 @@ ServiceWorkerContextCore* ServiceWorkerContextWrapper::context() {
 static void FinishRegistrationOnIO(
     const ServiceWorkerContext::ResultCallback& continuation,
     ServiceWorkerStatusCode status,
-    int64 registration_id) {
+    int64 registration_id,
+    int64 version_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   if (status != SERVICE_WORKER_OK)
     LOG(ERROR) << ServiceWorkerStatusToString(status);
@@ -87,6 +88,7 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
       pattern,
       script_url,
       -1,
+      NULL /* provider_host */,
       site_instance,
       base::Bind(&FinishRegistrationOnIO, continuation));
 }
@@ -122,6 +124,7 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
   context()->UnregisterServiceWorker(
       pattern,
       source_process_id,
+      NULL /* provider_host */,
       base::Bind(&FinishUnregistrationOnIO, continuation));
 }
 

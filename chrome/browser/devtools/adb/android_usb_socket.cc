@@ -33,18 +33,21 @@ AndroidUsbSocket::AndroidUsbSocket(scoped_refptr<AndroidUsbDevice> device,
       delete_callback_(delete_callback),
       local_id_(socket_id),
       remote_id_(0),
-      is_connected_(false),
-      is_closed_(false) {
+      is_connected_(false) {
 }
 
 AndroidUsbSocket::~AndroidUsbSocket() {
   DCHECK(CalledOnValidThread());
   if (is_connected_)
     Disconnect();
-  delete_callback_.Run(local_id_);
+  if (!delete_callback_.is_null())
+    delete_callback_.Run(local_id_);
 }
 
 void AndroidUsbSocket::HandleIncoming(scoped_refptr<AdbMessage> message) {
+  if (!device_)
+    return;
+
   CHECK_EQ(message->arg1, local_id_);
   switch (message->command) {
     case AdbMessage::kCommandOKAY:
@@ -79,9 +82,7 @@ void AndroidUsbSocket::HandleIncoming(scoped_refptr<AdbMessage> message) {
     case AdbMessage::kCommandCLSE:
       if (is_connected_)
         device_->Send(AdbMessage::kCommandCLSE, local_id_, 0, "");
-      is_connected_ = false;
-      is_closed_ = true;
-      RespondToReaders(true);
+      Terminated();
       // "this" can be NULL.
       break;
     default:
@@ -91,7 +92,13 @@ void AndroidUsbSocket::HandleIncoming(scoped_refptr<AdbMessage> message) {
 
 void AndroidUsbSocket::Terminated() {
   is_connected_ = false;
-  is_closed_ = true;
+
+  // Break the socket -> device connection, release the device.
+  delete_callback_.Run(local_id_);
+  delete_callback_.Reset();
+  device_ = NULL;
+
+  // Respond to pending callbacks.
   if (!connect_callback_.is_null()) {
     net::CompletionCallback callback = connect_callback_;
     connect_callback_.Reset();
@@ -106,7 +113,7 @@ int AndroidUsbSocket::Read(net::IOBuffer* buffer,
                            int length,
                            const net::CompletionCallback& callback) {
   if (!is_connected_)
-    return is_closed_ ? 0 : net::ERR_SOCKET_NOT_CONNECTED;
+    return device_ ? net::ERR_SOCKET_NOT_CONNECTED : 0;
 
   if (read_buffer_.empty()) {
     read_requests_.push_back(IORequest(buffer, length, callback));
@@ -137,19 +144,19 @@ int AndroidUsbSocket::Write(net::IOBuffer* buffer,
   return net::ERR_IO_PENDING;
 }
 
-bool AndroidUsbSocket::SetReceiveBufferSize(int32 size) {
+int AndroidUsbSocket::SetReceiveBufferSize(int32 size) {
   NOTIMPLEMENTED();
-  return false;
+  return net::ERR_NOT_IMPLEMENTED;
 }
 
-bool AndroidUsbSocket::SetSendBufferSize(int32 size) {
+int AndroidUsbSocket::SetSendBufferSize(int32 size) {
   NOTIMPLEMENTED();
-  return false;
+  return net::ERR_NOT_IMPLEMENTED;
 }
 
 int AndroidUsbSocket::Connect(const net::CompletionCallback& callback) {
   DCHECK(CalledOnValidThread());
-  if (device_->terminated())
+  if (!device_)
     return net::ERR_FAILED;
   connect_callback_ = callback;
   device_->Send(AdbMessage::kCommandOPEN, local_id_, 0, command_);
@@ -157,9 +164,10 @@ int AndroidUsbSocket::Connect(const net::CompletionCallback& callback) {
 }
 
 void AndroidUsbSocket::Disconnect() {
-  is_connected_ = false;
+  if (!device_)
+    return;
   device_->Send(AdbMessage::kCommandCLSE, local_id_, remote_id_, "");
-  RespondToReaders(true);
+  Terminated();
 }
 
 bool AndroidUsbSocket::IsConnected() const {
@@ -180,7 +188,7 @@ int AndroidUsbSocket::GetPeerAddress(net::IPEndPoint* address) const {
 
 int AndroidUsbSocket::GetLocalAddress(net::IPEndPoint* address) const {
   NOTIMPLEMENTED();
-  return net::ERR_FAILED;
+  return net::ERR_NOT_IMPLEMENTED;
 }
 
 const net::BoundNetLog& AndroidUsbSocket::NetLog() const {

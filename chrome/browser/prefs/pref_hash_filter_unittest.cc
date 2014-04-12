@@ -29,6 +29,7 @@ namespace {
 const char kAtomicPref[] = "atomic_pref";
 const char kAtomicPref2[] = "atomic_pref2";
 const char kAtomicPref3[] = "pref3";
+const char kAtomicPref4[] = "pref4";
 const char kReportOnlyPref[] = "report_only";
 const char kReportOnlySplitPref[] = "report_only_split_pref";
 const char kSplitPref[] = "split_pref";
@@ -58,6 +59,10 @@ const PrefHashFilter::TrackedPreferenceMetadata kTestTrackedPrefs[] = {
     5, kAtomicPref3, PrefHashFilter::ENFORCE_ON_LOAD,
     PrefHashFilter::TRACKING_STRATEGY_ATOMIC
   },
+  {
+    6, kAtomicPref4, PrefHashFilter::ENFORCE_ON_LOAD,
+    PrefHashFilter::TRACKING_STRATEGY_ATOMIC
+  },
 };
 
 }  // namespace
@@ -70,7 +75,8 @@ class MockPrefHashStore : public PrefHashStore {
       ValuePtrStrategyPair;
 
   MockPrefHashStore() : transactions_performed_(0),
-                        transaction_active_(false) {}
+                        transaction_active_(false),
+                        commit_performed_(false) {}
 
   virtual ~MockPrefHashStore() {
     EXPECT_FALSE(transaction_active_);
@@ -90,6 +96,10 @@ class MockPrefHashStore : public PrefHashStore {
 
   // Returns the number of transactions that were performed.
   size_t transactions_performed() { return transactions_performed_; }
+
+  // Returns true if this MockPrefHashStore's CommitPendingWrite method was
+  // called.
+  bool commit_performed() { return commit_performed_; }
 
   // Returns the number of paths checked.
   size_t checked_paths_count() const {
@@ -129,6 +139,7 @@ class MockPrefHashStore : public PrefHashStore {
 
   // PrefHashStore implementation.
   virtual scoped_ptr<PrefHashStoreTransaction> BeginTransaction() OVERRIDE;
+  virtual void CommitPendingWrite() OVERRIDE;
 
  private:
   // A MockPrefHashStoreTransaction is handed to the caller on
@@ -193,6 +204,9 @@ class MockPrefHashStore : public PrefHashStore {
   // active at a time).
   bool transaction_active_;
 
+  // Whether CommitPendingWrite() was called.
+  bool commit_performed_;
+
   DISALLOW_COPY_AND_ASSIGN(MockPrefHashStore);
 };
 
@@ -218,6 +232,11 @@ scoped_ptr<PrefHashStoreTransaction> MockPrefHashStore::BeginTransaction() {
   EXPECT_FALSE(transaction_active_);
   return scoped_ptr<PrefHashStoreTransaction>(
       new MockPrefHashStoreTransaction(this));
+}
+
+void MockPrefHashStore::CommitPendingWrite() {
+  EXPECT_FALSE(commit_performed_);
+  commit_performed_ = true;
 }
 
 PrefHashStoreTransaction::ValueState MockPrefHashStore::RecordCheckValue(
@@ -309,9 +328,9 @@ class PrefHashFilterTest
   }
 
  protected:
-  // Creates a PrefHashFilter that uses a MockPrefHashStore. The
-  // MockPrefHashStore (owned by the PrefHashFilter) is returned in
-  // |mock_pref_hash_store|.
+  // Initializes |pref_hash_filter_| with a PrefHashFilter that uses a
+  // MockPrefHashStore. The raw pointer to the MockPrefHashStore (owned by the
+  // PrefHashFilter) is stored in |mock_pref_hash_store_|.
   void InitializePrefHashFilter(const std::vector<
       PrefHashFilter::TrackedPreferenceMetadata>& configuration) {
     scoped_ptr<MockPrefHashStore> temp_mock_pref_hash_store(
@@ -335,7 +354,7 @@ class PrefHashFilterTest
 };
 
 TEST_P(PrefHashFilterTest, EmptyAndUnchanged) {
-  pref_hash_filter_->FilterOnLoad(&pref_store_contents_);
+  ASSERT_FALSE(pref_hash_filter_->FilterOnLoad(&pref_store_contents_));
   // All paths checked.
   ASSERT_EQ(arraysize(kTestTrackedPrefs),
             mock_pref_hash_store_->checked_paths_count());
@@ -349,6 +368,7 @@ TEST_P(PrefHashFilterTest, EmptyAndUnchanged) {
   }
   ASSERT_EQ(1u, mock_pref_hash_store_->transactions_performed());
   ASSERT_FALSE(RecordedReset());
+  EXPECT_FALSE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, FilterTrackedPrefUpdate) {
@@ -371,6 +391,7 @@ TEST_P(PrefHashFilterTest, FilterTrackedPrefUpdate) {
 
   ASSERT_EQ(1u, mock_pref_hash_store_->transactions_performed());
   ASSERT_FALSE(RecordedReset());
+  EXPECT_TRUE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, FilterSplitPrefUpdate) {
@@ -395,6 +416,7 @@ TEST_P(PrefHashFilterTest, FilterSplitPrefUpdate) {
 
   ASSERT_EQ(1u, mock_pref_hash_store_->transactions_performed());
   ASSERT_FALSE(RecordedReset());
+  EXPECT_TRUE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, FilterUntrackedPrefUpdate) {
@@ -461,6 +483,7 @@ TEST_P(PrefHashFilterTest, MultiplePrefsFilterSerializeData) {
        mock_pref_hash_store_->stored_value(kSplitPref);
   ASSERT_EQ(dict_value, stored_value_split.first);
   ASSERT_EQ(PrefHashFilter::TRACKING_STRATEGY_SPLIT, stored_value_split.second);
+  EXPECT_TRUE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, EmptyAndUnknown) {
@@ -471,7 +494,7 @@ TEST_P(PrefHashFilterTest, EmptyAndUnknown) {
       kAtomicPref, PrefHashStoreTransaction::TRUSTED_UNKNOWN_VALUE);
   mock_pref_hash_store_->SetCheckResult(
       kSplitPref, PrefHashStoreTransaction::TRUSTED_UNKNOWN_VALUE);
-  pref_hash_filter_->FilterOnLoad(&pref_store_contents_);
+  ASSERT_FALSE(pref_hash_filter_->FilterOnLoad(&pref_store_contents_));
   ASSERT_EQ(arraysize(kTestTrackedPrefs),
             mock_pref_hash_store_->checked_paths_count());
   ASSERT_EQ(2u, mock_pref_hash_store_->stored_paths_count());
@@ -488,6 +511,7 @@ TEST_P(PrefHashFilterTest, EmptyAndUnknown) {
   ASSERT_EQ(NULL, stored_split_value.first);
   ASSERT_EQ(PrefHashFilter::TRACKING_STRATEGY_SPLIT,
             stored_split_value.second);
+  EXPECT_FALSE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, InitialValueUnknown) {
@@ -507,7 +531,9 @@ TEST_P(PrefHashFilterTest, InitialValueUnknown) {
       kAtomicPref, PrefHashStoreTransaction::UNTRUSTED_UNKNOWN_VALUE);
   mock_pref_hash_store_->SetCheckResult(
       kSplitPref, PrefHashStoreTransaction::UNTRUSTED_UNKNOWN_VALUE);
-  pref_hash_filter_->FilterOnLoad(&pref_store_contents_);
+  // If we are enforcing, expect this to report changes.
+  ASSERT_EQ(GetParam() >= PrefHashFilter::ENFORCE_ON_LOAD,
+            pref_hash_filter_->FilterOnLoad(&pref_store_contents_));
   ASSERT_EQ(arraysize(kTestTrackedPrefs),
             mock_pref_hash_store_->checked_paths_count());
   ASSERT_EQ(2u, mock_pref_hash_store_->stored_paths_count());
@@ -546,6 +572,7 @@ TEST_P(PrefHashFilterTest, InitialValueUnknown) {
 
     ASSERT_FALSE(RecordedReset());
   }
+  EXPECT_FALSE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, InitialValueTrustedUnknown) {
@@ -565,7 +592,7 @@ TEST_P(PrefHashFilterTest, InitialValueTrustedUnknown) {
       kAtomicPref, PrefHashStoreTransaction::TRUSTED_UNKNOWN_VALUE);
   mock_pref_hash_store_->SetCheckResult(
       kSplitPref, PrefHashStoreTransaction::TRUSTED_UNKNOWN_VALUE);
-  pref_hash_filter_->FilterOnLoad(&pref_store_contents_);
+  ASSERT_FALSE(pref_hash_filter_->FilterOnLoad(&pref_store_contents_));
   ASSERT_EQ(arraysize(kTestTrackedPrefs),
             mock_pref_hash_store_->checked_paths_count());
   ASSERT_EQ(2u, mock_pref_hash_store_->stored_paths_count());
@@ -589,6 +616,7 @@ TEST_P(PrefHashFilterTest, InitialValueTrustedUnknown) {
   ASSERT_EQ(dict_value, stored_split_value.first);
   ASSERT_EQ(PrefHashFilter::TRACKING_STRATEGY_SPLIT,
             stored_split_value.second);
+  EXPECT_FALSE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, InitialValueChanged) {
@@ -616,7 +644,8 @@ TEST_P(PrefHashFilterTest, InitialValueChanged) {
   mock_invalid_keys.push_back("c");
   mock_pref_hash_store_->SetInvalidKeysResult(kSplitPref, mock_invalid_keys);
 
-  pref_hash_filter_->FilterOnLoad(&pref_store_contents_);
+  ASSERT_EQ(GetParam() >= PrefHashFilter::ENFORCE_ON_LOAD,
+            pref_hash_filter_->FilterOnLoad(&pref_store_contents_));
   ASSERT_EQ(arraysize(kTestTrackedPrefs),
             mock_pref_hash_store_->checked_paths_count());
   ASSERT_EQ(2u, mock_pref_hash_store_->stored_paths_count());
@@ -668,6 +697,7 @@ TEST_P(PrefHashFilterTest, InitialValueChanged) {
 
     ASSERT_FALSE(RecordedReset());
   }
+  EXPECT_FALSE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, EmptyCleared) {
@@ -677,7 +707,7 @@ TEST_P(PrefHashFilterTest, EmptyCleared) {
                                         PrefHashStoreTransaction::CLEARED);
   mock_pref_hash_store_->SetCheckResult(kSplitPref,
                                         PrefHashStoreTransaction::CLEARED);
-  pref_hash_filter_->FilterOnLoad(&pref_store_contents_);
+  ASSERT_FALSE(pref_hash_filter_->FilterOnLoad(&pref_store_contents_));
   ASSERT_EQ(arraysize(kTestTrackedPrefs),
             mock_pref_hash_store_->checked_paths_count());
   ASSERT_EQ(2u, mock_pref_hash_store_->stored_paths_count());
@@ -698,6 +728,7 @@ TEST_P(PrefHashFilterTest, EmptyCleared) {
   ASSERT_EQ(NULL, stored_split_value.first);
   ASSERT_EQ(PrefHashFilter::TRACKING_STRATEGY_SPLIT,
             stored_split_value.second);
+  EXPECT_FALSE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, InitialValueMigrated) {
@@ -712,7 +743,9 @@ TEST_P(PrefHashFilterTest, InitialValueMigrated) {
 
   mock_pref_hash_store_->SetCheckResult(kAtomicPref,
                                         PrefHashStoreTransaction::WEAK_LEGACY);
-  pref_hash_filter_->FilterOnLoad(&pref_store_contents_);
+
+  ASSERT_EQ(GetParam() >= PrefHashFilter::ENFORCE_ON_LOAD,
+            pref_hash_filter_->FilterOnLoad(&pref_store_contents_));
   ASSERT_EQ(arraysize(kTestTrackedPrefs),
             mock_pref_hash_store_->checked_paths_count());
   ASSERT_EQ(1u, mock_pref_hash_store_->stored_paths_count());
@@ -739,6 +772,7 @@ TEST_P(PrefHashFilterTest, InitialValueMigrated) {
 
     ASSERT_FALSE(RecordedReset());
   }
+  EXPECT_FALSE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, InitialValueUnchangedLegacyId) {
@@ -758,7 +792,7 @@ TEST_P(PrefHashFilterTest, InitialValueUnchangedLegacyId) {
       kAtomicPref, PrefHashStoreTransaction::SECURE_LEGACY);
   mock_pref_hash_store_->SetCheckResult(
       kSplitPref, PrefHashStoreTransaction::SECURE_LEGACY);
-  pref_hash_filter_->FilterOnLoad(&pref_store_contents_);
+  ASSERT_FALSE(pref_hash_filter_->FilterOnLoad(&pref_store_contents_));
   ASSERT_EQ(arraysize(kTestTrackedPrefs),
             mock_pref_hash_store_->checked_paths_count());
   ASSERT_EQ(1u, mock_pref_hash_store_->transactions_performed());
@@ -788,6 +822,7 @@ TEST_P(PrefHashFilterTest, InitialValueUnchangedLegacyId) {
   ASSERT_EQ(dict_value, stored_split_value.first);
 
   ASSERT_FALSE(RecordedReset());
+  EXPECT_FALSE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, DontResetReportOnly) {
@@ -815,7 +850,9 @@ TEST_P(PrefHashFilterTest, DontResetReportOnly) {
                                         PrefHashStoreTransaction::CHANGED);
   mock_pref_hash_store_->SetCheckResult(kReportOnlySplitPref,
                                         PrefHashStoreTransaction::CHANGED);
-  pref_hash_filter_->FilterOnLoad(&pref_store_contents_);
+
+  ASSERT_EQ(GetParam() >= PrefHashFilter::ENFORCE_ON_LOAD,
+            pref_hash_filter_->FilterOnLoad(&pref_store_contents_));
   // All prefs should be checked and a new hash should be stored for each tested
   // pref.
   ASSERT_EQ(arraysize(kTestTrackedPrefs),
@@ -854,6 +891,7 @@ TEST_P(PrefHashFilterTest, DontResetReportOnly) {
 
     ASSERT_FALSE(RecordedReset());
   }
+  EXPECT_FALSE(mock_pref_hash_store_->commit_performed());
 }
 
 TEST_P(PrefHashFilterTest, MigrateValuesTest) {
@@ -877,21 +915,37 @@ TEST_P(PrefHashFilterTest, MigrateValuesTest) {
   scoped_refptr<TestingPrefStore> source(new TestingPrefStore);
   scoped_refptr<TestingPrefStore> destination(new TestingPrefStore);
 
+  // If enforcing, should be migrated.
   source->SetString(kAtomicPref, "foobar");
-  source->SetString(kAtomicPref2, "foobar2");
-  destination->SetString(kAtomicPref2, "foobar2 preexisting");
-  destination->SetString(kAtomicPref3, "foobar3");
-  source->SetString(kReportOnlyPref, "helloworld");
-
   mock_pref_hash_store_->SetCheckResult(kAtomicPref,
                                         PrefHashStoreTransaction::UNCHANGED);
+
+  // If enforcing, should be discarded due to pre-existing value in
+  // |destination|.
+  source->SetString(kAtomicPref2, "foobar2");
   mock_pref_hash_store_->SetCheckResult(kAtomicPref2,
                                         PrefHashStoreTransaction::UNCHANGED);
+
+  // If enforcing, should be kept preferentially to value from |source|. If not
+  // enforcing, should still be unaffected.
+  destination->SetString(kAtomicPref2, "foobar2 preexisting");
+  // Should stay in |destination| in both scenarios.
+  destination->SetString(kAtomicPref3, "foobar3");
   mock_pref_hash_store_->SetCheckResult(kAtomicPref3,
                                         PrefHashStoreTransaction::UNCHANGED);
+
+  // When enforcing, should be discarded due to MAC mismatch. If not enforcing,
+  // stays in |source|.
+  source->SetString(kAtomicPref4, "foobar4");
+  mock_pref_hash_store_->SetCheckResult(kAtomicPref4,
+                                        PrefHashStoreTransaction::CHANGED);
+
+  // Should remain in |source| in both scenarios.
+  source->SetString(kReportOnlyPref, "helloworld");
   mock_pref_hash_store_->SetCheckResult(kReportOnlyPref,
                                         PrefHashStoreTransaction::UNCHANGED);
 
+  // Perform the migration.
   pref_hash_filter_->MigrateValues(source, destination);
   ASSERT_EQ(1u, mock_pref_hash_store_->transactions_performed());
 
@@ -901,6 +955,7 @@ TEST_P(PrefHashFilterTest, MigrateValuesTest) {
     ASSERT_FALSE(source->GetValue(kAtomicPref, NULL));
     ASSERT_FALSE(source->GetValue(kAtomicPref2, NULL));
     ASSERT_FALSE(source->GetValue(kAtomicPref3, NULL));
+    ASSERT_FALSE(source->GetValue(kAtomicPref4, NULL));
     ASSERT_TRUE(source->GetString(kReportOnlyPref, &value));
     ASSERT_EQ("helloworld", value);
 
@@ -911,6 +966,7 @@ TEST_P(PrefHashFilterTest, MigrateValuesTest) {
     ASSERT_TRUE(destination->GetString(kAtomicPref3, &value));
     ASSERT_EQ("foobar3", value);
     ASSERT_FALSE(destination->GetValue(kReportOnlyPref, NULL));
+    ASSERT_FALSE(destination->GetValue(kAtomicPref4, NULL));
   } else {
     std::string value;
 
@@ -919,15 +975,20 @@ TEST_P(PrefHashFilterTest, MigrateValuesTest) {
     ASSERT_TRUE(source->GetString(kAtomicPref2, &value));
     ASSERT_EQ("foobar2", value);
     ASSERT_FALSE(source->GetString(kAtomicPref3, &value));
+    ASSERT_TRUE(source->GetString(kAtomicPref4, &value));
+    ASSERT_EQ("foobar4", value);
     ASSERT_TRUE(source->GetString(kReportOnlyPref, &value));
     ASSERT_EQ("helloworld", value);
 
     ASSERT_FALSE(destination->GetValue(kAtomicPref, NULL));
     ASSERT_TRUE(destination->GetString(kAtomicPref2, &value));
     ASSERT_EQ("foobar2 preexisting", value);
-    ASSERT_TRUE(destination->GetValue(kAtomicPref3, NULL));
+    ASSERT_TRUE(destination->GetString(kAtomicPref3, &value));
+    ASSERT_EQ("foobar3", value);
+    ASSERT_FALSE(destination->GetValue(kAtomicPref4, NULL));
     ASSERT_FALSE(destination->GetValue(kReportOnlyPref, NULL));
   }
+  EXPECT_FALSE(mock_pref_hash_store_->commit_performed());
 }
 
 INSTANTIATE_TEST_CASE_P(

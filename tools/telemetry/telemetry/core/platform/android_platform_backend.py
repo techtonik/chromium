@@ -14,6 +14,7 @@ from telemetry.core import util
 from telemetry.core.platform import proc_supporting_platform_backend
 from telemetry.core.platform import factory
 from telemetry.core.platform.power_monitor import android_ds2784_power_monitor
+from telemetry.core.platform.power_monitor import android_dumpsys_power_monitor
 from telemetry.core.platform.power_monitor import monsoon_power_monitor
 from telemetry.core.platform.power_monitor import power_monitor_controller
 from telemetry.core.platform.profiler import android_prebuilt_profiler_helper
@@ -52,7 +53,8 @@ class AndroidPlatformBackend(
         self._adb.CanAccessProtectedFileContents()
     self._powermonitor = power_monitor_controller.PowerMonitorController([
         monsoon_power_monitor.MonsoonPowerMonitor(),
-        android_ds2784_power_monitor.DS2784PowerMonitor(adb)
+        android_ds2784_power_monitor.DS2784PowerMonitor(adb),
+        android_dumpsys_power_monitor.DumpsysPowerMonitor(adb),
     ])
     self._video_recorder = None
     self._video_output = None
@@ -71,6 +73,9 @@ class AndroidPlatformBackend(
     self._surface_stats_collector.Start()
 
   def StopRawDisplayFrameRateMeasurement(self):
+    if not self._surface_stats_collector:
+      return
+
     self._surface_stats_collector.Stop()
     for r in self._surface_stats_collector.GetResults():
       self._raw_display_frame_rate_measurements.append(
@@ -247,14 +252,14 @@ class AndroidPlatformBackend(
     for frame in self._FramesFromMp4(self._video_output):
       yield frame
 
-  def CanMonitorPowerAsync(self):
-    return self._powermonitor.CanMonitorPowerAsync()
+  def CanMonitorPower(self):
+    return self._powermonitor.CanMonitorPower()
 
-  def StartMonitoringPowerAsync(self):
-    self._powermonitor.StartMonitoringPowerAsync()
+  def StartMonitoringPower(self, browser):
+    self._powermonitor.StartMonitoringPower(browser)
 
-  def StopMonitoringPowerAsync(self):
-    return self._powermonitor.StopMonitoringPowerAsync()
+  def StopMonitoringPower(self):
+    return self._powermonitor.StopMonitoringPower()
 
   def _FramesFromMp4(self, mp4_file):
     if not self.CanLaunchApplication('avconv'):

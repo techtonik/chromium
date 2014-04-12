@@ -231,6 +231,9 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
   // Enable deferred filter rendering if requested on the command line.
   settings->setDeferredFiltersEnabled(prefs.deferred_filters_enabled);
 
+  // Enable container culling if requested on the command line.
+  settings->setContainerCullingEnabled(prefs.container_culling_enabled);
+
   // Enable gesture tap highlight if requested on the command line.
   settings->setGestureTapHighlightEnabled(prefs.gesture_tap_highlight_enabled);
 
@@ -347,11 +350,10 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
       prefs.report_screen_size_in_physical_pixels_quirk);
   settings->setMainFrameClipsContent(false);
   settings->setShrinksStandaloneImagesToFit(false);
+  settings->setShrinksViewportContentToFit(true);
 #endif
 
   WebNetworkStateNotifier::setOnLine(prefs.is_online);
-  settings->setExperimentalWebSocketEnabled(
-      prefs.experimental_websocket_enabled);
   settings->setPinchVirtualViewportEnabled(
       prefs.pinch_virtual_viewport_enabled);
 

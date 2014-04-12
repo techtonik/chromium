@@ -61,13 +61,6 @@
 #include "ui/gfx/skia_util.h"
 #endif
 
-#if defined(TOOLKIT_GTK)
-#include <gdk/gdk.h>
-#include <gtk/gtk.h>
-#include "ui/gfx/gdk_compat.h"
-#include "ui/gfx/gtk_compat.h"
-#endif
-
 namespace ui {
 
 namespace {
@@ -260,16 +253,6 @@ bool IsShapeAvailable() {
   return is_shape_available;
 
 }
-
-// A list of bogus sizes in mm that X detects that should be ignored.
-// See crbug.com/136533. The first element maintains the minimum
-// size required to be valid size.
-const unsigned long kInvalidDisplaySizeList[][2] = {
-  {40, 30},
-  {50, 40},
-  {160, 90},
-  {160, 100},
-};
 
 }  // namespace
 
@@ -539,33 +522,6 @@ XID GetX11RootWindow() {
 bool GetCurrentDesktop(int* desktop) {
   return GetIntProperty(GetX11RootWindow(), "_NET_CURRENT_DESKTOP", desktop);
 }
-
-#if defined(TOOLKIT_GTK)
-XID GetX11WindowFromGtkWidget(GtkWidget* widget) {
-  return GDK_WINDOW_XID(gtk_widget_get_window(widget));
-}
-
-XID GetX11WindowFromGdkWindow(GdkWindow* window) {
-  return GDK_WINDOW_XID(window);
-}
-
-GtkWindow* GetGtkWindowFromX11Window(XID xid) {
-  GdkWindow* gdk_window =
-      gdk_x11_window_lookup_for_display(gdk_display_get_default(), xid);
-  if (!gdk_window)
-    return NULL;
-  GtkWindow* gtk_window = NULL;
-  gdk_window_get_user_data(gdk_window,
-                           reinterpret_cast<gpointer*>(&gtk_window));
-  if (!gtk_window)
-    return NULL;
-  return gtk_window;
-}
-
-void* GetVisualFromGtkWidget(GtkWidget* widget) {
-  return GDK_VISUAL_XVISUAL(gtk_widget_get_visual(widget));
-}
-#endif  // defined(TOOLKIT_GTK)
 
 void SetHideTitlebarWhenMaximizedProperty(XID window,
                                           HideTitlebarWhenMaximized property) {
@@ -983,13 +939,8 @@ bool SetStringProperty(XID window,
 }
 
 Atom GetAtom(const char* name) {
-#if defined(TOOLKIT_GTK)
-  return gdk_x11_get_xatom_by_name_for_display(
-      gdk_display_get_default(), name);
-#else
   // TODO(derat): Cache atoms to avoid round-trips to the server.
   return XInternAtom(gfx::GetXDisplay(), name, false);
-#endif
 }
 
 void SetWindowClassHint(XDisplay* display,
@@ -1404,17 +1355,6 @@ bool IsX11WindowFullScreen(XID window) {
   if (!ui::GetWindowRect(window, &window_rect))
     return false;
 
-#if defined(TOOLKIT_GTK)
-  // As the last resort, check if the window size is as large as the main
-  // screen.
-  GdkRectangle monitor_rect;
-  gdk_screen_get_monitor_geometry(gdk_screen_get_default(), 0, &monitor_rect);
-
-  return monitor_rect.x == window_rect.x() &&
-         monitor_rect.y == window_rect.y() &&
-         monitor_rect.width == window_rect.width() &&
-         monitor_rect.height == window_rect.height();
-#else
   // We can't use gfx::Screen here because we don't have an aura::Window. So
   // instead just look at the size of the default display.
   //
@@ -1425,26 +1365,6 @@ bool IsX11WindowFullScreen(XID window) {
   int width = WidthOfScreen(screen);
   int height = HeightOfScreen(screen);
   return window_rect.size() == gfx::Size(width, height);
-#endif
-}
-
-bool IsXDisplaySizeBlackListed(unsigned long mm_width,
-                               unsigned long mm_height) {
-  // Ignore if the reported display is smaller than minimum size.
-  if (mm_width <= kInvalidDisplaySizeList[0][0] ||
-      mm_height <= kInvalidDisplaySizeList[0][1]) {
-    LOG(WARNING) << "Smaller than minimum display size";
-    return true;
-  }
-  for (unsigned long i = 1 ; i < arraysize(kInvalidDisplaySizeList); ++i) {
-    const unsigned long* size = kInvalidDisplaySizeList[i];
-    if (mm_width == size[0] && mm_height == size[1]) {
-      LOG(WARNING) << "Black listed display size detected:"
-                   << size[0] << "x" << size[1];
-      return true;
-    }
-  }
-  return false;
 }
 
 const unsigned char* XRefcountedMemory::front() const {

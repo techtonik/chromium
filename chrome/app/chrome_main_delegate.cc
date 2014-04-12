@@ -199,7 +199,8 @@ static void AdjustLinuxOOMScore(const std::string& process_type) {
              process_type == switches::kServiceProcess) {
     score = kMiscScore;
 #ifndef DISABLE_NACL
-  } else if (process_type == switches::kNaClLoaderProcess) {
+  } else if (process_type == switches::kNaClLoaderProcess ||
+             process_type == switches::kNaClLoaderNonSfiProcess) {
     score = kPluginScore;
 #endif
   } else if (process_type == switches::kZygoteProcess ||
@@ -671,11 +672,6 @@ void ChromeMainDelegate::PreSandboxStartup() {
     file_state = logging::DELETE_OLD_LOG_FILE;
   }
   logging::InitChromeLogging(command_line, file_state);
-#endif
-
-#if defined(OS_WIN)
-  // TODO(darin): Kill this once http://crbug.com/52609 is fixed.
-  ui::SetResourcesDataDLL(_AtlBaseModule.GetResourceInstance());
 #endif
 
   if (SubprocessNeedsResourceBundle(process_type)) {

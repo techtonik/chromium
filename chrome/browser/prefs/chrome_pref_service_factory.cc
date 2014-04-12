@@ -158,12 +158,19 @@ const size_t kTrackedPrefsReportingIDsCount = 14;
 COMPILE_ASSERT(kTrackedPrefsReportingIDsCount >= arraysize(kTrackedPrefs),
                need_to_increment_ids_count);
 
+// Each group enforces a superset of the protection provided by the previous
+// one.
 enum SettingsEnforcementGroup {
   GROUP_NO_ENFORCEMENT,
   // Only enforce settings on profile loads; still allow seeding of unloaded
   // profiles.
   GROUP_ENFORCE_ON_LOAD,
-  GROUP_ENFORCE_ALWAYS
+  // Also disallow seeding of unloaded profiles.
+  GROUP_ENFORCE_ALWAYS,
+  // Also enforce extension settings.
+  GROUP_ENFORCE_ALWAYS_WITH_EXTENSIONS,
+  // The default enforcement group contains all protection features.
+  GROUP_ENFORCE_DEFAULT
 };
 
 SettingsEnforcementGroup GetSettingsEnforcementGroup() {
@@ -191,11 +198,20 @@ SettingsEnforcementGroup GetSettingsEnforcementGroup() {
       GROUP_ENFORCE_ON_LOAD },
     { chrome_prefs::internals::kSettingsEnforcementGroupEnforceAlways,
       GROUP_ENFORCE_ALWAYS },
+    { chrome_prefs::internals::
+          kSettingsEnforcementGroupEnforceAlwaysWithExtensions,
+      GROUP_ENFORCE_ALWAYS_WITH_EXTENSIONS },
   };
 
   // Use the strongest enforcement setting in the absence of a field trial
-  // config.
-  SettingsEnforcementGroup enforcement_group = GROUP_ENFORCE_ALWAYS;
+  // config on Windows.
+  // TODO(gab): Enforce this on all platforms.
+  SettingsEnforcementGroup enforcement_group =
+#if defined(OS_WIN)
+      GROUP_ENFORCE_DEFAULT;
+#else
+      GROUP_NO_ENFORCEMENT;
+#endif
   bool group_determined_from_trial = false;
   base::FieldTrial* trial =
       base::FieldTrialList::Find(
@@ -222,16 +238,29 @@ SettingsEnforcementGroup GetSettingsEnforcementGroup() {
 // Returns the effective preference tracking configuration.
 std::vector<PrefHashFilter::TrackedPreferenceMetadata>
 GetTrackingConfiguration() {
-  const PrefHashFilter::EnforcementLevel maximum_level =
-      GetSettingsEnforcementGroup() == GROUP_NO_ENFORCEMENT
-          ? PrefHashFilter::NO_ENFORCEMENT
-          : PrefHashFilter::ENFORCE_ON_LOAD;
+  const SettingsEnforcementGroup enforcement_group =
+      GetSettingsEnforcementGroup();
 
   std::vector<PrefHashFilter::TrackedPreferenceMetadata> result;
   for (size_t i = 0; i < arraysize(kTrackedPrefs); ++i) {
     PrefHashFilter::TrackedPreferenceMetadata data = kTrackedPrefs[i];
-    if (data.enforcement_level > maximum_level)
-      data.enforcement_level = maximum_level;
+
+    switch (enforcement_group) {
+      case GROUP_NO_ENFORCEMENT:
+        // Remove enforcement for all tracked preferences.
+        data.enforcement_level = PrefHashFilter::NO_ENFORCEMENT;
+        break;
+      case GROUP_ENFORCE_ON_LOAD:  // Falls through.
+      case GROUP_ENFORCE_ALWAYS:
+        // Keep the default enforcement level for this tracked preference.
+        break;
+      case GROUP_ENFORCE_ALWAYS_WITH_EXTENSIONS:  // Falls through.
+      case GROUP_ENFORCE_DEFAULT:
+        // Specifically enable extension settings enforcement.
+        if (data.name == extensions::pref_names::kExtensions)
+          data.enforcement_level = PrefHashFilter::ENFORCE_ON_LOAD;
+    }
+
     result.push_back(data);
   }
   return result;
@@ -334,8 +363,6 @@ void PrepareFactory(
 // path matches |ignored_profile_path|.
 void UpdateAllPrefHashStoresIfRequired(
     const base::FilePath& ignored_profile_path) {
-  if (GetSettingsEnforcementGroup() >= GROUP_ENFORCE_ALWAYS)
-    return;
   const ProfileInfoCache& profile_info_cache =
       g_browser_process->profile_manager()->GetProfileInfoCache();
   const size_t n_profiles = profile_info_cache.GetNumberOfProfiles();
@@ -361,6 +388,8 @@ const char kSettingsEnforcementTrialName[] = "SettingsEnforcement";
 const char kSettingsEnforcementGroupNoEnforcement[] = "no_enforcement";
 const char kSettingsEnforcementGroupEnforceOnload[] = "enforce_on_load";
 const char kSettingsEnforcementGroupEnforceAlways[] = "enforce_always";
+const char kSettingsEnforcementGroupEnforceAlwaysWithExtensions[] =
+    "enforce_always_with_extensions";
 
 }  // namespace internals
 
@@ -429,6 +458,9 @@ void SchedulePrefHashStoresUpdateCheck(
         g_browser_process->local_state());
     return;
   }
+
+  if (GetSettingsEnforcementGroup() >= GROUP_ENFORCE_ALWAYS)
+    return;
 
   const int kDefaultPrefHashStoresUpdateCheckDelaySeconds = 55;
   BrowserThread::PostDelayedTask(

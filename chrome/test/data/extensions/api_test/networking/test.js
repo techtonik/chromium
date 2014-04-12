@@ -55,6 +55,20 @@ var privateHelpers = {
           self.listenForChanges);
       done();
     };
+  },
+  watchForCaptivePortalState: function(expectedNetworkPath,
+                                       expectedState,
+                                       done) {
+    var self = this;
+    this.onPortalDetectionCompleted = function(networkPath, state) {
+      assertEq(expectedNetworkPath, networkPath);
+      assertEq(expectedState, state);
+      chrome.networkingPrivate.onPortalDetectionCompleted.removeListener(
+          self.onPortalDetectionCompleted);
+      done();
+    };
+    chrome.networkingPrivate.onPortalDetectionCompleted.addListener(
+        self.onPortalDetectionCompleted);
   }
 };
 
@@ -381,7 +395,29 @@ var availableTests = [
       callbackPass(function(result) {
         assertEq("Connected", result);
       }));
-  }
+  },
+  function getCaptivePortalStatus() {
+    var networks = [['stub_ethernet', 'Online'],
+                    ['stub_wifi1', 'Offline'],
+                    ['stub_wifi2', 'Portal'],
+                    ['stub_cellular1', 'ProxyAuthRequired'],
+                    ['stub_vpn1', 'Unknown']];
+    networks.forEach(function(network) {
+      var servicePath = network[0];
+      var expectedStatus = network[1];
+      chrome.networkingPrivate.getCaptivePortalStatus(
+        servicePath,
+        callbackPass(function(status) {
+          assertEq(expectedStatus, status);
+        }));
+    });
+  },
+  function captivePortalNotification() {
+    var done = chrome.test.callbackAdded();
+    var listener =
+        new privateHelpers.watchForCaptivePortalState('wifi', 'Online', done);
+    chrome.test.sendMessage('notifyPortalDetectorObservers');
+  },
 ];
 
 var testToRun = window.location.search.substring(1);

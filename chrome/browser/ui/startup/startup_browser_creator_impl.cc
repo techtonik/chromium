@@ -24,6 +24,7 @@
 #include "base/strings/string_split.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread_restrictions.h"
+#include "chrome/browser/apps/install_chrome_app.h"
 #include "chrome/browser/auto_launch_trial.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
@@ -91,6 +92,8 @@
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/common/constants.h"
+#include "extensions/common/extension.h"
+#include "extensions/common/extension_set.h"
 #include "grit/locale_settings.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -98,10 +101,6 @@
 #if defined(OS_MACOSX)
 #include "base/mac/mac_util.h"
 #include "chrome/browser/ui/cocoa/keystone_infobar_delegate.h"
-#endif
-
-#if defined(TOOLKIT_GTK)
-#include "chrome/browser/ui/gtk/gtk_util.h"
 #endif
 
 #if defined(OS_WIN)
@@ -227,11 +226,11 @@ void RecordCmdLineAppHistogram(extensions::Manifest::Type app_type) {
 void RecordAppLaunches(Profile* profile,
                        const std::vector<GURL>& cmd_line_urls,
                        StartupTabs& autolaunch_tabs) {
-  ExtensionService* extension_service = profile->GetExtensionService();
-  DCHECK(extension_service);
+  const extensions::ExtensionSet& extensions =
+      extensions::ExtensionRegistry::Get(profile)->enabled_extensions();
   for (size_t i = 0; i < cmd_line_urls.size(); ++i) {
     const extensions::Extension* extension =
-        extension_service->GetInstalledApp(cmd_line_urls.at(i));
+        extensions.GetAppByURL(cmd_line_urls.at(i));
     if (extension) {
       CoreAppLauncherHandler::RecordAppLaunchType(
           extension_misc::APP_LAUNCH_CMD_LINE_URL,
@@ -240,7 +239,7 @@ void RecordAppLaunches(Profile* profile,
   }
   for (size_t i = 0; i < autolaunch_tabs.size(); ++i) {
     const extensions::Extension* extension =
-        extension_service->GetInstalledApp(autolaunch_tabs.at(i).url);
+        extensions.GetAppByURL(autolaunch_tabs.at(i).url);
     if (extension) {
       CoreAppLauncherHandler::RecordAppLaunchType(
           extension_misc::APP_LAUNCH_AUTOLAUNCH,
@@ -388,6 +387,11 @@ bool StartupBrowserCreatorImpl::Launch(Profile* profile,
 
     ProcessLaunchURLs(process_startup, urls_to_open, desktop_type);
 
+    if (command_line_.HasSwitch(switches::kInstallChromeApp)) {
+      install_chrome_app::InstallChromeApp(
+          command_line_.GetSwitchValueASCII(switches::kInstallChromeApp));
+    }
+
     // If this is an app launch, but we didn't open an app window, it may
     // be an app tab.
     OpenApplicationTab(profile);
@@ -507,7 +511,8 @@ bool StartupBrowserCreatorImpl::OpenApplicationWindow(
     if (policy->IsWebSafeScheme(url.scheme()) ||
         url.SchemeIs(content::kFileScheme)) {
       const extensions::Extension* extension =
-          profile->GetExtensionService()->GetInstalledApp(url);
+          extensions::ExtensionRegistry::Get(profile)
+              ->enabled_extensions().GetAppByURL(url);
       if (extension) {
         RecordCmdLineAppHistogram(extension->GetType());
       } else {
@@ -810,12 +815,12 @@ Browser* StartupBrowserCreatorImpl::OpenTabsInBrowser(
     params.tabstrip_add_types = add_types;
     params.extension_app_id = tabs[i].app_id;
 
-#if defined(ENABLE_RLZ)
+#if defined(ENABLE_RLZ) && !defined(OS_IOS)
     if (process_startup && google_util::IsGoogleHomePageUrl(tabs[i].url)) {
       params.extra_headers = RLZTracker::GetAccessPointHttpHeader(
           RLZTracker::CHROME_HOME_PAGE);
     }
-#endif
+#endif  // defined(ENABLE_RLZ) && !defined(OS_IOS)
 
     chrome::Navigate(&params);
 

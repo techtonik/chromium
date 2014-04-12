@@ -17,14 +17,6 @@
 #include "third_party/jsoncpp/source/include/json/value.h"
 
 namespace plugin {
-namespace {
-const PPB_NaCl_Private* GetNaClInterface() {
-  pp::Module *module = pp::Module::Get();
-  CHECK(module);
-  return static_cast<const PPB_NaCl_Private*>(
-      module->GetBrowserInterface(PPB_NACL_PRIVATE_INTERFACE));
-}
-}  // namespace
 
 static const char kPnaclBaseUrl[] = "chrome://pnacl-translator/";
 const char PnaclUrls::kResourceInfoUrl[] = "pnacl.json";
@@ -104,14 +96,7 @@ void PnaclResources::ReadResourceInfo(
     const pp::CompletionCallback& resource_info_read_cb) {
   PLUGIN_PRINTF(("PnaclResources::ReadResourceInfo\n"));
 
-  nacl::string full_url;
-  ErrorInfo error_info;
-  if (!manifest_->ResolveURL(resource_info_url, &full_url, &error_info)) {
-    ReadResourceInfoError(nacl::string("failed to resolve ") +
-                          resource_info_url + ": " +
-                          error_info.message() + ".");
-    return;
-  }
+  nacl::string full_url = PnaclUrls::GetBaseUrl() + resource_info_url;
   PLUGIN_PRINTF(("Resolved resources info url: %s\n", full_url.c_str()));
   nacl::string resource_info_filename =
     PnaclUrls::PnaclComponentURLToFilename(full_url);
@@ -194,17 +179,9 @@ bool PnaclResources::ParseResourceInfo(const nacl::string& buf,
 
 nacl::string PnaclResources::GetFullUrl(
     const nacl::string& partial_url, const nacl::string& sandbox_arch) const {
-  nacl::string full_url;
-  ErrorInfo error_info;
   const nacl::string& url_with_platform_prefix =
       sandbox_arch + "/" + partial_url;
-  if (!manifest_->ResolveURL(url_with_platform_prefix,
-                             &full_url,
-                             &error_info)) {
-    PLUGIN_PRINTF(("PnaclResources::GetFullUrl failed: %s.\n",
-                   error_info.message().c_str()));
-    return "";
-  }
+  nacl::string full_url = PnaclUrls::GetBaseUrl() + url_with_platform_prefix;
   return full_url;
 }
 

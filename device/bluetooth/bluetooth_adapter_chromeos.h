@@ -33,10 +33,10 @@ class BluetoothPairingChromeOS;
 // Chrome OS platform.
 class BluetoothAdapterChromeOS
     : public device::BluetoothAdapter,
-      private chromeos::BluetoothAdapterClient::Observer,
-      private chromeos::BluetoothDeviceClient::Observer,
-      private chromeos::BluetoothInputClient::Observer,
-      private chromeos::BluetoothAgentServiceProvider::Delegate {
+      public chromeos::BluetoothAdapterClient::Observer,
+      public chromeos::BluetoothDeviceClient::Observer,
+      public chromeos::BluetoothInputClient::Observer,
+      public chromeos::BluetoothAgentServiceProvider::Delegate {
  public:
   // BluetoothAdapter override
   virtual void AddObserver(
@@ -105,7 +105,7 @@ class BluetoothAdapterChromeOS
                                     const std::string& property_name) OVERRIDE;
 
   // BluetoothAgentServiceProvider::Delegate override.
-  virtual void Release() OVERRIDE;
+  virtual void Released() OVERRIDE;
   virtual void RequestPinCode(const dbus::ObjectPath& device_path,
                               const PinCodeCallback& callback) OVERRIDE;
   virtual void DisplayPinCode(const dbus::ObjectPath& device_path,

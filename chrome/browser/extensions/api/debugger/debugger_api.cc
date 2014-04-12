@@ -25,7 +25,6 @@
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/infobars/confirm_infobar_delegate.h"
 #include "chrome/browser/infobars/infobar.h"
-#include "chrome/browser/infobars/infobar_manager.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/webui/chrome_web_ui_controller_factory.h"
@@ -159,7 +158,7 @@ class ExtensionDevToolsInfoBarDelegate : public ConfirmInfoBarDelegate {
   virtual void InfoBarDismissed() OVERRIDE;
   virtual Type GetInfoBarType() const OVERRIDE;
   virtual bool ShouldExpireInternal(
-      const content::LoadCommittedDetails& details) const OVERRIDE;
+      const NavigationDetails& details) const OVERRIDE;
   virtual base::string16 GetMessageText() const OVERRIDE;
   virtual int GetButtons() const OVERRIDE;
   virtual bool Cancel() OVERRIDE;
@@ -211,7 +210,7 @@ InfoBarDelegate::Type ExtensionDevToolsInfoBarDelegate::GetInfoBarType() const {
 }
 
 bool ExtensionDevToolsInfoBarDelegate::ShouldExpireInternal(
-    const content::LoadCommittedDetails& details) const {
+    const NavigationDetails& details) const {
   return false;
 }
 
@@ -342,7 +341,7 @@ ExtensionDevToolsClientHost::~ExtensionDevToolsClientHost() {
         infobar_->delegate())->set_client_host(NULL);
     InfoBarService* infobar_service = InfoBarService::FromWebContents(
         WebContents::FromRenderViewHost(agent_host_->GetRenderViewHost()));
-    infobar_service->infobar_manager()->RemoveInfoBar(infobar_);
+    infobar_service->RemoveInfoBar(infobar_);
   }
   AttachedClientHosts::GetInstance()->Remove(this);
 }

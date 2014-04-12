@@ -35,6 +35,8 @@
 #include "content/public/common/content_switches.h"
 #include "gpu/command_buffer/service/gpu_switches.h"
 #include "media/base/media_switches.h"
+#include "third_party/cros_system_api/switches/chrome_switches.h"
+#include "ui/app_list/app_list_switches.h"
 #include "ui/base/ui_base_switches.h"
 #include "ui/compositor/compositor_switches.h"
 #include "ui/events/event_switches.h"
@@ -70,7 +72,6 @@ std::string DeriveCommandLine(const GURL& start_url,
     ::switches::kDisableAccelerated2dCanvas,
     ::switches::kDisableAcceleratedOverflowScroll,
     ::switches::kDisableAcceleratedVideoDecode,
-    ::switches::kDisableBrowserPluginCompositing,
     ::switches::kDisableDelegatedRenderer,
     ::switches::kDisableFastTextAutosizing,
     ::switches::kDisableFiltersOverIPC,
@@ -105,6 +106,7 @@ std::string DeriveCommandLine(const GURL& start_url,
     ::switches::kDisableGestureTapHighlight,
     ::switches::kDisableGpuSandbox,
     ::switches::kEnableDeferredFilters,
+    ::switches::kEnableContainerCulling,
     ::switches::kEnableGpuRasterization,
     ::switches::kEnableImplSidePainting,
     ::switches::kEnableLogging,
@@ -163,6 +165,8 @@ std::string DeriveCommandLine(const GURL& start_url,
 #if defined(USE_OZONE)
     ::switches::kOzonePlatform,
 #endif
+    app_list::switches::kDisableSyncAppList,
+    app_list::switches::kEnableSyncAppList,
     ash::switches::kAshDefaultWallpaperLarge,
     ash::switches::kAshDefaultWallpaperSmall,
     ash::switches::kAshGuestWallpaperLarge,
@@ -202,6 +206,7 @@ std::string DeriveCommandLine(const GURL& start_url,
     chromeos::switches::kHasChromeOSKeyboard,
     chromeos::switches::kLoginProfile,
     chromeos::switches::kNaturalScrollDefault,
+    chromeos::switches::kSystemInDevMode,
     ::switches::kEnableBrowserTextSubpixelPositioning,
     ::switches::kEnableWebkitTextSubpixelPositioning,
     policy::switches::kDeviceManagementUrl,

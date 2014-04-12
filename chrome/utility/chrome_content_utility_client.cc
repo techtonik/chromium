@@ -17,7 +17,6 @@
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_utility_messages.h"
 #include "chrome/common/extensions/chrome_extensions_client.h"
-#include "chrome/common/extensions/extension_l10n_util.h"
 #include "chrome/common/extensions/update_manifest.h"
 #include "chrome/common/safe_browsing/zip_analyzer.h"
 #include "chrome/utility/chrome_content_utility_ipc_whitelist.h"
@@ -34,6 +33,7 @@
 #include "courgette/courgette.h"
 #include "courgette/third_party/bsdiff.h"
 #include "extensions/common/extension.h"
+#include "extensions/common/extension_l10n_util.h"
 #include "extensions/common/manifest.h"
 #include "media/base/media.h"
 #include "media/base/media_file_checker.h"
@@ -720,6 +720,14 @@ bool ChromeContentUtilityClient::RenderPDFPagesToPWGRaster(
       page_number = total_page_count - 1 - page_number;
     }
 
+    bool rotate = false;
+
+    // Transform odd pages.
+    if (page_number % 2) {
+      rotate =
+          (bitmap_settings.odd_page_transform != printing::TRANSFORM_NORMAL);
+    }
+
     if (!g_pdf_lib.Get().RenderPDFPageToBitmap(data.data(),
                                                data.size(),
                                                page_number,
@@ -731,36 +739,9 @@ bool ChromeContentUtilityClient::RenderPDFPagesToPWGRaster(
                                                autoupdate)) {
       return false;
     }
-
-    cloud_print::PwgHeaderInfo header_info;
-    header_info.dpi = settings.dpi();
-    header_info.total_pages = total_page_count;
-
-    // Transform odd pages.
-    if (page_number % 2) {
-      switch (bitmap_settings.odd_page_transform) {
-        case printing::TRANSFORM_NORMAL:
-          break;
-        case printing::TRANSFORM_ROTATE_180:
-          header_info.flipx = true;
-          header_info.flipy = true;
-          break;
-        case printing::TRANSFORM_FLIP_HORIZONTAL:
-          header_info.flipx = true;
-          break;
-        case printing::TRANSFORM_FLIP_VERTICAL:
-          header_info.flipy = true;
-          break;
-      }
-    }
-
-    if (bitmap_settings.rotate_all_pages) {
-      header_info.flipx = !header_info.flipx;
-      header_info.flipy = !header_info.flipy;
-    }
-
     std::string pwg_page;
-    if (!encoder.EncodePage(&image, header_info, &pwg_page))
+    if (!encoder.EncodePage(
+            image, settings.dpi(), total_page_count, &pwg_page, rotate))
       return false;
     bytes_written = base::WritePlatformFileAtCurrentPos(bitmap_file,
                                                         pwg_page.data(),
@@ -961,22 +942,22 @@ void ChromeContentUtilityClient::OnParseITunesLibraryXmlFile(
 void ChromeContentUtilityClient::OnParsePicasaPMPDatabase(
     const picasa::AlbumTableFilesForTransit& album_table_files) {
   picasa::AlbumTableFiles files;
-  files.indicator_file = IPC::PlatformFileForTransitToPlatformFile(
-      album_table_files.indicator_file);
-  files.category_file = IPC::PlatformFileForTransitToPlatformFile(
-      album_table_files.category_file);
-  files.date_file = IPC::PlatformFileForTransitToPlatformFile(
-      album_table_files.date_file);
-  files.filename_file = IPC::PlatformFileForTransitToPlatformFile(
-      album_table_files.filename_file);
-  files.name_file = IPC::PlatformFileForTransitToPlatformFile(
-      album_table_files.name_file);
-  files.token_file = IPC::PlatformFileForTransitToPlatformFile(
-      album_table_files.token_file);
-  files.uid_file = IPC::PlatformFileForTransitToPlatformFile(
-      album_table_files.uid_file);
+  files.indicator_file =
+      IPC::PlatformFileForTransitToFile(album_table_files.indicator_file);
+  files.category_file =
+      IPC::PlatformFileForTransitToFile(album_table_files.category_file);
+  files.date_file =
+      IPC::PlatformFileForTransitToFile(album_table_files.date_file);
+  files.filename_file =
+      IPC::PlatformFileForTransitToFile(album_table_files.filename_file);
+  files.name_file =
+      IPC::PlatformFileForTransitToFile(album_table_files.name_file);
+  files.token_file =
+      IPC::PlatformFileForTransitToFile(album_table_files.token_file);
+  files.uid_file =
+      IPC::PlatformFileForTransitToFile(album_table_files.uid_file);
 
-  picasa::PicasaAlbumTableReader reader(files);
+  picasa::PicasaAlbumTableReader reader(files.Pass());
   bool parse_success = reader.Init();
   Send(new ChromeUtilityHostMsg_ParsePicasaPMPDatabase_Finished(
       parse_success,

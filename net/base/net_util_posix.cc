@@ -18,11 +18,11 @@
 #include "net/base/net_errors.h"
 #include "url/gurl.h"
 
-#if !defined(OS_ANDROID)
+#if !defined(OS_ANDROID) && !defined(OS_NACL)
 #include <ifaddrs.h>
-#endif
 #include <net/if.h>
 #include <netinet/in.h>
+#endif
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
 #include <netinet/in_var.h>
@@ -85,42 +85,11 @@ void RemovePermanentIPv6AddressesWhereTemporaryExists(
 
 }  // namespace
 
-bool FileURLToFilePath(const GURL& url, base::FilePath* path) {
-  *path = base::FilePath();
-  std::string& file_path_str = const_cast<std::string&>(path->value());
-  file_path_str.clear();
-
-  if (!url.is_valid())
-    return false;
-
-  // Firefox seems to ignore the "host" of a file url if there is one. That is,
-  // file://foo/bar.txt maps to /bar.txt.
-  // TODO(dhg): This should probably take into account UNCs which could
-  // include a hostname other than localhost or blank
-  std::string old_path = url.path();
-
-  if (old_path.empty())
-    return false;
-
-  // GURL stores strings as percent-encoded 8-bit, this will undo if possible.
-  old_path = UnescapeURLComponent(old_path,
-      UnescapeRule::SPACES | UnescapeRule::URL_SPECIAL_CHARS);
-
-  // Collapse multiple path slashes into a single path slash.
-  std::string new_path;
-  do {
-    new_path = old_path;
-    ReplaceSubstringsAfterOffset(&new_path, 0, "//", "/");
-    old_path.swap(new_path);
-  } while (new_path != old_path);
-
-  file_path_str.assign(old_path);
-
-  return !file_path_str.empty();
-}
-
 bool GetNetworkList(NetworkInterfaceList* networks, int policy) {
-#if defined(OS_ANDROID)
+#if defined(OS_NACL)
+  NOTIMPLEMENTED();
+  return false;
+#elif defined(OS_ANDROID)
   std::string network_list = android::GetNetworkList();
   base::StringTokenizer network_interfaces(network_list, "\n");
   while (network_interfaces.GetNext()) {
@@ -142,7 +111,8 @@ bool GetNetworkList(NetworkInterfaceList* networks, int policy) {
     CHECK(base::StringToUint(network_tokenizer.token(), &index));
 
     networks->push_back(
-        NetworkInterface(name, name, index, address, network_prefix));
+        NetworkInterface(name, name, index, NETWORK_INTERFACE_UNKNOWN,
+                         address, network_prefix));
   }
   return true;
 #else
@@ -242,7 +212,7 @@ bool GetNetworkList(NetworkInterfaceList* networks, int policy) {
         }
       }
       network_info.interface = NetworkInterface(
-          name, name, if_nametoindex(name.c_str()),
+          name, name, if_nametoindex(name.c_str()), NETWORK_INTERFACE_UNKNOWN,
           address.address(), net_mask);
 
       network_infos.push_back(NetworkInterfaceInfo(network_info));

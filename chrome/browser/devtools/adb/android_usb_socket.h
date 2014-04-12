@@ -38,8 +38,8 @@ class AndroidUsbSocket : public net::StreamSocket,
                    const net::CompletionCallback& callback) OVERRIDE;
   virtual int Write(net::IOBuffer* buf, int buf_len,
                     const net::CompletionCallback& callback) OVERRIDE;
-  virtual bool SetReceiveBufferSize(int32 size) OVERRIDE;
-  virtual bool SetSendBufferSize(int32 size) OVERRIDE;
+  virtual int SetReceiveBufferSize(int32 size) OVERRIDE;
+  virtual int SetSendBufferSize(int32 size) OVERRIDE;
   virtual int Connect(const net::CompletionCallback& callback) OVERRIDE;
   virtual void Disconnect() OVERRIDE;
   virtual bool IsConnected() const OVERRIDE;
@@ -78,7 +78,6 @@ class AndroidUsbSocket : public net::StreamSocket,
   uint32 remote_id_;
   net::BoundNetLog net_log_;
   bool is_connected_;
-  bool is_closed_;
   std::string read_buffer_;
   net::CompletionCallback connect_callback_;
   std::deque<IORequest> read_requests_;

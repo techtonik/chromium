@@ -8,6 +8,7 @@
 #include <string>
 
 #include "base/basictypes.h"
+#include "base/observer_list.h"
 #include "device/bluetooth/bluetooth_device.h"
 
 #ifdef __OBJC__
@@ -16,14 +17,24 @@
 class IOBluetoothDevice;
 #endif
 
+namespace base {
+class SequencedTaskRunner;
+}  // namespace base
+
 namespace device {
 
 class BluetoothDeviceMac : public BluetoothDevice {
  public:
-  explicit BluetoothDeviceMac(IOBluetoothDevice* device);
+  explicit BluetoothDeviceMac(
+      const scoped_refptr<base::SequencedTaskRunner>& ui_task_runner,
+      IOBluetoothDevice* device);
   virtual ~BluetoothDeviceMac();
 
   // BluetoothDevice override
+  virtual void AddObserver(
+      device::BluetoothDevice::Observer* observer) OVERRIDE;
+  virtual void RemoveObserver(
+      device::BluetoothDevice::Observer* observer) OVERRIDE;
   virtual uint32 GetBluetoothClass() const OVERRIDE;
   virtual std::string GetAddress() const OVERRIDE;
   virtual VendorIDSource GetVendorIDSource() const OVERRIDE;
@@ -52,12 +63,12 @@ class BluetoothDeviceMac : public BluetoothDevice {
       const ErrorCallback& error_callback) OVERRIDE;
   virtual void Forget(const ErrorCallback& error_callback) OVERRIDE;
   virtual void ConnectToService(
-      const std::string& service_uuid,
+      const device::BluetoothUUID& service_uuid,
       const SocketCallback& callback) OVERRIDE;
   virtual void ConnectToProfile(
-      device::BluetoothProfile* profile,
+      BluetoothProfile* profile,
       const base::Closure& callback,
-      const ErrorCallback& error_callback) OVERRIDE;
+      const ConnectToProfileErrorCallback& error_callback) OVERRIDE;
   virtual void SetOutOfBandPairingData(
       const BluetoothOutOfBandPairingData& data,
       const base::Closure& callback,
@@ -73,6 +84,11 @@ class BluetoothDeviceMac : public BluetoothDevice {
  private:
   friend class BluetoothAdapterMac;
 
+  // List of observers interested in event notifications from us.
+  ObserverList<Observer> observers_;
+
+  scoped_refptr<base::SequencedTaskRunner> ui_task_runner_;
+  // (retained)
   IOBluetoothDevice* device_;
 
   DISALLOW_COPY_AND_ASSIGN(BluetoothDeviceMac);

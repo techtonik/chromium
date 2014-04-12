@@ -143,7 +143,7 @@ FileTasks.UMA_INDEX_KNOWN_EXTENSIONS_ = Object.freeze([
 ]);
 
 /**
- * The list of excutable file extensions.
+ * The list of executable file extensions.
  *
  * @const
  * @type {Array.<string>}
@@ -690,18 +690,12 @@ FileTasks.prototype.openGalleryInternal_ = function(entries) {
     var downloadsVolume =
         fm.volumeManager.getCurrentProfileVolumeInfo(RootType.DOWNLOADS);
     var downloadsDir = downloadsVolume && downloadsVolume.fileSystem.root;
+
+    // TODO(mtomasz): Pass Entry instead of localized name. Conversion to a
+    //     display string should be done in gallery.js.
     var readonlyDirName = null;
-    if (readonly && currentDir) {
-      // TODO(mtomasz): Pass Entry instead of localized name. Conversion to a
-      //     display string should be done in gallery.js.
-      var locationInfo = fm.volumeManager.getLocationInfo(currentDir);
-      if (locationInfo && locationInfo.isRootEntry) {
-        readonlyDirName = PathUtil.getRootTypeLabel(currentDir.rootType) ||
-            currentDir.name;
-      } else {
-        readonlyDirName = currentDir.name;
-      }
-    }
+    if (readonly && currentDir)
+      readonlyDirName = util.getEntryLabel(fm.volumeManager, currentDir);
 
     var context = {
       // We show the root label in readonly warning (e.g. archive name).

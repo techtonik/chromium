@@ -4,10 +4,6 @@
 
 #include "chrome/browser/chrome_browser_main.h"
 
-#if defined(TOOLKIT_GTK)
-#include <gtk/gtk.h>
-#endif
-
 #include <set>
 #include <string>
 #include <vector>
@@ -53,7 +49,6 @@
 #include "chrome/browser/component_updater/swiftshader_component_installer.h"
 #include "chrome/browser/component_updater/widevine_cdm_component_installer.h"
 #include "chrome/browser/defaults.h"
-#include "chrome/browser/extensions/extension_protocols.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/startup_helper.h"
 #include "chrome/browser/feedback/feedback_profile_observer.h"
@@ -128,6 +123,7 @@
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/main_function_params.h"
+#include "extensions/browser/extension_protocols.h"
 #include "extensions/browser/extension_system.h"
 #include "grit/app_locale_settings.h"
 #include "grit/browser_resources.h"
@@ -520,7 +516,7 @@ namespace chrome_browser {
 const char kMissingLocaleDataTitle[] = "Missing File Error";
 #endif
 
-#if defined(OS_WIN) || defined(TOOLKIT_GTK)
+#if defined(OS_WIN)
 // TODO(port) This should be used on Linux Aura as well. http://crbug.com/338969
 const char kMissingLocaleDataMessage[] =
     "Unable to find locale data files. Please reinstall.";
@@ -915,10 +911,6 @@ int ChromeBrowserMainParts::PreCreateThreadsImpl() {
         resources_pack_path, ui::SCALE_FACTOR_NONE);
   }
 #endif  // defined(OS_MACOSX)
-
-#if defined(TOOLKIT_GTK)
-  g_set_application_name(l10n_util::GetStringUTF8(IDS_PRODUCT_NAME).c_str());
-#endif
 
   // Android does first run in Java instead of native.
   // Chrome OS has its own out-of-box-experience code.

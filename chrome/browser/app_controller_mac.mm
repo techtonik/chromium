@@ -60,7 +60,7 @@
 #import "chrome/browser/ui/cocoa/encoding_menu_controller_delegate_mac.h"
 #import "chrome/browser/ui/cocoa/history_menu_bridge.h"
 #include "chrome/browser/ui/cocoa/last_active_browser_cocoa.h"
-#import "chrome/browser/ui/cocoa/profile_menu_controller.h"
+#import "chrome/browser/ui/cocoa/profiles/profile_menu_controller.h"
 #import "chrome/browser/ui/cocoa/tabs/tab_strip_controller.h"
 #import "chrome/browser/ui/cocoa/tabs/tab_window_controller.h"
 #include "chrome/browser/ui/cocoa/task_manager_mac.h"
@@ -86,7 +86,7 @@
 #include "extensions/browser/extension_system.h"
 #include "grit/chromium_strings.h"
 #include "grit/generated_resources.h"
-#include "net/base/net_util.h"
+#include "net/base/filename_util.h"
 #include "ui/base/cocoa/focus_window_set.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/l10n_util_mac.h"
@@ -955,7 +955,7 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
 // check, otherwise it should have been disabled in the UI in
 // |-validateUserInterfaceItem:|.
 - (void)commandDispatch:(id)sender {
-  Profile* lastProfile = [self lastProfile];
+  Profile* lastProfile = [self safeLastProfileForNewWindows];
 
   // Handle the case where we're dispatching a command from a sender that's in a
   // browser window. This means that the command came from a background window
@@ -1290,6 +1290,16 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
       *CommandLine::ForCurrentProcess()));
 }
 
+- (Profile*)safeLastProfileForNewWindows {
+  Profile* profile = [self lastProfile];
+
+  // Guest sessions must always be OffTheRecord. Use that when opening windows.
+  if (profile->IsGuestSession())
+    return profile->GetOffTheRecordProfile();
+
+  return profile;
+}
+
 // Various methods to open URLs that we get in a native fashion. We use
 // StartupBrowserCreator here because on the other platforms, URLs to open come
 // through the ProcessSingleton, and it calls StartupBrowserCreator. It's best
@@ -1353,7 +1363,7 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
     chrome::ShowSettings(browser);
   } else {
     // No browser window, so create one for the options tab.
-    chrome::OpenOptionsWindow([self lastProfile]);
+    chrome::OpenOptionsWindow([self safeLastProfileForNewWindows]);
   }
 }
 
@@ -1362,7 +1372,7 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
     chrome::ShowAboutChrome(browser);
   } else {
     // No browser window, so create one for the about tab.
-    chrome::OpenAboutWindow([self lastProfile]);
+    chrome::OpenAboutWindow([self safeLastProfileForNewWindows]);
   }
 }
 

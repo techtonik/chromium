@@ -38,11 +38,14 @@
         'content_resources.gyp:content_resources',
         'content_shell_resources',
         'copy_test_netscape_plugin',
-        'test_support_content',
+        'layouttest_support_content',
         '../base/base.gyp:base',
+        '../base/base.gyp:base_static',
         '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
+        '../cc/cc.gyp:cc',
         '../components/components.gyp:breakpad_component',
         '../gin/gin.gyp:gin',
+        '../gpu/gpu.gyp:gpu',
         '../ipc/ipc.gyp:ipc',
         '../media/media.gyp:media',
         '../net/net.gyp:net',
@@ -58,13 +61,14 @@
         '../url/url.gyp:url_lib',
         '../v8/tools/gyp/v8.gyp:v8',
         '../webkit/common/webkit_common.gyp:webkit_common',
+        '../webkit/renderer/compositor_bindings/compositor_bindings.gyp:webkit_compositor_bindings',
+        '../webkit/storage_browser.gyp:webkit_storage_browser',
         '../webkit/webkit_resources.gyp:webkit_resources',
       ],
       'include_dirs': [
         '..',
       ],
       'sources': [
-        'public/test/layouttest_support.h',
         'shell/android/shell_jni_registrar.cc',
         'shell/android/shell_jni_registrar.h',
         'shell/android/shell_manager.cc',
@@ -104,9 +108,7 @@
         'shell/browser/shell_devtools_frontend.h',
         'shell/browser/shell_download_manager_delegate.cc',
         'shell/browser/shell_download_manager_delegate.h',
-        'shell/browser/shell_gtk.cc',
         'shell/browser/shell.h',
-        'shell/browser/shell_javascript_dialog_gtk.cc',
         'shell/browser/shell_javascript_dialog.h',
         'shell/browser/shell_javascript_dialog_mac.mm',
         'shell/browser/shell_javascript_dialog_manager.cc',
@@ -115,7 +117,6 @@
         'shell/browser/shell_layout_tests_android.cc',
         'shell/browser/shell_layout_tests_android.h',
         'shell/browser/shell_login_dialog.cc',
-        'shell/browser/shell_login_dialog_gtk.cc',
         'shell/browser/shell_login_dialog.h',
         'shell/browser/shell_login_dialog_mac.mm',
         'shell/browser/shell_mac.mm',
@@ -140,7 +141,6 @@
         'shell/browser/shell_views.cc',
         'shell/browser/shell_web_contents_view_delegate_android.cc',
         'shell/browser/shell_web_contents_view_delegate_creator.h',
-        'shell/browser/shell_web_contents_view_delegate_gtk.cc',
         'shell/browser/shell_web_contents_view_delegate.h',
         'shell/browser/shell_web_contents_view_delegate_mac.mm',
         'shell/browser/shell_web_contents_view_delegate_win.cc',
@@ -155,8 +155,8 @@
         'shell/common/shell_switches.h',
         'shell/common/shell_test_configuration.cc',
         'shell/common/shell_test_configuration.h',
-        'shell/common/test_runner/WebPreferences.cpp',
-        'shell/common/test_runner/WebPreferences.h',
+        'shell/common/test_runner/test_preferences.cc',
+        'shell/common/test_runner/test_preferences.h',
         'shell/common/webkit_test_helpers.cc',
         'shell/common/webkit_test_helpers.h',
         'shell/geolocation/shell_access_token_store.cc',
@@ -173,8 +173,8 @@
         'shell/renderer/shell_render_process_observer.h',
         'shell/renderer/shell_render_view_observer.cc',
         'shell/renderer/shell_render_view_observer.h',
-        'shell/renderer/test_runner/KeyCodeMapping.cpp',
-        'shell/renderer/test_runner/KeyCodeMapping.h',
+        'shell/renderer/test_runner/key_code_mapping.cc',
+        'shell/renderer/test_runner/key_code_mapping.h',
         'shell/renderer/test_runner/MockColorChooser.cpp',
         'shell/renderer/test_runner/MockColorChooser.h',
         'shell/renderer/test_runner/MockConstraints.cpp',
@@ -236,12 +236,10 @@
         'shell/renderer/test_runner/test_runner.h',
         'shell/renderer/test_runner/text_input_controller.cc',
         'shell/renderer/test_runner/text_input_controller.h',
-        'shell/renderer/test_runner/unsafe_persistent.h',
         'shell/renderer/test_runner/web_ax_object_proxy.cc',
         'shell/renderer/test_runner/web_ax_object_proxy.h',
         'shell/renderer/webkit_test_runner.cc',
         'shell/renderer/webkit_test_runner.h',
-        'test/layouttest_support.cc',
       ],
       'msvs_settings': {
         'VCLinkerTool': {
@@ -299,12 +297,6 @@
           'dependencies!': [
             'copy_test_netscape_plugin',
           ],
-        }, {  # else: OS!="android"
-          'dependencies': [
-            # This dependency is for running DRT against the content shell, and
-            # this combination is not yet supported on Android.
-            'test_support_content',
-          ],
         }],  # OS=="android"
         ['os_posix == 1 and OS != "mac" and android_webview_build != 1', {
           'dependencies': [
@@ -312,7 +304,7 @@
           ],
         }],
         # TODO(dmikurube): Kill {linux|android}_use_tcmalloc. http://crbug.com/345554
-        ['(use_allocator!="none" and use_allocator!="see_use_tcmalloc") or (use_allocator=="see_use_tcmalloc" and ((OS=="linux" and os_posix==1 and use_aura==1 and linux_use_tcmalloc==1) or (OS=="android" and android_use_tcmalloc==1)))', {
+        ['(use_allocator!="none" and use_allocator!="see_use_tcmalloc") or (use_allocator=="see_use_tcmalloc" and ((OS=="linux" and linux_use_tcmalloc==1) or (OS=="android" and android_use_tcmalloc==1)))', {
           'dependencies': [
             # This is needed by content/app/content_main_runner.cc
             '../base/allocator/allocator.gyp:allocator',
@@ -321,10 +313,9 @@
         ['use_aura==1', {
           'dependencies': [
             '../ui/aura/aura.gyp:aura',
+            '../ui/aura/aura.gyp:aura_test_support',
             '../ui/base/strings/ui_strings.gyp:ui_strings',
-          ],
-          'sources/': [
-            ['exclude', 'shell/browser/shell_gtk.cc'],
+            '../ui/events/events.gyp:events',
           ],
           'conditions': [
             ['toolkit_views==1', {
@@ -492,11 +483,7 @@
             ],
             'conditions': [
               ['OS!="android"', {
-                'variables': {
-                  'pak_inputs': [
-                    '<(SHARED_INTERMEDIATE_DIR)/webkit/devtools_resources.pak',
-                  ],
-                },
+                'pak_inputs': ['<(SHARED_INTERMEDIATE_DIR)/webkit/devtools_resources.pak',],
                 'pak_output': '<(PRODUCT_DIR)/content_shell.pak',
               }, {
                 'pak_output': '<(PRODUCT_DIR)/content_shell/assets/content_shell.pak',
@@ -576,11 +563,6 @@
             '../sandbox/sandbox.gyp:sandbox',
           ],
         }],  # OS=="win" or toolkit_uses_gtk == 1
-        ['toolkit_uses_gtk == 1', {
-          'dependencies': [
-            '<(DEPTH)/build/linux/system.gyp:gtk',
-          ],
-        }],  # toolkit_uses_gtk
         ['OS=="mac"', {
           'product_name': '<(content_shell_product_name)',
           'dependencies!': [

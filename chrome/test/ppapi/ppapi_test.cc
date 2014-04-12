@@ -13,7 +13,6 @@
 #include "chrome/browser/content_settings/host_content_settings_map.h"
 #include "chrome/browser/infobars/confirm_infobar_delegate.h"
 #include "chrome/browser/infobars/infobar.h"
-#include "chrome/browser/infobars/infobar_manager.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
@@ -22,10 +21,11 @@
 #include "chrome/common/chrome_switches.h"
 #include "chrome/test/base/test_switches.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/nacl/common/nacl_switches.h"
 #include "content/public/browser/dom_operation_notification_details.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/web_contents.h"
-#include "net/base/net_util.h"
+#include "net/base/filename_util.h"
 #include "net/base/test_data_directory.h"
 #include "ppapi/shared_impl/ppapi_switches.h"
 #include "ui/gl/gl_switches.h"
@@ -111,13 +111,12 @@ void PPAPITestBase::InfoBarObserver::VerifyInfoBarState() {
       InfoBarService::FromWebContents(web_contents);
   ASSERT_TRUE(infobar_service != NULL);
 
-  InfoBarManager* infobar_manager = infobar_service->infobar_manager();
-  EXPECT_EQ(expecting_infobar_ ? 1U : 0U, infobar_manager->infobar_count());
+  EXPECT_EQ(expecting_infobar_ ? 1U : 0U, infobar_service->infobar_count());
   if (!expecting_infobar_)
     return;
   expecting_infobar_ = false;
 
-  InfoBar* infobar = infobar_manager->infobar_at(0);
+  InfoBar* infobar = infobar_service->infobar_at(0);
   ConfirmInfoBarDelegate* delegate =
       infobar->delegate()->AsConfirmInfoBarDelegate();
   ASSERT_TRUE(delegate != NULL);
@@ -126,7 +125,7 @@ void PPAPITestBase::InfoBarObserver::VerifyInfoBarState() {
   else
     delegate->Cancel();
 
-  infobar_manager->RemoveInfoBar(infobar);
+  infobar_service->RemoveInfoBar(infobar);
 }
 
 PPAPITestBase::PPAPITestBase() {
@@ -444,6 +443,19 @@ std::string PPAPINaClPNaClTest::BuildQuery(const std::string& base,
                                            const std::string& test_case) {
   return base::StringPrintf("%smode=nacl_pnacl&testcase=%s", base.c_str(),
                             test_case.c_str());
+}
+
+void PPAPINaClPNaClNonSfiTest::SetUpCommandLine(
+    base::CommandLine* command_line) {
+  PPAPINaClTest::SetUpCommandLine(command_line);
+  command_line->AppendSwitch(switches::kEnableNaClNonSfiMode);
+}
+
+std::string PPAPINaClPNaClNonSfiTest::BuildQuery(
+    const std::string& base,
+    const std::string& test_case) {
+  return base::StringPrintf("%smode=nacl_pnacl_nonsfi&testcase=%s",
+                            base.c_str(), test_case.c_str());
 }
 
 void PPAPIPrivateNaClPNaClTest::SetUpCommandLine(

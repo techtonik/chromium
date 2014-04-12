@@ -74,6 +74,8 @@
         'autofill/core/common/password_form_fill_data.h',
         'autofill/core/common/password_generation_util.cc',
         'autofill/core/common/password_generation_util.h',
+        'autofill/core/common/save_password_progress_logger.cc',
+        'autofill/core/common/save_password_progress_logger.h',
         'autofill/core/common/web_element_descriptor.cc',
         'autofill/core/common/web_element_descriptor.h',
       ],
@@ -427,6 +429,8 @@
             'autofill/content/renderer/password_form_conversion_utils.h',
             'autofill/content/renderer/password_generation_agent.cc',
             'autofill/content/renderer/password_generation_agent.h',
+            'autofill/content/renderer/renderer_save_password_progress_logger.cc',
+            'autofill/content/renderer/renderer_save_password_progress_logger.h',
           ],
           # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
           'msvs_disabled_warnings': [4267, ],

@@ -735,7 +735,7 @@ class PolicyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     response.policy_data = signed_data
     if signing_key:
       response.policy_data_signature = (
-          signing_key['private_key'].hashAndSign(signed_data).tostring())
+          bytes(signing_key['private_key'].hashAndSign(signed_data)))
       if msg.public_key_version != current_key_index + 1:
         response.new_public_key = signing_key['public_key']
 
@@ -753,7 +753,7 @@ class PolicyRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
         if req_key:
           response.new_public_key_signature = (
-              req_key.hashAndSign(response.new_public_key).tostring())
+              bytes(req_key.hashAndSign(response.new_public_key)))
 
     return (200, response.SerializeToString())
 
@@ -847,8 +847,8 @@ class PolicyTestServer(testserver_base.BrokenPipeHandlerMixIn,
         try:
           key = tlslite.api.parsePEMKey(key_str, private=True)
         except SyntaxError:
-          key = tlslite.utils.Python_RSAKey.Python_RSAKey._parsePKCS8(
-              tlslite.utils.cryptomath.stringToBytes(key_str))
+          key = tlslite.utils.python_rsakey.Python_RSAKey._parsePKCS8(
+              bytearray(key_str))
 
         assert key is not None
         key_info = { 'private_key' : key }
@@ -865,8 +865,8 @@ class PolicyTestServer(testserver_base.BrokenPipeHandlerMixIn,
       # Use the canned private keys if none were passed from the command line.
       for signing_key in SIGNING_KEYS:
         decoded_key = base64.b64decode(signing_key['key']);
-        key = tlslite.utils.Python_RSAKey.Python_RSAKey._parsePKCS8(
-            tlslite.utils.cryptomath.stringToBytes(decoded_key))
+        key = tlslite.utils.python_rsakey.Python_RSAKey._parsePKCS8(
+            bytearray(decoded_key))
         assert key is not None
         # Grab the signature dictionary for this key and decode all of the
         # signatures.

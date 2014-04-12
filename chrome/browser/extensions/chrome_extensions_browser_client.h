@@ -23,6 +23,7 @@ class BrowserContext;
 namespace extensions {
 
 class ChromeExtensionsAPIClient;
+class ContentSettingsPrefsObserver;
 
 // Implementation of extensions::BrowserClient for Chrome, which includes
 // knowledge of Profiles, BrowserContexts and incognito.
@@ -55,8 +56,22 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
   virtual bool CanExtensionCrossIncognito(
       const extensions::Extension* extension,
       content::BrowserContext* context) const OVERRIDE;
+  virtual net::URLRequestJob* MaybeCreateResourceBundleRequestJob(
+      net::URLRequest* request,
+      net::NetworkDelegate* network_delegate,
+      const base::FilePath& directory_path,
+      const std::string& content_security_policy,
+      bool send_cors_header) OVERRIDE;
+  virtual bool AllowCrossRendererResourceLoad(net::URLRequest* request,
+                                              bool is_incognito,
+                                              const Extension* extension,
+                                              InfoMap* extension_info_map)
+      OVERRIDE;
   virtual PrefService* GetPrefServiceForContext(
       content::BrowserContext* context) OVERRIDE;
+  virtual void GetEarlyExtensionPrefsObservers(
+      content::BrowserContext* context,
+      std::vector<ExtensionPrefsObserver*>* observers) const OVERRIDE;
   virtual bool DeferLoadingBackgroundHosts(
       content::BrowserContext* context) const OVERRIDE;
   virtual bool IsBackgroundPageAllowed(
@@ -64,7 +79,6 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
   virtual scoped_ptr<ExtensionHostDelegate> CreateExtensionHostDelegate()
       OVERRIDE;
   virtual bool DidVersionUpdate(content::BrowserContext* context) OVERRIDE;
-  virtual void PermitExternalProtocolHandler() OVERRIDE;
   virtual scoped_ptr<AppSorting> CreateAppSorting() OVERRIDE;
   virtual bool IsRunningInForcedAppMode() OVERRIDE;
   virtual ApiActivityMonitor* GetApiActivityMonitor(

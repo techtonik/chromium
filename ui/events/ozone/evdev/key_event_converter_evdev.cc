@@ -7,7 +7,7 @@
 #include <errno.h>
 #include <linux/input.h>
 
-#include "base/message_loop/message_pump_ozone.h"
+#include "base/message_loop/message_loop.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/events/ozone/evdev/event_modifiers_evdev.h"
@@ -200,7 +200,7 @@ KeyEventConverterEvdev::~KeyEventConverterEvdev() {
 }
 
 void KeyEventConverterEvdev::Start() {
-  base::MessagePumpOzone::Current()->WatchFileDescriptor(
+  base::MessageLoopForUI::current()->WatchFileDescriptor(
       fd_, true, base::MessagePumpLibevent::WATCH_READ, &controller_, this);
 }
 
@@ -258,9 +258,9 @@ void KeyEventConverterEvdev::ConvertKeyEvent(int key, int value) {
 
   int flags = modifiers_->GetModifierFlags();
 
-  scoped_ptr<KeyEvent> key_event(
-      new KeyEvent(down ? ET_KEY_PRESSED : ET_KEY_RELEASED, code, flags, true));
-  DispatchEvent(key_event.PassAs<ui::Event>());
+  KeyEvent key_event(
+      down ? ET_KEY_PRESSED : ET_KEY_RELEASED, code, flags, true);
+  DispatchEventToCallback(&key_event);
 }
 
 }  // namespace ui

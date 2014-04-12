@@ -8,13 +8,16 @@
 #include "base/debug/trace_event.h"
 #include "base/logging.h"
 #include "base/message_loop/message_loop.h"
+#include "cc/resources/shared_bitmap.h"
 #include "cc/resources/texture_mailbox.h"
+#include "content/child/child_shared_bitmap_manager.h"
 #include "content/public/renderer/render_thread.h"
 #include "content/public/renderer/renderer_ppapi_host.h"
 #include "content/renderer/pepper/common.h"
 #include "content/renderer/pepper/gfx_conversion.h"
 #include "content/renderer/pepper/pepper_plugin_instance_impl.h"
 #include "content/renderer/pepper/ppb_image_data_impl.h"
+#include "content/renderer/render_thread_impl.h"
 #include "ppapi/c/pp_bool.h"
 #include "ppapi/c/pp_errors.h"
 #include "ppapi/c/pp_rect.h"
@@ -137,7 +140,6 @@ struct PepperGraphics2DHost::QueuedOperation {
     PAINT,
     SCROLL,
     REPLACE,
-    SET_OFFSET
   };
 
   QueuedOperation(Type t)
@@ -161,9 +163,6 @@ struct PepperGraphics2DHost::QueuedOperation {
 
   // Valid when type == REPLACE.
   scoped_refptr<PPB_ImageData_Impl> replace_image;
-
-  // Valid when type == SET_OFFSET.
-  gfx::Point offset;
 };
 
 // static
@@ -196,8 +195,7 @@ PepperGraphics2DHost::PepperGraphics2DHost(RendererPpapiHost* host,
       is_always_opaque_(false),
       scale_(1.0f),
       is_running_in_process_(host->IsRunningInProcess()),
-      texture_mailbox_modified_(true),
-      resize_mode_(PP_GRAPHICS2D_DEV_RESIZEMODE_DEFAULT) {}
+      texture_mailbox_modified_(true) {}
 
 PepperGraphics2DHost::~PepperGraphics2DHost() {
   // Unbind from the instance when destroyed if we're still bound.
@@ -236,18 +234,12 @@ int32_t PepperGraphics2DHost::OnResourceMessageReceived(
     PPAPI_DISPATCH_HOST_RESOURCE_CALL(
         PpapiHostMsg_Graphics2D_ReplaceContents,
         OnHostMsgReplaceContents)
-    PPAPI_DISPATCH_HOST_RESOURCE_CALL(
+    PPAPI_DISPATCH_HOST_RESOURCE_CALL_0(
         PpapiHostMsg_Graphics2D_Flush,
         OnHostMsgFlush)
     PPAPI_DISPATCH_HOST_RESOURCE_CALL(
-        PpapiHostMsg_Graphics2D_Dev_SetScale,
+        PpapiHostMsg_Graphics2D_SetScale,
         OnHostMsgSetScale)
-    PPAPI_DISPATCH_HOST_RESOURCE_CALL(
-        PpapiHostMsg_Graphics2D_SetOffset,
-        OnHostMsgSetOffset)
-    PPAPI_DISPATCH_HOST_RESOURCE_CALL(
-        PpapiHostMsg_Graphics2D_SetResizeMode,
-        OnHostMsgSetResizeMode)
     PPAPI_DISPATCH_HOST_RESOURCE_CALL(
         PpapiHostMsg_Graphics2D_ReadImageData,
         OnHostMsgReadImageData)
@@ -397,16 +389,11 @@ void PepperGraphics2DHost::Paint(blink::WebCanvas* canvas,
 
   SkPoint pixel_origin = origin;
 
-  gfx::PointF resize_scale(GetResizeScale());
-  gfx::PointF scale(ScalePoint(resize_scale, scale_));
-  if ((scale.x() != 1.0f || scale.y() != 1.0f) &&
-      scale.x() > 0.0f && scale.y() > 0.0f) {
-    canvas->scale(scale.x(), scale.y());
-    pixel_origin.set(pixel_origin.x() * (1.0f / scale.x()),
-                     pixel_origin.y() * (1.0f / scale.y()));
+  if (scale_ != 1.0f && scale_ > 0.0f) {
+    canvas->scale(scale_, scale_);
+    pixel_origin.set(pixel_origin.x() * (1.0f / scale_),
+                     pixel_origin.y() * (1.0f / scale_));
   }
-  pixel_origin.offset(SkIntToScalar(plugin_offset_.x()),
-                      SkIntToScalar(plugin_offset_.y()));
   canvas->drawBitmap(image, pixel_origin.x(), pixel_origin.y(), &paint);
 }
 
@@ -419,11 +406,6 @@ void PepperGraphics2DHost::ViewFlushedPaint() {
     SendFlushAck();
     need_flush_ack_ = false;
   }
-}
-
-void PepperGraphics2DHost::DidChangeView(const ppapi::ViewData& view_data) {
-  gfx::Size old_plugin_size = current_plugin_size_;
-  current_plugin_size_ = PP_ToGfxSize(view_data.rect.size);
 }
 
 void PepperGraphics2DHost::SetScale(float scale) {
@@ -446,21 +428,6 @@ gfx::Size PepperGraphics2DHost::Size() const {
   if (!image_data_)
     return gfx::Size();
   return gfx::Size(image_data_->width(), image_data_->height());
-}
-
-gfx::PointF PepperGraphics2DHost::GetResizeScale() const {
-  switch (resize_mode_) {
-    case PP_GRAPHICS2D_DEV_RESIZEMODE_DEFAULT:
-      return gfx::PointF(1.0f, 1.0f);
-    case PP_GRAPHICS2D_DEV_RESIZEMODE_STRETCH:
-      if (flushed_plugin_size_.IsEmpty())
-        return gfx::PointF(1.0f, 1.0f);
-      return gfx::PointF(
-          1.0f * current_plugin_size_.width() / flushed_plugin_size_.width(),
-          1.0f * current_plugin_size_.height() / flushed_plugin_size_.height());
-  }
-  NOTREACHED();
-  return gfx::PointF(1.0f, 1.0f);
 }
 
 int32_t PepperGraphics2DHost::OnHostMsgPaintImageData(
@@ -555,8 +522,7 @@ int32_t PepperGraphics2DHost::OnHostMsgReplaceContents(
 }
 
 int32_t PepperGraphics2DHost::OnHostMsgFlush(
-    ppapi::host::HostMessageContext* context,
-    const ppapi::ViewData& view_data) {
+    ppapi::host::HostMessageContext* context) {
   // Don't allow more than one pending flush at a time.
   if (HasPendingFlush())
     return PP_ERROR_INPROGRESS;
@@ -564,10 +530,10 @@ int32_t PepperGraphics2DHost::OnHostMsgFlush(
   PP_Resource old_image_data = 0;
   flush_reply_context_ = context->MakeReplyMessageContext();
   if (is_running_in_process_)
-    return Flush(NULL, PP_ToGfxSize(view_data.rect.size));
+    return Flush(NULL);
 
   // Reuse image data when running out of process.
-  int32_t result = Flush(&old_image_data, PP_ToGfxSize(view_data.rect.size));
+  int32_t result = Flush(&old_image_data);
 
   if (old_image_data) {
     // If the Graphics2D has an old image data it's not using any more, send
@@ -593,22 +559,6 @@ int32_t PepperGraphics2DHost::OnHostMsgSetScale(
   return PP_ERROR_BADARGUMENT;
 }
 
-int32_t PepperGraphics2DHost::OnHostMsgSetOffset(
-    ppapi::host::HostMessageContext* context,
-    const PP_Point& offset) {
-  QueuedOperation operation(QueuedOperation::SET_OFFSET);
-  operation.offset = PP_ToGfxPoint(offset);
-  queued_operations_.push_back(operation);
-  return PP_OK;
-}
-
-int32_t PepperGraphics2DHost::OnHostMsgSetResizeMode(
-    ppapi::host::HostMessageContext* context,
-    PP_Graphics2D_Dev_ResizeMode resize_mode) {
-  resize_mode_ = resize_mode;
-  return PP_OK;
-}
-
 int32_t PepperGraphics2DHost::OnHostMsgReadImageData(
     ppapi::host::HostMessageContext* context,
     PP_Resource image,
@@ -617,7 +567,7 @@ int32_t PepperGraphics2DHost::OnHostMsgReadImageData(
   return ReadImageData(image, &top_left) ? PP_OK : PP_ERROR_FAILED;
 }
 
-void ReleaseCallback(scoped_ptr<base::SharedMemory> memory,
+void ReleaseCallback(scoped_ptr<cc::SharedBitmap> bitmap,
                      uint32 sync_point,
                      bool lost_resource) {}
 
@@ -628,18 +578,21 @@ bool PepperGraphics2DHost::PrepareTextureMailbox(
     return false;
   // TODO(jbauman): Send image_data_ through mailbox to avoid copy.
   gfx::Size pixel_image_size(image_data_->width(), image_data_->height());
-  int buffer_size = pixel_image_size.GetArea() * 4;
-  scoped_ptr<base::SharedMemory> memory =
-      RenderThread::Get()->HostAllocateSharedMemoryBuffer(buffer_size);
-  if (!memory || !memory->Map(buffer_size))
+  scoped_ptr<cc::SharedBitmap> shared_bitmap =
+      RenderThreadImpl::current()
+          ->shared_bitmap_manager()
+          ->AllocateSharedBitmap(pixel_image_size);
+  if (!shared_bitmap)
     return false;
   void* src = image_data_->Map();
-  memcpy(memory->memory(), src, buffer_size);
+  memcpy(shared_bitmap->pixels(),
+         src,
+         cc::SharedBitmap::CheckedSizeInBytes(pixel_image_size));
   image_data_->Unmap();
 
-  *mailbox = cc::TextureMailbox(memory.get(), pixel_image_size);
+  *mailbox = cc::TextureMailbox(shared_bitmap->memory(), pixel_image_size);
   *release_callback = cc::SingleReleaseCallback::Create(
-      base::Bind(&ReleaseCallback, base::Passed(&memory)));
+      base::Bind(&ReleaseCallback, base::Passed(&shared_bitmap)));
   texture_mailbox_modified_ = false;
   return true;
 }
@@ -648,15 +601,13 @@ void PepperGraphics2DHost::AttachedToNewLayer() {
   texture_mailbox_modified_ = true;
 }
 
-int32_t PepperGraphics2DHost::Flush(PP_Resource* old_image_data,
-                                    const gfx::Size& flushed_plugin_size) {
+int32_t PepperGraphics2DHost::Flush(PP_Resource* old_image_data) {
   bool done_replace_contents = false;
   bool no_update_visible = true;
   bool is_plugin_visible = true;
   for (size_t i = 0; i < queued_operations_.size(); i++) {
     QueuedOperation& operation = queued_operations_[i];
     gfx::Rect op_rect;
-    gfx::Rect old_op_rect;
     switch (operation.type) {
       case QueuedOperation::PAINT:
         ExecutePaintImageData(operation.paint_image.get(),
@@ -680,16 +631,7 @@ int32_t PepperGraphics2DHost::Flush(PP_Resource* old_image_data,
                                done_replace_contents ? NULL : old_image_data);
         done_replace_contents = true;
         break;
-      case QueuedOperation::SET_OFFSET:
-        old_op_rect = gfx::Rect(plugin_offset_.x(), plugin_offset_.y(),
-            image_data_->width(), image_data_->height());
-        plugin_offset_ = operation.offset;
-        // The offset is applied below for |op_rect|.
-        op_rect = gfx::Rect(image_data_->width(), image_data_->height());
-        break;
     }
-
-    op_rect.Offset(plugin_offset_.x(), plugin_offset_.y());
 
     // For correctness with accelerated compositing, we must issue an invalidate
     // on the full op_rect even if it is partially or completely off-screen.
@@ -697,11 +639,8 @@ int32_t PepperGraphics2DHost::Flush(PP_Resource* old_image_data,
     // do nothing and we won't get any ViewFlushedPaint calls, leaving our
     // callback stranded. So we still need to check whether the repainted area
     // is visible to determine how to deal with the callback.
-    if (bound_instance_ && (!op_rect.IsEmpty() || !old_op_rect.IsEmpty())) {
+    if (bound_instance_ && !op_rect.IsEmpty()) {
       gfx::Point scroll_delta(operation.scroll_dx, operation.scroll_dy);
-      if (!ConvertToLogicalPixels(scale_, &old_op_rect, NULL)) {
-        NOTREACHED();
-      }
       if (!ConvertToLogicalPixels(scale_,
                                   &op_rect,
                                   operation.type == QueuedOperation::SCROLL ?
@@ -715,8 +654,7 @@ int32_t PepperGraphics2DHost::Flush(PP_Resource* old_image_data,
 
       // Set |no_update_visible| to false if the change overlaps the visible
       // area.
-      if (!gfx::IntersectRects(clip, op_rect).IsEmpty() ||
-          !gfx::IntersectRects(clip, old_op_rect).IsEmpty()) {
+      if (!gfx::IntersectRects(clip, op_rect).IsEmpty()) {
         no_update_visible = false;
       }
 
@@ -725,19 +663,15 @@ int32_t PepperGraphics2DHost::Flush(PP_Resource* old_image_data,
       if (operation.type == QueuedOperation::SCROLL) {
         bound_instance_->ScrollRect(scroll_delta.x(), scroll_delta.y(),
                                     op_rect);
-        DCHECK(old_op_rect.IsEmpty());
       } else {
         if (!op_rect.IsEmpty())
           bound_instance_->InvalidateRect(op_rect);
-        if (!old_op_rect.IsEmpty())
-          bound_instance_->InvalidateRect(old_op_rect);
       }
       texture_mailbox_modified_ = true;
     }
   }
   queued_operations_.clear();
 
-  flushed_plugin_size_ = flushed_plugin_size;
   if (!bound_instance_) {
     // As promised in the API, we always schedule callback when unbound.
     ScheduleOffscreenFlushAck();

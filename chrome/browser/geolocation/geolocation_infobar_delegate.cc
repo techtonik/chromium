@@ -70,6 +70,7 @@ InfoBar* GeolocationInfoBarDelegate::Create(
     const std::string& display_languages,
     const std::string& accept_button_label) {
   RecordUmaEvent(GEOLOCATION_INFO_BAR_DELEGATE_EVENT_CREATE);
+  CHECK(infobar_service->web_contents());
   const content::NavigationEntry* committed_entry =
       infobar_service->web_contents()->GetController().GetLastCommittedEntry();
   GeolocationInfoBarDelegate* const delegate = new DelegateType(
@@ -112,9 +113,11 @@ bool GeolocationInfoBarDelegate::Accept() {
 
 void GeolocationInfoBarDelegate::SetPermission(bool update_content_setting,
                                                bool allowed) {
+  content::WebContents* web_contents =
+      InfoBarService::WebContentsFromInfoBar(infobar());
   controller_->OnPermissionSet(
         id_, requesting_frame_,
-        web_contents()->GetLastCommittedURL().GetOrigin(),
+        web_contents->GetLastCommittedURL().GetOrigin(),
         update_content_setting, allowed);
 }
 
@@ -133,14 +136,11 @@ InfoBarDelegate::Type GeolocationInfoBarDelegate::GetInfoBarType() const {
 }
 
 bool GeolocationInfoBarDelegate::ShouldExpireInternal(
-    const content::LoadCommittedDetails& details) const {
+    const NavigationDetails& details) const {
   // This implementation matches InfoBarDelegate::ShouldExpireInternal(), but
   // uses the unique ID we set in the constructor instead of that stored in the
   // base class.
-  return (contents_unique_id_ != details.entry->GetUniqueID()) ||
-      (content::PageTransitionStripQualifier(
-          details.entry->GetTransitionType()) ==
-              content::PAGE_TRANSITION_RELOAD);
+  return (contents_unique_id_ != details.entry_id) || details.is_reload;
 }
 
 base::string16 GeolocationInfoBarDelegate::GetMessageText() const {
@@ -177,10 +177,11 @@ bool GeolocationInfoBarDelegate::LinkClicked(
       "https://www.google.com/support/chrome/bin/answer.py?answer=142065";
 #endif
 
-  web_contents()->OpenURL(content::OpenURLParams(
-      google_util::AppendGoogleLocaleParam(GURL(kGeolocationLearnMoreUrl)),
-      content::Referrer(),
-      (disposition == CURRENT_TAB) ? NEW_FOREGROUND_TAB : disposition,
-      content::PAGE_TRANSITION_LINK, false));
+  InfoBarService::WebContentsFromInfoBar(infobar())->OpenURL(
+      content::OpenURLParams(
+          google_util::AppendGoogleLocaleParam(GURL(kGeolocationLearnMoreUrl)),
+          content::Referrer(),
+          (disposition == CURRENT_TAB) ? NEW_FOREGROUND_TAB : disposition,
+          content::PAGE_TRANSITION_LINK, false));
   return false;  // Do not dismiss the info bar.
 }

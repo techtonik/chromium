@@ -25,6 +25,8 @@
 #include "ui/base/hit_test.h"
 #include "ui/base/x/x11_util.h"
 #include "ui/events/event_utils.h"
+#include "ui/events/platform/platform_event_source.h"
+#include "ui/events/platform/x11/x11_event_source.h"
 #include "ui/events/x/device_data_manager.h"
 #include "ui/events/x/device_list_cache_x.h"
 #include "ui/events/x/touch_factory_x11.h"
@@ -311,7 +313,8 @@ void DesktopWindowTreeHostX11::CloseNow() {
 
   open_windows().remove(xwindow_);
   // Actually free our native resources.
-  base::MessagePumpX11::Current()->RemoveDispatcherForWindow(xwindow_);
+  if (ui::PlatformEventSource::GetInstance())
+    ui::PlatformEventSource::GetInstance()->RemovePlatformEventDispatcher(this);
   XDestroyWindow(xdisplay_, xwindow_);
   xwindow_ = None;
 
@@ -389,7 +392,7 @@ void DesktopWindowTreeHostX11::CenterWindow(const gfx::Size& size) {
 void DesktopWindowTreeHostX11::GetWindowPlacement(
     gfx::Rect* bounds,
     ui::WindowShowState* show_state) const {
-  *bounds = bounds_;
+  *bounds = GetRestoredBounds();
 
   if (IsFullscreen()) {
     *show_state = ui::SHOW_STATE_FULLSCREEN;
@@ -759,10 +762,6 @@ void DesktopWindowTreeHostX11::Hide() {
   native_widget_delegate_->OnNativeWidgetVisibilityChanged(false);
 }
 
-void DesktopWindowTreeHostX11::ToggleFullScreen() {
-  NOTIMPLEMENTED();
-}
-
 gfx::Rect DesktopWindowTreeHostX11::GetBounds() const {
   return bounds_;
 }
@@ -804,13 +803,6 @@ void DesktopWindowTreeHostX11::SetBounds(const gfx::Rect& bounds) {
     OnHostResized(bounds.size());
   else
     compositor()->ScheduleRedrawRect(gfx::Rect(bounds.size()));
-}
-
-gfx::Insets DesktopWindowTreeHostX11::GetInsets() const {
-  return gfx::Insets();
-}
-
-void DesktopWindowTreeHostX11::SetInsets(const gfx::Insets& insets) {
 }
 
 gfx::Point DesktopWindowTreeHostX11::GetLocationOnNativeScreen() const {
@@ -862,15 +854,6 @@ bool DesktopWindowTreeHostX11::QueryMouseLocation(
       std::max(0, std::min(bounds_.height(), win_y_return)));
   return (win_x_return >= 0 && win_x_return < bounds_.width() &&
           win_y_return >= 0 && win_y_return < bounds_.height());
-}
-
-bool DesktopWindowTreeHostX11::ConfineCursorToRootWindow() {
-  NOTIMPLEMENTED();
-  return false;
-}
-
-void DesktopWindowTreeHostX11::UnConfineCursor() {
-  NOTIMPLEMENTED();
 }
 
 void DesktopWindowTreeHostX11::SetCursorNative(gfx::NativeCursor cursor) {
@@ -976,7 +959,8 @@ void DesktopWindowTreeHostX11::InitX11Window(
       CopyFromParent,  // visual
       attribute_mask,
       &swa);
-  base::MessagePumpX11::Current()->AddDispatcherForWindow(this, xwindow_);
+  if (ui::PlatformEventSource::GetInstance())
+    ui::PlatformEventSource::GetInstance()->AddPlatformEventDispatcher(this);
   open_windows().push_back(xwindow_);
 
   // TODO(erg): Maybe need to set a ViewProp here like in RWHL::RWHL().
@@ -1302,14 +1286,23 @@ void DesktopWindowTreeHostX11::MapWindow(ui::WindowShowState show_state) {
   // We now block until our window is mapped. Some X11 APIs will crash and
   // burn if passed |xwindow_| before the window is mapped, and XMapWindow is
   // asynchronous.
-  base::MessagePumpX11::Current()->BlockUntilWindowMapped(xwindow_);
+  if (ui::X11EventSource::GetInstance())
+    ui::X11EventSource::GetInstance()->BlockUntilWindowMapped(xwindow_);
   window_mapped_ = true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// DesktopWindowTreeHostX11, MessagePumpDispatcher implementation:
+// DesktopWindowTreeHostX11, ui::PlatformEventDispatcher implementation:
 
-uint32_t DesktopWindowTreeHostX11::Dispatch(const base::NativeEvent& event) {
+bool DesktopWindowTreeHostX11::CanDispatchEvent(
+    const ui::PlatformEvent& event) {
+  return event->xany.window == xwindow_ ||
+         (event->type == GenericEvent &&
+          static_cast<XIDeviceEvent*>(event->xcookie.data)->event == xwindow_);
+}
+
+uint32_t DesktopWindowTreeHostX11::DispatchEvent(
+    const ui::PlatformEvent& event) {
   XEvent* xev = event;
 
   TRACE_EVENT1("views", "DesktopWindowTreeHostX11::Dispatch",
@@ -1399,7 +1392,8 @@ uint32_t DesktopWindowTreeHostX11::Dispatch(const base::NativeEvent& event) {
         OnHostResized(bounds.size());
       if (origin_changed)
         OnHostMoved(bounds_.origin());
-      ResetWindowRegion();
+      if (size_changed)
+        ResetWindowRegion();
       break;
     }
     case GenericEvent: {
@@ -1599,7 +1593,7 @@ uint32_t DesktopWindowTreeHostX11::Dispatch(const base::NativeEvent& event) {
       break;
     }
   }
-  return POST_DISPATCH_NONE;
+  return ui::POST_DISPATCH_STOP_PROPAGATION;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

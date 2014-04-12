@@ -63,6 +63,7 @@
             'autofill/core/common/form_data_unittest.cc',
             'autofill/core/common/form_field_data_unittest.cc',
             'autofill/core/common/password_form_fill_data_unittest.cc',
+            'autofill/core/common/save_password_progress_logger_unittest.cc',
             'cloud_devices/printer_description_unittest.cc',
             'dom_distiller/core/article_entry_unittest.cc',
             'dom_distiller/core/distiller_unittest.cc',
@@ -92,6 +93,7 @@
             'os_crypt/ie7_password_win_unittest.cc',
             'os_crypt/keychain_password_mac_unittest.mm',
             'os_crypt/os_crypt_unittest.cc',
+            'password_manager/core/browser/browser_save_password_progress_logger_unittest.cc',
             'password_manager/core/browser/login_database_unittest.cc',
             'password_manager/core/browser/password_form_manager_unittest.cc',
             'password_manager/core/browser/password_generation_manager_unittest.cc',
@@ -177,6 +179,9 @@
             'components_strings.gyp:components_strings',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber',
 
+            # Dependencies of bookmarks
+            'components.gyp:bookmarks_core_common',
+
             # Dependencies of cloud_devices
             'components.gyp:cloud_devices',
 
@@ -230,11 +235,13 @@
           'conditions': [
             ['OS != "ios"', {
               'sources': [
+                'autofill/content/renderer/renderer_save_password_progress_logger_unittest.cc',
                 'dom_distiller/content/dom_distiller_viewer_source_unittest.cc',
               ],
               'dependencies': [
                 # Dependencies of autofill
                 'components.gyp:autofill_content_browser',
+                'components.gyp:autofill_content_renderer',
                 'components.gyp:autofill_content_test_support',
 
                 # Dependencies of dom_distiller
@@ -532,6 +539,7 @@
           'type': '<(gtest_target_type)',
           'defines!': ['CONTENT_IMPLEMENTATION'],
           'dependencies': [
+            'components.gyp:autofill_content_browser',
             'components.gyp:dom_distiller_content',
             'components.gyp:dom_distiller_core',
             'components_resources.gyp:components_resources',
@@ -545,7 +553,9 @@
             '../content/content_shell_and_tests.gyp:content_shell_pak',
             '../content/content_shell_and_tests.gyp:test_support_content',
             '../skia/skia.gyp:skia',
+            '../testing/gmock.gyp:gmock',
             '../testing/gtest.gyp:gtest',
+            '../testing/gmock.gyp:gmock',
           ],
           'include_dirs': [
             '..',
@@ -554,11 +564,8 @@
             'HAS_OUT_OF_PROC_TEST_RUNNER',
           ],
           'sources': [
+            'autofill/content/browser/risk/fingerprint_browsertest.cc',
             'dom_distiller/content/distiller_page_web_contents_browsertest.cc',
-
-            # content_extractor is a standalone content extraction tool built as
-            # a MANUAL component_browsertest.
-            'dom_distiller/standalone/content_extractor.cc',
           ],
           'actions': [
             {
@@ -574,6 +581,18 @@
             },
           ],
           'conditions': [
+            ['OS == "android"', {
+              'sources!': [
+                'autofill/content/browser/risk/fingerprint_browsertest.cc',
+              ],
+            }],
+            ['OS == "linux"', {
+              'sources': [
+                  # content_extractor is a standalone content extraction tool built as
+                  # a MANUAL component_browsertest.
+                  'dom_distiller/standalone/content_extractor.cc',
+                ],
+            }],
             ['OS=="win"', {
               'resource_include_dirs': [
                 '<(SHARED_INTERMEDIATE_DIR)/webkit',

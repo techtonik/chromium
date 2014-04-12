@@ -160,7 +160,6 @@
             'browser/devtools/adb_client_socket.cc',
             'browser/devtools/adb_client_socket.h',
             'browser/devtools/adb_web_socket.cc',
-            'browser/devtools/adb_web_socket.h',
             'browser/devtools/android_device.cc',
             'browser/devtools/android_device.h',
             'browser/devtools/browser_list_tabcontents_provider.cc',
@@ -187,17 +186,10 @@
             'browser/devtools/devtools_window.h',
             'browser/devtools/port_forwarding_controller.cc',
             'browser/devtools/port_forwarding_controller.h',
-            'browser/devtools/refcounted_adb_thread.cc',
-            'browser/devtools/refcounted_adb_thread.h',
             'browser/devtools/remote_debugging_server.cc',
             'browser/devtools/remote_debugging_server.h',
           ],
           'conditions': [
-            ['toolkit_uses_gtk == 1', {
-              'dependencies': [
-                '../build/linux/system.gyp:gtk',
-              ],
-            }],
             ['OS=="android"', {
               'dependencies!': [
                 '../third_party/libusb/libusb.gyp:libusb',
@@ -316,11 +308,6 @@
             'common/extensions/api/api.gyp:chrome_api',
           ],
           'conditions': [
-            ['toolkit_uses_gtk == 1', {
-              'dependencies': [
-                '../build/linux/system.gyp:gtk',
-              ],
-            }],
             ['OS=="win" or OS=="mac"', {
               'sources': [
                 'utility/media_galleries/iapps_xml_utils.cc',
@@ -750,9 +737,6 @@
               'actions': [
                 {
                   'action_name': 'strip_reliability_tests',
-                  'inputs': [
-                    '<(PRODUCT_DIR)/_pyautolib.so',
-                  ],
                   'outputs': [
                     '<(PRODUCT_DIR)/strip_reliability_tests.stamp',
                   ],
@@ -860,30 +844,6 @@
               ],
               'message': 'Generating version header file: <@(_outputs)',
             },
-          ],
-        },
-        {
-          'target_name': 'automation',
-          'type': 'static_library',
-          'dependencies': [
-            'chrome_resources.gyp:theme_resources',
-            '../ui/accessibility/accessibility.gyp:ax_gen',
-            '../skia/skia.gyp:skia',
-          ],
-          'include_dirs': [
-            '..',
-          ],
-          'sources': [
-             'test/automation/automation_handle_tracker.cc',
-             'test/automation/automation_handle_tracker.h',
-             'test/automation/automation_proxy.cc',
-             'test/automation/automation_proxy.h',
-             'test/automation/browser_proxy.cc',
-             'test/automation/browser_proxy.h',
-             'test/automation/tab_proxy.cc',
-             'test/automation/tab_proxy.h',
-             'test/automation/window_proxy.cc',
-             'test/automation/window_proxy.h',
           ],
         },
         {
@@ -1100,11 +1060,6 @@
             '..',
           ],
           'conditions': [
-            ['toolkit_uses_gtk == 1', {
-              'dependencies': [
-                '../build/linux/system.gyp:gtk',
-              ],
-            }],
             ['use_cups==1', {
               'dependencies': [
                 '../printing/printing.gyp:cups',

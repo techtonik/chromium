@@ -522,6 +522,7 @@ enum SecondLevelDomainName {
   DOMAIN_LAVABIT_COM,
 
   DOMAIN_GOOGLETAGMANAGER_COM,
+  DOMAIN_GOOGLETAGSERVICES_COM,
 
   // Boundary value for UMA_HISTOGRAM_ENUMERATION:
   DOMAIN_NUM_EVENTS
@@ -718,21 +719,6 @@ bool TransportSecurityState::IsGooglePinnedProperty(const std::string& host,
 }
 
 // static
-bool TransportSecurityState::GetPinsForDebugging(
-    const std::string& host,
-    const char* const** out_required_pins,
-    const char* const** out_excluded_pins) {
-  const std::string canonicalized_host = CanonicalizeHost(host);
-  const struct HSTSPreload* entry =
-      GetHSTSPreload(canonicalized_host, kPreloadedSTS, kNumPreloadedSTS);
-  if (!entry)
-    return false;
-  *out_required_pins = entry->pins.required_hashes;
-  *out_excluded_pins = entry->pins.excluded_hashes;
-  return true;
-}
-
-// static
 void TransportSecurityState::ReportUMAOnPinFailure(const std::string& host) {
   std::string canonicalized_host = CanonicalizeHost(host);
 
@@ -860,21 +846,21 @@ TransportSecurityState::DomainState::~DomainState() {
 }
 
 bool TransportSecurityState::DomainState::CheckPublicKeyPins(
-    const HashValueVector& hashes) const {
+    const HashValueVector& hashes, std::string* failure_log) const {
   // Validate that hashes is not empty. By the time this code is called (in
   // production), that should never happen, but it's good to be defensive.
   // And, hashes *can* be empty in some test scenarios.
   if (hashes.empty()) {
-    LOG(ERROR) << "Rejecting empty public key chain for public-key-pinned "
-                  "domain " << domain;
+    *failure_log = "Rejecting empty public key chain for public-key-pinned "
+                   "domains: " + domain;
     return false;
   }
 
   if (HashesIntersect(bad_static_spki_hashes, hashes)) {
-    LOG(ERROR) << "Rejecting public key chain for domain " << domain
-               << ". Validated chain: " << HashesToBase64String(hashes)
-               << ", matches one or more bad hashes: "
-               << HashesToBase64String(bad_static_spki_hashes);
+    *failure_log = "Rejecting public key chain for domain " + domain +
+                   ". Validated chain: " + HashesToBase64String(hashes) +
+                   ", matches one or more bad hashes: " +
+                   HashesToBase64String(bad_static_spki_hashes);
     return false;
   }
 
@@ -887,10 +873,10 @@ bool TransportSecurityState::DomainState::CheckPublicKeyPins(
     return true;
   }
 
-  LOG(ERROR) << "Rejecting public key chain for domain " << domain
-             << ". Validated chain: " << HashesToBase64String(hashes)
-             << ", expected: " << HashesToBase64String(dynamic_spki_hashes)
-             << " or: " << HashesToBase64String(static_spki_hashes);
+  *failure_log = "Rejecting public key chain for domain " + domain +
+                 ". Validated chain: " + HashesToBase64String(hashes) +
+                 ", expected: " + HashesToBase64String(dynamic_spki_hashes) +
+                 " or: " + HashesToBase64String(static_spki_hashes);
   return false;
 }
 

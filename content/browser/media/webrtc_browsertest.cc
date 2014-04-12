@@ -126,7 +126,7 @@ IN_PROC_BROWSER_TEST_P(WebRtcBrowserTest, MAYBE_CanForwardRemoteStream) {
 
 IN_PROC_BROWSER_TEST_P(WebRtcBrowserTest, MAYBE_CanForwardRemoteStream720p) {
   const std::string javascript = GenerateGetUserMediaCall(
-      "callAndForwardRemoteStream", 1280, 1280, 720, 720, 30, 30);
+      "callAndForwardRemoteStream", 1280, 1280, 720, 720, 10, 30);
   MakeTypicalPeerConnectionCall(javascript);
 }
 
@@ -294,8 +294,17 @@ IN_PROC_BROWSER_TEST_P(WebRtcBrowserTest,
   MakeTypicalPeerConnectionCall("callAndEnsureAudioIsPlaying();");
 }
 
+#if defined(OS_ANDROID)
+// Flaky on Android: http://crbug.com/362432
+#define MAYBE_EstablishAudioVideoCallAndVerifyMutingWorks \
+    FLAKY_EstablishAudioVideoCallAndVerifyMutingWorks
+#else
+#define MAYBE_EstablishAudioVideoCallAndVerifyMutingWorks \
+    EstablishAudioVideoCallAndVerifyMutingWorks
+#endif
+
 IN_PROC_BROWSER_TEST_P(WebRtcBrowserTest,
-                       EstablishAudioVideoCallAndVerifyMutingWorks) {
+                       MAYBE_EstablishAudioVideoCallAndVerifyMutingWorks) {
   if (!media::AudioManager::Get()->HasAudioOutputDevices()) {
     // Bots with no output devices will force the audio code into a different
     // path where it doesn't manage to set either the low or high latency path.
@@ -342,11 +351,10 @@ IN_PROC_BROWSER_TEST_P(WebRtcBrowserTest, CallAndVerifyVideoMutingWorks) {
 
 // This tests will make a complete PeerConnection-based call, verify that
 // video is playing for the call, and verify that a non-empty AEC dump file
-// exists. The AEC dump is enabled through webrtc-internals, in contrast to
-// using a command line flag (tested in webrtc_aecdump_browsertest.cc). The HTML
-// and Javascript is bypassed since it would trigger a file picker dialog.
-// Instead, the dialog callback FileSelected() is invoked directly. In fact,
-// there's never a webrtc-internals page opened at all since that's not needed.
+// exists. The AEC dump is enabled through webrtc-internals. The HTML and
+// Javascript is bypassed since it would trigger a file picker dialog. Instead,
+// the dialog callback FileSelected() is invoked directly. In fact, there's
+// never a webrtc-internals page opened at all since that's not needed.
 IN_PROC_BROWSER_TEST_P(WebRtcBrowserTest, MAYBE_CallWithAecDump) {
   ASSERT_TRUE(embedded_test_server()->InitializeAndWaitUntilReady());
 

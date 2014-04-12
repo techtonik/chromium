@@ -25,10 +25,7 @@
 #include "ui/views/layout/box_layout.h"
 
 namespace ash {
-namespace internal {
-
 namespace tray {
-
 namespace {
 
 // Updates bluetooth device |device| in the |list|. If it is new, append to the
@@ -297,10 +294,14 @@ class BluetoothDetailedView : public TrayDetailsView,
 
   // Add settings entries.
   void AppendSettingsEntries() {
+    if (!ash::Shell::GetInstance()->
+            system_tray_delegate()->ShouldShowSettings()) {
+      return;
+    }
+
     // Add bluetooth device requires a browser window, hide it for non logged in
     // user.
-    if (login_ == user::LOGGED_IN_NONE ||
-        login_ == user::LOGGED_IN_LOCKED)
+    if (login_ == user::LOGGED_IN_NONE || login_ == user::LOGGED_IN_LOCKED)
       return;
 
     ash::SystemTrayDelegate* delegate =
@@ -309,6 +310,7 @@ class BluetoothDetailedView : public TrayDetailsView,
     HoverHighlightView* container = new HoverHighlightView(this);
     container->AddLabel(
         rb.GetLocalizedString(IDS_ASH_STATUS_TRAY_BLUETOOTH_MANAGE_DEVICES),
+        gfx::ALIGN_LEFT,
         gfx::Font::NORMAL);
     container->SetEnabled(delegate->GetBluetoothAvailable());
     AddChildView(container);
@@ -465,5 +467,4 @@ void TrayBluetooth::OnBluetoothDiscoveringChanged() {
   detailed_->Update();
 }
 
-}  // namespace internal
 }  // namespace ash

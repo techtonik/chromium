@@ -32,9 +32,8 @@ bool InfoBarDelegate::EqualsDelegate(InfoBarDelegate* delegate) const {
   return false;
 }
 
-bool InfoBarDelegate::ShouldExpire(
-    const content::LoadCommittedDetails& details) const {
-  if (!details.is_navigation_to_different_page())
+bool InfoBarDelegate::ShouldExpire(const NavigationDetails& details) const {
+  if (!details.is_navigation_to_different_page)
     return false;
 
   return ShouldExpireInternal(details);
@@ -96,9 +95,13 @@ TranslateInfoBarDelegate* InfoBarDelegate::AsTranslateInfoBarDelegate() {
 }
 
 void InfoBarDelegate::StoreActiveEntryUniqueID() {
-  DCHECK(web_contents());
+  // TODO(droger): Remove this dependency on InfoBarService, see
+  // http://crbug.com/354379.
+  content::WebContents* web_contents =
+      InfoBarService::WebContentsFromInfoBar(infobar());
+  DCHECK(web_contents);
   NavigationEntry* active_entry =
-      web_contents()->GetController().GetActiveEntry();
+      web_contents->GetController().GetActiveEntry();
   contents_unique_id_ = active_entry ? active_entry->GetUniqueID() : 0;
 }
 
@@ -108,20 +111,12 @@ gfx::Image InfoBarDelegate::GetIcon() const {
       ResourceBundle::GetSharedInstance().GetNativeImageNamed(icon_id);
 }
 
-content::WebContents* InfoBarDelegate::web_contents() {
-  return (infobar_ && infobar_->owner()) ?
-      infobar_->owner()->web_contents() : NULL;
-}
-
 InfoBarDelegate::InfoBarDelegate() : contents_unique_id_(0) {
 }
 
 bool InfoBarDelegate::ShouldExpireInternal(
-    const content::LoadCommittedDetails& details) const {
+    const NavigationDetails& details) const {
   // NOTE: If you change this, be sure to check and adjust the behavior of
   // anyone who overrides this as necessary!
-  return (contents_unique_id_ != details.entry->GetUniqueID()) ||
-      (content::PageTransitionStripQualifier(
-          details.entry->GetTransitionType()) ==
-              content::PAGE_TRANSITION_RELOAD);
+  return (contents_unique_id_ != details.entry_id) || details.is_reload;
 }

@@ -101,6 +101,11 @@ class CompositingIOSurfaceMac {
   // Returns true if asynchronous readback is supported on this system.
   bool IsAsynchronousReadbackSupported();
 
+  // Scan the list of started asynchronous copies and test if each one has
+  // completed. If |block_until_finished| is true, then block until all
+  // pending copies are finished.
+  void CheckIfAllCopiesAreFinished(bool block_until_finished);
+
   // Returns true if the offscreen context used by this surface has been
   // poisoned.
   bool HasBeenPoisoned() const;
@@ -203,8 +208,6 @@ class CompositingIOSurfaceMac {
   void SwitchToContextOnNewWindow(NSView* view,
                                   int window_number);
 
-  bool IsVendorIntel();
-
   // Returns true if IOSurface is ready to render. False otherwise.
   bool MapIOSurfaceToTextureWithContextCurrent(
       const scoped_refptr<CompositingIOSurfaceContext>& current_context,
@@ -249,10 +252,6 @@ class CompositingIOSurfaceMac {
       const SkBitmap* bitmap_output,
       const scoped_refptr<media::VideoFrame>& video_frame_output);
 
-  // Scan the list of started asynchronous copies and test if each one has
-  // completed. If |block_until_finished| is true, then block until all
-  // pending copies are finished.
-  void CheckIfAllCopiesAreFinished(bool block_until_finished);
   void CheckIfAllCopiesAreFinishedWithinContext(
       bool block_until_finished,
       std::vector<base::Closure>* done_callbacks);

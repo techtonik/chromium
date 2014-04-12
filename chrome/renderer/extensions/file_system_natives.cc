@@ -16,7 +16,7 @@
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/web/WebDOMError.h"
 #include "third_party/WebKit/public/web/WebDOMFileSystem.h"
-#include "third_party/WebKit/public/web/WebFrame.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "webkit/common/fileapi/file_system_types.h"
 #include "webkit/common/fileapi/file_system_util.h"
 
@@ -42,8 +42,8 @@ void FileSystemNatives::GetIsolatedFileSystem(
   DCHECK(args.Length() == 1 || args.Length() == 2);
   DCHECK(args[0]->IsString());
   std::string file_system_id(*v8::String::Utf8Value(args[0]));
-  blink::WebFrame* webframe =
-      blink::WebFrame::frameForContext(context()->v8_context());
+  blink::WebLocalFrame* webframe =
+      blink::WebLocalFrame::frameForContext(context()->v8_context());
   DCHECK(webframe);
 
   GURL context_url =
@@ -100,8 +100,8 @@ void FileSystemNatives::GetFileEntry(
       ? blink::WebDOMFileSystem::EntryTypeDirectory
       : blink::WebDOMFileSystem::EntryTypeFile;
 
-  blink::WebFrame* webframe =
-      blink::WebFrame::frameForContext(context()->v8_context());
+  blink::WebLocalFrame* webframe =
+      blink::WebLocalFrame::frameForContext(context()->v8_context());
   DCHECK(webframe);
   args.GetReturnValue().Set(
       blink::WebDOMFileSystem::create(

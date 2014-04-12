@@ -14,6 +14,8 @@
 #include "chrome/browser/content_settings/tab_specific_content_settings.h"
 #include "chrome/browser/google/google_url_tracker.h"
 #include "chrome/browser/google/google_util.h"
+#include "chrome/browser/infobars/infobar_container.h"
+#include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/prerender/prerender_contents.h"
 #include "chrome/browser/prerender/prerender_manager.h"
 #include "chrome/browser/prerender/prerender_manager_factory.h"
@@ -229,9 +231,9 @@ void TabAndroid::SwapTabContents(content::WebContents* old_contents,
           Java_Tab_getNativeInfoBarContainer(
               env,
               weak_java_tab_.get(env).obj()));
-  InfoBarManager* new_infobar_manager = new_contents ?
-      InfoBarService::InfoBarManagerFromWebContents(new_contents) : NULL;
-  infobar_container->ChangeInfoBarManager(new_infobar_manager);
+  InfoBarService* new_infobar_service =
+      new_contents ? InfoBarService::FromWebContents(new_contents) : NULL;
+  infobar_container->ChangeInfoBarManager(new_infobar_service);
 
   Java_Tab_swapWebContents(
       env,

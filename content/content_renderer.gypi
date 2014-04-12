@@ -4,9 +4,12 @@
 
 {
   'dependencies': [
+    'content_common_mojo_bindings',
     '../gin/gin.gyp:gin',
     '../jingle/jingle.gyp:jingle_glue',
     '../media/media.gyp:media',
+    '../mojo/mojo.gyp:mojo_environment_chromium',
+    '../mojo/mojo.gyp:mojo_js_bindings_lib',
     '../net/net.gyp:net',
     '../skia/skia.gyp:skia',
     '../third_party/WebKit/public/blink.gyp:blink',
@@ -65,10 +68,10 @@
     'public/renderer/video_encode_accelerator.cc',
     'public/renderer/video_encode_accelerator.h',
     'public/renderer/web_preferences.h',
-    'renderer/accessibility/accessibility_node_serializer.cc',
-    'renderer/accessibility/accessibility_node_serializer.h',
     'renderer/accessibility/blink_ax_enum_conversion.cc',
     'renderer/accessibility/blink_ax_enum_conversion.h',
+    'renderer/accessibility/blink_ax_tree_source.cc',
+    'renderer/accessibility/blink_ax_tree_source.h',
     'renderer/accessibility/renderer_accessibility.cc',
     'renderer/accessibility/renderer_accessibility.h',
     'renderer/accessibility/renderer_accessibility_complete.cc',
@@ -200,11 +203,11 @@
     'renderer/media/android/renderer_demuxer_android.h',
     'renderer/media/android/renderer_media_player_manager.cc',
     'renderer/media/android/renderer_media_player_manager.h',
-    'renderer/media/android/stream_texture_factory_android.h',
-    'renderer/media/android/stream_texture_factory_android_impl.cc',
-    'renderer/media/android/stream_texture_factory_android_impl.h',
-    'renderer/media/android/stream_texture_factory_android_synchronous_impl.cc',
-    'renderer/media/android/stream_texture_factory_android_synchronous_impl.h',
+    'renderer/media/android/stream_texture_factory.h',
+    'renderer/media/android/stream_texture_factory_impl.cc',
+    'renderer/media/android/stream_texture_factory_impl.h',
+    'renderer/media/android/stream_texture_factory_synchronous_impl.cc',
+    'renderer/media/android/stream_texture_factory_synchronous_impl.h',
     'renderer/media/android/webmediaplayer_android.cc',
     'renderer/media/android/webmediaplayer_android.h',
     'renderer/media/audio_decoder.cc',
@@ -219,6 +222,8 @@
     'renderer/media/audio_renderer_mixer_manager.h',
     'renderer/media/buffered_data_source.cc',
     'renderer/media/buffered_data_source.h',
+    'renderer/media/buffered_data_source_host_impl.h',
+    'renderer/media/buffered_data_source_host_impl.cc',
     'renderer/media/buffered_resource_loader.cc',
     'renderer/media/buffered_resource_loader.h',
     'renderer/media/cache_util.cc',
@@ -442,6 +447,8 @@
     'renderer/pepper/usb_key_code_conversion_win.cc',
     'renderer/pepper/v8_var_converter.cc',
     'renderer/pepper/v8_var_converter.h',
+    'renderer/push_messaging_dispatcher.cc',
+    'renderer/push_messaging_dispatcher.h',
     'renderer/render_frame_impl.cc',
     'renderer/render_frame_impl.h',
     'renderer/render_process.h',
@@ -554,11 +561,6 @@
         'renderer/input_tag_speech_dispatcher.h',
       ]
     }],
-    ['toolkit_uses_gtk == 1', {
-      'dependencies': [
-        '../build/linux/system.gyp:gtk',
-      ],
-    }],
     ['OS=="mac"', {
       'sources!': [
         'common/process_watcher_posix.cc',
@@ -578,24 +580,6 @@
     ['OS=="win" and win_use_allocator_shim==1', {
       'dependencies': [
           '../base/allocator/allocator.gyp:allocator',
-      ],
-    }],
-    ['use_mojo==0', {
-      'sources!': [
-        'renderer/mojo/mojo_render_process_observer.cc',
-        'renderer/mojo/mojo_render_process_observer.h',
-        'renderer/web_ui_mojo.cc',
-        'renderer/web_ui_mojo.h',
-        'renderer/web_ui_mojo_context_state.cc',
-        'renderer/web_ui_mojo_context_state.h',
-        'renderer/web_ui_runner.cc',
-        'renderer/web_ui_runner.h',
-      ],
-    }, {
-      'dependencies': [
-        'content_common_mojo_bindings',
-        '../mojo/mojo.gyp:mojo_environment_chromium',
-        '../mojo/mojo.gyp:mojo_js_bindings_lib',
       ],
     }],
     ['OS=="android"', {
@@ -701,14 +685,14 @@
         'renderer/media/rtc_video_encoder_factory.h',
         'renderer/media/rtc_video_renderer.cc',
         'renderer/media/rtc_video_renderer.h',
-        'renderer/media/video_destination_handler.cc',
-        'renderer/media/video_destination_handler.h',
         'renderer/media/video_source_handler.cc',
         'renderer/media/video_source_handler.h',
         'renderer/media/webaudio_capturer_source.cc',
         'renderer/media/webaudio_capturer_source.h',
         'renderer/media/webrtc/media_stream_track_metrics.cc',
         'renderer/media/webrtc/media_stream_track_metrics.h',
+        'renderer/media/webrtc/video_destination_handler.cc',
+        'renderer/media/webrtc/video_destination_handler.h',
         'renderer/media/webrtc/webrtc_audio_sink_adapter.cc',
         'renderer/media/webrtc/webrtc_audio_sink_adapter.h',
         'renderer/media/webrtc/webrtc_local_audio_track_adapter.cc',
@@ -780,8 +764,8 @@
       ],
       'sources!': [
         'renderer/media/pepper_platform_video_decoder.cc',
-        'renderer/media/video_destination_handler.cc',
-        'renderer/media/video_destination_handler.h',
+        'renderer/media/webrtc/video_destination_handler.cc',
+        'renderer/media/webrtc/video_destination_handler.h',
         'renderer/render_widget_fullscreen_pepper.cc',
         'renderer/render_widget_fullscreen_pepper.h',
       ],

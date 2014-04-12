@@ -237,7 +237,8 @@ class SearchTermsDataSnapshot : public SearchTermsData {
 
   virtual std::string GoogleBaseURLValue() const OVERRIDE;
   virtual std::string GetApplicationLocale() const OVERRIDE;
-  virtual base::string16 GetRlzParameterValue() const OVERRIDE;
+  virtual base::string16 GetRlzParameterValue(
+      bool from_app_list) const OVERRIDE;
   virtual std::string GetSearchClient() const OVERRIDE;
   virtual std::string NTPIsThemedParam() const OVERRIDE;
 
@@ -255,7 +256,7 @@ SearchTermsDataSnapshot::SearchTermsDataSnapshot(
     const SearchTermsData& search_terms_data)
     : google_base_url_value_(search_terms_data.GoogleBaseURLValue()),
       application_locale_(search_terms_data.GetApplicationLocale()),
-      rlz_parameter_value_(search_terms_data.GetRlzParameterValue()),
+      rlz_parameter_value_(search_terms_data.GetRlzParameterValue(false)),
       search_client_(search_terms_data.GetSearchClient()),
       ntp_is_themed_param_(search_terms_data.NTPIsThemedParam()) {}
 
@@ -270,7 +271,8 @@ std::string SearchTermsDataSnapshot::GetApplicationLocale() const {
   return application_locale_;
 }
 
-base::string16 SearchTermsDataSnapshot::GetRlzParameterValue() const {
+base::string16 SearchTermsDataSnapshot::GetRlzParameterValue(
+    bool from_app_list) const {
   return rlz_parameter_value_;
 }
 
@@ -1155,9 +1157,13 @@ ACMatchClassifications HistoryURLProvider::ClassifyDescription(
   history::WordStarts description_word_starts;
   history::String16VectorFromString16(
       clean_description, false, &description_word_starts);
+  // If HistoryURL retrieves any matches (and hence we reach this code), we
+  // are guaranteed that the beginning of input_text must be a word break.
+  history::WordStarts offsets(1, 0u);
   description_matches =
       history::ScoredHistoryMatch::FilterTermMatchesByWordStarts(
-          description_matches, description_word_starts, 0, std::string::npos);
+          description_matches, offsets, description_word_starts, 0,
+          std::string::npos);
   return SpansFromTermMatch(
       description_matches, clean_description.length(), false);
 }

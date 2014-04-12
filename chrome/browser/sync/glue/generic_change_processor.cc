@@ -26,6 +26,8 @@ namespace browser_sync {
 
 namespace {
 
+const int kContextSizeLimit = 1024;  // Datatype context size limit.
+
 void SetNodeSpecifics(const sync_pb::EntitySpecifics& entity_specifics,
                       syncer::WriteNode* write_node) {
   if (syncer::GetModelTypeFromSpecifics(entity_specifics) ==
@@ -78,9 +80,9 @@ GenericChangeProcessor::GenericChangeProcessor(
       share_handle_(user_share),
       attachment_service_(attachment_service.Pass()),
       attachment_service_weak_ptr_factory_(attachment_service_.get()),
-      attachment_service_proxy_(syncer::AttachmentServiceProxy(
+      attachment_service_proxy_(
           base::MessageLoopProxy::current(),
-          attachment_service_weak_ptr_factory_.GetWeakPtr())) {
+          attachment_service_weak_ptr_factory_.GetWeakPtr()) {
   DCHECK(CalledOnValidThread());
   DCHECK(attachment_service_);
 }
@@ -165,6 +167,28 @@ syncer::SyncDataList GenericChangeProcessor::GetAllSyncData(
   syncer::SyncDataList data;
   GetAllSyncDataReturnError(type, &data);
   return data;
+}
+
+syncer::SyncError GenericChangeProcessor::UpdateDataTypeContext(
+    syncer::ModelType type,
+    syncer::SyncChangeProcessor::ContextRefreshStatus refresh_status,
+    const std::string& context) {
+  DCHECK(syncer::ProtocolTypes().Has(type));
+
+  if (context.size() > static_cast<size_t>(kContextSizeLimit)) {
+    return syncer::SyncError(FROM_HERE,
+                             syncer::SyncError::DATATYPE_ERROR,
+                             "Context size limit exceeded.",
+                             type);
+  }
+
+  syncer::WriteTransaction trans(FROM_HERE, share_handle());
+  trans.SetDataTypeContext(type, refresh_status, context);
+
+  // TODO(zea): plumb a pointer to the PSS or SyncManagerImpl here so we can
+  // trigger a datatype nudge if |refresh_status == REFRESH_NEEDED|.
+
+  return syncer::SyncError();
 }
 
 syncer::SyncError GenericChangeProcessor::GetAllSyncDataReturnError(
@@ -291,7 +315,7 @@ syncer::SyncError AttemptDelete(
     DataTypeErrorHandler* error_handler) {
   DCHECK_EQ(change.change_type(), syncer::SyncChange::ACTION_DELETE);
   if (change.sync_data().IsLocal()) {
-    const std::string& tag = change.sync_data().GetTag();
+    const std::string& tag = syncer::SyncDataLocal(change.sync_data()).GetTag();
     if (tag.empty()) {
       syncer::SyncError error(
           FROM_HERE,
@@ -315,8 +339,8 @@ syncer::SyncError AttemptDelete(
           type, error_handler);
     }
   } else {
-    syncer::BaseNode::InitByLookupResult result =
-        node->InitByIdLookup(change.sync_data().GetRemoteId());
+    syncer::BaseNode::InitByLookupResult result = node->InitByIdLookup(
+        syncer::SyncDataRemote(change.sync_data()).GetId());
     if (result != syncer::BaseNode::INIT_OK) {
       return LogLookupFailure(
           result, FROM_HERE,
@@ -415,9 +439,10 @@ syncer::SyncError GenericChangeProcessor::HandleActionAdd(
     return error;
   }
   syncer::WriteNode::InitUniqueByCreationResult result =
-      sync_node->InitUniqueByCreation(change.sync_data().GetDataType(),
-                                      root_node,
-                                      change.sync_data().GetTag());
+      sync_node->InitUniqueByCreation(
+          change.sync_data().GetDataType(),
+          root_node,
+          syncer::SyncDataLocal(change.sync_data()).GetTag());
   if (result != syncer::WriteNode::INIT_SUCCESS) {
     std::string error_prefix = "Failed to create " + type_str + " node: " +
                                change.location().ToString() + ", ";
@@ -485,8 +510,9 @@ syncer::SyncError GenericChangeProcessor::HandleActionUpdate(
     syncer::WriteNode* sync_node) {
   // TODO(zea): consider having this logic for all possible changes?
   syncer::BaseNode::InitByLookupResult result =
-      sync_node->InitByClientTagLookup(change.sync_data().GetDataType(),
-                                       change.sync_data().GetTag());
+      sync_node->InitByClientTagLookup(
+          change.sync_data().GetDataType(),
+          syncer::SyncDataLocal(change.sync_data()).GetTag());
   if (result != syncer::BaseNode::INIT_OK) {
     std::string error_prefix = "Failed to load " + type_str + " node. " +
                                change.location().ToString() + ", ";

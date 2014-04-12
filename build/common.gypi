@@ -278,9 +278,6 @@
       'sysroot%': '<(sysroot)',
       'chroot_cmd%': '<(chroot_cmd)',
 
-      # Whether content/chrome is using mojo: see http://crbug.com/353602
-      'use_mojo%': 0,
-
       # Set to 1 to enable fast builds. Set to 2 for even faster builds
       # (it disables debug info for fastest compilation - only for use
       # on compile-only bots).
@@ -419,9 +416,6 @@
 
       # Enable Chrome browser extensions
       'enable_extensions%': 1,
-
-      # Enable browser automation.
-      'enable_automation%': 1,
 
       # Enable Google Now.
       'enable_google_now%': 1,
@@ -655,7 +649,6 @@
         }],
 
         ['OS=="android"', {
-          'enable_automation%': 0,
           'enable_extensions%': 0,
           'enable_google_now%': 0,
           'cld_version%': 1,
@@ -699,7 +692,6 @@
 
         ['OS=="ios"', {
           'disable_ftp_support%': 1,
-          'enable_automation%': 0,
           'enable_extensions%': 0,
           'enable_google_now%': 0,
           'cld_version%': 1,
@@ -864,10 +856,6 @@
           'enable_printing%': 0,
         }],
 
-        ['OS=="win" or OS=="linux"', {
-          'use_mojo%': 1,
-        }],
-
         # By default, use ICU data file (icudtl.dat) on all platforms
         # except when building Android WebView.
         # TODO(jshin): Handle 'use_system_icu' on Linux (Chromium).
@@ -939,7 +927,6 @@
     'use_aura%': '<(use_aura)',
     'use_ash%': '<(use_ash)',
     'use_cras%': '<(use_cras)',
-    'use_mojo%': '<(use_mojo)',
     'use_openssl%': '<(use_openssl)',
     'use_openssl_certs%': '<(use_openssl_certs)',
     'use_nss%': '<(use_nss)',
@@ -1015,7 +1002,6 @@
     'test_isolation_mode%': '<(test_isolation_mode)',
     'test_isolation_outdir%': '<(test_isolation_outdir)',
     'test_isolation_fail_on_missing': '<(test_isolation_fail_on_missing)',
-    'enable_automation%': '<(enable_automation)',
     'enable_printing%': '<(enable_printing)',
     'enable_spellcheck%': '<(enable_spellcheck)',
     'enable_google_now%': '<(enable_google_now)',
@@ -1196,6 +1182,10 @@
     'debug_unwind_tables%': 1,
     'release_unwind_tables%': 1,
 
+    # Override where to find binutils
+    'binutils_version%': 0,
+    'binutils_dir%': '',
+
     # Enable TCMalloc.
     # TODO(dmikurube): Change Linux default of use_allocator to "tcmalloc".
     # TODO(dmikurube): Change Android default of use_allocator to "none".
@@ -1229,6 +1219,10 @@
     # used to control such things as the set of warnings to enable, and
     # whether warnings are treated as errors.
     'chromium_code%': 0,
+
+    # Disable fatal linker warnings, similarly to how we make it possible
+    # to disable -Werror (e.g. for different toolchain versions).
+    'disable_fatal_linker_warnings%': 0,
 
     'release_valgrind_build%': 0,
 
@@ -1323,6 +1317,9 @@
     # Compile d8 for the host toolset.
     'v8_toolset_for_d8': 'host',
 
+    # Compiles v8 without its platform library.
+    'v8_use_default_platform': 0,
+
     # Use the chromium skia by default.
     'use_system_skia%': '0',
 
@@ -1352,7 +1349,37 @@
       }, {
         'syzygy_optimize%': 0,
       }],
-
+      # Get binutils version so we can enable debug fission if we can.
+      ['os_posix==1 and OS!="mac" and OS!="ios"', {
+        'conditions': [
+          # compiler_version doesn't work with clang
+          # TODO(mithro): Land https://codereview.chromium.org/199793014/ so
+          # compiler_version works with clang.
+          # TODO(glider): set clang to 1 earlier for ASan and TSan builds so
+          # that it takes effect here.
+          ['clang==0 and asan==0 and lsan==0 and tsan==0 and msan==0', {
+            'binutils_version%': '<!(python <(DEPTH)/build/compiler_version.py assembler)',
+          }],
+          # On Android we know the binutils version in the toolchain.
+          ['OS=="android"', {
+            'binutils_version%': 222,
+          }],
+          # Our version of binutils in third_party/binutils
+          ['linux_use_gold_binary==1', {
+            'binutils_version%': 224,
+            'conditions': [
+              ['host_arch=="x64"', {
+                'binutils_dir%': 'third_party/binutils/Linux_x64/Release/bin',
+              }],
+              ['host_arch=="ia32"', {
+                'binutils_dir%': 'third_party/binutils/Linux_ia32/Release/bin',
+              }],
+            ],
+          }],
+        ],
+      }, {
+        'binutils_version%': 0,
+      }],
       # The version of GCC in use, set later in platforms that use GCC and have
       # not explicitly chosen to build with clang. Currently, this means all
       # platforms except Windows, Mac and iOS.
@@ -1369,15 +1396,12 @@
                 'gcc_version%': 46,
               }],
             ],
-            'binutils_version%': 222,
           }, {
             'gcc_version%': '<!(python <(DEPTH)/build/compiler_version.py)',
-            'binutils_version%': '<!(python <(DEPTH)/build/compiler_version.py assembler)',
           }],
         ],
       }, {
         'gcc_version%': 0,
-        'binutils_version%': 0,
       }],
       ['OS=="win" and "<!(python <(DEPTH)/build/dir_exists.py <(windows_sdk_default_path))"=="True"', {
         'windows_sdk_path%': '<(windows_sdk_default_path)',
@@ -1469,6 +1493,7 @@
             # they're passed to ant which uses a different relative path from
             # gyp.
             'android_ndk_root%': '<!(cd <(DEPTH) && pwd -P)/third_party/android_tools/ndk/',
+            'android_ndk_experimental_root%': '<!(cd <(DEPTH) && pwd -P)/third_party/android_tools/ndk_experimental/',
             'android_sdk_root%': '<!(cd <(DEPTH) && pwd -P)/third_party/android_tools/sdk/',
             'android_host_arch%': '<!(uname -m)',
             # Android API-level of the SDK used for compilation.
@@ -1493,17 +1518,16 @@
           'conditions': [
             ['target_arch == "ia32"', {
               'android_app_abi%': 'x86',
-              'android_gdbserver_executable%': 'gdbserver',
               'android_gdbserver%': '<(android_ndk_root)/prebuilt/android-x86/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-14/arch-x86',
               'android_toolchain%': '<(android_ndk_root)/toolchains/x86-4.6/prebuilt/<(host_os)-<(android_host_arch)/bin',
             }],
             ['target_arch == "x64"', {
               'android_app_abi%': 'x86_64',
-              'android_gdbserver_executable%': 'gdbserver64',
-              'android_gdbserver%': '<(android_ndk_root)/prebuilt/android-x86_64/gdbserver/gdbserver64',
-              'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-19/arch-x86_64',
-              'android_toolchain%': '<(android_ndk_root)/toolchains/x86_64-4.8/prebuilt/<(host_os)-<(android_host_arch)/bin',
+              'android_gdbserver%': '<(android_ndk_experimental_root)/prebuilt/android-x86_64/gdbserver/gdbserver',
+              'android_ndk_sysroot%': '<(android_ndk_experimental_root)/platforms/android-20/arch-x86_64',
+              'android_toolchain%': '<(android_ndk_experimental_root)/toolchains/x86_64-4.8/prebuilt/<(host_os)-<(android_host_arch)/bin',
+              'android_stlport_root': '<(android_ndk_experimental_root)/sources/cxx-stl/stlport',
             }],
             ['target_arch=="arm"', {
               'conditions': [
@@ -1513,21 +1537,19 @@
                   'android_app_abi%': 'armeabi-v7a',
                 }],
               ],
-              'android_gdbserver_executable%': 'gdbserver',
               'android_gdbserver%': '<(android_ndk_root)/prebuilt/android-arm/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-14/arch-arm',
               'android_toolchain%': '<(android_ndk_root)/toolchains/arm-linux-androideabi-4.6/prebuilt/<(host_os)-<(android_host_arch)/bin',
             }],
             ['target_arch == "arm64"', {
               'android_app_abi%': 'arm64-v8a',
-              'android_gdbserver_executable%': 'gdbserver64',
-              'android_gdbserver%': '<(android_ndk_root)/prebuilt/android-arm64/gdbserver64/gdbserver64',
-              'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-19/arch-arm64',
-              'android_toolchain%': '<(android_ndk_root)/toolchains/aarch64-linux-android-4.8/prebuilt/<(host_os)-<(android_host_arch)/bin',
+              'android_gdbserver%': '<(android_ndk_experimental_root)/prebuilt/android-arm64/gdbserver/gdbserver',
+              'android_ndk_sysroot%': '<(android_ndk_experimental_root)/platforms/android-20/arch-arm64',
+              'android_toolchain%': '<(android_ndk_experimental_root)/toolchains/aarch64-linux-android-4.8/prebuilt/<(host_os)-<(android_host_arch)/bin',
+              'android_stlport_root': '<(android_ndk_experimental_root)/sources/cxx-stl/stlport',
             }],
             ['target_arch == "mipsel"', {
               'android_app_abi%': 'mips',
-              'android_gdbserver_executable%': 'gdbserver',
               'android_gdbserver%': '<(android_ndk_root)/prebuilt/android-mips/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-14/arch-mips',
               'android_toolchain%': '<(android_ndk_root)/toolchains/mipsel-linux-android-4.6/prebuilt/<(host_os)-<(android_host_arch)/bin',
@@ -1536,7 +1558,6 @@
         },
         # Copy conditionally-set variables out one scope.
         'android_app_abi%': '<(android_app_abi)',
-        'android_gdbserver_executable': '<(android_gdbserver_executable)',
         'android_gdbserver%': '<(android_gdbserver)',
         'android_ndk_root%': '<(android_ndk_root)',
         'android_ndk_sysroot%': '<(android_ndk_sysroot)',
@@ -1574,7 +1595,6 @@
         'proprietary_codecs%': '<(proprietary_codecs)',
         'safe_browsing%': 2,
         'input_speech%': 0,
-        'enable_automation%': 0,
         'java_bridge%': 1,
         'build_ffmpegsumo%': 0,
         # TODO(dmikurube): Change the default of use_allocator to "none".
@@ -1794,9 +1814,6 @@
       ['toolkit_views==1', {
         'grit_defines': ['-D', 'toolkit_views'],
       }],
-      ['use_mojo==1', {
-        'grit_defines': ['-D', 'use_mojo'],
-      }],
       ['toolkit_uses_gtk==1', {
         'grit_defines': ['-D', 'toolkit_uses_gtk'],
       }],
@@ -1895,7 +1912,7 @@
         'grit_defines': ['-D', 'enable_notifications'],
       }],
       ['enable_resource_whitelist_generation==1', {
-        'grit_rc_header_format': ['-h', '#define {textual_id} _Pragma("{textual_id}") {numeric_id}'],
+        'grit_rc_header_format': ['-h', '#define {textual_id} _Pragma("whitelisted_resource_{numeric_id}") {numeric_id}'],
       }],
       ['enable_mdns==1 or OS=="mac"', {
         'grit_defines': ['-D', 'enable_service_discovery'],
@@ -1920,6 +1937,7 @@
       }],
       ['tsan==1', {
         'clang%': 1,
+        'use_custom_libcxx%': 1,
       }],
       ['msan==1', {
         'clang%': 1,
@@ -2290,9 +2308,6 @@
       ['use_libjpeg_turbo==1', {
         'defines': ['USE_LIBJPEG_TURBO=1'],
       }],
-      ['use_mojo==1', {
-        'defines': ['USE_MOJO=1'],
-      }],
       ['use_x11==1', {
         'defines': ['USE_X11=1'],
       }],
@@ -2522,9 +2537,6 @@
       }],
       ['enable_background==1', {
         'defines': ['ENABLE_BACKGROUND=1'],
-      }],
-      ['enable_automation==1', {
-        'defines': ['ENABLE_AUTOMATION=1'],
       }],
       ['enable_google_now==1', {
         'defines': ['ENABLE_GOOGLE_NOW=1'],
@@ -3069,13 +3081,19 @@
     },
   },
   'conditions': [
+    ['os_posix==1', {
+      'target_defaults': {
+        'ldflags': [
+          '-Wl,-z,now',
+          '-Wl,-z,relro',
+        ],
+      },
+    }],
     # TODO(jochen): Enable this on chromeos on arm. http://crbug.com/356580
-    ['os_posix==1 and (chromeos==0 or target_arch!="arm")', {
+    ['os_posix==1 and disable_fatal_linker_warnings==0 and (chromeos==0 or target_arch!="arm")', {
       'target_defaults': {
         'ldflags': [
           '-Wl,--fatal-warnings',
-          '-Wl,-z,now',
-          '-Wl,-z,relro',
         ],
       },
     }],
@@ -3806,12 +3824,16 @@
           ['linux_dump_symbols==1', {
             'cflags': [ '-g' ],
             'conditions': [
-              ['target_arch=="ia32" and OS!="android"', {
+              # TODO(thestig) We should not need to specify chromeos==0 here,
+              # but somehow ChromeOS uses gold despite linux_use_gold_binary==0.
+              # http://crbug.com./360082
+              ['linux_use_gold_binary==0 and chromeos==0 and OS!="android"', {
                 'target_conditions': [
                   ['_toolset=="target"', {
                     'ldflags': [
-                      # Workaround for linker OOM.
+                      # Workarounds for linker OOM.
                       '-Wl,--no-keep-memory',
+                      '-Wl,--reduce-memory-overheads',
                     ],
                   }],
                 ],
@@ -3853,18 +3875,43 @@
                   }],
                 ],
               }],
+              # Newer gcc's support -fuse-ld, use the flag to force gold
+              # selection.
+              # gcc -- http://gcc.gnu.org/onlinedocs/gcc-4.8.0/gcc/Optimize-Options.html
+              # TODO(mithro): Watch for clang support at following thread:
+              # http://clang-developers.42468.n3.nabble.com/Adding-fuse-ld-support-to-clang-td4032180.html
+              ['gcc_version>=48', {
+                'cflags': [
+                  '-fuse-ld=gold',
+                ],
+                'ldflags': [
+                  '-fuse-ld=gold',
+                ],
+              }]
             ],
           }],
           ['linux_use_gold_binary==1', {
+	    # Put our binutils, which contains gold in the search path. We pass
+	    # the path to gold to the compiler. gyp leaves unspecified what the
+	    # cwd is when running the compiler, so the normal gyp path-munging
+	    # fails us. This hack gets the right path.
+            'cflags': [
+              '-B<!(cd <(DEPTH) && pwd -P)/<(binutils_dir)',
+            ],
             'ldflags': [
-              # Put our gold binary in the search path for the linker.
-              # We pass the path to gold to the compiler.  gyp leaves
-              # unspecified what the cwd is when running the compiler,
-              # so the normal gyp path-munging fails us.  This hack
-              # gets the right path.
-              '-B<!(cd <(DEPTH) && pwd -P)/third_party/gold',
+              '-B<!(cd <(DEPTH) && pwd -P)/<(binutils_dir)',
             ],
           }],
+          ['binutils_version>=224', {
+	    # Newer binutils don't set DT_RPATH unless you disable "new" dtags
+	    # and the new DT_RUNPATH doesn't work without --no-as-needed flag.
+	    # FIXME(mithro): Figure out the --as-needed/--no-as-needed flags
+	    # inside this file to allow usage of --no-as-needed and removal of
+	    # this flag.
+            'ldflags': [
+              '-Wl,--disable-new-dtags',
+            ],
+          }]
         ],
       },
     }],
@@ -4344,6 +4391,16 @@
               'OTHER_CFLAGS': [
                 # See http://crbug.com/110262
                 '-fcolor-diagnostics',
+              ],
+            }],
+            ['OS=="ios" and target_subarch!="arm32" and \
+              "<(GENERATOR)"=="xcode"', {
+              'OTHER_CFLAGS': [
+                # TODO(ios): when building Chrome for iOS on 64-bit platform
+                # with Xcode, the -Wshorted-64-to-32 warning is automatically
+                # enabled. This cause failures when compiling protobuf code,
+                # so disable the warning. http://crbug.com/359107
+                '-Wno-shorten-64-to-32',
               ],
             }],
           ],

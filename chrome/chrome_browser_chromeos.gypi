@@ -372,6 +372,8 @@
         'browser/chromeos/file_system_provider/observer.h',
         'browser/chromeos/file_system_provider/provided_file_system.cc',
         'browser/chromeos/file_system_provider/provided_file_system.h',
+        'browser/chromeos/file_system_provider/request_manager.cc',
+        'browser/chromeos/file_system_provider/request_manager.h',
         'browser/chromeos/file_system_provider/service.cc',
         'browser/chromeos/file_system_provider/service.h',
         'browser/chromeos/file_system_provider/service_factory.cc',
@@ -1033,6 +1035,13 @@
         ['use_ozone == 1', {
           'dependencies': [
             '../ui/ozone/ozone.gyp:ozone',
+          ],
+          'sources!': [
+            'browser/chromeos/input_method/input_method_engine.cc',
+            'browser/chromeos/input_method/input_method_engine.h',
+          ],
+          'sources/': [
+            ['exclude', '^browser/chromeos/events/'],
           ],
         }],
       ],

@@ -15,10 +15,8 @@
 #include "cc/debug/devtools_instrumentation.h"
 #include "cc/debug/traced_value.h"
 #include "cc/layers/picture_layer_impl.h"
-#include "cc/resources/direct_raster_worker_pool.h"
-#include "cc/resources/image_raster_worker_pool.h"
-#include "cc/resources/pixel_buffer_raster_worker_pool.h"
-#include "cc/resources/raster_worker_pool_delegate.h"
+#include "cc/resources/raster_worker_pool.h"
+#include "cc/resources/rasterizer_delegate.h"
 #include "cc/resources/tile.h"
 #include "skia/ext/paint_simplifier.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -32,6 +30,9 @@ namespace {
 // a tile is of solid color.
 const bool kUseColorEstimator = true;
 
+// Minimum width/height of a pile that would require analysis for tiles.
+const int kMinDimensionsForAnalysis = 256;
+
 class DisableLCDTextFilter : public SkDrawFilter {
  public:
   // SkDrawFilter interface.
@@ -44,9 +45,9 @@ class DisableLCDTextFilter : public SkDrawFilter {
   }
 };
 
-class RasterWorkerPoolTaskImpl : public internal::RasterWorkerPoolTask {
+class RasterTaskImpl : public internal::RasterTask {
  public:
-  RasterWorkerPoolTaskImpl(
+  RasterTaskImpl(
       const Resource* resource,
       PicturePileImpl* picture_pile,
       const gfx::Rect& content_rect,
@@ -59,8 +60,8 @@ class RasterWorkerPoolTaskImpl : public internal::RasterWorkerPoolTask {
       bool analyze_picture,
       RenderingStatsInstrumentation* rendering_stats,
       const base::Callback<void(const PicturePileImpl::Analysis&, bool)>& reply,
-      internal::WorkerPoolTask::Vector* dependencies)
-      : internal::RasterWorkerPoolTask(resource, dependencies),
+      internal::ImageDecodeTask::Vector* dependencies)
+      : internal::RasterTask(resource, dependencies),
         picture_pile_(picture_pile),
         content_rect_(content_rect),
         contents_scale_(contents_scale),
@@ -76,7 +77,7 @@ class RasterWorkerPoolTaskImpl : public internal::RasterWorkerPoolTask {
 
   // Overridden from internal::Task:
   virtual void RunOnWorkerThread() OVERRIDE {
-    TRACE_EVENT0("cc", "RasterWorkerPoolTaskImpl::RunOnWorkerThread");
+    TRACE_EVENT0("cc", "RasterizerTaskImpl::RunOnWorkerThread");
 
     DCHECK(picture_pile_);
     if (canvas_) {
@@ -85,21 +86,21 @@ class RasterWorkerPoolTaskImpl : public internal::RasterWorkerPoolTask {
     }
   }
 
-  // Overridden from internal::WorkerPoolTask:
-  virtual void ScheduleOnOriginThread(internal::WorkerPoolTaskClient* client)
+  // Overridden from internal::RasterizerTask:
+  virtual void ScheduleOnOriginThread(internal::RasterizerTaskClient* client)
       OVERRIDE {
     DCHECK(!canvas_);
-    canvas_ = client->AcquireCanvasForRaster(this, resource());
+    canvas_ = client->AcquireCanvasForRaster(this);
   }
   virtual void RunOnOriginThread() OVERRIDE {
-    TRACE_EVENT0("cc", "RasterWorkerPoolTaskImpl::RunOnOriginThread");
+    TRACE_EVENT0("cc", "RasterTaskImpl::RunOnOriginThread");
     if (canvas_)
       AnalyzeAndRaster(picture_pile_);
   }
-  virtual void CompleteOnOriginThread(internal::WorkerPoolTaskClient* client)
+  virtual void CompleteOnOriginThread(internal::RasterizerTaskClient* client)
       OVERRIDE {
     canvas_ = NULL;
-    client->ReleaseCanvasForRaster(this, resource());
+    client->ReleaseCanvasForRaster(this);
   }
   virtual void RunReplyOnOriginThread() OVERRIDE {
     DCHECK(!canvas_);
@@ -107,7 +108,7 @@ class RasterWorkerPoolTaskImpl : public internal::RasterWorkerPoolTask {
   }
 
  protected:
-  virtual ~RasterWorkerPoolTaskImpl() { DCHECK(!canvas_); }
+  virtual ~RasterTaskImpl() { DCHECK(!canvas_); }
 
  private:
   scoped_ptr<base::Value> DataAsValue() const {
@@ -134,7 +135,7 @@ class RasterWorkerPoolTaskImpl : public internal::RasterWorkerPoolTask {
 
   void Analyze(PicturePileImpl* picture_pile) {
     TRACE_EVENT1("cc",
-                 "RasterWorkerPoolTaskImpl::Analyze",
+                 "RasterTaskImpl::Analyze",
                  "data",
                  TracedValue::FromValue(DataAsValue().release()));
 
@@ -154,7 +155,7 @@ class RasterWorkerPoolTaskImpl : public internal::RasterWorkerPoolTask {
   void Raster(PicturePileImpl* picture_pile) {
     TRACE_EVENT2(
         "cc",
-        "RasterWorkerPoolTaskImpl::Raster",
+        "RasterTaskImpl::Raster",
         "data",
         TracedValue::FromValue(DataAsValue().release()),
         "raster_mode",
@@ -218,16 +219,15 @@ class RasterWorkerPoolTaskImpl : public internal::RasterWorkerPoolTask {
   const base::Callback<void(const PicturePileImpl::Analysis&, bool)> reply_;
   SkCanvas* canvas_;
 
-  DISALLOW_COPY_AND_ASSIGN(RasterWorkerPoolTaskImpl);
+  DISALLOW_COPY_AND_ASSIGN(RasterTaskImpl);
 };
 
-class ImageDecodeWorkerPoolTaskImpl : public internal::WorkerPoolTask {
+class ImageDecodeTaskImpl : public internal::ImageDecodeTask {
  public:
-  ImageDecodeWorkerPoolTaskImpl(
-      SkPixelRef* pixel_ref,
-      int layer_id,
-      RenderingStatsInstrumentation* rendering_stats,
-      const base::Callback<void(bool was_canceled)>& reply)
+  ImageDecodeTaskImpl(SkPixelRef* pixel_ref,
+                      int layer_id,
+                      RenderingStatsInstrumentation* rendering_stats,
+                      const base::Callback<void(bool was_canceled)>& reply)
       : pixel_ref_(skia::SharePtr(pixel_ref)),
         layer_id_(layer_id),
         rendering_stats_(rendering_stats),
@@ -235,25 +235,25 @@ class ImageDecodeWorkerPoolTaskImpl : public internal::WorkerPoolTask {
 
   // Overridden from internal::Task:
   virtual void RunOnWorkerThread() OVERRIDE {
-    TRACE_EVENT0("cc", "ImageDecodeWorkerPoolTaskImpl::RunOnWorkerThread");
+    TRACE_EVENT0("cc", "ImageDecodeTaskImpl::RunOnWorkerThread");
     Decode();
   }
 
-  // Overridden from internal::WorkerPoolTask:
-  virtual void ScheduleOnOriginThread(internal::WorkerPoolTaskClient* client)
+  // Overridden from internal::RasterizerTask:
+  virtual void ScheduleOnOriginThread(internal::RasterizerTaskClient* client)
       OVERRIDE {}
   virtual void RunOnOriginThread() OVERRIDE {
-    TRACE_EVENT0("cc", "ImageDecodeWorkerPoolTaskImpl::RunOnOriginThread");
+    TRACE_EVENT0("cc", "ImageDecodeTaskImpl::RunOnOriginThread");
     Decode();
   }
-  virtual void CompleteOnOriginThread(internal::WorkerPoolTaskClient* client)
+  virtual void CompleteOnOriginThread(internal::RasterizerTaskClient* client)
       OVERRIDE {}
   virtual void RunReplyOnOriginThread() OVERRIDE {
     reply_.Run(!HasFinishedRunning());
   }
 
  protected:
-  virtual ~ImageDecodeWorkerPoolTaskImpl() {}
+  virtual ~ImageDecodeTaskImpl() {}
 
  private:
   void Decode() {
@@ -269,7 +269,7 @@ class ImageDecodeWorkerPoolTaskImpl : public internal::WorkerPoolTask {
   RenderingStatsInstrumentation* rendering_stats_;
   const base::Callback<void(bool was_canceled)> reply_;
 
-  DISALLOW_COPY_AND_ASSIGN(ImageDecodeWorkerPoolTaskImpl);
+  DISALLOW_COPY_AND_ASSIGN(ImageDecodeTaskImpl);
 };
 
 const size_t kScheduledRasterTasksLimit = 32u;
@@ -397,52 +397,33 @@ scoped_ptr<base::Value> RasterTaskCompletionStatsAsValue(
 // static
 scoped_ptr<TileManager> TileManager::Create(
     TileManagerClient* client,
-    base::SequencedTaskRunner* task_runner,
     ResourceProvider* resource_provider,
-    ContextProvider* context_provider,
-    RenderingStatsInstrumentation* rendering_stats_instrumentation,
-    bool use_map_image,
-    bool use_rasterize_on_demand,
-    size_t max_transfer_buffer_usage_bytes,
+    Rasterizer* rasterizer,
+    Rasterizer* gpu_rasterizer,
     size_t max_raster_usage_bytes,
-    unsigned map_image_texture_target) {
-  return make_scoped_ptr(new TileManager(
-      client,
-      task_runner,
-      resource_provider,
-      context_provider,
-      use_map_image
-          ? ImageRasterWorkerPool::Create(
-                task_runner, resource_provider, map_image_texture_target)
-          : PixelBufferRasterWorkerPool::Create(
-                task_runner,
-                resource_provider,
-                max_transfer_buffer_usage_bytes),
-      DirectRasterWorkerPool::Create(
-          task_runner, resource_provider, context_provider),
-      max_raster_usage_bytes,
-      rendering_stats_instrumentation,
-      use_rasterize_on_demand));
+    bool use_rasterize_on_demand,
+    RenderingStatsInstrumentation* rendering_stats_instrumentation) {
+  return make_scoped_ptr(new TileManager(client,
+                                         resource_provider,
+                                         rasterizer,
+                                         gpu_rasterizer,
+                                         max_raster_usage_bytes,
+                                         use_rasterize_on_demand,
+                                         rendering_stats_instrumentation));
 }
 
 TileManager::TileManager(
     TileManagerClient* client,
-    base::SequencedTaskRunner* task_runner,
     ResourceProvider* resource_provider,
-    ContextProvider* context_provider,
-    scoped_ptr<RasterWorkerPool> raster_worker_pool,
-    scoped_ptr<RasterWorkerPool> direct_raster_worker_pool,
+    Rasterizer* rasterizer,
+    Rasterizer* gpu_rasterizer,
     size_t max_raster_usage_bytes,
-    RenderingStatsInstrumentation* rendering_stats_instrumentation,
-    bool use_rasterize_on_demand)
+    bool use_rasterize_on_demand,
+    RenderingStatsInstrumentation* rendering_stats_instrumentation)
     : client_(client),
-      context_provider_(context_provider),
-      resource_pool_(
-          ResourcePool::Create(resource_provider,
-                               raster_worker_pool->GetResourceTarget(),
-                               raster_worker_pool->GetResourceFormat())),
-      raster_worker_pool_(raster_worker_pool.Pass()),
-      direct_raster_worker_pool_(direct_raster_worker_pool.Pass()),
+      resource_pool_(ResourcePool::Create(resource_provider,
+                                          rasterizer->GetResourceTarget(),
+                                          rasterizer->GetResourceFormat())),
       prioritized_tiles_dirty_(false),
       all_tiles_that_need_to_be_rasterized_have_memory_(true),
       all_tiles_required_for_activation_have_memory_(true),
@@ -455,13 +436,14 @@ TileManager::TileManager(
       rendering_stats_instrumentation_(rendering_stats_instrumentation),
       did_initialize_visible_tile_(false),
       did_check_for_completed_tasks_since_last_schedule_tasks_(true),
-      use_rasterize_on_demand_(use_rasterize_on_demand) {
-  RasterWorkerPool* raster_worker_pools[NUM_RASTER_WORKER_POOL_TYPES] = {
-      raster_worker_pool_.get(),        // RASTER_WORKER_POOL_TYPE_DEFAULT
-      direct_raster_worker_pool_.get()  // RASTER_WORKER_POOL_TYPE_DIRECT
+      use_rasterize_on_demand_(use_rasterize_on_demand),
+      resource_format_(rasterizer->GetResourceFormat()) {
+  Rasterizer* rasterizers[NUM_RASTERIZER_TYPES] = {
+      rasterizer,      // RASTERIZER_TYPE_DEFAULT
+      gpu_rasterizer,  // RASTERIZER_TYPE_GPU
   };
-  raster_worker_pool_delegate_ = RasterWorkerPoolDelegate::Create(
-      this, raster_worker_pools, arraysize(raster_worker_pools));
+  rasterizer_delegate_ =
+      RasterizerDelegate::Create(this, rasterizers, arraysize(rasterizers));
 }
 
 TileManager::~TileManager() {
@@ -472,14 +454,14 @@ TileManager::~TileManager() {
   CleanUpReleasedTiles();
   DCHECK_EQ(0u, tiles_.size());
 
-  RasterTaskQueue empty[NUM_RASTER_WORKER_POOL_TYPES];
-  raster_worker_pool_delegate_->ScheduleTasks(empty);
+  RasterTaskQueue empty[NUM_RASTERIZER_TYPES];
+  rasterizer_delegate_->ScheduleTasks(empty);
   orphan_raster_tasks_.clear();
 
   // This should finish all pending tasks and release any uninitialized
   // resources.
-  raster_worker_pool_delegate_->Shutdown();
-  raster_worker_pool_delegate_->CheckForCompletedTasks();
+  rasterizer_delegate_->Shutdown();
+  rasterizer_delegate_->CheckForCompletedTasks();
 
   DCHECK_EQ(0u, bytes_releasable_);
   DCHECK_EQ(0u, resources_releasable_);
@@ -557,7 +539,7 @@ void TileManager::DidFinishRunningTasks() {
       !memory_usage_above_limit)
     return;
 
-  raster_worker_pool_delegate_->CheckForCompletedTasks();
+  rasterizer_delegate_->CheckForCompletedTasks();
   did_check_for_completed_tasks_since_last_schedule_tasks_ = true;
 
   TileVector tiles_that_need_to_be_rasterized;
@@ -752,7 +734,7 @@ void TileManager::ManageTiles(const GlobalStateThatImpactsTilePriority& state) {
   // We need to call CheckForCompletedTasks() once in-between each call
   // to ScheduleTasks() to prevent canceled tasks from being scheduled.
   if (!did_check_for_completed_tasks_since_last_schedule_tasks_) {
-    raster_worker_pool_delegate_->CheckForCompletedTasks();
+    rasterizer_delegate_->CheckForCompletedTasks();
     did_check_for_completed_tasks_since_last_schedule_tasks_ = true;
   }
 
@@ -781,7 +763,7 @@ void TileManager::ManageTiles(const GlobalStateThatImpactsTilePriority& state) {
 bool TileManager::UpdateVisibleTiles() {
   TRACE_EVENT0("cc", "TileManager::UpdateVisibleTiles");
 
-  raster_worker_pool_delegate_->CheckForCompletedTasks();
+  rasterizer_delegate_->CheckForCompletedTasks();
   did_check_for_completed_tasks_since_last_schedule_tasks_ = true;
 
   TRACE_EVENT_INSTANT1(
@@ -1067,7 +1049,7 @@ void TileManager::ScheduleTasks(
 
   DCHECK(did_check_for_completed_tasks_since_last_schedule_tasks_);
 
-  for (size_t i = 0; i < NUM_RASTER_WORKER_POOL_TYPES; ++i)
+  for (size_t i = 0; i < NUM_RASTERIZER_TYPES; ++i)
     raster_queue_[i].Reset();
 
   // Build a new task queue containing all task currently needed. Tasks
@@ -1086,9 +1068,8 @@ void TileManager::ScheduleTasks(
     if (!tile_version.raster_task_)
       tile_version.raster_task_ = CreateRasterTask(tile);
 
-    size_t pool_type = tile->use_gpu_rasterization()
-                           ? RASTER_WORKER_POOL_TYPE_DIRECT
-                           : RASTER_WORKER_POOL_TYPE_DEFAULT;
+    size_t pool_type = tile->use_gpu_rasterization() ? RASTERIZER_TYPE_GPU
+                                                     : RASTERIZER_TYPE_DEFAULT;
 
     raster_queue_[pool_type].items.push_back(RasterTaskQueue::Item(
         tile_version.raster_task_.get(), tile->required_for_activation()));
@@ -1103,7 +1084,7 @@ void TileManager::ScheduleTasks(
   // Schedule running of |raster_tasks_|. This replaces any previously
   // scheduled tasks and effectively cancels all tasks not present
   // in |raster_tasks_|.
-  raster_worker_pool_delegate_->ScheduleTasks(raster_queue_);
+  rasterizer_delegate_->ScheduleTasks(raster_queue_);
 
   // It's now safe to clean up orphan tasks as raster worker pool is not
   // allowed to keep around unreferenced raster tasks after ScheduleTasks() has
@@ -1113,10 +1094,10 @@ void TileManager::ScheduleTasks(
   did_check_for_completed_tasks_since_last_schedule_tasks_ = false;
 }
 
-scoped_refptr<internal::WorkerPoolTask> TileManager::CreateImageDecodeTask(
+scoped_refptr<internal::ImageDecodeTask> TileManager::CreateImageDecodeTask(
     Tile* tile,
     SkPixelRef* pixel_ref) {
-  return make_scoped_refptr(new ImageDecodeWorkerPoolTaskImpl(
+  return make_scoped_refptr(new ImageDecodeTaskImpl(
       pixel_ref,
       tile->layer_id(),
       rendering_stats_instrumentation_,
@@ -1126,8 +1107,7 @@ scoped_refptr<internal::WorkerPoolTask> TileManager::CreateImageDecodeTask(
                  base::Unretained(pixel_ref))));
 }
 
-scoped_refptr<internal::RasterWorkerPoolTask> TileManager::CreateRasterTask(
-    Tile* tile) {
+scoped_refptr<internal::RasterTask> TileManager::CreateRasterTask(Tile* tile) {
   ManagedTileState& mts = tile->managed_state();
 
   scoped_ptr<ScopedResource> resource =
@@ -1135,7 +1115,7 @@ scoped_refptr<internal::RasterWorkerPoolTask> TileManager::CreateRasterTask(
   const ScopedResource* const_resource = resource.get();
 
   // Create and queue all image decode tasks that this tile depends on.
-  internal::WorkerPoolTask::Vector decode_tasks;
+  internal::ImageDecodeTask::Vector decode_tasks;
   PixelRefTaskMap& existing_pixel_refs = image_decode_tasks_[tile->layer_id()];
   for (PicturePileImpl::PixelRefIterator iter(
            tile->content_rect(), tile->contents_scale(), tile->picture_pile());
@@ -1152,7 +1132,7 @@ scoped_refptr<internal::RasterWorkerPoolTask> TileManager::CreateRasterTask(
     }
 
     // Create and append new image decode task for this pixel ref.
-    scoped_refptr<internal::WorkerPoolTask> decode_task =
+    scoped_refptr<internal::ImageDecodeTask> decode_task =
         CreateImageDecodeTask(tile, pixel_ref);
     decode_tasks.push_back(decode_task);
     existing_pixel_refs[id] = decode_task;
@@ -1163,26 +1143,37 @@ scoped_refptr<internal::RasterWorkerPoolTask> TileManager::CreateRasterTask(
   // It is drawn directly as a solid-color quad saving raster and upload cost.
   // The analysis step is however expensive and is not justified when doing
   // gpu rasterization where there is no upload.
-  bool analyze_picture = !tile->use_gpu_rasterization();
+  //
+  // Additionally, we do not want to do the analysis if the layer that produced
+  // this tile is narrow, since more likely than not the tile would not be
+  // solid. We use the picture pile size as a proxy for layer size, since it
+  // represents the recorded (and thus rasterizable) content.
+  // Note that this last optimization is a heuristic that ensures that we don't
+  // spend too much time analyzing tiles on a multitude of small layers, as it
+  // is likely that these layers have some non-solid content.
+  gfx::Size pile_size = tile->picture_pile()->size();
+  bool analyze_picture = !tile->use_gpu_rasterization() &&
+                         std::min(pile_size.width(), pile_size.height()) >=
+                             kMinDimensionsForAnalysis;
 
-  return make_scoped_refptr(new RasterWorkerPoolTaskImpl(
-      const_resource,
-      tile->picture_pile(),
-      tile->content_rect(),
-      tile->contents_scale(),
-      mts.raster_mode,
-      mts.resolution,
-      tile->layer_id(),
-      static_cast<const void*>(tile),
-      tile->source_frame_number(),
-      analyze_picture,
-      rendering_stats_instrumentation_,
-      base::Bind(&TileManager::OnRasterTaskCompleted,
-                 base::Unretained(this),
-                 tile->id(),
-                 base::Passed(&resource),
-                 mts.raster_mode),
-      &decode_tasks));
+  return make_scoped_refptr(
+      new RasterTaskImpl(const_resource,
+                         tile->picture_pile(),
+                         tile->content_rect(),
+                         tile->contents_scale(),
+                         mts.raster_mode,
+                         mts.resolution,
+                         tile->layer_id(),
+                         static_cast<const void*>(tile),
+                         tile->source_frame_number(),
+                         analyze_picture,
+                         rendering_stats_instrumentation_,
+                         base::Bind(&TileManager::OnRasterTaskCompleted,
+                                    base::Unretained(this),
+                                    tile->id(),
+                                    base::Passed(&resource),
+                                    mts.raster_mode),
+                         &decode_tasks));
 }
 
 void TileManager::OnImageDecodeTaskCompleted(int layer_id,
@@ -1194,7 +1185,6 @@ void TileManager::OnImageDecodeTaskCompleted(int layer_id,
     return;
 
   LayerPixelRefTaskMap::iterator layer_it = image_decode_tasks_.find(layer_id);
-
   if (layer_it == image_decode_tasks_.end())
     return;
 

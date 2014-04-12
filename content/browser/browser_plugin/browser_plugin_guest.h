@@ -292,6 +292,7 @@ class CONTENT_EXPORT BrowserPluginGuest
   // Requests geolocation permission through Embedder JavaScript API.
   void AskEmbedderForGeolocationPermission(int bridge_id,
                                            const GURL& requesting_frame,
+                                           bool user_gesture,
                                            const GeolocationCallback& callback);
   // Cancels pending geolocation request.
   void CancelGeolocationRequest(int bridge_id);
@@ -310,9 +311,6 @@ class CONTENT_EXPORT BrowserPluginGuest
 
   void DragSourceEndedAt(int client_x, int client_y, int screen_x,
       int screen_y, blink::WebDragOperation operation);
-
-  void DragSourceMovedTo(int client_x, int client_y,
-                         int screen_x, int screen_y);
 
   // Called when the drag started by this guest ends at an OS-level.
   void EndSystemDrag();

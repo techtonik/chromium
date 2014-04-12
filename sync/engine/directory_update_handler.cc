@@ -31,17 +31,44 @@ void DirectoryUpdateHandler::GetDownloadProgress(
   dir_->GetDownloadProgress(type_, progress_marker);
 }
 
-void DirectoryUpdateHandler::ProcessGetUpdatesResponse(
+void DirectoryUpdateHandler::GetDataTypeContext(
+    sync_pb::DataTypeContext* context) const {
+  syncable::ModelNeutralWriteTransaction trans(FROM_HERE, SYNCER, dir_);
+  dir_->GetDataTypeContext(&trans, type_, context);
+}
+
+SyncerError DirectoryUpdateHandler::ProcessGetUpdatesResponse(
     const sync_pb::DataTypeProgressMarker& progress_marker,
+    const sync_pb::DataTypeContext& mutated_context,
     const SyncEntityList& applicable_updates,
     sessions::StatusController* status) {
   syncable::ModelNeutralWriteTransaction trans(FROM_HERE, SYNCER, dir_);
+  if (mutated_context.has_context()) {
+    sync_pb::DataTypeContext local_context;
+    dir_->GetDataTypeContext(&trans, type_, &local_context);
+
+    // Only update the local context if it is still relevant. If the local
+    // version is higher, it means a local change happened while the mutation
+    // was in flight, and the local context takes priority.
+    if (mutated_context.version() >= local_context.version() &&
+        local_context.context() != mutated_context.context()) {
+      dir_->SetDataTypeContext(&trans, type_, mutated_context);
+      // TODO(zea): trigger the datatype's UpdateDataTypeContext method.
+    } else if (mutated_context.version() < local_context.version()) {
+      // A GetUpdates using the old context was in progress when the context was
+      // set. Fail this get updates cycle, to force a retry.
+      DVLOG(1) << "GU Context conflict detected, forcing GU retry.";
+      return DATATYPE_TRIGGERED_RETRY;
+    }
+  }
+
   UpdateSyncEntities(&trans, applicable_updates, status);
 
   if (IsValidProgressMarker(progress_marker)) {
     ExpireEntriesIfNeeded(&trans, progress_marker);
     UpdateProgressMarker(progress_marker);
   }
+  return SYNCER_OK;
 }
 
 void DirectoryUpdateHandler::ApplyUpdates(sessions::StatusController* status) {

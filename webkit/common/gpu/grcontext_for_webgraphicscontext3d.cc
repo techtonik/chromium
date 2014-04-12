@@ -43,6 +43,9 @@ GrContextForWebGraphicsContext3D::GrContextForWebGraphicsContext3D(
 }
 
 GrContextForWebGraphicsContext3D::~GrContextForWebGraphicsContext3D() {
+}
+
+void GrContextForWebGraphicsContext3D::OnLostContext() {
   if (gr_context_)
     gr_context_->contextDestroyed();
 }

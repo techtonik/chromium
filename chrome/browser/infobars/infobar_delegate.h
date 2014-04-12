@@ -7,7 +7,6 @@
 
 #include "base/basictypes.h"
 #include "base/strings/string16.h"
-#include "chrome/browser/infobars/infobar_service.h"
 #include "ui/base/window_open_disposition.h"
 
 class AutoLoginInfoBarDelegate;
@@ -48,6 +47,21 @@ class InfoBarDelegate {
     UNKNOWN_INFOBAR,
   };
 
+  // Describes navigation events, used to decide whether infobars should be
+  // dismissed.
+  struct NavigationDetails {
+    // Unique identifier for the entry.
+    int entry_id;
+    // True if it is a navigation to a different page (as opposed to in-page).
+    bool is_navigation_to_different_page;
+    // True if the entry replaced the existing one.
+    bool did_replace_entry;
+    // True for the main frame, false for a sub-frame.
+    bool is_main_frame;
+    bool is_reload;
+    bool is_redirect;
+  };
+
   // Value to use when the InfoBar has no icon to show.
   static const int kNoIconID;
 
@@ -70,7 +84,7 @@ class InfoBarDelegate {
   // page (not including reloads).  Subclasses wishing to change this behavior
   // can override either this function or ShouldExpireInternal(), depending on
   // what level of control they need.
-  virtual bool ShouldExpire(const content::LoadCommittedDetails& details) const;
+  virtual bool ShouldExpire(const NavigationDetails& details) const;
 
   // Called when the user clicks on the close button to dismiss the infobar.
   virtual void InfoBarDismissed();
@@ -107,16 +121,11 @@ class InfoBarDelegate {
   // empty, no icon is shown.
   virtual gfx::Image GetIcon() const;
 
-  // This trivial getter is defined out-of-line in order to avoid needing to
-  // #include infobar.h, which would lead to circular #includes.
-  content::WebContents* web_contents();
-
  protected:
   InfoBarDelegate();
 
   // Returns true if the navigation is to a new URL or a reload occured.
-  virtual bool ShouldExpireInternal(
-      const content::LoadCommittedDetails& details) const;
+  virtual bool ShouldExpireInternal(const NavigationDetails& details) const;
 
   int contents_unique_id() const { return contents_unique_id_; }
   InfoBar* infobar() { return infobar_; }

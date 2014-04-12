@@ -223,6 +223,11 @@
             '../google_apis/gcm/gcm.gyp:*',
           ],
         }],
+        ['chromeos==1 or (OS=="linux" and use_aura==1)', {
+          'dependencies': [
+            '../apps/shell/app_shell.gyp:*',
+          ],
+        }],
       ],
     }, # target_name: All
     {
@@ -459,7 +464,6 @@
             '../chrome/chrome.gyp:chrome',
             '../chrome/chrome.gyp:load_library_perf_tests',
             '../chrome/chrome.gyp:performance_browser_tests',
-            '../chrome/chrome.gyp:performance_ui_tests',
             '../chrome/chrome.gyp:sync_performance_tests',
             '../media/media.gyp:media_perftests',
             '../tools/perf/clear_system_cache/clear_system_cache.gyp:*',
@@ -494,7 +498,6 @@
           'dependencies': [
             '../chrome/chrome.gyp:chrome',
             '../chrome/chrome.gyp:performance_browser_tests',
-            '../chrome/chrome.gyp:performance_ui_tests',
             '../content/content_shell_and_tests.gyp:content_browsertests',
             '../content/content_shell_and_tests.gyp:content_gl_tests',
             '../gpu/gles2_conform_support/gles2_conform_test.gyp:gles2_conform_test',
@@ -567,7 +570,6 @@
             '../chrome/chrome.gyp:chrome',
             # Dependencies of pyauto_functional tests.
             '../remoting/remoting.gyp:remoting_webapp',
-            '../chrome/chrome.gyp:pyautolib',
           ],
           'conditions': [
             ['OS=="mac"', {
@@ -603,7 +605,7 @@
         {
           # This target contains everything we need to run tests on the special
           # device-equipped WebRTC bots. We have device-requiring tests in
-          # PyAuto, browser_tests and content_browsertests.
+          # browser_tests and content_browsertests.
           'target_name': 'chromium_builder_webrtc',
           'type': 'none',
           'dependencies': [
@@ -773,6 +775,7 @@
                 '../sql/sql.gyp:sql_unittests_apk',
                 '../sync/sync.gyp:sync_unit_tests_apk',
                 '../ui/events/events.gyp:events_unittests_apk',
+                '../ui/gfx/gfx.gyp:gfx_unittests_apk',
                 '../ui/ui_unittests.gyp:ui_unittests_apk',
                 '../android_webview/android_webview.gyp:android_webview_test_apk',
                 '../chrome/chrome.gyp:chrome_shell_test_apk',
@@ -885,7 +888,6 @@
             '../cc/cc_tests.gyp:cc_unittests',
             '../chrome/chrome.gyp:browser_tests',
             '../chrome/chrome.gyp:performance_browser_tests',
-            '../chrome/chrome.gyp:performance_ui_tests',
             '../chrome/chrome.gyp:sync_integration_tests',
             '../chrome/chrome.gyp:unit_tests',
             '../cloud_print/cloud_print.gyp:cloud_print_unittests',
@@ -986,7 +988,6 @@
             '../chrome/chrome.gyp:interactive_ui_tests',
             '../chrome/chrome.gyp:mini_installer_test',
             '../chrome/chrome.gyp:performance_browser_tests',
-            '../chrome/chrome.gyp:performance_ui_tests',
             '../chrome/chrome.gyp:sync_integration_tests',
             '../chrome/chrome.gyp:unit_tests',
             '../cloud_print/cloud_print.gyp:cloud_print_unittests',
@@ -1057,6 +1058,8 @@
             '../chrome/chrome.gyp:browser_tests',
             '../cloud_print/cloud_print.gyp:cloud_print_unittests',
             '../components/components_tests.gyp:components_unittests',
+            '../content/content_shell_and_tests.gyp:content_browsertests',
+            '../content/content_shell_and_tests.gyp:content_shell',
             '../content/content_shell_and_tests.gyp:content_unittests',
             '../crypto/crypto.gyp:crypto_unittests',
             '../device/device_tests.gyp:device_unittests',
@@ -1065,9 +1068,11 @@
             '../media/media.gyp:media_unittests',
             '../net/net.gyp:net_unittests',
             '../google_apis/gcm/gcm.gyp:gcm_unit_tests',
+            '../gpu/gpu.gyp:gpu_unittests',
             '../printing/printing.gyp:printing_unittests',
             '../remoting/remoting.gyp:remoting_unittests',
             '../sql/sql.gyp:sql_unittests',
+            '../sync/sync.gyp:sync_unit_tests',
             '../third_party/cacheinvalidation/cacheinvalidation.gyp:cacheinvalidation_unittests',
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput_unittests',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber_unittests',
@@ -1155,6 +1160,7 @@
             '../ui/aura/aura.gyp:*',
             '../ui/compositor/compositor.gyp:*',
             '../ui/events/events.gyp:*',
+            '../ui/wm/wm.gyp:*',
             '../ui/gfx/gfx.gyp:gfx_unittests',
             '../ui/keyboard/keyboard.gyp:*',
             '../ui/message_center/message_center.gyp:*',

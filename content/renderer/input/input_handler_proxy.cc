@@ -4,9 +4,11 @@
 
 #include "content/renderer/input/input_handler_proxy.h"
 
+#include "base/auto_reset.h"
 #include "base/debug/trace_event.h"
 #include "base/logging.h"
 #include "base/metrics/histogram.h"
+#include "content/common/input/did_overscroll_params.h"
 #include "content/common/input/web_input_event_traits.h"
 #include "content/renderer/input/input_handler_proxy_client.h"
 #include "third_party/WebKit/public/platform/Platform.h"
@@ -29,6 +31,10 @@ namespace {
 
 // Validate provided event timestamps that interact with animation timestamps.
 const double kBadTimestampDeltaFromNowInS = 60. * 60. * 24. * 7.;
+
+// Threshold for determining whether a fling scroll delta should have caused the
+// client to scroll.
+const float kScrollEpsilon = 0.1f;
 
 double InSecondsF(const base::TimeTicks& time) {
   return (time - base::TimeTicks()).InSecondsF();
@@ -248,7 +254,10 @@ InputHandlerProxy::EventDisposition InputHandlerProxy::HandleInputEvent(
     }
     return DROP_EVENT;
   } else if (WebInputEvent::isKeyboardEventType(event.type)) {
-    CancelCurrentFling(true);
+    // Only call |CancelCurrentFling()| if a fling was active, as it will
+    // otherwise disrupt an in-progress touch scroll.
+    if (fling_curve_)
+      CancelCurrentFling(true);
   } else if (event.type == WebInputEvent::MouseMove) {
     const WebMouseEvent& mouse_event =
         *static_cast<const WebMouseEvent*>(&event);
@@ -347,7 +356,8 @@ void InputHandlerProxy::Animate(base::TimeTicks time) {
     return;
 
   double monotonic_time_sec = InSecondsF(time);
-  if (!fling_parameters_.startTime) {
+  if (!fling_parameters_.startTime ||
+      monotonic_time_sec <= fling_parameters_.startTime) {
     fling_parameters_.startTime = monotonic_time_sec;
     input_handler_->ScheduleAnimation();
     return;
@@ -375,8 +385,16 @@ void InputHandlerProxy::MainThreadHasStoppedFlinging() {
   client_->DidStopFlinging();
 }
 
-void InputHandlerProxy::DidOverscroll(const cc::DidOverscrollParams& params) {
+void InputHandlerProxy::DidOverscroll(
+    const gfx::Vector2dF& accumulated_overscroll,
+    const gfx::Vector2dF& latest_overscroll_delta) {
   DCHECK(client_);
+
+  DidOverscrollParams params;
+  params.accumulated_overscroll = accumulated_overscroll;
+  params.latest_overscroll_delta = latest_overscroll_delta;
+  params.current_fling_velocity = current_fling_velocity_;
+
   if (fling_curve_) {
     static const int kFlingOverscrollThreshold = 1;
     disallow_horizontal_fling_scroll_ |=
@@ -409,6 +427,7 @@ bool InputHandlerProxy::CancelCurrentFling(
                        had_fling_animation);
   fling_curve_.reset();
   gesture_scroll_on_impl_thread_ = false;
+  current_fling_velocity_ = gfx::Vector2dF();
   fling_parameters_ = blink::WebActiveWheelFlingParameters();
   if (send_fling_stopped_notification && had_fling_animation)
     client_->DidStopFlinging();
@@ -458,15 +477,25 @@ static gfx::Vector2dF ToClientScrollIncrement(const WebFloatSize& increment) {
   return gfx::Vector2dF(-increment.width, -increment.height);
 }
 
-void InputHandlerProxy::scrollBy(const WebFloatSize& increment) {
+bool InputHandlerProxy::scrollBy(const WebFloatSize& increment,
+                                 const WebFloatSize& velocity) {
   WebFloatSize clipped_increment;
-  if (!disallow_horizontal_fling_scroll_)
+  WebFloatSize clipped_velocity;
+  if (!disallow_horizontal_fling_scroll_) {
     clipped_increment.width = increment.width;
-  if (!disallow_vertical_fling_scroll_)
+    clipped_velocity.width = velocity.width;
+  }
+  if (!disallow_vertical_fling_scroll_) {
     clipped_increment.height = increment.height;
+    clipped_velocity.height = velocity.height;
+  }
 
+  current_fling_velocity_ = ToClientScrollIncrement(clipped_velocity);
+
+  // Early out if the increment is zero, but avoid early terimination if the
+  // velocity is still non-zero.
   if (clipped_increment == WebFloatSize())
-    return;
+    return clipped_velocity != WebFloatSize();
 
   TRACE_EVENT2("input",
                "InputHandlerProxy::scrollBy",
@@ -492,17 +521,15 @@ void InputHandlerProxy::scrollBy(const WebFloatSize& increment) {
     fling_parameters_.cumulativeScroll.width += clipped_increment.width;
     fling_parameters_.cumulativeScroll.height += clipped_increment.height;
   }
-}
 
-void InputHandlerProxy::notifyCurrentFlingVelocity(
-    const WebFloatSize& velocity) {
-  TRACE_EVENT2("input",
-               "InputHandlerProxy::notifyCurrentFlingVelocity",
-               "vx",
-               velocity.width,
-               "vy",
-               velocity.height);
-  input_handler_->NotifyCurrentFlingVelocity(ToClientScrollIncrement(velocity));
+  // It's possible the provided |increment| is sufficiently small as to not
+  // trigger a scroll, e.g., with a trivial time delta between fling updates.
+  // Return true in this case to prevent early fling termination.
+  if (std::abs(clipped_increment.width) < kScrollEpsilon &&
+      std::abs(clipped_increment.height) < kScrollEpsilon)
+    return true;
+
+  return did_scroll;
 }
 
 }  // namespace content

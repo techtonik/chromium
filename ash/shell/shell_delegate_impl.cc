@@ -8,7 +8,6 @@
 #include "ash/default_accessibility_delegate.h"
 #include "ash/default_user_wallpaper_delegate.h"
 #include "ash/gpu_support_stub.h"
-#include "ash/host/window_tree_host_factory.h"
 #include "ash/media_delegate.h"
 #include "ash/new_window_delegate.h"
 #include "ash/session_state_delegate.h"
@@ -98,6 +97,10 @@ bool ShellDelegateImpl::IsRunningInForcedAppMode() const {
   return false;
 }
 
+bool ShellDelegateImpl::IsMultiAccountEnabled() const {
+  return false;
+}
+
 void ShellDelegateImpl::PreInit() {
 }
 
@@ -111,6 +114,17 @@ void ShellDelegateImpl::Exit() {
 keyboard::KeyboardControllerProxy*
     ShellDelegateImpl::CreateKeyboardControllerProxy() {
   return new KeyboardControllerProxyStub();
+}
+
+void ShellDelegateImpl::VirtualKeyboardActivated(bool activated) {
+}
+
+void ShellDelegateImpl::AddVirtualKeyboardStateObserver(
+    VirtualKeyboardStateObserver* observer) {
+}
+
+void ShellDelegateImpl::RemoveVirtualKeyboardStateObserver(
+    VirtualKeyboardStateObserver* observer) {
 }
 
 content::BrowserContext* ShellDelegateImpl::GetActiveBrowserContext() {
@@ -139,7 +153,7 @@ ash::SessionStateDelegate* ShellDelegateImpl::CreateSessionStateDelegate() {
 }
 
 ash::AccessibilityDelegate* ShellDelegateImpl::CreateAccessibilityDelegate() {
-  return new internal::DefaultAccessibilityDelegate;
+  return new DefaultAccessibilityDelegate;
 }
 
 ash::NewWindowDelegate* ShellDelegateImpl::CreateNewWindowDelegate() {
@@ -155,10 +169,6 @@ ui::MenuModel* ShellDelegateImpl::CreateContextMenu(
     ash::ShelfItemDelegate* item_delegate,
     ash::ShelfItem* item) {
   return new ContextMenu(root);
-}
-
-WindowTreeHostFactory* ShellDelegateImpl::CreateWindowTreeHostFactory() {
-  return WindowTreeHostFactory::Create();
 }
 
 GPUSupport* ShellDelegateImpl::CreateGPUSupport() {

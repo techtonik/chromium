@@ -165,16 +165,8 @@ void SpellingMenuObserver::InitMenu(const content::ContextMenuParams& params) {
   proxy_->AddMenuItem(IDC_SPELLCHECK_ADD_TO_DICTIONARY,
       l10n_util::GetStringUTF16(IDS_CONTENT_CONTEXT_ADD_TO_DICTIONARY));
 
-#if defined(TOOLKIT_GTK)
-  extensions::ViewType view_type =
-      extensions::GetViewType(proxy_->GetWebContents());
-  if (view_type != extensions::VIEW_TYPE_PANEL) {
-#endif
-    proxy_->AddCheckItem(IDC_CONTENT_CONTEXT_SPELLING_TOGGLE,
-        l10n_util::GetStringUTF16(IDS_CONTENT_CONTEXT_SPELLING_ASK_GOOGLE));
-#if defined(TOOLKIT_GTK)
-  }
-#endif
+  proxy_->AddCheckItem(IDC_CONTENT_CONTEXT_SPELLING_TOGGLE,
+      l10n_util::GetStringUTF16(IDS_CONTENT_CONTEXT_SPELLING_ASK_GOOGLE));
 
   const CommandLine* command_line = CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(switches::kEnableSpellingAutoCorrect)) {
@@ -251,7 +243,7 @@ void SpellingMenuObserver::ExecuteCommand(int command_id) {
   if (command_id >= IDC_SPELLCHECK_SUGGESTION_0 &&
       command_id <= IDC_SPELLCHECK_SUGGESTION_LAST) {
     int suggestion_index = command_id - IDC_SPELLCHECK_SUGGESTION_0;
-    proxy_->GetRenderViewHost()->ReplaceMisspelling(
+    proxy_->GetWebContents()->ReplaceMisspelling(
         suggestions_[suggestion_index]);
     // GetSpellCheckHost() can return null when the suggested word is provided
     // by Web SpellCheck API.
@@ -273,7 +265,7 @@ void SpellingMenuObserver::ExecuteCommand(int command_id) {
   // the misspelled word with the suggestion and add it to our custom-word
   // dictionary so this word is not marked as misspelled any longer.
   if (command_id == IDC_CONTENT_CONTEXT_SPELLING_SUGGESTION) {
-    proxy_->GetRenderViewHost()->ReplaceMisspelling(result_);
+    proxy_->GetWebContents()->ReplaceMisspelling(result_);
     misspelled_word_ = result_;
   }
 

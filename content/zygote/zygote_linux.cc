@@ -192,8 +192,21 @@ void Zygote::HandleReapRequest(int fd,
   }
 
   if (!child_info.started_from_helper) {
+    // Do not call base::EnsureProcessTerminated() under ThreadSanitizer, as it
+    // spawns a separate thread which may live until the call to fork() in the
+    // zygote. As a result, ThreadSanitizer will report an error and almost
+    // disable race detection in the child process.
+    // Not calling EnsureProcessTerminated() may result in zombie processes
+    // sticking around. This will only happen during testing, so we can live
+    // with this for now.
+#if !defined(THREAD_SANITIZER)
     // TODO(jln): this old code is completely broken. See crbug.com/274855.
     base::EnsureProcessTerminated(child_info.internal_pid);
+#else
+    LOG(WARNING) << "Zygote process omitting a call to "
+        << "base::EnsureProcessTerminated() for child pid " << child
+        << " under ThreadSanitizer. See http://crbug.com/274855.";
+#endif
   } else {
     // For processes from the helper, send a GetTerminationStatus request
     // with known_dead set to true.
@@ -320,7 +333,7 @@ int Zygote::ForkWithRealPid(const std::string& process_type,
     fds.push_back(ipc_channel_fd);  // kBrowserFDIndex
     fds.push_back(dummy_fd);  // kDummyFDIndex
     fds.push_back(pipe_fds[0]);  // kParentFDIndex
-    pid = helper_->Fork(fds);
+    pid = helper_->Fork(process_type, fds);
   } else {
     pid = fork();
   }

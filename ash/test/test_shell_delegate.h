@@ -34,11 +34,17 @@ class TestShellDelegate : public ShellDelegate {
   virtual bool IsIncognitoAllowed() const OVERRIDE;
   virtual bool IsMultiProfilesEnabled() const OVERRIDE;
   virtual bool IsRunningInForcedAppMode() const OVERRIDE;
+  virtual bool IsMultiAccountEnabled() const OVERRIDE;
   virtual void PreInit() OVERRIDE;
   virtual void PreShutdown() OVERRIDE;
   virtual void Exit() OVERRIDE;
   virtual keyboard::KeyboardControllerProxy*
       CreateKeyboardControllerProxy() OVERRIDE;
+  virtual void VirtualKeyboardActivated(bool activated) OVERRIDE;
+  virtual void AddVirtualKeyboardStateObserver(
+      VirtualKeyboardStateObserver* observer) OVERRIDE;
+  virtual void RemoveVirtualKeyboardStateObserver(
+      VirtualKeyboardStateObserver* observer) OVERRIDE;
   virtual content::BrowserContext* GetActiveBrowserContext() OVERRIDE;
   virtual app_list::AppListViewDelegate* CreateAppListViewDelegate() OVERRIDE;
   virtual ShelfDelegate* CreateShelfDelegate(ShelfModel* model) OVERRIDE;
@@ -52,7 +58,6 @@ class TestShellDelegate : public ShellDelegate {
       aura::Window* root,
       ash::ShelfItemDelegate* item_delegate,
       ash::ShelfItem* item) OVERRIDE;
-  virtual WindowTreeHostFactory* CreateWindowTreeHostFactory() OVERRIDE;
   virtual GPUSupport* CreateGPUSupport() OVERRIDE;
   virtual base::string16 GetProductName() const OVERRIDE;
 

@@ -29,12 +29,6 @@ typedef unsigned long Cursor;
 typedef struct _XcursorImage XcursorImage;
 typedef union _XEvent XEvent;
 
-#if defined(TOOLKIT_GTK)
-typedef struct _GdkDrawable GdkWindow;
-typedef struct _GtkWidget GtkWidget;
-typedef struct _GtkWindow GtkWindow;
-#endif
-
 namespace gfx {
 class Canvas;
 class Point;
@@ -118,21 +112,6 @@ UI_BASE_EXPORT XID GetX11RootWindow();
 
 // Returns the user's current desktop.
 bool GetCurrentDesktop(int* desktop);
-
-#if defined(TOOLKIT_GTK)
-// Get the X window id for the given GTK widget.
-UI_BASE_EXPORT XID GetX11WindowFromGtkWidget(GtkWidget* widget);
-XID GetX11WindowFromGdkWindow(GdkWindow* window);
-
-// Get the GtkWindow* wrapping a given XID, if any.
-// Returns NULL if there isn't already a GtkWindow* wrapping this XID;
-// see gdk_window_foreign_new() etc. to wrap arbitrary XIDs.
-UI_BASE_EXPORT GtkWindow* GetGtkWindowFromX11Window(XID xid);
-
-// Get a Visual from the given widget. Since we don't include the Xlib
-// headers, this is returned as a void*.
-UI_BASE_EXPORT void* GetVisualFromGtkWidget(GtkWidget* widget);
-#endif  // defined(TOOLKIT_GTK)
 
 enum HideTitlebarWhenMaximized {
   SHOW_TITLEBAR_WHEN_MAXIMIZED = 0,
@@ -323,11 +302,6 @@ UI_BASE_EXPORT void SetDefaultX11ErrorHandlers();
 
 // Return true if a given window is in full-screen mode.
 UI_BASE_EXPORT bool IsX11WindowFullScreen(XID window);
-
-// Returns true if a given size is in list of bogus sizes in mm that X detects
-// that should be ignored.
-UI_BASE_EXPORT bool IsXDisplaySizeBlackListed(unsigned long mm_width,
-                                              unsigned long mm_height);
 
 // Manages a piece of X11 allocated memory as a RefCountedMemory segment. This
 // object takes ownership over the passed in memory and will free it with the

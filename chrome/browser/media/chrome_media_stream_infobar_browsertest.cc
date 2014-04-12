@@ -9,7 +9,6 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/content_settings/host_content_settings_map.h"
 #include "chrome/browser/infobars/infobar.h"
-#include "chrome/browser/infobars/infobar_manager.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/media/webrtc_browsertest_base.h"
 #include "chrome/browser/media/webrtc_browsertest_common.h"
@@ -22,7 +21,6 @@
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/test_switches.h"
 #include "chrome/test/base/ui_test_utils.h"
-#include "chrome/test/ui/ui_test.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/test/browser_test_utils.h"
 #include "net/test/spawned_test_server/spawned_test_server.h"
@@ -123,9 +121,9 @@ IN_PROC_BROWSER_TEST_F(MediaStreamInfoBarTest,
   EXPECT_TRUE(test::PollingWaitUntil("obtainGetUserMediaResult()",
                                      kFailedWithPermissionDeniedError,
                                      tab_contents));
-  InfoBarManager* infobar_manager =
-      InfoBarService::FromWebContents(tab_contents)->infobar_manager();
-  EXPECT_EQ(0u, infobar_manager->infobar_count());
+  InfoBarService* infobar_service =
+      InfoBarService::FromWebContents(tab_contents);
+  EXPECT_EQ(0u, infobar_service->infobar_count());
 }
 
 // Failing on Win Aura, so disabling on that.

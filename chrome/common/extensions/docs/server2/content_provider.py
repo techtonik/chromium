@@ -2,8 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import logging
 import mimetypes
 import posixpath
+import traceback
 
 from compiled_file_system import SingleFile
 from directory_zipper import DirectoryZipper
@@ -27,9 +29,10 @@ class ContentAndType(object):
   '''Return value from ContentProvider.GetContentAndType.
   '''
 
-  def __init__(self, content, content_type):
+  def __init__(self, content, content_type, version):
     self.content = content
     self.content_type = content_type
+    self.version = version
 
 
 class ContentProvider(object):
@@ -100,7 +103,9 @@ class ContentProvider(object):
       content = ToUnicode(text)
     else:
       content = text
-    return ContentAndType(content, mimetype)
+    return ContentAndType(content,
+                          mimetype,
+                          self.file_system.Stat(path).version)
 
   def GetCanonicalPath(self, path):
     '''Gets the canonical location of |path|. This class is tolerant of
@@ -133,7 +138,7 @@ class ContentProvider(object):
     if self._directory_zipper and ext == '.zip':
       zip_future = self._directory_zipper.Zip(ToDirectory(base))
       return Future(callback=
-          lambda: ContentAndType(zip_future.Get(), 'application/zip'))
+          lambda: ContentAndType(zip_future.Get(), 'application/zip', None))
 
     # If there is no file extension, look for a file with one of the default
     # extensions.
@@ -150,16 +155,24 @@ class ContentProvider(object):
     return self._content_cache.GetFromFile(path)
 
   def Cron(self):
-    futures = [self._path_canonicalizer.Cron()]
+    futures = [('<path_canonicalizer>',  # semi-arbitrary string since there is
+                                         # no path associated with this Future.
+                self._path_canonicalizer.Cron())]
     for root, _, files in self.file_system.Walk(''):
       for f in files:
-        futures.append(self.GetContentAndType(Join(root, f)))
+        futures.append((Join(root, f),
+                        self.GetContentAndType(Join(root, f))))
         # Also cache the extension-less version of the file if needed.
         base, ext = posixpath.splitext(f)
         if f != SITE_VERIFICATION_FILE and ext in self._default_extensions:
-          futures.append(self.GetContentAndType(Join(root, base)))
+          futures.append((Join(root, base),
+                          self.GetContentAndType(Join(root, base))))
       # TODO(kalman): Cache .zip files for each directory (if supported).
-    return Future(callback=lambda: [f.Get() for f in futures])
+    def resolve():
+      for label, future in futures:
+        try: future.Get()
+        except: logging.error('%s: %s' % (label, traceback.format_exc()))
+    return Future(callback=resolve)
 
   def __repr__(self):
     return 'ContentProvider of <%s>' % repr(self.file_system)

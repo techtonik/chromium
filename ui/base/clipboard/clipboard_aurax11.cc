@@ -15,8 +15,6 @@
 #include "base/memory/ref_counted_memory.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/singleton.h"
-#include "base/message_loop/message_pump_observer.h"
-#include "base/message_loop/message_pump_x11.h"
 #include "base/stl_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -25,6 +23,9 @@
 #include "ui/base/x/selection_requestor.h"
 #include "ui/base/x/selection_utils.h"
 #include "ui/base/x/x11_util.h"
+#include "ui/events/platform/platform_event_dispatcher.h"
+#include "ui/events/platform/platform_event_observer.h"
+#include "ui/events/platform/platform_event_source.h"
 #include "ui/gfx/codec/png_codec.h"
 #include "ui/gfx/size.h"
 #include "ui/gfx/x/x11_atom_cache.h"
@@ -55,7 +56,7 @@ const char* kAtomsToCache[] = {
 ///////////////////////////////////////////////////////////////////////////////
 
 // Uses the XFixes API to provide sequence numbers for GetSequenceNumber().
-class SelectionChangeObserver : public base::MessagePumpObserver {
+class SelectionChangeObserver : public ui::PlatformEventObserver {
  public:
   static SelectionChangeObserver* GetInstance();
 
@@ -70,11 +71,9 @@ class SelectionChangeObserver : public base::MessagePumpObserver {
   SelectionChangeObserver();
   virtual ~SelectionChangeObserver();
 
-  // Overridden from base::MessagePumpObserver:
-  virtual base::EventStatus WillProcessEvent(
-      const base::NativeEvent& event) OVERRIDE;
-  virtual void DidProcessEvent(
-      const base::NativeEvent& event) OVERRIDE {}
+  // ui::PlatformEventObserver:
+  virtual void WillProcessEvent(const ui::PlatformEvent& event) OVERRIDE;
+  virtual void DidProcessEvent(const ui::PlatformEvent& event) OVERRIDE {}
 
   int event_base_;
   Atom clipboard_atom_;
@@ -106,20 +105,19 @@ SelectionChangeObserver::SelectionChangeObserver()
                                XFixesSelectionWindowDestroyNotifyMask |
                                XFixesSelectionClientCloseNotifyMask);
 
-    base::MessagePumpX11::Current()->AddObserver(this);
+    ui::PlatformEventSource::GetInstance()->AddPlatformEventObserver(this);
   }
 }
 
 SelectionChangeObserver::~SelectionChangeObserver() {
-  // We are a singleton; we will outlive our message pump.
+  // We are a singleton; we will outlive the event source.
 }
 
 SelectionChangeObserver* SelectionChangeObserver::GetInstance() {
   return Singleton<SelectionChangeObserver>::get();
 }
 
-base::EventStatus SelectionChangeObserver::WillProcessEvent(
-    const base::NativeEvent& event) {
+void SelectionChangeObserver::WillProcessEvent(const ui::PlatformEvent& event) {
   if (event->type == event_base_ + XFixesSelectionNotify) {
     XFixesSelectionNotifyEvent* ev =
         reinterpret_cast<XFixesSelectionNotifyEvent*>(event);
@@ -131,7 +129,6 @@ base::EventStatus SelectionChangeObserver::WillProcessEvent(
       DLOG(ERROR) << "Unexpected selection atom: " << ev->selection;
     }
   }
-  return base::EVENT_CONTINUE;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -224,7 +221,7 @@ bool Clipboard::FormatType::Equals(const FormatType& other) const {
 
 // Private implementation of our X11 integration. Keeps X11 headers out of the
 // majority of chrome, which break badly.
-class Clipboard::AuraX11Details : public base::MessagePumpDispatcher {
+class Clipboard::AuraX11Details : public PlatformEventDispatcher {
  public:
   AuraX11Details();
   virtual ~AuraX11Details();
@@ -282,8 +279,9 @@ class Clipboard::AuraX11Details : public base::MessagePumpDispatcher {
   void Clear(ClipboardType type);
 
  private:
-  // Overridden from base::MessagePumpDispatcher:
-  virtual uint32_t Dispatch(const base::NativeEvent& event) OVERRIDE;
+  // PlatformEventDispatcher:
+  virtual bool CanDispatchEvent(const PlatformEvent& event) OVERRIDE;
+  virtual uint32_t DispatchEvent(const PlatformEvent& event) OVERRIDE;
 
   // Our X11 state.
   Display* x_display_;
@@ -332,11 +330,13 @@ Clipboard::AuraX11Details::AuraX11Details()
   XStoreName(x_display_, x_window_, "Chromium clipboard");
   XSelectInput(x_display_, x_window_, PropertyChangeMask);
 
-  base::MessagePumpX11::Current()->AddDispatcherForWindow(this, x_window_);
+  if (PlatformEventSource::GetInstance())
+    PlatformEventSource::GetInstance()->AddPlatformEventDispatcher(this);
 }
 
 Clipboard::AuraX11Details::~AuraX11Details() {
-  base::MessagePumpX11::Current()->RemoveDispatcherForWindow(x_window_);
+  if (PlatformEventSource::GetInstance())
+    PlatformEventSource::GetInstance()->RemovePlatformEventDispatcher(this);
 
   XDestroyWindow(x_display_, x_window_);
 }
@@ -485,9 +485,11 @@ void Clipboard::AuraX11Details::Clear(ClipboardType type) {
     primary_owner_.ClearSelectionOwner();
 }
 
-uint32_t Clipboard::AuraX11Details::Dispatch(const base::NativeEvent& event) {
-  XEvent* xev = event;
+bool Clipboard::AuraX11Details::CanDispatchEvent(const PlatformEvent& event) {
+  return event->xany.window == x_window_;
+}
 
+uint32_t Clipboard::AuraX11Details::DispatchEvent(const PlatformEvent& xev) {
   switch (xev->type) {
     case SelectionRequest: {
       if (xev->xselectionrequest.selection == XA_PRIMARY)

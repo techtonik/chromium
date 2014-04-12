@@ -44,11 +44,12 @@ class FrameRateCounter;
 class LayerImpl;
 class LayerTreeHostImplTimeSourceAdapter;
 class LayerTreeImpl;
+class MemoryHistory;
 class PageScaleAnimation;
 class PaintTimeCounter;
-class MemoryHistory;
-class RenderingStatsInstrumentation;
+class RasterWorkerPool;
 class RenderPassDrawQuad;
+class RenderingStatsInstrumentation;
 class ScrollbarLayerImplBase;
 class TextureMailboxDeleter;
 class TopControlsManager;
@@ -123,8 +124,6 @@ class CC_EXPORT LayerTreeHostImpl
   virtual void OnRootLayerDelegatedScrollOffsetChanged() OVERRIDE;
   virtual void ScrollEnd() OVERRIDE;
   virtual InputHandler::ScrollStatus FlingScrollBegin() OVERRIDE;
-  virtual void NotifyCurrentFlingVelocity(
-      const gfx::Vector2dF& velocity) OVERRIDE;
   virtual void MouseMoveAt(const gfx::Point& viewport_point) OVERRIDE;
   virtual void PinchGestureBegin() OVERRIDE;
   virtual void PinchGestureUpdate(float magnify_delta,
@@ -383,9 +382,6 @@ class CC_EXPORT LayerTreeHostImpl
   gfx::Vector2dF accumulated_root_overscroll() const {
     return accumulated_root_overscroll_;
   }
-  gfx::Vector2dF current_fling_velocity() const {
-    return current_fling_velocity_;
-  }
 
   bool pinch_gesture_active() const { return pinch_gesture_active_; }
 
@@ -542,6 +538,8 @@ class CC_EXPORT LayerTreeHostImpl
   // free rendering - see OutputSurface::ForcedDrawToSoftwareDevice().
   scoped_ptr<ResourceProvider> resource_provider_;
   scoped_ptr<TileManager> tile_manager_;
+  scoped_ptr<RasterWorkerPool> raster_worker_pool_;
+  scoped_ptr<RasterWorkerPool> direct_raster_worker_pool_;
   scoped_ptr<Renderer> renderer_;
 
   GlobalStateThatImpactsTilePriority global_tile_state_;
@@ -574,7 +572,6 @@ class CC_EXPORT LayerTreeHostImpl
   ManagedMemoryPolicy cached_managed_memory_policy_;
 
   gfx::Vector2dF accumulated_root_overscroll_;
-  gfx::Vector2dF current_fling_velocity_;
 
   bool pinch_gesture_active_;
   bool pinch_gesture_end_should_clear_scrolling_layer_;

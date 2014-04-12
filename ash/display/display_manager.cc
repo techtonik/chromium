@@ -24,6 +24,8 @@
 #include "base/strings/utf_string_conversions.h"
 #include "grit/ash_strings.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/base/layout.h"
+#include "ui/base/resource/resource_bundle.h"
 #include "ui/gfx/display.h"
 #include "ui/gfx/rect.h"
 #include "ui/gfx/screen.h"
@@ -43,7 +45,6 @@
 #endif
 
 namespace ash {
-namespace internal {
 typedef std::vector<gfx::Display> DisplayList;
 typedef std::vector<DisplayInfo> DisplayInfoList;
 
@@ -158,6 +159,10 @@ DisplayManager::DisplayManager()
 #if defined(OS_CHROMEOS)
   change_display_upon_host_resize_ = !base::SysInfo::IsRunningOnChromeOS();
 #endif
+  DisplayInfo::SetAllowUpgradeToHighDPI(
+      ui::ResourceBundle::GetSharedInstance().GetMaxScaleFactor() ==
+      ui::SCALE_FACTOR_200P);
+
   gfx::Screen::SetScreenInstance(gfx::SCREEN_TYPE_ALTERNATE,
                                  screen_ash_.get());
   gfx::Screen* current_native =
@@ -456,7 +461,7 @@ void DisplayManager::SetDisplayResolution(int64 display_id,
   display_modes_[display_id] = *iter;
 #if defined(OS_CHROMEOS)
   if (base::SysInfo::IsRunningOnChromeOS())
-    Shell::GetInstance()->output_configurator()->OnConfigurationChanged();
+    Shell::GetInstance()->display_configurator()->OnConfigurationChanged();
 #endif
 }
 
@@ -516,7 +521,7 @@ void DisplayManager::SetColorCalibrationProfile(
     delegate_->PreDisplayConfigurationChange(false);
   // Just sets color profile if it's not running on ChromeOS (like tests).
   if (!base::SysInfo::IsRunningOnChromeOS() ||
-      Shell::GetInstance()->output_configurator()->SetColorCalibrationProfile(
+      Shell::GetInstance()->display_configurator()->SetColorCalibrationProfile(
           display_id, profile)) {
     display_info_[display_id].SetColorProfile(profile);
     UMA_HISTOGRAM_ENUMERATION(
@@ -865,9 +870,10 @@ void DisplayManager::SetMirrorMode(bool mirrored) {
 
 #if defined(OS_CHROMEOS)
   if (base::SysInfo::IsRunningOnChromeOS()) {
-    ui::OutputState new_state = mirrored ? ui::OUTPUT_STATE_DUAL_MIRROR :
-                                           ui::OUTPUT_STATE_DUAL_EXTENDED;
-    Shell::GetInstance()->output_configurator()->SetDisplayMode(new_state);
+    ui::MultipleDisplayState new_state =
+        mirrored ? ui::MULTIPLE_DISPLAY_STATE_DUAL_MIRROR :
+                   ui::MULTIPLE_DISPLAY_STATE_DUAL_EXTENDED;
+    Shell::GetInstance()->display_configurator()->SetDisplayMode(new_state);
     return;
   }
 #endif
@@ -1005,7 +1011,7 @@ void DisplayManager::OnDisplayInfoUpdated(const DisplayInfo& display_info) {
 #if defined(OS_CHROMEOS)
   ui::ColorCalibrationProfile color_profile = display_info.color_profile();
   if (color_profile != ui::COLOR_PROFILE_STANDARD) {
-    Shell::GetInstance()->output_configurator()->SetColorCalibrationProfile(
+    Shell::GetInstance()->display_configurator()->SetColorCalibrationProfile(
         display_info.id(), color_profile);
   }
 #endif
@@ -1017,9 +1023,7 @@ gfx::Display DisplayManager::CreateDisplayFromDisplayInfoById(int64 id) {
 
   gfx::Display new_display(display_info.id());
   gfx::Rect bounds_in_native(display_info.size_in_pixel());
-  float device_scale_factor = display_info.device_scale_factor();
-  if (device_scale_factor == 2.0f && display_info.configured_ui_scale() == 2.0f)
-    device_scale_factor = 1.0f;
+  float device_scale_factor = display_info.GetEffectiveDeviceScaleFactor();
 
   // Simply set the origin to (0,0).  The primary display's origin is
   // always (0,0) and the secondary display's bounds will be updated
@@ -1117,5 +1121,4 @@ void DisplayManager::UpdateDisplayBoundsForLayout(
   secondary_display->UpdateWorkAreaFromInsets(insets);
 }
 
-}  // namespace internal
 }  // namespace ash

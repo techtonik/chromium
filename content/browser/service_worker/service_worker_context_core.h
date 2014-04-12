@@ -47,7 +47,8 @@ class CONTENT_EXPORT ServiceWorkerContextCore
           public base::SupportsWeakPtr<ServiceWorkerContextCore>) {
  public:
   typedef base::Callback<void(ServiceWorkerStatusCode status,
-                              int64 registration_id)> RegistrationCallback;
+                              int64 registration_id,
+                              int64 version_id)> RegistrationCallback;
   typedef base::Callback<
       void(ServiceWorkerStatusCode status)> UnregistrationCallback;
 
@@ -59,6 +60,12 @@ class CONTENT_EXPORT ServiceWorkerContextCore
   ~ServiceWorkerContextCore();
 
   ServiceWorkerStorage* storage() { return storage_.get(); }
+  EmbeddedWorkerRegistry* embedded_worker_registry() {
+    return embedded_worker_registry_.get();
+  }
+  ServiceWorkerJobCoordinator* job_coordinator() {
+    return job_coordinator_.get();
+  }
 
   // The context class owns the set of ProviderHosts.
   ServiceWorkerProviderHost* GetProviderHost(int process_id, int provider_id);
@@ -67,28 +74,37 @@ class CONTENT_EXPORT ServiceWorkerContextCore
   void RemoveAllProviderHostsForProcess(int process_id);
 
   // The callback will be called on the IO thread.
+  // A child process of |source_process_id| may be used to run the created
+  // worker for initial installation.
+  // Non-null |provider_host| must be given if this is called from a document,
+  // whose process_id() must match with |source_process_id|.
   void RegisterServiceWorker(const GURL& pattern,
                              const GURL& script_url,
                              int source_process_id,
+                             ServiceWorkerProviderHost* provider_host,
                              SiteInstance* site_instance,
                              const RegistrationCallback& callback);
 
   // The callback will be called on the IO thread.
   void UnregisterServiceWorker(const GURL& pattern,
                                int source_process_id,
+                               ServiceWorkerProviderHost* provider_host,
                                const UnregistrationCallback& callback);
 
-  EmbeddedWorkerRegistry* embedded_worker_registry() {
-    return embedded_worker_registry_.get();
-  }
-
-  ServiceWorkerJobCoordinator* job_coordinator() {
-    return job_coordinator_.get();
-  }
+  // This class maintains collections of live instances, this class
+  // does not own these object or influence their lifetime.
+  ServiceWorkerRegistration* GetLiveRegistration(int64 registration_id);
+  void AddLiveRegistration(ServiceWorkerRegistration* registration);
+  void RemoveLiveRegistration(int64 registration_id);
+  ServiceWorkerVersion* GetLiveVersion(int64 version_id);
+  void AddLiveVersion(ServiceWorkerVersion* version);
+  void RemoveLiveVersion(int64 registration_id);
 
  private:
   typedef IDMap<ServiceWorkerProviderHost, IDMapOwnPointer> ProviderMap;
   typedef IDMap<ProviderMap, IDMapOwnPointer> ProcessToProviderMap;
+  typedef std::map<int64, ServiceWorkerRegistration*> RegistrationsMap;
+  typedef std::map<int64, ServiceWorkerVersion*> VersionMap;
 
   ProviderMap* GetProviderMapForProcess(int process_id) {
     return providers_.Lookup(process_id);
@@ -97,12 +113,15 @@ class CONTENT_EXPORT ServiceWorkerContextCore
   void RegistrationComplete(
       const RegistrationCallback& callback,
       ServiceWorkerStatusCode status,
-      const scoped_refptr<ServiceWorkerRegistration>& registration);
+      ServiceWorkerRegistration* registration,
+      ServiceWorkerVersion* version);
 
   ProcessToProviderMap providers_;
   scoped_ptr<ServiceWorkerStorage> storage_;
   scoped_refptr<EmbeddedWorkerRegistry> embedded_worker_registry_;
   scoped_ptr<ServiceWorkerJobCoordinator> job_coordinator_;
+  std::map<int64, ServiceWorkerRegistration*> live_registrations_;
+  std::map<int64, ServiceWorkerVersion*> live_versions_;
 
   DISALLOW_COPY_AND_ASSIGN(ServiceWorkerContextCore);
 };

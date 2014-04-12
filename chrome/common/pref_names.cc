@@ -289,17 +289,6 @@ const char kWebKitLoadsImagesAutomatically[] =
     "webkit.webprefs.loads_images_automatically";
 const char kWebKitPluginsEnabled[] = "webkit.webprefs.plugins_enabled";
 
-// Boolean which specifies whether the bookmark bar is visible on all tabs.
-const char kShowBookmarkBar[] = "bookmark_bar.show_on_all_tabs";
-
-// Boolean which specifies whether the apps shortcut is visible on the bookmark
-// bar.
-const char kShowAppsShortcutInBookmarkBar[] = "bookmark_bar.show_apps_shortcut";
-
-// Boolean which specifies the ids of the bookmark nodes that are expanded in
-// the bookmark editor.
-const char kBookmarkEditorExpandedNodes[] = "bookmark_editor.expanded_nodes";
-
 // Boolean that is true when SafeBrowsing is enabled.
 const char kSafeBrowsingEnabled[] = "safebrowsing.enabled";
 
@@ -1040,10 +1029,6 @@ const char kShowUpdatePromotionInfoBar[] =
 // true, we draw a custom chrome frame (thicker title bar and blue border).
 const char kUseCustomChromeFrame[] = "browser.custom_chrome_frame";
 
-// The preferred position (which corner of screen) for desktop notifications.
-const char kDesktopNotificationPosition[] =
-    "browser.desktop_notification_position";
-
 // Dictionary of content settings applied to all hosts by default.
 const char kDefaultContentSettings[] = "profile.default_content_settings";
 
@@ -1115,9 +1100,6 @@ const char kAutofillGeneratedCardBubbleTimesShown[] =
 // A dictionary that tracks the defaults to be set on the next invocation
 // of the requestAutocomplete dialog.
 const char kAutofillDialogDefaults[] = "autofill.rac_dialog_defaults";
-
-// Modifying bookmarks is completely disabled when this is set to false.
-const char kEditBookmarksEnabled[] = "bookmarks.editing_enabled";
 
 #if !defined(OS_ANDROID)
 const char kPinnedTabs[] = "pinned_tabs";
@@ -1407,13 +1389,6 @@ const char kMetricsInitialLogs[] =
 // user activities.
 const char kMetricsOngoingLogs[] =
     "user_experience_metrics.ongoing_logs_as_protobufs";
-
-// Boolean that is true when bookmark prompt is enabled.
-const char kBookmarkPromptEnabled[] = "bookmark_prompt_enabled";
-
-// Number of times bookmark prompt displayed.
-const char kBookmarkPromptImpressionCount[] =
-    "bookmark_prompt_impression_count";
 
 // 64-bit integer serialization of the base::Time from the last successful seed
 // fetch (i.e. when the Variations server responds with 200 or 304).
@@ -2048,7 +2023,7 @@ const char kVideoCaptureAllowedUrls[] = "hardware.video_capture_allowed_urls";
 
 // A boolean pref that controls the enabled-state of hotword search voice
 // trigger.
-const char kHotwordSearchEnabled[] = "hotword.search_enabled";
+const char kHotwordSearchEnabled[] = "hotword.search_enabled_2";
 
 // An integer pref that keeps track of how many times the opt in popup for
 // hotword void search has been shown to the user. After this pref has reached
@@ -2510,10 +2485,6 @@ const char kRLZDisabled[] = "rlz.disabled";
 // The directory in user data dir that contains the profile to be used with the
 // app launcher.
 const char kAppListProfile[] = "app_list.profile";
-
-// Whether to show the app list on a browser relaunch. Used when switching out
-// of metro mode after a user gesture requests showing the app list.
-const char kRestartWithAppList[] = "app_list.show_on_relaunch";
 
 // The number of times the app launcher was launched since last ping and
 // the time of the last ping.

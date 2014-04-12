@@ -41,15 +41,23 @@ void BluetoothPrivateAPI::Shutdown() {
 }
 
 void BluetoothPrivateAPI::OnListenerAdded(const EventListenerInfo& details) {
-  BluetoothAPI::Get(browser_context_)
-      ->bluetooth_event_router()
-      ->AddPairingDelegate(details.extension_id);
+  // This function can be called multiple times for the same JS listener, for
+  // example, once for the addListener call and again if it is a lazy listener.
+  if (!details.browser_context)
+    return;
+
+  BluetoothAPI::Get(browser_context_)->event_router()->AddPairingDelegate(
+      details.extension_id);
 }
 
 void BluetoothPrivateAPI::OnListenerRemoved(const EventListenerInfo& details) {
-  BluetoothAPI::Get(browser_context_)
-      ->bluetooth_event_router()
-      ->RemovePairingDelegate(details.extension_id);
+  // This function can be called multiple times for the same JS listener, for
+  // example, once for the addListener call and again if it is a lazy listener.
+  if (!details.browser_context)
+    return;
+
+  BluetoothAPI::Get(browser_context_)->event_router()->RemovePairingDelegate(
+      details.extension_id);
 }
 
 namespace api {
@@ -89,6 +97,9 @@ bool ValidatePairingResponseOptions(
     return false;
 
   // Check the BluetoothDevice is in expecting the correct response.
+  if (!device->ExpectingConfirmation() && !device->ExpectingPinCode() &&
+      !device->ExpectingPasskey())
+    return false;
   if (pincode && !device->ExpectingPinCode())
     return false;
   if (passkey && !device->ExpectingPasskey())
@@ -169,7 +180,7 @@ BluetoothPrivateSetAdapterStateFunction::CreatePropertyErrorCallback(
 void BluetoothPrivateSetAdapterStateFunction::OnAdapterPropertySet(
     const std::string& property) {
   DCHECK(pending_properties_.find(property) != pending_properties_.end());
-  DCHECK(failed_properties_.find(property) != pending_properties_.end());
+  DCHECK(failed_properties_.find(property) == failed_properties_.end());
 
   pending_properties_.erase(property);
   if (pending_properties_.empty()) {
@@ -183,7 +194,7 @@ void BluetoothPrivateSetAdapterStateFunction::OnAdapterPropertySet(
 void BluetoothPrivateSetAdapterStateFunction::OnAdapterPropertyError(
     const std::string& property) {
   DCHECK(pending_properties_.find(property) != pending_properties_.end());
-  DCHECK(failed_properties_.find(property) != pending_properties_.end());
+  DCHECK(failed_properties_.find(property) == failed_properties_.end());
 
   pending_properties_.erase(property);
   failed_properties_.insert(property);
@@ -222,7 +233,7 @@ bool BluetoothPrivateSetPairingResponseFunction::DoWork(
   const bt_private::SetPairingResponseOptions& options = params->options;
 
   BluetoothEventRouter* router =
-      BluetoothAPI::Get(browser_context())->bluetooth_event_router();
+      BluetoothAPI::Get(browser_context())->event_router();
   if (!router->GetPairingDelegate(extension_id())) {
     SetError(kPairingNotEnabled);
     SendResponse(false);
@@ -243,7 +254,11 @@ bool BluetoothPrivateSetPairingResponseFunction::DoWork(
     return true;
   }
 
-  if (options.response != bt_private::PAIRING_RESPONSE_NONE) {
+  if (options.pincode.get()) {
+    device->SetPinCode(*options.pincode.get());
+  } else if (options.passkey.get()) {
+    device->SetPasskey(*options.passkey.get());
+  } else {
     switch (options.response) {
       case bt_private::PAIRING_RESPONSE_CONFIRM:
         device->ConfirmPairing();
@@ -257,10 +272,6 @@ bool BluetoothPrivateSetPairingResponseFunction::DoWork(
       default:
         NOTREACHED();
     }
-  } else if (options.pincode.get()) {
-    device->SetPinCode(*options.pincode.get());
-  } else if (options.passkey.get()) {
-    device->SetPasskey(*options.passkey.get());
   }
 
   SendResponse(true);

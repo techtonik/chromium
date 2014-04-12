@@ -20,12 +20,12 @@
 #include "cc/resources/memory_history.h"
 #include "cc/resources/picture_pile_impl.h"
 #include "cc/resources/prioritized_tile_set.h"
-#include "cc/resources/raster_worker_pool.h"
+#include "cc/resources/rasterizer.h"
 #include "cc/resources/resource_pool.h"
 #include "cc/resources/tile.h"
 
 namespace cc {
-class RasterWorkerPoolDelegate;
+class RasterizerDelegate;
 class ResourceProvider;
 
 class CC_EXPORT TileManagerClient {
@@ -49,7 +49,7 @@ scoped_ptr<base::Value> RasterTaskCompletionStatsAsValue(
 // should no longer have any memory assigned to them. Tile objects are "owned"
 // by layers; they automatically register with the manager when they are
 // created, and unregister from the manager when they are deleted.
-class CC_EXPORT TileManager : public RasterWorkerPoolClient,
+class CC_EXPORT TileManager : public RasterizerClient,
                               public RefCountedManager<Tile> {
  public:
   struct CC_EXPORT PairedPictureLayer {
@@ -108,15 +108,12 @@ class CC_EXPORT TileManager : public RasterWorkerPoolClient,
 
   static scoped_ptr<TileManager> Create(
       TileManagerClient* client,
-      base::SequencedTaskRunner* task_runner,
       ResourceProvider* resource_provider,
-      ContextProvider* context_provider,
-      RenderingStatsInstrumentation* rendering_stats_instrumentation,
-      bool use_map_image,
-      bool use_rasterize_on_demand,
-      size_t max_transfer_buffer_usage_bytes,
+      Rasterizer* rasterizer,
+      Rasterizer* gpu_rasterizer,
       size_t max_raster_usage_bytes,
-      unsigned map_image_texture_target);
+      bool use_rasterize_on_demand,
+      RenderingStatsInstrumentation* rendering_stats_instrumentation);
   virtual ~TileManager();
 
   void ManageTiles(const GlobalStateThatImpactsTilePriority& state);
@@ -149,9 +146,9 @@ class CC_EXPORT TileManager : public RasterWorkerPoolClient,
 
   void GetPairedPictureLayers(std::vector<PairedPictureLayer>* layers) const;
 
-  void InitializeTilesWithResourcesForTesting(
-      const std::vector<Tile*>& tiles,
-      ResourceProvider* resource_provider) {
+  ResourcePool* resource_pool() { return resource_pool_.get(); }
+
+  void InitializeTilesWithResourcesForTesting(const std::vector<Tile*>& tiles) {
     for (size_t i = 0; i < tiles.size(); ++i) {
       ManagedTileState& mts = tiles[i]->managed_state();
       ManagedTileState::TileVersion& tile_version =
@@ -180,14 +177,12 @@ class CC_EXPORT TileManager : public RasterWorkerPoolClient,
 
  protected:
   TileManager(TileManagerClient* client,
-              base::SequencedTaskRunner* task_runner,
               ResourceProvider* resource_provider,
-              ContextProvider* context_provider,
-              scoped_ptr<RasterWorkerPool> raster_worker_pool,
-              scoped_ptr<RasterWorkerPool> direct_raster_worker_pool,
+              Rasterizer* rasterizer,
+              Rasterizer* gpu_rasterizer,
               size_t max_raster_usage_bytes,
-              RenderingStatsInstrumentation* rendering_stats_instrumentation,
-              bool use_rasterize_on_demand);
+              bool use_rasterize_on_demand,
+              RenderingStatsInstrumentation* rendering_stats_instrumentation);
 
   // Methods called by Tile
   friend class Tile;
@@ -198,7 +193,7 @@ class CC_EXPORT TileManager : public RasterWorkerPoolClient,
   // Overriden from RefCountedManager<Tile>:
   virtual void Release(Tile* tile) OVERRIDE;
 
-  // Overriden from RasterWorkerPoolClient:
+  // Overriden from RasterizerClient:
   virtual bool ShouldForceTasksRequiredForActivationToComplete() const OVERRIDE;
   virtual void DidFinishRunningTasks() OVERRIDE;
   virtual void DidFinishRunningTasksRequiredForActivation() OVERRIDE;
@@ -215,10 +210,10 @@ class CC_EXPORT TileManager : public RasterWorkerPoolClient,
   void GetTilesWithAssignedBins(PrioritizedTileSet* tiles);
 
  private:
-  enum RasterWorkerPoolType {
-    RASTER_WORKER_POOL_TYPE_DEFAULT,
-    RASTER_WORKER_POOL_TYPE_DIRECT,
-    NUM_RASTER_WORKER_POOL_TYPES
+  enum RasterizerType {
+    RASTERIZER_TYPE_DEFAULT,
+    RASTERIZER_TYPE_GPU,
+    NUM_RASTERIZER_TYPES
   };
 
   void OnImageDecodeTaskCompleted(int layer_id,
@@ -231,26 +226,22 @@ class CC_EXPORT TileManager : public RasterWorkerPoolClient,
                              bool was_canceled);
 
   inline size_t BytesConsumedIfAllocated(const Tile* tile) const {
-    return Resource::MemorySizeBytes(tile->size(),
-                                     raster_worker_pool_->GetResourceFormat());
+    return Resource::MemorySizeBytes(tile->size(), resource_format_);
   }
 
   void FreeResourceForTile(Tile* tile, RasterMode mode);
   void FreeResourcesForTile(Tile* tile);
   void FreeUnusedResourcesForTile(Tile* tile);
-  scoped_refptr<internal::WorkerPoolTask> CreateImageDecodeTask(
+  scoped_refptr<internal::ImageDecodeTask> CreateImageDecodeTask(
       Tile* tile,
       SkPixelRef* pixel_ref);
-  scoped_refptr<internal::RasterWorkerPoolTask> CreateRasterTask(Tile* tile);
+  scoped_refptr<internal::RasterTask> CreateRasterTask(Tile* tile);
   scoped_ptr<base::Value> GetMemoryRequirementsAsValue() const;
   void UpdatePrioritizedTileSetIfNeeded();
 
   TileManagerClient* client_;
-  ContextProvider* context_provider_;
   scoped_ptr<ResourcePool> resource_pool_;
-  scoped_ptr<RasterWorkerPool> raster_worker_pool_;
-  scoped_ptr<RasterWorkerPool> direct_raster_worker_pool_;
-  scoped_ptr<RasterWorkerPoolDelegate> raster_worker_pool_delegate_;
+  scoped_ptr<RasterizerDelegate> rasterizer_delegate_;
   GlobalStateThatImpactsTilePriority global_state_;
 
   typedef base::hash_map<Tile::Id, Tile*> TileMap;
@@ -277,7 +268,7 @@ class CC_EXPORT TileManager : public RasterWorkerPoolClient,
   bool did_initialize_visible_tile_;
   bool did_check_for_completed_tasks_since_last_schedule_tasks_;
 
-  typedef base::hash_map<uint32_t, scoped_refptr<internal::WorkerPoolTask> >
+  typedef base::hash_map<uint32_t, scoped_refptr<internal::ImageDecodeTask> >
       PixelRefTaskMap;
   typedef base::hash_map<int, PixelRefTaskMap> LayerPixelRefTaskMap;
   LayerPixelRefTaskMap image_decode_tasks_;
@@ -291,10 +282,12 @@ class CC_EXPORT TileManager : public RasterWorkerPoolClient,
 
   bool use_rasterize_on_demand_;
 
-  // Queues used when scheduling raster tasks.
-  RasterTaskQueue raster_queue_[NUM_RASTER_WORKER_POOL_TYPES];
+  ResourceFormat resource_format_;
 
-  std::vector<scoped_refptr<internal::Task> > orphan_raster_tasks_;
+  // Queues used when scheduling raster tasks.
+  RasterTaskQueue raster_queue_[NUM_RASTERIZER_TYPES];
+
+  std::vector<scoped_refptr<internal::RasterTask> > orphan_raster_tasks_;
 
   std::vector<PictureLayerImpl*> layers_;
 

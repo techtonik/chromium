@@ -12,6 +12,7 @@
 #include "chrome/browser/password_manager/password_store_factory.h"
 #include "chrome/browser/sync/profile_sync_service.h"
 #include "chrome/browser/sync/profile_sync_service_factory.h"
+#include "chrome/browser/sync/test/integration/multi_client_status_change_checker.h"
 #include "chrome/browser/sync/test/integration/profile_sync_service_harness.h"
 #include "chrome/browser/sync/test/integration/sync_datatype_helper.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -20,6 +21,7 @@
 #include "components/password_manager/core/browser/password_store_consumer.h"
 
 using autofill::PasswordForm;
+using password_manager::PasswordStore;
 using sync_datatype_helper::test;
 
 const std::string kFakeSignonRealm = "http://fake-signon-realm.google.com/";
@@ -35,11 +37,11 @@ void PasswordStoreCallback(base::WaitableEvent* wait_event) {
   wait_event->Signal();
 }
 
-class PasswordStoreConsumerHelper : public PasswordStoreConsumer {
+class PasswordStoreConsumerHelper
+    : public password_manager::PasswordStoreConsumer {
  public:
   explicit PasswordStoreConsumerHelper(std::vector<PasswordForm>* result)
-      : PasswordStoreConsumer(),
-        result_(result) {}
+      : password_manager::PasswordStoreConsumer(), result_(result) {}
 
   virtual void OnGetPasswordStoreResults(
       const std::vector<PasswordForm*>& result) OVERRIDE {
@@ -134,7 +136,8 @@ bool ProfileContainsSamePasswordFormsAsVerifier(int index) {
   std::vector<PasswordForm> forms;
   GetLogins(GetVerifierPasswordStore(), verifier_forms);
   GetLogins(GetPasswordStore(index), forms);
-  bool result = ContainsSamePasswordForms(verifier_forms, forms);
+  bool result =
+      password_manager::ContainsSamePasswordForms(verifier_forms, forms);
   if (!result) {
     LOG(ERROR) << "Password forms in Verifier Profile:";
     for (std::vector<PasswordForm>::iterator it = verifier_forms.begin();
@@ -155,7 +158,7 @@ bool ProfilesContainSamePasswordForms(int index_a, int index_b) {
   std::vector<PasswordForm> forms_b;
   GetLogins(GetPasswordStore(index_a), forms_a);
   GetLogins(GetPasswordStore(index_b), forms_b);
-  bool result = ContainsSamePasswordForms(forms_a, forms_b);
+  bool result = password_manager::ContainsSamePasswordForms(forms_a, forms_b);
   if (!result) {
     LOG(ERROR) << "Password forms in Profile" << index_a << ":";
     for (std::vector<PasswordForm>::iterator it = forms_a.begin();
@@ -191,6 +194,41 @@ bool AllProfilesContainSamePasswordForms() {
     }
   }
   return true;
+}
+
+namespace {
+
+// Helper class used in the implementation of
+// AwaitAllProfilesContainSamePasswordForms.
+class SamePasswordFormsChecker : public MultiClientStatusChangeChecker {
+ public:
+  SamePasswordFormsChecker();
+  virtual ~SamePasswordFormsChecker();
+
+  virtual bool IsExitConditionSatisfied() OVERRIDE;
+  virtual std::string GetDebugMessage() const OVERRIDE;
+};
+
+SamePasswordFormsChecker::SamePasswordFormsChecker()
+    : MultiClientStatusChangeChecker(
+        sync_datatype_helper::test()->GetSyncServices()) {}
+
+SamePasswordFormsChecker::~SamePasswordFormsChecker() {}
+
+bool SamePasswordFormsChecker::IsExitConditionSatisfied() {
+  return AllProfilesContainSamePasswordForms();
+}
+
+std::string SamePasswordFormsChecker::GetDebugMessage() const {
+  return "Waiting for matching passwords";
+}
+
+}  //  namespace
+
+bool AwaitAllProfilesContainSamePasswordForms() {
+  SamePasswordFormsChecker checker;
+  checker.Wait();
+  return !checker.TimedOut();
 }
 
 int GetPasswordCount(int index) {

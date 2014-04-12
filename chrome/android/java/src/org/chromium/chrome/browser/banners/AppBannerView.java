@@ -242,12 +242,22 @@ public class AppBannerView extends SwipableOverlayView
         mTitleView.setText(mAppData.title());
         mIconView.setImageDrawable(mAppData.icon());
         mRatingView.initialize(mAppData.rating());
+        setAccessibilityInformation();
 
         // Determine how much the user can drag sideways before their touch is considered a scroll.
         mTouchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
 
         // Set up the install button.
-        updateButtonAppearance();
+        updateButtonStatus();
+    }
+
+    /**
+     * Creates a succinct description about the app being advertised.
+     */
+    private void setAccessibilityInformation() {
+        String bannerText = getContext().getString(
+                R.string.app_banner_view_accessibility, mAppData.title(), mAppData.rating());
+        setContentDescription(bannerText);
     }
 
     @Override
@@ -261,6 +271,11 @@ public class AppBannerView extends SwipableOverlayView
         }
 
         if (view == mInstallButtonView) {
+            // Check that nothing happened in the background to change the install state of the app.
+            int previousState = mInstallState;
+            updateButtonStatus();
+            if (mInstallState != previousState) return;
+
             // Ignore button clicks when the app is installing.
             if (mInstallState == INSTALL_STATE_INSTALLING) return;
 
@@ -282,13 +297,11 @@ public class AppBannerView extends SwipableOverlayView
                 }
             } else if (mInstallState == INSTALL_STATE_INSTALLED) {
                 // The app is installed. Open it.
-                String packageName = mAppData.packageName();
-                PackageManager packageManager = getContext().getPackageManager();
-                Intent appIntent = packageManager.getLaunchIntentForPackage(packageName);
                 try {
-                    getContext().startActivity(appIntent);
+                    Intent appIntent = getAppLaunchIntent();
+                    if (appIntent != null) getContext().startActivity(appIntent);
                 } catch (ActivityNotFoundException e) {
-                    Log.e(TAG, "Failed to find app package: " + packageName);
+                    Log.e(TAG, "Failed to find app package: " + mAppData.packageName());
                 }
 
                 dismiss(AppBannerMetricsIds.DISMISS_APP_OPEN);
@@ -347,7 +360,7 @@ public class AppBannerView extends SwipableOverlayView
             mInstallTask.start();
             mInstallState = INSTALL_STATE_INSTALLING;
         }
-        updateButtonAppearance();
+        updateButtonStatus();
     }
 
 
@@ -359,7 +372,7 @@ public class AppBannerView extends SwipableOverlayView
             // Let the user open the app from here.
             mObserver.onBannerInstallEvent(this, AppBannerMetricsIds.INSTALL_COMPLETED);
             mInstallState = INSTALL_STATE_INSTALLED;
-            updateButtonAppearance();
+            updateButtonStatus();
         } else {
             dismiss(AppBannerMetricsIds.DISMISS_INSTALL_TIMEOUT);
         }
@@ -412,11 +425,23 @@ public class AppBannerView extends SwipableOverlayView
     }
 
     /**
-     * Updates the text and color of the button displayed on the button.
+     * Updates the install button (install state, text, color, etc.).
      */
-    void updateButtonAppearance() {
+    void updateButtonStatus() {
         if (mInstallButtonView == null) return;
 
+        // Determine if the saved install status of the app is out of date.
+        // It is not easily possible to detect if an app is in the process of being installed, so we
+        // can't properly transition to that state from here.
+        if (getAppLaunchIntent() == null) {
+            if (mInstallState == INSTALL_STATE_INSTALLED) {
+                mInstallState = INSTALL_STATE_NOT_INSTALLED;
+            }
+        } else {
+            mInstallState = INSTALL_STATE_INSTALLED;
+        }
+
+        // Update what the button looks like.
         Resources res = getResources();
         int fgColor;
         String text;
@@ -431,6 +456,8 @@ public class AppBannerView extends SwipableOverlayView
             fgColor = res.getColor(R.color.app_banner_install_button_fg);
             if (mInstallState == INSTALL_STATE_NOT_INSTALLED) {
                 text = mAppData.installButtonText();
+                mInstallButtonView.setContentDescription(
+                        getContext().getString(R.string.app_banner_install_accessibility, text));
             } else {
                 text = res.getString(R.string.app_banner_installing);
             }
@@ -525,6 +552,20 @@ public class AppBannerView extends SwipableOverlayView
         }
         initializeControls();
         requestLayout();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasWindowFocus) {
+        if (hasWindowFocus) updateButtonStatus();
+    }
+
+    /**
+     * @return Intent to launch the app that is being promoted.
+     */
+    private Intent getAppLaunchIntent() {
+        String packageName = mAppData.packageName();
+        PackageManager packageManager = getContext().getPackageManager();
+        return packageManager.getLaunchIntentForPackage(packageName);
     }
 
     /**
@@ -622,8 +663,13 @@ public class AppBannerView extends SwipableOverlayView
         final int contentWidth =
                 maxControlWidth - getWidthWithMargins(mIconView) - mPaddingControls;
         final int contentHeight = biggestStackHeight - mPaddingControls;
-        measureChildForSpace(mInstallButtonView, contentWidth, contentHeight);
         measureChildForSpace(mLogoView, contentWidth, contentHeight);
+
+        // Restrict the button size to prevent overrunning the Google Play logo.
+        int remainingButtonWidth =
+                maxControlWidth - getWidthWithMargins(mLogoView) - getWidthWithMargins(mIconView);
+        mInstallButtonView.setMaxWidth(remainingButtonWidth);
+        measureChildForSpace(mInstallButtonView, contentWidth, contentHeight);
 
         // Measure the star rating, which sits below the title and above the logo.
         final int ratingWidth = contentWidth;
