@@ -13,6 +13,12 @@
 
 namespace {
 
+using content::BrowserThread;
+using content::SERVICE_WORKER_OK;
+using content::ServiceWorkerContext;
+using content::ServiceWorkerRegistration;
+using content::ServiceWorkerStatusCode;
+
 void FinishRegistrationOnIO(
     const ServiceWorkerContext::ResultCallback& continuation,
     ServiceWorkerStatusCode status,
@@ -29,10 +35,12 @@ void PostResultToUIFromStatusOnIO(
     const ServiceWorkerContext::ResultCallback& continuation,
     ServiceWorkerStatusCode status) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  BrowserThread::PostTask(
-      BrowserThread::UI,
-      FROM_HERE,
-      base::Bind(continuation, status == SERVICE_WORKER_OK));
+  if (!continuation.is_null()) {
+    BrowserThread::PostTask(
+        BrowserThread::UI,
+        FROM_HERE,
+        base::Bind(continuation, status == SERVICE_WORKER_OK));
+  }
 }
 
 void SendMessageAfterFind(
