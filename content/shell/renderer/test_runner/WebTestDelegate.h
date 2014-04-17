@@ -7,7 +7,7 @@
 
 #include <string>
 
-#include "third_party/WebKit/public/platform/WebScreenOrientation.h"
+#include "third_party/WebKit/public/platform/WebScreenOrientationType.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebURL.h"
 #include "third_party/WebKit/public/platform/WebVector.h"
@@ -57,7 +57,7 @@ public:
     virtual void setDeviceOrientationData(const blink::WebDeviceOrientationData&) = 0;
 
     // Set orientation to set when registering via Platform::setScreenOrientationListener().
-    virtual void setScreenOrientation(const blink::WebScreenOrientation&) = 0;
+    virtual void setScreenOrientation(const blink::WebScreenOrientationType&) = 0;
 
     // Add a message to the text dump for the layout test.
     virtual void printMessage(const std::string& message) = 0;
@@ -103,7 +103,8 @@ public:
     virtual void clearDevToolsLocalStorage() = 0;
 
     // Opens and closes the inspector.
-    virtual void showDevTools(const std::string& settings) = 0;
+    virtual void showDevTools(const std::string& settings,
+                              const std::string& frontend_url) = 0;
     virtual void closeDevTools() = 0;
 
     // Evaluate the given script in the DevTools agent.

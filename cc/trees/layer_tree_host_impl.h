@@ -50,6 +50,7 @@ class PaintTimeCounter;
 class RasterWorkerPool;
 class RenderPassDrawQuad;
 class RenderingStatsInstrumentation;
+class ResourcePool;
 class ScrollbarLayerImplBase;
 class TextureMailboxDeleter;
 class TopControlsManager;
@@ -64,7 +65,7 @@ class LayerTreeHostImplClient {
   virtual void DidLoseOutputSurfaceOnImplThread() = 0;
   virtual void DidSwapBuffersOnImplThread() = 0;
   virtual void OnSwapBuffersCompleteOnImplThread() = 0;
-  virtual void BeginImplFrame(const BeginFrameArgs& args) = 0;
+  virtual void BeginFrame(const BeginFrameArgs& args) = 0;
   virtual void OnCanDrawStateChanged(bool can_draw) = 0;
   virtual void NotifyReadyToActivate() = 0;
   // Please call these 2 functions through
@@ -224,7 +225,7 @@ class CC_EXPORT LayerTreeHostImpl
       scoped_refptr<ContextProvider> offscreen_context_provider) OVERRIDE;
   virtual void ReleaseGL() OVERRIDE;
   virtual void SetNeedsRedrawRect(const gfx::Rect& rect) OVERRIDE;
-  virtual void BeginImplFrame(const BeginFrameArgs& args) OVERRIDE;
+  virtual void BeginFrame(const BeginFrameArgs& args) OVERRIDE;
   virtual void SetExternalDrawConstraints(
       const gfx::Transform& transform,
       const gfx::Rect& viewport,
@@ -263,7 +264,8 @@ class CC_EXPORT LayerTreeHostImpl
   const RendererCapabilitiesImpl& GetRendererCapabilities() const;
 
   virtual bool SwapBuffers(const FrameData& frame);
-  void SetNeedsBeginImplFrame(bool enable);
+  void SetNeedsBeginFrame(bool enable);
+  virtual void WillBeginImplFrame(const BeginFrameArgs& args);
   void DidModifyTilePriorities();
 
   void Readback(void* pixels, const gfx::Rect& rect_in_device_viewport);
@@ -540,6 +542,7 @@ class CC_EXPORT LayerTreeHostImpl
   scoped_ptr<TileManager> tile_manager_;
   scoped_ptr<RasterWorkerPool> raster_worker_pool_;
   scoped_ptr<RasterWorkerPool> direct_raster_worker_pool_;
+  scoped_ptr<ResourcePool> resource_pool_;
   scoped_ptr<Renderer> renderer_;
 
   GlobalStateThatImpactsTilePriority global_tile_state_;

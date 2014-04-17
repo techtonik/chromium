@@ -15,7 +15,7 @@ class ResourceProvider;
 
 class CC_EXPORT DirectRasterWorkerPool : public RasterWorkerPool,
                                          public Rasterizer,
-                                         public internal::RasterizerTaskClient {
+                                         public RasterizerTaskClient {
  public:
   virtual ~DirectRasterWorkerPool();
 
@@ -31,13 +31,11 @@ class CC_EXPORT DirectRasterWorkerPool : public RasterWorkerPool,
   virtual void SetClient(RasterizerClient* client) OVERRIDE;
   virtual void Shutdown() OVERRIDE {}
   virtual void ScheduleTasks(RasterTaskQueue* queue) OVERRIDE;
-  virtual unsigned GetResourceTarget() const OVERRIDE;
-  virtual ResourceFormat GetResourceFormat() const OVERRIDE;
   virtual void CheckForCompletedTasks() OVERRIDE;
 
-  // Overridden from internal::RasterizerTaskClient:
-  virtual SkCanvas* AcquireCanvasForRaster(internal::RasterTask* task) OVERRIDE;
-  virtual void ReleaseCanvasForRaster(internal::RasterTask* task) OVERRIDE;
+  // Overridden from RasterizerTaskClient:
+  virtual SkCanvas* AcquireCanvasForRaster(RasterTask* task) OVERRIDE;
+  virtual void ReleaseCanvasForRaster(RasterTask* task) OVERRIDE;
 
  private:
   DirectRasterWorkerPool(base::SequencedTaskRunner* task_runner,
@@ -48,7 +46,7 @@ class CC_EXPORT DirectRasterWorkerPool : public RasterWorkerPool,
   void OnRasterRequiredForActivationFinished();
   void ScheduleRunTasksOnOriginThread();
   void RunTasksOnOriginThread();
-  void RunTaskOnOriginThread(internal::RasterizerTask* task);
+  void RunTaskOnOriginThread(RasterizerTask* task);
 
   scoped_refptr<base::SequencedTaskRunner> task_runner_;
   RasterizerClient* client_;
@@ -65,11 +63,10 @@ class CC_EXPORT DirectRasterWorkerPool : public RasterWorkerPool,
   base::WeakPtrFactory<DirectRasterWorkerPool>
       raster_finished_weak_ptr_factory_;
 
-  scoped_refptr<internal::RasterizerTask> raster_finished_task_;
-  scoped_refptr<internal::RasterizerTask>
-      raster_required_for_activation_finished_task_;
+  scoped_refptr<RasterizerTask> raster_finished_task_;
+  scoped_refptr<RasterizerTask> raster_required_for_activation_finished_task_;
 
-  internal::RasterizerTask::Vector completed_tasks_;
+  RasterizerTask::Vector completed_tasks_;
 
   base::WeakPtrFactory<DirectRasterWorkerPool> weak_ptr_factory_;
 

@@ -136,7 +136,7 @@ class CONTENT_EXPORT MediaStreamDependencyFactory
 
   WebRtcAudioDeviceImpl* GetWebRtcAudioDevice();
 
-  static void AddNativeTrackToBlinkTrack(
+  static void AddNativeAudioTrackToBlinkTrack(
       webrtc::MediaStreamTrackInterface* native_track,
       const blink::WebMediaStreamTrack& webkit_track,
       bool is_local_track);
@@ -173,7 +173,8 @@ class CONTENT_EXPORT MediaStreamDependencyFactory
   // it reuses existing capture if any; otherwise it creates a new capturer.
   virtual scoped_refptr<WebRtcAudioCapturer> CreateAudioCapturer(
       int render_view_id, const StreamDeviceInfo& device_info,
-      const blink::WebMediaConstraints& constraints);
+      const blink::WebMediaConstraints& constraints,
+      MediaStreamAudioSource* audio_source);
 
   // Adds the audio device as a sink to the audio track and starts the local
   // audio track. This is virtual for test purposes since no real audio device

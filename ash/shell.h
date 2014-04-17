@@ -51,7 +51,7 @@ class Rect;
 namespace ui {
 class DisplayConfigurator;
 class Layer;
-class UserActivityNotifier;
+class UserActivityPowerManagerNotifier;
 }
 namespace views {
 class NonClientFrameView;
@@ -145,7 +145,6 @@ class WebNotificationTray;
 class WindowCycleController;
 class WindowPositioner;
 class WindowSelectorController;
-class WindowTreeHostFactory;
 
 namespace shell {
 class WindowWatcher;
@@ -302,8 +301,14 @@ class ASH_EXPORT Shell : public SystemModalContainerEventFilterDelegate,
   // their original position.
   void OnMaximizeModeEnded();
 
+  // Called when a root window is created.
+  void OnRootWindowAdded(aura::Window* root_window);
+
   // Initializes |shelf_|.  Does nothing if it's already initialized.
   void CreateShelf();
+
+  // Called when the shelf is created for |root_window|.
+  void OnShelfCreatedForRootWindow(aura::Window* root_window);
 
   // Creates a virtual keyboard. Deletes the old virtual keyboard if it already
   // exists.
@@ -515,10 +520,6 @@ class ASH_EXPORT Shell : public SystemModalContainerEventFilterDelegate,
   }
 #endif  // defined(OS_CHROMEOS)
 
-  WindowTreeHostFactory* window_tree_host_factory() {
-    return window_tree_host_factory_.get();
-  }
-
   ShelfModel* shelf_model() {
     return shelf_model_.get();
   }
@@ -652,12 +653,12 @@ class ASH_EXPORT Shell : public SystemModalContainerEventFilterDelegate,
   scoped_ptr<AutoclickController> autoclick_controller_;
   scoped_ptr<aura::client::FocusClient> focus_client_;
   aura::client::ActivationClient* activation_client_;
+
   scoped_ptr<MouseCursorEventFilter> mouse_cursor_filter_;
   scoped_ptr<ScreenPositionController> screen_position_controller_;
   scoped_ptr<SystemModalContainerEventFilter> modality_filter_;
   scoped_ptr<EventClientImpl> event_client_;
   scoped_ptr<EventTransformationHandler> event_transformation_handler_;
-  scoped_ptr<WindowTreeHostFactory> window_tree_host_factory_;
 
   // An event filter that pre-handles key events while the partial
   // screenshot UI or the keyboard overlay is active.
@@ -691,7 +692,7 @@ class ASH_EXPORT Shell : public SystemModalContainerEventFilterDelegate,
 
 #if defined(OS_CHROMEOS)
   scoped_ptr<PowerEventObserver> power_event_observer_;
-  scoped_ptr<ui::UserActivityNotifier> user_activity_notifier_;
+  scoped_ptr<ui::UserActivityPowerManagerNotifier> user_activity_notifier_;
   scoped_ptr<VideoActivityNotifier> video_activity_notifier_;
   scoped_ptr<StickyKeysController> sticky_keys_controller_;
   scoped_ptr<ResolutionNotificationController>

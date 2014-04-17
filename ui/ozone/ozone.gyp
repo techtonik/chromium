@@ -32,6 +32,11 @@
       },
       'sources': [
         '<(platform_list_file)',
+        # common/chromeos files are excluded automatically when building with
+        # chromeos=0, by exclusion rules in filename_rules.gypi due to the
+        # 'chromeos' folder name.
+        'common/chromeos/native_display_delegate_ozone.cc',
+        'common/chromeos/native_display_delegate_ozone.h',
         'ozone_platform.cc',
         'ozone_platform.h',
         'ozone_switches.cc',
@@ -40,6 +45,18 @@
         'platform/dri/ozone_platform_dri.h',
         'platform/dri/cursor_factory_evdev_dri.cc',
         'platform/dri/cursor_factory_evdev_dri.h',
+        'platform/dri/dri_buffer.cc',
+        'platform/dri/dri_buffer.h',
+        'platform/dri/dri_surface.cc',
+        'platform/dri/dri_surface.h',
+        'platform/dri/dri_surface_factory.cc',
+        'platform/dri/dri_surface_factory.h',
+        'platform/dri/dri_vsync_provider.cc',
+        'platform/dri/dri_vsync_provider.h',
+        'platform/dri/dri_wrapper.cc',
+        'platform/dri/dri_wrapper.h',
+        'platform/dri/hardware_display_controller.cc',
+        'platform/dri/hardware_display_controller.h',
         'platform/test/ozone_platform_test.cc',
         'platform/test/ozone_platform_test.h',
         '<@(external_ozone_platform_files)',
@@ -75,7 +92,10 @@
             'ozone_platforms': [
               'dri'
             ]
-          }
+          },
+          'dependencies': [
+            '../../build/linux/system.gyp:dridrm',
+          ],
         }, {  # ozone_platform_dri==0
           'sources/': [
             ['exclude', '^platform/dri/'],
@@ -91,6 +111,11 @@
           'sources/': [
             ['exclude', '^platform/test/'],
           ]
+        }],
+        ['chromeos==1', {
+          'dependencies': [
+            '<(DEPTH)/ui/display/display.gyp:display_types',
+          ],
         }],
       ]
     },

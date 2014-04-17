@@ -12,6 +12,7 @@
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "base/strings/string16.h"
 #include "content/common/content_export.h"
 #include "content/common/service_worker/service_worker_status_code.h"
 
@@ -46,6 +47,7 @@ class CONTENT_EXPORT EmbeddedWorkerRegistry
   ServiceWorkerStatusCode StartWorker(int process_id,
                                       int embedded_worker_id,
                                       int64 service_worker_version_id,
+                                      const GURL& scope,
                                       const GURL& script_url);
   ServiceWorkerStatusCode StopWorker(int process_id,
                                      int embedded_worker_id);
@@ -59,6 +61,11 @@ class CONTENT_EXPORT EmbeddedWorkerRegistry
   void OnSendMessageToBrowser(int embedded_worker_id,
                               int request_id,
                               const IPC::Message& message);
+  void OnReportException(int embedded_worker_id,
+                         const base::string16& error_message,
+                         int line_number,
+                         int column_number,
+                         const GURL& source_url);
 
   // Keeps a map from process_id to sender information.
   void AddChildProcessSender(int process_id, IPC::Sender* sender);

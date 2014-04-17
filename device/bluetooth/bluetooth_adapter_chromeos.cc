@@ -42,7 +42,23 @@ void OnUnregisterAgentError(const std::string& error_name,
 
 }  // namespace
 
+namespace device {
+
+// static
+base::WeakPtr<BluetoothAdapter> BluetoothAdapter::CreateAdapter(
+    const InitCallback& init_callback) {
+  return chromeos::BluetoothAdapterChromeOS::CreateAdapter();
+}
+
+}
+
 namespace chromeos {
+
+// static
+base::WeakPtr<BluetoothAdapter> BluetoothAdapterChromeOS::CreateAdapter() {
+  BluetoothAdapterChromeOS* adapter = new BluetoothAdapterChromeOS();
+  return adapter->weak_ptr_factory_.GetWeakPtr();
+}
 
 BluetoothAdapterChromeOS::BluetoothAdapterChromeOS()
     : num_discovery_sessions_(0),
@@ -342,7 +358,7 @@ void BluetoothAdapterChromeOS::InputPropertyChanged(
     NotifyDeviceChanged(device_chromeos);
 }
 
-void BluetoothAdapterChromeOS::Release() {
+void BluetoothAdapterChromeOS::Released() {
   DCHECK(agent_.get());
   VLOG(1) << "Release";
 

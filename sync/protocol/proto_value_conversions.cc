@@ -223,6 +223,8 @@ base::DictionaryValue* PasswordSpecificsDataToValue(
   SET_BOOL(preferred);
   SET_INT64(date_created);
   SET_BOOL(blacklisted);
+  SET_INT32(type);
+  SET_INT32(times_used);
   return value;
 }
 
@@ -438,6 +440,7 @@ base::DictionaryValue* AutofillProfileSpecificsToValue(
   SET_STR(address_home_street_address);
   SET_STR(address_home_sorting_code);
   SET_STR(address_home_dependent_locality);
+  SET_STR(address_home_language_code);
 
   SET_STR_REP(phone_home_whole_number);
   return value;

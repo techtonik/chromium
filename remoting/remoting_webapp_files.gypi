@@ -84,6 +84,7 @@
       'webapp/menu_button.js',
       'webapp/ui_mode.js',
       'webapp/toolbar.js',
+      'webapp/feedback.js',
     ],
     # UI files for controlling the local machine as a host.
     'remoting_webapp_js_ui_host_control_files': [
@@ -153,6 +154,7 @@
       'resources/disclosure_arrow_right.webp',
       'resources/host_setup_instructions.webp',
       'resources/icon_cross.webp',
+      'resources/icon_help.webp',
       'resources/icon_host.webp',
       'resources/icon_pencil.webp',
       'resources/icon_warning.webp',

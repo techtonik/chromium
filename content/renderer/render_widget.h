@@ -159,6 +159,9 @@ class CONTENT_EXPORT RenderWidget
   virtual void didHandleGestureEvent(const blink::WebGestureEvent& event,
                                      bool event_cancelled);
 
+  // Begins the compositor's scheduler to start producing frames.
+  void StartCompositor();
+
   // Called when a plugin is moved.  These events are queued up and sent with
   // the next paint or scroll message to the host.
   void SchedulePluginMove(const WebPluginGeometry& move);
@@ -253,7 +256,7 @@ class CONTENT_EXPORT RenderWidget
   void UpdateTextInputState(ShowIme show_ime, ChangeSource change_source);
 #endif
 
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
   // Checks if the composition range or composition character bounds have been
   // changed. If they are changed, the new value will be sent to the browser
   // process.
@@ -275,7 +278,8 @@ class CONTENT_EXPORT RenderWidget
   RenderWidget(blink::WebPopupType popup_type,
                const blink::WebScreenInfo& screen_info,
                bool swapped_out,
-               bool hidden);
+               bool hidden,
+               bool never_visible);
 
   virtual ~RenderWidget();
 
@@ -441,7 +445,7 @@ class CONTENT_EXPORT RenderWidget
   virtual ui::TextInputType WebKitToUiTextInputType(
       blink::WebTextInputType type);
 
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
   // Override point to obtain that the current composition character bounds.
   // In the case of surrogate pairs, the character is treated as two characters:
   // the bounds for first character is actual one, and the bounds for second
@@ -616,6 +620,9 @@ class CONTENT_EXPORT RenderWidget
 
   // Indicates that we shouldn't bother generated paint events.
   bool is_hidden_;
+
+  // Indicates that we are never visible, so never produce graphical output.
+  bool never_visible_;
 
   // Indicates that we are in fullscreen mode.
   bool is_fullscreen_;

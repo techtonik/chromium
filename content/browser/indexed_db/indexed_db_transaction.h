@@ -87,6 +87,10 @@ class CONTENT_EXPORT IndexedDBTransaction
  private:
   FRIEND_TEST_ALL_PREFIXES(IndexedDBTransactionTestMode, AbortPreemptive);
   FRIEND_TEST_ALL_PREFIXES(IndexedDBTransactionTest, Timeout);
+  FRIEND_TEST_ALL_PREFIXES(IndexedDBTransactionTest,
+                           SchedulePreemptiveTask);
+  FRIEND_TEST_ALL_PREFIXES(IndexedDBTransactionTestMode,
+                           ScheduleNormalTask);
 
   friend class base::RefCounted<IndexedDBTransaction>;
   virtual ~IndexedDBTransaction();

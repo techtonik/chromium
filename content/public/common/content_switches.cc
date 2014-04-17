@@ -83,9 +83,6 @@ const char kDisable3DAPIs[]                 = "disable-3d-apis";
 // Disable gpu-accelerated 2d canvas.
 const char kDisableAccelerated2dCanvas[]    = "disable-accelerated-2d-canvas";
 
-// Disables accelerated compositing.
-const char kDisableAcceleratedCompositing[] = "disable-accelerated-compositing";
-
 // Disables accelerated compositing for backgrounds of root layers with
 // background-attachment: fixed.
 const char kDisableAcceleratedFixedRootBackground[] =
@@ -169,10 +166,6 @@ const char kDisableFlash3d[]                = "disable-flash-3d";
 // Disable Stage3D inside of flapper.
 const char kDisableFlashStage3d[]           = "disable-flash-stage3d";
 
-// This flag disables force compositing mode and prevents it from being enabled
-// via field trials.
-const char kDisableForceCompositingMode[]   = "disable-force-compositing-mode";
-
 // Disable deferral of scroll-ending gesture events when a scroll is active.
 const char kDisableGestureDebounce[]        = "disable-gesture-debounce";
 
@@ -250,6 +243,9 @@ const char kDisableLogging[]                = "disable-logging";
 // Overrides the kEnableMapImage flag.
 const char kDisableMapImage[]               = "disable-map-image";
 
+// Disables Media Source API (i.e., the MediaSource object).
+const char kDisableMediaSource[]            = "disable-media-source";
+
 // Disable Pepper3D.
 const char kDisablePepper3d[]               = "disable-pepper-3d";
 
@@ -312,12 +308,6 @@ const char kDisableThreadedHTMLParser[]     = "disable-threaded-html-parser";
 const char kDisableUniversalAcceleratedOverflowScroll[] =
     "disable-universal-accelerated-overflow-scroll";
 
-// Disables unprefixed Media Source API (i.e., the MediaSource object).
-const char kDisableUnprefixedMediaSource[]  = "disable-unprefixed-media-source";
-
-// Disables prefixed Media Source API (i.e., the WebKitMediaSource object).
-const char kDisableWebKitMediaSource[]      = "disable-webkit-media-source";
-
 // Don't enforce the same-origin policy. (Used by people testing their sites.)
 const char kDisableWebSecurity[]            = "disable-web-security";
 
@@ -366,7 +356,7 @@ const char kEnableContainerCulling[]        = "enable-container-culling";
 // Turns on extremely verbose logging of accessibility events.
 const char kEnableAccessibilityLogging[]    = "enable-accessibility-logging";
 
-// Use a BeginImplFrame signal from browser to renderer to schedule rendering.
+// Use a BeginFrame signal from browser to renderer to schedule rendering.
 const char kEnableBeginFrameScheduling[]    = "enable-begin-frame-scheduling";
 
 // Enables browser plugin for all types of pages.
@@ -475,6 +465,12 @@ const char kEnableMapImage[]                = "enable-map-image";
 // Enables the memory benchmarking extension
 const char kEnableMemoryBenchmarking[]      = "enable-memory-benchmarking";
 
+// Make the values returned to window.performance.memory more granular and more
+// up to date in shared worker. Without this flag, the memory information is
+// still available, but it is bucketized and updated less frequently.
+const char kEnableSharedWorkerMemoryInfo[] =
+    "enable-shared-worker-memory-info";
+
 // On Windows, converts the page to the currently-installed monitor profile.
 // This does NOT enable color management for images. The source is still
 // assumed to be sRGB.
@@ -531,9 +527,6 @@ const char kEnableSkiaBenchmarking[]        = "enable-skia-benchmarking";
 // On platforms that support it, enables smooth scroll animation.
 const char kEnableSmoothScrolling[]         = "enable-smooth-scrolling";
 
-// Allow the compositor to use its software implementation if GL fails.
-const char kEnableSoftwareCompositing[]     = "enable-software-compositing";
-
 // Enable spatial navigation
 const char kEnableSpatialNavigation[]       = "enable-spatial-navigation";
 
@@ -558,6 +551,9 @@ const char kEnableStrictSiteIsolation[]     = "enable-strict-site-isolation";
 // Enable support for ServiceWorker. See
 // https://github.com/slightlyoff/ServiceWorker for more information.
 const char kEnableServiceWorker[]           = "enable-service-worker";
+
+// Enable support for sync events in ServiceWorkers.
+const char kEnableServiceWorkerSync[]       = "enable-service-worker-sync";
 
 // Enable use of experimental TCP sockets API for sending data in the
 // SYN packet.

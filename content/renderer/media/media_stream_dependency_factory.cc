@@ -205,7 +205,8 @@ bool MediaStreamDependencyFactory::InitializeMediaStreamAudioSource(
                                  &device_info.device.input.effects);
 
   scoped_refptr<WebRtcAudioCapturer> capturer(
-      CreateAudioCapturer(render_view_id, device_info, audio_constraints));
+      CreateAudioCapturer(render_view_id, device_info, audio_constraints,
+                          source_data));
   if (!capturer.get()) {
     DLOG(WARNING) << "Failed to create the capturer for device "
         << device_info.device.id;
@@ -666,7 +667,8 @@ scoped_refptr<WebRtcAudioCapturer>
 MediaStreamDependencyFactory::CreateAudioCapturer(
     int render_view_id,
     const StreamDeviceInfo& device_info,
-    const blink::WebMediaConstraints& constraints) {
+    const blink::WebMediaConstraints& constraints,
+    MediaStreamAudioSource* audio_source) {
   // TODO(xians): Handle the cases when gUM is called without a proper render
   // view, for example, by an extension.
   DCHECK_GE(render_view_id, 0);
@@ -675,27 +677,24 @@ MediaStreamDependencyFactory::CreateAudioCapturer(
   DCHECK(GetWebRtcAudioDevice());
   return WebRtcAudioCapturer::CreateCapturer(render_view_id, device_info,
                                              constraints,
-                                             GetWebRtcAudioDevice());
+                                             GetWebRtcAudioDevice(),
+                                             audio_source);
 }
 
-void MediaStreamDependencyFactory::AddNativeTrackToBlinkTrack(
+void MediaStreamDependencyFactory::AddNativeAudioTrackToBlinkTrack(
     webrtc::MediaStreamTrackInterface* native_track,
     const blink::WebMediaStreamTrack& webkit_track,
     bool is_local_track) {
   DCHECK(!webkit_track.isNull() && !webkit_track.extraData());
+  DCHECK_EQ(blink::WebMediaStreamSource::TypeAudio,
+            webkit_track.source().type());
   blink::WebMediaStreamTrack track = webkit_track;
 
-  if (track.source().type() == blink::WebMediaStreamSource::TypeVideo) {
-    DVLOG(1) << "AddNativeTrackToBlinkTrack() video";
-    track.setExtraData(new WebRtcMediaStreamVideoTrack(
-        static_cast<webrtc::VideoTrackInterface*>(native_track)));
-  } else {
-    DVLOG(1) << "AddNativeTrackToBlinkTrack() audio";
-    track.setExtraData(
-        new MediaStreamTrack(
-            static_cast<webrtc::AudioTrackInterface*>(native_track),
-            is_local_track));
-  }
+  DVLOG(1) << "AddNativeTrackToBlinkTrack() audio";
+  track.setExtraData(
+      new MediaStreamTrack(
+          static_cast<webrtc::AudioTrackInterface*>(native_track),
+          is_local_track));
 }
 
 bool MediaStreamDependencyFactory::OnControlMessageReceived(

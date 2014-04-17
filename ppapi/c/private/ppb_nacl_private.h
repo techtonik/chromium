@@ -3,7 +3,7 @@
  * found in the LICENSE file.
  */
 
-/* From private/ppb_nacl_private.idl modified Wed Apr  9 10:26:49 2014. */
+/* From private/ppb_nacl_private.idl modified Tue Apr 15 14:43:25 2014. */
 
 #ifndef PPAPI_C_PRIVATE_PPB_NACL_PRIVATE_H_
 #define PPAPI_C_PRIVATE_PPB_NACL_PRIVATE_H_
@@ -152,6 +152,19 @@ typedef enum {
  */
 
 /**
+ * @addtogroup Structs
+ * @{
+ */
+struct PP_PNaClOptions {
+  PP_Bool translate;
+  PP_Bool is_debug;
+  int32_t opt_level;
+};
+/**
+ * @}
+ */
+
+/**
  * @addtogroup Interfaces
  * @{
  */
@@ -228,25 +241,20 @@ struct PPB_NaCl_Private_1_0 {
   /* Create a temporary file, which will be deleted by the time the
    * last handle is closed (or earlier on POSIX systems), to use for
    * the nexe with the cache information given by |pexe_url|,
-   * |abi_version|, |opt_level|, |last_modified|, |etag|, and
-   * |has_no_store_header|. If the nexe is already present in the
-   * cache, |is_hit| is set to PP_TRUE and the contents of the nexe
-   * will be copied into the temporary file. Otherwise |is_hit| is set
-   * to PP_FALSE and the temporary file will be writeable.  Currently
-   * the implementation is a stub, which always sets is_hit to false
-   * and calls the implementation of CreateTemporaryFile. In a
-   * subsequent CL it will call into the browser which will remember
-   * the association between the cache key and the fd, and copy the
-   * nexe into the cache after the translation finishes.
+   * |abi_version|, |opt_level|, and |headers|.  If the nexe is already present
+   * in the cache, |is_hit| is set to PP_TRUE and the contents of the nexe will
+   * be copied into the temporary file. Otherwise |is_hit| is set to PP_FALSE
+   * and the temporary file will be writeable.  Currently the implementation is
+   * a stub, which always sets is_hit to false and calls the implementation of
+   * CreateTemporaryFile. In a subsequent CL it will call into the browser
+   * which will remember the association between the cache key and the fd, and
+   * copy the nexe into the cache after the translation finishes.
    */
   int32_t (*GetNexeFd)(PP_Instance instance,
                        const char* pexe_url,
                        uint32_t abi_version,
                        uint32_t opt_level,
-                       const char* last_modified,
-                       const char* etag,
-                       PP_Bool has_no_store_header,
-                       const char* sandbox_isa,
+                       const char* headers,
                        const char* extra_flags,
                        PP_Bool* is_hit,
                        PP_FileHandle* nexe_handle,
@@ -288,9 +296,11 @@ struct PPB_NaCl_Private_1_0 {
                           int32_t fd,
                           int32_t http_status,
                           int64_t nexe_bytes_read,
-                          const char* url);
+                          const char* url,
+                          int64_t time_since_open);
   /* Report that the nexe loaded successfully. */
   void (*ReportLoadSuccess)(PP_Instance instance,
+                            PP_Bool is_pnacl,
                             const char* url,
                             uint64_t loaded_bytes,
                             uint64_t total_bytes);
@@ -328,8 +338,6 @@ struct PPB_NaCl_Private_1_0 {
   PP_Bool (*GetIsInstalled)(PP_Instance instance);
   /* Sets whether the plugin is an installed app. */
   void (*SetIsInstalled)(PP_Instance instance, PP_Bool is_installed);
-  /* Sets the time the nexe became ready. */
-  void (*SetReadyTime)(PP_Instance instance);
   /* Returns the exit status of the plugin process. */
   int32_t (*GetExitStatus)(PP_Instance instance);
   /* Sets the exit status of the plugin process. */

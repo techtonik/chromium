@@ -79,10 +79,6 @@ class TestRenderWidgetHostView : public RenderWidgetHostViewBase {
   virtual bool IsSpeaking() const OVERRIDE;
   virtual void StopSpeaking() OVERRIDE;
 #endif  // defined(OS_MACOSX)
-#if defined(TOOLKIT_GTK)
-  virtual GdkEventButton* GetLastMouseDown() OVERRIDE;
-  virtual gfx::NativeView BuildInputMethodsGtkMenu() OVERRIDE;
-#endif  // defined(TOOLKIT_GTK)
   virtual void OnSwapCompositorFrame(
       uint32 output_surface_id,
       scoped_ptr<cc::CompositorFrame> frame) OVERRIDE;
@@ -105,7 +101,7 @@ class TestRenderWidgetHostView : public RenderWidgetHostViewBase {
                                     ui::TextInputMode input_mode,
                                     bool can_compose_inline) OVERRIDE {}
   virtual void ImeCancelComposition() OVERRIDE {}
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
   virtual void ImeCompositionRangeChanged(
       const gfx::Range& range,
       const std::vector<gfx::Rect>& character_bounds) OVERRIDE {}
@@ -126,7 +122,6 @@ class TestRenderWidgetHostView : public RenderWidgetHostViewBase {
   virtual void SelectionRootBoundsChanged(const gfx::Rect&) OVERRIDE {}
 #endif
   virtual void ScrollOffsetChanged() OVERRIDE {}
-  virtual BackingStore* AllocBackingStore(const gfx::Size& size) OVERRIDE;
   virtual void CopyFromCompositingSurface(
       const gfx::Rect& src_subrect,
       const gfx::Size& dst_size,
@@ -320,7 +315,8 @@ class TestRenderViewHost
 
   virtual bool CreateRenderView(const base::string16& frame_name,
                                 int opener_route_id,
-                                int32 max_page_id) OVERRIDE;
+                                int32 max_page_id,
+                                bool window_was_created_with_opener) OVERRIDE;
   virtual bool IsRenderViewLive() const OVERRIDE;
   virtual bool IsFullscreen() const OVERRIDE;
 

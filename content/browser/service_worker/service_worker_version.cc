@@ -4,6 +4,7 @@
 
 #include "content/browser/service_worker/service_worker_version.h"
 
+#include "base/command_line.h"
 #include "base/stl_util.h"
 #include "content/browser/service_worker/embedded_worker_instance.h"
 #include "content/browser/service_worker/embedded_worker_registry.h"
@@ -11,6 +12,7 @@
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/common/service_worker/service_worker_messages.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/common/content_switches.h"
 
 namespace content {
 
@@ -169,12 +171,13 @@ ServiceWorkerVersion::ServiceWorkerVersion(
     : version_id_(version_id),
       registration_id_(kInvalidServiceWorkerVersionId),
       status_(NEW),
-      weak_factory_(this),
-      context_(context) {
+      context_(context),
+      weak_factory_(this) {
   DCHECK(context_);
   if (registration) {
     registration_id_ = registration->id();
     script_url_ = registration->script_url();
+    scope_ = registration->pattern();
   }
   context_->AddLiveVersion(this);
   embedded_worker_ = context_->embedded_worker_registry()->CreateWorker();
@@ -191,6 +194,9 @@ ServiceWorkerVersion::~ServiceWorkerVersion() {
 }
 
 void ServiceWorkerVersion::SetStatus(Status status) {
+  if (status_ == status)
+    return;
+
   status_ = status;
 
   std::vector<base::Closure> callbacks;
@@ -199,6 +205,8 @@ void ServiceWorkerVersion::SetStatus(Status status) {
        i != callbacks.end(); ++i) {
     (*i).Run();
   }
+
+  FOR_EACH_OBSERVER(Listener, listeners_, OnVersionStateChanged(this));
 }
 
 void ServiceWorkerVersion::RegisterStatusChangeCallback(
@@ -210,6 +218,7 @@ ServiceWorkerVersionInfo ServiceWorkerVersion::GetInfo() {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
   return ServiceWorkerVersionInfo(running_status(),
                                   status(),
+                                  version_id(),
                                   embedded_worker()->process_id(),
                                   embedded_worker()->thread_id());
 }
@@ -226,8 +235,7 @@ void ServiceWorkerVersion::StartWorker(const StatusCallback& callback) {
   }
   if (start_callbacks_.empty()) {
     ServiceWorkerStatusCode status = embedded_worker_->Start(
-        version_id_,
-        script_url_);
+        version_id_, scope_, script_url_);
     if (status != SERVICE_WORKER_OK) {
       RunSoon(base::Bind(callback, status));
       return;
@@ -342,6 +350,13 @@ void ServiceWorkerVersion::DispatchFetchEvent(
 
 void ServiceWorkerVersion::DispatchSyncEvent(const StatusCallback& callback) {
   DCHECK_EQ(ACTIVE, status()) << status();
+
+  if (!CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableServiceWorkerSync)) {
+    callback.Run(SERVICE_WORKER_ERROR_ABORT);
+    return;
+  }
+
   SendMessageAndRegisterCallback(
       ServiceWorkerMsg_SyncEvent(),
       base::Bind(&HandleSyncEventFinished, callback));
@@ -353,6 +368,10 @@ void ServiceWorkerVersion::AddProcessToWorker(int process_id) {
 
 void ServiceWorkerVersion::RemoveProcessFromWorker(int process_id) {
   embedded_worker_->ReleaseProcessReference(process_id);
+}
+
+bool ServiceWorkerVersion::HasProcessToRun() const {
+  return embedded_worker_->HasProcessToRun();
 }
 
 void ServiceWorkerVersion::AddControllee(
@@ -372,10 +391,29 @@ void ServiceWorkerVersion::RemoveControllee(
   // deactivate this version).
 }
 
+void ServiceWorkerVersion::AddPendingControllee(
+    ServiceWorkerProviderHost* provider_host) {
+  AddProcessToWorker(provider_host->process_id());
+}
+
+void ServiceWorkerVersion::RemovePendingControllee(
+    ServiceWorkerProviderHost* provider_host) {
+  RemoveProcessFromWorker(provider_host->process_id());
+}
+
+void ServiceWorkerVersion::AddListener(Listener* listener) {
+  listeners_.AddObserver(listener);
+}
+
+void ServiceWorkerVersion::RemoveListener(Listener* listener) {
+  listeners_.RemoveObserver(listener);
+}
+
 void ServiceWorkerVersion::OnStarted() {
   DCHECK_EQ(RUNNING, running_status());
   // Fire all start callbacks.
   RunCallbacks(this, &start_callbacks_, SERVICE_WORKER_OK);
+  FOR_EACH_OBSERVER(Listener, listeners_, OnWorkerStarted(this));
 }
 
 void ServiceWorkerVersion::OnStopped() {
@@ -398,6 +436,19 @@ void ServiceWorkerVersion::OnStopped() {
     iter.Advance();
   }
   message_callbacks_.Clear();
+  FOR_EACH_OBSERVER(Listener, listeners_, OnWorkerStopped(this));
+}
+
+void ServiceWorkerVersion::OnReportException(
+    const base::string16& error_message,
+    int line_number,
+    int column_number,
+    const GURL& source_url) {
+  FOR_EACH_OBSERVER(
+      Listener,
+      listeners_,
+      OnErrorReported(
+          this, error_message, line_number, column_number, source_url));
 }
 
 void ServiceWorkerVersion::OnMessageReceived(

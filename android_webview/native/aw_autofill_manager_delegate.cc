@@ -195,12 +195,12 @@ void AwAutofillManagerDelegate::ConfirmSaveCreditCard(
 void AwAutofillManagerDelegate::ShowRequestAutocompleteDialog(
     const autofill::FormData& form,
     const GURL& source_url,
-    const base::Callback<void(const autofill::FormStructure*)>& callback) {
+    const ResultCallback& callback) {
   NOTIMPLEMENTED();
 }
 
 bool RegisterAwAutofillManagerDelegate(JNIEnv* env) {
-  return RegisterNativesImpl(env) >= 0;
+  return RegisterNativesImpl(env);
 }
 
 } // namespace android_webview

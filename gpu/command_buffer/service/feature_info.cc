@@ -95,6 +95,13 @@ void StringToWorkarounds(
     workarounds->max_cube_map_texture_size = 1024;
   if (workarounds->max_cube_map_texture_size_limit_512)
     workarounds->max_cube_map_texture_size = 512;
+
+  if (workarounds->max_fragment_uniform_vectors_32)
+    workarounds->max_fragment_uniform_vectors = 32;
+  if (workarounds->max_varying_vectors_16)
+    workarounds->max_varying_vectors = 16;
+  if (workarounds->max_vertex_uniform_vectors_256)
+    workarounds->max_vertex_uniform_vectors = 256;
 }
 
 }  // anonymous namespace.
@@ -127,6 +134,7 @@ FeatureInfo::FeatureFlags::FeatureFlags()
       enable_samplers(false),
       ext_draw_buffers(false),
       ext_frag_depth(false),
+      ext_shader_texture_lod(false),
       use_async_readpixels(false),
       map_buffer_range(false),
       ext_discard_framebuffer(false),
@@ -142,7 +150,10 @@ FeatureInfo::Workarounds::Workarounds() :
     GPU_DRIVER_BUG_WORKAROUNDS(GPU_OP)
 #undef GPU_OP
     max_texture_size(0),
-    max_cube_map_texture_size(0) {
+    max_cube_map_texture_size(0),
+    max_fragment_uniform_vectors(0),
+    max_varying_vectors(0),
+    max_vertex_uniform_vectors(0) {
 }
 
 FeatureInfo::FeatureInfo() {
@@ -710,7 +721,8 @@ void FeatureInfo::InitializeFeatures() {
   if (!workarounds_.disable_angle_instanced_arrays &&
       (extensions.Contains("GL_ANGLE_instanced_arrays") ||
        (extensions.Contains("GL_ARB_instanced_arrays") &&
-        extensions.Contains("GL_ARB_draw_instanced")))) {
+        extensions.Contains("GL_ARB_draw_instanced")) ||
+       is_es3)) {
     AddExtensionString("GL_ANGLE_instanced_arrays");
     feature_flags_.angle_instanced_arrays = true;
     validators_.vertex_attribute.AddValue(GL_VERTEX_ATTRIB_ARRAY_DIVISOR_ANGLE);
@@ -744,6 +756,12 @@ void FeatureInfo::InitializeFeatures() {
   if (extensions.Contains("GL_EXT_frag_depth") || gfx::HasDesktopGLFeatures()) {
     AddExtensionString("GL_EXT_frag_depth");
     feature_flags_.ext_frag_depth = true;
+  }
+
+  if (extensions.Contains("GL_EXT_shader_texture_lod") ||
+      gfx::HasDesktopGLFeatures()) {
+    AddExtensionString("GL_EXT_shader_texture_lod");
+    feature_flags_.ext_shader_texture_lod = true;
   }
 
   bool ui_gl_fence_works = extensions.Contains("GL_NV_fence") ||

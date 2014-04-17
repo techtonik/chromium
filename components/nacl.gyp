@@ -162,6 +162,14 @@
             '../third_party/WebKit/public/blink.gyp:blink',
             '../webkit/common/webkit_common.gyp:webkit_common',
           ],
+          'conditions': [
+            ['OS=="linux"', {
+              'dependencies': [
+                # Required by nacl_fork_delegate_linux.cc.
+                '../sandbox/sandbox.gyp:suid_sandbox_client',
+              ]
+            }],
+          ],
           'defines': [
             '<@(nacl_defines)',
           ],
@@ -184,11 +192,18 @@
               'dependencies': [
                 'nacl',
                 'nacl_common',
+                'nacl_switches',
                 '../components/tracing.gyp:tracing',
                 '../crypto/crypto.gyp:crypto',
                 '../sandbox/sandbox.gyp:libc_urandom_override',
                 '../sandbox/sandbox.gyp:sandbox',
                 '../ppapi/ppapi_internal.gyp:ppapi_proxy',
+              ],
+              'ldflags!': [
+                # Do not pick the default ASan options from
+                # base/debug/sanitizer_options.cc to avoid a conflict with those
+                # in nacl/nacl_helper_linux.cc.
+                '-Wl,-u_sanitizer_options_link_helper',
               ],
               'defines': [
                 '<@(nacl_defines)',

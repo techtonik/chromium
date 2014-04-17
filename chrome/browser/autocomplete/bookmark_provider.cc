@@ -15,9 +15,9 @@
 #include "chrome/browser/autocomplete/url_prefix.h"
 #include "chrome/browser/bookmarks/bookmark_model.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
-#include "chrome/browser/bookmarks/bookmark_title_match.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/pref_names.h"
+#include "components/bookmarks/core/browser/bookmark_title_match.h"
 #include "net/base/net_util.h"
 
 typedef std::vector<BookmarkTitleMatch> TitleMatches;
@@ -137,7 +137,7 @@ class ScoringFunctor {
         scoring_factor_(0.0) {
   }
 
-  void operator()(const Snippet::MatchPosition& match) {
+  void operator()(const query_parser::Snippet::MatchPosition& match) {
     double term_length = static_cast<double>(match.second - match.first);
     scoring_factor_ += term_length / title_length_ *
         (title_length_ - match.first) / title_length_;
@@ -275,7 +275,7 @@ AutocompleteMatch BookmarkProvider::TitleMatchToACMatch(
 
 // static
 ACMatchClassifications BookmarkProvider::ClassificationsFromMatch(
-    const Snippet::MatchPositions& positions,
+    const query_parser::Snippet::MatchPositions& positions,
     size_t text_length) {
   ACMatchClassifications classifications;
   if (positions.empty()) {
@@ -284,8 +284,10 @@ ACMatchClassifications BookmarkProvider::ClassificationsFromMatch(
     return classifications;
   }
 
-  for (Snippet::MatchPositions::const_iterator i = positions.begin();
-       i != positions.end(); ++i) {
+  for (query_parser::Snippet::MatchPositions::const_iterator i =
+           positions.begin();
+       i != positions.end();
+       ++i) {
     AutocompleteMatch::ACMatchClassifications new_class;
     AutocompleteMatch::ClassifyLocationInString(i->first, i->second - i->first,
         text_length, 0, &new_class);

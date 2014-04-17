@@ -14,9 +14,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/timer/elapsed_timer.h"
 #include "chrome/common/url_constants.h"
-#include "chrome/renderer/chrome_render_process_observer.h"
 #include "chrome/renderer/extensions/dom_activity_logger.h"
-#include "chrome/renderer/extensions/extension_groups.h"
 #include "chrome/renderer/isolated_world_ids.h"
 #include "content/public/renderer/render_thread.h"
 #include "content/public/renderer/render_view.h"
@@ -25,10 +23,12 @@
 #include "extensions/common/extension_set.h"
 #include "extensions/common/manifest_handlers/csp_info.h"
 #include "extensions/common/permissions/permissions_data.h"
+#include "extensions/renderer/extension_groups.h"
+#include "extensions/renderer/extensions_renderer_client.h"
+#include "extensions/renderer/script_context.h"
 #include "grit/renderer_resources.h"
 #include "third_party/WebKit/public/platform/WebURLRequest.h"
 #include "third_party/WebKit/public/platform/WebVector.h"
-#include "third_party/WebKit/public/web/WebDataSource.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebFrame.h"
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
@@ -54,7 +54,8 @@ static const char kUserScriptTail[] = "\n})(window);";
 
 int UserScriptSlave::GetIsolatedWorldIdForExtension(const Extension* extension,
                                                     WebFrame* frame) {
-  static int g_next_isolated_world_id = chrome::ISOLATED_WORLD_ID_EXTENSIONS;
+  static int g_next_isolated_world_id =
+      ExtensionsRendererClient::Get()->GetLowestIsolatedWorldId();
 
   IsolatedWorldMap::iterator iter = isolated_world_ids_.find(extension->id());
   if (iter != isolated_world_ids_.end()) {
@@ -119,7 +120,7 @@ bool UserScriptSlave::UpdateScripts(base::SharedMemoryHandle shared_memory) {
   scripts_.clear();
 
   bool only_inject_incognito =
-      ChromeRenderProcessObserver::is_incognito_process();
+      ExtensionsRendererClient::Get()->IsIncognitoProcess();
 
   // Create the shared memory object (read only).
   shared_memory_.reset(new base::SharedMemory(shared_memory, true));
@@ -179,24 +180,9 @@ bool UserScriptSlave::UpdateScripts(base::SharedMemoryHandle shared_memory) {
   return true;
 }
 
-GURL UserScriptSlave::GetDataSourceURLForFrame(const WebFrame* frame) {
-  // Normally we would use frame->document().url() to determine the document's
-  // URL, but to decide whether to inject a content script, we use the URL from
-  // the data source. This "quirk" helps prevents content scripts from
-  // inadvertently adding DOM elements to the compose iframe in Gmail because
-  // the compose iframe's dataSource URL is about:blank, but the document URL
-  // changes to match the parent document after Gmail document.writes into
-  // it to create the editor.
-  // http://code.google.com/p/chromium/issues/detail?id=86742
-  blink::WebDataSource* data_source = frame->provisionalDataSource() ?
-      frame->provisionalDataSource() : frame->dataSource();
-  CHECK(data_source);
-  return GURL(data_source->request().url());
-}
-
 void UserScriptSlave::InjectScripts(WebFrame* frame,
                                     UserScript::RunLocation location) {
-  GURL data_source_url = GetDataSourceURLForFrame(frame);
+  GURL data_source_url = ScriptContext::GetDataSourceURLForFrame(frame);
   if (data_source_url.is_empty())
     return;
 
@@ -302,7 +288,7 @@ void UserScriptSlave::InjectScripts(WebFrame* frame,
         render_view->GetRoutingID(),
         extensions_executing_scripts,
         render_view->GetPageId(),
-        GetDataSourceURLForFrame(top_frame)));
+        ScriptContext::GetDataSourceURLForFrame(top_frame)));
   }
 
   // Log debug info.

@@ -9,7 +9,6 @@
 #include <algorithm>
 
 #include "base/bind.h"
-#include "base/command_line.h"
 #include "base/files/file_path.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/memory/ref_counted.h"
@@ -36,7 +35,6 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/chrome_paths.h"
-#include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -62,7 +60,42 @@ void InvokeFullHashCallback(
   callback.Run(result, true);
 }
 
-}  // namespace
+class FakeSafeBrowsingService : public SafeBrowsingService {
+ public:
+  explicit FakeSafeBrowsingService(const std::string& url_prefix)
+      : url_prefix_(url_prefix) {}
+
+  virtual SafeBrowsingProtocolConfig GetProtocolConfig() const OVERRIDE {
+    SafeBrowsingProtocolConfig config;
+    config.url_prefix = url_prefix_;
+    // Makes sure the auto update is not triggered. The tests will force the
+    // update when needed.
+    config.disable_auto_update = true;
+    config.client_name = "browser_tests";
+    return config;
+  }
+
+ private:
+  virtual ~FakeSafeBrowsingService() {}
+
+  std::string url_prefix_;
+
+  DISALLOW_COPY_AND_ASSIGN(FakeSafeBrowsingService);
+};
+
+// Factory that creates FakeSafeBrowsingService instances.
+class TestSafeBrowsingServiceFactory : public SafeBrowsingServiceFactory {
+ public:
+  explicit TestSafeBrowsingServiceFactory(const std::string& url_prefix)
+      : url_prefix_(url_prefix) {}
+
+  virtual SafeBrowsingService* CreateSafeBrowsingService() OVERRIDE {
+    return new FakeSafeBrowsingService(url_prefix_);
+  }
+
+ private:
+  std::string url_prefix_;
+};
 
 // A SafeBrowingDatabase class that allows us to inject the malicious URLs.
 class TestSafeBrowsingDatabase :  public SafeBrowsingDatabase {
@@ -89,16 +122,16 @@ class TestSafeBrowsingDatabase :  public SafeBrowsingDatabase {
                                  std::vector<SBFullHashResult>* full_hits,
                                  base::Time last_update) OVERRIDE {
     std::vector<GURL> urls(1, url);
-    return ContainsUrl(safe_browsing_util::kMalwareList,
-                       safe_browsing_util::kPhishingList,
+    return ContainsUrl(safe_browsing_util::MALWARE,
+                       safe_browsing_util::PHISH,
                        urls, prefix_hits, full_hits);
   }
   virtual bool ContainsDownloadUrl(
       const std::vector<GURL>& urls,
       std::vector<SBPrefix>* prefix_hits) OVERRIDE {
     std::vector<SBFullHashResult> full_hits;
-    bool found = ContainsUrl(safe_browsing_util::kBinUrlList,
-                             safe_browsing_util::kBinUrlList,
+    bool found = ContainsUrl(safe_browsing_util::BINURL,
+                             safe_browsing_util::BINURL,
                              urls, prefix_hits, &full_hits);
     if (!found)
       return false;
@@ -151,10 +184,10 @@ class TestSafeBrowsingDatabase :  public SafeBrowsingDatabase {
 
   // Fill up the database with test URL.
   void AddUrl(const GURL& url,
-              const std::string& list_name,
+              int list_id,
               const std::vector<SBPrefix>& prefix_hits,
               const std::vector<SBFullHashResult>& full_hits) {
-    badurls_[url.spec()].list_name = list_name;
+    badurls_[url.spec()].list_id = list_id;
     badurls_[url.spec()].prefix_hits = prefix_hits;
     badurls_[url.spec()].full_hits = full_hits;
   }
@@ -166,13 +199,13 @@ class TestSafeBrowsingDatabase :  public SafeBrowsingDatabase {
 
  private:
   struct Hits {
-    std::string list_name;
+    int list_id;
     std::vector<SBPrefix> prefix_hits;
     std::vector<SBFullHashResult> full_hits;
   };
 
-  bool ContainsUrl(const std::string& list_name0,
-                   const std::string& list_name1,
+  bool ContainsUrl(int list_id0,
+                   int list_id1,
                    const std::vector<GURL>& urls,
                    std::vector<SBPrefix>* prefix_hits,
                    std::vector<SBFullHashResult>* full_hits) {
@@ -185,8 +218,8 @@ class TestSafeBrowsingDatabase :  public SafeBrowsingDatabase {
       if (badurls_it == badurls_.end())
         continue;
 
-      if (badurls_it->second.list_name == list_name0 ||
-          badurls_it->second.list_name == list_name1) {
+      if (badurls_it->second.list_id == list_id0 ||
+          badurls_it->second.list_id == list_id1) {
         prefix_hits->insert(prefix_hits->end(),
                             badurls_it->second.prefix_hits.begin(),
                             badurls_it->second.prefix_hits.end());
@@ -326,6 +359,8 @@ MATCHER_P(IsUnsafeResourceFor, url, "") {
           arg.threat_type != SB_THREAT_TYPE_SAFE);
 }
 
+}  // namespace
+
 // Tests the safe browsing blocking page in a browser.
 class SafeBrowsingServiceTest : public InProcessBrowserTest {
  public:
@@ -333,29 +368,21 @@ class SafeBrowsingServiceTest : public InProcessBrowserTest {
   }
 
   static void GenUrlFullhashResult(const GURL& url,
-                                   const std::string& list_name,
-                                   int add_chunk_id,
+                                   int list_id,
                                    SBFullHashResult* full_hash) {
     std::string host;
     std::string path;
     safe_browsing_util::CanonicalizeUrl(url, &host, &path, NULL);
     full_hash->hash = SBFullHashForString(host + path);
-    full_hash->list_name = list_name;
-    full_hash->add_chunk_id = add_chunk_id;
-  }
-
-  static void GenDigestFullhashResult(const std::string& full_digest,
-                                      const std::string& list_name,
-                                      int add_chunk_id,
-                                      SBFullHashResult* full_hash) {
-    full_hash->hash = safe_browsing_util::StringToSBFullHash(full_digest);
-    full_hash->list_name = list_name;
-    full_hash->add_chunk_id = add_chunk_id;
+    full_hash->list_id = list_id;
   }
 
   virtual void SetUp() {
     // InProcessBrowserTest::SetUp() instantiates SafebrowsingService and
     // RegisterFactory has to be called before SafeBrowsingService is created.
+    sb_factory_.reset(new TestSafeBrowsingServiceFactory(
+        "https://definatelynotarealdomain/safebrowsing"));
+    SafeBrowsingService::RegisterFactory(sb_factory_.get());
     SafeBrowsingDatabase::RegisterFactory(&db_factory_);
     SafeBrowsingProtocolManager::RegisterFactory(&pm_factory_);
     InProcessBrowserTest::SetUp();
@@ -368,13 +395,7 @@ class SafeBrowsingServiceTest : public InProcessBrowserTest {
     // (which destructs SafeBrowsingService).
     SafeBrowsingDatabase::RegisterFactory(NULL);
     SafeBrowsingProtocolManager::RegisterFactory(NULL);
-  }
-
-  virtual void SetUpCommandLine(CommandLine* command_line) {
-    // Makes sure the auto update is not triggered during the test.
-    // This test will fill up the database using testing prefixes
-    // and urls.
-    command_line->AppendSwitch(switches::kSbDisableAutoUpdate);
+    SafeBrowsingService::RegisterFactory(NULL);
   }
 
   virtual void SetUpInProcessBrowserTestFixture() {
@@ -391,7 +412,7 @@ class SafeBrowsingServiceTest : public InProcessBrowserTest {
     // full hash is hit in database's local cache.
     std::vector<SBFullHashResult> empty_full_hits;
     TestSafeBrowsingDatabase* db = db_factory_.GetDb();
-    db->AddUrl(url, full_hash.list_name, prefix_hits, empty_full_hits);
+    db->AddUrl(url, full_hash.list_id, prefix_hits, empty_full_hits);
 
     TestProtocolManager* pm = pm_factory_.GetProtocolManager();
     pm->SetGetFullHashResponse(full_hash);
@@ -469,6 +490,7 @@ class SafeBrowsingServiceTest : public InProcessBrowserTest {
   }
 
  private:
+  scoped_ptr<TestSafeBrowsingServiceFactory> sb_factory_;
   TestSafeBrowsingDatabaseFactory db_factory_;
   TestSBProtocolManagerFactory pm_factory_;
 
@@ -490,9 +512,7 @@ IN_PROC_BROWSER_TEST_F(SafeBrowsingServiceTest, Malware) {
   // After adding the url to safebrowsing database and getfullhash result,
   // we should see the interstitial page.
   SBFullHashResult malware_full_hash;
-  int chunk_id = 0;
-  GenUrlFullhashResult(url, safe_browsing_util::kMalwareList, chunk_id,
-                       &malware_full_hash);
+  GenUrlFullhashResult(url, safe_browsing_util::MALWARE, &malware_full_hash);
   EXPECT_CALL(observer_,
               OnSafeBrowsingMatch(IsUnsafeResourceFor(url))).Times(1);
   EXPECT_CALL(observer_, OnSafeBrowsingHit(IsUnsafeResourceFor(url))).Times(1);
@@ -511,9 +531,7 @@ IN_PROC_BROWSER_TEST_F(SafeBrowsingServiceTest, DISABLED_MalwareWithWhitelist) {
   // After adding the url to safebrowsing database and getfullhash result,
   // we should see the interstitial page.
   SBFullHashResult malware_full_hash;
-  int chunk_id = 0;
-  GenUrlFullhashResult(url, safe_browsing_util::kMalwareList, chunk_id,
-                       &malware_full_hash);
+  GenUrlFullhashResult(url, safe_browsing_util::MALWARE, &malware_full_hash);
   EXPECT_CALL(observer_,
               OnSafeBrowsingMatch(IsUnsafeResourceFor(url))).Times(1);
   EXPECT_CALL(observer_, OnSafeBrowsingHit(IsUnsafeResourceFor(url))).Times(1)
@@ -572,9 +590,8 @@ IN_PROC_BROWSER_TEST_F(SafeBrowsingServiceTest, Prefetch) {
   // getfullhash result, we should not see the interstitial page since the
   // only malware was a prefetch target.
   SBFullHashResult malware_full_hash;
-  int chunk_id = 0;
-  GenUrlFullhashResult(malware_url, safe_browsing_util::kMalwareList,
-                       chunk_id, &malware_full_hash);
+  GenUrlFullhashResult(malware_url, safe_browsing_util::MALWARE,
+                       &malware_full_hash);
   SetupResponseForUrl(malware_url, malware_full_hash);
   ui_test_utils::NavigateToURL(browser(), url);
   EXPECT_FALSE(ShowingInterstitialPage());
@@ -658,9 +675,8 @@ IN_PROC_BROWSER_TEST_F(SafeBrowsingServiceTest, CheckDownloadUrl) {
   EXPECT_EQ(SB_THREAT_TYPE_SAFE, client->GetThreatType());
 
   SBFullHashResult full_hash_result;
-  int chunk_id = 0;
-  GenUrlFullhashResult(badbin_url, safe_browsing_util::kBinUrlList,
-                       chunk_id, &full_hash_result);
+  GenUrlFullhashResult(badbin_url, safe_browsing_util::BINURL,
+                       &full_hash_result);
   SetupResponseForUrl(badbin_url, full_hash_result);
 
   client->CheckDownloadUrl(badbin_urls);
@@ -685,9 +701,8 @@ IN_PROC_BROWSER_TEST_F(SafeBrowsingServiceTest, CheckDownloadUrlRedirects) {
   EXPECT_EQ(SB_THREAT_TYPE_SAFE, client->GetThreatType());
 
   SBFullHashResult full_hash_result;
-  int chunk_id = 0;
-  GenUrlFullhashResult(badbin_url, safe_browsing_util::kBinUrlList,
-                       chunk_id, &full_hash_result);
+  GenUrlFullhashResult(badbin_url, safe_browsing_util::BINURL,
+                       &full_hash_result);
   SetupResponseForUrl(badbin_url, full_hash_result);
 
   client->CheckDownloadUrl(badbin_urls);
@@ -702,9 +717,8 @@ IN_PROC_BROWSER_TEST_F(SafeBrowsingServiceTest, CheckDownloadUrlTimedOut) {
 
   scoped_refptr<TestSBClient> client(new TestSBClient);
   SBFullHashResult full_hash_result;
-  int chunk_id = 0;
-  GenUrlFullhashResult(badbin_url, safe_browsing_util::kBinUrlList,
-                       chunk_id, &full_hash_result);
+  GenUrlFullhashResult(badbin_url, safe_browsing_util::BINURL,
+                       &full_hash_result);
   SetupResponseForUrl(badbin_url, full_hash_result);
   client->CheckDownloadUrl(badbin_urls);
 
@@ -863,20 +877,25 @@ class SafeBrowsingDatabaseManagerCookieTest : public InProcessBrowserTest {
  public:
   SafeBrowsingDatabaseManagerCookieTest() {}
 
-  virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
+  virtual void SetUp() OVERRIDE {
     // We need to start the test server to get the host&port in the url.
     ASSERT_TRUE(test_server()->Start());
-
-    // Makes sure the auto update is not triggered. This test will force the
-    // update when needed.
-    command_line->AppendSwitch(switches::kSbDisableAutoUpdate);
 
     // Point to the testing server for all SafeBrowsing requests.
     GURL url_prefix = test_server()->GetURL(
         "expect-and-set-cookie?expect=a%3db"
         "&set=c%3dd%3b%20Expires=Fri,%2001%20Jan%202038%2001:01:01%20GMT"
         "&data=foo#");
-    command_line->AppendSwitchASCII(switches::kSbURLPrefix, url_prefix.spec());
+    sb_factory_.reset(new TestSafeBrowsingServiceFactory(url_prefix.spec()));
+    SafeBrowsingService::RegisterFactory(sb_factory_.get());
+
+    InProcessBrowserTest::SetUp();
+  }
+
+  virtual void TearDown() OVERRIDE {
+    InProcessBrowserTest::TearDown();
+
+    SafeBrowsingService::RegisterFactory(NULL);
   }
 
   virtual bool SetUpUserDataDirectory() OVERRIDE {
@@ -963,6 +982,8 @@ class SafeBrowsingDatabaseManagerCookieTest : public InProcessBrowserTest {
   scoped_refptr<SafeBrowsingService> sb_service_;
 
  private:
+  scoped_ptr<TestSafeBrowsingServiceFactory> sb_factory_;
+
   DISALLOW_COPY_AND_ASSIGN(SafeBrowsingDatabaseManagerCookieTest);
 };
 

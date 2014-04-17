@@ -13,6 +13,7 @@
 #include "base/logging.h"
 #include "base/memory/ref_counted.h"
 #include "base/observer_list.h"
+#include "base/strings/string16.h"
 #include "content/common/content_export.h"
 #include "content/common/service_worker/service_worker_status_code.h"
 
@@ -46,6 +47,10 @@ class CONTENT_EXPORT EmbeddedWorkerInstance {
     virtual void OnStopped() = 0;
     virtual void OnMessageReceived(int request_id,
                                    const IPC::Message& message) = 0;
+    virtual void OnReportException(const base::string16& error_message,
+                                   int line_number,
+                                   int column_number,
+                                   const GURL& source_url) = 0;
   };
 
   ~EmbeddedWorkerInstance();
@@ -53,6 +58,7 @@ class CONTENT_EXPORT EmbeddedWorkerInstance {
   // Starts the worker. It is invalid to call this when the worker is
   // not in STOPPED status.
   ServiceWorkerStatusCode Start(int64 service_worker_version_id,
+                                const GURL& scope,
                                 const GURL& script_url);
 
   // Stops the worker. It is invalid to call this when the worker is
@@ -73,6 +79,7 @@ class CONTENT_EXPORT EmbeddedWorkerInstance {
   // worker can be started.
   void AddProcessReference(int process_id);
   void ReleaseProcessReference(int process_id);
+  bool HasProcessToRun() const { return !process_refs_.empty(); }
 
   int embedded_worker_id() const { return embedded_worker_id_; }
   Status status() const { return status_; }
@@ -108,6 +115,12 @@ class CONTENT_EXPORT EmbeddedWorkerInstance {
   // Called back from Registry when the worker instance sends message
   // to the browser (i.e. EmbeddedWorker observers).
   void OnMessageReceived(int request_id, const IPC::Message& message);
+
+  // Called back from Registry when the worker instance reports the exception.
+  void OnReportException(const base::string16& error_message,
+                         int line_number,
+                         int column_number,
+                         const GURL& source_url);
 
   // Chooses a process to start this worker and populate process_id_.
   // Returns false when no process is available.

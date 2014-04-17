@@ -33,11 +33,6 @@
 #include "base/message_loop/message_pump_android.h"
 #endif
 
-#if defined(TOOLKIT_GTK)
-#include <gdk/gdk.h>
-#include <gdk/gdkx.h>
-#endif
-
 namespace base {
 
 namespace {
@@ -236,10 +231,6 @@ scoped_ptr<MessagePump> MessageLoop::CreateMessagePumpForType(Type type) {
   }
   if (type == MessageLoop::TYPE_IO)
     return MESSAGE_PUMP_IO;
-#if defined(TOOLKIT_GTK)
-  if (type == MessageLoop::TYPE_GPU)
-    return scoped_ptr<MessagePump>(new MessagePumpX11());
-#endif
 #if defined(OS_ANDROID)
   if (type == MessageLoop::TYPE_JAVA)
     return MESSAGE_PUMP_UI;
@@ -669,8 +660,7 @@ void MessageLoopForUI::Attach() {
 }
 #endif
 
-#if !defined(OS_NACL) && (defined(TOOLKIT_GTK) || \
-                          defined(OS_WIN) || defined(USE_X11))
+#if !defined(OS_NACL) && defined(OS_WIN)
 void MessageLoopForUI::AddObserver(Observer* observer) {
   pump_ui()->AddObserver(observer);
 }
@@ -678,7 +668,7 @@ void MessageLoopForUI::AddObserver(Observer* observer) {
 void MessageLoopForUI::RemoveObserver(Observer* observer) {
   pump_ui()->RemoveObserver(observer);
 }
-#endif  //  !defined(OS_MACOSX) && !defined(OS_NACL) && !defined(OS_ANDROID)
+#endif  // !defined(OS_NACL) && defined(OS_WIN)
 
 #if defined(USE_OZONE) && !defined(OS_NACL)
 bool MessageLoopForUI::WatchFileDescriptor(

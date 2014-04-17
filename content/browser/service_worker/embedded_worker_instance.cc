@@ -17,16 +17,18 @@ EmbeddedWorkerInstance::~EmbeddedWorkerInstance() {
 
 ServiceWorkerStatusCode EmbeddedWorkerInstance::Start(
     int64 service_worker_version_id,
+    const GURL& scope,
     const GURL& script_url) {
   DCHECK(status_ == STOPPED);
   if (!ChooseProcess())
     return SERVICE_WORKER_ERROR_PROCESS_NOT_FOUND;
   status_ = STARTING;
-  ServiceWorkerStatusCode status = registry_->StartWorker(
-      process_id_,
-      embedded_worker_id_,
-      service_worker_version_id,
-      script_url);
+  ServiceWorkerStatusCode status =
+      registry_->StartWorker(process_id_,
+                             embedded_worker_id_,
+                             service_worker_version_id,
+                             scope,
+                             script_url);
   if (status != SERVICE_WORKER_OK) {
     status_ = STOPPED;
     process_id_ = -1;
@@ -101,6 +103,17 @@ void EmbeddedWorkerInstance::OnMessageReceived(int request_id,
                                                const IPC::Message& message) {
   FOR_EACH_OBSERVER(Observer, observer_list_,
                     OnMessageReceived(request_id, message));
+}
+
+void EmbeddedWorkerInstance::OnReportException(
+    const base::string16& error_message,
+    int line_number,
+    int column_number,
+    const GURL& source_url) {
+  FOR_EACH_OBSERVER(
+      Observer,
+      observer_list_,
+      OnReportException(error_message, line_number, column_number, source_url));
 }
 
 void EmbeddedWorkerInstance::AddObserver(Observer* observer) {

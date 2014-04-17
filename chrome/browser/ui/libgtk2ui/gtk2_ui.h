@@ -132,10 +132,6 @@ class Gtk2UI : public views::LinuxUI {
                           GdkColor* thumb_inactive_color,
                           GdkColor* track_color);
 
-  // Gets the name of the current icon theme and passes it to our low level XDG
-  // integration.
-  void SetXDGIconTheme();
-
   // Extracts colors and tints from the GTK theme, both for the
   // ThemeService interface and the colors we send to webkit.
   void LoadGtkValues();
@@ -259,9 +255,6 @@ class Gtk2UI : public views::LinuxUI {
 
   // Image cache of lazily created images.
   mutable ImageCache gtk_images_;
-
-  // Whether to use the Gtk2 version of the native theme.
-  bool use_gtk_;
 
   DISALLOW_COPY_AND_ASSIGN(Gtk2UI);
 };

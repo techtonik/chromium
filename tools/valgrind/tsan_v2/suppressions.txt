@@ -65,11 +65,6 @@ race:media::TestInputCallback::OnData
 # http://crbug.com/244368
 race:skia::BeginPlatformPaint
 
-# http://crbug.com/244383
-race:IPC::SyncChannel::SyncChannel
-race:ppapi::proxy::ProxyChannel::InitWithChannel
-race:ppapi::proxy::*Dispatcher::Init*WithChannel
-
 # http://crbug.com/244385
 race:unixTempFileDir
 
@@ -250,3 +245,15 @@ race:sctp_express_handle_sack
 
 # http://crbug.com/350982
 race:libvpx/vp9/decoder/vp9_thread.c
+
+# http://crbug.com/361790
+race:workerGlobalScopeDestroyed
+
+# http://crbug.com/363999
+race:v8::internal::EnterDebugger::*EnterDebugger
+
+# http://crbug.com/364006
+race:gfx::ImageFamily::~ImageFamily
+
+# http://crbug.com/364014
+race:WTF::Latin1Encoding()::globalLatin1Encoding

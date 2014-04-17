@@ -521,7 +521,9 @@ cr.define('print_preview', function() {
       this.isInKioskAutoPrintMode_ = settings.isInKioskAutoPrintMode;
 
       // The following components must be initialized in this order.
-      this.appState_.init(settings.serializedAppStateStr);
+      this.appState_.init(
+          settings.serializedAppStateStr,
+          settings.systemDefaultDestinationId);
       this.documentInfo_.init(
           settings.isDocumentModifiable,
           settings.documentTitle,
@@ -531,7 +533,7 @@ cr.define('print_preview', function() {
           settings.decimalDelimeter,
           settings.unitType,
           settings.selectionOnly);
-      this.destinationStore_.init(settings.systemDefaultDestinationId);
+      this.destinationStore_.init();
       this.appState_.setInitialized();
 
       $('document-title').innerText = settings.documentTitle;
@@ -783,6 +785,7 @@ cr.define('print_preview', function() {
 
       if (e.keyCode == 13 /*enter*/ &&
           !this.destinationSearch_.getIsVisible() &&
+          this.destinationStore_.selectedDestination &&
           this.printTicketStore_.isTicketValid()) {
         assert(this.uiState_ == PrintPreview.UiState_.READY,
             'Trying to print when not in ready state: ' + this.uiState_);
@@ -897,9 +900,10 @@ cr.define('print_preview', function() {
      */
     onDestinationSelect_: function() {
       var selectedDest = this.destinationStore_.selectedDestination;
-      setIsVisible($('cloud-print-dialog-link'),
-                   !cr.isChromeOS && !selectedDest.isLocal);
-      if (this.isInKioskAutoPrintMode_) {
+      setIsVisible(
+          $('cloud-print-dialog-link'),
+          selectedDest && !cr.isChromeOS && !selectedDest.isLocal);
+      if (selectedDest && this.isInKioskAutoPrintMode_) {
         this.onPrintButtonClick_();
       }
     },

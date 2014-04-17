@@ -351,8 +351,6 @@
     'common/message_router.cc',
     'common/message_router.h',
     'common/mime_registry_messages.h',
-    'common/mojo/mojo_channel_init.cc',
-    'common/mojo/mojo_channel_init.h',
     'common/mojo/mojo_messages.h',
     'common/navigation_gesture.h',
     'common/net/url_fetcher.cc',
@@ -452,7 +450,7 @@
     'port/common/input_event_ack_state.h',
   ],
   'target_conditions': [
-    ['OS=="android"', {
+    ['OS=="android" and <(use_seccomp_bpf)==1', {
       'sources/': [
         ['include', '^common/sandbox_linux/sandbox_bpf_base_policy_linux\\.cc$'],
         ['include', '^common/sandbox_linux/sandbox_bpf_base_policy_linux\\.h$'],
@@ -510,7 +508,6 @@
         '../media/media.gyp:media',
         '../media/media.gyp:shared_memory_support',
         '../mojo/mojo.gyp:mojo_environment_chromium',
-        '../mojo/mojo.gyp:mojo_system',
         '../mojo/mojo.gyp:mojo_system_impl',
         '../third_party/WebKit/public/blink.gyp:blink',
         '../ui/gl/gl.gyp:gl',
@@ -742,6 +739,8 @@
     }],
     ['use_seccomp_bpf==0', {
       'sources!': [
+        'common/sandbox_linux/android/sandbox_bpf_base_policy_android.cc',
+        'common/sandbox_linux/android/sandbox_bpf_base_policy_android.h',
         'common/sandbox_linux/bpf_cros_arm_gpu_policy_linux.cc',
         'common/sandbox_linux/bpf_cros_arm_gpu_policy_linux.h',
         'common/sandbox_linux/bpf_gpu_policy_linux.cc',

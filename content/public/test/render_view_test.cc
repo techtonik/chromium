@@ -15,6 +15,7 @@
 #include "content/public/common/renderer_preferences.h"
 #include "content/public/renderer/content_renderer_client.h"
 #include "content/public/renderer/history_item_serialization.h"
+#include "content/renderer/history_controller.h"
 #include "content/renderer/render_thread_impl.h"
 #include "content/renderer/render_view_impl.h"
 #include "content/renderer/renderer_main_platform_delegate.h"
@@ -132,6 +133,11 @@ void RenderViewTest::GoForward(const blink::WebHistoryItem& item) {
   GoToOffset(1, item);
 }
 
+void RenderViewTest::GoBackToPrevious() {
+  RenderViewImpl* impl = static_cast<RenderViewImpl*>(view_);
+  GoBack(impl->history_controller()->GetPreviousItemForExport());
+}
+
 void RenderViewTest::SetUp() {
   content_client_.reset(CreateContentClient());
   content_browser_client_.reset(CreateContentBrowserClient());
@@ -179,6 +185,7 @@ void RenderViewTest::SetUp() {
   // This needs to pass the mock render thread to the view.
   RenderViewImpl* view =
       RenderViewImpl::Create(kOpenerId,
+                             false,  // window_was_created_with_opener
                              RendererPreferences(),
                              WebPreferences(),
                              kRouteId,
@@ -189,6 +196,7 @@ void RenderViewTest::SetUp() {
                              false,  // is_renderer_created
                              false,  // swapped_out
                              false,  // hidden
+                             false,  // never_visible
                              1,      // next_page_id
                              blink::WebScreenInfo(),
                              AccessibilityModeOff);
@@ -360,9 +368,11 @@ bool RenderViewTest::OnMessageReceived(const IPC::Message& msg) {
 void RenderViewTest::DidNavigateWithinPage(blink::WebLocalFrame* frame,
                                            bool is_new_navigation) {
   RenderViewImpl* impl = static_cast<RenderViewImpl*>(view_);
+  blink::WebHistoryItem item;
+  item.initialize();
   impl->main_render_frame()->didNavigateWithinPage(
       frame,
-      blink::WebHistoryItem(),
+      item,
       is_new_navigation ? blink::WebStandardCommit
                         : blink::WebHistoryInertCommit);
 }

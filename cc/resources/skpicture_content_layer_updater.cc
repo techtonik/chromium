@@ -27,11 +27,11 @@ void SkPictureContentLayerUpdater::PrepareToUpdate(
     float contents_width_scale,
     float contents_height_scale,
     gfx::Rect* resulting_opaque_rect) {
+  SkPictureRecorder recorder;
   SkCanvas* canvas =
-      picture_.beginRecording(content_rect.width(), content_rect.height());
-  SkISize size = canvas->getBaseLayerSize();
-  CHECK_EQ(content_rect.width(), size.width());
-  CHECK_EQ(content_rect.height(), size.height());
+      recorder.beginRecording(content_rect.width(), content_rect.height());
+  DCHECK_EQ(content_rect.width(), canvas->getBaseLayerSize().width());
+  DCHECK_EQ(content_rect.height(), canvas->getBaseLayerSize().height());
   base::TimeTicks start_time =
       rendering_stats_instrumentation_->StartRecording();
   PaintContents(canvas,
@@ -43,12 +43,13 @@ void SkPictureContentLayerUpdater::PrepareToUpdate(
       rendering_stats_instrumentation_->EndRecording(start_time);
   rendering_stats_instrumentation_->AddRecord(
       duration, content_rect.width() * content_rect.height());
-  picture_.endRecording();
+  picture_ = skia::AdoptRef(recorder.endRecording());
 }
 
 void SkPictureContentLayerUpdater::DrawPicture(SkCanvas* canvas) {
   TRACE_EVENT0("cc", "SkPictureContentLayerUpdater::DrawPicture");
-  canvas->drawPicture(picture_);
+  if (picture_)
+    canvas->drawPicture(*picture_);
 }
 
 }  // namespace cc

@@ -18,6 +18,7 @@
   "ipc_tests",
   "jingle_unittests",
   "media_unittests",
+  "message_center_unittests",
   "mojo_apps_js_unittests",
   "mojo_common_unittests",
   "mojo_js_unittests",
@@ -35,5 +36,14 @@
   "sync_integration_tests",
   "sync_unit_tests",
   "ui_unittests",
-  "unit_tests"
+  "unit_tests",
+  {
+    "test": "app_shell_browsertests",
+    "chromium_configs": ["chromium_chromeos", "chromium_chromeos_clang"]
+  },
+  {
+    "test": "sandbox_linux_unittests",
+    "platforms": ["linux"],
+    "args": ["--test-launcher-print-test-stdio=always"]
+  }
 ]

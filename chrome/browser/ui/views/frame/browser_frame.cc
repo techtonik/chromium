@@ -166,7 +166,9 @@ int BrowserFrame::GetMinimizeButtonOffset() const {
 }
 
 gfx::Rect BrowserFrame::GetBoundsForTabStrip(views::View* tabstrip) const {
-  return browser_frame_view_->GetBoundsForTabStrip(tabstrip);
+  // This can be invoked before |browser_frame_view_| has been set.
+  return browser_frame_view_ ?
+      browser_frame_view_->GetBoundsForTabStrip(tabstrip) : gfx::Rect();
 }
 
 int BrowserFrame::GetTopInset() const {
@@ -291,11 +293,9 @@ NewAvatarButton* BrowserFrame::GetNewAvatarMenuButton() {
   return browser_frame_view_->new_avatar_button();
 }
 
-#if !defined(OS_WIN) || defined(USE_AURA)
 bool BrowserFrame::ShouldLeaveOffsetNearTopBorder() {
   return !IsMaximized();
 }
-#endif  // OS_WIN
 
 void BrowserFrame::OnUseCustomChromeFrameChanged() {
   // Tell the window manager to add or remove system borders.

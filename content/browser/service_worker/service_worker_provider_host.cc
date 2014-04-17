@@ -26,6 +26,8 @@ ServiceWorkerProviderHost::ServiceWorkerProviderHost(
 ServiceWorkerProviderHost::~ServiceWorkerProviderHost() {
   if (active_version_)
     active_version_->RemoveControllee(this);
+  if (pending_version_)
+    pending_version_->RemovePendingControllee(this);
 }
 
 void ServiceWorkerProviderHost::AddScriptClient(int thread_id) {
@@ -40,6 +42,8 @@ void ServiceWorkerProviderHost::RemoveScriptClient(int thread_id) {
 
 void ServiceWorkerProviderHost::SetActiveVersion(
     ServiceWorkerVersion* version) {
+  if (version == active_version_)
+    return;
   scoped_refptr<ServiceWorkerVersion> previous_version = active_version_;
   active_version_ = version;
   if (version)
@@ -53,22 +57,37 @@ void ServiceWorkerProviderHost::SetActiveVersion(
   for (std::set<int>::iterator it = script_client_thread_ids_.begin();
        it != script_client_thread_ids_.end();
        ++it) {
-    dispatcher_host_->RegisterServiceWorkerHandle(
-        ServiceWorkerHandle::Create(context_, dispatcher_host_,
-                                    *it, version));
+    if (version) {
+      dispatcher_host_->RegisterServiceWorkerHandle(
+          ServiceWorkerHandle::Create(context_, dispatcher_host_,
+                                      *it, version));
+    }
     // TODO(kinuko): dispatch activechange event to the script clients.
   }
 }
 
 void ServiceWorkerProviderHost::SetPendingVersion(
     ServiceWorkerVersion* version) {
+  if (version == pending_version_)
+    return;
+  scoped_refptr<ServiceWorkerVersion> previous_version = pending_version_;
   pending_version_ = version;
+  if (version)
+    version->AddPendingControllee(this);
+  if (previous_version)
+    previous_version->RemovePendingControllee(this);
+
+  if (!dispatcher_host_)
+    return;  // Could be NULL in some tests.
+
   for (std::set<int>::iterator it = script_client_thread_ids_.begin();
        it != script_client_thread_ids_.end();
        ++it) {
-    dispatcher_host_->RegisterServiceWorkerHandle(
-        ServiceWorkerHandle::Create(context_, dispatcher_host_,
-                                    *it, version));
+    if (version) {
+      dispatcher_host_->RegisterServiceWorkerHandle(
+          ServiceWorkerHandle::Create(context_, dispatcher_host_,
+                                      *it, version));
+    }
     // TODO(kinuko): dispatch pendingchange event to the script clients.
   }
 }

@@ -29,7 +29,7 @@
         '../gfx/gfx.gyp:gfx_geometry',
         '../native_theme/native_theme.gyp:native_theme',
         '../resources/ui_resources.gyp:ui_resources',
-        '../wm/wm.gyp:wm_core',
+        '../wm/wm.gyp:wm',
       ],
       'export_dependent_settings': [
         '../accessibility/accessibility.gyp:ax_gen',
@@ -39,6 +39,8 @@
       ],
       'sources': [
         # All .cc, .h under views, except unittests
+        'accessibility/ax_tree_source_views.cc',
+        'accessibility/ax_tree_source_views.h',
         'accessibility/native_view_accessibility.cc',
         'accessibility/native_view_accessibility.h',
         'accessibility/native_view_accessibility_win.cc',
@@ -384,6 +386,7 @@
         'widget/widget_hwnd_utils.cc',
         'widget/widget_hwnd_utils.h',
         'widget/widget_observer.h',
+        'widget/widget_removals_observer.h',
         'widget/window_reorderer.cc',
         'widget/window_reorderer.h',
         'win/appbar.cc',
@@ -433,7 +436,7 @@
         }],
         ['chromeos==0 and use_x11==1', {
           'dependencies': [
-            '../display/display.gyp:display',
+            '../display/display.gyp:display_util',
           ],
         }],
         ['OS=="linux" and chromeos==0', {
@@ -513,7 +516,7 @@
         '../events/events.gyp:events',
         '../gfx/gfx.gyp:gfx',
         '../gfx/gfx.gyp:gfx_geometry',
-        '../wm/wm.gyp:wm_core',
+        '../wm/wm.gyp:wm',
         'views',
       ],
       'include_dirs': [
@@ -577,7 +580,7 @@
         '../resources/ui_resources.gyp:ui_resources',
         '../resources/ui_resources.gyp:ui_test_pak',
         '../ui_unittests.gyp:ui_test_support',
-        '../wm/wm.gyp:wm_core',
+        '../wm/wm.gyp:wm',
         'views',
         'views_test_support',
       ],
@@ -585,6 +588,7 @@
         '..',
       ],
       'sources': [
+        'accessibility/ax_tree_source_views_unittest.cc',
         'accessibility/native_view_accessibility_win_unittest.cc',
         'accessible_pane_view_unittest.cc',
         'animation/bounds_animator_unittest.cc',

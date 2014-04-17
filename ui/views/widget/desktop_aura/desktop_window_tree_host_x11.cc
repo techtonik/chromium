@@ -12,7 +12,6 @@
 
 #include "base/basictypes.h"
 #include "base/debug/trace_event.h"
-#include "base/message_loop/message_pump_x11.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "third_party/skia/include/core/SkPath.h"
@@ -35,6 +34,7 @@
 #include "ui/gfx/insets.h"
 #include "ui/gfx/path.h"
 #include "ui/gfx/path_x11.h"
+#include "ui/gfx/screen.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/corewm/tooltip_aura.h"
 #include "ui/views/ime/input_method.h"
@@ -355,8 +355,10 @@ void DesktopWindowTreeHostX11::SetSize(const gfx::Size& size) {
   bool size_changed = bounds_.size() != size;
   XResizeWindow(xdisplay_, xwindow_, size.width(), size.height());
   bounds_.set_size(size);
-  if (size_changed)
+  if (size_changed) {
     OnHostResized(size);
+    ResetWindowRegion();
+  }
 }
 
 void DesktopWindowTreeHostX11::StackAtTop() {
@@ -613,10 +615,27 @@ NonClientFrameView* DesktopWindowTreeHostX11::CreateNonClientFrameView() {
 }
 
 void DesktopWindowTreeHostX11::SetFullscreen(bool fullscreen) {
+  if (is_fullscreen_ == fullscreen)
+    return;
   is_fullscreen_ = fullscreen;
   SetWMSpecState(fullscreen,
                  atom_cache_.GetAtom("_NET_WM_STATE_FULLSCREEN"),
                  None);
+  // Try to guess the size we will have after the switch to/from fullscreen:
+  // - (may) avoid transient states
+  // - works around Flash content which expects to have the size updated
+  //   synchronously.
+  // See https://crbug.com/361408
+  if (fullscreen) {
+    restored_bounds_ = bounds_;
+    const gfx::Display display =
+        gfx::Screen::GetScreenFor(NULL)->GetDisplayNearestWindow(window());
+    bounds_ = display.bounds();
+  } else {
+    bounds_ = restored_bounds_;
+  }
+  OnHostMoved(bounds_.origin());
+  OnHostResized(bounds_.size());
 }
 
 bool DesktopWindowTreeHostX11::IsFullscreen() const {
@@ -762,10 +781,6 @@ void DesktopWindowTreeHostX11::Hide() {
   native_widget_delegate_->OnNativeWidgetVisibilityChanged(false);
 }
 
-void DesktopWindowTreeHostX11::ToggleFullScreen() {
-  NOTIMPLEMENTED();
-}
-
 gfx::Rect DesktopWindowTreeHostX11::GetBounds() const {
   return bounds_;
 }
@@ -803,17 +818,12 @@ void DesktopWindowTreeHostX11::SetBounds(const gfx::Rect& bounds) {
 
   if (origin_changed)
     native_widget_delegate_->AsWidget()->OnNativeWidgetMove();
-  if (size_changed)
+  if (size_changed) {
     OnHostResized(bounds.size());
-  else
+    ResetWindowRegion();
+  } else {
     compositor()->ScheduleRedrawRect(gfx::Rect(bounds.size()));
-}
-
-gfx::Insets DesktopWindowTreeHostX11::GetInsets() const {
-  return gfx::Insets();
-}
-
-void DesktopWindowTreeHostX11::SetInsets(const gfx::Insets& insets) {
+  }
 }
 
 gfx::Point DesktopWindowTreeHostX11::GetLocationOnNativeScreen() const {
@@ -865,15 +875,6 @@ bool DesktopWindowTreeHostX11::QueryMouseLocation(
       std::max(0, std::min(bounds_.height(), win_y_return)));
   return (win_x_return >= 0 && win_x_return < bounds_.width() &&
           win_y_return >= 0 && win_y_return < bounds_.height());
-}
-
-bool DesktopWindowTreeHostX11::ConfineCursorToRootWindow() {
-  NOTIMPLEMENTED();
-  return false;
-}
-
-void DesktopWindowTreeHostX11::UnConfineCursor() {
-  NOTIMPLEMENTED();
 }
 
 void DesktopWindowTreeHostX11::SetCursorNative(gfx::NativeCursor cursor) {
@@ -1333,8 +1334,6 @@ uint32_t DesktopWindowTreeHostX11::DispatchEvent(
   switch (xev->type) {
     case EnterNotify:
     case LeaveNotify: {
-      if (!g_current_capture)
-        X11DesktopHandler::get()->ProcessXEvent(xev);
       ui::MouseEvent mouse_event(xev);
       DispatchMouseEvent(&mouse_event);
       break;
@@ -1382,6 +1381,7 @@ uint32_t DesktopWindowTreeHostX11::DispatchEvent(
       if (xev->xfocus.mode != NotifyGrab) {
         ReleaseCapture();
         OnHostLostWindowCapture();
+        X11DesktopHandler::get()->ProcessXEvent(xev);
       } else {
         dispatcher()->OnHostLostMouseGrab();
       }

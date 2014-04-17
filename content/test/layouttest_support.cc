@@ -64,7 +64,6 @@ RenderFrameImpl* CreateWebFrameTestProxy(
 
   FrameProxy* render_frame_proxy = new FrameProxy(render_view, routing_id);
   render_frame_proxy->setBaseProxy(GetWebTestProxyBase(render_view));
-  render_frame_proxy->setVersion(3);
 
   return render_frame_proxy;
 }
@@ -100,7 +99,8 @@ void SetMockDeviceOrientationData(const WebDeviceOrientationData& data) {
       SetMockDeviceOrientationDataForTesting(data);
 }
 
-void SetMockScreenOrientation(const blink::WebScreenOrientation& orientation) {
+void SetMockScreenOrientation(
+    const blink::WebScreenOrientationType& orientation) {
   RendererWebKitPlatformSupportImpl::
       SetMockScreenOrientationForTesting(orientation);
 }

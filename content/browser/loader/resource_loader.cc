@@ -357,12 +357,21 @@ void ResourceLoader::OnReadCompleted(net::URLRequest* unused, int bytes_read) {
 
   CompleteRead(bytes_read);
 
-  if (is_deferred())
+  // If the handler cancelled or deferred the request, do not continue
+  // processing the read. If cancelled, the URLRequest has already been
+  // cancelled and will schedule an erroring OnReadCompleted later. If deferred,
+  // do nothing until resumed.
+  //
+  // Note: if bytes_read is 0 (EOF) and the handler defers, resumption will call
+  // Read() on the URLRequest again and get a second EOF.
+  if (is_deferred() || !request_->status().is_success())
     return;
 
-  if (request_->status().is_success() && bytes_read > 0) {
+  if (bytes_read > 0) {
     StartReading(true);  // Read the next chunk.
   } else {
+    // URLRequest reported an EOF. Call ResponseCompleted.
+    DCHECK_EQ(0, bytes_read);
     ResponseCompleted();
   }
 }
@@ -615,6 +624,11 @@ void ResourceLoader::CompleteRead(int bytes_read) {
   } else if (defer) {
     deferred_stage_ = DEFERRED_READ;  // Read next chunk when resumed.
   }
+
+  // Note: the request may still have been cancelled while OnReadCompleted
+  // returns true if OnReadCompleted caused request to get cancelled
+  // out-of-band. (In AwResourceDispatcherHostDelegate::DownloadStarting, for
+  // instance.)
 }
 
 void ResourceLoader::ResponseCompleted() {

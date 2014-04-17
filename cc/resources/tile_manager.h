@@ -5,6 +5,7 @@
 #ifndef CC_RESOURCES_TILE_MANAGER_H_
 #define CC_RESOURCES_TILE_MANAGER_H_
 
+#include <deque>
 #include <queue>
 #include <set>
 #include <utility>
@@ -94,9 +95,6 @@ class CC_EXPORT TileManager : public RasterizerClient,
                       PairedPictureLayerIterator* b) const;
 
      private:
-      bool ComparePriorities(const TilePriority& a_priority,
-                             const TilePriority& b_priority,
-                             bool prioritize_low_res) const;
       TreePriority tree_priority_;
     };
 
@@ -106,9 +104,53 @@ class CC_EXPORT TileManager : public RasterizerClient,
     RasterOrderComparator comparator_;
   };
 
+  struct CC_EXPORT EvictionTileIterator {
+   public:
+    EvictionTileIterator();
+    EvictionTileIterator(TileManager* tile_manager, TreePriority tree_priority);
+    ~EvictionTileIterator();
+
+    EvictionTileIterator& operator++();
+    operator bool() const;
+    Tile* operator*();
+
+   private:
+    struct PairedPictureLayerIterator {
+      PairedPictureLayerIterator();
+      ~PairedPictureLayerIterator();
+
+      Tile* PeekTile(TreePriority tree_priority);
+      void PopTile(TreePriority tree_priority);
+
+      PictureLayerImpl::LayerEvictionTileIterator* NextTileIterator(
+          TreePriority tree_priority);
+
+      PictureLayerImpl::LayerEvictionTileIterator active_iterator;
+      PictureLayerImpl::LayerEvictionTileIterator pending_iterator;
+
+      std::vector<Tile*> returned_shared_tiles;
+    };
+
+    class EvictionOrderComparator {
+     public:
+      explicit EvictionOrderComparator(TreePriority tree_priority);
+
+      bool operator()(PairedPictureLayerIterator* a,
+                      PairedPictureLayerIterator* b) const;
+
+     private:
+      TreePriority tree_priority_;
+    };
+
+    std::vector<PairedPictureLayerIterator> paired_iterators_;
+    std::vector<PairedPictureLayerIterator*> iterator_heap_;
+    TreePriority tree_priority_;
+    EvictionOrderComparator comparator_;
+  };
+
   static scoped_ptr<TileManager> Create(
       TileManagerClient* client,
-      ResourceProvider* resource_provider,
+      ResourcePool* resource_pool,
       Rasterizer* rasterizer,
       Rasterizer* gpu_rasterizer,
       size_t max_raster_usage_bytes,
@@ -146,8 +188,6 @@ class CC_EXPORT TileManager : public RasterizerClient,
 
   void GetPairedPictureLayers(std::vector<PairedPictureLayer>* layers) const;
 
-  ResourcePool* resource_pool() { return resource_pool_.get(); }
-
   void InitializeTilesWithResourcesForTesting(const std::vector<Tile*>& tiles) {
     for (size_t i = 0; i < tiles.size(); ++i) {
       ManagedTileState& mts = tiles[i]->managed_state();
@@ -158,6 +198,15 @@ class CC_EXPORT TileManager : public RasterizerClient,
 
       bytes_releasable_ += BytesConsumedIfAllocated(tiles[i]);
       ++resources_releasable_;
+    }
+  }
+
+  void ReleaseTileResourcesForTesting(const std::vector<Tile*>& tiles) {
+    for (size_t i = 0; i < tiles.size(); ++i) {
+      Tile* tile = tiles[i];
+      for (int mode = 0; mode < NUM_RASTER_MODES; ++mode) {
+        FreeResourceForTile(tile, static_cast<RasterMode>(mode));
+      }
     }
   }
 
@@ -177,7 +226,7 @@ class CC_EXPORT TileManager : public RasterizerClient,
 
  protected:
   TileManager(TileManagerClient* client,
-              ResourceProvider* resource_provider,
+              ResourcePool* resource_pool,
               Rasterizer* rasterizer,
               Rasterizer* gpu_rasterizer,
               size_t max_raster_usage_bytes,
@@ -226,21 +275,21 @@ class CC_EXPORT TileManager : public RasterizerClient,
                              bool was_canceled);
 
   inline size_t BytesConsumedIfAllocated(const Tile* tile) const {
-    return Resource::MemorySizeBytes(tile->size(), resource_format_);
+    return Resource::MemorySizeBytes(tile->size(),
+                                     resource_pool_->resource_format());
   }
 
   void FreeResourceForTile(Tile* tile, RasterMode mode);
   void FreeResourcesForTile(Tile* tile);
   void FreeUnusedResourcesForTile(Tile* tile);
-  scoped_refptr<internal::ImageDecodeTask> CreateImageDecodeTask(
-      Tile* tile,
-      SkPixelRef* pixel_ref);
-  scoped_refptr<internal::RasterTask> CreateRasterTask(Tile* tile);
+  scoped_refptr<ImageDecodeTask> CreateImageDecodeTask(Tile* tile,
+                                                       SkPixelRef* pixel_ref);
+  scoped_refptr<RasterTask> CreateRasterTask(Tile* tile);
   scoped_ptr<base::Value> GetMemoryRequirementsAsValue() const;
   void UpdatePrioritizedTileSetIfNeeded();
 
   TileManagerClient* client_;
-  scoped_ptr<ResourcePool> resource_pool_;
+  ResourcePool* resource_pool_;
   scoped_ptr<RasterizerDelegate> rasterizer_delegate_;
   GlobalStateThatImpactsTilePriority global_state_;
 
@@ -268,7 +317,7 @@ class CC_EXPORT TileManager : public RasterizerClient,
   bool did_initialize_visible_tile_;
   bool did_check_for_completed_tasks_since_last_schedule_tasks_;
 
-  typedef base::hash_map<uint32_t, scoped_refptr<internal::ImageDecodeTask> >
+  typedef base::hash_map<uint32_t, scoped_refptr<ImageDecodeTask> >
       PixelRefTaskMap;
   typedef base::hash_map<int, PixelRefTaskMap> LayerPixelRefTaskMap;
   LayerPixelRefTaskMap image_decode_tasks_;
@@ -287,7 +336,7 @@ class CC_EXPORT TileManager : public RasterizerClient,
   // Queues used when scheduling raster tasks.
   RasterTaskQueue raster_queue_[NUM_RASTERIZER_TYPES];
 
-  std::vector<scoped_refptr<internal::RasterTask> > orphan_raster_tasks_;
+  std::vector<scoped_refptr<RasterTask> > orphan_raster_tasks_;
 
   std::vector<PictureLayerImpl*> layers_;
 

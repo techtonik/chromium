@@ -65,6 +65,9 @@
             'autofill/core/common/password_form_fill_data_unittest.cc',
             'autofill/core/common/save_password_progress_logger_unittest.cc',
             'cloud_devices/printer_description_unittest.cc',
+            'data_reduction_proxy/browser/data_reduction_proxy_metrics_unittest.cc',
+            'data_reduction_proxy/browser/data_reduction_proxy_settings_unittest.cc',
+            'data_reduction_proxy/browser/http_auth_handler_data_reduction_proxy_unittest.cc',
             'dom_distiller/core/article_entry_unittest.cc',
             'dom_distiller/core/distiller_unittest.cc',
             'dom_distiller/core/distiller_url_fetcher_unittest.cc',
@@ -74,6 +77,7 @@
             'dom_distiller/core/dom_distiller_store_unittest.cc',
             'dom_distiller/core/task_tracker_unittest.cc',
             'dom_distiller/core/url_utils_unittest.cc',
+            'dom_distiller/core/viewer_unittest.cc',
             'domain_reliability/context_unittest.cc',
             'domain_reliability/dispatcher_unittest.cc',
             'domain_reliability/monitor_unittest.cc',
@@ -106,6 +110,8 @@
             'precache/core/precache_database_unittest.cc',
             'precache/core/precache_fetcher_unittest.cc',
             'precache/core/precache_url_table_unittest.cc',
+            'query_parser/query_parser_unittest.cc',
+            'query_parser/snippet_unittest.cc',
             'rappor/bloom_filter_unittest.cc',
             'rappor/byte_vector_utils_unittest.cc',
             'rappor/log_uploader_unittest.cc',
@@ -115,6 +121,7 @@
             'signin/core/browser/mutable_profile_oauth2_token_service_unittest.cc',
             'signin/core/browser/signin_error_controller_unittest.cc',
             'signin/core/browser/webdata/token_service_table_unittest.cc',
+            'signin/ios/browser/profile_oauth2_token_service_ios_unittest.mm',
             'storage_monitor/image_capture_device_manager_unittest.mm',
             'storage_monitor/media_storage_util_unittest.cc',
             'storage_monitor/media_transfer_protocol_device_observer_linux_unittest.cc',
@@ -142,6 +149,7 @@
             'url_matcher/url_matcher_unittest.cc',
             'variations/entropy_provider_unittest.cc',
             'variations/metrics_util_unittest.cc',
+            'variations/study_filtering_unittest.cc',
             'variations/variations_associated_data_unittest.cc',
             'variations/variations_seed_processor_unittest.cc',
             'variations/variations_seed_simulator_unittest.cc',
@@ -179,11 +187,13 @@
             'components_strings.gyp:components_strings',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber',
 
-            # Dependencies of bookmarks
-            'components.gyp:bookmarks_core_common',
-
             # Dependencies of cloud_devices
             'components.gyp:cloud_devices',
+
+            # Dependencies of data_reduction_proxy
+            'components.gyp:data_reduction_proxy_browser',
+            'components.gyp:data_reduction_proxy_common',
+            'components.gyp:data_reduction_proxy_test_support',
 
             # Dependencies of dom_distiller
             'components.gyp:distilled_page_proto',
@@ -212,6 +222,9 @@
             # Dependencies of precache/core
             'components.gyp:password_manager_core_browser',
             'components.gyp:precache_core',
+
+            # Dependencies of query_parser
+            'components.gyp:query_parser',
 
             # Dependencies of rappor
             'components.gyp:rappor',
@@ -297,6 +310,11 @@
                 ['include', '^sync_driver/'],
                 ['include', '^translate/'],
                 ['include', '^variations/'],
+              ],
+              'dependencies': [
+                # Dependencies of signin
+                'components.gyp:signin_ios_browser',
+                '../ios/ios_tests.gyp:test_support_ios',
               ],
               'actions': [
                 {

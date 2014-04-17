@@ -369,9 +369,14 @@
         'browser/chromeos/file_manager/volume_manager_observer.h',
         'browser/chromeos/file_manager/zip_file_creator.cc',
         'browser/chromeos/file_manager/zip_file_creator.h',
+        'browser/chromeos/file_system_provider/mount_path_util.cc',
+        'browser/chromeos/file_system_provider/mount_path_util.h',
         'browser/chromeos/file_system_provider/observer.h',
         'browser/chromeos/file_system_provider/provided_file_system.cc',
         'browser/chromeos/file_system_provider/provided_file_system.h',
+        'browser/chromeos/file_system_provider/provided_file_system_info.cc',
+        'browser/chromeos/file_system_provider/provided_file_system_info.h',
+        'browser/chromeos/file_system_provider/provided_file_system_interface.h',
         'browser/chromeos/file_system_provider/request_manager.cc',
         'browser/chromeos/file_system_provider/request_manager.h',
         'browser/chromeos/file_system_provider/service.cc',
@@ -588,6 +593,9 @@
         'browser/chromeos/login/screens/eula_screen.cc',
         'browser/chromeos/login/screens/eula_screen.h',
         'browser/chromeos/login/screens/eula_screen_actor.h',
+        'browser/chromeos/login/screens/hid_detection_screen.cc',
+        'browser/chromeos/login/screens/hid_detection_screen.h',
+        'browser/chromeos/login/screens/hid_detection_screen_actor.h',
         'browser/chromeos/login/screens/kiosk_autolaunch_screen.cc',
         'browser/chromeos/login/screens/kiosk_autolaunch_screen.h',
         'browser/chromeos/login/screens/kiosk_autolaunch_screen_actor.h',
@@ -1025,6 +1033,7 @@
         ['use_aura==1 and use_x11==1', {
           'dependencies': [
             '../build/linux/system.gyp:x11',
+            '../ui/gfx/gfx.gyp:gfx_x11',
           ],
         }],
         ['enable_printing != 0', {

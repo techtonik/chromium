@@ -16,8 +16,8 @@
 #include "ui/aura/window_event_dispatcher.h"
 #include "ui/aura/window_tree_host.h"
 #include "ui/base/layout.h"
-#include "ui/display/display_util.h"
-#include "ui/display/x11/edid_parser_x11.h"
+#include "ui/display/util/display_util.h"
+#include "ui/display/util/x11/edid_parser_x11.h"
 #include "ui/events/platform/platform_event_source.h"
 #include "ui/gfx/display.h"
 #include "ui/gfx/display_observer.h"
@@ -120,7 +120,7 @@ namespace views {
 // DesktopScreenX11, public:
 
 DesktopScreenX11::DesktopScreenX11()
-    : xdisplay_(base::MessagePumpX11::GetDefaultXDisplay()),
+    : xdisplay_(gfx::GetXDisplay()),
       x_root_window_(DefaultRootWindow(xdisplay_)),
       has_xrandr_(false),
       xrandr_event_base_(0) {
@@ -342,7 +342,7 @@ uint32_t DesktopScreenX11::DispatchEvent(const ui::PlatformEvent& event) {
 
 DesktopScreenX11::DesktopScreenX11(
     const std::vector<gfx::Display>& test_displays)
-    : xdisplay_(base::MessagePumpX11::GetDefaultXDisplay()),
+    : xdisplay_(gfx::GetXDisplay()),
       x_root_window_(DefaultRootWindow(xdisplay_)),
       has_xrandr_(false),
       xrandr_event_base_(0),

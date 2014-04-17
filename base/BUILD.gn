@@ -11,6 +11,7 @@ component("base") {
     "third_party/dmg_fp/dtoa_wrapper.cc",
     "third_party/icu/icu_utf.cc",
     "third_party/icu/icu_utf.h",
+    "third_party/superfasthash/superfasthash.c",
     "allocator/allocator_extension.cc",
     "allocator/allocator_extension.h",
     "allocator/type_profiler_control.cc",
@@ -75,6 +76,8 @@ component("base") {
     "base64.cc",
     "base64.h",
     "basictypes.h",
+    "big_endian.cc",
+    "big_endian.h",
     "bind.h",
     "bind_helpers.cc",
     "bind_helpers.h",
@@ -330,8 +333,6 @@ component("base") {
     "message_loop/message_pump_observer.h",
     "message_loop/message_pump_win.cc",
     "message_loop/message_pump_win.h",
-    "message_loop/message_pump_x11.cc",
-    "message_loop/message_pump_x11.h",
     "metrics/field_trial.cc",
     "metrics/field_trial.h",
     "metrics/sample_map.cc",
@@ -681,6 +682,32 @@ component("base") {
     "win/wrapped_window_proc.h",
   ]
 
+  if (is_android) {
+    sources -= [
+      "debug/stack_trace_posix.cc",
+    ]
+
+    # TODO(dpranke): crbug.com/360936.
+    # These are disabled until we have JNI support on Android.
+    sources -= [
+      "android/activity_status.cc",
+      "android/base_jni_registrar.cc",
+      "android/base_jni_registrar.h",
+      "android/build_info.cc",
+      "android/build_info.h",
+      "android/cpu_features.cc",
+      "android/important_file_writer_android.cc",
+      "android/memory_pressure_listener_android.cc",
+      "android/path_service_android.cc",
+      "android/path_utils.cc",
+      "android/sys_utils.cc",
+      "android/trace_event_binding.cc",
+      "message_loop/message_pump_android.cc",
+      "power_monitor/power_monitor_device_source_android.cc",
+      "threading/platform_thread_android.cc",
+    ]
+  }
+
   # TODO(brettw) I don't understand the conditions this file is used.
   sources -= [ "files/file_path_watcher_stub.cc" ]
 
@@ -706,12 +733,6 @@ component("base") {
     "//base/third_party/nspr",
     "//third_party/modp_b64",
   ]
-
-  if (!is_chromeos) {
-    sources -= [
-      "sys_info_chromeos.cc",
-    ]
-  }
 
   if (is_nacl) {
     # These things would otherwise be built on a Posix build but aren't
@@ -784,18 +805,6 @@ component("base") {
     if (toolkit_uses_gtk) {
       linux_configs += [ "//build/config/linux:gtk" ]
     }
-    if (use_x11) {
-      linux_configs += [
-        "//build/config/linux:x11",
-      ]
-    } else {
-      # On non-Linux platforms, the X11 files will already have been filtered
-      # out using the sources assignment filter.
-      sources -= [
-        "message_loop/message_pump_x11.cc",
-        "message_loop/message_pump_x11.h",
-      ]
-    }
 
     configs += linux_configs
     all_dependent_configs = linux_configs
@@ -853,12 +862,14 @@ component("i18n") {
     "i18n/bidi_line_iterator.h",
     "i18n/break_iterator.cc",
     "i18n/break_iterator.h",
-    "i18n/char_iterator.cc",
-    "i18n/char_iterator.h",
     "i18n/case_conversion.cc",
     "i18n/case_conversion.h",
+    "i18n/char_iterator.cc",
+    "i18n/char_iterator.h",
     "i18n/file_util_icu.cc",
     "i18n/file_util_icu.h",
+    "i18n/i18n_constants.cc",
+    "i18n/i18n_constants.h",
     "i18n/icu_encoding_detection.cc",
     "i18n/icu_encoding_detection.h",
     "i18n/icu_string_conversions.cc",
@@ -869,12 +880,18 @@ component("i18n") {
     "i18n/number_formatting.h",
     "i18n/rtl.cc",
     "i18n/rtl.h",
+    "i18n/streaming_utf8_validator.cc",
+    "i18n/streaming_utf8_validator.h",
     "i18n/string_compare.cc",
     "i18n/string_compare.h",
     "i18n/string_search.cc",
     "i18n/string_search.h",
     "i18n/time_formatting.cc",
     "i18n/time_formatting.h",
+    "i18n/timezone.cc",
+    "i18n/timezone.h",
+    "i18n/utf8_validator_tables.cc",
+    "i18n/utf8_validator_tables.h",
   ]
   defines = [ "BASE_I18N_IMPLEMENTATION" ]
   configs += [ "//build/config/compiler:wexit_time_destructors" ]

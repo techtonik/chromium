@@ -11,6 +11,7 @@
 #include "extensions/common/permissions/permissions_info.h"
 #include "extensions/common/permissions/socket_permission.h"
 #include "extensions/common/permissions/usb_device_permission.h"
+#include "grit/extensions_strings.h"
 #include "grit/generated_resources.h"
 
 namespace extensions {
@@ -208,6 +209,7 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
         {APIPermission::kIdentityPrivate, "identityPrivate",
          APIPermissionInfo::kFlagCannotBeOptional},
         {APIPermission::kLogPrivate, "logPrivate"},
+        {APIPermission::kWebcamPrivate, "webcamPrivate"},
         {APIPermission::kNetworkingPrivate, "networkingPrivate",
          APIPermissionInfo::kFlagCannotBeOptional,
          IDS_EXTENSION_PROMPT_WARNING_NETWORKING_PRIVATE,

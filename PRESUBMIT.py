@@ -79,7 +79,7 @@ _BANNED_OBJC_FUNCTIONS = (
       False,
     ),
     (
-      'NSTrackingArea',
+      r'/NSTrackingArea\W',
       (
        'The use of NSTrackingAreas is prohibited. Please use CrTrackingArea',
        'instead.',
@@ -240,7 +240,9 @@ _BANNED_CPP_FUNCTIONS = (
         'gin::Wrappable instead. See http://crbug.com/334679',
       ),
       True,
-      (),
+      (
+        r'extensions[/\\]renderer[/\\]safe_builtins\.*',
+      ),
     ),
 )
 
@@ -394,7 +396,14 @@ def _CheckNoBannedFunctions(input_api, output_api):
   for f in input_api.AffectedFiles(file_filter=file_filter):
     for line_num, line in f.ChangedContents():
       for func_name, message, error in _BANNED_OBJC_FUNCTIONS:
-        if func_name in line:
+        matched = False
+        if func_name[0:1] == '/':
+          regex = func_name[1:]
+          if input_api.re.search(regex, line):
+            matched = True
+        elif func_name in line:
+            matched = True
+        if matched:
           problems = warnings;
           if error:
             problems = errors;
@@ -909,8 +918,7 @@ def _CheckSpamLogging(input_api, output_api):
                  r"^chrome[\\\/]browser[\\\/]ui[\\\/]startup[\\\/]"
                      r"startup_browser_creator\.cc$",
                  r"^chrome[\\\/]installer[\\\/]setup[\\\/].*",
-                 r"^chrome[\\\/]renderer[\\\/]extensions[\\\/]"
-                     r"logging_native_handler\.cc$",
+                 r"^extensions[\\\/]renderer[\\\/]logging_native_handler\.cc$",
                  r"^content[\\\/]common[\\\/]gpu[\\\/]client[\\\/]"
                      r"gl_helper_benchmark\.cc$",
                  r"^native_client_sdk[\\\/]",
@@ -1335,6 +1343,9 @@ def GetDefaultTryConfigs(bots=None):
       ],
       'win': ['compile'],
       'win_chromium_compile_dbg': ['defaulttests'],
+      'win_chromium_dbg': ['defaulttests'],
+      'win_chromium_rel': ['defaulttests'],
+      'win_chromium_x64_rel': ['defaulttests'],
       'win_nacl_sdk_build': ['compile'],
       'win_rel': standard_tests + [
           'app_list_unittests',
@@ -1427,7 +1438,7 @@ def GetPreferredTryMasters(project, change):
         'mac_chromium_rel',
     ])
   if all(re.search('(^|[/_])win[/_.]', f) for f in files):
-    return GetDefaultTryConfigs(['win', 'win_rel'])
+    return GetDefaultTryConfigs(['win_chromium_dbg', 'win_chromium_rel'])
   if all(re.search('(^|[/_])android[/_.]', f) for f in files):
     return GetDefaultTryConfigs([
         'android_aosp',
@@ -1448,8 +1459,8 @@ def GetPreferredTryMasters(project, change):
       'mac_chromium_compile_dbg',
       'mac_chromium_rel',
       'win_chromium_compile_dbg',
-      'win_rel',
-      'win_x64_rel',
+      'win_chromium_rel',
+      'win_chromium_x64_rel',
   ]
 
   # Match things like path/aura/file.cc and path/file_aura.cc.

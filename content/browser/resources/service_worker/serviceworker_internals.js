@@ -79,12 +79,62 @@ cr.define('serviceworker', function() {
                 }
             }
         }
+        displayErrorLogs();
+    }
+
+    function onWorkerStarted(version_id, process_id, thread_id) {
+        update();
+    }
+
+    function onWorkerStopped(version_id, process_id, thread_id) {
+        update();
+    }
+
+    var errorLogs = {};
+
+    function onErrorReported(version_id,
+                             process_id,
+                             thread_id,
+                             error_info) {
+        if (version_id in errorLogs) {
+            errorLogs[version_id].push(error_info);
+        } else {
+            errorLogs[version_id] = [error_info];
+        }
+        displayErrorLogs();
+    }
+
+    function displayErrorLogs() {
+        var container = $('serviceworker-list');
+        var logAreas =
+            container.querySelectorAll('textarea.serviceworker-error-log');
+        for (var i = 0; i < logAreas.length; ++i) {
+            var logArea = logAreas[i];
+            var vid = logArea.vid;
+            if (!(vid in errorLogs)) {
+                continue;
+            }
+            var logs = errorLogs[vid];
+            for (var j = 0; j < logs.length; ++j) {
+                logArea.value += JSON.stringify(logs[j]) + '\n';
+            }
+            delete errorLogs[vid];
+        }
+
+    }
+
+    function onVersionStateChanged(version_id) {
+        update();
     }
 
     return {
         update: update,
         onOperationComplete: onOperationComplete,
         onPartitionData: onPartitionData,
+        onWorkerStarted: onWorkerStarted,
+        onWorkerStopped: onWorkerStopped,
+        onErrorReported: onErrorReported,
+        onVersionStateChanged: onVersionStateChanged,
     };
 });
 

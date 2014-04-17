@@ -60,6 +60,7 @@ class MP4StreamParserTest : public testing::Test {
 
   void InitF(bool init_ok,
              base::TimeDelta duration,
+             base::Time wallclock_timeline_offset,
              bool auto_update_timestamp_offset) {
     DVLOG(1) << "InitF: ok=" << init_ok << ", dur=" << duration.InMilliseconds()
              << ", autoTimestampOffset=" << auto_update_timestamp_offset;
@@ -204,6 +205,13 @@ TEST_F(MP4StreamParserTest, NoMoovAfterFlush) {
   EXPECT_TRUE(AppendDataInPieces(buffer->data() + kFirstMoofOffset,
                                  buffer->data_size() - kFirstMoofOffset,
                                  512));
+}
+
+// Test an invalid file where there are encrypted samples, but
+// SampleAuxiliaryInformation{Sizes|Offsets}Box (saiz|saio) are missing.
+// The parser should fail instead of crash. See http://crbug.com/361347
+TEST_F(MP4StreamParserTest, MissingSampleAuxInfo) {
+  ParseMP4File("bear-1280x720-a_frag-cenc_missing-saiz-saio.mp4", 512);
 }
 
 // TODO(strobe): Create and test media which uses CENC auxiliary info stored

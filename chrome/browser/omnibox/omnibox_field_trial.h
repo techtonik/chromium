@@ -6,7 +6,6 @@
 #define CHROME_BROWSER_OMNIBOX_OMNIBOX_FIELD_TRIAL_H_
 
 #include <map>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -90,9 +89,6 @@ class OmniboxFieldTrial {
   // specified type should have their relevance score multiplied by the
   // given number.  Omitted types are assumed to have multipliers of 1.0.
   typedef std::map<AutocompleteMatchType::Type, float> DemotionMultipliers;
-
-  // A set of types that should not be demoted when they are the top match.
-  typedef std::set<AutocompleteMatchType::Type> UndemotableTopMatchTypes;
 
   // Creates the static field trial groups.
   // *** MUST NOT BE CALLED MORE THAN ONCE. ***
@@ -226,24 +222,6 @@ class OmniboxFieldTrial {
       AutocompleteInput::PageClassification current_page_classification,
       DemotionMultipliers* demotions_by_type);
 
-  // Get the set of types that should not be demoted if they are the top
-  // match.
-  static UndemotableTopMatchTypes GetUndemotableTopTypes(
-      AutocompleteInput::PageClassification current_page_classification);
-
-  // ---------------------------------------------------------
-  // For the ReorderForLegalDefaultMatch experiment that's part of the
-  // bundled omnibox field trial.
-
-  // Returns true if the omnibox will reorder matches, in the provided
-  // |current_page_classification| context so that a match that's allowed to
-  // be the default match will appear first.  This means AutocompleteProviders
-  // can score matches however they desire without regard to making sure the
-  // top match when all the matches from all providers are merged is a legal
-  // default match.
-  static bool ReorderForLegalDefaultMatch(
-      AutocompleteInput::PageClassification current_page_classification);
-
   // ---------------------------------------------------------
   // For the HistoryURL provider new scoring experiment that is part of the
   // bundled omnibox field trial.
@@ -287,16 +265,12 @@ class OmniboxFieldTrial {
   static const char kShortcutsScoringMaxRelevanceRule[];
   static const char kSearchHistoryRule[];
   static const char kDemoteByTypeRule[];
-  static const char kUndemotableTopTypeRule[];
-  static const char kReorderForLegalDefaultMatchRule[];
   static const char kHQPBookmarkValueRule[];
   static const char kHQPDiscountFrecencyWhenFewVisitsRule[];
   static const char kHQPAllowMatchInTLDRule[];
   static const char kHQPAllowMatchInSchemeRule[];
   static const char kZeroSuggestRule[];
   static const char kZeroSuggestVariantRule[];
-  // Rule values.
-  static const char kReorderForLegalDefaultMatchRuleDisabled[];
 
   // Parameter names used by the HUP new scoring experiments.
   static const char kHUPNewScoringEnabledParam[];

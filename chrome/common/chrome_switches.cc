@@ -21,11 +21,6 @@ namespace switches {
 // all work out.
 // -----------------------------------------------------------------------------
 
-// Allows choosing an existing managed user profile during the managed
-// user creation flow. Is only used on ChromeOS.
-const char kAllowCreateExistingManagedUsers[] =
-    "allow-create-existing-managed-users";
-
 // Allows third-party content included on a page to prompt for a HTTP basic
 // auth username/password pair.
 const char kAllowCrossOriginAuthPrompt[]    = "allow-cross-origin-auth-prompt";
@@ -180,8 +175,12 @@ const char kCloudPrintSetupProxy[]          = "cloud-print-setup-proxy";
 
 // The URL of the cloud print service to use, overrides any value stored in
 // preferences, and the default. Only used if the cloud print service has been
-// enabled (see enable-cloud-print).
-const char kCloudPrintServiceURL[]          = "cloud-print-service";
+// enabled. Used for testing.
+const char kCloudPrintServiceURL[]          = "cloud-print-url";
+
+// The XMPP endpoint the cloud print service will use. Only used if the cloud
+// print service has been enabled. Used for testing.
+const char kCloudPrintXmppEndpoint[] = "cloud-print-xmpp-endpoint";
 
 // Comma-separated options to troubleshoot the component updater. Only valid
 // for the browser process.
@@ -208,12 +207,6 @@ const char kCrashOnHangThreads[]            = "crash-on-hang-threads";
 // (http://crbug.com/148675)
 const char kCreateBrowserOnStartupForTests[] =
     "create-browser-on-startup-for-tests";
-
-#if defined(OS_ANDROID) || defined(OS_IOS)
-// If set, the data reduction proxy will only be enabled if a request for this
-// URL is successful.
-const char kDataReductionProxyProbeURL[]    = "data-reduction-proxy-probe-url";
-#endif
 
 // Enables a frame context menu item that toggles the frame in and out of glass
 // mode (Windows Vista and up only).
@@ -271,11 +264,6 @@ const char kDisableComponentUpdate[]        = "disable-component-update";
 // set of CRLs rather than performing on-line checks.
 const char kDisableCRLSets[]                = "disable-crl-sets";
 
-// Disables choosing an existing managed user profile during the managed
-// user creation flow.
-const char kDisableCreateExistingManagedUsers[] =
-    "disable-create-exsting-managed-users";
-
 // Disables installation of default apps on first run. This is used during
 // automated testing.
 const char kDisableDefaultApps[]            = "disable-default-apps";
@@ -313,10 +301,6 @@ const char kDisableExtensionsResourceWhitelist[] =
 // which would prevent fullscreening the browser window during screen-capture of
 // a tab.  http://crbug.com/256870 and http://crbug.com/290403
 const char kDisableFullscreenWithinTab[] = "disable-fullscreen-within-tab";
-
-// Disables improved SafeBrowsing download protection.
-const char kDisableImprovedDownloadProtection[] =
-    "disable-improved-download-protection";
 
 // Prevent infobars from appearing.
 const char kDisableInfoBars[]               = "disable-infobars";
@@ -403,9 +387,6 @@ const char kDisableSpdy31[]                 = "disable-spdy31";
 
 // Disables syncing browser data to a Google Account.
 const char kDisableSync[]                   = "disable-sync";
-
-// Disables sync/API based session sync implementation (back to legacy).
-const char kDisableSyncSessionsV2[] = "disable-sync-sessions-v2";
 
 // Disable synced notifications.
 const char kDisableSyncSyncedNotifications[] =
@@ -534,13 +515,6 @@ const char kEnableExtensionActivityLogTesting[] =
 // crbug.com/142458 .
 const char kEnableFastUnload[]         = "enable-fast-unload";
 
-// Enable HTTP/2 draft 04. This is a temporary testing flag.
-const char kEnableHttp2Draft04[]            = "enable-http2-draft-04";
-
-// Enables the pure web-based flow for sign in on first run/NTP/wrench menu/
-// settings page.
-const char kEnableWebBasedSignin[]            = "enable-web-based-signin";
-
 // Enables IPv6 support, even if probes suggest that it may not be fully
 // supported. Some probes may require internet connections, and this flag will
 // allow support independent of application testing. This flag overrides
@@ -664,8 +638,8 @@ const char kEnableSearchButtonInOmniboxForStrOrIip[] =
 // Enable settings in a separate browser window per profile.
 const char kEnableSettingsWindow[]          = "enable-settings-window";
 
-// Enable SPDY/4 alpha 2. This is a temporary testing flag.
-const char kEnableSpdy4a2[]                 = "enable-spdy4a2";
+// Enable SPDY/4, aka HTTP/2. This is a temporary testing flag.
+const char kEnableSpdy4[]                   = "enable-spdy4";
 
 // Enables auto correction for misspelled words.
 const char kEnableSpellingAutoCorrect[]     = "enable-spelling-auto-correct";
@@ -740,10 +714,6 @@ const char kFakeVariationsChannel[]         = "fake-variations-channel";
 // loaded. It is useful to tell the difference for tracking purposes.
 const char kFastStart[]            = "fast-start";
 
-// Allows displaying the list of existing profiles in the avatar bubble for
-// fast switching between profiles.
-const char kFastUserSwitching[]             = "fast-user-switching";
-
 // These two flags are added around the switches about:flags adds to the
 // command line. This is useful to see which switches were added by about:flags
 // on about:version. They don't have any effect.
@@ -773,9 +743,6 @@ const char kForceVariationIds[]             = "force-variation-ids";
 
 // Specifies an alternate URL to use for speaking to Google. Useful for testing.
 const char kGoogleBaseURL[]                 = "google-base-url";
-
-// Enables using GAIA information to populate profile name and icon.
-const char kGoogleProfileInfo[]             = "google-profile-info";
 
 // Specifies a custom name for the GSSAPI library to load.
 const char kGSSAPILibraryName[]             = "gssapi-library-name";
@@ -914,10 +881,6 @@ const char kMultiProfiles[]                 = "multi-profiles";
 // Sets the base logging level for the net log. Log 0 logs the most data.
 // Intended primarily for use with --log-net-log.
 const char kNetLogLevel[]                   = "net-log-level";
-
-// Use new profile management system, including profile sign-out and new
-// choosers.
-const char kNewProfileManagement[]          = "new-profile-management";
 
 // Disables the default browser check. Useful for UI/browser tests where we
 // want to avoid having the default browser info-bar displayed.
@@ -1139,10 +1102,6 @@ const char kRestoreLastSession[]            = "restore-last-session";
 // See http://crbug.com/120416 for how to remove this switch.
 const char kSavePageAsMHTML[]               = "save-page-as-mhtml";
 
-// URL prefix used by safebrowsing to fetch hash, download data and report
-// malware.
-const char kSbURLPrefix[]                   = "safebrowsing-url-prefix";
-
 // If present, safebrowsing only performs update when
 // SafeBrowsingProtocolManager::ForceScheduleNextUpdate() is explicitly called.
 // This is used for testing only.
@@ -1163,9 +1122,6 @@ const char kSbDisableExtensionBlacklist[] =
 // Disables safebrowsing feature that provides a side-effect free whitelist.
 const char kSbDisableSideEffectFreeWhitelist[] =
     "safebrowsing-disable-side-effect-free-whitelist";
-
-// URL to send safebrowsing download feedback reports to.
-const char kSbDownloadFeedbackURL[] = "safebrowsing-download-feedback-url";
 
 // Causes the process to run as a service process.
 const char kServiceProcess[]                = "service";
@@ -1205,21 +1161,6 @@ const char kSimulateOutdated[]               = "simulate-outdated";
 
 // Simulates that current version is outdated and auto-update is off.
 const char kSimulateOutdatedNoAU[]           = "simulate-outdated-no-au";
-
-// Replaces the buffered data source for <audio> and <video> with a simplified
-// resource loader that downloads the entire resource into memory.
-
-// Second origin that can be used for the spdy proxy.
-const char kSpdyProxyAuthFallback[]         = "spdy-proxy-auth-fallback";
-
-// Origin for which SpdyProxy authentication is supported.
-const char kSpdyProxyAuthOrigin[]           = "spdy-proxy-auth-origin";
-
-// Authentication string for the data reduction proxy.
-const char kSpdyProxyAuthValue[]            = "spdy-proxy-auth-value";
-
-// Origin for which dev version of SpdyProxy authentication is supported.
-const char kSpdyProxyDevAuthOrigin[]        = "spdy-proxy-dev-auth-origin";
 
 // Specifies the URL where spelling service feedback data will be sent instead
 // of the default URL. This switch is for temporary testing only.
@@ -1364,11 +1305,6 @@ const char kWinHttpProxyResolver[]          = "winhttp-proxy-resolver";
 // Specifies a custom URL for fetching plug-ins metadata. Used for testing.
 const char kPluginsMetadataServerURL[]      = "plugins-metadata-server-url";
 #endif
-
-#if defined(OS_ANDROID) || defined(OS_IOS)
-// Enable SPDY proxy.
-const char kEnableSpdyProxyAuth[]           = "enable-spdy-proxy-auth";
-#endif  // defined(OS_ANDROID) || defined(OS_IOS)
 
 #if defined(OS_ANDROID)
 // Disables the app banner <meta> tag.

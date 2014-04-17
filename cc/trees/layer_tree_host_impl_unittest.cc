@@ -110,7 +110,7 @@ class LayerTreeHostImplTest : public testing::Test,
   virtual void DidLoseOutputSurfaceOnImplThread() OVERRIDE {}
   virtual void DidSwapBuffersOnImplThread() OVERRIDE {}
   virtual void OnSwapBuffersCompleteOnImplThread() OVERRIDE {}
-  virtual void BeginImplFrame(const BeginFrameArgs& args) OVERRIDE {}
+  virtual void BeginFrame(const BeginFrameArgs& args) OVERRIDE {}
   virtual void OnCanDrawStateChanged(bool can_draw) OVERRIDE {
     on_can_draw_state_changed_called_ = true;
   }
@@ -1538,7 +1538,7 @@ class DidDrawCheckLayer : public TiledLayerImpl {
     scoped_ptr<LayerTilingData> tiler =
         LayerTilingData::Create(gfx::Size(100, 100),
                                 LayerTilingData::HAS_BORDER_TEXELS);
-    tiler->SetBounds(content_bounds());
+    tiler->SetTilingRect(gfx::Rect(content_bounds()));
     SetTilingData(*tiler.get());
   }
 
@@ -1749,7 +1749,7 @@ class MissingTextureAnimatingLayer : public DidDrawCheckLayer {
     scoped_ptr<LayerTilingData> tiling_data =
         LayerTilingData::Create(gfx::Size(10, 10),
                                 LayerTilingData::NO_BORDER_TEXELS);
-    tiling_data->SetBounds(bounds());
+    tiling_data->SetTilingRect(gfx::Rect(bounds()));
     SetTilingData(*tiling_data.get());
     set_skips_draw(skips_draw);
     if (!tile_missing) {
@@ -5949,6 +5949,79 @@ TEST_F(LayerTreeHostImplTest, WheelFlingShouldBubble) {
     ASSERT_EQ(2u, scroll_info->scrolls.size());
     ExpectContains(*scroll_info.get(), root_scroll_id, gfx::Vector2d(0, 10));
   }
+}
+
+TEST_F(LayerTreeHostImplTest, ScrollUnknownNotOnAncestorChain) {
+  // If we ray cast a scroller that is not on the first layer's ancestor chain,
+  // we should return ScrollUnknown.
+  gfx::Size content_size(100, 100);
+  SetupScrollAndContentsLayers(content_size);
+
+  int scroll_layer_id = 2;
+  LayerImpl* scroll_layer =
+      host_impl_->active_tree()->LayerById(scroll_layer_id);
+  scroll_layer->SetDrawsContent(true);
+
+  int page_scale_layer_id = 5;
+  LayerImpl* page_scale_layer =
+      host_impl_->active_tree()->LayerById(page_scale_layer_id);
+
+  int occluder_layer_id = 6;
+  scoped_ptr<LayerImpl> occluder_layer =
+      LayerImpl::Create(host_impl_->active_tree(), occluder_layer_id);
+  occluder_layer->SetDrawsContent(true);
+  occluder_layer->SetBounds(content_size);
+  occluder_layer->SetContentBounds(content_size);
+  occluder_layer->SetPosition(gfx::PointF());
+  occluder_layer->SetAnchorPoint(gfx::PointF());
+
+  // The parent of the occluder is *above* the scroller.
+  page_scale_layer->AddChild(occluder_layer.Pass());
+
+  DrawFrame();
+
+  EXPECT_EQ(InputHandler::ScrollUnknown,
+            host_impl_->ScrollBegin(gfx::Point(), InputHandler::Wheel));
+}
+
+TEST_F(LayerTreeHostImplTest, ScrollUnknownScrollAncestorMismatch) {
+  // If we ray cast a scroller this is on the first layer's ancestor chain, but
+  // is not the first scroller we encounter when walking up from the layer, we
+  // should also return ScrollUnknown.
+  gfx::Size content_size(100, 100);
+  SetupScrollAndContentsLayers(content_size);
+
+  int scroll_layer_id = 2;
+  LayerImpl* scroll_layer =
+      host_impl_->active_tree()->LayerById(scroll_layer_id);
+  scroll_layer->SetDrawsContent(true);
+
+  int occluder_layer_id = 6;
+  scoped_ptr<LayerImpl> occluder_layer =
+      LayerImpl::Create(host_impl_->active_tree(), occluder_layer_id);
+  occluder_layer->SetDrawsContent(true);
+  occluder_layer->SetBounds(content_size);
+  occluder_layer->SetContentBounds(content_size);
+  occluder_layer->SetPosition(gfx::PointF());
+  occluder_layer->SetAnchorPoint(gfx::PointF());
+
+  int child_scroll_clip_layer_id = 7;
+  scoped_ptr<LayerImpl> child_scroll_clip =
+      LayerImpl::Create(host_impl_->active_tree(), child_scroll_clip_layer_id);
+
+  int child_scroll_layer_id = 8;
+  scoped_ptr<LayerImpl> child_scroll = CreateScrollableLayer(
+      child_scroll_layer_id, content_size, child_scroll_clip.get());
+
+  child_scroll->SetDrawsContent(false);
+
+  child_scroll->AddChild(occluder_layer.Pass());
+  scroll_layer->AddChild(child_scroll.Pass());
+
+  DrawFrame();
+
+  EXPECT_EQ(InputHandler::ScrollUnknown,
+            host_impl_->ScrollBegin(gfx::Point(), InputHandler::Wheel));
 }
 
 // Make sure LatencyInfo carried by LatencyInfoSwapPromise are passed

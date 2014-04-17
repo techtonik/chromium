@@ -8,7 +8,9 @@
 #include "base/observer_list.h"
 #include "chrome/browser/extensions/tab_helper.h"
 #include "chrome/browser/guestview/guestview.h"
+#include "chrome/browser/guestview/webview/javascript_dialog_helper.h"
 #include "chrome/browser/guestview/webview/webview_find_helper.h"
+#include "content/public/browser/javascript_dialog_manager.h"
 #include "content/public/browser/notification_registrar.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "third_party/WebKit/public/web/WebFindOptions.h"
@@ -73,7 +75,7 @@ class WebViewGuest : public GuestView,
                          const std::string& error_type) OVERRIDE;
   virtual void RendererResponsive() OVERRIDE;
   virtual void RendererUnresponsive() OVERRIDE;
-  virtual bool RequestPermission(
+  virtual void RequestPermission(
       BrowserPluginPermissionType permission_type,
       const base::DictionaryValue& request_info,
       const PermissionResponseCallback& callback,
@@ -81,6 +83,18 @@ class WebViewGuest : public GuestView,
   virtual GURL ResolveURL(const std::string& src) OVERRIDE;
   virtual void SizeChanged(const gfx::Size& old_size, const gfx::Size& new_size)
       OVERRIDE;
+  virtual void RequestMediaAccessPermission(
+      const content::MediaStreamRequest& request,
+      const content::MediaResponseCallback& callback) OVERRIDE;
+  virtual void CanDownload(const std::string& request_method,
+                           const GURL& url,
+                           const base::Callback<void(bool)>& callback) OVERRIDE;
+  virtual void RequestPointerLockPermission(
+      bool user_gesture,
+      bool last_unlocked_by_target,
+      const base::Callback<void(bool)>& callback) OVERRIDE;
+  virtual content::JavaScriptDialogManager*
+      GetJavaScriptDialogManager() OVERRIDE;
 
   // NotificationObserver implementation.
   virtual void Observe(int type,
@@ -107,6 +121,37 @@ class WebViewGuest : public GuestView,
 
   // Reload the guest.
   void Reload();
+
+  // Requests Geolocation Permission from the embedder.
+  void RequestGeolocationPermission(int bridge_id,
+                                    const GURL& requesting_frame,
+                                    bool user_gesture,
+                                    const base::Callback<void(bool)>& callback);
+
+  void OnWebViewGeolocationPermissionResponse(
+      int bridge_id,
+      bool user_gesture,
+      const base::Callback<void(bool)>& callback,
+      bool allow,
+      const std::string& user_input);
+
+  void CancelGeolocationPermissionRequest(int bridge_id);
+
+  void OnWebViewMediaPermissionResponse(
+      const content::MediaStreamRequest& request,
+      const content::MediaResponseCallback& callback,
+      bool allow,
+      const std::string& user_input);
+
+  void OnWebViewDownloadPermissionResponse(
+      const base::Callback<void(bool)>& callback,
+      bool allow,
+      const std::string& user_input);
+
+  void OnWebViewPointerLockPermissionResponse(
+      const base::Callback<void(bool)>& callback,
+      bool allow,
+      const std::string& user_input);
 
   enum PermissionResponseAction {
     DENY,
@@ -219,6 +264,17 @@ class WebViewGuest : public GuestView,
 
   void InjectChromeVoxIfNeeded(content::RenderViewHost* render_view_host);
 
+  // Bridge IDs correspond to a geolocation request. This method will remove
+  // the bookkeeping for a particular geolocation request associated with the
+  // provided |bridge_id|. It returns the request ID of the geolocation request.
+  int RemoveBridgeID(int bridge_id);
+
+  int RequestPermissionInternal(
+      BrowserPluginPermissionType permission_type,
+      const base::DictionaryValue& request_info,
+      const PermissionResponseCallback& callback,
+      bool allowed_by_default);
+
   ObserverList<extensions::TabHelper::ScriptExecutionObserver>
       script_observers_;
   scoped_ptr<extensions::ScriptExecutor> script_executor_;
@@ -251,6 +307,9 @@ class WebViewGuest : public GuestView,
   // Handles find requests and replies for the webview find API.
   WebviewFindHelper find_helper_;
 
+  // Handles the JavaScript dialog requests.
+  JavaScriptDialogHelper javascript_dialog_helper_;
+
   friend void WebviewFindHelper::DispatchFindUpdateEvent(bool canceled,
                                                          bool final_update);
 
@@ -259,6 +318,8 @@ class WebViewGuest : public GuestView,
   scoped_ptr<chromeos::AccessibilityStatusSubscription>
       accessibility_subscription_;
 #endif
+
+  std::map<int, int> bridge_id_to_request_id_map_;
 
   DISALLOW_COPY_AND_ASSIGN(WebViewGuest);
 };

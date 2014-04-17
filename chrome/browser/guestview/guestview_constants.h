@@ -13,6 +13,7 @@ namespace guestview {
 extern const char kIsTopLevel[];
 extern const char kReason[];
 extern const char kUrl[];
+extern const char kUserGesture[];
 
 // Initialization parameters.
 extern const char kParameterApi[];

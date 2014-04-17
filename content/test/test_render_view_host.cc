@@ -16,7 +16,6 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/page_state.h"
-#include "content/test/test_backing_store.h"
 #include "content/test/test_web_contents.h"
 #include "media/base/video_frame.h"
 #include "ui/gfx/rect.h"
@@ -100,11 +99,6 @@ gfx::Rect TestRenderWidgetHostView::GetViewBounds() const {
   return gfx::Rect();
 }
 
-BackingStore* TestRenderWidgetHostView::AllocBackingStore(
-    const gfx::Size& size) {
-  return new TestBackingStore(rwh_, size);
-}
-
 void TestRenderWidgetHostView::CopyFromCompositingSurface(
     const gfx::Rect& src_subrect,
     const gfx::Size& dst_size,
@@ -180,16 +174,6 @@ gfx::Rect TestRenderWidgetHostView::GetBoundsInRootWindow() {
   return gfx::Rect();
 }
 
-#if defined(TOOLKIT_GTK)
-GdkEventButton* TestRenderWidgetHostView::GetLastMouseDown() {
-  return NULL;
-}
-
-gfx::NativeView TestRenderWidgetHostView::BuildInputMethodsGtkMenu() {
-  return NULL;
-}
-#endif  // defined(TOOLKIT_GTK)
-
 void TestRenderWidgetHostView::OnSwapCompositorFrame(
     uint32 output_surface_id,
     scoped_ptr<cc::CompositorFrame> frame) {
@@ -254,7 +238,8 @@ TestRenderViewHost::~TestRenderViewHost() {
 bool TestRenderViewHost::CreateRenderView(
     const base::string16& frame_name,
     int opener_route_id,
-    int32 max_page_id) {
+    int32 max_page_id,
+    bool window_was_created_with_opener) {
   DCHECK(!render_view_created_);
   render_view_created_ = true;
   opener_route_id_ = opener_route_id;

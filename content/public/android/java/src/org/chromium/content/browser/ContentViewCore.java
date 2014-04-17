@@ -314,8 +314,6 @@ public class ContentViewCore
     // Native pointer to C++ ContentViewCoreImpl object which will be set by nativeInit().
     private long mNativeContentViewCore = 0;
 
-    private boolean mInForeground = false;
-
     private final ObserverList<GestureStateListener> mGestureStateListeners;
     private final RewindableIterator<GestureStateListener> mGestureStateListenersIterator;
     private ZoomControlsDelegate mZoomControlsDelegate;
@@ -729,10 +727,20 @@ public class ContentViewCore
         mContainerView.setContentDescription(contentDescription);
         mWebContentsObserver = new WebContentsObserverAndroid(this) {
             @Override
-            public void didStartLoading(String url) {
+            public void didNavigateMainFrame(String url, String baseUrl,
+                    boolean isNavigationToDifferentPage, boolean isNavigationInPage) {
+                if (!isNavigationToDifferentPage) return;
                 hidePopupDialog();
                 resetScrollInProgress();
-                resetGestureDetectors();
+                resetGestureDetection();
+            }
+
+            @Override
+            public void renderProcessGone(boolean wasOomProtected) {
+                hidePopupDialog();
+                resetScrollInProgress();
+                // No need to reset gesture detection as the detector will have
+                // been destroyed in the RenderWidgetHostView.
             }
         };
     }
@@ -766,7 +774,6 @@ public class ContentViewCore
         mContainerView.setClickable(true);
 
         mRenderCoordinates.reset();
-        onRenderCoordinatesUpdated();
 
         initPopupZoomer(mContext);
         mImeAdapter = createImeAdapter(mContext);
@@ -923,6 +930,8 @@ public class ContentViewCore
                 params.mUrl,
                 params.mLoadUrlType,
                 params.mTransitionType,
+                params.getReferrer() != null ? params.getReferrer().getUrl() : null,
+                params.getReferrer() != null ? params.getReferrer().getPolicy() : 0,
                 params.mUaOverrideOption,
                 params.getExtraHeadersString(),
                 params.mPostData,
@@ -1211,8 +1220,7 @@ public class ContentViewCore
     }
 
     public void setIgnoreRemainingTouchEvents() {
-        if (mNativeContentViewCore == 0) return;
-        nativeIgnoreRemainingTouchEvents(mNativeContentViewCore);
+        resetGestureDetection();
     }
 
     public boolean isScrollInProgress() {
@@ -1409,11 +1417,6 @@ public class ContentViewCore
      */
     public void onShow() {
         assert mNativeContentViewCore != 0;
-        if (!mInForeground) {
-            ChildProcessLauncher.getBindingManager().setInForeground(getCurrentRenderProcessId(),
-                    true);
-        }
-        mInForeground = true;
         nativeOnShow(mNativeContentViewCore);
         setAccessibilityState(mAccessibilityManager.isEnabled());
     }
@@ -1431,11 +1434,6 @@ public class ContentViewCore
      */
     public void onHide() {
         assert mNativeContentViewCore != 0;
-        if (mInForeground) {
-            ChildProcessLauncher.getBindingManager().setInForeground(getCurrentRenderProcessId(),
-                    false);
-        }
-        mInForeground = false;
         hidePopupDialog();
         setInjectedAccessibility(false);
         nativeOnHide(mNativeContentViewCore);
@@ -1451,23 +1449,8 @@ public class ContentViewCore
         return mContentSettings;
     }
 
-    private void onRenderCoordinatesUpdated() {
-        if (mNativeContentViewCore == 0) return;
-
-        // We disable double tap zoom for pages that have a width=device-width
-        // or narrower viewport (indicating that this is a mobile-optimized or
-        // responsive web design, so text will be legible without zooming).
-        // We also disable it for pages that disallow the user from zooming in
-        // or out (even if they don't have a device-width or narrower viewport).
-        nativeSetDoubleTapSupportForPageEnabled(mNativeContentViewCore,
-                !mRenderCoordinates.hasMobileViewport() && !mRenderCoordinates.hasFixedPageScale());
-    }
-
     private void hidePopupDialog() {
-        if (mSelectPopupDialog != null) {
-            mSelectPopupDialog.hide();
-            mSelectPopupDialog = null;
-        }
+        hideSelectPopup();
         hideHandles();
         hideSelectActionBar();
     }
@@ -1483,9 +1466,9 @@ public class ContentViewCore
         return mActionMode != null;
     }
 
-    private void resetGestureDetectors() {
+    private void resetGestureDetection() {
         if (mNativeContentViewCore == 0) return;
-        nativeResetGestureDetectors(mNativeContentViewCore);
+        nativeResetGestureDetection(mNativeContentViewCore);
     }
 
     /**
@@ -1663,10 +1646,7 @@ public class ContentViewCore
      * @see View#onWindowFocusChanged(boolean)
      */
     public void onWindowFocusChanged(boolean hasWindowFocus) {
-        if (!hasWindowFocus) {
-            if (mNativeContentViewCore == 0) return;
-            nativeOnWindowFocusLost(mNativeContentViewCore);
-        }
+        if (!hasWindowFocus) resetGestureDetection();
     }
 
     public void onFocusChanged(boolean gainFocus) {
@@ -2342,7 +2322,6 @@ public class ContentViewCore
                 viewportWidth, viewportHeight,
                 pageScaleFactor, minPageScaleFactor, maxPageScaleFactor,
                 contentOffsetYPix);
-        onRenderCoordinatesUpdated();
 
         if (scrollChanged || contentOffsetChanged) {
             for (mGestureStateListenersIterator.rewind();
@@ -2571,14 +2550,7 @@ public class ContentViewCore
 
     @SuppressWarnings("unused")
     @CalledByNative
-    private void onRenderProcessSwap(int oldPid, int newPid) {
-        if (!mInForeground) {
-            ChildProcessLauncher.getBindingManager().setInForeground(newPid, false);
-        } else if (oldPid != newPid) {
-            ChildProcessLauncher.getBindingManager().setInForeground(oldPid, false);
-            ChildProcessLauncher.getBindingManager().setInForeground(newPid, true);
-        }
-
+    private void onRenderProcessSwap() {
         attachImeAdapter();
     }
 
@@ -3193,6 +3165,8 @@ public class ContentViewCore
             String url,
             int loadUrlType,
             int transitionType,
+            String referrerUrl,
+            int referrerPolicy,
             int uaOverrideOption,
             String extraHeaders,
             byte[] postData,
@@ -3266,14 +3240,7 @@ public class ContentViewCore
 
     private native void nativeMoveCaret(long nativeContentViewCoreImpl, float x, float y);
 
-    private native void nativeResetGestureDetectors(long nativeContentViewCoreImpl);
-
-    private native void nativeIgnoreRemainingTouchEvents(long nativeContentViewCoreImpl);
-
-    private native void nativeOnWindowFocusLost(long nativeContentViewCoreImpl);
-
-    private native void nativeSetDoubleTapSupportForPageEnabled(
-            long nativeContentViewCoreImpl, boolean enabled);
+    private native void nativeResetGestureDetection(long nativeContentViewCoreImpl);
     private native void nativeSetDoubleTapSupportEnabled(
             long nativeContentViewCoreImpl, boolean enabled);
     private native void nativeSetMultiTouchZoomSupportEnabled(

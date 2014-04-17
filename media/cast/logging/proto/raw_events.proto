@@ -33,7 +33,7 @@ enum EventType {
   AUDIO_FRAME_DECODED = 12;
   // Video sender.
   VIDEO_FRAME_CAPTURED = 13;
-  VIEDO_FRAME_RECEIVED = 14;
+  VIDEO_FRAME_RECEIVED = 14;
   VIDEO_FRAME_SENT_TO_ENCODER = 15;
   VIDEO_FRAME_ENCODED = 16;
   // Video receiver.
@@ -69,24 +69,40 @@ message LogMetadata {
 
   // Number of AggregatedPacketEvent's.
   optional int32 num_packet_events = 4;
+
+  // The internal timestamp value in milliseconds that represents the time
+  // of the Unix epoch. This is used for relating the timestamps in the events
+  // to a real time and date.
+  optional int64 reference_timestamp_ms_at_unix_epoch = 5;
 }
 
 message AggregatedFrameEvent {
   optional uint32 relative_rtp_timestamp = 1;
 
   repeated EventType event_type = 2 [packed = true];
+  
+  // The internal timestamp value in milliseconds. Use
+  // LogMetadata.reference_timestamp_ms_at_unix_epoch to relate to a real time
+  // and date.
   repeated int64 event_timestamp_ms = 3 [packed = true];
 
-  // Size is set only for kAudioFrameEncoded and kVideoFrameEncoded.
+  // Only set if there is a kAudioFrameEncoded and kVideoFrameEncoded event.
   optional int32 encoded_frame_size = 4;
 
-  // Delay is only set for kAudioPlayoutDelay and kVideoRenderDelay.
+  // Only set if there is a kAudioPlayoutDelay or kVideoRenderDelay event.
   optional int32 delay_millis = 5;
+
+  // Only set if there is a kVideoFrameEncoded event.
+  optional bool key_frame = 6;
 };
 
 message BasePacketEvent {
   optional int32 packet_id = 1;
   repeated EventType event_type = 2 [packed = true];
+  
+  // The internal timestamp value in milliseconds. Use
+  // LogMetadata.reference_timestamp_ms_at_unix_epoch to relate to a real time
+  // and date.
   repeated int64 event_timestamp_ms = 3 [packed = true];
 }
 

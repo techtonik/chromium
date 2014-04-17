@@ -125,6 +125,37 @@ class RenderViewHostDeletedObserver : public WebContentsObserver {
 };
 
 
+// This observer keeps track of the last deleted RenderViewHost to avoid
+// accessing it and causing use-after-free condition.
+class RenderFrameHostDeletedObserver : public WebContentsObserver {
+ public:
+  RenderFrameHostDeletedObserver(RenderFrameHost* rfh)
+      : WebContentsObserver(WebContents::FromRenderFrameHost(rfh)),
+        process_id_(rfh->GetProcess()->GetID()),
+        routing_id_(rfh->GetRoutingID()),
+        deleted_(false) {
+  }
+
+  virtual void RenderFrameDeleted(RenderFrameHost* render_frame_host) OVERRIDE {
+    if (render_frame_host->GetProcess()->GetID() == process_id_ &&
+        render_frame_host->GetRoutingID() == routing_id_) {
+      deleted_ = true;
+    }
+  }
+
+  bool deleted() {
+    return deleted_;
+  }
+
+ private:
+  int process_id_;
+  int routing_id_;
+  bool deleted_;
+
+  DISALLOW_COPY_AND_ASSIGN(RenderFrameHostDeletedObserver);
+};
+
+
 // This observer is used to check whether IPC messages are being filtered for
 // swapped out RenderFrameHost objects. It observes the plugin crash and favicon
 // update events, which the FilterMessagesWhileSwappedOut test simulates being
@@ -1060,7 +1091,7 @@ TEST_F(RenderFrameHostManagerTest, WebUIInNewTab) {
   manager1->Init(
       browser_context(), blank_instance, MSG_ROUTING_NONE, MSG_ROUTING_NONE);
   // Test the case that new RVH is considered live.
-  manager1->current_host()->CreateRenderView(base::string16(), -1, -1);
+  manager1->current_host()->CreateRenderView(base::string16(), -1, -1, false);
 
   // Navigate to a WebUI page.
   const GURL kUrl1("chrome://foo");
@@ -1095,7 +1126,7 @@ TEST_F(RenderFrameHostManagerTest, WebUIInNewTab) {
       browser_context(), webui_instance, MSG_ROUTING_NONE, MSG_ROUTING_NONE);
   // Make sure the new RVH is considered live.  This is usually done in
   // RenderWidgetHost::Init when opening a new tab from a link.
-  manager2->current_host()->CreateRenderView(base::string16(), -1, -1);
+  manager2->current_host()->CreateRenderView(base::string16(), -1, -1, false);
 
   const GURL kUrl2("chrome://foo/bar");
   NavigationEntryImpl entry2(NULL /* instance */, -1 /* page_id */, kUrl2,
@@ -1297,7 +1328,8 @@ TEST_F(RenderFrameHostManagerTest, CleanUpSwappedOutRVHOnProcessCrash) {
   contents()->SetOpener(opener1.get());
 
   // Make sure the new opener RVH is considered live.
-  opener1_manager->current_host()->CreateRenderView(base::string16(), -1, -1);
+  opener1_manager->current_host()->CreateRenderView(
+      base::string16(), -1, -1, false);
 
   // Use a cross-process navigation in the opener to swap out the old RVH.
   EXPECT_FALSE(opener1_manager->GetSwappedOutRenderViewHost(
@@ -1763,6 +1795,56 @@ TEST_F(RenderFrameHostManagerTest,
   // rvh1 should be swapped out.
   EXPECT_FALSE(rvh_deleted_observer.deleted());
   EXPECT_TRUE(rvh1->IsSwappedOut());
+}
+
+// Test that a RenderFrameHost is properly deleted or swapped out when a
+// cross-site navigation is cancelled.
+TEST_F(RenderFrameHostManagerTest,
+       CancelPendingProperlyDeletesOrSwaps) {
+  const GURL kUrl1("http://www.google.com/");
+  const GURL kUrl2("http://www.chromium.org/");
+  RenderFrameHostImpl* pending_rfh = NULL;
+  base::TimeTicks now = base::TimeTicks::Now();
+
+  // Navigate to the first page.
+  contents()->NavigateAndCommit(kUrl1);
+  TestRenderViewHost* rvh1 = test_rvh();
+  EXPECT_EQ(RenderViewHostImpl::STATE_DEFAULT, rvh1->rvh_state());
+
+  // Navigate to a new site, starting a cross-site navigation.
+  controller().LoadURL(kUrl2, Referrer(), PAGE_TRANSITION_LINK, std::string());
+  {
+    pending_rfh = contents()->GetFrameTree()->root()->render_manager()
+        ->pending_frame_host();
+    RenderFrameHostDeletedObserver rvh_deleted_observer(pending_rfh);
+
+    // Cancel the navigation by simulating a declined beforeunload dialog.
+    main_test_rfh()->OnMessageReceived(
+        FrameHostMsg_BeforeUnload_ACK(0, false, now, now));
+    EXPECT_FALSE(contents()->cross_navigation_pending());
+
+    // Since the pending RFH is the only one for the new SiteInstance, it should
+    // be deleted.
+    EXPECT_TRUE(rvh_deleted_observer.deleted());
+  }
+
+  // Start another cross-site navigation.
+  controller().LoadURL(kUrl2, Referrer(), PAGE_TRANSITION_LINK, std::string());
+  {
+    pending_rfh = contents()->GetFrameTree()->root()->render_manager()
+        ->pending_frame_host();
+    RenderFrameHostDeletedObserver rvh_deleted_observer(pending_rfh);
+
+    // Increment the number of active views in the new SiteInstance, which will
+    // cause the pending RFH to be swapped out instead of deleted.
+    static_cast<SiteInstanceImpl*>(
+        pending_rfh->GetSiteInstance())->increment_active_view_count();
+
+    main_test_rfh()->OnMessageReceived(
+        FrameHostMsg_BeforeUnload_ACK(0, false, now, now));
+    EXPECT_FALSE(contents()->cross_navigation_pending());
+    EXPECT_FALSE(rvh_deleted_observer.deleted());
+  }
 }
 
 }  // namespace content

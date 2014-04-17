@@ -301,7 +301,7 @@ bool MP4StreamParser::ParseMoov(BoxReader* reader) {
   }
 
   if (!init_cb_.is_null())
-    base::ResetAndReturn(&init_cb_).Run(true, duration, false);
+    base::ResetAndReturn(&init_cb_).Run(true, duration, base::Time(), false);
 
   EmitNeedKeyIfNecessary(moov_->pssh);
   return true;
@@ -432,6 +432,12 @@ bool MP4StreamParser::EnqueueSample(BufferQueue* audio_buffers,
   // Skip this entire track if it's not one we're interested in
   if (!audio && !video)
     runs_->AdvanceRun();
+
+  // AuxInfo is required for encrypted samples.
+  // See ISO Common Encryption spec: ISO/IEC FDIS 23001-7:2011(E);
+  // Section 7: Common Encryption Sample Auxiliary Information.
+  if (runs_->is_encrypted() && !runs_->aux_info_size())
+    return false;
 
   // Attempt to cache the auxiliary information first. Aux info is usually
   // placed in a contiguous block before the sample data, rather than being

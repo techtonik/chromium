@@ -50,7 +50,6 @@
 #include "chrome/common/extensions/api/tabs.h"
 #include "chrome/common/extensions/api/windows.h"
 #include "chrome/common/extensions/extension_constants.h"
-#include "chrome/common/extensions/extension_file_util.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
 #include "components/translate/core/common/language_detection_details.h"
@@ -564,8 +563,8 @@ bool WindowsCreateFunction::RunImpl() {
     create_params.initial_bounds = window_bounds;
   } else {
     create_params = Browser::CreateParams::CreateForApp(
-        window_type,
         web_app::GenerateApplicationNameFromExtensionId(extension_id),
+        false /* trusted_source */,
         window_bounds,
         window_profile,
         host_desktop_type);

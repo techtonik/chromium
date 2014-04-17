@@ -25,6 +25,7 @@
 #include "content/browser/renderer_host/render_widget_host_delegate.h"
 #include "content/common/content_export.h"
 #include "content/public/browser/ax_event_notification_details.h"
+#include "content/public/browser/color_chooser.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
 #include "content/public/browser/web_contents.h"
@@ -45,7 +46,6 @@ namespace content {
 class BrowserPluginEmbedder;
 class BrowserPluginGuest;
 class BrowserPluginGuestManager;
-class ColorChooser;
 class DateTimeChooserAndroid;
 class DownloadItem;
 class InterstitialPageImpl;
@@ -340,6 +340,7 @@ class CONTENT_EXPORT WebContentsImpl
                                       bool is_reload,
                                       IPC::Message* reply_msg) OVERRIDE;
   virtual WebContents* GetAsWebContents() OVERRIDE;
+  virtual bool IsNeverVisible() OVERRIDE;
 
   // RenderViewHostDelegate ----------------------------------------------------
   virtual RenderViewHostDelegateView* GetDelegateView() OVERRIDE;
@@ -895,6 +896,10 @@ class CONTENT_EXPORT WebContentsImpl
   // is closed.
   WebContentsImpl* opener_;
 
+  // True if this tab was opened by another tab. This is not unset if the opener
+  // is closed.
+  bool created_with_opener_;
+
 #if defined(OS_WIN)
   gfx::NativeViewAccessible accessible_parent_;
 #endif
@@ -1027,17 +1032,31 @@ class CONTENT_EXPORT WebContentsImpl
   scoped_ptr<DateTimeChooserAndroid> date_time_chooser_;
 #endif
 
-  // Color chooser that was opened by this tab.
-  scoped_ptr<ColorChooser> color_chooser_;
+  // Holds information about a current color chooser dialog, if one is visible.
+  struct ColorChooserInfo {
+    ColorChooserInfo(int render_process_id,
+                     int render_frame_id,
+                     ColorChooser* chooser,
+                     int identifier);
+    ~ColorChooserInfo();
 
-  // A unique identifier for the current color chooser.  Identifiers are unique
-  // across a renderer process.  This avoids race conditions in synchronizing
-  // the browser and renderer processes.  For example, if a renderer closes one
-  // chooser and opens another, and simultaneously the user picks a color in the
-  // first chooser, the IDs can be used to drop the "chose a color" message
-  // rather than erroneously tell the renderer that the user picked a color in
-  // the second chooser.
-  int color_chooser_identifier_;
+    int render_process_id;
+    int render_frame_id;
+
+    // Color chooser that was opened by this tab.
+    scoped_ptr<ColorChooser> chooser;
+
+    // A unique identifier for the current color chooser.  Identifiers are
+    // unique across a renderer process.  This avoids race conditions in
+    // synchronizing the browser and renderer processes.  For example, if a
+    // renderer closes one chooser and opens another, and simultaneously the
+    // user picks a color in the first chooser, the IDs can be used to drop the
+    // "chose a color" message rather than erroneously tell the renderer that
+    // the user picked a color in the second chooser.
+    int identifier;
+  };
+
+  scoped_ptr<ColorChooserInfo> color_chooser_info_;
 
   // Manages the embedder state for browser plugins, if this WebContents is an
   // embedder; NULL otherwise.

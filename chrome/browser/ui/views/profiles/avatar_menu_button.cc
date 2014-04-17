@@ -16,7 +16,7 @@
 #include "chrome/browser/ui/views/profiles/avatar_menu_bubble_view.h"
 #include "chrome/browser/ui/views/profiles/profile_chooser_view.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/common/profile_management_switches.h"
+#include "components/signin/core/common/profile_management_switches.h"
 #include "content/public/browser/notification_service.h"
 #include "ui/gfx/canvas.h"
 #include "ui/views/widget/widget.h"
@@ -105,7 +105,7 @@ void AvatarMenuButton::ShowAvatarBubble() {
   gfx::Rect bounds(origin, size());
   views::BubbleBorder::Arrow arrow = button_on_right_ ?
       views::BubbleBorder::TOP_RIGHT : views::BubbleBorder::TOP_LEFT;
-  if (switches::IsNewProfileManagement()) {
+  if (switches::IsNewAvatarMenu()) {
     ProfileChooserView::ShowBubble(
         ProfileChooserView::BUBBLE_VIEW_MODE_PROFILE_CHOOSER,
         this, arrow, views::BubbleBorder::ALIGN_ARROW_TO_MID_ANCHOR, bounds,

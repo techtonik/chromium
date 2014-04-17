@@ -152,7 +152,8 @@ class HTTPSServer(tlslite.api.TLSSocketServerMixIn,
   client verification."""
 
   def __init__(self, server_address, request_hander_class, pem_cert_and_key,
-               ssl_client_auth, ssl_client_cas, ssl_bulk_ciphers,
+               ssl_client_auth, ssl_client_cas,
+               ssl_bulk_ciphers, ssl_key_exchanges, enable_npn,
                record_resume_info, tls_intolerant, signed_cert_timestamps,
                fallback_scsv_enabled, ocsp_response):
     self.cert_chain = tlslite.api.X509CertChain()
@@ -166,6 +167,10 @@ class HTTPSServer(tlslite.api.TLSSocketServerMixIn,
                                                implementations=['python'])
     self.ssl_client_auth = ssl_client_auth
     self.ssl_client_cas = []
+    if enable_npn:
+      self.next_protos = ['http/1.1']
+    else:
+      self.next_protos = None
     if tls_intolerant == 0:
       self.tls_intolerant = None
     else:
@@ -182,6 +187,8 @@ class HTTPSServer(tlslite.api.TLSSocketServerMixIn,
     self.ssl_handshake_settings = tlslite.api.HandshakeSettings()
     if ssl_bulk_ciphers is not None:
       self.ssl_handshake_settings.cipherNames = ssl_bulk_ciphers
+    if ssl_key_exchanges is not None:
+      self.ssl_handshake_settings.keyExchangeNames = ssl_key_exchanges
 
     if record_resume_info:
       # If record_resume_info is true then we'll replace the session cache with
@@ -204,6 +211,7 @@ class HTTPSServer(tlslite.api.TLSSocketServerMixIn,
                                     reqCert=self.ssl_client_auth,
                                     settings=self.ssl_handshake_settings,
                                     reqCAs=self.ssl_client_cas,
+                                    nextProtos=self.next_protos,
                                     tlsIntolerant=self.tls_intolerant,
                                     signedCertTimestamps=
                                     self.signed_cert_timestamps,
@@ -1982,6 +1990,8 @@ class ServerRunner(testserver_base.TestServerRunner):
                              self.options.ssl_client_auth,
                              self.options.ssl_client_ca,
                              self.options.ssl_bulk_cipher,
+                             self.options.ssl_key_exchange,
+                             self.options.enable_npn,
                              self.options.record_resume,
                              self.options.tls_intolerant,
                              self.options.signed_cert_timestamps_tls_ext.decode(
@@ -2170,6 +2180,21 @@ class ServerRunner(testserver_base.TestServerRunner):
                                   'algorithms will be used. This option may '
                                   'appear multiple times, indicating '
                                   'multiple algorithms should be enabled.');
+    self.option_parser.add_option('--ssl-key-exchange', action='append',
+                                  help='Specify the key exchange algorithm(s)'
+                                  'that will be accepted by the SSL server. '
+                                  'Valid values are "rsa", "dhe_rsa". If '
+                                  'omitted, all algorithms will be used. This '
+                                  'option may appear multiple times, '
+                                  'indicating multiple algorithms should be '
+                                  'enabled.');
+    # TODO(davidben): Add ALPN support to tlslite.
+    self.option_parser.add_option('--enable-npn', dest='enable_npn',
+                                  default=False, const=True,
+                                  action='store_const',
+                                  help='Enable server support for the NPN '
+                                  'extension. The server will advertise '
+                                  'support for exactly one protocol, http/1.1')
     self.option_parser.add_option('--file-root-url', default='/files/',
                                   help='Specify a root URL for files served.')
 

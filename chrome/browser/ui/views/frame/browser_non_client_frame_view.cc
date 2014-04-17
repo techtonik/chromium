@@ -16,7 +16,7 @@
 #include "chrome/browser/ui/views/profiles/avatar_label.h"
 #include "chrome/browser/ui/views/profiles/avatar_menu_button.h"
 #include "chrome/browser/ui/views/profiles/new_avatar_button.h"
-#include "chrome/common/profile_management_switches.h"
+#include "components/signin/core/common/profile_management_switches.h"
 #include "grit/generated_resources.h"
 #include "grit/theme_resources.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -143,7 +143,7 @@ void BrowserNonClientFrameView::UpdateAvatarInfo() {
 void BrowserNonClientFrameView::UpdateNewStyleAvatarInfo(
     views::ButtonListener* listener,
     const NewAvatarButton::AvatarButtonStyle style) {
-  DCHECK(switches::IsNewProfileManagement());
+  DCHECK(switches::IsNewAvatarMenu());
   // This should never be called in incognito mode.
   DCHECK(browser_view_->IsRegularOrGuestSession());
 

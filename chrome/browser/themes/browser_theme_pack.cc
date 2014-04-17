@@ -43,7 +43,7 @@ namespace {
 // Version number of the current theme pack. We just throw out and rebuild
 // theme packs that aren't int-equal to this. Increment this number if you
 // change default theme assets.
-const int kThemePackVersion = 32;
+const int kThemePackVersion = 33;
 
 // IDs that are in the DataPack won't clash with the positive integer
 // uint16. kHeaderID should always have the maximum value because we want the
@@ -870,8 +870,7 @@ gfx::Image BrowserThemePack::GetImageNamed(int idr_id) {
       png_map[scale_factors_[i]] = memory;
   }
   if (!png_map.empty()) {
-    gfx::ImageSkia image_skia(new ThemeImagePngSource(png_map),
-                              ui::SCALE_FACTOR_100P);
+    gfx::ImageSkia image_skia(new ThemeImagePngSource(png_map), 1.0f);
     // |image_skia| takes ownership of ThemeImagePngSource.
     gfx::Image ret = gfx::Image(image_skia);
     images_on_ui_thread_[prs_id] = ret;

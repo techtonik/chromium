@@ -371,13 +371,13 @@ bool CreateApplicationShortcutView::Accept() {
   if (!IsDialogButtonEnabled(ui::DIALOG_BUTTON_OK))
     return false;
 
-  ShellIntegration::ShortcutLocations creation_locations;
+  web_app::ShortcutLocations creation_locations;
   creation_locations.on_desktop = desktop_check_box_->checked();
   if (menu_check_box_ != NULL && menu_check_box_->checked()) {
     creation_locations.applications_menu_location =
         create_in_chrome_apps_subdir_ ?
-            ShellIntegration::APP_MENU_LOCATION_SUBDIR_CHROMEAPPS :
-            ShellIntegration::APP_MENU_LOCATION_ROOT;
+            web_app::APP_MENU_LOCATION_SUBDIR_CHROMEAPPS :
+            web_app::APP_MENU_LOCATION_ROOT;
   }
 
 #if defined(OS_WIN)
@@ -521,7 +521,6 @@ CreateChromeApplicationShortcutView::CreateChromeApplicationShortcutView(
     const extensions::Extension* app,
     const base::Closure& close_callback)
         : CreateApplicationShortcutView(profile),
-          app_(app),
           close_callback_(close_callback),
           weak_ptr_factory_(this) {
   // Required by InitControls().
@@ -556,7 +555,7 @@ bool CreateChromeApplicationShortcutView::Cancel() {
 
 // Called when the app's ShortcutInfo (with icon) is loaded.
 void CreateChromeApplicationShortcutView::OnShortcutInfoLoaded(
-    const ShellIntegration::ShortcutInfo& shortcut_info) {
+    const web_app::ShortcutInfo& shortcut_info) {
   shortcut_info_ = shortcut_info;
 
   CHECK(app_info_);

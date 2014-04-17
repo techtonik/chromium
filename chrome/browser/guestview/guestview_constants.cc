@@ -10,6 +10,7 @@ namespace guestview {
 const char kIsTopLevel[] = "isTopLevel";
 const char kReason[] = "reason";
 const char kUrl[] = "url";
+const char kUserGesture[] = "userGesture";
 
 // Initialization parameters.
 const char kParameterApi[] = "api";

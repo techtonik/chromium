@@ -22,19 +22,24 @@
 #include "base/at_exit.h"
 #include "base/command_line.h"
 #include "base/logging.h"
+#include "base/memory/scoped_ptr.h"
 #include "base/message_loop/message_loop.h"
 #include "base/posix/eintr_wrapper.h"
 #include "base/posix/global_descriptors.h"
 #include "base/posix/unix_domain_socket_linux.h"
 #include "base/process/kill.h"
 #include "base/rand_util.h"
+#include "components/nacl/common/nacl_switches.h"
 #include "components/nacl/loader/nacl_listener.h"
 #include "components/nacl/loader/nacl_sandbox_linux.h"
 #include "content/public/common/zygote_fork_delegate_linux.h"
 #include "crypto/nss_util.h"
 #include "ipc/ipc_descriptors.h"
 #include "ipc/ipc_switches.h"
+#include "sandbox/linux/services/credentials.h"
 #include "sandbox/linux/services/libc_urandom_override.h"
+#include "sandbox/linux/services/thread_helpers.h"
+#include "sandbox/linux/suid/client/setuid_sandbox_client.h"
 
 namespace {
 
@@ -42,6 +47,69 @@ struct NaClLoaderSystemInfo {
   size_t prereserved_sandbox_size;
   long number_of_cores;
 };
+
+// This is a poor man's check on whether we are sandboxed.
+bool IsSandboxed() {
+  int proc_fd = open("/proc/self/exe", O_RDONLY);
+  if (proc_fd >= 0) {
+    close(proc_fd);
+    return false;
+  }
+  return true;
+}
+
+void InitializeLayerOneSandbox() {
+  // Check that IsSandboxed() works. We should not be sandboxed at this point.
+  CHECK(!IsSandboxed()) << "Unexpectedly sandboxed!";
+  scoped_ptr<sandbox::SetuidSandboxClient>
+      setuid_sandbox_client(sandbox::SetuidSandboxClient::Create());
+  PCHECK(0 == IGNORE_EINTR(close(
+                  setuid_sandbox_client->GetUniqueToChildFileDescriptor())));
+  const bool suid_sandbox_child = setuid_sandbox_client->IsSuidSandboxChild();
+  const bool is_init_process = 1 == getpid();
+  CHECK_EQ(is_init_process, suid_sandbox_child);
+
+  if (suid_sandbox_child) {
+    // Make sure that no directory file descriptor is open, as it would bypass
+    // the setuid sandbox model.
+    sandbox::Credentials credentials;
+    CHECK(!credentials.HasOpenDirectory(-1));
+
+    // Get sandboxed.
+    CHECK(setuid_sandbox_client->ChrootMe());
+    CHECK(IsSandboxed());
+  }
+}
+
+void InitializeLayerTwoSandbox(bool uses_nonsfi_mode) {
+  if (uses_nonsfi_mode) {
+    const bool can_be_no_sandbox = CommandLine::ForCurrentProcess()->HasSwitch(
+        switches::kNaClDangerousNoSandboxNonSfi);
+    const bool setuid_sandbox_enabled = IsSandboxed();
+    if (!setuid_sandbox_enabled) {
+      if (can_be_no_sandbox)
+        LOG(ERROR) << "DANGEROUS: Running non-SFI NaCl without SUID sandbox!";
+      else
+        LOG(FATAL) << "SUID sandbox is mandatory for non-SFI NaCl";
+    }
+    const bool bpf_sandbox_initialized = InitializeBPFSandbox();
+    if (!bpf_sandbox_initialized) {
+      if (can_be_no_sandbox) {
+        LOG(ERROR)
+            << "DANGEROUS: Running non-SFI NaCl without seccomp-bpf sandbox!";
+      } else {
+        LOG(FATAL) << "Could not initialize NaCl's second "
+                   << "layer sandbox (seccomp-bpf) for non-SFI mode.";
+      }
+    }
+  } else {
+    const bool bpf_sandbox_initialized = InitializeBPFSandbox();
+    if (!bpf_sandbox_initialized) {
+      LOG(ERROR) << "Could not initialize NaCl's second "
+                 << "layer sandbox (seccomp-bpf) for SFI mode.";
+    }
+  }
+}
 
 // The child must mimic the behavior of zygote_main_linux.cc on the child
 // side of the fork. See zygote_main_linux.cc:HandleForkRequest from
@@ -53,11 +121,7 @@ void BecomeNaClLoader(const std::vector<int>& child_fds,
   // don't need zygote FD any more
   if (IGNORE_EINTR(close(kNaClZygoteDescriptor)) != 0)
     LOG(ERROR) << "close(kNaClZygoteDescriptor) failed.";
-  bool sandbox_initialized = InitializeBPFSandbox();
-  if (!sandbox_initialized) {
-    LOG(ERROR) << "Could not initialize NaCl's second "
-      << "layer sandbox (seccomp-bpf).";
-  }
+  InitializeLayerTwoSandbox(uses_nonsfi_mode);
   base::GlobalDescriptors::GetInstance()->Set(
       kPrimaryIPCChannel,
       child_fds[content::ZygoteForkDelegate::kBrowserFDIndex]);
@@ -84,7 +148,7 @@ void ChildNaClLoaderInit(const std::vector<int>& child_fds,
   // should not fork any child processes (which the seccomp
   // sandbox does) until then, because that can interfere with the
   // parent's discovery of our PID.
-  const int nread = HANDLE_EINTR(read(parent_fd, buffer, kMaxReadSize));
+  const ssize_t nread = HANDLE_EINTR(read(parent_fd, buffer, kMaxReadSize));
   const std::string switch_prefix = std::string("--") +
       switches::kProcessChannelID + std::string("=");
   const size_t len = switch_prefix.length();
@@ -92,7 +156,7 @@ void ChildNaClLoaderInit(const std::vector<int>& child_fds,
   if (nread < 0) {
     perror("read");
     LOG(ERROR) << "read returned " << nread;
-  } else if (nread > static_cast<int>(len)) {
+  } else if (static_cast<size_t>(nread) > len) {
     if (switch_prefix.compare(0, len, buffer, 0, len) == 0) {
       VLOG(1) << "NaCl loader is synchronised with Chrome zygote";
       CommandLine::ForCurrentProcess()->AppendSwitchASCII(
@@ -183,16 +247,6 @@ bool HandleGetTerminationStatusRequest(PickleIterator* input_iter,
     status = base::GetTerminationStatus(child_to_wait, &exit_code);
   output_pickle->WriteInt(static_cast<int>(status));
   output_pickle->WriteInt(exit_code);
-  return true;
-}
-
-// This is a poor man's check on whether we are sandboxed.
-bool IsSandboxed() {
-  int proc_fd = open("/proc/self/exe", O_RDONLY);
-  if (proc_fd >= 0) {
-    close(proc_fd);
-    return false;
-  }
   return true;
 }
 
@@ -381,8 +435,13 @@ int main(int argc, char* argv[]) {
 
   CheckRDebug(argv[0]);
 
-  // Check that IsSandboxed() works. We should not be sandboxed at this point.
-  CHECK(!IsSandboxed()) << "Unexpectedly sandboxed!";
+  // Make sure that the early initialization did not start any spurious
+  // threads.
+#if !defined(THREAD_SANITIZER)
+  CHECK(sandbox::ThreadHelpers::IsSingleThreaded(-1));
+#endif
+
+  InitializeLayerOneSandbox();
 
   const std::vector<int> empty;
   // Send the zygote a message to let it know we are ready to help

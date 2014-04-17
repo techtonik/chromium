@@ -653,6 +653,7 @@
         ['use_x11==1', {
           'dependencies': [
             '../build/linux/system.gyp:x11',
+            '../ui/gfx/gfx.gyp:gfx_x11',
           ]
         }]
       ],
@@ -990,6 +991,7 @@
         'browser/errorpage_browsertest.cc',
         'browser/extensions/active_tab_apitest.cc',
         'browser/extensions/activity_log/activity_log_browsertest.cc',
+        'browser/extensions/activity_log/ad_injection_browsertest.cc',
         'browser/extensions/activity_log/uma_policy_browsertest.cc',
         'browser/extensions/alert_apitest.cc',
         'browser/extensions/all_urls_apitest.cc',
@@ -999,6 +1001,7 @@
         'browser/extensions/api/automation/automation_apitest.cc',
         'browser/extensions/api/autotest_private/autotest_private_apitest.cc',
         'browser/extensions/api/bluetooth/bluetooth_apitest.cc',
+        'browser/extensions/api/bluetooth/bluetooth_private_apitest.cc',
         'browser/extensions/api/bookmark_manager_private/bookmark_manager_private_apitest.cc',
         'browser/extensions/api/braille_display_private/braille_display_private_apitest.cc',
         'browser/extensions/api/braille_display_private/mock_braille_controller.cc',
@@ -1104,6 +1107,7 @@
         'browser/extensions/browsertest_util.h',
         'browser/extensions/browsertest_util_browsertest.cc',
         'browser/extensions/chrome_app_api_browsertest.cc',
+        'browser/extensions/chrome_ui_overrides_browsertest.cc',
         'browser/extensions/content_script_apitest.cc',
         'browser/extensions/content_security_policy_apitest.cc',
         'browser/extensions/convert_web_app_browsertest.cc',
@@ -1603,7 +1607,8 @@
                 '../ppapi/native_client/native_client.gyp:nacl_irt',
                 '../ppapi/ppapi_nacl.gyp:ppapi_nacl_tests',
                 '../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_background_keepalive',
-                '../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_socket'
+                '../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_media_galleries',
+                '../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_socket',
               ],
               'conditions': [
                 ['chromeos==1', {
@@ -1772,6 +1777,7 @@
             # for win aura builds.
             # TODO: enable these for win_ash browser tests.
             'browser/chromeos/system/tray_accessibility_browsertest.cc',
+            'browser/ui/ash/accelerator_commands_browsertest.cc',
             'browser/ui/ash/launcher/chrome_launcher_controller_browsertest.cc',
             'browser/ui/ash/launcher/launcher_favicon_loader_browsertest.cc',
             'browser/ui/ash/shelf_browsertest.cc',
@@ -1885,11 +1891,16 @@
           ],
         }],
         ['OS!="android" and OS!="ios"', {
+          'dependencies': [
+            # build time dependency.
+            '../v8/src/d8.gyp:d8#host',
+          ],
+        }],
+        ['OS!="android" and OS!="ios" and OS!="linux"', {
           # npapi test plugin doesn't build on android or ios
           'dependencies': [
             # build time dependency.
             '../content/content_shell_and_tests.gyp:copy_npapi_test_plugin',
-            '../v8/src/d8.gyp:d8#host',
           ],
         }],
         ['enable_app_list==0', {
@@ -1941,6 +1952,13 @@
         ['enable_autofill_dialog!=1 or OS=="android" or OS=="ios"', {
           '!dependencies': [
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput',
+          ],
+        }],
+        ['use_ozone==1', {
+          'sources!': [
+            # crbug.com/362698
+            'browser/chromeos/input_method/input_method_engine_browsertests.cc',
+            'browser/extensions/api/input_ime/input_ime_apitest_chromeos.cc',
           ],
         }],
       ],  # conditions

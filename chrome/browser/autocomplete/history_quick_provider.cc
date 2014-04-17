@@ -200,15 +200,10 @@ void HistoryQuickProvider::DoAutocomplete() {
   // Loop over every result and add it to matches_.  In the process,
   // guarantee that scores are decreasing.  |max_match_score| keeps
   // track of the highest score we can assign to any later results we
-  // see.  Also, if we're not allowing inline autocompletions in
-  // general or the current best suggestion isn't inlineable,
-  // artificially reduce the starting |max_match_score| (which
-  // therefore applies to all results) to something low enough that
-  // guarantees no result will be offered as an inline autocomplete
-  // suggestion.  Also do a similar reduction if we think there will be
+  // see.  Also, reduce |max_match_score| if we think there will be
   // a URL-what-you-typed match.  (We want URL-what-you-typed matches for
   // visited URLs to beat out any longer URLs, no matter how frequently
-  // they're visited.)  The strength of this last reduction depends on the
+  // they're visited.)  The strength of this reduction depends on the
   // likely score for the URL-what-you-typed result.
 
   // |template_url_service| or |template_url| can be NULL in unit tests.
@@ -216,13 +211,7 @@ void HistoryQuickProvider::DoAutocomplete() {
       TemplateURLServiceFactory::GetForProfile(profile_);
   TemplateURL* template_url = template_url_service ?
       template_url_service->GetDefaultSearchProvider() : NULL;
-  int max_match_score =
-      (OmniboxFieldTrial::ReorderForLegalDefaultMatch(
-         autocomplete_input_.current_page_classification()) ||
-       (!PreventInlineAutocomplete(autocomplete_input_) &&
-        matches.begin()->can_inline())) ?
-      matches.begin()->raw_score() :
-      (AutocompleteResult::kLowestDefaultScore - 1);
+  int max_match_score = matches.begin()->raw_score();
   if (will_have_url_what_you_typed_match_first) {
     max_match_score = std::min(max_match_score,
         url_what_you_typed_match_score - 1);
@@ -273,8 +262,18 @@ AutocompleteMatch HistoryQuickProvider::QuickMatchToACMatch(
   match.contents_class =
       SpansFromTermMatch(new_matches, match.contents.length(), true);
 
-  if (history_match.can_inline()) {
-    DCHECK(!new_matches.empty());
+  // Set |inline_autocompletion| and |allowed_to_be_default_match| if possible.
+  // The second part of this test can happen if the only match(es) of the user's
+  // term occur in places FormatUrl() decides to omit in the formatted url.
+  // In these cases, it's impossible to set |inline_autocompletion| correctly
+  // and hence the match cannot be the default match.  I (mpearson@) believe
+  // this is likely caused by the mismatch that offsets are originally
+  // computed with respect to the cleaned-up URL yet then applied and
+  // updated by FormatUrl() as if they applied to the original string.
+  // See crbug.com/252630.
+  // TODO(mpearson): replacing the second clause with a DCHECK after fixing
+  // 252630.
+  if (history_match.can_inline() && !new_matches.empty()) {
     size_t inline_autocomplete_offset = new_matches[0].offset +
         new_matches[0].length;
     // |inline_autocomplete_offset| may be beyond the end of the

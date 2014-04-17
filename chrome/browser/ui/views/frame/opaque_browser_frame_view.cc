@@ -25,7 +25,7 @@
 #include "chrome/browser/ui/views/theme_image_mapper.h"
 #include "chrome/browser/ui/views/toolbar/toolbar_view.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/common/profile_management_switches.h"
+#include "components/signin/core/common/profile_management_switches.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/web_contents.h"
 #include "grit/chromium_strings.h"
@@ -149,8 +149,7 @@ OpaqueBrowserFrameView::OpaqueBrowserFrameView(BrowserFrame* frame,
   window_title_->set_id(VIEW_ID_WINDOW_TITLE);
   AddChildView(window_title_);
 
-  if (browser_view->IsRegularOrGuestSession() &&
-      switches::IsNewProfileManagement())
+  if (browser_view->IsRegularOrGuestSession() && switches::IsNewAvatarMenu())
     UpdateNewStyleAvatarInfo(this, NewAvatarButton::THEMED_BUTTON);
   else
     UpdateAvatarInfo();
@@ -419,10 +418,11 @@ void OpaqueBrowserFrameView::Observe(
   switch (type) {
     case chrome::NOTIFICATION_PROFILE_CACHED_INFO_CHANGED:
       if (browser_view() ->IsRegularOrGuestSession() &&
-          switches::IsNewProfileManagement())
+          switches::IsNewAvatarMenu()) {
         UpdateNewStyleAvatarInfo(this, NewAvatarButton::THEMED_BUTTON);
-      else
+      } else {
         UpdateAvatarInfo();
+      }
       break;
     default:
       NOTREACHED() << "Got a notification we didn't register for!";

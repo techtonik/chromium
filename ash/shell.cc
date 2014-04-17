@@ -30,7 +30,6 @@
 #include "ash/frame/custom_frame_view_ash.h"
 #include "ash/gpu_support.h"
 #include "ash/high_contrast/high_contrast_controller.h"
-#include "ash/host/window_tree_host_factory.h"
 #include "ash/keyboard_uma_event_filter.h"
 #include "ash/magnifier/magnification_controller.h"
 #include "ash/magnifier/partial_magnification_controller.h"
@@ -115,7 +114,7 @@
 #if defined(USE_X11)
 #include "ash/accelerators/magnifier_key_scroller.h"
 #include "ash/accelerators/spoken_feedback_toggler.h"
-#include "base/message_loop/message_pump_x11.h"
+#include "ui/gfx/x/x11_types.h"
 #endif  // defined(USE_X11)
 #include "ash/ash_constants.h"
 #include "ash/display/display_change_observer_chromeos.h"
@@ -133,7 +132,7 @@
 #include "ash/system/chromeos/session/logout_confirmation_controller.h"
 #include "base/bind_helpers.h"
 #include "base/sys_info.h"
-#include "ui/chromeos/user_activity_notifier.h"
+#include "ui/chromeos/user_activity_power_manager_notifier.h"
 #include "ui/display/chromeos/display_configurator.h"
 #endif  // defined(OS_CHROMEOS)
 
@@ -397,11 +396,21 @@ void Shell::OnMaximizeModeEnded() {
   FOR_EACH_OBSERVER(ShellObserver, observers_, OnMaximizeModeEnded());
 }
 
+void Shell::OnRootWindowAdded(aura::Window* root_window) {
+  FOR_EACH_OBSERVER(ShellObserver, observers_, OnRootWindowAdded(root_window));
+}
+
 void Shell::CreateShelf() {
   RootWindowControllerList controllers = GetAllRootWindowControllers();
   for (RootWindowControllerList::iterator iter = controllers.begin();
        iter != controllers.end(); ++iter)
     (*iter)->shelf()->CreateShelf();
+}
+
+void Shell::OnShelfCreatedForRootWindow(aura::Window* root_window) {
+  FOR_EACH_OBSERVER(ShellObserver,
+                    observers_,
+                    OnShelfCreatedForRootWindow(root_window));
 }
 
 void Shell::CreateKeyboard() {
@@ -699,6 +708,7 @@ Shell::~Shell() {
   video_activity_notifier_.reset();
 #endif  // defined(OS_CHROMEOS)
   video_detector_.reset();
+  high_contrast_controller_.reset();
 
   shadow_controller_.reset();
   resize_shadow_controller_.reset();
@@ -838,10 +848,9 @@ void Shell::Init() {
   focus_cycler_.reset(new FocusCycler());
 
   screen_position_controller_.reset(new ScreenPositionController);
-  window_tree_host_factory_.reset(delegate_->CreateWindowTreeHostFactory());
 
   display_controller_->Start();
-  display_controller_->InitPrimaryDisplay();
+  display_controller_->CreatePrimaryHost();
   aura::Window* root_window = display_controller_->GetPrimaryRootWindow();
   target_root_window_ = root_window;
 
@@ -977,12 +986,7 @@ void Shell::Init() {
                  base::Unretained(system_tray_delegate_.get()))));
 #endif
 
-  // TODO(oshima): Initialize all RootWindowControllers once, and
-  // initialize controller/delegates above when initializing the
-  // primary root window controller.
-  RootWindowController::CreateForPrimaryDisplay(root_window->GetHost());
-
-  display_controller_->InitSecondaryDisplays();
+  display_controller_->InitDisplays();
 
   // It needs to be created after RootWindowController has been created
   // (which calls OnWindowResized has been called, otherwise the
@@ -1003,7 +1007,7 @@ void Shell::Init() {
 
   power_event_observer_.reset(new PowerEventObserver());
   user_activity_notifier_.reset(
-      new ui::UserActivityNotifier(user_activity_detector_.get()));
+      new ui::UserActivityPowerManagerNotifier(user_activity_detector_.get()));
   video_activity_notifier_.reset(
       new VideoActivityNotifier(video_detector_.get()));
   bluetooth_notification_controller_.reset(new BluetoothNotificationController);

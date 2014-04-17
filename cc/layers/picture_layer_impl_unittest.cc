@@ -120,8 +120,7 @@ class PictureLayerImplTest : public testing::Test {
       pending_layer_->tilings()->tiling_at(i)->CreateAllTilesForTesting();
   }
 
-  void SetupPendingTree(
-      scoped_refptr<PicturePileImpl> pile) {
+  void SetupPendingTree(scoped_refptr<PicturePileImpl> pile) {
     host_impl_.CreatePendingTree();
     LayerTreeImpl* pending_tree = host_impl_.pending_tree();
     // Clear recycled tree.
@@ -140,8 +139,8 @@ class PictureLayerImplTest : public testing::Test {
   static void VerifyAllTilesExistAndHavePile(
       const PictureLayerTiling* tiling,
       PicturePileImpl* pile) {
-    for (PictureLayerTiling::CoverageIterator
-             iter(tiling, tiling->contents_scale(), tiling->ContentRect());
+    for (PictureLayerTiling::CoverageIterator iter(
+             tiling, tiling->contents_scale(), tiling->TilingRect());
          iter;
          ++iter) {
       EXPECT_TRUE(*iter);
@@ -455,10 +454,8 @@ TEST_F(PictureLayerImplTest, ClonePartialInvalidation) {
     gfx::Rect content_invalidation = gfx::ScaleToEnclosingRect(
         layer_invalidation,
         tiling->contents_scale());
-    for (PictureLayerTiling::CoverageIterator
-             iter(tiling,
-                  tiling->contents_scale(),
-                  tiling->ContentRect());
+    for (PictureLayerTiling::CoverageIterator iter(
+             tiling, tiling->contents_scale(), tiling->TilingRect());
          iter;
          ++iter) {
       EXPECT_TRUE(*iter);
@@ -518,10 +515,8 @@ TEST_F(PictureLayerImplTest, NoInvalidationBoundsChange) {
     gfx::Rect active_content_bounds = gfx::ScaleToEnclosingRect(
         gfx::Rect(active_layer_bounds),
         tiling->contents_scale());
-    for (PictureLayerTiling::CoverageIterator
-             iter(tiling,
-                  tiling->contents_scale(),
-                  tiling->ContentRect());
+    for (PictureLayerTiling::CoverageIterator iter(
+             tiling, tiling->contents_scale(), tiling->TilingRect());
          iter;
          ++iter) {
       EXPECT_TRUE(*iter);
@@ -574,10 +569,8 @@ TEST_F(PictureLayerImplTest, AddTilesFromNewRecording) {
   for (size_t i = 0; i < tilings->num_tilings(); ++i) {
     const PictureLayerTiling* tiling = tilings->tiling_at(i);
 
-    for (PictureLayerTiling::CoverageIterator
-             iter(tiling,
-                  tiling->contents_scale(),
-                  tiling->ContentRect());
+    for (PictureLayerTiling::CoverageIterator iter(
+             tiling, tiling->contents_scale(), tiling->TilingRect());
          iter;
          ++iter) {
       EXPECT_FALSE(iter.full_tile_geometry_rect().IsEmpty());
@@ -1935,6 +1928,14 @@ TEST_F(PictureLayerImplTest, LayerRasterTileIterator) {
 
   float low_res_factor = host_impl_.settings().low_res_contents_scale_factor;
 
+  // Empty iterator
+  PictureLayerImpl::LayerRasterTileIterator it;
+  EXPECT_FALSE(it);
+
+  // No tilings.
+  it = PictureLayerImpl::LayerRasterTileIterator(pending_layer_, false);
+  EXPECT_FALSE(it);
+
   pending_layer_->AddTiling(low_res_factor);
   pending_layer_->AddTiling(0.3f);
   pending_layer_->AddTiling(0.7f);
@@ -1943,9 +1944,6 @@ TEST_F(PictureLayerImplTest, LayerRasterTileIterator) {
 
   host_impl_.SetViewportSize(gfx::Size(500, 500));
   host_impl_.pending_tree()->UpdateDrawProperties();
-
-  PictureLayerImpl::LayerRasterTileIterator it;
-  EXPECT_FALSE(it);
 
   std::set<Tile*> unique_tiles;
   bool reached_prepaint = false;
@@ -2068,7 +2066,8 @@ TEST_F(PictureLayerImplTest, LayerEvictionTileIterator) {
   EXPECT_FALSE(it);
 
   // Tiles don't have resources yet.
-  it = PictureLayerImpl::LayerEvictionTileIterator(pending_layer_);
+  it = PictureLayerImpl::LayerEvictionTileIterator(
+      pending_layer_, SAME_PRIORITY_FOR_BOTH_TREES);
   EXPECT_FALSE(it);
 
   host_impl_.tile_manager()->InitializeTilesWithResourcesForTesting(all_tiles);
@@ -2079,7 +2078,9 @@ TEST_F(PictureLayerImplTest, LayerEvictionTileIterator) {
   bool reached_visible = false;
   bool reached_required = false;
   Tile* last_tile = NULL;
-  for (it = PictureLayerImpl::LayerEvictionTileIterator(pending_layer_); it;
+  for (it = PictureLayerImpl::LayerEvictionTileIterator(
+           pending_layer_, SAME_PRIORITY_FOR_BOTH_TREES);
+       it;
        ++it) {
     Tile* tile = *it;
     if (!last_tile)

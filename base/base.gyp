@@ -70,22 +70,6 @@
             '../build/linux/system.gyp:glib',
           ],
         }],
-        ['use_x11==1', {
-          'dependencies': [
-            '../build/linux/system.gyp:x11',
-          ],
-          'export_dependent_settings': [
-            '../build/linux/system.gyp:x11',
-          ],
-        }],
-        ['use_aura==1 and use_x11==1', {
-          'dependencies': [
-            '../build/linux/system.gyp:xrandr',
-          ],
-          'export_dependent_settings': [
-            '../build/linux/system.gyp:xrandr',
-          ],
-        }],
         ['OS == "android" and _toolset == "host"', {
           # Always build base as a static_library for host toolset, even if
           # we're doing a component build. Specifically, we only care about the
@@ -236,8 +220,6 @@
         'message_loop/message_pump_android.h',
         'message_loop/message_pump_glib.cc',
         'message_loop/message_pump_glib.h',
-        'message_loop/message_pump_gtk.cc',
-        'message_loop/message_pump_gtk.h',
         'message_loop/message_pump_io_ios.cc',
         'message_loop/message_pump_io_ios.h',
         'message_loop/message_pump_observer.h',
@@ -245,8 +227,6 @@
         'message_loop/message_pump_libevent.h',
         'message_loop/message_pump_mac.h',
         'message_loop/message_pump_mac.mm',
-        'message_loop/message_pump_x11.cc',
-        'message_loop/message_pump_x11.h',
         'metrics/field_trial.cc',
         'metrics/field_trial.h',
         'posix/file_descriptor_shuffle.cc',
@@ -724,11 +704,6 @@
             }],
           ],
         }],
-        ['use_x11 == 1', {
-          'dependencies': [
-            '../tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',
-          ],
-        }],
         ['use_glib == 1', {
           'dependencies': [
             '../build/linux/system.gyp:glib',
@@ -1008,6 +983,47 @@
           ],
         }],
       ],
+    },
+    {
+      'target_name': 'sanitizer_options',
+      'type': 'static_library',
+      'toolsets': ['host', 'target'],
+      'variables': {
+         # Every target is going to depend on sanitizer_options, so allow
+         # this one to depend on itself.
+         'prune_self_dependency': 1,
+         # Do not let 'none' targets depend on this one, they don't need to.
+         'link_dependency': 1,
+       },
+      'sources': [
+        'debug/sanitizer_options.cc',
+      ],
+      'include_dirs': [
+        '..',
+      ],
+      # Some targets may want to opt-out from ASan, TSan and MSan and link
+      # without the corresponding runtime libraries. We drop the libc++
+      # dependency and omit the compiler flags to avoid bringing instrumented
+      # code to those targets.
+      'conditions': [
+        ['use_custom_libcxx==1', {
+          'dependencies!': [
+            '../third_party/libc++/libc++.gyp:libc++',
+            '../third_party/libc++abi/libc++abi.gyp:libc++abi',
+          ],
+        }],
+      ],
+      'cflags!': [
+        '-fsanitize=address',
+        '-fsanitize=thread',
+        '-fsanitize=memory',
+        '-fsanitize-memory-track-origins',
+      ],
+      'direct_dependent_settings': {
+        'ldflags': [
+          '-Wl,-u_sanitizer_options_link_helper',
+        ],
+      },
     },
   ],
   'conditions': [

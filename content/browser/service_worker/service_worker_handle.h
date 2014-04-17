@@ -10,6 +10,8 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "content/browser/service_worker/service_worker_version.h"
+#include "content/common/content_export.h"
+#include "content/common/service_worker/service_worker_types.h"
 
 namespace IPC {
 class Sender;
@@ -25,7 +27,8 @@ class ServiceWorkerRegistration;
 // Has references to the corresponding ServiceWorkerVersion and
 // ServiceWorkerRegistration (therefore they're guaranteed to be alive while
 // this handle is around).
-class ServiceWorkerHandle : public ServiceWorkerVersion::Listener {
+class CONTENT_EXPORT ServiceWorkerHandle
+    : public ServiceWorkerVersion::Listener {
  public:
   // Creates a handle for a live version. The version's corresponding
   // registration must be also alive.
@@ -47,15 +50,26 @@ class ServiceWorkerHandle : public ServiceWorkerVersion::Listener {
   virtual ~ServiceWorkerHandle();
 
   // ServiceWorkerVersion::Listener overrides.
+  virtual void OnWorkerStarted(ServiceWorkerVersion* version) OVERRIDE;
+  virtual void OnWorkerStopped(ServiceWorkerVersion* version) OVERRIDE;
+  virtual void OnErrorReported(ServiceWorkerVersion* version,
+                               const base::string16& error_message,
+                               int line_number,
+                               int column_number,
+                               const GURL& source_url) OVERRIDE;
   virtual void OnVersionStateChanged(ServiceWorkerVersion* version) OVERRIDE;
+
+  ServiceWorkerObjectInfo GetObjectInfo();
 
   ServiceWorkerRegistration* registration() { return registration_.get(); }
   ServiceWorkerVersion* version() { return version_.get(); }
+  int handle_id() const { return handle_id_; }
 
  private:
   base::WeakPtr<ServiceWorkerContextCore> context_;
   IPC::Sender* sender_;  // Not owned, it should always outlive this.
   const int thread_id_;
+  const int handle_id_;
   scoped_refptr<ServiceWorkerRegistration> registration_;
   scoped_refptr<ServiceWorkerVersion> version_;
 

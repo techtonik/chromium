@@ -1297,8 +1297,10 @@ PictureLayerImpl::LayerRasterTileIterator::LayerRasterTileIterator(
     bool prioritize_low_res)
     : layer_(layer), current_stage_(0) {
   DCHECK(layer_);
-  if (!layer_->tilings_ || !layer_->tilings_->num_tilings())
+  if (!layer_->tilings_ || !layer_->tilings_->num_tilings()) {
+    current_stage_ = arraysize(stages_);
     return;
+  }
 
   WhichTree tree =
       layer_->layer_tree_impl()->IsActiveTree() ? ACTIVE_TREE : PENDING_TREE;
@@ -1393,16 +1395,14 @@ PictureLayerImpl::LayerEvictionTileIterator::LayerEvictionTileIterator()
       layer_(NULL) {}
 
 PictureLayerImpl::LayerEvictionTileIterator::LayerEvictionTileIterator(
-    PictureLayerImpl* layer)
+    PictureLayerImpl* layer,
+    TreePriority tree_priority)
     : iterator_index_(0),
       iteration_stage_(TilePriority::EVENTUALLY),
       required_for_activation_(false),
       layer_(layer) {
   if (!layer_->tilings_ || !layer_->tilings_->num_tilings())
     return;
-
-  WhichTree tree =
-      layer_->layer_tree_impl()->IsActiveTree() ? ACTIVE_TREE : PENDING_TREE;
 
   size_t high_res_tiling_index = layer_->tilings_->num_tilings();
   size_t low_res_tiling_index = layer_->tilings_->num_tilings();
@@ -1419,7 +1419,7 @@ PictureLayerImpl::LayerEvictionTileIterator::LayerEvictionTileIterator(
   // Higher resolution non-ideal goes first.
   for (size_t i = 0; i < high_res_tiling_index; ++i) {
     iterators_.push_back(PictureLayerTiling::TilingEvictionTileIterator(
-        layer_->tilings_->tiling_at(i), tree));
+        layer_->tilings_->tiling_at(i), tree_priority));
   }
 
   // Lower resolution non-ideal goes next.
@@ -1431,19 +1431,19 @@ PictureLayerImpl::LayerEvictionTileIterator::LayerEvictionTileIterator(
       continue;
 
     iterators_.push_back(
-        PictureLayerTiling::TilingEvictionTileIterator(tiling, tree));
+        PictureLayerTiling::TilingEvictionTileIterator(tiling, tree_priority));
   }
 
   // Now, put the low res tiling if we have one.
   if (low_res_tiling_index < layer_->tilings_->num_tilings()) {
     iterators_.push_back(PictureLayerTiling::TilingEvictionTileIterator(
-        layer_->tilings_->tiling_at(low_res_tiling_index), tree));
+        layer_->tilings_->tiling_at(low_res_tiling_index), tree_priority));
   }
 
   // Finally, put the high res tiling if we have one.
   if (high_res_tiling_index < layer_->tilings_->num_tilings()) {
     iterators_.push_back(PictureLayerTiling::TilingEvictionTileIterator(
-        layer_->tilings_->tiling_at(high_res_tiling_index), tree));
+        layer_->tilings_->tiling_at(high_res_tiling_index), tree_priority));
   }
 
   DCHECK_GT(iterators_.size(), 0u);

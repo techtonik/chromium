@@ -82,9 +82,11 @@ EmbeddedWorkerContextClient::ThreadSpecificInstance() {
 EmbeddedWorkerContextClient::EmbeddedWorkerContextClient(
     int embedded_worker_id,
     int64 service_worker_version_id,
+    const GURL& service_worker_scope,
     const GURL& script_url)
     : embedded_worker_id_(embedded_worker_id),
       service_worker_version_id_(service_worker_version_id),
+      service_worker_scope_(service_worker_scope),
       script_url_(script_url),
       sender_(ChildThread::current()->thread_safe_sender()),
       main_thread_proxy_(base::MessageLoopProxy::current()),
@@ -143,7 +145,7 @@ void EmbeddedWorkerContextClient::workerContextStarted(
                  weak_factory_.GetWeakPtr()));
 }
 
-void EmbeddedWorkerContextClient::workerContextDestroyed() {
+void EmbeddedWorkerContextClient::willDestroyWorkerContext() {
   // At this point OnWorkerRunLoopStopped is already called, so
   // worker_task_runner_->RunsTasksOnCurrentThread() returns false
   // (while we're still on the worker thread).
@@ -223,6 +225,10 @@ EmbeddedWorkerContextClient::createServiceWorkerNetworkProvider(
 void EmbeddedWorkerContextClient::didHandleSyncEvent(int request_id) {
   DCHECK(script_context_);
   script_context_->DidHandleSyncEvent(request_id);
+}
+
+blink::WebURL EmbeddedWorkerContextClient::scope() const {
+  return service_worker_scope_;
 }
 
 void EmbeddedWorkerContextClient::OnSendMessageToWorker(

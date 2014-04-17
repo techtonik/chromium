@@ -458,6 +458,9 @@
       'filepath': 'chrome/browser/resources/options/|'\
           'chrome/browser/ui/webui/options/',
     },
+    'overview_mode': {
+      'filepath': 'ash/wm/overview/',
+    },
     'ozone': {
       'filepath': 'ui/ozone/|'\
         'ui/events/ozone/|'\
@@ -821,7 +824,7 @@
                               'erikwright+watch@chromium.org',
                               'robertshield+watch@chromium.org'],
     'nacl': ['native-client-reviews@googlegroups.com'],
-    'native_client_sdk': ['sbc@chromium.org', 'binji@chromium.org'],
+    'native_client_sdk': ['sbc@chromium.org', 'binji+watch@chromium.org'],
     'navigation': ['creis+watch@chromium.org', 'nasko+codewatch@chromium.org'],
     'net': ['cbentzel+watch@chromium.org'],
     'net_error_list': ['mmenke@chromium.org'],
@@ -831,6 +834,7 @@
             'pedrosimonetti+watch@chromium.org'],
     'omnibox': ['suzhe@chromium.org'],
     'options': ['dbeam+watch-options@chromium.org'],
+    'overview_mode': ['tdanderson+overview@chromium.org'],
     'ozone': ['kalyan.kondapally@intel.com', 'ozone-reviews@chromium.org',
               'rjkroege@chromium.org'],
     'panels': ['dimich@chromium.org', 'jennb@chromium.org',
@@ -838,7 +842,7 @@
     'pepper_api': ['piman+watch@chromium.org',
                    'ihf+watch@chromium.org', 'yzshen+watch@chromium.org',
                    'yusukes+watch@chromium.org', 'raymes+watch@chromium.org',
-                   'noelallen@chromium.org', 'binji@chromium.org',
+                   'noelallen@chromium.org', 'binji+watch@chromium.org',
                    'nfullagar@chromium.org', 'teravest+watch@chromium.org',
                    'tzik@chromium.org'],
     'plugin': ['jam@chromium.org',
@@ -899,7 +903,8 @@
     'version_assembly': ['caitkp+watch@chromium.org',
                          'gab+watch@chromium.org'],
     'views': ['tfarina@chromium.org'],
-    'views_core': ['ben+views@chromium.org'],
+    'views_core': ['ben+views@chromium.org',
+                   'tdanderson+views@chromium.org'],
     'views_corewm': ['ben+corewm@chromium.org'],
     'virtual_keyboard': ['dfaden+virtualkb@google.com',
                          'groby+virtualkb@chromium.org'],

@@ -48,12 +48,11 @@ class SyncEngineInitializerTest : public testing::Test {
     ASSERT_TRUE(database_dir_.CreateUniqueTempDir());
     in_memory_env_.reset(leveldb::NewMemEnv(leveldb::Env::Default()));
 
-    scoped_ptr<drive::FakeDriveService> fake_drive_service(
-        new drive::FakeDriveService());
+    fake_drive_service_.reset(new drive::FakeDriveService());
 
     sync_context_.reset(new SyncEngineContext(
-        fake_drive_service.PassAs<drive::DriveServiceInterface>(),
-        scoped_ptr<drive::DriveUploaderInterface>(),
+        fake_drive_service_.get(),
+        NULL /* drive_uploader */,
         base::MessageLoopProxy::current()));
 
     sync_task_manager_.reset(new SyncTaskManager(
@@ -66,6 +65,7 @@ class SyncEngineInitializerTest : public testing::Test {
     sync_task_manager_.reset();
     metadata_database_.reset();
     sync_context_.reset();
+    fake_drive_service_.reset();
     base::RunLoop().RunUntilIdle();
   }
 
@@ -107,6 +107,7 @@ class SyncEngineInitializerTest : public testing::Test {
     SyncStatusCode status = SYNC_STATUS_UNKNOWN;
     scoped_ptr<MetadataDatabase> database;
     MetadataDatabase::Create(
+        base::MessageLoopProxy::current(),
         base::MessageLoopProxy::current(),
         database_path(),
         in_memory_env_.get(),
@@ -227,6 +228,7 @@ class SyncEngineInitializerTest : public testing::Test {
   scoped_ptr<MetadataDatabase> metadata_database_;
   scoped_ptr<SyncTaskManager> sync_task_manager_;
   scoped_ptr<SyncEngineContext> sync_context_;
+  scoped_ptr<drive::FakeDriveService> fake_drive_service_;
 
   DISALLOW_COPY_AND_ASSIGN(SyncEngineInitializerTest);
 };

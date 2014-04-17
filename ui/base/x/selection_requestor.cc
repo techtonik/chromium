@@ -4,10 +4,10 @@
 
 #include "ui/base/x/selection_requestor.h"
 
-#include "base/message_loop/message_pump_x11.h"
 #include "base/run_loop.h"
 #include "ui/base/x/selection_utils.h"
 #include "ui/base/x/x11_util.h"
+#include "ui/gfx/x/x11_types.h"
 
 namespace ui {
 
@@ -69,12 +69,16 @@ bool SelectionRequestor::PerformBlockingConvertSelection(
   DCHECK_EQ(&pending_request, pending_requests_.back());
   pending_requests_.pop_back();
 
-  if (pending_request.returned_property != property_to_set)
-    return false;
-
-  return ui::GetRawBytesOfProperty(x_window_, pending_request.returned_property,
-                                   out_data, out_data_bytes, out_data_items,
-                                   out_type);
+  bool success = false;
+  if (pending_request.returned_property == property_to_set) {
+    success =  ui::GetRawBytesOfProperty(x_window_,
+                                         pending_request.returned_property,
+                                         out_data, out_data_bytes,
+                                         out_data_items, out_type);
+  }
+  if (pending_request.returned_property != None)
+    XDeleteProperty(x_display_, x_window_, pending_request.returned_property);
+  return success;
 }
 
 SelectionData SelectionRequestor::RequestAndWaitForTypes(
@@ -118,8 +122,14 @@ void SelectionRequestor::OnSelectionNotify(const XSelectionEvent& event) {
   // This event doesn't correspond to any XConvertSelection calls that we
   // issued in PerformBlockingConvertSelection. This shouldn't happen, but any
   // client can send any message, so it can happen.
-  if (!request_notified)
+  if (!request_notified) {
+    // ICCCM requires us to delete the property passed into SelectionNotify. If
+    // |request_notified| is true, the property will be deleted when the run
+    // loop has quit.
+    if (event.property != None)
+      XDeleteProperty(x_display_, x_window_, event.property);
     return;
+  }
 
   request_notified->returned_property = event.property;
   request_notified->returned = true;

@@ -30,11 +30,12 @@ ServiceWorkerStatusCode EmbeddedWorkerRegistry::StartWorker(
     int process_id,
     int embedded_worker_id,
     int64 service_worker_version_id,
+    const GURL& scope,
     const GURL& script_url) {
-  return Send(process_id,
-              new EmbeddedWorkerMsg_StartWorker(embedded_worker_id,
-                                               service_worker_version_id,
-                                               script_url));
+  return Send(
+      process_id,
+      new EmbeddedWorkerMsg_StartWorker(
+          embedded_worker_id, service_worker_version_id, scope, script_url));
 }
 
 ServiceWorkerStatusCode EmbeddedWorkerRegistry::StopWorker(
@@ -87,6 +88,21 @@ void EmbeddedWorkerRegistry::OnSendMessageToBrowser(
     return;
   }
   NOTREACHED() << "Got unexpected message: " << message.type();
+}
+
+void EmbeddedWorkerRegistry::OnReportException(
+    int embedded_worker_id,
+    const base::string16& error_message,
+    int line_number,
+    int column_number,
+    const GURL& source_url) {
+  WorkerInstanceMap::iterator found = worker_map_.find(embedded_worker_id);
+  if (found == worker_map_.end()) {
+    LOG(ERROR) << "Worker " << embedded_worker_id << " not registered";
+    return;
+  }
+  found->second->OnReportException(
+      error_message, line_number, column_number, source_url);
 }
 
 void EmbeddedWorkerRegistry::AddChildProcessSender(

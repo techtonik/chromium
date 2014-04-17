@@ -9,7 +9,7 @@
 #include "components/password_manager/core/browser/password_form_data.h"
 
 using passwords_helper::AddLogin;
-using passwords_helper::AllProfilesContainSamePasswordForms;
+using passwords_helper::AwaitAllProfilesContainSamePasswordForms;
 using passwords_helper::CreateTestPasswordForm;
 using passwords_helper::GetPasswordCount;
 using passwords_helper::GetPasswordStore;
@@ -25,15 +25,16 @@ class MultipleClientPasswordsSyncTest : public SyncTest {
   DISALLOW_COPY_AND_ASSIGN(MultipleClientPasswordsSyncTest);
 };
 
-IN_PROC_BROWSER_TEST_F(MultipleClientPasswordsSyncTest, Sanity) {
+// This test was flaky on the Mac buildbot and also appears to be flaky
+// in local Linux (debug) builds. See crbug.com/363247.
+IN_PROC_BROWSER_TEST_F(MultipleClientPasswordsSyncTest, DISABLED_Sanity) {
   ASSERT_TRUE(SetupSync()) << "SetupSync() failed.";
 
   for (int i = 0; i < num_clients(); ++i) {
     PasswordForm form = CreateTestPasswordForm(i);
     AddLogin(GetPasswordStore(i), form);
   }
-  ASSERT_TRUE(AwaitQuiescence());
 
+  ASSERT_TRUE(AwaitAllProfilesContainSamePasswordForms());
   ASSERT_EQ(num_clients(), GetPasswordCount(0));
-  ASSERT_TRUE(AllProfilesContainSamePasswordForms());
 }

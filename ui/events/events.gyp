@@ -25,6 +25,7 @@
       'dependencies': [
         '<(DEPTH)/base/base.gyp:base',
         '<(DEPTH)/base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
+        '../gfx/gfx.gyp:gfx',
         '../gfx/gfx.gyp:gfx_geometry',
         'dom4_keycode_converter',
       ],
@@ -61,7 +62,8 @@
       'conditions': [
         ['use_x11==1', {
           'dependencies': [
-            '<(DEPTH)/build/linux/system.gyp:x11',
+            '../../build/linux/system.gyp:x11',
+            '../gfx/gfx.gyp:gfx_x11',
           ],
         }],
       ],
@@ -115,6 +117,14 @@
         'gestures/gesture_types.h',
         'gestures/velocity_calculator.cc',
         'gestures/velocity_calculator.h',
+        'ozone/evdev/libgestures_glue/event_reader_libevdev_cros.cc',
+        'ozone/evdev/libgestures_glue/event_reader_libevdev_cros.h',
+        'ozone/evdev/libgestures_glue/gesture_interpreter_libevdev_cros.cc',
+        'ozone/evdev/libgestures_glue/gesture_interpreter_libevdev_cros.h',
+        'ozone/evdev/libgestures_glue/gesture_logging.cc',
+        'ozone/evdev/libgestures_glue/gesture_logging.h',
+        'ozone/evdev/libgestures_glue/gesture_timer_provider.cc',
+        'ozone/evdev/libgestures_glue/gesture_timer_provider.h',
         'ozone/evdev/device_manager_evdev.cc',
         'ozone/evdev/device_manager_evdev.h',
         'ozone/evdev/device_manager_udev.cc',
@@ -172,7 +182,8 @@
             'platform/platform_event_source_stub.cc',
           ],
           'dependencies': [
-            '<(DEPTH)/build/linux/system.gyp:x11',
+            '../../build/linux/system.gyp:x11',
+            '../gfx/gfx.gyp:gfx_x11',
           ],
         }],
         ['use_glib==1', {
@@ -186,6 +197,19 @@
         ['use_ozone_evdev==1 and use_udev==1', {
           'dependencies': [
             '<(DEPTH)/build/linux/system.gyp:udev',
+          ],
+        }],
+        ['use_ozone_evdev==1 and use_evdev_gestures==1', {
+          'dependencies': [
+            '<(DEPTH)/build/linux/system.gyp:libgestures',
+            '<(DEPTH)/build/linux/system.gyp:libevdev-cros',
+          ],
+          'defines': [
+            'USE_EVDEV_GESTURES',
+          ],
+        }, {
+          'sources/': [
+            ['exclude', '^ozone/evdev/libgestures_glue/'],
           ],
         }],
         ['use_udev==0', {
@@ -276,7 +300,8 @@
       'conditions': [
         ['use_x11==1', {
           'dependencies': [
-            '<(DEPTH)/build/linux/system.gyp:x11',
+            '../../build/linux/system.gyp:x11',
+            '../gfx/gfx.gyp:gfx_x11',
           ],
         }],
         ['OS=="ios"', {

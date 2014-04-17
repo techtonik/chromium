@@ -139,6 +139,7 @@ class DocumentState;
 class ExternalPopupMenu;
 class FaviconHelper;
 class GeolocationDispatcher;
+class HistoryController;
 class ImageResourceFetcher;
 class InputTagSpeechDispatcher;
 class LoadProgressTracker;
@@ -181,8 +182,11 @@ class CONTENT_EXPORT RenderViewImpl
       public base::SupportsWeakPtr<RenderViewImpl> {
  public:
   // Creates a new RenderView. |opener_id| is the routing ID of the RenderView
-  // responsible for creating this RenderView.
+  // responsible for creating this RenderView. Note that if the original opener
+  // has been closed, |window_was_created_with_opener| will be true and
+  // |opener_id| will be MSG_ROUTING_NONE.
   static RenderViewImpl* Create(int32 opener_id,
+                                bool window_was_created_with_opener,
                                 const RendererPreferences& renderer_prefs,
                                 const WebPreferences& webkit_prefs,
                                 int32 routing_id,
@@ -193,6 +197,7 @@ class CONTENT_EXPORT RenderViewImpl
                                 bool is_renderer_created,
                                 bool swapped_out,
                                 bool hidden,
+                                bool never_visible,
                                 int32 next_page_id,
                                 const blink::WebScreenInfo& screen_info,
                                 AccessibilityMode accessibility_mode);
@@ -241,6 +246,10 @@ class CONTENT_EXPORT RenderViewImpl
 
   MouseLockDispatcher* mouse_lock_dispatcher() {
     return mouse_lock_dispatcher_;
+  }
+
+  HistoryController* history_controller() {
+    return history_controller_.get();
   }
 
   // Lazily initialize this view's BrowserPluginManager and return it.
@@ -433,10 +442,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual void didCancelCompositionOnSelectionChange();
   virtual void didExecuteCommand(const blink::WebString& command_name);
   virtual bool handleCurrentKeyboardEvent();
-  virtual blink::WebColorChooser* createColorChooser(
-      blink::WebColorChooserClient*,
-      const blink::WebColor& initial_color,
-      const blink::WebVector<blink::WebColorSuggestion>& suggestions);
   virtual bool runFileChooser(
       const blink::WebFileChooserParams& params,
       blink::WebFileChooserCompletion* chooser_completion);
@@ -520,7 +525,6 @@ class CONTENT_EXPORT RenderViewImpl
                               const blink::WebFormElement& form);
   virtual void didCreateDataSource(blink::WebLocalFrame* frame,
                                    blink::WebDataSource* datasource);
-  virtual void didStartProvisionalLoad(blink::WebLocalFrame* frame);
   virtual void didFailProvisionalLoad(blink::WebLocalFrame* frame,
                                       const blink::WebURLError& error);
   virtual void didClearWindowObject(blink::WebLocalFrame* frame, int world_id);
@@ -633,7 +637,7 @@ class CONTENT_EXPORT RenderViewImpl
   virtual void SetDeviceScaleFactor(float device_scale_factor) OVERRIDE;
   virtual ui::TextInputType GetTextInputType() OVERRIDE;
   virtual void GetSelectionBounds(gfx::Rect* start, gfx::Rect* end) OVERRIDE;
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
   virtual void GetCompositionCharacterBounds(
       std::vector<gfx::Rect>* character_bounds) OVERRIDE;
   virtual void GetCompositionRange(gfx::Range* range) OVERRIDE;
@@ -651,7 +655,9 @@ class CONTENT_EXPORT RenderViewImpl
  protected:
   explicit RenderViewImpl(RenderViewImplParams* params);
 
-  void Initialize(RenderViewImplParams* params);
+  void Initialize(
+      RenderViewImplParams* params,
+      RenderFrameImpl* main_render_frame);
   virtual void SetScreenMetricsEmulationParameters(
       float device_scale_factor,
       const gfx::Point& root_layer_offset,
@@ -1208,6 +1214,8 @@ class CONTENT_EXPORT RenderViewImpl
 
   // Mouse Lock dispatcher attached to this view.
   MouseLockDispatcher* mouse_lock_dispatcher_;
+
+  scoped_ptr<HistoryController> history_controller_;
 
 #if defined(OS_ANDROID)
   // Android Specific ---------------------------------------------------------

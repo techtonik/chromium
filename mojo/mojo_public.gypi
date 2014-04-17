@@ -2,7 +2,7 @@
   'targets': [
     {
       'target_name': 'mojo_system',
-      'type': '<(component)',
+      'type': 'static_library',
       'defines': [
         'MOJO_SYSTEM_IMPLEMENTATION',
       ],
@@ -19,22 +19,8 @@
         'public/c/system/core.h',
         'public/c/system/macros.h',
         'public/c/system/system_export.h',
-        'public/system/core_private.cc',
-        'public/system/core_private.h',
-      ],
-      'conditions': [
-        ['OS=="mac"', {
-          'xcode_settings': {
-            # Make it a run-path dependent library.
-            'DYLIB_INSTALL_NAME_BASE': '@rpath',
-          },
-          'direct_dependent_settings': {
-            'xcode_settings': {
-              # Look for run-path dependent libraries in the loader's directory.
-              'LD_RUNPATH_SEARCH_PATHS': [ '@loader_path/.', ],
-            },
-          },
-        }],
+        'public/platform/native/system_thunks.cc',
+        'public/platform/native/system_thunks.h',
       ],
     },
     {
@@ -68,13 +54,7 @@
         ['OS=="mac"', {
           'xcode_settings': {
             # Make it a run-path dependent library.
-            'DYLIB_INSTALL_NAME_BASE': '@rpath',
-          },
-          'direct_dependent_settings': {
-            'xcode_settings': {
-              # Look for run-path dependent libraries in the loader's directory.
-              'LD_RUNPATH_SEARCH_PATHS': [ '@loader_path/.', ],
-            },
+            'DYLIB_INSTALL_NAME_BASE': '@loader_path',
           },
         }],
       ],
@@ -103,13 +83,7 @@
         ['OS=="mac"', {
           'xcode_settings': {
             # Make it a run-path dependent library.
-            'DYLIB_INSTALL_NAME_BASE': '@rpath',
-          },
-          'direct_dependent_settings': {
-            'xcode_settings': {
-              # Look for run-path dependent libraries in the loader's directory.
-              'LD_RUNPATH_SEARCH_PATHS': [ '@loader_path/.', ],
-            },
+            'DYLIB_INSTALL_NAME_BASE': '@loader_path',
           },
         }],
       ],
@@ -120,7 +94,6 @@
       'dependencies': [
         '../base/base.gyp:base',
         '../testing/gtest.gyp:gtest',
-        'mojo_system',
         'mojo_test_support',
       ],
       'sources': [
@@ -138,8 +111,7 @@
         'mojo_environment_standalone',
         'mojo_public_test_utils',
         'mojo_run_all_unittests',
-        'mojo_sample_service',
-        'mojo_system',
+        'mojo_public_test_interfaces',
         'mojo_utility',
       ],
       'sources': [
@@ -152,15 +124,7 @@
         'public/cpp/bindings/tests/router_unittest.cc',
         'public/cpp/bindings/tests/sample_service_unittest.cc',
         'public/cpp/bindings/tests/type_conversion_unittest.cc',
-        'public/interfaces/bindings/tests/math_calculator.mojom',
-        'public/interfaces/bindings/tests/sample_factory.mojom',
-        'public/interfaces/bindings/tests/sample_interfaces.mojom',
-        'public/interfaces/bindings/tests/test_structs.mojom',
       ],
-      'variables': {
-        'mojom_base_output_dir': 'mojo',
-      },
-      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
     },
     {
       'target_name': 'mojo_public_environment_unittests',
@@ -171,7 +135,6 @@
         'mojo_environment_standalone',
         'mojo_public_test_utils',
         'mojo_run_all_unittests',
-        'mojo_system',
         'mojo_utility',
       ],
       'sources': [
@@ -187,7 +150,6 @@
         'mojo_bindings',
         'mojo_public_test_utils',
         'mojo_run_all_unittests',
-        'mojo_system',
       ],
       'sources': [
         'public/c/system/tests/core_unittest.cc',
@@ -206,7 +168,6 @@
         'mojo_bindings',
         'mojo_public_test_utils',
         'mojo_run_all_unittests',
-        'mojo_system',
         'mojo_utility',
       ],
       'sources': [
@@ -232,7 +193,6 @@
         '../testing/gtest.gyp:gtest',
         'mojo_public_test_utils',
         'mojo_run_all_perftests',
-        'mojo_system',
         'mojo_utility',
       ],
       'sources': [
@@ -288,12 +248,16 @@
       ],
     },
     {
-      'target_name': 'mojo_sample_service',
+      'target_name': 'mojo_public_test_interfaces',
       'type': 'static_library',
       'sources': [
-        'public/interfaces/bindings/tests/sample_service.mojom',
+        'public/interfaces/bindings/tests/math_calculator.mojom',
+        'public/interfaces/bindings/tests/sample_factory.mojom',
         'public/interfaces/bindings/tests/sample_import.mojom',
         'public/interfaces/bindings/tests/sample_import2.mojom',
+        'public/interfaces/bindings/tests/sample_interfaces.mojom',
+        'public/interfaces/bindings/tests/sample_service.mojom',
+        'public/interfaces/bindings/tests/test_structs.mojom',
       ],
       'variables': {
         'mojom_base_output_dir': 'mojo',
@@ -301,11 +265,9 @@
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
         'mojo_bindings',
-        'mojo_system',
       ],
       'dependencies': [
         'mojo_bindings',
-        'mojo_system',
       ],
     },
     {
@@ -366,7 +328,6 @@
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'dependencies': [
         'mojo_bindings',
-        'mojo_system',
       ],
       'export_dependent_settings': [
         'mojo_bindings',

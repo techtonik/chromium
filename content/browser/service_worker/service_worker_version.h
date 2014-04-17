@@ -13,6 +13,7 @@
 #include "base/id_map.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
+#include "base/observer_list.h"
 #include "content/browser/service_worker/embedded_worker_instance.h"
 #include "content/common/content_export.h"
 #include "content/common/service_worker/service_worker_status_code.h"
@@ -70,7 +71,14 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   class Listener {
    public:
+    virtual void OnWorkerStarted(ServiceWorkerVersion* version) = 0;
+    virtual void OnWorkerStopped(ServiceWorkerVersion* version) = 0;
     virtual void OnVersionStateChanged(ServiceWorkerVersion* version) = 0;
+    virtual void OnErrorReported(ServiceWorkerVersion* version,
+                                 const base::string16& error_message,
+                                 int line_number,
+                                 int column_number,
+                                 const GURL& source_url) = 0;
   };
 
   ServiceWorkerVersion(
@@ -168,9 +176,21 @@ class CONTENT_EXPORT ServiceWorkerVersion
   void AddProcessToWorker(int process_id);
   void RemoveProcessFromWorker(int process_id);
 
+  // Returns true if this has at least one process to run.
+  bool HasProcessToRun() const;
+
   // Adds and removes a controllee's |provider_host|.
   void AddControllee(ServiceWorkerProviderHost* provider_host);
   void RemoveControllee(ServiceWorkerProviderHost* provider_host);
+  void AddPendingControllee(ServiceWorkerProviderHost* provider_host);
+  void RemovePendingControllee(ServiceWorkerProviderHost* provider_host);
+
+  // Returns if it has (non-pending) controllee.
+  bool HasControllee() const { return !controllee_providers_.empty(); }
+
+  // Adds and removes Listeners.
+  void AddListener(Listener* listener);
+  void RemoveListener(Listener* listener);
 
   EmbeddedWorkerInstance* embedded_worker() { return embedded_worker_.get(); }
 
@@ -179,6 +199,10 @@ class CONTENT_EXPORT ServiceWorkerVersion
   virtual void OnStopped() OVERRIDE;
   virtual void OnMessageReceived(int request_id,
                                  const IPC::Message& message) OVERRIDE;
+  virtual void OnReportException(const base::string16& error_message,
+                                 int line_number,
+                                 int column_number,
+                                 const GURL& source_url) OVERRIDE;
 
  private:
   typedef ServiceWorkerVersion self;
@@ -190,17 +214,18 @@ class CONTENT_EXPORT ServiceWorkerVersion
   const int64 version_id_;
   int64 registration_id_;
   GURL script_url_;
+  GURL scope_;
   Status status_;
   scoped_ptr<EmbeddedWorkerInstance> embedded_worker_;
   std::vector<StatusCallback> start_callbacks_;
   std::vector<StatusCallback> stop_callbacks_;
   std::vector<base::Closure> status_change_callbacks_;
   IDMap<MessageCallback, IDMapOwnPointer> message_callbacks_;
-
   ProviderHostSet controllee_providers_;
+  base::WeakPtr<ServiceWorkerContextCore> context_;
+  ObserverList<Listener> listeners_;
 
   base::WeakPtrFactory<ServiceWorkerVersion> weak_factory_;
-  base::WeakPtr<ServiceWorkerContextCore> context_;
 
   DISALLOW_COPY_AND_ASSIGN(ServiceWorkerVersion);
 };

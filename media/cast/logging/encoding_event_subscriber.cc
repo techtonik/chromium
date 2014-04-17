@@ -55,9 +55,11 @@ void EncodingEventSubscriber::OnReceiveFrameEvent(
     event_proto->add_event_timestamp_ms(
         (frame_event.timestamp - base::TimeTicks()).InMilliseconds());
 
-    if (frame_event.type == kAudioFrameEncoded ||
-        frame_event.type == kVideoFrameEncoded) {
+    if (frame_event.type == kAudioFrameEncoded) {
       event_proto->set_encoded_frame_size(frame_event.size);
+    } else if (frame_event.type == kVideoFrameEncoded) {
+      event_proto->set_encoded_frame_size(frame_event.size);
+      event_proto->set_key_frame(frame_event.key_frame);
     } else if (frame_event.type == kAudioPlayoutDelay ||
                frame_event.type == kVideoRenderDelay) {
       event_proto->set_delay_millis(frame_event.delay_delta.InMilliseconds());
@@ -136,6 +138,8 @@ void EncodingEventSubscriber::GetEventsAndReset(LogMetadata* metadata,
   metadata->set_first_rtp_timestamp(first_rtp_timestamp_);
   metadata->set_num_frame_events(frame_event_map_.size());
   metadata->set_num_packet_events(packet_event_map_.size());
+  metadata->set_reference_timestamp_ms_at_unix_epoch(
+      (base::TimeTicks::UnixEpoch() - base::TimeTicks()).InMilliseconds());
   frame_events->swap(frame_event_map_);
   packet_events->swap(packet_event_map_);
   Reset();

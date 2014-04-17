@@ -50,6 +50,7 @@
 #include "cc/resources/pixel_buffer_raster_worker_pool.h"
 #include "cc/resources/prioritized_resource_manager.h"
 #include "cc/resources/raster_worker_pool.h"
+#include "cc/resources/resource_pool.h"
 #include "cc/resources/texture_mailbox_deleter.h"
 #include "cc/resources/ui_resource_bitmap.h"
 #include "cc/scheduler/delay_based_time_source.h"
@@ -307,6 +308,7 @@ LayerTreeHostImpl::~LayerTreeHostImpl() {
   pending_tree_.reset();
   active_tree_.reset();
   tile_manager_.reset();
+  resource_pool_.reset();
   raster_worker_pool_.reset();
   direct_raster_worker_pool_.reset();
 }
@@ -1190,6 +1192,15 @@ void LayerTreeHostImpl::UpdateTileManagerMemoryPolicy(
           gpu::MemoryAllocation::CUTOFF_ALLOW_NOTHING);
   global_tile_state_.num_resources_limit = policy.num_resources_limit;
 
+  DCHECK(resource_pool_);
+  resource_pool_->CheckBusyResources();
+  // Soft limit is used for resource pool such that memory returns to soft
+  // limit after going over.
+  resource_pool_->SetResourceUsageLimits(
+      global_tile_state_.soft_memory_limit_in_bytes,
+      global_tile_state_.unused_memory_limit_in_bytes,
+      global_tile_state_.num_resources_limit);
+
   DidModifyTilePriorities();
 }
 
@@ -1282,8 +1293,8 @@ void LayerTreeHostImpl::SetNeedsRedrawRect(const gfx::Rect& damage_rect) {
   client_->SetNeedsRedrawRectOnImplThread(damage_rect);
 }
 
-void LayerTreeHostImpl::BeginImplFrame(const BeginFrameArgs& args) {
-  client_->BeginImplFrame(args);
+void LayerTreeHostImpl::BeginFrame(const BeginFrameArgs& args) {
+  client_->BeginFrame(args);
 }
 
 void LayerTreeHostImpl::DidSwapBuffers() {
@@ -1303,11 +1314,10 @@ void LayerTreeHostImpl::ReclaimResources(const CompositorFrameAck* ack) {
   // In OOM, we now might be able to release more resources that were held
   // because they were exported.
   if (tile_manager_) {
-    DCHECK(tile_manager_->resource_pool());
+    DCHECK(resource_pool_);
 
-    // TODO(vmpstr): Move resource pool to be LTHI member.
-    tile_manager_->resource_pool()->CheckBusyResources();
-    tile_manager_->resource_pool()->ReduceResourceUsage();
+    resource_pool_->CheckBusyResources();
+    resource_pool_->ReduceResourceUsage();
   }
   // If we're not visible, we likely released resources, so we want to
   // aggressively flush here to make sure those DeleteTextures make it to the
@@ -1499,9 +1509,15 @@ bool LayerTreeHostImpl::SwapBuffers(const LayerTreeHostImpl::FrameData& frame) {
   return true;
 }
 
-void LayerTreeHostImpl::SetNeedsBeginImplFrame(bool enable) {
+void LayerTreeHostImpl::SetNeedsBeginFrame(bool enable) {
   if (output_surface_)
-    output_surface_->SetNeedsBeginImplFrame(enable);
+    output_surface_->SetNeedsBeginFrame(enable);
+}
+
+void LayerTreeHostImpl::WillBeginImplFrame(const BeginFrameArgs& args) {
+  // Sample the frame time now. This time will be used for updating animations
+  // when we draw.
+  UpdateCurrentFrameTime();
 }
 
 gfx::SizeF LayerTreeHostImpl::ComputeInnerViewportContainerSize() const {
@@ -1797,23 +1813,30 @@ void LayerTreeHostImpl::CreateAndSetTileManager(
   DCHECK(proxy_->ImplThreadTaskRunner());
 
   if (using_map_image) {
-    raster_worker_pool_ = ImageRasterWorkerPool::Create(
-        proxy_->ImplThreadTaskRunner(),
-        RasterWorkerPool::GetTaskGraphRunner(),
-        resource_provider,
-        GetMapImageTextureTarget(context_provider));
+    raster_worker_pool_ =
+        ImageRasterWorkerPool::Create(proxy_->ImplThreadTaskRunner(),
+                                      RasterWorkerPool::GetTaskGraphRunner(),
+                                      resource_provider);
+    resource_pool_ =
+        ResourcePool::Create(resource_provider,
+                             GetMapImageTextureTarget(context_provider),
+                             resource_provider->best_texture_format());
   } else {
     raster_worker_pool_ = PixelBufferRasterWorkerPool::Create(
         proxy_->ImplThreadTaskRunner(),
         RasterWorkerPool::GetTaskGraphRunner(),
         resource_provider,
         GetMaxTransferBufferUsageBytes(context_provider));
+    resource_pool_ = ResourcePool::Create(
+        resource_provider,
+        GL_TEXTURE_2D,
+        resource_provider->memory_efficient_texture_format());
   }
   direct_raster_worker_pool_ = DirectRasterWorkerPool::Create(
       proxy_->ImplThreadTaskRunner(), resource_provider, context_provider);
   tile_manager_ =
       TileManager::Create(this,
-                          resource_provider,
+                          resource_pool_.get(),
                           raster_worker_pool_->AsRasterizer(),
                           direct_raster_worker_pool_->AsRasterizer(),
                           GetMaxRasterTasksUsageBytes(context_provider),
@@ -1842,6 +1865,7 @@ bool LayerTreeHostImpl::InitializeRenderer(
   // Note: order is important here.
   renderer_.reset();
   tile_manager_.reset();
+  resource_pool_.reset();
   raster_worker_pool_.reset();
   direct_raster_worker_pool_.reset();
   resource_provider_.reset();
@@ -1877,14 +1901,14 @@ bool LayerTreeHostImpl::InitializeRenderer(
         GetRendererCapabilities().allow_rasterize_on_demand);
   }
 
-  // Setup BeginImplFrameEmulation if it's not supported natively
+  // Setup BeginFrameEmulation if it's not supported natively
   if (!settings_.begin_impl_frame_scheduling_enabled) {
     const base::TimeDelta display_refresh_interval =
       base::TimeDelta::FromMicroseconds(
           base::Time::kMicrosecondsPerSecond /
           settings_.refresh_rate);
 
-    output_surface->InitializeBeginImplFrameEmulation(
+    output_surface->InitializeBeginFrameEmulation(
         proxy_->ImplThreadTaskRunner(),
         settings_.throttle_frame_production,
         display_refresh_interval);
@@ -1969,6 +1993,7 @@ void LayerTreeHostImpl::ReleaseGL() {
   ReleaseTreeResources();
   renderer_.reset();
   tile_manager_.reset();
+  resource_pool_.reset();
   raster_worker_pool_.reset();
   direct_raster_worker_pool_.reset();
   resource_provider_->InitializeSoftware();
@@ -2115,6 +2140,17 @@ LayerImpl* LayerTreeHostImpl::FindScrollLayerForDeviceViewportPoint(
   return potentially_scrolling_layer_impl;
 }
 
+// Similar to LayerImpl::HasAncestor, but takes into account scroll parents.
+static bool HasScrollAncestor(LayerImpl* child, LayerImpl* scroll_ancestor) {
+  DCHECK(scroll_ancestor);
+  for (LayerImpl* ancestor = child; ancestor;
+       ancestor = NextScrollLayer(ancestor)) {
+    if (ancestor->scrollable())
+      return ancestor == scroll_ancestor;
+  }
+  return false;
+}
+
 InputHandler::ScrollStatus LayerTreeHostImpl::ScrollBegin(
     const gfx::Point& viewport_point,
     InputHandler::ScrollInputType type) {
@@ -2134,6 +2170,15 @@ InputHandler::ScrollStatus LayerTreeHostImpl::ScrollBegin(
   LayerImpl* layer_impl = LayerTreeHostCommon::FindLayerThatIsHitByPoint(
       device_viewport_point,
       active_tree_->RenderSurfaceLayerList());
+
+  if (layer_impl) {
+    LayerImpl* scroll_layer_impl =
+        LayerTreeHostCommon::FindFirstScrollingLayerThatIsHitByPoint(
+            device_viewport_point, active_tree_->RenderSurfaceLayerList());
+    if (scroll_layer_impl && !HasScrollAncestor(layer_impl, scroll_layer_impl))
+      return ScrollUnknown;
+  }
+
   bool scroll_on_main_thread = false;
   LayerImpl* potentially_scrolling_layer_impl =
       FindScrollLayerForDeviceViewportPoint(device_viewport_point,
@@ -2315,6 +2360,13 @@ bool LayerTreeHostImpl::ScrollBy(const gfx::Point& viewport_point,
         unused_root_delta.set_x(0.0f);
       if (std::abs(unused_root_delta.y()) < kEpsilon)
         unused_root_delta.set_y(0.0f);
+      // Disable overscroll on axes which is impossible to scroll.
+      if (settings_.report_overscroll_only_for_scrollable_axes) {
+        if (std::abs(active_tree_->TotalMaxScrollOffset().x()) <= kEpsilon)
+          unused_root_delta.set_x(0.0f);
+        if (std::abs(active_tree_->TotalMaxScrollOffset().y()) <= kEpsilon)
+          unused_root_delta.set_y(0.0f);
+      }
     }
 
     // If the layer wasn't able to move, try the next one in the hierarchy.

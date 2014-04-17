@@ -23,48 +23,26 @@
 #include "chrome/common/url_constants.h"
 #include "chrome/renderer/chrome_render_process_observer.h"
 #include "chrome/renderer/extensions/api_activity_logger.h"
-#include "chrome/renderer/extensions/api_definitions_natives.h"
 #include "chrome/renderer/extensions/app_bindings.h"
 #include "chrome/renderer/extensions/app_runtime_custom_bindings.h"
 #include "chrome/renderer/extensions/app_window_custom_bindings.h"
-#include "chrome/renderer/extensions/binding_generating_native_handler.h"
-#include "chrome/renderer/extensions/blob_native_handler.h"
 #include "chrome/renderer/extensions/chrome_v8_context.h"
 #include "chrome/renderer/extensions/chrome_v8_extension.h"
-#include "chrome/renderer/extensions/content_watcher.h"
-#include "chrome/renderer/extensions/context_menus_custom_bindings.h"
-#include "chrome/renderer/extensions/css_native_handler.h"
-#include "chrome/renderer/extensions/document_custom_bindings.h"
 #include "chrome/renderer/extensions/dom_activity_logger.h"
-#include "chrome/renderer/extensions/event_bindings.h"
-#include "chrome/renderer/extensions/extension_groups.h"
 #include "chrome/renderer/extensions/extension_helper.h"
 #include "chrome/renderer/extensions/file_browser_handler_custom_bindings.h"
 #include "chrome/renderer/extensions/file_browser_private_custom_bindings.h"
-#include "chrome/renderer/extensions/file_system_natives.h"
-#include "chrome/renderer/extensions/i18n_custom_bindings.h"
-#include "chrome/renderer/extensions/id_generator_custom_bindings.h"
-#include "chrome/renderer/extensions/logging_native_handler.h"
 #include "chrome/renderer/extensions/media_galleries_custom_bindings.h"
 #include "chrome/renderer/extensions/messaging_bindings.h"
-#include "chrome/renderer/extensions/module_system.h"
-#include "chrome/renderer/extensions/object_backed_native_handler.h"
 #include "chrome/renderer/extensions/page_actions_custom_bindings.h"
 #include "chrome/renderer/extensions/page_capture_custom_bindings.h"
 #include "chrome/renderer/extensions/pepper_request_natives.h"
-#include "chrome/renderer/extensions/render_view_observer_natives.h"
-#include "chrome/renderer/extensions/request_sender.h"
 #include "chrome/renderer/extensions/runtime_custom_bindings.h"
-#include "chrome/renderer/extensions/safe_builtins.h"
-#include "chrome/renderer/extensions/send_request_natives.h"
-#include "chrome/renderer/extensions/set_icon_natives.h"
 #include "chrome/renderer/extensions/sync_file_system_custom_bindings.h"
 #include "chrome/renderer/extensions/tab_finder.h"
 #include "chrome/renderer/extensions/tabs_custom_bindings.h"
 #include "chrome/renderer/extensions/user_script_slave.h"
-#include "chrome/renderer/extensions/utils_native_handler.h"
 #include "chrome/renderer/extensions/webstore_bindings.h"
-#include "chrome/renderer/resource_bundle_source_map.h"
 #include "content/public/renderer/render_thread.h"
 #include "content/public/renderer/render_view.h"
 #include "content/public/renderer/v8_value_converter.h"
@@ -85,6 +63,28 @@
 #include "extensions/common/permissions/permissions_data.h"
 #include "extensions/common/switches.h"
 #include "extensions/common/view_type.h"
+#include "extensions/renderer/api_definitions_natives.h"
+#include "extensions/renderer/binding_generating_native_handler.h"
+#include "extensions/renderer/blob_native_handler.h"
+#include "extensions/renderer/content_watcher.h"
+#include "extensions/renderer/context_menus_custom_bindings.h"
+#include "extensions/renderer/css_native_handler.h"
+#include "extensions/renderer/document_custom_bindings.h"
+#include "extensions/renderer/event_bindings.h"
+#include "extensions/renderer/extension_groups.h"
+#include "extensions/renderer/file_system_natives.h"
+#include "extensions/renderer/i18n_custom_bindings.h"
+#include "extensions/renderer/id_generator_custom_bindings.h"
+#include "extensions/renderer/logging_native_handler.h"
+#include "extensions/renderer/module_system.h"
+#include "extensions/renderer/object_backed_native_handler.h"
+#include "extensions/renderer/render_view_observer_natives.h"
+#include "extensions/renderer/request_sender.h"
+#include "extensions/renderer/safe_builtins.h"
+#include "extensions/renderer/script_context.h"
+#include "extensions/renderer/send_request_natives.h"
+#include "extensions/renderer/set_icon_natives.h"
+#include "extensions/renderer/utils_native_handler.h"
 #include "grit/common_resources.h"
 #include "grit/renderer_resources.h"
 #include "third_party/WebKit/public/platform/WebString.h"
@@ -133,7 +133,7 @@ static const char kOnSuspendCanceledEvent[] = "runtime.onSuspendCanceled";
 //
 // Note that this isn't necessarily an object, since webpages can write, for
 // example, "window.chrome = true".
-v8::Handle<v8::Value> GetOrCreateChrome(ChromeV8Context* context) {
+v8::Handle<v8::Value> GetOrCreateChrome(ScriptContext* context) {
   v8::Handle<v8::String> chrome_string(
       v8::String::NewFromUtf8(context->isolate(), "chrome"));
   v8::Handle<v8::Object> global(context->v8_context()->Global());
@@ -294,11 +294,10 @@ class PrintNativeHandler : public ObjectBackedNativeHandler {
   }
 };
 
-class LazyBackgroundPageNativeHandler : public ChromeV8Extension {
+class LazyBackgroundPageNativeHandler : public ObjectBackedNativeHandler {
  public:
-  LazyBackgroundPageNativeHandler(Dispatcher* dispatcher,
-                                  ChromeV8Context* context)
-      : ChromeV8Extension(dispatcher, context) {
+  explicit LazyBackgroundPageNativeHandler(ScriptContext* context)
+      : ObjectBackedNativeHandler(context) {
     RouteFunction("IncrementKeepaliveCount",
         base::Bind(&LazyBackgroundPageNativeHandler::IncrementKeepaliveCount,
                    base::Unretained(this)));
@@ -341,16 +340,15 @@ class LazyBackgroundPageNativeHandler : public ChromeV8Extension {
   }
 };
 
-class ProcessInfoNativeHandler : public ChromeV8Extension {
+class ProcessInfoNativeHandler : public ObjectBackedNativeHandler {
  public:
-  ProcessInfoNativeHandler(Dispatcher* dispatcher,
-                           ChromeV8Context* context,
+  ProcessInfoNativeHandler(ScriptContext* context,
                            const std::string& extension_id,
                            const std::string& context_type,
                            bool is_incognito_context,
                            int manifest_version,
                            bool send_request_disabled)
-      : ChromeV8Extension(dispatcher, context),
+      : ObjectBackedNativeHandler(context),
         extension_id_(extension_id),
         context_type_(context_type),
         is_incognito_context_(is_incognito_context),
@@ -889,22 +887,26 @@ void Dispatcher::RegisterBinding(const std::string& api_name,
 // NOTE: please use the naming convention "foo_natives" for these.
 void Dispatcher::RegisterNativeHandlers(ModuleSystem* module_system,
                                         ChromeV8Context* context) {
-  module_system->RegisterNativeHandler("event_natives",
-      scoped_ptr<NativeHandler>(EventBindings::Create(this, context)));
+  module_system->RegisterNativeHandler(
+      "event_natives",
+      scoped_ptr<NativeHandler>(new EventBindings(this, context)));
   module_system->RegisterNativeHandler("messaging_natives",
       scoped_ptr<NativeHandler>(MessagingBindings::Get(this, context)));
   module_system->RegisterNativeHandler("apiDefinitions",
       scoped_ptr<NativeHandler>(new ApiDefinitionsNatives(this, context)));
-  module_system->RegisterNativeHandler("sendRequest",
+  module_system->RegisterNativeHandler(
+      "sendRequest",
       scoped_ptr<NativeHandler>(
-          new SendRequestNatives(this, request_sender_.get(), context)));
-  module_system->RegisterNativeHandler("setIcon",
+          new SendRequestNatives(request_sender_.get(), context)));
+  module_system->RegisterNativeHandler(
+      "setIcon",
       scoped_ptr<NativeHandler>(
-          new SetIconNatives(this, request_sender_.get(), context)));
+          new SetIconNatives(request_sender_.get(), context)));
   module_system->RegisterNativeHandler("activityLogger",
       scoped_ptr<NativeHandler>(new APIActivityLogger(this, context)));
-  module_system->RegisterNativeHandler("renderViewObserverNatives",
-      scoped_ptr<NativeHandler>(new RenderViewObserverNatives(this, context)));
+  module_system->RegisterNativeHandler(
+      "renderViewObserverNatives",
+      scoped_ptr<NativeHandler>(new RenderViewObserverNatives(context)));
 
   // Natives used by multiple APIs.
   module_system->RegisterNativeHandler("file_system_natives",
@@ -921,14 +923,14 @@ void Dispatcher::RegisterNativeHandlers(ModuleSystem* module_system,
           new AppWindowCustomBindings(this, context)));
   module_system->RegisterNativeHandler("blob_natives",
       scoped_ptr<NativeHandler>(new BlobNativeHandler(context)));
-  module_system->RegisterNativeHandler("context_menus",
-      scoped_ptr<NativeHandler>(
-          new ContextMenusCustomBindings(this, context)));
+  module_system->RegisterNativeHandler(
+      "context_menus",
+      scoped_ptr<NativeHandler>(new ContextMenusCustomBindings(context)));
   module_system->RegisterNativeHandler(
       "css_natives", scoped_ptr<NativeHandler>(new CssNativeHandler(context)));
-  module_system->RegisterNativeHandler("document_natives",
-      scoped_ptr<NativeHandler>(
-          new DocumentCustomBindings(this, context)));
+  module_system->RegisterNativeHandler(
+      "document_natives",
+      scoped_ptr<NativeHandler>(new DocumentCustomBindings(context)));
   module_system->RegisterNativeHandler("sync_file_system",
       scoped_ptr<NativeHandler>(
           new SyncFileSystemCustomBindings(this, context)));
@@ -938,12 +940,11 @@ void Dispatcher::RegisterNativeHandlers(ModuleSystem* module_system,
   module_system->RegisterNativeHandler("file_browser_private",
       scoped_ptr<NativeHandler>(new FileBrowserPrivateCustomBindings(
           this, context)));
-  module_system->RegisterNativeHandler("i18n",
-      scoped_ptr<NativeHandler>(
-          new I18NCustomBindings(this, context)));
+  module_system->RegisterNativeHandler(
+      "i18n", scoped_ptr<NativeHandler>(new I18NCustomBindings(context)));
   module_system->RegisterNativeHandler(
       "id_generator",
-      scoped_ptr<NativeHandler>(new IdGeneratorCustomBindings(this, context)));
+      scoped_ptr<NativeHandler>(new IdGeneratorCustomBindings(context)));
   module_system->RegisterNativeHandler("mediaGalleries",
       scoped_ptr<NativeHandler>(
           new MediaGalleriesCustomBindings(this, context)));
@@ -970,8 +971,6 @@ void Dispatcher::RegisterNativeHandlers(ModuleSystem* module_system,
 
 void Dispatcher::PopulateSourceMap() {
   // Libraries.
-  source_map_.RegisterSource("automationNode", IDR_AUTOMATION_NODE_JS);
-  source_map_.RegisterSource("automationTree", IDR_AUTOMATION_TREE_JS);
   source_map_.RegisterSource("entryIdManager", IDR_ENTRY_ID_MANAGER);
   source_map_.RegisterSource(kEventBindings, IDR_EVENT_BINDINGS_JS);
   source_map_.RegisterSource("imageUtil", IDR_IMAGE_UTIL_JS);
@@ -992,6 +991,7 @@ void Dispatcher::PopulateSourceMap() {
   source_map_.RegisterSource("app.runtime", IDR_APP_RUNTIME_CUSTOM_BINDINGS_JS);
   source_map_.RegisterSource("app.window", IDR_APP_WINDOW_CUSTOM_BINDINGS_JS);
   source_map_.RegisterSource("automation", IDR_AUTOMATION_CUSTOM_BINDINGS_JS);
+  source_map_.RegisterSource("automationEvent", IDR_AUTOMATION_EVENT_JS);
   source_map_.RegisterSource("automationNode", IDR_AUTOMATION_NODE_JS);
   source_map_.RegisterSource("automationTree", IDR_AUTOMATION_TREE_JS);
   source_map_.RegisterSource("browserAction",
@@ -1131,11 +1131,11 @@ void Dispatcher::DidCreateScriptContext(
     extension_id = "";
   }
 
-  Feature::Context context_type = ClassifyJavaScriptContext(
-      extension,
-      extension_group,
-      UserScriptSlave::GetDataSourceURLForFrame(frame),
-      frame->document().securityOrigin());
+  Feature::Context context_type =
+      ClassifyJavaScriptContext(extension,
+                                extension_group,
+                                ScriptContext::GetDataSourceURLForFrame(frame),
+                                frame->document().securityOrigin());
 
   ChromeV8Context* context =
       new ChromeV8Context(v8_context, frame, extension, context_type);
@@ -1161,9 +1161,9 @@ void Dispatcher::DidCreateScriptContext(
       scoped_ptr<NativeHandler>(new ChromeNativeHandler(context)));
   module_system->RegisterNativeHandler("print",
       scoped_ptr<NativeHandler>(new PrintNativeHandler(context)));
-  module_system->RegisterNativeHandler("lazy_background_page",
-      scoped_ptr<NativeHandler>(
-          new LazyBackgroundPageNativeHandler(this, context)));
+  module_system->RegisterNativeHandler(
+      "lazy_background_page",
+      scoped_ptr<NativeHandler>(new LazyBackgroundPageNativeHandler(context)));
   module_system->RegisterNativeHandler("logging",
       scoped_ptr<NativeHandler>(new LoggingNativeHandler(context)));
   module_system->RegisterNativeHandler("schema_registry",
@@ -1181,12 +1181,15 @@ void Dispatcher::DidCreateScriptContext(
   bool send_request_disabled =
       (extension && Manifest::IsUnpackedLocation(extension->location()) &&
        BackgroundInfo::HasLazyBackgroundPage(extension));
-  module_system->RegisterNativeHandler("process",
+  module_system->RegisterNativeHandler(
+      "process",
       scoped_ptr<NativeHandler>(new ProcessInfoNativeHandler(
-          this, context, context->GetExtensionID(),
+          context,
+          context->GetExtensionID(),
           context->GetContextTypeDescription(),
           ChromeRenderProcessObserver::is_incognito_process(),
-          manifest_version, send_request_disabled)));
+          manifest_version,
+          send_request_disabled)));
 
   // chrome.Event is part of the public API (although undocumented). Make it
   // lazily evalulate to Event from event_bindings.js. For extensions only
@@ -1271,7 +1274,7 @@ std::string Dispatcher::GetExtensionID(const WebFrame* frame, int world_id) {
     return std::string();
 
   // Extension pages (chrome-extension:// URLs).
-  GURL frame_url = UserScriptSlave::GetDataSourceURLForFrame(frame);
+  GURL frame_url = ScriptContext::GetDataSourceURLForFrame(frame);
   return extensions_.GetExtensionOrAppIDByURL(frame_url);
 }
 
@@ -1606,7 +1609,8 @@ void Dispatcher::OnExtensionResponse(int request_id,
 }
 
 bool Dispatcher::CheckContextAccessToExtensionAPI(
-    const std::string& function_name, ChromeV8Context* context) const {
+    const std::string& function_name,
+    ScriptContext* context) const {
   if (!context) {
     DLOG(ERROR) << "Not in a v8::Context";
     return false;
@@ -1621,7 +1625,7 @@ bool Dispatcher::CheckContextAccessToExtensionAPI(
   // Theoretically we could end up with bindings being injected into sandboxed
   // frames, for example content scripts. Don't let them execute API functions.
   blink::WebFrame* frame = context->web_frame();
-  if (IsSandboxedPage(UserScriptSlave::GetDataSourceURLForFrame(frame))) {
+  if (IsSandboxedPage(ScriptContext::GetDataSourceURLForFrame(frame))) {
     static const char kMessage[] =
         "%s cannot be used within a sandboxed frame.";
     std::string error_msg = base::StringPrintf(kMessage, function_name.c_str());

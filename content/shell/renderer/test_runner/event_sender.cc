@@ -29,8 +29,6 @@
 #include "third_party/WebKit/public/web/mac/WebInputEventFactory.h"
 #elif defined(OS_ANDROID)
 #include "third_party/WebKit/public/web/android/WebInputEventFactory.h"
-#elif defined(TOOLKIT_GTK)
-#include "third_party/WebKit/public/web/gtk/WebInputEventFactory.h"
 #endif
 
 using blink::WebContextMenuData;
@@ -50,8 +48,7 @@ using blink::WebTouchPoint;
 using blink::WebVector;
 using blink::WebView;
 
-#if defined(OS_WIN) || defined(OS_MACOSX) || defined(OS_ANDROID) || \
-    defined(TOOLKIT_GTK)
+#if defined(OS_WIN) || defined(OS_MACOSX) || defined(OS_ANDROID)
 using blink::WebInputEventFactory;
 #endif
 
@@ -343,7 +340,7 @@ class EventSenderBindings : public gin::Wrappable<EventSenderBindings> {
   void SetPageScaleFactor(gin::Arguments* args);
   void ClearTouchPoints();
   void ReleaseTouchPoint(unsigned index);
-  void UpdateTouchPoint(unsigned index, int x, int y);
+  void UpdateTouchPoint(unsigned index, double x, double y);
   void CancelTouchPoint(unsigned index);
   void SetTouchModifier(const std::string& key_name, bool set_mask);
   void DumpFilenameBeingDragged();
@@ -590,8 +587,8 @@ void EventSenderBindings::SetPageScaleFactor(gin::Arguments* args) {
   if (!sender_)
     return;
   float scale_factor;
-  int x;
-  int y;
+  double x;
+  double y;
   if (args->PeekNext().IsEmpty())
     return;
   args->GetNext(&scale_factor);
@@ -601,7 +598,8 @@ void EventSenderBindings::SetPageScaleFactor(gin::Arguments* args) {
   if (args->PeekNext().IsEmpty())
     return;
   args->GetNext(&y);
-  sender_->SetPageScaleFactor(scale_factor, x, y);
+  sender_->SetPageScaleFactor(scale_factor,
+                              static_cast<int>(x), static_cast<int>(y));
 }
 
 void EventSenderBindings::ClearTouchPoints() {
@@ -614,9 +612,9 @@ void EventSenderBindings::ReleaseTouchPoint(unsigned index) {
     sender_->ReleaseTouchPoint(index);
 }
 
-void EventSenderBindings::UpdateTouchPoint(unsigned index, int x, int y) {
+void EventSenderBindings::UpdateTouchPoint(unsigned index, double x, double y) {
   if (sender_)
-    sender_->UpdateTouchPoint(index, x, y);
+    sender_->UpdateTouchPoint(index, static_cast<int>(x), static_cast<int>(y));
 }
 
 void EventSenderBindings::CancelTouchPoint(unsigned index) {
@@ -1243,10 +1241,6 @@ void EventSender::KeyDown(const std::string& code_str,
   event_down.modifiers = modifiers;
   event_down.windowsKeyCode = code;
 
-#if defined(OS_LINUX) && defined(TOOLKIT_GTK)
-  event_down.nativeKeyCode = NativeKeyCodeForWindowsKeyCode(code);
-#endif
-
   if (generate_char) {
     event_down.text[0] = text;
     event_down.unmodifiedText[0] = text;
@@ -1254,8 +1248,7 @@ void EventSender::KeyDown(const std::string& code_str,
 
   event_down.setKeyIdentifierFromWindowsKeyCode();
 
-#if defined(OS_WIN) || defined(OS_MACOSX) || defined(OS_ANDROID) || \
-    defined(TOOLKIT_GTK)
+#if defined(OS_WIN) || defined(OS_MACOSX) || defined(OS_ANDROID)
   if (event_down.modifiers != 0)
     event_down.isSystemKey = WebInputEventFactory::isSystemKeyEvent(event_down);
 #endif
@@ -1397,15 +1390,27 @@ void EventSender::ClearTouchPoints() {
   touch_points_.clear();
 }
 
+void EventSender::ThrowTouchPointError() {
+  v8::Isolate* isolate = blink::mainThreadIsolate();
+  isolate->ThrowException(v8::Exception::TypeError(
+      gin::StringToV8(isolate, "Invalid touch point.")));
+}
+
 void EventSender::ReleaseTouchPoint(unsigned index) {
-  DCHECK_LT(index, touch_points_.size());
+  if (index >= touch_points_.size()) {
+    ThrowTouchPointError();
+    return;
+  }
 
   WebTouchPoint* touch_point = &touch_points_[index];
   touch_point->state = WebTouchPoint::StateReleased;
 }
 
 void EventSender::UpdateTouchPoint(unsigned index, int x, int y) {
-  DCHECK_LT(index, touch_points_.size());
+  if (index >= touch_points_.size()) {
+    ThrowTouchPointError();
+    return;
+  }
 
   WebTouchPoint* touch_point = &touch_points_[index];
   touch_point->state = WebTouchPoint::StateMoved;
@@ -1414,7 +1419,10 @@ void EventSender::UpdateTouchPoint(unsigned index, int x, int y) {
 }
 
 void EventSender::CancelTouchPoint(unsigned index) {
-  DCHECK_LT(index, touch_points_.size());
+  if (index >= touch_points_.size()) {
+    ThrowTouchPointError();
+    return;
+  }
 
   WebTouchPoint* touch_point = &touch_points_[index];
   touch_point->state = WebTouchPoint::StateCancelled;
@@ -1545,24 +1553,25 @@ void EventSender::BeginDragWithFiles(const std::vector<std::string>& files) {
 }
 
 void EventSender::AddTouchPoint(gin::Arguments* args) {
-  int x;
-  int y;
+  double x;
+  double y;
   args->GetNext(&x);
   args->GetNext(&y);
 
   WebTouchPoint touch_point;
   touch_point.state = WebTouchPoint::StatePressed;
-  touch_point.position = WebFloatPoint(x, y);
+  touch_point.position = WebFloatPoint(static_cast<int>(x),
+                                       static_cast<int>(y));
   touch_point.screenPosition = touch_point.position;
 
   if (!args->PeekNext().IsEmpty()) {
-    int radius_x;
+    double radius_x;
     if (!args->GetNext(&radius_x)) {
       args->ThrowError();
       return;
     }
 
-    int radius_y = radius_x;
+    double radius_y = radius_x;
     if (!args->PeekNext().IsEmpty()) {
       if (!args->GetNext(&radius_y)) {
         args->ThrowError();
@@ -1570,8 +1579,8 @@ void EventSender::AddTouchPoint(gin::Arguments* args) {
       }
     }
 
-    touch_point.radiusX = radius_x;
-    touch_point.radiusY = radius_y;
+    touch_point.radiusX = static_cast<int>(radius_x);
+    touch_point.radiusY = static_cast<int>(radius_y);
   }
 
   int lowest_id = 0;
@@ -1695,11 +1704,11 @@ void EventSender::MouseMoveTo(gin::Arguments* args) {
   if (force_layout_on_events_)
     view_->layout();
 
-  int x;
-  int y;
+  double x;
+  double y;
   args->GetNext(&x);
   args->GetNext(&y);
-  WebPoint mouse_pos(x, y);
+  WebPoint mouse_pos(static_cast<int>(x), static_cast<int>(y));
 
   int modifiers = 0;
   if (!args->PeekNext().IsEmpty())

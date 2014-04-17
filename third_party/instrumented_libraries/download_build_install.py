@@ -105,8 +105,9 @@ def destdir_configure_make_install(parsed_arguments, environment,
   shell_call(configure_command, parsed_arguments.verbose, environment)
   shell_call('make -j%s' % parsed_arguments.jobs,
       parsed_arguments.verbose, environment)
-  shell_call('make -j%s DESTDIR=%s install' % (parsed_arguments.jobs,
-                                               install_prefix),
+  # Some makefiles use BUILDROOT instead of DESTDIR.
+  shell_call('make -j%s DESTDIR=%s BUILDROOT=%s install' % \
+        (parsed_arguments.jobs, install_prefix, install_prefix),
       parsed_arguments.verbose, environment)
   # Kill the .la files. They contain absolute paths, and will cause build errors
   # in dependent libraries.
@@ -164,7 +165,7 @@ def libcap2_make_install(parsed_arguments, environment, install_prefix):
   shell_call('make -j%s %s' % (parsed_arguments.jobs, ' '.join(make_args)),
     parsed_arguments.verbose, environment)
   install_args = [
-    'prefix=%s' % install_prefix,
+    'DESTDIR=%s' % install_prefix,
     # Do not install in lib64/.
     'lib=lib',
     # Skip a step that requires sudo.

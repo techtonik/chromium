@@ -65,6 +65,9 @@ const char kEchoExtensionPath[]             = "echo-ext-path";
 // Enables switching between different cellular carriers from the UI.
 const char kEnableCarrierSwitching[]        = "enable-carrier-switching";
 
+// Enables MTP support in Files.app.
+const char kEnableFileManagerMTP[] = "enable-filemanager-mtp";
+
 // Enables notifications about captive portals in session.
 const char kEnableNetworkPortalNotification[] =
     "enable-network-portal-notification";
@@ -170,10 +173,6 @@ const char kPowerStub[] = "power-stub";
 //  'cellular=1' - Cellular is initially connected
 //  'interactive=3' - Interactive mode, connect/scan/etc requests take 3 secs
 const char kShillStub[] = "shill-stub";
-
-// Skips the machine hwid check. Useful for running in VMs because they have no
-// hwid.
-const char kSkipHWIDCheck[]                 = "skip-hwid-check";
 
 // Sends test messages on first call to RequestUpdate (stub only).
 const char kSmsTestMessages[]               = "sms-test-messages";

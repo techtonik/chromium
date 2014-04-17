@@ -34,14 +34,10 @@
 #include "base/message_loop/message_pump_libevent.h"
 #if !defined(OS_MACOSX) && !defined(OS_ANDROID)
 
-#if defined(USE_AURA) && defined(USE_X11) && !defined(OS_NACL)
-#include "base/message_loop/message_pump_x11.h"
+#if defined(USE_GLIB) && !defined(OS_NACL)
+#include "base/message_loop/message_pump_glib.h"
 #elif !defined(OS_ANDROID_HOST)
-#define USE_GTK_MESSAGE_PUMP
-#include "base/message_loop/message_pump_gtk.h"
-#if defined(TOOLKIT_GTK)
-#include "base/message_loop/message_pump_x11.h"
-#endif
+#include "base/message_loop/message_pump_glib.h"
 #endif
 
 #endif
@@ -93,11 +89,8 @@ class WaitableEvent;
 //
 class BASE_EXPORT MessageLoop : public MessagePump::Delegate {
  public:
-
-#if defined(USE_AURA)
+#if defined(OS_WIN)
   typedef MessagePumpObserver Observer;
-#elif defined(USE_GTK_MESSAGE_PUMP)
-  typedef MessagePumpGdkObserver Observer;
 #endif
 
   // A MessageLoop has a particular type, which indicates the set of
@@ -109,11 +102,6 @@ class BASE_EXPORT MessageLoop : public MessagePump::Delegate {
   // TYPE_UI
   //   This type of ML also supports native UI events (e.g., Windows messages).
   //   See also MessageLoopForUI.
-  //
-  // TYPE_GPU
-  //   This type of ML also supports native UI events for use in the GPU
-  //   process. On Linux this will always be an X11 ML (as compared with the
-  //   sometimes-GTK ML in the browser process).
   //
   // TYPE_IO
   //   This type of ML also supports asynchronous IO.  See also
@@ -132,9 +120,6 @@ class BASE_EXPORT MessageLoop : public MessagePump::Delegate {
     TYPE_DEFAULT,
     TYPE_UI,
     TYPE_CUSTOM,
-#if defined(TOOLKIT_GTK)
-    TYPE_GPU,
-#endif
     TYPE_IO,
 #if defined(OS_ANDROID)
     TYPE_JAVA,
@@ -414,13 +399,6 @@ class BASE_EXPORT MessageLoop : public MessagePump::Delegate {
   MessagePumpLibevent* pump_libevent() {
     return static_cast<MessagePumpLibevent*>(pump_.get());
   }
-#if defined(TOOLKIT_GTK)
-  friend class MessagePumpX11;
-  MessagePumpX11* pump_gpu() {
-    DCHECK_EQ(TYPE_GPU, type());
-    return static_cast<MessagePumpX11*>(pump_.get());
-  }
-#endif
 #endif
 
   scoped_ptr<MessagePump> pump_;
@@ -577,10 +555,8 @@ class BASE_EXPORT MessageLoopForUI : public MessageLoop {
   void Start();
 #endif
 
-#if !defined(OS_NACL) && (defined(TOOLKIT_GTK) || \
-                          defined(OS_WIN) || defined(USE_X11))
-  // Please see message_pump_win/message_pump_glib for definitions of these
-  // methods.
+#if !defined(OS_NACL) && defined(OS_WIN)
+  // Please see message_pump_win for definitions of these methods.
   void AddObserver(Observer* observer);
   void RemoveObserver(Observer* observer);
 #endif
@@ -596,10 +572,6 @@ class BASE_EXPORT MessageLoopForUI : public MessageLoop {
 #endif
 
  protected:
-#if defined(USE_X11)
-  friend class MessagePumpX11;
-#endif
-
 #if !defined(OS_MACOSX) && !defined(OS_ANDROID)
   // TODO(rvargas): Make this platform independent.
   MessagePumpForUI* pump_ui() {

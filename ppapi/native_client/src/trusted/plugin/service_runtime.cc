@@ -50,7 +50,6 @@
 #include "ppapi/native_client/src/trusted/plugin/manifest.h"
 #include "ppapi/native_client/src/trusted/plugin/plugin.h"
 #include "ppapi/native_client/src/trusted/plugin/plugin_error.h"
-#include "ppapi/native_client/src/trusted/plugin/pnacl_options.h"
 #include "ppapi/native_client/src/trusted/plugin/pnacl_resources.h"
 #include "ppapi/native_client/src/trusted/plugin/sel_ldr_launcher_chrome.h"
 #include "ppapi/native_client/src/trusted/plugin/srpc_client.h"
@@ -216,7 +215,7 @@ void PluginReverseInterface::OpenManifestEntry_MainThreadContinuation(
   NaClLog(4, "Entered OpenManifestEntry_MainThreadContinuation\n");
 
   std::string mapped_url;
-  PnaclOptions pnacl_options;
+  PP_PNaClOptions pnacl_options = {PP_FALSE, PP_FALSE, 2};
   ErrorInfo error_info;
   if (!manifest_->ResolveKey(p->url, &mapped_url,
                              &pnacl_options, &error_info)) {
@@ -236,9 +235,9 @@ void PluginReverseInterface::OpenManifestEntry_MainThreadContinuation(
   NaClLog(4,
           "OpenManifestEntry_MainThreadContinuation: "
           "ResolveKey: %s -> %s (pnacl_translate(%d))\n",
-          p->url.c_str(), mapped_url.c_str(), pnacl_options.translate());
+          p->url.c_str(), mapped_url.c_str(), pnacl_options.translate);
 
-  if (pnacl_options.translate()) {
+  if (pnacl_options.translate) {
     // Requires PNaCl translation, but that's not supported.
     NaClLog(4,
             "OpenManifestEntry_MainThreadContinuation: "
@@ -608,11 +607,30 @@ void ServiceRuntime::StartSelLdrContinuation(int32_t pp_error,
   pp::Module::Get()->core()->CallOnMainThread(0, callback, pp_error);
 }
 
-void ServiceRuntime::WaitForSelLdrStart() {
+bool ServiceRuntime::WaitForSelLdrStart() {
+  // Time to wait on condvar (for browser to create a new sel_ldr process on
+  // our behalf). Use 6 seconds to be *fairly* conservative.
+  //
+  // On surfaway, the CallOnMainThread above may never get scheduled
+  // to unblock this condvar, or the IPC reply from the browser to renderer
+  // might get canceled/dropped. However, it is currently important to
+  // avoid waiting indefinitely because ~PnaclCoordinator will attempt to
+  // join() the PnaclTranslateThread, and the PnaclTranslateThread is waiting
+  // for the signal before exiting.
+  static int64_t const kWaitTimeMicrosecs = 6 * NACL_MICROS_PER_UNIT;
+  int64_t left_to_wait = kWaitTimeMicrosecs;
+  int64_t deadline = NaClGetTimeOfDayMicroseconds() + left_to_wait;
   nacl::MutexLocker take(&mu_);
-  while(!start_sel_ldr_done_) {
-    NaClXCondVarWait(&cond_, &mu_);
+  while(!start_sel_ldr_done_ && left_to_wait > 0) {
+    struct nacl_abi_timespec left_timespec;
+    left_timespec.tv_sec = left_to_wait / NACL_MICROS_PER_UNIT;
+    left_timespec.tv_nsec =
+        (left_to_wait % NACL_MICROS_PER_UNIT) * NACL_NANOS_PER_MICRO;
+    NaClXCondVarTimedWaitRelative(&cond_, &mu_, &left_timespec);
+    int64_t now = NaClGetTimeOfDayMicroseconds();
+    left_to_wait = deadline - now;
   }
+  return start_sel_ldr_done_;
 }
 
 void ServiceRuntime::SignalStartSelLdrDone() {

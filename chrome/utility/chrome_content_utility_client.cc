@@ -68,6 +68,7 @@
 #endif  // defined(OS_WIN) || defined(OS_MACOSX)
 
 #if !defined(OS_ANDROID) && !defined(OS_IOS)
+#include "chrome/utility/media_galleries/image_metadata_extractor.h"
 #include "chrome/utility/media_galleries/ipc_data_source.h"
 #include "chrome/utility/media_galleries/media_metadata_parser.h"
 #endif  // !defined(OS_ANDROID) && !defined(OS_IOS)
@@ -437,6 +438,11 @@ void ChromeContentUtilityClient::PreSandboxStartup() {
 
   g_pdf_lib.Get().Init();
 
+#if !defined(OS_ANDROID) && !defined(OS_IOS)
+  // Initialize libexif for image metadata parsing.
+  metadata::ImageMetadataExtractor::InitializeLibrary();
+#endif  // !defined(OS_ANDROID) && !defined(OS_IOS)
+
   // Load media libraries for media file validation.
   base::FilePath media_path;
   PathService::Get(content::DIR_MEDIA_LIBS, &media_path);
@@ -720,14 +726,6 @@ bool ChromeContentUtilityClient::RenderPDFPagesToPWGRaster(
       page_number = total_page_count - 1 - page_number;
     }
 
-    bool rotate = false;
-
-    // Transform odd pages.
-    if (page_number % 2) {
-      rotate =
-          (bitmap_settings.odd_page_transform != printing::TRANSFORM_NORMAL);
-    }
-
     if (!g_pdf_lib.Get().RenderPDFPageToBitmap(data.data(),
                                                data.size(),
                                                page_number,
@@ -739,9 +737,36 @@ bool ChromeContentUtilityClient::RenderPDFPagesToPWGRaster(
                                                autoupdate)) {
       return false;
     }
+
+    cloud_print::PwgHeaderInfo header_info;
+    header_info.dpi = settings.dpi();
+    header_info.total_pages = total_page_count;
+
+    // Transform odd pages.
+    if (page_number % 2) {
+      switch (bitmap_settings.odd_page_transform) {
+        case printing::TRANSFORM_NORMAL:
+          break;
+        case printing::TRANSFORM_ROTATE_180:
+          header_info.flipx = true;
+          header_info.flipy = true;
+          break;
+        case printing::TRANSFORM_FLIP_HORIZONTAL:
+          header_info.flipx = true;
+          break;
+        case printing::TRANSFORM_FLIP_VERTICAL:
+          header_info.flipy = true;
+          break;
+      }
+    }
+
+    if (bitmap_settings.rotate_all_pages) {
+      header_info.flipx = !header_info.flipx;
+      header_info.flipy = !header_info.flipy;
+    }
+
     std::string pwg_page;
-    if (!encoder.EncodePage(
-            image, settings.dpi(), total_page_count, &pwg_page, rotate))
+    if (!encoder.EncodePage(image, header_info, &pwg_page))
       return false;
     bytes_written = base::WritePlatformFileAtCurrentPos(bitmap_file,
                                                         pwg_page.data(),

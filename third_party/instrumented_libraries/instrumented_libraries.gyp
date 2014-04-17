@@ -116,11 +116,21 @@
           ],
         },
       ],
+      'direct_dependent_settings': {
+        'target_conditions': [
+          ['_toolset=="target"', {
+            'ldflags': [
+              # Add RPATH to result binary to make it linking instrumented libraries ($ORIGIN means relative RPATH)
+              '-Wl,-R,\$$ORIGIN/instrumented_libraries/<(_sanitizer_type)/lib/:\$$ORIGIN/instrumented_libraries/<(_sanitizer_type)/usr/lib/x86_64-linux-gnu/',
+              '-Wl,-z,origin',
+            ],
+          }],
+        ],
+      },
     },
     {
       'library_name': 'freetype',
       'dependencies=': [],
-      'custom_configure_flags': '',
       'run_before_build': 'freetype.sh',
       'includes': ['standard_instrumented_library_target.gypi'],
     },
@@ -142,7 +152,9 @@
       'dependencies=': [
         '<(_sanitizer_type)-libglib2.0-0',
       ],
-      'build_method': 'prefix',
+      # Use system dbus-binding-tool. The just-built one is instrumented but
+      # doesn't have the correct RPATH, and will crash.
+      'custom_configure_flags': '--with-dbus-binding-tool=dbus-binding-tool',
       'includes': ['standard_instrumented_library_target.gypi'],
     },
     {
@@ -342,15 +354,30 @@
       'run_before_build': 'libcups2.sh',
       'jobs': 1,
       'custom_configure_flags': [
-        # Do not touch system-wide directories.
-        '--with-rcdir=no',
-        '--with-xinetd=no',
-        '--with-dbusdir=no',
-        '--with-menudir=no',
-        '--with-icondir=no',
-        '--with-docdir=no'
+        # All from debian/rules.
+        '--localedir=/usr/share/cups/locale',
+        '--enable-slp',
+        '--enable-libpaper',
+        '--enable-ssl',
+        '--enable-gnutls',
+        '--disable-openssl',
+        '--enable-threads',
+        '--enable-static',
+        '--enable-debug',
+        '--enable-dbus',
+        '--with-dbusdir=/etc/dbus-1',
+        '--enable-gssapi',
+        '--enable-avahi',
+        '--with-pdftops=/usr/bin/gs',
+        '--disable-launchd',
+        '--with-cups-group=lp',
+        '--with-system-groups=lpadmin',
+        '--with-printcap=/var/run/cups/printcap',
+        '--with-log-file-perm=0640',
+        '--with-local_protocols="CUPS dnssd"',
+        '--with-remote_protocols="CUPS dnssd"',
+        '--enable-libusb',
       ],
-      'build_method': 'prefix',
       'includes': ['standard_instrumented_library_target.gypi'],
     },
     {

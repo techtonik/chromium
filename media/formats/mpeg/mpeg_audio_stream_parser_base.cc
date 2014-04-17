@@ -166,8 +166,14 @@ int MPEGAudioStreamParserBase::ParseFrame(const uint8* data,
   ChannelLayout channel_layout;
   int frame_size;
   int sample_count;
-  int bytes_read = ParseFrameHeader(
-      data, size, &frame_size, &sample_rate, &channel_layout, &sample_count);
+  bool metadata_frame = false;
+  int bytes_read = ParseFrameHeader(data,
+                                    size,
+                                    &frame_size,
+                                    &sample_rate,
+                                    &channel_layout,
+                                    &sample_count,
+                                    &metadata_frame);
 
   if (bytes_read <= 0)
     return bytes_read;
@@ -208,11 +214,15 @@ int MPEGAudioStreamParserBase::ParseFrame(const uint8* data,
     bool success = config_cb_.Run(config_, video_config, TextTrackConfigMap());
 
     if (!init_cb_.is_null())
-      base::ResetAndReturn(&init_cb_).Run(success, kInfiniteDuration(), true);
+      base::ResetAndReturn(&init_cb_).Run(
+          success, kInfiniteDuration(), base::Time(), true);
 
     if (!success)
       return -1;
   }
+
+  if (metadata_frame)
+    return frame_size;
 
   // TODO(wolenetz/acolwell): Validate and use a common cross-parser TrackId
   // type and allow multiple audio tracks, if applicable. See
@@ -338,7 +348,7 @@ int MPEGAudioStreamParserBase::FindNextValidStartCode(const uint8* data,
       int sync_size = end - sync;
       int frame_size;
       int sync_bytes = ParseFrameHeader(
-          sync, sync_size, &frame_size, NULL, NULL, NULL);
+          sync, sync_size, &frame_size, NULL, NULL, NULL, NULL);
 
       if (sync_bytes == 0)
         return 0;

@@ -24,7 +24,6 @@
 #include "chrome/common/extensions/extension_process_policy.h"
 #include "chrome/common/localized_error.h"
 #include "chrome/common/pepper_permission_util.h"
-#include "chrome/common/profile_management_switches.h"
 #include "chrome/common/render_messages.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/renderer/benchmarking_extension.h"
@@ -32,6 +31,7 @@
 #include "chrome/renderer/chrome_render_process_observer.h"
 #include "chrome/renderer/chrome_render_view_observer.h"
 #include "chrome/renderer/content_settings_observer.h"
+#include "chrome/renderer/extensions/chrome_extensions_renderer_client.h"
 #include "chrome/renderer/extensions/chrome_v8_context.h"
 #include "chrome/renderer/extensions/chrome_v8_extension.h"
 #include "chrome/renderer/extensions/dispatcher.h"
@@ -71,6 +71,7 @@
 #include "components/autofill/content/renderer/password_generation_agent.h"
 #include "components/nacl/renderer/ppb_nacl_private_impl.h"
 #include "components/plugins/renderer/mobile_youtube_plugin.h"
+#include "components/signin/core/common/profile_management_switches.h"
 #include "components/visitedlink/renderer/visitedlink_slave.h"
 #include "content/public/common/content_constants.h"
 #include "content/public/renderer/render_frame.h"
@@ -134,6 +135,7 @@ using blink::WebConsoleMessage;
 using blink::WebDataSource;
 using blink::WebDocument;
 using blink::WebFrame;
+using blink::WebLocalFrame;
 using blink::WebPlugin;
 using blink::WebPluginParams;
 using blink::WebSecurityOrigin;
@@ -360,6 +362,8 @@ void ChromeContentRendererClient::RenderThreadStarted() {
 
   extensions::ExtensionsClient::Set(
       extensions::ChromeExtensionsClient::GetInstance());
+  extensions::ExtensionsRendererClient::Set(
+      ChromeExtensionsRendererClient::GetInstance());
 
 #if defined(OS_WIN)
   // Report if the renderer process has been patched by chrome_elf.
@@ -466,7 +470,7 @@ const Extension* ChromeContentRendererClient::GetExtensionByOrigin(
 
 bool ChromeContentRendererClient::OverrideCreatePlugin(
     content::RenderFrame* render_frame,
-    WebFrame* frame,
+    WebLocalFrame* frame,
     const WebPluginParams& params,
     WebPlugin** plugin) {
   std::string orig_mime_type = params.mimeType.utf8();
@@ -494,6 +498,9 @@ bool ChromeContentRendererClient::OverrideCreatePlugin(
   render_frame->Send(new ChromeViewHostMsg_GetPluginInfo(
       render_frame->GetRoutingID(), GURL(params.url),
       frame->top()->document().url(), orig_mime_type, &output));
+
+  if (output.plugin.type == content::WebPluginInfo::PLUGIN_TYPE_BROWSER_PLUGIN)
+    return false;
 #else
   output.status.value = ChromeViewHostMsg_GetPluginInfo_Status::kNotFound;
 #endif
@@ -529,7 +536,7 @@ void ChromeContentRendererClient::DeferMediaLoad(
 
 WebPlugin* ChromeContentRendererClient::CreatePlugin(
     content::RenderFrame* render_frame,
-    WebFrame* frame,
+    WebLocalFrame* frame,
     const WebPluginParams& original_params,
     const ChromeViewHostMsg_GetPluginInfo_Output& output) {
   const ChromeViewHostMsg_GetPluginInfo_Status& status = output.status;

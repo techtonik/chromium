@@ -57,7 +57,7 @@ namespace mediaGalleries {
       void ([instanceOf=DOMFileSystem] object[] mediaFileSystems,
             DOMString selectedFileSystemName);
 
-  callback DropPermissionForMediaFileSystemCallback = void (boolean wasDropped);
+  callback DropPermissionForMediaFileSystemCallback = void ();
 
   [inline_doc] dictionary MediaFileSystemMetadata {
     // The name of the file system.
@@ -98,6 +98,14 @@ namespace mediaGalleries {
   callback MediaFileSystemsMetadataCallback =
       void (MediaFileSystemMetadata[] metadata);
 
+  dictionary StreamInfo {
+    // Describes format of container or codec of stream, i.e. "mp3", "h264".
+    DOMString type;
+    
+    // An unfiltered string->string dictionary of tags for the stream.
+    object tags;
+  };
+
   dictionary MediaMetadata {
     // The browser sniffed mime type.
     DOMString mimeType;
@@ -106,13 +114,26 @@ namespace mediaGalleries {
     long? height;
     long? width;
 
+    // Defined for images only.
+    double? xResolution;
+    double? yResolution;
+
     // Defined for audio and video. In seconds.
     double? duration;
     
     // Defined for images and video. In degrees.
     long? rotation;
 
-    // Generic metadata tags.
+    // Defined for images only.
+    DOMString? cameraMake;
+    DOMString? cameraModel;
+    double? exposureTimeSeconds;
+    boolean? flashFired;
+    double? fNumber;
+    double? focalLengthMm;
+    double? isoEquivalent;
+
+    // Defined for audio and video only.
     DOMString? album;
     DOMString? artist;
     DOMString? comment;
@@ -123,9 +144,9 @@ namespace mediaGalleries {
     DOMString? title;
     long? track;
 
-    // A dictionary of all the metadata in the media file. This metadata is in
-    // string form, and neither the key nor value is normalized.
-    object rawTags;
+    // All the metadata in the media file. For formats with multiple streams,
+    // stream order will be preserved. Container metadata is the first element.
+    StreamInfo[] rawTags;
   };
 
   callback MediaMetadataCallback = void (MediaMetadata metadata);

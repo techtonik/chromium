@@ -40,7 +40,6 @@ struct WebScreenInfo;
 }
 
 namespace content {
-class BackingStore;
 class RenderWidgetHostViewFrameSubscriber;
 class SyntheticGesture;
 class SyntheticGestureTarget;
@@ -109,7 +108,7 @@ class CONTENT_EXPORT RenderWidgetHostViewPort : public RenderWidgetHostView,
   // Informs that the focused DOM node has changed.
   virtual void FocusedNodeChanged(bool is_editable_node) = 0;
 
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
   // Updates the range of the marked text in an IME composition.
   virtual void ImeCompositionRangeChanged(
       const gfx::Range& range,
@@ -170,9 +169,6 @@ class CONTENT_EXPORT RenderWidgetHostViewPort : public RenderWidgetHostView,
 
   // Notifies the view that the scroll offset has changed.
   virtual void ScrollOffsetChanged() = 0;
-
-  // Allocate a backing store for this view.
-  virtual BackingStore* AllocBackingStore(const gfx::Size& size) = 0;
 
   // Copies the contents of the compositing surface into the given
   // (uninitialized) PlatformCanvas if any.

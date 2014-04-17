@@ -49,12 +49,14 @@ MergeResult MergeLocalAndSyncPasswords(
       password_form.preferred == password_specifics.preferred() &&
       password_form.date_created.ToInternalValue() ==
           password_specifics.date_created() &&
-      password_form.blacklisted_by_user == password_specifics.blacklisted()) {
+      password_form.blacklisted_by_user == password_specifics.blacklisted() &&
+      password_form.type == password_specifics.type() &&
+      password_form.times_used == password_specifics.times_used()) {
     return IDENTICAL;
   }
 
   // If the passwords differ, take the one that was created more recently.
-  if (base::Time::FromInternalValue(password_specifics.date_created()) <=
+  if (base::Time::FromInternalValue(password_specifics.date_created()) <
           password_form.date_created) {
     *new_password_form = password_form;
     return LOCAL;
@@ -215,54 +217,29 @@ syncer::SyncError PasswordSyncableService::ProcessSyncChanges(
   base::AutoReset<bool> processing_changes(&is_processing_sync_changes_, true);
   // The |db_entries_map| and associated vectors are filled only in case of
   // update change.
-  PasswordEntryMap db_entries_map;
-  ScopedVector<autofill::PasswordForm> password_db_entries;
   ScopedVector<autofill::PasswordForm> new_sync_entries;
   ScopedVector<autofill::PasswordForm> updated_sync_entries;
   ScopedVector<autofill::PasswordForm> deleted_entries;
-  bool has_read_passwords = false;
 
   for (syncer::SyncChangeList::const_iterator it = change_list.begin();
        it != change_list.end();
        ++it) {
+    const sync_pb::EntitySpecifics& specifics = it->sync_data().GetSpecifics();
+    scoped_ptr<autofill::PasswordForm> form(new autofill::PasswordForm);
+    PasswordFromSpecifics(specifics.password().client_only_encrypted_data(),
+                          form.get());
     switch (it->change_type()) {
       case syncer::SyncChange::ACTION_ADD: {
-        const sync_pb::EntitySpecifics& specifics =
-            it->sync_data().GetSpecifics();
-        new_sync_entries.push_back(new autofill::PasswordForm);
-        PasswordFromSpecifics(specifics.password().client_only_encrypted_data(),
-                              new_sync_entries.back());
+        new_sync_entries.push_back(form.release());
         break;
       }
       case syncer::SyncChange::ACTION_UPDATE: {
-        if (!has_read_passwords) {
-          if (ReadFromPasswordStore(&password_db_entries,
-                                    &db_entries_map)) {
-            has_read_passwords = true;
-          } else {
-            return sync_error_factory_->CreateAndUploadError(
-                FROM_HERE,
-                "Failed to get passwords from store.");
-          }
-        }
-        syncer::SyncChangeList sync_changes;
-
-        CreateOrUpdateEntry(it->sync_data(),
-                            &db_entries_map,
-                            &new_sync_entries,
-                            &updated_sync_entries,
-                            &sync_changes);
-        DCHECK(sync_changes.empty());
+        updated_sync_entries.push_back(form.release());
         break;
       }
 
       case syncer::SyncChange::ACTION_DELETE: {
-        const sync_pb::EntitySpecifics& specifics =
-            it->sync_data().GetSpecifics();
-        const sync_pb::PasswordSpecificsData& password_specifics(
-            specifics.password().client_only_encrypted_data());
-        deleted_entries.push_back(new autofill::PasswordForm);
-        PasswordFromSpecifics(password_specifics, deleted_entries.back());
+        deleted_entries.push_back(form.release());
         break;
       }
       case syncer::SyncChange::ACTION_INVALID:
@@ -442,6 +419,8 @@ syncer::SyncData SyncDataFromPassword(
   password_specifics->set_date_created(
       password_form.date_created.ToInternalValue());
   password_specifics->set_blacklisted(password_form.blacklisted_by_user);
+  password_specifics->set_type(password_form.type);
+  password_specifics->set_times_used(password_form.times_used);
 
   std::string tag = MakePasswordSyncTag(*password_specifics);
   return syncer::SyncData::CreateLocalData(tag, tag, password_data);
@@ -465,6 +444,9 @@ void PasswordFromSpecifics(const sync_pb::PasswordSpecificsData& password,
   new_password->date_created =
       base::Time::FromInternalValue(password.date_created());
   new_password->blacklisted_by_user = password.blacklisted();
+  new_password->type =
+      static_cast<autofill::PasswordForm::Type>(password.type());
+  new_password->times_used = password.times_used();
 }
 
 std::string MakePasswordSyncTag(

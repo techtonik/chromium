@@ -348,7 +348,8 @@ void RenderWidget::ScreenMetricsEmulator::OnShowContextMenu(
 RenderWidget::RenderWidget(blink::WebPopupType popup_type,
                            const blink::WebScreenInfo& screen_info,
                            bool swapped_out,
-                           bool hidden)
+                           bool hidden,
+                           bool never_visible)
     : routing_id_(MSG_ROUTING_NONE),
       surface_id_(0),
       webwidget_(NULL),
@@ -365,6 +366,7 @@ RenderWidget::RenderWidget(blink::WebPopupType popup_type,
       num_swapbuffers_complete_pending_(0),
       did_show_(false),
       is_hidden_(hidden),
+      never_visible_(never_visible),
       is_fullscreen_(false),
       needs_repainting_on_restore_(false),
       has_focus_(false),
@@ -433,7 +435,7 @@ RenderWidget* RenderWidget::Create(int32 opener_id,
                                    const blink::WebScreenInfo& screen_info) {
   DCHECK(opener_id != MSG_ROUTING_NONE);
   scoped_refptr<RenderWidget> widget(
-      new RenderWidget(popup_type, screen_info, false, false));
+      new RenderWidget(popup_type, screen_info, false, false, false));
   if (widget->Init(opener_id)) {  // adds reference on success.
     return widget.get();
   }
@@ -500,9 +502,8 @@ void RenderWidget::CompleteInit() {
   if (webwidget_ && is_threaded_compositing_enabled_) {
     webwidget_->enterForceCompositingMode(true);
   }
-  if (compositor_) {
-    compositor_->setSurfaceReady();
-  }
+  if (compositor_)
+    StartCompositor();
   DoDeferredUpdate();
 
   Send(new ViewHostMsg_RenderViewReady(routing_id_));
@@ -603,7 +604,6 @@ bool RenderWidget::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ViewMsg_WasShown, OnWasShown)
     IPC_MESSAGE_HANDLER(ViewMsg_WasSwappedOut, OnWasSwappedOut)
     IPC_MESSAGE_HANDLER(ViewMsg_UpdateRect_ACK, OnUpdateRectAck)
-    IPC_MESSAGE_HANDLER(ViewMsg_SwapBuffers_ACK, OnSwapBuffersComplete)
     IPC_MESSAGE_HANDLER(ViewMsg_SetInputMethodActive, OnSetInputMethodActive)
     IPC_MESSAGE_HANDLER(ViewMsg_CandidateWindowShown, OnCandidateWindowShown)
     IPC_MESSAGE_HANDLER(ViewMsg_CandidateWindowUpdated,
@@ -881,6 +881,9 @@ bool RenderWidget::ForceCompositingModeEnabled() {
 }
 
 scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
+  // For widgets that are never visible, we don't start the compositor, so we
+  // never get a request for a cc::OutputSurface.
+  DCHECK(!never_visible_);
 
 #if defined(OS_ANDROID)
   if (SynchronousCompositorFactory* factory =
@@ -914,9 +917,6 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
             context_provider));
   }
   if (!context_provider.get()) {
-    if (!command_line.HasSwitch(switches::kEnableSoftwareCompositing))
-      return scoped_ptr<cc::OutputSurface>();
-
     scoped_ptr<cc::SoftwareOutputDevice> software_device(
         new CompositorSoftwareOutputDevice());
 
@@ -1866,7 +1866,7 @@ void RenderWidget::initializeLayerTreeView() {
 
   compositor_->setViewportSize(size_, physical_backing_size_);
   if (init_complete_)
-    compositor_->setSurfaceReady();
+    StartCompositor();
 }
 
 blink::WebLayerTreeView* RenderWidget::layerTreeView() {
@@ -2147,7 +2147,7 @@ void RenderWidget::OnImeSetComposition(
     // sure we are in a consistent state.
     Send(new ViewHostMsg_ImeCancelComposition(routing_id()));
   }
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
   UpdateCompositionInfo(true);
 #endif
 }
@@ -2166,7 +2166,7 @@ void RenderWidget::OnImeConfirmComposition(const base::string16& text,
   else
     webwidget_->confirmComposition(WebWidget::DoNotKeepSelection);
   handling_input_event_ = false;
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
   UpdateCompositionInfo(true);
 #endif
 }
@@ -2507,7 +2507,7 @@ void RenderWidget::UpdateSelectionBounds() {
     params.is_anchor_first = webwidget_->isSelectionAnchorFirst();
     Send(new ViewHostMsg_SelectionBoundsChanged(routing_id_, params));
   }
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
   UpdateCompositionInfo(false);
 #endif
 }
@@ -2562,7 +2562,7 @@ ui::TextInputType RenderWidget::GetTextInputType() {
   return ui::TEXT_INPUT_TYPE_NONE;
 }
 
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
 void RenderWidget::UpdateCompositionInfo(bool should_update_range) {
   gfx::Range range = gfx::Range();
   if (should_update_range) {
@@ -2641,7 +2641,7 @@ void RenderWidget::resetInputMethod() {
       Send(new ViewHostMsg_ImeCancelComposition(routing_id()));
   }
 
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
   UpdateCompositionInfo(true);
 #endif
 }
@@ -2657,6 +2657,14 @@ void RenderWidget::didHandleGestureEvent(
     UpdateTextInputState(SHOW_IME_IF_NEEDED, FROM_NON_IME);
   }
 #endif
+}
+
+void RenderWidget::StartCompositor() {
+  // For widgets that are never visible, we don't need the compositor to run
+  // at all.
+  if (never_visible_)
+    return;
+  compositor_->setSurfaceReady();
 }
 
 void RenderWidget::SchedulePluginMove(const WebPluginGeometry& move) {
