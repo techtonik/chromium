@@ -88,6 +88,10 @@
         '<(_sanitizer_type)-libudev0',
         '<(_sanitizer_type)-libtasn1-3',
         '<(_sanitizer_type)-libgnome-keyring0',
+        '<(_sanitizer_type)-libgtk2.0-0',
+        '<(_sanitizer_type)-libgdk-pixbuf2.0-0',
+        '<(_sanitizer_type)-libpci3',
+        '<(_sanitizer_type)-libdbusmenu-glib4',
       ],
       'conditions': [
         ['asan==1', {
@@ -422,6 +426,56 @@
           '--enable-tests=no',
       ],
       'custom_linker_flags': '-Wl,--as-needed',
+      'dependencies=': [],
+      'includes': ['standard_instrumented_library_target.gypi'],
+    },
+    {
+      'library_name': 'libgtk2.0-0',
+      'custom_c_compiler_flags': '-Wno-return-type',
+      'custom_configure_flags': [
+          # From debian/rules.
+          '--prefix=/usr',
+          '--sysconfdir=/etc',
+          '--enable-test-print-backend',
+          '--enable-introspection=no',
+          '--with-xinput=yes',
+      ],
+      'dependencies=': [],
+      'run_before_build': 'libgtk2.0-0.sh',
+      'includes': ['standard_instrumented_library_target.gypi'],
+    },
+    {
+      'library_name': 'libgdk-pixbuf2.0-0',
+      'custom_configure_flags': [
+          # From debian/rules.
+          '--with-libjasper',
+          '--with-x11',
+          # Make the build less problematic.
+          '--disable-introspection',
+      ],
+      'dependencies=': [],
+      'run_before_build': 'libgdk-pixbuf2.0-0.sh',
+      'includes': ['standard_instrumented_library_target.gypi'],
+    },
+    {
+      'library_name': 'libpci3',
+      'dependencies=': [],
+      'build_method': 'custom_libpci3',
+      'jobs': 1,
+      'includes': ['standard_instrumented_library_target.gypi'],
+    },
+    {
+      'library_name': 'libdbusmenu-glib4',
+      'custom_configure_flags': [
+          # From debian/rules.
+          '--disable-scrollkeeper',
+          '--enable-gtk-doc',
+          # --enable-introspection introduces a build step that attempts to run
+          # a just-built binary and crashes. Vala requires introspection.
+          # TODO(earthdok): find a better fix.
+          '--disable-introspection',
+          '--disable-vala',
+      ],
       'dependencies=': [],
       'includes': ['standard_instrumented_library_target.gypi'],
     },

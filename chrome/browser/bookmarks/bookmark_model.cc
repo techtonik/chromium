@@ -23,11 +23,11 @@
 #include "chrome/browser/history/history_service.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/common/favicon/favicon_types.h"
 #include "components/bookmarks/core/browser/bookmark_title_match.h"
+#include "components/favicon_base/favicon_types.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_source.h"
-#include "grit/generated_resources.h"
+#include "grit/component_strings.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/gfx/favicon_size.h"
 #include "ui/gfx/image/image_util.h"
@@ -493,11 +493,6 @@ void BookmarkModel::BlockTillLoaded() {
   loaded_signal_.Wait();
 }
 
-const BookmarkNode* BookmarkModel::GetNodeByID(int64 id) const {
-  // TODO(sky): TreeNode needs a method that visits all nodes using a predicate.
-  return GetNodeByID(&root_, id);
-}
-
 const BookmarkNode* BookmarkModel::AddFolder(const BookmarkNode* parent,
                                              int index,
                                              const base::string16& title) {
@@ -817,19 +812,6 @@ BookmarkNode* BookmarkModel::AddNode(BookmarkNode* parent,
   return node;
 }
 
-const BookmarkNode* BookmarkModel::GetNodeByID(const BookmarkNode* node,
-                                               int64 id) const {
-  if (node->id() == id)
-    return node;
-
-  for (int i = 0, child_count = node->child_count(); i < child_count; ++i) {
-    const BookmarkNode* result = GetNodeByID(node->GetChild(i), id);
-    if (result)
-      return result;
-  }
-  return NULL;
-}
-
 bool BookmarkModel::IsValidIndex(const BookmarkNode* parent,
                                  int index,
                                  bool allow_end) {
@@ -871,7 +853,7 @@ BookmarkPermanentNode* BookmarkModel::CreatePermanentNode(
 
 void BookmarkModel::OnFaviconDataAvailable(
     BookmarkNode* node,
-    const chrome::FaviconImageResult& image_result) {
+    const favicon_base::FaviconImageResult& image_result) {
   DCHECK(node);
   node->set_favicon_load_task_id(base::CancelableTaskTracker::kBadTaskId);
   node->set_favicon_state(BookmarkNode::LOADED_FAVICON);
@@ -894,7 +876,7 @@ void BookmarkModel::LoadFavicon(BookmarkNode* node) {
   base::CancelableTaskTracker::TaskId taskId =
       favicon_service->GetFaviconImageForURL(
           FaviconService::FaviconForURLParams(
-              node->url(), chrome::FAVICON, gfx::kFaviconSize),
+              node->url(), favicon_base::FAVICON, gfx::kFaviconSize),
           base::Bind(&BookmarkModel::OnFaviconDataAvailable,
                      base::Unretained(this),
                      node),

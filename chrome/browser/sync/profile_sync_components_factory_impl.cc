@@ -26,7 +26,6 @@
 #include "chrome/browser/sync/glue/data_type_manager_impl.h"
 #include "chrome/browser/sync/glue/extension_data_type_controller.h"
 #include "chrome/browser/sync/glue/extension_setting_data_type_controller.h"
-#include "chrome/browser/sync/glue/generic_change_processor.h"
 #include "chrome/browser/sync/glue/password_data_type_controller.h"
 #include "chrome/browser/sync/glue/search_engine_data_type_controller.h"
 #include "chrome/browser/sync/glue/shared_change_processor.h"
@@ -55,6 +54,7 @@
 #include "components/password_manager/core/browser/password_store.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/sync_driver/data_type_manager_observer.h"
+#include "components/sync_driver/generic_change_processor.h"
 #include "components/sync_driver/proxy_data_type_controller.h"
 #include "content/public/browser/browser_thread.h"
 #include "extensions/browser/extension_system.h"
@@ -382,8 +382,13 @@ void ProfileSyncComponentsFactoryImpl::RegisterDesktopDataTypes(
               profile_,
               pss));
 
-    // Synced Notification App Infos are disabled by default.
-    if (command_line_->HasSwitch(switches::kEnableSyncSyncedNotifications)) {
+    // Synced Notification App Infos are enabled by default on Dev and Canary
+    // only.
+    // TODO(petewil): Enable on stable when the feature is ready.
+    chrome::VersionInfo::Channel channel = chrome::VersionInfo::GetChannel();
+    if (channel == chrome::VersionInfo::CHANNEL_UNKNOWN ||
+        channel == chrome::VersionInfo::CHANNEL_DEV ||
+        channel == chrome::VersionInfo::CHANNEL_CANARY) {
       pss->RegisterDataTypeController(new UIDataTypeController(
           BrowserThread::GetMessageLoopProxyForThread(BrowserThread::UI),
           base::Bind(&ChromeReportUnrecoverableError),
@@ -440,13 +445,16 @@ browser_sync::GenericChangeProcessor*
         const base::WeakPtr<syncer::SyncableService>& local_service,
         const base::WeakPtr<syncer::SyncMergeResult>& merge_result) {
   syncer::UserShare* user_share = profile_sync_service->GetUserShare();
-  // TODO(maniscalco): Replace FakeAttachmentService with a real
-  // AttachmentService implementation once it has been implemented (bug 356359).
-  scoped_ptr<syncer::AttachmentStore> attachment_store(
-      new syncer::FakeAttachmentStore(
-          BrowserThread::GetMessageLoopProxyForThread(BrowserThread::IO)));
+
   scoped_ptr<syncer::AttachmentService> attachment_service(
-      new syncer::FakeAttachmentService(attachment_store.Pass()));
+      // TODO(tim): Bug 339726. Remove merge_result->model_type hack! This
+      // method (CreateGenericChangeProcessor) will cease to exist in favor
+      // of a new SharedChangeProcessor::Connect, at which point we'll know
+      // the data type.
+      // TODO(maniscalco): Replace FakeAttachmentService with a real
+      // AttachmentService implementation once implemented (bug 356359).
+      new syncer::FakeAttachmentService(
+          CreateCustomAttachmentStoreForType(merge_result->model_type())));
   return new GenericChangeProcessor(
       error_handler,
       local_service,
@@ -585,6 +593,15 @@ base::WeakPtr<syncer::SyncableService> ProfileSyncComponentsFactoryImpl::
   }
 }
 
+scoped_ptr<syncer::AttachmentStore>
+    ProfileSyncComponentsFactoryImpl::CreateCustomAttachmentStoreForType(
+    syncer::ModelType type) {
+  scoped_ptr<syncer::AttachmentStore> store(
+      new syncer::FakeAttachmentStore(
+          BrowserThread::GetMessageLoopProxyForThread(BrowserThread::IO)));
+  return store.Pass();
+}
+
 ProfileSyncComponentsFactory::SyncComponents
     ProfileSyncComponentsFactoryImpl::CreateBookmarkSyncComponents(
         ProfileSyncService* profile_sync_service,
@@ -605,7 +622,8 @@ ProfileSyncComponentsFactory::SyncComponents
                                   error_handler,
                                   kExpectMobileBookmarksFolder);
   BookmarkChangeProcessor* change_processor =
-      new BookmarkChangeProcessor(model_associator,
+      new BookmarkChangeProcessor(profile_sync_service->profile(),
+                                  model_associator,
                                   error_handler);
   return SyncComponents(model_associator, change_processor);
 }

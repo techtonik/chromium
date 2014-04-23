@@ -281,8 +281,6 @@
         'test/ppapi/ppapi_test.h',
         '../ui/gfx/image/image_unittest_util.cc',
         '../ui/gfx/image/image_unittest_util.h',
-        '../webkit/browser/quota/mock_special_storage_policy.cc',
-        '../webkit/browser/quota/mock_special_storage_policy.h',
       ],
       'conditions': [
         ['OS!="ios"', {
@@ -357,7 +355,7 @@
             ['exclude', '^browser/extensions/fake_safe_browsing_database_manager.h'],
           ],
         }],
-        ['toolkit_uses_gtk == 1 or chromeos==1 or (OS=="linux" and use_aura==1)', {
+        ['OS=="linux"', {
           'dependencies': [
             '../build/linux/system.gyp:ssl',
           ],
@@ -474,6 +472,7 @@
         # 2) test-specific support libraries:
         '../base/base.gyp:test_support_base',
         '../components/components_resources.gyp:components_resources',
+        '../content/content_shell_and_tests.gyp:webkit_test_support_content',
         '../content/content.gyp:content_app_both',
         '../net/net.gyp:net',
         '../net/net.gyp:net_test_support',
@@ -576,6 +575,7 @@
         '../extensions/common/url_pattern_set_unittest.cc',
         '../extensions/common/url_pattern_unittest.cc',
         '../extensions/common/user_script_unittest.cc',
+        '../extensions/renderer/script_context_set_unittest.cc',
         'app/chrome_dll.rc',
         # All unittests in browser, common, renderer and service.
         'browser/about_flags_unittest.cc',
@@ -709,6 +709,7 @@
         'browser/chromeos/file_manager/volume_manager_unittest.cc',
         'browser/chromeos/file_system_provider/fake_provided_file_system.cc',
         'browser/chromeos/file_system_provider/fake_provided_file_system.h',
+        'browser/chromeos/file_system_provider/fileapi/provider_async_file_util_unittest.cc',
         'browser/chromeos/file_system_provider/mount_path_util_unittest.cc',
         'browser/chromeos/file_system_provider/provided_file_system_unittest.cc',
         'browser/chromeos/file_system_provider/request_manager_unittest.cc',
@@ -1294,17 +1295,12 @@
         'browser/sync/glue/autofill_data_type_controller_unittest.cc',
         'browser/sync/glue/bookmark_data_type_controller_unittest.cc',
         'browser/sync/glue/browser_thread_model_worker_unittest.cc',
-        'browser/sync/glue/change_processor_mock.cc',
-        'browser/sync/glue/change_processor_mock.h',
         'browser/sync/glue/data_type_manager_impl_unittest.cc',
         'browser/sync/glue/extensions_activity_monitor_unittest.cc',
-        'browser/sync/glue/fake_generic_change_processor.cc',
-        'browser/sync/glue/fake_generic_change_processor.h',
         'browser/sync/glue/favicon_cache_unittest.cc',
         'browser/sync/glue/frontend_data_type_controller_mock.cc',
         'browser/sync/glue/frontend_data_type_controller_mock.h',
         'browser/sync/glue/frontend_data_type_controller_unittest.cc',
-        'browser/sync/glue/generic_change_processor_unittest.cc',
         'browser/sync/glue/non_frontend_data_type_controller_mock.cc',
         'browser/sync/glue/non_frontend_data_type_controller_mock.h',
         'browser/sync/glue/non_frontend_data_type_controller_unittest.cc',
@@ -1659,6 +1655,8 @@
         'browser/ui/omnibox/omnibox_popup_model_unittest.cc',
         'browser/ui/omnibox/omnibox_view_unittest.cc',
         'browser/ui/panels/panel_mouse_watcher_unittest.cc',
+        'browser/ui/passwords/manage_passwords_bubble_model_unittest.cc',
+        'browser/ui/passwords/manage_passwords_bubble_ui_controller_mock.cc',
         'browser/ui/passwords/password_manager_presenter_unittest.cc',
         'browser/ui/search_engines/keyword_editor_controller_unittest.cc',
         'browser/ui/search/instant_page_unittest.cc',
@@ -1756,7 +1754,6 @@
         'browser/chrome_content_browser_client_unittest.cc',
         'browser/undo/bookmark_undo_service_test.cc',
         'browser/undo/undo_manager_test.cc',
-        'browser/usb/usb_context_unittest.cc',
         'browser/web_applications/web_app_mac_unittest.mm',
         'browser/web_applications/web_app_unittest.cc',
         'browser/web_resource/eula_accepted_notifier_unittest.cc',
@@ -1859,7 +1856,6 @@
         'renderer/chrome_content_renderer_client_unittest.cc',
         'renderer/content_settings_observer_unittest.cc',
         'renderer/extensions/activity_log_converter_strategy_unittest.cc',
-        'renderer/extensions/chrome_v8_context_set_unittest.cc',
         'renderer/extensions/event_unittest.cc',
         'renderer/extensions/extension_localization_peer_unittest.cc',
         'renderer/extensions/json_schema_unittest.cc',
@@ -1964,8 +1960,6 @@
         '../tools/json_schema_compiler/test/simple_api_unittest.cc',
         '../tools/json_schema_compiler/test/error_generation_unittest.cc',
         '../ui/webui/resources/js/cr.js',
-        '../webkit/browser/quota/mock_storage_client.cc',
-        '../webkit/browser/quota/mock_storage_client.h',
       ],
       'conditions': [
         ['OS!="ios"', {
@@ -2287,7 +2281,7 @@
             '../tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',
           ],
         }],
-        ['toolkit_uses_gtk == 1 or chromeos==1 or (OS=="linux" and use_aura==1)', {
+        ['OS=="linux"', {
           'dependencies': [
             '../build/linux/system.gyp:ssl',
           ],
@@ -2456,6 +2450,11 @@
           'dependencies!': [
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput',
           ],
+          'ldflags': [
+            # Some android targets still depend on --gc-sections to link.
+            # TODO: remove --gc-sections for Debug builds (crbug.com/159847).
+            '-Wl,--gc-sections',
+          ],
           'sources!': [
             # Bookmark export/import are handled via the BookmarkColumns
             # ContentProvider.
@@ -2528,9 +2527,6 @@
 
             # The importer code is not used on Android.
             'common/importer/firefox_importer_utils_unittest.cc',
-
-            # USB service is not supported on Android.
-            'browser/usb/usb_context_unittest.cc',
 
             # Bookmark undo is not used on Android.
            'browser/undo/bookmark_undo_service_test.cc',
@@ -2769,7 +2765,6 @@
           ],
           'variables': {
             'test_suite_name': 'unit_tests',
-            'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)unit_tests<(SHARED_LIB_SUFFIX)',
             'android_manifest_path': 'test/android/unit_tests_apk/AndroidManifest.xml',
           },
           'includes': [ '../build/apk_test.gypi' ],

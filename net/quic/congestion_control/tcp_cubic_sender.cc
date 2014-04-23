@@ -61,9 +61,10 @@ bool TcpCubicSender::InSlowStart() const {
 }
 
 void TcpCubicSender::SetFromConfig(const QuicConfig& config, bool is_server) {
-  if (is_server) {
+  if (is_server && config.HasReceivedInitialCongestionWindow()) {
     // Set the initial window size.
-    congestion_window_ = config.server_initial_congestion_window();
+    congestion_window_ = min(kMaxInitialWindow,
+                             config.ReceivedInitialCongestionWindow());
   }
 }
 
@@ -145,7 +146,7 @@ bool TcpCubicSender::OnPacketSent(QuicTime /*sent_time*/,
     // DCHECK_LT(largest_sent_sequence_number_, sequence_number);
     largest_sent_sequence_number_ = sequence_number;
   }
-  hybrid_slow_start_.OnPacketSent(sequence_number, AvailableSendWindow());
+  hybrid_slow_start_.OnPacketSent(sequence_number);
   return true;
 }
 
@@ -269,14 +270,16 @@ void TcpCubicSender::OnRetransmissionTimeout(bool packets_retransmitted) {
   largest_sent_at_last_cutback_ = 0;
   if (packets_retransmitted) {
     cubic_.Reset();
+    hybrid_slow_start_.Restart();
     congestion_window_ = kMinimumCongestionWindow;
   }
 }
 
 void TcpCubicSender::UpdateRtt(QuicTime::Delta rtt) {
-  // Hybrid start triggers when cwnd is larger than some threshold.
   if (InSlowStart() &&
-      hybrid_slow_start_.ShouldExitSlowStart(rtt_stats_, congestion_window_)) {
+      hybrid_slow_start_.ShouldExitSlowStart(rtt_stats_->latest_rtt(),
+                                             rtt_stats_->min_rtt(),
+                                             congestion_window_)) {
      slowstart_threshold_ = congestion_window_;
   }
 }

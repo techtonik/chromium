@@ -65,6 +65,10 @@ const char kEchoExtensionPath[]             = "echo-ext-path";
 // Enables switching between different cellular carriers from the UI.
 const char kEnableCarrierSwitching[]        = "enable-carrier-switching";
 
+// Enables consumer management, which allows user to enroll, remotely lock and
+// locate the device.
+const char kEnableConsumerManagement[]      = "enable-consumer-management";
+
 // Enables MTP support in Files.app.
 const char kEnableFileManagerMTP[] = "enable-filemanager-mtp";
 
@@ -105,6 +109,10 @@ const char kEnterpriseEnrollmentSkipRobotAuth[] =
 // Enables the new audio player in the Files.app.
 const char kFileManagerEnableNewAudioPlayer[] =
     "file-manager-enable-new-audio-player";
+
+// Enables the new gallery in the Files.app.
+const char kFileManagerEnableNewGallery[] =
+    "file-manager-enable-new-gallery";
 
 // Passed to Chrome the first time that it's run after the system boots.
 // Not passed on restart after sign out.

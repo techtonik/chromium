@@ -273,7 +273,6 @@ extern const char kOpenNetworkConfiguration[];
 extern const char kRAConsentFirstTime[];
 extern const char kMultiProfileNeverShowIntro[];
 extern const char kMultiProfileWarningShowDismissed[];
-extern const char kMultiProfileNotificationDismissed[];
 extern const char kMultiProfileUserBehavior[];
 extern const char kFirstRunTutorialShown[];
 extern const char kSAMLOfflineSigninTimeLimit[];
@@ -394,6 +393,7 @@ extern const char kEnabledSyncedNotificationSendingServices[];
 extern const char kInitializedSyncedNotificationSendingServices[];
 extern const char kSyncedNotificationFirstRun[];
 extern const char kWelcomeNotificationDismissed[];
+extern const char kWelcomeNotificationDismissedLocal[];
 extern const char kWelcomeNotificationPreviouslyPoppedUp[];
 extern const char kWelcomeNotificationExpirationTimestamp[];
 
@@ -631,8 +631,6 @@ extern const char kRemoteAccessHostAllowGnubbyAuth[];
 
 extern const char kPrintPreviewStickySettings[];
 extern const char kCloudPrintRoot[];
-extern const char kCloudPrintServiceURL[];
-extern const char kCloudPrintSigninURL[];
 extern const char kCloudPrintDialogWidth[];
 extern const char kCloudPrintDialogHeight[];
 extern const char kCloudPrintSigninDialogWidth[];

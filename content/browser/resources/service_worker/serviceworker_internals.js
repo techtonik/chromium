@@ -46,8 +46,10 @@ cr.define('serviceworker', function() {
         update();
     }
 
+    var allLogMessages = {};
+
     // Fired once per partition from the backend.
-    function onPartitionData(registrations, partition_path) {
+    function onPartitionData(registrations, partition_id, partition_path) {
         var template;
         var container = $('serviceworker-list');
 
@@ -66,7 +68,25 @@ cr.define('serviceworker', function() {
             container.appendChild(template);
         }
 
+        // Set log for each worker versions.
+        if (!(partition_id in allLogMessages)) {
+            allLogMessages[partition_id] = {};
+        }
+        var logMessages = allLogMessages[partition_id];
+        registrations.forEach(function (worker) {
+            [worker.active, worker.pending].forEach(function (version) {
+                if (version) {
+                    if (version.version_id in logMessages) {
+                        version.log = logMessages[version.version_id];
+                    } else {
+                        version.log = '';
+                    }
+                }
+            });
+        });
+
         jstProcess(new JsEvalContext({ registrations: registrations,
+                                       partition_id: partition_id,
                                        partition_path: partition_path}),
                    template);
         for (var i = 0; i < COMMANDS.length; ++i) {
@@ -79,52 +99,60 @@ cr.define('serviceworker', function() {
                 }
             }
         }
-        displayErrorLogs();
     }
 
-    function onWorkerStarted(version_id, process_id, thread_id) {
+    function onWorkerStarted(partition_id, version_id, process_id, thread_id) {
         update();
     }
 
-    function onWorkerStopped(version_id, process_id, thread_id) {
+    function onWorkerStopped(partition_id, version_id, process_id, thread_id) {
         update();
     }
 
-    var errorLogs = {};
-
-    function onErrorReported(version_id,
+    function onErrorReported(partition_id,
+                             version_id,
                              process_id,
                              thread_id,
                              error_info) {
-        if (version_id in errorLogs) {
-            errorLogs[version_id].push(error_info);
-        } else {
-            errorLogs[version_id] = [error_info];
-        }
-        displayErrorLogs();
+        outputLogMessage(partition_id,
+                         version_id,
+                         'Error: ' + JSON.stringify(error_info) + '\n');
     }
 
-    function displayErrorLogs() {
-        var container = $('serviceworker-list');
+    function onConsoleMessageReported(partition_id,
+                             version_id,
+                             process_id,
+                             thread_id,
+                             message) {
+        outputLogMessage(partition_id,
+                         version_id,
+                         'Console: ' + JSON.stringify(message) + '\n');
+    }
+
+    function onVersionStateChanged(partition_id, version_id) {
+        update();
+    }
+
+    function outputLogMessage(partition_id, version_id, message) {
+        if (!(partition_id in allLogMessages)) {
+            allLogMessages[partition_id] = {};
+        }
+        var logMessages = allLogMessages[partition_id];
+        if (version_id in logMessages) {
+            logMessages[version_id] += message;
+        } else {
+            logMessages[version_id] = message;
+        }
+
         var logAreas =
-            container.querySelectorAll('textarea.serviceworker-error-log');
+            document.querySelectorAll('textarea.serviceworker-log');
         for (var i = 0; i < logAreas.length; ++i) {
             var logArea = logAreas[i];
-            var vid = logArea.vid;
-            if (!(vid in errorLogs)) {
-                continue;
+            if (logArea.partition_id == partition_id &&
+                logArea.version_id == version_id) {
+                logArea.value += message;
             }
-            var logs = errorLogs[vid];
-            for (var j = 0; j < logs.length; ++j) {
-                logArea.value += JSON.stringify(logs[j]) + '\n';
-            }
-            delete errorLogs[vid];
         }
-
-    }
-
-    function onVersionStateChanged(version_id) {
-        update();
     }
 
     return {
@@ -134,6 +162,7 @@ cr.define('serviceworker', function() {
         onWorkerStarted: onWorkerStarted,
         onWorkerStopped: onWorkerStopped,
         onErrorReported: onErrorReported,
+        onConsoleMessageReported: onConsoleMessageReported,
         onVersionStateChanged: onVersionStateChanged,
     };
 });

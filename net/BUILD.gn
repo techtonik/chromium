@@ -39,10 +39,6 @@ enable_built_in_dns = !is_ios
 
 enable_ftp_support = !is_ios
 
-# When OpenSSL is used for SSL and crypto on Unix-like systems, use OpenSSL"s
-# certificate definition.
-use_openssl_certs = (is_linux || is_android) && use_openssl
-
 config("net_config") {
   defines = []
   if (posix_avoid_mmap) {
@@ -54,7 +50,7 @@ config("net_config") {
 # TODO(jschuh): crbug.com/167187 fix this and delete this config.
 config("net_win_size_truncation") {
   if (is_win) {
-    cflags += [ "/wd4267" ]
+    cflags = [ "/wd4267" ]
   }
 }
 
@@ -268,10 +264,7 @@ component("net") {
       "cert/cert_database_nss.cc",
       "cert/nss_cert_database.cc",
       "cert/nss_cert_database.h",
-      "cert/test_root_certs_nss.cc",
       "cert/x509_certificate_nss.cc",
-      "ocsp/nss_ocsp.cc",
-      "ocsp/nss_ocsp.h",
       "third_party/mozilla_security_manager/nsKeygenHandler.cpp",
       "third_party/mozilla_security_manager/nsKeygenHandler.h",
       "third_party/mozilla_security_manager/nsNSSCertificateDB.cpp",
@@ -279,15 +272,31 @@ component("net") {
       "third_party/mozilla_security_manager/nsPKCS12Blob.cpp",
       "third_party/mozilla_security_manager/nsPKCS12Blob.h",
     ]
+
+    if (!is_ios) {
+      # These files are part of the partial implementation of NSS on iOS so
+      # keep them in that case.
+      sources -= [
+        "cert/test_root_certs_nss.cc",
+        "ocsp/nss_ocsp.cc",
+        "ocsp/nss_ocsp.h",
+      ]
+    }
   }
 
-  if (!use_nss) {
+  if (!use_nss_certs) {
     sources -= [
-      "cert/cert_verify_proc_nss.cc",
-      "cert/cert_verify_proc_nss.h",
       "ssl/client_cert_store_nss.cc",
       "ssl/client_cert_store_nss.h",
     ]
+    if (!is_ios) {
+      # These files are part of the partial implementation of NSS on iOS so
+      # keep them in that case (even though use_nss_certs is not set).
+      sources -= [
+        "cert/cert_verify_proc_nss.cc",
+        "cert/cert_verify_proc_nss.h",
+      ]
+    }
     if (is_chromeos) {
       # These were already removed on non-ChromeOS.
       sources -= [
@@ -396,19 +405,15 @@ component("net") {
   }
 
   if (is_mac) {
-    sources -= [
-      "ssl/client_cert_store_nss.cc",
-      "ssl/client_cert_store_nss.h",
-    ]
     deps += [
       "//third_party/nss:nspr",
       "//third_party/nss",
     ]
     libs = [
-      "$SDKROOT/System/Library/Frameworks/Foundation.framework",
-      "$SDKROOT/System/Library/Frameworks/Security.framework",
-      "$SDKROOT/System/Library/Frameworks/SystemConfiguration.framework",
-      "$SDKROOT/usr/lib/libresolv.dylib",
+      "Foundation.framework",
+      "Security.framework",
+      "SystemConfiguration.framework",
+      "resolv",
     ]
   }
 
@@ -418,11 +423,11 @@ component("net") {
       "//third_party/nss",
     ]
     libs = [
-      "$SDKROOT/System/Library/Frameworks/CFNetwork.framework",
-      "$SDKROOT/System/Library/Frameworks/MobileCoreServices.framework",
-      "$SDKROOT/System/Library/Frameworks/Security.framework",
-      "$SDKROOT/System/Library/Frameworks/SystemConfiguration.framework",
-      "$SDKROOT/usr/lib/libresolv.dylib",
+      "CFNetwork.framework",
+      "MobileCoreServices.framework",
+      "Security.framework",
+      "SystemConfiguration.framework",
+      "resolv",
     ]
   }
 
@@ -570,6 +575,7 @@ source_set("net_test_support") {
     "//base",
     "//base/test:test_support",
     "//crypto:platform",
+    "//net",
     "//net/tools/tld_cleanup",
     "//testing/gmock",
     "//testing/gtest",

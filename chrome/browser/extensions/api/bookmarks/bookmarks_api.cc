@@ -44,7 +44,6 @@
 #include "content/public/browser/web_contents_view.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_function_dispatcher.h"
-#include "extensions/browser/extension_system.h"
 #include "extensions/browser/quota_service.h"
 #include "grit/generated_resources.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -132,8 +131,8 @@ const BookmarkNode* BookmarksFunction::GetBookmarkNodeFromId(
   if (!GetBookmarkIdAsInt64(id_string, &id))
     return NULL;
 
-  BookmarkModel* model = BookmarkModelFactory::GetForProfile(GetProfile());
-  const BookmarkNode* node = model->GetNodeByID(id);
+  const BookmarkNode* node = GetBookmarkNodeByID(
+      BookmarkModelFactory::GetForProfile(GetProfile()), id);
   if (!node)
     error_ = keys::kNoNodeError;
 
@@ -173,11 +172,10 @@ BookmarkEventRouter::~BookmarkEventRouter() {
 void BookmarkEventRouter::DispatchEvent(
     const std::string& event_name,
     scoped_ptr<base::ListValue> event_args) {
-  if (extensions::ExtensionSystem::Get(browser_context_)->event_router()) {
-    extensions::ExtensionSystem::Get(browser_context_)
-        ->event_router()
-        ->BroadcastEvent(make_scoped_ptr(
-              new extensions::Event(event_name, event_args.Pass())));
+  EventRouter* event_router = EventRouter::Get(browser_context_);
+  if (event_router) {
+    event_router->BroadcastEvent(
+        make_scoped_ptr(new extensions::Event(event_name, event_args.Pass())));
   }
 }
 
@@ -289,8 +287,7 @@ void BookmarkEventRouter::ExtensiveBookmarkChangesEnded(BookmarkModel* model) {
 
 BookmarksAPI::BookmarksAPI(BrowserContext* context)
     : browser_context_(context) {
-  EventRouter* event_router =
-      ExtensionSystem::Get(browser_context_)->event_router();
+  EventRouter* event_router = EventRouter::Get(browser_context_);
   event_router->RegisterObserver(this, bookmarks::OnCreated::kEventName);
   event_router->RegisterObserver(this, bookmarks::OnRemoved::kEventName);
   event_router->RegisterObserver(this, bookmarks::OnChanged::kEventName);
@@ -305,8 +302,7 @@ BookmarksAPI::~BookmarksAPI() {
 }
 
 void BookmarksAPI::Shutdown() {
-  ExtensionSystem::Get(browser_context_)->event_router()->UnregisterObserver(
-      this);
+  EventRouter::Get(browser_context_)->UnregisterObserver(this);
 }
 
 static base::LazyInstance<BrowserContextKeyedAPIFactory<BookmarksAPI> >
@@ -323,8 +319,7 @@ void BookmarksAPI::OnListenerAdded(const EventListenerInfo& details) {
       browser_context_,
       BookmarkModelFactory::GetForProfile(
           Profile::FromBrowserContext(browser_context_))));
-  ExtensionSystem::Get(browser_context_)->event_router()->UnregisterObserver(
-      this);
+  EventRouter::Get(browser_context_)->UnregisterObserver(this);
 }
 
 bool BookmarksGetFunction::RunImpl() {
@@ -528,7 +523,7 @@ bool BookmarksCreateFunction::RunImpl() {
     if (!GetBookmarkIdAsInt64(*params->bookmark.parent_id, &parentId))
       return false;
   }
-  const BookmarkNode* parent = model->GetNodeByID(parentId);
+  const BookmarkNode* parent = GetBookmarkNodeByID(model, parentId);
   if (!parent) {
     error_ = keys::kNoParentError;
     return false;
@@ -616,7 +611,7 @@ bool BookmarksMoveFunction::RunImpl() {
     if (!GetBookmarkIdAsInt64(*params->destination.parent_id, &parentId))
       return false;
 
-    parent = model->GetNodeByID(parentId);
+    parent = GetBookmarkNodeByID(model, parentId);
   }
   if (!parent) {
     error_ = keys::kNoParentError;
@@ -744,7 +739,7 @@ class CreateBookmarkBucketMapper : public BookmarkBucketMapper<std::string> {
 
     int64 parent_id_int64;
     base::StringToInt64(parent_id, &parent_id_int64);
-    const BookmarkNode* parent = model->GetNodeByID(parent_id_int64);
+    const BookmarkNode* parent = GetBookmarkNodeByID(model, parent_id_int64);
     if (!parent)
       return;
 
@@ -782,7 +777,7 @@ class RemoveBookmarksBucketMapper : public BookmarkBucketMapper<std::string> {
     for (IdList::iterator it = ids.begin(); it != ids.end(); ++it) {
       BookmarkModel* model = BookmarkModelFactory::GetForProfile(
           Profile::FromBrowserContext(browser_context_));
-      const BookmarkNode* node = model->GetNodeByID(*it);
+      const BookmarkNode* node = GetBookmarkNodeByID(model, *it);
       if (!node || node->is_root())
         return;
 

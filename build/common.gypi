@@ -194,13 +194,6 @@
             'toolkit_views%': 0,
           }],
 
-          # Set toolkit_uses_gtk for the Chromium browser on Linux.
-          ['desktop_linux==1 and use_aura==0 and use_ozone==0', {
-            'toolkit_uses_gtk%': 1,
-          }, {
-            'toolkit_uses_gtk%': 0,
-          }],
-
           # Enable HiDPI on Mac OS, Chrome OS and Windows.
           ['OS=="mac" or chromeos==1 or OS=="win"', {
             'enable_hidpi%': 1,
@@ -253,7 +246,6 @@
       'target_arch%': '<(target_arch)',
       'target_subarch%': '<(target_subarch)',
       'toolkit_views%': '<(toolkit_views)',
-      'toolkit_uses_gtk%': '<(toolkit_uses_gtk)',
       'desktop_linux%': '<(desktop_linux)',
       'use_aura%': '<(use_aura)',
       'use_ash%': '<(use_ash)',
@@ -503,11 +495,6 @@
       # Enable plug-in installation by default.
       'enable_plugin_installation%': 1,
 
-      # Enable PPAPI and NPAPI by default.
-      # TODO(nileshagrawal): Make this flag enable/disable NPAPI as well
-      # as PPAPI; see crbug.com/162667.
-      'enable_plugins%': 1,
-
       # Specifies whether to use canvas_skia.cc in place of platform
       # specific implementations of gfx::Canvas. Affects text drawing in the
       # Chrome UI.
@@ -634,8 +621,8 @@
           'use_gnome_keyring%': 1,
         }],
 
-        ['toolkit_uses_gtk==1 or OS=="mac" or OS=="ios"', {
-          # GTK+, Mac and iOS want Title Case strings
+        ['OS=="mac" or OS=="ios"', {
+          # Mac and iOS want Title Case strings
           'use_titlecase_in_grd_files%': 1,
         }],
 
@@ -728,6 +715,7 @@
           'enable_plugin_installation%': 1,
         }],
 
+        # Whether PPAPI is enabled.
         ['OS=="android" or OS=="ios" or embedded==1', {
           'enable_plugins%': 0,
         }, {
@@ -956,7 +944,6 @@
     'use_ozone_evdev%': '<(use_ozone_evdev)',
     'use_clipboard_aurax11%': '<(use_clipboard_aurax11)',
     'use_system_fontconfig%': '<(use_system_fontconfig)',
-    'toolkit_uses_gtk%': '<(toolkit_uses_gtk)',
     'desktop_linux%': '<(desktop_linux)',
     'use_x11%': '<(use_x11)',
     'use_gnome_keyring%': '<(use_gnome_keyring)',
@@ -1372,7 +1359,7 @@
           # TODO(glider): set clang to 1 earlier for ASan and TSan builds so
           # that it takes effect here.
           ['clang==0 and asan==0 and lsan==0 and tsan==0 and msan==0', {
-            'binutils_version%': '<!pymod_do_main(compiler_version assembler)', 
+            'binutils_version%': '<!pymod_do_main(compiler_version assembler)',
           }],
           # On Android we know the binutils version in the toolchain.
           ['OS=="android"', {
@@ -1825,9 +1812,6 @@
       }],
       ['toolkit_views==1', {
         'grit_defines': ['-D', 'toolkit_views'],
-      }],
-      ['toolkit_uses_gtk==1', {
-        'grit_defines': ['-D', 'toolkit_uses_gtk'],
       }],
       ['use_aura==1', {
         'grit_defines': ['-D', 'use_aura'],
@@ -2331,11 +2315,6 @@
       }],
       ['enable_one_click_signin==1', {
         'defines': ['ENABLE_ONE_CLICK_SIGNIN'],
-      }],
-      ['toolkit_uses_gtk==1 and toolkit_views==0', {
-        # TODO(erg): We are progressively sealing up use of deprecated features
-        # in gtk in preparation for an eventual porting to gtk3.
-        'defines': ['GTK_DISABLE_SINGLE_INCLUDES=1'],
       }],
       ['chromeos==1', {
         'defines': ['OS_CHROMEOS=1'],
@@ -3187,6 +3166,7 @@
                   # Only link with needed input sections. This is to avoid
                   # getting undefined reference to __cxa_bad_typeid in the CDU
                   # library.
+                  # TODO(primiano): remove below as soon as WebRTC r5898 rolls.
                   '-Wl,--gc-sections',
                   # Warn in case of text relocations.
                   '-Wl,--warn-shared-textrel',

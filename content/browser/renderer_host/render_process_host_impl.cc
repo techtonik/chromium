@@ -324,11 +324,6 @@ class RendererSandboxedProcessLauncherDelegate
 
 RendererMainThreadFactoryFunction g_renderer_main_thread_factory = NULL;
 
-void RenderProcessHost::RegisterRendererMainThreadFactory(
-    RendererMainThreadFactoryFunction create) {
-  g_renderer_main_thread_factory = create;
-}
-
 base::MessageLoop* g_in_process_thread;
 
 base::MessageLoop*
@@ -465,6 +460,11 @@ void RenderProcessHostImpl::ShutDownInProcessRenderer() {
       NOTREACHED() << "There should be only one RenderProcessHost when running "
                    << "in-process.";
   }
+}
+
+void RenderProcessHostImpl::RegisterRendererMainThreadFactory(
+    RendererMainThreadFactoryFunction create) {
+  g_renderer_main_thread_factory = create;
 }
 
 RenderProcessHostImpl::~RenderProcessHostImpl() {
@@ -941,9 +941,6 @@ static void AppendGpuCommandLineFlags(CommandLine* command_line) {
   if (IsThreadedCompositingEnabled())
     command_line->AppendSwitch(switches::kEnableThreadedCompositing);
 
-  if (IsForceCompositingModeEnabled())
-    command_line->AppendSwitch(switches::kForceCompositingMode);
-
   if (IsDelegatedRendererEnabled())
     command_line->AppendSwitch(switches::kEnableDelegatedRenderer);
 
@@ -1094,6 +1091,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableWebAnimationsSVG,
     switches::kEnableWebGLDraftExtensions,
     switches::kEnableWebMIDI,
+    switches::kForceCompositingMode,
     switches::kForceDeviceScaleFactor,
     switches::kFullMemoryCrashReport,
     switches::kJavaScriptFlags,

@@ -60,7 +60,7 @@ const QuicByteCount kMaxPacketSize = 1452;
 
 // Maximum size of the initial congestion window in packets.
 const size_t kDefaultInitialWindow = 10;
-const size_t kMaxInitialWindow = 100;
+const uint32 kMaxInitialWindow = 100;
 
 // Default size of initial flow control window.
 const uint32 kDefaultFlowControlSendWindow = 16 * 1024;  // 16 KB
@@ -70,7 +70,7 @@ const uint32 kDefaultFlowControlSendWindow = 16 * 1024;  // 16 KB
 const size_t kMaxTcpCongestionWindow = 200;
 
 // Don't allow a client to suggest an RTT longer than 15 seconds.
-const size_t kMaxInitialRoundTripTimeUs = 15 * kNumMicrosPerSecond;
+const uint32 kMaxInitialRoundTripTimeUs = 15 * kNumMicrosPerSecond;
 
 // Maximum number of open streams per connection.
 const size_t kDefaultMaxStreamsPerConnection = 100;
@@ -109,6 +109,9 @@ const QuicStreamId kHeadersStreamId = 3;
 const int64 kDefaultInitialTimeoutSecs = 120;  // 2 mins.
 const int64 kDefaultTimeoutSecs = 60 * 10;  // 10 minutes.
 const int64 kDefaultMaxTimeForCryptoHandshakeSecs = 5;  // 5 secs.
+
+// Default ping timeout.
+const int64 kPingTimeoutSecs = 15;  // 15 secs.
 
 // We define an unsigned 16-bit floating point value, inspired by IEEE floats
 // (http://en.wikipedia.org/wiki/Half_precision_floating-point_format),
@@ -349,10 +352,19 @@ enum QuicRstStreamErrorCode {
   QUIC_STREAM_PEER_GOING_AWAY,
   // The stream has been cancelled.
   QUIC_STREAM_CANCELLED,
+  // Sending a RST to allow for proper flow control accounting.
+  QUIC_RST_FLOW_CONTROL_ACCOUNTING,
 
   // No error. Used as bound while iterating.
   QUIC_STREAM_LAST_ERROR,
 };
+
+// Because receiving an unknown QuicRstStreamErrorCode results in connection
+// teardown, we use this to make sure any errors predating a given version are
+// downgraded to the most appropriate existing error.
+NET_EXPORT_PRIVATE QuicRstStreamErrorCode AdjustErrorForVersion(
+    QuicRstStreamErrorCode error_code,
+    QuicVersion version);
 
 // These values must remain stable as they are uploaded to UMA histograms.
 // To add a new error code, use the current value of QUIC_LAST_ERROR and
@@ -1014,6 +1026,7 @@ enum WriteStatus {
 // of bytes written or the error code, depending upon the status.
 struct NET_EXPORT_PRIVATE WriteResult {
   WriteResult(WriteStatus status, int bytes_written_or_error_code);
+  WriteResult();
 
   WriteStatus status;
   union {

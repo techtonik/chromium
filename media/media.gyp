@@ -891,11 +891,6 @@
             }],
           ],
         }],
-        ['toolkit_uses_gtk==1', {
-          'dependencies': [
-            '../build/linux/system.gyp:gtk',
-          ],
-        }],
         ['target_arch=="ia32" or target_arch=="x64"', {
           'dependencies': [
             'media_asm',
@@ -1516,7 +1511,6 @@
           ],
           'variables': {
             'test_suite_name': 'media_unittests',
-            'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)media_unittests<(SHARED_LIB_SUFFIX)',
           },
           'includes': ['../build/apk_test.gypi'],
         },
@@ -1529,7 +1523,6 @@
           ],
           'variables': {
             'test_suite_name': 'media_perftests',
-            'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)media_perftests<(SHARED_LIB_SUFFIX)',
           },
           'includes': ['../build/apk_test.gypi'],
         },
@@ -1659,25 +1652,6 @@
           ],
           'sources': [
             'ffmpeg/ffmpeg_unittest.cc',
-          ],
-          'conditions': [
-            ['toolkit_uses_gtk==1', {
-              'dependencies': [
-                # Needed for the following #include chain:
-                #   base/run_all_unittests.cc
-                #   ../base/test_suite.h
-                #   gtk/gtk.h
-                '../build/linux/system.gyp:gtk',
-              ],
-              'conditions': [
-                # TODO(dmikurube): Kill linux_use_tcmalloc. http://crbug.com/345554
-                ['(use_allocator!="none" and use_allocator!="see_use_tcmalloc") or (use_allocator=="see_use_tcmalloc" and linux_use_tcmalloc==1)', {
-                  'dependencies': [
-                    '../base/allocator/allocator.gyp:allocator',
-                  ],
-                }],
-              ],
-            }],
           ],
         },
         {

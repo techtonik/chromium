@@ -176,79 +176,6 @@ class NoOpFramerVisitor : public QuicFramerVisitorInterface {
   DISALLOW_COPY_AND_ASSIGN(NoOpFramerVisitor);
 };
 
-class FramerVisitorCapturingPublicReset : public NoOpFramerVisitor {
- public:
-  FramerVisitorCapturingPublicReset();
-  virtual ~FramerVisitorCapturingPublicReset();
-
-  virtual void OnPublicResetPacket(
-      const QuicPublicResetPacket& packet) OVERRIDE;
-
-  const QuicPublicResetPacket public_reset_packet() {
-    return public_reset_packet_;
-  }
-
- private:
-  QuicPublicResetPacket public_reset_packet_;
-};
-
-class FramerVisitorCapturingFrames : public NoOpFramerVisitor {
- public:
-  FramerVisitorCapturingFrames();
-  virtual ~FramerVisitorCapturingFrames();
-
-  // Reset the visitor to it's initial state.
-  void Reset();
-
-  // NoOpFramerVisitor
-  virtual void OnVersionNegotiationPacket(
-      const QuicVersionNegotiationPacket& packet) OVERRIDE;
-  virtual bool OnPacketHeader(const QuicPacketHeader& header) OVERRIDE;
-  virtual bool OnStreamFrame(const QuicStreamFrame& frame) OVERRIDE;
-  virtual bool OnAckFrame(const QuicAckFrame& frame) OVERRIDE;
-  virtual bool OnCongestionFeedbackFrame(
-      const QuicCongestionFeedbackFrame& frame) OVERRIDE;
-  virtual bool OnStopWaitingFrame(
-      const QuicStopWaitingFrame& frame) OVERRIDE;
-  virtual bool OnRstStreamFrame(const QuicRstStreamFrame& frame) OVERRIDE;
-  virtual bool OnConnectionCloseFrame(
-      const QuicConnectionCloseFrame& frame) OVERRIDE;
-  virtual bool OnGoAwayFrame(const QuicGoAwayFrame& frame) OVERRIDE;
-
-  size_t frame_count() const { return frame_count_; }
-  QuicPacketHeader* header() { return &header_; }
-  const std::vector<QuicStreamFrame>* stream_frames() const {
-    return &stream_frames_;
-  }
-  const std::vector<string*>& stream_data() const {
-    return stream_data_;
-  }
-  QuicAckFrame* ack() { return ack_.get(); }
-  QuicCongestionFeedbackFrame* feedback() { return feedback_.get(); }
-  QuicStopWaitingFrame* stop_waiting() { return stop_waiting_.get(); }
-  QuicRstStreamFrame* rst() { return rst_.get(); }
-  QuicConnectionCloseFrame* close() { return close_.get(); }
-  QuicGoAwayFrame* goaway() { return goaway_.get(); }
-  QuicVersionNegotiationPacket* version_negotiation_packet() {
-    return version_negotiation_packet_.get();
-  }
-
- private:
-  size_t frame_count_;
-  QuicPacketHeader header_;
-  std::vector<QuicStreamFrame> stream_frames_;
-  std::vector<std::string*> stream_data_;
-  scoped_ptr<QuicAckFrame> ack_;
-  scoped_ptr<QuicCongestionFeedbackFrame> feedback_;
-  scoped_ptr<QuicStopWaitingFrame> stop_waiting_;
-  scoped_ptr<QuicRstStreamFrame> rst_;
-  scoped_ptr<QuicConnectionCloseFrame> close_;
-  scoped_ptr<QuicGoAwayFrame> goaway_;
-  scoped_ptr<QuicVersionNegotiationPacket> version_negotiation_packet_;
-
-  DISALLOW_COPY_AND_ASSIGN(FramerVisitorCapturingFrames);
-};
-
 class MockConnectionVisitor : public QuicConnectionVisitorInterface {
  public:
   MockConnectionVisitor();
@@ -266,6 +193,7 @@ class MockConnectionVisitor : public QuicConnectionVisitorInterface {
   MOCK_METHOD0(OnCanWrite, void());
   MOCK_CONST_METHOD0(HasPendingWrites, bool());
   MOCK_CONST_METHOD0(HasPendingHandshake, bool());
+  MOCK_CONST_METHOD0(HasOpenDataStreams, bool());
   MOCK_METHOD1(OnSuccessfulVersionNegotiation,
                void(const QuicVersion& version));
   MOCK_METHOD0(OnConfigNegotiated, void());
@@ -286,6 +214,8 @@ class MockHelper : public QuicConnectionHelperInterface {
  private:
   MockClock clock_;
   MockRandom random_generator_;
+
+  DISALLOW_COPY_AND_ASSIGN(MockHelper);
 };
 
 class MockConnection : public QuicConnection {
@@ -410,6 +340,7 @@ class TestSession : public QuicSession {
 
  private:
   QuicCryptoStream* crypto_stream_;
+
   DISALLOW_COPY_AND_ASSIGN(TestSession);
 };
 
@@ -434,6 +365,7 @@ class TestClientSession : public QuicClientSessionBase {
 
  private:
   QuicCryptoStream* crypto_stream_;
+
   DISALLOW_COPY_AND_ASSIGN(TestClientSession);
 };
 
@@ -450,6 +382,9 @@ class MockPacketWriter : public QuicPacketWriter {
   MOCK_CONST_METHOD0(IsWriteBlockedDataBuffered, bool());
   MOCK_CONST_METHOD0(IsWriteBlocked, bool());
   MOCK_METHOD0(SetWritable, void());
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(MockPacketWriter);
 };
 
 class MockSendAlgorithm : public SendAlgorithmInterface {
@@ -494,6 +429,9 @@ class MockLossAlgorithm : public LossDetectionInterface {
                                  QuicPacketSequenceNumber largest_observed,
                                  const RttStats& rtt_stats));
   MOCK_CONST_METHOD0(GetLossTimeout, QuicTime());
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(MockLossAlgorithm);
 };
 
 class TestEntropyCalculator :
@@ -504,6 +442,9 @@ class TestEntropyCalculator :
 
   virtual QuicPacketEntropyHash EntropyHash(
       QuicPacketSequenceNumber sequence_number) const OVERRIDE;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(TestEntropyCalculator);
 };
 
 class MockEntropyCalculator : public TestEntropyCalculator {
@@ -514,20 +455,27 @@ class MockEntropyCalculator : public TestEntropyCalculator {
   MOCK_CONST_METHOD1(
       EntropyHash,
       QuicPacketEntropyHash(QuicPacketSequenceNumber sequence_number));
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(MockEntropyCalculator);
 };
 
 class MockAckNotifierDelegate : public QuicAckNotifier::DelegateInterface {
  public:
   MockAckNotifierDelegate();
 
-  MOCK_METHOD4(OnAckNotification, void(int num_original_packets,
+  MOCK_METHOD5(OnAckNotification, void(int num_original_packets,
                                        int num_original_bytes,
                                        int num_retransmitted_packets,
-                                       int num_retransmitted_bytes));
+                                       int num_retransmitted_bytes,
+                                       QuicTime::Delta delta_largest_observed));
 
  protected:
   // Object is ref counted.
   virtual ~MockAckNotifierDelegate();
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(MockAckNotifierDelegate);
 };
 
 }  // namespace test

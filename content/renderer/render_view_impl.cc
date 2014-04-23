@@ -100,7 +100,6 @@
 #include "content/renderer/media/webmediaplayer_params.h"
 #include "content/renderer/memory_benchmarking_extension.h"
 #include "content/renderer/mhtml_generator.h"
-#include "content/renderer/notification_provider.h"
 #include "content/renderer/push_messaging_dispatcher.h"
 #include "content/renderer/render_frame_impl.h"
 #include "content/renderer/render_process.h"
@@ -660,7 +659,6 @@ RenderViewImpl::RenderViewImpl(RenderViewImplParams* params)
       cached_has_main_frame_horizontal_scrollbar_(false),
       cached_has_main_frame_vertical_scrollbar_(false),
       has_scrolled_focused_editable_node_into_rect_(false),
-      notification_provider_(NULL),
       push_messaging_dispatcher_(NULL),
       geolocation_dispatcher_(NULL),
       input_tag_speech_dispatcher_(NULL),
@@ -703,12 +701,6 @@ void RenderViewImpl::Initialize(
 
   // Ensure we start with a valid next_page_id_ from the browser.
   DCHECK_GE(next_page_id_, 0);
-
-#if defined(ENABLE_NOTIFICATIONS)
-  notification_provider_ = new NotificationProvider(this);
-#else
-  notification_provider_ = NULL;
-#endif
 
   webwidget_ = WebView::create(this);
   webwidget_mouse_lock_target_.reset(new WebWidgetLockTarget(webwidget_));
@@ -1589,10 +1581,6 @@ void RenderViewImpl::printPage(WebLocalFrame* frame) {
                     PrintPage(frame, handling_input_event_));
 }
 
-blink::WebNotificationPresenter* RenderViewImpl::notificationPresenter() {
-  return notification_provider_;
-}
-
 bool RenderViewImpl::enumerateChosenDirectory(
     const WebString& path,
     WebFileChooserCompletion* chooser_completion) {
@@ -1993,25 +1981,6 @@ void RenderViewImpl::requestPointerUnlock() {
 bool RenderViewImpl::isPointerLocked() {
   return mouse_lock_dispatcher_->IsMouseLockedTo(
       webwidget_mouse_lock_target_.get());
-}
-
-// FIXME: To be removed as soon as chromium and blink side changes land
-// didActivateCompositor with parameters is still kept in order to land
-// these changes s-chromium - https://codereview.chromium.org/137893025/.
-// s-blink - https://codereview.chromium.org/138523003/
-void RenderViewImpl::didActivateCompositor(int input_handler_identifier) {
-#if !defined(OS_MACOSX)  // many events are unhandled - http://crbug.com/138003
-  InputHandlerManager* input_handler_manager =
-      RenderThreadImpl::current()->input_handler_manager();
-  if (input_handler_manager) {
-     input_handler_manager->AddInputHandler(
-        routing_id_,
-        compositor_->GetInputHandler(),
-        AsWeakPtr());
-  }
-#endif
-
-  RenderWidget::didActivateCompositor(input_handler_identifier);
 }
 
 void RenderViewImpl::didActivateCompositor() {

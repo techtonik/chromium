@@ -8172,6 +8172,40 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="InstantSearchClicks.PreviewScrollState"
+    enum="InstantSearchClicks_PreviewScrollState">
+  <owner>ksimbili@chromium.org</owner>
+  <summary>
+    Records the scroll state on the preview page when instant search clicks
+    feature is triggered.
+  </summary>
+</histogram>
+
+<histogram name="InstantSearchClicks.ReasonForSwap"
+    enum="InstantSearchClicks_ReasonForSwap">
+  <owner>ksimbili@chromium.org</owner>
+  <summary>
+    Records the reason that triggered the page swap when instant search clicks
+    feature is triggered.
+  </summary>
+</histogram>
+
+<histogram name="InstantSearchClicks.TimeInPreview" units="milliseconds">
+  <owner>ksimbili@chromium.org</owner>
+  <summary>
+    The time spent by the user in preview page before swapping to original or
+    navigating out of preview page.
+  </summary>
+</histogram>
+
+<histogram name="InstantSearchClicks.TimeToSwap" units="milliseconds">
+  <owner>ksimbili@chromium.org</owner>
+  <summary>
+    The time it took for swap to trigger for all swaps. The is the time between
+    preview page load start to preview page swap with the original page.
+  </summary>
+</histogram>
+
 <histogram name="interstitial.authority_invalid_time" units="milliseconds">
   <obsolete>
     Removed on 8/1/13.
@@ -15036,6 +15070,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Chrome OS connection manager service errors seen.</summary>
 </histogram>
 
+<histogram name="Network.Shill.ServicesOnSameNetwork">
+  <owner>zqiu@chromium.org</owner>
+  <summary>
+    Chrome OS network metric sampling the number of services that are connected
+    to the currently connected network.
+  </summary>
+</histogram>
+
 <histogram name="Network.Shill.TerminationActionResult"
     enum="ShillTerminationActionResult">
   <obsolete>
@@ -15169,6 +15211,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Chrome OS network usage metric.  The AP mode setting for each successful
     WiFi connection.
+  </summary>
+</histogram>
+
+<histogram name="Network.Shill.WiFi.AutoConnectableServices">
+  <owner>zqiu@chromium.org</owner>
+  <summary>
+    Chrome OS network metric sampling the number of wifi services available for
+    auto-connect when auto-connect is initiated for wifi device.
+  </summary>
+</histogram>
+
+<histogram name="Network.Shill.WiFi.AvailableBSSesAtConnect">
+  <owner>zqiu@chromium.org</owner>
+  <summary>
+    Chrome OS network metric sampling the number of BSSes (endpoints) available
+    for the currently connecting wifi service.
   </summary>
 </histogram>
 
@@ -25371,6 +25429,47 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>The outcome of Entry::WriteData in the simple cache.</summary>
 </histogram>
 
+<histogram name="SimpleGeolocation.Request.Event"
+    enum="SimpleGeolocationRequestEvent">
+  <owner>alemate@chromium.org</owner>
+  <summary>Events in reqests processing of IP-based SimpleGeolocation.</summary>
+</histogram>
+
+<histogram name="SimpleGeolocation.Request.ResponseCode"
+    enum="HttpResponseCode">
+  <owner>alemate@chromium.org</owner>
+  <summary>Http response codes in IP-based SimpleGeolocation.</summary>
+</histogram>
+
+<histogram name="SimpleGeolocation.Request.ResponseFailureTime"
+    units="milliseconds">
+  <owner>alemate@chromium.org</owner>
+  <summary>
+    The time elapsed between the sending of the first API request and the time
+    the final (failed) response was recorded. Includes all retries.
+  </summary>
+</histogram>
+
+<histogram name="SimpleGeolocation.Request.ResponseSuccessTime"
+    units="milliseconds">
+  <owner>alemate@chromium.org</owner>
+  <summary>
+    The time elapsed between the sending of the first API request and the time
+    the final (successfull) response was recorded. Includes all retries.
+  </summary>
+</histogram>
+
+<histogram name="SimpleGeolocation.Request.Result"
+    enum="SimpleGeolocationRequestResult">
+  <owner>alemate@chromium.org</owner>
+  <summary>Result of SimpleGeolocationRequest.</summary>
+</histogram>
+
+<histogram name="SimpleGeolocation.Request.Retries">
+  <owner>alemate@chromium.org</owner>
+  <summary>Number of retries until the final response was recorded.</summary>
+</histogram>
+
 <histogram name="SiteIsolation.AllResponses">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -28618,6 +28717,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
     This is reported when OOBE (Out Of Box Experience) completes (M34 or later)
     or when upgrading to a version with install-date-days support.
+
+    This metric is specific to ChromeOS.
+  </summary>
+</histogram>
+
+<histogram name="UpdateEngine.Rollback.Result" enum="BooleanSuccess">
+  <owner>zeuthen@chromium.org</owner>
+  <summary>
+    Whether rollback worked.
+
+    This is reported every time there's a rollback request.
 
     This metric is specific to ChromeOS.
   </summary>
@@ -33751,7 +33861,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="FeatureObserver" type="int">
-<!-- See http://src.chromium.org/viewvc/blink/trunk/Source/core/page/UseCounter.h -->
+<!-- Generated from ../../../third_party/WebKit/Source/core/frame/UseCounter.h -->
 
   <int value="0" label="PageDestruction"/>
   <int value="1" label="LegacyNotifications"/>
@@ -33759,7 +33869,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="3" label="PrefixedIndexedDB"/>
   <int value="4" label="WorkerStart"/>
   <int value="5" label="SharedWorkerStart"/>
-  <int value="6" label="LegacyWebAudioNoteOn"/>
+  <int value="6" label="LegacyWebAudio"/>
   <int value="7" label="WebAudioStart"/>
   <int value="8" label="PrefixedContentSecurityPolicy"/>
   <int value="9" label="UnprefixedIndexedDB"/>
@@ -33810,7 +33920,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="54" label="Unused: CSSOverflowMarquee"/>
   <int value="55" label="Reflection"/>
   <int value="56" label="CursorVisibility"/>
-  <int value="57" label="StorageInfo"/>
+  <int value="57" label="PrefixedStorageInfo"/>
   <int value="58" label="XFrameOptions"/>
   <int value="59" label="XFrameOptionsSameOrigin"/>
   <int value="60" label="XFrameOptionsSameOriginWithBadAncestorChain"/>
@@ -33836,7 +33946,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="80" label="SVGSwitchElement"/>
   <int value="81" label="PrefixedDocumentRegister"/>
   <int value="82" label="HTMLShadowElementOlderShadowRoot"/>
-  <int value="83" label="Document.all()"/>
+  <int value="83" label="DocumentAll"/>
   <int value="84" label="FormElement"/>
   <int value="85" label="DemotedFormElement"/>
   <int value="86" label="CaptureAttributeAsEnum"/>
@@ -33937,9 +34047,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="181" label="BarPropScrollbars"/>
   <int value="182" label="BarPropStatusbar"/>
   <int value="183" label="BarPropToolbar"/>
-  <int value="184" label="input[type=email][multiple]"/>
-  <int value="185" label="input[type=email][maxlength]"/>
-  <int value="186" label="input[type=email][multiple][maxlength]"/>
+  <int value="184" label="InputTypeEmailMultiple"/>
+  <int value="185" label="InputTypeEmailMaxLength"/>
+  <int value="186" label="InputTypeEmailMultipleMaxLength"/>
   <int value="187" label="TextTrackCueConstructor"/>
   <int value="188" label="CSSStyleDeclarationPropertyName"/>
   <int value="189" label="CSSStyleDeclarationFloatPropertyName"/>
@@ -34035,7 +34145,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="279" label="SVGClassName"/>
   <int value="280" label="HTMLAppletElement"/>
   <int value="281" label="HTMLMediaElementSeekToFragmentStart"/>
-  <int value="282" label="HTMLMediaElementSeekToFragmentEnd"/>
+  <int value="282" label="HTMLMediaElementPauseAtFragmentEnd"/>
   <int value="283" label="PrefixedWindowURL"/>
   <int value="284" label="PrefixedWorkerURL"/>
   <int value="285" label="WindowOrientation"/>
@@ -34082,6 +34192,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="326" label="PrefixedElementRequestPointerLock"/>
   <int value="327" label="SelectionSetPosition"/>
   <int value="328" label="AnimationPlayerFinishEvent"/>
+  <int value="329" label="SVGSVGElementInXMLDocument"/>
+  <int value="330" label="CanvasRenderingContext2DSetAlpha"/>
+  <int value="331" label="CanvasRenderingContext2DSetCompositeOperation"/>
+  <int value="332" label="CanvasRenderingContext2DSetLineWidth"/>
+  <int value="333" label="CanvasRenderingContext2DSetLineCap"/>
+  <int value="334" label="CanvasRenderingContext2DSetLineJoin"/>
+  <int value="335" label="CanvasRenderingContext2DSetMiterLimit"/>
+  <int value="336" label="CanvasRenderingContext2DClearShadow"/>
+  <int value="337" label="CanvasRenderingContext2DSetStrokeColor"/>
+  <int value="338" label="CanvasRenderingContext2DSetFillColor"/>
+  <int value="339" label="CanvasRenderingContext2DDrawImageFromRect"/>
+  <int value="340" label="CanvasRenderingContext2DSetShadow"/>
 </enum>
 
 <enum name="FFmpegCodecs" type="int">
@@ -35197,6 +35319,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="3" label="Opted in local"/>
   <int value="4" label="Opted out local"/>
   <int value="5" label="Opted out both"/>
+</enum>
+
+<enum name="InstantSearchClicks_PreviewScrollState" type="int">
+  <int value="0" label="No scroll"/>
+  <int value="1" label="Scrolled but not to bottom"/>
+  <int value="2" label="Scrolled to bottom."/>
+</enum>
+
+<enum name="InstantSearchClicks_ReasonForSwap" type="int">
+  <int value="0" label="Regular swap"/>
+  <int value="1" label="Swapped on timeout"/>
+  <int value="2" label="Swap aborted due to navigation"/>
+  <int value="3" label="No swap as preview failed"/>
+  <int value="4" label="Swapped as original failed"/>
 </enum>
 
 <enum name="InstantSessionStorageNamespace" type="int">
@@ -40239,6 +40375,21 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="3" label="Bad State"/>
   <int value="4" label="Synchronous Write Failure"/>
   <int value="5" label="Fast Empty Return (Success)"/>
+</enum>
+
+<enum name="SimpleGeolocationRequestEvent" type="int">
+  <int value="0" label="Request start"/>
+  <int value="1" label="Response success"/>
+  <int value="2" label="Response not OK"/>
+  <int value="3" label="Response empty"/>
+  <int value="4" label="Response malformed"/>
+</enum>
+
+<enum name="SimpleGeolocationRequestResult" type="int">
+  <int value="0" label="Success"/>
+  <int value="1" label="Failure"/>
+  <int value="2" label="Server error"/>
+  <int value="3" label="Request is cancelled."/>
 </enum>
 
 <enum name="SimpleIndexState" type="int">

@@ -23,6 +23,7 @@
         '../ui/gfx/gfx.gyp:gfx_geometry',
         'command_buffer/command_buffer.gyp:gles2_utils',
         'gles2_cmd_helper',
+        'gpu',
       ],
       'defines': [
         'GLES2_IMPL_IMPLEMENTATION',
@@ -244,7 +245,6 @@
         'command_buffer/service/gpu_tracer_unittest.cc',
         'config/gpu_blacklist_unittest.cc',
         'config/gpu_control_list_entry_unittest.cc',
-        'config/gpu_control_list_machine_model_info_unittest.cc',
         'config/gpu_control_list_number_info_unittest.cc',
         'config/gpu_control_list_os_info_unittest.cc',
         'config/gpu_control_list_string_info_unittest.cc',
@@ -579,7 +579,6 @@
           ],
           'variables': {
             'test_suite_name': 'gl_tests',
-            'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)gl_tests<(SHARED_LIB_SUFFIX)',
           },
           'includes': [
             '../build/apk_test.gypi',

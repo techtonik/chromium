@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "base/files/file.h"
+#include "base/files/file_path.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
@@ -19,9 +20,12 @@
 #include "chrome/common/extensions/api/file_system_provider.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "content/public/browser/browser_context.h"
+#include "extensions/browser/extension_registry_observer.h"
+#include "extensions/common/extension.h"
 
 namespace extensions {
 class EventRouter;
+class ExtensionRegistry;
 }  // namespace extensions
 
 namespace chromeos {
@@ -34,14 +38,15 @@ class ServiceFactory;
 
 // Manages and registers the file system provider service. Maintains provided
 // file systems.
-class Service : public KeyedService {
+class Service : public KeyedService,
+                public extensions::ExtensionRegistryObserver {
  public:
   typedef base::Callback<ProvidedFileSystemInterface*(
       extensions::EventRouter* event_router,
       const ProvidedFileSystemInfo& file_system_info)>
       FileSystemFactoryCallback;
 
-  explicit Service(Profile* profile);
+  Service(Profile* profile, extensions::ExtensionRegistry* extension_registry);
   virtual ~Service();
 
   // Sets a custom ProvidedFileSystemInterface factory. Used by unit tests,
@@ -74,6 +79,11 @@ class Service : public KeyedService {
       const std::string& extension_id,
       int file_system_id);
 
+  // Returns a provided file system attached to the the passed
+  // |mount_point_name|. If not found, then returns NULL.
+  ProvidedFileSystemInterface* GetProvidedFileSystem(
+      const std::string& mount_point_name);
+
   // Adds and removes observers.
   void AddObserver(Observer* observer);
   void RemoveObserver(Observer* observer);
@@ -81,11 +91,15 @@ class Service : public KeyedService {
   // Gets the singleton instance for the |context|.
   static Service* Get(content::BrowserContext* context);
 
-  // BrowserContextKeyedService overrides.
-  virtual void Shutdown() OVERRIDE;
+  // extensions::ExtensionRegistryObserver overrides.
+  virtual void OnExtensionUnloaded(
+      content::BrowserContext* browser_context,
+      const extensions::Extension* extension,
+      extensions::UnloadedExtensionInfo::Reason reason) OVERRIDE;
 
  private:
   typedef std::map<int, ProvidedFileSystemInterface*> ProvidedFileSystemMap;
+  typedef std::map<std::string, int> MountPointNameToIdMap;
 
   // Called when the providing extension accepts or refuses a unmount request.
   // If |error| is equal to FILE_OK, then the request is accepted.
@@ -93,9 +107,11 @@ class Service : public KeyedService {
                               base::File::Error error);
 
   Profile* profile_;
+  extensions::ExtensionRegistry* extension_registry_;  // Not owned.
   FileSystemFactoryCallback file_system_factory_;
   ObserverList<Observer> observers_;
   ProvidedFileSystemMap file_system_map_;  // Owns pointers.
+  MountPointNameToIdMap mount_point_name_to_id_map_;
   int next_id_;
   base::WeakPtrFactory<Service> weak_ptr_factory_;
 

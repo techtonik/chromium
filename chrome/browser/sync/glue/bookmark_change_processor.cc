@@ -44,13 +44,16 @@ namespace browser_sync {
 static const char kMobileBookmarksTag[] = "synced_bookmarks";
 
 BookmarkChangeProcessor::BookmarkChangeProcessor(
+    Profile* profile,
     BookmarkModelAssociator* model_associator,
     DataTypeErrorHandler* error_handler)
     : ChangeProcessor(error_handler),
       bookmark_model_(NULL),
+      profile_(profile),
       model_associator_(model_associator) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   DCHECK(model_associator);
+  DCHECK(profile);
   DCHECK(error_handler);
 }
 
@@ -59,12 +62,10 @@ BookmarkChangeProcessor::~BookmarkChangeProcessor() {
     bookmark_model_->RemoveObserver(this);
 }
 
-void BookmarkChangeProcessor::StartImpl(Profile* profile) {
+void BookmarkChangeProcessor::StartImpl() {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
-  DCHECK(profile);
-  profile_ = profile;
   DCHECK(!bookmark_model_);
-  bookmark_model_ = BookmarkModelFactory::GetForProfile(profile);
+  bookmark_model_ = BookmarkModelFactory::GetForProfile(profile_);
   DCHECK(bookmark_model_->loaded());
   bookmark_model_->AddObserver(this);
 }
@@ -75,7 +76,7 @@ void BookmarkChangeProcessor::UpdateSyncNodeProperties(
     syncer::WriteNode* dst) {
   // Set the properties of the item.
   dst->SetIsFolder(src->is_folder());
-  dst->SetTitle(base::UTF16ToWideHack(src->GetTitle()));
+  dst->SetTitle(base::UTF16ToUTF8(src->GetTitle()));
   sync_pb::BookmarkSpecifics bookmark_specifics(dst->GetBookmarkSpecifics());
   if (!src->is_folder())
     bookmark_specifics.set_url(src->url().spec());
@@ -842,7 +843,7 @@ void BookmarkChangeProcessor::ApplyBookmarkFavicon(
   gfx::Size pixel_size(gfx::kFaviconSize, gfx::kFaviconSize);
   favicon_service->MergeFavicon(bookmark_node->url(),
                                 icon_url,
-                                chrome::FAVICON,
+                                favicon_base::FAVICON,
                                 bitmap_data,
                                 pixel_size);
 }

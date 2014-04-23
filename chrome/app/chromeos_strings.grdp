@@ -360,9 +360,6 @@ Press any key to continue exploring.
   <message name="IDS_FILE_BROWSER_GALLERY_OVERWRITE_BUBBLE" desc="In the Gallery, text in the bubble informing user about saving and overwriting original file.">
     Your edits are saved automatically.<ph name="BREAKS">&lt;br&gt;&lt;br&gt;<ex>&lt;br&gt;&lt;br&gt;</ex></ph>To keep a copy of the original image, uncheck "Overwrite original"
   </message>
-  <message name="IDS_FILE_BROWSER_GALLERY_UNSAVED_CHANGES" desc="In the Gallery, message informing about unsaved changes, when user tries to close the tab.">
-    Changes are not saved yet.
-  </message>
   <message name="IDS_FILE_BROWSER_GALLERY_READONLY_WARNING" desc="In the Gallery, message informing that directory is readonly, and edited files will be saved to Downloads directory.">
     Cannot save to $1. Edited images will be saved in the Downloads folder.
   </message>
@@ -3815,8 +3812,14 @@ Battery full
   <message name="IDS_EXTERNAL_STORAGE_DISABLED_MESSAGE" desc="Text of notification message which is shown when user inserts removable device but external storage is disabled by policy">
    Sorry, your administrator has disabled external storage on your account.
   </message>
-  <message name="IDS_EXTERNAL_STORAGE_HARD_UNPLUG_MESSAGE" desc="Text of notification message which is shown when user manually removes external storage without clicking the eject icon">
-   Your data may have been lost or damaged. Next time, be sure to click the eject icon in the Files app before removing your device.
+  <message name="IDS_DEVICE_HARD_UNPLUGGED_TITLE" desc="Text of notification title which is shown when user manually removes external storage without clicking the eject icon">
+   Whoa, there. Be careful.
+  </message>
+  <message name="IDS_DEVICE_HARD_UNPLUGGED_MESSAGE" desc="Text of notification message which is shown when user manually removes external storage without clicking the eject icon">
+    In the future, be sure to eject your removable device in the Files app before unplugging it. Otherwise, you might lose data.
+  </message>
+  <message name="IDS_DEVICE_HARD_UNPLUGGED_BUTTON_LABEL" desc="Text of button label which is shown when user manually removes external storage without clicking the eject icon">
+    Got it
   </message>
 
   <!-- Formatting device notifications -->
@@ -5496,6 +5499,17 @@ All users must sign out to continue.
   </message>
   <message name="IDS_NFC_DEBUG_ERROR_FAILED_TO_SUBMIT_PREFIX" desc="Error message shown when an NDEF form could not be submitted." translateable="false">
     Failed to submit NDEF:
+  </message>
+
+  <!-- About the security section in the settings page -->
+  <message name="IDS_OPTIONS_SECURITY_SECTION_TITLE" desc="The title of the security section in the settings page.">
+    Security
+  </message>
+  <message name="IDS_OPTIONS_CONSUMER_MANAGEMENT_ENROLL_DESCRIPTION" desc="Description of the consumer management enroll button in the settings page.">
+    Let Google help you remotely lock, erase, and locate your device.
+  </message>
+  <message name="IDS_OPTIONS_CONSUMER_MANAGEMENT_ENROLL_BUTTON" desc="The text of the consumer management enroll button in the settings page.">
+    Enroll
   </message>
 
 </grit-part>

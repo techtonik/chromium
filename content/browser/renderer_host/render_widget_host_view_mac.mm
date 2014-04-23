@@ -374,6 +374,8 @@ blink::WebScreenInfo GetWebScreenInfo(NSView* view) {
       [[screen colorSpace] colorSpaceModel] == NSGrayColorSpaceModel;
   results.rect = display.bounds();
   results.availableRect = display.work_area();
+  results.orientationAngle = display.RotationAsDegree();
+
   return results;
 }
 
@@ -3465,7 +3467,7 @@ SkBitmap::Config RenderWidgetHostViewMac::PreferredReadbackFormat() {
     // method returns.
     BrowserAccessibilityManager* manager =
         renderWidgetHostView_->GetBrowserAccessibilityManager();
-    manager->SetFocus(manager->GetFromRendererID(accessibilityObjectId), false);
+    manager->SetFocus(manager->GetFromID(accessibilityObjectId), false);
   }
 }
 

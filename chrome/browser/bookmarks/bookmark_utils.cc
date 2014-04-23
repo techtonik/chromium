@@ -15,8 +15,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "chrome/browser/bookmarks/bookmark_model.h"
-#include "chrome/browser/bookmarks/bookmark_model_factory.h"
-#include "chrome/common/pref_names.h"
+#include "components/bookmarks/core/common/bookmark_pref_names.h"
 #include "components/query_parser/query_parser.h"
 #include "components/user_prefs/pref_registry_syncable.h"
 #include "content/public/browser/user_metrics.h"
@@ -110,6 +109,18 @@ bool HasSelectedAncestor(BookmarkModel* model,
       return true;
 
   return HasSelectedAncestor(model, selected_nodes, node->parent());
+}
+
+const BookmarkNode* GetNodeByID(const BookmarkNode* node, int64 id) {
+  if (node->id() == id)
+    return node;
+
+  for (int i = 0, child_count = node->child_count(); i < child_count; ++i) {
+    const BookmarkNode* result = GetNodeByID(node->GetChild(i), id);
+    if (result)
+      return result;
+  }
+  return NULL;
 }
 
 }  // namespace
@@ -341,7 +352,7 @@ void DeleteBookmarkFolders(BookmarkModel* model,
   for (std::vector<int64>::const_iterator iter = ids.begin();
        iter != ids.end();
        ++iter) {
-    const BookmarkNode* node = model->GetNodeByID(*iter);
+    const BookmarkNode* node = GetBookmarkNodeByID(model, *iter);
     if (!node)
       continue;
     const BookmarkNode* parent = node->parent();
@@ -376,3 +387,8 @@ void RemoveAllBookmarks(BookmarkModel* model, const GURL& url) {
 }
 
 }  // namespace bookmark_utils
+
+const BookmarkNode* GetBookmarkNodeByID(const BookmarkModel* model, int64 id) {
+  // TODO(sky): TreeNode needs a method that visits all nodes using a predicate.
+  return GetNodeByID(model->root_node(), id);
+}

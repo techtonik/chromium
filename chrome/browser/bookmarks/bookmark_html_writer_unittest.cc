@@ -24,7 +24,7 @@
 #include "chrome/test/base/testing_profile.h"
 #include "chrome/utility/importer/bookmark_html_reader.h"
 #include "content/public/test/test_browser_thread_bundle.h"
-#include "grit/generated_resources.h"
+#include "grit/component_strings.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -202,10 +202,11 @@ TEST_F(BookmarkHTMLWriterTest, Test) {
   model->AddURLWithCreationTime(f1, 0, url1_title, url1, t1);
   HistoryServiceFactory::GetForProfile(&profile, Profile::EXPLICIT_ACCESS)->
       AddPage(url1, base::Time::Now(), history::SOURCE_BROWSED);
-  FaviconServiceFactory::GetForProfile(
-      &profile, Profile::EXPLICIT_ACCESS)->SetFavicons(
-          url1, url1_favicon, chrome::FAVICON,
-          gfx::Image::CreateFrom1xBitmap(bitmap));
+  FaviconServiceFactory::GetForProfile(&profile, Profile::EXPLICIT_ACCESS)
+      ->SetFavicons(url1,
+                    url1_favicon,
+                    favicon_base::FAVICON,
+                    gfx::Image::CreateFrom1xBitmap(bitmap));
   const BookmarkNode* f2 = model->AddFolder(f1, 1, f2_title);
   model->AddURLWithCreationTime(f2, 0, url2_title, url2, t2);
   model->AddURLWithCreationTime(model->bookmark_bar_node(),
@@ -230,9 +231,8 @@ TEST_F(BookmarkHTMLWriterTest, Test) {
   run_loop.Run();
 
   // Clear favicon so that it would be read from file.
-  FaviconServiceFactory::GetForProfile(
-      &profile, Profile::EXPLICIT_ACCESS)->SetFavicons(
-          url1, url1_favicon, chrome::FAVICON, gfx::Image());
+  FaviconServiceFactory::GetForProfile(&profile, Profile::EXPLICIT_ACCESS)
+      ->SetFavicons(url1, url1_favicon, favicon_base::FAVICON, gfx::Image());
 
   // Read the bookmarks back in.
   std::vector<ImportedBookmarkEntry> parsed_bookmarks;

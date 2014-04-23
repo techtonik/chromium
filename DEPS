@@ -23,12 +23,12 @@ vars = {
   "libcxxabi_revision": "206024",
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
   "nacl_trunk": "http://src.chromium.org/native_client/trunk",
-  "webkit_revision": "171837",
+  "webkit_revision": "172130",
   "chromium_git": "https://chromium.googlesource.com",
   "chromiumos_git": "https://chromium.googlesource.com/chromiumos",
   "skia_git": "https://skia.googlesource.com",
   "swig_revision": "230490",
-  "nacl_revision": "13018",
+  "nacl_revision": "13062",
   # After changing nacl_revision, run 'glient sync' and check native_client/DEPS
   # to update other nacl_*_revision's.
   "nacl_tools_revision": "12970",  # native_client/DEPS: tools_rev
@@ -45,13 +45,13 @@ vars = {
 
   "sfntly_revision": "228",
   "lighttpd_revision": "33737",
-  "skia_revision": "14202",
-  "skia_hash": "51b0d0bc5c82f257dca244c864702c66d84100a2",
+  "skia_revision": "14292",
+  "skia_hash": "4bbe2e552a8eb823f71dd9c63a54fcb65efca6bb",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   "v8_branch": "trunk",
-  "v8_revision": "20789",
+  "v8_revision": "20867",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
@@ -89,7 +89,7 @@ deps = {
     Var("chromium_git") + "/angle/angle.git@" + Var("angle_revision"),
 
   "src/third_party/trace-viewer":
-    (Var("googlecode_url") % "trace-viewer") + "/trunk@1240",
+    (Var("googlecode_url") % "trace-viewer") + "/trunk@1265",
 
   "src/third_party/WebKit":
     Var("webkit_trunk") + "@" + Var("webkit_revision"),
@@ -106,7 +106,7 @@ deps = {
     "/trunk/deps/third_party/icu46@262949",
 
   "src/third_party/libexif/sources":
-    "/trunk/deps/third_party/libexif/sources@263766",
+    "/trunk/deps/third_party/libexif/sources@265008",
 
   "src/third_party/hunspell":
    "/trunk/deps/third_party/hunspell@256272",
@@ -253,7 +253,7 @@ deps = {
         "/trunk/jsoncpp/src/lib_json@" + Var("jsoncpp_revision"),
 
   "src/third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@994",
+    (Var("googlecode_url") % "libyuv") + "/trunk@1000",
 
   "src/third_party/smhasher/src":
     (Var("googlecode_url") % "smhasher") + "/trunk@151",
@@ -294,7 +294,7 @@ deps = {
     "/trunk/deps/cdm@262570",
 
   "src/third_party/mesa/src":
-    "/trunk/deps/third_party/mesa@261106",
+    "/trunk/deps/third_party/mesa@265279",
 
   "src/third_party/cld_2/src":
     (Var("googlecode_url") % "cld2") + "/trunk@160",
@@ -469,7 +469,7 @@ deps_os = {
     # For Linux and Chromium OS.
     "src/third_party/cros_system_api":
       Var("chromiumos_git") + "/platform/system_api.git" +
-      "@926038efc28089447a2f9292d7dc8cdc7eff7a36",
+      "@916c5d850ca4424b1de79e9e1054f34a23ee2e33",
 
     # Note that this is different from Android's freetype repo.
     "src/third_party/freetype2/src":
@@ -479,7 +479,7 @@ deps_os = {
     # Build tools for targeting ChromeOS.
     "src/third_party/chromite":
       Var("chromiumos_git") + "/chromite.git" +
-      "@5f6a47786408789bc4622a34b491c0a9d0a69c68",
+      "@aaa614c9521c705071737f840f68d1262036bebe",
 
     # Dependency of chromite.git.
     "src/third_party/pyelftools":
@@ -588,8 +588,7 @@ hooks = [
     "pattern": ".",
     "action": [
         "python", "src/build/download_nacl_toolchains.py",
-         "--no-arm-trusted",
-         "--keep",
+        "--exclude", "arm_trusted",
     ],
   },
   {

@@ -97,6 +97,7 @@ class LayerTreeHostImplTest : public testing::Test,
     settings.minimum_occlusion_tracking_size = gfx::Size();
     settings.impl_side_painting = true;
     settings.texture_id_allocation_chunk_size = 1;
+    settings.report_overscroll_only_for_scrollable_axes = true;
     return settings;
   }
 
@@ -108,8 +109,9 @@ class LayerTreeHostImplTest : public testing::Test,
 
   virtual void UpdateRendererCapabilitiesOnImplThread() OVERRIDE {}
   virtual void DidLoseOutputSurfaceOnImplThread() OVERRIDE {}
+  virtual void SetMaxSwapsPendingOnImplThread(int max) OVERRIDE {}
   virtual void DidSwapBuffersOnImplThread() OVERRIDE {}
-  virtual void OnSwapBuffersCompleteOnImplThread() OVERRIDE {}
+  virtual void DidSwapBuffersCompleteOnImplThread() OVERRIDE {}
   virtual void BeginFrame(const BeginFrameArgs& args) OVERRIDE {}
   virtual void OnCanDrawStateChanged(bool can_draw) OVERRIDE {
     on_can_draw_state_changed_called_ = true;
@@ -3171,6 +3173,45 @@ TEST_F(LayerTreeHostImplTest, OverscrollAlways) {
   EXPECT_EQ(gfx::Vector2dF(0, 10), host_impl_->accumulated_root_overscroll());
 }
 
+TEST_F(LayerTreeHostImplTest, NoOverscrollOnFractionalDeviceScale) {
+  gfx::Size surface_size(980, 1439);
+  gfx::Size content_size(980, 1438);
+  float device_scale_factor = 1.5f;
+  scoped_ptr<LayerImpl> root_clip =
+      LayerImpl::Create(host_impl_->active_tree(), 3);
+  scoped_ptr<LayerImpl> root =
+      CreateScrollableLayer(1, content_size, root_clip.get());
+  root->SetIsContainerForFixedPositionLayers(true);
+  scoped_ptr<LayerImpl> child =
+      CreateScrollableLayer(2, content_size, root_clip.get());
+  root->scroll_clip_layer()->SetBounds(gfx::Size(320, 469));
+  host_impl_->active_tree()->SetPageScaleFactorAndLimits(
+      0.326531f, 0.326531f, 5.f);
+  host_impl_->active_tree()->SetPageScaleDelta(1.f);
+  child->SetScrollClipLayer(Layer::INVALID_ID);
+  root->AddChild(child.Pass());
+  root_clip->AddChild(root.Pass());
+
+  host_impl_->SetViewportSize(surface_size);
+  host_impl_->SetDeviceScaleFactor(device_scale_factor);
+  host_impl_->active_tree()->SetRootLayer(root_clip.Pass());
+  host_impl_->active_tree()->SetViewportLayersFromIds(3, 1, Layer::INVALID_ID);
+  host_impl_->active_tree()->DidBecomeActive();
+  DrawFrame();
+  {
+    // Horizontal & Vertical GlowEffect should not be applied when
+    // content size is less then view port size. For Example Horizontal &
+    // vertical GlowEffect should not be applied in about:blank page.
+    EXPECT_EQ(InputHandler::ScrollStarted,
+              host_impl_->ScrollBegin(gfx::Point(0, 0), InputHandler::Wheel));
+    host_impl_->ScrollBy(gfx::Point(), gfx::Vector2dF(0, -1));
+    EXPECT_EQ(gfx::Vector2dF().ToString(),
+              host_impl_->accumulated_root_overscroll().ToString());
+
+    host_impl_->ScrollEnd();
+  }
+}
+
 TEST_F(LayerTreeHostImplTest, NoOverscrollWhenNotAtEdge) {
   gfx::Size surface_size(100, 100);
   gfx::Size content_size(200, 200);
@@ -5354,7 +5395,7 @@ class CompositorFrameMetadataTest : public LayerTreeHostImplTest {
   CompositorFrameMetadataTest()
       : swap_buffers_complete_(0) {}
 
-  virtual void OnSwapBuffersCompleteOnImplThread() OVERRIDE {
+  virtual void DidSwapBuffersCompleteOnImplThread() OVERRIDE {
     swap_buffers_complete_++;
   }
 
@@ -5372,7 +5413,7 @@ TEST_F(CompositorFrameMetadataTest, CompositorFrameAckCountsAsSwapComplete) {
   }
   CompositorFrameAck ack;
   host_impl_->ReclaimResources(&ack);
-  host_impl_->OnSwapBuffersComplete();
+  host_impl_->DidSwapBuffersComplete();
   EXPECT_EQ(swap_buffers_complete_, 1);
 }
 

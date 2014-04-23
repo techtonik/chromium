@@ -182,8 +182,6 @@ static void GLibLogHandler(const gchar* log_domain,
   } else if (strstr(message, "Unable to create Ubuntu Menu Proxy") &&
              strstr(log_domain, "<unknown>")) {
     LOG(ERROR) << "GTK menu proxy create failed";
-  } else if (strstr(message, "gtk_drag_dest_leave: assertion")) {
-    LOG(ERROR) << "Drag destination deleted: http://crbug.com/18557";
   } else if (strstr(message, "Out of memory") &&
              strstr(log_domain, "<unknown>")) {
     LOG(ERROR) << "DBus call timeout or out of memory: "
@@ -926,7 +924,7 @@ int BrowserMainLoop::BrowserThreadsStarted() {
   // otherwise we'll trigger the assertion about doing IO on the UI thread.
   GpuDataManagerImpl::GetInstance()->Initialize();
 
-  bool always_uses_gpu = IsForceCompositingModeEnabled();
+  bool always_uses_gpu = true;
   bool established_gpu_channel = false;
 #if defined(USE_AURA) || defined(OS_MACOSX)
   if (ShouldInitializeBrowserGpuChannelAndTransportSurface()) {

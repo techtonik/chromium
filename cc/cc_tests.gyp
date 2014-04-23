@@ -37,6 +37,7 @@
       'layers/layer_utils_unittest.cc',
       'layers/nine_patch_layer_impl_unittest.cc',
       'layers/nine_patch_layer_unittest.cc',
+      'layers/painted_scrollbar_layer_impl_unittest.cc',
       'layers/picture_image_layer_impl_unittest.cc',
       'layers/picture_layer_impl_unittest.cc',
       'layers/picture_layer_unittest.cc',
@@ -385,7 +386,6 @@
             ],
             'variables': {
               'test_suite_name': 'cc_unittests',
-              'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)cc_unittests<(SHARED_LIB_SUFFIX)',
             },
             'includes': [ '../build/apk_test.gypi' ],
           },
@@ -397,7 +397,6 @@
             ],
             'variables': {
               'test_suite_name': 'cc_perftests',
-              'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)cc_perftests<(SHARED_LIB_SUFFIX)',
             },
             'includes': [ '../build/apk_test.gypi' ],
           },

@@ -173,15 +173,6 @@ const char kCloudPrintJobTitle[]            = "cloud-print-job-title";
 // service or register proxy for autostart.
 const char kCloudPrintSetupProxy[]          = "cloud-print-setup-proxy";
 
-// The URL of the cloud print service to use, overrides any value stored in
-// preferences, and the default. Only used if the cloud print service has been
-// enabled. Used for testing.
-const char kCloudPrintServiceURL[]          = "cloud-print-url";
-
-// The XMPP endpoint the cloud print service will use. Only used if the cloud
-// print service has been enabled. Used for testing.
-const char kCloudPrintXmppEndpoint[] = "cloud-print-xmpp-endpoint";
-
 // Comma-separated options to troubleshoot the component updater. Only valid
 // for the browser process.
 const char kComponentUpdater[]              = "component-updater";
@@ -301,9 +292,6 @@ const char kDisableExtensionsResourceWhitelist[] =
 // which would prevent fullscreening the browser window during screen-capture of
 // a tab.  http://crbug.com/256870 and http://crbug.com/290403
 const char kDisableFullscreenWithinTab[] = "disable-fullscreen-within-tab";
-
-// Prevent infobars from appearing.
-const char kDisableInfoBars[]               = "disable-infobars";
 
 // Don't resolve hostnames to IPv6 addresses. This can be used when debugging
 // issues relating to IPv6, but shouldn't otherwise be needed. Be sure to file
@@ -457,11 +445,6 @@ const char kEnableAsyncDns[]                = "enable-async-dns";
 // in response to a Negotiate challenge. See
 // HttpAuthHandlerNegotiate::CreateSPN for more background.
 const char kEnableAuthNegotiatePort[]       = "enable-auth-negotiate-port";
-
-// Enables the pre- and auto-login features. When a user signs in to sync, the
-// browser's cookie jar is pre-filled with GAIA cookies. When the user visits a
-// GAIA login page, an info bar can help the user login.
-const char kEnableAutologin[]               = "enable-autologin";
 
 // Enables the Automation extension API.
 // TODO(dtseng): Remove once API enabled for stable channel.
@@ -1429,7 +1412,7 @@ const char kViewerLaunchViaAppId[]          = "viewer-launch-via-appid";
 const char kWaitForMutex[]                  = "wait-for-mutex";
 
 // Indicates that chrome was launched to service a search request in Windows 8.
-const char kWindows8Search[]           = "windows8-search";
+const char kWindows8Search[]                = "windows8-search";
 #endif
 
 #if defined(ENABLE_FULL_PRINTING) && !defined(OFFICIAL_BUILD)
@@ -1440,10 +1423,7 @@ const char kDebugPrint[] = "debug-print";
 #ifndef NDEBUG
 // Enables overriding the path of file manager extension.
 const char kFileManagerExtensionPath[]      = "filemgr-ext-path";
-
-// Enables overriding the path of image loader extension.
-const char kImageLoaderExtensionPath[]      = "image-loader-ext-path";
-#endif  // NDEBUG
+#endif
 
 // Controls print preview in the browser process.
 #if defined(GOOGLE_CHROME_BUILD)

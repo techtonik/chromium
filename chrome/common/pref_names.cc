@@ -841,11 +841,6 @@ const char kMultiProfileNeverShowIntro[] =
 const char kMultiProfileWarningShowDismissed[] =
     "settings.multi_profile_warning_show_dismissed";
 
-// A boolean pref recording whether user has dismissed the multiprofile
-// notification.
-const char kMultiProfileNotificationDismissed[] =
-    "settings.multi_profile_notification_dismissed";
-
 // A string pref that holds string enum values of how the user should behave
 // in a multiprofile session. See ChromeOsMultiProfileUserBehavior policy
 // for more details of the valid values.
@@ -1248,9 +1243,17 @@ extern const char kInitializedSyncedNotificationSendingServices[] =
 extern const char kSyncedNotificationFirstRun[] =
     "synced_notification.first_run";
 
-// Boolean pref indicating the welcome notification was dismissed by the user.
+// Boolean pref indicating the Chrome Now welcome notification was dismissed
+// by the user. Syncable.
+// Note: This is now read-only. The welcome notification writes the _local
+// version, below.
 extern const char kWelcomeNotificationDismissed[] =
     "message_center.welcome_notification_dismissed";
+
+// Boolean pref indicating the Chrome Now welcome notification was dismissed
+// by the user on this machine.
+extern const char kWelcomeNotificationDismissedLocal[] =
+    "message_center.welcome_notification_dismissed_local";
 
 // Boolean pref indicating the welcome notification was previously popped up.
 extern const char kWelcomeNotificationPreviouslyPoppedUp[] =
@@ -1879,11 +1882,6 @@ const char kRemoteAccessHostAllowGnubbyAuth[] =
 // The last used printer and its settings.
 const char kPrintPreviewStickySettings[] =
     "printing.print_preview_sticky_settings";
-// The root URL of the cloud print service.
-const char kCloudPrintServiceURL[] = "cloud_print.service_url";
-
-// The URL to use to sign in to cloud print.
-const char kCloudPrintSigninURL[] = "cloud_print.signin_url";
 
 // The last requested size of the dialog as it was closed.
 const char kCloudPrintDialogWidth[] = "cloud_print.dialog_size.width";

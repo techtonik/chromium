@@ -28,6 +28,10 @@ class NET_EXPORT_PRIVATE RttStats {
 
   QuicTime::Delta SmoothedRtt() const;
 
+  int64 initial_rtt_us() const {
+    return initial_rtt_us_;
+  }
+
   // Sets an initial RTT to be used for SmoothedRtt before any RTT updates.
   void set_initial_rtt_us(int64 initial_rtt_us) {
     initial_rtt_us_ = initial_rtt_us;
@@ -54,6 +58,8 @@ class NET_EXPORT_PRIVATE RttStats {
   // larger than the standard deviation, for a normally distributed signal.
   QuicTime::Delta mean_deviation_;
   int64 initial_rtt_us_;
+
+  DISALLOW_COPY_AND_ASSIGN(RttStats);
 };
 
 }  // namespace net

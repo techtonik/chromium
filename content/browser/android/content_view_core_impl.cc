@@ -1377,7 +1377,7 @@ void ContentViewCoreImpl::WasResized(JNIEnv* env, jobject obj) {
 }
 
 void ContentViewCoreImpl::ShowInterstitialPage(
-    JNIEnv* env, jobject obj, jstring jurl, jint delegate_ptr) {
+    JNIEnv* env, jobject obj, jstring jurl, jlong delegate_ptr) {
   GURL url(base::android::ConvertJavaStringToUTF8(env, jurl));
   InterstitialPageDelegateAndroid* delegate =
       reinterpret_cast<InterstitialPageDelegateAndroid*>(delegate_ptr);
@@ -1504,7 +1504,7 @@ ContentViewCoreImpl::GetOriginalUrlForActiveNavigationEntry(JNIEnv* env,
   return ConvertUTF8ToJavaString(env, entry->GetOriginalRequestURL().spec());
 }
 
-int ContentViewCoreImpl::GetNativeImeAdapter(JNIEnv* env, jobject obj) {
+long ContentViewCoreImpl::GetNativeImeAdapter(JNIEnv* env, jobject obj) {
   RenderWidgetHostViewAndroid* rwhva = GetRenderWidgetHostViewAndroid();
   if (!rwhva)
     return 0;

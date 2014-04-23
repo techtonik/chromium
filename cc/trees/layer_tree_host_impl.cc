@@ -254,7 +254,6 @@ LayerTreeHostImpl::LayerTreeHostImpl(
       overhang_ui_resource_id_(0),
       overdraw_bottom_height_(0.f),
       device_viewport_valid_for_tile_management_(true),
-      external_stencil_test_enabled_(false),
       animation_registrar_(AnimationRegistrar::Create()),
       rendering_stats_instrumentation_(rendering_stats_instrumentation),
       micro_benchmark_controller_(this),
@@ -670,7 +669,7 @@ static void AppendQuadsToFillScreen(
                  visible_screen_space_rect,
                  screen_background_color,
                  false);
-    quad_culler.MaybeAppend(quad.PassAs<DrawQuad>());
+    quad_culler.Append(quad.PassAs<DrawQuad>());
   }
   for (Region::Iterator fill_rects(overhang_region);
        fill_rects.has_rect();
@@ -698,7 +697,7 @@ static void AppendQuadsToFillScreen(
         screen_background_color,
         vertex_opacity,
         false);
-    quad_culler.MaybeAppend(tex_quad.PassAs<DrawQuad>());
+    quad_culler.Append(tex_quad.PassAs<DrawQuad>());
   }
 }
 
@@ -1301,8 +1300,8 @@ void LayerTreeHostImpl::DidSwapBuffers() {
   client_->DidSwapBuffersOnImplThread();
 }
 
-void LayerTreeHostImpl::OnSwapBuffersComplete() {
-  client_->OnSwapBuffersCompleteOnImplThread();
+void LayerTreeHostImpl::DidSwapBuffersComplete() {
+  client_->DidSwapBuffersCompleteOnImplThread();
 }
 
 void LayerTreeHostImpl::ReclaimResources(const CompositorFrameAck* ack) {
@@ -1901,8 +1900,11 @@ bool LayerTreeHostImpl::InitializeRenderer(
         GetRendererCapabilities().allow_rasterize_on_demand);
   }
 
-  // Setup BeginFrameEmulation if it's not supported natively
-  if (!settings_.begin_impl_frame_scheduling_enabled) {
+  if (!settings_.throttle_frame_production) {
+    // Disable VSync
+    output_surface->SetThrottleFrameProduction(false);
+  } else if (!settings_.begin_impl_frame_scheduling_enabled) {
+    // Setup BeginFrameEmulation if it's not supported natively
     const base::TimeDelta display_refresh_interval =
       base::TimeDelta::FromMicroseconds(
           base::Time::kMicrosecondsPerSecond /
@@ -1910,7 +1912,6 @@ bool LayerTreeHostImpl::InitializeRenderer(
 
     output_surface->InitializeBeginFrameEmulation(
         proxy_->ImplThreadTaskRunner(),
-        settings_.throttle_frame_production,
         display_refresh_interval);
   }
 
@@ -1918,7 +1919,7 @@ bool LayerTreeHostImpl::InitializeRenderer(
       output_surface->capabilities().max_frames_pending;
   if (max_frames_pending <= 0)
     max_frames_pending = OutputSurface::DEFAULT_MAX_FRAMES_PENDING;
-  output_surface->SetMaxFramesPending(max_frames_pending);
+  client_->SetMaxSwapsPendingOnImplThread(max_frames_pending);
 
   resource_provider_ = resource_provider.Pass();
   output_surface_ = output_surface.Pass();

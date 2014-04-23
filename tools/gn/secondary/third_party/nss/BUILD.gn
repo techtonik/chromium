@@ -140,10 +140,6 @@ if (is_linux) {
       "nspr/pr/src/md/prosdep.c",
       "nspr/pr/src/md/unix/darwin.c",
       "nspr/pr/src/md/unix/os_Darwin.s",
-      # os_Darwin_x86.s and os_Darwin_x86_64.s are included by
-      # os_Darwin.s.
-      "nspr/pr/src/md/unix/os_Darwin_x86.s",
-      "nspr/pr/src/md/unix/os_Darwin_x86_64.s",
       "nspr/pr/src/md/unix/unix.c",
       "nspr/pr/src/md/unix/unix_errors.c",
       "nspr/pr/src/md/unix/uxproces.c",
@@ -213,11 +209,16 @@ if (is_linux) {
 
     configs -= [
       "//build/config/compiler:chromium_code",
-      "//build/config/win:unicode",  # Requires 8-bit mode.
-      "//build/config/win:lean_and_mean",  # Won"t compile with lean and mean.
     ]
+    if (is_win) {
+      configs -= [
+        "//build/config/win:unicode",  # Requires 8-bit mode.
+        "//build/config/win:lean_and_mean",  # Won"t compile with lean and mean.
+      ]
+    }
     configs += [ "//build/config/compiler:no_chromium_code" ]
 
+    cflags = []
     defines = [
       "_NSPR_BUILD",
       "FORCE_PR_LOG",
@@ -430,8 +431,13 @@ if (is_linux) {
 
     configs -= [
       "//build/config/compiler:chromium_code"
-      "//build/config/win:unicode",  # Requires 8-bit mode.
     ]
+
+    if (is_win) {
+      configs -= [
+        "//build/config/win:unicode",  # Requires 8-bit mode.
+      ]
+    }
     configs += [ "//build/config/compiler:no_chromium_code" ]
 
     include_dirs = [ "nss/lib/ckfw" ]
@@ -828,8 +834,12 @@ if (is_linux) {
 
     configs -= [
       "//build/config/compiler:chromium_code"
-      "//build/config/win:unicode",  # Requires 8-bit mode.
     ]
+    if (is_win) {
+      configs -= [
+        "//build/config/win:unicode",  # Requires 8-bit mode.
+      ]
+    }
     configs += [ "//build/config/compiler:no_chromium_code" ]
     direct_dependent_configs = [ ":nss_static_config" ]
 

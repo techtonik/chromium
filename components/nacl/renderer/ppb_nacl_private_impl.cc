@@ -4,6 +4,8 @@
 
 #include "components/nacl/renderer/ppb_nacl_private_impl.h"
 
+#include "base/bind.h"
+#include "base/bind_helpers.h"
 #include "base/command_line.h"
 #include "base/containers/scoped_ptr_hash_map.h"
 #include "base/lazy_instance.h"
@@ -13,6 +15,7 @@
 #include "components/nacl/common/nacl_messages.h"
 #include "components/nacl/common/nacl_switches.h"
 #include "components/nacl/common/nacl_types.h"
+#include "components/nacl/renderer/manifest_service_channel.h"
 #include "components/nacl/renderer/nexe_load_manager.h"
 #include "components/nacl/renderer/pnacl_translation_resource_host.h"
 #include "components/nacl/renderer/sandbox_arch.h"
@@ -24,6 +27,7 @@
 #include "content/public/renderer/render_thread.h"
 #include "content/public/renderer/render_view.h"
 #include "content/public/renderer/renderer_ppapi_host.h"
+#include "net/base/data_url.h"
 #include "net/http/http_response_headers.h"
 #include "ppapi/c/pp_bool.h"
 #include "ppapi/c/private/pp_file_handle.h"
@@ -104,6 +108,50 @@ bool IsValidChannelHandle(const IPC::ChannelHandle& channel_handle) {
 
   return true;
 }
+
+// Callback invoked when an IPC channel connection is established.
+// As we will establish multiple IPC channels, this takes the number
+// of expected invocations and a callback. When all channels are established,
+// the given callback will be invoked on the main thread. Its argument will be
+// PP_OK if all the connections are successfully established. Otherwise,
+// the first error code will be passed, and remaining errors will be ignored.
+// Note that PP_CompletionCallback is designed to be called exactly once.
+class ChannelConnectedCallback {
+ public:
+  ChannelConnectedCallback(int num_expect_calls,
+                           PP_CompletionCallback callback)
+      : num_remaining_calls_(num_expect_calls),
+        callback_(callback),
+        result_(PP_OK) {
+  }
+
+  ~ChannelConnectedCallback() {
+  }
+
+  void Run(int32_t result) {
+    if (result_ == PP_OK && result != PP_OK) {
+      // This is the first error, so remember it.
+      result_ = result;
+    }
+
+    --num_remaining_calls_;
+    if (num_remaining_calls_ > 0) {
+      // There still are some pending or on-going tasks. Wait for the results.
+      return;
+    }
+
+    ppapi::PpapiGlobals::Get()->GetMainThreadMessageLoop()->PostTask(
+        FROM_HERE,
+        base::Bind(callback_.func, callback_.user_data, result_));
+  }
+
+ private:
+  int num_remaining_calls_;
+  PP_CompletionCallback callback_;
+  int32_t result_;
+
+  DISALLOW_COPY_AND_ASSIGN(ChannelConnectedCallback);
+};
 
 // Launch NaCl's sel_ldr process.
 void LaunchSelLdr(PP_Instance instance,
@@ -192,15 +240,15 @@ void LaunchSelLdr(PP_Instance instance,
   *(static_cast<NaClHandle*>(imc_handle)) =
       nacl::ToNativeHandle(result_socket);
 
-  // TODO(hidehiko): We'll add EmbedderServiceChannel here, and it will wait
-  // for the connection in parallel with TrustedPluginChannel.
-  // Thus, the callback will wait for its second invocation to run callback,
-  // then.
-  // Note that PP_CompletionCallback is not designed to be called twice or
-  // more. Thus, it is necessary to create a function to handle multiple
-  // invocation.
-  base::Callback<void(int32_t)> completion_callback =
-      base::Bind(callback.func, callback.user_data);
+  // Here after, we starts to establish connections for TrustedPluginChannel
+  // and ManifestServiceChannel in parallel. The invocation of the callback
+  // is delegated to their connection completion callback.
+  base::Callback<void(int32_t)> connected_callback = base::Bind(
+      &ChannelConnectedCallback::Run,
+      base::Owned(new ChannelConnectedCallback(
+          2, // For TrustedPluginChannel and ManifestServiceChannel.
+          callback)));
+
   nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
   DCHECK(load_manager);
 
@@ -210,11 +258,29 @@ void LaunchSelLdr(PP_Instance instance,
     scoped_ptr<nacl::TrustedPluginChannel> trusted_plugin_channel(
         new nacl::TrustedPluginChannel(
             launch_result.trusted_ipc_channel_handle,
-            completion_callback,
+            connected_callback,
             content::RenderThread::Get()->GetShutdownEvent()));
     load_manager->set_trusted_plugin_channel(trusted_plugin_channel.Pass());
   } else {
-    completion_callback.Run(PP_ERROR_FAILED);
+    connected_callback.Run(PP_ERROR_FAILED);
+  }
+
+  // Stash the manifest service handle as well.
+  if (load_manager &&
+      IsValidChannelHandle(
+          launch_result.manifest_service_ipc_channel_handle)) {
+    scoped_ptr<nacl::ManifestServiceChannel> manifest_service_channel(
+        new nacl::ManifestServiceChannel(
+            launch_result.manifest_service_ipc_channel_handle,
+            connected_callback,
+            content::RenderThread::Get()->GetShutdownEvent()));
+    load_manager->set_manifest_service_channel(
+        manifest_service_channel.Pass());
+  } else {
+    // Currently, manifest service works only on linux/non-SFI mode.
+    // On other platforms, the socket will not be created, and thus this
+    // condition needs to be handled as success.
+    connected_callback.Run(PP_OK);
   }
 }
 
@@ -645,11 +711,11 @@ void Vlog(const char* message) {
   VLOG(1) << message;
 }
 
-void SetInitTime(PP_Instance instance) {
+void InitializePlugin(PP_Instance instance) {
   nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
   DCHECK(load_manager);
   if (load_manager)
-    return load_manager->set_init_time();
+    load_manager->InitializePlugin();
 }
 
 int64_t GetNexeSize(PP_Instance instance) {
@@ -658,6 +724,53 @@ int64_t GetNexeSize(PP_Instance instance) {
   if (load_manager)
     return load_manager->nexe_size();
   return 0;
+}
+
+PP_Bool RequestNaClManifest(PP_Instance instance,
+                            const char* url,
+                            PP_Bool* pp_is_data_uri) {
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  DCHECK(load_manager);
+  if (load_manager) {
+    bool is_data_uri;
+    bool result = load_manager->RequestNaClManifest(url, &is_data_uri);
+    *pp_is_data_uri = PP_FromBool(is_data_uri);
+    return PP_FromBool(result);
+  }
+  return PP_FALSE;
+}
+
+PP_Var GetManifestBaseURL(PP_Instance instance) {
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  DCHECK(load_manager);
+  if (!load_manager)
+    return PP_MakeUndefined();
+  const GURL& gurl = load_manager->manifest_base_url();
+  if (!gurl.is_valid())
+    return PP_MakeUndefined();
+  return ppapi::StringVar::StringToPPVar(gurl.spec());
+}
+
+PP_Bool ResolvesRelativeToPluginBaseURL(PP_Instance instance,
+                                        const char *url) {
+  nacl::NexeLoadManager* load_manager = GetNexeLoadManager(instance);
+  DCHECK(load_manager);
+  if (!load_manager)
+    return PP_FALSE;
+  const GURL& gurl = load_manager->plugin_base_url().Resolve(url);
+  if (!gurl.is_valid())
+    return PP_FALSE;
+  return PP_TRUE;
+}
+
+PP_Var ParseDataURL(const char* data_url) {
+  GURL gurl(data_url);
+  std::string mime_type;
+  std::string charset;
+  std::string data;
+  if (!net::DataURL::Parse(gurl, &mime_type, &charset, &data))
+    return PP_MakeUndefined();
+  return ppapi::StringVar::StringToPPVar(data);
 }
 
 const PPB_NaCl_Private nacl_interface = {
@@ -692,8 +805,12 @@ const PPB_NaCl_Private nacl_interface = {
   &GetExitStatus,
   &SetExitStatus,
   &Vlog,
-  &SetInitTime,
-  &GetNexeSize
+  &InitializePlugin,
+  &GetNexeSize,
+  &RequestNaClManifest,
+  &GetManifestBaseURL,
+  &ResolvesRelativeToPluginBaseURL,
+  &ParseDataURL
 };
 
 }  // namespace

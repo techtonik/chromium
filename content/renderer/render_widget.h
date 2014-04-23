@@ -20,7 +20,6 @@
 #include "content/common/cursors/webcursor.h"
 #include "content/common/gpu/client/webgraphicscontext3d_command_buffer_impl.h"
 #include "content/common/input/synthetic_gesture_params.h"
-#include "content/renderer/paint_aggregator.h"
 #include "ipc/ipc_listener.h"
 #include "ipc/ipc_sender.h"
 #include "third_party/WebKit/public/platform/WebRect.h"
@@ -127,11 +126,6 @@ class CONTENT_EXPORT RenderWidget
   virtual void didScrollRect(int dx, int dy,
                              const blink::WebRect& clipRect);
   virtual void didAutoResize(const blink::WebSize& new_size);
-  // FIXME: To be removed as soon as chromium and blink side changes land
-  // didActivateCompositor with parameters is still kept in order to land
-  // these changes s-chromium - https://codereview.chromium.org/137893025/.
-  // s-blink - https://codereview.chromium.org/138523003/
-  virtual void didActivateCompositor(int input_handler_identifier);
   virtual void didActivateCompositor() OVERRIDE;
   virtual void didDeactivateCompositor();
   virtual void initializeLayerTreeView();
@@ -358,7 +352,6 @@ class CONTENT_EXPORT RenderWidget
   virtual void OnWasHidden();
   virtual void OnWasShown(bool needs_repainting);
   virtual void OnWasSwappedOut();
-  void OnUpdateRectAck();
   void OnCreateVideoAck(int32 video_id);
   void OnUpdateVideoAck(int32 video_id);
   void OnRequestMoveAck();
@@ -411,12 +404,6 @@ class CONTENT_EXPORT RenderWidget
   virtual void DidInitiatePaint() {}
   virtual void DidFlushPaint() {}
 
-  // Override and return true when the widget is rendered with a graphics
-  // context that supports asynchronous swapbuffers. When returning true, the
-  // subclass must call OnSwapBuffersPosted() when swap is posted,
-  // OnSwapBuffersComplete() when swaps complete, and OnSwapBuffersAborted if
-  // the context is lost.
-  virtual bool SupportsAsynchronousSwapBuffers();
   virtual GURL GetURLForGraphicsContext3D();
 
   virtual bool ForceCompositingModeEnabled();
@@ -567,10 +554,7 @@ class CONTENT_EXPORT RenderWidget
   // The size of the RenderWidget.
   gfx::Size size_;
 
-  // The TransportDIB that is being used to transfer an image to the browser.
-  TransportDIB* current_paint_buf_;
-
-  PaintAggregator paint_aggregator_;
+  bool has_frame_pending_;
 
   // The size of the view's backing surface in non-DPI-adjusted pixels.
   gfx::Size physical_backing_size_;
@@ -588,10 +572,6 @@ class CONTENT_EXPORT RenderWidget
   // Filtered time per frame based on UpdateRect messages.
   float filtered_time_per_frame_;
 
-  // True if we are expecting an UpdateRect_ACK message (i.e., that a
-  // UpdateRect message has been sent).
-  bool update_reply_pending_;
-
   // Whether the WebWidget is in auto resize mode, which is used for example
   // by extension popups.
   bool auto_resize_mode_;
@@ -599,21 +579,6 @@ class CONTENT_EXPORT RenderWidget
   // True if we need to send an UpdateRect message to notify the browser about
   // an already-completed auto-resize.
   bool need_update_rect_for_auto_resize_;
-
-  // True if the underlying graphics context supports asynchronous swap.
-  // Cached on the RenderWidget because determining support is costly.
-  bool using_asynchronous_swapbuffers_;
-
-  // Number of OnSwapBuffersComplete we are expecting. Incremented each time
-  // WebWidget::composite has been been performed when the RenderWidget subclass
-  // SupportsAsynchronousSwapBuffers. Decremented in OnSwapBuffers. Will block
-  // rendering.
-  int num_swapbuffers_complete_pending_;
-
-  // When accelerated rendering is on, is the maximum number of swapbuffers that
-  // can be outstanding before we start throttling based on
-  // OnSwapBuffersComplete callback.
-  static const int kMaxSwapBuffersPending = 2;
 
   // Set to true if we should ignore RenderWidget::Show calls.
   bool did_show_;
@@ -731,17 +696,6 @@ class CONTENT_EXPORT RenderWidget
 
   // Stats for legacy software mode
   scoped_ptr<cc::RenderingStatsInstrumentation> legacy_software_mode_stats_;
-
-  // UpdateRect parameters for the current compositing pass. This is used to
-  // pass state between DoDeferredUpdate and OnSwapBuffersPosted.
-  scoped_ptr<ViewHostMsg_UpdateRect_Params> pending_update_params_;
-
-  // Queue of UpdateRect messages corresponding to a SwapBuffers. We want to
-  // delay sending of UpdateRect until the corresponding SwapBuffers has been
-  // executed. Since we can have several in flight, we need to keep them in a
-  // queue. Note: some SwapBuffers may not correspond to an update, in which
-  // case NULL is added to the queue.
-  std::deque<ViewHostMsg_UpdateRect*> updates_pending_swap_;
 
   // Properties of the screen hosting this RenderWidget instance.
   blink::WebScreenInfo screen_info_;

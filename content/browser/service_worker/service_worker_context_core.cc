@@ -77,7 +77,8 @@ ServiceWorkerContextCore::ServiceWorkerContextCore(
     const base::FilePath& path,
     quota::QuotaManagerProxy* quota_manager_proxy,
     ObserverListThreadSafe<ServiceWorkerContextObserver>* observer_list)
-    : storage_(new ServiceWorkerStorage(path, quota_manager_proxy)),
+    : storage_(new ServiceWorkerStorage(
+          path, AsWeakPtr(), quota_manager_proxy)),
       embedded_worker_registry_(new EmbeddedWorkerRegistry(AsWeakPtr())),
       job_coordinator_(new ServiceWorkerJobCoordinator(AsWeakPtr())),
       next_handle_id_(0),
@@ -262,6 +263,24 @@ void ServiceWorkerContextCore::OnErrorReported(
       version->embedded_worker()->thread_id(),
       ServiceWorkerContextObserver::ErrorInfo(
           error_message, line_number, column_number, source_url));
+}
+
+void ServiceWorkerContextCore::OnReportConsoleMessage(
+    ServiceWorkerVersion* version,
+    int source_identifier,
+    int message_level,
+    const base::string16& message,
+    int line_number,
+    const GURL& source_url) {
+  if (!observer_list_)
+    return;
+  observer_list_->Notify(
+      &ServiceWorkerContextObserver::OnReportConsoleMessage,
+      version->version_id(),
+      version->embedded_worker()->process_id(),
+      version->embedded_worker()->thread_id(),
+      ServiceWorkerContextObserver::ConsoleMessage(
+          source_identifier, message_level, message, line_number, source_url));
 }
 
 }  // namespace content

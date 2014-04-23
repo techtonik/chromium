@@ -20,6 +20,8 @@
     'dom_distiller.gypi',
     'domain_reliability.gypi',
     'favicon.gypi',
+    'favicon_base.gypi',
+    'infobars.gypi',
     'json_schema.gypi',
     'keyed_service.gypi',
     'language_usage_metrics.gypi',
@@ -52,6 +54,11 @@
         'web_modal.gypi',
         'wifi.gypi',
       ],
+    }],
+    ['OS != "ios" and OS != "android"', {
+      'includes': [
+        'usb_service.gypi',
+      ]
     }],
     ['android_webview_build == 0', {
       # Android WebView fails to build if a dependency on sync.gyp:sync is

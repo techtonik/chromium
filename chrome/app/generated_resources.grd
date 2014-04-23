@@ -4295,10 +4295,10 @@ Make sure you do not expose any sensitive information.
         Access your data on all websites
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_FAVICON" desc="Permission string for access to favicons.">
-        Access the icons of the websites you visit.
+        Access the icons of the websites you visit
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_INPUT" desc="Permission string for access to input.">
-        Access anything you type.
+        Access anything you type
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_BOOKMARKS" desc="Permission string for access to bookmarks.">
         Read and modify your bookmarks
@@ -4340,10 +4340,10 @@ Make sure you do not expose any sensitive information.
         Access input devices over USB and Bluetooth
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_BLUETOOTH" desc="Permission string for general access to the Bluetooth API.">
-        Access information about Bluetooth devices paired with your system.
+        Access information about Bluetooth devices paired with your system
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_BLUETOOTH_DEVICES" desc="Permission string for implementing Bluetooth profiles.">
-        Access Bluetooth devices paired with your system.
+        Access Bluetooth devices paired with your system
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_AUDIO_CAPTURE" desc="Permission string for access to audio capture devices.">
         Use your microphone
@@ -4373,16 +4373,16 @@ Make sure you do not expose any sensitive information.
         Write to files and folders that you open in the application
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_MEDIA_GALLERIES_READ_WRITE" desc="Permission string for access to read and write to all of the user's media galleries.">
-        Access and change photos, music, and other media from your computer.
+        Access and change photos, music, and other media from your computer
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_MEDIA_GALLERIES_READ_DELETE" desc="Permission string for access to read and delete all of the user's media galleries.">
-        Access and delete photos, music, and other media from your computer.
+        Access and delete photos, music, and other media from your computer
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_SERIAL" desc="Permission string for access to serial devices.">
         Use serial devices attached to your computer
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_SYSTEM_INDICATOR" desc="Permission string for access to an icon in the system indicator area, such as the taskbar or system tray.">
-        Display and manage an icon in the system indicator area.
+        Display an icon in the system indicator area
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_SYNCFILESYSTEM" desc="Permission string for synchronizing files to the user's Google Drive">
         Store data in your Google Drive account
@@ -4415,7 +4415,7 @@ Make sure you do not expose any sensitive information.
         Block parts of web pages
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_BLUETOOTH_PRIVATE" desc="Permission string for Bluetooth Private API.">
-        Control Bluetooth adapter state and pairing.
+        Control Bluetooth adapter state and pairing
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_ACCESSIBILITY_FEATURES_MODIFY" desc="Permission string for modifying acccessibility settings via extension API shown when an extension utilizing the API is installed.">
         Modify your accessibility settings
@@ -4424,7 +4424,7 @@ Make sure you do not expose any sensitive information.
         Read your accessibility settings
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_AUTOMATION" desc="Permission string for access to accessibility tree. TODO(aboxhall/dtseng): write more accurate description; write different versions for different permission levels">
-        Access and interact with all web pages.
+        Access and interact with all web pages
       </message>
 
       <!-- Extension/App error messages -->
@@ -4676,6 +4676,12 @@ Make sure you do not expose any sensitive information.
         <message name="IDS_EXTENSIONS_UPDATE_BUTTON" desc="Text for the 'Update extensions' button.">
           Update extensions now
         </message>
+        <message name="IDS_EXTENSIONS_APPS_DEV_TOOLS_PROMO_TEXT" desc="The text encouraging users to get the Apps Developer Tools.">
+          Chrome Apps &amp; Extensions Developer Tool is the new way to debug your apps and extensions.
+        </message>
+        <message name="IDS_EXTENSIONS_APPS_DEV_TOOLS_LINK_TEXT" desc="The text of the link to get the Apps Developer Tools.">
+          Visit website
+        </message>
         <message name="IDS_EXTENSIONS_NONE_INSTALLED" desc="Text that lets the user know that no extensions are installed.">
           Boo... You have no extensions :-(
         </message>
@@ -4819,6 +4825,9 @@ Make sure you do not expose any sensitive information.
         </message>
         <message name="IDS_EXTENSIONS_ENABLE_INCOGNITO" desc="The checkbox for enabling an extension in incognito.">
           Allow in incognito
+        </message>
+        <message name="IDS_EXTENSIONS_ENABLE_ERROR_COLLECTION" desc="The checkbox for enabling error collection for an extension.">
+          Collect errors
         </message>
         <message name="IDS_EXTENSIONS_ALLOW_FILE_ACCESS" desc="The checkbox for allowing an extension access to run scripts on file URLs.">
           Allow access to file URLs
@@ -5118,6 +5127,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_EXTENSION_WARNINGS_DOWNLOAD_FILENAME_CONFLICT" desc="Warning message which indicates that two or more extensions tried to determine the filename of a downloaded file in a conflicting way and the modification of this extension was ignored">
         This extension failed to name the download "<ph name="ATTEMPTED_FILENAME">$1<ex>apple.png</ex></ph>" because another extension (<ph name="EXTENSION_NAME">$2<ex>My Cool Extension</ex></ph>) determined a different filename "<ph name="ACTUAL_FILENAME">$3<ex>banana.png</ex></ph>".
+      </message>
+      <message name="IDS_EXTENSION_WARNING_RELOAD_TOO_FREQUENT" desc="Warning message which indates that an extension got stuck in a reload loop.">
+        This extension reloaded itself too frequently.
       </message>
 
       <!-- External extension install alerts -->
@@ -5656,6 +5668,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_FORCE_UNIVERSAL_ACCELERATED_OVERFLOW_SCROLL_MODE_DESCRIPTION" desc="Description of the 'Universal accelerated overflow scroll mode' lab.">
         Puts scrolling content in composited layers, even in those cases where promoting the overflow scrolling element to a stacking context and a containing block would have broken stacking or clipping.
       </message>
+      <message name="IDS_FLAGS_DISABLE_LAYER_SQUASHING_NAME" desc="Name of the 'Disable layer squashing' lab.">
+        Disable layer squashing
+      </message>
+      <message name="IDS_FLAGS_DISABLE_LAYER_SQUASHING_DESCRIPTION" desc="Description of the 'Disable layer squashing' lab.">
+        Prevents the automatic combining of composited layers.
+      </message>
       <message name="IDS_FLAGS_ENABLE_DIRECT_WRITE_NAME" desc="Name of the 'Enable DirectWrite' lab.">
         Enable DirectWrite
       </message>
@@ -5807,15 +5825,8 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_OVERLAY_SCROLLBARS_DESCRIPTION" desc="Description for the flag to turn on overlay scrollbars">
         Enable the experimental overlay scrollbars implementation. You must also enable threaded compositing to have the scrollbars animate.
       </message>
-      <message name="IDS_FLAGS_ENABLE_AUTOLOGIN_NAME" desc="Title for the flag to auto-sign in the user">
-        Enable auto sign-in
-      </message>
       <message desc="Message to display when auto-login fails. [CHAR-LIMIT=64]" name="IDS_AUTO_LOGIN_FAILED">
         Automatic sign-in failed
-      </message>
-      <message name="IDS_FLAGS_ENABLE_AUTOLOGIN_DESCRIPTION" desc="Description for the flag to pre-login the user">
-        When enabled, visiting a Google account sign-in page will trigger an infobar allowing easy sign-in with the Google account connected to the profile.
-        Auto sign-in is always disabled if the profile is not connected to an account, regardless of this flag.
       </message>
       <message name="IDS_FLAGS_SHOW_AUTOFILL_TYPE_PREDICTIONS_NAME" desc="Title for the flag to show Autofill field type predictions for all forms">
         Show Autofill predictions
@@ -6119,7 +6130,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Enable TouchView maximizing UI for testing
       </message>
       <message name="IDS_FLAGS_ASH_ENABLE_TOUCH_VIEW_TESTING_DESCRIPTION" desc="Description for the flag to enable the TouchView testing mode.">
-        Enable Ctrl+Alt+Shift+D to toggle the TouchView maximizing mode.
+        Enable Ctrl+Alt+Shift+8 to toggle the TouchView maximizing mode.
       </message>
       <message name="IDS_FLAGS_ENABLE_FULL_MULTI_PROFILE_MODE" desc="Title for the full multi profile mode flag.">
         Enable side-by-side multi profile mode
@@ -6779,11 +6790,11 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_EASY_UNLOCK_DESCRIPTION" desc="Description for flag to Enable Easy Unlock.">
         Easy Unlock allows you to unlock your Chromebook when in proximity to your phone.
       </message>
-      <message name="IDS_FLAGS_ENABLE_EMBEDDED_SHARED_WORKER_NAME" desc="Name for In-renderer Shared Worker.">
-        In-renderer Shared Worker.
+      <message name="IDS_FLAGS_DISABLE_EMBEDDED_SHARED_WORKER_NAME" desc="Name of the flag to disable In-renderer Shared Worker.">
+        Disable In-renderer Shared Worker.
       </message>
-      <message name="IDS_FLAGS_ENABLE_EMBEDDED_SHARED_WORKER_DESCRIPTION" desc="Description for flag to In-renderer Shared Worker.">
-        Run Shared Worker in a renderer process.
+      <message name="IDS_FLAGS_DISABLE_EMBEDDED_SHARED_WORKER_DESCRIPTION" desc="Description of the flag to disable In-renderer Shared Worker.">
+        Disable In-Renderer Shared Worker to run Shared Worker in a legacy dedicated worker process.
       </message>
 
       <!-- Crashes -->
@@ -8712,6 +8723,12 @@ The following plug-in is unresponsive: <ph name="PLUGIN_NAME">$1
       <message name="IDS_ERRORPAGES_BUTTON_RELOAD" desc="Label for the button on an error page to reload the page">
         Reload
       </message>
+      <message name="IDS_ERRORPAGES_BUTTON_LOAD_STALE" desc="Label for the button on an error page to load a stale entry from the cache">
+        Load Stale Local Copy
+      </message>
+      <message name="IDS_ERRORPAGES_BUTTON_LOAD_STALE_HELP" desc="Explanation for the BUTTON_LOAD_STALE button">
+        Load a known-to-be-out-of-date saved copy of this page.
+      </message>
       <message name="IDS_ERRORPAGES_BUTTON_DIAGNOSE" desc="Label for the button that invokes the connection diagnostic tool on the error page">
         Diagnose errors...
       </message>
@@ -9934,8 +9951,8 @@ Would you like to start <ph name="CONTROL_PANEL_APPLET_NAME">$1<ex>Add/Remove Pr
         <message name="IDS_OPTIONS_EASY_UNLOCK_SECTION_TITLE" desc="The title of the Easy Unlock section on the settings page.">
           Easy Unlock
         </message>
-        <message name="IDS_OPTIONS_EASY_UNLOCK_SETUP_BUTTON" desc="The label of the button to setup Easy Unlock section on the settings page.">
-          Setup Easy Unlock
+        <message name="IDS_OPTIONS_EASY_UNLOCK_SETUP_BUTTON" desc="The label of the button to set up Easy Unlock section on the settings page.">
+          Set up Easy Unlock
         </message>
         <message name="IDS_OPTIONS_EASY_UNLOCK_CHECKBOX_LABEL" desc="The label beside the checkbox to enable or disable easy unlock.">
           Enable Easy Unlock for this device.
@@ -11574,11 +11591,6 @@ Would you like to start <ph name="CONTROL_PANEL_APPLET_NAME">$1<ex>Add/Remove Pr
           This account is already being used on this computer.
         </message>
       </if>
-      <if expr="chromeos">
-        <message name="IDS_MULTI_PROFILES_WARNING" desc="A notification message when user signs into a multiprofile session for the first time.">
-          You have enabled multiprofiles, an unsupported experimental mode in Chrome OS. Features may change or break.
-        </message>
-      </if>
 
      <!-- SafeBrowsing -->
       <message name="IDS_SAFE_BROWSING_MALWARE_TITLE" desc="SafeBrowsing Malware HTML title">
@@ -12006,7 +12018,7 @@ Some features may be unavailable.  Please check that the profile exists and you 
       <message name="IDS_OPTIONS_ADVANCED_SECTION_TITLE_CONTENT">
         Web content
       </message>
-      <message name="IDS_OPTIONS_ADVANCED_SECTION_TITLE_SECURITY">
+      <message name="IDS_OPTIONS_ADVANCED_SECTION_TITLE_CERTIFICATES">
         HTTPS/SSL
       </message>
       <message name="IDS_OPTIONS_ADVANCED_SECTION_TITLE_NETWORK">

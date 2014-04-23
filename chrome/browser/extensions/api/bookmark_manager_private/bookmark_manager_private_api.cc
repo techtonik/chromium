@@ -33,16 +33,11 @@
 #include "content/public/browser/web_contents_view.h"
 #include "content/public/browser/web_ui.h"
 #include "extensions/browser/extension_function_dispatcher.h"
-#include "extensions/browser/extension_system.h"
 #include "extensions/browser/view_type_utils.h"
 #include "grit/generated_resources.h"
 #include "ui/base/dragdrop/drag_drop_types.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/webui/web_ui_util.h"
-
-#if defined(OS_WIN)
-#include "win8/util/win8_util.h"
-#endif  // OS_WIN
 
 namespace extensions {
 
@@ -68,12 +63,12 @@ namespace {
 
 // Returns a single bookmark node from the argument ID.
 // This returns NULL in case of failure.
-const BookmarkNode* GetNodeFromString(
-    BookmarkModel* model, const std::string& id_string) {
+const BookmarkNode* GetNodeFromString(BookmarkModel* model,
+                                      const std::string& id_string) {
   int64 id;
   if (!base::StringToInt64(id_string, &id))
     return NULL;
-  return model->GetNodeByID(id);
+  return GetBookmarkNodeByID(model, id);
 }
 
 // Gets a vector of bookmark nodes from the argument list of IDs.
@@ -144,12 +139,15 @@ CreateApiNodeDataElement(const BookmarkNodeData::Element& element) {
 // Creates a bookmark_manager_private::BookmarkNodeData from a BookmarkNodeData.
 scoped_ptr<bookmark_manager_private::BookmarkNodeData>
 CreateApiBookmarkNodeData(Profile* profile, const BookmarkNodeData& data) {
+  const base::FilePath& profile_path = profile->GetPath();
+
   scoped_ptr<bookmark_manager_private::BookmarkNodeData> node_data(
       new bookmark_manager_private::BookmarkNodeData);
-  node_data->same_profile = data.IsFromProfile(profile);
+  node_data->same_profile = data.IsFromProfilePath(profile_path);
 
   if (node_data->same_profile) {
-    std::vector<const BookmarkNode*> nodes = data.GetNodes(profile);
+    std::vector<const BookmarkNode*> nodes = data.GetNodes(
+        BookmarkModelFactory::GetForProfile(profile), profile_path);
     for (size_t i = 0; i < nodes.size(); ++i) {
       node_data->elements.push_back(
           CreateNodeDataElementFromBookmarkNode(*nodes[i]));
@@ -180,10 +178,8 @@ BookmarkManagerPrivateEventRouter::~BookmarkManagerPrivateEventRouter() {
 void BookmarkManagerPrivateEventRouter::DispatchEvent(
     const std::string& event_name,
     scoped_ptr<base::ListValue> event_args) {
-  extensions::ExtensionSystem::Get(browser_context_)
-      ->event_router()
-      ->BroadcastEvent(make_scoped_ptr(
-          new extensions::Event(event_name, event_args.Pass())));
+  extensions::EventRouter::Get(browser_context_)->BroadcastEvent(
+      make_scoped_ptr(new extensions::Event(event_name, event_args.Pass())));
 }
 
 void BookmarkManagerPrivateEventRouter::BookmarkModelChanged() {}
@@ -204,8 +200,7 @@ void BookmarkManagerPrivateEventRouter::BookmarkMetaInfoChanged(
 BookmarkManagerPrivateAPI::BookmarkManagerPrivateAPI(
     content::BrowserContext* browser_context)
     : browser_context_(browser_context) {
-  EventRouter* event_router =
-      ExtensionSystem::Get(browser_context)->event_router();
+  EventRouter* event_router = EventRouter::Get(browser_context);
   event_router->RegisterObserver(
       this, bookmark_manager_private::OnMetaInfoChanged::kEventName);
 }
@@ -213,8 +208,7 @@ BookmarkManagerPrivateAPI::BookmarkManagerPrivateAPI(
 BookmarkManagerPrivateAPI::~BookmarkManagerPrivateAPI() {}
 
 void BookmarkManagerPrivateAPI::Shutdown() {
-  ExtensionSystem::Get(browser_context_)->event_router()->UnregisterObserver(
-      this);
+  EventRouter::Get(browser_context_)->UnregisterObserver(this);
 }
 
 static base::LazyInstance<
@@ -229,8 +223,7 @@ BookmarkManagerPrivateAPI::GetFactoryInstance() {
 
 void BookmarkManagerPrivateAPI::OnListenerAdded(
     const EventListenerInfo& details) {
-  ExtensionSystem::Get(browser_context_)->event_router()->UnregisterObserver(
-      this);
+  EventRouter::Get(browser_context_)->UnregisterObserver(this);
   event_router_.reset(new BookmarkManagerPrivateEventRouter(
       browser_context_,
       BookmarkModelFactory::GetForProfile(
@@ -257,11 +250,12 @@ BookmarkManagerPrivateDragEventRouter::
 void BookmarkManagerPrivateDragEventRouter::DispatchEvent(
     const std::string& event_name,
     scoped_ptr<base::ListValue> args) {
-  if (!ExtensionSystem::Get(profile_)->event_router())
+  EventRouter* event_router = EventRouter::Get(profile_);
+  if (!event_router)
     return;
 
   scoped_ptr<Event> event(new Event(event_name, args.Pass()));
-  ExtensionSystem::Get(profile_)->event_router()->BroadcastEvent(event.Pass());
+  event_router->BroadcastEvent(event.Pass());
 }
 
 void BookmarkManagerPrivateDragEventRouter::OnDragEnter(
@@ -631,12 +625,6 @@ bool BookmarkManagerPrivateSetMetaInfoFunction::RunImpl() {
 
 bool BookmarkManagerPrivateCanOpenNewWindowsFunction::RunImpl() {
   bool can_open_new_windows = true;
-
-#if defined(OS_WIN)
-  if (win8::IsSingleWindowMetroMode())
-    can_open_new_windows = false;
-#endif  // OS_WIN
-
   SetResult(new base::FundamentalValue(can_open_new_windows));
   return true;
 }
@@ -645,10 +633,10 @@ bool BookmarkManagerPrivateRemoveTreesFunction::RunImpl() {
   scoped_ptr<RemoveTrees::Params> params(RemoveTrees::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params);
 
-#if !defined(OS_ANDROID)
-  ScopedGroupBookmarkActions group_deletes(GetProfile());
-#endif
   BookmarkModel* model = BookmarkModelFactory::GetForProfile(GetProfile());
+#if !defined(OS_ANDROID)
+  ScopedGroupBookmarkActions group_deletes(model);
+#endif
   int64 id;
   for (size_t i = 0; i < params->id_list.size(); ++i) {
     if (!GetBookmarkIdAsInt64(params->id_list[i], &id))

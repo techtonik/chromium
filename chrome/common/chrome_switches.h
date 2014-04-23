@@ -62,8 +62,6 @@ extern const char kCloudPrintJobTitle[];
 extern const char kCloudPrintFileType[];
 extern const char kCloudPrintPrintTicket[];
 extern const char kCloudPrintSetupProxy[];
-extern const char kCloudPrintServiceURL[];
-extern const char kCloudPrintXmppEndpoint[];
 extern const char kComponentUpdater[];
 extern const char kConflictingModulesCheck[];
 extern const char kCrashOnHangThreads[];
@@ -92,7 +90,6 @@ extern const char kDisableExtensionsHttpThrottling[];
 extern const char kDisableExtensionsResourceWhitelist[];
 extern const char kDisableExtensions[];
 extern const char kDisableFullscreenWithinTab[];
-extern const char kDisableInfoBars[];
 extern const char kDisableIPv6[];
 extern const char kDisableMinimizeOnSecondLauncherItemClick[];
 extern const char kDisableNTPOtherSessionsMenu[];
@@ -133,7 +130,6 @@ extern const char kEnableAppWindowControls[];
 extern const char kEnableAppsShowOnFirstPaint[];
 extern const char kEnableAsyncDns[];
 extern const char kEnableAuthNegotiatePort[];
-extern const char kEnableAutologin[];
 extern const char kEnableAutomationAPI[];
 extern const char kEnableBenchmarking[];
 extern const char kEnableClientHints[];
@@ -411,7 +407,6 @@ extern const char kDebugPrint[];
 
 #ifndef NDEBUG
 extern const char kFileManagerExtensionPath[];
-extern const char kImageLoaderExtensionPath[];
 #endif
 
 #if defined(GOOGLE_CHROME_BUILD)

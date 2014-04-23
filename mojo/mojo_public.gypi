@@ -14,8 +14,18 @@
           '..',
         ],
       },
+      'all_dependent_settings': {
+        'conditions': [
+          # We need to be able to call the MojoSetSystemThunks() function in
+          # system_thunks.cc
+          ['OS=="android"', {
+            'ldflags!': [
+              '-Wl,--exclude-libs=ALL',
+            ],
+          }],
+        ],
+      },
       'sources': [
-        'public/c/system/async_waiter.h',
         'public/c/system/core.h',
         'public/c/system/macros.h',
         'public/c/system/system_export.h',

@@ -86,6 +86,10 @@ class VisitorShim : public QuicConnectionVisitorInterface {
     return session_->HasPendingHandshake();
   }
 
+  virtual bool HasOpenDataStreams() const OVERRIDE {
+    return session_->HasOpenDataStreams();
+  }
+
  private:
   QuicSession* session_;
 };
@@ -285,7 +289,7 @@ void QuicSession::OnCanWrite() {
       has_pending_handshake_ = false;  // We just popped it.
     }
     ReliableQuicStream* stream = GetStream(stream_id);
-    if (stream != NULL && !stream->IsFlowControlBlocked()) {
+    if (stream != NULL && !stream->flow_controller()->IsBlocked()) {
       // If the stream can't write all bytes, it'll re-add itself to the blocked
       // list.
       stream->OnCanWrite();
@@ -299,6 +303,10 @@ bool QuicSession::HasPendingWrites() const {
 
 bool QuicSession::HasPendingHandshake() const {
   return has_pending_handshake_;
+}
+
+bool QuicSession::HasOpenDataStreams() const {
+  return GetNumOpenStreams() > 0;
 }
 
 QuicConsumedData QuicSession::WritevData(
@@ -323,8 +331,7 @@ void QuicSession::SendRstStream(QuicStreamId id,
                                 QuicRstStreamErrorCode error,
                                 QuicStreamOffset bytes_written) {
   if (connection()->connected()) {
-    // Don't bother sending a RST_STREAM frame if the connection is already
-    // closed.
+    // Only send a RST_STREAM frame if still connected.
     connection_->SendRstStream(id, error, bytes_written);
   }
   CloseStreamInner(id, true);
@@ -374,11 +381,12 @@ bool QuicSession::IsCryptoHandshakeConfirmed() {
 void QuicSession::OnConfigNegotiated() {
   connection_->SetFromConfig(config_);
   // Tell all streams about the newly received peer receive window.
-  if (connection()->version() >= QUIC_VERSION_17) {
+  if (connection()->version() >= QUIC_VERSION_17 &&
+      config_.HasReceivedInitialFlowControlWindowBytes()) {
     // Streams which were created before the SHLO was received (0RTT requests)
     // are now informed of the peer's initial flow control window.
     uint32 new_flow_control_send_window =
-        config_.peer_initial_flow_control_window_bytes();
+        config_.ReceivedInitialFlowControlWindowBytes();
     if (new_flow_control_send_window < kDefaultFlowControlSendWindow) {
       LOG(DFATAL)
           << "Peer sent us an invalid flow control send window: "
@@ -389,7 +397,8 @@ void QuicSession::OnConfigNegotiated() {
     }
     DataStreamMap::iterator it = stream_map_.begin();
     while (it != stream_map_.end()) {
-      it->second->UpdateFlowControlSendLimit(new_flow_control_send_window);
+      it->second->flow_controller()->UpdateSendWindowOffset(
+          new_flow_control_send_window);
       it++;
     }
   }
@@ -558,10 +567,12 @@ void QuicSession::MarkWriteBlocked(QuicStreamId id, QuicPriority priority) {
 #ifndef NDEBUG
   ReliableQuicStream* stream = GetStream(id);
   if (stream != NULL) {
-    if (stream->IsFlowControlBlocked()) {
-      LOG(DFATAL) << "Stream " << id << " is flow control blocked.";
+    if (stream->flow_controller()->IsBlocked()) {
+      LOG(DFATAL) << ENDPOINT << "Stream " << id
+                  << " is flow control blocked and write blocked!";
     }
     LOG_IF(DFATAL, priority != stream->EffectivePriority())
+        << ENDPOINT << "Stream " << id
         << "Priorities do not match.  Got: " << priority
         << " Expected: " << stream->EffectivePriority();
   } else {

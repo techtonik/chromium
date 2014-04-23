@@ -389,6 +389,9 @@ void ServiceWorkerVersion::RemoveControllee(
   // TODO(kinuko): Fire NoControllees notification when the # of controllees
   // reaches 0, so that a new pending version can be activated (which will
   // deactivate this version).
+  // TODO(michaeln): On no controllees call storage DeleteVersionResources
+  // if this version has been deactivated. Probably storage can listen for
+  // NoControllees for versions that have been deleted.
 }
 
 void ServiceWorkerVersion::AddPendingControllee(
@@ -449,6 +452,21 @@ void ServiceWorkerVersion::OnReportException(
       listeners_,
       OnErrorReported(
           this, error_message, line_number, column_number, source_url));
+}
+
+void ServiceWorkerVersion::OnReportConsoleMessage(int source_identifier,
+                                                  int message_level,
+                                                  const base::string16& message,
+                                                  int line_number,
+                                                  const GURL& source_url) {
+  FOR_EACH_OBSERVER(Listener,
+                    listeners_,
+                    OnReportConsoleMessage(this,
+                                           source_identifier,
+                                           message_level,
+                                           message,
+                                           line_number,
+                                           source_url));
 }
 
 void ServiceWorkerVersion::OnMessageReceived(

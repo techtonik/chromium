@@ -34,6 +34,7 @@ struct Foo {
   handle<message_pipe> source @9;
   handle<data_pipe_consumer>[] input_streams @10;
   handle<data_pipe_producer>[] output_streams @11;
+  bool[][] array_of_array_of_bools @12;
 };
 
 struct DefaultsTestInner {
@@ -68,7 +69,7 @@ interface ServiceClient {
 // This interface is referenced above where it is defined. It also refers to
 // itself from a method.
 interface Port {
-  PostMessage@0(string message_text @0, Port extra_port@1);
+  PostMessage@0(string message_text @0, Port[] extra_ports@1);
 };
 
 }

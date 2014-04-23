@@ -32,8 +32,6 @@
 #include "chrome/renderer/chrome_render_view_observer.h"
 #include "chrome/renderer/content_settings_observer.h"
 #include "chrome/renderer/extensions/chrome_extensions_renderer_client.h"
-#include "chrome/renderer/extensions/chrome_v8_context.h"
-#include "chrome/renderer/extensions/chrome_v8_extension.h"
 #include "chrome/renderer/extensions/dispatcher.h"
 #include "chrome/renderer/extensions/extension_frame_helper.h"
 #include "chrome/renderer/extensions/extension_helper.h"
@@ -83,6 +81,7 @@
 #include "extensions/common/extension_set.h"
 #include "extensions/common/extension_urls.h"
 #include "extensions/common/switches.h"
+#include "extensions/renderer/script_context.h"
 #include "grit/generated_resources.h"
 #include "grit/locale_settings.h"
 #include "grit/renderer_resources.h"
@@ -98,7 +97,7 @@
 #include "third_party/WebKit/public/web/WebDataSource.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebElement.h"
-#include "third_party/WebKit/public/web/WebFrame.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebPluginContainer.h"
 #include "third_party/WebKit/public/web/WebPluginParams.h"
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
@@ -1067,8 +1066,8 @@ bool ChromeContentRendererClient::RunIdleHandlerWhenWidgetsHidden() {
 }
 
 bool ChromeContentRendererClient::AllowPopup() {
-  extensions::ChromeV8Context* current_context =
-      extension_dispatcher_->v8_context_set().GetCurrent();
+  extensions::ScriptContext* current_context =
+      extension_dispatcher_->script_context_set().GetCurrent();
   if (!current_context || !current_context->extension())
     return false;
   // See http://crbug.com/117446 for the subtlety of this check.

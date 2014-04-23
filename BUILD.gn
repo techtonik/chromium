@@ -21,9 +21,11 @@ group("root") {
     "//components/language_usage_metrics",
     "//components/navigation_metrics",
     "//components/onc",
+    "//components/os_crypt",
     "//components/startup_metric_utils",
     #"//components/translate:translate_core_browser",
     #"//components/translate:translate_core_common",
+    "//components/url_matcher",
     "//crypto",
     "//device/usb",
     "//ipc",
@@ -44,7 +46,9 @@ group("root") {
     "//tools/gn",
     "//ui/events",
     "//ui/gfx",
+    "//ui/resources",
     "//url",
+    "//v8:v8_base",
   ]
 
   if (is_linux) {
@@ -55,6 +59,9 @@ group("root") {
 
   if (is_android) {
     deps -= [
+      "//components/os_crypt",
+      "//crypto",
+      "//net",
       "//skia",
       "//third_party/libusb",
       "//tools/gn",

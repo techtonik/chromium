@@ -88,6 +88,7 @@
     'public/browser/cookie_store_factory.h',
     'public/browser/desktop_media_id.cc',
     'public/browser/desktop_media_id.h',
+    'public/browser/desktop_notification_delegate.h',
     'public/browser/devtools_agent_host.h',
     'public/browser/devtools_client_host.h',
     'public/browser/devtools_external_agent_proxy.h',
@@ -1471,6 +1472,11 @@
         'browser/renderer_host/p2p/socket_dispatcher_host.h',
       ],
     }],
+    ['enable_webrtc==1 and OS=="linux"', {
+      'dependencies': [
+        '../third_party/libjingle/libjingle.gyp:libjingle_webrtc',
+      ],
+    }],
     ['enable_webrtc==1 and (OS=="linux" or OS=="mac" or OS=="win")', {
       'sources': [
         'browser/media/capture/desktop_capture_device.cc',
@@ -1490,7 +1496,6 @@
         # For accessibility
         '../third_party/iaccessible2/iaccessible2.gyp:iaccessible2',
         '../third_party/isimpledom/isimpledom.gyp:isimpledom',
-        '../win8/win8.gyp:win8_util',
       ],
       'sources/': [
         ['exclude', '^browser/device_orientation/data_fetcher_shared_memory_default.cc$'],

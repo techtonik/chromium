@@ -16,9 +16,9 @@
         ['OS!="ios"', {
           # layouttest_support_content is not supported nor required on iOS.
           'dependencies': [
+            'webkit_test_support_content',
             '../skia/skia.gyp:skia',
             '../v8/tools/gyp/v8.gyp:v8',
-            '../webkit/common/webkit_common.gyp:webkit_common',
           ],
           'include_dirs': [
             '..',
@@ -60,6 +60,7 @@
         'content.gyp:content_app_both',
         'content.gyp:content_browser',
         'content.gyp:content_common',
+        'webkit_test_support_content',
       ],
       'include_dirs': [
         '..',
@@ -92,6 +93,8 @@
         'public/test/mock_render_thread.h',
         'public/test/mock_resource_context.cc',
         'public/test/mock_resource_context.h',
+        'public/test/mock_storage_client.cc',
+        'public/test/mock_storage_client.h',
         'public/test/render_view_test.cc',
         'public/test/render_view_test.h',
         'public/test/render_widget_test.cc',
@@ -201,6 +204,16 @@
         'test/weburl_loader_mock_factory.h',
       ],
       'conditions': [
+        ['enable_plugins==0', {
+          'sources!': [
+            'test/ppapi_unittest.cc',
+          ],
+        }],
+        ['input_speech==0', {
+          'sources!': [
+            'test/mock_google_streaming_server.cc',
+          ],
+        }],
         ['OS == "ios"', {
           'sources/': [
             # iOS only needs a small portion of content; exclude all the
@@ -247,6 +260,7 @@
             '../ppapi/ppapi_internal.gyp:ppapi_unittest_shared',
             '../third_party/WebKit/public/blink.gyp:blink',
             '../ui/surface/surface.gyp:surface',
+            '../v8/tools/gyp/v8.gyp:v8',
             '../webkit/child/webkit_child.gyp:webkit_child',
             '../webkit/common/gpu/webkit_gpu.gyp:webkit_gpu',
             '../webkit/renderer/compositor_bindings/compositor_bindings.gyp:webkit_compositor_support',
@@ -313,6 +327,23 @@
       ],
     },
     {
+      'target_name': 'webkit_test_support_content',
+      'type': 'static_library',
+      'dependencies': [
+        '../webkit/common/webkit_common.gyp:webkit_common',
+      ],
+      'include_dirs': [
+        '..',
+      ],
+      'export_dependent_settings': [
+        '../webkit/common/webkit_common.gyp:webkit_common',
+      ],
+      'sources': [
+        '../webkit/browser/quota/mock_special_storage_policy.cc',
+        '../webkit/browser/quota/mock_special_storage_policy.h',
+      ],
+    },
+    {
       'target_name': 'content_unittests',
       'type': '<(gtest_target_type)',
       'dependencies': [
@@ -360,6 +391,10 @@
         'browser/appcache/manifest_parser_unittest.cc',
         'browser/appcache/mock_appcache_policy.cc',
         'browser/appcache/mock_appcache_policy.h',
+        'browser/appcache/mock_appcache_service.cc',
+        'browser/appcache/mock_appcache_service.h',
+        'browser/appcache/mock_appcache_storage.cc',
+        'browser/appcache/mock_appcache_storage.h',
         'browser/appcache/mock_appcache_storage_unittest.cc',
         'browser/browser_thread_unittest.cc',
         'browser/browser_url_handler_impl_unittest.cc',
@@ -518,12 +553,14 @@
         'browser/service_worker/embedded_worker_test_helper.cc',
         'browser/service_worker/embedded_worker_test_helper.h',
         'browser/service_worker/service_worker_context_unittest.cc',
+        'browser/service_worker/service_worker_database_unittest.cc',
         'browser/service_worker/service_worker_dispatcher_host_unittest.cc',
         'browser/service_worker/service_worker_dispatcher_host_unittest.cc',
         'browser/service_worker/service_worker_handle_unittest.cc',
         'browser/service_worker/service_worker_job_unittest.cc',
         'browser/service_worker/service_worker_provider_host_unittest.cc',
         'browser/service_worker/service_worker_registration_unittest.cc',
+        'browser/service_worker/service_worker_storage_unittest.cc',
         'browser/service_worker/service_worker_url_request_job_unittest.cc',
         'browser/service_worker/service_worker_utils_unittest.cc',
         'browser/service_worker/service_worker_version_unittest.cc',
@@ -614,7 +651,6 @@
         'renderer/media/webaudiosourceprovider_impl_unittest.cc',
         'renderer/media/webrtc/video_destination_handler_unittest.cc',
         'renderer/npapi/webplugin_impl_unittest.cc',
-        'renderer/paint_aggregator_unittest.cc',
         'renderer/pepper/host_var_tracker_unittest.cc',
         'renderer/pepper/mock_resource.h',
         'renderer/pepper/pepper_broker_unittest.cc',
@@ -630,10 +666,6 @@
         'test/image_decoder_test.cc',
         'test/image_decoder_test.h',
         'test/run_all_unittests.cc',
-        '../webkit/browser/appcache/mock_appcache_service.cc',
-        '../webkit/browser/appcache/mock_appcache_service.h',
-        '../webkit/browser/appcache/mock_appcache_storage.cc',
-        '../webkit/browser/appcache/mock_appcache_storage.h',
         '../webkit/browser/blob/local_file_stream_reader_unittest.cc',
         '../webkit/browser/database/database_quota_client_unittest.cc',
         '../webkit/browser/database/database_tracker_unittest.cc',
@@ -659,10 +691,6 @@
         '../webkit/common/database/database_connections_unittest.cc',
         '../webkit/common/database/database_identifier_unittest.cc',
         '../webkit/common/fileapi/file_system_util_unittest.cc',
-        '../webkit/browser/quota/mock_special_storage_policy.cc',
-        '../webkit/browser/quota/mock_special_storage_policy.h',
-        '../webkit/browser/quota/mock_storage_client.cc',
-        '../webkit/browser/quota/mock_storage_client.h',
       ],
       'conditions': [
         ['OS == "ios"', {
@@ -697,8 +725,6 @@
             '../third_party/libjingle/libjingle.gyp:libjingle',
             '../ui/compositor/compositor.gyp:compositor_test_support',
             '../ui/gl/gl.gyp:gl',
-            '../v8/tools/gyp/v8.gyp:v8',
-            '../webkit/common/webkit_common.gyp:webkit_common',
             '../webkit/child/webkit_child.gyp:webkit_child',
             '../webkit/storage_browser.gyp:webkit_storage_browser',
             '../webkit/storage_common.gyp:webkit_storage_common',
@@ -746,6 +772,7 @@
             'renderer/media/webrtc/media_stream_remote_video_source_unittest.cc',
             'renderer/media/webrtc/media_stream_track_metrics_unittest.cc',
             'renderer/media/webrtc/webrtc_local_audio_track_adapter_unittest.cc',
+            'renderer/media/webrtc/webrtc_media_stream_adapter_unittest.cc',
             'renderer/media/webrtc/webrtc_video_capturer_adapter_unittest.cc',
             'renderer/media/webrtc_audio_capturer_unittest.cc',
             'renderer/media/webrtc_audio_renderer_unittest.cc',
@@ -817,6 +844,9 @@
           'xcode_settings': {'OTHER_LDFLAGS': ['-Wl,-ObjC']},
         }],
         ['chromeos==1', {
+          'dependencies': [
+            '../chromeos/chromeos.gyp:chromeos',
+          ],
           'sources/': [
             ['exclude', '^browser/geolocation/wifi_data_provider_linux_unittest.cc'],
           ],
@@ -1266,11 +1296,12 @@
             '../testing/gtest.gyp:gtest',
             '../third_party/WebKit/public/blink.gyp:blink',
             '../ui/base/ui_base.gyp:ui_base',
+            '../v8/tools/gyp/v8.gyp:v8',
             '../ui/gfx/gfx.gyp:gfx',
             '../ui/gfx/gfx.gyp:gfx_geometry',
             '../ui/gl/gl.gyp:gl',
-            # The following two dependencies provide the missing
-            # symbol HeapProfilerStart in Linux component builds.
+            # The following dependency provides the missing symbol
+            # HeapProfilerStart in Linux component builds.
             '../webkit/child/webkit_child.gyp:webkit_child',
           ],
           'include_dirs': [
@@ -1470,7 +1501,6 @@
           ],
           'variables': {
             'test_suite_name': 'content_gl_tests',
-            'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)content_gl_tests<(SHARED_LIB_SUFFIX)',
           },
           'includes': [
             '../build/apk_test.gypi',
@@ -1485,7 +1515,6 @@
           ],
           'variables': {
             'test_suite_name': 'content_unittests',
-            'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)content_unittests<(SHARED_LIB_SUFFIX)',
           },
           'includes': [ '../build/apk_test.gypi' ],
         },
@@ -1525,7 +1554,6 @@
           ],
           'variables': {
             'test_suite_name': 'content_perftests',
-            'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)content_perftests<(SHARED_LIB_SUFFIX)',
           },
           'includes': [ '../build/apk_test.gypi' ],
         },
@@ -1593,7 +1621,6 @@
           ],
           'variables': {
             'test_suite_name': 'video_decode_accelerator_unittest',
-            'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)content_unittests<(SHARED_LIB_SUFFIX)',
           },
           'includes': [ '../build/apk_test.gypi' ],
         },

@@ -164,7 +164,7 @@ class ContentViewCoreImpl : public ContentViewCore,
                           jstring script,
                           jobject callback,
                           jboolean start_renderer);
-  int GetNativeImeAdapter(JNIEnv* env, jobject obj);
+  long GetNativeImeAdapter(JNIEnv* env, jobject obj);
   void SetFocus(JNIEnv* env, jobject obj, jboolean focused);
   void ScrollFocusedEditableNodeIntoView(JNIEnv* env, jobject obj);
 
@@ -215,7 +215,7 @@ class ContentViewCoreImpl : public ContentViewCore,
   void ShowInterstitialPage(JNIEnv* env,
                             jobject obj,
                             jstring jurl,
-                            jint delegate);
+                            jlong delegate);
   jboolean IsShowingInterstitialPage(JNIEnv* env, jobject obj);
 
   void SetAccessibilityEnabled(JNIEnv* env, jobject obj, bool enabled);

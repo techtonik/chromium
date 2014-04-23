@@ -12,15 +12,14 @@
 #include "content/renderer/render_view_impl.h"
 #include "third_party/WebKit/public/web/WebAXObject.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
-#include "third_party/WebKit/public/web/WebFrame.h"
 #include "third_party/WebKit/public/web/WebInputElement.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebNode.h"
 #include "third_party/WebKit/public/web/WebView.h"
 #include "ui/accessibility/ax_tree.h"
 
 using blink::WebAXObject;
 using blink::WebDocument;
-using blink::WebFrame;
 using blink::WebNode;
 using blink::WebPoint;
 using blink::WebRect;
@@ -195,10 +194,6 @@ void RendererAccessibilityComplete::SendPendingAccessibilityEvents() {
         ui::AX_EVENT_SELECTED_CHILDREN_CHANGED) {
       serializer_.DeleteClientSubtree(obj);
     }
-
-    // Allow Blink to cache intermediate results since we're doing a bunch
-    // of read-only queries at once.
-    obj.startCachingComputedObjectAttributesUntilTreeMutates();
 
     AccessibilityHostMsg_EventParams event_msg;
     event_msg.event_type = event.event_type;

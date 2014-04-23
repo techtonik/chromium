@@ -8,6 +8,7 @@
 
 #include "base/command_line.h"
 #include "base/macros.h"
+#include "base/metrics/histogram.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
@@ -110,6 +111,7 @@ FeatureInfo::FeatureFlags::FeatureFlags()
     : chromium_color_buffer_float_rgba(false),
       chromium_color_buffer_float_rgb(false),
       chromium_framebuffer_multisample(false),
+      chromium_sync_query(false),
       use_core_framebuffer_multisample(false),
       multisampled_render_to_texture(false),
       use_img_for_multisampled_render_to_texture(false),
@@ -764,9 +766,10 @@ void FeatureInfo::InitializeFeatures() {
     feature_flags_.ext_shader_texture_lod = true;
   }
 
-  bool ui_gl_fence_works = extensions.Contains("GL_NV_fence") ||
+  bool ui_gl_fence_works = is_es3 || extensions.Contains("GL_NV_fence") ||
                            extensions.Contains("GL_ARB_sync") ||
                            extensions.Contains("EGL_KHR_fence_sync");
+  UMA_HISTOGRAM_BOOLEAN("GPU.FenceSupport", ui_gl_fence_works);
 
   feature_flags_.map_buffer_range =
       is_es3 || extensions.Contains("GL_ARB_map_buffer_range");
@@ -793,6 +796,11 @@ void FeatureInfo::InitializeFeatures() {
     // DiscardFramebufferEXT is automatically bound to InvalidateFramebuffer.
     AddExtensionString("GL_EXT_discard_framebuffer");
     feature_flags_.ext_discard_framebuffer = true;
+  }
+
+  if (ui_gl_fence_works) {
+    AddExtensionString("GL_CHROMIUM_sync_query");
+    feature_flags_.chromium_sync_query = true;
   }
 }
 

@@ -42,7 +42,6 @@
 #include "content/common/accessibility_messages.h"
 #include "content/common/browser_plugin/browser_plugin_messages.h"
 #include "content/common/content_switches_internal.h"
-#include "content/common/desktop_notification_messages.h"
 #include "content/common/drag_messages.h"
 #include "content/common/frame_messages.h"
 #include "content/common/input_messages.h"
@@ -404,7 +403,7 @@ WebPreferences RenderViewHostImpl::GetWebkitPrefs(const GURL& url) {
   prefs.allow_file_access_from_file_urls =
       command_line.HasSwitch(switches::kAllowFileAccessFromFiles);
 
-  prefs.layer_squashing_enabled = false;
+  prefs.layer_squashing_enabled = true;
   if (command_line.HasSwitch(switches::kEnableLayerSquashing))
       prefs.layer_squashing_enabled = true;
   if (command_line.HasSwitch(switches::kDisableLayerSquashing))
@@ -413,7 +412,6 @@ WebPreferences RenderViewHostImpl::GetWebkitPrefs(const GURL& url) {
   prefs.show_paint_rects =
       command_line.HasSwitch(switches::kShowPaintRects);
   prefs.accelerated_compositing_enabled = GpuProcessHost::gpu_enabled();
-  prefs.force_compositing_mode = content::IsForceCompositingModeEnabled();
   prefs.accelerated_2d_canvas_enabled =
       GpuProcessHost::gpu_enabled() &&
       !command_line.HasSwitch(switches::kDisableAccelerated2dCanvas);
@@ -473,9 +471,6 @@ WebPreferences RenderViewHostImpl::GetWebkitPrefs(const GURL& url) {
     prefs.enable_scroll_animator = true;
   if (command_line.HasSwitch(switches::kDisableSmoothScrolling))
     prefs.enable_scroll_animator = false;
-
-  prefs.visual_word_movement_enabled =
-      command_line.HasSwitch(switches::kEnableVisualWordMovement);
 
   // Certain GPU features might have been blacklisted.
   GpuDataManagerImpl::GetInstance()->UpdateRendererWebPrefs(&prefs);
@@ -810,34 +805,6 @@ void RenderViewHostImpl::DragTargetDrop(
                               key_modifiers));
 }
 
-void RenderViewHostImpl::DesktopNotificationPermissionRequestDone(
-    int callback_context) {
-  Send(new DesktopNotificationMsg_PermissionRequestDone(
-      GetRoutingID(), callback_context));
-}
-
-void RenderViewHostImpl::DesktopNotificationPostDisplay(int callback_context) {
-  Send(new DesktopNotificationMsg_PostDisplay(GetRoutingID(),
-                                              callback_context));
-}
-
-void RenderViewHostImpl::DesktopNotificationPostError(
-    int notification_id,
-    const base::string16& message) {
-  Send(new DesktopNotificationMsg_PostError(
-      GetRoutingID(), notification_id, message));
-}
-
-void RenderViewHostImpl::DesktopNotificationPostClose(int notification_id,
-                                                      bool by_user) {
-  Send(new DesktopNotificationMsg_PostClose(
-      GetRoutingID(), notification_id, by_user));
-}
-
-void RenderViewHostImpl::DesktopNotificationPostClick(int notification_id) {
-  Send(new DesktopNotificationMsg_PostClick(GetRoutingID(), notification_id));
-}
-
 void RenderViewHostImpl::DragSourceEndedAt(
     int client_x, int client_y, int screen_x, int screen_y,
     WebDragOperation operation) {
@@ -1051,12 +1018,6 @@ bool RenderViewHostImpl::OnMessageReceived(const IPC::Message& msg) {
                         OnSelectionRootBoundsChanged)
 #endif
     IPC_MESSAGE_HANDLER(ViewHostMsg_DidZoomURL, OnDidZoomURL)
-    IPC_MESSAGE_HANDLER(DesktopNotificationHostMsg_RequestPermission,
-                        OnRequestDesktopNotificationPermission)
-    IPC_MESSAGE_HANDLER(DesktopNotificationHostMsg_Show,
-                        OnShowDesktopNotification)
-    IPC_MESSAGE_HANDLER(DesktopNotificationHostMsg_Cancel,
-                        OnCancelDesktopNotification)
 #if defined(OS_MACOSX) || defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ShowPopup, OnShowPopup)
     IPC_MESSAGE_HANDLER(ViewHostMsg_HidePopup, OnHidePopup)
@@ -1683,23 +1644,6 @@ void RenderViewHostImpl::OnDidZoomURL(double zoom_level,
     host_zoom_map->SetTemporaryZoomLevel(
         GetProcess()->GetID(), GetRoutingID(), zoom_level);
   }
-}
-
-void RenderViewHostImpl::OnRequestDesktopNotificationPermission(
-    const GURL& source_origin, int callback_context) {
-  GetContentClient()->browser()->RequestDesktopNotificationPermission(
-      source_origin, callback_context, GetProcess()->GetID(), GetRoutingID());
-}
-
-void RenderViewHostImpl::OnShowDesktopNotification(
-    const ShowDesktopNotificationHostMsgParams& params) {
-  GetContentClient()->browser()->ShowDesktopNotification(
-      params, GetProcess()->GetID(), GetRoutingID(), false);
-}
-
-void RenderViewHostImpl::OnCancelDesktopNotification(int notification_id) {
-  GetContentClient()->browser()->CancelDesktopNotification(
-      GetProcess()->GetID(), GetRoutingID(), notification_id);
 }
 
 void RenderViewHostImpl::OnRunFileChooser(const FileChooserParams& params) {
