@@ -53,6 +53,9 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
                                        int source_process_id,
                                        const ResultCallback& continuation)
       OVERRIDE;
+  virtual void GetServiceWorkerHost(const Scope& scope,
+                                    IPC::Listener* listener,
+                                    const GetWorkerCallback& callback) OVERRIDE;
   virtual void SendMessage(const GURL& pattern,
                            const IPC::Message& message,
                            const ResultCallback& callback) OVERRIDE;

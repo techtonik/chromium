@@ -172,6 +172,13 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
       base::Bind(&PostResultToUIFromStatusOnIO, continuation));
 }
 
+void ServiceWorkerContextWrapper::GetServiceWorkerHost(
+    const Scope& scope,
+    IPC::Listener* listener,
+    const GetWorkerCallback& callback) {
+  NOTIMPLEMENTED();
+}
+
 void ServiceWorkerContextWrapper::AddObserver(
     ServiceWorkerContextObserver* observer) {
   observer_list_->AddObserver(observer);

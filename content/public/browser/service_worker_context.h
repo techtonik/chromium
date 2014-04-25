@@ -7,25 +7,17 @@
 
 #include "base/basictypes.h"
 #include "base/callback_forward.h"
+#include "base/memory/weak_ptr.h"
 #include "url/gurl.h"
 
 namespace IPC {
+class Listener;
 class Message;
 }  // namespace IPC
 
 namespace content {
 
-// Interface to communicate with service workers from any thread. Abstracts the
-// lifetime and active version for calling code, just call Send and the messages
-// will be queued as needed and sent to the active service worker.
-class ServiceWorkerProxy : public IPC::Sender {
-  // TODO: michaeln suggested these, but do we know we'll need them yet?
-  virtual const GURL& scope() const = 0;
-  virtual const GURL& script() const = 0;
-
-  // Always returns true.
-  virtual bool Send(IPC::Message* message) = 0;
-};
+class ServiceWorkerHost;
 
 // Represents the per-StoragePartition ServiceWorker data.  Must be used from
 // the UI thread.
@@ -38,7 +30,8 @@ class ServiceWorkerContext {
   typedef base::Callback<void(bool success)> ResultCallback;
   typedef base::Callback<void(bool success, const IPC::Message& message)>
       MessageCallback;
-  typedef base::Callback<void(WeakPtr<ServiceWorkerProxy>)> GetWorkerCallback;
+  typedef base::Callback<void(base::WeakPtr<ServiceWorkerHost>)>
+      GetWorkerCallback;
 
   // Equivalent to calling navigator.serviceWorker.register(script_url, {scope:
   // pattern}) from a renderer in |source_process_id|, except that |pattern| is
@@ -69,17 +62,17 @@ class ServiceWorkerContext {
                                        int source_process_id,
                                        const ResultCallback& callback) = 0;
 
-  // Provides a ServiceWorkerProxy object, via callback, for communicating with
+  // Provides a ServiceWorkerHost object, via callback, for communicating with
   // the service worker registered for |scope|. May return NULL if there's an
   // error. Should the service worker be unregistered or for some other reason
-  // become unavailable the ServiceWorkerProxy will be deleted; test the weak
-  // pointer before use. 
-  // 
+  // become unavailable the ServiceWorkerHost will be deleted; test the weak
+  // pointer before use.
+  //
   // Optionally provide a |listener| that will be reattached during normal
   // service worker process lifetime events of being shutdown and restarted.
-  virtual void GetServiceWorkerProxy(const Scope& scope,
-                                     IPC::Listener* listener,
-                                     const GetWorkerCallback& callback) = 0;
+  virtual void GetServiceWorkerHost(const Scope& scope,
+                                    IPC::Listener* listener,
+                                    const GetWorkerCallback& callback) = 0;
 
   // Sends an IPC message to the active ServiceWorker whose scope is |pattern|.
   // If the worker is not running this first tries to start it. |callback| can
