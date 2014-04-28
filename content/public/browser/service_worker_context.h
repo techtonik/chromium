@@ -28,8 +28,6 @@ class ServiceWorkerContext {
   typedef GURL Scope;
 
   typedef base::Callback<void(bool success)> ResultCallback;
-  typedef base::Callback<void(bool success, const IPC::Message& message)>
-      MessageCallback;
   typedef base::Callback<void(base::WeakPtr<ServiceWorkerHost>)>
       GetWorkerCallback;
 
@@ -73,25 +71,6 @@ class ServiceWorkerContext {
   virtual void GetServiceWorkerHost(const Scope& scope,
                                     IPC::Listener* listener,
                                     const GetWorkerCallback& callback) = 0;
-
-  // Sends an IPC message to the active ServiceWorker whose scope is |pattern|.
-  // If the worker is not running this first tries to start it. |callback| can
-  // be null if the sender does not need to know if the message is successfully
-  // sent or not. (If the sender expects the receiver to respond use
-  // SendMessageAndRegisterCallback instead.)
-  virtual void SendMessage(const Scope& pattern,
-                           const IPC::Message& message,
-                           const ResultCallback& callback) = 0;
-
-  // Sends an IPC message to the active ServiceWorker whose scope is |pattern|
-  // and registers |callback| to be notified when a response message is
-  // received. The |callback| will be also fired with an error code if the
-  // worker is unexpectedly (being) stopped. If the worker is not running this
-  // first tries to start it by calling StartWorker internally.
-  virtual void SendMessageAndRegisterCallback(
-      const Scope& pattern,
-      const IPC::Message& message,
-      const MessageCallback& callback) = 0;
 
  protected:
   ServiceWorkerContext() {}

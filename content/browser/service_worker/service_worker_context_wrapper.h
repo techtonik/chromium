@@ -56,13 +56,6 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
   virtual void GetServiceWorkerHost(const Scope& scope,
                                     IPC::Listener* listener,
                                     const GetWorkerCallback& callback) OVERRIDE;
-  virtual void SendMessage(const GURL& pattern,
-                           const IPC::Message& message,
-                           const ResultCallback& callback) OVERRIDE;
-  virtual void SendMessageAndRegisterCallback(const GURL& pattern,
-                                              const IPC::Message& message,
-                                              const MessageCallback& callback)
-      OVERRIDE;
 
   void AddObserver(ServiceWorkerContextObserver* observer);
   void RemoveObserver(ServiceWorkerContextObserver* observer);

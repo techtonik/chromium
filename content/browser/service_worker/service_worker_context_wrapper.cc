@@ -44,43 +44,6 @@ void PostResultToUIFromStatusOnIO(
   }
 }
 
-void SendMessageAfterFind(
-    const IPC::Message& message,
-    const ServiceWorkerContext::ResultCallback& callback,
-    ServiceWorkerStatusCode status,
-    const scoped_refptr<ServiceWorkerRegistration>& registration) {
-  if (status != SERVICE_WORKER_OK || !registration->active_version()) {
-    callback.Run(false);
-    return;
-  }
-  registration->active_version()->SendMessage(
-      message, base::Bind(&PostResultToUIFromStatusOnIO, callback));
-}
-
-void PostMessageToUIFromStatusMessageOnIO(
-    const ServiceWorkerContext::MessageCallback& continuation,
-    ServiceWorkerStatusCode status,
-    const IPC::Message& message) {
-  DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  BrowserThread::PostTask(
-      BrowserThread::UI,
-      FROM_HERE,
-      base::Bind(continuation, status == SERVICE_WORKER_OK, message));
-}
-
-void SendMessageAndRegisterAfterFind(
-    const IPC::Message& message,
-    const ServiceWorkerContext::MessageCallback& callback,
-    ServiceWorkerStatusCode status,
-    const scoped_refptr<ServiceWorkerRegistration>& registration) {
-  if (status != SERVICE_WORKER_OK || !registration->active_version()) {
-    callback.Run(false, IPC::Message());
-    return;
-  }
-  registration->active_version()->SendMessageAndRegisterCallback(
-      message, base::Bind(&PostMessageToUIFromStatusMessageOnIO, callback));
-}
-
 }  // namespace
 
 namespace content {
@@ -187,45 +150,6 @@ void ServiceWorkerContextWrapper::AddObserver(
 void ServiceWorkerContextWrapper::RemoveObserver(
     ServiceWorkerContextObserver* observer) {
   observer_list_->RemoveObserver(observer);
-}
-
-void ServiceWorkerContextWrapper::SendMessage(const GURL& pattern,
-                                              const IPC::Message& message,
-                                              const ResultCallback& callback) {
-  if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
-    BrowserThread::PostTask(
-        BrowserThread::IO,
-        FROM_HERE,
-        base::Bind(&ServiceWorkerContextWrapper::SendMessage,
-                   this,
-                   pattern,
-                   message,
-                   callback));
-    return;
-  }
-
-  context()->storage()->FindRegistrationForPattern(
-      pattern, base::Bind(&SendMessageAfterFind, message, callback));
-}
-
-void ServiceWorkerContextWrapper::SendMessageAndRegisterCallback(
-    const GURL& pattern,
-    const IPC::Message& message,
-    const MessageCallback& callback) {
-  if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
-    BrowserThread::PostTask(
-        BrowserThread::IO,
-        FROM_HERE,
-        base::Bind(&ServiceWorkerContextWrapper::SendMessageAndRegisterCallback,
-                   this,
-                   pattern,
-                   message,
-                   callback));
-    return;
-  }
-
-  context()->storage()->FindRegistrationForPattern(
-      pattern, base::Bind(&SendMessageAndRegisterAfterFind, message, callback));
 }
 
 }  // namespace content
