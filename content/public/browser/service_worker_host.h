@@ -18,7 +18,8 @@ class ServiceWorkerHostImpl;
 class ServiceWorkerHost : public IPC::Sender {
  private:
   friend ServiceWorkerHostImpl;
-  virtual ~ServiceWorkerHost() {}
+  ServiceWorkerHost() {};
+  virtual ~ServiceWorkerHost() {};
   DISALLOW_COPY_AND_ASSIGN(ServiceWorkerHost);
 };
 
