@@ -22,11 +22,11 @@ void SendMessageAfterFind(
     IPC::Message* message,
     ServiceWorkerStatusCode status,
     const scoped_refptr<ServiceWorkerRegistration>& registration) {
-  if (status != SERVICE_WORKER_OK || !registration->active_version() ||
-      !message) {
+  if (status != SERVICE_WORKER_OK || !registration->active_version()) {
     // TODO(scheib) Inform the Host client that we failed to send?
     return;
   }
+  CHECK(message);  // Check pointer before taking a reference to it.
   // TODO(scheib) Inform the Host client that we failed to send (via callback)?
   registration->active_version()->SendMessage(
       *message, ServiceWorkerVersion::StatusCallback());
