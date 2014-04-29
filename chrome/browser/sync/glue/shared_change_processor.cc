@@ -4,9 +4,9 @@
 
 #include "chrome/browser/sync/glue/shared_change_processor.h"
 
-#include "chrome/browser/sync/glue/generic_change_processor.h"
 #include "chrome/browser/sync/profile_sync_components_factory.h"
 #include "chrome/browser/sync/profile_sync_service.h"
+#include "components/sync_driver/generic_change_processor.h"
 #include "content/public/browser/browser_thread.h"
 #include "sync/api/sync_change.h"
 
@@ -181,6 +181,17 @@ bool SharedChangeProcessor::CryptoReadyIfNecessary() {
     return true;  // Otherwise we get into infinite spin waiting.
   }
   return generic_change_processor_->CryptoReadyIfNecessary(type_);
+}
+
+bool SharedChangeProcessor::GetDataTypeContext(std::string* context) const {
+  DCHECK(backend_loop_.get());
+  DCHECK(backend_loop_->BelongsToCurrentThread());
+  AutoLock lock(monitor_lock_);
+  if (disconnected_) {
+    LOG(ERROR) << "Change processor disconnected.";
+    return false;
+  }
+  return generic_change_processor_->GetDataTypeContext(type_, context);
 }
 
 void SharedChangeProcessor::ActivateDataType(

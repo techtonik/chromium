@@ -63,7 +63,6 @@ class SessionStorageNamespaceImpl;
 class TestRenderViewHost;
 class TimeoutMonitor;
 struct FileChooserParams;
-struct ShowDesktopNotificationHostMsgParams;
 
 #if defined(COMPILER_MSVC)
 // RenderViewHostImpl is the bottom of a diamond-shaped hierarchy,
@@ -158,15 +157,6 @@ class CONTENT_EXPORT RenderViewHostImpl
   virtual void ClearFocusedElement() OVERRIDE;
   virtual void ClosePage() OVERRIDE;
   virtual void CopyImageAt(int x, int y) OVERRIDE;
-  virtual void DesktopNotificationPermissionRequestDone(
-      int callback_context) OVERRIDE;
-  virtual void DesktopNotificationPostDisplay(int callback_context) OVERRIDE;
-  virtual void DesktopNotificationPostError(
-      int notification_id,
-      const base::string16& message) OVERRIDE;
-  virtual void DesktopNotificationPostClose(int notification_id,
-                                            bool by_user) OVERRIDE;
-  virtual void DesktopNotificationPostClick(int notification_id) OVERRIDE;
   virtual void DirectoryEnumerationFinished(
       int request_id,
       const std::vector<base::FilePath>& files) OVERRIDE;
@@ -226,7 +216,6 @@ class CONTENT_EXPORT RenderViewHostImpl
                                          float x,
                                          float y) OVERRIDE;
   virtual void RequestFindMatchRects(int current_version) OVERRIDE;
-  virtual void DisableFullscreenEncryptedMediaPlayback() OVERRIDE;
 #endif
 
   void set_delegate(RenderViewHostDelegate* d) {
@@ -240,9 +229,12 @@ class CONTENT_EXPORT RenderViewHostImpl
   // The |opener_route_id| parameter indicates which RenderView created this
   // (MSG_ROUTING_NONE if none). If |max_page_id| is larger than -1, the
   // RenderView is told to start issuing page IDs at |max_page_id| + 1.
+  // |window_was_created_with_opener| is true if this top-level frame was
+  // created with an opener. (The opener may have been closed since.)
   virtual bool CreateRenderView(const base::string16& frame_name,
                                 int opener_route_id,
-                                int32 max_page_id);
+                                int32 max_page_id,
+                                bool window_was_created_with_opener);
 
   base::TerminationStatus render_view_termination_status() const {
     return render_view_termination_status_;
@@ -290,13 +282,6 @@ class CONTENT_EXPORT RenderViewHostImpl
   // canceled or suspended.  This is important if we later return to this
   // RenderViewHost.
   void CancelSuspendedNavigations();
-
-  // Whether the initial empty page of this view has been accessed by another
-  // page, making it unsafe to show the pending URL.  Always false after the
-  // first commit.
-  bool has_accessed_initial_document() {
-    return has_accessed_initial_document_;
-  }
 
   // Whether this RenderViewHost has been swapped out to be displayed by a
   // different process.
@@ -541,13 +526,7 @@ class CONTENT_EXPORT RenderViewHostImpl
   void OnAccessibilityLocationChanges(
       const std::vector<AccessibilityHostMsg_LocationChangeParams>& params);
   void OnDidZoomURL(double zoom_level, bool remember, const GURL& url);
-  void OnRequestDesktopNotificationPermission(const GURL& origin,
-                                              int callback_id);
-  void OnShowDesktopNotification(
-      const ShowDesktopNotificationHostMsgParams& params);
-  void OnCancelDesktopNotification(int notification_id);
   void OnRunFileChooser(const FileChooserParams& params);
-  void OnDidAccessInitialDocument();
   void OnFocusedNodeTouched(bool editable);
 
 #if defined(OS_MACOSX) || defined(OS_ANDROID)
@@ -607,12 +586,6 @@ class CONTENT_EXPORT RenderViewHostImpl
   // a new one if a second navigation occurs.
   // TODO(nasko): Move to RenderFrameHost, as this is per-frame state.
   scoped_ptr<FrameMsg_Navigate_Params> suspended_nav_params_;
-
-  // Whether the initial empty page of this view has been accessed by another
-  // page, making it unsafe to show the pending URL.  Usually false unless
-  // another window tries to modify the blank page.  Always false after the
-  // first commit.
-  bool has_accessed_initial_document_;
 
   // The current state of this RVH.
   // TODO(nasko): Move to RenderFrameHost, as this is per-frame state.

@@ -53,13 +53,45 @@ function updateIconClass(classList, newClass) {
   classList['last_icon_class'] = newClass;
 }
 
+// Does a search using |baseSearchUrl| and the text in the search box.
+function search(baseSearchUrl) {
+  var searchTextNode = document.getElementById('search-box');
+  document.location = baseSearchUrl + searchTextNode.value;
+  return false;
+}
+
+// Implements button clicks.  This function is needed during the transition
+// between implementing these in trunk chromium and implementing them in
+// iOS.
+function reloadButtonClick(url) {
+  if (window.errorPageController) {
+    errorPageController.reloadButtonClick();
+  } else {
+    location = url;
+  }
+}
+
+function loadStaleButtonClick() {
+  if (window.errorPageController) {
+    errorPageController.loadStaleButtonClick();
+  }
+}
+
+function moreButtonClick() {
+  if (window.errorPageController) {
+    errorPageController.moreButtonClick();
+  }
+}
+
 <if expr="is_macosx or is_ios or is_linux or is_android">
 // Re-orders buttons. Used on Mac, Linux, and Android, where reload should go
 // on the right.
 function swapButtonOrder() {
-  reloadButton = document.getElementById('reload-button');
-  moreLessButton = document.getElementById('more-less-button');
+  var reloadButton = document.getElementById('reload-button');
+  var moreLessButton = document.getElementById('more-less-button');
+  var staleLoadButton = document.getElementById('stale-load-button');
   reloadButton.parentNode.insertBefore(moreLessButton, reloadButton);
+  reloadButton.parentNode.insertBefore(staleLoadButton, reloadButton)
 }
 document.addEventListener("DOMContentLoaded", swapButtonOrder);
 </if>

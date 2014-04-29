@@ -24,6 +24,9 @@ IPC_ENUM_TRAITS_MAX_VALUE(blink::WebServiceWorkerError::ErrorType,
 IPC_ENUM_TRAITS_MAX_VALUE(blink::WebServiceWorkerEventResult,
                           blink::WebServiceWorkerEventResultLast)
 
+IPC_ENUM_TRAITS_MAX_VALUE(blink::WebServiceWorkerState,
+                          blink::WebServiceWorkerStateLast)
+
 IPC_STRUCT_TRAITS_BEGIN(content::ServiceWorkerFetchRequest)
   IPC_STRUCT_TRAITS_MEMBER(url)
   IPC_STRUCT_TRAITS_MEMBER(method)
@@ -40,6 +43,14 @@ IPC_STRUCT_TRAITS_BEGIN(content::ServiceWorkerResponse)
   IPC_STRUCT_TRAITS_MEMBER(headers)
 IPC_STRUCT_TRAITS_END()
 
+IPC_STRUCT_TRAITS_BEGIN(content::ServiceWorkerObjectInfo)
+  IPC_STRUCT_TRAITS_MEMBER(handle_id)
+  IPC_STRUCT_TRAITS_MEMBER(scope)
+  IPC_STRUCT_TRAITS_MEMBER(url)
+  IPC_STRUCT_TRAITS_MEMBER(state)
+IPC_STRUCT_TRAITS_END()
+
+//---------------------------------------------------------------------------
 // Messages sent from the child process to the browser.
 
 IPC_MESSAGE_CONTROL5(ServiceWorkerHostMsg_RegisterServiceWorker,
@@ -91,29 +102,41 @@ IPC_MESSAGE_CONTROL2(ServiceWorkerHostMsg_RemoveScriptClient,
                      int /* thread_id */,
                      int /* provider_id */)
 
-// Informs the browser that install event handling has finished.
-// Sent via EmbeddedWorker.
-IPC_MESSAGE_CONTROL1(ServiceWorkerHostMsg_InstallEventFinished,
-                     blink::WebServiceWorkerEventResult)
+// Informs the browser that event handling has finished.
+// Routed to the target ServiceWorkerVersion.
+IPC_MESSAGE_ROUTED2(ServiceWorkerHostMsg_InstallEventFinished,
+                    int /* request_id */,
+                    blink::WebServiceWorkerEventResult)
+IPC_MESSAGE_ROUTED2(ServiceWorkerHostMsg_ActivateEventFinished,
+                    int /* request_id */,
+                    blink::WebServiceWorkerEventResult);
+IPC_MESSAGE_ROUTED3(ServiceWorkerHostMsg_FetchEventFinished,
+                    int /* request_id */,
+                    content::ServiceWorkerFetchEventResult,
+                    content::ServiceWorkerResponse)
+IPC_MESSAGE_ROUTED1(ServiceWorkerHostMsg_SyncEventFinished,
+                    int /* request_id */)
 
-IPC_MESSAGE_CONTROL1(ServiceWorkerHostMsg_ActivateEventFinished,
-                     blink::WebServiceWorkerEventResult);
+// Asks the browser to retrieve documents controlled by the sender
+// ServiceWorker.
+IPC_MESSAGE_ROUTED1(ServiceWorkerHostMsg_GetClientDocuments,
+                    int /* request_id */)
 
-// Informs the browser that fetch event handling has finished.
-// Sent via EmbeddedWorker.
-IPC_MESSAGE_CONTROL2(ServiceWorkerHostMsg_FetchEventFinished,
-                     content::ServiceWorkerFetchEventResult,
-                     content::ServiceWorkerResponse)
-
+//---------------------------------------------------------------------------
 // Messages sent from the browser to the child process.
+//
+// NOTE: All ServiceWorkerMsg messages not sent via EmbeddedWorker must have
+// a thread_id as their first field so that ServiceWorkerMessageFilter can
+// extract it and dispatch the message to the correct ServiceWorkerDispatcher
+// on the correct thread.
 
-// Response to ServiceWorkerMsg_RegisterServiceWorker
+// Response to ServiceWorkerMsg_RegisterServiceWorker.
 IPC_MESSAGE_CONTROL3(ServiceWorkerMsg_ServiceWorkerRegistered,
                      int /* thread_id */,
                      int /* request_id */,
-                     int /* handle_id */)
+                     content::ServiceWorkerObjectInfo)
 
-// Response to ServiceWorkerMsg_UnregisterServiceWorker
+// Response to ServiceWorkerMsg_UnregisterServiceWorker.
 IPC_MESSAGE_CONTROL2(ServiceWorkerMsg_ServiceWorkerUnregistered,
                      int /* thread_id */,
                      int /* request_id */)
@@ -126,23 +149,36 @@ IPC_MESSAGE_CONTROL4(ServiceWorkerMsg_ServiceWorkerRegistrationError,
                      blink::WebServiceWorkerError::ErrorType /* code */,
                      base::string16 /* message */)
 
-// Sent via EmbeddedWorker to dispatch install event.
-IPC_MESSAGE_CONTROL1(ServiceWorkerMsg_InstallEvent, int /* active_version_id */)
+// Informs the child process that the ServiceWorker's state has changed.
+IPC_MESSAGE_CONTROL3(ServiceWorkerMsg_ServiceWorkerStateChanged,
+                     int /* thread_id */,
+                     int /* handle_id */,
+                     blink::WebServiceWorkerState)
 
-IPC_MESSAGE_CONTROL0(ServiceWorkerMsg_ActivateEvent)
+// Tells the child process to set the current ServiceWorker for the given
+// provider.
+IPC_MESSAGE_CONTROL3(ServiceWorkerMsg_SetCurrentServiceWorker,
+                     int /* thread_id */,
+                     int /* provider_id */,
+                     content::ServiceWorkerObjectInfo)
 
-// Sent via EmbeddedWorker to dispatch fetch event.
-IPC_MESSAGE_CONTROL1(ServiceWorkerMsg_FetchEvent,
+// Sent via EmbeddedWorker to dispatch events.
+IPC_MESSAGE_CONTROL2(ServiceWorkerMsg_InstallEvent,
+                     int /* request_id */,
+                     int /* active_version_id */)
+IPC_MESSAGE_CONTROL1(ServiceWorkerMsg_ActivateEvent,
+                     int /* request_id */)
+IPC_MESSAGE_CONTROL2(ServiceWorkerMsg_FetchEvent,
+                     int /* request_id */,
                      content::ServiceWorkerFetchRequest)
-
-// Sends a 'message' event to a service worker (browser->EmbeddedWorker).
+IPC_MESSAGE_CONTROL1(ServiceWorkerMsg_SyncEvent,
+                     int /* request_id */)
 IPC_MESSAGE_CONTROL3(ServiceWorkerMsg_Message,
                      base::string16 /* message */,
                      std::vector<int> /* sent_message_port_ids */,
                      std::vector<int> /* new_routing_ids */)
 
-// Sent via EmbeddedWorker to dispatch sync event.
-IPC_MESSAGE_CONTROL0(ServiceWorkerMsg_SyncEvent)
-
-// Informs the browser that sync event handling has finished.
-IPC_MESSAGE_CONTROL0(ServiceWorkerHostMsg_SyncEventFinished)
+// Sent via EmbeddedWorker as a response of GetClientDocuments.
+IPC_MESSAGE_CONTROL2(ServiceWorkerMsg_DidGetClientDocuments,
+                     int /* request_id */,
+                     std::vector<int> /* client_ids */)

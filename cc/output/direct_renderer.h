@@ -26,15 +26,12 @@ class CC_EXPORT DirectRenderer : public Renderer {
  public:
   virtual ~DirectRenderer();
 
-  ResourceProvider* resource_provider() const { return resource_provider_; }
-
   virtual bool CanReadPixels() const OVERRIDE;
   virtual void DecideRenderPassAllocationsForFrame(
       const RenderPassList& render_passes_in_draw_order) OVERRIDE;
   virtual bool HasAllocatedResourcesForTesting(RenderPass::Id id) const
       OVERRIDE;
   virtual void DrawFrame(RenderPassList* render_passes_in_draw_order,
-                         ContextProvider* offscreen_context_provider,
                          float device_scale_factor,
                          const gfx::Rect& device_viewport_rect,
                          const gfx::Rect& device_clip_rect,
@@ -54,8 +51,6 @@ class CC_EXPORT DirectRenderer : public Renderer {
 
     gfx::Transform projection_matrix;
     gfx::Transform window_matrix;
-
-    ContextProvider* offscreen_context_provider;
 
     bool disable_picture_quad_image_filtering;
 
@@ -97,7 +92,7 @@ class CC_EXPORT DirectRenderer : public Renderer {
   void DrawRenderPass(DrawingFrame* frame, const RenderPass* render_pass);
   bool UseRenderPass(DrawingFrame* frame, const RenderPass* render_pass);
 
-  void RunOnDemandRasterTask(internal::Task* on_demand_raster_task);
+  void RunOnDemandRasterTask(Task* on_demand_raster_task);
 
   virtual void BindFramebufferToOutputSurface(DrawingFrame* frame) = 0;
   virtual bool BindFramebufferToTexture(DrawingFrame* frame,
@@ -140,7 +135,7 @@ class CC_EXPORT DirectRenderer : public Renderer {
  private:
   gfx::Vector2d enlarge_pass_texture_amount_;
 
-  internal::NamespaceToken on_demand_task_namespace_;
+  NamespaceToken on_demand_task_namespace_;
 
   DISALLOW_COPY_AND_ASSIGN(DirectRenderer);
 };

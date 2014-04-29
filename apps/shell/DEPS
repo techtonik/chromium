@@ -7,6 +7,11 @@ include_rules = [
   "+apps/shell/common",
   "+apps/shell/test",
 
+  "+grit/extensions_resources.h",
+
+  # TODO(yoz): Do not depend on Chrome resources.
+  "!grit/common_resources.h",
+
   # Do not add dependencies on Chrome. Talk to OWNERS about how to refactor
   # the code you need to a shared location.
   "-chrome",
@@ -17,10 +22,6 @@ include_rules = [
   "!chrome/browser/chrome_notification_types.h",
   "!chrome/common/extensions/api/generated_api.h",
   "!chrome/common/extensions/api/generated_schemas.h",
-  "!chrome/common/extensions/api/sockets/sockets_manifest_handler.h",
-  "!chrome/common/extensions/extension_file_util.h",
-  "!chrome/common/extensions/features/base_feature_provider.h",
-  "!chrome/common/extensions/features/base_feature_provider.h",
   "!chrome/common/extensions/permissions/chrome_api_permissions.h",
   "!chrome/renderer/extensions/dispatcher.h",
   "!chrome/renderer/extensions/extension_helper.h",

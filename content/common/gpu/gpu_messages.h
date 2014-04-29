@@ -165,7 +165,8 @@ IPC_STRUCT_TRAITS_BEGIN(gpu::GPUInfo)
   IPC_STRUCT_TRAITS_MEMBER(driver_date)
   IPC_STRUCT_TRAITS_MEMBER(pixel_shader_version)
   IPC_STRUCT_TRAITS_MEMBER(vertex_shader_version)
-  IPC_STRUCT_TRAITS_MEMBER(machine_model)
+  IPC_STRUCT_TRAITS_MEMBER(machine_model_name)
+  IPC_STRUCT_TRAITS_MEMBER(machine_model_version)
   IPC_STRUCT_TRAITS_MEMBER(gl_version)
   IPC_STRUCT_TRAITS_MEMBER(gl_version_string)
   IPC_STRUCT_TRAITS_MEMBER(gl_vendor)
@@ -288,10 +289,6 @@ IPC_MESSAGE_CONTROL0(GpuMsg_CollectGraphicsInfo)
 // Tells the GPU process to report video_memory information for the task manager
 IPC_MESSAGE_CONTROL0(GpuMsg_GetVideoMemoryUsageStats)
 
-// Tells the GPU process that the browser process has finished resizing the
-// view.
-IPC_MESSAGE_ROUTED0(AcceleratedSurfaceMsg_ResizeViewACK)
-
 // Tells the GPU process that the browser process has handled the swap
 // buffers or post sub-buffer request. A non-zero sync point means
 // that we should wait for the sync point. The surface_handle identifies
@@ -384,13 +381,6 @@ IPC_MESSAGE_CONTROL3(GpuHostMsg_OnLogMessage,
                      int /*severity*/,
                      std::string /* header */,
                      std::string /* message */)
-
-// Resize the window that is being drawn into. It's important that this
-// resize be synchronized with the swapping of the front and back buffers.
-IPC_MESSAGE_CONTROL3(GpuHostMsg_ResizeView,
-                     int32 /* surface_id */,
-                     int32 /* route_id */,
-                     gfx::Size /* size */)
 
 // Tells the browser that a new accelerated surface was initialized.
 IPC_MESSAGE_CONTROL2(GpuHostMsg_AcceleratedSurfaceInitialized,

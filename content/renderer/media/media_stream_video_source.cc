@@ -27,14 +27,14 @@ const char MediaStreamVideoSource::kMaxFrameRate[] = "maxFrameRate";
 const char MediaStreamVideoSource::kMinFrameRate[] = "minFrameRate";
 
 const char* kSupportedConstraints[] = {
-    MediaStreamVideoSource::kMaxAspectRatio,
-    MediaStreamVideoSource::kMinAspectRatio,
-    MediaStreamVideoSource::kMaxWidth,
-    MediaStreamVideoSource::kMinWidth,
-    MediaStreamVideoSource::kMaxHeight,
-    MediaStreamVideoSource::kMinHeight,
-    MediaStreamVideoSource::kMaxFrameRate,
-    MediaStreamVideoSource::kMinFrameRate,
+  MediaStreamVideoSource::kMaxAspectRatio,
+  MediaStreamVideoSource::kMinAspectRatio,
+  MediaStreamVideoSource::kMaxWidth,
+  MediaStreamVideoSource::kMinWidth,
+  MediaStreamVideoSource::kMaxHeight,
+  MediaStreamVideoSource::kMinHeight,
+  MediaStreamVideoSource::kMaxFrameRate,
+  MediaStreamVideoSource::kMinFrameRate,
 };
 
 const int MediaStreamVideoSource::kDefaultWidth = 640;
@@ -291,7 +291,7 @@ MediaStreamVideoSource* MediaStreamVideoSource::GetVideoSource(
   return static_cast<MediaStreamVideoSource*>(source.extraData());
 }
 
-//static
+// static
 bool MediaStreamVideoSource::IsConstraintSupported(const std::string& name) {
   for (size_t i = 0; i < arraysize(kSupportedConstraints); ++i) {
     if (kSupportedConstraints[i] == name)
@@ -300,12 +300,8 @@ bool MediaStreamVideoSource::IsConstraintSupported(const std::string& name) {
   return false;
 }
 
-MediaStreamVideoSource::MediaStreamVideoSource(
-    MediaStreamDependencyFactory* factory)
-    : state_(NEW),
-      factory_(factory),
-      capture_adapter_(NULL) {
-  DCHECK(factory_);
+MediaStreamVideoSource::MediaStreamVideoSource()
+    : state_(NEW) {
 }
 
 MediaStreamVideoSource::~MediaStreamVideoSource() {
@@ -354,35 +350,17 @@ void MediaStreamVideoSource::AddTrack(
 }
 
 void MediaStreamVideoSource::RemoveTrack(MediaStreamVideoTrack* video_track) {
+  DCHECK(CalledOnValidThread());
   std::vector<MediaStreamVideoTrack*>::iterator it =
       std::find(tracks_.begin(), tracks_.end(), video_track);
   DCHECK(it != tracks_.end());
   tracks_.erase(it);
-}
-
-void MediaStreamVideoSource::InitAdapter() {
-  if (adapter_)
-    return;
-  // Create the webrtc::MediaStreamVideoSourceInterface adapter.
-  // It needs the constraints so that constraints used by a PeerConnection
-  // will be available such as constraints for CPU adaptation and a tab
-  // capture.
-  bool is_screencast =
-      device_info().device.type == MEDIA_TAB_VIDEO_CAPTURE ||
-      device_info().device.type == MEDIA_DESKTOP_VIDEO_CAPTURE;
-  capture_adapter_ = factory_->CreateVideoCapturer(is_screencast);
-  adapter_ = factory_->CreateVideoSource(capture_adapter_,
-                                         current_constraints_);
-}
-
-webrtc::VideoSourceInterface* MediaStreamVideoSource::GetAdapter() {
-  if (!adapter_) {
-    InitAdapter();
-  }
-  return adapter_;
+  if (tracks_.empty())
+    StopSource();
 }
 
 void MediaStreamVideoSource::DoStopSource() {
+  DCHECK(CalledOnValidThread());
   DVLOG(3) << "DoStopSource()";
   StopSourceImpl();
   state_ = ENDED;
@@ -390,38 +368,27 @@ void MediaStreamVideoSource::DoStopSource() {
 }
 
 void MediaStreamVideoSource::DeliverVideoFrame(
-    const scoped_refptr<media::VideoFrame>& frame) {
+    const scoped_refptr<media::VideoFrame>& frame,
+    const media::VideoCaptureFormat& format) {
   DCHECK(CalledOnValidThread());
   scoped_refptr<media::VideoFrame> video_frame(frame);
 
   if (frame->visible_rect().size().width() > max_frame_output_size_.width() ||
       frame->visible_rect().size().height() > max_frame_output_size_.height()) {
-
     // If |frame| is not the size that is expected, we need to crop it by
     // providing a new |visible_rect|. The new visible rect must be within the
     // original |visible_rect|.
-    const int visible_width = std::min(max_frame_output_size_.width(),
-                                       frame->visible_rect().width());
-
-    const int visible_height = std::min(max_frame_output_size_.height(),
-                                        frame->visible_rect().height());
-
-    // Find a new horizontal offset within |frame|.
-    const int horiz_crop = frame->visible_rect().x() +
-        ((frame->visible_rect().width() - visible_width) / 2);
-    // Find a new vertical offset within |frame|.
-    const int vert_crop = frame->visible_rect().y() +
-        ((frame->visible_rect().height() - visible_height) / 2);
-
-    gfx::Rect rect(horiz_crop, vert_crop, visible_width, visible_height);
-    video_frame = media::VideoFrame::WrapVideoFrame(
-        frame, rect, rect.size(), base::Bind(&ReleaseOriginalFrame, frame));
-  }
-
-  if ((frame->format() == media::VideoFrame::I420 ||
-       frame->format() == media::VideoFrame::YV12) &&
-      capture_adapter_) {
-    capture_adapter_->OnFrameCaptured(video_frame);
+    gfx::Rect output_rect = frame->visible_rect();
+    output_rect.ClampToCenteredSize(max_frame_output_size_);
+    // TODO(perkj): Allow cropping of textures once http://crbug/362521 is
+    // fixed.
+    if (frame->format() != media::VideoFrame::NATIVE_TEXTURE) {
+      video_frame = media::VideoFrame::WrapVideoFrame(
+          frame,
+          output_rect,
+          output_rect.size(),
+          base::Bind(&ReleaseOriginalFrame, frame));
+    }
   }
 
   for (std::vector<MediaStreamVideoTrack*>::iterator it = tracks_.begin();
@@ -440,8 +407,10 @@ void MediaStreamVideoSource::OnSupportedFormats(
                                      &current_format_,
                                      &max_frame_output_size_,
                                      &current_constraints_)) {
-    FinalizeAddTrack();
     SetReadyState(blink::WebMediaStreamSource::ReadyStateEnded);
+    // This object can be deleted after calling FinalizeAddTrack. See comment
+    // in the header file.
+    FinalizeAddTrack();
     return;
   }
 
@@ -496,6 +465,8 @@ void MediaStreamVideoSource::OnStartDone(bool success) {
     StopSourceImpl();
   }
 
+  // This object can be deleted after calling FinalizeAddTrack. See comment in
+  // the header file.
   FinalizeAddTrack();
 }
 
@@ -507,7 +478,6 @@ void MediaStreamVideoSource::FinalizeAddTrack() {
   callbacks.swap(requested_constraints_);
   for (std::vector<RequestedConstraints>::iterator it = callbacks.begin();
        it != callbacks.end(); ++it) {
-
     bool success = state_ == STARTED &&
         !FilterFormats(it->constraints, formats).empty();
     DVLOG(3) << "FinalizeAddTrack() success " << success;

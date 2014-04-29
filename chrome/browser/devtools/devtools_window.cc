@@ -25,7 +25,6 @@
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/file_select_helper.h"
 #include "chrome/browser/infobars/confirm_infobar_delegate.h"
-#include "chrome/browser/infobars/infobar.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/prefs/pref_service_syncable.h"
 #include "chrome/browser/profiles/profile.h"
@@ -47,6 +46,7 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/common/render_messages.h"
 #include "chrome/common/url_constants.h"
+#include "components/infobars/core/infobar.h"
 #include "components/user_prefs/pref_registry_syncable.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/child_process_security_policy.h"
@@ -398,6 +398,8 @@ DevToolsWindow::~DevToolsWindow() {
     jobs_it->second->Stop();
   }
   indexing_jobs_.clear();
+  if (device_listener_enabled_)
+    EnableRemoteDeviceCounter(false);
 }
 
 // static
@@ -425,7 +427,7 @@ void DevToolsWindow::RegisterProfilePrefs(
 
   registry->RegisterBooleanPref(
       prefs::kDevToolsDiscoverUsbDevicesEnabled,
-      false,
+      true,
       user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
   registry->RegisterBooleanPref(
       prefs::kDevToolsPortForwardingEnabled,
@@ -785,6 +787,7 @@ DevToolsWindow::DevToolsWindow(Profile* profile,
       browser_(NULL),
       is_docked_(true),
       can_dock_(can_dock),
+      device_listener_enabled_(false),
       // This initialization allows external front-end to work without changes.
       // We don't wait for docking call, but instead immediately show undocked.
       // Passing "dockSide=undocked" parameter ensures proper UI.
@@ -1374,6 +1377,51 @@ void DevToolsWindow::ResetZoom() {
   chrome_page_zoom::Zoom(web_contents(), content::PAGE_ZOOM_RESET);
 }
 
+void DevToolsWindow::OpenUrlOnRemoteDeviceAndInspect(
+    const std::string& browser_id,
+    const std::string& url) {
+  if (remote_targets_handler_)
+    remote_targets_handler_->OpenAndInspect(browser_id, url, profile_);
+}
+
+void DevToolsWindow::StartRemoteDevicesListener() {
+  remote_targets_handler_ = DevToolsRemoteTargetsUIHandler::CreateForAdb(
+      base::Bind(&DevToolsWindow::PopulateRemoteDevices,
+                 base::Unretained(this)),
+      profile_);
+}
+
+void DevToolsWindow::StopRemoteDevicesListener() {
+  remote_targets_handler_.reset();
+}
+
+void DevToolsWindow::EnableRemoteDeviceCounter(bool enable) {
+  DevToolsAndroidBridge* adb_bridge =
+      DevToolsAndroidBridge::Factory::GetForProfile(profile_);
+  if (!adb_bridge)
+    return;
+
+  DCHECK(device_listener_enabled_ != enable);
+  device_listener_enabled_ = enable;
+  if (enable)
+    adb_bridge->AddDeviceCountListener(this);
+  else
+    adb_bridge->RemoveDeviceCountListener(this);
+}
+
+void DevToolsWindow::DeviceCountChanged(int count) {
+  base::FundamentalValue value(count);
+  CallClientFunction(
+      "InspectorFrontendAPI.setRemoteDeviceCount", &value, NULL, NULL);
+}
+
+void DevToolsWindow::PopulateRemoteDevices(
+    const std::string& source,
+    scoped_ptr<base::ListValue> targets) {
+  CallClientFunction(
+      "InspectorFrontendAPI.populateRemoteDevices", targets.get(), NULL, NULL);
+}
+
 void DevToolsWindow::FileSavedAs(const std::string& url) {
   base::StringValue url_value(url);
   CallClientFunction("InspectorFrontendAPI.savedURL", &url_value, NULL, NULL);
@@ -1628,7 +1676,7 @@ void DevToolsWindow::CallClientFunction(const std::string& function_name,
     }
   }
   base::string16 javascript =
-      base::ASCIIToUTF16(function_name + "(" + params + ");");
+      base::UTF8ToUTF16(function_name + "(" + params + ");");
   web_contents_->GetMainFrame()->ExecuteJavaScript(javascript);
 }
 

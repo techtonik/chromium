@@ -56,6 +56,7 @@ CHROME_REMOTING_GROUP_NAME = "chrome-remote-desktop"
 HOME_DIR = os.environ["HOME"]
 CONFIG_DIR = os.path.join(HOME_DIR, ".config/chrome-remote-desktop")
 SESSION_FILE_PATH = os.path.join(HOME_DIR, ".chrome-remote-desktop-session")
+SYSTEM_SESSION_FILE_PATH = "/etc/chrome-remote-desktop-session"
 
 X_LOCK_FILE_TEMPLATE = "/tmp/.X%d-lock"
 FIRST_X_DISPLAY_NUMBER = 20
@@ -80,7 +81,8 @@ g_host_hash = hashlib.md5(socket.gethostname()).hexdigest()
 def is_supported_platform():
   # Always assume that the system is supported if the config directory or
   # session file exist.
-  if os.path.isdir(CONFIG_DIR) or os.path.isfile(SESSION_FILE_PATH):
+  if (os.path.isdir(CONFIG_DIR) or os.path.isfile(SESSION_FILE_PATH) or
+      os.path.isfile(SYSTEM_SESSION_FILE_PATH)):
     return True
 
   # The host has been tested only on Ubuntu.
@@ -488,12 +490,21 @@ def get_daemon_pid():
   uid = os.getuid()
   this_pid = os.getpid()
 
+  # Support new & old psutil API.
+  if 'error' in dir(psutil):
+    # Old API (0.x & 1.x).
+    psutil.Error = psutil.error.Error
+    psget = lambda x: x
+  else:
+    # New API (2.x+).
+    psget = lambda x: x()
+
   for process in psutil.process_iter():
     # Skip any processes that raise an exception, as processes may terminate
     # during iteration over the list.
     try:
       # Skip other users' processes.
-      if process.uids.real != uid:
+      if psget(process.uids).real != uid:
         continue
 
       # Skip the process for this instance.
@@ -501,12 +512,12 @@ def get_daemon_pid():
         continue
 
       # |cmdline| will be [python-interpreter, script-file, other arguments...]
-      cmdline = process.cmdline
+      cmdline = psget(process.cmdline)
       if len(cmdline) < 2:
         continue
       if cmdline[0] == sys.executable and cmdline[1] == sys.argv[0]:
         return process.pid
-    except psutil.error.Error:
+    except psutil.Error:
       continue
 
   return 0
@@ -521,14 +532,9 @@ def choose_x_session():
     the first parameter of subprocess.Popen().  If a suitable session cannot
     be found, returns None.
   """
-  # If the session wrapper script (see below) is given a specific session as an
-  # argument (such as ubuntu-2d on Ubuntu 12.04), the wrapper will run that
-  # session instead of looking for custom .xsession files in the home directory.
-  # So it's necessary to test for these files here.
   XSESSION_FILES = [
     SESSION_FILE_PATH,
-    "~/.xsession",
-    "~/.Xsession" ]
+    SYSTEM_SESSION_FILE_PATH ]
   for startup_file in XSESSION_FILES:
     startup_file = os.path.expanduser(startup_file)
     if os.path.exists(startup_file):

@@ -12,10 +12,12 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string16.h"
+#include "chrome/browser/devtools/device/devtools_android_bridge.h"
 #include "chrome/browser/devtools/devtools_contents_resizing_strategy.h"
 #include "chrome/browser/devtools/devtools_embedder_message_dispatcher.h"
 #include "chrome/browser/devtools/devtools_file_helper.h"
 #include "chrome/browser/devtools/devtools_file_system_indexer.h"
+#include "chrome/browser/devtools/devtools_targets_ui.h"
 #include "chrome/browser/devtools/devtools_toggle_action.h"
 #include "content/public/browser/devtools_client_host.h"
 #include "content/public/browser/devtools_frontend_host_delegate.h"
@@ -54,7 +56,8 @@ class PrefRegistrySyncable;
 class DevToolsWindow : private content::NotificationObserver,
                        private content::WebContentsDelegate,
                        private content::DevToolsFrontendHostDelegate,
-                       private DevToolsEmbedderMessageDispatcher::Delegate {
+                       private DevToolsEmbedderMessageDispatcher::Delegate,
+                       private DevToolsAndroidBridge::DeviceCountListener {
  public:
   typedef base::Callback<void(bool)> InfoBarCallback;
 
@@ -340,6 +343,18 @@ class DevToolsWindow : private content::NotificationObserver,
   virtual void ZoomIn() OVERRIDE;
   virtual void ZoomOut() OVERRIDE;
   virtual void ResetZoom() OVERRIDE;
+  virtual void OpenUrlOnRemoteDeviceAndInspect(const std::string& browser_id,
+                                               const std::string& url) OVERRIDE;
+  virtual void StartRemoteDevicesListener() OVERRIDE;
+  virtual void StopRemoteDevicesListener() OVERRIDE;
+  virtual void EnableRemoteDeviceCounter(bool enable) OVERRIDE;
+
+  // DevToolsAndroidBridge::DeviceCountListener override:
+  virtual void DeviceCountChanged(int count) OVERRIDE;
+
+  // Forwards discovered devices to frontend.
+  virtual void PopulateRemoteDevices(const std::string& source,
+                                     scoped_ptr<base::ListValue> targets);
 
   // DevToolsFileHelper callbacks.
   void FileSavedAs(const std::string& url);
@@ -388,7 +403,8 @@ class DevToolsWindow : private content::NotificationObserver,
   content::WebContents* web_contents_;
   Browser* browser_;
   bool is_docked_;
-  bool can_dock_;
+  const bool can_dock_;
+  bool device_listener_enabled_;
   LoadState load_state_;
   DevToolsToggleAction action_on_load_;
   bool ignore_set_is_docked_;
@@ -407,6 +423,7 @@ class DevToolsWindow : private content::NotificationObserver,
   bool intercepted_page_beforeunload_;
   base::Closure load_completed_callback_;
 
+  scoped_ptr<DevToolsRemoteTargetsUIHandler> remote_targets_handler_;
   scoped_ptr<DevToolsEmbedderMessageDispatcher> embedder_message_dispatcher_;
   base::WeakPtrFactory<DevToolsWindow> weak_factory_;
   base::TimeTicks inspect_element_start_time_;

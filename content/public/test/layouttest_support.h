@@ -5,8 +5,11 @@
 #ifndef CONTENT_PUBLIC_TEST_LAYOUTTEST_SUPPORT_H_
 #define CONTENT_PUBLIC_TEST_LAYOUTTEST_SUPPORT_H_
 
+#include <string>
+#include <vector>
+
 #include "base/callback_forward.h"
-#include "third_party/WebKit/public/platform/WebScreenOrientation.h"
+#include "third_party/WebKit/public/platform/WebScreenOrientationType.h"
 
 namespace blink {
 class WebDeviceMotionData;
@@ -16,13 +19,11 @@ class WebGamepads;
 struct WebSize;
 }
 
-namespace WebTestRunner {
-class WebTestProxyBase;
-}
-
 namespace content {
 
+class PageState;
 class RenderView;
+class WebTestProxyBase;
 
 // Turn the browser process into layout test mode.
 void EnableBrowserLayoutTestMode();
@@ -36,8 +37,8 @@ void EnableRendererLayoutTestMode();
 // Enable injecting of a WebTestProxy between WebViews and RenderViews.
 // |callback| is invoked with a pointer to WebTestProxyBase for each created
 // WebTestProxy.
-void EnableWebTestProxyCreation(const base::Callback<
-    void(RenderView*, WebTestRunner::WebTestProxyBase*)>& callback);
+void EnableWebTestProxyCreation(
+    const base::Callback<void(RenderView*, WebTestProxyBase*)>& callback);
 
 // Sets the WebGamepads that should be returned by
 // WebKitPlatformSupport::sampleGamepads().
@@ -57,9 +58,9 @@ void SetMockDeviceMotionData(const blink::WebDeviceMotionData& data);
 // a listener through WebKitPlatformSupport::setDeviceOrientationListener().
 void SetMockDeviceOrientationData(const blink::WebDeviceOrientationData& data);
 
-// Sets WebScreenOrientation that should be used when registering a listener
-// through WebKitPlatformSupport::setScreenOrientationListener().
-void SetMockScreenOrientation(const blink::WebScreenOrientation& orientation);
+// Sets WebScreenOrientationType that should be used as a mock orientation.
+void SetMockScreenOrientation(
+    const blink::WebScreenOrientationType& orientation);
 
 // Returns the length of the local session history of a render view.
 int GetLocalSessionHistoryLength(RenderView* render_view);
@@ -95,6 +96,10 @@ void DisableAutoResizeMode(RenderView* render_view,
 
 // Forces the |render_view| to use mock media streams.
 void UseMockMediaStreams(RenderView* render_view);
+
+// Provides a text dump of the contents of the given page state.
+std::string DumpBackForwardList(std::vector<PageState>& page_state,
+                                size_t current_index);
 
 }  // namespace content
 

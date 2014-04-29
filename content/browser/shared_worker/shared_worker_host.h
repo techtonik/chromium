@@ -29,7 +29,8 @@ class SharedWorkerInstance;
 class SharedWorkerHost {
  public:
   SharedWorkerHost(SharedWorkerInstance* instance,
-                   SharedWorkerMessageFilter* filter);
+                   SharedWorkerMessageFilter* filter,
+                   int worker_route_id);
   ~SharedWorkerHost();
 
   // Sends |message| to the SharedWorker.

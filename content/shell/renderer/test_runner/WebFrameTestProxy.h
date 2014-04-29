@@ -12,7 +12,7 @@
 #include "content/shell/renderer/test_runner/WebTestProxy.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 
-namespace WebTestRunner {
+namespace content {
 
 // Templetized wrapper around RenderFrameImpl objects, which implement
 // the WebFrameClient interface.
@@ -21,19 +21,13 @@ class WebFrameTestProxy : public Base {
 public:
     WebFrameTestProxy(P p, R r)
         : Base(p, r)
-        , m_baseProxy(0)
-        , m_version(0) { }
+        , m_baseProxy(0) { }
 
     virtual ~WebFrameTestProxy() { }
 
     void setBaseProxy(WebTestProxyBase* proxy)
     {
         m_baseProxy = proxy;
-    }
-
-    void setVersion(int version)
-    {
-        m_version = version;
     }
 
     blink::WebPlugin* createPlugin(blink::WebLocalFrame* frame, const blink::WebPluginParams& params)
@@ -57,10 +51,14 @@ public:
         const CR_DEFINE_STATIC_LOCAL(WebString, suffix, ("-can-create-without-renderer"));
         return mimeType.utf8().find(suffix.utf8()) != std::string::npos;
     }
+    virtual void loadURLExternally(blink::WebLocalFrame* frame, const blink::WebURLRequest& request, blink::WebNavigationPolicy policy, const blink::WebString& suggested_name)
+    {
+        m_baseProxy->loadURLExternally(frame, request, policy, suggested_name);
+        Base::loadURLExternally(frame, request, policy, suggested_name);
+    }
     virtual void didStartProvisionalLoad(blink::WebLocalFrame* frame)
     {
-        if (m_version > 2)
-            m_baseProxy->didStartProvisionalLoad(frame);
+        m_baseProxy->didStartProvisionalLoad(frame);
         Base::didStartProvisionalLoad(frame);
     }
     virtual void didReceiveServerRedirectForProvisionalLoad(blink::WebLocalFrame* frame)
@@ -70,36 +68,50 @@ public:
     }
     virtual void didFailProvisionalLoad(blink::WebLocalFrame* frame, const blink::WebURLError& error)
     {
+        // If the test finished, don't notify the embedder of the failed load,
+        // as we already destroyed the document loader.
+        if (m_baseProxy->didFailProvisionalLoad(frame, error))
+            return;
         Base::didFailProvisionalLoad(frame, error);
     }
-    virtual void didCommitProvisionalLoad(blink::WebLocalFrame* frame, bool isNewNavigation)
+    virtual void didCommitProvisionalLoad(blink::WebLocalFrame* frame, const blink::WebHistoryItem& item, blink::WebHistoryCommitType commit_type)
     {
-        m_baseProxy->didCommitProvisionalLoad(frame, isNewNavigation);
-        Base::didCommitProvisionalLoad(frame, isNewNavigation);
+        m_baseProxy->didCommitProvisionalLoad(frame, item, commit_type);
+        Base::didCommitProvisionalLoad(frame, item, commit_type);
     }
     virtual void didReceiveTitle(blink::WebLocalFrame* frame, const blink::WebString& title, blink::WebTextDirection direction)
     {
+        m_baseProxy->didReceiveTitle(frame, title, direction);
         Base::didReceiveTitle(frame, title, direction);
     }
     virtual void didChangeIcon(blink::WebLocalFrame* frame, blink::WebIconURL::Type iconType)
     {
+        m_baseProxy->didChangeIcon(frame, iconType);
         Base::didChangeIcon(frame, iconType);
     }
     virtual void didFinishDocumentLoad(blink::WebLocalFrame* frame)
     {
+        m_baseProxy->didFinishDocumentLoad(frame);
         Base::didFinishDocumentLoad(frame);
     }
     virtual void didHandleOnloadEvents(blink::WebLocalFrame* frame)
     {
+        m_baseProxy->didHandleOnloadEvents(frame);
         Base::didHandleOnloadEvents(frame);
     }
     virtual void didFailLoad(blink::WebLocalFrame* frame, const blink::WebURLError& error)
     {
+        m_baseProxy->didFailLoad(frame, error);
         Base::didFailLoad(frame, error);
     }
     virtual void didFinishLoad(blink::WebLocalFrame* frame)
     {
+        m_baseProxy->didFinishLoad(frame);
         Base::didFinishLoad(frame);
+    }
+    virtual blink::WebNotificationPresenter* notificationPresenter()
+    {
+        return m_baseProxy->notificationPresenter();
     }
     virtual void didChangeSelection(bool is_selection_empty) {
         m_baseProxy->didChangeSelection(is_selection_empty);
@@ -174,6 +186,7 @@ public:
     }
     virtual void didFinishResourceLoad(blink::WebLocalFrame* frame, unsigned identifier)
     {
+        m_baseProxy->didFinishResourceLoad(frame, identifier);
         Base::didFinishResourceLoad(frame, identifier);
     }
     virtual blink::WebNavigationPolicy decidePolicyForNavigation(blink::WebLocalFrame* frame, blink::WebDataSource::ExtraData* extraData, const blink::WebURLRequest& request, blink::WebNavigationType type, blink::WebNavigationPolicy defaultPolicy, bool isRedirect)
@@ -183,6 +196,11 @@ public:
             return policy;
 
         return Base::decidePolicyForNavigation(frame, extraData, request, type, defaultPolicy, isRedirect);
+    }
+    virtual void willStartUsingPeerConnectionHandler(blink::WebLocalFrame* frame, blink::WebRTCPeerConnectionHandler* handler)
+    {
+        // RenderFrameImpl::willStartUsingPeerConnectionHandler can not be mocked.
+        // See http://crbug/363285.
     }
     virtual bool willCheckAndDispatchMessageEvent(blink::WebLocalFrame* sourceFrame, blink::WebFrame* targetFrame, blink::WebSecurityOrigin target, blink::WebDOMMessageEvent event)
     {
@@ -199,14 +217,9 @@ public:
 private:
     WebTestProxyBase* m_baseProxy;
 
-    // This is used to incrementally change code between Blink and Chromium.
-    // It is used instead of a #define and is set by layouttest_support when
-    // creating this object.
-    int m_version;
-
     DISALLOW_COPY_AND_ASSIGN(WebFrameTestProxy);
 };
 
-}
+}  // namespace content
 
 #endif // WebTestProxy_h

@@ -7,6 +7,7 @@
 
 #include "ash/ash_export.h"
 #include "ash/display/display_controller.h"
+#include "ash/shell_observer.h"
 #include "base/basictypes.h"
 #include "base/files/file_path.h"
 #include "base/gtest_prod_util.h"
@@ -36,7 +37,7 @@ enum WallpaperLayout {
   // desktop's size.
   WALLPAPER_LAYOUT_STRETCH,
   // Tile the wallpaper over the background without scaling it.
-  WALLPAPER_LAYOUT_TILE,
+  WALLPAPER_LAYOUT_TILE
 };
 
 const SkColor kLoginWallpaperColor = 0xFEFEFE;
@@ -46,7 +47,8 @@ class WallpaperResizer;
 
 // Updates background layer if necessary.
 class ASH_EXPORT DesktopBackgroundController
-    : public DisplayController::Observer {
+    : public DisplayController::Observer,
+      public ShellObserver {
  public:
   class TestAPI;
 
@@ -54,6 +56,10 @@ class ASH_EXPORT DesktopBackgroundController
     BACKGROUND_NONE,
     BACKGROUND_IMAGE,
   };
+
+  // This is used to initialize Resource ID variables and to denote "no
+  // resource ID" in parameters.
+  static const int kInvalidResourceID;
 
   DesktopBackgroundController();
   virtual ~DesktopBackgroundController();
@@ -71,9 +77,6 @@ class ASH_EXPORT DesktopBackgroundController
   gfx::ImageSkia GetWallpaper() const;
 
   WallpaperLayout GetWallpaperLayout() const;
-
-  // Initialize root window's background.
-  void OnRootWindowAdded(aura::Window* root_window);
 
   // Sets wallpaper. This is mostly called by WallpaperManager to set
   // the default or user selected custom wallpaper.
@@ -99,8 +102,11 @@ class ASH_EXPORT DesktopBackgroundController
   // Returns true if the desktop moved.
   bool MoveDesktopToUnlockedContainer();
 
-  // Overrides DisplayController::Observer:
+  // DisplayController::Observer:
   virtual void OnDisplayConfigurationChanged() OVERRIDE;
+
+  // ShellObserver:
+  virtual void OnRootWindowAdded(aura::Window* root_window) OVERRIDE;
 
   // Returns the maximum size of all displays combined in native
   // resolutions.  Note that this isn't the bounds of the display who
@@ -108,17 +114,19 @@ class ASH_EXPORT DesktopBackgroundController
   // maximum width of all displays, and the maximum height of all displays.
   static gfx::Size GetMaxDisplaySizeInNative();
 
+  // Returns true if the specified wallpaper is already stored
+  // in |current_wallpaper_|.
+  // If |image| is NULL, resource_id is compared.
+  // If |compare_layouts| is false, layout is ignored.
+  bool WallpaperIsAlreadyLoaded(const gfx::ImageSkia* image,
+                                int resource_id,
+                                bool compare_layouts,
+                                WallpaperLayout layout) const;
+
  private:
   friend class DesktopBackgroundControllerTest;
   //  friend class chromeos::WallpaperManagerBrowserTestDefaultWallpaper;
   FRIEND_TEST_ALL_PREFIXES(DesktopBackgroundControllerTest, GetMaxDisplaySize);
-
-  // Returns true if the specified wallpaper is already stored
-  // in |current_wallpaper_|.
-  // If |image| is NULL, resource_id is compared.
-  bool WallpaperIsAlreadyLoaded(const gfx::ImageSkia* image,
-                                int resource_id,
-                                WallpaperLayout layout) const;
 
   // Creates view for all root windows, or notifies them to repaint if they
   // already exist.

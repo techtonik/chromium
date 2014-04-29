@@ -51,11 +51,10 @@ class ProfileSyncComponentsFactoryImpl : public ProfileSyncComponentsFactory {
       const base::WeakPtr<syncer::SyncableService>& local_service,
       const base::WeakPtr<syncer::SyncMergeResult>& merge_result) OVERRIDE;
 
-  virtual browser_sync::SharedChangeProcessor*
-      CreateSharedChangeProcessor() OVERRIDE;
-
   virtual base::WeakPtr<syncer::SyncableService> GetSyncableServiceForType(
       syncer::ModelType type) OVERRIDE;
+  virtual scoped_ptr<syncer::AttachmentStore>
+      CreateCustomAttachmentStoreForType(syncer::ModelType type) OVERRIDE;
 
   // Legacy datatypes that need to be converted to the SyncableService API.
   virtual SyncComponents CreateBookmarkSyncComponents(
@@ -64,9 +63,6 @@ class ProfileSyncComponentsFactoryImpl : public ProfileSyncComponentsFactory {
   virtual SyncComponents CreateTypedUrlSyncComponents(
       ProfileSyncService* profile_sync_service,
       history::HistoryBackend* history_backend,
-      browser_sync::DataTypeErrorHandler* error_handler) OVERRIDE;
-  virtual SyncComponents CreateSessionSyncComponents(
-      ProfileSyncService* profile_sync_service,
       browser_sync::DataTypeErrorHandler* error_handler) OVERRIDE;
 
  private:

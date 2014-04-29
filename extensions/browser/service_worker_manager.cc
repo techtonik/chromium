@@ -65,14 +65,9 @@ void ServiceWorkerManager::RegisterExtension(const Extension* extension) {
   const GURL service_worker_script = extension->GetResourceURL(
       BackgroundInfo::GetServiceWorkerScript(extension));
 
-  extensions::ProcessManager* process_manager =
-      ExtensionSystem::Get(context_)->process_manager();
-
   GetSWContext(extension->id())->RegisterServiceWorker(
       extension->GetResourceURL("/*"),
       service_worker_script,
-      process_manager->GetSiteInstanceForURL(
-          service_worker_script),  // host->render_process_host()->GetID(),
       base::Bind(&ServiceWorkerManager::FinishRegistration,
                  WeakThis(),
                  extension->id()));

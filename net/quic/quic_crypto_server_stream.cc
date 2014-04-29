@@ -20,7 +20,8 @@ QuicCryptoServerStream::QuicCryptoServerStream(
     QuicSession* session)
     : QuicCryptoStream(session),
       crypto_config_(crypto_config),
-      validate_client_hello_cb_(NULL) {
+      validate_client_hello_cb_(NULL),
+      num_handshake_messages_(0) {
 }
 
 QuicCryptoServerStream::~QuicCryptoServerStream() {
@@ -37,6 +38,7 @@ void QuicCryptoServerStream::CancelOutstandingCallbacks() {
 void QuicCryptoServerStream::OnHandshakeMessage(
     const CryptoHandshakeMessage& message) {
   QuicCryptoStream::OnHandshakeMessage(message);
+  ++num_handshake_messages_;
 
   // Do not process handshake messages after the handshake is confirmed.
   if (handshake_confirmed_) {
@@ -89,7 +91,7 @@ void QuicCryptoServerStream::FinishProcessingHandshakeMessage(
 
   // If we are returning a SHLO then we accepted the handshake.
   QuicConfig* config = session()->config();
-  error = config->ProcessClientHello(message, &error_details);
+  error = config->ProcessPeerHello(message, CLIENT, &error_details);
   if (error != QUIC_NO_ERROR) {
     CloseConnectionWithDetails(error, error_details);
     return;

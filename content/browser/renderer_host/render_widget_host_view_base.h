@@ -9,10 +9,6 @@
 #include <OpenGL/OpenGL.h>
 #endif
 
-#if defined(TOOLKIT_GTK)
-#include <gdk/gdk.h>
-#endif
-
 #include <string>
 #include <vector>
 
@@ -58,8 +54,8 @@ class CONTENT_EXPORT RenderWidgetHostViewBase
   virtual void SetShowingContextMenu(bool showing_menu) OVERRIDE;
   virtual base::string16 GetSelectedText() const OVERRIDE;
   virtual bool IsMouseLocked() OVERRIDE;
-  virtual void HandledWheelEvent(const blink::WebMouseWheelEvent& event,
-                                 bool consumed) OVERRIDE;
+  virtual void UnhandledWheelEvent(
+      const blink::WebMouseWheelEvent& event) OVERRIDE;
   virtual InputEventAckState FilterInputEvent(
       const blink::WebInputEvent& input_event) OVERRIDE;
   virtual void OnSetNeedsFlushInput() OVERRIDE;
@@ -83,9 +79,6 @@ class CONTENT_EXPORT RenderWidgetHostViewBase
   virtual void OnSwapCompositorFrame(
       uint32 output_surface_id,
       scoped_ptr<cc::CompositorFrame> frame) OVERRIDE {}
-  virtual void ResizeCompositingSurface(const gfx::Size&) OVERRIDE {}
-  virtual void OnOverscrolled(gfx::Vector2dF accumulated_overscroll,
-                              gfx::Vector2dF current_fling_velocity) OVERRIDE;
   virtual void DidStopFlinging() OVERRIDE {}
   virtual uint32 RendererFrameNumber() OVERRIDE;
   virtual void DidReceiveRendererFrame() OVERRIDE;
@@ -93,6 +86,9 @@ class CONTENT_EXPORT RenderWidgetHostViewBase
   virtual void UnlockCompositingSurface() OVERRIDE;
 
   virtual SkBitmap::Config PreferredReadbackFormat() OVERRIDE;
+
+  virtual gfx::Size GetVisibleViewportSize() const OVERRIDE;
+  virtual void SetInsets(const gfx::Insets& insets) OVERRIDE;
 
   void SetBrowserAccessibilityManager(BrowserAccessibilityManager* manager);
 

@@ -71,7 +71,7 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
   virtual std::string GetDefaultEncoding() OVERRIDE;
   virtual bool OverrideCreatePlugin(
       content::RenderFrame* render_frame,
-      blink::WebFrame* frame,
+      blink::WebLocalFrame* frame,
       const blink::WebPluginParams& params,
       blink::WebPlugin** plugin) OVERRIDE;
   virtual blink::WebPlugin* CreatePluginReplacement(
@@ -142,7 +142,7 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
 
   static blink::WebPlugin* CreatePlugin(
       content::RenderFrame* render_frame,
-      blink::WebFrame* frame,
+      blink::WebLocalFrame* frame,
       const blink::WebPluginParams& params,
       const ChromeViewHostMsg_GetPluginInfo_Output& output);
 

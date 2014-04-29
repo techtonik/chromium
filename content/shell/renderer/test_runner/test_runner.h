@@ -30,9 +30,7 @@ class Arguments;
 
 namespace WebTestRunner {
 class TestInterfaces;
-class WebPermissions;
 class WebTestDelegate;
-class WebTestProxyBase;
 }
 
 namespace content {
@@ -40,6 +38,8 @@ namespace content {
 class InvokeCallbackTask;
 class NotificationPresenter;
 class TestPageOverlay;
+class WebPermissions;
+class WebTestProxyBase;
 
 class TestRunner : public ::WebTestRunner::WebTestRunner,
                    public base::SupportsWeakPtr<TestRunner> {
@@ -50,7 +50,7 @@ class TestRunner : public ::WebTestRunner::WebTestRunner,
   void Install(blink::WebFrame* frame);
 
   void SetDelegate(::WebTestRunner::WebTestDelegate*);
-  void SetWebView(blink::WebView*, ::WebTestRunner::WebTestProxyBase*);
+  void SetWebView(blink::WebView*, WebTestProxyBase*);
 
   void Reset();
 
@@ -81,7 +81,8 @@ class TestRunner : public ::WebTestRunner::WebTestRunner,
   bool shouldDumpAsMarkup();
   bool shouldDumpChildFrameScrollPositions() const;
   bool shouldDumpChildFramesAsText() const;
-  void showDevTools(const std::string& settings);
+  void showDevTools(const std::string& settings,
+                    const std::string& frontend_url);
   void clearDevToolsLocalStorage();
   void setShouldDumpAsText(bool);
   void setShouldDumpAsMarkup(bool);
@@ -104,6 +105,7 @@ class TestRunner : public ::WebTestRunner::WebTestRunner,
   bool shouldDumpProgressFinishedCallback() const;
   bool shouldDumpSpellCheckCallbacks() const;
   bool shouldStayOnPageAfterHandlingBeforeUnload() const;
+  bool shouldWaitUntilExternalURLLoad() const;
   const std::set<std::string>* httpHeadersToClear() const;
   void setTopLoadingFrame(blink::WebFrame*, bool);
   blink::WebFrame* topLoadingFrame() const;
@@ -442,6 +444,10 @@ class TestRunner : public ::WebTestRunner::WebTestRunner,
   // Sets a flag to enable the mock theme.
   void SetUseMockTheme(bool use);
 
+  // Sets a flag that causes the test to be marked as completed when the
+  // WebFrameClient receives a loadURLExternally() call.
+  void WaitUntilExternalURLLoad();
+
   ///////////////////////////////////////////////////////////////////////////
   // Methods interacting with the WebTestProxy
 
@@ -449,7 +455,8 @@ class TestRunner : public ::WebTestRunner::WebTestRunner,
   // Methods forwarding to the WebTestDelegate
 
   // Shows DevTools window.
-  void ShowWebInspector(const std::string& str);
+  void ShowWebInspector(const std::string& str,
+                        const std::string& frontend_url);
   void CloseWebInspector();
 
   // Inspect chooser state
@@ -531,6 +538,10 @@ class TestRunner : public ::WebTestRunner::WebTestRunner,
 
   // If true, don't dump output until notifyDone is called.
   bool wait_until_done_;
+
+  // If true, ends the test when a URL is loaded externally via
+  // WebFrameClient::loadURLExternally().
+  bool wait_until_external_url_load_;
 
   // Causes navigation actions just printout the intended navigation instead
   // of taking you to the page. This is used for cases like mailto, where you
@@ -681,15 +692,15 @@ class TestRunner : public ::WebTestRunner::WebTestRunner,
   ::WebTestRunner::WebTestDelegate* delegate_;
   blink::WebView* web_view_;
   TestPageOverlay* page_overlay_;
-  ::WebTestRunner::WebTestProxyBase* proxy_;
+  WebTestProxyBase* proxy_;
 
   // This is non-0 IFF a load is in progress.
   blink::WebFrame* top_loading_frame_;
 
   // WebPermissionClient mock object.
-  scoped_ptr< ::WebTestRunner::WebPermissions> web_permissions_;
+  scoped_ptr<WebPermissions> web_permissions_;
 
-  scoped_ptr<content::NotificationPresenter> notification_presenter_;
+  scoped_ptr<NotificationPresenter> notification_presenter_;
 
   bool pointer_locked_;
   enum {

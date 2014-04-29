@@ -478,6 +478,13 @@ static bool LayerShouldBeSkipped(LayerType* layer, bool layer_is_drawn) {
 
 static inline bool SubtreeShouldBeSkipped(LayerImpl* layer,
                                           bool layer_is_drawn) {
+  // If the layer transform is not invertible, it should not be drawn.
+  // TODO(ajuma): Correctly process subtrees with singular transform for the
+  // case where we may animate to a non-singular transform and wish to
+  // pre-raster.
+  if (!layer->transform_is_invertible() && !layer->TransformIsAnimating())
+    return true;
+
   // When we need to do a readback/copy of a layer's output, we can not skip
   // it or any of its ancestors.
   if (layer->draw_properties().layer_or_descendant_has_copy_request)
@@ -501,6 +508,10 @@ static inline bool SubtreeShouldBeSkipped(LayerImpl* layer,
 }
 
 static inline bool SubtreeShouldBeSkipped(Layer* layer, bool layer_is_drawn) {
+  // If the layer transform is not invertible, it should not be drawn.
+  if (!layer->transform_is_invertible() && !layer->TransformIsAnimating())
+    return true;
+
   // When we need to do a readback/copy of a layer's output, we can not skip
   // it or any of its ancestors.
   if (layer->draw_properties().layer_or_descendant_has_copy_request)
@@ -1101,16 +1112,9 @@ static inline void CalculateAnimationContentsScale(
       std::max(ancestor_transform_scales.x(), ancestor_transform_scales.y());
 }
 
-static inline RenderSurface* CreateOrReuseRenderSurface(Layer* layer) {
-  // The render surface should always be new on the main thread, as the
-  // RenderSurfaceLayerList should be a new empty list when given to
-  // CalculateDrawProperties.
-  DCHECK(!layer->render_surface());
-  layer->CreateRenderSurface();
-  return layer->render_surface();
-}
-
-static inline RenderSurfaceImpl* CreateOrReuseRenderSurface(LayerImpl* layer) {
+template <typename LayerType>
+static inline typename LayerType::RenderSurfaceType* CreateOrReuseRenderSurface(
+    LayerType* layer) {
   if (!layer->render_surface()) {
     layer->CreateRenderSurface();
     return layer->render_surface();
@@ -1132,12 +1136,12 @@ static inline void RemoveSurfaceForEarlyExit(
   // things to crash. So here we proactively remove any additional
   // layers from the end of the list.
   while (render_surface_layer_list->back() != layer_to_remove) {
-    render_surface_layer_list->back()->ClearRenderSurface();
+    render_surface_layer_list->back()->ClearRenderSurfaceLayerList();
     render_surface_layer_list->pop_back();
   }
   DCHECK_EQ(render_surface_layer_list->back(), layer_to_remove);
   render_surface_layer_list->pop_back();
-  layer_to_remove->ClearRenderSurface();
+  layer_to_remove->ClearRenderSurfaceLayerList();
 }
 
 struct PreCalculateMetaInformationRecursiveData {
@@ -1165,6 +1169,12 @@ static void PreCalculateMetaInformation(
   bool has_delegated_content = layer->HasDelegatedContent();
   int num_descendants_that_draw_content = 0;
 
+  if (!layer->transform_is_invertible()) {
+    // Layers with singular transforms should not be drawn, the whole subtree
+    // can be skipped.
+    return;
+  }
+
   if (has_delegated_content) {
     // Layers with delegated content need to be treated as if they have as
     // many children as the number of layers they own delegated quads for.
@@ -1181,7 +1191,7 @@ static void PreCalculateMetaInformation(
 
   for (size_t i = 0; i < layer->children().size(); ++i) {
     LayerType* child_layer =
-        LayerTreeHostCommon::get_child_as_raw_ptr(layer->children(), i);
+        LayerTreeHostCommon::get_layer_as_raw_ptr(layer->children(), i);
 
     PreCalculateMetaInformationRecursiveData data_for_child;
     PreCalculateMetaInformation(child_layer, &data_for_child);
@@ -1333,7 +1343,7 @@ static bool SortChildrenForRecursion(std::vector<LayerType*>* out,
   bool order_changed = false;
   for (size_t i = 0; i < parent.children().size(); ++i) {
     LayerType* current =
-        LayerTreeHostCommon::get_child_as_raw_ptr(parent.children(), i);
+        LayerTreeHostCommon::get_layer_as_raw_ptr(parent.children(), i);
 
     if (current->draw_properties().sorted_for_recursion) {
       order_changed = true;
@@ -1364,18 +1374,26 @@ static void GetNewRenderSurfacesStartIndexAndCount(LayerType* layer,
   *count = layer->draw_properties().num_render_surfaces_added;
 }
 
-template <typename LayerType,
-          typename GetIndexAndCountType>
+// We need to extract a list from the the two flavors of RenderSurfaceListType
+// for use in the sorting function below.
+static LayerList* GetLayerListForSorting(RenderSurfaceLayerList* rsll) {
+  return &rsll->AsLayerList();
+}
+
+static LayerImplList* GetLayerListForSorting(LayerImplList* layer_list) {
+  return layer_list;
+}
+
+template <typename LayerType, typename GetIndexAndCountType>
 static void SortLayerListContributions(
     const LayerType& parent,
-    typename LayerType::RenderSurfaceListType* unsorted,
+    typename LayerType::LayerListType* unsorted,
     size_t start_index_for_all_contributions,
     GetIndexAndCountType get_index_and_count) {
-
   typename LayerType::LayerListType buffer;
   for (size_t i = 0; i < parent.children().size(); ++i) {
     LayerType* child =
-        LayerTreeHostCommon::get_child_as_raw_ptr(parent.children(), i);
+        LayerTreeHostCommon::get_layer_as_raw_ptr(parent.children(), i);
 
     size_t start_index = 0;
     size_t count = 0;
@@ -1399,7 +1417,7 @@ static void CalculateDrawPropertiesInternal(
     const SubtreeGlobals<LayerType>& globals,
     const DataForRecursion<LayerType>& data_from_ancestor,
     typename LayerType::RenderSurfaceListType* render_surface_layer_list,
-    typename LayerType::RenderSurfaceListType* layer_list,
+    typename LayerType::LayerListType* layer_list,
     std::vector<AccumulatedSurfaceState<LayerType> >*
         accumulated_surface_state) {
   // This function computes the new matrix transformations recursively for this
@@ -1543,7 +1561,7 @@ static void CalculateDrawPropertiesInternal(
   // The root layer cannot skip CalcDrawProperties.
   if (!IsRootLayer(layer) && SubtreeShouldBeSkipped(layer, layer_is_drawn)) {
     if (layer->render_surface())
-      layer->ClearRenderSurface();
+      layer->ClearRenderSurfaceLayerList();
     return;
   }
 
@@ -1747,7 +1765,7 @@ static void CalculateDrawPropertiesInternal(
     // subtree
     if (!layer->double_sided() && TransformToParentIsKnown(layer) &&
         IsSurfaceBackFaceVisible(layer, combined_transform)) {
-      layer->ClearRenderSurface();
+      layer->ClearRenderSurfaceLayerList();
       return;
     }
 
@@ -1980,7 +1998,7 @@ static void CalculateDrawPropertiesInternal(
     layer_draw_properties.clip_rect = rect_in_target_space;
   }
 
-  typename LayerType::RenderSurfaceListType& descendants =
+  typename LayerType::LayerListType& descendants =
       (layer->render_surface() ? layer->render_surface()->layer_list()
                                : *layer_list);
 
@@ -2042,7 +2060,7 @@ static void CalculateDrawPropertiesInternal(
     LayerType* child =
         layer_draw_properties.has_child_with_a_scroll_parent
             ? sorted_children[i]
-            : LayerTreeHostCommon::get_child_as_raw_ptr(layer->children(), i);
+            : LayerTreeHostCommon::get_layer_as_raw_ptr(layer->children(), i);
 
     child->draw_properties().index_of_first_descendants_addition =
         descendants.size();
@@ -2056,6 +2074,7 @@ static void CalculateDrawPropertiesInternal(
                                                &descendants,
                                                accumulated_surface_state);
     if (child->render_surface() &&
+        !child->render_surface()->layer_list().empty() &&
         !child->render_surface()->content_rect().IsEmpty()) {
       descendants.push_back(child);
     }
@@ -2073,7 +2092,7 @@ static void CalculateDrawPropertiesInternal(
   if (child_order_changed) {
     SortLayerListContributions(
         *layer,
-        render_surface_layer_list,
+        GetLayerListForSorting(render_surface_layer_list),
         render_surface_layer_list_child_sorting_start_index,
         &GetNewRenderSurfacesStartIndexAndCount<LayerType>);
 
@@ -2296,7 +2315,7 @@ static void ProcessCalcDrawPropsInputs(
 
 void LayerTreeHostCommon::CalculateDrawProperties(
     CalcDrawPropsMainInputs* inputs) {
-  RenderSurfaceLayerList dummy_layer_list;
+  LayerList dummy_layer_list;
   SubtreeGlobals<Layer> globals;
   DataForRecursion<Layer> data_for_recursion;
   ProcessCalcDrawPropsInputs(*inputs, &globals, &data_for_recursion);
@@ -2437,6 +2456,50 @@ static bool PointIsClippedBySurfaceOrClipRect(
   return false;
 }
 
+static bool PointHitsLayer(LayerImpl* layer,
+                           const gfx::PointF& screen_space_point) {
+  gfx::RectF content_rect(layer->content_bounds());
+  if (!PointHitsRect(
+          screen_space_point, layer->screen_space_transform(), content_rect))
+    return false;
+
+  // At this point, we think the point does hit the layer, but we need to walk
+  // up the parents to ensure that the layer was not clipped in such a way
+  // that the hit point actually should not hit the layer.
+  if (PointIsClippedBySurfaceOrClipRect(screen_space_point, layer))
+    return false;
+
+  // Skip the HUD layer.
+  if (layer == layer->layer_tree_impl()->hud_layer())
+    return false;
+
+  return true;
+}
+
+LayerImpl* LayerTreeHostCommon::FindFirstScrollingLayerThatIsHitByPoint(
+    const gfx::PointF& screen_space_point,
+    const LayerImplList& render_surface_layer_list) {
+  typedef LayerIterator<LayerImpl> LayerIteratorType;
+  LayerIteratorType end = LayerIteratorType::End(&render_surface_layer_list);
+  for (LayerIteratorType it =
+           LayerIteratorType::Begin(&render_surface_layer_list);
+       it != end;
+       ++it) {
+    // We don't want to consider render_surfaces for hit testing.
+    if (!it.represents_itself())
+      continue;
+
+    LayerImpl* current_layer = (*it);
+    if (!PointHitsLayer(current_layer, screen_space_point))
+      continue;
+
+    if (current_layer->scrollable())
+      return current_layer;
+  }
+
+  return NULL;
+}
+
 LayerImpl* LayerTreeHostCommon::FindLayerThatIsHitByPoint(
     const gfx::PointF& screen_space_point,
     const LayerImplList& render_surface_layer_list) {
@@ -2453,21 +2516,7 @@ LayerImpl* LayerTreeHostCommon::FindLayerThatIsHitByPoint(
       continue;
 
     LayerImpl* current_layer = (*it);
-
-    gfx::RectF content_rect(current_layer->content_bounds());
-    if (!PointHitsRect(screen_space_point,
-                       current_layer->screen_space_transform(),
-                       content_rect))
-      continue;
-
-    // At this point, we think the point does hit the layer, but we need to walk
-    // up the parents to ensure that the layer was not clipped in such a way
-    // that the hit point actually should not hit the layer.
-    if (PointIsClippedBySurfaceOrClipRect(screen_space_point, current_layer))
-      continue;
-
-    // Skip the HUD layer.
-    if (current_layer == current_layer->layer_tree_impl()->hud_layer())
+    if (!PointHitsLayer(current_layer, screen_space_point))
       continue;
 
     found_layer = current_layer;
@@ -2482,21 +2531,32 @@ LayerImpl* LayerTreeHostCommon::FindLayerThatIsHitByPoint(
 LayerImpl* LayerTreeHostCommon::FindLayerThatIsHitByPointInTouchHandlerRegion(
     const gfx::PointF& screen_space_point,
     const LayerImplList& render_surface_layer_list) {
-  // First find out which layer was hit from the saved list of visible layers
-  // in the most recent frame.
-  LayerImpl* layer_impl = LayerTreeHostCommon::FindLayerThatIsHitByPoint(
-      screen_space_point,
-      render_surface_layer_list);
+  typedef LayerIterator<LayerImpl> LayerIteratorType;
+  LayerIteratorType end = LayerIteratorType::End(&render_surface_layer_list);
+  for (LayerIteratorType it =
+           LayerIteratorType::Begin(&render_surface_layer_list);
+       it != end;
+       ++it) {
+    // We don't want to consider render_surfaces for hit testing.
+    if (!it.represents_itself())
+      continue;
 
-  // Walk up the hierarchy and look for a layer with a touch event handler
-  // region that the given point hits.
-  // This walk may not be necessary anymore: http://crbug.com/310817
-  for (; layer_impl; layer_impl = layer_impl->parent()) {
+    LayerImpl* current_layer = (*it);
+    if (!PointHitsLayer(current_layer, screen_space_point))
+      continue;
+
     if (LayerTreeHostCommon::LayerHasTouchEventHandlersAt(screen_space_point,
-                                                          layer_impl))
-      break;
+                                                          current_layer))
+      return current_layer;
+
+    // Note that we could stop searching if we hit a layer we know to be
+    // opaque to hit-testing, but knowing that reliably is tricky (eg. due to
+    // CSS pointer-events: none).  Also blink has an optimization for the
+    // common case of an entire document having handlers where it doesn't
+    // report any rects for child layers (since it knows they can't exceed
+    // the document bounds).
   }
-  return layer_impl;
+  return NULL;
 }
 
 bool LayerTreeHostCommon::LayerHasTouchEventHandlersAt(

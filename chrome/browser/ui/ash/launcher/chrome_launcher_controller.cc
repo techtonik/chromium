@@ -379,10 +379,9 @@ ChromeLauncherController::ChromeLauncherController(Profile* profile,
         ash::Shell::GetInstance()->shelf_item_delegate_manager();
   }
 
-  notification_registrar_.Add(
-      this,
-      chrome::NOTIFICATION_EXTENSION_LOADED,
-      content::Source<Profile>(profile_));
+  notification_registrar_.Add(this,
+                              chrome::NOTIFICATION_EXTENSION_LOADED_DEPRECATED,
+                              content::Source<Profile>(profile_));
   notification_registrar_.Add(
       this,
       chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED,
@@ -1054,8 +1053,7 @@ void ChromeLauncherController::ShelfItemAdded(int index) {
   // The app list launcher can get added to the shelf after we applied the
   // preferences. In that case the item might be at the wrong spot. As such we
   // call the function again.
-  if (model_->items()[index].type == ash::TYPE_APP_LIST &&
-      ash::switches::UseAlternateShelfLayout())
+  if (model_->items()[index].type == ash::TYPE_APP_LIST)
     UpdateAppLaunchersFromPref();
 }
 
@@ -1068,8 +1066,7 @@ void ChromeLauncherController::ShelfItemMoved(int start_index,
   // We remember the moved item position if it is either pinnable or
   // it is the app list with the alternate shelf layout.
   if ((HasItemController(item.id) && IsPinned(item.id)) ||
-      (ash::switches::UseAlternateShelfLayout() &&
-       item.type == ash::TYPE_APP_LIST))
+       item.type == ash::TYPE_APP_LIST)
     PersistPinnedState();
 }
 
@@ -1117,7 +1114,7 @@ void ChromeLauncherController::Observe(
     const content::NotificationSource& source,
     const content::NotificationDetails& details) {
   switch (type) {
-    case chrome::NOTIFICATION_EXTENSION_LOADED: {
+    case chrome::NOTIFICATION_EXTENSION_LOADED_DEPRECATED: {
       const Extension* extension =
           content::Details<const Extension>(details).ptr();
       if (IsAppPinned(extension->id())) {
@@ -1817,18 +1814,17 @@ void ChromeLauncherController::MoveChromeOrApplistToFinalPosition(
 }
 
 int ChromeLauncherController::FindInsertionPoint(bool is_app_list) {
-  bool alternate = ash::switches::UseAlternateShelfLayout();
   // Keeping this change small to backport to M33&32 (see crbug.com/329597).
   // TODO(skuhne): With the removal of the legacy shelf layout we should remove
   // the ability to move the app list item since this was never used. We should
   // instead ask the ShelfModel::ValidateInsertionIndex or similir for an index.
-  if (is_app_list && alternate)
+  if (is_app_list)
     return 0;
 
   for (int i = model_->item_count() - 1; i > 0; --i) {
     ash::ShelfItemType type = model_->items()[i].type;
     if (type == ash::TYPE_APP_SHORTCUT ||
-        ((is_app_list || alternate) && type == ash::TYPE_APP_LIST) ||
+        (is_app_list && type == ash::TYPE_APP_LIST) ||
         type == ash::TYPE_BROWSER_SHORTCUT) {
       return i;
     }
@@ -1918,10 +1914,7 @@ ChromeLauncherController::GetListOfPinnedAppsAndBrowser() {
   // If not added yet, add the app list item either at the end or at the
   // beginning - depending on the shelf layout.
   if (!app_list_icon_added) {
-    if (ash::switches::UseAlternateShelfLayout())
-      pinned_apps.insert(pinned_apps.begin(), kAppShelfIdPlaceholder);
-    else
-      pinned_apps.push_back(kAppShelfIdPlaceholder);
+    pinned_apps.insert(pinned_apps.begin(), kAppShelfIdPlaceholder);
   }
   return pinned_apps;
 }

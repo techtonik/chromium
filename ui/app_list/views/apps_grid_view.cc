@@ -46,6 +46,7 @@
 #include "ui/base/dragdrop/drop_target_win.h"
 #include "ui/base/dragdrop/os_exchange_data.h"
 #include "ui/base/dragdrop/os_exchange_data_provider_win.h"
+#include "ui/gfx/win/dpi.h"
 #endif
 
 namespace app_list {
@@ -232,8 +233,7 @@ class SynchronousDrag : public ui::DragSourceWin {
     SetupExchangeData(&data);
 
     // Hide the dragged view because the OS is going to create its own.
-    const gfx::Size drag_view_size = drag_view_->size();
-    drag_view_->SetSize(gfx::Size(0, 0));
+    drag_view_->SetVisible(false);
 
     // Blocks until the drag is finished. Calls into the ui::DragSourceWin
     // methods.
@@ -243,8 +243,8 @@ class SynchronousDrag : public ui::DragSourceWin {
 
     // If |drag_view_| is NULL the drag was ended by some reentrant code.
     if (drag_view_) {
-      // Restore the dragged view to its original size.
-      drag_view_->SetSize(drag_view_size);
+      // Make the drag view visible again.
+      drag_view_->SetVisible(true);
       drag_view_->OnSyncDragEnd();
 
       grid_view_->EndDrag(canceled_ || !IsCursorWithinGridView());
@@ -295,6 +295,7 @@ class SynchronousDrag : public ui::DragSourceWin {
     GetCursorPos(&p);
     ScreenToClient(GetGridViewHWND(), &p);
     gfx::Point grid_view_pt(p.x, p.y);
+    grid_view_pt = gfx::win::ScreenToDIPPoint(grid_view_pt);
     views::View::ConvertPointFromWidget(grid_view_, &grid_view_pt);
     return grid_view_pt;
   }

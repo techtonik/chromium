@@ -66,6 +66,14 @@ const bool kContextMenuOnMousePress = true;
 // rect-based targeting algorithm.
 static const float kRectTargetOverlap = 0.6f;
 
+// Default horizontal drag threshold in pixels.
+// Same as what gtk uses.
+const int kDefaultHorizontalDragThreshold = 8;
+
+// Default vertical drag threshold in pixels.
+// Same as what gtk uses.
+const int kDefaultVerticalDragThreshold = 8;
+
 // Returns the top view in |view|'s hierarchy.
 const views::View* GetHierarchyRoot(const views::View* view) {
   const views::View* root = view;
@@ -237,7 +245,7 @@ void View::AddChildViewAt(View* view, int index) {
     RegisterChildrenForVisibleBoundsNotification(view);
     const ui::NativeTheme* new_theme = widget->GetNativeTheme();
     if (new_theme != old_theme)
-      PropagateNativeThemeChanged(new_theme);
+      view->PropagateNativeThemeChanged(new_theme);
     if (view->visible())
       view->SchedulePaint();
   }
@@ -1616,6 +1624,18 @@ bool View::InDrag() {
   return widget ? widget->dragged_view() == this : false;
 }
 
+int View::GetHorizontalDragThreshold() {
+  // TODO(jennyz): This value may need to be adjusted for different platforms
+  // and for different display density.
+  return kDefaultHorizontalDragThreshold;
+}
+
+int View::GetVerticalDragThreshold() {
+  // TODO(jennyz): This value may need to be adjusted for different platforms
+  // and for different display density.
+  return kDefaultVerticalDragThreshold;
+}
+
 // Debugging -------------------------------------------------------------------
 
 #if !defined(NDEBUG)
@@ -1806,6 +1826,7 @@ void View::DoRemoveChildView(View* view,
       UnregisterChildrenForVisibleBoundsNotification(view);
       if (view->visible())
         view->SchedulePaint();
+      GetWidget()->NotifyWillRemoveView(view);
     }
     view->PropagateRemoveNotifications(this, new_parent);
     view->parent_ = NULL;
@@ -2147,6 +2168,15 @@ bool View::ProcessMousePressed(const ui::MouseEvent& event) {
       context_menu_controller_ : 0;
   View::DragInfo* drag_info = GetDragInfo();
 
+  // TODO(sky): for debugging 360238.
+  int storage_id = 0;
+  if (event.IsOnlyRightMouseButton() && context_menu_controller &&
+      kContextMenuOnMousePress && HitTestPoint(event.location())) {
+    ViewStorage* view_storage = ViewStorage::GetInstance();
+    storage_id = view_storage->CreateStorageID();
+    view_storage->StoreView(storage_id, this);
+  }
+
   const bool enabled = enabled_;
   const bool result = OnMousePressed(event);
 
@@ -2159,6 +2189,8 @@ bool View::ProcessMousePressed(const ui::MouseEvent& event) {
     // from mouse pressed.
     gfx::Point location(event.location());
     if (HitTestPoint(location)) {
+      if (storage_id != 0)
+        CHECK_EQ(this, ViewStorage::GetInstance()->RetrieveView(storage_id));
       ConvertPointToScreen(this, &location);
       ShowContextMenu(location, ui::MENU_SOURCE_MOUSE);
       return true;

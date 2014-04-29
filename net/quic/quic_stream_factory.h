@@ -132,6 +132,9 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
 
   base::Value* QuicStreamFactoryInfoToValue() const;
 
+  // Delete all cached state objects in |crypto_config_|.
+  void ClearCachedStatesInCryptoConfig();
+
   // NetworkChangeNotifier::IPAddressObserver methods:
 
   // Until the servers support roaming, close all connections when the local
@@ -212,11 +215,9 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
 
   // Initializes the cached state associated with |server_id| in
   // |crypto_config_| with the information in |server_info|.
-  void InitializeCachedState(const QuicServerId& server_id,
-                             const scoped_ptr<QuicServerInfo>& server_info);
-
-  void ExpireBrokenAlternateProtocolMappings();
-  void ScheduleBrokenAlternateProtocolMappingsExpiration();
+  void InitializeCachedStateInCryptoConfig(
+      const QuicServerId& server_id,
+      const scoped_ptr<QuicServerInfo>& server_info);
 
   bool require_confirmation_;
   HostResolver* host_resolver_;
@@ -244,20 +245,6 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
 
   // Origins which have gone away recently.
   AliasSet gone_away_aliases_;
-
-  // List of broken host:ports and the times when they can be expired.
-  struct BrokenAlternateProtocolEntry {
-    HostPortPair origin;
-    base::TimeTicks when;
-  };
-  typedef std::list<BrokenAlternateProtocolEntry>
-      BrokenAlternateProtocolList;
-  BrokenAlternateProtocolList broken_alternate_protocol_list_;
-
-  // Map from host:port to the number of times alternate protocol has
-  // been marked broken.
-  typedef std::map<HostPortPair, int> BrokenAlternateProtocolMap;
-  BrokenAlternateProtocolMap broken_alternate_protocol_map_;
 
   QuicConfig config_;
   QuicCryptoClientConfig crypto_config_;

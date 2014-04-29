@@ -7,7 +7,9 @@
 {
   'dependencies': [
     'sandbox',
+    'sandbox_linux_test_utils',
     '../base/base.gyp:base',
+    '../base/base.gyp:test_support_base',
     '../testing/gtest.gyp:gtest',
   ],
   'include_dirs': [
@@ -15,10 +17,6 @@
   ],
   'sources': [
     'tests/main.cc',
-    'tests/test_utils.cc',
-    'tests/test_utils.h',
-    'tests/unit_tests.cc',
-    'tests/unit_tests.h',
     'tests/unit_tests_unittest.cc',
     'services/broker_process_unittest.cc',
     'services/scoped_process_unittest.cc',
@@ -44,6 +42,7 @@
     [ 'compile_credentials==1', {
       'sources': [
         'services/credentials_unittest.cc',
+        'services/unix_domain_socket_unittest.cc',
       ],
     }],
   ],

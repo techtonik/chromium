@@ -193,8 +193,7 @@ int HttpNetworkTransaction::Start(const HttpRequestInfo* request_info,
     proxy_ssl_config_.rev_checking_enabled = false;
   }
 
-  // Channel ID is enabled unless --disable-tls-channel-id flag is set,
-  // or if privacy mode is enabled.
+  // Channel ID is disabled if privacy mode is enabled for this request.
   bool channel_id_enabled = server_ssl_config_.channel_id_enabled &&
       (request_->privacy_mode == PRIVACY_MODE_DISABLED);
   server_ssl_config_.channel_id_enabled = channel_id_enabled;
@@ -995,29 +994,32 @@ int HttpNetworkTransaction::DoReadHeadersComplete(int result) {
   if (response_.was_fetched_via_proxy) {
     ProxyService::DataReductionProxyBypassEventType proxy_bypass_event =
         ProxyService::BYPASS_EVENT_TYPE_MAX;
-    bool chrome_proxy_used =
+    bool data_reduction_proxy_used =
         proxy_info_.proxy_server().isDataReductionProxy();
-    bool chrome_fallback_proxy_used = false;
+    bool data_reduction_fallback_proxy_used = false;
 #if defined(DATA_REDUCTION_FALLBACK_HOST)
-    if (!chrome_proxy_used) {
-      chrome_fallback_proxy_used =
+    if (!data_reduction_proxy_used) {
+      data_reduction_fallback_proxy_used =
           proxy_info_.proxy_server().isDataReductionProxyFallback();
     }
 #endif
 
-    if (chrome_proxy_used || chrome_fallback_proxy_used) {
-      net::HttpResponseHeaders::ChromeProxyInfo chrome_proxy_info;
-      proxy_bypass_event = response_.headers->GetChromeProxyBypassEventType(
-          &chrome_proxy_info);
+    if (data_reduction_proxy_used || data_reduction_fallback_proxy_used) {
+      net::HttpResponseHeaders::DataReductionProxyInfo
+      data_reduction_proxy_info;
+      proxy_bypass_event
+          = response_.headers->GetDataReductionProxyBypassEventType(
+              &data_reduction_proxy_info);
       if (proxy_bypass_event < ProxyService::BYPASS_EVENT_TYPE_MAX) {
         ProxyService* proxy_service = session_->proxy_service();
 
         proxy_service->RecordDataReductionProxyBypassInfo(
-            chrome_proxy_used, proxy_info_.proxy_server(), proxy_bypass_event);
+            data_reduction_proxy_used, proxy_info_.proxy_server(),
+            proxy_bypass_event);
 
         ProxyServer proxy_server;
 #if defined(DATA_REDUCTION_FALLBACK_HOST)
-        if (chrome_proxy_used && chrome_proxy_info.bypass_all) {
+        if (data_reduction_proxy_used && data_reduction_proxy_info.bypass_all) {
           // TODO(bengr): Rename as DATA_REDUCTION_FALLBACK_ORIGIN.
           GURL proxy_url(DATA_REDUCTION_FALLBACK_HOST);
           if (proxy_url.SchemeIsHTTPOrHTTPS()) {
@@ -1030,7 +1032,7 @@ int HttpNetworkTransaction::DoReadHeadersComplete(int result) {
 #endif
         if (proxy_service->MarkProxiesAsBadUntil(
                 proxy_info_,
-                chrome_proxy_info.bypass_duration,
+                data_reduction_proxy_info.bypass_duration,
                 proxy_server,
                 net_log_)) {
           // Only retry idempotent methods. We don't want to resubmit a POST

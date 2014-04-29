@@ -805,12 +805,6 @@ INSTANTIATE_TEST_CASE_P(
                                     "transferFromOfflineToDrive")));
 
 INSTANTIATE_TEST_CASE_P(
-     HideSearchBox,
-     FileManagerBrowserTest,
-     ::testing::Values(TestParameter(IN_GUEST_MODE, "hideSearchBox"),
-                       TestParameter(NOT_IN_GUEST_MODE, "hideSearchBox")));
-
-INSTANTIATE_TEST_CASE_P(
     RestorePrefs,
     FileManagerBrowserTest,
     ::testing::Values(TestParameter(IN_GUEST_MODE, "restoreSortColumn"),
@@ -921,9 +915,6 @@ class MultiProfileFileManagerBrowserTest : public FileManagerBrowserTestBase {
     const TestAccountInfo& info = kTestAccounts[PRIMARY_ACCOUNT_INDEX];
 
     AddUser(info, true);
-    chromeos::UserManager* const user_manager = chromeos::UserManager::Get();
-    if (user_manager->GetActiveUser() != user_manager->FindUser(info.email))
-      chromeos::UserManager::Get()->SwitchActiveUser(info.email);
     FileManagerBrowserTestBase::SetUpOnMainThread();
   }
 

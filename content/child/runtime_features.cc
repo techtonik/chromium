@@ -23,9 +23,9 @@ static void SetRuntimeFeatureDefaultsForPlatform() {
 #if defined(OS_ANDROID)
   // MSE/EME implementation needs Android MediaCodec API.
   if (!media::MediaCodecBridge::IsAvailable()) {
-    WebRuntimeFeatures::enableWebKitMediaSource(false);
     WebRuntimeFeatures::enableMediaSource(false);
     WebRuntimeFeatures::enablePrefixedEncryptedMedia(false);
+    WebRuntimeFeatures::enableEncryptedMedia(false);
   }
   // WebAudio is enabled by default on ARM and X86 and only when the
   // MediaCodec API is available.
@@ -75,10 +75,7 @@ void SetRuntimeFeaturesDefaultsAndUpdateFromArgs(
   if (command_line.HasSwitch(switches::kDisableSessionStorage))
     WebRuntimeFeatures::enableSessionStorage(false);
 
-  if (command_line.HasSwitch(switches::kDisableWebKitMediaSource))
-    WebRuntimeFeatures::enableWebKitMediaSource(false);
-
-  if (command_line.HasSwitch(switches::kDisableUnprefixedMediaSource))
+  if (command_line.HasSwitch(switches::kDisableMediaSource))
     WebRuntimeFeatures::enableMediaSource(false);
 
   if (command_line.HasSwitch(switches::kDisableSharedWorkers))

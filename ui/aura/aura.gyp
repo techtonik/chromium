@@ -143,13 +143,13 @@
         '../../skia/skia.gyp:skia',
         '../../testing/gtest.gyp:gtest',
         '../base/ui_base.gyp:ui_base',
+        '../base/ui_base.gyp:ui_base_test_support',
         '../compositor/compositor.gyp:compositor_test_support',
         '../events/events.gyp:events',
         '../events/events.gyp:events_base',
         '../events/events.gyp:events_test_support',
         '../gfx/gfx.gyp:gfx',
         '../gfx/gfx.gyp:gfx_geometry',
-        '../ui_unittests.gyp:ui_test_support',
         'aura',
       ],
       'include_dirs': [
@@ -160,6 +160,8 @@
         'test/aura_test_base.h',
         'test/aura_test_helper.cc',
         'test/aura_test_helper.h',
+        'test/aura_test_utils.cc',
+        'test/aura_test_utils.h',
         'test/env_test_helper.h',
         'test/event_generator.cc',
         'test/event_generator.h',
@@ -208,6 +210,13 @@
       'sources': [
         'demo/demo_main.cc',
       ],
+      'conditions': [
+        ['use_x11==1', {
+          'dependencies': [
+            '../gfx/gfx.gyp:gfx_x11',
+          ],
+        }],
+      ]
     },
     {
       'target_name': 'aura_bench',
@@ -234,6 +243,13 @@
       'sources': [
         'bench/bench_main.cc',
       ],
+      'conditions': [
+        ['use_x11==1', {
+          'dependencies': [
+            '../gfx/gfx.gyp:gfx_x11',
+          ],
+        }],
+      ]
     },
     {
       'target_name': 'aura_unittests',
@@ -243,6 +259,7 @@
         '../../skia/skia.gyp:skia',
         '../../testing/gtest.gyp:gtest',
         '../base/ui_base.gyp:ui_base',
+        '../base/ui_base.gyp:ui_base_test_support',
         '../compositor/compositor.gyp:compositor',
         '../compositor/compositor.gyp:compositor_test_support',
         '../events/events.gyp:events',
@@ -250,7 +267,6 @@
         '../gfx/gfx.gyp:gfx',
         '../gfx/gfx.gyp:gfx_geometry',
         '../gl/gl.gyp:gl',
-        '../ui_unittests.gyp:ui_test_support',
         'aura_test_support',
         'aura',
       ],

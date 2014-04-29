@@ -263,7 +263,6 @@ class RenderWidgetHostViewMac : public RenderWidgetHostViewBase,
   virtual void WasShown() OVERRIDE;
   virtual void WasHidden() OVERRIDE;
   virtual void MovePluginWindows(
-      const gfx::Vector2d& scroll_offset,
       const std::vector<WebPluginGeometry>& moves) OVERRIDE;
   virtual void Focus() OVERRIDE;
   virtual void Blur() OVERRIDE;
@@ -291,7 +290,6 @@ class RenderWidgetHostViewMac : public RenderWidgetHostViewBase,
   virtual void SelectionBoundsChanged(
       const ViewHostMsg_SelectionBounds_Params& params) OVERRIDE;
   virtual void ScrollOffsetChanged() OVERRIDE;
-  virtual BackingStore* AllocBackingStore(const gfx::Size& size) OVERRIDE;
   virtual void CopyFromCompositingSurface(
       const gfx::Rect& src_subrect,
       const gfx::Size& dst_size,
@@ -334,8 +332,8 @@ class RenderWidgetHostViewMac : public RenderWidgetHostViewBase,
       bool is_pinned_to_left, bool is_pinned_to_right) OVERRIDE;
   virtual bool LockMouse() OVERRIDE;
   virtual void UnlockMouse() OVERRIDE;
-  virtual void HandledWheelEvent(const blink::WebMouseWheelEvent& event,
-                                 bool consumed) OVERRIDE;
+  virtual void UnhandledWheelEvent(
+      const blink::WebMouseWheelEvent& event) OVERRIDE;
 
   // IPC::Sender implementation.
   virtual bool Send(IPC::Message* message) OVERRIDE;
@@ -512,6 +510,8 @@ class RenderWidgetHostViewMac : public RenderWidgetHostViewBase,
   // all of them using this function when any of those parameters changes. Also
   // update the scale factor of the layers.
   void LayoutLayers();
+
+  bool HasPendingSwapAck() const { return pending_swap_ack_; }
 
  private:
   friend class RenderWidgetHostView;

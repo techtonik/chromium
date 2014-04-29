@@ -12,12 +12,16 @@
 #include "third_party/WebKit/public/web/WebColorChooserClient.h"
 
 namespace WebTestRunner {
-
 class WebTestDelegate;
+}
+
+namespace content {
+
 class WebTestProxyBase;
+
 class MockColorChooser : public blink::WebColorChooser {
 public:
-    MockColorChooser(blink::WebColorChooserClient*, WebTestDelegate*, WebTestProxyBase*);
+    MockColorChooser(blink::WebColorChooserClient*, WebTestRunner::WebTestDelegate*, content::WebTestProxyBase*);
     virtual ~MockColorChooser();
 
     // blink::WebColorChooser implementation.
@@ -25,16 +29,17 @@ public:
     virtual void endChooser() OVERRIDE;
 
     void invokeDidEndChooser();
-    WebTaskList* taskList() { return &m_taskList; }
+    WebTestRunner::WebTaskList* taskList() { return &m_taskList; }
+
 private:
     blink::WebColorChooserClient* m_client;
-    WebTestDelegate* m_delegate;
-    WebTestProxyBase* m_proxy;
-    WebTaskList m_taskList;
+    WebTestRunner::WebTestDelegate* m_delegate;
+    content::WebTestProxyBase* m_proxy;
+    WebTestRunner::WebTaskList m_taskList;
 
     DISALLOW_COPY_AND_ASSIGN(MockColorChooser);
 };
 
-}
+}  // namespace content
 
 #endif  // CONTENT_SHELL_RENDERER_TEST_RUNNER_MOCKCOLORCHOOSER_H_

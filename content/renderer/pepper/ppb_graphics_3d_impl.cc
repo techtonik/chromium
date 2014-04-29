@@ -21,14 +21,14 @@
 #include "third_party/WebKit/public/web/WebConsoleMessage.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebElement.h"
-#include "third_party/WebKit/public/web/WebFrame.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebPluginContainer.h"
 #include "webkit/common/webpreferences.h"
 
 using ppapi::thunk::EnterResourceNoLock;
 using ppapi::thunk::PPB_Graphics3D_API;
 using blink::WebConsoleMessage;
-using blink::WebFrame;
+using blink::WebLocalFrame;
 using blink::WebPluginContainer;
 using blink::WebString;
 
@@ -44,12 +44,9 @@ PPB_Graphics3D_Impl::PPB_Graphics3D_Impl(PP_Instance instance)
     : PPB_Graphics3D_Shared(instance),
       bound_to_instance_(false),
       commit_pending_(false),
-      weak_ptr_factory_(this) {
-}
+      weak_ptr_factory_(this) {}
 
-PPB_Graphics3D_Impl::~PPB_Graphics3D_Impl() {
-  DestroyGLES2Impl();
-}
+PPB_Graphics3D_Impl::~PPB_Graphics3D_Impl() { DestroyGLES2Impl(); }
 
 // static
 PP_Resource PPB_Graphics3D_Impl::Create(PP_Instance instance,
@@ -135,9 +132,7 @@ bool PPB_Graphics3D_Impl::BindToInstance(bool bind) {
   return true;
 }
 
-bool PPB_Graphics3D_Impl::IsOpaque() {
-  return platform_context_->IsOpaque();
-}
+bool PPB_Graphics3D_Impl::IsOpaque() { return platform_context_->IsOpaque(); }
 
 void PPB_Graphics3D_Impl::ViewInitiatedPaint() {
   commit_pending_ = false;
@@ -146,8 +141,7 @@ void PPB_Graphics3D_Impl::ViewInitiatedPaint() {
     SwapBuffersACK(PP_OK);
 }
 
-void PPB_Graphics3D_Impl::ViewFlushedPaint() {
-}
+void PPB_Graphics3D_Impl::ViewFlushedPaint() {}
 
 gpu::CommandBuffer* PPB_Graphics3D_Impl::GetCommandBuffer() {
   return platform_context_->GetCommandBuffer();
@@ -184,7 +178,6 @@ int32 PPB_Graphics3D_Impl::DoSwapBuffers() {
                                        weak_ptr_factory_.GetWeakPtr()));
   }
 
-
   return PP_OK_COMPLETIONPENDING;
 }
 
@@ -203,8 +196,7 @@ bool PPB_Graphics3D_Impl::Init(PPB_Graphics3D_API* share_context,
         static_cast<PPB_Graphics3D_Shared*>(share_context)->gles2_impl();
   }
 
-  return CreateGLES2Impl(kCommandBufferSize, kTransferBufferSize,
-                         share_gles2);
+  return CreateGLES2Impl(kCommandBufferSize, kTransferBufferSize, share_gles2);
 }
 
 bool PPB_Graphics3D_Impl::InitRaw(PPB_Graphics3D_API* share_context,
@@ -214,15 +206,11 @@ bool PPB_Graphics3D_Impl::InitRaw(PPB_Graphics3D_API* share_context,
   if (!plugin_instance)
     return false;
 
-  const WebPreferences& prefs = static_cast<RenderViewImpl*>(plugin_instance->
-      GetRenderView())->webkit_preferences();
+  const WebPreferences& prefs =
+      static_cast<RenderViewImpl*>(plugin_instance->GetRenderView())
+          ->webkit_preferences();
   // 3D access might be disabled or blacklisted.
   if (!prefs.pepper_3d_enabled)
-    return false;
-  // If accelerated compositing of plugins is disabled, fail to create a 3D
-  // context, because it won't be visible. This allows graceful fallback in the
-  // modules.
-  if (!prefs.accelerated_compositing_for_plugins_enabled)
     return false;
 
   platform_context_.reset(new PlatformContext3D);
@@ -239,25 +227,22 @@ bool PPB_Graphics3D_Impl::InitRaw(PPB_Graphics3D_API* share_context,
   if (!platform_context_->Init(attrib_list, share_platform_context))
     return false;
 
-  platform_context_->SetContextLostCallback(
-      base::Bind(&PPB_Graphics3D_Impl::OnContextLost,
-                 weak_ptr_factory_.GetWeakPtr()));
+  platform_context_->SetContextLostCallback(base::Bind(
+      &PPB_Graphics3D_Impl::OnContextLost, weak_ptr_factory_.GetWeakPtr()));
 
-  platform_context_->SetOnConsoleMessageCallback(
-      base::Bind(&PPB_Graphics3D_Impl::OnConsoleMessage,
-                 weak_ptr_factory_.GetWeakPtr()));
+  platform_context_->SetOnConsoleMessageCallback(base::Bind(
+      &PPB_Graphics3D_Impl::OnConsoleMessage, weak_ptr_factory_.GetWeakPtr()));
   return true;
 }
 
-void PPB_Graphics3D_Impl::OnConsoleMessage(const std::string& message,
-                                           int id) {
+void PPB_Graphics3D_Impl::OnConsoleMessage(const std::string& message, int id) {
   if (!bound_to_instance_)
     return;
   WebPluginContainer* container =
       HostGlobals::Get()->GetInstance(pp_instance())->container();
   if (!container)
     return;
-  WebFrame* frame = container->element().document().frame();
+  WebLocalFrame* frame = container->element().document().frame();
   if (!frame)
     return;
   WebConsoleMessage console_message = WebConsoleMessage(
@@ -278,8 +263,8 @@ void PPB_Graphics3D_Impl::OnContextLost() {
   // Don't need to check for NULL from GetPluginInstance since when we're
   // bound, we know our instance is valid.
   if (bound_to_instance_) {
-    HostGlobals::Get()->GetInstance(pp_instance())->BindGraphics(
-        pp_instance(), 0);
+    HostGlobals::Get()->GetInstance(pp_instance())->BindGraphics(pp_instance(),
+                                                                 0);
   }
 
   // Send context lost to plugin. This may have been caused by a PPAPI call, so
@@ -304,10 +289,8 @@ void PPB_Graphics3D_Impl::SendContextLost() {
   // send the Graphics3DContextLost to the plugin; the instance may care about
   // that event even though this context has been destroyed.
   PP_Instance this_pp_instance = pp_instance();
-  const PPP_Graphics3D* ppp_graphics_3d =
-      static_cast<const PPP_Graphics3D*>(
-          instance->module()->GetPluginInterface(
-              PPP_GRAPHICS_3D_INTERFACE));
+  const PPP_Graphics3D* ppp_graphics_3d = static_cast<const PPP_Graphics3D*>(
+      instance->module()->GetPluginInterface(PPP_GRAPHICS_3D_INTERFACE));
   // We have to check *again* that the instance exists, because it could have
   // been deleted during GetPluginInterface(). Even the PluginModule could be
   // deleted, but in that case, the instance should also be gone, so the

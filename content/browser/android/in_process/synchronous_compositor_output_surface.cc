@@ -69,6 +69,7 @@ SynchronousCompositorOutputSurface::SynchronousCompositorOutputSurface(
     : cc::OutputSurface(
           scoped_ptr<cc::SoftwareOutputDevice>(new SoftwareDevice(this))),
       routing_id_(routing_id),
+      needs_begin_frame_(false),
       invoking_composite_(false),
       did_swap_buffer_(false),
       current_sw_canvas_(NULL),
@@ -123,14 +124,12 @@ void SynchronousCompositorOutputSurface::Reshape(
   // Intentional no-op: surface size is controlled by the embedder.
 }
 
-void SynchronousCompositorOutputSurface::SetNeedsBeginImplFrame(
-    bool enable) {
+void SynchronousCompositorOutputSurface::SetNeedsBeginFrame(bool enable) {
   DCHECK(CalledOnValidThread());
-  needs_begin_impl_frame_ = enable;
-  client_ready_for_begin_impl_frame_ = true;
+  needs_begin_frame_ = enable;
   SynchronousCompositorOutputSurfaceDelegate* delegate = GetDelegate();
   if (delegate && !invoking_composite_)
-    delegate->SetContinuousInvalidate(needs_begin_impl_frame_);
+    delegate->SetContinuousInvalidate(needs_begin_frame_);
 }
 
 void SynchronousCompositorOutputSurface::SwapBuffers(
@@ -143,7 +142,7 @@ void SynchronousCompositorOutputSurface::SwapBuffers(
   UpdateFrameMetaData(frame->metadata);
 
   did_swap_buffer_ = true;
-  DidSwapBuffers();
+  client_->DidSwapBuffers();
 }
 
 void SynchronousCompositorOutputSurface::UpdateFrameMetaData(
@@ -171,14 +170,12 @@ void AdjustTransform(gfx::Transform* transform, gfx::Rect viewport) {
 } // namespace
 
 bool SynchronousCompositorOutputSurface::InitializeHwDraw(
-    scoped_refptr<cc::ContextProvider> onscreen_context_provider,
-    scoped_refptr<cc::ContextProvider> offscreen_context_provider) {
+    scoped_refptr<cc::ContextProvider> onscreen_context_provider) {
   DCHECK(CalledOnValidThread());
   DCHECK(HasClient());
   DCHECK(!context_provider_);
 
-  return InitializeAndSetContext3d(onscreen_context_provider,
-                                   offscreen_context_provider);
+  return InitializeAndSetContext3d(onscreen_context_provider);
 }
 
 void SynchronousCompositorOutputSurface::ReleaseHwDraw() {
@@ -239,7 +236,7 @@ void SynchronousCompositorOutputSurface::InvokeComposite(
   SetExternalDrawConstraints(
       adjusted_transform, viewport, clip, valid_for_tile_management);
   SetNeedsRedrawRect(gfx::Rect(viewport.size()));
-  BeginImplFrame(cc::BeginFrameArgs::CreateForSynchronousCompositor());
+  client_->BeginFrame(cc::BeginFrameArgs::CreateForSynchronousCompositor());
 
   // After software draws (which might move the viewport arbitrarily), restore
   // the previous hardware viewport to allow CC's tile manager to prioritize
@@ -254,17 +251,11 @@ void SynchronousCompositorOutputSurface::InvokeComposite(
   }
 
   if (did_swap_buffer_)
-    OnSwapBuffersComplete();
+    client_->DidSwapBuffersComplete();
 
   SynchronousCompositorOutputSurfaceDelegate* delegate = GetDelegate();
   if (delegate)
-    delegate->SetContinuousInvalidate(needs_begin_impl_frame_);
-}
-
-void
-SynchronousCompositorOutputSurface::PostCheckForRetroactiveBeginImplFrame() {
-  // Synchronous compositor cannot perform retroactive BeginImplFrames, so
-  // intentionally no-op here.
+    delegate->SetContinuousInvalidate(needs_begin_frame_);
 }
 
 void SynchronousCompositorOutputSurface::SetMemoryPolicy(

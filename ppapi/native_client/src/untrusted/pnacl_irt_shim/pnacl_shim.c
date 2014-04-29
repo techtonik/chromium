@@ -3085,11 +3085,13 @@ static int32_t Pnacl_M33_PPB_IsolatedFileSystem_Private_Open(PP_Instance instanc
 
 /* End wrapper methods for PPB_IsolatedFileSystem_Private_0_2 */
 
+/* Not generating wrapper methods for PP_ManifestService_1_0 */
+
 /* Begin wrapper methods for PPB_NaCl_Private_1_0 */
 
-static void Pnacl_M25_PPB_NaCl_Private_LaunchSelLdr(PP_Instance instance, const char* alleged_url, PP_Bool uses_irt, PP_Bool uses_ppapi, PP_Bool uses_nonsfi_mode, PP_Bool enable_ppapi_dev, PP_Bool enable_dyncode_syscalls, PP_Bool enable_exception_handling, PP_Bool enable_crash_throttling, void* imc_handle, struct PP_Var* error_message, struct PP_CompletionCallback* callback) {
+static void Pnacl_M25_PPB_NaCl_Private_LaunchSelLdr(PP_Instance instance, const char* alleged_url, PP_Bool uses_irt, PP_Bool uses_ppapi, PP_Bool uses_nonsfi_mode, PP_Bool enable_ppapi_dev, PP_Bool enable_dyncode_syscalls, PP_Bool enable_exception_handling, PP_Bool enable_crash_throttling, const struct PP_ManifestService_1_0* manifest_service_interface, void* manifest_service_user_data, void* imc_handle, struct PP_Var* error_message, struct PP_CompletionCallback* callback) {
   const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  iface->LaunchSelLdr(instance, alleged_url, uses_irt, uses_ppapi, uses_nonsfi_mode, enable_ppapi_dev, enable_dyncode_syscalls, enable_exception_handling, enable_crash_throttling, imc_handle, error_message, *callback);
+  iface->LaunchSelLdr(instance, alleged_url, uses_irt, uses_ppapi, uses_nonsfi_mode, enable_ppapi_dev, enable_dyncode_syscalls, enable_exception_handling, enable_crash_throttling, manifest_service_interface, manifest_service_user_data, imc_handle, error_message, *callback);
 }
 
 static PP_Bool Pnacl_M25_PPB_NaCl_Private_StartPpapiProxy(PP_Instance instance) {
@@ -3152,9 +3154,9 @@ static void Pnacl_M25_PPB_NaCl_Private_DispatchEvent(PP_Instance instance, PP_Na
   iface->DispatchEvent(instance, event_type, resource_url, length_is_computable, loaded_bytes, total_bytes);
 }
 
-static void Pnacl_M25_PPB_NaCl_Private_NexeFileDidOpen(PP_Instance instance, int32_t pp_error, int32_t fd, int32_t http_status, int64_t nexe_bytes_read, const char* url) {
+static void Pnacl_M25_PPB_NaCl_Private_NexeFileDidOpen(PP_Instance instance, int32_t pp_error, int32_t fd, int32_t http_status, int64_t nexe_bytes_read, const char* url, int64_t time_since_open) {
   const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  iface->NexeFileDidOpen(instance, pp_error, fd, http_status, nexe_bytes_read, url);
+  iface->NexeFileDidOpen(instance, pp_error, fd, http_status, nexe_bytes_read, url, time_since_open);
 }
 
 static void Pnacl_M25_PPB_NaCl_Private_ReportLoadSuccess(PP_Instance instance, const char* url, uint64_t loaded_bytes, uint64_t total_bytes) {
@@ -3212,24 +3214,9 @@ static PP_NaClReadyState Pnacl_M25_PPB_NaCl_Private_GetNaClReadyState(PP_Instanc
   return iface->GetNaClReadyState(instance);
 }
 
-static void Pnacl_M25_PPB_NaCl_Private_SetNaClReadyState(PP_Instance instance, PP_NaClReadyState ready_state) {
-  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  iface->SetNaClReadyState(instance, ready_state);
-}
-
 static PP_Bool Pnacl_M25_PPB_NaCl_Private_GetIsInstalled(PP_Instance instance) {
   const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
   return iface->GetIsInstalled(instance);
-}
-
-static void Pnacl_M25_PPB_NaCl_Private_SetIsInstalled(PP_Instance instance, PP_Bool is_installed) {
-  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  iface->SetIsInstalled(instance, is_installed);
-}
-
-static void Pnacl_M25_PPB_NaCl_Private_SetReadyTime(PP_Instance instance) {
-  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  iface->SetReadyTime(instance);
 }
 
 static int32_t Pnacl_M25_PPB_NaCl_Private_GetExitStatus(PP_Instance instance) {
@@ -3247,9 +3234,9 @@ static void Pnacl_M25_PPB_NaCl_Private_Vlog(const char* message) {
   iface->Vlog(message);
 }
 
-static void Pnacl_M25_PPB_NaCl_Private_SetInitTime(PP_Instance instance) {
+static void Pnacl_M25_PPB_NaCl_Private_InitializePlugin(PP_Instance instance, uint32_t argc, const char* argn[], const char* argv[]) {
   const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  iface->SetInitTime(instance);
+  iface->InitializePlugin(instance, argc, argn, argv);
 }
 
 static int64_t Pnacl_M25_PPB_NaCl_Private_GetNexeSize(PP_Instance instance) {
@@ -3257,9 +3244,44 @@ static int64_t Pnacl_M25_PPB_NaCl_Private_GetNexeSize(PP_Instance instance) {
   return iface->GetNexeSize(instance);
 }
 
-static void Pnacl_M25_PPB_NaCl_Private_SetNexeSize(PP_Instance instance, int64_t nexe_size) {
+static PP_Bool Pnacl_M25_PPB_NaCl_Private_RequestNaClManifest(PP_Instance instance, const char* manifest_url, PP_Bool* is_data_uri) {
   const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  iface->SetNexeSize(instance, nexe_size);
+  return iface->RequestNaClManifest(instance, manifest_url, is_data_uri);
+}
+
+static void Pnacl_M25_PPB_NaCl_Private_GetManifestBaseURL(struct PP_Var* _struct_result, PP_Instance instance) {
+  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
+  *_struct_result = iface->GetManifestBaseURL(instance);
+}
+
+static PP_Bool Pnacl_M25_PPB_NaCl_Private_ResolvesRelativeToPluginBaseUrl(PP_Instance instance, const char* url) {
+  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
+  return iface->ResolvesRelativeToPluginBaseUrl(instance, url);
+}
+
+static void Pnacl_M25_PPB_NaCl_Private_ParseDataURL(struct PP_Var* _struct_result, const char* data_url) {
+  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
+  *_struct_result = iface->ParseDataURL(data_url);
+}
+
+static void Pnacl_M25_PPB_NaCl_Private_ProcessNaClManifest(PP_Instance instance, const char* program_url) {
+  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
+  iface->ProcessNaClManifest(instance, program_url);
+}
+
+static void Pnacl_M25_PPB_NaCl_Private_GetManifestURLArgument(struct PP_Var* _struct_result, PP_Instance instance) {
+  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
+  *_struct_result = iface->GetManifestURLArgument(instance);
+}
+
+static PP_Bool Pnacl_M25_PPB_NaCl_Private_IsPNaCl(PP_Instance instance) {
+  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
+  return iface->IsPNaCl(instance);
+}
+
+static PP_Bool Pnacl_M25_PPB_NaCl_Private_DevInterfacesEnabled(PP_Instance instance) {
+  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
+  return iface->DevInterfacesEnabled(instance);
 }
 
 /* End wrapper methods for PPB_NaCl_Private_1_0 */
@@ -5135,8 +5157,10 @@ static const struct PPB_IsolatedFileSystem_Private_0_2 Pnacl_Wrappers_PPB_Isolat
     .Open = (int32_t (*)(PP_Instance instance, PP_IsolatedFileSystemType_Private type, PP_Resource* file_system, struct PP_CompletionCallback callback))&Pnacl_M33_PPB_IsolatedFileSystem_Private_Open
 };
 
+/* Not generating wrapper interface for PP_ManifestService_1_0 */
+
 static const struct PPB_NaCl_Private_1_0 Pnacl_Wrappers_PPB_NaCl_Private_1_0 = {
-    .LaunchSelLdr = (void (*)(PP_Instance instance, const char* alleged_url, PP_Bool uses_irt, PP_Bool uses_ppapi, PP_Bool uses_nonsfi_mode, PP_Bool enable_ppapi_dev, PP_Bool enable_dyncode_syscalls, PP_Bool enable_exception_handling, PP_Bool enable_crash_throttling, void* imc_handle, struct PP_Var* error_message, struct PP_CompletionCallback callback))&Pnacl_M25_PPB_NaCl_Private_LaunchSelLdr,
+    .LaunchSelLdr = (void (*)(PP_Instance instance, const char* alleged_url, PP_Bool uses_irt, PP_Bool uses_ppapi, PP_Bool uses_nonsfi_mode, PP_Bool enable_ppapi_dev, PP_Bool enable_dyncode_syscalls, PP_Bool enable_exception_handling, PP_Bool enable_crash_throttling, const struct PP_ManifestService_1_0* manifest_service_interface, void* manifest_service_user_data, void* imc_handle, struct PP_Var* error_message, struct PP_CompletionCallback callback))&Pnacl_M25_PPB_NaCl_Private_LaunchSelLdr,
     .StartPpapiProxy = (PP_Bool (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_StartPpapiProxy,
     .UrandomFD = (int32_t (*)(void))&Pnacl_M25_PPB_NaCl_Private_UrandomFD,
     .Are3DInterfacesDisabled = (PP_Bool (*)(void))&Pnacl_M25_PPB_NaCl_Private_Are3DInterfacesDisabled,
@@ -5149,7 +5173,7 @@ static const struct PPB_NaCl_Private_1_0 Pnacl_Wrappers_PPB_NaCl_Private_1_0 = {
     .ReportTranslationFinished = (void (*)(PP_Instance instance, PP_Bool success))&Pnacl_M25_PPB_NaCl_Private_ReportTranslationFinished,
     .OpenNaClExecutable = (PP_FileHandle (*)(PP_Instance instance, const char* file_url, uint64_t* file_token_lo, uint64_t* file_token_hi))&Pnacl_M25_PPB_NaCl_Private_OpenNaClExecutable,
     .DispatchEvent = (void (*)(PP_Instance instance, PP_NaClEventType event_type, const char* resource_url, PP_Bool length_is_computable, uint64_t loaded_bytes, uint64_t total_bytes))&Pnacl_M25_PPB_NaCl_Private_DispatchEvent,
-    .NexeFileDidOpen = (void (*)(PP_Instance instance, int32_t pp_error, int32_t fd, int32_t http_status, int64_t nexe_bytes_read, const char* url))&Pnacl_M25_PPB_NaCl_Private_NexeFileDidOpen,
+    .NexeFileDidOpen = (void (*)(PP_Instance instance, int32_t pp_error, int32_t fd, int32_t http_status, int64_t nexe_bytes_read, const char* url, int64_t time_since_open))&Pnacl_M25_PPB_NaCl_Private_NexeFileDidOpen,
     .ReportLoadSuccess = (void (*)(PP_Instance instance, const char* url, uint64_t loaded_bytes, uint64_t total_bytes))&Pnacl_M25_PPB_NaCl_Private_ReportLoadSuccess,
     .ReportLoadError = (void (*)(PP_Instance instance, PP_NaClError error, const char* error_message, const char* console_message))&Pnacl_M25_PPB_NaCl_Private_ReportLoadError,
     .ReportLoadAbort = (void (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_ReportLoadAbort,
@@ -5161,16 +5185,20 @@ static const struct PPB_NaCl_Private_1_0 Pnacl_Wrappers_PPB_NaCl_Private_1_0 = {
     .GetUrlScheme = (PP_UrlSchemeType (*)(struct PP_Var url))&Pnacl_M25_PPB_NaCl_Private_GetUrlScheme,
     .LogToConsole = (void (*)(PP_Instance instance, const char* message))&Pnacl_M25_PPB_NaCl_Private_LogToConsole,
     .GetNaClReadyState = (PP_NaClReadyState (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_GetNaClReadyState,
-    .SetNaClReadyState = (void (*)(PP_Instance instance, PP_NaClReadyState ready_state))&Pnacl_M25_PPB_NaCl_Private_SetNaClReadyState,
     .GetIsInstalled = (PP_Bool (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_GetIsInstalled,
-    .SetIsInstalled = (void (*)(PP_Instance instance, PP_Bool is_installed))&Pnacl_M25_PPB_NaCl_Private_SetIsInstalled,
-    .SetReadyTime = (void (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_SetReadyTime,
     .GetExitStatus = (int32_t (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_GetExitStatus,
     .SetExitStatus = (void (*)(PP_Instance instance, int32_t exit_status))&Pnacl_M25_PPB_NaCl_Private_SetExitStatus,
     .Vlog = (void (*)(const char* message))&Pnacl_M25_PPB_NaCl_Private_Vlog,
-    .SetInitTime = (void (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_SetInitTime,
+    .InitializePlugin = (void (*)(PP_Instance instance, uint32_t argc, const char* argn[], const char* argv[]))&Pnacl_M25_PPB_NaCl_Private_InitializePlugin,
     .GetNexeSize = (int64_t (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_GetNexeSize,
-    .SetNexeSize = (void (*)(PP_Instance instance, int64_t nexe_size))&Pnacl_M25_PPB_NaCl_Private_SetNexeSize
+    .RequestNaClManifest = (PP_Bool (*)(PP_Instance instance, const char* manifest_url, PP_Bool* is_data_uri))&Pnacl_M25_PPB_NaCl_Private_RequestNaClManifest,
+    .GetManifestBaseURL = (struct PP_Var (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_GetManifestBaseURL,
+    .ResolvesRelativeToPluginBaseUrl = (PP_Bool (*)(PP_Instance instance, const char* url))&Pnacl_M25_PPB_NaCl_Private_ResolvesRelativeToPluginBaseUrl,
+    .ParseDataURL = (struct PP_Var (*)(const char* data_url))&Pnacl_M25_PPB_NaCl_Private_ParseDataURL,
+    .ProcessNaClManifest = (void (*)(PP_Instance instance, const char* program_url))&Pnacl_M25_PPB_NaCl_Private_ProcessNaClManifest,
+    .GetManifestURLArgument = (struct PP_Var (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_GetManifestURLArgument,
+    .IsPNaCl = (PP_Bool (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_IsPNaCl,
+    .DevInterfacesEnabled = (PP_Bool (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_DevInterfacesEnabled
 };
 
 static const struct PPB_NetAddress_Private_0_1 Pnacl_Wrappers_PPB_NetAddress_Private_0_1 = {

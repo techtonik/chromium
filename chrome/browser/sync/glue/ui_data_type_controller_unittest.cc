@@ -8,11 +8,11 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/message_loop/message_loop.h"
 #include "base/tracked_objects.h"
-#include "chrome/browser/sync/glue/fake_generic_change_processor.h"
 #include "chrome/browser/sync/profile_sync_components_factory_mock.h"
 #include "chrome/browser/sync/profile_sync_service_mock.h"
 #include "chrome/test/base/profile_mock.h"
 #include "components/sync_driver/data_type_controller_mock.h"
+#include "components/sync_driver/fake_generic_change_processor.h"
 #include "content/public/test/test_browser_thread.h"
 #include "sync/api/fake_syncable_service.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -24,10 +24,6 @@ using testing::Return;
 
 namespace browser_sync {
 namespace {
-
-ACTION(MakeSharedChangeProcessor) {
-  return new SharedChangeProcessor();
-}
 
 ACTION_P(ReturnAndRelease, change_processor) {
   return change_processor->release();
@@ -71,8 +67,6 @@ class SyncUIDataTypeControllerTest : public testing::Test {
     EXPECT_CALL(model_load_callback_, Run(_, _));
     EXPECT_CALL(*profile_sync_factory_, GetSyncableServiceForType(type_)).
         WillOnce(Return(syncable_service_.AsWeakPtr()));
-    EXPECT_CALL(*profile_sync_factory_, CreateSharedChangeProcessor()).
-        WillOnce(MakeSharedChangeProcessor());
     EXPECT_CALL(*profile_sync_factory_,
                 CreateGenericChangeProcessor(_, _, _, _)).
         WillOnce(ReturnAndRelease(&change_processor_));

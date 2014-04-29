@@ -22,12 +22,16 @@ SchedulerStateMachine::SchedulerStateMachine(const SchedulerSettings& settings)
       readback_state_(READBACK_STATE_IDLE),
       commit_count_(0),
       current_frame_number_(0),
+      last_frame_number_animate_performed_(-1),
       last_frame_number_swap_performed_(-1),
       last_frame_number_begin_main_frame_sent_(-1),
       last_frame_number_update_visible_tiles_was_called_(-1),
       manage_tiles_funnel_(0),
       consecutive_checkerboard_animations_(0),
+      max_pending_swaps_(1),
+      pending_swaps_(0),
       needs_redraw_(false),
+      needs_animate_(false),
       needs_manage_tiles_(false),
       swap_used_incomplete_tile_(false),
       needs_commit_(false),
@@ -44,7 +48,8 @@ SchedulerStateMachine::SchedulerStateMachine(const SchedulerSettings& settings)
       skip_next_begin_main_frame_to_reduce_latency_(false),
       skip_begin_main_frame_to_reduce_latency_(false),
       continuous_painting_(false),
-      needs_back_to_back_readback_(false) {}
+      needs_back_to_back_readback_(false) {
+}
 
 const char* SchedulerStateMachine::OutputSurfaceStateToString(
     OutputSurfaceState state) {
@@ -141,6 +146,8 @@ const char* SchedulerStateMachine::ActionToString(Action action) {
   switch (action) {
     case ACTION_NONE:
       return "ACTION_NONE";
+    case ACTION_ANIMATE:
+      return "ACTION_ANIMATE";
     case ACTION_SEND_BEGIN_MAIN_FRAME:
       return "ACTION_SEND_BEGIN_MAIN_FRAME";
     case ACTION_COMMIT:
@@ -186,31 +193,27 @@ scoped_ptr<base::Value> SchedulerStateMachine::AsValue() const  {
   scoped_ptr<base::DictionaryValue> timestamps_state(new base::DictionaryValue);
   base::TimeTicks now = gfx::FrameTime::Now();
   timestamps_state->SetDouble(
-      "0_interval",
-      last_begin_impl_frame_args_.interval.InMicroseconds() / 1000.0L);
+      "0_interval", begin_impl_frame_args_.interval.InMicroseconds() / 1000.0L);
   timestamps_state->SetDouble(
       "1_now_to_deadline",
-      (last_begin_impl_frame_args_.deadline - now).InMicroseconds() / 1000.0L);
+      (begin_impl_frame_args_.deadline - now).InMicroseconds() / 1000.0L);
   timestamps_state->SetDouble(
       "2_frame_time_to_now",
-      (now - last_begin_impl_frame_args_.frame_time).InMicroseconds() /
-          1000.0L);
+      (now - begin_impl_frame_args_.frame_time).InMicroseconds() / 1000.0L);
   timestamps_state->SetDouble(
       "3_frame_time_to_deadline",
-      (last_begin_impl_frame_args_.deadline -
-              last_begin_impl_frame_args_.frame_time).InMicroseconds() /
+      (begin_impl_frame_args_.deadline - begin_impl_frame_args_.frame_time)
+              .InMicroseconds() /
           1000.0L);
   timestamps_state->SetDouble(
       "4_now", (now - base::TimeTicks()).InMicroseconds() / 1000.0L);
   timestamps_state->SetDouble(
       "5_frame_time",
-      (last_begin_impl_frame_args_.frame_time - base::TimeTicks())
-              .InMicroseconds() /
+      (begin_impl_frame_args_.frame_time - base::TimeTicks()).InMicroseconds() /
           1000.0L);
   timestamps_state->SetDouble(
       "6_deadline",
-      (last_begin_impl_frame_args_.deadline - base::TimeTicks())
-              .InMicroseconds() /
+      (begin_impl_frame_args_.deadline - base::TimeTicks()).InMicroseconds() /
           1000.0L);
   state->Set("major_timestamps_in_ms", timestamps_state.release());
 
@@ -218,6 +221,8 @@ scoped_ptr<base::Value> SchedulerStateMachine::AsValue() const  {
   minor_state->SetInteger("commit_count", commit_count_);
   minor_state->SetInteger("current_frame_number", current_frame_number_);
 
+  minor_state->SetInteger("last_frame_number_animate_performed",
+                          last_frame_number_animate_performed_);
   minor_state->SetInteger("last_frame_number_swap_performed",
                           last_frame_number_swap_performed_);
   minor_state->SetInteger(
@@ -230,7 +235,10 @@ scoped_ptr<base::Value> SchedulerStateMachine::AsValue() const  {
   minor_state->SetInteger("manage_tiles_funnel", manage_tiles_funnel_);
   minor_state->SetInteger("consecutive_checkerboard_animations",
                           consecutive_checkerboard_animations_);
+  minor_state->SetInteger("max_pending_swaps_", max_pending_swaps_);
+  minor_state->SetInteger("pending_swaps_", pending_swaps_);
   minor_state->SetBoolean("needs_redraw", needs_redraw_);
+  minor_state->SetBoolean("needs_animate_", needs_animate_);
   minor_state->SetBoolean("needs_manage_tiles", needs_manage_tiles_);
   minor_state->SetBoolean("swap_used_incomplete_tile",
                           swap_used_incomplete_tile_);
@@ -368,6 +376,10 @@ bool SchedulerStateMachine::ShouldDraw() const {
   if (HasSwappedThisFrame())
     return false;
 
+  // Do not queue too many swaps.
+  if (pending_swaps_ >= max_pending_swaps_)
+    return false;
+
   // Except for the cases above, do not draw outside of the BeginImplFrame
   // deadline.
   if (begin_impl_frame_state_ != BEGIN_IMPL_FRAME_STATE_INSIDE_DEADLINE)
@@ -423,6 +435,20 @@ bool SchedulerStateMachine::ShouldUpdateVisibleTiles() const {
   return false;
 }
 
+bool SchedulerStateMachine::ShouldAnimate() const {
+  if (!can_draw_)
+    return false;
+
+  if (last_frame_number_animate_performed_ == current_frame_number_)
+    return false;
+
+  if (begin_impl_frame_state_ != BEGIN_IMPL_FRAME_STATE_BEGIN_FRAME_STARTING &&
+      begin_impl_frame_state_ != BEGIN_IMPL_FRAME_STATE_INSIDE_DEADLINE)
+    return false;
+
+  return needs_redraw_ || needs_animate_;
+}
+
 bool SchedulerStateMachine::ShouldSendBeginMainFrame() const {
   if (!needs_commit_)
     return false;
@@ -460,7 +486,7 @@ bool SchedulerStateMachine::ShouldSendBeginMainFrame() const {
   // TODO(brianderson): Allow sending BeginMainFrame while idle when the main
   // thread isn't consuming user input.
   if (begin_impl_frame_state_ == BEGIN_IMPL_FRAME_STATE_IDLE &&
-      BeginImplFrameNeeded())
+      BeginFrameNeeded())
     return false;
 
   // We need a new commit for the forced redraw. This honors the
@@ -474,6 +500,11 @@ bool SchedulerStateMachine::ShouldSendBeginMainFrame() const {
 
   // We shouldn't normally accept commits if there isn't an OutputSurface.
   if (!HasInitializedOutputSurface())
+    return false;
+
+  // SwapAck throttle the BeginMainFrames
+  // TODO(brianderson): Remove this restriction to improve throughput.
+  if (pending_swaps_ >= max_pending_swaps_)
     return false;
 
   if (skip_begin_main_frame_to_reduce_latency_)
@@ -522,6 +553,8 @@ SchedulerStateMachine::Action SchedulerStateMachine::NextAction() const {
     return ACTION_ACTIVATE_PENDING_TREE;
   if (ShouldCommit())
     return ACTION_COMMIT;
+  if (ShouldAnimate())
+    return ACTION_ANIMATE;
   if (ShouldDraw()) {
     if (readback_state_ == READBACK_STATE_WAITING_FOR_DRAW_AND_READBACK)
       return ACTION_DRAW_AND_READBACK;
@@ -562,6 +595,14 @@ void SchedulerStateMachine::UpdateState(Action action) {
       UpdateStateOnActivation();
       return;
 
+    case ACTION_ANIMATE:
+      last_frame_number_animate_performed_ = current_frame_number_;
+      needs_animate_ = false;
+      // TODO(skyostil): Instead of assuming this, require the client to tell
+      // us.
+      SetNeedsRedraw();
+      return;
+
     case ACTION_SEND_BEGIN_MAIN_FRAME:
       DCHECK(!has_pending_tree_ ||
              settings_.main_frame_before_activation_enabled);
@@ -585,15 +626,15 @@ void SchedulerStateMachine::UpdateState(Action action) {
 
     case ACTION_DRAW_AND_SWAP_FORCED:
     case ACTION_DRAW_AND_SWAP_IF_POSSIBLE: {
-      bool did_swap = true;
-      UpdateStateOnDraw(did_swap);
+      bool did_request_swap = true;
+      UpdateStateOnDraw(did_request_swap);
       return;
     }
 
     case ACTION_DRAW_AND_SWAP_ABORT:
     case ACTION_DRAW_AND_READBACK: {
-      bool did_swap = false;
-      UpdateStateOnDraw(did_swap);
+      bool did_request_swap = false;
+      UpdateStateOnDraw(did_request_swap);
       return;
     }
 
@@ -730,7 +771,7 @@ void SchedulerStateMachine::UpdateStateOnActivation() {
   needs_redraw_ = true;
 }
 
-void SchedulerStateMachine::UpdateStateOnDraw(bool did_swap) {
+void SchedulerStateMachine::UpdateStateOnDraw(bool did_request_swap) {
   DCHECK(readback_state_ != READBACK_STATE_WAITING_FOR_REPLACEMENT_COMMIT &&
          readback_state_ != READBACK_STATE_WAITING_FOR_REPLACEMENT_ACTIVATION)
       << *AsValue();
@@ -755,7 +796,7 @@ void SchedulerStateMachine::UpdateStateOnDraw(bool did_swap) {
   draw_if_possible_failed_ = false;
   active_tree_needs_first_draw_ = false;
 
-  if (did_swap)
+  if (did_request_swap)
     last_frame_number_swap_performed_ = current_frame_number_;
 }
 
@@ -767,44 +808,44 @@ void SchedulerStateMachine::SetSkipNextBeginMainFrameToReduceLatency() {
   skip_next_begin_main_frame_to_reduce_latency_ = true;
 }
 
-bool SchedulerStateMachine::BeginImplFrameNeeded() const {
-  // Proactive BeginImplFrames are bad for the synchronous compositor because we
-  // have to draw when we get the BeginImplFrame and could end up drawing many
+bool SchedulerStateMachine::BeginFrameNeeded() const {
+  // Proactive BeginFrames are bad for the synchronous compositor because we
+  // have to draw when we get the BeginFrame and could end up drawing many
   // duplicate frames if our new frame isn't ready in time.
   // To poll for state with the synchronous compositor without having to draw,
   // we rely on ShouldPollForAnticipatedDrawTriggers instead.
-  if (!SupportsProactiveBeginImplFrame())
-    return BeginImplFrameNeededToDraw();
+  if (!SupportsProactiveBeginFrame())
+    return BeginFrameNeededToAnimateOrDraw();
 
-  return BeginImplFrameNeededToDraw() ||
-         ProactiveBeginImplFrameWanted();
+  return BeginFrameNeededToAnimateOrDraw() || ProactiveBeginFrameWanted();
 }
 
 bool SchedulerStateMachine::ShouldPollForAnticipatedDrawTriggers() const {
   // ShouldPollForAnticipatedDrawTriggers is what we use in place of
-  // ProactiveBeginImplFrameWanted when we are using the synchronous
+  // ProactiveBeginFrameWanted when we are using the synchronous
   // compositor.
-  if (!SupportsProactiveBeginImplFrame()) {
-    return !BeginImplFrameNeededToDraw() &&
-           ProactiveBeginImplFrameWanted();
+  if (!SupportsProactiveBeginFrame()) {
+    return !BeginFrameNeededToAnimateOrDraw() && ProactiveBeginFrameWanted();
   }
 
   // Non synchronous compositors should rely on
-  // ProactiveBeginImplFrameWanted to poll for state instead.
+  // ProactiveBeginFrameWanted to poll for state instead.
   return false;
 }
 
-bool SchedulerStateMachine::SupportsProactiveBeginImplFrame() const {
-  // Both the synchronous compositor and disabled vsync settings
-  // make it undesirable to proactively request BeginImplFrames.
-  // If this is true, the scheduler should poll.
-  return !settings_.using_synchronous_renderer_compositor &&
-         settings_.throttle_frame_production;
+// Note: If SupportsProactiveBeginFrame is false, the scheduler should poll
+// for changes in it's draw state so it can request a BeginFrame when it's
+// actually ready.
+bool SchedulerStateMachine::SupportsProactiveBeginFrame() const {
+  // It is undesirable to proactively request BeginFrames if we are
+  // using a synchronous compositor because we *must* draw for every
+  // BeginFrame, which could cause duplicate draws.
+  return !settings_.using_synchronous_renderer_compositor;
 }
 
 // These are the cases where we definitely (or almost definitely) have a
-// new frame to draw and can draw.
-bool SchedulerStateMachine::BeginImplFrameNeededToDraw() const {
+// new frame to animate and/or draw and can draw.
+bool SchedulerStateMachine::BeginFrameNeededToAnimateOrDraw() const {
   // The output surface is the provider of BeginImplFrames, so we are not going
   // to get them even if we ask for them.
   if (!HasInitializedOutputSurface())
@@ -829,14 +870,17 @@ bool SchedulerStateMachine::BeginImplFrameNeededToDraw() const {
   if (swap_used_incomplete_tile_)
     return true;
 
+  if (needs_animate_)
+    return true;
+
   return needs_redraw_;
 }
 
 // These are cases where we are very likely to draw soon, but might not
 // actually have a new frame to draw when we receive the next BeginImplFrame.
 // Proactively requesting the BeginImplFrame helps hide the round trip latency
-// of the SetNeedsBeginImplFrame request that has to go to the Browser.
-bool SchedulerStateMachine::ProactiveBeginImplFrameWanted() const {
+// of the SetNeedsBeginFrame request that has to go to the Browser.
+bool SchedulerStateMachine::ProactiveBeginFrameWanted() const {
   // The output surface is the provider of BeginImplFrames,
   // so we are not going to get them even if we ask for them.
   if (!HasInitializedOutputSurface())
@@ -863,7 +907,7 @@ bool SchedulerStateMachine::ProactiveBeginImplFrameWanted() const {
 
   // If we just swapped, it's likely that we are going to produce another
   // frame soon. This helps avoid negative glitches in our
-  // SetNeedsBeginImplFrame requests, which may propagate to the BeginImplFrame
+  // SetNeedsBeginFrame requests, which may propagate to the BeginImplFrame
   // provider and get sampled at an inopportune time, delaying the next
   // BeginImplFrame.
   if (last_frame_number_swap_performed_ == current_frame_number_)
@@ -874,7 +918,7 @@ bool SchedulerStateMachine::ProactiveBeginImplFrameWanted() const {
 
 void SchedulerStateMachine::OnBeginImplFrame(const BeginFrameArgs& args) {
   AdvanceCurrentFrameNumber();
-  last_begin_impl_frame_args_ = args;
+  begin_impl_frame_args_ = args;
   DCHECK_EQ(begin_impl_frame_state_, BEGIN_IMPL_FRAME_STATE_IDLE) << *AsValue();
   begin_impl_frame_state_ = BEGIN_IMPL_FRAME_STATE_BEGIN_FRAME_STARTING;
 }
@@ -913,6 +957,10 @@ bool SchedulerStateMachine::ShouldTriggerBeginImplFrameDeadlineEarly() const {
   // so we can start creating the next output surface.
   if (output_surface_state_ == OUTPUT_SURFACE_LOST)
     return true;
+
+  // SwapAck throttle the deadline since we wont draw and swap anyway.
+  if (pending_swaps_ >= max_pending_swaps_)
+    return false;
 
   if (active_tree_needs_first_draw_)
     return true;
@@ -994,6 +1042,10 @@ void SchedulerStateMachine::SetCanDraw(bool can_draw) { can_draw_ = can_draw; }
 
 void SchedulerStateMachine::SetNeedsRedraw() { needs_redraw_ = true; }
 
+void SchedulerStateMachine::SetNeedsAnimate() {
+  needs_animate_ = true;
+}
+
 void SchedulerStateMachine::SetNeedsManageTiles() {
   if (!needs_manage_tiles_) {
     TRACE_EVENT0("cc",
@@ -1002,9 +1054,23 @@ void SchedulerStateMachine::SetNeedsManageTiles() {
   }
 }
 
+void SchedulerStateMachine::SetMaxSwapsPending(int max) {
+  max_pending_swaps_ = max;
+}
+
+void SchedulerStateMachine::DidSwapBuffers() {
+  pending_swaps_++;
+  DCHECK_LE(pending_swaps_, max_pending_swaps_);
+}
+
 void SchedulerStateMachine::SetSwapUsedIncompleteTile(
     bool used_incomplete_tile) {
   swap_used_incomplete_tile_ = used_incomplete_tile;
+}
+
+void SchedulerStateMachine::DidSwapBuffersComplete() {
+  DCHECK_GT(pending_swaps_, 0);
+  pending_swaps_--;
 }
 
 void SchedulerStateMachine::SetSmoothnessTakesPriority(
@@ -1138,6 +1204,7 @@ void SchedulerStateMachine::DidCreateAndInitializeOutputSurface() {
     needs_commit_ = true;
   }
   did_create_and_initialize_first_output_surface_ = true;
+  pending_swaps_ = 0;
 }
 
 void SchedulerStateMachine::NotifyBeginMainFrameStarted() {

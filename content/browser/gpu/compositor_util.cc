@@ -16,6 +16,10 @@ namespace content {
 
 namespace {
 
+const char* kGpuCompositingFeatureName = "gpu_compositing";
+const char* kWebGLFeatureName = "webgl";
+const char* kRasterizationFeatureName = "rasterization";
+
 struct GpuFeatureInfo {
   std::string name;
   uint32 blocked;
@@ -41,37 +45,16 @@ const GpuFeatureInfo GetGpuFeatureInfo(size_t index, bool* eof) {
           true
       },
       {
-          "compositing",
-          manager->IsFeatureBlacklisted(
-              gpu::GPU_FEATURE_TYPE_ACCELERATED_COMPOSITING),
-          command_line.HasSwitch(switches::kDisableAcceleratedCompositing),
-          "Accelerated compositing has been disabled, either via about:flags or"
-          " command line. This adversely affects performance of all hardware"
-          " accelerated features.",
+          kGpuCompositingFeatureName,
+          manager->IsFeatureBlacklisted(gpu::GPU_FEATURE_TYPE_GPU_COMPOSITING),
+          false,
+          "Gpu compositing has been disabled, either via about:flags or"
+          " command line. The browser will fall back to software compositing"
+          " and hardware acceleration will be unavailable.",
           true
       },
       {
-          "3d_css",
-          manager->IsFeatureBlacklisted(
-              gpu::GPU_FEATURE_TYPE_ACCELERATED_COMPOSITING) ||
-          manager->IsFeatureBlacklisted(gpu::GPU_FEATURE_TYPE_3D_CSS),
-          command_line.HasSwitch(switches::kDisableAcceleratedLayers),
-          "Accelerated layers have been disabled at the command line.",
-          false
-      },
-      {
-          "css_animation",
-          manager->IsFeatureBlacklisted(
-              gpu::GPU_FEATURE_TYPE_ACCELERATED_COMPOSITING) ||
-          manager->IsFeatureBlacklisted(gpu::GPU_FEATURE_TYPE_3D_CSS),
-          command_line.HasSwitch(cc::switches::kDisableThreadedAnimation) ||
-          command_line.HasSwitch(switches::kDisableAcceleratedCompositing) ||
-          command_line.HasSwitch(switches::kDisableAcceleratedLayers),
-          "Accelerated CSS animation has been disabled at the command line.",
-          true
-      },
-      {
-          "webgl",
+          kWebGLFeatureName,
           manager->IsFeatureBlacklisted(gpu::GPU_FEATURE_TYPE_WEBGL),
           command_line.HasSwitch(switches::kDisableExperimentalWebGL),
           "WebGL has been disabled, either via about:flags or command line.",
@@ -123,16 +106,6 @@ const GpuFeatureInfo GetGpuFeatureInfo(size_t index, bool* eof) {
           true
       },
 #endif
-      {
-          "video",
-          manager->IsFeatureBlacklisted(
-              gpu::GPU_FEATURE_TYPE_ACCELERATED_VIDEO),
-          command_line.HasSwitch(switches::kDisableAcceleratedVideo) ||
-          command_line.HasSwitch(switches::kDisableAcceleratedCompositing),
-          "Accelerated video presentation has been disabled, either via"
-          " about:flags or command line.",
-          true
-      },
 #if defined(OS_CHROMEOS)
       {
           "panel_fitting",
@@ -144,21 +117,13 @@ const GpuFeatureInfo GetGpuFeatureInfo(size_t index, bool* eof) {
       },
 #endif
       {
-          "force_compositing_mode",
+          kRasterizationFeatureName,
           manager->IsFeatureBlacklisted(
-              gpu::GPU_FEATURE_TYPE_FORCE_COMPOSITING_MODE) &&
-          !IsForceCompositingModeEnabled(),
-          !IsForceCompositingModeEnabled() &&
-          !manager->IsFeatureBlacklisted(
-              gpu::GPU_FEATURE_TYPE_FORCE_COMPOSITING_MODE),
-          "Force compositing mode is off, either disabled at the command"
-          " line or not supported by the current system.",
-          false
-      },
-      {
-          "raster",
-          false,
+              gpu::GPU_FEATURE_TYPE_GPU_RASTERIZATION) &&
           !IsGpuRasterizationEnabled() && !IsForceGpuRasterizationEnabled(),
+          !IsGpuRasterizationEnabled() && !IsForceGpuRasterizationEnabled() &&
+          !manager->IsFeatureBlacklisted(
+              gpu::GPU_FEATURE_TYPE_GPU_RASTERIZATION),
           "Accelerated rasterization has not been enabled or"
           " is not supported by the current system.",
           true
@@ -169,40 +134,29 @@ const GpuFeatureInfo GetGpuFeatureInfo(size_t index, bool* eof) {
   return kGpuFeatureInfo[index];
 }
 
-bool CanDoAcceleratedCompositing() {
-  const GpuDataManagerImpl* manager = GpuDataManagerImpl::GetInstance();
-
-  // Don't use force compositing mode if gpu access has been blocked or
-  // accelerated compositing is blacklisted.
-  if (!manager->GpuAccessAllowed(NULL) ||
-      manager->IsFeatureBlacklisted(
-          gpu::GPU_FEATURE_TYPE_ACCELERATED_COMPOSITING))
-    return false;
-
-  // Check for SwiftShader.
-  if (manager->ShouldUseSwiftShader())
-    return false;
-
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
-  if (command_line.HasSwitch(switches::kDisableAcceleratedCompositing))
-    return false;
-
-  return true;
-}
-
-bool IsForceCompositingModeBlacklisted() {
-  return GpuDataManagerImpl::GetInstance()->IsFeatureBlacklisted(
-      gpu::GPU_FEATURE_TYPE_FORCE_COMPOSITING_MODE);
-}
-
 }  // namespace
+
+bool IsPinchVirtualViewportEnabled() {
+  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+
+  // Command line switches take precedence over platform default.
+  if (command_line.HasSwitch(cc::switches::kDisablePinchVirtualViewport))
+    return false;
+  if (command_line.HasSwitch(cc::switches::kEnablePinchVirtualViewport))
+    return true;
+
+#if defined(OS_CHROMEOS)
+  return true;
+#else
+  return false;
+#endif
+}
 
 bool IsThreadedCompositingEnabled() {
   const CommandLine& command_line = *CommandLine::ForCurrentProcess();
 
   // Command line switches take precedence over blacklist.
-  if (command_line.HasSwitch(switches::kDisableForceCompositingMode) ||
-      command_line.HasSwitch(switches::kDisableThreadedCompositing))
+  if (command_line.HasSwitch(switches::kDisableThreadedCompositing))
     return false;
   if (command_line.HasSwitch(switches::kEnableThreadedCompositing))
     return true;
@@ -210,32 +164,6 @@ bool IsThreadedCompositingEnabled() {
 #if defined(USE_AURA) || defined(OS_MACOSX)
   // We always want threaded compositing on Aura and Mac (the fallback is a
   // threaded software compositor).
-  return true;
-#else
-  return false;
-#endif
-}
-
-bool IsForceCompositingModeEnabled() {
-  // Force compositing mode is a subset of threaded compositing mode.
-  if (IsThreadedCompositingEnabled())
-    return true;
-
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
-
-  // Command line switches take precedence over blacklisting.
-  if (command_line.HasSwitch(switches::kDisableForceCompositingMode))
-    return false;
-  if (command_line.HasSwitch(switches::kForceCompositingMode))
-    return true;
-
-  if (!CanDoAcceleratedCompositing() || IsForceCompositingModeBlacklisted())
-    return false;
-
-#if defined(OS_MACOSX) || defined(OS_WIN)
-  // Windows Vista+ has been shipping with TCM enabled at 100% since M24 and
-  // Mac OSX 10.8+ since M28. The blacklist check above takes care of returning
-  // false before this hits on unsupported Win/Mac versions.
   return true;
 #else
   return false;
@@ -256,8 +184,7 @@ bool IsDelegatedRendererEnabled() {
   enabled &= !command_line.HasSwitch(switches::kDisableDelegatedRenderer);
 
   // Needs compositing, and thread.
-  if (enabled &&
-      (!IsForceCompositingModeEnabled() || !IsThreadedCompositingEnabled())) {
+  if (enabled && !IsThreadedCompositingEnabled()) {
     enabled = false;
     LOG(ERROR) << "Disabling delegated-rendering because it needs "
                << "force-compositing-mode and threaded-compositing.";
@@ -274,11 +201,7 @@ bool IsImplSidePaintingEnabled() {
   else if (command_line.HasSwitch(switches::kEnableImplSidePainting))
     return true;
 
-#if defined(OS_ANDROID)
-  return true;
-#else
-  return false;
-#endif
+  return IsThreadedCompositingEnabled();
 }
 
 bool IsGpuRasterizationEnabled() {
@@ -292,8 +215,12 @@ bool IsGpuRasterizationEnabled() {
   else if (command_line.HasSwitch(switches::kEnableGpuRasterization))
     return true;
 
-  return command_line.HasSwitch(
-      switches::kEnableBleedingEdgeRenderingFastPaths);
+  if (GpuDataManagerImpl::GetInstance()->IsFeatureBlacklisted(
+          gpu::GPU_FEATURE_TYPE_GPU_RASTERIZATION)) {
+    return false;
+  }
+
+  return true;
 }
 
 bool IsForceGpuRasterizationEnabled() {
@@ -306,7 +233,6 @@ bool IsForceGpuRasterizationEnabled() {
 }
 
 base::Value* GetFeatureStatus() {
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
   GpuDataManagerImpl* manager = GpuDataManagerImpl::GetInstance();
   std::string gpu_access_blocked_reason;
   bool gpu_access_blocked =
@@ -317,16 +243,10 @@ base::Value* GetFeatureStatus() {
   bool eof = false;
   for (size_t i = 0; !eof; ++i) {
     const GpuFeatureInfo gpu_feature_info = GetGpuFeatureInfo(i, &eof);
-    // force_compositing_mode status is part of the compositing status.
-    if (gpu_feature_info.name == "force_compositing_mode")
-      continue;
-
     std::string status;
     if (gpu_feature_info.disabled) {
       status = "disabled";
-      if (gpu_feature_info.name == "css_animation") {
-        status += "_software_animated";
-      } else if (gpu_feature_info.name == "raster") {
+      if (gpu_feature_info.name == kRasterizationFeatureName) {
         if (IsImplSidePaintingEnabled())
           status += "_software_multithreaded";
         else
@@ -348,27 +268,17 @@ base::Value* GetFeatureStatus() {
         status += "_off";
     } else {
       status = "enabled";
-      if (gpu_feature_info.name == "webgl" &&
-          (command_line.HasSwitch(switches::kDisableAcceleratedCompositing) ||
-           manager->IsFeatureBlacklisted(
-               gpu::GPU_FEATURE_TYPE_ACCELERATED_COMPOSITING)))
+      if (gpu_feature_info.name == kWebGLFeatureName &&
+          manager->IsFeatureBlacklisted(gpu::GPU_FEATURE_TYPE_GPU_COMPOSITING))
         status += "_readback";
-      bool has_thread = IsThreadedCompositingEnabled();
-      if (gpu_feature_info.name == "compositing") {
-        bool force_compositing = IsForceCompositingModeEnabled();
-        if (force_compositing)
-          status += "_force";
-        if (has_thread)
-          status += "_threaded";
-      } else if (gpu_feature_info.name == "css_animation") {
-        if (has_thread)
-          status = "accelerated_threaded";
-        else
-          status = "accelerated";
-      } else if (gpu_feature_info.name == "raster") {
+      if (gpu_feature_info.name == kRasterizationFeatureName) {
         if (IsForceGpuRasterizationEnabled())
           status += "_force";
       }
+    }
+    if (gpu_feature_info.name == kGpuCompositingFeatureName) {
+      if (IsThreadedCompositingEnabled())
+        status += "_threaded";
     }
     feature_status_dict->SetString(
         gpu_feature_info.name.c_str(), status.c_str());

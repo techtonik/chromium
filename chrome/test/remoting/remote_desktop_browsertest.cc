@@ -9,7 +9,6 @@
 #include "chrome/browser/extensions/unpacked_installer.h"
 #include "chrome/browser/ui/extensions/application_launch.h"
 #include "chrome/common/chrome_switches.h"
-#include "chrome/common/extensions/extension_file_util.h"
 #include "chrome/test/remoting/key_code_conv.h"
 #include "chrome/test/remoting/page_load_notification_observer.h"
 #include "chrome/test/remoting/waiter.h"
@@ -118,7 +117,7 @@ void RemoteDesktopBrowserTest::InstallChromotingAppUnpacked() {
   installer->set_prompt_for_plugins(false);
 
   content::WindowedNotificationObserver observer(
-      chrome::NOTIFICATION_EXTENSION_LOADED,
+      chrome::NOTIFICATION_EXTENSION_LOADED_DEPRECATED,
       content::NotificationService::AllSources());
 
   installer->Load(webapp_unpacked_);

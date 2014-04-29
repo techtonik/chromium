@@ -4,21 +4,43 @@
 
 #include "chrome/browser/chromeos/file_system_provider/provided_file_system.h"
 
+#include "base/files/file.h"
+#include "chrome/browser/chromeos/file_system_provider/operations/unmount.h"
+#include "chrome/browser/chromeos/file_system_provider/request_manager.h"
+#include "chrome/common/extensions/api/file_system_provider.h"
+#include "extensions/browser/event_router.h"
+
 namespace chromeos {
 namespace file_system_provider {
+namespace {
 
-ProvidedFileSystem::ProvidedFileSystem() {}
+}  // namespace
 
-ProvidedFileSystem::ProvidedFileSystem(const std::string& extension_id,
-                                       int file_system_id,
-                                       const std::string& file_system_name,
-                                       const base::FilePath& mount_path)
-    : extension_id_(extension_id),
-      file_system_id_(file_system_id),
-      file_system_name_(file_system_name),
-      mount_path_(mount_path) {}
+ProvidedFileSystem::ProvidedFileSystem(
+    extensions::EventRouter* event_router,
+    const ProvidedFileSystemInfo& file_system_info)
+    : event_router_(event_router), file_system_info_(file_system_info) {
+}
 
 ProvidedFileSystem::~ProvidedFileSystem() {}
+
+void ProvidedFileSystem::RequestUnmount(
+    const fileapi::AsyncFileUtil::StatusCallback& callback) {
+  if (!request_manager_.CreateRequest(
+          make_scoped_ptr<RequestManager::HandlerInterface>(
+              new operations::Unmount(
+                  event_router_, file_system_info_, callback)))) {
+    callback.Run(base::File::FILE_ERROR_SECURITY);
+  }
+}
+
+const ProvidedFileSystemInfo& ProvidedFileSystem::GetFileSystemInfo() const {
+  return file_system_info_;
+}
+
+RequestManager* ProvidedFileSystem::GetRequestManager() {
+  return &request_manager_;
+}
 
 }  // namespace file_system_provider
 }  // namespace chromeos

@@ -25,6 +25,7 @@
 #include "content/browser/renderer_host/render_widget_host_delegate.h"
 #include "content/common/content_export.h"
 #include "content/public/browser/ax_event_notification_details.h"
+#include "content/public/browser/color_chooser.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
 #include "content/public/browser/web_contents.h"
@@ -45,7 +46,6 @@ namespace content {
 class BrowserPluginEmbedder;
 class BrowserPluginGuest;
 class BrowserPluginGuestManager;
-class ColorChooser;
 class DateTimeChooserAndroid;
 class DownloadItem;
 class InterstitialPageImpl;
@@ -339,7 +339,9 @@ class CONTENT_EXPORT WebContentsImpl
                                       const base::string16& message,
                                       bool is_reload,
                                       IPC::Message* reply_msg) OVERRIDE;
+  virtual void DidAccessInitialDocument() OVERRIDE;
   virtual WebContents* GetAsWebContents() OVERRIDE;
+  virtual bool IsNeverVisible() OVERRIDE;
 
   // RenderViewHostDelegate ----------------------------------------------------
   virtual RenderViewHostDelegateView* GetDelegateView() OVERRIDE;
@@ -370,7 +372,6 @@ class CONTENT_EXPORT WebContentsImpl
   virtual void DidCancelLoading() OVERRIDE;
   virtual void DidChangeLoadProgress(double progress) OVERRIDE;
   virtual void DidDisownOpener(RenderViewHost* rvh) OVERRIDE;
-  virtual void DidAccessInitialDocument() OVERRIDE;
   virtual void DocumentAvailableInMainFrame(
       RenderViewHost* render_view_host) OVERRIDE;
   virtual void DocumentOnLoadCompletedInMainFrame(
@@ -489,6 +490,7 @@ class CONTENT_EXPORT WebContentsImpl
       NavigationController::ReloadType reload_type) OVERRIDE;
   virtual void RequestOpenURL(RenderFrameHostImpl* render_frame_host,
                               const OpenURLParams& params) OVERRIDE;
+  virtual bool ShouldPreserveAbortedURLs() OVERRIDE;
 
   // RenderWidgetHostDelegate --------------------------------------------------
 
@@ -555,6 +557,11 @@ class CONTENT_EXPORT WebContentsImpl
   // Activate this WebContents and show a form repost warning.
   virtual void ActivateAndShowRepostFormWarningDialog() OVERRIDE;
 
+  // Whether the initial empty page of this view has been accessed by another
+  // page, making it unsafe to show the pending URL. Always false after the
+  // first commit.
+  virtual bool HasAccessedInitialDocument() OVERRIDE;
+
   // Updates the max page ID for the current SiteInstance in this
   // WebContentsImpl to be at least |page_id|.
   virtual void UpdateMaxPageID(int32 page_id) OVERRIDE;
@@ -618,7 +625,6 @@ class CONTENT_EXPORT WebContentsImpl
   void SelectRange(const gfx::Point& start, const gfx::Point& end);
 
  private:
-  friend class NavigationControllerImpl;
   friend class TestNavigationObserver;
   friend class WebContentsObserver;
   friend class WebContents;  // To implement factory methods.
@@ -664,8 +670,11 @@ class CONTENT_EXPORT WebContentsImpl
   // watching |web_contents|. No-op if there is no such observer.
   void RemoveDestructionObserver(WebContentsImpl* web_contents);
 
-  // Callback function when showing JavaScript dialogs.
-  void OnDialogClosed(RenderFrameHost* rfh,
+  // Callback function when showing JavaScript dialogs.  Takes in a routing ID
+  // pair to identify the RenderFrameHost that opened the dialog, because it's
+  // possible for the RenderFrameHost to be deleted by the time this is called.
+  void OnDialogClosed(int render_process_id,
+                      int render_frame_id,
                       IPC::Message* reply_msg,
                       bool dialog_was_suppressed,
                       bool success,
@@ -895,6 +904,10 @@ class CONTENT_EXPORT WebContentsImpl
   // is closed.
   WebContentsImpl* opener_;
 
+  // True if this tab was opened by another tab. This is not unset if the opener
+  // is closed.
+  bool created_with_opener_;
+
 #if defined(OS_WIN)
   gfx::NativeViewAccessible accessible_parent_;
 #endif
@@ -963,6 +976,11 @@ class CONTENT_EXPORT WebContentsImpl
   // True if this is a secure page which displayed insecure content.
   bool displayed_insecure_content_;
 
+  // Whether the initial empty page has been accessed by another page, making it
+  // unsafe to show the pending URL. Usually false unless another window tries
+  // to modify the blank page.  Always false after the first commit.
+  bool has_accessed_initial_document_;
+
   // Data for misc internal state ----------------------------------------------
 
   // When > 0, the WebContents is currently being captured (e.g., for
@@ -1027,17 +1045,31 @@ class CONTENT_EXPORT WebContentsImpl
   scoped_ptr<DateTimeChooserAndroid> date_time_chooser_;
 #endif
 
-  // Color chooser that was opened by this tab.
-  scoped_ptr<ColorChooser> color_chooser_;
+  // Holds information about a current color chooser dialog, if one is visible.
+  struct ColorChooserInfo {
+    ColorChooserInfo(int render_process_id,
+                     int render_frame_id,
+                     ColorChooser* chooser,
+                     int identifier);
+    ~ColorChooserInfo();
 
-  // A unique identifier for the current color chooser.  Identifiers are unique
-  // across a renderer process.  This avoids race conditions in synchronizing
-  // the browser and renderer processes.  For example, if a renderer closes one
-  // chooser and opens another, and simultaneously the user picks a color in the
-  // first chooser, the IDs can be used to drop the "chose a color" message
-  // rather than erroneously tell the renderer that the user picked a color in
-  // the second chooser.
-  int color_chooser_identifier_;
+    int render_process_id;
+    int render_frame_id;
+
+    // Color chooser that was opened by this tab.
+    scoped_ptr<ColorChooser> chooser;
+
+    // A unique identifier for the current color chooser.  Identifiers are
+    // unique across a renderer process.  This avoids race conditions in
+    // synchronizing the browser and renderer processes.  For example, if a
+    // renderer closes one chooser and opens another, and simultaneously the
+    // user picks a color in the first chooser, the IDs can be used to drop the
+    // "chose a color" message rather than erroneously tell the renderer that
+    // the user picked a color in the second chooser.
+    int identifier;
+  };
+
+  scoped_ptr<ColorChooserInfo> color_chooser_info_;
 
   // Manages the embedder state for browser plugins, if this WebContents is an
   // embedder; NULL otherwise.

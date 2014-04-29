@@ -95,6 +95,8 @@ void MessageCenterNotificationManager::RegisterPrefs(
     PrefRegistrySimple* registry) {
   registry->RegisterBooleanPref(prefs::kMessageCenterShowedFirstRunBalloon,
                                 false);
+  registry->RegisterBooleanPref(prefs::kMessageCenterShowIcon, true);
+  registry->RegisterBooleanPref(prefs::kMessageCenterForcedOnTaskbar, false);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -367,14 +369,7 @@ void MessageCenterNotificationManager::ImageDownloads::StartDownloadWithImage(
   if (url.is_empty())
     return;
 
-  content::RenderViewHost* host = notification.GetRenderViewHost();
-  if (!host) {
-    LOG(WARNING) << "Notification needs an image but has no RenderViewHost";
-    return;
-  }
-
-  content::WebContents* contents =
-      content::WebContents::FromRenderViewHost(host);
+  content::WebContents* contents = notification.GetWebContents();
   if (!contents) {
     LOG(WARNING) << "Notification needs an image but has no WebContents";
     return;

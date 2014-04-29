@@ -10,6 +10,7 @@
 #include "chrome/browser/extensions/api/audio/audio_api.h"
 #include "chrome/browser/extensions/api/bluetooth/bluetooth_api.h"
 #include "chrome/browser/extensions/api/bluetooth/bluetooth_private_api.h"
+#include "chrome/browser/extensions/api/bluetooth_low_energy/bluetooth_low_energy_api.h"
 #include "chrome/browser/extensions/api/bookmark_manager_private/bookmark_manager_private_api.h"
 #include "chrome/browser/extensions/api/bookmarks/bookmarks_api.h"
 #include "chrome/browser/extensions/api/braille_display_private/braille_display_private_api.h"
@@ -50,6 +51,7 @@
 #include "chrome/browser/extensions/api/web_request/web_request_api.h"
 #include "chrome/browser/extensions/api/webrtc_audio_private/webrtc_audio_private_api.h"
 #include "chrome/browser/extensions/api/webstore/webstore_api.h"
+#include "chrome/browser/extensions/extension_garbage_collector_factory.h"
 #include "chrome/browser/extensions/extension_gcm_app_handler.h"
 #include "chrome/browser/extensions/extension_storage_monitor_factory.h"
 #include "chrome/browser/extensions/extension_system_factory.h"
@@ -89,6 +91,7 @@ void EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   extensions::BookmarksAPI::GetFactoryInstance();
   extensions::BookmarkManagerPrivateAPI::GetFactoryInstance();
   extensions::BluetoothAPI::GetFactoryInstance();
+  extensions::BluetoothLowEnergyAPI::GetFactoryInstance();
   extensions::BluetoothPrivateAPI::GetFactoryInstance();
   extensions::BrailleDisplayPrivateAPI::GetFactoryInstance();
   extensions::chromedirectsetting::ChromeDirectSettingAPI::GetFactoryInstance();
@@ -98,6 +101,7 @@ void EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   extensions::DeveloperPrivateAPI::GetFactoryInstance();
   extensions::DialAPIFactory::GetInstance();
   extensions::ExtensionActionAPI::GetFactoryInstance();
+  extensions::ExtensionGarbageCollectorFactory::GetInstance();
   extensions::ExtensionStorageMonitorFactory::GetInstance();
   extensions::ExtensionSystemFactory::GetInstance();
   extensions::ExtensionToolbarModelFactory::GetInstance();

@@ -92,7 +92,8 @@ class CC_EXPORT PictureLayerTiling {
   class CC_EXPORT TilingEvictionTileIterator {
    public:
     TilingEvictionTileIterator();
-    TilingEvictionTileIterator(PictureLayerTiling* tiling, WhichTree tree);
+    TilingEvictionTileIterator(PictureLayerTiling* tiling,
+                               TreePriority tree_priority);
     ~TilingEvictionTileIterator();
 
     operator bool();
@@ -100,7 +101,9 @@ class CC_EXPORT PictureLayerTiling {
     TilingEvictionTileIterator& operator++();
     TilePriority::PriorityBin get_type() {
       DCHECK(*this);
-      return (*tile_iterator_)->priority(tree_).priority_bin;
+      const TilePriority& priority =
+          (*tile_iterator_)->priority_for_tree_priority(tree_priority_);
+      return priority.priority_bin;
     }
 
    private:
@@ -109,7 +112,7 @@ class CC_EXPORT PictureLayerTiling {
 
     bool is_valid_;
     PictureLayerTiling* tiling_;
-    WhichTree tree_;
+    TreePriority tree_priority_;
     std::vector<Tile*>::iterator tile_iterator_;
   };
 
@@ -132,8 +135,7 @@ class CC_EXPORT PictureLayerTiling {
   void set_resolution(TileResolution resolution) { resolution_ = resolution; }
   TileResolution resolution() const { return resolution_; }
 
-  gfx::Rect ContentRect() const;
-  gfx::SizeF ContentSizeF() const;
+  gfx::Rect TilingRect() const;
   gfx::Rect live_tiles_rect() const { return live_tiles_rect_; }
   gfx::Size tile_size() const { return tiling_data_.max_texture_size(); }
   float contents_scale() const { return contents_scale_; }
@@ -144,7 +146,7 @@ class CC_EXPORT PictureLayerTiling {
   }
 
   void CreateAllTilesForTesting() {
-    SetLiveTilesRect(gfx::Rect(tiling_data_.total_size()));
+    SetLiveTilesRect(tiling_data_.tiling_rect());
   }
 
   std::vector<Tile*> AllTilesForTesting() const {
@@ -276,7 +278,7 @@ class CC_EXPORT PictureLayerTiling {
                             const gfx::Rect& visible_rect_in_content_space)
       const;
 
-  void UpdateEvictionCacheIfNeeded(WhichTree tree);
+  void UpdateEvictionCacheIfNeeded(TreePriority tree_priority);
   void DoInvalidate(const Region& layer_region, bool recreate_tiles);
 
   // Given properties.
@@ -300,6 +302,7 @@ class CC_EXPORT PictureLayerTiling {
 
   std::vector<Tile*> eviction_tiles_cache_;
   bool eviction_tiles_cache_valid_;
+  TreePriority eviction_cache_tree_priority_;
 
  private:
   DISALLOW_ASSIGN(PictureLayerTiling);

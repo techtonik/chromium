@@ -24,9 +24,8 @@ class Channel;
 class Waiter;
 
 // |MessagePipe| is the secondary object implementing a message pipe (see the
-// explanatory comment in core_impl.cc). It is typically owned by the
-// dispatcher(s) corresponding to the local endpoints. This class is
-// thread-safe.
+// explanatory comment in core.cc). It is typically owned by the dispatcher(s)
+// corresponding to the local endpoints. This class is thread-safe.
 class MOJO_SYSTEM_IMPL_EXPORT MessagePipe :
     public base::RefCountedThreadSafe<MessagePipe> {
  public:
@@ -82,10 +81,11 @@ class MOJO_SYSTEM_IMPL_EXPORT MessagePipe :
                             std::vector<DispatcherTransport>* transports);
 
   // These are used by |Channel|.
-  void Attach(unsigned port,
+  bool Attach(unsigned port,
               scoped_refptr<Channel> channel,
               MessageInTransit::EndpointId local_id);
   void Run(unsigned port, MessageInTransit::EndpointId remote_id);
+  void OnRemove(unsigned port);
 
  private:
   friend class base::RefCountedThreadSafe<MessagePipe>;

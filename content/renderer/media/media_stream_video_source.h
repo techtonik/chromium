@@ -8,25 +8,18 @@
 #include <vector>
 
 #include "base/compiler_specific.h"
+#include "base/threading/non_thread_safe.h"
 #include "content/common/content_export.h"
-#include "content/renderer/media/media_stream_dependency_factory.h"
 #include "content/renderer/media/media_stream_source.h"
 #include "media/base/video_frame.h"
-#include "media/base/video_frame_pool.h"
 #include "media/video/capture/video_capture_types.h"
 #include "third_party/WebKit/public/platform/WebMediaConstraints.h"
 #include "third_party/WebKit/public/platform/WebMediaStreamSource.h"
 #include "third_party/WebKit/public/platform/WebMediaStreamTrack.h"
 
-namespace media {
-class VideoFrame;
-}
-
 namespace content {
 
-class MediaStreamDependencyFactory;
 class MediaStreamVideoTrack;
-class WebRtcVideoCapturerAdapter;
 
 // MediaStreamVideoSource is an interface used for sending video frames to a
 // MediaStreamVideoTrack.
@@ -47,7 +40,7 @@ class CONTENT_EXPORT MediaStreamVideoSource
     : public MediaStreamSource,
       NON_EXPORTED_BASE(public base::NonThreadSafe) {
  public:
-  explicit MediaStreamVideoSource(MediaStreamDependencyFactory* factory);
+  MediaStreamVideoSource();
   virtual ~MediaStreamVideoSource();
 
   // Returns the MediaStreamVideoSource object owned by |source|.
@@ -59,12 +52,6 @@ class CONTENT_EXPORT MediaStreamVideoSource
                 const blink::WebMediaConstraints& constraints,
                 const ConstraintsCallback& callback);
   void RemoveTrack(MediaStreamVideoTrack* track);
-
-  // TODO(ronghuawu): Remove webrtc::VideoSourceInterface from the public
-  // interface of this class.
-  // This creates a VideoSourceInterface implementation if it does not already
-  // exist.
-  webrtc::VideoSourceInterface* GetAdapter();
 
   // Return true if |name| is a constraint supported by MediaStreamVideoSource.
   static bool IsConstraintSupported(const std::string& name);
@@ -89,15 +76,15 @@ class CONTENT_EXPORT MediaStreamVideoSource
  protected:
   virtual void DoStopSource() OVERRIDE;
 
-  MediaStreamDependencyFactory* factory() { return factory_; }
-
   // Sets ready state and notifies the ready state to all registered tracks.
   virtual void SetReadyState(blink::WebMediaStreamSource::ReadyState state);
 
   // Delivers |frame| to registered tracks according to their constraints.
   // Note: current implementation assumes |frame| be contiguous layout of image
   // planes and I420.
-  virtual void DeliverVideoFrame(const scoped_refptr<media::VideoFrame>& frame);
+  // |format| contains extra information like the frame rate of this source.
+  virtual void DeliverVideoFrame(const scoped_refptr<media::VideoFrame>& frame,
+                                 const media::VideoCaptureFormat& format);
 
   // An implementation must fetch the formats that can currently be used by
   // the source and call OnSupportedFormats when done.
@@ -130,7 +117,7 @@ class CONTENT_EXPORT MediaStreamVideoSource
     STARTED,
     ENDED
   };
-  State state() { return state_; }
+  State state() const { return state_; }
 
  private:
   // Creates a webrtc::VideoSourceInterface used by libjingle.
@@ -150,6 +137,10 @@ class CONTENT_EXPORT MediaStreamVideoSource
   // Trigger all cached callbacks from AddTrack. AddTrack is successful
   // if the capture delegate has started and the constraints provided in
   // AddTrack match the format that was used to start the device.
+  // Note that it must be ok to delete the MediaStreamVideoSource object
+  // in the context of the callback. If gUM fail, the implementation will
+  // simply drop the references to the blink source and track which will lead
+  // to that this object is deleted.
   void FinalizeAddTrack();
 
   State state_;
@@ -174,12 +165,6 @@ class CONTENT_EXPORT MediaStreamVideoSource
 
   // Tracks that currently are receiving video frames.
   std::vector<MediaStreamVideoTrack*> tracks_;
-
-  // TODO(perkj): The below classes use webrtc/libjingle types. The goal is to
-  // get rid of them as far as possible.
-  MediaStreamDependencyFactory* factory_;
-  scoped_refptr<webrtc::VideoSourceInterface> adapter_;
-  WebRtcVideoCapturerAdapter* capture_adapter_;
 
   DISALLOW_COPY_AND_ASSIGN(MediaStreamVideoSource);
 };

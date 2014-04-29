@@ -23,7 +23,6 @@
 #include "content/public/common/url_utils.h"
 #include "content/public/renderer/content_renderer_client.h"
 #include "content/public/renderer/document_state.h"
-#include "content/public/renderer/history_item_serialization.h"
 #include "content/public/renderer/navigation_state.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/render_view_test.h"
@@ -31,6 +30,8 @@
 #include "content/renderer/accessibility/renderer_accessibility.h"
 #include "content/renderer/accessibility/renderer_accessibility_complete.h"
 #include "content/renderer/accessibility/renderer_accessibility_focus_only.h"
+#include "content/renderer/history_controller.h"
+#include "content/renderer/history_serialization.h"
 #include "content/renderer/render_view_impl.h"
 #include "content/shell/browser/shell.h"
 #include "content/shell/browser/shell_browser_context.h"
@@ -43,8 +44,8 @@
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebURLResponse.h"
 #include "third_party/WebKit/public/web/WebDataSource.h"
-#include "third_party/WebKit/public/web/WebFrame.h"
 #include "third_party/WebKit/public/web/WebHistoryItem.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
 #include "third_party/WebKit/public/web/WebView.h"
 #include "third_party/WebKit/public/web/WebWindowFeatures.h"
@@ -1048,7 +1049,7 @@ TEST_F(RenderViewImplTest, ImeComposition) {
 
       case IME_SETCOMPOSITION:
         view()->OnImeSetComposition(
-            base::WideToUTF16Hack(ime_message->ime_string),
+            base::WideToUTF16(ime_message->ime_string),
             std::vector<blink::WebCompositionUnderline>(),
             ime_message->selection_start,
             ime_message->selection_end);
@@ -1056,7 +1057,7 @@ TEST_F(RenderViewImplTest, ImeComposition) {
 
       case IME_CONFIRMCOMPOSITION:
         view()->OnImeConfirmComposition(
-            base::WideToUTF16Hack(ime_message->ime_string),
+            base::WideToUTF16(ime_message->ime_string),
             gfx::Range::InvalidRange(),
             false);
         break;
@@ -1079,9 +1080,9 @@ TEST_F(RenderViewImplTest, ImeComposition) {
       // Retrieve the content of this page and compare it with the expected
       // result.
       const int kMaxOutputCharacters = 128;
-      std::wstring output = base::UTF16ToWideHack(
-          GetMainFrame()->contentAsText(kMaxOutputCharacters));
-      EXPECT_EQ(output, ime_message->result);
+      base::string16 output =
+          GetMainFrame()->contentAsText(kMaxOutputCharacters);
+      EXPECT_EQ(base::WideToUTF16(ime_message->result), output);
     }
   }
 }
@@ -1128,9 +1129,8 @@ TEST_F(RenderViewImplTest, OnSetTextDirection) {
     // Copy the document content to std::wstring and compare with the
     // expected result.
     const int kMaxOutputCharacters = 16;
-    std::wstring output = base::UTF16ToWideHack(
-        GetMainFrame()->contentAsText(kMaxOutputCharacters));
-    EXPECT_EQ(output, kTextDirection[i].expected_result);
+    base::string16 output = GetMainFrame()->contentAsText(kMaxOutputCharacters);
+    EXPECT_EQ(base::WideToUTF16(kTextDirection[i].expected_result), output);
   }
 }
 
@@ -1508,9 +1508,8 @@ TEST_F(RenderViewImplTest, MAYBE_InsertCharacters) {
     // text created from a virtual-key code, a character code, and the
     // modifier-key status.
     const int kMaxOutputCharacters = 4096;
-    std::wstring output = base::UTF16ToWideHack(
-        GetMainFrame()->contentAsText(kMaxOutputCharacters));
-    EXPECT_EQ(kLayouts[i].expected_result, output);
+    base::string16 output = GetMainFrame()->contentAsText(kMaxOutputCharacters);
+    EXPECT_EQ(base::WideToUTF16(kLayouts[i].expected_result), output);
   }
 #else
   NOTIMPLEMENTED();
@@ -1585,8 +1584,13 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
   EXPECT_EQ(-1, view()->history_page_ids_[1]);
   ClearHistory();
 
+  blink::WebHistoryItem item;
+  item.initialize();
+
   // No history to merge and a committed page to be kept.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
   view()->OnSetHistoryLengthAndPrune(0, expected_page_id);
   EXPECT_EQ(1, view()->history_list_length_);
@@ -1595,7 +1599,9 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
   ClearHistory();
 
   // No history to merge and a committed page to be pruned.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
   view()->OnSetHistoryLengthAndPrune(0, expected_page_id + 1);
   EXPECT_EQ(0, view()->history_list_length_);
@@ -1603,7 +1609,9 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
   ClearHistory();
 
   // No history to merge and a committed page that the browser was unaware of.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
   view()->OnSetHistoryLengthAndPrune(0, -1);
   EXPECT_EQ(1, view()->history_list_length_);
@@ -1612,7 +1620,9 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
   ClearHistory();
 
   // History to merge and a committed page to be kept.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
   view()->OnSetHistoryLengthAndPrune(2, expected_page_id);
   EXPECT_EQ(3, view()->history_list_length_);
@@ -1623,7 +1633,9 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
   ClearHistory();
 
   // History to merge and a committed page to be pruned.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
   view()->OnSetHistoryLengthAndPrune(2, expected_page_id + 1);
   EXPECT_EQ(2, view()->history_list_length_);
@@ -1633,7 +1645,9 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
   ClearHistory();
 
   // History to merge and a committed page that the browser was unaware of.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
   view()->OnSetHistoryLengthAndPrune(2, -1);
   EXPECT_EQ(3, view()->history_list_length_);
@@ -1646,9 +1660,13 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
   int expected_page_id_2 = -1;
 
   // No history to merge and two committed pages, both to be kept.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id_2 = view()->page_id_;
   EXPECT_GT(expected_page_id_2, expected_page_id);
   view()->OnSetHistoryLengthAndPrune(0, expected_page_id);
@@ -1659,9 +1677,13 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
   ClearHistory();
 
   // No history to merge and two committed pages, and only the second is kept.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id_2 = view()->page_id_;
   EXPECT_GT(expected_page_id_2, expected_page_id);
   view()->OnSetHistoryLengthAndPrune(0, expected_page_id_2);
@@ -1672,9 +1694,13 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
 
   // No history to merge and two committed pages, both of which the browser was
   // unaware of.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id_2 = view()->page_id_;
   EXPECT_GT(expected_page_id_2, expected_page_id);
   view()->OnSetHistoryLengthAndPrune(0, -1);
@@ -1685,9 +1711,13 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
   ClearHistory();
 
   // History to merge and two committed pages, both to be kept.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id_2 = view()->page_id_;
   EXPECT_GT(expected_page_id_2, expected_page_id);
   view()->OnSetHistoryLengthAndPrune(2, expected_page_id);
@@ -1700,9 +1730,13 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
   ClearHistory();
 
   // History to merge and two committed pages, and only the second is kept.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id_2 = view()->page_id_;
   EXPECT_GT(expected_page_id_2, expected_page_id);
   view()->OnSetHistoryLengthAndPrune(2, expected_page_id_2);
@@ -1715,9 +1749,13 @@ TEST_F(RenderViewImplTest, SetHistoryLengthAndPrune) {
 
   // History to merge and two committed pages, both of which the browser was
   // unaware of.
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id = view()->page_id_;
-  frame()->didCommitProvisionalLoad(GetMainFrame(), true);
+  frame()->didCommitProvisionalLoad(GetMainFrame(),
+                                    item,
+                                    blink::WebStandardCommit);
   expected_page_id_2 = view()->page_id_;
   EXPECT_GT(expected_page_id_2, expected_page_id);
   view()->OnSetHistoryLengthAndPrune(2, -1);
@@ -1754,7 +1792,8 @@ TEST_F(RenderViewImplTest, ContextMenu) {
 
 TEST_F(RenderViewImplTest, TestBackForward) {
   LoadHTML("<div id=pagename>Page A</div>");
-  blink::WebHistoryItem page_a_item = GetMainFrame()->currentHistoryItem();
+  blink::WebHistoryItem page_a_item =
+      view()->history_controller()->GetCurrentItemForExport();
   int was_page_a = -1;
   base::string16 check_page_a =
       base::ASCIIToUTF16(
@@ -1778,8 +1817,9 @@ TEST_F(RenderViewImplTest, TestBackForward) {
   EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_c, &was_page_c));
   EXPECT_EQ(1, was_page_b);
 
-  blink::WebHistoryItem forward_item = GetMainFrame()->currentHistoryItem();
-  GoBack(GetMainFrame()->previousHistoryItem());
+  blink::WebHistoryItem forward_item =
+      view()->history_controller()->GetCurrentItemForExport();
+  GoBack(view()->history_controller()->GetPreviousItemForExport());
   EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_b, &was_page_b));
   EXPECT_EQ(1, was_page_b);
 
@@ -1787,11 +1827,11 @@ TEST_F(RenderViewImplTest, TestBackForward) {
   EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_c, &was_page_c));
   EXPECT_EQ(1, was_page_c);
 
-  GoBack(GetMainFrame()->previousHistoryItem());
+  GoBack(view()->history_controller()->GetPreviousItemForExport());
   EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_b, &was_page_b));
   EXPECT_EQ(1, was_page_b);
 
-  forward_item = GetMainFrame()->currentHistoryItem();
+  forward_item = view()->history_controller()->GetCurrentItemForExport();
   GoBack(page_a_item);
   EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_a, &was_page_a));
   EXPECT_EQ(1, was_page_a);
@@ -1801,7 +1841,7 @@ TEST_F(RenderViewImplTest, TestBackForward) {
   EXPECT_EQ(1, was_page_b);
 }
 
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
 TEST_F(RenderViewImplTest, GetCompositionCharacterBoundsTest) {
 
 #if defined(OS_WIN)
@@ -1976,9 +2016,9 @@ TEST_F(RenderViewImplTest, NavigateFrame) {
   // Copy the document content to std::wstring and compare with the
   // expected result.
   const int kMaxOutputCharacters = 256;
-  std::wstring output = base::UTF16ToWideHack(
+  std::string output = base::UTF16ToUTF8(
       GetMainFrame()->contentAsText(kMaxOutputCharacters));
-  EXPECT_EQ(output, L"hello \n\nworld");
+  EXPECT_EQ(output, "hello \n\nworld");
 }
 
 // This test ensures that a RenderFrame object is created for the top level
@@ -1990,7 +2030,7 @@ TEST_F(RenderViewImplTest, BasicRenderFrame) {
 TEST_F(RenderViewImplTest, GetSSLStatusOfFrame) {
   LoadHTML("<!DOCTYPE html><html><body></body></html>");
 
-  WebFrame* frame = GetMainFrame();
+  WebLocalFrame* frame = GetMainFrame();
   SSLStatus ssl_status = view()->GetSSLStatusOfFrame(frame);
   EXPECT_FALSE(net::IsCertStatusError(ssl_status.cert_status));
 

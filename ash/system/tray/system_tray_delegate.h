@@ -130,7 +130,6 @@ class ASH_EXPORT SystemTrayDelegate {
 
   // Gets information about the active user.
   virtual user::LoginStatus GetUserLoginStatus() const = 0;
-  virtual bool IsOobeCompleted() const = 0;
 
   // Shows UI for changing user's profile picture.
   virtual void ChangeProfilePicture() = 0;
@@ -165,6 +164,9 @@ class ASH_EXPORT SystemTrayDelegate {
 
   // Shows the settings related to date, timezone etc.
   virtual void ShowDateSettings() = 0;
+
+  // Shows the dialog to set system time, date, and timezone.
+  virtual void ShowSetTimeDialog() = 0;
 
   // Shows the settings related to network. If |service_path| is not empty,
   // show the settings for that network.

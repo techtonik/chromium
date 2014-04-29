@@ -24,7 +24,6 @@ class Thread;
 
 namespace device {
 
-class BluetoothAdapterFactory;
 class BluetoothAdapterWinTest;
 class BluetoothDevice;
 class BluetoothSocketThreadWin;
@@ -32,9 +31,10 @@ class BluetoothSocketThreadWin;
 class BluetoothAdapterWin : public BluetoothAdapter,
                             public BluetoothTaskManagerWin::Observer {
  public:
-  typedef base::Callback<void()> InitCallback;
+  static base::WeakPtr<BluetoothAdapter> CreateAdapter(
+      const InitCallback& init_callback);
 
-  // BluetoothAdapter override
+  // BluetoothAdapter:
   virtual void AddObserver(BluetoothAdapter::Observer* observer) OVERRIDE;
   virtual void RemoveObserver(BluetoothAdapter::Observer* observer) OVERRIDE;
   virtual std::string GetAddress() const OVERRIDE;
@@ -72,13 +72,19 @@ class BluetoothAdapterWin : public BluetoothAdapter,
       const ScopedVector<BluetoothTaskManagerWin::DeviceState>& devices)
           OVERRIDE;
 
+  const scoped_refptr<base::SequencedTaskRunner>& ui_task_runner() const {
+    return ui_task_runner_;
+  }
+  const scoped_refptr<BluetoothSocketThreadWin>& socket_thread() const {
+    return socket_thread_;
+  }
+
  protected:
-  // BluetoothAdapter override
+  // BluetoothAdapter:
   virtual void RemovePairingDelegateInternal(
       device::BluetoothDevice::PairingDelegate* pairing_delegate) OVERRIDE;
 
  private:
-  friend class BluetoothAdapterFactory;
   friend class BluetoothAdapterWinTest;
 
   enum DiscoveryStatus {
@@ -91,7 +97,7 @@ class BluetoothAdapterWin : public BluetoothAdapter,
   explicit BluetoothAdapterWin(const InitCallback& init_callback);
   virtual ~BluetoothAdapterWin();
 
-  // BluetoothAdapter override.
+  // BluetoothAdapter:
   virtual void AddDiscoverySession(
       const base::Closure& callback,
       const ErrorCallback& error_callback) OVERRIDE;

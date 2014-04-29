@@ -158,6 +158,8 @@ class MEDIA_EXPORT ChunkDemuxer : public Demuxer {
   virtual void OnAudioRendererDisabled() OVERRIDE;
   virtual DemuxerStream* GetStream(DemuxerStream::Type type) OVERRIDE;
   virtual base::TimeDelta GetStartTime() const OVERRIDE;
+  virtual base::Time GetTimelineOffset() const OVERRIDE;
+  virtual Liveness GetLiveness() const OVERRIDE;
 
   // Methods used by an external object to control this demuxer.
   //
@@ -286,7 +288,8 @@ class MEDIA_EXPORT ChunkDemuxer : public Demuxer {
   bool CanEndOfStream_Locked() const;
 
   // SourceState callbacks.
-  void OnSourceInitDone(bool success, base::TimeDelta duration);
+  void OnSourceInitDone(bool success,
+                        const StreamParser::InitParameters& params);
 
   // Creates a DemuxerStream for the specified |type|.
   // Returns a new ChunkDemuxerStream instance if a stream of this type
@@ -362,6 +365,9 @@ class MEDIA_EXPORT ChunkDemuxer : public Demuxer {
   // variable is set to < 0 to indicate that the |duration_| represents
   // the actual duration instead of a user specified value.
   double user_specified_duration_;
+
+  base::Time timeline_offset_;
+  Liveness liveness_;
 
   typedef std::map<std::string, SourceState*> SourceStateMap;
   SourceStateMap source_state_map_;

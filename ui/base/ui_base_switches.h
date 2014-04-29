@@ -26,14 +26,6 @@ UI_BASE_EXPORT extern const char kHighlightMissingScaledResources[];
 UI_BASE_EXPORT extern const char kLang[];
 UI_BASE_EXPORT extern const char kLocalePak[];
 UI_BASE_EXPORT extern const char kNoMessageBox[];
-UI_BASE_EXPORT extern const char kTouchOptimizedUI[];
-UI_BASE_EXPORT extern const char kTouchOptimizedUIAuto[];
-UI_BASE_EXPORT extern const char kTouchOptimizedUIDisabled[];
-UI_BASE_EXPORT extern const char kTouchOptimizedUIEnabled[];
-
-#if defined(OS_ANDROID)
-UI_BASE_EXPORT extern const char kTabletUI[];
-#endif
 
 }  // namespace switches
 

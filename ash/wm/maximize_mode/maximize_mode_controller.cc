@@ -7,6 +7,7 @@
 #include "ash/accelerometer/accelerometer_controller.h"
 #include "ash/display/display_manager.h"
 #include "ash/shell.h"
+#include "ash/wm/maximize_mode/maximize_mode_event_blocker.h"
 #include "ui/gfx/vector3d_f.h"
 
 namespace ash {
@@ -24,15 +25,25 @@ const float kExitMaximizeModeAngle = 160.0f;
 // occasionally appear as though the lid is almost closed. If the lid appears
 // near closed but the device is on we assume it is an erroneous reading from
 // it being open 360 degrees.
-const float kFullyOpenAngleErrorTolerance = 10.0f;
+const float kFullyOpenAngleErrorTolerance = 20.0f;
 
 // When the device approaches vertical orientation (i.e. portrait orientation)
 // the accelerometers for the base and lid approach the same values (i.e.
 // gravity pointing in the direction of the hinge). When this happens we cannot
 // compute the hinge angle reliably and must turn ignore accelerometer readings.
-// This is the angle from vertical under which we will not compute a hinge
-// angle.
-const float kHingeAxisAlignedThreshold = 15.0f;
+// This is the minimum acceleration perpendicular to the hinge under which to
+// detect hinge angle.
+const float kHingeAngleDetectionThreshold = 0.25f;
+
+// The maximum deviation from the acceleration expected due to gravity under
+// which to detect hinge angle and screen rotation.
+const float kDeviationFromGravityThreshold = 0.1f;
+
+// The maximum deviation between the magnitude of the two accelerometers under
+// which to detect hinge angle and screen rotation. These accelerometers are
+// attached to the same physical device and so should be under the same
+// acceleration.
+const float kNoisyMagnitudeDeviation = 0.1f;
 
 // The angle which the screen has to be rotated past before the display will
 // rotate to match it (i.e. 45.0f is no stickiness).
@@ -70,7 +81,8 @@ float ClockwiseAngleBetweenVectorsInDegrees(const gfx::Vector3dF& base,
 
 }  // namespace
 
-MaximizeModeController::MaximizeModeController() {
+MaximizeModeController::MaximizeModeController()
+    : rotation_locked_(false) {
   Shell::GetInstance()->accelerometer_controller()->AddObserver(this);
 }
 
@@ -81,6 +93,17 @@ MaximizeModeController::~MaximizeModeController() {
 void MaximizeModeController::OnAccelerometerUpdated(
     const gfx::Vector3dF& base,
     const gfx::Vector3dF& lid) {
+  // Ignore the reading if it appears unstable. The reading is considered
+  // unstable if it deviates too much from gravity and/or the magnitude of the
+  // reading from the lid differs too much from the reading from the base.
+  float base_magnitude = base.Length();
+  float lid_magnitude = lid.Length();
+  if (std::abs(base_magnitude - lid_magnitude) > kNoisyMagnitudeDeviation ||
+      std::abs(base_magnitude - 1.0f) > kDeviationFromGravityThreshold ||
+      std::abs(lid_magnitude - 1.0f) > kDeviationFromGravityThreshold) {
+      return;
+  }
+
   // Responding to the hinge rotation can change the maximize mode state which
   // affects screen rotation, so we handle hinge rotation first.
   HandleHingeRotation(base, lid);
@@ -92,18 +115,24 @@ void MaximizeModeController::HandleHingeRotation(const gfx::Vector3dF& base,
   static const gfx::Vector3dF hinge_vector(0.0f, 1.0f, 0.0f);
   bool maximize_mode_engaged =
       Shell::GetInstance()->IsMaximizeModeWindowManagerEnabled();
+  // Ignore the component of acceleration parallel to the hinge for the purposes
+  // of hinge angle calculation.
+  gfx::Vector3dF base_flattened(base);
+  gfx::Vector3dF lid_flattened(lid);
+  base_flattened.set_y(0.0f);
+  lid_flattened.set_y(0.0f);
 
   // As the hinge approaches a vertical angle, the base and lid accelerometers
   // approach the same values making any angle calculations highly inaccurate.
   // Bail out early when it is too close.
-  float hinge_angle = AngleBetweenVectorsInDegrees(base, hinge_vector);
-  if (hinge_angle < kHingeAxisAlignedThreshold ||
-      hinge_angle > 180.0f - kHingeAxisAlignedThreshold) {
+  if (base_flattened.Length() < kHingeAngleDetectionThreshold ||
+      lid_flattened.Length() < kHingeAngleDetectionThreshold) {
     return;
   }
 
   // Compute the angle between the base and the lid.
-  float angle = ClockwiseAngleBetweenVectorsInDegrees(base, lid, hinge_vector);
+  float angle = ClockwiseAngleBetweenVectorsInDegrees(base_flattened,
+      lid_flattened, hinge_vector);
 
   // Toggle maximize mode on or off when corresponding thresholds are passed.
   // TODO(flackr): Make MaximizeModeController own the MaximizeModeWindowManager
@@ -113,9 +142,11 @@ void MaximizeModeController::HandleHingeRotation(const gfx::Vector3dF& base,
       angle > kFullyOpenAngleErrorTolerance &&
       angle < kExitMaximizeModeAngle) {
     Shell::GetInstance()->EnableMaximizeModeWindowManager(false);
+    event_blocker_.reset();
   } else if (!maximize_mode_engaged &&
       angle > kEnterMaximizeModeAngle) {
     Shell::GetInstance()->EnableMaximizeModeWindowManager(true);
+    event_blocker_.reset(new MaximizeModeEventBlocker);
   }
 }
 
@@ -141,8 +172,12 @@ void MaximizeModeController::HandleScreenRotation(const gfx::Vector3dF& lid) {
       display_manager->SetDisplayRotation(gfx::Display::InternalDisplayId(),
                                           gfx::Display::ROTATE_0);
     }
+    rotation_locked_ = false;
     return;
   }
+
+  if (rotation_locked_)
+    return;
 
   // After determining maximize mode state, determine if the screen should
   // be rotated.

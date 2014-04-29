@@ -16,10 +16,10 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/extensions/tab_helper.h"
 #include "chrome/browser/favicon/favicon_tab_helper.h"
-#include "chrome/browser/history/select_favicon_frames.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/web_applications/web_app.h"
 #include "chrome/browser/web_applications/web_app_win.h"
+#include "components/favicon_base/select_favicon_frames.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_source.h"
@@ -111,15 +111,19 @@ void UpdateShortcutWorker::DidDownloadFavicon(
                             requested_size,
                             &closest_indices,
                             NULL);
-  size_t closest_index = closest_indices[0];
 
-  if (!bitmaps.empty() && !bitmaps[closest_index].isNull()) {
+  SkBitmap bitmap;
+  if (!bitmaps.empty()) {
+     size_t closest_index = closest_indices[0];
+     bitmap = bitmaps[closest_index];
+  }
+
+  if (!bitmap.isNull()) {
     // Update icon with download image and update shortcut.
-    shortcut_info_.favicon.Add(
-        gfx::Image::CreateFrom1xBitmap(bitmaps[closest_index]));
+    shortcut_info_.favicon.Add(gfx::Image::CreateFrom1xBitmap(bitmap));
     extensions::TabHelper* extensions_tab_helper =
         extensions::TabHelper::FromWebContents(web_contents_);
-    extensions_tab_helper->SetAppIcon(bitmaps[closest_index]);
+    extensions_tab_helper->SetAppIcon(bitmap);
     UpdateShortcuts();
   } else {
     // Try the next icon otherwise.

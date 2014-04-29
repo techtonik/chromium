@@ -26,6 +26,7 @@ const float kFakeCoordY = 24.f;
 const TimeDelta kOneSecond = TimeDelta::FromSeconds(1);
 const TimeDelta kOneMicrosecond = TimeDelta::FromMicroseconds(1);
 const TimeDelta kDeltaTimeForFlingSequences = TimeDelta::FromMilliseconds(5);
+const float kMockTouchRadius = MockMotionEvent::TOUCH_MAJOR / 2;
 
 GestureProvider::Config CreateDefaultConfig() {
   GestureProvider::Config sConfig;
@@ -42,6 +43,11 @@ GestureProvider::Config CreateDefaultConfig() {
   // the second tap at microsecond intervals.
   sConfig.gesture_detector_config.double_tap_timeout = kOneMicrosecond * 4;
   return sConfig;
+}
+
+gfx::RectF BoundsForSingleMockTouchAtLocation(float x, float y) {
+  float diameter = MockMotionEvent::TOUCH_MAJOR;
+  return gfx::RectF(x - diameter / 2, y - diameter / 2, diameter, diameter);
 }
 
 }  // namespace
@@ -67,16 +73,43 @@ class GestureProviderTest : public testing::Test, public GestureProviderClient {
     return MockMotionEvent(action, event_time, x0, y0, x1, y1);
   }
 
+  static MockMotionEvent ObtainMotionEvent(
+      base::TimeTicks event_time,
+      MotionEvent::Action action,
+      const std::vector<gfx::PointF>& positions) {
+    switch (positions.size()) {
+      case 1:
+        return MockMotionEvent(
+            action, event_time, positions[0].x(), positions[0].y());
+      case 2:
+        return MockMotionEvent(action,
+                               event_time,
+                               positions[0].x(),
+                               positions[0].y(),
+                               positions[1].x(),
+                               positions[1].y());
+      case 3:
+        return MockMotionEvent(action,
+                               event_time,
+                               positions[0].x(),
+                               positions[0].y(),
+                               positions[1].x(),
+                               positions[1].y(),
+                               positions[2].x(),
+                               positions[2].y());
+      default:
+        CHECK(false) << "MockMotionEvent only supports 1-3 pointers";
+        return MockMotionEvent();
+    }
+  }
+
   static MockMotionEvent ObtainMotionEvent(base::TimeTicks event_time,
                                            MotionEvent::Action action) {
     return ObtainMotionEvent(event_time, action, kFakeCoordX, kFakeCoordY);
   }
 
   // Test
-  virtual void SetUp() OVERRIDE {
-    gesture_provider_.reset(new GestureProvider(GetDefaultConfig(), this));
-    gesture_provider_->SetMultiTouchSupportEnabled(false);
-  }
+  virtual void SetUp() OVERRIDE { SetUpWithConfig(GetDefaultConfig()); }
 
   virtual void TearDown() OVERRIDE {
     gestures_.clear();
@@ -90,6 +123,15 @@ class GestureProviderTest : public testing::Test, public GestureProviderClient {
     gestures_.push_back(gesture);
   }
 
+  void SetUpWithConfig(const GestureProvider::Config& config) {
+    gesture_provider_.reset(new GestureProvider(config, this));
+    gesture_provider_->SetMultiTouchZoomSupportEnabled(false);
+  }
+
+  void ResetGestureDetection() {
+    CancelActiveTouchSequence();
+    gestures_.clear();
+  }
   bool CancelActiveTouchSequence() {
     if (!gesture_provider_->current_down_event())
       return false;
@@ -110,7 +152,7 @@ class GestureProviderTest : public testing::Test, public GestureProviderClient {
     return gestures_.back();
   }
 
-  const EventType GetMostRecentGestureEventType() const {
+  EventType GetMostRecentGestureEventType() const {
     EXPECT_FALSE(gestures_.empty());
     return gestures_.back().type;
   }
@@ -131,8 +173,12 @@ class GestureProviderTest : public testing::Test, public GestureProviderClient {
     return sConfig;
   }
 
-  int GetTouchSlop() const {
-    return GetDefaultConfig().gesture_detector_config.scaled_touch_slop;
+  float GetTouchSlop() const {
+    return GetDefaultConfig().gesture_detector_config.touch_slop;
+  }
+
+  float GetMinSwipeVelocity() const {
+    return GetDefaultConfig().gesture_detector_config.minimum_swipe_velocity;
   }
 
   base::TimeDelta GetLongPressTimeout() const {
@@ -143,11 +189,20 @@ class GestureProviderTest : public testing::Test, public GestureProviderClient {
     return GetDefaultConfig().gesture_detector_config.showpress_timeout;
   }
 
-  void SetBeginEndTypesEnabled(bool enabled) {
+  base::TimeDelta GetDoubleTapTimeout() const {
+    return GetDefaultConfig().gesture_detector_config.double_tap_timeout;
+  }
+
+  void EnableBeginEndTypes() {
     GestureProvider::Config config = GetDefaultConfig();
     config.gesture_begin_end_types_enabled = true;
-    gesture_provider_.reset(new GestureProvider(config, this));
-    gesture_provider_->SetMultiTouchSupportEnabled(false);
+    SetUpWithConfig(config);
+  }
+
+  void EnableMultiFingerSwipe() {
+    GestureProvider::Config config = GetDefaultConfig();
+    config.gesture_detector_config.swipe_enabled = true;
+    SetUpWithConfig(config);
   }
 
   bool HasDownEvent() const { return gesture_provider_->current_down_event(); }
@@ -156,8 +211,8 @@ class GestureProviderTest : public testing::Test, public GestureProviderClient {
   void CheckScrollEventSequenceForEndActionType(
       MotionEvent::Action end_action_type) {
     base::TimeTicks event_time = base::TimeTicks::Now();
-    const int scroll_to_x = kFakeCoordX + 100;
-    const int scroll_to_y = kFakeCoordY + 100;
+    const float scroll_to_x = kFakeCoordX + 100;
+    const float scroll_to_y = kFakeCoordY + 100;
     int motion_event_id = 0;
 
     MockMotionEvent event =
@@ -177,6 +232,8 @@ class GestureProviderTest : public testing::Test, public GestureProviderClient {
     EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_SCROLL_BEGIN));
     EXPECT_EQ(motion_event_id, GetMostRecentGestureEvent().motion_event_id);
     EXPECT_EQ(ET_GESTURE_SCROLL_UPDATE, GetMostRecentGestureEventType());
+    EXPECT_EQ(BoundsForSingleMockTouchAtLocation(scroll_to_x, scroll_to_y),
+              GetMostRecentGestureEvent().details.bounding_box());
     ASSERT_EQ(3U, GetReceivedGestureCount()) << "Only TapDown, "
                                                 "ScrollBegin and ScrollBy "
                                                 "should have been sent";
@@ -196,6 +253,74 @@ class GestureProviderTest : public testing::Test, public GestureProviderClient {
     EXPECT_EQ(ET_GESTURE_SCROLL_END, GetMostRecentGestureEventType());
     EXPECT_EQ(motion_event_id, GetMostRecentGestureEvent().motion_event_id);
     EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+    EXPECT_EQ(BoundsForSingleMockTouchAtLocation(scroll_to_x, scroll_to_y),
+              GetMostRecentGestureEvent().details.bounding_box());
+  }
+
+  void TwoFingerSwipe(float vx0, float vy0, float vx1, float vy1) {
+    std::vector<gfx::Vector2dF> velocities;
+    velocities.push_back(gfx::Vector2dF(vx0, vy0));
+    velocities.push_back(gfx::Vector2dF(vx1, vy1));
+    MultiFingerSwipe(velocities);
+  }
+
+  void ThreeFingerSwipe(float vx0,
+                        float vy0,
+                        float vx1,
+                        float vy1,
+                        float vx2,
+                        float vy2) {
+    std::vector<gfx::Vector2dF> velocities;
+    velocities.push_back(gfx::Vector2dF(vx0, vy0));
+    velocities.push_back(gfx::Vector2dF(vx1, vy1));
+    velocities.push_back(gfx::Vector2dF(vx2, vy2));
+    MultiFingerSwipe(velocities);
+  }
+
+  void MultiFingerSwipe(std::vector<gfx::Vector2dF> velocities) {
+    ASSERT_GT(velocities.size(), 0U);
+
+    base::TimeTicks event_time = base::TimeTicks::Now();
+
+    std::vector<gfx::PointF> positions(velocities.size());
+    for (size_t i = 0; i < positions.size(); ++i)
+      positions[i] = gfx::PointF(kFakeCoordX * (i + 1), kFakeCoordY * (i + 1));
+
+    float dt = kDeltaTimeForFlingSequences.InSecondsF();
+
+    // Each pointer down should be a separate event.
+    for (size_t i = 0; i < positions.size(); ++i) {
+      const size_t pointer_count = i + 1;
+      std::vector<gfx::PointF> event_positions(pointer_count);
+      event_positions.assign(positions.begin(),
+                             positions.begin() + pointer_count);
+      MockMotionEvent event =
+          ObtainMotionEvent(event_time,
+                            pointer_count > 1 ? MotionEvent::ACTION_POINTER_DOWN
+                                              : MotionEvent::ACTION_DOWN,
+                            event_positions);
+      EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+    }
+
+    for (size_t i = 0; i < positions.size(); ++i)
+      positions[i] += gfx::ScaleVector2d(velocities[i], dt);
+    MockMotionEvent event =
+        ObtainMotionEvent(event_time + kDeltaTimeForFlingSequences,
+                          MotionEvent::ACTION_MOVE,
+                          positions);
+    EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+
+    for (size_t i = 0; i < positions.size(); ++i)
+      positions[i] += gfx::ScaleVector2d(velocities[i], dt);
+    event = ObtainMotionEvent(event_time + 2 * kDeltaTimeForFlingSequences,
+                              MotionEvent::ACTION_MOVE,
+                              positions);
+    EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+
+    event = ObtainMotionEvent(event_time + 2 * kDeltaTimeForFlingSequences,
+                              MotionEvent::ACTION_POINTER_UP,
+                              positions);
+    EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   }
 
   static void RunTasksAndWait(base::TimeDelta delay) {
@@ -224,6 +349,8 @@ TEST_F(GestureProviderTest, GestureTapTap) {
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   EXPECT_EQ(ET_GESTURE_TAP_DOWN, GetMostRecentGestureEventType());
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY),
+            GetMostRecentGestureEvent().details.bounding_box());
 
   event = ObtainMotionEvent(event_time + kOneMicrosecond,
                             MotionEvent::ACTION_UP);
@@ -232,11 +359,11 @@ TEST_F(GestureProviderTest, GestureTapTap) {
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   EXPECT_EQ(ET_GESTURE_TAP, GetMostRecentGestureEventType());
   // Ensure tap details have been set.
-  EXPECT_EQ(10, GetMostRecentGestureEvent().details.bounding_box().width());
-  EXPECT_EQ(10, GetMostRecentGestureEvent().details.bounding_box().height());
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.tap_count());
   EXPECT_EQ(motion_event_id, GetMostRecentGestureEvent().motion_event_id);
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY),
+            GetMostRecentGestureEvent().details.bounding_box());
 }
 
 // Verify that a DOWN followed shortly by an UP will trigger
@@ -255,6 +382,8 @@ TEST_F(GestureProviderTest, GestureTapTapWithDelay) {
   EXPECT_EQ(ET_GESTURE_TAP_DOWN, GetMostRecentGestureEventType());
   EXPECT_EQ(motion_event_id, GetMostRecentGestureEvent().motion_event_id);
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY),
+            GetMostRecentGestureEvent().details.bounding_box());
 
   event = ObtainMotionEvent(event_time + kOneMicrosecond,
                             MotionEvent::ACTION_UP);
@@ -263,13 +392,15 @@ TEST_F(GestureProviderTest, GestureTapTapWithDelay) {
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   EXPECT_EQ(ET_GESTURE_TAP_UNCONFIRMED, GetMostRecentGestureEventType());
   // Ensure tap details have been set.
-  EXPECT_EQ(10, GetMostRecentGestureEvent().details.bounding_box().width());
-  EXPECT_EQ(10, GetMostRecentGestureEvent().details.bounding_box().height());
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.tap_count());
   EXPECT_EQ(motion_event_id, GetMostRecentGestureEvent().motion_event_id);
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY),
+            GetMostRecentGestureEvent().details.bounding_box());
 
   EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_TAP));
+  RunTasksAndWait(GetDoubleTapTimeout());
+  EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_TAP));
 }
 
 // Verify that a DOWN followed by a MOVE will trigger fling (but not LONG).
@@ -305,6 +436,9 @@ TEST_F(GestureProviderTest, GestureFlingAndCancelLongPress) {
   EXPECT_EQ(motion_event_id, GetMostRecentGestureEvent().motion_event_id);
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
   EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_LONG_PRESS));
+  EXPECT_EQ(
+      BoundsForSingleMockTouchAtLocation(kFakeCoordX * 10, kFakeCoordY * 10),
+      GetMostRecentGestureEvent().details.bounding_box());
 }
 
 // Verify that for a normal scroll the following events are sent:
@@ -504,6 +638,8 @@ TEST_F(GestureProviderTest, DoubleTapDragZoomBasic) {
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_SCROLL_BEGIN));
   ASSERT_EQ(ET_GESTURE_PINCH_BEGIN, GetMostRecentGestureEventType());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY + 100),
+            GetMostRecentGestureEvent().details.bounding_box());
 
   event = ObtainMotionEvent(down_time_2 + kOneMicrosecond * 2,
                             MotionEvent::ACTION_MOVE,
@@ -512,6 +648,8 @@ TEST_F(GestureProviderTest, DoubleTapDragZoomBasic) {
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   ASSERT_EQ(ET_GESTURE_PINCH_UPDATE, GetMostRecentGestureEventType());
   EXPECT_LT(1.f, GetMostRecentGestureEvent().details.scale());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY + 200),
+            GetMostRecentGestureEvent().details.bounding_box());
 
   event = ObtainMotionEvent(down_time_2 + kOneMicrosecond * 3,
                             MotionEvent::ACTION_MOVE,
@@ -520,6 +658,8 @@ TEST_F(GestureProviderTest, DoubleTapDragZoomBasic) {
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   ASSERT_EQ(ET_GESTURE_PINCH_UPDATE, GetMostRecentGestureEventType());
   EXPECT_GT(1.f, GetMostRecentGestureEvent().details.scale());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY + 100),
+            GetMostRecentGestureEvent().details.bounding_box());
 
   event = ObtainMotionEvent(down_time_2 + kOneMicrosecond * 4,
                             MotionEvent::ACTION_UP,
@@ -528,13 +668,15 @@ TEST_F(GestureProviderTest, DoubleTapDragZoomBasic) {
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_PINCH_END));
   EXPECT_EQ(ET_GESTURE_SCROLL_END, GetMostRecentGestureEventType());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY - 200),
+            GetMostRecentGestureEvent().details.bounding_box());
 }
 
 // Generate a scroll gesture and verify that the resulting scroll motion event
 // has both absolute and relative position information.
 TEST_F(GestureProviderTest, ScrollUpdateValues) {
-  const int delta_x = 16;
-  const int delta_y = 84;
+  const float delta_x = 16;
+  const float delta_y = 84;
 
   const base::TimeTicks event_time = TimeTicks::Now();
 
@@ -625,8 +767,8 @@ TEST_F(GestureProviderTest, FractionalScroll) {
 // Generate a scroll gesture and verify that the resulting scroll begin event
 // has the expected hint values.
 TEST_F(GestureProviderTest, ScrollBeginValues) {
-  const int delta_x = 13;
-  const int delta_y = 89;
+  const float delta_x = 13;
+  const float delta_y = 89;
 
   const base::TimeTicks event_time = TimeTicks::Now();
 
@@ -696,11 +838,15 @@ TEST_F(GestureProviderTest, GestureLongTap) {
 
   EXPECT_EQ(ET_GESTURE_LONG_PRESS, GetMostRecentGestureEventType());
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY),
+            GetMostRecentGestureEvent().details.bounding_box());
 
   event = ObtainMotionEvent(event_time + kOneSecond, MotionEvent::ACTION_UP);
   gesture_provider_->OnTouchEvent(event);
   EXPECT_EQ(ET_GESTURE_LONG_TAP, GetMostRecentGestureEventType());
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY),
+            GetMostRecentGestureEvent().details.bounding_box());
 }
 
 TEST_F(GestureProviderTest, GestureLongPressDoesNotPreventScrolling) {
@@ -789,8 +935,8 @@ TEST_F(GestureProviderTest, NoGestureLongPressDuringDoubleTap) {
 // Verify that the touch slop region is removed from the first scroll delta to
 // avoid a jump when starting to scroll.
 TEST_F(GestureProviderTest, TouchSlopRemovedFromScroll) {
-  const int scaled_touch_slop = GetTouchSlop();
-  const int scroll_delta = 5;
+  const float touch_slop = GetTouchSlop();
+  const float scroll_delta = 5;
 
   base::TimeTicks event_time = base::TimeTicks::Now();
 
@@ -801,7 +947,7 @@ TEST_F(GestureProviderTest, TouchSlopRemovedFromScroll) {
   event = ObtainMotionEvent(event_time + kOneMicrosecond * 2,
                             MotionEvent::ACTION_MOVE,
                             kFakeCoordX,
-                            kFakeCoordY + scaled_touch_slop + scroll_delta);
+                            kFakeCoordY + touch_slop + scroll_delta);
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
 
   EXPECT_EQ(ET_GESTURE_SCROLL_UPDATE, GetMostRecentGestureEventType());
@@ -811,16 +957,65 @@ TEST_F(GestureProviderTest, TouchSlopRemovedFromScroll) {
   EXPECT_EQ(1, gesture.details.touch_points());
 }
 
+// Verify that movement within the touch slop region does not generate a scroll,
+// and that the slop region is correct even when using fractional coordinates.
+TEST_F(GestureProviderTest, NoScrollWithinTouchSlop) {
+  const float touch_slop = GetTouchSlop();
+  const float scale_factor = 2.5f;
+  const int touch_slop_pixels = static_cast<int>(scale_factor * touch_slop);
+
+  base::TimeTicks event_time = base::TimeTicks::Now();
+
+  MockMotionEvent event =
+      ObtainMotionEvent(event_time, MotionEvent::ACTION_DOWN);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+
+  event = ObtainMotionEvent(event_time + kOneMicrosecond * 2,
+                            MotionEvent::ACTION_MOVE,
+                            kFakeCoordX + touch_slop_pixels / scale_factor,
+                            kFakeCoordY);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_SCROLL_BEGIN));
+
+  event = ObtainMotionEvent(event_time + kOneMicrosecond * 2,
+                            MotionEvent::ACTION_MOVE,
+                            kFakeCoordX,
+                            kFakeCoordY + touch_slop_pixels / scale_factor);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_SCROLL_BEGIN));
+
+  event = ObtainMotionEvent(event_time + kOneMicrosecond * 2,
+                            MotionEvent::ACTION_MOVE,
+                            kFakeCoordX - touch_slop_pixels / scale_factor,
+                            kFakeCoordY);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_SCROLL_BEGIN));
+
+  event = ObtainMotionEvent(event_time + kOneMicrosecond * 2,
+                            MotionEvent::ACTION_MOVE,
+                            kFakeCoordX,
+                            kFakeCoordY - touch_slop_pixels / scale_factor);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_SCROLL_BEGIN));
+
+  event =
+      ObtainMotionEvent(event_time + kOneMicrosecond * 2,
+                        MotionEvent::ACTION_MOVE,
+                        kFakeCoordX,
+                        kFakeCoordY + (touch_slop_pixels + 1.f) / scale_factor);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_SCROLL_BEGIN));
+}
+
 TEST_F(GestureProviderTest, NoDoubleTapWhenExplicitlyDisabled) {
+  // Ensure that double-tap gestures can be disabled.
   gesture_provider_->SetDoubleTapSupportForPlatformEnabled(false);
 
   base::TimeTicks event_time = base::TimeTicks::Now();
   MockMotionEvent event = ObtainMotionEvent(
       event_time, MotionEvent::ACTION_DOWN, kFakeCoordX, kFakeCoordY);
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
-  EXPECT_EQ(1U, GetReceivedGestureCount());
   EXPECT_EQ(ET_GESTURE_TAP_DOWN, GetMostRecentGestureEventType());
-  EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
 
   event = ObtainMotionEvent(event_time + kOneMicrosecond,
                             MotionEvent::ACTION_UP,
@@ -828,7 +1023,6 @@ TEST_F(GestureProviderTest, NoDoubleTapWhenExplicitlyDisabled) {
                             kFakeCoordY);
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   EXPECT_EQ(ET_GESTURE_TAP, GetMostRecentGestureEventType());
-  EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
 
   event = ObtainMotionEvent(event_time + kOneMicrosecond * 2,
                             MotionEvent::ACTION_DOWN,
@@ -836,7 +1030,6 @@ TEST_F(GestureProviderTest, NoDoubleTapWhenExplicitlyDisabled) {
                             kFakeCoordY);
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   EXPECT_EQ(ET_GESTURE_TAP_DOWN, GetMostRecentGestureEventType());
-  EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
 
   event = ObtainMotionEvent(event_time + kOneMicrosecond * 3,
                             MotionEvent::ACTION_UP,
@@ -844,7 +1037,86 @@ TEST_F(GestureProviderTest, NoDoubleTapWhenExplicitlyDisabled) {
                             kFakeCoordY);
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   EXPECT_EQ(ET_GESTURE_TAP, GetMostRecentGestureEventType());
-  EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+
+  // Ensure that double-tap gestures can be interrupted.
+  gesture_provider_->SetDoubleTapSupportForPlatformEnabled(true);
+
+  event_time = base::TimeTicks::Now();
+  event = ObtainMotionEvent(
+      event_time, MotionEvent::ACTION_DOWN, kFakeCoordX, kFakeCoordY);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_EQ(5U, GetReceivedGestureCount());
+
+  event = ObtainMotionEvent(event_time + kOneMicrosecond,
+                            MotionEvent::ACTION_UP,
+                            kFakeCoordX,
+                            kFakeCoordY);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_EQ(ET_GESTURE_TAP_UNCONFIRMED, GetMostRecentGestureEventType());
+
+  gesture_provider_->SetDoubleTapSupportForPlatformEnabled(false);
+  EXPECT_EQ(ET_GESTURE_TAP, GetMostRecentGestureEventType());
+
+  // Ensure that double-tap gestures can be resumed.
+  gesture_provider_->SetDoubleTapSupportForPlatformEnabled(true);
+
+  event = ObtainMotionEvent(event_time + kOneMicrosecond * 2,
+                            MotionEvent::ACTION_DOWN,
+                            kFakeCoordX,
+                            kFakeCoordY);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_EQ(ET_GESTURE_TAP_DOWN, GetMostRecentGestureEventType());
+
+  event = ObtainMotionEvent(event_time + kOneMicrosecond * 3,
+                            MotionEvent::ACTION_UP,
+                            kFakeCoordX,
+                            kFakeCoordY);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_EQ(ET_GESTURE_TAP_UNCONFIRMED, GetMostRecentGestureEventType());
+
+  event = ObtainMotionEvent(event_time + kOneMicrosecond * 4,
+                            MotionEvent::ACTION_DOWN,
+                            kFakeCoordX,
+                            kFakeCoordY);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_EQ(ET_GESTURE_TAP_DOWN, GetMostRecentGestureEventType());
+
+  event = ObtainMotionEvent(event_time + kOneMicrosecond * 5,
+                            MotionEvent::ACTION_UP,
+                            kFakeCoordX,
+                            kFakeCoordY);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_EQ(ET_GESTURE_DOUBLE_TAP, GetMostRecentGestureEventType());
+}
+
+TEST_F(GestureProviderTest, NoDelayedTapWhenDoubleTapSupportToggled) {
+  gesture_provider_->SetDoubleTapSupportForPlatformEnabled(true);
+
+  base::TimeTicks event_time = base::TimeTicks::Now();
+  MockMotionEvent event = ObtainMotionEvent(
+      event_time, MotionEvent::ACTION_DOWN, kFakeCoordX, kFakeCoordY);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_EQ(ET_GESTURE_TAP_DOWN, GetMostRecentGestureEventType());
+  EXPECT_EQ(1U, GetReceivedGestureCount());
+
+  event = ObtainMotionEvent(event_time + kOneMicrosecond,
+                            MotionEvent::ACTION_UP,
+                            kFakeCoordX,
+                            kFakeCoordY);
+  EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
+  EXPECT_EQ(ET_GESTURE_TAP_UNCONFIRMED, GetMostRecentGestureEventType());
+  EXPECT_EQ(2U, GetReceivedGestureCount());
+
+  // Disabling double-tap during the tap timeout should flush the delayed tap.
+  gesture_provider_->SetDoubleTapSupportForPlatformEnabled(false);
+  EXPECT_EQ(ET_GESTURE_TAP, GetMostRecentGestureEventType());
+  EXPECT_EQ(3U, GetReceivedGestureCount());
+
+  // No further timeout gestures should arrive.
+  const base::TimeDelta long_press_timeout =
+      GetLongPressTimeout() + GetShowPressTimeout() + kOneMicrosecond;
+  RunTasksAndWait(long_press_timeout);
+  EXPECT_EQ(3U, GetReceivedGestureCount());
 }
 
 TEST_F(GestureProviderTest, NoDoubleTapDragZoomWhenDisabledOnPlatform) {
@@ -1043,15 +1315,15 @@ TEST_F(GestureProviderTest, FixedPageScaleDuringDoubleTapDragZoom) {
 // Verify that pinch zoom sends the proper event sequence.
 TEST_F(GestureProviderTest, PinchZoom) {
   base::TimeTicks event_time = base::TimeTicks::Now();
-  const int scaled_touch_slop = GetTouchSlop();
+  const float touch_slop = GetTouchSlop();
   int motion_event_id = 0;
 
   gesture_provider_->SetDoubleTapSupportForPageEnabled(false);
   gesture_provider_->SetDoubleTapSupportForPlatformEnabled(true);
-  gesture_provider_->SetMultiTouchSupportEnabled(true);
+  gesture_provider_->SetMultiTouchZoomSupportEnabled(true);
 
-  int secondary_coord_x = kFakeCoordX + 20 * scaled_touch_slop;
-  int secondary_coord_y = kFakeCoordY + 20 * scaled_touch_slop;
+  int secondary_coord_x = kFakeCoordX + 20 * touch_slop;
+  int secondary_coord_y = kFakeCoordY + 20 * touch_slop;
 
   MockMotionEvent event =
       ObtainMotionEvent(event_time, MotionEvent::ACTION_DOWN);
@@ -1059,6 +1331,8 @@ TEST_F(GestureProviderTest, PinchZoom) {
   EXPECT_TRUE(gesture_provider_->OnTouchEvent(event));
   EXPECT_EQ(ET_GESTURE_TAP_DOWN, GetMostRecentGestureEventType());
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY),
+            GetMostRecentGestureEvent().details.bounding_box());
 
   // Toggling double-tap support should not take effect until the next sequence.
   gesture_provider_->SetDoubleTapSupportForPageEnabled(true);
@@ -1074,9 +1348,11 @@ TEST_F(GestureProviderTest, PinchZoom) {
   gesture_provider_->OnTouchEvent(event);
   EXPECT_EQ(1U, GetReceivedGestureCount());
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+  EXPECT_EQ(BoundsForSingleMockTouchAtLocation(kFakeCoordX, kFakeCoordY),
+            GetMostRecentGestureEvent().details.bounding_box());
 
-  secondary_coord_x += 5 * scaled_touch_slop;
-  secondary_coord_y += 5 * scaled_touch_slop;
+  secondary_coord_x += 5 * touch_slop;
+  secondary_coord_y += 5 * touch_slop;
   event = ObtainMotionEvent(event_time,
                             MotionEvent::ACTION_MOVE,
                             kFakeCoordX,
@@ -1094,9 +1370,15 @@ TEST_F(GestureProviderTest, PinchZoom) {
   EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_PINCH_BEGIN));
   EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_SCROLL_BEGIN));
   EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_SCROLL_UPDATE));
+  EXPECT_EQ(
+      gfx::RectF(kFakeCoordX - kMockTouchRadius,
+                 kFakeCoordY - kMockTouchRadius,
+                 secondary_coord_x - kFakeCoordX + kMockTouchRadius * 2,
+                 secondary_coord_y - kFakeCoordY + kMockTouchRadius * 2),
+      GetMostRecentGestureEvent().details.bounding_box());
 
-  secondary_coord_x += 2 * scaled_touch_slop;
-  secondary_coord_y += 2 * scaled_touch_slop;
+  secondary_coord_x += 2 * touch_slop;
+  secondary_coord_y += 2 * touch_slop;
   event = ObtainMotionEvent(event_time,
                             MotionEvent::ACTION_MOVE,
                             kFakeCoordX,
@@ -1114,6 +1396,12 @@ TEST_F(GestureProviderTest, PinchZoom) {
   EXPECT_EQ(ET_GESTURE_PINCH_UPDATE, GetMostRecentGestureEventType());
   EXPECT_EQ(2, GetMostRecentGestureEvent().details.touch_points());
   EXPECT_LT(1.f, GetMostRecentGestureEvent().details.scale());
+  EXPECT_EQ(
+      gfx::RectF(kFakeCoordX - kMockTouchRadius,
+                 kFakeCoordY - kMockTouchRadius,
+                 secondary_coord_x - kFakeCoordX + kMockTouchRadius * 2,
+                 secondary_coord_y - kFakeCoordY + kMockTouchRadius * 2),
+      GetMostRecentGestureEvent().details.bounding_box());
 
   event = ObtainMotionEvent(event_time,
                             MotionEvent::ACTION_POINTER_UP,
@@ -1128,11 +1416,121 @@ TEST_F(GestureProviderTest, PinchZoom) {
   EXPECT_EQ(ET_GESTURE_PINCH_END, GetMostRecentGestureEventType());
   EXPECT_EQ(2, GetMostRecentGestureEvent().details.touch_points());
   EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_SCROLL_END));
+  EXPECT_EQ(
+      gfx::RectF(kFakeCoordX - kMockTouchRadius,
+                 kFakeCoordY - kMockTouchRadius,
+                 secondary_coord_x - kFakeCoordX + kMockTouchRadius * 2,
+                 secondary_coord_y - kFakeCoordY + kMockTouchRadius * 2),
+      GetMostRecentGestureEvent().details.bounding_box());
 
   event = ObtainMotionEvent(event_time, MotionEvent::ACTION_UP);
   gesture_provider_->OnTouchEvent(event);
   EXPECT_EQ(ET_GESTURE_SCROLL_END, GetMostRecentGestureEventType());
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+  EXPECT_EQ(gfx::RectF(kFakeCoordX - kMockTouchRadius,
+                       kFakeCoordY - kMockTouchRadius,
+                       kMockTouchRadius * 2,
+                       kMockTouchRadius * 2),
+            GetMostRecentGestureEvent().details.bounding_box());
+}
+
+// Verify that multi-finger swipe sends the proper event sequence.
+TEST_F(GestureProviderTest, MultiFingerSwipe) {
+  EnableMultiFingerSwipe();
+  gesture_provider_->SetMultiTouchZoomSupportEnabled(false);
+  const float min_swipe_velocity = GetMinSwipeVelocity();
+
+  // Swipe right.
+  TwoFingerSwipe(min_swipe_velocity * 2, 0, min_swipe_velocity * 2, 0);
+  EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_MULTIFINGER_SWIPE));
+  EXPECT_TRUE(GetMostRecentGestureEvent().details.swipe_right());
+  EXPECT_EQ(2, GetMostRecentGestureEvent().details.touch_points());
+  ResetGestureDetection();
+
+  // Swipe left.
+  TwoFingerSwipe(-min_swipe_velocity * 2, 0, -min_swipe_velocity * 2, 0);
+  EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_MULTIFINGER_SWIPE));
+  EXPECT_TRUE(GetMostRecentGestureEvent().details.swipe_left());
+  EXPECT_EQ(2, GetMostRecentGestureEvent().details.touch_points());
+  ResetGestureDetection();
+
+  // No swipe with different touch directions.
+  TwoFingerSwipe(min_swipe_velocity * 2, 0, -min_swipe_velocity * 2, 0);
+  EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_MULTIFINGER_SWIPE));
+  ResetGestureDetection();
+
+  // No swipe without a dominant direction.
+  TwoFingerSwipe(min_swipe_velocity * 2,
+                 min_swipe_velocity * 2,
+                 min_swipe_velocity * 2,
+                 min_swipe_velocity * 2);
+  EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_MULTIFINGER_SWIPE));
+  ResetGestureDetection();
+
+  // Swipe up with non-zero velocities on both axes and dominant direction.
+  TwoFingerSwipe(-min_swipe_velocity,
+                 min_swipe_velocity * 4,
+                 -min_swipe_velocity,
+                 min_swipe_velocity * 4);
+  EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_MULTIFINGER_SWIPE));
+  EXPECT_TRUE(GetMostRecentGestureEvent().details.swipe_down());
+  EXPECT_FALSE(GetMostRecentGestureEvent().details.swipe_left());
+  EXPECT_EQ(2, GetMostRecentGestureEvent().details.touch_points());
+  ResetGestureDetection();
+
+  // Swipe down with non-zero velocities on both axes.
+  TwoFingerSwipe(min_swipe_velocity,
+                 -min_swipe_velocity * 4,
+                 min_swipe_velocity,
+                 -min_swipe_velocity * 4);
+  EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_MULTIFINGER_SWIPE));
+  EXPECT_TRUE(GetMostRecentGestureEvent().details.swipe_up());
+  EXPECT_FALSE(GetMostRecentGestureEvent().details.swipe_right());
+  EXPECT_EQ(2, GetMostRecentGestureEvent().details.touch_points());
+  ResetGestureDetection();
+
+  // No swipe without sufficient velocity.
+  TwoFingerSwipe(min_swipe_velocity / 2, 0, 0, 0);
+  EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_MULTIFINGER_SWIPE));
+  ResetGestureDetection();
+
+  // Swipe up with one small and one medium velocity in slightly different but
+  // not opposing directions.
+  TwoFingerSwipe(min_swipe_velocity / 2,
+                 min_swipe_velocity / 2,
+                 0,
+                 min_swipe_velocity * 2);
+  EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_MULTIFINGER_SWIPE));
+  EXPECT_TRUE(GetMostRecentGestureEvent().details.swipe_down());
+  EXPECT_FALSE(GetMostRecentGestureEvent().details.swipe_right());
+  EXPECT_EQ(2, GetMostRecentGestureEvent().details.touch_points());
+  ResetGestureDetection();
+
+  // No swipe in orthogonal directions.
+  TwoFingerSwipe(min_swipe_velocity * 2, 0, 0, min_swipe_velocity * 7);
+  EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_MULTIFINGER_SWIPE));
+  ResetGestureDetection();
+
+  // Three finger swipe in same directions.
+  ThreeFingerSwipe(min_swipe_velocity * 2,
+                   0,
+                   min_swipe_velocity * 3,
+                   0,
+                   min_swipe_velocity * 4,
+                   0);
+  EXPECT_TRUE(HasReceivedGesture(ET_GESTURE_MULTIFINGER_SWIPE));
+  EXPECT_TRUE(GetMostRecentGestureEvent().details.swipe_right());
+  EXPECT_EQ(3, GetMostRecentGestureEvent().details.touch_points());
+  ResetGestureDetection();
+
+  // No three finger swipe in different directions.
+  ThreeFingerSwipe(min_swipe_velocity * 2,
+                   0,
+                   0,
+                   min_swipe_velocity * 3,
+                   min_swipe_velocity * 4,
+                   0);
+  EXPECT_FALSE(HasReceivedGesture(ET_GESTURE_MULTIFINGER_SWIPE));
 }
 
 // Verify that the timer of LONG_PRESS will be cancelled when scrolling begins
@@ -1257,7 +1655,7 @@ TEST_F(GestureProviderTest, DoubleTapDragZoomCancelledOnSecondaryPointerDown) {
 
 // Verify that gesture begin and gesture end events are dispatched correctly.
 TEST_F(GestureProviderTest, GestureBeginAndEnd) {
-  SetBeginEndTypesEnabled(true);
+  EnableBeginEndTypes();
   base::TimeTicks event_time = base::TimeTicks::Now();
 
   EXPECT_EQ(0U, GetReceivedGestureCount());
@@ -1269,6 +1667,11 @@ TEST_F(GestureProviderTest, GestureBeginAndEnd) {
   EXPECT_EQ(ET_GESTURE_TAP_DOWN, GetMostRecentGestureEventType());
   EXPECT_EQ(2U, GetReceivedGestureCount());
   EXPECT_EQ(1, GetMostRecentGestureEvent().details.touch_points());
+  EXPECT_EQ(gfx::RectF(kFakeCoordX - kMockTouchRadius,
+                       kFakeCoordY - kMockTouchRadius,
+                       kMockTouchRadius * 2,
+                       kMockTouchRadius * 2),
+            GetMostRecentGestureEvent().details.bounding_box());
 
   event = ObtainMotionEvent(event_time, MotionEvent::ACTION_POINTER_DOWN);
   event.pointer_count = 2;

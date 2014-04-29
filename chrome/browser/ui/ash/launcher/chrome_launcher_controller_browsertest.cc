@@ -11,6 +11,7 @@
 #include "ash/display/display_controller.h"
 #include "ash/shelf/shelf.h"
 #include "ash/shelf/shelf_button.h"
+#include "ash/shelf/shelf_constants.h"
 #include "ash/shelf/shelf_model.h"
 #include "ash/shelf/shelf_util.h"
 #include "ash/shelf/shelf_view.h"
@@ -42,6 +43,7 @@
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/extensions/application_launch.h"
 #include "chrome/browser/ui/host_desktop.h"
+#include "chrome/browser/ui/settings_window_manager.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/test/base/ui_test_utils.h"
@@ -820,7 +822,7 @@ IN_PROC_BROWSER_TEST_F(LauncherPlatformAppBrowserTest, SetIcon) {
   EXPECT_TRUE(app_item_controller->image_set_by_controller());
   EXPECT_TRUE(panel_item_controller->image_set_by_controller());
   // Ensure icon heights are correct (see test.js in app_icon/ test directory)
-  EXPECT_EQ(48, app_item.image.height());
+  EXPECT_EQ(ash::kShelfSize, app_item.image.height());
   EXPECT_EQ(64, panel_item.image.height());
 }
 
@@ -1375,6 +1377,43 @@ IN_PROC_BROWSER_TEST_F(LauncherPlatformAppBrowserTest, LaunchPanelWindow) {
   // Opening a panel does not activate it.
   EXPECT_EQ(ash::STATUS_RUNNING, item.status);
   CloseAppWindow(window);
+  --item_count;
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+}
+
+// Test that we get correct shelf presence with hidden app windows.
+IN_PROC_BROWSER_TEST_F(LauncherPlatformAppBrowserTest, HiddenAppWindows) {
+  int item_count = shelf_model()->item_count();
+  const Extension* extension = LoadAndLaunchPlatformApp("launch");
+  AppWindow::CreateParams params;
+
+  // Create a hidden window.
+  params.hidden = true;
+  AppWindow* window_1 = CreateAppWindowFromParams(extension, params);
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+
+  // Create a visible window.
+  params.hidden = false;
+  AppWindow* window_2 = CreateAppWindowFromParams(extension, params);
+  ++item_count;
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+
+  // Minimize the visible window.
+  window_2->Minimize();
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+
+  // Hide the visible window.
+  window_2->Hide();
+  --item_count;
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+
+  // Show the originally hidden window.
+  window_1->Show(AppWindow::SHOW_ACTIVE);
+  ++item_count;
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+
+  // Close the originally hidden window.
+  CloseAppWindow(window_1);
   --item_count;
   EXPECT_EQ(item_count, shelf_model()->item_count());
 }
@@ -2029,4 +2068,24 @@ IN_PROC_BROWSER_TEST_F(ShelfAppBrowserTest, V1AppNavigation) {
   // Make sure that the app is really gone.
   base::MessageLoop::current()->RunUntilIdle();
   EXPECT_EQ(ash::STATUS_CLOSED, model_->ItemByID(id)->status);
+}
+
+// Checks that a opening a settings window creates a new launcher item.
+IN_PROC_BROWSER_TEST_F(ShelfAppBrowserTest, SettingsWindow) {
+  chrome::SettingsWindowManager* settings_manager =
+      chrome::SettingsWindowManager::GetInstance();
+  ash::ShelfModel* shelf_model = ash::Shell::GetInstance()->shelf_model();
+
+  // Get the number of items in the shelf and browser menu.
+  int item_count = shelf_model->item_count();
+  size_t browser_count = NumberOfDetectedLauncherBrowsers(false);
+
+  // Open a settings window. Number of browser items should remain unchanged,
+  // number of shelf items should increase.
+  settings_manager->ShowForProfile(browser()->profile(), std::string());
+  Browser* settings_browser =
+      settings_manager->FindBrowserForProfile(browser()->profile());
+  ASSERT_TRUE(settings_browser);
+  EXPECT_EQ(browser_count, NumberOfDetectedLauncherBrowsers(false));
+  EXPECT_EQ(item_count + 1, shelf_model->item_count());
 }

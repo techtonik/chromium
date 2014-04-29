@@ -447,6 +447,7 @@ bool SourceBufferStream::Append(const BufferQueue& buffers) {
 
   DCHECK(!buffers.empty());
   DCHECK(media_segment_start_time_ != kNoTimestamp());
+  DCHECK(media_segment_start_time_ <= buffers.front()->GetDecodeTimestamp());
   DCHECK(!end_of_stream_);
 
   // New media segments must begin with a keyframe.
@@ -490,7 +491,8 @@ bool SourceBufferStream::Append(const BufferQueue& buffers) {
     last_appended_buffer_timestamp_ = buffers.back()->GetDecodeTimestamp();
     last_appended_buffer_is_keyframe_ = buffers.back()->IsKeyframe();
   } else {
-    base::TimeDelta new_range_start_time = media_segment_start_time_;
+    base::TimeDelta new_range_start_time = std::min(
+        media_segment_start_time_, buffers.front()->GetDecodeTimestamp());
     const BufferQueue* buffers_for_new_range = &buffers;
     BufferQueue trimmed_buffers;
 
@@ -988,7 +990,14 @@ void SourceBufferStream::PrepareRangesForNextAppend(
   // timestamp situation. This prevents the first buffer in the current append
   // from deleting the last buffer in the previous append if both buffers
   // have the same timestamp.
-  bool is_exclusive = (prev_timestamp == next_timestamp) &&
+  //
+  // The delete range should never be exclusive if a splice frame was generated
+  // because we don't generate splice frames for same timestamp situations.
+  DCHECK(new_buffers.front()->splice_timestamp() !=
+         new_buffers.front()->timestamp());
+  const bool is_exclusive =
+      new_buffers.front()->get_splice_buffers().empty() &&
+      prev_timestamp == next_timestamp &&
       AllowSameTimestamp(prev_is_keyframe, next_is_keyframe, GetType());
 
   // Delete the buffers that |new_buffers| overlaps.
@@ -1152,6 +1161,10 @@ SourceBufferStream::Status SourceBufferStream::GetNextBuffer(
       return SourceBufferStream::kConfigChange;
     }
 
+    // Every pre splice buffer must have the same splice_timestamp().
+    DCHECK(splice_buffer_->splice_timestamp() ==
+           splice_buffers[splice_buffers_index_]->splice_timestamp());
+
     *out_buffer = splice_buffers[splice_buffers_index_++];
     return SourceBufferStream::kSuccess;
   }
@@ -1169,6 +1182,7 @@ SourceBufferStream::Status SourceBufferStream::GetNextBuffer(
   // always issued prior to handing out this buffer, any changes in config id
   // have been inherently handled.
   DCHECK_GE(splice_buffers_index_, splice_buffers.size());
+  DCHECK(splice_buffers.back()->splice_timestamp() == kNoTimestamp());
   *out_buffer = splice_buffers.back();
   splice_buffer_ = NULL;
   splice_buffers_index_ = 0;
@@ -1672,8 +1686,12 @@ SourceBufferRange::SourceBufferRange(
 
 void SourceBufferRange::AppendBuffersToEnd(const BufferQueue& new_buffers) {
   DCHECK(buffers_.empty() || CanAppendBuffersToEnd(new_buffers));
+  DCHECK(media_segment_start_time_ == kNoTimestamp() ||
+         media_segment_start_time_ <=
+             new_buffers.front()->GetDecodeTimestamp());
   for (BufferQueue::const_iterator itr = new_buffers.begin();
-       itr != new_buffers.end(); ++itr) {
+       itr != new_buffers.end();
+       ++itr) {
     DCHECK((*itr)->GetDecodeTimestamp() != kNoTimestamp());
     buffers_.push_back(*itr);
     size_in_bytes_ += (*itr)->data_size();

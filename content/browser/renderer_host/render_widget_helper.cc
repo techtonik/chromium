@@ -97,7 +97,7 @@ RenderWidgetHelper::~RenderWidgetHelper() {
   // object, so we should not be destroyed unless pending_paints_ is empty!
   DCHECK(pending_paints_.empty());
 
-#if defined(OS_POSIX) && !defined(TOOLKIT_GTK) && !defined(OS_ANDROID)
+#if defined(OS_POSIX) && !defined(OS_ANDROID)
   ClearAllocatedDIBs();
 #endif
 }
@@ -342,19 +342,7 @@ void RenderWidgetHelper::OnCreateFullscreenWidgetOnUI(int opener_id,
     host->CreateNewFullscreenWidget(route_id);
 }
 
-#if defined(OS_POSIX) && !defined(TOOLKIT_GTK) && !defined(OS_ANDROID)
-TransportDIB* RenderWidgetHelper::MapTransportDIB(TransportDIB::Id dib_id) {
-  base::AutoLock locked(allocated_dibs_lock_);
-
-  const std::map<TransportDIB::Id, int>::iterator
-      i = allocated_dibs_.find(dib_id);
-  if (i == allocated_dibs_.end())
-    return NULL;
-
-  base::FileDescriptor fd(dup(i->second), true);
-  return TransportDIB::Map(fd);
-}
-
+#if defined(OS_POSIX) && !defined(OS_ANDROID)
 void RenderWidgetHelper::AllocTransportDIB(uint32 size,
                                            bool cache_in_browser,
                                            TransportDIB::Handle* result) {

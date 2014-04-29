@@ -45,6 +45,25 @@ def typed_ptr(ptr):
     return '((%s)%s)' % (ptr.dynamic_type, ptr)
 
 
+def yield_fields(val):
+    """Use this in a printer's children() method to print an object's fields.
+
+    e.g.
+      def children():
+        for result in yield_fields(self.val):
+          yield result
+    """
+    try:
+        fields = val.type.target().fields()
+    except:
+        fields = val.type.fields()
+    for field in fields:
+        if field.is_base_class:
+            yield (field.name, val.cast(gdb.lookup_type(field.name)))
+        else:
+            yield (field.name, val[field.name])
+
+
 class Printer(object):
     def __init__(self, val):
         self.val = val
@@ -144,6 +163,11 @@ pp_set.add_printer('tracked_objects::Location', '^tracked_objects::Location$',
 class PendingTaskPrinter(Printer):
     def to_string(self):
         return 'From %s' % (self.val['posted_from'],)
+
+    def children(self):
+        for result in yield_fields(self.val):
+            if result[0] not in ('task', 'posted_from'):
+                yield result
 pp_set.add_printer('base::PendingTask', '^base::PendingTask$',
                    PendingTaskPrinter)
 

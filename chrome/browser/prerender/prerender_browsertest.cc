@@ -28,6 +28,8 @@
 #include "chrome/browser/extensions/extension_apitest.h"
 #include "chrome/browser/external_protocol/external_protocol_handler.h"
 #include "chrome/browser/favicon/favicon_tab_helper.h"
+#include "chrome/browser/predictors/autocomplete_action_predictor.h"
+#include "chrome/browser/predictors/autocomplete_action_predictor_factory.h"
 #include "chrome/browser/prerender/prerender_contents.h"
 #include "chrome/browser/prerender/prerender_handle.h"
 #include "chrome/browser/prerender/prerender_link_manager.h"
@@ -47,6 +49,10 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/omnibox/location_bar.h"
+#include "chrome/browser/ui/omnibox/omnibox_edit_model.h"
+#include "chrome/browser/ui/omnibox/omnibox_popup_model.h"
+#include "chrome/browser/ui/omnibox/omnibox_view.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "chrome/common/chrome_paths.h"
@@ -148,6 +154,7 @@ bool ShouldAbortPrerenderBeforeSwap(FinalStatus status) {
     case FINAL_STATUS_USED:
     case FINAL_STATUS_WINDOW_OPENER:
     case FINAL_STATUS_APP_TERMINATING:
+    case FINAL_STATUS_PROFILE_DESTROYED:
     case FINAL_STATUS_CACHE_OR_HISTORY_CLEARED:
     // We'll crash the renderer after it's loaded.
     case FINAL_STATUS_RENDERER_CRASHED:
@@ -273,6 +280,10 @@ class NavigationOrSwapObserver : public WebContentsObserver,
     tab_strip_model_->RemoveObserver(this);
   }
 
+  void set_did_start_loading() {
+    did_start_loading_ = true;
+  }
+
   void Wait() {
     loop_.Run();
   }
@@ -343,6 +354,7 @@ class NewTabNavigationOrSwapObserver {
         static_cast<Browser*>(new_tab->GetDelegate())->tab_strip_model();
     swap_observer_.reset(new NavigationOrSwapObserver(tab_strip_model,
                                                       new_tab));
+    swap_observer_->set_did_start_loading();
     return true;
   }
 
@@ -2559,12 +2571,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderHTML5VideoNetwork) {
 }
 
 // Checks that scripts can retrieve the correct window size while prerendering.
-#if defined(TOOLKIT_VIEWS)
-// TODO(beng): Widget hierarchy split causes this to fail http://crbug.com/82363
-IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, DISABLED_PrerenderWindowSize) {
-#else
 IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderWindowSize) {
-#endif
   PrerenderTestURL("files/prerender/prerender_size.html",
                    FINAL_STATUS_USED,
                    1);
@@ -2837,6 +2844,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderSSLErrorIframe) {
 
 // Checks that we cancel correctly when window.print() is called.
 IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderPrint) {
+  DisableLoadEventCheck();
   PrerenderTestURL("files/prerender/prerender_print.html",
                    FINAL_STATUS_WINDOW_PRINT,
                    0);
@@ -3223,30 +3231,30 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderClickNavigateGoBack) {
   GoBackToPrerender();
 }
 
-// http://crbug.com/345474
-IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest,
-                       DISABLED_PrerenderClickNewWindow) {
+IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderClickNewWindow) {
+  // Prerender currently doesn't interpose on this navigation.
+  // http://crbug.com/345474.
   PrerenderTestURL("files/prerender/prerender_page_with_link.html",
-                   FINAL_STATUS_WINDOW_OPENER,
+                   FINAL_STATUS_APP_TERMINATING,
                    1);
   OpenDestURLViaClickNewWindow();
 }
 
-// http://crbug.com/345474
-IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest,
-                       DISABLED_PrerenderClickNewForegroundTab) {
+IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderClickNewForegroundTab) {
+  // Prerender currently doesn't interpose on this navigation.
+  // http://crbug.com/345474.
   PrerenderTestURL("files/prerender/prerender_page_with_link.html",
-                   FINAL_STATUS_WINDOW_OPENER,
+                   FINAL_STATUS_APP_TERMINATING,
                    1);
   OpenDestURLViaClickNewForegroundTab();
 }
 
-// http://crbug.com/345474
-IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest,
-                       DISABLED_PrerenderClickNewBackgroundTab) {
+IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderClickNewBackgroundTab) {
+  // Prerender currently doesn't interpose on this navigation.
+  // http://crbug.com/345474.
   scoped_ptr<TestPrerender> prerender =
       PrerenderTestURL("files/prerender/prerender_page_with_link.html",
-                       FINAL_STATUS_WINDOW_OPENER,
+                       FINAL_STATUS_APP_TERMINATING,
                        1);
   ASSERT_TRUE(prerender->contents());
   prerender->contents()->set_should_be_shown(false);
@@ -3499,9 +3507,6 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTestWithExtensions, WebNavigation) {
   ASSERT_TRUE(StartSpawnedTestServer());
   extensions::FrameNavigationState::set_allow_extension_scheme(true);
 
-  CommandLine::ForCurrentProcess()->AppendSwitch(
-      extensions::switches::kAllowLegacyExtensionManifests);
-
   // Wait for the extension to set itself up and return control to us.
   ASSERT_TRUE(RunExtensionTest("webnavigation/prerender")) << message_;
 
@@ -3519,19 +3524,12 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTestWithExtensions, WebNavigation) {
   ASSERT_TRUE(catcher.GetNextResult()) << catcher.message();
 }
 
-// Fails often on Windows dbg bots. http://crbug.com/177163
-#if defined(OS_WIN) && !defined(NDEBUG)
-#define MAYBE_TabsApi DISABLED_TabsApi
-#else
-#define MAYBE_TabsApi TabsApi
-#endif  // defined(OS_WIN) && !defined(NDEBUG)
-IN_PROC_BROWSER_TEST_F(PrerenderBrowserTestWithExtensions, MAYBE_TabsApi) {
+IN_PROC_BROWSER_TEST_F(PrerenderBrowserTestWithExtensions, TabsApi) {
   ASSERT_TRUE(StartSpawnedTestServer());
   extensions::FrameNavigationState::set_allow_extension_scheme(true);
 
   // Wait for the extension to set itself up and return control to us.
-  ASSERT_TRUE(RunExtensionSubtest("tabs/on_replaced", "on_replaced.html"))
-      << message_;
+  ASSERT_TRUE(RunExtensionTest("tabs/on_replaced")) << message_;
 
   ResultCatcher catcher;
 
@@ -3674,10 +3672,10 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderHTML5MediaSourceVideo) {
 
 // Checks that a prerender that creates an audio stream (via a WebAudioDevice)
 // is cancelled.
-// http://crbug.com/261489
-IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, DISABLED_PrerenderWebAudioDevice) {
+IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderWebAudioDevice) {
+  DisableLoadEventCheck();
   PrerenderTestURL("files/prerender/prerender_web_audio_device.html",
-                   FINAL_STATUS_CREATING_AUDIO_STREAM, 1);
+                   FINAL_STATUS_CREATING_AUDIO_STREAM, 0);
 }
 
 // Checks that prerenders do not swap in to WebContents being captured.
@@ -4172,6 +4170,98 @@ class PrerenderIncognitoBrowserTest : public PrerenderBrowserTest {
 IN_PROC_BROWSER_TEST_F(PrerenderIncognitoBrowserTest, PrerenderIncognito) {
   PrerenderTestURL("files/prerender/prerender_page.html", FINAL_STATUS_USED, 1);
   NavigateToDestURL();
+}
+
+// Checks that prerenders are aborted when an incognito profile is closed.
+IN_PROC_BROWSER_TEST_F(PrerenderIncognitoBrowserTest,
+                       PrerenderIncognitoClosed) {
+  scoped_ptr<TestPrerender> prerender =
+      PrerenderTestURL("files/prerender/prerender_page.html",
+                       FINAL_STATUS_PROFILE_DESTROYED, 1);
+  current_browser()->window()->Close();
+  prerender->WaitForStop();
+}
+
+class PrerenderOmniboxBrowserTest : public PrerenderBrowserTest {
+ public:
+  LocationBar* GetLocationBar() {
+    return current_browser()->window()->GetLocationBar();
+  }
+
+  OmniboxView* GetOmniboxView() {
+    return GetLocationBar()->GetOmniboxView();
+  }
+
+  void WaitForAutocompleteDone(OmniboxView* omnibox_view) {
+    AutocompleteController* controller =
+        omnibox_view->model()->popup_model()->autocomplete_controller();
+    while (!controller->done()) {
+      content::WindowedNotificationObserver ready_observer(
+          chrome::NOTIFICATION_AUTOCOMPLETE_CONTROLLER_RESULT_READY,
+          content::Source<AutocompleteController>(controller));
+      ready_observer.Wait();
+    }
+  }
+
+  predictors::AutocompleteActionPredictor* GetAutocompleteActionPredictor() {
+    Profile* profile = current_browser()->profile();
+    return predictors::AutocompleteActionPredictorFactory::GetForProfile(
+        profile);
+  }
+
+  scoped_ptr<TestPrerender> StartOmniboxPrerender(
+      const GURL& url,
+      FinalStatus expected_final_status) {
+    scoped_ptr<TestPrerender> prerender =
+        ExpectPrerender(expected_final_status);
+    WebContents* web_contents = GetActiveWebContents();
+    GetAutocompleteActionPredictor()->StartPrerendering(
+        url,
+        web_contents->GetController().GetSessionStorageNamespaceMap(),
+        gfx::Size(50, 50));
+    prerender->WaitForStart();
+    return prerender.Pass();
+  }
+};
+
+// Checks that closing the omnibox popup cancels an omnibox prerender.
+IN_PROC_BROWSER_TEST_F(PrerenderOmniboxBrowserTest, PrerenderOmniboxCancel) {
+  // Fake an omnibox prerender.
+  scoped_ptr<TestPrerender> prerender = StartOmniboxPrerender(
+      test_server()->GetURL("files/empty.html"),
+      FINAL_STATUS_CANCELLED);
+
+  // Revert the location bar. This should cancel the prerender.
+  GetLocationBar()->Revert();
+  prerender->WaitForStop();
+}
+
+// Checks that closing the omnibox popup cancels an omnibox prerender.
+IN_PROC_BROWSER_TEST_F(PrerenderOmniboxBrowserTest, PrerenderOmniboxAbandon) {
+  // Set the abandon timeout to something high so it does not introduce
+  // flakiness if the prerender times out before the test completes.
+  GetPrerenderManager()->mutable_config().abandon_time_to_live =
+      base::TimeDelta::FromDays(999);
+
+  // Enter a URL into the Omnibox.
+  OmniboxView* omnibox_view = GetOmniboxView();
+  omnibox_view->OnBeforePossibleChange();
+  omnibox_view->SetUserText(
+      base::UTF8ToUTF16(test_server()->GetURL("files/empty.html?1").spec()));
+  omnibox_view->OnAfterPossibleChange();
+  WaitForAutocompleteDone(omnibox_view);
+
+  // Fake an omnibox prerender for a different URL.
+  scoped_ptr<TestPrerender> prerender = StartOmniboxPrerender(
+      test_server()->GetURL("files/empty.html?2"),
+      FINAL_STATUS_APP_TERMINATING);
+
+  // Navigate to the URL entered.
+  omnibox_view->model()->AcceptInput(CURRENT_TAB, false);
+
+  // Prerender should be running, but abandoned.
+  EXPECT_TRUE(
+      GetAutocompleteActionPredictor()->IsPrerenderAbandonedForTesting());
 }
 
 }  // namespace prerender

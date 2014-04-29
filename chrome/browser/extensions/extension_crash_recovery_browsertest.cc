@@ -24,8 +24,6 @@
 #include "extensions/browser/process_manager.h"
 #include "extensions/browser/process_map.h"
 #include "ui/message_center/message_center.h"
-#include "ui/message_center/message_center_switches.h"
-#include "ui/message_center/message_center_util.h"
 #include "ui/message_center/notification_list.h"
 
 using content::NavigationController;
@@ -510,7 +508,7 @@ IN_PROC_BROWSER_TEST_F(MAYBE_ExtensionCrashRecoveryTest,
 
 // Fails a DCHECK on Aura and Linux: http://crbug.com/169622
 // Failing on Windows: http://crbug.com/232340
-#if defined(USE_AURA) || defined(OS_WIN) || defined(OS_LINUX)
+#if defined(USE_AURA)
 #define MAYBE_ReloadTabsWithBackgroundPage DISABLED_ReloadTabsWithBackgroundPage
 #else
 #define MAYBE_ReloadTabsWithBackgroundPage ReloadTabsWithBackgroundPage

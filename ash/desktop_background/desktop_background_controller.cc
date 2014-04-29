@@ -43,15 +43,19 @@ const int kWallpaperReloadDelayMs = 2000;
 
 }  // namespace
 
+const int DesktopBackgroundController::kInvalidResourceID = -1;
+
 DesktopBackgroundController::DesktopBackgroundController()
     : locked_(false),
       desktop_background_mode_(BACKGROUND_NONE),
       wallpaper_reload_delay_(kWallpaperReloadDelayMs) {
   Shell::GetInstance()->display_controller()->AddObserver(this);
+  Shell::GetInstance()->AddShellObserver(this);
 }
 
 DesktopBackgroundController::~DesktopBackgroundController() {
   Shell::GetInstance()->display_controller()->RemoveObserver(this);
+  Shell::GetInstance()->RemoveShellObserver(this);
 }
 
 gfx::ImageSkia DesktopBackgroundController::GetWallpaper() const {
@@ -76,29 +80,13 @@ WallpaperLayout DesktopBackgroundController::GetWallpaperLayout() const {
   return WALLPAPER_LAYOUT_CENTER_CROPPED;
 }
 
-void DesktopBackgroundController::OnRootWindowAdded(aura::Window* root_window) {
-  // The background hasn't been set yet.
-  if (desktop_background_mode_ == BACKGROUND_NONE)
-    return;
-
-  // Handle resolution change for "built-in" images.
-  gfx::Size max_display_size = GetMaxDisplaySizeInNative();
-  if (current_max_display_size_ != max_display_size) {
-    current_max_display_size_ = max_display_size;
-    if (desktop_background_mode_ == BACKGROUND_IMAGE &&
-        current_wallpaper_.get())
-      UpdateWallpaper();
-  }
-
-  InstallDesktopController(root_window);
-}
-
 bool DesktopBackgroundController::SetWallpaperImage(const gfx::ImageSkia& image,
                                                     WallpaperLayout layout) {
   VLOG(1) << "SetWallpaper: image_id=" << WallpaperResizer::GetImageId(image)
           << " layout=" << layout;
 
-  if (WallpaperIsAlreadyLoaded(&image, kInvalidResourceID, layout)) {
+  if (WallpaperIsAlreadyLoaded(
+          &image, kInvalidResourceID, true /* compare_layouts */, layout)) {
     VLOG(1) << "Wallpaper is already loaded";
     return false;
   }
@@ -119,7 +107,8 @@ bool DesktopBackgroundController::SetWallpaperResource(int resource_id,
   VLOG(1) << "SetWallpaper: resource_id=" << resource_id
           << " layout=" << layout;
 
-  if (WallpaperIsAlreadyLoaded(NULL, resource_id, layout)) {
+  if (WallpaperIsAlreadyLoaded(
+          NULL, resource_id, true /* compare_layouts */, layout)) {
     VLOG(1) << "Wallpaper is already loaded";
     return false;
   }
@@ -169,6 +158,23 @@ void DesktopBackgroundController::OnDisplayConfigurationChanged() {
   }
 }
 
+void DesktopBackgroundController::OnRootWindowAdded(aura::Window* root_window) {
+  // The background hasn't been set yet.
+  if (desktop_background_mode_ == BACKGROUND_NONE)
+    return;
+
+  // Handle resolution change for "built-in" images.
+  gfx::Size max_display_size = GetMaxDisplaySizeInNative();
+  if (current_max_display_size_ != max_display_size) {
+    current_max_display_size_ = max_display_size;
+    if (desktop_background_mode_ == BACKGROUND_IMAGE &&
+        current_wallpaper_.get())
+      UpdateWallpaper();
+  }
+
+  InstallDesktopController(root_window);
+}
+
 // static
 gfx::Size DesktopBackgroundController::GetMaxDisplaySizeInNative() {
   int width = 0;
@@ -194,11 +200,13 @@ gfx::Size DesktopBackgroundController::GetMaxDisplaySizeInNative() {
 bool DesktopBackgroundController::WallpaperIsAlreadyLoaded(
     const gfx::ImageSkia* image,
     int resource_id,
+    bool compare_layouts,
     WallpaperLayout layout) const {
   if (!current_wallpaper_.get())
     return false;
 
-  if (layout != current_wallpaper_->layout())
+  // Compare layouts only if necessary.
+  if (compare_layouts && layout != current_wallpaper_->layout())
     return false;
 
   if (image) {

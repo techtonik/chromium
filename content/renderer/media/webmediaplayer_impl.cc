@@ -66,6 +66,7 @@
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebURL.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
 #include "third_party/WebKit/public/web/WebView.h"
@@ -154,6 +155,7 @@ WebMediaPlayerImpl::WebMediaPlayerImpl(
           RenderThreadImpl::current()->GetMediaThreadMessageLoopProxy()),
       media_log_(new RenderMediaLog()),
       pipeline_(media_loop_, media_log_.get()),
+      opaque_(false),
       paused_(true),
       seeking_(false),
       playback_rate_(0.0f),
@@ -169,11 +171,14 @@ WebMediaPlayerImpl::WebMediaPlayerImpl(
       supports_save_(true),
       starting_(false),
       chunk_demuxer_(NULL),
-      compositor_(  // Threaded compositing isn't enabled universally yet.
-          (RenderThreadImpl::current()->compositor_message_loop_proxy()
-               ? RenderThreadImpl::current()->compositor_message_loop_proxy()
-               : base::MessageLoopProxy::current()),
-          BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnNaturalSizeChange)),
+      // Threaded compositing isn't enabled universally yet.
+      compositor_task_runner_(
+          RenderThreadImpl::current()->compositor_message_loop_proxy()
+              ? RenderThreadImpl::current()->compositor_message_loop_proxy()
+              : base::MessageLoopProxy::current()),
+      compositor_(new VideoFrameCompositor(
+          BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnNaturalSizeChanged),
+          BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnOpacityChanged))),
       text_track_index_(0),
       web_cdm_(NULL) {
   media_log_->AddEvent(
@@ -228,6 +233,8 @@ WebMediaPlayerImpl::~WebMediaPlayerImpl() {
   pipeline_.Stop(
       base::Bind(&base::WaitableEvent::Signal, base::Unretained(&waiter)));
   waiter.Wait();
+
+  compositor_task_runner_->DeleteSoon(FROM_HERE, compositor_);
 
   // Let V8 know we are not using extra resources anymore.
   if (incremented_externally_allocated_memory_) {
@@ -480,6 +487,15 @@ double WebMediaPlayerImpl::duration() const {
   return GetPipelineDuration();
 }
 
+double WebMediaPlayerImpl::timelineOffset() const {
+  DCHECK(main_loop_->BelongsToCurrentThread());
+
+  if (pipeline_metadata_.timeline_offset.is_null())
+    return std::numeric_limits<double>::quiet_NaN();
+
+  return pipeline_metadata_.timeline_offset.ToJsTime();
+}
+
 double WebMediaPlayerImpl::currentTime() const {
   DCHECK(main_loop_->BelongsToCurrentThread());
   return (paused_ ? paused_time_ : pipeline_.GetMediaTime()).InSecondsF();
@@ -548,7 +564,7 @@ void WebMediaPlayerImpl::paint(WebCanvas* canvas,
   //   - We haven't reached HAVE_CURRENT_DATA and need to paint black
   //   - We're painting to a canvas
   // See http://crbug.com/341225 http://crbug.com/342621 for details.
-  scoped_refptr<media::VideoFrame> video_frame = compositor_.GetCurrentFrame();
+  scoped_refptr<media::VideoFrame> video_frame = compositor_->GetCurrentFrame();
 
   TRACE_EVENT0("media", "WebMediaPlayerImpl:paint");
   gfx::Rect gfx_rect(rect);
@@ -582,14 +598,7 @@ unsigned WebMediaPlayerImpl::droppedFrameCount() const {
   DCHECK(main_loop_->BelongsToCurrentThread());
 
   media::PipelineStatistics stats = pipeline_.GetStatistics();
-
-  unsigned frames_dropped = stats.video_frames_dropped;
-
-  frames_dropped += const_cast<VideoFrameCompositor&>(compositor_)
-                        .GetFramesDroppedBeforeCompositorWasNotified();
-
-  DCHECK_LE(frames_dropped, stats.video_frames_decoded);
-  return frames_dropped;
+  return stats.video_frames_dropped;
 }
 
 unsigned WebMediaPlayerImpl::audioDecodedByteCount() const {
@@ -614,7 +623,7 @@ bool WebMediaPlayerImpl::copyVideoTextureToPlatformTexture(
     unsigned int type,
     bool premultiply_alpha,
     bool flip_y) {
-  scoped_refptr<media::VideoFrame> video_frame = compositor_.GetCurrentFrame();
+  scoped_refptr<media::VideoFrame> video_frame = compositor_->GetCurrentFrame();
 
   TRACE_EVENT0("media", "WebMediaPlayerImpl:copyVideoTextureToPlatformTexture");
 
@@ -979,8 +988,9 @@ void WebMediaPlayerImpl::OnPipelineMetadata(
 
   if (hasVideo()) {
     DCHECK(!video_weblayer_);
-    video_weblayer_.reset(new webkit::WebLayerImpl(
-        cc::VideoLayer::Create(compositor_.GetVideoFrameProvider())));
+    video_weblayer_.reset(
+        new webkit::WebLayerImpl(cc::VideoLayer::Create(compositor_)));
+    video_weblayer_->setOpaque(opaque_);
     client_->setWebLayer(video_weblayer_.get());
   }
 
@@ -1103,12 +1113,6 @@ void WebMediaPlayerImpl::OnKeyMessage(const std::string& session_id,
       default_url_gurl);
 }
 
-void WebMediaPlayerImpl::SetOpaque(bool opaque) {
-  DCHECK(main_loop_->BelongsToCurrentThread());
-
-  client_->setOpaque(opaque);
-}
-
 void WebMediaPlayerImpl::DataSourceInitialized(const GURL& gurl, bool success) {
   DCHECK(main_loop_->BelongsToCurrentThread());
 
@@ -1204,7 +1208,6 @@ void WebMediaPlayerImpl::StartPipeline() {
           video_decoders.Pass(),
           set_decryptor_ready_cb,
           base::Bind(&WebMediaPlayerImpl::FrameReady, base::Unretained(this)),
-          BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::SetOpaque),
           true));
   filter_collection->SetVideoRenderer(video_renderer.Pass());
 
@@ -1226,7 +1229,7 @@ void WebMediaPlayerImpl::StartPipeline() {
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineSeek),
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineMetadata),
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelinePrerollCompleted),
-      BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnDurationChange));
+      BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnDurationChanged));
 }
 
 void WebMediaPlayerImpl::SetNetworkState(WebMediaPlayer::NetworkState state) {
@@ -1273,14 +1276,14 @@ double WebMediaPlayerImpl::GetPipelineDuration() const {
   return duration.InSecondsF();
 }
 
-void WebMediaPlayerImpl::OnDurationChange() {
+void WebMediaPlayerImpl::OnDurationChanged() {
   if (ready_state_ == WebMediaPlayer::ReadyStateHaveNothing)
     return;
 
   client_->durationChanged();
 }
 
-void WebMediaPlayerImpl::OnNaturalSizeChange(gfx::Size size) {
+void WebMediaPlayerImpl::OnNaturalSizeChanged(gfx::Size size) {
   DCHECK(main_loop_->BelongsToCurrentThread());
   DCHECK_NE(ready_state_, WebMediaPlayer::ReadyStateHaveNothing);
   TRACE_EVENT0("media", "WebMediaPlayerImpl::OnNaturalSizeChanged");
@@ -1292,9 +1295,22 @@ void WebMediaPlayerImpl::OnNaturalSizeChange(gfx::Size size) {
   client_->sizeChanged();
 }
 
+void WebMediaPlayerImpl::OnOpacityChanged(bool opaque) {
+  DCHECK(main_loop_->BelongsToCurrentThread());
+  DCHECK_NE(ready_state_, WebMediaPlayer::ReadyStateHaveNothing);
+
+  opaque_ = opaque;
+  if (video_weblayer_)
+    video_weblayer_->setOpaque(opaque_);
+}
+
 void WebMediaPlayerImpl::FrameReady(
     const scoped_refptr<media::VideoFrame>& frame) {
-  compositor_.UpdateCurrentFrame(frame);
+  compositor_task_runner_->PostTask(
+      FROM_HERE,
+      base::Bind(&VideoFrameCompositor::UpdateCurrentFrame,
+                 base::Unretained(compositor_),
+                 frame));
 }
 
 void WebMediaPlayerImpl::SetDecryptorReadyCB(

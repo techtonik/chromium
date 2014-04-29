@@ -15,15 +15,19 @@ class FakeLayerTreeHostImplClient : public LayerTreeHostImplClient {
   // LayerTreeHostImplClient implementation.
   virtual void UpdateRendererCapabilitiesOnImplThread() OVERRIDE {}
   virtual void DidLoseOutputSurfaceOnImplThread() OVERRIDE {}
+  virtual void CommitVSyncParameters(base::TimeTicks timebase,
+                                     base::TimeDelta interval) OVERRIDE {}
+  virtual void SetEstimatedParentDrawTime(base::TimeDelta draw_time) OVERRIDE {}
+  virtual void SetMaxSwapsPendingOnImplThread(int max) OVERRIDE {}
   virtual void DidSwapBuffersOnImplThread() OVERRIDE {}
-  virtual void OnSwapBuffersCompleteOnImplThread() OVERRIDE {}
-  virtual void BeginImplFrame(const BeginFrameArgs& args)
-      OVERRIDE {}
+  virtual void DidSwapBuffersCompleteOnImplThread() OVERRIDE {}
+  virtual void BeginFrame(const BeginFrameArgs& args) OVERRIDE {}
   virtual void OnCanDrawStateChanged(bool can_draw) OVERRIDE {}
   virtual void NotifyReadyToActivate() OVERRIDE {}
   virtual void SetNeedsRedrawOnImplThread() OVERRIDE {}
   virtual void SetNeedsRedrawRectOnImplThread(
     const gfx::Rect& damage_rect) OVERRIDE {}
+  virtual void SetNeedsAnimateOnImplThread() OVERRIDE {}
   virtual void DidInitializeVisibleTileOnImplThread() OVERRIDE {}
   virtual void SetNeedsCommitOnImplThread() OVERRIDE {}
   virtual void SetNeedsManageTilesOnImplThread() OVERRIDE {}

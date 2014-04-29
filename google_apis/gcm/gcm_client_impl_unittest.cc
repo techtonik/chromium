@@ -4,15 +4,17 @@
 
 #include "google_apis/gcm/gcm_client_impl.h"
 
+#include "base/command_line.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/message_loop/message_loop.h"
 #include "base/run_loop.h"
 #include "base/test/simple_test_clock.h"
-#include "components/os_crypt/os_crypt.h"
+#include "components/os_crypt/os_crypt_switches.h"
 #include "google_apis/gcm/base/mcs_message.h"
 #include "google_apis/gcm/base/mcs_util.h"
 #include "google_apis/gcm/engine/fake_connection_factory.h"
 #include "google_apis/gcm/engine/fake_connection_handler.h"
+#include "google_apis/gcm/monitoring/gcm_stats_recorder.h"
 #include "google_apis/gcm/protocol/android_checkin.pb.h"
 #include "google_apis/gcm/protocol/checkin.pb.h"
 #include "google_apis/gcm/protocol/mcs.pb.h"
@@ -66,7 +68,8 @@ class FakeMCSClient : public MCSClient {
  public:
   FakeMCSClient(base::Clock* clock,
                 ConnectionFactory* connection_factory,
-                GCMStore* gcm_store);
+                GCMStore* gcm_store,
+                GCMStatsRecorder* recorder);
   virtual ~FakeMCSClient();
   virtual void Login(uint64 android_id, uint64 security_token) OVERRIDE;
   virtual void SendMessage(const MCSMessage& message) OVERRIDE;
@@ -87,8 +90,9 @@ class FakeMCSClient : public MCSClient {
 
 FakeMCSClient::FakeMCSClient(base::Clock* clock,
                              ConnectionFactory* connection_factory,
-                             GCMStore* gcm_store)
-    : MCSClient("", clock, connection_factory, gcm_store),
+                             GCMStore* gcm_store,
+                             GCMStatsRecorder* recorder)
+    : MCSClient("", clock, connection_factory, gcm_store, recorder),
       last_android_id_(0u),
       last_security_token_(0u),
       last_message_tag_(kNumProtoTypes) {
@@ -121,7 +125,8 @@ class FakeGCMInternalsBuilder : public GCMInternalsBuilder {
       const std::string& version,
       base::Clock* clock,
       ConnectionFactory* connection_factory,
-      GCMStore* gcm_store) OVERRIDE;
+      GCMStore* gcm_store,
+      GCMStatsRecorder* recorder) OVERRIDE;
   virtual scoped_ptr<ConnectionFactory> BuildConnectionFactory(
       const std::vector<GURL>& endpoints,
       const net::BackoffEntry::Policy& backoff_policy,
@@ -141,10 +146,12 @@ scoped_ptr<MCSClient> FakeGCMInternalsBuilder::BuildMCSClient(
     const std::string& version,
     base::Clock* clock,
     ConnectionFactory* connection_factory,
-    GCMStore* gcm_store) {
+    GCMStore* gcm_store,
+    GCMStatsRecorder* recorder) {
   return make_scoped_ptr<MCSClient>(new FakeMCSClient(clock,
                                                       connection_factory,
-                                                      gcm_store));
+                                                      gcm_store,
+                                                      recorder));
 }
 
 scoped_ptr<ConnectionFactory> FakeGCMInternalsBuilder::BuildConnectionFactory(
@@ -267,6 +274,11 @@ GCMClientImplTest::GCMClientImplTest()
 GCMClientImplTest::~GCMClientImplTest() {}
 
 void GCMClientImplTest::SetUp() {
+  testing::Test::SetUp();
+#if defined(OS_MACOSX)
+  base::CommandLine::ForCurrentProcess()->AppendSwitch(
+      os_crypt::switches::kUseMockKeychain);
+#endif  // OS_MACOSX
   ASSERT_TRUE(temp_directory_.CreateUniqueTempDir());
   run_loop_.reset(new base::RunLoop);
   BuildGCMClient();
@@ -361,11 +373,6 @@ void GCMClientImplTest::InitializeGCMClient() {
                           message_loop_.message_loop_proxy(),
                           url_request_context_getter_,
                           this);
-
-#if defined(OS_MACOSX)
-  // On OSX, prevent the Keychain permissions popup during unit tests.
-  OSCrypt::UseMockKeychain(true);  // Must be after Initialize.
-#endif
 
   // Start loading and check-in.
   gcm_client_->Load();

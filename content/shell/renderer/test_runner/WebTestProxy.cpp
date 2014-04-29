@@ -34,8 +34,8 @@
 #include "third_party/WebKit/public/web/WebDataSource.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebElement.h"
-#include "third_party/WebKit/public/web/WebFrame.h"
 #include "third_party/WebKit/public/web/WebHistoryItem.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebMIDIClientMock.h"
 #include "third_party/WebKit/public/web/WebNode.h"
 #include "third_party/WebKit/public/web/WebPluginParams.h"
@@ -44,10 +44,11 @@
 #include "third_party/WebKit/public/web/WebUserGestureIndicator.h"
 #include "third_party/WebKit/public/web/WebView.h"
 
+using namespace WebTestRunner;
 using namespace blink;
 using namespace std;
 
-namespace WebTestRunner {
+namespace content {
 
 namespace {
 
@@ -303,73 +304,12 @@ string dumpFrameScrollPosition(WebFrame* frame, bool recursive)
     return result;
 }
 
-struct ToLower {
-    base::char16 operator()(base::char16 c) { return tolower(c); }
-};
-
-// Returns True if item1 < item2.
-bool HistoryItemCompareLess(const WebHistoryItem& item1, const WebHistoryItem& item2)
-{
-    base::string16 target1 = item1.target();
-    base::string16 target2 = item2.target();
-    std::transform(target1.begin(), target1.end(), target1.begin(), ToLower());
-    std::transform(target2.begin(), target2.end(), target2.begin(), ToLower());
-    return target1 < target2;
-}
-
-string dumpHistoryItem(const WebHistoryItem& item, int indent, bool isCurrent)
-{
-    string result;
-
-    if (isCurrent) {
-        result.append("curr->");
-        result.append(indent - 6, ' '); // 6 == "curr->".length()
-    } else
-        result.append(indent, ' ');
-
-    string url = normalizeLayoutTestURL(item.urlString().utf8());
-    result.append(url);
-    if (!item.target().isEmpty()) {
-        result.append(" (in frame \"");
-        result.append(item.target().utf8());
-        result.append("\")");
-    }
-    result.append("\n");
-
-    const WebVector<WebHistoryItem>& children = item.children();
-    if (!children.isEmpty()) {
-        // Must sort to eliminate arbitrary result ordering which defeats
-        // reproducible testing.
-        // FIXME: WebVector should probably just be a std::vector!!
-        std::vector<WebHistoryItem> sortedChildren;
-        for (size_t i = 0; i < children.size(); ++i)
-            sortedChildren.push_back(children[i]);
-        std::sort(sortedChildren.begin(), sortedChildren.end(), HistoryItemCompareLess);
-        for (size_t i = 0; i < sortedChildren.size(); ++i)
-            result += dumpHistoryItem(sortedChildren[i], indent + 4, false);
-    }
-
-    return result;
-}
-
-void dumpBackForwardList(const WebVector<WebHistoryItem>& history, size_t currentEntryIndex, string& result)
-{
-    result.append("\n============== Back Forward List ==============\n");
-    for (size_t index = 0; index < history.size(); ++index)
-        result.append(dumpHistoryItem(history[index], 8, index == currentEntryIndex));
-    result.append("===============================================\n");
-}
-
 string dumpAllBackForwardLists(TestInterfaces* interfaces, WebTestDelegate* delegate)
 {
     string result;
     const vector<WebTestProxyBase*>& windowList = interfaces->windowList();
-    for (unsigned i = 0; i < windowList.size(); ++i) {
-        size_t currentEntryIndex = 0;
-        WebVector<WebHistoryItem> history;
-        delegate->captureHistoryForWindow(windowList.at(i), &history, &currentEntryIndex);
-        dumpBackForwardList(history, currentEntryIndex, result);
-    }
+    for (unsigned i = 0; i < windowList.size(); ++i)
+        result.append(delegate->dumpHistoryForWindow(windowList.at(i)));
     return result;
 }
 
@@ -767,6 +707,13 @@ void WebTestProxyBase::didAutoResize(const WebSize&)
 
 void WebTestProxyBase::postAccessibilityEvent(const blink::WebAXObject& obj, blink::WebAXEvent event)
 {
+    // Only hook the accessibility events occured during the test run.
+    // This check prevents false positives in WebLeakDetector.
+    // The pending tasks in browser/renderer message queue may trigger accessibility events,
+    // and AccessibilityController will hold on to their target nodes if we don't ignore them here.
+    if (!m_testInterfaces->testRunner()->TestIsRunning())
+        return;
+
     if (event == blink::WebAXEventFocus)
         m_testInterfaces->accessibilityController()->SetFocusedElement(obj);
 
@@ -1028,6 +975,18 @@ bool WebTestProxyBase::isChooserShown()
     return 0 < m_chooserCount;
 }
 
+void WebTestProxyBase::loadURLExternally(WebLocalFrame* frame, const WebURLRequest& request, WebNavigationPolicy policy, const WebString& suggested_name)
+{
+    if (m_testInterfaces->testRunner()->shouldWaitUntilExternalURLLoad()) {
+        if (policy == WebNavigationPolicyDownload) {
+            m_delegate->printMessage(string("Downloading URL with suggested filename \"") + suggested_name.utf8() + "\"\n");
+        } else {
+            m_delegate->printMessage(string("Loading URL externally - \"") + URLDescription(request.url()) + "\"\n");
+        }
+        m_delegate->testFinished();
+    }
+}
+
 void WebTestProxyBase::didStartProvisionalLoad(WebLocalFrame* frame)
 {
     if (!m_testInterfaces->testRunner()->topLoadingFrame())
@@ -1060,7 +1019,7 @@ bool WebTestProxyBase::didFailProvisionalLoad(WebLocalFrame* frame, const WebURL
     return !frame->provisionalDataSource();
 }
 
-void WebTestProxyBase::didCommitProvisionalLoad(WebLocalFrame* frame, bool)
+void WebTestProxyBase::didCommitProvisionalLoad(WebLocalFrame* frame, const WebHistoryItem&, blink::WebHistoryCommitType)
 {
     if (m_testInterfaces->testRunner()->shouldDumpFrameLoadCallbacks()) {
         printFrameDescription(m_delegate, frame);
@@ -1350,4 +1309,4 @@ void WebTestProxyBase::resetInputMethod()
         m_webWidget->confirmComposition();
 }
 
-}
+}  // namespace content

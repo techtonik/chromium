@@ -203,9 +203,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kSigninAllowed,
     prefs::kSigninAllowed,
     base::Value::TYPE_BOOLEAN },
-  { key::kEnableOriginBoundCerts,
-    prefs::kEnableOriginBoundCerts,
-    base::Value::TYPE_BOOLEAN },
   { key::kDisableSSLRecordSplitting,
     prefs::kDisableSSLRecordSplitting,
     base::Value::TYPE_BOOLEAN },
@@ -467,7 +464,7 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
 
 #if defined(OS_ANDROID)
   { key::kDataCompressionProxyEnabled,
-    prefs::kSpdyProxyAuthEnabled,
+    data_reduction_proxy::prefs::kDataReductionProxyEnabled,
     base::Value::TYPE_BOOLEAN },
 #endif  // defined(OS_ANDROID)
 

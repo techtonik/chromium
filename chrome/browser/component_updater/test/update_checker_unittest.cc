@@ -149,7 +149,6 @@ CrxUpdateItem UpdateCheckerTest::BuildCrxUpdateItem() {
   crx_component.name = "test_jebg";
   crx_component.pk_hash.assign(jebg_hash, jebg_hash + arraysize(jebg_hash));
   crx_component.installer = NULL;
-  crx_component.observer = NULL;
   crx_component.version = base::Version("0.9");
   crx_component.fingerprint = "fp1";
 
@@ -166,7 +165,7 @@ TEST_F(UpdateCheckerTest, UpdateCheckSuccess) {
       "updatecheck"), test_file("updatecheck_reply_1.xml")));
 
   update_checker_ = UpdateChecker::Create(
-      GURL("http://localhost2/update2"),
+      GURL("https://localhost2/update2"),
       context(),
       base::Bind(&UpdateCheckerTest::UpdateCheckComplete,
                  base::Unretained(this))).Pass();
@@ -209,7 +208,7 @@ TEST_F(UpdateCheckerTest, UpdateNetworkError) {
                                                 test_file("no such file")));
 
   update_checker_ = UpdateChecker::Create(
-      GURL("http://localhost2/update2"),
+      GURL("https://localhost2/update2"),
       context(),
       base::Bind(&UpdateCheckerTest::UpdateCheckComplete,
                  base::Unretained(this))).Pass();

@@ -13,6 +13,7 @@
 #include "content/common/frame_messages.h"
 #include "content/common/gpu/gpu_messages.h"
 #include "content/common/host_shared_bitmap_manager.h"
+#include "content/common/input/web_touch_event_traits.h"
 #include "content/common/view_messages.h"
 #include "content/common/webplugin_geometry.h"
 #include "content/public/common/content_switches.h"
@@ -23,7 +24,7 @@
 #import "content/browser/renderer_host/render_widget_host_view_mac_dictionary_helper.h"
 #endif
 
-#if defined(OS_WIN) || defined(USE_AURA)
+#if defined(USE_AURA)
 #include "content/browser/renderer_host/ui_events_helper.h"
 #endif
 
@@ -31,7 +32,7 @@ namespace content {
 
 namespace {
 
-#if defined(OS_WIN) || defined(USE_AURA)
+#if defined(USE_AURA)
 blink::WebGestureEvent CreateFlingCancelEvent(double time_stamp) {
   blink::WebGestureEvent gesture_event;
   gesture_event.timeStampSeconds = time_stamp;
@@ -39,7 +40,7 @@ blink::WebGestureEvent CreateFlingCancelEvent(double time_stamp) {
   gesture_event.sourceDevice = blink::WebGestureEvent::Touchscreen;
   return gesture_event;
 }
-#endif  // defined(OS_WIN) || defined(USE_AURA)
+#endif  // defined(USE_AURA)
 
 }  // namespace
 
@@ -51,16 +52,16 @@ RenderWidgetHostViewGuest::RenderWidgetHostViewGuest(
       // |guest| is NULL during test.
       guest_(guest ? guest->AsWeakPtr() : base::WeakPtr<BrowserPluginGuest>()),
       platform_view_(static_cast<RenderWidgetHostViewPort*>(platform_view)) {
-#if defined(OS_WIN) || defined(USE_AURA)
+#if defined(USE_AURA)
   gesture_recognizer_.reset(ui::GestureRecognizer::Create());
   gesture_recognizer_->AddGestureEventHelper(this);
-#endif  // defined(OS_WIN) || defined(USE_AURA)
+#endif  // defined(USE_AURA)
 }
 
 RenderWidgetHostViewGuest::~RenderWidgetHostViewGuest() {
-#if defined(OS_WIN) || defined(USE_AURA)
+#if defined(USE_AURA)
   gesture_recognizer_->RemoveGestureEventHelper(this);
-#endif  // defined(OS_WIN) || defined(USE_AURA)
+#endif  // defined(USE_AURA)
 }
 
 void RenderWidgetHostViewGuest::WasShown() {
@@ -92,7 +93,7 @@ void RenderWidgetHostViewGuest::SetBounds(const gfx::Rect& rect) {
   SetSize(rect.size());
 }
 
-#if defined(OS_WIN) || defined(USE_AURA)
+#if defined(USE_AURA)
 void RenderWidgetHostViewGuest::ProcessAckedTouchEvent(
     const TouchEventWithLatencyInfo& touch, InputEventAckState ack_result) {
   // TODO(fsamuel): Currently we will only take this codepath if the guest has
@@ -166,9 +167,6 @@ void RenderWidgetHostViewGuest::AcceleratedSurfaceBuffersSwapped(
   if (!guest_)
     return;
 
-  // If accelerated surface buffers are getting swapped then we're not using
-  // the software path.
-  guest_->clear_damage_buffer();
   FrameMsg_BuffersSwapped_Params guest_params;
   guest_params.size = params.size;
   guest_params.mailbox = params.mailbox;
@@ -190,8 +188,6 @@ void RenderWidgetHostViewGuest::OnSwapCompositorFrame(
     scoped_ptr<cc::CompositorFrame> frame) {
   if (!guest_)
     return;
-
-  guest_->clear_damage_buffer();
 
   if (!guest_->attached()) {
     // If the guest doesn't have an embedder then there's nothing to give the
@@ -280,9 +276,8 @@ gfx::NativeViewAccessible RenderWidgetHostViewGuest::GetNativeViewAccessible() {
 }
 
 void RenderWidgetHostViewGuest::MovePluginWindows(
-    const gfx::Vector2d& scroll_offset,
     const std::vector<WebPluginGeometry>& moves) {
-  platform_view_->MovePluginWindows(scroll_offset, moves);
+  platform_view_->MovePluginWindows(moves);
 }
 
 void RenderWidgetHostViewGuest::UpdateCursor(const WebCursor& cursor) {
@@ -320,7 +315,7 @@ void RenderWidgetHostViewGuest::ImeCancelComposition() {
   rwhv->ImeCancelComposition();
 }
 
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
 void RenderWidgetHostViewGuest::ImeCompositionRangeChanged(
     const gfx::Range& range,
     const std::vector<gfx::Rect>& character_bounds) {
@@ -531,14 +526,18 @@ void RenderWidgetHostViewGuest::DispatchCancelTouchEvent(
     return;
 
   blink::WebTouchEvent cancel_event;
-  cancel_event.type = blink::WebInputEvent::TouchCancel;
-  cancel_event.timeStampSeconds = event->time_stamp().InSecondsF();
+  // TODO(rbyers): This event has no touches in it.  Don't we need to know what
+  // touches are currently active in order to cancel them all properly?
+  WebTouchEventTraits::ResetType(blink::WebInputEvent::TouchCancel,
+                                 event->time_stamp().InSecondsF(),
+                                 &cancel_event);
+
   host_->ForwardTouchEventWithLatencyInfo(cancel_event, *event->latency());
 }
 
 bool RenderWidgetHostViewGuest::ForwardGestureEventToRenderer(
     ui::GestureEvent* gesture) {
-#if defined(OS_WIN) || defined(USE_AURA)
+#if defined(USE_AURA)
   if (!host_)
     return false;
 

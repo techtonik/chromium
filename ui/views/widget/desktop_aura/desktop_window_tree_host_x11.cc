@@ -12,7 +12,6 @@
 
 #include "base/basictypes.h"
 #include "base/debug/trace_event.h"
-#include "base/message_loop/message_pump_x11.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "third_party/skia/include/core/SkPath.h"
@@ -35,6 +34,7 @@
 #include "ui/gfx/insets.h"
 #include "ui/gfx/path.h"
 #include "ui/gfx/path_x11.h"
+#include "ui/gfx/screen.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/corewm/tooltip_aura.h"
 #include "ui/views/ime/input_method.h"
@@ -343,8 +343,9 @@ void DesktopWindowTreeHostX11::ShowWindowWithState(
 
 void DesktopWindowTreeHostX11::ShowMaximizedWithBounds(
     const gfx::Rect& restored_bounds) {
-  restored_bounds_ = restored_bounds;
   ShowWindowWithState(ui::SHOW_STATE_MAXIMIZED);
+  // Enforce |restored_bounds_| since calling Maximize() could have reset it.
+  restored_bounds_ = restored_bounds;
 }
 
 bool DesktopWindowTreeHostX11::IsVisible() const {
@@ -355,8 +356,10 @@ void DesktopWindowTreeHostX11::SetSize(const gfx::Size& size) {
   bool size_changed = bounds_.size() != size;
   XResizeWindow(xdisplay_, xwindow_, size.width(), size.height());
   bounds_.set_size(size);
-  if (size_changed)
+  if (size_changed) {
     OnHostResized(size);
+    ResetWindowRegion();
+  }
 }
 
 void DesktopWindowTreeHostX11::StackAtTop() {
@@ -483,9 +486,9 @@ bool DesktopWindowTreeHostX11::IsActive() const {
 }
 
 void DesktopWindowTreeHostX11::Maximize() {
-  // When we're the process requesting the maximizing, we can accurately keep
-  // track of our restored bounds instead of relying on the heuristics that are
-  // in the PropertyNotify and ConfigureNotify handlers.
+  // When we are in the process of requesting to maximize a window, we can
+  // accurately keep track of our restored bounds instead of relying on the
+  // heuristics that are in the PropertyNotify and ConfigureNotify handlers.
   restored_bounds_ = bounds_;
 
   SetWMSpecState(true,
@@ -613,10 +616,27 @@ NonClientFrameView* DesktopWindowTreeHostX11::CreateNonClientFrameView() {
 }
 
 void DesktopWindowTreeHostX11::SetFullscreen(bool fullscreen) {
+  if (is_fullscreen_ == fullscreen)
+    return;
   is_fullscreen_ = fullscreen;
   SetWMSpecState(fullscreen,
                  atom_cache_.GetAtom("_NET_WM_STATE_FULLSCREEN"),
                  None);
+  // Try to guess the size we will have after the switch to/from fullscreen:
+  // - (may) avoid transient states
+  // - works around Flash content which expects to have the size updated
+  //   synchronously.
+  // See https://crbug.com/361408
+  if (fullscreen) {
+    restored_bounds_ = bounds_;
+    const gfx::Display display =
+        gfx::Screen::GetScreenFor(NULL)->GetDisplayNearestWindow(window());
+    bounds_ = display.bounds();
+  } else {
+    bounds_ = restored_bounds_;
+  }
+  OnHostMoved(bounds_.origin());
+  OnHostResized(bounds_.size());
 }
 
 bool DesktopWindowTreeHostX11::IsFullscreen() const {
@@ -745,6 +765,10 @@ bool DesktopWindowTreeHostX11::IsAnimatingClosed() const {
 ////////////////////////////////////////////////////////////////////////////////
 // DesktopWindowTreeHostX11, aura::WindowTreeHost implementation:
 
+ui::EventSource* DesktopWindowTreeHostX11::GetEventSource() {
+  return this;
+}
+
 gfx::AcceleratedWidget DesktopWindowTreeHostX11::GetAcceleratedWidget() {
   return xwindow_;
 }
@@ -799,10 +823,12 @@ void DesktopWindowTreeHostX11::SetBounds(const gfx::Rect& bounds) {
 
   if (origin_changed)
     native_widget_delegate_->AsWidget()->OnNativeWidgetMove();
-  if (size_changed)
+  if (size_changed) {
     OnHostResized(bounds.size());
-  else
+    ResetWindowRegion();
+  } else {
     compositor()->ScheduleRedrawRect(gfx::Rect(bounds.size()));
+  }
 }
 
 gfx::Point DesktopWindowTreeHostX11::GetLocationOnNativeScreen() const {
@@ -828,32 +854,6 @@ void DesktopWindowTreeHostX11::SetCapture() {
 void DesktopWindowTreeHostX11::ReleaseCapture() {
   if (g_current_capture == this)
     g_current_capture->OnCaptureReleased();
-}
-
-bool DesktopWindowTreeHostX11::QueryMouseLocation(
-    gfx::Point* location_return) {
-  aura::client::CursorClient* cursor_client =
-      aura::client::GetCursorClient(window());
-  if (cursor_client && !cursor_client->IsMouseEventsEnabled()) {
-    *location_return = gfx::Point(0, 0);
-    return false;
-  }
-
-  ::Window root_return, child_return;
-  int root_x_return, root_y_return, win_x_return, win_y_return;
-  unsigned int mask_return;
-  XQueryPointer(xdisplay_,
-                xwindow_,
-                &root_return,
-                &child_return,
-                &root_x_return, &root_y_return,
-                &win_x_return, &win_y_return,
-                &mask_return);
-  *location_return = gfx::Point(
-      std::max(0, std::min(bounds_.width(), win_x_return)),
-      std::max(0, std::min(bounds_.height(), win_y_return)));
-  return (win_x_return >= 0 && win_x_return < bounds_.width() &&
-          win_y_return >= 0 && win_y_return < bounds_.height());
 }
 
 void DesktopWindowTreeHostX11::SetCursorNative(gfx::NativeCursor cursor) {
@@ -1313,8 +1313,6 @@ uint32_t DesktopWindowTreeHostX11::DispatchEvent(
   switch (xev->type) {
     case EnterNotify:
     case LeaveNotify: {
-      if (!g_current_capture)
-        X11DesktopHandler::get()->ProcessXEvent(xev);
       ui::MouseEvent mouse_event(xev);
       DispatchMouseEvent(&mouse_event);
       break;
@@ -1362,6 +1360,7 @@ uint32_t DesktopWindowTreeHostX11::DispatchEvent(
       if (xev->xfocus.mode != NotifyGrab) {
         ReleaseCapture();
         OnHostLostWindowCapture();
+        X11DesktopHandler::get()->ProcessXEvent(xev);
       } else {
         dispatcher()->OnHostLostMouseGrab();
       }
@@ -1611,7 +1610,7 @@ DesktopWindowTreeHost* DesktopWindowTreeHost::Create(
 ui::NativeTheme* DesktopWindowTreeHost::GetNativeTheme(aura::Window* window) {
   const views::LinuxUI* linux_ui = views::LinuxUI::instance();
   if (linux_ui) {
-    ui::NativeTheme* native_theme = linux_ui->GetNativeTheme();
+    ui::NativeTheme* native_theme = linux_ui->GetNativeTheme(window);
     if (native_theme)
       return native_theme;
   }

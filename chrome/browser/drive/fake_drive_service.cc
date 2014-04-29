@@ -16,19 +16,18 @@
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/values.h"
 #include "chrome/browser/drive/drive_api_util.h"
 #include "content/public/browser/browser_thread.h"
 #include "google_apis/drive/drive_api_parser.h"
 #include "google_apis/drive/gdata_wapi_parser.h"
 #include "google_apis/drive/test_util.h"
-#include "google_apis/drive/time_util.h"
 #include "net/base/escape.h"
 #include "net/base/url_util.h"
 
 using content::BrowserThread;
 using google_apis::AboutResource;
 using google_apis::AboutResourceCallback;
-using google_apis::AccountMetadata;
 using google_apis::AppList;
 using google_apis::AppListCallback;
 using google_apis::AuthStatusCallback;
@@ -65,9 +64,6 @@ namespace test_util = google_apis::test_util;
 
 namespace drive {
 namespace {
-
-// Mime type of directories.
-const char kDriveFolderMimeType[] = "application/vnd.google-apps.folder";
 
 // Returns true if a resource entry matches with the search query.
 // Supports queries consist of following format.
@@ -176,7 +172,8 @@ FakeDriveService::FakeDriveService()
       app_list_load_count_(0),
       blocked_resource_list_load_count_(0),
       offline_(false),
-      never_return_all_resource_list_(false) {
+      never_return_all_resource_list_(false),
+      share_url_base_("https://share_url/") {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
 
   about_resource_->set_largest_change_id(654321);
@@ -188,55 +185,6 @@ FakeDriveService::FakeDriveService()
 FakeDriveService::~FakeDriveService() {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   STLDeleteValues(&entries_);
-}
-
-bool FakeDriveService::LoadResourceListForWapi(
-    const std::string& relative_path) {
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
-  scoped_ptr<base::Value> raw_value = test_util::LoadJSONFile(relative_path);
-  base::DictionaryValue* as_dict = NULL;
-  scoped_ptr<base::Value> feed;
-  base::DictionaryValue* feed_as_dict = NULL;
-
-  // Extract the "feed" from the raw value and take the ownership.
-  // Note that Remove() transfers the ownership to |feed|.
-  if (raw_value->GetAsDictionary(&as_dict) &&
-      as_dict->Remove("feed", &feed) &&
-      feed->GetAsDictionary(&feed_as_dict)) {
-    base::ListValue* entries = NULL;
-    if (feed_as_dict->GetList("entry", &entries)) {
-      for (size_t i = 0; i < entries->GetSize(); ++i) {
-        base::DictionaryValue* entry = NULL;
-        if (entries->GetDictionary(i, &entry)) {
-          scoped_ptr<ResourceEntry> resource_entry =
-              ResourceEntry::CreateFrom(*entry);
-
-          const std::string resource_id = resource_entry->resource_id();
-          EntryInfoMap::iterator it = entries_.find(resource_id);
-          if (it == entries_.end()) {
-            it = entries_.insert(
-                std::make_pair(resource_id, new EntryInfo)).first;
-          }
-          EntryInfo* new_entry = it->second;
-
-          ChangeResource* change = &new_entry->change_resource;
-          change->set_change_id(about_resource_->largest_change_id());
-          change->set_file_id(resource_id);
-          change->set_file(
-              util::ConvertResourceEntryToFileResource(*resource_entry));
-
-          const Link* share_url =
-              resource_entry->GetLinkByType(Link::LINK_SHARE);
-          if (share_url)
-            new_entry->share_url = share_url->href();
-
-          entry->GetString("test$data", &new_entry->content_data);
-        }
-      }
-    }
-  }
-
-  return feed_as_dict;
 }
 
 bool FakeDriveService::LoadAppListForDriveApi(
@@ -757,7 +705,6 @@ CancelCallback FakeDriveService::CopyResource(
     ParentReference parent;
     parent.set_file_id(parent_resource_id);
     parent.set_parent_link(GetFakeLinkUrl(parent_resource_id));
-    parent.set_is_root(parent_resource_id == GetRootResourceId());
     std::vector<ParentReference> parents;
     parents.push_back(parent);
     *new_file->mutable_parents() = parents;
@@ -809,14 +756,15 @@ CancelCallback FakeDriveService::UpdateResource(
   if (entry) {
     ChangeResource* change = &entry->change_resource;
     FileResource* file = change->mutable_file();
-    file->set_title(new_title);
+
+    if (!new_title.empty())
+      file->set_title(new_title);
 
     // Set parent if necessary.
     if (!parent_resource_id.empty()) {
       ParentReference parent;
       parent.set_file_id(parent_resource_id);
       parent.set_parent_link(GetFakeLinkUrl(parent_resource_id));
-      parent.set_is_root(parent_resource_id == GetRootResourceId());
 
       std::vector<ParentReference> parents;
       parents.push_back(parent);
@@ -882,7 +830,6 @@ CancelCallback FakeDriveService::AddResourceToDirectory(
     ParentReference parent;
     parent.set_file_id(parent_resource_id);
     parent.set_parent_link(GetFakeLinkUrl(parent_resource_id));
-    parent.set_is_root(parent_resource_id == GetRootResourceId());
     change->mutable_file()->mutable_parents()->push_back(parent);
 
     AddNewChangestamp(change);
@@ -935,39 +882,12 @@ CancelCallback FakeDriveService::AddNewDirectory(
     const std::string& directory_title,
     const AddNewDirectoryOptions& options,
     const GetResourceEntryCallback& callback) {
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
-  DCHECK(!callback.is_null());
-
-  if (offline_) {
-    scoped_ptr<ResourceEntry> null;
-    base::MessageLoop::current()->PostTask(
-        FROM_HERE,
-        base::Bind(callback,
-                   GDATA_NO_CONNECTION,
-                   base::Passed(&null)));
-    return CancelCallback();
-  }
-
-  const EntryInfo* new_entry = AddNewEntry("",  // resource_id,
-                                           kDriveFolderMimeType,
-                                           "",  // content_data
-                                           parent_resource_id,
-                                           directory_title,
-                                           false);  // shared_with_me
-  if (!new_entry) {
-    scoped_ptr<ResourceEntry> null;
-    base::MessageLoop::current()->PostTask(
-        FROM_HERE,
-        base::Bind(callback, HTTP_NOT_FOUND, base::Passed(&null)));
-    return CancelCallback();
-  }
-
-  scoped_ptr<ResourceEntry> parsed_entry(
-      util::ConvertChangeResourceToResourceEntry(new_entry->change_resource));
-  base::MessageLoop::current()->PostTask(
-      FROM_HERE,
-      base::Bind(callback, HTTP_CREATED, base::Passed(&parsed_entry)));
-  return CancelCallback();
+  return AddNewDirectoryWithResourceId(
+      "",
+      parent_resource_id.empty() ? GetRootResourceId() : parent_resource_id,
+      directory_title,
+      options,
+      callback);
 }
 
 CancelCallback FakeDriveService::InitiateUploadNewFile(
@@ -1267,6 +1187,47 @@ void FakeDriveService::AddNewFileWithResourceId(
       base::Bind(callback, HTTP_CREATED, base::Passed(&parsed_entry)));
 }
 
+CancelCallback FakeDriveService::AddNewDirectoryWithResourceId(
+    const std::string& resource_id,
+    const std::string& parent_resource_id,
+    const std::string& directory_title,
+    const AddNewDirectoryOptions& options,
+    const GetResourceEntryCallback& callback) {
+  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  DCHECK(!callback.is_null());
+
+  if (offline_) {
+    scoped_ptr<ResourceEntry> null;
+    base::MessageLoop::current()->PostTask(
+        FROM_HERE,
+        base::Bind(callback,
+                   GDATA_NO_CONNECTION,
+                   base::Passed(&null)));
+    return CancelCallback();
+  }
+
+  const EntryInfo* new_entry = AddNewEntry(resource_id,
+                                           util::kDriveFolderMimeType,
+                                           "",  // content_data
+                                           parent_resource_id,
+                                           directory_title,
+                                           false);  // shared_with_me
+  if (!new_entry) {
+    scoped_ptr<ResourceEntry> null;
+    base::MessageLoop::current()->PostTask(
+        FROM_HERE,
+        base::Bind(callback, HTTP_NOT_FOUND, base::Passed(&null)));
+    return CancelCallback();
+  }
+
+  scoped_ptr<ResourceEntry> parsed_entry(
+      util::ConvertChangeResourceToResourceEntry(new_entry->change_resource));
+  base::MessageLoop::current()->PostTask(
+      FROM_HERE,
+      base::Bind(callback, HTTP_CREATED, base::Passed(&parsed_entry)));
+  return CancelCallback();
+}
+
 void FakeDriveService::SetLastModifiedTime(
     const std::string& resource_id,
     const base::Time& last_modified_time,
@@ -1363,7 +1324,7 @@ const FakeDriveService::EntryInfo* FakeDriveService::AddNewEntry(
   new_file->set_file_id(resource_id);
   new_file->set_title(title);
   // Set the contents, size and MD5 for a file.
-  if (content_type != kDriveFolderMimeType) {
+  if (content_type != util::kDriveFolderMimeType) {
     new_entry->content_data = content_data;
     new_file->set_file_size(content_data.size());
     new_file->set_md5_checksum(base::MD5String(content_data));
@@ -1379,17 +1340,19 @@ const FakeDriveService::EntryInfo* FakeDriveService::AddNewEntry(
   // Set mime type.
   new_file->set_mime_type(content_type);
 
+  // Set alternate link if needed.
+  if (content_type == util::kGoogleDocumentMimeType)
+    new_file->set_alternate_link(GURL("https://document_alternate_link"));
+
   // Set parents.
-  ParentReference parent;
-  if (parent_resource_id.empty())
-    parent.set_file_id(GetRootResourceId());
-  else
+  if (!parent_resource_id.empty()) {
+    ParentReference parent;
     parent.set_file_id(parent_resource_id);
-  parent.set_parent_link(GetFakeLinkUrl(parent.file_id()));
-  parent.set_is_root(parent.file_id() == GetRootResourceId());
-  std::vector<ParentReference> parents;
-  parents.push_back(parent);
-  *new_file->mutable_parents() = parents;
+    parent.set_parent_link(GetFakeLinkUrl(parent.file_id()));
+    std::vector<ParentReference> parents;
+    parents.push_back(parent);
+    *new_file->mutable_parents() = parents;
+  }
 
   new_entry->share_url = net::AppendOrReplaceQueryParameter(
       share_url_base_, "name", title);

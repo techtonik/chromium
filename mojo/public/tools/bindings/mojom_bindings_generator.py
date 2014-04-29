@@ -12,19 +12,38 @@ import os
 import pprint
 import sys
 
-script_dir = os.path.dirname(os.path.realpath(__file__))
-sys.path.insert(0, os.path.join(script_dir, "pylib"))
+# Disable lint check for finding modules:
+# pylint: disable=F0401
 
-from generate import mojom_data
-from parse import mojo_lexer
-from parse import mojo_parser
-from parse import mojo_translate
+def _GetDirAbove(dirname):
+  """Returns the directory "above" this file containing |dirname| (which must
+  also be "above" this file)."""
+  path = os.path.abspath(__file__)
+  while True:
+    path, tail = os.path.split(path)
+    assert tail
+    if tail == dirname:
+      return path
+
+# Manually check for the command-line flag. (This isn't quite right, since it
+# ignores, e.g., "--", but it's close enough.)
+if "--use_chromium_bundled_pylibs" in sys.argv[1:]:
+  sys.path.insert(0, os.path.join(_GetDirAbove("mojo"), "third_party"))
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "pylib"))
+
+from mojom.error import Error
+from mojom.generate.data import OrderedModuleFromData
+from mojom.parse.parser import Parse
+from mojom.parse.translate import Translate
 
 
 def LoadGenerators(generators_string):
   if not generators_string:
     return []  # No generators.
 
+  script_dir = os.path.dirname(os.path.abspath(__file__))
   generators = []
   for generator_name in [s.strip() for s in generators_string.split(",")]:
     # "Built-in" generators:
@@ -46,41 +65,45 @@ def LoadGenerators(generators_string):
   return generators
 
 
-def _PrintImportStack(imported_filename_stack):
-  """Prints a chain of imports, given by imported_filename_stack."""
-  for i in reversed(xrange(0, len(imported_filename_stack)-1)):
-    print "  %s was imported by %s" % (imported_filename_stack[i+1],
-                                       imported_filename_stack[i])
+def MakeImportStackMessage(imported_filename_stack):
+  """Make a (human-readable) message listing a chain of imports. (Returned
+  string begins with a newline (if nonempty) and does not end with one.)"""
+  return ''.join(
+      reversed(["\n  %s was imported by %s" % (a, b) for (a, b) in \
+                    zip(imported_filename_stack[1:], imported_filename_stack)]))
 
-def ProcessFile(args, generator_modules, filename, processed_files={},
-                imported_filename_stack=[]):
+
+# Disable Check for dangerous default arguments (they're "private" keyword
+# arguments):
+# pylint: disable=W0102
+def ProcessFile(args, generator_modules, filename, _processed_files={},
+                _imported_filename_stack=[]):
   # Memoized results.
-  if filename in processed_files:
-    return processed_files[filename]
+  if filename in _processed_files:
+    return _processed_files[filename]
 
   # Ensure we only visit each file once.
-  if filename in imported_filename_stack:
-    print "%s: Error: Circular dependency" % filename
-    _PrintImportStack(imported_filename_stack + [filename])
+  if filename in _imported_filename_stack:
+    print "%s: Error: Circular dependency" % filename + \
+        MakeImportStackMessage(_imported_filename_stack + [filename])
     sys.exit(1)
 
   try:
     with open(filename) as f:
       source = f.read()
   except IOError as e:
-    print "%s: Error: %s" % (e.filename, e.strerror)
-    _PrintImportStack(imported_filename_stack + [filename])
+    print "%s: Error: %s" % (e.filename, e.strerror) + \
+        MakeImportStackMessage(_imported_filename_stack + [filename])
     sys.exit(1)
 
   try:
-    tree = mojo_parser.Parse(source, filename)
-  except (mojo_lexer.LexError, mojo_parser.ParseError) as e:
-    print e
-    _PrintImportStack(imported_filename_stack + [filename])
+    tree = Parse(source, filename)
+  except Error as e:
+    print str(e) + MakeImportStackMessage(_imported_filename_stack + [filename])
     sys.exit(1)
 
   dirname, name = os.path.split(filename)
-  mojom = mojo_translate.Translate(tree, name)
+  mojom = Translate(tree, name)
   if args.debug_print_intermediate:
     pprint.PrettyPrinter().pprint(mojom)
 
@@ -90,10 +113,10 @@ def ProcessFile(args, generator_modules, filename, processed_files={},
     import_filename = os.path.join(dirname, import_data['filename'])
     import_data['module'] = ProcessFile(
         args, generator_modules, import_filename,
-        processed_files=processed_files,
-        imported_filename_stack=imported_filename_stack + [filename])
+        _processed_files=_processed_files,
+        _imported_filename_stack=_imported_filename_stack + [filename])
 
-  module = mojom_data.OrderedModuleFromData(mojom)
+  module = OrderedModuleFromData(mojom)
 
   # Set the path as relative to the source root.
   module.path = os.path.relpath(os.path.abspath(filename),
@@ -107,11 +130,12 @@ def ProcessFile(args, generator_modules, filename, processed_files={},
     generator.GenerateFiles()
 
   # Save result.
-  processed_files[filename] = module
+  _processed_files[filename] = module
   return module
+# pylint: enable=W0102
 
 
-def Main():
+def main():
   parser = argparse.ArgumentParser(
       description="Generate bindings from mojom files.")
   parser.add_argument("filename", nargs="+",
@@ -125,6 +149,8 @@ def Main():
                       help="comma-separated list of generators")
   parser.add_argument("--debug_print_intermediate", action="store_true",
                       help="print the intermediate representation")
+  parser.add_argument("--use_chromium_bundled_pylibs", action="store_true",
+                      help="use Python modules bundled in the Chromium source")
   args = parser.parse_args()
 
   generator_modules = LoadGenerators(args.generators_string)
@@ -139,4 +165,4 @@ def Main():
 
 
 if __name__ == "__main__":
-  sys.exit(Main())
+  sys.exit(main())

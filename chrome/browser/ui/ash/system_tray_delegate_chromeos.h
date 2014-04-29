@@ -62,7 +62,6 @@ class SystemTrayDelegateChromeOS
   virtual void Shutdown() OVERRIDE;
   virtual bool GetTrayVisibilityOnStartup() OVERRIDE;
   virtual ash::user::LoginStatus GetUserLoginStatus() const OVERRIDE;
-  virtual bool IsOobeCompleted() const OVERRIDE;
   virtual void ChangeProfilePicture() OVERRIDE;
   virtual const std::string GetEnterpriseDomain() const OVERRIDE;
   virtual const base::string16 GetEnterpriseMessage() const OVERRIDE;
@@ -75,6 +74,7 @@ class SystemTrayDelegateChromeOS
   virtual void ShowSettings() OVERRIDE;
   virtual bool ShouldShowSettings() OVERRIDE;
   virtual void ShowDateSettings() OVERRIDE;
+  virtual void ShowSetTimeDialog() OVERRIDE;
   virtual void ShowNetworkSettings(const std::string& service_path) OVERRIDE;
   virtual void ShowBluetoothSettings() OVERRIDE;
   virtual void ShowDisplaySettings() OVERRIDE;

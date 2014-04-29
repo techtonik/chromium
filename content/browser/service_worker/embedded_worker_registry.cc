@@ -4,37 +4,17 @@
 
 #include "content/browser/service_worker/embedded_worker_registry.h"
 
+#include "base/bind_helpers.h"
 #include "base/stl_util.h"
-#include "content/browser/renderer_host/render_process_host_impl.h"
 #include "content/browser/service_worker/embedded_worker_instance.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
+#include "content/browser/service_worker/service_worker_context_wrapper.h"
 #include "content/common/service_worker/embedded_worker_messages.h"
-#include "content/common/service_worker/service_worker_messages.h"
 #include "content/public/browser/browser_thread.h"
-#include "content/public/browser/render_process_host.h"
-#include "content/public/browser/site_instance.h"
-#include "content/public/common/child_process_host.h"
 #include "ipc/ipc_message.h"
 #include "ipc/ipc_sender.h"
 
 namespace content {
-
-static void IncrementWorkerCount(int process_id) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  if (RenderProcessHost* host = RenderProcessHost::FromID(process_id)) {
-    static_cast<RenderProcessHostImpl*>(host)->IncrementWorkerRefCount();
-  } else {
-    LOG(ERROR) << "RPH " << process_id
-               << " was killed while a ServiceWorker was trying to use it.";
-  }
-}
-
-static void DecrementWorkerCount(int process_id) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  if (RenderProcessHost* host = RenderProcessHost::FromID(process_id)) {
-    static_cast<RenderProcessHostImpl*>(host)->DecrementWorkerRefCount();
-  }
-}
 
 EmbeddedWorkerRegistry::EmbeddedWorkerRegistry(
     base::WeakPtr<ServiceWorkerContextCore> context)
@@ -48,74 +28,48 @@ scoped_ptr<EmbeddedWorkerInstance> EmbeddedWorkerRegistry::CreateWorker() {
   return worker.Pass();
 }
 
-ServiceWorkerStatusCode EmbeddedWorkerRegistry::StartWorker(
-    int process_id,
-    int embedded_worker_id,
-    int64 service_worker_version_id,
-    const GURL& script_url) {
-  BrowserThread::PostTask(BrowserThread::UI,
-                          FROM_HERE,
-                          base::Bind(&IncrementWorkerCount, process_id));
-  return Send(process_id,
-              new EmbeddedWorkerMsg_StartWorker(embedded_worker_id,
-                                               service_worker_version_id,
-                                               script_url));
-}
-
-static EmbeddedWorkerRegistry::StatusCodeAndProcessId StartWorkerOnUI(
-    EmbeddedWorkerRegistry* registry,
-    SiteInstance* site_instance,
-    int embedded_worker_id,
-    int64 service_worker_version_id,
-    const GURL& script_url) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  scoped_refptr<SiteInstance> site_instance_for_script_url =
-      site_instance->GetRelatedSiteInstance(script_url);
-  EmbeddedWorkerRegistry::StatusCodeAndProcessId result = {
-      SERVICE_WORKER_OK, content::ChildProcessHost::kInvalidUniqueID};
-  RenderProcessHost* process = site_instance_for_script_url->GetProcess();
-  if (!process->Init()) {
-    LOG(ERROR) << "Couldn't start a new process!";
-    result.status = SERVICE_WORKER_ERROR_START_WORKER_FAILED;
-    return result;
-  }
-  static_cast<RenderProcessHostImpl*>(process)->IncrementWorkerRefCount();
-  if (!process->Send(
-          new EmbeddedWorkerMsg_StartWorker(
-              embedded_worker_id, service_worker_version_id, script_url)))
-    result.status = SERVICE_WORKER_ERROR_IPC_FAILED;
-  result.process_id = process->GetID();
-  return result;
-}
-
-void EmbeddedWorkerRegistry::StartWorker(SiteInstance* site_instance,
+void EmbeddedWorkerRegistry::StartWorker(const std::vector<int>& process_ids,
                                          int embedded_worker_id,
                                          int64 service_worker_version_id,
+                                         const GURL& scope,
                                          const GURL& script_url,
                                          const StatusCallback& callback) {
-  AddRef();
-  BrowserThread::PostTaskAndReplyWithResult(
-      BrowserThread::UI,
-      FROM_HERE,
-      base::Bind(&StartWorkerOnUI,
-                 base::Unretained(this),
-                 base::Unretained(site_instance),
+  if (!context_) {
+    callback.Run(SERVICE_WORKER_ERROR_ABORT);
+    return;
+  }
+  context_->process_manager()->AllocateWorkerProcess(
+      process_ids,
+      script_url,
+      base::Bind(&EmbeddedWorkerRegistry::StartWorkerWithProcessId,
+                 this,
                  embedded_worker_id,
-                 service_worker_version_id,
-                 script_url),
-      base::Bind(&EmbeddedWorkerRegistry::RecordStartedProcessId,
-                 base::Unretained(this),
-                 embedded_worker_id,
+                 base::Passed(make_scoped_ptr(new EmbeddedWorkerMsg_StartWorker(
+                     embedded_worker_id,
+                     service_worker_version_id,
+                     scope,
+                     script_url))),
                  callback));
 }
 
 ServiceWorkerStatusCode EmbeddedWorkerRegistry::StopWorker(
     int process_id, int embedded_worker_id) {
-  BrowserThread::PostTask(BrowserThread::UI,
-                          FROM_HERE,
-                          base::Bind(&DecrementWorkerCount, process_id));
+  if (context_)
+    context_->process_manager()->ReleaseWorkerProcess(process_id);
   return Send(process_id,
               new EmbeddedWorkerMsg_StopWorker(embedded_worker_id));
+}
+
+bool EmbeddedWorkerRegistry::OnMessageReceived(const IPC::Message& message) {
+  // TODO(kinuko): Move all EmbeddedWorker message handling from
+  // ServiceWorkerDispatcherHost.
+
+  WorkerInstanceMap::iterator found = worker_map_.find(message.routing_id());
+  if (found == worker_map_.end()) {
+    LOG(ERROR) << "Worker " << message.routing_id() << " not registered";
+    return false;
+  }
+  return found->second->OnMessageReceived(message);
 }
 
 void EmbeddedWorkerRegistry::Shutdown() {
@@ -152,24 +106,35 @@ void EmbeddedWorkerRegistry::OnWorkerStopped(
   found->second->OnStopped();
 }
 
-void EmbeddedWorkerRegistry::OnSendMessageToBrowser(
-    int embedded_worker_id, int request_id, const IPC::Message& message) {
+void EmbeddedWorkerRegistry::OnReportException(
+    int embedded_worker_id,
+    const base::string16& error_message,
+    int line_number,
+    int column_number,
+    const GURL& source_url) {
   WorkerInstanceMap::iterator found = worker_map_.find(embedded_worker_id);
   if (found == worker_map_.end()) {
     LOG(ERROR) << "Worker " << embedded_worker_id << " not registered";
     return;
   }
-  // Perform security check to filter out any unexpected (and non-test)
-  // messages. This must list up all message types that can go through here.
-  if (message.type() == ServiceWorkerHostMsg_ActivateEventFinished::ID ||
-      message.type() == ServiceWorkerHostMsg_InstallEventFinished::ID ||
-      message.type() == ServiceWorkerHostMsg_FetchEventFinished::ID ||
-      message.type() == ServiceWorkerHostMsg_SyncEventFinished::ID ||
-      IPC_MESSAGE_CLASS(message) == TestMsgStart) {
-    found->second->OnMessageReceived(request_id, message);
+  found->second->OnReportException(
+      error_message, line_number, column_number, source_url);
+}
+
+void EmbeddedWorkerRegistry::OnReportConsoleMessage(
+    int embedded_worker_id,
+    int source_identifier,
+    int message_level,
+    const base::string16& message,
+    int line_number,
+    const GURL& source_url) {
+  WorkerInstanceMap::iterator found = worker_map_.find(embedded_worker_id);
+  if (found == worker_map_.end()) {
+    LOG(ERROR) << "Worker " << embedded_worker_id << " not registered";
     return;
   }
-  NOTREACHED() << "Got unexpected message: " << message.type();
+  found->second->OnReportConsoleMessage(
+      source_identifier, message_level, message, line_number, source_url);
 }
 
 void EmbeddedWorkerRegistry::AddChildProcessSender(
@@ -207,16 +172,33 @@ EmbeddedWorkerRegistry::~EmbeddedWorkerRegistry() {
   Shutdown();
 }
 
-void EmbeddedWorkerRegistry::RecordStartedProcessId(
+void EmbeddedWorkerRegistry::StartWorkerWithProcessId(
     int embedded_worker_id,
+    scoped_ptr<EmbeddedWorkerMsg_StartWorker> message,
     const StatusCallback& callback,
-    StatusCodeAndProcessId result) {
-  DCHECK(ContainsKey(worker_map_, embedded_worker_id));
-  worker_map_[embedded_worker_id]->RecordStartedProcessId(result.process_id,
-                                                          result.status);
-  callback.Run(result.status);
-  // Matches the AddRef() in StartWorker(SiteInstance).
-  Release();
+    ServiceWorkerStatusCode status,
+    int process_id) {
+  WorkerInstanceMap::const_iterator worker =
+      worker_map_.find(embedded_worker_id);
+  if (worker == worker_map_.end()) {
+    // The Instance was destroyed before it could finish starting.  Undo what
+    // we've done so far.
+    if (context_)
+      context_->process_manager()->ReleaseWorkerProcess(process_id);
+    callback.Run(SERVICE_WORKER_ERROR_ABORT);
+    return;
+  }
+  worker->second->RecordProcessId(process_id, status);
+
+  if (status != SERVICE_WORKER_OK) {
+    callback.Run(status);
+    return;
+  }
+  // The ServiceWorkerDispatcherHost is supposed to be created when the process
+  // is created, and keep an entry in process_sender_map_ for its whole
+  // lifetime.
+  DCHECK(ContainsKey(process_sender_map_, process_id));
+  callback.Run(Send(process_id, message.release()));
 }
 
 ServiceWorkerStatusCode EmbeddedWorkerRegistry::Send(

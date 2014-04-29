@@ -9,6 +9,7 @@
 #include "content/common/service_worker/service_worker_messages.h"
 #include "content/renderer/service_worker/embedded_worker_context_client.h"
 #include "ipc/ipc_message.h"
+#include "third_party/WebKit/public/web/WebServiceWorkerContextClient.h"
 #include "third_party/WebKit/public/web/WebServiceWorkerContextProxy.h"
 
 namespace content {
@@ -17,70 +18,84 @@ ServiceWorkerScriptContext::ServiceWorkerScriptContext(
     EmbeddedWorkerContextClient* embedded_context,
     blink::WebServiceWorkerContextProxy* proxy)
     : embedded_context_(embedded_context),
-      proxy_(proxy),
-      current_request_id_(kInvalidServiceWorkerRequestId) {
+      proxy_(proxy) {
 }
 
 ServiceWorkerScriptContext::~ServiceWorkerScriptContext() {}
 
 void ServiceWorkerScriptContext::OnMessageReceived(
-    int request_id,
     const IPC::Message& message) {
-  DCHECK_EQ(kInvalidServiceWorkerRequestId, current_request_id_);
-  current_request_id_ = request_id;
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(ServiceWorkerScriptContext, message)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_ActivateEvent, OnActivateEvent)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_FetchEvent, OnFetchEvent)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_InstallEvent, OnInstallEvent)
-    IPC_MESSAGE_HANDLER(ServiceWorkerMsg_Message, OnPostMessage)
     IPC_MESSAGE_HANDLER(ServiceWorkerMsg_SyncEvent, OnSyncEvent)
+    IPC_MESSAGE_HANDLER(ServiceWorkerMsg_Message, OnPostMessage)
+    IPC_MESSAGE_HANDLER(ServiceWorkerMsg_DidGetClientDocuments,
+                        OnDidGetClientDocuments)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   DCHECK(handled);
-  current_request_id_ = kInvalidServiceWorkerRequestId;
 }
 
 void ServiceWorkerScriptContext::DidHandleActivateEvent(
     int request_id,
     blink::WebServiceWorkerEventResult result) {
-  Send(request_id, ServiceWorkerHostMsg_ActivateEventFinished(result));
+  Send(new ServiceWorkerHostMsg_ActivateEventFinished(
+      GetRoutingID(), request_id, result));
 }
 
 void ServiceWorkerScriptContext::DidHandleInstallEvent(
     int request_id,
     blink::WebServiceWorkerEventResult result) {
-  Send(request_id, ServiceWorkerHostMsg_InstallEventFinished(result));
+  Send(new ServiceWorkerHostMsg_InstallEventFinished(
+      GetRoutingID(), request_id, result));
 }
 
 void ServiceWorkerScriptContext::DidHandleFetchEvent(
     int request_id,
     ServiceWorkerFetchEventResult result,
     const ServiceWorkerResponse& response) {
-  Send(request_id, ServiceWorkerHostMsg_FetchEventFinished(result, response));
+  Send(new ServiceWorkerHostMsg_FetchEventFinished(
+      GetRoutingID(), request_id, result, response));
 }
 
 void ServiceWorkerScriptContext::DidHandleSyncEvent(int request_id) {
-  Send(request_id, ServiceWorkerHostMsg_SyncEventFinished());
+  Send(new ServiceWorkerHostMsg_SyncEventFinished(
+      GetRoutingID(), request_id));
 }
 
-void ServiceWorkerScriptContext::Send(int request_id,
-                                      const IPC::Message& message) {
-  embedded_context_->SendMessageToBrowser(request_id, message);
+void ServiceWorkerScriptContext::GetClientDocuments(
+    blink::WebServiceWorkerClientsCallbacks* callbacks) {
+  DCHECK(callbacks);
+  int request_id = pending_clients_callbacks_.Add(callbacks);
+  Send(new ServiceWorkerHostMsg_GetClientDocuments(
+      GetRoutingID(), request_id));
 }
 
-void ServiceWorkerScriptContext::OnActivateEvent() {
-  proxy_->dispatchActivateEvent(current_request_id_);
+void ServiceWorkerScriptContext::Send(IPC::Message* message) {
+  embedded_context_->Send(message);
 }
 
-void ServiceWorkerScriptContext::OnInstallEvent(int active_version_id) {
-  proxy_->dispatchInstallEvent(current_request_id_);
+void ServiceWorkerScriptContext::OnActivateEvent(int request_id) {
+  proxy_->dispatchActivateEvent(request_id);
+}
+
+void ServiceWorkerScriptContext::OnInstallEvent(int request_id,
+                                                int active_version_id) {
+  proxy_->dispatchInstallEvent(request_id);
 }
 
 void ServiceWorkerScriptContext::OnFetchEvent(
+    int request_id,
     const ServiceWorkerFetchRequest& request) {
   // TODO(falken): Pass in the request.
-  proxy_->dispatchFetchEvent(current_request_id_);
+  proxy_->dispatchFetchEvent(request_id);
+}
+
+void ServiceWorkerScriptContext::OnSyncEvent(int request_id) {
+  proxy_->dispatchSyncEvent(request_id);
 }
 
 void ServiceWorkerScriptContext::OnPostMessage(
@@ -100,8 +115,23 @@ void ServiceWorkerScriptContext::OnPostMessage(
   proxy_->dispatchMessageEvent(message, ports);
 }
 
-void ServiceWorkerScriptContext::OnSyncEvent() {
-  proxy_->dispatchSyncEvent(current_request_id_);
+void ServiceWorkerScriptContext::OnDidGetClientDocuments(
+    int request_id, const std::vector<int>& client_ids) {
+  blink::WebServiceWorkerClientsCallbacks* callbacks =
+      pending_clients_callbacks_.Lookup(request_id);
+  if (!callbacks) {
+    NOTREACHED() << "Got stray response: " << request_id;
+    return;
+  }
+  scoped_ptr<blink::WebServiceWorkerClientsInfo> info(
+      new blink::WebServiceWorkerClientsInfo);
+  info->clientIDs = client_ids;
+  callbacks->onSuccess(info.release());
+  pending_clients_callbacks_.Remove(request_id);
+}
+
+int ServiceWorkerScriptContext::GetRoutingID() const {
+  return embedded_context_->embedded_worker_id();
 }
 
 }  // namespace content

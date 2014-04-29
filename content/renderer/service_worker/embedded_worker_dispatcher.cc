@@ -58,10 +58,10 @@ void EmbeddedWorkerDispatcher::WorkerContextDestroyed(
   workers_.Remove(embedded_worker_id);
 }
 
-void EmbeddedWorkerDispatcher::OnStartWorker(
-    int embedded_worker_id,
-    int64 service_worker_version_id,
-    const GURL& script_url) {
+void EmbeddedWorkerDispatcher::OnStartWorker(int embedded_worker_id,
+                                             int64 service_worker_version_id,
+                                             const GURL& service_worker_scope,
+                                             const GURL& script_url) {
   DCHECK(!workers_.Lookup(embedded_worker_id));
   RenderThread::Get()->EnsureWebKitInitialized();
   scoped_ptr<WorkerWrapper> wrapper(new WorkerWrapper(
@@ -69,6 +69,7 @@ void EmbeddedWorkerDispatcher::OnStartWorker(
           new EmbeddedWorkerContextClient(
               embedded_worker_id,
               service_worker_version_id,
+              service_worker_scope,
               script_url),
           NULL)));
 

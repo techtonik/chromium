@@ -59,6 +59,7 @@ Layer::Layer()
       draw_checkerboard_for_missing_tiles_(false),
       force_render_surface_(false),
       is_3d_sorted_(false),
+      transform_is_invertible_(true),
       anchor_point_(0.5f, 0.5f),
       background_color_(0),
       opacity_(1.f),
@@ -132,7 +133,6 @@ void Layer::SetLayerTreeHost(LayerTreeHost* host) {
 
   if (host && layer_animation_controller_->has_any_animation())
     host->SetNeedsCommit();
-  SetNeedsFilterContextIfNeeded();
 }
 
 void Layer::SetNeedsUpdate() {
@@ -164,15 +164,6 @@ void Layer::SetNextCommitWaitsForActivation() {
     return;
 
   layer_tree_host_->SetNextCommitWaitsForActivation();
-}
-
-void Layer::SetNeedsFilterContextIfNeeded() {
-  if (!layer_tree_host_)
-    return;
-
-  if (!filters_.IsEmpty() || !background_filters_.IsEmpty() ||
-      !uses_default_blend_mode())
-    layer_tree_host_->set_needs_filter_context();
 }
 
 void Layer::SetNeedsPushProperties() {
@@ -486,7 +477,6 @@ void Layer::SetFilters(const FilterOperations& filters) {
     return;
   filters_ = filters;
   SetNeedsCommit();
-  SetNeedsFilterContextIfNeeded();
 }
 
 bool Layer::FilterIsAnimating() const {
@@ -499,7 +489,6 @@ void Layer::SetBackgroundFilters(const FilterOperations& filters) {
     return;
   background_filters_ = filters;
   SetNeedsCommit();
-  SetNeedsFilterContextIfNeeded();
 }
 
 void Layer::SetOpacity(float opacity) {
@@ -565,7 +554,6 @@ void Layer::SetBlendMode(SkXfermode::Mode blend_mode) {
 
   blend_mode_ = blend_mode;
   SetNeedsCommit();
-  SetNeedsFilterContextIfNeeded();
 }
 
 void Layer::SetIsRootForIsolatedGroup(bool root) {
@@ -605,6 +593,7 @@ void Layer::SetTransform(const gfx::Transform& transform) {
   if (transform_ == transform)
     return;
   transform_ = transform;
+  transform_is_invertible_ = transform.IsInvertible();
   SetNeedsCommit();
 }
 
@@ -920,7 +909,7 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
   layer->SetIs3dSorted(is_3d_sorted_);
   layer->SetUseParentBackfaceVisibility(use_parent_backface_visibility_);
   if (!layer->TransformIsAnimatingOnImplOnly() && !TransformIsAnimating())
-    layer->SetTransform(transform_);
+    layer->SetTransformAndInvertibility(transform_, transform_is_invertible_);
   DCHECK(!(TransformIsAnimating() && layer->TransformIsAnimatingOnImplOnly()));
 
   layer->SetScrollClipLayer(scroll_clip_layer_id_);
@@ -1069,6 +1058,11 @@ void Layer::CreateRenderSurface() {
 
 void Layer::ClearRenderSurface() {
   draw_properties_.render_surface.reset();
+}
+
+void Layer::ClearRenderSurfaceLayerList() {
+  if (draw_properties_.render_surface)
+    draw_properties_.render_surface->layer_list().clear();
 }
 
 gfx::Vector2dF Layer::ScrollOffsetForAnimation() const {

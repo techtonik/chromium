@@ -24,7 +24,7 @@ WebServiceWorkerProviderImpl::WebServiceWorkerProviderImpl(
 
 WebServiceWorkerProviderImpl::~WebServiceWorkerProviderImpl() {
   // Make sure the script client is removed.
-  GetDispatcher()->RemoveScriptClient(provider_id_);
+  RemoveScriptClient();
 }
 
 void WebServiceWorkerProviderImpl::setClient(
@@ -32,7 +32,7 @@ void WebServiceWorkerProviderImpl::setClient(
   if (client)
     GetDispatcher()->AddScriptClient(provider_id_, client);
   else
-    GetDispatcher()->RemoveScriptClient(provider_id_);
+    RemoveScriptClient();
 }
 
 void WebServiceWorkerProviderImpl::registerServiceWorker(
@@ -50,8 +50,18 @@ void WebServiceWorkerProviderImpl::unregisterServiceWorker(
       provider_id_, pattern, callbacks);
 }
 
+void WebServiceWorkerProviderImpl::RemoveScriptClient() {
+  // Remove the script client, but only if the dispatcher is still there.
+  // (For cleanup path we don't need to bother creating a new dispatcher)
+  ServiceWorkerDispatcher* dispatcher =
+      ServiceWorkerDispatcher::GetThreadSpecificInstance();
+  if (dispatcher)
+    dispatcher->RemoveScriptClient(provider_id_);
+}
+
 ServiceWorkerDispatcher* WebServiceWorkerProviderImpl::GetDispatcher() {
-  return ServiceWorkerDispatcher::ThreadSpecificInstance(thread_safe_sender_);
+  return ServiceWorkerDispatcher::GetOrCreateThreadSpecificInstance(
+      thread_safe_sender_);
 }
 
 }  // namespace content

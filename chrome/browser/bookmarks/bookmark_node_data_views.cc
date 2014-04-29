@@ -7,8 +7,13 @@
 #include "base/logging.h"
 #include "base/pickle.h"
 #include "base/strings/utf_string_conversions.h"
-#include "content/public/common/url_constants.h"
 #include "ui/base/clipboard/clipboard.h"
+
+namespace {
+
+const char kJavaScriptScheme[] = "javascript";
+
+}  // namespace
 
 // static
 const ui::OSExchangeData::CustomFormat&
@@ -21,13 +26,14 @@ BookmarkNodeData::GetBookmarkCustomFormat() {
   return format;
 }
 
-void BookmarkNodeData::Write(Profile* profile, ui::OSExchangeData* data) const {
+void BookmarkNodeData::Write(const base::FilePath& profile_path,
+                             ui::OSExchangeData* data) const {
   DCHECK(data);
 
   // If there is only one element and it is a URL, write the URL to the
   // clipboard.
   if (elements.size() == 1 && elements[0].is_url) {
-    if (elements[0].url.SchemeIs(content::kJavaScriptScheme)) {
+    if (elements[0].url.SchemeIs(kJavaScriptScheme)) {
       data->SetString(base::UTF8ToUTF16(elements[0].url.spec()));
     } else {
       data->SetURL(elements[0].url, elements[0].title);
@@ -35,7 +41,7 @@ void BookmarkNodeData::Write(Profile* profile, ui::OSExchangeData* data) const {
   }
 
   Pickle data_pickle;
-  WriteToPickle(profile, &data_pickle);
+  WriteToPickle(profile_path, &data_pickle);
 
   data->SetPickledData(GetBookmarkCustomFormat(), data_pickle);
 }

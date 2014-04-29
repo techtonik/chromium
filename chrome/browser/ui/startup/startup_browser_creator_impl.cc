@@ -590,9 +590,6 @@ void StartupBrowserCreatorImpl::ProcessLaunchURLs(
   std::vector<GURL> adjust_urls = urls_to_open;
   if (adjust_urls.empty()) {
     AddStartupURLs(&adjust_urls);
-    if (StartupBrowserCreatorImpl::OpenStartupURLsInExistingBrowser(
-            profile_, adjust_urls))
-      return;
   } else if (!command_line_.HasSwitch(switches::kOpenInNewWindow)) {
     // Always open a list of urls in a window on the native desktop.
     browser = chrome::FindTabbedBrowser(profile_, false,
@@ -779,16 +776,8 @@ Browser* StartupBrowserCreatorImpl::OpenTabsInBrowser(
   if (!profile_ && browser)
     profile_ = browser->profile();
 
-  if (!browser || !browser->is_type_tabbed()) {
+  if (!browser || !browser->is_type_tabbed())
     browser = new Browser(Browser::CreateParams(profile_, desktop_type));
-  } else {
-#if defined(TOOLKIT_GTK)
-    // Setting the time of the last action on the window here allows us to steal
-    // focus, which is what the user wants when opening a new tab in an existing
-    // browser window.
-    gtk_util::SetWMLastUserActionTime(browser->window()->GetNativeWindow());
-#endif
-  }
 
   bool first_tab = true;
   ProtocolHandlerRegistry* registry = profile_ ?
@@ -948,12 +937,3 @@ void StartupBrowserCreatorImpl::AddStartupURLs(
     }
   }
 }
-
-#if !defined(OS_WIN)
-// static
-bool StartupBrowserCreatorImpl::OpenStartupURLsInExistingBrowser(
-    Profile* profile,
-    const std::vector<GURL>& startup_urls) {
-  return false;
-}
-#endif

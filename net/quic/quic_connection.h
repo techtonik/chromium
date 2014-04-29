@@ -61,11 +61,12 @@ class NET_EXPORT_PRIVATE QuicConnectionVisitorInterface {
  public:
   virtual ~QuicConnectionVisitorInterface() {}
 
-  // A simple visitor interface for dealing with data frames.  The session
-  // should determine if all frames will be accepted, and return true if so.
-  // If any frames can't be processed or buffered, none of the data should
-  // be used, and the callee should return false.
-  virtual bool OnStreamFrames(const std::vector<QuicStreamFrame>& frames) = 0;
+  // A simple method to determine if all frames will be accepted by the visitor.
+  virtual bool WillAcceptStreamFrames(
+      const std::vector<QuicStreamFrame>& frames) = 0;
+
+  // A simple visitor interface for dealing with data frames.
+  virtual void OnStreamFrames(const std::vector<QuicStreamFrame>& frames) = 0;
 
   // The session should process all WINDOW_UPDATE frames, adjusting both stream
   // and connection level flow control windows.
@@ -103,6 +104,10 @@ class NET_EXPORT_PRIVATE QuicConnectionVisitorInterface {
 
   // Called to ask if any handshake messages are pending in this visitor.
   virtual bool HasPendingHandshake() const = 0;
+
+  // Called to ask if any streams are open in this visitor, excluding the
+  // reserved crypto and headers stream.
+  virtual bool HasOpenDataStreams() const = 0;
 };
 
 // Interface which gets callbacks from the QuicConnection at interesting
@@ -151,6 +156,9 @@ class NET_EXPORT_PRIVATE QuicConnectionDebugVisitorInterface
 
   // Called when a StopWaitingFrame has been parsed.
   virtual void OnStopWaitingFrame(const QuicStopWaitingFrame& frame) {}
+
+  // Called when a Ping has been parsed.
+  virtual void OnPingFrame(const QuicPingFrame& frame) {}
 
   // Called when a RstStreamFrame has been parsed.
   virtual void OnRstStreamFrame(const QuicRstStreamFrame& frame) {}
@@ -315,6 +323,7 @@ class NET_EXPORT_PRIVATE QuicConnection
   virtual bool OnCongestionFeedbackFrame(
       const QuicCongestionFeedbackFrame& frame) OVERRIDE;
   virtual bool OnStopWaitingFrame(const QuicStopWaitingFrame& frame) OVERRIDE;
+  virtual bool OnPingFrame(const QuicPingFrame& frame) OVERRIDE;
   virtual bool OnRstStreamFrame(const QuicRstStreamFrame& frame) OVERRIDE;
   virtual bool OnConnectionCloseFrame(
       const QuicConnectionCloseFrame& frame) OVERRIDE;
@@ -391,6 +400,9 @@ class NET_EXPORT_PRIVATE QuicConnection
   // true.  Otherwise, it will return false and will reset the timeout alarm.
   bool CheckForTimeout();
 
+  // Sends a ping, and resets the ping alarm.
+  void SendPing();
+
   // Sets up a packet with an QuicAckFrame and sends it out.
   void SendAck();
 
@@ -450,6 +462,26 @@ class NET_EXPORT_PRIVATE QuicConnection
     return max_flow_control_receive_window_bytes_;
   }
 
+  // Stores current batch state for connection, puts the connection
+  // into batch mode, and destruction restores the stored batch state.
+  // While the bundler is in scope, any generated frames are bundled
+  // as densely as possible into packets.  In addition, this bundler
+  // can be configured to ensure that an ACK frame is included in the
+  // first packet created, if there's new ack information to be sent.
+  class ScopedPacketBundler {
+   public:
+    // In addition to all outgoing frames being bundled when the
+    // bundler is in scope, setting |include_ack| to true ensures that
+    // an ACK frame is opportunistically bundled with the first
+    // outgoing packet.
+    ScopedPacketBundler(QuicConnection* connection, AckBundling send_ack);
+    ~ScopedPacketBundler();
+
+   private:
+    QuicConnection* connection_;
+    bool already_in_batch_mode_;
+  };
+
  protected:
   // Send a packet to the peer using encryption |level|. If |sequence_number|
   // is present in the |retransmission_map_|, then contents of this packet will
@@ -471,28 +503,9 @@ class NET_EXPORT_PRIVATE QuicConnection
   // such a version exists, false otherwise.
   bool SelectMutualVersion(const QuicVersionVector& available_versions);
 
+  QuicPacketWriter* writer() { return writer_; }
+
  private:
-  // Stores current batch state for connection, puts the connection
-  // into batch mode, and destruction restores the stored batch state.
-  // While the bundler is in scope, any generated frames are bundled
-  // as densely as possible into packets.  In addition, this bundler
-  // can be configured to ensure that an ACK frame is included in the
-  // first packet created, if there's new ack information to be sent.
-  class ScopedPacketBundler {
-   public:
-    // In addition to all outgoing frames being bundled when the
-    // bundler is in scope, setting |include_ack| to true ensures that
-    // an ACK frame is opportunistically bundled with the first
-    // outgoing packet.
-    ScopedPacketBundler(QuicConnection* connection, AckBundling send_ack);
-    ~ScopedPacketBundler();
-
-   private:
-    QuicConnection* connection_;
-    bool already_in_batch_mode_;
-  };
-
-  friend class ScopedPacketBundler;
   friend class test::QuicConnectionPeer;
 
   // Packets which have not been written to the wire.
@@ -589,6 +602,9 @@ class NET_EXPORT_PRIVATE QuicConnection
   // Closes any FEC groups protecting packets before |sequence_number|.
   void CloseFecGroupsBefore(QuicPacketSequenceNumber sequence_number);
 
+  // Sets the ping alarm to the appropriate value, if any.
+  void SetPingAlarm();
+
   QuicFramer framer_;
   QuicConnectionHelperInterface* helper_;  // Not owned.
   QuicPacketWriter* writer_;  // Not owned.
@@ -668,6 +684,8 @@ class NET_EXPORT_PRIVATE QuicConnection
   scoped_ptr<QuicAlarm> resume_writes_alarm_;
   // An alarm that fires when the connection may have timed out.
   scoped_ptr<QuicAlarm> timeout_alarm_;
+  // An alarm that fires when a ping should be sent.
+  scoped_ptr<QuicAlarm> ping_alarm_;
 
   QuicConnectionVisitorInterface* visitor_;
   QuicConnectionDebugVisitorInterface* debug_visitor_;
@@ -678,8 +696,6 @@ class NET_EXPORT_PRIVATE QuicConnection
   QuicTime::Delta idle_network_timeout_;
   // Overall connection timeout.
   QuicTime::Delta overall_connection_timeout_;
-  // Connection creation time.
-  QuicTime creation_time_;
 
   // Statistics for this session.
   QuicConnectionStats stats_;

@@ -18,6 +18,7 @@
 #include "chrome/browser/autocomplete/autocomplete_match.h"
 #include "chrome/browser/autocomplete/autocomplete_provider_listener.h"
 #include "chrome/browser/autocomplete/autocomplete_result.h"
+#include "chrome/browser/bookmarks/bookmark_utils.h"
 #include "chrome/browser/history/history_backend.h"
 #include "chrome/browser/history/history_database.h"
 #include "chrome/browser/history/history_service.h"
@@ -511,7 +512,6 @@ void HistoryURLProvider::DoAutocomplete(history::HistoryBackend* backend,
   // Otherwise, this is just low-quality noise.  In the cases where we've parsed
   // as UNKNOWN, we'll still show an accidental search infobar if need be.
   bool have_what_you_typed_match =
-      params->input.canonicalized_url().is_valid() &&
       (params->input.type() != AutocompleteInput::QUERY) &&
       ((params->input.type() != AutocompleteInput::UNKNOWN) ||
        (classifier.type() == VisitClassifier::UNVISITED_INTRANET) ||
@@ -703,8 +703,7 @@ void HistoryURLProvider::RunAutocompletePasses(
   const bool trim_http = !AutocompleteInput::HasHTTPScheme(input.text());
   // Don't do this for queries -- while we can sometimes mark up a match for
   // this, it's not what the user wants, and just adds noise.
-  if ((input.type() != AutocompleteInput::QUERY) &&
-      input.canonicalized_url().is_valid()) {
+  if (input.type() != AutocompleteInput::QUERY) {
     AutocompleteMatch what_you_typed(SuggestExactInput(
         input.text(), input.canonicalized_url(), trim_http));
     what_you_typed.relevance = CalculateRelevance(WHAT_YOU_TYPED, 0);
@@ -768,8 +767,7 @@ void HistoryURLProvider::RunAutocompletePasses(
 
   // Pass 2: Ask the history service to call us back on the history thread,
   // where we can read the full on-disk DB.
-  if (search_url_database_ &&
-      (input.matches_requested() == AutocompleteInput::ALL_MATCHES)) {
+  if (search_url_database_ && input.want_asynchronous_matches()) {
     done_ = false;
     params_ = params.release();  // This object will be destroyed in
                                  // QueryComplete() once we're done with it.
@@ -1150,7 +1148,7 @@ int HistoryURLProvider::CalculateRelevanceScoreUsingScoringParams(
 ACMatchClassifications HistoryURLProvider::ClassifyDescription(
     const base::string16& input_text,
     const base::string16& description) {
-  base::string16 clean_description = history::CleanUpTitleForMatching(
+  base::string16 clean_description = bookmark_utils::CleanUpTitleForMatching(
       description);
   history::TermMatches description_matches(SortAndDeoverlapMatches(
       history::MatchTermInString(input_text, clean_description, 0)));

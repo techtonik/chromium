@@ -15,14 +15,7 @@
 #include "content/renderer/media/media_stream_track.h"
 #include "content/renderer/media/media_stream_video_source.h"
 
-namespace webrtc {
-class VideoTrackInterface;
-}
-
 namespace content {
-
-class MediaStreamDependencyFactory;
-class WebRtcVideoSinkAdapter;
 
 // MediaStreamVideoTrack is a video specific representation of a
 // blink::WebMediaStreamTrack in content. It is owned by the blink object
@@ -42,8 +35,7 @@ class CONTENT_EXPORT MediaStreamVideoTrack : public MediaStreamTrack {
       MediaStreamVideoSource* source,
       const blink::WebMediaConstraints& constraints,
       const MediaStreamVideoSource::ConstraintsCallback& callback,
-      bool enabled,
-      MediaStreamDependencyFactory* factory);
+      bool enabled);
 
   static MediaStreamVideoTrack* GetVideoTrack(
       const blink::WebMediaStreamTrack& track);
@@ -53,19 +45,20 @@ class CONTENT_EXPORT MediaStreamVideoTrack : public MediaStreamTrack {
        MediaStreamVideoSource* source,
        const blink::WebMediaConstraints& constraints,
        const MediaStreamVideoSource::ConstraintsCallback& callback,
-       bool enabled,
-       MediaStreamDependencyFactory* factory);
+       bool enabled);
   virtual ~MediaStreamVideoTrack();
   virtual void AddSink(MediaStreamVideoSink* sink);
   virtual void RemoveSink(MediaStreamVideoSink* sink);
 
-  // TODO(perkj): GetVideoAdapter is webrtc specific. Move GetVideoAdapter to
-  // where the track is added to a RTCPeerConnection. crbug/323223.
-  virtual webrtc::VideoTrackInterface* GetVideoAdapter() OVERRIDE;
   virtual void SetEnabled(bool enabled) OVERRIDE;
+  virtual void Stop() OVERRIDE;
 
   void OnVideoFrame(const scoped_refptr<media::VideoFrame>& frame);
   void OnReadyStateChanged(blink::WebMediaStreamSource::ReadyState state);
+
+  const blink::WebMediaConstraints& constraints() const {
+    return constraints_;
+  }
 
  protected:
   // Used to DCHECK that we are called on the correct thread.
@@ -74,37 +67,14 @@ class CONTENT_EXPORT MediaStreamVideoTrack : public MediaStreamTrack {
  private:
   bool enabled_;
   std::vector<MediaStreamVideoSink*> sinks_;
+  blink::WebMediaConstraints constraints_;
 
   // Weak ref to the source this tracks is connected to.  |source_| is owned
   // by the blink::WebMediaStreamSource and is guaranteed to outlive the
   // track.
   MediaStreamVideoSource* source_;
 
-  // Weak ref to a MediaStreamDependencyFactory, owned by the RenderThread.
-  // It's valid for the lifetime of RenderThread.
-  MediaStreamDependencyFactory* factory_;
-
   DISALLOW_COPY_AND_ASSIGN(MediaStreamVideoTrack);
-};
-
-// WebRtcMediaStreamVideoTrack is a content representation of a video track.
-// received on a PeerConnection.
-// TODO(perkj): Replace WebRtcMediaStreamVideoTrack with a remote
-// MediaStreamVideoSource class so that all tracks are MediaStreamVideoTracks
-// and new tracks can be cloned from the original remote video track.
-// crbug/334243.
-class CONTENT_EXPORT WebRtcMediaStreamVideoTrack
-    : public MediaStreamVideoTrack {
- public:
-  explicit WebRtcMediaStreamVideoTrack(webrtc::VideoTrackInterface* track);
-  virtual ~WebRtcMediaStreamVideoTrack();
-  virtual void AddSink(MediaStreamVideoSink* sink) OVERRIDE;
-  virtual void RemoveSink(MediaStreamVideoSink* sink) OVERRIDE;
-
- private:
-  ScopedVector<WebRtcVideoSinkAdapter> sinks_;
-
-  DISALLOW_COPY_AND_ASSIGN(WebRtcMediaStreamVideoTrack);
 };
 
 }  // namespace content

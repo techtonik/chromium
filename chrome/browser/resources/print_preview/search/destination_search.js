@@ -147,6 +147,9 @@ cr.define('print_preview', function() {
               print_preview.Metrics.DestinationSearchBucket.
                   CLOUDPRINT_PROMO_SHOWN);
         }
+        if (this.userInfo_.initialized) {
+          this.onUsersChanged_();
+        }
         this.reflowLists_();
       } else {
         this.getElement().classList.add('transparent');
@@ -224,7 +227,7 @@ cr.define('print_preview', function() {
       this.tracker.add(
           this.destinationStore_,
           print_preview.DestinationStore.EventType.DESTINATION_SEARCH_DONE,
-          this.updateThrobbers_.bind(this));
+          this.onDestinationSearchDone_.bind(this));
 
       this.tracker.add(
           this.localList_,
@@ -312,7 +315,9 @@ cr.define('print_preview', function() {
       var cloudDestinations = [];
       var unregisteredCloudDestinations = [];
 
-      this.destinationStore_.destinations.forEach(function(destination) {
+      var destinations =
+          this.destinationStore_.destinations(this.userInfo_.activeUser);
+      destinations.forEach(function(destination) {
         if (destination.isRecent) {
           recentDestinations.push(destination);
         }
@@ -362,34 +367,57 @@ cr.define('print_preview', function() {
         lists.push(this.cloudList_);
       }
 
+      var getListsTotalHeight = function(lists, counts) {
+        return lists.reduce(function(sum, list, index) {
+          return sum + list.getEstimatedHeightInPixels(counts[index]) +
+              DestinationSearch.LIST_BOTTOM_PADDING_;
+        }, 0);
+      };
+      var getCounts = function(lists, count) {
+        return lists.map(function(list) { return count; });
+      };
+
       var availableHeight = this.getAvailableListsHeight_();
-      this.getChildElement('.lists').style.maxHeight = availableHeight + 'px';
+      var listsEl = this.getChildElement('.lists');
+      listsEl.style.maxHeight = availableHeight + 'px';
 
       var maxListLength = lists.reduce(function(prevCount, list) {
         return Math.max(prevCount, list.getDestinationsCount());
       }, 0);
       for (var i = 1; i <= maxListLength; i++) {
-        var listsHeight = lists.reduce(function(sum, list) {
-          return sum + list.getEstimatedHeightInPixels(i) +
-              DestinationSearch.LIST_BOTTOM_PADDING_;
-        }, 0);
-        if (listsHeight > availableHeight) {
-          i -= 1;
+        if (getListsTotalHeight(lists, getCounts(lists, i)) > availableHeight) {
+          i--;
           break;
         }
       }
+      var counts = getCounts(lists, i);
+      // Fill up the possible n-1 free slots left by the previous loop.
+      if (getListsTotalHeight(lists, counts) < availableHeight) {
+        for (var countIndex = 0; countIndex < counts.length; countIndex++) {
+          counts[countIndex]++;
+          if (getListsTotalHeight(lists, counts) > availableHeight) {
+            counts[countIndex]--;
+            break;
+          }
+        }
+      }
 
-      lists.forEach(function(list) {
-        list.updateShortListSize(i);
+      lists.forEach(function(list, index) {
+        list.updateShortListSize(counts[index]);
       });
 
       // Set height of the list manually so that search filter doesn't change
       // lists height.
-      this.getChildElement('.lists').style.height =
-          lists.reduce(function(sum, list) {
-            return sum + list.getEstimatedHeightInPixels(i) +
-                DestinationSearch.LIST_BOTTOM_PADDING_;
-          }, 0) + 'px';
+      var listsHeight = getListsTotalHeight(lists, counts) + 'px';
+      if (listsHeight != listsEl.style.height) {
+        // Try to close account select if there's a possibility it's open now.
+        var accountSelectEl = this.getChildElement('.account-select');
+        if (!accountSelectEl.disabled) {
+          accountSelectEl.disabled = true;
+          accountSelectEl.disabled = false;
+        }
+        listsEl.style.height = listsHeight;
+      }
     },
 
     /**
@@ -408,18 +436,16 @@ cr.define('print_preview', function() {
       this.reflowLists_();
     },
 
-
     /**
-     * Updates the account selection UI.
-     * @param {string} email Email of the logged in user.
-     * @param {!Array.<string>} accounts List of logged in user accounts.
+     * Called when user's logged in accounts change. Updates the UI.
+     * @private
      */
-    setAccounts_: function(email, accounts) {
-      var loggedIn = !!email;
+    onUsersChanged_: function() {
+      var loggedIn = this.userInfo_.loggedIn;
       if (loggedIn) {
         var accountSelectEl = this.getChildElement('.account-select');
         accountSelectEl.innerHTML = '';
-        accounts.forEach(function(account) {
+        this.userInfo_.users.forEach(function(account) {
           var option = document.createElement('option');
           option.text = account;
           option.value = account;
@@ -430,7 +456,8 @@ cr.define('print_preview', function() {
         option.value = '';
         accountSelectEl.add(option);
 
-        accountSelectEl.selectedIndex = accounts.indexOf(email);
+        accountSelectEl.selectedIndex =
+            this.userInfo_.users.indexOf(this.userInfo_.activeUser);
       }
 
       setIsVisible(this.getChildElement('.user-info'), loggedIn);
@@ -480,7 +507,8 @@ cr.define('print_preview', function() {
      * @private
      */
     onDestinationStoreSelect_: function() {
-      var destinations = this.destinationStore_.destinations;
+      var destinations =
+          this.destinationStore_.destinations(this.userInfo_.activeUser);
       var recentDestinations = [];
       destinations.forEach(function(destination) {
         if (destination.isRecent) {
@@ -497,6 +525,17 @@ cr.define('print_preview', function() {
      * @private
      */
     onDestinationsInserted_: function() {
+      this.renderDestinations_();
+      this.reflowLists_();
+    },
+
+    /**
+     * Called when destinations are inserted into the store. Rerenders
+     * destinations.
+     * @private
+     */
+    onDestinationSearchDone_: function() {
+      this.updateThrobbers_();
       this.renderDestinations_();
       this.reflowLists_();
     },
@@ -543,6 +582,7 @@ cr.define('print_preview', function() {
           accountSelectEl.options[accountSelectEl.selectedIndex].value;
       if (account) {
         this.userInfo_.activeUser = account;
+        this.destinationStore_.reloadUserCookieBasedDestinations();
       } else {
         cr.dispatchSimpleEvent(this, DestinationSearch.EventType.ADD_ACCOUNT);
         // Set selection back to the active user.
@@ -581,14 +621,6 @@ cr.define('print_preview', function() {
      */
     onAnimationEnd_: function() {
       this.getChildElement('.page').classList.remove('pulse');
-    },
-
-    /**
-     * Called when user's logged in accounts change. Updates the UI.
-     * @private
-     */
-    onUsersChanged_: function() {
-      this.setAccounts_(this.userInfo_.activeUser, this.userInfo_.users);
     },
 
     /**

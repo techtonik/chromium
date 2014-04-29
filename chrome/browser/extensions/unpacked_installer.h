@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 
+#include "base/bind.h"
 #include "base/files/file_path.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
@@ -29,6 +30,9 @@ class RequirementsChecker;
 class UnpackedInstaller
     : public base::RefCountedThreadSafe<UnpackedInstaller> {
  public:
+  typedef base::Callback<void(const base::FilePath&, const std::string&)>
+      OnFailureCallback;
+
   static scoped_refptr<UnpackedInstaller> Create(
       ExtensionService* extension_service);
 
@@ -61,6 +65,10 @@ class UnpackedInstaller
     require_modern_manifest_version_ = val;
   }
 
+  void set_on_failure_callback(const OnFailureCallback& callback) {
+    on_failure_callback_ = callback;
+  }
+
  private:
   friend class base::RefCountedThreadSafe<UnpackedInstaller>;
 
@@ -85,7 +93,7 @@ class UnpackedInstaller
   // the UI thread. In turn, once that gets the pref, it goes back to the
   // file thread with LoadWithFileAccess.
   // TODO(yoz): It would be nice to remove this ping-pong, but we need to know
-  // what file access flags to pass to extension_file_util::LoadExtension.
+  // what file access flags to pass to file_util::LoadExtension.
   void GetAbsolutePath();
   void CheckExtensionFileAccess();
   void LoadWithFileAccess(int flags);
@@ -116,6 +124,9 @@ class UnpackedInstaller
   // Whether to require the extension installed to have a modern manifest
   // version.
   bool require_modern_manifest_version_;
+
+  // An optional callback to set in order to be notified of failure.
+  OnFailureCallback on_failure_callback_;
 
   // Gives access to common methods and data of an extension installer.
   ExtensionInstaller installer_;

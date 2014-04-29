@@ -30,7 +30,7 @@ ConstrainedWindowMac::ConstrainedWindowMac(
   DCHECK(sheet_.get());
   WebContentsModalDialogManager* web_contents_modal_dialog_manager =
       WebContentsModalDialogManager::FromWebContents(web_contents);
-  web_contents_modal_dialog_manager->ShowDialog(this);
+  web_contents_modal_dialog_manager->ShowModalDialog(this);
 }
 
 ConstrainedWindowMac::~ConstrainedWindowMac() {
@@ -56,11 +56,16 @@ void ConstrainedWindowMac::ShowWebContentsModalDialog() {
 void ConstrainedWindowMac::CloseWebContentsModalDialog() {
   [[ConstrainedWindowSheetController controllerForSheet:sheet_]
       closeSheet:sheet_];
+  // TODO(gbillock): get this object in config, not from a global.
   WebContentsModalDialogManager* web_contents_modal_dialog_manager =
       WebContentsModalDialogManager::FromWebContents(web_contents_);
-  web_contents_modal_dialog_manager->WillClose(this);
+
+  // Will result in the delegate being deleted.
   if (delegate_)
     delegate_->OnConstrainedWindowClosed(this);
+
+  // Will cause this object to be deleted.
+  web_contents_modal_dialog_manager->WillClose(this);
 }
 
 void ConstrainedWindowMac::FocusWebContentsModalDialog() {

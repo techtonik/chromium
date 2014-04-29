@@ -13,3 +13,10 @@ fun:*MOZ_Z_deflate*
 # Uninit in Mesa. http://crbug.com/347967
 fun:unpack_RGBA8888
 fun:unpack_RGB888
+
+# http://crbug.com/363487
+fun:*WebCore*RenderLayerCompositor*updateIfNeeded*
+
+# Fixed in clang r207227.
+# http://code.google.com/p/memory-sanitizer/issues/detail?id=53
+fun:getc_unlocked

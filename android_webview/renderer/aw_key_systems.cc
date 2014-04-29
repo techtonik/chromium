@@ -8,17 +8,12 @@
 
 #include "base/command_line.h"
 #include "base/logging.h"
-#include "base/strings/string_split.h"
+#include "content/public/common/eme_codec.h"
 #include "third_party/widevine/cdm/widevine_cdm_common.h"
 
 using content::KeySystemInfo;
 
 namespace {
-
-const char kAudioMp4[] = "audio/mp4";
-const char kVideoMp4[] = "video/mp4";
-const char kMp4a[] = "mp4a";
-const char kMp4aAvc1Avc3[] = "mp4a,avc1,avc3";
 
 // Return |name|'s parent key system.
 std::string GetDirectParentName(const std::string& name) {
@@ -35,8 +30,7 @@ void AddWidevineWithCodecs(const std::string& key_system_name,
   if (add_parent_name)
     info.parent_key_system = GetDirectParentName(key_system_name);
 
-  info.supported_types.push_back(std::make_pair(kAudioMp4, kMp4a));
-  info.supported_types.push_back(std::make_pair(kVideoMp4, kMp4aAvc1Avc3));
+  info.supported_codecs = content::EME_CODEC_MP4_ALL;
 
   concrete_key_systems->push_back(info);
 }

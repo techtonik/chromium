@@ -92,6 +92,14 @@ enum EventFlags {
   EF_MOD3_DOWN           = 1 << 11,
 };
 
+// Flags specific to key events
+enum KeyEventFlags {
+  EF_NUMPAD_KEY         = 1 << 16,  // Key originates from number pad (Xkb only)
+  EF_IME_FABRICATED_KEY = 1 << 17,  // Key event fabricated by the underlying
+                                    // IME without a user action.
+                                    // (Linux X11 only)
+};
+
 // Flags specific to mouse events
 enum MouseEventFlags {
   EF_IS_DOUBLE_CLICK    = 1 << 16,

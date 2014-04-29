@@ -46,7 +46,8 @@ class RtcpTestPacketSender : public transport::PacketSender {
   void set_drop_packets(bool drop_packets) { drop_packets_ = drop_packets; }
 
   // A singular packet implies a RTCP packet.
-  virtual bool SendPacket(const Packet& packet) OVERRIDE {
+  virtual bool SendPacket(transport::PacketRef packet,
+                          const base::Closure& cb) OVERRIDE {
     if (short_delay_) {
       testing_clock_->Advance(
           base::TimeDelta::FromMilliseconds(kAddedShortDelay));
@@ -56,7 +57,7 @@ class RtcpTestPacketSender : public transport::PacketSender {
     if (drop_packets_)
       return true;
 
-    rtcp_receiver_->IncomingRtcpPacket(&(packet[0]), packet.size());
+    rtcp_receiver_->IncomingRtcpPacket(&packet->data[0], packet->data.size());
     return true;
   }
 
@@ -83,7 +84,8 @@ class LocalRtcpTransport : public transport::PacedPacketSender {
 
   void set_drop_packets(bool drop_packets) { drop_packets_ = drop_packets; }
 
-  virtual bool SendRtcpPacket(const Packet& packet) OVERRIDE {
+  virtual bool SendRtcpPacket(uint32 ssrc,
+                              transport::PacketRef packet) OVERRIDE {
     if (short_delay_) {
       testing_clock_->Advance(
           base::TimeDelta::FromMilliseconds(kAddedShortDelay));
@@ -93,13 +95,17 @@ class LocalRtcpTransport : public transport::PacedPacketSender {
     if (drop_packets_)
       return true;
 
-    rtcp_->IncomingRtcpPacket(&(packet[0]), packet.size());
+    rtcp_->IncomingRtcpPacket(&packet->data[0], packet->data.size());
     return true;
   }
 
-  virtual bool SendPackets(const PacketList& packets) OVERRIDE { return false; }
+  virtual bool SendPackets(
+      const transport::SendPacketVector& packets) OVERRIDE {
+    return false;
+  }
 
-  virtual bool ResendPackets(const PacketList& packets) OVERRIDE {
+  virtual bool ResendPackets(
+      const transport::SendPacketVector& packets) OVERRIDE {
     return false;
   }
 

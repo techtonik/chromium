@@ -10,10 +10,9 @@
       'dependencies': [
         '../mojo/mojo.gyp:mojo_bindings',
         '../mojo/mojo.gyp:mojo_environment_chromium',
-        '../mojo/mojo.gyp:mojo_system',
       ],
       'sources': [
-        'common/mojo/render_process.mojom',
+        'common/web_ui_setup.mojom',
       ],
       # TODO(sky): this shouldn't be necessary. It's working around a bug in
       # gyp.
@@ -24,7 +23,6 @@
       'export_dependent_settings': [
         '../mojo/mojo.gyp:mojo_bindings',
         '../mojo/mojo.gyp:mojo_environment_chromium',
-        '../mojo/mojo.gyp:mojo_system',
       ],
     },
   ],

@@ -53,8 +53,6 @@ enum CreateSessionFailure {
   CREATION_ERROR_MAX
 };
 
-const uint64 kBrokenAlternateProtocolDelaySecs = 300;
-
 // The initial receive window size for both streams and sessions.
 const int32 kInitialReceiveWindowSize = 10 * 1024 * 1024;  // 10MB
 
@@ -105,6 +103,7 @@ class QuicStreamFactory::Job {
       HostResolver* host_resolver,
       const HostPortPair& host_port_pair,
       bool is_https,
+      bool was_alternate_protocol_recently_broken,
       PrivacyMode privacy_mode,
       base::StringPiece method,
       QuicServerInfo* server_info,
@@ -148,6 +147,7 @@ class QuicStreamFactory::Job {
   SingleRequestHostResolver host_resolver_;
   QuicServerId server_id_;
   bool is_post_;
+  bool was_alternate_protocol_recently_broken_;
   scoped_ptr<QuicServerInfo> server_info_;
   const BoundNetLog net_log_;
   QuicClientSession* session_;
@@ -162,6 +162,7 @@ QuicStreamFactory::Job::Job(QuicStreamFactory* factory,
                             HostResolver* host_resolver,
                             const HostPortPair& host_port_pair,
                             bool is_https,
+                            bool was_alternate_protocol_recently_broken,
                             PrivacyMode privacy_mode,
                             base::StringPiece method,
                             QuicServerInfo* server_info,
@@ -170,6 +171,8 @@ QuicStreamFactory::Job::Job(QuicStreamFactory* factory,
       host_resolver_(host_resolver),
       server_id_(host_port_pair, is_https, privacy_mode),
       is_post_(method == "POST"),
+      was_alternate_protocol_recently_broken_(
+          was_alternate_protocol_recently_broken),
       server_info_(server_info),
       net_log_(net_log),
       session_(NULL),
@@ -302,8 +305,11 @@ int QuicStreamFactory::Job::DoConnect() {
   if (!session_->connection()->connected()) {
     return ERR_QUIC_PROTOCOL_ERROR;
   }
+  bool require_confirmation =
+      factory_->require_confirmation() || server_id_.is_https() || is_post_ ||
+      was_alternate_protocol_recently_broken_;
   rv = session_->CryptoConnect(
-      factory_->require_confirmation() || server_id_.is_https() || is_post_,
+      require_confirmation,
       base::Bind(&QuicStreamFactory::Job::OnIOComplete,
                  base::Unretained(this)));
   return rv;
@@ -453,7 +459,12 @@ int QuicStreamFactory::Create(const HostPortPair& host_port_pair,
       quic_server_info = quic_server_info_factory_->GetForServer(server_id);
     }
   }
+  bool was_alternate_protocol_recently_broken =
+      http_server_properties_ &&
+      http_server_properties_->WasAlternateProtocolRecentlyBroken(
+          server_id.host_port_pair());
   scoped_ptr<Job> job(new Job(this, host_resolver_, host_port_pair, is_https,
+                              was_alternate_protocol_recently_broken,
                               privacy_mode, method, quic_server_info, net_log));
   int rv = job->Run(base::Bind(&QuicStreamFactory::OnJobComplete,
                                base::Unretained(this), job.get()));
@@ -563,28 +574,16 @@ void QuicStreamFactory::OnSessionGoingAway(QuicClientSession* session) {
       // packets from the peer, we should consider blacklisting this
       // differently so that we still race TCP but we don't consider the
       // session connected until the handshake has been confirmed.
+      HistogramBrokenAlternateProtocolLocation(
+          BROKEN_ALTERNATE_PROTOCOL_LOCATION_QUIC_STREAM_FACTORY);
       http_server_properties_->SetBrokenAlternateProtocol(it->host_port_pair());
       UMA_HISTOGRAM_COUNTS("Net.QuicHandshakeNotConfirmedNumPacketsReceived",
                            stats.packets_received);
-      int count = ++broken_alternate_protocol_map_[it->host_port_pair()];
-      base::TimeDelta delay =
-          base::TimeDelta::FromSeconds(kBrokenAlternateProtocolDelaySecs);
-      BrokenAlternateProtocolEntry entry;
-      entry.origin = it->host_port_pair();
-      entry.when = base::TimeTicks::Now() + delay * (1 << (count - 1));
-      broken_alternate_protocol_list_.push_back(entry);
-      // If this is the only entry in the list, schedule an expiration task.
-      // Otherwse it will be rescheduled automatically when the pending
-      // task runs.
-      if (broken_alternate_protocol_list_.size() == 1) {
-        ScheduleBrokenAlternateProtocolMappingsExpiration();
-      }
       continue;
     }
 
-    broken_alternate_protocol_map_.erase(it->host_port_pair());
     HttpServerProperties::NetworkStats network_stats;
-    network_stats.rtt = base::TimeDelta::FromMicroseconds(stats.rtt);
+    network_stats.srtt = base::TimeDelta::FromMicroseconds(stats.srtt_us);
     network_stats.bandwidth_estimate = stats.estimated_bandwidth;
     http_server_properties_->SetServerNetworkStats(it->host_port_pair(),
                                                    network_stats);
@@ -647,6 +646,10 @@ base::Value* QuicStreamFactory::QuicStreamFactoryInfoToValue() const {
     }
   }
   return list;
+}
+
+void QuicStreamFactory::ClearCachedStatesInCryptoConfig() {
+  crypto_config_.ClearCachedStates();
 }
 
 void QuicStreamFactory::OnIPAddressChanged() {
@@ -751,7 +754,7 @@ int QuicStreamFactory::CreateSession(
   writer->SetConnection(connection);
   connection->options()->max_packet_length = max_packet_length_;
 
-  InitializeCachedState(server_id, server_info);
+  InitializeCachedStateInCryptoConfig(server_id, server_info);
 
   QuicConfig config = config_;
   if (http_server_properties_) {
@@ -759,8 +762,7 @@ int QuicStreamFactory::CreateSession(
         http_server_properties_->GetServerNetworkStats(
             server_id.host_port_pair());
     if (stats != NULL) {
-      config.set_initial_round_trip_time_us(stats->rtt.InMicroseconds(),
-                                            stats->rtt.InMicroseconds());
+      config.SetInitialRoundTripTimeUsToSend(stats->srtt.InMicroseconds());
     }
   }
 
@@ -788,7 +790,7 @@ void QuicStreamFactory::ActivateSession(
   ip_aliases_[ip_alias_key].insert(session);
 }
 
-void QuicStreamFactory::InitializeCachedState(
+void QuicStreamFactory::InitializeCachedStateInCryptoConfig(
     const QuicServerId& server_id,
     const scoped_ptr<QuicServerInfo>& server_info) {
   if (!server_info)
@@ -810,35 +812,6 @@ void QuicStreamFactory::InitializeCachedState(
     // Don't check the certificates for insecure QUIC.
     cached->SetProofValid();
   }
-}
-
-void QuicStreamFactory::ExpireBrokenAlternateProtocolMappings() {
-  base::TimeTicks now = base::TimeTicks::Now();
-  while (!broken_alternate_protocol_list_.empty()) {
-    BrokenAlternateProtocolEntry entry =
-        broken_alternate_protocol_list_.front();
-    if (now < entry.when) {
-      break;
-    }
-
-    http_server_properties_->ClearAlternateProtocol(entry.origin);
-    broken_alternate_protocol_list_.pop_front();
-  }
-  ScheduleBrokenAlternateProtocolMappingsExpiration();
-}
-
-void QuicStreamFactory::ScheduleBrokenAlternateProtocolMappingsExpiration() {
-  if (broken_alternate_protocol_list_.empty()) {
-    return;
-  }
-  base::TimeTicks now = base::TimeTicks::Now();
-  base::TimeTicks when = broken_alternate_protocol_list_.front().when;
-  base::TimeDelta delay = when > now ? when - now : base::TimeDelta();
-  base::MessageLoop::current()->PostDelayedTask(
-      FROM_HERE,
-      base::Bind(&QuicStreamFactory::ExpireBrokenAlternateProtocolMappings,
-                 weak_factory_.GetWeakPtr()),
-      delay);
 }
 
 }  // namespace net

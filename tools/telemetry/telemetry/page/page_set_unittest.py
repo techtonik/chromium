@@ -10,49 +10,7 @@ from telemetry.core import util
 from telemetry.page import page_set
 
 
-simple_archive_info = """
-{
-"archives": {
-  "data_01.wpr": ["http://www.foo.com/"],
-  "data_02.wpr": ["http://www.bar.com/"]
-}
-}
-"""
-
-
-simple_set = """
-{"description": "hello",
- "archive_data_file": "%s",
- "pages": [
-   {"url": "http://www.foo.com/"},
-   {"url": "http://www.bar.com/"}
- ]
-}
-"""
-
-
 class TestPageSet(unittest.TestCase):
-  def testSimpleSet(self):
-    try:
-      with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as f:
-        f.write(simple_archive_info)
-
-      with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as f2:
-        f2.write(simple_set % f.name.replace('\\', '\\\\'))
-
-      ps = page_set.PageSet.FromFile(f2.name)
-    finally:
-      os.remove(f.name)
-      os.remove(f2.name)
-
-    self.assertEquals('hello', ps.description)
-    self.assertEquals(f.name, ps.archive_data_file)
-    self.assertEquals(2, len(ps.pages))
-    self.assertEquals('http://www.foo.com/', ps.pages[0].url)
-    self.assertEquals('http://www.bar.com/', ps.pages[1].url)
-    self.assertEquals('data_01.wpr', os.path.basename(ps.pages[0].archive_path))
-    self.assertEquals('data_02.wpr', os.path.basename(ps.pages[1].archive_path))
-
   def testServingDirs(self):
     directory_path = tempfile.mkdtemp()
     try:
@@ -148,3 +106,15 @@ class TestPageSet(unittest.TestCase):
     self.assertEqual(
       os.path.normpath(os.path.join(
         util.GetUnittestDataDir(), 'pages/foo.html')), external_page.file_path)
+
+  def testDictBasedPageSet(self):
+    dict_ps = page_set.PageSet.FromDict({
+      'description': 'hello',
+      'archive_path': 'foo.wpr',
+      'pages': [{'url': 'file://../../otherdir/foo/'}]
+      }, os.path.dirname(__file__))
+    self.assertTrue(dict_ps.IsDictBasedPageSet())
+
+    test_pps_dir = os.path.join(util.GetUnittestDataDir(), 'test_page_set.py')
+    python_ps = page_set.PageSet.FromFile(test_pps_dir)
+    self.assertFalse(python_ps.IsDictBasedPageSet())

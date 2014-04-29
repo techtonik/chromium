@@ -51,6 +51,10 @@ uint32_t WindowTreeHostOzone::DispatchEvent(const ui::PlatformEvent& ne) {
   return ui::POST_DISPATCH_STOP_PROPAGATION;
 }
 
+ui::EventSource* WindowTreeHostOzone::GetEventSource() {
+  return this;
+}
+
 gfx::AcceleratedWidget WindowTreeHostOzone::GetAcceleratedWidget() {
   return widget_;
 }
@@ -62,7 +66,13 @@ void WindowTreeHostOzone::Hide() { NOTIMPLEMENTED(); }
 gfx::Rect WindowTreeHostOzone::GetBounds() const { return bounds_; }
 
 void WindowTreeHostOzone::SetBounds(const gfx::Rect& bounds) {
-  NOTIMPLEMENTED();
+  bool origin_changed = bounds_.origin() != bounds.origin();
+  bool size_changed = bounds_.size() != bounds.size();
+  bounds_ = bounds;
+  if (size_changed)
+    OnHostResized(bounds_.size());
+  if (origin_changed)
+    OnHostMoved(bounds_.origin());
 }
 
 gfx::Point WindowTreeHostOzone::GetLocationOnNativeScreen() const {
@@ -72,11 +82,6 @@ gfx::Point WindowTreeHostOzone::GetLocationOnNativeScreen() const {
 void WindowTreeHostOzone::SetCapture() { NOTIMPLEMENTED(); }
 
 void WindowTreeHostOzone::ReleaseCapture() { NOTIMPLEMENTED(); }
-
-bool WindowTreeHostOzone::QueryMouseLocation(gfx::Point* location_return) {
-  NOTIMPLEMENTED();
-  return false;
-}
 
 void WindowTreeHostOzone::PostNativeEvent(
     const base::NativeEvent& native_event) {

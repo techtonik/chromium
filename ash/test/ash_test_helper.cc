@@ -98,7 +98,7 @@ void AshTestHelper::SetUp(bool start_session) {
 
   test::DisplayManagerTestApi(shell->display_manager()).
       DisableChangeDisplayUponHostResize();
-  ShellTestApi(shell).DisableOutputConfiguratorAnimation();
+  ShellTestApi(shell).DisableDisplayConfiguratorAnimation();
 
   test_screenshot_delegate_ = new TestScreenshotDelegate();
   shell->accelerator_controller()->SetScreenshotDelegate(
@@ -154,7 +154,7 @@ aura::Window* AshTestHelper::CurrentContext() {
 // static
 bool AshTestHelper::SupportsMultipleDisplays() {
 #if defined(OS_WIN)
-  return base::win::GetVersion() < base::win::VERSION_WIN8;
+  return false;
 #else
   return true;
 #endif
@@ -163,7 +163,7 @@ bool AshTestHelper::SupportsMultipleDisplays() {
 // static
 bool AshTestHelper::SupportsHostWindowResize() {
 #if defined(OS_WIN)
-  return base::win::GetVersion() < base::win::VERSION_WIN8;
+  return false;
 #else
   return true;
 #endif

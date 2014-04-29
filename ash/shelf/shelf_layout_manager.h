@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "ash/ash_export.h"
+#include "ash/session_state_observer.h"
 #include "ash/shelf/background_animator.h"
 #include "ash/shelf/shelf.h"
 #include "ash/shelf/shelf_types.h"
@@ -60,7 +61,8 @@ class ASH_EXPORT ShelfLayoutManager :
     public aura::client::ActivationChangeObserver,
     public DockedWindowLayoutManagerObserver,
     public keyboard::KeyboardControllerObserver,
-    public LockStateObserver {
+    public LockStateObserver,
+    public SessionStateObserver {
  public:
 
   // We reserve a small area on the edge of the workspace area to ensure that
@@ -74,17 +76,9 @@ class ASH_EXPORT ShelfLayoutManager :
   // Size of the shelf when auto-hidden.
   static const int kAutoHideSize;
 
-  // The size of the shelf when shown (currently only used in alternate
-  // settings see ash::switches::UseAlternateShelfLayout).
-  static const int kShelfSize;
-
   // Inset between the inner edge of the shelf (towards centre of screen), and
   // the shelf items, notifications, status area etc.
   static const int kShelfItemInset;
-
-  // Returns the preferred size for the shelf (either kShelfPreferredSize or
-  // kShelfSize).
-  static int GetPreferredShelfSize();
 
   explicit ShelfLayoutManager(ShelfWidget* shelf);
   virtual ~ShelfLayoutManager();
@@ -190,6 +184,10 @@ class ASH_EXPORT ShelfLayoutManager :
 
   // Overridden from ash::LockStateObserver:
   virtual void OnLockStateEvent(LockStateObserver::EventType event) OVERRIDE;
+
+  // Overridden from ash::SessionStateObserver:
+  virtual void SessionStateChanged(
+      SessionStateDelegate::SessionState state) OVERRIDE;
 
   // TODO(harrym|oshima): These templates will be moved to
   // new Shelf class.
@@ -323,9 +321,8 @@ class ASH_EXPORT ShelfLayoutManager :
 
   int GetWorkAreaSize(const State& state, int size) const;
 
-  // Return the bounds available in the parent, taking into account the bounds
-  // of the keyboard if necessary.
-  gfx::Rect GetAvailableBounds() const;
+  // Returns true if the shelf should be forced to be visible.
+  bool IsShelfForcedToBeVisible() const;
 
   // Overridden from keyboard::KeyboardControllerObserver:
   virtual void OnKeyboardBoundsChanging(const gfx::Rect& new_bounds) OVERRIDE;

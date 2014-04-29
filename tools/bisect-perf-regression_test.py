@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import math
 import unittest
 
 # Special import necessary because filename contains dash characters.
@@ -18,6 +19,37 @@ class BisectPerfRegressionTest(unittest.TestCase):
   def tearDown(self):
     """Cleans up the test environment after each test method."""
     pass
+
+  def testParseDEPSStringManually(self):
+    """Tests DEPS parsing."""
+    bisect_options = bisect_perf_module.BisectOptions()
+    bisect_instance = bisect_perf_module.BisectPerformanceMetrics(
+        None, bisect_options)
+
+    deps_file_contents = """
+vars = {
+    'ffmpeg_hash':
+         '@ac4a9f31fe2610bd146857bbd55d7a260003a888',
+    'webkit_url':
+         'https://chromium.googlesource.com/chromium/blink.git',
+    'git_url':
+         'https://chromium.googlesource.com',
+    'webkit_rev':
+         '@e01ac0a267d1017288bc67fa3c366b10469d8a24',
+    'angle_revision':
+         '74697cf2064c0a2c0d7e1b1b28db439286766a05'
+}"""
+
+    # Should only expect svn/git revisions to come through, and urls to be
+    # filtered out.
+    expected_vars_dict = {
+        'ffmpeg_hash': '@ac4a9f31fe2610bd146857bbd55d7a260003a888',
+        'webkit_rev': '@e01ac0a267d1017288bc67fa3c366b10469d8a24',
+        'angle_revision': '74697cf2064c0a2c0d7e1b1b28db439286766a05'
+    }
+    vars_dict = bisect_instance._ParseRevisionsFromDEPSFileManually(
+        deps_file_contents)
+    self.assertEqual(vars_dict, expected_vars_dict)
 
   def testCalculateTruncatedMeanRaisesError(self):
     """CalculateTrunctedMean raises an error when passed an empty list."""
@@ -74,6 +106,28 @@ class BisectPerfRegressionTest(unittest.TestCase):
     # Standard deviation in both groups is zero, so confidence is 100.
     self.assertEqual(
         100, bisect_perf_module.CalculateConfidence(bad_values, good_values))
+
+  def testCalculateRelativeChange(self):
+    """Tests the common cases for calculating relative change."""
+    # The change is relative to the first value, regardless of which is bigger.
+    self.assertEqual(0.5, bisect_perf_module.CalculateRelativeChange(1.0, 1.5))
+    self.assertEqual(0.5, bisect_perf_module.CalculateRelativeChange(2.0, 1.0))
+
+  def testCalculateRelativeChangeFromZero(self):
+    """Tests what happens when relative change from zero is calculated."""
+    # If the first number is zero, then the result is not a number.
+    self.assertEqual(0, bisect_perf_module.CalculateRelativeChange(0, 0))
+    self.assertTrue(
+        math.isnan(bisect_perf_module.CalculateRelativeChange(0, 1)))
+    self.assertTrue(
+        math.isnan(bisect_perf_module.CalculateRelativeChange(0, -1)))
+
+  def testCalculateRelativeChangeWithNegatives(self):
+    """Tests that relative change given is always positive."""
+    self.assertEqual(3.0, bisect_perf_module.CalculateRelativeChange(-1, 2))
+    self.assertEqual(3.0, bisect_perf_module.CalculateRelativeChange(1, -2))
+    self.assertEqual(1.0, bisect_perf_module.CalculateRelativeChange(-1, -2))
+
 
 if __name__ == '__main__':
   unittest.main()

@@ -144,11 +144,6 @@ class CONTENT_EXPORT RenderViewHostDelegate {
   // the window.
   virtual void DidDisownOpener(RenderViewHost* rvh) {}
 
-  // Another page accessed the initial empty document of this RenderView,
-  // which means it is no longer safe to display a pending URL without
-  // risking a URL spoof.
-  virtual void DidAccessInitialDocument() {}
-
   // The RenderView's main frame document element is ready. This happens when
   // the document has finished parsing.
   virtual void DocumentAvailableInMainFrame(RenderViewHost* render_view_host) {}
@@ -307,6 +302,9 @@ class CONTENT_EXPORT RenderViewHostDelegate {
   // create the SessionStorageNamespace on the fly.
   virtual SessionStorageNamespace* GetSessionStorageNamespace(
       SiteInstance* instance);
+
+  // Returns true if the RenderViewHost will never be visible.
+  virtual bool IsNeverVisible();
 
   // Returns the FrameTree the render view should use. Guaranteed to be constant
   // for the lifetime of the render view.

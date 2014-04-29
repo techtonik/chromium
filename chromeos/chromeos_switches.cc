@@ -15,6 +15,9 @@ const char kAppOemManifestFile[]            = "app-mode-oem-manifest";
 // Possible values: parallel|postpone. Default: parallel.
 const char kAshWebUIInit[]                  = "ash-webui-init";
 
+// Specifies the URL of the consumer device management backend.
+const char kConsumerDeviceManagementUrl[]   = "consumer-device-management-url";
+
 // Forces the stub implementation of dbus clients.
 const char kDbusStub[] = "dbus-stub";
 
@@ -65,6 +68,13 @@ const char kEchoExtensionPath[]             = "echo-ext-path";
 // Enables switching between different cellular carriers from the UI.
 const char kEnableCarrierSwitching[]        = "enable-carrier-switching";
 
+// Enables consumer management, which allows user to enroll, remotely lock and
+// locate the device.
+const char kEnableConsumerManagement[]      = "enable-consumer-management";
+
+// Enables MTP support in Files.app.
+const char kEnableFileManagerMTP[] = "enable-filemanager-mtp";
+
 // Enables notifications about captive portals in session.
 const char kEnableNetworkPortalNotification[] =
     "enable-network-portal-notification";
@@ -103,6 +113,10 @@ const char kEnterpriseEnrollmentSkipRobotAuth[] =
 const char kFileManagerEnableNewAudioPlayer[] =
     "file-manager-enable-new-audio-player";
 
+// Enables the new gallery in the Files.app.
+const char kFileManagerEnableNewGallery[] =
+    "file-manager-enable-new-gallery";
+
 // Passed to Chrome the first time that it's run after the system boots.
 // Not passed on restart after sign out.
 const char kFirstExecAfterBoot[]            = "first-exec-after-boot";
@@ -125,16 +139,14 @@ const char kHasChromeOSDiamondKey[]         = "has-chromeos-diamond-key";
 // Path for the screensaver used in Kiosk mode
 const char kKioskModeScreensaverPath[]      = "kiosk-mode-screensaver-path";
 
-// Allows override of oobe for testing - goes directly to the login screen.
-const char kLoginScreen[]                   = "login-screen";
-
 // Enables Chrome-as-a-login-manager behavior.
 const char kLoginManager[]                  = "login-manager";
 
 // Specifies a password to be used to login (along with login-user).
 const char kLoginPassword[]                 = "login-password";
 
-// Specifies the profile to use once a chromeos user is logged in.
+// Specifies the profile to use once a chromeos user is logged in. This is
+// required unless --multi-profile is set.
 const char kLoginProfile[]                  = "login-profile";
 
 // Specifies the user which is already logged in.
@@ -170,10 +182,6 @@ const char kPowerStub[] = "power-stub";
 //  'cellular=1' - Cellular is initially connected
 //  'interactive=3' - Interactive mode, connect/scan/etc requests take 3 secs
 const char kShillStub[] = "shill-stub";
-
-// Skips the machine hwid check. Useful for running in VMs because they have no
-// hwid.
-const char kSkipHWIDCheck[]                 = "skip-hwid-check";
 
 // Sends test messages on first call to RequestUpdate (stub only).
 const char kSmsTestMessages[]               = "sms-test-messages";

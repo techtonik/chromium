@@ -7,14 +7,14 @@
 }
 
 .profile-icon-grid-item {
-  height: 31px;
+  height: 38px;
   margin: 2px 4px;
   padding: 4px;
   width: 38px;
 }
 
 .profile-icon {
-  height: 31px;
+  height: 38px;
   width: 38px;
 }
 
@@ -35,6 +35,19 @@
 #create-profile-name:invalid,
 #manage-profile-name:invalid {
   background-color: pink;
+}
+
+#disconnect-managed-profile-domain-name {
+  font-weight: bold;
+}
+
+#disconnect-managed-profile-domain-information {
+  background-color: #f0f0f0;
+  padding: 14px 0 14px 17px;
+}
+
+#disconnect-managed-profile-message {
+  padding-top: 9px;
 }
 
 #create-profile-error-bubble,

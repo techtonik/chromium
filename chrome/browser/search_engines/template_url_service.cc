@@ -520,6 +520,8 @@ void TemplateURLService::AddExtensionControlledTURL(
   DCHECK(template_url);
   DCHECK_EQ(kInvalidTemplateURLID, template_url->id());
   DCHECK(info);
+  DCHECK_EQ(info->wants_to_be_default_engine,
+            template_url->show_in_default_list());
   template_url->extension_info_.swap(info);
   DCHECK(!FindTemplateURLForExtension(
       template_url->GetExtensionId(),
@@ -673,17 +675,9 @@ bool TemplateURLService::CanMakeDefault(const TemplateURL* url) {
       (url->GetType() == TemplateURL::NORMAL);
 }
 
-void TemplateURLService::SetDefaultSearchProvider(TemplateURL* url) {
-  DCHECK(!is_default_search_managed_);
-  // Omnibox keywords cannot be made default. Extension-controlled search
-  // engines can be made default only by the extension itself because they
-  // aren't persisted.
-  DCHECK(!url || (url->GetType() == TemplateURL::NORMAL));
-
-  // Always persist the setting in the database, that way if the backup
-  // signature has changed out from under us it gets reset correctly.
-  if (SetDefaultSearchProviderNoNotify(url))
-    NotifyObservers();
+void TemplateURLService::SetUserSelectedDefaultSearchProvider(
+    TemplateURL* url) {
+  SetDefaultSearchProvider(url);
 }
 
 TemplateURL* TemplateURLService::GetDefaultSearchProvider() {
@@ -926,7 +920,7 @@ void TemplateURLService::OnSyncedDefaultSearchProviderGUIDChanged() {
     if (new_default_search != GetDefaultSearchProvider()) {
       base::AutoReset<DefaultSearchChangeOrigin> change_origin(
           &dsp_change_origin_, DSP_CHANGE_SYNC_PREF);
-      SetDefaultSearchProvider(new_default_search);
+      SetUserSelectedDefaultSearchProvider(new_default_search);
       pending_synced_default_search_ = false;
     }
   } else {
@@ -1204,7 +1198,7 @@ syncer::SyncMergeResult TemplateURLService::MergeDataAndStartSyncing(
   if (pending_default) {
     base::AutoReset<DefaultSearchChangeOrigin> change_origin(
         &dsp_change_origin_, DSP_CHANGE_SYNC_ADD);
-    SetDefaultSearchProvider(pending_default);
+    SetUserSelectedDefaultSearchProvider(pending_default);
   }
 
   // The remaining SyncData in local_data_map should be everything that needs to
@@ -2125,6 +2119,20 @@ void TemplateURLService::UpdateDefaultSearch() {
     }
   }
   NotifyObservers();
+}
+
+void TemplateURLService::SetDefaultSearchProvider(
+    TemplateURL* url) {
+  DCHECK(!is_default_search_managed_);
+  // Omnibox keywords cannot be made default. Extension-controlled search
+  // engines can be made default only by the extension itself because they
+  // aren't persisted.
+  DCHECK(!url || (url->GetType() == TemplateURL::NORMAL));
+
+  // Always persist the setting in the database, that way if the backup
+  // signature has changed out from under us it gets reset correctly.
+  if (SetDefaultSearchProviderNoNotify(url))
+    NotifyObservers();
 }
 
 bool TemplateURLService::SetDefaultSearchProviderNoNotify(TemplateURL* url) {

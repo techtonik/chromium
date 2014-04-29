@@ -114,12 +114,12 @@
 #if defined(USE_X11)
 #include "ash/accelerators/magnifier_key_scroller.h"
 #include "ash/accelerators/spoken_feedback_toggler.h"
-#include "base/message_loop/message_pump_x11.h"
+#include "ui/gfx/x/x11_types.h"
 #endif  // defined(USE_X11)
 #include "ash/ash_constants.h"
 #include "ash/display/display_change_observer_chromeos.h"
+#include "ash/display/display_configurator_animation.h"
 #include "ash/display/display_error_observer_chromeos.h"
-#include "ash/display/output_configurator_animation.h"
 #include "ash/display/projecting_observer_chromeos.h"
 #include "ash/display/resolution_notification_controller.h"
 #include "ash/sticky_keys/sticky_keys_controller.h"
@@ -132,7 +132,7 @@
 #include "ash/system/chromeos/session/logout_confirmation_controller.h"
 #include "base/bind_helpers.h"
 #include "base/sys_info.h"
-#include "ui/chromeos/user_activity_notifier.h"
+#include "ui/chromeos/user_activity_power_manager_notifier.h"
 #include "ui/display/chromeos/display_configurator.h"
 #endif  // defined(OS_CHROMEOS)
 
@@ -396,11 +396,21 @@ void Shell::OnMaximizeModeEnded() {
   FOR_EACH_OBSERVER(ShellObserver, observers_, OnMaximizeModeEnded());
 }
 
+void Shell::OnRootWindowAdded(aura::Window* root_window) {
+  FOR_EACH_OBSERVER(ShellObserver, observers_, OnRootWindowAdded(root_window));
+}
+
 void Shell::CreateShelf() {
   RootWindowControllerList controllers = GetAllRootWindowControllers();
   for (RootWindowControllerList::iterator iter = controllers.begin();
        iter != controllers.end(); ++iter)
     (*iter)->shelf()->CreateShelf();
+}
+
+void Shell::OnShelfCreatedForRootWindow(aura::Window* root_window) {
+  FOR_EACH_OBSERVER(ShellObserver,
+                    observers_,
+                    OnShelfCreatedForRootWindow(root_window));
 }
 
 void Shell::CreateKeyboard() {
@@ -698,6 +708,7 @@ Shell::~Shell() {
   video_activity_notifier_.reset();
 #endif  // defined(OS_CHROMEOS)
   video_detector_.reset();
+  high_contrast_controller_.reset();
 
   shadow_controller_.reset();
   resize_shadow_controller_.reset();
@@ -761,8 +772,9 @@ Shell::~Shell() {
 #if defined(OS_CHROMEOS)
   if (display_change_observer_)
     display_configurator_->RemoveObserver(display_change_observer_.get());
-  if (output_configurator_animation_)
-    display_configurator_->RemoveObserver(output_configurator_animation_.get());
+  if (display_configurator_animation_)
+    display_configurator_->RemoveObserver(
+        display_configurator_animation_.get());
   if (display_error_observer_)
     display_configurator_->RemoveObserver(display_error_observer_.get());
   if (projecting_observer_)
@@ -786,8 +798,8 @@ void Shell::Init() {
   bool display_initialized = display_manager_->InitFromCommandLine();
 #if defined(OS_CHROMEOS)
   display_configurator_->Init(!gpu_support_->IsPanelFittingDisabled());
-  output_configurator_animation_.reset(new OutputConfiguratorAnimation());
-  display_configurator_->AddObserver(output_configurator_animation_.get());
+  display_configurator_animation_.reset(new DisplayConfiguratorAnimation());
+  display_configurator_->AddObserver(display_configurator_animation_.get());
 
   projecting_observer_.reset(new ProjectingObserver());
   display_configurator_->AddObserver(projecting_observer_.get());
@@ -996,7 +1008,7 @@ void Shell::Init() {
 
   power_event_observer_.reset(new PowerEventObserver());
   user_activity_notifier_.reset(
-      new ui::UserActivityNotifier(user_activity_detector_.get()));
+      new ui::UserActivityPowerManagerNotifier(user_activity_detector_.get()));
   video_activity_notifier_.reset(
       new VideoActivityNotifier(video_detector_.get()));
   bluetooth_notification_controller_.reset(new BluetoothNotificationController);

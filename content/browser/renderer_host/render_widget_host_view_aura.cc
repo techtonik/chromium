@@ -26,7 +26,6 @@
 #include "content/browser/frame_host/frame_tree_node.h"
 #include "content/browser/frame_host/render_frame_host_impl.h"
 #include "content/browser/gpu/compositor_util.h"
-#include "content/browser/renderer_host/backing_store_aura.h"
 #include "content/browser/renderer_host/compositor_resize_lock_aura.h"
 #include "content/browser/renderer_host/dip_util.h"
 #include "content/browser/renderer_host/input/synthetic_gesture_target_aura.h"
@@ -311,6 +310,7 @@ void GetScreenInfoForWindow(WebScreenInfo* results, aura::Window* window) {
   results->depth = 24;
   results->depthPerComponent = 8;
   results->deviceScaleFactor = display.device_scale_factor();
+  results->orientationAngle = display.RotationAsDegree();
 }
 
 bool PointerEventActivates(const ui::Event& event) {
@@ -762,7 +762,6 @@ RenderFrameHostImpl* RenderWidgetHostViewAura::GetFocusedFrame() {
 }
 
 void RenderWidgetHostViewAura::MovePluginWindows(
-    const gfx::Vector2d& scroll_offset,
     const std::vector<WebPluginGeometry>& plugin_window_moves) {
 #if defined(OS_WIN)
   // We need to clip the rectangle to the tab's viewport, otherwise we will draw
@@ -775,13 +774,12 @@ void RenderWidgetHostViewAura::MovePluginWindows(
   gfx::Rect view_bounds = window_->GetBoundsInRootWindow();
   std::vector<WebPluginGeometry> moves = plugin_window_moves;
 
-  gfx::Rect view_port(scroll_offset.x(), scroll_offset.y(), view_bounds.width(),
-                      view_bounds.height());
+  gfx::Rect view_port(view_bounds.size());
 
   for (size_t i = 0; i < moves.size(); ++i) {
     gfx::Rect clip(moves[i].clip_rect);
     gfx::Vector2d view_port_offset(
-        moves[i].window_rect.OffsetFromOrigin() + scroll_offset);
+        moves[i].window_rect.OffsetFromOrigin());
     clip.Offset(view_port_offset);
     clip.Intersect(view_port);
     clip.Offset(-view_port_offset);
@@ -833,7 +831,7 @@ bool RenderWidgetHostViewAura::HasFocus() const {
 }
 
 bool RenderWidgetHostViewAura::IsSurfaceAvailableForCopy() const {
-  return CanCopyToBitmap() || !!host_->GetBackingStore(false);
+  return CanCopyToBitmap();
 }
 
 void RenderWidgetHostViewAura::Show() {
@@ -873,6 +871,22 @@ void RenderWidgetHostViewAura::SetBackground(const SkBitmap& background) {
   RenderWidgetHostViewBase::SetBackground(background);
   host_->SetBackground(background);
   window_->layer()->SetFillsBoundsOpaquely(background.isOpaque());
+}
+
+gfx::Size RenderWidgetHostViewAura::GetVisibleViewportSize() const {
+  gfx::Rect window_bounds = window_->bounds();
+  int viewport_width = std::max(
+      0, window_bounds.width() - insets_.left() - insets_.right());
+  int viewport_height = std::max(
+      0, window_bounds.height() - insets_.top() - insets_.bottom());
+  return gfx::Size(viewport_width, viewport_height);
+}
+
+void RenderWidgetHostViewAura::SetInsets(const gfx::Insets& insets) {
+  if (insets != insets_) {
+    insets_ = insets;
+    host_->WasResized();
+  }
 }
 
 void RenderWidgetHostViewAura::UpdateCursor(const WebCursor& cursor) {
@@ -1051,11 +1065,6 @@ void RenderWidgetHostViewAura::ScrollOffsetChanged() {
       aura::client::GetCursorClient(root);
   if (cursor_client && !cursor_client->IsCursorVisible())
     cursor_client->DisableMouseEvents();
-}
-
-BackingStore* RenderWidgetHostViewAura::AllocBackingStore(
-    const gfx::Size& size) {
-  return new BackingStoreAura(host_, size);
 }
 
 void RenderWidgetHostViewAura::CopyFromCompositingSurface(
@@ -1787,32 +1796,13 @@ void RenderWidgetHostViewAura::GetScreenInfo(WebScreenInfo* results) {
 }
 
 gfx::Rect RenderWidgetHostViewAura::GetBoundsInRootWindow() {
+  gfx::Rect rect = window_->GetToplevelWindow()->GetBoundsInScreen();
+
 #if defined(OS_WIN)
-  // aura::Window::GetBoundsInScreen doesn't take non-client area into
-  // account.
-  RECT window_rect = {0};
-
-  aura::Window* top_level = window_->GetToplevelWindow();
-  aura::WindowTreeHost* host = top_level->GetHost();
-  if (!host)
-    return top_level->GetBoundsInScreen();
-  HWND hwnd = host->GetAcceleratedWidget();
-  ::GetWindowRect(hwnd, &window_rect);
-  gfx::Rect rect(window_rect);
-
-  // Maximized windows are outdented from the work area by the frame thickness
-  // even though this "frame" is not painted.  This confuses code (and people)
-  // that think of a maximized window as corresponding exactly to the work area.
-  // Correct for this by subtracting the frame thickness back off.
-  if (::IsZoomed(hwnd)) {
-    rect.Inset(GetSystemMetrics(SM_CXSIZEFRAME),
-               GetSystemMetrics(SM_CYSIZEFRAME));
-  }
-
-  return gfx::win::ScreenToDIPRect(rect);
-#else
-  return window_->GetToplevelWindow()->GetBoundsInScreen();
+  rect = gfx::win::ScreenToDIPRect(rect);
 #endif
+
+  return rect;
 }
 
 void RenderWidgetHostViewAura::GestureEventAck(
@@ -2236,6 +2226,9 @@ void RenderWidgetHostViewAura::OnBoundsChanged(const gfx::Rect& old_bounds,
   // SetBounds() itself.  No matter how we got here, any redundant calls are
   // harmless.
   SetSize(new_bounds.size());
+
+  if (GetInputMethod())
+    GetInputMethod()->OnCaretBoundsChanged(this);
 }
 
 gfx::NativeCursor RenderWidgetHostViewAura::GetCursor(const gfx::Point& point) {
@@ -2266,38 +2259,17 @@ void RenderWidgetHostViewAura::OnCaptureLost() {
 }
 
 void RenderWidgetHostViewAura::OnPaint(gfx::Canvas* canvas) {
-  bool has_backing_store = !!host_->GetBackingStore(false);
-  if (has_backing_store) {
-    paint_canvas_ = canvas;
-    BackingStoreAura* backing_store = static_cast<BackingStoreAura*>(
-        host_->GetBackingStore(true));
-    paint_canvas_ = NULL;
-    backing_store->SkiaShowRect(gfx::Point(), canvas);
-
-    ui::Compositor* compositor = GetCompositor();
-    if (compositor) {
-      for (size_t i = 0; i < software_latency_info_.size(); i++)
-        compositor->SetLatencyInfo(software_latency_info_[i]);
-    }
-    software_latency_info_.clear();
-  } else {
-    // For non-opaque windows, we don't draw anything, since we depend on the
-    // canvas coming from the compositor to already be initialized as
-    // transparent.
-    if (window_->layer()->fills_bounds_opaquely())
-      canvas->DrawColor(SK_ColorWHITE);
-  }
+  // For non-opaque windows, we don't draw anything, since we depend on the
+  // canvas coming from the compositor to already be initialized as
+  // transparent.
+  if (window_->layer()->fills_bounds_opaquely())
+    canvas->DrawColor(SK_ColorWHITE);
 }
 
 void RenderWidgetHostViewAura::OnDeviceScaleFactorChanged(
     float device_scale_factor) {
   if (!host_)
     return;
-
-  BackingStoreAura* backing_store = static_cast<BackingStoreAura*>(
-      host_->GetBackingStore(false));
-  if (backing_store)  // NULL in hardware path.
-    backing_store->ScaleFactorChanged(device_scale_factor);
 
   UpdateScreenInfo(window_);
 

@@ -149,7 +149,11 @@ void PictureLayerImpl::AppendQuads(QuadSink* quad_sink,
 
     gfx::Rect geometry_rect = rect;
     gfx::Rect opaque_rect = contents_opaque() ? geometry_rect : gfx::Rect();
-    gfx::Rect visible_geometry_rect = geometry_rect;
+    gfx::Rect visible_geometry_rect =
+        quad_sink->UnoccludedContentRect(geometry_rect, draw_transform());
+    if (visible_geometry_rect.IsEmpty())
+      return;
+
     gfx::Size texture_size = rect.size();
     gfx::RectF texture_rect = gfx::RectF(texture_size);
     gfx::Rect quad_content_rect = rect;
@@ -166,8 +170,8 @@ void PictureLayerImpl::AppendQuads(QuadSink* quad_sink,
                  quad_content_rect,
                  contents_scale,
                  pile_);
-    if (quad_sink->MaybeAppend(quad.PassAs<DrawQuad>()))
-      append_quads_data->num_missing_tiles++;
+    quad_sink->Append(quad.PassAs<DrawQuad>());
+    append_quads_data->num_missing_tiles++;
     return;
   }
 
@@ -216,7 +220,7 @@ void PictureLayerImpl::AppendQuads(QuadSink* quad_sink,
                                 visible_geometry_rect,
                                 color,
                                 width);
-      quad_sink->MaybeAppend(debug_border_quad.PassAs<DrawQuad>());
+      quad_sink->Append(debug_border_quad.PassAs<DrawQuad>());
     }
   }
 
@@ -229,16 +233,18 @@ void PictureLayerImpl::AppendQuads(QuadSink* quad_sink,
        iter;
        ++iter) {
     gfx::Rect geometry_rect = iter.geometry_rect();
-    gfx::Rect visible_geometry_rect = geometry_rect;
+    gfx::Rect visible_geometry_rect =
+        quad_sink->UnoccludedContentRect(geometry_rect, draw_transform());
+    if (visible_geometry_rect.IsEmpty())
+      continue;
+
     if (!*iter || !iter->IsReadyToDraw()) {
       if (draw_checkerboard_for_missing_tiles()) {
-        // TODO(enne): Figure out how to show debug "invalidated checker" color
         scoped_ptr<CheckerboardDrawQuad> quad = CheckerboardDrawQuad::Create();
         SkColor color = DebugColors::DefaultCheckerboardColor();
         quad->SetNew(
             shared_quad_state, geometry_rect, visible_geometry_rect, color);
-        if (quad_sink->MaybeAppend(quad.PassAs<DrawQuad>()))
-          append_quads_data->num_missing_tiles++;
+        quad_sink->Append(quad.PassAs<DrawQuad>());
       } else {
         SkColor color = SafeOpaqueBackgroundColor();
         scoped_ptr<SolidColorDrawQuad> quad = SolidColorDrawQuad::Create();
@@ -247,10 +253,10 @@ void PictureLayerImpl::AppendQuads(QuadSink* quad_sink,
                      visible_geometry_rect,
                      color,
                      false);
-        if (quad_sink->MaybeAppend(quad.PassAs<DrawQuad>()))
-          append_quads_data->num_missing_tiles++;
+        quad_sink->Append(quad.PassAs<DrawQuad>());
       }
 
+      append_quads_data->num_missing_tiles++;
       append_quads_data->had_incomplete_tile = true;
       continue;
     }
@@ -315,7 +321,7 @@ void PictureLayerImpl::AppendQuads(QuadSink* quad_sink,
     }
 
     DCHECK(draw_quad);
-    quad_sink->MaybeAppend(draw_quad.Pass());
+    quad_sink->Append(draw_quad.Pass());
 
     if (seen_tilings.empty() || seen_tilings.back() != iter.CurrentTiling())
       seen_tilings.push_back(iter.CurrentTiling());
@@ -341,10 +347,10 @@ void PictureLayerImpl::UpdateTilePriorities() {
     layer_needs_to_register_itself_ = false;
   }
 
-  if (!layer_tree_impl()->device_viewport_valid_for_tile_management()) {
-    for (size_t i = 0; i < tilings_->num_tilings(); ++i)
-      DCHECK(tilings_->tiling_at(i)->has_ever_been_updated());
-    return;
+  if (layer_tree_impl()->device_viewport_valid_for_tile_management()) {
+    visible_rect_for_tile_priority_ = visible_content_rect();
+    viewport_size_for_tile_priority_ = layer_tree_impl()->DrawViewportSize();
+    screen_space_transform_for_tile_priority_ = screen_space_transform();
   }
 
   if (!tilings_->num_tilings())
@@ -369,14 +375,14 @@ void PictureLayerImpl::UpdateTilePriorities() {
 
   // Use visible_content_rect, unless it's empty. If it's empty, then
   // try to inverse project the viewport into layer space and use that.
-  gfx::Rect visible_rect_in_content_space = visible_content_rect();
+  gfx::Rect visible_rect_in_content_space = visible_rect_for_tile_priority_;
   if (visible_rect_in_content_space.IsEmpty()) {
     gfx::Transform screen_to_layer(gfx::Transform::kSkipInitialization);
-    if (screen_space_transform().GetInverse(&screen_to_layer)) {
-      gfx::Size viewport_size = layer_tree_impl()->DrawViewportSize();
+    if (screen_space_transform_for_tile_priority_.GetInverse(
+            &screen_to_layer)) {
       visible_rect_in_content_space =
           gfx::ToEnclosingRect(MathUtil::ProjectClippedRect(
-              screen_to_layer, gfx::Rect(viewport_size)));
+              screen_to_layer, gfx::Rect(viewport_size_for_tile_priority_)));
       visible_rect_in_content_space.Intersect(gfx::Rect(content_bounds()));
     }
   }
@@ -567,6 +573,13 @@ gfx::Size PictureLayerImpl::CalculateTileSize(
       layer_tree_impl()->resource_provider()->max_texture_size();
 
   gfx::Size default_tile_size = layer_tree_impl()->settings().default_tile_size;
+  if (ShouldUseGpuRasterization()) {
+    // TODO(ernstm) crbug.com/365877: We need a unified way to override the
+    // default-tile-size.
+    default_tile_size =
+        gfx::Size(layer_tree_impl()->device_viewport_size().width(),
+                  layer_tree_impl()->device_viewport_size().height() / 4);
+  }
   default_tile_size.SetToMin(gfx::Size(max_texture_size, max_texture_size));
 
   gfx::Size max_untiled_content_size =
@@ -587,10 +600,12 @@ gfx::Size PictureLayerImpl::CalculateTileSize(
   // 500x500 max untiled size would get 500x12 tiles.  Also do this
   // if the layer is small.
   if (any_dimension_one_tile || !any_dimension_too_large) {
-    int width =
-        std::min(max_untiled_content_size.width(), content_bounds.width());
-    int height =
-        std::min(max_untiled_content_size.height(), content_bounds.height());
+    int width = std::min(
+        std::max(max_untiled_content_size.width(), default_tile_size.width()),
+        content_bounds.width());
+    int height = std::min(
+        std::max(max_untiled_content_size.height(), default_tile_size.height()),
+        content_bounds.height());
     // Round width and height up to the closest multiple of 64, or 56 if
     // we should avoid power-of-two textures. This helps reduce the number
     // of different textures sizes to help recycling, and also keeps all
@@ -661,7 +676,12 @@ void PictureLayerImpl::SyncTiling(
     return;
   tilings_->AddTiling(tiling->contents_scale());
 
-  if (!layer_tree_impl()->needs_update_draw_properties()) {
+  // If this tree needs update draw properties, then the tiling will
+  // get updated prior to drawing or activation.  If this tree does not
+  // need update draw properties, then its transforms are up to date and
+  // we can create tiles for this tiling immediately.
+  if (!layer_tree_impl()->needs_update_draw_properties() &&
+      should_update_tile_priorities_) {
     // When the tree is up to date, the set of tilings must either be empty or
     // contain at least one high resolution tiling.  (If it is up to date,
     // then it would be invalid to sync a tiling if it is the first tiling
@@ -669,15 +689,9 @@ void PictureLayerImpl::SyncTiling(
     SanityCheckTilingState();
     // TODO(enne): temporary sanity CHECK for http://crbug.com/358350
     CHECK_GT(tilings_->num_tilings(), 1u);
-  }
 
-  // If this tree needs update draw properties, then the tiling will
-  // get updated prior to drawing or activation.  If this tree does not
-  // need update draw properties, then its transforms are up to date and
-  // we can create tiles for this tiling immediately.
-  if (!layer_tree_impl()->needs_update_draw_properties() &&
-      should_update_tile_priorities_)
     UpdateTilePriorities();
+  }
 }
 
 void PictureLayerImpl::SetIsMask(bool is_mask) {
@@ -945,9 +959,6 @@ void PictureLayerImpl::ManageTilings(bool animating_transform_to_screen,
   raster_source_scale_was_animating_ = animating_transform_to_screen;
 
   if (!change_target_tiling)
-    return;
-
-  if (!layer_tree_impl()->device_viewport_valid_for_tile_management())
     return;
 
   RecalculateRasterScales(animating_transform_to_screen,
@@ -1297,8 +1308,10 @@ PictureLayerImpl::LayerRasterTileIterator::LayerRasterTileIterator(
     bool prioritize_low_res)
     : layer_(layer), current_stage_(0) {
   DCHECK(layer_);
-  if (!layer_->tilings_ || !layer_->tilings_->num_tilings())
+  if (!layer_->tilings_ || !layer_->tilings_->num_tilings()) {
+    current_stage_ = arraysize(stages_);
     return;
+  }
 
   WhichTree tree =
       layer_->layer_tree_impl()->IsActiveTree() ? ACTIVE_TREE : PENDING_TREE;
@@ -1393,16 +1406,14 @@ PictureLayerImpl::LayerEvictionTileIterator::LayerEvictionTileIterator()
       layer_(NULL) {}
 
 PictureLayerImpl::LayerEvictionTileIterator::LayerEvictionTileIterator(
-    PictureLayerImpl* layer)
+    PictureLayerImpl* layer,
+    TreePriority tree_priority)
     : iterator_index_(0),
       iteration_stage_(TilePriority::EVENTUALLY),
       required_for_activation_(false),
       layer_(layer) {
   if (!layer_->tilings_ || !layer_->tilings_->num_tilings())
     return;
-
-  WhichTree tree =
-      layer_->layer_tree_impl()->IsActiveTree() ? ACTIVE_TREE : PENDING_TREE;
 
   size_t high_res_tiling_index = layer_->tilings_->num_tilings();
   size_t low_res_tiling_index = layer_->tilings_->num_tilings();
@@ -1419,7 +1430,7 @@ PictureLayerImpl::LayerEvictionTileIterator::LayerEvictionTileIterator(
   // Higher resolution non-ideal goes first.
   for (size_t i = 0; i < high_res_tiling_index; ++i) {
     iterators_.push_back(PictureLayerTiling::TilingEvictionTileIterator(
-        layer_->tilings_->tiling_at(i), tree));
+        layer_->tilings_->tiling_at(i), tree_priority));
   }
 
   // Lower resolution non-ideal goes next.
@@ -1431,19 +1442,19 @@ PictureLayerImpl::LayerEvictionTileIterator::LayerEvictionTileIterator(
       continue;
 
     iterators_.push_back(
-        PictureLayerTiling::TilingEvictionTileIterator(tiling, tree));
+        PictureLayerTiling::TilingEvictionTileIterator(tiling, tree_priority));
   }
 
   // Now, put the low res tiling if we have one.
   if (low_res_tiling_index < layer_->tilings_->num_tilings()) {
     iterators_.push_back(PictureLayerTiling::TilingEvictionTileIterator(
-        layer_->tilings_->tiling_at(low_res_tiling_index), tree));
+        layer_->tilings_->tiling_at(low_res_tiling_index), tree_priority));
   }
 
   // Finally, put the high res tiling if we have one.
   if (high_res_tiling_index < layer_->tilings_->num_tilings()) {
     iterators_.push_back(PictureLayerTiling::TilingEvictionTileIterator(
-        layer_->tilings_->tiling_at(high_res_tiling_index), tree));
+        layer_->tilings_->tiling_at(high_res_tiling_index), tree_priority));
   }
 
   DCHECK_GT(iterators_.size(), 0u);

@@ -407,8 +407,8 @@ class GLRenderingVDAClient
   int num_queued_fragments() { return num_queued_fragments_; }
   int num_decoded_frames();
   double frames_per_second();
-  // Return the median of the decode time in milliseconds.
-  int decode_time_median();
+  // Return the median of the decode time of all decoded frames.
+  base::TimeDelta decode_time_median();
   bool decoder_deleted() { return !decoder_.get(); }
 
  private:
@@ -945,20 +945,18 @@ int GLRenderingVDAClient::num_decoded_frames() {
 
 double GLRenderingVDAClient::frames_per_second() {
   base::TimeDelta delta = frame_delivery_times_.back() - initialize_done_ticks_;
-  if (delta.InSecondsF() == 0)
-    return 0;
   return num_decoded_frames() / delta.InSecondsF();
 }
 
-int GLRenderingVDAClient::decode_time_median() {
+base::TimeDelta GLRenderingVDAClient::decode_time_median() {
   if (decode_time_.size() == 0)
-    return 0;
+    return base::TimeDelta();
   std::sort(decode_time_.begin(), decode_time_.end());
   int index = decode_time_.size() / 2;
   if (decode_time_.size() % 2 != 0)
-    return decode_time_[index].InMilliseconds();
+    return decode_time_[index];
 
-  return (decode_time_[index] + decode_time_[index - 1]).InMilliseconds() / 2;
+  return (decode_time_[index] + decode_time_[index - 1]) / 2;
 }
 
 class VideoDecodeAcceleratorTest : public ::testing::Test {
@@ -1326,7 +1324,7 @@ TEST_P(VideoDecodeAcceleratorParamTest, TestSimpleDecode) {
       EXPECT_EQ(client->num_done_bitstream_buffers(),
                 client->num_queued_fragments());
     }
-    VLOG(0) << "Decoder " << i << " fps: " << client->frames_per_second();
+    LOG(INFO) << "Decoder " << i << " fps: " << client->frames_per_second();
     if (!render_as_thumbnails) {
       int min_fps = suppress_rendering ?
           video_file->min_fps_no_render : video_file->min_fps_render;
@@ -1509,11 +1507,11 @@ TEST_F(VideoDecodeAcceleratorTest, TestDecodeTimeMedian) {
   CreateAndStartDecoder(client, note);
   WaitUntilDecodeFinish(note);
 
-  int decode_time_median = client->decode_time_median();
+  base::TimeDelta decode_time_median = client->decode_time_median();
   std::string output_string =
-      base::StringPrintf("Decode time median: %d ms", decode_time_median);
-  VLOG(0) << output_string;
-  ASSERT_GT(decode_time_median, 0);
+      base::StringPrintf("Decode time median: %" PRId64 " us",
+                         decode_time_median.InMicroseconds());
+  LOG(INFO) << output_string;
 
   if (g_output_log != NULL)
     OutputLogFile(g_output_log, output_string);
@@ -1551,9 +1549,8 @@ int main(int argc, char **argv) {
       content::g_test_video_data = it->second.c_str();
       continue;
     }
-    // TODO(wuchengli): remove frame_deliver_log after CrOS test get updated.
-    // See http://crosreview.com/175426.
-    if (it->first == "frame_delivery_log" || it->first == "output_log") {
+    // The output log for VDA performance test.
+    if (it->first == "output_log") {
       content::g_output_log = it->second.c_str();
       continue;
     }

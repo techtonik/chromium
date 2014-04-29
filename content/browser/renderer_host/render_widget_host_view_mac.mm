@@ -30,8 +30,6 @@
 #include "content/browser/frame_host/frame_tree.h"
 #include "content/browser/frame_host/frame_tree_node.h"
 #include "content/browser/frame_host/render_frame_host_impl.h"
-#include "content/browser/renderer_host/backing_store_mac.h"
-#include "content/browser/renderer_host/backing_store_manager.h"
 #include "content/browser/renderer_host/compositing_iosurface_context_mac.h"
 #include "content/browser/renderer_host/compositing_iosurface_layer_mac.h"
 #include "content/browser/renderer_host/compositing_iosurface_mac.h"
@@ -72,7 +70,6 @@
 #include "ui/gl/gl_switches.h"
 #include "ui/gl/io_surface_support_mac.h"
 
-using content::BackingStoreMac;
 using content::BrowserAccessibility;
 using content::BrowserAccessibilityManager;
 using content::EditCommand;
@@ -85,6 +82,7 @@ using content::RenderWidgetHostImpl;
 using content::RenderWidgetHostViewMac;
 using content::RenderWidgetHostViewMacEditCommandHelper;
 using content::TextInputClientMac;
+using content::WebContents;
 using blink::WebInputEvent;
 using blink::WebInputEventFactory;
 using blink::WebMouseEvent;
@@ -144,13 +142,14 @@ static float ScaleFactorForView(NSView* view) {
 
 + (BOOL)shouldAutohideCursorForEvent:(NSEvent*)event;
 - (id)initWithRenderWidgetHostViewMac:(RenderWidgetHostViewMac*)r;
-- (void)gotWheelEventConsumed:(BOOL)consumed;
+- (void)gotUnhandledWheelEvent;
+- (void)scrollOffsetPinnedToLeft:(BOOL)left toRight:(BOOL)right;
+- (void)setHasHorizontalScrollbar:(BOOL)has_horizontal_scrollbar;
 - (void)keyEvent:(NSEvent*)theEvent wasKeyEquivalent:(BOOL)equiv;
 - (void)windowDidChangeBackingProperties:(NSNotification*)notification;
 - (void)windowChangedGlobalFrame:(NSNotification*)notification;
-- (void)drawBackingStore:(BackingStoreMac*)backingStore
-               dirtyRect:(CGRect)dirtyRect
-               inContext:(CGContextRef)context;
+- (void)drawWithDirtyRect:(CGRect)dirtyRect
+                inContext:(CGContextRef)context;
 - (void)checkForPluginImeCancellation;
 - (void)updateScreenProperties;
 - (void)setResponderDelegate:
@@ -377,6 +376,8 @@ blink::WebScreenInfo GetWebScreenInfo(NSView* view) {
       [[screen colorSpace] colorSpaceModel] == NSGrayColorSpaceModel;
   results.rect = display.bounds();
   results.availableRect = display.work_area();
+  results.orientationAngle = display.RotationAsDegree();
+
   return results;
 }
 
@@ -783,11 +784,6 @@ void RenderWidgetHostViewMac::UpdateBackingStoreScaleFactor() {
     return;
   backing_store_scale_factor_ = new_scale_factor;
 
-  BackingStoreMac* backing_store = static_cast<BackingStoreMac*>(
-      render_widget_host_->GetBackingStore(false));
-  if (backing_store)
-    backing_store->ScaleFactorChanged(backing_store_scale_factor_);
-
   render_widget_host_->NotifyScreenInfoChanged();
 }
 
@@ -907,7 +903,6 @@ gfx::NativeViewAccessible RenderWidgetHostViewMac::GetNativeViewAccessible() {
 }
 
 void RenderWidgetHostViewMac::MovePluginWindows(
-    const gfx::Vector2d& scroll_offset,
     const std::vector<WebPluginGeometry>& moves) {
   // Must be overridden, but unused on this platform. Core Animation
   // plugins are drawn by the GPU process (through the compositor),
@@ -930,8 +925,7 @@ bool RenderWidgetHostViewMac::HasFocus() const {
 
 bool RenderWidgetHostViewMac::IsSurfaceAvailableForCopy() const {
   return software_frame_manager_->HasCurrentFrame() ||
-         (compositing_iosurface_ && compositing_iosurface_->HasIOSurface()) ||
-         !!render_widget_host_->GetBackingStore(false);
+         (compositing_iosurface_ && compositing_iosurface_->HasIOSurface());
 }
 
 void RenderWidgetHostViewMac::Show() {
@@ -1181,12 +1175,6 @@ bool RenderWidgetHostViewMac::IsPopup() const {
   return popup_type_ != blink::WebPopupTypeNone;
 }
 
-BackingStore* RenderWidgetHostViewMac::AllocBackingStore(
-    const gfx::Size& size) {
-  float scale = ScaleFactorForView(cocoa_view_);
-  return new BackingStoreMac(render_widget_host_, size, scale);
-}
-
 void RenderWidgetHostViewMac::CopyFromCompositingSurface(
     const gfx::Rect& src_subrect,
     const gfx::Size& dst_size,
@@ -1277,8 +1265,7 @@ void RenderWidgetHostViewMac::CopyFromCompositingSurfaceToVideoFrame(
 }
 
 bool RenderWidgetHostViewMac::CanCopyToVideoFrame() const {
-  return (!render_widget_host_->GetBackingStore(false) &&
-          !software_frame_manager_->HasCurrentFrame() &&
+  return (!software_frame_manager_->HasCurrentFrame() &&
           render_widget_host_->is_accelerated_compositing_active() &&
           compositing_iosurface_ &&
           compositing_iosurface_->HasIOSurface());
@@ -1881,10 +1868,13 @@ gfx::GLSurfaceHandle RenderWidgetHostViewMac::GetCompositingSurface() {
 
 void RenderWidgetHostViewMac::SetHasHorizontalScrollbar(
     bool has_horizontal_scrollbar) {
+  [cocoa_view_ setHasHorizontalScrollbar:has_horizontal_scrollbar];
 }
 
 void RenderWidgetHostViewMac::SetScrollOffsetPinning(
     bool is_pinned_to_left, bool is_pinned_to_right) {
+  [cocoa_view_ scrollOffsetPinnedToLeft:is_pinned_to_left
+                                toRight:is_pinned_to_right];
 }
 
 bool RenderWidgetHostViewMac::LockMouse() {
@@ -1916,11 +1906,12 @@ void RenderWidgetHostViewMac::UnlockMouse() {
     render_widget_host_->LostMouseLock();
 }
 
-void RenderWidgetHostViewMac::HandledWheelEvent(
-    const blink::WebMouseWheelEvent& event,
-    bool consumed) {
+void RenderWidgetHostViewMac::UnhandledWheelEvent(
+    const blink::WebMouseWheelEvent& event) {
+  // Only record a wheel event as unhandled if JavaScript handlers got a chance
+  // to see it (no-op wheel events are ignored by the event dispatcher)
   if (event.deltaX || event.deltaY)
-    [cocoa_view_ gotWheelEventConsumed:consumed];
+    [cocoa_view_ gotUnhandledWheelEvent];
 }
 
 bool RenderWidgetHostViewMac::Send(IPC::Message* message) {
@@ -1966,7 +1957,6 @@ void RenderWidgetHostViewMac::GotAcceleratedFrame() {
     }
 
     // Delete software backingstore and layer.
-    BackingStoreManager::RemoveBackingStore(render_widget_host_);
     software_frame_manager_->DiscardCurrentFrame();
     DestroySoftwareLayer();
   }
@@ -2188,6 +2178,10 @@ void RenderWidgetHostViewMac::AddPendingSwapAck(
   // loss. Drop the old acks.
   pending_swap_ack_.reset(new PendingSwapAck(
       route_id, gpu_host_id, renderer_id));
+
+  // A trace value of 2 indicates that there is a pending swap ack. See
+  // CompositingIOSurfaceLayer's canDrawInCGLContext for other value meanings.
+  TRACE_COUNTER_ID1("browser", "PendingSwapAck", this, 2);
 }
 
 void RenderWidgetHostViewMac::SendPendingSwapAck() {
@@ -2200,10 +2194,8 @@ void RenderWidgetHostViewMac::SendPendingSwapAck() {
   RenderWidgetHostImpl::AcknowledgeBufferPresent(pending_swap_ack_->route_id,
                                                  pending_swap_ack_->gpu_host_id,
                                                  ack_params);
-  if (render_widget_host_)
-    render_widget_host_->AcknowledgeSwapBuffersToRenderer();
-
   pending_swap_ack_.reset();
+  TRACE_COUNTER_ID1("browser", "PendingSwapAck", this, 0);
 }
 
 void RenderWidgetHostViewMac::PauseForPendingResizeOrRepaintsAndDraw() {
@@ -2257,7 +2249,9 @@ void RenderWidgetHostViewMac::LayoutLayers() {
       EnsureCompositedIOSurfaceLayer();
     }
   }
-  if (compositing_iosurface_ && compositing_iosurface_layer_) {
+  if (compositing_iosurface_ &&
+      compositing_iosurface_->HasIOSurface() &&
+      compositing_iosurface_layer_) {
     CGRect layer_bounds = CGRectMake(
       0,
       0,
@@ -2389,8 +2383,28 @@ SkBitmap::Config RenderWidgetHostViewMac::PreferredReadbackFormat() {
   }
 }
 
-- (void)gotWheelEventConsumed:(BOOL)consumed {
-  [responderDelegate_ gotWheelEventConsumed:consumed];
+- (void)gotUnhandledWheelEvent {
+  if (responderDelegate_ &&
+      [responderDelegate_
+          respondsToSelector:@selector(gotUnhandledWheelEvent)]) {
+    [responderDelegate_ gotUnhandledWheelEvent];
+  }
+}
+
+- (void)scrollOffsetPinnedToLeft:(BOOL)left toRight:(BOOL)right {
+  if (responderDelegate_ &&
+      [responderDelegate_
+          respondsToSelector:@selector(scrollOffsetPinnedToLeft:toRight:)]) {
+    [responderDelegate_ scrollOffsetPinnedToLeft:left toRight:right];
+  }
+}
+
+- (void)setHasHorizontalScrollbar:(BOOL)has_horizontal_scrollbar {
+  if (responderDelegate_ &&
+      [responderDelegate_
+          respondsToSelector:@selector(setHasHorizontalScrollbar:)]) {
+    [responderDelegate_ setHasHorizontalScrollbar:has_horizontal_scrollbar];
+  }
 }
 
 - (BOOL)respondsToSelector:(SEL)selector {
@@ -3137,9 +3151,6 @@ SkBitmap::Config RenderWidgetHostViewMac::PreferredReadbackFormat() {
     return;
   }
 
-  BackingStoreMac* backingStore = static_cast<BackingStoreMac*>(
-      renderWidgetHostView_->render_widget_host_->GetBackingStore(false));
-
   const gfx::Rect damagedRect([self flipNSRectToRect:dirtyRect]);
 
   if (renderWidgetHostView_->last_frame_was_accelerated_ &&
@@ -3166,26 +3177,18 @@ SkBitmap::Config RenderWidgetHostViewMac::PreferredReadbackFormat() {
 
   CGContextRef context = static_cast<CGContextRef>(
       [[NSGraphicsContext currentContext] graphicsPort]);
-  [self drawBackingStore:backingStore
-               dirtyRect:NSRectToCGRect(dirtyRect)
-               inContext:context];
+  [self drawWithDirtyRect:NSRectToCGRect(dirtyRect)
+                inContext:context];
 }
 
-- (void)drawBackingStore:(BackingStoreMac*)backingStore
-               dirtyRect:(CGRect)dirtyRect
-               inContext:(CGContextRef)context {
+- (void)drawWithDirtyRect:(CGRect)dirtyRect
+                inContext:(CGContextRef)context {
   content::SoftwareFrameManager* software_frame_manager =
       renderWidgetHostView_->software_frame_manager_.get();
-  // There should never be both a legacy software and software composited
-  // frame.
-  DCHECK(!backingStore || !software_frame_manager->HasCurrentFrame());
-
-  if (backingStore || software_frame_manager->HasCurrentFrame()) {
+  if (software_frame_manager->HasCurrentFrame()) {
     // Note: All coordinates are in view units, not pixels.
     gfx::Rect bitmapRect(
-        software_frame_manager->HasCurrentFrame() ?
-            software_frame_manager->GetCurrentFrameSizeInDIP() :
-            backingStore->size());
+            software_frame_manager->GetCurrentFrameSizeInDIP());
 
     // Specify the proper y offset to ensure that the view is rooted to the
     // upper left corner.  This can be negative, if the window was resized
@@ -3197,47 +3200,30 @@ SkBitmap::Config RenderWidgetHostViewMac::PreferredReadbackFormat() {
 
     gfx::Rect paintRect = gfx::IntersectRects(bitmapRect, damagedRect);
     if (!paintRect.IsEmpty()) {
-      if (software_frame_manager->HasCurrentFrame()) {
-        // If a software compositor framebuffer is present, draw using that.
-        gfx::Size sizeInPixels =
-            software_frame_manager->GetCurrentFrameSizeInPixels();
-        base::ScopedCFTypeRef<CGDataProviderRef> dataProvider(
-            CGDataProviderCreateWithData(
-                NULL,
-                software_frame_manager->GetCurrentFramePixels(),
-                4 * sizeInPixels.width() * sizeInPixels.height(),
-                NULL));
-        base::ScopedCFTypeRef<CGImageRef> image(
-            CGImageCreate(
-                sizeInPixels.width(),
-                sizeInPixels.height(),
-                8,
-                32,
-                4 * sizeInPixels.width(),
-                base::mac::GetSystemColorSpace(),
-                kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Host,
-                dataProvider,
-                NULL,
-                false,
-                kCGRenderingIntentDefault));
-        CGRect imageRect = bitmapRect.ToCGRect();
-        imageRect.origin.y = yOffset;
-        CGContextDrawImage(context, imageRect, image);
-      } else if (backingStore->cg_layer()) {
-        // If we have a CGLayer, draw that into the window
-        // TODO: add clipping to dirtyRect if it improves drawing performance.
-        CGContextDrawLayerAtPoint(context, CGPointMake(0.0, yOffset),
-                                  backingStore->cg_layer());
-      } else {
-        // If we haven't created a layer yet, draw the cached bitmap into
-        // the window.  The CGLayer will be created the next time the renderer
-        // paints.
-        base::ScopedCFTypeRef<CGImageRef> image(
-            CGBitmapContextCreateImage(backingStore->cg_bitmap()));
-        CGRect imageRect = bitmapRect.ToCGRect();
-        imageRect.origin.y = yOffset;
-        CGContextDrawImage(context, imageRect, image);
-      }
+      gfx::Size sizeInPixels =
+          software_frame_manager->GetCurrentFrameSizeInPixels();
+      base::ScopedCFTypeRef<CGDataProviderRef> dataProvider(
+          CGDataProviderCreateWithData(
+              NULL,
+              software_frame_manager->GetCurrentFramePixels(),
+              4 * sizeInPixels.width() * sizeInPixels.height(),
+              NULL));
+      base::ScopedCFTypeRef<CGImageRef> image(
+          CGImageCreate(
+              sizeInPixels.width(),
+              sizeInPixels.height(),
+              8,
+              32,
+              4 * sizeInPixels.width(),
+              base::mac::GetSystemColorSpace(),
+              kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Host,
+              dataProvider,
+              NULL,
+              false,
+              kCGRenderingIntentDefault));
+      CGRect imageRect = bitmapRect.ToCGRect();
+      imageRect.origin.y = yOffset;
+      CGContextDrawImage(context, imageRect, image);
     }
 
     renderWidgetHostView_->SendPendingLatencyInfoToHost();
@@ -3513,7 +3499,7 @@ SkBitmap::Config RenderWidgetHostViewMac::PreferredReadbackFormat() {
     // method returns.
     BrowserAccessibilityManager* manager =
         renderWidgetHostView_->GetBrowserAccessibilityManager();
-    manager->SetFocus(manager->GetFromRendererID(accessibilityObjectId), false);
+    manager->SetFocus(manager->GetFromID(accessibilityObjectId), false);
   }
 }
 
@@ -4053,31 +4039,45 @@ extern NSString *NSTextInputReplacementRangeAttributeName;
 }
 
 - (void)undo:(id)sender {
-  renderWidgetHostView_->GetWebContents()->Undo();
+  WebContents* web_contents = renderWidgetHostView_->GetWebContents();
+  if (web_contents)
+    web_contents->Undo();
 }
 
 - (void)redo:(id)sender {
-  renderWidgetHostView_->GetWebContents()->Redo();
+  WebContents* web_contents = renderWidgetHostView_->GetWebContents();
+  if (web_contents)
+    web_contents->Redo();
 }
 
 - (void)cut:(id)sender {
-  renderWidgetHostView_->GetWebContents()->Cut();
+  WebContents* web_contents = renderWidgetHostView_->GetWebContents();
+  if (web_contents)
+    web_contents->Cut();
 }
 
 - (void)copy:(id)sender {
-  renderWidgetHostView_->GetWebContents()->Copy();
+  WebContents* web_contents = renderWidgetHostView_->GetWebContents();
+  if (web_contents)
+    web_contents->Copy();
 }
 
 - (void)copyToFindPboard:(id)sender {
-  renderWidgetHostView_->GetWebContents()->CopyToFindPboard();
+  WebContents* web_contents = renderWidgetHostView_->GetWebContents();
+  if (web_contents)
+    web_contents->CopyToFindPboard();
 }
 
 - (void)paste:(id)sender {
-  renderWidgetHostView_->GetWebContents()->Paste();
+  WebContents* web_contents = renderWidgetHostView_->GetWebContents();
+  if (web_contents)
+    web_contents->Paste();
 }
 
 - (void)pasteAndMatchStyle:(id)sender {
-  renderWidgetHostView_->GetWebContents()->PasteAndMatchStyle();
+  WebContents* web_contents = renderWidgetHostView_->GetWebContents();
+  if (web_contents)
+    web_contents->PasteAndMatchStyle();
 }
 
 - (void)selectAll:(id)sender {
@@ -4088,7 +4088,9 @@ extern NSString *NSTextInputReplacementRangeAttributeName;
   // menu handler, neither is true.
   // Explicitly call SelectAll() here to make sure the renderer returns
   // selection results.
-  renderWidgetHostView_->GetWebContents()->SelectAll();
+  WebContents* web_contents = renderWidgetHostView_->GetWebContents();
+  if (web_contents)
+    web_contents->SelectAll();
 }
 
 - (void)startSpeaking:(id)sender {
@@ -4298,11 +4300,8 @@ extern NSString *NSTextInputReplacementRangeAttributeName;
 
   CGRect clipRect = CGContextGetClipBoundingBox(context);
   if (renderWidgetHostView_) {
-    BackingStoreMac* backingStore = static_cast<BackingStoreMac*>(
-        renderWidgetHostView_->render_widget_host_->GetBackingStore(false));
-    [renderWidgetHostView_->cocoa_view() drawBackingStore:backingStore
-                                                dirtyRect:clipRect
-                                                inContext:context];
+    [renderWidgetHostView_->cocoa_view() drawWithDirtyRect:clipRect
+                                                 inContext:context];
   } else {
     CGContextSetFillColorWithColor(context,
                                    CGColorGetConstantColor(kCGColorWhite));

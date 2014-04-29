@@ -29,7 +29,7 @@ class BuildDirAmbiguous(Exception): pass
 
 class ChromeTests:
   SLOW_TOOLS = ["memcheck", "tsan", "tsan_rv", "drmemory"]
-  LAYOUT_TESTS_DEFAULT_CHUNK_SIZE = 400
+  LAYOUT_TESTS_DEFAULT_CHUNK_SIZE = 300
 
   def __init__(self, options, args, test):
     if ':' in test:
@@ -281,9 +281,6 @@ class ChromeTests:
   def TestContent(self):
     return self.SimpleTest("content", "content_unittests")
 
-  def TestContentBrowser(self):
-    return self.SimpleTest("content", "content_browsertests")
-
   def TestCourgette(self):
     return self.SimpleTest("courgette", "courgette_unittests")
 
@@ -366,6 +363,18 @@ class ChromeTests:
   def TestViews(self):
     return self.SimpleTest("views", "views_unittests")
 
+  def TestCloudPrint(self):
+    return self.SimpleTest("cloud_print", "cloud_print_unittests")
+
+  def TestCacheInvalidation(self):
+    return self.SimpleTest("cacheinvalidation", "cacheinvalidation_unittests")
+
+  def TestAddressInput(self):
+    return self.SimpleTest("addressinput", "libaddressinput_unittests")
+
+  def TestPhoneNumber(self):
+    return self.SimpleTest("phonenumber", "libphonenumber_unittests")
+
   # Valgrind timeouts are in seconds.
   UI_VALGRIND_ARGS = ["--timeout=14400", "--trace_children", "--indirect"]
   # UI test timeouts are in milliseconds.
@@ -388,6 +397,11 @@ class ChromeTests:
 
   def TestBrowser(self):
     return self.SimpleTest("chrome", "browser_tests",
+                           valgrind_test_args=self.BROWSER_VALGRIND_ARGS,
+                           cmd_args=self.BROWSER_TEST_ARGS)
+
+  def TestContentBrowser(self):
+    return self.SimpleTest("content", "content_browsertests",
                            valgrind_test_args=self.BROWSER_VALGRIND_ARGS,
                            cmd_args=self.BROWSER_TEST_ARGS)
 
@@ -583,6 +597,14 @@ class ChromeTests:
     "unit": TestUnit,            "unit_tests": TestUnit,
     "url": TestURL,              "url_unittests": TestURL,
     "views": TestViews,          "views_unittests": TestViews,
+    "cloud_print": TestCloudPrint,
+    "cloud_print_unittests": TestCloudPrint,
+    "cacheinvalidation": TestCacheInvalidation,
+    "cacheinvalidation_unittests": TestCacheInvalidation,
+    "addressinput": TestAddressInput,
+    "libaddressinput_unittests": TestAddressInput,
+    "phonenumber": TestPhoneNumber,
+    "libphonenumber_unittests": TestPhoneNumber,
   }
 
 

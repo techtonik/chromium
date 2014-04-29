@@ -164,6 +164,12 @@ void Layer::Add(Layer* child) {
 }
 
 void Layer::Remove(Layer* child) {
+  // Current bounds are used to calculate offsets when layers are reparented.
+  // Stop (and complete) an ongoing animation to update the bounds immediately.
+  if (child->GetAnimator()) {
+    child->GetAnimator()->StopAnimatingProperty(
+        ui::LayerAnimationElement::BOUNDS);
+  }
   std::vector<Layer*>::iterator i =
       std::find(children_.begin(), children_.end(), child);
   DCHECK(i != children_.end());
@@ -329,6 +335,12 @@ void Layer::SetBackgroundZoom(float zoom, int inset) {
   SetLayerBackgroundFilters();
 }
 
+void Layer::SetAlphaShape(scoped_ptr<SkRegion> region) {
+  alpha_shape_ = region.Pass();
+
+  SetLayerFilters();
+}
+
 void Layer::SetLayerFilters() {
   cc::FilterOperations filters;
   if (layer_saturation_) {
@@ -347,6 +359,10 @@ void Layer::SetLayerFilters() {
   if (layer_brightness_) {
     filters.Append(cc::FilterOperation::CreateSaturatingBrightnessFilter(
         layer_brightness_));
+  }
+  if (alpha_shape_) {
+    filters.Append(cc::FilterOperation::CreateAlphaThresholdFilter(
+            *alpha_shape_, 1.f, 0.f));
   }
 
   cc_layer_->SetFilters(filters);

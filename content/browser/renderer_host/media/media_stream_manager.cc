@@ -36,6 +36,9 @@
 #include "media/audio/audio_manager_base.h"
 #include "media/audio/audio_parameters.h"
 #include "media/base/channel_layout.h"
+#include "media/base/media_switches.h"
+#include "media/video/capture/fake_video_capture_device_factory.h"
+#include "media/video/capture/file_video_capture_device_factory.h"
 #include "url/gurl.h"
 
 #if defined(OS_WIN)
@@ -1427,19 +1430,32 @@ void MediaStreamManager::InitializeDeviceManagersOnIOThread() {
   audio_input_device_manager_ = new AudioInputDeviceManager(audio_manager_);
   audio_input_device_manager_->Register(this, device_task_runner_);
 
-  video_capture_manager_ = new VideoCaptureManager();
-  video_capture_manager_->Register(this, device_task_runner_);
-
   // We want to be notified of IO message loop destruction to delete the thread
   // and the device managers.
   io_loop_ = base::MessageLoop::current();
   io_loop_->AddDestructionObserver(this);
 
+  // Use a Fake Audio Device and Fake/File Video Device Factory if the command
+  // line flags are present, otherwise use a normal device factory.
   if (CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kUseFakeDeviceForMediaStream)) {
-    DVLOG(1) << "Using fake device";
-    UseFakeDevice();
+    if (CommandLine::ForCurrentProcess()->HasSwitch(
+            switches::kUseFileForFakeVideoCapture)) {
+      video_capture_manager_ = new VideoCaptureManager(
+          scoped_ptr<media::VideoCaptureDeviceFactory>(
+              new media::FileVideoCaptureDeviceFactory()));
+    } else {
+      video_capture_manager_ = new VideoCaptureManager(
+          scoped_ptr<media::VideoCaptureDeviceFactory>(
+              new media::FakeVideoCaptureDeviceFactory()));
+    }
+    audio_input_device_manager()->UseFakeDevice();
+  } else {
+    video_capture_manager_ = new VideoCaptureManager(
+        scoped_ptr<media::VideoCaptureDeviceFactory>(
+            new media::VideoCaptureDeviceFactory()));
   }
+  video_capture_manager_->Register(this, device_task_runner_);
 }
 
 void MediaStreamManager::Opened(MediaStreamType stream_type,
@@ -1791,12 +1807,6 @@ void MediaStreamManager::StopMediaStreamFromBrowser(const std::string& label) {
   CancelRequest(label);
 }
 
-void MediaStreamManager::UseFakeDevice() {
-  DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  video_capture_manager()->UseFakeDevice();
-  audio_input_device_manager()->UseFakeDevice();
-}
-
 void MediaStreamManager::UseFakeUI(scoped_ptr<FakeMediaStreamUIProxy> fake_ui) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   use_fake_ui_ = true;
@@ -1825,8 +1835,6 @@ void MediaStreamManager::NotifyDevicesChanged(
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   MediaObserver* media_observer =
       GetContentClient()->browser()->GetMediaObserver();
-  if (media_observer == NULL)
-    return;
 
   // Map the devices to MediaStreamDevices.
   MediaStreamDevices new_devices;
@@ -1838,11 +1846,13 @@ void MediaStreamManager::NotifyDevicesChanged(
   if (IsAudioMediaType(stream_type)) {
     MediaCaptureDevicesImpl::GetInstance()->OnAudioCaptureDevicesChanged(
         new_devices);
-    media_observer->OnAudioCaptureDevicesChanged();
+    if (media_observer)
+      media_observer->OnAudioCaptureDevicesChanged();
   } else if (IsVideoMediaType(stream_type)) {
     MediaCaptureDevicesImpl::GetInstance()->OnVideoCaptureDevicesChanged(
         new_devices);
-    media_observer->OnVideoCaptureDevicesChanged();
+    if (media_observer)
+      media_observer->OnVideoCaptureDevicesChanged();
   } else {
     NOTREACHED();
   }

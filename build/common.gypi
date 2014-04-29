@@ -194,13 +194,6 @@
             'toolkit_views%': 0,
           }],
 
-          # Set toolkit_uses_gtk for the Chromium browser on Linux.
-          ['desktop_linux==1 and use_aura==0 and use_ozone==0', {
-            'toolkit_uses_gtk%': 1,
-          }, {
-            'toolkit_uses_gtk%': 0,
-          }],
-
           # Enable HiDPI on Mac OS, Chrome OS and Windows.
           ['OS=="mac" or chromeos==1 or OS=="win"', {
             'enable_hidpi%': 1,
@@ -253,7 +246,6 @@
       'target_arch%': '<(target_arch)',
       'target_subarch%': '<(target_subarch)',
       'toolkit_views%': '<(toolkit_views)',
-      'toolkit_uses_gtk%': '<(toolkit_uses_gtk)',
       'desktop_linux%': '<(desktop_linux)',
       'use_aura%': '<(use_aura)',
       'use_ash%': '<(use_ash)',
@@ -283,6 +275,11 @@
       # on compile-only bots).
       'fastbuild%': 0,
 
+      # Set to 1 to force Visual C++ to use legacy debug information format /Z7.
+      # This is useful for parallel compilation tools which can't support /Zi.
+      # Only used on Windows.
+      'win_z7%' : 0,
+
       # Set to 1 to enable dcheck in release.
       'dcheck_always_on%': 0,
 
@@ -292,9 +289,6 @@
 
       # Disable image loader component extension by default.
       'image_loader_extension%': 0,
-
-      # Python version.
-      'python_ver%': '2.6',
 
       # Set NEON compilation flags.
       'arm_neon%': 1,
@@ -360,6 +354,10 @@
       # Enable coverage gathering instrumentation in ASan. This flag also
       # controls coverage granularity (experimental).
       'asan_coverage%': 0,
+
+      # Enable Chromium overrides of the default configurations for various
+      # dynamic tools (like ASan).
+      'use_sanitizer_options%': 1,
 
       # Enable building with SyzyAsan.
       # See https://code.google.com/p/sawbuck/wiki/SyzyASanHowTo
@@ -501,11 +499,6 @@
       # Enable plug-in installation by default.
       'enable_plugin_installation%': 1,
 
-      # Enable PPAPI and NPAPI by default.
-      # TODO(nileshagrawal): Make this flag enable/disable NPAPI as well
-      # as PPAPI; see crbug.com/162667.
-      'enable_plugins%': 1,
-
       # Specifies whether to use canvas_skia.cc in place of platform
       # specific implementations of gfx::Canvas. Affects text drawing in the
       # Chrome UI.
@@ -593,7 +586,7 @@
         }],
 
         # Flags to use glib.
-        ['OS=="win" or OS=="mac" or OS=="ios" or OS=="android" or embedded==1', {
+        ['OS=="win" or OS=="mac" or OS=="ios" or OS=="android" or use_ozone==1', {
           'use_glib%': 0,
         }, {
           'use_glib%': 1,
@@ -632,8 +625,8 @@
           'use_gnome_keyring%': 1,
         }],
 
-        ['toolkit_uses_gtk==1 or OS=="mac" or OS=="ios"', {
-          # GTK+, Mac and iOS want Title Case strings
+        ['OS=="mac" or OS=="ios"', {
+          # Mac and iOS want Title Case strings
           'use_titlecase_in_grd_files%': 1,
         }],
 
@@ -726,19 +719,33 @@
           'enable_plugin_installation%': 1,
         }],
 
+        # Whether PPAPI is enabled.
         ['OS=="android" or OS=="ios" or embedded==1', {
           'enable_plugins%': 0,
         }, {
           'enable_plugins%': 1,
         }],
 
-        # linux_use_gold_binary: whether to use the binary checked into
-        # third_party/gold.  Gold is not used for 32-bit linux builds
-        # as it runs out of address space.
+        # linux_use_bundled_gold: whether to use the gold linker binary checked
+        # into third_party/binutils.  Force this off via GYP_DEFINES when you
+        # are using a custom toolchain and need to control -B in ldflags.
+        # Do not use 32-bit gold on 32-bit hosts as it runs out address space
+        # for component=static_library builds.
         ['OS=="linux" and (target_arch=="x64" or target_arch=="arm")', {
-          'linux_use_gold_binary%': 1,
+          'linux_use_bundled_gold%': 1,
         }, {
-          'linux_use_gold_binary%': 0,
+          'linux_use_bundled_gold%': 0,
+        }],
+
+        # linux_use_bundled_binutils: whether to use the binary binutils
+        # checked into third_party/binutils.  These are not multi-arch so cannot
+        # be used except on x86 and x86-64 (the only two architectures which
+        # are currently checke in).  Force this off via GYP_DEFINES when you
+        # are using a custom toolchain and need to control -B in cflags.
+        ['OS=="linux" and (target_arch=="x64")', {
+          'linux_use_bundled_binutils%': 1,
+        }, {
+          'linux_use_bundled_binutils%': 0,
         }],
 
         # linux_use_gold_flags: whether to use build flags that rely on gold.
@@ -941,7 +948,6 @@
     'use_ozone_evdev%': '<(use_ozone_evdev)',
     'use_clipboard_aurax11%': '<(use_clipboard_aurax11)',
     'use_system_fontconfig%': '<(use_system_fontconfig)',
-    'toolkit_uses_gtk%': '<(toolkit_uses_gtk)',
     'desktop_linux%': '<(desktop_linux)',
     'use_x11%': '<(use_x11)',
     'use_gnome_keyring%': '<(use_gnome_keyring)',
@@ -952,9 +958,9 @@
     'use_xi2_mt%':'<(use_xi2_mt)',
     'image_loader_extension%': '<(image_loader_extension)',
     'fastbuild%': '<(fastbuild)',
+    'win_z7%': '<(win_z7)',
     'dcheck_always_on%': '<(dcheck_always_on)',
     'tracing_like_official_build%': '<(tracing_like_official_build)',
-    'python_ver%': '<(python_ver)',
     'arm_version%': '<(arm_version)',
     'arm_neon%': '<(arm_neon)',
     'arm_neon_optional%': '<(arm_neon_optional)',
@@ -977,6 +983,7 @@
     'mac_want_real_dsym%': '<(mac_want_real_dsym)',
     'asan%': '<(asan)',
     'asan_coverage%': '<(asan_coverage)',
+    'use_sanitizer_options%': '<(use_sanitizer_options)',
     'syzyasan%': '<(syzyasan)',
     'syzygy_optimize%': '<(syzygy_optimize)',
     'lsan%': '<(lsan)',
@@ -996,7 +1003,8 @@
     'enable_themes%': '<(enable_themes)',
     'enable_autofill_dialog%': '<(enable_autofill_dialog)',
     'enable_background%': '<(enable_background)',
-    'linux_use_gold_binary%': '<(linux_use_gold_binary)',
+    'linux_use_bundled_gold%': '<(linux_use_bundled_gold)',
+    'linux_use_bundled_binutils%': '<(linux_use_bundled_binutils)',
     'linux_use_gold_flags%': '<(linux_use_gold_flags)',
     'use_canvas_skia%': '<(use_canvas_skia)',
     'test_isolation_mode%': '<(test_isolation_mode)',
@@ -1085,11 +1093,6 @@
 
     # Set to 1 to enable running Android lint on java/class files.
     'android_lint%': 0,
-
-    # Set to 1 to force Visual C++ to use legacy debug information format /Z7.
-    # This is useful for parallel compilation tools which can't support /Zi.
-    # Only used on Windows.
-    'win_z7%' : 0,
 
     # Although base/allocator lets you select a heap library via an
     # environment variable, the libcmt shim it uses sometimes gets in
@@ -1301,8 +1304,8 @@
     # Contains data about the attached devices for gyp_managed_install.
     'build_device_config_path': '<(PRODUCT_DIR)/build_devices.cfg',
 
-    'sas_dll_exists': '<!(python <(DEPTH)/build/dir_exists.py "<(sas_dll_path)")',
-    'wix_exists': '<!(python <(DEPTH)/build/dir_exists.py "<(wix_path)")',
+    'sas_dll_exists': '<!pymod_do_main(dir_exists "<(sas_dll_path)")',
+    'wix_exists': '<!pymod_do_main(dir_exists "<(wix_path)")',
 
     'windows_sdk_default_path': '<(DEPTH)/third_party/platformsdk_win8/files',
     'directx_sdk_default_path': '<(DEPTH)/third_party/directxsdk/files',
@@ -1342,6 +1345,9 @@
     # Set to 1 to compile with MSE support for MPEG2 TS
     'enable_mpeg2ts_stream_parser%': 0,
 
+    # Support ChromeOS touchpad gestures with ozone.
+    'use_evdev_gestures%': 0,
+
     'conditions': [
       # Enable the Syzygy optimization step for the official builds.
       ['OS=="win" and buildtype=="Official" and syzyasan!=1', {
@@ -1358,23 +1364,21 @@
           # TODO(glider): set clang to 1 earlier for ASan and TSan builds so
           # that it takes effect here.
           ['clang==0 and asan==0 and lsan==0 and tsan==0 and msan==0', {
-            'binutils_version%': '<!(python <(DEPTH)/build/compiler_version.py assembler)',
+            'binutils_version%': '<!pymod_do_main(compiler_version target assembler)',
           }],
           # On Android we know the binutils version in the toolchain.
           ['OS=="android"', {
             'binutils_version%': 222,
           }],
+          ['host_arch=="x64"', {
+            'binutils_dir%': 'third_party/binutils/Linux_x64/Release/bin',
+          }],
+          ['host_arch=="ia32"', {
+            'binutils_dir%': 'third_party/binutils/Linux_ia32/Release/bin',
+          }],
           # Our version of binutils in third_party/binutils
-          ['linux_use_gold_binary==1', {
+          ['linux_use_bundled_binutils==1', {
             'binutils_version%': 224,
-            'conditions': [
-              ['host_arch=="x64"', {
-                'binutils_dir%': 'third_party/binutils/Linux_x64/Release/bin',
-              }],
-              ['host_arch=="ia32"', {
-                'binutils_dir%': 'third_party/binutils/Linux_ia32/Release/bin',
-              }],
-            ],
           }],
         ],
       }, {
@@ -1386,9 +1390,10 @@
       # TODO(glider): set clang to 1 earlier for ASan and TSan builds so that
       # it takes effect here.
       ['os_posix==1 and OS!="mac" and OS!="ios" and clang==0 and asan==0 and lsan==0 and tsan==0 and msan==0', {
+        'host_gcc_version%': '<!pymod_do_main(compiler_version host compiler)',
         'conditions': [
           ['OS=="android"', {
-            # We directly set the gcc_version since we know what we use.
+            # We directly set the gcc versions since we know what we use.
             'conditions': [
               ['target_arch=="x64" or target_arch=="arm64"', {
                 'gcc_version%': 48,
@@ -1397,18 +1402,19 @@
               }],
             ],
           }, {
-            'gcc_version%': '<!(python <(DEPTH)/build/compiler_version.py)',
+            'gcc_version%': '<!pymod_do_main(compiler_version target compiler)',
           }],
         ],
       }, {
+        'host_gcc_version%': 0,
         'gcc_version%': 0,
       }],
-      ['OS=="win" and "<!(python <(DEPTH)/build/dir_exists.py <(windows_sdk_default_path))"=="True"', {
+      ['OS=="win" and "<!pymod_do_main(dir_exists <(windows_sdk_default_path))"=="True"', {
         'windows_sdk_path%': '<(windows_sdk_default_path)',
       }, {
         'windows_sdk_path%': 'C:/Program Files (x86)/Windows Kits/8.0',
       }],
-      ['OS=="win" and "<!(python <(DEPTH)/build/dir_exists.py <(directx_sdk_default_path))"=="True"', {
+      ['OS=="win" and "<!pymod_do_main(dir_exists <(directx_sdk_default_path))"=="True"', {
         'directx_sdk_path%': '<(directx_sdk_default_path)',
       }, {
         'directx_sdk_path%': '$(DXSDK_DIR)',
@@ -1439,6 +1445,16 @@
             # Omit unwind support in official release builds to save space. We
             # can use breakpad for these builds.
             'release_unwind_tables%': 0,
+
+            'conditions': [
+              # For official builds, use a 64-bit linker to avoid running out
+              # of address space. The buildbots should have a 64-bit kernel
+              # and a 64-bit libc installed.
+              ['host_arch=="ia32" and target_arch=="ia32"', {
+                'linux_use_bundled_gold%': '1',
+                'binutils_dir%': 'third_party/binutils/Linux_x64/Release/bin',
+              }],
+            ],
           }],
         ],
       }],  # os_posix==1 and OS!="mac" and OS!="ios"
@@ -1520,12 +1536,14 @@
               'android_app_abi%': 'x86',
               'android_gdbserver%': '<(android_ndk_root)/prebuilt/android-x86/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-14/arch-x86',
+              'android_ndk_lib_dir%': 'usr/lib',
               'android_toolchain%': '<(android_ndk_root)/toolchains/x86-4.6/prebuilt/<(host_os)-<(android_host_arch)/bin',
             }],
             ['target_arch == "x64"', {
               'android_app_abi%': 'x86_64',
               'android_gdbserver%': '<(android_ndk_experimental_root)/prebuilt/android-x86_64/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_experimental_root)/platforms/android-20/arch-x86_64',
+              'android_ndk_lib_dir%': 'usr/lib64',
               'android_toolchain%': '<(android_ndk_experimental_root)/toolchains/x86_64-4.8/prebuilt/<(host_os)-<(android_host_arch)/bin',
               'android_stlport_root': '<(android_ndk_experimental_root)/sources/cxx-stl/stlport',
             }],
@@ -1539,19 +1557,22 @@
               ],
               'android_gdbserver%': '<(android_ndk_root)/prebuilt/android-arm/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-14/arch-arm',
+              'android_ndk_lib_dir%': 'usr/lib',
               'android_toolchain%': '<(android_ndk_root)/toolchains/arm-linux-androideabi-4.6/prebuilt/<(host_os)-<(android_host_arch)/bin',
             }],
             ['target_arch == "arm64"', {
               'android_app_abi%': 'arm64-v8a',
               'android_gdbserver%': '<(android_ndk_experimental_root)/prebuilt/android-arm64/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_experimental_root)/platforms/android-20/arch-arm64',
-              'android_toolchain%': '<(android_ndk_experimental_root)/toolchains/aarch64-linux-android-4.8/prebuilt/<(host_os)-<(android_host_arch)/bin',
+              'android_ndk_lib_dir%': 'usr/lib',
+              'android_toolchain%': '<(android_ndk_experimental_root)/toolchains/aarch64-linux-android-4.9/prebuilt/<(host_os)-<(android_host_arch)/bin',
               'android_stlport_root': '<(android_ndk_experimental_root)/sources/cxx-stl/stlport',
             }],
             ['target_arch == "mipsel"', {
               'android_app_abi%': 'mips',
               'android_gdbserver%': '<(android_ndk_root)/prebuilt/android-mips/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-14/arch-mips',
+              'android_ndk_lib_dir%': 'usr/lib',
               'android_toolchain%': '<(android_ndk_root)/toolchains/mipsel-linux-android-4.6/prebuilt/<(host_os)-<(android_host_arch)/bin',
             }],
           ],
@@ -1566,7 +1587,7 @@
         'android_toolchain%': '<(android_toolchain)',
 
         'android_ndk_include': '<(android_ndk_sysroot)/usr/include',
-        'android_ndk_lib': '<(android_ndk_sysroot)/usr/lib',
+        'android_ndk_lib': '<(android_ndk_sysroot)/<(android_ndk_lib_dir)',
         'android_sdk_tools%': '<(android_sdk_tools)',
         'android_sdk%': '<(android_sdk)',
         'android_sdk_jar%': '<(android_sdk)/android.jar',
@@ -1741,7 +1762,7 @@
           },{
             'msvs_large_module_debug_link_mode%': '2',  # Yes
           }],
-          ['MSVS_VERSION=="2013e" or MSVS_VERSION=="2012e" or MSVS_VERSION=="2010e"', {
+          ['MSVS_VERSION=="2013e"', {
             'msvs_express%': 1,
             'secure_atl%': 0,
           },{
@@ -1813,9 +1834,6 @@
       }],
       ['toolkit_views==1', {
         'grit_defines': ['-D', 'toolkit_views'],
-      }],
-      ['toolkit_uses_gtk==1', {
-        'grit_defines': ['-D', 'toolkit_uses_gtk'],
       }],
       ['use_aura==1', {
         'grit_defines': ['-D', 'use_aura'],
@@ -1911,8 +1929,11 @@
       ['notifications==1', {
         'grit_defines': ['-D', 'enable_notifications'],
       }],
-      ['enable_resource_whitelist_generation==1', {
+      ['enable_resource_whitelist_generation==1 and OS!="win"', {
         'grit_rc_header_format': ['-h', '#define {textual_id} _Pragma("whitelisted_resource_{numeric_id}") {numeric_id}'],
+      }],
+      ['enable_resource_whitelist_generation==1 and OS=="win"', {
+        'grit_rc_header_format': ['-h', '#define {textual_id} __pragma(message("whitelisted_resource_{numeric_id}")) {numeric_id}'],
       }],
       ['enable_mdns==1 or OS=="mac"', {
         'grit_defines': ['-D', 'enable_service_discovery'],
@@ -2079,8 +2100,8 @@
         'chromium_win_pch': 0,
         # goma doesn't support PDB yet, so win_z7=1 or fastbuild=1.
         'conditions': [
-          ['fastbuild==0', {
-            'win_z7': 1,
+          ['win_z7==0', {
+            'fastbuild': 1,
           }],
         ],
       }],
@@ -2316,11 +2337,6 @@
       }],
       ['enable_one_click_signin==1', {
         'defines': ['ENABLE_ONE_CLICK_SIGNIN'],
-      }],
-      ['toolkit_uses_gtk==1 and toolkit_views==0', {
-        # TODO(erg): We are progressively sealing up use of deprecated features
-        # in gtk in preparation for an eventual porting to gtk3.
-        'defines': ['GTK_DISABLE_SINGLE_INCLUDES=1'],
       }],
       ['chromeos==1', {
         'defines': ['OS_CHROMEOS=1'],
@@ -3169,10 +3185,6 @@
             'conditions' : [
               ['OS=="android"', {
                 'ldflags': [
-                  # Only link with needed input sections. This is to avoid
-                  # getting undefined reference to __cxa_bad_typeid in the CDU
-                  # library.
-                  '-Wl,--gc-sections',
                   # Warn in case of text relocations.
                   '-Wl,--warn-shared-textrel',
                 ],
@@ -3657,6 +3669,14 @@
                 ],
               }],
             ],
+            # TODO(glider): enable the default options on other systems.
+            'conditions': [
+              ['use_sanitizer_options==1 and OS=="linux" and (chromeos==0 or target_arch!="ia32")', {
+                'dependencies': [
+                  '<(DEPTH)/base/base.gyp:sanitizer_options',
+                ],
+              }],
+            ],
           }],
           ['asan==1', {
             'target_conditions': [
@@ -3712,7 +3732,7 @@
                 'cflags': [
                   '-fsanitize=thread',
                   '-fPIC',
-                  '-mllvm', '-tsan-blacklist=<(tsan_blacklist)',
+                  '-fsanitize-blacklist=<(tsan_blacklist)',
                 ],
                 'ldflags': [
                   '-fsanitize=thread',
@@ -3761,40 +3781,6 @@
             'dependencies': [
               '<(DEPTH)/third_party/instrumented_libraries/instrumented_libraries.gyp:instrumented_libraries',
             ],
-            'conditions': [
-              ['asan==1', {
-                'target_conditions': [
-                  ['_toolset=="target"', {
-                    'ldflags': [
-                      # Add RPATH to result binary to make it linking instrumented libraries ($ORIGIN means relative RPATH)
-                      '-Wl,-R,\$$ORIGIN/instrumented_libraries/asan/lib/:\$$ORIGIN/instrumented_libraries/asan/usr/lib/x86_64-linux-gnu/',
-                      '-Wl,-z,origin',
-                    ],
-                  }],
-                ],
-              }],
-              ['msan==1', {
-                'target_conditions': [
-                  ['_toolset=="target"', {
-                    'ldflags': [
-                      '-Wl,-R,\$$ORIGIN/instrumented_libraries/msan/lib/:\$$ORIGIN/instrumented_libraries/msan/usr/lib/x86_64-linux-gnu/',
-                      '-Wl,-z,origin',
-                    ],
-                  }],
-                ],
-              }],
-              ['tsan==1', {
-                'target_conditions': [
-                  ['_toolset=="target"', {
-                    'ldflags': [
-                      # Add RPATH to result binary to make it linking instrumented libraries ($ORIGIN means relative RPATH)
-                      '-Wl,-R,\$$ORIGIN/instrumented_libraries/tsan/lib/:\$$ORIGIN/instrumented_libraries/tsan/usr/lib/x86_64-linux-gnu/',
-                      '-Wl,-z,origin',
-                    ],
-                  }],
-                ],
-              }],
-            ],
           }],
           ['use_custom_libcxx==1', {
             'dependencies': [
@@ -3824,16 +3810,14 @@
           ['linux_dump_symbols==1', {
             'cflags': [ '-g' ],
             'conditions': [
-              # TODO(thestig) We should not need to specify chromeos==0 here,
-              # but somehow ChromeOS uses gold despite linux_use_gold_binary==0.
-              # http://crbug.com./360082
-              ['linux_use_gold_binary==0 and chromeos==0 and OS!="android"', {
+              ['OS=="linux" and host_arch=="ia32" and linux_use_bundled_gold==0', {
                 'target_conditions': [
                   ['_toolset=="target"', {
                     'ldflags': [
-                      # Workarounds for linker OOM.
+                      # Attempt to use less memory to prevent the linker from
+                      # running out of address space. Considering installing a
+                      # 64-bit kernel and switching to a 64-bit linker.
                       '-Wl,--no-keep-memory',
-                      '-Wl,--reduce-memory-overheads',
                     ],
                   }],
                 ],
@@ -3881,33 +3865,54 @@
               # TODO(mithro): Watch for clang support at following thread:
               # http://clang-developers.42468.n3.nabble.com/Adding-fuse-ld-support-to-clang-td4032180.html
               ['gcc_version>=48', {
-                'cflags': [
-                  '-fuse-ld=gold',
+                'target_conditions': [
+                  ['_toolset=="target"', {
+                    'cflags': [
+                      '-fuse-ld=gold',
+                    ],
+                    'ldflags': [
+                      '-fuse-ld=gold',
+                    ],
+                  }],
                 ],
-                'ldflags': [
-                  '-fuse-ld=gold',
+              }],
+              ['host_gcc_version>=48', {
+                'target_conditions': [
+                  ['_toolset=="host"', {
+                    'cflags': [
+                      '-fuse-ld=gold',
+                    ],
+                    'ldflags': [
+                      '-fuse-ld=gold',
+                    ],
+                  }],
                 ],
-              }]
+              }],
             ],
           }],
-          ['linux_use_gold_binary==1', {
-	    # Put our binutils, which contains gold in the search path. We pass
-	    # the path to gold to the compiler. gyp leaves unspecified what the
-	    # cwd is when running the compiler, so the normal gyp path-munging
-	    # fails us. This hack gets the right path.
+          ['linux_use_bundled_binutils==1', {
             'cflags': [
               '-B<!(cd <(DEPTH) && pwd -P)/<(binutils_dir)',
             ],
+          }],
+          ['linux_use_bundled_gold==1', {
+            # Put our binutils, which contains gold in the search path. We pass
+            # the path to gold to the compiler. gyp leaves unspecified what the
+            # cwd is when running the compiler, so the normal gyp path-munging
+            # fails us. This hack gets the right path.
             'ldflags': [
               '-B<!(cd <(DEPTH) && pwd -P)/<(binutils_dir)',
             ],
           }],
-          ['binutils_version>=224', {
-	    # Newer binutils don't set DT_RPATH unless you disable "new" dtags
-	    # and the new DT_RUNPATH doesn't work without --no-as-needed flag.
-	    # FIXME(mithro): Figure out the --as-needed/--no-as-needed flags
-	    # inside this file to allow usage of --no-as-needed and removal of
-	    # this flag.
+          # Some binutils 2.23 releases may or may not have new dtags enabled,
+          # but they are all compatible with --disable-new-dtags,
+          # because the new dynamic tags are not created by default.
+          ['binutils_version>=223', {
+            # Newer binutils don't set DT_RPATH unless you disable "new" dtags
+            # and the new DT_RUNPATH doesn't work without --no-as-needed flag.
+            # FIXME(mithro): Figure out the --as-needed/--no-as-needed flags
+            # inside this file to allow usage of --no-as-needed and removal of
+            # this flag.
             'ldflags': [
               '-Wl,--disable-new-dtags',
             ],
@@ -4863,25 +4868,6 @@
               '<(windows_driver_kit_path)/inc/atl71',
               '<(windows_driver_kit_path)/inc/mfc42',
             ],
-            'target_conditions': [
-              ['chromium_code and MSVS_VERSION=="2010e"', {
-                # Workaround for intsafe in 2010 Express + WDK.
-                # ATL code uses intsafe.h and both intsafe.h and stdint.h
-                # define INT8_MIN et al.
-                # We can't use this workaround in third_party code because
-                # it has various levels of intolerance for including stdint.h.
-                # This is not necessary in 2013e, and should be removed once
-                # mainline is switched: http://crbug.com/340358.
-                'msvs_system_include_dirs': [
-                  '<(DEPTH)/build',
-                ],
-                'msvs_settings': {
-                  'VCCLCompilerTool': {
-                    'ForcedIncludeFiles': [ 'intsafe_workaround.h', ],
-                  },
-                },
-              }],
-            ],
           }],
         ],
         'msvs_system_include_dirs': [
@@ -4988,6 +4974,7 @@
                 'WarnAsError': 'false',
                 'RuntimeTypeInfo': 'false',
                 'AdditionalOptions': [
+                  '-fmsc-version=1800',
                   '/fallback',
 
                   # Many files use intrinsics without including this header.
@@ -5032,22 +5019,6 @@
                   '-ferror-limit=1',
                 ],
               },
-              'conditions': [
-                ['MSVS_VERSION=="2013" or MSVS_VERSION=="2013e"', {
-                  'VCCLCompilerTool': {
-                    'AdditionalOptions': [
-                      '-fmsc-version=1800',
-                    ],
-                  },
-                }],
-                ['MSVS_VERSION=="2010" or MSVS_VERSION=="2010e"', {
-                  'VCCLCompilerTool': {
-                    'AdditionalOptions': [
-                      '-fmsc-version=1600',
-                    ],
-                  },
-                }],
-              ],
             }],
             ['asan==1', {
               # ASan on Windows is a work in progress and very experimental.

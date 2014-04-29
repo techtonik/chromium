@@ -14,7 +14,6 @@
 #include "cc/base/cc_export.h"
 
 namespace cc {
-namespace internal {
 
 class CC_EXPORT Task : public base::RefCountedThreadSafe<Task> {
  public:
@@ -32,6 +31,7 @@ class CC_EXPORT Task : public base::RefCountedThreadSafe<Task> {
   Task();
   virtual ~Task();
 
+  bool will_run_;
   bool did_run_;
 };
 
@@ -227,7 +227,6 @@ class CC_EXPORT TaskGraphRunner {
   DISALLOW_COPY_AND_ASSIGN(TaskGraphRunner);
 };
 
-}  // namespace internal
 }  // namespace cc
 
 #endif  // CC_RESOURCES_TASK_GRAPH_RUNNER_H_

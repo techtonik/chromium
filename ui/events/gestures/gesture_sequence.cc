@@ -989,9 +989,7 @@ void GestureSequence::AppendScrollGestureEnd(const GesturePoint& point,
     gestures->push_back(CreateGestureEvent(
         GestureEventDetails(ui::ET_SCROLL_FLING_START,
             CalibrateFlingVelocity(railed_x_velocity),
-            CalibrateFlingVelocity(railed_y_velocity),
-            CalibrateFlingVelocity(x_velocity),
-            CalibrateFlingVelocity(y_velocity)),
+            CalibrateFlingVelocity(railed_y_velocity)),
         location,
         flags_,
         base::Time::FromDoubleT(point.last_touch_time()),
@@ -1044,8 +1042,6 @@ void GestureSequence::AppendScrollGestureUpdate(GesturePoint& point,
     d.set_y(d.y() * ratio);
   }
 
-  gfx::Vector2dF o = d;
-
   if (scroll_type_ == ST_HORIZONTAL)
     d.set_y(0);
   else if (scroll_type_ == ST_VERTICAL)
@@ -1053,13 +1049,7 @@ void GestureSequence::AppendScrollGestureUpdate(GesturePoint& point,
   if (d.IsZero())
     return;
 
-  GestureEventDetails details(ui::ET_GESTURE_SCROLL_UPDATE,
-                              d.x(), d.y(), o.x(), o.y());
-  details.SetScrollVelocity(
-      scroll_type_ == ST_VERTICAL ? 0 : point.XVelocity(),
-      scroll_type_ == ST_HORIZONTAL ? 0 : point.YVelocity(),
-      point.XVelocity(),
-      point.YVelocity());
+  GestureEventDetails details(ui::ET_GESTURE_SCROLL_UPDATE, d.x(), d.y());
   gestures->push_back(CreateGestureEvent(
       details,
       location,
@@ -1423,7 +1413,6 @@ bool GestureSequence::MaybeSwipe(const TouchEvent& event,
   }
 
   float min_velocity = GestureConfiguration::min_swipe_speed();
-  min_velocity *= min_velocity;
 
   velocity_x = fabs(velocity_x / point_count_);
   velocity_y = fabs(velocity_y / point_count_);

@@ -64,7 +64,9 @@ def PushAndLaunchAdbReboot(devices, target):
     device.old_interface.PushIfNeeded(adb_reboot, '/data/local/tmp/')
     # Launch adb_reboot
     print '  Launching adb_reboot ...'
-    p = subprocess.Popen(['adb', '-s', device, 'shell'], stdin=subprocess.PIPE)
+    # TODO(jbudorick) Try to convert this to RunShellCommand.
+    p = subprocess.Popen(['adb', '-s', device_serial, 'shell'],
+                         stdin=subprocess.PIPE)
     p.communicate('/data/local/tmp/adb_reboot; exit\n')
   LaunchHostHeartbeat()
 
@@ -111,7 +113,7 @@ def WipeDeviceData(device):
     device.old_interface.RunShellCommandWithSU('mkdir -p %s' % dir_path)
     adb_keys = device.old_interface.RunShellCommand(
       'echo %s > %s' % (adb_keys, constants.ADB_KEYS_FILE))
-  device.Reboot()
+  device.old_interface.Reboot()
 
 
 def ProvisionDevices(options):
@@ -121,6 +123,7 @@ def ProvisionDevices(options):
     devices = android_commands.GetAttachedDevices()
   for device_serial in devices:
     device = device_utils.DeviceUtils(device_serial)
+    device.old_interface.EnableAdbRoot()
     install_output = GetCmdOutput(
       ['%s/build/android/adb_install_apk.py' % constants.DIR_SOURCE_ROOT,
        '--apk',
@@ -138,6 +141,9 @@ def ProvisionDevices(options):
       device_settings.ConfigureContentSettingsDict(
           device, device_settings.NETWORK_DISABLED_SETTINGS)
     device.old_interface.RunShellCommandWithSU('date -u %f' % time.time())
+    (_, props) = device.old_interface.GetShellCommandStatusAndOutput('getprop')
+    for prop in props:
+      print prop
   if options.auto_reconnect:
     PushAndLaunchAdbReboot(devices, options.target)
 

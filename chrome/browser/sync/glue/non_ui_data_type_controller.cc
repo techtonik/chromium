@@ -20,6 +20,11 @@ using content::BrowserThread;
 
 namespace browser_sync {
 
+SharedChangeProcessor*
+NonUIDataTypeController::CreateSharedChangeProcessor() {
+  return new SharedChangeProcessor();
+}
+
 NonUIDataTypeController::NonUIDataTypeController(
     scoped_refptr<base::MessageLoopProxy> ui_thread,
     const base::Closure& error_callback,
@@ -47,12 +52,10 @@ void NonUIDataTypeController::LoadModels(
   }
 
   state_ = MODEL_STARTING;
-
   // Since we can't be called multiple times before Stop() is called,
   // |shared_change_processor_| must be NULL here.
   DCHECK(!shared_change_processor_.get());
-  shared_change_processor_ =
-      profile_sync_factory_->CreateSharedChangeProcessor();
+  shared_change_processor_ = CreateSharedChangeProcessor();
   DCHECK(shared_change_processor_.get());
 
   model_load_callback_ = model_load_callback;
@@ -377,6 +380,12 @@ void NonUIDataTypeController::
               local_merge_result,
               syncer_merge_result);
     return;
+  }
+
+  std::string datatype_context;
+  if (shared_change_processor_->GetDataTypeContext(&datatype_context)) {
+    local_service_->UpdateDataTypeContext(
+        type(), syncer::SyncChangeProcessor::NO_REFRESH, datatype_context);
   }
 
   syncer_merge_result.set_num_items_before_association(

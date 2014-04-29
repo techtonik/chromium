@@ -21,12 +21,14 @@ namespace content {
 class EmbeddedWorkerRegistry;
 class EmbeddedWorkerTestHelper;
 class ServiceWorkerContextCore;
+class ServiceWorkerContextWrapper;
 struct ServiceWorkerFetchRequest;
 
 // In-Process EmbeddedWorker test helper.
 //
-// Usage: create an instance of this class for a ServiceWorkerContextCore
-// to test browser-side embedded worker code without creating a child process.
+// Usage: create an instance of this class to test browser-side embedded worker
+// code without creating a child process.  This class will create a
+// ServiceWorkerContextWrapper and ServiceWorkerContextCore for you.
 //
 // By default this class just notifies back WorkerStarted and WorkerStopped
 // for StartWorker and StopWorker requests. The default implementation
@@ -42,8 +44,7 @@ class EmbeddedWorkerTestHelper : public IPC::Sender,
  public:
   // Initialize this helper for |context|, and enable this as an IPC
   // sender for |mock_render_process_id|.
-  EmbeddedWorkerTestHelper(ServiceWorkerContextCore* context,
-                           int mock_render_process_id);
+  EmbeddedWorkerTestHelper(int mock_render_process_id);
   virtual ~EmbeddedWorkerTestHelper();
 
   // Call this to simulate add/associate a process to a worker.
@@ -61,6 +62,10 @@ class EmbeddedWorkerTestHelper : public IPC::Sender,
   // Inner IPC sink for script context messages sent via EmbeddedWorker.
   IPC::TestSink* inner_ipc_sink() { return &inner_sink_; }
 
+  ServiceWorkerContextCore* context();
+  ServiceWorkerContextWrapper* context_wrapper() { return wrapper_.get(); }
+  void ShutdownContext();
+
  protected:
   // Called when StartWorker, StopWorker and SendMessageToWorker message
   // is sent to the embedded worker. Override if necessary. By default
@@ -70,17 +75,17 @@ class EmbeddedWorkerTestHelper : public IPC::Sender,
   // - OnSendMessageToWorker calls the message's respective On*Event handler
   virtual void OnStartWorker(int embedded_worker_id,
                              int64 service_worker_version_id,
+                             const GURL& scope,
                              const GURL& script_url);
   virtual void OnStopWorker(int embedded_worker_id);
-  virtual bool OnSendMessageToWorker(int thread_id,
-                                     int embedded_worker_id,
-                                     int request_id,
-                                     const IPC::Message& message);
+  virtual bool OnMessageToWorker(int thread_id,
+                                 int embedded_worker_id,
+                                 const IPC::Message& message);
 
   // On*Event handlers. Called by the default implementation of
-  // OnSendMessageToWorker when events are sent to the embedded
+  // OnMessageToWorker when events are sent to the embedded
   // worker. By default they just return success via
-  // SimulateSendMessageToBrowser.
+  // SimulateSendReplyToBrowser.
   virtual void OnActivateEvent(int embedded_worker_id, int request_id);
   virtual void OnInstallEvent(int embedded_worker_id,
                               int request_id,
@@ -89,13 +94,11 @@ class EmbeddedWorkerTestHelper : public IPC::Sender,
                             int request_id,
                             const ServiceWorkerFetchRequest& request);
 
-  // Call this to simulate sending WorkerStarted, WorkerStopped and
-  // SendMessageToBrowser to the browser.
+  // These functions simulate sending an EmbeddedHostMsg message to the
+  // browser.
   void SimulateWorkerStarted(int thread_id, int embedded_worker_id);
   void SimulateWorkerStopped(int embedded_worker_id);
-  void SimulateSendMessageToBrowser(int embedded_worker_id,
-                                    int request_id,
-                                    const IPC::Message& message);
+  void SimulateSend(IPC::Message* message);
 
  protected:
   EmbeddedWorkerRegistry* registry();
@@ -103,26 +106,26 @@ class EmbeddedWorkerTestHelper : public IPC::Sender,
  private:
   void OnStartWorkerStub(int embedded_worker_id,
                          int64 service_worker_version_id,
+                         const GURL& scope,
                          const GURL& script_url);
   void OnStopWorkerStub(int embedded_worker_id);
-  void OnSendMessageToWorkerStub(int thread_id,
-                                 int embedded_worker_id,
-                                 int request_id,
-                                 const IPC::Message& message);
-  void OnActivateEventStub();
-  void OnInstallEventStub(int active_version_id);
-  void OnFetchEventStub(const ServiceWorkerFetchRequest& request);
+  void OnMessageToWorkerStub(int thread_id,
+                             int embedded_worker_id,
+                             const IPC::Message& message);
+  void OnActivateEventStub(int request_id);
+  void OnInstallEventStub(int request_id, int active_version_id);
+  void OnFetchEventStub(int request_id,
+                        const ServiceWorkerFetchRequest& request);
 
-  base::WeakPtr<ServiceWorkerContextCore> context_;
+  scoped_refptr<ServiceWorkerContextWrapper> wrapper_;
 
   IPC::TestSink sink_;
   IPC::TestSink inner_sink_;
 
   int next_thread_id_;
 
-  // Updated each time SendMessageToWorker message is received.
+  // Updated each time MessageToWorker message is received.
   int current_embedded_worker_id_;
-  int current_request_id_;
 
   base::WeakPtrFactory<EmbeddedWorkerTestHelper> weak_factory_;
 

@@ -51,6 +51,7 @@
 #include "chrome/browser/chromeos/login/supervised_user_manager.h"
 #include "chrome/browser/chromeos/login/user.h"
 #include "chrome/browser/chromeos/login/user_manager.h"
+#include "chrome/browser/chromeos/login/wallpaper_manager.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/first_run/first_run.h"
@@ -198,6 +199,19 @@ class LoginUtilsImpl
   // Callback to resume profile creation after transferring auth data from
   // the authentication profile.
   void CompleteProfileCreate(Profile* user_profile);
+
+  // Callback to resume profile preparing after start session.
+  void OnSessionStarted(const UserContext& user_context,
+                        const std::string& display_email,
+                        bool has_cookies,
+                        LoginUtils::Delegate* delegate,
+                        bool success);
+
+  // Complete profile preparation with having active session.
+  void CompletePrepareProfileWithActiveSession(const UserContext& user_context,
+                                               const std::string& display_email,
+                                               bool has_cookies,
+                                               LoginUtils::Delegate* delegate);
 
   // Finalized profile preparation.
   void FinalizePrepareProfile(Profile* user_profile);
@@ -348,6 +362,14 @@ void LoginUtilsImpl::DoBrowserLaunchOnLocaleLoadedImpl(
                                 first_run,
                                 &return_code);
 
+  // If the current user is a new regular user (not including
+  // multi-profile cases) enable surprise me wallpaper by default.
+  if (UserManager::Get()->IsCurrentUserNew() &&
+      UserManager::Get()->IsLoggedInAsRegularUser() &&
+      UserManager::Get()->GetLoggedInUsers().size() == 1) {
+    WallpaperManager::Get()->EnableSurpriseMe();
+  }
+
   // Triggers app launcher start page service to load start page web contents.
   app_list::StartPageService::Get(profile);
 
@@ -391,10 +413,42 @@ void LoginUtilsImpl::PrepareProfile(
   if (!has_active_session) {
     btl->AddLoginTimeMarker("StartSession-Start", false);
     DBusThreadManager::Get()->GetSessionManagerClient()->StartSession(
-        user_context.username);
-    btl->AddLoginTimeMarker("StartSession-End", false);
+        user_context.username,
+        base::Bind(&LoginUtilsImpl::OnSessionStarted,
+                   AsWeakPtr(),
+                   user_context,
+                   display_email,
+                   has_cookies,
+                   delegate));
+    return;
   }
+  CompletePrepareProfileWithActiveSession(
+      user_context, display_email, has_cookies, delegate);
+}
 
+void LoginUtilsImpl::OnSessionStarted(const UserContext& user_context,
+                                      const std::string& display_email,
+                                      bool has_cookies,
+                                      LoginUtils::Delegate* delegate,
+                                      bool success) {
+  BootTimesLoader* btl = BootTimesLoader::Get();
+  btl->AddLoginTimeMarker("StartSession-End", false);
+
+  if (!success) {
+    LOG(ERROR) << "StartSession failed";
+    chrome::AttemptUserExit();
+    return;
+  }
+  CompletePrepareProfileWithActiveSession(
+      user_context, display_email, has_cookies, delegate);
+}
+
+void LoginUtilsImpl::CompletePrepareProfileWithActiveSession(
+    const UserContext& user_context,
+    const std::string& display_email,
+    bool has_cookies,
+    LoginUtils::Delegate* delegate) {
+  BootTimesLoader* btl = BootTimesLoader::Get();
   btl->AddLoginTimeMarker("UserLoggedIn-Start", false);
   UserManager* user_manager = UserManager::Get();
   user_manager->UserLoggedIn(user_context.username,
@@ -456,7 +510,7 @@ void LoginUtilsImpl::InitProfilePreferences(Profile* user_profile,
 
     user_profile->GetPrefs()->SetString(prefs::kManagedUserId,
                                         managed_user_sync_id);
-  } else {
+  } else if (UserManager::Get()->IsLoggedInAsRegularUser()) {
     // Make sure that the google service username is properly set (we do this
     // on every sign in, not just the first login, to deal with existing
     // profiles that might not have it set yet).

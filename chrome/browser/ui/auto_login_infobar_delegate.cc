@@ -12,7 +12,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/google/google_util.h"
-#include "chrome/browser/infobars/infobar.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
@@ -21,6 +20,7 @@
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
+#include "components/infobars/core/infobar.h"
 #include "components/signin/core/browser/profile_oauth2_token_service.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/page_navigator.h"
@@ -179,6 +179,11 @@ AutoLoginInfoBarDelegate::~AutoLoginInfoBarDelegate() {
     RecordHistogramAction(IGNORED);
 }
 
+void AutoLoginInfoBarDelegate::RecordHistogramAction(Actions action) {
+  UMA_HISTOGRAM_ENUMERATION("AutoLogin.Regular", action,
+                            HISTOGRAM_BOUNDING_VALUE);
+}
+
 void AutoLoginInfoBarDelegate::InfoBarDismissed() {
   RecordHistogramAction(DISMISSED);
   button_pressed_ = true;
@@ -188,7 +193,8 @@ int AutoLoginInfoBarDelegate::GetIconID() const {
   return IDR_INFOBAR_AUTOLOGIN;
 }
 
-InfoBarDelegate::Type AutoLoginInfoBarDelegate::GetInfoBarType() const {
+infobars::InfoBarDelegate::Type AutoLoginInfoBarDelegate::GetInfoBarType()
+    const {
   return PAGE_ACTION_TYPE;
 }
 
@@ -231,9 +237,4 @@ bool AutoLoginInfoBarDelegate::Cancel() {
 
 void AutoLoginInfoBarDelegate::GoogleSignedOut(const std::string& username) {
   infobar()->RemoveSelf();
-}
-
-void AutoLoginInfoBarDelegate::RecordHistogramAction(Actions action) {
-  UMA_HISTOGRAM_ENUMERATION("AutoLogin.Regular", action,
-                            HISTOGRAM_BOUNDING_VALUE);
 }

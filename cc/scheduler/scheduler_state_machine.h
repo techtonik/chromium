@@ -101,6 +101,7 @@ class CC_EXPORT SchedulerStateMachine {
 
   enum Action {
     ACTION_NONE,
+    ACTION_ANIMATE,
     ACTION_SEND_BEGIN_MAIN_FRAME,
     ACTION_COMMIT,
     ACTION_UPDATE_VISIBLE_TILES,
@@ -123,7 +124,7 @@ class CC_EXPORT SchedulerStateMachine {
 
   // Indicates whether the impl thread needs a BeginImplFrame callback in order
   // to make progress.
-  bool BeginImplFrameNeeded() const;
+  bool BeginFrameNeeded() const;
 
   // Indicates that we need to independently poll for new state and actions
   // because we can't expect a BeginImplFrame. This is mostly used to avoid
@@ -164,13 +165,27 @@ class CC_EXPORT SchedulerStateMachine {
   void SetNeedsRedraw();
   bool needs_redraw() const { return needs_redraw_; }
 
+  void SetNeedsAnimate();
+  bool needs_animate() const { return needs_animate_; }
+
   // Indicates that manage-tiles is required. This guarantees another
   // ManageTiles will occur shortly (even if no redraw is required).
   void SetNeedsManageTiles();
 
+  // Sets how many swaps can be pending to the OutputSurface.
+  void SetMaxSwapsPending(int max);
+
+  // If the scheduler attempted to draw and swap, this provides feedback
+  // regarding whether or not the swap actually occured. We might skip the
+  // swap when there is not damage, for example.
+  void DidSwapBuffers();
+
   // Indicates whether a redraw is required because we are currently rendering
   // with a low resolution or checkerboarded tile.
   void SetSwapUsedIncompleteTile(bool used_incomplete_tile);
+
+  // Notification from the OutputSurface that a swap has been consumed.
+  void DidSwapBuffersComplete();
 
   // Indicates whether to prioritize animation smoothness over new content
   // activation.
@@ -230,19 +245,20 @@ class CC_EXPORT SchedulerStateMachine {
   // True if we need to abort draws to make forward progress.
   bool PendingDrawsShouldBeAborted() const;
 
-  bool SupportsProactiveBeginImplFrame() const;
+  bool SupportsProactiveBeginFrame() const;
 
   void SetContinuousPainting(bool continuous_painting) {
     continuous_painting_ = continuous_painting;
   }
 
  protected:
-  bool BeginImplFrameNeededToDraw() const;
-  bool ProactiveBeginImplFrameWanted() const;
+  bool BeginFrameNeededToAnimateOrDraw() const;
+  bool ProactiveBeginFrameWanted() const;
 
   // True if we need to force activations to make forward progress.
   bool PendingActivationsShouldBeForced() const;
 
+  bool ShouldAnimate() const;
   bool ShouldBeginOutputSurfaceCreation() const;
   bool ShouldDrawForced() const;
   bool ShouldDraw() const;
@@ -260,7 +276,7 @@ class CC_EXPORT SchedulerStateMachine {
 
   void UpdateStateOnCommit(bool commit_was_aborted);
   void UpdateStateOnActivation();
-  void UpdateStateOnDraw(bool did_swap);
+  void UpdateStateOnDraw(bool did_request_swap);
   void UpdateStateOnManageTiles();
 
   const SchedulerSettings settings_;
@@ -271,10 +287,11 @@ class CC_EXPORT SchedulerStateMachine {
   ForcedRedrawOnTimeoutState forced_redraw_state_;
   SynchronousReadbackState readback_state_;
 
-  BeginFrameArgs last_begin_impl_frame_args_;
+  BeginFrameArgs begin_impl_frame_args_;
 
   int commit_count_;
   int current_frame_number_;
+  int last_frame_number_animate_performed_;
   int last_frame_number_swap_performed_;
   int last_frame_number_begin_main_frame_sent_;
   int last_frame_number_update_visible_tiles_was_called_;
@@ -285,7 +302,10 @@ class CC_EXPORT SchedulerStateMachine {
   // ManageTile per BeginImplFrame.
   int manage_tiles_funnel_;
   int consecutive_checkerboard_animations_;
+  int max_pending_swaps_;
+  int pending_swaps_;
   bool needs_redraw_;
+  bool needs_animate_;
   bool needs_manage_tiles_;
   bool swap_used_incomplete_tile_;
   bool needs_commit_;

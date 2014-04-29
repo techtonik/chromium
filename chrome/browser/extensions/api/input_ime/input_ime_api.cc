@@ -6,17 +6,13 @@
 
 #include "base/strings/string_number_conversions.h"
 #include "base/values.h"
-#include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/chromeos/profiles/profile_helper.h"
-#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/common/extensions/api/input_ime.h"
 #include "chrome/common/extensions/api/input_ime/input_components_handler.h"
-#include "content/public/browser/notification_details.h"
-#include "content/public/browser/notification_source.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_function_registry.h"
-#include "extensions/browser/extension_system.h"
+#include "extensions/browser/extension_registry.h"
 
 #if defined(USE_X11)
 #include "chrome/browser/chromeos/input_method/input_method_engine.h"
@@ -80,8 +76,8 @@ static void DispatchEventToExtension(Profile* profile,
   scoped_ptr<extensions::Event> event(new extensions::Event(
       event_name, args.Pass()));
   event->restrict_to_browser_context = profile;
-  extensions::ExtensionSystem::Get(profile)->event_router()->
-      DispatchEventToExtension(extension_id, event.Pass());
+  extensions::EventRouter::Get(profile)
+      ->DispatchEventToExtension(extension_id, event.Pass());
 }
 
 }  // namespace
@@ -90,16 +86,7 @@ namespace chromeos {
 class ImeObserver : public InputMethodEngineInterface::Observer {
  public:
   ImeObserver(Profile* profile, const std::string& extension_id)
-      : profile_(profile), extension_id_(extension_id) {
-    // The original profile for login screen is called signin profile.
-    // And the active profile is the incognito profile based on signin profile.
-    // So if |profile| is signin profile, we need to make sure the
-    // observer runs under its incognito profile, because the component
-    // extensions were installed under its incognito profile.
-    if (ProfileHelper::IsSigninProfile(profile)) {
-      profile_ = ProfileManager::GetActiveUserProfile();
-    }
-  }
+      : profile_(profile), extension_id_(extension_id) {}
 
   virtual ~ImeObserver() {}
 
@@ -290,8 +277,7 @@ class ImeObserver : public InputMethodEngineInterface::Observer {
 
  private:
   bool HasKeyEventListener() const {
-    return extensions::ExtensionSystem::Get(profile_)
-        ->event_router()
+    return extensions::EventRouter::Get(profile_)
         ->ExtensionHasEventListener(extension_id_,
                                     input_ime::OnKeyEvent::kEventName);
   }
@@ -312,20 +298,10 @@ InputImeEventRouter::GetInstance() {
 }
 
 bool InputImeEventRouter::RegisterIme(
-    Profile* profile,
     const std::string& extension_id,
     const extensions::InputComponentInfo& component) {
 #if defined(USE_X11)
   VLOG(1) << "RegisterIme: " << extension_id << " id: " << component.id;
-
-  // If the engine exists already, it may be registered with an old profile.
-  // So overwrite it with the new engine instance.
-  EngineMap& engine_map = engines_[extension_id];
-  EngineMap::iterator engine_ix = engine_map.find(component.id);
-  if (engine_ix != engine_map.end()) {
-    delete engine_ix->second;
-    engine_map.erase(engine_ix);
-  }
 
   std::vector<std::string> layouts;
   layouts.assign(component.layouts.begin(), component.layouts.end());
@@ -338,6 +314,7 @@ bool InputImeEventRouter::RegisterIme(
   // to maintain an internal map for observers which does nearly nothing
   // but just make sure they can properly deleted.
   // Making Obesrver per InputMethodEngine can make things cleaner.
+  Profile* profile = ProfileManager::GetActiveUserProfile();
   scoped_ptr<chromeos::InputMethodEngineInterface::Observer> observer(
       new chromeos::ImeObserver(profile, extension_id));
   chromeos::InputMethodEngine* engine = new chromeos::InputMethodEngine();
@@ -349,7 +326,7 @@ bool InputImeEventRouter::RegisterIme(
                      layouts,
                      component.options_page_url,
                      component.input_view_url);
-  engine_map[component.id] = engine;
+  profile_engine_map_[profile][extension_id][component.id] = engine;
 
   return true;
 #else
@@ -359,45 +336,59 @@ bool InputImeEventRouter::RegisterIme(
 #endif
 }
 
-void InputImeEventRouter::UnregisterAllImes(
-    Profile* profile, const std::string& extension_id) {
-  std::map<std::string, EngineMap>::iterator engine_map =
-      engines_.find(extension_id);
-  if (engine_map != engines_.end()) {
-    STLDeleteContainerPairSecondPointers(engine_map->second.begin(),
-                                         engine_map->second.end());
-    engines_.erase(engine_map);
-  }
+void InputImeEventRouter::UnregisterAllImes(const std::string& extension_id) {
+  Profile* profile = ProfileManager::GetActiveUserProfile();
+  ProfileEngineMap::iterator extension_map =
+      profile_engine_map_.find(profile);
+  if (extension_map == profile_engine_map_.end())
+    return;
+  ExtensionMap::iterator engine_map = extension_map->second.find(extension_id);
+  if (engine_map == extension_map->second.end())
+    return;
+  STLDeleteContainerPairSecondPointers(engine_map->second.begin(),
+                                       engine_map->second.end());
+  extension_map->second.erase(extension_id);
+  profile_engine_map_.erase(profile);
 }
 
 InputMethodEngineInterface* InputImeEventRouter::GetEngine(
     const std::string& extension_id, const std::string& engine_id) {
-  std::map<std::string,
-           std::map<std::string, InputMethodEngineInterface*> >::const_iterator
-               engine_list = engines_.find(extension_id);
-  if (engine_list != engines_.end()) {
-    std::map<std::string, InputMethodEngineInterface*>::const_iterator
-        engine_ix = engine_list->second.find(engine_id);
-    if (engine_ix != engine_list->second.end())
-      return engine_ix->second;
-  }
-  return NULL;
+  // IME can only work on active user profile.
+  Profile* profile = ProfileManager::GetActiveUserProfile();
+
+  ProfileEngineMap::const_iterator extension_map =
+      profile_engine_map_.find(profile);
+  if (extension_map == profile_engine_map_.end())
+    return NULL;
+  ExtensionMap::const_iterator engine_map =
+      extension_map->second.find(extension_id);
+  if (engine_map == extension_map->second.end())
+    return NULL;
+  EngineMap::const_iterator engine = engine_map->second.find(engine_id);
+  if (engine == engine_map->second.end())
+    return NULL;
+  return engine->second;
 }
 
 InputMethodEngineInterface* InputImeEventRouter::GetActiveEngine(
     const std::string& extension_id) {
-  std::map<std::string,
-           std::map<std::string, InputMethodEngineInterface*> >::const_iterator
-               engine_list = engines_.find(extension_id);
-  if (engine_list != engines_.end()) {
-    std::map<std::string, InputMethodEngineInterface*>::const_iterator
-        engine_ix;
-    for (engine_ix = engine_list->second.begin();
-         engine_ix != engine_list->second.end();
-         ++engine_ix) {
-      if (engine_ix->second->IsActive())
-        return engine_ix->second;
-    }
+  // IME can only work on active user profile.
+  Profile* profile = ProfileManager::GetActiveUserProfile();
+
+  ProfileEngineMap::const_iterator extension_map =
+      profile_engine_map_.find(profile);
+  if (extension_map == profile_engine_map_.end())
+    return NULL;
+  ExtensionMap::const_iterator engine_map =
+      extension_map->second.find(extension_id);
+  if (engine_map == extension_map->second.end())
+    return NULL;
+
+  for (EngineMap::const_iterator i = engine_map->second.begin();
+       i != engine_map->second.end();
+       ++i) {
+    if (i->second->IsActive())
+      return i->second;
   }
   return NULL;
 }
@@ -783,21 +774,16 @@ bool InputImeKeyEventHandledFunction::RunImpl() {
 }
 
 InputImeAPI::InputImeAPI(content::BrowserContext* context)
-    : profile_(Profile::FromBrowserContext(context)) {
-  registrar_.Add(this,
-                 chrome::NOTIFICATION_EXTENSION_LOADED,
-                 content::Source<Profile>(profile_));
-  registrar_.Add(this,
-                 chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED,
-                 content::Source<Profile>(profile_));
+    : browser_context_(context), extension_registry_observer_(this) {
+  extension_registry_observer_.Add(ExtensionRegistry::Get(browser_context_));
 
-  EventRouter* event_router = ExtensionSystem::Get(profile_)->event_router();
+  EventRouter* event_router = EventRouter::Get(browser_context_);
   event_router->RegisterObserver(this, input_ime::OnActivate::kEventName);
   event_router->RegisterObserver(this, input_ime::OnFocus::kEventName);
 }
 
 InputImeAPI::~InputImeAPI() {
-  ExtensionSystem::Get(profile_)->event_router()->UnregisterObserver(this);
+  EventRouter::Get(browser_context_)->UnregisterObserver(this);
 }
 
 static base::LazyInstance<BrowserContextKeyedAPIFactory<InputImeAPI> >
@@ -808,34 +794,38 @@ BrowserContextKeyedAPIFactory<InputImeAPI>* InputImeAPI::GetFactoryInstance() {
   return g_factory.Pointer();
 }
 
-void InputImeAPI::Observe(int type,
-                          const content::NotificationSource& source,
-                          const content::NotificationDetails& details) {
-  if (type == chrome::NOTIFICATION_EXTENSION_LOADED) {
-    const Extension* extension =
-        content::Details<const Extension>(details).ptr();
-    const std::vector<InputComponentInfo>* input_components =
-        extensions::InputComponents::GetInputComponents(extension);
-    if (!input_components)
-      return;
-    for (std::vector<extensions::InputComponentInfo>::const_iterator component =
-        input_components->begin(); component != input_components->end();
-        ++component) {
-      if (component->type == extensions::INPUT_COMPONENT_TYPE_IME) {
-        input_ime_event_router()->RegisterIme(
-            profile_, extension->id(), *component);
-      }
+void InputImeAPI::OnExtensionLoaded(content::BrowserContext* browser_context,
+                                    const Extension* extension) {
+  const std::vector<InputComponentInfo>* input_components =
+      extensions::InputComponents::GetInputComponents(extension);
+  if (!input_components)
+    return;
+  for (std::vector<extensions::InputComponentInfo>::const_iterator component =
+           input_components->begin();
+       component != input_components->end();
+       ++component) {
+    if (component->type == extensions::INPUT_COMPONENT_TYPE_IME) {
+      // Don't pass profile_ to register ime, instead always use
+      // GetActiveUserProfile. It is because:
+      // The original profile for login screen is called signin profile.
+      // And the active profile is the incognito profile based on signin
+      // profile. So if |profile_| is signin profile, we need to make sure
+      // the router/observer runs under its incognito profile, because the
+      // component extensions were installed under its incognito profile.
+      input_ime_event_router()->RegisterIme(extension->id(), *component);
     }
-  } else if (type == chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED) {
-    const Extension* extension =
-        content::Details<const UnloadedExtensionInfo>(details)->extension;
-    const std::vector<InputComponentInfo>* input_components =
-        extensions::InputComponents::GetInputComponents(extension);
-    if (!input_components)
-      return;
-    if (input_components->size() > 0)
-      input_ime_event_router()->UnregisterAllImes(profile_, extension->id());
   }
+}
+
+void InputImeAPI::OnExtensionUnloaded(content::BrowserContext* browser_context,
+                                      const Extension* extension,
+                                      UnloadedExtensionInfo::Reason reason) {
+  const std::vector<InputComponentInfo>* input_components =
+      extensions::InputComponents::GetInputComponents(extension);
+  if (!input_components)
+    return;
+  if (input_components->size() > 0)
+    input_ime_event_router()->UnregisterAllImes(extension->id());
 }
 
 void InputImeAPI::OnListenerAdded(const EventListenerInfo& details) {

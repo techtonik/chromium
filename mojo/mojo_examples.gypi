@@ -9,9 +9,8 @@
       'type': 'shared_library',
       'dependencies': [
         # TODO(darin): we should not be linking against these libraries!
-        '../ui/gfx/gfx.gyp:gfx',
+        '../ui/events/events.gyp:events',
         '../ui/gfx/gfx.gyp:gfx_geometry',
-        '../ui/gl/gl.gyp:gl',
         'mojo_bindings',
         'mojo_environment_standalone',
         'mojo_gles2',
@@ -44,7 +43,6 @@
         '../skia/skia.gyp:skia',
         '../gpu/gpu.gyp:gles2_implementation',
         'mojo_gles2',
-        'mojo_system',
       ],
       'sources': [
         'examples/compositor_app/mojo_context_provider.cc',
@@ -65,7 +63,7 @@
         'mojo_gles2',
         'mojo_native_viewport_bindings',
         'mojo_shell_client',
-        'mojo_system',
+        'mojo_system_impl',
       ],
       'sources': [
         'examples/compositor_app/compositor_app.cc',
@@ -94,7 +92,7 @@
         'mojo_gles2',
         'mojo_native_viewport_bindings',
         'mojo_shell_client',
-        'mojo_system',
+        'mojo_system_impl',
       ],
       'defines': [
         # We don't really want to export. We could change how
@@ -215,7 +213,7 @@
             'mojo_environment_chromium',
             'mojo_gles2',
             'mojo_shell_client',
-            'mojo_system',
+            'mojo_system_impl'
           ],
           'sources': [
             'examples/aura_demo/aura_demo.cc',
@@ -240,11 +238,9 @@
           'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
           'export_dependent_settings': [
             'mojo_bindings',
-            'mojo_system',
           ],
           'dependencies': [
             'mojo_bindings',
-            'mojo_system',
           ],
         },
         {
@@ -266,7 +262,7 @@
             'mojo_gles2',
             'mojo_launcher_bindings',
             'mojo_shell_client',
-            'mojo_system',
+            'mojo_system_impl',
           ],
           'sources': [
             'examples/launcher/launcher.cc',
@@ -280,48 +276,44 @@
           'includes': [ 'build/package_app.gypi' ],
         },
         {
-          'target_name': 'mojo_view_manager_bindings',
-          'type': 'static_library',
-          'sources': [
-            'examples/view_manager/view_manager.mojom',
-          ],
-          'variables': {
-            'mojom_base_output_dir': 'mojo',
-          },
-          'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
-          'export_dependent_settings': [
-            'mojo_bindings',
-            'mojo_system',
-          ],
-          'dependencies': [
-            'mojo_bindings',
-            'mojo_system',
-          ],
-        },
-        {
-          'target_name': 'mojo_view_manager',
+          'target_name': 'mojo_sample_view_manager_app',
           'type': 'shared_library',
           'dependencies': [
             '../base/base.gyp:base',
+            '../ui/gfx/gfx.gyp:gfx',
             '../ui/gfx/gfx.gyp:gfx_geometry',
-            'mojo_common_lib',
-            'mojo_environment_chromium',
-            'mojo_launcher_bindings',
-            'mojo_native_viewport_bindings',
+            '../ui/gl/gl.gyp:gl',
+            'mojo_bindings',
+            'mojo_environment_standalone',
+            'mojo_gles2',
+            'mojo_view_manager_bindings',
             'mojo_shell_client',
             'mojo_system',
-            'mojo_view_manager_bindings',
+            'mojo_utility',
           ],
           'sources': [
-            'examples/view_manager/view_manager.cc',
+            'examples/sample_view_manager_app/sample_view_manager_app.cc',
           ],
         },
+      ],
+    }],
+    ['OS=="linux"', {
+      'targets': [
         {
-          'target_name': 'package_mojo_view_manager',
-          'variables': {
-            'app_name': 'mojo_view_manager',
-          },
-          'includes': [ 'build/package_app.gypi' ],
+          'target_name': 'mojo_dbus_echo',
+          'type': 'shared_library',
+          'dependencies': [
+            '../base/base.gyp:base',
+            'mojo_bindings',
+            'mojo_environment_standalone',
+            'mojo_echo_bindings',
+            'mojo_shell_client',
+            'mojo_system',
+            'mojo_utility',
+          ],
+          'sources': [
+            'examples/dbus_echo/dbus_echo_app.cc',
+          ],
         },
       ],
     }],

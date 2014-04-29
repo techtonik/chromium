@@ -14,6 +14,18 @@ using chrome::VersionInfo;
 
 namespace extensions {
 
+namespace {
+
+template <class FeatureClass>
+SimpleFeature* CreateFeature() {
+  SimpleFeature* feature = new FeatureClass();
+  feature->AddFilter(
+      scoped_ptr<SimpleFeatureFilter>(new ChromeChannelFeatureFilter(feature)));
+  return feature;
+}
+
+}  // namespace
+
 TEST(BaseFeatureProviderTest, ManifestFeatures) {
   FeatureProvider* provider = BaseFeatureProvider::GetByName("manifest");
   SimpleFeature* feature =
@@ -98,13 +110,6 @@ TEST(BaseFeatureProviderTest, PermissionFeatures) {
       extension.get(), Feature::UNSPECIFIED_CONTEXT).result());
 }
 
-SimpleFeature* CreatePermissionFeature() {
-  SimpleFeature* feature = new PermissionFeature();
-  feature->AddFilter(
-      scoped_ptr<SimpleFeatureFilter>(new ChromeChannelFeatureFilter(feature)));
-  return feature;
-}
-
 TEST(BaseFeatureProviderTest, Validation) {
   scoped_ptr<base::DictionaryValue> value(new base::DictionaryValue());
 
@@ -123,19 +128,21 @@ TEST(BaseFeatureProviderTest, Validation) {
   value->Set("feature2", feature2);
 
   scoped_ptr<BaseFeatureProvider> provider(
-      new BaseFeatureProvider(*value, CreatePermissionFeature));
+      new BaseFeatureProvider(*value, CreateFeature<PermissionFeature>));
 
   // feature1 won't validate because it lacks an extension type.
   EXPECT_FALSE(provider->GetFeature("feature1"));
 
   // If we add one, it works.
   feature1->Set("extension_types", extension_types->DeepCopy());
-  provider.reset(new BaseFeatureProvider(*value, CreatePermissionFeature));
+  provider.reset(
+      new BaseFeatureProvider(*value, CreateFeature<PermissionFeature>));
   EXPECT_TRUE(provider->GetFeature("feature1"));
 
   // Remove the channel, and feature1 won't validate.
   feature1->Remove("channel", NULL);
-  provider.reset(new BaseFeatureProvider(*value, CreatePermissionFeature));
+  provider.reset(
+      new BaseFeatureProvider(*value, CreateFeature<PermissionFeature>));
   EXPECT_FALSE(provider->GetFeature("feature1"));
 
   // feature2 won't validate because of the presence of "contexts".
@@ -143,7 +150,8 @@ TEST(BaseFeatureProviderTest, Validation) {
 
   // If we remove it, it works.
   feature2->Remove("contexts", NULL);
-  provider.reset(new BaseFeatureProvider(*value, CreatePermissionFeature));
+  provider.reset(
+      new BaseFeatureProvider(*value, CreateFeature<PermissionFeature>));
   EXPECT_TRUE(provider->GetFeature("feature2"));
 }
 
@@ -162,7 +170,7 @@ TEST(BaseFeatureProviderTest, ComplexFeatures) {
       .Build());
 
   scoped_ptr<BaseFeatureProvider> provider(
-      new BaseFeatureProvider(*rule, NULL));
+      new BaseFeatureProvider(*rule, CreateFeature<SimpleFeature>));
 
   Feature* feature = provider->GetFeature("feature1");
   EXPECT_TRUE(feature);
@@ -170,29 +178,33 @@ TEST(BaseFeatureProviderTest, ComplexFeatures) {
   // Make sure both rules are applied correctly.
   {
     ScopedCurrentChannel current_channel(VersionInfo::CHANNEL_BETA);
-    EXPECT_EQ(Feature::IS_AVAILABLE, feature->IsAvailableToManifest(
-        "1",
-        Manifest::TYPE_EXTENSION,
-        Feature::UNSPECIFIED_LOCATION,
-        Feature::UNSPECIFIED_PLATFORM).result());
-    EXPECT_EQ(Feature::IS_AVAILABLE, feature->IsAvailableToManifest(
-        "2",
-        Manifest::TYPE_LEGACY_PACKAGED_APP,
-        Feature::UNSPECIFIED_LOCATION,
-        Feature::UNSPECIFIED_PLATFORM).result());
+    EXPECT_EQ(
+        Feature::IS_AVAILABLE,
+        feature->IsAvailableToManifest("1",
+                                       Manifest::TYPE_EXTENSION,
+                                       Manifest::INVALID_LOCATION,
+                                       Feature::UNSPECIFIED_PLATFORM).result());
+    EXPECT_EQ(
+        Feature::IS_AVAILABLE,
+        feature->IsAvailableToManifest("2",
+                                       Manifest::TYPE_LEGACY_PACKAGED_APP,
+                                       Manifest::INVALID_LOCATION,
+                                       Feature::UNSPECIFIED_PLATFORM).result());
   }
   {
     ScopedCurrentChannel current_channel(VersionInfo::CHANNEL_STABLE);
-    EXPECT_NE(Feature::IS_AVAILABLE, feature->IsAvailableToManifest(
-        "1",
-        Manifest::TYPE_EXTENSION,
-        Feature::UNSPECIFIED_LOCATION,
-        Feature::UNSPECIFIED_PLATFORM).result());
-    EXPECT_NE(Feature::IS_AVAILABLE, feature->IsAvailableToManifest(
-        "2",
-        Manifest::TYPE_LEGACY_PACKAGED_APP,
-        Feature::UNSPECIFIED_LOCATION,
-        Feature::UNSPECIFIED_PLATFORM).result());
+    EXPECT_NE(
+        Feature::IS_AVAILABLE,
+        feature->IsAvailableToManifest("1",
+                                       Manifest::TYPE_EXTENSION,
+                                       Manifest::INVALID_LOCATION,
+                                       Feature::UNSPECIFIED_PLATFORM).result());
+    EXPECT_NE(
+        Feature::IS_AVAILABLE,
+        feature->IsAvailableToManifest("2",
+                                       Manifest::TYPE_LEGACY_PACKAGED_APP,
+                                       Manifest::INVALID_LOCATION,
+                                       Feature::UNSPECIFIED_PLATFORM).result());
   }
 }
 

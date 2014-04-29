@@ -5,7 +5,8 @@
 define('main', [
     'mojo/public/js/bindings/connection',
     'content/test/data/web_ui_test_mojo_bindings.mojom',
-], function(connection, bindings) {
+], function (connection, bindings) {
+  var retainedConnection, kIterations = 100, kBadValue = 13;
 
   function RendererTargetTest(bindings) {
     this.bindings_ = bindings;
@@ -18,14 +19,39 @@ define('main', [
   RendererTargetTest.prototype =
       Object.create(bindings.RendererTargetStub.prototype);
 
-  RendererTargetTest.prototype.test = function() {
-    this.bindings_.test();
+  RendererTargetTest.prototype.ping = function () {
+    this.bindings_.pingResponse();
   };
 
-  var retainedConnection;
+  RendererTargetTest.prototype.echo = function (arg) {
+    var i;
+
+    // Ensure negative values are negative.
+    if (arg.si64 > 0)
+      arg.si64 = kBadValue;
+
+    if (arg.si32 > 0)
+      arg.si32 = kBadValue;
+
+    if (arg.si16 > 0)
+      arg.si16 = kBadValue;
+
+    if (arg.si8 > 0)
+      arg.si8 = kBadValue;
+
+    for (i = 0; i < kIterations; ++i) {
+      arg2 = new bindings.EchoArgs();
+      arg2.si64 = -1;
+      arg2.si32 = -1;
+      arg2.si16 = -1;
+      arg2.si8 = -1;
+      arg2.name = "going";
+      this.bindings_.echoResponse(arg, arg2);
+    }
+  };
 
   return function(handle) {
-    retainedConnection = new connection.Connection(handle, RendererTargetTest,
-                                                   bindings.BrowserTargetProxy);
+    retainedConnection = new connection.Connection(
+        handle, RendererTargetTest, bindings.BrowserTargetProxy);
   };
 });

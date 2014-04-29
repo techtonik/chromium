@@ -12,7 +12,6 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/content_settings/host_content_settings_map.h"
 #include "chrome/browser/infobars/confirm_infobar_delegate.h"
-#include "chrome/browser/infobars/infobar.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
@@ -21,6 +20,7 @@
 #include "chrome/common/chrome_switches.h"
 #include "chrome/test/base/test_switches.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/infobars/core/infobar.h"
 #include "components/nacl/common/nacl_switches.h"
 #include "content/public/browser/dom_operation_notification_details.h"
 #include "content/public/browser/notification_service.h"
@@ -116,7 +116,7 @@ void PPAPITestBase::InfoBarObserver::VerifyInfoBarState() {
     return;
   expecting_infobar_ = false;
 
-  InfoBar* infobar = infobar_service->infobar_at(0);
+  infobars::InfoBar* infobar = infobar_service->infobar_at(0);
   ConfirmInfoBarDelegate* delegate =
       infobar->delegate()->AsConfirmInfoBarDelegate();
   ASSERT_TRUE(delegate != NULL);
@@ -445,6 +445,12 @@ std::string PPAPINaClPNaClTest::BuildQuery(const std::string& base,
                             test_case.c_str());
 }
 
+void PPAPIPrivateNaClPNaClTest::SetUpCommandLine(
+    base::CommandLine* command_line) {
+  PPAPINaClPNaClTest::SetUpCommandLine(command_line);
+  AddPrivateSwitches(command_line);
+}
+
 void PPAPINaClPNaClNonSfiTest::SetUpCommandLine(
     base::CommandLine* command_line) {
   PPAPINaClTest::SetUpCommandLine(command_line);
@@ -458,9 +464,9 @@ std::string PPAPINaClPNaClNonSfiTest::BuildQuery(
                             base.c_str(), test_case.c_str());
 }
 
-void PPAPIPrivateNaClPNaClTest::SetUpCommandLine(
+void PPAPIPrivateNaClPNaClNonSfiTest::SetUpCommandLine(
     base::CommandLine* command_line) {
-  PPAPINaClPNaClTest::SetUpCommandLine(command_line);
+  PPAPINaClPNaClNonSfiTest::SetUpCommandLine(command_line);
   AddPrivateSwitches(command_line);
 }
 

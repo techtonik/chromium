@@ -51,6 +51,7 @@
     ],
     # Remoting core JavaScript files.
     'remoting_webapp_js_core_files': [
+      'webapp/base.js',
       'webapp/error.js',
       'webapp/event_handlers.js',
       'webapp/plugin_settings.js',
@@ -84,6 +85,7 @@
       'webapp/menu_button.js',
       'webapp/ui_mode.js',
       'webapp/toolbar.js',
+      'webapp/feedback.js',
     ],
     # UI files for controlling the local machine as a host.
     'remoting_webapp_js_ui_host_control_files': [
@@ -116,10 +118,12 @@
     ],
     # The JavaScript files required by main.html.
     'remoting_webapp_main_html_js_files': [
+      # Include the core files first as it is required by the other files.
+      # Otherwise, Jscompile will complain.
+      '<@(remoting_webapp_js_core_files)',
       '<@(remoting_webapp_js_auth_client2host_files)',
       '<@(remoting_webapp_js_auth_google_files)',
       '<@(remoting_webapp_js_client_files)',
-      '<@(remoting_webapp_js_core_files)',
       '<@(remoting_webapp_js_gnubby_auth_files)',
       '<@(remoting_webapp_js_host_files)',
       '<@(remoting_webapp_js_logging_files)',
@@ -153,6 +157,7 @@
       'resources/disclosure_arrow_right.webp',
       'resources/host_setup_instructions.webp',
       'resources/icon_cross.webp',
+      'resources/icon_help.webp',
       'resources/icon_host.webp',
       'resources/icon_pencil.webp',
       'resources/icon_warning.webp',

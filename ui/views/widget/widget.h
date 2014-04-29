@@ -12,11 +12,13 @@
 #include "base/gtest_prod_util.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/observer_list.h"
+#include "base/scoped_observer.h"
 #include "ui/aura/window_layer_type.h"
 #include "ui/base/ui_base_types.h"
 #include "ui/events/event_source.h"
 #include "ui/gfx/native_widget_types.h"
 #include "ui/gfx/rect.h"
+#include "ui/native_theme/native_theme_observer.h"
 #include "ui/views/focus/focus_manager.h"
 #include "ui/views/widget/native_widget_delegate.h"
 #include "ui/views/window/client_view.h"
@@ -61,6 +63,7 @@ class TooltipManager;
 class View;
 class WidgetDelegate;
 class WidgetObserver;
+class WidgetRemovalsObserver;
 
 namespace internal {
 class NativeWidgetPrivate;
@@ -94,7 +97,8 @@ class RootView;
 //
 class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
                             public ui::EventSource,
-                            public FocusTraversable {
+                            public FocusTraversable,
+                            public ui::NativeThemeObserver {
  public:
   typedef std::set<Widget*> Widgets;
 
@@ -255,9 +259,9 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
 
   // Creates a decorated window Widget with the specified properties.
   static Widget* CreateWindowWithParent(WidgetDelegate* delegate,
-                                        gfx::NativeWindow parent);
+                                        gfx::NativeView parent);
   static Widget* CreateWindowWithParentAndBounds(WidgetDelegate* delegate,
-                                                 gfx::NativeWindow parent,
+                                                 gfx::NativeView parent,
                                                  const gfx::Rect& bounds);
 
   // Creates a decorated window Widget in the same desktop context as |context|.
@@ -338,6 +342,11 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
   void RemoveObserver(WidgetObserver* observer);
   bool HasObserver(WidgetObserver* observer);
 
+  // Add/remove removals observer.
+  void AddRemovalsObserver(WidgetRemovalsObserver* observer);
+  void RemoveRemovalsObserver(WidgetRemovalsObserver* observer);
+  bool HasRemovalsObserver(WidgetRemovalsObserver* observer);
+
   // Returns the accelerator given a command id. Returns false if there is
   // no accelerator associated with a given id, which is a common condition.
   virtual bool GetAccelerator(int cmd_id, ui::Accelerator* accelerator);
@@ -352,6 +361,9 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
   // Called after changing the widget's parent NativeView. Notifies the RootView
   // about the change.
   void NotifyNativeViewHierarchyChanged();
+
+  // Called immediately before removing |view| from this widget.
+  void NotifyWillRemoveView(View* view);
 
   // Returns the top level widget in a hierarchy (see is_top_level() for
   // the definition of top level widget.) Will return NULL if called
@@ -752,6 +764,9 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
   virtual FocusTraversable* GetFocusTraversableParent() OVERRIDE;
   virtual View* GetFocusTraversableParentView() OVERRIDE;
 
+  // Overridden from ui::NativeThemeObserver:
+  virtual void OnNativeThemeUpdated(ui::NativeTheme* observed_theme) OVERRIDE;
+
  protected:
   // Creates the RootView to be used within this Widget. Subclasses may override
   // to create custom RootViews that do specialized event processing.
@@ -797,6 +812,8 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
   internal::NativeWidgetPrivate* native_widget_;
 
   ObserverList<WidgetObserver> observers_;
+
+  ObserverList<WidgetRemovalsObserver> removals_observers_;
 
   // Non-owned pointer to the Widget's delegate. If a NULL delegate is supplied
   // to Init() a default WidgetDelegate is created.
@@ -894,6 +911,8 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
   // True when window movement via mouse interaction with the frame should be
   // disabled.
   bool movement_disabled_;
+
+  ScopedObserver<ui::NativeTheme, ui::NativeThemeObserver> observer_manager_;
 
   DISALLOW_COPY_AND_ASSIGN(Widget);
 };

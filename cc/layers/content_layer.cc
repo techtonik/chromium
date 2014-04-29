@@ -12,6 +12,7 @@
 #include "cc/resources/bitmap_skpicture_content_layer_updater.h"
 #include "cc/resources/layer_painter.h"
 #include "cc/trees/layer_tree_host.h"
+#include "third_party/skia/include/core/SkPictureRecorder.h"
 
 namespace cc {
 
@@ -160,10 +161,10 @@ skia::RefPtr<SkPicture> ContentLayer::GetPicture() const {
   int height = bounds().height();
   gfx::RectF opaque;
 
-  skia::RefPtr<SkPicture> picture = skia::AdoptRef(new SkPicture);
-  SkCanvas* canvas = picture->beginRecording(width, height);
+  SkPictureRecorder recorder;
+  SkCanvas* canvas = recorder.beginRecording(width, height, NULL, 0);
   client_->PaintContents(canvas, gfx::Rect(width, height), &opaque);
-  picture->endRecording();
+  skia::RefPtr<SkPicture> picture = skia::AdoptRef(recorder.endRecording());
   return picture;
 }
 

@@ -19,7 +19,7 @@
 #include "ppapi/proxy/ppapi_messages.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebElement.h"
-#include "third_party/WebKit/public/web/WebFrame.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebPluginContainer.h"
 
 namespace {
@@ -59,13 +59,15 @@ PepperExtensionsCommonHost* PepperExtensionsCommonHost::Create(
       host->GetContainerForInstance(instance);
   if (!container)
     return NULL;
-  blink::WebFrame* frame = container->element().document().frame();
+  blink::WebLocalFrame* frame = container->element().document().frame();
   if (!frame)
     return NULL;
   v8::HandleScope scope(v8::Isolate::GetCurrent());
+  // TODO(rockot): Remove this downcast. See http://crbug.com/362616.
   extensions::ChromeV8Context* context =
-      dispatcher->v8_context_set().GetByV8Context(
-          frame->mainWorldScriptContext());
+      static_cast<extensions::ChromeV8Context*>(
+          dispatcher->script_context_set().GetByV8Context(
+              frame->mainWorldScriptContext()));
   if (!context)
     return NULL;
 
@@ -84,12 +86,12 @@ int32_t PepperExtensionsCommonHost::OnResourceMessageReceived(
 }
 
 void PepperExtensionsCommonHost::OnResponseReceived(
-    scoped_ptr<ppapi::host::ReplyMessageContext> context,
+    ppapi::host::ReplyMessageContext reply_context,
     bool success,
     const base::ListValue& response,
     const std::string& /* error */) {
-  context->params.set_result(success ? PP_OK : PP_ERROR_FAILED);
-  SendReply(*context, PpapiPluginMsg_ExtensionsCommon_CallReply(response));
+  reply_context.params.set_result(success ? PP_OK : PP_ERROR_FAILED);
+  SendReply(reply_context, PpapiPluginMsg_ExtensionsCommon_CallReply(response));
 }
 
 int32_t PepperExtensionsCommonHost::OnPost(
@@ -107,12 +109,10 @@ int32_t PepperExtensionsCommonHost::OnCall(
     const std::string& request_name,
     const base::ListValue& args) {
   std::string error;
-  scoped_ptr<ppapi::host::ReplyMessageContext> message_context(
-      new ppapi::host::ReplyMessageContext(context->MakeReplyMessageContext()));
   bool success = pepper_request_proxy_->StartRequest(
       base::Bind(&PepperExtensionsCommonHost::OnResponseReceived,
                  weak_factory_.GetWeakPtr(),
-                 base::Passed(&message_context)),
+                 context->MakeReplyMessageContext()),
       request_name,
       args,
       &error);

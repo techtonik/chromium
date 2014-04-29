@@ -9,9 +9,6 @@
 using base::TimeTicks;
 
 namespace ui {
-namespace {
-const float kTouchMajor = 10.f;
-}  // namespace
 
 MockMotionEvent::MockMotionEvent()
     : action(ACTION_CANCEL), pointer_count(1), id(0) {}
@@ -36,6 +33,20 @@ MockMotionEvent::MockMotionEvent(Action action,
     : action(action), pointer_count(2), time(time), id(0) {
   points[0].SetPoint(x0, y0);
   points[1].SetPoint(x1, y1);
+}
+
+MockMotionEvent::MockMotionEvent(Action action,
+                                 TimeTicks time,
+                                 float x0,
+                                 float y0,
+                                 float x1,
+                                 float y1,
+                                 float x2,
+                                 float y2)
+    : action(action), pointer_count(3), time(time), id(0) {
+  points[0].SetPoint(x0, y0);
+  points[1].SetPoint(x1, y1);
+  points[2].SetPoint(x2, y2);
 }
 
 MockMotionEvent::MockMotionEvent(const MockMotionEvent& other)
@@ -79,7 +90,7 @@ float MockMotionEvent::GetY(size_t pointer_index) const {
 }
 
 float MockMotionEvent::GetTouchMajor(size_t pointer_index) const {
-  return kTouchMajor;
+  return TOUCH_MAJOR;
 }
 
 float MockMotionEvent::GetPressure(size_t pointer_index) const {
@@ -126,7 +137,7 @@ void MockMotionEvent::PressPoint(float x, float y) {
   if (pointer_count == 1 && (action == ACTION_UP || action == ACTION_CANCEL))
     pointer_count = 0;
 
-  DCHECK_LT(pointer_count + 1, static_cast<size_t>(MAX_POINTERS));
+  DCHECK_LT(pointer_count, static_cast<size_t>(MAX_POINTERS));
   points[pointer_count++] = gfx::PointF(x, y);
   action = pointer_count > 1 ? ACTION_POINTER_DOWN : ACTION_DOWN;
 }

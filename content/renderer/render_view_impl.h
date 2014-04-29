@@ -22,6 +22,7 @@
 #include "base/timer/timer.h"
 #include "build/build_config.h"
 #include "cc/input/top_controls_state.h"
+#include "cc/resources/shared_bitmap.h"
 #include "content/common/content_export.h"
 #include "content/common/drag_event_source_info.h"
 #include "content/common/edit_command.h"
@@ -46,7 +47,6 @@
 #include "third_party/WebKit/public/web/WebConsoleMessage.h"
 #include "third_party/WebKit/public/web/WebDataSource.h"
 #include "third_party/WebKit/public/web/WebElement.h"
-#include "third_party/WebKit/public/web/WebFrameClient.h"
 #include "third_party/WebKit/public/web/WebHistoryItem.h"
 #include "third_party/WebKit/public/web/WebIconURL.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
@@ -139,6 +139,7 @@ class DocumentState;
 class ExternalPopupMenu;
 class FaviconHelper;
 class GeolocationDispatcher;
+class HistoryController;
 class ImageResourceFetcher;
 class InputTagSpeechDispatcher;
 class LoadProgressTracker;
@@ -147,7 +148,6 @@ class MediaStreamClient;
 class MediaStreamDispatcher;
 class MouseLockDispatcher;
 class NavigationState;
-class NotificationProvider;
 class PepperPluginInstanceImpl;
 class PushMessagingDispatcher;
 class RenderViewObserver;
@@ -174,15 +174,17 @@ class WebMediaPlayerProxyAndroid;
 class CONTENT_EXPORT RenderViewImpl
     : public RenderWidget,
       NON_EXPORTED_BASE(public blink::WebViewClient),
-      NON_EXPORTED_BASE(public blink::WebFrameClient),
       NON_EXPORTED_BASE(public blink::WebPageSerializerClient),
       public RenderView,
       NON_EXPORTED_BASE(public WebMediaPlayerDelegate),
       public base::SupportsWeakPtr<RenderViewImpl> {
  public:
   // Creates a new RenderView. |opener_id| is the routing ID of the RenderView
-  // responsible for creating this RenderView.
+  // responsible for creating this RenderView. Note that if the original opener
+  // has been closed, |window_was_created_with_opener| will be true and
+  // |opener_id| will be MSG_ROUTING_NONE.
   static RenderViewImpl* Create(int32 opener_id,
+                                bool window_was_created_with_opener,
                                 const RendererPreferences& renderer_prefs,
                                 const WebPreferences& webkit_prefs,
                                 int32 routing_id,
@@ -193,6 +195,7 @@ class CONTENT_EXPORT RenderViewImpl
                                 bool is_renderer_created,
                                 bool swapped_out,
                                 bool hidden,
+                                bool never_visible,
                                 int32 next_page_id,
                                 const blink::WebScreenInfo& screen_info,
                                 AccessibilityMode accessibility_mode);
@@ -241,6 +244,10 @@ class CONTENT_EXPORT RenderViewImpl
 
   MouseLockDispatcher* mouse_lock_dispatcher() {
     return mouse_lock_dispatcher_;
+  }
+
+  HistoryController* history_controller() {
+    return history_controller_.get();
   }
 
   // Lazily initialize this view's BrowserPluginManager and return it.
@@ -402,11 +409,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual bool requestPointerLock();
   virtual void requestPointerUnlock();
   virtual bool isPointerLocked();
-  // FIXME: To be removed as soon as chromium and blink side changes land
-  // didActivateCompositor with parameters is still kept in order to land
-  // these changes s-chromium - https://codereview.chromium.org/137893025/.
-  // s-blink - https://codereview.chromium.org/138523003/
-  virtual void didActivateCompositor(int input_handler_identifier);
   virtual void didActivateCompositor() OVERRIDE;
   virtual void didHandleGestureEvent(const blink::WebGestureEvent& event,
                                      bool event_cancelled) OVERRIDE;
@@ -426,17 +428,12 @@ class CONTENT_EXPORT RenderViewImpl
       blink::WebExternalPopupMenuClient* popup_menu_client);
   virtual blink::WebStorageNamespace* createSessionStorageNamespace();
   virtual void printPage(blink::WebLocalFrame* frame);
-  virtual blink::WebNotificationPresenter* notificationPresenter();
   virtual bool enumerateChosenDirectory(
       const blink::WebString& path,
       blink::WebFileChooserCompletion* chooser_completion);
   virtual void didCancelCompositionOnSelectionChange();
   virtual void didExecuteCommand(const blink::WebString& command_name);
   virtual bool handleCurrentKeyboardEvent();
-  virtual blink::WebColorChooser* createColorChooser(
-      blink::WebColorChooserClient*,
-      const blink::WebColor& initial_color,
-      const blink::WebVector<blink::WebColorSuggestion>& suggestions);
   virtual bool runFileChooser(
       const blink::WebFileChooserParams& params,
       blink::WebFileChooserCompletion* chooser_completion);
@@ -466,6 +463,7 @@ class CONTENT_EXPORT RenderViewImpl
       const blink::WebGestureEvent& event,
       const blink::WebVector<blink::WebRect>& target_rects);
 #endif
+  virtual blink::WebString acceptLanguages();
   virtual void navigateBackForwardSoon(int offset);
   virtual int historyBackListCount();
   virtual int historyForwardListCount();
@@ -503,50 +501,6 @@ class CONTENT_EXPORT RenderViewImpl
                                    blink::WebDateTimeChooserCompletion*);
   virtual void didScrollWithKeyboard(const blink::WebSize& delta);
 #endif
-
-  // blink::WebFrameClient implementation -------------------------------------
-
-  virtual void didAccessInitialDocument(blink::WebLocalFrame* frame);
-  virtual void didDisownOpener(blink::WebLocalFrame* frame);
-  virtual void frameDetached(blink::WebFrame* frame);
-  virtual void willClose(blink::WebFrame* frame);
-  virtual void didMatchCSS(
-      blink::WebLocalFrame* frame,
-      const blink::WebVector<blink::WebString>& newly_matching_selectors,
-      const blink::WebVector<blink::WebString>& stopped_matching_selectors);
-  virtual void willSendSubmitEvent(blink::WebLocalFrame* frame,
-                                   const blink::WebFormElement& form);
-  virtual void willSubmitForm(blink::WebLocalFrame* frame,
-                              const blink::WebFormElement& form);
-  virtual void didCreateDataSource(blink::WebLocalFrame* frame,
-                                   blink::WebDataSource* datasource);
-  virtual void didStartProvisionalLoad(blink::WebLocalFrame* frame);
-  virtual void didFailProvisionalLoad(blink::WebLocalFrame* frame,
-                                      const blink::WebURLError& error);
-  virtual void didClearWindowObject(blink::WebLocalFrame* frame, int world_id);
-  virtual void didCreateDocumentElement(blink::WebLocalFrame* frame);
-  virtual void didReceiveTitle(blink::WebLocalFrame* frame,
-                               const blink::WebString& title,
-                               blink::WebTextDirection direction);
-  virtual void didChangeIcon(blink::WebLocalFrame*, blink::WebIconURL::Type);
-  virtual void didFinishDocumentLoad(blink::WebLocalFrame* frame);
-  virtual void didHandleOnloadEvents(blink::WebLocalFrame* frame);
-  virtual void didFailLoad(blink::WebLocalFrame* frame,
-                           const blink::WebURLError& error);
-  virtual void didFinishLoad(blink::WebLocalFrame* frame);
-  virtual void didUpdateCurrentHistoryItem(blink::WebLocalFrame* frame);
-  virtual void didFinishResourceLoad(blink::WebLocalFrame* frame,
-                                     unsigned identifier);
-  virtual void didChangeScrollOffset(blink::WebLocalFrame* frame);
-  virtual void didFirstVisuallyNonEmptyLayout(blink::WebLocalFrame*);
-  virtual void didChangeContentsSize(blink::WebLocalFrame* frame,
-                                     const blink::WebSize& size);
-  virtual bool willCheckAndDispatchMessageEvent(
-      blink::WebLocalFrame* sourceFrame,
-      blink::WebFrame* targetFrame,
-      blink::WebSecurityOrigin targetOrigin,
-      blink::WebDOMMessageEvent event);
-  virtual blink::WebString acceptLanguages();
 
   // blink::WebPageSerializerClient implementation ----------------------------
 
@@ -609,7 +563,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual void DidFlushPaint() OVERRIDE;
   virtual gfx::Vector2d GetScrollOffset() OVERRIDE;
   virtual void DidHandleKeyEvent() OVERRIDE;
-  virtual void WillProcessUserGesture() OVERRIDE;
   virtual bool WillHandleMouseEvent(
       const blink::WebMouseEvent& event) OVERRIDE;
   virtual bool WillHandleGestureEvent(
@@ -633,7 +586,7 @@ class CONTENT_EXPORT RenderViewImpl
   virtual void SetDeviceScaleFactor(float device_scale_factor) OVERRIDE;
   virtual ui::TextInputType GetTextInputType() OVERRIDE;
   virtual void GetSelectionBounds(gfx::Rect* start, gfx::Rect* end) OVERRIDE;
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
   virtual void GetCompositionCharacterBounds(
       std::vector<gfx::Rect>* character_bounds) OVERRIDE;
   virtual void GetCompositionRange(gfx::Range* range) OVERRIDE;
@@ -722,6 +675,35 @@ class CONTENT_EXPORT RenderViewImpl
     HTTP_404,
     CONNECTION_ERROR,
   };
+
+  // Old WebFrameClient implementations ----------------------------------------
+
+  // RenderViewImpl used to be a WebFrameClient, but now RenderFrameImpl is the
+  // WebFrameClient. However, many implementations of WebFrameClient methods
+  // still live here and are called from RenderFrameImpl. These implementations
+  // are to be moved to RenderFrameImpl <http://crbug.com/361761>.
+
+  void didDisownOpener(blink::WebLocalFrame* frame);
+  void didCreateDataSource(blink::WebLocalFrame* frame,
+                           blink::WebDataSource* datasource);
+  void didClearWindowObject(blink::WebLocalFrame* frame, int world_id);
+  void didReceiveTitle(blink::WebLocalFrame* frame,
+                       const blink::WebString& title,
+                       blink::WebTextDirection direction);
+  void didChangeIcon(blink::WebLocalFrame*, blink::WebIconURL::Type);
+  void didHandleOnloadEvents(blink::WebLocalFrame* frame);
+  void didUpdateCurrentHistoryItem(blink::WebLocalFrame* frame);
+  void didFinishResourceLoad(blink::WebLocalFrame* frame,
+                             unsigned identifier);
+  void didChangeScrollOffset(blink::WebLocalFrame* frame);
+  void didFirstVisuallyNonEmptyLayout(blink::WebLocalFrame*);
+  void didChangeContentsSize(blink::WebLocalFrame* frame,
+                             const blink::WebSize& size);
+  bool willCheckAndDispatchMessageEvent(
+      blink::WebLocalFrame* sourceFrame,
+      blink::WebFrame* targetFrame,
+      blink::WebSecurityOrigin targetOrigin,
+      blink::WebDOMMessageEvent event);
 
   static bool IsReload(const FrameMsg_Navigate_Params& params);
 
@@ -817,7 +799,7 @@ class CONTENT_EXPORT RenderViewImpl
                         const blink::WebPluginAction& action);
   void OnMoveOrResizeStarted();
   void OnPostMessageEvent(const ViewMsg_PostMessage_Params& params);
-  void OnReleaseDisambiguationPopupDIB(TransportDIB::Handle dib_handle);
+  void OnReleaseDisambiguationPopupBitmap(const cc::SharedBitmapId& id);
   void OnResetPageEncodingToDefault();
   void OnSetAccessibilityMode(AccessibilityMode new_mode);
   void OnSetActive(bool active);
@@ -1165,9 +1147,6 @@ class CONTENT_EXPORT RenderViewImpl
   // along with the RenderView automatically.  This is why we just store
   // weak references.
 
-  // Holds a reference to the service which provides desktop notifications.
-  NotificationProvider* notification_provider_;
-
   // The push messaging dispatcher attached to this view, lazily initialized.
   PushMessagingDispatcher* push_messaging_dispatcher_;
 
@@ -1208,6 +1187,8 @@ class CONTENT_EXPORT RenderViewImpl
 
   // Mouse Lock dispatcher attached to this view.
   MouseLockDispatcher* mouse_lock_dispatcher_;
+
+  scoped_ptr<HistoryController> history_controller_;
 
 #if defined(OS_ANDROID)
   // Android Specific ---------------------------------------------------------
@@ -1316,6 +1297,9 @@ class CONTENT_EXPORT RenderViewImpl
   // NOTE: stats_collection_observer_ should be the last members because their
   // constructors call the AddObservers method of RenderViewImpl.
   scoped_ptr<StatsCollectionObserver> stats_collection_observer_;
+
+  typedef std::map<cc::SharedBitmapId, cc::SharedBitmap*> BitmapMap;
+  BitmapMap disambiguation_bitmaps_;
 
   // ---------------------------------------------------------------------------
   // ADDING NEW DATA? Please see if it fits appropriately in one of the above

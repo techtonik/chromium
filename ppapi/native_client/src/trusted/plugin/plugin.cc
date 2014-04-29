@@ -13,7 +13,6 @@
 #include <sys/types.h>
 
 #include <algorithm>
-#include <deque>
 #include <string>
 #include <vector>
 
@@ -30,12 +29,10 @@
 #include "native_client/src/trusted/service_runtime/nacl_error_code.h"
 
 #include "ppapi/c/pp_errors.h"
-#include "ppapi/c/ppb_console.h"
 #include "ppapi/c/ppb_var.h"
 #include "ppapi/c/private/ppb_nacl_private.h"
 #include "ppapi/cpp/dev/url_util_dev.h"
 #include "ppapi/cpp/module.h"
-#include "ppapi/cpp/text_input_controller.h"
 
 #include "ppapi/native_client/src/trusted/plugin/file_utils.h"
 #include "ppapi/native_client/src/trusted/plugin/json_manifest.h"
@@ -49,16 +46,6 @@ namespace plugin {
 
 namespace {
 
-const char* const kTypeAttribute = "type";
-// The "src" attribute of the <embed> tag.  The value is expected to be either
-// a URL or URI pointing to the manifest file (which is expected to contain
-// JSON matching ISAs with .nexe URLs).
-const char* const kSrcManifestAttribute = "src";
-// The "nacl" attribute of the <embed> tag.  We use the value of this attribute
-// to find the manifest file when NaCl is registered as a plug-in for another
-// MIME type because the "src" attribute is used to supply us with the resource
-// of that MIME type that we're supposed to display.
-const char* const kNaClManifestAttribute = "nacl";
 // The pseudo-architecture used to indicate portable native client.
 const char* const kPortableArch = "portable";
 // This is a pretty arbitrary limit on the byte size of the NaCl manfest file.
@@ -66,58 +53,16 @@ const char* const kPortableArch = "portable";
 // for the null termination character.
 const size_t kNaClManifestMaxFileBytes = 1024 * 1024;
 
-// Define an argument name to enable 'dev' interfaces. To make sure it doesn't
-// collide with any user-defined HTML attribute, make the first character '@'.
-const char* const kDevAttribute = "@dev";
-
 // Up to 20 seconds
 const int64_t kTimeSmallMin = 1;         // in ms
 const int64_t kTimeSmallMax = 20000;     // in ms
 const uint32_t kTimeSmallBuckets = 100;
-
-// Up to 3 minutes, 20 seconds
-const int64_t kTimeMediumMin = 10;         // in ms
-const int64_t kTimeMediumMax = 200000;     // in ms
-const uint32_t kTimeMediumBuckets = 100;
 
 const int64_t kSizeKBMin = 1;
 const int64_t kSizeKBMax = 512*1024;     // very large .nexe
 const uint32_t kSizeKBBuckets = 100;
 
 }  // namespace
-
-bool Plugin::EarlyInit(int argc, const char* argn[], const char* argv[]) {
-  PLUGIN_PRINTF(("Plugin::EarlyInit (instance=%p)\n",
-                 static_cast<void*>(this)));
-
-#ifdef NACL_OSX
-  // TODO(kochi): For crbug.com/102808, this is a stopgap solution for Lion
-  // until we expose IME API to .nexe. This disables any IME interference
-  // against key inputs, so you cannot use off-the-spot IME input for NaCl apps.
-  // This makes discrepancy among platforms and therefore we should remove
-  // this hack when IME API is made available.
-  // The default for non-Mac platforms is still off-the-spot IME mode.
-  pp::TextInputController(this).SetTextInputType(PP_TEXTINPUT_TYPE_NONE);
-#endif
-
-  for (int i = 0; i < argc; ++i) {
-    std::string name(argn[i]);
-    std::string value(argv[i]);
-    args_[name] = value;
-  }
-
-  // Set up the factory used to produce DescWrappers.
-  wrapper_factory_ = new nacl::DescWrapperFactory();
-  if (NULL == wrapper_factory_) {
-    return false;
-  }
-  PLUGIN_PRINTF(("Plugin::Init (wrapper_factory=%p)\n",
-                 static_cast<void*>(wrapper_factory_)));
-
-  PLUGIN_PRINTF(("Plugin::Init (return 1)\n"));
-  // Return success.
-  return true;
-}
 
 void Plugin::ShutDownSubprocesses() {
   PLUGIN_PRINTF(("Plugin::ShutDownSubprocesses (this=%p)\n",
@@ -140,15 +85,6 @@ void Plugin::HistogramTimeSmall(const std::string& name,
                                       ms,
                                       kTimeSmallMin, kTimeSmallMax,
                                       kTimeSmallBuckets);
-}
-
-void Plugin::HistogramTimeMedium(const std::string& name,
-                                 int64_t ms) {
-  if (ms < 0) return;
-  uma_interface_.HistogramCustomTimes(name,
-                                      ms,
-                                      kTimeMediumMin, kTimeMediumMax,
-                                      kTimeMediumBuckets);
 }
 
 void Plugin::HistogramSizeKB(const std::string& name,
@@ -217,7 +153,7 @@ bool Plugin::LoadNaClModuleFromBackgroundThread(
                  static_cast<void*>(service_runtime)));
 
   // Now start the SelLdr instance.  This must be created on the main thread.
-  bool service_runtime_started;
+  bool service_runtime_started = false;
   pp::CompletionCallback sel_ldr_callback =
       callback_factory_.NewCallback(&Plugin::SignalStartSelLdrDone,
                                     &service_runtime_started,
@@ -227,7 +163,11 @@ bool Plugin::LoadNaClModuleFromBackgroundThread(
                                     service_runtime, params,
                                     sel_ldr_callback);
   pp::Module::Get()->core()->CallOnMainThread(0, callback, 0);
-  service_runtime->WaitForSelLdrStart();
+  if (!service_runtime->WaitForSelLdrStart()) {
+    PLUGIN_PRINTF(("Plugin::LoadNaClModuleFromBackgroundThread "
+                   "WaitForSelLdrStart timed out!\n"));
+    return false;
+  }
   PLUGIN_PRINTF(("Plugin::LoadNaClModuleFromBackgroundThread "
                  "(service_runtime_started=%d)\n",
                  service_runtime_started));
@@ -278,11 +218,16 @@ void Plugin::LoadNaClModule(nacl::DescWrapper* wrapper,
   // associated listener threads do not go unjoined because if they
   // outlive the Plugin object, they will not be memory safe.
   ShutDownSubprocesses();
-  SelLdrStartParams params(manifest_base_url(),
+  pp::Var manifest_base_url =
+      pp::Var(pp::PASS_REF, nacl_interface_->GetManifestBaseURL(pp_instance()));
+  std::string manifest_base_url_str = manifest_base_url.AsString();
+  bool enable_dev_interfaces =
+      nacl_interface_->DevInterfacesEnabled(pp_instance());
+  SelLdrStartParams params(manifest_base_url_str,
                            true /* uses_irt */,
                            true /* uses_ppapi */,
                            uses_nonsfi_mode,
-                           enable_dev_interfaces_,
+                           enable_dev_interfaces,
                            enable_dyncode_syscalls,
                            enable_exception_handling,
                            enable_crash_throttling);
@@ -369,11 +314,13 @@ NaClSubprocess* Plugin::LoadHelperNaClModule(const nacl::string& helper_url,
   // done to save on address space and swap space.
   // TODO(jvoung): See if we still need the uses_ppapi variable, now that
   // LaunchSelLdr always happens on the main thread.
+  bool enable_dev_interfaces =
+      nacl_interface_->DevInterfacesEnabled(pp_instance());
   SelLdrStartParams params(helper_url,
                            false /* uses_irt */,
                            false /* uses_ppapi */,
                            false /* uses_nonsfi_mode */,
-                           enable_dev_interfaces_,
+                           enable_dev_interfaces,
                            false /* enable_dyncode_syscalls */,
                            false /* enable_exception_handling */,
                            true /* enable_crash_throttling */);
@@ -407,27 +354,6 @@ NaClSubprocess* Plugin::LoadHelperNaClModule(const nacl::string& helper_url,
   return nacl_subprocess.release();
 }
 
-std::string Plugin::LookupArgument(const std::string& key) const {
-  std::map<std::string, std::string>::const_iterator it = args_.find(key);
-  if (it != args_.end())
-    return it->second;
-  return std::string();
-}
-
-const char* const Plugin::kNaClMIMEType = "application/x-nacl";
-const char* const Plugin::kPnaclMIMEType = "application/x-pnacl";
-
-bool Plugin::NexeIsContentHandler() const {
-  // Tests if the MIME type is not a NaCl MIME type.
-  // If the MIME type is foreign, then this NEXE is being used as a content
-  // type handler rather than directly by an HTML document.
-  return
-      !mime_type().empty() &&
-      mime_type() != kNaClMIMEType &&
-      mime_type() != kPnaclMIMEType;
-}
-
-
 Plugin* Plugin::New(PP_Instance pp_instance) {
   PLUGIN_PRINTF(("Plugin::New (pp_instance=%" NACL_PRId32 ")\n", pp_instance));
   Plugin* plugin = new Plugin(pp_instance);
@@ -435,72 +361,22 @@ Plugin* Plugin::New(PP_Instance pp_instance) {
   return plugin;
 }
 
-
 // All failures of this function will show up as "Missing Plugin-in", so
 // there is no need to log to JS console that there was an initialization
 // failure. Note that module loading functions will log their own errors.
 bool Plugin::Init(uint32_t argc, const char* argn[], const char* argv[]) {
   PLUGIN_PRINTF(("Plugin::Init (argc=%" NACL_PRIu32 ")\n", argc));
-  init_time_ = NaClGetTimeOfDayMicroseconds();
-  nacl_interface_->SetInitTime(pp_instance());
-
+  nacl_interface_->InitializePlugin(pp_instance(), argc, argn, argv);
   url_util_ = pp::URLUtil_Dev::Get();
   if (url_util_ == NULL)
     return false;
 
-  PLUGIN_PRINTF(("Plugin::Init (url_util_=%p)\n",
-                 static_cast<const void*>(url_util_)));
-
-  bool status = EarlyInit(static_cast<int>(argc), argn, argv);
-  if (status) {
-    // Look for the developer attribute; if it's present, enable 'dev'
-    // interfaces.
-    enable_dev_interfaces_ = args_.find(kDevAttribute) != args_.end();
-
-    mime_type_ = LookupArgument(kTypeAttribute);
-    std::transform(mime_type_.begin(), mime_type_.end(), mime_type_.begin(),
-                   tolower);
-
-    std::string manifest_url;
-    if (NexeIsContentHandler()) {
-      // For content handlers 'src' will be the URL for the content
-      // and 'nacl' will be the URL for the manifest.
-      manifest_url = LookupArgument(kNaClManifestAttribute);
-      // For content handlers the NEXE runs in the security context of the
-      // content it is rendering and the NEXE itself appears to be a
-      // cross-origin resource stored in a Chrome extension.
-    } else {
-      manifest_url = LookupArgument(kSrcManifestAttribute);
-    }
-    // Use the document URL as the base for resolving relative URLs to find the
-    // manifest.  This takes into account the setting of <base> tags that
-    // precede the embed/object.
-    CHECK(url_util_ != NULL);
-    pp::Var base_var = url_util_->GetDocumentURL(this);
-    if (!base_var.is_string()) {
-      PLUGIN_PRINTF(("Plugin::Init (unable to find document url)\n"));
-      return false;
-    }
-    set_plugin_base_url(base_var.AsString());
-    if (manifest_url.empty()) {
-      // TODO(sehr,polina): this should be a hard error when scripting
-      // the src property is no longer allowed.
-      PLUGIN_PRINTF(("Plugin::Init:"
-                     " WARNING: no 'src' property, so no manifest loaded.\n"));
-      if (args_.find(kNaClManifestAttribute) != args_.end()) {
-        PLUGIN_PRINTF(("Plugin::Init:"
-                       " WARNING: 'nacl' property is incorrect. Use 'src'.\n"));
-      }
-    } else {
-      // Issue a GET for the manifest_url.  The manifest file will be parsed to
-      // determine the nexe URL.
-      // Sets src property to full manifest URL.
-      RequestNaClManifest(manifest_url.c_str());
-    }
-  }
-
-  PLUGIN_PRINTF(("Plugin::Init (status=%d)\n", status));
-  return status;
+  wrapper_factory_ = new nacl::DescWrapperFactory();
+  pp::Var manifest_url(pp::PASS_REF, nacl_interface_->GetManifestURLArgument(
+      pp_instance()));
+  if (manifest_url.is_string() && !manifest_url.AsString().empty())
+    RequestNaClManifest(manifest_url.AsString());
+  return true;
 }
 
 Plugin::Plugin(PP_Instance pp_instance)
@@ -508,10 +384,9 @@ Plugin::Plugin(PP_Instance pp_instance)
       main_subprocess_("main subprocess", NULL, NULL),
       uses_nonsfi_mode_(false),
       wrapper_factory_(NULL),
-      enable_dev_interfaces_(false),
-      init_time_(0),
-      ready_time_(0),
       time_of_last_progress_event_(0),
+      manifest_open_time_(-1),
+      nexe_open_time_(-1),
       nacl_interface_(NULL),
       uma_interface_(this) {
   PLUGIN_PRINTF(("Plugin::Plugin (this=%p, pp_instance=%"
@@ -594,24 +469,6 @@ bool Plugin::HandleDocumentLoad(const pp::URLLoader& url_loader) {
   return true;
 }
 
-void Plugin::HistogramStartupTimeSmall(const std::string& name, float dt) {
-  int64_t nexe_size = nacl_interface_->GetNexeSize(pp_instance());
-  if (nexe_size > 0) {
-    float size_in_MB = static_cast<float>(nexe_size) / (1024.f * 1024.f);
-    HistogramTimeSmall(name, static_cast<int64_t>(dt));
-    HistogramTimeSmall(name + "PerMB", static_cast<int64_t>(dt / size_in_MB));
-  }
-}
-
-void Plugin::HistogramStartupTimeMedium(const std::string& name, float dt) {
-  int64_t nexe_size = nacl_interface_->GetNexeSize(pp_instance());
-  if (nexe_size > 0) {
-    float size_in_MB = static_cast<float>(nexe_size) / (1024.f * 1024.f);
-    HistogramTimeMedium(name, static_cast<int64_t>(dt));
-    HistogramTimeMedium(name + "PerMB", static_cast<int64_t>(dt / size_in_MB));
-  }
-}
-
 void Plugin::NexeFileDidOpen(int32_t pp_error) {
   NaClFileInfo tmp_info(nexe_downloader_.GetFileInfo());
   NaClFileInfoAutoCloser info(&tmp_info);
@@ -623,17 +480,25 @@ void Plugin::NexeFileDidOpen(int32_t pp_error) {
       nexe_bytes_read = stat_buf.st_size;
   }
 
-  nacl_interface_->NexeFileDidOpen(pp_instance(),
-                                   pp_error,
-                                   info.get_desc(),
-                                   nexe_downloader_.status_code(),
-                                   nexe_bytes_read,
-                                   nexe_downloader_.url().c_str());
-  HistogramStartupTimeMedium(
-      "NaCl.Perf.StartupTime.NexeDownload",
-      static_cast<float>(nexe_downloader_.TimeSinceOpenMilliseconds()));
+  int64_t now = NaClGetTimeOfDayMicroseconds();
+  int64_t download_time;
+  if (now < nexe_open_time_)
+    download_time = 0;
+  else
+    download_time = now - nexe_open_time_;
 
-  load_start_ = NaClGetTimeOfDayMicroseconds();
+  nacl_interface_->NexeFileDidOpen(
+      pp_instance(),
+      pp_error,
+      info.get_desc(),
+      nexe_downloader_.status_code(),
+      nexe_bytes_read,
+      nexe_downloader_.url().c_str(),
+      download_time / 1000);
+
+  if (nexe_bytes_read == -1)
+    return;
+
   nacl::scoped_ptr<nacl::DescWrapper>
       wrapper(wrapper_factory()->MakeFileDesc(info.Release().desc, O_RDONLY));
   NaClLog(4, "NexeFileDidOpen: invoking LoadNaClModule\n");
@@ -658,15 +523,6 @@ void Plugin::NexeFileDidOpenContinuation(int32_t pp_error) {
   if (was_successful) {
     NaClLog(4, "NexeFileDidOpenContinuation: success;"
             " setting histograms\n");
-    ready_time_ = NaClGetTimeOfDayMicroseconds();
-    nacl_interface_->SetReadyTime(pp_instance());
-    HistogramStartupTimeSmall(
-        "NaCl.Perf.StartupTime.LoadModule",
-        static_cast<float>(ready_time_ - load_start_) / NACL_MICROS_PER_MILLI);
-    HistogramStartupTimeMedium(
-        "NaCl.Perf.StartupTime.Total",
-        static_cast<float>(ready_time_ - init_time_) / NACL_MICROS_PER_MILLI);
-
     int64_t nexe_size = nacl_interface_->GetNexeSize(pp_instance());
     ReportLoadSuccess(nexe_size, nexe_size);
   } else {
@@ -722,47 +578,17 @@ void Plugin::BitcodeDidTranslateContinuation(int32_t pp_error) {
   }
 }
 
-void Plugin::NaClManifestBufferReady(int32_t pp_error) {
-  PLUGIN_PRINTF(("Plugin::NaClManifestBufferReady (pp_error=%"
-                 NACL_PRId32 ")\n", pp_error));
-  ErrorInfo error_info;
-  if (pp_error != PP_OK) {
-    if (pp_error == PP_ERROR_ABORTED) {
-      ReportLoadAbort();
-    } else {
-      error_info.SetReport(PP_NACL_ERROR_MANIFEST_LOAD_URL,
-                           "could not load manifest url.");
-      ReportLoadError(error_info);
-    }
-    return;
-  }
-
-  const std::deque<char>& buffer = nexe_downloader_.buffer();
-  size_t buffer_size = buffer.size();
-  if (buffer_size > kNaClManifestMaxFileBytes) {
-    error_info.SetReport(PP_NACL_ERROR_MANIFEST_TOO_LARGE,
-                         "manifest file too large.");
-    ReportLoadError(error_info);
-    return;
-  }
-  nacl::scoped_array<char> json_buffer(new char[buffer_size + 1]);
-  if (json_buffer == NULL) {
-    error_info.SetReport(PP_NACL_ERROR_MANIFEST_MEMORY_ALLOC,
-                         "could not allocate manifest memory.");
-    ReportLoadError(error_info);
-    return;
-  }
-  std::copy(buffer.begin(), buffer.begin() + buffer_size, &json_buffer[0]);
-  json_buffer[buffer_size] = '\0';
-
-  ProcessNaClManifest(json_buffer.get());
-}
-
 void Plugin::NaClManifestFileDidOpen(int32_t pp_error) {
   PLUGIN_PRINTF(("Plugin::NaClManifestFileDidOpen (pp_error=%"
                  NACL_PRId32 ")\n", pp_error));
+  int64_t now = NaClGetTimeOfDayMicroseconds();
+  int64_t download_time;
+  if (now < manifest_open_time_)
+    download_time = 0;
+  else
+    download_time = now - manifest_open_time_;
   HistogramTimeSmall("NaCl.Perf.StartupTime.ManifestDownload",
-                     nexe_downloader_.TimeSinceOpenMilliseconds());
+                     download_time / 1000);
   HistogramHTTPStatusCode(
       nacl_interface_->GetIsInstalled(pp_instance()) ?
           "NaCl.HttpStatusCodeClass.Manifest.InstalledApp" :
@@ -835,22 +661,15 @@ void Plugin::ProcessNaClManifest(const nacl::string& manifest_json) {
   }
 
   nacl::string program_url;
-  PnaclOptions pnacl_options;
+  PP_PNaClOptions pnacl_options = {PP_FALSE, PP_FALSE, 2};
   bool uses_nonsfi_mode;
   if (manifest_->GetProgramURL(
           &program_url, &pnacl_options, &uses_nonsfi_mode, &error_info)) {
-    pp::Var program_url_var(program_url);
-    nacl_interface_->SetIsInstalled(
-        pp_instance(),
-        PP_FromBool(
-            nacl_interface_->GetUrlScheme(program_url_var.pp_var()) ==
-            PP_SCHEME_CHROME_EXTENSION));
+    // TODO(teravest): Make ProcessNaClManifest take responsibility for more of
+    // this function.
+    nacl_interface_->ProcessNaClManifest(pp_instance(), program_url.c_str());
     uses_nonsfi_mode_ = uses_nonsfi_mode;
-    nacl_interface_->SetNaClReadyState(pp_instance(),
-                                       PP_NACL_READY_STATE_LOADING);
-    // Inform JavaScript that we found a nexe URL to load.
-    EnqueueProgressEvent(PP_NACL_EVENT_PROGRESS);
-    if (pnacl_options.translate()) {
+    if (pnacl_options.translate) {
       pp::CompletionCallback translate_callback =
           callback_factory_.NewCallback(&Plugin::BitcodeDidTranslate);
       // Will always call the callback on success or failure.
@@ -861,6 +680,7 @@ void Plugin::ProcessNaClManifest(const nacl::string& manifest_json) {
                                             translate_callback));
       return;
     } else {
+      nexe_open_time_ = NaClGetTimeOfDayMicroseconds();
       // Try the fast path first. This will only block if the file is installed.
       if (OpenURLFast(program_url, &nexe_downloader_)) {
         NexeFileDidOpen(PP_OK);
@@ -884,48 +704,34 @@ void Plugin::ProcessNaClManifest(const nacl::string& manifest_json) {
 
 void Plugin::RequestNaClManifest(const nacl::string& url) {
   PLUGIN_PRINTF(("Plugin::RequestNaClManifest (url='%s')\n", url.c_str()));
-  PLUGIN_PRINTF(("Plugin::RequestNaClManifest (plugin base url='%s')\n",
-                 plugin_base_url().c_str()));
-  // The full URL of the manifest file is relative to the base url.
-  CHECK(url_util_ != NULL);
-  pp::Var nmf_resolved_url =
-      url_util_->ResolveRelativeToURL(plugin_base_url(), pp::Var(url));
-  if (!nmf_resolved_url.is_string()) {
-    ErrorInfo error_info;
-    error_info.SetReport(
-        PP_NACL_ERROR_MANIFEST_RESOLVE_URL,
-        nacl::string("could not resolve URL \"") + url.c_str() +
-        "\" relative to \"" + plugin_base_url().c_str() + "\".");
-    ReportLoadError(error_info);
+  PP_Bool is_data_uri;
+  ErrorInfo error_info;
+  if (!nacl_interface_->RequestNaClManifest(pp_instance(), url.c_str(),
+                                            &is_data_uri))
     return;
-  }
-  PLUGIN_PRINTF(("Plugin::RequestNaClManifest (resolved url='%s')\n",
-                 nmf_resolved_url.AsString().c_str()));
-  nacl_interface_->SetIsInstalled(
-      pp_instance(),
-      PP_FromBool(
-          nacl_interface_->GetUrlScheme(nmf_resolved_url.pp_var()) ==
-          PP_SCHEME_CHROME_EXTENSION));
-  set_manifest_base_url(nmf_resolved_url.AsString());
-  // Inform JavaScript that a load is starting.
-  nacl_interface_->SetNaClReadyState(pp_instance(), PP_NACL_READY_STATE_OPENED);
-  EnqueueProgressEvent(PP_NACL_EVENT_LOADSTART);
-  bool is_data_uri =
-      (nacl_interface_->GetUrlScheme(nmf_resolved_url.pp_var()) ==
-       PP_SCHEME_DATA);
-  HistogramEnumerateManifestIsDataURI(static_cast<int>(is_data_uri));
+  pp::Var nmf_resolved_url =
+      pp::Var(pp::PASS_REF, nacl_interface_->GetManifestBaseURL(pp_instance()));
   if (is_data_uri) {
-    pp::CompletionCallback open_callback =
-        callback_factory_.NewCallback(&Plugin::NaClManifestBufferReady);
-    // Will always call the callback on success or failure.
-    CHECK(nexe_downloader_.Open(nmf_resolved_url.AsString(),
-                                DOWNLOAD_TO_BUFFER,
-                                open_callback,
-                                false,
-                                NULL));
+    std::string string_nmf_resolved_url = nmf_resolved_url.AsString();
+    pp::Var nmf_data = pp::Var(
+        pp::PASS_REF,
+        nacl_interface_->ParseDataURL(string_nmf_resolved_url.c_str()));
+    if (!nmf_data.is_string()) {
+      error_info.SetReport(PP_NACL_ERROR_MANIFEST_LOAD_URL,
+                           "could not load manifest url.");
+      ReportLoadError(error_info);
+    } else if (nmf_data.AsString().size() > kNaClManifestMaxFileBytes) {
+      error_info.SetReport(PP_NACL_ERROR_MANIFEST_TOO_LARGE,
+                           "manifest file too large.");
+      ReportLoadError(error_info);
+    } else {
+      // TODO(teravest): Does this have to be async for any reason?
+      ProcessNaClManifest(nmf_data.AsString());
+    }
   } else {
     pp::CompletionCallback open_callback =
         callback_factory_.NewCallback(&Plugin::NaClManifestFileDidOpen);
+    manifest_open_time_ = NaClGetTimeOfDayMicroseconds();
     // Will always call the callback on success or failure.
     CHECK(nexe_downloader_.Open(nmf_resolved_url.AsString(),
                                 DOWNLOAD_TO_FILE,
@@ -944,15 +750,18 @@ bool Plugin::SetManifestObject(const nacl::string& manifest_json,
     return false;
   // Determine whether lookups should use portable (i.e., pnacl versions)
   // rather than platform-specific files.
-  bool is_pnacl = (mime_type() == kPnaclMIMEType);
+  bool is_pnacl = nacl_interface_->IsPNaCl(pp_instance());
   bool nonsfi_mode_enabled =
       PP_ToBool(nacl_interface_->IsNonSFIModeEnabled());
+  pp::Var manifest_base_url =
+      pp::Var(pp::PASS_REF, nacl_interface_->GetManifestBaseURL(pp_instance()));
+  std::string manifest_base_url_str = manifest_base_url.AsString();
   bool pnacl_debug = GetNaClInterface()->NaClDebugEnabledForURL(
-      manifest_base_url().c_str());
+      manifest_base_url_str.c_str());
   const char* sandbox_isa = nacl_interface_->GetSandboxArch();
   nacl::scoped_ptr<JsonManifest> json_manifest(
       new JsonManifest(url_util_,
-                       manifest_base_url(),
+                       manifest_base_url_str,
                        (is_pnacl ? kPortableArch : sandbox_isa),
                        nonsfi_mode_enabled,
                        pnacl_debug));
@@ -1012,17 +821,11 @@ bool Plugin::StreamAsFile(const nacl::string& url,
   FileDownloader* downloader = new FileDownloader();
   downloader->Initialize(this);
   url_downloaders_.insert(downloader);
+
   // Untrusted loads are always relative to the page's origin.
-  CHECK(url_util_ != NULL);
-  pp::Var resolved_url =
-      url_util_->ResolveRelativeToURL(pp::Var(plugin_base_url()), url);
-  if (!resolved_url.is_string()) {
-    PLUGIN_PRINTF(("Plugin::StreamAsFile: "
-                   "could not resolve url \"%s\" relative to plugin \"%s\".",
-                   url.c_str(),
-                   plugin_base_url().c_str()));
+  if (!GetNaClInterface()->ResolvesRelativeToPluginBaseUrl(pp_instance(),
+                                                           url.c_str()))
     return false;
-  }
 
   // Try the fast path first. This will only block if the file is installed.
   if (OpenURLFast(url, downloader)) {
@@ -1116,14 +919,6 @@ const FileDownloader* Plugin::FindFileDownloader(
 
 void Plugin::ReportSelLdrLoadStatus(int status) {
   HistogramEnumerateSelLdrLoadStatus(static_cast<NaClErrorCode>(status));
-}
-
-void Plugin::EnqueueProgressEvent(PP_NaClEventType event_type) {
-  EnqueueProgressEvent(event_type,
-                       NACL_NO_URL,
-                       Plugin::LENGTH_IS_NOT_COMPUTABLE,
-                       Plugin::kUnknownBytes,
-                       Plugin::kUnknownBytes);
 }
 
 void Plugin::EnqueueProgressEvent(PP_NaClEventType event_type,

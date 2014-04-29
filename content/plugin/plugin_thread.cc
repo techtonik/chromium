@@ -28,23 +28,20 @@
 #include "content/public/plugin/content_plugin_client.h"
 #include "third_party/WebKit/public/web/WebKit.h"
 #include "ipc/ipc_channel_handle.h"
-
-#if defined(USE_X11)
-#include "ui/base/x/x11_util.h"
-#endif
+#include "ipc/message_filter.h"
 
 namespace content {
 
 namespace {
 
-class EnsureTerminateMessageFilter : public IPC::ChannelProxy::MessageFilter {
+class EnsureTerminateMessageFilter : public IPC::MessageFilter {
  public:
   EnsureTerminateMessageFilter() {}
 
  protected:
   virtual ~EnsureTerminateMessageFilter() {}
 
-  // IPC::ChannelProxy::MessageFilter:
+  // IPC::MessageFilter:
   virtual void OnChannelError() OVERRIDE {
     // How long we wait before forcibly shutting down the process.
     const base::TimeDelta kPluginProcessTerminateTimeout =

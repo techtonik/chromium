@@ -240,7 +240,6 @@ class LayerTreeHostDelegatedTest : public LayerTreeTest {
     for (size_t i = 0; i < resources_to_return.size(); ++i)
       output_surface()->ReturnResource(resources_to_return[i], &ack);
     host_impl->ReclaimResources(&ack);
-    host_impl->OnSwapBuffersComplete();
   }
 };
 
@@ -406,7 +405,7 @@ class LayerTreeHostDelegatedTestInvalidFrameAfterContextLost
     SetFrameData(frame1.Pass());
   }
 
-  virtual void DidInitializeOutputSurface(bool succeeded) OVERRIDE {
+  virtual void DidInitializeOutputSurface() OVERRIDE {
     if (!num_output_surfaces_initialized_++)
       return;
 
@@ -467,126 +466,6 @@ class LayerTreeHostDelegatedTestInvalidFrameAfterContextLost
 
 SINGLE_AND_MULTI_THREAD_TEST_F(
     LayerTreeHostDelegatedTestInvalidFrameAfterContextLost);
-
-class LayerTreeHostDelegatedTestOffscreenContext_NoFilters
-    : public LayerTreeHostDelegatedTestCaseSingleDelegatedLayer {
- protected:
-  virtual void BeginTest() OVERRIDE {
-    scoped_ptr<DelegatedFrameData> frame =
-        CreateFrameData(gfx::Rect(0, 0, 1, 1),
-                        gfx::Rect(0, 0, 1, 1));
-    SetFrameData(frame.Pass());
-
-    PostSetNeedsCommitToMainThread();
-  }
-
-  virtual void DrawLayersOnThread(LayerTreeHostImpl* host_impl) OVERRIDE {
-    EXPECT_FALSE(host_impl->offscreen_context_provider());
-    EndTest();
-  }
-};
-
-SINGLE_AND_MULTI_THREAD_TEST_F(
-    LayerTreeHostDelegatedTestOffscreenContext_NoFilters);
-
-class LayerTreeHostDelegatedTestOffscreenContext_Filters
-    : public LayerTreeHostDelegatedTestCaseSingleDelegatedLayer {
- protected:
-  virtual void BeginTest() OVERRIDE {
-    scoped_ptr<DelegatedFrameData> frame =
-        CreateFrameData(gfx::Rect(0, 0, 1, 1),
-                        gfx::Rect(0, 0, 1, 1));
-
-    FilterOperations filters;
-    filters.Append(FilterOperation::CreateGrayscaleFilter(0.5f));
-    AddRenderPass(frame.get(),
-                  RenderPass::Id(2, 1),
-                  gfx::Rect(0, 0, 1, 1),
-                  gfx::Rect(0, 0, 1, 1),
-                  filters,
-                  FilterOperations());
-    SetFrameData(frame.Pass());
-
-    PostSetNeedsCommitToMainThread();
-  }
-
-  virtual void DrawLayersOnThread(LayerTreeHostImpl* host_impl) OVERRIDE {
-    bool expect_context = !delegating_renderer();
-    EXPECT_EQ(expect_context, !!host_impl->offscreen_context_provider());
-    EndTest();
-  }
-};
-
-SINGLE_AND_MULTI_THREAD_TEST_F(
-    LayerTreeHostDelegatedTestOffscreenContext_Filters);
-
-class LayerTreeHostDelegatedTestOffscreenContext_BackgroundFilters
-    : public LayerTreeHostDelegatedTestCaseSingleDelegatedLayer {
- protected:
-  virtual void BeginTest() OVERRIDE {
-    scoped_ptr<DelegatedFrameData> frame =
-        CreateFrameData(gfx::Rect(0, 0, 1, 1),
-                        gfx::Rect(0, 0, 1, 1));
-
-    FilterOperations filters;
-    filters.Append(FilterOperation::CreateGrayscaleFilter(0.5f));
-    AddRenderPass(frame.get(),
-                  RenderPass::Id(2, 1),
-                  gfx::Rect(0, 0, 1, 1),
-                  gfx::Rect(0, 0, 1, 1),
-                  FilterOperations(),
-                  filters);
-    SetFrameData(frame.Pass());
-
-    PostSetNeedsCommitToMainThread();
-  }
-
-  virtual void DrawLayersOnThread(LayerTreeHostImpl* host_impl) OVERRIDE {
-    bool expect_context = !delegating_renderer();
-    EXPECT_EQ(expect_context, !!host_impl->offscreen_context_provider());
-    EndTest();
-  }
-};
-
-SINGLE_AND_MULTI_THREAD_TEST_F(
-    LayerTreeHostDelegatedTestOffscreenContext_BackgroundFilters);
-
-class LayerTreeHostDelegatedTestOffscreenContext_Filters_AddedToTree
-    : public LayerTreeHostDelegatedTestCaseSingleDelegatedLayer {
- protected:
-  virtual void BeginTest() OVERRIDE {
-    scoped_ptr<DelegatedFrameData> frame_no_filters =
-        CreateFrameData(gfx::Rect(0, 0, 1, 1), gfx::Rect(0, 0, 1, 1));
-
-    scoped_ptr<DelegatedFrameData> frame_with_filters =
-        CreateFrameData(gfx::Rect(0, 0, 1, 1), gfx::Rect(0, 0, 1, 1));
-
-    FilterOperations filters;
-    filters.Append(FilterOperation::CreateGrayscaleFilter(0.5f));
-    AddRenderPass(frame_with_filters.get(),
-                  RenderPass::Id(2, 1),
-                  gfx::Rect(0, 0, 1, 1),
-                  gfx::Rect(0, 0, 1, 1),
-                  filters,
-                  FilterOperations());
-
-    SetFrameData(frame_no_filters.Pass());
-    delegated_->RemoveFromParent();
-    SetFrameData(frame_with_filters.Pass());
-    layer_tree_host()->root_layer()->AddChild(delegated_);
-
-    PostSetNeedsCommitToMainThread();
-  }
-
-  virtual void DrawLayersOnThread(LayerTreeHostImpl* host_impl) OVERRIDE {
-    bool expect_context = !delegating_renderer();
-    EXPECT_EQ(expect_context, !!host_impl->offscreen_context_provider());
-    EndTest();
-  }
-};
-
-SINGLE_AND_MULTI_THREAD_TEST_F(
-    LayerTreeHostDelegatedTestOffscreenContext_Filters_AddedToTree);
 
 class LayerTreeHostDelegatedTestLayerUsesFrameDamage
     : public LayerTreeHostDelegatedTestCaseSingleDelegatedLayer {
@@ -1648,7 +1527,6 @@ class LayerTreeHostDelegatedTestResourceSentToParent
     CompositorFrameAck ack;
     output_surface()->ReturnResource(map.find(999)->second, &ack);
     host_impl->ReclaimResources(&ack);
-    host_impl->OnSwapBuffersComplete();
   }
 
   virtual void UnusedResourcesAreAvailable() OVERRIDE {

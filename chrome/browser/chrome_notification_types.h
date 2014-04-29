@@ -405,22 +405,19 @@ enum NotificationType {
   // the tab.
   NOTIFICATION_EXTENSION_LOCATION_BAR_UPDATED,
 
+  // DEPRECATED: Use ExtensionRegistry::AddObserver instead.
+  //
   // Sent when a new extension is loaded. The details are an Extension, and
   // the source is a Profile.
-  NOTIFICATION_EXTENSION_LOADED,
+  NOTIFICATION_EXTENSION_LOADED_DEPRECATED,
 
   // An error occured while attempting to load an extension. The details are a
   // string with details about why the load failed.
   NOTIFICATION_EXTENSION_LOAD_ERROR,
 
-  // Sent when an unpacked extension fails to load. The details are a std::pair,
-  // the first object is a boolean signifying the user's retry response value,
-  // and the second object is a const base::FilePath& of the extension that
-  // failed to load. Source is a Profile.
-  NOTIFICATION_EXTENSION_LOAD_RETRY,
-
   // Sent when an extension is enabled. Under most circumstances, listeners
-  // will want to use NOTIFICATION_EXTENSION_LOADED. This notification is only
+  // will want to use NOTIFICATION_EXTENSION_LOADED_DEPRECATED. This
+  // notification is only
   // fired when the "Enable" button is hit in the extensions tab.  The details
   // are an Extension, and the source is a Profile.
   NOTIFICATION_EXTENSION_ENABLED,

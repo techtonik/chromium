@@ -275,6 +275,7 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   // so that its list can be recreated.
   void CreateRenderSurface();
   void ClearRenderSurface();
+  void ClearRenderSurfaceLayerList();
 
   DrawProperties<LayerImpl>& draw_properties() {
     return draw_properties_;
@@ -448,11 +449,18 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   const gfx::Transform& transform() const { return transform_; }
   bool TransformIsAnimating() const;
   bool TransformIsAnimatingOnImplOnly() const;
+  void SetTransformAndInvertibility(const gfx::Transform& transform,
+                                    bool transform_is_invertible);
+  bool transform_is_invertible() const { return transform_is_invertible_; }
 
   // Note this rect is in layer space (not content space).
   void SetUpdateRect(const gfx::RectF& update_rect);
 
   const gfx::RectF& update_rect() const { return update_rect_; }
+
+  void AddDamageRect(const gfx::RectF& damage_rect);
+
+  const gfx::RectF& damage_rect() const { return damage_rect_; }
 
   virtual base::DictionaryValue* LayerTreeAsJson() const;
 
@@ -607,6 +615,9 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   bool hide_layer_and_subtree_ : 1;
   bool force_render_surface_ : 1;
 
+  // Cache transform_'s invertibility.
+  bool transform_is_invertible_ : 1;
+
   // Set for the layer that other layers are fixed to.
   bool is_container_for_fixed_position_layers_ : 1;
   bool is_3d_sorted_ : 1;
@@ -651,6 +662,9 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   // Note that plugin layers bypass this and leave it empty.
   // Uses layer (not content) space.
   gfx::RectF update_rect_;
+
+  // This rect is in layer space.
+  gfx::RectF damage_rect_;
 
   // Manages animations for this layer.
   scoped_refptr<LayerAnimationController> layer_animation_controller_;

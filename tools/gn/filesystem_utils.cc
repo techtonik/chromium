@@ -179,7 +179,7 @@ SourceFileType GetSourceFileType(const SourceFile& file) {
     return SOURCE_MM;
   if (extension == "rc")
     return SOURCE_RC;
-  if (extension == "S")
+  if (extension == "S" || extension == "s")
     return SOURCE_S;
 
   return SOURCE_UNKNOWN;
@@ -311,6 +311,23 @@ base::StringPiece FindDir(const std::string* path) {
   if (filename_offset == 0u)
     return base::StringPiece();
   return base::StringPiece(path->data(), filename_offset);
+}
+
+base::StringPiece FindLastDirComponent(const SourceDir& dir) {
+  const std::string& dir_string = dir.value();
+
+  if (dir_string.empty())
+    return base::StringPiece();
+  int cur = static_cast<int>(dir_string.size()) - 1;
+  DCHECK(dir_string[cur] == '/');
+  int end = cur;
+  cur--;  // Skip before the last slash.
+
+  for (; cur >= 0; cur--) {
+    if (dir_string[cur] == '/')
+      return base::StringPiece(&dir_string[cur + 1], end - cur - 1);
+  }
+  return base::StringPiece(&dir_string[0], end);
 }
 
 bool EnsureStringIsInOutputDir(const SourceDir& dir,

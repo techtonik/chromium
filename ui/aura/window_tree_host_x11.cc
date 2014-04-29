@@ -298,6 +298,7 @@ uint32_t WindowTreeHostX11::DispatchEvent(const ui::PlatformEvent& event) {
                    False,
                    SubstructureRedirectMask | SubstructureNotifyMask,
                    &reply_event);
+        XFlush(xdisplay_);
       }
       break;
     }
@@ -340,6 +341,10 @@ uint32_t WindowTreeHostX11::DispatchEvent(const ui::PlatformEvent& event) {
     }
   }
   return ui::POST_DISPATCH_STOP_PROPAGATION;
+}
+
+ui::EventSource* WindowTreeHostX11::GetEventSource() {
+  return this;
 }
 
 gfx::AcceleratedWidget WindowTreeHostX11::GetAcceleratedWidget() {
@@ -433,30 +438,6 @@ void WindowTreeHostX11::ReleaseCapture() {
   // TODO(oshima): Release x input.
 }
 
-bool WindowTreeHostX11::QueryMouseLocation(gfx::Point* location_return) {
-  client::CursorClient* cursor_client =
-      client::GetCursorClient(window());
-  if (cursor_client && !cursor_client->IsMouseEventsEnabled()) {
-    *location_return = gfx::Point(0, 0);
-    return false;
-  }
-
-  ::Window root_return, child_return;
-  int root_x_return, root_y_return, win_x_return, win_y_return;
-  unsigned int mask_return;
-  XQueryPointer(xdisplay_,
-                xwindow_,
-                &root_return,
-                &child_return,
-                &root_x_return, &root_y_return,
-                &win_x_return, &win_y_return,
-                &mask_return);
-  *location_return = gfx::Point(max(0, min(bounds_.width(), win_x_return)),
-                                max(0, min(bounds_.height(), win_y_return)));
-  return (win_x_return >= 0 && win_x_return < bounds_.width() &&
-          win_y_return >= 0 && win_y_return < bounds_.height());
-}
-
 void WindowTreeHostX11::PostNativeEvent(
     const base::NativeEvent& native_event) {
   DCHECK(xwindow_);
@@ -488,6 +469,7 @@ void WindowTreeHostX11::PostNativeEvent(
       break;
   }
   XSendEvent(xdisplay_, xwindow_, False, 0, &xevent);
+  XFlush(xdisplay_);
 }
 
 void WindowTreeHostX11::OnDeviceScaleFactorChanged(

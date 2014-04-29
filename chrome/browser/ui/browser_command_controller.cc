@@ -287,7 +287,7 @@ bool BrowserCommandController::IsReservedCommandOrKey(
   if (window()->IsFullscreen() && command_id == IDC_FULLSCREEN)
     return true;
 
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS) && !defined(TOOLKIT_GTK)
+#if defined(OS_LINUX) && !defined(OS_CHROMEOS)
   // If this key was registered by the user as a content editing hotkey, then
   // it is not reserved.
   ui::TextEditKeyBindingsDelegateAuraLinux* delegate =
@@ -484,7 +484,7 @@ void BrowserCommandController::ExecuteCommandWithDisposition(
       break;
 #endif
 
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS) && !defined(TOOLKIT_GTK)
+#if defined(OS_LINUX) && !defined(OS_CHROMEOS)
     case IDC_USE_SYSTEM_TITLE_BAR: {
       PrefService* prefs = browser_->profile()->GetPrefs();
       prefs->SetBoolean(prefs::kUseCustomChromeFrame,
@@ -562,6 +562,11 @@ void BrowserCommandController::ExecuteCommandWithDisposition(
     case IDC_TRANSLATE_PAGE:
       Translate(browser_);
       break;
+    case IDC_MANAGE_PASSWORDS_FOR_PAGE:
+      ManagePasswordsForPage(browser_);
+      break;
+
+    // Page encoding commands
     case IDC_ENCODING_AUTO_DETECT:
       browser_->ToggleEncodingAutoDetect();
       break;
@@ -914,13 +919,14 @@ void BrowserCommandController::InitCommandState() {
   command_updater_.UpdateCommandEnabled(IDC_VISIT_DESKTOP_OF_LRU_USER_2, true);
   command_updater_.UpdateCommandEnabled(IDC_VISIT_DESKTOP_OF_LRU_USER_3, true);
 #endif
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS) && !defined(TOOLKIT_GTK)
+#if defined(OS_LINUX) && !defined(OS_CHROMEOS)
   command_updater_.UpdateCommandEnabled(IDC_USE_SYSTEM_TITLE_BAR, true);
 #endif
 
   // Page-related commands
   command_updater_.UpdateCommandEnabled(IDC_EMAIL_PAGE_LOCATION, true);
   command_updater_.UpdateCommandEnabled(IDC_BOOKMARK_PAGE_FROM_STAR, true);
+  command_updater_.UpdateCommandEnabled(IDC_MANAGE_PASSWORDS_FOR_PAGE, true);
   command_updater_.UpdateCommandEnabled(IDC_ENCODING_AUTO_DETECT, true);
   command_updater_.UpdateCommandEnabled(IDC_ENCODING_UTF8, true);
   command_updater_.UpdateCommandEnabled(IDC_ENCODING_UTF16LE, true);
@@ -1187,6 +1193,7 @@ void BrowserCommandController::UpdateCommandsForBookmarkEditing() {
 void BrowserCommandController::UpdateCommandsForBookmarkBar() {
   command_updater_.UpdateCommandEnabled(IDC_SHOW_BOOKMARK_BAR,
       browser_defaults::bookmarks_enabled &&
+      !profile()->IsGuestSession() &&
       !profile()->GetPrefs()->IsManagedPreference(prefs::kShowBookmarkBar) &&
       IsShowingMainUI());
 }
@@ -1241,8 +1248,9 @@ void BrowserCommandController::UpdateCommandsForFullscreenMode() {
   UpdateShowSyncState(show_main_ui);
 
   // Settings page/subpages are forced to open in normal mode. We disable these
-  // commands when incognito is forced.
+  // commands for guest sessions and when incognito is forced.
   const bool options_enabled = show_main_ui &&
+      !profile()->IsGuestSession() &&
       IncognitoModePrefs::GetAvailability(
           profile()->GetPrefs()) != IncognitoModePrefs::FORCED;
   command_updater_.UpdateCommandEnabled(IDC_OPTIONS, options_enabled);

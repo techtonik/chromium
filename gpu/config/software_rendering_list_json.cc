@@ -18,7 +18,7 @@ const char kSoftwareRenderingListJson[] = LONG_STRING_CONST(
 {
   "name": "software rendering list",
   // Please update the version number whenever you change this file.
-  "version": "7.5",
+  "version": "8.0",
   "entries": [
     {
       "id": 1,
@@ -671,7 +671,6 @@ const char kSoftwareRenderingListJson[] = LONG_STRING_CONST(
         "value": "NVIDIA"
       },
       "features": [
-        "accelerated_video",
         "accelerated_video_decode",
         "flash_3d",
         "flash_stage3d"
@@ -949,12 +948,7 @@ LONG_STRING_CONST(
           "value": "4.1.2"
         }
       },
-      "machine_model": {
-        "name": {
-          "op": "=",
-          "value": "GT-N7100"
-        }
-      },
+      "machine_model_name": ["GT-N7100"],
       "features": [
         "accelerated_video_decode"
       ]
@@ -966,12 +960,7 @@ LONG_STRING_CONST(
       "os": {
         "type": "android"
       },
-      "machine_model": {
-        "name": {
-          "op": "=",
-          "value": "SCH-I545"
-        }
-      },
+      "machine_model_name": ["SCH-I545"],
       "features": [
         "accelerated_video_decode"
       ]
@@ -1110,6 +1099,41 @@ LONG_STRING_CONST(
       },
       "features": [
         "all"
+      ]
+    },
+    {
+      "id": 95,
+      "description": "AMD driver version 13.101 is unstable on linux.",
+      "cr_bugs": [363378],
+      "os": {
+        "type": "linux"
+      },
+      "vendor_id": "0x1002",
+      "driver_vendor": {
+        "op": "contains",
+        "value": "AMD"
+      },
+      "driver_version": {
+        "op": "=",
+        "value": "13.101"
+      },
+      "features": [
+        "all"
+      ]
+    },
+    {
+      "id": 96,
+      "description": "GPU rasterization is whitelisted on N4, N5, N7 and Moto X",
+      "cr_bugs": [362779],
+      "exceptions": [
+        {
+          "machine_model_name": ["Nexus 4", "Nexus 5", "Nexus 7",
+                                 "XT1049", "XT1050", "XT1052", "XT1053",
+                                 "XT1055", "XT1056", "XT1058", "XT1060"]
+        }
+      ],
+      "features": [
+        "gpu_rasterization"
       ]
     }
   ]

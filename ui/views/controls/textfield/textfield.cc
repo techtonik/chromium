@@ -32,6 +32,7 @@
 #include "ui/views/drag_utils.h"
 #include "ui/views/ime/input_method.h"
 #include "ui/views/metrics.h"
+#include "ui/views/native_cursor.h"
 #include "ui/views/painter.h"
 #include "ui/views/views_delegate.h"
 #include "ui/views/widget/widget.h"
@@ -263,9 +264,6 @@ Textfield::Textfield()
     password_reveal_duration_ = ViewsDelegate::views_delegate->
         GetDefaultTextfieldObscuredRevealDuration();
   }
-
-  if (NativeViewHost::kRenderNativeControlFocus)
-    focus_painter_ = Painter::CreateDashedFocusPainter();
 }
 
 Textfield::~Textfield() {}
@@ -396,6 +394,14 @@ base::string16 Textfield::GetPlaceholderText() const {
   return placeholder_text_;
 }
 
+gfx::HorizontalAlignment Textfield::GetHorizontalAlignment() const {
+  return GetRenderText()->horizontal_alignment();
+}
+
+void Textfield::SetHorizontalAlignment(gfx::HorizontalAlignment alignment) {
+  GetRenderText()->SetHorizontalAlignment(alignment);
+}
+
 void Textfield::ShowImeIfNeeded() {
   if (enabled() && !read_only())
     GetInputMethod()->ShowImeIfNeeded();
@@ -490,7 +496,7 @@ gfx::NativeCursor Textfield::GetCursor(const ui::MouseEvent& event) {
   bool in_selection = GetRenderText()->IsPointInSelection(event.location());
   bool drag_event = event.type() == ui::ET_MOUSE_DRAGGED;
   bool text_cursor = !initiating_drag_ && (drag_event || !in_selection);
-  return text_cursor ? ui::kCursorIBeam : ui::kCursorNull;
+  return text_cursor ? GetNativeIBeamCursor() : gfx::kNullCursor;
 }
 
 bool Textfield::OnMousePressed(const ui::MouseEvent& event) {
@@ -859,8 +865,6 @@ void Textfield::OnPaint(gfx::Canvas* canvas) {
   OnPaintBackground(canvas);
   PaintTextAndCursor(canvas);
   OnPaintBorder(canvas);
-  if (NativeViewHost::kRenderNativeControlFocus)
-    Painter::PaintFocusPainter(this, canvas, focus_painter_.get());
 }
 
 void Textfield::OnFocus() {
@@ -1290,7 +1294,7 @@ gfx::NativeWindow Textfield::GetAttachedWindow() const {
   // IME may want to interact with the native view of [NativeWidget A] rather
   // than that of [NativeWidget B]. This is why we need to call
   // GetTopLevelWidget() here.
-  return GetWidget()->GetTopLevelWidget()->GetNativeView();
+  return GetWidget()->GetTopLevelWidget()->GetNativeWindow();
 }
 
 ui::TextInputType Textfield::GetTextInputType() const {

@@ -15,6 +15,7 @@ class Smoothness(page_measurement.PageMeasurement):
 
   def CustomizeBrowserOptions(self, options):
     options.AppendExtraBrowserArgs('--enable-gpu-benchmarking')
+    options.AppendExtraBrowserArgs('--touch-events=enabled')
     power.PowerMetric.CustomizeBrowserOptions(options)
 
   def WillRunActions(self, page, tab):
@@ -22,9 +23,6 @@ class Smoothness(page_measurement.PageMeasurement):
     self._power_metric.Start(page, tab)
     self._smoothness_controller = smoothness_controller.SmoothnessController()
     self._smoothness_controller.Start(page, tab)
-
-  def DidRunAction(self, page, tab, action):
-    self._smoothness_controller.AddActionToIncludeInMetric(action)
 
   def DidRunActions(self, page, tab):
     self._power_metric.Stop(page, tab)

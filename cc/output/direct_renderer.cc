@@ -58,10 +58,8 @@ static gfx::Transform window_matrix(int x, int y, int width, int height) {
 namespace cc {
 
 DirectRenderer::DrawingFrame::DrawingFrame()
-    : root_render_pass(NULL),
-      current_render_pass(NULL),
-      current_texture(NULL),
-      offscreen_context_provider(NULL) {}
+    : root_render_pass(NULL), current_render_pass(NULL), current_texture(NULL) {
+}
 
 DirectRenderer::DrawingFrame::~DrawingFrame() {}
 
@@ -198,7 +196,6 @@ void DirectRenderer::DecideRenderPassAllocationsForFrame(
 }
 
 void DirectRenderer::DrawFrame(RenderPassList* render_passes_in_draw_order,
-                               ContextProvider* offscreen_context_provider,
                                float device_scale_factor,
                                const gfx::Rect& device_viewport_rect,
                                const gfx::Rect& device_clip_rect,
@@ -218,7 +215,6 @@ void DirectRenderer::DrawFrame(RenderPassList* render_passes_in_draw_order,
   frame.root_damage_rect.Intersect(gfx::Rect(device_viewport_rect.size()));
   frame.device_viewport_rect = device_viewport_rect;
   frame.device_clip_rect = device_clip_rect;
-  frame.offscreen_context_provider = offscreen_context_provider;
   frame.disable_picture_quad_image_filtering =
       disable_picture_quad_image_filtering;
 
@@ -421,10 +417,8 @@ bool DirectRenderer::UseRenderPass(DrawingFrame* frame,
   return BindFramebufferToTexture(frame, texture, render_pass->output_rect);
 }
 
-void DirectRenderer::RunOnDemandRasterTask(
-    internal::Task* on_demand_raster_task) {
-  internal::TaskGraphRunner* task_graph_runner =
-      RasterWorkerPool::GetTaskGraphRunner();
+void DirectRenderer::RunOnDemandRasterTask(Task* on_demand_raster_task) {
+  TaskGraphRunner* task_graph_runner = RasterWorkerPool::GetTaskGraphRunner();
   DCHECK(task_graph_runner);
 
   // Make sure we have a unique task namespace token.
@@ -432,18 +426,18 @@ void DirectRenderer::RunOnDemandRasterTask(
     on_demand_task_namespace_ = task_graph_runner->GetNamespaceToken();
 
   // Construct a task graph that contains this single raster task.
-  internal::TaskGraph graph;
+  TaskGraph graph;
   graph.nodes.push_back(
-      internal::TaskGraph::Node(on_demand_raster_task,
-                                RasterWorkerPool::kOnDemandRasterTaskPriority,
-                                0u));
+      TaskGraph::Node(on_demand_raster_task,
+                      RasterWorkerPool::kOnDemandRasterTaskPriority,
+                      0u));
 
   // Schedule task and wait for task graph runner to finish running it.
   task_graph_runner->ScheduleTasks(on_demand_task_namespace_, &graph);
   task_graph_runner->WaitForTasksToFinishRunning(on_demand_task_namespace_);
 
   // Collect task now that it has finished running.
-  internal::Task::Vector completed_tasks;
+  Task::Vector completed_tasks;
   task_graph_runner->CollectCompletedTasks(on_demand_task_namespace_,
                                            &completed_tasks);
   DCHECK_EQ(1u, completed_tasks.size());

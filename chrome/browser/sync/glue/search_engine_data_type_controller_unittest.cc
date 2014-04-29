@@ -10,12 +10,12 @@
 #include "base/tracked_objects.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/search_engines/template_url_service_test_util.h"
-#include "chrome/browser/sync/glue/fake_generic_change_processor.h"
 #include "chrome/browser/sync/glue/search_engine_data_type_controller.h"
 #include "chrome/browser/sync/profile_sync_components_factory_mock.h"
 #include "chrome/browser/sync/profile_sync_service_mock.h"
 #include "chrome/test/base/profile_mock.h"
 #include "components/sync_driver/data_type_controller_mock.h"
+#include "components/sync_driver/fake_generic_change_processor.h"
 #include "sync/api/fake_syncable_service.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -27,10 +27,6 @@ using testing::SetArgumentPointee;
 
 namespace browser_sync {
 namespace {
-
-ACTION(MakeSharedChangeProcessor) {
-  return new SharedChangeProcessor();
-}
 
 ACTION_P(ReturnAndRelease, change_processor) {
   return change_processor->release();
@@ -74,8 +70,6 @@ class SyncSearchEngineDataTypeControllerTest : public testing::Test {
     EXPECT_CALL(*profile_sync_factory_,
                 GetSyncableServiceForType(syncer::SEARCH_ENGINES)).
         WillOnce(Return(syncable_service_.AsWeakPtr()));
-    EXPECT_CALL(*profile_sync_factory_, CreateSharedChangeProcessor()).
-        WillOnce(MakeSharedChangeProcessor());
     EXPECT_CALL(*profile_sync_factory_,
                 CreateGenericChangeProcessor(_, _, _, _)).
         WillOnce(ReturnAndRelease(&change_processor_));
@@ -128,9 +122,6 @@ TEST_F(SyncSearchEngineDataTypeControllerTest, StartURLServiceReady) {
 }
 
 TEST_F(SyncSearchEngineDataTypeControllerTest, StartURLServiceNotReady) {
-  EXPECT_CALL(*profile_sync_factory_, CreateSharedChangeProcessor()).
-      WillOnce(MakeSharedChangeProcessor());
-
   EXPECT_CALL(model_load_callback_, Run(_, _));
   EXPECT_FALSE(syncable_service_.syncing());
   search_engine_dtc_->LoadModels(

@@ -10,6 +10,7 @@
 #include "ash/shell.h"
 #include "base/file_util.h"
 #include "base/path_service.h"
+#include "base/prefs/pref_service.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "chrome/browser/browser_process.h"
@@ -31,12 +32,14 @@
 #include "chrome/browser/chromeos/settings/device_oauth2_token_service_factory.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_test_message_listener.h"
+#include "chrome/browser/ui/webui/chromeos/login/kiosk_app_menu_handler.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chromeos/chromeos_switches.h"
 #include "chromeos/dbus/cryptohome_client.h"
+#include "components/signin/core/common/signin_pref_names.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
 #include "content/public/browser/notification_service.h"
@@ -282,8 +285,7 @@ class KioskTest : public OobeBaseTest {
   }
 
   void LaunchApp(const std::string& app_id, bool diagnostic_mode) {
-    bool new_kiosk_ui = !CommandLine::ForCurrentProcess()->
-        HasSwitch(switches::kDisableNewKioskUI);
+    bool new_kiosk_ui = KioskAppMenuHandler::EnableNewKioskUI();
     GetLoginUI()->CallJavascriptFunction(new_kiosk_ui ?
         kLaunchAppForTestNewAPI : kLaunchAppForTestOldAPI,
         base::StringValue(app_id),
@@ -316,8 +318,12 @@ class KioskTest : public OobeBaseTest {
       login_signal.Wait();
     } else {
       // No wizard and running with an existing profile and it should land
-      // on account picker.
-      OobeScreenWaiter(OobeDisplay::SCREEN_ACCOUNT_PICKER).Wait();
+      // on account picker when new kiosk UI is enabled. Otherwise, just
+      // wait for the login signal from Gaia.
+      if (KioskAppMenuHandler::EnableNewKioskUI())
+        OobeScreenWaiter(OobeDisplay::SCREEN_ACCOUNT_PICKER).Wait();
+      else
+        login_signal.Wait();
     }
 
     // Wait for the Kiosk App configuration to reload.
@@ -536,6 +542,18 @@ IN_PROC_BROWSER_TEST_F(KioskTest, InstallAndLaunchApp) {
   WaitForAppLaunchSuccess();
 }
 
+IN_PROC_BROWSER_TEST_F(KioskTest, NotSignedInWithGAIAAccount) {
+  // Tests that the kiosk session is not considered to be logged in with a GAIA
+  // account.
+  StartAppLaunchFromLoginScreen(SimulateNetworkOnlineClosure());
+  WaitForAppLaunchSuccess();
+
+  Profile* app_profile = ProfileManager::GetPrimaryUserProfile();
+  ASSERT_TRUE(app_profile);
+  EXPECT_FALSE(app_profile->GetPrefs()->HasPrefPath(
+      prefs::kGoogleServicesUsername));
+}
+
 IN_PROC_BROWSER_TEST_F(KioskTest, PRE_LaunchAppNetworkDown) {
   // Tests the network down case for the initial app download and launch.
   RunAppLaunchNetworkDownTest();
@@ -598,7 +616,8 @@ IN_PROC_BROWSER_TEST_F(KioskTest, LaunchAppNetworkDownConfigureNotAllowed) {
   WaitForAppLaunchSuccess();
 }
 
-IN_PROC_BROWSER_TEST_F(KioskTest, LaunchAppNetworkPortal) {
+// Flaky on bots. http://crbug.com/365507
+IN_PROC_BROWSER_TEST_F(KioskTest, DISABLED_LaunchAppNetworkPortal) {
   // Mock network could be configured without the owner password.
   ScopedCanConfigureNetwork can_configure_network(true, false);
 
@@ -642,8 +661,7 @@ IN_PROC_BROWSER_TEST_F(KioskTest, LaunchInDiagnosticMode) {
 
   content::WebContents* login_contents = GetLoginUI()->GetWebContents();
 
-  bool new_kiosk_ui = !CommandLine::ForCurrentProcess()->
-      HasSwitch(switches::kDisableNewKioskUI);
+  bool new_kiosk_ui = KioskAppMenuHandler::EnableNewKioskUI();
   JsConditionWaiter(login_contents, new_kiosk_ui ?
       kCheckDiagnosticModeNewAPI : kCheckDiagnosticModeOldAPI).Wait();
 
@@ -1198,6 +1216,13 @@ IN_PROC_BROWSER_TEST_F(KioskEnterpriseTest, EnterpriseKioskApp) {
       "});",
       &result));
   EXPECT_EQ(kTestAccessToken, result);
+
+  // Verify that the session is not considered to be logged in with a GAIA
+  // account.
+  Profile* app_profile = ProfileManager::GetPrimaryUserProfile();
+  ASSERT_TRUE(app_profile);
+  EXPECT_FALSE(app_profile->GetPrefs()->HasPrefPath(
+      prefs::kGoogleServicesUsername));
 
   // Terminate the app.
   window->GetBaseWindow()->Close();

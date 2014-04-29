@@ -36,6 +36,7 @@
         '<(DEPTH)/chrome/chrome_resources.gyp:chrome_strings',
         '<(DEPTH)/chrome/chrome_resources.gyp:theme_resources',
         '<(DEPTH)/chrome/common_constants.gyp:common_constants',
+        '<(DEPTH)/components/components.gyp:cloud_devices_common',
         '<(DEPTH)/components/components.gyp:json_schema',
         '<(DEPTH)/components/components.gyp:metrics',
         '<(DEPTH)/components/components.gyp:policy_component_common',
@@ -43,7 +44,9 @@
         '<(DEPTH)/components/components.gyp:variations',
         '<(DEPTH)/content/content.gyp:content_common',
         '<(DEPTH)/crypto/crypto.gyp:crypto',
-        '<(DEPTH)/media/cast/transport/cast_transport.gyp:cast_transport',
+        '<(DEPTH)/extensions/extensions_resources.gyp:extensions_resources',
+        '<(DEPTH)/extensions/extensions_strings.gyp:extensions_strings',
+        '<(DEPTH)/media/cast/cast.gyp:cast_transport',
         '<(DEPTH)/net/net.gyp:net',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/icu/icu.gyp:icui18n',
@@ -109,6 +112,8 @@
         'common/custom_handlers/protocol_handler.h',
         'common/descriptors_android.h',
         'common/encrypted_media_messages_android.h',
+        'common/extensions/ad_injection_constants.cc',
+        'common/extensions/ad_injection_constants.h',
         'common/extensions/api/bluetooth/bluetooth_manifest_data.cc',
         'common/extensions/api/bluetooth/bluetooth_manifest_data.h',
         'common/extensions/api/bluetooth/bluetooth_manifest_handler.cc',
@@ -171,6 +176,8 @@
         'common/extensions/features/chrome_channel_feature_filter.h',
         'common/extensions/features/feature_channel.cc',
         'common/extensions/features/feature_channel.h',
+        'common/extensions/file_handler_info.cc',
+        'common/extensions/file_handler_info.h',
         'common/extensions/manifest_handlers/app_isolation_info.cc',
         'common/extensions/manifest_handlers/app_isolation_info.h',
         'common/extensions/manifest_handlers/app_launch_info.cc',
@@ -201,14 +208,8 @@
         'common/extensions/sync_helper.h',
         'common/extensions/update_manifest.cc',
         'common/extensions/update_manifest.h',
-        'common/extensions/value_counter.cc',
-        'common/extensions/value_counter.h',
-        'common/favicon/favicon_types.cc',
-        'common/favicon/favicon_types.h',
         'common/favicon/favicon_url_parser.cc',
         'common/favicon/favicon_url_parser.h',
-        'common/profile_management_switches.cc',
-        'common/profile_management_switches.h',
         'common/icon_with_badge_image_source.cc',
         'common/icon_with_badge_image_source.h',
         'common/importer/firefox_importer_utils.cc',
@@ -240,8 +241,6 @@
         'common/instant_types.h',
         'common/localized_error.cc',
         'common/localized_error.h',
-        'common/local_discovery/service_discovery_client.cc',
-        'common/local_discovery/service_discovery_client.h',
         'common/logging_chrome.cc',
         'common/logging_chrome.h',
         'common/mac/app_mode_common.h',
@@ -425,6 +424,18 @@
           'dependencies': [
             '<(DEPTH)/printing/printing.gyp:printing',
           ],
+        }],
+        ['enable_service_discovery==1', {
+          'sources' : [
+            'common/local_discovery/service_discovery_client.cc',
+            'common/local_discovery/service_discovery_client.h',
+           ]
+        }],
+        ['enable_mdns==1', {
+          'sources' : [
+            'common/local_discovery/service_discovery_client_impl.cc',
+            'common/local_discovery/service_discovery_client_impl.h',
+          ]
         }],
         ['OS=="android"', {
           'sources/': [

@@ -413,6 +413,11 @@
         'filters/source_buffer_stream.h',
         'filters/stream_parser_factory.cc',
         'filters/stream_parser_factory.h',
+        'filters/video_frame_scheduler.h',
+        'filters/video_frame_scheduler_impl.cc',
+        'filters/video_frame_scheduler_impl.h',
+        'filters/video_frame_scheduler_proxy.cc',
+        'filters/video_frame_scheduler_proxy.h',
         'filters/video_renderer_impl.cc',
         'filters/video_renderer_impl.h',
         'filters/vpx_video_decoder.cc',
@@ -455,8 +460,12 @@
         'video/capture/android/video_capture_device_factory_android.h',
         'video/capture/fake_video_capture_device.cc',
         'video/capture/fake_video_capture_device.h',
+        'video/capture/fake_video_capture_device_factory.h',
+        'video/capture/fake_video_capture_device_factory.cc',
         'video/capture/file_video_capture_device.cc',
         'video/capture/file_video_capture_device.h',
+        'video/capture/file_video_capture_device_factory.h',
+        'video/capture/file_video_capture_device_factory.cc',
         'video/capture/linux/video_capture_device_linux.cc',
         'video/capture/linux/video_capture_device_linux.h',
         'video/capture/mac/avfoundation_glue.h',
@@ -470,11 +479,10 @@
         'video/capture/mac/video_capture_device_mac.mm',
         'video/capture/mac/video_capture_device_qtkit_mac.h',
         'video/capture/mac/video_capture_device_qtkit_mac.mm',
-        'video/capture/video_capture.h',
         'video/capture/video_capture_device.cc',
         'video/capture/video_capture_device.h',
-        'video/capture/video_capture_proxy.cc',
-        'video/capture/video_capture_proxy.h',
+        'video/capture/video_capture_device_factory.cc',
+        'video/capture/video_capture_device_factory.h',
         'video/capture/video_capture_types.cc',
         'video/capture/video_capture_types.h',
         'video/capture/win/capability_list_win.cc',
@@ -886,11 +894,6 @@
             }],
           ],
         }],
-        ['toolkit_uses_gtk==1', {
-          'dependencies': [
-            '../build/linux/system.gyp:gtk',
-          ],
-        }],
         ['target_arch=="ia32" or target_arch=="x64"', {
           'dependencies': [
             'media_asm',
@@ -1034,11 +1037,14 @@
         'filters/h264_bit_reader_unittest.cc',
         'filters/h264_parser_unittest.cc',
         'filters/h264_to_annex_b_bitstream_converter_unittest.cc',
+        'filters/opus_audio_decoder_unittest.cc',
         'filters/pipeline_integration_test.cc',
         'filters/pipeline_integration_test_base.cc',
         'filters/skcanvas_video_renderer_unittest.cc',
         'filters/source_buffer_stream_unittest.cc',
         'filters/video_decoder_selector_unittest.cc',
+        'filters/video_frame_scheduler_impl_unittest.cc',
+        'filters/video_frame_scheduler_unittest.cc',
         'filters/video_frame_stream_unittest.cc',
         'filters/video_renderer_impl_unittest.cc',
         'midi/midi_manager_usb_unittest.cc',
@@ -1111,6 +1117,7 @@
             'filters/ffmpeg_glue_unittest.cc',
             'filters/ffmpeg_h264_to_annex_b_bitstream_converter_unittest.cc',
             'filters/ffmpeg_video_decoder_unittest.cc',
+            'filters/opus_audio_decoder_unittest.cc',
             'filters/pipeline_integration_test.cc',
             'filters/pipeline_integration_test_base.cc',
           ],
@@ -1193,6 +1200,7 @@
         'base/run_all_perftests.cc',
         'base/sinc_resampler_perftest.cc',
         'base/vector_math_perftest.cc',
+        'base/yuv_convert_perftest.cc',
         'filters/pipeline_integration_perftest.cc',
         'filters/pipeline_integration_test_base.cc',
       ],
@@ -1259,10 +1267,12 @@
         'base/test_data_util.h',
         'base/test_helpers.cc',
         'base/test_helpers.h',
+        'filters/clockless_video_frame_scheduler.cc',
+        'filters/clockless_video_frame_scheduler.h',
         'filters/mock_gpu_video_accelerator_factories.cc',
         'filters/mock_gpu_video_accelerator_factories.h',
-        'video/capture/mock_video_capture_event_handler.cc',
-        'video/capture/mock_video_capture_event_handler.h',
+        'filters/test_video_frame_scheduler.cc',
+        'filters/test_video_frame_scheduler.h',
         'video/mock_video_decode_accelerator.cc',
         'video/mock_video_decode_accelerator.h',
       ],
@@ -1510,7 +1520,6 @@
           ],
           'variables': {
             'test_suite_name': 'media_unittests',
-            'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)media_unittests<(SHARED_LIB_SUFFIX)',
           },
           'includes': ['../build/apk_test.gypi'],
         },
@@ -1523,7 +1532,6 @@
           ],
           'variables': {
             'test_suite_name': 'media_perftests',
-            'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)media_perftests<(SHARED_LIB_SUFFIX)',
           },
           'includes': ['../build/apk_test.gypi'],
         },
@@ -1653,25 +1661,6 @@
           ],
           'sources': [
             'ffmpeg/ffmpeg_unittest.cc',
-          ],
-          'conditions': [
-            ['toolkit_uses_gtk==1', {
-              'dependencies': [
-                # Needed for the following #include chain:
-                #   base/run_all_unittests.cc
-                #   ../base/test_suite.h
-                #   gtk/gtk.h
-                '../build/linux/system.gyp:gtk',
-              ],
-              'conditions': [
-                # TODO(dmikurube): Kill linux_use_tcmalloc. http://crbug.com/345554
-                ['(use_allocator!="none" and use_allocator!="see_use_tcmalloc") or (use_allocator=="see_use_tcmalloc" and linux_use_tcmalloc==1)', {
-                  'dependencies': [
-                    '../base/allocator/allocator.gyp:allocator',
-                  ],
-                }],
-              ],
-            }],
           ],
         },
         {

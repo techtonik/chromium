@@ -96,10 +96,12 @@
         '<(SHARED_INTERMEDIATE_DIR)/android_webview_unittests',
       ],
       'sources': [
+        'browser/aw_cookie_access_policy_unittest.cc',
         'browser/aw_form_database_service_unittest.cc',
         'browser/net/android_stream_reader_url_request_job_unittest.cc',
         'browser/net/input_stream_reader_unittest.cc',
         'lib/main/webview_tests.cc',
+        'native/aw_contents_client_bridge_unittest.cc',
         'native/input_stream_unittest.cc',
         'native/state_serializer_unittest.cc',
       ],
@@ -122,6 +124,7 @@
       'type': 'none',
       'sources': [
           '../android_webview/unittestjava/src/org/chromium/android_webview/unittest/InputStreamUnittest.java',
+          '../android_webview/unittestjava/src/org/chromium/android_webview/unittest/MockAwContentsClientBridge.java',
       ],
       'variables': {
         'jni_gen_package': 'android_webview_unittests',
@@ -138,7 +141,6 @@
       ],
       'variables': {
         'test_suite_name': 'android_webview_unittests',
-        'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)android_webview_unittests<(SHARED_LIB_SUFFIX)',
       },
       'includes': [ '../build/apk_test.gypi' ],
     },

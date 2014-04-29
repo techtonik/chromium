@@ -8,12 +8,12 @@
 #include <jni.h>
 
 #include "base/android/jni_android.h"
-#include "base/android/jni_helper.h"
+#include "base/android/jni_weak_ref.h"
 #include "base/basictypes.h"
 #include "base/compiler_specific.h"
 #include "chrome/browser/android/bookmarks/managed_bookmarks_shim.h"
 #include "chrome/browser/android/bookmarks/partner_bookmarks_shim.h"
-#include "chrome/browser/bookmarks/base_bookmark_model_observer.h"
+#include "components/bookmarks/core/browser/base_bookmark_model_observer.h"
 
 class Profile;
 

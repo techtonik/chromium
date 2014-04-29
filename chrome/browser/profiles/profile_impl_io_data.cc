@@ -49,7 +49,7 @@
 #include "webkit/browser/quota/special_storage_policy.h"
 
 #if defined(OS_ANDROID) || defined(OS_IOS)
-#include "chrome/browser/net/spdyproxy/data_reduction_proxy_settings.h"
+#include "components/data_reduction_proxy/browser/data_reduction_proxy_settings.h"
 #endif
 
 namespace {
@@ -462,8 +462,8 @@ void ProfileImplIOData::InitializeInternal(
   main_cache->InitializeInfiniteCache(lazy_params_->infinite_cache_path);
 
 #if defined(OS_ANDROID) || defined(OS_IOS)
-  DataReductionProxySettings::InitDataReductionProxySession(
-      main_cache->GetSession());
+  data_reduction_proxy::DataReductionProxySettings::
+      InitDataReductionProxySession(main_cache->GetSession());
 #endif
 
   if (chrome_browser_net::ShouldUseInMemoryCookiesAndCache()) {
@@ -504,6 +504,7 @@ void ProfileImplIOData::InitializeInternal(
   if (IsDomainReliabilityMonitoringEnabled()) {
     domain_reliability_monitor_.reset(
         new domain_reliability::DomainReliabilityMonitor(main_context));
+    domain_reliability_monitor_->AddBakedInConfigs();
     network_delegate()->set_domain_reliability_monitor(
         domain_reliability_monitor_.get());
   }

@@ -14,6 +14,7 @@
 #include "base/logging.h"
 #include "ui/aura/client/screen_position_client.h"
 #include "ui/aura/env.h"
+#include "ui/aura/test/aura_test_utils.h"
 #include "ui/aura/test/ui_controls_factory_aura.h"
 #include "ui/aura/window_event_dispatcher.h"
 #include "ui/base/test/ui_controls_aura.h"
@@ -21,6 +22,7 @@
 #include "ui/compositor/dip_util.h"
 #include "ui/events/keycodes/keyboard_code_conversion_x.h"
 #include "ui/events/test/platform_event_waiter.h"
+#include "ui/gfx/x/x11_connection.h"
 #include "ui/views/widget/desktop_aura/desktop_window_tree_host_x11.h"
 
 namespace views {
@@ -141,8 +143,8 @@ class UIControlsDesktopX11 : public UIControlsAura {
     }
 
     aura::WindowTreeHost* host = root_window->GetHost();
-    gfx::Point root_current_location;
-    host->QueryMouseLocation(&root_current_location);
+    gfx::Point root_current_location =
+        aura::test::QueryLatestMousePositionRequestInHost(host);
     host->ConvertPointFromHost(&root_current_location);
 
     if (root_location != root_current_location && button_down_mask == 0) {
@@ -280,8 +282,9 @@ class UIControlsDesktopX11 : public UIControlsAura {
 }  // namespace
 
 UIControlsAura* CreateUIControlsDesktopAura() {
-  // The constructor of UIControlsDesktopX11 needs XInitThreads to be called.
-  XInitThreads();
+  // The constructor of UIControlsDesktopX11 needs X11 connection to be
+  // initialized.
+  gfx::InitializeThreadedX11();
   return new UIControlsDesktopX11();
 }
 

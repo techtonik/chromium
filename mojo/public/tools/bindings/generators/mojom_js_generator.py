@@ -4,11 +4,10 @@
 
 """Generates JavaScript source files from a mojom.Module."""
 
-from generate import mojom
-from generate import mojom_pack
-from generate import mojom_generator
-
-from generate.template_expander import UseJinja
+import mojom.generate.generator as generator
+import mojom.generate.module as mojom
+import mojom.generate.pack as pack
+from mojom.generate.template_expander import UseJinja
 
 _kind_to_javascript_default_value = {
   mojom.BOOL:         "false",
@@ -52,11 +51,11 @@ def JavaScriptPayloadSize(packed):
     return 0;
   last_field = packed_fields[-1]
   offset = last_field.offset + last_field.size
-  pad = mojom_pack.GetPad(offset, 8)
+  pad = pack.GetPad(offset, 8)
   return offset + pad;
 
 
-_kind_to_javascript_type = {
+_kind_to_codec_type = {
   mojom.BOOL:         "codec.Uint8",
   mojom.INT8:         "codec.Int8",
   mojom.UINT8:        "codec.Uint8",
@@ -77,86 +76,44 @@ _kind_to_javascript_type = {
 }
 
 
-def GetJavaScriptType(kind):
+def CodecType(kind):
   if kind in mojom.PRIMITIVES:
-    return _kind_to_javascript_type[kind]
+    return _kind_to_codec_type[kind]
   if isinstance(kind, mojom.Struct):
-    return "new codec.PointerTo(%s)" % GetJavaScriptType(kind.name)
+    return "new codec.PointerTo(%s)" % CodecType(kind.name)
   if isinstance(kind, mojom.Array):
-    return "new codec.ArrayOf(%s)" % GetJavaScriptType(kind.kind)
+    return "new codec.ArrayOf(%s)" % CodecType(kind.kind)
   if isinstance(kind, mojom.Interface):
-    return GetJavaScriptType(mojom.MSGPIPE)
+    return CodecType(mojom.MSGPIPE)
   if isinstance(kind, mojom.Enum):
-    return _kind_to_javascript_type[mojom.INT32]
+    return _kind_to_codec_type[mojom.INT32]
   return kind
-
-
-_kind_to_javascript_decode_snippet = {
-  mojom.BOOL:         "read8() & 1",
-  mojom.INT8:         "read8()",
-  mojom.UINT8:        "read8()",
-  mojom.INT16:        "read16()",
-  mojom.UINT16:       "read16()",
-  mojom.INT32:        "read32()",
-  mojom.UINT32:       "read32()",
-  mojom.FLOAT:        "decodeFloat()",
-  mojom.HANDLE:       "decodeHandle()",
-  mojom.DCPIPE:       "decodeHandle()",
-  mojom.DPPIPE:       "decodeHandle()",
-  mojom.MSGPIPE:      "decodeHandle()",
-  mojom.SHAREDBUFFER: "decodeHandle()",
-  mojom.INT64:        "read64()",
-  mojom.UINT64:       "read64()",
-  mojom.DOUBLE:       "decodeDouble()",
-  mojom.STRING:       "decodeStringPointer()",
-}
 
 
 def JavaScriptDecodeSnippet(kind):
   if kind in mojom.PRIMITIVES:
-    return _kind_to_javascript_decode_snippet[kind]
+    return "decodeStruct(%s)" % CodecType(kind);
   if isinstance(kind, mojom.Struct):
-    return "decodeStructPointer(%s)" % GetJavaScriptType(kind.name);
+    return "decodeStructPointer(%s)" % CodecType(kind.name);
   if isinstance(kind, mojom.Array):
-    return "decodeArrayPointer(%s)" % GetJavaScriptType(kind.kind);
+    return "decodeArrayPointer(%s)" % CodecType(kind.kind);
   if isinstance(kind, mojom.Interface):
     return JavaScriptDecodeSnippet(mojom.MSGPIPE)
   if isinstance(kind, mojom.Enum):
-    return _kind_to_javascript_decode_snippet[mojom.INT32]
-
-
-_kind_to_javascript_encode_snippet = {
-  mojom.BOOL:         "write8(1 & ",
-  mojom.INT8:         "write8(",
-  mojom.UINT8:        "write8(",
-  mojom.INT16:        "write16(",
-  mojom.UINT16:       "write16(",
-  mojom.INT32:        "write32(",
-  mojom.UINT32:       "write32(",
-  mojom.FLOAT:        "encodeFloat(",
-  mojom.HANDLE:       "encodeHandle(",
-  mojom.DCPIPE:       "encodeHandle(",
-  mojom.DPPIPE:       "encodeHandle(",
-  mojom.MSGPIPE:      "encodeHandle(",
-  mojom.SHAREDBUFFER: "encodeHandle(",
-  mojom.INT64:        "write64(",
-  mojom.UINT64:       "write64(",
-  mojom.DOUBLE:       "encodeDouble(",
-  mojom.STRING:       "encodeStringPointer(",
-}
+    return JavaScriptDecodeSnippet(mojom.INT32)
 
 
 def JavaScriptEncodeSnippet(kind):
   if kind in mojom.PRIMITIVES:
-    return _kind_to_javascript_encode_snippet[kind]
+    return "encodeStruct(%s, " % CodecType(kind);
   if isinstance(kind, mojom.Struct):
-    return "encodeStructPointer(%s, " % GetJavaScriptType(kind.name);
+    return "encodeStructPointer(%s, " % CodecType(kind.name);
   if isinstance(kind, mojom.Array):
-    return "encodeArrayPointer(%s, " % GetJavaScriptType(kind.kind);
+    return "encodeArrayPointer(%s, " % CodecType(kind.kind);
   if isinstance(kind, mojom.Interface):
     return JavaScriptEncodeSnippet(mojom.MSGPIPE)
   if isinstance(kind, mojom.Enum):
-    return _kind_to_javascript_encode_snippet[mojom.INT32]
+    return JavaScriptEncodeSnippet(mojom.INT32)
 
 def TranslateConstants(token, module):
   if isinstance(token, mojom.Constant):
@@ -177,7 +134,7 @@ def TranslateConstants(token, module):
 def ExpressionToText(value, module):
   if value[0] != "EXPRESSION":
     raise Exception("Expected EXPRESSION, got" + value)
-  return "".join(mojom_generator.ExpressionMapper(value,
+  return "".join(generator.ExpressionMapper(value,
       lambda token: TranslateConstants(token, module)))
 
 
@@ -187,7 +144,7 @@ def JavascriptType(kind):
   return kind.name
 
 
-class Generator(mojom_generator.Generator):
+class Generator(generator.Generator):
 
   js_filters = {
     "default_value": JavaScriptDefaultValue,
@@ -195,12 +152,12 @@ class Generator(mojom_generator.Generator):
     "decode_snippet": JavaScriptDecodeSnippet,
     "encode_snippet": JavaScriptEncodeSnippet,
     "expression_to_text": ExpressionToText,
-    "is_object_kind": mojom_generator.IsObjectKind,
-    "is_string_kind": mojom_generator.IsStringKind,
+    "is_object_kind": generator.IsObjectKind,
+    "is_string_kind": generator.IsStringKind,
     "is_array_kind": lambda kind: isinstance(kind, mojom.Array),
     "js_type": JavascriptType,
-    "stylize_method": mojom_generator.StudlyCapsToCamel,
-    "verify_token_type": mojom_generator.VerifyTokenType,
+    "stylize_method": generator.StudlyCapsToCamel,
+    "verify_token_type": generator.VerifyTokenType,
   }
 
   @UseJinja("js_templates/module.js.tmpl", filters=js_filters)

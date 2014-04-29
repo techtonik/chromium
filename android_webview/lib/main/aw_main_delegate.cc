@@ -13,8 +13,10 @@
 #include "android_webview/native/aw_quota_manager_bridge_impl.h"
 #include "android_webview/native/aw_web_contents_view_delegate.h"
 #include "android_webview/native/aw_web_preferences_populater_impl.h"
+#include "android_webview/native/external_video_surface_container_impl.h"
 #include "android_webview/renderer/aw_content_renderer_client.h"
 #include "base/command_line.h"
+#include "base/cpu.h"
 #include "base/lazy_instance.h"
 #include "base/logging.h"
 #include "base/memory/scoped_ptr.h"
@@ -82,6 +84,11 @@ bool AwMainDelegate::BasicStartupComplete(int* exit_code) {
 void AwMainDelegate::PreSandboxStartup() {
   // TODO(torne): When we have a separate renderer process, we need to handle
   // being passed open FDs for the resource paks here.
+#if defined(ARCH_CPU_ARM_FAMILY)
+  // Create an instance of the CPU class to parse /proc/cpuinfo and cache
+  // cpu_brand info.
+  base::CPU cpu_info;
+#endif
 }
 
 void AwMainDelegate::SandboxInitialized(const std::string& process_type) {
@@ -146,5 +153,13 @@ content::WebContentsViewDelegate* AwMainDelegate::CreateViewDelegate(
 AwWebPreferencesPopulater* AwMainDelegate::CreateWebPreferencesPopulater() {
   return new AwWebPreferencesPopulaterImpl();
 }
+
+#if defined(VIDEO_HOLE)
+content::ExternalVideoSurfaceContainer*
+AwMainDelegate::CreateExternalVideoSurfaceContainer(
+    content::WebContents* web_contents) {
+  return new ExternalVideoSurfaceContainerImpl(web_contents);
+}
+#endif
 
 }  // namespace android_webview

@@ -63,6 +63,7 @@ LayerImpl::LayerImpl(LayerTreeImpl* tree_impl, int id)
       draws_content_(false),
       hide_layer_and_subtree_(false),
       force_render_surface_(false),
+      transform_is_invertible_(true),
       is_container_for_fixed_position_layers_(false),
       is_3d_sorted_(false),
       background_color_(0),
@@ -237,6 +238,11 @@ void LayerImpl::CreateRenderSurface() {
 
 void LayerImpl::ClearRenderSurface() {
   draw_properties_.render_surface.reset();
+}
+
+void LayerImpl::ClearRenderSurfaceLayerList() {
+  if (draw_properties_.render_surface)
+    draw_properties_.render_surface->layer_list().clear();
 }
 
 scoped_ptr<SharedQuadState> LayerImpl::CreateSharedQuadState() const {
@@ -519,7 +525,7 @@ void LayerImpl::PushPropertiesTo(LayerImpl* layer) {
   layer->SetShouldFlattenTransform(should_flatten_transform_);
   layer->SetIs3dSorted(is_3d_sorted_);
   layer->SetUseParentBackfaceVisibility(use_parent_backface_visibility_);
-  layer->SetTransform(transform_);
+  layer->SetTransformAndInvertibility(transform_, transform_is_invertible_);
 
   layer->SetScrollClipLayer(scroll_clip_layer_ ? scroll_clip_layer_->id()
                                                : Layer::INVALID_ID);
@@ -701,6 +707,7 @@ void LayerImpl::ResetAllChangeTrackingForSubtree() {
   layer_property_changed_ = false;
 
   update_rect_ = gfx::RectF();
+  damage_rect_ = gfx::RectF();
 
   if (draw_properties_.render_surface)
     draw_properties_.render_surface->ResetPropertyChangedFlag();
@@ -999,6 +1006,19 @@ void LayerImpl::SetTransform(const gfx::Transform& transform) {
     return;
 
   transform_ = transform;
+  transform_is_invertible_ = transform_.IsInvertible();
+  NoteLayerPropertyChangedForSubtree();
+}
+
+void LayerImpl::SetTransformAndInvertibility(const gfx::Transform& transform,
+                                             bool transform_is_invertible) {
+  if (transform_ == transform) {
+    DCHECK(transform_is_invertible_ == transform_is_invertible)
+        << "Can't change invertibility if transform is unchanged";
+    return;
+  }
+  transform_ = transform;
+  transform_is_invertible_ = transform_is_invertible;
   NoteLayerPropertyChangedForSubtree();
 }
 
@@ -1015,6 +1035,10 @@ bool LayerImpl::TransformIsAnimatingOnImplOnly() const {
 void LayerImpl::SetUpdateRect(const gfx::RectF& update_rect) {
   update_rect_ = update_rect;
   SetNeedsPushProperties();
+}
+
+void LayerImpl::AddDamageRect(const gfx::RectF& damage_rect) {
+  damage_rect_ = gfx::UnionRects(damage_rect_, damage_rect);
 }
 
 void LayerImpl::SetContentBounds(const gfx::Size& content_bounds) {
@@ -1193,6 +1217,7 @@ gfx::Vector2d LayerImpl::MaxScrollOffset() const {
 
   scaled_scroll_bounds.SetSize(scale_factor * scaled_scroll_bounds.width(),
                                scale_factor * scaled_scroll_bounds.height());
+  scaled_scroll_bounds = gfx::ToFlooredSize(scaled_scroll_bounds);
 
   gfx::Vector2dF max_offset(
       scaled_scroll_bounds.width() - scroll_clip_layer_->bounds().width(),
@@ -1282,14 +1307,25 @@ void LayerImpl::SetScrollbarPosition(ScrollbarLayerImplBase* scrollbar_layer,
   }
 
   layer_tree_impl()->set_needs_update_draw_properties();
-  // TODO(wjmaclean) Should the rest of this function be deleted?
   // TODO(wjmaclean) The scrollbar animator for the pinch-zoom scrollbars should
   // activate for every scroll on the main frame, not just the scrolls that move
   // the pinch virtual viewport (i.e. trigger from either inner or outer
   // viewport).
   if (scrollbar_animation_controller_) {
-    bool should_animate = scrollbar_animation_controller_->DidScrollUpdate(
-        layer_tree_impl_->CurrentFrameTimeTicks());
+    // When both non-overlay and overlay scrollbars are both present, don't
+    // animate the overlay scrollbars when page scale factor is at the min.
+    // Non-overlay scrollbars also shouldn't trigger animations.
+    bool is_animatable_scrollbar =
+        scrollbar_layer->is_overlay_scrollbar() &&
+        ((layer_tree_impl()->total_page_scale_factor() >
+          layer_tree_impl()->min_page_scale_factor()) ||
+         !layer_tree_impl()->settings().use_pinch_zoom_scrollbars);
+    // Note that DidScrollUpdate() has the side-effect of setting the
+    // scrollbar's opacity to 1.0 even if the function returns false, so
+    // evaluate it last in the boolean expression.
+    bool should_animate = is_animatable_scrollbar &&
+                          scrollbar_animation_controller_->DidScrollUpdate(
+                              layer_tree_impl_->CurrentFrameTimeTicks());
     if (should_animate)
       layer_tree_impl_->StartScrollbarAnimation();
   }

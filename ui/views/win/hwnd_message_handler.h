@@ -229,11 +229,13 @@ class VIEWS_EXPORT HWNDMessageHandler :
                                          WPARAM w_param,
                                          LPARAM l_param) OVERRIDE;
 
-  // Returns the auto-hide edges of the appbar. See Appbar::GetAutohideEdges()
-  // for details. If the edges change OnAppbarAutohideEdgesChanged() is called.
+  // Returns the auto-hide edges of the appbar. See
+  // ViewsDelegate::GetAppbarAutohideEdges() for details. If the edges change,
+  // OnAppbarAutohideEdgesChanged() is called.
   int GetAppbarAutohideEdges(HMONITOR monitor);
 
-  // Callback if the autohide edges have changed. See Appbar for details.
+  // Callback if the autohide edges have changed. See
+  // ViewsDelegate::GetAppbarAutohideEdges() for details.
   void OnAppbarAutohideEdgesChanged();
 
   // Can be called after the delegate has had the opportunity to set focus and
@@ -599,6 +601,10 @@ class VIEWS_EXPORT HWNDMessageHandler :
   // synthesized mouse messages. For more information please refer to
   // the IsMouseEventFromTouch function.
   static long last_touch_message_time_;
+
+  // Time the last WM_MOUSEHWHEEL message is received. Please refer to the
+  // HandleMouseEventInternal function as to why this is needed.
+  long last_mouse_hwheel_time_;
 
   DISALLOW_COPY_AND_ASSIGN(HWNDMessageHandler);
 };

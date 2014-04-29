@@ -28,15 +28,15 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
         browser_options=browser_options,
         output_profile_path=None, extensions_to_load=extensions_to_load)
 
-    from telemetry.core.backends.chrome import chrome_browser_options
-    assert isinstance(browser_options,
-                      chrome_browser_options.CrosBrowserOptions)
-
     # Initialize fields so that an explosion during init doesn't break in Close.
     self._browser_type = browser_type
     self._cri = cri
     self._is_guest = is_guest
     self._forwarder = None
+
+    from telemetry.core.backends.chrome import chrome_browser_options
+    assert isinstance(browser_options,
+                      chrome_browser_options.CrosBrowserOptions)
 
     self.wpr_port_pairs = forwarders.PortPairs(
         http=forwarders.PortPair(self.wpr_port_pairs.http.local_port,
@@ -46,8 +46,6 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
         dns=None)
     self._remote_debugging_port = self._cri.GetRemotePort()
     self._port = self._remote_debugging_port
-
-    self._SetBranchNumber(self._GetChromeVersion())
 
     # Copy extensions to temp directories on the device.
     # Note that we also perform this copy locally to ensure that
@@ -59,9 +57,11 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
       cri.Chown(extension_dir)
       e.local_path = os.path.join(extension_dir, os.path.basename(e.path))
 
-    # Ensure the UI is running and logged out.
-    self._RestartUI()
-    util.WaitFor(self.IsBrowserRunning, 20)
+    self._cri.RunCmdOnDevice(['stop', 'ui'])
+
+    if self.browser_options.clear_enterprise_policy:
+      self._cri.RmRF('/var/lib/whitelist/*')
+      self._cri.RmRF('/home/chronos/Local\ State')
 
     # Delete test user's cryptohome vault (user data directory).
     if not self.browser_options.dont_override_profile:
@@ -72,6 +72,11 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
       cri.PushFile(self.browser_options.profile_dir + '/Default',
                    self.profile_directory)
       cri.Chown(self.profile_directory)
+
+    self._cri.RunCmdOnDevice(['start', 'ui'])
+    util.WaitFor(self.IsBrowserRunning, 20)
+
+    self._SetBranchNumber(self._GetChromeVersion())
 
   def GetBrowserStartupArgs(self):
     args = super(CrOSBrowserBackend, self).GetBrowserStartupArgs()
@@ -89,21 +94,9 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
             '--remote-debugging-port=%i' % self._remote_debugging_port,
             # Open a maximized window.
             '--start-maximized',
-            # TODO(achuith): Re-enable this flag again before multi-profiles
-            # will become enabled by default to have telemetry mileage on it.
-            # '--multi-profiles',
-            # Debug logging for login flake (crbug.com/263527).
-            '--vmodule=*/browser/automation/*=2,*/chromeos/net/*=2,'
-                '*/chromeos/login/*=2,*/extensions/*=2,'
-                '*/device_policy_decoder_chromeos.cc=2'])
+            # Debug logging.
+            '--vmodule=*/chromeos/net/*=2,*/chromeos/login/*=2'])
 
-    if self._is_guest:
-      args.extend([
-          # Jump to the login screen, skipping network selection, eula, etc.
-          '--login-screen=login',
-          # Skip hwid check, for VMs and pre-MP lab devices.
-          '--skip-hwid-check'
-      ])
     return args
 
   def _GetSessionManagerPid(self, procs):
@@ -227,6 +220,8 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
 
     self._RestartUI() # Logs out.
 
+    util.WaitFor(lambda: not self._IsCryptohomeMounted(), 30)
+
     if self._forwarder:
       self._forwarder.Close()
       self._forwarder = None
@@ -280,10 +275,14 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
       }
     ''')
 
+  def _IsCryptohomeMounted(self):
+    username = '$guest' if self._is_guest else self.browser_options.username
+    return self._cri.IsCryptohomeMounted(username, self._is_guest)
+
   def _IsLoggedIn(self):
     """Returns True if cryptohome has mounted, the browser is
     responsive to devtools requests, and the oobe has been dismissed."""
-    return (self._cri.IsCryptohomeMounted(self.browser_options.username) and
+    return (self._IsCryptohomeMounted() and
             self.HasBrowserFinishedLaunching() and
             not self.oobe_exists)
 
@@ -316,9 +315,6 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
 
   def _GaiaLoginContext(self):
     oobe = self.oobe
-    # TODO(achuith): Implement an api in the oobe instead of calling
-    # chrome.send.
-    oobe.ExecuteJavaScript("chrome.send('addUser');")
     for gaia_context in range(15):
       try:
         if oobe.EvaluateJavaScriptInContext(
@@ -342,7 +338,7 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
       self._WaitForSigninScreen()
       self._ClickBrowseAsGuest()
 
-    util.WaitFor(lambda: self._cri.IsCryptohomeMounted('$guest'), 30)
+    util.WaitFor(self._IsCryptohomeMounted, 30)
 
   def _NavigateFakeLogin(self):
     """Logs in using Oobe.loginForTesting."""
@@ -362,18 +358,24 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
 
   def _NavigateGaiaLogin(self):
     """Logs into the GAIA service with provided credentials."""
-    # TODO(achuith): Fake gaia service with a python server.
-    self._WaitForSigninScreen()
-    gaia_context = util.WaitFor(self._GaiaLoginContext, timeout=10)
+    logging.info('Invoking Oobe.addUserForTesting')
     oobe = self.oobe
-    oobe.ExecuteJavaScriptInContext(
-        "document.getElementById('Email').value='%s';"
-            % self.browser_options.username, gaia_context)
-    oobe.ExecuteJavaScriptInContext(
-        "document.getElementById('Passwd').value='%s';"
-            % self.browser_options.password, gaia_context)
-    oobe.ExecuteJavaScriptInContext(
-        "document.getElementById('signIn').click();", gaia_context)
+    util.WaitFor(lambda: oobe.EvaluateJavaScript(
+        'typeof Oobe !== \'undefined\''), 10)
+    oobe.ExecuteJavaScript('Oobe.addUserForTesting();')
+
+    try:
+      gaia_context = util.WaitFor(self._GaiaLoginContext, timeout=30)
+    except util.TimeoutException:
+      self._cri.TakeScreenShot('add-user-screen')
+      raise
+
+    oobe.ExecuteJavaScriptInContext("""
+        document.getElementById('Email').value='%s';
+        document.getElementById('Passwd').value='%s';
+        document.getElementById('signIn').click();"""
+            % (self.browser_options.username, self.browser_options.password),
+        gaia_context)
     self._WaitForLogin()
 
   def _WaitForLogin(self):

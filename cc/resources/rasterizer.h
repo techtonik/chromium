@@ -14,10 +14,9 @@
 class SkCanvas;
 
 namespace cc {
-class Resource;
-
-namespace internal {
+class ImageDecodeTask;
 class RasterTask;
+class Resource;
 
 class CC_EXPORT RasterizerTaskClient {
  public:
@@ -28,14 +27,11 @@ class CC_EXPORT RasterizerTaskClient {
   virtual ~RasterizerTaskClient() {}
 };
 
-class ImageDecodeTask;
-
 class CC_EXPORT RasterizerTask : public Task {
  public:
   typedef std::vector<scoped_refptr<RasterizerTask> > Vector;
 
   virtual void ScheduleOnOriginThread(RasterizerTaskClient* client) = 0;
-  virtual void RunOnOriginThread() = 0;
   virtual void CompleteOnOriginThread(RasterizerTaskClient* client) = 0;
   virtual void RunReplyOnOriginThread() = 0;
 
@@ -90,8 +86,6 @@ class CC_EXPORT RasterTask : public RasterizerTask {
   ImageDecodeTask::Vector dependencies_;
 };
 
-}  // namespace internal
-
 class CC_EXPORT RasterizerClient {
  public:
   virtual bool ShouldForceTasksRequiredForActivationToComplete() const = 0;
@@ -106,24 +100,24 @@ struct CC_EXPORT RasterTaskQueue {
   struct CC_EXPORT Item {
     class TaskComparator {
      public:
-      explicit TaskComparator(const internal::RasterTask* task) : task_(task) {}
+      explicit TaskComparator(const RasterTask* task) : task_(task) {}
 
       bool operator()(const Item& item) const { return item.task == task_; }
 
      private:
-      const internal::RasterTask* task_;
+      const RasterTask* task_;
     };
 
     typedef std::vector<Item> Vector;
 
-    Item(internal::RasterTask* task, bool required_for_activation);
+    Item(RasterTask* task, bool required_for_activation);
     ~Item();
 
     static bool IsRequiredForActivation(const Item& item) {
       return item.required_for_activation;
     }
 
-    internal::RasterTask* task;
+    RasterTask* task;
     bool required_for_activation;
   };
 
@@ -161,12 +155,6 @@ class CC_EXPORT Rasterizer {
 
   // Check for completed tasks and dispatch reply callbacks.
   virtual void CheckForCompletedTasks() = 0;
-
-  // Returns the target that needs to be used for raster task resources.
-  virtual unsigned GetResourceTarget() const = 0;
-
-  // Returns the format that needs to be used for raster task resources.
-  virtual ResourceFormat GetResourceFormat() const = 0;
 
  protected:
   virtual ~Rasterizer() {}

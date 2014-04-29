@@ -1,4 +1,4 @@
-// Copyright 2013 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -30,11 +30,15 @@ extern const char kEventUnresponsive[];
 extern const char kEventZoomChange[];
 
 // Parameters/properties on events.
+extern const char kDefaultPromptText[];
 extern const char kFindSearchText[];
 extern const char kFindFinalUpdate[];
+extern const char kLastUnlockedBySelf[];
 extern const char kLevel[];
 extern const char kLine[];
 extern const char kMessage[];
+extern const char kMessageText[];
+extern const char kMessageType[];
 extern const char kNewHeight[];
 extern const char kNewURL[];
 extern const char kNewWidth[];
@@ -78,6 +82,7 @@ extern const char kParameterUserAgentOverride[];
 
 // Miscellaneous.
 extern const unsigned int kMaxOutstandingPermissionRequests;
+extern const int kInvalidPermissionRequestID;
 
 }  // namespace webview
 

@@ -7,6 +7,7 @@ import os
 import tempfile
 import unittest
 
+from telemetry import decorators
 from telemetry.core import browser_finder
 from telemetry.core import exceptions
 from telemetry.core import user_agent
@@ -62,7 +63,7 @@ class PageRunnerTests(unittest.TestCase):
   def testHandlingOfCrashedTab(self):
     ps = page_set.PageSet()
     expectations = test_expectations.TestExpectations()
-    page1 = page_module.Page('chrome://crash', ps)
+    page1 = page_module.PageWithDefaultRunNavigate('chrome://crash', ps)
     ps.pages.append(page1)
 
     class Test(page_test.PageTest):
@@ -171,35 +172,36 @@ class PageRunnerTests(unittest.TestCase):
     options.upload_results = None
     options.results_label = None
 
-    options.repeat_options.page_repeat = 1
-    options.repeat_options.pageset_repeat = 1
+    options.page_repeat = 1
+    options.pageset_repeat = 1
     SetUpPageRunnerArguments(options)
     results = page_runner.Run(Measurement(), ps, expectations, options)
     self.assertEquals(0, len(results.successes))
     self.assertEquals(0, len(results.failures))
 
-    options.repeat_options.page_repeat = 1
-    options.repeat_options.pageset_repeat = 2
+    options.page_repeat = 1
+    options.pageset_repeat = 2
     SetUpPageRunnerArguments(options)
     results = page_runner.Run(Measurement(), ps, expectations, options)
     self.assertEquals(2, len(results.successes))
     self.assertEquals(0, len(results.failures))
 
-    options.repeat_options.page_repeat = 2
-    options.repeat_options.pageset_repeat = 1
+    options.page_repeat = 2
+    options.pageset_repeat = 1
     SetUpPageRunnerArguments(options)
     results = page_runner.Run(Measurement(), ps, expectations, options)
     self.assertEquals(2, len(results.successes))
     self.assertEquals(0, len(results.failures))
 
     options.output_format = 'html'
-    options.repeat_options.page_repeat = 1
-    options.repeat_options.pageset_repeat = 1
+    options.page_repeat = 1
+    options.pageset_repeat = 1
     SetUpPageRunnerArguments(options)
     results = page_runner.Run(Measurement(), ps, expectations, options)
     self.assertEquals(0, len(results.successes))
     self.assertEquals(0, len(results.failures))
 
+  @decorators.Disabled('win')
   def testPagesetRepeat(self):
     ps = page_set.PageSet()
     expectations = test_expectations.TestExpectations()
@@ -223,14 +225,15 @@ class PageRunnerTests(unittest.TestCase):
       options.upload_results = None
       options.results_label = None
 
-      options.repeat_options.page_repeat = 1
-      options.repeat_options.pageset_repeat = 2
+      options.page_repeat = 1
+      options.pageset_repeat = 2
       SetUpPageRunnerArguments(options)
       results = page_runner.Run(Measurement(), ps, expectations, options)
       results.PrintSummary()
       self.assertEquals(4, len(results.successes))
       self.assertEquals(0, len(results.failures))
-      stdout = open(output_file).read()
+      with open(output_file) as f:
+        stdout = f.read()
       self.assertIn('RESULT metric_by_url: blank.html= [1,3] unit', stdout)
       self.assertIn('RESULT metric_by_url: green_rect.html= [2,4] unit', stdout)
       self.assertIn('*RESULT metric: metric= [1,2,3,4] unit', stdout)
@@ -407,7 +410,7 @@ class PageRunnerTests(unittest.TestCase):
         pass
 
     options = options_for_unittests.GetCopy()
-    options.repeat_options.page_repeat = 2
+    options.page_repeat = 2
     options.output_format = 'none'
     if not browser_finder.FindBrowser(options):
       return

@@ -37,6 +37,7 @@
       'layers/layer_utils_unittest.cc',
       'layers/nine_patch_layer_impl_unittest.cc',
       'layers/nine_patch_layer_unittest.cc',
+      'layers/painted_scrollbar_layer_impl_unittest.cc',
       'layers/picture_image_layer_impl_unittest.cc',
       'layers/picture_layer_impl_unittest.cc',
       'layers/picture_layer_unittest.cc',
@@ -82,7 +83,6 @@
       'resources/tile_priority_unittest.cc',
       'resources/video_resource_updater_unittest.cc',
       'scheduler/delay_based_time_source_unittest.cc',
-      'scheduler/frame_rate_controller_unittest.cc',
       'scheduler/scheduler_state_machine_unittest.cc',
       'scheduler/scheduler_unittest.cc',
       'test/layer_tree_json_parser_unittest.cc',
@@ -107,7 +107,6 @@
       'trees/layer_tree_host_unittest_scroll.cc',
       'trees/layer_tree_host_unittest_video.cc',
       'trees/occlusion_tracker_unittest.cc',
-      'trees/quad_culler_unittest.cc',
       'trees/tree_synchronizer_unittest.cc',
     ],
     'cc_surfaces_unit_tests_source_files': [
@@ -353,6 +352,7 @@
         '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
         '../gpu/gpu.gyp:gles2_c_lib',
         '../gpu/gpu.gyp:gles2_implementation',
+        '../gpu/gpu.gyp:gl_in_process_context',
         '../gpu/gpu.gyp:gpu_unittest_utils',
         '../gpu/skia_bindings/skia_bindings.gyp:gpu_skia_bindings',
         '../skia/skia.gyp:skia',
@@ -385,7 +385,6 @@
             ],
             'variables': {
               'test_suite_name': 'cc_unittests',
-              'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)cc_unittests<(SHARED_LIB_SUFFIX)',
             },
             'includes': [ '../build/apk_test.gypi' ],
           },
@@ -397,7 +396,6 @@
             ],
             'variables': {
               'test_suite_name': 'cc_perftests',
-              'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)cc_perftests<(SHARED_LIB_SUFFIX)',
             },
             'includes': [ '../build/apk_test.gypi' ],
           },

@@ -91,7 +91,7 @@ void FillOutputForSection(
     FullWallet* full_wallet,
     const base::string16& email_address) {
   DetailInputs inputs;
-  common::BuildInputsForSection(section, "US", &inputs);
+  common::BuildInputsForSection(section, "US", &inputs, NULL);
 
   FillOutputForSectionWithComparator(
       section, inputs,
@@ -142,7 +142,7 @@ base::WeakPtr<AutofillDialogController> AutofillDialogControllerAndroid::Create(
     content::WebContents* contents,
     const FormData& form_structure,
     const GURL& source_url,
-    const base::Callback<void(const FormStructure*)>& callback) {
+    const AutofillManagerDelegate::ResultCallback& callback) {
   // AutofillDialogControllerAndroid owns itself.
   AutofillDialogControllerAndroid* autofill_dialog_controller =
       new AutofillDialogControllerAndroid(contents,
@@ -159,7 +159,7 @@ AutofillDialogController::Create(
     content::WebContents* contents,
     const FormData& form_structure,
     const GURL& source_url,
-    const base::Callback<void(const FormStructure*)>& callback) {
+    const AutofillManagerDelegate::ResultCallback& callback) {
   return AutofillDialogControllerAndroid::Create(contents,
                                                  form_structure,
                                                  source_url,
@@ -190,9 +190,26 @@ void AutofillDialogControllerAndroid::Show() {
   JNIEnv* env = base::android::AttachCurrentThread();
   dialog_shown_timestamp_ = base::Time::Now();
 
+  // The Autofill dialog is shown in response to a message from the renderer and
+  // as such, it can only be made in the context of the current document. A call
+  // to GetActiveEntry would return a pending entry, if there was one, which
+  // would be a security bug. Therefore, we use the last committed URL for the
+  // access checks.
   const GURL& current_url = contents_->GetLastCommittedURL();
   invoked_from_same_origin_ =
       current_url.GetOrigin() == source_url_.GetOrigin();
+
+  // Fail if the dialog factory (e.g. SDK) doesn't support cross-origin calls.
+  if (!Java_AutofillDialogControllerAndroid_isDialogAllowed(
+          env,
+          invoked_from_same_origin_)) {
+    callback_.Run(
+        AutofillManagerDelegate::AutocompleteResultErrorDisabled,
+        base::ASCIIToUTF16("Cross-origin form invocations are not supported."),
+        NULL);
+    delete this;
+    return;
+  }
 
   // Determine what field types should be included in the dialog.
   bool has_types = false;
@@ -202,11 +219,32 @@ void AutofillDialogControllerAndroid::Show() {
 
   // Fail if the author didn't specify autocomplete types, or
   // if the dialog shouldn't be shown in a given circumstances.
-  if (!has_types ||
-      !Java_AutofillDialogControllerAndroid_isDialogAllowed(
-          env,
-          invoked_from_same_origin_)) {
-    callback_.Run(NULL);
+  if (!has_types) {
+    callback_.Run(
+        AutofillManagerDelegate::AutocompleteResultErrorDisabled,
+        base::ASCIIToUTF16("Form is missing autocomplete attributes."),
+        NULL);
+    delete this;
+    return;
+  }
+
+  // Fail if the author didn't ask for at least some kind of credit card
+  // information.
+  bool has_credit_card_field = false;
+  for (size_t i = 0; i < form_structure_.field_count(); ++i) {
+    AutofillType type = form_structure_.field(i)->Type();
+    if (type.html_type() != HTML_TYPE_UNKNOWN && type.group() == CREDIT_CARD) {
+      has_credit_card_field = true;
+      break;
+    }
+  }
+
+  if (!has_credit_card_field) {
+    callback_.Run(
+        AutofillManagerDelegate::AutocompleteResultErrorDisabled,
+        base::ASCIIToUTF16("Form is not a payment form (must contain "
+                           "some autocomplete=\"cc-*\" fields). "),
+        NULL);
     delete this;
     return;
   }
@@ -248,7 +286,7 @@ void AutofillDialogControllerAndroid::Show() {
   bool request_shipping_address = false;
   {
     DetailInputs inputs;
-    common::BuildInputsForSection(SECTION_SHIPPING, "US", &inputs);
+    common::BuildInputsForSection(SECTION_SHIPPING, "US", &inputs, NULL);
     request_shipping_address = form_structure_.FillFields(
         common::TypesFromInputs(inputs),
         base::Bind(common::ServerTypeMatchesField, SECTION_SHIPPING),
@@ -324,7 +362,9 @@ bool AutofillDialogControllerAndroid::
 void AutofillDialogControllerAndroid::DialogCancel(JNIEnv* env,
                                                    jobject obj) {
   LogOnCancelMetrics();
-  callback_.Run(NULL);
+  callback_.Run(AutofillManagerDelegate::AutocompleteResultErrorCancel,
+                base::string16(),
+                NULL);
 }
 
 void AutofillDialogControllerAndroid::DialogContinue(
@@ -373,14 +413,16 @@ void AutofillDialogControllerAndroid::DialogContinue(
       if (!last_used_card.empty())
         defaults->SetString(kLastUsedCreditCardGuid, last_used_card);
     } else {
-      LOG(ERROR) << "Failed to save AutofillDialog preferences";
+      DLOG(ERROR) << "Failed to save AutofillDialog preferences";
     }
   }
 
   LogOnFinishSubmitMetrics();
 
   // Callback should be called as late as possible.
-  callback_.Run(&form_structure_);
+  callback_.Run(AutofillManagerDelegate::AutocompleteResultSuccess,
+                base::string16(),
+                &form_structure_);
 
   // This might delete us.
   Hide();
@@ -390,7 +432,7 @@ AutofillDialogControllerAndroid::AutofillDialogControllerAndroid(
     content::WebContents* contents,
     const FormData& form_structure,
     const GURL& source_url,
-    const base::Callback<void(const FormStructure*)>& callback)
+    const AutofillManagerDelegate::ResultCallback& callback)
     : profile_(Profile::FromBrowserContext(contents->GetBrowserContext())),
       contents_(contents),
       initial_user_state_(AutofillMetrics::DIALOG_USER_STATE_UNKNOWN),

@@ -49,7 +49,6 @@ class ComponentLoader;
 class CrxInstaller;
 class ExtensionActionStorageManager;
 class ExtensionErrorController;
-class ExtensionGarbageCollector;
 class ExtensionRegistry;
 class ExtensionSystem;
 class ExtensionToolbarModel;
@@ -85,7 +84,6 @@ class ExtensionServiceInterface
       const std::string& id,
       const base::FilePath& path,
       bool file_ownership_passed,
-      const GURL& download_url,
       extensions::CrxInstaller** out_crx_installer) = 0;
   virtual const extensions::Extension* GetExtensionById(
       const std::string& id,
@@ -191,7 +189,6 @@ class ExtensionService
       const std::string& id,
       const base::FilePath& extension_path,
       bool file_ownership_passed,
-      const GURL& download_url,
       extensions::CrxInstaller** out_crx_installer) OVERRIDE;
 
   // Reloads the specified extension, sending the onLaunched() event to it if it
@@ -351,12 +348,7 @@ class ExtensionService
   // TODO(aa): Remove this. It doesn't do enough to be worth the dependency
   // of these classes on ExtensionService.
   void ReportExtensionLoadError(const base::FilePath& extension_path,
-                                const std::string& error,
-                                bool be_noisy);
-
-  // Notifies ExtensionSettingsHandler whether or not to retry installation for
-  // given |extension_path|.
-  void NotifyLoadRetry(bool retry, const base::FilePath& extension_path);
+                                const std::string& error);
 
   // ExtensionHost of background page calls this method right after its render
   // view has been created.
@@ -437,6 +429,11 @@ class ExtensionService
   static void RecordPermissionMessagesHistogram(
       const extensions::Extension* e, const char* histogram);
 
+  // Unloads the given extension and mark the extension as terminated. This
+  // doesn't notify the user that the extension was terminated, if such a
+  // notification is desired the calling code is responsible for doing that.
+  void TerminateExtension(const std::string& extension_id);
+
 #if defined(UNIT_TEST)
   void TrackTerminatedExtensionForTest(const extensions::Extension* extension) {
     TrackTerminatedExtension(extension);
@@ -448,10 +445,6 @@ class ExtensionService
 #endif
 
   base::WeakPtr<ExtensionService> AsWeakPtr() { return base::AsWeakPtr(this); }
-
-  extensions::ExtensionGarbageCollector* garbage_collector() {
-    return garbage_collector_.get();
-  }
 
   bool browser_terminating() const { return browser_terminating_; }
 
@@ -692,10 +685,6 @@ class ExtensionService
 #endif
   scoped_ptr<extensions::ManagementPolicy::Provider>
       shared_module_policy_provider_;
-
-  // The ExtensionGarbageCollector to clean up all the garbage that leaks into
-  // the extensions directory.
-  scoped_ptr<extensions::ExtensionGarbageCollector> garbage_collector_;
 
   // The SharedModuleService used to check for import dependencies.
   scoped_ptr<extensions::SharedModuleService> shared_module_service_;

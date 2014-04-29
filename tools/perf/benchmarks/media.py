@@ -23,21 +23,20 @@ class _MSEMeasurement(page_measurement.PageMeasurement):
 class Media(test.Test):
   """Obtains media metrics for key user scenarios."""
   test = media.Media
-  page_set = 'page_sets/tough_video_cases.json'
+  page_set = 'page_sets/tough_video_cases.py'
 
 
-@test.Disabled('mac')  # http://crbug.com/353268
 class MediaNetworkSimulation(test.Test):
   """Obtains media metrics under different network simulations."""
   test = media.Media
-  page_set = 'page_sets/media_cns_cases.json'
+  page_set = 'page_sets/media_cns_cases.py'
 
 
 class MediaAndroid(test.Test):
   """Obtains media metrics for key user scenarios on Android."""
   test = media.Media
   tag = 'android'
-  page_set = 'page_sets/tough_video_cases.json'
+  page_set = 'page_sets/tough_video_cases.py'
   # Exclude is_4k and 50 fps media files (garden* & crowd*).
   options = {'page_label_filter_exclude': 'is_4k,is_50fps'}
 
@@ -47,7 +46,7 @@ class MediaChromeOS4kOnly(test.Test):
   """
   test = media.Media
   tag = 'chromeOS4kOnly'
-  page_set = 'page_sets/tough_video_cases.json'
+  page_set = 'page_sets/tough_video_cases.py'
   options = {
       'page_label_filter': 'is_4k',
       # Exclude is_50fps test files: crbug/331816
@@ -63,7 +62,7 @@ class MediaChromeOS(test.Test):
   """
   test = media.Media
   tag = 'chromeOS'
-  page_set = 'page_sets/tough_video_cases.json'
+  page_set = 'page_sets/tough_video_cases.py'
   # Exclude is_50fps test files: crbug/331816
   options = {'page_label_filter_exclude': 'is_4k,is_50fps'}
 
@@ -71,7 +70,7 @@ class MediaChromeOS(test.Test):
 class MediaSourceExtensions(test.Test):
   """Obtains media metrics for key media source extensions functions."""
   test = _MSEMeasurement
-  page_set = 'page_sets/mse_cases.json'
+  page_set = 'page_sets/mse_cases.py'
 
   def CustomizeBrowserOptions(self, options):
     # Needed to allow XHR requests to return stream objects.

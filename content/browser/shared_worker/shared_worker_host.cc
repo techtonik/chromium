@@ -46,12 +46,13 @@ void NotifyWorkerDestroyedOnUI(int worker_process_id, int worker_route_id) {
 }  // namespace
 
 SharedWorkerHost::SharedWorkerHost(SharedWorkerInstance* instance,
-                                   SharedWorkerMessageFilter* filter)
+                                   SharedWorkerMessageFilter* filter,
+                                   int worker_route_id)
     : instance_(instance),
       worker_document_set_(new WorkerDocumentSet()),
       container_render_filter_(filter),
       worker_process_id_(filter->render_process_id()),
-      worker_route_id_(filter->GetNextRoutingID()),
+      worker_route_id_(worker_route_id),
       load_failed_(false),
       closed_(false),
       creation_time_(base::TimeTicks::Now()) {

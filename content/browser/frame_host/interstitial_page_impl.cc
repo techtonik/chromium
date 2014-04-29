@@ -357,7 +357,18 @@ void InterstitialPageImpl::NavigationEntryCommitted(
   OnNavigatingAwayOrTabClosing();
 }
 
+void InterstitialPageImpl::WebContentsWillBeDestroyed() {
+  OnNavigatingAwayOrTabClosing();
+}
+
 void InterstitialPageImpl::WebContentsDestroyed(WebContents* web_contents) {
+  // WebContentsImpl will only call WebContentsWillBeDestroyed for interstitial
+  // pages that it knows about, pages that called
+  // WebContentsImpl::AttachInterstitialPage. But it's possible to have an
+  // interstitial page that never progressed that far. In that case, ensure that
+  // this interstitial page is destroyed. (And if it was attached, and
+  // OnNavigatingAwayOrTabClosing was called, it's safe to call
+  // OnNavigatingAwayOrTabClosing twice.)
   OnNavigatingAwayOrTabClosing();
 }
 
@@ -578,7 +589,8 @@ WebContentsView* InterstitialPageImpl::CreateWebContentsView() {
       GetMaxPageIDForSiteInstance(render_view_host_->GetSiteInstance());
   render_view_host_->CreateRenderView(base::string16(),
                                       MSG_ROUTING_NONE,
-                                      max_page_id);
+                                      max_page_id,
+                                      false);
   controller_->delegate()->RenderFrameForInterstitialPageCreated(
       frame_tree_.root()->current_frame_host());
   view->SetSize(web_contents_view->GetContainerSize());

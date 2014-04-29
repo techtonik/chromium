@@ -16,7 +16,6 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/infobars/confirm_infobar_delegate.h"
-#include "chrome/browser/infobars/infobar.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/notifications/desktop_notification_service.h"
 #include "chrome/browser/notifications/desktop_notification_service_factory.h"
@@ -30,6 +29,7 @@
 #include "chrome/common/content_settings_pattern.h"
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/infobars/core/infobar.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/notification_source.h"
 #include "content/public/browser/notification_types.h"
@@ -43,8 +43,6 @@
 #include "ui/base/window_open_disposition.h"
 #include "ui/message_center/message_center.h"
 #include "ui/message_center/message_center_observer.h"
-#include "ui/message_center/message_center_switches.h"
-#include "ui/message_center/message_center_util.h"
 #include "url/gurl.h"
 
 namespace {
@@ -290,8 +288,8 @@ bool NotificationsTest::PerformActionOnInfoBar(
     return false;
   }
 
-  InfoBar* infobar = infobar_service->infobar_at(infobar_index);
-  InfoBarDelegate* infobar_delegate = infobar->delegate();
+  infobars::InfoBar* infobar = infobar_service->infobar_at(infobar_index);
+  infobars::InfoBarDelegate* infobar_delegate = infobar->delegate();
   switch (action) {
     case DISMISS:
       infobar_delegate->InfoBarDismissed();
@@ -764,7 +762,14 @@ IN_PROC_BROWSER_TEST_F(NotificationsTest,
   ASSERT_EQ(1, GetNotificationCount());
 }
 
-IN_PROC_BROWSER_TEST_F(NotificationsTest, TestNotificationReplacement) {
+// See http://crbug.com/366539
+#if defined(OS_LINUX)
+#define MAYBE_TestNotificationReplacement DISABLED_TestNotificationReplacement
+#else
+#define MAYBE_TestNotificationReplacement TestNotificationReplacement
+#endif
+
+IN_PROC_BROWSER_TEST_F(NotificationsTest, MAYBE_TestNotificationReplacement) {
   ASSERT_TRUE(embedded_test_server()->InitializeAndWaitUntilReady());
 
   // Test that we can replace a notification using the replaceId.

@@ -5,6 +5,32 @@
 {
   'targets': [
     {
+      'target_name': 'bookmarks_core_browser',
+      'type': 'static_library',
+      'include_dirs': [
+        '..',
+      ],
+      'dependencies': [
+        '../base/base.gyp:base',
+        '../ui/base/ui_base.gyp:ui_base',
+        '../ui/gfx/gfx.gyp:gfx',
+        '../url/url.gyp:url_lib',
+      ],
+      'sources': [
+        'bookmarks/core/browser/base_bookmark_model_observer.cc',
+        'bookmarks/core/browser/base_bookmark_model_observer.h',
+        'bookmarks/core/browser/bookmark_client.h',
+        'bookmarks/core/browser/bookmark_match.cc',
+        'bookmarks/core/browser/bookmark_match.h',
+        'bookmarks/core/browser/bookmark_model_observer.h',
+        'bookmarks/core/browser/bookmark_node.cc',
+        'bookmarks/core/browser/bookmark_node.h',
+        'bookmarks/core/browser/bookmark_prompt_prefs.cc',
+        'bookmarks/core/browser/bookmark_prompt_prefs.h',
+        'bookmarks/core/browser/bookmark_service.h',
+      ],
+    },
+    {
       'target_name': 'bookmarks_core_common',
       'type': 'static_library',
       'include_dirs': [
@@ -14,6 +40,8 @@
         '../base/base.gyp:base',
       ],
       'sources': [
+        'bookmarks/core/common/bookmark_constants.cc',
+        'bookmarks/core/common/bookmark_constants.h',
         'bookmarks/core/common/bookmark_pref_names.cc',
         'bookmarks/core/common/bookmark_pref_names.h',
       ],

@@ -20,7 +20,7 @@
 #if defined(USE_X11)
 #include <X11/Xlib.h>
 
-#include "base/message_loop/message_pump_x11.h"
+#include "ui/gfx/x/x11_types.h"
 #endif
 
 namespace ash {
@@ -59,7 +59,7 @@ DisplayInfo CreateDisplayInfo(int64 id,
 
 void MoveMouseSync(aura::Window* window, int x, int y) {
 #if defined(USE_X11)
-  XWarpPointer(base::MessagePumpX11::GetDefaultXDisplay(),
+  XWarpPointer(gfx::GetXDisplay(),
                None,
                window->GetHost()->GetAcceleratedWidget(),
                0, 0, 0, 0,
@@ -102,10 +102,10 @@ TEST_F(AshNativeCursorManagerTest, MAYBE_CursorChangeOnEnterNotify) {
   display_manager->OnNativeDisplaysChanged(display_info_list);
 
   MoveMouseSync(Shell::GetAllRootWindows()[0], 10, 10);
-  EXPECT_EQ(1.0f, test_api.GetDisplay().device_scale_factor());
+  EXPECT_EQ(1.0f, test_api.GetCurrentCursor().device_scale_factor());
 
   MoveMouseSync(Shell::GetAllRootWindows()[0], 600, 10);
-  EXPECT_EQ(2.0f, test_api.GetDisplay().device_scale_factor());
+  EXPECT_EQ(2.0f, test_api.GetCurrentCursor().device_scale_factor());
 }
 
 }  // namespace ash

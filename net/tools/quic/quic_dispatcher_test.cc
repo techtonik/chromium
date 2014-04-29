@@ -191,10 +191,11 @@ class MockTimeWaitListManager : public QuicTimeWaitListManager {
       : QuicTimeWaitListManager(writer, visitor, eps, QuicSupportedVersions()) {
   }
 
-  MOCK_METHOD4(ProcessPacket, void(const IPEndPoint& server_address,
+  MOCK_METHOD5(ProcessPacket, void(const IPEndPoint& server_address,
                                    const IPEndPoint& client_address,
                                    QuicConnectionId connection_id,
-                                   QuicPacketSequenceNumber sequence_number));
+                                   QuicPacketSequenceNumber sequence_number,
+                                   const QuicEncryptedPacket& packet));
 };
 
 TEST_F(QuicDispatcherTest, TimeWaitListManager) {
@@ -236,7 +237,7 @@ TEST_F(QuicDispatcherTest, TimeWaitListManager) {
   // Dispatcher forwards subsequent packets for this connection_id to the time
   // wait list manager.
   EXPECT_CALL(*time_wait_list_manager,
-              ProcessPacket(_, _, connection_id, _)).Times(1);
+              ProcessPacket(_, _, connection_id, _, _)).Times(1);
   ProcessPacket(client_address, connection_id, true, "foo");
 }
 
@@ -254,17 +255,17 @@ TEST_F(QuicDispatcherTest, StrayPacketToTimeWaitListManager) {
   // list manager.
   EXPECT_CALL(dispatcher_, CreateQuicSession(_, _, _)).Times(0);
   EXPECT_CALL(*time_wait_list_manager,
-              ProcessPacket(_, _, connection_id, _)).Times(1);
+              ProcessPacket(_, _, connection_id, _, _)).Times(1);
   string data = "foo";
   ProcessPacket(client_address, connection_id, false, "foo");
 }
 
 TEST(QuicDispatcherFlowControlTest, NoNewVersion17ConnectionsIfFlagDisabled) {
-  // If FLAGS_enable_quic_stream_flow_control is disabled
+  // If FLAGS_enable_quic_stream_flow_control_2 is disabled
   // then the dispatcher should stop creating connections that support
   // QUIC_VERSION_17 (existing connections will stay alive).
   // TODO(rjshade): Remove once
-  // FLAGS_enable_quic_stream_flow_control is removed.
+  // FLAGS_enable_quic_stream_flow_control_2 is removed.
 
   EpollServer eps;
   QuicConfig config;
@@ -287,7 +288,7 @@ TEST(QuicDispatcherFlowControlTest, NoNewVersion17ConnectionsIfFlagDisabled) {
   dispatcher.Initialize(0);
 
   // When flag is enabled, new connections should support QUIC_VERSION_17.
-  FLAGS_enable_quic_stream_flow_control = true;
+  FLAGS_enable_quic_stream_flow_control_2 = true;
   scoped_ptr<QuicConnection> connection_1(
       QuicDispatcherPeer::CreateQuicConnection(
           &dispatcher, kCID, client, server, kInitialFlowControlWindowForTest));
@@ -295,7 +296,7 @@ TEST(QuicDispatcherFlowControlTest, NoNewVersion17ConnectionsIfFlagDisabled) {
 
 
   // When flag is disabled, new connections should not support QUIC_VERSION_17.
-  FLAGS_enable_quic_stream_flow_control = false;
+  FLAGS_enable_quic_stream_flow_control_2 = false;
   scoped_ptr<QuicConnection> connection_2(
       QuicDispatcherPeer::CreateQuicConnection(
           &dispatcher, kCID, client, server, kInitialFlowControlWindowForTest));

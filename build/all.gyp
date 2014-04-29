@@ -125,6 +125,7 @@
         }],
         ['OS=="mac"', {
           'dependencies': [
+            '../sandbox/sandbox.gyp:*',
             '../third_party/ocmock/ocmock.gyp:*',
           ],
         }],
@@ -150,11 +151,6 @@
         ['use_x11==1', {
           'dependencies': [
             '../tools/xdisplaycheck/xdisplaycheck.gyp:*',
-          ],
-        }],
-        ['toolkit_uses_gtk==1', {
-          'dependencies': [
-            '../tools/gtk_clipboard_dump/gtk_clipboard_dump.gyp:*',
           ],
         }],
         ['OS=="win"', {
@@ -387,6 +383,11 @@
         ['use_ash==1', {
           'dependencies': [
             '../ash/ash.gyp:ash_unittests',
+          ],
+        }],
+        ['disable_nacl==0', {
+          'dependencies': [
+            '../components/nacl.gyp:nacl_loader_unittests',
           ],
         }],
       ],
@@ -747,11 +748,6 @@
             '../tools/android/findbugs_plugin/findbugs_plugin.gyp:findbugs_plugin_test',
             '../ui/events/events.gyp:events_unittests',
             '../ui/ui_unittests.gyp:ui_unittests',
-            # Required by ui_unittests.
-            # TODO(wangxianzhu): It'd better let ui_unittests depend on it, but
-            # this would cause circular gyp dependency which needs refactoring the
-            # gyps to resolve.
-            '../chrome/chrome_resources.gyp:packed_resources',
           ],
           'conditions': [
             ['"<(gtest_target_type)"=="shared_library"', {
@@ -1060,6 +1056,8 @@
             '../components/components_tests.gyp:components_unittests',
             '../content/content_shell_and_tests.gyp:content_browsertests',
             '../content/content_shell_and_tests.gyp:content_shell',
+            '../content/content_shell_and_tests.gyp:content_shell_crash_service',
+            '../content/content_shell_and_tests.gyp:layout_test_helper',
             '../content/content_shell_and_tests.gyp:content_unittests',
             '../crypto/crypto.gyp:crypto_unittests',
             '../device/device_tests.gyp:device_unittests',
@@ -1201,6 +1199,11 @@
             ['chromeos==1', {
               'dependencies': [
                 '../chromeos/chromeos.gyp:chromeos_unittests',
+              ],
+            }],
+            ['use_ozone==1', {
+              'dependencies!': [
+                '../chrome/chrome.gyp:interactive_ui_tests',  # crbug.com/362166
               ],
             }],
           ],

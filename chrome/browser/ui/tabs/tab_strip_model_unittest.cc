@@ -104,29 +104,32 @@ class TabStripModelTestIDUserData : public base::SupportsUserData::Data {
   int id_;
 };
 
-class DummyNativeWebContentsModalDialogManager
-    : public web_modal::NativeWebContentsModalDialogManager {
+class DummySingleWebContentsDialogManager
+    : public web_modal::SingleWebContentsDialogManager {
  public:
-  explicit DummyNativeWebContentsModalDialogManager(
-      web_modal::NativeWebContentsModalDialogManagerDelegate* delegate)
-      : delegate_(delegate) {}
-  virtual ~DummyNativeWebContentsModalDialogManager() {}
+  explicit DummySingleWebContentsDialogManager(
+      NativeWebContentsModalDialog dialog,
+      web_modal::SingleWebContentsDialogManagerDelegate* delegate)
+      : delegate_(delegate),
+        dialog_(dialog) {}
+  virtual ~DummySingleWebContentsDialogManager() {}
 
-  virtual void ManageDialog(NativeWebContentsModalDialog dialog) OVERRIDE {}
-  virtual void ShowDialog(NativeWebContentsModalDialog dialog) OVERRIDE {}
-  virtual void HideDialog(NativeWebContentsModalDialog dialog) OVERRIDE {}
-  virtual void CloseDialog(NativeWebContentsModalDialog dialog) OVERRIDE {
-    delegate_->WillClose(dialog);
+  virtual void Show() OVERRIDE {}
+  virtual void Hide() OVERRIDE {}
+  virtual void Close() OVERRIDE {
+    delegate_->WillClose(dialog_);
   }
-  virtual void FocusDialog(NativeWebContentsModalDialog dialog) OVERRIDE {}
-  virtual void PulseDialog(NativeWebContentsModalDialog dialog) OVERRIDE {}
+  virtual void Focus() OVERRIDE {}
+  virtual void Pulse() OVERRIDE {}
   virtual void HostChanged(
       web_modal::WebContentsModalDialogHost* new_host) OVERRIDE {}
+  virtual NativeWebContentsModalDialog dialog() OVERRIDE { return dialog_; }
 
  private:
-  web_modal::NativeWebContentsModalDialogManagerDelegate* delegate_;
+  web_modal::SingleWebContentsDialogManagerDelegate* delegate_;
+  NativeWebContentsModalDialog dialog_;
 
-  DISALLOW_COPY_AND_ASSIGN(DummyNativeWebContentsModalDialogManager);
+  DISALLOW_COPY_AND_ASSIGN(DummySingleWebContentsDialogManager);
 };
 
 // Test Browser-like class for TabStripModelTest.TabBlockedState.
@@ -2557,19 +2560,23 @@ TEST_F(TabStripModelTest, TabBlockedState) {
   TabStripModel strip_dst(&dummy_tab_strip_delegate, profile());
   TabBlockedStateTestBrowser browser_dst(&strip_dst);
 
-  // Setup a NativeWebContentsModalDialogManager for tab |contents2|.
+  // Setup a SingleWebContentsDialogManager for tab |contents2|.
   web_modal::WebContentsModalDialogManager* modal_dialog_manager =
       web_modal::WebContentsModalDialogManager::FromWebContents(contents2);
   web_modal::WebContentsModalDialogManager::TestApi test_api(
       modal_dialog_manager);
-  test_api.ResetNativeManager(
-      new DummyNativeWebContentsModalDialogManager(modal_dialog_manager));
 
   // Show a dialog that blocks tab |contents2|.
-  // DummyNativeWebContentsModalDialogManager doesn't care about the
+  // DummySingleWebContentsDialogManager doesn't care about the
   // NativeWebContentsModalDialog value, so any dummy value works.
-  modal_dialog_manager->ShowDialog(
-      reinterpret_cast<NativeWebContentsModalDialog>(0));
+  DummySingleWebContentsDialogManager* native_manager =
+      new DummySingleWebContentsDialogManager(
+          reinterpret_cast<NativeWebContentsModalDialog>(0),
+          modal_dialog_manager);
+  modal_dialog_manager->ShowDialogWithManager(
+      reinterpret_cast<NativeWebContentsModalDialog>(0),
+      scoped_ptr<web_modal::SingleWebContentsDialogManager>(
+          native_manager).Pass());
   EXPECT_TRUE(strip_src.IsTabBlocked(1));
 
   // Detach the tab.

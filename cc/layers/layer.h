@@ -180,6 +180,7 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   void SetTransform(const gfx::Transform& transform);
   const gfx::Transform& transform() const { return transform_; }
   bool TransformIsAnimating() const;
+  bool transform_is_invertible() const { return transform_is_invertible_; }
 
   void SetScrollParent(Layer* parent);
 
@@ -371,6 +372,7 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
 
   void CreateRenderSurface();
   void ClearRenderSurface();
+  void ClearRenderSurfaceLayerList();
 
   // The contents scale converts from logical, non-page-scaled pixels to target
   // pixels. The contents scale is 1 for the root layer as it is already in
@@ -483,9 +485,6 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   // unused resources on the impl thread are returned before commit completes.
   void SetNextCommitWaitsForActivation();
 
-  // Called when the blend mode or filters have been changed.
-  void SetNeedsFilterContextIfNeeded();
-
   void AddDependentNeedsPushProperties();
   void RemoveDependentNeedsPushProperties();
   bool parent_should_know_need_push_properties() const {
@@ -591,6 +590,7 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   bool draw_checkerboard_for_missing_tiles_ : 1;
   bool force_render_surface_ : 1;
   bool is_3d_sorted_ : 1;
+  bool transform_is_invertible_ : 1;
   Region non_fast_scrollable_region_;
   Region touch_event_handler_region_;
   gfx::PointF position_;

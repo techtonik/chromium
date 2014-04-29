@@ -55,13 +55,12 @@ void ServiceWorkerJobCoordinator::Register(
     const GURL& pattern,
     const GURL& script_url,
     int source_process_id,
-    SiteInstance* site_instance,
     const ServiceWorkerRegisterJob::RegistrationCallback& callback) {
   scoped_ptr<ServiceWorkerRegisterJobBase> job(
       new ServiceWorkerRegisterJob(context_, pattern, script_url));
   ServiceWorkerRegisterJob* queued_job =
       static_cast<ServiceWorkerRegisterJob*>(jobs_[pattern].Push(job.Pass()));
-  queued_job->AddCallback(callback, source_process_id, site_instance);
+  queued_job->AddCallback(callback, source_process_id);
 }
 
 void ServiceWorkerJobCoordinator::Unregister(

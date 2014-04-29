@@ -115,9 +115,6 @@ class Plugin : public pp::Instance {
                                        const Manifest* manifest,
                                        ErrorInfo* error_info);
 
-  // Returns the argument value for the specified key, or NULL if not found.
-  std::string LookupArgument(const std::string& key) const;
-
   enum LengthComputable {
     LENGTH_IS_NOT_COMPUTABLE = 0,
     LENGTH_IS_COMPUTABLE = 1
@@ -134,7 +131,6 @@ class Plugin : public pp::Instance {
   // event (loadstart, progress, error, abort, load, loadend).  Events are
   // enqueued on the JavaScript event loop, which then calls back through
   // DispatchProgressEvent.
-  void EnqueueProgressEvent(PP_NaClEventType event_type);
   void EnqueueProgressEvent(PP_NaClEventType event_type,
                             const nacl::string& url,
                             LengthComputable length_computable,
@@ -144,27 +140,10 @@ class Plugin : public pp::Instance {
   // Report the error code that sel_ldr produces when starting a nexe.
   void ReportSelLdrLoadStatus(int status);
 
-  // URL resolution support.
-  // plugin_base_url is the URL used for resolving relative URLs used in
-  // src="...".
-  nacl::string plugin_base_url() const { return plugin_base_url_; }
-  void set_plugin_base_url(const nacl::string& url) { plugin_base_url_ = url; }
-  // manifest_base_url is the URL used for resolving relative URLs mentioned
-  // in manifest files.  If the manifest is a data URI, this is an empty string.
-  nacl::string manifest_base_url() const { return manifest_base_url_; }
-  void set_manifest_base_url(const nacl::string& url) {
-    manifest_base_url_ = url;
-  }
-
   nacl::DescWrapperFactory* wrapper_factory() const { return wrapper_factory_; }
 
   // Requests a NaCl manifest download from a |url| relative to the page origin.
   void RequestNaClManifest(const nacl::string& url);
-
-  // The size returned when a file download operation is unable to determine
-  // the size of the file to load.  W3C ProgressEvents specify that unknown
-  // sizes return 0.
-  static const uint64_t kUnknownBytes = 0;
 
   // Called back by CallOnMainThread.  Dispatches the first enqueued progress
   // event.
@@ -186,18 +165,6 @@ class Plugin : public pp::Instance {
   // document to request the URL using CORS even if this function returns false.
   bool DocumentCanRequest(const std::string& url);
 
-  // The MIME type used to instantiate this instance of the NaCl plugin.
-  // Typically, the MIME type will be application/x-nacl.  However, if the NEXE
-  // is being used as a content type handler for another content type (such as
-  // PDF), then this function will return that type.
-  const nacl::string& mime_type() const { return mime_type_; }
-  // The default MIME type for the NaCl plugin.
-  static const char* const kNaClMIMEType;
-  // The MIME type for the plugin when using PNaCl.
-  static const char* const kPnaclMIMEType;
-  // Returns true if PPAPI Dev interfaces should be allowed.
-  bool enable_dev_interfaces() { return enable_dev_interfaces_; }
-
   Manifest const* manifest() const { return manifest_.get(); }
   const pp::URLUtil_Dev* url_util() const { return url_util_; }
 
@@ -216,7 +183,6 @@ class Plugin : public pp::Instance {
   // pointer to this object, not from base's Delete().
   ~Plugin();
 
-  bool EarlyInit(int argc, const char* argn[], const char* argv[]);
   // Shuts down socket connection, service runtime, and receive thread,
   // in this order, for the main nacl subprocess.
   void ShutDownSubprocesses();
@@ -297,9 +263,6 @@ class Plugin : public pp::Instance {
   // chosen for the sandbox ISA, any current service runtime is shut down, the
   // .nexe is loaded and run.
 
-  // Callback used when getting the manifest file as a buffer (e.g., data URIs)
-  void NaClManifestBufferReady(int32_t pp_error);
-
   // Callback used when getting the manifest file as a local file descriptor.
   void NaClManifestFileDidOpen(int32_t pp_error);
 
@@ -319,10 +282,6 @@ class Plugin : public pp::Instance {
   void HistogramStartupTimeSmall(const std::string& name, float dt);
   void HistogramStartupTimeMedium(const std::string& name, float dt);
 
-  // This NEXE is being used as a content type handler rather than directly by
-  // an HTML document.
-  bool NexeIsContentHandler() const;
-
   // Callback used when loading a URL for SRPC-based StreamAsFile().
   void UrlDidOpenForStreamAsFile(int32_t pp_error,
                                  FileDownloader* url_downloader,
@@ -335,16 +294,10 @@ class Plugin : public pp::Instance {
 
   void SetExitStatusOnMainThread(int32_t pp_error, int exit_status);
 
-  std::map<std::string, std::string> args_;
-
   // Keep track of the NaCl module subprocess that was spun up in the plugin.
   NaClSubprocess main_subprocess_;
 
-  nacl::string plugin_base_url_;
-  nacl::string manifest_base_url_;
-  nacl::string manifest_url_;
   bool uses_nonsfi_mode_;
-  bool nexe_error_reported_;  // error or crash reported
 
   nacl::DescWrapperFactory* wrapper_factory_;
 
@@ -364,43 +317,11 @@ class Plugin : public pp::Instance {
   // URL processing interface for use in looking up resources in manifests.
   const pp::URLUtil_Dev* url_util_;
 
-  // PPAPI Dev interfaces are disabled by default.
-  bool enable_dev_interfaces_;
-
-  // A flag indicating if the NaCl executable is being loaded from an installed
-  // application.  This flag is used to bucket UMA statistics more precisely to
-  // help determine whether nexe loading problems are caused by networking
-  // issues.  (Installed applications will be loaded from disk.)
-  // Unfortunately, the definition of what it means to be part of an installed
-  // application is a little murky - for example an installed application can
-  // register a mime handler that loads NaCl executables into an arbitrary web
-  // page.  As such, the flag actually means "our best guess, based on the URLs
-  // for NaCl resources that we have seen so far".
-  bool is_installed_;
-
-  // If we get a DidChangeView event before the nexe is loaded, we store it and
-  // replay it to nexe after it's loaded. We need to replay when this View
-  // resource is non-is_null().
-  pp::View view_to_replay_;
-
-  // If we get a HandleDocumentLoad event before the nexe is loaded, we store
-  // it and replay it to nexe after it's loaded. We need to replay when this
-  // URLLoader resource is non-is_null().
-  pp::URLLoader document_load_to_replay_;
-
-  nacl::string mime_type_;
-
   // Keep track of the FileDownloaders created to fetch urls.
   std::set<FileDownloader*> url_downloaders_;
   // Keep track of file descriptors opened by StreamAsFile().
   // These are owned by the browser.
   std::map<nacl::string, NaClFileInfoAutoCloser*> url_file_info_map_;
-
-  // Used for NexeFileDidOpenContinuation
-  int64_t load_start_;
-
-  int64_t init_time_;
-  int64_t ready_time_;
 
   // Callback to receive .nexe and .dso download progress notifications.
   static void UpdateDownloadProgress(
@@ -418,6 +339,10 @@ class Plugin : public pp::Instance {
 
   int64_t time_of_last_progress_event_;
   int exit_status_;
+
+  // Open times are in microseconds.
+  int64_t manifest_open_time_;
+  int64_t nexe_open_time_;
 
   const PPB_NaCl_Private* nacl_interface_;
   pp::UMAPrivate uma_interface_;

@@ -105,13 +105,13 @@
 #include "chrome/common/logging_chrome.h"
 #include "chrome/common/net/net_resource_provider.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/common/profile_management_switches.h"
 #include "chrome/common/profiling.h"
 #include "chrome/installer/util/google_update_settings.h"
 #include "components/language_usage_metrics/language_usage_metrics.h"
 #include "components/nacl/browser/nacl_browser.h"
 #include "components/nacl/browser/nacl_process_host.h"
 #include "components/rappor/rappor_service.h"
+#include "components/signin/core/common/profile_management_switches.h"
 #include "components/startup_metric_utils/startup_metric_utils.h"
 #include "components/translate/core/browser/translate_download_manager.h"
 #include "content/public/browser/browser_thread.h"
@@ -139,6 +139,10 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/layout.h"
 #include "ui/base/resource/resource_bundle.h"
+
+#if defined(OS_ANDROID)
+#include "chrome/browser/metrics/thread_watcher_android.h"
+#endif
 
 #if defined(OS_LINUX) && !defined(OS_CHROMEOS)
 #include "chrome/browser/first_run/upgrade_util_linux.h"
@@ -432,27 +436,6 @@ bool ProcessSingletonNotificationCallback(
 
   g_browser_process->platform_part()->PlatformSpecificCommandLineProcessing(
       command_line);
-
-  // TODO(erikwright): Consider removing this - AFAIK it is no longer used.
-  // Handle the --uninstall-extension startup action. This needs to done here in
-  // the process that is running with the target profile, otherwise the
-  // uninstall will fail to unload and remove all components.
-  if (command_line.HasSwitch(switches::kUninstallExtension)) {
-    // The uninstall extension switch can't be combined with the profile
-    // directory switch.
-    DCHECK(!command_line.HasSwitch(switches::kProfileDirectory));
-
-    Profile* profile = ProfileManager::GetLastUsedProfile();
-    if (!profile) {
-      // We should never be called before the profile has been created.
-      NOTREACHED();
-      return true;
-    }
-
-    extensions::StartupHelper extension_startup_helper;
-    extension_startup_helper.UninstallExtension(command_line, profile);
-    return true;
-  }
 
   base::FilePath user_data_dir =
       g_browser_process->profile_manager()->user_data_dir();
@@ -1045,13 +1028,13 @@ void ChromeBrowserMainParts::PreProfileInit() {
   ProfileInfoCache& profile_cache = profile_manager->GetProfileInfoCache();
   size_t profiles_count = profile_cache.GetNumberOfProfiles();
   std::vector<base::FilePath> profiles_to_delete;
-  for (size_t i = 0;i < profiles_count; ++i) {
+  for (size_t i = 0; i < profiles_count; ++i) {
     if (profile_cache.ProfileIsEphemeralAtIndex(i))
       profiles_to_delete.push_back(profile_cache.GetPathOfProfileAtIndex(i));
   }
 
   if (profiles_to_delete.size()) {
-    for (size_t i = 0;i < profiles_to_delete.size(); ++i) {
+    for (size_t i = 0; i < profiles_to_delete.size(); ++i) {
       profile_manager->ScheduleProfileForDeletion(
           profiles_to_delete[i], ProfileManager::CreateCallback());
     }
@@ -1149,9 +1132,8 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   }
 
 #if defined(USE_AURA)
-  // Env creates the compositor. Aura widgets need the compositor to be created
-  // before they can be initialized by the browser.
-  aura::Env::CreateInstance();
+  // Make sure aura::Env has been initialized.
+  CHECK(aura::Env::GetInstance());
 #endif
 
   // Android doesn't support extensions and doesn't implement ProcessSingleton.
@@ -1441,17 +1423,6 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   language_usage_metrics::LanguageUsageMetrics::RecordApplicationLanguage(
       browser_process_->GetApplicationLocale());
 
-  // The extension service may be available at this point. If the command line
-  // specifies --uninstall-extension, attempt the uninstall extension startup
-  // action.
-  if (parsed_command_line().HasSwitch(switches::kUninstallExtension)) {
-    extensions::StartupHelper extension_startup_helper;
-    if (extension_startup_helper.UninstallExtension(
-            parsed_command_line(), profile_))
-      return content::RESULT_CODE_NORMAL_EXIT;
-    return chrome::RESULT_CODE_UNINSTALL_EXTENSION_ERROR;
-  }
-
   // Start watching for hangs during startup. We disarm this hang detector when
   // ThreadWatcher takes over or when browser is shutdown or when
   // startup_watcher_ is deleted.
@@ -1479,6 +1450,10 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   // Start watching all browser threads for responsiveness.
   MetricsService::SetExecutionPhase(MetricsService::THREAD_WATCHER_START);
   ThreadWatcherList::StartWatchingAll(parsed_command_line());
+
+#if defined(OS_ANDROID)
+  ThreadWatcherAndroid::RegisterApplicationStatusListener();
+#endif
 
 #if !defined(DISABLE_NACL)
   content::BrowserThread::PostTask(

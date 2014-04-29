@@ -170,7 +170,9 @@ class QuicStreamFactoryTest : public ::testing::TestWithParam<QuicVersion> {
 
   scoped_ptr<QuicEncryptedPacket> ConstructRstPacket() {
     QuicStreamId stream_id = 5;
-    return maker_.MakeRstPacket(1, true, stream_id, QUIC_STREAM_NO_ERROR);
+    return maker_.MakeRstPacket(
+        1, true, stream_id,
+        AdjustErrorForVersion(QUIC_RST_FLOW_CONTROL_ACCOUNTING, GetParam()));
   }
 
   MockHostResolver host_resolver_;
@@ -825,8 +827,7 @@ TEST_P(QuicStreamFactoryTest, CloseAllSessions) {
   };
   scoped_ptr<QuicEncryptedPacket> rst(ConstructRstPacket());
   std::vector<MockWrite> writes;
-  if (GetParam() > QUIC_VERSION_13)
-    writes.push_back(MockWrite(ASYNC, rst->data(), rst->length(), 1));
+  writes.push_back(MockWrite(ASYNC, rst->data(), rst->length(), 1));
   DeterministicSocketData socket_data(reads, arraysize(reads),
                                       writes.empty() ? NULL  : &writes[0],
                                       writes.size());
@@ -889,8 +890,7 @@ TEST_P(QuicStreamFactoryTest, OnIPAddressChanged) {
   };
   scoped_ptr<QuicEncryptedPacket> rst(ConstructRstPacket());
   std::vector<MockWrite> writes;
-  if (GetParam() > QUIC_VERSION_13)
-    writes.push_back(MockWrite(ASYNC, rst->data(), rst->length(), 1));
+  writes.push_back(MockWrite(ASYNC, rst->data(), rst->length(), 1));
   DeterministicSocketData socket_data(reads, arraysize(reads),
                                       writes.empty() ? NULL  : &writes[0],
                                       writes.size());
@@ -954,8 +954,7 @@ TEST_P(QuicStreamFactoryTest, OnCertAdded) {
   };
   scoped_ptr<QuicEncryptedPacket> rst(ConstructRstPacket());
   std::vector<MockWrite> writes;
-  if (GetParam() > QUIC_VERSION_13)
-    writes.push_back(MockWrite(ASYNC, rst->data(), rst->length(), 1));
+  writes.push_back(MockWrite(ASYNC, rst->data(), rst->length(), 1));
   DeterministicSocketData socket_data(reads, arraysize(reads),
                                       writes.empty() ? NULL  : &writes[0],
                                       writes.size());
@@ -1019,8 +1018,7 @@ TEST_P(QuicStreamFactoryTest, OnCACertChanged) {
   };
   scoped_ptr<QuicEncryptedPacket> rst(ConstructRstPacket());
   std::vector<MockWrite> writes;
-  if (GetParam() > QUIC_VERSION_13)
-    writes.push_back(MockWrite(ASYNC, rst->data(), rst->length(), 1));
+  writes.push_back(MockWrite(ASYNC, rst->data(), rst->length(), 1));
   DeterministicSocketData socket_data(reads, arraysize(reads),
                                       writes.empty() ? NULL  : &writes[0],
                                       writes.size());

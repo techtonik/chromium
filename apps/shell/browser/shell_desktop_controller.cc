@@ -5,18 +5,28 @@
 #include "apps/shell/browser/shell_desktop_controller.h"
 
 #include "apps/shell/browser/shell_app_window.h"
+#include "ui/aura/client/cursor_client.h"
 #include "ui/aura/env.h"
 #include "ui/aura/layout_manager.h"
 #include "ui/aura/test/test_screen.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_event_dispatcher.h"
+#include "ui/aura/window_tree_host.h"
+#include "ui/base/cursor/cursor.h"
+#include "ui/base/cursor/image_cursors.h"
 #include "ui/base/ime/input_method_initializer.h"
+#include "ui/gfx/native_widget_types.h"
 #include "ui/gfx/screen.h"
+#include "ui/wm/core/cursor_manager.h"
+#include "ui/wm/core/native_cursor_manager.h"
+#include "ui/wm/core/native_cursor_manager_delegate.h"
+#include "ui/wm/core/user_activity_detector.h"
 #include "ui/wm/test/wm_test_helper.h"
 
 #if defined(OS_CHROMEOS)
-#include "ui/display/chromeos/display_mode.h"
-#include "ui/display/chromeos/display_snapshot.h"
+#include "ui/chromeos/user_activity_power_manager_notifier.h"
+#include "ui/display/types/chromeos/display_mode.h"
+#include "ui/display/types/chromeos/display_snapshot.h"
 #endif
 
 namespace apps {
@@ -56,6 +66,77 @@ class FillLayout : public aura::LayoutManager {
   DISALLOW_COPY_AND_ASSIGN(FillLayout);
 };
 
+// A class that bridges the gap between CursorManager and Aura. It borrows
+// heavily from AshNativeCursorManager.
+class ShellNativeCursorManager : public wm::NativeCursorManager {
+ public:
+  explicit ShellNativeCursorManager(aura::WindowTreeHost* host)
+      : host_(host),
+        image_cursors_(new ui::ImageCursors) {}
+  virtual ~ShellNativeCursorManager() {}
+
+  // wm::NativeCursorManager overrides.
+  virtual void SetDisplay(
+      const gfx::Display& display,
+      wm::NativeCursorManagerDelegate* delegate) OVERRIDE {
+    if (image_cursors_->SetDisplay(display, display.device_scale_factor()))
+      SetCursor(delegate->GetCursor(), delegate);
+  }
+
+  virtual void SetCursor(
+      gfx::NativeCursor cursor,
+      wm::NativeCursorManagerDelegate* delegate) OVERRIDE {
+    image_cursors_->SetPlatformCursor(&cursor);
+    cursor.set_device_scale_factor(image_cursors_->GetScale());
+    delegate->CommitCursor(cursor);
+
+    if (delegate->IsCursorVisible())
+      ApplyCursor(cursor);
+  }
+
+  virtual void SetVisibility(
+      bool visible,
+      wm::NativeCursorManagerDelegate* delegate) OVERRIDE {
+    delegate->CommitVisibility(visible);
+
+    if (visible) {
+      SetCursor(delegate->GetCursor(), delegate);
+    } else {
+      gfx::NativeCursor invisible_cursor(ui::kCursorNone);
+      image_cursors_->SetPlatformCursor(&invisible_cursor);
+      ApplyCursor(invisible_cursor);
+    }
+  }
+
+  virtual void SetCursorSet(
+      ui::CursorSetType cursor_set,
+      wm::NativeCursorManagerDelegate* delegate) OVERRIDE {
+    image_cursors_->SetCursorSet(cursor_set);
+    delegate->CommitCursorSet(cursor_set);
+    if (delegate->IsCursorVisible())
+      SetCursor(delegate->GetCursor(), delegate);
+  }
+
+  virtual void SetMouseEventsEnabled(
+      bool enabled,
+      wm::NativeCursorManagerDelegate* delegate) OVERRIDE {
+    delegate->CommitMouseEventsEnabled(enabled);
+    SetVisibility(delegate->IsCursorVisible(), delegate);
+  }
+
+ private:
+  // Sets |cursor| as the active cursor within Aura.
+  void ApplyCursor(gfx::NativeCursor cursor) {
+    host_->SetCursor(cursor);
+  }
+
+  aura::WindowTreeHost* host_;  // Not owned.
+
+  scoped_ptr<ui::ImageCursors> image_cursors_;
+
+  DISALLOW_COPY_AND_ASSIGN(ShellNativeCursorManager);
+};
+
 ShellDesktopController* g_instance = NULL;
 
 }  // namespace
@@ -69,6 +150,23 @@ ShellDesktopController::ShellDesktopController() {
 #endif
   CreateRootWindow();
 
+  cursor_manager_.reset(
+      new wm::CursorManager(scoped_ptr<wm::NativeCursorManager>(
+          new ShellNativeCursorManager(GetWindowTreeHost()))));
+  cursor_manager_->SetDisplay(
+      gfx::Screen::GetNativeScreen()->GetPrimaryDisplay());
+  cursor_manager_->SetCursor(ui::kCursorPointer);
+  aura::client::SetCursorClient(
+      GetWindowTreeHost()->window(), cursor_manager_.get());
+
+  user_activity_detector_.reset(new wm::UserActivityDetector);
+  GetWindowTreeHost()->event_processor()->GetRootTarget()->AddPreTargetHandler(
+      user_activity_detector_.get());
+#if defined(OS_CHROMEOS)
+  user_activity_notifier_.reset(
+      new ui::UserActivityPowerManagerNotifier(user_activity_detector_.get()));
+#endif
+
   g_instance = this;
 }
 
@@ -76,6 +174,8 @@ ShellDesktopController::~ShellDesktopController() {
   // The app window must be explicitly closed before desktop teardown.
   DCHECK(!app_window_);
   g_instance = NULL;
+  GetWindowTreeHost()->event_processor()->GetRootTarget()
+      ->RemovePreTargetHandler(user_activity_detector_.get());
   DestroyRootWindow();
   aura::Env::DeleteInstance();
 }
@@ -108,7 +208,7 @@ aura::WindowTreeHost* ShellDesktopController::GetWindowTreeHost() {
 
 #if defined(OS_CHROMEOS)
 void ShellDesktopController::OnDisplayModeChanged(
-    const std::vector<ui::DisplayConfigurator::DisplayState>& outputs) {
+    const std::vector<ui::DisplayConfigurator::DisplayState>& displays) {
   gfx::Size size = GetPrimaryDisplaySize();
   if (!size.IsEmpty())
     wm_test_helper_->host()->UpdateRootWindowSize(size);
@@ -143,11 +243,11 @@ void ShellDesktopController::DestroyRootWindow() {
 
 gfx::Size ShellDesktopController::GetPrimaryDisplaySize() {
 #if defined(OS_CHROMEOS)
-  const std::vector<ui::DisplayConfigurator::DisplayState>& states =
+  const std::vector<ui::DisplayConfigurator::DisplayState>& displays =
       display_configurator_->cached_displays();
-  if (states.empty())
+  if (displays.empty())
     return gfx::Size();
-  const ui::DisplayMode* mode = states[0].display->current_mode();
+  const ui::DisplayMode* mode = displays[0].display->current_mode();
   return mode ? mode->size() : gfx::Size();
 #else
   return gfx::Size();

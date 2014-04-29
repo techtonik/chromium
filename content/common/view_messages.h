@@ -14,12 +14,12 @@
 #include "content/common/content_export.h"
 #include "content/common/content_param_traits.h"
 #include "content/common/cookie_data.h"
+#include "content/common/input/did_overscroll_params.h"
 #include "content/common/navigation_gesture.h"
 #include "content/common/pepper_renderer_instance_data.h"
 #include "content/common/view_message_enums.h"
 #include "content/common/webplugin_geometry.h"
 #include "content/port/common/input_event_ack_state.h"
-#include "content/public/common/color_suggestion.h"
 #include "content/public/common/common_param_traits.h"
 #include "content/public/common/favicon_url.h"
 #include "content/public/common/file_chooser_params.h"
@@ -132,6 +132,8 @@ IPC_STRUCT_TRAITS_BEGIN(blink::WebScreenInfo)
   IPC_STRUCT_TRAITS_MEMBER(isMonochrome)
   IPC_STRUCT_TRAITS_MEMBER(rect)
   IPC_STRUCT_TRAITS_MEMBER(availableRect)
+  IPC_STRUCT_TRAITS_MEMBER(orientationType)
+  IPC_STRUCT_TRAITS_MEMBER(orientationAngle)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(content::MenuItem)
@@ -146,15 +148,16 @@ IPC_STRUCT_TRAITS_BEGIN(content::MenuItem)
   IPC_STRUCT_TRAITS_MEMBER(submenu)
 IPC_STRUCT_TRAITS_END()
 
-IPC_STRUCT_TRAITS_BEGIN(content::ColorSuggestion)
-  IPC_STRUCT_TRAITS_MEMBER(color)
-  IPC_STRUCT_TRAITS_MEMBER(label)
-IPC_STRUCT_TRAITS_END()
-
 IPC_STRUCT_TRAITS_BEGIN(content::DateTimeSuggestion)
   IPC_STRUCT_TRAITS_MEMBER(value)
   IPC_STRUCT_TRAITS_MEMBER(localized_value)
   IPC_STRUCT_TRAITS_MEMBER(label)
+IPC_STRUCT_TRAITS_END()
+
+IPC_STRUCT_TRAITS_BEGIN(content::DidOverscrollParams)
+  IPC_STRUCT_TRAITS_MEMBER(accumulated_overscroll)
+  IPC_STRUCT_TRAITS_MEMBER(latest_overscroll_delta)
+  IPC_STRUCT_TRAITS_MEMBER(current_fling_velocity)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(content::FaviconURL)
@@ -211,6 +214,7 @@ IPC_STRUCT_TRAITS_BEGIN(content::RendererPreferences)
   IPC_STRUCT_TRAITS_MEMBER(tap_multiple_targets_strategy)
   IPC_STRUCT_TRAITS_MEMBER(disable_client_blocked_error_page)
   IPC_STRUCT_TRAITS_MEMBER(plugin_fullscreen_allowed)
+  IPC_STRUCT_TRAITS_MEMBER(use_video_overlay_for_embedded_encrypted_video)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(content::CookieData)
@@ -446,10 +450,6 @@ IPC_STRUCT_BEGIN(ViewHostMsg_UpdateRect_Params)
   // request messages.
   IPC_STRUCT_MEMBER(int, flags)
 
-  // Whether or not the renderer expects a ViewMsg_UpdateRect_ACK for this
-  // update. True for 2D painting, but false for accelerated compositing.
-  IPC_STRUCT_MEMBER(bool, needs_ack)
-
   // All the above coordinates are in DIP. This is the scale factor needed
   // to convert them to pixels.
   IPC_STRUCT_MEMBER(float, scale_factor)
@@ -490,6 +490,12 @@ IPC_STRUCT_BEGIN(ViewMsg_New_Params)
 
   // Whether the RenderView should initially be hidden.
   IPC_STRUCT_MEMBER(bool, hidden)
+
+  // Whether the RenderView will never be visible.
+  IPC_STRUCT_MEMBER(bool, never_visible)
+
+  // Whether the window associated with this view was created with an opener.
+  IPC_STRUCT_MEMBER(bool, window_was_created_with_opener)
 
   // The initial page ID to use for this view, which must be larger than any
   // existing navigation that might be loaded in the view.  Page IDs are unique
@@ -605,6 +611,7 @@ IPC_STRUCT_BEGIN(ViewMsg_Resize_Params)
   IPC_STRUCT_MEMBER(gfx::Size, new_size)
   IPC_STRUCT_MEMBER(gfx::Size, physical_backing_size)
   IPC_STRUCT_MEMBER(float, overdraw_bottom_height)
+  IPC_STRUCT_MEMBER(gfx::Size, visible_viewport_size)
   IPC_STRUCT_MEMBER(gfx::Rect, resizer_rect)
   IPC_STRUCT_MEMBER(bool, is_fullscreen)
 IPC_STRUCT_END()
@@ -636,18 +643,6 @@ IPC_MESSAGE_ROUTED1(ViewMsg_WasShown,
 // Sent to inform the view that it was swapped out.  This allows the process to
 // exit if no other views are using it.
 IPC_MESSAGE_ROUTED0(ViewMsg_WasSwappedOut)
-
-// Tells the render view that a ViewHostMsg_UpdateRect message was processed.
-// This signals the render view that it can send another UpdateRect message.
-IPC_MESSAGE_ROUTED0(ViewMsg_UpdateRect_ACK)
-
-// Tells the render view that a SwapBuffers was completed. Typically,
-// SwapBuffers requests go from renderer -> GPU process -> browser. Most
-// platforms still use the GfxCxt3D Echo for receiving the SwapBuffers Ack.
-// Using Echo routes the ack from browser -> GPU process -> renderer, while this
-// Ack goes directly from browser -> renderer. This is not used for the threaded
-// compositor path.
-IPC_MESSAGE_ROUTED0(ViewMsg_SwapBuffers_ACK)
 
 // Tells the renderer to focus the first (last if reverse is true) focusable
 // node.
@@ -783,12 +778,6 @@ IPC_MESSAGE_ROUTED3(ViewMsg_ImeConfirmComposition,
 // Used to notify the render-view that we have received a target URL. Used
 // to prevent target URLs spamming the browser.
 IPC_MESSAGE_ROUTED0(ViewMsg_UpdateTargetURL_ACK)
-
-// Notifies the color chooser client that the user selected a color.
-IPC_MESSAGE_ROUTED2(ViewMsg_DidChooseColorResponse, unsigned, SkColor)
-
-// Notifies the color chooser client that the color chooser has ended.
-IPC_MESSAGE_ROUTED1(ViewMsg_DidEndColorChooser, unsigned)
 
 IPC_MESSAGE_ROUTED1(ViewMsg_RunFileChooserResponse,
                     std::vector<ui::SelectedFileInfo>)
@@ -927,8 +916,8 @@ IPC_MESSAGE_ROUTED1(ViewMsg_SetAccessibilityMode,
 
 // An acknowledge to ViewHostMsg_MultipleTargetsTouched to notify the renderer
 // process to release the magnified image.
-IPC_MESSAGE_ROUTED1(ViewMsg_ReleaseDisambiguationPopupDIB,
-                    TransportDIB::Handle /* DIB handle */)
+IPC_MESSAGE_ROUTED1(ViewMsg_ReleaseDisambiguationPopupBitmap,
+                    cc::SharedBitmapId /* id */)
 
 // Notifies the renderer that a snapshot has been retrieved.
 IPC_MESSAGE_ROUTED3(ViewMsg_WindowSnapshotCompleted,
@@ -1031,10 +1020,6 @@ IPC_MESSAGE_ROUTED2(ViewMsg_SwapCompositorFrameAck,
 IPC_MESSAGE_ROUTED2(ViewMsg_ReclaimCompositorResources,
                     uint32 /* output_surface_id */,
                     cc::CompositorFrameAck /* ack */)
-
-// Sent by the browser to ask the renderer for a snapshot of the current view.
-IPC_MESSAGE_ROUTED1(ViewMsg_Snapshot,
-                    gfx::Rect /* src_subrect */)
 
 // -----------------------------------------------------------------------------
 // Messages sent from the renderer to the browser.
@@ -1254,6 +1239,12 @@ IPC_MESSAGE_ROUTED1(ViewHostMsg_FocusedNodeChanged,
 
 IPC_MESSAGE_ROUTED1(ViewHostMsg_SetCursor, content::WebCursor)
 
+// Message sent from renderer requesting touch emulation using mouse.
+// Shift-scrolling should be converted to pinch, if |allow_pinch| is true.
+IPC_MESSAGE_ROUTED2(ViewHostMsg_SetTouchEventEmulationEnabled,
+                    bool /* enabled */,
+                    bool /* allow_pinch */)
+
 // Used to set a cookie. The cookie is set asynchronously, but will be
 // available to a subsequent ViewHostMsg_GetCookies request.
 IPC_MESSAGE_CONTROL4(ViewHostMsg_SetCookie,
@@ -1467,20 +1458,6 @@ IPC_MESSAGE_ROUTED3(ViewHostMsg_RequestPpapiBrokerPermission,
                     GURL /* document_url */,
                     base::FilePath /* plugin_path */)
 
-#if defined(USE_X11)
-// A renderer sends this when it needs a browser-side widget for
-// hosting a windowed plugin. id is the XID of the plugin window, for which
-// the container is created.
-IPC_SYNC_MESSAGE_ROUTED1_0(ViewHostMsg_CreatePluginContainer,
-                           gfx::PluginWindowHandle /* id */)
-
-// Destroy a plugin container previously created using CreatePluginContainer.
-// id is the XID of the plugin window corresponding to the container that is
-// to be destroyed.
-IPC_SYNC_MESSAGE_ROUTED1_0(ViewHostMsg_DestroyPluginContainer,
-                           gfx::PluginWindowHandle /* id */)
-#endif
-
 // Send the tooltip text for the current mouse position to the browser.
 IPC_MESSAGE_ROUTED2(ViewHostMsg_SetTooltipText,
                     base::string16 /* tooltip text string */,
@@ -1507,20 +1484,6 @@ IPC_MESSAGE_ROUTED1(ViewHostMsg_SelectionBoundsChanged,
 IPC_MESSAGE_ROUTED1(ViewHostMsg_SelectionRootBoundsChanged,
                     gfx::Rect /* bounds of the selection root */)
 #endif
-
-// Asks the browser to open the color chooser.
-IPC_MESSAGE_ROUTED3(ViewHostMsg_OpenColorChooser,
-                    int /* id */,
-                    SkColor /* color */,
-                    std::vector<content::ColorSuggestion> /* suggestions */)
-
-// Asks the browser to end the color chooser.
-IPC_MESSAGE_ROUTED1(ViewHostMsg_EndColorChooser, int /* id */)
-
-// Change the selected color in the color chooser.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_SetSelectedColorInColorChooser,
-                    int /* id */,
-                    SkColor /* color */)
 
 // Asks the browser to display the file chooser.  The result is returned in a
 // ViewMsg_RunFileChooserResponse message.
@@ -1609,18 +1572,11 @@ IPC_MESSAGE_ROUTED2(ViewHostMsg_SwapCompositorFrame,
 
 // Sent by the compositor when input scroll events are dropped due to bounds
 // restricions on the root scroll offset.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_DidOverscroll,
-                    gfx::Vector2dF /* accumulated_overscroll */,
-                    gfx::Vector2dF /* current_fling_velocity */)
+IPC_MESSAGE_ROUTED1(ViewHostMsg_DidOverscroll,
+                    content::DidOverscrollParams /* params */)
 
 // Sent by the compositor when a flinging animation is stopped.
 IPC_MESSAGE_ROUTED0(ViewHostMsg_DidStopFlinging)
-
-// Reply to a snapshot request containing whether snapshotting succeeded and the
-// SkBitmap if it succeeded.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_Snapshot,
-                    bool, /* success */
-                    SkBitmap /* bitmap */)
 
 //---------------------------------------------------------------------------
 // Request for cryptographic operation messages:
@@ -1699,17 +1655,12 @@ IPC_MESSAGE_ROUTED3(ViewHostMsg_LockMouse,
 // ViewHostMsg_UnlockMouse).
 IPC_MESSAGE_ROUTED0(ViewHostMsg_UnlockMouse)
 
-// Notifies that the initial empty document of a view has been accessed.
-// After this, it is no longer safe to show a pending navigation's URL without
-// making a URL spoof possible.
-IPC_MESSAGE_ROUTED0(ViewHostMsg_DidAccessInitialDocument)
-
 // Notifies that multiple touch targets may have been pressed, and to show
 // the disambiguation popup.
 IPC_MESSAGE_ROUTED3(ViewHostMsg_ShowDisambiguationPopup,
                     gfx::Rect, /* Border of touched targets */
                     gfx::Size, /* Size of zoomed image */
-                    TransportDIB::Id /* DIB of zoomed image */)
+                    cc::SharedBitmapId /* id */)
 
 // Sent by the renderer process to check whether client 3D APIs
 // (Pepper 3D, WebGL) are explicitly blocked.
@@ -1867,8 +1818,8 @@ IPC_MESSAGE_CONTROL1(ViewHostMsg_FreeTransportDIB,
                      TransportDIB::Id /* DIB id */)
 #endif
 
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
-// On MACOSX, WIN and AURA IME can request composition character bounds
+#if defined(OS_MACOSX) || defined(USE_AURA)
+// On Mac and Aura IME can request composition character bounds
 // synchronously (see crbug.com/120597). This IPC message sends the character
 // bounds after every composition change to always have correct bound info.
 IPC_MESSAGE_ROUTED2(ViewHostMsg_ImeCompositionRangeChanged,

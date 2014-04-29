@@ -40,6 +40,7 @@ class NavigationControllerDelegate {
   virtual int32 GetMaxPageID() = 0;
   virtual int32 GetMaxPageIDForSiteInstance(SiteInstance* site_instance) = 0;
   virtual bool IsLoading() const = 0;
+  virtual bool IsBeingDestroyed() const = 0;
 
   // Methods from WebContentsImpl that NavigationControllerImpl needs to
   // call.
@@ -57,6 +58,7 @@ class NavigationControllerDelegate {
   virtual void UpdateMaxPageIDForSiteInstance(SiteInstance* site_instance,
                                               int32 page_id) = 0;
   virtual void ActivateAndShowRepostFormWarningDialog() = 0;
+  virtual bool HasAccessedInitialDocument() = 0;
 
   // This method is needed, since we are no longer guaranteed that the
   // embedder for NavigationController will be a WebContents object.

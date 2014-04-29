@@ -109,7 +109,7 @@ gfx::Transform WindowTreeHost::GetInverseRootTransform() const {
 void WindowTreeHost::UpdateRootWindowSize(const gfx::Size& host_size) {
   gfx::Rect bounds(host_size);
   gfx::RectF new_bounds(ui::ConvertRectToDIP(window()->layer(), bounds));
-  GetRootTransform().TransformRect(&new_bounds);
+  window()->layer()->transform().TransformRect(&new_bounds);
   window()->SetBounds(gfx::Rect(gfx::ToFlooredSize(new_bounds.size())));
 }
 
@@ -257,6 +257,7 @@ void WindowTreeHost::OnHostLostWindowCapture() {
 
 void WindowTreeHost::MoveCursorToInternal(const gfx::Point& root_location,
                                           const gfx::Point& host_location) {
+  last_cursor_request_position_in_host_ = host_location;
   MoveCursorToNative(host_location);
   client::CursorClient* cursor_client = client::GetCursorClient(window());
   if (cursor_client) {

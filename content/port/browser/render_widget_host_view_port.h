@@ -40,7 +40,6 @@ struct WebScreenInfo;
 }
 
 namespace content {
-class BackingStore;
 class RenderWidgetHostViewFrameSubscriber;
 class SyntheticGesture;
 class SyntheticGestureTarget;
@@ -86,7 +85,6 @@ class CONTENT_EXPORT RenderWidgetHostViewPort : public RenderWidgetHostView,
   // Moves all plugin windows as described in the given list.
   // |scroll_offset| is the scroll offset of the render view.
   virtual void MovePluginWindows(
-      const gfx::Vector2d& scroll_offset,
       const std::vector<WebPluginGeometry>& moves) = 0;
 
   // Take focus from the associated View component.
@@ -109,7 +107,7 @@ class CONTENT_EXPORT RenderWidgetHostViewPort : public RenderWidgetHostView,
   // Informs that the focused DOM node has changed.
   virtual void FocusedNodeChanged(bool is_editable_node) = 0;
 
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(USE_AURA)
+#if defined(OS_MACOSX) || defined(USE_AURA)
   // Updates the range of the marked text in an IME composition.
   virtual void ImeCompositionRangeChanged(
       const gfx::Range& range,
@@ -170,9 +168,6 @@ class CONTENT_EXPORT RenderWidgetHostViewPort : public RenderWidgetHostView,
 
   // Notifies the view that the scroll offset has changed.
   virtual void ScrollOffsetChanged() = 0;
-
-  // Allocate a backing store for this view.
-  virtual BackingStore* AllocBackingStore(const gfx::Size& size) = 0;
 
   // Copies the contents of the compositing surface into the given
   // (uninitialized) PlatformCanvas if any.
@@ -273,9 +268,6 @@ class CONTENT_EXPORT RenderWidgetHostViewPort : public RenderWidgetHostView,
 
   virtual gfx::GLSurfaceHandle GetCompositingSurface() = 0;
 
-  // Resize compositing surface.
-  virtual void ResizeCompositingSurface(const gfx::Size&) = 0;
-
   // Because the associated remote WebKit instance can asynchronously
   // prevent-default on a dispatched touch event, the touch events are queued in
   // the GestureRecognizer until invocation of ProcessAckedTouchEvent releases
@@ -288,12 +280,8 @@ class CONTENT_EXPORT RenderWidgetHostViewPort : public RenderWidgetHostView,
   virtual void SetScrollOffsetPinning(
       bool is_pinned_to_left, bool is_pinned_to_right) = 0;
 
-  // When a wheel event is first received, it is sent to the renderer.  This
-  // method is invoked once the renderer, and |delegate_| have been given a
-  // chance to process the wheel event. |consumed| indicates whether either
-  // chose to process the |event|. At most one entity should consume an event.
-  virtual void HandledWheelEvent(const blink::WebMouseWheelEvent& event,
-                                 bool consumed) = 0;
+  // Called when a mousewheel event was not processed by the renderer.
+  virtual void UnhandledWheelEvent(const blink::WebMouseWheelEvent& event) = 0;
 
   // Called prior to forwarding input event messages to the renderer, giving
   // the view a chance to perform in-process event filtering or processing.
@@ -315,9 +303,6 @@ class CONTENT_EXPORT RenderWidgetHostViewPort : public RenderWidgetHostView,
 
   virtual void GestureEventAck(const blink::WebGestureEvent& event,
                                InputEventAckState ack_result) = 0;
-
-  virtual void OnOverscrolled(gfx::Vector2dF accumulated_overscroll,
-                              gfx::Vector2dF current_fling_velocity) = 0;
 
   virtual void DidStopFlinging() = 0;
 

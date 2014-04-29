@@ -55,8 +55,8 @@
 #include "chromeos/chromeos_switches.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/dbus/power_manager_client.h"
+#include "chromeos/ime/ime_keyboard.h"
 #include "chromeos/ime/input_method_manager.h"
-#include "chromeos/ime/xkeyboard.h"
 #include "chromeos/network/network_state.h"
 #include "chromeos/network/network_state_handler.h"
 #include "content/public/browser/browser_thread.h"
@@ -501,8 +501,9 @@ void SigninScreenHandler::ShowImpl() {
     SendUserList(false);
 
     // Reset Caps Lock state when login screen is shown.
-    input_method::InputMethodManager::Get()->GetXKeyboard()->
-        SetCapsLockEnabled(false);
+    input_method::InputMethodManager::Get()
+        ->GetImeKeyboard()
+        ->SetCapsLockEnabled(false);
 
     base::DictionaryValue params;
     params.SetBoolean("disableAddUser", AllWhitelistedUsersPresent());
@@ -765,8 +766,6 @@ void SigninScreenHandler::RegisterMessages() {
               &SigninScreenHandler::HandleToggleEnrollmentScreen);
   AddCallback("toggleKioskEnableScreen",
               &SigninScreenHandler::HandleToggleKioskEnableScreen);
-  AddCallback("toggleResetScreen",
-              &SigninScreenHandler::HandleToggleResetScreen);
   AddCallback("createAccount", &SigninScreenHandler::HandleCreateAccount);
   AddCallback("accountPickerReady",
               &SigninScreenHandler::HandleAccountPickerReady);
@@ -1279,13 +1278,6 @@ void SigninScreenHandler::HandleToggleKioskEnableScreen() {
   }
 }
 
-void SigninScreenHandler::HandleToggleResetScreen() {
-  policy::BrowserPolicyConnectorChromeOS* connector =
-      g_browser_process->platform_part()->browser_policy_connector_chromeos();
-  if (delegate_ && !connector->IsEnterpriseManaged())
-    delegate_->ShowResetScreen();
-}
-
 void SigninScreenHandler::HandleToggleKioskAutolaunchScreen() {
   policy::BrowserPolicyConnectorChromeOS* connector =
       g_browser_process->platform_part()->browser_policy_connector_chromeos();
@@ -1396,10 +1388,12 @@ void SigninScreenHandler::SendUserList(bool animated) {
           !signed_in && !is_signin_to_add);
       user_dict->SetBoolean(kKeyCanRemove, can_remove_user);
 
-      if (is_owner) {
-        users_list.Insert(0, user_dict);
-      } else {
+      if (!is_owner)
         ++non_owner_count;
+      if (is_owner && users_list.GetSize() > kMaxUsers) {
+        // Owner is always in the list.
+        users_list.Insert(kMaxUsers - 1, user_dict);
+      } else {
         users_list.Append(user_dict);
       }
     }
@@ -1423,7 +1417,8 @@ void SigninScreenHandler::HandleAccountPickerReady() {
 
   PrefService* prefs = g_browser_process->local_state();
   if (prefs->GetBoolean(prefs::kFactoryResetRequested)) {
-    HandleToggleResetScreen();
+    if (core_oobe_actor_)
+      core_oobe_actor_->ShowDeviceResetScreen();
     return;
   }
 
@@ -1452,7 +1447,7 @@ void SigninScreenHandler::HandleLoginWebuiReady() {
     // Do this only once. Any subsequent call would relod GAIA frame.
     focus_stolen_ = false;
     const char code[] =
-        "if (typeof gWindowOnLoad != 'undefined) gWindowOnLoad();";
+        "if (typeof gWindowOnLoad != 'undefined') gWindowOnLoad();";
     content::RenderFrameHost* frame =
         LoginDisplayHostImpl::GetGaiaAuthIframe(web_ui()->GetWebContents());
     frame->ExecuteJavaScript(base::ASCIIToUTF16(code));

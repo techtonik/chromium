@@ -45,6 +45,12 @@ std::string GetWindowKeyForRenderViewHost(
 
 namespace apps {
 
+void AppWindowRegistry::Observer::OnAppWindowHidden(AppWindow* app_window) {}
+
+void AppWindowRegistry::Observer::OnAppWindowShown(AppWindow* app_window) {}
+
+AppWindowRegistry::Observer::~Observer() {}
+
 AppWindowRegistry::AppWindowRegistry(content::BrowserContext* context)
     : context_(context),
       devtools_callback_(base::Bind(&AppWindowRegistry::OnDevToolsStateChanged,
@@ -75,6 +81,14 @@ void AppWindowRegistry::AppWindowIconChanged(AppWindow* app_window) {
 
 void AppWindowRegistry::AppWindowActivated(AppWindow* app_window) {
   BringToFront(app_window);
+}
+
+void AppWindowRegistry::AppWindowHidden(AppWindow* app_window) {
+  FOR_EACH_OBSERVER(Observer, observers_, OnAppWindowHidden(app_window));
+}
+
+void AppWindowRegistry::AppWindowShown(AppWindow* app_window) {
+  FOR_EACH_OBSERVER(Observer, observers_, OnAppWindowShown(app_window));
 }
 
 void AppWindowRegistry::RemoveAppWindow(AppWindow* app_window) {
@@ -228,6 +242,24 @@ bool AppWindowRegistry::IsAppWindowRegisteredInAnyProfile(
   return false;
 }
 
+// static
+void AppWindowRegistry::CloseAllAppWindows() {
+  std::vector<content::BrowserContext*> contexts =
+      AppsClient::Get()->GetLoadedBrowserContexts();
+  for (std::vector<content::BrowserContext*>::const_iterator i =
+           contexts.begin();
+       i != contexts.end();
+       ++i) {
+    AppWindowRegistry* registry =
+        Factory::GetForBrowserContext(*i, false /* create */);
+    if (!registry)
+      continue;
+
+    while (!registry->app_windows().empty())
+      registry->app_windows().front()->GetBaseWindow()->Close();
+  }
+}
+
 void AppWindowRegistry::OnDevToolsStateChanged(
     content::DevToolsAgentHost* agent_host,
     bool attached) {
@@ -304,4 +336,4 @@ content::BrowserContext* AppWindowRegistry::Factory::GetBrowserContextToUse(
       context);
 }
 
-}  // namespace extensions
+}  // namespace apps

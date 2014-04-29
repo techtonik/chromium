@@ -15,6 +15,7 @@
 #include "content/public/browser/android/content_view_core.h"
 #include "content/public/browser/android/external_video_surface_container.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/storage_partition.h"
@@ -126,7 +127,6 @@ BrowserMediaPlayerManager::BrowserMediaPlayerManager(
     RenderViewHost* render_view_host)
     : WebContentsObserver(WebContents::FromRenderViewHost(render_view_host)),
       fullscreen_player_id_(-1),
-      pending_fullscreen_player_id_(-1),
       fullscreen_player_is_released_(false),
       web_contents_(WebContents::FromRenderViewHost(render_view_host)),
       weak_ptr_factory_(this) {
@@ -354,7 +354,7 @@ void BrowserMediaPlayerManager::DestroyAllMediaPlayers() {
   }
 }
 
-void BrowserMediaPlayerManager::OnProtectedSurfaceRequested(int player_id) {
+void BrowserMediaPlayerManager::RequestFullScreen(int player_id) {
   if (fullscreen_player_id_ == player_id)
     return;
 
@@ -364,20 +364,9 @@ void BrowserMediaPlayerManager::OnProtectedSurfaceRequested(int player_id) {
     return;
   }
 
-  // If the player is pending approval, wait for the approval to happen.
-  if (cdm_ids_pending_approval_.end() !=
-      cdm_ids_pending_approval_.find(player_id)) {
-    pending_fullscreen_player_id_ = player_id;
-    return;
-  }
-
   // Send an IPC to the render process to request the video element to enter
   // fullscreen. OnEnterFullscreen() will be called later on success.
   // This guarantees the fullscreen video will be rendered correctly.
-  // During the process, DisableFullscreenEncryptedMediaPlayback() may get
-  // called before or after OnEnterFullscreen(). If it is called before
-  // OnEnterFullscreen(), the player will not enter fullscreen. And it will
-  // retry the process once CreateSession() is allowed to proceed.
   // TODO(qinmin): make this flag default on android.
   if (CommandLine::ForCurrentProcess()->HasSwitch(
       switches::kDisableGestureRequirementForMediaFullscreen)) {
@@ -437,57 +426,51 @@ void BrowserMediaPlayerManager::DetachExternalVideoSurface(int player_id) {
     player->SetVideoSurface(gfx::ScopedJavaSurface());
 }
 
+void BrowserMediaPlayerManager::OnFrameInfoUpdated() {
+  if (external_video_surface_container_)
+    external_video_surface_container_->OnFrameInfoUpdated();
+}
+
 void BrowserMediaPlayerManager::OnNotifyExternalSurface(
     int player_id, bool is_request, const gfx::RectF& rect) {
   if (!web_contents_)
     return;
 
-  ExternalVideoSurfaceContainer::CreateForWebContents(web_contents_);
-  ExternalVideoSurfaceContainer* surface_container =
-      ExternalVideoSurfaceContainer::FromWebContents(web_contents_);
-  if (!surface_container)
-    return;
-
   if (is_request) {
-    // It's safe to use base::Unretained(this), because the callbacks will not
-    // be called after running ReleaseExternalVideoSurface().
-    surface_container->RequestExternalVideoSurface(
+    OnRequestExternalSurface(player_id, rect);
+  }
+  if (external_video_surface_container_) {
+    external_video_surface_container_->OnExternalVideoSurfacePositionChanged(
+        player_id, rect);
+  }
+}
+
+void BrowserMediaPlayerManager::OnRequestExternalSurface(
+    int player_id, const gfx::RectF& rect) {
+  if (!external_video_surface_container_) {
+    ContentBrowserClient* client = GetContentClient()->browser();
+    external_video_surface_container_.reset(
+        client->OverrideCreateExternalVideoSurfaceContainer(web_contents_));
+  }
+  // It's safe to use base::Unretained(this), because the callbacks will not
+  // be called after running ReleaseExternalVideoSurface().
+  if (external_video_surface_container_) {
+    external_video_surface_container_->RequestExternalVideoSurface(
         player_id,
         base::Bind(&BrowserMediaPlayerManager::AttachExternalVideoSurface,
                    base::Unretained(this)),
         base::Bind(&BrowserMediaPlayerManager::DetachExternalVideoSurface,
                    base::Unretained(this)));
   }
-  surface_container->OnExternalVideoSurfacePositionChanged(player_id, rect);
 }
 #endif  // defined(VIDEO_HOLE)
 
-void BrowserMediaPlayerManager::DisableFullscreenEncryptedMediaPlayback() {
-  if (fullscreen_player_id_ == -1)
-    return;
-
-  // If the fullscreen player is not playing back encrypted video, do nothing.
-  MediaDrmBridge* drm_bridge = GetDrmBridge(fullscreen_player_id_);
-  if (!drm_bridge)
-    return;
-
-  // Exit fullscreen.
-  pending_fullscreen_player_id_ = fullscreen_player_id_;
-  OnExitFullscreen(fullscreen_player_id_);
-}
-
 void BrowserMediaPlayerManager::OnEnterFullscreen(int player_id) {
   DCHECK_EQ(fullscreen_player_id_, -1);
-  if (cdm_ids_pending_approval_.find(player_id) !=
-      cdm_ids_pending_approval_.end()) {
-    return;
-  }
 
 #if defined(VIDEO_HOLE)
-  ExternalVideoSurfaceContainer* surface_container =
-      ExternalVideoSurfaceContainer::FromWebContents(web_contents_);
-  if (surface_container)
-    surface_container->ReleaseExternalVideoSurface(player_id);
+  if (external_video_surface_container_)
+    external_video_surface_container_->ReleaseExternalVideoSurface(player_id);
 #endif  // defined(VIDEO_HOLE)
   if (video_view_.get()) {
     fullscreen_player_id_ = player_id;
@@ -497,6 +480,10 @@ void BrowserMediaPlayerManager::OnEnterFullscreen(int player_id) {
     // fullscreen video, we just ignore the second one.
     fullscreen_player_id_ = player_id;
     video_view_.reset(new ContentVideoView(this));
+  } else {
+    // Force the second video to exit fullscreen.
+    Send(new MediaPlayerMsg_DidEnterFullscreen(routing_id(), player_id));
+    Send(new MediaPlayerMsg_DidExitFullscreen(routing_id(), player_id));
   }
 }
 
@@ -535,8 +522,13 @@ void BrowserMediaPlayerManager::OnInitialize(
 
 void BrowserMediaPlayerManager::OnStart(int player_id) {
   MediaPlayerAndroid* player = GetPlayer(player_id);
-  if (player)
-    player->Start();
+  if (!player)
+    return;
+  player->Start();
+  if (fullscreen_player_id_ == player_id && fullscreen_player_is_released_) {
+    video_view_->OpenVideo();
+    fullscreen_player_is_released_ = false;
+  }
 }
 
 void BrowserMediaPlayerManager::OnSeek(
@@ -637,10 +629,6 @@ void BrowserMediaPlayerManager::OnCreateSession(
     DLOG(WARNING) << "No MediaDrmBridge for ID: " << cdm_id << " found";
     OnSessionError(cdm_id, session_id, media::MediaKeys::kUnknownError, 0);
     return;
-  }
-
-  if (cdm_ids_approved_.find(cdm_id) == cdm_ids_approved_.end()) {
-    cdm_ids_pending_approval_.insert(cdm_id);
   }
 
   BrowserContext* context =
@@ -813,26 +801,10 @@ void BrowserMediaPlayerManager::CreateSessionIfPermitted(
     OnSessionError(cdm_id, session_id, media::MediaKeys::kUnknownError, 0);
     return;
   }
-  cdm_ids_pending_approval_.erase(cdm_id);
-  cdm_ids_approved_.insert(cdm_id);
 
-  if (!drm_bridge->CreateSession(
-           session_id, content_type, &init_data[0], init_data.size())) {
-    return;
-  }
-
-  // TODO(xhwang): Move the following code to OnSessionReady.
-
-  // TODO(qinmin): For prefixed EME implementation, |cdm_id| and player_id are
-  // identical. This will not be the case for unpredixed EME. See:
-  // http://crbug.com/338910
-  if (pending_fullscreen_player_id_ != cdm_id)
-    return;
-
-  pending_fullscreen_player_id_ = -1;
-  MediaPlayerAndroid* player = GetPlayer(cdm_id);
-  if (player->IsPlaying())
-    OnProtectedSurfaceRequested(cdm_id);
+  // This could fail, in which case a SessionError will be fired.
+  drm_bridge->CreateSession(
+      session_id, content_type, &init_data[0], init_data.size());
 }
 
 void BrowserMediaPlayerManager::ReleaseFullscreenPlayer(
@@ -873,10 +845,8 @@ void BrowserMediaPlayerManager::OnMediaResourcesReleased(int player_id) {
   MediaPlayerAndroid* player = GetPlayer(player_id);
   if (player && player->IsSurfaceInUse())
     return;
-  ExternalVideoSurfaceContainer* surface_container =
-      ExternalVideoSurfaceContainer::FromWebContents(web_contents_);
-  if (surface_container)
-    surface_container->ReleaseExternalVideoSurface(player_id);
+  if (external_video_surface_container_)
+    external_video_surface_container_->ReleaseExternalVideoSurface(player_id);
 #endif  // defined(VIDEO_HOLE)
 }
 

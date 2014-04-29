@@ -28,7 +28,9 @@ bool IsRateLimitedEventType(ui::Event* event) {
 }
 
 class NativeViewportImpl
-    : public Service<mojo::NativeViewport, NativeViewportImpl, shell::Context>,
+    : public ServiceConnection<mojo::NativeViewport,
+                               NativeViewportImpl,
+                               shell::Context>,
       public NativeViewportDelegate {
  public:
   NativeViewportImpl()
@@ -182,30 +184,13 @@ class NativeViewportImpl
 }  // namespace mojo
 
 
-#if defined(OS_ANDROID)
-
-// Android will call this.
 MOJO_NATIVE_VIEWPORT_EXPORT mojo::Application*
     CreateNativeViewportService(mojo::shell::Context* context,
                                 mojo::ScopedShellHandle shell_handle) {
   mojo::Application* app = new mojo::Application(shell_handle.Pass());
-  app->AddServiceFactory(
-    new mojo::ServiceFactory<mojo::services::NativeViewportImpl,
-                             mojo::shell::Context>(context));
+  app->AddServiceConnector(
+      new mojo::ServiceConnector<mojo::services::NativeViewportImpl,
+                                 mojo::shell::Context>(context));
   return app;
 }
 
-#else
-
-extern "C" MOJO_NATIVE_VIEWPORT_EXPORT MojoResult MojoMain(
-    const MojoHandle shell_handle) {
-  base::MessageLoopForUI loop;
-  mojo::Application app(shell_handle);
-  app.AddServiceFactory(
-    new mojo::ServiceFactory<mojo::services::NativeViewportImpl,
-                             mojo::shell::Context>);
-  loop.Run();
-  return MOJO_RESULT_OK;
-}
-
-#endif // !OS_ANDROID

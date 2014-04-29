@@ -163,12 +163,6 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
   settings->setCookieEnabled(prefs.cookie_enabled);
   settings->setNavigateOnDragDrop(prefs.navigate_on_drag_drop);
 
-  // This setting affects the behavior of links in an editable region:
-  // clicking the link should select it rather than navigate to it.
-  // Safari uses the same default. It is unlikley an embedder would want to
-  // change this, since it would break existing rich text editors.
-  settings->setEditableLinkBehaviorNeverLive();
-
   settings->setJavaEnabled(prefs.java_enabled);
 
   // By default, allow_universal_access_from_file_urls is set to false and thus
@@ -209,9 +203,8 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
   // overlay of rects, if requested on the command line.
   settings->setShowPaintRects(prefs.show_paint_rects);
 
-  // Enable gpu-accelerated compositing if requested on the command line.
-  settings->setAcceleratedCompositingEnabled(
-      prefs.accelerated_compositing_enabled);
+  // Enable gpu-accelerated compositing always.
+  settings->setAcceleratedCompositingEnabled(true);
 
   // Enable gpu-accelerated 2d canvas if requested on the command line.
   settings->setAccelerated2dCanvasEnabled(prefs.accelerated_2d_canvas_enabled);
@@ -238,17 +231,9 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
   settings->setGestureTapHighlightEnabled(prefs.gesture_tap_highlight_enabled);
 
   // Enabling accelerated layers from the command line enabled accelerated
-  // 3D CSS, Video, and Animations.
-  settings->setAcceleratedCompositingFor3DTransformsEnabled(
-      prefs.accelerated_compositing_for_3d_transforms_enabled);
+  // Video.
   settings->setAcceleratedCompositingForVideoEnabled(
       prefs.accelerated_compositing_for_video_enabled);
-  settings->setAcceleratedCompositingForAnimationEnabled(
-      prefs.accelerated_compositing_for_animation_enabled);
-
-  // Enabling accelerated plugins if specified from the command line.
-  settings->setAcceleratedCompositingForPluginsEnabled(
-      prefs.accelerated_compositing_for_plugins_enabled);
 
   // WebGL and accelerated 2D canvas are always gpu composited.
   settings->setAcceleratedCompositingForCanvasEnabled(
@@ -279,7 +264,6 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
   settings->setShouldClearDocumentBackground(
       prefs.should_clear_document_background);
   settings->setEnableScrollAnimator(prefs.enable_scroll_animator);
-  settings->setVisualWordMovementEnabled(prefs.visual_word_movement_enabled);
 
   settings->setRegionBasedColumnsEnabled(prefs.region_based_columns_enabled);
 
@@ -324,6 +308,7 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
   web_view->setIgnoreViewportTagScaleLimits(prefs.force_enable_zoom);
   settings->setAutoZoomFocusedNodeToLegibleScale(true);
   settings->setDoubleTapToZoomEnabled(prefs.double_tap_to_zoom_enabled);
+  settings->setMediaControlsOverlayPlayButtonEnabled(true);
   settings->setMediaPlaybackRequiresUserGesture(
       prefs.user_gesture_required_for_media_playback);
   settings->setDefaultVideoPosterURL(

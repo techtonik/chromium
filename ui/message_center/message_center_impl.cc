@@ -10,7 +10,6 @@
 #include "base/observer_list.h"
 #include "ui/message_center/message_center_style.h"
 #include "ui/message_center/message_center_types.h"
-#include "ui/message_center/message_center_util.h"
 #include "ui/message_center/notification.h"
 #include "ui/message_center/notification_blocker.h"
 #include "ui/message_center/notification_list.h"
@@ -550,12 +549,7 @@ NotificationList::PopupNotifications
 // Client code interface.
 void MessageCenterImpl::AddNotification(scoped_ptr<Notification> notification) {
   DCHECK(notification.get());
-  if (GetMessageCenterShowState() == MESSAGE_CENTER_SHOW_NEVER) {
-    notification->set_shown_as_popup(false);
-    notification->set_never_timeout(true);
-    notification->set_priority(message_center::DEFAULT_PRIORITY);
-  }
-
+  const std::string id = notification->id();
   for (size_t i = 0; i < blockers_.size(); ++i)
     blockers_[i]->CheckState();
 
@@ -567,7 +561,6 @@ void MessageCenterImpl::AddNotification(scoped_ptr<Notification> notification) {
   // Sometimes the notification can be added with the same id and the
   // |notification_list| will replace the notification instead of adding new.
   // This is essentially an update rather than addition.
-  const std::string& id = notification->id();
   bool already_exists = notification_list_->HasNotification(id);
   notification_list_->AddNotification(notification.Pass());
   notification_cache_.Rebuild(
@@ -637,15 +630,16 @@ void MessageCenterImpl::RemoveNotification(const std::string& id,
   if (!HasNotification(id))
     return;
 
-  scoped_refptr<NotificationDelegate> delegate =
-      notification_list_->GetNotificationDelegate(id);
-  if (delegate.get())
-    delegate->Close(by_user);
-
   // In many cases |id| is a reference to an existing notification instance
   // but the instance can be destructed in RemoveNotification(). Hence
   // copies the id explicitly here.
   std::string copied_id(id);
+
+  scoped_refptr<NotificationDelegate> delegate =
+      notification_list_->GetNotificationDelegate(copied_id);
+  if (delegate.get())
+    delegate->Close(by_user);
+
   notification_list_->RemoveNotification(copied_id);
   notification_cache_.Rebuild(
       notification_list_->GetVisibleNotifications(blockers_));

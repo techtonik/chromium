@@ -100,8 +100,7 @@ bool SynchronousCompositorImpl::InitializeHwDraw(
   scoped_refptr<cc::ContextProvider> onscreen_context =
   g_factory.Get().CreateOnscreenContextProviderForCompositorThread(surface);
 
-  bool success =
-      output_surface_->InitializeHwDraw(onscreen_context, offscreen_context);
+  bool success = output_surface_->InitializeHwDraw(onscreen_context);
 
   if (success)
     g_factory.Get().CompositorInitializedHardwareDraw();
@@ -140,7 +139,7 @@ void SynchronousCompositorImpl::SetMemoryPolicy(
   DCHECK(CalledOnValidThread());
   DCHECK(output_surface_);
 
-  return output_surface_->SetMemoryPolicy(policy);
+  output_surface_->SetMemoryPolicy(policy);
 }
 
 void SynchronousCompositorImpl::DidChangeRootLayerScrollOffset() {

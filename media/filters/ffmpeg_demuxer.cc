@@ -34,6 +34,22 @@
 
 namespace media {
 
+static base::Time ExtractTimelineOffset(AVFormatContext* format_context) {
+  if (strstr(format_context->iformat->name, "webm") ||
+      strstr(format_context->iformat->name, "matroska")) {
+    const AVDictionaryEntry* entry =
+        av_dict_get(format_context->metadata, "creation_time", NULL, 0);
+
+    base::Time timeline_offset;
+    if (entry != NULL && entry->value != NULL &&
+        FFmpegUTCDateToTime(entry->value, &timeline_offset)) {
+      return timeline_offset;
+    }
+  }
+
+  return base::Time();
+}
+
 //
 // FFmpegDemuxerStream
 //
@@ -378,6 +394,7 @@ FFmpegDemuxer::FFmpegDemuxer(
       media_log_(media_log),
       bitrate_(0),
       start_time_(kNoTimestamp()),
+      liveness_(LIVENESS_UNKNOWN),
       audio_disabled_(false),
       text_enabled_(false),
       duration_known_(false),
@@ -484,6 +501,15 @@ FFmpegDemuxerStream* FFmpegDemuxer::GetFFmpegStream(
 base::TimeDelta FFmpegDemuxer::GetStartTime() const {
   DCHECK(task_runner_->BelongsToCurrentThread());
   return start_time_;
+}
+
+base::Time FFmpegDemuxer::GetTimelineOffset() const {
+  return timeline_offset_;
+}
+
+Demuxer::Liveness FFmpegDemuxer::GetLiveness() const {
+  DCHECK(task_runner_->BelongsToCurrentThread());
+  return liveness_;
 }
 
 void FFmpegDemuxer::AddTextStreams() {
@@ -673,6 +699,16 @@ void FFmpegDemuxer::OnFindStreamInfoDone(const PipelineStatusCB& status_cb,
   // generation so we always get timestamps, see http://crbug.com/169570
   if (strcmp(format_context->iformat->name, "avi") == 0)
     format_context->flags |= AVFMT_FLAG_GENPTS;
+
+  timeline_offset_ = ExtractTimelineOffset(format_context);
+
+  if (max_duration == kInfiniteDuration() && !timeline_offset_.is_null()) {
+    liveness_ = LIVENESS_LIVE;
+  } else if (max_duration != kInfiniteDuration()) {
+    liveness_ = LIVENESS_RECORDED;
+  } else {
+    liveness_ = LIVENESS_UNKNOWN;
+  }
 
   // Good to go: set the duration and bitrate and notify we're done
   // initializing.

@@ -156,7 +156,7 @@ class PictureLayerTilingIteratorTest : public testing::Test {
                                         const gfx::Rect& dest_rect) {
     float dest_to_contents_scale = tiling_->contents_scale() / rect_scale;
     gfx::Rect clamped_rect = gfx::ScaleToEnclosingRect(
-        tiling_->ContentRect(), 1.f / dest_to_contents_scale);
+        tiling_->TilingRect(), 1.f / dest_to_contents_scale);
     clamped_rect.Intersect(dest_rect);
     VerifyTilesExactlyCoverRect(rect_scale, dest_rect, clamped_rect);
   }
@@ -172,6 +172,23 @@ class PictureLayerTilingIteratorTest : public testing::Test {
  private:
   DISALLOW_COPY_AND_ASSIGN(PictureLayerTilingIteratorTest);
 };
+
+TEST_F(PictureLayerTilingIteratorTest, ResizeDeletesTiles) {
+  // Verifies that a resize deletes tiles that used to be on the edge.
+  gfx::Size tile_size(100, 100);
+  gfx::Size original_layer_size(10, 10);
+  Initialize(tile_size, 1.f, original_layer_size);
+  SetLiveRectAndVerifyTiles(gfx::Rect(original_layer_size));
+
+  // Tiling only has one tile, since its total size is less than one.
+  EXPECT_TRUE(tiling_->TileAt(0, 0));
+
+  // Stop creating tiles so that any invalidations are left as holes.
+  client_.set_allow_create_tile(false);
+
+  tiling_->SetLayerBounds(gfx::Size(200, 200));
+  EXPECT_FALSE(tiling_->TileAt(0, 0));
+}
 
 TEST_F(PictureLayerTilingIteratorTest, LiveTilesExactlyCoverLiveTileRect) {
   Initialize(gfx::Size(100, 100), 1, gfx::Size(1099, 801));
@@ -949,7 +966,8 @@ TEST(PictureLayerTilingTest, TilingEvictionTileIteratorStaticViewport) {
 
   std::vector<Tile*> all_tiles = tiling->AllTilesForTesting();
 
-  PictureLayerTiling::TilingEvictionTileIterator it(tiling.get(), ACTIVE_TREE);
+  PictureLayerTiling::TilingEvictionTileIterator it(tiling.get(),
+                                                    SMOOTHNESS_TAKES_PRIORITY);
 
   // Tiles don't have resources to evict.
   EXPECT_FALSE(it);
@@ -961,8 +979,8 @@ TEST(PictureLayerTilingTest, TilingEvictionTileIteratorStaticViewport) {
 
   std::set<Tile*> all_tiles_set(all_tiles.begin(), all_tiles.end());
 
-  it =
-      PictureLayerTiling::TilingEvictionTileIterator(tiling.get(), ACTIVE_TREE);
+  it = PictureLayerTiling::TilingEvictionTileIterator(
+      tiling.get(), SMOOTHNESS_TAKES_PRIORITY);
   EXPECT_TRUE(it);
 
   std::set<Tile*> eviction_tiles;

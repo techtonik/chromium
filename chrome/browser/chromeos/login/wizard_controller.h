@@ -18,7 +18,6 @@
 #include "chrome/browser/chromeos/login/screens/screen_observer.h"
 #include "chrome/browser/chromeos/login/screens/wizard_screen.h"
 #include "chrome/browser/chromeos/policy/auto_enrollment_client.h"
-#include "content/public/common/geoposition.h"
 #include "ui/gfx/rect.h"
 #include "url/gurl.h"
 
@@ -29,16 +28,14 @@ namespace base {
 class DictionaryValue;
 }
 
-namespace content {
-struct Geoposition;
-}
-
 namespace chromeos {
 
 class AutoEnrollmentCheckStep;
 class EnrollmentScreen;
 class ErrorScreen;
 class EulaScreen;
+class HIDDetectionScreen;
+struct Geoposition;
 class KioskAutolaunchScreen;
 class KioskEnableScreen;
 class LocallyManagedUserCreationScreen;
@@ -47,6 +44,7 @@ class LoginScreenContext;
 class NetworkScreen;
 class OobeDisplay;
 class ResetScreen;
+class SimpleGeolocationProvider;
 class TermsOfServiceScreen;
 class TimeZoneProvider;
 struct TimeZoneResponseData;
@@ -132,6 +130,7 @@ class WizardController : public ScreenObserver {
   KioskEnableScreen* GetKioskEnableScreen();
   TermsOfServiceScreen* GetTermsOfServiceScreen();
   WrongHWIDScreen* GetWrongHWIDScreen();
+  HIDDetectionScreen* GetHIDDetectionScreen();
   LocallyManagedUserCreationScreen* GetLocallyManagedUserCreationScreen();
 
   // Returns a pointer to the current screen or NULL if there's no such
@@ -157,13 +156,10 @@ class WizardController : public ScreenObserver {
   static const char kWrongHWIDScreenName[];
   static const char kLocallyManagedUserCreationScreenName[];
   static const char kAppLaunchSplashScreenName[];
+  static const char kHIDDetectionScreenName [];
 
   // Volume percent at which spoken feedback is still audible.
   static const int kMinAudibleOutputVolumePercent;
-
-  // Called from LoginLocationMonitor when location is resolved.
-  static void OnLocationUpdated(const content::Geoposition& position,
-                                base::TimeDelta elapsed);
 
  private:
   // Show specific screen.
@@ -178,6 +174,7 @@ class WizardController : public ScreenObserver {
   void ShowTermsOfServiceScreen();
   void ShowWrongHWIDScreen();
   void ShowLocallyManagedUserCreationScreen();
+  void ShowHIDDetectionScreen();
 
   // Shows images login screen.
   void ShowLoginScreen(const LoginScreenContext& context);
@@ -186,6 +183,7 @@ class WizardController : public ScreenObserver {
   void ResumeLoginScreen();
 
   // Exit handlers:
+  void OnHIDDetectionCompleted();
   void OnNetworkConnected();
   void OnNetworkOffline();
   void OnConnectionFailed();
@@ -274,7 +272,7 @@ class WizardController : public ScreenObserver {
   }
 
   // Called when network is UP.
-  void StartTimezoneResolve() const;
+  void StartTimezoneResolve();
 
   // Creates provider on demand.
   TimeZoneProvider* GetTimezoneProvider();
@@ -282,6 +280,11 @@ class WizardController : public ScreenObserver {
   // TimeZoneRequest::TimeZoneResponseCallback implementation.
   void OnTimezoneResolved(scoped_ptr<TimeZoneResponseData> timezone,
                           bool server_error);
+
+  // Called from SimpleGeolocationProvider when location is resolved.
+  void OnLocationResolved(const Geoposition& position,
+                          bool server_error,
+                          const base::TimeDelta elapsed);
 
   // Whether to skip any screens that may normally be shown after login
   // (registration, Terms of Service, user image selection).
@@ -303,6 +306,7 @@ class WizardController : public ScreenObserver {
   scoped_ptr<WrongHWIDScreen> wrong_hwid_screen_;
   scoped_ptr<LocallyManagedUserCreationScreen>
       locally_managed_user_creation_screen_;
+  scoped_ptr<HIDDetectionScreen> hid_detection_screen_;
 
   // Screen that's currently active.
   WizardScreen* current_screen_;
@@ -371,6 +375,7 @@ class WizardController : public ScreenObserver {
 
   base::WeakPtrFactory<WizardController> weak_factory_;
 
+  scoped_ptr<SimpleGeolocationProvider> geolocation_provider_;
   scoped_ptr<TimeZoneProvider> timezone_provider_;
 
   DISALLOW_COPY_AND_ASSIGN(WizardController);

@@ -670,6 +670,7 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermission::kSystemStorage);
   skip.insert(APIPermission::kTts);
   skip.insert(APIPermission::kUnlimitedStorage);
+  skip.insert(APIPermission::kWebcamPrivate);
   skip.insert(APIPermission::kWebView);
   skip.insert(APIPermission::kWindowShape);
 
@@ -706,7 +707,6 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermission::kIdentity);
 
   // These are private.
-  skip.insert(APIPermission::kAccessibilityPrivate);
   skip.insert(APIPermission::kAutoTestPrivate);
   skip.insert(APIPermission::kBookmarkManagerPrivate);
   skip.insert(APIPermission::kBrailleDisplayPrivate);
@@ -808,6 +808,52 @@ TEST(PermissionsTest, HiddenFileSystemPermissionMessages) {
           permissions, Manifest::TYPE_PLATFORM_APP);
   ASSERT_EQ(1u, messages.size());
   EXPECT_EQ(PermissionMessage::kFileSystemWriteDirectory, messages[0].id());
+}
+
+TEST(PermissionsTest, SuppressedPermissionMessages) {
+  {
+    APIPermissionSet api_permissions;
+    api_permissions.insert(APIPermission::kTab);
+    api_permissions.insert(APIPermission::kHistory);
+    scoped_refptr<PermissionSet> permissions(
+        new PermissionSet(api_permissions, ManifestPermissionSet(),
+                          URLPatternSet(), URLPatternSet()));
+    PermissionMessages messages =
+        PermissionMessageProvider::Get()->GetPermissionMessages(
+            permissions, Manifest::TYPE_EXTENSION);
+    EXPECT_EQ(1u, messages.size());
+    EXPECT_EQ(PermissionMessage::kBrowsingHistory, messages[0].id());
+  }
+  {
+    APIPermissionSet api_permissions;
+    api_permissions.insert(APIPermission::kTab);
+    URLPatternSet hosts;
+    hosts.AddPattern(URLPattern(URLPattern::SCHEME_CHROMEUI,
+                                "chrome://favicon/"));
+    scoped_refptr<PermissionSet> permissions(
+        new PermissionSet(api_permissions, ManifestPermissionSet(),
+                          hosts, URLPatternSet()));
+    PermissionMessages messages =
+        PermissionMessageProvider::Get()->GetPermissionMessages(
+            permissions, Manifest::TYPE_EXTENSION);
+    EXPECT_EQ(1u, messages.size());
+    EXPECT_EQ(PermissionMessage::kTabs, messages[0].id());
+  }
+  {
+    APIPermissionSet api_permissions;
+    api_permissions.insert(APIPermission::kHistory);
+    URLPatternSet hosts;
+    hosts.AddPattern(URLPattern(URLPattern::SCHEME_CHROMEUI,
+                                "chrome://favicon/"));
+    scoped_refptr<PermissionSet> permissions(
+        new PermissionSet(api_permissions, ManifestPermissionSet(),
+                          hosts, URLPatternSet()));
+    PermissionMessages messages =
+        PermissionMessageProvider::Get()->GetPermissionMessages(
+            permissions, Manifest::TYPE_EXTENSION);
+    EXPECT_EQ(1u, messages.size());
+    EXPECT_EQ(PermissionMessage::kBrowsingHistory, messages[0].id());
+  }
 }
 
 TEST(PermissionsTest, MergedFileSystemPermissionComparison) {

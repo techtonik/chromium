@@ -12,6 +12,7 @@
 #include "content/public/browser/browser_message_filter.h"
 
 class GURL;
+struct EmbeddedWorkerHostMsg_ReportConsoleMessage_Params;
 
 namespace content {
 
@@ -30,13 +31,21 @@ class CONTENT_EXPORT ServiceWorkerDispatcherHost : public BrowserMessageFilter {
 
   void Init(ServiceWorkerContextWrapper* context_wrapper);
 
-  // BrowserIOMessageFilter implementation
+  // BrowserMessageFilter implementation
+  virtual void OnFilterAdded(IPC::Channel* channel) OVERRIDE;
   virtual void OnDestruct() const OVERRIDE;
   virtual bool OnMessageReceived(const IPC::Message& message,
                                  bool* message_was_ok) OVERRIDE;
 
-  // Returns a new handle id.
-  int RegisterServiceWorkerHandle(scoped_ptr<ServiceWorkerHandle> handle);
+  // IPC::Sender implementation
+
+  // Send() queues the message until the underlying channel is ready.  This
+  // class assumes that Send() can only fail after that when the renderer
+  // process has terminated, at which point the whole instance will eventually
+  // be destroyed.
+  virtual bool Send(IPC::Message* message) OVERRIDE;
+
+  void RegisterServiceWorkerHandle(scoped_ptr<ServiceWorkerHandle> handle);
 
  protected:
   virtual ~ServiceWorkerDispatcherHost();
@@ -64,14 +73,14 @@ class CONTENT_EXPORT ServiceWorkerDispatcherHost : public BrowserMessageFilter {
   void OnWorkerStarted(int thread_id,
                        int embedded_worker_id);
   void OnWorkerStopped(int embedded_worker_id);
-  void OnSendMessageToBrowser(int embedded_worker_id,
-                              int request_id,
-                              const IPC::Message& message);
   void OnReportException(int embedded_worker_id,
                          const base::string16& error_message,
                          int line_number,
                          int column_number,
                          const GURL& source_url);
+  void OnReportConsoleMessage(
+      int embedded_worker_id,
+      const EmbeddedWorkerHostMsg_ReportConsoleMessage_Params& params);
   void OnPostMessage(int handle_id,
                      const base::string16& message,
                      const std::vector<int>& sent_message_port_ids);
@@ -97,6 +106,9 @@ class CONTENT_EXPORT ServiceWorkerDispatcherHost : public BrowserMessageFilter {
   base::WeakPtr<ServiceWorkerContextCore> context_;
 
   IDMap<ServiceWorkerHandle, IDMapOwnPointer> handles_;
+
+  bool channel_ready_;  // True after BrowserMessageFilter::channel_ != NULL.
+  ScopedVector<IPC::Message> pending_messages_;
 
   DISALLOW_COPY_AND_ASSIGN(ServiceWorkerDispatcherHost);
 };

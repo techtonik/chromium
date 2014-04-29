@@ -61,10 +61,6 @@ class SystemTrayDelegateWin : public ash::SystemTrayDelegate,
     return ash::user::LOGGED_IN_OWNER;
   }
 
-  virtual bool IsOobeCompleted() const OVERRIDE {
-    return true;
-  }
-
   virtual void ChangeProfilePicture() OVERRIDE {
   }
 
@@ -105,6 +101,9 @@ class SystemTrayDelegateWin : public ash::SystemTrayDelegate,
   }
 
   virtual void ShowDateSettings() OVERRIDE {
+  }
+
+  virtual void ShowSetTimeDialog() OVERRIDE {
   }
 
   virtual void ShowNetworkSettings(const std::string& service_path) OVERRIDE {

@@ -45,7 +45,6 @@
 #include "chrome/browser/guestview/guestview.h"
 #include "chrome/browser/guestview/guestview_constants.h"
 #include "chrome/browser/guestview/webview/webview_guest.h"
-#include "chrome/browser/local_discovery/storage/privet_filesystem_backend.h"
 #include "chrome/browser/media/cast_transport_host_filter.h"
 #include "chrome/browser/media/media_capture_devices_dispatcher.h"
 #include "chrome/browser/metrics/chrome_browser_main_extra_parts_metrics.h"
@@ -94,16 +93,17 @@
 #include "chrome/common/logging_chrome.h"
 #include "chrome/common/pepper_permission_util.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/common/profile_management_switches.h"
 #include "chrome/common/render_messages.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/installer/util/google_update_settings.h"
 #include "chromeos/chromeos_constants.h"
+#include "components/cloud_devices/common/cloud_devices_switches.h"
 #include "components/nacl/browser/nacl_browser.h"
 #include "components/nacl/browser/nacl_host_message_filter.h"
 #include "components/nacl/browser/nacl_process_host.h"
 #include "components/nacl/common/nacl_process_type.h"
 #include "components/nacl/common/nacl_switches.h"
+#include "components/signin/core/common/profile_management_switches.h"
 #include "components/translate/core/common/translate_switches.h"
 #include "components/user_prefs/pref_registry_syncable.h"
 #include "content/public/browser/browser_child_process_host.h"
@@ -150,7 +150,6 @@
 #include "ppapi/shared_impl/ppapi_switches.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
-#include "ui/message_center/message_center_util.h"
 #include "webkit/browser/fileapi/external_mount_points.h"
 #include "webkit/common/webpreferences.h"
 
@@ -165,7 +164,9 @@
 #elif defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/chrome_browser_main_chromeos.h"
 #include "chrome/browser/chromeos/drive/fileapi/file_system_backend_delegate.h"
+#include "chrome/browser/chromeos/file_system_provider/fileapi/backend_delegate.h"
 #include "chrome/browser/chromeos/fileapi/file_system_backend.h"
+#include "chrome/browser/chromeos/fileapi/mtp_file_system_backend_delegate.h"
 #include "chrome/browser/chromeos/login/startup_utils.h"
 #include "chrome/browser/chromeos/login/user_manager.h"
 #include "chrome/browser/chromeos/system/input_device_settings.h"
@@ -254,6 +255,7 @@ using content::BrowserThread;
 using content::BrowserURLHandler;
 using content::ChildProcessSecurityPolicy;
 using content::QuotaPermissionContext;
+using content::RenderFrameHost;
 using content::RenderViewHost;
 using content::SiteInstance;
 using content::WebContents;
@@ -838,9 +840,7 @@ void ChromeContentBrowserClient::GuestWebContentsCreated(
   /// TODO(fsamuel): In the future, certain types of GuestViews won't require
   // extension bindings. At that point, we should clear |extension_id| instead
   // of exiting early.
-  if (!service->GetExtensionById(extension_id, false) &&
-      !CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableBrowserPluginForAllViewTypes)) {
+  if (!service->GetExtensionById(extension_id, false)) {
     NOTREACHED();
     return;
   }
@@ -1148,6 +1148,17 @@ bool ChromeContentBrowserClient::ShouldAllowOpenURL(
             extension, url.path()))
       return false;
   }
+
+  // Do not allow chrome://chrome-signin navigate to other chrome:// URLs, since
+  // the signin page may host untrusted web content.
+  if (from_url.GetOrigin().spec() == chrome::kChromeUIChromeSigninURL &&
+      url.SchemeIs(content::kChromeUIScheme) &&
+      url.host() != chrome::kChromeUIChromeSigninHost) {
+    VLOG(1) << "Blocked navigation to " << url.spec() << " from "
+            << chrome::kChromeUIChromeSigninURL;
+    return false;
+  }
+
   return true;
 }
 
@@ -1571,7 +1582,8 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
       switches::kAllowNaClFileHandleAPI,
       switches::kAppsCheckoutURL,
       switches::kAppsGalleryURL,
-      switches::kCloudPrintServiceURL,
+      switches::kCloudPrintURL,
+      switches::kCloudPrintXmppEndpoint,
       switches::kDisableBundledPpapiFlash,
       switches::kDisableExtensionsResourceWhitelist,
       switches::kDisablePnacl,
@@ -1628,6 +1640,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
     static const char* const kSwitchNames[] = {
       // Load (in-process) Pepper plugins in-process in the zygote pre-sandbox.
       switches::kDisableBundledPpapiFlash,
+      switches::kNaClDangerousNoSandboxNonSfi,
       switches::kPpapiFlashPath,
       switches::kPpapiFlashVersion,
     };
@@ -1945,22 +1958,14 @@ content::MediaObserver* ChromeContentBrowserClient::GetMediaObserver() {
 
 void ChromeContentBrowserClient::RequestDesktopNotificationPermission(
     const GURL& source_origin,
-    int callback_context,
-    int render_process_id,
-    int render_view_id) {
+    content::RenderFrameHost* render_frame_host,
+    base::Closure& callback) {
 #if defined(ENABLE_NOTIFICATIONS)
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
-  WebContents* contents =
-      tab_util::GetWebContentsByID(render_process_id, render_view_id);
-  if (!contents) {
-    NOTREACHED();
-    return;
-  }
-
   // Skip showing the infobar if the request comes from an extension, and that
   // extension has the 'notify' permission. (If the extension does not have the
   // permission, the user will still be prompted.)
-  Profile* profile = Profile::FromBrowserContext(contents->GetBrowserContext());
+  Profile* profile = Profile::FromBrowserContext(
+      render_frame_host->GetSiteInstance()->GetBrowserContext());
   InfoMap* extension_info_map =
       extensions::ExtensionSystem::Get(profile)->info_map();
   DesktopNotificationService* notification_service =
@@ -1969,7 +1974,7 @@ void ChromeContentBrowserClient::RequestDesktopNotificationPermission(
   if (extension_info_map) {
     extensions::ExtensionSet extensions;
     extension_info_map->GetExtensionsWithAPIPermissionForSecurityOrigin(
-        source_origin, render_process_id,
+        source_origin, render_frame_host->GetProcess()->GetID(),
         extensions::APIPermission::kNotification, &extensions);
     for (extensions::ExtensionSet::const_iterator iter = extensions.begin();
          iter != extensions.end(); ++iter) {
@@ -1980,17 +1985,15 @@ void ChromeContentBrowserClient::RequestDesktopNotificationPermission(
       }
     }
   }
-  RenderViewHost* rvh =
-      RenderViewHost::FromID(render_process_id, render_view_id);
   if (IsExtensionWithPermissionOrSuggestInConsole(
-      APIPermission::kNotification, extension, rvh)) {
-    if (rvh)
-      rvh->DesktopNotificationPermissionRequestDone(callback_context);
+          APIPermission::kNotification, extension,
+          render_frame_host->GetRenderViewHost())) {
+    callback.Run();
     return;
   }
 
-  notification_service->RequestPermission(source_origin, render_process_id,
-      render_view_id, callback_context, contents);
+  notification_service->RequestPermission(
+      source_origin, render_frame_host, callback);
 #else
   NOTIMPLEMENTED();
 #endif
@@ -2042,48 +2045,16 @@ blink::WebNotificationPresenter::Permission
 
 void ChromeContentBrowserClient::ShowDesktopNotification(
     const content::ShowDesktopNotificationHostMsgParams& params,
-    int render_process_id,
-    int render_view_id,
-    bool worker) {
+    RenderFrameHost* render_frame_host,
+    content::DesktopNotificationDelegate* delegate,
+    base::Closure* cancel_callback) {
 #if defined(ENABLE_NOTIFICATIONS)
-  RenderViewHost* rvh = RenderViewHost::FromID(
-      render_process_id, render_view_id);
-  if (!rvh) {
-    NOTREACHED();
-    return;
-  }
-
-  content::RenderProcessHost* process = rvh->GetProcess();
+  content::RenderProcessHost* process = render_frame_host->GetProcess();
   Profile* profile = Profile::FromBrowserContext(process->GetBrowserContext());
   DesktopNotificationService* service =
       DesktopNotificationServiceFactory::GetForProfile(profile);
   service->ShowDesktopNotification(
-    params, render_process_id, render_view_id,
-    worker ? DesktopNotificationService::WorkerNotification :
-        DesktopNotificationService::PageNotification);
-#else
-  NOTIMPLEMENTED();
-#endif
-}
-
-void ChromeContentBrowserClient::CancelDesktopNotification(
-    int render_process_id,
-    int render_view_id,
-    int notification_id) {
-#if defined(ENABLE_NOTIFICATIONS)
-  RenderViewHost* rvh = RenderViewHost::FromID(
-      render_process_id, render_view_id);
-  if (!rvh) {
-    NOTREACHED();
-    return;
-  }
-
-  content::RenderProcessHost* process = rvh->GetProcess();
-  Profile* profile = Profile::FromBrowserContext(process->GetBrowserContext());
-  DesktopNotificationService* service =
-      DesktopNotificationServiceFactory::GetForProfile(profile);
-  service->CancelDesktopNotification(
-      render_process_id, render_view_id, notification_id);
+      params, render_frame_host, delegate, cancel_callback);
 #else
   NOTIMPLEMENTED();
 #endif
@@ -2350,26 +2321,6 @@ void ChromeContentBrowserClient::OverrideWebkitPrefs(
           extension, view_type, web_prefs);
     }
   }
-
-  if (view_type == extensions::VIEW_TYPE_NOTIFICATION) {
-    web_prefs->allow_scripts_to_close_windows = true;
-  } else if (view_type == extensions::VIEW_TYPE_BACKGROUND_CONTENTS) {
-    // Disable all kinds of acceleration for background pages.
-    // See http://crbug.com/96005 and http://crbug.com/96006
-    web_prefs->force_compositing_mode = false;
-    web_prefs->accelerated_compositing_enabled = false;
-  }
-
-#if defined(OS_CHROMEOS)
-  // Override the default of suppressing HW compositing for WebUI pages for the
-  // file manager, which is implemented using WebUI but wants HW acceleration
-  // for video decode & render.
-  if (url.SchemeIs(extensions::kExtensionScheme) &&
-      url.host() == file_manager::kFileManagerAppId) {
-    web_prefs->accelerated_compositing_enabled = true;
-    web_prefs->accelerated_2d_canvas_enabled = true;
-  }
-#endif
 }
 
 void ChromeContentBrowserClient::UpdateInspectorSetting(
@@ -2466,30 +2417,6 @@ content::BrowserPpapiHost*
   return NULL;
 }
 
-bool ChromeContentBrowserClient::SupportsBrowserPlugin(
-    content::BrowserContext* browser_context, const GURL& site_url) {
-  if (CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableBrowserPluginForAllViewTypes))
-    return true;
-
-  if (content::HasWebUIScheme(site_url))
-    return true;
-
-  Profile* profile = Profile::FromBrowserContext(browser_context);
-  ExtensionService* service =
-      extensions::ExtensionSystem::Get(profile)->extension_service();
-  if (!service)
-    return false;
-
-  const Extension* extension =
-      service->extensions()->GetExtensionOrAppByURL(site_url);
-  if (!extension)
-    return false;
-
-  return extension->HasAPIPermission(APIPermission::kWebView) ||
-         extension->HasAPIPermission(APIPermission::kAdView);
-}
-
 bool ChromeContentBrowserClient::AllowPepperSocketAPI(
     content::BrowserContext* browser_context,
     const GURL& url,
@@ -2578,12 +2505,13 @@ void ChromeContentBrowserClient::GetAdditionalFileSystemBackends(
   fileapi::ExternalMountPoints* external_mount_points =
       content::BrowserContext::GetMountPoints(browser_context);
   DCHECK(external_mount_points);
-  chromeos::FileSystemBackend* backend =
-      new chromeos::FileSystemBackend(
-          new drive::FileSystemBackendDelegate,
-          browser_context->GetSpecialStoragePolicy(),
-          external_mount_points,
-          fileapi::ExternalMountPoints::GetSystemInstance());
+  chromeos::FileSystemBackend* backend = new chromeos::FileSystemBackend(
+      new drive::FileSystemBackendDelegate,
+      new chromeos::file_system_provider::BackendDelegate,
+      new chromeos::MTPFileSystemBackendDelegate(storage_partition_path),
+      browser_context->GetSpecialStoragePolicy(),
+      external_mount_points,
+      fileapi::ExternalMountPoints::GetSystemInstance());
   backend->AddSystemMountPoints();
   DCHECK(backend->CanHandleType(fileapi::kFileSystemTypeExternal));
   additional_backends->push_back(backend);

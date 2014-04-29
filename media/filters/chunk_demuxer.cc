@@ -93,13 +93,6 @@ class SourceState {
   typedef base::Callback<void(
       ChunkDemuxerStream*, const TextTrackConfig&)> NewTextTrackCB;
 
-  // First parameter - Indicates initialization success. Set to true if
-  //                   initialization was successful. False if an error
-  //                   occurred.
-  // Second parameter - Indicates the stream duration. Only contains a valid
-  //                    value if the first parameter is true.
-  typedef base::Callback<void(bool, TimeDelta)> InitCB;
-
   SourceState(
       scoped_ptr<StreamParser> stream_parser,
       scoped_ptr<FrameProcessorBase> frame_processor, const LogCB& log_cb,
@@ -107,7 +100,7 @@ class SourceState {
 
   ~SourceState();
 
-  void Init(const InitCB& init_cb,
+  void Init(const StreamParser::InitCB& init_cb,
             bool allow_audio,
             bool allow_video,
             const StreamParser::NeedKeyCB& need_key_cb,
@@ -189,8 +182,7 @@ class SourceState {
                     const StreamParser::TextBufferQueueMap& text_map);
 
   void OnSourceInitDone(bool success,
-                        TimeDelta duration,
-                        bool auto_update_timestamp_offset);
+                        const StreamParser::InitParameters& params);
 
   CreateDemuxerStreamCB create_demuxer_stream_cb_;
   NewTextTrackCB new_text_track_cb_;
@@ -231,7 +223,7 @@ class SourceState {
 
   scoped_ptr<FrameProcessorBase> frame_processor_;
   LogCB log_cb_;
-  InitCB init_cb_;
+  StreamParser::InitCB init_cb_;
 
   // Indicates that timestampOffset should be updated automatically during
   // OnNewBuffers() based on the earliest end timestamp of the buffers provided.
@@ -264,7 +256,7 @@ SourceState::~SourceState() {
   STLDeleteValues(&text_stream_map_);
 }
 
-void SourceState::Init(const InitCB& init_cb,
+void SourceState::Init(const StreamParser::InitCB& init_cb,
                        bool allow_audio,
                        bool allow_video,
                        const StreamParser::NeedKeyCB& need_key_cb,
@@ -696,10 +688,9 @@ bool SourceState::OnNewBuffers(
 }
 
 void SourceState::OnSourceInitDone(bool success,
-                                   TimeDelta duration,
-                                   bool auto_update_timestamp_offset) {
-  auto_update_timestamp_offset_ = auto_update_timestamp_offset;
-  base::ResetAndReturn(&init_cb_).Run(success, duration);
+                                   const StreamParser::InitParameters& params) {
+  auto_update_timestamp_offset_ = params.auto_update_timestamp_offset;
+  base::ResetAndReturn(&init_cb_).Run(success, params);
 }
 
 ChunkDemuxerStream::ChunkDemuxerStream(Type type, bool splice_frames_enabled)
@@ -983,6 +974,7 @@ ChunkDemuxer::ChunkDemuxer(const base::Closure& open_cb,
       log_cb_(log_cb),
       duration_(kNoTimestamp()),
       user_specified_duration_(-1),
+      liveness_(LIVENESS_UNKNOWN),
       splice_frames_enabled_(splice_frames_enabled) {
   DCHECK(!open_cb_.is_null());
   DCHECK(!need_key_cb_.is_null());
@@ -1067,6 +1059,14 @@ DemuxerStream* ChunkDemuxer::GetStream(DemuxerStream::Type type) {
 
 TimeDelta ChunkDemuxer::GetStartTime() const {
   return TimeDelta();
+}
+
+base::Time ChunkDemuxer::GetTimelineOffset() const {
+  return timeline_offset_;
+}
+
+Demuxer::Liveness ChunkDemuxer::GetLiveness() const {
+  return liveness_;
 }
 
 void ChunkDemuxer::StartWaitingForSeek(TimeDelta seek_time) {
@@ -1486,9 +1486,11 @@ bool ChunkDemuxer::IsSeekWaitingForData_Locked() const {
   return false;
 }
 
-void ChunkDemuxer::OnSourceInitDone(bool success, TimeDelta duration) {
+void ChunkDemuxer::OnSourceInitDone(
+    bool success,
+    const StreamParser::InitParameters& params) {
   DVLOG(1) << "OnSourceInitDone(" << success << ", "
-           << duration.InSecondsF() << ")";
+           << params.duration.InSecondsF() << ")";
   lock_.AssertAcquired();
   DCHECK_EQ(state_, INITIALIZING);
   if (!success || (!audio_ && !video_)) {
@@ -1496,13 +1498,37 @@ void ChunkDemuxer::OnSourceInitDone(bool success, TimeDelta duration) {
     return;
   }
 
-  if (duration != TimeDelta() && duration_ == kNoTimestamp())
-    UpdateDuration(duration);
+  if (params.duration != TimeDelta() && duration_ == kNoTimestamp())
+    UpdateDuration(params.duration);
+
+  if (!params.timeline_offset.is_null()) {
+    if (!timeline_offset_.is_null() &&
+        params.timeline_offset != timeline_offset_) {
+      MEDIA_LOG(log_cb_)
+          << "Timeline offset is not the same across all SourceBuffers.";
+      ReportError_Locked(DEMUXER_ERROR_COULD_NOT_OPEN);
+      return;
+    }
+
+    timeline_offset_ = params.timeline_offset;
+  }
+
+  if (params.liveness != LIVENESS_UNKNOWN) {
+    if (liveness_ != LIVENESS_UNKNOWN && params.liveness != liveness_) {
+      MEDIA_LOG(log_cb_)
+          << "Liveness is not the same across all SourceBuffers.";
+      ReportError_Locked(DEMUXER_ERROR_COULD_NOT_OPEN);
+      return;
+    }
+
+    liveness_ = params.liveness;
+  }
 
   // Wait until all streams have initialized.
   if ((!source_id_audio_.empty() && !audio_) ||
-      (!source_id_video_.empty() && !video_))
+      (!source_id_video_.empty() && !video_)) {
     return;
+  }
 
   SeekAllSources(GetStartTime());
   StartReturningData();

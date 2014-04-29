@@ -24,10 +24,9 @@ class ServiceWorkerContext {
   typedef base::Callback<void(bool success)> ResultCallback;
 
   // Equivalent to calling navigator.serviceWorker.register(script_url, {scope:
-  // pattern}) from a renderer running in |site_instance|, except that |pattern|
-  // is an absolute URL instead of relative to some current origin.  |callback|
-  // is passed true when the JS promise is fulfilled or false when the JS
-  // promise is rejected.
+  // pattern}) from a renderer, except that |pattern| is an absolute URL instead
+  // of relative to some current origin.  |callback| is passed true when the JS
+  // promise is fulfilled or false when the JS promise is rejected.
   //
   // The registration can fail if:
   //  * |script_url| is on a different origin from |pattern|
@@ -35,11 +34,9 @@ class ServiceWorkerContext {
   //  * |script_url| fails to parse or its top-level execution fails.
   //    TODO: The error message for this needs to be available to developers.
   //  * Something unexpected goes wrong, like a renderer crash or a full disk.
-  virtual void RegisterServiceWorker(
-      const Scope& pattern,
-      const GURL& script_url,
-      SiteInstance* associated_site_instance,
-      const ResultCallback& callback) = 0;
+  virtual void RegisterServiceWorker(const Scope& pattern,
+                                     const GURL& script_url,
+                                     const ResultCallback& callback) = 0;
 
   // Equivalent to calling navigator.serviceWorker.unregister(pattern) from a
   // renderer in |source_process_id|, except that |pattern| is an absolute URL

@@ -51,7 +51,7 @@ class Rect;
 namespace ui {
 class DisplayConfigurator;
 class Layer;
-class UserActivityNotifier;
+class UserActivityPowerManagerNotifier;
 }
 namespace views {
 class NonClientFrameView;
@@ -83,6 +83,7 @@ class BluetoothNotificationController;
 class CaptureController;
 class DesktopBackgroundController;
 class DisplayChangeObserver;
+class DisplayConfiguratorAnimation;
 class DisplayController;
 class DisplayErrorObserver;
 class DisplayManager;
@@ -107,7 +108,6 @@ class MouseCursorEventFilter;
 class MruWindowTracker;
 class NestedDispatcherController;
 class NewWindowDelegate;
-class OutputConfiguratorAnimation;
 class OverlayEventFilter;
 class PartialMagnificationController;
 class PowerButtonController;
@@ -301,8 +301,14 @@ class ASH_EXPORT Shell : public SystemModalContainerEventFilterDelegate,
   // their original position.
   void OnMaximizeModeEnded();
 
+  // Called when a root window is created.
+  void OnRootWindowAdded(aura::Window* root_window);
+
   // Initializes |shelf_|.  Does nothing if it's already initialized.
   void CreateShelf();
+
+  // Called when the shelf is created for |root_window|.
+  void OnShelfCreatedForRootWindow(aura::Window* root_window);
 
   // Creates a virtual keyboard. Deletes the old virtual keyboard if it already
   // exists.
@@ -498,8 +504,8 @@ class ASH_EXPORT Shell : public SystemModalContainerEventFilterDelegate,
   ui::DisplayConfigurator* display_configurator() {
     return display_configurator_.get();
   }
-  OutputConfiguratorAnimation* output_configurator_animation() {
-    return output_configurator_animation_.get();
+  DisplayConfiguratorAnimation* display_configurator_animation() {
+    return display_configurator_animation_.get();
   }
   DisplayErrorObserver* display_error_observer() {
     return display_error_observer_.get();
@@ -686,7 +692,7 @@ class ASH_EXPORT Shell : public SystemModalContainerEventFilterDelegate,
 
 #if defined(OS_CHROMEOS)
   scoped_ptr<PowerEventObserver> power_event_observer_;
-  scoped_ptr<ui::UserActivityNotifier> user_activity_notifier_;
+  scoped_ptr<ui::UserActivityPowerManagerNotifier> user_activity_notifier_;
   scoped_ptr<VideoActivityNotifier> video_activity_notifier_;
   scoped_ptr<StickyKeysController> sticky_keys_controller_;
   scoped_ptr<ResolutionNotificationController>
@@ -698,7 +704,7 @@ class ASH_EXPORT Shell : public SystemModalContainerEventFilterDelegate,
       last_window_closed_logout_reminder_;
   // Controls video output device state.
   scoped_ptr<ui::DisplayConfigurator> display_configurator_;
-  scoped_ptr<OutputConfiguratorAnimation> output_configurator_animation_;
+  scoped_ptr<DisplayConfiguratorAnimation> display_configurator_animation_;
   scoped_ptr<DisplayErrorObserver> display_error_observer_;
   scoped_ptr<ProjectingObserver> projecting_observer_;
 

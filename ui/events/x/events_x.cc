@@ -9,10 +9,10 @@
 #include <X11/extensions/XInput.h>
 #include <X11/extensions/XInput2.h>
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 
 #include "base/logging.h"
 #include "base/memory/singleton.h"
-#include "base/message_loop/message_pump_x11.h"
 #include "ui/events/event_utils.h"
 #include "ui/events/keycodes/keyboard_code_conversion_x.h"
 #include "ui/events/x/device_data_manager.h"
@@ -146,6 +146,31 @@ int GetEventFlagsFromXState(unsigned int state) {
   if (state & Button3Mask)
     flags |= ui::EF_RIGHT_MOUSE_BUTTON;
   return flags;
+}
+
+int GetEventFlagsFromXKeyEvent(XEvent* xevent) {
+  DCHECK(xevent->type == KeyPress || xevent->type == KeyRelease);
+
+#if defined(OS_CHROMEOS)
+  const int ime_fabricated_flag = 0;
+#else
+  // XIM fabricates key events for the character compositions by XK_Multi_key.
+  // For example, when a user hits XK_Multi_key, XK_apostrophe, and XK_e in
+  // order to input "é", then XIM generates a key event with keycode=0 and
+  // state=0 for the composition, and the sequence of X11 key events will be
+  // XK_Multi_key, XK_apostrophe, **NoSymbol**, and XK_e.
+  //
+  // We have to send these fabricated key events to XIM so it can correctly
+  // handle the character compositions.
+  const bool fabricated_by_xim =
+      xevent->xkey.keycode == 0 && xevent->xkey.state == 0;
+  const int ime_fabricated_flag =
+      fabricated_by_xim ? ui::EF_IME_FABRICATED_KEY : 0;
+#endif
+
+  return GetEventFlagsFromXState(xevent->xkey.state) |
+      (IsKeypadKey(XLookupKeysym(&xevent->xkey, 0)) ? ui::EF_NUMPAD_KEY : 0) |
+      ime_fabricated_flag;
 }
 
 // Get the event flag for the button in XButtonEvent. During a ButtonPress
@@ -328,7 +353,7 @@ int EventFlagsFromNative(const base::NativeEvent& native_event) {
     case KeyPress:
     case KeyRelease: {
       XModifierStateWatcher::GetInstance()->UpdateStateFromEvent(native_event);
-      return GetEventFlagsFromXState(native_event->xkey.state);
+      return GetEventFlagsFromXKeyEvent(native_event);
     }
     case ButtonPress:
     case ButtonRelease: {
@@ -532,6 +557,18 @@ gfx::Vector2d GetMouseWheelOffset(const base::NativeEvent& native_event) {
     default:
       return gfx::Vector2d();
   }
+}
+
+base::NativeEvent CopyNativeEvent(const base::NativeEvent& event) {
+  if (!event || event->type == GenericEvent)
+    return NULL;
+  XEvent* copy = new XEvent;
+  *copy = *event;
+  return copy;
+}
+
+void ReleaseCopiedNativeEvent(const base::NativeEvent& event) {
+  delete event;
 }
 
 void ClearTouchIdIfReleased(const base::NativeEvent& xev) {

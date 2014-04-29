@@ -43,23 +43,30 @@ class DOMAIN_RELIABILITY_EXPORT DomainReliabilityMonitor {
       scoped_ptr<MockableTime> time);
   ~DomainReliabilityMonitor();
 
+  // Adds the "baked-in" configuration(s) for Google sites.
+  void AddBakedInConfigs();
+
   // Should be called from the profile's NetworkDelegate on the corresponding
   // events:
   void OnBeforeRedirect(net::URLRequest* request);
   void OnCompleted(net::URLRequest* request, bool started);
 
-  // Creates a context for testing, adds it to the monitor, and returns a
-  // pointer to it. (The pointer is only valid until the MOnitor is destroyed.)
   DomainReliabilityContext* AddContextForTesting(
       scoped_ptr<const DomainReliabilityConfig> config);
+
+  size_t contexts_size_for_testing() const { return contexts_.size(); }
 
  private:
   friend class DomainReliabilityMonitorTest;
 
+  typedef std::map<std::string, DomainReliabilityContext*> ContextMap;
+
   struct DOMAIN_RELIABILITY_EXPORT RequestInfo {
     RequestInfo();
-    RequestInfo(const net::URLRequest& request);
+    explicit RequestInfo(const net::URLRequest& request);
     ~RequestInfo();
+
+    bool DefinitelyReachedNetwork() const;
 
     GURL url;
     net::URLRequestStatus status;
@@ -67,8 +74,14 @@ class DOMAIN_RELIABILITY_EXPORT DomainReliabilityMonitor {
     net::HostPortPair socket_address;
     net::LoadTimingInfo load_timing_info;
     bool was_cached;
+    int load_flags;
+    bool is_upload;
   };
 
+  // Creates a context, adds it to the monitor, and returns a pointer to it.
+  // (The pointer is only valid until the Monitor is destroyed.)
+  DomainReliabilityContext* AddContext(
+      scoped_ptr<const DomainReliabilityConfig> config);
   void OnRequestLegComplete(const RequestInfo& info);
 
   scoped_ptr<MockableTime> time_;
@@ -76,7 +89,7 @@ class DOMAIN_RELIABILITY_EXPORT DomainReliabilityMonitor {
   DomainReliabilityScheduler::Params scheduler_params_;
   DomainReliabilityDispatcher dispatcher_;
   scoped_ptr<DomainReliabilityUploader> uploader_;
-  std::map<std::string, DomainReliabilityContext*> contexts_;
+  ContextMap contexts_;
 
   DISALLOW_COPY_AND_ASSIGN(DomainReliabilityMonitor);
 };

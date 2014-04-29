@@ -36,7 +36,7 @@
 #endif
 
 #if defined(OS_CHROMEOS)
-#include "ash/display/output_configurator_animation.h"
+#include "ash/display/display_configurator_animation.h"
 #include "base/sys_info.h"
 #endif
 
@@ -838,6 +838,8 @@ bool DisplayManager::IsMirrored() const {
 }
 
 const DisplayInfo& DisplayManager::GetDisplayInfo(int64 display_id) const {
+  DCHECK_NE(gfx::Display::kInvalidDisplayID, display_id);
+
   std::map<int64, DisplayInfo>::const_iterator iter =
       display_info_.find(display_id);
   CHECK(iter != display_info_.end()) << display_id;
@@ -888,8 +890,8 @@ void DisplayManager::SetMirrorMode(bool mirrored) {
   }
   UpdateDisplays(display_info_list);
 #if defined(OS_CHROMEOS)
-  if (Shell::GetInstance()->output_configurator_animation()) {
-    Shell::GetInstance()->output_configurator_animation()->
+  if (Shell::GetInstance()->display_configurator_animation()) {
+    Shell::GetInstance()->display_configurator_animation()->
         StartFadeInAnimation();
   }
 #endif

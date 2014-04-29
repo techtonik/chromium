@@ -25,6 +25,7 @@
       'dependencies': [
         '<(DEPTH)/base/base.gyp:base',
         '<(DEPTH)/base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
+        '../gfx/gfx.gyp:gfx',
         '../gfx/gfx.gyp:gfx_geometry',
         'dom4_keycode_converter',
       ],
@@ -61,7 +62,8 @@
       'conditions': [
         ['use_x11==1', {
           'dependencies': [
-            '<(DEPTH)/build/linux/system.gyp:x11',
+            '../../build/linux/system.gyp:x11',
+            '../gfx/gfx.gyp:gfx_x11',
           ],
         }],
       ],
@@ -83,6 +85,7 @@
       'sources': [
         'cocoa/cocoa_event_utils.h',
         'cocoa/cocoa_event_utils.mm',
+        'cocoa/events_mac.mm',
         'event.cc',
         'event.h',
         'event_dispatcher.cc',
@@ -115,6 +118,14 @@
         'gestures/gesture_types.h',
         'gestures/velocity_calculator.cc',
         'gestures/velocity_calculator.h',
+        'ozone/evdev/libgestures_glue/event_reader_libevdev_cros.cc',
+        'ozone/evdev/libgestures_glue/event_reader_libevdev_cros.h',
+        'ozone/evdev/libgestures_glue/gesture_interpreter_libevdev_cros.cc',
+        'ozone/evdev/libgestures_glue/gesture_interpreter_libevdev_cros.h',
+        'ozone/evdev/libgestures_glue/gesture_logging.cc',
+        'ozone/evdev/libgestures_glue/gesture_logging.h',
+        'ozone/evdev/libgestures_glue/gesture_timer_provider.cc',
+        'ozone/evdev/libgestures_glue/gesture_timer_provider.h',
         'ozone/evdev/device_manager_evdev.cc',
         'ozone/evdev/device_manager_evdev.h',
         'ozone/evdev/device_manager_udev.cc',
@@ -144,6 +155,8 @@
         'platform/scoped_event_dispatcher.h',
         'platform/x11/x11_event_source.cc',
         'platform/x11/x11_event_source.h',
+        'platform/x11/x11_event_source_glib.cc',
+        'platform/x11/x11_event_source_libevent.cc',
         'win/events_win.cc',
         'x/events_x.cc',
         'linux/text_edit_command_auralinux.cc',
@@ -154,7 +167,7 @@
       'conditions': [
         # We explicitly enumerate the platforms we _do_ provide native cracking
         # for here.
-        ['OS=="win" or use_x11==1 or use_ozone==1', {
+        ['OS=="win" or OS=="mac" or use_x11==1 or use_ozone==1', {
           'sources!': [
             'events_stub.cc',
           ],
@@ -172,12 +185,21 @@
             'platform/platform_event_source_stub.cc',
           ],
           'dependencies': [
-            '<(DEPTH)/build/linux/system.gyp:x11',
+            '../../build/linux/system.gyp:x11',
+            '../gfx/gfx.gyp:gfx_x11',
           ],
         }],
         ['use_glib==1', {
           'dependencies': [
             '../../build/linux/system.gyp:glib',
+          ],
+          'sources!': [
+            'platform/x11/x11_event_source_libevent.cc',
+          ],
+        }, {
+          # use_glib == 0
+          'sources!': [
+            'platform/x11/x11_event_source_glib.cc',
           ],
         }],
         ['use_ozone_evdev==1', {
@@ -186,6 +208,19 @@
         ['use_ozone_evdev==1 and use_udev==1', {
           'dependencies': [
             '<(DEPTH)/build/linux/system.gyp:udev',
+          ],
+        }],
+        ['use_ozone_evdev==1 and use_evdev_gestures==1', {
+          'dependencies': [
+            '<(DEPTH)/build/linux/system.gyp:libgestures',
+            '<(DEPTH)/build/linux/system.gyp:libevdev-cros',
+          ],
+          'defines': [
+            'USE_EVDEV_GESTURES',
+          ],
+        }, {
+          'sources/': [
+            ['exclude', '^ozone/evdev/libgestures_glue/'],
           ],
         }],
         ['use_udev==0', {
@@ -276,7 +311,8 @@
       'conditions': [
         ['use_x11==1', {
           'dependencies': [
-            '<(DEPTH)/build/linux/system.gyp:x11',
+            '../../build/linux/system.gyp:x11',
+            '../gfx/gfx.gyp:gfx_x11',
           ],
         }],
         ['OS=="ios"', {
@@ -293,8 +329,8 @@
         '<(DEPTH)/base/base.gyp:run_all_unittests',
         '<(DEPTH)/base/base.gyp:test_support_base',
         '<(DEPTH)/testing/gtest.gyp:gtest',
-        '../gfx/gfx.gyp:gfx',
         '../gfx/gfx.gyp:gfx_geometry',
+        '../gfx/gfx.gyp:gfx_test_support',
         'dom4_keycode_converter',
         'events',
         'events_base',
@@ -302,7 +338,7 @@
         'gesture_detection'
       ],
       'sources': [
-        'cocoa/cocoa_event_utils_unittest.mm',
+        'cocoa/events_mac_unittest.mm',
         'event_dispatcher_unittest.cc',
         'event_processor_unittest.cc',
         'event_rewriter_unittest.cc',
@@ -357,7 +393,6 @@
           ],
           'variables': {
             'test_suite_name': 'events_unittests',
-            'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)events_unittests<(SHARED_LIB_SUFFIX)',
           },
           'includes': [ '../../build/apk_test.gypi' ],
         },

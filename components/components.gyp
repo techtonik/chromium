@@ -16,9 +16,12 @@
     'breakpad.gypi',
     'cloud_devices.gypi',
     'cronet.gypi',
+    'data_reduction_proxy.gypi',
     'dom_distiller.gypi',
     'domain_reliability.gypi',
     'favicon.gypi',
+    'favicon_base.gypi',
+    'infobars.gypi',
     'json_schema.gypi',
     'keyed_service.gypi',
     'language_usage_metrics.gypi',
@@ -29,6 +32,7 @@
     'password_manager.gypi',
     'policy.gypi',
     'precache.gypi',
+    'query_parser.gypi',
     'rappor.gypi',
     'signin.gypi',
     'startup_metric_utils.gypi',
@@ -48,8 +52,17 @@
         'visitedlink.gypi',
         'web_contents_delegate_android.gypi',
         'web_modal.gypi',
+      ],
+    }],
+    ['OS == "win" or OS == "mac"', {
+      'includes': [
         'wifi.gypi',
       ],
+    }],
+    ['OS != "ios" and OS != "android"', {
+      'includes': [
+        'usb_service.gypi',
+      ]
     }],
     ['android_webview_build == 0', {
       # Android WebView fails to build if a dependency on sync.gyp:sync is

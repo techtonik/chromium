@@ -79,7 +79,7 @@ class CC_EXPORT ResourceProvider {
   virtual ~ResourceProvider();
 
   void InitializeSoftware();
-  bool InitializeGL();
+  void InitializeGL();
 
   void DidLoseOutputSurface() { lost_output_surface_ = true; }
 
@@ -324,13 +324,14 @@ class CC_EXPORT ResourceProvider {
   SkCanvas* MapDirectRasterBuffer(ResourceId id);
   void UnmapDirectRasterBuffer(ResourceId id);
 
-  // Returns a canvas backed by an image buffer.
+  // Returns a canvas backed by an image buffer. UnmapImageRasterBuffer
+  // returns true if canvas was written to while mapped.
   // Rasterizing to the canvas writes the content into the image buffer,
   // which is internally bound to the underlying resource when read.
   // Call Unmap before the resource can be read or used for compositing.
   // It is used by ImageRasterWorkerPool.
   SkCanvas* MapImageRasterBuffer(ResourceId id);
-  void UnmapImageRasterBuffer(ResourceId id);
+  bool UnmapImageRasterBuffer(ResourceId id);
 
   // Returns a canvas backed by pixel buffer. UnmapPixelRasterBuffer
   // returns true if canvas was written to while mapped.
@@ -359,16 +360,16 @@ class CC_EXPORT ResourceProvider {
   // Sets the current read fence. If a resource is locked for read
   // and has read fences enabled, the resource will not allow writes
   // until this fence has passed.
-  void SetReadLockFence(scoped_refptr<Fence> fence) {
-    current_read_lock_fence_ = fence;
-  }
-  Fence* GetReadLockFence() { return current_read_lock_fence_.get(); }
+  void SetReadLockFence(Fence* fence) { current_read_lock_fence_ = fence; }
 
   // Enable read lock fences for a specific resource.
   void EnableReadLockFences(ResourceProvider::ResourceId id, bool enable);
 
   // Indicates if we can currently lock this resource for write.
   bool CanLockForWrite(ResourceId id);
+
+  // Copy pixels from source to destination.
+  void CopyResource(ResourceId source_id, ResourceId dest_id);
 
   static GLint GetActiveTextureUnit(gpu::gles2::GLES2Interface* gl);
 
@@ -409,6 +410,8 @@ class CC_EXPORT ResourceProvider {
     unsigned gl_pixel_buffer_id;
     // Query used to determine when asynchronous set pixels complete.
     unsigned gl_upload_query_id;
+    // Query used to determine when read lock fence has passed.
+    unsigned gl_read_lock_query_id;
     TextureMailbox mailbox;
     ReleaseCallback release_callback;
     uint8_t* pixels;
@@ -645,6 +648,8 @@ class CC_EXPORT ResourceProvider {
   const size_t id_allocation_chunk_size_;
   scoped_ptr<IdAllocator> texture_id_allocator_;
   scoped_ptr<IdAllocator> buffer_id_allocator_;
+
+  bool use_sync_query_;
 
   DISALLOW_COPY_AND_ASSIGN(ResourceProvider);
 };

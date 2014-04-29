@@ -28,14 +28,13 @@
 #include "third_party/WebKit/public/platform/WebGraphicsContext3D.h"
 #include "third_party/WebKit/public/platform/WebMediaPlayer.h"
 #include "third_party/WebKit/public/platform/WebMediaPlayerClient.h"
-// TODO(dcheng): Convert back to forward declare.
-#include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "url/gurl.h"
 
 class RenderAudioSourceProvider;
 
 namespace blink {
 class WebContentDecryptionModule;
+class WebLocalFrame;
 }
 
 namespace base {
@@ -107,6 +106,7 @@ class WebMediaPlayerImpl
   virtual bool paused() const;
   virtual bool seeking() const;
   virtual double duration() const;
+  virtual double timelineOffset() const;
   virtual double currentTime() const;
 
   // Internal states of loading and network.
@@ -184,7 +184,6 @@ class WebMediaPlayerImpl
                  const std::vector<uint8>& init_data);
   void OnAddTextTrack(const media::TextTrackConfig& config,
                       const media::AddTextTrackDoneCB& done_cb);
-  void SetOpaque(bool);
 
  private:
   // Called after |defer_load_cb_| has decided to allow the load. If
@@ -228,8 +227,9 @@ class WebMediaPlayerImpl
   double GetPipelineDuration() const;
 
   // Callbacks from |pipeline_| that are forwarded to |client_|.
-  void OnDurationChange();
-  void OnNaturalSizeChange(gfx::Size size);
+  void OnDurationChanged();
+  void OnNaturalSizeChanged(gfx::Size size);
+  void OnOpacityChanged(bool opaque);
 
   // Called by VideoRendererImpl on its internal thread with the new frame to be
   // painted.
@@ -264,6 +264,9 @@ class WebMediaPlayerImpl
 
   // Cache of metadata for answering hasAudio(), hasVideo(), and naturalSize().
   media::PipelineMetadata pipeline_metadata_;
+
+  // Whether the video is known to be opaque or not.
+  bool opaque_;
 
   // Playback state.
   //
@@ -329,7 +332,8 @@ class WebMediaPlayerImpl
   std::string init_data_type_;
 
   // Video rendering members.
-  VideoFrameCompositor compositor_;
+  scoped_refptr<base::SingleThreadTaskRunner> compositor_task_runner_;
+  VideoFrameCompositor* compositor_;  // Deleted on |compositor_task_runner_|.
   media::SkCanvasVideoRenderer skcanvas_video_renderer_;
 
   // The compositor layer for displaying the video content when using composited

@@ -154,10 +154,6 @@
 	path = third_party/gnu_binutils
 	url = https://chromium.googlesource.com/native_client/deps/third_party/gnu_binutils.git
 	os = win
-[submodule "third_party/gold"]
-	path = third_party/gold
-	url = https://chromium.googlesource.com/chromium/deps/gold.git
-	os = unix
 [submodule "third_party/google_toolbox_for_mac/src"]
 	path = third_party/google_toolbox_for_mac/src
 	url = https://chromium.googlesource.com/external/google-toolbox-for-mac.git

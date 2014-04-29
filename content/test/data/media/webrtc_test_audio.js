@@ -30,9 +30,14 @@ function gatherAudioLevelSamples(peerConnection, numSamples, frequency,
 // test if we can't see a signal. The samples should have been gathered over at
 // least two seconds since we expect to see at least three "peaks" in there
 // (we should see either 3 or 4 depending on how things line up).
-function verifyAudioIsPlaying(samples) {
+//
+// If |beLenient| is specified, we assume we're running on a slow device or
+// or under TSAN, and relax the checks quite a bit.
+function verifyAudioIsPlaying(samples, beLenient) {
   var numPeaks = 0;
   var threshold = MAX_AUDIO_OUTPUT_ENERGY * 0.7;
+  if (beLenient)
+    threshold = MAX_AUDIO_OUTPUT_ENERGY * 0.6;
   var currentlyOverThreshold = false;
 
   // Detect when we have been been over the threshold and is going back again
@@ -45,9 +50,14 @@ function verifyAudioIsPlaying(samples) {
 
   console.log('Number of peaks identified: ' + numPeaks);
 
-  if (numPeaks < 2)
-    failTest('Expected to see at least two peaks in audio signal, got ' +
-        numPeaks + '. Dumping samples for analysis: "' + samples + '"');
+  var expectedPeaks = 2;
+  if (beLenient)
+    expectedPeaks = 1;
+
+  if (numPeaks < expectedPeaks)
+    failTest('Expected to see at least ' + expectedPeaks + ' peak(s) in ' +
+        'audio signal, got ' + numPeaks + '. Dumping samples for analysis: "' +
+        samples + '"');
 }
 
 // If silent (like when muted), we should get very near zero audio level.

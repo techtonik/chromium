@@ -508,7 +508,8 @@ public class AwContents {
         mLayoutSizer.setDelegate(new AwLayoutSizerDelegate());
         mLayoutSizer.setDIPScale(mDIPScale);
         mWebContentsDelegate = new AwWebContentsDelegateAdapter(contentsClient, mContainerView);
-        mContentsClientBridge = new AwContentsClientBridge(contentsClient);
+        mContentsClientBridge = new AwContentsClientBridge(contentsClient,
+                mBrowserContext.getKeyStore(), mBrowserContext.getClientCertLookupTable());
         mZoomControls = new AwZoomControls(this);
         mIoThreadClient = new IoThreadClientImpl();
         mInterceptNavigationDelegate = new InterceptNavigationDelegateImpl();
@@ -1369,6 +1370,15 @@ public class AwContents {
     }
 
     /**
+     * @see android.webkit.WebView#clearClientCertPreferences()
+     */
+    public void clearClientCertPreferences() {
+        mBrowserContext.getClientCertLookupTable().clear();
+        if (mNativeAwContents == 0) return;
+        nativeClearClientCertPreferences(mNativeAwContents);
+    }
+
+    /**
      * Method to return all hit test values relevant to public WebView API.
      * Note that this expose more data than needed for WebView.getHitTestResult.
      * Unsafely returning reference to mutable internal object to avoid excessive
@@ -1605,16 +1615,16 @@ public class AwContents {
         mIsAttachedToWindow = false;
         hideAutofillPopup();
         if (mNativeAwContents != 0) {
-            if (mContainerView.isHardwareAccelerated()) {
-                boolean result = mInternalAccessAdapter.executeHardwareAction(new Runnable() {
-                    @Override
-                    public void run() {
-                        nativeReleaseHardwareDrawOnRenderThread(mNativeAwContents);
-                    }
-                });
-                if (!result) {
-                    Log.d(TAG, "executeHardwareAction failed");
+            Runnable releaseHardware = new Runnable() {
+                @Override
+                public void run() {
+                    nativeReleaseHardwareDrawOnRenderThread(mNativeAwContents);
                 }
+            };
+            boolean result = mInternalAccessAdapter.executeHardwareAction(releaseHardware);
+            if (!result) {
+                Log.e(TAG, "May leak or deadlock. Leaked window?");
+                releaseHardware.run();
             }
 
             nativeOnDetachedFromWindow(mNativeAwContents);
@@ -2140,4 +2150,5 @@ public class AwContents {
 
     private native void nativeCreatePdfExporter(long nativeAwContents, AwPdfExporter awPdfExporter);
 
+    private native void nativeClearClientCertPreferences(long nativeAwContents);
 }

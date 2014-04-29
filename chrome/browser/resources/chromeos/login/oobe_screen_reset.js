@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 /**
- * @fileoverview Oobe reset screen implementation.
+ * @fileoverview Device reset screen implementation.
  */
 
 login.createScreen('ResetScreen', 'reset', function() {
@@ -11,6 +11,10 @@ login.createScreen('ResetScreen', 'reset', function() {
     /** @override */
     decorate: function() {
       $('reset-powerwash-help-link-on-rollback').addEventListener(
+          'click', function(event) {
+        chrome.send('resetOnLearnMore');
+      });
+      $('powerwash-help-link').addEventListener(
           'click', function(event) {
         chrome.send('resetOnLearnMore');
       });

@@ -38,20 +38,18 @@ class ServiceWorkerRegisterJob : public ServiceWorkerRegisterJobBase {
                               ServiceWorkerVersion* version)>
       RegistrationCallback;
 
-  ServiceWorkerRegisterJob(base::WeakPtr<ServiceWorkerContextCore> context,
-                           const GURL& pattern,
-                           const GURL& script_url);
+  CONTENT_EXPORT ServiceWorkerRegisterJob(
+      base::WeakPtr<ServiceWorkerContextCore> context,
+      const GURL& pattern,
+      const GURL& script_url);
   virtual ~ServiceWorkerRegisterJob();
 
-  // Registers a callback to be called when the job completes (whether
-  // successfully or not). Multiple callbacks may be registered. |process_id|
-  // and |site_instance| are potentially used to create the Service Worker
-  // instance if there are no other clients.  If not NULL, |site_instance| must
-  // have been AddRef()ed on the UI thread and is retained to create future
-  // Service Worker instances.
-  void AddCallback(const RegistrationCallback& callback,
-                   int process_id,
-                   SiteInstance* site_instance);
+  // Registers a callback to be called when the promise would resolve (whether
+  // successfully or not). Multiple callbacks may be registered. If |process_id|
+  // is not -1, it's added to the existing clients when deciding in which
+  // process to create the Service Worker instance.  If there are no existing
+  // clients, a new RenderProcessHost will be created.
+  void AddCallback(const RegistrationCallback& callback, int process_id);
 
   // ServiceWorkerRegisterJobBase implementation:
   virtual void Start() OVERRIDE;
@@ -59,12 +57,16 @@ class ServiceWorkerRegisterJob : public ServiceWorkerRegisterJobBase {
   virtual RegistrationJobType GetType() OVERRIDE;
 
  private:
+  FRIEND_TEST_ALL_PREFIXES(ServiceWorkerRegisterJobAndProviderHostTest,
+                           AssociatePendingVersionToDocuments);
+
   enum Phase {
      INITIAL,
      START,
      REGISTER,
      UPDATE,
      INSTALL,
+     STORE,
      ACTIVATE,
      COMPLETE
   };
@@ -91,14 +93,19 @@ class ServiceWorkerRegisterJob : public ServiceWorkerRegisterJobBase {
   void RegisterAndContinue(ServiceWorkerStatusCode status);
   void UpdateAndContinue(ServiceWorkerStatusCode status);
   void OnStartWorkerFinished(ServiceWorkerStatusCode status);
+  void OnStoreRegistrationComplete(ServiceWorkerStatusCode status);
   void InstallAndContinue();
   void OnInstallFinished(ServiceWorkerStatusCode status);
   void ActivateAndContinue();
+  void OnActivateFinished(ServiceWorkerStatusCode status);
   void Complete(ServiceWorkerStatusCode status);
 
-  void RunCallbacks(ServiceWorkerStatusCode status,
-                    ServiceWorkerRegistration* registration,
-                    ServiceWorkerVersion* version);
+  void ResolvePromise(ServiceWorkerStatusCode status,
+                      ServiceWorkerRegistration* registration,
+                      ServiceWorkerVersion* version);
+
+  CONTENT_EXPORT void AssociatePendingVersionToDocuments(
+      ServiceWorkerVersion* version);
 
   // The ServiceWorkerContextCore object should always outlive this.
   base::WeakPtr<ServiceWorkerContextCore> context_;
@@ -106,10 +113,13 @@ class ServiceWorkerRegisterJob : public ServiceWorkerRegisterJobBase {
   const GURL pattern_;
   const GURL script_url_;
   std::vector<RegistrationCallback> callbacks_;
-  int pending_process_id_;
-  SiteInstance* site_instance_;
+  std::vector<int> pending_process_ids_;
   Phase phase_;
   Internal internal_;
+  bool is_promise_resolved_;
+  ServiceWorkerStatusCode promise_resolved_status_;
+  scoped_refptr<ServiceWorkerRegistration> promise_resolved_registration_;
+  scoped_refptr<ServiceWorkerVersion> promise_resolved_version_;
   base::WeakPtrFactory<ServiceWorkerRegisterJob> weak_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(ServiceWorkerRegisterJob);

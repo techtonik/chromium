@@ -1,4 +1,4 @@
-// Copyright 2013 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -27,11 +27,15 @@ const char kEventUnresponsive[] = "webview.onUnresponsive";
 const char kEventZoomChange[] = "webview.onZoomChange";
 
 // Parameters/properties on events.
+const char kDefaultPromptText[] = "defaultPromptText";
 const char kFindSearchText[] = "searchText";
 const char kFindFinalUpdate[] = "finalUpdate";
+const char kLastUnlockedBySelf[] = "lastUnlockedBySelf";
 const char kLevel[] = "level";
 const char kLine[] = "line";
 const char kMessage[] = "message";
+const char kMessageText[] = "messageText";
+const char kMessageType[] = "messageType";
 const char kNewHeight[] = "newHeight";
 const char kNewURL[] = "newUrl";
 const char kNewWidth[] = "newWidth";
@@ -74,5 +78,6 @@ const char kParameterUserAgentOverride[] = "userAgentOverride";
 
 // Miscellaneous.
 const unsigned int kMaxOutstandingPermissionRequests = 1024;
+const int kInvalidPermissionRequestID = 0;
 
 }  // namespace webview

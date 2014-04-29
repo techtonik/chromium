@@ -116,14 +116,6 @@ class Browser : public TabStripModelObserver,
     TYPE_POPUP = 2
   };
 
-  // Distinguishes between browsers that host an app (opened from
-  // ApplicationLauncher::OpenApplication), and child browsers created by an app
-  // from Browser::CreateForApp (e.g. by windows.open or the extension API).
-  enum AppType {
-    APP_TYPE_HOST = 1,
-    APP_TYPE_CHILD = 2
-  };
-
   // Possible elements of the Browser window.
   enum WindowFeature {
     FEATURE_NONE = 0,
@@ -157,8 +149,8 @@ class Browser : public TabStripModelObserver,
                  Profile* profile,
                  chrome::HostDesktopType host_desktop_type);
 
-    static CreateParams CreateForApp(Type type,
-                                     const std::string& app_name,
+    static CreateParams CreateForApp(const std::string& app_name,
+                                     bool trusted_source,
                                      const gfx::Rect& window_bounds,
                                      Profile* profile,
                                      chrome::HostDesktopType host_desktop_type);
@@ -176,14 +168,8 @@ class Browser : public TabStripModelObserver,
     // The host desktop the browser is created on.
     chrome::HostDesktopType host_desktop_type;
 
-    // The application name that is also the name of the window to the shell.
-    // This name should be set when:
-    // 1) we launch an application via an application shortcut or extension API.
-    // 2) we launch an undocked devtool window.
-    std::string app_name;
-
-    // Type of app (host or child). See description of AppType.
-    AppType app_type;
+    // Specifies the browser is_trusted_source_ value.
+    bool trusted_source;
 
     // The bounds of the window to open.
     gfx::Rect initial_bounds;
@@ -195,6 +181,17 @@ class Browser : public TabStripModelObserver,
     // Supply a custom BrowserWindow implementation, to be used instead of the
     // default. Intended for testing.
     BrowserWindow* window;
+
+   private:
+    friend class Browser;
+
+    // The application name that is also the name of the window to the shell.
+    // Do not set this value directly, use CreateForApp.
+    // This name will be set for:
+    // 1) v1 applications launched via an application shortcut or extension API.
+    // 2) undocked devtool windows.
+    // 3) popup windows spawned from v1 applications.
+    std::string app_name;
   };
 
   // Constructors, Creation, Showing //////////////////////////////////////////
@@ -231,7 +228,7 @@ class Browser : public TabStripModelObserver,
 
   Type type() const { return type_; }
   const std::string& app_name() const { return app_name_; }
-  AppType app_type() const { return app_type_; }
+  bool is_trusted_source() const { return is_trusted_source_; }
   Profile* profile() const { return profile_; }
   gfx::Rect override_bounds() const { return override_bounds_; }
 
@@ -363,6 +360,7 @@ class Browser : public TabStripModelObserver,
   // See the description of
   // FullscreenController::ToggleFullscreenModeWithExtension.
   void ToggleFullscreenModeWithExtension(const GURL& extension_url);
+
 #if defined(OS_WIN)
   // See the description of FullscreenController::ToggleMetroSnapMode.
   void SetMetroSnapMode(bool enable);
@@ -430,6 +428,7 @@ class Browser : public TabStripModelObserver,
 
   // Overridden from content::WebContentsDelegate:
   virtual bool CanOverscrollContent() const OVERRIDE;
+  virtual bool ShouldPreserveAbortedURLs(content::WebContents* source) OVERRIDE;
   virtual bool PreHandleKeyboardEvent(
       content::WebContents* source,
       const content::NativeWebKeyboardEvent& event,
@@ -489,6 +488,7 @@ class Browser : public TabStripModelObserver,
   FRIEND_TEST_ALL_PREFIXES(BrowserTest, ConvertTabToAppShortcut);
   FRIEND_TEST_ALL_PREFIXES(BrowserTest, OpenAppWindowLikeNtp);
   FRIEND_TEST_ALL_PREFIXES(BrowserTest, AppIdSwitch);
+  FRIEND_TEST_ALL_PREFIXES(BrowserTest, ShouldShowLocationBar);
   FRIEND_TEST_ALL_PREFIXES(FullscreenControllerTest,
                            TabEntersPresentationModeFromWindowed);
   FRIEND_TEST_ALL_PREFIXES(FullscreenExitBubbleControllerTest,
@@ -828,8 +828,10 @@ class Browser : public TabStripModelObserver,
   // 2) we launch an undocked devtool window.
   std::string app_name_;
 
-  // Type of app (host or child). See description of AppType.
-  AppType app_type_;
+  // True if the source is trusted (i.e. we do not need to show the URL in a
+  // a popup window). Also used to determine which app windows to save and
+  // restore on Chrome OS.
+  bool is_trusted_source_;
 
   // Unique identifier of this browser for session restore. This id is only
   // unique within the current session, and is not guaranteed to be unique

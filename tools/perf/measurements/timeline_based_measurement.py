@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 from measurements import timeline_controller
-from metrics import timeline_interaction_record as tir_module
+from telemetry.web_perf import timeline_interaction_record as tir_module
 from metrics import smoothness
 from telemetry.page import page_measurement
 from telemetry.core.timeline import model as model_module
@@ -64,7 +64,7 @@ class _TimelineBasedMetrics(object):
       wrapped_results = _ResultsWrapper(results, interaction)
       for m in metrics:
         m.AddResults(self._model, self._renderer_thread,
-                     interaction, wrapped_results)
+                     [interaction], wrapped_results)
 
 
 class TimelineBasedMeasurement(page_measurement.PageMeasurement):

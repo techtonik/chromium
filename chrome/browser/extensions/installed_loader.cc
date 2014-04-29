@@ -17,7 +17,6 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/extensions/api/managed_mode_private/managed_mode_handler.h"
-#include "chrome/common/extensions/extension_file_util.h"
 #include "chrome/common/extensions/manifest_url_handler.h"
 #include "chrome/common/pref_names.h"
 #include "content/public/browser/notification_service.h"
@@ -28,6 +27,7 @@
 #include "extensions/browser/management_policy.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_l10n_util.h"
+#include "extensions/common/file_util.h"
 #include "extensions/common/manifest.h"
 #include "extensions/common/manifest_constants.h"
 #include "extensions/common/manifest_handlers/background_info.h"
@@ -171,8 +171,7 @@ void InstalledLoader::Load(const ExtensionInfo& info, bool write_to_prefs) {
   }
 
   if (!extension.get()) {
-    extension_service_->ReportExtensionLoadError(
-        info.extension_path, error, false);
+    extension_service_->ReportExtensionLoadError(info.extension_path, error);
     return;
   }
 
@@ -217,15 +216,14 @@ void InstalledLoader::LoadAllExtensions() {
 
       std::string error;
       scoped_refptr<const Extension> extension(
-          extension_file_util::LoadExtension(
-              info->extension_path,
-              info->extension_location,
-              GetCreationFlags(info),
-              &error));
+          file_util::LoadExtension(info->extension_path,
+                                   info->extension_location,
+                                   GetCreationFlags(info),
+                                   &error));
 
       if (!extension.get()) {
         extension_service_->ReportExtensionLoadError(
-            info->extension_path, error, false);
+            info->extension_path, error);
         continue;
       }
 

@@ -26,6 +26,7 @@
 #include "base/strings/utf_string_conversions.h"
 #import "chrome/browser/mac/dock.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/shell_integration.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
@@ -203,7 +204,7 @@ bool HasSameUserDataDir(const base::FilePath& bundle_path) {
 }
 
 void LaunchShimOnFileThread(
-    const ShellIntegration::ShortcutInfo& shortcut_info) {
+    const web_app::ShortcutInfo& shortcut_info) {
   DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::FILE));
   base::FilePath shim_path = web_app::GetAppInstallPath(shortcut_info);
 
@@ -388,11 +389,11 @@ std::vector<base::FilePath> GetAllAppBundlesInPath(
   return bundle_paths;
 }
 
-ShellIntegration::ShortcutInfo BuildShortcutInfoFromBundle(
+web_app::ShortcutInfo BuildShortcutInfoFromBundle(
     const base::FilePath& bundle_path) {
   NSDictionary* plist = ReadPlist(GetPlistPath(bundle_path));
 
-  ShellIntegration::ShortcutInfo shortcut_info;
+  web_app::ShortcutInfo shortcut_info;
   shortcut_info.extension_id = base::SysNSStringToUTF8(
       [plist valueForKey:app_mode::kCrAppModeShortcutIDKey]);
   shortcut_info.is_platform_app = true;
@@ -417,6 +418,51 @@ ShellIntegration::ShortcutInfo BuildShortcutInfoFromBundle(
   return shortcut_info;
 }
 
+void UpdateFileTypes(NSMutableDictionary* plist,
+                     const extensions::FileHandlersInfo& file_handlers_info) {
+  const std::vector<extensions::FileHandlerInfo>& handlers =
+      file_handlers_info.handlers;
+  NSMutableArray* document_types =
+      [NSMutableArray arrayWithCapacity:handlers.size()];
+
+  for (std::vector<extensions::FileHandlerInfo>::const_iterator info_it =
+           handlers.begin();
+       info_it != handlers.end();
+       ++info_it) {
+    const extensions::FileHandlerInfo& info = *info_it;
+
+    NSMutableArray* file_extensions =
+        [NSMutableArray arrayWithCapacity:info.extensions.size()];
+    for (std::set<std::string>::iterator it = info.extensions.begin();
+         it != info.extensions.end();
+         ++it) {
+      [file_extensions addObject:base::SysUTF8ToNSString(*it)];
+    }
+
+    NSMutableArray* mime_types =
+        [NSMutableArray arrayWithCapacity:info.types.size()];
+    for (std::set<std::string>::iterator it = info.types.begin();
+         it != info.types.end();
+         ++it) {
+      [mime_types addObject:base::SysUTF8ToNSString(*it)];
+    }
+
+    NSDictionary* type_dictionary = @{
+      // TODO(jackhou): Add the type name and and icon file once the manifest
+      // supports these.
+      // app_mode::kCFBundleTypeNameKey : ,
+      // app_mode::kCFBundleTypeIconFileKey : ,
+      app_mode::kCFBundleTypeExtensionsKey : file_extensions,
+      app_mode::kCFBundleTypeMIMETypesKey : mime_types,
+      app_mode::kCFBundleTypeRoleKey : app_mode::kBundleTypeRoleViewer
+    };
+    [document_types addObject:type_dictionary];
+  }
+
+  [plist setObject:document_types
+            forKey:app_mode::kCFBundleDocumentTypesKey];
+}
+
 }  // namespace
 
 namespace chrome {
@@ -428,7 +474,7 @@ void ShowCreateChromeAppShortcutsDialog(gfx::NativeWindow /*parent_window*/,
   // Normally we would show a dialog, but since we always create the app
   // shortcut in ~/Applications there are no options for the user to choose.
   web_app::CreateShortcuts(web_app::SHORTCUT_CREATION_BY_USER,
-                           ShellIntegration::ShortcutLocations(),
+                           web_app::ShortcutLocations(),
                            profile,
                            app);
   if (!close_callback.is_null())
@@ -441,9 +487,11 @@ namespace web_app {
 
 WebAppShortcutCreator::WebAppShortcutCreator(
     const base::FilePath& app_data_dir,
-    const ShellIntegration::ShortcutInfo& shortcut_info)
+    const web_app::ShortcutInfo& shortcut_info,
+    const extensions::FileHandlersInfo& file_handlers_info)
     : app_data_dir_(app_data_dir),
-      info_(shortcut_info) {}
+      info_(shortcut_info),
+      file_handlers_info_(file_handlers_info) {}
 
 WebAppShortcutCreator::~WebAppShortcutCreator() {}
 
@@ -521,7 +569,7 @@ size_t WebAppShortcutCreator::CreateShortcutsIn(
 
 bool WebAppShortcutCreator::CreateShortcuts(
     ShortcutCreationReason creation_reason,
-    ShellIntegration::ShortcutLocations creation_locations) {
+    web_app::ShortcutLocations creation_locations) {
   const base::FilePath applications_dir = GetApplicationsDirname();
   if (applications_dir.empty() ||
       !base::DirectoryExists(applications_dir.DirName())) {
@@ -678,6 +726,11 @@ bool WebAppShortcutCreator::UpdatePlist(const base::FilePath& app_path) const {
   [plist setObject:base::mac::FilePathToNSString(app_name)
             forKey:base::mac::CFToNSCast(kCFBundleNameKey)];
 
+  if (CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableAppsFileAssociations)) {
+    UpdateFileTypes(plist, file_handlers_info_);
+  }
+
   return [plist writeToFile:plist_path
                  atomically:YES];
 }
@@ -794,12 +847,13 @@ void WebAppShortcutCreator::RevealAppShimInFinder() const {
 }
 
 base::FilePath GetAppInstallPath(
-    const ShellIntegration::ShortcutInfo& shortcut_info) {
-  WebAppShortcutCreator shortcut_creator(base::FilePath(), shortcut_info);
+    const web_app::ShortcutInfo& shortcut_info) {
+  WebAppShortcutCreator shortcut_creator(
+      base::FilePath(), shortcut_info, extensions::FileHandlersInfo());
   return shortcut_creator.GetApplicationsShortcutPath();
 }
 
-void MaybeLaunchShortcut(const ShellIntegration::ShortcutInfo& shortcut_info) {
+void MaybeLaunchShortcut(const web_app::ShortcutInfo& shortcut_info) {
   if (!apps::IsAppShimsEnabled())
     return;
 
@@ -812,28 +866,33 @@ namespace internals {
 
 bool CreatePlatformShortcuts(
     const base::FilePath& app_data_path,
-    const ShellIntegration::ShortcutInfo& shortcut_info,
-    const ShellIntegration::ShortcutLocations& creation_locations,
+    const web_app::ShortcutInfo& shortcut_info,
+    const extensions::FileHandlersInfo& file_handlers_info,
+    const web_app::ShortcutLocations& creation_locations,
     ShortcutCreationReason creation_reason) {
   DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::FILE));
-  WebAppShortcutCreator shortcut_creator(app_data_path, shortcut_info);
+  WebAppShortcutCreator shortcut_creator(
+      app_data_path, shortcut_info, file_handlers_info);
   return shortcut_creator.CreateShortcuts(creation_reason, creation_locations);
 }
 
 void DeletePlatformShortcuts(
     const base::FilePath& app_data_path,
-    const ShellIntegration::ShortcutInfo& shortcut_info) {
+    const web_app::ShortcutInfo& shortcut_info) {
   DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::FILE));
-  WebAppShortcutCreator shortcut_creator(app_data_path, shortcut_info);
+  WebAppShortcutCreator shortcut_creator(
+      app_data_path, shortcut_info, extensions::FileHandlersInfo());
   shortcut_creator.DeleteShortcuts();
 }
 
 void UpdatePlatformShortcuts(
     const base::FilePath& app_data_path,
     const base::string16& old_app_title,
-    const ShellIntegration::ShortcutInfo& shortcut_info) {
+    const web_app::ShortcutInfo& shortcut_info,
+    const extensions::FileHandlersInfo& file_handlers_info) {
   DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::FILE));
-  WebAppShortcutCreator shortcut_creator(app_data_path, shortcut_info);
+  WebAppShortcutCreator shortcut_creator(
+      app_data_path, shortcut_info, file_handlers_info);
   shortcut_creator.UpdateShortcuts();
 }
 
@@ -844,9 +903,10 @@ void DeleteAllShortcutsForProfile(const base::FilePath& profile_path) {
 
   for (std::vector<base::FilePath>::const_iterator it = bundles.begin();
        it != bundles.end(); ++it) {
-    ShellIntegration::ShortcutInfo shortcut_info =
+    web_app::ShortcutInfo shortcut_info =
         BuildShortcutInfoFromBundle(*it);
-    WebAppShortcutCreator shortcut_creator(it->DirName(), shortcut_info);
+    WebAppShortcutCreator shortcut_creator(
+        it->DirName(), shortcut_info, extensions::FileHandlersInfo());
     shortcut_creator.DeleteShortcuts();
   }
 }

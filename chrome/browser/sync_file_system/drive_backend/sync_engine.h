@@ -13,10 +13,10 @@
 #include "base/observer_list.h"
 #include "chrome/browser/drive/drive_notification_observer.h"
 #include "chrome/browser/drive/drive_service_interface.h"
-#include "chrome/browser/sync_file_system/drive_backend/sync_engine_context.h"
-#include "chrome/browser/sync_file_system/drive_backend/sync_task_manager.h"
 #include "chrome/browser/sync_file_system/local_change_processor.h"
 #include "chrome/browser/sync_file_system/remote_file_sync_service.h"
+#include "chrome/browser/sync_file_system/sync_action.h"
+#include "chrome/browser/sync_file_system/sync_direction.h"
 #include "net/base/network_change_notifier.h"
 
 class ExtensionServiceInterface;
@@ -29,6 +29,7 @@ class SequencedTaskRunner;
 namespace drive {
 class DriveServiceInterface;
 class DriveNotificationManager;
+class DriveUploaderInterface;
 }
 
 namespace leveldb {
@@ -36,12 +37,17 @@ class Env;
 }
 
 namespace sync_file_system {
+
+class RemoteChangeProcessor;
+
 namespace drive_backend {
 
 class LocalToRemoteSyncer;
 class MetadataDatabase;
 class RemoteToLocalSyncer;
 class SyncEngineInitializer;
+class SyncTaskManager;
+class SyncWorker;
 
 class SyncEngine : public RemoteFileSyncService,
                    public LocalChangeProcessor,
@@ -51,25 +57,6 @@ class SyncEngine : public RemoteFileSyncService,
  public:
   typedef Observer SyncServiceObserver;
 
-  class TaskManagerClient : public SyncTaskManager::Client,
-                            public base::SupportsWeakPtr<TaskManagerClient> {
-   public:
-    TaskManagerClient(const base::WeakPtr<SyncEngine>& sync_engine,
-                      base::SequencedTaskRunner* task_runner);
-    virtual ~TaskManagerClient();
-
-    // SyncTaskManager::Client overrides
-    virtual void MaybeScheduleNextTask() OVERRIDE;
-    virtual void NotifyLastOperationStatus(
-        SyncStatusCode sync_status, bool used_network) OVERRIDE;
-
-   private:
-    base::WeakPtr<SyncEngine> sync_engine_;
-    scoped_refptr<base::SequencedTaskRunner> task_runner_;
-
-    DISALLOW_COPY_AND_ASSIGN(TaskManagerClient);
-  };
-
   static scoped_ptr<SyncEngine> CreateForBrowserContext(
       content::BrowserContext* context);
   static void AppendDependsOnFactories(
@@ -77,7 +64,9 @@ class SyncEngine : public RemoteFileSyncService,
 
   virtual ~SyncEngine();
 
-  void Initialize();
+  void Initialize(const base::FilePath& base_dir,
+                  base::SequencedTaskRunner* file_task_runner,
+                  leveldb::Env* env_override);
 
   // RemoteFileSyncService overrides.
   virtual void AddServiceObserver(SyncServiceObserver* observer) OVERRIDE;
@@ -146,52 +135,36 @@ class SyncEngine : public RemoteFileSyncService,
   drive::DriveServiceInterface* GetDriveService();
   drive::DriveUploaderInterface* GetDriveUploader();
   MetadataDatabase* GetMetadataDatabase();
+  SyncTaskManager* GetSyncTaskManagerForTesting();
+
+  // Notifies update of sync status to each observer.
+  void UpdateSyncEnabled(bool enabled);
+
+  void OnPendingFileListUpdated(int item_count);
+  void OnFileStatusChanged(const fileapi::FileSystemURL& url,
+                           SyncFileStatus file_status,
+                           SyncAction sync_action,
+                           SyncDirection direction);
+  void UpdateServiceState(RemoteServiceState state,
+                          const std::string& description);
 
  private:
+  class WorkerObserver;
+
   friend class DriveBackendSyncTest;
   friend class SyncEngineTest;
 
-  SyncEngine(const base::FilePath& base_dir,
-             base::SequencedTaskRunner* task_runner,
-             scoped_ptr<drive::DriveServiceInterface> drive_service,
+  SyncEngine(scoped_ptr<drive::DriveServiceInterface> drive_service,
              scoped_ptr<drive::DriveUploaderInterface> drive_uploader,
+             base::SequencedTaskRunner* worker_task_runner,
              drive::DriveNotificationManager* notification_manager,
              ExtensionServiceInterface* extension_service,
-             SigninManagerBase* signin_manager,
-             leveldb::Env* env_override);
+             SigninManagerBase* signin_manager);
 
-  void DoDisableApp(const std::string& app_id,
-                    const SyncStatusCallback& callback);
-  void DoEnableApp(const std::string& app_id,
-                   const SyncStatusCallback& callback);
-
-  void PostInitializeTask();
-  void DidInitialize(SyncEngineInitializer* initializer,
-                     SyncStatusCode status);
-  void DidProcessRemoteChange(RemoteToLocalSyncer* syncer,
-                              const SyncFileCallback& callback,
-                              SyncStatusCode status);
-  void DidApplyLocalChange(LocalToRemoteSyncer* syncer,
-                           const SyncStatusCallback& callback,
-                           SyncStatusCode status);
-
-  void MaybeStartFetchChanges();
-  void DidResolveConflict(SyncStatusCode status);
-  void DidFetchChanges(SyncStatusCode status);
-
-  void UpdateServiceStateFromSyncStatusCode(SyncStatusCode state,
-                                            bool used_network);
-  void UpdateServiceState(RemoteServiceState state,
-                          const std::string& description);
   void UpdateRegisteredApps();
 
-  void MaybeScheduleNextTask();
-  void NotifyLastOperationStatus(SyncStatusCode sync_status, bool used_network);
-
-  base::FilePath base_dir_;
-  base::FilePath temporary_file_dir_;
-
-  leveldb::Env* env_override_;
+  scoped_ptr<drive::DriveServiceInterface> drive_service_;
+  scoped_ptr<drive::DriveUploaderInterface> drive_uploader_;
 
   // These external services are not owned by SyncEngine.
   // The owner of the SyncEngine is responsible for their lifetime.
@@ -204,21 +177,9 @@ class SyncEngine : public RemoteFileSyncService,
   ObserverList<SyncServiceObserver> service_observers_;
   ObserverList<FileStatusObserver> file_status_observers_;
 
-  RemoteServiceState service_state_;
-
-  bool should_check_conflict_;
-  bool should_check_remote_change_;
-  bool listing_remote_changes_;
-  base::TimeTicks time_to_check_changes_;
-
-  bool sync_enabled_;
-  ConflictResolutionPolicy default_conflict_resolution_policy_;
-  bool network_available_;
-
-  scoped_ptr<SyncTaskManager> task_manager_;
-
-  scoped_ptr<SyncEngineContext> context_;
-  scoped_ptr<TaskManagerClient> task_manager_client_;
+  scoped_ptr<WorkerObserver> worker_observer_;
+  scoped_ptr<SyncWorker> sync_worker_;
+  scoped_refptr<base::SequencedTaskRunner> worker_task_runner_;
 
   base::WeakPtrFactory<SyncEngine> weak_ptr_factory_;
   DISALLOW_COPY_AND_ASSIGN(SyncEngine);

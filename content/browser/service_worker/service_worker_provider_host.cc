@@ -6,10 +6,13 @@
 
 #include "base/stl_util.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
+#include "content/browser/service_worker/service_worker_context_request_handler.h"
+#include "content/browser/service_worker/service_worker_controllee_request_handler.h"
 #include "content/browser/service_worker/service_worker_dispatcher_host.h"
 #include "content/browser/service_worker/service_worker_handle.h"
 #include "content/browser/service_worker/service_worker_utils.h"
 #include "content/browser/service_worker/service_worker_version.h"
+#include "content/common/service_worker/service_worker_messages.h"
 
 namespace content {
 
@@ -26,6 +29,8 @@ ServiceWorkerProviderHost::ServiceWorkerProviderHost(
 ServiceWorkerProviderHost::~ServiceWorkerProviderHost() {
   if (active_version_)
     active_version_->RemoveControllee(this);
+  if (pending_version_)
+    pending_version_->RemovePendingControllee(this);
 }
 
 void ServiceWorkerProviderHost::AddScriptClient(int thread_id) {
@@ -40,6 +45,8 @@ void ServiceWorkerProviderHost::RemoveScriptClient(int thread_id) {
 
 void ServiceWorkerProviderHost::SetActiveVersion(
     ServiceWorkerVersion* version) {
+  if (version == active_version_)
+    return;
   scoped_refptr<ServiceWorkerVersion> previous_version = active_version_;
   active_version_ = version;
   if (version)
@@ -53,22 +60,35 @@ void ServiceWorkerProviderHost::SetActiveVersion(
   for (std::set<int>::iterator it = script_client_thread_ids_.begin();
        it != script_client_thread_ids_.end();
        ++it) {
-    dispatcher_host_->RegisterServiceWorkerHandle(
-        ServiceWorkerHandle::Create(context_, dispatcher_host_,
-                                    *it, version));
-    // TODO(kinuko): dispatch activechange event to the script clients.
+    ServiceWorkerObjectInfo info;
+    if (context_ && version) {
+      scoped_ptr<ServiceWorkerHandle> handle =
+          ServiceWorkerHandle::Create(context_, dispatcher_host_, *it, version);
+      info = handle->GetObjectInfo();
+      dispatcher_host_->RegisterServiceWorkerHandle(handle.Pass());
+    }
+    dispatcher_host_->Send(
+        new ServiceWorkerMsg_SetCurrentServiceWorker(*it, provider_id(), info));
   }
 }
 
 void ServiceWorkerProviderHost::SetPendingVersion(
     ServiceWorkerVersion* version) {
+  if (version == pending_version_)
+    return;
+  scoped_refptr<ServiceWorkerVersion> previous_version = pending_version_;
   pending_version_ = version;
+  if (version)
+    version->AddPendingControllee(this);
+  if (previous_version)
+    previous_version->RemovePendingControllee(this);
+
+  if (!dispatcher_host_)
+    return;  // Could be NULL in some tests.
+
   for (std::set<int>::iterator it = script_client_thread_ids_.begin();
        it != script_client_thread_ids_.end();
        ++it) {
-    dispatcher_host_->RegisterServiceWorkerHandle(
-        ServiceWorkerHandle::Create(context_, dispatcher_host_,
-                                    *it, version));
     // TODO(kinuko): dispatch pendingchange event to the script clients.
   }
 }
@@ -91,23 +111,25 @@ bool ServiceWorkerProviderHost::SetHostedVersionId(int64 version_id) {
     return false;
   }
 
-  hosted_version_ = live_version;
+  running_hosted_version_ = live_version;
   return true;
 }
 
-bool ServiceWorkerProviderHost::ShouldHandleRequest(
-    ResourceType::Type resource_type) const {
-  if (ServiceWorkerUtils::IsMainResourceType(resource_type))
-    return true;
-
-  if (active_version())
-    return true;
-
-  // TODO(kinuko): Handle ServiceWorker cases.
-  // For now we always return false here, so that we don't handle
-  // requests for ServiceWorker (either for the main or sub resources).
-
-  return false;
+scoped_ptr<ServiceWorkerRequestHandler>
+ServiceWorkerProviderHost::CreateRequestHandler(
+    ResourceType::Type resource_type) {
+  if (IsHostToRunningServiceWorker()) {
+    return scoped_ptr<ServiceWorkerRequestHandler>(
+        new ServiceWorkerContextRequestHandler(
+            context_, AsWeakPtr(), resource_type));
+  }
+  if (ServiceWorkerUtils::IsMainResourceType(resource_type) ||
+      active_version()) {
+    return scoped_ptr<ServiceWorkerRequestHandler>(
+        new ServiceWorkerControlleeRequestHandler(
+            context_, AsWeakPtr(), resource_type));
+  }
+  return scoped_ptr<ServiceWorkerRequestHandler>();
 }
 
 }  // namespace content

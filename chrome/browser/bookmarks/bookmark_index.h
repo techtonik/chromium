@@ -11,30 +11,27 @@
 
 #include "base/basictypes.h"
 #include "base/strings/string16.h"
+#include "components/query_parser/query_parser.h"
 
+class BookmarkClient;
 class BookmarkNode;
-struct BookmarkTitleMatch;
-class QueryNode;
-class QueryParser;
+struct BookmarkMatch;
 
-namespace content {
-class BrowserContext;
-}
-
-namespace history {
-class URLDatabase;
-}
-
-// BookmarkIndex maintains an index of the titles of bookmarks for quick
-// look up. BookmarkIndex is owned and maintained by BookmarkModel, you
+// BookmarkIndex maintains an index of the titles and URLs of bookmarks for
+// quick look up. BookmarkIndex is owned and maintained by BookmarkModel, you
 // shouldn't need to interact directly with BookmarkIndex.
 //
 // BookmarkIndex maintains the index (index_) as a map of sets. The map (type
 // Index) maps from a lower case string to the set (type NodeSet) of
-// BookmarkNodes that contain that string in their title.
+// BookmarkNodes that contain that string in their title or URL.
 class BookmarkIndex {
  public:
-  explicit BookmarkIndex(content::BrowserContext* browser_context);
+  // |index_urls| says whether URLs should be stored in the index in addition
+  // to bookmark titles.  |languages| used to help parse IDNs in URLs for the
+  // bookmark index.
+  BookmarkIndex(BookmarkClient* client,
+                bool index_urls,
+                const std::string& languages);
   ~BookmarkIndex();
 
   // Invoked when a bookmark has been added to the model.
@@ -43,62 +40,44 @@ class BookmarkIndex {
   // Invoked when a bookmark has been removed from the model.
   void Remove(const BookmarkNode* node);
 
-  // Returns up to |max_count| of bookmarks containing the text |query|.
-  void GetBookmarksWithTitlesMatching(
+  // Returns up to |max_count| of bookmarks containing each term from
+  // the text |query| in either the title or the URL.
+  void GetBookmarksMatching(
       const base::string16& query,
       size_t max_count,
-      std::vector<BookmarkTitleMatch>* results);
+      std::vector<BookmarkMatch>* results);
 
  private:
+  typedef std::vector<const BookmarkNode*> Nodes;
   typedef std::set<const BookmarkNode*> NodeSet;
   typedef std::map<base::string16, NodeSet> Index;
 
   struct Match;
   typedef std::vector<Match> Matches;
 
-  // Pairs BookmarkNodes and the number of times the nodes' URLs were typed.
-  // Used to sort Matches in decreasing order of typed count.
-  typedef std::pair<const BookmarkNode*, int> NodeTypedCountPair;
-  typedef std::vector<NodeTypedCountPair> NodeTypedCountPairs;
-
-  // Extracts |matches.nodes| into NodeTypedCountPairs, sorts the pairs in
-  // decreasing order of typed count, and then de-dupes the matches.
-  void SortMatches(const Matches& matches,
-                   NodeTypedCountPairs* node_typed_counts) const;
-
-  // Extracts BookmarkNodes from |match| and retrieves typed counts for each
-  // node from the in-memory database. Inserts pairs containing the node and
-  // typed count into the vector |node_typed_counts|. |node_typed_counts| is
-  // sorted in decreasing order of typed count.
-  void ExtractBookmarkNodePairs(history::URLDatabase* url_db,
-                                const Match& match,
-                                NodeTypedCountPairs* node_typed_counts) const;
-
-  // Sort function for NodeTypedCountPairs. We sort in decreasing order of typed
-  // count so that the best matches will always be added to the results.
-  static bool NodeTypedCountPairSortFunc(const NodeTypedCountPair& a,
-                                         const NodeTypedCountPair& b) {
-      return a.second > b.second;
-  }
+  // Extracts |matches.nodes| into Nodes, sorts the pairs in decreasing order of
+  // typed count (if supported by the client), and then de-dupes the matches.
+  void SortMatches(const Matches& matches, Nodes* sorted_nodes) const;
 
   // Add |node| to |results| if the node matches the query.
-  void AddMatchToResults(const BookmarkNode* node,
-                         QueryParser* parser,
-                         const std::vector<QueryNode*>& query_nodes,
-                         std::vector<BookmarkTitleMatch>* results);
+  void AddMatchToResults(
+      const BookmarkNode* node,
+      query_parser::QueryParser* parser,
+      const query_parser::QueryNodeStarVector& query_nodes,
+      std::vector<BookmarkMatch>* results);
 
   // Populates |matches| for the specified term. If |first_term| is true, this
   // is the first term in the query. Returns true if there is at least one node
   // matching the term.
-  bool GetBookmarksWithTitleMatchingTerm(const base::string16& term,
-                                         bool first_term,
-                                         Matches* matches);
+  bool GetBookmarksMatchingTerm(const base::string16& term,
+                                bool first_term,
+                                Matches* matches);
 
   // Iterates over |matches| updating each Match's nodes to contain the
   // intersection of the Match's current nodes and the nodes at |index_i|.
   // If the intersection is empty, the Match is removed.
   //
-  // This is invoked from GetBookmarksWithTitleMatchingTerm.
+  // This is invoked from GetBookmarksMatchingTerm.
   void CombineMatchesInPlace(const Index::const_iterator& index_i,
                              Matches* matches);
 
@@ -110,7 +89,7 @@ class BookmarkIndex {
   // non-empty the result is added to result, not combined in place. This
   // variant is used for prefix matching.
   //
-  // This is invoked from GetBookmarksWithTitleMatchingTerm.
+  // This is invoked from GetBookmarksMatchingTerm.
   void CombineMatches(const Index::const_iterator& index_i,
                       const Matches& current_matches,
                       Matches* result);
@@ -126,7 +105,13 @@ class BookmarkIndex {
 
   Index index_;
 
-  content::BrowserContext* browser_context_;
+  BookmarkClient* const client_;
+
+  // Languages used to help parse IDNs in URLs for the bookmark index.
+  const std::string languages_;
+
+  // True if URLs are stored in the index as well as bookmark titles.
+  const bool index_urls_;
 
   DISALLOW_COPY_AND_ASSIGN(BookmarkIndex);
 };

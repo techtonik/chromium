@@ -59,10 +59,6 @@ user::LoginStatus DefaultSystemTrayDelegate::GetUserLoginStatus() const {
   return user::LOGGED_IN_USER;
 }
 
-bool DefaultSystemTrayDelegate::IsOobeCompleted() const {
-  return true;
-}
-
 void DefaultSystemTrayDelegate::ChangeProfilePicture() {
 }
 
@@ -106,6 +102,9 @@ bool DefaultSystemTrayDelegate::ShouldShowSettings() {
 }
 
 void DefaultSystemTrayDelegate::ShowDateSettings() {
+}
+
+void DefaultSystemTrayDelegate::ShowSetTimeDialog() {
 }
 
 void DefaultSystemTrayDelegate::ShowNetworkSettings(

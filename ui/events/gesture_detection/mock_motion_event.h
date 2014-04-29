@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <vector>
+
 #include "base/basictypes.h"
 #include "base/time/time.h"
 #include "ui/events/gesture_detection/motion_event.h"
@@ -11,6 +13,7 @@ namespace ui {
 
 struct MockMotionEvent : public MotionEvent {
   enum { MAX_POINTERS = 3 };
+  enum { TOUCH_MAJOR = 10 };
 
   MockMotionEvent();
   explicit MockMotionEvent(Action action);
@@ -21,6 +24,17 @@ struct MockMotionEvent : public MotionEvent {
                   float y0,
                   float x1,
                   float y1);
+  MockMotionEvent(Action action,
+                  base::TimeTicks time,
+                  float x0,
+                  float y0,
+                  float x1,
+                  float y1,
+                  float x2,
+                  float y2);
+  MockMotionEvent(Action action,
+                  base::TimeTicks time,
+                  const std::vector<gfx::PointF>& positions);
   MockMotionEvent(const MockMotionEvent& other);
   virtual ~MockMotionEvent();
 
@@ -54,7 +68,6 @@ struct MockMotionEvent : public MotionEvent {
   void MovePoint(size_t index, float x, float y);
   void ReleasePoint();
   void CancelPoint();
-
   MotionEvent::Action action;
   size_t pointer_count;
   gfx::PointF points[MAX_POINTERS];

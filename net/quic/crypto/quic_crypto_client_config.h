@@ -64,6 +64,9 @@ class NET_EXPORT_PRIVATE QuicCryptoClientConfig : public QuicCryptoConfig {
     void SetProof(const std::vector<std::string>& certs,
                   base::StringPiece signature);
 
+    // Clears all the data.
+    void Clear();
+
     // Clears the certificate chain and signature and invalidates the proof.
     void ClearProof();
 
@@ -135,6 +138,9 @@ class NET_EXPORT_PRIVATE QuicCryptoClientConfig : public QuicCryptoConfig {
   // LookupOrCreate returns a CachedState for the given |server_id|. If no such
   // CachedState currently exists, it will be created and cached.
   CachedState* LookupOrCreate(const QuicServerId& server_id);
+
+  // Delete all CachedState objects from cached_states_.
+  void ClearCachedStates();
 
   // FillInchoateClientHello sets |out| to be a CHLO message that elicits a
   // source-address token or SCFG from a server. If |cached| is non-NULL, the

@@ -232,13 +232,6 @@ UNADDRESSABLE ACCESS
 name=::Crasher::Run deliberate crash
 *!base::`anonymous namespace'::Crasher::Run
 
-UNADDRESSABLE ACCESS
-name=intentional OOM in layout test: fast/js/string-replacement-outofmemory.html
-*!WebCore::reportFatalErrorInMainThread
-*!v8::internal::V8::FatalProcessOutOfMemory
-...
-*!WebCore::HTMLScriptRunner::executePendingScriptAndDispatchEvent
-
 ############################
 # Benign issues in Chromium
 
@@ -444,7 +437,7 @@ skia.dll!SkGlyphCache::findImage
 skia.dll!D1G_NoBounder_RectClip
 skia.dll!SkDraw::drawPosText
 skia.dll!SkBitmapDevice::drawPosText
-skia.dll!SkCanvas::drawPosText
+skia.dll!SkCanvas::onDrawPosText
 
 HANDLE LEAK
 name=http://crbug.com/346993
@@ -453,3 +446,13 @@ KERNELBASE.dll!DuplicateHandle
 KERNEL32.dll!DuplicateHandle*
 base.dll!base::`anonymous namespace'::ThreadFunc
 KERNEL32.dll!BaseThreadInitThunk
+
+UNADDRESSABLE ACCESS
+name=http://crbug.com/42043-uninit
+...
+QuickTime.qts!*
+
+GDI USAGE ERROR
+name=http://crbug.com/42043-gdi
+...
+QuickTime.qts!*

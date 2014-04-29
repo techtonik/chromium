@@ -53,17 +53,18 @@ class MOJO_SYSTEM_IMPL_EXPORT RawChannel {
       FATAL_ERROR_FAILED_WRITE
     };
 
-    // Called when a message is read. This may call |Shutdown()| on the
-    // |RawChannel|, but must not destroy it.
+    // Called when a message is read. This may call |Shutdown()| (on the
+    // |RawChannel|), but must not destroy it.
     virtual void OnReadMessage(const MessageInTransit::View& message_view) = 0;
 
     // Called when there's a fatal error, which leads to the channel no longer
-    // being viable.
-    // For each raw channel, at most one |FATAL_ERROR_FAILED_READ| and one
-    // |FATAL_ERROR_FAILED_WRITE| notification will be issued. (And it is
-    // possible to get both.)
-    // After |OnFatalError(FATAL_ERROR_FAILED_READ)| there won't be further
-    // |OnReadMessage()| calls.
+    // being viable. This may call |Shutdown()| (on the |RawChannel()|), but
+    // must not destroy it.
+    //
+    // For each raw channel, at most one |FATAL_ERROR_FAILED_READ| and at most
+    // one |FATAL_ERROR_FAILED_WRITE| notification will be issued (both may be
+    // issued). After a |OnFatalError(FATAL_ERROR_FAILED_READ)|, there will be
+    // no further calls to |OnReadMessage()|.
     virtual void OnFatalError(FatalError fatal_error) = 0;
 
    protected:
@@ -77,7 +78,8 @@ class MOJO_SYSTEM_IMPL_EXPORT RawChannel {
 
   // This must be called (on an I/O thread) before this object is used. Does
   // *not* take ownership of |delegate|. Both the I/O thread and |delegate| must
-  // remain alive for the lifetime of this object. Returns true on success. On
+  // remain alive until |Shutdown()| is called (unless this fails); |delegate|
+  // will no longer be used after |Shutdown()|. Returns true on success. On
   // failure, |Shutdown()| should *not* be called.
   bool Init(Delegate* delegate);
 
@@ -102,7 +104,7 @@ class MOJO_SYSTEM_IMPL_EXPORT RawChannel {
     IO_PENDING
   };
 
-  class ReadBuffer {
+  class MOJO_SYSTEM_IMPL_EXPORT ReadBuffer {
    public:
     ReadBuffer();
     ~ReadBuffer();
@@ -122,7 +124,7 @@ class MOJO_SYSTEM_IMPL_EXPORT RawChannel {
     DISALLOW_COPY_AND_ASSIGN(ReadBuffer);
   };
 
-  class WriteBuffer {
+  class MOJO_SYSTEM_IMPL_EXPORT WriteBuffer {
    public:
     struct Buffer {
       const char* addr;
@@ -198,9 +200,9 @@ class MOJO_SYSTEM_IMPL_EXPORT RawChannel {
 
   // Must be called on the I/O thread WITHOUT |write_lock_| held.
   virtual bool OnInit() = 0;
-  // On shutdown, passes the ownership of the buffers to subclasses, who may
-  // want to preserve them if there are pending read/write.
-  // Must be called on the I/O thread under |write_lock_|.
+  // On shutdown, passes the ownership of the buffers to subclasses, which may
+  // want to preserve them if there are pending read/write. Must be called on
+  // the I/O thread under |write_lock_|.
   virtual void OnShutdownNoLock(
       scoped_ptr<ReadBuffer> read_buffer,
       scoped_ptr<WriteBuffer> write_buffer) = 0;
@@ -224,10 +226,10 @@ class MOJO_SYSTEM_IMPL_EXPORT RawChannel {
 
   // Set in |Init()| and never changed (hence usable on any thread without
   // locking):
-  Delegate* delegate_;
   base::MessageLoopForIO* message_loop_for_io_;
 
   // Only used on the I/O thread:
+  Delegate* delegate_;
   bool read_stopped_;
   scoped_ptr<ReadBuffer> read_buffer_;
 

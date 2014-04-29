@@ -58,6 +58,11 @@ class DevToolsEmbedderMessageDispatcher {
     virtual void ZoomIn() = 0;
     virtual void ZoomOut() = 0;
     virtual void ResetZoom() = 0;
+    virtual void OpenUrlOnRemoteDeviceAndInspect(const std::string& browser_id,
+                                                 const std::string& url) = 0;
+    virtual void StartRemoteDevicesListener() = 0;
+    virtual void StopRemoteDevicesListener() = 0;
+    virtual void EnableRemoteDeviceCounter(bool enable) = 0;
   };
 
   virtual ~DevToolsEmbedderMessageDispatcher() {}

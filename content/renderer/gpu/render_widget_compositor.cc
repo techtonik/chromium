@@ -90,7 +90,7 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
 
   settings.throttle_frame_production =
       !cmd->HasSwitch(switches::kDisableGpuVsync);
-  settings.begin_impl_frame_scheduling_enabled =
+  settings.begin_frame_scheduling_enabled =
       cmd->HasSwitch(switches::kEnableBeginFrameScheduling);
   settings.main_frame_before_activation_enabled =
       cmd->HasSwitch(cc::switches::kEnableMainFrameBeforeActivation) &&
@@ -99,6 +99,8 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
       !cmd->HasSwitch(cc::switches::kDisableMainFrameBeforeDraw);
   settings.using_synchronous_renderer_compositor =
       widget->UsingSynchronousRendererCompositor();
+  settings.report_overscroll_only_for_scrollable_axes =
+      !widget->UsingSynchronousRendererCompositor();
   settings.accelerated_animation_enabled =
       !cmd->HasSwitch(cc::switches::kDisableThreadedAnimation);
   settings.touch_hit_testing =
@@ -133,16 +135,21 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
   settings.max_untiled_layer_size = gfx::Size(max_untiled_layer_width,
                                            max_untiled_layer_height);
 
-  settings.impl_side_painting =
-      RenderThreadImpl::current()->is_impl_side_painting_enabled();
-  if (RenderThreadImpl::current()->is_gpu_rasterization_forced())
-    settings.rasterization_site = cc::LayerTreeSettings::GpuRasterization;
-  else if (RenderThreadImpl::current()->is_gpu_rasterization_enabled())
-    settings.rasterization_site = cc::LayerTreeSettings::HybridRasterization;
-  else
-    settings.rasterization_site = cc::LayerTreeSettings::CpuRasterization;
-  settings.create_low_res_tiling =
-      RenderThreadImpl::current()->is_low_res_tiling_enabled();
+  RenderThreadImpl* render_thread = RenderThreadImpl::current();
+  // render_thread may be NULL in tests.
+  if (render_thread) {
+    settings.impl_side_painting =
+        render_thread->is_impl_side_painting_enabled();
+    if (render_thread->is_gpu_rasterization_forced())
+      settings.rasterization_site = cc::LayerTreeSettings::GpuRasterization;
+    else if (render_thread->is_gpu_rasterization_enabled())
+      settings.rasterization_site = cc::LayerTreeSettings::HybridRasterization;
+    else
+      settings.rasterization_site = cc::LayerTreeSettings::CpuRasterization;
+    settings.create_low_res_tiling = render_thread->is_low_res_tiling_enabled();
+    settings.can_use_lcd_text = render_thread->is_lcd_text_enabled();
+    settings.use_map_image = render_thread->is_map_image_enabled();
+  }
 
   settings.calculate_top_controls_position =
       cmd->HasSwitch(cc::switches::kEnableTopControlsPositionCalculation);
@@ -180,8 +187,6 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
         settings.top_controls_hide_threshold = hide_threshold;
   }
 
-  settings.can_use_lcd_text =
-      RenderThreadImpl::current()->is_lcd_text_enabled();
   settings.use_pinch_virtual_viewport =
       cmd->HasSwitch(cc::switches::kEnablePinchVirtualViewport);
   settings.allow_antialiasing &=
@@ -247,8 +252,6 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
   settings.strict_layer_property_change_checking =
       cmd->HasSwitch(cc::switches::kStrictLayerPropertyChangeChecking);
 
-  settings.use_map_image = RenderThreadImpl::current()->is_map_image_enabled();
-
 #if defined(OS_ANDROID)
   settings.max_partial_texture_updates = 0;
   settings.scrollbar_animator = cc::LayerTreeSettings::LinearFade;
@@ -287,6 +290,9 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
     settings.scrollbar_animator = cc::LayerTreeSettings::Thinning;
     settings.solid_color_scrollbar_color = SkColorSetARGB(128, 128, 128, 128);
   } else if (cmd->HasSwitch(cc::switches::kEnablePinchVirtualViewport)) {
+    // use_pinch_zoom_scrollbars is only true on desktop when non-overlay
+    // scrollbars are in use.
+    settings.use_pinch_zoom_scrollbars = true;
     settings.scrollbar_animator = cc::LayerTreeSettings::LinearFade;
     settings.solid_color_scrollbar_color = SkColorSetARGB(128, 128, 128, 128);
   }
@@ -397,17 +403,21 @@ bool RenderWidgetCompositor::ScheduleMicroBenchmark(
 }
 
 void RenderWidgetCompositor::Initialize(cc::LayerTreeSettings settings) {
-  scoped_refptr<base::MessageLoopProxy> compositor_message_loop_proxy =
-      RenderThreadImpl::current()->compositor_message_loop_proxy();
+  scoped_refptr<base::MessageLoopProxy> compositor_message_loop_proxy;
+  RenderThreadImpl* render_thread = RenderThreadImpl::current();
+  cc::SharedBitmapManager* shared_bitmap_manager = NULL;
+  // render_thread may be NULL in tests.
+  if (render_thread) {
+    compositor_message_loop_proxy =
+        render_thread->compositor_message_loop_proxy();
+    shared_bitmap_manager = render_thread->shared_bitmap_manager();
+  }
   if (compositor_message_loop_proxy.get()) {
     layer_tree_host_ = cc::LayerTreeHost::CreateThreaded(
-        this,
-        ChildThread::current()->shared_bitmap_manager(),
-        settings,
-        compositor_message_loop_proxy);
+        this, shared_bitmap_manager, settings, compositor_message_loop_proxy);
   } else {
     layer_tree_host_ = cc::LayerTreeHost::CreateSingleThreaded(
-        this, this, ChildThread::current()->shared_bitmap_manager(), settings);
+        this, this, shared_bitmap_manager, settings);
   }
   DCHECK(layer_tree_host_);
 }
@@ -602,9 +612,7 @@ scoped_ptr<cc::OutputSurface> RenderWidgetCompositor::CreateOutputSurface(
   return widget_->CreateOutputSurface(fallback);
 }
 
-void RenderWidgetCompositor::DidInitializeOutputSurface(bool success) {
-  if (!success)
-    widget_->webwidget()->didExitCompositingMode();
+void RenderWidgetCompositor::DidInitializeOutputSurface() {
 }
 
 void RenderWidgetCompositor::WillCommit() {
@@ -624,11 +632,6 @@ void RenderWidgetCompositor::DidCompleteSwapBuffers() {
   widget_->didCompleteSwapBuffers();
   if (!threaded_)
     widget_->OnSwapBuffersComplete();
-}
-
-scoped_refptr<cc::ContextProvider>
-RenderWidgetCompositor::OffscreenContextProvider() {
-  return RenderThreadImpl::current()->OffscreenCompositorContextProvider();
 }
 
 void RenderWidgetCompositor::ScheduleComposite() {

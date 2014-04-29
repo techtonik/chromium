@@ -6,13 +6,18 @@
 
 #include "base/files/file_path.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
+#include "content/browser/service_worker/service_worker_context_observer.h"
+#include "content/browser/service_worker/service_worker_process_manager.h"
 #include "content/public/browser/browser_thread.h"
-#include "content/public/browser/site_instance.h"
 #include "webkit/browser/quota/quota_manager_proxy.h"
 
 namespace content {
 
-ServiceWorkerContextWrapper::ServiceWorkerContextWrapper() {
+ServiceWorkerContextWrapper::ServiceWorkerContextWrapper(
+    BrowserContext* browser_context)
+    : observer_list_(
+          new ObserverListThreadSafe<ServiceWorkerContextObserver>()),
+      browser_context_(browser_context) {
 }
 
 ServiceWorkerContextWrapper::~ServiceWorkerContextWrapper() {
@@ -23,20 +28,26 @@ void ServiceWorkerContextWrapper::Init(
     quota::QuotaManagerProxy* quota_manager_proxy) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
     BrowserThread::PostTask(
-        BrowserThread::IO, FROM_HERE,
-        base::Bind(&ServiceWorkerContextWrapper::Init, this,
+        BrowserThread::IO,
+        FROM_HERE,
+        base::Bind(&ServiceWorkerContextWrapper::Init,
+                   this,
                    user_data_directory,
                    make_scoped_refptr(quota_manager_proxy)));
     return;
   }
   DCHECK(!context_core_);
-  context_core_.reset(
-      new ServiceWorkerContextCore(
-          user_data_directory, quota_manager_proxy));
+  context_core_.reset(new ServiceWorkerContextCore(
+      user_data_directory,
+      quota_manager_proxy,
+      observer_list_,
+      make_scoped_ptr(new ServiceWorkerProcessManager(this))));
 }
 
 void ServiceWorkerContextWrapper::Shutdown() {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
+    DCHECK_CURRENTLY_ON(BrowserThread::UI);
+    browser_context_ = NULL;
     BrowserThread::PostTask(
         BrowserThread::IO, FROM_HERE,
         base::Bind(&ServiceWorkerContextWrapper::Shutdown, this));
@@ -56,8 +67,6 @@ static void FinishRegistrationOnIO(
     int64 registration_id,
     int64 version_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  if (status != SERVICE_WORKER_OK)
-    LOG(ERROR) << ServiceWorkerStatusToString(status);
   BrowserThread::PostTask(
       BrowserThread::UI,
       FROM_HERE,
@@ -67,11 +76,8 @@ static void FinishRegistrationOnIO(
 void ServiceWorkerContextWrapper::RegisterServiceWorker(
     const GURL& pattern,
     const GURL& script_url,
-    SiteInstance* site_instance,
     const ResultCallback& continuation) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
-    DCHECK_CURRENTLY_ON(BrowserThread::UI);
-    site_instance->AddRef();
     BrowserThread::PostTask(
         BrowserThread::IO,
         FROM_HERE,
@@ -79,7 +85,6 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
                    this,
                    pattern,
                    script_url,
-                   base::Unretained(site_instance),
                    continuation));
     return;
   }
@@ -89,7 +94,6 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
       script_url,
       -1,
       NULL /* provider_host */,
-      site_instance,
       base::Bind(&FinishRegistrationOnIO, continuation));
 }
 
@@ -97,8 +101,6 @@ static void FinishUnregistrationOnIO(
     const ServiceWorkerContext::ResultCallback& continuation,
     ServiceWorkerStatusCode status) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  if (status != SERVICE_WORKER_OK)
-    LOG(ERROR) << ServiceWorkerStatusToString(status);
   BrowserThread::PostTask(
       BrowserThread::UI,
       FROM_HERE,
@@ -126,6 +128,16 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
       source_process_id,
       NULL /* provider_host */,
       base::Bind(&FinishUnregistrationOnIO, continuation));
+}
+
+void ServiceWorkerContextWrapper::AddObserver(
+    ServiceWorkerContextObserver* observer) {
+  observer_list_->AddObserver(observer);
+}
+
+void ServiceWorkerContextWrapper::RemoveObserver(
+    ServiceWorkerContextObserver* observer) {
+  observer_list_->RemoveObserver(observer);
 }
 
 }  // namespace content

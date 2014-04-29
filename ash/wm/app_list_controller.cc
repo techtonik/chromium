@@ -167,13 +167,13 @@ void AppListController::SetVisible(bool visible, aura::Window* window) {
         GetContainer(kShellWindowId_AppListContainer);
     if (app_list::switches::IsExperimentalAppListPositionEnabled()) {
       // The experimental app list is centered over the primary display.
-      view->InitAsBubbleAtFixedLocation(
+      view->InitAsBubbleCenteredOnPrimaryDisplay(
           NULL,
           pagination_model_.get(),
-          Shell::GetScreen()->GetPrimaryDisplay().bounds().CenterPoint(),
+          Shell::GetScreen(),
           views::BubbleBorder::FLOAT,
           true /* border_accepts_events */);
-    } else if (ash::switches::UseAlternateShelfLayout()) {
+    } else {
       gfx::Rect applist_button_bounds = Shelf::ForWindow(container)->
           GetAppListButtonView()->GetBoundsInScreen();
       // We need the location of the button within the local screen.
@@ -190,14 +190,6 @@ void AppListController::SetVisible(bool visible, aura::Window* window) {
           GetBubbleArrow(container),
           true /* border_accepts_events */);
       view->SetArrowPaintType(views::BubbleBorder::PAINT_NONE);
-    } else {
-      view->InitAsBubbleAttachedToAnchor(
-          container,
-          pagination_model_.get(),
-          Shelf::ForWindow(container)->GetAppListButtonView(),
-          gfx::Vector2d(),
-          GetBubbleArrow(container),
-          true /* border_accepts_events */);
     }
     SetView(view);
     // By setting us as DnD recipient, the app list knows that we can
@@ -304,7 +296,7 @@ void AppListController::ProcessLocatedEvent(ui::LocatedEvent* event) {
     }
   }
 
-  aura::Window* window = view_->GetWidget()->GetNativeView();
+  aura::Window* window = view_->GetWidget()->GetNativeView()->parent();
   if (!window->Contains(target))
     SetVisible(false, window);
 }
