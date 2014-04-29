@@ -20,27 +20,15 @@ using content::ServiceWorkerContext;
 using content::ServiceWorkerRegistration;
 using content::ServiceWorkerStatusCode;
 
-void FinishRegistrationOnIO(
-    const ServiceWorkerContext::ResultCallback& continuation,
-    ServiceWorkerStatusCode status,
-    int64 registration_id,
-    int64 version_id) {
-  DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  BrowserThread::PostTask(
-      BrowserThread::UI,
-      FROM_HERE,
-      base::Bind(continuation, status == SERVICE_WORKER_OK));
-}
-
 void PostResultToUIFromStatusOnIO(
-    const ServiceWorkerContext::ResultCallback& continuation,
+    const ServiceWorkerContext::ResultCallback& callback,
     ServiceWorkerStatusCode status) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  if (!continuation.is_null()) {
+  if (!callback.is_null()) {
     BrowserThread::PostTask(
         BrowserThread::UI,
         FROM_HERE,
-        base::Bind(continuation, status == SERVICE_WORKER_OK));
+        base::Bind(callback, status == SERVICE_WORKER_OK));
   }
 }
 
@@ -87,17 +75,17 @@ ServiceWorkerContextCore* ServiceWorkerContextWrapper::context() {
 }
 
 void ServiceWorkerContextWrapper::RegisterServiceWorker(
-    const GURL& pattern,
+    const Scope& scope,
     const GURL& script_url,
     int source_process_id,
-    const ResultCallback& continuation) {
+    const WorkerCallback& continuation) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
     BrowserThread::PostTask(
         BrowserThread::IO,
         FROM_HERE,
         base::Bind(&ServiceWorkerContextWrapper::RegisterServiceWorker,
                    this,
-                   pattern,
+                   scope,
                    script_url,
                    source_process_id,
                    continuation));
@@ -105,15 +93,15 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
   }
 
   context()->RegisterServiceWorker(
-      pattern,
+      scope,
       script_url,
       source_process_id,
       NULL /* provider_host */,
-      base::Bind(&FinishRegistrationOnIO, continuation));
+      base::Bind(&ServiceWorkerContextWrapper::FinishRegistrationOnIO, this, scope, continuation));
 }
 
 void ServiceWorkerContextWrapper::UnregisterServiceWorker(
-    const GURL& pattern,
+    const Scope& scope,
     int source_process_id,
     const ResultCallback& continuation) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
@@ -122,14 +110,14 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
         FROM_HERE,
         base::Bind(&ServiceWorkerContextWrapper::UnregisterServiceWorker,
                    this,
-                   pattern,
+                   scope,
                    source_process_id,
                    continuation));
     return;
   }
 
   context()->UnregisterServiceWorker(
-      pattern,
+      scope,
       source_process_id,
       NULL /* provider_host */,
       base::Bind(&PostResultToUIFromStatusOnIO, continuation));
@@ -137,8 +125,10 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
 
 void ServiceWorkerContextWrapper::GetServiceWorkerHost(
     const Scope& scope,
-    IPC::Listener* listener,
-    const GetWorkerCallback& callback) {
+    const WorkerCallback& callback) {
+  // 
+  // TODO(scheib) Still need to implement this for this patch.
+  //
   NOTIMPLEMENTED();
 }
 
@@ -150,6 +140,23 @@ void ServiceWorkerContextWrapper::AddObserver(
 void ServiceWorkerContextWrapper::RemoveObserver(
     ServiceWorkerContextObserver* observer) {
   observer_list_->RemoveObserver(observer);
+}
+
+void ServiceWorkerContextWrapper::FinishRegistrationOnIO(
+    const Scope& scope,
+    const WorkerCallback& callback,
+    ServiceWorkerStatusCode status,
+    int64 registration_id,
+    int64 version_id) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  if (status == SERVICE_WORKER_OK) {
+    ServiceWorkerContextWrapper::GetServiceWorkerHost(scope, callback);
+  } else {
+    BrowserThread::PostTask(
+        BrowserThread::UI,
+        FROM_HERE,
+        base::Bind(callback, base::WeakPtr<ServiceWorkerHost>()));
+  }
 }
 
 }  // namespace content

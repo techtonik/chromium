@@ -27,9 +27,8 @@ class ServiceWorkerContext {
   // roughly, must be of the form "<origin>/<path>/*".
   typedef GURL Scope;
 
-  typedef base::Callback<void(bool success)> ResultCallback;
-  typedef base::Callback<void(base::WeakPtr<ServiceWorkerHost>)>
-      GetWorkerCallback;
+  typedef base::Callback<void(base::WeakPtr<ServiceWorkerHost>)> WorkerCallback;
+  typedef base::Callback<void(bool)> ResultCallback;
 
   // Equivalent to calling navigator.serviceWorker.register(script_url, {scope:
   // pattern}) from a renderer in |source_process_id|, except that |pattern| is
@@ -46,7 +45,7 @@ class ServiceWorkerContext {
   virtual void RegisterServiceWorker(const Scope& pattern,
                                      const GURL& script_url,
                                      int source_process_id,
-                                     const ResultCallback& callback) = 0;
+                                     const WorkerCallback& callback) = 0;
 
   // Equivalent to calling navigator.serviceWorker.unregister(pattern) from a
   // renderer in |source_process_id|, except that |pattern| is an absolute URL
@@ -69,8 +68,7 @@ class ServiceWorkerContext {
   // Optionally provide a |listener| that will be reattached during normal
   // service worker process lifetime events of being shutdown and restarted.
   virtual void GetServiceWorkerHost(const Scope& scope,
-                                    IPC::Listener* listener,
-                                    const GetWorkerCallback& callback) = 0;
+                                    const WorkerCallback& callback) = 0;
 
  protected:
   ServiceWorkerContext() {}

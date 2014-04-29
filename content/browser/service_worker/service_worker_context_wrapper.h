@@ -44,18 +44,17 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
   ServiceWorkerContextCore* context();
 
   // ServiceWorkerContext implementation:
-  virtual void RegisterServiceWorker(const GURL& pattern,
+  virtual void RegisterServiceWorker(const Scope& scope,
                                      const GURL& script_url,
                                      int source_process_id,
-                                     const ResultCallback& continuation)
+                                     const WorkerCallback& continuation)
       OVERRIDE;
-  virtual void UnregisterServiceWorker(const GURL& pattern,
+  virtual void UnregisterServiceWorker(const Scope& scope,
                                        int source_process_id,
                                        const ResultCallback& continuation)
       OVERRIDE;
   virtual void GetServiceWorkerHost(const Scope& scope,
-                                    IPC::Listener* listener,
-                                    const GetWorkerCallback& callback) OVERRIDE;
+                                    const WorkerCallback& callback) OVERRIDE;
 
   void AddObserver(ServiceWorkerContextObserver* observer);
   void RemoveObserver(ServiceWorkerContextObserver* observer);
@@ -63,6 +62,14 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
  private:
   friend class base::RefCountedThreadSafe<ServiceWorkerContextWrapper>;
   virtual ~ServiceWorkerContextWrapper();
+
+  // Completes the registration process on IO thread.
+  void FinishRegistrationOnIO(
+    const Scope& scope,
+    const WorkerCallback& callback,
+    ServiceWorkerStatusCode status,
+    int64 registration_id,
+    int64 version_id);
 
   scoped_ptr<ServiceWorkerContextCore> context_core_;
   scoped_refptr<ObserverListThreadSafe<ServiceWorkerContextObserver> >
