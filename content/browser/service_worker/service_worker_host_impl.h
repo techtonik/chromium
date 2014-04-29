@@ -26,7 +26,7 @@ class ServiceWorkerHostImpl : public ServiceWorkerHost {
   virtual const GURL& scope() OVERRIDE;
   virtual const GURL& script() OVERRIDE;
   virtual bool HasActiveVersion() OVERRIDE;
-  
+
   // IPC::Sender implementation.
   virtual bool Send(IPC::Message* msg) OVERRIDE;
 
