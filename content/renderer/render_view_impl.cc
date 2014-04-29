@@ -34,6 +34,7 @@
 #include "cc/base/switches.h"
 #include "content/child/appcache/appcache_dispatcher.h"
 #include "content/child/appcache/web_application_cache_host_impl.h"
+#include "content/child/child_shared_bitmap_manager.h"
 #include "content/child/child_thread.h"
 #include "content/child/npapi/webplugin_delegate_impl.h"
 #include "content/child/request_extra_data.h"
@@ -62,7 +63,6 @@
 #include "content/public/common/url_utils.h"
 #include "content/public/renderer/content_renderer_client.h"
 #include "content/public/renderer/document_state.h"
-#include "content/public/renderer/history_item_serialization.h"
 #include "content/public/renderer/navigation_state.h"
 #include "content/public/renderer/render_view_observer.h"
 #include "content/public/renderer/render_view_visitor.h"
@@ -81,6 +81,7 @@
 #include "content/renderer/geolocation_dispatcher.h"
 #include "content/renderer/gpu/render_widget_compositor.h"
 #include "content/renderer/history_controller.h"
+#include "content/renderer/history_serialization.h"
 #include "content/renderer/idle_user_detector.h"
 #include "content/renderer/ime_event_guard.h"
 #include "content/renderer/input/input_handler_manager.h"
@@ -610,6 +611,17 @@ WebDragData DropDataToWebDragData(const DropData& drop_data) {
     item_list.push_back(item);
   }
 
+  for (std::vector<DropData::FileSystemFileInfo>::const_iterator it =
+           drop_data.file_system_files.begin();
+       it != drop_data.file_system_files.end();
+       ++it) {
+    WebDragData::Item item;
+    item.storageType = WebDragData::Item::StorageTypeFileSystemFile;
+    item.fileSystemURL = it->url;
+    item.fileSystemFileSize = it->size;
+    item_list.push_back(item);
+  }
+
   for (std::map<base::string16, base::string16>::const_iterator it =
            drop_data.custom_data.begin();
        it != drop_data.custom_data.end();
@@ -691,9 +703,7 @@ RenderViewImpl::RenderViewImpl(RenderViewImplParams* params)
       next_snapshot_id_(0) {
 }
 
-void RenderViewImpl::Initialize(
-    RenderViewImplParams* params,
-    RenderFrameImpl* main_render_frame) {
+void RenderViewImpl::Initialize(RenderViewImplParams* params) {
   routing_id_ = params->routing_id;
   surface_id_ = params->surface_id;
   if (params->opener_id != MSG_ROUTING_NONE && params->is_renderer_created)
@@ -701,6 +711,13 @@ void RenderViewImpl::Initialize(
 
   // Ensure we start with a valid next_page_id_ from the browser.
   DCHECK_GE(next_page_id_, 0);
+
+  RenderFrameImpl* main_render_frame = RenderFrameImpl::Create(
+      this, params->main_frame_routing_id);
+  // The main frame WebLocalFrame object is closed by
+  // RenderFrameImpl::frameDetached().
+  WebLocalFrame* web_frame = WebLocalFrame::create(main_render_frame);
+  main_render_frame->SetWebFrame(web_frame);
 
   webwidget_ = WebView::create(this);
   webwidget_mouse_lock_target_.reset(new WebWidgetLockTarget(webwidget_));
@@ -762,6 +779,9 @@ void RenderViewImpl::Initialize(
           ShouldUseCompositingForGpuRasterizationHint());
 
   ApplyWebPreferences(webkit_preferences_, webview());
+
+  webview()->settings()->setAllowConnectingInsecureWebSocket(
+      command_line.HasSwitch(switches::kAllowInsecureWebSocketFromHttpsOrigin));
 
   main_render_frame_.reset(main_render_frame);
   webview()->setMainFrame(main_render_frame_->GetWebFrame());
@@ -835,6 +855,10 @@ void RenderViewImpl::Initialize(
 }
 
 RenderViewImpl::~RenderViewImpl() {
+  for (BitmapMap::iterator it = disambiguation_bitmaps_.begin();
+       it != disambiguation_bitmaps_.end();
+       ++it)
+    delete it->second;
   history_page_ids_.clear();
 
   base::debug::TraceLog::GetInstance()->RemoveProcessLabel(routing_id_);
@@ -943,14 +967,7 @@ RenderViewImpl* RenderViewImpl::Create(
   else
     render_view = new RenderViewImpl(&params);
 
-  RenderFrameImpl* main_frame = RenderFrameImpl::Create(
-      render_view, main_frame_routing_id);
-  // The main frame WebLocalFrame object is closed by
-  // RenderFrameImpl::frameDetached().
-  WebLocalFrame* web_frame = WebLocalFrame::create(main_frame);
-  main_frame->SetWebFrame(web_frame);
-
-  render_view->Initialize(&params, main_frame);
+  render_view->Initialize(&params);
   return render_view;
 }
 
@@ -1136,8 +1153,8 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ViewMsg_EnableViewSourceMode, OnEnableViewSourceMode)
     IPC_MESSAGE_HANDLER(ViewMsg_SetAccessibilityMode, OnSetAccessibilityMode)
     IPC_MESSAGE_HANDLER(ViewMsg_DisownOpener, OnDisownOpener)
-    IPC_MESSAGE_HANDLER(ViewMsg_ReleaseDisambiguationPopupDIB,
-                        OnReleaseDisambiguationPopupDIB)
+    IPC_MESSAGE_HANDLER(ViewMsg_ReleaseDisambiguationPopupBitmap,
+                        OnReleaseDisambiguationPopupBitmap)
     IPC_MESSAGE_HANDLER(ViewMsg_WindowSnapshotCompleted,
                         OnWindowSnapshotCompleted)
 #if defined(OS_ANDROID)
@@ -1425,8 +1442,6 @@ void RenderViewImpl::GetWindowSnapshot(const WindowSnapshotCallback& callback) {
   if (RenderWidgetCompositor* rwc = compositor()) {
     latency_info_swap_promise_monitor =
         rwc->CreateLatencyInfoSwapPromiseMonitor(&latency_info).Pass();
-  } else {
-    latency_info_.push_back(latency_info);
   }
   ScheduleCompositeWithForcedRedraw();
 }
@@ -1985,8 +2000,10 @@ bool RenderViewImpl::isPointerLocked() {
 
 void RenderViewImpl::didActivateCompositor() {
 #if !defined(OS_MACOSX)  // many events are unhandled - http://crbug.com/138003
+  RenderThreadImpl* render_thread = RenderThreadImpl::current();
+  // render_thread may be NULL in tests.
   InputHandlerManager* input_handler_manager =
-      RenderThreadImpl::current()->input_handler_manager();
+      render_thread ? render_thread->input_handler_manager() : NULL;
   if (input_handler_manager) {
      input_handler_manager->AddInputHandler(
         routing_id_,
@@ -2049,13 +2066,6 @@ blink::WebMediaPlayer* RenderViewImpl::CreateMediaPlayer(
 #endif  // defined(OS_ANDROID)
 }
 
-void RenderViewImpl::didAccessInitialDocument(WebLocalFrame* frame) {
-  // Notify the browser process that it is no longer safe to show the pending
-  // URL of the main frame, since a URL spoof is now possible.
-  if (!frame->parent() && page_id_ == -1)
-    Send(new ViewHostMsg_DidAccessInitialDocument(routing_id_));
-}
-
 void RenderViewImpl::didDisownOpener(blink::WebLocalFrame* frame) {
   // We only need to notify the browser if the active, top-level frame clears
   // its opener.  We can ignore cases where a swapped out frame clears its
@@ -2066,27 +2076,6 @@ void RenderViewImpl::didDisownOpener(blink::WebLocalFrame* frame) {
 
   // Notify WebContents and all its swapped out RenderViews.
   Send(new ViewHostMsg_DidDisownOpener(routing_id_));
-}
-
-void RenderViewImpl::frameDetached(WebFrame* frame) {
-  // NOTE: We may get here for either the main frame or for subframes.  The
-  // RenderFrameImpl will be deleted immediately after this call for subframes
-  // but not for the main frame, which is owned by |main_render_frame_|.
-
-  FOR_EACH_OBSERVER(RenderViewObserver, observers_, FrameDetached(frame));
-}
-
-void RenderViewImpl::willClose(WebFrame* frame) {
-  FOR_EACH_OBSERVER(RenderViewObserver, observers_, FrameWillClose(frame));
-}
-
-void RenderViewImpl::didMatchCSS(
-    WebLocalFrame* frame,
-    const WebVector<WebString>& newly_matching_selectors,
-    const WebVector<WebString>& stopped_matching_selectors) {
-  FOR_EACH_OBSERVER(
-      RenderViewObserver, observers_,
-      DidMatchCSS(frame, newly_matching_selectors, stopped_matching_selectors));
 }
 
 void RenderViewImpl::Repaint(const gfx::Size& size) {
@@ -2121,18 +2110,6 @@ SSLStatus RenderViewImpl::GetSSLStatusOfFrame(blink::WebFrame* frame) const {
 
 const std::string& RenderViewImpl::GetAcceptLanguages() const {
   return renderer_preferences_.accept_languages;
-}
-
-void RenderViewImpl::willSendSubmitEvent(blink::WebLocalFrame* frame,
-                                         const blink::WebFormElement& form) {
-  FOR_EACH_OBSERVER(
-      RenderViewObserver, observers_, WillSendSubmitEvent(frame, form));
-}
-
-void RenderViewImpl::willSubmitForm(WebLocalFrame* frame,
-                                    const WebFormElement& form) {
-  FOR_EACH_OBSERVER(
-      RenderViewObserver, observers_, WillSubmitForm(frame, form));
 }
 
 void RenderViewImpl::didCreateDataSource(WebLocalFrame* frame,
@@ -2313,18 +2290,6 @@ void RenderViewImpl::ProcessViewLayoutFlags(const CommandLine& command_line) {
   webview()->setPageScaleFactorLimits(1, maxPageScaleFactor);
 }
 
-void RenderViewImpl::didFailProvisionalLoad(WebLocalFrame* frame,
-                                            const WebURLError& error) {
-  // Notify the browser that we failed a provisional load with an error.
-  //
-  // Note: It is important this notification occur before DidStopLoading so the
-  //       SSL manager can react to the provisional load failure before being
-  //       notified the load stopped.
-  //
-  FOR_EACH_OBSERVER(
-      RenderViewObserver, observers_, DidFailProvisionalLoad(frame, error));
-}
-
 void RenderViewImpl::FrameDidCommitProvisionalLoad(WebLocalFrame* frame,
                                                    bool is_new_navigation) {
   FOR_EACH_OBSERVER(RenderViewObserver, observers_,
@@ -2365,11 +2330,6 @@ void RenderViewImpl::didClearWindowObject(WebLocalFrame* frame, int world_id) {
     MemoryBenchmarkingExtension::Install(frame);
 }
 
-void RenderViewImpl::didCreateDocumentElement(WebLocalFrame* frame) {
-  FOR_EACH_OBSERVER(RenderViewObserver, observers_,
-                    DidCreateDocumentElement(frame));
-}
-
 void RenderViewImpl::didReceiveTitle(WebLocalFrame* frame,
                                      const WebString& title,
                                      WebTextDirection direction) {
@@ -2398,25 +2358,11 @@ void RenderViewImpl::didChangeIcon(WebLocalFrame* frame,
   SendUpdateFaviconURL(urls);
 }
 
-void RenderViewImpl::didFinishDocumentLoad(WebLocalFrame* frame) {
-  FOR_EACH_OBSERVER(RenderViewObserver, observers_,
-                    DidFinishDocumentLoad(frame));
-}
-
 void RenderViewImpl::didHandleOnloadEvents(WebLocalFrame* frame) {
   if (webview()->mainFrame() == frame) {
     Send(new ViewHostMsg_DocumentOnLoadCompletedInMainFrame(routing_id_,
                                                             page_id_));
   }
-}
-
-void RenderViewImpl::didFailLoad(WebLocalFrame* frame,
-                                 const WebURLError& error) {
-  FOR_EACH_OBSERVER(RenderViewObserver, observers_, DidFailLoad(frame, error));
-}
-
-void RenderViewImpl::didFinishLoad(WebLocalFrame* frame) {
-  FOR_EACH_OBSERVER(RenderViewObserver, observers_, DidFinishLoad(frame));
 }
 
 void RenderViewImpl::didUpdateCurrentHistoryItem(WebLocalFrame* frame) {
@@ -2739,7 +2685,7 @@ bool RenderViewImpl::GetContentStateImmediately() const {
 }
 
 float RenderViewImpl::GetFilteredTimePerFrame() const {
-  return filtered_time_per_frame();
+  return 0.0f;
 }
 
 blink::WebPageVisibilityState RenderViewImpl::GetVisibilityState() const {
@@ -3241,6 +3187,7 @@ void RenderViewImpl::OnDisableAutoResize(const gfx::Size& new_size) {
     Resize(new_size,
            physical_backing_size_,
            overdraw_bottom_height_,
+           visible_viewport_size_,
            resizer_rect_,
            is_fullscreen_,
            NO_RESIZE_ACK);
@@ -3620,11 +3567,6 @@ void RenderViewImpl::Close() {
 
 void RenderViewImpl::DidHandleKeyEvent() {
   ClearEditCommands();
-}
-
-void RenderViewImpl::WillProcessUserGesture() {
-  FOR_EACH_OBSERVER(
-      RenderViewObserver, observers_, WillProcessUserGesture());
 }
 
 bool RenderViewImpl::WillHandleMouseEvent(const blink::WebMouseEvent& event) {
@@ -4355,27 +4297,28 @@ bool RenderViewImpl::didTapMultipleTargets(
     case TAP_MULTIPLE_TARGETS_STRATEGY_POPUP: {
       gfx::Size canvas_size =
           gfx::ToCeiledSize(gfx::ScaleSize(zoom_rect.size(), new_total_scale));
-      TransportDIB* transport_dib = NULL;
+      cc::SharedBitmapManager* manager =
+          RenderThreadImpl::current()->shared_bitmap_manager();
+      scoped_ptr<cc::SharedBitmap> shared_bitmap =
+          manager->AllocateSharedBitmap(canvas_size);
       {
-        scoped_ptr<skia::PlatformCanvas> canvas(
-            RenderProcess::current()->GetDrawingCanvas(&transport_dib,
-                                                       gfx::Rect(canvas_size)));
-        if (!canvas) {
-          handled = false;
-          break;
-        }
+        SkBitmap bitmap;
+        SkImageInfo info = SkImageInfo::MakeN32Premul(canvas_size.width(),
+                                                      canvas_size.height());
+        bitmap.installPixels(info, shared_bitmap->pixels(), info.minRowBytes());
+        SkCanvas canvas(bitmap);
 
         // TODO(trchen): Cleanup the device scale factor mess.
         // device scale will be applied in WebKit
         // --> zoom_rect doesn't include device scale,
         //     but WebKit will still draw on zoom_rect * device_scale_factor_
-        canvas->scale(new_total_scale / device_scale_factor_,
-                      new_total_scale / device_scale_factor_);
-        canvas->translate(-zoom_rect.x() * device_scale_factor_,
-                          -zoom_rect.y() * device_scale_factor_);
+        canvas.scale(new_total_scale / device_scale_factor_,
+                     new_total_scale / device_scale_factor_);
+        canvas.translate(-zoom_rect.x() * device_scale_factor_,
+                         -zoom_rect.y() * device_scale_factor_);
 
         webwidget_->paint(
-            canvas.get(),
+            &canvas,
             zoom_rect,
             WebWidget::ForceSoftwareRenderingAndIgnoreGPUResidentContent);
       }
@@ -4385,7 +4328,9 @@ bool RenderViewImpl::didTapMultipleTargets(
       Send(new ViewHostMsg_ShowDisambiguationPopup(routing_id_,
                                                    physical_window_zoom_rect,
                                                    canvas_size,
-                                                   transport_dib->id()));
+                                                   shared_bitmap->id()));
+      cc::SharedBitmapId id = shared_bitmap->id();
+      disambiguation_bitmaps_[id] = shared_bitmap.release();
       handled = true;
       break;
     }
@@ -4457,10 +4402,12 @@ void RenderViewImpl::SetMediaStreamClientForTesting(
   media_stream_client_ = media_stream_client;
 }
 
-void RenderViewImpl::OnReleaseDisambiguationPopupDIB(
-    TransportDIB::Handle dib_handle) {
-  TransportDIB* dib = TransportDIB::CreateWithHandle(dib_handle);
-  RenderProcess::current()->ReleaseTransportDIB(dib);
+void RenderViewImpl::OnReleaseDisambiguationPopupBitmap(
+    const cc::SharedBitmapId& id) {
+  BitmapMap::iterator it = disambiguation_bitmaps_.find(id);
+  DCHECK(it != disambiguation_bitmaps_.end());
+  delete it->second;
+  disambiguation_bitmaps_.erase(it);
 }
 
 void RenderViewImpl::DidCommitCompositorFrame() {

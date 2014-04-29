@@ -27,13 +27,13 @@ struct WebURLError;
 }
 
 namespace content {
+class WebTestProxyBase;
 struct TestPreferences;
 }
 
 namespace WebTestRunner {
 
 class WebTask;
-class WebTestProxyBase;
 
 class WebTestDelegate {
 public:
@@ -118,7 +118,7 @@ public:
     virtual void setDeviceScaleFactor(float) = 0;
 
     // Controls which WebView should be focused.
-    virtual void setFocus(WebTestProxyBase*, bool) = 0;
+    virtual void setFocus(content::WebTestProxyBase*, bool) = 0;
 
     // Controls whether all cookies should be accepted or writing cookies in a
     // third-party context is blocked.
@@ -150,9 +150,9 @@ public:
     // Returns true if resource requests to external URLs should be permitted.
     virtual bool allowExternalPages() = 0;
 
-    // Returns the back/forward history for the WebView associated with the
-    // given WebTestProxyBase as well as the index of the current entry.
-    virtual void captureHistoryForWindow(WebTestProxyBase*, blink::WebVector<blink::WebHistoryItem>*, size_t* currentEntryIndex) = 0;
+    // Returns a text dump the back/forward history for the WebView associated
+    // with the given WebTestProxyBase.
+    virtual std::string dumpHistoryForWindow(content::WebTestProxyBase*) = 0;
 };
 
 }

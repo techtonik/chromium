@@ -13,17 +13,21 @@
 #include "base/threading/non_thread_safe.h"
 #include "base/timer/timer.h"
 #include "base/values.h"
-#include "chrome/browser/invalidation/invalidation_auth_provider.h"
 #include "chrome/browser/invalidation/invalidation_logger.h"
 #include "chrome/browser/invalidation/invalidation_service.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "components/signin/core/browser/profile_oauth2_token_service.h"
+#include "google_apis/gaia/identity_provider.h"
 #include "google_apis/gaia/oauth2_token_service.h"
 #include "net/base/backoff_entry.h"
 #include "sync/notifier/invalidation_handler.h"
 #include "sync/notifier/invalidator_registrar.h"
 
 class Profile;
+
+namespace gcm {
+class GCMService;
+}
 
 namespace net {
 class URLRequestContextGetter;
@@ -43,7 +47,7 @@ class TiclInvalidationService : public base::NonThreadSafe,
                                 public InvalidationService,
                                 public OAuth2TokenService::Consumer,
                                 public OAuth2TokenService::Observer,
-                                public InvalidationAuthProvider::Observer,
+                                public IdentityProvider::Observer,
                                 public syncer::InvalidationHandler {
  public:
   enum InvalidationNetworkChannel {
@@ -56,7 +60,8 @@ class TiclInvalidationService : public base::NonThreadSafe,
   };
 
   TiclInvalidationService(
-      scoped_ptr<InvalidationAuthProvider> auth_provider,
+      scoped_ptr<IdentityProvider> identity_provider,
+      gcm::GCMService* gcm_service,
       const scoped_refptr<net::URLRequestContextGetter>& request_context,
       Profile* profile);
   virtual ~TiclInvalidationService();
@@ -78,7 +83,7 @@ class TiclInvalidationService : public base::NonThreadSafe,
   virtual InvalidationLogger* GetInvalidationLogger() OVERRIDE;
   virtual void RequestDetailedStatus(
       base::Callback<void(const base::DictionaryValue&)> caller) const OVERRIDE;
-  virtual InvalidationAuthProvider* GetInvalidationAuthProvider() OVERRIDE;
+  virtual IdentityProvider* GetIdentityProvider() OVERRIDE;
 
   void RequestAccessToken();
 
@@ -95,8 +100,8 @@ class TiclInvalidationService : public base::NonThreadSafe,
   virtual void OnRefreshTokenAvailable(const std::string& account_id) OVERRIDE;
   virtual void OnRefreshTokenRevoked(const std::string& account_id) OVERRIDE;
 
-  // InvalidationAuthProvider::Observer implementation.
-  virtual void OnInvalidationAuthLogout() OVERRIDE;
+  // IdentityProvider::Observer implementation.
+  virtual void OnActiveAccountLogout() OVERRIDE;
 
   // syncer::InvalidationHandler implementation.
   virtual void OnInvalidatorStateChange(
@@ -127,7 +132,7 @@ class TiclInvalidationService : public base::NonThreadSafe,
   void StopInvalidator();
 
   Profile *const profile_;
-  scoped_ptr<InvalidationAuthProvider> auth_provider_;
+  scoped_ptr<IdentityProvider> identity_provider_;
 
   scoped_ptr<syncer::InvalidatorRegistrar> invalidator_registrar_;
   scoped_ptr<syncer::InvalidationStateTracker> invalidation_state_tracker_;
@@ -145,6 +150,7 @@ class TiclInvalidationService : public base::NonThreadSafe,
 
   PrefChangeRegistrar pref_change_registrar_;
   InvalidationNetworkChannel network_channel_type_;
+  gcm::GCMService* gcm_service_;
   scoped_ptr<GCMInvalidationBridge> gcm_invalidation_bridge_;
   scoped_refptr<net::URLRequestContextGetter> request_context_;
 

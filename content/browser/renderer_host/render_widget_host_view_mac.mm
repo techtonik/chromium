@@ -142,7 +142,9 @@ static float ScaleFactorForView(NSView* view) {
 
 + (BOOL)shouldAutohideCursorForEvent:(NSEvent*)event;
 - (id)initWithRenderWidgetHostViewMac:(RenderWidgetHostViewMac*)r;
-- (void)gotWheelEventConsumed:(BOOL)consumed;
+- (void)gotUnhandledWheelEvent;
+- (void)scrollOffsetPinnedToLeft:(BOOL)left toRight:(BOOL)right;
+- (void)setHasHorizontalScrollbar:(BOOL)has_horizontal_scrollbar;
 - (void)keyEvent:(NSEvent*)theEvent wasKeyEquivalent:(BOOL)equiv;
 - (void)windowDidChangeBackingProperties:(NSNotification*)notification;
 - (void)windowChangedGlobalFrame:(NSNotification*)notification;
@@ -901,7 +903,6 @@ gfx::NativeViewAccessible RenderWidgetHostViewMac::GetNativeViewAccessible() {
 }
 
 void RenderWidgetHostViewMac::MovePluginWindows(
-    const gfx::Vector2d& scroll_offset,
     const std::vector<WebPluginGeometry>& moves) {
   // Must be overridden, but unused on this platform. Core Animation
   // plugins are drawn by the GPU process (through the compositor),
@@ -1867,10 +1868,13 @@ gfx::GLSurfaceHandle RenderWidgetHostViewMac::GetCompositingSurface() {
 
 void RenderWidgetHostViewMac::SetHasHorizontalScrollbar(
     bool has_horizontal_scrollbar) {
+  [cocoa_view_ setHasHorizontalScrollbar:has_horizontal_scrollbar];
 }
 
 void RenderWidgetHostViewMac::SetScrollOffsetPinning(
     bool is_pinned_to_left, bool is_pinned_to_right) {
+  [cocoa_view_ scrollOffsetPinnedToLeft:is_pinned_to_left
+                                toRight:is_pinned_to_right];
 }
 
 bool RenderWidgetHostViewMac::LockMouse() {
@@ -1902,11 +1906,12 @@ void RenderWidgetHostViewMac::UnlockMouse() {
     render_widget_host_->LostMouseLock();
 }
 
-void RenderWidgetHostViewMac::HandledWheelEvent(
-    const blink::WebMouseWheelEvent& event,
-    bool consumed) {
+void RenderWidgetHostViewMac::UnhandledWheelEvent(
+    const blink::WebMouseWheelEvent& event) {
+  // Only record a wheel event as unhandled if JavaScript handlers got a chance
+  // to see it (no-op wheel events are ignored by the event dispatcher)
   if (event.deltaX || event.deltaY)
-    [cocoa_view_ gotWheelEventConsumed:consumed];
+    [cocoa_view_ gotUnhandledWheelEvent];
 }
 
 bool RenderWidgetHostViewMac::Send(IPC::Message* message) {
@@ -2173,6 +2178,10 @@ void RenderWidgetHostViewMac::AddPendingSwapAck(
   // loss. Drop the old acks.
   pending_swap_ack_.reset(new PendingSwapAck(
       route_id, gpu_host_id, renderer_id));
+
+  // A trace value of 2 indicates that there is a pending swap ack. See
+  // CompositingIOSurfaceLayer's canDrawInCGLContext for other value meanings.
+  TRACE_COUNTER_ID1("browser", "PendingSwapAck", this, 2);
 }
 
 void RenderWidgetHostViewMac::SendPendingSwapAck() {
@@ -2186,6 +2195,7 @@ void RenderWidgetHostViewMac::SendPendingSwapAck() {
                                                  pending_swap_ack_->gpu_host_id,
                                                  ack_params);
   pending_swap_ack_.reset();
+  TRACE_COUNTER_ID1("browser", "PendingSwapAck", this, 0);
 }
 
 void RenderWidgetHostViewMac::PauseForPendingResizeOrRepaintsAndDraw() {
@@ -2239,7 +2249,9 @@ void RenderWidgetHostViewMac::LayoutLayers() {
       EnsureCompositedIOSurfaceLayer();
     }
   }
-  if (compositing_iosurface_ && compositing_iosurface_layer_) {
+  if (compositing_iosurface_ &&
+      compositing_iosurface_->HasIOSurface() &&
+      compositing_iosurface_layer_) {
     CGRect layer_bounds = CGRectMake(
       0,
       0,
@@ -2371,8 +2383,28 @@ SkBitmap::Config RenderWidgetHostViewMac::PreferredReadbackFormat() {
   }
 }
 
-- (void)gotWheelEventConsumed:(BOOL)consumed {
-  [responderDelegate_ gotWheelEventConsumed:consumed];
+- (void)gotUnhandledWheelEvent {
+  if (responderDelegate_ &&
+      [responderDelegate_
+          respondsToSelector:@selector(gotUnhandledWheelEvent)]) {
+    [responderDelegate_ gotUnhandledWheelEvent];
+  }
+}
+
+- (void)scrollOffsetPinnedToLeft:(BOOL)left toRight:(BOOL)right {
+  if (responderDelegate_ &&
+      [responderDelegate_
+          respondsToSelector:@selector(scrollOffsetPinnedToLeft:toRight:)]) {
+    [responderDelegate_ scrollOffsetPinnedToLeft:left toRight:right];
+  }
+}
+
+- (void)setHasHorizontalScrollbar:(BOOL)has_horizontal_scrollbar {
+  if (responderDelegate_ &&
+      [responderDelegate_
+          respondsToSelector:@selector(setHasHorizontalScrollbar:)]) {
+    [responderDelegate_ setHasHorizontalScrollbar:has_horizontal_scrollbar];
+  }
 }
 
 - (BOOL)respondsToSelector:(SEL)selector {

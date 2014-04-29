@@ -215,6 +215,11 @@
     'content': {
       'filepath': 'content/',
     },
+    'content_input': {
+      'filepath': 'content/browser/renderer_host/input/|'\
+                  'content/common/input/|'\
+                  'content/renderer/input/',
+    },
     'content_shell': {
       'filepath': 'content/shell/',
     },
@@ -225,12 +230,12 @@
     'deep_memory_profiler': {
       'filepath': 'tools/(deep_memory_profiler|find_runtime_symbols)',
     },
-    'device_orientation': {
-      'filepath': 'content/browser/device_orientation/|'\
-                  'content/common/device_orientation/|'\
-                  'content/public/android/java/src/org/chromium/content/browser/DeviceMotionAndOrientation.java|'\
-                  'content/public/android/javatests/src/org/chromium/content/browser/DeviceMotionAndOrientationTest.java|'\
-                  'content/renderer/device_orientation/',
+    'device_sensors': {
+      'filepath': 'content/browser/device_sensors/|'\
+                  'content/common/device_sensors/|'\
+                  'content/public/android/java/src/org/chromium/content/browser/DeviceSensors.java|'\
+                  'content/public/android/javatests/src/org/chromium/content/browser/DeviceSensorsTest.java|'\
+                  'content/renderer/device_sensors/',
     },
     'devtools': {
       'filepath': 'devtools',
@@ -273,6 +278,9 @@
     'drive_resource_metadata': {
       'filepath': 'chrome/browser/chromeos/drive/resource_metadata'
     },
+    'events': {
+      'filepath': 'ui/events/',
+    },
     'extension': {
       'filepath': 'extension',
     },
@@ -286,8 +294,7 @@
                   'filebrowse'
     },
     'filesapp': {
-      'filepath': 'chrome/browser/resources/file_manager|' \
-                  'ui/file_manager'
+      'filepath': 'ui/file_manager'
     },
     'ftp': {
       'filepath': 'ftp',
@@ -349,6 +356,9 @@
     },
     'ipc': {
       'filepath': 'ipc/ipc',
+    },
+    'libvpx': {
+      'filepath': 'third_party/libvpx'
     },
     'libwebp': {
       'filepath': 'third_party/libwebp'
@@ -756,10 +766,11 @@
     'clipboard': ['dcheng@chromium.org'],
     'content': ['jam@chromium.org',
                 'darin-cc@chromium.org'],
+    'content_input': ['jdduke+watch@chromium.org'],
     'content_shell': ['jochen+watch@chromium.org'],
     'cookie_monster': ['erikwright@chromium.org'],
     'deep_memory_profiler': ['dmikurube+memory@chromium.org'],
-    'device_orientation': ['timvolodine@chromium.org', 'mvanouwerkerk@chromium.org'],
+    'device_sensors': ['timvolodine@chromium.org', 'mvanouwerkerk@chromium.org', 'rijubrata.bhaumik@intel.com'],
     'devtools': ['pfeldman@chromium.org', 'yurys@chromium.org',
                  'vsevik@chromium.org', 'aandrey+blink@chromium.org',
                  'paulirish+reviews@chromium.org',
@@ -772,6 +783,7 @@
     'downloads_ui': ['asanka@chromium.org', 'benjhayden+dwatch@chromium.org'],
     'drive': ['tfarina@chromium.org'],
     'drive_resource_metadata': ['hashimoto+watch@chromium.org'],
+    'events': ['tdresser+watch@chromium.org'],
     'extension': ['chromium-apps-reviews@chromium.org',
                   'extensions-reviews@chromium.org'],
     'fileapi': ['kinuko+watch@chromium.org',
@@ -801,6 +813,8 @@
                 'jfweitz+watch@chromium.org', 'skanuj+watch@chromium.org',
                 'donnd+watch@chromium.org'],
     'ipc': ['jam@chromium.org', 'darin-cc@chromium.org'],
+    'libvpx': ['tomfinegan@chromium.org', 'jzern@chromium.org',
+               'fgalligan@chromium.org', 'johannkoenig@chromium.org'],
     'libwebp': ['urvang@google.com', 'jzern@chromium.org',
                 'skal@google.com', 'vikasa@google.com'],
     'linux_fonts': ['derat+watch@chromium.org'],
@@ -819,6 +833,7 @@
              'abarth@chromium.org',
              'ben+mojo@chromium.org',
              'darin@chromium.org',
+             'qsr+mojo@chromium.org',
              'viettrungluu+watch@chromium.org'],
     'mouse_lock': ['scheib+watch@chromium.org'],
     'music_manager_private': ['gab+watch@chromium.org',

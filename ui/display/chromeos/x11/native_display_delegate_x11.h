@@ -111,7 +111,7 @@ class DISPLAY_EXPORT NativeDisplayDelegateX11 : public NativeDisplayDelegate {
   // Destroys unused CRTCs and parks used CRTCs in a way which allows a
   // framebuffer resize. This is faster than turning them off, resizing,
   // then turning them back on.
-  void DestroyUnusedCrtcs();
+  void DestroyUnusedCrtcs(const gfx::Size& new_size);
 
   bool ConfigureCrtc(RRCrtc crtc, RRMode mode, RROutput output, int x, int y);
 
@@ -123,6 +123,8 @@ class DISPLAY_EXPORT NativeDisplayDelegateX11 : public NativeDisplayDelegate {
   XRRCrtcGamma* CreateGammaRampForProfile(
       const DisplaySnapshotX11& x11_output,
       ColorCalibrationProfile new_profile);
+
+  void DrawBackground();
 
   Display* display_;
   Window window_;
@@ -148,6 +150,9 @@ class DISPLAY_EXPORT NativeDisplayDelegateX11 : public NativeDisplayDelegate {
 
   // List of observers waiting for display configuration change events.
   ObserverList<NativeDisplayObserver> observers_;
+
+  // A background color used during boot time + multi displays.
+  uint32_t background_color_argb_;
 
   DISALLOW_COPY_AND_ASSIGN(NativeDisplayDelegateX11);
 };

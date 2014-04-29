@@ -61,6 +61,9 @@ QuicPacketGenerator::~QuicPacketGenerator() {
       case STOP_WAITING_FRAME:
         delete it->stop_waiting_frame;
         break;
+      case PING_FRAME:
+        delete it->ping_frame;
+        break;
       case NUM_FRAME_TYPES:
         DCHECK(false) << "Cannot delete type: " << it->type;
     }
@@ -91,9 +94,6 @@ QuicConsumedData QuicPacketGenerator::ConsumeData(QuicStreamId id,
                                                   bool fin,
                                                   QuicAckNotifier* notifier) {
   IsHandshake handshake = id == kCryptoStreamId ? IS_HANDSHAKE : NOT_HANDSHAKE;
-  // The caller should have flushed pending frames before sending handshake
-  // messages.
-  DCHECK(handshake == NOT_HANDSHAKE || !HasPendingFrames());
   SendQueuedFrames(false);
 
   size_t total_bytes_consumed = 0;

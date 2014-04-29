@@ -20,7 +20,6 @@
 #include "content/common/content_export.h"
 #include "content/common/gpu/client/gpu_channel_host.h"
 #include "content/public/renderer/render_thread.h"
-#include "ipc/ipc_channel_proxy.h"
 #include "ui/gfx/native_widget_types.h"
 
 #if defined(OS_MACOSX)
@@ -50,6 +49,7 @@ class ContextProvider;
 
 namespace IPC {
 class ForwardingMessageFilter;
+class MessageFilter;
 }
 
 namespace media {
@@ -136,8 +136,8 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
   virtual void AddRoute(int32 routing_id, IPC::Listener* listener) OVERRIDE;
   virtual void RemoveRoute(int32 routing_id) OVERRIDE;
   virtual int GenerateRoutingID() OVERRIDE;
-  virtual void AddFilter(IPC::ChannelProxy::MessageFilter* filter) OVERRIDE;
-  virtual void RemoveFilter(IPC::ChannelProxy::MessageFilter* filter) OVERRIDE;
+  virtual void AddFilter(IPC::MessageFilter* filter) OVERRIDE;
+  virtual void RemoveFilter(IPC::MessageFilter* filter) OVERRIDE;
   virtual void AddObserver(RenderProcessObserver* observer) OVERRIDE;
   virtual void RemoveObserver(RenderProcessObserver* observer) OVERRIDE;
   virtual void SetResourceDispatcherDelegate(
@@ -290,7 +290,6 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
 
   scoped_refptr<media::GpuVideoAcceleratorFactories> GetGpuFactories();
 
-  scoped_refptr<cc::ContextProvider> OffscreenCompositorContextProvider();
   scoped_refptr<webkit::gpu::ContextProviderWebContext>
       SharedMainThreadContextProvider();
 
@@ -400,6 +399,11 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
       size_t width,
       size_t height,
       unsigned internalformat) OVERRIDE;
+
+  // mojo::ShellClient implementation:
+  virtual void AcceptConnection(
+      const mojo::String& service_name,
+      mojo::ScopedMessagePipeHandle message_pipe) OVERRIDE;
 
   void Init();
 
@@ -511,7 +515,6 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
   scoped_ptr<InputHandlerManager> input_handler_manager_;
   scoped_refptr<IPC::ForwardingMessageFilter> compositor_output_surface_filter_;
 
-  scoped_refptr<ContextProviderCommandBuffer> offscreen_compositor_contexts_;
   scoped_refptr<ContextProviderCommandBuffer> shared_main_thread_contexts_;
 
   ObserverList<RenderProcessObserver> observers_;

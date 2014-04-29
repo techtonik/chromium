@@ -940,6 +940,11 @@ const char kCurrentThemeDisplayProperties[] = "extensions.theme.properties";
 // (showing developer packing tools and extensions details)
 const char kExtensionsUIDeveloperMode[] = "extensions.ui.developer_mode";
 
+// Boolean pref which indicates whether the Chrome Apps & Extensions Developer
+// Tool promotion has been dismissed by the user.
+const char kExtensionsUIDismissedADTPromo[] =
+    "extensions.ui.dismissed_adt_promo";
+
 // Dictionary pref that tracks which command belongs to which
 // extension + named command pair.
 const char kExtensionCommands[] = "extensions.commands";
@@ -1331,7 +1336,6 @@ const char kCertRevocationCheckingRequiredLocalAnchors[] =
 const char kSSLVersionMin[] = "ssl.version_min";
 const char kSSLVersionMax[] = "ssl.version_max";
 const char kCipherSuiteBlacklist[] = "ssl.cipher_suites.blacklist";
-const char kEnableOriginBoundCerts[] = "ssl.origin_bound_certs.enabled";
 const char kDisableSSLRecordSplitting[] = "ssl.ssl_record_splitting.disabled";
 
 // A boolean pref of the EULA accepted flag.
@@ -2078,6 +2082,12 @@ const char kUsedPolicyCertificates[] = "policy.used_policy_certificates";
 // after recovery.
 const char kServerBackedDeviceState[] = "server_backed_device_state";
 
+// Customized wallpaper URL, which is already downloaded and scaled.
+// The URL from this preference must never be fetched. It is compared to the
+// URL from customization document to check if wallpaper URL has changed
+// since wallpaper was cached.
+const char kCustomizationDefaultWallpaperURL[] =
+    "customization.default_wallpaper_url";
 #endif
 
 // Whether there is a Flash version installed that supports clearing LSO data.
@@ -2119,6 +2129,13 @@ const char kRollbackRequested[] = "RollbackRequested";
 // center for desktop notifications.
 const char kMessageCenterShowedFirstRunBalloon[] =
     "message_center.showed_first_run_balloon";
+
+// Boolean recording whether the user has disabled the notifications
+// menubar or systray icon.
+const char kMessageCenterShowIcon[] = "message_center.show_icon";
+
+const char kMessageCenterForcedOnTaskbar[] =
+    "message_center.was_forced_on_taskbar";
 
 // *************** SERVICE PREFS ***************
 // These are attached to the service process.
@@ -2226,6 +2243,11 @@ const char kChromeCreatedLoginItem[] =
 // time.
 const char kMigratedLoginItemPref[] =
   "background_mode.migrated_login_item_pref";
+
+// A boolean that tracks whether to show a notification when trying to quit
+// while there are apps running.
+const char kNotifyWhenAppsKeepChromeAlive[] =
+    "apps.notify-when-apps-keep-chrome-alive";
 #endif
 
 // Set to true if background mode is enabled on this browser.

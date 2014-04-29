@@ -119,6 +119,10 @@ class QuicDispatcher::QuicFramerVisitor : public QuicFramerVisitorInterface {
     DCHECK(false);
     return false;
   }
+  virtual bool OnPingFrame(const QuicPingFrame& /*frame*/) OVERRIDE {
+    DCHECK(false);
+    return false;
+  }
   virtual bool OnRstStreamFrame(const QuicRstStreamFrame& /*frame*/) OVERRIDE {
     DCHECK(false);
     return false;
@@ -382,7 +386,7 @@ QuicConnection* QuicDispatcher::CreateQuicConnection(
     uint32 initial_flow_control_window) {
   // If we have disabled per-stream flow control, then don't allow new
   // connections to talk QUIC_VERSION_17 or higher.
-  if (FLAGS_enable_quic_stream_flow_control) {
+  if (FLAGS_enable_quic_stream_flow_control_2) {
     return new QuicConnection(connection_id, client_address, helper_.get(),
                               writer_.get(), true, supported_versions_,
                               initial_flow_control_window_bytes_);

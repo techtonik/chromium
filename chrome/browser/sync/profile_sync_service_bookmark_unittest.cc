@@ -22,7 +22,6 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
-#include "chrome/browser/bookmarks/base_bookmark_model_observer.h"
 #include "chrome/browser/bookmarks/bookmark_model.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/bookmarks/bookmark_test_helpers.h"
@@ -30,6 +29,7 @@
 #include "chrome/browser/sync/glue/bookmark_model_associator.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/test/base/testing_profile.h"
+#include "components/bookmarks/core/browser/base_bookmark_model_observer.h"
 #include "components/sync_driver/data_type_error_handler.h"
 #include "components/sync_driver/data_type_error_handler_mock.h"
 #include "content/public/test/test_browser_thread.h"
@@ -1452,8 +1452,12 @@ void ProfileSyncServiceBookmarkTestWithData::PopulateFromTestData(
     if (item.url) {
       const base::Time add_time =
           start_time_ + base::TimeDelta::FromMinutes(*running_count);
-      model_->AddURLWithCreationTime(node, i, base::UTF8ToUTF16(item.title),
-                                     GURL(item.url), add_time);
+      model_->AddURLWithCreationTimeAndMetaInfo(node,
+                                                i,
+                                                base::UTF8ToUTF16(item.title),
+                                                GURL(item.url),
+                                                add_time,
+                                                NULL);
     } else {
       model_->AddFolder(node, i, base::UTF8ToUTF16(item.title));
     }

@@ -23,6 +23,7 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "build/build_config.h"
+#include "cc/resources/shared_bitmap.h"
 #include "content/browser/renderer_host/input/input_ack_handler.h"
 #include "content/browser/renderer_host/input/input_router_client.h"
 #include "content/browser/renderer_host/input/synthetic_gesture.h"
@@ -169,9 +170,6 @@ class CONTENT_EXPORT RenderWidgetHostImpl : virtual public RenderWidgetHost,
   virtual void RemoveMouseEventCallback(
       const MouseEventCallback& callback) OVERRIDE;
   virtual void GetWebScreenInfo(blink::WebScreenInfo* result) OVERRIDE;
-  virtual void GetSnapshotFromRenderer(
-      const gfx::Rect& src_subrect,
-      const base::Callback<void(bool, const SkBitmap&)>& callback) OVERRIDE;
 
   virtual SkBitmap::Config PreferredReadbackFormat() OVERRIDE;
 
@@ -630,8 +628,6 @@ class CONTENT_EXPORT RenderWidgetHostImpl : virtual public RenderWidgetHost,
       const ViewHostMsg_CompositorSurfaceBuffersSwapped_Params& params);
 #endif
   bool OnSwapCompositorFrame(const IPC::Message& message);
-  void OnOverscrolled(gfx::Vector2dF accumulated_overscroll,
-                      gfx::Vector2dF current_fling_velocity);
   void OnFlingingStopped();
   void OnUpdateRect(const ViewHostMsg_UpdateRect_Params& params);
   void OnUpdateIsDelayed();
@@ -656,7 +652,7 @@ class CONTENT_EXPORT RenderWidgetHostImpl : virtual public RenderWidgetHost,
   void OnUnlockMouse();
   void OnShowDisambiguationPopup(const gfx::Rect& rect,
                                  const gfx::Size& size,
-                                 const TransportDIB::Id& id);
+                                 const cc::SharedBitmapId& id);
 #if defined(OS_WIN)
   void OnWindowlessPluginDummyWindowCreated(
       gfx::NativeViewId dummy_activation_window);
@@ -762,6 +758,11 @@ class CONTENT_EXPORT RenderWidgetHostImpl : virtual public RenderWidgetHost,
   // The height of the physical backing surface that is overdrawn opaquely in
   // the browser, for example by an on-screen-keyboard (in DPI-adjusted pixels).
   float overdraw_bottom_height_;
+
+  // The size of the visible viewport, which may be smaller than the view if the
+  // view is partially occluded (e.g. by a virtual keyboard).  The size is in
+  // DPI-adjusted pixels.
+  gfx::Size visible_viewport_size_;
 
   // The size we last sent as requested size to the renderer. |current_size_|
   // is only updated once the resize message has been ack'd. This on the other
@@ -879,9 +880,6 @@ class CONTENT_EXPORT RenderWidgetHostImpl : virtual public RenderWidgetHost,
 #if defined(OS_WIN)
   std::list<HWND> dummy_windows_for_activation_;
 #endif
-
-  // List of callbacks for pending snapshot requests to the renderer.
-  std::queue<base::Callback<void(bool, const SkBitmap&)> > pending_snapshots_;
 
   int64 last_input_number_;
 

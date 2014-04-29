@@ -132,6 +132,8 @@
         'cursor/cursor_x11.cc',
         'cursor/cursors_aura.cc',
         'cursor/cursors_aura.h',
+        'cursor/image_cursors.cc',
+        'cursor/image_cursors.h',
         'cursor/ozone/bitmap_cursor_factory_ozone.cc',
         'cursor/ozone/bitmap_cursor_factory_ozone.h',
         'cursor/ozone/cursor_factory_ozone.cc',
@@ -153,6 +155,7 @@
         'dragdrop/drag_utils.cc',
         'dragdrop/drag_utils.h',
         'dragdrop/drag_utils_aura.cc',
+        'dragdrop/drag_utils_mac.mm',
         'dragdrop/drag_utils_win.cc',
         'dragdrop/drop_target_event.cc',
         'dragdrop/drop_target_event.h',
@@ -166,6 +169,7 @@
         'dragdrop/os_exchange_data_provider_aura.h',
         'dragdrop/os_exchange_data_provider_aurax11.cc',
         'dragdrop/os_exchange_data_provider_aurax11.h',
+        'dragdrop/os_exchange_data_provider_mac.mm',
         'dragdrop/os_exchange_data_provider_win.cc',
         'dragdrop/os_exchange_data_provider_win.h',
         'hit_test.h',
@@ -354,8 +358,6 @@
             'cursor/cursor_mac.mm',
             'cursor/cursor_win.cc',
             'cursor/cursor_x11.cc',
-            'nine_image_painter_factory.cc',
-            'nine_image_painter_factory.h',
             'x/selection_owner.cc',
             'x/selection_owner.h',
             'x/selection_requestor.cc',
@@ -388,14 +390,13 @@
               'sources/': [
                 ['exclude', '^dragdrop/drag_utils.cc'],
                 ['exclude', '^dragdrop/drag_utils.h'],
-                ['exclude', '^dragdrop/os_exchange_data.cc'],
-                ['exclude', '^dragdrop/os_exchange_data.h'],
               ],
             }, {
-              # Note: because of gyp predence rules this has to be defined as
-              # 'sources/' rather than 'sources!'.
               'sources/': [
                 ['include', '^dragdrop/os_exchange_data.cc'],
+                ['include', '^dragdrop/os_exchange_data.h'],
+                ['include', '^nine_image_painter_factory.cc'],
+                ['include', '^nine_image_painter_factory.h'],
               ],
             }],
           ],
@@ -469,16 +470,14 @@
               ],
             }],
           ],
-          'sources!': [
-            'dragdrop/drag_drop_types.h',
-            'dragdrop/os_exchange_data.cc',
-          ],
         }],
         ['OS=="mac"', {
           'dependencies': [
             '../../third_party/mozilla/mozilla.gyp:mozilla',
           ],
           'sources!': [
+            'cursor/image_cursors.cc',
+            'cursor/image_cursors.h',
             'dragdrop/drag_utils.cc',
             'dragdrop/drag_utils.h',
           ],
@@ -506,12 +505,19 @@
         }],
         ['toolkit_views==0', {
           'sources!': [
+            'dragdrop/drag_drop_types.h',
             'dragdrop/drop_target_event.cc',
             'dragdrop/drop_target_event.h',
+            'dragdrop/os_exchange_data.cc',
+            'dragdrop/os_exchange_data.h',
+            'nine_image_painter_factory.cc',
+            'nine_image_painter_factory.h',
           ],
         }],
         ['OS=="android"', {
           'sources!': [
+            'cursor/image_cursors.cc',
+            'cursor/image_cursors.h',
             'default_theme_provider.cc',
             'dragdrop/drag_utils.cc',
             'dragdrop/drag_utils.h',
@@ -562,6 +568,46 @@
           # which are included by public headers in the ui target, so we need
           # ui to be a hard dependency for all its users.
           'hard_dependency': 1,
+        }],
+      ],
+    },
+    {
+      'target_name': 'ui_base_test_support',
+      'dependencies': [
+        '../../base/base.gyp:base',
+        '../../skia/skia.gyp:skia',
+        '../../testing/gtest.gyp:gtest',
+        '../gfx/gfx.gyp:gfx',
+        '../gfx/gfx.gyp:gfx_geometry',
+      ],
+      'sources': [
+        'test/ui_controls.h',
+        'test/ui_controls_aura.cc',
+        'test/ui_controls_internal_win.cc',
+        'test/ui_controls_internal_win.h',
+        'test/ui_controls_mac.mm',
+        'test/ui_controls_win.cc',
+      ],
+      'include_dirs': [
+        '../..',
+      ],
+      'conditions': [
+        ['OS!="ios"', {
+          'type': 'static_library',
+          'includes': [ 'ime/ime_test_support.gypi' ],
+        }, {  # OS=="ios"
+          # None of the sources in this target are built on iOS, resulting in
+          # link errors when building targets that depend on this target
+          # because the static library isn't found. If this target is changed
+          # to have sources that are built on iOS, the target should be changed
+          # to be of type static_library on all platforms.
+          'type': 'none',
+        }],
+        ['use_aura==1', {
+          'sources!': [
+            'test/ui_controls_mac.mm',
+            'test/ui_controls_win.cc',
+          ],
         }],
       ],
     },

@@ -150,7 +150,6 @@
 #include "ppapi/shared_impl/ppapi_switches.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
-#include "ui/message_center/message_center_util.h"
 #include "webkit/browser/fileapi/external_mount_points.h"
 #include "webkit/common/webpreferences.h"
 
@@ -167,6 +166,7 @@
 #include "chrome/browser/chromeos/drive/fileapi/file_system_backend_delegate.h"
 #include "chrome/browser/chromeos/file_system_provider/fileapi/backend_delegate.h"
 #include "chrome/browser/chromeos/fileapi/file_system_backend.h"
+#include "chrome/browser/chromeos/fileapi/mtp_file_system_backend_delegate.h"
 #include "chrome/browser/chromeos/login/startup_utils.h"
 #include "chrome/browser/chromeos/login/user_manager.h"
 #include "chrome/browser/chromeos/system/input_device_settings.h"
@@ -840,9 +840,7 @@ void ChromeContentBrowserClient::GuestWebContentsCreated(
   /// TODO(fsamuel): In the future, certain types of GuestViews won't require
   // extension bindings. At that point, we should clear |extension_id| instead
   // of exiting early.
-  if (!service->GetExtensionById(extension_id, false) &&
-      !CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableBrowserPluginForAllViewTypes)) {
+  if (!service->GetExtensionById(extension_id, false)) {
     NOTREACHED();
     return;
   }
@@ -1150,6 +1148,17 @@ bool ChromeContentBrowserClient::ShouldAllowOpenURL(
             extension, url.path()))
       return false;
   }
+
+  // Do not allow chrome://chrome-signin navigate to other chrome:// URLs, since
+  // the signin page may host untrusted web content.
+  if (from_url.GetOrigin().spec() == chrome::kChromeUIChromeSigninURL &&
+      url.SchemeIs(content::kChromeUIScheme) &&
+      url.host() != chrome::kChromeUIChromeSigninHost) {
+    VLOG(1) << "Blocked navigation to " << url.spec() << " from "
+            << chrome::kChromeUIChromeSigninURL;
+    return false;
+  }
+
   return true;
 }
 
@@ -2312,17 +2321,6 @@ void ChromeContentBrowserClient::OverrideWebkitPrefs(
           extension, view_type, web_prefs);
     }
   }
-
-#if defined(OS_CHROMEOS)
-  // Override the default of suppressing HW compositing for WebUI pages for the
-  // file manager, which is implemented using WebUI but wants HW acceleration
-  // for video decode & render.
-  if (url.SchemeIs(extensions::kExtensionScheme) &&
-      url.host() == file_manager::kFileManagerAppId) {
-    web_prefs->accelerated_compositing_enabled = true;
-    web_prefs->accelerated_2d_canvas_enabled = true;
-  }
-#endif
 }
 
 void ChromeContentBrowserClient::UpdateInspectorSetting(
@@ -2510,6 +2508,7 @@ void ChromeContentBrowserClient::GetAdditionalFileSystemBackends(
   chromeos::FileSystemBackend* backend = new chromeos::FileSystemBackend(
       new drive::FileSystemBackendDelegate,
       new chromeos::file_system_provider::BackendDelegate,
+      new chromeos::MTPFileSystemBackendDelegate(storage_partition_path),
       browser_context->GetSpecialStoragePolicy(),
       external_mount_points,
       fileapi::ExternalMountPoints::GetSystemInstance());

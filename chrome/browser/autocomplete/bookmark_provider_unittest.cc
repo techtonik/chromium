@@ -12,13 +12,14 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/strings/string16.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/autocomplete/autocomplete_provider.h"
 #include "chrome/browser/autocomplete/autocomplete_provider_listener.h"
 #include "chrome/browser/bookmarks/bookmark_model.h"
-#include "chrome/browser/bookmarks/bookmark_model_factory.h"
+#include "chrome/browser/bookmarks/test_bookmark_client.h"
 #include "chrome/test/base/testing_profile.h"
-#include "components/bookmarks/core/browser/bookmark_title_match.h"
+#include "components/bookmarks/core/browser/bookmark_match.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 // The bookmark corpus against which we will simulate searches.
@@ -35,6 +36,8 @@ struct BookmarksTestInfo {
   { "jkl ghi", "http://www.catsanddogs.com/g" },
   { "frankly frankly frank", "http://www.catsanddogs.com/h" },
   { "foobar foobar", "http://www.foobar.com/" },
+  { "domain", "http://www.domain.com/http/" },
+  { "repeat", "http://www.repeat.com/1/repeat/2/" },
   // For testing inline_autocompletion.
   { "http://blah.com/", "http://blah.com/" },
   { "http://fiddle.com/", "http://fiddle.com/" },
@@ -61,7 +64,7 @@ struct BookmarksTestInfo {
 class BookmarkProviderTest : public testing::Test,
                              public AutocompleteProviderListener {
  public:
-  BookmarkProviderTest() : model_(new BookmarkModel(NULL)) {}
+  BookmarkProviderTest();
 
   // AutocompleteProviderListener: Not called.
   virtual void OnProviderUpdate(bool updated_matches) OVERRIDE {}
@@ -69,6 +72,7 @@ class BookmarkProviderTest : public testing::Test,
  protected:
   virtual void SetUp() OVERRIDE;
 
+  test::TestBookmarkClient client_;
   scoped_ptr<TestingProfile> profile_;
   scoped_ptr<BookmarkModel> model_;
   scoped_refptr<BookmarkProvider> provider_;
@@ -76,6 +80,10 @@ class BookmarkProviderTest : public testing::Test,
  private:
   DISALLOW_COPY_AND_ASSIGN(BookmarkProviderTest);
 };
+
+BookmarkProviderTest::BookmarkProviderTest() {
+  model_ = client_.CreateModel(false);
+}
 
 void BookmarkProviderTest::SetUp() {
   profile_.reset(new TestingProfile());
@@ -292,14 +300,15 @@ TEST_F(BookmarkProviderTest, Rankings) {
     const size_t match_count;
     // |matches| specifies the titles for all bookmarks expected to be matched
     // by the |query|
-    const std::string matches[99];
+    const std::string matches[3];
   } query_data[] = {
     // Basic ranking test.
     {"abc",       3, {"abcde",      // Most complete match.
                       "abcdef",
                       "abc def"}},  // Least complete match.
     {"ghi",       2, {"ghi jkl",    // Matched earlier.
-                      "jkl ghi"}},  // Matched later.
+                      "jkl ghi",    // Matched later.
+                      ""}},
     // Rankings of exact-word matches with different URLs.
     {"achlorhydric",
                   3, {"achlorhydric mockingbirds resuscitates featherhead",
@@ -307,14 +316,16 @@ TEST_F(BookmarkProviderTest, Rankings) {
                       "featherhead resuscitates achlorhydric mockingbirds"}},
     {"achlorhydric featherheads",
                   2, {"achlorhydric featherheads resuscitates mockingbirds",
-                      "mockingbirds resuscitates featherheads achlorhydric"}},
+                      "mockingbirds resuscitates featherheads achlorhydric",
+                      ""}},
     {"mockingbirds resuscitates",
                   3, {"mockingbirds resuscitates featherheads achlorhydric",
                       "achlorhydric mockingbirds resuscitates featherhead",
                       "featherhead resuscitates achlorhydric mockingbirds"}},
     // Ranking of exact-word matches with URL boost.
     {"worms",     2, {"burning worms #2",    // boosted
-                      "burning worms #1"}},  // not boosted
+                      "burning worms #1",    // not boosted
+                      ""}},
     // Ranking of prefix matches with URL boost. Note that a query of
     // "worm burn" will have the same results.
     {"burn worm", 3, {"burning worms #2",    // boosted
@@ -387,13 +398,69 @@ TEST_F(BookmarkProviderTest, InlineAutocompletion) {
     provider_->FixupUserInput(&fixed_up_input);
     BookmarkNode node(GURL(query_data[i].url));
     node.SetTitle(base::ASCIIToUTF16(query_data[i].url));
-    BookmarkTitleMatch bookmark_match;
+    BookmarkMatch bookmark_match;
     bookmark_match.node = &node;
-    const AutocompleteMatch& ac_match =
-        provider_->TitleMatchToACMatch(input, fixed_up_input, bookmark_match);
+    const AutocompleteMatch& ac_match = provider_->BookmarkMatchToACMatch(
+        input, fixed_up_input, bookmark_match);
     EXPECT_EQ(query_data[i].allowed_to_be_default_match,
               ac_match.allowed_to_be_default_match) << description;
     EXPECT_EQ(base::ASCIIToUTF16(query_data[i].inline_autocompletion),
               ac_match.inline_autocompletion) << description;
+  }
+}
+
+TEST_F(BookmarkProviderTest, StripHttpAndAdjustOffsets) {
+  // Simulate searches.
+  struct QueryData {
+    const std::string query;
+    const std::string expected_contents;
+    // |expected_contents_class| is in format offset:style,offset:style,...
+    const std::string expected_contents_class;
+  } query_data[] = {
+    { "foo",       "www.foobar.com",             "0:1,4:3,7:1"           },
+    { "www foo",   "www.foobar.com",             "0:3,3:1,4:3,7:1"       },
+    { "foo www",   "www.foobar.com",             "0:3,3:1,4:3,7:1"       },
+    { "foo http",  "http://www.foobar.com",      "0:3,4:1,11:3,14:1"     },
+    { "blah",      "blah.com",                   "0:3,4:1"               },
+    { "http blah", "http://blah.com",            "0:3,4:1,7:3,11:1"      },
+    { "dom",       "www.domain.com/http/",       "0:1,4:3,7:1"           },
+    { "dom http",  "http://www.domain.com/http/",
+      "0:3,4:1,11:3,14:1,22:3,26:1"                                      },
+    { "rep",       "www.repeat.com/1/repeat/2/", "0:1,4:3,7:1,17:3,20:1" },
+    { "versi",     "chrome://version",           "0:1,9:3,14:1"          }
+  };
+
+  // Reload the bookmarks index with |index_urls| == true.
+  model_ = client_.CreateModel(true);
+  SetUp();
+
+  for (size_t i = 0; i < ARRAYSIZE_UNSAFE(query_data); ++i) {
+    std::string description = "for query=" + query_data[i].query;
+    AutocompleteInput input(base::ASCIIToUTF16(query_data[i].query),
+                            base::string16::npos, base::string16(), GURL(),
+                            AutocompleteInput::INVALID_SPEC, false, false,
+                            false, true);
+    provider_->Start(input, false);
+    const ACMatches& matches(provider_->matches());
+    ASSERT_EQ(1U, matches.size()) << description;
+    const AutocompleteMatch& match = matches[0];
+    EXPECT_EQ(base::ASCIIToUTF16(query_data[i].expected_contents),
+              match.contents) << description;
+    std::vector<std::string> class_strings;
+    base::SplitString(
+        query_data[i].expected_contents_class, ',', &class_strings);
+    ASSERT_EQ(class_strings.size(), match.contents_class.size())
+        << description;
+    for (size_t i = 0; i < class_strings.size(); ++i) {
+      std::vector<std::string> chunks;
+      base::SplitString(class_strings[i], ':', &chunks);
+      ASSERT_EQ(2U, chunks.size()) << description;
+      size_t offset;
+      EXPECT_TRUE(base::StringToSizeT(chunks[0], &offset)) << description;
+      EXPECT_EQ(offset, match.contents_class[i].offset) << description;
+      int style;
+      EXPECT_TRUE(base::StringToInt(chunks[1], &style)) << description;
+      EXPECT_EQ(style, match.contents_class[i].style) << description;
+    }
   }
 }

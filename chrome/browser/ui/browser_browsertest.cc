@@ -17,6 +17,7 @@
 #include "chrome/browser/command_updater.h"
 #include "chrome/browser/content_settings/host_content_settings_map.h"
 #include "chrome/browser/defaults.h"
+#include "chrome/browser/devtools/devtools_window.h"
 #include "chrome/browser/extensions/extension_browsertest.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/tab_helper.h"
@@ -570,6 +571,33 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, SadTabCancelsDialogs) {
 
   // Make sure subsequent navigations work.
   GURL url2("http://www.example.com/files/empty.html");
+  ui_test_utils::NavigateToURL(browser(), url2);
+}
+
+// Make sure that dialogs opened by subframes are closed when the process dies.
+// See http://crbug.com/366510.
+IN_PROC_BROWSER_TEST_F(BrowserTest, SadTabCancelsSubframeDialogs) {
+  // Navigate to an iframe that opens an alert dialog.
+  WebContents* contents = browser()->tab_strip_model()->GetActiveWebContents();
+  contents->GetMainFrame()->ExecuteJavaScript(
+      ASCIIToUTF16("window.location.href = 'data:text/html,"
+                   "<iframe srcdoc=\"<script>alert(1)</script>\">'"));
+  AppModalDialog* alert = ui_test_utils::WaitForAppModalDialog();
+  EXPECT_TRUE(alert->IsValid());
+  AppModalDialogQueue* dialog_queue = AppModalDialogQueue::GetInstance();
+  EXPECT_TRUE(dialog_queue->HasActiveDialog());
+
+  // Crash the renderer process and ensure the dialog is gone.
+  content::RenderProcessHost* child_process = contents->GetRenderProcessHost();
+  content::RenderProcessHostWatcher crash_observer(
+      child_process,
+      content::RenderProcessHostWatcher::WATCH_FOR_PROCESS_EXIT);
+  base::KillProcess(child_process->GetHandle(), 0, false);
+  crash_observer.Wait();
+  EXPECT_FALSE(dialog_queue->HasActiveDialog());
+
+  // Make sure subsequent navigations work.
+  GURL url2("data:text/html,foo");
   ui_test_utils::NavigateToURL(browser(), url2);
 }
 
@@ -1322,6 +1350,55 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, AppIdSwitch) {
   ASSERT_NE(
       new_browser->app_name_.find(extension_app->id()),
       std::string::npos) << new_browser->app_name_;
+}
+
+// Open an app window and the dev tools window and ensure that the location
+// bar settings are correct.
+IN_PROC_BROWSER_TEST_F(BrowserTest, ShouldShowLocationBar) {
+  ASSERT_TRUE(test_server()->Start());
+
+  // Load an app.
+  host_resolver()->AddRule("www.example.com", "127.0.0.1");
+  ASSERT_TRUE(LoadExtension(test_data_dir_.AppendASCII("app/")));
+  const Extension* extension_app = GetExtension();
+
+  // Launch it in a window, as AppLauncherHandler::HandleLaunchApp() would.
+  WebContents* app_window =
+      OpenApplication(AppLaunchParams(browser()->profile(),
+                                      extension_app,
+                                      extensions::LAUNCH_CONTAINER_WINDOW,
+                                      NEW_WINDOW));
+  ASSERT_TRUE(app_window);
+
+  DevToolsWindow::OpenDevToolsWindowForTest(
+      browser()->tab_strip_model()->GetActiveWebContents()->GetRenderViewHost(),
+      false);
+
+  // The launch should have created a new app browser and a dev tools browser.
+  ASSERT_EQ(3u,
+            chrome::GetBrowserCount(browser()->profile(),
+                                    browser()->host_desktop_type()));
+
+  // Find the new browsers.
+  Browser* app_browser = NULL;
+  Browser* dev_tools_browser = NULL;
+  for (chrome::BrowserIterator it; !it.done(); it.Next()) {
+    if (*it == browser()) {
+      continue;
+    } else if ((*it)->app_name() == DevToolsWindow::kDevToolsApp) {
+      dev_tools_browser = *it;
+    } else {
+      app_browser = *it;
+    }
+  }
+  ASSERT_TRUE(dev_tools_browser);
+  ASSERT_TRUE(app_browser);
+  ASSERT_TRUE(app_browser != browser());
+
+  EXPECT_FALSE(
+      dev_tools_browser->SupportsWindowFeature(Browser::FEATURE_LOCATIONBAR));
+  EXPECT_FALSE(
+      app_browser->SupportsWindowFeature(Browser::FEATURE_LOCATIONBAR));
 }
 #endif
 
@@ -2084,30 +2161,6 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, FullscreenBookmarkBar) {
 #endif
 }
 #endif
-
-class ShowModalDialogTest : public BrowserTest {
- public:
-  ShowModalDialogTest() {}
-
-  virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
-    command_line->AppendSwitch(switches::kDisablePopupBlocking);
-  }
-};
-
-IN_PROC_BROWSER_TEST_F(ShowModalDialogTest, BasicTest) {
-  // This navigation should show a modal dialog that will be immediately
-  // closed, but the fact that it was shown should be recorded.
-  GURL url = ui_test_utils::GetTestUrl(
-      base::FilePath(), base::FilePath().AppendASCII("showmodaldialog.html"));
-
-  base::string16 expected_title(ASCIIToUTF16("SUCCESS"));
-  content::TitleWatcher title_watcher(
-      browser()->tab_strip_model()->GetActiveWebContents(), expected_title);
-  ui_test_utils::NavigateToURL(browser(), url);
-
-  // Verify that we set a mark on successful dialog show.
-  ASSERT_EQ(expected_title, title_watcher.WaitAndGetTitle());
-}
 
 IN_PROC_BROWSER_TEST_F(BrowserTest, DisallowFileUrlUniversalAccessTest) {
   GURL url = ui_test_utils::GetTestUrl(

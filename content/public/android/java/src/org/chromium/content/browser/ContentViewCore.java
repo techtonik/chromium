@@ -439,6 +439,10 @@ public class ContentViewCore
     // if there is no render process.
     public static final int INVALID_RENDER_PROCESS_PID = 0;
 
+    // Offsets for the events that passes through this ContentViewCore.
+    private float mCurrentTouchOffsetX;
+    private float mCurrentTouchOffsetY;
+
     /**
      * Constructs a new ContentViewCore. Embedders must call initialize() after constructing
      * a ContentViewCore and before using it.
@@ -945,7 +949,7 @@ public class ContentViewCore
      * Stops loading the current web contents.
      */
     public void stopLoading() {
-        if (mNativeContentViewCore != 0) nativeStopLoading(mNativeContentViewCore);
+        if (mWebContents != null) mWebContents.stop();
     }
 
     /**
@@ -964,8 +968,7 @@ public class ContentViewCore
      * @return The title of the current page.
      */
     public String getTitle() {
-        if (mNativeContentViewCore != 0) return nativeGetTitle(mNativeContentViewCore);
-        return null;
+        return mWebContents == null ? null : mWebContents.getTitle();
     }
 
     /**
@@ -1187,6 +1190,8 @@ public class ContentViewCore
      * @see View#onTouchEvent(MotionEvent)
      */
     public boolean onTouchEvent(MotionEvent event) {
+        MotionEvent offset = createOffsetMotionEvent(event);
+
         cancelRequestToScrollFocusedEditableNodeIntoView();
 
         if (!mRequestedVSyncForInput) {
@@ -1194,7 +1199,7 @@ public class ContentViewCore
             addVSyncSubscriber();
         }
 
-        final int eventAction = event.getActionMasked();
+        final int eventAction = offset.getActionMasked();
 
         // Only these actions have any effect on gesture detection.  Other
         // actions have no corresponding WebTouchEvent type and may confuse the
@@ -1209,15 +1214,17 @@ public class ContentViewCore
         }
 
         if (mNativeContentViewCore == 0) return false;
-        final int pointerCount = event.getPointerCount();
-        return nativeOnTouchEvent(mNativeContentViewCore, event,
-                event.getEventTime(), eventAction,
-                pointerCount, event.getHistorySize(), event.getActionIndex(),
-                event.getX(), event.getY(),
-                pointerCount > 1 ? event.getX(1) : 0,
-                pointerCount > 1 ? event.getY(1) : 0,
-                event.getPointerId(0), pointerCount > 1 ? event.getPointerId(1) : -1,
-                event.getTouchMajor(), pointerCount > 1 ? event.getTouchMajor(1) : 0);
+        final int pointerCount = offset.getPointerCount();
+        boolean consumed = nativeOnTouchEvent(mNativeContentViewCore, offset,
+                offset.getEventTime(), eventAction,
+                pointerCount, offset.getHistorySize(), offset.getActionIndex(),
+                offset.getX(), offset.getY(),
+                pointerCount > 1 ? offset.getX(1) : 0,
+                pointerCount > 1 ? offset.getY(1) : 0,
+                offset.getPointerId(0), pointerCount > 1 ? offset.getPointerId(1) : -1,
+                offset.getTouchMajor(), pointerCount > 1 ? offset.getTouchMajor(1) : 0);
+        offset.recycle();
+        return consumed;
     }
 
     public void setIgnoreRemainingTouchEvents() {
@@ -1299,6 +1306,15 @@ public class ContentViewCore
 
     @SuppressWarnings("unused")
     @CalledByNative
+    private void onTapEventNotConsumed(int x, int y) {
+        for (mGestureStateListenersIterator.rewind();
+                mGestureStateListenersIterator.hasNext();) {
+            mGestureStateListenersIterator.next().onUnhandledTapEvent(x, y);
+        }
+    }
+
+    @SuppressWarnings("unused")
+    @CalledByNative
     private void onDoubleTapEventAck() {
         temporarilyHideTextHandles();
     }
@@ -1328,6 +1344,15 @@ public class ContentViewCore
         nativeFlingCancel(mNativeContentViewCore, timeMs);
         nativeScrollBegin(mNativeContentViewCore, timeMs, x, y, velocityX, velocityY);
         nativeFlingStart(mNativeContentViewCore, timeMs, x, y, velocityX, velocityY);
+    }
+
+    /**
+     * Cancel any fling gestures active.
+     * @param timeMs Current time (in milliseconds).
+     */
+    public void cancelFling(long timeMs) {
+        if (mNativeContentViewCore == 0) return;
+        nativeFlingCancel(mNativeContentViewCore, timeMs);
     }
 
     /**
@@ -1701,23 +1726,25 @@ public class ContentViewCore
      */
     public boolean onHoverEvent(MotionEvent event) {
         TraceEvent.begin("onHoverEvent");
+        MotionEvent offset = createOffsetMotionEvent(event);
 
         if (mBrowserAccessibilityManager != null) {
-            return mBrowserAccessibilityManager.onHoverEvent(event);
+            return mBrowserAccessibilityManager.onHoverEvent(offset);
         }
 
         // Work around Android bug where the x, y coordinates of a hover exit
         // event are incorrect when touch exploration is on.
-        if (mTouchExplorationEnabled && event.getAction() == MotionEvent.ACTION_HOVER_EXIT) {
+        if (mTouchExplorationEnabled && offset.getAction() == MotionEvent.ACTION_HOVER_EXIT) {
             return true;
         }
 
         mContainerView.removeCallbacks(mFakeMouseMoveRunnable);
         if (mNativeContentViewCore != 0) {
-            nativeSendMouseMoveEvent(mNativeContentViewCore, event.getEventTime(),
-                    event.getX(), event.getY());
+            nativeSendMouseMoveEvent(mNativeContentViewCore, offset.getEventTime(),
+                    offset.getX(), offset.getY());
         }
         TraceEvent.end("onHoverEvent");
+        offset.recycle();
         return true;
     }
 
@@ -1747,6 +1774,23 @@ public class ContentViewCore
             }
         }
         return mContainerViewInternals.super_onGenericMotionEvent(event);
+    }
+
+    /**
+     * Sets the current amount to offset incoming touch events by.  This is used to handle content
+     * moving and not lining up properly with the android input system.
+     * @param dx The X offset in pixels to shift touch events.
+     * @param dy The Y offset in pixels to shift touch events.
+     */
+    public void setCurrentMotionEventOffsets(float dx, float dy) {
+        mCurrentTouchOffsetX = dx;
+        mCurrentTouchOffsetY = dy;
+    }
+
+    private MotionEvent createOffsetMotionEvent(MotionEvent src) {
+        MotionEvent dst = MotionEvent.obtain(src);
+        dst.offsetLocation(mCurrentTouchOffsetX, mCurrentTouchOffsetY);
+        return dst;
     }
 
     /**
@@ -2902,8 +2946,11 @@ public class ContentViewCore
      */
     public boolean isDeviceAccessibilityScriptInjectionEnabled() {
         try {
-            if (!CommandLine.getInstance().hasSwitch(
-                    ContentSwitches.ENABLE_ACCESSIBILITY_SCRIPT_INJECTION)) {
+            // On JellyBean and higher, native accessibility is the default so script
+            // injection is only allowed if enabled via a flag.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN &&
+                    !CommandLine.getInstance().hasSwitch(
+                            ContentSwitches.ENABLE_ACCESSIBILITY_SCRIPT_INJECTION)) {
                 return false;
             }
 
@@ -3184,8 +3231,6 @@ public class ContentViewCore
 
     private native String nativeGetURL(long nativeContentViewCoreImpl);
 
-    private native String nativeGetTitle(long nativeContentViewCoreImpl);
-
     private native void nativeShowInterstitialPage(
             long nativeContentViewCoreImpl, String url, long nativeInterstitialPageDelegateAndroid);
     private native boolean nativeIsShowingInterstitialPage(long nativeContentViewCoreImpl);
@@ -3256,8 +3301,6 @@ public class ContentViewCore
 
     private native void nativeLoadIfNecessary(long nativeContentViewCoreImpl);
     private native void nativeRequestRestoreLoad(long nativeContentViewCoreImpl);
-
-    private native void nativeStopLoading(long nativeContentViewCoreImpl);
 
     private native void nativeReload(long nativeContentViewCoreImpl, boolean checkForRepost);
     private native void nativeReloadIgnoringCache(

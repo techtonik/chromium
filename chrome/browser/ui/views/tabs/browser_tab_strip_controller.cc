@@ -40,7 +40,6 @@
 #include "content/public/common/webplugininfo.h"
 #include "ipc/ipc_message.h"
 #include "net/base/filename_util.h"
-#include "ui/base/layout.h"
 #include "ui/base/models/list_selection_model.h"
 #include "ui/gfx/image/image.h"
 #include "ui/views/controls/menu/menu_item_view.h"
@@ -70,14 +69,9 @@ TabStripLayoutType DetermineTabStripLayout(
           switches::kEnableStackedTabStrip)) {
     return TAB_STRIP_LAYOUT_STACKED;
   }
-  // For chromeos always allow entering stacked mode.
-#if defined(USE_AURA)
+  // For ash, always allow entering stacked mode.
   if (host_desktop_type != chrome::HOST_DESKTOP_TYPE_ASH)
     return TAB_STRIP_LAYOUT_SHRINK;
-#else
-  if (ui::GetDisplayLayout() != ui::LAYOUT_TOUCH)
-    return TAB_STRIP_LAYOUT_SHRINK;
-#endif
   *adjust_layout = true;
   switch (prefs->GetInteger(prefs::kTabStripLayoutType)) {
     case TAB_STRIP_LAYOUT_STACKED:

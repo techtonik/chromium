@@ -92,7 +92,7 @@ EventMediaType GetEventMediaType(CastLoggingEvent event) {
 
 FrameEvent::FrameEvent()
     : rtp_timestamp(0u), frame_id(kFrameIdUnknown), size(0u), type(kUnknown),
-      key_frame(false) {}
+      key_frame(false), target_bitrate(0) {}
 FrameEvent::~FrameEvent() {}
 
 PacketEvent::PacketEvent()
@@ -104,25 +104,5 @@ PacketEvent::PacketEvent()
       type(kUnknown) {}
 PacketEvent::~PacketEvent() {}
 
-GenericEvent::GenericEvent() : type(kUnknown), value(0) {}
-GenericEvent::~GenericEvent() {}
-
-FrameLogStats::FrameLogStats()
-    : event_counter(0),
-      sum_size(0) {}
-FrameLogStats::~FrameLogStats() {}
-
-PacketLogStats::PacketLogStats()
-    : event_counter(0),
-      sum_size(0) {}
-PacketLogStats::~PacketLogStats() {}
-
-GenericLogStats::GenericLogStats()
-    : event_counter(0),
-      sum(0),
-      sum_squared(0),
-      min(0),
-      max(0) {}
-GenericLogStats::~GenericLogStats() {}
 }  // namespace cast
 }  // namespace media

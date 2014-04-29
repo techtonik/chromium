@@ -1456,7 +1456,6 @@ TEST_F(LayerTreeHostCommonTest,
   // are unexpected at draw time (e.g. we might try to create a content texture
   // of size 0).
   ASSERT_TRUE(parent->render_surface());
-  ASSERT_FALSE(render_surface1->render_surface());
   EXPECT_EQ(1U, render_surface_layer_list.size());
 }
 
@@ -2166,9 +2165,6 @@ TEST_F(LayerTreeHostCommonTest, ClipRectIsPropagatedCorrectlyToSurfaces) {
   ASSERT_TRUE(grand_child1->render_surface());
   ASSERT_TRUE(grand_child2->render_surface());
   ASSERT_TRUE(grand_child3->render_surface());
-  // Because grand_child4 is entirely clipped, it is expected to not have a
-  // render surface.
-  EXPECT_FALSE(grand_child4->render_surface());
 
   // Surfaces are clipped by their parent, but un-affected by the owning layer's
   // masksToBounds.
@@ -6026,20 +6022,11 @@ TEST_F(LayerTreeHostCommonTest,
       LayerTreeHostCommon::FindLayerThatIsHitByPointInTouchHandlerRegion(
           test_point, render_surface_layer_list);
 
-  // In this case we should abort searching for touch handlers at the opaque
-  // occluder and not find the region behind it.
-  EXPECT_FALSE(result_layer);
-
-  host_impl.active_tree()->LayerById(1234)->SetContentsOpaque(true);
-  host_impl.active_tree()->LayerById(1234)->SetScrollClipLayer(1);
-
-  result_layer =
-      LayerTreeHostCommon::FindLayerThatIsHitByPointInTouchHandlerRegion(
-          test_point, render_surface_layer_list);
-
-  // In this case we should abort searching for touch handlers at the scroller
-  // (which is opaque to hit testing) and not find the region behind it.
-  EXPECT_FALSE(result_layer);
+  // Even with an opaque layer in the middle, we should still find the layer
+  // with
+  // the touch handler behind it (since we can't assume that opaque layers are
+  // opaque to hit testing).
+  EXPECT_TRUE(result_layer);
 
   test_point = gfx::Point(35, 15);
   result_layer =

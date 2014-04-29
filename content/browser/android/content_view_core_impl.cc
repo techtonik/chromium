@@ -307,6 +307,12 @@ void ContentViewCoreImpl::Observe(int type,
                 switched_details->first->GetView());
         if (view)
           view->SetContentViewCore(NULL);
+
+        view = static_cast<RenderWidgetHostViewAndroid*>(
+            switched_details->second->GetView());
+
+        if (view)
+          view->SetContentViewCore(this);
       }
       int new_pid = GetRenderProcessIdFromRenderViewHost(
           web_contents_->GetRenderViewHost());
@@ -593,6 +599,12 @@ void ContentViewCoreImpl::OnGestureEventAck(const blink::WebGestureEvent& event,
     case WebInputEvent::GesturePinchEnd:
       Java_ContentViewCore_onPinchEndEventAck(env, j_obj.obj());
       break;
+    case WebInputEvent::GestureTap:
+      if (ack_result != INPUT_EVENT_ACK_STATE_CONSUMED) {
+        Java_ContentViewCore_onTapEventNotConsumed(
+            env, j_obj.obj(), event.x * dpi_scale(), event.y * dpi_scale());
+      }
+      break;
     case WebInputEvent::GestureDoubleTap:
       Java_ContentViewCore_onDoubleTapEventAck(env, j_obj.obj());
       break;
@@ -780,6 +792,13 @@ void ContentViewCoreImpl::DidStopFlinging() {
     Java_ContentViewCore_onNativeFlingStopped(env, obj.obj());
 }
 
+gfx::Size ContentViewCoreImpl::GetViewSize() const {
+  gfx::Size size = GetViewportSizeDip();
+  gfx::Size offset = GetViewportSizeOffsetDip();
+  size.Enlarge(-offset.width(), -offset.height());
+  return size;
+}
+
 gfx::Size ContentViewCoreImpl::GetPhysicalBackingSize() const {
   JNIEnv* env = AttachCurrentThread();
   ScopedJavaLocalRef<jobject> j_obj = java_ref_.get(env);
@@ -962,11 +981,6 @@ void ContentViewCoreImpl::LoadUrl(
 ScopedJavaLocalRef<jstring> ContentViewCoreImpl::GetURL(
     JNIEnv* env, jobject) const {
   return ConvertUTF8ToJavaString(env, GetWebContents()->GetURL().spec());
-}
-
-ScopedJavaLocalRef<jstring> ContentViewCoreImpl::GetTitle(
-    JNIEnv* env, jobject obj) const {
-  return ConvertUTF16ToJavaString(env, GetWebContents()->GetTitle());
 }
 
 jboolean ContentViewCoreImpl::IsIncognito(JNIEnv* env, jobject obj) {
@@ -1248,10 +1262,6 @@ void ContentViewCoreImpl::RequestRestoreLoad(JNIEnv* env, jobject obj) {
   web_contents_->GetController().SetNeedsReload();
 }
 
-void ContentViewCoreImpl::StopLoading(JNIEnv* env, jobject obj) {
-  web_contents_->Stop();
-}
-
 void ContentViewCoreImpl::Reload(JNIEnv* env,
                                  jobject obj,
                                  jboolean check_for_repost) {
@@ -1372,8 +1382,12 @@ jboolean ContentViewCoreImpl::OnAnimate(JNIEnv* env, jobject /* obj */,
 
 void ContentViewCoreImpl::WasResized(JNIEnv* env, jobject obj) {
   RenderWidgetHostViewAndroid* view = GetRenderWidgetHostViewAndroid();
-  if (view)
+  if (view) {
+    RenderWidgetHostImpl* host = RenderWidgetHostImpl::From(
+        view->GetRenderWidgetHost());
+    host->SendScreenRects();
     view->WasResized();
+  }
 }
 
 void ContentViewCoreImpl::ShowInterstitialPage(

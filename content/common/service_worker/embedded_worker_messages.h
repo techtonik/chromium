@@ -20,11 +20,11 @@
 // The data members directly correspond to parameters of
 // WorkerMessagingProxy::reportConsoleMessage()
 IPC_STRUCT_BEGIN(EmbeddedWorkerHostMsg_ReportConsoleMessage_Params)
-IPC_STRUCT_MEMBER(int, source_identifier)
-IPC_STRUCT_MEMBER(int, message_level)
-IPC_STRUCT_MEMBER(base::string16, message)
-IPC_STRUCT_MEMBER(int, line_number)
-IPC_STRUCT_MEMBER(GURL, source_url)
+  IPC_STRUCT_MEMBER(int, source_identifier)
+  IPC_STRUCT_MEMBER(int, message_level)
+  IPC_STRUCT_MEMBER(base::string16, message)
+  IPC_STRUCT_MEMBER(int, line_number)
+  IPC_STRUCT_MEMBER(GURL, source_url)
 IPC_STRUCT_END()
 
 // Browser -> Renderer message to create a new embedded worker context.
@@ -46,13 +46,6 @@ IPC_MESSAGE_CONTROL2(EmbeddedWorkerHostMsg_WorkerStarted,
 // Renderer -> Browser message to indicate that the worker is stopped.
 IPC_MESSAGE_CONTROL1(EmbeddedWorkerHostMsg_WorkerStopped,
                      int /* embedded_worker_id */)
-
-// Renderer -> Browser message to send message.
-// |request_id| might be used for bi-directional messaging.
-IPC_MESSAGE_CONTROL3(EmbeddedWorkerHostMsg_SendMessageToBrowser,
-                     int /* embedded_worker_id */,
-                     int /* request_id */,
-                     IPC::Message /* message */)
 
 // Renderer -> Browser message to report an exception.
 IPC_MESSAGE_CONTROL5(EmbeddedWorkerHostMsg_ReportException,
@@ -77,9 +70,7 @@ IPC_MESSAGE_CONTROL2(
 #define IPC_MESSAGE_START EmbeddedWorkerContextMsgStart
 
 // Browser -> Renderer message to send message.
-// |request_id| might be used for bi-directional messaging.
-IPC_MESSAGE_CONTROL4(EmbeddedWorkerContextMsg_SendMessageToWorker,
+IPC_MESSAGE_CONTROL3(EmbeddedWorkerContextMsg_MessageToWorker,
                      int /* thread_id */,
                      int /* embedded_worker_id */,
-                     int /* request_id */,
                      IPC::Message /* message */)

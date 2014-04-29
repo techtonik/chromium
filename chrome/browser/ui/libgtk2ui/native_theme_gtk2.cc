@@ -171,6 +171,10 @@ void NativeThemeGtk2::PaintMenuItemBackground(
   canvas->drawRect(gfx::RectToSkRect(rect), paint);
 }
 
+void NativeThemeGtk2::NotifyNativeThemeObservers() {
+  NotifyObservers();
+}
+
 GdkColor NativeThemeGtk2::GetSystemGdkColor(ColorId color_id) const {
   switch (color_id) {
     // Windows
@@ -230,6 +234,8 @@ GdkColor NativeThemeGtk2::GetSystemGdkColor(ColorId color_id) const {
       return GetButtonStyle()->base[GTK_STATE_SELECTED];
     case kColorId_ButtonHoverColor:
       return GetButtonStyle()->text[GTK_STATE_PRELIGHT];
+    case kColorId_ButtonHoverBackgroundColor:
+      return GetButtonStyle()->bg[GTK_STATE_PRELIGHT];
 
     // Textfield
     case kColorId_TextfieldDefaultColor:

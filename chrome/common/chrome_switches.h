@@ -111,10 +111,10 @@ extern const char kDisableSavePasswordBubble[];
 extern const char kDisableSearchButtonInOmnibox[];
 extern const char kDisableScriptedPrintThrottling[];
 extern const char kDisableSpdy31[];
+extern const char kDisableSuggestionsService[];
 extern const char kDisableSync[];
 extern const char kDisableSyncSyncedNotifications[];
 extern const char kDisableSyncTypes[];
-extern const char kDisableTLSChannelID[];
 extern const char kDisableUserMediaSecurity[];
 extern const char kDisableWebResources[];
 extern const char kDisableZeroBrowsersOpenForTests[];
@@ -124,6 +124,7 @@ extern const char kDnsLogDetails[];
 extern const char kDnsPrefetchDisable[];
 extern const char kDumpBrowserHistograms[];
 extern const char kEasyUnlockAppPath[];
+extern const char kEnableAccessRequestNotifications[];
 extern const char kEnableAdview[];
 extern const char kEnableAppList[];
 extern const char kEnableAppWindowControls[];
@@ -184,6 +185,7 @@ extern const char kEnableSpellingAutoCorrect[];
 extern const char kEnableSpellingFeedbackFieldTrial[];
 extern const char kEnableStackedTabStrip[];
 extern const char kEnableStreamlinedHostedApps[];
+extern const char kEnableSuggestionsService[];
 extern const char kEnableSyncArticles[];
 extern const char kEnableSyncSyncedNotifications[];
 extern const char kEnableThumbnailRetargeting[];
@@ -335,7 +337,6 @@ extern const char kTabCapture[];
 extern const char kTestName[];
 extern const char kTrustedSpdyProxy[];
 extern const char kTryChromeAgain[];
-extern const char kUninstallExtension[];
 extern const char kUninstall[];
 extern const char kUnlimitedStorage[];
 extern const char kUseSimpleCacheBackend[];
@@ -355,7 +356,6 @@ extern const char kPluginsMetadataServerURL[];
 #endif
 
 #if defined(OS_ANDROID)
-extern const char kDisableAppBanners[];
 extern const char kDisableCast[];
 extern const char kDisableNewNTP[];
 extern const char kDisableZeroSuggest[];
@@ -383,6 +383,7 @@ extern const char kMigrateDataDirForSxS[];
 #endif
 
 #if defined(OS_MACOSX)
+extern const char kAppsKeepChromeAlive[];
 extern const char kDisableAppShims[];
 extern const char kDisableSystemFullscreenForTesting[];
 extern const char kEnableSimplifiedFullscreen[];

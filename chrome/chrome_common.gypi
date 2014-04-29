@@ -44,8 +44,9 @@
         '<(DEPTH)/components/components.gyp:variations',
         '<(DEPTH)/content/content.gyp:content_common',
         '<(DEPTH)/crypto/crypto.gyp:crypto',
+        '<(DEPTH)/extensions/extensions_resources.gyp:extensions_resources',
         '<(DEPTH)/extensions/extensions_strings.gyp:extensions_strings',
-        '<(DEPTH)/media/cast/transport/cast_transport.gyp:cast_transport',
+        '<(DEPTH)/media/cast/cast.gyp:cast_transport',
         '<(DEPTH)/net/net.gyp:net',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/icu/icu.gyp:icui18n',
@@ -240,8 +241,6 @@
         'common/instant_types.h',
         'common/localized_error.cc',
         'common/localized_error.h',
-        'common/local_discovery/service_discovery_client.cc',
-        'common/local_discovery/service_discovery_client.h',
         'common/logging_chrome.cc',
         'common/logging_chrome.h',
         'common/mac/app_mode_common.h',
@@ -425,6 +424,18 @@
           'dependencies': [
             '<(DEPTH)/printing/printing.gyp:printing',
           ],
+        }],
+        ['enable_service_discovery==1', {
+          'sources' : [
+            'common/local_discovery/service_discovery_client.cc',
+            'common/local_discovery/service_discovery_client.h',
+           ]
+        }],
+        ['enable_mdns==1', {
+          'sources' : [
+            'common/local_discovery/service_discovery_client_impl.cc',
+            'common/local_discovery/service_discovery_client_impl.h',
+          ]
         }],
         ['OS=="android"', {
           'sources/': [

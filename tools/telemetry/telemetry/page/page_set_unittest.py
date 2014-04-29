@@ -11,7 +11,6 @@ from telemetry.page import page_set
 
 
 class TestPageSet(unittest.TestCase):
-
   def testServingDirs(self):
     directory_path = tempfile.mkdtemp()
     try:
@@ -108,7 +107,14 @@ class TestPageSet(unittest.TestCase):
       os.path.normpath(os.path.join(
         util.GetUnittestDataDir(), 'pages/foo.html')), external_page.file_path)
 
-  def testIgnoreArchive(self):
+  def testDictBasedPageSet(self):
+    dict_ps = page_set.PageSet.FromDict({
+      'description': 'hello',
+      'archive_path': 'foo.wpr',
+      'pages': [{'url': 'file://../../otherdir/foo/'}]
+      }, os.path.dirname(__file__))
+    self.assertTrue(dict_ps.IsDictBasedPageSet())
+
     test_pps_dir = os.path.join(util.GetUnittestDataDir(), 'test_page_set.py')
-    ps = page_set.PageSet.FromFile(test_pps_dir, True)
-    self.assertEquals(None, ps.wpr_archive_info)
+    python_ps = page_set.PageSet.FromFile(test_pps_dir)
+    self.assertFalse(python_ps.IsDictBasedPageSet())

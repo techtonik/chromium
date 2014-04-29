@@ -14,8 +14,7 @@
 #include "base/memory/ref_counted_memory.h"
 #include "chrome/browser/favicon/favicon_service_factory.h"
 #include "chrome/browser/favicon/favicon_util.h"
-#include "chrome/browser/history/select_favicon_frames.h"
-#include "chrome/browser/profiles/profile.h"
+#include "components/favicon_base/select_favicon_frames.h"
 #include "content/public/browser/favicon_status.h"
 #include "content/public/browser/navigation_entry.h"
 #include "skia/ext/image_operations.h"
@@ -241,9 +240,8 @@ FaviconHandler::FaviconCandidate::FaviconCandidate(
 
 ////////////////////////////////////////////////////////////////////////////////
 
-FaviconHandler::FaviconHandler(Profile* profile,
-                               FaviconClient* client,
-                               FaviconHandlerDelegate* delegate,
+FaviconHandler::FaviconHandler(FaviconClient* client,
+                               FaviconDriver* driver,
                                Type icon_type,
                                bool download_largest_icon)
     : got_favicon_from_history_(false),
@@ -253,11 +251,9 @@ FaviconHandler::FaviconHandler(Profile* profile,
                       : favicon_base::TOUCH_ICON |
                             favicon_base::TOUCH_PRECOMPOSED_ICON),
       download_largest_icon_(download_largest_icon),
-      profile_(profile),
       client_(client),
-      delegate_(delegate) {
-  DCHECK(profile_);
-  DCHECK(delegate_);
+      driver_(driver) {
+  DCHECK(driver_);
 }
 
 FaviconHandler::~FaviconHandler() {
@@ -499,7 +495,7 @@ void FaviconHandler::OnDidDownloadFavicon(
 }
 
 NavigationEntry* FaviconHandler::GetEntry() {
-  NavigationEntry* entry = delegate_->GetActiveEntry();
+  NavigationEntry* entry = driver_->GetActiveEntry();
   if (entry && UrlMatches(entry->GetURL(), url_))
     return entry;
 
@@ -514,7 +510,7 @@ int FaviconHandler::DownloadFavicon(const GURL& image_url,
     NOTREACHED();
     return 0;
   }
-  return delegate_->StartDownload(image_url, max_bitmap_size);
+  return driver_->StartDownload(image_url, max_bitmap_size);
 }
 
 void FaviconHandler::UpdateFaviconMappingAndFetch(
@@ -561,7 +557,7 @@ void FaviconHandler::SetHistoryFavicons(const GURL& page_url,
 }
 
 bool FaviconHandler::ShouldSaveFavicon(const GURL& url) {
-  if (!delegate_->IsOffTheRecord())
+  if (!driver_->IsOffTheRecord())
     return true;
 
   // Otherwise store the favicon if the page is bookmarked.
@@ -569,7 +565,7 @@ bool FaviconHandler::ShouldSaveFavicon(const GURL& url) {
 }
 
 void FaviconHandler::NotifyFaviconUpdated(bool icon_url_changed) {
-  delegate_->NotifyFaviconUpdated(icon_url_changed);
+  driver_->NotifyFaviconUpdated(icon_url_changed);
 }
 
 void FaviconHandler::OnFaviconDataForInitialURLFromFaviconService(
@@ -637,7 +633,7 @@ void FaviconHandler::DownloadFaviconOrAskFaviconService(
     // We don't know the favicon, but we may have previously downloaded the
     // favicon for another page that shares the same favicon. Ask for the
     // favicon given the favicon URL.
-    if (delegate_->IsOffTheRecord()) {
+    if (driver_->IsOffTheRecord()) {
       GetFaviconFromFaviconService(
           icon_url, icon_type,
           base::Bind(&FaviconHandler::OnFaviconData, base::Unretained(this)),
@@ -693,7 +689,7 @@ int FaviconHandler::ScheduleDownload(const GURL& url,
                                      const GURL& image_url,
                                      favicon_base::IconType icon_type) {
   // A max bitmap size is specified to avoid receiving huge bitmaps in
-  // OnDidDownloadFavicon(). See FaviconHandlerDelegate::StartDownload()
+  // OnDidDownloadFavicon(). See FaviconDriver::StartDownload()
   // for more details about the max bitmap size.
   const int download_id = DownloadFavicon(image_url,
                                           GetMaximalIconSize(icon_type));

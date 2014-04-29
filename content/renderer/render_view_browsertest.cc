@@ -23,7 +23,6 @@
 #include "content/public/common/url_utils.h"
 #include "content/public/renderer/content_renderer_client.h"
 #include "content/public/renderer/document_state.h"
-#include "content/public/renderer/history_item_serialization.h"
 #include "content/public/renderer/navigation_state.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/render_view_test.h"
@@ -32,6 +31,7 @@
 #include "content/renderer/accessibility/renderer_accessibility_complete.h"
 #include "content/renderer/accessibility/renderer_accessibility_focus_only.h"
 #include "content/renderer/history_controller.h"
+#include "content/renderer/history_serialization.h"
 #include "content/renderer/render_view_impl.h"
 #include "content/shell/browser/shell.h"
 #include "content/shell/browser/shell_browser_context.h"
@@ -1049,7 +1049,7 @@ TEST_F(RenderViewImplTest, ImeComposition) {
 
       case IME_SETCOMPOSITION:
         view()->OnImeSetComposition(
-            base::WideToUTF16Hack(ime_message->ime_string),
+            base::WideToUTF16(ime_message->ime_string),
             std::vector<blink::WebCompositionUnderline>(),
             ime_message->selection_start,
             ime_message->selection_end);
@@ -1057,7 +1057,7 @@ TEST_F(RenderViewImplTest, ImeComposition) {
 
       case IME_CONFIRMCOMPOSITION:
         view()->OnImeConfirmComposition(
-            base::WideToUTF16Hack(ime_message->ime_string),
+            base::WideToUTF16(ime_message->ime_string),
             gfx::Range::InvalidRange(),
             false);
         break;
@@ -1080,9 +1080,9 @@ TEST_F(RenderViewImplTest, ImeComposition) {
       // Retrieve the content of this page and compare it with the expected
       // result.
       const int kMaxOutputCharacters = 128;
-      std::wstring output = base::UTF16ToWideHack(
-          GetMainFrame()->contentAsText(kMaxOutputCharacters));
-      EXPECT_EQ(output, ime_message->result);
+      base::string16 output =
+          GetMainFrame()->contentAsText(kMaxOutputCharacters);
+      EXPECT_EQ(base::WideToUTF16(ime_message->result), output);
     }
   }
 }
@@ -1129,9 +1129,8 @@ TEST_F(RenderViewImplTest, OnSetTextDirection) {
     // Copy the document content to std::wstring and compare with the
     // expected result.
     const int kMaxOutputCharacters = 16;
-    std::wstring output = base::UTF16ToWideHack(
-        GetMainFrame()->contentAsText(kMaxOutputCharacters));
-    EXPECT_EQ(output, kTextDirection[i].expected_result);
+    base::string16 output = GetMainFrame()->contentAsText(kMaxOutputCharacters);
+    EXPECT_EQ(base::WideToUTF16(kTextDirection[i].expected_result), output);
   }
 }
 
@@ -1509,9 +1508,8 @@ TEST_F(RenderViewImplTest, MAYBE_InsertCharacters) {
     // text created from a virtual-key code, a character code, and the
     // modifier-key status.
     const int kMaxOutputCharacters = 4096;
-    std::wstring output = base::UTF16ToWideHack(
-        GetMainFrame()->contentAsText(kMaxOutputCharacters));
-    EXPECT_EQ(kLayouts[i].expected_result, output);
+    base::string16 output = GetMainFrame()->contentAsText(kMaxOutputCharacters);
+    EXPECT_EQ(base::WideToUTF16(kLayouts[i].expected_result), output);
   }
 #else
   NOTIMPLEMENTED();
@@ -2018,9 +2016,9 @@ TEST_F(RenderViewImplTest, NavigateFrame) {
   // Copy the document content to std::wstring and compare with the
   // expected result.
   const int kMaxOutputCharacters = 256;
-  std::wstring output = base::UTF16ToWideHack(
+  std::string output = base::UTF16ToUTF8(
       GetMainFrame()->contentAsText(kMaxOutputCharacters));
-  EXPECT_EQ(output, L"hello \n\nworld");
+  EXPECT_EQ(output, "hello \n\nworld");
 }
 
 // This test ensures that a RenderFrame object is created for the top level

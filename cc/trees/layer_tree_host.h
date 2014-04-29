@@ -65,7 +65,6 @@ struct ScrollAndScaleSet;
 struct CC_EXPORT RendererCapabilities {
   RendererCapabilities(ResourceFormat best_texture_format,
                        bool allow_partial_texture_updates,
-                       bool using_offscreen_context3d,
                        int max_texture_size,
                        bool using_shared_memory_resources);
 
@@ -75,7 +74,6 @@ struct CC_EXPORT RendererCapabilities {
   // Duplicate any modification to this list to RendererCapabilitiesImpl.
   ResourceFormat best_texture_format;
   bool allow_partial_texture_updates;
-  bool using_offscreen_context3d;
   int max_texture_size;
   bool using_shared_memory_resources;
 };
@@ -98,11 +96,6 @@ class CC_EXPORT LayerTreeHost {
 
   void SetLayerTreeHostClientReady();
 
-  void set_needs_filter_context() { needs_filter_context_ = true; }
-  bool needs_offscreen_context() const {
-    return needs_filter_context_;
-  }
-
   // LayerTreeHost interface to Proxy.
   void WillBeginMainFrame() {
     client_->WillBeginMainFrame(source_frame_number_);
@@ -121,13 +114,7 @@ class CC_EXPORT LayerTreeHost {
       LayerTreeHostImplClient* client);
   void DidLoseOutputSurface();
   bool output_surface_lost() const { return output_surface_lost_; }
-  enum CreateResult {
-    CreateSucceeded,
-    CreateFailedButTryAgain,
-    CreateFailedAndGaveUp,
-  };
-  virtual CreateResult OnCreateAndInitializeOutputSurfaceAttempted(
-      bool success);
+  virtual void OnCreateAndInitializeOutputSurfaceAttempted(bool success);
   void DidCommitAndDrawFrame() { client_->DidCommitAndDrawFrame(); }
   void DidCompleteSwapBuffers() { client_->DidCompleteSwapBuffers(); }
   void DeleteContentsTexturesOnImplThread(ResourceProvider* resource_provider);
@@ -366,7 +353,6 @@ class CC_EXPORT LayerTreeHost {
 
   bool animating_;
   bool needs_full_tree_sync_;
-  bool needs_filter_context_;
 
   base::CancelableClosure prepaint_callback_;
 

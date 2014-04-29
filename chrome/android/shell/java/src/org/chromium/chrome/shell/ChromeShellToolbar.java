@@ -71,7 +71,7 @@ public class ChromeShellToolbar extends LinearLayout {
 
     private void onLoadProgressChanged(int progress) {
         removeCallbacks(mClearProgressRunnable);
-        mProgressDrawable.setLevel((int) (100.0 * progress));
+        mProgressDrawable.setLevel(100 * progress);
         if (progress == 100) postDelayed(mClearProgressRunnable, COMPLETED_PROGRESS_TIMEOUT_MS);
     }
 
@@ -97,7 +97,7 @@ public class ChromeShellToolbar extends LinearLayout {
             public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                 if ((actionId != EditorInfo.IME_ACTION_GO) && (event == null ||
                         event.getKeyCode() != KeyEvent.KEYCODE_ENTER ||
-                        event.getKeyCode() != KeyEvent.ACTION_DOWN)) {
+                        event.getAction() != KeyEvent.ACTION_DOWN)) {
                     return false;
                 }
 

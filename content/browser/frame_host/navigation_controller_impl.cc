@@ -701,7 +701,7 @@ void NavigationControllerImpl::LoadURLWithParams(const LoadURLParams& params) {
   if (params.frame_tree_node_id != -1)
     entry->set_frame_tree_node_id(params.frame_tree_node_id);
   if (params.redirect_chain.size() > 0)
-    entry->set_redirect_chain(params.redirect_chain);
+    entry->SetRedirectChain(params.redirect_chain);
   if (params.should_replace_current_entry)
     entry->set_should_replace_entry(true);
   entry->set_should_clear_history_list(params.should_clear_history_list);
@@ -822,6 +822,7 @@ bool NavigationControllerImpl::RendererDidNavigate(
   active_entry->SetTimestamp(timestamp);
   active_entry->SetHttpStatusCode(params.http_status_code);
   active_entry->SetPageState(params.page_state);
+  active_entry->SetRedirectChain(params.redirects);
 
   // Once it is committed, we no longer need to track several pieces of state on
   // the entry.
@@ -1315,6 +1316,7 @@ void NavigationControllerImpl::CopyStateFromAndPrune(
   // that new and existing navigations in the tab's current SiteInstances
   // are identified properly.
   delegate_->CopyMaxPageIDsFrom(source->delegate()->GetWebContents());
+  max_restored_page_id_ = source->max_restored_page_id_;
 
   // If there is a last committed entry, be sure to include it in the new
   // max page ID map.
@@ -1404,13 +1406,9 @@ int32 NavigationControllerImpl::GetMaxRestoredPageID() const {
 }
 
 bool NavigationControllerImpl::IsUnmodifiedBlankTab() const {
-  // TODO(creis): Move has_accessed_initial_document from RenderViewHost to
-  // WebContents and NavigationControllerDelegate.
-  RenderViewHostImpl* rvh = static_cast<RenderViewHostImpl*>(
-      delegate_->GetRenderViewHost());
   return IsInitialNavigation() &&
-      !GetLastCommittedEntry() &&
-      !rvh->has_accessed_initial_document();
+         !GetLastCommittedEntry() &&
+         !delegate_->HasAccessedInitialDocument();
 }
 
 SessionStorageNamespace*

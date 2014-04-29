@@ -22,6 +22,7 @@ namespace switches {
 // Please keep alphabetized.
 CHROMEOS_EXPORT extern const char kAppOemManifestFile[];
 CHROMEOS_EXPORT extern const char kAshWebUIInit[];
+CHROMEOS_EXPORT extern const char kConsumerDeviceManagementUrl[];
 CHROMEOS_EXPORT extern const char kDbusStub[];
 CHROMEOS_EXPORT extern const char kDerelictDetectionTimeout[];
 CHROMEOS_EXPORT extern const char kDerelictIdleTimeout[];
@@ -55,7 +56,6 @@ CHROMEOS_EXPORT extern const char kGuestSession[];
 CHROMEOS_EXPORT extern const char kHasChromeOSDiamondKey[];
 CHROMEOS_EXPORT extern const char kHasChromeOSKeyboard[];
 CHROMEOS_EXPORT extern const char kKioskModeScreensaverPath[];
-CHROMEOS_EXPORT extern const char kLoginScreen[];
 CHROMEOS_EXPORT extern const char kLoginManager[];
 CHROMEOS_EXPORT extern const char kLoginPassword[];
 CHROMEOS_EXPORT extern const char kLoginProfile[];

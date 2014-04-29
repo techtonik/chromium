@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <limits>
+
 #include "base/command_line.h"
 #include "base/file_util.h"
 #include "base/files/file_path.h"
@@ -21,6 +23,7 @@
 #include "content/public/test/content_browser_test_utils.h"
 #include "content/test/data/web_ui_test_mojo_bindings.mojom.h"
 #include "grit/content_resources.h"
+#include "mojo/common/test/test_utils.h"
 #include "mojo/public/cpp/bindings/allocation_scope.h"
 #include "mojo/public/cpp/bindings/remote_ptr.h"
 #include "mojo/public/js/bindings/constants.h"
@@ -31,27 +34,32 @@ namespace {
 bool got_message = false;
 int message_count = 0;
 
-const int kExpectedMessageCount = 1000;
+const int kExpectedMessageCount = 100;
+
+// Negative numbers with different values in each byte, the last of
+// which can survive promotion to double and back.
+const int8  kExpectedInt8Value = -65;
+const int16 kExpectedInt16Value = -16961;
+const int32 kExpectedInt32Value = -1145258561;
+const int64 kExpectedInt64Value = -77263311946305LL;
 
 // Positive numbers with different values in each byte, the last of
 // which can survive promotion to double and back.
-const int8  kExpectedInt8Value = 65;
-const int16 kExpectedInt16Value = 16961;
-const int32 kExpectedInt32Value = 1145258561;
-const int64 kExpectedInt64Value = 77263311946305LL;
+const uint8  kExpectedUInt8Value = 65;
+const uint16 kExpectedUInt16Value = 16961;
+const uint32 kExpectedUInt32Value = 1145258561;
+const uint64 kExpectedUInt64Value = 77263311946305LL;
 
-// Returns the path to the mojom js bindings file.
-base::FilePath GetFilePathForJSResource(const std::string& path) {
-  std::string binding_path = "gen/" + path + ".js";
-#if defined(OS_WIN)
-  std::string tmp;
-  base::ReplaceChars(binding_path, "//", "\\", &tmp);
-  binding_path.swap(tmp);
-#endif
-  base::FilePath file_path;
-  PathService::Get(CHILD_PROCESS_EXE, &file_path);
-  return file_path.DirName().AppendASCII(binding_path);
-}
+// Double/float values, including special case constants.
+const double kExpectedDoubleVal = 3.14159265358979323846;
+const double kExpectedDoubleInf = std::numeric_limits<double>::infinity();
+const double kExpectedDoubleNan = std::numeric_limits<double>::quiet_NaN();
+const float kExpectedFloatVal = static_cast<float>(kExpectedDoubleVal);
+const float kExpectedFloatInf = std::numeric_limits<float>::infinity();
+const float kExpectedFloatNan = std::numeric_limits<float>::quiet_NaN();
+
+// NaN has the property that it is not equal to itself.
+#define EXPECT_NAN(x) EXPECT_NE(x, x)
 
 // The bindings for the page are generated from a .mojom file. This code looks
 // up the generated file from disk and returns it.
@@ -65,7 +73,8 @@ bool GetResource(const std::string& id,
     return false;
 
   std::string contents;
-  CHECK(base::ReadFileToString(GetFilePathForJSResource(id), &contents,
+  CHECK(base::ReadFileToString(mojo::test::GetFilePathForJSResource(id),
+                               &contents,
                                std::string::npos)) << id;
   base::RefCountedString* ref_contents = new base::RefCountedString;
   ref_contents->data() = contents;
@@ -129,11 +138,26 @@ class EchoBrowserTargetImpl : public BrowserTargetImpl {
       : BrowserTargetImpl(handle, run_loop) {
     mojo::AllocationScope scope;
     mojo::EchoArgs::Builder builder;
-    builder.set_w(kExpectedInt64Value);
-    builder.set_x(kExpectedInt32Value);
-    builder.set_y(kExpectedInt16Value);
-    builder.set_z(kExpectedInt8Value);
+    builder.set_si64(kExpectedInt64Value);
+    builder.set_si32(kExpectedInt32Value);
+    builder.set_si16(kExpectedInt16Value);
+    builder.set_si8(kExpectedInt8Value);
+    builder.set_ui64(kExpectedUInt64Value);
+    builder.set_ui32(kExpectedUInt32Value);
+    builder.set_ui16(kExpectedUInt16Value);
+    builder.set_ui8(kExpectedUInt8Value);
+    builder.set_float_val(kExpectedFloatVal);
+    builder.set_float_inf(kExpectedFloatInf);
+    builder.set_float_nan(kExpectedFloatNan);
+    builder.set_double_val(kExpectedDoubleVal);
+    builder.set_double_inf(kExpectedDoubleInf);
+    builder.set_double_nan(kExpectedDoubleNan);
     builder.set_name("coming");
+    mojo::Array<mojo::String>::Builder string_array(3);
+    string_array[0] = "one";
+    string_array[1] = "two";
+    string_array[2] = "three";
+    builder.set_string_array(string_array.Finish());
     client_->Echo(builder.Finish());
   }
 
@@ -143,16 +167,29 @@ class EchoBrowserTargetImpl : public BrowserTargetImpl {
   // Check the response, and quit the RunLoop after N calls.
   virtual void EchoResponse(const mojo::EchoArgs& arg1,
                             const mojo::EchoArgs& arg2) OVERRIDE {
-    EXPECT_EQ(kExpectedInt64Value, arg1.w());
-    EXPECT_EQ(kExpectedInt32Value, arg1.x());
-    EXPECT_EQ(kExpectedInt16Value, arg1.y());
-    EXPECT_EQ(kExpectedInt8Value, arg1.z());
+    EXPECT_EQ(kExpectedInt64Value, arg1.si64());
+    EXPECT_EQ(kExpectedInt32Value, arg1.si32());
+    EXPECT_EQ(kExpectedInt16Value, arg1.si16());
+    EXPECT_EQ(kExpectedInt8Value, arg1.si8());
+    EXPECT_EQ(kExpectedUInt64Value, arg1.ui64());
+    EXPECT_EQ(kExpectedUInt32Value, arg1.ui32());
+    EXPECT_EQ(kExpectedUInt16Value, arg1.ui16());
+    EXPECT_EQ(kExpectedUInt8Value, arg1.ui8());
+    EXPECT_EQ(kExpectedFloatVal, arg1.float_val());
+    EXPECT_EQ(kExpectedFloatInf, arg1.float_inf());
+    EXPECT_NAN(arg1.float_nan());
+    EXPECT_EQ(kExpectedDoubleVal, arg1.double_val());
+    EXPECT_EQ(kExpectedDoubleInf, arg1.double_inf());
+    EXPECT_NAN(arg1.double_nan());
     EXPECT_EQ(std::string("coming"), arg1.name().To<std::string>());
+    EXPECT_EQ(std::string("one"), arg1.string_array()[0].To<std::string>());
+    EXPECT_EQ(std::string("two"), arg1.string_array()[1].To<std::string>());
+    EXPECT_EQ(std::string("three"), arg1.string_array()[2].To<std::string>());
 
-    EXPECT_EQ(-1LL, arg2.w());
-    EXPECT_EQ(-1, arg2.x());
-    EXPECT_EQ(-1, arg2.y());
-    EXPECT_EQ(-1, arg2.z());
+    EXPECT_EQ(-1, arg2.si64());
+    EXPECT_EQ(-1, arg2.si32());
+    EXPECT_EQ(-1, arg2.si16());
+    EXPECT_EQ(-1, arg2.si8());
     EXPECT_EQ(std::string("going"), arg2.name().To<std::string>());
 
     message_count += 1;
@@ -278,8 +315,8 @@ class WebUIMojoTest : public ContentBrowserTest {
   DISALLOW_COPY_AND_ASSIGN(WebUIMojoTest);
 };
 
-// Temporarily disabled due to memory leaks. http://crbug.com/360081
-#if defined(LEAK_SANITIZER)
+// Temporarily disabled due to flakiness on Windows. http://crbug.com/366644
+#if defined(OS_WIN)
 #define MAYBE_EndToEndPing DISABLED_EndToEndPing
 #define MAYBE_EndToEndEcho DISABLED_EndToEndEcho
 #else
@@ -295,7 +332,7 @@ IN_PROC_BROWSER_TEST_F(WebUIMojoTest, MAYBE_EndToEndPing) {
   // pass.
   // TODO(sky): remove this conditional when isolates support copying from gen.
   const base::FilePath test_file_path(
-      GetFilePathForJSResource(
+      mojo::test::GetFilePathForJSResource(
           "content/test/data/web_ui_test_mojo_bindings.mojom"));
   if (!base::PathExists(test_file_path)) {
     LOG(WARNING) << " mojom binding file doesn't exist, assuming on isolate";
@@ -321,7 +358,7 @@ IN_PROC_BROWSER_TEST_F(WebUIMojoTest, MAYBE_EndToEndEcho) {
   // pass.
   // TODO(sky): remove this conditional when isolates support copying from gen.
   const base::FilePath test_file_path(
-      GetFilePathForJSResource(
+      mojo::test::GetFilePathForJSResource(
           "content/test/data/web_ui_test_mojo_bindings.mojom"));
   if (!base::PathExists(test_file_path)) {
     LOG(WARNING) << " mojom binding file doesn't exist, assuming on isolate";

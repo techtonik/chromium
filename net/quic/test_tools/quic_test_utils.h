@@ -127,6 +127,7 @@ class MockFramerVisitor : public QuicFramerVisitorInterface {
   MOCK_METHOD1(OnCongestionFeedbackFrame,
                bool(const QuicCongestionFeedbackFrame& frame));
   MOCK_METHOD1(OnStopWaitingFrame, bool(const QuicStopWaitingFrame& frame));
+  MOCK_METHOD1(OnPingFrame, bool(const QuicPingFrame& frame));
   MOCK_METHOD1(OnFecData, void(const QuicFecData& fec));
   MOCK_METHOD1(OnRstStreamFrame, bool(const QuicRstStreamFrame& frame));
   MOCK_METHOD1(OnConnectionCloseFrame,
@@ -163,6 +164,7 @@ class NoOpFramerVisitor : public QuicFramerVisitorInterface {
       const QuicCongestionFeedbackFrame& frame) OVERRIDE;
   virtual bool OnStopWaitingFrame(
       const QuicStopWaitingFrame& frame) OVERRIDE;
+  virtual bool OnPingFrame(const QuicPingFrame& frame) OVERRIDE;
   virtual void OnFecData(const QuicFecData& fec) OVERRIDE {}
   virtual bool OnRstStreamFrame(const QuicRstStreamFrame& frame) OVERRIDE;
   virtual bool OnConnectionCloseFrame(
@@ -181,7 +183,9 @@ class MockConnectionVisitor : public QuicConnectionVisitorInterface {
   MockConnectionVisitor();
   virtual ~MockConnectionVisitor();
 
-  MOCK_METHOD1(OnStreamFrames, bool(const std::vector<QuicStreamFrame>& frame));
+  MOCK_METHOD1(WillAcceptStreamFrames, bool(
+      const std::vector<QuicStreamFrame>& frame));
+  MOCK_METHOD1(OnStreamFrames, void(const std::vector<QuicStreamFrame>& frame));
   MOCK_METHOD1(OnWindowUpdateFrames,
                void(const std::vector<QuicWindowUpdateFrame>& frame));
   MOCK_METHOD1(OnBlockedFrames,

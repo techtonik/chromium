@@ -10,6 +10,7 @@
 #include "base/strings/string16.h"
 #include "content/common/service_worker/service_worker_types.h"
 #include "ipc/ipc_listener.h"
+#include "third_party/WebKit/public/platform/WebServiceWorkerClientsInfo.h"
 #include "third_party/WebKit/public/platform/WebServiceWorkerEventResult.h"
 #include "third_party/WebKit/public/platform/WebURL.h"
 #include "third_party/WebKit/public/web/WebServiceWorkerContextClient.h"
@@ -56,11 +57,15 @@ class EmbeddedWorkerContextClient
 
   bool OnMessageReceived(const IPC::Message& msg);
 
-  void SendMessageToBrowser(int request_id, const IPC::Message& message);
+  void Send(IPC::Message* message);
+
+  // TODO(kinuko): Deprecate this.
+  void SendReplyToBrowser(int request_id, const IPC::Message& message);
 
   // WebServiceWorkerContextClient overrides, some of them are just dispatched
   // on to script_context_.
   virtual blink::WebURL scope() const;
+  virtual void getClients(blink::WebServiceWorkerClientsCallbacks*);
   virtual void workerContextFailedToStart();
   virtual void workerContextStarted(blink::WebServiceWorkerContextProxy* proxy);
   virtual void willDestroyWorkerContext();
@@ -81,9 +86,9 @@ class EmbeddedWorkerContextClient
   virtual void didHandleFetchEvent(
       int request_id,
       const blink::WebServiceWorkerResponse& response);
+  virtual void didHandleSyncEvent(int request_id);
   virtual blink::WebServiceWorkerNetworkProvider*
       createServiceWorkerNetworkProvider(blink::WebDataSource* data_source);
-  virtual void didHandleSyncEvent(int request_id);
 
   // TODO: Implement DevTools related method overrides.
 
@@ -93,10 +98,9 @@ class EmbeddedWorkerContextClient
   }
 
  private:
-  void OnSendMessageToWorker(int thread_id,
-                             int embedded_worker_id,
-                             int request_id,
-                             const IPC::Message& message);
+  void OnMessageToWorker(int thread_id,
+                         int embedded_worker_id,
+                         const IPC::Message& message);
   void SendWorkerStarted();
 
   const int embedded_worker_id_;

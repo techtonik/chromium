@@ -288,6 +288,8 @@ bool RenderFrameHostImpl::OnMessageReceived(const IPC::Message &msg) {
                                     OnRunJavaScriptMessage)
     IPC_MESSAGE_HANDLER_DELAY_REPLY(FrameHostMsg_RunBeforeUnloadConfirm,
                                     OnRunBeforeUnloadConfirm)
+    IPC_MESSAGE_HANDLER(FrameHostMsg_DidAccessInitialDocument,
+                        OnDidAccessInitialDocument)
     IPC_MESSAGE_HANDLER(DesktopNotificationHostMsg_RequestPermission,
                         OnRequestDesktopNotificationPermission)
     IPC_MESSAGE_HANDLER(DesktopNotificationHostMsg_Show,
@@ -437,10 +439,6 @@ void RenderFrameHostImpl::OnNavigate(const IPC::Message& msg) {
     process->ReceivedBadMessage();
   }
 
-  // Now that something has committed, we don't need to track whether the
-  // initial page has been accessed.
-  render_view_host_->has_accessed_initial_document_ = false;
-
   // Without this check, an evil renderer can trick the browser into creating
   // a navigation entry for a banned URL.  If the user clicks the back button
   // followed by the forward button (or clicks reload, or round-trips through
@@ -522,9 +520,13 @@ void RenderFrameHostImpl::OnBeforeUnloadACK(
     bool proceed,
     const base::TimeTicks& renderer_before_unload_start_time,
     const base::TimeTicks& renderer_before_unload_end_time) {
-  // TODO(creis): Support beforeunload on subframes.
+  // TODO(creis): Support properly beforeunload on subframes. For now just
+  // pretend that the handler ran and allowed the navigation to proceed.
   if (GetParent()) {
-    NOTREACHED() << "Should only receive BeforeUnload_ACK from the main frame.";
+    render_view_host_->is_waiting_for_beforeunload_ack_ = false;
+    frame_tree_node_->render_manager()->OnBeforeUnloadACK(
+        render_view_host_->unload_ack_is_for_cross_site_transition_, proceed,
+        renderer_before_unload_end_time);
     return;
   }
 
@@ -674,6 +676,10 @@ void RenderFrameHostImpl::OnCancelDesktopNotification(int notification_id) {
   cancel_notification_callbacks_.erase(notification_id);
 }
 
+void RenderFrameHostImpl::OnDidAccessInitialDocument() {
+  delegate_->DidAccessInitialDocument();
+}
+
 void RenderFrameHostImpl::SetPendingShutdown(const base::Closure& on_swap_out) {
   render_view_host_->SetPendingShutdown(on_swap_out);
 }
@@ -750,9 +756,7 @@ void RenderFrameHostImpl::NavigateToURL(const GURL& url) {
 
 void RenderFrameHostImpl::DispatchBeforeUnload(bool for_cross_site_transition) {
   // TODO(creis): Support subframes.
-  DCHECK(!GetParent());
-
-  if (!render_view_host_->IsRenderViewLive()) {
+  if (!render_view_host_->IsRenderViewLive() || GetParent()) {
     // We don't have a live renderer, so just skip running beforeunload.
     render_view_host_->is_waiting_for_beforeunload_ack_ = true;
     render_view_host_->unload_ack_is_for_cross_site_transition_ =

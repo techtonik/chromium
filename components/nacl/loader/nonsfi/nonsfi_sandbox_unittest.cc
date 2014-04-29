@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// ASan internally uses some syscalls which non-SFI NaCl disallows.
+// Seccomp-BPF tests die under TSan v2. See http://crbug.com/356588
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
+
 #include "components/nacl/loader/nonsfi/nonsfi_sandbox.h"
 
 #include <errno.h>
@@ -51,14 +55,9 @@ void DoSocketpair(base::ScopedFD* fds) {
 }
 
 TEST(NaClNonSfiSandboxTest, BPFIsSupported) {
-  bool seccomp_bpf_supported = false;
-  // Seccomp-BPF tests die under TSAN v2. See http://crbug.com/356588
-#if !defined(THREAD_SANITIZER)
-  seccomp_bpf_supported = (
+  bool seccomp_bpf_supported = (
       sandbox::SandboxBPF::SupportsSeccompSandbox(-1) ==
       sandbox::SandboxBPF::STATUS_AVAILABLE);
-#endif
-
   if (!seccomp_bpf_supported) {
     LOG(ERROR) << "Seccomp BPF is not supported, these tests "
                << "will pass without running";
@@ -80,7 +79,7 @@ void* SetValueInThread(void* test_val_ptr) {
 
 // To make this test pass, we need to allow sched_getaffinity and
 // mmap. We just disable this test not to complicate the sandbox.
-BPF_TEST(NaClNonSfiSandboxTest, DISABLE_ON_ASAN(clone_by_pthread_create),
+BPF_TEST(NaClNonSfiSandboxTest, clone_by_pthread_create,
          nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
   // clone call for thread creation is allowed.
   pthread_t th;
@@ -306,15 +305,30 @@ BPF_DEATH_TEST(NaClNonSfiSandboxTest, mmap_unallowed_prot,
        MAP_ANONYMOUS, -1, 0);
 }
 
-// TODO(hamaji): Disallow RWX mmap.
-#if 0
-BPF_DEATH_TEST(NaClNonSfiSandboxTest, mmap_rwx,
+BPF_DEATH_TEST(NaClNonSfiSandboxTest, mmap_exec,
+               DEATH_MESSAGE(sandbox::GetErrorMessageContentForTests()),
+               nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
+  mmap(NULL, getpagesize(), PROT_EXEC, MAP_ANONYMOUS, -1, 0);
+}
+
+BPF_DEATH_TEST(NaClNonSfiSandboxTest, mmap_read_exec,
+               DEATH_MESSAGE(sandbox::GetErrorMessageContentForTests()),
+               nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
+  mmap(NULL, getpagesize(), PROT_READ | PROT_EXEC, MAP_ANONYMOUS, -1, 0);
+}
+
+BPF_DEATH_TEST(NaClNonSfiSandboxTest, mmap_write_exec,
+               DEATH_MESSAGE(sandbox::GetErrorMessageContentForTests()),
+               nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
+  mmap(NULL, getpagesize(), PROT_WRITE | PROT_EXEC, MAP_ANONYMOUS, -1, 0);
+}
+
+BPF_DEATH_TEST(NaClNonSfiSandboxTest, mmap_read_write_exec,
                DEATH_MESSAGE(sandbox::GetErrorMessageContentForTests()),
                nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
   mmap(NULL, getpagesize(), PROT_READ | PROT_WRITE | PROT_EXEC,
        MAP_ANONYMOUS, -1, 0);
 }
-#endif
 
 BPF_TEST(NaClNonSfiSandboxTest, mprotect_allowed,
          nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
@@ -346,146 +360,36 @@ BPF_TEST(NaClNonSfiSandboxTest, brk,
   BPF_ASSERT_EQ(ENOMEM, errno);
 }
 
+// The following test cases check if syscalls return EPERM regardless
+// of arguments.
+#define RESTRICT_SYSCALL_EPERM_TEST(name)                               \
+  BPF_TEST(                                                             \
+      NaClNonSfiSandboxTest, name ## _EPERM,                            \
+      nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {  \
+    errno = 0;                                                          \
+    BPF_ASSERT_EQ(-1, syscall(__NR_ ## name, 0, 0, 0, 0, 0, 0));        \
+    BPF_ASSERT_EQ(EPERM, errno);                                        \
+  }
+
+RESTRICT_SYSCALL_EPERM_TEST(epoll_create);
 #if defined(__i386__) || defined(__arm__)
-BPF_TEST(NaClNonSfiSandboxTest, getegid32_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_getegid32));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, geteuid32_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_geteuid32));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, getgid32_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_getgid32));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, getuid32_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_getuid32));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_DEATH_TEST(NaClNonSfiSandboxTest, getegid_SIGSYS,
-               DEATH_MESSAGE(sandbox::GetErrorMessageContentForTests()),
-               nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  syscall(__NR_getegid);
-}
-
-BPF_DEATH_TEST(NaClNonSfiSandboxTest, geteuid_SIGSYS,
-               DEATH_MESSAGE(sandbox::GetErrorMessageContentForTests()),
-               nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  syscall(__NR_geteuid);
-}
-
-BPF_DEATH_TEST(NaClNonSfiSandboxTest, getgid_SIGSYS,
-               DEATH_MESSAGE(sandbox::GetErrorMessageContentForTests()),
-               nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  syscall(__NR_getgid);
-}
-
-BPF_DEATH_TEST(NaClNonSfiSandboxTest, getuid_SIGSYS,
-               DEATH_MESSAGE(sandbox::GetErrorMessageContentForTests()),
-               nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  syscall(__NR_getuid);
-}
+RESTRICT_SYSCALL_EPERM_TEST(getegid32);
+RESTRICT_SYSCALL_EPERM_TEST(geteuid32);
+RESTRICT_SYSCALL_EPERM_TEST(getgid32);
+RESTRICT_SYSCALL_EPERM_TEST(getuid32);
 #endif
-
-#if defined(__x86_64__)
-BPF_TEST(NaClNonSfiSandboxTest, getegid_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_getegid));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, geteuid_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_geteuid));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, getgid_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_getgid));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, getuid_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_getuid));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-#endif
-
-BPF_TEST(NaClNonSfiSandboxTest, getpid_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_getpid));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, ioctl_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_ioctl));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, readlink_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_readlink));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, madvise_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_madvise));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, open_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_open));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, ptrace_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_ptrace));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
-BPF_TEST(NaClNonSfiSandboxTest, set_robust_list_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_set_robust_list));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
-
+RESTRICT_SYSCALL_EPERM_TEST(getegid);
+RESTRICT_SYSCALL_EPERM_TEST(geteuid);
+RESTRICT_SYSCALL_EPERM_TEST(getgid);
+RESTRICT_SYSCALL_EPERM_TEST(getuid);
+RESTRICT_SYSCALL_EPERM_TEST(madvise);
+RESTRICT_SYSCALL_EPERM_TEST(open);
+RESTRICT_SYSCALL_EPERM_TEST(ptrace);
+RESTRICT_SYSCALL_EPERM_TEST(set_robust_list);
 #if defined(__i386__) || defined(__x86_64__)
-BPF_TEST(NaClNonSfiSandboxTest, time_EPERM,
-         nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {
-  errno = 0;
-  BPF_ASSERT_EQ(-1, syscall(__NR_time));
-  BPF_ASSERT_EQ(EPERM, errno);
-}
+RESTRICT_SYSCALL_EPERM_TEST(time);
 #endif
 
 }  // namespace
+
+#endif  // !ADDRESS_SANITIZER && !THREAD_SANITIZER

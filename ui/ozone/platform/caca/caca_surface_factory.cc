@@ -23,10 +23,12 @@ class CacaSurface : public gfx::SurfaceOzoneCanvas {
   CacaSurface(CacaConnection* connection);
   virtual ~CacaSurface();
 
+  bool Initialize();
+
   // gfx::SurfaceOzoneCanvas overrides:
   virtual skia::RefPtr<SkCanvas> GetCanvas() OVERRIDE;
-  virtual bool ResizeCanvas(const gfx::Size& viewport_size) OVERRIDE;
-  virtual bool PresentCanvas() OVERRIDE;
+  virtual void ResizeCanvas(const gfx::Size& viewport_size) OVERRIDE;
+  virtual void PresentCanvas(const gfx::Rect& damage) OVERRIDE;
   virtual scoped_ptr<gfx::VSyncProvider> CreateVSyncProvider() OVERRIDE;
 
  private:
@@ -46,7 +48,7 @@ CacaSurface::~CacaSurface() {
   caca_free_dither(dither_);
 }
 
-bool CacaSurface::InitializeCanvas() {
+bool CacaSurface::Initialize() {
   SkImageInfo info = SkImageInfo::Make(connection_->bitmap_size().width(),
                                        connection_->bitmap_size().height(),
                                        kPMColor_SkColorType,
@@ -75,12 +77,11 @@ skia::RefPtr<SkCanvas> CacaSurface::GetCanvas() {
   return skia::SharePtr<SkCanvas>(surface_->getCanvas());
 }
 
-bool CacaSurface::ResizeCanvas(const gfx::Size& viewport_size) {
+void CacaSurface::ResizeCanvas(const gfx::Size& viewport_size) {
   NOTIMPLEMENTED();
-  return false;
 }
 
-bool CacaSurface::PresentCanvas() {
+void CacaSurface::PresentCanvas(const gfx::Rect& damage) {
   SkImageInfo info;
   size_t row_bytes;
   const void* pixels = surface_->peekPixels(&info, &row_bytes);
@@ -92,8 +93,6 @@ bool CacaSurface::PresentCanvas() {
                      dither_,
                      static_cast<const uint8_t*>(pixels));
   caca_refresh_display(connection_->display());
-
-  return true;
 }
 
 scoped_ptr<gfx::VSyncProvider> CacaSurface::CreateVSyncProvider() {
@@ -140,7 +139,9 @@ scoped_ptr<gfx::SurfaceOzoneCanvas> CacaSurfaceFactory::CreateCanvasForWidget(
   CHECK_EQ(INITIALIZED, state_);
   CHECK_EQ(kDefaultWidgetHandle, widget);
 
-  return make_scoped_ptr<gfx::SurfaceOzoneCanvas>(new CacaSurface(connection_));
+  scoped_ptr<CacaSurface> canvas(new CacaSurface(connection_));
+  CHECK(canvas->Initialize());
+  return canvas.PassAs<gfx::SurfaceOzoneCanvas>();
 }
 
 }  // namespace ui

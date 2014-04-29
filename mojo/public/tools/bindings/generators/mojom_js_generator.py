@@ -55,7 +55,7 @@ def JavaScriptPayloadSize(packed):
   return offset + pad;
 
 
-_kind_to_javascript_type = {
+_kind_to_codec_type = {
   mojom.BOOL:         "codec.Uint8",
   mojom.INT8:         "codec.Int8",
   mojom.UINT8:        "codec.Uint8",
@@ -76,86 +76,44 @@ _kind_to_javascript_type = {
 }
 
 
-def GetJavaScriptType(kind):
+def CodecType(kind):
   if kind in mojom.PRIMITIVES:
-    return _kind_to_javascript_type[kind]
+    return _kind_to_codec_type[kind]
   if isinstance(kind, mojom.Struct):
-    return "new codec.PointerTo(%s)" % GetJavaScriptType(kind.name)
+    return "new codec.PointerTo(%s)" % CodecType(kind.name)
   if isinstance(kind, mojom.Array):
-    return "new codec.ArrayOf(%s)" % GetJavaScriptType(kind.kind)
+    return "new codec.ArrayOf(%s)" % CodecType(kind.kind)
   if isinstance(kind, mojom.Interface):
-    return GetJavaScriptType(mojom.MSGPIPE)
+    return CodecType(mojom.MSGPIPE)
   if isinstance(kind, mojom.Enum):
-    return _kind_to_javascript_type[mojom.INT32]
+    return _kind_to_codec_type[mojom.INT32]
   return kind
-
-
-_kind_to_javascript_decode_snippet = {
-  mojom.BOOL:         "read8() & 1",
-  mojom.INT8:         "read8()",
-  mojom.UINT8:        "read8()",
-  mojom.INT16:        "read16()",
-  mojom.UINT16:       "read16()",
-  mojom.INT32:        "read32()",
-  mojom.UINT32:       "read32()",
-  mojom.FLOAT:        "decodeFloat()",
-  mojom.HANDLE:       "decodeHandle()",
-  mojom.DCPIPE:       "decodeHandle()",
-  mojom.DPPIPE:       "decodeHandle()",
-  mojom.MSGPIPE:      "decodeHandle()",
-  mojom.SHAREDBUFFER: "decodeHandle()",
-  mojom.INT64:        "read64()",
-  mojom.UINT64:       "read64()",
-  mojom.DOUBLE:       "decodeDouble()",
-  mojom.STRING:       "decodeStringPointer()",
-}
 
 
 def JavaScriptDecodeSnippet(kind):
   if kind in mojom.PRIMITIVES:
-    return _kind_to_javascript_decode_snippet[kind]
+    return "decodeStruct(%s)" % CodecType(kind);
   if isinstance(kind, mojom.Struct):
-    return "decodeStructPointer(%s)" % GetJavaScriptType(kind.name);
+    return "decodeStructPointer(%s)" % CodecType(kind.name);
   if isinstance(kind, mojom.Array):
-    return "decodeArrayPointer(%s)" % GetJavaScriptType(kind.kind);
+    return "decodeArrayPointer(%s)" % CodecType(kind.kind);
   if isinstance(kind, mojom.Interface):
     return JavaScriptDecodeSnippet(mojom.MSGPIPE)
   if isinstance(kind, mojom.Enum):
-    return _kind_to_javascript_decode_snippet[mojom.INT32]
-
-
-_kind_to_javascript_encode_snippet = {
-  mojom.BOOL:         "write8(1 & ",
-  mojom.INT8:         "write8(",
-  mojom.UINT8:        "write8(",
-  mojom.INT16:        "write16(",
-  mojom.UINT16:       "write16(",
-  mojom.INT32:        "write32(",
-  mojom.UINT32:       "write32(",
-  mojom.FLOAT:        "encodeFloat(",
-  mojom.HANDLE:       "encodeHandle(",
-  mojom.DCPIPE:       "encodeHandle(",
-  mojom.DPPIPE:       "encodeHandle(",
-  mojom.MSGPIPE:      "encodeHandle(",
-  mojom.SHAREDBUFFER: "encodeHandle(",
-  mojom.INT64:        "write64(",
-  mojom.UINT64:       "write64(",
-  mojom.DOUBLE:       "encodeDouble(",
-  mojom.STRING:       "encodeStringPointer(",
-}
+    return JavaScriptDecodeSnippet(mojom.INT32)
 
 
 def JavaScriptEncodeSnippet(kind):
   if kind in mojom.PRIMITIVES:
-    return _kind_to_javascript_encode_snippet[kind]
+    return "encodeStruct(%s, " % CodecType(kind);
   if isinstance(kind, mojom.Struct):
-    return "encodeStructPointer(%s, " % GetJavaScriptType(kind.name);
+    return "encodeStructPointer(%s, " % CodecType(kind.name);
   if isinstance(kind, mojom.Array):
-    return "encodeArrayPointer(%s, " % GetJavaScriptType(kind.kind);
+    return "encodeArrayPointer(%s, " % CodecType(kind.kind);
   if isinstance(kind, mojom.Interface):
     return JavaScriptEncodeSnippet(mojom.MSGPIPE)
   if isinstance(kind, mojom.Enum):
-    return _kind_to_javascript_encode_snippet[mojom.INT32]
+    return JavaScriptEncodeSnippet(mojom.INT32)
 
 def TranslateConstants(token, module):
   if isinstance(token, mojom.Constant):

@@ -61,11 +61,12 @@ class NET_EXPORT_PRIVATE QuicConnectionVisitorInterface {
  public:
   virtual ~QuicConnectionVisitorInterface() {}
 
-  // A simple visitor interface for dealing with data frames.  The session
-  // should determine if all frames will be accepted, and return true if so.
-  // If any frames can't be processed or buffered, none of the data should
-  // be used, and the callee should return false.
-  virtual bool OnStreamFrames(const std::vector<QuicStreamFrame>& frames) = 0;
+  // A simple method to determine if all frames will be accepted by the visitor.
+  virtual bool WillAcceptStreamFrames(
+      const std::vector<QuicStreamFrame>& frames) = 0;
+
+  // A simple visitor interface for dealing with data frames.
+  virtual void OnStreamFrames(const std::vector<QuicStreamFrame>& frames) = 0;
 
   // The session should process all WINDOW_UPDATE frames, adjusting both stream
   // and connection level flow control windows.
@@ -155,6 +156,9 @@ class NET_EXPORT_PRIVATE QuicConnectionDebugVisitorInterface
 
   // Called when a StopWaitingFrame has been parsed.
   virtual void OnStopWaitingFrame(const QuicStopWaitingFrame& frame) {}
+
+  // Called when a Ping has been parsed.
+  virtual void OnPingFrame(const QuicPingFrame& frame) {}
 
   // Called when a RstStreamFrame has been parsed.
   virtual void OnRstStreamFrame(const QuicRstStreamFrame& frame) {}
@@ -319,6 +323,7 @@ class NET_EXPORT_PRIVATE QuicConnection
   virtual bool OnCongestionFeedbackFrame(
       const QuicCongestionFeedbackFrame& frame) OVERRIDE;
   virtual bool OnStopWaitingFrame(const QuicStopWaitingFrame& frame) OVERRIDE;
+  virtual bool OnPingFrame(const QuicPingFrame& frame) OVERRIDE;
   virtual bool OnRstStreamFrame(const QuicRstStreamFrame& frame) OVERRIDE;
   virtual bool OnConnectionCloseFrame(
       const QuicConnectionCloseFrame& frame) OVERRIDE;
@@ -691,8 +696,6 @@ class NET_EXPORT_PRIVATE QuicConnection
   QuicTime::Delta idle_network_timeout_;
   // Overall connection timeout.
   QuicTime::Delta overall_connection_timeout_;
-  // Connection creation time.
-  QuicTime creation_time_;
 
   // Statistics for this session.
   QuicConnectionStats stats_;

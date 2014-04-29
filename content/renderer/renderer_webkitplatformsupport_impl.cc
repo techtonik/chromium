@@ -38,8 +38,8 @@
 #include "content/public/common/content_switches.h"
 #include "content/public/common/webplugininfo.h"
 #include "content/public/renderer/content_renderer_client.h"
-#include "content/renderer/device_orientation/device_motion_event_pump.h"
-#include "content/renderer/device_orientation/device_orientation_event_pump.h"
+#include "content/renderer/device_sensors/device_motion_event_pump.h"
+#include "content/renderer/device_sensors/device_orientation_event_pump.h"
 #include "content/renderer/dom_storage/webstoragenamespace_impl.h"
 #include "content/renderer/gamepad_shared_memory_reader.h"
 #include "content/renderer/media/audio_decoder.h"
@@ -432,18 +432,17 @@ RendererWebKitPlatformSupportImpl::MimeRegistry::supportsMediaMIMEType(
 
   // Check list of strict codecs to see if it is supported.
   if (net::IsStrictMediaMimeType(mime_type_ascii)) {
+    // Check if the codecs are a perfect match.
+    std::vector<std::string> strict_codecs;
+    net::ParseCodecString(ToASCIIOrEmpty(codecs), &strict_codecs, false);
+    if (net::IsSupportedStrictMediaMimeType(mime_type_ascii, strict_codecs))
+      return IsSupported;
+
     // We support the container, but no codecs were specified.
     if (codecs.isNull())
       return MayBeSupported;
 
-    // Check if the codecs are a perfect match.
-    std::vector<std::string> strict_codecs;
-    net::ParseCodecString(ToASCIIOrEmpty(codecs), &strict_codecs, false);
-    if (!net::IsSupportedStrictMediaMimeType(mime_type_ascii, strict_codecs))
-      return IsNotSupported;
-
-    // Good to go!
-    return IsSupported;
+    return IsNotSupported;
   }
 
   // If we don't recognize the codec, it's possible we support it.
@@ -670,7 +669,9 @@ bool RendererWebKitPlatformSupportImpl::canAccelerate2dCanvas() {
 }
 
 bool RendererWebKitPlatformSupportImpl::isThreadedCompositingEnabled() {
-  return !!RenderThreadImpl::current()->compositor_message_loop_proxy().get();
+  RenderThreadImpl* thread = RenderThreadImpl::current();
+  // thread can be NULL in tests.
+  return thread && thread->compositor_message_loop_proxy().get();
 }
 
 double RendererWebKitPlatformSupportImpl::audioHardwareSampleRate() {

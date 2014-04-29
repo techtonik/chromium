@@ -289,6 +289,9 @@ void OpusAudioDecoder::Reset(const base::Closure& closure) {
 void OpusAudioDecoder::Stop() {
   DCHECK(task_runner_->BelongsToCurrentThread());
 
+  if (!opus_decoder_)
+    return;
+
   opus_multistream_decoder_ctl(opus_decoder_, OPUS_RESET_STATE);
   ResetTimestampState();
   CloseDecoder();
@@ -398,7 +401,8 @@ bool OpusAudioDecoder::ConfigureDecoder() {
 
   if (config_.codec_delay() != opus_extra_data.skip_samples) {
     DLOG(ERROR) << "Invalid file. Codec Delay in container does not match the "
-                << "value in Opus Extra Data.";
+                << "value in Opus Extra Data. " << config_.codec_delay()
+                << " vs " << opus_extra_data.skip_samples;
     return false;
   }
 
@@ -491,12 +495,7 @@ bool OpusAudioDecoder::Decode(const scoped_refptr<DecoderBuffer>& input,
   if (output_timestamp_helper_->base_timestamp() == kNoTimestamp() &&
       !input->end_of_stream()) {
     DCHECK(input->timestamp() != kNoTimestamp());
-    // Adjust the timestamp helper so the base timestamp is corrected for frames
-    // dropped due to codec delay.
     output_timestamp_helper_->SetBaseTimestamp(input->timestamp());
-    output_timestamp_helper_->SetBaseTimestamp(
-        input->timestamp() -
-        output_timestamp_helper_->GetFrameDuration(config_.codec_delay()));
   }
 
   // Trim off any extraneous allocation.
@@ -522,22 +521,25 @@ bool OpusAudioDecoder::Decode(const scoped_refptr<DecoderBuffer>& input,
       }
       output_buffer->get()->TrimEnd(discard_padding);
       frames_to_output -= discard_padding;
+    } else {
+      DCHECK_EQ(input->discard_padding().InMicroseconds(), 0);
     }
   } else {
     frames_to_discard_ -= frames_to_output;
     frames_to_output = 0;
   }
 
+  // Discard the buffer to indicate we need more data.
+  if (!frames_to_output) {
+    *output_buffer = NULL;
+    return true;
+  }
+
   // Assign timestamp and duration to the buffer.
   output_buffer->get()->set_timestamp(output_timestamp_helper_->GetTimestamp());
   output_buffer->get()->set_duration(
       output_timestamp_helper_->GetFrameDuration(frames_to_output));
-  output_timestamp_helper_->AddFrames(frames_decoded);
-
-  // Discard the buffer to indicate we need more data.
-  if (!frames_to_output)
-    *output_buffer = NULL;
-
+  output_timestamp_helper_->AddFrames(frames_to_output);
   return true;
 }
 

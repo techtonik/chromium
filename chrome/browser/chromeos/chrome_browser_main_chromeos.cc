@@ -45,6 +45,7 @@
 #include "chrome/browser/chromeos/login/login_wizard.h"
 #include "chrome/browser/chromeos/login/screen_locker.h"
 #include "chrome/browser/chromeos/login/startup_utils.h"
+#include "chrome/browser/chromeos/login/user.h"
 #include "chrome/browser/chromeos/login/user_manager.h"
 #include "chrome/browser/chromeos/login/wallpaper_manager.h"
 #include "chrome/browser/chromeos/login/wizard_controller.h"
@@ -52,6 +53,7 @@
 #include "chrome/browser/chromeos/net/network_portal_detector.h"
 #include "chrome/browser/chromeos/options/cert_library.h"
 #include "chrome/browser/chromeos/policy/browser_policy_connector_chromeos.h"
+#include "chrome/browser/chromeos/policy/device_local_account.h"
 #include "chrome/browser/chromeos/power/idle_action_warning_observer.h"
 #include "chrome/browser/chromeos/power/peripheral_battery_observer.h"
 #include "chrome/browser/chromeos/power/power_button_observer.h"
@@ -65,6 +67,7 @@
 #include "chrome/browser/chromeos/system/input_device_settings.h"
 #include "chrome/browser/chromeos/upgrade_detector_chromeos.h"
 #include "chrome/browser/defaults.h"
+#include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/metrics/metrics_service.h"
 #include "chrome/browser/net/chrome_network_delegate.h"
 #include "chrome/browser/profiles/profile.h"
@@ -163,10 +166,13 @@ class StubLogin : public LoginStatusConsumer,
 
   // LoginUtils::Delegate implementation:
   virtual void OnProfilePrepared(Profile* profile) OVERRIDE {
-    std::string login_user =
+    const std::string login_user =
         CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
             chromeos::switches::kLoginUser);
-    profile->GetPrefs()->SetString(prefs::kGoogleServicesUsername, login_user);
+    if (!policy::IsDeviceLocalAccountUser(login_user, NULL)) {
+      profile->GetPrefs()->SetString(prefs::kGoogleServicesUsername,
+                                     login_user);
+    }
     profile_prepared_ = true;
     LoginUtils::Get()->DoBrowserLaunch(profile, NULL);
     delete this;
@@ -198,10 +204,7 @@ void OptionallyRunChromeOSLoginManager(const CommandLine& parsed_command_line,
   if (ShouldAutoLaunchKioskApp(parsed_command_line)) {
     RunAutoLaunchKioskApp();
   } else if (parsed_command_line.HasSwitch(switches::kLoginManager)) {
-    const std::string first_screen =
-        parsed_command_line.HasSwitch(switches::kLoginScreen) ?
-            WizardController::kLoginScreenName : std::string();
-    ShowLoginWizard(first_screen);
+    ShowLoginWizard(std::string());
 
     if (KioskModeSettings::Get()->IsKioskModeEnabled())
       InitializeKioskModeScreensaver();
@@ -519,15 +522,28 @@ void ChromeBrowserMainPartsChromeos::PreProfileInit() {
   ChromeBrowserMainPartsLinux::PreProfileInit();
 
   if (immediate_login) {
-    std::string username =
+    const std::string user_id =
         parsed_command_line().GetSwitchValueASCII(switches::kLoginUser);
     UserManager* user_manager = UserManager::Get();
+
+    if (policy::IsDeviceLocalAccountUser(user_id, NULL) &&
+        !user_manager->IsKnownUser(user_id)) {
+      // When a device-local account is removed, its policy is deleted from disk
+      // immediately. If a session using this account happens to be in progress,
+      // the session is allowed to continue with policy served from an in-memory
+      // cache. If Chrome crashes later in the session, the policy becomes
+      // completely unavailable. Exit the session in that case, rather than
+      // allowing it to continue without policy.
+      chrome::AttemptUserExit();
+      return;
+    }
+
     // In case of multi-profiles --login-profile will contain user_id_hash.
-    std::string username_hash =
+    std::string user_id_hash =
         parsed_command_line().GetSwitchValueASCII(switches::kLoginProfile);
-    user_manager->UserLoggedIn(username, username_hash, true);
-    VLOG(1) << "Relaunching browser for user: " << username
-            << " with hash: " << username_hash;
+    user_manager->UserLoggedIn(user_id, user_id_hash, true);
+    VLOG(1) << "Relaunching browser for user: " << user_id
+            << " with hash: " << user_id_hash;
   }
 }
 

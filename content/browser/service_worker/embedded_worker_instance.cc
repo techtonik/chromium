@@ -46,13 +46,11 @@ ServiceWorkerStatusCode EmbeddedWorkerInstance::Stop() {
 }
 
 ServiceWorkerStatusCode EmbeddedWorkerInstance::SendMessage(
-    int request_id,
     const IPC::Message& message) {
   DCHECK(status_ == RUNNING);
   return registry_->Send(process_id_,
-                         new EmbeddedWorkerContextMsg_SendMessageToWorker(
-                             thread_id_, embedded_worker_id_,
-                             request_id, message));
+                         new EmbeddedWorkerContextMsg_MessageToWorker(
+                             thread_id_, embedded_worker_id_, message));
 }
 
 void EmbeddedWorkerInstance::AddProcessReference(int process_id) {
@@ -89,20 +87,23 @@ void EmbeddedWorkerInstance::OnStarted(int thread_id) {
   DCHECK(status_ == STARTING);
   status_ = RUNNING;
   thread_id_ = thread_id;
-  FOR_EACH_OBSERVER(Observer, observer_list_, OnStarted());
+  FOR_EACH_OBSERVER(Listener, listener_list_, OnStarted());
 }
 
 void EmbeddedWorkerInstance::OnStopped() {
   status_ = STOPPED;
   process_id_ = -1;
   thread_id_ = -1;
-  FOR_EACH_OBSERVER(Observer, observer_list_, OnStopped());
+  FOR_EACH_OBSERVER(Listener, listener_list_, OnStopped());
 }
 
-void EmbeddedWorkerInstance::OnMessageReceived(int request_id,
-                                               const IPC::Message& message) {
-  FOR_EACH_OBSERVER(Observer, observer_list_,
-                    OnMessageReceived(request_id, message));
+bool EmbeddedWorkerInstance::OnMessageReceived(const IPC::Message& message) {
+  ListenerList::Iterator it(listener_list_);
+  while (Listener* listener = it.GetNext()) {
+    if (listener->OnMessageReceived(message))
+      return true;
+  }
+  return false;
 }
 
 void EmbeddedWorkerInstance::OnReportException(
@@ -111,8 +112,8 @@ void EmbeddedWorkerInstance::OnReportException(
     int column_number,
     const GURL& source_url) {
   FOR_EACH_OBSERVER(
-      Observer,
-      observer_list_,
+      Listener,
+      listener_list_,
       OnReportException(error_message, line_number, column_number, source_url));
 }
 
@@ -123,18 +124,18 @@ void EmbeddedWorkerInstance::OnReportConsoleMessage(
     int line_number,
     const GURL& source_url) {
   FOR_EACH_OBSERVER(
-      Observer,
-      observer_list_,
+      Listener,
+      listener_list_,
       OnReportConsoleMessage(
           source_identifier, message_level, message, line_number, source_url));
 }
 
-void EmbeddedWorkerInstance::AddObserver(Observer* observer) {
-  observer_list_.AddObserver(observer);
+void EmbeddedWorkerInstance::AddListener(Listener* listener) {
+  listener_list_.AddObserver(listener);
 }
 
-void EmbeddedWorkerInstance::RemoveObserver(Observer* observer) {
-  observer_list_.RemoveObserver(observer);
+void EmbeddedWorkerInstance::RemoveListener(Listener* listener) {
+  listener_list_.RemoveObserver(listener);
 }
 
 bool EmbeddedWorkerInstance::ChooseProcess() {

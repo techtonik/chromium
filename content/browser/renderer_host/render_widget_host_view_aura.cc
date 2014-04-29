@@ -762,7 +762,6 @@ RenderFrameHostImpl* RenderWidgetHostViewAura::GetFocusedFrame() {
 }
 
 void RenderWidgetHostViewAura::MovePluginWindows(
-    const gfx::Vector2d& scroll_offset,
     const std::vector<WebPluginGeometry>& plugin_window_moves) {
 #if defined(OS_WIN)
   // We need to clip the rectangle to the tab's viewport, otherwise we will draw
@@ -775,13 +774,12 @@ void RenderWidgetHostViewAura::MovePluginWindows(
   gfx::Rect view_bounds = window_->GetBoundsInRootWindow();
   std::vector<WebPluginGeometry> moves = plugin_window_moves;
 
-  gfx::Rect view_port(scroll_offset.x(), scroll_offset.y(), view_bounds.width(),
-                      view_bounds.height());
+  gfx::Rect view_port(view_bounds.size());
 
   for (size_t i = 0; i < moves.size(); ++i) {
     gfx::Rect clip(moves[i].clip_rect);
     gfx::Vector2d view_port_offset(
-        moves[i].window_rect.OffsetFromOrigin() + scroll_offset);
+        moves[i].window_rect.OffsetFromOrigin());
     clip.Offset(view_port_offset);
     clip.Intersect(view_port);
     clip.Offset(-view_port_offset);
@@ -873,6 +871,22 @@ void RenderWidgetHostViewAura::SetBackground(const SkBitmap& background) {
   RenderWidgetHostViewBase::SetBackground(background);
   host_->SetBackground(background);
   window_->layer()->SetFillsBoundsOpaquely(background.isOpaque());
+}
+
+gfx::Size RenderWidgetHostViewAura::GetVisibleViewportSize() const {
+  gfx::Rect window_bounds = window_->bounds();
+  int viewport_width = std::max(
+      0, window_bounds.width() - insets_.left() - insets_.right());
+  int viewport_height = std::max(
+      0, window_bounds.height() - insets_.top() - insets_.bottom());
+  return gfx::Size(viewport_width, viewport_height);
+}
+
+void RenderWidgetHostViewAura::SetInsets(const gfx::Insets& insets) {
+  if (insets != insets_) {
+    insets_ = insets;
+    host_->WasResized();
+  }
 }
 
 void RenderWidgetHostViewAura::UpdateCursor(const WebCursor& cursor) {
@@ -2212,6 +2226,9 @@ void RenderWidgetHostViewAura::OnBoundsChanged(const gfx::Rect& old_bounds,
   // SetBounds() itself.  No matter how we got here, any redundant calls are
   // harmless.
   SetSize(new_bounds.size());
+
+  if (GetInputMethod())
+    GetInputMethod()->OnCaretBoundsChanged(this);
 }
 
 gfx::NativeCursor RenderWidgetHostViewAura::GetCursor(const gfx::Point& point) {

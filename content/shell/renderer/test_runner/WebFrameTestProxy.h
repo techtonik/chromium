@@ -12,7 +12,7 @@
 #include "content/shell/renderer/test_runner/WebTestProxy.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 
-namespace WebTestRunner {
+namespace content {
 
 // Templetized wrapper around RenderFrameImpl objects, which implement
 // the WebFrameClient interface.
@@ -50,6 +50,11 @@ public:
 
         const CR_DEFINE_STATIC_LOCAL(WebString, suffix, ("-can-create-without-renderer"));
         return mimeType.utf8().find(suffix.utf8()) != std::string::npos;
+    }
+    virtual void loadURLExternally(blink::WebLocalFrame* frame, const blink::WebURLRequest& request, blink::WebNavigationPolicy policy, const blink::WebString& suggested_name)
+    {
+        m_baseProxy->loadURLExternally(frame, request, policy, suggested_name);
+        Base::loadURLExternally(frame, request, policy, suggested_name);
     }
     virtual void didStartProvisionalLoad(blink::WebLocalFrame* frame)
     {
@@ -215,6 +220,6 @@ private:
     DISALLOW_COPY_AND_ASSIGN(WebFrameTestProxy);
 };
 
-}
+}  // namespace content
 
 #endif // WebTestProxy_h

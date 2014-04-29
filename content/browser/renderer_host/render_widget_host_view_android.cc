@@ -46,6 +46,7 @@
 #include "content/browser/renderer_host/render_widget_host_impl.h"
 #include "content/common/gpu/client/gl_helper.h"
 #include "content/common/gpu/gpu_messages.h"
+#include "content/common/input/did_overscroll_params.h"
 #include "content/common/input_messages.h"
 #include "content/common/view_messages.h"
 #include "content/public/browser/devtools_agent_host.h"
@@ -214,6 +215,7 @@ bool RenderWidgetHostViewAndroid::OnMessageReceived(
     IPC_MESSAGE_HANDLER(ViewHostMsg_StartContentIntent, OnStartContentIntent)
     IPC_MESSAGE_HANDLER(ViewHostMsg_DidChangeBodyBackgroundColor,
                         OnDidChangeBodyBackgroundColor)
+    IPC_MESSAGE_HANDLER(ViewHostMsg_DidOverscroll, OnDidOverscroll)
     IPC_MESSAGE_HANDLER(ViewHostMsg_SetNeedsBeginFrame,
                         OnSetNeedsBeginFrame)
     IPC_MESSAGE_HANDLER(ViewHostMsg_TextInputStateChanged,
@@ -280,7 +282,6 @@ void RenderWidgetHostViewAndroid::SetSize(const gfx::Size& size) {
   // Ignore the given size as only the Java code has the power to
   // resize the view on Android.
   default_size_ = size;
-  WasResized();
 }
 
 void RenderWidgetHostViewAndroid::SetBounds(const gfx::Rect& rect) {
@@ -343,7 +344,6 @@ RenderWidgetHostViewAndroid::GetNativeViewAccessible() {
 }
 
 void RenderWidgetHostViewAndroid::MovePluginWindows(
-    const gfx::Vector2d& scroll_offset,
     const std::vector<WebPluginGeometry>& moves) {
   // We don't have plugin windows on Android. Do nothing. Note: this is called
   // from RenderWidgetHost::OnUpdateRect which is itself invoked while
@@ -449,11 +449,7 @@ gfx::Rect RenderWidgetHostViewAndroid::GetViewBounds() const {
   if (!content_view_core_)
     return gfx::Rect(default_size_);
 
-  gfx::Size size = content_view_core_->GetViewportSizeDip();
-  gfx::Size offset = content_view_core_->GetViewportSizeOffsetDip();
-  size.Enlarge(-offset.width(), -offset.height());
-
-  return gfx::Rect(size);
+  return gfx::Rect(content_view_core_->GetViewSize());
 }
 
 gfx::Size RenderWidgetHostViewAndroid::GetPhysicalBackingSize() const {
@@ -520,6 +516,25 @@ void RenderWidgetHostViewAndroid::OnDidChangeBodyBackgroundColor(
     content_view_core_->OnBackgroundColorChanged(color);
 }
 
+void RenderWidgetHostViewAndroid::OnDidOverscroll(
+    const DidOverscrollParams& params) {
+  if (!content_view_core_ || !layer_ || !is_showing_)
+    return;
+
+  const float device_scale_factor = content_view_core_->GetDpiScale();
+  if (overscroll_effect_->OnOverscrolled(
+          content_view_core_->GetLayer(),
+          base::TimeTicks::Now(),
+          gfx::ScaleVector2d(params.accumulated_overscroll,
+                             device_scale_factor),
+          gfx::ScaleVector2d(params.latest_overscroll_delta,
+                             device_scale_factor),
+          gfx::ScaleVector2d(params.current_fling_velocity,
+                             device_scale_factor))) {
+    content_view_core_->SetNeedsAnimate();
+  }
+}
+
 void RenderWidgetHostViewAndroid::SendBeginFrame(
     const cc::BeginFrameArgs& args) {
   TRACE_EVENT0("cc", "RenderWidgetHostViewAndroid::SendBeginFrame");
@@ -535,8 +550,7 @@ void RenderWidgetHostViewAndroid::SendBeginFrame(
   host_->Send(new ViewMsg_BeginFrame(host_->GetRoutingID(), args));
 }
 
-void RenderWidgetHostViewAndroid::OnSetNeedsBeginFrame(
-    bool enabled) {
+void RenderWidgetHostViewAndroid::OnSetNeedsBeginFrame(bool enabled) {
   TRACE_EVENT1("cc", "RenderWidgetHostViewAndroid::OnSetNeedsBeginFrame",
                "enabled", enabled);
   // ContentViewCoreImpl handles multiple subscribers to the BeginFrame, so
@@ -1136,6 +1150,11 @@ void RenderWidgetHostViewAndroid::SetScrollOffsetPinning(
   // intentionally empty, like RenderWidgetHostViewViews
 }
 
+void RenderWidgetHostViewAndroid::UnhandledWheelEvent(
+    const blink::WebMouseWheelEvent& event) {
+  // intentionally empty, like RenderWidgetHostViewViews
+}
+
 void RenderWidgetHostViewAndroid::GestureEventAck(
     const blink::WebGestureEvent& event,
     InputEventAckState ack_result) {
@@ -1299,22 +1318,6 @@ SkColor RenderWidgetHostViewAndroid::GetCachedBackgroundColor() const {
   return cached_background_color_;
 }
 
-void RenderWidgetHostViewAndroid::OnOverscrolled(
-    gfx::Vector2dF accumulated_overscroll,
-    gfx::Vector2dF current_fling_velocity) {
-  if (!content_view_core_ || !layer_ || !is_showing_)
-    return;
-
-  const float device_scale_factor = content_view_core_->GetDpiScale();
-  if (overscroll_effect_->OnOverscrolled(
-          content_view_core_->GetLayer(),
-          base::TimeTicks::Now(),
-          gfx::ScaleVector2d(accumulated_overscroll, device_scale_factor),
-          gfx::ScaleVector2d(current_fling_velocity, device_scale_factor))) {
-    content_view_core_->SetNeedsAnimate();
-  }
-}
-
 void RenderWidgetHostViewAndroid::DidStopFlinging() {
   if (content_view_core_)
     content_view_core_->DidStopFlinging();
@@ -1328,8 +1331,11 @@ void RenderWidgetHostViewAndroid::SetContentViewCore(
     observing_root_window_ = false;
   }
 
-  if (content_view_core != content_view_core_)
+  bool resize = false;
+  if (content_view_core != content_view_core_) {
     ReleaseLocksOnSurface();
+    resize = true;
+  }
 
   content_view_core_ = content_view_core;
 
@@ -1346,6 +1352,9 @@ void RenderWidgetHostViewAndroid::SetContentViewCore(
     content_view_core_->GetWindowAndroid()->AddObserver(this);
     observing_root_window_ = true;
   }
+
+  if (resize && content_view_core_)
+    WasResized();
 }
 
 void RenderWidgetHostViewAndroid::RunAckCallbacks() {

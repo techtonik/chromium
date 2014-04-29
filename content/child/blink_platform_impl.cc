@@ -734,10 +734,8 @@ const DataResource kDataResources[] = {
     IDR_MEDIAPLAYER_FULLSCREEN_BUTTON_DOWN, ui::SCALE_FACTOR_100P },
   { "mediaplayerFullscreenDisabled",
     IDR_MEDIAPLAYER_FULLSCREEN_BUTTON_DISABLED, ui::SCALE_FACTOR_100P },
-#if defined(OS_ANDROID)
   { "mediaplayerOverlayPlay",
     IDR_MEDIAPLAYER_OVERLAY_PLAY_BUTTON, ui::SCALE_FACTOR_100P },
-#endif
 #if defined(OS_MACOSX)
   { "overhangPattern", IDR_OVERHANG_PATTERN, ui::SCALE_FACTOR_100P },
   { "overhangShadow", IDR_OVERHANG_SHADOW, ui::SCALE_FACTOR_100P },
@@ -756,9 +754,6 @@ const DataResource kDataResources[] = {
   { "generatePassword", IDR_PASSWORD_GENERATION_ICON, ui::SCALE_FACTOR_100P },
   { "generatePasswordHover",
     IDR_PASSWORD_GENERATION_ICON_HOVER, ui::SCALE_FACTOR_100P },
-  // TODO(dgozman): remove this after moving to content-based touch emulation.
-  { "syntheticTouchCursor",
-    IDR_SYNTHETIC_TOUCH_CURSOR, ui::SCALE_FACTOR_100P },
 };
 
 }  // namespace

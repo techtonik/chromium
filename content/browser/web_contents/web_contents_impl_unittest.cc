@@ -2430,22 +2430,21 @@ TEST_F(WebContentsImplTest, HandleWheelEvent) {
   contents()->SetDelegate(delegate.get());
 
   int modifiers = 0;
-  float dy = 1;
   // Verify that normal mouse wheel events do nothing to change the zoom level.
   blink::WebMouseWheelEvent event =
-      SyntheticWebMouseWheelEventBuilder::Build(0, dy, modifiers, false);
+      SyntheticWebMouseWheelEventBuilder::Build(0, 1, modifiers, false);
   EXPECT_FALSE(contents()->HandleWheelEvent(event));
   EXPECT_EQ(0, delegate->GetAndResetContentsZoomChangedCallCount());
 
   modifiers = WebInputEvent::ShiftKey | WebInputEvent::AltKey;
-  event = SyntheticWebMouseWheelEventBuilder::Build(0, dy, modifiers, false);
+  event = SyntheticWebMouseWheelEventBuilder::Build(0, 1, modifiers, false);
   EXPECT_FALSE(contents()->HandleWheelEvent(event));
   EXPECT_EQ(0, delegate->GetAndResetContentsZoomChangedCallCount());
 
   // But whenever the ctrl modifier is applied, they can increase/decrease zoom.
   // Except on MacOS where we never want to adjust zoom with mousewheel.
   modifiers = WebInputEvent::ControlKey;
-  event = SyntheticWebMouseWheelEventBuilder::Build(0, dy, modifiers, false);
+  event = SyntheticWebMouseWheelEventBuilder::Build(0, 1, modifiers, false);
   bool handled = contents()->HandleWheelEvent(event);
 #if defined(OS_MACOSX)
   EXPECT_FALSE(handled);
@@ -2458,8 +2457,7 @@ TEST_F(WebContentsImplTest, HandleWheelEvent) {
 
   modifiers = WebInputEvent::ControlKey | WebInputEvent::ShiftKey |
       WebInputEvent::AltKey;
-  dy = -5;
-  event = SyntheticWebMouseWheelEventBuilder::Build(2, dy, modifiers, false);
+  event = SyntheticWebMouseWheelEventBuilder::Build(2, -5, modifiers, false);
   handled = contents()->HandleWheelEvent(event);
 #if defined(OS_MACOSX)
   EXPECT_FALSE(handled);
@@ -2471,12 +2469,19 @@ TEST_F(WebContentsImplTest, HandleWheelEvent) {
 #endif
 
   // Unless there is no vertical movement.
-  dy = 0;
-  event = SyntheticWebMouseWheelEventBuilder::Build(2, dy, modifiers, false);
+  event = SyntheticWebMouseWheelEventBuilder::Build(2, 0, modifiers, false);
   EXPECT_FALSE(contents()->HandleWheelEvent(event));
   EXPECT_EQ(0, delegate->GetAndResetContentsZoomChangedCallCount());
 
-  // Ensure pointers to the delegate aren't kept beyond it's lifetime.
+  // Events containing precise scrolling deltas also shouldn't result in the
+  // zoom being adjusted, to avoid accidental adjustments caused by
+  // two-finger-scrolling on a touchpad.
+  modifiers = WebInputEvent::ControlKey;
+  event = SyntheticWebMouseWheelEventBuilder::Build(0, 5, modifiers, true);
+  EXPECT_FALSE(contents()->HandleWheelEvent(event));
+  EXPECT_EQ(0, delegate->GetAndResetContentsZoomChangedCallCount());
+
+  // Ensure pointers to the delegate aren't kept beyond its lifetime.
   contents()->SetDelegate(NULL);
 }
 
@@ -2494,7 +2499,7 @@ TEST_F(WebContentsImplTest, HandleGestureEvent) {
       WebInputEvent::GesturePinchUpdate, WebGestureEvent::Touchpad);
 
   // A pinch less than the step value doesn't change the zoom level.
-  event.data.pinchUpdate.scale = kZoomStepValue * 0.8f;
+  event.data.pinchUpdate.scale = 1.0f + kZoomStepValue * 0.8f;
   EXPECT_TRUE(contents()->HandleGestureEvent(event));
   EXPECT_EQ(0, delegate->GetAndResetContentsZoomChangedCallCount());
 
@@ -2504,7 +2509,7 @@ TEST_F(WebContentsImplTest, HandleGestureEvent) {
   EXPECT_TRUE(delegate->last_zoom_in());
 
   // Pinching back out one step goes back to 100%.
-  event.data.pinchUpdate.scale = -kZoomStepValue;
+  event.data.pinchUpdate.scale = 1.0f - kZoomStepValue;
   EXPECT_TRUE(contents()->HandleGestureEvent(event));
   EXPECT_EQ(1, delegate->GetAndResetContentsZoomChangedCallCount());
   EXPECT_FALSE(delegate->last_zoom_in());
@@ -2522,7 +2527,7 @@ TEST_F(WebContentsImplTest, HandleGestureEvent) {
   // a touchscreen pinch gesture).
   event = SyntheticWebGestureEventBuilder::Build(
       WebInputEvent::GesturePinchUpdate, WebGestureEvent::Touchscreen);
-  event.data.pinchUpdate.scale = kZoomStepValue * 3;
+  event.data.pinchUpdate.scale = 1.0f + kZoomStepValue * 3;
   EXPECT_FALSE(contents()->HandleGestureEvent(event));
   EXPECT_EQ(0, delegate->GetAndResetContentsZoomChangedCallCount());
 

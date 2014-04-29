@@ -71,10 +71,7 @@ class SmoothnessGpuRasterizationTop25(test.Test):
   test = smoothness.Smoothness
   page_set = 'page_sets/top_25.py'
   def CustomizeBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--enable-threaded-compositing')
-    options.AppendExtraBrowserArgs('--force-compositing-mode')
-    options.AppendExtraBrowserArgs('--enable-impl-side-painting')
-    options.AppendExtraBrowserArgs('--force-gpu-rasterization')
+    silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
 
 
 class SmoothnessGpuRasterizationKeyMobileSites(test.Test):
@@ -85,10 +82,7 @@ class SmoothnessGpuRasterizationKeyMobileSites(test.Test):
   test = smoothness.Smoothness
   page_set = 'page_sets/key_mobile_sites.py'
   def CustomizeBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--enable-threaded-compositing')
-    options.AppendExtraBrowserArgs('--force-compositing-mode')
-    options.AppendExtraBrowserArgs('--enable-impl-side-painting')
-    options.AppendExtraBrowserArgs('--force-gpu-rasterization')
+    silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
 
 
 class SmoothnessGpuRasterizationKeySilkCases(test.Test):
@@ -98,10 +92,7 @@ class SmoothnessGpuRasterizationKeySilkCases(test.Test):
   test = smoothness.Smoothness
   page_set = 'page_sets/key_silk_cases.py'
   def CustomizeBrowserOptions(self, options):
-    options.AppendExtraBrowserArgs('--enable-threaded-compositing')
-    options.AppendExtraBrowserArgs('--force-compositing-mode')
-    options.AppendExtraBrowserArgs('--enable-impl-side-painting')
-    options.AppendExtraBrowserArgs('--force-gpu-rasterization')
+    silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
 
 
 class SmoothnessFastPathGpuRasterizationKeySilkCases(
@@ -125,3 +116,10 @@ class SmoothnessToughPinchZoomCases(test.Test):
   """
   test = smoothness.Smoothness
   page_set = 'page_sets/tough_pinch_zoom_cases.py'
+
+
+class SmoothnessPolymer(test.Test):
+  """Measures rendering statistics for Polymer cases.
+  """
+  test = smoothness.Smoothness
+  page_set = 'page_sets/polymer.py'

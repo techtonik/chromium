@@ -1,6 +1,23 @@
 {
   'targets': [
     {
+      'target_name': 'mojo_echo_bindings',
+      'type': 'static_library',
+      'sources': [
+        'services/dbus_echo/echo.mojom',
+      ],
+      'variables': {
+        'mojom_base_output_dir': 'mojo',
+      },
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'export_dependent_settings': [
+        'mojo_bindings',
+      ],
+      'dependencies': [
+        'mojo_bindings',
+      ],
+    },
+    {
       'target_name': 'mojo_gles2_bindings',
       'type': 'static_library',
       'sources': [
@@ -162,7 +179,7 @@
         },
         {
           'target_name': 'mojo_view_manager',
-          'type': 'shared_library',
+          'type': '<(component)',
           'dependencies': [
             '../base/base.gyp:base',
             '../skia/skia.gyp:skia',
@@ -177,13 +194,40 @@
             'mojo_view_manager_bindings',
           ],
           'sources': [
-            'services/view_manager/root_view_manager.cc',
-            'services/view_manager/root_view_manager.h',
+            'services/view_manager/ids.h',
+            'services/view_manager/node.cc',
+            'services/view_manager/node.h',
+            'services/view_manager/node_delegate.h',
+            'services/view_manager/root_node_manager.cc',
+            'services/view_manager/root_node_manager.h',
             'services/view_manager/view.cc',
             'services/view_manager/view.h',
+            'services/view_manager/view_manager.cc',
             'services/view_manager/view_manager_connection.cc',
             'services/view_manager/view_manager_connection.h',
-            'services/view_manager/view_manager.cc',
+            'services/view_manager/view_manager_export.h',
+          ],
+          'defines': [
+            'MOJO_VIEW_MANAGER_IMPLEMENTATION',
+          ],
+        },
+        {
+          'target_name': 'mojo_view_manager_unittests',
+          'type': 'executable',
+          'dependencies': [
+            '../base/base.gyp:base',
+            '../skia/skia.gyp:skia',
+            '../testing/gtest.gyp:gtest',
+            '../ui/aura/aura.gyp:aura',
+            'mojo_environment_chromium',
+            'mojo_run_all_unittests',
+            'mojo_shell_client',
+            'mojo_system_impl',
+            'mojo_view_manager',
+            'mojo_view_manager_bindings',
+          ],
+          'sources': [
+            'services/view_manager/view_manager_connection_unittest.cc',
           ],
         },
         {
@@ -192,6 +236,28 @@
             'app_name': 'mojo_view_manager',
           },
           'includes': [ 'build/package_app.gypi' ],
+        },
+      ],
+    }],
+    ['OS=="linux"', {
+      'targets': [
+        {
+          'target_name': 'mojo_dbus_echo_service',
+          'type': 'executable',
+          'dependencies': [
+            '../base/base.gyp:base',
+            '../build/linux/system.gyp:dbus',
+            '../dbus/dbus.gyp:dbus',
+            'mojo_external_service_bindings',
+            'mojo_common_lib',
+            'mojo_environment_chromium',
+            'mojo_echo_bindings',
+            'mojo_shell_client',
+            'mojo_system_impl',
+          ],
+          'sources': [
+            'services/dbus_echo/dbus_echo_service.cc',
+          ],
         },
       ],
     }],

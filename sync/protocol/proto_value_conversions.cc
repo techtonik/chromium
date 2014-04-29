@@ -205,6 +205,15 @@ base::DictionaryValue* TabNavigationToValue(
   SET_INT32(http_status_code);
   SET_INT32(referrer_policy);
   SET_BOOL(is_restored);
+  SET_REP(navigation_redirect, NavigationRedirectToValue);
+  SET_STR(last_navigation_redirect_url);
+  return value;
+}
+
+base::DictionaryValue* NavigationRedirectToValue(
+    const sync_pb::NavigationRedirect& proto) {
+  base::DictionaryValue* value = new base::DictionaryValue();
+  SET_STR(url);
   return value;
 }
 
@@ -407,6 +416,8 @@ base::DictionaryValue* AppSpecificsToValue(
   SET_STR(app_launch_ordinal);
   SET_STR(page_ordinal);
   SET_ENUM(launch_type, GetLaunchTypeString);
+  SET_STR(bookmark_app_url);
+  SET_STR(bookmark_app_description);
 
   return value;
 }

@@ -6,12 +6,14 @@
 
 #include "content/browser/renderer_host/input/motion_event_web.h"
 #include "content/browser/renderer_host/input/web_input_event_util.h"
+#include "content/common/input/web_touch_event_traits.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_switches.h"
 #include "grit/content_resources.h"
 #include "third_party/WebKit/public/platform/WebCursorInfo.h"
 #include "ui/events/gesture_detection/gesture_config_helper.h"
 #include "ui/gfx/image/image.h"
+#include "ui/gfx/screen.h"
 
 using blink::WebGestureEvent;
 using blink::WebInputEvent;
@@ -47,8 +49,17 @@ TouchEmulator::TouchEmulator(TouchEmulatorClient* client)
   DCHECK(client_);
   ResetState();
 
-  InitCursorFromResource(&touch_cursor_, IDR_DEVTOOLS_TOUCH_CURSOR_ICON);
-  InitCursorFromResource(&pinch_cursor_, IDR_DEVTOOLS_PINCH_CURSOR_ICON);
+  bool use_2x = gfx::Screen::GetNativeScreen()->
+      GetPrimaryDisplay().device_scale_factor() > 1.5f;
+  float cursor_scale_factor = use_2x ? 2.f : 1.f;
+  InitCursorFromResource(&touch_cursor_,
+      cursor_scale_factor,
+      use_2x ? IDR_DEVTOOLS_TOUCH_CURSOR_ICON_2X :
+          IDR_DEVTOOLS_TOUCH_CURSOR_ICON);
+  InitCursorFromResource(&pinch_cursor_,
+      cursor_scale_factor,
+      use_2x ? IDR_DEVTOOLS_PINCH_CURSOR_ICON_2X :
+          IDR_DEVTOOLS_PINCH_CURSOR_ICON);
 
   WebCursor::CursorInfo cursor_info;
   cursor_info.type = blink::WebCursorInfo::TypePointer;
@@ -96,13 +107,13 @@ void TouchEmulator::Disable() {
   CancelTouch();
 }
 
-void TouchEmulator::InitCursorFromResource(WebCursor* cursor, int resource_id) {
+void TouchEmulator::InitCursorFromResource(
+    WebCursor* cursor, float scale, int resource_id) {
   gfx::Image& cursor_image =
       content::GetContentClient()->GetNativeImageNamed(resource_id);
   WebCursor::CursorInfo cursor_info;
   cursor_info.type = blink::WebCursorInfo::TypeCustom;
-  // TODO(dgozman): Add HiDPI cursors.
-  cursor_info.image_scale_factor = 1.f;
+  cursor_info.image_scale_factor = scale;
   cursor_info.custom_image = cursor_image.AsBitmap();
   cursor_info.hotspot =
       gfx::Point(cursor_image.Width() / 2, cursor_image.Height() / 2);
@@ -251,10 +262,10 @@ void TouchEmulator::CancelTouch() {
   if (!touch_active_)
     return;
 
-  touch_event_.timeStampSeconds =
-      (base::TimeTicks::Now() - base::TimeTicks()).InSecondsF();
-  touch_event_.type = WebInputEvent::TouchCancel;
-  touch_event_.touches[0].state = WebTouchPoint::StateCancelled;
+  WebTouchEventTraits::ResetTypeAndTouchStates(
+      WebInputEvent::TouchCancel,
+      (base::TimeTicks::Now() - base::TimeTicks()).InSecondsF(),
+      &touch_event_);
   touch_active_ = false;
   if (gesture_provider_.OnTouchEvent(MotionEventWeb(touch_event_)))
     client_->ForwardTouchEvent(touch_event_);
@@ -329,9 +340,26 @@ bool TouchEmulator::FillTouchEventAndPoint(const WebMouseEvent& mouse_event) {
     return false;
   }
 
+  WebInputEvent::Type eventType;
+  switch (mouse_event.type) {
+    case WebInputEvent::MouseDown:
+      eventType = WebInputEvent::TouchStart;
+      touch_active_ = true;
+      break;
+    case WebInputEvent::MouseMove:
+      eventType = WebInputEvent::TouchMove;
+      break;
+    case WebInputEvent::MouseUp:
+      eventType = WebInputEvent::TouchEnd;
+      break;
+    default:
+      eventType = WebInputEvent::Undefined;
+      NOTREACHED();
+  }
   touch_event_.touchesLength = 1;
-  touch_event_.timeStampSeconds = mouse_event.timeStampSeconds;
   touch_event_.modifiers = mouse_event.modifiers;
+  WebTouchEventTraits::ResetTypeAndTouchStates(
+      eventType, mouse_event.timeStampSeconds, &touch_event_);
 
   WebTouchPoint& point = touch_event_.touches[0];
   point.id = 0;
@@ -343,24 +371,6 @@ bool TouchEmulator::FillTouchEventAndPoint(const WebMouseEvent& mouse_event) {
   point.position.y = mouse_event.y;
   point.screenPosition.y = mouse_event.globalY;
 
-  switch (mouse_event.type) {
-    case WebInputEvent::MouseDown:
-      touch_event_.type = WebInputEvent::TouchStart;
-      touch_active_ = true;
-      point.state = WebTouchPoint::StatePressed;
-      break;
-    case WebInputEvent::MouseMove:
-      touch_event_.type = WebInputEvent::TouchMove;
-      point.state = WebTouchPoint::StateMoved;
-      break;
-    case WebInputEvent::MouseUp:
-      touch_event_.type = WebInputEvent::TouchEnd;
-      touch_active_ = false;
-      point.state = WebTouchPoint::StateReleased;
-      break;
-    default:
-      NOTREACHED();
-  }
   return true;
 }
 

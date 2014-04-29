@@ -24,7 +24,7 @@
 #include "base/threading/thread_restrictions.h"
 #include "base/timer/hi_res_timer_manager.h"
 #include "content/browser/browser_thread_impl.h"
-#include "content/browser/device_orientation/device_inertial_sensor_service.h"
+#include "content/browser/device_sensors/device_inertial_sensor_service.h"
 #include "content/browser/download/save_file_manager.h"
 #include "content/browser/gamepad/gamepad_service.h"
 #include "content/browser/gpu/browser_gpu_channel_host_factory.h"
@@ -39,7 +39,6 @@
 #include "content/browser/net/browser_online_state_observer.h"
 #include "content/browser/plugin_service_impl.h"
 #include "content/browser/renderer_host/media/media_stream_manager.h"
-#include "content/browser/renderer_host/render_process_host_impl.h"
 #include "content/browser/speech/speech_recognition_manager_impl.h"
 #include "content/browser/startup_task_runner.h"
 #include "content/browser/webui/content_web_ui_controller_factory.h"
@@ -64,6 +63,14 @@
 
 #if defined(USE_AURA) || (defined(OS_MACOSX) && !defined(OS_IOS))
 #include "content/browser/compositor/image_transport_factory.h"
+#endif
+
+#if defined(USE_AURA)
+#include "ui/aura/env.h"
+#endif
+
+#if !defined(OS_IOS)
+#include "content/browser/renderer_host/render_process_host_impl.h"
 #endif
 
 #if defined(OS_ANDROID)
@@ -111,10 +118,12 @@
 
 #if defined(USE_X11)
 #include "ui/gfx/x/x11_connection.h"
+#include "ui/gfx/x/x11_types.h"
 #endif
 
 #if defined(USE_OZONE)
 #include "ui/ozone/ozone_platform.h"
+#include "ui/events/ozone/event_factory_ozone.h"
 #endif
 
 // One of the linux specific headers defines this as a macro.
@@ -713,8 +722,10 @@ void BrowserMainLoop::ShutdownThreadsAndCleanUp() {
       base::Bind(base::IgnoreResult(&base::ThreadRestrictions::SetIOAllowed),
                  true));
 
+#if !defined(OS_IOS)
   if (RenderProcessHost::run_renderer_in_process())
     RenderProcessHostImpl::ShutDownInProcessRenderer();
+#endif
 
   if (parts_) {
     TRACE_EVENT0("shutdown",
@@ -1018,7 +1029,7 @@ int BrowserMainLoop::BrowserThreadsStarted() {
   return result_code_;
 }
 
-void BrowserMainLoop::InitializeToolkit() {
+bool BrowserMainLoop::InitializeToolkit() {
   TRACE_EVENT0("startup", "BrowserMainLoop::InitializeToolkit")
   // TODO(evan): this function is rather subtle, due to the variety
   // of intersecting ifdefs we have.  To keep it easy to follow, there
@@ -1042,8 +1053,22 @@ void BrowserMainLoop::InitializeToolkit() {
     LOG_GETLASTERROR(FATAL);
 #endif
 
+#if defined(USE_AURA)
+
+#if defined(USE_X11)
+  if (!gfx::GetXDisplay())
+    return false;
+#endif
+
+  // Env creates the compositor. Aura widgets need the compositor to be created
+  // before they can be initialized by the browser.
+  aura::Env::CreateInstance();
+#endif  // defined(USE_AURA)
+
   if (parts_)
     parts_->ToolkitInitialized();
+
+  return true;
 }
 
 void BrowserMainLoop::MainMessageLoopRun() {

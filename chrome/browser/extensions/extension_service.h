@@ -84,7 +84,6 @@ class ExtensionServiceInterface
       const std::string& id,
       const base::FilePath& path,
       bool file_ownership_passed,
-      const GURL& download_url,
       extensions::CrxInstaller** out_crx_installer) = 0;
   virtual const extensions::Extension* GetExtensionById(
       const std::string& id,
@@ -190,7 +189,6 @@ class ExtensionService
       const std::string& id,
       const base::FilePath& extension_path,
       bool file_ownership_passed,
-      const GURL& download_url,
       extensions::CrxInstaller** out_crx_installer) OVERRIDE;
 
   // Reloads the specified extension, sending the onLaunched() event to it if it
@@ -350,12 +348,7 @@ class ExtensionService
   // TODO(aa): Remove this. It doesn't do enough to be worth the dependency
   // of these classes on ExtensionService.
   void ReportExtensionLoadError(const base::FilePath& extension_path,
-                                const std::string& error,
-                                bool be_noisy);
-
-  // Notifies ExtensionSettingsHandler whether or not to retry installation for
-  // given |extension_path|.
-  void NotifyLoadRetry(bool retry, const base::FilePath& extension_path);
+                                const std::string& error);
 
   // ExtensionHost of background page calls this method right after its render
   // view has been created.

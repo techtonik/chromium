@@ -373,6 +373,9 @@ const char kDisableSearchButtonInOmnibox[]  =
 // Disable SPDY/3.1. This is a temporary testing flag.
 const char kDisableSpdy31[]                 = "disable-spdy31";
 
+// Disables the suggestions service.
+const char kDisableSuggestionsService[]     = "disable-suggestions-service";
+
 // Disables syncing browser data to a Google Account.
 const char kDisableSync[]                   = "disable-sync";
 
@@ -386,9 +389,6 @@ const char kDisableSyncSyncedNotifications[] =
 // representation of model types, e.g.:
 // --disable-synctypes='Typed URLs, Bookmarks, Autofill Profiles'
 const char kDisableSyncTypes[]              = "disable-sync-types";
-
-// Disables TLS Channel ID extension.
-const char kDisableTLSChannelID[]           = "disable-tls-channel-id";
 
 // Disables some security measures when accessing user media devices like
 // webcams and microphones, especially on non-HTTPS pages.
@@ -423,6 +423,11 @@ const char kDumpBrowserHistograms[]         = "dump-browser-histograms";
 
 // Overrides the path of Easy Unlock component app.
 extern const char kEasyUnlockAppPath[]      = "easy-unlock-app-path";
+
+// Enables the notifications for the custodian of a supervised user when the
+// supervised user sends an access request.
+extern const char kEnableAccessRequestNotifications[] =
+    "enable-access-request-notifications";
 
 // Enables the <adview> tag in packaged apps.
 const char kEnableAdview[]                  = "enable-adview";
@@ -637,6 +642,9 @@ const char kEnableStackedTabStrip[]         = "enable-stacked-tab-strip";
 
 // Enables an experimental hosted app experience.
 const char kEnableStreamlinedHostedApps[]   = "enable-streamlined-hosted-apps";
+
+// Enables the suggestions service.
+const char kEnableSuggestionsService[]      = "enable-suggestions-service";
 
 // Enables synced notifications.
 const char kEnableSyncSyncedNotifications[] =
@@ -1235,9 +1243,6 @@ const char kTrustedSpdyProxy[]              = "trusted-spdy-proxy";
 // be used only by the upgrade process.
 const char kTryChromeAgain[]                = "try-chrome-again";
 
-// Uninstalls an extension with the specified extension id.
-const char kUninstallExtension[]            = "uninstall-extension";
-
 // Runs un-installation steps that were done by chrome first-run.
 const char kUninstall[]                     = "uninstall";
 
@@ -1290,9 +1295,6 @@ const char kPluginsMetadataServerURL[]      = "plugins-metadata-server-url";
 #endif
 
 #if defined(OS_ANDROID)
-// Disables the app banner <meta> tag.
-const char kDisableAppBanners[]              = "disable-app-banners";
-
 // Disables support for playing videos on Chromecast devices.
 const char kDisableCast[]                    = "disable-cast";
 
@@ -1360,6 +1362,9 @@ const char kEnableSpeechDispatcher[] = "enable-speech-dispatcher";
 #endif  // defined(OS_LINUX) && !defined(OS_CHROMEOS)
 
 #if defined(OS_MACOSX)
+// Prevents Chrome from quitting when Chrome Apps are open.
+const char kAppsKeepChromeAlive[]           = "apps-keep-chrome-alive";
+
 // Disables the creation and launch of app shims for platform apps.
 const char kDisableAppShims[]               = "disable-app-shims";
 

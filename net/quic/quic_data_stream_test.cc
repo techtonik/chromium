@@ -286,7 +286,7 @@ TEST_P(QuicDataStreamTest, StreamFlowControlBlocked) {
   if (GetParam() < QUIC_VERSION_17) {
     return;
   }
-  ValueRestore<bool> old_flag(&FLAGS_enable_quic_stream_flow_control, true);
+  ValueRestore<bool> old_flag(&FLAGS_enable_quic_stream_flow_control_2, true);
 
   Initialize(kShouldProcessData);
 
@@ -325,7 +325,7 @@ TEST_P(QuicDataStreamTest, StreamFlowControlNoWindowUpdateIfNotConsumed) {
   if (GetParam() < QUIC_VERSION_17) {
     return;
   }
-  ValueRestore<bool> old_flag(&FLAGS_enable_quic_stream_flow_control, true);
+  ValueRestore<bool> old_flag(&FLAGS_enable_quic_stream_flow_control_2, true);
 
   // Don't process data - it will be buffered instead.
   Initialize(!kShouldProcessData);
@@ -372,7 +372,7 @@ TEST_P(QuicDataStreamTest, StreamFlowControlWindowUpdate) {
   if (GetParam() < QUIC_VERSION_17) {
     return;
   }
-  ValueRestore<bool> old_flag(&FLAGS_enable_quic_stream_flow_control, true);
+  ValueRestore<bool> old_flag(&FLAGS_enable_quic_stream_flow_control_2, true);
 
   Initialize(kShouldProcessData);
 
@@ -419,7 +419,7 @@ TEST_P(QuicDataStreamTest, StreamFlowControlViolation) {
   if (GetParam() < QUIC_VERSION_17) {
     return;
   }
-  ValueRestore<bool> old_flag(&FLAGS_enable_quic_stream_flow_control, true);
+  ValueRestore<bool> old_flag(&FLAGS_enable_quic_stream_flow_control_2, true);
 
   // Stream should not process data, so that data gets buffered in the
   // sequencer, triggering flow control limits.
@@ -440,9 +440,7 @@ TEST_P(QuicDataStreamTest, StreamFlowControlViolation) {
   GenerateBody(&body, kWindow + 1);
   QuicStreamFrame frame(kStreamId, false, 0, MakeIOVector(body));
   EXPECT_CALL(*connection_, SendConnectionClose(QUIC_FLOW_CONTROL_ERROR));
-  EXPECT_DFATAL(stream_->OnStreamFrame(frame),
-                "Server: Flow control violation on stream 3, receive window: "
-                "50, bytes received: 51");
+  stream_->OnStreamFrame(frame);
 }
 
 TEST_P(QuicDataStreamTest, StreamFlowControlFinNotBlocked) {
@@ -451,7 +449,7 @@ TEST_P(QuicDataStreamTest, StreamFlowControlFinNotBlocked) {
   if (GetParam() < QUIC_VERSION_17) {
     return;
   }
-  ValueRestore<bool> old_flag(&FLAGS_enable_quic_stream_flow_control, true);
+  ValueRestore<bool> old_flag(&FLAGS_enable_quic_stream_flow_control_2, true);
 
   Initialize(kShouldProcessData);
 

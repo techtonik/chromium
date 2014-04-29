@@ -446,9 +446,8 @@ bool RenderWidgetHostViewBase::IsMouseLocked() {
   return mouse_locked_;
 }
 
-void RenderWidgetHostViewBase::HandledWheelEvent(
-    const blink::WebMouseWheelEvent& event,
-    bool consumed) {
+void RenderWidgetHostViewBase::UnhandledWheelEvent(
+    const blink::WebMouseWheelEvent& event) {
   // Most implementations don't need to do anything here.
 }
 
@@ -574,11 +573,6 @@ void RenderWidgetHostViewBase::EndFrameSubscription() {
   render_process_host->EndFrameSubscription(impl->GetRoutingID());
 }
 
-void RenderWidgetHostViewBase::OnOverscrolled(
-    gfx::Vector2dF accumulated_overscroll,
-    gfx::Vector2dF current_fling_velocity) {
-}
-
 uint32 RenderWidgetHostViewBase::RendererFrameNumber() {
   return renderer_frame_number_;
 }
@@ -606,6 +600,14 @@ void RenderWidgetHostViewBase::FlushInput() {
 
 SkBitmap::Config RenderWidgetHostViewBase::PreferredReadbackFormat() {
   return SkBitmap::kARGB_8888_Config;
+}
+
+gfx::Size RenderWidgetHostViewBase::GetVisibleViewportSize() const {
+  return GetViewBounds().size();
+}
+
+void RenderWidgetHostViewBase::SetInsets(const gfx::Insets& insets) {
+  NOTIMPLEMENTED();
 }
 
 }  // namespace content

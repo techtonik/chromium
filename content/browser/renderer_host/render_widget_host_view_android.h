@@ -52,6 +52,7 @@ class ContentViewCoreImpl;
 class OverscrollGlow;
 class RenderWidgetHost;
 class RenderWidgetHostImpl;
+struct DidOverscrollParams;
 struct NativeWebKeyboardEvent;
 
 // -----------------------------------------------------------------------------
@@ -86,7 +87,6 @@ class RenderWidgetHostViewAndroid
   virtual gfx::NativeViewId GetNativeViewId() const OVERRIDE;
   virtual gfx::NativeViewAccessible GetNativeViewAccessible() OVERRIDE;
   virtual void MovePluginWindows(
-      const gfx::Vector2d& scroll_offset,
       const std::vector<WebPluginGeometry>& moves) OVERRIDE;
   virtual void Focus() OVERRIDE;
   virtual void Blur() OVERRIDE;
@@ -153,6 +153,8 @@ class RenderWidgetHostViewAndroid
       bool has_horizontal_scrollbar) OVERRIDE;
   virtual void SetScrollOffsetPinning(
       bool is_pinned_to_left, bool is_pinned_to_right) OVERRIDE;
+  virtual void UnhandledWheelEvent(
+      const blink::WebMouseWheelEvent& event) OVERRIDE;
   virtual InputEventAckState FilterInputEvent(
       const blink::WebInputEvent& input_event) OVERRIDE;
   virtual void OnSetNeedsFlushInput() OVERRIDE;
@@ -164,8 +166,6 @@ class RenderWidgetHostViewAndroid
   virtual void OnSwapCompositorFrame(
       uint32 output_surface_id,
       scoped_ptr<cc::CompositorFrame> frame) OVERRIDE;
-  virtual void OnOverscrolled(gfx::Vector2dF accumulated_overscroll,
-                              gfx::Vector2dF current_fling_velocity) OVERRIDE;
   virtual void DidStopFlinging() OVERRIDE;
   virtual void ShowDisambiguationPopup(const gfx::Rect& target_rect,
                                        const SkBitmap& zoomed_bitmap) OVERRIDE;
@@ -218,6 +218,7 @@ class RenderWidgetHostViewAndroid
 
   void OnTextInputStateChanged(const ViewHostMsg_TextInputState_Params& params);
   void OnDidChangeBodyBackgroundColor(SkColor color);
+  void OnDidOverscroll(const DidOverscrollParams& params);
   void OnStartContentIntent(const GURL& content_url);
   void OnSetNeedsBeginFrame(bool enabled);
   void OnSmartClipDataExtracted(const base::string16& result);

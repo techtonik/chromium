@@ -147,6 +147,8 @@ class TaggingEncrypter : public QuicEncrypter {
   };
 
   const uint8 tag_;
+
+  DISALLOW_COPY_AND_ASSIGN(TaggingEncrypter);
 };
 
 // TaggingDecrypter ensures that the final kTagSize bytes of the message all
@@ -348,6 +350,10 @@ class TestPacketWriter : public QuicPacketWriter {
 
   const vector<QuicStreamFrame>& stream_frames() const {
     return framer_.stream_frames();
+  }
+
+  const vector<QuicPingFrame>& ping_frames() const {
+    return framer_.ping_frames();
   }
 
   size_t last_packet_size() {
@@ -646,7 +652,10 @@ class QuicConnectionTest : public ::testing::TestWithParam<QuicVersion> {
   }
 
   void ProcessPacket(QuicPacketSequenceNumber number) {
-    EXPECT_CALL(visitor_, OnStreamFrames(_)).WillOnce(Return(accept_packet_));
+    EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillOnce(
+        Return(accept_packet_));
+    EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(accept_packet_ ? 1 : 0);
+
     ProcessDataPacket(number, 0, !kEntropyFlag);
   }
 
@@ -694,10 +703,14 @@ class QuicConnectionTest : public ::testing::TestWithParam<QuicVersion> {
   size_t ProcessFecProtectedPacket(QuicPacketSequenceNumber number,
                                    bool expect_revival, bool entropy_flag) {
     if (expect_revival) {
-      EXPECT_CALL(visitor_, OnStreamFrames(_)).WillOnce(Return(accept_packet_));
+      EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillOnce(
+          Return(accept_packet_));
+      EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(accept_packet_ ? 1 : 0);
     }
-    EXPECT_CALL(visitor_, OnStreamFrames(_)).WillOnce(Return(accept_packet_))
-        .RetiresOnSaturation();
+    EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillOnce(
+        Return(accept_packet_)).RetiresOnSaturation();
+    EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(accept_packet_ ? 1 : 0).
+          RetiresOnSaturation();
     return ProcessDataPacket(number, 1, entropy_flag);
   }
 
@@ -709,7 +722,9 @@ class QuicConnectionTest : public ::testing::TestWithParam<QuicVersion> {
                           bool entropy_flag,
                           QuicPacket* packet) {
     if (expect_revival) {
-      EXPECT_CALL(visitor_, OnStreamFrames(_)).WillOnce(Return(accept_packet_));
+      EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillOnce(
+          Return(accept_packet_));
+      EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(accept_packet_ ? 1 : 0);
     }
 
     // Construct the decrypted data packet so we can compute the correct
@@ -1695,7 +1710,8 @@ TEST_P(QuicConnectionTest, FramePackingFEC) {
 TEST_P(QuicConnectionTest, FramePackingAckResponse) {
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
   // Process a data packet to queue up a pending ack.
-  EXPECT_CALL(visitor_, OnStreamFrames(_)).WillOnce(Return(true));
+  EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillOnce(Return(true));
+  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(1);
   ProcessDataPacket(1, 1, kEntropyFlag);
 
   EXPECT_CALL(visitor_, OnCanWrite()).WillOnce(DoAll(
@@ -2409,13 +2425,15 @@ TEST_P(QuicConnectionTest, BufferNonDecryptablePackets) {
   connection_.SetDecrypter(new StrictTaggingDecrypter(tag));
   connection_.SetDefaultEncryptionLevel(ENCRYPTION_INITIAL);
   connection_.SetEncrypter(ENCRYPTION_INITIAL, new TaggingEncrypter(tag));
-  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(2).WillRepeatedly(
+  EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).Times(2).WillRepeatedly(
       Return(true));
+  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(2);
   ProcessDataPacketAtLevel(2, false, kEntropyFlag, ENCRYPTION_INITIAL);
 
   // Finally, process a third packet and note that we do not
   // reprocess the buffered packet.
-  EXPECT_CALL(visitor_, OnStreamFrames(_)).WillOnce(Return(true));
+  EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillOnce(Return(true));
+  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(1);
   ProcessDataPacketAtLevel(3, false, kEntropyFlag, ENCRYPTION_INITIAL);
 }
 
@@ -2686,9 +2704,13 @@ TEST_P(QuicConnectionTest, PingAfterSend) {
   clock_.AdvanceTime(QuicTime::Delta::FromSeconds(15));
   connection_.GetPingAlarm()->Fire();
   EXPECT_EQ(1u, writer_->frame_count());
-  ASSERT_EQ(1u, writer_->stream_frames().size());
-  EXPECT_EQ(kCryptoStreamId, writer_->stream_frames()[0].stream_id);
-  EXPECT_EQ(0u, writer_->stream_frames()[0].offset);
+  if (version() > QUIC_VERSION_17) {
+    ASSERT_EQ(1u, writer_->ping_frames().size());
+  } else {
+    ASSERT_EQ(1u, writer_->stream_frames().size());
+    EXPECT_EQ(kCryptoStreamId, writer_->stream_frames()[0].stream_id);
+    EXPECT_EQ(0u, writer_->stream_frames()[0].offset);
+  }
   writer_->Reset();
 
   EXPECT_CALL(visitor_, HasOpenDataStreams()).WillRepeatedly(Return(false));
@@ -3151,9 +3173,6 @@ TEST_P(QuicConnectionTest, GoAway) {
 }
 
 TEST_P(QuicConnectionTest, WindowUpdate) {
-  if (version() == QUIC_VERSION_13) {
-    return;
-  }
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
 
   QuicWindowUpdateFrame window_update;
@@ -3164,9 +3183,6 @@ TEST_P(QuicConnectionTest, WindowUpdate) {
 }
 
 TEST_P(QuicConnectionTest, Blocked) {
-  if (version() == QUIC_VERSION_13) {
-    return;
-  }
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
 
   QuicBlockedFrame blocked;
@@ -3201,7 +3217,8 @@ TEST_P(QuicConnectionTest, MissingPacketsBeforeLeastUnacked) {
 }
 
 TEST_P(QuicConnectionTest, ReceivedEntropyHashCalculation) {
-  EXPECT_CALL(visitor_, OnStreamFrames(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(AtLeast(1));
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
   ProcessDataPacket(1, 1, kEntropyFlag);
   ProcessDataPacket(4, 1, kEntropyFlag);
@@ -3215,7 +3232,8 @@ TEST_P(QuicConnectionTest, ReceivedEntropyHashCalculationHalfFEC) {
     return;
   }
   // FEC packets should not change the entropy hash calculation.
-  EXPECT_CALL(visitor_, OnStreamFrames(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(AtLeast(1));
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
   ProcessDataPacket(1, 1, kEntropyFlag);
   ProcessFecPacket(4, 1, false, kEntropyFlag, NULL);
@@ -3225,7 +3243,8 @@ TEST_P(QuicConnectionTest, ReceivedEntropyHashCalculationHalfFEC) {
 }
 
 TEST_P(QuicConnectionTest, UpdateEntropyForReceivedPackets) {
-  EXPECT_CALL(visitor_, OnStreamFrames(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(AtLeast(1));
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
   ProcessDataPacket(1, 1, kEntropyFlag);
   ProcessDataPacket(5, 1, kEntropyFlag);
@@ -3254,7 +3273,8 @@ TEST_P(QuicConnectionTest, UpdateEntropyForReceivedPackets) {
 }
 
 TEST_P(QuicConnectionTest, UpdateEntropyHashUptoCurrentPacket) {
-  EXPECT_CALL(visitor_, OnStreamFrames(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(AtLeast(1));
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
   ProcessDataPacket(1, 1, kEntropyFlag);
   ProcessDataPacket(5, 1, !kEntropyFlag);
@@ -3281,7 +3301,8 @@ TEST_P(QuicConnectionTest, UpdateEntropyHashUptoCurrentPacket) {
 }
 
 TEST_P(QuicConnectionTest, EntropyCalculationForTruncatedAck) {
-  EXPECT_CALL(visitor_, OnStreamFrames(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(AtLeast(1));
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
   QuicPacketEntropyHash entropy[51];
   entropy[0] = 0;
@@ -3482,7 +3503,8 @@ TEST_P(QuicConnectionTest, ClientHandlesVersionNegotiation) {
   scoped_ptr<QuicPacket> packet(
       framer_.BuildUnsizedDataPacket(header, frames).packet);
   encrypted.reset(framer_.EncryptPacket(ENCRYPTION_NONE, 12, *packet));
-  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(1);
+  EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).Times(1);
+  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(0);
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
   connection_.ProcessUdpPacket(IPEndPoint(), IPEndPoint(), *encrypted);
 
@@ -3635,7 +3657,8 @@ TEST_P(QuicConnectionTest, ProcessFramesIfPacketClosedConnection) {
       ENCRYPTION_NONE, 1, *packet));
 
   EXPECT_CALL(visitor_, OnConnectionClosed(QUIC_PEER_GOING_AWAY, true));
-  EXPECT_CALL(visitor_, OnStreamFrames(_)).WillOnce(Return(true));
+  EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillOnce(Return(true));
+  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(1);
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
 
   connection_.ProcessUdpPacket(IPEndPoint(), IPEndPoint(), *encrypted);
@@ -3666,7 +3689,8 @@ TEST_P(QuicConnectionTest, DontProcessStreamFrameAndIgnoreCloseFrame) {
   scoped_ptr<QuicEncryptedPacket> encrypted(framer_.EncryptPacket(
       ENCRYPTION_NONE, 1, *packet));
 
-  EXPECT_CALL(visitor_, OnStreamFrames(_)).WillOnce(Return(false));
+  EXPECT_CALL(visitor_, WillAcceptStreamFrames(_)).WillOnce(Return(false));
+  EXPECT_CALL(visitor_, OnStreamFrames(_)).Times(0);
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
 
   connection_.ProcessUdpPacket(IPEndPoint(), IPEndPoint(), *encrypted);
@@ -3917,7 +3941,7 @@ TEST_P(QuicConnectionTest, AckNotifierFECTriggerCallback) {
   // Create a delegate which we expect to be called.
   scoped_refptr<MockAckNotifierDelegate> delegate(
       new MockAckNotifierDelegate);
-  EXPECT_CALL(*delegate, OnAckNotification(_, _, _, _, _)).Times(1);;
+  EXPECT_CALL(*delegate, OnAckNotification(_, _, _, _, _)).Times(1);
 
   // Send some data, which will register the delegate to be notified.
   connection_.SendStreamDataWithString(1, "foo", 0, !kFin, delegate.get());
@@ -4061,9 +4085,6 @@ TEST_P(QuicConnectionTest, Pacing) {
 }
 
 TEST_P(QuicConnectionTest, ControlFramesInstigateAcks) {
-  if (version() == QUIC_VERSION_13) {
-    return;
-  }
   EXPECT_CALL(visitor_, OnSuccessfulVersionNegotiation(_));
 
   // Send a WINDOW_UPDATE frame.

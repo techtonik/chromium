@@ -485,7 +485,7 @@ void WebRtcAudioCapturer::Capture(media::AudioBus* audio_source,
     // Note that, we turn off the audio processing in PeerConnection if the
     // processor has already processed the data.
     need_audio_processing = need_audio_processing_ ?
-        !audio_processor_->IsAudioTrackProcessingEnabled() : false;
+        !MediaStreamAudioProcessor::IsAudioTrackProcessingEnabled() : false;
   }
 
   DCHECK(audio_processor_->InputFormat().IsValid());
@@ -609,11 +609,10 @@ void WebRtcAudioCapturer::SetCapturerSourceForTesting(
                     static_cast<float>(params.sample_rate()));
 }
 
-void WebRtcAudioCapturer::StartAecDump(
-    const base::PlatformFile& aec_dump_file) {
+void WebRtcAudioCapturer::StartAecDump(base::File aec_dump_file) {
   DCHECK(thread_checker_.CalledOnValidThread());
-  DCHECK_NE(aec_dump_file, base::kInvalidPlatformFileValue);
-  audio_processor_->StartAecDump(aec_dump_file);
+  DCHECK(aec_dump_file.IsValid());
+  audio_processor_->StartAecDump(aec_dump_file.Pass());
 }
 
 void WebRtcAudioCapturer::StopAecDump() {

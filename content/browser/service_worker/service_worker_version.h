@@ -18,6 +18,7 @@
 #include "content/common/content_export.h"
 #include "content/common/service_worker/service_worker_status_code.h"
 #include "content/common/service_worker/service_worker_types.h"
+#include "third_party/WebKit/public/platform/WebServiceWorkerEventResult.h"
 
 class GURL;
 
@@ -40,7 +41,7 @@ class ServiceWorkerVersionInfo;
 // This happens when a version is replaced as well as at browser shutdown.
 class CONTENT_EXPORT ServiceWorkerVersion
     : NON_EXPORTED_BASE(public base::RefCounted<ServiceWorkerVersion>),
-      public EmbeddedWorkerInstance::Observer {
+      public EmbeddedWorkerInstance::Listener {
  public:
   typedef base::Callback<void(ServiceWorkerStatusCode)> StatusCallback;
   typedef base::Callback<void(ServiceWorkerStatusCode,
@@ -125,18 +126,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // calling StartWorker internally.
   // |callback| can be null if the sender does not need to know if the
   // message is successfully sent or not.
-  // (If the sender expects the receiver to respond please use
-  // SendMessageAndRegisterCallback instead)
   void SendMessage(const IPC::Message& message, const StatusCallback& callback);
-
-  // Sends an IPC message to the worker and registers |callback| to
-  // be notified when a response message is received.
-  // The |callback| will be also fired with an error code if the worker
-  // is unexpectedly (being) stopped.
-  // If the worker is not running this first tries to start it by
-  // calling StartWorker internally.
-  void SendMessageAndRegisterCallback(const IPC::Message& message,
-                                      const MessageCallback& callback);
 
   // Sends install event to the associated embedded worker and asynchronously
   // calls |callback| when it errors out or it gets response from the worker
@@ -185,14 +175,14 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // Returns true if this has at least one process to run.
   bool HasProcessToRun() const;
 
-  // Adds and removes a controllee's |provider_host|.
+  // Adds and removes |provider_host| as a controllee of this ServiceWorker.
   void AddControllee(ServiceWorkerProviderHost* provider_host);
   void RemoveControllee(ServiceWorkerProviderHost* provider_host);
   void AddPendingControllee(ServiceWorkerProviderHost* provider_host);
   void RemovePendingControllee(ServiceWorkerProviderHost* provider_host);
 
   // Returns if it has (non-pending) controllee.
-  bool HasControllee() const { return !controllee_providers_.empty(); }
+  bool HasControllee() const { return !controllee_map_.empty(); }
 
   // Adds and removes Listeners.
   void AddListener(Listener* listener);
@@ -200,11 +190,9 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   EmbeddedWorkerInstance* embedded_worker() { return embedded_worker_.get(); }
 
-  // EmbeddedWorkerInstance::Observer overrides:
+  // EmbeddedWorkerInstance::Listener overrides:
   virtual void OnStarted() OVERRIDE;
   virtual void OnStopped() OVERRIDE;
-  virtual void OnMessageReceived(int request_id,
-                                 const IPC::Message& message) OVERRIDE;
   virtual void OnReportException(const base::string16& error_message,
                                  int line_number,
                                  int column_number,
@@ -214,13 +202,26 @@ class CONTENT_EXPORT ServiceWorkerVersion
                                       const base::string16& message,
                                       int line_number,
                                       const GURL& source_url) OVERRIDE;
+  virtual bool OnMessageReceived(const IPC::Message& message) OVERRIDE;
 
  private:
   typedef ServiceWorkerVersion self;
-  typedef std::set<ServiceWorkerProviderHost*> ProviderHostSet;
+  typedef std::map<ServiceWorkerProviderHost*, int> ControlleeMap;
+  typedef IDMap<ServiceWorkerProviderHost> ControlleeByIDMap;
   friend class base::RefCounted<ServiceWorkerVersion>;
 
   virtual ~ServiceWorkerVersion();
+
+  // Message handlers.
+  void OnGetClientDocuments(int request_id);
+  void OnActivateEventFinished(int request_id,
+                               blink::WebServiceWorkerEventResult result);
+  void OnInstallEventFinished(int request_id,
+                              blink::WebServiceWorkerEventResult result);
+  void OnFetchEventFinished(int request_id,
+                            ServiceWorkerFetchEventResult result,
+                            const ServiceWorkerResponse& response);
+  void OnSyncEventFinished(int request_id);
 
   const int64 version_id_;
   int64 registration_id_;
@@ -231,8 +232,15 @@ class CONTENT_EXPORT ServiceWorkerVersion
   std::vector<StatusCallback> start_callbacks_;
   std::vector<StatusCallback> stop_callbacks_;
   std::vector<base::Closure> status_change_callbacks_;
-  IDMap<MessageCallback, IDMapOwnPointer> message_callbacks_;
-  ProviderHostSet controllee_providers_;
+
+  // Message callbacks.
+  IDMap<StatusCallback, IDMapOwnPointer> activate_callbacks_;
+  IDMap<StatusCallback, IDMapOwnPointer> install_callbacks_;
+  IDMap<FetchCallback, IDMapOwnPointer> fetch_callbacks_;
+  IDMap<StatusCallback, IDMapOwnPointer> sync_callbacks_;
+
+  ControlleeMap controllee_map_;
+  ControlleeByIDMap controllee_by_id_;
   base::WeakPtr<ServiceWorkerContextCore> context_;
   ObserverList<Listener> listeners_;
 

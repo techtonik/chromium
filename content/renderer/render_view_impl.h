@@ -22,6 +22,7 @@
 #include "base/timer/timer.h"
 #include "build/build_config.h"
 #include "cc/input/top_controls_state.h"
+#include "cc/resources/shared_bitmap.h"
 #include "content/common/content_export.h"
 #include "content/common/drag_event_source_info.h"
 #include "content/common/edit_command.h"
@@ -562,7 +563,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual void DidFlushPaint() OVERRIDE;
   virtual gfx::Vector2d GetScrollOffset() OVERRIDE;
   virtual void DidHandleKeyEvent() OVERRIDE;
-  virtual void WillProcessUserGesture() OVERRIDE;
   virtual bool WillHandleMouseEvent(
       const blink::WebMouseEvent& event) OVERRIDE;
   virtual bool WillHandleGestureEvent(
@@ -604,9 +604,7 @@ class CONTENT_EXPORT RenderViewImpl
  protected:
   explicit RenderViewImpl(RenderViewImplParams* params);
 
-  void Initialize(
-      RenderViewImplParams* params,
-      RenderFrameImpl* main_render_frame);
+  void Initialize(RenderViewImplParams* params);
   virtual void SetScreenMetricsEmulationParameters(
       float device_scale_factor,
       const gfx::Point& root_layer_offset,
@@ -685,33 +683,15 @@ class CONTENT_EXPORT RenderViewImpl
   // still live here and are called from RenderFrameImpl. These implementations
   // are to be moved to RenderFrameImpl <http://crbug.com/361761>.
 
-  void didAccessInitialDocument(blink::WebLocalFrame* frame);
   void didDisownOpener(blink::WebLocalFrame* frame);
-  void frameDetached(blink::WebFrame* frame);
-  void willClose(blink::WebFrame* frame);
-  void didMatchCSS(
-      blink::WebLocalFrame* frame,
-      const blink::WebVector<blink::WebString>& newly_matching_selectors,
-      const blink::WebVector<blink::WebString>& stopped_matching_selectors);
-  void willSendSubmitEvent(blink::WebLocalFrame* frame,
-                           const blink::WebFormElement& form);
-  void willSubmitForm(blink::WebLocalFrame* frame,
-                      const blink::WebFormElement& form);
   void didCreateDataSource(blink::WebLocalFrame* frame,
                            blink::WebDataSource* datasource);
-  void didFailProvisionalLoad(blink::WebLocalFrame* frame,
-                              const blink::WebURLError& error);
   void didClearWindowObject(blink::WebLocalFrame* frame, int world_id);
-  void didCreateDocumentElement(blink::WebLocalFrame* frame);
   void didReceiveTitle(blink::WebLocalFrame* frame,
                        const blink::WebString& title,
                        blink::WebTextDirection direction);
   void didChangeIcon(blink::WebLocalFrame*, blink::WebIconURL::Type);
-  void didFinishDocumentLoad(blink::WebLocalFrame* frame);
   void didHandleOnloadEvents(blink::WebLocalFrame* frame);
-  void didFailLoad(blink::WebLocalFrame* frame,
-                   const blink::WebURLError& error);
-  void didFinishLoad(blink::WebLocalFrame* frame);
   void didUpdateCurrentHistoryItem(blink::WebLocalFrame* frame);
   void didFinishResourceLoad(blink::WebLocalFrame* frame,
                              unsigned identifier);
@@ -819,7 +799,7 @@ class CONTENT_EXPORT RenderViewImpl
                         const blink::WebPluginAction& action);
   void OnMoveOrResizeStarted();
   void OnPostMessageEvent(const ViewMsg_PostMessage_Params& params);
-  void OnReleaseDisambiguationPopupDIB(TransportDIB::Handle dib_handle);
+  void OnReleaseDisambiguationPopupBitmap(const cc::SharedBitmapId& id);
   void OnResetPageEncodingToDefault();
   void OnSetAccessibilityMode(AccessibilityMode new_mode);
   void OnSetActive(bool active);
@@ -1317,6 +1297,9 @@ class CONTENT_EXPORT RenderViewImpl
   // NOTE: stats_collection_observer_ should be the last members because their
   // constructors call the AddObservers method of RenderViewImpl.
   scoped_ptr<StatsCollectionObserver> stats_collection_observer_;
+
+  typedef std::map<cc::SharedBitmapId, cc::SharedBitmap*> BitmapMap;
+  BitmapMap disambiguation_bitmaps_;
 
   // ---------------------------------------------------------------------------
   // ADDING NEW DATA? Please see if it fits appropriately in one of the above

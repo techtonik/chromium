@@ -310,6 +310,7 @@ extern const char kCurrentThemeColors[];
 extern const char kCurrentThemeTints[];
 extern const char kCurrentThemeDisplayProperties[];
 extern const char kExtensionsUIDeveloperMode[];
+extern const char kExtensionsUIDismissedADTPromo[];
 extern const char kExtensionCommands[];
 extern const char kPluginsLastInternalDirectory[];
 extern const char kPluginsPluginsList[];
@@ -416,7 +417,6 @@ extern const char kCertRevocationCheckingRequiredLocalAnchors[];
 extern const char kSSLVersionMin[];
 extern const char kSSLVersionMax[];
 extern const char kCipherSuiteBlacklist[];
-extern const char kEnableOriginBoundCerts[];
 extern const char kDisableSSLRecordSplitting[];
 
 extern const char kGLVendorString[];
@@ -718,6 +718,7 @@ extern const char kOobeComplete[];
 extern const char kDeviceRegistered[];
 extern const char kUsedPolicyCertificates[];
 extern const char kServerBackedDeviceState[];
+extern const char kCustomizationDefaultWallpaperURL[];
 #endif
 
 extern const char kClearPluginLSODataEnabled[];
@@ -754,6 +755,7 @@ extern const char kCustomHandlersEnabled[];
 extern const char kUserRemovedLoginItem[];
 extern const char kChromeCreatedLoginItem[];
 extern const char kMigratedLoginItemPref[];
+extern const char kNotifyWhenAppsKeepChromeAlive[];
 #endif
 
 extern const char kBackgroundModeEnabled[];
@@ -766,6 +768,8 @@ extern const char kFactoryResetRequested[];
 extern const char kRollbackRequested[];
 
 extern const char kMessageCenterShowedFirstRunBalloon[];
+extern const char kMessageCenterShowIcon[];
+extern const char kMessageCenterForcedOnTaskbar[];
 
 extern const char kRecoveryComponentVersion[];
 extern const char kComponentUpdaterState[];

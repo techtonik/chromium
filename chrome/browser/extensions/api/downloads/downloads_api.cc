@@ -4,9 +4,6 @@
 
 #include "chrome/browser/extensions/api/downloads/downloads_api.h"
 
-#include <algorithm>
-#include <cctype>
-#include <iterator>
 #include <set>
 #include <string>
 
@@ -41,7 +38,6 @@
 #include "chrome/browser/download/drag_download_item.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_warning_service.h"
-#include "chrome/browser/extensions/extension_warning_set.h"
 #include "chrome/browser/icon_loader.h"
 #include "chrome/browser/icon_manager.h"
 #include "chrome/browser/platform_util.h"
@@ -68,14 +64,11 @@
 #include "content/public/browser/web_contents_view.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_function_dispatcher.h"
-#include "extensions/browser/extension_prefs.h"
+#include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
-#include "extensions/common/extension.h"
-#include "extensions/common/permissions/permissions_data.h"
 #include "net/base/filename_util.h"
 #include "net/base/load_flags.h"
 #include "net/http/http_util.h"
-#include "net/url_request/url_request.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/webui/web_ui_util.h"
 #include "ui/gfx/image/image_skia.h"
@@ -439,6 +432,7 @@ enum DownloadsFunctionName {
   DOWNLOADS_FUNCTION_REMOVE_FILE = 12,
   DOWNLOADS_FUNCTION_SHOW_DEFAULT_FOLDER = 13,
   DOWNLOADS_FUNCTION_SET_SHELF_ENABLED = 14,
+  DOWNLOADS_FUNCTION_DETERMINE_FILENAME = 15,
   // Insert new values here, not at the beginning.
   DOWNLOADS_FUNCTION_LAST
 };
@@ -507,8 +501,7 @@ void RunDownloadQuery(
     query_out.Limit(limit);
   }
 
-  std::string state_string =
-      downloads::ToString(query_in.state);
+  std::string state_string = downloads::ToString(query_in.state);
   if (!state_string.empty()) {
     DownloadItem::DownloadState state = StateEnumFromString(state_string);
     if (state == DownloadItem::MAX_DOWNLOAD_STATE) {
@@ -723,7 +716,8 @@ class ExtensionDownloadsEventRouterData : public base::SupportsUserData::Data {
         // Do not use filename if another determiner has already overridden the
         // filename and they take precedence. Extensions that were installed
         // later take precedence over previous extensions.
-        if (!filename.empty()) {
+        if (!filename.empty() ||
+            (conflict_action != downloads::FILENAME_CONFLICT_ACTION_UNIQUIFY)) {
           extensions::ExtensionWarningSet warnings;
           std::string winner_extension_id;
           ExtensionDownloadsEventRouter::DetermineFilenameInternal(
@@ -775,7 +769,9 @@ class ExtensionDownloadsEventRouterData : public base::SupportsUserData::Data {
       if (!iter->reported)
         return;
     }
-    if (determined_filename_.empty()) {
+    if (determined_filename_.empty() &&
+        (determined_conflict_action_ ==
+         downloads::FILENAME_CONFLICT_ACTION_UNIQUIFY)) {
       if (!filename_no_change_.is_null())
         filename_no_change_.Run();
     } else {
@@ -1048,7 +1044,9 @@ void DownloadsDownloadFunction::OnStarted(
   if (item) {
     DCHECK_EQ(content::DOWNLOAD_INTERRUPT_REASON_NONE, interrupt_reason);
     SetResult(new base::FundamentalValue(static_cast<int>(item->GetId())));
-    if (!creator_suggested_filename.empty()) {
+    if (!creator_suggested_filename.empty() ||
+        (creator_conflict_action !=
+         downloads::FILENAME_CONFLICT_ACTION_UNIQUIFY)) {
       ExtensionDownloadsEventRouterData* data =
           ExtensionDownloadsEventRouterData::Get(item);
       if (!data) {
@@ -1516,11 +1514,12 @@ ExtensionDownloadsEventRouter::ExtensionDownloadsEventRouter(
     Profile* profile,
     DownloadManager* manager)
     : profile_(profile),
-      notifier_(manager, this) {
+      notifier_(manager, this),
+      extension_registry_observer_(this) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   DCHECK(profile_);
-  registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED,
-                 content::Source<Profile>(profile_));
+  extension_registry_observer_.Add(
+      extensions::ExtensionRegistry::Get(profile_));
   extensions::EventRouter* router = extensions::EventRouter::Get(profile_);
   if (router)
     router->RegisterObserver(this,
@@ -1601,7 +1600,9 @@ void ExtensionDownloadsEventRouter::OnDeterminingFilename(
                 json);
   if (!any_determiners) {
     data->ClearPendingDeterminers();
-    if (!data->creator_suggested_filename().empty()) {
+    if (!data->creator_suggested_filename().empty() ||
+        (data->creator_conflict_action() !=
+         downloads::FILENAME_CONFLICT_ACTION_UNIQUIFY)) {
       change.Run(data->creator_suggested_filename(),
                  ConvertConflictAction(data->creator_conflict_action()));
       // If all listeners are removed, don't keep |data| around.
@@ -1624,7 +1625,8 @@ void ExtensionDownloadsEventRouter::DetermineFilenameInternal(
     downloads::FilenameConflictAction*
       determined_conflict_action,
     extensions::ExtensionWarningSet* warnings) {
-  DCHECK(!filename.empty());
+  DCHECK(!filename.empty() ||
+         (conflict_action != downloads::FILENAME_CONFLICT_ACTION_UNIQUIFY));
   DCHECK(!suggesting_extension_id.empty());
 
   if (incumbent_extension_id.empty()) {
@@ -1665,6 +1667,7 @@ bool ExtensionDownloadsEventRouter::DetermineFilename(
     downloads::FilenameConflictAction conflict_action,
     std::string* error) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  RecordApiFunctions(DOWNLOADS_FUNCTION_DETERMINE_FILENAME);
   DownloadItem* item = GetDownload(profile, include_incognito, download_id);
   ExtensionDownloadsEventRouterData* data =
       item ? ExtensionDownloadsEventRouterData::Get(item) : NULL;
@@ -1887,20 +1890,13 @@ void ExtensionDownloadsEventRouter::DispatchEvent(
       content::Details<std::string>(&json_args));
 }
 
-void ExtensionDownloadsEventRouter::Observe(
-    int type,
-    const content::NotificationSource& source,
-    const content::NotificationDetails& details) {
+void ExtensionDownloadsEventRouter::OnExtensionUnloaded(
+    content::BrowserContext* browser_context,
+    const extensions::Extension* extension,
+    extensions::UnloadedExtensionInfo::Reason reason) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  switch (type) {
-    case chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED: {
-      extensions::UnloadedExtensionInfo* unloaded =
-          content::Details<extensions::UnloadedExtensionInfo>(details).ptr();
-      std::set<const extensions::Extension*>::iterator iter =
-        shelf_disabling_extensions_.find(unloaded->extension);
-      if (iter != shelf_disabling_extensions_.end())
-        shelf_disabling_extensions_.erase(iter);
-      break;
-    }
-  }
+  std::set<const extensions::Extension*>::iterator iter =
+      shelf_disabling_extensions_.find(extension);
+  if (iter != shelf_disabling_extensions_.end())
+    shelf_disabling_extensions_.erase(iter);
 }

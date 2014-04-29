@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// ASAN internally uses some syscalls which non-SFI NaCl disallows.
+// Seccomp-BPF tests die under TSAN v2. See http://crbug.com/356588
+#if !defined(ADDRESS_SANITIZER) && !defined(THREAD_SANITIZER)
+
 #include "components/nacl/loader/nonsfi/nonsfi_sandbox.h"
 
 #include "sandbox/linux/seccomp-bpf-helpers/sigsys_handlers.h"
@@ -18,7 +22,7 @@ namespace {
       NaClNonSfiSandboxSIGSYSTest, name,                                \
       DEATH_MESSAGE(sandbox::GetErrorMessageContentForTests()),         \
       nacl::nonsfi::NaClNonSfiBPFSandboxPolicy::EvaluateSyscallImpl) {  \
-    syscall(sysno, 0, 0, 0, 0, 0);                                      \
+    syscall(sysno, 0, 0, 0, 0, 0, 0);                                   \
   }
 
 #define RESTRICT_SYSCALL_DEATH_TEST(name)               \
@@ -84,10 +88,12 @@ RESTRICT_SYSCALL_DEATH_TEST(create_module);
 RESTRICT_SYSCALL_DEATH_TEST(delete_module);
 RESTRICT_SYSCALL_DEATH_TEST(dup3);
 RESTRICT_SYSCALL_DEATH_TEST(epoll_create1);
+RESTRICT_SYSCALL_DEATH_TEST(epoll_ctl);
 #if defined(__x86_64__)
 RESTRICT_SYSCALL_DEATH_TEST(epoll_ctl_old);
 #endif
 RESTRICT_SYSCALL_DEATH_TEST(epoll_pwait);
+RESTRICT_SYSCALL_DEATH_TEST(epoll_wait);
 #if defined(__x86_64__)
 RESTRICT_SYSCALL_DEATH_TEST(epoll_wait_old);
 #endif
@@ -163,6 +169,7 @@ RESTRICT_SYSCALL_DEATH_TEST(getpeername);
 #endif
 RESTRICT_SYSCALL_DEATH_TEST(getpgid);
 RESTRICT_SYSCALL_DEATH_TEST(getpgrp);
+RESTRICT_SYSCALL_DEATH_TEST(getpid);
 #if defined(__i386__) || defined(__x86_64__)
 RESTRICT_SYSCALL_DEATH_TEST(getpmsg);
 #endif
@@ -204,6 +211,7 @@ RESTRICT_SYSCALL_DEATH_TEST(io_destroy);
 RESTRICT_SYSCALL_DEATH_TEST(io_getevents);
 RESTRICT_SYSCALL_DEATH_TEST(io_setup);
 RESTRICT_SYSCALL_DEATH_TEST(io_submit);
+RESTRICT_SYSCALL_DEATH_TEST(ioctl);
 #if defined(__i386__) || defined(__x86_64__)
 RESTRICT_SYSCALL_DEATH_TEST(ioperm);
 #endif
@@ -326,7 +334,6 @@ RESTRICT_SYSCALL_DEATH_TEST(perf_event_open);
 RESTRICT_SYSCALL_DEATH_TEST(personality);
 RESTRICT_SYSCALL_DEATH_TEST(pipe2);
 RESTRICT_SYSCALL_DEATH_TEST(pivot_root);
-RESTRICT_SYSCALL_DEATH_TEST(poll);
 RESTRICT_SYSCALL_DEATH_TEST(ppoll);
 RESTRICT_SYSCALL_DEATH_TEST(preadv);
 RESTRICT_SYSCALL_DEATH_TEST(prlimit64);
@@ -351,6 +358,7 @@ RESTRICT_SYSCALL_DEATH_TEST(readahead);
 #if defined(__i386__)
 RESTRICT_SYSCALL_DEATH_TEST(readdir);
 #endif
+RESTRICT_SYSCALL_DEATH_TEST(readlink);
 RESTRICT_SYSCALL_DEATH_TEST(readlinkat);
 RESTRICT_SYSCALL_DEATH_TEST(readv);
 RESTRICT_SYSCALL_DEATH_TEST(reboot);
@@ -604,3 +612,5 @@ RESTRICT_ARM_SYSCALL_DEATH_TEST(set_tls);
 #endif
 
 }  // namespace
+
+#endif  // !ADDRESS_SANITIZER && !THREAD_SANITIZER

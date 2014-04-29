@@ -30,11 +30,14 @@ struct FrameMsg_CompositorFrameSwapped_Params;
 struct FrameMsg_Navigate_Params;
 
 namespace blink {
+class WebGeolocationClient;
 class WebInputEvent;
 class WebMouseEvent;
 class WebContentDecryptionModule;
+class WebMIDIClient;
 class WebNotificationPresenter;
 class WebSecurityOrigin;
+class WebUserMediaClient;
 struct WebCompositionUnderline;
 struct WebContextMenuData;
 struct WebCursorInfo;
@@ -236,9 +239,6 @@ class CONTENT_EXPORT RenderFrameImpl
                                       const blink::WebString& stack_trace);
   virtual void loadURLExternally(blink::WebLocalFrame* frame,
                                  const blink::WebURLRequest& request,
-                                 blink::WebNavigationPolicy policy);
-  virtual void loadURLExternally(blink::WebLocalFrame* frame,
-                                 const blink::WebURLRequest& request,
                                  blink::WebNavigationPolicy policy,
                                  const blink::WebString& suggested_name);
   // The WebDataSource::ExtraData* is assumed to be a DocumentState* subclass.
@@ -342,9 +342,12 @@ class CONTENT_EXPORT RenderFrameImpl
                                    blink::WebStorageQuotaCallbacks callbacks);
   virtual void willOpenSocketStream(
       blink::WebSocketStreamHandle* handle);
+  virtual blink::WebGeolocationClient* geolocationClient();
   virtual void willStartUsingPeerConnectionHandler(
       blink::WebLocalFrame* frame,
       blink::WebRTCPeerConnectionHandler* handler);
+  virtual blink::WebUserMediaClient* userMediaClient();
+  virtual blink::WebMIDIClient* webMIDIClient();
   virtual bool willCheckAndDispatchMessageEvent(
       blink::WebLocalFrame* sourceFrame,
       blink::WebFrame* targetFrame,

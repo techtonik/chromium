@@ -35,11 +35,8 @@ scoped_ptr<DelegatingRenderer> DelegatingRenderer::Create(
     const LayerTreeSettings* settings,
     OutputSurface* output_surface,
     ResourceProvider* resource_provider) {
-  scoped_ptr<DelegatingRenderer> renderer(new DelegatingRenderer(
+  return make_scoped_ptr(new DelegatingRenderer(
       client, settings, output_surface, resource_provider));
-  if (!renderer->Initialize())
-    return scoped_ptr<DelegatingRenderer>();
-  return renderer.Pass();
 }
 
 DelegatingRenderer::DelegatingRenderer(RendererClient* client,
@@ -51,33 +48,27 @@ DelegatingRenderer::DelegatingRenderer(RendererClient* client,
       resource_provider_(resource_provider),
       visible_(true) {
   DCHECK(resource_provider_);
-}
 
-bool DelegatingRenderer::Initialize() {
   capabilities_.using_partial_swap = false;
   capabilities_.max_texture_size = resource_provider_->max_texture_size();
   capabilities_.best_texture_format = resource_provider_->best_texture_format();
   capabilities_.allow_partial_texture_updates = false;
-  capabilities_.using_offscreen_context3d = false;
 
   if (!output_surface_->context_provider()) {
     capabilities_.using_shared_memory_resources = true;
     capabilities_.using_map_image = true;
-    return true;
+  } else {
+    const ContextProvider::Capabilities& caps =
+        output_surface_->context_provider()->ContextCapabilities();
+
+    DCHECK(!caps.gpu.iosurface || caps.gpu.texture_rectangle);
+
+    capabilities_.using_egl_image = caps.gpu.egl_image_external;
+    capabilities_.using_map_image =
+        settings_->use_map_image && caps.gpu.map_image;
+
+    capabilities_.allow_rasterize_on_demand = false;
   }
-
-  const ContextProvider::Capabilities& caps =
-      output_surface_->context_provider()->ContextCapabilities();
-
-  DCHECK(!caps.gpu.iosurface || caps.gpu.texture_rectangle);
-
-  capabilities_.using_egl_image = caps.gpu.egl_image_external;
-  capabilities_.using_map_image =
-      settings_->use_map_image && caps.gpu.map_image;
-
-  capabilities_.allow_rasterize_on_demand = false;
-
-  return true;
 }
 
 DelegatingRenderer::~DelegatingRenderer() {}
@@ -96,7 +87,6 @@ static ResourceProvider::ResourceId AppendToArray(
 }
 
 void DelegatingRenderer::DrawFrame(RenderPassList* render_passes_in_draw_order,
-                                   ContextProvider* offscreen_context_provider,
                                    float device_scale_factor,
                                    const gfx::Rect& device_viewport_rect,
                                    const gfx::Rect& device_clip_rect,

@@ -573,6 +573,13 @@ gfx::Size PictureLayerImpl::CalculateTileSize(
       layer_tree_impl()->resource_provider()->max_texture_size();
 
   gfx::Size default_tile_size = layer_tree_impl()->settings().default_tile_size;
+  if (ShouldUseGpuRasterization()) {
+    // TODO(ernstm) crbug.com/365877: We need a unified way to override the
+    // default-tile-size.
+    default_tile_size =
+        gfx::Size(layer_tree_impl()->device_viewport_size().width(),
+                  layer_tree_impl()->device_viewport_size().height() / 4);
+  }
   default_tile_size.SetToMin(gfx::Size(max_texture_size, max_texture_size));
 
   gfx::Size max_untiled_content_size =
@@ -593,10 +600,12 @@ gfx::Size PictureLayerImpl::CalculateTileSize(
   // 500x500 max untiled size would get 500x12 tiles.  Also do this
   // if the layer is small.
   if (any_dimension_one_tile || !any_dimension_too_large) {
-    int width =
-        std::min(max_untiled_content_size.width(), content_bounds.width());
-    int height =
-        std::min(max_untiled_content_size.height(), content_bounds.height());
+    int width = std::min(
+        std::max(max_untiled_content_size.width(), default_tile_size.width()),
+        content_bounds.width());
+    int height = std::min(
+        std::max(max_untiled_content_size.height(), default_tile_size.height()),
+        content_bounds.height());
     // Round width and height up to the closest multiple of 64, or 56 if
     // we should avoid power-of-two textures. This helps reduce the number
     // of different textures sizes to help recycling, and also keeps all
@@ -667,7 +676,12 @@ void PictureLayerImpl::SyncTiling(
     return;
   tilings_->AddTiling(tiling->contents_scale());
 
-  if (!layer_tree_impl()->needs_update_draw_properties()) {
+  // If this tree needs update draw properties, then the tiling will
+  // get updated prior to drawing or activation.  If this tree does not
+  // need update draw properties, then its transforms are up to date and
+  // we can create tiles for this tiling immediately.
+  if (!layer_tree_impl()->needs_update_draw_properties() &&
+      should_update_tile_priorities_) {
     // When the tree is up to date, the set of tilings must either be empty or
     // contain at least one high resolution tiling.  (If it is up to date,
     // then it would be invalid to sync a tiling if it is the first tiling
@@ -675,15 +689,9 @@ void PictureLayerImpl::SyncTiling(
     SanityCheckTilingState();
     // TODO(enne): temporary sanity CHECK for http://crbug.com/358350
     CHECK_GT(tilings_->num_tilings(), 1u);
-  }
 
-  // If this tree needs update draw properties, then the tiling will
-  // get updated prior to drawing or activation.  If this tree does not
-  // need update draw properties, then its transforms are up to date and
-  // we can create tiles for this tiling immediately.
-  if (!layer_tree_impl()->needs_update_draw_properties() &&
-      should_update_tile_priorities_)
     UpdateTilePriorities();
+  }
 }
 
 void PictureLayerImpl::SetIsMask(bool is_mask) {

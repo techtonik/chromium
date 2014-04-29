@@ -3,7 +3,7 @@
  * found in the LICENSE file.
  */
 
-/* From private/ppb_nacl_private.idl modified Fri Apr 18 11:23:31 2014. */
+/* From private/ppb_nacl_private.idl modified Wed Apr 23 12:20:47 2014. */
 
 #ifndef PPAPI_C_PRIVATE_PPB_NACL_PRIVATE_H_
 #define PPAPI_C_PRIVATE_PPB_NACL_PRIVATE_H_
@@ -14,6 +14,9 @@
 #include "ppapi/c/pp_macros.h"
 #include "ppapi/c/pp_stdint.h"
 #include "ppapi/c/pp_var.h"
+
+#define PP_MANIFESTSERVICE_INTERFACE_1_0 "PP_ManifestService;1.0"
+#define PP_MANIFESTSERVICE_INTERFACE PP_MANIFESTSERVICE_INTERFACE_1_0
 
 #define PPB_NACL_PRIVATE_INTERFACE_1_0 "PPB_NaCl_Private;1.0"
 #define PPB_NACL_PRIVATE_INTERFACE PPB_NACL_PRIVATE_INTERFACE_1_0
@@ -168,6 +171,22 @@ struct PP_PNaClOptions {
  * @addtogroup Interfaces
  * @{
  */
+/* ManifestService to support irt_open_resource() function.
+ * All functions of the service should have PP_Bool return value. It represents
+ * whether the service is still alive or not. Trivially Quit() should always
+ * return false. However, other functions also can return false.
+ * Once false is called, as the service has been destructed, all functions
+ * should never be called afterwords.
+ */
+struct PP_ManifestService_1_0 {
+  /* Called when ManifestService should be destructed. */
+  PP_Bool (*Quit)(void* user_data);
+  /* Called when PPAPI initialization in the NaCl plugin is finished. */
+  PP_Bool (*StartupInitializationComplete)(void* user_data);
+};
+
+typedef struct PP_ManifestService_1_0 PP_ManifestService;
+
 /* PPB_NaCl_Private */
 struct PPB_NaCl_Private_1_0 {
   /* Launches NaCl's sel_ldr process.  Returns PP_EXTERNAL_PLUGIN_OK on success
@@ -189,18 +208,21 @@ struct PPB_NaCl_Private_1_0 {
    * the nexe contribute to crash throttling statisics and whether nexe starts
    * are throttled by crash throttling.
    */
-  void (*LaunchSelLdr)(PP_Instance instance,
-                       const char* alleged_url,
-                       PP_Bool uses_irt,
-                       PP_Bool uses_ppapi,
-                       PP_Bool uses_nonsfi_mode,
-                       PP_Bool enable_ppapi_dev,
-                       PP_Bool enable_dyncode_syscalls,
-                       PP_Bool enable_exception_handling,
-                       PP_Bool enable_crash_throttling,
-                       void* imc_handle,
-                       struct PP_Var* error_message,
-                       struct PP_CompletionCallback callback);
+  void (*LaunchSelLdr)(
+      PP_Instance instance,
+      const char* alleged_url,
+      PP_Bool uses_irt,
+      PP_Bool uses_ppapi,
+      PP_Bool uses_nonsfi_mode,
+      PP_Bool enable_ppapi_dev,
+      PP_Bool enable_dyncode_syscalls,
+      PP_Bool enable_exception_handling,
+      PP_Bool enable_crash_throttling,
+      const struct PP_ManifestService_1_0* manifest_service_interface,
+      void* manifest_service_user_data,
+      void* imc_handle,
+      struct PP_Var* error_message,
+      struct PP_CompletionCallback callback);
   /* This function starts the IPC proxy so the nexe can communicate with the
    * browser.
    */
@@ -300,7 +322,6 @@ struct PPB_NaCl_Private_1_0 {
                           int64_t time_since_open);
   /* Report that the nexe loaded successfully. */
   void (*ReportLoadSuccess)(PP_Instance instance,
-                            PP_Bool is_pnacl,
                             const char* url,
                             uint64_t loaded_bytes,
                             uint64_t total_bytes);
@@ -331,13 +352,8 @@ struct PPB_NaCl_Private_1_0 {
   void (*LogToConsole)(PP_Instance instance, const char* message);
   /* Returns the NaCl readiness status for this instance. */
   PP_NaClReadyState (*GetNaClReadyState)(PP_Instance instance);
-  /* Sets the NaCl readiness status for this instance. */
-  void (*SetNaClReadyState)(PP_Instance instance,
-                            PP_NaClReadyState ready_state);
   /* Returns true if the plugin is an installed app. */
   PP_Bool (*GetIsInstalled)(PP_Instance instance);
-  /* Sets whether the plugin is an installed app. */
-  void (*SetIsInstalled)(PP_Instance instance, PP_Bool is_installed);
   /* Returns the exit status of the plugin process. */
   int32_t (*GetExitStatus)(PP_Instance instance);
   /* Sets the exit status of the plugin process. */
@@ -345,7 +361,10 @@ struct PPB_NaCl_Private_1_0 {
   /* Logs the message via VLOG. */
   void (*Vlog)(const char* message);
   /* Initializes internal state for a NaCl plugin. */
-  void (*InitializePlugin)(PP_Instance instance);
+  void (*InitializePlugin)(PP_Instance instance,
+                           uint32_t argc,
+                           const char* argn[],
+                           const char* argv[]);
   /* Returns the size of the nexe. */
   int64_t (*GetNexeSize)(PP_Instance instance);
   /* Performs accounting for requesting the NaCl manifest at the given URL. */
@@ -356,6 +375,15 @@ struct PPB_NaCl_Private_1_0 {
   PP_Bool (*ResolvesRelativeToPluginBaseUrl)(PP_Instance instance,
                                              const char* url);
   struct PP_Var (*ParseDataURL)(const char* data_url);
+  /* Processes the NaCl manifest once it's been retrieved.
+   * TODO(teravest): Move the rest of the supporting logic out of the trusted
+   * plugin.
+   */
+  void (*ProcessNaClManifest)(PP_Instance instance, const char* program_url);
+  /* Returns the manifest url as passed as a plugin argument. */
+  struct PP_Var (*GetManifestURLArgument)(PP_Instance instance);
+  PP_Bool (*IsPNaCl)(PP_Instance instance);
+  PP_Bool (*DevInterfacesEnabled)(PP_Instance instance);
 };
 
 typedef struct PPB_NaCl_Private_1_0 PPB_NaCl_Private;

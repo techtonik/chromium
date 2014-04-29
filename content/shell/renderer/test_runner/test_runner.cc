@@ -223,6 +223,7 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
   void SetWillSendRequestClearHeader(const std::string& header);
   void DumpResourceRequestPriorities();
   void SetUseMockTheme(bool use);
+  void WaitUntilExternalURLLoad();
   void ShowWebInspector(gin::Arguments* args);
   void CloseWebInspector();
   bool IsChooserShown();
@@ -284,6 +285,8 @@ void TestRunnerBindings::Install(base::WeakPtr<TestRunner> runner,
 
   gin::Handle<TestRunnerBindings> bindings =
       gin::CreateHandle(isolate, new TestRunnerBindings(runner));
+  if (bindings.IsEmpty())
+    return;
   v8::Handle<v8::Object> global = context->Global();
   v8::Handle<v8::Value> v8_bindings = bindings.ToV8();
   global->Set(gin::StringToV8(isolate, "testRunner"), v8_bindings);
@@ -444,6 +447,8 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
       .SetMethod("dumpResourceRequestPriorities",
                  &TestRunnerBindings::DumpResourceRequestPriorities)
       .SetMethod("setUseMockTheme", &TestRunnerBindings::SetUseMockTheme)
+      .SetMethod("waitUntilExternalURLLoad",
+                 &TestRunnerBindings::WaitUntilExternalURLLoad)
       .SetMethod("showWebInspector", &TestRunnerBindings::ShowWebInspector)
       .SetMethod("closeWebInspector", &TestRunnerBindings::CloseWebInspector)
       .SetMethod("isChooserShown", &TestRunnerBindings::IsChooserShown)
@@ -1102,6 +1107,11 @@ void TestRunnerBindings::SetUseMockTheme(bool use) {
     runner_->SetUseMockTheme(use);
 }
 
+void TestRunnerBindings::WaitUntilExternalURLLoad() {
+  if (runner_)
+    runner_->WaitUntilExternalURLLoad();
+}
+
 void TestRunnerBindings::ShowWebInspector(gin::Arguments* args) {
   if (runner_) {
     std::string settings;
@@ -1423,6 +1433,7 @@ void TestRunner::Reset() {
 
   top_loading_frame_ = NULL;
   wait_until_done_ = false;
+  wait_until_external_url_load_ = false;
   policy_delegate_enabled_ = false;
   policy_delegate_is_permissive_ = false;
   policy_delegate_should_notify_done_ = false;
@@ -1641,6 +1652,10 @@ bool TestRunner::isPrinting() const {
 
 bool TestRunner::shouldStayOnPageAfterHandlingBeforeUnload() const {
   return should_stay_on_page_after_handling_before_unload_;
+}
+
+bool TestRunner::shouldWaitUntilExternalURLLoad() const {
+  return wait_until_external_url_load_;
 }
 
 const std::set<std::string>* TestRunner::httpHeadersToClear() const {
@@ -2469,6 +2484,10 @@ void TestRunner::SetUseMockTheme(bool use) {
 void TestRunner::ShowWebInspector(const std::string& str,
                                   const std::string& frontend_url) {
   showDevTools(str, frontend_url);
+}
+
+void TestRunner::WaitUntilExternalURLLoad() {
+  wait_until_external_url_load_ = true;
 }
 
 void TestRunner::CloseWebInspector() {

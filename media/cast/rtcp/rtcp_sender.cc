@@ -237,7 +237,7 @@ void RtcpSender::SendRtcpFromRtpReceiver(
   if (packet->data.empty())
     return;  // Sanity don't send empty packets.
 
-  transport_->SendRtcpPacket(packet);
+  transport_->SendRtcpPacket(ssrc_, packet);
 }
 
 void RtcpSender::BuildRR(const transport::RtcpReportBlock* report_block,
@@ -457,9 +457,6 @@ void RtcpSender::BuildRemb(const RtcpRembMessage* remb, Packet* packet) const {
   for (; it != remb->remb_ssrcs.end(); ++it) {
     big_endian_writer.WriteU32(*it);
   }
-  base::TimeTicks now = cast_environment_->Clock()->NowTicks();
-  cast_environment_->Logging()->InsertGenericEvent(
-      now, kRembBitrate, remb->remb_bitrate);
 }
 
 void RtcpSender::BuildNack(const RtcpNackMessage* nack, Packet* packet) const {

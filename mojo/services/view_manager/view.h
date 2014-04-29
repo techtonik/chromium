@@ -5,28 +5,36 @@
 #ifndef MOJO_SERVICES_VIEW_MANAGER_VIEW_H_
 #define MOJO_SERVICES_VIEW_MANAGER_VIEW_H_
 
+#include <vector>
+
 #include "base/logging.h"
-#include "ui/aura/window.h"
+#include "mojo/services/view_manager/ids.h"
+#include "mojo/services/view_manager/view_manager_export.h"
 
 namespace mojo {
 namespace services {
 namespace view_manager {
 
-class View {
+class Node;
+
+// Represents a view. A view may be associated with a single Node.
+class MOJO_VIEW_MANAGER_EXPORT View {
  public:
-  View(int32_t view_id);
+  explicit View(const ViewId& id);
   ~View();
 
-  int32 id() const { return id_; }
+  const ViewId& id() const { return id_; }
 
-  void Add(View* child);
-  void Remove(View* child);
-
-  View* GetParent();
+  Node* node() { return node_; }
 
  private:
-  const int32_t id_;
-  aura::Window window_;
+  // Node is responsible for maintaining |node_|.
+  friend class Node;
+
+  void set_node(Node* node) { node_ = node; }
+
+  const ViewId id_;
+  Node* node_;
 
   DISALLOW_COPY_AND_ASSIGN(View);
 };

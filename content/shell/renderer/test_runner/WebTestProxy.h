@@ -28,6 +28,8 @@
 #include "third_party/WebKit/public/web/WebTextAffinity.h"
 #include "third_party/WebKit/public/web/WebTextDirection.h"
 
+class SkCanvas;
+
 namespace blink {
 class WebAXObject;
 class WebAudioDevice;
@@ -70,27 +72,24 @@ struct WebWindowFeatures;
 typedef unsigned WebColor;
 }
 
-namespace content {
-class RenderFrame;
-}
-
-class SkCanvas;
-
 namespace WebTestRunner {
-
 class MockWebSpeechInputController;
 class MockWebSpeechRecognizer;
 class SpellCheckClient;
 class TestInterfaces;
 class WebTestDelegate;
 class WebTestInterfaces;
-class WebTestRunner;
 class WebUserMediaClientMock;
+}
+
+namespace content {
+
+class RenderFrame;
 
 class WebTestProxyBase {
 public:
-    void setInterfaces(WebTestInterfaces*);
-    void setDelegate(WebTestDelegate*);
+    void setInterfaces(WebTestRunner::WebTestInterfaces*);
+    void setDelegate(WebTestRunner::WebTestDelegate*);
     void setWidget(blink::WebWidget*);
 
     void reset();
@@ -120,10 +119,10 @@ public:
     void discardBackingStore();
 
     blink::WebMIDIClientMock* midiClientMock();
-    MockWebSpeechInputController* speechInputControllerMock();
-    MockWebSpeechRecognizer* speechRecognizerMock();
+    WebTestRunner::MockWebSpeechInputController* speechInputControllerMock();
+    WebTestRunner::MockWebSpeechRecognizer* speechRecognizerMock();
 
-    WebTaskList* taskList() { return &m_taskList; }
+    WebTestRunner::WebTaskList* taskList() { return &m_taskList; }
 
     blink::WebView* webView();
 
@@ -166,6 +165,7 @@ protected:
     void didBlur();
     void setToolTipText(const blink::WebString&, blink::WebTextDirection);
     void didAddMessageToConsole(const blink::WebConsoleMessage&, const blink::WebString& sourceName, unsigned sourceLine);
+    void loadURLExternally(blink::WebLocalFrame* frame, const blink::WebURLRequest& request, blink::WebNavigationPolicy policy, const blink::WebString& suggested_name);
     void didStartProvisionalLoad(blink::WebLocalFrame*);
     void didReceiveServerRedirectForProvisionalLoad(blink::WebLocalFrame*);
     bool didFailProvisionalLoad(blink::WebLocalFrame*, const blink::WebURLError&);
@@ -200,14 +200,14 @@ private:
 
     blink::WebWidget* webWidget();
 
-    TestInterfaces* m_testInterfaces;
-    WebTestDelegate* m_delegate;
+    WebTestRunner::TestInterfaces* m_testInterfaces;
+    ::WebTestRunner::WebTestDelegate* m_delegate;
     blink::WebWidget* m_webWidget;
 
-    WebTaskList m_taskList;
+    WebTestRunner::WebTaskList m_taskList;
 
-    scoped_ptr<SpellCheckClient> m_spellcheck;
-    scoped_ptr<WebUserMediaClientMock> m_userMediaClient;
+    scoped_ptr<WebTestRunner::SpellCheckClient> m_spellcheck;
+    scoped_ptr<WebTestRunner::WebUserMediaClientMock> m_userMediaClient;
 
     // Painting.
     scoped_ptr<SkCanvas> m_canvas;
@@ -221,8 +221,9 @@ private:
     int m_chooserCount;
 
     scoped_ptr<blink::WebMIDIClientMock> m_midiClient;
-    scoped_ptr<MockWebSpeechRecognizer> m_speechRecognizer;
-    scoped_ptr<MockWebSpeechInputController> m_speechInputController;
+    scoped_ptr<WebTestRunner::MockWebSpeechRecognizer> m_speechRecognizer;
+    scoped_ptr<WebTestRunner::MockWebSpeechInputController>
+        m_speechInputController;
 
 private:
     DISALLOW_COPY_AND_ASSIGN(WebTestProxyBase);
@@ -378,6 +379,6 @@ private:
     DISALLOW_COPY_AND_ASSIGN(WebTestProxy);
 };
 
-}
+}  // namespace content
 
 #endif  // CONTENT_SHELL_RENDERER_TEST_RUNNER_WEBTESTPROXY_H_

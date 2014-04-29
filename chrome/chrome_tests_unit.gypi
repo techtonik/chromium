@@ -50,6 +50,8 @@
         'browser/android/mock_google_location_settings_helper.h',
         'browser/bookmarks/bookmark_test_helpers.cc',
         'browser/bookmarks/bookmark_test_helpers.h',
+        'browser/bookmarks/test_bookmark_client.cc',
+        'browser/bookmarks/test_bookmark_client.h',
         'browser/browsing_data/mock_browsing_data_appcache_helper.cc',
         'browser/browsing_data/mock_browsing_data_appcache_helper.h',
         'browser/browsing_data/mock_browsing_data_cookie_helper.cc',
@@ -125,6 +127,8 @@
         'browser/drive/dummy_drive_service.h',
         'browser/drive/fake_drive_service.cc',
         'browser/drive/fake_drive_service.h',
+        'browser/drive/test_util.cc',
+        'browser/drive/test_util.h',
         'browser/extensions/api/messaging/native_messaging_test_util.cc',
         'browser/extensions/api/messaging/native_messaging_test_util.h',
         'browser/extensions/extension_notification_observer.cc',
@@ -493,9 +497,9 @@
         '../third_party/icu/icu.gyp:icui18n',
         '../third_party/icu/icu.gyp:icuuc',
         '../third_party/libxml/libxml.gyp:libxml',
+        '../ui/base/ui_base.gyp:ui_base_test_support',
         '../ui/gfx/gfx.gyp:gfx_test_support',
         '../ui/resources/ui_resources.gyp:ui_resources',
-        '../ui/ui_unittests.gyp:ui_test_support',
         'chrome_resources.gyp:chrome_resources',
         'chrome_resources.gyp:chrome_strings',
       ],
@@ -1133,6 +1137,7 @@
         'browser/password_manager/password_store_x_unittest.cc',
         'browser/performance_monitor/database_unittest.cc',
         'browser/plugins/plugin_finder_unittest.cc',
+        'browser/plugins/plugin_installer_unittest.cc',
         'browser/plugins/plugin_metadata_unittest.cc',
         'browser/plugins/plugin_prefs_unittest.cc',
         'browser/policy/cloud/cloud_policy_invalidator_unittest.cc',
@@ -1249,11 +1254,14 @@
         'browser/search_engines/template_url_prepopulate_data_unittest.cc',
         'browser/search_engines/template_url_scraper_unittest.cc',
         'browser/search_engines/template_url_unittest.cc',
+        'browser/services/gcm/fake_gcm_client_factory.cc',
+        'browser/services/gcm/fake_gcm_client_factory.h',
+        'browser/services/gcm/fake_signin_manager.cc',
+        'browser/services/gcm/fake_signin_manager.h',
         'browser/services/gcm/gcm_client_mock.cc',
         'browser/services/gcm/gcm_client_mock.h',
-        'browser/services/gcm/gcm_profile_service_test_helper.cc',
-        'browser/services/gcm/gcm_profile_service_test_helper.h',
         'browser/services/gcm/gcm_profile_service_unittest.cc',
+        'browser/services/gcm/gcm_service_unittest.cc',
         'browser/sessions/persistent_tab_restore_service_unittest.cc',
         'browser/sessions/restore_on_startup_policy_handler_unittest.cc',
         'browser/sessions/session_backend_unittest.cc',
@@ -1308,8 +1316,6 @@
         'browser/sync/glue/non_ui_data_type_controller_mock.h',
         'browser/sync/glue/non_ui_data_type_controller_unittest.cc',
         'browser/sync/glue/search_engine_data_type_controller_unittest.cc',
-        'browser/sync/glue/shared_change_processor_mock.cc',
-        'browser/sync/glue/shared_change_processor_mock.h',
         'browser/sync/glue/shared_change_processor_unittest.cc',
         'browser/sync/glue/sync_backend_host_impl_unittest.cc',
         'browser/sync/glue/sync_backend_host_mock.cc',
@@ -1343,6 +1349,7 @@
         'browser/sync/test/test_http_bridge_factory.h',
         'browser/sync/test_profile_sync_service.cc',
         'browser/sync/test_profile_sync_service.h',
+        'browser/sync_file_system/drive_backend/callback_helper_unittest.cc',
         'browser/sync_file_system/drive_backend/conflict_resolver_unittest.cc',
         'browser/sync_file_system/drive_backend/drive_backend_sync_unittest.cc',
         'browser/sync_file_system/drive_backend/drive_backend_test_util.cc',
@@ -1655,8 +1662,10 @@
         'browser/ui/omnibox/omnibox_popup_model_unittest.cc',
         'browser/ui/omnibox/omnibox_view_unittest.cc',
         'browser/ui/panels/panel_mouse_watcher_unittest.cc',
+        'browser/ui/passwords/manage_passwords_icon_mock.cc',
         'browser/ui/passwords/manage_passwords_bubble_model_unittest.cc',
         'browser/ui/passwords/manage_passwords_bubble_ui_controller_mock.cc',
+        'browser/ui/passwords/manage_passwords_bubble_ui_controller_unittest.cc',
         'browser/ui/passwords/password_manager_presenter_unittest.cc',
         'browser/ui/search_engines/keyword_editor_controller_unittest.cc',
         'browser/ui/search/instant_page_unittest.cc',
@@ -2099,6 +2108,7 @@
         }],
         ['use_aura==1', {
           'dependencies': [
+            '../ui/wm/wm.gyp:wm',
             '../ui/aura/aura.gyp:aura_test_support',
           ],
           'sources/': [
@@ -2118,7 +2128,6 @@
         ['use_aura==1 or toolkit_views==1', {
           'dependencies': [
             '../ui/events/events.gyp:events_test_support',
-            '../ui/wm/wm.gyp:wm',
           ],
         }],
         ['use_aura==1 and component=="shared_library"', {
@@ -2138,6 +2147,7 @@
         }],
         ['chromeos==0', {
           'sources!': [
+            'browser/extensions/image_loader_unittest.cc',
             # TODO(zturner): Enable this on Windows.  See
             # BrowserWithTestWindowTest::SetUp() for a comment explaining why
             # this is broken.
@@ -2147,12 +2157,12 @@
         }],
         ['enable_mdns == 1', {
             'sources': [
-              'utility/local_discovery/local_domain_resolver_unittest.cc',
-              'utility/local_discovery/service_discovery_client_unittest.cc',
               'browser/local_discovery/privet_device_lister_unittest.cc',
               'browser/local_discovery/privet_notifications_unittest.cc',
               'browser/local_discovery/privet_local_printer_lister_unittest.cc',
               'browser/local_discovery/storage/privet_filesystem_attribute_cache_unittest.cc',
+              'common/local_discovery/local_domain_resolver_unittest.cc',
+              'common/local_discovery/service_discovery_client_unittest.cc',
             ]
         }],
         ['configuration_policy==0', {
@@ -2672,6 +2682,11 @@
           ],
           'sources/': [
             ['exclude', '^browser/chromeos/events/'],  # crbug.com/354036
+          ],
+        }],
+        ['enable_plugin_installation==0', {
+          'sources!': [
+            'browser/plugins/plugin_installer_unittest.cc',
           ],
         }],
       ],

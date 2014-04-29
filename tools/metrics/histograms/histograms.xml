@@ -11651,6 +11651,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.ErrorPageCounts" enum="NetErrorPageEvents">
+  <owner>rdsmith@chromium.org</owner>
+  <owner>ellyjones@chromium.org</owner>
+  <summary>
+    Counts of various events that can occur on the network error page. See the
+    histogram for details.
+  </summary>
+</histogram>
+
 <histogram name="Net.FileError_Flush">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -13177,52 +13186,70 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Net.SocketStream.ConnectionEstablish" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
   <summary>The time from the connection start to connection establish.</summary>
 </histogram>
 
 <histogram name="Net.SocketStream.ConnectionLatency" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
   <summary>The time waiting to be ready to start connecting.</summary>
 </histogram>
 
 <histogram name="Net.SocketStream.ConnectionType"
     enum="SocketStreamConnectionType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
   <summary>
     Each bucket is the number of connection type of socket stream.
   </summary>
 </histogram>
 
 <histogram name="Net.SocketStream.Duration" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
   <summary>The time a socket stream was open.</summary>
 </histogram>
 
 <histogram name="Net.SocketStream.ProtocolType" enum="SocketStreamProtocolType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
   <summary>
     Each bucket is the number of protocol type on socket stream.
   </summary>
 </histogram>
 
 <histogram name="Net.SocketStream.ReceivedBytes" units="bytes">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
   <summary>Number of bytes on a socket stream.</summary>
 </histogram>
 
 <histogram name="Net.SocketStream.ReceivedCounts">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
   <summary>Number of reads on a socket stream.</summary>
 </histogram>
 
 <histogram name="Net.SocketStream.SentBytes" units="bytes">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
   <summary>Number of bytes on a socket stream.</summary>
 </histogram>
 
 <histogram name="Net.SocketStream.SentCounts">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
   <summary>Number of Write on a socket stream.</summary>
 </histogram>
 
@@ -13969,6 +13996,28 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Net.UDPSocketWinClose" units="milliseconds">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The time spent in closesocket call in UDPSocketWin::Close.</summary>
+</histogram>
+
+<histogram name="Net.WebSocket.DeflateMode"
+    enum="WebSocketNewPerMessageDeflateContextTakeoverMode">
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
+  <summary>
+    Count the number of WebSockets that accepted permessage-deflate extension
+    for each context take over mode. Used by the new Chromium-based WebSocket
+    implementation.
+  </summary>
+</histogram>
+
+<histogram name="Net.WebSocket.Duration" units="milliseconds">
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
+  <summary>
+    The time from a WebSocket is successfully opened until it's closed. Used to
+    study how WebSockets are used.
+  </summary>
 </histogram>
 
 <histogram name="Net.WebSocket.HandshakeResult"
@@ -23103,6 +23152,39 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="SharedWorker.RendererSurviveForWorkerTime"
+    units="milliseconds">
+  <owner>horo@chromium.org</owner>
+  <summary>
+    A survival time of RenderProcessHostImpl for the In-renderer Shared Worker
+    from when FastShutdownIfPossible() is called.
+  </summary>
+</histogram>
+
+<histogram name="SharedWorker.TimeToDeleted" units="milliseconds">
+  <owner>horo@chromium.org</owner>
+  <summary>
+    The lifetime of a SharedWorkerHost. This roughly corresponds to the lifetime
+    of SharedWorker.
+  </summary>
+</histogram>
+
+<histogram name="SharedWorker.TimeToScriptLoaded" units="milliseconds">
+  <owner>horo@chromium.org</owner>
+  <summary>
+    The time from the creation of SharedWorkerHost until when WorkerScriptLoaded
+    is called.
+  </summary>
+</histogram>
+
+<histogram name="SharedWorker.TimeToScriptLoadFailed" units="milliseconds">
+  <owner>horo@chromium.org</owner>
+  <summary>
+    The time from the creation of SharedWorkerHost until when
+    WorkerScriptLoadFailed is called.
+  </summary>
+</histogram>
+
 <histogram name="Signin.OneClickConfirmation" enum="SigninFlowConfirmations">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -29723,7 +29805,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="WebCore.WebSocket.HandshakeResult"
     enum="WebSocketHandshakeResult">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
   <summary>
     Count the number of WebSocket handshake for each result. Use this histogram
     as a baseline for investigating feature usage counters.
@@ -29732,10 +29816,23 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="WebCore.WebSocket.PerMessageDeflateContextTakeOverMode"
     enum="WebSocketPerMessageDeflateContextTakeOverMode">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
   <summary>
     Count the number of WebSockets that accepted permessage-deflate extension
-    for each context take over mode.
+    for each context take over mode. Used by the old Blink-based WebSocket
+    implementation.
+  </summary>
+</histogram>
+
+<histogram name="WebCore.WebSocket.SendType" enum="WebSocketSendType">
+  <owner>yhirano@chromium.org</owner>
+  <owner>ricea@chromium.org</owner>
+  <owner>tyoshino@chromium.org</owner>
+  <summary>
+    Count the number of send() method calls on WebSockets for each argument
+    type.
   </summary>
 </histogram>
 
@@ -30113,6 +30210,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="WebRTC.DesktopCaptureCounters" enum="DesktopCaptureCounters">
+  <owner>jiayl@chromium.org</owner>
+  <summary>
+    Counters on creation of DesktopCaptureDevice and the first capture call.
+  </summary>
+</histogram>
+
 <histogram name="WebRTC.NumDataChannelsPerPeerConnection">
   <owner>perkj@chromium.org</owner>
   <summary>
@@ -30149,6 +30253,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     individual message is added to the histogram as a sample immediately when a
     message is sent.
   </summary>
+</histogram>
+
+<histogram name="WebRTC.ScreenCaptureTime" units="milliseconds">
+  <owner>jiayl@chromium.org</owner>
+  <summary>Time for capturing one frame in screen capturing.</summary>
 </histogram>
 
 <histogram name="WebRTC.SentAudioTrackDuration" units="milliseconds">
@@ -30201,6 +30310,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Counts number of calls to WebRTC APIs from JavaScript, once per origin per
     renderer process.
   </summary>
+</histogram>
+
+<histogram name="WebRTC.WindowCaptureTime" units="milliseconds">
+  <owner>jiayl@chromium.org</owner>
+  <summary>Time for capturing one frame in window capturing.</summary>
 </histogram>
 
 <histogram name="Webstore.ExtensionInstallResult" enum="BooleanSuccess">
@@ -31586,6 +31700,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="0" label="Proxy not available"/>
   <int value="1" label="Proxy available but not enabled"/>
   <int value="2" label="Proxy available and enabled"/>
+</enum>
+
+<enum name="DesktopCaptureCounters" type="int">
+  <int value="0" label="Screen capturer created."/>
+  <int value="1" label="Window capturer created."/>
+  <int value="2" label="First screen capture call succeeded."/>
+  <int value="3" label="First screen capture call failed."/>
+  <int value="4" label="First window capture call succeeded."/>
+  <int value="5" label="First window capture call failed."/>
 </enum>
 
 <enum name="DevicePermissionActions" type="int">
@@ -33567,6 +33690,32 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="720" label="WEBCAMPRIVATE_SET"/>
   <int value="721" label="WEBCAMPRIVATE_RESET"/>
   <int value="722" label="WEBCAMPRIVATE_GET"/>
+  <int value="723" label="BLUETOOTHLOWENERGY_GETSERVICE"/>
+  <int value="724" label="BLUETOOTHLOWENERGY_GETSERVICES"/>
+  <int value="725" label="BLUETOOTHLOWENERGY_GETCHARACTERISTIC"/>
+  <int value="726" label="BLUETOOTHLOWENERGY_GETCHARACTERISTICS"/>
+  <int value="727" label="BLUETOOTHLOWENERGY_GETINCLUDEDSERVICES"/>
+  <int value="728" label="BLUETOOTHLOWENERGY_GETDESCRIPTOR"/>
+  <int value="729" label="BLUETOOTHLOWENERGY_GETDESCRIPTORS"/>
+  <int value="730" label="BLUETOOTHLOWENERGY_READCHARACTERISTICVALUE"/>
+  <int value="731" label="BLUETOOTHLOWENERGY_WRITECHARACTERISTICVALUE"/>
+  <int value="732" label="BLUETOOTHLOWENERGY_READDESCRIPTORVALUE"/>
+  <int value="733" label="BLUETOOTHLOWENERGY_WRITEDESCRIPTORVALUE"/>
+  <int value="734" label="BOOKMARKMANAGERPRIVATE_CREATEWITHMETAINFO"/>
+  <int value="735" label="BOOKMARKMANAGERPRIVATE_UPDATEMETAINFO"/>
+  <int value="736" label="BLUETOOTHSOCKET_CREATE"/>
+  <int value="737" label="BLUETOOTHSOCKET_UPDATE"/>
+  <int value="738" label="BLUETOOTHSOCKET_SETPAUSED"/>
+  <int value="739" label="BLUETOOTHSOCKET_LISTENUSINGRFCOMM"/>
+  <int value="740" label="BLUETOOTHSOCKET_LISTENUSINGINSECURERFCOMM"/>
+  <int value="741" label="BLUETOOTHSOCKET_LISTENUSINGL2CAP"/>
+  <int value="742" label="BLUETOOTHSOCKET_CONNECT"/>
+  <int value="743" label="BLUETOOTHSOCKET_DISCONNECT"/>
+  <int value="744" label="BLUETOOTHSOCKET_CLOSE"/>
+  <int value="745" label="BLUETOOTHSOCKET_SEND"/>
+  <int value="746" label="BLUETOOTHSOCKET_GETINFO"/>
+  <int value="747" label="BLUETOOTHSOCKET_GETSOCKETS"/>
+  <int value="748" label="WEBSTOREPRIVATE_SIGNINFUNCTION"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -37340,6 +37489,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="806" label="DNS_SORT_ERROR"/>
 </enum>
 
+<enum name="NetErrorPageEvents" type="int">
+  <int value="0" label="Error Page Shown"/>
+  <int value="1" label="Reload Button Shown"/>
+  <int value="2" label="Reload Button Clicked"/>
+  <int value="3" label="Reload Button Click Load Error"/>
+  <int value="4" label="Load Stale Button Shown"/>
+  <int value="5" label="Load Stale Button Clicked"/>
+  <int value="6" label="Load Stale Button Click Load Error"/>
+  <int value="7" label="More Button Clicked"/>
+  <int value="8" label="Browser Initiated Reload"/>
+</enum>
+
 <enum name="NetPreconnectUtilization" type="int">
   <int value="0" label="non-speculative, never connected"/>
   <int value="1" label="non-speculative, never used"/>
@@ -40426,11 +40587,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="SocketStreamConnectionType" type="int">
-  <int value="0" label="none"/>
-  <int value="1" label="all connections"/>
-  <int value="2" label="tunnel connections"/>
-  <int value="3" label="socks connections"/>
-  <int value="4" label="ssl connections"/>
+  <int value="0" label="None"/>
+  <int value="1" label="All"/>
+  <int value="2" label="Tunnel"/>
+  <int value="3" label="SOCKS"/>
+  <int value="4" label="SSL"/>
+  <int value="5" label="Secure proxy"/>
 </enum>
 
 <enum name="SocketStreamProtocolType" type="int">
@@ -42109,9 +42271,21 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="FAILED">Failed</int>
 </enum>
 
+<enum name="WebSocketNewPerMessageDeflateContextTakeoverMode" type="int">
+  <int value="0" label="Do not take over"/>
+  <int value="1" label="Take over"/>
+</enum>
+
 <enum name="WebSocketPerMessageDeflateContextTakeOverMode" type="int">
-  <int value="0" label="DoNotTakeOverContext"/>
-  <int value="1" label="TakeOverContext"/>
+  <int value="0" label="Do not take over"/>
+  <int value="1" label="Take over"/>
+</enum>
+
+<enum name="WebSocketSendType" type="int">
+  <int value="0" label="String"/>
+  <int value="1" label="ArrayBuffer"/>
+  <int value="2" label="ArrayBufferView"/>
+  <int value="3" label="Blob"/>
 </enum>
 
 <enum name="WiFiApMode" type="int">

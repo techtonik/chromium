@@ -14,6 +14,7 @@
 #include "content/common/content_export.h"
 #include "content/common/content_param_traits.h"
 #include "content/common/cookie_data.h"
+#include "content/common/input/did_overscroll_params.h"
 #include "content/common/navigation_gesture.h"
 #include "content/common/pepper_renderer_instance_data.h"
 #include "content/common/view_message_enums.h"
@@ -131,6 +132,8 @@ IPC_STRUCT_TRAITS_BEGIN(blink::WebScreenInfo)
   IPC_STRUCT_TRAITS_MEMBER(isMonochrome)
   IPC_STRUCT_TRAITS_MEMBER(rect)
   IPC_STRUCT_TRAITS_MEMBER(availableRect)
+  IPC_STRUCT_TRAITS_MEMBER(orientationType)
+  IPC_STRUCT_TRAITS_MEMBER(orientationAngle)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(content::MenuItem)
@@ -149,6 +152,12 @@ IPC_STRUCT_TRAITS_BEGIN(content::DateTimeSuggestion)
   IPC_STRUCT_TRAITS_MEMBER(value)
   IPC_STRUCT_TRAITS_MEMBER(localized_value)
   IPC_STRUCT_TRAITS_MEMBER(label)
+IPC_STRUCT_TRAITS_END()
+
+IPC_STRUCT_TRAITS_BEGIN(content::DidOverscrollParams)
+  IPC_STRUCT_TRAITS_MEMBER(accumulated_overscroll)
+  IPC_STRUCT_TRAITS_MEMBER(latest_overscroll_delta)
+  IPC_STRUCT_TRAITS_MEMBER(current_fling_velocity)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(content::FaviconURL)
@@ -205,6 +214,7 @@ IPC_STRUCT_TRAITS_BEGIN(content::RendererPreferences)
   IPC_STRUCT_TRAITS_MEMBER(tap_multiple_targets_strategy)
   IPC_STRUCT_TRAITS_MEMBER(disable_client_blocked_error_page)
   IPC_STRUCT_TRAITS_MEMBER(plugin_fullscreen_allowed)
+  IPC_STRUCT_TRAITS_MEMBER(use_video_overlay_for_embedded_encrypted_video)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(content::CookieData)
@@ -601,6 +611,7 @@ IPC_STRUCT_BEGIN(ViewMsg_Resize_Params)
   IPC_STRUCT_MEMBER(gfx::Size, new_size)
   IPC_STRUCT_MEMBER(gfx::Size, physical_backing_size)
   IPC_STRUCT_MEMBER(float, overdraw_bottom_height)
+  IPC_STRUCT_MEMBER(gfx::Size, visible_viewport_size)
   IPC_STRUCT_MEMBER(gfx::Rect, resizer_rect)
   IPC_STRUCT_MEMBER(bool, is_fullscreen)
 IPC_STRUCT_END()
@@ -905,8 +916,8 @@ IPC_MESSAGE_ROUTED1(ViewMsg_SetAccessibilityMode,
 
 // An acknowledge to ViewHostMsg_MultipleTargetsTouched to notify the renderer
 // process to release the magnified image.
-IPC_MESSAGE_ROUTED1(ViewMsg_ReleaseDisambiguationPopupDIB,
-                    TransportDIB::Handle /* DIB handle */)
+IPC_MESSAGE_ROUTED1(ViewMsg_ReleaseDisambiguationPopupBitmap,
+                    cc::SharedBitmapId /* id */)
 
 // Notifies the renderer that a snapshot has been retrieved.
 IPC_MESSAGE_ROUTED3(ViewMsg_WindowSnapshotCompleted,
@@ -1009,10 +1020,6 @@ IPC_MESSAGE_ROUTED2(ViewMsg_SwapCompositorFrameAck,
 IPC_MESSAGE_ROUTED2(ViewMsg_ReclaimCompositorResources,
                     uint32 /* output_surface_id */,
                     cc::CompositorFrameAck /* ack */)
-
-// Sent by the browser to ask the renderer for a snapshot of the current view.
-IPC_MESSAGE_ROUTED1(ViewMsg_Snapshot,
-                    gfx::Rect /* src_subrect */)
 
 // -----------------------------------------------------------------------------
 // Messages sent from the renderer to the browser.
@@ -1565,18 +1572,11 @@ IPC_MESSAGE_ROUTED2(ViewHostMsg_SwapCompositorFrame,
 
 // Sent by the compositor when input scroll events are dropped due to bounds
 // restricions on the root scroll offset.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_DidOverscroll,
-                    gfx::Vector2dF /* accumulated_overscroll */,
-                    gfx::Vector2dF /* current_fling_velocity */)
+IPC_MESSAGE_ROUTED1(ViewHostMsg_DidOverscroll,
+                    content::DidOverscrollParams /* params */)
 
 // Sent by the compositor when a flinging animation is stopped.
 IPC_MESSAGE_ROUTED0(ViewHostMsg_DidStopFlinging)
-
-// Reply to a snapshot request containing whether snapshotting succeeded and the
-// SkBitmap if it succeeded.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_Snapshot,
-                    bool, /* success */
-                    SkBitmap /* bitmap */)
 
 //---------------------------------------------------------------------------
 // Request for cryptographic operation messages:
@@ -1655,17 +1655,12 @@ IPC_MESSAGE_ROUTED3(ViewHostMsg_LockMouse,
 // ViewHostMsg_UnlockMouse).
 IPC_MESSAGE_ROUTED0(ViewHostMsg_UnlockMouse)
 
-// Notifies that the initial empty document of a view has been accessed.
-// After this, it is no longer safe to show a pending navigation's URL without
-// making a URL spoof possible.
-IPC_MESSAGE_ROUTED0(ViewHostMsg_DidAccessInitialDocument)
-
 // Notifies that multiple touch targets may have been pressed, and to show
 // the disambiguation popup.
 IPC_MESSAGE_ROUTED3(ViewHostMsg_ShowDisambiguationPopup,
                     gfx::Rect, /* Border of touched targets */
                     gfx::Size, /* Size of zoomed image */
-                    TransportDIB::Id /* DIB of zoomed image */)
+                    cc::SharedBitmapId /* id */)
 
 // Sent by the renderer process to check whether client 3D APIs
 // (Pepper 3D, WebGL) are explicitly blocked.

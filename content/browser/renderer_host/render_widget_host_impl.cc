@@ -46,6 +46,7 @@
 #include "content/common/content_constants_internal.h"
 #include "content/common/cursors/webcursor.h"
 #include "content/common/gpu/gpu_messages.h"
+#include "content/common/host_shared_bitmap_manager.h"
 #include "content/common/input_messages.h"
 #include "content/common/view_messages.h"
 #include "content/port/browser/render_widget_host_view_port.h"
@@ -462,7 +463,6 @@ bool RenderWidgetHostImpl::OnMessageReceived(const IPC::Message &msg) {
     IPC_MESSAGE_HANDLER(ViewHostMsg_SetTooltipText, OnSetTooltipText)
     IPC_MESSAGE_HANDLER_GENERIC(ViewHostMsg_SwapCompositorFrame,
                                 msg_is_ok = OnSwapCompositorFrame(msg))
-    IPC_MESSAGE_HANDLER(ViewHostMsg_DidOverscroll, OnOverscrolled)
     IPC_MESSAGE_HANDLER(ViewHostMsg_DidStopFlinging, OnFlingingStopped)
     IPC_MESSAGE_HANDLER(ViewHostMsg_UpdateRect, OnUpdateRect)
     IPC_MESSAGE_HANDLER(ViewHostMsg_UpdateIsDelayed, OnUpdateIsDelayed)
@@ -484,7 +484,6 @@ bool RenderWidgetHostImpl::OnMessageReceived(const IPC::Message &msg) {
     IPC_MESSAGE_HANDLER(ViewHostMsg_SelectionChanged, OnSelectionChanged)
     IPC_MESSAGE_HANDLER(ViewHostMsg_SelectionBoundsChanged,
                         OnSelectionBoundsChanged)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_Snapshot, OnSnapshot)
 #if defined(OS_WIN)
     IPC_MESSAGE_HANDLER(ViewHostMsg_WindowlessPluginDummyWindowCreated,
                         OnWindowlessPluginDummyWindowCreated)
@@ -601,13 +600,16 @@ void RenderWidgetHostImpl::WasResized() {
   is_fullscreen_ = IsFullscreen();
   float old_overdraw_bottom_height = overdraw_bottom_height_;
   overdraw_bottom_height_ = view_->GetOverdrawBottomHeight();
+  gfx::Size old_visible_viewport_size = visible_viewport_size_;
+  visible_viewport_size_ = view_->GetVisibleViewportSize();
 
   bool size_changed = new_size != last_requested_size_;
   bool side_payload_changed =
       screen_info_out_of_date_ ||
       old_physical_backing_size != physical_backing_size_ ||
       was_fullscreen != is_fullscreen_ ||
-      old_overdraw_bottom_height != overdraw_bottom_height_;
+      old_overdraw_bottom_height != overdraw_bottom_height_ ||
+      old_visible_viewport_size != visible_viewport_size_;
 
   if (!size_changed && !side_payload_changed)
     return;
@@ -627,6 +629,7 @@ void RenderWidgetHostImpl::WasResized() {
   params.new_size = new_size;
   params.physical_backing_size = physical_backing_size_;
   params.overdraw_bottom_height = overdraw_bottom_height_;
+  params.visible_viewport_size = visible_viewport_size_;
   params.resizer_rect = GetRootWindowResizerRect();
   params.is_fullscreen = is_fullscreen_;
   if (!Send(new ViewMsg_Resize(routing_id_, params))) {
@@ -1187,24 +1190,6 @@ void RenderWidgetHostImpl::InvalidateScreenInfo() {
   screen_info_.reset();
 }
 
-void RenderWidgetHostImpl::GetSnapshotFromRenderer(
-    const gfx::Rect& src_subrect,
-    const base::Callback<void(bool, const SkBitmap&)>& callback) {
-  TRACE_EVENT0("browser", "RenderWidgetHostImpl::GetSnapshotFromRenderer");
-  if (!view_) {
-    callback.Run(false, SkBitmap());
-    return;
-  }
-
-  pending_snapshots_.push(callback);
-
-  gfx::Rect copy_rect = src_subrect.IsEmpty() ?
-      gfx::Rect(view_->GetViewBounds().size()) : src_subrect;
-
-  gfx::Rect copy_rect_in_pixel = ConvertViewRectToPixel(view_, copy_rect);
-  Send(new ViewMsg_Snapshot(GetRoutingID(), copy_rect_in_pixel));
-}
-
 void RenderWidgetHostImpl::OnSelectionChanged(const base::string16& text,
                                               size_t offset,
                                               const gfx::Range& range) {
@@ -1217,26 +1202,6 @@ void RenderWidgetHostImpl::OnSelectionBoundsChanged(
   if (view_) {
     view_->SelectionBoundsChanged(params);
   }
-}
-
-void RenderWidgetHostImpl::OnSnapshot(bool success,
-                                    const SkBitmap& bitmap) {
-  if (pending_snapshots_.size() == 0) {
-    LOG(ERROR) << "RenderWidgetHostImpl::OnSnapshot: "
-                  "Received a snapshot that was not requested.";
-    return;
-  }
-
-  base::Callback<void(bool, const SkBitmap&)> callback =
-      pending_snapshots_.front();
-  pending_snapshots_.pop();
-
-  if (!success) {
-    callback.Run(success, SkBitmap());
-    return;
-  }
-
-  callback.Run(success, bitmap);
 }
 
 void RenderWidgetHostImpl::UpdateVSyncParameters(base::TimeTicks timebase,
@@ -1548,13 +1513,6 @@ bool RenderWidgetHostImpl::OnSwapCompositorFrame(
   return true;
 }
 
-void RenderWidgetHostImpl::OnOverscrolled(
-    gfx::Vector2dF accumulated_overscroll,
-    gfx::Vector2dF current_fling_velocity) {
-  if (view_)
-    view_->OnOverscrolled(accumulated_overscroll, current_fling_velocity);
-}
-
 void RenderWidgetHostImpl::OnFlingingStopped() {
   if (view_)
     view_->DidStopFlinging();
@@ -1630,7 +1588,7 @@ void RenderWidgetHostImpl::DidUpdateBackingStore(
   // in the process could dispatch other window messages which could cause the
   // view to be destroyed.
   if (view_)
-    view_->MovePluginWindows(params.scroll_offset, params.plugin_window_moves);
+    view_->MovePluginWindows(params.plugin_window_moves);
 
   NotificationService::current()->Notify(
       NOTIFICATION_RENDER_WIDGET_HOST_DID_UPDATE_BACKING_STORE,
@@ -1785,25 +1743,24 @@ void RenderWidgetHostImpl::OnUnlockMouse() {
 void RenderWidgetHostImpl::OnShowDisambiguationPopup(
     const gfx::Rect& rect,
     const gfx::Size& size,
-    const TransportDIB::Id& id) {
+    const cc::SharedBitmapId& id) {
   DCHECK(!rect.IsEmpty());
   DCHECK(!size.IsEmpty());
 
-  TransportDIB* dib = process_->GetTransportDIB(id);
-  if (!dib) {
+  scoped_ptr<cc::SharedBitmap> bitmap =
+      HostSharedBitmapManager::current()->GetSharedBitmapFromId(size, id);
+  if (!bitmap) {
     RecordAction(base::UserMetricsAction("BadMessageTerminate_RWH6"));
     GetProcess()->ReceivedBadMessage();
     return;
   }
 
-  DCHECK(dib->memory());
-  DCHECK(dib->size() == SkBitmap::ComputeSize(SkBitmap::kARGB_8888_Config,
-                                              size.width(), size.height()));
+  DCHECK(bitmap->pixels());
 
   SkBitmap zoomed_bitmap;
   zoomed_bitmap.setConfig(SkBitmap::kARGB_8888_Config,
       size.width(), size.height());
-  zoomed_bitmap.setPixels(dib->memory());
+  zoomed_bitmap.setPixels(bitmap->pixels());
 
 #if defined(OS_ANDROID)
   if (view_)
@@ -1813,8 +1770,7 @@ void RenderWidgetHostImpl::OnShowDisambiguationPopup(
 #endif
 
   zoomed_bitmap.setPixels(0);
-  Send(new ViewMsg_ReleaseDisambiguationPopupDIB(GetRoutingID(),
-                                                 dib->handle()));
+  Send(new ViewMsg_ReleaseDisambiguationPopupBitmap(GetRoutingID(), id));
 }
 
 #if defined(OS_WIN)
@@ -1959,13 +1915,10 @@ void RenderWidgetHostImpl::OnWheelEventAck(
         ui::INPUT_EVENT_LATENCY_TERMINATED_MOUSE_COMPONENT, 0, 0);
   }
 
-  bool consumed = (INPUT_EVENT_ACK_STATE_CONSUMED == ack_result);
-  if (!is_hidden() && view_) {
-    // If the renderer did not consume the event, give the delegate a chance
-    // to consume it.
-    if (!consumed)
-      consumed = delegate_->HandleWheelEvent(wheel_event.event);
-    view_->HandledWheelEvent(wheel_event.event, consumed);
+  const bool processed = (INPUT_EVENT_ACK_STATE_CONSUMED == ack_result);
+  if (!processed && !is_hidden() && view_) {
+    if (!delegate_->HandleWheelEvent(wheel_event.event))
+      view_->UnhandledWheelEvent(wheel_event.event);
   }
 }
 

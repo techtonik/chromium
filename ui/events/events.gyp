@@ -85,6 +85,7 @@
       'sources': [
         'cocoa/cocoa_event_utils.h',
         'cocoa/cocoa_event_utils.mm',
+        'cocoa/events_mac.mm',
         'event.cc',
         'event.h',
         'event_dispatcher.cc',
@@ -166,7 +167,7 @@
       'conditions': [
         # We explicitly enumerate the platforms we _do_ provide native cracking
         # for here.
-        ['OS=="win" or use_x11==1 or use_ozone==1', {
+        ['OS=="win" or OS=="mac" or use_x11==1 or use_ozone==1', {
           'sources!': [
             'events_stub.cc',
           ],
@@ -328,8 +329,8 @@
         '<(DEPTH)/base/base.gyp:run_all_unittests',
         '<(DEPTH)/base/base.gyp:test_support_base',
         '<(DEPTH)/testing/gtest.gyp:gtest',
-        '../gfx/gfx.gyp:gfx',
         '../gfx/gfx.gyp:gfx_geometry',
+        '../gfx/gfx.gyp:gfx_test_support',
         'dom4_keycode_converter',
         'events',
         'events_base',
@@ -337,7 +338,7 @@
         'gesture_detection'
       ],
       'sources': [
-        'cocoa/cocoa_event_utils_unittest.mm',
+        'cocoa/events_mac_unittest.mm',
         'event_dispatcher_unittest.cc',
         'event_processor_unittest.cc',
         'event_rewriter_unittest.cc',

@@ -355,6 +355,10 @@
       # controls coverage granularity (experimental).
       'asan_coverage%': 0,
 
+      # Enable Chromium overrides of the default configurations for various
+      # dynamic tools (like ASan).
+      'use_sanitizer_options%': 1,
+
       # Enable building with SyzyAsan.
       # See https://code.google.com/p/sawbuck/wiki/SyzyASanHowTo
       'syzyasan%': 0,
@@ -582,7 +586,7 @@
         }],
 
         # Flags to use glib.
-        ['OS=="win" or OS=="mac" or OS=="ios" or OS=="android" or embedded==1', {
+        ['OS=="win" or OS=="mac" or OS=="ios" or OS=="android" or use_ozone==1', {
           'use_glib%': 0,
         }, {
           'use_glib%': 1,
@@ -725,8 +729,8 @@
         # linux_use_bundled_gold: whether to use the gold linker binary checked
         # into third_party/binutils.  Force this off via GYP_DEFINES when you
         # are using a custom toolchain and need to control -B in ldflags.
-        # Gold is not used for 32-bit linux builds as it runs out of address
-        # space.
+        # Do not use 32-bit gold on 32-bit hosts as it runs out address space
+        # for component=static_library builds.
         ['OS=="linux" and (target_arch=="x64" or target_arch=="arm")', {
           'linux_use_bundled_gold%': 1,
         }, {
@@ -979,6 +983,7 @@
     'mac_want_real_dsym%': '<(mac_want_real_dsym)',
     'asan%': '<(asan)',
     'asan_coverage%': '<(asan_coverage)',
+    'use_sanitizer_options%': '<(use_sanitizer_options)',
     'syzyasan%': '<(syzyasan)',
     'syzygy_optimize%': '<(syzygy_optimize)',
     'lsan%': '<(lsan)',
@@ -1359,7 +1364,7 @@
           # TODO(glider): set clang to 1 earlier for ASan and TSan builds so
           # that it takes effect here.
           ['clang==0 and asan==0 and lsan==0 and tsan==0 and msan==0', {
-            'binutils_version%': '<!pymod_do_main(compiler_version assembler)',
+            'binutils_version%': '<!pymod_do_main(compiler_version target assembler)',
           }],
           # On Android we know the binutils version in the toolchain.
           ['OS=="android"', {
@@ -1385,9 +1390,10 @@
       # TODO(glider): set clang to 1 earlier for ASan and TSan builds so that
       # it takes effect here.
       ['os_posix==1 and OS!="mac" and OS!="ios" and clang==0 and asan==0 and lsan==0 and tsan==0 and msan==0', {
+        'host_gcc_version%': '<!pymod_do_main(compiler_version host compiler)',
         'conditions': [
           ['OS=="android"', {
-            # We directly set the gcc_version since we know what we use.
+            # We directly set the gcc versions since we know what we use.
             'conditions': [
               ['target_arch=="x64" or target_arch=="arm64"', {
                 'gcc_version%': 48,
@@ -1396,10 +1402,11 @@
               }],
             ],
           }, {
-            'gcc_version%': '<!pymod_do_main(compiler_version)',
+            'gcc_version%': '<!pymod_do_main(compiler_version target compiler)',
           }],
         ],
       }, {
+        'host_gcc_version%': 0,
         'gcc_version%': 0,
       }],
       ['OS=="win" and "<!pymod_do_main(dir_exists <(windows_sdk_default_path))"=="True"', {
@@ -1438,6 +1445,16 @@
             # Omit unwind support in official release builds to save space. We
             # can use breakpad for these builds.
             'release_unwind_tables%': 0,
+
+            'conditions': [
+              # For official builds, use a 64-bit linker to avoid running out
+              # of address space. The buildbots should have a 64-bit kernel
+              # and a 64-bit libc installed.
+              ['host_arch=="ia32" and target_arch=="ia32"', {
+                'linux_use_bundled_gold%': '1',
+                'binutils_dir%': 'third_party/binutils/Linux_x64/Release/bin',
+              }],
+            ],
           }],
         ],
       }],  # os_posix==1 and OS!="mac" and OS!="ios"
@@ -1519,12 +1536,14 @@
               'android_app_abi%': 'x86',
               'android_gdbserver%': '<(android_ndk_root)/prebuilt/android-x86/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-14/arch-x86',
+              'android_ndk_lib_dir%': 'usr/lib',
               'android_toolchain%': '<(android_ndk_root)/toolchains/x86-4.6/prebuilt/<(host_os)-<(android_host_arch)/bin',
             }],
             ['target_arch == "x64"', {
               'android_app_abi%': 'x86_64',
               'android_gdbserver%': '<(android_ndk_experimental_root)/prebuilt/android-x86_64/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_experimental_root)/platforms/android-20/arch-x86_64',
+              'android_ndk_lib_dir%': 'usr/lib64',
               'android_toolchain%': '<(android_ndk_experimental_root)/toolchains/x86_64-4.8/prebuilt/<(host_os)-<(android_host_arch)/bin',
               'android_stlport_root': '<(android_ndk_experimental_root)/sources/cxx-stl/stlport',
             }],
@@ -1538,19 +1557,22 @@
               ],
               'android_gdbserver%': '<(android_ndk_root)/prebuilt/android-arm/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-14/arch-arm',
+              'android_ndk_lib_dir%': 'usr/lib',
               'android_toolchain%': '<(android_ndk_root)/toolchains/arm-linux-androideabi-4.6/prebuilt/<(host_os)-<(android_host_arch)/bin',
             }],
             ['target_arch == "arm64"', {
               'android_app_abi%': 'arm64-v8a',
               'android_gdbserver%': '<(android_ndk_experimental_root)/prebuilt/android-arm64/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_experimental_root)/platforms/android-20/arch-arm64',
-              'android_toolchain%': '<(android_ndk_experimental_root)/toolchains/aarch64-linux-android-4.8/prebuilt/<(host_os)-<(android_host_arch)/bin',
+              'android_ndk_lib_dir%': 'usr/lib',
+              'android_toolchain%': '<(android_ndk_experimental_root)/toolchains/aarch64-linux-android-4.9/prebuilt/<(host_os)-<(android_host_arch)/bin',
               'android_stlport_root': '<(android_ndk_experimental_root)/sources/cxx-stl/stlport',
             }],
             ['target_arch == "mipsel"', {
               'android_app_abi%': 'mips',
               'android_gdbserver%': '<(android_ndk_root)/prebuilt/android-mips/gdbserver/gdbserver',
               'android_ndk_sysroot%': '<(android_ndk_root)/platforms/android-14/arch-mips',
+              'android_ndk_lib_dir%': 'usr/lib',
               'android_toolchain%': '<(android_ndk_root)/toolchains/mipsel-linux-android-4.6/prebuilt/<(host_os)-<(android_host_arch)/bin',
             }],
           ],
@@ -1565,7 +1587,7 @@
         'android_toolchain%': '<(android_toolchain)',
 
         'android_ndk_include': '<(android_ndk_sysroot)/usr/include',
-        'android_ndk_lib': '<(android_ndk_sysroot)/usr/lib',
+        'android_ndk_lib': '<(android_ndk_sysroot)/<(android_ndk_lib_dir)',
         'android_sdk_tools%': '<(android_sdk_tools)',
         'android_sdk%': '<(android_sdk)',
         'android_sdk_jar%': '<(android_sdk)/android.jar',
@@ -3163,11 +3185,6 @@
             'conditions' : [
               ['OS=="android"', {
                 'ldflags': [
-                  # Only link with needed input sections. This is to avoid
-                  # getting undefined reference to __cxa_bad_typeid in the CDU
-                  # library.
-                  # TODO(primiano): remove below as soon as WebRTC r5898 rolls.
-                  '-Wl,--gc-sections',
                   # Warn in case of text relocations.
                   '-Wl,--warn-shared-textrel',
                 ],
@@ -3654,7 +3671,7 @@
             ],
             # TODO(glider): enable the default options on other systems.
             'conditions': [
-              ['OS=="linux" and (chromeos==0 or target_arch!="ia32")', {
+              ['use_sanitizer_options==1 and OS=="linux" and (chromeos==0 or target_arch!="ia32")', {
                 'dependencies': [
                   '<(DEPTH)/base/base.gyp:sanitizer_options',
                 ],
@@ -3715,7 +3732,7 @@
                 'cflags': [
                   '-fsanitize=thread',
                   '-fPIC',
-                  '-mllvm', '-tsan-blacklist=<(tsan_blacklist)',
+                  '-fsanitize-blacklist=<(tsan_blacklist)',
                 ],
                 'ldflags': [
                   '-fsanitize=thread',
@@ -3793,16 +3810,14 @@
           ['linux_dump_symbols==1', {
             'cflags': [ '-g' ],
             'conditions': [
-              # TODO(thestig) We should not need to specify chromeos==0 here,
-              # but somehow ChromeOS uses gold despite linux_use_bundled_gold==0.
-              # http://crbug.com./360082
-              ['linux_use_bundled_gold==0 and chromeos==0 and OS!="android"', {
+              ['OS=="linux" and host_arch=="ia32" and linux_use_bundled_gold==0', {
                 'target_conditions': [
                   ['_toolset=="target"', {
                     'ldflags': [
-                      # Workarounds for linker OOM.
+                      # Attempt to use less memory to prevent the linker from
+                      # running out of address space. Considering installing a
+                      # 64-bit kernel and switching to a 64-bit linker.
                       '-Wl,--no-keep-memory',
-                      '-Wl,--reduce-memory-overheads',
                     ],
                   }],
                 ],
@@ -3850,13 +3865,29 @@
               # TODO(mithro): Watch for clang support at following thread:
               # http://clang-developers.42468.n3.nabble.com/Adding-fuse-ld-support-to-clang-td4032180.html
               ['gcc_version>=48', {
-                'cflags': [
-                  '-fuse-ld=gold',
+                'target_conditions': [
+                  ['_toolset=="target"', {
+                    'cflags': [
+                      '-fuse-ld=gold',
+                    ],
+                    'ldflags': [
+                      '-fuse-ld=gold',
+                    ],
+                  }],
                 ],
-                'ldflags': [
-                  '-fuse-ld=gold',
+              }],
+              ['host_gcc_version>=48', {
+                'target_conditions': [
+                  ['_toolset=="host"', {
+                    'cflags': [
+                      '-fuse-ld=gold',
+                    ],
+                    'ldflags': [
+                      '-fuse-ld=gold',
+                    ],
+                  }],
                 ],
-              }]
+              }],
             ],
           }],
           ['linux_use_bundled_binutils==1', {
@@ -3873,7 +3904,10 @@
               '-B<!(cd <(DEPTH) && pwd -P)/<(binutils_dir)',
             ],
           }],
-          ['binutils_version>=224', {
+          # Some binutils 2.23 releases may or may not have new dtags enabled,
+          # but they are all compatible with --disable-new-dtags,
+          # because the new dynamic tags are not created by default.
+          ['binutils_version>=223', {
             # Newer binutils don't set DT_RPATH unless you disable "new" dtags
             # and the new DT_RUNPATH doesn't work without --no-as-needed flag.
             # FIXME(mithro): Figure out the --as-needed/--no-as-needed flags

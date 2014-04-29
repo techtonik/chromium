@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "base/android/jni_android.h"
-#include "base/android/jni_helper.h"
+#include "base/android/jni_weak_ref.h"
 #include "base/basictypes.h"
 #include "base/compiler_specific.h"
 #include "base/i18n/rtl.h"
@@ -91,8 +91,6 @@ class ContentViewCoreImpl : public ContentViewCore,
       jstring virtual_url_for_data_url,
       jboolean can_load_local_resources);
   base::android::ScopedJavaLocalRef<jstring> GetURL(JNIEnv* env, jobject) const;
-  base::android::ScopedJavaLocalRef<jstring> GetTitle(
-      JNIEnv* env, jobject obj) const;
   jboolean IsIncognito(JNIEnv* env, jobject obj);
   void SendOrientationChangeEvent(JNIEnv* env, jobject obj, jint orientation);
   jboolean OnTouchEvent(JNIEnv* env,
@@ -153,7 +151,6 @@ class ContentViewCoreImpl : public ContentViewCore,
 
   void LoadIfNecessary(JNIEnv* env, jobject obj);
   void RequestRestoreLoad(JNIEnv* env, jobject obj);
-  void StopLoading(JNIEnv* env, jobject obj);
   void Reload(JNIEnv* env, jobject obj, jboolean check_for_repost);
   void ReloadIgnoringCache(JNIEnv* env, jobject obj, jboolean check_for_repost);
   void CancelPendingReload(JNIEnv* env, jobject obj);
@@ -296,6 +293,9 @@ class ContentViewCoreImpl : public ContentViewCore,
   bool ShouldBlockMediaRequest(const GURL& url);
 
   void DidStopFlinging();
+
+  // Returns the viewport size after accounting for the viewport offset.
+  gfx::Size GetViewSize() const;
 
   // --------------------------------------------------------------------------
   // Methods called from native code

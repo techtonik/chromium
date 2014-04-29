@@ -17,13 +17,9 @@
 #include "base/strings/string16.h"
 #include "base/synchronization/lock.h"
 #include "base/synchronization/waitable_event.h"
-#include "base/task/cancelable_task_tracker.h"
+#include "components/bookmarks/core/browser/bookmark_client.h"
 #include "components/bookmarks/core/browser/bookmark_node.h"
 #include "components/bookmarks/core/browser/bookmark_service.h"
-#include "components/favicon_base/favicon_types.h"
-#include "components/keyed_service/core/keyed_service.h"
-#include "content/public/browser/notification_observer.h"
-#include "content/public/browser/notification_registrar.h"
 #include "ui/gfx/image/image.h"
 #include "url/gurl.h"
 
@@ -32,16 +28,21 @@ class BookmarkIndex;
 class BookmarkLoadDetails;
 class BookmarkModelObserver;
 class BookmarkStorage;
-struct BookmarkTitleMatch;
-class Profile;
+struct BookmarkMatch;
+class PrefService;
 class ScopedGroupBookmarkActions;
 
 namespace base {
+class FilePath;
 class SequencedTaskRunner;
 }
 
-namespace chrome {
+namespace favicon_base {
 struct FaviconImageResult;
+}
+
+namespace test {
+class TestBookmarkClient;
 }
 
 // BookmarkModel --------------------------------------------------------------
@@ -54,20 +55,25 @@ struct FaviconImageResult;
 //
 // You should NOT directly create a BookmarkModel, instead go through the
 // BookmarkModelFactory.
-class BookmarkModel : public content::NotificationObserver,
-                      public BookmarkService,
-                      public KeyedService {
+class BookmarkModel : public BookmarkService {
  public:
-  explicit BookmarkModel(Profile* profile);
+  // |index_urls| says whether URLs should be stored in the BookmarkIndex
+  // in addition to bookmark titles.
+  BookmarkModel(BookmarkClient* client, bool index_urls);
   virtual ~BookmarkModel();
 
   // Invoked prior to destruction to release any necessary resources.
-  virtual void Shutdown() OVERRIDE;
+  void Shutdown();
 
   // Loads the bookmarks. This is called upon creation of the
   // BookmarkModel. You need not invoke this directly.
-  // All load operations will be executed on |task_runner|.
-  void Load(const scoped_refptr<base::SequencedTaskRunner>& task_runner);
+  // All load operations will be executed on |io_task_runner| and the completion
+  // callback will be called from |ui_task_runner|.
+  void Load(PrefService* pref_service,
+            const std::string& accept_languages,
+            const base::FilePath& profile_path,
+            const scoped_refptr<base::SequencedTaskRunner>& io_task_runner,
+            const scoped_refptr<base::SequencedTaskRunner>& ui_task_runner);
 
   // Returns true if the model finished loading.
   bool loaded() const { return loaded_; }
@@ -178,18 +184,27 @@ class BookmarkModel : public content::NotificationObserver,
                                 int index,
                                 const base::string16& title);
 
+  // Adds a new folder with meta info.
+  const BookmarkNode* AddFolderWithMetaInfo(
+      const BookmarkNode* parent,
+      int index,
+      const base::string16& title,
+      const BookmarkNode::MetaInfoMap* meta_info);
+
   // Adds a url at the specified position.
   const BookmarkNode* AddURL(const BookmarkNode* parent,
                              int index,
                              const base::string16& title,
                              const GURL& url);
 
-  // Adds a url with a specific creation date.
-  const BookmarkNode* AddURLWithCreationTime(const BookmarkNode* parent,
-                                             int index,
-                                             const base::string16& title,
-                                             const GURL& url,
-                                             const base::Time& creation_time);
+  // Adds a url with a specific creation date and meta info.
+  const BookmarkNode* AddURLWithCreationTimeAndMetaInfo(
+      const BookmarkNode* parent,
+      int index,
+      const base::string16& title,
+      const GURL& url,
+      const base::Time& creation_time,
+      const BookmarkNode::MetaInfoMap* meta_info);
 
   // Sorts the children of |parent|, notifying observers by way of the
   // BookmarkNodeChildrenReordered method.
@@ -210,10 +225,12 @@ class BookmarkModel : public content::NotificationObserver,
   // combobox of most recently modified folders.
   void ResetDateFolderModified(const BookmarkNode* node);
 
-  void GetBookmarksWithTitlesMatching(
+  // Returns up to |max_count| of bookmarks containing each term from |text|
+  // in either the title or the URL.
+  void GetBookmarksMatching(
       const base::string16& text,
       size_t max_count,
-      std::vector<BookmarkTitleMatch>* matches);
+      std::vector<BookmarkMatch>* matches);
 
   // Sets the store to NULL, making it so the BookmarkModel does not persist
   // any changes to disk. This is only useful during testing to speed up
@@ -245,14 +262,19 @@ class BookmarkModel : public content::NotificationObserver,
   void SetNodeSyncTransactionVersion(const BookmarkNode* node,
                                      int64 sync_transaction_version);
 
-  // Returns the profile that corresponds to this BookmarkModel.
-  Profile* profile() { return profile_; }
+  // Notify BookmarkModel that the favicons for |urls| have changed and have to
+  // be refetched. This notification is sent by BookmarkClient.
+  void OnFaviconChanged(const std::set<GURL>& urls);
+
+  // Returns the client used by this BookmarkModel.
+  BookmarkClient* client() const { return client_; }
 
  private:
   friend class BookmarkCodecTest;
   friend class BookmarkModelTest;
   friend class BookmarkStorage;
   friend class ScopedGroupBookmarkActions;
+  friend class test::TestBookmarkClient;
 
   // Used to order BookmarkNodes by URL.
   class NodeURLComparator {
@@ -274,7 +296,7 @@ class BookmarkModel : public content::NotificationObserver,
 
   // Invoked when loading is finished. Sets |loaded_| and notifies observers.
   // BookmarkModel takes ownership of |details|.
-  void DoneLoading(BookmarkLoadDetails* details);
+  void DoneLoading(scoped_ptr<BookmarkLoadDetails> details);
 
   // Populates |nodes_ordered_by_url_set_| from root.
   void PopulateNodesByURL(BookmarkNode* node);
@@ -292,10 +314,6 @@ class BookmarkModel : public content::NotificationObserver,
 
   // Remove |node| from |nodes_ordered_by_url_set_|.
   void RemoveNodeFromURLSet(BookmarkNode* node);
-
-  // Notifies the history backend about urls of removed bookmarks.
-  void NotifyHistoryAboutRemovedBookmarks(
-      const std::set<GURL>& removed_bookmark_urls) const;
 
   // Adds the |node| at |parent| in the specified |index| and notifies its
   // observers.
@@ -331,11 +349,6 @@ class BookmarkModel : public content::NotificationObserver,
   void BeginGroupedChanges();
   void EndGroupedChanges();
 
-  // content::NotificationObserver:
-  virtual void Observe(int type,
-                       const content::NotificationSource& source,
-                       const content::NotificationDetails& details) OVERRIDE;
-
   // Generates and returns the next node ID.
   int64 generate_next_node_id();
 
@@ -346,11 +359,10 @@ class BookmarkModel : public content::NotificationObserver,
 
   // Creates and returns a new BookmarkLoadDetails. It's up to the caller to
   // delete the returned object.
-  BookmarkLoadDetails* CreateLoadDetails();
+  scoped_ptr<BookmarkLoadDetails> CreateLoadDetails(
+      const std::string& accept_languages);
 
-  content::NotificationRegistrar registrar_;
-
-  Profile* profile_;
+  BookmarkClient* const client_;
 
   // Whether the initial set of data has been loaded.
   bool loaded_;
@@ -384,6 +396,10 @@ class BookmarkModel : public content::NotificationObserver,
   scoped_refptr<BookmarkStorage> store_;
 
   scoped_ptr<BookmarkIndex> index_;
+
+  // True if URLs are stored in the BookmarkIndex in addition to bookmark
+  // titles.
+  const bool index_urls_;
 
   base::WaitableEvent loaded_signal_;
 

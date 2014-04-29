@@ -5,6 +5,16 @@
   'variables': {
     'chromium_code': 1,
   },
+  'target_defaults': {
+    'conditions': [
+      ['use_aura==1', {
+        'dependencies': [
+          '../aura/aura.gyp:aura',
+          '../wm/wm.gyp:wm',
+        ],
+      }],
+    ],
+  },
   'targets': [
     {
       'target_name': 'views',
@@ -19,7 +29,6 @@
         '../../url/url.gyp:url_lib',
         '../accessibility/accessibility.gyp:accessibility',
         '../accessibility/accessibility.gyp:ax_gen',
-        '../aura/aura.gyp:aura',
         '../base/strings/ui_strings.gyp:ui_strings',
         '../base/ui_base.gyp:ui_base',
         '../compositor/compositor.gyp:compositor',
@@ -29,7 +38,6 @@
         '../gfx/gfx.gyp:gfx_geometry',
         '../native_theme/native_theme.gyp:native_theme',
         '../resources/ui_resources.gyp:ui_resources',
-        '../wm/wm.gyp:wm',
       ],
       'export_dependent_settings': [
         '../accessibility/accessibility.gyp:ax_gen',
@@ -232,9 +240,6 @@
         'drag_controller.h',
         'drag_utils.cc',
         'drag_utils.h',
-        'event_utils.h',
-        'event_utils_aura.cc',
-        'event_utils_win.cc',
         'focus/external_focus_tracker.cc',
         'focus/external_focus_tracker.h',
         'focus/focus_manager.cc',
@@ -267,7 +272,6 @@
         'layout/layout_manager.h',
         'linux_ui/linux_ui.h',
         'linux_ui/linux_ui.cc',
-        'linux_ui/native_theme_change_observer.h',
         'linux_ui/status_icon_linux.h',
         'linux_ui/status_icon_linux.cc',
         'linux_ui/window_button_order_observer.h',
@@ -279,6 +283,9 @@
         'mouse_watcher.h',
         'mouse_watcher_view_host.cc',
         'mouse_watcher_view_host.h',
+        'native_cursor.h',
+        'native_cursor_aura.cc',
+        'native_cursor_mac.mm',
         'native_theme_delegate.h',
         'painter.cc',
         'painter.h',
@@ -296,7 +303,6 @@
         'touchui/touch_selection_controller_impl.h',
         'view.cc',
         'view.h',
-        'view_aura.cc',
         'view_constants.cc',
         'view_constants.h',
         'view_constants_aura.cc',
@@ -311,6 +317,9 @@
         'views_switches.h',
         'views_delegate.cc',
         'views_delegate.h',
+        'views_touch_selection_controller_factory.h',
+        'views_touch_selection_controller_factory_aura.cc',
+        'views_touch_selection_controller_factory_mac.cc',
         'widget/desktop_aura/desktop_capture_client.cc',
         'widget/desktop_aura/desktop_capture_client.h',
         'widget/desktop_aura/desktop_cursor_loader_updater.h',
@@ -507,14 +516,11 @@
         '../../ipc/ipc.gyp:test_support_ipc',
         '../../skia/skia.gyp:skia',
         '../../testing/gtest.gyp:gtest',
-        '../aura/aura.gyp:aura',
-        '../aura/aura.gyp:aura_test_support',
         '../base/ui_base.gyp:ui_base',
         '../compositor/compositor.gyp:compositor',
         '../events/events.gyp:events',
         '../gfx/gfx.gyp:gfx',
         '../gfx/gfx.gyp:gfx_geometry',
-        '../wm/wm.gyp:wm',
         'views',
       ],
       'include_dirs': [
@@ -551,6 +557,11 @@
             'test/ui_controls_factory_desktop_aurax11.h',
           ],
         }],
+        ['use_aura==1', {
+          'dependencies': [
+            '../aura/aura.gyp:aura_test_support',
+          ],
+        }],
       ],
     },  # target_name: views_test_support
     {
@@ -566,10 +577,9 @@
         '../../third_party/icu/icu.gyp:icuuc',
         '../../url/url.gyp:url_lib',
         '../accessibility/accessibility.gyp:accessibility',
-        '../aura/aura.gyp:aura',
-        '../aura/aura.gyp:aura_test_support',
         '../base/strings/ui_strings.gyp:ui_strings',
         '../base/ui_base.gyp:ui_base',
+        '../base/ui_base.gyp:ui_base_test_support',
         '../compositor/compositor.gyp:compositor',
         '../compositor/compositor.gyp:compositor_test_support',
         '../events/events.gyp:events',
@@ -577,8 +587,6 @@
         '../gfx/gfx.gyp:gfx_geometry',
         '../resources/ui_resources.gyp:ui_resources',
         '../resources/ui_resources.gyp:ui_test_pak',
-        '../ui_unittests.gyp:ui_test_support',
-        '../wm/wm.gyp:wm',
         'views',
         'views_test_support',
       ],
@@ -691,6 +699,11 @@
         ['use_ozone==1', {
           'sources!': [
             'corewm/capture_controller_unittest.cc',
+          ],
+        }],
+        ['use_aura==1', {
+          'dependencies': [
+            '../aura/aura.gyp:aura_test_support',
           ],
         }],
       ],
