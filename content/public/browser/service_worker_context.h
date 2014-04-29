@@ -7,7 +7,7 @@
 
 #include "base/basictypes.h"
 #include "base/callback_forward.h"
-#include "base/memory/weak_ptr.h"
+#include "base/memory/ref_counted.h"
 #include "url/gurl.h"
 
 namespace IPC {
@@ -18,6 +18,7 @@ class Message;
 namespace content {
 
 class ServiceWorkerHost;
+class ServiceWorkerHostClient;
 
 // Represents the per-StoragePartition ServiceWorker data.  Must be used from
 // the UI thread.
@@ -27,14 +28,18 @@ class ServiceWorkerContext {
   // roughly, must be of the form "<origin>/<path>/*".
   typedef GURL Scope;
 
-  typedef base::Callback<void(base::WeakPtr<ServiceWorkerHost>)> WorkerCallback;
+  typedef base::Callback<void(scoped_refptr<ServiceWorkerHost>)>
+      ServiceWorkerHostCallback;
   typedef base::Callback<void(bool)> ResultCallback;
 
   // Equivalent to calling navigator.serviceWorker.register(script_url, {scope:
   // pattern}) from a renderer in |source_process_id|, except that |pattern| is
-  // an absolute URL instead of relative to some current origin.  |callback| is
-  // passed true when the JS promise is fulfilled or false when the JS
-  // promise is rejected.
+  // an absolute URL instead of relative to some current origin.
+  //
+  // Optionally provide a |client| for communication from the service worker.
+  //
+  // |callback| is passed a |ServiceWorkerHost| when the JS promise is fulfilled
+  // or NULL when the JS promise is rejected.
   //
   // The registration can fail if:
   //  * |script_url| is on a different origin from |pattern|
@@ -42,10 +47,12 @@ class ServiceWorkerContext {
   //  * |script_url| fails to parse or its top-level execution fails.
   //    TODO: The error message for this needs to be available to developers.
   //  * Something unexpected goes wrong, like a renderer crash or a full disk.
-  virtual void RegisterServiceWorker(const Scope& pattern,
-                                     const GURL& script_url,
-                                     int source_process_id,
-                                     const WorkerCallback& callback) = 0;
+  virtual void RegisterServiceWorker(
+      const Scope& pattern,
+      const GURL& script_url,
+      int source_process_id,
+      ServiceWorkerHostClient* client,
+      const ServiceWorkerHostCallback& callback) = 0;
 
   // Equivalent to calling navigator.serviceWorker.unregister(pattern) from a
   // renderer in |source_process_id|, except that |pattern| is an absolute URL
@@ -65,10 +72,11 @@ class ServiceWorkerContext {
   // become unavailable the ServiceWorkerHost will be deleted; test the weak
   // pointer before use.
   //
-  // Optionally provide a |listener| that will be reattached during normal
-  // service worker process lifetime events of being shutdown and restarted.
-  virtual void GetServiceWorkerHost(const Scope& scope,
-                                    const WorkerCallback& callback) = 0;
+  // Optionally provide a |client| for communication from the service worker.
+  virtual void GetServiceWorkerHost(
+      const Scope& scope,
+      ServiceWorkerHostClient* client,
+      const ServiceWorkerHostCallback& callback) = 0;
 
  protected:
   ServiceWorkerContext() {}

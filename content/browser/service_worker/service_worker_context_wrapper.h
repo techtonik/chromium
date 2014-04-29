@@ -48,13 +48,15 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
       const Scope& scope,
       const GURL& script_url,
       int source_process_id,
-      const WorkerCallback& continuation) OVERRIDE;
-  virtual void UnregisterServiceWorker(
+      ServiceWorkerHostClient* client,
+      const ServiceWorkerHostCallback& callback) OVERRIDE;
+  virtual void UnregisterServiceWorker(const Scope& scope,
+                                       int source_process_id,
+                                       const ResultCallback& callback) OVERRIDE;
+  virtual void GetServiceWorkerHost(
       const Scope& scope,
-      int source_process_id,
-      const ResultCallback& continuation) OVERRIDE;
-  virtual void GetServiceWorkerHost(const Scope& scope,
-                                    const WorkerCallback& callback) OVERRIDE;
+      ServiceWorkerHostClient* client,
+      const ServiceWorkerHostCallback& callback) OVERRIDE;
 
   void AddObserver(ServiceWorkerContextObserver* observer);
   void RemoveObserver(ServiceWorkerContextObserver* observer);
@@ -65,7 +67,8 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
 
   // Completes the registration process on IO thread.
   void FinishRegistrationOnIO(const Scope& scope,
-                              const WorkerCallback& callback,
+                              ServiceWorkerHostClient* client,
+                              const ServiceWorkerHostCallback& callback,
                               ServiceWorkerStatusCode status,
                               int64 registration_id,
                               int64 version_id);

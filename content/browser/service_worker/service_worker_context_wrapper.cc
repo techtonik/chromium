@@ -9,6 +9,8 @@
 #include "content/browser/service_worker/service_worker_context_observer.h"
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/service_worker_host.h"
+#include "content/public/browser/service_worker_host_client.h"
 #include "ipc/ipc_message.h"
 #include "webkit/browser/quota/quota_manager_proxy.h"
 
@@ -77,7 +79,8 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
     const Scope& scope,
     const GURL& script_url,
     int source_process_id,
-    const WorkerCallback& continuation) {
+    ServiceWorkerHostClient* client,
+    const ServiceWorkerHostCallback& callback) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
     BrowserThread::PostTask(
         BrowserThread::IO,
@@ -87,7 +90,8 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
                    scope,
                    script_url,
                    source_process_id,
-                   continuation));
+                   client,
+                   callback));
     return;
   }
 
@@ -99,13 +103,14 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
       base::Bind(&ServiceWorkerContextWrapper::FinishRegistrationOnIO,
                  this,
                  scope,
-                 continuation));
+                 client,
+                 callback));
 }
 
 void ServiceWorkerContextWrapper::UnregisterServiceWorker(
     const Scope& scope,
     int source_process_id,
-    const ResultCallback& continuation) {
+    const ResultCallback& callback) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
     BrowserThread::PostTask(
         BrowserThread::IO,
@@ -114,7 +119,7 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
                    this,
                    scope,
                    source_process_id,
-                   continuation));
+                   callback));
     return;
   }
 
@@ -122,12 +127,13 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
       scope,
       source_process_id,
       NULL /* provider_host */,
-      base::Bind(&PostResultToUIFromStatusOnIO, continuation));
+      base::Bind(&PostResultToUIFromStatusOnIO, callback));
 }
 
 void ServiceWorkerContextWrapper::GetServiceWorkerHost(
     const Scope& scope,
-    const WorkerCallback& callback) {
+    ServiceWorkerHostClient* client,
+    const ServiceWorkerHostCallback& callback) {
   //
   // TODO(scheib) Still need to implement this for this patch.
   //
@@ -146,18 +152,19 @@ void ServiceWorkerContextWrapper::RemoveObserver(
 
 void ServiceWorkerContextWrapper::FinishRegistrationOnIO(
     const Scope& scope,
-    const WorkerCallback& callback,
+    ServiceWorkerHostClient* client,
+    const ServiceWorkerHostCallback& callback,
     ServiceWorkerStatusCode status,
     int64 registration_id,
     int64 version_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   if (status == SERVICE_WORKER_OK) {
-    ServiceWorkerContextWrapper::GetServiceWorkerHost(scope, callback);
+    ServiceWorkerContextWrapper::GetServiceWorkerHost(scope, client, callback);
   } else {
     BrowserThread::PostTask(
         BrowserThread::UI,
         FROM_HERE,
-        base::Bind(callback, base::WeakPtr<ServiceWorkerHost>()));
+        base::Bind(callback, scoped_refptr<ServiceWorkerHost>()));
   }
 }
 
