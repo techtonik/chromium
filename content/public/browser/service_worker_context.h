@@ -10,11 +10,6 @@
 #include "base/memory/ref_counted.h"
 #include "url/gurl.h"
 
-namespace IPC {
-class Listener;
-class Message;
-}  // namespace IPC
-
 namespace content {
 
 class ServiceWorkerHost;
