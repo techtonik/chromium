@@ -25,10 +25,9 @@ void PostResultToUIFromStatusOnIO(
     ServiceWorkerStatusCode status) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   if (!callback.is_null()) {
-    BrowserThread::PostTask(
-        BrowserThread::UI,
-        FROM_HERE,
-        base::Bind(callback, status == SERVICE_WORKER_OK));
+    BrowserThread::PostTask(BrowserThread::UI,
+                            FROM_HERE,
+                            base::Bind(callback, status == SERVICE_WORKER_OK));
   }
 }
 
@@ -97,7 +96,10 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
       script_url,
       source_process_id,
       NULL /* provider_host */,
-      base::Bind(&ServiceWorkerContextWrapper::FinishRegistrationOnIO, this, scope, continuation));
+      base::Bind(&ServiceWorkerContextWrapper::FinishRegistrationOnIO,
+                 this,
+                 scope,
+                 continuation));
 }
 
 void ServiceWorkerContextWrapper::UnregisterServiceWorker(
@@ -126,7 +128,7 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
 void ServiceWorkerContextWrapper::GetServiceWorkerHost(
     const Scope& scope,
     const WorkerCallback& callback) {
-  // 
+  //
   // TODO(scheib) Still need to implement this for this patch.
   //
   NOTIMPLEMENTED();
