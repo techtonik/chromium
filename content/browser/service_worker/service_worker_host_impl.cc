@@ -38,8 +38,14 @@ namespace content {
 
 ServiceWorkerHostImpl::ServiceWorkerHostImpl(
     const GURL& scope,
-    ServiceWorkerContextCore* context_core)
-    : scope_(scope), context_core_(context_core) {
+    ServiceWorkerContextCore* context_core,
+    ServiceWorkerHostClient* client)
+    : scope_(scope), context_core_(context_core), client_(client) {
+  //
+  //
+  // TODO: Register the client and implement interface.
+  //
+  //
 }
 
 bool ServiceWorkerHostImpl::Send(IPC::Message* message) {
@@ -54,6 +60,10 @@ bool ServiceWorkerHostImpl::Send(IPC::Message* message) {
         scope_, base::Bind(&SendMessageAfterFind, message));
   }
   return true;
+}
+
+ServiceWorkerHostImpl::~ServiceWorkerHostImpl() {
+  // TODO: Unregister |client_| from any location it was registered.
 }
 
 ServiceWorkerContextCore* ServiceWorkerHostImpl::context() {

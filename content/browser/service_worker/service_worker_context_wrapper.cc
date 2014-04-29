@@ -7,6 +7,7 @@
 #include "base/files/file_path.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/browser/service_worker/service_worker_context_observer.h"
+#include "content/browser/service_worker/service_worker_host_impl.h"
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/service_worker_host.h"
@@ -134,10 +135,7 @@ void ServiceWorkerContextWrapper::GetServiceWorkerHost(
     const Scope& scope,
     ServiceWorkerHostClient* client,
     const ServiceWorkerHostCallback& callback) {
-  //
-  // TODO(scheib) Still need to implement this for this patch.
-  //
-  NOTIMPLEMENTED();
+  callback.Run(new ServiceWorkerHostImpl(scope, context(), client));
 }
 
 void ServiceWorkerContextWrapper::AddObserver(
