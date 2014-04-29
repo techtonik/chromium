@@ -185,6 +185,7 @@
     'public/browser/save_page_type.h',
     'public/browser/service_worker_context.h',
     'public/browser/service_worker_host.h',
+    'public/browser/service_worker_host_client.h',
     'public/browser/session_storage_namespace.h',
     'public/browser/session_storage_usage_info.h',
     'public/browser/signed_certificate_timestamp_store.h',
