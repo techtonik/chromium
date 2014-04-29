@@ -135,7 +135,9 @@ void ServiceWorkerContextWrapper::GetServiceWorkerHost(
     const Scope& scope,
     ServiceWorkerHostClient* client,
     const ServiceWorkerHostCallback& callback) {
-  callback.Run(new ServiceWorkerHostImpl(scope, context(), client));
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  callback.Run(scoped_ptr<ServiceWorkerHost>(
+      new ServiceWorkerHostImpl(scope, context(), client)));
 }
 
 void ServiceWorkerContextWrapper::AddObserver(
@@ -156,14 +158,17 @@ void ServiceWorkerContextWrapper::FinishRegistrationOnIO(
     int64 registration_id,
     int64 version_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  if (status == SERVICE_WORKER_OK) {
-    ServiceWorkerContextWrapper::GetServiceWorkerHost(scope, client, callback);
-  } else {
-    BrowserThread::PostTask(
-        BrowserThread::UI,
-        FROM_HERE,
-        base::Bind(callback, scoped_refptr<ServiceWorkerHost>()));
-  }
+  //
+  // TODO: Do something if (status != SERVICE_WORKER_OK).
+  //
+  BrowserThread::PostTask(
+      BrowserThread::UI,
+      FROM_HERE,
+      base::Bind(&ServiceWorkerContextWrapper::GetServiceWorkerHost,
+                 this,
+                 scope,
+                 client,
+                 callback));
 }
 
 }  // namespace content

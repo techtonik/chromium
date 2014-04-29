@@ -20,14 +20,16 @@ class ServiceWorkerHostImpl;
 // Refcounted to make sense out of multiple calls to GetServiceWorkerHost and/or
 // RegisterServiceWorker which return the same object. If an individual caller
 // is no longer interested in listening, RemoveListner and drop ref.
-class ServiceWorkerHost : public IPC::Sender,
-                          public base::RefCountedThreadSafe<ServiceWorkerHost> {
+class ServiceWorkerHost : public IPC::Sender {
+ public:
+  virtual ~ServiceWorkerHost() {};
+
   // Identifying attributes.
-  const GURL& scope();
-  const GURL& script();
+  virtual const GURL& scope() = 0;
+  virtual const GURL& script() = 0;
 
   // True when a version is installed and activated.
-  virtual bool HasActiveVersion();
+  virtual bool HasActiveVersion() = 0;
 
   // IPC::Sender interface:
   // Sends a message to the version farthest along in in the install flow,
@@ -38,10 +40,8 @@ class ServiceWorkerHost : public IPC::Sender,
   virtual bool Send(IPC::Message* msg) OVERRIDE;
 
  private:
-  friend class base::RefCountedThreadSafe<ServiceWorkerHost>;
   friend ServiceWorkerHostImpl;
   ServiceWorkerHost() {};
-  virtual ~ServiceWorkerHost() {};
   DISALLOW_COPY_AND_ASSIGN(ServiceWorkerHost);
 };
 

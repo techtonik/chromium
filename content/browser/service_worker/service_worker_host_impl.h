@@ -7,6 +7,8 @@
 
 #include "content/public/browser/service_worker_host.h"
 
+#include "base/memory/weak_ptr.h"
+
 namespace content {
 
 class ServiceWorkerContextCore;
@@ -20,6 +22,11 @@ class ServiceWorkerHostImpl : public ServiceWorkerHost {
                         ServiceWorkerContextCore* context_core,
                         ServiceWorkerHostClient* client);
 
+  // ServiceWorkerHost implementation:
+  virtual const GURL& scope() OVERRIDE;
+  virtual const GURL& script() OVERRIDE;
+  virtual bool HasActiveVersion() OVERRIDE;
+  
   // IPC::Sender implementation.
   virtual bool Send(IPC::Message* msg) OVERRIDE;
 
@@ -30,6 +37,7 @@ class ServiceWorkerHostImpl : public ServiceWorkerHost {
   ServiceWorkerContextCore* context();
 
   const GURL scope_;
+  const GURL script_;  // TODO: implement this existing.
   ServiceWorkerContextCore* context_core_;
   ServiceWorkerHostClient* client_
       ALLOW_UNUSED;  // TODO: remove macro once used

@@ -14,11 +14,12 @@ namespace {
 
 using content::BrowserThread;
 using content::SERVICE_WORKER_OK;
+using content::ServiceWorkerContextCore;
 using content::ServiceWorkerRegistration;
 using content::ServiceWorkerStatusCode;
 using content::ServiceWorkerVersion;
 
-void SendMessageAfterFind(
+void OnRegistrationFoundSendMessage(
     IPC::Message* message,
     ServiceWorkerStatusCode status,
     const scoped_refptr<ServiceWorkerRegistration>& registration) {
@@ -32,6 +33,13 @@ void SendMessageAfterFind(
       *message, ServiceWorkerVersion::StatusCallback());
 }
 
+void SendOnIO(ServiceWorkerContextCore* context,
+              const GURL scope,
+              IPC::Message* message) {
+  context->storage()->FindRegistrationForPattern(
+      scope, base::Bind(&OnRegistrationFoundSendMessage, message));
+}
+
 }  // namespace
 
 namespace content {
@@ -41,6 +49,7 @@ ServiceWorkerHostImpl::ServiceWorkerHostImpl(
     ServiceWorkerContextCore* context_core,
     ServiceWorkerHostClient* client)
     : scope_(scope), context_core_(context_core), client_(client) {
+  NOTIMPLEMENTED();
   //
   //
   // TODO: Register the client and implement interface.
@@ -48,22 +57,25 @@ ServiceWorkerHostImpl::ServiceWorkerHostImpl(
   //
 }
 
-bool ServiceWorkerHostImpl::Send(IPC::Message* message) {
-  if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
-    BrowserThread::PostTask(
-        BrowserThread::IO,
-        FROM_HERE,
-        base::Bind(
-            base::IgnoreResult(&ServiceWorkerHostImpl::Send), this, message));
-  } else {
-    context()->storage()->FindRegistrationForPattern(
-        scope_, base::Bind(&SendMessageAfterFind, message));
-  }
-  return true;
+const GURL& ServiceWorkerHostImpl::scope() {
+  return scope_;
 }
 
-ServiceWorkerHostImpl::~ServiceWorkerHostImpl() {
-  // TODO: Unregister |client_| from any location it was registered.
+const GURL& ServiceWorkerHostImpl::script() {
+  return script_;
+}
+
+bool ServiceWorkerHostImpl::HasActiveVersion() {
+  NOTIMPLEMENTED();  // TODO
+  return false;
+}
+
+bool ServiceWorkerHostImpl::Send(IPC::Message* message) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  BrowserThread::PostTask(BrowserThread::IO,
+                          FROM_HERE,
+                          base::Bind(SendOnIO, context(), scope_, message));
+  return true;
 }
 
 ServiceWorkerContextCore* ServiceWorkerHostImpl::context() {
