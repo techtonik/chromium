@@ -98,6 +98,7 @@ class IOThreadInstallUninstallTest {
 static void FailTest(const std::string& message,
                      const base::Closure& continuation) {
   ADD_FAILURE() << message;
+  continuation.Run();
 }
 
 static void ShutdownWorkers(

@@ -159,8 +159,10 @@ void ServiceWorkerManager::WhenRegistered(
     const base::Closure& failure) {
   base::hash_map<ExtensionId, State>::iterator it =
       states_.find(extension->id());
-  if (it == states_.end())
+  if (it == states_.end()) {
     base::MessageLoop::current()->PostTask(from_here, failure);
+    return;
+  }
 
   State& state = it->second;
   switch (state.registration) {
@@ -185,8 +187,10 @@ void ServiceWorkerManager::WhenUnregistered(
     const base::Closure& failure) {
   base::hash_map<ExtensionId, State>::iterator it =
       states_.find(extension->id());
-  if (it == states_.end())
+  if (it == states_.end()) {
     base::MessageLoop::current()->PostTask(from_here, success);
+    return;
+  }
 
   State& state = it->second;
   switch(state.registration) {
