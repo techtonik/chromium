@@ -57,6 +57,14 @@ ServiceWorkerHostImpl::ServiceWorkerHostImpl(
   //
 }
 
+ServiceWorkerHostImpl::~ServiceWorkerHostImpl() {
+  //
+  //
+  // TODO: Disconnect client from wherever we've registered it
+  //
+  //
+}
+
 const GURL& ServiceWorkerHostImpl::scope() {
   return scope_;
 }
