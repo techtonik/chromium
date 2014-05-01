@@ -8571,6 +8571,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Records events related to devices page.</summary>
 </histogram>
 
+<histogram name="LocalDiscovery.FirewallAccessTime" units="milliseconds">
+  <owner>noamsml@chromium.org</owner>
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Windows only histogram that reports request time spend accessing firewall
+    rules. It's logged once per browser process lifetime, when local discovery
+    is used first time.
+  </summary>
+</histogram>
+
+<histogram name="LocalDiscovery.FirewallState" enum="BooleanEnabled">
+  <owner>noamsml@chromium.org</owner>
+  <owner>vitalybuka@chromium.org</owner>
+  <summary>
+    Windows only histogram that reports, whether a firewall is set, so we can
+    bind inbound sockets. It's logged once per browser process lifetime, when
+    local discovery is used first time.
+  </summary>
+</histogram>
+
 <histogram name="LocalDiscovery.PrivetNotificationsEvent"
     enum="PrivetNotificationsEvent">
   <owner>noamsml@chromium.org</owner>
@@ -13343,6 +13363,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.SpdyHpackEncodedCharacterFrequency" units="ASCII codes">
+  <owner>jgraettinger@chromium.org</owner>
+  <summary>
+    Frequencies of characters observed in request and response headers.
+    Temporarily being collected to inform the construction of an optimized
+    Huffman code for the HTTP/2 specification. Buckets are ASCII codes offset by
+    1.
+  </summary>
+</histogram>
+
 <histogram name="Net.SpdyIPPoolDomainMatch" enum="SpdyIPPoolDomainMatch"
     units="count">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
@@ -15820,6 +15850,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="NewTabPage.BookmarkActionAndroid"
     enum="NewTabPageBookmarkActionAndroid">
+  <obsolete>
+    Deprecated on M33 with the change to native NTP.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     Actions taken by users on partner bookmarks (editing / renaming) on the NTP
@@ -15849,6 +15882,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NewTabPage.MobilePromo" enum="NewTabPageMobilePromo">
+  <obsolete>
+    Deprecated on M33 with the change to native NTP.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     Android: Tallies counts for how the user interacted with the NTP promo page.
@@ -23182,6 +23218,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The time from the creation of SharedWorkerHost until when
     WorkerScriptLoadFailed is called.
+  </summary>
+</histogram>
+
+<histogram name="ShortcutsProvider.QueryIndexTime" units="milliseconds">
+  <owner>davidben@chromium.org</owner>
+  <summary>
+    The time it takes for the ShortcutsProvider to perform a query after the
+    user has typed N characters.
   </summary>
 </histogram>
 
@@ -32731,6 +32775,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="260" label="Media keys default to function keys"/>
   <int value="261" label="Enable WPAD quick check"/>
   <int value="262" label="Wallpaper image"/>
+  <int value="263"
+      label="Enable the use of relay servers by the remote access host"/>
+  <int value="264"
+      label="Restrict the UDP port range used by the remote access host"/>
 </enum>
 
 <enum name="EnterprisePolicyInvalidations" type="int">
@@ -33716,6 +33764,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="746" label="BLUETOOTHSOCKET_GETINFO"/>
   <int value="747" label="BLUETOOTHSOCKET_GETSOCKETS"/>
   <int value="748" label="WEBSTOREPRIVATE_SIGNINFUNCTION"/>
+  <int value="749" label="SHELL_CREATEWINDOW"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -39393,6 +39442,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="6" label="CLOUD_DUPLICATE_SELECTED"/>
   <int value="7" label="REGISTER_PROMO_SHOWN"/>
   <int value="8" label="REGISTER_PROMO_SELECTED"/>
+  <int value="9" label="ACCOUNT_CHANGED"/>
+  <int value="10" label="ADD_ACCOUNT_SELECTED"/>
 </enum>
 
 <enum name="PrintPreviewUserActionType" type="int">
@@ -40689,6 +40740,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="29" label="GoAway Frame Corrupt"/>
   <int value="30" label="RstStream Frame Corrupt"/>
   <int value="31" label="Unexpected Frame (Expected Continuation)"/>
+<!-- More SpdyRstStreamStatus -->
+
+  <int value="32" label="Timeout waiting for settings acknowledgement"/>
+  <int value="33"
+      label="Connection established in response to CONNECT request was
+             abnormally closed"/>
+  <int value="34" label="Peer exhibiting suspect behavior."/>
 </enum>
 
 <enum name="SpdySessionGet" type="int">
@@ -45026,6 +45084,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <suffix name="4" label="N = 4"/>
   <suffix name="5" label="N = 5"/>
   <affected-histogram name="Omnibox.QueryTime"/>
+  <affected-histogram name="ShortcutsProvider.QueryIndexTime"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="QuicPortSelection" separator="">

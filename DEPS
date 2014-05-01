@@ -23,19 +23,19 @@ vars = {
   "libcxxabi_revision": "206024",
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
   "nacl_trunk": "http://src.chromium.org/native_client/trunk",
-  "webkit_revision": "172802",
+  "webkit_revision": "173042",
   "chromium_git": "https://chromium.googlesource.com",
   "chromiumos_git": "https://chromium.googlesource.com/chromiumos",
   "skia_git": "https://skia.googlesource.com",
   "swig_revision": "230490",
-  "nacl_revision": "13018",
+  "nacl_revision": "13106",
   # After changing nacl_revision, run 'glient sync' and check native_client/DEPS
   # to update other nacl_*_revision's.
-  "nacl_tools_revision": "12970",  # native_client/DEPS: tools_rev
+  "nacl_tools_revision": "13077",  # native_client/DEPS: tools_rev
   "google_toolbox_for_mac_revision": "662",
   "libaddressinput_revision": "176",
   "libphonenumber_revision": "621",
-  "libvpx_revision": "263116",
+  "libvpx_revision": "264320",
   "lss_revision": "26",
 
   # These two FFmpeg variables must be updated together.  One is used for SVN
@@ -45,23 +45,23 @@ vars = {
 
   "sfntly_revision": "228",
   "lighttpd_revision": "33737",
-  "skia_revision": "14390",
-  "skia_hash": "f672cead70404080a991ebfb86c38316a4589b23",
+  "skia_revision": "14458",
+  "skia_hash": "6b127cd2b1b2cb4ab5ef995f2f8f937b24f6d682",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   "v8_branch": "trunk",
-  "v8_revision": "21011",
+  "v8_revision": "21064",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
-  "webrtc_revision": "5963",
+  "webrtc_revision": "6029",
   "jsoncpp_revision": "248",
-  "nss_revision": "265958",
+  "nss_revision": "266724",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
-  "swarming_revision": "b19319e0bc258985a01760c4260fcfb2b338db2b",
+  "swarming_revision": "66c1861d7bd0ee72150d1f78ad4fb48e0e9cfde6",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openssl
   # and whatever else without interference from each other.
@@ -74,7 +74,7 @@ vars = {
 
 deps = {
   "src/breakpad/src":
-    (Var("googlecode_url") % "google-breakpad") + "/trunk/src@1318",
+    (Var("googlecode_url") % "google-breakpad") + "/trunk/src@1322",
 
   "src/sdch/open-vcdiff":
     (Var("googlecode_url") % "open-vcdiff") + "/trunk@42",
@@ -168,7 +168,7 @@ deps = {
     (Var("googlecode_url") % "skia") + "/trunk/include@" + Var("skia_revision"),
 
   "src/third_party/ots":
-    (Var("googlecode_url") % "ots") + "/trunk@112",
+    (Var("googlecode_url") % "ots") + "/trunk@113",
 
   "src/third_party/brotli/src":
     Var("chromium_git") +
@@ -242,7 +242,7 @@ deps = {
     (Var("googlecode_url") % "webrtc") + "/trunk/webrtc@" + Var("webrtc_revision"),
 
   "src/third_party/openmax_dl":
-    (Var("googlecode_url") % "webrtc") + "/deps/third_party/openmax@5569",
+    (Var("googlecode_url") % "webrtc") + "/deps/third_party/openmax@6024",
 
   "src/third_party/jsoncpp/source/include":
     (Var("sourceforge_url") % {"repo": "jsoncpp"}) +
@@ -301,7 +301,7 @@ deps = {
 
   "src/chrome/browser/resources/pdf/html_office":
      Var("chromium_git") +
-         "/chromium/html-office-public.git@c29b3dcd20a03c5cec041764d178245b7d306dec",
+         "/chromium/html-office-public.git@eeff97614f65e0578529490d44d412032c3d7359",
 
   "src/third_party/libwebm/source":
     Var("chromium_git") +
@@ -469,7 +469,7 @@ deps_os = {
     # For Linux and Chromium OS.
     "src/third_party/cros_system_api":
       Var("chromiumos_git") + "/platform/system_api.git" +
-      "@916c5d850ca4424b1de79e9e1054f34a23ee2e33",
+      "@b35e305e2348af2be22b633cfb25e176601cb821",
 
     # Note that this is different from Android's freetype repo.
     "src/third_party/freetype2/src":

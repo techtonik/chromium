@@ -289,12 +289,12 @@ const Experiment::Choice kOverlayScrollbarChoices[] = {
 };
 #endif
 
-const Experiment::Choice kMapImageChoices[] = {
+const Experiment::Choice kZeroCopyChoices[] = {
   { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
   { IDS_GENERIC_EXPERIMENT_CHOICE_ENABLED,
-    switches::kEnableMapImage, ""},
+    switches::kEnableZeroCopy, ""},
   { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
-    switches::kDisableMapImage, ""}
+    switches::kDisableZeroCopy, ""}
 };
 
 #if defined(OS_ANDROID)
@@ -1089,6 +1089,14 @@ const Experiment kExperiments[] = {
                               autofill::switches::kDisablePasswordGeneration)
   },
   {
+    "enable-automatic-password-saving",
+    IDS_FLAGS_ENABLE_AUTOMATIC_PASSWORD_SAVING_NAME,
+    IDS_FLAGS_ENABLE_AUTOMATIC_PASSWORD_SAVING_DESCRIPTION,
+    kOsDesktop,
+    SINGLE_VALUE_TYPE(
+        password_manager::switches::kEnableAutomaticPasswordSaving)
+  },
+  {
     "password-manager-reauthentication",
     IDS_FLAGS_PASSWORD_MANAGER_REAUTHENTICATION_NAME,
     IDS_FLAGS_PASSWORD_MANAGER_REAUTHENTICATION_DESCRIPTION,
@@ -1497,11 +1505,18 @@ const Experiment kExperiments[] = {
   },
 #endif
   {
-    "map-image",
-    IDS_FLAGS_MAP_IMAGE_NAME,
-    IDS_FLAGS_MAP_IMAGE_DESCRIPTION,
+    "enable-one-copy",
+    IDS_FLAGS_ONE_COPY_NAME,
+    IDS_FLAGS_ONE_COPY_DESCRIPTION,
     kOsAll,
-    MULTI_VALUE_TYPE(kMapImageChoices)
+    SINGLE_VALUE_TYPE(switches::kEnableOneCopy)
+  },
+  {
+    "enable-zero-copy",
+    IDS_FLAGS_ZERO_COPY_NAME,
+    IDS_FLAGS_ZERO_COPY_DESCRIPTION,
+    kOsAll,
+    MULTI_VALUE_TYPE(kZeroCopyChoices)
   },
 #if defined(OS_CHROMEOS)
   {
@@ -1671,6 +1686,13 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnablePermissionsBubbles)
   },
   {
+    "enable-session-crashed-bubble",
+    IDS_FLAGS_ENABLE_SESSION_CRASHED_BUBBLE_NAME,
+    IDS_FLAGS_ENABLE_SESSION_CRASHED_BUBBLE_DESCRIPTION,
+    kOsWin | kOsLinux,
+    SINGLE_VALUE_TYPE(switches::kEnableSessionCrashedBubble)
+  },
+  {
     "out-of-process-pdf",
     IDS_FLAGS_OUT_OF_PROCESS_PDF_NAME,
     IDS_FLAGS_OUT_OF_PROCESS_PDF_DESCRIPTION,
@@ -1796,7 +1818,23 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_APPS_KEEP_CHROME_ALIVE_DESCRIPTION,
     kOsMac,
     SINGLE_VALUE_TYPE(switches::kAppsKeepChromeAlive)
-  }
+  },
+#endif
+  {
+    "enable-apps-file-associations",
+    IDS_FLAGS_ENABLE_APPS_FILE_ASSOCIATIONS_NAME,
+    IDS_FLAGS_ENABLE_APPS_FILE_ASSOCIATIONS_DESCRIPTION,
+    kOsMac,
+    SINGLE_VALUE_TYPE(switches::kEnableAppsFileAssociations)
+  },
+#if defined(OS_ANDROID)
+  {
+    "enable-embeddedsearch-api",
+    IDS_FLAGS_ENABLE_EMBEDDEDSEARCH_API_NAME,
+    IDS_FLAGS_ENABLE_EMBEDDEDSEARCH_API_DESCRIPTION,
+    kOsAndroid,
+    SINGLE_VALUE_TYPE(switches::kEnableEmbeddedSearchAPI)
+  },
 #endif
 };
 

@@ -354,6 +354,11 @@ const char kDisableQuicPacing[]             = "disable-quic-pacing";
 // This only has an effect if QUIC protocol is enabled.
 const char kDisableQuicPortSelection[]      = "disable-quic-port-selection";
 
+// Disable use of time-base loss detection for QUIC connections.
+// This only has an effect if QUIC protocol is enabled.
+const char kDisableQuicTimeBasedLossDetection[] =
+    "disable-quic-time-based-loss-detection";
+
 // Prevents the URLs of BackgroundContents from being remembered and
 // re-launched when the browser restarts.
 const char kDisableRestoreBackgroundContents[] =
@@ -437,6 +442,9 @@ const char kEnableAppList[]                 = "enable-app-list";
 
 // Enables the <window-controls> tag in platform apps.
 const char kEnableAppWindowControls[]       = "enable-app-window-controls";
+
+// Enable OS integration for Chrome app file associations.
+const char kEnableAppsFileAssociations[]    = "enable-apps-file-associations";
 
 // Show apps windows after the first paint. Windows will be shown significantly
 // later for heavy apps loading resources synchronously but it will be
@@ -602,6 +610,11 @@ const char kEnableQuicPacing[]              = "enable-quic-pacing";
 // This only has an effect if QUIC protocol is enabled.
 const char kEnableQuicPortSelection[]       = "enable-quic-port-selection";
 
+// Enables use of time-base loss detection for QUIC connections.
+// This only has an effect if QUIC protocol is enabled.
+const char kEnableQuicTimeBasedLossDetection[] =
+    "enable-quic-time-based-loss-detection";
+
 // Enables save password prompt bubble.
 const char kEnableSavePasswordBubble[]      = "enable-save-password-bubble";
 
@@ -622,6 +635,9 @@ const char kEnableSearchButtonInOmniboxForStr[] =
     "enable-search-button-in-omnibox-for-str";
 const char kEnableSearchButtonInOmniboxForStrOrIip[] =
     "enable-search-button-in-omnibox-for-str-or-iip";
+
+// Enables using bubbles for session restore request instead of infobars.
+const char kEnableSessionCrashedBubble[] = "enable-session-crashed-bubble";
 
 // Enable settings in a separate browser window per profile.
 const char kEnableSettingsWindow[]          = "enable-settings-window";
@@ -1336,6 +1352,9 @@ const char kEnableZeroSuggestPersonalized[] =
 
 // Enables instant search clicks feature.
 const char kEnableInstantSearchClicks[] = "enable-instant-search-clicks";
+
+// Enables EmbeddedSearch API in the search results page.
+const char kEnableEmbeddedSearchAPI[] = "enable-embeddedsearch-api";
 
 #endif
 

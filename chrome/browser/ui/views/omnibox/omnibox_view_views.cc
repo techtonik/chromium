@@ -12,7 +12,6 @@
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/autocomplete/autocomplete_input.h"
 #include "chrome/browser/autocomplete/autocomplete_match.h"
-#include "chrome/browser/bookmarks/bookmark_node_data.h"
 #include "chrome/browser/command_updater.h"
 #include "chrome/browser/search/search.h"
 #include "chrome/browser/ui/omnibox/omnibox_edit_controller.h"
@@ -23,6 +22,7 @@
 #include "chrome/browser/ui/views/omnibox/omnibox_popup_contents_view.h"
 #include "chrome/browser/ui/views/settings_api_bubble_helper_views.h"
 #include "chrome/browser/ui/views/website_settings/website_settings_popup_view.h"
+#include "components/bookmarks/core/browser/bookmark_node_data.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/common/constants.h"
 #include "grit/app_locale_settings.h"
@@ -158,8 +158,6 @@ OmniboxViewViews::~OmniboxViewViews() {
 void OmniboxViewViews::Init() {
   set_controller(this);
   SetTextInputType(DetermineTextInputType());
-  SetBackgroundColor(location_bar_view_->GetColor(
-      ToolbarModel::NONE, LocationBarView::BACKGROUND));
 
   if (popup_window_mode_)
     SetReadOnly(true);
@@ -362,7 +360,7 @@ void OmniboxViewViews::EmphasizeURLComponents() {
   // this input.  This can tell us whether an UNKNOWN input string is going to
   // be treated as a search or a navigation, and is the same method the Paste
   // And Go system uses.
-  url_parse::Component scheme, host;
+  url::Component scheme, host;
   AutocompleteInput::ParseForEmphasizeComponents(text(), &scheme, &host);
   bool grey_out_url = text().substr(scheme.begin, scheme.len) ==
       base::UTF8ToUTF16(extensions::kExtensionScheme);

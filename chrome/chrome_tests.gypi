@@ -771,6 +771,7 @@
         '../base/base.gyp:test_support_base',
         '../components/components.gyp:autofill_content_risk_proto',
         '../components/components.gyp:autofill_content_test_support',
+        '../components/components.gyp:captive_portal_test_support',
         '../components/components.gyp:dom_distiller_content',
         '../components/components.gyp:dom_distiller_test_support',
         '../components/components.gyp:translate_core_common',
@@ -911,7 +912,10 @@
         'browser/chromeos/login/login_utils_browsertest.cc',
         'browser/chromeos/login/login_manager_test.cc',
         'browser/chromeos/login/login_manager_test.h',
-        'browser/chromeos/login/managed/supervised_user_creation_browsertest.cc',
+        'browser/chromeos/login/managed/managed_user_creation_browsertest.cc',
+        'browser/chromeos/login/managed/managed_user_password_browsertest.cc',
+        'browser/chromeos/login/managed/managed_user_test_base.cc',
+        'browser/chromeos/login/managed/managed_user_test_base.h',
         'browser/chromeos/login/mock_authenticator.cc',
         'browser/chromeos/login/mock_authenticator.h',
         'browser/chromeos/login/oauth2_browsertest.cc',
@@ -1480,6 +1484,7 @@
         'test/base/test_chrome_web_ui_controller_factory.h',
         'test/base/test_chrome_web_ui_controller_factory_browsertest.cc',
         'test/data/chromeos/oobe_webui_browsertest.js',
+        'test/data/pdf/pdf_extension_test.cc',
         'test/data/webui/about_invalidations_browsertest.js',
         'test/data/webui/accessibility_audit_browsertest.js',
         'test/data/webui/assertions.js',
@@ -1610,7 +1615,6 @@
                 '../ppapi/ppapi_nacl.gyp:ppapi_nacl_tests',
                 '../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_background_keepalive',
                 '../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_media_galleries',
-                '../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_socket',
               ],
               'conditions': [
                 ['chromeos==1', {
@@ -1961,6 +1965,15 @@
             # crbug.com/362698
             'browser/chromeos/input_method/input_method_engine_browsertests.cc',
             'browser/extensions/api/input_ime/input_ime_apitest_chromeos.cc',
+          ],
+        }],
+        ['remoting==1', {
+          'dependencies': [
+            '../remoting/remoting.gyp:remoting_webapp',
+          ]
+        }, {
+          'sources/': [
+            ['exclude', '^test/remoting'],
           ],
         }],
       ],  # conditions

@@ -25,7 +25,6 @@
 #include "ui/views/background.h"
 #include "ui/views/controls/focusable_border.h"
 #include "ui/views/controls/label.h"
-#include "ui/views/controls/menu/menu_item_view.h"
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/native/native_view_host.h"
 #include "ui/views/controls/textfield/textfield_controller.h"
@@ -855,12 +854,6 @@ void Textfield::OnEnabledChanged() {
   SchedulePaint();
 }
 
-void Textfield::ViewHierarchyChanged(
-    const ViewHierarchyChangedDetails& details) {
-  if (details.is_add && details.child == this)
-    UpdateColorsFromTheme(GetNativeTheme());
-}
-
 void Textfield::OnPaint(gfx::Canvas* canvas) {
   OnPaintBackground(canvas);
   PaintTextAndCursor(canvas);
@@ -905,7 +898,15 @@ gfx::Point Textfield::GetKeyboardContextMenuLocation() {
 }
 
 void Textfield::OnNativeThemeChanged(const ui::NativeTheme* theme) {
-  UpdateColorsFromTheme(theme);
+  gfx::RenderText* render_text = GetRenderText();
+  render_text->SetColor(GetTextColor());
+  UpdateBackgroundColor();
+  render_text->set_cursor_color(GetTextColor());
+  render_text->set_selection_color(theme->GetSystemColor(
+      ui::NativeTheme::kColorId_TextfieldSelectionColor));
+  render_text->set_selection_background_focused_color(theme->GetSystemColor(
+      ui::NativeTheme::kColorId_TextfieldSelectionBackgroundFocused));
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -923,8 +924,12 @@ void Textfield::ShowContextMenuForView(View* source,
                                        const gfx::Point& point,
                                        ui::MenuSourceType source_type) {
   UpdateContextMenu();
-  ignore_result(context_menu_runner_->RunMenuAt(GetWidget(), NULL,
-      gfx::Rect(point, gfx::Size()), MenuItemView::TOPLEFT, source_type,
+  ignore_result(context_menu_runner_->RunMenuAt(
+      GetWidget(),
+      NULL,
+      gfx::Rect(point, gfx::Size()),
+      MENU_ANCHOR_TOPLEFT,
+      source_type,
       MenuRunner::HAS_MNEMONICS | MenuRunner::CONTEXT_MENU));
 }
 
@@ -1469,17 +1474,6 @@ void Textfield::UpdateBackgroundColor() {
   set_background(Background::CreateSolidBackground(color));
   GetRenderText()->set_background_is_transparent(SkColorGetA(color) != 0xFF);
   SchedulePaint();
-}
-
-void Textfield::UpdateColorsFromTheme(const ui::NativeTheme* theme) {
-  gfx::RenderText* render_text = GetRenderText();
-  render_text->SetColor(GetTextColor());
-  UpdateBackgroundColor();
-  render_text->set_cursor_color(GetTextColor());
-  render_text->set_selection_color(theme->GetSystemColor(
-      ui::NativeTheme::kColorId_TextfieldSelectionColor));
-  render_text->set_selection_background_focused_color(theme->GetSystemColor(
-      ui::NativeTheme::kColorId_TextfieldSelectionBackgroundFocused));
 }
 
 void Textfield::UpdateAfterChange(bool text_changed, bool cursor_changed) {

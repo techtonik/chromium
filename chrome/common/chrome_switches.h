@@ -106,6 +106,7 @@ extern const char kDisableQuic[];
 extern const char kDisableQuicHttps[];
 extern const char kDisableQuicPacing[];
 extern const char kDisableQuicPortSelection[];
+extern const char kDisableQuicTimeBasedLossDetection[];
 extern const char kDisableRestoreBackgroundContents[];
 extern const char kDisableSavePasswordBubble[];
 extern const char kDisableSearchButtonInOmnibox[];
@@ -128,6 +129,7 @@ extern const char kEnableAccessRequestNotifications[];
 extern const char kEnableAdview[];
 extern const char kEnableAppList[];
 extern const char kEnableAppWindowControls[];
+extern const char kEnableAppsFileAssociations[];
 extern const char kEnableAppsShowOnFirstPaint[];
 extern const char kEnableAsyncDns[];
 extern const char kEnableAuthNegotiatePort[];
@@ -173,12 +175,14 @@ extern const char kEnableQuic[];
 extern const char kEnableQuicHttps[];
 extern const char kEnableQuicPacing[];
 extern const char kEnableQuicPortSelection[];
+extern const char kEnableQuicTimeBasedLossDetection[];
 extern const char kEnableResourceContentSettings[];
 extern const char kEnableSavePasswordBubble[];
 extern const char kEnableSdchOverHttps[];
 extern const char kEnableSearchButtonInOmniboxAlways[];
 extern const char kEnableSearchButtonInOmniboxForStr[];
 extern const char kEnableSearchButtonInOmniboxForStrOrIip[];
+extern const char kEnableSessionCrashedBubble[];
 extern const char kEnableSettingsWindow[];
 extern const char kEnableSpdy4[];
 extern const char kEnableSpellingAutoCorrect[];
@@ -367,6 +371,7 @@ extern const char kEnableZeroSuggestEtherNoSerp[];
 extern const char kEnableZeroSuggestMostVisited[];
 extern const char kEnableZeroSuggestPersonalized[];
 extern const char kEnableInstantSearchClicks[];
+extern const char kEnableEmbeddedSearchAPI[];
 #endif
 
 #if defined(USE_ASH)

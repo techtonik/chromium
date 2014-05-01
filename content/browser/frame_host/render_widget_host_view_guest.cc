@@ -336,14 +336,6 @@ void RenderWidgetHostViewGuest::ImeCompositionRangeChanged(
 }
 #endif
 
-void RenderWidgetHostViewGuest::DidUpdateBackingStore(
-    const gfx::Rect& scroll_rect,
-    const gfx::Vector2d& scroll_delta,
-    const std::vector<gfx::Rect>& copy_rects,
-    const std::vector<ui::LatencyInfo>& latency_info) {
-  NOTREACHED();
-}
-
 void RenderWidgetHostViewGuest::SelectionChanged(const base::string16& text,
                                                  size_t offset,
                                                  const gfx::Range& range) {
@@ -391,11 +383,6 @@ void RenderWidgetHostViewGuest::CopyFromCompositingSurface(
 
 void RenderWidgetHostViewGuest::SetBackground(const SkBitmap& background) {
   platform_view_->SetBackground(background);
-}
-
-void RenderWidgetHostViewGuest::SetHasHorizontalScrollbar(
-    bool has_horizontal_scrollbar) {
-  platform_view_->SetHasHorizontalScrollbar(has_horizontal_scrollbar);
 }
 
 void RenderWidgetHostViewGuest::SetScrollOffsetPinning(

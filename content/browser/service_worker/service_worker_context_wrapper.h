@@ -5,6 +5,8 @@
 #ifndef CONTENT_BROWSER_SERVICE_WORKER_SERVICE_WORKER_CONTEXT_WRAPPER_H_
 #define CONTENT_BROWSER_SERVICE_WORKER_SERVICE_WORKER_CONTEXT_WRAPPER_H_
 
+#include <vector>
+
 #include "base/files/file_path.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
@@ -22,6 +24,8 @@ class QuotaManagerProxy;
 
 namespace content {
 
+class BrowserContext;
+class ServiceWorkerContextCore;
 class ServiceWorkerContextObserver;
 
 // A refcounted wrapper class for our core object. Higher level content lib
@@ -32,7 +36,7 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
     : NON_EXPORTED_BASE(public ServiceWorkerContext),
       public base::RefCountedThreadSafe<ServiceWorkerContextWrapper> {
  public:
-  ServiceWorkerContextWrapper();
+  ServiceWorkerContextWrapper(BrowserContext* browser_context);
 
   // Init and Shutdown are for use on the UI thread when the profile,
   // storagepartition is being setup and torn down.
@@ -47,11 +51,9 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
   virtual void RegisterServiceWorker(
       const Scope& scope,
       const GURL& script_url,
-      int source_process_id,
       ServiceWorkerHostClient* client,
       const ServiceWorkerHostCallback& callback) OVERRIDE;
-  virtual void UnregisterServiceWorker(const Scope& scope,
-                                       int source_process_id,
+  virtual void UnregisterServiceWorker(const GURL& pattern,
                                        const ResultCallback& callback) OVERRIDE;
   virtual void GetServiceWorkerHost(
       const Scope& scope,
@@ -63,6 +65,7 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
 
  private:
   friend class base::RefCountedThreadSafe<ServiceWorkerContextWrapper>;
+  friend class ServiceWorkerProcessManager;
   virtual ~ServiceWorkerContextWrapper();
 
   // Completes the registration process on IO thread.
@@ -73,9 +76,11 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
                               int64 registration_id,
                               int64 version_id);
 
-  scoped_ptr<ServiceWorkerContextCore> context_core_;
-  scoped_refptr<ObserverListThreadSafe<ServiceWorkerContextObserver> >
+  const scoped_refptr<ObserverListThreadSafe<ServiceWorkerContextObserver> >
       observer_list_;
+  // Cleared in Shutdown():
+  BrowserContext* browser_context_;
+  scoped_ptr<ServiceWorkerContextCore> context_core_;
 };
 
 }  // namespace content

@@ -140,6 +140,7 @@ class ExternalPopupMenu;
 class FaviconHelper;
 class GeolocationDispatcher;
 class HistoryController;
+class HistoryEntry;
 class ImageResourceFetcher;
 class InputTagSpeechDispatcher;
 class LoadProgressTracker;
@@ -271,12 +272,6 @@ class CONTENT_EXPORT RenderViewImpl
   // didn't schedule anything.
   bool ScheduleFileChooser(const FileChooserParams& params,
                            blink::WebFileChooserCompletion* completion);
-
-  void LoadNavigationErrorPage(
-      blink::WebFrame* frame,
-      const blink::WebURLRequest& failed_request,
-      const blink::WebURLError& error,
-      bool replace);
 
 #if defined(OS_ANDROID)
   void DismissDateTimeDialog();
@@ -693,12 +688,8 @@ class CONTENT_EXPORT RenderViewImpl
   void didChangeIcon(blink::WebLocalFrame*, blink::WebIconURL::Type);
   void didHandleOnloadEvents(blink::WebLocalFrame* frame);
   void didUpdateCurrentHistoryItem(blink::WebLocalFrame* frame);
-  void didFinishResourceLoad(blink::WebLocalFrame* frame,
-                             unsigned identifier);
   void didChangeScrollOffset(blink::WebLocalFrame* frame);
   void didFirstVisuallyNonEmptyLayout(blink::WebLocalFrame*);
-  void didChangeContentsSize(blink::WebLocalFrame* frame,
-                             const blink::WebSize& size);
   bool willCheckAndDispatchMessageEvent(
       blink::WebLocalFrame* sourceFrame,
       blink::WebFrame* targetFrame,
@@ -717,7 +708,7 @@ class CONTENT_EXPORT RenderViewImpl
   void UpdateTitle(blink::WebFrame* frame, const base::string16& title,
                    blink::WebTextDirection title_direction);
   void UpdateSessionHistory(blink::WebFrame* frame);
-  void SendUpdateState(const blink::WebHistoryItem& item);
+  void SendUpdateState(HistoryEntry* entry);
 
   // Update current main frame's encoding and send it to browser window.
   // Since we want to let users see the right encoding info from menu
@@ -1129,10 +1120,6 @@ class CONTENT_EXPORT RenderViewImpl
   // or right" state that was last sent to the browser.
   bool cached_is_main_frame_pinned_to_left_;
   bool cached_is_main_frame_pinned_to_right_;
-
-  // These store the "has scrollbars" state last sent to the browser.
-  bool cached_has_main_frame_horizontal_scrollbar_;
-  bool cached_has_main_frame_vertical_scrollbar_;
 
   // Bookkeeping to suppress redundant scroll and focus requests for an already
   // scrolled and focused editable node.

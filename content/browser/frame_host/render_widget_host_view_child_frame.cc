@@ -120,14 +120,6 @@ void RenderWidgetHostViewChildFrame::ImeCompositionRangeChanged(
 }
 #endif
 
-void RenderWidgetHostViewChildFrame::DidUpdateBackingStore(
-    const gfx::Rect& scroll_rect,
-    const gfx::Vector2d& scroll_delta,
-    const std::vector<gfx::Rect>& copy_rects,
-    const std::vector<ui::LatencyInfo>& latency_info) {
-  NOTREACHED();
-}
-
 void RenderWidgetHostViewChildFrame::WasShown() {
   if (!host_->is_hidden())
     return;
@@ -334,10 +326,6 @@ bool RenderWidgetHostViewChildFrame::HasAcceleratedSurface(
 
 gfx::GLSurfaceHandle RenderWidgetHostViewChildFrame::GetCompositingSurface() {
   return gfx::GLSurfaceHandle(gfx::kNullPluginWindow, gfx::TEXTURE_TRANSPORT);
-}
-
-void RenderWidgetHostViewChildFrame::SetHasHorizontalScrollbar(
-    bool has_horizontal_scrollbar) {
 }
 
 void RenderWidgetHostViewChildFrame::SetScrollOffsetPinning(

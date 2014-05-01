@@ -662,10 +662,9 @@ void ExtensionService::ReloadExtension(const std::string extension_id) {
   SetBeingReloaded(extension_id, false);
 }
 
-bool ExtensionService::UninstallExtension(
-    std::string extension_id,
-    bool external_uninstall,
-    base::string16* error) {
+bool ExtensionService::UninstallExtension(const std::string& extension_id,
+                                          bool external_uninstall,
+                                          base::string16* error) {
   CHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
 
   scoped_refptr<const Extension> extension(GetInstalledExtension(extension_id));
@@ -1021,7 +1020,6 @@ void ExtensionService::NotifyExtensionLoaded(const Extension* extension) {
     ThemeSource* theme_source = new ThemeSource(profile_);
     content::URLDataSource::Add(profile_, theme_source);
   }
-#endif
 
   // Same for chrome://thumb/ resources.
   if (extensions::PermissionsData::HasHostPermission(
@@ -1029,6 +1027,7 @@ void ExtensionService::NotifyExtensionLoaded(const Extension* extension) {
     ThumbnailSource* thumbnail_source = new ThumbnailSource(profile_, false);
     content::URLDataSource::Add(profile_, thumbnail_source);
   }
+#endif
 }
 
 void ExtensionService::NotifyExtensionUnloaded(

@@ -99,7 +99,6 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
       public aura::client::FocusChangeObserver,
       public aura::client::CursorClientObserver,
       public ImageTransportFactoryObserver,
-      public BrowserAccessibilityDelegate,
       public DelegatedFrameEvictorClient,
       public base::SupportsWeakPtr<RenderWidgetHostViewAura>,
       public cc::DelegatedFrameResourceCollectionClient {
@@ -181,11 +180,6 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   virtual void ImeCompositionRangeChanged(
       const gfx::Range& range,
       const std::vector<gfx::Rect>& character_bounds) OVERRIDE;
-  virtual void DidUpdateBackingStore(
-      const gfx::Rect& scroll_rect,
-      const gfx::Vector2d& scroll_delta,
-      const std::vector<gfx::Rect>& copy_rects,
-      const std::vector<ui::LatencyInfo>& latency_info) OVERRIDE;
   virtual void RenderProcessGone(base::TerminationStatus status,
                                  int error_code) OVERRIDE;
   virtual void Destroy() OVERRIDE;
@@ -231,8 +225,6 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
       InputEventAckState ack_result) OVERRIDE;
   virtual scoped_ptr<SyntheticGestureTarget> CreateSyntheticGestureTarget()
       OVERRIDE;
-  virtual void SetHasHorizontalScrollbar(
-      bool has_horizontal_scrollbar) OVERRIDE;
   virtual void SetScrollOffsetPinning(
       bool is_pinned_to_left, bool is_pinned_to_right) OVERRIDE;
   virtual gfx::GLSurfaceHandle GetCompositingSurface() OVERRIDE;
@@ -416,18 +408,6 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
 
   // Overridden from ImageTransportFactoryObserver:
   virtual void OnLostResources() OVERRIDE;
-
-  // Overridden from BrowserAccessibilityDelegate:
-  virtual void SetAccessibilityFocus(int acc_obj_id) OVERRIDE;
-  virtual void AccessibilityDoDefaultAction(int acc_obj_id) OVERRIDE;
-  virtual void AccessibilityScrollToMakeVisible(
-      int acc_obj_id, gfx::Rect subfocus) OVERRIDE;
-  virtual void AccessibilityScrollToPoint(
-      int acc_obj_id, gfx::Point point) OVERRIDE;
-  virtual void AccessibilitySetTextSelection(
-      int acc_obj_id, int start_offset, int end_offset) OVERRIDE;
-  virtual gfx::Point GetLastTouchEventLocation() const OVERRIDE;
-  virtual void FatalAccessibilityTreeError() OVERRIDE;
 
   void UpdateCursorIfOverSelf();
   bool ShouldSkipFrame(gfx::Size size_in_dip) const;
@@ -730,8 +710,6 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   TouchEditingClient* touch_editing_client_;
 
   gfx::Insets insets_;
-
-  std::vector<ui::LatencyInfo> software_latency_info_;
 
   scoped_ptr<DelegatedFrameEvictor> delegated_frame_evictor_;
 

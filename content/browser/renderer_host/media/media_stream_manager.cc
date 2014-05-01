@@ -50,7 +50,8 @@ namespace content {
 // Forward declaration of DeviceMonitorMac and its only useable method.
 class DeviceMonitorMac {
  public:
-  void StartMonitoring();
+  void StartMonitoring(
+    const scoped_refptr<base::SingleThreadTaskRunner>& device_task_runner);
 };
 
 namespace {
@@ -741,6 +742,38 @@ void MediaStreamManager::OpenDevice(MediaStreamRequester* requester,
                  base::Unretained(this), label));
 }
 
+bool MediaStreamManager::TranslateSourceIdToDeviceId(
+    MediaStreamType stream_type,
+    const ResourceContext::SaltCallback& sc,
+    const GURL& security_origin,
+    const std::string& source_id,
+    std::string* device_id) const {
+  DCHECK(stream_type == MEDIA_DEVICE_AUDIO_CAPTURE ||
+         stream_type == MEDIA_DEVICE_VIDEO_CAPTURE);
+  // The source_id can be empty if the constraint is set but empty.
+  if (source_id.empty())
+    return false;
+
+  const EnumerationCache* cache =
+      stream_type == MEDIA_DEVICE_AUDIO_CAPTURE ?
+      &audio_enumeration_cache_ : &video_enumeration_cache_;
+
+  // If device monitoring hasn't started, the |device_guid| is not valid.
+  if (!cache->valid)
+    return false;
+
+  for (StreamDeviceInfoArray::const_iterator it = cache->devices.begin();
+       it != cache->devices.end();
+       ++it) {
+    if (content::DoesMediaDeviceIDMatchHMAC(sc, security_origin, source_id,
+                                            it->device.id)) {
+      *device_id = it->device.id;
+      return true;
+    }
+  }
+  return false;
+}
+
 void MediaStreamManager::EnsureDeviceMonitorStarted() {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   StartMonitoring();
@@ -837,8 +870,10 @@ void MediaStreamManager::StartMonitoring() {
 void MediaStreamManager::StartMonitoringOnUIThread() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   BrowserMainLoop* browser_main_loop = content::BrowserMainLoop::GetInstance();
-  if (browser_main_loop)
-    browser_main_loop->device_monitor_mac()->StartMonitoring();
+  if (browser_main_loop) {
+    browser_main_loop->device_monitor_mac()
+        ->StartMonitoring(audio_manager_->GetWorkerTaskRunner());
+  }
 }
 #endif
 
@@ -915,38 +950,6 @@ void MediaStreamManager::TranslateDeviceIdToSourceId(
         request->security_origin,
         device->id);
   }
-}
-
-bool MediaStreamManager::TranslateSourceIdToDeviceId(
-    MediaStreamType stream_type,
-    const ResourceContext::SaltCallback& sc,
-    const GURL& security_origin,
-    const std::string& source_id,
-    std::string* device_id) const {
-  DCHECK(stream_type == MEDIA_DEVICE_AUDIO_CAPTURE ||
-         stream_type == MEDIA_DEVICE_VIDEO_CAPTURE);
-  // The source_id can be empty if the constraint is set but empty.
-  if (source_id.empty())
-    return false;
-
-  const EnumerationCache* cache =
-      stream_type == MEDIA_DEVICE_AUDIO_CAPTURE ?
-      &audio_enumeration_cache_ : &video_enumeration_cache_;
-
-  // If device monitoring hasn't started, the |device_guid| is not valid.
-  if (!cache->valid)
-    return false;
-
-  for (StreamDeviceInfoArray::const_iterator it = cache->devices.begin();
-       it != cache->devices.end();
-       ++it) {
-    if (content::DoesMediaDeviceIDMatchHMAC(sc, security_origin, source_id,
-                                            it->device.id)) {
-      *device_id = it->device.id;
-      return true;
-    }
-  }
-  return false;
 }
 
 void MediaStreamManager::ClearEnumerationCache(EnumerationCache* cache) {
@@ -1618,6 +1621,14 @@ void MediaStreamManager::DevicesEnumerated(
   label_list.clear();
   --active_enumeration_ref_count_[stream_type];
   DCHECK_GE(active_enumeration_ref_count_[stream_type], 0);
+}
+
+void MediaStreamManager::Aborted(MediaStreamType stream_type,
+                                 int capture_session_id) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  DVLOG(1) << "Aborted({stream_type = " << stream_type <<  "} "
+           << "{capture_session_id = " << capture_session_id << "})";
+  StopDevice(stream_type, capture_session_id);
 }
 
 // static

@@ -5,6 +5,7 @@
 #include "mojo/services/view_manager/view_manager_connection.h"
 
 #include "base/stl_util.h"
+#include "mojo/public/cpp/bindings/allocation_scope.h"
 #include "mojo/services/view_manager/node.h"
 #include "mojo/services/view_manager/root_node_manager.h"
 #include "mojo/services/view_manager/view.h"
@@ -12,6 +13,48 @@
 namespace mojo {
 namespace services {
 namespace view_manager {
+namespace {
+
+// Implementation of NodeCount(). |count| is the current count.
+void NodeCountImpl(Node* node, size_t* count) {
+  (*count)++;
+  std::vector<Node*> children(node->GetChildren());
+  for (size_t i = 0 ; i < children.size(); ++i)
+    NodeCountImpl(children[i], count);
+}
+
+// Returns the number of descendants of |node|.
+size_t NodeCount(Node* node) {
+  size_t count = 0;
+  if (node)
+    NodeCountImpl(node, &count);
+  return count;
+}
+
+// Converts a Node to an INode, putting the result at |index| in
+// |array_builder|. This then recurses through the children.
+void NodeToINode(Node* node,
+                 Array<INode>::Builder* array_builder,
+                 size_t* index) {
+  if (!node)
+    return;
+
+  INode::Builder builder;
+  Node* parent = node->GetParent();
+  builder.set_parent_id(NodeIdToTransportId(parent ? parent->id() : NodeId()));
+  builder.set_node_id(NodeIdToTransportId(node->id()));
+  builder.set_view_id(ViewIdToTransportId(
+                          node->view() ? node->view()->id() : ViewId()));
+  (*array_builder)[*index] = builder.Finish();
+
+  std::vector<Node*> children(node->GetChildren());
+  for (size_t i = 0 ; i < children.size(); ++i) {
+    (*index)++;
+    NodeToINode(children[i], array_builder, index);
+  }
+}
+
+}  // namespace
 
 ViewManagerConnection::ViewManagerConnection() : id_(0) {
 }
@@ -39,7 +82,7 @@ void ViewManagerConnection::Initialize(
     ServiceConnector<ViewManagerConnection, RootNodeManager>* service_factory,
     ScopedMessagePipeHandle client_handle) {
   DCHECK_EQ(0, id_);  // Should only get Initialize() once.
-  ServiceConnection<ViewManager, ViewManagerConnection, RootNodeManager>::
+  ServiceConnection<IViewManager, ViewManagerConnection, RootNodeManager>::
       Initialize(service_factory, client_handle.Pass());
   id_ = context()->GetAndAdvanceNextConnectionId();
   context()->AddConnection(this);
@@ -66,7 +109,7 @@ void ViewManagerConnection::NotifyNodeHierarchyChanged(
     const NodeId& node,
     const NodeId& new_parent,
     const NodeId& old_parent,
-    int32_t change_id) {
+    ChangeId change_id) {
   client()->OnNodeHierarchyChanged(NodeIdToTransportId(node),
                                    NodeIdToTransportId(new_parent),
                                    NodeIdToTransportId(old_parent),
@@ -76,7 +119,7 @@ void ViewManagerConnection::NotifyNodeHierarchyChanged(
 void ViewManagerConnection::NotifyNodeViewReplaced(const NodeId& node,
                                                    const ViewId& new_view_id,
                                                    const ViewId& old_view_id,
-                                                   int32_t change_id) {
+                                                   ChangeId change_id) {
   client()->OnNodeViewReplaced(NodeIdToTransportId(node),
                                ViewIdToTransportId(new_view_id),
                                ViewIdToTransportId(old_view_id),
@@ -85,7 +128,7 @@ void ViewManagerConnection::NotifyNodeViewReplaced(const NodeId& node,
 
 bool ViewManagerConnection::DeleteNodeImpl(ViewManagerConnection* source,
                                            const NodeId& node_id,
-                                           int32_t change_id) {
+                                           ChangeId change_id) {
   DCHECK_EQ(node_id.connection_id, id_);
   Node* node = GetNode(node_id);
   if (!node)
@@ -104,7 +147,7 @@ bool ViewManagerConnection::DeleteNodeImpl(ViewManagerConnection* source,
 
 bool ViewManagerConnection::DeleteViewImpl(ViewManagerConnection* source,
                                            const ViewId& view_id,
-                                           int32_t change_id) {
+                                           ChangeId change_id) {
   DCHECK_EQ(view_id.connection_id, id_);
   View* view = GetView(view_id);
   if (!view)
@@ -119,7 +162,7 @@ bool ViewManagerConnection::DeleteViewImpl(ViewManagerConnection* source,
 
 bool ViewManagerConnection::SetViewImpl(const NodeId& node_id,
                                         const ViewId& view_id,
-                                        int32_t change_id) {
+                                        ChangeId change_id) {
   Node* node = GetNode(node_id);
   if (!node)
     return false;
@@ -145,8 +188,8 @@ void ViewManagerConnection::CreateNode(
 
 void ViewManagerConnection::DeleteNode(
     uint32_t transport_node_id,
-    int32_t change_id,
-    const mojo::Callback<void(bool)>& callback) {
+    ChangeId change_id,
+    const Callback<void(bool)>& callback) {
   const NodeId node_id(NodeIdFromTransportId(transport_node_id));
   ViewManagerConnection* connection = context()->GetConnection(
       node_id.connection_id);
@@ -157,7 +200,7 @@ void ViewManagerConnection::DeleteNode(
 void ViewManagerConnection::AddNode(
     uint32_t parent_id,
     uint32_t child_id,
-    int32_t change_id,
+    ChangeId change_id,
     const Callback<void(bool)>& callback) {
   Node* parent = GetNode(NodeIdFromTransportId(parent_id));
   Node* child = GetNode(NodeIdFromTransportId(child_id));
@@ -171,7 +214,7 @@ void ViewManagerConnection::AddNode(
 
 void ViewManagerConnection::RemoveNodeFromParent(
       uint32_t node_id,
-      int32_t change_id,
+      ChangeId change_id,
       const Callback<void(bool)>& callback) {
   Node* node = GetNode(NodeIdFromTransportId(node_id));
   const bool success = (node && node->GetParent());
@@ -182,9 +225,22 @@ void ViewManagerConnection::RemoveNodeFromParent(
   callback.Run(success);
 }
 
+void ViewManagerConnection::GetNodeTree(
+    uint32_t node_id,
+    const Callback<void(Array<INode>)>& callback) {
+  AllocationScope allocation_scope;
+  Node* node = GetNode(NodeIdFromTransportId(node_id));
+  Array<INode>::Builder array_builder(NodeCount(node));
+  {
+    size_t index = 0;
+    NodeToINode(node, &array_builder, &index);
+  }
+  callback.Run(array_builder.Finish());
+}
+
 void ViewManagerConnection::CreateView(
     uint16_t view_id,
-    const mojo::Callback<void(bool)>& callback) {
+    const Callback<void(bool)>& callback) {
   if (view_map_.count(view_id)) {
     callback.Run(false);
     return;
@@ -195,8 +251,8 @@ void ViewManagerConnection::CreateView(
 
 void ViewManagerConnection::DeleteView(
     uint32_t transport_view_id,
-    int32_t change_id,
-    const mojo::Callback<void(bool)>& callback) {
+    ChangeId change_id,
+    const Callback<void(bool)>& callback) {
   const ViewId view_id(ViewIdFromTransportId(transport_view_id));
   ViewManagerConnection* connection = context()->GetConnection(
       view_id.connection_id);
@@ -207,8 +263,8 @@ void ViewManagerConnection::DeleteView(
 void ViewManagerConnection::SetView(
     uint32_t transport_node_id,
     uint32_t transport_view_id,
-    int32_t change_id,
-    const mojo::Callback<void(bool)>& callback) {
+    ChangeId change_id,
+    const Callback<void(bool)>& callback) {
   const NodeId node_id(NodeIdFromTransportId(transport_node_id));
   callback.Run(SetViewImpl(node_id, ViewIdFromTransportId(transport_view_id),
                            change_id));

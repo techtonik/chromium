@@ -1601,23 +1601,6 @@ void RenderWidgetHostImpl::DidUpdateBackingStore(
   if (is_hidden_)
     return;
 
-  // Now paint the view. Watch out: it might be destroyed already.
-  if (view_ && !is_accelerated_compositing_active_) {
-
-    std::vector<ui::LatencyInfo> latency_info;
-    for (size_t i = 0; i < params.latency_info.size(); i++) {
-      ui::LatencyInfo info = params.latency_info[i];
-      AddLatencyInfoComponentIds(&info);
-      latency_info.push_back(info);
-    }
-
-    view_being_painted_ = true;
-    view_->DidUpdateBackingStore(params.scroll_rect, params.scroll_delta,
-                                 params.copy_rects, latency_info);
-    view_->DidReceiveRendererFrame();
-    view_being_painted_ = false;
-  }
-
   // If we got a resize ack, then perhaps we have another resize to send?
   bool is_resize_ack =
       ViewHostMsg_UpdateRect_Flags::is_resize_ack(params.flags);
@@ -1628,16 +1611,6 @@ void RenderWidgetHostImpl::DidUpdateBackingStore(
   TimeTicks now = TimeTicks::Now();
   TimeDelta delta = now - update_start;
   UMA_HISTOGRAM_TIMES("MPArch.RWH_DidUpdateBackingStore", delta);
-
-  // Measures the time from receiving the MsgUpdateRect IPC to completing the
-  // DidUpdateBackingStore() method.  On platforms which have asynchronous
-  // painting, such as Linux, this is the sum of MPArch.RWH_OnMsgUpdateRect,
-  // MPArch.RWH_DidUpdateBackingStore, and the time spent asynchronously
-  // waiting for the paint to complete.
-  //
-  // On other platforms, this will be equivalent to MPArch.RWH_OnMsgUpdateRect.
-  delta = now - paint_start;
-  UMA_HISTOGRAM_TIMES("MPArch.RWH_TotalPaintTime", delta);
 }
 
 void RenderWidgetHostImpl::OnQueueSyntheticGesture(
@@ -2027,12 +2000,17 @@ void RenderWidgetHostImpl::SetAccessibilityMode(AccessibilityMode mode) {
   Send(new ViewMsg_SetAccessibilityMode(GetRoutingID(), mode));
 }
 
+void RenderWidgetHostImpl::AccessibilitySetFocus(int object_id) {
+  Send(new AccessibilityMsg_SetFocus(GetRoutingID(), object_id));
+  view_->OnAccessibilitySetFocus(object_id);
+}
+
 void RenderWidgetHostImpl::AccessibilityDoDefaultAction(int object_id) {
   Send(new AccessibilityMsg_DoDefaultAction(GetRoutingID(), object_id));
 }
 
-void RenderWidgetHostImpl::AccessibilitySetFocus(int object_id) {
-  Send(new AccessibilityMsg_SetFocus(GetRoutingID(), object_id));
+void RenderWidgetHostImpl::AccessibilityShowMenu(int object_id) {
+  view_->AccessibilityShowMenu(object_id);
 }
 
 void RenderWidgetHostImpl::AccessibilityScrollToMakeVisible(
@@ -2053,8 +2031,22 @@ void RenderWidgetHostImpl::AccessibilitySetTextSelection(
       GetRoutingID(), object_id, start_offset, end_offset));
 }
 
-void RenderWidgetHostImpl::FatalAccessibilityTreeError() {
+bool RenderWidgetHostImpl::AccessibilityViewHasFocus() const {
+  return view_->HasFocus();
+}
+
+gfx::Rect RenderWidgetHostImpl::AccessibilityGetViewBounds() const {
+  return view_->GetViewBounds();
+}
+
+gfx::Point RenderWidgetHostImpl::AccessibilityOriginInScreen(
+    const gfx::Rect& bounds) const {
+  return view_->AccessibilityOriginInScreen(bounds);
+}
+
+void RenderWidgetHostImpl::AccessibilityFatalError() {
   Send(new AccessibilityMsg_FatalError(GetRoutingID()));
+  view_->SetBrowserAccessibilityManager(NULL);
 }
 
 #if defined(OS_WIN)

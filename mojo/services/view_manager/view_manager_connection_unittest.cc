@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "mojo/services/view_manager/view_manager_connection.h"
-
 #include <string>
 #include <vector>
 
@@ -14,7 +12,8 @@
 #include "base/strings/stringprintf.h"
 #include "mojo/public/cpp/bindings/allocation_scope.h"
 #include "mojo/public/cpp/environment/environment.h"
-#include "mojo/services/view_manager/root_node_manager.h"
+#include "mojo/services/public/interfaces/view_manager/view_manager.mojom.h"
+#include "mojo/shell/shell_test_helper.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace mojo {
@@ -24,6 +23,17 @@ namespace view_manager {
 namespace {
 
 base::RunLoop* current_run_loop = NULL;
+
+// TODO(sky): remove and include a common header.
+typedef uint32_t ChangeId;
+
+uint16_t FirstIdFromTransportId(uint32_t id) {
+  return static_cast<uint16_t>((id >> 16) & 0xFFFF);
+}
+
+uint16_t SecondIdFromTransportId(uint32_t id) {
+  return static_cast<uint16_t>(id & 0xFFFF);
+}
 
 // Sets |current_run_loop| and runs it. It is expected that someone else quits
 // the loop.
@@ -48,19 +58,46 @@ void BooleanCallback(bool* result_cache, bool result) {
   current_run_loop->Quit();
 }
 
+struct TestNode {
+  std::string ToString() const {
+    return base::StringPrintf("node=%s parent=%s view=%s",
+                              NodeIdToString(node_id).c_str(),
+                              NodeIdToString(parent_id).c_str(),
+                              NodeIdToString(view_id).c_str());
+  }
+
+  uint32_t parent_id;
+  uint32_t node_id;
+  uint32_t view_id;
+};
+
+// Callback that results in a vector of INodes. The INodes are converted to
+// TestNodes.
+void INodesCallback(std::vector<TestNode>* test_nodes,
+                    const mojo::Array<INode>& data) {
+  for (size_t i = 0; i < data.size(); ++i) {
+    TestNode node;
+    node.parent_id = data[i].parent_id();
+    node.node_id = data[i].node_id();
+    node.view_id = data[i].view_id();
+    test_nodes->push_back(node);
+  }
+  current_run_loop->Quit();
+}
+
 // Creates an id used for transport from the specified parameters.
 uint32_t CreateNodeId(uint16_t connection_id, uint16_t node_id) {
-  return NodeIdToTransportId(NodeId(connection_id, node_id));
+  return (connection_id << 16) | node_id;
 }
 
 // Creates an id used for transport from the specified parameters.
 uint32_t CreateViewId(uint16_t connection_id, uint16_t view_id) {
-  return ViewIdToTransportId(ViewId(connection_id, view_id));
+  return (connection_id << 16) | view_id;
 }
 
 // Creates a node with the specified id. Returns true on success. Blocks until
 // we get back result from server.
-bool CreateNode(ViewManager* view_manager, uint16_t id) {
+bool CreateNode(IViewManager* view_manager, uint16_t id) {
   bool result = false;
   view_manager->CreateNode(id, base::Bind(&BooleanCallback, &result));
   DoRunLoop();
@@ -70,9 +107,9 @@ bool CreateNode(ViewManager* view_manager, uint16_t id) {
 // TODO(sky): make a macro for these functions, they are all the same.
 
 // Deletes a node, blocking until done.
-bool DeleteNode(ViewManager* view_manager,
+bool DeleteNode(IViewManager* view_manager,
                 uint32_t node_id,
-                int32_t change_id) {
+                ChangeId change_id) {
   bool result = false;
   view_manager->DeleteNode(node_id, change_id,
                            base::Bind(&BooleanCallback, &result));
@@ -81,10 +118,10 @@ bool DeleteNode(ViewManager* view_manager,
 }
 
 // Adds a node, blocking until done.
-bool AddNode(ViewManager* view_manager,
+bool AddNode(IViewManager* view_manager,
              uint32_t parent,
              uint32_t child,
-             int32_t change_id) {
+             ChangeId change_id) {
   bool result = false;
   view_manager->AddNode(parent, child, change_id,
                         base::Bind(&BooleanCallback, &result));
@@ -93,9 +130,9 @@ bool AddNode(ViewManager* view_manager,
 }
 
 // Removes a node, blocking until done.
-bool RemoveNodeFromParent(ViewManager* view_manager,
+bool RemoveNodeFromParent(IViewManager* view_manager,
                           uint32_t node_id,
-                          int32_t change_id) {
+                          ChangeId change_id) {
   bool result = false;
   view_manager->RemoveNodeFromParent(node_id, change_id,
                                      base::Bind(&BooleanCallback, &result));
@@ -103,9 +140,16 @@ bool RemoveNodeFromParent(ViewManager* view_manager,
   return result;
 }
 
+void GetNodeTree(IViewManager* view_manager,
+                 uint32_t node_id,
+                 std::vector<TestNode>* nodes) {
+  view_manager->GetNodeTree(node_id, base::Bind(&INodesCallback, nodes));
+  DoRunLoop();
+}
+
 // Creates a view with the specified id. Returns true on success. Blocks until
 // we get back result from server.
-bool CreateView(ViewManager* view_manager, uint16_t id) {
+bool CreateView(IViewManager* view_manager, uint16_t id) {
   bool result = false;
   view_manager->CreateView(id, base::Bind(&BooleanCallback, &result));
   DoRunLoop();
@@ -114,10 +158,10 @@ bool CreateView(ViewManager* view_manager, uint16_t id) {
 
 // Sets a view on the specified node. Returns true on success. Blocks until we
 // get back result from server.
-bool SetView(ViewManager* view_manager,
+bool SetView(IViewManager* view_manager,
              uint32_t node_id,
              uint32_t view_id,
-             int32_t change_id) {
+             ChangeId change_id) {
   bool result = false;
   view_manager->SetView(node_id, view_id, change_id,
                         base::Bind(&BooleanCallback, &result));
@@ -129,11 +173,9 @@ bool SetView(ViewManager* view_manager,
 
 typedef std::vector<std::string> Changes;
 
-class ViewManagerClientImpl : public ViewManagerClient {
+class ViewManagerClientImpl : public IViewManagerClient {
  public:
   ViewManagerClientImpl() : id_(0), quit_count_(0) {}
-
-  void set_quit_count(int count) { quit_count_ = count; }
 
   uint16_t id() const { return id_; }
 
@@ -143,20 +185,33 @@ class ViewManagerClientImpl : public ViewManagerClient {
     return changes;
   }
 
+  void WaitForId() {
+    if (id_ == 0)
+      DoRunLoop();
+  }
+
+  void DoRunLoopUntilChangesCount(size_t count) {
+    if (changes_.size() >= count)
+      return;
+    quit_count_ = count - changes_.size();
+    DoRunLoop();
+  }
+
  private:
-  // ViewManagerClient overrides:
+  // IViewManagerClient overrides:
   virtual void OnConnectionEstablished(uint16_t connection_id) OVERRIDE {
     id_ = connection_id;
-    current_run_loop->Quit();
+    if (current_run_loop)
+      current_run_loop->Quit();
   }
   virtual void OnNodeHierarchyChanged(uint32_t node,
                                       uint32_t new_parent,
                                       uint32_t old_parent,
-                                      int32_t change_id) OVERRIDE {
+                                      ChangeId change_id) OVERRIDE {
     changes_.push_back(
         base::StringPrintf(
             "change_id=%d node=%s new_parent=%s old_parent=%s",
-            change_id, NodeIdToString(node).c_str(),
+            static_cast<int>(change_id), NodeIdToString(node).c_str(),
             NodeIdToString(new_parent).c_str(),
             NodeIdToString(old_parent).c_str()));
     QuitIfNecessary();
@@ -164,11 +219,11 @@ class ViewManagerClientImpl : public ViewManagerClient {
   virtual void OnNodeViewReplaced(uint32_t node,
                                   uint32_t new_view_id,
                                   uint32_t old_view_id,
-                                  int32_t change_id) OVERRIDE {
+                                  ChangeId change_id) OVERRIDE {
     changes_.push_back(
         base::StringPrintf(
             "change_id=%d node=%s new_view=%s old_view=%s",
-            change_id, NodeIdToString(node).c_str(),
+            static_cast<int>(change_id), NodeIdToString(node).c_str(),
             NodeIdToString(new_view_id).c_str(),
             NodeIdToString(old_view_id).c_str()));
     QuitIfNecessary();
@@ -182,7 +237,7 @@ class ViewManagerClientImpl : public ViewManagerClient {
   uint16_t id_;
 
   // Used to determine when/if to quit the run loop.
-  int quit_count_;
+  size_t quit_count_;
 
   Changes changes_;
 
@@ -191,47 +246,45 @@ class ViewManagerClientImpl : public ViewManagerClient {
 
 class ViewManagerConnectionTest : public testing::Test {
  public:
-  ViewManagerConnectionTest() : service_factory_(&root_node_manager_) {}
+  ViewManagerConnectionTest() {}
 
   virtual void SetUp() OVERRIDE {
-    InterfacePipe<ViewManagerClient, ViewManager> pipe;
-    view_manager_.reset(pipe.handle_to_peer.Pass(), &client_);
-    connection_.Initialize(
-        &service_factory_,
-        ScopedMessagePipeHandle::From(pipe.handle_to_self.Pass()));
-    // Wait for the id.
-    DoRunLoop();
+    AllocationScope allocation_scope;
+
+    test_helper_.Init();
+
+    InterfacePipe<IViewManager, AnyInterface> pipe;
+    test_helper_.shell()->Connect("mojo:mojo_view_manager",
+                                  pipe.handle_to_peer.Pass());
+    view_manager_.reset(pipe.handle_to_self.Pass(), &client_);
+
+    client_.WaitForId();
   }
 
  protected:
   // Creates a second connection to the viewmanager.
   void EstablishSecondConnection() {
-    connection2_.reset(new ViewManagerConnection);
-    InterfacePipe<ViewManagerClient, ViewManager> pipe;
-    view_manager2_.reset(pipe.handle_to_peer.Pass(), &client2_);
-    connection2_->Initialize(
-        &service_factory_,
-        ScopedMessagePipeHandle::From(pipe.handle_to_self.Pass()));
-    // Wait for the id.
-    DoRunLoop();
+    AllocationScope allocation_scope;
+    InterfacePipe<IViewManager, AnyInterface> pipe;
+    test_helper_.shell()->Connect("mojo:mojo_view_manager",
+                                  pipe.handle_to_peer.Pass());
+    view_manager2_.reset(pipe.handle_to_self.Pass(), &client2_);
+
+    client2_.WaitForId();
   }
 
   void DestroySecondConnection() {
-    connection2_.reset();
     view_manager2_.reset();
   }
 
-  Environment env_;
   base::MessageLoop loop_;
-  RootNodeManager root_node_manager_;
-  ServiceConnector<ViewManagerConnection, RootNodeManager> service_factory_;
-  ViewManagerConnection connection_;
+  shell::ShellTestHelper test_helper_;
+
   ViewManagerClientImpl client_;
-  RemotePtr<ViewManager> view_manager_;
+  RemotePtr<IViewManager> view_manager_;
 
   ViewManagerClientImpl client2_;
-  RemotePtr<ViewManager> view_manager2_;
-  scoped_ptr<ViewManagerConnection> connection2_;
+  RemotePtr<IViewManager> view_manager2_;
 
   DISALLOW_COPY_AND_ASSIGN(ViewManagerConnectionTest);
 };
@@ -317,12 +370,8 @@ TEST_F(ViewManagerConnectionTest, AddRemoveNotifyMultipleConnections) {
 
   // Second client should also have received the change.
   {
+    client2_.DoRunLoopUntilChangesCount(1);
     Changes changes(client2_.GetAndClearChanges());
-    if (changes.empty()) {
-      client2_.set_quit_count(1);
-      DoRunLoop();
-      changes = client2_.GetAndClearChanges();
-    }
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("change_id=0 node=1,2 new_parent=1,1 old_parent=null",
               changes[0]);
@@ -500,10 +549,12 @@ TEST_F(ViewManagerConnectionTest, SetViewFromSecondConnection) {
                         CreateNodeId(client_.id(), 1),
                         CreateViewId(client2_.id(), 51),
                         22));
+    client_.DoRunLoopUntilChangesCount(1);
     Changes changes(client_.GetAndClearChanges());
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("change_id=0 node=1,1 new_view=2,51 old_view=null", changes[0]);
 
+    client2_.DoRunLoopUntilChangesCount(1);
     changes = client2_.GetAndClearChanges();
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("change_id=22 node=1,1 new_view=2,51 old_view=null", changes[0]);
@@ -512,12 +563,70 @@ TEST_F(ViewManagerConnectionTest, SetViewFromSecondConnection) {
   // Shutdown the second connection and verify view is removed.
   {
     DestroySecondConnection();
-    client_.set_quit_count(1);
-    DoRunLoop();
+    client_.DoRunLoopUntilChangesCount(1);
 
     Changes changes(client_.GetAndClearChanges());
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("change_id=0 node=1,1 new_view=null old_view=2,51", changes[0]);
+  }
+}
+
+// Assertions for GetNodeTree.
+TEST_F(ViewManagerConnectionTest, GetNodeTree) {
+  EstablishSecondConnection();
+
+  // Create two nodes in first connection, 1 and 11 (11 is a child of 1).
+  ASSERT_TRUE(CreateNode(view_manager_.get(), 1));
+  ASSERT_TRUE(CreateNode(view_manager_.get(), 11));
+  ASSERT_TRUE(AddNode(view_manager_.get(),
+                      CreateNodeId(0, 1),
+                      CreateNodeId(client_.id(), 1),
+                      101));
+  ASSERT_TRUE(AddNode(view_manager_.get(),
+                      CreateNodeId(client_.id(), 1),
+                      CreateNodeId(client_.id(), 11),
+                      102));
+
+  // Create two nodes in second connection, 2 and 3, both children of the root.
+  ASSERT_TRUE(CreateNode(view_manager2_.get(), 2));
+  ASSERT_TRUE(CreateNode(view_manager2_.get(), 3));
+  ASSERT_TRUE(AddNode(view_manager2_.get(),
+                      CreateNodeId(0, 1),
+                      CreateNodeId(client2_.id(), 2),
+                      99));
+  ASSERT_TRUE(AddNode(view_manager2_.get(),
+                      CreateNodeId(0, 1),
+                      CreateNodeId(client2_.id(), 3),
+                      99));
+
+  // Attach view to node 11 in the first connection.
+  ASSERT_TRUE(CreateView(view_manager_.get(), 51));
+  ASSERT_TRUE(SetView(view_manager_.get(),
+                      CreateNodeId(client_.id(), 11),
+                      CreateViewId(client_.id(), 51),
+                      22));
+
+  // Verifies GetNodeTree() on the root.
+  {
+    AllocationScope scope;
+    std::vector<TestNode> nodes;
+    GetNodeTree(view_manager2_.get(), CreateNodeId(0, 1), &nodes);
+    ASSERT_EQ(5u, nodes.size());
+    EXPECT_EQ("node=0,1 parent=null view=null", nodes[0].ToString());
+    EXPECT_EQ("node=1,1 parent=0,1 view=null", nodes[1].ToString());
+    EXPECT_EQ("node=1,11 parent=1,1 view=1,51", nodes[2].ToString());
+    EXPECT_EQ("node=2,2 parent=0,1 view=null", nodes[3].ToString());
+    EXPECT_EQ("node=2,3 parent=0,1 view=null", nodes[4].ToString());
+  }
+
+  // Verifies GetNodeTree() on the node 1,1.
+  {
+    AllocationScope scope;
+    std::vector<TestNode> nodes;
+    GetNodeTree(view_manager2_.get(), CreateNodeId(1, 1), &nodes);
+    ASSERT_EQ(2u, nodes.size());
+    EXPECT_EQ("node=1,1 parent=0,1 view=null", nodes[0].ToString());
+    EXPECT_EQ("node=1,11 parent=1,1 view=1,51", nodes[1].ToString());
   }
 }
 

@@ -204,7 +204,6 @@
 #if defined(OS_ANDROID)
 #include <cpu-features.h>
 
-#include "content/common/android/device_telephony_info.h"
 #include "content/common/gpu/client/context_provider_command_buffer.h"
 #include "content/renderer/android/address_detector.h"
 #include "content/renderer/android/content_detector.h"
@@ -214,6 +213,7 @@
 #include "content/renderer/media/android/renderer_media_player_manager.h"
 #include "content/renderer/media/android/stream_texture_factory_impl.h"
 #include "content/renderer/media/android/webmediaplayer_android.h"
+#include "net/android/network_library.h"
 #include "skia/ext/platform_canvas.h"
 #include "third_party/WebKit/public/platform/WebFloatPoint.h"
 #include "third_party/WebKit/public/platform/WebFloatRect.h"
@@ -668,8 +668,6 @@ RenderViewImpl::RenderViewImpl(RenderViewImplParams* params)
 #endif
       cached_is_main_frame_pinned_to_left_(false),
       cached_is_main_frame_pinned_to_right_(false),
-      cached_has_main_frame_horizontal_scrollbar_(false),
-      cached_has_main_frame_vertical_scrollbar_(false),
       has_scrolled_focused_editable_node_into_rect_(false),
       push_messaging_dispatcher_(NULL),
       geolocation_dispatcher_(NULL),
@@ -728,12 +726,10 @@ void RenderViewImpl::Initialize(RenderViewImplParams* params) {
     stats_collection_observer_.reset(new StatsCollectionObserver(this));
 
 #if defined(OS_ANDROID)
-  content::DeviceTelephonyInfo device_info;
-
   const std::string region_code =
       command_line.HasSwitch(switches::kNetworkCountryIso)
           ? command_line.GetSwitchValueASCII(switches::kNetworkCountryIso)
-          : device_info.GetNetworkCountryIso();
+          : net::android::GetTelephonyNetworkOperator();
   content_detectors_.push_back(linked_ptr<ContentDetector>(
       new AddressDetector()));
   content_detectors_.push_back(linked_ptr<ContentDetector>(
@@ -1385,38 +1381,19 @@ void RenderViewImpl::UpdateSessionHistory(WebFrame* frame) {
   // there is no past session history to record.
   if (page_id_ == -1)
     return;
-
-  WebHistoryItem item = history_controller_->GetPreviousItemForExport();
-  SendUpdateState(item);
+  SendUpdateState(history_controller_->GetPreviousEntry());
 }
 
-void RenderViewImpl::SendUpdateState(const WebHistoryItem& item) {
-  if (item.isNull())
+void RenderViewImpl::SendUpdateState(HistoryEntry* entry) {
+  if (!entry)
     return;
 
   // Don't send state updates for kSwappedOutURL.
-  if (item.urlString() == WebString::fromUTF8(kSwappedOutURL))
+  if (entry->root().urlString() == WebString::fromUTF8(kSwappedOutURL))
     return;
 
   Send(new ViewHostMsg_UpdateState(
-      routing_id_, page_id_, HistoryItemToPageState(item)));
-}
-
-// WebViewDelegate ------------------------------------------------------------
-
-void RenderViewImpl::LoadNavigationErrorPage(
-    WebFrame* frame,
-    const WebURLRequest& failed_request,
-    const WebURLError& error,
-    bool replace) {
-  std::string error_html;
-  GetContentClient()->renderer()->GetNavigationErrorStrings(
-      this, frame, failed_request, error, &error_html, NULL);
-
-  frame->loadHTMLString(error_html,
-                        GURL(kUnreachableWebDataURL),
-                        error.unreachableURL,
-                        replace);
+      routing_id_, page_id_, HistoryEntryToPageState(entry)));
 }
 
 bool RenderViewImpl::SendAndRunNestedMessageLoop(IPC::SyncMessage* message) {
@@ -2369,30 +2346,6 @@ void RenderViewImpl::didUpdateCurrentHistoryItem(WebLocalFrame* frame) {
   StartNavStateSyncTimerIfNecessary();
 }
 
-void RenderViewImpl::didFinishResourceLoad(WebLocalFrame* frame,
-                                           unsigned identifier) {
-  InternalDocumentStateData* internal_data =
-      InternalDocumentStateData::FromDataSource(frame->dataSource());
-  if (!internal_data->use_error_page())
-    return;
-
-  // Do not show error page when DevTools is attached.
-  if (devtools_agent_->IsAttached())
-    return;
-
-  // Display error page, if appropriate.
-  std::string error_domain = "http";
-  int http_status_code = internal_data->http_status_code();
-  if (GetContentClient()->renderer()->HasErrorPage(
-          http_status_code, &error_domain)) {
-    WebURLError error;
-    error.unreachableURL = frame->document().url();
-    error.domain = WebString::fromUTF8(error_domain);
-    error.reason = http_status_code;
-    LoadNavigationErrorPage(frame, frame->dataSource()->request(), error, true);
-  }
-}
-
 void RenderViewImpl::CheckPreferredSize() {
   // We don't always want to send the change messages over IPC, only if we've
   // been put in that mode by getting a |ViewMsg_EnablePreferredSizeChangedMode|
@@ -2448,27 +2401,6 @@ bool RenderViewImpl::InitializeMediaStreamClient() {
 #else
   return false;
 #endif
-}
-
-void RenderViewImpl::didChangeContentsSize(WebLocalFrame* frame,
-                                           const WebSize& size) {
-  if (webview()->mainFrame() != frame)
-    return;
-  WebView* frameView = frame->view();
-  if (!frameView)
-    return;
-
-  bool has_horizontal_scrollbar = frame->hasHorizontalScrollbar();
-  bool has_vertical_scrollbar = frame->hasVerticalScrollbar();
-
-  if (has_horizontal_scrollbar != cached_has_main_frame_horizontal_scrollbar_ ||
-      has_vertical_scrollbar != cached_has_main_frame_vertical_scrollbar_) {
-    Send(new ViewHostMsg_DidChangeScrollbarsForMainFrame(
-          routing_id_, has_horizontal_scrollbar, has_vertical_scrollbar));
-
-    cached_has_main_frame_horizontal_scrollbar_ = has_horizontal_scrollbar;
-    cached_has_main_frame_vertical_scrollbar_ = has_vertical_scrollbar;
-  }
 }
 
 void RenderViewImpl::UpdateScrollState(WebFrame* frame) {
@@ -2719,9 +2651,7 @@ void RenderViewImpl::PlayerGone(blink::WebMediaPlayer* player) {
 void RenderViewImpl::SyncNavigationState() {
   if (!webview())
     return;
-
-  WebHistoryItem item = history_controller_->GetCurrentItemForExport();
-  SendUpdateState(item);
+  SendUpdateState(history_controller_->GetCurrentEntry());
 }
 
 GURL RenderViewImpl::GetLoadingUrl(blink::WebFrame* frame) const {

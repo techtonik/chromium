@@ -148,7 +148,8 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
       settings.rasterization_site = cc::LayerTreeSettings::CpuRasterization;
     settings.create_low_res_tiling = render_thread->is_low_res_tiling_enabled();
     settings.can_use_lcd_text = render_thread->is_lcd_text_enabled();
-    settings.use_map_image = render_thread->is_map_image_enabled();
+    settings.use_zero_copy = render_thread->is_zero_copy_enabled();
+    settings.use_one_copy = render_thread->is_one_copy_enabled();
   }
 
   settings.calculate_top_controls_position =
@@ -496,6 +497,11 @@ void RenderWidgetCompositor::startPageScaleAnimation(
       use_anchor,
       new_page_scale,
       duration);
+}
+
+void RenderWidgetCompositor::heuristicsForGpuRasterizationUpdated(
+    bool matches_heuristics) {
+  layer_tree_host_->set_has_gpu_rasterization_trigger(matches_heuristics);
 }
 
 void RenderWidgetCompositor::setNeedsAnimate() {
