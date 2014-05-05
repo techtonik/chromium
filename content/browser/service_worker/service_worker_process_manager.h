@@ -5,6 +5,7 @@
 #ifndef CONTENT_BROWSER_SERVICE_WORKER_SERVICE_WORKER_PROCESS_MANAGER_H_
 #define CONTENT_BROWSER_SERVICE_WORKER_SERVICE_WORKER_PROCESS_MANAGER_H_
 
+#include <map>
 #include <vector>
 
 #include "base/callback.h"
@@ -18,6 +19,7 @@ namespace content {
 
 class BrowserContext;
 class ServiceWorkerContextWrapper;
+class SiteInstance;
 
 // Interacts with the UI thread to keep RenderProcessHosts alive while the
 // ServiceWorker system is using them.  Each instance of
@@ -40,14 +42,15 @@ class CONTENT_EXPORT ServiceWorkerProcessManager {
   // Allocation can fail with SERVICE_WORKER_ERROR_START_WORKER_FAILED if
   // RenderProcessHost::Init fails.
   void AllocateWorkerProcess(
+      int embedded_worker_id,
       const std::vector<int>& process_ids,
       const GURL& script_url,
       const base::Callback<void(ServiceWorkerStatusCode, int process_id)>&
-          callback) const;
+          callback);
 
   // Drops a reference to a process that was running a Service Worker.  This
   // must match a call to AllocateWorkerProcess.
-  void ReleaseWorkerProcess(int process_id);
+  void ReleaseWorkerProcess(int embedded_worker_id);
 
   // |increment_for_test| and |decrement_for_test| define how to look up a
   // process by ID and increment or decrement its worker reference count. This
@@ -65,10 +68,22 @@ class CONTENT_EXPORT ServiceWorkerProcessManager {
   scoped_refptr<ServiceWorkerContextWrapper> context_wrapper_;
   base::Callback<bool(int)> increment_for_test_;
   base::Callback<bool(int)> decrement_for_test_;
+  // Stores the SiteInstance used to create/retrieve the process for an
+  // EmbeddedWorkerInstance. We have to keep this alive as long as the process
+  // so that the extension system can maintain its set of extensions allowed to
+  // make calls from the process.
+  struct ProcessOrSite {
+    ProcessOrSite(int process_id);
+    ProcessOrSite(const scoped_refptr<SiteInstance>& site_instance);
+    ~ProcessOrSite();
+    int process_id;
+    scoped_refptr<SiteInstance> site_instance;
+  };
+  std::map<int, ProcessOrSite> instance_info_;
 
   // Used to double-check that we don't access *this after it's destroyed.
   base::WeakPtrFactory<ServiceWorkerProcessManager> weak_this_factory_;
-  base::WeakPtr<ServiceWorkerProcessManager> weak_this_;
+  const base::WeakPtr<ServiceWorkerProcessManager> weak_this_;
 };
 
 }  // namespace content

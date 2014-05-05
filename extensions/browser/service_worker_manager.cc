@@ -26,7 +26,9 @@ using base::WeakPtr;
 using content::BrowserContext;
 using content::BrowserThread;
 
-ServiceWorkerManager::State::State() {}
+ServiceWorkerManager::State::State()
+    : registration(UNREGISTERED), outstanding_state_changes(0) {
+}
 ServiceWorkerManager::State::~State() {}
 
 ServiceWorkerManager::ServiceWorkerManager(BrowserContext* context)

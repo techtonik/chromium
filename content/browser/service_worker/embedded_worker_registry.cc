@@ -39,6 +39,7 @@ void EmbeddedWorkerRegistry::StartWorker(const std::vector<int>& process_ids,
     return;
   }
   context_->process_manager()->AllocateWorkerProcess(
+      embedded_worker_id,
       process_ids,
       script_url,
       base::Bind(&EmbeddedWorkerRegistry::StartWorkerWithProcessId,
@@ -55,7 +56,7 @@ void EmbeddedWorkerRegistry::StartWorker(const std::vector<int>& process_ids,
 ServiceWorkerStatusCode EmbeddedWorkerRegistry::StopWorker(
     int process_id, int embedded_worker_id) {
   if (context_)
-    context_->process_manager()->ReleaseWorkerProcess(process_id);
+    context_->process_manager()->ReleaseWorkerProcess(embedded_worker_id);
   return Send(process_id,
               new EmbeddedWorkerMsg_StopWorker(embedded_worker_id));
 }

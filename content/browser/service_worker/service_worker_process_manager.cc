@@ -24,26 +24,39 @@ ServiceWorkerProcessManager::~ServiceWorkerProcessManager() {
 }
 
 void ServiceWorkerProcessManager::AllocateWorkerProcess(
+    int embedded_worker_id,
     const std::vector<int>& process_ids,
     const GURL& script_url,
     const base::Callback<void(ServiceWorkerStatusCode, int process_id)>&
-        callback) const {
+        callback) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::UI)) {
     BrowserThread::PostTask(
         BrowserThread::UI,
         FROM_HERE,
         base::Bind(&ServiceWorkerProcessManager::AllocateWorkerProcess,
                    weak_this_,
+                   embedded_worker_id,
                    process_ids,
                    script_url,
                    callback));
     return;
   }
 
+  DCHECK(!ContainsKey(instance_info_, embedded_worker_id))
+      << embedded_worker_id << " already has a process allocated";
+
   for (std::vector<int>::const_iterator it = process_ids.begin();
        it != process_ids.end();
        ++it) {
     if (IncrementWorkerRefcountByPid(*it)) {
+      // TODO(jyasskin): Deal with:
+      //  1. We allocate a process from an existing RPH.
+      //  2. A non-RPH call comes in that gets to run for some amount of time.
+      //  3. All the existing RPHs are destroyed, with their SiteInstances.
+      //  4. Because permissions are scoped with a SiteInstance, the process no
+      //     longer has the ability to execute calls needed for step #2.
+      instance_info_.insert(
+          std::make_pair(embedded_worker_id, ProcessOrSite(*it)));
       BrowserThread::PostTask(BrowserThread::IO,
                               FROM_HERE,
                               base::Bind(callback, SERVICE_WORKER_OK, *it));
@@ -75,6 +88,9 @@ void ServiceWorkerProcessManager::AllocateWorkerProcess(
     return;
   }
 
+  instance_info_.insert(
+      std::make_pair(embedded_worker_id, ProcessOrSite(site_instance)));
+
   static_cast<RenderProcessHostImpl*>(rph)->IncrementWorkerRefCount();
   BrowserThread::PostTask(
       BrowserThread::IO,
@@ -82,20 +98,31 @@ void ServiceWorkerProcessManager::AllocateWorkerProcess(
       base::Bind(callback, SERVICE_WORKER_OK, rph->GetID()));
 }
 
-void ServiceWorkerProcessManager::ReleaseWorkerProcess(int process_id) {
+void ServiceWorkerProcessManager::ReleaseWorkerProcess(int embedded_worker_id) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::UI)) {
     BrowserThread::PostTask(
         BrowserThread::UI,
         FROM_HERE,
         base::Bind(&ServiceWorkerProcessManager::ReleaseWorkerProcess,
                    weak_this_,
-                   process_id));
+                   embedded_worker_id));
     return;
   }
+  std::map<int, ProcessOrSite>::iterator info =
+      instance_info_.find(embedded_worker_id);
+  if (info == instance_info_.end()) {
+    // Just return on a double-release: this supports instances that stop
+    // abruptly instead of being explicitly stopped.
+    return;
+  }
+  int process_id = info->second.process_id;
+  if (process_id == -1)
+    process_id = info->second.site_instance->GetProcess()->GetID();
   if (!DecrementWorkerRefcountByPid(process_id)) {
     DCHECK(false) << "DecrementWorkerRef(" << process_id
                   << ") doesn't match a previous IncrementWorkerRef";
   }
+  instance_info_.erase(info);
 }
 
 void ServiceWorkerProcessManager::SetProcessRefcountOpsForTest(
@@ -129,6 +156,16 @@ bool ServiceWorkerProcessManager::DecrementWorkerRefcountByPid(
     static_cast<RenderProcessHostImpl*>(rph)->DecrementWorkerRefCount();
 
   return rph != NULL;
+}
+
+ServiceWorkerProcessManager::ProcessOrSite::ProcessOrSite(int process_id)
+    : process_id(process_id) {
+}
+ServiceWorkerProcessManager::ProcessOrSite::ProcessOrSite(
+    const scoped_refptr<SiteInstance>& site_instance)
+    : process_id(-1), site_instance(site_instance) {
+}
+ServiceWorkerProcessManager::ProcessOrSite::~ProcessOrSite() {
 }
 
 }  // namespace content
