@@ -184,8 +184,6 @@
     'renderer/input/input_handler_proxy.h',
     'renderer/input/input_handler_wrapper.cc',
     'renderer/input/input_handler_wrapper.h',
-    'renderer/input_tag_speech_dispatcher.cc',
-    'renderer/input_tag_speech_dispatcher.h',
     'renderer/internal_document_state_data.cc',
     'renderer/internal_document_state_data.h',
     'renderer/java/java_bridge_channel.cc',
@@ -377,8 +375,6 @@
     'renderer/pepper/pepper_platform_audio_input.h',
     'renderer/pepper/pepper_platform_audio_output.cc',
     'renderer/pepper/pepper_platform_audio_output.h',
-    'renderer/pepper/pepper_platform_context_3d.cc',
-    'renderer/pepper/pepper_platform_context_3d.h',
     'renderer/pepper/pepper_platform_video_capture.cc',
     'renderer/pepper/pepper_platform_video_capture.h',
     'renderer/pepper/pepper_plugin_instance_impl.cc',
@@ -501,6 +497,8 @@
     'renderer/service_worker/embedded_worker_context_client.h',
     'renderer/service_worker/embedded_worker_context_message_filter.cc',
     'renderer/service_worker/embedded_worker_context_message_filter.h',
+    'renderer/service_worker/embedded_worker_devtools_agent.cc',
+    'renderer/service_worker/embedded_worker_devtools_agent.h',
     'renderer/service_worker/embedded_worker_dispatcher.cc',
     'renderer/service_worker/embedded_worker_dispatcher.h',
     'renderer/service_worker/service_worker_script_context.cc',
@@ -555,12 +553,6 @@
         'renderer/notification_provider.cc',
         'renderer/active_notification_tracker.cc',
       ],
-    }],
-    ['input_speech==0', {
-      'sources!': [
-        'renderer/input_tag_speech_dispatcher.cc',
-        'renderer/input_tag_speech_dispatcher.h',
-      ]
     }],
     ['OS=="mac"', {
       'sources!': [

@@ -128,10 +128,6 @@
         'browser/ui/views/message_center/web_notification_tray_browsertest.cc',
         'browser/ui/views/omnibox/omnibox_view_views_browsertest.cc',
         'browser/ui/views/panels/panel_view_browsertest.cc',
-        'browser/ui/views/passwords/manage_passwords_view_test.cc',
-        'browser/ui/views/passwords/manage_passwords_view_test.h',
-        'browser/ui/views/passwords/manage_passwords_bubble_view_browsertest.cc',
-        'browser/ui/views/passwords/manage_passwords_icon_view_browsertest.cc',
         'browser/ui/views/ssl_client_certificate_selector_browsertest.cc',
         'browser/ui/views/status_icons/status_tray_state_changer_interactive_uitest_win.cc',
         'browser/ui/views/tabs/tab_drag_controller_interactive_uitest.cc',
@@ -189,11 +185,6 @@
         }],
         ['OS=="linux" and use_aura==1 and chromeos==0', {
           'sources!': [
-            # TODO(port): These tests fail because they don't have a Screen,
-            # but expect one.
-            # TODO(port): I have no idea about the crashes in here; there's
-            # nothing obviously wrong. It doesn't run on gtk today, either.
-            'browser/ui/views/tabs/tab_drag_controller_interactive_uitest.cc',
             # TODO(port): Everything here times out. Attempts have been made to
             # fix the individual failures, but each time I disable a test from
             # these suites, it seems like one or another starts timing out too.
@@ -775,6 +766,7 @@
         '../base/base.gyp:test_support_base',
         '../components/components.gyp:autofill_content_risk_proto',
         '../components/components.gyp:autofill_content_test_support',
+        '../components/components.gyp:captive_portal_test_support',
         '../components/components.gyp:dom_distiller_content',
         '../components/components.gyp:dom_distiller_test_support',
         '../components/components.gyp:translate_core_common',
@@ -915,7 +907,10 @@
         'browser/chromeos/login/login_utils_browsertest.cc',
         'browser/chromeos/login/login_manager_test.cc',
         'browser/chromeos/login/login_manager_test.h',
-        'browser/chromeos/login/managed/supervised_user_creation_browsertest.cc',
+        'browser/chromeos/login/managed/managed_user_creation_browsertest.cc',
+        'browser/chromeos/login/managed/managed_user_password_browsertest.cc',
+        'browser/chromeos/login/managed/managed_user_test_base.cc',
+        'browser/chromeos/login/managed/managed_user_test_base.h',
         'browser/chromeos/login/mock_authenticator.cc',
         'browser/chromeos/login/mock_authenticator.h',
         'browser/chromeos/login/oauth2_browsertest.cc',
@@ -1006,6 +1001,7 @@
         'browser/extensions/api/braille_display_private/braille_display_private_apitest.cc',
         'browser/extensions/api/braille_display_private/mock_braille_controller.cc',
         'browser/extensions/api/braille_display_private/mock_braille_controller.h',
+        'browser/extensions/api/browser/browser_apitest.cc',
         'browser/extensions/api/bookmarks/bookmark_apitest.cc',
         'browser/extensions/api/browsing_data/browsing_data_test.cc',
         'browser/extensions/api/cast_channel/cast_channel_apitest.cc',
@@ -1289,7 +1285,6 @@
         'browser/sessions/tab_restore_browsertest.cc',
         'browser/signin/signin_browsertest.cc',
         'browser/speech/extension_api/tts_extension_apitest.cc',
-        'browser/speech/speech_recognition_bubble_browsertest.cc',
         'browser/spellchecker/spellcheck_service_browsertest.cc',
         'browser/ssl/ssl_browser_tests.cc',
         'browser/ssl/ssl_client_certificate_selector_test.cc',
@@ -1384,6 +1379,7 @@
         'browser/ui/views/location_bar/zoom_bubble_view_browsertest.cc',
         'browser/ui/views/profiles/avatar_menu_button_browsertest.cc',
         'browser/ui/views/profiles/new_avatar_menu_button_browsertest.cc',
+        'browser/ui/views/profiles/profile_chooser_view_browsertest.cc',
         'browser/ui/views/select_file_dialog_extension_browsertest.cc',
         'browser/ui/views/toolbar/browser_actions_container_browsertest.cc',
         'browser/ui/views/toolbar/toolbar_view_browsertest.cc',
@@ -1485,6 +1481,7 @@
         'test/base/test_chrome_web_ui_controller_factory.h',
         'test/base/test_chrome_web_ui_controller_factory_browsertest.cc',
         'test/data/chromeos/oobe_webui_browsertest.js',
+        'test/data/pdf/pdf_extension_test.cc',
         'test/data/webui/about_invalidations_browsertest.js',
         'test/data/webui/accessibility_audit_browsertest.js',
         'test/data/webui/assertions.js',
@@ -1615,7 +1612,6 @@
                 '../ppapi/ppapi_nacl.gyp:ppapi_nacl_tests',
                 '../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_background_keepalive',
                 '../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_media_galleries',
-                '../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_socket',
               ],
               'conditions': [
                 ['chromeos==1', {
@@ -1966,6 +1962,15 @@
             # crbug.com/362698
             'browser/chromeos/input_method/input_method_engine_browsertests.cc',
             'browser/extensions/api/input_ime/input_ime_apitest_chromeos.cc',
+          ],
+        }],
+        ['remoting==1', {
+          'dependencies': [
+            '../remoting/remoting.gyp:remoting_webapp',
+          ]
+        }, {
+          'sources/': [
+            ['exclude', '^test/remoting'],
           ],
         }],
       ],  # conditions

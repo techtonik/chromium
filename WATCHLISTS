@@ -357,9 +357,6 @@
     'ipc': {
       'filepath': 'ipc/ipc',
     },
-    'libvpx': {
-      'filepath': 'third_party/libvpx'
-    },
     'libwebp': {
       'filepath': 'third_party/libwebp'
     },
@@ -813,8 +810,6 @@
                 'jfweitz+watch@chromium.org', 'skanuj+watch@chromium.org',
                 'donnd+watch@chromium.org'],
     'ipc': ['jam@chromium.org', 'darin-cc@chromium.org'],
-    'libvpx': ['tomfinegan@chromium.org', 'jzern@chromium.org',
-               'fgalligan@chromium.org', 'johannkoenig@chromium.org'],
     'libwebp': ['urvang@google.com', 'jzern@chromium.org',
                 'skal@google.com', 'vikasa@google.com'],
     'linux_fonts': ['derat+watch@chromium.org'],
@@ -834,7 +829,8 @@
              'ben+mojo@chromium.org',
              'darin@chromium.org',
              'qsr+mojo@chromium.org',
-             'viettrungluu+watch@chromium.org'],
+             'viettrungluu+watch@chromium.org',
+             'yzshen+watch@chromium.org'],
     'mouse_lock': ['scheib+watch@chromium.org'],
     'music_manager_private': ['gab+watch@chromium.org',
                               'erikwright+watch@chromium.org',
@@ -855,8 +851,7 @@
               'rjkroege@chromium.org'],
     'panels': ['dimich@chromium.org', 'jennb@chromium.org',
                'dcheng@chromium.org', 'jianli@chromium.org'],
-    'pepper_api': ['piman+watch@chromium.org',
-                   'ihf+watch@chromium.org', 'yzshen+watch@chromium.org',
+    'pepper_api': ['piman+watch@chromium.org', 'ihf+watch@chromium.org',
                    'yusukes+watch@chromium.org', 'raymes+watch@chromium.org',
                    'noelallen@chromium.org', 'binji+watch@chromium.org',
                    'nfullagar@chromium.org', 'teravest+watch@chromium.org',

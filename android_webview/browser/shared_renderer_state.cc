@@ -20,7 +20,9 @@ SharedRendererState::SharedRendererState(
     : ui_loop_(ui_loop),
       client_on_ui_(client),
       weak_factory_on_ui_thread_(this),
-      ui_thread_weak_ptr_(weak_factory_on_ui_thread_.GetWeakPtr()) {
+      ui_thread_weak_ptr_(weak_factory_on_ui_thread_.GetWeakPtr()),
+      memory_policy_dirty_(false),
+      hardware_initialized_(false) {
   DCHECK(ui_loop_->BelongsToCurrentThread());
   DCHECK(client_on_ui_);
 }
@@ -40,28 +42,90 @@ void SharedRendererState::ClientRequestDrawGL() {
 
 void SharedRendererState::ClientRequestDrawGLOnUIThread() {
   DCHECK(ui_loop_->BelongsToCurrentThread());
-  if (!client_on_ui_->RequestDrawGL(NULL)) {
+  if (!client_on_ui_->RequestDrawGL(NULL, false)) {
     LOG(ERROR) << "Failed to request GL process. Deadlock likely";
   }
 }
 
 void SharedRendererState::SetCompositorOnUiThread(
     content::SynchronousCompositor* compositor) {
+  base::AutoLock lock(lock_);
   DCHECK(ui_loop_->BelongsToCurrentThread());
   compositor_ = compositor;
 }
 
 content::SynchronousCompositor* SharedRendererState::GetCompositor() {
+  base::AutoLock lock(lock_);
   DCHECK(compositor_);
   return compositor_;
 }
 
+void SharedRendererState::SetMemoryPolicy(
+    const content::SynchronousCompositorMemoryPolicy new_policy) {
+  base::AutoLock lock(lock_);
+  if (memory_policy_ != new_policy) {
+    memory_policy_ = new_policy;
+    memory_policy_dirty_ = true;
+  }
+}
+
+content::SynchronousCompositorMemoryPolicy
+SharedRendererState::GetMemoryPolicy() const {
+  base::AutoLock lock(lock_);
+  return memory_policy_;
+}
+
 void SharedRendererState::SetDrawGLInput(const DrawGLInput& input) {
+  base::AutoLock lock(lock_);
   draw_gl_input_ = input;
 }
 
 DrawGLInput SharedRendererState::GetDrawGLInput() const {
+  base::AutoLock lock(lock_);
   return draw_gl_input_;
+}
+
+void SharedRendererState::ClearClosureQueue() {
+  base::AutoLock lock(lock_);
+  std::queue<base::Closure> empty;
+  std::swap(closure_queue_, empty);
+}
+
+void SharedRendererState::AppendClosure(const base::Closure& closure) {
+  base::AutoLock lock(lock_);
+  closure_queue_.push(closure);
+}
+
+base::Closure SharedRendererState::PopFrontClosure() {
+  base::Closure closure;
+
+  base::AutoLock lock(lock_);
+  if (!closure_queue_.empty()) {
+    closure = closure_queue_.front();
+    closure_queue_.pop();
+  }
+
+  return closure;
+}
+
+void SharedRendererState::SetHardwareInitialized(bool initialized) {
+  base::AutoLock lock(lock_);
+  hardware_initialized_ = initialized;
+}
+
+bool SharedRendererState::IsHardwareInitialized() const {
+  base::AutoLock lock(lock_);
+  return hardware_initialized_;
+}
+
+void SharedRendererState::SetMemoryPolicyDirty(bool is_dirty) {
+  base::AutoLock lock(lock_);
+  memory_policy_dirty_ = is_dirty;
+}
+
+bool SharedRendererState::IsMemoryPolicyDirty() const {
+  base::AutoLock lock(lock_);
+  return memory_policy_dirty_;
 }
 
 }  // namespace android_webview

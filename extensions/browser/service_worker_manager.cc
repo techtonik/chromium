@@ -121,7 +121,6 @@ void ServiceWorkerManager::UnregisterExtension(const Extension* extension) {
 
   GetSWContext(extension->id())->UnregisterServiceWorker(
       extension->GetResourceURL("/*"),
-      -1,
       base::Bind(&ServiceWorkerManager::FinishUnregistration,
                  WeakThis(),
                  extension->id()));

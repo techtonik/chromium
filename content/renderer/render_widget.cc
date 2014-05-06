@@ -361,7 +361,6 @@ RenderWidget::RenderWidget(blink::WebPopupType popup_type,
       webwidget_(NULL),
       opener_id_(MSG_ROUTING_NONE),
       init_complete_(false),
-      has_frame_pending_(false),
       overdraw_bottom_height_(0.f),
       next_paint_flags_(0),
       auto_resize_mode_(false),
@@ -370,7 +369,6 @@ RenderWidget::RenderWidget(blink::WebPopupType popup_type,
       is_hidden_(hidden),
       never_visible_(never_visible),
       is_fullscreen_(false),
-      needs_repainting_on_restore_(false),
       has_focus_(false),
       handling_input_event_(false),
       handling_ime_event_(false),
@@ -395,6 +393,11 @@ RenderWidget::RenderWidget(blink::WebPopupType popup_type,
 #if defined(OS_ANDROID)
       text_field_is_dirty_(false),
       outstanding_ime_acks_(0),
+      body_background_color_(SK_ColorWHITE),
+#endif
+#if defined(OS_MACOSX)
+      cached_has_main_frame_horizontal_scrollbar_(false),
+      cached_has_main_frame_vertical_scrollbar_(false),
 #endif
       popup_origin_scale_for_emulation_(0.f),
       resizing_mode_selector_(new ResizingModeSelector()),
@@ -667,23 +670,12 @@ void RenderWidget::Resize(const gfx::Size& new_size,
   is_fullscreen_ = is_fullscreen;
 
   if (size_ != new_size) {
-    // TODO(darin): We should not need to reset this here.
-    needs_repainting_on_restore_ = false;
-
     size_ = new_size;
-
-    has_frame_pending_ = false;
 
     // When resizing, we want to wait to paint before ACK'ing the resize.  This
     // ensures that we only resize as fast as we can paint.  We only need to
     // send an ACK if we are resized to a non-empty rect.
     webwidget_->resize(new_size);
-
-    if (resizing_mode_selector_->NeverUsesSynchronousResize()) {
-      // Resize should have caused an invalidation of the entire view.
-      DCHECK(new_size.IsEmpty() || is_accelerated_compositing_active_ ||
-             has_frame_pending_);
-    }
   } else if (!resizing_mode_selector_->is_synchronous_mode()) {
     resize_ack = NO_RESIZE_ACK;
   }
@@ -767,22 +759,11 @@ void RenderWidget::OnResize(const ViewMsg_Resize_Params& params) {
 }
 
 void RenderWidget::OnChangeResizeRect(const gfx::Rect& resizer_rect) {
-  if (resizer_rect_ != resizer_rect) {
-    gfx::Rect view_rect(size_);
-
-    gfx::Rect old_damage_rect = gfx::IntersectRects(view_rect, resizer_rect_);
-    if (!old_damage_rect.IsEmpty())
-      has_frame_pending_ = true;
-
-    gfx::Rect new_damage_rect = gfx::IntersectRects(view_rect, resizer_rect);
-    if (!new_damage_rect.IsEmpty())
-      has_frame_pending_ = true;
-
-    resizer_rect_ = resizer_rect;
-
-    if (webwidget_)
-      webwidget_->didChangeWindowResizerRect();
-  }
+  if (resizer_rect_ == resizer_rect)
+    return;
+  resizer_rect_ = resizer_rect;
+  if (webwidget_)
+    webwidget_->didChangeWindowResizerRect();
 }
 
 void RenderWidget::OnWasHidden() {
@@ -800,13 +781,8 @@ void RenderWidget::OnWasShown(bool needs_repainting) {
   // See OnWasHidden
   SetHidden(false);
 
-  if (!needs_repainting && !needs_repainting_on_restore_)
+  if (!needs_repainting)
     return;
-  needs_repainting_on_restore_ = false;
-
-  // Tag the next paint as a restore ack, which is picked up by
-  // DoDeferredUpdate when it sends out the next PaintRect message.
-  set_next_paint_is_restore_ack();
 
   // Generate a full repaint.
   if (!is_accelerated_compositing_active_) {
@@ -1071,11 +1047,7 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
       (input_event->type == WebInputEvent::TouchMove &&
        ack_result == INPUT_EVENT_ACK_STATE_CONSUMED);
 
-  bool frame_pending = has_frame_pending_;
-  if (is_accelerated_compositing_active_) {
-    frame_pending = compositor_ &&
-                    compositor_->BeginMainFrameRequested();
-  }
+  bool frame_pending = compositor_ && compositor_->BeginMainFrameRequested();
 
   // If we don't have a fast and accurate HighResNow, we assume the input
   // handlers are heavy and rate limit them.
@@ -1164,85 +1136,6 @@ void RenderWidget::ClearFocus() {
     webwidget_->setFocus(false);
 }
 
-void RenderWidget::PaintRect(const gfx::Rect& rect,
-                             const gfx::Point& canvas_origin,
-                             skia::PlatformCanvas* canvas) {
-  TRACE_EVENT2("renderer", "PaintRect",
-               "width", rect.width(), "height", rect.height());
-
-  canvas->save();
-
-  // Bring the canvas into the coordinate system of the paint rect.
-  canvas->translate(static_cast<SkScalar>(-canvas_origin.x()),
-                    static_cast<SkScalar>(-canvas_origin.y()));
-
-  // If there is a custom background, tile it.
-  if (!background_.empty()) {
-    SkPaint paint;
-    skia::RefPtr<SkShader> shader = skia::AdoptRef(
-        SkShader::CreateBitmapShader(background_,
-                                     SkShader::kRepeat_TileMode,
-                                     SkShader::kRepeat_TileMode));
-    paint.setShader(shader.get());
-
-    // Use kSrc_Mode to handle background_ transparency properly.
-    paint.setXfermodeMode(SkXfermode::kSrc_Mode);
-
-    // Canvas could contain multiple update rects. Clip to given rect so that
-    // we don't accidentally clear other update rects.
-    canvas->save();
-    canvas->scale(device_scale_factor_, device_scale_factor_);
-    canvas->clipRect(gfx::RectToSkRect(rect));
-    canvas->drawPaint(paint);
-    canvas->restore();
-  }
-
-  // Normal painting case.
-  base::TimeTicks start_time;
-  if (!is_accelerated_compositing_active_)
-    start_time = legacy_software_mode_stats_->StartRecording();
-
-  webwidget_->paint(canvas, rect);
-
-  if (!is_accelerated_compositing_active_) {
-    base::TimeDelta paint_time =
-        legacy_software_mode_stats_->EndRecording(start_time);
-    int64 painted_pixel_count = rect.width() * rect.height();
-    legacy_software_mode_stats_->AddPaint(paint_time, painted_pixel_count);
-  }
-
-  // Flush to underlying bitmap.  TODO(darin): is this needed?
-  skia::GetTopDevice(*canvas)->accessBitmap(false);
-
-  PaintDebugBorder(rect, canvas);
-  canvas->restore();
-}
-
-void RenderWidget::PaintDebugBorder(const gfx::Rect& rect,
-                                    skia::PlatformCanvas* canvas) {
-  static bool kPaintBorder =
-      CommandLine::ForCurrentProcess()->HasSwitch(switches::kShowPaintRects);
-  if (!kPaintBorder)
-    return;
-
-  // Cycle through these colors to help distinguish new paint rects.
-  const SkColor colors[] = {
-    SkColorSetARGB(0x3F, 0xFF, 0, 0),
-    SkColorSetARGB(0x3F, 0xFF, 0, 0xFF),
-    SkColorSetARGB(0x3F, 0, 0, 0xFF),
-  };
-  static int color_selector = 0;
-
-  SkPaint paint;
-  paint.setStyle(SkPaint::kStroke_Style);
-  paint.setColor(colors[color_selector++ % arraysize(colors)]);
-  paint.setStrokeWidth(1);
-
-  SkIRect irect;
-  irect.set(rect.x(), rect.y(), rect.right() - 1, rect.bottom() - 1);
-  canvas->drawIRect(irect, paint);
-}
-
 void RenderWidget::AnimationCallback() {
   TRACE_EVENT0("renderer", "RenderWidget::AnimationCallback");
   if (!animation_update_pending_) {
@@ -1283,8 +1176,6 @@ void RenderWidget::didInvalidateRect(const WebRect& rect) {
   if (damaged_rect.IsEmpty())
     return;
 
-  has_frame_pending_ = true;
-
   // We may not need to schedule another call to DoDeferredUpdate.
   if (invalidation_task_posted_)
     return;
@@ -1319,8 +1210,6 @@ void RenderWidget::didScrollRect(int dx, int dy,
   if (damaged_rect.IsEmpty())
     return;
 
-  has_frame_pending_ = true;
-
   // We may not need to schedule another call to DoDeferredUpdate.
   if (invalidation_task_posted_)
     return;
@@ -1345,12 +1234,6 @@ void RenderWidget::didScrollRect(int dx, int dy,
 void RenderWidget::didAutoResize(const WebSize& new_size) {
   if (size_.width() != new_size.width || size_.height() != new_size.height) {
     size_ = new_size;
-
-    // If we don't clear has_frame_pending_ after changing autoResize state,
-    // then we might end up in a situation where bitmap_rect is larger than the
-    // view_size. By clearing has_frame_pending_, we ensure that we don't end up
-    // with invalid damage rects.
-    has_frame_pending_ = false;
 
     if (resizing_mode_selector_->is_synchronous_mode()) {
       WebRect new_pos(rootWindowRect().x,
@@ -1857,16 +1740,8 @@ bool RenderWidget::next_paint_is_resize_ack() const {
   return ViewHostMsg_UpdateRect_Flags::is_resize_ack(next_paint_flags_);
 }
 
-bool RenderWidget::next_paint_is_restore_ack() const {
-  return ViewHostMsg_UpdateRect_Flags::is_restore_ack(next_paint_flags_);
-}
-
 void RenderWidget::set_next_paint_is_resize_ack() {
   next_paint_flags_ |= ViewHostMsg_UpdateRect_Flags::IS_RESIZE_ACK;
-}
-
-void RenderWidget::set_next_paint_is_restore_ack() {
-  next_paint_flags_ |= ViewHostMsg_UpdateRect_Flags::IS_RESTORE_ACK;
 }
 
 void RenderWidget::set_next_paint_is_repaint_ack() {
@@ -2126,9 +2001,38 @@ bool RenderWidget::ShouldUpdateCompositionInfo(
 }
 #endif
 
+#if defined(OS_ANDROID)
+void RenderWidget::DidChangeBodyBackgroundColor(SkColor bg_color) {
+  // If not initialized, default to white. Note that 0 is different from black
+  // as black still has alpha 0xFF.
+  if (!bg_color)
+    bg_color = SK_ColorWHITE;
+
+  if (bg_color != body_background_color_) {
+    body_background_color_ = bg_color;
+    Send(new ViewHostMsg_DidChangeBodyBackgroundColor(routing_id(), bg_color));
+  }
+}
+#endif
+
 bool RenderWidget::CanComposeInline() {
   return true;
 }
+
+#if defined(OS_MACOSX)
+void RenderWidget::DidChangeScrollbarsForMainFrame(
+    bool has_horizontal_scrollbar,
+    bool has_vertical_scrollbar) {
+  if (has_horizontal_scrollbar != cached_has_main_frame_horizontal_scrollbar_ ||
+      has_vertical_scrollbar != cached_has_main_frame_vertical_scrollbar_) {
+    Send(new ViewHostMsg_DidChangeScrollbarsForMainFrame(
+          routing_id_, has_horizontal_scrollbar, has_vertical_scrollbar));
+
+    cached_has_main_frame_horizontal_scrollbar_ = has_horizontal_scrollbar;
+    cached_has_main_frame_vertical_scrollbar_ = has_vertical_scrollbar;
+  }
+}
+#endif  // defined(OS_MACOSX)
 
 WebScreenInfo RenderWidget::screenInfo() {
   return screen_info_;

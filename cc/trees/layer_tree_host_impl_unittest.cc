@@ -155,8 +155,12 @@ class LayerTreeHostImplTest : public testing::Test,
   virtual void SendManagedMemoryStats() OVERRIDE {}
   virtual bool IsInsideDraw() OVERRIDE { return false; }
   virtual void RenewTreePriority() OVERRIDE {}
-  virtual void RequestScrollbarAnimationOnImplThread(base::TimeDelta delay)
-      OVERRIDE { requested_scrollbar_animation_delay_ = delay; }
+  virtual void PostDelayedScrollbarFadeOnImplThread(
+      const base::Closure& start_fade,
+      base::TimeDelta delay) OVERRIDE {
+    scrollbar_fade_start_ = start_fade;
+    requested_scrollbar_animation_delay_ = delay;
+  }
   virtual void DidActivatePendingTree() OVERRIDE {}
   virtual void DidManageTiles() OVERRIDE {}
 
@@ -404,6 +408,7 @@ class LayerTreeHostImplTest : public testing::Test,
   bool did_request_manage_tiles_;
   bool did_upload_visible_tile_;
   bool reduce_memory_result_;
+  base::Closure scrollbar_fade_start_;
   base::TimeDelta requested_scrollbar_animation_delay_;
   size_t current_limit_bytes_;
   int current_priority_cutoff_value_;
@@ -952,6 +957,61 @@ TEST_F(LayerTreeHostImplTest, ImplPinchZoom) {
   }
 }
 
+TEST_F(LayerTreeHostImplTest, MasksToBoundsDoesntClobberInnerContainerSize) {
+  SetupScrollAndContentsLayers(gfx::Size(100, 100));
+  host_impl_->SetViewportSize(gfx::Size(50, 50));
+  DrawFrame();
+
+  LayerImpl* scroll_layer = host_impl_->InnerViewportScrollLayer();
+  LayerImpl* container_layer = scroll_layer->scroll_clip_layer();
+  DCHECK(scroll_layer);
+
+  float min_page_scale = 1.f;
+  float max_page_scale = 4.f;
+  host_impl_->active_tree()->SetPageScaleFactorAndLimits(1.f,
+                                                         min_page_scale,
+                                                         max_page_scale);
+
+  // If the container's masks_to_bounds is false, the viewport size should
+  // overwrite the inner viewport container layer's size.
+  {
+    EXPECT_EQ(gfx::Size(50, 50),
+              container_layer->bounds());
+    container_layer->SetMasksToBounds(false);
+
+    container_layer->SetBounds(gfx::Size(30, 25));
+    EXPECT_EQ(gfx::Size(30, 25),
+              container_layer->bounds());
+
+    // This should cause a reset of the inner viewport container layer's bounds.
+    host_impl_->DidChangeTopControlsPosition();
+
+    EXPECT_EQ(gfx::Size(50, 50),
+              container_layer->bounds());
+  }
+
+  host_impl_->SetViewportSize(gfx::Size(50, 50));
+  container_layer->SetBounds(gfx::Size(50, 50));
+
+  // If the container's masks_to_bounds is true, the viewport size should
+  // *NOT* overwrite the inner viewport container layer's size.
+  {
+    EXPECT_EQ(gfx::Size(50, 50),
+              container_layer->bounds());
+    container_layer->SetMasksToBounds(true);
+
+    container_layer->SetBounds(gfx::Size(30, 25));
+    EXPECT_EQ(gfx::Size(30, 25),
+              container_layer->bounds());
+
+    // This should cause a reset of the inner viewport container layer's bounds.
+    host_impl_->DidChangeTopControlsPosition();
+
+    EXPECT_EQ(gfx::Size(30, 25),
+              container_layer->bounds());
+  }
+}
+
 TEST_F(LayerTreeHostImplTest, PinchGesture) {
   SetupScrollAndContentsLayers(gfx::Size(100, 100));
   host_impl_->SetViewportSize(gfx::Size(50, 50));
@@ -1301,27 +1361,22 @@ class LayerTreeHostImplOverridePhysicalTime : public LayerTreeHostImpl {
 TEST_F(LayerTreeHostImplTest, ScrollbarLinearFadeScheduling) {
   LayerTreeSettings settings;
   settings.scrollbar_animator = LayerTreeSettings::LinearFade;
-  settings.scrollbar_linear_fade_delay_ms = 20;
-  settings.scrollbar_linear_fade_length_ms = 20;
+  settings.scrollbar_fade_delay_ms = 20;
+  settings.scrollbar_fade_duration_ms = 20;
 
   SETUP_LAYERS_FOR_SCROLLBAR_ANIMATION_TEST();
 
   base::TimeTicks fake_now = gfx::FrameTime::Now();
-  host_impl_override_time->SetCurrentPhysicalTimeTicksForTest(fake_now);
 
-  // If no scroll happened recently, StartScrollbarAnimation should have no
-  // effect.
-  host_impl_->StartScrollbarAnimation();
   EXPECT_EQ(base::TimeDelta(), requested_scrollbar_animation_delay_);
   EXPECT_FALSE(did_request_redraw_);
 
-  // If no scroll happened during a scroll gesture, StartScrollbarAnimation
-  // should have no effect.
+  // If no scroll happened during a scroll gesture, it should have no effect.
   host_impl_->ScrollBegin(gfx::Point(), InputHandler::Wheel);
   host_impl_->ScrollEnd();
-  host_impl_->StartScrollbarAnimation();
   EXPECT_EQ(base::TimeDelta(), requested_scrollbar_animation_delay_);
   EXPECT_FALSE(did_request_redraw_);
+  EXPECT_TRUE(scrollbar_fade_start_.Equals(base::Closure()));
 
   // After a scroll, a fade animation should be scheduled about 20ms from now.
   host_impl_->ScrollBegin(gfx::Point(), InputHandler::Wheel);
@@ -1329,89 +1384,65 @@ TEST_F(LayerTreeHostImplTest, ScrollbarLinearFadeScheduling) {
   host_impl_->ScrollEnd();
   did_request_redraw_ = false;
   did_request_animate_ = false;
-  host_impl_->StartScrollbarAnimation();
   EXPECT_LT(base::TimeDelta::FromMilliseconds(19),
             requested_scrollbar_animation_delay_);
   EXPECT_FALSE(did_request_redraw_);
   EXPECT_FALSE(did_request_animate_);
   requested_scrollbar_animation_delay_ = base::TimeDelta();
+  scrollbar_fade_start_.Run();
+  host_impl_->Animate(fake_now);
 
   // After the fade begins, we should start getting redraws instead of a
   // scheduled animation.
   fake_now += base::TimeDelta::FromMilliseconds(25);
-  host_impl_override_time->SetCurrentPhysicalTimeTicksForTest(fake_now);
-  host_impl_->StartScrollbarAnimation();
   EXPECT_EQ(base::TimeDelta(), requested_scrollbar_animation_delay_);
   EXPECT_TRUE(did_request_animate_);
   did_request_animate_ = false;
 
-  // If no scroll happened recently, StartScrollbarAnimation should have no
-  // effect.
-  fake_now += base::TimeDelta::FromMilliseconds(25);
-  host_impl_override_time->SetCurrentPhysicalTimeTicksForTest(fake_now);
-  host_impl_->StartScrollbarAnimation();
-  EXPECT_EQ(base::TimeDelta(), requested_scrollbar_animation_delay_);
-  EXPECT_FALSE(did_request_redraw_);
-
   // Setting the scroll offset outside a scroll should also cause the scrollbar
   // to appear and to schedule a fade.
   host_impl_->InnerViewportScrollLayer()->SetScrollOffset(gfx::Vector2d(5, 5));
-  host_impl_->StartScrollbarAnimation();
   EXPECT_LT(base::TimeDelta::FromMilliseconds(19),
             requested_scrollbar_animation_delay_);
   EXPECT_FALSE(did_request_redraw_);
   EXPECT_FALSE(did_request_animate_);
   requested_scrollbar_animation_delay_ = base::TimeDelta();
-
-  // None of the above should have called CurrentFrameTimeTicks, so if we call
-  // it now we should get the current time.
-  fake_now += base::TimeDelta::FromMilliseconds(10);
-  host_impl_override_time->SetCurrentPhysicalTimeTicksForTest(fake_now);
-  EXPECT_EQ(fake_now, host_impl_->CurrentFrameTimeTicks());
 }
 
 TEST_F(LayerTreeHostImplTest, ScrollbarFadePinchZoomScrollbars) {
   LayerTreeSettings settings;
   settings.scrollbar_animator = LayerTreeSettings::LinearFade;
-  settings.scrollbar_linear_fade_delay_ms = 20;
-  settings.scrollbar_linear_fade_length_ms = 20;
+  settings.scrollbar_fade_delay_ms = 20;
+  settings.scrollbar_fade_duration_ms = 20;
   settings.use_pinch_zoom_scrollbars = true;
 
   SETUP_LAYERS_FOR_SCROLLBAR_ANIMATION_TEST();
 
   base::TimeTicks fake_now = gfx::FrameTime::Now();
-  host_impl_override_time->SetCurrentPhysicalTimeTicksForTest(fake_now);
 
   host_impl_->active_tree()->SetPageScaleFactorAndLimits(1.f, 1.f, 4.f);
 
-  // If no scroll happened recently, StartScrollbarAnimation should have no
-  // effect.
-  host_impl_->StartScrollbarAnimation();
   EXPECT_EQ(base::TimeDelta(), requested_scrollbar_animation_delay_);
   EXPECT_FALSE(did_request_animate_);
 
-  // If no scroll happened during a scroll gesture, StartScrollbarAnimation
-  // should have no effect.
+  // If no scroll happened during a scroll gesture, it should have no effect.
   host_impl_->ScrollBegin(gfx::Point(), InputHandler::Wheel);
   host_impl_->ScrollEnd();
-  host_impl_->StartScrollbarAnimation();
   EXPECT_EQ(base::TimeDelta(), requested_scrollbar_animation_delay_);
   EXPECT_FALSE(did_request_animate_);
+  EXPECT_TRUE(scrollbar_fade_start_.Equals(base::Closure()));
 
   // After a scroll, no fade animation should be scheduled.
   host_impl_->ScrollBegin(gfx::Point(), InputHandler::Wheel);
   host_impl_->ScrollBy(gfx::Point(), gfx::Vector2dF(5, 0));
   host_impl_->ScrollEnd();
   did_request_redraw_ = false;
-  host_impl_->StartScrollbarAnimation();
   EXPECT_EQ(base::TimeDelta(), requested_scrollbar_animation_delay_);
   EXPECT_FALSE(did_request_animate_);
   requested_scrollbar_animation_delay_ = base::TimeDelta();
 
   // We should not see any draw requests.
   fake_now += base::TimeDelta::FromMilliseconds(25);
-  host_impl_override_time->SetCurrentPhysicalTimeTicksForTest(fake_now);
-  host_impl_->StartScrollbarAnimation();
   EXPECT_EQ(base::TimeDelta(), requested_scrollbar_animation_delay_);
   EXPECT_FALSE(did_request_animate_);
 
@@ -1423,24 +1454,24 @@ TEST_F(LayerTreeHostImplTest, ScrollbarFadePinchZoomScrollbars) {
   host_impl_->ScrollBy(gfx::Point(), gfx::Vector2dF(5, 0));
   host_impl_->ScrollEnd();
   did_request_redraw_ = false;
-  host_impl_->StartScrollbarAnimation();
   EXPECT_LT(base::TimeDelta::FromMilliseconds(19),
             requested_scrollbar_animation_delay_);
   EXPECT_FALSE(did_request_animate_);
   requested_scrollbar_animation_delay_ = base::TimeDelta();
+  scrollbar_fade_start_.Run();
 
   // After the fade begins, we should start getting redraws instead of a
   // scheduled animation.
   fake_now += base::TimeDelta::FromMilliseconds(25);
-  host_impl_override_time->SetCurrentPhysicalTimeTicksForTest(fake_now);
-  host_impl_->StartScrollbarAnimation();
-  EXPECT_EQ(base::TimeDelta(), requested_scrollbar_animation_delay_);
+  host_impl_->Animate(fake_now);
   EXPECT_TRUE(did_request_animate_);
 }
 
 void LayerTreeHostImplTest::SetupMouseMoveAtWithDeviceScale(
     float device_scale_factor) {
   LayerTreeSettings settings;
+  settings.scrollbar_fade_delay_ms = 500;
+  settings.scrollbar_fade_duration_ms = 300;
   settings.scrollbar_animator = LayerTreeSettings::Thinning;
 
   gfx::Size viewport_size(300, 200);
@@ -5712,8 +5743,8 @@ TEST_F(LayerTreeHostImplTest, MemoryPolicy) {
       gpu::MemoryAllocation::CUTOFF_ALLOW_NOTHING);
 
   // GPU rasterization should be disabled by default.
-  EXPECT_EQ(LayerTreeSettings::CpuRasterization,
-            host_impl_->settings().rasterization_site);
+  EXPECT_FALSE(host_impl_->settings().gpu_rasterization_enabled);
+  EXPECT_FALSE(host_impl_->settings().gpu_rasterization_forced);
 
   host_impl_->SetVisible(true);
   host_impl_->SetMemoryPolicy(policy1);
@@ -5731,7 +5762,7 @@ TEST_F(LayerTreeHostImplTest, MemoryPolicy) {
   // Now enable GPU rasterization and test if we get required only cutoff,
   // when visible.
   LayerTreeSettings settings;
-  settings.rasterization_site = LayerTreeSettings::GpuRasterization;
+  settings.gpu_rasterization_forced = true;
   host_impl_ = LayerTreeHostImpl::Create(
       settings, this, &proxy_, &stats_instrumentation_, NULL, 0);
 
@@ -6239,6 +6270,14 @@ TEST_F(LayerTreeHostImplWithTopControlsTest, NoIdleAnimations) {
       ->SetScrollOffset(gfx::Vector2d(0, 10));
   host_impl_->Animate(base::TimeTicks());
   EXPECT_FALSE(did_request_redraw_);
+}
+
+TEST_F(LayerTreeHostImplWithTopControlsTest, TopControlsAnimationScheduling) {
+  SetupScrollAndContentsLayers(gfx::Size(100, 100))
+      ->SetScrollOffset(gfx::Vector2d(0, 10));
+  host_impl_->DidChangeTopControlsPosition();
+  EXPECT_TRUE(did_request_animate_);
+  EXPECT_TRUE(did_request_redraw_);
 }
 
 TEST_F(LayerTreeHostImplWithTopControlsTest, ScrollHandledByTopControls) {

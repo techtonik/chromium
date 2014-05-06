@@ -193,8 +193,6 @@
         'shell/renderer/test_runner/MockWebRTCDataChannelHandler.h',
         'shell/renderer/test_runner/MockWebRTCPeerConnectionHandler.cpp',
         'shell/renderer/test_runner/MockWebRTCPeerConnectionHandler.h',
-        'shell/renderer/test_runner/MockWebSpeechInputController.cpp',
-        'shell/renderer/test_runner/MockWebSpeechInputController.h',
         'shell/renderer/test_runner/MockWebSpeechRecognizer.cpp',
         'shell/renderer/test_runner/MockWebSpeechRecognizer.h',
         'shell/renderer/test_runner/SpellCheckClient.cpp',
@@ -314,6 +312,7 @@
             '../ui/aura/aura.gyp:aura_test_support',
             '../ui/base/strings/ui_strings.gyp:ui_strings',
             '../ui/events/events.gyp:events',
+            '../ui/wm/wm.gyp:wm',
           ],
           'conditions': [
             ['toolkit_views==1', {
@@ -322,7 +321,6 @@
                 '../ui/views/controls/webview/webview.gyp:webview',
                 '../ui/views/views.gyp:views',
                 '../ui/views/views.gyp:views_test_support',
-                '../ui/wm/wm.gyp:wm',
               ],
               'sources/': [
                 ['exclude', 'shell/browser/shell_aura.cc'],

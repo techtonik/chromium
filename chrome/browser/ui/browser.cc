@@ -32,8 +32,6 @@
 #include "chrome/browser/autofill/personal_data_manager_factory.h"
 #include "chrome/browser/background/background_contents_service.h"
 #include "chrome/browser/background/background_contents_service_factory.h"
-#include "chrome/browser/bookmarks/bookmark_model.h"
-#include "chrome/browser/bookmarks/bookmark_utils.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browser_shutdown.h"
 #include "chrome/browser/character_encoding.h"
@@ -151,6 +149,8 @@
 #include "chrome/common/profiling.h"
 #include "chrome/common/search_types.h"
 #include "chrome/common/url_constants.h"
+#include "components/bookmarks/core/browser/bookmark_model.h"
+#include "components/bookmarks/core/browser/bookmark_utils.h"
 #include "components/startup_metric_utils/startup_metric_utils.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "content/public/browser/devtools_manager.h"
@@ -169,7 +169,6 @@
 #include "content/public/browser/site_instance.h"
 #include "content/public/browser/user_metrics.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/page_zoom.h"
 #include "content/public/common/renderer_preferences.h"
@@ -880,7 +879,7 @@ void Browser::UpdateUIForNavigationInTab(WebContents* contents,
   ScheduleUIUpdate(contents, content::INVALIDATE_TYPE_URL);
 
   if (contents_is_selected)
-    contents->GetView()->SetInitialFocus();
+    contents->SetInitialFocus();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1717,12 +1716,11 @@ bool Browser::RequestPpapiBrokerPermission(
   return true;
 }
 
-gfx::Size Browser::GetSizeForNewRenderView(
-    const WebContents* web_contents) const {
+gfx::Size Browser::GetSizeForNewRenderView(WebContents* web_contents) const {
   // When navigating away from NTP with unpinned bookmark bar, the bookmark bar
   // would disappear on non-NTP pages, resulting in a bigger size for the new
   // render view.
-  gfx::Size size = web_contents->GetView()->GetContainerSize();
+  gfx::Size size = web_contents->GetContainerBounds().size();
   // Don't change render view size if bookmark bar is currently not detached,
   // or there's no pending entry, or navigating to a NTP page.
   if (size.IsEmpty() || bookmark_bar_state_ != BookmarkBar::DETACHED)
@@ -1822,7 +1820,7 @@ void Browser::SetWebContentsBlocked(content::WebContents* web_contents,
   }
   tab_strip_model_->SetTabBlocked(index, blocked);
   if (!blocked && tab_strip_model_->GetActiveWebContents() == web_contents)
-    web_contents->GetView()->Focus();
+    web_contents->Focus();
 }
 
 web_modal::WebContentsModalDialogHost*
@@ -2248,22 +2246,25 @@ bool Browser::ShouldShowLocationBar() const {
   if (is_type_tabbed())
     return true;
 
-  if (is_app() && CommandLine::ForCurrentProcess()->HasSwitch(
-                      switches::kEnableStreamlinedHostedApps)) {
-    // If kEnableStreamlinedHostedApps is true, show the location bar for
-    // bookmark apps.
-    ExtensionService* service =
-        extensions::ExtensionSystem::Get(profile_)->extension_service();
-    const extensions::Extension* extension =
-        service ? service->GetInstalledExtension(
-                      web_app::GetExtensionIdFromApplicationName(app_name()))
-                : NULL;
-    return (!extension || extension->from_bookmark()) &&
-           app_name() != DevToolsWindow::kDevToolsApp;
+  if (is_app()) {
+    if (CommandLine::ForCurrentProcess()->HasSwitch(
+            switches::kEnableStreamlinedHostedApps)) {
+      // If kEnableStreamlinedHostedApps is true, show the location bar for
+      // bookmark apps.
+      ExtensionService* service =
+          extensions::ExtensionSystem::Get(profile_)->extension_service();
+      const extensions::Extension* extension =
+          service ? service->GetInstalledExtension(
+                        web_app::GetExtensionIdFromApplicationName(app_name()))
+                  : NULL;
+      return (!extension || extension->from_bookmark()) &&
+             app_name() != DevToolsWindow::kDevToolsApp;
+    } else {
+      return false;
+    }
   }
 
-  // All app windows and system windows are trusted and never show a location
-  // bar.
+  // Trusted app windows and system windows never show a location bar.
   return !is_trusted_source();
 }
 

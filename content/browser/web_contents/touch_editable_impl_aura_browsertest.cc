@@ -12,19 +12,21 @@
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/browser/web_contents/web_contents_view_aura.h"
 #include "content/public/browser/render_frame_host.h"
-#include "content/public/browser/web_contents_view.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/content_browser_test.h"
 #include "content/public/test/content_browser_test_utils.h"
 #include "content/public/test/test_utils.h"
 #include "content/shell/browser/shell.h"
+#include "third_party/WebKit/public/web/WebInputEvent.h"
 #include "ui/aura/test/event_generator.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_tree_host.h"
 #include "ui/base/ui_base_switches.h"
 #include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/events/event_utils.h"
+
+using blink::WebInputEvent;
 
 namespace content {
 
@@ -33,14 +35,14 @@ class TestTouchEditableImplAura : public TouchEditableImplAura {
   TestTouchEditableImplAura()
       : selection_changed_callback_arrived_(false),
         waiting_for_selection_changed_callback_(false),
-        gesture_ack_callback_arrived_(false),
-        waiting_for_gesture_ack_callback_(false) {}
+        waiting_for_gesture_ack_type_(WebInputEvent::Undefined),
+        last_gesture_ack_type_(WebInputEvent::Undefined) {}
 
   virtual void Reset() {
     selection_changed_callback_arrived_ = false;
     waiting_for_selection_changed_callback_ = false;
-    gesture_ack_callback_arrived_ = false;
-    waiting_for_gesture_ack_callback_ = false;
+    waiting_for_gesture_ack_type_ = WebInputEvent::Undefined;
+    last_gesture_ack_type_ = WebInputEvent::Undefined;
   }
 
   virtual void OnSelectionOrCursorChanged(const gfx::Rect& anchor,
@@ -52,9 +54,10 @@ class TestTouchEditableImplAura : public TouchEditableImplAura {
   }
 
   virtual void GestureEventAck(int gesture_event_type) OVERRIDE {
-    gesture_ack_callback_arrived_ = true;
+    last_gesture_ack_type_ =
+        static_cast<WebInputEvent::Type>(gesture_event_type);
     TouchEditableImplAura::GestureEventAck(gesture_event_type);
-    if (waiting_for_gesture_ack_callback_)
+    if (waiting_for_gesture_ack_type_ == gesture_event_type)
       gesture_ack_wait_run_loop_->Quit();
   }
 
@@ -66,10 +69,10 @@ class TestTouchEditableImplAura : public TouchEditableImplAura {
     selection_changed_wait_run_loop_->Run();
   }
 
-  virtual void WaitForGestureAck() {
-    if (gesture_ack_callback_arrived_)
+  virtual void WaitForGestureAck(WebInputEvent::Type gesture_event_type) {
+    if (last_gesture_ack_type_ == gesture_event_type)
       return;
-    waiting_for_gesture_ack_callback_ = true;
+    waiting_for_gesture_ack_type_ = gesture_event_type;
     gesture_ack_wait_run_loop_.reset(new base::RunLoop());
     gesture_ack_wait_run_loop_->Run();
   }
@@ -80,8 +83,8 @@ class TestTouchEditableImplAura : public TouchEditableImplAura {
  private:
   bool selection_changed_callback_arrived_;
   bool waiting_for_selection_changed_callback_;
-  bool gesture_ack_callback_arrived_;
-  bool waiting_for_gesture_ack_callback_;
+  WebInputEvent::Type waiting_for_gesture_ack_type_;
+  WebInputEvent::Type last_gesture_ack_type_;
   scoped_ptr<base::RunLoop> selection_changed_wait_run_loop_;
   scoped_ptr<base::RunLoop> gesture_ack_wait_run_loop_;
 
@@ -136,8 +139,7 @@ class TouchEditableImplAuraTest : public ContentBrowserTest {
     ASSERT_TRUE(test_server()->Start());
     GURL test_url(test_server()->GetURL(url));
     NavigateToURL(shell(), test_url);
-    aura::Window* content =
-        shell()->web_contents()->GetView()->GetContentNativeView();
+    aura::Window* content = shell()->web_contents()->GetContentNativeView();
     content->GetHost()->SetBounds(gfx::Rect(800, 600));
   }
 
@@ -172,7 +174,7 @@ IN_PROC_BROWSER_TEST_F(TouchEditableImplAuraTest,
   view_aura->SetTouchEditableForTest(touch_editable);
   RenderWidgetHostViewAura* rwhva = static_cast<RenderWidgetHostViewAura*>(
       web_contents->GetRenderWidgetHostView());
-  aura::Window* content = web_contents->GetView()->GetContentNativeView();
+  aura::Window* content = web_contents->GetContentNativeView();
   aura::test::EventGenerator generator(content->GetRootWindow(), content);
   gfx::Rect bounds = content->GetBoundsInRootWindow();
 
@@ -358,7 +360,7 @@ IN_PROC_BROWSER_TEST_F(TouchEditableImplAuraTest,
   view_aura->SetTouchEditableForTest(touch_editable);
   RenderWidgetHostViewAura* rwhva = static_cast<RenderWidgetHostViewAura*>(
       web_contents->GetRenderWidgetHostView());
-  aura::Window* content = web_contents->GetView()->GetContentNativeView();
+  aura::Window* content = web_contents->GetContentNativeView();
   aura::test::EventGenerator generator(content->GetRootWindow(), content);
   gfx::Rect bounds = content->GetBoundsInRootWindow();
   EXPECT_EQ(GetRenderWidgetHostViewAura(touch_editable), rwhva);
@@ -369,7 +371,8 @@ IN_PROC_BROWSER_TEST_F(TouchEditableImplAuraTest,
   // Tap textfield
   touch_editable->Reset();
   generator.GestureTapAt(gfx::Point(bounds.x() + 50, bounds.y() + 40));
-  // Tap Down and Tap acks are sent synchronously.
+  // Tap Down acks are sent synchronously, while Tap acks are asynchronous.
+  touch_editable->WaitForGestureAck(WebInputEvent::GestureTap);
   touch_editable->WaitForSelectionChangeCallback();
   touch_editable->Reset();
 

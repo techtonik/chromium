@@ -9,8 +9,8 @@
 
 #include "base/compiler_specific.h"
 #include "base/memory/scoped_ptr.h"
+#include "gpu/command_buffer/client/gpu_control.h"
 #include "gpu/command_buffer/common/cmd_buffer_common.h"
-#include "gpu/command_buffer/common/gpu_control.h"
 #include "gpu/command_buffer/common/gpu_memory_allocation.h"
 #include "gpu/command_buffer/service/command_buffer_service.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -29,7 +29,6 @@ class MockCommandBufferBase : public CommandBufferServiceBase {
   virtual ~MockCommandBufferBase();
 
   virtual bool Initialize() OVERRIDE;
-  virtual State GetState() OVERRIDE;
   virtual State GetLastState() OVERRIDE;
   virtual int32 GetLastToken() OVERRIDE;
   virtual void WaitForTokenInRange(int32 start, int32 end) OVERRIDE;

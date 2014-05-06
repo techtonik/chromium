@@ -4,7 +4,7 @@
 
 #include "apps/shell/common/shell_extensions_client.h"
 
-#include "apps/shell/common/shell_app_runtime.h"
+#include "apps/shell/common/api/generated_schemas.h"
 #include "base/logging.h"
 #include "chrome/common/extensions/api/generated_schemas.h"
 #include "chrome/common/extensions/permissions/chrome_api_permissions.h"
@@ -21,6 +21,7 @@
 #include "extensions/common/permissions/permission_message_provider.h"
 #include "extensions/common/permissions/permissions_provider.h"
 #include "extensions/common/url_pattern_set.h"
+#include "grit/app_shell_resources.h"
 #include "grit/common_resources.h"
 #include "grit/extensions_resources.h"
 
@@ -132,8 +133,9 @@ scoped_ptr<FeatureProvider> ShellExtensionsClient::CreateFeatureProvider(
     const std::string& name) const {
   extensions::JSONFeatureProviderSource source(name);
   if (name == "api") {
-    // TODO(yoz): Only include src/extensions resources.
     source.LoadJSON(IDR_EXTENSION_API_FEATURES);
+    source.LoadJSON(IDR_SHELL_EXTENSION_API_FEATURES);
+    // TODO(yoz): Don't include Chrome resources.
     source.LoadJSON(IDR_CHROME_EXTENSION_API_FEATURES);
     return scoped_ptr<FeatureProvider>(new BaseFeatureProvider(
         source.dictionary(), CreateFeature<extensions::APIFeature>));
@@ -192,7 +194,7 @@ bool ShellExtensionsClient::IsAPISchemaGenerated(
   // have the Chrome app APIs available.
   return extensions::api::GeneratedSchemas::IsGenerated(name) ||
          extensions::core_api::GeneratedSchemas::IsGenerated(name) ||
-         name == extensions::ShellAppRuntime::GetName();
+         apps::shell_api::GeneratedSchemas::IsGenerated(name);
 }
 
 base::StringPiece ShellExtensionsClient::GetAPISchema(
@@ -202,9 +204,9 @@ base::StringPiece ShellExtensionsClient::GetAPISchema(
   if (extensions::api::GeneratedSchemas::IsGenerated(name))
     return extensions::api::GeneratedSchemas::Get(name);
 
-  // Special-case our simplified app.runtime implementation.
-  if (name == extensions::ShellAppRuntime::GetName())
-    return extensions::ShellAppRuntime::GetSchema();
+  // Schema for chrome.shell APIs.
+  if (apps::shell_api::GeneratedSchemas::IsGenerated(name))
+    return apps::shell_api::GeneratedSchemas::Get(name);
 
   return extensions::core_api::GeneratedSchemas::Get(name);
 }

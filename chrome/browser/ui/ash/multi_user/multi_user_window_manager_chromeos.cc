@@ -9,11 +9,12 @@
 #include "ash/ash_switches.h"
 #include "ash/multi_profile_uma.h"
 #include "ash/root_window_controller.h"
-#include "ash/session_state_delegate.h"
+#include "ash/session/session_state_delegate.h"
 #include "ash/shelf/shelf.h"
 #include "ash/shell.h"
 #include "ash/shell_delegate.h"
 #include "ash/shell_window_ids.h"
+#include "ash/system/tray/system_tray_notifier.h"
 #include "ash/wm/window_state.h"
 #include "base/auto_reset.h"
 #include "base/message_loop/message_loop.h"
@@ -297,8 +298,8 @@ void MultiUserWindowManagerChromeOS::SetWindowOwner(
 }
 
 const std::string& MultiUserWindowManagerChromeOS::GetWindowOwner(
-    aura::Window* window) {
-  WindowToEntryMap::iterator it = window_to_entry_.find(window);
+    aura::Window* window) const {
+  WindowToEntryMap::const_iterator it = window_to_entry_.find(window);
   return it != window_to_entry_.end() ? it->second->owner()
                                       : base::EmptyString();
 }
@@ -319,8 +320,8 @@ void MultiUserWindowManagerChromeOS::ShowWindowForUser(
       user_id);
 }
 
-bool MultiUserWindowManagerChromeOS::AreWindowsSharedAmongUsers() {
-  WindowToEntryMap::iterator it = window_to_entry_.begin();
+bool MultiUserWindowManagerChromeOS::AreWindowsSharedAmongUsers() const {
+  WindowToEntryMap::const_iterator it = window_to_entry_.begin();
   for (; it != window_to_entry_.end(); ++it) {
     if (it->second->owner() != it->second->show_for_user())
       return true;
@@ -329,9 +330,10 @@ bool MultiUserWindowManagerChromeOS::AreWindowsSharedAmongUsers() {
 }
 
 void MultiUserWindowManagerChromeOS::GetOwnersOfVisibleWindows(
-    std::set<std::string>* user_ids) {
-  for (WindowToEntryMap::iterator it = window_to_entry_.begin();
-       it != window_to_entry_.end(); ++it) {
+    std::set<std::string>* user_ids) const {
+  for (WindowToEntryMap::const_iterator it = window_to_entry_.begin();
+       it != window_to_entry_.end();
+       ++it) {
     if (it->first->IsVisible())
       user_ids->insert(it->second->owner());
   }
@@ -339,14 +341,14 @@ void MultiUserWindowManagerChromeOS::GetOwnersOfVisibleWindows(
 
 bool MultiUserWindowManagerChromeOS::IsWindowOnDesktopOfUser(
     aura::Window* window,
-    const std::string& user_id) {
+    const std::string& user_id) const {
   const std::string& presenting_user = GetUserPresentingWindow(window);
   return presenting_user.empty() || presenting_user == user_id;
 }
 
 const std::string& MultiUserWindowManagerChromeOS::GetUserPresentingWindow(
-    aura::Window* window) {
-  WindowToEntryMap::iterator it = window_to_entry_.find(window);
+    aura::Window* window) const {
+  WindowToEntryMap::const_iterator it = window_to_entry_.find(window);
   // If the window is not owned by anyone it is shown on all desktops and we
   // return the empty string.
   if (it == window_to_entry_.end())
@@ -399,6 +401,11 @@ void MultiUserWindowManagerChromeOS::ActiveUserChanged(
   animation_.reset(
       new UserSwichAnimatorChromeOS(
           this, user_id, GetAdjustedAnimationTimeInMS(kUserFadeTimeMS)));
+  // Call notifier here instead of observing ActiveUserChanged because
+  // this must happen after MultiUserWindowManagerChromeOS is notified.
+  ash::Shell::GetInstance()
+      ->system_tray_notifier()
+      ->NotifyMediaCaptureChanged();
 }
 
 void MultiUserWindowManagerChromeOS::OnWindowDestroyed(aura::Window* window) {
@@ -499,7 +506,8 @@ bool MultiUserWindowManagerChromeOS::IsAnimationRunningForTest() {
   return animation_.get() != NULL && !animation_->IsAnimationFinished();
 }
 
-const std::string& MultiUserWindowManagerChromeOS::GetCurrentUserForTest() {
+const std::string& MultiUserWindowManagerChromeOS::GetCurrentUserForTest()
+    const {
   return current_user_id_;
 }
 
@@ -612,7 +620,7 @@ void MultiUserWindowManagerChromeOS::ShowWithTransientChildrenRecursive(
 }
 
 aura::Window* MultiUserWindowManagerChromeOS::GetOwningWindowInTransientChain(
-    aura::Window* window) {
+    aura::Window* window) const {
   if (!GetWindowOwner(window).empty())
     return NULL;
   aura::Window* parent = wm::GetTransientParent(window);
@@ -701,7 +709,7 @@ void MultiUserWindowManagerChromeOS::SetWindowVisible(
 }
 
 int MultiUserWindowManagerChromeOS::GetAdjustedAnimationTimeInMS(
-    int default_time_in_ms) {
+    int default_time_in_ms) const {
   return animation_speed_ == ANIMATION_SPEED_NORMAL ? default_time_in_ms :
       (animation_speed_ == ANIMATION_SPEED_FAST ? 10 : 0);
 }

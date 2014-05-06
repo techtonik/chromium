@@ -47,11 +47,13 @@ DictionaryValue* CreateResult(apps::ShellAppWindow* app_window) {
 
 }  // namespace
 
-ShellAppWindowCreateFunction::ShellAppWindowCreateFunction() {}
+ShellAppWindowCreateFunction::ShellAppWindowCreateFunction() {
+}
 
-ShellAppWindowCreateFunction::~ShellAppWindowCreateFunction() {}
+ShellAppWindowCreateFunction::~ShellAppWindowCreateFunction() {
+}
 
-bool ShellAppWindowCreateFunction::RunImpl() {
+bool ShellAppWindowCreateFunction::RunAsync() {
   // Arguments must contain a URL and may contain options and a callback.
   if (args_->GetSize() < 1 || args_->GetSize() > 3)
     return false;

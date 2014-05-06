@@ -8,7 +8,6 @@
 #import <Cocoa/Cocoa.h>
 #include <vector>
 
-#include "apps/app_window.h"
 #include "apps/size_constraints.h"
 #include "apps/ui/native_app_window.h"
 #include "base/mac/scoped_nsobject.h"
@@ -17,6 +16,10 @@
 #include "content/public/browser/web_contents_observer.h"
 #include "extensions/common/draggable_region.h"
 #include "ui/gfx/rect.h"
+
+namespace apps {
+class AppWindow;
+}
 
 class ExtensionKeybindingRegistryCocoa;
 class NativeAppWindowCocoa;
@@ -123,7 +126,8 @@ class NativeAppWindowCocoa : public apps::NativeAppWindow,
       const content::NativeWebKeyboardEvent& event) OVERRIDE;
   virtual bool IsFrameless() const OVERRIDE;
   virtual bool HasFrameColor() const OVERRIDE;
-  virtual SkColor FrameColor() const OVERRIDE;
+  virtual SkColor ActiveFrameColor() const OVERRIDE;
+  virtual SkColor InactiveFrameColor() const OVERRIDE;
   virtual gfx::Insets GetFrameInsets() const OVERRIDE;
 
   // These are used to simulate Mac-style hide/show. Since windows can be hidden
@@ -155,13 +159,7 @@ class NativeAppWindowCocoa : public apps::NativeAppWindow,
   virtual ~NativeAppWindowCocoa();
 
   ShellNSWindow* window() const;
-
-  content::WebContents* web_contents() const {
-    return app_window_->web_contents();
-  }
-  const extensions::Extension* extension() const {
-    return app_window_->extension();
-  }
+  content::WebContents* WebContents() const;
 
   // Returns the WindowStyleMask based on the type of window frame.
   // Specifically, this includes NSResizableWindowMask if the window is
@@ -171,7 +169,7 @@ class NativeAppWindowCocoa : public apps::NativeAppWindow,
 
   void InstallView();
   void UninstallView();
-  void InstallDraggableRegionViews();
+  void UpdateDraggableRegionViews();
 
   // Cache |restored_bounds_| only if the window is currently restored.
   void UpdateRestoredBounds();
@@ -205,7 +203,7 @@ class NativeAppWindowCocoa : public apps::NativeAppWindow,
 
   // For system drag, the whole window is draggable and the non-draggable areas
   // have to been explicitly excluded.
-  std::vector<gfx::Rect> system_drag_exclude_areas_;
+  std::vector<extensions::DraggableRegion> draggable_regions_;
 
   // The Extension Command Registry used to determine which keyboard events to
   // handle.

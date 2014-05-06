@@ -4,14 +4,16 @@
 
 #include "chrome/browser/sync/glue/shared_change_processor.h"
 
-#include "chrome/browser/sync/profile_sync_components_factory.h"
+#include "base/message_loop/message_loop_proxy.h"
 #include "chrome/browser/sync/profile_sync_service.h"
 #include "components/sync_driver/generic_change_processor.h"
-#include "content/public/browser/browser_thread.h"
+#include "components/sync_driver/generic_change_processor_factory.h"
+#include "components/sync_driver/sync_api_component_factory.h"
+#include "sync/api/attachments/attachment_service.h"
+#include "sync/api/attachments/fake_attachment_service.h"
 #include "sync/api/sync_change.h"
 
 using base::AutoLock;
-using content::BrowserThread;
 
 namespace browser_sync {
 
@@ -19,10 +21,9 @@ SharedChangeProcessor::SharedChangeProcessor()
     : disconnected_(false),
       type_(syncer::UNSPECIFIED),
       sync_service_(NULL),
+      frontend_loop_(base::MessageLoopProxy::current()),
       generic_change_processor_(NULL),
       error_handler_(NULL) {
-  // We're always created on the UI thread.
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
 }
 
 SharedChangeProcessor::~SharedChangeProcessor() {
@@ -30,7 +31,7 @@ SharedChangeProcessor::~SharedChangeProcessor() {
   // thread), or when the syncer::SyncableService stop's syncing (datatype
   // thread).  |generic_change_processor_|, if non-NULL, must be
   // deleted on |backend_loop_|.
-  if (BrowserThread::CurrentlyOn(BrowserThread::UI)) {
+  if (frontend_loop_->BelongsToCurrentThread()) {
     if (backend_loop_.get()) {
       if (!backend_loop_->DeleteSoon(FROM_HERE, generic_change_processor_)) {
         NOTREACHED();
@@ -46,7 +47,8 @@ SharedChangeProcessor::~SharedChangeProcessor() {
 }
 
 base::WeakPtr<syncer::SyncableService> SharedChangeProcessor::Connect(
-    ProfileSyncComponentsFactory* sync_factory,
+    browser_sync::SyncApiComponentFactory* sync_factory,
+    GenericChangeProcessorFactory* processor_factory,
     ProfileSyncService* sync_service,
     DataTypeErrorHandler* error_handler,
     syncer::ModelType type,
@@ -70,12 +72,18 @@ base::WeakPtr<syncer::SyncableService> SharedChangeProcessor::Connect(
     return base::WeakPtr<syncer::SyncableService>();
   }
 
-  // TODO(zea): Pass |merge_result| to the generic change processor.
-  generic_change_processor_ =
-      sync_factory->CreateGenericChangeProcessor(sync_service_,
-                                                 error_handler,
-                                                 local_service,
-                                                 merge_result);
+  // TODO(maniscalco): Replace FakeAttachmentService with a real
+  // AttachmentService implementation once implemented (bug 356359).
+  scoped_ptr<syncer::AttachmentService> attachment_service(
+      new syncer::FakeAttachmentService(
+          sync_factory->CreateCustomAttachmentStoreForType(type)));
+
+  generic_change_processor_ = processor_factory->CreateGenericChangeProcessor(
+      sync_service_->GetUserShare(),
+      error_handler,
+      local_service,
+      merge_result,
+      attachment_service.Pass()).release();
   return local_service;
 }
 

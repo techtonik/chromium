@@ -370,6 +370,14 @@ login.createScreen('LocallyManagedUserCreationScreen',
       return this.children;
     },
 
+    /**
+     * Returns selected pod.
+     * @type {Node}
+     */
+    get selectedPod() {
+      return this.selectedPod_;
+    },
+
     addPod: function(user) {
       var importPod = new ImportPod({user: user});
       this.appendChild(importPod);
@@ -733,15 +741,16 @@ login.createScreen('LocallyManagedUserCreationScreen',
      * @type {!Array} Array of Buttons.
      */
     get buttons() {
-      var buttons = [];
-
-      var status = this.makeFromTemplate('status-container', 'status');
-      buttons.push(status);
+      var links = this.ownerDocument.createElement('div');
+      var buttons = this.ownerDocument.createElement('div');
+      links.classList.add('controls-links');
+      buttons.classList.add('controls-buttons');
 
       var importLink = this.makeFromTemplate('import-supervised-user-link',
                                              'import-link');
       importLink.hidden = true;
-      buttons.push(importLink);
+      links.appendChild(importLink);
+
       var linkElement = importLink.querySelector('.signin-link');
       linkElement.addEventListener('click',
           this.importLinkPressed_.bind(this));
@@ -749,47 +758,50 @@ login.createScreen('LocallyManagedUserCreationScreen',
       var createLink = this.makeFromTemplate('create-supervised-user-link',
                                              'create-link');
       createLink.hidden = true;
-      buttons.push(createLink);
+      links.appendChild(createLink);
+
+      var status = this.makeFromTemplate('status-container', 'status');
+      buttons.appendChild(status);
 
       linkElement = createLink.querySelector('.signin-link');
       linkElement.addEventListener('click',
           this.createLinkPressed_.bind(this));
 
-      buttons.push(this.makeButton(
+      buttons.appendChild(this.makeButton(
           'start',
           'managedUserCreationFlow',
           this.startButtonPressed_.bind(this),
           ['intro'],
           ['custom-appearance', 'button-fancy', 'button-blue']));
 
-      buttons.push(this.makeButton(
+      buttons.appendChild(this.makeButton(
           'prev',
           'managedUserCreationFlow',
           this.prevButtonPressed_.bind(this),
           ['manager'],
           []));
 
-      buttons.push(this.makeButton(
+      buttons.appendChild(this.makeButton(
           'next',
           'managedUserCreationFlow',
           this.nextButtonPressed_.bind(this),
           ['manager', 'username'],
           []));
 
-      buttons.push(this.makeButton(
+      buttons.appendChild(this.makeButton(
           'import',
           'managedUserCreationFlow',
           this.importButtonPressed_.bind(this),
           ['import', 'import-password'],
           []));
 
-      buttons.push(this.makeButton(
+      buttons.appendChild(this.makeButton(
           'gotit',
           'managedUserCreationFlow',
           this.gotItButtonPressed_.bind(this),
           ['created'],
           ['custom-appearance', 'button-fancy', 'button-blue']));
-      return buttons;
+      return [links, buttons];
     },
 
     /**
@@ -835,6 +847,7 @@ login.createScreen('LocallyManagedUserCreationScreen',
       if (this.disabled)
         return;
       this.disabled = true;
+
       this.context_.managedName = userName;
       chrome.send('specifyLocallyManagedUserCreationFlowUserData',
           [userName, firstPassword]);
@@ -1301,6 +1314,7 @@ login.createScreen('LocallyManagedUserCreationScreen',
         control.disabled = value;
       }
       $('login-header-bar').disabled = value;
+      $('cancel-add-user-button').disabled = false;
     },
 
     /**
@@ -1542,8 +1556,12 @@ login.createScreen('LocallyManagedUserCreationScreen',
     },
 
     setExistingManagedUsers: function(users) {
-      var userList = users;
+      var selectedUser = null;
+      // Store selected user
+      if (this.importList_.selectedPod)
+        selectedUser = this.importList_.selectedPod.user.id;
 
+      var userList = users;
       userList.sort(function(a, b) {
         // Put existing users last.
         if (a.exists != b.exists)
@@ -1553,14 +1571,21 @@ login.createScreen('LocallyManagedUserCreationScreen',
       });
 
       this.importList_.clearPods();
-      for (var i = 0; i < userList.length; ++i)
+      var selectedIndex = -1;
+      for (var i = 0; i < userList.length; ++i) {
         this.importList_.addPod(userList[i]);
+        if (selectedUser == userList[i].id)
+          selectedIndex = i;
+      }
 
       if (userList.length == 1)
-        this.importList_.selectPod(this.managerList_.pods[0]);
+        this.importList_.selectPod(this.importList_.pods[0]);
 
-      if (userList.length > 0 && this.currentPage_ == 'username')
-        this.getScreenElement('import-link').hidden = false;
+      if (selectedIndex >= 0)
+        this.importList_.selectPod(this.importList_.pods[selectedIndex]);
+
+      if (this.currentPage_ == 'username')
+        this.getScreenElement('import-link').hidden = (userList.length == 0);
     },
   };
 });

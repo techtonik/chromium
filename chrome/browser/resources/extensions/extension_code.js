@@ -39,7 +39,8 @@ cr.define('extensions', function() {
       this.appendChild(sourceDiv);
 
       // If there's no code, then display an appropriate message.
-      if (!code) {
+      if (!code ||
+          (!code.highlight && !code.beforeHighlight && !code.afterHighlight)) {
         var span = document.createElement('span');
         span.textContent = emptyMessage;
         sourceDiv.appendChild(span);
@@ -97,7 +98,7 @@ cr.define('extensions', function() {
     scrollToError: function() {
       var errorSpan = this.querySelector('.extension-code-highlighted-source');
       if (errorSpan)
-        errorSpan.scrollIntoView(false);  // Scroll to bottom of view.
+        this.scrollTop = errorSpan.offsetTop - this.clientHeight / 2;
     }
   };
 

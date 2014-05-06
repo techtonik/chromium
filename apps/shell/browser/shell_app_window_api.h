@@ -13,7 +13,7 @@ namespace extensions {
 // A simplified implementation of the chrome.app.window.create() function for
 // app_shell. Opens a fullscreen window and invokes the window callback. Most
 // of the response is stub data, but the JS contentWindow is valid.
-class ShellAppWindowCreateFunction : public UIThreadExtensionFunction {
+class ShellAppWindowCreateFunction : public AsyncExtensionFunction {
  public:
   ShellAppWindowCreateFunction();
 
@@ -23,7 +23,7 @@ class ShellAppWindowCreateFunction : public UIThreadExtensionFunction {
 
  private:
   virtual ~ShellAppWindowCreateFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 };
 
 }  // namespace extensions

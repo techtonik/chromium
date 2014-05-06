@@ -15,6 +15,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/extensions/bundle_installer.h"
 #include "chrome/browser/extensions/extension_install_ui.h"
+#include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/image_loader.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
@@ -25,7 +26,6 @@
 #include "chrome/common/pref_names.h"
 #include "components/signin/core/browser/profile_oauth2_token_service.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_icon_set.h"
@@ -137,8 +137,8 @@ int GetSizeForMaxScaleFactor(int size_in_dip) {
 // pixel size under maximal supported scale factor.
 SkBitmap GetDefaultIconBitmapForMaxScaleFactor(bool is_app) {
   const gfx::ImageSkia& image = is_app ?
-      extensions::IconsInfo::GetDefaultAppIcon() :
-      extensions::IconsInfo::GetDefaultExtensionIcon();
+      extensions::util::GetDefaultAppIcon() :
+      extensions::util::GetDefaultExtensionIcon();
   return image.GetRepresentation(
       gfx::ImageSkia::GetMaxSupportedScale()).sk_bitmap();
 }
@@ -186,7 +186,7 @@ gfx::NativeWindow NativeWindowForWebContents(content::WebContents* contents) {
   if (!contents)
     return NULL;
 
-  return contents->GetView()->GetTopLevelNativeWindow();
+  return contents->GetTopLevelNativeWindow();
 }
 
 }  // namespace

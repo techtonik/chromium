@@ -463,6 +463,8 @@ TEST(PictureTest, RecordingModes) {
                                                    0,
                                                    Picture::RECORD_NORMALLY);
   EXPECT_TRUE(content_layer_client.last_canvas() != NULL);
+  EXPECT_EQ(ContentLayerClient::GRAPHICS_CONTEXT_ENABLED,
+            content_layer_client.last_context_status());
   EXPECT_TRUE(picture);
 
   picture = Picture::Create(layer_rect,
@@ -472,6 +474,8 @@ TEST(PictureTest, RecordingModes) {
                             0,
                             Picture::RECORD_WITH_SK_NULL_CANVAS);
   EXPECT_TRUE(content_layer_client.last_canvas() != NULL);
+  EXPECT_EQ(ContentLayerClient::GRAPHICS_CONTEXT_ENABLED,
+            content_layer_client.last_context_status());
   EXPECT_TRUE(picture);
 
   picture = Picture::Create(layer_rect,
@@ -480,10 +484,21 @@ TEST(PictureTest, RecordingModes) {
                             false,
                             0,
                             Picture::RECORD_WITH_PAINTING_DISABLED);
-  EXPECT_EQ(NULL, content_layer_client.last_canvas());
+  EXPECT_TRUE(content_layer_client.last_canvas() != NULL);
+  EXPECT_EQ(ContentLayerClient::GRAPHICS_CONTEXT_DISABLED,
+            content_layer_client.last_context_status());
   EXPECT_TRUE(picture);
 
-  EXPECT_EQ(3, Picture::RECORDING_MODE_COUNT);
+  picture = Picture::Create(layer_rect,
+                            &content_layer_client,
+                            tile_grid_info,
+                            false,
+                            0,
+                            Picture::RECORD_WITH_SKRECORD);
+  EXPECT_TRUE(content_layer_client.last_canvas() != NULL);
+  EXPECT_TRUE(picture);
+
+  EXPECT_EQ(4, Picture::RECORDING_MODE_COUNT);
 }
 
 }  // namespace

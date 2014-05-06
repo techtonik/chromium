@@ -2,12 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-(function() {
 'use strict';
 
 <include src="../../../../ui/webui/resources/js/util.js">
 <include src="viewport.js">
 <include src="pdf_scripting_api.js">
+
+/**
+ * @return {number} Width of a scrollbar in pixels
+ */
+function getScrollbarWidth() {
+  var div = document.createElement('div');
+  div.style.visibility = 'hidden';
+  div.style.overflow = 'scroll';
+  div.style.width = '50px';
+  div.style.height = '50px';
+  div.style.position = 'absolute';
+  document.body.appendChild(div);
+  var result = div.offsetWidth - div.clientWidth;
+  div.parentNode.removeChild(div);
+  return result;
+}
 
 /**
  * Creates a new PDFViewer. There should only be one of these objects per
@@ -25,12 +40,12 @@ function PDFViewer() {
   this.passwordScreen_.addEventListener('password-submitted',
                                         this.onPasswordSubmitted_.bind(this));
   this.errorScreen_ = $('error-screen');
-  this.errorScreen_.text = 'Failed to load PDF document';
 
   // Create the viewport.
   this.viewport_ = new Viewport(window,
                                 this.sizer_,
-                                this.viewportChangedCallback_.bind(this));
+                                this.viewportChangedCallback_.bind(this),
+                                getScrollbarWidth());
 
   // Create the plugin object dynamically so we can set its src. The plugin
   // element is sized to fill the entire window and is set to be fixed
@@ -47,8 +62,10 @@ function PDFViewer() {
   // Otherwise, we take the query string of the URL to indicate the URL of the
   // PDF to load. This is used for print preview in particular.
   var streamDetails;
-  if (chrome.extension.getBackgroundPage)
+  if (chrome.extension.getBackgroundPage &&
+      chrome.extension.getBackgroundPage()) {
     streamDetails = chrome.extension.getBackgroundPage().popStreamDetails();
+  }
 
   if (!streamDetails) {
     // The URL of this page will be of the form
@@ -102,7 +119,7 @@ PDFViewer.prototype = {
           return;
         case 33:  // Page up key.
           // Go to the previous page if we are fit-to-page.
-          if (isFitToPageEnabled()) {
+          if (this.viewport_.fittingType == Viewport.FittingType.FIT_TO_PAGE) {
             this.viewport_.goToPage(this.viewport_.getMostVisiblePage() - 1);
             // Since we do the movement of the page.
             e.preventDefault();
@@ -118,7 +135,7 @@ PDFViewer.prototype = {
           return;
         case 34:  // Page down key.
           // Go to the next page if we are fit-to-page.
-          if (isFitToPageEnabled()) {
+          if (this.viewport_.fittingType == Viewport.FittingType.FIT_TO_PAGE) {
             this.viewport_.goToPage(this.viewport_.getMostVisiblePage() + 1);
             // Since we do the movement of the page.
             e.preventDefault();
@@ -189,6 +206,9 @@ PDFViewer.prototype = {
       }
     } else if (progress == 100) {
       // Document load complete.
+      var loadEvent = new Event('pdfload');
+      window.dispatchEvent(loadEvent);
+      // TODO(raymes): Replace this and other callbacks with events.
       this.messagingHost_.documentLoaded();
       if (this.lastViewportPosition_)
         this.viewport_.position = this.lastViewportPosition_;
@@ -248,6 +268,12 @@ PDFViewer.prototype = {
           this.passwordScreen_.active = true;
         else
           this.passwordScreen_.deny();
+        break;
+      case 'setTranslatedStrings':
+        this.passwordScreen_.text = message.data.getPasswordString;
+        this.progressBar_.text = message.data.loadingString;
+        this.errorScreen_.text = message.data.loadFailedString;
+        break;
     }
   },
 
@@ -361,9 +387,6 @@ PDFViewer.prototype = {
   get viewport() {
     return this.viewport_;
   }
+};
 
-}
-
-new PDFViewer();
-
-})();
+var viewer = new PDFViewer();

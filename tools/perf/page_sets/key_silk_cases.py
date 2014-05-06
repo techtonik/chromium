@@ -8,7 +8,7 @@ from telemetry.page import page_set as page_set_module
 from telemetry.web_perf import timeline_interaction_record as tir_module
 
 
-class KeySilkCasesPage(page_module.PageWithDefaultRunNavigate):
+class KeySilkCasesPage(page_module.Page):
 
   def __init__(self, url, page_set):
     super(KeySilkCasesPage, self).__init__(url=url, page_set=page_set)
@@ -374,11 +374,9 @@ class Page18(KeySilkCasesPage):
   def ToggleDrawer(self, action_runner):
     action_runner.RunAction(TapAction(
       {
-        'selector': '#menu-button'
+        'selector': '#menu-button',
+        'wait_after' : {'seconds': 1}
       }))
-    action_runner.BeginInteraction('Wait', [tir_module.IS_SMOOTH])
-    action_runner.RunAction(WaitAction({'seconds': 1}))
-    action_runner.EndInteraction('Wait', [tir_module.IS_SMOOTH])
 
 
 class Page19(KeySilkCasesPage):
@@ -418,13 +416,11 @@ class Page19(KeySilkCasesPage):
         'element_function': '''
           function(callback) {
             callback(document.getElementById('nav-drawer').children[0]);
-          }'''
+          }''',
+        'wait_after' : {
+          'javascript': '!document.getElementById("nav-drawer").active'
+        }
       }))
-    action_runner.BeginInteraction('Wait', [tir_module.IS_SMOOTH])
-    action_runner.RunAction(WaitAction({
-      'javascript': '!document.getElementById("nav-drawer").active'
-    }))
-    action_runner.EndInteraction('Wait', [tir_module.IS_SMOOTH])
 
 
 class Page20(KeySilkCasesPage):
@@ -474,11 +470,9 @@ class Page21(KeySilkCasesPage):
         'element_function': '''
           function(callback) {
             callback(document.getElementsByClassName("vk_arc")[0]);
-          }'''
+          }''',
+        'wait_after': {'seconds': 2}
       }))
-    action_runner.BeginInteraction('Wait', [tir_module.IS_SMOOTH])
-    action_runner.RunAction(WaitAction({'seconds' : 2}))
-    action_runner.EndInteraction('Wait', [tir_module.IS_SMOOTH])
 
 
   def RunNavigateSteps(self, action_runner):

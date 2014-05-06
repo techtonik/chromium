@@ -36,8 +36,6 @@ class NET_EXPORT_PRIVATE ReliableQuicStream {
 
   virtual ~ReliableQuicStream();
 
-  bool WillAcceptStreamFrame(const QuicStreamFrame& frame) const;
-
   // Called when a (potentially duplicate) stream frame has been received
   // for this stream.  Returns false if this frame can not be accepted
   // because there is too much data already buffered.
@@ -99,9 +97,9 @@ class NET_EXPORT_PRIVATE ReliableQuicStream {
   // sequencer's buffer.
   void MaybeSendWindowUpdate();
 
-  int num_frames_received();
+  int num_frames_received() const;
 
-  int num_duplicate_frames_received();
+  int num_duplicate_frames_received() const;
 
   QuicFlowController* flow_controller() { return &flow_controller_; }
 
@@ -130,9 +128,9 @@ class NET_EXPORT_PRIVATE ReliableQuicStream {
   // Close the write side of the socket.  Further writes will fail.
   void CloseWriteSide();
 
-  bool HasBufferedData();
+  bool HasBufferedData() const;
 
-  bool fin_buffered() { return fin_buffered_; }
+  bool fin_buffered() const { return fin_buffered_; }
 
   const QuicSession* session() const { return session_; }
   QuicSession* session() { return session_; }

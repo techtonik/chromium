@@ -58,14 +58,17 @@ class SourceBufferStreamTest : public testing::Test {
   void SetAudioStream() {
     video_config_ = TestVideoConfig::Invalid();
     accurate_durations_ = true;
-    AudioDecoderConfig config(kCodecVorbis,
-                              kSampleFormatPlanarF32,
-                              CHANNEL_LAYOUT_STEREO,
-                              1000,
-                              NULL,
-                              0,
-                              false);
-    stream_.reset(new SourceBufferStream(config, LogCB(), true));
+    audio_config_.Initialize(kCodecVorbis,
+                             kSampleFormatPlanarF32,
+                             CHANNEL_LAYOUT_STEREO,
+                             1000,
+                             NULL,
+                             0,
+                             false,
+                             false,
+                             base::TimeDelta(),
+                             0);
+    stream_.reset(new SourceBufferStream(audio_config_, LogCB(), true));
 
     // Equivalent to 2ms per frame.
     SetStreamInfo(500, 500);
@@ -316,6 +319,13 @@ class SourceBufferStreamTest : public testing::Test {
         << "\nActual: " << actual.AsHumanReadableString();
   }
 
+  void CheckAudioConfig(const AudioDecoderConfig& config) {
+    const AudioDecoderConfig& actual = stream_->GetCurrentAudioDecoderConfig();
+    EXPECT_TRUE(actual.Matches(config))
+        << "Expected: " << config.AsHumanReadableString()
+        << "\nActual: " << actual.AsHumanReadableString();
+  }
+
   const LogCB log_cb() {
     return base::Bind(&SourceBufferStreamTest::DebugMediaLog,
                       base::Unretained(this));
@@ -325,6 +335,7 @@ class SourceBufferStreamTest : public testing::Test {
 
   scoped_ptr<SourceBufferStream> stream_;
   VideoDecoderConfig video_config_;
+  AudioDecoderConfig audio_config_;
 
  private:
   base::TimeDelta ConvertToFrameDuration(int frames_per_second) {
@@ -465,6 +476,7 @@ class SourceBufferStreamTest : public testing::Test {
       if (last_splice_frame) {
         // Require at least one additional buffer for a splice.
         CHECK(!pre_splice_buffers.empty());
+        buffer->SetConfigId(splice_config_id);
         buffer->ConvertToSpliceBuffer(pre_splice_buffers);
         pre_splice_buffers.clear();
       }
@@ -3593,8 +3605,9 @@ TEST_F(SourceBufferStreamTest, SpliceFrame_ConfigChangeWithinSplice) {
   CheckExpectedBuffers("0K 3K C");
   CheckVideoConfig(new_config);
   CheckExpectedBuffers("6 9 C");
+  CheckExpectedBuffers("10 C");
   CheckVideoConfig(video_config_);
-  CheckExpectedBuffers("10 15");
+  CheckExpectedBuffers("15");
   CheckNoNextBuffer();
 }
 
@@ -3628,8 +3641,9 @@ TEST_F(SourceBufferStreamTest,
   CheckExpectedBuffers("7K C");
   CheckVideoConfig(new_config);
   CheckExpectedBuffers("8 9 C");
+  CheckExpectedBuffers("10 C");
   CheckVideoConfig(video_config_);
-  CheckExpectedBuffers("10 20");
+  CheckExpectedBuffers("20");
   CheckNoNextBuffer();
 }
 
@@ -3651,32 +3665,24 @@ TEST_F(SourceBufferStreamTest, Audio_SpliceFrame_NoExactSplices) {
   CheckNoNextBuffer();
 }
 
-TEST_F(SourceBufferStreamTest, Audio_SpliceFrame_DoubleSpliceEarlierOverlap) {
+// Do not allow splices on top of splices.
+TEST_F(SourceBufferStreamTest, Audio_SpliceFrame_NoDoubleSplice) {
   SetAudioStream();
   Seek(0);
   NewSegmentAppend("0K 2K 4K 6K 8K 10K 12K");
   NewSegmentAppend("11K 13K 15K 17K");
 
+  // Verify the splice was created.
+  CheckExpectedBuffers("0K 2K 4K 6K 8K 10K 12K C 11K 13K 15K 17K");
+  CheckNoNextBuffer();
+  Seek(0);
+
   // Create a splice before the first splice which would include it.
   NewSegmentAppend("9K");
 
-  // TODO(dalecurtis/wolenetz): Technically 15K and 17K should be included here,
-  // but since the range merge algorithm doesn't use exact durations, they're
-  // currently dropped.
-  CheckExpectedBuffers("0K 2K 4K 6K 8K 10K 11K 13K C 9K");
-  CheckNoNextBuffer();
-}
-
-TEST_F(SourceBufferStreamTest, Audio_SpliceFrame_DoubleSpliceLaterOverlap) {
-  SetAudioStream();
-  Seek(0);
-  NewSegmentAppend("0K 2K 4K 6K 8K 10K 12K");
-  NewSegmentAppend("10K 13K 15K 17K");
-
-  // Create a splice after the first splice which would include it.
-  NewSegmentAppend("11K");
-
-  CheckExpectedBuffers("0K 2K 4K 6K 8K 10K 13K 15K C 11K");
+  // A splice on top of a splice should result in a discard of the original
+  // splice and no new splice frame being generated.
+  CheckExpectedBuffers("0K 2K 4K 6K 8K 9K 13K 15K 17K");
   CheckNoNextBuffer();
 }
 
@@ -3701,6 +3707,28 @@ TEST_F(SourceBufferStreamTest, Audio_SpliceFrame_CorrectMediaSegmentStartTime) {
   NewSegmentAppend("1K 4K");
   CheckExpectedRangesByTimestamp("{ [0,12) }");
   CheckExpectedBuffers("0K 2K 4K C 1K 4K 6K 8K 10K");
+  CheckNoNextBuffer();
+}
+
+TEST_F(SourceBufferStreamTest, Audio_SpliceFrame_ConfigChange) {
+  SetAudioStream();
+
+  AudioDecoderConfig new_config(kCodecVorbis,
+                                kSampleFormatPlanarF32,
+                                CHANNEL_LAYOUT_MONO,
+                                1000,
+                                NULL,
+                                0,
+                                false);
+  ASSERT_NE(new_config.channel_layout(), audio_config_.channel_layout());
+
+  Seek(0);
+  CheckAudioConfig(audio_config_);
+  NewSegmentAppend("0K 2K 4K 6K");
+  stream_->UpdateAudioConfig(new_config);
+  NewSegmentAppend("5K 8K 12K");
+  CheckExpectedBuffers("0K 2K 4K 6K C 5K 8K 12K");
+  CheckAudioConfig(new_config);
   CheckNoNextBuffer();
 }
 

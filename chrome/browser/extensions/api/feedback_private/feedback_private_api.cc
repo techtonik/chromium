@@ -96,7 +96,7 @@ void FeedbackPrivateAPI::RequestFeedback(
 // static
 base::Closure* FeedbackPrivateGetStringsFunction::test_callback_ = NULL;
 
-bool FeedbackPrivateGetStringsFunction::RunImpl() {
+bool FeedbackPrivateGetStringsFunction::RunSync() {
   base::DictionaryValue* dict = new base::DictionaryValue();
   SetResult(dict);
 
@@ -132,7 +132,7 @@ bool FeedbackPrivateGetStringsFunction::RunImpl() {
   return true;
 }
 
-bool FeedbackPrivateGetUserEmailFunction::RunImpl() {
+bool FeedbackPrivateGetUserEmailFunction::RunSync() {
   // TODO(rkc): Remove logging once crbug.com/284662 is closed.
   LOG(WARNING) << "FEEDBACK_DEBUG: User e-mail requested.";
   FeedbackService* service =
@@ -142,7 +142,7 @@ bool FeedbackPrivateGetUserEmailFunction::RunImpl() {
   return true;
 }
 
-bool FeedbackPrivateGetSystemInformationFunction::RunImpl() {
+bool FeedbackPrivateGetSystemInformationFunction::RunAsync() {
   // TODO(rkc): Remove logging once crbug.com/284662 is closed.
   LOG(WARNING) << "FEEDBACK_DEBUG: System information requested.";
   FeedbackService* service =
@@ -161,7 +161,7 @@ void FeedbackPrivateGetSystemInformationFunction::OnCompleted(
   SendResponse(true);
 }
 
-bool FeedbackPrivateSendFeedbackFunction::RunImpl() {
+bool FeedbackPrivateSendFeedbackFunction::RunAsync() {
   scoped_ptr<feedback_private::SendFeedback::Params> params(
       feedback_private::SendFeedback::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get());

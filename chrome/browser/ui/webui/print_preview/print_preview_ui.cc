@@ -272,6 +272,8 @@ content::WebUIDataSource* CreatePrintPreviewUISource() {
   source->AddLocalizedString("bottom", IDS_PRINT_PREVIEW_BOTTOM_MARGIN_LABEL);
   source->AddLocalizedString("left", IDS_PRINT_PREVIEW_LEFT_MARGIN_LABEL);
   source->AddLocalizedString("right", IDS_PRINT_PREVIEW_RIGHT_MARGIN_LABEL);
+  source->AddLocalizedString("mediaSizeLabel",
+                             IDS_PRINT_PREVIEW_MEDIA_SIZE_LABEL);
   source->AddLocalizedString("destinationSearchTitle",
                              IDS_PRINT_PREVIEW_DESTINATION_SEARCH_TITLE);
   source->AddLocalizedString("userInfo", IDS_PRINT_PREVIEW_USER_INFO);
@@ -517,7 +519,7 @@ void PrintPreviewUI::OnDidPreviewPage(int page_number,
   base::FundamentalValue ui_identifier(id_);
   base::FundamentalValue request_id(preview_request_id);
   if (g_testing_delegate)
-    g_testing_delegate->DidRenderPreviewPage(*web_ui()->GetWebContents());
+    g_testing_delegate->DidRenderPreviewPage(web_ui()->GetWebContents());
   web_ui()->CallJavascriptFunction(
       "onDidPreviewPage", number, ui_identifier, request_id);
   if (g_testing_delegate && g_testing_delegate->IsAutoCancelEnabled())

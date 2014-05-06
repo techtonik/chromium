@@ -58,7 +58,6 @@
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "content/public/browser/web_ui.h"
 #include "google_apis/gaia/oauth2_token_service.h"
 #include "printing/backend/print_backend.h"
@@ -130,6 +129,8 @@ enum PrintDestinationBuckets {
   CLOUD_DUPLICATE_SELECTED,
   REGISTER_PROMO_SHOWN,
   REGISTER_PROMO_SELECTED,
+  ACCOUNT_CHANGED,
+  ADD_ACCOUNT_SELECTED,
   PRINT_DESTINATION_BUCKET_BOUNDARY
 };
 
@@ -827,7 +828,7 @@ void PrintPreviewHandler::PrintToPdf() {
     PostPrintToPdfTask();
   } else if (!select_file_dialog_.get() ||
              !select_file_dialog_->IsRunning(platform_util::GetTopLevel(
-                 preview_web_contents()->GetView()->GetNativeView()))) {
+                 preview_web_contents()->GetNativeView()))) {
     PrintPreviewUI* print_preview_ui = static_cast<PrintPreviewUI*>(
         web_ui()->GetController());
     // Pre-populating select file dialog with print job title.
@@ -936,7 +937,7 @@ void PrintPreviewHandler::PrintWithCloudPrintDialog() {
   }
 
   gfx::NativeWindow modal_parent = platform_util::GetTopLevel(
-      preview_web_contents()->GetView()->GetNativeView());
+      preview_web_contents()->GetNativeView());
   print_dialog_cloud::CreatePrintDialogForBytes(
       preview_web_contents()->GetBrowserContext(),
       modal_parent,
@@ -1232,8 +1233,7 @@ void PrintPreviewHandler::SelectFile(const base::FilePath& default_filename) {
       &file_type_info,
       0,
       base::FilePath::StringType(),
-      platform_util::GetTopLevel(
-          preview_web_contents()->GetView()->GetNativeView()),
+      platform_util::GetTopLevel(preview_web_contents()->GetNativeView()),
       NULL);
 }
 

@@ -756,6 +756,11 @@ IPC_MESSAGE_CONTROL1(PpapiHostMsg_ChannelCreated,
 // Notify the renderer that the PPAPI channel gets ready in the plugin.
 IPC_MESSAGE_CONTROL0(PpapiHostMsg_StartupInitializationComplete);
 
+// Calls renderer to open a resource file for nacl_irt_open_resource().
+IPC_SYNC_MESSAGE_CONTROL1_1(PpapiHostMsg_OpenResource,
+                            std::string /* key */,
+                            ppapi::proxy::SerializedHandle /* fd */)
+
 // Logs the given message to the console of all instances.
 IPC_MESSAGE_CONTROL4(PpapiHostMsg_LogWithSource,
                      PP_Instance /* instance */,
@@ -788,10 +793,6 @@ IPC_SYNC_MESSAGE_ROUTED3_1(PpapiHostMsg_PPBGraphics3D_Create,
 IPC_SYNC_MESSAGE_ROUTED2_0(PpapiHostMsg_PPBGraphics3D_SetGetBuffer,
                            ppapi::HostResource /* context */,
                            int32 /* transfer_buffer_id */)
-IPC_SYNC_MESSAGE_ROUTED1_2(PpapiHostMsg_PPBGraphics3D_GetState,
-                           ppapi::HostResource /* context */,
-                           gpu::CommandBuffer::State /* state */,
-                           bool /* success */)
 IPC_SYNC_MESSAGE_ROUTED3_2(PpapiHostMsg_PPBGraphics3D_WaitForTokenInRange,
                            ppapi::HostResource /* context */,
                            int32 /* start */,

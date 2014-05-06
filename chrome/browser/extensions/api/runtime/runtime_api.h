@@ -129,7 +129,7 @@ class RuntimeGetBackgroundPageFunction : public ChromeAsyncExtensionFunction {
 
  protected:
   virtual ~RuntimeGetBackgroundPageFunction() {}
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
  private:
   void OnPageLoaded(ExtensionHost*);
@@ -142,7 +142,7 @@ class RuntimeSetUninstallURLFunction : public ChromeSyncExtensionFunction {
 
  protected:
   virtual ~RuntimeSetUninstallURLFunction() {}
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 class RuntimeReloadFunction : public ChromeSyncExtensionFunction {
@@ -151,7 +151,7 @@ class RuntimeReloadFunction : public ChromeSyncExtensionFunction {
 
  protected:
   virtual ~RuntimeReloadFunction() {}
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 class RuntimeRequestUpdateCheckFunction : public ChromeAsyncExtensionFunction,
@@ -163,7 +163,7 @@ class RuntimeRequestUpdateCheckFunction : public ChromeAsyncExtensionFunction,
   RuntimeRequestUpdateCheckFunction();
  protected:
   virtual ~RuntimeRequestUpdateCheckFunction() {}
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
   // Implements content::NotificationObserver interface.
   virtual void Observe(int type,
@@ -183,7 +183,7 @@ class RuntimeRestartFunction : public ChromeSyncExtensionFunction {
 
  protected:
   virtual ~RuntimeRestartFunction() {}
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 class RuntimeGetPlatformInfoFunction : public ChromeSyncExtensionFunction {
@@ -192,7 +192,7 @@ class RuntimeGetPlatformInfoFunction : public ChromeSyncExtensionFunction {
                              RUNTIME_GETPLATFORMINFO);
  protected:
   virtual ~RuntimeGetPlatformInfoFunction() {}
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 class RuntimeGetPackageDirectoryEntryFunction
@@ -203,7 +203,7 @@ class RuntimeGetPackageDirectoryEntryFunction
 
  protected:
   virtual ~RuntimeGetPackageDirectoryEntryFunction() {}
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 }  // namespace extensions

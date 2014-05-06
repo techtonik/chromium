@@ -466,7 +466,7 @@ class GLES2ImplementationTest : public testing::Test {
 
       scoped_refptr<Buffer> ring_buffer = helper_->get_ring_buffer();
       commands_ = static_cast<CommandBufferEntry*>(ring_buffer->memory()) +
-                  command_buffer()->GetState().put_offset;
+                  command_buffer()->GetLastState().put_offset;
       ClearCommands();
       EXPECT_TRUE(transfer_buffer_->InSync());
 
@@ -2722,7 +2722,8 @@ TEST_F(GLES2ImplementationTest, GetString) {
   const char* expected_str =
       "foobar "
       "GL_CHROMIUM_flipy "
-      "GL_EXT_unpack_subimage";
+      "GL_EXT_unpack_subimage "
+      "GL_CHROMIUM_map_sub";
   const char kBad = 0x12;
   struct Cmds {
     cmd::SetBucketSize set_bucket_size1;

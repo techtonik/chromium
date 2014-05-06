@@ -57,6 +57,7 @@ class MEDIA_EXPORT VideoRendererImpl
 
   // VideoRenderer implementation.
   virtual void Initialize(DemuxerStream* stream,
+                          bool low_delay,
                           const PipelineStatusCB& init_cb,
                           const StatisticsCB& statistics_cb,
                           const TimeCB& max_time_cb,
@@ -135,6 +136,9 @@ class MEDIA_EXPORT VideoRendererImpl
 
   // Provides video frames to VideoRendererImpl.
   VideoFrameStream video_frame_stream_;
+
+  // Flag indicating low-delay mode.
+  bool low_delay_;
 
   // Queue of incoming frames yet to be painted.
   typedef std::deque<scoped_refptr<VideoFrame> > VideoFrameQueue;

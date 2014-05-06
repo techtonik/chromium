@@ -18,6 +18,7 @@
 #include "base/files/scoped_file.h"
 #include "base/logging.h"
 #include "base/memory/scoped_ptr.h"
+#include "base/memory/scoped_vector.h"
 #include "base/path_service.h"
 #include "base/pickle.h"
 #include "base/posix/eintr_wrapper.h"
@@ -93,7 +94,7 @@ bool SendIPCRequestAndReadReply(int ipc_channel,
   }
 
   // Then read the remote reply.
-  std::vector<int> received_fds;
+  ScopedVector<base::ScopedFD> received_fds;
   const ssize_t msg_len =
       UnixDomainSocket::RecvMsg(ipc_channel, reply_data_buffer,
                                 reply_data_buffer_size, &received_fds);
@@ -130,14 +131,6 @@ void NaClForkDelegate::Init(const int sandboxdesc,
   base::FileHandleMappingVector fds_to_map;
   fds_to_map.push_back(std::make_pair(fds[1], kNaClZygoteDescriptor));
   fds_to_map.push_back(std::make_pair(sandboxdesc, nacl_sandbox_descriptor));
-
-  // Make sure that nacl_loader is started with a dummy file descriptor. This
-  // is required because the setuid sandbox will always try to close a
-  // hard-wired file descriptor.
-  base::ScopedFD dummy_fd(socket(PF_UNIX, SOCK_DGRAM, 0));
-  CHECK(dummy_fd.is_valid());
-  fds_to_map.push_back(std::make_pair(
-      dummy_fd.get(), setuid_sandbox_client->GetUniqueToChildFileDescriptor()));
 
   // Using nacl_helper_bootstrap is not necessary on x86-64 because
   // NaCl's x86-64 sandbox is not zero-address-based.  Starting
@@ -206,13 +199,16 @@ void NaClForkDelegate::Init(const int sandboxdesc,
     }
 
     base::LaunchOptions options;
+
+    base::ScopedFD dummy_fd;
     if (enable_layer1_sandbox) {
-      // NaCl needs to keep tight control of the cmd_line, so
-      // pass NULL and prepend the setuid sandbox wrapper manually.
-      setuid_sandbox_client->PrependWrapper(NULL /* cmd_line */, &options);
+      // NaCl needs to keep tight control of the cmd_line, so prepend the
+      // setuid sandbox wrapper manually.
       base::FilePath sandbox_path =
           setuid_sandbox_client->GetSandboxBinaryPath();
       argv_to_launch.insert(argv_to_launch.begin(), sandbox_path.value());
+      setuid_sandbox_client->SetupLaunchOptions(
+          &options, &fds_to_map, &dummy_fd);
       setuid_sandbox_client->SetupLaunchEnvironment();
     }
 
@@ -231,6 +227,11 @@ void NaClForkDelegate::Init(const int sandboxdesc,
     if (!base::LaunchProcess(argv_to_launch, options, NULL))
       status_ = kNaClHelperLaunchFailed;
     // parent and error cases are handled below
+
+    if (enable_layer1_sandbox) {
+      // Sanity check that dummy_fd was kept alive for LaunchProcess.
+      DCHECK(dummy_fd.is_valid());
+    }
   }
   if (IGNORE_EINTR(close(fds[1])) != 0)
     LOG(ERROR) << "close(fds[1]) failed";

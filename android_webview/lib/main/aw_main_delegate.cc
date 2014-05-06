@@ -5,8 +5,8 @@
 #include "android_webview/lib/main/aw_main_delegate.h"
 
 #include "android_webview/browser/aw_content_browser_client.h"
+#include "android_webview/browser/browser_view_renderer.h"
 #include "android_webview/browser/gpu_memory_buffer_factory_impl.h"
-#include "android_webview/browser/hardware_renderer.h"
 #include "android_webview/browser/scoped_allow_wait_for_legacy_web_view_api.h"
 #include "android_webview/lib/aw_browser_dependency_factory_impl.h"
 #include "android_webview/native/aw_geolocation_permission_context.h"
@@ -53,18 +53,17 @@ bool AwMainDelegate::BasicStartupComplete(int* exit_code) {
   gpu::InProcessCommandBuffer::SetGpuMemoryBufferFactory(
       gpu_memory_buffer_factory_.get());
 
-  HardwareRenderer::CalculateTileMemoryPolicy();
+  BrowserViewRenderer::CalculateTileMemoryPolicy();
 
   CommandLine* cl = CommandLine::ForCurrentProcess();
   cl->AppendSwitch(switches::kEnableBeginFrameScheduling);
-  cl->AppendSwitch(switches::kEnableMapImage);
+  cl->AppendSwitch(switches::kEnableZeroCopy);
   cl->AppendSwitch(switches::kEnableImplSidePainting);
 
   // WebView uses the Android system's scrollbars and overscroll glow.
   cl->AppendSwitch(switches::kDisableOverscrollEdgeEffect);
 
   // Not yet supported in single-process mode.
-  cl->AppendSwitch(switches::kDisableExperimentalWebGL);
   cl->AppendSwitch(switches::kDisableSharedWorkers);
 
 

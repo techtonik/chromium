@@ -61,9 +61,6 @@
         <structure name="IDR_NEW_TAB_4_HTML" file="resources\ntp4\new_tab.html" flattenhtml="true" type="chrome_html" />
         <structure name="IDR_NEW_TAB_4_THEME_CSS" file="resources\ntp4\new_tab_theme.css" flattenhtml="true" type="chrome_html" />
       </if>
-      <if expr="is_android">
-        <structure name="IDR_NEW_TAB_ANDROID_HTML" file="resources\ntp_android\new_tab.html" flattenhtml="true" type="chrome_html" />
-      </if>
       <if expr="chromeos">
         <structure name="IDR_OOBE_HTML" file="resources\chromeos\login\oobe.html" flattenhtml="true" type="chrome_html" variables="OOBE=oobe" expand_variables="true"/>
         <structure name="IDR_OOBE_JS" file="resources\chromeos\login\oobe.js" flattenhtml="true" type="chrome_html" />
@@ -100,7 +97,7 @@
       </if>
       <include name="IDR_ABOUT_VERSION_JS" file="resources\about_version.js" type="BINDATA" />
       <include name="IDR_ABOUT_VERSION_CSS" file="resources\about_version.css" type="BINDATA" />
-
+      <include name="IDR_AD_NETWORK_HASHES" file="resources\ad_networks.dat" type="BINDATA" />
       <include name="IDR_BOOKMARKS_MANIFEST" file="resources\bookmark_manager\manifest.json" type="BINDATA" />
       <if expr="is_posix and not is_macosx and not is_ios">
         <include name="IDR_CERTIFICATE_VIEWER_HTML" file="resources\certificate_viewer.html" type="BINDATA" />
@@ -206,6 +203,7 @@
       <include name="IDR_OMNIBOX_HTML" file="resources\omnibox\omnibox.html" flattenhtml="true" allowexternalscript="true" type="BINDATA" />
       <include name="IDR_OMNIBOX_CSS" file="resources\omnibox\omnibox.css" type="BINDATA" />
       <include name="IDR_OMNIBOX_JS" file="resources\omnibox\omnibox.js" type="BINDATA" />
+      <include name="IDR_OMNIBOX_MOJO_JS" file="${omnibox_mojom_file}" use_base_dir="false" type="BINDATA"/>
       <if expr="not is_android">
         <include name="IDR_PLUGINS_HTML" file="resources\plugins.html" flattenhtml="true" allowexternalscript="true" type="BINDATA" />
         <include name="IDR_PLUGINS_JS" file="resources\plugins.js" type="BINDATA" />

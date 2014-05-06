@@ -25,7 +25,6 @@
 #include "ui/views/background.h"
 #include "ui/views/controls/focusable_border.h"
 #include "ui/views/controls/label.h"
-#include "ui/views/controls/menu/menu_item_view.h"
 #include "ui/views/controls/menu/menu_runner.h"
 #include "ui/views/controls/native/native_view_host.h"
 #include "ui/views/controls/textfield/textfield_controller.h"
@@ -549,7 +548,6 @@ bool Textfield::OnMousePressed(const ui::MouseEvent& event) {
 #endif
   }
 
-  touch_selection_controller_.reset();
   return true;
 }
 
@@ -593,7 +591,6 @@ void Textfield::OnMouseReleased(const ui::MouseEvent& event) {
 
 bool Textfield::OnKeyPressed(const ui::KeyEvent& event) {
   bool handled = controller_ && controller_->HandleKeyEvent(this, event);
-  touch_selection_controller_.reset();
   if (handled)
     return true;
 
@@ -686,7 +683,7 @@ void Textfield::OnGestureEvent(ui::GestureEvent* event) {
           event->SetHandled();
       } else if (switches::IsTouchDragDropEnabled()) {
         initiating_drag_ = true;
-        touch_selection_controller_.reset();
+        DestroyTouchSelection();
       } else {
         if (!touch_selection_controller_)
           CreateTouchSelectionControllerAndNotifyIt();
@@ -855,12 +852,6 @@ void Textfield::OnEnabledChanged() {
   SchedulePaint();
 }
 
-void Textfield::ViewHierarchyChanged(
-    const ViewHierarchyChangedDetails& details) {
-  if (details.is_add && details.child == this)
-    UpdateColorsFromTheme(GetNativeTheme());
-}
-
 void Textfield::OnPaint(gfx::Canvas* canvas) {
   OnPaintBackground(canvas);
   PaintTextAndCursor(canvas);
@@ -894,7 +885,7 @@ void Textfield::OnBlur() {
     RepaintCursor();
   }
 
-  touch_selection_controller_.reset();
+  DestroyTouchSelection();
 
   // Border typically draws focus indicator.
   SchedulePaint();
@@ -905,7 +896,15 @@ gfx::Point Textfield::GetKeyboardContextMenuLocation() {
 }
 
 void Textfield::OnNativeThemeChanged(const ui::NativeTheme* theme) {
-  UpdateColorsFromTheme(theme);
+  gfx::RenderText* render_text = GetRenderText();
+  render_text->SetColor(GetTextColor());
+  UpdateBackgroundColor();
+  render_text->set_cursor_color(GetTextColor());
+  render_text->set_selection_color(theme->GetSystemColor(
+      ui::NativeTheme::kColorId_TextfieldSelectionColor));
+  render_text->set_selection_background_focused_color(theme->GetSystemColor(
+      ui::NativeTheme::kColorId_TextfieldSelectionBackgroundFocused));
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -923,8 +922,12 @@ void Textfield::ShowContextMenuForView(View* source,
                                        const gfx::Point& point,
                                        ui::MenuSourceType source_type) {
   UpdateContextMenu();
-  ignore_result(context_menu_runner_->RunMenuAt(GetWidget(), NULL,
-      gfx::Rect(point, gfx::Size()), MenuItemView::TOPLEFT, source_type,
+  ignore_result(context_menu_runner_->RunMenuAt(
+      GetWidget(),
+      NULL,
+      gfx::Rect(point, gfx::Size()),
+      MENU_ANCHOR_TOPLEFT,
+      source_type,
       MenuRunner::HAS_MNEMONICS | MenuRunner::CONTEXT_MENU));
 }
 
@@ -1031,8 +1034,12 @@ bool Textfield::DrawsHandles() {
 }
 
 void Textfield::OpenContextMenu(const gfx::Point& anchor) {
-  touch_selection_controller_.reset();
+  DestroyTouchSelection();
   ShowContextMenu(anchor, ui::MENU_SOURCE_TOUCH_EDIT_MENU);
+}
+
+void Textfield::DestroyTouchSelection() {
+  touch_selection_controller_.reset();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1094,7 +1101,7 @@ bool Textfield::GetAcceleratorForCommandId(int command_id,
 }
 
 void Textfield::ExecuteCommand(int command_id, int event_flags) {
-  touch_selection_controller_.reset();
+  DestroyTouchSelection();
   if (!IsCommandIdEnabled(command_id))
     return;
 
@@ -1329,7 +1336,7 @@ bool Textfield::GetCompositionCharacterBounds(uint32 index,
   size_t text_index = composition_range.start() + index;
   if (composition_range.end() <= text_index)
     return false;
-  if (!render_text->IsCursorablePosition(text_index)) {
+  if (!render_text->IsValidCursorIndex(text_index)) {
     text_index = render_text->IndexOfAdjacentGrapheme(
         text_index, gfx::CURSOR_BACKWARD);
   }
@@ -1469,17 +1476,6 @@ void Textfield::UpdateBackgroundColor() {
   set_background(Background::CreateSolidBackground(color));
   GetRenderText()->set_background_is_transparent(SkColorGetA(color) != 0xFF);
   SchedulePaint();
-}
-
-void Textfield::UpdateColorsFromTheme(const ui::NativeTheme* theme) {
-  gfx::RenderText* render_text = GetRenderText();
-  render_text->SetColor(GetTextColor());
-  UpdateBackgroundColor();
-  render_text->set_cursor_color(GetTextColor());
-  render_text->set_selection_color(theme->GetSystemColor(
-      ui::NativeTheme::kColorId_TextfieldSelectionColor));
-  render_text->set_selection_background_focused_color(theme->GetSystemColor(
-      ui::NativeTheme::kColorId_TextfieldSelectionBackgroundFocused));
 }
 
 void Textfield::UpdateAfterChange(bool text_changed, bool cursor_changed) {

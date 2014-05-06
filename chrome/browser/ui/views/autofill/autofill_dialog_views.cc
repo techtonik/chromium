@@ -25,7 +25,6 @@
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "grit/theme_resources.h"
 #include "grit/ui_resources.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -399,8 +398,6 @@ class LoadingAnimationView : public views::View,
       container_->AddChildView(
           new views::Label(base::ASCIIToUTF16("."), font_list));
     }
-
-    OnNativeThemeChanged(GetNativeTheme());
   }
 
   virtual ~LoadingAnimationView() {}
@@ -539,7 +536,7 @@ void AutofillDialogViews::AccountChooser::OnMenuButtonClicked(
   if (menu_runner_->RunMenuAt(source->GetWidget(),
                               NULL,
                               source->GetBoundsInScreen(),
-                              views::MenuItemView::TOPRIGHT,
+                              views::MENU_ANCHOR_TOPRIGHT,
                               ui::MENU_SOURCE_NONE,
                               0) == views::MenuRunner::MENU_DELETED) {
     return;
@@ -579,8 +576,6 @@ AutofillDialogViews::OverlayView::OverlayView(
 
   AddChildView(image_view_);
   AddChildView(message_view_);
-
-  OnNativeThemeChanged(GetNativeTheme());
 }
 
 AutofillDialogViews::OverlayView::~OverlayView() {}
@@ -1261,7 +1256,7 @@ void AutofillDialogViews::Show() {
   // Listen for size changes on the browser.
   views::Widget* browser_widget =
       views::Widget::GetTopLevelWidgetForNativeView(
-          delegate_->GetWebContents()->GetView()->GetNativeView());
+          delegate_->GetWebContents()->GetNativeView());
   observer_.Add(browser_widget);
 
   // Listen for unhandled mouse presses on the non-client view.
@@ -1631,7 +1626,6 @@ views::View* AutofillDialogViews::CreateFootnoteView() {
       views::Background::CreateSolidBackground(kShadingColor));
 
   legal_document_view_ = new views::StyledLabel(base::string16(), this);
-  OnNativeThemeChanged(GetNativeTheme());
 
   footnote_view_->AddChildView(legal_document_view_);
   footnote_view_->SetVisible(false);
@@ -1757,7 +1751,7 @@ void AutofillDialogViews::OnMenuButtonClicked(views::View* source,
   if (menu_runner_->RunMenuAt(source->GetWidget(),
                               NULL,
                               screen_bounds,
-                              views::MenuItemView::TOPRIGHT,
+                              views::MENU_ANCHOR_TOPRIGHT,
                               ui::MENU_SOURCE_NONE,
                               0) == views::MenuRunner::MENU_DELETED) {
     return;

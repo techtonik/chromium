@@ -10,13 +10,11 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/passwords/manage_passwords_bubble_model.h"
-#include "chrome/browser/ui/passwords/manage_passwords_bubble_ui_controller.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/passwords/manage_password_item_view.h"
 #include "chrome/browser/ui/views/passwords/manage_passwords_icon_view.h"
 #include "content/public/browser/notification_source.h"
-#include "content/public/browser/web_contents_view.h"
 #include "grit/generated_resources.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/combobox_model.h"
@@ -76,23 +74,6 @@ class SavePasswordRefusalComboboxModel : public ui::ComboboxModel {
 }  // namespace
 
 
-// Globals --------------------------------------------------------------------
-
-namespace chrome {
-
-void ShowManagePasswordsBubble(content::WebContents* web_contents) {
-  ManagePasswordsBubbleUIController* controller =
-      ManagePasswordsBubbleUIController::FromWebContents(web_contents);
-  ManagePasswordsBubbleView::ShowBubble(
-      web_contents,
-      controller->manage_passwords_bubble_needs_showing() ?
-          ManagePasswordsBubbleView::AUTOMATIC :
-          ManagePasswordsBubbleView::USER_ACTION);
-}
-
-}  // namespace chrome
-
-
 // ManagePasswordsBubbleView --------------------------------------------------
 
 // static
@@ -119,7 +100,7 @@ void ManagePasswordsBubbleView::ShowBubble(content::WebContents* web_contents,
 
   if (is_fullscreen) {
     manage_passwords_bubble_->set_parent_window(
-        web_contents->GetView()->GetTopLevelNativeWindow());
+        web_contents->GetTopLevelNativeWindow());
   }
 
   views::BubbleDelegateView::CreateBubble(manage_passwords_bubble_);

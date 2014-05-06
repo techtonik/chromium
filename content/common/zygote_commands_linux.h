@@ -10,6 +10,10 @@
 
 namespace content {
 
+// Contents of the initial message sent from the zygote to the browser right
+// after it starts.
+static const char kZygoteBootMessage[] = "ZYGOTE_BOOT";
+
 // Contents of the initial message sent from the zygote to the browser when it
 // is ready to go.
 static const char kZygoteHelloMessage[] = "ZYGOTE_OK";
@@ -20,14 +24,6 @@ const size_t kZygoteMaxMessageLength = 8192;
 // File descriptors initialized by the Zygote Host
 const int kZygoteSocketPairFd =
     kPrimaryIPCChannel + base::GlobalDescriptors::kBaseDescriptor;
-// This file descriptor is special. It is passed to the Zygote and a setuid
-// helper will be called to locate the process of the Zygote on the system.
-// This mechanism is used when multiple PID namespaces exist because of the
-// setuid sandbox.
-// It is very important that this file descriptor does not exist in multiple
-// processes.
-// This number must be kept in sync in sandbox/linux/suid/sandbox.c
-const int kZygoteIdFd = 7;
 
 // These are the command codes used on the wire between the browser and the
 // zygote.

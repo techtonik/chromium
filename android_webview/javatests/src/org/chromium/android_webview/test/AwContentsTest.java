@@ -14,6 +14,9 @@ import android.test.suitebuilder.annotation.LargeTest;
 import android.test.suitebuilder.annotation.SmallTest;
 import android.util.Pair;
 
+import org.apache.http.Header;
+import org.apache.http.HttpRequest;
+
 import org.chromium.android_webview.AwContents;
 import org.chromium.android_webview.AwSettings;
 import org.chromium.android_webview.test.TestAwContentsClient.OnDownloadStartHelper;
@@ -25,7 +28,9 @@ import org.chromium.net.test.util.TestWebServer;
 import java.io.InputStream;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -89,6 +94,8 @@ public class AwContentsTest extends AwTestBase {
         }
     }
 
+    @LargeTest
+    @Feature({"AndroidWebView"})
     public void testCreateAndGcManyTimes() throws Throwable {
         final int CONCURRENT_INSTANCES = 4;
         final int REPETITIONS = 16;
@@ -127,6 +134,25 @@ public class AwContentsTest extends AwTestBase {
                 return AwContents.getNativeInstanceCount() <= MAX_IDLE_INSTANCES;
             }
         });
+    }
+
+    @SmallTest
+    @Feature({"AndroidWebView"})
+    public void testUseAwSettingsAfterDestroy() throws Throwable {
+        AwTestContainerView awTestContainerView =
+                createAwTestContainerViewOnMainSync(mContentsClient);
+        AwSettings awSettings = getAwSettingsOnUiThread(awTestContainerView.getAwContents());
+        loadUrlSync(awTestContainerView.getAwContents(),
+                mContentsClient.getOnPageFinishedHelper(), CommonResources.ABOUT_HTML);
+        destroyAwContentsOnMainSync(awTestContainerView.getAwContents());
+
+        // AwSettings should still be usable even after native side is destroyed.
+        String newFontFamily = "serif";
+        awSettings.setStandardFontFamily(newFontFamily);
+        assertEquals(newFontFamily, awSettings.getStandardFontFamily());
+        boolean newBlockNetworkLoads = !awSettings.getBlockNetworkLoads();
+        awSettings.setBlockNetworkLoads(newBlockNetworkLoads);
+        assertEquals(newBlockNetworkLoads, awSettings.getBlockNetworkLoads());
     }
 
     private int callDocumentHasImagesSync(final AwContents awContents)
@@ -402,6 +428,42 @@ public class AwContentsTest extends AwTestBase {
 
         assertEquals("false", executeJavaScriptAndWaitForResult(awContents, mContentsClient,
                 SCRIPT));
+    }
+
+    @Feature({"AndroidWebView"})
+    @SmallTest
+    public void testCanInjectHeaders() throws Throwable {
+        final AwTestContainerView testContainer =
+                createAwTestContainerViewOnMainSync(mContentsClient);
+        final AwContents awContents = testContainer.getAwContents();
+
+        TestWebServer webServer = null;
+        try {
+            webServer = new TestWebServer(false);
+            final String pagePath = "/test_can_inject_headers.html";
+            final String pageUrl = webServer.setResponse(
+                    pagePath, "<html><body>foo</body></html>", null);
+
+            final Map<String, String> extraHeaders = new HashMap<String, String>();
+            extraHeaders.put("Referer", "foo");
+            extraHeaders.put("X-foo", "bar");
+            loadUrlSync(awContents, mContentsClient.getOnPageFinishedHelper(),
+                    webServer.getResponseUrl(pagePath), extraHeaders);
+
+            assertEquals(1, webServer.getRequestCount(pagePath));
+
+            HttpRequest request = webServer.getLastRequest(pagePath);
+            assertNotNull(request);
+
+            for (Map.Entry<String, String> value : extraHeaders.entrySet()) {
+                String header = value.getKey();
+                Header[] matchingHeaders = request.getHeaders(header);
+                assertEquals("header " + header + " not found", 1, matchingHeaders.length);
+                assertEquals(value.getValue(), matchingHeaders[0].getValue());
+            }
+        } finally {
+            if (webServer != null) webServer.shutdown();
+        }
     }
 
 }

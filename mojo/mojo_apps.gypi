@@ -37,16 +37,36 @@
       ],
     },
     {
+      'target_name': 'mojo_apps_js_bindings',
+      'type': 'static_library',
+      'sources': [
+        'apps/js/test/js_to_cpp.mojom',
+      ],
+      'variables': {
+        'mojom_base_output_dir': 'mojo',
+      },
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'export_dependent_settings': [
+        'mojo_cpp_bindings',
+      ],
+      'dependencies': [
+        'mojo_cpp_bindings',
+      ],
+    },
+    {
       'target_name': 'mojo_apps_js_unittests',
       'type': 'executable',
       'dependencies': [
         '../gin/gin.gyp:gin_test',
+        'mojo_apps_js_bindings',
+        'mojo_common_lib',
         'mojo_common_test_support',
         'mojo_js_lib',
         'mojo_run_all_unittests',
         'mojo_public_test_interfaces',
       ],
       'sources': [
+        'apps/js/test/js_to_cpp_unittest.cc',
         'apps/js/test/run_apps_js_tests.cc',
       ],
     },

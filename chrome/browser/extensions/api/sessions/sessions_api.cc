@@ -195,7 +195,7 @@ scoped_ptr<api::sessions::Session>
                                   window.Pass());
 }
 
-bool SessionsGetRecentlyClosedFunction::RunImpl() {
+bool SessionsGetRecentlyClosedFunction::RunSync() {
   scoped_ptr<GetRecentlyClosed::Params> params(
       GetRecentlyClosed::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params);
@@ -342,7 +342,7 @@ SessionsGetDevicesFunction::CreateSessionModel(
 scoped_ptr<api::sessions::Device> SessionsGetDevicesFunction::CreateDeviceModel(
     const browser_sync::SyncedSession* session) {
   int max_results = api::sessions::MAX_SESSION_RESULTS;
-  // Already validated in RunImpl().
+  // Already validated in RunAsync().
   scoped_ptr<GetDevices::Params> params(GetDevices::Params::Create(*args_));
   if (params->filter && params->filter->max_results)
     max_results = *params->filter->max_results;
@@ -362,7 +362,7 @@ scoped_ptr<api::sessions::Device> SessionsGetDevicesFunction::CreateDeviceModel(
   return device_struct.Pass();
 }
 
-bool SessionsGetDevicesFunction::RunImpl() {
+bool SessionsGetDevicesFunction::RunSync() {
   ProfileSyncService* service =
       ProfileSyncServiceFactory::GetInstance()->GetForProfile(GetProfile());
   if (!(service && service->GetPreferredDataTypes().Has(syncer::SESSIONS))) {
@@ -405,7 +405,7 @@ void SessionsRestoreFunction::SetInvalidIdError(const std::string& invalid_id) {
 
 
 void SessionsRestoreFunction::SetResultRestoredTab(
-    const content::WebContents* contents) {
+    content::WebContents* contents) {
   scoped_ptr<base::DictionaryValue> tab_value(
       ExtensionTabUtil::CreateTabValue(contents, GetExtension()));
   scoped_ptr<tabs::Tab> tab(tabs::Tab::FromValue(*tab_value));
@@ -564,7 +564,7 @@ bool SessionsRestoreFunction::RestoreForeignSession(const SessionId& session_id,
   return SetResultRestoredWindow(ExtensionTabUtil::GetWindowId(browsers[0]));
 }
 
-bool SessionsRestoreFunction::RunImpl() {
+bool SessionsRestoreFunction::RunSync() {
   scoped_ptr<Restore::Params> params(Restore::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params);
 

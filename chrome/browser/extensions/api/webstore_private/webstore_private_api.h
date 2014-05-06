@@ -63,7 +63,7 @@ class WebstorePrivateInstallBundleFunction
   virtual ~WebstorePrivateInstallBundleFunction();
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
   // Reads the extension |details| into |items|.
   bool ReadBundleInfo(
@@ -137,7 +137,7 @@ class WebstorePrivateBeginInstallWithManifest3Function
   virtual ~WebstorePrivateBeginInstallWithManifest3Function();
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
   // Sets the result_ as a string based on |code|.
   void SetResultCode(ResultCode code);
@@ -191,7 +191,7 @@ class WebstorePrivateCompleteInstallFunction
   virtual ~WebstorePrivateCompleteInstallFunction();
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
  private:
   scoped_ptr<WebstoreInstaller::Approval> approval_;
@@ -209,7 +209,7 @@ class WebstorePrivateEnableAppLauncherFunction
   virtual ~WebstorePrivateEnableAppLauncherFunction();
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 class WebstorePrivateGetBrowserLoginFunction
@@ -222,7 +222,7 @@ class WebstorePrivateGetBrowserLoginFunction
   virtual ~WebstorePrivateGetBrowserLoginFunction() {}
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 class WebstorePrivateGetStoreLoginFunction
@@ -235,7 +235,7 @@ class WebstorePrivateGetStoreLoginFunction
   virtual ~WebstorePrivateGetStoreLoginFunction() {}
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 class WebstorePrivateSetStoreLoginFunction
@@ -248,7 +248,7 @@ class WebstorePrivateSetStoreLoginFunction
   virtual ~WebstorePrivateSetStoreLoginFunction() {}
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 class WebstorePrivateGetWebGLStatusFunction
@@ -265,7 +265,7 @@ class WebstorePrivateGetWebGLStatusFunction
   void OnFeatureCheck(bool feature_allowed);
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
  private:
   void CreateResult(bool webgl_allowed);
@@ -285,7 +285,7 @@ class WebstorePrivateGetIsLauncherEnabledFunction
   virtual ~WebstorePrivateGetIsLauncherEnabledFunction() {}
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 
  private:
   void OnIsLauncherCheckCompleted(bool is_enabled);
@@ -303,7 +303,7 @@ class WebstorePrivateIsInIncognitoModeFunction
   virtual ~WebstorePrivateIsInIncognitoModeFunction() {}
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 class WebstorePrivateSignInFunction : public ChromeAsyncExtensionFunction,
@@ -319,7 +319,7 @@ class WebstorePrivateSignInFunction : public ChromeAsyncExtensionFunction,
   virtual ~WebstorePrivateSignInFunction();
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
   // SigninManagerFactory::Observer:
   virtual void SigninManagerShutdown(SigninManagerBase* manager) OVERRIDE;

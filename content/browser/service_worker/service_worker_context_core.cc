@@ -77,11 +77,12 @@ void ServiceWorkerContextCore::ProviderHostIterator::Initialize() {
 
 ServiceWorkerContextCore::ServiceWorkerContextCore(
     const base::FilePath& path,
+    base::SequencedTaskRunner* database_task_runner,
     quota::QuotaManagerProxy* quota_manager_proxy,
     ObserverListThreadSafe<ServiceWorkerContextObserver>* observer_list,
     scoped_ptr<ServiceWorkerProcessManager> process_manager)
-    : storage_(
-          new ServiceWorkerStorage(path, AsWeakPtr(), quota_manager_proxy)),
+    : storage_(new ServiceWorkerStorage(
+          path, AsWeakPtr(), database_task_runner, quota_manager_proxy)),
       embedded_worker_registry_(new EmbeddedWorkerRegistry(AsWeakPtr())),
       job_coordinator_(new ServiceWorkerJobCoordinator(AsWeakPtr())),
       process_manager_(process_manager.Pass()),
@@ -160,15 +161,10 @@ void ServiceWorkerContextCore::RegisterServiceWorker(
 
 void ServiceWorkerContextCore::UnregisterServiceWorker(
     const GURL& pattern,
-    int source_process_id,
-    ServiceWorkerProviderHost* provider_host,
     const UnregistrationCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
 
-  // TODO(kinuko): Wire the provider_host so that we can tell which document
-  // is calling .register.
-
-  job_coordinator_->Unregister(pattern, source_process_id, callback);
+  job_coordinator_->Unregister(pattern, callback);
 }
 
 void ServiceWorkerContextCore::RegistrationComplete(

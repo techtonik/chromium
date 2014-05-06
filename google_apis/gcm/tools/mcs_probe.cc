@@ -28,6 +28,7 @@
 #include "google_apis/gcm/engine/checkin_request.h"
 #include "google_apis/gcm/engine/connection_factory_impl.h"
 #include "google_apis/gcm/engine/gcm_store_impl.h"
+#include "google_apis/gcm/engine/gservices_settings.h"
 #include "google_apis/gcm/engine/mcs_client.h"
 #include "google_apis/gcm/monitoring/gcm_stats_recorder.h"
 #include "net/base/host_mapping_rules.h"
@@ -301,7 +302,8 @@ void MCSProbe::Start() {
       new ConnectionFactoryImpl(endpoints,
                                 kDefaultBackoffPolicy,
                                 network_session_,
-                                &net_log_));
+                                &net_log_,
+                                &recorder_));
   gcm_store_.reset(
       new GCMStoreImpl(gcm_store_path_,
                        file_thread_.message_loop_proxy()));
@@ -432,10 +434,12 @@ void MCSProbe::CheckIn() {
       0, 0, std::string(), std::vector<std::string>(), chrome_build_proto);
 
   checkin_request_.reset(new CheckinRequest(
+      GServicesSettings(gcm_store_.get()).checkin_url(),
       request_info,
       kDefaultBackoffPolicy,
       base::Bind(&MCSProbe::OnCheckInCompleted, base::Unretained(this)),
-      url_request_context_getter_.get()));
+      url_request_context_getter_.get(),
+      &recorder_));
   checkin_request_->Start();
 }
 

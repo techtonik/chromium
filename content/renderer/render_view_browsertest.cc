@@ -35,6 +35,7 @@
 #include "content/renderer/render_view_impl.h"
 #include "content/shell/browser/shell.h"
 #include "content/shell/browser/shell_browser_context.h"
+#include "content/test/frame_load_waiter.h"
 #include "content/test/mock_keyboard.h"
 #include "net/base/net_errors.h"
 #include "net/cert/cert_status_flags.h"
@@ -333,9 +334,9 @@ TEST_F(RenderViewImplTest, OnNavigationHttpPost) {
 
   // Check post data sent to browser matches
   EXPECT_TRUE(host_nav_params.a.page_state.IsValid());
-  const blink::WebHistoryItem item = PageStateToHistoryItem(
-      host_nav_params.a.page_state);
-  blink::WebHTTPBody body = item.httpBody();
+  scoped_ptr<HistoryEntry> entry =
+      PageStateToHistoryEntry(host_nav_params.a.page_state);
+  blink::WebHTTPBody body = entry->root().httpBody();
   blink::WebHTTPBody::Element element;
   bool successful = body.elementAt(0, element);
   EXPECT_TRUE(successful);
@@ -1792,8 +1793,8 @@ TEST_F(RenderViewImplTest, ContextMenu) {
 
 TEST_F(RenderViewImplTest, TestBackForward) {
   LoadHTML("<div id=pagename>Page A</div>");
-  blink::WebHistoryItem page_a_item =
-      view()->history_controller()->GetCurrentItemForExport();
+  PageState page_a_state =
+      HistoryEntryToPageState(view()->history_controller()->GetCurrentEntry());
   int was_page_a = -1;
   base::string16 check_page_a =
       base::ASCIIToUTF16(
@@ -1817,26 +1818,29 @@ TEST_F(RenderViewImplTest, TestBackForward) {
   EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_c, &was_page_c));
   EXPECT_EQ(1, was_page_b);
 
-  blink::WebHistoryItem forward_item =
-      view()->history_controller()->GetCurrentItemForExport();
-  GoBack(view()->history_controller()->GetPreviousItemForExport());
+  PageState forward_state =
+      HistoryEntryToPageState(view()->history_controller()->GetCurrentEntry());
+  GoBack(HistoryEntryToPageState(
+      view()->history_controller()->GetPreviousEntry()));
   EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_b, &was_page_b));
   EXPECT_EQ(1, was_page_b);
 
-  GoForward(forward_item);
+  GoForward(forward_state);
   EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_c, &was_page_c));
   EXPECT_EQ(1, was_page_c);
 
-  GoBack(view()->history_controller()->GetPreviousItemForExport());
+  GoBack(HistoryEntryToPageState(
+      view()->history_controller()->GetPreviousEntry()));
   EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_b, &was_page_b));
   EXPECT_EQ(1, was_page_b);
 
-  forward_item = view()->history_controller()->GetCurrentItemForExport();
-  GoBack(page_a_item);
+  forward_state =
+      HistoryEntryToPageState(view()->history_controller()->GetCurrentEntry());
+  GoBack(page_a_state);
   EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_a, &was_page_a));
   EXPECT_EQ(1, was_page_a);
 
-  GoForward(forward_item);
+  GoForward(forward_state);
   EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_b, &was_page_b));
   EXPECT_EQ(1, was_page_b);
 }
@@ -2011,7 +2015,8 @@ TEST_F(RenderViewImplTest, NavigateFrame) {
   nav_params.page_id = -1;
   nav_params.frame_to_navigate = "frame";
   frame()->OnNavigate(nav_params);
-  ProcessPendingMessages();
+  FrameLoadWaiter(
+      RenderFrame::FromWebFrame(frame()->GetWebFrame()->firstChild())).Wait();
 
   // Copy the document content to std::wstring and compare with the
   // expected result.
@@ -2161,7 +2166,8 @@ TEST_F(SuppressErrorPageTest, MAYBE_DoesNotSuppress) {
 
   // An error occurred.
   view()->main_render_frame()->didFailProvisionalLoad(web_frame, error);
-  ProcessPendingMessages();
+  // The error page itself is loaded asynchronously.
+  FrameLoadWaiter(frame()).Wait();
   const int kMaxOutputCharacters = 22;
   EXPECT_EQ("A suffusion of yellow.",
             base::UTF16ToASCII(web_frame->contentAsText(kMaxOutputCharacters)));
@@ -2246,7 +2252,7 @@ TEST_F(RenderViewImplTest, SendProgressCompletionUpdates) {
   EXPECT_EQ(0.1, progress_value.a);
   render_thread_->sink().ClearMessages();
 
-  ProcessPendingMessages();
+  FrameLoadWaiter(frame()).Wait();
 
   // The data url has loaded, so we should see a progress change to 1.0 (done)
   // and a stop notification.

@@ -140,6 +140,10 @@
     "dependencies": ["permission:brailleDisplayPrivate"],
     "contexts": ["blessed_extension"]
   },
+  "browser": {
+    "dependencies": ["permission:browser"],
+    "contexts": ["blessed_extension"]
+  },
   "browserAction": {
     "dependencies": ["manifest:browser_action"],
     "contexts": ["blessed_extension"]
@@ -480,6 +484,11 @@
     "dependencies": [],
     "channel": "stable",
     "extension_types": ["extension", "legacy_packaged_app", "platform_app"]
+  },
+  "management.createAppShortcut": {
+    "dependencies": ["permission:management"],
+    "channel": "dev",
+    "contexts": ["blessed_extension"]
   },
   // This is not a real API, only here for documentation purposes.
   // See http://crbug.com/275944 for background.

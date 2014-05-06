@@ -32,7 +32,6 @@
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/common/permissions/api_permission.h"
 #include "grit/generated_resources.h"
@@ -259,7 +258,7 @@ std::vector<base::FilePath> GetGrayListedDirectories() {
 
 }  // namespace file_system_api
 
-bool FileSystemGetDisplayPathFunction::RunImpl() {
+bool FileSystemGetDisplayPathFunction::RunSync() {
   std::string filesystem_name;
   std::string filesystem_path;
   EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &filesystem_name));
@@ -353,7 +352,7 @@ void FileSystemEntryFunction::HandleWritableFileError(
   SendResponse(false);
 }
 
-bool FileSystemGetWritableEntryFunction::RunImpl() {
+bool FileSystemGetWritableEntryFunction::RunAsync() {
   std::string filesystem_name;
   std::string filesystem_path;
   EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &filesystem_name));
@@ -402,7 +401,7 @@ void FileSystemGetWritableEntryFunction::SetIsDirectoryOnFileThread() {
   }
 }
 
-bool FileSystemIsWritableEntryFunction::RunImpl() {
+bool FileSystemIsWritableEntryFunction::RunSync() {
   std::string filesystem_name;
   std::string filesystem_path;
   EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &filesystem_name));
@@ -438,7 +437,7 @@ class FileSystemChooseEntryFunction::FilePicker
     select_file_dialog_ = ui::SelectFileDialog::Create(
         this, new ChromeSelectFilePolicy(web_contents));
     gfx::NativeWindow owning_window = web_contents ?
-        platform_util::GetTopLevel(web_contents->GetView()->GetNativeView()) :
+        platform_util::GetTopLevel(web_contents->GetNativeView()) :
         NULL;
 
     if (g_skip_picker_for_test) {
@@ -833,7 +832,7 @@ void FileSystemChooseEntryFunction::BuildSuggestion(
   }
 }
 
-bool FileSystemChooseEntryFunction::RunImpl() {
+bool FileSystemChooseEntryFunction::RunAsync() {
   scoped_ptr<ChooseEntry::Params> params(ChooseEntry::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get());
 
@@ -902,7 +901,7 @@ bool FileSystemChooseEntryFunction::RunImpl() {
   return true;
 }
 
-bool FileSystemRetainEntryFunction::RunImpl() {
+bool FileSystemRetainEntryFunction::RunAsync() {
   std::string entry_id;
   EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &entry_id));
   SavedFilesService* saved_files_service = SavedFilesService::Get(GetProfile());
@@ -949,7 +948,7 @@ void FileSystemRetainEntryFunction::SetIsDirectoryOnFileThread() {
   is_directory_ = base::DirectoryExists(path_);
 }
 
-bool FileSystemIsRestorableFunction::RunImpl() {
+bool FileSystemIsRestorableFunction::RunSync() {
   std::string entry_id;
   EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &entry_id));
   SetResult(new base::FundamentalValue(SavedFilesService::Get(
@@ -957,7 +956,7 @@ bool FileSystemIsRestorableFunction::RunImpl() {
   return true;
 }
 
-bool FileSystemRestoreEntryFunction::RunImpl() {
+bool FileSystemRestoreEntryFunction::RunAsync() {
   std::string entry_id;
   bool needs_new_entry;
   EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &entry_id));

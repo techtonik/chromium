@@ -23,7 +23,9 @@ EmbeddedWorkerTestHelper::EmbeddedWorkerTestHelper(int mock_render_process_id)
     : wrapper_(new ServiceWorkerContextWrapper(NULL)),
       next_thread_id_(0),
       weak_factory_(this) {
-  wrapper_->Init(base::FilePath(), NULL);
+  wrapper_->InitForTesting(base::FilePath(),
+                           base::MessageLoopProxy::current(),
+                           NULL);
   scoped_ptr<ServiceWorkerProcessManager> process_manager(
       new ServiceWorkerProcessManager(wrapper_));
   process_manager->SetProcessRefcountOpsForTest(base::Bind(AlwaysTrue),
@@ -162,21 +164,19 @@ void EmbeddedWorkerTestHelper::SimulateSend(
 }
 
 void EmbeddedWorkerTestHelper::OnStartWorkerStub(
-    int embedded_worker_id,
-    int64 service_worker_version_id,
-    const GURL& scope,
-    const GURL& script_url) {
-  EmbeddedWorkerInstance* worker = registry()->GetWorker(embedded_worker_id);
+    const EmbeddedWorkerMsg_StartWorker_Params& params) {
+  EmbeddedWorkerInstance* worker =
+      registry()->GetWorker(params.embedded_worker_id);
   ASSERT_TRUE(worker != NULL);
   EXPECT_EQ(EmbeddedWorkerInstance::STARTING, worker->status());
   base::MessageLoopProxy::current()->PostTask(
       FROM_HERE,
       base::Bind(&EmbeddedWorkerTestHelper::OnStartWorker,
                  weak_factory_.GetWeakPtr(),
-                 embedded_worker_id,
-                 service_worker_version_id,
-                 scope,
-                 script_url));
+                 params.embedded_worker_id,
+                 params.service_worker_version_id,
+                 params.scope,
+                 params.script_url));
 }
 
 void EmbeddedWorkerTestHelper::OnStopWorkerStub(int embedded_worker_id) {

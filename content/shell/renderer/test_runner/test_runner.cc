@@ -8,7 +8,6 @@
 
 #include "base/logging.h"
 #include "content/shell/common/test_runner/test_preferences.h"
-#include "content/shell/renderer/test_runner/MockWebSpeechInputController.h"
 #include "content/shell/renderer/test_runner/MockWebSpeechRecognizer.h"
 #include "content/shell/renderer/test_runner/TestInterfaces.h"
 #include "content/shell/renderer/test_runner/WebPermissions.h"
@@ -48,7 +47,8 @@
 #endif
 
 using namespace blink;
-using namespace WebTestRunner;
+
+namespace content {
 
 namespace {
 
@@ -59,12 +59,11 @@ WebString V8StringToWebString(v8::Handle<v8::String> v8_str) {
   return WebString::fromUTF8(chars.get());
 }
 
-class HostMethodTask :
-      public ::WebTestRunner::WebMethodTask<content::TestRunner> {
+class HostMethodTask : public WebMethodTask<TestRunner> {
  public:
-  typedef void (content::TestRunner::*CallbackMethodType)();
-  HostMethodTask(content::TestRunner* object, CallbackMethodType callback)
-      : WebMethodTask<content::TestRunner>(object), callback_(callback) {}
+  typedef void (TestRunner::*CallbackMethodType)();
+  HostMethodTask(TestRunner* object, CallbackMethodType callback)
+      : WebMethodTask<TestRunner>(object), callback_(callback) {}
 
   virtual void runIfValid() OVERRIDE {
     (m_object->*callback_)();
@@ -76,13 +75,10 @@ class HostMethodTask :
 
 }  // namespace
 
-namespace content {
-
-class InvokeCallbackTask : public WebMethodTask<content::TestRunner> {
+class InvokeCallbackTask : public WebMethodTask<TestRunner> {
  public:
-  InvokeCallbackTask(content::TestRunner* object,
-                     v8::Handle<v8::Function> callback)
-      : WebMethodTask<content::TestRunner>(object),
+  InvokeCallbackTask(TestRunner* object, v8::Handle<v8::Function> callback)
+      : WebMethodTask<TestRunner>(object),
         callback_(blink::mainThreadIsolate(), callback) {}
 
   virtual void runIfValid() OVERRIDE {
@@ -216,8 +212,6 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
   void DumpSpellCheckCallbacks();
   void DumpBackForwardList();
   void DumpSelectionRect();
-  void TestRepaint();
-  void RepaintSweepHorizontally();
   void SetPrinting();
   void SetShouldStayOnPageAfterHandlingBeforeUnload(bool value);
   void SetWillSendRequestClearHeader(const std::string& header);
@@ -239,10 +233,6 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
   void SetMIDISysexPermission(bool value);
   void GrantWebNotificationPermission(gin::Arguments* args);
   bool SimulateWebNotificationClick(const std::string& value);
-  void AddMockSpeechInputResult(const std::string& result,
-                                double confidence,
-                                const std::string& language);
-  void SetMockSpeechInputDumpRect(bool value);
   void AddMockSpeechRecognitionResult(const std::string& transcript,
                                       double confidence);
   void SetMockSpeechRecognitionError(const std::string& error,
@@ -435,9 +425,6 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
       .SetMethod("dumpBackForwardList",
                  &TestRunnerBindings::DumpBackForwardList)
       .SetMethod("dumpSelectionRect", &TestRunnerBindings::DumpSelectionRect)
-      .SetMethod("testRepaint", &TestRunnerBindings::TestRepaint)
-      .SetMethod("repaintSweepHorizontally",
-                 &TestRunnerBindings::RepaintSweepHorizontally)
       .SetMethod("setPrinting", &TestRunnerBindings::SetPrinting)
       .SetMethod("setShouldStayOnPageAfterHandlingBeforeUnload",
                  &TestRunnerBindings::
@@ -472,10 +459,6 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::GrantWebNotificationPermission)
       .SetMethod("simulateWebNotificationClick",
                  &TestRunnerBindings::SimulateWebNotificationClick)
-      .SetMethod("addMockSpeechInputResult",
-                 &TestRunnerBindings::AddMockSpeechInputResult)
-      .SetMethod("setMockSpeechInputDumpRect",
-                 &TestRunnerBindings::SetMockSpeechInputDumpRect)
       .SetMethod("addMockSpeechRecognitionResult",
                  &TestRunnerBindings::AddMockSpeechRecognitionResult)
       .SetMethod("setMockSpeechRecognitionError",
@@ -1070,16 +1053,6 @@ void TestRunnerBindings::DumpSelectionRect() {
     runner_->DumpSelectionRect();
 }
 
-void TestRunnerBindings::TestRepaint() {
-  if (runner_)
-    runner_->TestRepaint();
-}
-
-void TestRunnerBindings::RepaintSweepHorizontally() {
-  if (runner_)
-    runner_->RepaintSweepHorizontally();
-}
-
 void TestRunnerBindings::SetPrinting() {
   if (runner_)
     runner_->SetPrinting();
@@ -1201,18 +1174,6 @@ bool TestRunnerBindings::SimulateWebNotificationClick(
   if (runner_)
     return runner_->SimulateWebNotificationClick(value);
   return false;
-}
-
-void TestRunnerBindings::AddMockSpeechInputResult(const std::string& result,
-                                                  double confidence,
-                                                  const std::string& language) {
-  if (runner_)
-    runner_->AddMockSpeechInputResult(result, confidence, language);
-}
-
-void TestRunnerBindings::SetMockSpeechInputDumpRect(bool value) {
-  if (runner_)
-    runner_->SetMockSpeechInputDumpRect(value);
 }
 
 void TestRunnerBindings::AddMockSpeechRecognitionResult(
@@ -1389,7 +1350,7 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
       web_view_(NULL),
       page_overlay_(NULL),
       web_permissions_(new WebPermissions()),
-      notification_presenter_(new content::NotificationPresenter()),
+      notification_presenter_(new NotificationPresenter()),
       weak_factory_(this) {}
 
 TestRunner::~TestRunner() {}
@@ -1636,14 +1597,6 @@ bool TestRunner::shouldDumpBackForwardList() const {
 
 bool TestRunner::shouldDumpSelectionRect() const {
   return dump_selection_rect_;
-}
-
-bool TestRunner::testRepaint() const {
-  return test_repaint_;
-}
-
-bool TestRunner::sweepHorizontally() const {
-  return sweep_horizontally_;
 }
 
 bool TestRunner::isPrinting() const {
@@ -2452,14 +2405,6 @@ void TestRunner::DumpSelectionRect() {
   dump_selection_rect_ = true;
 }
 
-void TestRunner::TestRepaint() {
-  test_repaint_ = true;
-}
-
-void TestRunner::RepaintSweepHorizontally() {
-  sweep_horizontally_ = true;
-}
-
 void TestRunner::SetPrinting() {
   is_printing_ = true;
 }
@@ -2552,21 +2497,6 @@ void TestRunner::GrantWebNotificationPermission(const std::string& origin,
 
 bool TestRunner::SimulateWebNotificationClick(const std::string& value) {
   return notification_presenter_->SimulateClick(value);
-}
-
-void TestRunner::AddMockSpeechInputResult(const std::string& result,
-                                          double confidence,
-                                          const std::string& language) {
-#if ENABLE_INPUT_SPEECH
-  proxy_->speechInputControllerMock()->addMockRecognitionResult(
-      WebString::fromUTF8(result), confidence, WebString::fromUTF8(language));
-#endif
-}
-
-void TestRunner::SetMockSpeechInputDumpRect(bool value) {
-#if ENABLE_INPUT_SPEECH
-  proxy_->speechInputControllerMock()->setDumpRect(value);
-#endif
 }
 
 void TestRunner::AddMockSpeechRecognitionResult(const std::string& transcript,

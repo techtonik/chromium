@@ -26,7 +26,7 @@ class FileBrowserPrivateExecuteTaskFunction
   virtual ~FileBrowserPrivateExecuteTaskFunction() {}
 
   // AsyncExtensionFunction overrides.
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
  private:
   void OnTaskExecuted(
@@ -44,7 +44,7 @@ class FileBrowserPrivateGetFileTasksFunction
   virtual ~FileBrowserPrivateGetFileTasksFunction() {}
 
   // AsyncExtensionFunction overrides.
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
  private:
   void OnSniffingMimeTypeCompleted(
@@ -63,7 +63,7 @@ class FileBrowserPrivateSetDefaultTaskFunction
   virtual ~FileBrowserPrivateSetDefaultTaskFunction() {}
 
   // SyncExtensionFunction overrides.
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 }  // namespace extensions

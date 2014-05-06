@@ -43,7 +43,7 @@
 #include "chrome/browser/ui/cocoa/task_manager_mac.h"
 #import "chrome/browser/ui/cocoa/toolbar/toolbar_controller.h"
 #import "chrome/browser/ui/cocoa/web_dialog_window_controller.h"
-#import "chrome/browser/ui/cocoa/website_settings_bubble_controller.h"
+#import "chrome/browser/ui/cocoa/website_settings/website_settings_bubble_controller.h"
 #include "chrome/browser/ui/search/search_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/web_applications/web_app.h"
@@ -54,7 +54,6 @@
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_source.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "grit/chromium_strings.h"
 #include "grit/generated_resources.h"
 #include "ui/base/l10n/l10n_util_mac.h"
@@ -74,7 +73,7 @@ namespace {
 NSPoint GetPointForBubble(content::WebContents* web_contents,
                           int x_offset,
                           int y_offset) {
-  NSView* view = web_contents->GetView()->GetNativeView();
+  NSView* view = web_contents->GetNativeView();
   NSRect bounds = [view bounds];
   NSPoint point;
   point.x = NSMinX(bounds) + x_offset;

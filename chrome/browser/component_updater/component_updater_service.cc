@@ -174,14 +174,14 @@ class CrxUpdateService : public ComponentUpdateService {
   virtual content::ResourceThrottle* GetOnDemandResourceThrottle(
       net::URLRequest* request, const std::string& crx_id) OVERRIDE;
 
-   // Context for a crx download url request.
-   struct CRXContext {
-     ComponentInstaller* installer;
-     std::vector<uint8> pk_hash;
-     std::string id;
-     std::string fingerprint;
-     CRXContext() : installer(NULL) {}
-   };
+  // Context for a crx download url request.
+  struct CRXContext {
+    ComponentInstaller* installer;
+    std::vector<uint8> pk_hash;
+    std::string id;
+    std::string fingerprint;
+    CRXContext() : installer(NULL) {}
+  };
 
  private:
   enum ErrorCategory {
@@ -203,9 +203,11 @@ class CrxUpdateService : public ComponentUpdateService {
   void OnUpdateCheckSucceeded(const UpdateResponse::Results& results);
   void OnUpdateCheckFailed(int error, const std::string& error_message);
 
-  void DownloadComplete(
-      scoped_ptr<CRXContext> crx_context,
-      const CrxDownloader::Result& download_result);
+  void DownloadProgress(const std::string& component_id,
+                        const CrxDownloader::Result& download_result);
+
+  void DownloadComplete(scoped_ptr<CRXContext> crx_context,
+                        const CrxDownloader::Result& download_result);
 
   Status OnDemandUpdateInternal(CrxUpdateItem* item);
 
@@ -313,12 +315,15 @@ ComponentUpdateService::Status CrxUpdateService::Start() {
   // Note that RegisterComponent will call Start() when the first
   // component is registered, so it can be called twice. This way
   // we avoid scheduling the timer if there is no work to do.
+  VLOG(1) << "CrxUpdateService starting up";
   running_ = true;
   if (work_items_.empty())
     return kOk;
 
   NotifyObservers(Observer::COMPONENT_UPDATER_STARTED, "");
 
+  VLOG(1) << "First update attempt will take place in "
+          << config_->InitialDelay() << " seconds";
   timer_.Start(FROM_HERE, base::TimeDelta::FromSeconds(config_->InitialDelay()),
                this, &CrxUpdateService::ProcessPendingItems);
   return kOk;
@@ -327,6 +332,7 @@ ComponentUpdateService::Status CrxUpdateService::Start() {
 // Stop the main check + update loop. In flight operations will be
 // completed.
 ComponentUpdateService::Status CrxUpdateService::Stop() {
+  VLOG(1) << "CrxUpdateService stopping";
   running_ = false;
   timer_.Stop();
   return kOk;
@@ -389,6 +395,7 @@ void CrxUpdateService::ScheduleNextRun(StepDelayInterval step_delay) {
       return;
   }
 
+  VLOG(1) << "Scheduling next run to occur in " << delay_seconds << " seconds";
   timer_.Start(FROM_HERE, base::TimeDelta::FromSeconds(delay_seconds),
                this, &CrxUpdateService::ProcessPendingItems);
 }
@@ -620,8 +627,17 @@ bool CrxUpdateService::CheckForUpdates() {
 
     if (!item->on_demand &&
         time_since_last_checked < minimum_recheck_wait_time) {
+      VLOG(1) << "Skipping check for component update: id=" << item->id
+              << ", time_since_last_checked="
+              << time_since_last_checked.InSeconds()
+              << " seconds: too soon to check for an update";
       continue;
     }
+
+    VLOG(1) << "Scheduling update check for component id=" << item->id
+            << ", time_since_last_checked="
+            << time_since_last_checked.InSeconds()
+            << " seconds";
 
     ChangeItemState(item, CrxUpdateItem::kChecking);
 
@@ -683,6 +699,10 @@ void CrxUpdateService::UpdateComponent(CrxUpdateItem* workitem) {
   crx_downloader_.reset(CrxDownloader::Create(is_background_download,
                                               config_->RequestContext(),
                                               blocking_task_runner_));
+  crx_downloader_->set_progress_callback(
+      base::Bind(&CrxUpdateService::DownloadProgress,
+                 base::Unretained(this),
+                 crx_context->id));
   crx_downloader_->StartDownload(*urls,
                                  base::Bind(&CrxUpdateService::DownloadComplete,
                                             base::Unretained(this),
@@ -710,6 +730,7 @@ void CrxUpdateService::OnUpdateCheckSucceeded(
     const UpdateResponse::Results& results) {
   size_t num_updates_pending = 0;
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  VLOG(1) << "Update check succeeded.";
   std::vector<UpdateResponse::Result>::const_iterator it;
   for (it = results.list.begin(); it != results.list.end(); ++it) {
     CrxUpdateItem* crx = FindUpdateItemById(it->extension_id);
@@ -724,18 +745,21 @@ void CrxUpdateService::OnUpdateCheckSucceeded(
     if (it->manifest.version.empty()) {
       // No version means no update available.
       ChangeItemState(crx, CrxUpdateItem::kNoUpdate);
+      VLOG(1) << "No update available for component: " << crx->id;
       continue;
     }
 
     if (!IsVersionNewer(crx->component.version, it->manifest.version)) {
       // The component is up to date.
       ChangeItemState(crx, CrxUpdateItem::kUpToDate);
+      VLOG(1) << "Component already up-to-date: " << crx->id;
       continue;
     }
 
     if (!it->manifest.browser_min_version.empty()) {
       if (IsVersionNewer(chrome_version_, it->manifest.browser_min_version)) {
         // The component is not compatible with this Chrome version.
+        VLOG(1) << "Ignoring incompatible component: " << crx->id;
         ChangeItemState(crx, CrxUpdateItem::kNoUpdate);
         continue;
       }
@@ -743,12 +767,15 @@ void CrxUpdateService::OnUpdateCheckSucceeded(
 
     if (it->manifest.packages.size() != 1) {
       // Assume one and only one package per component.
+      VLOG(1) << "Ignoring multiple packages for component: " << crx->id;
       ChangeItemState(crx, CrxUpdateItem::kNoUpdate);
       continue;
     }
 
     // Parse the members of the result and queue an upgrade for this component.
     crx->next_version = Version(it->manifest.version);
+
+    VLOG(1) << "Update found for component: " << crx->id;
 
     typedef UpdateResponse::Result::Manifest::Package Package;
     const Package& package(it->manifest.packages[0]);
@@ -779,7 +806,6 @@ void CrxUpdateService::OnUpdateCheckSucceeded(
   ScheduleNextRun(num_updates_pending > 0 ? kStepDelayShort : kStepDelayLong);
 }
 
-// TODO: record UMA stats.
 void CrxUpdateService::OnUpdateCheckFailed(int error,
                                            const std::string& error_message) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
@@ -787,7 +813,18 @@ void CrxUpdateService::OnUpdateCheckFailed(int error,
   size_t count = ChangeItemStatus(CrxUpdateItem::kChecking,
                                   CrxUpdateItem::kNoUpdate);
   DCHECK_GT(count, 0ul);
+  VLOG(1) << "Update check failed.";
   ScheduleNextRun(kStepDelayLong);
+}
+
+// Called when progress is being made downloading a CRX. The progress may
+// not monotonically increase due to how the CRX downloader switches between
+// different downloaders and fallback urls.
+void CrxUpdateService::DownloadProgress(
+    const std::string& component_id,
+    const CrxDownloader::Result& download_result) {
+  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  NotifyObservers(Observer::COMPONENT_UPDATE_DOWNLOADING, component_id);
 }
 
 // Called when the CRX package has been downloaded to a temporary location.
@@ -805,6 +842,8 @@ void CrxUpdateService::DownloadComplete(
   AppendDownloadMetrics(crx_downloader_->download_metrics(),
                         &crx->download_metrics);
 
+  crx_downloader_.reset();
+
   if (download_result.error) {
     if (crx->status == CrxUpdateItem::kDownloadingDiff) {
       crx->diff_error_category = kNetworkError;
@@ -813,7 +852,6 @@ void CrxUpdateService::DownloadComplete(
       size_t count = ChangeItemStatus(CrxUpdateItem::kDownloadingDiff,
                                       CrxUpdateItem::kCanUpdate);
       DCHECK_EQ(count, 1ul);
-      crx_downloader_.reset();
 
       ScheduleNextRun(kStepDelayShort);
       return;
@@ -823,7 +861,6 @@ void CrxUpdateService::DownloadComplete(
     size_t count = ChangeItemStatus(CrxUpdateItem::kDownloading,
                                     CrxUpdateItem::kNoUpdate);
     DCHECK_EQ(count, 1ul);
-    crx_downloader_.reset();
 
     // At this point, since both the differential and the full downloads failed,
     // the update for this component has finished with an error.
@@ -841,7 +878,6 @@ void CrxUpdateService::DownloadComplete(
                                CrxUpdateItem::kUpdating);
     }
     DCHECK_EQ(count, 1ul);
-    crx_downloader_.reset();
 
     // Why unretained? See comment at top of file.
     blocking_task_runner_->PostDelayedTask(
@@ -1020,4 +1056,3 @@ ComponentUpdateService* ComponentUpdateServiceFactory(
 }
 
 }  // namespace component_updater
-

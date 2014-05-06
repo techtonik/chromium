@@ -17,14 +17,14 @@ namespace device {
 
 class BluetoothAdapterWin;
 class BluetoothServiceRecord;
-class BluetoothSocketThreadWin;
+class BluetoothSocketThread;
 
 class BluetoothDeviceWin : public BluetoothDevice {
  public:
   explicit BluetoothDeviceWin(
       const BluetoothTaskManagerWin::DeviceState& state,
       scoped_refptr<base::SequencedTaskRunner> ui_task_runner,
-      scoped_refptr<BluetoothSocketThreadWin> socket_thread,
+      scoped_refptr<BluetoothSocketThread> socket_thread,
       net::NetLog* net_log,
       const net::NetLog::Source& net_log_source);
   virtual ~BluetoothDeviceWin();
@@ -40,6 +40,9 @@ class BluetoothDeviceWin : public BluetoothDevice {
   virtual uint16 GetVendorID() const OVERRIDE;
   virtual uint16 GetProductID() const OVERRIDE;
   virtual uint16 GetDeviceID() const OVERRIDE;
+  virtual int GetRSSI() const OVERRIDE;
+  virtual int GetCurrentHostTransmitPower() const OVERRIDE;
+  virtual int GetMaximumHostTransmitPower() const OVERRIDE;
   virtual bool IsPaired() const OVERRIDE;
   virtual bool IsConnected() const OVERRIDE;
   virtual bool IsConnectable() const OVERRIDE;
@@ -90,7 +93,7 @@ class BluetoothDeviceWin : public BluetoothDevice {
   void SetVisible(bool visible);
 
   scoped_refptr<base::SequencedTaskRunner> ui_task_runner_;
-  scoped_refptr<BluetoothSocketThreadWin> socket_thread_;
+  scoped_refptr<BluetoothSocketThread> socket_thread_;
   net::NetLog* net_log_;
   net::NetLog::Source net_log_source_;
 

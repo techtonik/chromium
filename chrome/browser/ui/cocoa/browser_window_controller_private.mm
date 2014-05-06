@@ -41,7 +41,6 @@
 #include "chrome/common/pref_names.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #import "ui/base/cocoa/focus_tracker.h"
 #include "ui/base/ui_base_types.h"
 
@@ -277,6 +276,20 @@ willPositionSheet:(NSWindow*)sheet
   // Normally, we don't need to tell the toolbar whether or not to show the
   // divider, but things break down during animation.
   [toolbarController_ setDividerOpacity:[self toolbarDividerOpacity]];
+
+  // Update the position of the active constrained window sheet.  We force this
+  // here because the |sheetParentView| may not have been resized (e.g., to
+  // prevent jank during a fullscreen mode transition), but constrained window
+  // sheets also compute their position based on the bookmark bar and toolbar.
+  content::WebContents* const activeWebContents =
+      browser_->tab_strip_model()->GetActiveWebContents();
+  NSView* const sheetParentView = activeWebContents ?
+      GetSheetParentViewForWebContents(activeWebContents) : nil;
+  if (sheetParentView) {
+    [[NSNotificationCenter defaultCenter]
+      postNotificationName:NSViewFrameDidChangeNotification
+                    object:sheetParentView];
+  }
 }
 
 - (CGFloat)floatingBarHeight {
@@ -985,12 +998,12 @@ willPositionSheet:(NSWindow*)sheet
   // transitioning between composited and non-composited mode.
   // http://crbug.com/279472
   allowOverlappingViews = YES;
-  contents->GetView()->SetAllowOverlappingViews(allowOverlappingViews);
+  contents->SetAllowOverlappingViews(allowOverlappingViews);
 
   DevToolsWindow* devToolsWindow =
       DevToolsWindow::GetDockedInstanceForInspectedTab(contents);
   if (devToolsWindow) {
-    devToolsWindow->web_contents()->GetView()->
+    devToolsWindow->web_contents()->
         SetAllowOverlappingViews(allowOverlappingViews);
   }
 }

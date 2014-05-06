@@ -99,7 +99,6 @@
 #include "content/browser/service_worker/service_worker_context_wrapper.h"
 #include "content/browser/service_worker/service_worker_dispatcher_host.h"
 #include "content/browser/shared_worker/shared_worker_message_filter.h"
-#include "content/browser/speech/input_tag_speech_dispatcher_host.h"
 #include "content/browser/speech/speech_recognition_dispatcher_host.h"
 #include "content/browser/storage_partition_impl.h"
 #include "content/browser/streams/stream_context.h"
@@ -395,6 +394,7 @@ RenderProcessHostImpl::RenderProcessHostImpl(
       is_self_deleted_(false),
 #endif
       pending_views_(0),
+      mojo_activation_required_(false),
       visible_widgets_(0),
       backgrounded_(true),
       is_initialized_(false),
@@ -604,6 +604,20 @@ bool RenderProcessHostImpl::Init() {
   return true;
 }
 
+void RenderProcessHostImpl::MaybeActivateMojo() {
+  // TODO(darin): Following security review, we can unconditionally initialize
+  // Mojo in all renderers. We will then be able to directly call Activate()
+  // from OnProcessLaunched.
+  if (!mojo_activation_required_)
+    return;  // Waiting on someone to require Mojo.
+
+  if (!GetHandle())
+    return;  // Waiting on renderer startup.
+
+  if (!mojo_application_host_->did_activate())
+    mojo_application_host_->Activate(this, GetHandle());
+}
+
 void RenderProcessHostImpl::CreateMessageFilters() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   AddFilter(new ResourceSchedulerFilter(GetID()));
@@ -688,7 +702,7 @@ void RenderProcessHostImpl::CreateMessageFilters() {
       storage_partition_impl_->GetIndexedDBContext(),
       ChromeBlobStorageContext::GetFor(browser_context)));
 
-  geolocation_dispatcher_host_ = GeolocationDispatcherHost::New(
+  geolocation_dispatcher_host_ = new GeolocationDispatcherHost(
       GetID(), browser_context->GetGeolocationPermissionContext());
   AddFilter(geolocation_dispatcher_host_);
   gpu_message_filter_ = new GpuMessageFilter(GetID(), widget_helper_.get());
@@ -708,10 +722,6 @@ void RenderProcessHostImpl::CreateMessageFilters() {
 #endif
 #if defined(ENABLE_PLUGINS)
   AddFilter(new PepperRendererConnection(GetID()));
-#endif
-#if defined(ENABLE_INPUT_SPEECH)
-  AddFilter(new InputTagSpeechDispatcherHost(
-      IsGuest(), GetID(), storage_partition_impl_->GetURLRequestContext()));
 #endif
   AddFilter(new SpeechRecognitionDispatcherHost(
       IsGuest(), GetID(), storage_partition_impl_->GetURLRequestContext()));
@@ -1034,7 +1044,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableLayerSquashing,
     switches::kDisableLocalStorage,
     switches::kDisableLogging,
-    switches::kDisableMapImage,
     switches::kDisableMediaSource,
     switches::kDisableOverlayScrollbar,
     switches::kDisablePinch,
@@ -1048,6 +1057,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableTouchDragDrop,
     switches::kDisableTouchEditing,
     switches::kDisableUniversalAcceleratedOverflowScroll,
+    switches::kDisableZeroCopy,
     switches::kDomAutomationController,
     switches::kEnableAcceleratedFixedRootBackground,
     switches::kEnableAcceleratedOverflowScroll,
@@ -1071,12 +1081,13 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableLCDText,
     switches::kEnableLayerSquashing,
     switches::kEnableLogging,
-    switches::kEnableMapImage,
     switches::kEnableMemoryBenchmarking,
+    switches::kEnableOneCopy,
     switches::kEnableOverlayFullscreenVideo,
     switches::kEnableOverlayScrollbar,
     switches::kEnableOverscrollNotifications,
     switches::kEnablePinch,
+    switches::kEnablePreciseMemoryInfo,
     switches::kEnablePreparsedJsCaching,
     switches::kEnableRepaintAfterLayout,
     switches::kEnableSeccompFilterSandbox,
@@ -1096,6 +1107,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableWebAnimationsSVG,
     switches::kEnableWebGLDraftExtensions,
     switches::kEnableWebMIDI,
+    switches::kEnableZeroCopy,
     switches::kForceCompositingMode,
     switches::kForceDeviceScaleFactor,
     switches::kFullMemoryCrashReport,
@@ -1971,13 +1983,10 @@ void RenderProcessHostImpl::OnProcessLaunched() {
       Source<RenderProcessHost>(this),
       NotificationService::NoDetails());
 
-  // TODO(darin): This is blocked on security review. Un-commenting this will
-  // allow Mojo calls from all renderers.
-#if 0
-  // Let the Mojo system get setup on the child process side before any other
-  // IPCs arrive. This way those may safely generate Mojo-related RPCs.
-  mojo_application_host_->Activate(this, GetHandle());
-#endif
+  // Allow Mojo to be setup before the renderer sees any Chrome IPC messages.
+  // This way, Mojo can be safely used from the renderer in response to any
+  // Chrome IPC message.
+  MaybeActivateMojo();
 
   while (!queued_messages_.empty()) {
     Send(queued_messages_.front());
@@ -2064,8 +2073,8 @@ void RenderProcessHostImpl::DecrementWorkerRefCount() {
 void RenderProcessHostImpl::ConnectTo(
     const base::StringPiece& service_name,
     mojo::ScopedMessagePipeHandle handle) {
-  if (!mojo_application_host_->did_activate())
-    mojo_application_host_->Activate(this, GetHandle());
+  mojo_activation_required_ = true;
+  MaybeActivateMojo();
 
   mojo::AllocationScope scope;
   mojo_application_host_->shell_client()->AcceptConnection(service_name,

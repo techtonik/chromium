@@ -400,27 +400,8 @@ IPC_STRUCT_BEGIN(ViewHostMsg_TextInputState_Params)
 IPC_STRUCT_END()
 
 IPC_STRUCT_BEGIN(ViewHostMsg_UpdateRect_Params)
-  // The bitmap to be painted into the view at the locations specified by
-  // update_rects.
-  IPC_STRUCT_MEMBER(TransportDIB::Id, bitmap)
-
-  // The position and size of the bitmap.
-  IPC_STRUCT_MEMBER(gfx::Rect, bitmap_rect)
-
-  // The scroll delta.  Only one of the delta components can be non-zero, and if
-  // they are both zero, then it means there is no scrolling and the scroll_rect
-  // is ignored.
-  IPC_STRUCT_MEMBER(gfx::Vector2d, scroll_delta)
-
-  // The rectangular region to scroll.
-  IPC_STRUCT_MEMBER(gfx::Rect, scroll_rect)
-
   // The scroll offset of the render view.
   IPC_STRUCT_MEMBER(gfx::Vector2d, scroll_offset)
-
-  // The regions of the bitmap (in view coords) that contain updated pixels.
-  // In the case of scrolling, this includes the scroll damage rect.
-  IPC_STRUCT_MEMBER(std::vector<gfx::Rect>, copy_rects)
 
   // The size of the RenderView when this message was generated.  This is
   // included so the host knows how large the view is from the perspective of
@@ -438,9 +419,6 @@ IPC_STRUCT_BEGIN(ViewHostMsg_UpdateRect_Params)
   //   ViewHostMsg_UpdateRect_Flags::IS_RESIZE_ACK
   //     Indicates that this is a response to a ViewMsg_Resize message.
   //
-  //   ViewHostMsg_UpdateRect_Flags::IS_RESTORE_ACK
-  //     Indicates that this is a response to a ViewMsg_WasShown message.
-  //
   //   ViewHostMsg_UpdateRect_Flags::IS_REPAINT_ACK
   //     Indicates that this is a response to a ViewMsg_Repaint message.
   //
@@ -453,10 +431,6 @@ IPC_STRUCT_BEGIN(ViewHostMsg_UpdateRect_Params)
   // All the above coordinates are in DIP. This is the scale factor needed
   // to convert them to pixels.
   IPC_STRUCT_MEMBER(float, scale_factor)
-
-  // The latency information for the frame. Only valid when accelerated
-  // compositing is disabled.
-  IPC_STRUCT_MEMBER(std::vector<ui::LatencyInfo>, latency_info)
 IPC_STRUCT_END()
 
 IPC_STRUCT_BEGIN(ViewMsg_New_Params)
@@ -634,9 +608,8 @@ IPC_MESSAGE_ROUTED0(ViewMsg_WasHidden)
 
 // Tells the render view that it is no longer hidden (see WasHidden), and the
 // render view is expected to respond with a full repaint if needs_repainting
-// is true.  In that case, the generated ViewHostMsg_UpdateRect message will
-// have the IS_RESTORE_ACK flag set.  If needs_repainting is false, then this
-// message does not trigger a message in response.
+// is true. If needs_repainting is false, then this message does not trigger a
+// message in response.
 IPC_MESSAGE_ROUTED1(ViewMsg_WasShown,
                     bool /* needs_repainting */)
 
@@ -1145,14 +1118,6 @@ IPC_MESSAGE_ROUTED5(ViewHostMsg_Find_Reply,
 // message.
 IPC_MESSAGE_ROUTED0(ViewHostMsg_ClosePage_ACK)
 
-// Notifies the browser that media has started/stopped playing.
-IPC_MESSAGE_ROUTED3(ViewHostMsg_MediaPlayingNotification,
-                    int64 /* player_cookie, distinguishes instances */,
-                    bool /* has_video */,
-                    bool /* has_audio */)
-IPC_MESSAGE_ROUTED1(ViewHostMsg_MediaPausedNotification,
-                    int64 /* player_cookie, distinguishes instances */)
-
 // Notifies the browser that we have session history information.
 // page_id: unique ID that allows us to distinguish between history entries.
 IPC_MESSAGE_ROUTED2(ViewHostMsg_UpdateState,
@@ -1181,19 +1146,10 @@ IPC_MESSAGE_ROUTED2(ViewHostMsg_UpdateTargetURL,
 IPC_MESSAGE_ROUTED1(ViewHostMsg_DidChangeLoadProgress,
                     double /* load_progress */)
 
-// Sent when the renderer main frame sets its opener to null, disowning it for
-// the lifetime of the window.
-IPC_MESSAGE_ROUTED0(ViewHostMsg_DidDisownOpener)
-
 // Sent when the document element is available for the top-level frame.  This
 // happens after the page starts loading, but before all resources are
 // finished.
 IPC_MESSAGE_ROUTED0(ViewHostMsg_DocumentAvailableInMainFrame)
-
-// Sent when after the onload handler has been invoked for the document
-// in the top-level frame.
-IPC_MESSAGE_ROUTED1(ViewHostMsg_DocumentOnLoadCompletedInMainFrame,
-                    int32 /* page_id */)
 
 // Sent when the renderer loads a resource from its memory cache.
 // The security info is non empty if the resource was originally loaded over
@@ -1364,11 +1320,6 @@ IPC_MESSAGE_ROUTED0(ViewHostMsg_DidChangeScrollOffset)
 IPC_MESSAGE_ROUTED2(ViewHostMsg_DidChangeScrollOffsetPinningForMainFrame,
                     bool /* pinned_to_left */,
                     bool /* pinned_to_right */)
-
-// Notifies that the scrollbars-visible state of the content changed.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_DidChangeScrollbarsForMainFrame,
-                    bool /* has_horizontal_scrollbar */,
-                    bool /* has_vertical_scrollbar */)
 
 // Notifies that the number of JavaScript scroll handlers changed.
 IPC_MESSAGE_ROUTED1(ViewHostMsg_DidChangeNumWheelEvents,
@@ -1787,6 +1738,11 @@ IPC_MESSAGE_ROUTED2(ViewHostMsg_PluginFocusChanged,
 
 // Instructs the browser to start plugin IME.
 IPC_MESSAGE_ROUTED0(ViewHostMsg_StartPluginIme)
+
+// Notifies that the scrollbars-visible state of the content changed.
+IPC_MESSAGE_ROUTED2(ViewHostMsg_DidChangeScrollbarsForMainFrame,
+                    bool /* has_horizontal_scrollbar */,
+                    bool /* has_vertical_scrollbar */)
 
 #elif defined(OS_WIN)
 // Request that the given font characters be loaded by the browser so it's

@@ -44,6 +44,7 @@
 #include "cc/quads/solid_color_draw_quad.h"
 #include "cc/quads/texture_draw_quad.h"
 #include "cc/resources/direct_raster_worker_pool.h"
+#include "cc/resources/image_copy_raster_worker_pool.h"
 #include "cc/resources/image_raster_worker_pool.h"
 #include "cc/resources/memory_history.h"
 #include "cc/resources/picture_layer_tiling.h"
@@ -262,7 +263,8 @@ LayerTreeHostImpl::LayerTreeHostImpl(
       did_lose_called_(false),
 #endif
       shared_bitmap_manager_(manager),
-      id_(id) {
+      id_(id),
+      transfer_buffer_memory_limit_(0u) {
   DCHECK(proxy_->IsImplThread());
   DidVisibilityChange(this, visible_);
 
@@ -310,6 +312,7 @@ LayerTreeHostImpl::~LayerTreeHostImpl() {
   resource_pool_.reset();
   raster_worker_pool_.reset();
   direct_raster_worker_pool_.reset();
+  staging_resource_pool_.reset();
 }
 
 void LayerTreeHostImpl::BeginMainFrameAborted(bool did_handle) {
@@ -857,6 +860,11 @@ DrawSwapReadbackResult::DrawResult LayerTreeHostImpl::CalculateRenderPasses(
       ++layers_drawn;
     }
 
+    rendering_stats_instrumentation_->AddVisibleContentArea(
+        append_quads_data.visible_content_area);
+    rendering_stats_instrumentation_->AddApproximatedVisibleContentArea(
+        append_quads_data.approximated_visible_content_area);
+
     if (append_quads_data.num_missing_tiles) {
       bool layer_has_animating_transform =
           it->screen_space_transform_is_animating() ||
@@ -1194,6 +1202,16 @@ void LayerTreeHostImpl::UpdateTileManagerMemoryPolicy(
       unused_memory_limit_in_bytes,
       global_tile_state_.num_resources_limit);
 
+  // Staging pool resources are used as transfer buffers so we use
+  // |transfer_buffer_memory_limit_| as the memory limit for this resource pool.
+  if (staging_resource_pool_) {
+    staging_resource_pool_->CheckBusyResources();
+    staging_resource_pool_->SetResourceUsageLimits(
+        visible_ ? transfer_buffer_memory_limit_ : 0,
+        transfer_buffer_memory_limit_,
+        std::numeric_limits<size_t>::max());
+  }
+
   DidModifyTilePriorities();
 }
 
@@ -1214,15 +1232,20 @@ void LayerTreeHostImpl::NotifyReadyToActivate() {
 }
 
 void LayerTreeHostImpl::NotifyTileInitialized(const Tile* tile) {
-  if (!active_tree_)
-    return;
+  TRACE_EVENT0("cc", "LayerTreeHostImpl::NotifyTileInitialized");
 
-  LayerImpl* layer_impl =
-      active_tree_->FindActiveTreeLayerById(tile->layer_id());
-  if (layer_impl) {
-    gfx::RectF layer_damage_rect =
-        gfx::ScaleRect(tile->content_rect(), 1.f / tile->contents_scale());
-    layer_impl->AddDamageRect(layer_damage_rect);
+  if (active_tree_) {
+    LayerImpl* layer_impl =
+        active_tree_->FindActiveTreeLayerById(tile->layer_id());
+    if (layer_impl)
+      layer_impl->NotifyTileInitialized(tile);
+  }
+
+  if (pending_tree_) {
+    LayerImpl* layer_impl =
+        pending_tree_->FindPendingTreeLayerById(tile->layer_id());
+    if (layer_impl)
+      layer_impl->NotifyTileInitialized(tile);
   }
 }
 
@@ -1679,6 +1702,7 @@ void LayerTreeHostImpl::ActivatePendingTree() {
   active_tree_->DidBecomeActive();
   active_tree_->SetRootLayerScrollOffsetDelegate(
       root_layer_scroll_offset_delegate_);
+  ActivateAnimations();
 
   client_->OnCanDrawStateChanged(CanDraw());
   SetNeedsRedraw();
@@ -1745,7 +1769,7 @@ ManagedMemoryPolicy LayerTreeHostImpl::ActualManagedMemoryPolicy() const {
   // rasterization per layer, we also need to disable pre-painting selectively:
   // crbug.com/335387
   if (debug_state_.rasterize_only_visible_content ||
-      settings_.rasterization_site == LayerTreeSettings::GpuRasterization) {
+      settings_.gpu_rasterization_forced) {
     actual.priority_cutoff_when_visible =
         gpu::MemoryAllocation::CUTOFF_ALLOW_REQUIRED_ONLY;
   }
@@ -1813,27 +1837,47 @@ void LayerTreeHostImpl::CreateAndSetRenderer(
 void LayerTreeHostImpl::CreateAndSetTileManager(
     ResourceProvider* resource_provider,
     ContextProvider* context_provider,
-    bool using_map_image,
+    bool use_zero_copy,
+    bool use_one_copy,
     bool allow_rasterize_on_demand) {
   DCHECK(settings_.impl_side_painting);
   DCHECK(resource_provider);
   DCHECK(proxy_->ImplThreadTaskRunner());
 
-  if (using_map_image) {
-    raster_worker_pool_ =
-        ImageRasterWorkerPool::Create(proxy_->ImplThreadTaskRunner(),
-                                      RasterWorkerPool::GetTaskGraphRunner(),
-                                      resource_provider);
+  transfer_buffer_memory_limit_ =
+      GetMaxTransferBufferUsageBytes(context_provider);
+
+  if (use_zero_copy) {
     resource_pool_ =
         ResourcePool::Create(resource_provider,
                              GetMapImageTextureTarget(context_provider),
                              resource_provider->best_texture_format());
+    raster_worker_pool_ =
+        ImageRasterWorkerPool::Create(proxy_->ImplThreadTaskRunner(),
+                                      RasterWorkerPool::GetTaskGraphRunner(),
+                                      resource_provider);
+  } else if (use_one_copy) {
+    // We need to create a staging resource pool when using copy rasterizer.
+    staging_resource_pool_ =
+        ResourcePool::Create(resource_provider,
+                             GetMapImageTextureTarget(context_provider),
+                             resource_provider->best_texture_format());
+    resource_pool_ =
+        ResourcePool::Create(resource_provider,
+                             GL_TEXTURE_2D,
+                             resource_provider->best_texture_format());
+
+    raster_worker_pool_ = ImageCopyRasterWorkerPool::Create(
+        proxy_->ImplThreadTaskRunner(),
+        RasterWorkerPool::GetTaskGraphRunner(),
+        resource_provider,
+        staging_resource_pool_.get());
   } else {
     raster_worker_pool_ = PixelBufferRasterWorkerPool::Create(
         proxy_->ImplThreadTaskRunner(),
         RasterWorkerPool::GetTaskGraphRunner(),
         resource_provider,
-        GetMaxTransferBufferUsageBytes(context_provider));
+        transfer_buffer_memory_limit_);
     resource_pool_ = ResourcePool::Create(
         resource_provider,
         GL_TEXTURE_2D,
@@ -1873,6 +1917,7 @@ bool LayerTreeHostImpl::InitializeRenderer(
   renderer_.reset();
   tile_manager_.reset();
   resource_pool_.reset();
+  staging_resource_pool_.reset();
   raster_worker_pool_.reset();
   direct_raster_worker_pool_.reset();
   resource_provider_.reset();
@@ -1895,11 +1940,27 @@ bool LayerTreeHostImpl::InitializeRenderer(
   CreateAndSetRenderer(
       output_surface.get(), resource_provider.get(), skip_gl_renderer);
 
+  transfer_buffer_memory_limit_ =
+      GetMaxTransferBufferUsageBytes(output_surface->context_provider().get());
+
   if (settings_.impl_side_painting) {
+    // Note: we use zero-copy rasterizer by default when the renderer is using
+    // shared memory resources.
+    bool use_zero_copy =
+        (settings_.use_zero_copy ||
+         GetRendererCapabilities().using_shared_memory_resources) &&
+        GetRendererCapabilities().using_map_image;
+
+    // Sync query support is required by one-copy rasterizer.
+    bool use_one_copy = settings_.use_one_copy &&
+                        GetRendererCapabilities().using_map_image &&
+                        resource_provider->use_sync_query();
+
     CreateAndSetTileManager(
         resource_provider.get(),
         output_surface->context_provider().get(),
-        GetRendererCapabilities().using_map_image,
+        use_zero_copy,
+        use_one_copy,
         GetRendererCapabilities().allow_rasterize_on_demand);
   }
 
@@ -1964,6 +2025,7 @@ void LayerTreeHostImpl::ReleaseGL() {
   resource_pool_.reset();
   raster_worker_pool_.reset();
   direct_raster_worker_pool_.reset();
+  staging_resource_pool_.reset();
   resource_provider_->InitializeSoftware();
 
   bool skip_gl_renderer = true;
@@ -1971,9 +2033,11 @@ void LayerTreeHostImpl::ReleaseGL() {
       output_surface_.get(), resource_provider_.get(), skip_gl_renderer);
 
   EnforceZeroBudget(true);
+  DCHECK(GetRendererCapabilities().using_map_image);
   CreateAndSetTileManager(resource_provider_.get(),
                           NULL,
-                          GetRendererCapabilities().using_map_image,
+                          true,
+                          false,
                           GetRendererCapabilities().allow_rasterize_on_demand);
   DCHECK(tile_manager_);
 
@@ -2044,6 +2108,7 @@ const gfx::Transform& LayerTreeHostImpl::DrawTransform() const {
 void LayerTreeHostImpl::DidChangeTopControlsPosition() {
   UpdateInnerViewportContainerSize();
   SetNeedsRedraw();
+  SetNeedsAnimate();
   active_tree_->set_needs_update_draw_properties();
   SetFullRootLayerDamage();
 }
@@ -2460,7 +2525,6 @@ void LayerTreeHostImpl::ScrollEnd() {
   if (top_controls_manager_)
     top_controls_manager_->ScrollEnd();
   ClearCurrentlyScrollingLayer();
-  StartScrollbarAnimation();
 }
 
 InputHandler::ScrollStatus LayerTreeHostImpl::FlingScrollBegin() {
@@ -2524,10 +2588,8 @@ void LayerTreeHostImpl::MouseMoveAt(const gfx::Point& viewport_point) {
     ScrollbarAnimationController* animation_controller =
         scroll_layer_impl ? scroll_layer_impl->scrollbar_animation_controller()
                           : NULL;
-    if (animation_controller) {
-      animation_controller->DidMouseMoveOffScrollbar(CurrentFrameTimeTicks());
-      StartScrollbarAnimation();
-    }
+    if (animation_controller)
+      animation_controller->DidMouseMoveOffScrollbar();
     scroll_layer_id_when_mouse_over_scrollbar_ = 0;
   }
 
@@ -2556,10 +2618,8 @@ void LayerTreeHostImpl::MouseMoveAt(const gfx::Point& viewport_point) {
         std::min(distance_to_scrollbar,
                  DeviceSpaceDistanceToLayer(device_viewport_point, *it));
 
-  bool should_animate = animation_controller->DidMouseMoveNear(
-      CurrentFrameTimeTicks(), distance_to_scrollbar / device_scale_factor_);
-  if (should_animate)
-    StartScrollbarAnimation();
+  animation_controller->DidMouseMoveNear(distance_to_scrollbar /
+                                         device_scale_factor_);
 }
 
 bool LayerTreeHostImpl::HandleMouseOverScrollbar(LayerImpl* layer_impl,
@@ -2569,11 +2629,7 @@ bool LayerTreeHostImpl::HandleMouseOverScrollbar(LayerImpl* layer_impl,
     layer_impl = active_tree_->LayerById(scroll_layer_id);
     if (layer_impl && layer_impl->scrollbar_animation_controller()) {
       scroll_layer_id_when_mouse_over_scrollbar_ = scroll_layer_id;
-      bool should_animate =
-          layer_impl->scrollbar_animation_controller()->DidMouseMoveNear(
-              CurrentFrameTimeTicks(), 0);
-      if (should_animate)
-        StartScrollbarAnimation();
+      layer_impl->scrollbar_animation_controller()->DidMouseMoveNear(0);
     } else {
       scroll_layer_id_when_mouse_over_scrollbar_ = 0;
     }
@@ -2792,6 +2848,20 @@ void LayerTreeHostImpl::UpdateAnimationState(bool start_ready_animations) {
   SetNeedsAnimate();
 }
 
+void LayerTreeHostImpl::ActivateAnimations() {
+  if (!settings_.accelerated_animation_enabled || !needs_animate_layers() ||
+      !active_tree_->root_layer())
+    return;
+
+  TRACE_EVENT0("cc", "LayerTreeHostImpl::ActivateAnimations");
+  AnimationRegistrar::AnimationControllerMap copy =
+      animation_registrar_->active_animation_controllers();
+  for (AnimationRegistrar::AnimationControllerMap::iterator iter = copy.begin();
+       iter != copy.end();
+       ++iter)
+    (*iter).second->ActivateAnimations();
+}
+
 base::TimeDelta LayerTreeHostImpl::LowFrequencyAnimationInterval() const {
   return base::TimeDelta::FromSeconds(1);
 }
@@ -2861,41 +2931,25 @@ void LayerTreeHostImpl::AnimateScrollbarsRecursive(LayerImpl* layer,
 
   ScrollbarAnimationController* scrollbar_controller =
       layer->scrollbar_animation_controller();
-  if (scrollbar_controller && scrollbar_controller->Animate(time)) {
-    TRACE_EVENT_INSTANT0(
-        "cc",
-        "LayerTreeHostImpl::SetNeedsAnimate due to AnimateScrollbars",
-        TRACE_EVENT_SCOPE_THREAD);
-    SetNeedsAnimate();
-  }
+  if (scrollbar_controller)
+    scrollbar_controller->Animate(time);
 
   for (size_t i = 0; i < layer->children().size(); ++i)
     AnimateScrollbarsRecursive(layer->children()[i], time);
 }
 
-void LayerTreeHostImpl::StartScrollbarAnimation() {
-  TRACE_EVENT0("cc", "LayerTreeHostImpl::StartScrollbarAnimation");
-  StartScrollbarAnimationRecursive(RootLayer(), CurrentFrameTimeTicks());
+void LayerTreeHostImpl::PostDelayedScrollbarFade(
+    const base::Closure& start_fade,
+    base::TimeDelta delay) {
+  client_->PostDelayedScrollbarFadeOnImplThread(start_fade, delay);
 }
 
-void LayerTreeHostImpl::StartScrollbarAnimationRecursive(LayerImpl* layer,
-                                                         base::TimeTicks time) {
-  if (!layer)
-    return;
-
-  ScrollbarAnimationController* scrollbar_controller =
-      layer->scrollbar_animation_controller();
-  if (scrollbar_controller && scrollbar_controller->IsAnimating()) {
-    base::TimeDelta delay = scrollbar_controller->DelayBeforeStart(time);
-    if (delay > base::TimeDelta()) {
-      client_->RequestScrollbarAnimationOnImplThread(delay);
-    } else if (scrollbar_controller->Animate(time)) {
-      SetNeedsAnimate();
-    }
-  }
-
-  for (size_t i = 0; i < layer->children().size(); ++i)
-    StartScrollbarAnimationRecursive(layer->children()[i], time);
+void LayerTreeHostImpl::SetNeedsScrollbarAnimationFrame() {
+  TRACE_EVENT_INSTANT0(
+      "cc",
+      "LayerTreeHostImpl::SetNeedsRedraw due to scrollbar fade",
+      TRACE_EVENT_SCOPE_THREAD);
+  SetNeedsAnimate();
 }
 
 void LayerTreeHostImpl::SetTreePriority(TreePriority priority) {

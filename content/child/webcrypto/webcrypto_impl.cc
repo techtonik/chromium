@@ -96,28 +96,15 @@ bool CryptoThreadPool::PostTask(const tracked_objects::Location& from_here,
 }
 
 void CompleteWithThreadPoolError(blink::WebCryptoResult* result) {
-#if defined(WEBCRYPTO_HAS_ERROR_TYPE)
   result->completeWithError(blink::WebCryptoErrorTypeOperation,
                             "Failed posting to crypto worker pool");
-#else
-  result->completeWithError("Failed posting to crypto worker pool");
-#endif
 }
 
 void CompleteWithError(const Status& status, blink::WebCryptoResult* result) {
   DCHECK(status.IsError());
 
-#if defined(WEBCRYPTO_HAS_ERROR_TYPE)
   result->completeWithError(status.error_type(),
                             blink::WebString::fromUTF8(status.error_details()));
-#else
-  // TODO(eroman): Delete once Blink changes have rolled into Chromium.
-  if (!status.error_details().empty())
-    result->completeWithError(
-        blink::WebString::fromUTF8(status.error_details()));
-  else
-    result->completeWithError();
-#endif
 }
 
 void CompleteWithBufferOrError(const Status& status,
@@ -371,37 +358,40 @@ void DoEncryptReply(scoped_ptr<EncryptState> state) {
   CompleteWithBufferOrError(state->status, state->buffer, &state->result);
 }
 
-void DoEncrypt(scoped_ptr<EncryptState> state) {
+void DoEncrypt(scoped_ptr<EncryptState> passed_state) {
+  EncryptState* state = passed_state.get();
   state->status = webcrypto::Encrypt(state->algorithm,
                                      state->key,
                                      webcrypto::CryptoData(state->data),
                                      &state->buffer);
-  state->origin_thread->PostTask(FROM_HERE,
-                                 base::Bind(DoEncryptReply, Passed(&state)));
+  state->origin_thread->PostTask(
+      FROM_HERE, base::Bind(DoEncryptReply, Passed(&passed_state)));
 }
 
 void DoDecryptReply(scoped_ptr<DecryptState> state) {
   CompleteWithBufferOrError(state->status, state->buffer, &state->result);
 }
 
-void DoDecrypt(scoped_ptr<DecryptState> state) {
+void DoDecrypt(scoped_ptr<DecryptState> passed_state) {
+  DecryptState* state = passed_state.get();
   state->status = webcrypto::Decrypt(state->algorithm,
                                      state->key,
                                      webcrypto::CryptoData(state->data),
                                      &state->buffer);
-  state->origin_thread->PostTask(FROM_HERE,
-                                 base::Bind(DoDecryptReply, Passed(&state)));
+  state->origin_thread->PostTask(
+      FROM_HERE, base::Bind(DoDecryptReply, Passed(&passed_state)));
 }
 
 void DoDigestReply(scoped_ptr<DigestState> state) {
   CompleteWithBufferOrError(state->status, state->buffer, &state->result);
 }
 
-void DoDigest(scoped_ptr<DigestState> state) {
+void DoDigest(scoped_ptr<DigestState> passed_state) {
+  DigestState* state = passed_state.get();
   state->status = webcrypto::Digest(
       state->algorithm, webcrypto::CryptoData(state->data), &state->buffer);
-  state->origin_thread->PostTask(FROM_HERE,
-                                 base::Bind(DoDigestReply, Passed(&state)));
+  state->origin_thread->PostTask(
+      FROM_HERE, base::Bind(DoDigestReply, Passed(&passed_state)));
 }
 
 void DoGenerateKeyReply(scoped_ptr<GenerateKeyState> state) {
@@ -415,7 +405,8 @@ void DoGenerateKeyReply(scoped_ptr<GenerateKeyState> state) {
   }
 }
 
-void DoGenerateKey(scoped_ptr<GenerateKeyState> state) {
+void DoGenerateKey(scoped_ptr<GenerateKeyState> passed_state) {
+  GenerateKeyState* state = passed_state.get();
   state->is_asymmetric = IsAlgorithmAsymmetric(state->algorithm);
   if (state->is_asymmetric) {
     state->status = webcrypto::GenerateKeyPair(state->algorithm,
@@ -449,14 +440,15 @@ void DoGenerateKey(scoped_ptr<GenerateKeyState> state) {
   }
 
   state->origin_thread->PostTask(
-      FROM_HERE, base::Bind(DoGenerateKeyReply, Passed(&state)));
+      FROM_HERE, base::Bind(DoGenerateKeyReply, Passed(&passed_state)));
 }
 
 void DoImportKeyReply(scoped_ptr<ImportKeyState> state) {
   CompleteWithKeyOrError(state->status, state->key, &state->result);
 }
 
-void DoImportKey(scoped_ptr<ImportKeyState> state) {
+void DoImportKey(scoped_ptr<ImportKeyState> passed_state) {
+  ImportKeyState* state = passed_state.get();
   state->status = webcrypto::ImportKey(state->format,
                                        webcrypto::CryptoData(state->key_data),
                                        state->algorithm,
@@ -469,33 +461,35 @@ void DoImportKey(scoped_ptr<ImportKeyState> state) {
     DCHECK_EQ(state->extractable, state->key.extractable());
   }
 
-  state->origin_thread->PostTask(FROM_HERE,
-                                 base::Bind(DoImportKeyReply, Passed(&state)));
+  state->origin_thread->PostTask(
+      FROM_HERE, base::Bind(DoImportKeyReply, Passed(&passed_state)));
 }
 
 void DoExportKeyReply(scoped_ptr<ExportKeyState> state) {
   CompleteWithBufferOrError(state->status, state->buffer, &state->result);
 }
 
-void DoExportKey(scoped_ptr<ExportKeyState> state) {
+void DoExportKey(scoped_ptr<ExportKeyState> passed_state) {
+  ExportKeyState* state = passed_state.get();
   state->status =
       webcrypto::ExportKey(state->format, state->key, &state->buffer);
-  state->origin_thread->PostTask(FROM_HERE,
-                                 base::Bind(DoExportKeyReply, Passed(&state)));
+  state->origin_thread->PostTask(
+      FROM_HERE, base::Bind(DoExportKeyReply, Passed(&passed_state)));
 }
 
 void DoSignReply(scoped_ptr<SignState> state) {
   CompleteWithBufferOrError(state->status, state->buffer, &state->result);
 }
 
-void DoSign(scoped_ptr<SignState> state) {
+void DoSign(scoped_ptr<SignState> passed_state) {
+  SignState* state = passed_state.get();
   state->status = webcrypto::Sign(state->algorithm,
                                   state->key,
                                   webcrypto::CryptoData(state->data),
                                   &state->buffer);
 
-  state->origin_thread->PostTask(FROM_HERE,
-                                 base::Bind(DoSignReply, Passed(&state)));
+  state->origin_thread->PostTask(
+      FROM_HERE, base::Bind(DoSignReply, Passed(&passed_state)));
 }
 
 void DoVerifyReply(scoped_ptr<VerifySignatureState> state) {
@@ -506,7 +500,8 @@ void DoVerifyReply(scoped_ptr<VerifySignatureState> state) {
   }
 }
 
-void DoVerify(scoped_ptr<VerifySignatureState> state) {
+void DoVerify(scoped_ptr<VerifySignatureState> passed_state) {
+  VerifySignatureState* state = passed_state.get();
   state->status =
       webcrypto::VerifySignature(state->algorithm,
                                  state->key,
@@ -514,15 +509,16 @@ void DoVerify(scoped_ptr<VerifySignatureState> state) {
                                  webcrypto::CryptoData(state->data),
                                  &state->verify_result);
 
-  state->origin_thread->PostTask(FROM_HERE,
-                                 base::Bind(DoVerifyReply, Passed(&state)));
+  state->origin_thread->PostTask(
+      FROM_HERE, base::Bind(DoVerifyReply, Passed(&passed_state)));
 }
 
 void DoWrapKeyReply(scoped_ptr<WrapKeyState> state) {
   CompleteWithBufferOrError(state->status, state->buffer, &state->result);
 }
 
-void DoWrapKey(scoped_ptr<WrapKeyState> state) {
+void DoWrapKey(scoped_ptr<WrapKeyState> passed_state) {
+  WrapKeyState* state = passed_state.get();
   // TODO(eroman): The parameter ordering of webcrypto::WrapKey() is
   //               inconsistent with that of blink::WebCrypto::wrapKey().
   state->status = webcrypto::WrapKey(state->format,
@@ -531,15 +527,16 @@ void DoWrapKey(scoped_ptr<WrapKeyState> state) {
                                      state->wrap_algorithm,
                                      &state->buffer);
 
-  state->origin_thread->PostTask(FROM_HERE,
-                                 base::Bind(DoWrapKeyReply, Passed(&state)));
+  state->origin_thread->PostTask(
+      FROM_HERE, base::Bind(DoWrapKeyReply, Passed(&passed_state)));
 }
 
 void DoUnwrapKeyReply(scoped_ptr<UnwrapKeyState> state) {
   CompleteWithKeyOrError(state->status, state->unwrapped_key, &state->result);
 }
 
-void DoUnwrapKey(scoped_ptr<UnwrapKeyState> state) {
+void DoUnwrapKey(scoped_ptr<UnwrapKeyState> passed_state) {
+  UnwrapKeyState* state = passed_state.get();
   state->status =
       webcrypto::UnwrapKey(state->format,
                            webcrypto::CryptoData(state->wrapped_key),
@@ -550,8 +547,8 @@ void DoUnwrapKey(scoped_ptr<UnwrapKeyState> state) {
                            state->usages,
                            &state->unwrapped_key);
 
-  state->origin_thread->PostTask(FROM_HERE,
-                                 base::Bind(DoUnwrapKeyReply, Passed(&state)));
+  state->origin_thread->PostTask(
+      FROM_HERE, base::Bind(DoUnwrapKeyReply, Passed(&passed_state)));
 }
 
 }  // namespace

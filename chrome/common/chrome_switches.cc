@@ -354,6 +354,11 @@ const char kDisableQuicPacing[]             = "disable-quic-pacing";
 // This only has an effect if QUIC protocol is enabled.
 const char kDisableQuicPortSelection[]      = "disable-quic-port-selection";
 
+// Disable use of time-base loss detection for QUIC connections.
+// This only has an effect if QUIC protocol is enabled.
+const char kDisableQuicTimeBasedLossDetection[] =
+    "disable-quic-time-based-loss-detection";
+
 // Prevents the URLs of BackgroundContents from being remembered and
 // re-launched when the browser restarts.
 const char kDisableRestoreBackgroundContents[] =
@@ -538,6 +543,9 @@ const char kEnableNpnHttpOnly[]             = "enable-npn-http";
 // Enable auto-reload of error pages if offline.
 const char kEnableOfflineAutoReload[]       = "enable-offline-auto-reload";
 
+// Enable offering a "Load stale copy" option to the user if offline.
+const char kEnableOfflineLoadStaleCache[]   = "enable-offline-load-stale-cache";
+
 // Controls which branch of the origin chip experiment is enabled. The first
 // flag (enable-origin-chip) is equivalent to the third
 // (enable-origin-chip-trailing-location-bar) and exists for backwards
@@ -605,6 +613,11 @@ const char kEnableQuicPacing[]              = "enable-quic-pacing";
 // This only has an effect if QUIC protocol is enabled.
 const char kEnableQuicPortSelection[]       = "enable-quic-port-selection";
 
+// Enables use of time-base loss detection for QUIC connections.
+// This only has an effect if QUIC protocol is enabled.
+const char kEnableQuicTimeBasedLossDetection[] =
+    "enable-quic-time-based-loss-detection";
+
 // Enables save password prompt bubble.
 const char kEnableSavePasswordBubble[]      = "enable-save-password-bubble";
 
@@ -625,6 +638,9 @@ const char kEnableSearchButtonInOmniboxForStr[] =
     "enable-search-button-in-omnibox-for-str";
 const char kEnableSearchButtonInOmniboxForStrOrIip[] =
     "enable-search-button-in-omnibox-for-str-or-iip";
+
+// Enables using bubbles for session restore request instead of infobars.
+const char kEnableSessionCrashedBubble[] = "enable-session-crashed-bubble";
 
 // Enable settings in a separate browser window per profile.
 const char kEnableSettingsWindow[]          = "enable-settings-window";
@@ -1257,10 +1273,6 @@ const char kUnlimitedStorage[]              = "unlimited-storage";
 // testing flag.
 const char kUseSpdy[]                       = "use-spdy";
 
-// Disables use of the spelling web service and only provides suggestions.
-// This will only work if asynchronous spell checking is not disabled.
-const char kUseSpellingSuggestions[]        = "use-spelling-suggestions";
-
 // A string used to override the default user agent with a custom one.
 const char kUserAgent[]                     = "user-agent";
 
@@ -1311,6 +1323,9 @@ const char kDisableZeroSuggest[] = "disable-zero-suggest";
 const char kEnableAccessibilityTabSwitcher[] =
     "enable-accessibility-tab-switcher";
 
+// Enables app install alerts.
+const char kEnableAppInstallAlerts[]        = "enable-app-install-alerts";
+
 // Enables Contextual Search
 const char kEnableContextualSearch[]        = "contextual-search";
 
@@ -1339,6 +1354,9 @@ const char kEnableZeroSuggestPersonalized[] =
 
 // Enables instant search clicks feature.
 const char kEnableInstantSearchClicks[] = "enable-instant-search-clicks";
+
+// Enables EmbeddedSearch API in the search results page.
+const char kEnableEmbeddedSearchAPI[] = "enable-embeddedsearch-api";
 
 #endif
 

@@ -49,7 +49,7 @@ class DesktopCaptureChooseDesktopMediaFunction
   virtual ~DesktopCaptureChooseDesktopMediaFunction();
 
   // ExtensionFunction overrides.
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
   // content::WebContentsObserver overrides.
   virtual void WebContentsDestroyed(
@@ -79,7 +79,7 @@ class DesktopCaptureCancelChooseDesktopMediaFunction
   virtual ~DesktopCaptureCancelChooseDesktopMediaFunction();
 
   // ExtensionFunction overrides.
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 class DesktopCaptureRequestsRegistry {

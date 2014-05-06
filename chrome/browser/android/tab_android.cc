@@ -21,6 +21,7 @@
 #include "chrome/browser/printing/print_view_manager_basic.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_android.h"
+#include "chrome/browser/search/search.h"
 #include "chrome/browser/sessions/session_tab_helper.h"
 #include "chrome/browser/sync/glue/synced_tab_delegate_android.h"
 #include "chrome/browser/ui/android/content_settings/popup_blocked_infobar_delegate.h"
@@ -30,6 +31,7 @@
 #include "chrome/browser/ui/android/tab_model/tab_model_list.h"
 #include "chrome/browser/ui/android/window_android_helper.h"
 #include "chrome/browser/ui/blocked_content/popup_blocker_tab_helper.h"
+#include "chrome/browser/ui/search/search_tab_helper.h"
 #include "chrome/browser/ui/tab_contents/core_tab_helper.h"
 #include "chrome/browser/ui/tab_helpers.h"
 #include "chrome/browser/ui/toolbar/toolbar_model_impl.h"
@@ -173,26 +175,6 @@ void TabAndroid::OnReceivedHttpAuthRequest(jobject auth_handler,
                                            const base::string16& host,
                                            const base::string16& realm) {
   NOTIMPLEMENTED();
-}
-
-void TabAndroid::AddShortcutToBookmark(const GURL& url,
-                                       const base::string16& title,
-                                       const SkBitmap& skbitmap,
-                                       int r_value,
-                                       int g_value,
-                                       int b_value) {
-  NOTREACHED();
-}
-
-void TabAndroid::EditBookmark(int64 node_id,
-                              const base::string16& node_title,
-                              bool is_folder,
-                              bool is_partner_bookmark) {
-  NOTREACHED();
-}
-
-void TabAndroid::OnNewTabPageReady() {
-  NOTREACHED();
 }
 
 bool TabAndroid::ShouldWelcomePageLinkToTermsOfService() {
@@ -460,6 +442,15 @@ TabAndroid::TabLoadStatus TabAndroid::LoadUrl(JNIEnv* env,
       load_params.referrer = content::Referrer(
           GURL(base::android::ConvertJavaStringToUTF8(env, j_referrer_url)),
           static_cast<blink::WebReferrerPolicy>(referrer_policy));
+    }
+    const base::string16 search_terms =
+        chrome::ExtractSearchTermsFromURL(GetProfile(), gurl);
+    SearchTabHelper* search_tab_helper =
+        SearchTabHelper::FromWebContents(web_contents_.get());
+    if (!search_terms.empty() && search_tab_helper &&
+        search_tab_helper->SupportsInstant()) {
+      search_tab_helper->Submit(search_terms);
+      return DEFAULT_PAGE_LOAD;
     }
     content_view->LoadUrl(load_params);
   }

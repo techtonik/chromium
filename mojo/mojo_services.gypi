@@ -11,10 +11,10 @@
       },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
-        'mojo_bindings',
+        'mojo_cpp_bindings',
       ],
       'dependencies': [
-        'mojo_bindings',
+        'mojo_cpp_bindings',
       ],
     },
     {
@@ -32,11 +32,11 @@
       },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
-        'mojo_bindings',
+        'mojo_cpp_bindings',
       ],
       'dependencies': [
         '../gpu/gpu.gyp:command_buffer_common',
-        'mojo_bindings',
+        'mojo_cpp_bindings',
       ],
     },
     {
@@ -69,10 +69,10 @@
       },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
-        'mojo_bindings',
+        'mojo_cpp_bindings',
       ],
       'dependencies': [
-        'mojo_bindings',
+        'mojo_cpp_bindings',
       ],
     },
     {
@@ -119,14 +119,45 @@
       ],
     },
     {
+      'target_name': 'mojo_view_manager_common',
+      'type': 'static_library',
+      'sources': [
+        'services/public/cpp/view_manager/view_manager_types.h',
+      ],
+    },
+    {
+      'target_name': 'mojo_view_manager_bindings',
+      'type': 'static_library',
+      'sources': [
+        'services/public/interfaces/view_manager/view_manager.mojom',
+      ],
+      'variables': {
+        'mojom_base_output_dir': 'mojo',
+      },
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'export_dependent_settings': [
+        'mojo_cpp_bindings',
+      ],
+      'dependencies': [
+        'mojo_cpp_bindings',
+      ],
+    },
+    {
       'target_name': 'mojo_view_manager_lib',
       'type': 'static_library',
       'dependencies': [
         '../base/base.gyp:base',
+        'mojo_shell_bindings',
+        'mojo_view_manager_bindings',
+        'mojo_view_manager_common',
       ],
       'sources': [
         'services/public/cpp/view_manager/lib/view.cc',
         'services/public/cpp/view_manager/lib/view_manager.cc',
+        'services/public/cpp/view_manager/lib/view_manager_private.cc',
+        'services/public/cpp/view_manager/lib/view_manager_private.h',
+        'services/public/cpp/view_manager/lib/view_manager_synchronizer.cc',
+        'services/public/cpp/view_manager/lib/view_manager_synchronizer.h',
         'services/public/cpp/view_manager/lib/view_tree_host.cc',
         'services/public/cpp/view_manager/lib/view_tree_node.cc',
         'services/public/cpp/view_manager/lib/view_tree_node_observer.cc',
@@ -134,6 +165,7 @@
         'services/public/cpp/view_manager/lib/view_tree_node_private.h',
         'services/public/cpp/view_manager/view.h',
         'services/public/cpp/view_manager/view_manager.h',
+        'services/public/cpp/view_manager/view_manager_types.h',
         'services/public/cpp/view_manager/view_tree_host.h',
         'services/public/cpp/view_manager/view_tree_node.h',
         'services/public/cpp/view_manager/view_tree_node_observer.h',
@@ -146,6 +178,7 @@
         '../base/base.gyp:base',
         '../base/base.gyp:test_support_base',
         '../testing/gtest.gyp:gtest',
+        'mojo_environment_chromium',
         'mojo_run_all_unittests',
         'mojo_view_manager_lib',
       ],
@@ -161,23 +194,6 @@
     ['use_aura==1', {
       'targets': [
         {
-          'target_name': 'mojo_view_manager_bindings',
-          'type': 'static_library',
-          'sources': [
-            'services/public/interfaces/view_manager/view_manager.mojom',
-          ],
-          'variables': {
-            'mojom_base_output_dir': 'mojo',
-          },
-          'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
-          'export_dependent_settings': [
-            'mojo_bindings',
-          ],
-          'dependencies': [
-            'mojo_bindings',
-          ],
-        },
-        {
           'target_name': 'mojo_view_manager',
           'type': '<(component)',
           'dependencies': [
@@ -192,6 +208,7 @@
             'mojo_shell_client',
             'mojo_system_impl',
             'mojo_view_manager_bindings',
+            'mojo_view_manager_common',
           ],
           'sources': [
             'services/view_manager/ids.h',
@@ -216,15 +233,16 @@
           'type': 'executable',
           'dependencies': [
             '../base/base.gyp:base',
+            '../base/base.gyp:run_all_unittests',
             '../skia/skia.gyp:skia',
             '../testing/gtest.gyp:gtest',
             '../ui/aura/aura.gyp:aura',
             'mojo_environment_chromium',
-            'mojo_run_all_unittests',
             'mojo_shell_client',
+            'mojo_shell_test_support',
             'mojo_system_impl',
-            'mojo_view_manager',
             'mojo_view_manager_bindings',
+            'mojo_view_manager_common',
           ],
           'sources': [
             'services/view_manager/view_manager_connection_unittest.cc',
@@ -248,10 +266,10 @@
             '../base/base.gyp:base',
             '../build/linux/system.gyp:dbus',
             '../dbus/dbus.gyp:dbus',
-            'mojo_external_service_bindings',
             'mojo_common_lib',
-            'mojo_environment_chromium',
+            'mojo_dbus_service',
             'mojo_echo_bindings',
+            'mojo_environment_chromium',
             'mojo_shell_client',
             'mojo_system_impl',
           ],

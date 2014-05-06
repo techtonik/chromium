@@ -19,10 +19,7 @@
 #include "media/base/video_frame.h"
 #include "media/base/video_util.h"
 #include "media/base/yuv_convert.h"
-
-#if !defined(AVOID_LIBYUV_FOR_ANDROID_WEBVIEW)
 #include "third_party/libyuv/include/libyuv.h"
-#endif
 
 using media::VideoCaptureFormat;
 
@@ -251,7 +248,7 @@ void VideoCaptureController::ReturnBuffer(
     const VideoCaptureControllerID& id,
     VideoCaptureControllerEventHandler* event_handler,
     int buffer_id,
-    uint32 sync_point) {
+    const std::vector<uint32>& sync_points) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
 
   ControllerClient* client = FindClient(id, event_handler, controller_clients_);
@@ -267,8 +264,10 @@ void VideoCaptureController::ReturnBuffer(
   scoped_refptr<media::VideoFrame> frame = iter->second;
   client->active_buffers.erase(iter);
 
-  if (frame->format() == media::VideoFrame::NATIVE_TEXTURE)
-    frame->mailbox_holder()->sync_point = sync_point;
+  if (frame->format() == media::VideoFrame::NATIVE_TEXTURE) {
+    for (size_t i = 0; i < sync_points.size(); i++)
+      frame->AppendReleaseSyncPoint(sync_points[i]);
+  }
 
   buffer_pool_->RelinquishConsumerHold(buffer_id, 1);
 }
@@ -333,7 +332,6 @@ void VideoCaptureController::VideoCaptureDeviceClient::OnIncomingCapturedData(
   if (!buffer)
     return;
   uint8* yplane = NULL;
-#if !defined(AVOID_LIBYUV_FOR_ANDROID_WEBVIEW)
   bool flip = false;
   yplane = reinterpret_cast<uint8*>(buffer->data());
   uint8* uplane =
@@ -418,12 +416,6 @@ void VideoCaptureController::VideoCaptureDeviceClient::OnIncomingCapturedData(
                         new_unrotated_height,
                         rotation_mode,
                         origin_colorspace);
-#else
-  // Libyuv is not linked in for Android WebView builds, but video capture is
-  // not used in those builds either. Whenever libyuv is added in that build,
-  // address all these #ifdef parts, see http://crbug.com/299611 .
-  NOTREACHED();
-#endif  // if !defined(AVOID_LIBYUV_FOR_ANDROID_WEBVIEW)
   scoped_refptr<media::VideoFrame> frame =
       media::VideoFrame::WrapExternalPackedMemory(
           media::VideoFrame::I420,

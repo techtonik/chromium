@@ -188,6 +188,7 @@
         'ninja_binary_target_writer_unittest.cc',
         'ninja_copy_target_writer_unittest.cc',
         'ninja_helper_unittest.cc',
+        'ninja_target_writer_unittest.cc',
         'operators_unittest.cc',
         'parse_tree_unittest.cc',
         'parser_unittest.cc',
@@ -202,6 +203,7 @@
         'test_with_scope.cc',
         'test_with_scope.h',
         'tokenizer_unittest.cc',
+        'value_unittest.cc',
         'visibility_unittest.cc',
       ],
       'dependencies': [

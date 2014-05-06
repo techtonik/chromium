@@ -123,6 +123,12 @@ class NaClBrowserTestPnacl : public NaClBrowserTestBase {
   virtual bool IsAPnaclTest() OVERRIDE;
 };
 
+class NaClBrowserTestPnaclNonSfi : public NaClBrowserTestBase {
+ public:
+  virtual void SetUpCommandLine(base::CommandLine* command_line) OVERRIDE;
+  virtual base::FilePath::StringType Variant() OVERRIDE;
+};
+
 // Class used to test that when --disable-pnacl is specified the PNaCl mime
 // type is not available.
 class NaClBrowserTestPnaclDisabled : public NaClBrowserTestBase {
@@ -156,6 +162,21 @@ class NaClBrowserTestStatic : public NaClBrowserTestBase {
 #define MAYBE_PNACL(test_name) DISABLED_##test_name
 #else
 #define MAYBE_PNACL(test_name) test_name
+#endif
+
+// ASan does not work with libc-free context, so disable the test.
+#if defined(OS_LINUX) && !defined(ADDRESS_SANITIZER)
+#  define MAYBE_NONSFI(test_case) test_case
+#else
+#  define MAYBE_NONSFI(test_case) DISABLED_##test_case
+#endif
+
+// Currently, translation from pexe to non-sfi nexe is supported only for
+// x86-32 binary.
+#if defined(OS_LINUX) && defined(ARCH_CPU_X86)
+#  define MAYBE_PNACL_NONSFI(test_case) test_case
+#else
+#  define MAYBE_PNACL_NONSFI(test_case) DISABLED_##test_case
 #endif
 
 #if defined(ARCH_CPU_ARM_FAMILY) || defined(ARCH_CPU_MIPS_FAMILY)

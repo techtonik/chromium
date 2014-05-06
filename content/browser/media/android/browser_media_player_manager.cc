@@ -4,6 +4,7 @@
 
 #include "content/browser/media/android/browser_media_player_manager.h"
 
+#include "base/android/scoped_java_ref.h"
 #include "base/command_line.h"
 #include "content/browser/android/content_view_core_impl.h"
 #include "content/browser/media/android/browser_demuxer_android.h"
@@ -467,7 +468,6 @@ void BrowserMediaPlayerManager::OnRequestExternalSurface(
 
 void BrowserMediaPlayerManager::OnEnterFullscreen(int player_id) {
   DCHECK_EQ(fullscreen_player_id_, -1);
-
 #if defined(VIDEO_HOLE)
   if (external_video_surface_container_)
     external_video_surface_container_->ReleaseExternalVideoSurface(player_id);
@@ -475,16 +475,26 @@ void BrowserMediaPlayerManager::OnEnterFullscreen(int player_id) {
   if (video_view_.get()) {
     fullscreen_player_id_ = player_id;
     video_view_->OpenVideo();
+    return;
   } else if (!ContentVideoView::GetInstance()) {
     // In Android WebView, two ContentViewCores could both try to enter
     // fullscreen video, we just ignore the second one.
-    fullscreen_player_id_ = player_id;
     video_view_.reset(new ContentVideoView(this));
-  } else {
-    // Force the second video to exit fullscreen.
-    Send(new MediaPlayerMsg_DidEnterFullscreen(routing_id(), player_id));
-    Send(new MediaPlayerMsg_DidExitFullscreen(routing_id(), player_id));
+    base::android::ScopedJavaLocalRef<jobject> j_content_video_view =
+        video_view_->GetJavaObject(base::android::AttachCurrentThread());
+    if (!j_content_video_view.is_null()) {
+      fullscreen_player_id_ = player_id;
+      return;
+    }
   }
+
+  // Force the second video to exit fullscreen.
+  // TODO(qinmin): There is no need to send DidEnterFullscreen message.
+  // However, if we don't send the message, page layers will not be
+  // correctly restored. http:crbug.com/367346.
+  Send(new MediaPlayerMsg_DidEnterFullscreen(routing_id(), player_id));
+  Send(new MediaPlayerMsg_DidExitFullscreen(routing_id(), player_id));
+  video_view_.reset();
 }
 
 void BrowserMediaPlayerManager::OnExitFullscreen(int player_id) {
@@ -667,10 +677,13 @@ void BrowserMediaPlayerManager::OnUpdateSession(
   }
 
   drm_bridge->UpdateSession(session_id, &response[0], response.size());
-  // In EME v0.1b MediaKeys lives in the media element. So the |cdm_id|
-  // is the same as the |player_id|.
-  // TODO(xhwang): Separate |cdm_id| and |player_id|.
-  MediaPlayerAndroid* player = GetPlayer(cdm_id);
+
+  DrmBridgePlayerMap::const_iterator iter = drm_bridge_player_map_.find(cdm_id);
+  if (iter == drm_bridge_player_map_.end())
+    return;
+
+  int player_id = iter->second;
+  MediaPlayerAndroid* player = GetPlayer(player_id);
   if (player)
     player->OnKeyAdded();
 }
@@ -712,6 +725,14 @@ void BrowserMediaPlayerManager::RemovePlayer(int player_id) {
     MediaPlayerAndroid* player = *it;
     if (player->player_id() == player_id) {
       players_.erase(it);
+      break;
+    }
+  }
+
+  for (DrmBridgePlayerMap::iterator it = drm_bridge_player_map_.begin();
+       it != drm_bridge_player_map_.end(); ++it) {
+    if (it->second == player_id) {
+      drm_bridge_player_map_.erase(it);
       break;
     }
   }
@@ -762,10 +783,15 @@ void BrowserMediaPlayerManager::AddDrmBridge(int cdm_id,
 }
 
 void BrowserMediaPlayerManager::RemoveDrmBridge(int cdm_id) {
+  // TODO(xhwang): Detach DrmBridge from the player it's set to. In prefixed
+  // EME implementation the current code is fine because we always destroy the
+  // player before we destroy the DrmBridge. This will not always be the case
+  // in unprefixed EME implementation.
   for (ScopedVector<MediaDrmBridge>::iterator it = drm_bridges_.begin();
       it != drm_bridges_.end(); ++it) {
     if ((*it)->cdm_id() == cdm_id) {
       drm_bridges_.erase(it);
+      drm_bridge_player_map_.erase(cdm_id);
       break;
     }
   }
@@ -782,6 +808,9 @@ void BrowserMediaPlayerManager::OnSetCdm(int player_id, int cdm_id) {
   // TODO(qinmin): add the logic to decide whether we should create the
   // fullscreen surface for EME lv1.
   player->SetDrmBridge(drm_bridge);
+  // Do now support setting one CDM on multiple players.
+  DCHECK(drm_bridge_player_map_.find(cdm_id) == drm_bridge_player_map_.end());
+  drm_bridge_player_map_[cdm_id] = player_id;
 }
 
 void BrowserMediaPlayerManager::CreateSessionIfPermitted(

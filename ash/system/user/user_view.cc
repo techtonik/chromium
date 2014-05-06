@@ -8,7 +8,8 @@
 
 #include "ash/multi_profile_uma.h"
 #include "ash/popup_message.h"
-#include "ash/session_state_delegate.h"
+#include "ash/session/session_state_delegate.h"
+#include "ash/session/user_info.h"
 #include "ash/shell.h"
 #include "ash/shell_delegate.h"
 #include "ash/system/tray/system_tray.h"
@@ -76,7 +77,7 @@ void SwitchUser(ash::MultiProfileIndex user_index) {
       ash::Shell::GetInstance()->session_state_delegate();
   ash::MultiProfileUMA::RecordSwitchActiveUser(
       ash::MultiProfileUMA::SWITCH_ACTIVE_USER_BY_TRAY);
-  delegate->SwitchActiveUser(delegate->GetUserID(user_index));
+  delegate->SwitchActiveUser(delegate->GetUserInfo(user_index)->GetUserID());
 }
 
 class LogoutButton : public TrayPopupLabelButton {
@@ -282,8 +283,8 @@ void UserView::Layout() {
     int remaining_width = contents_area.width() - logout_area.width();
     if (IsMultiProfileSupportedAndUserActive() ||
         IsMultiAccountSupportedAndUserActive()) {
-      // In multiprofile case |user_card_view_| and |logout_button_| have to
-      // have the same height.
+      // In multiprofile/multiaccount case |user_card_view_| and
+      // |logout_button_| have to have the same height.
       int y = std::min(user_card_area.y(), logout_area.y());
       int height = std::max(user_card_area.height(), logout_area.height());
       logout_area.set_y(y);

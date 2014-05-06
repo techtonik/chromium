@@ -24,7 +24,6 @@
 #include "chrome/browser/extensions/data_deleter.h"
 #include "chrome/browser/extensions/extension_disabled_ui.h"
 #include "chrome/browser/extensions/extension_error_controller.h"
-#include "chrome/browser/extensions/extension_error_reporter.h"
 #include "chrome/browser/extensions/extension_install_ui.h"
 #include "chrome/browser/extensions/extension_special_storage_policy.h"
 #include "chrome/browser/extensions/extension_sync_service.h"
@@ -665,10 +664,9 @@ void ExtensionService::ReloadExtension(const std::string extension_id) {
   SetBeingReloaded(extension_id, false);
 }
 
-bool ExtensionService::UninstallExtension(
-    std::string extension_id,
-    bool external_uninstall,
-    base::string16* error) {
+bool ExtensionService::UninstallExtension(const std::string& extension_id,
+                                          bool external_uninstall,
+                                          base::string16* error) {
   CHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
 
   scoped_refptr<const Extension> extension(GetInstalledExtension(extension_id));
@@ -1031,7 +1029,6 @@ void ExtensionService::NotifyExtensionLoaded(const Extension* extension) {
     ThemeSource* theme_source = new ThemeSource(profile_);
     content::URLDataSource::Add(profile_, theme_source);
   }
-#endif
 
   // Same for chrome://thumb/ resources.
   if (extensions::PermissionsData::HasHostPermission(
@@ -1039,6 +1036,7 @@ void ExtensionService::NotifyExtensionLoaded(const Extension* extension) {
     ThumbnailSource* thumbnail_source = new ThumbnailSource(profile_, false);
     content::URLDataSource::Add(profile_, thumbnail_source);
   }
+#endif
 }
 
 void ExtensionService::NotifyExtensionUnloaded(
@@ -2085,22 +2083,6 @@ bool ExtensionService::OnExternalExtensionFileFound(
     AcknowledgeExternalExtension(id);
 
   return true;
-}
-
-void ExtensionService::ReportExtensionLoadError(
-    const base::FilePath& extension_path,
-    const std::string &error) {
-  content::NotificationService::current()->Notify(
-      chrome::NOTIFICATION_EXTENSION_LOAD_ERROR,
-      content::Source<Profile>(profile_),
-      content::Details<const std::string>(&error));
-
-  std::string path_str = base::UTF16ToUTF8(extension_path.LossyDisplayName());
-  base::string16 message = base::UTF8ToUTF16(
-      base::StringPrintf("Could not load extension from '%s'. %s",
-                         path_str.c_str(),
-                         error.c_str()));
-  ExtensionErrorReporter::GetInstance()->ReportError(message, false);
 }
 
 void ExtensionService::DidCreateRenderViewForBackgroundPage(

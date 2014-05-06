@@ -18,9 +18,7 @@
 #include "chrome/browser/android/provider/blocking_ui_thread_async_request.h"
 #include "chrome/browser/android/provider/bookmark_model_observer_task.h"
 #include "chrome/browser/android/provider/run_on_ui_thread_blocking.h"
-#include "chrome/browser/bookmarks/bookmark_model.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
-#include "chrome/browser/bookmarks/bookmark_utils.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/favicon/favicon_service.h"
@@ -33,6 +31,8 @@
 #include "chrome/browser/search_engines/template_url.h"
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
+#include "components/bookmarks/core/browser/bookmark_model.h"
+#include "components/bookmarks/core/browser/bookmark_utils.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_service.h"
 #include "grit/generated_resources.h"
@@ -264,10 +264,12 @@ class RemoveBookmarkTask : public BookmarkModelObserverTask {
   }
 
   // Verify that the bookmark was actually removed. Called synchronously.
-  virtual void BookmarkNodeRemoved(BookmarkModel* bookmark_model,
-                                   const BookmarkNode* parent,
-                                   int old_index,
-                                   const BookmarkNode* node) OVERRIDE {
+  virtual void BookmarkNodeRemoved(
+      BookmarkModel* bookmark_model,
+      const BookmarkNode* parent,
+      int old_index,
+      const BookmarkNode* node,
+      const std::set<GURL>& removed_urls) OVERRIDE {
     if (bookmark_model == model() && node->id() == id_to_delete_)
         ++deleted_;
   }

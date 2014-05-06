@@ -6,11 +6,13 @@
 
 #include "base/file_util.h"
 #include "base/files/file_path.h"
+#include "base/format_macros.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_writer.h"
 #include "base/logging.h"
 #include "base/metrics/histogram.h"
 #include "base/strings/string_util.h"
+#include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "content/browser/child_process_security_policy_impl.h"
 #include "content/browser/indexed_db/indexed_db_blob_info.h"
@@ -26,17 +28,52 @@
 #include "content/common/indexed_db/indexed_db_key.h"
 #include "content/common/indexed_db/indexed_db_key_path.h"
 #include "content/common/indexed_db/indexed_db_key_range.h"
+#include "content/public/browser/browser_thread.h"
+#include "net/url_request/url_request_context.h"
 #include "third_party/WebKit/public/platform/WebIDBTypes.h"
 #include "third_party/WebKit/public/web/WebSerializedScriptValueVersion.h"
 #include "third_party/leveldatabase/env_chromium.h"
 #include "webkit/browser/blob/blob_data_handle.h"
+#include "webkit/browser/fileapi/file_stream_writer.h"
+#include "webkit/browser/fileapi/file_writer_delegate.h"
+#include "webkit/browser/fileapi/local_file_stream_writer.h"
 #include "webkit/common/database/database_identifier.h"
 
+using base::FilePath;
 using base::StringPiece;
+using fileapi::FileWriterDelegate;
 
 namespace content {
 
 namespace {
+
+FilePath GetBlobDirectoryName(const FilePath& pathBase, int64 database_id) {
+  return pathBase.AppendASCII(base::StringPrintf("%" PRIx64, database_id));
+}
+
+FilePath GetBlobDirectoryNameForKey(const FilePath& pathBase,
+                                    int64 database_id,
+                                    int64 key) {
+  FilePath path = GetBlobDirectoryName(pathBase, database_id);
+  path = path.AppendASCII(base::StringPrintf(
+      "%02x", static_cast<int>(key & 0x000000000000ff00) >> 8));
+  return path;
+}
+
+FilePath GetBlobFileNameForKey(const FilePath& pathBase,
+                               int64 database_id,
+                               int64 key) {
+  FilePath path = GetBlobDirectoryNameForKey(pathBase, database_id, key);
+  path = path.AppendASCII(base::StringPrintf("%" PRIx64, key));
+  return path;
+}
+
+bool MakeIDBBlobDirectory(const FilePath& pathBase,
+                          int64 database_id,
+                          int64 key) {
+  FilePath path = GetBlobDirectoryNameForKey(pathBase, database_id, key);
+  return base::CreateDirectory(path);
+}
 
 static std::string ComputeOriginIdentifier(const GURL& origin_url) {
   return webkit_database::GetIdentifierFromOrigin(origin_url) + "@1";
@@ -89,6 +126,8 @@ enum IndexedDBBackingStoreErrorSource {
   GET_DATABASE_NAMES,
   DELETE_INDEX,
   CLEAR_OBJECT_STORE,
+  READ_BLOB_JOURNAL,
+  DECODE_BLOB_JOURNAL,
   INTERNAL_ERROR_MAX,
 };
 
@@ -153,6 +192,10 @@ static leveldb::Status InternalInconsistencyStatus() {
 
 static leveldb::Status InvalidDBKeyStatus() {
   return leveldb::Status::InvalidArgument("Invalid database key ID");
+}
+
+static leveldb::Status IOErrorStatus() {
+  return leveldb::Status::IOError("IO Error");
 }
 
 template <typename DBOrTransaction>
@@ -437,10 +480,104 @@ class DefaultLevelDBFactory : public LevelDBFactory {
   }
 };
 
+// TODO(ericu): Error recovery. If we persistently can't read the
+// blob journal, the safe thing to do is to clear it and leak the blobs,
+// though that may be costly. Still, database/directory deletion should always
+// clean things up, and we can write an fsck that will do a full correction if
+// need be.
+template <typename T>
+static leveldb::Status GetBlobJournal(const StringPiece& leveldb_key,
+                                      T* leveldb_transaction,
+                                      BlobJournalType* journal) {
+  std::string data;
+  bool found = false;
+  leveldb::Status s = leveldb_transaction->Get(leveldb_key, &data, &found);
+  if (!s.ok()) {
+    INTERNAL_READ_ERROR_UNTESTED(READ_BLOB_JOURNAL);
+    return s;
+  }
+  journal->clear();
+  if (!found || !data.size())
+    return leveldb::Status::OK();
+  StringPiece slice(data);
+  if (!DecodeBlobJournal(&slice, journal)) {
+    INTERNAL_READ_ERROR_UNTESTED(DECODE_BLOB_JOURNAL);
+    s = InternalInconsistencyStatus();
+  }
+  return s;
+}
+
+static void ClearBlobJournal(LevelDBTransaction* leveldb_transaction,
+                             const std::string& level_db_key) {
+  leveldb_transaction->Remove(level_db_key);
+}
+
+static void UpdatePrimaryJournalWithBlobList(
+    LevelDBTransaction* leveldb_transaction,
+    const BlobJournalType& journal) {
+  const std::string leveldb_key = BlobJournalKey::Encode();
+  std::string data;
+  EncodeBlobJournal(journal, &data);
+  leveldb_transaction->Put(leveldb_key, &data);
+}
+
+static void UpdateLiveBlobJournalWithBlobList(
+    LevelDBTransaction* leveldb_transaction,
+    const BlobJournalType& journal) {
+  const std::string leveldb_key = LiveBlobJournalKey::Encode();
+  std::string data;
+  EncodeBlobJournal(journal, &data);
+  leveldb_transaction->Put(leveldb_key, &data);
+}
+
+static leveldb::Status MergeBlobsIntoLiveBlobJournal(
+    LevelDBTransaction* leveldb_transaction,
+    const BlobJournalType& journal) {
+  BlobJournalType old_journal;
+  const std::string key = LiveBlobJournalKey::Encode();
+  leveldb::Status s = GetBlobJournal(key, leveldb_transaction, &old_journal);
+  if (!s.ok())
+    return s;
+
+  old_journal.insert(old_journal.end(), journal.begin(), journal.end());
+
+  UpdateLiveBlobJournalWithBlobList(leveldb_transaction, old_journal);
+  return leveldb::Status::OK();
+}
+
+static void UpdateBlobJournalWithDatabase(
+    LevelDBDirectTransaction* leveldb_transaction,
+    int64 database_id) {
+  BlobJournalType journal;
+  journal.push_back(
+      std::make_pair(database_id, DatabaseMetaDataKey::kAllBlobsKey));
+  const std::string key = BlobJournalKey::Encode();
+  std::string data;
+  EncodeBlobJournal(journal, &data);
+  leveldb_transaction->Put(key, &data);
+}
+
+static leveldb::Status MergeDatabaseIntoLiveBlobJournal(
+    LevelDBDirectTransaction* leveldb_transaction,
+    int64 database_id) {
+  BlobJournalType journal;
+  const std::string key = LiveBlobJournalKey::Encode();
+  leveldb::Status s = GetBlobJournal(key, leveldb_transaction, &journal);
+  if (!s.ok())
+    return s;
+  journal.push_back(
+      std::make_pair(database_id, DatabaseMetaDataKey::kAllBlobsKey));
+  std::string data;
+  EncodeBlobJournal(journal, &data);
+  leveldb_transaction->Put(key, &data);
+  return leveldb::Status::OK();
+}
+
 IndexedDBBackingStore::IndexedDBBackingStore(
     IndexedDBFactory* indexed_db_factory,
     const GURL& origin_url,
     const base::FilePath& blob_path,
+    net::URLRequestContext* request_context,
     scoped_ptr<LevelDBDatabase> db,
     scoped_ptr<LevelDBComparator> comparator,
     base::TaskRunner* task_runner)
@@ -448,6 +585,7 @@ IndexedDBBackingStore::IndexedDBBackingStore(
       origin_url_(origin_url),
       blob_path_(blob_path),
       origin_identifier_(ComputeOriginIdentifier(origin_url)),
+      request_context_(request_context),
       task_runner_(task_runner),
       db_(db.Pass()),
       comparator_(comparator.Pass()),
@@ -506,20 +644,24 @@ scoped_refptr<IndexedDBBackingStore> IndexedDBBackingStore::Open(
     IndexedDBFactory* indexed_db_factory,
     const GURL& origin_url,
     const base::FilePath& path_base,
+    net::URLRequestContext* request_context,
     blink::WebIDBDataLoss* data_loss,
     std::string* data_loss_message,
     bool* disk_full,
-    base::TaskRunner* task_runner) {
+    base::TaskRunner* task_runner,
+    bool clean_journal) {
   *data_loss = blink::WebIDBDataLossNone;
   DefaultLevelDBFactory leveldb_factory;
   return IndexedDBBackingStore::Open(indexed_db_factory,
                                      origin_url,
                                      path_base,
+                                     request_context,
                                      data_loss,
                                      data_loss_message,
                                      disk_full,
                                      &leveldb_factory,
-                                     task_runner);
+                                     task_runner,
+                                     clean_journal);
 }
 
 static std::string OriginToCustomHistogramSuffix(const GURL& origin_url) {
@@ -655,11 +797,13 @@ scoped_refptr<IndexedDBBackingStore> IndexedDBBackingStore::Open(
     IndexedDBFactory* indexed_db_factory,
     const GURL& origin_url,
     const base::FilePath& path_base,
+    net::URLRequestContext* request_context,
     blink::WebIDBDataLoss* data_loss,
     std::string* data_loss_message,
     bool* is_disk_full,
     LevelDBFactory* leveldb_factory,
-    base::TaskRunner* task_runner) {
+    base::TaskRunner* task_runner,
+    bool clean_journal) {
   IDB_TRACE("IndexedDBBackingStore::Open");
   DCHECK(!path_base.empty());
   *data_loss = blink::WebIDBDataLossNone;
@@ -780,6 +924,7 @@ scoped_refptr<IndexedDBBackingStore> IndexedDBBackingStore::Open(
   return Create(indexed_db_factory,
                 origin_url,
                 blob_path,
+                request_context,
                 db.Pass(),
                 comparator.Pass(),
                 task_runner);
@@ -815,6 +960,7 @@ scoped_refptr<IndexedDBBackingStore> IndexedDBBackingStore::OpenInMemory(
   return Create(NULL /* indexed_db_factory */,
                 origin_url,
                 base::FilePath(),
+                NULL /* request_context */,
                 db.Pass(),
                 comparator.Pass(),
                 task_runner);
@@ -825,15 +971,16 @@ scoped_refptr<IndexedDBBackingStore> IndexedDBBackingStore::Create(
     IndexedDBFactory* indexed_db_factory,
     const GURL& origin_url,
     const base::FilePath& blob_path,
+    net::URLRequestContext* request_context,
     scoped_ptr<LevelDBDatabase> db,
     scoped_ptr<LevelDBComparator> comparator,
     base::TaskRunner* task_runner) {
   // TODO(jsbell): Handle comparator name changes.
-
   scoped_refptr<IndexedDBBackingStore> backing_store(
       new IndexedDBBackingStore(indexed_db_factory,
                                 origin_url,
                                 blob_path,
+                                request_context,
                                 db.Pass(),
                                 comparator.Pass(),
                                 task_runner));
@@ -1049,6 +1196,18 @@ leveldb::Status IndexedDBBackingStore::DeleteDatabase(
 
   const std::string key = DatabaseNameKey::Encode(origin_identifier_, name);
   transaction->Remove(key);
+
+  // TODO(ericu): Put the real calls to the blob journal code here.  For now,
+  // I've inserted fake calls so that we don't get "you didn't use this static
+  // function" compiler errors.
+  if (false) {
+    scoped_refptr<LevelDBTransaction> fake_transaction =
+        new LevelDBTransaction(NULL);
+    BlobJournalType fake_journal;
+    MergeDatabaseIntoLiveBlobJournal(transaction.get(), metadata.id);
+    UpdateBlobJournalWithDatabase(transaction.get(), metadata.id);
+    MergeBlobsIntoLiveBlobJournal(fake_transaction.get(), fake_journal);
+  }
 
   s = transaction->Commit();
   if (!s.ok()) {
@@ -1693,6 +1852,283 @@ leveldb::Status IndexedDBBackingStore::KeyExistsInObjectStore(
   return s;
 }
 
+class IndexedDBBackingStore::Transaction::ChainedBlobWriterImpl
+    : public IndexedDBBackingStore::Transaction::ChainedBlobWriter {
+ public:
+  typedef IndexedDBBackingStore::Transaction::WriteDescriptorVec
+      WriteDescriptorVec;
+  ChainedBlobWriterImpl(
+      int64 database_id,
+      IndexedDBBackingStore* backingStore,
+      WriteDescriptorVec& blobs,
+      scoped_refptr<IndexedDBBackingStore::BlobWriteCallback> callback)
+      : waiting_for_callback_(false),
+        database_id_(database_id),
+        backing_store_(backingStore),
+        callback_(callback),
+        aborted_(false) {
+    blobs_.swap(blobs);
+    iter_ = blobs_.begin();
+    WriteNextFile();
+  }
+
+  virtual void set_delegate(scoped_ptr<FileWriterDelegate> delegate) OVERRIDE {
+    delegate_.reset(delegate.release());
+  }
+
+  virtual void ReportWriteCompletion(bool succeeded,
+                                     int64 bytes_written) OVERRIDE {
+    // TODO(ericu): Check bytes_written against the blob's snapshot value.
+    DCHECK(waiting_for_callback_);
+    DCHECK(!succeeded || bytes_written >= 0);
+    waiting_for_callback_ = false;
+    if (delegate_.get())  // Only present for Blob, not File.
+      content::BrowserThread::DeleteSoon(
+          content::BrowserThread::IO, FROM_HERE, delegate_.release());
+    if (aborted_) {
+      self_ref_ = NULL;
+      return;
+    }
+    if (succeeded)
+      WriteNextFile();
+    else
+      callback_->Run(false);
+  }
+
+  virtual void Abort() OVERRIDE {
+    if (!waiting_for_callback_)
+      return;
+    self_ref_ = this;
+    aborted_ = true;
+  }
+
+ private:
+  virtual ~ChainedBlobWriterImpl() {}
+
+  void WriteNextFile() {
+    DCHECK(!waiting_for_callback_);
+    DCHECK(!aborted_);
+    if (iter_ == blobs_.end()) {
+      DCHECK(!self_ref_);
+      callback_->Run(true);
+      return;
+    } else {
+      if (!backing_store_->WriteBlobFile(database_id_, *iter_, this)) {
+        callback_->Run(false);
+        return;
+      }
+      waiting_for_callback_ = true;
+      ++iter_;
+    }
+  }
+
+  bool waiting_for_callback_;
+  scoped_refptr<ChainedBlobWriterImpl> self_ref_;
+  WriteDescriptorVec blobs_;
+  WriteDescriptorVec::const_iterator iter_;
+  int64 database_id_;
+  IndexedDBBackingStore* backing_store_;
+  scoped_refptr<IndexedDBBackingStore::BlobWriteCallback> callback_;
+  scoped_ptr<FileWriterDelegate> delegate_;
+  bool aborted_;
+};
+
+class LocalWriteClosure : public FileWriterDelegate::DelegateWriteCallback,
+                          public base::RefCounted<LocalWriteClosure> {
+ public:
+  LocalWriteClosure(IndexedDBBackingStore::Transaction::ChainedBlobWriter*
+                        chained_blob_writer_,
+                    base::TaskRunner* task_runner)
+      : chained_blob_writer_(chained_blob_writer_),
+        task_runner_(task_runner),
+        bytes_written_(-1) {}
+
+  void Run(base::File::Error rv,
+           int64 bytes,
+           FileWriterDelegate::WriteProgressStatus write_status) {
+    if (write_status == FileWriterDelegate::SUCCESS_IO_PENDING)
+      return;  // We don't care about progress events.
+    if (rv == base::File::FILE_OK) {
+      DCHECK(bytes >= 0);
+      DCHECK(write_status == FileWriterDelegate::SUCCESS_COMPLETED);
+      bytes_written_ = bytes;
+    } else {
+      DCHECK(write_status == FileWriterDelegate::ERROR_WRITE_STARTED ||
+             write_status == FileWriterDelegate::ERROR_WRITE_NOT_STARTED);
+    }
+    task_runner_->PostTask(
+        FROM_HERE,
+        base::Bind(&LocalWriteClosure::callBlobCallbackOnIDBTaskRunner,
+                   this,
+                   write_status == FileWriterDelegate::SUCCESS_COMPLETED));
+  }
+
+  void writeBlobToFileOnIOThread(const FilePath& file_path,
+                                 const GURL& blob_url,
+                                 net::URLRequestContext* request_context) {
+    DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::IO));
+    scoped_ptr<fileapi::FileStreamWriter> writer(
+        fileapi::FileStreamWriter::CreateForLocalFile(
+            task_runner_, file_path, 0,
+            fileapi::FileStreamWriter::CREATE_NEW_FILE));
+    scoped_ptr<FileWriterDelegate> delegate(
+        new FileWriterDelegate(writer.Pass()));
+
+    DCHECK(blob_url.is_valid());
+    scoped_ptr<net::URLRequest> blob_request(request_context->CreateRequest(
+        blob_url, net::DEFAULT_PRIORITY, delegate.get(), NULL));
+
+    delegate->Start(blob_request.Pass(),
+                    base::Bind(&LocalWriteClosure::Run, this));
+    chained_blob_writer_->set_delegate(delegate.Pass());
+  }
+
+ private:
+  virtual ~LocalWriteClosure() {}
+  friend class base::RefCounted<LocalWriteClosure>;
+
+  void callBlobCallbackOnIDBTaskRunner(bool succeeded) {
+    DCHECK(task_runner_->RunsTasksOnCurrentThread());
+    chained_blob_writer_->ReportWriteCompletion(succeeded, bytes_written_);
+  }
+
+  IndexedDBBackingStore::Transaction::ChainedBlobWriter* chained_blob_writer_;
+  base::TaskRunner* task_runner_;
+  int64 bytes_written_;
+};
+
+bool IndexedDBBackingStore::WriteBlobFile(
+    int64 database_id,
+    const Transaction::WriteDescriptor& descriptor,
+    Transaction::ChainedBlobWriter* chained_blob_writer) {
+
+  if (!MakeIDBBlobDirectory(blob_path_, database_id, descriptor.key()))
+    return false;
+
+  FilePath path = GetBlobFileName(database_id, descriptor.key());
+
+  if (descriptor.is_file()) {
+    DCHECK(!descriptor.file_path().empty());
+    if (!base::CopyFile(descriptor.file_path(), path))
+      return false;
+
+    base::File::Info info;
+    if (base::GetFileInfo(descriptor.file_path(), &info)) {
+      // TODO(ericu): Validate the snapshot date here.  Expand WriteDescriptor
+      // to include snapshot date and file size, and check both.
+      if (!base::TouchFile(path, info.last_accessed, info.last_modified)) {
+        // TODO(ericu): Complain quietly; timestamp's probably not vital.
+      }
+    } else {
+      // TODO(ericu): Complain quietly; timestamp's probably not vital.
+    }
+
+    task_runner_->PostTask(
+        FROM_HERE,
+        base::Bind(&Transaction::ChainedBlobWriter::ReportWriteCompletion,
+                   chained_blob_writer,
+                   true,
+                   info.size));
+  } else {
+    DCHECK(descriptor.url().is_valid());
+    scoped_refptr<LocalWriteClosure> write_closure(
+        new LocalWriteClosure(chained_blob_writer, task_runner_));
+    content::BrowserThread::PostTask(
+        content::BrowserThread::IO,
+        FROM_HERE,
+        base::Bind(&LocalWriteClosure::writeBlobToFileOnIOThread,
+                   write_closure.get(),
+                   path,
+                   descriptor.url(),
+                   request_context_));
+  }
+  return true;
+}
+
+void IndexedDBBackingStore::ReportBlobUnused(int64 database_id,
+                                             int64 blob_key) {
+  DCHECK(KeyPrefix::IsValidDatabaseId(database_id));
+  bool all_blobs = blob_key == DatabaseMetaDataKey::kAllBlobsKey;
+  DCHECK(all_blobs || DatabaseMetaDataKey::IsValidBlobKey(blob_key));
+  scoped_refptr<LevelDBTransaction> transaction =
+      new LevelDBTransaction(db_.get());
+
+  std::string live_blob_key = LiveBlobJournalKey::Encode();
+  BlobJournalType live_blob_journal;
+  if (!GetBlobJournal(live_blob_key, transaction.get(), &live_blob_journal)
+           .ok())
+    return;
+  DCHECK(live_blob_journal.size());
+
+  std::string primary_key = BlobJournalKey::Encode();
+  BlobJournalType primary_journal;
+  if (!GetBlobJournal(primary_key, transaction.get(), &primary_journal).ok())
+    return;
+
+  // There are several cases to handle.  If blob_key is kAllBlobsKey, we want to
+  // remove all entries with database_id from the live_blob journal and add only
+  // kAllBlobsKey to the primary journal.  Otherwise if IsValidBlobKey(blob_key)
+  // and we hit kAllBlobsKey for the right database_id in the journal, we leave
+  // the kAllBlobsKey entry in the live_blob journal but add the specific blob
+  // to the primary.  Otherwise if IsValidBlobKey(blob_key) and we find a
+  // matching (database_id, blob_key) tuple, we should move it to the primary
+  // journal.
+  BlobJournalType new_live_blob_journal;
+  for (BlobJournalType::iterator journal_iter = live_blob_journal.begin();
+       journal_iter != live_blob_journal.end();
+       ++journal_iter) {
+    int64 current_database_id = journal_iter->first;
+    int64 current_blob_key = journal_iter->second;
+    bool current_all_blobs =
+        current_blob_key == DatabaseMetaDataKey::kAllBlobsKey;
+    DCHECK(KeyPrefix::IsValidDatabaseId(current_database_id) ||
+           current_all_blobs);
+    if (current_database_id == database_id &&
+        (all_blobs || current_all_blobs || blob_key == current_blob_key)) {
+      if (!all_blobs) {
+        primary_journal.push_back(
+            std::make_pair(database_id, current_blob_key));
+        if (current_all_blobs)
+          new_live_blob_journal.push_back(*journal_iter);
+        new_live_blob_journal.insert(new_live_blob_journal.end(),
+                                     ++journal_iter,
+                                     live_blob_journal.end());  // All the rest.
+        break;
+      }
+    } else {
+      new_live_blob_journal.push_back(*journal_iter);
+    }
+  }
+  if (all_blobs) {
+    primary_journal.push_back(
+        std::make_pair(database_id, DatabaseMetaDataKey::kAllBlobsKey));
+  }
+  UpdatePrimaryJournalWithBlobList(transaction.get(), primary_journal);
+  UpdateLiveBlobJournalWithBlobList(transaction.get(), new_live_blob_journal);
+  transaction->Commit();
+  // We could just do the deletions/cleaning here, but if there are a lot of
+  // blobs about to be garbage collected, it'd be better to wait and do them all
+  // at once.
+  StartJournalCleaningTimer();
+}
+
+// The this reference is a raw pointer that's declared Unretained inside the
+// timer code, so this won't confuse IndexedDBFactory's check for
+// HasLastBackingStoreReference.  It's safe because if the backing store is
+// deleted, the timer will automatically be canceled on destruction.
+void IndexedDBBackingStore::StartJournalCleaningTimer() {
+  journal_cleaning_timer_.Start(
+      FROM_HERE,
+      base::TimeDelta::FromSeconds(5),
+      this,
+      &IndexedDBBackingStore::CleanPrimaryJournalIgnoreReturn);
+}
+
+// This assumes a file path of dbId/second-to-LSB-of-counter/counter.
+FilePath IndexedDBBackingStore::GetBlobFileName(int64 database_id, int64 key) {
+  return GetBlobFileNameForKey(blob_path_, database_id, key);
+}
+
 static bool CheckIndexAndMetaDataKey(const LevelDBIterator* it,
                                      const std::string& stop_key,
                                      int64 index_id,
@@ -1807,6 +2243,50 @@ leveldb::Status IndexedDBBackingStore::GetIndexes(
     INTERNAL_READ_ERROR_UNTESTED(GET_INDEXES);
 
   return s;
+}
+
+bool IndexedDBBackingStore::RemoveBlobFile(int64 database_id, int64 key) {
+  FilePath fileName = GetBlobFileName(database_id, key);
+  return base::DeleteFile(fileName, false);
+}
+
+bool IndexedDBBackingStore::RemoveBlobDirectory(int64 database_id) {
+  FilePath dirName = GetBlobDirectoryName(blob_path_, database_id);
+  return base::DeleteFile(dirName, true);
+}
+
+leveldb::Status IndexedDBBackingStore::CleanUpBlobJournal(
+    const std::string& level_db_key) {
+  scoped_refptr<LevelDBTransaction> journal_transaction =
+      new LevelDBTransaction(db_.get());
+  BlobJournalType journal;
+  leveldb::Status s =
+      GetBlobJournal(level_db_key, journal_transaction.get(), &journal);
+  if (!s.ok())
+    return s;
+  if (!journal.size())
+    return leveldb::Status::OK();
+  BlobJournalType::iterator journal_iter;
+  for (journal_iter = journal.begin(); journal_iter != journal.end();
+       ++journal_iter) {
+    int64 database_id = journal_iter->first;
+    int64 blob_key = journal_iter->second;
+    DCHECK(KeyPrefix::IsValidDatabaseId(database_id));
+    if (blob_key == DatabaseMetaDataKey::kAllBlobsKey) {
+      if (!RemoveBlobDirectory(database_id))
+        return IOErrorStatus();
+    } else {
+      DCHECK(DatabaseMetaDataKey::IsValidBlobKey(blob_key));
+      if (!RemoveBlobFile(database_id, blob_key))
+        return IOErrorStatus();
+    }
+  }
+  ClearBlobJournal(journal_transaction.get(), level_db_key);
+  return journal_transaction->Commit();
+}
+
+void IndexedDBBackingStore::CleanPrimaryJournalIgnoreReturn() {
+  CleanUpBlobJournal(BlobJournalKey::Encode());
 }
 
 WARN_UNUSED_RESULT static leveldb::Status SetMaxIndexId(
@@ -2124,11 +2604,6 @@ leveldb::Status IndexedDBBackingStore::KeyExistsInIndex(
     return s;
   else
     return InvalidDBKeyStatus();
-}
-
-void IndexedDBBackingStore::ReportBlobUnused(int64 database_id,
-                                             int64 blob_key) {
-  // TODO(ericu)
 }
 
 IndexedDBBackingStore::Cursor::Cursor(
@@ -2946,9 +3421,59 @@ leveldb::Status IndexedDBBackingStore::Transaction::Commit() {
   return s;
 }
 
+
+class IndexedDBBackingStore::Transaction::BlobWriteCallbackWrapper
+    : public IndexedDBBackingStore::BlobWriteCallback {
+ public:
+  BlobWriteCallbackWrapper(IndexedDBBackingStore::Transaction* transaction,
+                           scoped_refptr<BlobWriteCallback> callback)
+      : transaction_(transaction), callback_(callback) {}
+  virtual void Run(bool succeeded) OVERRIDE {
+    callback_->Run(succeeded);
+    transaction_->chained_blob_writer_ = NULL;
+  }
+
+ private:
+  virtual ~BlobWriteCallbackWrapper() {}
+  friend class base::RefCounted<IndexedDBBackingStore::BlobWriteCallback>;
+
+  IndexedDBBackingStore::Transaction* transaction_;
+  scoped_refptr<BlobWriteCallback> callback_;
+};
+
+void IndexedDBBackingStore::Transaction::WriteNewBlobs(
+    BlobEntryKeyValuePairVec& new_blob_entries,
+    WriteDescriptorVec& new_files_to_write,
+    scoped_refptr<BlobWriteCallback> callback) {
+  DCHECK_GT(new_files_to_write.size(), 0UL);
+  DCHECK_GT(database_id_, 0);
+  BlobEntryKeyValuePairVec::iterator blob_entry_iter;
+  for (blob_entry_iter = new_blob_entries.begin();
+       blob_entry_iter != new_blob_entries.end();
+       ++blob_entry_iter) {
+    // Add the new blob-table entry for each blob to the main transaction, or
+    // remove any entry that may exist if there's no new one.
+    if (!blob_entry_iter->second.size())
+      transaction_->Remove(blob_entry_iter->first.Encode());
+    else
+      transaction_->Put(blob_entry_iter->first.Encode(),
+                        &blob_entry_iter->second);
+  }
+  // Creating the writer will start it going asynchronously.
+  chained_blob_writer_ =
+      new ChainedBlobWriterImpl(database_id_,
+                                backing_store_,
+                                new_files_to_write,
+                                new BlobWriteCallbackWrapper(this, callback));
+}
+
 void IndexedDBBackingStore::Transaction::Rollback() {
   IDB_TRACE("IndexedDBBackingStore::Transaction::Rollback");
   DCHECK(transaction_.get());
+  if (chained_blob_writer_) {
+    chained_blob_writer_->Abort();
+    chained_blob_writer_ = NULL;
+  }
   transaction_->Rollback();
   transaction_ = NULL;
 }
@@ -3003,5 +3528,15 @@ void IndexedDBBackingStore::Transaction::PutBlobInfo(
   record->SetHandles(handles);
   DCHECK(!handles || !handles->size());
 }
+
+IndexedDBBackingStore::Transaction::WriteDescriptor::WriteDescriptor(
+    const GURL& url,
+    int64_t key)
+    : is_file_(false), url_(url), key_(key) {}
+
+IndexedDBBackingStore::Transaction::WriteDescriptor::WriteDescriptor(
+    const FilePath& file_path,
+    int64_t key)
+    : is_file_(true), file_path_(file_path), key_(key) {}
 
 }  // namespace content

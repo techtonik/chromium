@@ -48,6 +48,7 @@
 #include "content/renderer/browser_plugin/browser_plugin_manager.h"
 #include "content/renderer/child_frame_compositing_helper.h"
 #include "content/renderer/context_menu_params_builder.h"
+#include "content/renderer/devtools/devtools_agent.h"
 #include "content/renderer/dom_automation_controller.h"
 #include "content/renderer/history_controller.h"
 #include "content/renderer/history_serialization.h"
@@ -55,7 +56,14 @@
 #include "content/renderer/ime_event_guard.h"
 #include "content/renderer/internal_document_state_data.h"
 #include "content/renderer/java/java_bridge_dispatcher.h"
+#include "content/renderer/media/audio_renderer_mixer_manager.h"
+#include "content/renderer/media/media_stream_dispatcher.h"
+#include "content/renderer/media/media_stream_impl.h"
+#include "content/renderer/media/render_media_log.h"
 #include "content/renderer/media/webcontentdecryptionmodule_impl.h"
+#include "content/renderer/media/webmediaplayer_impl.h"
+#include "content/renderer/media/webmediaplayer_ms.h"
+#include "content/renderer/media/webmediaplayer_params.h"
 #include "content/renderer/notification_provider.h"
 #include "content/renderer/npapi/plugin_channel_host.h"
 #include "content/renderer/render_process.h"
@@ -67,6 +75,7 @@
 #include "content/renderer/shared_worker_repository.h"
 #include "content/renderer/v8_value_converter_impl.h"
 #include "content/renderer/websharedworker_proxy.h"
+#include "media/base/audio_renderer_mixer_input.h"
 #include "net/base/data_url.h"
 #include "net/base/net_errors.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
@@ -105,6 +114,15 @@
 #include "content/renderer/media/rtc_peer_connection_handler.h"
 #endif
 
+#if defined(OS_ANDROID)
+#include <cpu-features.h>
+
+#include "content/common/gpu/client/context_provider_command_buffer.h"
+#include "content/renderer/android/synchronous_compositor_factory.h"
+#include "content/renderer/media/android/stream_texture_factory_impl.h"
+#include "content/renderer/media/android/webmediaplayer_android.h"
+#endif
+
 using blink::WebContextMenuData;
 using blink::WebData;
 using blink::WebDataSource;
@@ -114,6 +132,8 @@ using blink::WebFrame;
 using blink::WebHistoryItem;
 using blink::WebHTTPBody;
 using blink::WebLocalFrame;
+using blink::WebMediaPlayer;
+using blink::WebMediaPlayerClient;
 using blink::WebNavigationPolicy;
 using blink::WebNavigationType;
 using blink::WebNode;
@@ -340,7 +360,10 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
       selection_text_offset_(0),
       selection_range_(gfx::Range::InvalidRange()),
       handling_select_range_(false),
-      notification_provider_(NULL) {
+      notification_provider_(NULL),
+      media_stream_client_(NULL),
+      web_user_media_client_(NULL),
+      weak_factory_(this) {
   RenderThread::Get()->AddRoute(routing_id_, this);
 
 #if defined(OS_ANDROID)
@@ -566,6 +589,13 @@ void RenderFrameImpl::OnImeConfirmComposition(
 
 #endif  // ENABLE_PLUGINS
 
+void RenderFrameImpl::SetMediaStreamClientForTesting(
+    MediaStreamClient* media_stream_client) {
+  DCHECK(!media_stream_client_);
+  DCHECK(!web_user_media_client_);
+  media_stream_client_ = media_stream_client;
+}
+
 bool RenderFrameImpl::Send(IPC::Message* message) {
   if (is_detaching_ ||
       ((is_swapped_out_ || render_view_->is_swapped_out()) &&
@@ -700,9 +730,7 @@ void RenderFrameImpl::OnNavigate(const FrameMsg_Navigate_Params& params) {
     CHECK(frame) << "Invalid frame name passed: " << params.frame_to_navigate;
   }
 
-  WebHistoryItem item =
-      render_view_->history_controller()->GetCurrentItemForExport();
-  if (is_reload && item.isNull()) {
+  if (is_reload && !render_view_->history_controller()->GetCurrentEntry()) {
     // We cannot reload if we do not have any history state.  This happens, for
     // example, when recovering from a crash.
     is_reload = false;
@@ -730,12 +758,13 @@ void RenderFrameImpl::OnNavigate(const FrameMsg_Navigate_Params& params) {
   } else if (params.page_state.IsValid()) {
     // We must know the page ID of the page we are navigating back to.
     DCHECK_NE(params.page_id, -1);
-    WebHistoryItem item = PageStateToHistoryItem(params.page_state);
-    if (!item.isNull()) {
+    scoped_ptr<HistoryEntry> entry =
+        PageStateToHistoryEntry(params.page_state);
+    if (entry) {
       // Ensure we didn't save the swapped out URL in UpdateState, since the
       // browser should never be telling us to navigate to swappedout://.
-      CHECK(item.urlString() != WebString::fromUTF8(kSwappedOutURL));
-      render_view_->history_controller()->GoToItem(item, cache_policy);
+      CHECK(entry->root().urlString() != WebString::fromUTF8(kSwappedOutURL));
+      render_view_->history_controller()->GoToEntry(entry.Pass(), cache_policy);
     }
   } else if (!params.base_url_for_data_url.is_empty()) {
     // A loadData request with a specified base URL.
@@ -1145,6 +1174,20 @@ bool RenderFrameImpl::RunJavaScriptMessage(JavaScriptMessageType type,
   return success;
 }
 
+void RenderFrameImpl::LoadNavigationErrorPage(
+    const WebURLRequest& failed_request,
+    const WebURLError& error,
+    bool replace) {
+  std::string error_html;
+  GetContentClient()->renderer()->GetNavigationErrorStrings(
+      render_view(), frame_, failed_request, error, &error_html, NULL);
+
+  frame_->loadHTMLString(error_html,
+                         GURL(kUnreachableWebDataURL),
+                         error.unreachableURL,
+                         replace);
+}
+
 void RenderFrameImpl::DidCommitCompositorFrame() {
   if (compositing_helper_)
     compositing_helper_->DidCommitCompositorFrame();
@@ -1272,11 +1315,22 @@ blink::WebMediaPlayer* RenderFrameImpl::createMediaPlayer(
     blink::WebLocalFrame* frame,
     const blink::WebURL& url,
     blink::WebMediaPlayerClient* client) {
-  DCHECK(!frame_ || frame_ == frame);
-  // TODO(nasko): Moving the implementation here involves moving a few media
-  // related client objects here or referencing them in the RenderView. Needs
-  // more work to understand where the proper place for those objects is.
-  return render_view_->CreateMediaPlayer(this, frame, url, client);
+  WebMediaPlayer* player = CreateWebMediaPlayerForMediaStream(url, client);
+  if (player)
+    return player;
+
+#if defined(OS_ANDROID)
+  return CreateAndroidWebMediaPlayer(url, client);
+#else
+  WebMediaPlayerParams params(
+      base::Bind(&ContentRendererClient::DeferMediaLoad,
+                 base::Unretained(GetContentClient()->renderer()),
+                 static_cast<RenderFrame*>(this)),
+      RenderThreadImpl::current()->GetAudioRendererMixerManager()->CreateInput(
+          render_view_->routing_id_, routing_id_));
+  return new WebMediaPlayerImpl(frame, client, weak_factory_.GetWeakPtr(),
+                                params);
+#endif  // defined(OS_ANDROID)
 }
 
 blink::WebContentDecryptionModule*
@@ -1351,6 +1405,9 @@ blink::WebFrame* RenderFrameImpl::createChildFrame(
   // happen if this RenderFrameImpl's IPCs are being filtered when in swapped
   // out state.
   if (child_routing_id == MSG_ROUTING_NONE) {
+#if !defined(OS_LINUX)
+    // DumpWithoutCrashing() crashes on Linux in renderer processes when
+    // breakpad and sandboxing are enabled: crbug.com/349600
     base::debug::Alias(parent);
     base::debug::Alias(&routing_id_);
     bool render_view_is_swapped_out = GetRenderWidget()->is_swapped_out();
@@ -1359,6 +1416,7 @@ blink::WebFrame* RenderFrameImpl::createChildFrame(
     base::debug::Alias(&render_view_is_closing);
     base::debug::Alias(&is_swapped_out_);
     base::debug::DumpWithoutCrashing();
+#endif
     return NULL;
   }
 
@@ -1377,7 +1435,15 @@ blink::WebFrame* RenderFrameImpl::createChildFrame(
 
 void RenderFrameImpl::didDisownOpener(blink::WebLocalFrame* frame) {
   DCHECK(!frame_ || frame_ == frame);
-  render_view_->didDisownOpener(frame);
+  // We only need to notify the browser if the active, top-level frame clears
+  // its opener.  We can ignore cases where a swapped out frame clears its
+  // opener after hearing about it from the browser, and the browser does not
+  // (yet) care about subframe openers.
+  if (render_view_->is_swapped_out_ || frame->parent())
+    return;
+
+  // Notify WebContents and all its swapped out RenderViews.
+  Send(new FrameHostMsg_DidDisownOpener(routing_id_));
 }
 
 void RenderFrameImpl::frameDetached(blink::WebFrame* frame) {
@@ -1774,8 +1840,7 @@ void RenderFrameImpl::didFailProvisionalLoad(blink::WebLocalFrame* frame,
   }
 
   // Load an error page.
-  render_view_->LoadNavigationErrorPage(
-      frame, failed_request, error, replace);
+  LoadNavigationErrorPage(failed_request, error, replace);
 }
 
 void RenderFrameImpl::didCommitProvisionalLoad(
@@ -1949,9 +2014,10 @@ void RenderFrameImpl::didFinishDocumentLoad(blink::WebLocalFrame* frame) {
 
 void RenderFrameImpl::didHandleOnloadEvents(blink::WebLocalFrame* frame) {
   DCHECK(!frame_ || frame_ == frame);
-  // TODO(nasko): Move implementation here. Needed state:
-  // * page_id_
-  render_view_->didHandleOnloadEvents(frame);
+  if (!frame->parent()) {
+    Send(new FrameHostMsg_DocumentOnLoadCompleted(routing_id_,
+                                                  render_view_->page_id_));
+  }
 }
 
 void RenderFrameImpl::didFailLoad(blink::WebLocalFrame* frame,
@@ -2401,11 +2467,26 @@ void RenderFrameImpl::didReceiveResponse(
 void RenderFrameImpl::didFinishResourceLoad(blink::WebLocalFrame* frame,
                                             unsigned identifier) {
   DCHECK(!frame_ || frame_ == frame);
-  // TODO(nasko): Move implementation here. Needed state:
-  // * devtools_agent_
-  // Needed methods:
-  // * LoadNavigationErrorPage
-  render_view_->didFinishResourceLoad(frame, identifier);
+  InternalDocumentStateData* internal_data =
+      InternalDocumentStateData::FromDataSource(frame->dataSource());
+  if (!internal_data->use_error_page())
+    return;
+
+  // Do not show error page when DevTools is attached.
+  if (render_view_->devtools_agent_->IsAttached())
+    return;
+
+  // Display error page, if appropriate.
+  std::string error_domain = "http";
+  int http_status_code = internal_data->http_status_code();
+  if (GetContentClient()->renderer()->HasErrorPage(
+          http_status_code, &error_domain)) {
+    WebURLError error;
+    error.unreachableURL = frame->document().url();
+    error.domain = WebString::fromUTF8(error_domain);
+    error.reason = http_status_code;
+    LoadNavigationErrorPage(frame->dataSource()->request(), error, true);
+  }
 }
 
 void RenderFrameImpl::didLoadResourceFromMemoryCache(
@@ -2481,16 +2562,34 @@ void RenderFrameImpl::willReleaseScriptContext(blink::WebLocalFrame* frame,
 void RenderFrameImpl::didFirstVisuallyNonEmptyLayout(
     blink::WebLocalFrame* frame) {
   DCHECK(!frame_ || frame_ == frame);
-  render_view_->didFirstVisuallyNonEmptyLayout(frame);
+  if (frame->parent())
+    return;
+
+  InternalDocumentStateData* data =
+      InternalDocumentStateData::FromDataSource(frame->dataSource());
+  data->set_did_first_visually_non_empty_layout(true);
+
+#if defined(OS_ANDROID)
+  GetRenderWidget()->DidChangeBodyBackgroundColor(
+      render_view_->webwidget_->backgroundColor());
+#endif
 }
 
 void RenderFrameImpl::didChangeContentsSize(blink::WebLocalFrame* frame,
                                             const blink::WebSize& size) {
   DCHECK(!frame_ || frame_ == frame);
-  // TODO(nasko): Move implementation here. Needed state:
-  // * cached_has_main_frame_horizontal_scrollbar_
-  // * cached_has_main_frame_vertical_scrollbar_
-  render_view_->didChangeContentsSize(frame, size);
+#if defined(OS_MACOSX)
+  if (frame->parent())
+    return;
+
+  WebView* frameView = frame->view();
+  if (!frameView)
+    return;
+
+  GetRenderWidget()->DidChangeScrollbarsForMainFrame(
+      frame->hasHorizontalScrollbar(),
+      frame->hasVerticalScrollbar());
+#endif  // defined(OS_MACOSX)
 }
 
 void RenderFrameImpl::didChangeScrollOffset(blink::WebLocalFrame* frame) {
@@ -2568,7 +2667,11 @@ void RenderFrameImpl::willStartUsingPeerConnectionHandler(
 }
 
 blink::WebUserMediaClient* RenderFrameImpl::userMediaClient() {
-  return render_view_->userMediaClient();
+  // This can happen in tests, in which case it's OK to return NULL.
+  if (!InitializeMediaStreamClient())
+    return NULL;
+
+  return web_user_media_client_;
 }
 
 blink::WebMIDIClient* RenderFrameImpl::webMIDIClient() {
@@ -2653,6 +2756,21 @@ void RenderFrameImpl::initializeChildFrame(const blink::WebRect& frame_rect,
       routing_id_, frame_rect, scale_factor));
 }
 
+void RenderFrameImpl::DidPlay(blink::WebMediaPlayer* player) {
+  Send(new FrameHostMsg_MediaPlayingNotification(
+      routing_id_, reinterpret_cast<int64>(player), player->hasVideo(),
+      player->hasAudio()));
+}
+
+void RenderFrameImpl::DidPause(blink::WebMediaPlayer* player) {
+  Send(new FrameHostMsg_MediaPausedNotification(
+      routing_id_, reinterpret_cast<int64>(player)));
+}
+
+void RenderFrameImpl::PlayerGone(blink::WebMediaPlayer* player) {
+  DidPause(player);
+}
+
 void RenderFrameImpl::AddObserver(RenderFrameObserver* observer) {
   observers_.AddObserver(observer);
 }
@@ -2713,13 +2831,11 @@ void RenderFrameImpl::UpdateURL(blink::WebFrame* frame) {
 
   // Make navigation state a part of the DidCommitProvisionalLoad message so
   // that commited entry has it at all times.
-  WebHistoryItem item =
-      render_view_->history_controller()->GetCurrentItemForExport();
-  if (item.isNull()) {
-    item.initialize();
-    item.setURLString(request.url().spec().utf16());
-  }
-  params.page_state = HistoryItemToPageState(item);
+  HistoryEntry* entry = render_view_->history_controller()->GetCurrentEntry();
+  if (entry)
+    params.page_state = HistoryEntryToPageState(entry);
+  else
+    params.page_state = PageState::CreateFromURL(request.url());
 
   if (!frame->parent()) {
     // Top-level navigation.
@@ -2784,7 +2900,7 @@ void RenderFrameImpl::UpdateURL(blink::WebFrame* frame) {
     base::string16 method = request.httpMethod();
     if (EqualsASCII(method, "POST")) {
       params.is_post = true;
-      params.post_id = ExtractPostId(item);
+      params.post_id = ExtractPostId(entry->root());
     }
 
     // Send the user agent override back.
@@ -3186,5 +3302,100 @@ void RenderFrameImpl::SyncSelectionIfRequired() {
   }
   GetRenderWidget()->UpdateSelectionBounds();
 }
+
+bool RenderFrameImpl::InitializeMediaStreamClient() {
+  if (media_stream_client_)
+    return true;
+
+  if (!RenderThreadImpl::current())  // Will be NULL during unit tests.
+    return false;
+
+#if defined(OS_ANDROID)
+  if (CommandLine::ForCurrentProcess()->HasSwitch(switches::kDisableWebRTC))
+    return false;
+#endif
+
+#if defined(ENABLE_WEBRTC)
+  if (!render_view_->media_stream_dispatcher_) {
+    render_view_->media_stream_dispatcher_ =
+        new MediaStreamDispatcher(render_view_.get());
+  }
+
+  MediaStreamImpl* media_stream_impl = new MediaStreamImpl(
+      render_view_.get(),
+      render_view_->media_stream_dispatcher_,
+      RenderThreadImpl::current()->GetMediaStreamDependencyFactory());
+  media_stream_client_ = media_stream_impl;
+  web_user_media_client_ = media_stream_impl;
+  return true;
+#else
+  return false;
+#endif
+}
+
+WebMediaPlayer* RenderFrameImpl::CreateWebMediaPlayerForMediaStream(
+    const blink::WebURL& url,
+    WebMediaPlayerClient* client) {
+#if defined(ENABLE_WEBRTC)
+  if (!InitializeMediaStreamClient()) {
+    LOG(ERROR) << "Failed to initialize MediaStreamClient";
+    return NULL;
+  }
+  if (media_stream_client_->IsMediaStream(url)) {
+#if defined(OS_ANDROID) && defined(ARCH_CPU_ARMEL)
+    bool found_neon =
+        (android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON) != 0;
+    UMA_HISTOGRAM_BOOLEAN("Platform.WebRtcNEONFound", found_neon);
+#endif  // defined(OS_ANDROID) && defined(ARCH_CPU_ARMEL)
+    return new WebMediaPlayerMS(frame_, client, weak_factory_.GetWeakPtr(),
+                                media_stream_client_, new RenderMediaLog());
+  }
+#endif  // defined(ENABLE_WEBRTC)
+  return NULL;
+}
+
+#if defined(OS_ANDROID)
+
+WebMediaPlayer* RenderFrameImpl::CreateAndroidWebMediaPlayer(
+      const blink::WebURL& url,
+      WebMediaPlayerClient* client) {
+  GpuChannelHost* gpu_channel_host =
+      RenderThreadImpl::current()->EstablishGpuChannelSync(
+          CAUSE_FOR_GPU_LAUNCH_VIDEODECODEACCELERATOR_INITIALIZE);
+  if (!gpu_channel_host) {
+    LOG(ERROR) << "Failed to establish GPU channel for media player";
+    return NULL;
+  }
+
+  scoped_refptr<StreamTextureFactory> stream_texture_factory;
+  if (GetRenderWidget()->UsingSynchronousRendererCompositor()) {
+    SynchronousCompositorFactory* factory =
+        SynchronousCompositorFactory::GetInstance();
+    stream_texture_factory = factory->CreateStreamTextureFactory(
+        render_view_->routing_id_);
+  } else {
+    scoped_refptr<webkit::gpu::ContextProviderWebContext> context_provider =
+        RenderThreadImpl::current()->SharedMainThreadContextProvider();
+
+    if (!context_provider.get()) {
+      LOG(ERROR) << "Failed to get context3d for media player";
+      return NULL;
+    }
+
+    stream_texture_factory = StreamTextureFactoryImpl::Create(
+        context_provider, gpu_channel_host, render_view_->routing_id_);
+  }
+
+  return new WebMediaPlayerAndroid(
+      frame_,
+      client,
+      weak_factory_.GetWeakPtr(),
+      render_view_->media_player_manager_,
+      stream_texture_factory,
+      RenderThreadImpl::current()->GetMediaThreadMessageLoopProxy(),
+      new RenderMediaLog());
+}
+
+#endif
 
 }  // namespace content

@@ -184,7 +184,7 @@ class IdentityGetAuthTokenFunction : public ChromeAsyncExtensionFunction,
   friend class MockGetAuthTokenFunction;
 
   // ExtensionFunction:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
   // Helpers to report async function results to the caller.
   void StartAsyncRun();
@@ -284,7 +284,7 @@ class IdentityRemoveCachedAuthTokenFunction
   virtual ~IdentityRemoveCachedAuthTokenFunction();
 
   // SyncExtensionFunction implementation:
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 };
 
 class IdentityLaunchWebAuthFlowFunction : public ChromeAsyncExtensionFunction,
@@ -300,7 +300,7 @@ class IdentityLaunchWebAuthFlowFunction : public ChromeAsyncExtensionFunction,
 
  private:
   virtual ~IdentityLaunchWebAuthFlowFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
   // WebAuthFlow::Delegate implementation.
   virtual void OnAuthFlowFailure(WebAuthFlow::Failure failure) OVERRIDE;

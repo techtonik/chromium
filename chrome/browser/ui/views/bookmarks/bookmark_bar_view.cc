@@ -15,7 +15,6 @@
 #include "base/prefs/pref_service.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/bookmarks/bookmark_model.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
@@ -48,6 +47,7 @@
 #include "chrome/common/extensions/extension_constants.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
+#include "components/bookmarks/core/browser/bookmark_model.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_source.h"
 #include "content/public/browser/page_navigator.h"
@@ -75,7 +75,6 @@
 #include "ui/views/button_drag_utils.h"
 #include "ui/views/controls/button/menu_button.h"
 #include "ui/views/controls/label.h"
-#include "ui/views/controls/menu/menu_item_view.h"
 #include "ui/views/drag_utils.h"
 #include "ui/views/metrics.h"
 #include "ui/views/view_constants.h"
@@ -90,7 +89,6 @@ using content::Referrer;
 using ui::DropTargetEvent;
 using views::CustomButton;
 using views::MenuButton;
-using views::MenuItemView;
 using views::View;
 
 // Margins around the content.
@@ -567,11 +565,11 @@ views::MenuButton* BookmarkBarView::GetMenuButtonForNode(
 
 void BookmarkBarView::GetAnchorPositionForButton(
     views::MenuButton* button,
-    MenuItemView::AnchorPosition* anchor) {
+    views::MenuAnchorPosition* anchor) {
   if (button == other_bookmarked_button_ || button == overflow_button_)
-    *anchor = MenuItemView::TOPRIGHT;
+    *anchor = views::MENU_ANCHOR_TOPRIGHT;
   else
-    *anchor = MenuItemView::TOPLEFT;
+    *anchor = views::MENU_ANCHOR_TOPLEFT;
 }
 
 views::MenuItemView* BookmarkBarView::GetMenu() {
@@ -1026,14 +1024,17 @@ void BookmarkBarView::BookmarkNodeAdded(BookmarkModel* model,
 void BookmarkBarView::BookmarkNodeRemoved(BookmarkModel* model,
                                           const BookmarkNode* parent,
                                           int old_index,
-                                          const BookmarkNode* node) {
+                                          const BookmarkNode* node,
+                                          const std::set<GURL>& removed_urls) {
   // Close the menu if the menu is showing for the deleted node.
   if (bookmark_menu_ && bookmark_menu_->node() == node)
     bookmark_menu_->Cancel();
   BookmarkNodeRemovedImpl(model, parent, old_index);
 }
 
-void BookmarkBarView::BookmarkAllNodesRemoved(BookmarkModel* model) {
+void BookmarkBarView::BookmarkAllNodesRemoved(
+    BookmarkModel* model,
+    const std::set<GURL>& removed_urls) {
   UpdateOtherBookmarksVisibility();
 
   StopThrobbing(true);

@@ -66,6 +66,7 @@ extern const char kUserGesture[];
 
 }  // namespace download_extension_errors
 
+namespace extensions {
 
 class DownloadedByExtension : public base::SupportsUserData::Data {
  public:
@@ -91,7 +92,7 @@ class DownloadsDownloadFunction : public ChromeAsyncExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("downloads.download", DOWNLOADS_DOWNLOAD)
   DownloadsDownloadFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
  protected:
   virtual ~DownloadsDownloadFunction();
@@ -110,7 +111,7 @@ class DownloadsSearchFunction : public ChromeSyncExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("downloads.search", DOWNLOADS_SEARCH)
   DownloadsSearchFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 
  protected:
   virtual ~DownloadsSearchFunction();
@@ -123,7 +124,7 @@ class DownloadsPauseFunction : public ChromeSyncExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("downloads.pause", DOWNLOADS_PAUSE)
   DownloadsPauseFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 
  protected:
   virtual ~DownloadsPauseFunction();
@@ -136,7 +137,7 @@ class DownloadsResumeFunction : public ChromeSyncExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("downloads.resume", DOWNLOADS_RESUME)
   DownloadsResumeFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 
  protected:
   virtual ~DownloadsResumeFunction();
@@ -149,7 +150,7 @@ class DownloadsCancelFunction : public ChromeSyncExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("downloads.cancel", DOWNLOADS_CANCEL)
   DownloadsCancelFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 
  protected:
   virtual ~DownloadsCancelFunction();
@@ -162,7 +163,7 @@ class DownloadsEraseFunction : public ChromeSyncExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("downloads.erase", DOWNLOADS_ERASE)
   DownloadsEraseFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 
  protected:
   virtual ~DownloadsEraseFunction();
@@ -175,7 +176,7 @@ class DownloadsRemoveFileFunction : public ChromeAsyncExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("downloads.removeFile", DOWNLOADS_REMOVEFILE)
   DownloadsRemoveFileFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
  protected:
   virtual ~DownloadsRemoveFileFunction();
@@ -196,7 +197,7 @@ class DownloadsAcceptDangerFunction : public ChromeAsyncExtensionFunction {
 
   DECLARE_EXTENSION_FUNCTION("downloads.acceptDanger", DOWNLOADS_ACCEPTDANGER)
   DownloadsAcceptDangerFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
  protected:
   virtual ~DownloadsAcceptDangerFunction();
@@ -214,7 +215,7 @@ class DownloadsShowFunction : public ChromeAsyncExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("downloads.show", DOWNLOADS_SHOW)
   DownloadsShowFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
  protected:
   virtual ~DownloadsShowFunction();
@@ -228,7 +229,7 @@ class DownloadsShowDefaultFolderFunction : public ChromeAsyncExtensionFunction {
   DECLARE_EXTENSION_FUNCTION(
       "downloads.showDefaultFolder", DOWNLOADS_SHOWDEFAULTFOLDER)
   DownloadsShowDefaultFolderFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
  protected:
   virtual ~DownloadsShowDefaultFolderFunction();
@@ -241,7 +242,7 @@ class DownloadsOpenFunction : public ChromeSyncExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("downloads.open", DOWNLOADS_OPEN)
   DownloadsOpenFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 
  protected:
   virtual ~DownloadsOpenFunction();
@@ -255,7 +256,7 @@ class DownloadsSetShelfEnabledFunction : public ChromeSyncExtensionFunction {
   DECLARE_EXTENSION_FUNCTION("downloads.setShelfEnabled",
                              DOWNLOADS_SETSHELFENABLED)
   DownloadsSetShelfEnabledFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
 
  protected:
   virtual ~DownloadsSetShelfEnabledFunction();
@@ -268,7 +269,7 @@ class DownloadsDragFunction : public ChromeAsyncExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("downloads.drag", DOWNLOADS_DRAG)
   DownloadsDragFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
 
  protected:
   virtual ~DownloadsDragFunction();
@@ -281,7 +282,7 @@ class DownloadsGetFileIconFunction : public ChromeAsyncExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("downloads.getFileIcon", DOWNLOADS_GETFILEICON)
   DownloadsGetFileIconFunction();
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunAsync() OVERRIDE;
   void SetIconExtractorForTesting(DownloadFileIconExtractor* extractor);
 
  protected:
@@ -305,6 +306,8 @@ class ExtensionDownloadsEventRouter
       const base::FilePath& changed_filename,
       DownloadPathReservationTracker::FilenameConflictAction)>
     FilenameChangedCallback;
+
+  static void SetDetermineFilenameTimeoutSecondsForTesting(int s);
 
   // The logic for how to handle conflicting filename suggestions from multiple
   // extensions is split out here for testing.
@@ -401,5 +404,7 @@ class ExtensionDownloadsEventRouter
 
   DISALLOW_COPY_AND_ASSIGN(ExtensionDownloadsEventRouter);
 };
+
+}  // namespace extensions
 
 #endif  // CHROME_BROWSER_EXTENSIONS_API_DOWNLOADS_DOWNLOADS_API_H_

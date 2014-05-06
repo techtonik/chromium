@@ -11,6 +11,7 @@ from telemetry.core import exceptions
 from telemetry.core import forwarders
 from telemetry.core import util
 from telemetry.core.backends.chrome import chrome_browser_backend
+from telemetry.core.backends.chrome import misc_web_contents_backend
 from telemetry.core.forwarders import cros_forwarder
 
 
@@ -66,7 +67,7 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
     # Delete test user's cryptohome vault (user data directory).
     if not self.browser_options.dont_override_profile:
       self._cri.RunCmdOnDevice(['cryptohome', '--action=remove', '--force',
-                                '--user=%s' % self.browser_options.username])
+                                '--user=%s' % self._username])
     if self.browser_options.profile_dir:
       cri.RmRF(self.profile_directory)
       cri.PushFile(self.browser_options.profile_dir + '/Default',
@@ -203,15 +204,15 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
     if self.browser_options.auto_login:
       if self._is_guest:
         pid = self.pid
-        self._NavigateGuestLogin()
+        self.oobe.NavigateGuestLogin()
         # Guest browsing shuts down the current browser and launches an
         # incognito browser in a separate process, which we need to wait for.
         util.WaitFor(lambda: pid != self.pid, 10)
-        self._WaitForBrowserToComeUp()
       elif self.browser_options.gaia_login:
-        self._NavigateGaiaLogin()
+        self.oobe.NavigateGaiaLogin(self._username, self._password)
       else:
-        self._NavigateFakeLogin()
+        self.oobe.NavigateFakeLogin(self._username, self._password)
+      self._WaitForLogin()
 
     logging.info('Browser is up!')
 
@@ -255,6 +256,12 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
         self._cri.RunCmdOnDevice(['start', 'ui'])
 
   @property
+  @decorators.Cache
+  def misc_web_contents_backend(self):
+    """Access to chrome://oobe/login page."""
+    return misc_web_contents_backend.MiscWebContentsBackend(self)
+
+  @property
   def oobe(self):
     return self.misc_web_contents_backend.GetOobe()
 
@@ -262,21 +269,16 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
   def oobe_exists(self):
     return self.misc_web_contents_backend.oobe_exists
 
-  def _SigninUIState(self):
-    """Returns the signin ui state of the oobe. HIDDEN: 0, GAIA_SIGNIN: 1,
-    ACCOUNT_PICKER: 2, WRONG_HWID_WARNING: 3, MANAGED_USER_CREATION_FLOW: 4.
-    These values are in
-    chrome/browser/resources/chromeos/login/display_manager.js
-    """
-    return self.oobe.EvaluateJavaScript('''
-      loginHeader = document.getElementById('login-header-bar')
-      if (loginHeader) {
-        loginHeader.signinUIState_;
-      }
-    ''')
+  @property
+  def _username(self):
+    return self.browser_options.username
+
+  @property
+  def _password(self):
+    return self.browser_options.password
 
   def _IsCryptohomeMounted(self):
-    username = '$guest' if self._is_guest else self.browser_options.username
+    username = '$guest' if self._is_guest else self._username
     return self._cri.IsCryptohomeMounted(username, self._is_guest)
 
   def _IsLoggedIn(self):
@@ -286,99 +288,12 @@ class CrOSBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
             self.HasBrowserFinishedLaunching() and
             not self.oobe_exists)
 
-  def _WaitForSigninScreen(self):
-    """Waits for oobe to be on the signin or account picker screen."""
-    def OnAccountPickerScreen():
-      signin_state = self._SigninUIState()
-      # GAIA_SIGNIN or ACCOUNT_PICKER screens.
-      return signin_state == 1 or signin_state == 2
-    try:
-      util.WaitFor(OnAccountPickerScreen, 60)
-    except util.TimeoutException:
-      self._cri.TakeScreenShot('guest-screen')
-      raise exceptions.LoginException('Timed out waiting for signin screen, '
-                                      'signin state %d' % self._SigninUIState())
-
-  def _ClickBrowseAsGuest(self):
-    """Click the Browse As Guest button on the account picker screen. This will
-    restart the browser, and we could have a tab crash or a browser crash."""
-    try:
-      self.oobe.EvaluateJavaScript("""
-          var guest = document.getElementById("guest-user-button");
-          if (guest) {
-            guest.click();
-          }
-      """)
-    except (exceptions.TabCrashException,
-            exceptions.BrowserConnectionGoneException):
-      pass
-
-  def _GaiaLoginContext(self):
-    oobe = self.oobe
-    for gaia_context in range(15):
-      try:
-        if oobe.EvaluateJavaScriptInContext(
-            "document.getElementById('Email') != null", gaia_context):
-          return gaia_context
-      except exceptions.EvaluateException:
-        pass
-    return None
-
-  def _NavigateGuestLogin(self):
-    """Navigates through oobe login screen as guest."""
-    logging.info('Logging in as guest')
-    oobe = self.oobe
-    util.WaitFor(lambda: oobe.EvaluateJavaScript(
-        'typeof Oobe !== \'undefined\''), 10)
-
-    if oobe.EvaluateJavaScript(
-        "typeof Oobe.guestLoginForTesting != 'undefined'"):
-      oobe.ExecuteJavaScript('Oobe.guestLoginForTesting();')
-    else:
-      self._WaitForSigninScreen()
-      self._ClickBrowseAsGuest()
-
-    util.WaitFor(self._IsCryptohomeMounted, 30)
-
-  def _NavigateFakeLogin(self):
-    """Logs in using Oobe.loginForTesting."""
-    logging.info('Invoking Oobe.loginForTesting')
-    oobe = self.oobe
-    util.WaitFor(lambda: oobe.EvaluateJavaScript(
-        'typeof Oobe !== \'undefined\''), 10)
-
-    if oobe.EvaluateJavaScript(
-        'typeof Oobe.loginForTesting == \'undefined\''):
-      raise exceptions.LoginException('Oobe.loginForTesting js api missing')
-
-    oobe.ExecuteJavaScript(
-        'Oobe.loginForTesting(\'%s\', \'%s\');'
-            % (self.browser_options.username, self.browser_options.password))
-    self._WaitForLogin()
-
-  def _NavigateGaiaLogin(self):
-    """Logs into the GAIA service with provided credentials."""
-    logging.info('Invoking Oobe.addUserForTesting')
-    oobe = self.oobe
-    util.WaitFor(lambda: oobe.EvaluateJavaScript(
-        'typeof Oobe !== \'undefined\''), 10)
-    oobe.ExecuteJavaScript('Oobe.addUserForTesting();')
-
-    try:
-      gaia_context = util.WaitFor(self._GaiaLoginContext, timeout=30)
-    except util.TimeoutException:
-      self._cri.TakeScreenShot('add-user-screen')
-      raise
-
-    oobe.ExecuteJavaScriptInContext("""
-        document.getElementById('Email').value='%s';
-        document.getElementById('Passwd').value='%s';
-        document.getElementById('signIn').click();"""
-            % (self.browser_options.username, self.browser_options.password),
-        gaia_context)
-    self._WaitForLogin()
-
   def _WaitForLogin(self):
+    if self._is_guest:
+      self._WaitForBrowserToComeUp()
+      util.WaitFor(self._IsCryptohomeMounted, 30)
+      return
+
     try:
       util.WaitFor(self._IsLoggedIn, 60)
     except util.TimeoutException:

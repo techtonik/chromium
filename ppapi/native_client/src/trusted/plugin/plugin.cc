@@ -34,7 +34,6 @@
 #include "ppapi/cpp/dev/url_util_dev.h"
 #include "ppapi/cpp/module.h"
 
-#include "ppapi/native_client/src/trusted/plugin/file_utils.h"
 #include "ppapi/native_client/src/trusted/plugin/json_manifest.h"
 #include "ppapi/native_client/src/trusted/plugin/nacl_entry_points.h"
 #include "ppapi/native_client/src/trusted/plugin/nacl_subprocess.h"
@@ -121,10 +120,6 @@ void Plugin::HistogramEnumerateSelLdrLoadStatus(NaClErrorCode error_code) {
       "NaCl.LoadStatus.SelLdr.NotInstalledApp";
   HistogramEnumerate(name, error_code, NACL_ERROR_CODE_MAX,
                      LOAD_STATUS_UNKNOWN);
-}
-
-void Plugin::HistogramEnumerateManifestIsDataURI(bool is_data_uri) {
-  HistogramEnumerate("NaCl.Manifest.IsDataURI", is_data_uri, 2, -1);
 }
 
 void Plugin::HistogramHTTPStatusCode(const std::string& name, int status) {
@@ -354,23 +349,12 @@ NaClSubprocess* Plugin::LoadHelperNaClModule(const nacl::string& helper_url,
   return nacl_subprocess.release();
 }
 
-Plugin* Plugin::New(PP_Instance pp_instance) {
-  PLUGIN_PRINTF(("Plugin::New (pp_instance=%" NACL_PRId32 ")\n", pp_instance));
-  Plugin* plugin = new Plugin(pp_instance);
-  PLUGIN_PRINTF(("Plugin::New (plugin=%p)\n", static_cast<void*>(plugin)));
-  return plugin;
-}
-
 // All failures of this function will show up as "Missing Plugin-in", so
 // there is no need to log to JS console that there was an initialization
 // failure. Note that module loading functions will log their own errors.
 bool Plugin::Init(uint32_t argc, const char* argn[], const char* argv[]) {
   PLUGIN_PRINTF(("Plugin::Init (argc=%" NACL_PRIu32 ")\n", argc));
   nacl_interface_->InitializePlugin(pp_instance(), argc, argn, argv);
-  url_util_ = pp::URLUtil_Dev::Get();
-  if (url_util_ == NULL)
-    return false;
-
   wrapper_factory_ = new nacl::DescWrapperFactory();
   pp::Var manifest_url(pp::PASS_REF, nacl_interface_->GetManifestURLArgument(
       pp_instance()));
@@ -385,7 +369,6 @@ Plugin::Plugin(PP_Instance pp_instance)
       uses_nonsfi_mode_(false),
       wrapper_factory_(NULL),
       time_of_last_progress_event_(0),
-      manifest_open_time_(-1),
       nexe_open_time_(-1),
       nacl_interface_(NULL),
       uma_interface_(this) {
@@ -581,88 +564,26 @@ void Plugin::BitcodeDidTranslateContinuation(int32_t pp_error) {
 void Plugin::NaClManifestFileDidOpen(int32_t pp_error) {
   PLUGIN_PRINTF(("Plugin::NaClManifestFileDidOpen (pp_error=%"
                  NACL_PRId32 ")\n", pp_error));
-  int64_t now = NaClGetTimeOfDayMicroseconds();
-  int64_t download_time;
-  if (now < manifest_open_time_)
-    download_time = 0;
-  else
-    download_time = now - manifest_open_time_;
-  HistogramTimeSmall("NaCl.Perf.StartupTime.ManifestDownload",
-                     download_time / 1000);
-  HistogramHTTPStatusCode(
-      nacl_interface_->GetIsInstalled(pp_instance()) ?
-          "NaCl.HttpStatusCodeClass.Manifest.InstalledApp" :
-          "NaCl.HttpStatusCodeClass.Manifest.NotInstalledApp",
-      nexe_downloader_.status_code());
-  ErrorInfo error_info;
-  NaClFileInfo tmp_info(nexe_downloader_.GetFileInfo());
-  NaClFileInfoAutoCloser info(&tmp_info);
-  PLUGIN_PRINTF(("Plugin::NaClManifestFileDidOpen (file_desc=%"
-                 NACL_PRId32 ")\n", info.get_desc()));
-  if (pp_error != PP_OK || info.get_desc() == NACL_NO_FILE_DESC) {
-    if (pp_error == PP_ERROR_ABORTED) {
-      ReportLoadAbort();
-    } else if (pp_error == PP_ERROR_NOACCESS) {
-      error_info.SetReport(PP_NACL_ERROR_MANIFEST_NOACCESS_URL,
-                           "access to manifest url was denied.");
-      ReportLoadError(error_info);
-    } else {
-      error_info.SetReport(PP_NACL_ERROR_MANIFEST_LOAD_URL,
-                           "could not load manifest url.");
-      ReportLoadError(error_info);
-    }
-    return;
-  }
-  nacl::string json_buffer;
-  // SlurpFile closes the file descriptor after reading (or on error).
-  file_utils::StatusCode status = file_utils::SlurpFile(
-      info.Release().desc, json_buffer, kNaClManifestMaxFileBytes);
+  if (pp_error == PP_OK) {
+    // Take local ownership of manifest_data_var_
+    pp::Var manifest_data = pp::Var(pp::PASS_REF, manifest_data_var_);
+    manifest_data_var_ = PP_MakeUndefined();
 
-  if (status != file_utils::PLUGIN_FILE_SUCCESS) {
-    switch (status) {
-      case file_utils::PLUGIN_FILE_SUCCESS:
-        CHECK(0);
-        break;
-      case file_utils::PLUGIN_FILE_ERROR_MEM_ALLOC:
-        error_info.SetReport(PP_NACL_ERROR_MANIFEST_MEMORY_ALLOC,
-                             "could not allocate manifest memory.");
-        break;
-      case file_utils::PLUGIN_FILE_ERROR_OPEN:
-        error_info.SetReport(PP_NACL_ERROR_MANIFEST_OPEN,
-                             "could not open manifest file.");
-        break;
-      case file_utils::PLUGIN_FILE_ERROR_FILE_TOO_LARGE:
-        error_info.SetReport(PP_NACL_ERROR_MANIFEST_TOO_LARGE,
-                             "manifest file too large.");
-        break;
-      case file_utils::PLUGIN_FILE_ERROR_STAT:
-        error_info.SetReport(PP_NACL_ERROR_MANIFEST_STAT,
-                             "could not stat manifest file.");
-        break;
-      case file_utils::PLUGIN_FILE_ERROR_READ:
-        error_info.SetReport(PP_NACL_ERROR_MANIFEST_READ,
-                             "could not read manifest file.");
-        break;
-    }
-    ReportLoadError(error_info);
-    return;
+    std::string json_buffer = manifest_data.AsString();
+    ProcessNaClManifest(json_buffer);
   }
-
-  ProcessNaClManifest(json_buffer);
 }
 
 void Plugin::ProcessNaClManifest(const nacl::string& manifest_json) {
   HistogramSizeKB("NaCl.Perf.Size.Manifest",
                   static_cast<int32_t>(manifest_json.length() / 1024));
-  ErrorInfo error_info;
-  if (!SetManifestObject(manifest_json, &error_info)) {
-    ReportLoadError(error_info);
+  if (!SetManifestObject(manifest_json))
     return;
-  }
 
   nacl::string program_url;
   PP_PNaClOptions pnacl_options = {PP_FALSE, PP_FALSE, 2};
   bool uses_nonsfi_mode;
+  ErrorInfo error_info;
   if (manifest_->GetProgramURL(
           &program_url, &pnacl_options, &uses_nonsfi_mode, &error_info)) {
     // TODO(teravest): Make ProcessNaClManifest take responsibility for more of
@@ -725,29 +646,25 @@ void Plugin::RequestNaClManifest(const nacl::string& url) {
                            "manifest file too large.");
       ReportLoadError(error_info);
     } else {
-      // TODO(teravest): Does this have to be async for any reason?
       ProcessNaClManifest(nmf_data.AsString());
     }
   } else {
     pp::CompletionCallback open_callback =
         callback_factory_.NewCallback(&Plugin::NaClManifestFileDidOpen);
-    manifest_open_time_ = NaClGetTimeOfDayMicroseconds();
-    // Will always call the callback on success or failure.
-    CHECK(nexe_downloader_.Open(nmf_resolved_url.AsString(),
-                                DOWNLOAD_TO_FILE,
-                                open_callback,
-                                false,
-                                NULL));
+    std::string nmf_resolved_url_str = nmf_resolved_url.AsString();
+    nacl_interface_->DownloadManifestToBuffer(
+        pp_instance(),
+        &manifest_data_var_,
+        open_callback.pp_completion_callback());
   }
 }
 
 
-bool Plugin::SetManifestObject(const nacl::string& manifest_json,
-                               ErrorInfo* error_info) {
+bool Plugin::SetManifestObject(const nacl::string& manifest_json) {
   PLUGIN_PRINTF(("Plugin::SetManifestObject(): manifest_json='%s'.\n",
        manifest_json.c_str()));
-  if (error_info == NULL)
-    return false;
+  ErrorInfo error_info;
+
   // Determine whether lookups should use portable (i.e., pnacl versions)
   // rather than platform-specific files.
   bool is_pnacl = nacl_interface_->IsPNaCl(pp_instance());
@@ -760,12 +677,13 @@ bool Plugin::SetManifestObject(const nacl::string& manifest_json,
       manifest_base_url_str.c_str());
   const char* sandbox_isa = nacl_interface_->GetSandboxArch();
   nacl::scoped_ptr<JsonManifest> json_manifest(
-      new JsonManifest(url_util_,
+      new JsonManifest(pp::URLUtil_Dev::Get(),
                        manifest_base_url_str,
                        (is_pnacl ? kPortableArch : sandbox_isa),
                        nonsfi_mode_enabled,
                        pnacl_debug));
-  if (!json_manifest->Init(manifest_json, error_info)) {
+  if (!json_manifest->Init(manifest_json, &error_info)) {
+    ReportLoadError(error_info);
     return false;
   }
   manifest_.reset(json_manifest.release());
@@ -790,9 +708,8 @@ void Plugin::UrlDidOpenForStreamAsFile(
   } else if (info->get_desc() > NACL_NO_FILE_DESC) {
     std::map<nacl::string, NaClFileInfoAutoCloser*>::iterator it =
         url_file_info_map_.find(url_downloader->url());
-    if (it != url_file_info_map_.end()) {
+    if (it != url_file_info_map_.end())
       delete it->second;
-    }
     url_file_info_map_[url_downloader->url()] = info;
     callback.Run(PP_OK);
   } else {
@@ -946,18 +863,6 @@ void Plugin::EnqueueProgressEvent(PP_NaClEventType event_type,
 
 bool Plugin::OpenURLFast(const nacl::string& url,
                          FileDownloader* downloader) {
-  // Fast path only works for installed file URLs.
-  pp::Var url_var(url);
-  if (nacl_interface_->GetUrlScheme(url_var.pp_var()) !=
-      PP_SCHEME_CHROME_EXTENSION)
-    return false;
-  // IMPORTANT: Make sure the document can request the given URL. If we don't
-  // check, a malicious app could probe the extension system. This enforces a
-  // same-origin policy which prevents the app from requesting resources from
-  // another app.
-  if (!DocumentCanRequest(url))
-    return false;
-
   uint64_t file_token_lo = 0;
   uint64_t file_token_hi = 0;
   PP_FileHandle file_handle =
@@ -974,8 +879,9 @@ bool Plugin::OpenURLFast(const nacl::string& url,
 }
 
 bool Plugin::DocumentCanRequest(const std::string& url) {
-  CHECK(url_util_ != NULL);
-  return url_util_->DocumentCanRequest(this, pp::Var(url));
+  CHECK(pp::Module::Get()->core()->IsMainThread());
+  CHECK(pp::URLUtil_Dev::Get() != NULL);
+  return pp::URLUtil_Dev::Get()->DocumentCanRequest(this, pp::Var(url));
 }
 
 void Plugin::set_exit_status(int exit_status) {

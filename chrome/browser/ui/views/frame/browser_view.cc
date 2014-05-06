@@ -82,6 +82,7 @@
 #include "chrome/browser/ui/views/profiles/avatar_menu_bubble_view.h"
 #include "chrome/browser/ui/views/profiles/avatar_menu_button.h"
 #include "chrome/browser/ui/views/profiles/profile_chooser_view.h"
+#include "chrome/browser/ui/views/settings_api_bubble_helper_views.h"
 #include "chrome/browser/ui/views/status_bubble_views.h"
 #include "chrome/browser/ui/views/tabs/browser_tab_strip_controller.h"
 #include "chrome/browser/ui/views/tabs/tab.h"
@@ -106,7 +107,6 @@
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/user_metrics.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "content/public/common/content_switches.h"
 #include "grit/chromium_strings.h"
 #include "grit/generated_resources.h"
@@ -831,7 +831,7 @@ void BrowserView::OnActiveTabChanged(content::WebContents* old_contents,
       GetWidget()->IsVisible()) {
     // We only restore focus if our window is visible, to avoid invoking blur
     // handlers when we are eventually shown.
-    new_contents->GetView()->RestoreFocus();
+    new_contents->RestoreFocus();
   }
 
   // Update all the UI bits.
@@ -941,7 +941,7 @@ bool BrowserView::IsInMetroSnapMode() const {
 void BrowserView::RestoreFocus() {
   WebContents* selected_web_contents = GetActiveWebContents();
   if (selected_web_contents)
-    selected_web_contents->GetView()->RestoreFocus();
+    selected_web_contents->RestoreFocus();
 }
 
 void BrowserView::SetWindowSwitcherButton(views::Button* button) {
@@ -1171,10 +1171,6 @@ void BrowserView::ShowBookmarkAppBubble(
                                     browser_->profile(),
                                     web_app_info,
                                     extension_id);
-}
-
-void BrowserView::ShowBookmarkPrompt() {
-  GetLocationBarView()->ShowBookmarkPrompt();
 }
 
 void BrowserView::ShowTranslateBubble(content::WebContents* web_contents,
@@ -1431,14 +1427,17 @@ void BrowserView::TabInsertedAt(WebContents* contents,
   // window yet. Per http://crbug/342672 add them now since drawing the
   // WebContents requires root window specific data - information about
   // the screen the WebContents is drawn on, for example.
-  if (!contents->GetView()->GetNativeView()->GetRootWindow()) {
-    aura::Window* window = contents->GetView()->GetNativeView();
+  if (!contents->GetNativeView()->GetRootWindow()) {
+    aura::Window* window = contents->GetNativeView();
     aura::Window* root_window = GetNativeWindow()->GetRootWindow();
     aura::client::ParentWindowWithContext(
         window, root_window, root_window->GetBoundsInScreen());
-    DCHECK(contents->GetView()->GetNativeView()->GetRootWindow());
+    DCHECK(contents->GetNativeView()->GetRootWindow());
   }
   web_contents_close_handler_->TabInserted();
+
+  if (foreground)
+    extensions::MaybeShowExtensionControlledNewTabPage(browser(), contents);
 }
 
 void BrowserView::TabDetachedAt(WebContents* contents, int index) {
@@ -1467,7 +1466,7 @@ void BrowserView::TabDeactivated(WebContents* contents) {
   // Some reports seem to show that the focus manager and/or focused view can
   // be garbage at that point, it is not clear why.
   if (!contents->IsBeingDestroyed())
-    contents->GetView()->StoreFocus();
+    contents->StoreFocus();
 }
 
 void BrowserView::TabStripEmpty() {
@@ -2503,7 +2502,7 @@ void BrowserView::DoCutCopyPaste(void (WebContents::*method)(),
 bool BrowserView::DoCutCopyPasteForWebContents(
     WebContents* contents,
     void (WebContents::*method)()) {
-  gfx::NativeView native_view = contents->GetView()->GetContentNativeView();
+  gfx::NativeView native_view = contents->GetContentNativeView();
   if (!native_view)
     return false;
   if (native_view->HasFocus()) {

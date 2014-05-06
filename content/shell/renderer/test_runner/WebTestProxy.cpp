@@ -6,10 +6,11 @@
 
 #include <cctype>
 
+#include "base/callback_helpers.h"
+#include "base/debug/trace_event.h"
 #include "base/logging.h"
 #include "content/shell/renderer/test_runner/event_sender.h"
 #include "content/shell/renderer/test_runner/MockColorChooser.h"
-#include "content/shell/renderer/test_runner/MockWebSpeechInputController.h"
 #include "content/shell/renderer/test_runner/MockWebSpeechRecognizer.h"
 #include "content/shell/renderer/test_runner/SpellCheckClient.h"
 #include "content/shell/renderer/test_runner/TestCommon.h"
@@ -44,7 +45,6 @@
 #include "third_party/WebKit/public/web/WebUserGestureIndicator.h"
 #include "third_party/WebKit/public/web/WebView.h"
 
-using namespace WebTestRunner;
 using namespace blink;
 using namespace std;
 
@@ -340,10 +340,6 @@ void WebTestProxyBase::setDelegate(WebTestDelegate* delegate)
 {
     m_delegate = delegate;
     m_spellcheck->setDelegate(delegate);
-#if ENABLE_INPUT_SPEECH
-    if (m_speechInputController.get())
-        m_speechInputController->setDelegate(delegate);
-#endif
     if (m_speechRecognizer.get())
         m_speechRecognizer->setDelegate(delegate);
 }
@@ -381,10 +377,6 @@ void WebTestProxyBase::reset()
     m_logConsoleOutput = true;
     if (m_midiClient.get())
         m_midiClient->resetMock();
-#if ENABLE_INPUT_SPEECH
-    if (m_speechInputController.get())
-        m_speechInputController->clearResults();
-#endif
 }
 
 WebSpellCheckClient* WebTestProxyBase::spellCheckClient() const
@@ -450,43 +442,66 @@ string WebTestProxyBase::captureTree(bool debugRenderTree)
 
 SkCanvas* WebTestProxyBase::capturePixels()
 {
+    TRACE_EVENT0("shell", "WebTestProxyBase::capturePixels");
     webWidget()->layout();
-    if (m_testInterfaces->testRunner()->testRepaint()) {
-        WebSize viewSize = webWidget()->size();
-        int width = viewSize.width;
-        int height = viewSize.height;
-        if (m_testInterfaces->testRunner()->sweepHorizontally()) {
-            for (WebRect column(0, 0, 1, height); column.x < width; column.x++)
-                paintRect(column);
-        } else {
-            for (WebRect line(0, 0, width, 1); line.y < height; line.y++)
-                paintRect(line);
-        }
-    } else if (m_testInterfaces->testRunner()->isPrinting())
+    if (m_testInterfaces->testRunner()->isPrinting())
         paintPagesWithBoundaries();
     else
         paintInvalidatedRegion();
 
-    // See if we need to draw the selection bounds rect. Selection bounds
-    // rect is the rect enclosing the (possibly transformed) selection.
-    // The rect should be drawn after everything is laid out and painted.
-    if (m_testInterfaces->testRunner()->shouldDumpSelectionRect()) {
-        // If there is a selection rect - draw a red 1px border enclosing rect
-        WebRect wr = webView()->mainFrame()->selectionBoundsRect();
-        if (!wr.isEmpty()) {
-            // Render a red rectangle bounding selection rect
-            SkPaint paint;
-            paint.setColor(0xFFFF0000); // Fully opaque red
-            paint.setStyle(SkPaint::kStroke_Style);
-            paint.setFlags(SkPaint::kAntiAlias_Flag);
-            paint.setStrokeWidth(1.0f);
-            SkIRect rect; // Bounding rect
-            rect.set(wr.x, wr.y, wr.x + wr.width, wr.y + wr.height);
-            canvas()->drawIRect(rect, paint);
-        }
-    }
+    DrawSelectionRect(canvas());
 
     return canvas();
+}
+
+void WebTestProxyBase::DrawSelectionRect(SkCanvas* canvas) {
+  // See if we need to draw the selection bounds rect. Selection bounds
+  // rect is the rect enclosing the (possibly transformed) selection.
+  // The rect should be drawn after everything is laid out and painted.
+  if (!m_testInterfaces->testRunner()->shouldDumpSelectionRect())
+    return;
+  // If there is a selection rect - draw a red 1px border enclosing rect
+  WebRect wr = webView()->mainFrame()->selectionBoundsRect();
+  if (wr.isEmpty())
+    return;
+  // Render a red rectangle bounding selection rect
+  SkPaint paint;
+  paint.setColor(0xFFFF0000);  // Fully opaque red
+  paint.setStyle(SkPaint::kStroke_Style);
+  paint.setFlags(SkPaint::kAntiAlias_Flag);
+  paint.setStrokeWidth(1.0f);
+  SkIRect rect;  // Bounding rect
+  rect.set(wr.x, wr.y, wr.x + wr.width, wr.y + wr.height);
+  canvas->drawIRect(rect, paint);
+}
+
+void WebTestProxyBase::didCompositeAndReadback(const SkBitmap& bitmap) {
+  TRACE_EVENT2("shell",
+               "WebTestProxyBase::didCompositeAndReadback",
+               "x",
+               bitmap.info().fWidth,
+               "y",
+               bitmap.info().fHeight);
+  SkCanvas canvas(bitmap);
+  DrawSelectionRect(&canvas);
+  base::ResetAndReturn(&m_compositeAndReadbackCallback).Run(bitmap);
+}
+
+void WebTestProxyBase::CapturePixelsAsync(
+    base::Callback<void(const SkBitmap&)> callback) {
+  m_compositeAndReadbackCallback = callback;
+  TRACE_EVENT0("shell", "WebTestProxyBase::CapturePixelsAsync");
+
+  // Do a layout here because it might leave compositing mode! x.x
+  // TODO(danakj): Remove this when we have kForceCompositingMode everywhere.
+  webWidget()->layout();
+
+  if (!webWidget()->compositeAndReadbackAsync(this)) {
+    TRACE_EVENT0("shell",
+                 "WebTestProxyBase::CapturePixelsAsync "
+                 "compositeAndReadbackAsync failed");
+    didCompositeAndReadback(SkBitmap());
+  }
 }
 
 void WebTestProxyBase::setLogConsoleOutput(bool enabled)
@@ -615,14 +630,6 @@ WebMIDIClientMock* WebTestProxyBase::midiClientMock()
         m_midiClient.reset(new WebMIDIClientMock);
     return m_midiClient.get();
 }
-
-#if ENABLE_INPUT_SPEECH
-MockWebSpeechInputController* WebTestProxyBase::speechInputControllerMock()
-{
-    DCHECK(m_speechInputController.get());
-    return m_speechInputController.get();
-}
-#endif
 
 MockWebSpeechRecognizer* WebTestProxyBase::speechRecognizerMock()
 {
@@ -909,20 +916,6 @@ WebNotificationPresenter* WebTestProxyBase::notificationPresenter()
 WebMIDIClient* WebTestProxyBase::webMIDIClient()
 {
     return midiClientMock();
-}
-
-WebSpeechInputController* WebTestProxyBase::speechInputController(WebSpeechInputListener* listener)
-{
-#if ENABLE_INPUT_SPEECH
-    if (!m_speechInputController.get()) {
-        m_speechInputController.reset(new MockWebSpeechInputController(listener));
-        m_speechInputController->setDelegate(m_delegate);
-    }
-    return m_speechInputController.get();
-#else
-    DCHECK(listener);
-    return 0;
-#endif
 }
 
 WebSpeechRecognizer* WebTestProxyBase::speechRecognizer()

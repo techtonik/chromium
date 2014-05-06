@@ -2249,6 +2249,18 @@ Even if you have downloaded files from this website before, the website might ha
           Uninstall
         </message>
       </if>
+      <message name="IDS_APPLICATION_INFO_REQUIRED_PERMISSIONS_TEXT" desc="Heading for the required permissions for the app (the permissions that the user must grant the app upon installation).">
+        Required
+      </message>
+      <message name="IDS_APPLICATION_INFO_OPTIONAL_PERMISSIONS_TEXT" desc="Heading for the optional permissions for the app (the permissions that the user may choose to grant the app, but are not required for the basic app's functionality).">
+        Optional
+      </message>
+      <message name="IDS_APPLICATION_INFO_RETAINED_FILE_PERMISSIONS_TEXT" desc="Heading for the retained files for the app, which are files the app has permanent access to (the app can read and write to these files).">
+        Files
+      </message>
+      <message name="IDS_APPLICATION_INFO_NO_PERMISSIONS_TEXT" desc="Text displayed in the Permissions area of the App Info dialog if the app has no permissions of any kind.">
+        This app requires no special permissions.
+      </message>
 
       <!-- "Create application shortcuts" dialog -->
       <if expr="not use_titlecase">
@@ -2269,6 +2281,9 @@ Even if you have downloaded files from this website before, the website might ha
       </message>
       <message name="IDS_CREATE_SHORTCUTS_MENU_CHKBOX" desc="Label of the checkbox to create an application shortcut in the system's applications menu.">
         Applications menu
+      </message>
+      <message name="IDS_CREATE_SHORTCUTS_APP_FOLDER_CHKBOX" desc="Label of the checkbox to create an application shortcut in the system's applications folder.">
+        Applications folder
       </message>
       <message name="IDS_CREATE_SHORTCUTS_START_MENU_CHKBOX" desc="Label of the checkbox to create an application shortcut in the start menu.">
         Start menu
@@ -4382,9 +4397,6 @@ Make sure you do not expose any sensitive information.
       <message name="IDS_EXTENSION_PROMPT_WARNING_FILE_SYSTEM_DIRECTORY" desc="Permission string for read access to directories and their contents.">
         Read folders that you open in the application
       </message>
-      <message name="IDS_EXTENSION_PROMPT_WARNING_FILE_SYSTEM_WRITE" desc="Permission string for write access to the file system.">
-        Write to files that you open in the application
-      </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_FILE_SYSTEM_WRITE_DIRECTORY" desc="Permission string for write access to directories and their contents.">
         Write to files and folders that you open in the application
       </message>
@@ -4549,6 +4561,9 @@ Make sure you do not expose any sensitive information.
       <message name="IDS_EXTENSION_INSTALL_DEPENDENCY_NOT_SHARED_MODULE" desc="Error displayed during installation of an extension which tries to imports resources from an extension which is not a shared module.">
         Unable to import extension with ID "<ph name="IMPORT_ID">$1<ex>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</ex></ph>" because it is not a shared module.
       </message>
+      <message name="IDS_EXTENSION_INSTALL_DEPENDENCY_NOT_WHITELISTED" desc="Error displayed during installation of an extension which tries to imports resources from an extension, but it is not whitelisted to do so.">
+        Unable to import extension with ID "<ph name="IMPORT_ID">$1<ex>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</ex></ph>" because it is not allowed its whitelist.
+      </message>
       <message name="IDS_EXTENSION_INSTALL_KIOSK_MODE_ONLY" desc="Error displayed during installation of an app with 'kiosk_only' attribute but user is not in ChromeOS kiosk mode.">
         App with 'kiosk_only' manifest attribute must be installed in ChromeOS kiosk mode.
       </message>
@@ -4692,11 +4707,8 @@ Make sure you do not expose any sensitive information.
         <message name="IDS_EXTENSIONS_UPDATE_BUTTON" desc="Text for the 'Update extensions' button.">
           Update extensions now
         </message>
-        <message name="IDS_EXTENSIONS_APPS_DEV_TOOLS_PROMO_TEXT" desc="The text encouraging users to get the Apps Developer Tools.">
-          Chrome Apps &amp; Extensions Developer Tool is the new way to debug your apps and extensions.
-        </message>
-        <message name="IDS_EXTENSIONS_APPS_DEV_TOOLS_LINK_TEXT" desc="The text of the link to get the Apps Developer Tools.">
-          Visit website
+        <message name="IDS_EXTENSIONS_APPS_DEV_TOOLS_PROMO_HTML" desc="The text encouraging users to get the Apps Developer Tools.">
+          Try the new <ph name="BEGIN_LINK">&lt;a target="_blank" href="$1"&gt;</ph>Chrome Apps &amp; Extensions Developer Tool<ph name="END_LINK">&lt;/a&gt;</ph>.
         </message>
         <message name="IDS_EXTENSIONS_NONE_INSTALLED" desc="Text that lets the user know that no extensions are installed.">
           Boo... You have no extensions :-(
@@ -5222,6 +5234,16 @@ Keep your key file in a safe place. You will need it to create new versions of y
           Is this the search page you were expecting?
         </message>
       </if>
+      <if expr="use_titlecase">
+        <message name="IDS_EXTENSIONS_NTP_CONTROLLED_TITLE_HOME_PAGE_BUBBLE" desc="In Title Case: Title of a bubble warning users that an extension has overridden their new tab page setting">
+         Is This the New Tab Page You Were Expecting?
+        </message>
+      </if>
+      <if expr="not use_titlecase">
+        <message name="IDS_EXTENSIONS_NTP_CONTROLLED_TITLE_HOME_PAGE_BUBBLE" desc="Title of a bubble warning users that an extension has overridden their new tab page setting">
+          Is this the new tab page you were expecting?
+        </message>
+      </if>
 
       <message name="IDS_EXTENSIONS_SETTINGS_API_FIRST_LINE_SEARCH_ENGINE" desc="Text displayed in the Settings API bubble as first line when an extension has changed the search engine.">
         An extension has changed what page is shown when you search from the Omnibox.
@@ -5238,6 +5260,10 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_EXTENSIONS_SETTINGS_API_SECOND_LINE_HOME_AND_SEARCH" desc="Second line in the Settings API bubble. Only shown if the secondary change by the extension was both the home page and the search engine. See IDS_EXTENSIONS_SETTINGS_API_SECOND_LINE_SEARCH_ENGINE for reason for triple quotes.">
         ''' It also controls what page is shown when you click the Home button or search from the Omnibox. '''
+      </message>
+
+      <message name="IDS_EXTENSIONS_NTP_CONTROLLED_FIRST_LINE" desc="Text displayed in the Settings API bubble as first line when an extension has changed the new tab page.">
+        An extension has changed what page is shown when you open a new tab.
       </message>
 
       <message name="IDS_EXTENSIONS_SETTINGS_API_THIRD_LINE_CONFIRMATION" desc="Third line in the Settings API bubble, always appended after the first (and optional second) line to make one paragraph. See IDS_EXTENSIONS_SETTINGS_API_SECOND_LINE_SEARCH_ENGINE for reason for triple quotes.">
@@ -6302,6 +6328,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_PASSWORD_GENERATION_DESCRIPTION" desc="Description of flag to enable password generation.">
         Allow the user to have Chrome generate passwords when it detects account creation pages.
       </message>
+      <message name="IDS_FLAGS_ENABLE_AUTOMATIC_PASSWORD_SAVING_NAME" desc="Name of the flag to automatically save password.">
+        Save passwords automatically.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_AUTOMATIC_PASSWORD_SAVING_DESCRIPTION" desc="Description of the flag to automatically save password.">
+        Skip the passwords prompt and save passwords automatically.
+      </message>
       <message name="IDS_FLAGS_PASSWORD_AUTOFILL_PUBLIC_SUFFIX_DOMAIN_MATCHING_NAME" desc="Name of the flag for public suffix domain matching for autofill of passwords.">
         Public suffix domain matching for autofill of passwords.
       </message>
@@ -6382,11 +6414,17 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_DELEGATED_RENDERER_DESCRIPTION" desc="Description of about:flags option for delegated renderer.">
         If enabled, the renderer delegates compositing to the browser, merging both compositing passes.
       </message>
-      <message name="IDS_FLAGS_MAP_IMAGE_NAME" desc="Name of about:flags option for map-image rasterizer.">
-        Map-image rasterizer (AKA Zero-copy)
+      <message name="IDS_FLAGS_ONE_COPY_NAME" desc="Name of about:flags option for one-copy rasterizer.">
+        Enable one-copy rasterizer
       </message>
-      <message name="IDS_FLAGS_MAP_IMAGE_DESCRIPTION" desc="Description of about:flags option for map-image rasterizer.">
-        If enabled, raster threads write directly to GPU memory.
+      <message name="IDS_FLAGS_ONE_COPY_DESCRIPTION" desc="Description of about:flags option for one-copy rasterizer.">
+        If enabled, raster threads write to GPU memory.
+      </message>
+      <message name="IDS_FLAGS_ZERO_COPY_NAME" desc="Name of about:flags option for zero-copy rasterizer.">
+        Enable zero-copy rasterizer
+      </message>
+      <message name="IDS_FLAGS_ZERO_COPY_DESCRIPTION" desc="Description of about:flags option for zero-copy rasterizer.">
+        If enabled, raster threads write directly to GPU memory associated with tiles.
       </message>
       <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_NAME" desc="Name of about:flags option for maximum tiles for interest area.">
         Maximum tiles for interest area
@@ -6551,16 +6589,16 @@ Keep your key file in a safe place. You will need it to create new versions of y
           Enable the app info dialog. If enabled, the user will be able to select the 'App Info' context menu in the App Launcher to show the app info dialog for the selected app.
        </message>
         <message name="IDS_FLAGS_ENABLE_EXPERIMENTAL_APP_LIST_NAME" desc="Name of the flag to enable the experimental app launcher.">
-          Enable the experimental app launcher.
+          Enable the experimental App Launcher.
         </message>
         <message name="IDS_FLAGS_ENABLE_EXPERIMENTAL_APP_LIST_DESCRIPTION" desc="Description of the flag to enable the experimental app launcher.">
-          Enable the experimental version of the app launcher.
+          Enable the experimental version of the App Launcher.
         </message>
-        <message name="IDS_FLAGS_ENABLE_EXPERIMENTAL_APP_LIST_POSITION_NAME" desc="Name of the flag to enable the experimental app launcher position.">
-          Enable the experimental app launcher position.
+        <message name="IDS_FLAGS_ENABLE_CENTERED_APP_LIST_NAME" desc="Name of the flag to center the app launcher.">
+          Center the App Launcher.
         </message>
-        <message name="IDS_FLAGS_ENABLE_EXPERIMENTAL_APP_LIST_POSITION_DESCRIPTION" desc="Description of the flag to enable the experimental app launcher position.">
-          Positions the app launcher in the center of the screen with a landscape aspect. This will not enable other app launcher experiments.
+        <message name="IDS_FLAGS_ENABLE_CENTERED_APP_LIST_DESCRIPTION" desc="Description of the flag to center the app launcher and make it wide instead of tall.">
+          Positions the App Launcher in the center of the screen with a landscape aspect.
         </message>
       </if>
       <if expr="chromeos">
@@ -7002,6 +7040,18 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <!-- Session Crashed Info Bar-->
       <message name="IDS_SESSION_CRASHED_VIEW_RESTORE_BUTTON" desc="Title of the restore button in the session crashed view.">
         Restore
+      </message>
+      <message name="IDS_SESSION_CRASHED_BUBBLE_TITLE" desc="Title of the session crashed bubble view.">
+        Restore pages?
+      </message>
+      <message name="IDS_SESSION_CRASHED_VIEW_UMA_OPTIN" desc="Text besides the checkbox to let users optin to UMA in the restore from previous crash bubble.">
+        Help make Google Chrome better by sending crash reports and usage statistics to Google
+      </message>
+      <message name="IDS_FLAGS_ENABLE_SESSION_CRASHED_BUBBLE_NAME" desc="Title for the flag to enable showing session restore request in bubbles.">
+        Enable session restore bubble UI.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_SESSION_CRASHED_BUBBLE_DESCRIPTION" desc="Description for the flag to enable showing session restore request in bubbles.">
+        If enabled, the session restore UI will be shown in a bubble instead of an info bar.
       </message>
 
       <!-- Bad Flags Info Bar-->
@@ -8408,6 +8458,9 @@ The following plug-in is unresponsive: <ph name="PLUGIN_NAME">$1
         </message>
         <message name="IDS_PRINT_PREVIEW_RIGHT_MARGIN_LABEL" desc="ARIA label used by screen reader to explain the purpose of the right margin textbox.">
           Right margin
+        </message>
+        <message name="IDS_PRINT_PREVIEW_MEDIA_SIZE_LABEL" desc="Media size option label. Provides user the option to change the size of the printed page.">
+          Paper size
         </message>
         <message name="IDS_PRINT_PREVIEW_NATIVE_DIALOG" desc="Option offering the user to open the native print dialog, displayed when the PDF viewer is missing or when print preview fails.">
           Print using system dialog…
@@ -9986,41 +10039,14 @@ Would you like to start <ph name="CONTROL_PANEL_APPLET_NAME">$1<ex>Add/Remove Pr
           Add a credit card
         </message>
 
-        <message name="IDS_AUTOFILL_FIELD_LABEL_FIRST_NAME" desc="The label of the first name entry.">
-          First name
-        </message>
-        <message name="IDS_AUTOFILL_FIELD_LABEL_MIDDLE_NAME" desc="The label of the middle name entry.">
-          Middle name(s)
-        </message>
-        <message name="IDS_AUTOFILL_FIELD_LABEL_LAST_NAME" desc="The label of the last name entry.">
-          Last name
-        </message>
         <message name="IDS_AUTOFILL_FIELD_LABEL_EMAIL" desc="The label of the Email entry.">
           Email
-        </message>
-        <message name="IDS_AUTOFILL_FIELD_LABEL_COMPANY_NAME" desc="The label of the Company name entry.">
-          Company name
-        </message>
-        <message name="IDS_AUTOFILL_FIELD_LABEL_ADDRESS_LINE_1" desc="The label of the Address Line 1 entry.">
-          Address line 1
-        </message>
-        <message name="IDS_AUTOFILL_FIELD_LABEL_ADDRESS_LINE_2" desc="The label of the Address Line 2 entry.">
-          Address line 2
-        </message>
-        <message name="IDS_AUTOFILL_FIELD_LABEL_CITY" desc="The label of the City entry.">
-          City/Town
         </message>
         <message name="IDS_AUTOFILL_FIELD_LABEL_PHONE" desc="The label of the Phone entry.">
           Phone
         </message>
-        <message name="IDS_AUTOFILL_FIELD_LABEL_ADD_FIRST_NAME" desc="The placeholder text of the first name field.">
-          Add first name
-        </message>
-        <message name="IDS_AUTOFILL_FIELD_LABEL_ADD_MIDDLE_NAME" desc="The placeholder text of the middle name field.">
-          Add middle name(s)
-        </message>
-        <message name="IDS_AUTOFILL_FIELD_LABEL_ADD_LAST_NAME" desc="The placeholder text of the last name field.">
-          Add last name
+        <message name="IDS_AUTOFILL_FIELD_LABEL_ADD_NAME" desc="The placeholder text of the recipient or contact name field.">
+          Add name
         </message>
         <message name="IDS_AUTOFILL_FIELD_LABEL_ADD_PHONE" desc="The placeholder text of the phone field.">
           Add phone number
@@ -10990,84 +11016,13 @@ Would you like to start <ph name="CONTROL_PANEL_APPLET_NAME">$1<ex>Add/Remove Pr
       </message>
 
       <!-- New Tab -->
-      <!-- Android specific strings -->
-      <if expr="is_android">
-        <message name="IDS_NEW_TAB_TITLE"
-            desc="Mobile: For Android devices. Do not use title case. Title of the new tab page, this is only shown while loading, then the title comes from the page.">
-          New tab
-        </message>
-        <message name="IDS_NEW_TAB_MOST_VISITED_TITLE"
-                 desc="The page title for the 'Most Visited' navigation control on the New Tab Page.">
-          New Tab - Most Visited
-        </message>
-        <message name="IDS_NEW_TAB_INCOGNITO_TITLE"
-                 desc="The page title for the 'Incognito' navigation control on the New Tab Page.">
-          New Tab - Incognito
-        </message>
-        <message name="IDS_NEW_TAB_BOOKMARKS_TITLE"
-                 desc="The page title for the 'Bookmarks' navigation control on the New Tab Page.">
-          New Tab - Bookmarks
-        </message>
-        <message name="IDS_NEW_TAB_OTHER_SESSIONS_TITLE"
-                 desc="The page title for the 'Other Sessions' navigation control on the New Tab Page.">
-          New Tab - Other Devices
-        </message>
-        <message name="IDS_NEW_TAB_OTR_MESSAGE_MOBILE"
-                 desc="Mobile: Used when a person opens an OTR tab">
-          <ph name="BEGIN_BOLD">&lt;strong&gt;</ph>You've gone incognito.<ph name="END_BOLD">&lt;/strong&gt;</ph>
-          Pages you view in incognito tabs won't stick around in your browser's history, cookie store, or search history after you've closed <ph name="BEGIN_BOLD">&lt;strong&gt;</ph>all<ph name="END_BOLD">&lt;/strong&gt;</ph> of your incognito tabs. Any files you download or bookmarks you create will be kept.
-          <ph name="LINE_BREAK">&lt;br /&gt;&lt;br /&gt;<ex>&lt;br /&gt;&lt;br /&gt;</ex></ph>
-          <ph name="BEGIN_BOLD">&lt;strong&gt;</ph>However, you aren't invisible.<ph name="END_BOLD">&lt;/strong&gt;</ph> Going incognito doesn't hide your browsing from your employer, your internet service provider, governments and other sophisticated attackers, or the websites you visit.
-          <ph name="BEGIN_LINK">&lt;a href="$1"&gt;</ph>Learn more<ph name="END_LINK">&lt;/a&gt;<ex>&lt;/a&gt;</ex></ph> about incognito browsing.
-        </message>
-        <message name="IDS_RECEIVED_DOCUMENTS" desc="New tab page section header for received documents">
-          Received from other devices
-        </message>
-        <message name="IDS_NEW_TAB_CONTEXT_MENU_OPEN_IN_NEW_TAB" desc="Context menu description for loading a link in a new tab">
-          Open in new tab
-        </message>
-        <message name="IDS_NEW_TAB_CONTEXT_MENU_OPEN_IN_INCOGNITO_TAB" desc="Context menu description for loading a link in an incognito tab">
-          Open in incognito tab
-        </message>
-        <message name="IDS_NEW_TAB_CONTEXT_MENU_REMOVE" desc="Context menu description for removing the selected item">
-          Remove
-        </message>
-        <message name="IDS_NEW_TAB_CONTEXT_MENU_REMOVE_ALL" desc="Context menu description for removing all items from a list">
-          Remove all
-        </message>
-        <message name="IDS_NEW_TAB_CONTEXT_MENU_EDIT_BOOKMARK" desc="Context menu description for editing the selected bookmark">
-          Edit bookmark
-        </message>
-        <message name="IDS_NEW_TAB_CONTEXT_MENU_DELETE_BOOKMARK" desc="Context menu description for deleting the selected bookmark">
-          Delete bookmark
-        </message>
-        <message name="IDS_NEW_TAB_CONTEXT_MENU_BOOKMARK_SHORTCUT" desc="Context menu description for creating a shortcut to bookmark on home screen">
-          Add to home screen
-        </message>
-        <message name="IDS_SYNC_PROMO_DESKTOP_INSTRUCTIONS" desc="Information about sync displayed on the NTP when the user has signed in on mobile but not on desktop">
-          &lt;p&gt;
-          Access the tabs you have open on your computer, right here.
-          &lt;/p&gt;
-          &lt;p&gt;
-          Just open Chrome on your computer, go to the menu, and select "Sign in to Chrome..."
-          &lt;/p&gt;
-        </message>
-        <message name="IDS_SYNC_ENABLE_SYNC" desc="Text that displayed on a link or button that allows the user to enable sync.">
-          &lt;p&gt;
-          Tabs you have opened in Chrome on your other devices will appear here.
-          &lt;/p&gt;
-          &lt;a href="#enablesync"&gt;
-          Enable sync.
-          &lt;/p&gt;
-        </message>
-      </if>
-
+      <message name="IDS_NEW_TAB_TITLE"
+               desc="Title of the new tab page, this is only shown while loading, then the title comes from the page">
+        New Tab
+      </message>
+      
       <!-- Strings used for non-Android builds -->
       <if expr="not is_android">
-        <message name="IDS_NEW_TAB_TITLE"
-            desc="Title of the new tab page, this is only shown while loading, then the title comes from the page">
-          New Tab
-        </message>
         <message name="IDS_NEW_TAB_SUGGESTIONS"
                  desc="The name for the 'Suggestions' navigation control on the New Tab Page.">
           Suggested
@@ -11147,14 +11102,14 @@ Would you like to start <ph name="CONTROL_PANEL_APPLET_NAME">$1<ex>Add/Remove Pr
         <message name="IDS_NEW_TAB_APP_INSTALL_HINT_LABEL" desc="Text for the plus icon on the NTP that links to the web store.">
           Add more apps
         </message>
+        <message name="IDS_NEW_TAB_MOST_VISITED"
+                 desc="The name for the 'Most Visited' navigation control on the New Tab Page.">
+          Most visited
+        </message>
       </if>
 
-      <message name="IDS_NEW_TAB_MOST_VISITED"
-               desc="The name for the 'Most Visited' navigation control on the New Tab Page.">
-        Most visited
-      </message>
       <message name="IDS_NEW_TAB_RESTORE_THUMBNAILS_SHORT_LINK"
-         desc="The link that restores previously removed thumbnails. Context is 'Thumbnail removed. Undo | Restore all'">
+               desc="The link that restores previously removed thumbnails. Context is 'Thumbnail removed. Undo | Restore all'">
         Restore all
       </message>
       <message name="IDS_NEW_TAB_RECENTLY_CLOSED"
@@ -11393,8 +11348,23 @@ Would you like to start <ph name="CONTROL_PANEL_APPLET_NAME">$1<ex>Add/Remove Pr
       <message name="IDS_PROFILES_TUTORIAL_TRY_BUTTON" desc="Text of the try button on the tutorial card in the avatar menu bubble view">
         Try it out
       </message>
+      <message name="IDS_PROFILES_FEEDBACK_TUTORIAL_TITLE" desc="Title of the tutorial card in the avatar menu bubble view that asks the user to send feedback about the new profile management UI.">
+        Thanks for your help.
+      </message>
+      <message name="IDS_PROFILES_SEND_FEEDBACK_BUTTON" desc="Text of the send feedback button on the tutorial card in the avatar menu bubble view">
+        Send feedback
+      </message>
+      <message name="IDS_PROFILES_END_PREVIEW" desc="The link/label text to end new profile management preview">
+        End preview
+      </message>
+      <message name="IDS_PROFILES_END_PREVIEW_AND_RELAUNCH" desc="The button text to end new profile management preview and relaunch Chrome">
+        End preview and relaunch
+      </message>
       <message name="IDS_PROFILES_NOT_YOU_BUTTON" desc="Button in the avatar menu bubble view for launching the user manager.">
         Not <ph name="PROFILE_DISPLAY_NAME">$1<ex>Jessica</ex></ph>?
+      </message>
+      <message name="IDS_PROFILES_EXIT_GUEST" desc="Button in the avatar menu bubble view for exiting the active guest session.">
+        Exit Guest
       </message>
       <if expr="not use_titlecase">
         <message name="IDS_PROFILES_PROFILE_ADD_ACCOUNT_BUTTON" desc="Button in the avatar menu bubble view used to add an account to a profile.">
@@ -11424,9 +11394,6 @@ Would you like to start <ph name="CONTROL_PANEL_APPLET_NAME">$1<ex>Add/Remove Pr
           Learn More
         </message>
       </if>
-      <message name="IDS_PROFILES_PROFILE_CHANGE_PHOTO_BUTTON" desc="Button in the avatar menu bubble view used to change the photo for a profile.">
-        Change
-      </message>
       <message name="IDS_PROFILES_SWITCH_TO_PROFILE_ACCESSIBLE_NAME" desc="Description of the switch to profile button. This is used for accessibility.">
         Switch to user: <ph name="PROFILE_NAME">$1<ex>First user</ex></ph>
       </message>
@@ -12130,13 +12097,6 @@ Some features may be unavailable.  Please check that the profile exists and you 
         </message>
         <message name="IDS_SYNC_SIGN_IN_ERROR_WRENCH_MENU_ITEM" desc="The sync error wrench menu item when the user needs to sign in again.">
           Sign in Again...
-        </message>
-      </if>
-
-      <!-- Android specific sync strings -->
-      <if expr="is_android">
-        <message name="IDS_SYNC_NTP_OPEN_TABS_LAST_SYNCED" desc="The message to display in front of the time of a last synced foreign tab">
-            Last synced
         </message>
       </if>
 
@@ -13342,34 +13302,6 @@ Some features may be unavailable.  Please check that the profile exists and you 
        Keep using <ph name="CURRENT_GOOGLE_HOST">$1<ex>google.fr</ex></ph>
     </message>
 
-    <message name="IDS_SPEECH_INPUT_BUBBLE_HEADING" desc="First line in the content area of the speech input bubble. Instructs the user that they can start speaking.">
-      Speak now
-    </message>
-    <message name="IDS_SPEECH_INPUT_ABORTED" desc="Message shown when speech recognition is aborted (due to another request).">
-      Speech recognition was aborted.
-    </message>
-    <message name="IDS_SPEECH_INPUT_MIC_ERROR" desc="Message shown when audio recording failed with an error during speech recognition.">
-      There was a problem with your microphone.
-    </message>
-    <message name="IDS_SPEECH_INPUT_NO_MIC" desc="Message shown when speech recognizer could not find a suitable microphone or other audio input device.">
-      No microphone found.
-    </message>
-    <message name="IDS_SPEECH_INPUT_NO_SPEECH" desc="Message shown when speech recognizer detected no speech in the recorded audio.">
-      No speech heard.
-    </message>
-    <message name="IDS_SPEECH_INPUT_NO_RESULTS" desc="Message shown when speech recognizer returned zero results.">
-      Speech not recognized.
-    </message>
-    <message name="IDS_SPEECH_INPUT_TRY_AGAIN" desc="Text shown on a button to retry speech recognition">
-      Try again
-    </message>
-    <message name="IDS_SPEECH_INPUT_NET_ERROR" desc="Message shown when a network error occurred and no results were received from the recognition server.">
-      Connection to speech servers failed.
-    </message>
-    <message name="IDS_SPEECH_INPUT_MIC_SETTINGS" desc="Text displayed on a button or link to open the microphone settings window.">
-      Microphone settings
-    </message>
-
     <message name="IDS_IMAGE_FILES" desc="The description of the image file extensions in the select file dialog.">
       Image Files
     </message>
@@ -13981,6 +13913,12 @@ Do you accept?
     <message name="IDS_FLAGS_ENABLE_OFFLINE_AUTO_RELOAD_DESCRIPTION" desc="Description of the flag to make pages which failed to load while offline auto-reload">
       Pages that fail to load while the browser is offline will be auto-reloaded when the browser is online again.
     </message>
+    <message name="IDS_FLAGS_ENABLE_OFFLINE_LOAD_STALE_NAME" desc="Name of the flag to enable offering users the option of loading a stale copy of a page when an error occurs.">
+      Enable Offline Load Stale Button
+    </message>
+    <message name="IDS_FLAGS_ENABLE_OFFLINE_LOAD_STALE_DESCRIPTION" desc="Description of the flag to enable offering users the option of loading a stale copy of a page when an error occurs.">
+      When a page fails to load, if a stale copy of the page exists in the browser, a button will be presented to allow the user to load that stale copy.
+    </message>
 
     <message name="IDS_FLAGS_ENABLE_VIRTUAL_KEYBOARD_NAME" desc="Name of about:flags option to turn on the virtual keyboard">
       Virtual Keyboard
@@ -14568,6 +14506,10 @@ Do you accept?
     <message name="IDS_A11Y_ALERT_WINDOW_NEEDED" desc="Alert sent to the accessibility api when the user attempts a keyboard command that requires a window to work.">
       Command unavailable. Press control-N to open a new window.
     </message>
+    <message name="IDS_A11Y_ALERT_WINDOW_OVERVIEW_MODE_ENTERED" desc="The accessible text read when the user enters window overview mode in Ash.">
+      Entered window overview mode
+    </message>
+
     <message name="IDS_DESKTOP_MEDIA_PICKER_SHARE" desc="Used for Share on buttons">
       Share
     </message>
@@ -14628,6 +14570,24 @@ Do you accept?
     </message>
     <message name="IDS_FLAGS_ALLOW_INSECURE_WEBSOCKET_FROM_HTTPS_ORIGIN_DESCRIPTION" desc="Description to allow insecure WebSocket from https origin">
       This flag makes Chrome unsafe. Use this only if you understand what this does. Note that this flag may be removed without any notice. If enabled, frames with an https origin can use WebSockets with an insecure URL (ws://).
+    </message>
+    
+    <!-- Experiment flags to enable EmbeddedSearch API in the search results page -->
+    <if expr="is_android">
+    <message name="IDS_FLAGS_ENABLE_EMBEDDEDSEARCH_API_NAME" desc="An about::flags experiment title to enable EmbeddedSearch API in the search results page">
+      Enable EmbeddedSearch API
+    </message>
+    <message name="IDS_FLAGS_ENABLE_EMBEDDEDSEARCH_API_DESCRIPTION" desc="Describes an about:flags experiment for enabling EmbeddedSearch API in the search results page">
+     If enabled, EmbeddedSearch API will be used to submit search queries in the search results page.
+    </message>
+    </if>
+
+    <!-- App install alerts flags -->
+    <message name="IDS_FLAGS_ENABLE_APP_INSTALL_ALERTS_NAME" desc="Title for the flag to allow app install alerts">
+      Enable app install alerts
+    </message>
+    <message name="IDS_FLAGS_ENABLE_APP_INSTALL_ALERTS_DESCRIPTION" desc="Description to allow app install alerts">
+      If enabled, websites will be parsed for app install alert meta tags.
     </message>
   </messages>
   </release>

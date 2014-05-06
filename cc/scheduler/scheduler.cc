@@ -394,7 +394,7 @@ void Scheduler::SetupPollingMechanisms(bool needs_begin_frame) {
 // If the scheduler is busy, we queue the BeginFrame to be handled later as
 // a BeginRetroFrame.
 void Scheduler::BeginFrame(const BeginFrameArgs& args) {
-  TRACE_EVENT0("cc", "Scheduler::BeginFrame");
+  TRACE_EVENT1("cc", "Scheduler::BeginFrame", "frame_time", args.frame_time);
   DCHECK(settings_.throttle_frame_production);
 
   bool should_defer_begin_frame;
@@ -422,8 +422,9 @@ void Scheduler::BeginFrame(const BeginFrameArgs& args) {
 // the scheduler was in the middle of processing a previous BeginFrame.
 void Scheduler::BeginRetroFrame() {
   TRACE_EVENT0("cc", "Scheduler::BeginRetroFrame");
-  DCHECK(begin_retro_frame_posted_);
   DCHECK(!settings_.using_synchronous_renderer_compositor);
+  DCHECK(begin_retro_frame_posted_);
+  begin_retro_frame_posted_ = false;
 
   // If there aren't any retroactive BeginFrames, then we've lost the
   // OutputSurface and should abort.
@@ -442,19 +443,22 @@ void Scheduler::BeginRetroFrame() {
   while (!begin_retro_frame_args_.empty() &&
          now > AdjustedBeginImplFrameDeadline(begin_retro_frame_args_.front(),
                                               draw_duration_estimate)) {
+    TRACE_EVENT1("cc",
+                 "Scheduler::BeginRetroFrame discarding",
+                 "frame_time",
+                 begin_retro_frame_args_.front().frame_time);
     begin_retro_frame_args_.pop_front();
   }
 
   if (begin_retro_frame_args_.empty()) {
     DCHECK(settings_.throttle_frame_production);
-    TRACE_EVENT_INSTANT0(
-        "cc", "Scheduler::BeginRetroFrames expired", TRACE_EVENT_SCOPE_THREAD);
+    TRACE_EVENT_INSTANT0("cc",
+                         "Scheduler::BeginRetroFrames all expired",
+                         TRACE_EVENT_SCOPE_THREAD);
   } else {
     BeginImplFrame(begin_retro_frame_args_.front());
     begin_retro_frame_args_.pop_front();
   }
-
-  begin_retro_frame_posted_ = false;
 }
 
 // There could be a race between the posted BeginRetroFrame and a new
@@ -484,7 +488,8 @@ void Scheduler::PostBeginRetroFrameIfNeeded() {
 // for a BeginMainFrame+activation to complete before it times out and draws
 // any asynchronous animation and scroll/pinch updates.
 void Scheduler::BeginImplFrame(const BeginFrameArgs& args) {
-  TRACE_EVENT0("cc", "Scheduler::BeginImplFrame");
+  TRACE_EVENT1(
+      "cc", "Scheduler::BeginImplFrame", "frame_time", args.frame_time);
   DCHECK(state_machine_.begin_impl_frame_state() ==
          SchedulerStateMachine::BEGIN_IMPL_FRAME_STATE_IDLE);
   DCHECK(state_machine_.HasInitializedOutputSurface());
@@ -506,9 +511,6 @@ void Scheduler::BeginImplFrame(const BeginFrameArgs& args) {
   devtools_instrumentation::DidBeginFrame(layer_tree_host_id_);
 
   ProcessScheduledActions();
-
-  if (!state_machine_.HasInitializedOutputSurface())
-    return;
 
   state_machine_.OnBeginImplFrameDeadlinePending();
   ScheduleBeginImplFrameDeadline(
@@ -693,8 +695,18 @@ scoped_ptr<base::Value> Scheduler::StateAsValue() const {
   scheduler_state->SetDouble(
       "time_until_anticipated_draw_time_ms",
       (AnticipatedDrawTime() - base::TimeTicks::Now()).InMillisecondsF());
+  scheduler_state->SetDouble("vsync_interval_ms",
+                             vsync_interval_.InMillisecondsF());
+  scheduler_state->SetDouble("estimated_parent_draw_time_ms",
+                             estimated_parent_draw_time_.InMillisecondsF());
   scheduler_state->SetBoolean("last_set_needs_begin_frame_",
                               last_set_needs_begin_frame_);
+  scheduler_state->SetBoolean("begin_unthrottled_frame_posted_",
+                              begin_unthrottled_frame_posted_);
+  scheduler_state->SetBoolean("begin_retro_frame_posted_",
+                              begin_retro_frame_posted_);
+  scheduler_state->SetInteger("begin_retro_frame_args_",
+                              begin_retro_frame_args_.size());
   scheduler_state->SetBoolean("begin_impl_frame_deadline_task_",
                               !begin_impl_frame_deadline_task_.IsCancelled());
   scheduler_state->SetBoolean("poll_for_draw_triggers_task_",

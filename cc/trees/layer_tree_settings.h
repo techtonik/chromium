@@ -31,12 +31,8 @@ class CC_EXPORT LayerTreeSettings {
   bool accelerated_animation_enabled;
   bool can_use_lcd_text;
   bool should_clear_root_render_pass;
-  enum RasterizationSite {
-    CpuRasterization,
-    HybridRasterization,
-    GpuRasterization,
-  };
-  RasterizationSite rasterization_site;
+  bool gpu_rasterization_enabled;
+  bool gpu_rasterization_forced;
   bool create_low_res_tiling;
 
   enum ScrollbarAnimator {
@@ -45,8 +41,8 @@ class CC_EXPORT LayerTreeSettings {
     Thinning,
   };
   ScrollbarAnimator scrollbar_animator;
-  int scrollbar_linear_fade_delay_ms;
-  int scrollbar_linear_fade_length_ms;
+  int scrollbar_fade_delay_ms;
+  int scrollbar_fade_duration_ms;
   SkColor solid_color_scrollbar_color;
   bool calculate_top_controls_position;
   bool timeout_and_draw_when_animation_checkerboards;
@@ -71,7 +67,8 @@ class CC_EXPORT LayerTreeSettings {
   size_t max_memory_for_prepaint_percentage;
   int highp_threshold_min;
   bool strict_layer_property_change_checking;
-  bool use_map_image;
+  bool use_one_copy;
+  bool use_zero_copy;
   bool ignore_root_layer_flings;
   bool use_rgba_4444_textures;
   bool touch_hit_testing;

@@ -24,6 +24,7 @@
 #include "ui/message_center/message_center.h"
 #include "ui/views/view.h"
 #include "ui/views/widget/widget.h"
+#include "ui/wm/core/default_activation_client.h"
 #include "ui/wm/core/wm_state.h"
 
 #if defined(USE_ASH)
@@ -133,13 +134,14 @@ void ViewEventTestBase::SetUp() {
   context = ash::Shell::GetPrimaryRootWindow();
   context->GetHost()->Show();
 #endif  // !OS_WIN
-  aura::Env::CreateInstance();
+  aura::Env::CreateInstance(true);
 #elif defined(USE_AURA)
   // Instead of using the ash shell, use an AuraTestHelper to create and manage
   // the test screen.
   aura_test_helper_.reset(
       new aura::test::AuraTestHelper(base::MessageLoopForUI::current()));
   aura_test_helper_->SetUp();
+  new wm::DefaultActivationClient(aura_test_helper_->root_window());
   context = aura_test_helper_->root_window();
 #endif  // !USE_ASH && USE_AURA
 

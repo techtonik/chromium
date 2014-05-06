@@ -18,7 +18,6 @@
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "extensions/common/extension.h"
 #include "third_party/skia/include/core/SkRegion.h"
 #include "ui/gfx/skia_util.h"
@@ -112,15 +111,18 @@ std::vector<gfx::Rect> CalculateNonDraggableRegions(
     const std::vector<extensions::DraggableRegion>& regions,
     int width,
     int height) {
-  scoped_ptr<SkRegion> draggable(
-      AppWindow::RawDraggableRegionsToSkRegion(regions));
-  scoped_ptr<SkRegion> non_draggable(new SkRegion);
-  non_draggable->op(0, 0, width, height, SkRegion::kUnion_Op);
-  non_draggable->op(*draggable, SkRegion::kDifference_Op);
-
   std::vector<gfx::Rect> result;
-  for (SkRegion::Iterator it(*non_draggable); !it.done(); it.next()) {
-    result.push_back(gfx::SkIRectToRect(it.rect()));
+  if (regions.empty()) {
+    result.push_back(gfx::Rect(0, 0, width, height));
+  } else {
+    scoped_ptr<SkRegion> draggable(
+        AppWindow::RawDraggableRegionsToSkRegion(regions));
+    scoped_ptr<SkRegion> non_draggable(new SkRegion);
+    non_draggable->op(0, 0, width, height, SkRegion::kUnion_Op);
+    non_draggable->op(*draggable, SkRegion::kDifference_Op);
+    for (SkRegion::Iterator it(*non_draggable); !it.done(); it.next()) {
+      result.push_back(gfx::SkIRectToRect(it.rect()));
+    }
   }
   return result;
 }
@@ -304,7 +306,7 @@ NativeAppWindowCocoa::NativeAppWindowCocoa(
       shows_resize_controls_(true),
       shows_fullscreen_controls_(true),
       attention_request_id_(0) {
-  Observe(web_contents());
+  Observe(WebContents());
 
   base::scoped_nsobject<NSWindow> window;
   Class window_class;
@@ -327,7 +329,12 @@ NativeAppWindowCocoa::NativeAppWindowCocoa(
                 styleMask:GetWindowStyleMask()
                   backing:NSBackingStoreBuffered
                     defer:NO]);
-  [window setTitle:base::SysUTF8ToNSString(extension()->name())];
+
+  std::string name;
+  const extensions::Extension* extension = app_window_->GetExtension();
+  if (extension)
+    name = extension->name();
+  [window setTitle:base::SysUTF8ToNSString(name)];
   [[window contentView] cr_setWantsLayer:YES];
 
   if (base::mac::IsOSSnowLeopard() &&
@@ -341,15 +348,8 @@ NativeAppWindowCocoa::NativeAppWindowCocoa(
   window_controller_.reset(
       [[NativeAppWindowController alloc] initWithWindow:window.release()]);
 
-  NSView* view = web_contents()->GetView()->GetNativeView();
+  NSView* view = WebContents()->GetNativeView();
   [view setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
-
-  // By default, the whole frameless window is not draggable.
-  if (!has_frame_) {
-    gfx::Rect window_bounds(
-        0, 0, NSWidth(cocoa_bounds), NSHeight(cocoa_bounds));
-    system_drag_exclude_areas_.push_back(window_bounds);
-  }
 
   InstallView();
 
@@ -386,7 +386,7 @@ NSUInteger NativeAppWindowCocoa::GetWindowStyleMask() const {
 }
 
 void NativeAppWindowCocoa::InstallView() {
-  NSView* view = web_contents()->GetView()->GetNativeView();
+  NSView* view = WebContents()->GetNativeView();
   if (has_frame_) {
     [view setFrame:[[window() contentView] bounds]];
     [[window() contentView] addSubview:view];
@@ -414,12 +414,12 @@ void NativeAppWindowCocoa::InstallView() {
     // prevent them from doing so in a frameless app window.
     [[window() standardWindowButton:NSWindowZoomButton] setEnabled:NO];
 
-    InstallDraggableRegionViews();
+    UpdateDraggableRegionViews();
   }
 }
 
 void NativeAppWindowCocoa::UninstallView() {
-  NSView* view = web_contents()->GetView()->GetNativeView();
+  NSView* view = WebContents()->GetNativeView();
   [view removeFromSuperview];
 }
 
@@ -641,13 +641,8 @@ void NativeAppWindowCocoa::UpdateDraggableRegions(
   if (has_frame_)
     return;
 
-  // Draggable regions is implemented by having the whole web view draggable
-  // (mouseDownCanMoveWindow) and overlaying regions that are not draggable.
-  NSView* web_view = web_contents()->GetView()->GetNativeView();
-  system_drag_exclude_areas_ = CalculateNonDraggableRegions(
-      regions, NSWidth([web_view bounds]), NSHeight([web_view bounds]));
-
-  InstallDraggableRegionViews();
+  draggable_regions_ = regions;
+  UpdateDraggableRegionViews();
 }
 
 SkRegion* NativeAppWindowCocoa::GetDraggableRegion() {
@@ -663,13 +658,15 @@ void NativeAppWindowCocoa::HandleKeyboardEvent(
   [window() redispatchKeyEvent:event.os_event];
 }
 
-void NativeAppWindowCocoa::InstallDraggableRegionViews() {
-  DCHECK(!has_frame_);
+void NativeAppWindowCocoa::UpdateDraggableRegionViews() {
+  if (has_frame_)
+    return;
 
   // All ControlRegionViews should be added as children of the WebContentsView,
   // because WebContentsView will be removed and re-added when entering and
   // leaving fullscreen mode.
-  NSView* webView = web_contents()->GetView()->GetNativeView();
+  NSView* webView = WebContents()->GetNativeView();
+  NSInteger webViewWidth = NSWidth([webView bounds]);
   NSInteger webViewHeight = NSHeight([webView bounds]);
 
   // Remove all ControlRegionViews that are added last time.
@@ -681,11 +678,17 @@ void NativeAppWindowCocoa::InstallDraggableRegionViews() {
     if ([subview isKindOfClass:[ControlRegionView class]])
       [subview removeFromSuperview];
 
-  // Create and add ControlRegionView for each region that needs to be excluded
-  // from the dragging.
+  // Draggable regions is implemented by having the whole web view draggable
+  // (mouseDownCanMoveWindow) and overlaying regions that are not draggable.
+  std::vector<gfx::Rect> system_drag_exclude_areas =
+      CalculateNonDraggableRegions(
+          draggable_regions_, webViewWidth, webViewHeight);
+
+  // Create and add a ControlRegionView for each region that needs to be
+  // excluded from the dragging.
   for (std::vector<gfx::Rect>::const_iterator iter =
-           system_drag_exclude_areas_.begin();
-       iter != system_drag_exclude_areas_.end();
+           system_drag_exclude_areas.begin();
+       iter != system_drag_exclude_areas.end();
        ++iter) {
     base::scoped_nsobject<NSView> controlRegion(
         [[ControlRegionView alloc] initWithFrame:NSZeroRect]);
@@ -693,7 +696,6 @@ void NativeAppWindowCocoa::InstallDraggableRegionViews() {
                                        webViewHeight - iter->bottom(),
                                        iter->width(),
                                        iter->height())];
-    [controlRegion setAutoresizingMask:NSViewWidthSizable|NSViewHeightSizable];
     [webView addSubview:controlRegion];
   }
 }
@@ -713,7 +715,7 @@ bool NativeAppWindowCocoa::IsAlwaysOnTop() const {
 
 void NativeAppWindowCocoa::RenderViewCreated(content::RenderViewHost* rvh) {
   if (IsActive())
-    web_contents()->GetView()->RestoreFocus();
+    WebContents()->RestoreFocus();
 }
 
 bool NativeAppWindowCocoa::IsFrameless() const {
@@ -725,7 +727,12 @@ bool NativeAppWindowCocoa::HasFrameColor() const {
   return false;
 }
 
-SkColor NativeAppWindowCocoa::FrameColor() const {
+SkColor NativeAppWindowCocoa::ActiveFrameColor() const {
+  // TODO(benwells): Implement this.
+  return SkColor();
+}
+
+SkColor NativeAppWindowCocoa::InactiveFrameColor() const {
   // TODO(benwells): Implement this.
   return SkColor();
 }
@@ -782,12 +789,12 @@ void NativeAppWindowCocoa::WindowWillClose() {
 
 void NativeAppWindowCocoa::WindowDidBecomeKey() {
   content::RenderWidgetHostView* rwhv =
-      web_contents()->GetRenderWidgetHostView();
+      WebContents()->GetRenderWidgetHostView();
   if (rwhv)
     rwhv->SetActive(true);
   app_window_->OnNativeWindowActivated();
 
-  web_contents()->GetView()->RestoreFocus();
+  WebContents()->RestoreFocus();
 }
 
 void NativeAppWindowCocoa::WindowDidResignKey() {
@@ -798,10 +805,10 @@ void NativeAppWindowCocoa::WindowDidResignKey() {
   if ([NSApp isActive] && ([NSApp keyWindow] == window()))
     return;
 
-  web_contents()->GetView()->StoreFocus();
+  WebContents()->StoreFocus();
 
   content::RenderWidgetHostView* rwhv =
-      web_contents()->GetRenderWidgetHostView();
+      WebContents()->GetRenderWidgetHostView();
   if (rwhv)
     rwhv->SetActive(false);
 }
@@ -830,6 +837,7 @@ void NativeAppWindowCocoa::WindowDidFinishResize() {
 
 void NativeAppWindowCocoa::WindowDidResize() {
   app_window_->OnNativeWindowChanged();
+  UpdateDraggableRegionViews();
 }
 
 void NativeAppWindowCocoa::WindowDidMove() {
@@ -934,6 +942,10 @@ ShellNSWindow* NativeAppWindowCocoa::window() const {
   NSWindow* window = [window_controller_ window];
   CHECK(!window || [window isKindOfClass:[ShellNSWindow class]]);
   return static_cast<ShellNSWindow*>(window);
+}
+
+content::WebContents* NativeAppWindowCocoa::WebContents() const {
+  return app_window_->web_contents();
 }
 
 void NativeAppWindowCocoa::UpdateRestoredBounds() {

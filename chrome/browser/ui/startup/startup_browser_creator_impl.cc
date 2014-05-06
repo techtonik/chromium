@@ -66,6 +66,7 @@
 #include "chrome/browser/ui/startup/default_browser_prompt.h"
 #include "chrome/browser/ui/startup/google_api_keys_infobar_delegate.h"
 #include "chrome/browser/ui/startup/obsolete_system_infobar_delegate.h"
+#include "chrome/browser/ui/startup/session_crashed_bubble.h"
 #include "chrome/browser/ui/startup/session_crashed_infobar_delegate.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/tabs/pinned_tab_codec.h"
@@ -87,7 +88,6 @@
 #include "content/public/browser/notification_registrar.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
@@ -844,8 +844,11 @@ void StartupBrowserCreatorImpl::AddInfoBarsIfNecessary(
   if (!browser || !profile_ || browser->tab_strip_model()->count() == 0)
     return;
 
-  if (HasPendingUncleanExit(browser->profile()))
-    SessionCrashedInfoBarDelegate::Create(browser);
+  if (HasPendingUncleanExit(browser->profile())) {
+    if (!command_line_.HasSwitch(switches::kEnableSessionCrashedBubble) ||
+        !ShowSessionCrashedBubble(browser))
+      SessionCrashedInfoBarDelegate::Create(browser);
+  }
 
   // The below info bars are only added to the first profile which is launched.
   // Other profiles might be restoring the browsing sessions asynchronously,

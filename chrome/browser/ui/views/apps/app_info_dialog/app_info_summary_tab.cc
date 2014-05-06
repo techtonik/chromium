@@ -10,6 +10,7 @@
 #include "base/command_line.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/extensions/extension_service.h"
+#include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/image_loader.h"
 #include "chrome/browser/extensions/launch_util.h"
 #include "chrome/browser/profiles/profile.h"
@@ -371,7 +372,7 @@ void AppInfoSummaryTab::LoadAppImageAsync() {
 void AppInfoSummaryTab::OnAppImageLoaded(const gfx::Image& image) {
   const SkBitmap* bitmap;
   if (image.IsEmpty()) {
-    bitmap = &extensions::IconsInfo::GetDefaultAppIcon()
+    bitmap = &extensions::util::GetDefaultAppIcon()
                   .GetRepresentation(gfx::ImageSkia::GetMaxSupportedScale())
                   .sk_bitmap();
   } else {
@@ -432,7 +433,7 @@ bool AppInfoSummaryTab::CanUninstallApp() const {
 void AppInfoSummaryTab::CreateShortcuts() {
   DCHECK(CanCreateShortcuts());
   chrome::ShowCreateChromeAppShortcutsDialog(
-      parent_window_, profile_, app_, base::Closure());
+      parent_window_, profile_, app_, base::Callback<void(bool)>());
 }
 
 bool AppInfoSummaryTab::CanCreateShortcuts() const {

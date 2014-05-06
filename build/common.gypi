@@ -446,6 +446,14 @@
       #      be loaded at runtime.
       'cld2_dynamic%': 0,
 
+      # Whether CLD2 is a component. Only evaluated if cld_version == 2 and
+      # cld2_dynamic == 1.
+      #   0: Not a component. If cld2_dynamic == 1, it is up to the distribution
+      #      to ensure that the data file is provided if desired.
+      #   1: Componentized. CLD data should be obtained via the Component
+      #      Updater.
+      'cld2_is_component%': 0,
+
       # Enable spell checker.
       'enable_spellcheck%': 1,
 
@@ -646,6 +654,7 @@
           'enable_google_now%': 0,
           'cld_version%': 1,
           'cld2_dynamic%': 0,
+          'cld2_is_component%': 0,
           'enable_spellcheck%': 0,
           'enable_themes%': 0,
           'remoting%': 0,
@@ -749,12 +758,22 @@
         }],
 
         # linux_use_gold_flags: whether to use build flags that rely on gold.
-        # On by default for x64 Linux.  Temporarily off for ChromeOS as
-        # it failed on a buildbot.
-        ['OS=="linux" and target_arch=="x64" and chromeos==0', {
+        # On by default for x64 Linux.
+        ['OS=="linux" and target_arch=="x64"', {
           'linux_use_gold_flags%': 1,
         }, {
           'linux_use_gold_flags%': 0,
+        }],
+
+        # linux_use_debug_fission: whether to use split DWARF debug info
+        # files. This can reduce link time significantly, but is incompatible
+        # with some utilities such as icecc and ccache. Requires gold and
+        # gcc >= 4.8 or clang.
+        # http://gcc.gnu.org/wiki/DebugFission
+        ['OS=="linux" and target_arch=="x64"', {
+          'linux_use_debug_fission%': 1,
+        }, {
+          'linux_use_debug_fission%': 0,
         }],
 
         ['OS=="android" or OS=="ios"', {
@@ -834,12 +853,12 @@
           'test_isolation_mode%': 'noop',
         }],
         # Whether Android ARM or x86 build uses OpenMAX DL FFT.
-        ['OS=="android" and ((target_arch=="arm" and arm_version >= 7) or target_arch=="ia32" or target_arch=="x64") and android_webview_build==0', {
-          # Currently only supported on Android ARMv7+, ia32 or x64
-          # without webview.  When enabled, this will also enable
-          # WebAudio support on Android ARM, ia32 and x64.  Default is
-          # enabled.  Whether WebAudio is actually available depends
-          # on runtime settings and flags.
+        ['OS=="android" and ((target_arch=="arm" and arm_version >= 7) or target_arch=="ia32" or target_arch=="x64")', {
+          # Currently only supported on Android ARMv7+, ia32 or x64.
+          # When enabled, this will also enable WebAudio support on
+          # Android ARM, ia32 and x64.  Default is enabled.  Whether
+          # WebAudio is actually available depends on runtime settings
+          # and flags.
           'use_openmax_dl_fft%': 1,
         }, {
           'use_openmax_dl_fft%': 0,
@@ -1006,6 +1025,7 @@
     'linux_use_bundled_gold%': '<(linux_use_bundled_gold)',
     'linux_use_bundled_binutils%': '<(linux_use_bundled_binutils)',
     'linux_use_gold_flags%': '<(linux_use_gold_flags)',
+    'linux_use_debug_fission%': '<(linux_use_debug_fission)',
     'use_canvas_skia%': '<(use_canvas_skia)',
     'test_isolation_mode%': '<(test_isolation_mode)',
     'test_isolation_outdir%': '<(test_isolation_outdir)',
@@ -1016,6 +1036,7 @@
     'cld_version%': '<(cld_version)',
     'cld2_table_size%': '<(cld2_table_size)',
     'cld2_dynamic%': '<(cld2_dynamic)',
+    'cld2_is_component%': '<(cld2_is_component)',
     'enable_captive_portal_detection%': '<(enable_captive_portal_detection)',
     'disable_ftp_support%': '<(disable_ftp_support)',
     'enable_task_manager%': '<(enable_task_manager)',
@@ -2084,9 +2105,11 @@
         'ozone_platform%': "test",
 
         # Enable built-in ozone platforms if ozone is enabled.
+        'ozone_platform_caca%': 0,
         'ozone_platform_dri%': 1,
         'ozone_platform_test%': 1,
       }, {  # use_ozone==0
+        'ozone_platform_caca%': 0,
         'ozone_platform_dri%': 0,
         'ozone_platform_test%': 0,
       }],
@@ -2562,6 +2585,9 @@
       }],
       ['cld2_dynamic!=0', {
         'defines': ['CLD2_DYNAMIC_MODE=1'],
+      }],
+      ['cld2_is_component!=0', {
+        'defines': ['CLD2_IS_COMPONENT=1'],
       }],
       ['enable_printing==1', {
         'defines': ['ENABLE_FULL_PRINTING=1', 'ENABLE_PRINTING=1'],
@@ -3215,9 +3241,10 @@
               }, {
                 'cflags': ['-fno-unwind-tables', '-fno-asynchronous-unwind-tables'],
               }],
-              # http://gcc.gnu.org/wiki/DebugFission
-              # Requires gold and gcc >= 4.8 or clang.
-              ['linux_use_gold_flags==1 and (clang==1 or gcc_version>=48) and binutils_version>=223', {
+              # TODO(mostynb): shuffle clang/gcc_version/binutils_version
+              # definitions in to the right scope to use them when setting
+              # linux_use_debug_fission, so it can be used here alone.
+              ['linux_use_debug_fission==1 and linux_use_gold_flags==1 and (clang==1 or gcc_version>=48) and binutils_version>=223', {
                 'cflags': ['-gsplit-dwarf'],
                 'ldflags': ['-Wl,--gdb-index'],
               }],
@@ -5031,7 +5058,7 @@
               'VCLinkerTool': {
                 'AdditionalLibraryDirectories': [
                   # TODO(hans): If make_clang_dir is absolute, this breaks.
-                  '<(DEPTH)/<(make_clang_dir)/lib/clang/3.5/lib/windows',
+                  '<(DEPTH)/<(make_clang_dir)/lib/clang/3.5.0/lib/windows',
                 ],
               },
               'target_conditions': [

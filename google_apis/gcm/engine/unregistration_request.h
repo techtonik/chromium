@@ -13,12 +13,15 @@
 #include "google_apis/gcm/base/gcm_export.h"
 #include "net/base/backoff_entry.h"
 #include "net/url_request/url_fetcher_delegate.h"
+#include "url/gurl.h"
 
 namespace net {
 class URLRequestContextGetter;
 }
 
 namespace gcm {
+
+class GCMStatsRecorder;
 
 // Unregistration request is used to revoke registration IDs for applications
 // that were uninstalled and should no longer receive GCM messages. In case an
@@ -70,10 +73,12 @@ class GCM_EXPORT UnregistrationRequest : public net::URLFetcherDelegate {
   // once registration has been revoked or there has been an error that makes
   // further retries pointless.
   UnregistrationRequest(
+      const GURL& registration_url,
       const RequestInfo& request_info,
       const net::BackoffEntry::Policy& backoff_policy,
       const UnregistrationCallback& callback,
-      scoped_refptr<net::URLRequestContextGetter> request_context_getter);
+      scoped_refptr<net::URLRequestContextGetter> request_context_getter,
+      GCMStatsRecorder* recorder);
   virtual ~UnregistrationRequest();
 
   // Starts an unregistration request.
@@ -89,10 +94,14 @@ class GCM_EXPORT UnregistrationRequest : public net::URLFetcherDelegate {
 
   UnregistrationCallback callback_;
   RequestInfo request_info_;
+  GURL registration_url_;
 
   net::BackoffEntry backoff_entry_;
   scoped_refptr<net::URLRequestContextGetter> request_context_getter_;
   scoped_ptr<net::URLFetcher> url_fetcher_;
+
+  // Recorder that records GCM activities for debugging purpose. Not owned.
+  GCMStatsRecorder* recorder_;
 
   base::WeakPtrFactory<UnregistrationRequest> weak_ptr_factory_;
 

@@ -15,6 +15,7 @@
 #include "chrome/browser/ui/browser_finder.h"
 #import "chrome/browser/ui/chrome_style.h"
 #import "chrome/browser/ui/cocoa/browser_window_controller.h"
+#import "chrome/browser/ui/cocoa/browser_window_utils.h"
 #import "chrome/browser/ui/cocoa/constrained_window/constrained_window_button.h"
 #import "chrome/browser/ui/cocoa/hover_close_button.h"
 #import "chrome/browser/ui/cocoa/hyperlink_text_view.h"
@@ -23,9 +24,11 @@
 #include "chrome/browser/ui/cocoa/website_settings/permission_bubble_cocoa.h"
 #include "chrome/browser/ui/cocoa/website_settings/permission_selector_button.h"
 #include "chrome/browser/ui/cocoa/website_settings/split_block_button.h"
+#include "chrome/browser/ui/cocoa/website_settings/website_settings_utils_cocoa.h"
 #include "chrome/browser/ui/website_settings/permission_bubble_request.h"
 #include "chrome/browser/ui/website_settings/permission_bubble_view.h"
 #include "chrome/browser/ui/website_settings/permission_menu_model.h"
+#include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/user_metrics.h"
 #include "grit/generated_resources.h"
 #include "skia/ext/skia_utils_mac.h"
@@ -45,7 +48,6 @@ const CGFloat kButtonPadding = 10.0f;
 const CGFloat kTitlePaddingX = 50.0f;
 const CGFloat kTitleFontSize = 15.0f;
 const CGFloat kPermissionFontSize = 12.0f;
-const CGFloat kPermissionButtonTitleRightPadding = 4.0f;
 
 class MenuDelegate : public ui::SimpleMenuModel::Delegate {
  public:
@@ -100,10 +102,14 @@ class MenuDelegate : public ui::SimpleMenuModel::Delegate {
     [self setBordered:NO];
 
     __block PermissionBubbleView::Delegate* blockDelegate = delegate;
+    __block AllowBlockMenuButton* blockSelf = self;
     PermissionMenuModel::ChangeCallback changeCallback =
         base::BindBlock(^(const WebsiteSettingsUI::PermissionInfo& permission) {
             blockDelegate->ToggleAccept(
                 index, permission.setting == CONTENT_SETTING_ALLOW);
+            [blockSelf setFrameSize:
+                SizeForWebsiteSettingsButtonTitle(blockSelf,
+                                                  [blockSelf title])];
         });
 
     menuModel_.reset(new PermissionMenuModel(url, setting, changeCallback));
@@ -111,24 +117,33 @@ class MenuDelegate : public ui::SimpleMenuModel::Delegate {
                                          useWithPopUpButtonCell:NO]);
     [self setMenu:[menuController_ menu]];
     [self selectItemAtIndex:menuModel_->GetIndexOfCommandId(setting)];
+    // Although the frame is reset, below, this sizes the cell properly.
     [self sizeToFit];
     // Adjust the size to fit the current title.  Using only -sizeToFit leaves
     // an ugly amount of whitespace between the title and the arrows because it
     // will fit to the largest element in the menu, not just the selected item.
-    // TODO(leng):  This was copied from PermissionSelectorButton.  Move to a
-    // shared location, so that the code is not duplicated.
-    NSDictionary* textAttributes =
-        [[self attributedTitle] attributesAtIndex:0 effectiveRange:NULL];
-    NSSize titleSize = [[self title] sizeWithAttributes:textAttributes];
-    NSRect frame = [self frame];
-    NSRect titleRect = [[self cell] titleRectForBounds:frame];
-    CGFloat width = titleSize.width + NSWidth(frame) - NSWidth(titleRect);
-    [self setFrameSize:NSMakeSize(width + kPermissionButtonTitleRightPadding,
-                                  NSHeight(frame))];
+    [self setFrameSize:SizeForWebsiteSettingsButtonTitle(self, [self title])];
   }
   return self;
 }
 
+@end
+
+// The window used for the permission bubble controller.
+// Subclassed to allow browser-handled keyboard events to be passed from the
+// permission bubble to its parent window, which is a browser window.
+@interface PermissionBubbleWindow : InfoBubbleWindow
+@end
+
+@implementation PermissionBubbleWindow
+- (BOOL)performKeyEquivalent:(NSEvent*)event {
+  content::NativeWebKeyboardEvent wrappedEvent(event);
+  if ([BrowserWindowUtils shouldHandleKeyboardEvent:wrappedEvent]) {
+    return [BrowserWindowUtils handleKeyboardEvent:event
+                                          inWindow:[self parentWindow]];
+  }
+  return [super performKeyEquivalent:event];
+}
 @end
 
 @interface PermissionBubbleController ()
@@ -191,11 +206,12 @@ class MenuDelegate : public ui::SimpleMenuModel::Delegate {
                     bridge:(PermissionBubbleCocoa*)bridge {
   DCHECK(parentWindow);
   DCHECK(bridge);
-  base::scoped_nsobject<InfoBubbleWindow> window([[InfoBubbleWindow alloc]
-      initWithContentRect:ui::kWindowSizeDeterminedLater
-                styleMask:NSBorderlessWindowMask
-                  backing:NSBackingStoreBuffered
-                    defer:NO]);
+  base::scoped_nsobject<PermissionBubbleWindow> window(
+      [[PermissionBubbleWindow alloc]
+          initWithContentRect:ui::kWindowSizeDeterminedLater
+                    styleMask:NSBorderlessWindowMask
+                      backing:NSBackingStoreBuffered
+                        defer:NO]);
   [window setAllowedAnimations:info_bubble::kAnimateNone];
   if ((self = [super initWithWindow:window
                        parentWindow:parentWindow

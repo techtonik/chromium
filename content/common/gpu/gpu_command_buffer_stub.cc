@@ -210,7 +210,6 @@ bool GpuCommandBufferStub::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_ProduceFrontBuffer,
                         OnProduceFrontBuffer);
     IPC_MESSAGE_HANDLER(GpuCommandBufferMsg_Echo, OnEcho);
-    IPC_MESSAGE_HANDLER_DELAY_REPLY(GpuCommandBufferMsg_GetState, OnGetState);
     IPC_MESSAGE_HANDLER_DELAY_REPLY(GpuCommandBufferMsg_WaitForTokenInRange,
                                     OnWaitForTokenInRange);
     IPC_MESSAGE_HANDLER_DELAY_REPLY(GpuCommandBufferMsg_WaitForGetOffsetInRange,
@@ -394,7 +393,7 @@ void GpuCommandBufferStub::Destroy() {
 
   bool have_context = false;
   if (decoder_ && command_buffer_ &&
-      command_buffer_->GetState().error != gpu::error::kLostContext)
+      command_buffer_->GetLastState().error != gpu::error::kLostContext)
     have_context = decoder_->MakeCurrent();
   FOR_EACH_OBSERVER(DestructionObserver,
                     destruction_observers_,
@@ -539,12 +538,8 @@ void GpuCommandBufferStub::OnInitialize(
     return;
   }
 
-  gpu_control_.reset(
-      new gpu::GpuControlService(context_group_->image_manager(),
-                                 NULL,
-                                 context_group_->mailbox_manager(),
-                                 NULL,
-                                 decoder_->GetCapabilities()));
+  gpu_control_service_.reset(
+      new gpu::GpuControlService(context_group_->image_manager(), NULL));
 
   if (CommandLine::ForCurrentProcess()->HasSwitch(
       switches::kEnableGPUServiceLogging)) {
@@ -588,7 +583,7 @@ void GpuCommandBufferStub::OnInitialize(
       shared_state_shm.Pass(), kSharedStateSize));
 
   GpuCommandBufferMsg_Initialize::WriteReplyParams(
-      reply_message, true, gpu_control_->GetCapabilities());
+      reply_message, true, decoder_->GetCapabilities());
   Send(reply_message);
 
   if (handle_.is_null() && !active_url_.is_empty()) {
@@ -651,23 +646,10 @@ void GpuCommandBufferStub::OnProduceFrontBuffer(const gpu::Mailbox& mailbox) {
   decoder_->ProduceFrontBuffer(mailbox);
 }
 
-void GpuCommandBufferStub::OnGetState(IPC::Message* reply_message) {
-  TRACE_EVENT0("gpu", "GpuCommandBufferStub::OnGetState");
-  if (command_buffer_) {
-    gpu::CommandBuffer::State state = command_buffer_->GetState();
-    CheckContextLost();
-    GpuCommandBufferMsg_GetState::WriteReplyParams(reply_message, state);
-  } else {
-    DLOG(ERROR) << "no command_buffer.";
-    reply_message->set_reply_error();
-  }
-  Send(reply_message);
-}
-
 void GpuCommandBufferStub::OnParseError() {
   TRACE_EVENT0("gpu", "GpuCommandBufferStub::OnParseError");
   DCHECK(command_buffer_.get());
-  gpu::CommandBuffer::State state = command_buffer_->GetState();
+  gpu::CommandBuffer::State state = command_buffer_->GetLastState();
   IPC::Message* msg = new GpuCommandBufferMsg_Destroyed(
       route_id_, state.context_lost_reason);
   msg->set_unblock(true);
@@ -714,7 +696,7 @@ void GpuCommandBufferStub::OnWaitForGetOffsetInRange(
 
 void GpuCommandBufferStub::CheckCompleteWaits() {
   if (wait_for_token_ || wait_for_get_offset_) {
-    gpu::CommandBuffer::State state = command_buffer_->GetState();
+    gpu::CommandBuffer::State state = command_buffer_->GetLastState();
     if (wait_for_token_ &&
         (gpu::CommandBuffer::InRange(
              wait_for_token_->start, wait_for_token_->end, state.token) ||
@@ -956,19 +938,16 @@ void GpuCommandBufferStub::OnRegisterGpuMemoryBuffer(
     return;
   }
 #endif
-  if (gpu_control_) {
-    gpu_control_->RegisterGpuMemoryBuffer(id,
-                                          gpu_memory_buffer,
-                                          width,
-                                          height,
-                                          internalformat);
+  if (gpu_control_service_) {
+    gpu_control_service_->RegisterGpuMemoryBuffer(
+        id, gpu_memory_buffer, width, height, internalformat);
   }
 }
 
 void GpuCommandBufferStub::OnDestroyGpuMemoryBuffer(int32 id) {
   TRACE_EVENT0("gpu", "GpuCommandBufferStub::OnDestroyGpuMemoryBuffer");
-  if (gpu_control_)
-    gpu_control_->DestroyGpuMemoryBuffer(id);
+  if (gpu_control_service_)
+    gpu_control_service_->UnregisterGpuMemoryBuffer(id);
 }
 
 void GpuCommandBufferStub::SendConsoleMessage(
@@ -1042,7 +1021,7 @@ void GpuCommandBufferStub::SuggestHaveFrontBuffer(
 
 bool GpuCommandBufferStub::CheckContextLost() {
   DCHECK(command_buffer_);
-  gpu::CommandBuffer::State state = command_buffer_->GetState();
+  gpu::CommandBuffer::State state = command_buffer_->GetLastState();
   bool was_lost = state.error == gpu::error::kLostContext;
   // Lose all other contexts if the reset was triggered by the robustness
   // extension instead of being synthetic.
@@ -1056,7 +1035,7 @@ bool GpuCommandBufferStub::CheckContextLost() {
 
 void GpuCommandBufferStub::MarkContextLost() {
   if (!command_buffer_ ||
-      command_buffer_->GetState().error == gpu::error::kLostContext)
+      command_buffer_->GetLastState().error == gpu::error::kLostContext)
     return;
 
   command_buffer_->SetContextLostReason(gpu::error::kUnknown);

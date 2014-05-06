@@ -471,7 +471,9 @@ TEST_P(EndToEndTest, PostMissingBytes) {
   EXPECT_EQ(500u, client_->response_headers()->parsed_response_code());
 }
 
-TEST_P(EndToEndTest, LargePostNoPacketLoss) {
+// TODO(rtenneti): DISABLED_LargePostNoPacketLoss seems to be flaky.
+// http://crbug.com/297040.
+TEST_P(EndToEndTest, DISABLED_LargePostNoPacketLoss) {
   ASSERT_TRUE(Initialize());
 
   client_->client()->WaitForCryptoHandshakeConfirmed();
@@ -544,7 +546,7 @@ TEST_P(EndToEndTest, LargePostNoPacketLossWithDelayAndReordering) {
   request.AddBody(body, true);
 
   EXPECT_EQ(kFooResponseBody, client_->SendCustomSynchronousRequest(request));
-  // TODO(ianswett): Add a VerifyCleanConnection call once this is clean.
+  VerifyCleanConnection(true);
 }
 
 TEST_P(EndToEndTest, LargePostWithPacketLossAndBlockedSocket) {
@@ -625,6 +627,7 @@ TEST_P(EndToEndTest, DISABLED_LargePostZeroRTTFailure) {
   ASSERT_TRUE(client_->client()->connected());
   EXPECT_EQ(kFooResponseBody, client_->SendCustomSynchronousRequest(request));
   EXPECT_EQ(2, client_->client()->session()->GetNumSentClientHellos());
+  VerifyCleanConnection(false);
 }
 
 TEST_P(EndToEndTest, LargePostFEC) {

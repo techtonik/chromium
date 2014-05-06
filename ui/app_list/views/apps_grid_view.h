@@ -6,6 +6,7 @@
 #define UI_APP_LIST_VIEWS_APPS_GRID_VIEW_H_
 
 #include <set>
+#include <string>
 
 #include "base/basictypes.h"
 #include "base/compiler_specific.h"
@@ -114,11 +115,7 @@ class APP_LIST_EXPORT AppsGridView : public views::View,
   void UpdateDrag(Pointer pointer, const gfx::Point& point);
   void EndDrag(bool cancel);
   bool IsDraggedView(const views::View* view) const;
-
-  void StartSettingUpSynchronousDrag();
-  bool RunSynchronousDrag();
-  void CleanUpSynchronousDrag();
-  void OnGotShortcutPath(const base::FilePath& path);
+  void ClearDragState(bool cancel_reparent);
 
   // Set the drag and drop host for application links.
   void SetDragAndDropHostOfCurrentAppList(
@@ -442,6 +439,14 @@ class APP_LIST_EXPORT AppsGridView : public views::View,
 
   // Returns true if the grid view is under an OEM folder.
   bool IsUnderOEMFolder();
+
+  void StartSettingUpSynchronousDrag();
+  bool RunSynchronousDrag();
+  void CleanUpSynchronousDrag();
+#if defined(OS_WIN)
+  void OnGotShortcutPath(scoped_refptr<SynchronousDrag> drag,
+                         const base::FilePath& path);
+#endif
 
   AppListModel* model_;  // Owned by AppListView.
   AppListItemList* item_list_;  // Not owned.

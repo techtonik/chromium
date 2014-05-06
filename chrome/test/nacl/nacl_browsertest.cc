@@ -37,25 +37,11 @@ NACL_BROWSER_TEST_F(NaClBrowserTest, SimpleLoad, {
   RunLoadTest(FILE_PATH_LITERAL("nacl_load_test.html"));
 })
 
-// ASan does not work with libc-free context, so disable the test.
-#if defined(OS_LINUX) && !defined(ADDRESS_SANITIZER)
-#  define MAYBE_NonSfiMessaging NonSfiMessaging
-#else
-#  define MAYBE_NonSfiMessaging DISABLED_NonSfiMessaging
-#endif
-
-IN_PROC_BROWSER_TEST_F(NaClBrowserTestNonSfiMode, MAYBE_NonSfiMessaging) {
+IN_PROC_BROWSER_TEST_F(NaClBrowserTestNonSfiMode, MAYBE_NONSFI(Messaging)) {
   RunLoadTest(FILE_PATH_LITERAL("libc_free.html"));
 }
 
-// ASan does not work with libc-free context, so disable the test.
-#if defined(OS_LINUX) && !defined(ADDRESS_SANITIZER)
-#  define MAYBE_NonSfiIrt NonSfiIrt
-#else
-#  define MAYBE_NonSfiIrt DISABLED_NonSfiIrt
-#endif
-
-IN_PROC_BROWSER_TEST_F(NaClBrowserTestNonSfiMode, MAYBE_NonSfiIrt) {
+IN_PROC_BROWSER_TEST_F(NaClBrowserTestNonSfiMode, MAYBE_NONSFI(Irt)) {
   RunNaClIntegrationTest(FILE_PATH_LITERAL("irt_test.html"));
 }
 
@@ -142,6 +128,18 @@ IN_PROC_BROWSER_TEST_F(NaClBrowserTestGLibc, PreInitManifestFile) {
 }
 IN_PROC_BROWSER_TEST_F(NaClBrowserTestNewlib, IrtManifestFile) {
   RunNaClIntegrationTest(FILE_PATH_LITERAL("irt_manifest_file_test.html"));
+}
+IN_PROC_BROWSER_TEST_F(NaClBrowserTestPnaclNonSfi,
+                       MAYBE_PNACL_NONSFI(IrtManifestFile)) {
+  RunNaClIntegrationTest(FILE_PATH_LITERAL("irt_manifest_file_test.html"));
+}
+
+IN_PROC_BROWSER_TEST_F(NaClBrowserTestNewlib, IrtException) {
+  RunNaClIntegrationTest(FILE_PATH_LITERAL("irt_exception_test.html"));
+}
+IN_PROC_BROWSER_TEST_F(NaClBrowserTestPnaclNonSfi,
+                       MAYBE_PNACL_NONSFI(IrtException)) {
+  RunNaClIntegrationTest(FILE_PATH_LITERAL("irt_exception_test.html"));
 }
 
 NACL_BROWSER_TEST_F(NaClBrowserTest, Nameservice, {

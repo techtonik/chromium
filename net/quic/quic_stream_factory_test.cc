@@ -72,10 +72,10 @@ class QuicStreamFactoryPeer {
 
   static bool IsLiveSession(QuicStreamFactory* factory,
                             QuicClientSession* session) {
-    for (QuicStreamFactory::SessionSet::iterator it =
+    for (QuicStreamFactory::SessionIdMap::iterator it =
              factory->all_sessions_.begin();
          it != factory->all_sessions_.end(); ++it) {
-      if (*it == session)
+      if (it->first == session)
         return true;
     }
     return false;
@@ -94,7 +94,7 @@ class QuicStreamFactoryTest : public ::testing::TestWithParam<QuicVersion> {
                  cert_verifier_.get(),
                  &crypto_client_stream_factory_,
                  &random_generator_, clock_, kDefaultMaxPacketSize,
-                 SupportedVersions(GetParam()), true, true),
+                 SupportedVersions(GetParam()), true, true, true),
         host_port_pair_(kDefaultServerHostName, kDefaultServerPort),
         is_https_(false),
         privacy_mode_(PRIVACY_MODE_DISABLED) {

@@ -95,7 +95,7 @@ ExtensionUpdater* GetExtensionUpdater(Profile* profile) {
     return profile->GetExtensionService()->updater();
 }
 
-GURL GetImageURLFromData(std::string contents) {
+GURL GetImageURLFromData(const std::string& contents) {
   std::string contents_base64;
   base::Base64Encode(contents, &contents_base64);
 
@@ -313,7 +313,7 @@ void DeveloperPrivateAPI::OnListenerRemoved(
 
 namespace api {
 
-bool DeveloperPrivateAutoUpdateFunction::RunImpl() {
+bool DeveloperPrivateAutoUpdateFunction::RunSync() {
   ExtensionUpdater* updater = GetExtensionUpdater(GetProfile());
   if (updater)
     updater->CheckNow(ExtensionUpdater::CheckParams());
@@ -595,7 +595,7 @@ ItemInspectViewList DeveloperPrivateGetItemsInfoFunction::
   return result;
 }
 
-bool DeveloperPrivateGetItemsInfoFunction::RunImpl() {
+bool DeveloperPrivateGetItemsInfoFunction::RunAsync() {
   scoped_ptr<developer::GetItemsInfo::Params> params(
       developer::GetItemsInfo::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get() != NULL);
@@ -652,7 +652,7 @@ bool DeveloperPrivateGetItemsInfoFunction::RunImpl() {
 
 DeveloperPrivateGetItemsInfoFunction::~DeveloperPrivateGetItemsInfoFunction() {}
 
-bool DeveloperPrivateAllowFileAccessFunction::RunImpl() {
+bool DeveloperPrivateAllowFileAccessFunction::RunSync() {
   scoped_ptr<AllowFileAccess::Params> params(
       AllowFileAccess::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get());
@@ -683,7 +683,7 @@ bool DeveloperPrivateAllowFileAccessFunction::RunImpl() {
 DeveloperPrivateAllowFileAccessFunction::
     ~DeveloperPrivateAllowFileAccessFunction() {}
 
-bool DeveloperPrivateAllowIncognitoFunction::RunImpl() {
+bool DeveloperPrivateAllowIncognitoFunction::RunSync() {
   scoped_ptr<AllowIncognito::Params> params(
       AllowIncognito::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get());
@@ -703,8 +703,7 @@ bool DeveloperPrivateAllowIncognitoFunction::RunImpl() {
 DeveloperPrivateAllowIncognitoFunction::
     ~DeveloperPrivateAllowIncognitoFunction() {}
 
-
-bool DeveloperPrivateReloadFunction::RunImpl() {
+bool DeveloperPrivateReloadFunction::RunSync() {
   scoped_ptr<Reload::Params> params(Reload::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get());
 
@@ -714,7 +713,7 @@ bool DeveloperPrivateReloadFunction::RunImpl() {
   return true;
 }
 
-bool DeveloperPrivateShowPermissionsDialogFunction::RunImpl() {
+bool DeveloperPrivateShowPermissionsDialogFunction::RunSync() {
   EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &extension_id_));
   ExtensionService* service = GetProfile()->GetExtensionService();
   CHECK(!extension_id_.empty());
@@ -771,7 +770,7 @@ DeveloperPrivateShowPermissionsDialogFunction::
 
 DeveloperPrivateEnableFunction::DeveloperPrivateEnableFunction() {}
 
-bool DeveloperPrivateEnableFunction::RunImpl() {
+bool DeveloperPrivateEnableFunction::RunSync() {
   scoped_ptr<Enable::Params> params(Enable::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get());
 
@@ -835,7 +834,7 @@ bool DeveloperPrivateEnableFunction::RunImpl() {
 }
 
 void DeveloperPrivateEnableFunction::OnRequirementsChecked(
-    std::string extension_id,
+    const std::string& extension_id,
     std::vector<std::string> requirements_errors) {
   if (requirements_errors.empty()) {
     ExtensionService* service = GetProfile()->GetExtensionService();
@@ -850,7 +849,7 @@ void DeveloperPrivateEnableFunction::OnRequirementsChecked(
 
 DeveloperPrivateEnableFunction::~DeveloperPrivateEnableFunction() {}
 
-bool DeveloperPrivateInspectFunction::RunImpl() {
+bool DeveloperPrivateInspectFunction::RunSync() {
   scoped_ptr<developer::Inspect::Params> params(
       developer::Inspect::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get() != NULL);
@@ -890,7 +889,7 @@ bool DeveloperPrivateInspectFunction::RunImpl() {
 
 DeveloperPrivateInspectFunction::~DeveloperPrivateInspectFunction() {}
 
-bool DeveloperPrivateLoadUnpackedFunction::RunImpl() {
+bool DeveloperPrivateLoadUnpackedFunction::RunAsync() {
   base::string16 select_title =
       l10n_util::GetStringUTF16(IDS_EXTENSION_LOAD_FROM_DIRECTORY);
 
@@ -947,7 +946,9 @@ bool DeveloperPrivateChooseEntryFunction::ShowPicker(
   return true;
 }
 
-bool DeveloperPrivateChooseEntryFunction::RunImpl() { return false; }
+bool DeveloperPrivateChooseEntryFunction::RunAsync() {
+  return false;
+}
 
 DeveloperPrivateChooseEntryFunction::~DeveloperPrivateChooseEntryFunction() {}
 
@@ -981,7 +982,7 @@ void DeveloperPrivatePackDirectoryFunction::OnPackFailure(
   Release();
 }
 
-bool DeveloperPrivatePackDirectoryFunction::RunImpl() {
+bool DeveloperPrivatePackDirectoryFunction::RunAsync() {
   scoped_ptr<PackDirectory::Params> params(
       PackDirectory::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get());
@@ -1035,7 +1036,7 @@ DeveloperPrivatePackDirectoryFunction::~DeveloperPrivatePackDirectoryFunction()
 
 DeveloperPrivateLoadUnpackedFunction::~DeveloperPrivateLoadUnpackedFunction() {}
 
-bool DeveloperPrivateLoadDirectoryFunction::RunImpl() {
+bool DeveloperPrivateLoadDirectoryFunction::RunAsync() {
   // TODO(grv) : add unittests.
   std::string directory_url_str;
   std::string filesystem_name;
@@ -1242,7 +1243,7 @@ DeveloperPrivateLoadDirectoryFunction::DeveloperPrivateLoadDirectoryFunction()
 DeveloperPrivateLoadDirectoryFunction::~DeveloperPrivateLoadDirectoryFunction()
     {}
 
-bool DeveloperPrivateChoosePathFunction::RunImpl() {
+bool DeveloperPrivateChoosePathFunction::RunAsync() {
   scoped_ptr<developer::ChoosePath::Params> params(
       developer::ChoosePath::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get() != NULL);
@@ -1296,7 +1297,7 @@ void DeveloperPrivateChoosePathFunction::FileSelectionCanceled() {
 
 DeveloperPrivateChoosePathFunction::~DeveloperPrivateChoosePathFunction() {}
 
-bool DeveloperPrivateIsProfileManagedFunction::RunImpl() {
+bool DeveloperPrivateIsProfileManagedFunction::RunSync() {
   SetResult(new base::FundamentalValue(GetProfile()->IsManaged()));
   return true;
 }
@@ -1311,7 +1312,7 @@ DeveloperPrivateRequestFileSourceFunction::
 DeveloperPrivateRequestFileSourceFunction::
     ~DeveloperPrivateRequestFileSourceFunction() {}
 
-bool DeveloperPrivateRequestFileSourceFunction::RunImpl() {
+bool DeveloperPrivateRequestFileSourceFunction::RunAsync() {
   scoped_ptr<developer::RequestFileSource::Params> params(
       developer::RequestFileSource::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get() != NULL);
@@ -1335,13 +1336,13 @@ void DeveloperPrivateRequestFileSourceFunction::LaunchCallback(
     const base::DictionaryValue& results) {
   SetResult(results.DeepCopy());
   SendResponse(true);
-  Release();  // Balanced in RunImpl().
+  Release();  // Balanced in RunAsync().
 }
 
 DeveloperPrivateOpenDevToolsFunction::DeveloperPrivateOpenDevToolsFunction() {}
 DeveloperPrivateOpenDevToolsFunction::~DeveloperPrivateOpenDevToolsFunction() {}
 
-bool DeveloperPrivateOpenDevToolsFunction::RunImpl() {
+bool DeveloperPrivateOpenDevToolsFunction::RunAsync() {
   scoped_ptr<developer::OpenDevTools::Params> params(
       developer::OpenDevTools::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get() != NULL);

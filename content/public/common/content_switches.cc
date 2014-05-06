@@ -161,9 +161,6 @@ const char kDisableFlash3d[]                = "disable-flash-3d";
 // Disable Stage3D inside of flapper.
 const char kDisableFlashStage3d[]           = "disable-flash-stage3d";
 
-// Disable deferral of scroll-ending gesture events when a scroll is active.
-const char kDisableGestureDebounce[]        = "disable-gesture-debounce";
-
 const char kDisableGestureTapHighlight[]    = "disable-gesture-tap-highlight";
 
 // Disable GL multisampling.
@@ -233,10 +230,6 @@ const char kDisableLocalStorage[]           = "disable-local-storage";
 // Force logging to be disabled.  Logging is enabled by default in debug
 // builds.
 const char kDisableLogging[]                = "disable-logging";
-
-// Disable rasterizer that writes directly to GPU memory.
-// Overrides the kEnableMapImage flag.
-const char kDisableMapImage[]               = "disable-map-image";
 
 // Disables Media Source API (i.e., the MediaSource object).
 const char kDisableMediaSource[]            = "disable-media-source";
@@ -309,6 +302,10 @@ const char kDisableXSLT[]                   = "disable-xslt";
 // Disables Blink's XSSAuditor. The XSSAuditor mitigates reflective XSS.
 const char kDisableXSSAuditor[]             = "disable-xss-auditor";
 
+// Disable rasterizer that writes directly to GPU memory associated with tiles.
+// Overrides the kEnableZeroCopy flag.
+const char kDisableZeroCopy[]               = "disable-zero-copy";
+
 // Specifies if the |DOMAutomationController| needs to be bound in the
 // renderer. This binding happens on per-frame basis and hence can potentially
 // be a performance bottleneck. One should only enable it when automating dom
@@ -321,8 +318,8 @@ const char kDomAutomationController[]       = "dom-automation";
 const char kEnableBleedingEdgeRenderingFastPaths[] =
     "enable-bleeding-edge-rendering-fast-paths";
 
-// Disable gpu-accelerated 2d canvas.
-const char kEnableDeferredFilters[]         = "enable-deferred-filters";
+// Disable deferred image filters.
+const char kDisableDeferredFilters[]         = "disable-deferred-filters";
 
 // Enables accelerated compositing for backgrounds of root layers with
 // background-attachment: fixed.
@@ -444,17 +441,8 @@ const char kEnableInbandTextTracks[]        = "enable-inband-text-tracks";
 // builds.
 const char kEnableLogging[]                 = "enable-logging";
 
-// Enable rasterizer that writes directly to GPU memory.
-const char kEnableMapImage[]                = "enable-map-image";
-
 // Enables the memory benchmarking extension
 const char kEnableMemoryBenchmarking[]      = "enable-memory-benchmarking";
-
-// Make the values returned to window.performance.memory more granular and more
-// up to date in shared worker. Without this flag, the memory information is
-// still available, but it is bucketized and updated less frequently.
-const char kEnableSharedWorkerMemoryInfo[] =
-    "enable-shared-worker-memory-info";
 
 // On Windows, converts the page to the currently-installed monitor profile.
 // This does NOT enable color management for images. The source is still
@@ -463,6 +451,9 @@ const char kEnableMonitorProfile[]          = "enable-monitor-profile";
 
 // Enables use of cache if offline, even if it's stale
 const char kEnableOfflineCacheAccess[]      = "enable-offline-cache-access";
+
+// Enable rasterizer that writes directly to GPU memory.
+const char kEnableOneCopy[]                 = "enable-one-copy";
 
 // Enables use of hardware overlay for fullscreen video playback. Android only.
 const char kEnableOverlayFullscreenVideo[]  = "enable-overlay-fullscreen-video";
@@ -476,6 +467,12 @@ const char kEnableOverscrollNotifications[] = "enable-overscroll-notifications";
 
 // Enables compositor-accelerated touch-screen pinch gestures.
 const char kEnablePinch[]                   = "enable-pinch";
+
+// Make the values returned to window.performance.memory more granular and more
+// up to date in shared worker. Without this flag, the memory information is
+// still available, but it is bucketized and updated less frequently. This flag
+// also applys to workers.
+const char kEnablePreciseMemoryInfo[] = "enable-precise-memory-info";
 
 // Enable caching of pre-parsed JS script data.  See http://crbug.com/32407.
 const char kEnablePreparsedJsCaching[]      = "enable-preparsed-js-caching";
@@ -580,6 +577,9 @@ const char kEnableWebGLDraftExtensions[] = "enable-webgl-draft-extensions";
 
 // Enables Web MIDI API.
 const char kEnableWebMIDI[]                 = "enable-web-midi";
+
+// Enable rasterizer that writes directly to GPU memory associated with tiles.
+const char kEnableZeroCopy[]                = "enable-zero-copy";
 
 // Load NPAPI plugins from the specified directory.
 const char kExtraPluginDir[]                = "extra-plugin-dir";
@@ -835,10 +835,6 @@ const char kTestSandbox[]                   = "test-sandbox";
 
 // Type of the current test harness ("browser" or "ui").
 const char kTestType[]                      = "test-type";
-
-// Enable timeout-based touch event cancellation if a touch ack is delayed.
-// If unspecified, touch timeout behavior will be disabled.
-const char kTouchAckTimeoutDelayMs[]        = "touch-ack-timeout-delay-ms";
 
 const char kTouchScrollingMode[]            = "touch-scrolling-mode";
 const char kTouchScrollingModeAsyncTouchmove[] = "async-touchmove";

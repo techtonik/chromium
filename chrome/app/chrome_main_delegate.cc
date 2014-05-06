@@ -40,6 +40,7 @@
 #include "ui/base/ui_base_switches.h"
 
 #if defined(OS_WIN)
+#include <atlbase.h>
 #include <malloc.h>
 #include <algorithm>
 #include "base/strings/string_util.h"
@@ -349,7 +350,7 @@ void InitializeUserDataDir() {
 
   const bool specified_directory_was_invalid = !user_data_dir.empty() &&
       !PathService::OverrideAndCreateIfNeeded(chrome::DIR_USER_DATA,
-          user_data_dir, true);
+          user_data_dir, false, true);
   // Save inaccessible or invalid paths so the user may be prompted later.
   if (specified_directory_was_invalid)
     chrome::SetInvalidSpecifiedUserDataDir(user_data_dir);
@@ -677,6 +678,13 @@ void ChromeMainDelegate::PreSandboxStartup() {
     file_state = logging::DELETE_OLD_LOG_FILE;
   }
   logging::InitChromeLogging(command_line, file_state);
+#endif
+
+#if defined(OS_WIN)
+  // TODO(zturner): Throbber icons are still stored in chrome.dll, this can be
+  // killed once those are merged into resources.pak.  See
+  // GlassBrowserFrameView::InitThrobberIcons() and http://crbug.com/368327.
+  ui::SetResourcesDataDLL(_AtlBaseModule.GetResourceInstance());
 #endif
 
   if (SubprocessNeedsResourceBundle(process_type)) {

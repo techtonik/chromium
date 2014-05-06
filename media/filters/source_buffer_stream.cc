@@ -359,6 +359,7 @@ SourceBufferStream::SourceBufferStream(const AudioDecoderConfig& audio_config,
       memory_limit_(kDefaultAudioMemoryLimit),
       config_change_pending_(false),
       splice_buffers_index_(0),
+      pre_splice_complete_(false),
       splice_frames_enabled_(splice_frames_enabled) {
   DCHECK(audio_config.IsValidConfig());
   audio_configs_.push_back(audio_config);
@@ -384,6 +385,7 @@ SourceBufferStream::SourceBufferStream(const VideoDecoderConfig& video_config,
       memory_limit_(kDefaultVideoMemoryLimit),
       config_change_pending_(false),
       splice_buffers_index_(0),
+      pre_splice_complete_(false),
       splice_frames_enabled_(splice_frames_enabled) {
   DCHECK(video_config.IsValidConfig());
   video_configs_.push_back(video_config);
@@ -410,6 +412,7 @@ SourceBufferStream::SourceBufferStream(const TextTrackConfig& text_config,
       memory_limit_(kDefaultAudioMemoryLimit),
       config_change_pending_(false),
       splice_buffers_index_(0),
+      pre_splice_complete_(false),
       splice_frames_enabled_(splice_frames_enabled) {}
 
 SourceBufferStream::~SourceBufferStream() {
@@ -691,6 +694,7 @@ void SourceBufferStream::ResetSeekState() {
   last_output_buffer_timestamp_ = kNoTimestamp();
   splice_buffers_index_ = 0;
   splice_buffer_ = NULL;
+  pre_splice_complete_ = false;
 }
 
 bool SourceBufferStream::ShouldSeekToStartOfBuffered(
@@ -1170,8 +1174,9 @@ SourceBufferStream::Status SourceBufferStream::GetNextBuffer(
   }
 
   // Did we hand out the last pre-splice buffer on the previous call?
-  if (splice_buffers_index_ == last_splice_buffer_index) {
-    splice_buffers_index_++;
+  if (!pre_splice_complete_) {
+    DCHECK_EQ(splice_buffers_index_, last_splice_buffer_index);
+    pre_splice_complete_ = true;
     config_change_pending_ = true;
     DVLOG(1) << "Config change (forced for fade in of splice frame).";
     return SourceBufferStream::kConfigChange;
@@ -1181,11 +1186,13 @@ SourceBufferStream::Status SourceBufferStream::GetNextBuffer(
   // so hand out the final buffer for fade in.  Because a config change is
   // always issued prior to handing out this buffer, any changes in config id
   // have been inherently handled.
-  DCHECK_GE(splice_buffers_index_, splice_buffers.size());
+  DCHECK(pre_splice_complete_);
+  DCHECK_EQ(splice_buffers_index_, splice_buffers.size() - 1);
   DCHECK(splice_buffers.back()->splice_timestamp() == kNoTimestamp());
   *out_buffer = splice_buffers.back();
   splice_buffer_ = NULL;
   splice_buffers_index_ = 0;
+  pre_splice_complete_ = false;
   return SourceBufferStream::kSuccess;
 }
 
@@ -1635,34 +1642,12 @@ void SourceBufferStream::GenerateSpliceFrame(const BufferQueue& new_buffers) {
   if (pre_splice_buffers.front()->timestamp() >= splice_timestamp)
     return;
 
-  // Sanitize |pre_splice_buffers| so that there are no recursive splices.
+  // If any |pre_splice_buffers| are already splices, do not generate a splice.
   for (size_t i = 0; i < pre_splice_buffers.size(); ++i) {
     const BufferQueue& original_splice_buffers =
         pre_splice_buffers[i]->get_splice_buffers();
-    if (original_splice_buffers.empty())
-      continue;
-
-    // Remove the original splice and move our index back to compensate.  NOTE:
-    // |i| will underflow if the splice is the first buffer, this is okay.  It
-    // will be corrected below or on the next loop iteration.
-    pre_splice_buffers.erase(pre_splice_buffers.begin() + i--);
-
-    // Cull all buffers which start after the end of the new splice point or
-    // after original overlapping buffer; this may introduce gaps, but no more
-    // than Remove() does currently.
-    const scoped_refptr<StreamParserBuffer>& overlapping_buffer =
-        original_splice_buffers.back();
-    for (BufferQueue::const_iterator it = original_splice_buffers.begin();
-         it != original_splice_buffers.end();
-         ++it) {
-      const scoped_refptr<StreamParserBuffer>& buffer = *it;
-      if (buffer->timestamp() <= max_splice_end_timestamp &&
-          (buffer->timestamp() < overlapping_buffer->timestamp() ||
-           buffer == overlapping_buffer)) {
-        // Add the buffer and adjust the index forward to compensate.
-        pre_splice_buffers.insert(pre_splice_buffers.begin() + ++i, buffer);
-      }
-    }
+    if (!original_splice_buffers.empty())
+      return;
   }
 
   new_buffers.front()->ConvertToSpliceBuffer(pre_splice_buffers);

@@ -13,9 +13,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/bookmarks/bookmark_model.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
-#include "chrome/browser/bookmarks/bookmark_utils.h"
 #include "chrome/browser/favicon/favicon_service.h"
 #include "chrome/browser/favicon/favicon_service_factory.h"
 #include "chrome/browser/history/history_service.h"
@@ -25,6 +23,8 @@
 #include "chrome/browser/undo/bookmark_undo_service.h"
 #include "chrome/browser/undo/bookmark_undo_service_factory.h"
 #include "chrome/browser/undo/bookmark_undo_utils.h"
+#include "components/bookmarks/core/browser/bookmark_model.h"
+#include "components/bookmarks/core/browser/bookmark_utils.h"
 #include "content/public/browser/browser_thread.h"
 #include "sync/internal_api/public/change_record.h"
 #include "sync/internal_api/public/read_node.h"
@@ -268,14 +268,18 @@ int64 BookmarkChangeProcessor::CreateSyncNode(const BookmarkNode* parent,
   return sync_child.GetId();
 }
 
-void BookmarkChangeProcessor::BookmarkNodeRemoved(BookmarkModel* model,
-                                                  const BookmarkNode* parent,
-                                                  int index,
-                                                  const BookmarkNode* node) {
+void BookmarkChangeProcessor::BookmarkNodeRemoved(
+    BookmarkModel* model,
+    const BookmarkNode* parent,
+    int index,
+    const BookmarkNode* node,
+    const std::set<GURL>& removed_urls) {
   RemoveSyncNodeHierarchy(node);
 }
 
-void BookmarkChangeProcessor::BookmarkAllNodesRemoved(BookmarkModel* model) {
+void BookmarkChangeProcessor::BookmarkAllNodesRemoved(
+    BookmarkModel* model,
+    const std::set<GURL>& removed_urls) {
   RemoveAllSyncNodes();
 }
 

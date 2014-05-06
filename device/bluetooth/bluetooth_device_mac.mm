@@ -4,17 +4,13 @@
 
 #include "device/bluetooth/bluetooth_device_mac.h"
 
-#include <IOBluetooth/Bluetooth.h>
-#import <IOBluetooth/objc/IOBluetoothDevice.h>
-#import <IOBluetooth/objc/IOBluetoothSDPServiceRecord.h>
-#import <IOBluetooth/objc/IOBluetoothSDPUUID.h>
-
 #include <string>
 
 #include "base/basictypes.h"
 #include "base/hash.h"
 #include "base/sequenced_task_runner.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/sys_string_conversions.h"
 #include "device/bluetooth/bluetooth_out_of_band_pairing_data.h"
@@ -28,12 +24,22 @@
 
 @interface IOBluetoothDevice (LionSDKDeclarations)
 - (NSString*)addressString;
-- (NSString*)name;
 - (unsigned int)classOfDevice;
+- (BluetoothConnectionHandle)connectionHandle;
+- (BluetoothHCIRSSIValue)rawRSSI;
 - (NSArray*)services;
 @end
 
 #endif  // MAC_OS_X_VERSION_10_7
+
+// Undocumented API for accessing the Bluetooth transmit power level.
+// Similar to the API defined here [ http://goo.gl/20Q5vE ].
+@interface IOBluetoothHostController (UndocumentedAPI)
+- (IOReturn)
+    BluetoothHCIReadTransmitPowerLevel:(BluetoothConnectionHandle)connection
+                                inType:(BluetoothHCITransmitPowerLevelType)type
+                 outTransmitPowerLevel:(BluetoothHCITransmitPowerLevel*)level;
+@end
 
 namespace device {
 
@@ -65,7 +71,7 @@ std::string BluetoothDeviceMac::GetDeviceName() const {
 }
 
 std::string BluetoothDeviceMac::GetAddress() const {
-  return base::SysNSStringToUTF8([device_ addressString]);
+  return GetDeviceAddress(device_);
 }
 
 BluetoothDevice::VendorIDSource BluetoothDeviceMac::GetVendorIDSource() const {
@@ -82,6 +88,30 @@ uint16 BluetoothDeviceMac::GetProductID() const {
 
 uint16 BluetoothDeviceMac::GetDeviceID() const {
   return 0;
+}
+
+int BluetoothDeviceMac::GetRSSI() const {
+  if (![device_ isConnected]) {
+    NOTIMPLEMENTED();
+    return kUnknownPower;
+  }
+
+  int rssi = [device_ rawRSSI];
+
+  // The API guarantees that +127 is returned in case the RSSI is not readable:
+  // http://goo.gl/bpURYv
+  if (rssi == 127)
+    return kUnknownPower;
+
+  return rssi;
+}
+
+int BluetoothDeviceMac::GetCurrentHostTransmitPower() const {
+  return GetHostTransmitPower(kReadCurrentTransmitPowerLevel);
+}
+
+int BluetoothDeviceMac::GetMaximumHostTransmitPower() const {
+  return GetHostTransmitPower(kReadMaximumTransmitPowerLevel);
 }
 
 bool BluetoothDeviceMac::IsPaired() const {
@@ -181,6 +211,41 @@ void BluetoothDeviceMac::ClearOutOfBandPairingData(
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
   NOTIMPLEMENTED();
+}
+
+int BluetoothDeviceMac::GetHostTransmitPower(
+    BluetoothHCITransmitPowerLevelType power_level_type) const {
+  IOBluetoothHostController* controller =
+      [IOBluetoothHostController defaultController];
+
+  // Bail if the undocumented API is unavailable on this machine.
+  SEL selector = @selector(
+      BluetoothHCIReadTransmitPowerLevel:inType:outTransmitPowerLevel:);
+  if (![controller respondsToSelector:selector])
+    return kUnknownPower;
+
+  BluetoothHCITransmitPowerLevel power_level;
+  IOReturn result =
+      [controller BluetoothHCIReadTransmitPowerLevel:[device_ connectionHandle]
+                                              inType:power_level_type
+                               outTransmitPowerLevel:&power_level];
+  if (result != kIOReturnSuccess)
+    return kUnknownPower;
+
+  return power_level;
+}
+
+// static
+std::string BluetoothDeviceMac::GetDeviceAddress(IOBluetoothDevice* device) {
+  return NormalizeAddress(base::SysNSStringToUTF8([device addressString]));
+}
+
+// static
+std::string BluetoothDeviceMac::NormalizeAddress(const std::string& address) {
+  std::string normalized;
+  base::ReplaceChars(address, "-", ":", &normalized);
+  StringToUpperASCII(&normalized);
+  return normalized;
 }
 
 }  // namespace device

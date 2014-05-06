@@ -31,6 +31,7 @@
 #include "content/browser/gpu/gpu_process_host_ui_shim.h"
 #include "content/browser/gpu/gpu_surface_tracker.h"
 #include "content/browser/renderer_host/dip_util.h"
+#include "content/browser/renderer_host/input/input_router_config_helper.h"
 #include "content/browser/renderer_host/input/input_router_impl.h"
 #include "content/browser/renderer_host/input/synthetic_gesture.h"
 #include "content/browser/renderer_host/input/synthetic_gesture_controller.h"
@@ -42,6 +43,7 @@
 #include "content/browser/renderer_host/render_view_host_impl.h"
 #include "content/browser/renderer_host/render_widget_helper.h"
 #include "content/browser/renderer_host/render_widget_host_delegate.h"
+#include "content/browser/renderer_host/render_widget_host_view_base.h"
 #include "content/common/accessibility_messages.h"
 #include "content/common/content_constants_internal.h"
 #include "content/common/cursors/webcursor.h"
@@ -49,7 +51,6 @@
 #include "content/common/host_shared_bitmap_manager.h"
 #include "content/common/input_messages.h"
 #include "content/common/view_messages.h"
-#include "content/port/browser/render_widget_host_view_port.h"
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/notification_types.h"
@@ -229,7 +230,8 @@ RenderWidgetHostImpl::RenderWidgetHostImpl(RenderWidgetHostDelegate* delegate,
   accessibility_mode_ =
       BrowserAccessibilityStateImpl::GetInstance()->accessibility_mode();
 
-  input_router_.reset(new InputRouterImpl(process_, this, this, routing_id_));
+  input_router_.reset(new InputRouterImpl(
+      process_, this, this, routing_id_, GetInputRouterConfigForPlatform()));
 
   touch_emulator_.reset();
 
@@ -322,8 +324,8 @@ RenderWidgetHostImpl* RenderWidgetHostImpl::From(RenderWidgetHost* rwh) {
   return rwh->AsRenderWidgetHostImpl();
 }
 
-void RenderWidgetHostImpl::SetView(RenderWidgetHostView* view) {
-  view_ = RenderWidgetHostViewPort::FromRWHV(view);
+void RenderWidgetHostImpl::SetView(RenderWidgetHostViewBase* view) {
+  view_ = view;
 
   GpuSurfaceTracker::Get()->SetSurfaceHandle(
       surface_id_, GetCompositingSurface());
@@ -1165,10 +1167,10 @@ void RenderWidgetHostImpl::RemoveMouseEventCallback(
 
 void RenderWidgetHostImpl::GetWebScreenInfo(blink::WebScreenInfo* result) {
   TRACE_EVENT0("renderer_host", "RenderWidgetHostImpl::GetWebScreenInfo");
-  if (GetView())
-    static_cast<RenderWidgetHostViewPort*>(GetView())->GetScreenInfo(result);
+  if (view_)
+    view_->GetScreenInfo(result);
   else
-    RenderWidgetHostViewPort::GetDefaultScreenInfo(result);
+    RenderWidgetHostViewBase::GetDefaultScreenInfo(result);
   screen_info_out_of_date_ = false;
 }
 
@@ -1218,7 +1220,8 @@ void RenderWidgetHostImpl::RendererExited(base::TerminationStatus status,
   waiting_for_screen_rects_ack_ = false;
 
   // Reset to ensure that input routing works with a new renderer.
-  input_router_.reset(new InputRouterImpl(process_, this, this, routing_id_));
+  input_router_.reset(new InputRouterImpl(
+      process_, this, this, routing_id_, GetInputRouterConfigForPlatform()));
 
   if (overscroll_controller_)
     overscroll_controller_->Reset();
@@ -1601,23 +1604,6 @@ void RenderWidgetHostImpl::DidUpdateBackingStore(
   if (is_hidden_)
     return;
 
-  // Now paint the view. Watch out: it might be destroyed already.
-  if (view_ && !is_accelerated_compositing_active_) {
-
-    std::vector<ui::LatencyInfo> latency_info;
-    for (size_t i = 0; i < params.latency_info.size(); i++) {
-      ui::LatencyInfo info = params.latency_info[i];
-      AddLatencyInfoComponentIds(&info);
-      latency_info.push_back(info);
-    }
-
-    view_being_painted_ = true;
-    view_->DidUpdateBackingStore(params.scroll_rect, params.scroll_delta,
-                                 params.copy_rects, latency_info);
-    view_->DidReceiveRendererFrame();
-    view_being_painted_ = false;
-  }
-
   // If we got a resize ack, then perhaps we have another resize to send?
   bool is_resize_ack =
       ViewHostMsg_UpdateRect_Flags::is_resize_ack(params.flags);
@@ -1628,16 +1614,6 @@ void RenderWidgetHostImpl::DidUpdateBackingStore(
   TimeTicks now = TimeTicks::Now();
   TimeDelta delta = now - update_start;
   UMA_HISTOGRAM_TIMES("MPArch.RWH_DidUpdateBackingStore", delta);
-
-  // Measures the time from receiving the MsgUpdateRect IPC to completing the
-  // DidUpdateBackingStore() method.  On platforms which have asynchronous
-  // painting, such as Linux, this is the sum of MPArch.RWH_OnMsgUpdateRect,
-  // MPArch.RWH_DidUpdateBackingStore, and the time spent asynchronously
-  // waiting for the paint to complete.
-  //
-  // On other platforms, this will be equivalent to MPArch.RWH_OnMsgUpdateRect.
-  delta = now - paint_start;
-  UMA_HISTOGRAM_TIMES("MPArch.RWH_TotalPaintTime", delta);
 }
 
 void RenderWidgetHostImpl::OnQueueSyntheticGesture(
@@ -2027,12 +2003,17 @@ void RenderWidgetHostImpl::SetAccessibilityMode(AccessibilityMode mode) {
   Send(new ViewMsg_SetAccessibilityMode(GetRoutingID(), mode));
 }
 
+void RenderWidgetHostImpl::AccessibilitySetFocus(int object_id) {
+  Send(new AccessibilityMsg_SetFocus(GetRoutingID(), object_id));
+  view_->OnAccessibilitySetFocus(object_id);
+}
+
 void RenderWidgetHostImpl::AccessibilityDoDefaultAction(int object_id) {
   Send(new AccessibilityMsg_DoDefaultAction(GetRoutingID(), object_id));
 }
 
-void RenderWidgetHostImpl::AccessibilitySetFocus(int object_id) {
-  Send(new AccessibilityMsg_SetFocus(GetRoutingID(), object_id));
+void RenderWidgetHostImpl::AccessibilityShowMenu(int object_id) {
+  view_->AccessibilityShowMenu(object_id);
 }
 
 void RenderWidgetHostImpl::AccessibilityScrollToMakeVisible(
@@ -2053,8 +2034,22 @@ void RenderWidgetHostImpl::AccessibilitySetTextSelection(
       GetRoutingID(), object_id, start_offset, end_offset));
 }
 
-void RenderWidgetHostImpl::FatalAccessibilityTreeError() {
+bool RenderWidgetHostImpl::AccessibilityViewHasFocus() const {
+  return view_->HasFocus();
+}
+
+gfx::Rect RenderWidgetHostImpl::AccessibilityGetViewBounds() const {
+  return view_->GetViewBounds();
+}
+
+gfx::Point RenderWidgetHostImpl::AccessibilityOriginInScreen(
+    const gfx::Rect& bounds) const {
+  return view_->AccessibilityOriginInScreen(bounds);
+}
+
+void RenderWidgetHostImpl::AccessibilityFatalError() {
   Send(new AccessibilityMsg_FatalError(GetRoutingID()));
+  view_->SetBrowserAccessibilityManager(NULL);
 }
 
 #if defined(OS_WIN)

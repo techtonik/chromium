@@ -112,8 +112,7 @@ bool IsRemovalPermitted(int removal_mask, PrefService* prefs) {
 
 }  // namespace
 
-
-bool BrowsingDataSettingsFunction::RunImpl() {
+bool BrowsingDataSettingsFunction::RunSync() {
   PrefService* prefs = GetProfile()->GetPrefs();
 
   // Fill origin types.
@@ -221,10 +220,10 @@ void BrowsingDataRemoverFunction::OnBrowsingDataRemoverDone() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   this->SendResponse(true);
 
-  Release();  // Balanced in RunImpl.
+  Release();  // Balanced in RunAsync.
 }
 
-bool BrowsingDataRemoverFunction::RunImpl() {
+bool BrowsingDataRemoverFunction::RunAsync() {
   // If we don't have a profile, something's pretty wrong.
   DCHECK(GetProfile());
 

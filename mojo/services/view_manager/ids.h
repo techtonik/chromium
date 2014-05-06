@@ -5,6 +5,7 @@
 #ifndef MOJO_SERVICES_VIEW_MANAGER_IDS_H_
 #define MOJO_SERVICES_VIEW_MANAGER_IDS_H_
 
+#include "mojo/services/public/cpp/view_manager/view_manager_types.h"
 #include "mojo/services/view_manager/view_manager_export.h"
 
 namespace mojo {
@@ -13,7 +14,8 @@ namespace view_manager {
 
 // Adds a bit of type safety to node ids.
 struct MOJO_VIEW_MANAGER_EXPORT NodeId {
-  NodeId(uint16_t connection_id, uint16_t node_id)
+  NodeId(TransportConnectionId connection_id,
+         TransportConnectionSpecificNodeId node_id)
       : connection_id(connection_id),
         node_id(node_id) {}
   NodeId() : connection_id(0), node_id(0) {}
@@ -27,13 +29,14 @@ struct MOJO_VIEW_MANAGER_EXPORT NodeId {
     return !(*this == other);
   }
 
-  uint16_t connection_id;
-  uint16_t node_id;
+  TransportConnectionId connection_id;
+  TransportConnectionSpecificNodeId node_id;
 };
 
 // Adds a bit of type safety to view ids.
 struct MOJO_VIEW_MANAGER_EXPORT ViewId {
-  ViewId(uint16_t connection_id, uint16_t view_id)
+  ViewId(TransportConnectionId connection_id,
+         TransportConnectionSpecificViewId view_id)
       : connection_id(connection_id),
         view_id(view_id) {}
   ViewId() : connection_id(0), view_id(0) {}
@@ -47,8 +50,8 @@ struct MOJO_VIEW_MANAGER_EXPORT ViewId {
     return !(*this == other);
   }
 
-  uint16_t connection_id;
-  uint16_t view_id;
+  TransportConnectionId connection_id;
+  TransportConnectionSpecificViewId view_id;
 };
 
 // Functions for converting to/from structs and transport values.
@@ -60,19 +63,19 @@ inline uint16_t SecondIdFromTransportId(uint32_t id) {
   return static_cast<uint16_t>(id & 0xFFFF);
 }
 
-inline NodeId NodeIdFromTransportId(uint32_t id) {
+inline NodeId NodeIdFromTransportId(TransportNodeId id) {
   return NodeId(FirstIdFromTransportId(id), SecondIdFromTransportId(id));
 }
 
-inline uint32_t NodeIdToTransportId(const NodeId& id) {
+inline TransportNodeId NodeIdToTransportId(const NodeId& id) {
   return (id.connection_id << 16) | id.node_id;
 }
 
-inline ViewId ViewIdFromTransportId(uint32_t id) {
+inline ViewId ViewIdFromTransportId(TransportViewId id) {
   return ViewId(FirstIdFromTransportId(id), SecondIdFromTransportId(id));
 }
 
-inline uint32_t ViewIdToTransportId(const ViewId& id) {
+inline TransportViewId ViewIdToTransportId(const ViewId& id) {
   return (id.connection_id << 16) | id.view_id;
 }
 

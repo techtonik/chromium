@@ -5,7 +5,11 @@
 #ifndef ANDROID_WEBVIEW_BROWSER_SHARED_RENDERER_STATE_H_
 #define ANDROID_WEBVIEW_BROWSER_SHARED_RENDERER_STATE_H_
 
+#include <queue>
+
+#include "base/callback.h"
 #include "base/message_loop/message_loop_proxy.h"
+#include "base/synchronization/lock.h"
 #include "content/public/browser/android/synchronous_compositor.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/vector2d.h"
@@ -51,8 +55,22 @@ class SharedRendererState {
 
   // This function can be called on both UI and RT thread.
   content::SynchronousCompositor* GetCompositor();
+
+  void SetMemoryPolicy(const content::SynchronousCompositorMemoryPolicy policy);
+  content::SynchronousCompositorMemoryPolicy GetMemoryPolicy() const;
+
+  void SetMemoryPolicyDirty(bool is_dirty);
+  bool IsMemoryPolicyDirty() const;
   void SetDrawGLInput(const DrawGLInput& input);
   DrawGLInput GetDrawGLInput() const;
+
+  void ClearClosureQueue();
+  void AppendClosure(const base::Closure& closure);
+  // Will return empty closure if queue empty.
+  base::Closure PopFrontClosure();
+
+  void SetHardwareInitialized(bool initialized);
+  bool IsHardwareInitialized() const;
 
  private:
   void ClientRequestDrawGLOnUIThread();
@@ -64,8 +82,15 @@ class SharedRendererState {
   base::WeakPtr<SharedRendererState> ui_thread_weak_ptr_;
 
   // Accessed by both UI and RT thread.
+  mutable base::Lock lock_;
   content::SynchronousCompositor* compositor_;
+  content::SynchronousCompositorMemoryPolicy memory_policy_;
+  // Set to true when SetMemoryPolicy called with a different memory policy.
+  // Set to false when memory policy is read and enforced to compositor.
+  bool memory_policy_dirty_;
   DrawGLInput draw_gl_input_;
+  std::queue<base::Closure> closure_queue_;
+  bool hardware_initialized_;
 };
 
 }  // namespace android_webview

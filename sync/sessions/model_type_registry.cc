@@ -7,10 +7,10 @@
 #include "base/bind.h"
 #include "base/message_loop/message_loop_proxy.h"
 #include "sync/engine/directory_commit_contributor.h"
-#include "sync/engine/directory_type_debug_info_emitter.h"
 #include "sync/engine/directory_update_handler.h"
 #include "sync/engine/non_blocking_type_processor_core.h"
 #include "sync/internal_api/public/non_blocking_type_processor.h"
+#include "sync/sessions/directory_type_debug_info_emitter.h"
 
 namespace syncer {
 
@@ -30,22 +30,21 @@ ModelTypeRegistry::~ModelTypeRegistry() {}
 
 void ModelTypeRegistry::SetEnabledDirectoryTypes(
     const ModelSafeRoutingInfo& routing_info) {
-  // Remove all existing directory processors and delete them.
+  // Remove all existing directory processors and delete them.  The
+  // DebugInfoEmitters are not deleted here, since we want to preserve their
+  // counters.
   for (ModelTypeSet::Iterator it = enabled_directory_types_.First();
        it.Good(); it.Inc()) {
     size_t result1 = update_handler_map_.erase(it.Get());
     size_t result2 = commit_contributor_map_.erase(it.Get());
-    size_t result3 = directory_type_debug_info_emitter_map_.erase(it.Get());
     DCHECK_EQ(1U, result1);
     DCHECK_EQ(1U, result2);
-    DCHECK_EQ(1U, result3);
   }
 
   // Clear the old instances of directory update handlers and commit
   // contributors, deleting their contents in the processs.
   directory_update_handlers_.clear();
   directory_commit_contributors_.clear();
-  directory_type_debug_info_emitters_.clear();
 
   // Create new ones and add them to the appropriate containers.
   for (ModelSafeRoutingInfo::const_iterator routing_iter = routing_info.begin();
@@ -57,17 +56,28 @@ void ModelTypeRegistry::SetEnabledDirectoryTypes(
     DCHECK(worker_it != workers_map_.end());
     scoped_refptr<ModelSafeWorker> worker = worker_it->second;
 
+    // DebugInfoEmitters are never deleted.  Use existing one if we have it.
+    DirectoryTypeDebugInfoEmitter* emitter = NULL;
+    DirectoryTypeDebugInfoEmitterMap::iterator it =
+        directory_type_debug_info_emitter_map_.find(type);
+    if (it != directory_type_debug_info_emitter_map_.end()) {
+      emitter = it->second;
+    } else {
+      emitter = new DirectoryTypeDebugInfoEmitter(directory_, type,
+                                                  &type_debug_info_observers_);
+      directory_type_debug_info_emitter_map_.insert(
+          std::make_pair(type, emitter));
+      directory_type_debug_info_emitters_.push_back(emitter);
+    }
+
     DirectoryCommitContributor* committer =
-        new DirectoryCommitContributor(directory_, type);
+        new DirectoryCommitContributor(directory_, type, emitter);
     DirectoryUpdateHandler* updater =
-        new DirectoryUpdateHandler(directory_, type, worker);
-    DirectoryTypeDebugInfoEmitter* emitter =
-        new DirectoryTypeDebugInfoEmitter(directory_, type);
+        new DirectoryUpdateHandler(directory_, type, worker, emitter);
 
     // These containers take ownership of their contents.
     directory_commit_contributors_.push_back(committer);
     directory_update_handlers_.push_back(updater);
-    directory_type_debug_info_emitters_.push_back(emitter);
 
     bool inserted1 =
         update_handler_map_.insert(std::make_pair(type, updater)).second;
@@ -76,11 +86,6 @@ void ModelTypeRegistry::SetEnabledDirectoryTypes(
     bool inserted2 =
         commit_contributor_map_.insert(std::make_pair(type, committer)).second;
     DCHECK(inserted2) << "Attempt to override existing type handler in map";
-
-    bool inserted3 =
-        directory_type_debug_info_emitter_map_.insert(
-            std::make_pair(type, emitter)).second;
-    DCHECK(inserted3) << "Attempt to override existing type handler in map";
   }
 
   enabled_directory_types_ = GetRoutingInfoTypes(routing_info);

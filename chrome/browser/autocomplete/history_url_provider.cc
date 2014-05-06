@@ -18,7 +18,6 @@
 #include "chrome/browser/autocomplete/autocomplete_match.h"
 #include "chrome/browser/autocomplete/autocomplete_provider_listener.h"
 #include "chrome/browser/autocomplete/autocomplete_result.h"
-#include "chrome/browser/bookmarks/bookmark_utils.h"
 #include "chrome/browser/history/history_backend.h"
 #include "chrome/browser/history/history_database.h"
 #include "chrome/browser/history/history_service.h"
@@ -34,6 +33,7 @@
 #include "chrome/common/net/url_fixer_upper.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
+#include "components/bookmarks/core/browser/bookmark_utils.h"
 #include "net/base/net_util.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "url/gurl.h"
@@ -812,7 +812,7 @@ bool HistoryURLProvider::FixupExactSuggestion(
   }
 
   const GURL& url = match->destination_url;
-  const url_parse::Parsed& parsed = url.parsed_for_possibly_invalid_spec();
+  const url::Parsed& parsed = url.parsed_for_possibly_invalid_spec();
   // If the what-you-typed result looks like a single word (which can be
   // interpreted as an intranet address) followed by a pound sign ("#"),
   // leave the score for the url-what-you-typed result as is.  It will be
@@ -830,11 +830,11 @@ bool HistoryURLProvider::FixupExactSuggestion(
   // between the input "c" and the input "c#", both of which will have empty
   // reference fragments.)
   if ((type == UNVISITED_INTRANET) &&
-      (input.type() != AutocompleteInput::URL) &&
-      url.username().empty() && url.password().empty() && url.port().empty() &&
-      (url.path() == "/") && url.query().empty() &&
-      (parsed.CountCharactersBefore(url_parse::Parsed::REF, true) !=
-       parsed.CountCharactersBefore(url_parse::Parsed::REF, false))) {
+      (input.type() != AutocompleteInput::URL) && url.username().empty() &&
+      url.password().empty() && url.port().empty() && (url.path() == "/") &&
+      url.query().empty() &&
+      (parsed.CountCharactersBefore(url::Parsed::REF, true) !=
+       parsed.CountCharactersBefore(url::Parsed::REF, false))) {
     return false;
   }
 

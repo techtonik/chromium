@@ -19,6 +19,7 @@
 #include "content/browser/loader/resource_dispatcher_host_impl.h"
 #include "content/browser/renderer_host/render_view_host_impl.h"
 #include "content/browser/renderer_host/render_widget_host_impl.h"
+#include "content/browser/renderer_host/render_widget_host_view_base.h"
 #include "content/browser/web_contents/web_contents_impl.h"
 #include "content/browser/web_contents/web_contents_view_guest.h"
 #include "content/common/browser_plugin/browser_plugin_constants.h"
@@ -28,14 +29,13 @@
 #include "content/common/input_messages.h"
 #include "content/common/view_messages.h"
 #include "content/port/browser/render_view_host_delegate_view.h"
-#include "content/port/browser/render_widget_host_view_port.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/user_metrics.h"
 #include "content/public/browser/web_contents_observer.h"
-#include "content/public/browser/web_contents_view.h"
+#include "content/public/common/context_menu_params.h"
 #include "content/public/common/drop_data.h"
 #include "content/public/common/media_stream_request.h"
 #include "content/public/common/result_codes.h"
@@ -633,10 +633,17 @@ ColorChooser* BrowserPluginGuest::OpenColorChooser(
 }
 
 bool BrowserPluginGuest::HandleContextMenu(const ContextMenuParams& params) {
-  // TODO(fsamuel): We show the regular page context menu handler for now until
-  // we implement the Apps Context Menu API for Browser Plugin (see
-  // http://crbug.com/140315).
-  return false;  // Will be handled by WebContentsViewGuest.
+  if (delegate_) {
+    WebContentsViewGuest* view_guest =
+        static_cast<WebContentsViewGuest*>(GetWebContents()->GetView());
+    ContextMenuParams context_menu_params =
+        view_guest->ConvertContextMenuParams(params);
+
+    return delegate_->HandleContextMenu(context_menu_params);
+  }
+
+  // Will be handled by WebContentsViewGuest.
+  return false;
 }
 
 void BrowserPluginGuest::HandleKeyboardEvent(
@@ -1291,7 +1298,7 @@ void BrowserPluginGuest::OnSetFocus(int instance_id, bool focused) {
     OnUnlockMouse();
 
   // Restore the last seen state of text input to the view.
-  RenderWidgetHostViewPort* rwhv = RenderWidgetHostViewPort::FromRWHV(
+  RenderWidgetHostViewBase* rwhv = static_cast<RenderWidgetHostViewBase*>(
       web_contents()->GetRenderWidgetHostView());
   if (rwhv) {
     rwhv->TextInputTypeChanged(last_text_input_type_, last_input_mode_,
@@ -1499,13 +1506,13 @@ void BrowserPluginGuest::OnTextInputTypeChanged(ui::TextInputType type,
   last_input_mode_ = input_mode;
   last_can_compose_inline_ = can_compose_inline;
 
-  RenderWidgetHostViewPort::FromRWHV(
+  static_cast<RenderWidgetHostViewBase*>(
       web_contents()->GetRenderWidgetHostView())->TextInputTypeChanged(
           type, input_mode, can_compose_inline);
 }
 
 void BrowserPluginGuest::OnImeCancelComposition() {
-  RenderWidgetHostViewPort::FromRWHV(
+  static_cast<RenderWidgetHostViewBase*>(
       web_contents()->GetRenderWidgetHostView())->ImeCancelComposition();
 }
 
@@ -1513,7 +1520,7 @@ void BrowserPluginGuest::OnImeCancelComposition() {
 void BrowserPluginGuest::OnImeCompositionRangeChanged(
       const gfx::Range& range,
       const std::vector<gfx::Rect>& character_bounds) {
-  RenderWidgetHostViewPort::FromRWHV(
+  static_cast<RenderWidgetHostViewBase*>(
       web_contents()->GetRenderWidgetHostView())->ImeCompositionRangeChanged(
           range, character_bounds);
 }

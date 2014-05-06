@@ -58,6 +58,7 @@ class MEDIA_EXPORT DecoderStream {
   // Initializes the DecoderStream and returns the initialization result
   // through |init_cb|. Note that |init_cb| is always called asynchronously.
   void Initialize(DemuxerStream* stream,
+                  bool low_delay,
                   const StatisticsCB& statistics_cb,
                   const InitCB& init_cb);
 
@@ -86,6 +87,9 @@ class MEDIA_EXPORT DecoderStream {
   // TODO(rileya): Remove the need for this by refactoring Decoder queueing
   // behavior.
   bool CanReadWithoutStalling() const;
+
+  // Returns true if one more decode request can be submitted to the decoder.
+  bool CanDecodeMore() const;
 
   // Allows callers to register for notification of splice buffers from the
   // demuxer.  I.e., DecoderBuffer::splice_timestamp() is not kNoTimestamp().
@@ -129,9 +133,6 @@ class MEDIA_EXPORT DecoderStream {
   void SatisfyRead(Status status,
                    const scoped_refptr<Output>& output);
 
-  // Abort pending |read_cb_|.
-  void AbortRead();
-
   // Decodes |buffer| and returns the result via OnDecodeOutputReady().
   void Decode(const scoped_refptr<DecoderBuffer>& buffer);
 
@@ -173,6 +174,7 @@ class MEDIA_EXPORT DecoderStream {
   base::Closure stop_cb_;
 
   DemuxerStream* stream_;
+  bool low_delay_;
 
   scoped_ptr<DecoderSelector<StreamType> > decoder_selector_;
 
@@ -187,6 +189,13 @@ class MEDIA_EXPORT DecoderStream {
   // splice_timestamp() of kNoTimestamp() is encountered.
   bool active_splice_;
 
+  // Decoded buffers that haven't been read yet. Used when the decoder supports
+  // parallel decoding.
+  std::list<scoped_refptr<Output> > ready_outputs_;
+
+  // Number of outstanding decode requests sent to the |decoder_|.
+  int pending_decode_requests_;
+
   // NOTE: Weak pointers must be invalidated before all other member variables.
   base::WeakPtrFactory<DecoderStream<StreamType> > weak_factory_;
 
@@ -197,6 +206,9 @@ class MEDIA_EXPORT DecoderStream {
 
 template <>
 bool DecoderStream<DemuxerStream::AUDIO>::CanReadWithoutStalling() const;
+
+template <>
+bool DecoderStream<DemuxerStream::AUDIO>::CanDecodeMore() const;
 
 typedef DecoderStream<DemuxerStream::VIDEO> VideoFrameStream;
 typedef DecoderStream<DemuxerStream::AUDIO> AudioBufferStream;

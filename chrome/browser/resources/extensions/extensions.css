@@ -54,8 +54,7 @@ html:not(.focus-outline-visible)
   content: url(apps_developer_tools_promo_48.png);
 }
 
-#apps-developer-tools-promo-text,
-#apps-developer-tools-promo-link {
+#apps-developer-tools-promo-text {
   -webkit-margin-start: 5px;
 }
 
@@ -67,6 +66,7 @@ html:not(.focus-outline-visible)
 
 #apps-developer-tools-promo .close-button {
   background: url(chrome://theme/IDR_CLOSE_DIALOG) no-repeat center center;
+  border: 0;
   height: 14px;
   width: 14px;
   z-index: 1;
@@ -294,6 +294,11 @@ html[dir='rtl'] .extension-list-item {
 
 .error-collection-control {
   -webkit-margin-start: 5px;
+  display: none;
+}
+
+#extension-settings.dev-mode .error-collection-control {
+  display: initial;
 }
 
 #font-measuring-div {

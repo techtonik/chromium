@@ -48,6 +48,7 @@
       'webapp/clipboard.js',
       'webapp/media_source_renderer.js',
       'webapp/session_connector.js',
+      'webapp/smart_reconnector.js',
     ],
     # Remoting core JavaScript files.
     'remoting_webapp_js_core_files': [
@@ -81,11 +82,14 @@
     'remoting_webapp_js_ui_files': [
       'webapp/butter_bar.js',
       'webapp/connection_stats.js',
+      'webapp/feedback.js',
+      'webapp/fullscreen.js',
+      'webapp/fullscreen_v1.js',
+      'webapp/fullscreen_v2.js',
       'webapp/l10n.js',
       'webapp/menu_button.js',
       'webapp/ui_mode.js',
       'webapp/toolbar.js',
-      'webapp/feedback.js',
     ],
     # UI files for controlling the local machine as a host.
     'remoting_webapp_js_ui_host_control_files': [

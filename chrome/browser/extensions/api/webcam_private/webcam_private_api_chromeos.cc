@@ -13,6 +13,10 @@
 #include "base/files/scoped_file.h"
 #include "base/posix/eintr_wrapper.h"
 #include "chrome/common/extensions/api/webcam_private.h"
+#include "content/public/browser/browser_context.h"
+#include "content/public/browser/media_device_id.h"
+#include "content/public/browser/resource_context.h"
+#include "content/public/common/media_stream_request.h"
 
 namespace content {
 class BrowserContext;
@@ -23,8 +27,19 @@ namespace {
 base::ScopedFD OpenWebcam(const std::string& extension_id,
                           content::BrowserContext* browser_context,
                           const std::string& webcam_id) {
-  // TODO(zork): Get device_id from content::MediaStreamManager.
-  std::string device_id = "/dev/video0";
+  GURL security_origin =
+      extensions::Extension::GetBaseURLFromExtensionId(extension_id);
+
+  std::string device_id;
+  bool success = content::GetMediaDeviceIDForHMAC(
+      content::MEDIA_DEVICE_VIDEO_CAPTURE,
+      browser_context->GetResourceContext()->GetMediaDeviceIDSalt(),
+      security_origin,
+      webcam_id,
+      &device_id);
+
+  if (!success)
+    return base::ScopedFD();
 
   return base::ScopedFD(HANDLE_EINTR(open(device_id.c_str(), 0)));
 }
@@ -55,7 +70,7 @@ WebcamPrivateSetFunction::WebcamPrivateSetFunction() {
 WebcamPrivateSetFunction::~WebcamPrivateSetFunction() {
 }
 
-bool WebcamPrivateSetFunction::RunImpl() {
+bool WebcamPrivateSetFunction::RunSync() {
   // Get parameters
   scoped_ptr<api::webcam_private::Set::Params> params(
       api::webcam_private::Set::Params::Create(*args_));
@@ -92,7 +107,7 @@ WebcamPrivateGetFunction::WebcamPrivateGetFunction() {
 WebcamPrivateGetFunction::~WebcamPrivateGetFunction() {
 }
 
-bool WebcamPrivateGetFunction::RunImpl() {
+bool WebcamPrivateGetFunction::RunSync() {
   // Get parameters
   scoped_ptr<api::webcam_private::Get::Params> params(
       api::webcam_private::Get::Params::Create(*args_));
@@ -130,7 +145,7 @@ WebcamPrivateResetFunction::WebcamPrivateResetFunction() {
 WebcamPrivateResetFunction::~WebcamPrivateResetFunction() {
 }
 
-bool WebcamPrivateResetFunction::RunImpl() {
+bool WebcamPrivateResetFunction::RunSync() {
   // Get parameters
   scoped_ptr<api::webcam_private::Reset::Params> params(
       api::webcam_private::Reset::Params::Create(*args_));

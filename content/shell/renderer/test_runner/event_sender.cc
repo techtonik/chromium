@@ -7,6 +7,7 @@
 #include "base/basictypes.h"
 #include "base/logging.h"
 #include "base/strings/stringprintf.h"
+#include "content/public/common/page_zoom.h"
 #include "content/shell/renderer/test_runner/MockSpellCheck.h"
 #include "content/shell/renderer/test_runner/TestInterfaces.h"
 #include "content/shell/renderer/test_runner/WebTestDelegate.h"
@@ -137,7 +138,7 @@ bool OutsideMultiClickRadius(const WebPoint& a, const WebPoint& b) {
 // helpful.
 std::vector<std::string> MakeMenuItemStringsFor(
     WebContextMenuData* context_menu,
-    WebTestRunner::WebTestDelegate* delegate) {
+    WebTestDelegate* delegate) {
   // These constants are based on Safari's context menu because tests are made
   // for it.
   static const char* kNonEditableMenuStrings[] = {
@@ -176,7 +177,7 @@ std::vector<std::string> MakeMenuItemStringsFor(
       strings.push_back(*item);
     }
     WebVector<WebString> suggestions;
-    WebTestRunner::MockSpellCheck::fillSuggestionList(
+    MockSpellCheck::fillSuggestionList(
         context_menu->misspelledWord, &suggestions);
     for (size_t i = 0; i < suggestions.size(); ++i) {
       strings.push_back(suggestions[i].utf8());
@@ -202,7 +203,7 @@ WebMouseEvent::Button GetButtonTypeFromButtonNumber(int button_code) {
   return WebMouseEvent::ButtonMiddle;
 }
 
-class MouseDownTask : public WebTestRunner::WebMethodTask<EventSender> {
+class MouseDownTask : public WebMethodTask<EventSender> {
  public:
   MouseDownTask(EventSender* obj, int button_number, int modifiers)
       : WebMethodTask<EventSender>(obj),
@@ -218,7 +219,7 @@ class MouseDownTask : public WebTestRunner::WebMethodTask<EventSender> {
   int modifiers_;
 };
 
-class MouseUpTask : public WebTestRunner::WebMethodTask<EventSender> {
+class MouseUpTask : public WebMethodTask<EventSender> {
  public:
   MouseUpTask(EventSender* obj, int button_number, int modifiers)
       : WebMethodTask<EventSender>(obj),
@@ -234,7 +235,7 @@ class MouseUpTask : public WebTestRunner::WebMethodTask<EventSender> {
   int modifiers_;
 };
 
-class KeyDownTask : public WebTestRunner::WebMethodTask<EventSender> {
+class KeyDownTask : public WebMethodTask<EventSender> {
  public:
   KeyDownTask(EventSender* obj,
               const std::string code_str,
@@ -335,6 +336,7 @@ class EventSenderBindings : public gin::Wrappable<EventSenderBindings> {
   void TextZoomOut();
   void ZoomPageIn();
   void ZoomPageOut();
+  void SetPageZoomFactor(gin::Arguments* args);
   void SetPageScaleFactor(gin::Arguments* args);
   void ClearTouchPoints();
   void ReleaseTouchPoint(unsigned index);
@@ -455,6 +457,7 @@ EventSenderBindings::GetObjectTemplateBuilder(v8::Isolate* isolate) {
       .SetMethod("textZoomOut", &EventSenderBindings::TextZoomOut)
       .SetMethod("zoomPageIn", &EventSenderBindings::ZoomPageIn)
       .SetMethod("zoomPageOut", &EventSenderBindings::ZoomPageOut)
+      .SetMethod("setPageZoomFactor", &EventSenderBindings::SetPageZoomFactor)
       .SetMethod("setPageScaleFactor", &EventSenderBindings::SetPageScaleFactor)
       .SetMethod("clearTouchPoints", &EventSenderBindings::ClearTouchPoints)
       .SetMethod("releaseTouchPoint", &EventSenderBindings::ReleaseTouchPoint)
@@ -581,6 +584,16 @@ void EventSenderBindings::ZoomPageIn() {
 void EventSenderBindings::ZoomPageOut() {
   if (sender_)
     sender_->ZoomPageOut();
+}
+
+void EventSenderBindings::SetPageZoomFactor(gin::Arguments* args) {
+  if (!sender_)
+    return;
+  double zoom_factor;
+  if (args->PeekNext().IsEmpty())
+    return;
+  args->GetNext(&zoom_factor);
+  sender_->SetPageZoomFactor(zoom_factor);
 }
 
 void EventSenderBindings::SetPageScaleFactor(gin::Arguments* args) {
@@ -994,7 +1007,7 @@ EventSender::SavedEvent::SavedEvent()
       milliseconds(0),
       modifiers(0) {}
 
-EventSender::EventSender(WebTestRunner::TestInterfaces* interfaces)
+EventSender::EventSender(TestInterfaces* interfaces)
     : interfaces_(interfaces),
       delegate_(NULL),
       view_(NULL),
@@ -1066,7 +1079,7 @@ void EventSender::Install(WebFrame* frame) {
   EventSenderBindings::Install(weak_factory_.GetWeakPtr(), frame);
 }
 
-void EventSender::SetDelegate(WebTestRunner::WebTestDelegate* delegate) {
+void EventSender::SetDelegate(WebTestDelegate* delegate) {
   delegate_ = delegate;
 }
 
@@ -1381,6 +1394,15 @@ void EventSender::ZoomPageOut() {
   for (size_t i = 0; i < window_list.size(); ++i) {
     window_list.at(i)->webView()->setZoomLevel(
         window_list.at(i)->webView()->zoomLevel() - 1);
+  }
+}
+
+void EventSender::SetPageZoomFactor(double zoom_factor) {
+  const std::vector<WebTestProxyBase*>& window_list = interfaces_->windowList();
+
+  for (size_t i = 0; i < window_list.size(); ++i) {
+    window_list.at(i)->webView()->setZoomLevel(
+        ZoomFactorToZoomLevel(zoom_factor));
   }
 }
 

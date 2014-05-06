@@ -134,7 +134,7 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
          APIPermissionInfo::kFlagNone,
          IDS_EXTENSION_PROMPT_WARNING_NATIVE_MESSAGING,
          PermissionMessage::kNativeMessaging},
-        {APIPermission::kPower, "power", },
+        {APIPermission::kPower, "power"},
         {APIPermission::kPrivacy, "privacy", APIPermissionInfo::kFlagNone,
          IDS_EXTENSION_PROMPT_WARNING_PRIVACY, PermissionMessage::kPrivacy},
         {APIPermission::kProcesses, "processes", APIPermissionInfo::kFlagNone,
@@ -329,10 +329,7 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
          PermissionMessage::kFileSystemDirectory},
         {APIPermission::kFileSystemProvider, "fileSystemProvider"},
         {APIPermission::kFileSystemRetainEntries, "fileSystem.retainEntries"},
-        {APIPermission::kFileSystemWrite, "fileSystem.write",
-         APIPermissionInfo::kFlagNone,
-         IDS_EXTENSION_PROMPT_WARNING_FILE_SYSTEM_WRITE,
-         PermissionMessage::kFileSystemWrite},
+        {APIPermission::kFileSystemWrite, "fileSystem.write"},
         {APIPermission::kFileSystemWriteDirectory, "fileSystem.writeDirectory",
          APIPermissionInfo::kFlagNone,
          IDS_EXTENSION_PROMPT_WARNING_FILE_SYSTEM_WRITE_DIRECTORY,
@@ -355,10 +352,6 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
         {APIPermission::kUsbDevice, "usbDevices", APIPermissionInfo::kFlagNone,
          0, PermissionMessage::kNone,
          &CreateAPIPermission<UsbDevicePermission>},
-        {APIPermission::kSystemIndicator, "systemIndicator",
-         APIPermissionInfo::kFlagNone,
-         IDS_EXTENSION_PROMPT_WARNING_SYSTEM_INDICATOR,
-         PermissionMessage::kSystemIndicator},
         {APIPermission::kSystemCpu, "system.cpu"},
         {APIPermission::kSystemMemory, "system.memory"},
         {APIPermission::kSystemNetwork, "system.network"},
@@ -371,6 +364,7 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
         {APIPermission::kOverrideEscFullscreen,
          "app.window.fullscreen.overrideEsc"},
         {APIPermission::kWindowShape, "app.window.shape"},
+        {APIPermission::kBrowser, "browser"},
 
         // Settings override permissions.
         {APIPermission::kHomepage, "homepage",
@@ -387,7 +381,8 @@ std::vector<APIPermissionInfo*> ChromeAPIPermissions::GetAllPermissions()
          APIPermissionInfo::kFlagCannotBeOptional |
              APIPermissionInfo::kFlagInternal,
          IDS_EXTENSION_PROMPT_WARNING_START_PAGE_SETTING_OVERRIDE,
-         PermissionMessage::kStartupPages}, };
+         PermissionMessage::kStartupPages},
+    };
 
   std::vector<APIPermissionInfo*> permissions;
 

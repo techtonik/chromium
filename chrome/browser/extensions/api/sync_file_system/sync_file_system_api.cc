@@ -65,7 +65,7 @@ std::string ErrorToString(SyncStatusCode code) {
 
 }  // namespace
 
-bool SyncFileSystemDeleteFileSystemFunction::RunImpl() {
+bool SyncFileSystemDeleteFileSystemFunction::RunAsync() {
   std::string url;
   EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &url));
 
@@ -113,7 +113,7 @@ void SyncFileSystemDeleteFileSystemFunction::DidDeleteFileSystem(
   SendResponse(true);
 }
 
-bool SyncFileSystemRequestFileSystemFunction::RunImpl() {
+bool SyncFileSystemRequestFileSystemFunction::RunAsync() {
   // SyncFileSystem initialization is done in OpenFileSystem below, but we call
   // GetSyncFileSystemService here too to initialize sync event observer for
   // extensions API.
@@ -168,7 +168,7 @@ void SyncFileSystemRequestFileSystemFunction::DidOpenFileSystem(
   SendResponse(true);
 }
 
-bool SyncFileSystemGetFileStatusFunction::RunImpl() {
+bool SyncFileSystemGetFileStatusFunction::RunAsync() {
   std::string url;
   EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &url));
 
@@ -207,7 +207,7 @@ SyncFileSystemGetFileStatusesFunction::SyncFileSystemGetFileStatusesFunction() {
 SyncFileSystemGetFileStatusesFunction::~SyncFileSystemGetFileStatusesFunction(
     ) {}
 
-bool SyncFileSystemGetFileStatusesFunction::RunImpl() {
+bool SyncFileSystemGetFileStatusesFunction::RunAsync() {
   // All FileEntries converted into array of URL Strings in JS custom bindings.
   base::ListValue* file_entry_urls = NULL;
   EXTENSION_FUNCTION_VALIDATE(args_->GetList(0, &file_entry_urls));
@@ -284,7 +284,7 @@ void SyncFileSystemGetFileStatusesFunction::DidGetFileStatus(
   SendResponse(true);
 }
 
-bool SyncFileSystemGetUsageAndQuotaFunction::RunImpl() {
+bool SyncFileSystemGetUsageAndQuotaFunction::RunAsync() {
   std::string url;
   EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &url));
 
@@ -340,7 +340,7 @@ void SyncFileSystemGetUsageAndQuotaFunction::DidGetUsageAndQuota(
   SendResponse(true);
 }
 
-bool SyncFileSystemSetConflictResolutionPolicyFunction::RunImpl() {
+bool SyncFileSystemSetConflictResolutionPolicyFunction::RunSync() {
   std::string policy_string;
   EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &policy_string));
   ConflictResolutionPolicy policy = ExtensionEnumToConflictResolutionPolicy(
@@ -362,7 +362,7 @@ bool SyncFileSystemSetConflictResolutionPolicyFunction::RunImpl() {
   return true;
 }
 
-bool SyncFileSystemGetConflictResolutionPolicyFunction::RunImpl() {
+bool SyncFileSystemGetConflictResolutionPolicyFunction::RunSync() {
   sync_file_system::SyncFileSystemService* service =
       GetSyncFileSystemService(GetProfile());
   DCHECK(service);
@@ -374,7 +374,7 @@ bool SyncFileSystemGetConflictResolutionPolicyFunction::RunImpl() {
   return true;
 }
 
-bool SyncFileSystemGetServiceStatusFunction::RunImpl() {
+bool SyncFileSystemGetServiceStatusFunction::RunSync() {
   sync_file_system::SyncFileSystemService* service =
       GetSyncFileSystemService(GetProfile());
   results_ = api::sync_file_system::GetServiceStatus::Results::Create(

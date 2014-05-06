@@ -12,6 +12,7 @@
 #include "base/logging.h"
 #include "base/strings/stringprintf.h"
 #include "mojo/system/message_pipe_endpoint.h"
+#include "mojo/system/transport_data.h"
 
 namespace mojo {
 namespace system {
@@ -347,12 +348,19 @@ void Channel::OnReadMessageForDownstream(
     return;
   }
 
-  // We need to duplicate the message, because |EnqueueMessage()| will take
-  // ownership of it.
+  // We need to duplicate the message (data), because |EnqueueMessage()| will
+  // take ownership of it.
   scoped_ptr<MessageInTransit> message(new MessageInTransit(message_view));
-  message->DeserializeDispatchers(this);
+  if (message_view.transport_data_buffer_size() > 0) {
+    DCHECK(message_view.transport_data_buffer());
+    message->SetDispatchers(
+        TransportData::DeserializeDispatchersFromBuffer(
+            message_view.transport_data_buffer(),
+            message_view.transport_data_buffer_size(),
+            this));
+  }
   MojoResult result = endpoint_info.message_pipe->EnqueueMessage(
-      MessagePipe::GetPeerPort(endpoint_info.port), message.Pass(), NULL);
+      MessagePipe::GetPeerPort(endpoint_info.port), message.Pass());
   if (result != MOJO_RESULT_OK) {
     // TODO(vtl): This might be a "non-error", e.g., if the destination endpoint
     // has been closed (in an unavoidable race). This might also be a "remote"
@@ -458,7 +466,7 @@ bool Channel::SendControlMessage(MessageInTransit::Subtype subtype,
   DVLOG(2) << "Sending channel control message: subtype " << subtype
            << ", local ID " << local_id << ", remote ID " << remote_id;
   scoped_ptr<MessageInTransit> message(new MessageInTransit(
-      MessageInTransit::kTypeChannel, subtype, 0, 0, NULL));
+      MessageInTransit::kTypeChannel, subtype, 0, NULL));
   message->set_source_id(local_id);
   message->set_destination_id(remote_id);
   return WriteMessage(message.Pass());

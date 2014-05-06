@@ -84,7 +84,6 @@
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "grit/chromium_strings.h"
 #include "grit/generated_resources.h"
 #include "grit/locale_settings.h"
@@ -2081,9 +2080,6 @@ willAnimateFromState:(BookmarkBar::State)oldState
 // Discussion: http://crbug.com/179181 and http:/crbug.com/351252
 - (void)setFullscreen:(BOOL)fullscreen {
   if (fullscreen == [self isFullscreen])
-    return;
-
-  if (!chrome::IsCommandEnabled(browser_.get(), IDC_FULLSCREEN))
     return;
 
   if (fullscreen) {

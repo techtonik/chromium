@@ -477,16 +477,15 @@ void ExtensionSettingsHandler::GetLocalizedValues(
   source->AddString("extensionSettingsUpdateButton",
       l10n_util::GetStringUTF16(IDS_EXTENSIONS_UPDATE_BUTTON));
   source->AddString(
-      "extensionSettingsAppsDevToolsPromoText",
-      l10n_util::GetStringUTF16(IDS_EXTENSIONS_APPS_DEV_TOOLS_PROMO_TEXT));
+      "extensionSettingsAppsDevToolsPromoHTML",
+      l10n_util::GetStringFUTF16(
+          IDS_EXTENSIONS_APPS_DEV_TOOLS_PROMO_HTML,
+          base::ASCIIToUTF16(google_util::AppendGoogleLocaleParam(
+              GURL(extension_urls::GetWebstoreItemDetailURLPrefix() +
+                       kAppsDeveloperToolsExtensionId)).spec())));
   source->AddString(
-      "extensionSettingsAppsDevToolsLinkText",
-      l10n_util::GetStringUTF16(IDS_EXTENSIONS_APPS_DEV_TOOLS_LINK_TEXT));
-  source->AddString(
-      "extensionSettingsAppsDevToolsUrl",
-      base::ASCIIToUTF16(google_util::AppendGoogleLocaleParam(
-          GURL(extension_urls::GetWebstoreItemDetailURLPrefix() +
-                   kAppsDeveloperToolsExtensionId)).spec()));
+      "extensionSettingsAppDevToolsPromoClose",
+      l10n_util::GetStringUTF16(IDS_CLOSE));
   source->AddString("extensionSettingsCrashMessage",
       l10n_util::GetStringUTF16(IDS_EXTENSIONS_CRASHED_EXTENSION));
   source->AddString("extensionSettingsInDevelopment",

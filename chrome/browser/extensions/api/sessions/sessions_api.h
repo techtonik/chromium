@@ -29,7 +29,7 @@ class SessionId;
 class SessionsGetRecentlyClosedFunction : public ChromeSyncExtensionFunction {
  protected:
   virtual ~SessionsGetRecentlyClosedFunction() {}
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
   DECLARE_EXTENSION_FUNCTION("sessions.getRecentlyClosed",
                              SESSIONS_GETRECENTLYCLOSED)
 
@@ -47,7 +47,7 @@ class SessionsGetRecentlyClosedFunction : public ChromeSyncExtensionFunction {
 class SessionsGetDevicesFunction : public ChromeSyncExtensionFunction {
  protected:
   virtual ~SessionsGetDevicesFunction() {}
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
   DECLARE_EXTENSION_FUNCTION("sessions.getDevices", SESSIONS_GETDEVICES)
 
  private:
@@ -68,12 +68,12 @@ class SessionsGetDevicesFunction : public ChromeSyncExtensionFunction {
 class SessionsRestoreFunction : public ChromeSyncExtensionFunction {
  protected:
   virtual ~SessionsRestoreFunction() {}
-  virtual bool RunImpl() OVERRIDE;
+  virtual bool RunSync() OVERRIDE;
   DECLARE_EXTENSION_FUNCTION("sessions.restore", SESSIONS_RESTORE)
 
  private:
   void SetInvalidIdError(const std::string& invalid_id);
-  void SetResultRestoredTab(const content::WebContents* contents);
+  void SetResultRestoredTab(content::WebContents* contents);
   bool SetResultRestoredWindow(int window_id);
   bool RestoreMostRecentlyClosed(Browser* browser);
   bool RestoreLocalSession(const SessionId& session_id, Browser* browser);

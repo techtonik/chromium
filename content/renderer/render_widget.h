@@ -256,6 +256,15 @@ class CONTENT_EXPORT RenderWidget
   void UpdateCompositionInfo(bool should_update_range);
 #endif
 
+#if defined(OS_MACOSX)
+  void DidChangeScrollbarsForMainFrame(bool has_horizontal_scrollbar,
+                                       bool has_vertical_scrollbar);
+#endif  // defined(OS_MACOSX)
+
+#if defined(OS_ANDROID)
+  void DidChangeBodyBackgroundColor(SkColor bg_color);
+#endif
+
  protected:
   // Friend RefCounted so that the dtor can be non-public. Using this class
   // without ref-counting is an error.
@@ -293,15 +302,6 @@ class CONTENT_EXPORT RenderWidget
   // sent (only ACKs) and the process is free to exit when there are no other
   // active RenderWidgets.
   void SetSwappedOut(bool is_swapped_out);
-
-  // Paints the given rectangular region of the WebWidget into canvas (a
-  // shared memory segment returned by AllocPaintBuf on Windows). The caller
-  // must ensure that the given rect fits within the bounds of the WebWidget.
-  void PaintRect(const gfx::Rect& rect, const gfx::Point& canvas_origin,
-                 SkCanvas* canvas);
-
-  // Paints a border at the given rect for debugging purposes.
-  void PaintDebugBorder(const gfx::Rect& rect, SkCanvas* canvas);
 
   void AnimationCallback();
   void InvalidationCallback();
@@ -416,9 +416,7 @@ class CONTENT_EXPORT RenderWidget
   void DidToggleFullscreen();
 
   bool next_paint_is_resize_ack() const;
-  bool next_paint_is_restore_ack() const;
   void set_next_paint_is_resize_ack();
-  void set_next_paint_is_restore_ack();
   void set_next_paint_is_repaint_ack();
 
   // Override point to obtain that the current input method state and caret
@@ -543,8 +541,6 @@ class CONTENT_EXPORT RenderWidget
   // The size of the RenderWidget.
   gfx::Size size_;
 
-  bool has_frame_pending_;
-
   // The size of the view's backing surface in non-DPI-adjusted pixels.
   gfx::Size physical_backing_size_;
 
@@ -580,13 +576,6 @@ class CONTENT_EXPORT RenderWidget
 
   // Indicates that we are in fullscreen mode.
   bool is_fullscreen_;
-
-  // Indicates that we should be repainted when restored.  This flag is set to
-  // true if we receive an invalidation / scroll event from webkit while our
-  // is_hidden_ flag is set to true.  This is used to force a repaint once we
-  // restore to account for the fact that our host would not know about the
-  // invalidation / scroll event(s) from webkit while we are hidden.
-  bool needs_repainting_on_restore_;
 
   // Indicates whether we have been focused/unfocused by the browser.
   bool has_focus_;
@@ -709,7 +698,18 @@ class CONTENT_EXPORT RenderWidget
   // browser regarding IME-type events that have not been acknowledged by the
   // browser. If this value is not 0 IME events will be dropped.
   int outstanding_ime_acks_;
+
+  // The background color of the document body element. This is used as the
+  // default background color for filling the screen areas for which we don't
+  // have the actual content.
+  SkColor body_background_color_;
 #endif
+
+#if defined(OS_MACOSX)
+  // These store the "has scrollbars" state last sent to the browser.
+  bool cached_has_main_frame_horizontal_scrollbar_;
+  bool cached_has_main_frame_vertical_scrollbar_;
+#endif  // defined(OS_MACOSX)
 
   scoped_ptr<ScreenMetricsEmulator> screen_metrics_emulator_;
 
