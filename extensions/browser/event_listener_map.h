@@ -50,6 +50,7 @@ class EventListener {
   EventListener(const std::string& event_name,
                 const std::string& extension_id,
                 content::RenderProcessHost* process,
+                content::ServiceWorkerHost* service_worker,
                 scoped_ptr<base::DictionaryValue> filter);
   ~EventListener();
 
@@ -70,6 +71,7 @@ class EventListener {
   const std::string event_name() const { return event_name_; }
   const std::string extension_id() const { return extension_id_; }
   content::RenderProcessHost* process() const { return process_; }
+  content::ServiceWorkerHost* service_worker() const { return service_worker_; }
   base::DictionaryValue* filter() const { return filter_.get(); }
   EventFilter::MatcherID matcher_id() const { return matcher_id_; }
   void set_matcher_id(EventFilter::MatcherID id) { matcher_id_ = id; }
@@ -78,6 +80,7 @@ class EventListener {
   const std::string event_name_;
   const std::string extension_id_;
   content::RenderProcessHost* process_;
+  content::ServiceWorkerHost* service_worker_;
   scoped_ptr<base::DictionaryValue> filter_;
   EventFilter::MatcherID matcher_id_;  // -1 if unset.
 

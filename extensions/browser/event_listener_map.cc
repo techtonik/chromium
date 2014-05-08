@@ -18,10 +18,12 @@ typedef EventFilter::MatcherID MatcherID;
 EventListener::EventListener(const std::string& event_name,
                              const std::string& extension_id,
                              content::RenderProcessHost* process,
+                             content::ServiceWorkerHost* service_worker,
                              scoped_ptr<DictionaryValue> filter)
     : event_name_(event_name),
       extension_id_(extension_id),
       process_(process),
+      service_worker_(service_worker),
       filter_(filter.Pass()),
       matcher_id_(-1) {
 }
@@ -34,6 +36,7 @@ bool EventListener::Equals(const EventListener* other) const {
   // equivalent but has.
   return event_name_ == other->event_name_ &&
          extension_id_ == other->extension_id_ && process_ == other->process_ &&
+         service_worker_ == other->service_worker_ &&
          ((!!filter_.get()) == (!!other->filter_.get())) &&
          (!filter_.get() || filter_->Equals(other->filter_.get()));
 }
@@ -42,8 +45,11 @@ scoped_ptr<EventListener> EventListener::Copy() const {
   scoped_ptr<DictionaryValue> filter_copy;
   if (filter_)
     filter_copy.reset(filter_->DeepCopy());
-  return scoped_ptr<EventListener>(new EventListener(
-      event_name_, extension_id_, process_, filter_copy.Pass()));
+  return scoped_ptr<EventListener>(new EventListener(event_name_,
+                                                     extension_id_,
+                                                     process_,
+                                                     service_worker_,
+                                                     filter_copy.Pass()));
 }
 
 bool EventListener::IsLazy() const {
@@ -51,6 +57,12 @@ bool EventListener::IsLazy() const {
 }
 
 void EventListener::MakeLazy() {
+  //
+  //
+  // TODO: Solve this for service workers. This method is used only for
+  // a higher level task of clearing listeners.
+  //
+  //
   process_ = NULL;
 }
 
