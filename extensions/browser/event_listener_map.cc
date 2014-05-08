@@ -6,6 +6,7 @@
 
 #include "base/values.h"
 #include "content/public/browser/render_process_host.h"
+#include "content/public/browser/service_worker_host.h"
 #include "extensions/browser/event_router.h"
 #include "ipc/ipc_message.h"
 
@@ -186,7 +187,7 @@ void EventListenerMap::LoadUnfilteredLazyListeners(
   for (std::set<std::string>::const_iterator it = event_names.begin();
        it != event_names.end(); ++it) {
     AddListener(scoped_ptr<EventListener>(new EventListener(
-        *it, extension_id, NULL, scoped_ptr<DictionaryValue>())));
+        *it, extension_id, NULL, NULL, scoped_ptr<DictionaryValue>())));
   }
 }
 
@@ -202,9 +203,12 @@ void EventListenerMap::LoadFilteredLazyListeners(
       const DictionaryValue* filter = NULL;
       if (!filter_list->GetDictionary(i, &filter))
         continue;
-      AddListener(scoped_ptr<EventListener>(new EventListener(
-          it.key(), extension_id, NULL,
-          scoped_ptr<DictionaryValue>(filter->DeepCopy()))));
+      AddListener(scoped_ptr<EventListener>(
+          new EventListener(it.key(),
+                            extension_id,
+                            NULL,
+                            NULL,
+                            scoped_ptr<DictionaryValue>(filter->DeepCopy()))));
     }
   }
 }

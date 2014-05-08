@@ -20,6 +20,7 @@ class DictionaryValue;
 namespace content {
 class BrowserContext;
 class RenderProcessHost;
+class ServiceWorkerHost;
 }
 
 class ListenerRemovalListener;

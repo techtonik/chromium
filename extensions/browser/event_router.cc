@@ -185,15 +185,25 @@ EventRouter::~EventRouter() {}
 void EventRouter::AddEventListener(const std::string& event_name,
                                    content::RenderProcessHost* process,
                                    const std::string& extension_id) {
+  //
+  //
+  // TODO Enable creating service worker listeners.
+  //
+  //
   listeners_.AddListener(scoped_ptr<EventListener>(new EventListener(
-      event_name, extension_id, process, scoped_ptr<DictionaryValue>())));
+      event_name, extension_id, process, NULL, scoped_ptr<DictionaryValue>())));
 }
 
 void EventRouter::RemoveEventListener(const std::string& event_name,
                                       content::RenderProcessHost* process,
                                       const std::string& extension_id) {
-  EventListener listener(event_name, extension_id, process,
-                         scoped_ptr<DictionaryValue>());
+  //
+  //
+  // TODO Enable service worker listeners.
+  //
+  //
+  EventListener listener(
+      event_name, extension_id, process, NULL, scoped_ptr<DictionaryValue>());
   listeners_.RemoveListener(&listener);
 }
 
@@ -238,7 +248,7 @@ void EventRouter::OnListenerRemoved(const EventListener* listener) {
 void EventRouter::AddLazyEventListener(const std::string& event_name,
                                        const std::string& extension_id) {
   scoped_ptr<EventListener> listener(new EventListener(
-      event_name, extension_id, NULL, scoped_ptr<DictionaryValue>()));
+      event_name, extension_id, NULL, NULL, scoped_ptr<DictionaryValue>()));
   bool is_new = listeners_.AddListener(listener.Pass());
 
   if (is_new) {
@@ -251,8 +261,8 @@ void EventRouter::AddLazyEventListener(const std::string& event_name,
 
 void EventRouter::RemoveLazyEventListener(const std::string& event_name,
                                           const std::string& extension_id) {
-  EventListener listener(event_name, extension_id, NULL,
-                         scoped_ptr<DictionaryValue>());
+  EventListener listener(
+      event_name, extension_id, NULL, NULL, scoped_ptr<DictionaryValue>());
   bool did_exist = listeners_.RemoveListener(&listener);
 
   if (did_exist) {
@@ -268,14 +278,25 @@ void EventRouter::AddFilteredEventListener(const std::string& event_name,
                                            const std::string& extension_id,
                                            const base::DictionaryValue& filter,
                                            bool add_lazy_listener) {
-  listeners_.AddListener(scoped_ptr<EventListener>(new EventListener(
-      event_name, extension_id, process,
-      scoped_ptr<DictionaryValue>(filter.DeepCopy()))));
+  //
+  //
+  // TODO Enable creating service worker listeners.
+  //
+  //
+  listeners_.AddListener(scoped_ptr<EventListener>(
+      new EventListener(event_name,
+                        extension_id,
+                        process,
+                        NULL,
+                        scoped_ptr<DictionaryValue>(filter.DeepCopy()))));
 
   if (add_lazy_listener) {
     bool added = listeners_.AddListener(scoped_ptr<EventListener>(
-        new EventListener(event_name, extension_id, NULL,
-        scoped_ptr<DictionaryValue>(filter.DeepCopy()))));
+        new EventListener(event_name,
+                          extension_id,
+                          NULL,
+                          NULL,
+                          scoped_ptr<DictionaryValue>(filter.DeepCopy()))));
 
     if (added)
       AddFilterToEvent(event_name, extension_id, &filter);
@@ -288,7 +309,15 @@ void EventRouter::RemoveFilteredEventListener(
     const std::string& extension_id,
     const base::DictionaryValue& filter,
     bool remove_lazy_listener) {
-  EventListener listener(event_name, extension_id, process,
+  //
+  //
+  // TODO Enable service worker listeners.
+  //
+  //
+  EventListener listener(event_name,
+                         extension_id,
+                         process,
+                         NULL,
                          scoped_ptr<DictionaryValue>(filter.DeepCopy()));
 
   listeners_.RemoveListener(&listener);
