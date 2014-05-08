@@ -478,6 +478,27 @@ void LayerTreeHostImpl::StartPageScaleAnimation(
   client_->RenewTreePriority();
 }
 
+bool LayerTreeHostImpl::IsCurrentlyScrollingLayerAt(
+    const gfx::Point& viewport_point,
+    InputHandler::ScrollInputType type) {
+  if (!CurrentlyScrollingLayer())
+    return false;
+
+  if (!EnsureRenderSurfaceLayerList())
+    return false;
+
+  gfx::PointF device_viewport_point =
+      gfx::ScalePoint(viewport_point, device_scale_factor_);
+
+  LayerImpl* layer_impl = LayerTreeHostCommon::FindLayerThatIsHitByPoint(
+      device_viewport_point, active_tree_->RenderSurfaceLayerList());
+
+  bool scroll_on_main_thread = false;
+  LayerImpl* scrolling_layer_impl = FindScrollLayerForDeviceViewportPoint(
+      device_viewport_point, type, layer_impl, &scroll_on_main_thread, NULL);
+  return CurrentlyScrollingLayer() == scrolling_layer_impl;
+}
+
 bool LayerTreeHostImpl::HaveTouchEventHandlersAt(
     const gfx::Point& viewport_point) {
   if (!settings_.touch_hit_testing)
@@ -1769,7 +1790,7 @@ ManagedMemoryPolicy LayerTreeHostImpl::ActualManagedMemoryPolicy() const {
   // rasterization per layer, we also need to disable pre-painting selectively:
   // crbug.com/335387
   if (debug_state_.rasterize_only_visible_content ||
-      settings_.rasterization_site == LayerTreeSettings::GpuRasterization) {
+      settings_.gpu_rasterization_forced) {
     actual.priority_cutoff_when_visible =
         gpu::MemoryAllocation::CUTOFF_ALLOW_REQUIRED_ONLY;
   }
@@ -2134,7 +2155,7 @@ LayerImpl* LayerTreeHostImpl::FindScrollLayerForDeviceViewportPoint(
     InputHandler::ScrollInputType type,
     LayerImpl* layer_impl,
     bool* scroll_on_main_thread,
-    bool* has_ancestor_scroll_handler) const {
+    bool* optional_has_ancestor_scroll_handler) const {
   DCHECK(scroll_on_main_thread);
 
   // Walk up the hierarchy and look for a scrollable layer.
@@ -2159,18 +2180,26 @@ LayerImpl* LayerTreeHostImpl::FindScrollLayerForDeviceViewportPoint(
       return NULL;
     }
 
-    if (has_ancestor_scroll_handler &&
+    if (optional_has_ancestor_scroll_handler &&
         scroll_layer_impl->have_scroll_event_handlers())
-      *has_ancestor_scroll_handler = true;
+      *optional_has_ancestor_scroll_handler = true;
 
     if (status == ScrollStarted && !potentially_scrolling_layer_impl)
       potentially_scrolling_layer_impl = scroll_layer_impl;
   }
 
+  // Falling back to the root scroll layer ensures generation of root overscroll
+  // notifications while preventing scroll updates from being unintentionally
+  // forwarded to the main thread.
+  if (!potentially_scrolling_layer_impl)
+    potentially_scrolling_layer_impl = OuterViewportScrollLayer()
+                                           ? OuterViewportScrollLayer()
+                                           : InnerViewportScrollLayer();
+
   return potentially_scrolling_layer_impl;
 }
 
-// Similar to LayerImpl::HasAncestor, but takes into account scroll parents.
+// Similar to LayerImpl::HasAncestor, but walks up the scroll parents.
 static bool HasScrollAncestor(LayerImpl* child, LayerImpl* scroll_ancestor) {
   DCHECK(scroll_ancestor);
   for (LayerImpl* ancestor = child; ancestor;
@@ -2210,7 +2239,7 @@ InputHandler::ScrollStatus LayerTreeHostImpl::ScrollBegin(
   }
 
   bool scroll_on_main_thread = false;
-  LayerImpl* potentially_scrolling_layer_impl =
+  LayerImpl* scrolling_layer_impl =
       FindScrollLayerForDeviceViewportPoint(device_viewport_point,
                                             type,
                                             layer_impl,
@@ -2222,15 +2251,8 @@ InputHandler::ScrollStatus LayerTreeHostImpl::ScrollBegin(
     return ScrollOnMainThread;
   }
 
-  // If we want to send a DidOverscroll for this scroll it can't be ignored.
-  if (!potentially_scrolling_layer_impl)
-    potentially_scrolling_layer_impl = OuterViewportScrollLayer()
-                                           ? OuterViewportScrollLayer()
-                                           : InnerViewportScrollLayer();
-
-  if (potentially_scrolling_layer_impl) {
-    active_tree_->SetCurrentlyScrollingLayer(
-        potentially_scrolling_layer_impl);
+  if (scrolling_layer_impl) {
+    active_tree_->SetCurrentlyScrollingLayer(scrolling_layer_impl);
     should_bubble_scrolls_ = (type != NonBubblingGesture);
     wheel_scrolling_ = (type == Wheel);
     client_->RenewTreePriority();
@@ -2525,7 +2547,6 @@ void LayerTreeHostImpl::ScrollEnd() {
   if (top_controls_manager_)
     top_controls_manager_->ScrollEnd();
   ClearCurrentlyScrollingLayer();
-  StartScrollbarAnimation();
 }
 
 InputHandler::ScrollStatus LayerTreeHostImpl::FlingScrollBegin() {
@@ -2589,10 +2610,8 @@ void LayerTreeHostImpl::MouseMoveAt(const gfx::Point& viewport_point) {
     ScrollbarAnimationController* animation_controller =
         scroll_layer_impl ? scroll_layer_impl->scrollbar_animation_controller()
                           : NULL;
-    if (animation_controller) {
-      animation_controller->DidMouseMoveOffScrollbar(CurrentFrameTimeTicks());
-      StartScrollbarAnimation();
-    }
+    if (animation_controller)
+      animation_controller->DidMouseMoveOffScrollbar();
     scroll_layer_id_when_mouse_over_scrollbar_ = 0;
   }
 
@@ -2621,10 +2640,8 @@ void LayerTreeHostImpl::MouseMoveAt(const gfx::Point& viewport_point) {
         std::min(distance_to_scrollbar,
                  DeviceSpaceDistanceToLayer(device_viewport_point, *it));
 
-  bool should_animate = animation_controller->DidMouseMoveNear(
-      CurrentFrameTimeTicks(), distance_to_scrollbar / device_scale_factor_);
-  if (should_animate)
-    StartScrollbarAnimation();
+  animation_controller->DidMouseMoveNear(distance_to_scrollbar /
+                                         device_scale_factor_);
 }
 
 bool LayerTreeHostImpl::HandleMouseOverScrollbar(LayerImpl* layer_impl,
@@ -2634,11 +2651,7 @@ bool LayerTreeHostImpl::HandleMouseOverScrollbar(LayerImpl* layer_impl,
     layer_impl = active_tree_->LayerById(scroll_layer_id);
     if (layer_impl && layer_impl->scrollbar_animation_controller()) {
       scroll_layer_id_when_mouse_over_scrollbar_ = scroll_layer_id;
-      bool should_animate =
-          layer_impl->scrollbar_animation_controller()->DidMouseMoveNear(
-              CurrentFrameTimeTicks(), 0);
-      if (should_animate)
-        StartScrollbarAnimation();
+      layer_impl->scrollbar_animation_controller()->DidMouseMoveNear(0);
     } else {
       scroll_layer_id_when_mouse_over_scrollbar_ = 0;
     }
@@ -2940,41 +2953,25 @@ void LayerTreeHostImpl::AnimateScrollbarsRecursive(LayerImpl* layer,
 
   ScrollbarAnimationController* scrollbar_controller =
       layer->scrollbar_animation_controller();
-  if (scrollbar_controller && scrollbar_controller->Animate(time)) {
-    TRACE_EVENT_INSTANT0(
-        "cc",
-        "LayerTreeHostImpl::SetNeedsAnimate due to AnimateScrollbars",
-        TRACE_EVENT_SCOPE_THREAD);
-    SetNeedsAnimate();
-  }
+  if (scrollbar_controller)
+    scrollbar_controller->Animate(time);
 
   for (size_t i = 0; i < layer->children().size(); ++i)
     AnimateScrollbarsRecursive(layer->children()[i], time);
 }
 
-void LayerTreeHostImpl::StartScrollbarAnimation() {
-  TRACE_EVENT0("cc", "LayerTreeHostImpl::StartScrollbarAnimation");
-  StartScrollbarAnimationRecursive(RootLayer(), CurrentFrameTimeTicks());
+void LayerTreeHostImpl::PostDelayedScrollbarFade(
+    const base::Closure& start_fade,
+    base::TimeDelta delay) {
+  client_->PostDelayedScrollbarFadeOnImplThread(start_fade, delay);
 }
 
-void LayerTreeHostImpl::StartScrollbarAnimationRecursive(LayerImpl* layer,
-                                                         base::TimeTicks time) {
-  if (!layer)
-    return;
-
-  ScrollbarAnimationController* scrollbar_controller =
-      layer->scrollbar_animation_controller();
-  if (scrollbar_controller && scrollbar_controller->IsAnimating()) {
-    base::TimeDelta delay = scrollbar_controller->DelayBeforeStart(time);
-    if (delay > base::TimeDelta()) {
-      client_->RequestScrollbarAnimationOnImplThread(delay);
-    } else if (scrollbar_controller->Animate(time)) {
-      SetNeedsAnimate();
-    }
-  }
-
-  for (size_t i = 0; i < layer->children().size(); ++i)
-    StartScrollbarAnimationRecursive(layer->children()[i], time);
+void LayerTreeHostImpl::SetNeedsScrollbarAnimationFrame() {
+  TRACE_EVENT_INSTANT0(
+      "cc",
+      "LayerTreeHostImpl::SetNeedsRedraw due to scrollbar fade",
+      TRACE_EVENT_SCOPE_THREAD);
+  SetNeedsAnimate();
 }
 
 void LayerTreeHostImpl::SetTreePriority(TreePriority priority) {

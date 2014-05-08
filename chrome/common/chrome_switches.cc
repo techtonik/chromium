@@ -543,6 +543,9 @@ const char kEnableNpnHttpOnly[]             = "enable-npn-http";
 // Enable auto-reload of error pages if offline.
 const char kEnableOfflineAutoReload[]       = "enable-offline-auto-reload";
 
+// Enable offering a "Load stale copy" option to the user if offline.
+const char kEnableOfflineLoadStaleCache[]   = "enable-offline-load-stale-cache";
+
 // Controls which branch of the origin chip experiment is enabled. The first
 // flag (enable-origin-chip) is equivalent to the third
 // (enable-origin-chip-trailing-location-bar) and exists for backwards
@@ -1270,10 +1273,6 @@ const char kUnlimitedStorage[]              = "unlimited-storage";
 // testing flag.
 const char kUseSpdy[]                       = "use-spdy";
 
-// Disables use of the spelling web service and only provides suggestions.
-// This will only work if asynchronous spell checking is not disabled.
-const char kUseSpellingSuggestions[]        = "use-spelling-suggestions";
-
 // A string used to override the default user agent with a custom one.
 const char kUserAgent[]                     = "user-agent";
 
@@ -1323,6 +1322,12 @@ const char kDisableZeroSuggest[] = "disable-zero-suggest";
 // Enable the accessibility tab switcher.
 const char kEnableAccessibilityTabSwitcher[] =
     "enable-accessibility-tab-switcher";
+
+// Enable Answers in Suggest.
+const char kEnableAnswersInSuggest[] = "enable-answers-in-suggest";
+
+// Enables app install alerts.
+const char kEnableAppInstallAlerts[]        = "enable-app-install-alerts";
 
 // Enables Contextual Search
 const char kEnableContextualSearch[]        = "contextual-search";

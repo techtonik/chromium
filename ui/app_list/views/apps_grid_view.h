@@ -6,6 +6,7 @@
 #define UI_APP_LIST_VIEWS_APPS_GRID_VIEW_H_
 
 #include <set>
+#include <string>
 
 #include "base/basictypes.h"
 #include "base/compiler_specific.h"
@@ -114,6 +115,8 @@ class APP_LIST_EXPORT AppsGridView : public views::View,
   void UpdateDrag(Pointer pointer, const gfx::Point& point);
   void EndDrag(bool cancel);
   bool IsDraggedView(const views::View* view) const;
+  void ClearDragState(bool cancel_reparent);
+  void SetDragViewVisible(bool visible);
 
   // Set the drag and drop host for application links.
   void SetDragAndDropHostOfCurrentAppList(

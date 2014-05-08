@@ -193,8 +193,6 @@
         'shell/renderer/test_runner/MockWebRTCDataChannelHandler.h',
         'shell/renderer/test_runner/MockWebRTCPeerConnectionHandler.cpp',
         'shell/renderer/test_runner/MockWebRTCPeerConnectionHandler.h',
-        'shell/renderer/test_runner/MockWebSpeechInputController.cpp',
-        'shell/renderer/test_runner/MockWebSpeechInputController.h',
         'shell/renderer/test_runner/MockWebSpeechRecognizer.cpp',
         'shell/renderer/test_runner/MockWebSpeechRecognizer.h',
         'shell/renderer/test_runner/SpellCheckClient.cpp',
@@ -1073,7 +1071,7 @@
         },
       ],
     }],  # OS=="win"
-    ['OS=="win" and fastbuild==0 and target_arch=="ia32"', {
+    ['OS=="win" and fastbuild==0 and target_arch=="ia32" and syzyasan==1', {
       'variables': {
         'dest_dir': '<(PRODUCT_DIR)/syzygy',
       },

@@ -128,6 +128,10 @@
         'browser/ui/views/message_center/web_notification_tray_browsertest.cc',
         'browser/ui/views/omnibox/omnibox_view_views_browsertest.cc',
         'browser/ui/views/panels/panel_view_browsertest.cc',
+        'browser/ui/views/passwords/manage_passwords_view_test.cc',
+        'browser/ui/views/passwords/manage_passwords_view_test.h',
+        'browser/ui/views/passwords/manage_passwords_bubble_view_browsertest.cc',
+        'browser/ui/views/passwords/manage_passwords_icon_view_browsertest.cc',
         'browser/ui/views/ssl_client_certificate_selector_browsertest.cc',
         'browser/ui/views/status_icons/status_tray_state_changer_interactive_uitest_win.cc',
         'browser/ui/views/tabs/tab_drag_controller_interactive_uitest.cc',
@@ -185,11 +189,6 @@
         }],
         ['OS=="linux" and use_aura==1 and chromeos==0', {
           'sources!': [
-            # TODO(port): These tests fail because they don't have a Screen,
-            # but expect one.
-            # TODO(port): I have no idea about the crashes in here; there's
-            # nothing obviously wrong. It doesn't run on gtk today, either.
-            'browser/ui/views/tabs/tab_drag_controller_interactive_uitest.cc',
             # TODO(port): Everything here times out. Attempts have been made to
             # fix the individual failures, but each time I disable a test from
             # these suites, it seems like one or another starts timing out too.
@@ -258,6 +257,7 @@
         }],
         ['chromeos==1', {
           'dependencies': [
+            '../ash/ash.gyp:ash_resources',
             '../chromeos/chromeos.gyp:chromeos',
           ],
           'conditions': [
@@ -781,6 +781,7 @@
         '../extensions/common/api/api.gyp:extensions_api',
         '../google_apis/google_apis.gyp:google_apis_test_support',
         '../media/cast/cast.gyp:cast_test_utility',
+        '../media/media.gyp:media',
         '../net/net.gyp:net',
         '../net/net.gyp:net_test_support',
         '../skia/skia.gyp:skia',
@@ -819,6 +820,8 @@
         '../apps/app_shim/test/app_shim_host_manager_test_api_mac.cc',
         '../apps/app_shim/test/app_shim_host_manager_test_api_mac.h',
         '../apps/load_and_launch_browsertest.cc',
+        '../extensions/browser/api/usb/usb_apitest.cc',
+        '../extensions/browser/api/usb/usb_manual_apitest.cc',
         # TODO(blundell): Bring up a components_browsertests target and move
         # this test to be in that target. crbug.com/283846
         '../components/autofill/content/renderer/password_form_conversion_utils_browsertest.cc',
@@ -869,6 +872,7 @@
         'browser/chromeos/accessibility/magnification_manager_browsertest.cc',
         'browser/chromeos/accessibility/speech_monitor.cc',
         'browser/chromeos/accessibility/speech_monitor.h',
+        'browser/chromeos/accessibility/touch_exploration_controller_browsertest.cc',
         'browser/chromeos/app_mode/kiosk_app_manager_browsertest.cc',
         'browser/chromeos/app_mode/kiosk_app_update_service_browsertest.cc',
         'browser/chromeos/attestation/attestation_policy_browsertest.cc',
@@ -1006,6 +1010,7 @@
         'browser/extensions/api/braille_display_private/braille_display_private_apitest.cc',
         'browser/extensions/api/braille_display_private/mock_braille_controller.cc',
         'browser/extensions/api/braille_display_private/mock_braille_controller.h',
+        'browser/extensions/api/browser/browser_apitest.cc',
         'browser/extensions/api/bookmarks/bookmark_apitest.cc',
         'browser/extensions/api/browsing_data/browsing_data_test.cc',
         'browser/extensions/api/cast_channel/cast_channel_apitest.cc',
@@ -1091,8 +1096,6 @@
         'browser/extensions/api/terminal/terminal_private_apitest.cc',
         'browser/extensions/api/test/apitest_apitest.cc',
         'browser/extensions/api/top_sites/top_sites_apitest.cc',
-        'browser/extensions/api/usb/usb_apitest.cc',
-        'browser/extensions/api/usb/usb_manual_apitest.cc',
         'browser/extensions/api/web_navigation/web_navigation_apitest.cc',
         'browser/extensions/api/web_request/web_request_apitest.cc',
         'browser/extensions/api/webrtc_audio_private/webrtc_audio_private_browsertest.cc',
@@ -1259,6 +1262,7 @@
         'browser/printing/cloud_print/test/cloud_print_proxy_process_browsertest.cc',
         'browser/printing/print_preview_dialog_controller_browsertest.cc',
         'browser/process_singleton_browsertest.cc',
+        'browser/profiles/host_zoom_map_browsertest.cc',
         'browser/profiles/profile_browsertest.cc',
         'browser/profiles/profile_list_desktop_browsertest.cc',
         'browser/profiles/profile_manager_browsertest.cc',
@@ -1288,7 +1292,6 @@
         'browser/sessions/tab_restore_browsertest.cc',
         'browser/signin/signin_browsertest.cc',
         'browser/speech/extension_api/tts_extension_apitest.cc',
-        'browser/speech/speech_recognition_bubble_browsertest.cc',
         'browser/spellchecker/spellcheck_service_browsertest.cc',
         'browser/ssl/ssl_browser_tests.cc',
         'browser/ssl/ssl_client_certificate_selector_test.cc',
@@ -1383,6 +1386,7 @@
         'browser/ui/views/location_bar/zoom_bubble_view_browsertest.cc',
         'browser/ui/views/profiles/avatar_menu_button_browsertest.cc',
         'browser/ui/views/profiles/new_avatar_menu_button_browsertest.cc',
+        'browser/ui/views/profiles/profile_chooser_view_browsertest.cc',
         'browser/ui/views/select_file_dialog_extension_browsertest.cc',
         'browser/ui/views/toolbar/browser_actions_container_browsertest.cc',
         'browser/ui/views/toolbar/toolbar_view_browsertest.cc',
@@ -1877,6 +1881,11 @@
             }],
           ],
         }],
+        ['OS=="win" or OS == "mac"', {
+          'dependencies': [
+            '../components/components.gyp:wifi_test_support',
+          ],
+        }],
         ['chromeos == 1 or OS=="win" or OS == "mac"', {
           'sources': [
             'browser/extensions/api/networking_private/networking_private_apitest.cc',
@@ -2192,6 +2201,8 @@
         'browser/sync/test/integration/extension_settings_helper.h',
         'browser/sync/test/integration/extensions_helper.cc',
         'browser/sync/test/integration/extensions_helper.h',
+        'browser/sync/test/integration/fake_server_invalidation_service.cc',
+        'browser/sync/test/integration/fake_server_invalidation_service.h',
         'browser/sync/test/integration/multi_client_status_change_checker.cc',
         'browser/sync/test/integration/multi_client_status_change_checker.h',
         'browser/sync/test/integration/passwords_helper.cc',

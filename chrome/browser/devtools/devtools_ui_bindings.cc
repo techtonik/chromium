@@ -42,7 +42,6 @@
 #include "content/public/browser/user_metrics.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
-#include "content/public/browser/web_contents_view.h"
 #include "content/public/common/page_transition_types.h"
 #include "content/public/common/renderer_preferences.h"
 #include "content/public/common/url_constants.h"
@@ -195,6 +194,7 @@ class DefaultBindingsDelegate : public DevToolsUIBindings::Delegate {
 
   virtual void InspectedContentsClosing() OVERRIDE;
   virtual void OnLoadCompleted() OVERRIDE {}
+  virtual InfoBarService* GetInfoBarService() OVERRIDE;
 
   content::WebContents* web_contents_;
   DISALLOW_COPY_AND_ASSIGN(DefaultBindingsDelegate);
@@ -202,7 +202,7 @@ class DefaultBindingsDelegate : public DevToolsUIBindings::Delegate {
 
 void DefaultBindingsDelegate::ActivateWindow() {
   web_contents_->GetDelegate()->ActivateContents(web_contents_);
-  web_contents_->GetView()->Focus();
+  web_contents_->Focus();
 }
 
 void DefaultBindingsDelegate::OpenInNewTab(const std::string& url) {
@@ -215,6 +215,10 @@ void DefaultBindingsDelegate::OpenInNewTab(const std::string& url) {
 
 void DefaultBindingsDelegate::InspectedContentsClosing() {
   web_contents_->GetRenderViewHost()->ClosePage();
+}
+
+InfoBarService* DefaultBindingsDelegate::GetInfoBarService() {
+  return InfoBarService::FromWebContents(web_contents_);
 }
 
 }  // namespace
@@ -231,7 +235,7 @@ class DevToolsUIBindings::FrontendWebContentsObserver
   // contents::WebContentsObserver:
   virtual void AboutToNavigateRenderView(
       content::RenderViewHost* render_view_host) OVERRIDE;
-  virtual void DocumentOnLoadCompletedInMainFrame(int32 page_id) OVERRIDE;
+  virtual void DocumentOnLoadCompletedInMainFrame() OVERRIDE;
 
   DevToolsUIBindings* devtools_bindings_;
   DISALLOW_COPY_AND_ASSIGN(FrontendWebContentsObserver);
@@ -253,7 +257,7 @@ void DevToolsUIBindings::FrontendWebContentsObserver::AboutToNavigateRenderView(
 }
 
 void DevToolsUIBindings::FrontendWebContentsObserver::
-    DocumentOnLoadCompletedInMainFrame(int32 page_id) {
+    DocumentOnLoadCompletedInMainFrame() {
   devtools_bindings_->DocumentOnLoadCompletedInMainFrame();
 }
 
@@ -389,7 +393,7 @@ void DevToolsUIBindings::ActivateWindow() {
 }
 
 void DevToolsUIBindings::CloseWindow() {
-  delegate_->ActivateWindow();
+  delegate_->CloseWindow();
 }
 
 void DevToolsUIBindings::SetContentsInsets(
@@ -680,8 +684,7 @@ void DevToolsUIBindings::SearchCompleted(
 void DevToolsUIBindings::ShowDevToolsConfirmInfoBar(
     const base::string16& message,
     const InfoBarCallback& callback) {
-  DevToolsConfirmInfoBarDelegate::Create(
-      InfoBarService::FromWebContents(web_contents_),
+  DevToolsConfirmInfoBarDelegate::Create(delegate_->GetInfoBarService(),
       callback, message);
 }
 

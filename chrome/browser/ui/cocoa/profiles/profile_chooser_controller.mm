@@ -42,7 +42,6 @@
 #include "components/signin/core/browser/signin_manager.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "google_apis/gaia/oauth2_token_service.h"
 #include "grit/chromium_strings.h"
 #include "grit/generated_resources.h"
@@ -75,7 +74,6 @@ const CGFloat kHorizontalSpacing = 16.0;
 const CGFloat kTitleFontSize = 15.0;
 const CGFloat kTextFontSize = 12.0;
 const CGFloat kProfileButtonHeight = 30;
-const int kOverlayHeight = 20;  // Height of the "Change" avatar photo overlay.
 const int kBezelThickness = 3;  // Width of the bezel on an NSButton.
 const int kImageTitleSpacing = 10;
 const int kBlueButtonHeight = 30;
@@ -95,9 +93,7 @@ const int kPrimaryProfileTag = -1;
 
 gfx::Image CreateProfileImage(const gfx::Image& icon, int imageSize) {
   return profiles::GetSizedAvatarIcon(
-      icon, true /* image is a square */,
-      imageSize + profiles::kAvatarIconPadding,
-      imageSize + profiles::kAvatarIconPadding);
+      icon, true /* image is a square */, imageSize, imageSize);
 }
 
 // Updates the window size and position.
@@ -348,7 +344,7 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
-  NSColor* backgroundColor = [NSColor colorWithCalibratedWhite:0 alpha:0.5f];
+  NSColor* backgroundColor = [NSColor colorWithCalibratedWhite:1 alpha:0.4f];
   [backgroundColor setFill];
   NSRectFillUsingOperation(dirtyRect, NSCompositeSourceAtop);
   [super drawRect:dirtyRect];
@@ -402,18 +398,22 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
             userInfo:nil]);
     [self addTrackingArea:trackingArea_.get()];
 
+    NSRect bounds = NSMakeRect(0, 0, kLargeImageSide, kLargeImageSide);
     if (editingAllowed) {
-      // The avatar photo uses a frame of width profiles::kAvatarIconPadding,
-      // which we must subtract from the button's bounds.
-      changePhotoButton_.reset([self changePhotoButtonWithRect:NSMakeRect(
-          profiles::kAvatarIconPadding, profiles::kAvatarIconPadding,
-          kLargeImageSide - 2 * profiles::kAvatarIconPadding,
-          kOverlayHeight)]);
+      changePhotoButton_.reset([self changePhotoButtonWithRect:bounds]);
       [self addSubview:changePhotoButton_];
 
       // Hide the button until the image is hovered over.
       [changePhotoButton_ setHidden:YES];
     }
+
+    // Add the frame overlay last, so that both the photo and the button
+    // look like circles.
+    base::scoped_nsobject<NSImageView> frameOverlay(
+        [[NSImageView alloc] initWithFrame:bounds]);
+    [frameOverlay setImage:ui::ResourceBundle::GetSharedInstance().
+        GetNativeImageNamed(IDR_ICON_PROFILES_AVATAR_PHOTO_FRAME).AsNSImage()];
+    [self addSubview:frameOverlay];
   }
   return self;
 }
@@ -433,21 +433,9 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
 - (TransparentBackgroundButton*)changePhotoButtonWithRect:(NSRect)rect {
   TransparentBackgroundButton* button =
       [[TransparentBackgroundButton alloc] initWithFrame:rect];
-
-  // The button has a centered white text and a transparent background.
-  base::scoped_nsobject<NSMutableParagraphStyle> textStyle(
-      [[NSMutableParagraphStyle alloc] init]);
-  [textStyle setAlignment:NSCenterTextAlignment];
-  NSDictionary* titleAttributes = @{
-      NSParagraphStyleAttributeName : textStyle,
-      NSForegroundColorAttributeName : [NSColor whiteColor]
-  };
-  NSString* buttonTitle = l10n_util::GetNSString(
-      IDS_PROFILES_PROFILE_CHANGE_PHOTO_BUTTON);
-  base::scoped_nsobject<NSAttributedString> attributedTitle(
-      [[NSAttributedString alloc] initWithString:buttonTitle
-                                      attributes:titleAttributes]);
-  [button setAttributedTitle:attributedTitle];
+  [button setImage:ui::ResourceBundle::GetSharedInstance().GetNativeImageNamed(
+      IDR_ICON_PROFILES_EDIT_CAMERA).AsNSImage()];
+  [button setImagePosition:NSImageOnly];
   [button setTarget:self];
   [button setAction:@selector(editPhoto:)];
   return button;
@@ -727,9 +715,11 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
                      frameOrigin:(NSPoint)frameOrigin
                           action:(SEL)action;
 
-// Creates an email account button with |title| and a remove icon.
+// Creates an email account button with |title| and a remove icon. |tag|
+// indicates which account the button refers to.
 - (NSButton*)accountButtonWithRect:(NSRect)rect
-                             title:(const std::string&)title;
+                             title:(const std::string&)title
+                               tag:(int)tag;
 
 @end
 
@@ -1349,19 +1339,19 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
     // Save the original email address, as the button text could be elided.
     currentProfileAccounts_[i] = accounts[i];
     NSButton* accountButton = [self accountButtonWithRect:rect
-                                                    title:accounts[i]];
-    [accountButton setTag:i];
+                                                    title:accounts[i]
+                                                      tag:i];
     [container addSubview:accountButton];
     rect.origin.y = NSMaxY([accountButton frame]);
   }
 
   // The primary account should always be listed first.
   NSButton* accountButton = [self accountButtonWithRect:rect
-                                                  title:primaryAccount];
+                                                  title:primaryAccount
+                                                    tag:kPrimaryProfileTag];
   [container addSubview:accountButton];
   [container setFrameSize:NSMakeSize(NSWidth([container frame]),
                                      NSMaxY([accountButton frame]))];
-  [accountButton setTag:kPrimaryProfileTag];
   return container.autorelease();
 }
 
@@ -1383,7 +1373,7 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
       content::Referrer(),
       content::PAGE_TRANSITION_AUTO_TOPLEVEL,
       std::string());
-  NSView* webview = webContents_->GetView()->GetNativeView();
+  NSView* webview = webContents_->GetNativeView();
   [webview setFrameSize:NSMakeSize(kFixedGaiaViewWidth, kFixedGaiaViewHeight)];
   [container addSubview:webview];
   yOffset = NSMaxY([webview frame]);
@@ -1534,20 +1524,39 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
 }
 
 - (NSButton*)accountButtonWithRect:(NSRect)rect
-                             title:(const std::string&)title {
+                             title:(const std::string&)title
+                               tag:(int)tag {
   NSColor* backgroundColor = gfx::SkColorToCalibratedNSColor(
       profiles::kAvatarBubbleAccountsBackgroundColor);
   base::scoped_nsobject<BackgroundColorHoverButton> button(
       [[BackgroundColorHoverButton alloc] initWithFrame:rect
                                       imageTitleSpacing:0
                                         backgroundColor:backgroundColor]);
-
-  [button setTitle:ElideEmail(title, rect.size.width)];
+  ui::ResourceBundle* rb = &ui::ResourceBundle::GetSharedInstance();
+  NSImage* defaultImage = rb->GetNativeImageNamed(IDR_CLOSE_1).AsNSImage();
+  CGFloat kDeleteButtonWidth = [defaultImage size].width;
+  CGFloat availableWidth = rect.size.width -
+      kDeleteButtonWidth - kHorizontalSpacing;
+  [button setTitle:ElideEmail(title, availableWidth)];
   [button setAlignment:NSLeftTextAlignment];
   [button setBordered:NO];
-  [button setTarget:self];
-  [button setAction:@selector(showAccountRemovalView:)];
 
+  // Delete button.
+  rect.origin = NSMakePoint(availableWidth, 0);
+  rect.size.width = kDeleteButtonWidth;
+  base::scoped_nsobject<HoverImageButton> deleteButton(
+      [[HoverImageButton alloc] initWithFrame:rect]);
+  [deleteButton setBordered:NO];
+  [deleteButton setDefaultImage:defaultImage];
+  [deleteButton setHoverImage:rb->GetNativeImageNamed(
+      IDR_CLOSE_1_H).ToNSImage()];
+  [deleteButton setPressedImage:rb->GetNativeImageNamed(
+      IDR_CLOSE_1_P).ToNSImage()];
+  [deleteButton setTarget:self];
+  [deleteButton setAction:@selector(showAccountRemovalView:)];
+  [deleteButton setTag:tag];
+
+  [button addSubview:deleteButton];
   return button.autorelease();
 }
 

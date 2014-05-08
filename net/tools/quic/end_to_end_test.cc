@@ -471,7 +471,9 @@ TEST_P(EndToEndTest, PostMissingBytes) {
   EXPECT_EQ(500u, client_->response_headers()->parsed_response_code());
 }
 
-TEST_P(EndToEndTest, LargePostNoPacketLoss) {
+// TODO(rtenneti): DISABLED_LargePostNoPacketLoss seems to be flaky.
+// http://crbug.com/297040.
+TEST_P(EndToEndTest, DISABLED_LargePostNoPacketLoss) {
   ASSERT_TRUE(Initialize());
 
   client_->client()->WaitForCryptoHandshakeConfirmed();
@@ -650,7 +652,9 @@ TEST_P(EndToEndTest, LargePostFEC) {
   VerifyCleanConnection(true);
 }
 
-TEST_P(EndToEndTest, LargePostLargeBuffer) {
+// TODO(rtenneti): DISABLED_LargePostLargeBuffer seems to be flaky.
+// http://crbug.com/370087.
+TEST_P(EndToEndTest, DISABLED_LargePostLargeBuffer) {
   ASSERT_TRUE(Initialize());
   SetPacketSendDelay(QuicTime::Delta::FromMicroseconds(1));
   // 1Mbit per second with a 128k buffer from server to client.  Wireless

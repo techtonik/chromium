@@ -7,6 +7,7 @@
 
 #include "base/basictypes.h"
 #include "chrome/browser/ui/passwords/manage_passwords_bubble_ui_controller.h"
+#include "components/password_manager/core/common/password_manager_ui.h"
 
 namespace content {
 class WebContents;
@@ -39,6 +40,12 @@ class ManagePasswordsBubbleUIControllerMock
   bool never_saved_password() const { return never_saved_password_; }
 
   virtual const autofill::PasswordForm& PendingCredentials() const OVERRIDE;
+
+  // Sneaky setters for testing.
+  void SetPasswordFormMap(const autofill::PasswordFormMap& map) {
+    password_form_map_ = map;
+  }
+  void SetState(password_manager::ui::State state) { state_ = state; }
 
   // True if this controller is installed on |web_contents()|.
   bool IsInstalled() const;

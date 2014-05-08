@@ -131,6 +131,8 @@ void EmbeddedWorkerContextClient::workerContextFailedToStart() {
   DCHECK(main_thread_proxy_->RunsTasksOnCurrentThread());
   DCHECK(!script_context_);
 
+  Send(new EmbeddedWorkerHostMsg_WorkerScriptLoadFailed(embedded_worker_id_));
+
   RenderThreadImpl::current()->embedded_worker_dispatcher()->
       WorkerContextDestroyed(embedded_worker_id_);
 }
@@ -146,6 +148,8 @@ void EmbeddedWorkerContextClient::workerContextStarted(
   g_worker_client_tls.Pointer()->Set(this);
   script_context_.reset(new ServiceWorkerScriptContext(this, proxy));
 
+  Send(new EmbeddedWorkerHostMsg_WorkerScriptLoaded(embedded_worker_id_));
+
   // Schedule a task to send back WorkerStarted asynchronously,
   // so that at the time we send it we can be sure that the worker
   // script has been evaluated and worker run loop has been started.
@@ -160,10 +164,26 @@ void EmbeddedWorkerContextClient::willDestroyWorkerContext() {
   // worker_task_runner_->RunsTasksOnCurrentThread() returns false
   // (while we're still on the worker thread).
   script_context_.reset();
+
+#if !defined(HAS_SERVICE_WORKER_CONTEXT_DESTROYED)
+  // TODO(kinuko): Remove this after blink side is landed.
   main_thread_proxy_->PostTask(
       FROM_HERE,
       base::Bind(&CallWorkerContextDestroyedOnMainThread,
                  embedded_worker_id_));
+#endif
+}
+
+void EmbeddedWorkerContextClient::workerContextDestroyed() {
+  // TODO(kinuko): Remove this ifdef after blink side is landed.
+#ifdef HAS_SERVICE_WORKER_CONTEXT_DESTROYED
+  // Now we should be able to free the WebEmbeddedWorker container on the
+  // main thread.
+  main_thread_proxy_->PostTask(
+      FROM_HERE,
+      base::Bind(&CallWorkerContextDestroyedOnMainThread,
+                 embedded_worker_id_));
+#endif
 }
 
 void EmbeddedWorkerContextClient::reportException(

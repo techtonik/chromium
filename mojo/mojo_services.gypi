@@ -119,6 +119,13 @@
       ],
     },
     {
+      'target_name': 'mojo_view_manager_common',
+      'type': 'static_library',
+      'sources': [
+        'services/public/cpp/view_manager/view_manager_types.h',
+      ],
+    },
+    {
       'target_name': 'mojo_view_manager_bindings',
       'type': 'static_library',
       'sources': [
@@ -140,11 +147,14 @@
       'type': 'static_library',
       'dependencies': [
         '../base/base.gyp:base',
+        'mojo_shell_bindings',
         'mojo_view_manager_bindings',
+        'mojo_view_manager_common',
       ],
       'sources': [
         'services/public/cpp/view_manager/lib/view.cc',
         'services/public/cpp/view_manager/lib/view_manager.cc',
+        'services/public/cpp/view_manager/lib/view_manager_observer.h',
         'services/public/cpp/view_manager/lib/view_manager_private.cc',
         'services/public/cpp/view_manager/lib/view_manager_private.h',
         'services/public/cpp/view_manager/lib/view_manager_synchronizer.cc',
@@ -156,6 +166,7 @@
         'services/public/cpp/view_manager/lib/view_tree_node_private.h',
         'services/public/cpp/view_manager/view.h',
         'services/public/cpp/view_manager/view_manager.h',
+        'services/public/cpp/view_manager/view_manager_types.h',
         'services/public/cpp/view_manager/view_tree_host.h',
         'services/public/cpp/view_manager/view_tree_node.h',
         'services/public/cpp/view_manager/view_tree_node_observer.h',
@@ -170,6 +181,8 @@
         '../testing/gtest.gyp:gtest',
         'mojo_environment_chromium',
         'mojo_run_all_unittests',
+        'mojo_shell_test_support',
+        'mojo_view_manager_bindings',
         'mojo_view_manager_lib',
       ],
       'sources': [
@@ -198,6 +211,7 @@
             'mojo_shell_client',
             'mojo_system_impl',
             'mojo_view_manager_bindings',
+            'mojo_view_manager_common',
           ],
           'sources': [
             'services/view_manager/ids.h',
@@ -231,6 +245,7 @@
             'mojo_shell_test_support',
             'mojo_system_impl',
             'mojo_view_manager_bindings',
+            'mojo_view_manager_common',
           ],
           'sources': [
             'services/view_manager/view_manager_connection_unittest.cc',
@@ -254,10 +269,10 @@
             '../base/base.gyp:base',
             '../build/linux/system.gyp:dbus',
             '../dbus/dbus.gyp:dbus',
-            'mojo_external_service_bindings',
             'mojo_common_lib',
-            'mojo_environment_chromium',
+            'mojo_dbus_service',
             'mojo_echo_bindings',
+            'mojo_environment_chromium',
             'mojo_shell_client',
             'mojo_system_impl',
           ],

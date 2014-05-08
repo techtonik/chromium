@@ -203,7 +203,6 @@ class CONTENT_EXPORT RenderViewHostImpl
                                 const std::string& value) OVERRIDE;
   virtual void Zoom(PageZoom zoom) OVERRIDE;
   virtual void SyncRendererPrefs() OVERRIDE;
-  virtual void ToggleSpeechInput() OVERRIDE;
   virtual WebPreferences GetWebkitPreferences() OVERRIDE;
   virtual void UpdateWebkitPreferences(
       const WebPreferences& prefs) OVERRIDE;
@@ -492,9 +491,7 @@ class CONTENT_EXPORT RenderViewHostImpl
   void OnClose();
   void OnRequestMove(const gfx::Rect& pos);
   void OnDidChangeLoadProgress(double load_progress);
-  void OnDidDisownOpener();
   void OnDocumentAvailableInMainFrame();
-  void OnDocumentOnLoadCompletedInMainFrame(int32 page_id);
   void OnToggleFullscreen(bool enter_fullscreen);
   void OnDidContentsPreferredSizeChange(const gfx::Size& new_size);
   void OnDidChangeScrollOffset();

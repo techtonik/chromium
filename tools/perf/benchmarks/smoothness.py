@@ -45,6 +45,7 @@ class SmoothnessToughAnimationCases(test.Test):
   page_set = 'page_sets/tough_animation_cases.py'
 
 
+@test.Disabled('android')  # crbug.com/355952
 class SmoothnessKeySilkCases(test.Test):
   """Measures rendering statistics for the key silk cases without GPU
   rasterization
@@ -53,6 +54,7 @@ class SmoothnessKeySilkCases(test.Test):
   page_set = 'page_sets/key_silk_cases.py'
 
 
+@test.Disabled('android')  # crbug.com/355952
 class SmoothnessFastPathKeySilkCases(test.Test):
   """Measures rendering statistics for the key silk cases without GPU
   rasterization using bleeding edge rendering fast paths.
@@ -64,6 +66,7 @@ class SmoothnessFastPathKeySilkCases(test.Test):
     silk_flags.CustomizeBrowserOptionsForFastPath(options)
 
 
+@test.Disabled('android')  # crbug.com/363783
 class SmoothnessGpuRasterizationTop25(test.Test):
   """Measures rendering statistics for the top 25 with GPU rasterization
   """
@@ -74,6 +77,7 @@ class SmoothnessGpuRasterizationTop25(test.Test):
     silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
 
 
+@test.Disabled('android')  # crbug.com/363783
 class SmoothnessGpuRasterizationKeyMobileSites(test.Test):
   """Measures rendering statistics for the key mobile sites with GPU
   rasterization
@@ -85,6 +89,7 @@ class SmoothnessGpuRasterizationKeyMobileSites(test.Test):
     silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
 
 
+@test.Disabled('android')  # crbug.com/355952
 class SmoothnessGpuRasterizationKeySilkCases(test.Test):
   """Measures rendering statistics for the key silk cases with GPU rasterization
   """
@@ -95,6 +100,7 @@ class SmoothnessGpuRasterizationKeySilkCases(test.Test):
     silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
 
 
+@test.Disabled('android')  # crbug.com/355952
 class SmoothnessFastPathGpuRasterizationKeySilkCases(
     SmoothnessGpuRasterizationKeySilkCases):
   """Measures rendering statistics for the key silk cases with GPU rasterization
@@ -118,7 +124,7 @@ class SmoothnessToughPinchZoomCases(test.Test):
   page_set = 'page_sets/tough_pinch_zoom_cases.py'
 
 
-@test.Enabled('android')
+@test.Disabled  # crbug.com/370725
 class SmoothnessPolymer(test.Test):
   """Measures rendering statistics for Polymer cases.
   """
@@ -126,7 +132,7 @@ class SmoothnessPolymer(test.Test):
   page_set = 'page_sets/polymer.py'
 
 
-@test.Enabled('android')
+@test.Disabled  # crbug.com/370725
 class SmoothnessFastPathPolymer(test.Test):
   """Measures rendering statistics for the Polymer cases without GPU
   rasterization using bleeding edge rendering fast paths.
@@ -138,7 +144,7 @@ class SmoothnessFastPathPolymer(test.Test):
     silk_flags.CustomizeBrowserOptionsForFastPath(options)
 
 
-@test.Enabled('android')
+@test.Disabled  # crbug.com/370725
 class SmoothnessGpuRasterizationPolymer(test.Test):
   """Measures rendering statistics for the Polymer cases with GPU rasterization
   """
@@ -149,7 +155,7 @@ class SmoothnessGpuRasterizationPolymer(test.Test):
     silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
 
 
-@test.Enabled('android')
+@test.Disabled  # crbug.com/370725
 class SmoothnessFastPathGpuRasterizationPolymer(
     SmoothnessGpuRasterizationPolymer):
   """Measures rendering statistics for the Polymer cases with GPU rasterization

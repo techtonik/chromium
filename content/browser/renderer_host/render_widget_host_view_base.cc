@@ -11,7 +11,7 @@
 #include "content/browser/renderer_host/render_process_host_impl.h"
 #include "content/browser/renderer_host/render_widget_host_impl.h"
 #include "content/common/content_switches_internal.h"
-#include "content/port/browser/render_widget_host_view_frame_subscriber.h"
+#include "content/public/browser/render_widget_host_view_frame_subscriber.h"
 #include "third_party/WebKit/public/platform/WebScreenInfo.h"
 #include "ui/gfx/display.h"
 #include "ui/gfx/screen.h"
@@ -35,18 +35,6 @@
 #endif
 
 namespace content {
-
-// static
-RenderWidgetHostViewPort* RenderWidgetHostViewPort::FromRWHV(
-    RenderWidgetHostView* rwhv) {
-  return static_cast<RenderWidgetHostViewPort*>(rwhv);
-}
-
-// static
-RenderWidgetHostViewPort* RenderWidgetHostViewPort::CreateViewForWidget(
-    RenderWidgetHost* widget) {
-  return FromRWHV(RenderWidgetHostView::CreateViewForWidget(widget));
-}
 
 #if defined(OS_WIN)
 
@@ -384,6 +372,7 @@ RenderWidgetHostViewBase::RenderWidgetHostViewBase()
       selection_text_offset_(0),
       selection_range_(gfx::Range::InvalidRange()),
       current_device_scale_factor_(0),
+      current_display_rotation_(gfx::Display::ROTATE_0),
       pinch_zoom_enabled_(content::IsPinchToZoomEnabled()),
       renderer_frame_number_(0) {
 }
@@ -525,16 +514,15 @@ bool RenderWidgetHostViewBase::HasDisplayPropertyChanged(gfx::NativeView view) {
   gfx::Display display =
       gfx::Screen::GetScreenFor(view)->GetDisplayNearestWindow(view);
   if (current_display_area_ == display.work_area() &&
-      current_device_scale_factor_ == display.device_scale_factor()) {
+      current_device_scale_factor_ == display.device_scale_factor() &&
+      current_display_rotation_ == display.rotation()) {
     return false;
   }
+
   current_display_area_ = display.work_area();
   current_device_scale_factor_ = display.device_scale_factor();
+  current_display_rotation_ = display.rotation();
   return true;
-}
-
-void RenderWidgetHostViewBase::ProcessAckedTouchEvent(
-    const TouchEventWithLatencyInfo& touch, InputEventAckState ack_result) {
 }
 
 scoped_ptr<SyntheticGestureTarget>
@@ -543,9 +531,6 @@ RenderWidgetHostViewBase::CreateSyntheticGestureTarget() {
       RenderWidgetHostImpl::From(GetRenderWidgetHost());
   return scoped_ptr<SyntheticGestureTarget>(
       new SyntheticGestureTargetBase(host));
-}
-
-void RenderWidgetHostViewBase::FocusedNodeChanged(bool is_editable_node) {
 }
 
 // Platform implementation should override this method to allow frame
@@ -590,14 +575,6 @@ uint32 RenderWidgetHostViewBase::RendererFrameNumber() {
 
 void RenderWidgetHostViewBase::DidReceiveRendererFrame() {
   ++renderer_frame_number_;
-}
-
-void RenderWidgetHostViewBase::LockCompositingSurface() {
-  NOTIMPLEMENTED();
-}
-
-void RenderWidgetHostViewBase::UnlockCompositingSurface() {
-  NOTIMPLEMENTED();
 }
 
 void RenderWidgetHostViewBase::FlushInput() {

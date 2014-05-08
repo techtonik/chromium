@@ -140,7 +140,6 @@ class APIPermission {
     kStreamsPrivate,
     kSyncFileSystem,
     kSystemPrivate,
-    kSystemIndicator,
     kSystemDisplay,
     kSystemStorage,
     kTab,
@@ -174,6 +173,7 @@ class APIPermission {
     kSystemInfoCpu,
     kSystemInfoMemory,
     kFirstRunPrivate,
+    kBrowser,
     kEnumBoundary
   };
 

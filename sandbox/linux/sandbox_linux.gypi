@@ -66,10 +66,26 @@
         '../..',
       ],
       'sources': [
+        'tests/sandbox_test_runner.h',
+        'tests/sandbox_test_runner_function_pointer.cc',
+        'tests/sandbox_test_runner_function_pointer.h',
         'tests/test_utils.cc',
         'tests/test_utils.h',
         'tests/unit_tests.cc',
         'tests/unit_tests.h',
+      ],
+      'conditions': [
+        [ 'use_seccomp_bpf==1', {
+          'sources': [
+            'seccomp-bpf/bpf_tests.cc',
+            'seccomp-bpf/bpf_tests.h',
+            'seccomp-bpf/sandbox_bpf_test_runner.cc',
+            'seccomp-bpf/sandbox_bpf_test_runner.h',
+          ],
+          'dependencies': [
+            'seccomp_bpf',
+          ]
+        }],
       ],
     },
     {
@@ -112,6 +128,7 @@
         'seccomp-bpf/linux_seccomp.h',
         'seccomp-bpf/sandbox_bpf.cc',
         'seccomp-bpf/sandbox_bpf.h',
+        'seccomp-bpf/sandbox_bpf_compatibility_policy.h',
         'seccomp-bpf/sandbox_bpf_policy.h',
         'seccomp-bpf/syscall.cc',
         'seccomp-bpf/syscall.h',

@@ -25,7 +25,7 @@ namespace {
 std::string GetAppShelfId(AppWindow* app_window) {
   if (app_window->window_type_is_panel())
     return base::StringPrintf("panel:%d", app_window->session_id().id());
-  return app_window->extension()->id();
+  return app_window->extension_id();
 }
 
 bool ControlsWindow(aura::Window* window) {
@@ -85,9 +85,6 @@ void AppWindowLauncherController::AdditionalUserAddedToSession(
 }
 
 void AppWindowLauncherController::OnAppWindowAdded(AppWindow* app_window) {
-  if (!ControlsWindow(app_window->GetNativeWindow()))
-    return;
-  RegisterApp(app_window);
 }
 
 void AppWindowLauncherController::OnAppWindowIconChanged(
@@ -108,6 +105,24 @@ void AppWindowLauncherController::OnAppWindowIconChanged(
 void AppWindowLauncherController::OnAppWindowRemoved(AppWindow* app_window) {
   // Do nothing here; app_window->window() has already been deleted and
   // OnWindowDestroying() has been called, doing the removal.
+}
+
+void AppWindowLauncherController::OnAppWindowShown(AppWindow* app_window) {
+  aura::Window* window = app_window->GetNativeWindow();
+  if (!ControlsWindow(window))
+    return;
+
+  if (!IsRegisteredApp(window))
+    RegisterApp(app_window);
+}
+
+void AppWindowLauncherController::OnAppWindowHidden(AppWindow* app_window) {
+  aura::Window* window = app_window->GetNativeWindow();
+  if (!ControlsWindow(window))
+    return;
+
+  if (IsRegisteredApp(window))
+    UnregisterApp(window);
 }
 
 // Called from aura::Window::~Window(), before delegate_->OnWindowDestroyed()
@@ -146,7 +161,7 @@ void AppWindowLauncherController::RegisterApp(AppWindow* app_window) {
   window->AddObserver(this);
 
   // Find or create an item controller and launcher item.
-  std::string app_id = app_window->extension()->id();
+  std::string app_id = app_window->extension_id();
   ash::ShelfItemStatus status = ash::wm::IsActiveWindow(window)
                                     ? ash::STATUS_ACTIVE
                                     : ash::STATUS_RUNNING;

@@ -41,6 +41,7 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chrome/browser/ui/chrome_pages.h"
 #include "chrome/browser/ui/extensions/application_launch.h"
 #include "chrome/browser/ui/host_desktop.h"
 #include "chrome/browser/ui/settings_window_manager.h"
@@ -1381,6 +1382,43 @@ IN_PROC_BROWSER_TEST_F(LauncherPlatformAppBrowserTest, LaunchPanelWindow) {
   EXPECT_EQ(item_count, shelf_model()->item_count());
 }
 
+// Test that we get correct shelf presence with hidden app windows.
+IN_PROC_BROWSER_TEST_F(LauncherPlatformAppBrowserTest, HiddenAppWindows) {
+  int item_count = shelf_model()->item_count();
+  const Extension* extension = LoadAndLaunchPlatformApp("launch");
+  AppWindow::CreateParams params;
+
+  // Create a hidden window.
+  params.hidden = true;
+  AppWindow* window_1 = CreateAppWindowFromParams(extension, params);
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+
+  // Create a visible window.
+  params.hidden = false;
+  AppWindow* window_2 = CreateAppWindowFromParams(extension, params);
+  ++item_count;
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+
+  // Minimize the visible window.
+  window_2->Minimize();
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+
+  // Hide the visible window.
+  window_2->Hide();
+  --item_count;
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+
+  // Show the originally hidden window.
+  window_1->Show(AppWindow::SHOW_ACTIVE);
+  ++item_count;
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+
+  // Close the originally hidden window.
+  CloseAppWindow(window_1);
+  --item_count;
+  EXPECT_EQ(item_count, shelf_model()->item_count());
+}
+
 // Test attention states of windows.
 IN_PROC_BROWSER_TEST_F(LauncherPlatformAppBrowserTest, WindowAttentionStatus) {
   const Extension* extension = LoadAndLaunchPlatformApp("launch");
@@ -2045,7 +2083,9 @@ IN_PROC_BROWSER_TEST_F(ShelfAppBrowserTest, SettingsWindow) {
 
   // Open a settings window. Number of browser items should remain unchanged,
   // number of shelf items should increase.
-  settings_manager->ShowForProfile(browser()->profile(), std::string());
+  settings_manager->ShowChromePageForProfile(
+      browser()->profile(),
+      chrome::GetSettingsUrl(std::string()));
   Browser* settings_browser =
       settings_manager->FindBrowserForProfile(browser()->profile());
   ASSERT_TRUE(settings_browser);

@@ -49,7 +49,6 @@
         '../third_party/icu/icu.gyp:icui18n',
         '../third_party/icu/icu.gyp:icuuc',
         '../third_party/leveldatabase/leveldatabase.gyp:leveldatabase',
-        '../third_party/libusb/libusb.gyp:libusb',
         '../third_party/webrtc/modules/modules.gyp:desktop_capture',
         '../ui/accessibility/accessibility.gyp:ax_gen',
         '../ui/base/strings/ui_strings.gyp:ui_strings',
@@ -184,6 +183,8 @@
         'browser/extensions/api/braille_display_private/brlapi_connection.h',
         'browser/extensions/api/braille_display_private/stub_braille_controller.cc',
         'browser/extensions/api/braille_display_private/stub_braille_controller.h',
+        'browser/extensions/api/browser/browser_api.cc',
+        'browser/extensions/api/browser/browser_api.h',
         'browser/extensions/api/browsing_data/browsing_data_api.cc',
         'browser/extensions/api/browsing_data/browsing_data_api.h',
         'browser/extensions/api/capture_web_contents_function.cc',
@@ -579,10 +580,6 @@
         'browser/extensions/api/tabs/windows_util.h',
         'browser/extensions/api/top_sites/top_sites_api.cc',
         'browser/extensions/api/top_sites/top_sites_api.h',
-        'browser/extensions/api/usb/usb_api.cc',
-        'browser/extensions/api/usb/usb_api.h',
-        'browser/extensions/api/usb/usb_device_resource.cc',
-        'browser/extensions/api/usb/usb_device_resource.h',
         'browser/extensions/api/web_navigation/frame_navigation_state.cc',
         'browser/extensions/api/web_navigation/frame_navigation_state.h',
         'browser/extensions/api/web_navigation/web_navigation_api.cc',
@@ -1027,7 +1024,6 @@
           ],
           'dependencies!': [
             '../device/bluetooth/bluetooth.gyp:device_bluetooth',
-            '../third_party/libusb/libusb.gyp:libusb'
           ],
         }],
         ['use_aura==1', {

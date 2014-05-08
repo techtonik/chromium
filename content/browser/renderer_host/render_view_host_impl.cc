@@ -39,6 +39,8 @@
 #include "content/browser/renderer_host/media/audio_renderer_host.h"
 #include "content/browser/renderer_host/render_process_host_impl.h"
 #include "content/browser/renderer_host/render_view_host_delegate.h"
+#include "content/browser/renderer_host/render_view_host_delegate_view.h"
+#include "content/browser/renderer_host/render_widget_host_view_base.h"
 #include "content/common/accessibility_messages.h"
 #include "content/common/browser_plugin/browser_plugin_messages.h"
 #include "content/common/content_switches_internal.h"
@@ -51,8 +53,6 @@
 #include "content/common/swapped_out_messages.h"
 #include "content/common/view_messages.h"
 #include "content/common/web_ui_setup.mojom.h"
-#include "content/port/browser/render_view_host_delegate_view.h"
-#include "content/port/browser/render_widget_host_view_port.h"
 #include "content/public/browser/ax_event_notification_details.h"
 #include "content/public/browser/browser_accessibility_state.h"
 #include "content/public/browser/browser_context.h"
@@ -420,7 +420,7 @@ WebPreferences RenderViewHostImpl::GetWebkitPrefs(const GURL& url) {
       atoi(command_line.GetSwitchValueASCII(
       switches::kAcceleratedCanvas2dMSAASampleCount).c_str());
   prefs.deferred_filters_enabled =
-      command_line.HasSwitch(switches::kEnableDeferredFilters);
+      !command_line.HasSwitch(switches::kDisableDeferredFilters);
   prefs.container_culling_enabled =
       command_line.HasSwitch(switches::kEnableContainerCulling);
   prefs.lazy_layout_enabled =
@@ -1002,11 +1002,8 @@ bool RenderViewHostImpl::OnMessageReceived(const IPC::Message& msg) {
     IPC_MESSAGE_HANDLER(ViewHostMsg_RequestMove, OnRequestMove)
     IPC_MESSAGE_HANDLER(ViewHostMsg_DidChangeLoadProgress,
                         OnDidChangeLoadProgress)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_DidDisownOpener, OnDidDisownOpener)
     IPC_MESSAGE_HANDLER(ViewHostMsg_DocumentAvailableInMainFrame,
                         OnDocumentAvailableInMainFrame)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_DocumentOnLoadCompletedInMainFrame,
-                        OnDocumentOnLoadCompletedInMainFrame)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ToggleFullscreen, OnToggleFullscreen)
     IPC_MESSAGE_HANDLER(ViewHostMsg_DidContentsPreferredSizeChange,
                         OnDidContentsPreferredSizeChange)
@@ -1235,17 +1232,8 @@ void RenderViewHostImpl::OnDidChangeLoadProgress(double load_progress) {
   delegate_->DidChangeLoadProgress(load_progress);
 }
 
-void RenderViewHostImpl::OnDidDisownOpener() {
-  delegate_->DidDisownOpener(this);
-}
-
 void RenderViewHostImpl::OnDocumentAvailableInMainFrame() {
   delegate_->DocumentAvailableInMainFrame(this);
-}
-
-void RenderViewHostImpl::OnDocumentOnLoadCompletedInMainFrame(
-    int32 page_id) {
-  delegate_->DocumentOnLoadCompletedInMainFrame(this, page_id);
 }
 
 void RenderViewHostImpl::OnToggleFullscreen(bool enter_fullscreen) {
@@ -1500,10 +1488,6 @@ void RenderViewHostImpl::DidCancelPopupMenu() {
 
 void RenderViewHostImpl::SendOrientationChangeEvent(int orientation) {
   Send(new ViewMsg_OrientationChangeEvent(GetRoutingID(), orientation));
-}
-
-void RenderViewHostImpl::ToggleSpeechInput() {
-  Send(new InputTagSpeechMsg_ToggleSpeechInput(GetRoutingID()));
 }
 
 bool RenderViewHostImpl::IsWaitingForUnloadACK() const {

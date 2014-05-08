@@ -1042,14 +1042,6 @@ const Experiment kExperiments[] = {
     kOsAll,
     SINGLE_VALUE_TYPE(ash::switches::kAshDebugShortcuts),
   },
-  { "ash-alternate-caption-button",
-    IDS_FLAGS_ASH_FRAME_CAPTION_BUTTON_STYLE_NAME,
-    IDS_FLAGS_ASH_FRAME_CAPTION_BUTTON_STYLE_DESCRIPTION,
-    kOsCrOS,
-    ENABLE_DISABLE_VALUE_TYPE(
-        ash::switches::kAshEnableAlternateFrameCaptionButtonStyle,
-        ash::switches::kAshDisableAlternateFrameCaptionButtonStyle),
-  },
   { "ash-enable-touch-view-testing",
     IDS_FLAGS_ASH_ENABLE_TOUCH_VIEW_TESTING_NAME,
     IDS_FLAGS_ASH_ENABLE_TOUCH_VIEW_TESTING_DESCRIPTION,
@@ -1244,6 +1236,13 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_OFFLINE_AUTO_RELOAD_DESCRIPTION,
     kOsAll,
     SINGLE_VALUE_TYPE(switches::kEnableOfflineAutoReload)
+  },
+  {
+    "enable-offline-load-stale-cache",
+    IDS_FLAGS_ENABLE_OFFLINE_LOAD_STALE_NAME,
+    IDS_FLAGS_ENABLE_OFFLINE_LOAD_STALE_DESCRIPTION,
+    kOsLinux | kOsMac | kOsWin | kOsAndroid,
+    SINGLE_VALUE_TYPE(switches::kEnableOfflineLoadStaleCache)
   },
   {
     "default-tile-width",
@@ -1732,11 +1731,11 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(app_list::switches::kEnableExperimentalAppList)
   },
   {
-    "enable-experimental-app-list-position",
-    IDS_FLAGS_ENABLE_EXPERIMENTAL_APP_LIST_POSITION_NAME,
-    IDS_FLAGS_ENABLE_EXPERIMENTAL_APP_LIST_POSITION_DESCRIPTION,
+    "enable-centered-app-list",
+    IDS_FLAGS_ENABLE_CENTERED_APP_LIST_NAME,
+    IDS_FLAGS_ENABLE_CENTERED_APP_LIST_DESCRIPTION,
     kOsWin | kOsLinux | kOsCrOS,
-    SINGLE_VALUE_TYPE(app_list::switches::kEnableExperimentalAppListPosition)
+    SINGLE_VALUE_TYPE(app_list::switches::kEnableCenteredAppList)
   },
 #endif
   {
@@ -1834,6 +1833,13 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_EMBEDDEDSEARCH_API_DESCRIPTION,
     kOsAndroid,
     SINGLE_VALUE_TYPE(switches::kEnableEmbeddedSearchAPI)
+  },
+  {
+    "enable-app-install-alerts",
+    IDS_FLAGS_ENABLE_APP_INSTALL_ALERTS_NAME,
+    IDS_FLAGS_ENABLE_APP_INSTALL_ALERTS_DESCRIPTION,
+    kOsAndroid,
+    SINGLE_VALUE_TYPE(switches::kEnableAppInstallAlerts)
   },
 #endif
 };

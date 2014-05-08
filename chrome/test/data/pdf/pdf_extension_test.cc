@@ -10,7 +10,7 @@
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/chrome_switches.h"
-#include "chrome/common/extensions/mime_types_handler.h"
+#include "chrome/common/extensions/manifest_handlers/mime_types_handler.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "content/public/test/browser_test_utils.h"
 #include "grit/browser_resources.h"
@@ -89,4 +89,8 @@ IN_PROC_BROWSER_TEST_F(PDFExtensionTest, Basic) {
 
 IN_PROC_BROWSER_TEST_F(PDFExtensionTest, BasicPlugin) {
   RunTestsInFile("basic_plugin_test.js", true);
+}
+
+IN_PROC_BROWSER_TEST_F(PDFExtensionTest, Viewport) {
+  RunTestsInFile("viewport_test.js", false);
 }

@@ -38,7 +38,6 @@
 #include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_widget_host_view.h"
-#include "content/public/browser/web_contents_view.h"
 #include "content/public/test/test_utils.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_system.h"
@@ -142,9 +141,9 @@ class ScopedPreviewTestingDelegate : PrintPreviewUI::TestingDelegate {
   }
 
   // PrintPreviewUI::TestingDelegate implementation.
-  virtual void DidRenderPreviewPage(const content::WebContents& preview_dialog)
+  virtual void DidRenderPreviewPage(content::WebContents* preview_dialog)
       OVERRIDE {
-    dialog_size_ = preview_dialog.GetView()->GetContainerSize();
+    dialog_size_ = preview_dialog->GetContainerBounds().size();
     ++rendered_page_count_;
     CHECK(rendered_page_count_ <= total_page_count_);
     if (waiting_runner_ && rendered_page_count_ == total_page_count_) {
@@ -1184,7 +1183,7 @@ class PlatformAppIncognitoBrowserTest : public PlatformAppBrowserTest,
 
   // AppWindowRegistry::Observer implementation.
   virtual void OnAppWindowAdded(AppWindow* app_window) OVERRIDE {
-    opener_app_ids_.insert(app_window->extension()->id());
+    opener_app_ids_.insert(app_window->extension_id());
   }
   virtual void OnAppWindowIconChanged(AppWindow* app_window) OVERRIDE {}
   virtual void OnAppWindowRemoved(AppWindow* app_window) OVERRIDE {}

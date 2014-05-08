@@ -476,6 +476,7 @@
           'api/attachments/attachment_id_unittest.cc',
           'api/attachments/attachment_service_proxy_unittest.cc',
           'api/attachments/fake_attachment_store_unittest.cc',
+          'api/attachments/fake_attachment_uploader_unittest.cc',
           'api/sync_change_unittest.cc',
           'api/sync_data_unittest.cc',
           'api/sync_error_unittest.cc',
@@ -595,27 +596,6 @@
           ],
           'sources': [
             'tools/testserver/run_sync_testserver.cc',
-          ],
-        },
-
-        # A standalone executable that runs a Sync FakeServer instance.
-        {
-          'target_name': 'run_sync_fake_server',
-          'type': 'executable',
-          'dependencies': [
-            '../base/base.gyp:base',
-            '../base/base.gyp:test_support_base',
-            '../net/net.gyp:http_server',
-            '../net/net.gyp:net',
-            '../net/net.gyp:net_test_support',
-            '../testing/gtest.gyp:gtest',
-            '../url/url.gyp:url_lib',
-            'test_support_sync_fake_server',
-          ],
-          'sources': [
-            'test/fake_server/run_sync_fake_server.cc',
-            'test/fake_server/fake_sync_server_http_handler.cc',
-            'test/fake_server/fake_sync_server_http_handler.h',
           ],
         },
 

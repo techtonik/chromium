@@ -44,6 +44,7 @@
 #include "chrome/browser/guest_view/ad_view/ad_view_guest.h"
 #include "chrome/browser/guest_view/guest_view_base.h"
 #include "chrome/browser/guest_view/guest_view_constants.h"
+#include "chrome/browser/guest_view/guest_view_manager.h"
 #include "chrome/browser/guest_view/web_view/web_view_guest.h"
 #include "chrome/browser/media/cast_transport_host_filter.h"
 #include "chrome/browser/media/media_capture_devices_dispatcher.h"
@@ -119,7 +120,6 @@
 #include "content/public/browser/resource_context.h"
 #include "content/public/browser/site_instance.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "content/public/common/child_process_host.h"
 #include "content/public/common/content_descriptors.h"
 #include "content/public/common/url_utils.h"
@@ -213,10 +213,6 @@
 
 #if defined(ENABLE_WEBRTC)
 #include "chrome/browser/media/webrtc_logging_handler_host.h"
-#endif
-
-#if defined(ENABLE_INPUT_SPEECH)
-#include "chrome/browser/speech/chrome_speech_recognition_manager_delegate_bubble_ui.h"
 #endif
 
 #if defined(OS_CHROMEOS)
@@ -853,7 +849,10 @@ void ChromeContentBrowserClient::GuestWebContentsCreated(
 
     // Create a new GuestViewBase of the same type as the opener.
     *guest_delegate = GuestViewBase::Create(
-        guest_web_contents, extension_id, guest->GetViewType());
+        guest_web_contents,
+        extension_id,
+        guest->GetViewType(),
+        guest->AsWeakPtr());
     return;
   }
 
@@ -868,7 +867,10 @@ void ChromeContentBrowserClient::GuestWebContentsCreated(
     return;
 
   *guest_delegate =
-      GuestViewBase::Create(guest_web_contents, extension_id, api_type);
+      GuestViewBase::Create(guest_web_contents,
+                            extension_id,
+                            api_type,
+                            base::WeakPtr<GuestViewBase>());
 }
 
 void ChromeContentBrowserClient::GuestWebContentsAttached(
@@ -1561,6 +1563,17 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
       }
     }
 
+    {
+      // Enable load stale cache if this session is in the field trial or
+      // the user explicitly enabled it.
+      std::string group =
+          base::FieldTrialList::FindFullName("LoadStaleCacheExperiment");
+      if (group == "Enabled" || browser_command_line.HasSwitch(
+              switches::kEnableOfflineLoadStaleCache)) {
+        command_line->AppendSwitch(switches::kEnableOfflineLoadStaleCache);
+      }
+    }
+
     // Please keep this in alphabetical order.
     static const char* const kSwitchNames[] = {
       autofill::switches::kDisableIgnoreAutocompleteOff,
@@ -2168,13 +2181,7 @@ void ChromeContentBrowserClient::ResourceDispatcherHostCreated() {
 // TODO(tommi): Rename from Get to Create.
 content::SpeechRecognitionManagerDelegate*
     ChromeContentBrowserClient::GetSpeechRecognitionManagerDelegate() {
-#if defined(ENABLE_INPUT_SPEECH)
-  return new speech::ChromeSpeechRecognitionManagerDelegateBubbleUI();
-#else
-  // Platforms who don't implement x-webkit-speech (a.k.a INPUT_SPEECH) just
-  // need the base delegate without the bubble UI.
   return new speech::ChromeSpeechRecognitionManagerDelegate();
-#endif
 }
 
 net::NetLog* ChromeContentBrowserClient::GetNetLog() {

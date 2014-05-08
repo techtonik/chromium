@@ -82,8 +82,8 @@
 #include "content/public/browser/url_data_source.h"
 #include "content/public/browser/user_metrics.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/browser/web_contents_view.h"
 #include "content/public/common/page_zoom.h"
+#include "extensions/browser/extension_registry.h"
 #include "google_apis/gaia/gaia_auth_util.h"
 #include "google_apis/gaia/google_service_auth_error.h"
 #include "grit/chromium_strings.h"
@@ -127,6 +127,7 @@
 #if defined(OS_WIN)
 #include "chrome/browser/extensions/settings_api_helpers.h"
 #include "chrome/installer/util/auto_launch_util.h"
+#include "content/public/browser/browser_url_handler.h"
 #endif  // defined(OS_WIN)
 
 #if defined(ENABLE_SERVICE_DISCOVERY)
@@ -139,6 +140,8 @@ using content::BrowserThread;
 using content::DownloadManager;
 using content::OpenURLParams;
 using content::Referrer;
+using extensions::Extension;
+using extensions::ExtensionRegistry;
 
 namespace options {
 
@@ -716,6 +719,9 @@ void BrowserOptionsHandler::RegisterMessages() {
 
 void BrowserOptionsHandler::Uninitialize() {
   registrar_.RemoveAll();
+#if defined(OS_WIN)
+  ExtensionRegistry::Get(Profile::FromWebUI(web_ui()))->RemoveObserver(this);
+#endif
 }
 
 void BrowserOptionsHandler::OnStateChanged() {
@@ -775,6 +781,8 @@ void BrowserOptionsHandler::InitializeHandler() {
   AddTemplateUrlServiceObserver();
 
 #if defined(OS_WIN)
+  ExtensionRegistry::Get(Profile::FromWebUI(web_ui()))->AddObserver(this);
+
   const CommandLine& command_line = *CommandLine::ForCurrentProcess();
   if (!command_line.HasSwitch(switches::kUserDataDir)) {
     BrowserThread::PostTask(BrowserThread::FILE, FROM_HERE,
@@ -868,10 +876,7 @@ void BrowserOptionsHandler::InitializePage() {
   SetupManageCertificatesSection();
   SetupManagingSupervisedUsers();
   SetupEasyUnlock();
-
-#if defined(OS_WIN)
   SetupExtensionControlledIndicators(NULL);
-#endif  // defined(OS_WIN)
 
 #if defined(OS_CHROMEOS)
   SetupAccessibilityFeatures();
@@ -1098,9 +1103,7 @@ void BrowserOptionsHandler::OnTemplateURLServiceChanged() {
           template_url_service_->is_default_search_managed() ||
           template_url_service_->IsExtensionControlledDefaultSearch()));
 
-#if defined(OS_WIN)
   SetupExtensionControlledIndicators(NULL);
-#endif  // defined(OS_WIN)
 }
 
 void BrowserOptionsHandler::SetDefaultSearchEngine(
@@ -1128,6 +1131,19 @@ void BrowserOptionsHandler::AddTemplateUrlServiceObserver() {
     template_url_service_->Load();
     template_url_service_->AddObserver(this);
   }
+}
+
+void BrowserOptionsHandler::OnExtensionLoaded(
+    content::BrowserContext* browser_context,
+    const Extension* extension) {
+  SetupExtensionControlledIndicators(NULL);
+}
+
+void BrowserOptionsHandler::OnExtensionUnloaded(
+    content::BrowserContext* browser_context,
+    const Extension* extension,
+    extensions::UnloadedExtensionInfo::Reason reason) {
+  SetupExtensionControlledIndicators(NULL);
 }
 
 void BrowserOptionsHandler::Observe(
@@ -1362,7 +1378,7 @@ void BrowserOptionsHandler::HandleSelectDownloadLocation(
       &info,
       0,
       base::FilePath::StringType(),
-      web_ui()->GetWebContents()->GetView()->GetTopLevelNativeWindow(),
+      web_ui()->GetWebContents()->GetTopLevelNativeWindow(),
       NULL);
 }
 
@@ -1719,10 +1735,11 @@ void BrowserOptionsHandler::SetupEasyUnlock() {
       has_pairing_value);
 }
 
-#if defined(OS_WIN)
 // Setup the UI for showing which settings are extension controlled.
 void BrowserOptionsHandler::SetupExtensionControlledIndicators(
     const base::ListValue* args) {
+#if defined(OS_WIN)
+  // Check if an extension is overriding the Search Engine.
   const extensions::Extension* extension = extensions::OverridesSearchEngine(
       Profile::FromWebUI(web_ui()), NULL);
   base::StringValue extension_id(extension ? extension->id() : std::string());
@@ -1733,6 +1750,7 @@ void BrowserOptionsHandler::SetupExtensionControlledIndicators(
       extension_id,
       extension_name);
 
+  // Check if an extension is overriding the Home page.
   extension = extensions::OverridesHomepage(Profile::FromWebUI(web_ui()), NULL);
   extension_id = base::StringValue(extension ? extension->id() : std::string());
   extension_name = base::StringValue(
@@ -1741,6 +1759,7 @@ void BrowserOptionsHandler::SetupExtensionControlledIndicators(
                                    extension_id,
                                    extension_name);
 
+  // Check if an extension is overriding the Startup pages.
   extension = extensions::OverridesStartupPages(
       Profile::FromWebUI(web_ui()), NULL);
   extension_id = base::StringValue(extension ? extension->id() : std::string());
@@ -1750,7 +1769,31 @@ void BrowserOptionsHandler::SetupExtensionControlledIndicators(
       "BrowserOptions.toggleStartupPagesControlled",
       extension_id,
       extension_name);
-}
+
+  // Check if an extension is overriding the NTP page.
+  GURL ntp_url(chrome::kChromeUINewTabURL);
+  bool ignored_param;
+  extension = NULL;
+  content::BrowserURLHandler::GetInstance()->RewriteURLIfNecessary(
+      &ntp_url,
+      web_ui()->GetWebContents()->GetBrowserContext(),
+      &ignored_param);
+  if (ntp_url.SchemeIs("chrome-extension")) {
+    using extensions::ExtensionRegistry;
+    ExtensionRegistry* registry = ExtensionRegistry::Get(
+        Profile::FromWebUI(web_ui()));
+    extension = registry->GetExtensionById(ntp_url.host(),
+                                           ExtensionRegistry::ENABLED);
+  }
+  extension_id = base::StringValue(
+      extension ? extension->id() : std::string());
+  extension_name = base::StringValue(
+      extension ? extension->name() : std::string());
+  web_ui()->CallJavascriptFunction(
+      "BrowserOptions.toggleNewTabPageControlled",
+      extension_id,
+      extension_name);
 #endif  // defined(OS_WIN)
+}
 
 }  // namespace options

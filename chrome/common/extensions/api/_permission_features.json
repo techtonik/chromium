@@ -83,10 +83,6 @@
       ]
     }
   ],
-  "automation": {
-    "channel": "trunk",
-    "extension_types": ["extension", "legacy_packaged_app", "platform_app"]
-  },
   "autotestPrivate": {
     "channel": "stable",
     "extension_types": ["extension", "legacy_packaged_app"],
@@ -151,6 +147,10 @@
     "channel": "stable",
     "extension_types": ["extension", "legacy_packaged_app", "platform_app"],
     "location": "component"
+  },
+  "browser": {
+    "channel": "dev",
+    "extension_types": ["platform_app"]
   },
   "browsingData": {
     "channel": "stable",
@@ -707,10 +707,17 @@
     "channel": "stable",
     "extension_types": ["extension", "legacy_packaged_app"]
   },
-  "processes": {
+  "processes": [{
     "channel": "dev",
     "extension_types": ["extension"]
-  },
+  }, {
+    "channel": "stable",
+    "extension_types": ["extension"],
+    "whitelist": [
+      "DF84F03F9B960409CCDE0D895B9650EBE81C0A8E",  // Hangout Services
+      "80B9DC58E5210749F052F5B4DB239C50CF72AEB6"   // Hangouts test extension
+    ]
+  }],
   "proxy": {
     "channel": "stable",
     "extension_types": ["extension", "legacy_packaged_app"]
@@ -793,10 +800,6 @@
     "channel": "stable",
     "extension_types": ["platform_app"]
   },
-  "systemIndicator": {
-    "channel": "dev",
-    "extension_types": ["extension", "legacy_packaged_app", "platform_app"]
-  },
   "system.cpu": {
     "channel": "stable",
     "extension_types": ["extension", "legacy_packaged_app", "platform_app"]
@@ -867,34 +870,6 @@
       "extension", "legacy_packaged_app", "hosted_app", "platform_app"
     ]
   },
-  "usb": [
-    {
-      "channel": "stable",
-      "extension_types": ["platform_app"]
-    },
-    {
-      "channel": "stable",
-      "extension_types": ["extension"],
-      "whitelist": [
-        "496B6890097EB6E19809ADEADD095A8721FBB2E0",  // FIDO U2F APIs
-        "E24F1786D842E91E74C27929B0B3715A4689A473"   // CryptoToken
-      ]
-    }
-  ],
-  "usbDevices": [
-    {
-      "channel": "stable",
-      "extension_types": ["platform_app"]
-    },
-    {
-      "channel": "stable",
-      "extension_types": ["extension"],
-      "whitelist": [
-        "496B6890097EB6E19809ADEADD095A8721FBB2E0",  // FIDO U2F APIs
-        "E24F1786D842E91E74C27929B0B3715A4689A473"   // CryptoToken
-      ]
-    }
-  ],
   "videoCapture": [
     {
       "channel": "stable",
@@ -939,6 +914,7 @@
     "channel": "stable",
     "extension_types": ["extension"],
     "whitelist": [
+      // Hangouts test extension
       "80B9DC58E5210749F052F5B4DB239C50CF72AEB6",
       // Hangout Services component extension.
       "DF84F03F9B960409CCDE0D895B9650EBE81C0A8E",
@@ -950,6 +926,7 @@
     "channel": "stable",
     "extension_types": ["extension"],
     "whitelist": [
+      // Hangouts test extension
       "80B9DC58E5210749F052F5B4DB239C50CF72AEB6",
       // Hangout Services component extension.
       "DF84F03F9B960409CCDE0D895B9650EBE81C0A8E"

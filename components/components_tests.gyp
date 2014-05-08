@@ -63,9 +63,12 @@
             'autofill/core/common/form_field_data_unittest.cc',
             'autofill/core/common/password_form_fill_data_unittest.cc',
             'autofill/core/common/save_password_progress_logger_unittest.cc',
+            'bookmarks/core/browser/bookmark_codec_unittest.cc',
             'captive_portal/captive_portal_detector_unittest.cc',
             'cloud_devices/common/cloud_devices_urls_unittest.cc',
             'cloud_devices/common/printer_description_unittest.cc',
+            'data_reduction_proxy/browser/data_reduction_proxy_auth_request_handler_unittest.cc',
+            'data_reduction_proxy/browser/data_reduction_proxy_config_service_unittest.cc',
             'data_reduction_proxy/browser/data_reduction_proxy_metrics_unittest.cc',
             'data_reduction_proxy/browser/data_reduction_proxy_settings_unittest.cc',
             'data_reduction_proxy/browser/http_auth_handler_data_reduction_proxy_unittest.cc',
@@ -95,6 +98,8 @@
             'keyed_service/core/dependency_graph_unittest.cc',
             'language_usage_metrics/language_usage_metrics_unittest.cc',
             'metrics/metrics_hashes_unittest.cc',
+            'metrics/metrics_log_base_unittest.cc',
+            'metrics/metrics_log_manager_unittest.cc',
             'navigation_interception/intercept_navigation_resource_throttle_unittest.cc',
             'os_crypt/ie7_password_win_unittest.cc',
             'os_crypt/keychain_password_mac_unittest.mm',
@@ -194,6 +199,10 @@
             'components_strings.gyp:components_strings',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber',
 
+            # Dependencies of bookmarks
+            'components.gyp:bookmarks_core_browser',
+            'components.gyp:bookmarks_core_test_support',
+            
             # Dependencies of captive_portal
             'components.gyp:captive_portal_test_support',
             '../net/net.gyp:net_test_support',
@@ -319,6 +328,8 @@
                 ['include', '^test/run_all_unittests\\.cc$'],
                 ['include', '^auto_login_parser/'],
                 ['include', '^autofill/core/'],
+                ['include', '^bookmarks/'],
+                ['include', '^data_reduction_proxy/'],
                 ['include', '^dom_distiller/'],
                 ['include', '^json_schema/'],
                 ['include', '^keyed_service/core/'],
