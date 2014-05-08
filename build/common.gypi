@@ -332,6 +332,8 @@
       'safe_browsing%': 1,
 
       # Speech input is compiled in by default. Set to 0 to disable.
+      # TODO(tommyw): Speech Input doesn't exist anymore. Clarify the scope
+      # of this flag (and probably rename it).
       'input_speech%': 1,
 
       # Notifications are compiled in by default. Set to 0 to disable.
@@ -2002,6 +2004,12 @@
         ],
       }],
 
+      ['OS=="win"', {
+        # The Clang plugins don't currently work on Windows.
+        # TODO(hans): One day, this will work. (crbug.com/82385)
+        'clang_use_chrome_plugins%': 0,
+      }],
+
       # On valgrind bots, override the optimizer settings so we don't inline too
       # much and make the stacks harder to figure out.
       #
@@ -2390,9 +2398,6 @@
       }],
       ['configuration_policy==1', {
         'defines': ['ENABLE_CONFIGURATION_POLICY'],
-      }],
-      ['input_speech==1', {
-        'defines': ['ENABLE_INPUT_SPEECH'],
       }],
       ['notifications==1', {
         'defines': ['ENABLE_NOTIFICATIONS'],
@@ -3377,9 +3382,6 @@
                 'conditions': [
                   # Use gold linker for Android ia32 target.
                   ['OS=="android"', {
-                    'cflags': [
-                      '-fuse-ld=gold',
-                    ],
                     'ldflags': [
                       '-fuse-ld=gold',
                     ],
@@ -3405,9 +3407,6 @@
                 'conditions': [
                   # Use gold linker for Android x64 target.
                   ['OS=="android"', {
-                    'cflags': [
-                      '-fuse-ld=gold',
-                    ],
                     'ldflags': [
                       '-fuse-ld=gold',
                     ],
@@ -3471,7 +3470,6 @@
                       # compiler (r5-r7). This can be verified using
                       # webkit_unit_tests' WTF.Checked_int8_t test.
                       '-fno-tree-sra',
-                      '-fuse-ld=gold',
                       '-Wno-psabi',
                     ],
                     # Android now supports .relro sections properly.
@@ -3499,7 +3497,6 @@
                           '-mthumb-interwork',
                           '-finline-limit=64',
                           '-fno-tree-sra',
-                          '-fuse-ld=gold',
                           '-Wno-psabi',
                         ],
                         'cflags': [
@@ -3811,8 +3808,7 @@
           }],
           ['use_custom_libcxx==1', {
             'dependencies': [
-              '<(DEPTH)/third_party/libc++/libc++.gyp:libc++',
-              '<(DEPTH)/third_party/libc++abi/libc++abi.gyp:libc++abi',
+              '<(DEPTH)/third_party/libc++/libc++.gyp:libcxx_proxy',
             ],
           }],
           ['order_profiling!=0 and (chromeos==1 or OS=="linux" or OS=="android")', {
@@ -3894,9 +3890,6 @@
               ['gcc_version>=48', {
                 'target_conditions': [
                   ['_toolset=="target"', {
-                    'cflags': [
-                      '-fuse-ld=gold',
-                    ],
                     'ldflags': [
                       '-fuse-ld=gold',
                     ],
@@ -3906,9 +3899,6 @@
               ['host_gcc_version>=48', {
                 'target_conditions': [
                   ['_toolset=="host"', {
-                    'cflags': [
-                      '-fuse-ld=gold',
-                    ],
                     'ldflags': [
                       '-fuse-ld=gold',
                     ],

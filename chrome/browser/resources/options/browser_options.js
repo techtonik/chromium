@@ -553,11 +553,17 @@ cr.define('options', function() {
 
       // Extension controlled UI.
       this.addExtensionControlledBox_('search-section-content',
-                                      'search-engine-controlled');
+                                      'search-engine-controlled',
+                                      true);
       this.addExtensionControlledBox_('extension-controlled-container',
-                                      'homepage-controlled');
+                                      'homepage-controlled',
+                                      true);
       this.addExtensionControlledBox_('startup-section-content',
-                                      'startpage-controlled');
+                                      'startpage-controlled',
+                                      false);
+      this.addExtensionControlledBox_('newtab-section-content',
+                                      'newtab-controlled',
+                                      false);
 
       document.body.addEventListener('click', function(e) {
         var button = findAncestor(e.target, function(el) {
@@ -1288,6 +1294,15 @@ cr.define('options', function() {
              'There should always be a current profile, but none found.');
     },
 
+    /**
+     * Propmpts user to confirm deletion of the profile for this browser
+     * window.
+     * @private
+     */
+    deleteCurrentProfile_: function() {
+      ManageProfileOverlay.showDeleteDialog(this.getCurrentProfile_());
+    },
+
     setNativeThemeButtonEnabled_: function(enabled) {
       var button = $('themes-native-button');
       if (button)
@@ -1528,13 +1543,17 @@ cr.define('options', function() {
      * extensions.
      * @param {string} parentDiv The div name to append the bubble to.
      * @param {string} bubbleId The ID to use for the bubble.
+     * @param {boolean} first Add as first node if true, otherwise last.
      * @private
      */
-    addExtensionControlledBox_: function(parentDiv, bubbleId) {
+    addExtensionControlledBox_: function(parentDiv, bubbleId, first) {
       var bubble = $('extension-controlled-warning-template').cloneNode(true);
       bubble.id = bubbleId;
       var parent = $(parentDiv);
-      parent.insertBefore(bubble, parent.firstChild);
+      if (first)
+        parent.insertBefore(bubble, parent.firstChild);
+      else
+        parent.appendChild(bubble);
     },
 
     /**
@@ -1595,6 +1614,21 @@ cr.define('options', function() {
     toggleHomepageControlled_: function(extensionId, extensionName) {
       this.toggleExtensionControlledBox_('extension-controlled-container',
                                          'homepage-controlled',
+                                         extensionId,
+                                         extensionName);
+    },
+
+    /**
+     * Toggles the bubble that shows which extension is controlling the new tab
+     * page.
+     * @param {string} extensionId The ID of the extension controlling the
+     *     new tab page setting.
+     * @param {string} extensionName The name of the extension.
+     * @private
+     */
+    toggleNewTabPageControlled_: function(extensionId, extensionName) {
+      this.toggleExtensionControlledBox_('newtab-section-content',
+                                         'newtab-controlled',
                                          extensionId,
                                          extensionName);
     },
@@ -1755,6 +1789,7 @@ cr.define('options', function() {
   //Forward public APIs to private implementations.
   [
     'addBluetoothDevice',
+    'deleteCurrentProfile',
     'enableCertificateButton',
     'enableFactoryResetSection',
     'getCurrentProfile',
@@ -1789,6 +1824,7 @@ cr.define('options', function() {
     'showMouseControls',
     'showTouchpadControls',
     'toggleHomepageControlled',
+    'toggleNewTabPageControlled',
     'toggleSearchEngineControlled',
     'toggleStartupPagesControlled',
     'updateAccountPicture',

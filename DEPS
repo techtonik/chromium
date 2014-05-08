@@ -23,7 +23,7 @@ vars = {
   "libcxxabi_revision": "206024",
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
   "nacl_trunk": "http://src.chromium.org/native_client/trunk",
-  "webkit_revision": "173285",
+  "webkit_revision": "173391",
   "chromium_git": "https://chromium.googlesource.com",
   "chromiumos_git": "https://chromium.googlesource.com/chromiumos",
   "skia_git": "https://skia.googlesource.com",
@@ -35,7 +35,7 @@ vars = {
   "google_toolbox_for_mac_revision": "662",
   "libaddressinput_revision": "176",
   "libphonenumber_revision": "621",
-  "libvpx_revision": "267596",
+  "libvpx_revision": "268125",
   "lss_revision": "26",
 
   # These two FFmpeg variables must be updated together.  One is used for SVN
@@ -45,13 +45,13 @@ vars = {
 
   "sfntly_revision": "228",
   "lighttpd_revision": "33737",
-  "skia_revision": "14562",
+  "skia_revision": "14586",
   "skia_hash": "24f6e29fc133f1082c73e2a96f30bee92e3123aa",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   "v8_branch": "trunk",
-  "v8_revision": "21114",
+  "v8_revision": "21152",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
@@ -74,7 +74,7 @@ vars = {
 
 deps = {
   "src/breakpad/src":
-    (Var("googlecode_url") % "google-breakpad") + "/trunk/src@1322",
+    (Var("googlecode_url") % "google-breakpad") + "/trunk/src@1325",
 
   "src/sdch/open-vcdiff":
     (Var("googlecode_url") % "open-vcdiff") + "/trunk@42",
@@ -122,7 +122,7 @@ deps = {
     "/trunk/src@331",
 
   "src/third_party/leveldatabase/src":
-    (Var("googlecode_url") % "leveldb") + "/trunk@79",
+    (Var("googlecode_url") % "leveldb") + "/trunk@80",
 
   "src/third_party/libc++/trunk":
     Var("llvm_url") + "/libcxx/trunk@" + Var("libcxx_revision"),
@@ -137,7 +137,7 @@ deps = {
     (Var("googlecode_url") % "grit-i18n") + "/trunk@167",
 
   "src/tools/gyp":
-    (Var("googlecode_url") % "gyp") + "/trunk@1911",
+    (Var("googlecode_url") % "gyp") + "/trunk@1912",
 
   "src/tools/swarming_client":
     Var("chromium_git") + "/external/swarming.client.git@" +
@@ -191,7 +191,7 @@ deps = {
 
   "src/third_party/webgl/src":
     Var("chromium_git") +
-    "/external/khronosgroup/webgl.git@dd5d37f23dcbdba91f1cf623ba10b2c0ea78ea38",
+    "/external/khronosgroup/webgl.git@1700aa98cc8bc494b305d4ec1045797bc4030f45",
 
   "src/third_party/swig/Lib":
     "/trunk/deps/third_party/swig/Lib@" + Var("swig_revision"),

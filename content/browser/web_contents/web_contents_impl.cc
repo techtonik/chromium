@@ -40,6 +40,7 @@
 #include "content/browser/message_port_service.h"
 #include "content/browser/power_save_blocker_impl.h"
 #include "content/browser/renderer_host/render_process_host_impl.h"
+#include "content/browser/renderer_host/render_view_host_delegate_view.h"
 #include "content/browser/renderer_host/render_view_host_impl.h"
 #include "content/browser/renderer_host/render_widget_host_impl.h"
 #include "content/browser/renderer_host/render_widget_host_view_base.h"
@@ -55,7 +56,6 @@
 #include "content/common/input_messages.h"
 #include "content/common/ssl_status_serialization.h"
 #include "content/common/view_messages.h"
-#include "content/port/browser/render_view_host_delegate_view.h"
 #include "content/public/browser/ax_event_notification_details.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/content_browser_client.h"
@@ -1426,7 +1426,9 @@ void WebContentsImpl::CreateNewWindow(
   } else {
     // This makes |new_contents| act as a guest.
     // For more info, see comment above class BrowserPluginGuest.
-    int instance_id = GetBrowserPluginGuestManager()->get_next_instance_id();
+    int instance_id =
+        BrowserPluginGuestManager::FromBrowserContext(GetBrowserContext())->
+            GetNextInstanceID();
     WebContentsImpl* new_contents_impl =
         static_cast<WebContentsImpl*>(new_contents);
     BrowserPluginGuest::CreateWithOpener(instance_id,
@@ -2839,10 +2841,9 @@ void WebContentsImpl::OnDidDownloadImage(
 }
 
 void WebContentsImpl::OnUpdateFaviconURL(
-    int32 page_id,
     const std::vector<FaviconURL>& candidates) {
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
-                    DidUpdateFaviconURL(page_id, candidates));
+                    DidUpdateFaviconURL(candidates));
 }
 
 void WebContentsImpl::OnMediaPlayingNotification(int64 player_cookie,
@@ -2878,9 +2879,9 @@ void WebContentsImpl::OnMediaPausedNotification(int64 player_cookie) {
 #endif  // !defined(OS_CHROMEOS)
 }
 
-void WebContentsImpl::OnFirstVisuallyNonEmptyPaint(int32 page_id) {
+void WebContentsImpl::OnFirstVisuallyNonEmptyPaint() {
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
-                    DidFirstVisuallyNonEmptyPaint(page_id));
+                    DidFirstVisuallyNonEmptyPaint());
 }
 
 void WebContentsImpl::DidChangeVisibleSSLState() {
@@ -3489,16 +3490,15 @@ void WebContentsImpl::DidDisownOpener(RenderFrameHost* render_frame_host) {
 }
 
 void WebContentsImpl::DocumentOnLoadCompleted(
-    RenderFrameHost* render_frame_host,
-    int32 page_id) {
+    RenderFrameHost* render_frame_host) {
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
-                    DocumentOnLoadCompletedInMainFrame(page_id));
+                    DocumentOnLoadCompletedInMainFrame());
 
   // TODO(avi): Remove. http://crbug.com/170921
   NotificationService::current()->Notify(
       NOTIFICATION_LOAD_COMPLETED_MAIN_FRAME,
       Source<WebContents>(this),
-      Details<int>(&page_id));
+      NotificationService::NoDetails());
 }
 
 void WebContentsImpl::DocumentAvailableInMainFrame(
@@ -3947,13 +3947,6 @@ void WebContentsImpl::SetBrowserPluginGuest(BrowserPluginGuest* guest) {
 
 BrowserPluginEmbedder* WebContentsImpl::GetBrowserPluginEmbedder() const {
   return browser_plugin_embedder_.get();
-}
-
-BrowserPluginGuestManager*
-    WebContentsImpl::GetBrowserPluginGuestManager() const {
-  return static_cast<BrowserPluginGuestManager*>(
-      GetBrowserContext()->GetUserData(
-          browser_plugin::kBrowserPluginGuestManagerKeyName));
 }
 
 void WebContentsImpl::ClearPowerSaveBlockers(

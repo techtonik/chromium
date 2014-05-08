@@ -1263,10 +1263,13 @@ Press any key to continue exploring.
     Bluetooth mouse paired
   </message>
   <message name="IDS_HID_DETECTION_PAIRED_BLUETOOTH_KEYBOARD" desc="Text shown on HID detection screen next to keyboard icon after Bluetooth keyboard is connected.">
-    "<ph name="DEVICE_NAME">%1<ex>Bluetooth Keyboard</ex></ph>" paired
+    "<ph name="DEVICE_NAME">$1<ex>Bluetooth Keyboard</ex></ph>" paired
   </message>
   <message name="IDS_HID_DETECTION_BLUETOOTH_REMOTE_PIN_CODE_REQUEST" desc="Bluetooth pairing message displayed on HID detection screen when pairing a Bluetooth keyboard.">
-    Type this code on "<ph name="DEVICE_NAME">%1<ex>Nexus S</ex></ph>" to pair:
+    Type this code on "<ph name="DEVICE_NAME">$1<ex>Nexus S</ex></ph>" to pair:
+  </message>
+  <message name="IDS_HID_DETECTION_DEFAULT_KEYBOARD_NAME" desc="Default keyboard name used at HID-detection labels and messages at HID-detection OOBE screen.">
+    Unknown keyboard
   </message>
   <message name="IDS_HID_DETECTION_BLUETOOTH_ENTER_KEY" meaning="Label on the button representing Enter key at the HID detection screen.">
     enter
@@ -4629,6 +4632,9 @@ Battery full
   <message name="IDS_LOGIN_ERROR_AUTHENTICATING_2ND_TIME" desc="Couldn't sign in because password is invalid for the 2nd time">
     Sorry, your password still could not be verified. Note: if you changed your password recently, your new password will be applied once you sign out, please use the old password here.
   </message>
+  <message name="IDS_LOGIN_ERROR_AUTHENTICATING_2ND_TIME_SUPERVISED" desc="Supervised user couldn't sign in because password is invalid for the 2nd time">
+    Sorry, your password could not be verified. The manager of this supervised user may have changed the password recently. If so, the new password will be applied the next time you sign in. Try using your old password.
+  </message>
   <message name="IDS_LOGIN_ERROR_PASSWORD_CHANGED" desc="Couldn't log in because password specified matched as old one, but not new one (online) - password change has been detected.">
     Your password has changed. Please try again with your new password.
   </message>
@@ -5157,6 +5163,9 @@ All users must sign out to continue.
 
   <message name="IDS_ENTERPRISE_ENROLLMENT_STATUS_REGISTRATION_FAILED" desc="Error message shown on the enrollment screen upon failed device registration.">
     Error when registering the device with the server: <ph name="CLIENT_ERROR">$1<ex>Failed to connect to the server</ex></ph>.
+  </message>
+  <message name="IDS_ENTERPRISE_ENROLLMENT_STATUS_NO_STATE_KEYS" desc="Error message shown on the enrollment screen when the system failed to determine server-backed state keys.">
+    Oops!  The system failed to determine device identifiers for this device.
   </message>
   <message name="IDS_ENTERPRISE_ENROLLMENT_STATUS_REGISTRATION_BAD_MODE" desc="Error message shown on the enrollment screen upon receiving a bad mode on device registration.">
     The supplied enrollment mode is not supported by this version of the operating system.  Please make sure you are running the newest version and try again.

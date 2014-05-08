@@ -43,6 +43,7 @@
         'bookmarks/core/browser/bookmark_node.h',
         'bookmarks/core/browser/bookmark_node_data.cc',
         'bookmarks/core/browser/bookmark_node_data.h',
+        'bookmarks/core/browser/bookmark_node_data_ios.cc',
         'bookmarks/core/browser/bookmark_node_data_mac.cc',
         'bookmarks/core/browser/bookmark_node_data_views.cc',
         'bookmarks/core/browser/bookmark_pasteboard_helper_mac.h',
@@ -70,6 +71,24 @@
         'bookmarks/core/common/bookmark_constants.h',
         'bookmarks/core/common/bookmark_pref_names.cc',
         'bookmarks/core/common/bookmark_pref_names.h',
+      ],
+    },
+    {
+      'target_name': 'bookmarks_core_test_support',
+      'type': 'static_library',
+      'include_dirs': [
+        '..',
+      ],
+      'dependencies': [
+        '../base/base.gyp:base',
+        '../url/url.gyp:url_lib',
+        'bookmarks_core_browser',
+      ],
+      'sources': [
+        'bookmarks/core/test/bookmark_test_helpers.cc',
+        'bookmarks/core/test/bookmark_test_helpers.h',
+        'bookmarks/core/test/test_bookmark_client.cc',
+        'bookmarks/core/test/test_bookmark_client.h',
       ],
     },
   ],

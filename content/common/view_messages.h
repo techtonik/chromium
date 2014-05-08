@@ -15,11 +15,11 @@
 #include "content/common/content_param_traits.h"
 #include "content/common/cookie_data.h"
 #include "content/common/input/did_overscroll_params.h"
+#include "content/common/input/input_event_ack_state.h"
 #include "content/common/navigation_gesture.h"
 #include "content/common/pepper_renderer_instance_data.h"
 #include "content/common/view_message_enums.h"
 #include "content/common/webplugin_geometry.h"
-#include "content/port/common/input_event_ack_state.h"
 #include "content/public/common/common_param_traits.h"
 #include "content/public/common/favicon_url.h"
 #include "content/public/common/file_chooser_params.h"
@@ -1635,14 +1635,12 @@ IPC_MESSAGE_CONTROL3(ViewHostMsg_DidLose3DContext,
 IPC_MESSAGE_ROUTED0(ViewHostMsg_WillInsertBody)
 
 // Notification that the urls for the favicon of a site has been determined.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_UpdateFaviconURL,
-                    int32 /* page_id */,
+IPC_MESSAGE_ROUTED1(ViewHostMsg_UpdateFaviconURL,
                     std::vector<content::FaviconURL> /* candidates */)
 
 // Sent once a paint happens after the first non empty layout. In other words
 // after the page has painted something.
-IPC_MESSAGE_ROUTED1(ViewHostMsg_DidFirstVisuallyNonEmptyPaint,
-                    int /* page_id */)
+IPC_MESSAGE_ROUTED0(ViewHostMsg_DidFirstVisuallyNonEmptyPaint)
 
 // Sent by the renderer to the browser to start a vibration with the given
 // duration.

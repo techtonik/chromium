@@ -71,9 +71,6 @@
         'base/text/bytes_formatting_unittest.cc',
         'base/view_prop_unittest.cc',
         'base/webui/web_ui_util_unittest.cc',
-        'gfx/animation/tween_unittest.cc',
-        'gfx/blit_unittest.cc',
-        'gfx/break_list_unittest.cc',
         'gfx/canvas_unittest.cc',
         'gfx/canvas_unittest_mac.mm',
         'gfx/codec/jpeg_codec_unittest.cc',
@@ -81,9 +78,6 @@
         'gfx/font_list_unittest.cc',
         'gfx/platform_font_mac_unittest.mm',
         'gfx/render_text_unittest.cc',
-        'gfx/sequential_id_generator_unittest.cc',
-        'gfx/transform_util_unittest.cc',
-        'gfx/utf16_indexing_unittest.cc',
       ],
       'includes': [
         'display/display_unittests.gypi',
@@ -225,6 +219,11 @@
         ['chromeos==1', {
           'dependencies': [
             '../chromeos/chromeos.gyp:chromeos',
+            'aura/aura.gyp:aura_test_support',
+            'chromeos/ui_chromeos.gyp:ui_chromeos',
+          ],
+          'sources': [
+            'chromeos/touch_exploration_controller_unittest.cc'
           ],
           'sources!': [
             'base/dragdrop/os_exchange_data_provider_aurax11_unittest.cc',

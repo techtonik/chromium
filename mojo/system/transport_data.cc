@@ -46,9 +46,8 @@ struct TransportData::PrivateStructForCompileAsserts {
                  sizeof_MessageInTransit_HandleTableEntry_invalid);
 };
 
-TransportData::TransportData(
-    scoped_ptr<std::vector<scoped_refptr<Dispatcher> > > dispatchers,
-    Channel* channel)
+TransportData::TransportData(scoped_ptr<DispatcherVector> dispatchers,
+                             Channel* channel)
     : buffer_size_(0) {
   DCHECK(dispatchers);
   DCHECK(channel);
@@ -107,6 +106,7 @@ TransportData::TransportData(
   Header* header = reinterpret_cast<Header*>(buffer_.get());
   header->num_handles = static_cast<uint32_t>(num_handles);
   // TODO(vtl): platform_handle_table_offset and num_platform_handles
+  // (Okay to not set |unused| since we cleared the entire buffer.)
 
   HandleTableEntry* handle_table = reinterpret_cast<HandleTableEntry*>(
       buffer_.get() + handle_table_start_offset);
@@ -132,6 +132,7 @@ TransportData::TransportData(
       handle_table[i].type = static_cast<int32_t>(dispatcher->GetType());
       handle_table[i].offset = static_cast<uint32_t>(current_offset);
       handle_table[i].size = static_cast<uint32_t>(actual_size);
+      // (Okay to not set |unused| since we cleared the entire buffer.)
 
 #if DCHECK_IS_ON
       DCHECK_LE(actual_size, all_max_sizes[i]);
@@ -219,18 +220,17 @@ const char* TransportData::ValidateBuffer(const void* buffer,
 }
 
 // static
-scoped_ptr<std::vector<scoped_refptr<Dispatcher> > >
-    TransportData::DeserializeDispatchersFromBuffer(const void* buffer,
-                                                    size_t buffer_size,
-                                                    Channel* channel) {
+scoped_ptr<DispatcherVector> TransportData::DeserializeDispatchersFromBuffer(
+    const void* buffer,
+    size_t buffer_size,
+    Channel* channel) {
   DCHECK(buffer);
   DCHECK_GT(buffer_size, 0u);
   DCHECK(channel);
 
   const Header* header = static_cast<const Header*>(buffer);
   const size_t num_handles = header->num_handles;
-  scoped_ptr<std::vector<scoped_refptr<Dispatcher> > > dispatchers(
-      new std::vector<scoped_refptr<Dispatcher> >(num_handles));
+  scoped_ptr<DispatcherVector> dispatchers(new DispatcherVector(num_handles));
 
   const HandleTableEntry* handle_table =
       reinterpret_cast<const HandleTableEntry*>(

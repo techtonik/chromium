@@ -37,8 +37,8 @@ TestInterfaces::TestInterfaces()
     , m_delegate(0)
 {
     blink::setLayoutTestMode(true);
-    if (CommandLine::ForCurrentProcess()->HasSwitch(switches::kEnableFontSmoothing))
-        blink::setFontSmoothingEnabledForTest(true);
+    if (CommandLine::ForCurrentProcess()->HasSwitch(switches::kEnableFontAntialiasing))
+        blink::setFontAntialiasingEnabledForTest(true);
 
     // NOTE: please don't put feature specific enable flags here,
     // instead add them to RuntimeEnabledFeatures.in

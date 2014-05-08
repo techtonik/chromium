@@ -608,6 +608,8 @@ bool RenderFrameImpl::Send(IPC::Message* message) {
 }
 
 bool RenderFrameImpl::OnMessageReceived(const IPC::Message& msg) {
+  GetContentClient()->SetActiveURL(frame_->document().url());
+
   ObserverListBase<RenderFrameObserver>::Iterator it(observers_);
   RenderFrameObserver* observer;
   while ((observer = it.GetNext()) != NULL) {
@@ -658,7 +660,8 @@ bool RenderFrameImpl::OnMessageReceived(const IPC::Message& msg) {
   if (!msg_is_ok) {
     // The message had a handler, but its deserialization failed.
     // Kill the renderer to avoid potential spoofing attacks.
-    CHECK(false) << "Unable to deserialize message in RenderFrameImpl.";
+    int id = msg.type();
+    CHECK(false) << "Unable to deserialize " << id << " in RenderFrameImpl.";
   }
 
   return handled;
@@ -2014,10 +2017,8 @@ void RenderFrameImpl::didFinishDocumentLoad(blink::WebLocalFrame* frame) {
 
 void RenderFrameImpl::didHandleOnloadEvents(blink::WebLocalFrame* frame) {
   DCHECK(!frame_ || frame_ == frame);
-  if (!frame->parent()) {
-    Send(new FrameHostMsg_DocumentOnLoadCompleted(routing_id_,
-                                                  render_view_->page_id_));
-  }
+  if (!frame->parent())
+    Send(new FrameHostMsg_DocumentOnLoadCompleted(routing_id_));
 }
 
 void RenderFrameImpl::didFailLoad(blink::WebLocalFrame* frame,

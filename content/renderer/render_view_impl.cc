@@ -473,11 +473,6 @@ static bool ShouldUseAcceleratedFixedRootBackground(float device_scale_factor) {
   return DeviceScaleEnsuresTextQuality(device_scale_factor);
 }
 
-static bool ShouldUseCompositingForGpuRasterizationHint() {
-  return RenderThreadImpl::current() &&
-         RenderThreadImpl::current()->is_gpu_rasterization_enabled();
-}
-
 static FaviconURL::IconType ToFaviconType(blink::WebIconURL::Type type) {
   switch (type) {
     case blink::WebIconURL::TypeFavicon:
@@ -751,9 +746,6 @@ void RenderViewImpl::Initialize(RenderViewImplParams* params) {
       ShouldUseAcceleratedFixedRootBackground(device_scale_factor_));
   webview()->settings()->setCompositedScrollingForFramesEnabled(
       ShouldUseCompositedScrollingForFrames(device_scale_factor_));
-  webview()->settings()
-      ->setAcceleratedCompositingForGpuRasterizationHintEnabled(
-          ShouldUseCompositingForGpuRasterizationHint());
 
   ApplyWebPreferences(webkit_preferences_, webview());
 
@@ -3250,8 +3242,7 @@ void RenderViewImpl::DidFlushPaint() {
     if (data->did_first_visually_non_empty_layout() &&
         !data->did_first_visually_non_empty_paint()) {
       data->set_did_first_visually_non_empty_paint(true);
-      Send(new ViewHostMsg_DidFirstVisuallyNonEmptyPaint(routing_id_,
-                                                         page_id_));
+      Send(new ViewHostMsg_DidFirstVisuallyNonEmptyPaint(routing_id_));
     }
 
     // TODO(jar): The following code should all be inside a method, probably in
@@ -4038,10 +4029,10 @@ bool RenderViewImpl::didTapMultipleTargets(
         canvas.translate(-zoom_rect.x() * device_scale_factor_,
                          -zoom_rect.y() * device_scale_factor_);
 
-        webwidget_->paint(
-            &canvas,
-            zoom_rect,
-            WebWidget::ForceSoftwareRenderingAndIgnoreGPUResidentContent);
+        DCHECK(webwidget_->isAcceleratedCompositingActive());
+        // TODO(aelias): The disambiguation popup should be composited so we
+        // don't have to call this method.
+        webwidget_->paintCompositedDeprecated(&canvas, zoom_rect);
       }
 
       gfx::Rect physical_window_zoom_rect = gfx::ToEnclosingRect(
@@ -4131,7 +4122,7 @@ void RenderViewImpl::DidCommitCompositorFrame() {
 
 void RenderViewImpl::SendUpdateFaviconURL(const std::vector<FaviconURL>& urls) {
   if (!urls.empty())
-    Send(new ViewHostMsg_UpdateFaviconURL(routing_id_, page_id_, urls));
+    Send(new ViewHostMsg_UpdateFaviconURL(routing_id_, urls));
 }
 
 void RenderViewImpl::DidStopLoadingIcons() {
