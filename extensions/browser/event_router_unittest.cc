@@ -68,8 +68,11 @@ TEST_F(EventRouterTest, GetBaseEventName) {
 // Tests adding and removing observers from EventRouter.
 TEST_F(EventRouterTest, EventRouterObserver) {
   EventRouter router(NULL, NULL);
-  EventListener listener(
-      "event_name", "extension_id", NULL, scoped_ptr<base::DictionaryValue>());
+  EventListener listener("event_name",
+                         "extension_id",
+                         NULL,
+                         NULL,
+                         scoped_ptr<base::DictionaryValue>());
 
   // Add/remove works without any observers.
   router.OnListenerAdded(&listener);
@@ -106,6 +109,7 @@ TEST_F(EventRouterTest, EventRouterObserver) {
   matching_observer.Reset();
   EventListener sub_event_listener("event_name/1",
                                    "extension_id",
+                                   NULL,
                                    NULL,
                                    scoped_ptr<base::DictionaryValue>());
   router.OnListenerAdded(&sub_event_listener);
