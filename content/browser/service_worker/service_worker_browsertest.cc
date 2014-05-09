@@ -19,6 +19,7 @@
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/render_process_host.h"
+#include "content/public/browser/service_worker_host.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_switches.h"
@@ -543,6 +544,14 @@ class ServiceWorkerBlackBoxBrowserTest : public ServiceWorkerBrowserTest {
  public:
   typedef ServiceWorkerBlackBoxBrowserTest self;
 
+  static void ExpectServiceWorkerHostAndRun(
+      bool expected,
+      const base::Closure& continuation,
+      scoped_ptr<ServiceWorkerHost> actual) {
+    EXPECT_EQ(expected, !!actual.get());
+    continuation.Run();
+  }
+
   static void ExpectResultAndRun(bool expected,
                                  const base::Closure& continuation,
                                  bool actual) {
@@ -603,9 +612,11 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
     public_context()->RegisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL(kWorkerUrl),
-        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
-                   true,
-                   run_loop.QuitClosure()));
+        NULL,
+        base::Bind(
+            &ServiceWorkerBlackBoxBrowserTest::ExpectServiceWorkerHostAndRun,
+            true,
+            run_loop.QuitClosure()));
     run_loop.Run();
   }
 
@@ -616,9 +627,11 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
     public_context()->RegisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL(kWorkerUrl),
-        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
-                   true,
-                   run_loop.QuitClosure()));
+        NULL,
+        base::Bind(
+            &ServiceWorkerBlackBoxBrowserTest::ExpectServiceWorkerHostAndRun,
+            true,
+            run_loop.QuitClosure()));
     run_loop.Run();
   }
 
