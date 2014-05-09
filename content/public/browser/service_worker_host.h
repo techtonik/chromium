@@ -22,7 +22,7 @@ class ServiceWorkerHostImpl;
 // is no longer interested in listening, RemoveListner and drop ref.
 class ServiceWorkerHost : public IPC::Sender {
  public:
-  virtual ~ServiceWorkerHost() {};
+  virtual ~ServiceWorkerHost() = 0;
 
   // Identifying attributes.
   virtual const GURL& scope() = 0;
@@ -37,12 +37,10 @@ class ServiceWorkerHost : public IPC::Sender {
   // (Some messages may be dropped during version transitions.)
   // TODO: michaeln added above comment - until I get into implementation I'm
   // not certain why we aren't able to queue up messages and ensure delivery.
-  virtual bool Send(IPC::Message* msg) OVERRIDE;
+  //virtual bool Send(IPC::Message* msg) OVERRIDE;
 
  private:
   friend ServiceWorkerHostImpl;
-  ServiceWorkerHost() {};
-  DISALLOW_COPY_AND_ASSIGN(ServiceWorkerHost);
 };
 
 }  // namespace content

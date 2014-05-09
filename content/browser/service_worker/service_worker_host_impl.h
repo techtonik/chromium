@@ -8,6 +8,7 @@
 #include "content/public/browser/service_worker_host.h"
 
 #include "base/memory/weak_ptr.h"
+#include "content/common/content_export.h"
 
 namespace content {
 
@@ -16,7 +17,7 @@ class ServiceWorkerContextCore;
 // Interface to communicate with service workers from any thread. Abstracts the
 // lifetime and active version for calling code; call Send and the messages
 // will be queued as needed and sent to the active service worker.
-class ServiceWorkerHostImpl : public ServiceWorkerHost {
+class CONTENT_EXPORT ServiceWorkerHostImpl : NON_EXPORTED_BASE(public ServiceWorkerHost) {
  public:
   ServiceWorkerHostImpl(const GURL& scope,
                         ServiceWorkerContextCore* context_core,

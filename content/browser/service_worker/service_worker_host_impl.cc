@@ -49,7 +49,6 @@ ServiceWorkerHostImpl::ServiceWorkerHostImpl(
     ServiceWorkerContextCore* context_core,
     ServiceWorkerHostClient* client)
     : scope_(scope), context_core_(context_core), client_(client) {
-  NOTIMPLEMENTED();
   //
   //
   // TODO: Register the client and implement interface.
@@ -74,7 +73,12 @@ const GURL& ServiceWorkerHostImpl::script() {
 }
 
 bool ServiceWorkerHostImpl::HasActiveVersion() {
-  NOTIMPLEMENTED();  // TODO
+  //
+  //
+  // TODO
+  //
+  //
+  NOTIMPLEMENTED();
   return false;
 }
 

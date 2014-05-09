@@ -594,6 +594,7 @@ class ServiceWorkerBlackBoxBrowserTest : public ServiceWorkerBrowserTest {
 
 IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
   const std::string kWorkerUrl = "/service_worker/fetch_event.js";
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
 
   // Unregistering nothing should return true.
   {
@@ -605,6 +606,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
                    run_loop.QuitClosure()));
     run_loop.Run();
   }
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
 
   // Register returns when the promise would be resolved.
   {
@@ -619,6 +621,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
             run_loop.QuitClosure()));
     run_loop.Run();
   }
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
 
   // Registering again should succeed, although the algo still
   // might not be complete.
@@ -634,6 +637,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
             run_loop.QuitClosure()));
     run_loop.Run();
   }
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
 
   // The registration algo might not be far enough along to have
   // stored the registration data, so it may not be findable
@@ -649,6 +653,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
                    run_loop.QuitClosure()));
     run_loop.Run();
   }
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
 
   // Should not be able to find it.
   {
@@ -662,6 +667,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
                    &script_url));
     EXPECT_EQ(SERVICE_WORKER_ERROR_NOT_FOUND, status);
   }
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
 }
 
 }  // namespace content
