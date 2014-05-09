@@ -124,15 +124,24 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
   }
 
   context()->UnregisterServiceWorker(
-      scope,
-      base::Bind(&PostResultToUIFromStatusOnIO, callback));
+      scope, base::Bind(&PostResultToUIFromStatusOnIO, callback));
 }
 
 void ServiceWorkerContextWrapper::GetServiceWorkerHost(
     const Scope& scope,
     ServiceWorkerHostClient* client,
     const ServiceWorkerHostCallback& callback) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
+    BrowserThread::PostTask(
+        BrowserThread::IO,
+        FROM_HERE,
+        base::Bind(&ServiceWorkerContextWrapper::GetServiceWorkerHost,
+                   this,
+                   scope,
+                   client,
+                   callback));
+    return;
+  }
   callback.Run(scoped_ptr<ServiceWorkerHost>(
       new ServiceWorkerHostImpl(scope, context(), client)));
 }
