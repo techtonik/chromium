@@ -6,8 +6,6 @@
 
 #include <algorithm>
 
-#include "base/debug/stack_trace.h"
-
 #include "base/bind.h"
 #include "base/compiler_specific.h"
 #include "base/debug/alias.h"
@@ -135,8 +133,6 @@ MessageLoop::MessageLoop(Type type)
 #endif  // OS_WIN
       message_histogram_(NULL),
       run_loop_(NULL) {
-  fprintf(stderr, "\n%s:%s:%d %p\n", __FILE__, __FUNCTION__, __LINE__, this);
-  base::debug::StackTrace().Print();
   Init();
 
   pump_ = CreateMessagePumpForType(type).Pass();

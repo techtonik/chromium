@@ -131,17 +131,6 @@ void ServiceWorkerContextWrapper::GetServiceWorkerHost(
     const Scope& scope,
     ServiceWorkerHostClient* client,
     const ServiceWorkerHostCallback& callback) {
-  if (!BrowserThread::CurrentlyOn(BrowserThread::UI)) {
-    BrowserThread::PostTask(
-        BrowserThread::IO,
-        FROM_HERE,
-        base::Bind(&ServiceWorkerContextWrapper::GetServiceWorkerHost,
-                   this,
-                   scope,
-                   client,
-                   callback));
-    return;
-  }
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   callback.Run(scoped_ptr<ServiceWorkerHost>(
       new ServiceWorkerHostImpl(scope, this, client)));
