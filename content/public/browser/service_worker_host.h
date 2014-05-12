@@ -22,25 +22,25 @@ class ServiceWorkerHostImpl;
 // is no longer interested in listening, RemoveListner and drop ref.
 class ServiceWorkerHost : public IPC::Sender {
  public:
-  virtual ~ServiceWorkerHost() = 0;
-
-  // Identifying attributes.
-  virtual const GURL& scope() = 0;
-  virtual const GURL& script() = 0;
-
-  // True when a version is installed and activated.
-  virtual bool HasActiveVersion() = 0;
-
-  // IPC::Sender interface:
-  // Sends a message to the version farthest along in in the install flow,
-  // typically the current active version.
-  // (Some messages may be dropped during version transitions.)
-  // TODO: michaeln added above comment - until I get into implementation I'm
-  // not certain why we aren't able to queue up messages and ensure delivery.
-  //virtual bool Send(IPC::Message* msg) OVERRIDE;
-
- private:
-  friend ServiceWorkerHostImpl;
+// virtual ~ServiceWorkerHost() = 0;
+//
+// // Identifying attributes.
+// virtual const GURL& scope() = 0;
+// virtual const GURL& script() = 0;
+//
+// // True when a version is installed and activated.
+// virtual bool HasActiveVersion() = 0;
+//
+// // IPC::Sender interface:
+// // Sends a message to the version farthest along in in the install flow,
+// // typically the current active version.
+// // (Some messages may be dropped during version transitions.)
+// // TODO: michaeln added above comment - until I get into implementation I'm
+// // not certain why we aren't able to queue up messages and ensure delivery.
+// //virtual bool Send(IPC::Message* msg) OVERRIDE;
+//
+//private:
+// friend ServiceWorkerHostImpl;
 };
 
 }  // namespace content

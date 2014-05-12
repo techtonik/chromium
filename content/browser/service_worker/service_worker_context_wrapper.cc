@@ -143,7 +143,8 @@ void ServiceWorkerContextWrapper::GetServiceWorkerHost(
     return;
   }
   callback.Run(scoped_ptr<ServiceWorkerHost>(
-      new ServiceWorkerHostImpl(scope, context(), client)));
+      new ServiceWorkerHostImpl()));
+//      new ServiceWorkerHostImpl(scope, context(), client)));
 }
 
 void ServiceWorkerContextWrapper::AddObserver(
