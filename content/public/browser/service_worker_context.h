@@ -51,8 +51,9 @@ class ServiceWorkerContext {
   // Equivalent to calling navigator.serviceWorker.unregister(pattern) from a
   // renderer, except that |pattern| is an absolute URL instead of relative to
   // some current origin.
-  // 
-  // |callback| is passed true when the JS promise is fulfilled or false when the JS promise is rejected.  |callback| is run on UI thread.
+  //
+  // |callback| is passed true when the JS promise is fulfilled or false when
+  // the JS promise is rejected.  |callback| is run on UI thread.
   //
   // Unregistration can fail if:
   //  * No Service Worker was registered for |pattern|.

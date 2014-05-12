@@ -36,6 +36,11 @@ void OnRegistrationFoundSendMessage(
 void SendOnIO(scoped_refptr<ServiceWorkerContextWrapper> context_wrapper,
               const GURL scope,
               IPC::Message* message) {
+  //
+  //
+  // TODO: Optimize by keeping a reference to Registration.
+  //
+  //
   context_wrapper->context()->storage()->FindRegistrationForPattern(
       scope, base::Bind(&OnRegistrationFoundSendMessage, message));
 }
@@ -83,9 +88,10 @@ bool ServiceWorkerHostImpl::HasActiveVersion() {
 
 bool ServiceWorkerHostImpl::Send(IPC::Message* message) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  BrowserThread::PostTask(BrowserThread::IO,
-                          FROM_HERE,
-                          base::Bind(SendOnIO, context_wrapper_, scope_, message));
+  BrowserThread::PostTask(
+      BrowserThread::IO,
+      FROM_HERE,
+      base::Bind(SendOnIO, context_wrapper_, scope_, message));
   return true;
 }
 

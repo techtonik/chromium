@@ -19,9 +19,10 @@ class ServiceWorkerContextWrapper;
 // will be queued as needed and sent to the active service worker.
 class ServiceWorkerHostImpl : public ServiceWorkerHost {
  public:
-  ServiceWorkerHostImpl(const GURL& scope,
-                        scoped_refptr<ServiceWorkerContextWrapper> context_wrapper,
-                        ServiceWorkerHostClient* client);
+  ServiceWorkerHostImpl(
+      const GURL& scope,
+      scoped_refptr<ServiceWorkerContextWrapper> context_wrapper,
+      ServiceWorkerHostClient* client);
 
   // ServiceWorkerHost implementation:
   virtual const GURL& scope() OVERRIDE;
