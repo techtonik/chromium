@@ -22,8 +22,8 @@ class ServiceWorkerHostImpl;
 // is no longer interested in listening, RemoveListner and drop ref.
 class ServiceWorkerHost : public IPC::Sender {
  public:
-// virtual ~ServiceWorkerHost() = 0;
-//
+  virtual ~ServiceWorkerHost() {};
+
 // // Identifying attributes.
 // virtual const GURL& scope() = 0;
 // virtual const GURL& script() = 0;
