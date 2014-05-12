@@ -31,14 +31,14 @@ class ServiceWorkerHost : public IPC::Sender {
 // // True when a version is installed and activated.
 // virtual bool HasActiveVersion() = 0;
 //
-// // IPC::Sender interface:
-// // Sends a message to the version farthest along in in the install flow,
-// // typically the current active version.
-// // (Some messages may be dropped during version transitions.)
-// // TODO: michaeln added above comment - until I get into implementation I'm
-// // not certain why we aren't able to queue up messages and ensure delivery.
-// //virtual bool Send(IPC::Message* msg) OVERRIDE;
-//
+  // IPC::Sender interface:
+  // Sends a message to the version farthest along in in the install flow,
+  // typically the current active version.
+  // (Some messages may be dropped during version transitions.)
+  // TODO: michaeln added above comment - until I get into implementation I'm
+  // not certain why we aren't able to queue up messages and ensure delivery.
+  virtual bool Send(IPC::Message* msg) OVERRIDE = 0;
+
  private:
   friend ServiceWorkerHostImpl;
   ServiceWorkerHost() {};
