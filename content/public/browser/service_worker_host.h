@@ -24,13 +24,13 @@ class ServiceWorkerHost : public IPC::Sender {
  public:
   virtual ~ServiceWorkerHost() {};
 
-// // Identifying attributes.
-// virtual const GURL& scope() = 0;
-// virtual const GURL& script() = 0;
-//
-// // True when a version is installed and activated.
-// virtual bool HasActiveVersion() = 0;
-//
+  // Identifying attributes.
+  virtual const GURL& scope() = 0;
+  virtual const GURL& script() = 0;
+
+  // True when a version is installed and activated.
+  virtual bool HasActiveVersion() = 0;
+
   // IPC::Sender interface:
   // Sends a message to the version farthest along in in the install flow,
   // typically the current active version.

@@ -19,29 +19,28 @@ class ServiceWorkerContextCore;
 // will be queued as needed and sent to the active service worker.
 class CONTENT_EXPORT ServiceWorkerHostImpl : NON_EXPORTED_BASE(public ServiceWorkerHost) {
  public:
-   ServiceWorkerHostImpl(const GURL& scope,
-                         ServiceWorkerContextCore* context_core,
-                         ServiceWorkerHostClient* client);
+  ServiceWorkerHostImpl(const GURL& scope,
+                        ServiceWorkerContextCore* context_core,
+                        ServiceWorkerHostClient* client);
 
-// // ServiceWorkerHost implementation:
-// virtual const GURL& scope() OVERRIDE;
-// virtual const GURL& script() OVERRIDE;
-// virtual bool HasActiveVersion() OVERRIDE;
-//
-// // IPC::Sender implementation.
- virtual bool Send(IPC::Message* msg) OVERRIDE;
+  // ServiceWorkerHost implementation:
+  virtual const GURL& scope() OVERRIDE;
+  virtual const GURL& script() OVERRIDE;
+  virtual bool HasActiveVersion() OVERRIDE;
+
+  // IPC::Sender implementation.
+  virtual bool Send(IPC::Message* msg) OVERRIDE;
 
  private:
   virtual ~ServiceWorkerHostImpl();
-//
-// // The core context is only for use on the IO thread.
-// ServiceWorkerContextCore* context();
-//
- const GURL scope_;
-// const GURL script_;  // TODO: implement this existing.
- ServiceWorkerContextCore* context_core_;
- ServiceWorkerHostClient* client_;
-//     ALLOW_UNUSED;  // TODO: remove macro once used
+
+  // The core context is only for use on the IO thread.
+  ServiceWorkerContextCore* context();
+
+  const GURL scope_;
+  const GURL script_;  // TODO: implement this existing.
+  ServiceWorkerContextCore* context_core_;
+  ServiceWorkerHostClient* client_ ALLOW_UNUSED;  // TODO: use.
 };
 
 }  // namespace content
