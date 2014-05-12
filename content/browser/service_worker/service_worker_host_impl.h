@@ -12,7 +12,7 @@
 
 namespace content {
 
-class ServiceWorkerContextCore;
+class ServiceWorkerContextWrapper;
 
 // Interface to communicate with service workers from any thread. Abstracts the
 // lifetime and active version for calling code; call Send and the messages
@@ -20,7 +20,7 @@ class ServiceWorkerContextCore;
 class ServiceWorkerHostImpl : public ServiceWorkerHost {
  public:
   ServiceWorkerHostImpl(const GURL& scope,
-                        ServiceWorkerContextCore* context_core,
+                        scoped_refptr<ServiceWorkerContextWrapper> context_wrapper,
                         ServiceWorkerHostClient* client);
 
   // ServiceWorkerHost implementation:
@@ -34,12 +34,9 @@ class ServiceWorkerHostImpl : public ServiceWorkerHost {
  private:
   virtual ~ServiceWorkerHostImpl();
 
-  // The core context is only for use on the IO thread.
-  ServiceWorkerContextCore* context();
-
   const GURL scope_;
   const GURL script_;  // TODO: implement this existing.
-  ServiceWorkerContextCore* context_core_;
+  scoped_refptr<ServiceWorkerContextWrapper> context_wrapper_;
   ServiceWorkerHostClient* client_ ALLOW_UNUSED;  // TODO: use.
 };
 
