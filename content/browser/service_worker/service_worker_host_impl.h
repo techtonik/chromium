@@ -17,7 +17,7 @@ class ServiceWorkerContextCore;
 // Interface to communicate with service workers from any thread. Abstracts the
 // lifetime and active version for calling code; call Send and the messages
 // will be queued as needed and sent to the active service worker.
-class CONTENT_EXPORT ServiceWorkerHostImpl : NON_EXPORTED_BASE(public ServiceWorkerHost) {
+class ServiceWorkerHostImpl : public ServiceWorkerHost {
  public:
   ServiceWorkerHostImpl(const GURL& scope,
                         ServiceWorkerContextCore* context_core,
