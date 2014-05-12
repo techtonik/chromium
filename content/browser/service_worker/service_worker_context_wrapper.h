@@ -37,8 +37,6 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
     : NON_EXPORTED_BASE(public ServiceWorkerContext),
       public base::RefCountedThreadSafe<ServiceWorkerContextWrapper> {
  public:
-  typedef base::Callback<void(base::WeakPtr<ServiceWorkerContextCore>)> ServiceWorkerContextCoreCallback;
-
   ServiceWorkerContextWrapper(BrowserContext* browser_context);
 
   // Init and Shutdown are for use on the UI thread when the profile,
