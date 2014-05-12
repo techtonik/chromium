@@ -39,8 +39,10 @@ class ServiceWorkerHost : public IPC::Sender {
 // // not certain why we aren't able to queue up messages and ensure delivery.
 // //virtual bool Send(IPC::Message* msg) OVERRIDE;
 //
-//private:
-// friend ServiceWorkerHostImpl;
+ private:
+  friend ServiceWorkerHostImpl;
+  ServiceWorkerHost() {};
+  DISALLOW_COPY_AND_ASSIGN(ServiceWorkerHost);
 };
 
 }  // namespace content

@@ -43,27 +43,29 @@ using content::ServiceWorkerVersion;
 }  // namespace
 
 namespace content {
-//
-//ServiceWorkerHostImpl::ServiceWorkerHostImpl(
-//    const GURL& scope,
-//    ServiceWorkerContextCore* context_core,
-//    ServiceWorkerHostClient* client)
-//    : scope_(scope), context_core_(context_core), client_(client) {
-//  //
-//  //
-//  // TODO: Register the client and implement interface.
-//  //
-//  //
-//}
-//
-//ServiceWorkerHostImpl::~ServiceWorkerHostImpl() {
-//  //
-//  //
-//  // TODO: Disconnect client from wherever we've registered it
-//  //
-//  //
-//}
-//
+
+ServiceWorkerHostImpl::ServiceWorkerHostImpl(
+    const GURL& scope,
+    ServiceWorkerContextCore* context_core,
+    ServiceWorkerHostClient* client)
+    : scope_(scope), context_core_(context_core), client_(client) {
+  DCHECK(context_core_);
+  DCHECK(client_);
+  //
+  //
+  // TODO: Register the client and implement interface.
+  //
+  //
+}
+
+ServiceWorkerHostImpl::~ServiceWorkerHostImpl() {
+  //
+  //
+  // TODO: Disconnect client from wherever we've registered it
+  //
+  //
+}
+
 //const GURL& ServiceWorkerHostImpl::scope() {
 //  return scope_;
 //}
