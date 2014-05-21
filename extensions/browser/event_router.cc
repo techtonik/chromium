@@ -311,7 +311,7 @@ void EventRouter::RemoveFilteredEventListener(
     bool remove_lazy_listener) {
   //
   //
-  // TODO Enable service worker listeners.
+  // TODO Enable service worker listeners by taking service worker input param.
   //
   //
   EventListener listener(event_name,

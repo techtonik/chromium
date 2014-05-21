@@ -58,13 +58,8 @@ bool EventListener::IsLazy() const {
 }
 
 void EventListener::MakeLazy() {
-  //
-  //
-  // TODO: Solve this for service workers. This method is used only for
-  // a higher level task of clearing listeners.
-  //
-  //
   process_ = NULL;
+  service_worker_ = NULL;
 }
 
 content::BrowserContext* EventListener::GetBrowserContext() const {
