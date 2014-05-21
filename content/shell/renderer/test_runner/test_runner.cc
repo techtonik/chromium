@@ -12,8 +12,8 @@
 #include "content/shell/renderer/test_runner/TestInterfaces.h"
 #include "content/shell/renderer/test_runner/WebPermissions.h"
 #include "content/shell/renderer/test_runner/WebTestDelegate.h"
-#include "content/shell/renderer/test_runner/WebTestProxy.h"
 #include "content/shell/renderer/test_runner/notification_presenter.h"
+#include "content/shell/renderer/test_runner/web_test_proxy.h"
 #include "gin/arguments.h"
 #include "gin/array_buffer.h"
 #include "gin/handle.h"
@@ -119,6 +119,7 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
   virtual gin::ObjectTemplateBuilder GetObjectTemplateBuilder(
       v8::Isolate* isolate) OVERRIDE;
 
+  void LogToStderr(const std::string& output);
   void NotifyDone();
   void WaitUntilDone();
   void QueueBackNavigation(int how_far_back);
@@ -228,6 +229,8 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
   void SetWindowIsKey(bool value);
   std::string PathToLocalResource(const std::string& path);
   void SetBackingScaleFactor(double value, v8::Handle<v8::Function> callback);
+  void SetColorProfile(const std::string& name,
+                       v8::Handle<v8::Function> callback);
   void SetPOSIXLocale(const std::string& locale);
   void SetMIDIAccessorResult(bool result);
   void SetMIDISysexPermission(bool value);
@@ -293,6 +296,7 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
     v8::Isolate* isolate) {
   return gin::Wrappable<TestRunnerBindings>::GetObjectTemplateBuilder(isolate)
       // Methods controlling test execution.
+      .SetMethod("logToStderr", &TestRunnerBindings::LogToStderr)
       .SetMethod("notifyDone", &TestRunnerBindings::NotifyDone)
       .SetMethod("waitUntilDone", &TestRunnerBindings::WaitUntilDone)
       .SetMethod("queueBackNavigation",
@@ -450,6 +454,8 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::PathToLocalResource)
       .SetMethod("setBackingScaleFactor",
                  &TestRunnerBindings::SetBackingScaleFactor)
+      .SetMethod("setColorProfile",
+                 &TestRunnerBindings::SetColorProfile)
       .SetMethod("setPOSIXLocale", &TestRunnerBindings::SetPOSIXLocale)
       .SetMethod("setMIDIAccessorResult",
                  &TestRunnerBindings::SetMIDIAccessorResult)
@@ -522,6 +528,10 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
       // Used at fast/dom/assign-to-window-status.html
       .SetMethod("dumpStatusCallbacks",
                  &TestRunnerBindings::DumpWindowStatusChanges);
+}
+
+void TestRunnerBindings::LogToStderr(const std::string& output) {
+  LOG(ERROR) << output;
 }
 
 void TestRunnerBindings::NotifyDone() {
@@ -1146,6 +1156,12 @@ void TestRunnerBindings::SetBackingScaleFactor(
     runner_->SetBackingScaleFactor(value, callback);
 }
 
+void TestRunnerBindings::SetColorProfile(
+    const std::string& name, v8::Handle<v8::Function> callback) {
+  if (runner_)
+    runner_->SetColorProfile(name, callback);
+}
+
 void TestRunnerBindings::SetPOSIXLocale(const std::string& locale) {
   if (runner_)
     runner_->SetPOSIXLocale(locale);
@@ -1413,12 +1429,14 @@ void TestRunner::Reset() {
   if (delegate_) {
     // Reset the default quota for each origin to 5MB
     delegate_->setDatabaseQuota(5 * 1024 * 1024);
+    delegate_->setDeviceColorProfile("sRGB");
     delegate_->setDeviceScaleFactor(1);
     delegate_->setAcceptAllCookies(false);
     delegate_->setLocale("");
     delegate_->useUnfortunateSynchronousResizeMode(false);
     delegate_->disableAutoResizeMode(WebSize());
     delegate_->deleteAllCookies();
+    delegate_->resetScreenOrientation();
   }
 
   dump_editting_callbacks_ = false;
@@ -1746,7 +1764,7 @@ void TestRunner::NotifyDone() {
     return;
 
   // Test didn't timeout. Kill the timeout timer.
-  taskList()->revokeAll();
+  task_list_.revokeAll();
 
   CompleteNotifyDone();
 }
@@ -2461,7 +2479,7 @@ void TestRunner::CloseWebInspector() {
 }
 
 bool TestRunner::IsChooserShown() {
-  return proxy_->isChooserShown();
+  return proxy_->IsChooserShown();
 }
 
 void TestRunner::EvaluateInWebInspector(int call_id,
@@ -2492,7 +2510,12 @@ std::string TestRunner::PathToLocalResource(const std::string& path) {
 void TestRunner::SetBackingScaleFactor(double value,
                                        v8::Handle<v8::Function> callback) {
   delegate_->setDeviceScaleFactor(value);
-  proxy_->discardBackingStore();
+  delegate_->postTask(new InvokeCallbackTask(this, callback));
+}
+
+void TestRunner::SetColorProfile(const std::string& name,
+                                 v8::Handle<v8::Function> callback) {
+  delegate_->setDeviceColorProfile(name);
   delegate_->postTask(new InvokeCallbackTask(this, callback));
 }
 
@@ -2508,7 +2531,7 @@ void TestRunner::SetMIDISysexPermission(bool value) {
   const std::vector<WebTestProxyBase*>& windowList =
       test_interfaces_->windowList();
   for (unsigned i = 0; i < windowList.size(); ++i)
-    windowList.at(i)->midiClientMock()->setSysexPermission(value);
+    windowList.at(i)->GetMIDIClientMock()->setSysexPermission(value);
 }
 
 void TestRunner::GrantWebNotificationPermission(const std::string& origin,
@@ -2522,18 +2545,18 @@ bool TestRunner::SimulateWebNotificationClick(const std::string& value) {
 
 void TestRunner::AddMockSpeechRecognitionResult(const std::string& transcript,
                                                 double confidence) {
-  proxy_->speechRecognizerMock()->addMockResult(
+  proxy_->GetSpeechRecognizerMock()->addMockResult(
       WebString::fromUTF8(transcript), confidence);
 }
 
 void TestRunner::SetMockSpeechRecognitionError(const std::string& error,
                                                const std::string& message) {
-  proxy_->speechRecognizerMock()->setError(WebString::fromUTF8(error),
+  proxy_->GetSpeechRecognizerMock()->setError(WebString::fromUTF8(error),
                                            WebString::fromUTF8(message));
 }
 
 bool TestRunner::WasMockSpeechRecognitionAborted() {
-  return proxy_->speechRecognizerMock()->wasAborted();
+  return proxy_->GetSpeechRecognizerMock()->wasAborted();
 }
 
 void TestRunner::AddWebPageOverlay() {
@@ -2552,13 +2575,13 @@ void TestRunner::RemoveWebPageOverlay() {
 }
 
 void TestRunner::DisplayAsync() {
-  proxy_->displayAsyncThen(base::Closure());
+  proxy_->DisplayAsyncThen(base::Closure());
 }
 
 void TestRunner::DisplayAsyncThen(v8::Handle<v8::Function> callback) {
   scoped_ptr<InvokeCallbackTask> task(
       new InvokeCallbackTask(this, callback));
-  proxy_->displayAsyncThen(base::Bind(&TestRunner::InvokeCallback,
+  proxy_->DisplayAsyncThen(base::Bind(&TestRunner::InvokeCallback,
                                       base::Unretained(this),
                                       base::Passed(&task)));
 }

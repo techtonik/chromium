@@ -151,6 +151,8 @@ scoped_ptr<RenderWidgetCompositor> RenderWidgetCompositor::Create(
         render_thread->is_gpu_rasterization_enabled();
     settings.create_low_res_tiling = render_thread->is_low_res_tiling_enabled();
     settings.can_use_lcd_text = render_thread->is_lcd_text_enabled();
+    settings.use_distance_field_text =
+        render_thread->is_distance_field_text_enabled();
     settings.use_zero_copy = render_thread->is_zero_copy_enabled();
     settings.use_one_copy = render_thread->is_one_copy_enabled();
   }
@@ -353,10 +355,6 @@ void RenderWidgetCompositor::UpdateAnimations(base::TimeTicks time) {
   layer_tree_host_->UpdateClientAnimations(time);
 }
 
-void RenderWidgetCompositor::Composite(base::TimeTicks frame_begin_time) {
-  layer_tree_host_->Composite(frame_begin_time);
-}
-
 void RenderWidgetCompositor::SetNeedsDisplayOnAllLayers() {
   layer_tree_host_->SetNeedsDisplayOnAllLayers();
 }
@@ -555,12 +553,6 @@ void RenderWidgetCompositor::clearViewportLayers() {
   layer_tree_host_->RegisterViewportLayers(scoped_refptr<cc::Layer>(),
                                            scoped_refptr<cc::Layer>(),
                                            scoped_refptr<cc::Layer>());
-}
-
-bool RenderWidgetCompositor::compositeAndReadback(
-    void *pixels, const WebRect& rect_in_device_viewport) {
-  return layer_tree_host_->CompositeAndReadback(pixels,
-                                                rect_in_device_viewport);
 }
 
 void CompositeAndReadbackAsyncCallback(

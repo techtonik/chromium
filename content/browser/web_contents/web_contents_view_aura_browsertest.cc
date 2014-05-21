@@ -267,17 +267,14 @@ class WebContentsViewAuraTest : public ContentBrowserTest {
   DISALLOW_COPY_AND_ASSIGN(WebContentsViewAuraTest);
 };
 
-// Flaky on Windows (perhaps just Win-Aura): http://crbug.com/305722
-#if defined(OS_WIN)
-#define MAYBE_OverscrollNavigation DISABLED_OverscrollNavigation
-#else
-#define MAYBE_OverscrollNavigation OverscrollNavigation
-#endif
-IN_PROC_BROWSER_TEST_F(WebContentsViewAuraTest, MAYBE_OverscrollNavigation) {
+// Flaky on Windows and ChromeOS: http://crbug.com/305722
+IN_PROC_BROWSER_TEST_F(WebContentsViewAuraTest,
+    DISABLED_OverscrollNavigation) {
   TestOverscrollNavigation(false);
 }
 
-// Flaky on Windows (perhaps just Win-Aura): http://crbug.com/305722
+// Flaky on Windows (might be related to the above test):
+// http://crbug.com/305722
 #if defined(OS_WIN)
 #define MAYBE_OverscrollNavigationWithTouchHandler \
         DISABLED_OverscrollNavigationWithTouchHandler
@@ -616,9 +613,18 @@ IN_PROC_BROWSER_TEST_F(WebContentsViewAuraTest,
   delete web_contents->GetContentNativeView();
 }
 
-// TODO(dalecurtis): Test disabled due to flakiness.  http://crbug.com/369871.
+
+#if defined(OS_WIN)
+// This appears to be flaky in the same was as the other overscroll
+// tests. Enabling for non-Windows platforms.
+// See http://crbug.com/369871.
+#define MAYBE_RepeatedQuickOverscrollGestures DISABLED_RepeatedQuickOverscrollGestures
+#else
+#define MAYBE_RepeatedQuickOverscrollGestures RepeatedQuickOverscrollGestures
+#endif
+
 IN_PROC_BROWSER_TEST_F(WebContentsViewAuraTest,
-                       DISABLED_RepeatedQuickOverscrollGestures) {
+                       MAYBE_RepeatedQuickOverscrollGestures) {
   ASSERT_NO_FATAL_FAILURE(
       StartTestWithPage("files/overscroll_navigation.html"));
 

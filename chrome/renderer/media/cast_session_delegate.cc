@@ -15,6 +15,7 @@
 #include "media/cast/cast_sender.h"
 #include "media/cast/logging/log_serializer.h"
 #include "media/cast/logging/logging_defines.h"
+#include "media/cast/logging/proto/raw_events.pb.h"
 #include "media/cast/logging/raw_event_subscriber_bundle.h"
 #include "media/cast/transport/cast_transport_config.h"
 #include "media/cast/transport/cast_transport_sender.h"
@@ -119,6 +120,7 @@ void CastSessionDelegate::ToggleLogging(bool is_audio, bool enable) {
 
 void CastSessionDelegate::GetEventLogsAndReset(
     bool is_audio,
+    const std::string& extra_data,
     const EventLogsCallback& callback) {
   DCHECK(io_message_loop_proxy_->BelongsToCurrentThread());
 
@@ -139,6 +141,9 @@ void CastSessionDelegate::GetEventLogsAndReset(
   media::cast::PacketEventList packet_events;
 
   subscriber->GetEventsAndReset(&metadata, &frame_events, &packet_events);
+
+  if (!extra_data.empty())
+    metadata.set_extra_data(extra_data);
 
   scoped_ptr<char[]> serialized_log(new char[media::cast::kMaxSerializedBytes]);
   int output_bytes;
@@ -215,6 +220,7 @@ void CastSessionDelegate::LogRawEvents(
        ++it) {
     cast_environment_->Logging()->InsertPacketEvent(it->timestamp,
                                                     it->type,
+                                                    it->media_type,
                                                     it->rtp_timestamp,
                                                     it->frame_id,
                                                     it->packet_id,

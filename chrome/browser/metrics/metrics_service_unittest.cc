@@ -8,10 +8,12 @@
 
 #include "base/command_line.h"
 #include "base/threading/platform_thread.h"
+#include "chrome/browser/metrics/metrics_state_manager.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
+#include "components/metrics/metrics_service_observer.h"
 #include "components/variations/metrics_util.h"
 #include "content/public/common/process_type.h"
 #include "content/public/common/webplugininfo.h"
@@ -29,7 +31,9 @@ using metrics::MetricsLogManager;
 
 class TestMetricsService : public MetricsService {
  public:
-  TestMetricsService() {}
+  explicit TestMetricsService(metrics::MetricsStateManager* state_manager)
+      : MetricsService(state_manager) {
+  }
   virtual ~TestMetricsService() {}
 
   MetricsLogManager* log_manager() {
@@ -85,11 +89,17 @@ class TestMetricsLog : public MetricsLog {
 class MetricsServiceTest : public testing::Test {
  public:
   MetricsServiceTest()
-      : testing_local_state_(TestingBrowserProcess::GetGlobal()) {
+      : testing_local_state_(TestingBrowserProcess::GetGlobal()),
+        metrics_state_manager_(metrics::MetricsStateManager::Create(
+            GetLocalState())) {
   }
 
   virtual ~MetricsServiceTest() {
     MetricsService::SetExecutionPhase(MetricsService::UNINITIALIZED_PHASE);
+  }
+
+  metrics::MetricsStateManager* GetMetricsStateManager() {
+    return metrics_state_manager_.get();
   }
 
   PrefService* GetLocalState() {
@@ -114,12 +124,12 @@ class MetricsServiceTest : public testing::Test {
   // Returns true if there is a synthetic trial in the given vector that matches
   // the given trial name and trial group; returns false otherwise.
   bool HasSyntheticTrial(
-      const std::vector<chrome_variations::ActiveGroupId>& synthetic_trials,
+      const std::vector<variations::ActiveGroupId>& synthetic_trials,
       const std::string& trial_name,
       const std::string& trial_group) {
     uint32 trial_name_hash = metrics::HashName(trial_name);
     uint32 trial_group_hash = metrics::HashName(trial_group);
-    for (std::vector<chrome_variations::ActiveGroupId>::const_iterator it =
+    for (std::vector<variations::ActiveGroupId>::const_iterator it =
              synthetic_trials.begin();
          it != synthetic_trials.end(); ++it) {
       if ((*it).name == trial_name_hash && (*it).group == trial_group_hash)
@@ -131,8 +141,25 @@ class MetricsServiceTest : public testing::Test {
  private:
   content::TestBrowserThreadBundle thread_bundle_;
   ScopedTestingLocalState testing_local_state_;
+  scoped_ptr<metrics::MetricsStateManager> metrics_state_manager_;
 
   DISALLOW_COPY_AND_ASSIGN(MetricsServiceTest);
+};
+
+class TestMetricsServiceObserver : public MetricsServiceObserver {
+ public:
+  TestMetricsServiceObserver(): observed_(0) {}
+  virtual ~TestMetricsServiceObserver() {}
+
+  virtual void OnDidCreateMetricsLog() OVERRIDE {
+    ++observed_;
+  }
+  int observed() const { return observed_; }
+
+ private:
+  int observed_;
+
+  DISALLOW_COPY_AND_ASSIGN(TestMetricsServiceObserver);
 };
 
 }  // namespace
@@ -150,7 +177,7 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCleanShutDown) {
   EnableMetricsReporting();
   GetLocalState()->SetBoolean(prefs::kStabilityExitedCleanly, true);
 
-  TestMetricsService service;
+  TestMetricsService service(GetMetricsStateManager());
   service.InitializeMetricsRecordingState();
   // No initial stability log should be generated.
   EXPECT_FALSE(service.log_manager()->has_unsent_logs());
@@ -166,9 +193,10 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCrash) {
   // Save an existing system profile to prefs, to correspond to what would be
   // saved from a previous session.
   TestMetricsLog log("client", 1);
-  log.RecordEnvironment(std::vector<content::WebPluginInfo>(),
+  log.RecordEnvironment(std::vector<metrics::MetricsProvider*>(),
+                        std::vector<content::WebPluginInfo>(),
                         GoogleUpdateMetrics(),
-                        std::vector<chrome_variations::ActiveGroupId>());
+                        std::vector<variations::ActiveGroupId>());
 
   // Record stability build time and version from previous session, so that
   // stability metrics (including exited cleanly flag) won't be cleared.
@@ -179,7 +207,7 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCrash) {
 
   GetLocalState()->SetBoolean(prefs::kStabilityExitedCleanly, false);
 
-  TestMetricsService service;
+  TestMetricsService service(GetMetricsStateManager());
   service.InitializeMetricsRecordingState();
 
   // The initial stability log should be generated and persisted in unsent logs.
@@ -192,7 +220,7 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCrash) {
   EXPECT_TRUE(log_manager->has_staged_log());
 
   metrics::ChromeUserMetricsExtension uma_log;
-  EXPECT_TRUE(uma_log.ParseFromString(log_manager->staged_log_text()));
+  EXPECT_TRUE(uma_log.ParseFromString(log_manager->staged_log()));
 
   EXPECT_TRUE(uma_log.has_client_id());
   EXPECT_TRUE(uma_log.has_session_id());
@@ -207,7 +235,7 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCrash) {
 }
 
 TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
-  MetricsService service;
+  MetricsService service(GetMetricsStateManager());
 
   // Add two synthetic trials and confirm that they show up in the list.
   SyntheticTrialGroup trial1(metrics::HashName("TestTrial1"),
@@ -227,7 +255,7 @@ TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
   // value changes).
   const base::TimeTicks begin_log_time = base::TimeTicks::Now();
 
-  std::vector<chrome_variations::ActiveGroupId> synthetic_trials;
+  std::vector<variations::ActiveGroupId> synthetic_trials;
   service.GetCurrentSyntheticFieldTrials(&synthetic_trials);
   EXPECT_EQ(2U, synthetic_trials.size());
   EXPECT_TRUE(HasSyntheticTrial(synthetic_trials, "TestTrial1", "Group1"));
@@ -237,7 +265,6 @@ TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
   WaitUntilTimeChanges(begin_log_time);
 
   // Change the group for the first trial after the log started.
-  // TODO(asvitkine): Assumption that this is > than BeginLoggingWithLog() time.
   SyntheticTrialGroup trial3(metrics::HashName("TestTrial1"),
                              metrics::HashName("Group2"));
   service.RegisterSyntheticFieldTrial(trial3);
@@ -303,4 +330,35 @@ TEST_F(MetricsServiceTest, CrashReportingEnabled) {
   // Chromium branded browsers never have crash reporting enabled.
   EXPECT_FALSE(MetricsServiceHelper::IsCrashReportingEnabled());
 #endif  // defined(GOOGLE_CHROME_BUILD)
+}
+
+TEST_F(MetricsServiceTest, MetricsServiceObserver) {
+  MetricsService service(GetMetricsStateManager());
+  TestMetricsServiceObserver observer1;
+  TestMetricsServiceObserver observer2;
+
+  service.AddObserver(&observer1);
+  EXPECT_EQ(0, observer1.observed());
+  EXPECT_EQ(0, observer2.observed());
+
+  service.OpenNewLog();
+  EXPECT_EQ(1, observer1.observed());
+  EXPECT_EQ(0, observer2.observed());
+  service.log_manager_.FinishCurrentLog();
+
+  service.AddObserver(&observer2);
+
+  service.OpenNewLog();
+  EXPECT_EQ(2, observer1.observed());
+  EXPECT_EQ(1, observer2.observed());
+  service.log_manager_.FinishCurrentLog();
+
+  service.RemoveObserver(&observer1);
+
+  service.OpenNewLog();
+  EXPECT_EQ(2, observer1.observed());
+  EXPECT_EQ(2, observer2.observed());
+  service.log_manager_.FinishCurrentLog();
+
+  service.RemoveObserver(&observer2);
 }

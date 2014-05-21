@@ -1097,9 +1097,12 @@ class GLES2DecoderImpl : public GLES2Decoder,
   }
 
   // Creates a vertex attrib manager for the given vertex array.
-  void CreateVertexAttribManager(GLuint client_id, GLuint service_id) {
+  scoped_refptr<VertexAttribManager> CreateVertexAttribManager(
+      GLuint client_id,
+      GLuint service_id,
+      bool client_visible) {
     return vertex_array_manager()->CreateVertexAttribManager(
-      client_id, service_id, group_->max_vertex_attribs());
+        client_id, service_id, group_->max_vertex_attribs(), client_visible);
   }
 
   void DoBindAttribLocation(GLuint client_id, GLuint index, const char* name);
@@ -2347,7 +2350,17 @@ bool GLES2DecoderImpl::Initialize(
   disallowed_features_ = disallowed_features;
 
   state_.attrib_values.resize(group_->max_vertex_attribs());
-  state_.default_vertex_attrib_manager = new VertexAttribManager();
+  vertex_array_manager_.reset(new VertexArrayManager());
+
+  GLuint default_vertex_attrib_service_id = 0;
+  if (features().native_vertex_array_object) {
+    glGenVertexArraysOES(1, &default_vertex_attrib_service_id);
+    glBindVertexArrayOES(default_vertex_attrib_service_id);
+  }
+
+  state_.default_vertex_attrib_manager =
+      CreateVertexAttribManager(0, default_vertex_attrib_service_id, false);
+
   state_.default_vertex_attrib_manager->Initialize(
       group_->max_vertex_attribs(),
       feature_info_->workarounds().init_vertex_attributes);
@@ -2356,7 +2369,6 @@ bool GLES2DecoderImpl::Initialize(
   DoBindVertexArrayOES(0);
 
   query_manager_.reset(new QueryManager(this, feature_info_.get()));
-  vertex_array_manager_.reset(new VertexArrayManager());
 
   util_.set_num_compressed_texture_formats(
       validators_->compressed_texture_format.GetValues().size());
@@ -4104,13 +4116,6 @@ void GLES2DecoderImpl::DoDisableVertexAttribArray(GLuint index) {
 void GLES2DecoderImpl::DoDiscardFramebufferEXT(GLenum target,
                                                GLsizei numAttachments,
                                                const GLenum* attachments) {
-  if (!features().ext_discard_framebuffer) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
-                       "glDiscardFramebufferEXT",
-                       "function not available");
-    return;
-  }
-
   Framebuffer* framebuffer =
       GetFramebufferInfoForTarget(GL_FRAMEBUFFER);
 
@@ -5088,12 +5093,6 @@ void GLES2DecoderImpl::DoFramebufferTexture2D(
 void GLES2DecoderImpl::DoFramebufferTexture2DMultisample(
     GLenum target, GLenum attachment, GLenum textarget,
     GLuint client_texture_id, GLint level, GLsizei samples) {
-  if (!features().multisampled_render_to_texture) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_OPERATION,
-        "glFramebufferTexture2DMultisample", "function not available");
-    return;
-  }
   DoFramebufferTexture2DCommon(
     "glFramebufferTexture2DMultisample", target, attachment,
     textarget, client_texture_id, level, samples);
@@ -5226,12 +5225,6 @@ void GLES2DecoderImpl::DoBlitFramebufferCHROMIUM(
     GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1,
     GLbitfield mask, GLenum filter) {
   DCHECK(!ShouldDeferReads() && !ShouldDeferDraws());
-  if (!features().chromium_framebuffer_multisample) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_OPERATION,
-        "glBlitFramebufferCHROMIUM", "function not available");
-    return;
-  }
 
   if (!CheckBoundFramebuffersValid("glBlitFramebufferCHROMIUM")) {
     return;
@@ -5331,13 +5324,6 @@ bool GLES2DecoderImpl::ValidateRenderbufferStorageMultisample(
 void GLES2DecoderImpl::DoRenderbufferStorageMultisampleCHROMIUM(
     GLenum target, GLsizei samples, GLenum internalformat,
     GLsizei width, GLsizei height) {
-  if (!features().chromium_framebuffer_multisample) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
-                       "glRenderbufferStorageMultisampleCHROMIUM",
-                       "function not available");
-    return;
-  }
-
   Renderbuffer* renderbuffer = GetRenderbufferInfoForTarget(GL_RENDERBUFFER);
   if (!renderbuffer) {
     LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
@@ -5384,13 +5370,6 @@ void GLES2DecoderImpl::DoRenderbufferStorageMultisampleCHROMIUM(
 void GLES2DecoderImpl::DoRenderbufferStorageMultisampleEXT(
     GLenum target, GLsizei samples, GLenum internalformat,
     GLsizei width, GLsizei height) {
-  if (!features().multisampled_render_to_texture) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_OPERATION,
-        "glRenderbufferStorageMultisampleEXT", "function not available");
-    return;
-  }
-
   Renderbuffer* renderbuffer = GetRenderbufferInfoForTarget(GL_RENDERBUFFER);
   if (!renderbuffer) {
     LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
@@ -8275,7 +8254,8 @@ error::Error GLES2DecoderImpl::HandleCompressedTexSubImage2DBucket(
 
 error::Error GLES2DecoderImpl::HandleTexImage2D(
     uint32 immediate_data_size, const cmds::TexImage2D& c) {
-  TRACE_EVENT0("gpu", "GLES2DecoderImpl::HandleTexImage2D");
+  TRACE_EVENT2("gpu", "GLES2DecoderImpl::HandleTexImage2D",
+      "width", c.width, "height", c.height);
   // Set as failed for now, but if it successed, this will be set to not failed.
   texture_state_.tex_image_2d_failed = true;
   GLenum target = static_cast<GLenum>(c.target);
@@ -8749,7 +8729,8 @@ error::Error GLES2DecoderImpl::DoTexSubImage2D(
 
 error::Error GLES2DecoderImpl::HandleTexSubImage2D(
     uint32 immediate_data_size, const cmds::TexSubImage2D& c) {
-  TRACE_EVENT0("gpu", "GLES2DecoderImpl::HandleTexSubImage2D");
+  TRACE_EVENT2("gpu", "GLES2DecoderImpl::HandleTexSubImage2D",
+      "width", c.width, "height", c.height);
   GLboolean internal = static_cast<GLboolean>(c.internal);
   if (internal == GL_TRUE && texture_state_.tex_image_2d_failed)
     return error::kNoError;
@@ -9684,14 +9665,14 @@ bool GLES2DecoderImpl::GenVertexArraysOESHelper(
   if (!features().native_vertex_array_object) {
     // Emulated VAO
     for (GLsizei ii = 0; ii < n; ++ii) {
-      CreateVertexAttribManager(client_ids[ii], 0);
+      CreateVertexAttribManager(client_ids[ii], 0, true);
     }
   } else {
     scoped_ptr<GLuint[]> service_ids(new GLuint[n]);
 
     glGenVertexArraysOES(n, service_ids.get());
     for (GLsizei ii = 0; ii < n; ++ii) {
-      CreateVertexAttribManager(client_ids[ii], service_ids[ii]);
+      CreateVertexAttribManager(client_ids[ii], service_ids[ii], true);
     }
   }
 
@@ -9714,7 +9695,6 @@ void GLES2DecoderImpl::DeleteVertexArraysOESHelper(
 
 void GLES2DecoderImpl::DoBindVertexArrayOES(GLuint client_id) {
   VertexAttribManager* vao = NULL;
-  GLuint service_id = 0;
   if (client_id != 0) {
     vao = GetVertexAttribManager(client_id);
     if (!vao) {
@@ -9726,8 +9706,6 @@ void GLES2DecoderImpl::DoBindVertexArrayOES(GLuint client_id) {
           "glBindVertexArrayOES", "bad vertex array id.");
       current_decoder_error_ = error::kNoError;
       return;
-    } else {
-      service_id = vao->service_id();
     }
   } else {
     vao = state_.default_vertex_attrib_manager.get();
@@ -9739,6 +9717,7 @@ void GLES2DecoderImpl::DoBindVertexArrayOES(GLuint client_id) {
     if (!features().native_vertex_array_object) {
       EmulateVertexArrayState();
     } else {
+      GLuint service_id = vao->service_id();
       glBindVertexArrayOES(service_id);
     }
   }
@@ -10123,7 +10102,8 @@ void GLES2DecoderImpl::DoTexStorage2DEXT(
     GLenum internal_format,
     GLsizei width,
     GLsizei height) {
-  TRACE_EVENT0("gpu", "GLES2DecoderImpl::DoTexStorage2DEXT");
+  TRACE_EVENT2("gpu", "GLES2DecoderImpl::DoTexStorage2DEXT",
+      "width", width, "height", height);
   if (!texture_manager()->ValidForTarget(target, 0, width, height, 1) ||
       TextureManager::ComputeMipMapCount(target, width, height, 1) < levels) {
     LOCAL_SET_GL_ERROR(

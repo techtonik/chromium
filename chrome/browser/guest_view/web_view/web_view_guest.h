@@ -5,11 +5,14 @@
 #ifndef CHROME_BROWSER_GUEST_VIEW_WEB_VIEW_WEB_VIEW_GUEST_H_
 #define CHROME_BROWSER_GUEST_VIEW_WEB_VIEW_WEB_VIEW_GUEST_H_
 
+#include <vector>
+
 #include "base/observer_list.h"
 #include "chrome/browser/extensions/tab_helper.h"
 #include "chrome/browser/guest_view/guest_view.h"
 #include "chrome/browser/guest_view/web_view/javascript_dialog_helper.h"
 #include "chrome/browser/guest_view/web_view/web_view_find_helper.h"
+#include "chrome/browser/guest_view/web_view/web_view_permission_types.h"
 #include "chrome/common/extensions/api/webview.h"
 #include "content/public/browser/javascript_dialog_manager.h"
 #include "content/public/browser/notification_registrar.h"
@@ -19,6 +22,10 @@
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/accessibility/accessibility_manager.h"
 #endif
+
+namespace webview_api = extensions::api::webview;
+
+class RenderViewContextMenu;
 
 namespace extensions {
 class ScriptExecutor;
@@ -40,14 +47,21 @@ class WebViewGuest : public GuestView<WebViewGuest>,
                      public content::NotificationObserver,
                      public content::WebContentsObserver {
  public:
-  WebViewGuest(content::WebContents* guest_web_contents,
-               const std::string& embedder_extension_id,
-               const base::WeakPtr<GuestViewBase>& opener);
+  WebViewGuest(int guest_instance_id,
+               content::WebContents* guest_web_contents,
+               const std::string& embedder_extension_id);
 
   // Returns guestview::kInstanceIDNone if |contents| does not correspond to a
   // WebViewGuest.
   static int GetViewInstanceId(content::WebContents* contents);
   static const char Type[];
+
+  typedef std::vector<linked_ptr<webview_api::ContextMenuItem> > MenuItemVector;
+  // Shows the context menu for the guest.
+  // |items| acts as a filter. This restricts the current context's default
+  // menu items to contain only the items from |items|.
+  // |items| == NULL means no filtering will be applied.
+  void ShowContextMenu(int request_id, const MenuItemVector* items);
 
   // GuestViewBase implementation.
   virtual void Attach(content::WebContents* embedder_web_contents,
@@ -72,21 +86,11 @@ class WebViewGuest : public GuestView<WebViewGuest>,
                          int active_match_ordinal,
                          bool final_update) OVERRIDE;
   virtual void GuestProcessGone(base::TerminationStatus status) OVERRIDE;
-  virtual bool HandleKeyboardEvent(
+  virtual void HandleKeyboardEvent(
       const content::NativeWebKeyboardEvent& event) OVERRIDE;
   virtual bool IsDragAndDropEnabled() OVERRIDE;
-  virtual bool IsOverridingUserAgent() const OVERRIDE;
-  virtual void LoadAbort(bool is_top_level,
-                         const GURL& url,
-                         const std::string& error_type) OVERRIDE;
   virtual void RendererResponsive() OVERRIDE;
   virtual void RendererUnresponsive() OVERRIDE;
-  virtual void RequestPermission(
-      BrowserPluginPermissionType permission_type,
-      const base::DictionaryValue& request_info,
-      const PermissionResponseCallback& callback,
-      bool allowed_by_default) OVERRIDE;
-  virtual GURL ResolveURL(const std::string& src) OVERRIDE;
   virtual void SizeChanged(const gfx::Size& old_size, const gfx::Size& new_size)
       OVERRIDE;
   virtual void RequestMediaAccessPermission(
@@ -101,6 +105,29 @@ class WebViewGuest : public GuestView<WebViewGuest>,
       const base::Callback<void(bool)>& callback) OVERRIDE;
   virtual content::JavaScriptDialogManager*
       GetJavaScriptDialogManager() OVERRIDE;
+  virtual content::ColorChooser* OpenColorChooser(
+      content::WebContents* web_contents,
+      SkColor color,
+      const std::vector<content::ColorSuggestion>& suggestions) OVERRIDE;
+  virtual void RunFileChooser(
+      content::WebContents* web_contents,
+      const content::FileChooserParams& params) OVERRIDE;
+  virtual void NavigateGuest(const std::string& src) OVERRIDE;
+  virtual void Destroy() OVERRIDE;
+  virtual void AddNewContents(content::WebContents* source,
+                              content::WebContents* new_contents,
+                              WindowOpenDisposition disposition,
+                              const gfx::Rect& initial_pos,
+                              bool user_gesture,
+                              bool* was_blocked) OVERRIDE;
+  virtual content::WebContents* OpenURLFromTab(
+      content::WebContents* source,
+      const content::OpenURLParams& params) OVERRIDE;
+  virtual void WebContentsCreated(content::WebContents* source_contents,
+                                  int opener_render_frame_id,
+                                  const base::string16& frame_name,
+                                  const GURL& target_url,
+                                  content::WebContents* new_contents) OVERRIDE;
 
   // NotificationObserver implementation.
   virtual void Observe(int type,
@@ -127,6 +154,15 @@ class WebViewGuest : public GuestView<WebViewGuest>,
 
   // Reload the guest.
   void Reload();
+
+  typedef base::Callback<void(bool /* allow */,
+                              const std::string& /* user_input */)>
+      PermissionResponseCallback;
+  int RequestPermission(
+      WebViewPermissionType permission_type,
+      const base::DictionaryValue& request_info,
+      const PermissionResponseCallback& callback,
+      bool allowed_by_default);
 
   // Requests Geolocation Permission from the embedder.
   void RequestGeolocationPermission(int bridge_id,
@@ -158,6 +194,10 @@ class WebViewGuest : public GuestView<WebViewGuest>,
       const base::Callback<void(bool)>& callback,
       bool allow,
       const std::string& user_input);
+
+  void OnWebViewNewWindowResponse(int new_window_instance_id,
+                                  bool allow,
+                                  const std::string& user_input);
 
   enum PermissionResponseAction {
     DENY,
@@ -206,11 +246,11 @@ class WebViewGuest : public GuestView<WebViewGuest>,
   // A map to store the callback for a request keyed by the request's id.
   struct PermissionResponseInfo {
     PermissionResponseCallback callback;
-    BrowserPluginPermissionType permission_type;
+    WebViewPermissionType permission_type;
     bool allowed_by_default;
     PermissionResponseInfo();
     PermissionResponseInfo(const PermissionResponseCallback& callback,
-                           BrowserPluginPermissionType permission_type,
+                           WebViewPermissionType permission_type,
                            bool allowed_by_default);
     ~PermissionResponseInfo();
   };
@@ -251,8 +291,7 @@ class WebViewGuest : public GuestView<WebViewGuest>,
       content::RenderViewHost* render_view_host) OVERRIDE;
   virtual void DidStopLoading(
       content::RenderViewHost* render_view_host) OVERRIDE;
-  virtual void WebContentsDestroyed(
-      content::WebContents* web_contents) OVERRIDE;
+  virtual void WebContentsDestroyed() OVERRIDE;
   virtual void UserAgentOverrideSet(const std::string& user_agent) OVERRIDE;
 
   // Called after the load handler is called in the guest's main frame.
@@ -280,11 +319,35 @@ class WebViewGuest : public GuestView<WebViewGuest>,
   // provided |bridge_id|. It returns the request ID of the geolocation request.
   int RemoveBridgeID(int bridge_id);
 
-  int RequestPermissionInternal(
-      BrowserPluginPermissionType permission_type,
-      const base::DictionaryValue& request_info,
-      const PermissionResponseCallback& callback,
-      bool allowed_by_default);
+  void LoadURLWithParams(const GURL& url,
+                         const content::Referrer& referrer,
+                         content::PageTransition transition_type,
+                         content::WebContents* web_contents);
+
+  void RequestNewWindowPermission(
+      WindowOpenDisposition disposition,
+      const gfx::Rect& initial_bounds,
+      bool user_gesture,
+      content::WebContents* new_contents);
+
+  // Destroy unattached new windows that have been opened by this
+  // WebViewGuest.
+  void DestroyUnattachedWindows();
+
+  // Requests resolution of a potentially relative URL.
+  GURL ResolveURL(const std::string& src);
+
+  // Notification that a load in the guest resulted in abort. Note that |url|
+  // may be invalid.
+  void LoadAbort(bool is_top_level,
+                 const GURL& url,
+                 const std::string& error_type);
+
+
+  // Creates a new guest window owned by this WebViewGuest.
+  WebViewGuest* CreateNewGuestWindow(const content::OpenURLParams& params);
+
+  bool HandleKeyboardShortcuts(const content::NativeWebKeyboardEvent& event);
 
   ObserverList<extensions::TabHelper::ScriptExecutionObserver>
       script_observers_;
@@ -294,7 +357,7 @@ class WebViewGuest : public GuestView<WebViewGuest>,
 
   // A counter to generate a unique request id for a context menu request.
   // We only need the ids to be unique for a given WebViewGuest.
-  int current_context_menu_request_id_;
+  int pending_context_menu_request_id_;
 
   // A counter to generate a unique request id for a permission request.
   // We only need the ids to be unique for a given WebViewGuest.
@@ -328,6 +391,10 @@ class WebViewGuest : public GuestView<WebViewGuest>,
   friend void WebviewFindHelper::DispatchFindUpdateEvent(bool canceled,
                                                          bool final_update);
 
+  // Holds the RenderViewContextMenu that has been built but yet to be
+  // shown. This is .Reset() after ShowContextMenu().
+  scoped_ptr<RenderViewContextMenu> pending_menu_;
+
 #if defined(OS_CHROMEOS)
   // Subscription to receive notifications on changes to a11y settings.
   scoped_ptr<chromeos::AccessibilityStatusSubscription>
@@ -335,6 +402,19 @@ class WebViewGuest : public GuestView<WebViewGuest>,
 #endif
 
   std::map<int, int> bridge_id_to_request_id_map_;
+
+  // Tracks the name, and target URL of the new window. Once the first
+  // navigation commits, we no longer track this information.
+  struct NewWindowInfo {
+    GURL url;
+    std::string name;
+    NewWindowInfo(const GURL& url, const std::string& name) :
+        url(url),
+        name(name) {}
+  };
+
+  typedef std::map<WebViewGuest*, NewWindowInfo> PendingWindowMap;
+  PendingWindowMap pending_new_windows_;
 
   DISALLOW_COPY_AND_ASSIGN(WebViewGuest);
 };

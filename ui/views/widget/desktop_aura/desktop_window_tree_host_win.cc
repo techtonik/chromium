@@ -35,7 +35,6 @@
 #include "ui/views/widget/widget_hwnd_utils.h"
 #include "ui/views/win/fullscreen_handler.h"
 #include "ui/views/win/hwnd_message_handler.h"
-#include "ui/views/window/native_frame_view.h"
 #include "ui/wm/core/compound_event_filter.h"
 #include "ui/wm/core/input_method_event_filter.h"
 #include "ui/wm/core/window_animations.h"
@@ -382,11 +381,6 @@ void DesktopWindowTreeHostWin::FrameTypeChanged() {
   SetWindowTransparency();
 }
 
-NonClientFrameView* DesktopWindowTreeHostWin::CreateNonClientFrameView() {
-  return GetWidget()->ShouldUseNativeFrame() ?
-      new NativeFrameView(GetWidget()) : NULL;
-}
-
 void DesktopWindowTreeHostWin::SetFullscreen(bool fullscreen) {
   message_handler_->fullscreen_handler()->SetFullscreen(fullscreen);
   // TODO(sky): workaround for ScopedFullscreenVisibility showing window
@@ -611,7 +605,7 @@ bool DesktopWindowTreeHostWin::IsModal() const {
 }
 
 int DesktopWindowTreeHostWin::GetInitialShowState() const {
-  return SW_SHOWNORMAL;
+  return CanActivate() ? SW_SHOWNORMAL : SW_SHOWNOACTIVATE;
 }
 
 bool DesktopWindowTreeHostWin::WillProcessWorkAreaChange() const {
@@ -656,7 +650,7 @@ void DesktopWindowTreeHostWin::ResetWindowControls() {
 }
 
 void DesktopWindowTreeHostWin::PaintLayeredWindow(gfx::Canvas* canvas) {
-  GetWidget()->GetRootView()->Paint(canvas);
+  GetWidget()->GetRootView()->Paint(canvas, views::CullSet());
 }
 
 gfx::NativeViewAccessible DesktopWindowTreeHostWin::GetNativeViewAccessible() {
@@ -864,7 +858,9 @@ bool DesktopWindowTreeHostWin::HandlePaintAccelerated(
 }
 
 void DesktopWindowTreeHostWin::HandlePaint(gfx::Canvas* canvas) {
-  compositor()->ScheduleRedrawRect(gfx::Rect());
+  // It appears possible to get WM_PAINT after WM_DESTROY.
+  if (compositor())
+    compositor()->ScheduleRedrawRect(gfx::Rect());
 }
 
 bool DesktopWindowTreeHostWin::HandleTooltipNotify(int w_param,
@@ -905,6 +901,11 @@ bool DesktopWindowTreeHostWin::HandleScrollEvent(
     const ui::ScrollEvent& event) {
   SendEventToProcessor(const_cast<ui::ScrollEvent*>(&event));
   return event.handled();
+}
+
+void DesktopWindowTreeHostWin::HandleWindowSizeChanging() {
+  if (compositor())
+    compositor()->FinishAllRendering();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

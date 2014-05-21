@@ -54,6 +54,8 @@
         'mojo_system_impl',
         'mojo_system_unittests',
         'mojo_utility',
+        'mojo_view_manager_lib',
+        'mojo_view_manager_lib_unittests',
       ],
       'conditions': [
         ['use_aura==1', {
@@ -67,10 +69,17 @@
         }],
         ['OS == "android"', {
           'dependencies': [
+            'mojo_bindings_java',
             'mojo_public_java',
             'mojo_system_java',
             'libmojo_system_java',
             'mojo_test_apk',
+          ],
+        }],
+        ['OS == "linux"', {
+          'dependencies': [
+            'mojo_dbus_echo',
+            'mojo_dbus_echo_service',
           ],
         }],
       ]
@@ -143,6 +152,8 @@
         'embedder/platform_channel_utils_posix.h',
         'embedder/platform_handle.cc',
         'embedder/platform_handle.h',
+        'embedder/platform_handle_vector.cc',
+        'embedder/platform_handle_vector.h',
         'embedder/scoped_platform_handle.h',
         'system/channel.cc',
         'system/channel.h',
@@ -178,6 +189,8 @@
         'system/message_pipe_dispatcher.h',
         'system/message_pipe_endpoint.cc',
         'system/message_pipe_endpoint.h',
+        'system/platform_handle_dispatcher.cc',
+        'system/platform_handle_dispatcher.h',
         'system/proxy_message_pipe_endpoint.cc',
         'system/proxy_message_pipe_endpoint.h',
         'system/raw_channel.cc',
@@ -233,6 +246,7 @@
         'system/message_pipe_dispatcher_unittest.cc',
         'system/message_pipe_unittest.cc',
         'system/multiprocess_message_pipe_unittest.cc',
+        'system/platform_handle_dispatcher_unittest.cc',
         'system/raw_channel_unittest.cc',
         'system/raw_shared_buffer_unittest.cc',
         'system/remote_message_pipe_unittest.cc',
@@ -502,6 +516,8 @@
         'shell/test_child_process.h',
         'shell/url_request_context_getter.cc',
         'shell/url_request_context_getter.h',
+        'shell/view_manager_loader.cc',
+        'shell/view_manager_loader.h',
       ],
       'conditions': [
         ['OS=="linux"', {
@@ -514,8 +530,15 @@
           'dependencies': [
             # These are only necessary as long as we hard code use of ViewManager.
             '../skia/skia.gyp:skia',
+            'mojo_gles2',
             'mojo_shell_client',
             'mojo_view_manager',
+            'mojo_view_manager_bindings',
+          ],
+        }, {  # use_aura==0
+          'sources!': [
+            'shell/view_manager_loader.cc',
+            'shell/view_manager_loader.h',
           ],
         }],
       ],
@@ -665,7 +688,6 @@
           ],
           'variables': {
             'jni_gen_package': 'mojo',
-            'jni_generator_ptr_type': 'long',
          },
           'includes': [ '../build/jni_generator.gypi' ],
         },
@@ -703,6 +725,7 @@
           'type': 'shared_library',
           'dependencies': [
             '../base/base.gyp:base',
+            '../base/base.gyp:test_support_base',
             'libmojo_system_java',
             'mojo_jni_headers',
           ],
@@ -716,6 +739,8 @@
           'target_name': 'mojo_test_apk',
           'type': 'none',
           'dependencies': [
+            'mojo_bindings_java',
+            'mojo_public_test_interfaces',
             'mojo_system_java',
             '../base/base.gyp:base_java_test_support',
           ],
@@ -751,7 +776,6 @@
           'type': 'none',
           'variables': {
             'jni_gen_package': 'mojo',
-            'jni_generator_ptr_type': 'long',
             'input_java_class': 'java/util/HashSet.class',
           },
           'includes': [ '../build/jar_file_jni_generator.gypi' ],

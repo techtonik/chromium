@@ -88,6 +88,7 @@ class WebMediaPlayerImpl
   virtual void setVolume(double volume);
   virtual void setPreload(blink::WebMediaPlayer::Preload preload);
   virtual const blink::WebTimeRanges& buffered();
+  virtual blink::WebTimeRanges buffered() const;
   virtual double maxTimeSeekable() const;
 
   // Methods for painting.
@@ -115,9 +116,7 @@ class WebMediaPlayerImpl
   virtual blink::WebMediaPlayer::NetworkState networkState() const;
   virtual blink::WebMediaPlayer::ReadyState readyState() const;
 
-  // TODO(sandersd): Change this to non-const in blink::WebMediaPlayer.
-  // http://crbug.com/360251
-  virtual bool didLoadingProgress() const;
+  virtual bool didLoadingProgress();
 
   virtual bool hasSingleSecurityOrigin() const;
   virtual bool didPassCORSAccessCheck() const;

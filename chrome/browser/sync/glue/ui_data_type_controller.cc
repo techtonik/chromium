@@ -138,7 +138,7 @@ void UIDataTypeController::Associate() {
   local_service_ = shared_change_processor_->Connect(
       profile_sync_factory_,
       processor_factory_.get(),
-      sync_service_,
+      sync_service_->GetUserShare(),
       this,
       type(),
       weak_ptr_factory.GetWeakPtr());
@@ -215,11 +215,15 @@ void UIDataTypeController::Associate() {
   syncer_merge_result.set_num_items_after_association(
       shared_change_processor_->GetSyncCount());
 
-  shared_change_processor_->ActivateDataType(model_safe_group());
   state_ = RUNNING;
   StartDone(sync_has_nodes ? OK : OK_FIRST_RUN,
             local_merge_result,
             syncer_merge_result);
+}
+
+ChangeProcessor* UIDataTypeController::GetChangeProcessor() const {
+  DCHECK_EQ(state_, RUNNING);
+  return shared_change_processor_->generic_change_processor();
 }
 
 void UIDataTypeController::AbortModelLoad() {
@@ -237,6 +241,9 @@ void UIDataTypeController::AbortModelLoad() {
                                             syncer::SyncError::DATATYPE_ERROR,
                                             "Aborted",
                                             type()));
+  // We don't want to continue loading models (e.g OnModelLoaded should never be
+  // called after we've decided to abort).
+  StopModels();
 }
 
 void UIDataTypeController::StartDone(

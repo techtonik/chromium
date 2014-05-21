@@ -60,7 +60,7 @@ namespace {
 
 const int kFixedMenuWidth = 250;
 const int kButtonHeight = 29;
-const int kProfileAvatarTutorialShowMax = 5;
+const int kProfileAvatarTutorialShowMax = 1;
 const int kFixedGaiaViewHeight = 400;
 const int kFixedGaiaViewWidth = 360;
 const int kFixedAccountRemovalViewWidth = 280;
@@ -365,7 +365,7 @@ class TitleCard : public views::View {
     title_label_->SetBoundsRect(GetContentsBounds());
   }
 
-  virtual gfx::Size GetPreferredSize() OVERRIDE{
+  virtual gfx::Size GetPreferredSize() const OVERRIDE{
     int height = std::max(title_label_->GetPreferredSize().height(),
         back_button_->GetPreferredSize().height());
     return gfx::Size(width(), height);
@@ -391,6 +391,9 @@ void ProfileChooserView::ShowBubble(
     views::BubbleBorder::BubbleAlignment border_alignment,
     const gfx::Rect& anchor_rect,
     Browser* browser) {
+  if (IsShowing())
+    return;
+
   profile_bubble_ = new ProfileChooserView(anchor_view, arrow, anchor_rect,
                                            browser, view_mode);
   views::BubbleDelegateView::CreateBubble(profile_bubble_);
@@ -460,7 +463,7 @@ void ProfileChooserView::ResetView() {
   tutorial_send_feedback_button_ = NULL;
   end_preview_and_relaunch_button_ = NULL;
   end_preview_cancel_button_ = NULL;
-  remove_account_and_relaunch_button_ = NULL;
+  remove_account_button_ = NULL;
   account_removal_cancel_button_ = NULL;
   gaia_signin_cancel_button_ = NULL;
   open_other_profile_indexes_map_.clear();
@@ -581,7 +584,7 @@ void ProfileChooserView::ButtonPressed(views::Button* sender,
     ProfileMetrics::LogProfileUpgradeEnrollment(
         ProfileMetrics::PROFILE_ENROLLMENT_ACCEPT_NEW_PROFILE_MGMT);
     profiles::EnableNewProfileManagementPreview();
-  } else if (sender == remove_account_and_relaunch_button_) {
+  } else if (sender == remove_account_button_) {
     RemoveAccount();
   } else if (sender == account_removal_cancel_button_) {
     account_id_to_remove_.clear();
@@ -597,8 +600,12 @@ void ProfileChooserView::ButtonPressed(views::Button* sender,
     tutorial_mode_ = TUTORIAL_MODE_SEND_FEEDBACK;
     ShowView(BUBBLE_VIEW_MODE_PROFILE_CHOOSER, avatar_menu_.get());
   } else if (sender == tutorial_send_feedback_button_) {
+    ProfileMetrics::LogProfileUpgradeEnrollment(
+        ProfileMetrics::PROFILE_ENROLLMENT_SEND_FEEDBACK);
     chrome::OpenFeedbackDialog(browser_);
   } else if (sender == end_preview_and_relaunch_button_) {
+    ProfileMetrics::LogProfileUpgradeEnrollment(
+        ProfileMetrics::PROFILE_ENROLLMENT_DISABLE_NEW_PROFILE_MGMT);
     profiles::DisableNewProfileManagementPreview();
   } else if (sender == end_preview_cancel_button_) {
     tutorial_mode_ = TUTORIAL_MODE_SEND_FEEDBACK;
@@ -643,7 +650,7 @@ void ProfileChooserView::RemoveAccount() {
     oauth2_token_service->RevokeCredentials(account_id_to_remove_);
   account_id_to_remove_.clear();
 
-  chrome::AttemptRestart();
+  ShowView(BUBBLE_VIEW_MODE_ACCOUNT_MANAGEMENT, avatar_menu_.get());
 }
 
 void ProfileChooserView::LinkClicked(views::Link* sender, int event_flags) {
@@ -710,7 +717,8 @@ bool ProfileChooserView::HandleKeyEvent(views::Textfield* sender,
 }
 
 views::View* ProfileChooserView::CreateProfileChooserView(
-    AvatarMenu* avatar_menu, TutorialMode last_tutorial_mode) {
+    AvatarMenu* avatar_menu,
+    TutorialMode last_tutorial_mode) {
   // TODO(guohui, noms): the view should be customized based on whether new
   // profile management preview is enabled or not.
 
@@ -730,10 +738,10 @@ views::View* ProfileChooserView::CreateProfileChooserView(
       current_profile_view = CreateCurrentProfileView(item, false);
       if (view_mode_ == BUBBLE_VIEW_MODE_PROFILE_CHOOSER) {
         if (is_new_profile_management) {
-          tutorial_view = tutorial_mode_ == TUTORIAL_MODE_SEND_FEEDBACK ?
+          tutorial_view = last_tutorial_mode == TUTORIAL_MODE_SEND_FEEDBACK ?
               CreateSendPreviewFeedbackView() :
               CreatePreviewEnabledTutorialView(
-                  item, tutorial_mode_ == TUTORIAL_MODE_PREVIEW_ENABLED);
+                  item, last_tutorial_mode == TUTORIAL_MODE_PREVIEW_ENABLED);
         } else {
           tutorial_view = CreateNewProfileManagementPreviewView();
         }
@@ -1239,13 +1247,13 @@ views::View* ProfileChooserView::CreateAccountRemovalView() {
 
   // Adds button.
   if (!is_primary_account) {
-    remove_account_and_relaunch_button_ = new views::BlueButton(
+    remove_account_button_ = new views::BlueButton(
         this, l10n_util::GetStringUTF16(IDS_PROFILES_ACCOUNT_REMOVAL_BUTTON));
-    remove_account_and_relaunch_button_->SetHorizontalAlignment(
+    remove_account_button_->SetHorizontalAlignment(
         gfx::ALIGN_CENTER);
     layout->StartRowWithPadding(
         1, 0, 0, views::kUnrelatedControlVerticalSpacing);
-    layout->AddView(remove_account_and_relaunch_button_);
+    layout->AddView(remove_account_button_);
   } else {
     layout->AddPaddingRow(0, views::kUnrelatedControlVerticalSpacing);
   }

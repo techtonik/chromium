@@ -15,12 +15,29 @@
         'component_metrics_proto',
       ],
       'sources': [
+        'metrics/metrics_provider.h',
         'metrics/metrics_hashes.cc',
         'metrics/metrics_hashes.h',
         'metrics/metrics_log_base.cc',
         'metrics/metrics_log_base.h',
         'metrics/metrics_log_manager.cc',
         'metrics/metrics_log_manager.h',
+        'metrics/metrics_pref_names.cc',
+        'metrics/metrics_pref_names.h',
+        'metrics/metrics_reporting_scheduler.cc',
+        'metrics/metrics_reporting_scheduler.h',
+        'metrics/metrics_service_client.h',
+        'metrics/metrics_service_observer.cc',
+        'metrics/metrics_service_observer.h',
+        'metrics/persisted_logs.cc',
+        'metrics/persisted_logs.h',
+      ],
+      'conditions': [
+        ['chromeos==1', {
+          'dependencies': [
+            'metrics_chromeos',
+          ],
+        }],
       ],
     },
     {
@@ -33,6 +50,7 @@
         'metrics/proto/omnibox_event.proto',
         'metrics/proto/perf_data.proto',
         'metrics/proto/profiler_event.proto',
+        'metrics/proto/sampled_profile.proto',
         'metrics/proto/system_profile.proto',
         'metrics/proto/user_action_event.proto',
       ],
@@ -42,5 +60,24 @@
       },
       'includes': [ '../build/protoc.gypi' ],
     },
+  ],
+  'conditions': [
+    ['chromeos==1', {
+      'targets': [
+        {
+          'target_name': 'metrics_chromeos',
+          'type': 'static_library',
+          'sources': [
+            'metrics/chromeos/serialization_utils.cc',
+            'metrics/chromeos/serialization_utils.h',
+            'metrics/chromeos/metric_sample.cc',
+            'metrics/chromeos/metric_sample.h',
+          ],
+          'dependencies': [
+            '../base/base.gyp:base',
+          ],
+        },
+      ],
+    }],
   ],
 }

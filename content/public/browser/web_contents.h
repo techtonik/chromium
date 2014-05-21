@@ -30,6 +30,7 @@
 #endif
 
 namespace base {
+class DictionaryValue;
 class TimeTicks;
 }
 
@@ -82,6 +83,7 @@ class WebContents : public PageNavigator,
  public:
   struct CONTENT_EXPORT CreateParams {
     explicit CreateParams(BrowserContext* context);
+    ~CreateParams();
     CreateParams(BrowserContext* context, SiteInstance* site);
 
     BrowserContext* browser_context;
@@ -91,7 +93,13 @@ class WebContents : public PageNavigator,
     // privileged process.
     SiteInstance* site_instance;
 
+    // The opener WebContents is the WebContents that initiated this request,
+    // if any.
     WebContents* opener;
+
+    // If the opener is suppressed, then the new WebContents doesn't hold a
+    // reference to its opener.
+    bool opener_suppressed;
     int routing_id;
     int main_frame_routing_id;
 
@@ -100,6 +108,14 @@ class WebContents : public PageNavigator,
 
     // True if the contents should be initially hidden.
     bool initially_hidden;
+
+    // If this instance ID is non-zero then it indicates that this WebContents
+    // should behave as a guest.
+    int guest_instance_id;
+
+    // TODO(fsamuel): This is temporary. Remove this once all guests are created
+    // from the content embedder.
+    scoped_ptr<base::DictionaryValue> guest_extra_params;
 
     // Used to specify the location context which display the new view should
     // belong. This can be NULL if not needed.
@@ -183,15 +199,6 @@ class WebContents : public PageNavigator,
 
   // Gets the current RenderViewHost for this tab.
   virtual RenderViewHost* GetRenderViewHost() const = 0;
-
-  // Returns the WebContents embedding this WebContents, if any.
-  // If this is a top-level WebContents then it returns NULL.
-  virtual WebContents* GetEmbedderWebContents() const = 0;
-
-  // Gets the instance ID of the current WebContents if it is embedded
-  // within a BrowserPlugin. The instance ID of a WebContents uniquely
-  // identifies it within its embedder WebContents.
-  virtual int GetEmbeddedInstanceID() const = 0;
 
   // Gets the current RenderViewHost's routing id. Returns
   // MSG_ROUTING_NONE when there is no RenderViewHost.

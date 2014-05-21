@@ -13,9 +13,10 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/extensions/extension_service.h"
-#include "chrome/browser/feedback/feedback_util.h"
 #include "chrome/browser/profiles/profile_info_cache.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/search/hotword_service.h"
+#include "chrome/browser/search/hotword_service_factory.h"
 #include "chrome/browser/ui/app_list/app_list_controller_delegate.h"
 #include "chrome/browser/ui/app_list/app_list_service.h"
 #include "chrome/browser/ui/app_list/app_list_syncable_service.h"
@@ -45,12 +46,19 @@
 #endif
 
 #if defined(USE_ASH)
+#include "ash/shell.h"
+#include "ash/wm/maximize_mode/maximize_mode_controller.h"
 #include "chrome/browser/ui/ash/app_list/app_sync_ui_state_watcher.h"
 #endif
 
 #if defined(OS_WIN)
 #include "chrome/browser/web_applications/web_app_win.h"
 #endif
+
+
+namespace chrome {
+const char kAppLauncherCategoryTag[] = "AppLauncher";
+}  // namespace chrome
 
 namespace {
 
@@ -146,6 +154,24 @@ AppListViewDelegate::~AppListViewDelegate() {
 
   // Ensure search controller is released prior to speech_ui_.
   search_controller_.reset();
+}
+
+void AppListViewDelegate::OnHotwordStateChanged(bool started) {
+  if (started) {
+    if (speech_ui_->state() == app_list::SPEECH_RECOGNITION_READY) {
+      OnSpeechRecognitionStateChanged(
+          app_list::SPEECH_RECOGNITION_HOTWORD_LISTENING);
+    }
+  } else {
+    if (speech_ui_->state() == app_list::SPEECH_RECOGNITION_HOTWORD_LISTENING)
+      OnSpeechRecognitionStateChanged(app_list::SPEECH_RECOGNITION_READY);
+  }
+}
+
+void AppListViewDelegate::OnHotwordRecognized() {
+  DCHECK_EQ(app_list::SPEECH_RECOGNITION_HOTWORD_LISTENING,
+            speech_ui_->state());
+  ToggleSpeechRecognition();
 }
 
 void AppListViewDelegate::SigninManagerCreated(SigninManagerBase* manager) {
@@ -295,8 +321,15 @@ void AppListViewDelegate::AutoLaunchCanceled() {
 void AppListViewDelegate::ViewInitialized() {
   app_list::StartPageService* service =
       app_list::StartPageService::Get(profile_);
-  if (service)
+  if (service) {
     service->AppListShown();
+    if (service->HotwordEnabled()) {
+      HotwordService* hotword_service =
+          HotwordServiceFactory::GetForProfile(profile_);
+      if (hotword_service)
+        hotword_service->RequestHotwordSession(this);
+    }
+  }
 }
 
 void AppListViewDelegate::Dismiss()  {
@@ -308,8 +341,15 @@ void AppListViewDelegate::ViewClosing() {
 
   app_list::StartPageService* service =
       app_list::StartPageService::Get(profile_);
-  if (service)
+  if (service) {
     service->AppListHidden();
+    if (service->HotwordEnabled()) {
+      HotwordService* hotword_service =
+          HotwordServiceFactory::GetForProfile(profile_);
+      if (hotword_service)
+        hotword_service->StopHotwordSession(this);
+    }
+  }
 }
 
 gfx::ImageSkia AppListViewDelegate::GetWindowIcon() {
@@ -427,6 +467,19 @@ bool AppListViewDelegate::ShouldCenterWindow() const {
   // position is too tall, and doesn't fit in the left-over screen space.
   if (keyboard::IsKeyboardEnabled())
     return true;
+#endif
+
+#if defined(USE_ASH)
+  // If it is at all possible to enter maximize mode in this configuration
+  // (which has a virtual keyboard), we should use the experimental position.
+  // This avoids having the app list change shape and position as the user
+  // enters and exits maximize mode.
+  if (ash::Shell::HasInstance() &&
+      ash::Shell::GetInstance()
+          ->maximize_mode_controller()
+          ->CanEnterMaximizeMode()) {
+    return true;
+  }
 #endif
 
   return false;

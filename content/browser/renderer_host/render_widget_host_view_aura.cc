@@ -646,6 +646,10 @@ gfx::NativeViewAccessible RenderWidgetHostViewAura::GetNativeViewAccessible() {
   return static_cast<gfx::NativeViewAccessible>(NULL);
 }
 
+ui::TextInputClient* RenderWidgetHostViewAura::GetTextInputClient() {
+  return this;
+}
+
 void RenderWidgetHostViewAura::SetKeyboardFocus() {
 #if defined(OS_WIN)
   if (CanFocus()) {
@@ -764,17 +768,13 @@ bool RenderWidgetHostViewAura::IsShowing() {
 }
 
 gfx::Rect RenderWidgetHostViewAura::GetViewBounds() const {
-  // This is the size that we want the renderer to produce. While we're waiting
-  // for the correct frame (i.e. during a resize), don't change the size so that
-  // we don't pipeline more resizes than we can handle.
-  gfx::Rect bounds(window_->GetBoundsInScreen());
-  return delegated_frame_host_->GetViewBoundsWithResizeLock(bounds);
+  return window_->GetBoundsInScreen();
 }
 
-void RenderWidgetHostViewAura::SetBackground(const SkBitmap& background) {
-  RenderWidgetHostViewBase::SetBackground(background);
-  host_->SetBackground(background);
-  window_->layer()->SetFillsBoundsOpaquely(background.isOpaque());
+void RenderWidgetHostViewAura::SetBackgroundOpaque(bool opaque) {
+  RenderWidgetHostViewBase::SetBackgroundOpaque(opaque);
+  host_->SetBackgroundOpaque(opaque);
+  window_->layer()->SetFillsBoundsOpaquely(opaque);
 }
 
 gfx::Size RenderWidgetHostViewAura::GetVisibleViewportSize() const {
@@ -957,9 +957,6 @@ void RenderWidgetHostViewAura::EndFrameSubscription() {
   delegated_frame_host_->EndFrameSubscription();
 }
 
-void RenderWidgetHostViewAura::OnAcceleratedCompositingStateChange() {
-}
-
 void RenderWidgetHostViewAura::AcceleratedSurfaceInitialized(int host_id,
                                                              int route_id) {
 }
@@ -990,13 +987,17 @@ void RenderWidgetHostViewAura::InternalSetBounds(const gfx::Rect& rect) {
   // Additonally the legacy dummy window is needed for accessibility and for
   // scrolling to work in legacy drivers for trackpoints/trackpads, etc.
   if (GetNativeViewId()) {
+    bool show_legacy_window = false;
     if (!legacy_render_widget_host_HWND_) {
       legacy_render_widget_host_HWND_ = LegacyRenderWidgetHostHWND::Create(
           reinterpret_cast<HWND>(GetNativeViewId()));
+      show_legacy_window = window_->TargetVisibility();
     }
     if (legacy_render_widget_host_HWND_) {
       legacy_render_widget_host_HWND_->SetBounds(
           window_->GetBoundsInRootWindow());
+      if (show_legacy_window)
+        legacy_render_widget_host_HWND_->Show();
     }
   }
 

@@ -79,7 +79,7 @@ class Parser(object):
       # Generator expects a module. If one wasn't specified insert one with an
       # empty name.
       if p[1][0] != 'MODULE':
-        p[0] = [('MODULE', '', [], p[1])]
+        p[0] = [('MODULE', '', None, p[1])]
       else:
         p[0] = [p[1]]
 
@@ -101,7 +101,8 @@ class Parser(object):
   def p_definition(self, p):
     """definition : struct
                   | interface
-                  | enum"""
+                  | enum
+                  | const"""
     p[0] = p[1]
 
   def p_attribute_section(self, p):
@@ -131,6 +132,7 @@ class Parser(object):
   def p_struct_body(self, p):
     """struct_body : field struct_body
                    | enum struct_body
+                   | const struct_body
                    | """
     if len(p) > 1:
       p[0] = _ListFromConcat(p[1], p[2])
@@ -154,6 +156,7 @@ class Parser(object):
   def p_interface_body(self, p):
     """interface_body : method interface_body
                       | enum interface_body
+                      | const interface_body
                       | """
     if len(p) > 1:
       p[0] = _ListFromConcat(p[1], p[2])
@@ -190,20 +193,25 @@ class Parser(object):
 
   def p_basictypename(self, p):
     """basictypename : identifier
-                     | HANDLE
-                     | specializedhandle"""
+                     | handletype"""
     p[0] = p[1]
 
-  def p_specializedhandle(self, p):
-    """specializedhandle : HANDLE LANGLE specializedhandlename RANGLE"""
-    p[0] = "handle<" + p[3] + ">"
-
-  def p_specializedhandlename(self, p):
-    """specializedhandlename : DATA_PIPE_CONSUMER
-                             | DATA_PIPE_PRODUCER
-                             | MESSAGE_PIPE
-                             | SHARED_BUFFER"""
-    p[0] = p[1]
+  def p_handletype(self, p):
+    """handletype : HANDLE
+                  | HANDLE LANGLE NAME RANGLE"""
+    if len(p) == 2:
+      p[0] = p[1]
+    else:
+      if p[3] not in ('data_pipe_consumer',
+                      'data_pipe_producer',
+                      'message_pipe',
+                      'shared_buffer'):
+        # Note: We don't enable tracking of line numbers for everything, so we
+        # can't use |p.lineno(3)|.
+        raise ParseError(self.filename, "Invalid handle type %r:" % p[3],
+                         lineno=p.lineno(1),
+                         snippet=self._GetSnippet(p.lineno(1)))
+      p[0] = "handle<" + p[3] + ">"
 
   def p_array(self, p):
     """array : typename LBRACKET RBRACKET"""
@@ -242,6 +250,10 @@ class Parser(object):
       p[0] = ('ENUM_FIELD', p[1], None)
     else:
       p[0] = ('ENUM_FIELD', p[1], p[3])
+
+  def p_const(self, p):
+    """const : CONST typename NAME EQUALS expression SEMI"""
+    p[0] = ('CONST', p[2], p[3], p[5])
 
   ### Expressions ###
 

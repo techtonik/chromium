@@ -31,6 +31,7 @@ class WindowAndroid;
 }
 
 namespace content {
+class JavaBridgeDispatcherHostManager;
 class RenderWidgetHostViewAndroid;
 struct MenuItem;
 
@@ -44,7 +45,8 @@ class ContentViewCoreImpl : public ContentViewCore,
                       jobject obj,
                       WebContents* web_contents,
                       ui::ViewAndroid* view_android,
-                      ui::WindowAndroid* window_android);
+                      ui::WindowAndroid* window_android,
+                      jobject java_bridge_retained_object_set);
 
   // ContentViewCore implementation.
   virtual base::android::ScopedJavaLocalRef<jobject> GetJavaObject() OVERRIDE;
@@ -184,8 +186,7 @@ class ContentViewCoreImpl : public ContentViewCore,
                               jobject obj,
                               jobject object,
                               jstring name,
-                              jclass safe_annotation_clazz,
-                              jobject retained_object_set);
+                              jclass safe_annotation_clazz);
   void RemoveJavascriptInterface(JNIEnv* env, jobject obj, jstring name);
   int GetNavigationHistory(JNIEnv* env, jobject obj, jobject history);
   void GetDirectedNavigationHistory(JNIEnv* env,
@@ -264,7 +265,6 @@ class ContentViewCoreImpl : public ContentViewCore,
   void OnSelectionChanged(const std::string& text);
   void OnSelectionBoundsChanged(
       const ViewHostMsg_SelectionBounds_Params& params);
-  void OnSelectionRootBoundsChanged(const gfx::Rect& bounds);
 
   void StartContentIntent(const GURL& content_url);
 
@@ -292,6 +292,8 @@ class ContentViewCoreImpl : public ContentViewCore,
   // Returns the viewport size after accounting for the viewport offset.
   gfx::Size GetViewSize() const;
 
+  void SetAccessibilityEnabledInternal(bool enabled);
+
   // --------------------------------------------------------------------------
   // Methods called from native code
   // --------------------------------------------------------------------------
@@ -317,7 +319,7 @@ class ContentViewCoreImpl : public ContentViewCore,
 
   // WebContentsObserver implementation.
   virtual void RenderViewReady() OVERRIDE;
-  virtual void WebContentsDestroyed(WebContents* web_contents) OVERRIDE;
+  virtual void WebContentsDestroyed() OVERRIDE;
 
   // --------------------------------------------------------------------------
   // Other private methods and data
@@ -372,7 +374,11 @@ class ContentViewCoreImpl : public ContentViewCore,
   // will be sent to Renderer once it is ready.
   int device_orientation_;
 
-  bool geolocation_needs_pause_;
+  bool accessibility_enabled_;
+
+  // Manages injecting Java objects.
+  scoped_ptr<JavaBridgeDispatcherHostManager>
+      java_bridge_dispatcher_host_manager_;
 
   DISALLOW_COPY_AND_ASSIGN(ContentViewCoreImpl);
 };

@@ -180,24 +180,11 @@ class Plugin : public pp::Instance {
   // in this order, for the main nacl subprocess.
   void ShutDownSubprocesses();
 
-  // Access the service runtime for the main NaCl subprocess.
-  ServiceRuntime* main_service_runtime() const {
-    return main_subprocess_.service_runtime();
-  }
-
   // Histogram helper functions, internal to Plugin so they can use
   // uma_interface_ normally.
   void HistogramTimeSmall(const std::string& name, int64_t ms);
-  void HistogramTimeMedium(const std::string& name, int64_t ms);
-  void HistogramTimeLarge(const std::string& name, int64_t ms);
-  void HistogramSizeKB(const std::string& name, int32_t sample);
-  void HistogramEnumerate(const std::string& name,
-                          int sample,
-                          int maximum,
-                          int out_of_range_replacement);
   void HistogramEnumerateLoadStatus(PP_NaClError error_code);
   void HistogramEnumerateSelLdrLoadStatus(NaClErrorCode error_code);
-  void HistogramHTTPStatusCode(const std::string& name, int status);
 
   // Load a nacl module from the file specified in wrapper.
   // Only to be used from a background (non-main) thread.
@@ -260,13 +247,6 @@ class Plugin : public pp::Instance {
   // Processes the JSON manifest string and starts loading the nexe.
   void ProcessNaClManifest(const nacl::string& manifest_json);
 
-  // Parses the JSON in |manifest_json| and retains a Manifest in
-  // |manifest_| for use by subsequent resource lookups.
-  // On success, |true| is returned and |manifest_| is updated to
-  // contain a Manifest that is used by SelectNexeURLFromManifest.
-  // On failure, |false| is returned, and |manifest_| is unchanged.
-  bool SetManifestObject(const nacl::string& manifest_json);
-
   // Logs timing information to a UMA histogram, and also logs the same timing
   // information divided by the size of the nexe to another histogram.
   void HistogramStartupTimeSmall(const std::string& name, float dt);
@@ -291,13 +271,9 @@ class Plugin : public pp::Instance {
 
   nacl::DescWrapperFactory* wrapper_factory_;
 
-  // File download support.  |nexe_downloader_| can be opened with a specific
-  // callback to run when the file has been downloaded and is opened for
-  // reading.  We use one downloader for all URL downloads to prevent issuing
-  // multiple GETs that might arrive out of order.  For example, this will
-  // prevent a GET of a NaCl manifest while a .nexe GET is pending.  Note that
-  // this will also prevent simultaneous handling of multiple .nexes on a page.
-  FileDownloader nexe_downloader_;
+  // Original, unresolved URL for the .nexe program to load.
+  std::string program_url_;
+
   pp::CompletionCallbackFactory<Plugin> callback_factory_;
 
   nacl::scoped_ptr<PnaclCoordinator> pnacl_coordinator_;
@@ -325,11 +301,9 @@ class Plugin : public pp::Instance {
   int64_t time_of_last_progress_event_;
   int exit_status_;
 
-  // Open times are in microseconds.
-  int64_t nexe_open_time_;
-
-  PP_Var manifest_data_var_;
   int32_t manifest_id_;
+
+  PP_FileHandle nexe_handle_;
 
   const PPB_NaCl_Private* nacl_interface_;
   pp::UMAPrivate uma_interface_;

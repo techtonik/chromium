@@ -62,7 +62,7 @@ class AppListFolderView : public views::View,
   void CloseFolderPage();
 
   // views::View
-  virtual gfx::Size GetPreferredSize() OVERRIDE;
+  virtual gfx::Size GetPreferredSize() const OVERRIDE;
   virtual void Layout() OVERRIDE;
   virtual bool OnKeyPressed(const ui::KeyEvent& event) OVERRIDE;
 
@@ -103,7 +103,8 @@ class AppListFolderView : public views::View,
       AppsGridView::Pointer pointer,
       const gfx::Point& drag_point_in_folder_grid) OVERRIDE;
   virtual void DispatchEndDragEventForReparent(
-      bool events_forwarded_to_drag_drop_host) OVERRIDE;
+      bool events_forwarded_to_drag_drop_host,
+      bool cancel_drag) OVERRIDE;
   virtual bool IsPointOutsideOfFolderBoundary(const gfx::Point& point) OVERRIDE;
   virtual bool IsOEMFolder() const OVERRIDE;
   virtual void SetRootLevelDragViewVisible(bool visible) OVERRIDE;

@@ -15,6 +15,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Picture;
 import android.graphics.Rect;
+import android.net.Uri;
 import android.net.http.SslCertificate;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -1497,6 +1498,14 @@ public class AwContents {
     }
 
     /**
+     * @see android.webkit.WebView#preauthorizePermission(Uri, long)
+     */
+    public void preauthorizePermission(Uri origin, long resources) {
+        if (mNativeAwContents == 0) return;
+        nativePreauthorizePermission(mNativeAwContents, origin.toString(), resources);
+    }
+
+    /**
      * @see ContentViewCore.evaluateJavaScript(String, ContentViewCore.JavaScriptCallback)
      */
     public void evaluateJavaScript(String script, final ValueCallback<String> callback) {
@@ -1582,6 +1591,10 @@ public class AwContents {
      */
     public void onAttachedToWindow() {
         if (mNativeAwContents == 0) return;
+        if (mIsAttachedToWindow) {
+            Log.w(TAG, "onAttachedToWindow called when already attached. Ignoring");
+            return;
+        }
         mIsAttachedToWindow = true;
 
         mContentViewCore.onAttachedToWindow();
@@ -1599,6 +1612,10 @@ public class AwContents {
      */
     @SuppressLint("MissingSuperCall")
     public void onDetachedFromWindow() {
+        if (!mIsAttachedToWindow) {
+            Log.w(TAG, "onDetachedFromWindow called when already detached. Ignoring");
+            return;
+        }
         mIsAttachedToWindow = false;
         hideAutofillPopup();
         if (mNativeAwContents != 0) {
@@ -1932,11 +1949,6 @@ public class AwContents {
     }
 
     @CalledByNative
-    private void setMaxContainerViewScrollOffset(int maxX, int maxY) {
-        mScrollOffsetManager.setMaxScrollOffset(maxX, maxY);
-    }
-
-    @CalledByNative
     private void scrollContainerViewTo(int x, int y) {
         mScrollOffsetManager.scrollContainerViewTo(x, y);
     }
@@ -1947,31 +1959,14 @@ public class AwContents {
     }
 
     @CalledByNative
-    private void setContentsSize(int widthDip, int heightDip) {
-        mContentWidthDip = widthDip;
-        mContentHeightDip = heightDip;
-    }
-
-    @CalledByNative
-    private void setPageScaleFactorAndLimits(
+    private void updateScrollState(int maxContainerViewScrollOffsetX,
+            int maxContainerViewScrollOffsetY, int contentWidthDip, int contentHeightDip,
             float pageScaleFactor, float minPageScaleFactor, float maxPageScaleFactor) {
-        if (mPageScaleFactor == pageScaleFactor &&
-                mMinPageScaleFactor == minPageScaleFactor &&
-                mMaxPageScaleFactor == maxPageScaleFactor) {
-            return;
-        }
-        mMinPageScaleFactor = minPageScaleFactor;
-        mMaxPageScaleFactor = maxPageScaleFactor;
-        if (mPageScaleFactor != pageScaleFactor) {
-          float oldPageScaleFactor = mPageScaleFactor;
-          mPageScaleFactor = pageScaleFactor;
-          // NOTE: if this ever needs to become synchronous then we need to make sure the scroll
-          // bounds are correctly updated before calling the method, otherwise embedder code that
-          // attempts to scroll on scale change might cause weird results.
-          mContentsClient.getCallbackHelper().postOnScaleChangedScaled(
-                  (float)(oldPageScaleFactor * mDIPScale),
-                  (float)(mPageScaleFactor * mDIPScale));
-        }
+        mContentWidthDip = contentWidthDip;
+        mContentHeightDip = contentHeightDip;
+        mScrollOffsetManager.setMaxScrollOffset(maxContainerViewScrollOffsetX,
+            maxContainerViewScrollOffsetY);
+        setPageScaleFactorAndLimits(pageScaleFactor, minPageScaleFactor, maxPageScaleFactor);
     }
 
     @CalledByNative
@@ -1996,6 +1991,27 @@ public class AwContents {
     // -------------------------------------------------------------------------------------------
     // Helper methods
     // -------------------------------------------------------------------------------------------
+
+    private void setPageScaleFactorAndLimits(
+            float pageScaleFactor, float minPageScaleFactor, float maxPageScaleFactor) {
+        if (mPageScaleFactor == pageScaleFactor &&
+                mMinPageScaleFactor == minPageScaleFactor &&
+                mMaxPageScaleFactor == maxPageScaleFactor) {
+            return;
+        }
+        mMinPageScaleFactor = minPageScaleFactor;
+        mMaxPageScaleFactor = maxPageScaleFactor;
+        if (mPageScaleFactor != pageScaleFactor) {
+            float oldPageScaleFactor = mPageScaleFactor;
+            mPageScaleFactor = pageScaleFactor;
+            // NOTE: if this ever needs to become synchronous then we need to make sure the scroll
+            // bounds are correctly updated before calling the method, otherwise embedder code that
+            // attempts to scroll on scale change might cause weird results.
+            mContentsClient.getCallbackHelper().postOnScaleChangedScaled(
+                    (float)(oldPageScaleFactor * mDIPScale),
+                    (float)(mPageScaleFactor * mDIPScale));
+        }
+    }
 
     private void saveWebArchiveInternal(String path, final ValueCallback<String> callback) {
         if (path == null || mNativeAwContents == 0) {
@@ -2126,4 +2142,7 @@ public class AwContents {
     private native void nativeTrimMemory(long nativeAwContents, int level, boolean visible);
 
     private native void nativeCreatePdfExporter(long nativeAwContents, AwPdfExporter awPdfExporter);
+
+    private native void nativePreauthorizePermission(long nativeAwContents, String origin,
+            long resources);
 }

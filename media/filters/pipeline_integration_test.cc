@@ -248,6 +248,76 @@ class KeyProvidingApp : public FakeEncryptedMedia::AppBase {
   uint32 current_session_id_;
 };
 
+class RotatingKeyProvidingApp : public KeyProvidingApp {
+ public:
+  RotatingKeyProvidingApp() : num_distint_need_key_calls_(0) {}
+  virtual ~RotatingKeyProvidingApp() {
+    // Expect that NeedKey is fired multiple times with different |init_data|.
+    EXPECT_GT(num_distint_need_key_calls_, 1u);
+  }
+
+  virtual void NeedKey(const std::string& type,
+                       const std::vector<uint8>& init_data,
+                       AesDecryptor* decryptor) OVERRIDE {
+    // Skip the request if the |init_data| has been seen.
+    if (init_data == prev_init_data_)
+      return;
+    prev_init_data_ = init_data;
+    ++num_distint_need_key_calls_;
+
+    EXPECT_TRUE(decryptor->CreateSession(current_session_id_ + 1,
+                                         type,
+                                         vector_as_array(&init_data),
+                                         init_data.size()));
+
+    std::vector<uint8> key_id;
+    std::vector<uint8> key;
+    EXPECT_TRUE(GetKeyAndKeyId(init_data, &key, &key_id));
+
+    // Convert key into a JSON structure and then add it.
+    std::string jwk = GenerateJWKSet(vector_as_array(&key),
+                                     key.size(),
+                                     vector_as_array(&key_id),
+                                     key_id.size());
+    decryptor->UpdateSession(current_session_id_,
+                             reinterpret_cast<const uint8*>(jwk.data()),
+                             jwk.size());
+  }
+
+ private:
+  bool GetKeyAndKeyId(std::vector<uint8> init_data,
+                      std::vector<uint8>* key,
+                      std::vector<uint8>* key_id) {
+    // For WebM, init_data is key_id; for ISO CENC, init_data should contain
+    // the key_id. We assume key_id is in the end of init_data here (that is
+    // only a reasonable assumption for WebM and clear key ISO CENC).
+    DCHECK_GE(init_data.size(), arraysize(kKeyId));
+    std::vector<uint8> key_id_from_init_data(
+        init_data.end() - arraysize(kKeyId), init_data.end());
+
+    key->assign(kSecretKey, kSecretKey + arraysize(kSecretKey));
+    key_id->assign(kKeyId, kKeyId + arraysize(kKeyId));
+
+    // The Key and KeyId for this testing key provider are created by left
+    // rotating kSecretKey and kKeyId. Note that this implementation is only
+    // intended for testing purpose. The actual key rotation algorithm can be
+    // much more complicated.
+    // Find out the rotating position from |key_id_from_init_data| and apply on
+    // |key|.
+    for (size_t pos = 0; pos < arraysize(kKeyId); ++pos) {
+      std::rotate(key_id->begin(), key_id->begin() + pos, key_id->end());
+      if (*key_id == key_id_from_init_data) {
+        std::rotate(key->begin(), key->begin() + pos, key->end());
+        return true;
+      }
+    }
+    return false;
+  }
+
+  std::vector<uint8> prev_init_data_;
+  uint32 num_distint_need_key_calls_;
+};
+
 // Ignores needkey and does not perform a license request
 class NoResponseApp : public FakeEncryptedMedia::AppBase {
  public:
@@ -449,10 +519,7 @@ class MockMediaSource {
 // Test parameter determines which coded frame processor is used to process
 // appended data, and is only applicable in tests where the pipeline is using a
 // (Mock)MediaSource (which are TEST_P, not TEST_F). If true,
-// LegacyFrameProcessor is used. Otherwise, (not yet supported), a more
-// compliant frame processor is used.
-// TODO(wolenetz): Enable usage of new frame processor based on this flag.
-// See http://crbug.com/249422.
+// LegacyFrameProcessor is used. Otherwise, the new FrameProcessor is used.
 class PipelineIntegrationTest
     : public testing::TestWithParam<bool>,
       public PipelineIntegrationTestBase {
@@ -993,6 +1060,33 @@ TEST_P(PipelineIntegrationTest,
   Stop();
 }
 
+TEST_P(PipelineIntegrationTest,
+       MediaSource_ConfigChange_Encrypted_MP4_CENC_KeyRotation_VideoOnly) {
+  MockMediaSource source("bear-640x360-v_frag-cenc-key_rotation.mp4",
+                         kMP4Video, kAppendWholeFile, GetParam());
+  FakeEncryptedMedia encrypted_media(new RotatingKeyProvidingApp());
+  StartPipelineWithEncryptedMedia(&source, &encrypted_media);
+
+  scoped_refptr<DecoderBuffer> second_file =
+      ReadTestDataFile("bear-1280x720-v_frag-cenc-key_rotation.mp4");
+
+  source.AppendAtTime(base::TimeDelta::FromSeconds(kAppendTimeSec),
+                      second_file->data(), second_file->data_size());
+
+  source.EndOfStream();
+
+  EXPECT_EQ(1u, pipeline_->GetBufferedTimeRanges().size());
+  EXPECT_EQ(0, pipeline_->GetBufferedTimeRanges().start(0).InMilliseconds());
+  EXPECT_EQ(kAppendTimeMs + k1280IsoFileDurationMs,
+            pipeline_->GetBufferedTimeRanges().end(0).InMilliseconds());
+
+  Play();
+
+  EXPECT_TRUE(WaitUntilOnEnded());
+  source.Abort();
+  Stop();
+}
+
 // Config changes from clear to encrypted are not currently supported.
 // TODO(ddorwin): Figure out why this CHECKs in AppendAtTime().
 TEST_P(PipelineIntegrationTest,
@@ -1203,6 +1297,37 @@ TEST_P(PipelineIntegrationTest, BasicPlayback_MediaSource_VideoOnly_MP4_AVC3) {
   Stop();
 }
 
+TEST_P(PipelineIntegrationTest, EncryptedPlayback_MP4_CENC_KeyRotation_Video) {
+  MockMediaSource source("bear-1280x720-v_frag-cenc-key_rotation.mp4",
+                         kMP4Video, kAppendWholeFile, GetParam());
+  FakeEncryptedMedia encrypted_media(new RotatingKeyProvidingApp());
+  StartPipelineWithEncryptedMedia(&source, &encrypted_media);
+
+  source.EndOfStream();
+  ASSERT_EQ(PIPELINE_OK, pipeline_status_);
+
+  Play();
+
+  ASSERT_TRUE(WaitUntilOnEnded());
+  source.Abort();
+  Stop();
+}
+
+TEST_P(PipelineIntegrationTest, EncryptedPlayback_MP4_CENC_KeyRotation_Audio) {
+  MockMediaSource source("bear-1280x720-a_frag-cenc-key_rotation.mp4",
+                         kMP4Audio, kAppendWholeFile, GetParam());
+  FakeEncryptedMedia encrypted_media(new RotatingKeyProvidingApp());
+  StartPipelineWithEncryptedMedia(&source, &encrypted_media);
+
+  source.EndOfStream();
+  ASSERT_EQ(PIPELINE_OK, pipeline_status_);
+
+  Play();
+
+  ASSERT_TRUE(WaitUntilOnEnded());
+  source.Abort();
+  Stop();
+}
 #endif
 
 // TODO(acolwell): Fix flakiness http://crbug.com/117921
@@ -1319,8 +1444,10 @@ TEST_F(PipelineIntegrationTest,
   ASSERT_TRUE(WaitUntilOnEnded());
 }
 
-// TODO(wolenetz): Enable MSE testing of new frame processor based on this flag,
-// once the new processor has landed. See http://crbug.com/249422.
+// For MediaSource tests, generate two sets of tests: one using FrameProcessor,
+// and one using LegacyFrameProcessor.
+INSTANTIATE_TEST_CASE_P(NewFrameProcessor, PipelineIntegrationTest,
+                        Values(false));
 INSTANTIATE_TEST_CASE_P(LegacyFrameProcessor, PipelineIntegrationTest,
                         Values(true));
 

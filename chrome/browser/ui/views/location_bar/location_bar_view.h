@@ -233,6 +233,7 @@ class LocationBarView : public LocationBar,
   gfx::Point GetLocationBarAnchorPoint() const;
 
   OmniboxViewViews* omnibox_view() { return omnibox_view_; }
+  const OmniboxViewViews* omnibox_view() const { return omnibox_view_; }
 
   views::View* generated_credit_card_view();
 
@@ -258,7 +259,7 @@ class LocationBarView : public LocationBar,
   // views::View:
   virtual bool HasFocus() const OVERRIDE;
   virtual void GetAccessibleState(ui::AXViewState* state) OVERRIDE;
-  virtual gfx::Size GetPreferredSize() OVERRIDE;
+  virtual gfx::Size GetPreferredSize() const OVERRIDE;
   virtual void Layout() OVERRIDE;
 
   // OmniboxEditController:
@@ -291,6 +292,10 @@ class LocationBarView : public LocationBar,
   friend class PageActionWithBadgeView;
   typedef std::vector<ExtensionAction*> PageActions;
   typedef std::vector<PageActionWithBadgeView*> PageActionViews;
+
+  // Helper for GetMinimumWidth().  Calculates the incremental minimum width
+  // |view| should add to the trailing width after the omnibox.
+  static int IncrementalMinimumWidth(views::View* view);
 
   // Returns the thickness of any visible left and right edge, in pixels.
   int GetHorizontalEdgeThickness() const;
@@ -337,6 +342,9 @@ class LocationBarView : public LocationBar,
   // Returns true if the suggest text is valid.
   bool HasValidSuggestText() const;
 
+  bool ShouldShowKeywordBubble() const;
+  bool ShouldShowEVBubble() const;
+
   // Origin chip animation control methods.
   void OnShowURLAnimationEnded();
   void OnHideURLAnimationEnded();
@@ -369,9 +377,9 @@ class LocationBarView : public LocationBar,
   // views::View:
   virtual const char* GetClassName() const OVERRIDE;
   virtual void OnBoundsChanged(const gfx::Rect& previous_bounds) OVERRIDE;
-  virtual void OnFocus() OVERRIDE;
   virtual void OnPaint(gfx::Canvas* canvas) OVERRIDE;
-  virtual void PaintChildren(gfx::Canvas* canvas) OVERRIDE;
+  virtual void PaintChildren(gfx::Canvas* canvas,
+                             const views::CullSet& cull_set) OVERRIDE;
 
   // views::ButtonListener:
   virtual void ButtonPressed(views::Button* sender,

@@ -51,7 +51,7 @@ class TestRunner : public WebTestRunner,
 
   void Reset();
 
-  WebTaskList* taskList() { return &task_list_; }
+  WebTaskList* mutable_task_list() { return &task_list_; }
 
   void SetTestIsRunning(bool);
   bool TestIsRunning() const { return test_is_running_; }
@@ -150,7 +150,7 @@ class TestRunner : public WebTestRunner,
 
     void set_frozen(bool frozen) { frozen_ = frozen; }
     bool is_empty() { return queue_.empty(); }
-    WebTaskList* taskList() { return &task_list_; }
+    WebTaskList* mutable_task_list() { return &task_list_; }
 
    private:
     void ProcessWork();
@@ -476,6 +476,10 @@ class TestRunner : public WebTestRunner,
 
   // Used to set the device scale factor.
   void SetBackingScaleFactor(double value, v8::Handle<v8::Function> callback);
+
+  // Change the device color profile while running a layout test.
+  void SetColorProfile(const std::string& name,
+                       v8::Handle<v8::Function> callback);
 
   // Calls setlocale(LC_ALL, ...) for a specified locale.
   // Resets between tests.

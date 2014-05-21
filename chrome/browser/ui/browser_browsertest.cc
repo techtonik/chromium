@@ -204,7 +204,7 @@ class TransferHttpsRedirectsContentBrowserClient
       content::ResourceContext* resource_context,
       const GURL& current_url,
       const GURL& new_url) OVERRIDE {
-    return new_url.SchemeIs(content::kHttpsScheme);
+    return new_url.SchemeIs(url::kHttpsScheme);
   }
 };
 
@@ -631,7 +631,7 @@ class RedirectObserver : public content::WebContentsObserver {
     params_ = params;
   }
 
-  virtual void WebContentsDestroyed(WebContents* contents) OVERRIDE {
+  virtual void WebContentsDestroyed() OVERRIDE {
     // Make sure we don't close the tab while the observer is in scope.
     // See http://crbug.com/314036.
     FAIL() << "WebContents closed during navigation (http://crbug.com/314036).";
@@ -1119,7 +1119,7 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, CommandCreateAppShortcutHttp) {
 
   ASSERT_TRUE(test_server()->Start());
   GURL http_url(test_server()->GetURL(std::string()));
-  ASSERT_TRUE(http_url.SchemeIs(content::kHttpScheme));
+  ASSERT_TRUE(http_url.SchemeIs(url::kHttpScheme));
   ui_test_utils::NavigateToURL(browser(), http_url);
   EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_CREATE_SHORTCUTS));
 }
@@ -1133,7 +1133,7 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, CommandCreateAppShortcutHttps) {
                                      base::FilePath(kDocRoot));
   ASSERT_TRUE(test_server.Start());
   GURL https_url(test_server.GetURL("/"));
-  ASSERT_TRUE(https_url.SchemeIs(content::kHttpsScheme));
+  ASSERT_TRUE(https_url.SchemeIs(url::kHttpsScheme));
   ui_test_utils::NavigateToURL(browser(), https_url);
   EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_CREATE_SHORTCUTS));
 }
@@ -1179,7 +1179,7 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, CommandCreateAppShortcutInvalid) {
 IN_PROC_BROWSER_TEST_F(BrowserTest, DISABLED_ConvertTabToAppShortcut) {
   ASSERT_TRUE(test_server()->Start());
   GURL http_url(test_server()->GetURL(std::string()));
-  ASSERT_TRUE(http_url.SchemeIs(content::kHttpScheme));
+  ASSERT_TRUE(http_url.SchemeIs(url::kHttpScheme));
 
   ASSERT_EQ(1, browser()->tab_strip_model()->count());
   WebContents* initial_tab = browser()->tab_strip_model()->GetWebContentsAt(0);
@@ -1531,13 +1531,7 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, RestorePinnedTabs) {
 
 // This test verifies we don't crash when closing the last window and the app
 // menu is showing.
-// TODO(linux_aura) http://crbug.com/163931
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS) && defined(USE_AURA)
-#define MAYBE_CloseWithAppMenuOpen DISABLED_CloseWithAppMenuOpen
-#else
-#define MAYBE_CloseWithAppMenuOpen CloseWithAppMenuOpen
-#endif
-IN_PROC_BROWSER_TEST_F(BrowserTest, MAYBE_CloseWithAppMenuOpen) {
+IN_PROC_BROWSER_TEST_F(BrowserTest, CloseWithAppMenuOpen) {
   if (browser_defaults::kBrowserAliveWithNoWindows)
     return;
 
@@ -2487,13 +2481,7 @@ IN_PROC_BROWSER_TEST_F(ClickModifierTest, WindowOpenControlShiftClickTest) {
 }
 
 // Middle-clicks open in a background tab.
-// TODO(linux_aura) http://crbug.com/163931
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS) && defined(USE_AURA)
-#define MAYBE_WindowOpenMiddleClickTest DISABLED_WindowOpenMiddleClickTest
-#else
-#define MAYBE_WindowOpenMiddleClickTest WindowOpenMiddleClickTest
-#endif
-IN_PROC_BROWSER_TEST_F(ClickModifierTest, MAYBE_WindowOpenMiddleClickTest) {
+IN_PROC_BROWSER_TEST_F(ClickModifierTest, WindowOpenMiddleClickTest) {
   int modifiers = 0;
   blink::WebMouseEvent::Button button = blink::WebMouseEvent::ButtonMiddle;
   WindowOpenDisposition disposition = NEW_BACKGROUND_TAB;
@@ -2556,13 +2544,7 @@ IN_PROC_BROWSER_TEST_F(ClickModifierTest, HrefControlShiftClickTest) {
 }
 
 // Middle-clicks open in a background tab.
-// TODO(linux_aura) http://crbug.com/163931
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS) && defined(USE_AURA)
-#define MAYBE_HrefMiddleClickTest DISABLED_HrefMiddleClickTest
-#else
-#define MAYBE_HrefMiddleClickTest HrefMiddleClickTest
-#endif
-IN_PROC_BROWSER_TEST_F(ClickModifierTest, MAYBE_HrefMiddleClickTest) {
+IN_PROC_BROWSER_TEST_F(ClickModifierTest, HrefMiddleClickTest) {
   int modifiers = 0;
   blink::WebMouseEvent::Button button = blink::WebMouseEvent::ButtonMiddle;
   WindowOpenDisposition disposition = NEW_BACKGROUND_TAB;

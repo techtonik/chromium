@@ -15,15 +15,21 @@
 #include "base/basictypes.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/scoped_ptr.h"
+#include "base/memory/scoped_vector.h"
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/user_metrics.h"
+#include "base/observer_list.h"
 #include "base/process/kill.h"
+#include "base/threading/thread_checker.h"
 #include "base/time/time.h"
 #include "chrome/browser/metrics/metrics_log.h"
 #include "chrome/browser/metrics/tracking_synchronizer_observer.h"
 #include "chrome/common/metrics/metrics_service_base.h"
 #include "chrome/installer/util/google_update_settings.h"
+#include "components/metrics/metrics_provider.h"
+#include "components/metrics/metrics_service_observer.h"
+#include "components/variations/active_field_trials.h"
 #include "content/public/browser/browser_child_process_observer.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
@@ -32,10 +38,9 @@
 
 #if defined(OS_ANDROID)
 #include "chrome/browser/android/activity_type_ids.h"
-#elif defined(OS_CHROMEOS)
-#include "chrome/browser/chromeos/external_metrics.h"
 #endif
 
+class ChromeBrowserMetricsServiceObserver;
 class MetricsReportingScheduler;
 class PrefService;
 class PrefRegistrySimple;
@@ -52,7 +57,7 @@ class DictionaryValue;
 class MessageLoopProxy;
 }
 
-namespace chrome_variations {
+namespace variations {
 struct ActiveGroupId;
 }
 
@@ -95,7 +100,7 @@ struct SyntheticTrialGroup {
  public:
   ~SyntheticTrialGroup();
 
-  chrome_variations::ActiveGroupId id;
+  variations::ActiveGroupId id;
   base::TimeTicks start_time;
 
  private:
@@ -127,7 +132,10 @@ class MetricsService
     SHUTDOWN_COMPLETE = 700,
   };
 
-  MetricsService();
+  // Creates the MetricsService with the given |state_manager|. Does not take
+  // ownership of |state_manager|, instead stores a weak pointer to it. Caller
+  // should ensure that |state_manager| is valid for the lifetime of this class.
+  explicit MetricsService(metrics::MetricsStateManager* state_manager);
   virtual ~MetricsService();
 
   // Initializes metrics recording state. Updates various bookkeeping values in
@@ -248,10 +256,6 @@ class MetricsService
 #endif  // OS_WIN
 
 #if defined(OS_CHROMEOS)
-  // Start the external metrics service, which collects metrics from Chrome OS
-  // and passes them to UMA.
-  void StartExternalMetrics();
-
   // Records a Chrome OS crash.
   void LogChromeOSCrash(const std::string &crash_type);
 #endif
@@ -275,10 +279,15 @@ class MetricsService
   // To use this method, SyntheticTrialGroup should friend your class.
   void RegisterSyntheticFieldTrial(const SyntheticTrialGroup& trial_group);
 
+  // Register the specified |provider| to provide additional metrics into the
+  // UMA log. Should be called during MetricsService initialization only.
+  void RegisterMetricsProvider(scoped_ptr<metrics::MetricsProvider> provider);
+
   // Check if this install was cloned or imaged from another machine. If a
   // clone is detected, reset the client id and low entropy source. This
   // should not be called more than once.
-  void CheckForClonedInstall();
+  void CheckForClonedInstall(
+      scoped_refptr<base::SingleThreadTaskRunner> task_runner);
 
  private:
   // The MetricsService has a lifecycle that is stored as a state.
@@ -360,6 +369,11 @@ class MetricsService
 
   // Set up client ID, session ID, etc.
   void InitializeMetricsState();
+
+  // Registers/unregisters |observer| to receive MetricsLog notifications.
+  void AddObserver(MetricsServiceObserver* observer);
+  void RemoveObserver(MetricsServiceObserver* observer);
+  void NotifyOnDidCreateMetricsLog();
 
   // Schedule the next save of LocalState information.  This is called
   // automatically by the task that performs each save to schedule the next one.
@@ -469,11 +483,14 @@ class MetricsService
   // Returns a list of synthetic field trials that were active for the entire
   // duration of the current log.
   void GetCurrentSyntheticFieldTrials(
-      std::vector<chrome_variations::ActiveGroupId>* synthetic_trials);
+      std::vector<variations::ActiveGroupId>* synthetic_trials);
 
   // Used to manage various metrics reporting state prefs, such as client id,
-  // low entropy source and whether metrics reporting is enabled.
-  scoped_ptr<metrics::MetricsStateManager> state_manager_;
+  // low entropy source and whether metrics reporting is enabled. Weak pointer.
+  metrics::MetricsStateManager* state_manager_;
+
+  // Registered metrics providers.
+  ScopedVector<metrics::MetricsProvider> metrics_providers_;
 
   base::ActionCallback action_callback_;
 
@@ -561,11 +578,6 @@ class MetricsService
   // Number of async histogram fetch requests in progress.
   int num_async_histogram_fetches_in_progress_;
 
-#if defined(OS_CHROMEOS)
-  // The external metric service is used to log ChromeOS UMA events.
-  scoped_refptr<chromeos::ExternalMetrics> external_metrics_;
-#endif
-
   // Stores the time of the first call to |GetUptimes()|.
   base::TimeTicks first_updated_time_;
 
@@ -582,7 +594,15 @@ class MetricsService
   // Field trial groups that map to Chrome configuration states.
   SyntheticTrialGroups synthetic_trial_groups_;
 
+  ObserverList<MetricsServiceObserver> observers_;
+
+  // Confirms single-threaded access to |observers_| in debug builds.
+  base::ThreadChecker thread_checker_;
+
+  friend class MetricsServiceHelper;
+
   FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, IsPluginProcess);
+  FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, MetricsServiceObserver);
   FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest,
                            PermutedEntropyCacheClearedWhenLowEntropyReset);
   FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, RegisterSyntheticTrial);
@@ -590,12 +610,13 @@ class MetricsService
   DISALLOW_COPY_AND_ASSIGN(MetricsService);
 };
 
-// This class limits and documents access to the IsMetricsReportingEnabled() and
-// IsCrashReportingEnabled() methods. Since these methods are private, each user
-// has to be explicitly declared as a 'friend' below.
+// This class limits and documents access to metrics service helper methods.
+// Since these methods are private, each user has to be explicitly declared
+// as a 'friend' below.
 class MetricsServiceHelper {
  private:
   friend bool prerender::IsOmniboxEnabled(Profile* profile);
+  friend class ::ChromeBrowserMetricsServiceObserver;
   friend class ChromeRenderMessageFilter;
   friend class ::CrashesDOMHandler;
   friend class extensions::ExtensionDownloader;
@@ -616,6 +637,11 @@ class MetricsServiceHelper {
   // level for Android and ChromeOS, and otherwise is the same as
   // IsMetricsReportingEnabled for desktop Chrome.
   static bool IsCrashReportingEnabled();
+
+  // Registers/unregisters |observer| to receive MetricsLog notifications
+  // from metrics service.
+  static void AddMetricsServiceObserver(MetricsServiceObserver* observer);
+  static void RemoveMetricsServiceObserver(MetricsServiceObserver* observer);
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(MetricsServiceHelper);
 };

@@ -187,26 +187,23 @@
 #include "chrome/browser/memory_details.h"
 #include "chrome/browser/metrics/compression_utils.h"
 #include "chrome/browser/metrics/metrics_log.h"
-#include "chrome/browser/metrics/metrics_log_serializer.h"
-#include "chrome/browser/metrics/metrics_reporting_scheduler.h"
 #include "chrome/browser/metrics/metrics_state_manager.h"
 #include "chrome/browser/metrics/time_ticks_experiment_win.h"
 #include "chrome/browser/metrics/tracking_synchronizer.h"
-#include "chrome/common/metrics/variations/variations_util.h"
 #include "chrome/browser/net/http_pipelining_compatibility_client.h"
 #include "chrome/browser/net/network_stats.h"
 #include "chrome/browser/omnibox/omnibox_log.h"
-#include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_otr_state.h"
-#include "chrome/browser/ui/search/search_tab_helper.h"
 #include "chrome/common/chrome_constants.h"
-#include "chrome/common/chrome_result_codes.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/crash_keys.h"
+#include "chrome/common/metrics/variations/variations_util.h"
 #include "chrome/common/net/test_server_locations.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/render_messages.h"
 #include "components/metrics/metrics_log_manager.h"
+#include "components/metrics/metrics_pref_names.h"
+#include "components/metrics/metrics_reporting_scheduler.h"
 #include "components/variations/entropy_provider.h"
 #include "components/variations/metrics_util.h"
 #include "content/public/browser/child_process_data.h"
@@ -229,7 +226,6 @@
 #endif
 
 #if defined(OS_CHROMEOS)
-#include "chrome/browser/chromeos/external_metrics.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
 #include "chromeos/system/statistics_provider.h"
 #endif
@@ -447,8 +443,8 @@ void MetricsService::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterStringPref(prefs::kStabilitySavedSystemProfileHash,
                                std::string());
 
-  registry->RegisterListPref(prefs::kMetricsInitialLogs);
-  registry->RegisterListPref(prefs::kMetricsOngoingLogs);
+  registry->RegisterListPref(metrics::prefs::kMetricsInitialLogs);
+  registry->RegisterListPref(metrics::prefs::kMetricsOngoingLogs);
 
   registry->RegisterInt64Pref(prefs::kInstallDate, 0);
   registry->RegisterInt64Pref(prefs::kUninstallMetricsPageLoadCount, 0);
@@ -462,9 +458,10 @@ void MetricsService::RegisterPrefs(PrefRegistrySimple* registry) {
 #endif  // defined(OS_ANDROID)
 }
 
-MetricsService::MetricsService()
-    : state_manager_(metrics::MetricsStateManager::Create(
-        g_browser_process->local_state())),
+MetricsService::MetricsService(metrics::MetricsStateManager* state_manager)
+    : MetricsServiceBase(g_browser_process->local_state(),
+                         kUploadLogAvoidRetransmitSize),
+      state_manager_(state_manager),
       recording_active_(false),
       reporting_active_(false),
       test_mode_active_(false),
@@ -479,9 +476,6 @@ MetricsService::MetricsService()
       num_async_histogram_fetches_in_progress_(0) {
   DCHECK(IsSingleThreaded());
   DCHECK(state_manager_);
-
-  log_manager_.set_log_serializer(new MetricsLogSerializer);
-  log_manager_.set_max_ongoing_log_store_size(kUploadLogAvoidRetransmitSize);
 
   BrowserChildProcessObserver::Add(this);
 }
@@ -559,6 +553,9 @@ void MetricsService::EnableRecording() {
   if (!log_manager_.current_log())
     OpenNewLog();
 
+  for (size_t i = 0; i < metrics_providers_.size(); ++i)
+    metrics_providers_[i]->OnRecordingEnabled();
+
   SetUpNotifications(&registrar_, this);
   base::RemoveActionCallback(action_callback_);
   action_callback_ = base::Bind(&MetricsService::OnUserAction,
@@ -575,6 +572,10 @@ void MetricsService::DisableRecording() {
 
   base::RemoveActionCallback(action_callback_);
   registrar_.RemoveAll();
+
+  for (size_t i = 0; i < metrics_providers_.size(); ++i)
+    metrics_providers_[i]->OnRecordingDisabled();
+
   PushPendingLogsToPersistentStorage();
   DCHECK(!log_manager_.has_staged_log());
 }
@@ -1044,6 +1045,7 @@ void MetricsService::ReceivedProfilerData(
     initial_metrics_log_.reset(
         new MetricsLog(state_manager_->client_id(), session_id_,
                        MetricsLog::ONGOING_LOG));
+    NotifyOnDidCreateMetricsLog();
   }
 
   initial_metrics_log_->RecordProfilerData(process_data, process_type);
@@ -1075,6 +1077,22 @@ void MetricsService::GetUptimes(PrefService* pref,
     metrics_uptime += incremental_time_secs;
     pref->SetInt64(prefs::kUninstallMetricsUptimeSec, metrics_uptime);
   }
+}
+
+void MetricsService::AddObserver(MetricsServiceObserver* observer) {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  observers_.AddObserver(observer);
+}
+
+void MetricsService::RemoveObserver(MetricsServiceObserver* observer) {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  observers_.RemoveObserver(observer);
+}
+
+void MetricsService::NotifyOnDidCreateMetricsLog() {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  FOR_EACH_OBSERVER(
+      MetricsServiceObserver, observers_, OnDidCreateMetricsLog());
 }
 
 //------------------------------------------------------------------------------
@@ -1112,6 +1130,7 @@ void MetricsService::OpenNewLog() {
   log_manager_.BeginLoggingWithLog(
       new MetricsLog(state_manager_->client_id(), session_id_,
                      MetricsLog::ONGOING_LOG));
+  NotifyOnDidCreateMetricsLog();
   if (state_ == INITIALIZED) {
     // We only need to schedule that run once.
     state_ = INIT_TASK_SCHEDULED;
@@ -1153,17 +1172,19 @@ void MetricsService::CloseCurrentLog() {
   MetricsLog* current_log =
       static_cast<MetricsLog*>(log_manager_.current_log());
   DCHECK(current_log);
-  std::vector<chrome_variations::ActiveGroupId> synthetic_trials;
+  std::vector<variations::ActiveGroupId> synthetic_trials;
   GetCurrentSyntheticFieldTrials(&synthetic_trials);
-  current_log->RecordEnvironment(plugins_, google_update_metrics_,
-                                 synthetic_trials);
+  current_log->RecordEnvironment(metrics_providers_.get(), plugins_,
+                                 google_update_metrics_, synthetic_trials);
   PrefService* pref = g_browser_process->local_state();
   base::TimeDelta incremental_uptime;
   base::TimeDelta uptime;
   GetUptimes(pref, &incremental_uptime, &uptime);
-  current_log->RecordStabilityMetrics(incremental_uptime, uptime);
+  current_log->RecordStabilityMetrics(metrics_providers_.get(),
+                                      incremental_uptime, uptime);
 
   RecordCurrentHistograms();
+  current_log->RecordGeneralMetrics(metrics_providers_.get());
 
   log_manager_.FinishCurrentLog();
 }
@@ -1174,11 +1195,11 @@ void MetricsService::PushPendingLogsToPersistentStorage() {
 
   if (log_manager_.has_staged_log()) {
     // We may race here, and send second copy of the log later.
-    MetricsLogManager::StoreType store_type;
+    metrics::PersistedLogs::StoreType store_type;
     if (current_fetch_.get())
-      store_type = MetricsLogManager::PROVISIONAL_STORE;
+      store_type = metrics::PersistedLogs::PROVISIONAL_STORE;
     else
-      store_type = MetricsLogManager::NORMAL_STORE;
+      store_type = metrics::PersistedLogs::NORMAL_STORE;
     log_manager_.StoreStagedLogAsUnsent(store_type);
   }
   DCHECK(!log_manager_.has_staged_log());
@@ -1409,18 +1430,33 @@ void MetricsService::PrepareInitialStabilityLog() {
   scoped_ptr<MetricsLog> initial_stability_log(
       new MetricsLog(state_manager_->client_id(), session_id_,
                      MetricsLog::INITIAL_STABILITY_LOG));
+
+  // Do not call NotifyOnDidCreateMetricsLog here because the stability
+  // log describes stats from the _previous_ session.
+
   if (!initial_stability_log->LoadSavedEnvironmentFromPrefs())
     return;
-  initial_stability_log->RecordStabilityMetrics(base::TimeDelta(),
-                                                base::TimeDelta());
+
   log_manager_.LoadPersistedUnsentLogs();
 
   log_manager_.PauseCurrentLog();
   log_manager_.BeginLoggingWithLog(initial_stability_log.release());
+
+  // Note: Some stability providers may record stability stats via histograms,
+  //       so this call has to be after BeginLoggingWithLog().
+  MetricsLog* current_log =
+      static_cast<MetricsLog*>(log_manager_.current_log());
+  current_log->RecordStabilityMetrics(metrics_providers_.get(),
+                                      base::TimeDelta(), base::TimeDelta());
+
 #if defined(OS_ANDROID)
   ConvertAndroidStabilityPrefsToHistograms(pref);
   RecordCurrentStabilityHistograms();
 #endif  // defined(OS_ANDROID)
+
+  // Note: RecordGeneralMetrics() intentionally not called since this log is for
+  //       stability stats from a previous session only.
+
   log_manager_.FinishCurrentLog();
   log_manager_.ResumePausedLog();
 
@@ -1435,24 +1471,35 @@ void MetricsService::PrepareInitialMetricsLog() {
   DCHECK(state_ == INIT_TASK_DONE || state_ == SENDING_INITIAL_STABILITY_LOG);
   initial_metrics_log_->set_hardware_class(hardware_class_);
 
-  std::vector<chrome_variations::ActiveGroupId> synthetic_trials;
+  std::vector<variations::ActiveGroupId> synthetic_trials;
   GetCurrentSyntheticFieldTrials(&synthetic_trials);
-  initial_metrics_log_->RecordEnvironment(plugins_, google_update_metrics_,
+  initial_metrics_log_->RecordEnvironment(metrics_providers_.get(), plugins_,
+                                          google_update_metrics_,
                                           synthetic_trials);
   PrefService* pref = g_browser_process->local_state();
   base::TimeDelta incremental_uptime;
   base::TimeDelta uptime;
   GetUptimes(pref, &incremental_uptime, &uptime);
-  initial_metrics_log_->RecordStabilityMetrics(incremental_uptime, uptime);
 
   // Histograms only get written to the current log, so make the new log current
   // before writing them.
   log_manager_.PauseCurrentLog();
   log_manager_.BeginLoggingWithLog(initial_metrics_log_.release());
+
+  // Note: Some stability providers may record stability stats via histograms,
+  //       so this call has to be after BeginLoggingWithLog().
+  MetricsLog* current_log =
+      static_cast<MetricsLog*>(log_manager_.current_log());
+  current_log->RecordStabilityMetrics(metrics_providers_.get(),
+                                      base::TimeDelta(), base::TimeDelta());
+
 #if defined(OS_ANDROID)
   ConvertAndroidStabilityPrefsToHistograms(pref);
 #endif  // defined(OS_ANDROID)
   RecordCurrentHistograms();
+
+  current_log->RecordGeneralMetrics(metrics_providers_.get());
+
   log_manager_.FinishCurrentLog();
   log_manager_.ResumePausedLog();
 
@@ -1494,7 +1541,7 @@ void MetricsService::PrepareFetchWithStagedLog() {
     current_fetch_->SetRequestContext(
         g_browser_process->system_request_context());
 
-    std::string log_text = log_manager_.staged_log_text();
+    std::string log_text = log_manager_.staged_log();
     std::string compressed_log_text;
     bool compression_successful = chrome::GzipCompress(log_text,
                                                        &compressed_log_text);
@@ -1548,7 +1595,7 @@ void MetricsService::OnURLFetchComplete(const net::URLFetcher* source) {
 
   // Provide boolean for error recovery (allow us to ignore response_code).
   bool discard_log = false;
-  const size_t log_size = log_manager_.staged_log_text().length();
+  const size_t log_size = log_manager_.staged_log().length();
   if (!upload_succeeded && log_size > kUploadLogAvoidRetransmitSize) {
     UMA_HISTOGRAM_COUNTS("UMA.Large Rejected Log was Discarded",
                          static_cast<int>(log_size));
@@ -1705,12 +1752,19 @@ void MetricsService::RegisterSyntheticFieldTrial(
   synthetic_trial_groups_.push_back(trial_group);
 }
 
-void MetricsService::CheckForClonedInstall() {
-  state_manager_->CheckForClonedInstall();
+void MetricsService::RegisterMetricsProvider(
+    scoped_ptr<metrics::MetricsProvider> provider) {
+  DCHECK_EQ(INITIALIZED, state_);
+  metrics_providers_.push_back(provider.release());
+}
+
+void MetricsService::CheckForClonedInstall(
+    scoped_refptr<base::SingleThreadTaskRunner> task_runner) {
+  state_manager_->CheckForClonedInstall(task_runner);
 }
 
 void MetricsService::GetCurrentSyntheticFieldTrials(
-    std::vector<chrome_variations::ActiveGroupId>* synthetic_trials) {
+    std::vector<variations::ActiveGroupId>* synthetic_trials) {
   DCHECK(synthetic_trials);
   synthetic_trials->clear();
   const MetricsLog* current_log =
@@ -1898,13 +1952,6 @@ bool MetricsService::IsPluginProcess(int process_type) {
           process_type == content::PROCESS_TYPE_PPAPI_BROKER);
 }
 
-#if defined(OS_CHROMEOS)
-void MetricsService::StartExternalMetrics() {
-  external_metrics_ = new chromeos::ExternalMetrics;
-  external_metrics_->Start();
-}
-#endif
-
 // static
 bool MetricsServiceHelper::IsMetricsReportingEnabled() {
   bool result = false;
@@ -1937,4 +1984,18 @@ bool MetricsServiceHelper::IsCrashReportingEnabled() {
 #else
   return false;
 #endif
+}
+
+void MetricsServiceHelper::AddMetricsServiceObserver(
+    MetricsServiceObserver* observer) {
+  MetricsService* metrics_service = g_browser_process->metrics_service();
+  if (metrics_service)
+    metrics_service->AddObserver(observer);
+}
+
+void MetricsServiceHelper::RemoveMetricsServiceObserver(
+    MetricsServiceObserver* observer) {
+  MetricsService* metrics_service = g_browser_process->metrics_service();
+  if (metrics_service)
+    metrics_service->RemoveObserver(observer);
 }

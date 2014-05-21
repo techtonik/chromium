@@ -33,7 +33,7 @@
 #include "chrome/common/url_constants.h"
 #include "chrome/test/base/test_switches.h"
 #include "chrome/test/base/ui_test_utils.h"
-#include "components/user_prefs/pref_registry_syncable.h"
+#include "components/pref_registry/pref_registry_syncable.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/render_process_host.h"
@@ -47,8 +47,8 @@
 
 #if defined(OS_CHROMEOS)
 #include "base/memory/scoped_ptr.h"
-#include "chrome/browser/chromeos/login/mock_user_manager.h"
-#include "chrome/browser/chromeos/login/user_manager.h"
+#include "chrome/browser/chromeos/login/users/mock_user_manager.h"
+#include "chrome/browser/chromeos/login/users/user_manager.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/dbus/fake_dbus_thread_manager.h"
 #include "chromeos/dbus/fake_power_manager_client.h"
@@ -544,6 +544,16 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest, LaunchWithFileExtension) {
   SetCommandLineArg(kTestFilePath);
   ASSERT_TRUE(RunPlatformAppTest("platform_apps/launch_file_by_extension"))
       << message_;
+}
+
+// Tests that launch data is sent through to a whitelisted extension if the file
+// extension matches.
+IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest,
+                       LaunchWhiteListedExtensionWithFile) {
+  SetCommandLineArg(kTestFilePath);
+  ASSERT_TRUE(RunPlatformAppTest(
+      "platform_apps/launch_whitelisted_ext_with_file"))
+          << message_;
 }
 
 #if defined(OS_LINUX) && !defined(OS_CHROMEOS) && defined(USE_AURA)
@@ -1185,8 +1195,6 @@ class PlatformAppIncognitoBrowserTest : public PlatformAppBrowserTest,
   virtual void OnAppWindowAdded(AppWindow* app_window) OVERRIDE {
     opener_app_ids_.insert(app_window->extension_id());
   }
-  virtual void OnAppWindowIconChanged(AppWindow* app_window) OVERRIDE {}
-  virtual void OnAppWindowRemoved(AppWindow* app_window) OVERRIDE {}
 
  protected:
   // A set of ids of apps we've seen open a app window.

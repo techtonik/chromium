@@ -5,6 +5,7 @@
 #ifndef UI_APP_LIST_VIEWS_APP_LIST_VIEW_H_
 #define UI_APP_LIST_VIEWS_APP_LIST_VIEW_H_
 
+#include "base/callback.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/observer_list.h"
 #include "ui/app_list/app_list_export.h"
@@ -79,8 +80,9 @@ class APP_LIST_EXPORT AppListView : public views::BubbleDelegateView,
   bool ShouldCenterWindow() const;
 
   // Overridden from views::View:
-  virtual gfx::Size GetPreferredSize() OVERRIDE;
-  virtual void Paint(gfx::Canvas* canvas) OVERRIDE;
+  virtual gfx::Size GetPreferredSize() const OVERRIDE;
+  virtual void Paint(gfx::Canvas* canvas,
+                     const views::CullSet& cull_set) OVERRIDE;
   virtual void OnThemeChanged() OVERRIDE;
 
   // WidgetDelegate overrides:
@@ -97,7 +99,7 @@ class APP_LIST_EXPORT AppListView : public views::BubbleDelegateView,
   void RemoveObserver(AppListViewObserver* observer);
 
   // Set a callback to be called the next time any app list paints.
-  static void SetNextPaintCallback(void (*callback)());
+  void SetNextPaintCallback(const base::Closure& callback);
 
 #if defined(OS_WIN)
   HWND GetHWND() const;
@@ -149,6 +151,9 @@ class APP_LIST_EXPORT AppListView : public views::BubbleDelegateView,
 
   ObserverList<AppListViewObserver> observers_;
   scoped_ptr<HideViewAnimationObserver> animation_observer_;
+
+  // For UMA and testing. If non-null, triggered when the app list is painted.
+  base::Closure next_paint_callback_;
 
   DISALLOW_COPY_AND_ASSIGN(AppListView);
 };

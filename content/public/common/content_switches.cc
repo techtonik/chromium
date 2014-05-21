@@ -224,6 +224,9 @@ const char kDisablePrefixedEncryptedMedia[] =
 // Disables LCD text.
 const char kDisableLCDText[]                = "disable-lcd-text";
 
+// Disables distance field text.
+const char kDisableDistanceFieldText[]      = "disable-distance-field-text";
+
 // Disable LocalStorage.
 const char kDisableLocalStorage[]           = "disable-local-storage";
 
@@ -331,6 +334,10 @@ const char kEnableAcceleratedOverflowScroll[] =
 // Enables LCD text.
 const char kEnableLCDText[]                 = "enable-lcd-text";
 
+// Enables using signed distance fields when rendering text.
+// Only valid if GPU rasterization is enabled as well.
+const char kEnableDistanceFieldText[]       = "enable-distance-field-text";
+
 // Enables experimental feature that maps multiple RenderLayers to
 // one composited layer to avoid pathological layer counts.
 const char kEnableLayerSquashing[] =
@@ -338,9 +345,6 @@ const char kEnableLayerSquashing[] =
 
 // Enable experimental container node culling.
 const char kEnableContainerCulling[]        = "enable-container-culling";
-
-// Turns on extremely verbose logging of accessibility events.
-const char kEnableAccessibilityLogging[]    = "enable-accessibility-logging";
 
 // Use a BeginFrame signal from browser to renderer to schedule rendering.
 const char kEnableBeginFrameScheduling[]    = "enable-begin-frame-scheduling";
@@ -426,6 +430,12 @@ const char kEnableDirectWrite[]             = "enable-direct-write";
 
 // Use high resolution timers for TimeTicks.
 const char kEnableHighResolutionTime[]      = "enable-high-resolution-time";
+
+// Enable the Win32K process mitigation policy for renderer processes which
+// prevents them from invoking user32 and gdi32 system calls which enter
+// the kernel. This is only supported on Windows 8 and beyond.
+const char kEnableWin32kRendererLockDown[]
+    = "enable_win32k_renderer_lockdown";
 #endif
 
 // Paint content on the compositor thread instead of the main thread.
@@ -440,14 +450,6 @@ const char kEnableLogging[]                 = "enable-logging";
 
 // Enables the memory benchmarking extension
 const char kEnableMemoryBenchmarking[]      = "enable-memory-benchmarking";
-
-// On Windows, converts the page to the currently-installed monitor profile.
-// This does NOT enable color management for images. The source is still
-// assumed to be sRGB.
-const char kEnableMonitorProfile[]          = "enable-monitor-profile";
-
-// Enables use of cache if offline, even if it's stale
-const char kEnableOfflineCacheAccess[]      = "enable-offline-cache-access";
 
 // Enable rasterizer that writes directly to GPU memory.
 const char kEnableOneCopy[]                 = "enable-one-copy";
@@ -883,9 +885,6 @@ extern const char kUIPrioritizeInGpuProcess[] =
 // Overrides the preferred discardable memory implementation.
 const char kUseDiscardableMemory[] = "use-discardable-memory";
 
-// Use fake device for MediaStream to replace actual camera and microphone.
-const char kUseFakeDeviceForMediaStream[] = "use-fake-device-for-media-stream";
-
 // Bypass the media stream infobar by selecting the default device for media
 // streams (e.g. WebRTC). Works with --use-fake-device-for-media-stream.
 const char kUseFakeUIForMediaStream[]     = "use-fake-ui-for-media-stream";
@@ -917,9 +916,6 @@ const char kValidateInputEventStream[] = "validate-input-event-stream";
 // will be used as a filter to determine if the child process should have the
 // kWaitForDebugger flag passed on or not.
 const char kWaitForDebuggerChildren[]       = "wait-for-debugger-children";
-
-// Overrides the amount of shared memory the webgl command buffer allocates
-const char kWebGLCommandBufferSizeKb[]      = "webgl-command-buffer-size-kb";
 
 // Causes the process to run as a worker subprocess.
 const char kWorkerProcess[]                 = "worker";
@@ -963,9 +959,6 @@ const char kDisableGestureRequirementForMediaFullscreen[] =
 // Disable user gesture requirement for media playback.
 const char kDisableGestureRequirementForMediaPlayback[] =
     "disable-gesture-requirement-for-media-playback";
-
-// Disable history logging for media elements.
-const char kDisableMediaHistoryLogging[]    = "disable-media-history";
 
 // Disable the click delay by sending click events during double tap.
 const char kDisableClickDelay[]             = "disable-click-delay";

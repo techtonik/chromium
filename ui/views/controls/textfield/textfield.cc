@@ -481,7 +481,7 @@ int Textfield::GetBaseline() const {
   return GetInsets().top() + GetRenderText()->GetBaseline();
 }
 
-gfx::Size Textfield::GetPreferredSize() {
+gfx::Size Textfield::GetPreferredSize() const {
   const gfx::Insets& insets = GetInsets();
   return gfx::Size(GetFontList().GetExpectedTextWidth(default_width_in_chars_) +
                    insets.width(), GetFontList().GetHeight() + insets.height());
@@ -724,9 +724,10 @@ bool Textfield::SkipDefaultKeyEventProcessing(const ui::KeyEvent& event) {
   }
 #endif
 
-  // Skip any accelerator handling of backspace; textfields handle this key.
+  // Skip backspace accelerator handling; editable textfields handle this key.
   // Also skip processing Windows [Alt]+<num-pad digit> Unicode alt-codes.
-  return event.key_code() == ui::VKEY_BACK || event.IsUnicodeKeyCode();
+  const bool is_backspace = event.key_code() == ui::VKEY_BACK;
+  return (is_backspace && !read_only()) || event.IsUnicodeKeyCode();
 }
 
 bool Textfield::GetDropFormats(
@@ -862,7 +863,7 @@ void Textfield::OnFocus() {
   GetRenderText()->set_focused(true);
   cursor_visible_ = true;
   SchedulePaint();
-  GetInputMethod()->OnFocus();
+  GetInputMethod()->OnTextInputTypeChanged(this);
   OnCaretBoundsChanged();
 
   const size_t caret_blink_ms = Textfield::GetCaretBlinkMs();
@@ -878,7 +879,7 @@ void Textfield::OnFocus() {
 
 void Textfield::OnBlur() {
   GetRenderText()->set_focused(false);
-  GetInputMethod()->OnBlur();
+  GetInputMethod()->OnTextInputTypeChanged(this);
   cursor_repaint_timer_.Stop();
   if (cursor_visible_) {
     cursor_visible_ = false;
@@ -955,7 +956,7 @@ void Textfield::WriteDragDataForView(View* sender,
   // Desktop Linux Aura does not yet support transparency in drag images.
   canvas->DrawColor(background);
 #endif
-  label.Paint(canvas.get());
+  label.Paint(canvas.get(), views::CullSet());
   const gfx::Vector2d kOffset(-15, 0);
   drag_utils::SetDragImageOnDataObject(*canvas, label.size(), kOffset, data);
   if (controller_)
@@ -1488,7 +1489,7 @@ void Textfield::UpdateAfterChange(bool text_changed, bool cursor_changed) {
     cursor_visible_ = true;
     RepaintCursor();
     if (cursor_repaint_timer_.IsRunning())
-    cursor_repaint_timer_.Reset();
+      cursor_repaint_timer_.Reset();
     if (!text_changed) {
       // TEXT_CHANGED implies SELECTION_CHANGED, so we only need to fire
       // this if only the selection changed.

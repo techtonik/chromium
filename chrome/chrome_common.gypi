@@ -111,7 +111,6 @@
         'common/custom_handlers/protocol_handler.cc',
         'common/custom_handlers/protocol_handler.h',
         'common/descriptors_android.h',
-        'common/encrypted_media_messages_android.h',
         'common/extensions/api/bluetooth/bluetooth_manifest_data.cc',
         'common/extensions/api/bluetooth/bluetooth_manifest_data.h',
         'common/extensions/api/bluetooth/bluetooth_manifest_handler.cc',
@@ -253,8 +252,7 @@
         'common/media/webrtc_logging_messages.h',
         'common/media/webrtc_logging_message_data.cc',
         'common/media/webrtc_logging_message_data.h',
-        'common/metrics/caching_permuted_entropy_provider.cc',
-        'common/metrics/caching_permuted_entropy_provider.h',
+        'common/media_galleries/metadata_types.h',
         'common/metrics/metrics_service_base.cc',
         'common/metrics/metrics_service_base.h',
         'common/metrics/variations/experiment_labels.cc',
@@ -391,6 +389,7 @@
             ['exclude', '^common/custom_handlers/'],
             ['exclude', '^common/extensions/'],
             ['exclude', '^common/logging_chrome\\.'],
+            ['exclude', '^common/media_galleries/'],
             ['exclude', '^common/multi_process_'],
             ['exclude', '^common/nacl_'],
             ['exclude', '^common/pepper_flash\\.'],
@@ -436,6 +435,7 @@
             ['exclude', '^common/importer/'],
             ['include', '^common/importer/imported_favicon_usage.cc$'],
             ['include', '^common/importer/imported_favicon_usage.h$'],
+            ['exclude', '^common/media_galleries/'],
             ['exclude', '^common/service_'],
           ],
           'sources!': [
@@ -682,7 +682,6 @@
       'type': 'static_library',
       'sources': [
         'common/metrics/proto/chrome_experiments.proto',
-        'common/metrics/proto/permuted_entropy_cache.proto',
       ],
       'variables': {
         'proto_in_dir': 'common/metrics/proto',

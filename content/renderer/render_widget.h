@@ -121,19 +121,13 @@ class CONTENT_EXPORT RenderWidget
   // blink::WebWidgetClient
   virtual void suppressCompositorScheduling(bool enable);
   virtual void willBeginCompositorFrame();
-  virtual void didInvalidateRect(const blink::WebRect&);
-  virtual void didScrollRect(int dx, int dy,
-                             const blink::WebRect& clipRect);
   virtual void didAutoResize(const blink::WebSize& new_size);
-  virtual void didActivateCompositor() OVERRIDE;
-  virtual void didDeactivateCompositor();
   virtual void initializeLayerTreeView();
   virtual blink::WebLayerTreeView* layerTreeView();
   virtual void didBecomeReadyForAdditionalInput();
   virtual void didCommitAndDrawCompositorFrame();
   virtual void didCompleteSwapBuffers();
   virtual void scheduleComposite();
-  virtual void scheduleAnimation();
   virtual void didFocus();
   virtual void didBlur();
   virtual void didChangeCursor(const blink::WebCursorInfo&);
@@ -303,18 +297,9 @@ class CONTENT_EXPORT RenderWidget
   // active RenderWidgets.
   void SetSwappedOut(bool is_swapped_out);
 
-  void AnimationCallback();
-  void InvalidationCallback();
   void FlushPendingInputEventAck();
-  void DoDeferredUpdateAndSendInputAck();
-  void DoDeferredUpdate();
   void DoDeferredClose();
   void DoDeferredSetWindowRect(const blink::WebRect& pos);
-
-  // Set the background of the render widget to a bitmap. The bitmap will be
-  // tiled in both directions if it isn't big enough to fill the area. This is
-  // mainly intended to be used in conjuction with WebView::SetIsTransparent().
-  virtual void SetBackground(const SkBitmap& bitmap);
 
   // Resizes the render widget.
   void Resize(const gfx::Size& new_size,
@@ -389,6 +374,8 @@ class CONTENT_EXPORT RenderWidget
   void AutoResizeCompositor();
 
   virtual void SetDeviceScaleFactor(float device_scale_factor);
+
+  virtual void OnOrientationChange();
 
   // Override points to notify derived classes that a paint has happened.
   // DidInitiatePaint happens when that has completed, and subsequent rendering
@@ -635,9 +622,6 @@ class CONTENT_EXPORT RenderWidget
   typedef std::vector<WebPluginGeometry> WebPluginGeometryVector;
   WebPluginGeometryVector plugin_window_moves_;
 
-  // A custom background for the widget.
-  SkBitmap background_;
-
   // While we are waiting for the browser to update window sizes, we track the
   // pending size temporarily.
   int pending_window_rect_count_;
@@ -654,22 +638,6 @@ class CONTENT_EXPORT RenderWidget
 
   // Indicates if the next sequence of Char events should be suppressed or not.
   bool suppress_next_char_events_;
-
-  // Set to true if painting to the window is handled by the accelerated
-  // compositor.
-  bool is_accelerated_compositing_active_;
-
-  // Set to true if compositing has ever been active for this widget. Once a
-  // widget has used compositing, it will act as though force compositing mode
-  // is on for the remainder of the widget's lifetime.
-  bool was_accelerated_compositing_ever_active_;
-
-  base::OneShotTimer<RenderWidget> animation_timer_;
-  bool animation_update_pending_;
-  bool invalidation_task_posted_;
-
-  // Stats for legacy software mode
-  scoped_ptr<cc::RenderingStatsInstrumentation> legacy_software_mode_stats_;
 
   // Properties of the screen hosting this RenderWidget instance.
   blink::WebScreenInfo screen_info_;

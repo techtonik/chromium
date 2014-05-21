@@ -178,6 +178,11 @@ cr.define('cr.ui.login', function() {
      */
     displayType_: DISPLAY_TYPE.UNKNOWN,
 
+    /**
+     * Error message (bubble) was shown. This is checked in tests.
+     */
+    errorMessageWasShownForTesting_: false,
+
     get displayType() {
       return this.displayType_;
     },
@@ -240,6 +245,11 @@ cr.define('cr.ui.login', function() {
       if (value) {
         keyboard.initializeKeyboardFlow();
         cr.ui.DropDown.enableKeyboardFlow();
+        for (var i = 0; i < this.screens_.length; ++i) {
+          var screen = $(this.screens_[i]);
+          if (screen.enableKeyboardFlow)
+            screen.enableKeyboardFlow();
+        }
       }
     },
 
@@ -876,8 +886,10 @@ cr.define('cr.ui.login', function() {
     }
 
     var currentScreen = Oobe.getInstance().currentScreen;
-    if (currentScreen && typeof currentScreen.showErrorBubble === 'function')
+    if (currentScreen && typeof currentScreen.showErrorBubble === 'function') {
       currentScreen.showErrorBubble(loginAttempts, error);
+      this.errorMessageWasShownForTesting_ = true;
+    }
   };
 
   /**
@@ -907,6 +919,7 @@ cr.define('cr.ui.login', function() {
    */
   DisplayManager.clearErrors = function() {
     $('bubble').hide();
+    this.errorMessageWasShownForTesting_ = false;
   };
 
   /**
