@@ -207,6 +207,12 @@ class EventRouter : public content::NotificationObserver,
                             const std::string& extension_id,
                             const std::string& event_name);
 
+  // Returns tru if the |set_of_ids| contains the EventDispatchIdentifier for
+  // the |listener|.
+  static bool ContainsKey(
+      const std::set<EventRouter::EventDispatchIdentifier> set_of_ids,
+      const EventListener* listener);
+
   // Shared by DispatchEvent*. If |restrict_to_extension_id| is empty, the
   // event is broadcast.
   // An event that just came off the pending list may not be delayed again.

@@ -459,6 +459,15 @@ void EventRouter::DispatchEventWithLazyListener(const std::string& extension_id,
     RemoveLazyEventListener(event_name, extension_id);
 }
 
+// static
+bool EventRouter::ContainsKey(
+    const std::set<EventRouter::EventDispatchIdentifier> set_of_ids,
+    const EventListener* listener) {
+  EventDispatchIdentifier dispatch_id(listener->GetBrowserContext(),
+                                      listener->extension_id());
+  return ::ContainsKey(set_of_ids, dispatch_id);
+}
+
 void EventRouter::DispatchEventImpl(const std::string& restrict_to_extension_id,
                                     const linked_ptr<Event>& event) {
   // We don't expect to get events from a completely different browser context.
@@ -493,13 +502,18 @@ void EventRouter::DispatchEventImpl(const std::string& restrict_to_extension_id,
     const EventListener* listener = *it;
     if (restrict_to_extension_id.empty() ||
         restrict_to_extension_id == listener->extension_id()) {
-      if (listener->process()) {
-        EventDispatchIdentifier dispatch_id(listener->GetBrowserContext(),
-                                            listener->extension_id());
-        if (!ContainsKey(already_dispatched, dispatch_id)) {
+      if (listener->process() && !ContainsKey(already_dispatched, listener)) {
+        DispatchEventToProcess(
+            listener->extension_id(), listener->process(), event);
+      } else if (listener->service_worker() &&
+                 !ContainsKey(already_dispatched, listener)) {
+        //
+        //
+        // TODO: Make a DispatchEventToServieWorker.
+        //
+        //
           DispatchEventToProcess(
               listener->extension_id(), listener->process(), event);
-        }
       }
     }
   }
