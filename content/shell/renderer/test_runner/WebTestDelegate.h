@@ -56,6 +56,9 @@ public:
     // Set orientation to set when registering via Platform::setScreenOrientationListener().
     virtual void setScreenOrientation(const blink::WebScreenOrientationType&) = 0;
 
+    // Reset the screen orientation data used for testing.
+    virtual void resetScreenOrientation() = 0;
+
     // Add a message to the text dump for the layout test.
     virtual void printMessage(const std::string& message) = 0;
 
@@ -113,6 +116,9 @@ public:
 
     // Controls the device scale factor of the main WebView for hidpi tests.
     virtual void setDeviceScaleFactor(float) = 0;
+
+    // Change the device color profile while running a layout test.
+    virtual void setDeviceColorProfile(const std::string& name) = 0;
 
     // Controls which WebView should be focused.
     virtual void setFocus(WebTestProxyBase*, bool) = 0;

@@ -63,14 +63,6 @@ void WebContentsModalDialogManager::FocusTopmostDialog() {
   child_dialogs_.front()->manager->Focus();
 }
 
-void WebContentsModalDialogManager::SetCloseOnInterstitialPage(
-    NativeWebContentsModalDialog dialog,
-    bool close) {
-  WebContentsModalDialogList::iterator loc = FindDialogState(dialog);
-  DCHECK(loc != child_dialogs_.end());
-  (*loc)->close_on_interstitial_webui = close;
-}
-
 content::WebContents* WebContentsModalDialogManager::GetWebContents() const {
   return web_contents();
 }
@@ -106,15 +98,7 @@ WebContentsModalDialogManager::DialogState::DialogState(
     NativeWebContentsModalDialog dialog,
     scoped_ptr<SingleWebContentsDialogManager> mgr)
     : dialog(dialog),
-      manager(mgr.release()),
-#if defined(USE_AURA)
-      close_on_interstitial_webui(true)
-#else
-      // TODO(wittman): Test that closing on interstitial webui works properly
-      // on Mac and use the true default for all platforms.
-      close_on_interstitial_webui(false)
-#endif
-                                         {
+      manager(mgr.release()) {
 }
 
 WebContentsModalDialogManager::DialogState::~DialogState() {}
@@ -187,7 +171,7 @@ void WebContentsModalDialogManager::WasHidden() {
     child_dialogs_.front()->manager->Hide();
 }
 
-void WebContentsModalDialogManager::WebContentsDestroyed(WebContents* tab) {
+void WebContentsModalDialogManager::WebContentsDestroyed() {
   // First cleanly close all child dialogs.
   // TODO(mpcomplete): handle case if MaybeCloseChildWindows() already asked
   // some of these to close.  CloseAllDialogs is async, so it might get called
@@ -196,14 +180,10 @@ void WebContentsModalDialogManager::WebContentsDestroyed(WebContents* tab) {
 }
 
 void WebContentsModalDialogManager::DidAttachInterstitialPage() {
-  // Copy the dialogs so we can close and remove them while iterating over the
-  // list.
-  WebContentsModalDialogList dialogs(child_dialogs_);
-  for (WebContentsModalDialogList::iterator it = dialogs.begin();
-       it != dialogs.end(); ++it) {
-    if ((*it)->close_on_interstitial_webui)
-      (*it)->manager->Close();
-  }
+  // TODO(wittman): Test closing on interstitial webui works properly on Mac.
+#if defined(USE_AURA)
+  CloseAllDialogs();
+#endif
 }
 
 }  // namespace web_modal

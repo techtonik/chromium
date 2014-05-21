@@ -337,8 +337,9 @@ extern const char kAutoPasswordGenerationLearnMoreURL[];
 
 extern const char kPasswordManagerLearnMoreURL[];
 
-// "Learn more" URL for the Settings API bubble.
-extern const char kSettingsApiLearnMoreURL[];
+// "Learn more" URL for the Settings API, NTP bubble and other settings bubbles
+// showing which extension is controlling them.
+extern const char kExtensionControlledSettingLearnMoreURL[];
 
 // General help links for Chrome, opened using various actions.
 extern const char kChromeHelpViaKeyboardURL[];
@@ -379,9 +380,6 @@ extern const char kSupervisedUserManagementDisplayURL[];
 
 // Help URL for the settings page's search feature.
 extern const char kSettingsSearchHelpURL[];
-
-// "About" URL for the translate bar's options menu.
-extern const char kAboutGoogleTranslateURL[];
 
 // Help URL for the Omnibox setting.
 extern const char kOmniboxLearnMoreURL[];

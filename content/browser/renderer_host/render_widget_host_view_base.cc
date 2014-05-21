@@ -367,6 +367,7 @@ const int kFlushInputRateInUs = 16666;
 
 RenderWidgetHostViewBase::RenderWidgetHostViewBase()
     : popup_type_(blink::WebPopupTypeNone),
+      background_opaque_(true),
       mouse_locked_(false),
       showing_context_menu_(false),
       selection_text_offset_(0),
@@ -385,12 +386,12 @@ bool RenderWidgetHostViewBase::OnMessageReceived(const IPC::Message& msg){
   return false;
 }
 
-void RenderWidgetHostViewBase::SetBackground(const SkBitmap& background) {
-  background_ = background;
+void RenderWidgetHostViewBase::SetBackgroundOpaque(bool opaque) {
+  background_opaque_ = opaque;
 }
 
-const SkBitmap& RenderWidgetHostViewBase::GetBackground() {
-  return background_;
+bool RenderWidgetHostViewBase::GetBackgroundOpaque() {
+  return background_opaque_;
 }
 
 gfx::Size RenderWidgetHostViewBase::GetPhysicalBackingSize() const {
@@ -412,6 +413,11 @@ void RenderWidgetHostViewBase::SelectionChanged(const base::string16& text,
   selection_text_offset_ = offset;
   selection_range_.set_start(range.start());
   selection_range_.set_end(range.end());
+}
+
+ui::TextInputClient* RenderWidgetHostViewBase::GetTextInputClient() {
+  NOTREACHED();
+  return NULL;
 }
 
 bool RenderWidgetHostViewBase::IsShowingContextMenu() const {

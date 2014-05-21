@@ -81,11 +81,11 @@
 #include "chrome/common/net/url_fixer_upper.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
-#include "components/bookmarks/core/browser/bookmark_model.h"
+#include "components/bookmarks/browser/bookmark_model.h"
 #include "components/dom_distiller/content/dom_distiller_viewer_source.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
+#include "components/pref_registry/pref_registry_syncable.h"
 #include "components/startup_metric_utils/startup_metric_utils.h"
-#include "components/user_prefs/pref_registry_syncable.h"
 #include "components/user_prefs/user_prefs.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/dom_storage_context.h"
@@ -130,7 +130,7 @@
 
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/locale_change_guard.h"
-#include "chrome/browser/chromeos/login/user_manager.h"
+#include "chrome/browser/chromeos/login/users/user_manager.h"
 #include "chrome/browser/chromeos/preferences.h"
 #include "chrome/browser/chromeos/profiles/profile_helper.h"
 #endif
@@ -1071,8 +1071,7 @@ content::GeolocationPermissionContext*
   return ChromeGeolocationPermissionContextFactory::GetForProfile(this);
 }
 
-content::BrowserPluginGuestManagerDelegate*
-    ProfileImpl::GetGuestManagerDelegate() {
+content::BrowserPluginGuestManager* ProfileImpl::GetGuestManager() {
   return GuestViewManager::FromBrowserContext(this);
 }
 
@@ -1244,9 +1243,16 @@ chrome_browser_net::Predictor* ProfileImpl::GetNetworkPredictor() {
   return predictor_;
 }
 
-void ProfileImpl::ClearNetworkingHistorySince(base::Time time,
-                                              const base::Closure& completion) {
+void ProfileImpl::ClearNetworkingHistorySince(
+    base::Time time,
+    const base::Closure& completion) {
   io_data_.ClearNetworkingHistorySince(time, completion);
+}
+
+void ProfileImpl::ClearDomainReliabilityMonitor(
+    domain_reliability::DomainReliabilityClearMode mode,
+    const base::Closure& completion) {
+  io_data_.ClearDomainReliabilityMonitor(mode, completion);
 }
 
 GURL ProfileImpl::GetHomePage() {

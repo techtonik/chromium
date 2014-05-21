@@ -26,7 +26,7 @@
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/util.h"
 #include "chrome/common/pref_names.h"
-#include "components/user_prefs/pref_registry_syncable.h"
+#include "components/pref_registry/pref_registry_syncable.h"
 
 // A dictionary to hold all data related to the Default Search Engine.
 // Eventually, this should replace all the data stored in the
@@ -99,7 +99,7 @@ void DefaultSearchManager::RegisterProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterDictionaryPref(
       kDefaultSearchProviderDataPrefName,
-      user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+      user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
 }
 
 // static
@@ -128,7 +128,8 @@ TemplateURLData* DefaultSearchManager::GetDefaultSearchEngine(
 
   if (source)
     *source = FROM_FALLBACK;
-  return fallback_default_search_.get();
+  return TemplateURLService::fallback_search_engines_disabled() ?
+      NULL : fallback_default_search_.get();
 }
 
 DefaultSearchManager::Source

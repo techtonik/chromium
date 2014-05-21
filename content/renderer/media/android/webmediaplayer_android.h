@@ -99,6 +99,7 @@ class WebMediaPlayerAndroid : public blink::WebMediaPlayer,
   virtual void setRate(double rate);
   virtual void setVolume(double volume);
   virtual const blink::WebTimeRanges& buffered();
+  virtual blink::WebTimeRanges buffered() const;
   virtual double maxTimeSeekable() const;
 
   // Poster image, as defined in the <video> element.
@@ -132,7 +133,7 @@ class WebMediaPlayerAndroid : public blink::WebMediaPlayer,
   virtual double timelineOffset() const;
   virtual double currentTime() const;
 
-  virtual bool didLoadingProgress() const;
+  virtual bool didLoadingProgress();
 
   // Internal states of loading and network.
   virtual blink::WebMediaPlayer::NetworkState networkState() const;
@@ -331,7 +332,7 @@ class WebMediaPlayerAndroid : public blink::WebMediaPlayer,
   base::TimeDelta seek_time_;
 
   // Whether loading has progressed since the last call to didLoadingProgress.
-  mutable bool did_loading_progress_;
+  bool did_loading_progress_;
 
   // Manager for managing this object and for delegating method calls on
   // Render Thread.

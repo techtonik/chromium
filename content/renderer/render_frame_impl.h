@@ -18,6 +18,7 @@
 #include "content/public/common/referrer.h"
 #include "content/public/renderer/render_frame.h"
 #include "content/renderer/media/webmediaplayer_delegate.h"
+#include "content/renderer/render_frame_proxy.h"
 #include "content/renderer/renderer_webcookiejar_impl.h"
 #include "ipc/ipc_message.h"
 #include "third_party/WebKit/public/web/WebDataSource.h"
@@ -74,6 +75,9 @@ class CONTENT_EXPORT RenderFrameImpl
   // TODO(creis): We should structure this so that |SetWebFrame| isn't needed.
   static RenderFrameImpl* Create(RenderViewImpl* render_view, int32 routing_id);
 
+  // Returns the RenderFrameImpl for the given routing ID.
+  static RenderFrameImpl* FromRoutingID(int routing_id);
+
   // Just like RenderFrame::FromWebFrame but returns the implementation.
   static RenderFrameImpl* FromWebFrame(blink::WebFrame* web_frame);
 
@@ -86,6 +90,12 @@ class CONTENT_EXPORT RenderFrameImpl
 
   bool is_swapped_out() const {
     return is_swapped_out_;
+  }
+
+  // TODO(nasko): This can be removed once we don't have a swapped out state on
+  // RenderFrames. See https://crbug.com/357747.
+  void set_render_frame_proxy(RenderFrameProxy* proxy) {
+    render_frame_proxy_ = proxy;
   }
 
   // Out-of-process child frames receive a signal from RenderWidgetCompositor
@@ -274,7 +284,7 @@ class CONTENT_EXPORT RenderFrameImpl
       blink::WebLocalFrame* frame,
       const blink::WebHistoryItem& item,
       blink::WebHistoryCommitType commit_type);
-  virtual void didClearWindowObject(blink::WebLocalFrame* frame, int world_id);
+  virtual void didClearWindowObject(blink::WebLocalFrame* frame);
   virtual void didCreateDocumentElement(blink::WebLocalFrame* frame);
   virtual void didReceiveTitle(blink::WebLocalFrame* frame,
                                const blink::WebString& title,
@@ -356,9 +366,9 @@ class CONTENT_EXPORT RenderFrameImpl
   virtual blink::WebUserMediaClient* userMediaClient();
   virtual blink::WebMIDIClient* webMIDIClient();
   virtual bool willCheckAndDispatchMessageEvent(
-      blink::WebLocalFrame* sourceFrame,
-      blink::WebFrame* targetFrame,
-      blink::WebSecurityOrigin targetOrigin,
+      blink::WebLocalFrame* source_frame,
+      blink::WebFrame* target_frame,
+      blink::WebSecurityOrigin target_origin,
       blink::WebDOMMessageEvent event);
   virtual blink::WebString userAgentOverride(blink::WebLocalFrame* frame,
                                              const blink::WebURL& url);
@@ -412,7 +422,7 @@ class CONTENT_EXPORT RenderFrameImpl
   // The documentation for these functions should be in
   // content/common/*_messages.h for the message that the function is handling.
   void OnBeforeUnload();
-  void OnSwapOut();
+  void OnSwapOut(int proxy_routing_id);
   void OnChildFrameProcessGone();
   void OnBuffersSwapped(const FrameMsg_BuffersSwapped_Params& params);
   void OnCompositorFrameSwapped(const IPC::Message& message);
@@ -460,6 +470,22 @@ class CONTENT_EXPORT RenderFrameImpl
                const Referrer& referrer,
                blink::WebNavigationPolicy policy);
 
+  // Update current main frame's encoding and send it to browser window.
+  // Since we want to let users see the right encoding info from menu
+  // before finishing loading, we call the UpdateEncoding in
+  // a) function:DidCommitLoadForFrame. When this function is called,
+  // that means we have got first data. In here we try to get encoding
+  // of page if it has been specified in http header.
+  // b) function:DidReceiveTitle. When this function is called,
+  // that means we have got specified title. Because in most of webpages,
+  // title tags will follow meta tags. In here we try to get encoding of
+  // page if it has been specified in meta tag.
+  // c) function:DidFinishDocumentLoadForFrame. When this function is
+  // called, that means we have got whole html page. In here we should
+  // finally get right encoding of page.
+  void UpdateEncoding(blink::WebFrame* frame,
+                      const std::string& encoding_name);
+
   // Dispatches the current state of selection on the webpage to the browser if
   // it has changed.
   // TODO(varunjain): delete this method once we figure out how to keep
@@ -506,6 +532,10 @@ class CONTENT_EXPORT RenderFrameImpl
   base::WeakPtr<RenderViewImpl> render_view_;
   int routing_id_;
   bool is_swapped_out_;
+  // RenderFrameProxy exists only when is_swapped_out_ is true.
+  // TODO(nasko): This can be removed once we don't have a swapped out state on
+  // RenderFrame. See https://crbug.com/357747.
+  RenderFrameProxy* render_frame_proxy_;
   bool is_detaching_;
 
 #if defined(ENABLE_PLUGINS)

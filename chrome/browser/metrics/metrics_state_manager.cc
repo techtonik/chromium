@@ -16,8 +16,8 @@
 #include "chrome/browser/metrics/cloned_install_detector.h"
 #include "chrome/browser/metrics/machine_id_provider.h"
 #include "chrome/common/chrome_switches.h"
-#include "chrome/common/metrics/caching_permuted_entropy_provider.h"
 #include "chrome/common/pref_names.h"
+#include "components/variations/caching_permuted_entropy_provider.h"
 
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/settings/cros_settings.h"
@@ -109,7 +109,8 @@ void MetricsStateManager::ForceClientIdCreation() {
   local_state_->ClearPref(prefs::kMetricsOldClientID);
 }
 
-void MetricsStateManager::CheckForClonedInstall() {
+void MetricsStateManager::CheckForClonedInstall(
+    scoped_refptr<base::SingleThreadTaskRunner> task_runner) {
   DCHECK(!cloned_install_detector_);
 
   MachineIdProvider* provider = MachineIdProvider::CreateInstance();
@@ -117,7 +118,7 @@ void MetricsStateManager::CheckForClonedInstall() {
     return;
 
   cloned_install_detector_.reset(new ClonedInstallDetector(provider));
-  cloned_install_detector_->CheckForClonedInstall(local_state_);
+  cloned_install_detector_->CheckForClonedInstall(local_state_, task_runner);
 }
 
 scoped_ptr<const base::FieldTrial::EntropyProvider>

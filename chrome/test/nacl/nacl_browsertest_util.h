@@ -8,11 +8,11 @@
 #include "base/files/file_path.h"
 #include "base/memory/scoped_ptr.h"
 #include "chrome/test/base/in_process_browser_test.h"
-#include "chrome/test/base/javascript_test_observer.h"
+#include "content/public/test/javascript_test_observer.h"
 
 // A helper base class that decodes structured automation messages of the form:
 // {"type": type_name, ...}
-class StructuredMessageHandler : public TestMessageHandler {
+class StructuredMessageHandler : public content::TestMessageHandler {
  public:
   virtual MessageResponse HandleMessage(const std::string& json) OVERRIDE;
 
@@ -85,7 +85,7 @@ class NaClBrowserTestBase : public InProcessBrowserTest {
   // Load a URL and listen to automation events with a given handler.
   // Returns true if the test glue function correctly.  (The handler should
   // seperately indicate if the test failed.)
-  bool RunJavascriptTest(const GURL& url, TestMessageHandler* handler);
+  bool RunJavascriptTest(const GURL& url, content::TestMessageHandler* handler);
 
   // Run a simple test that checks that a nexe loads correctly.  Useful for
   // setting up other tests, such as checking that UMA data was logged.
@@ -159,9 +159,17 @@ class NaClBrowserTestStatic : public NaClBrowserTestBase {
 // and sometimes time out.  Disable until it is made faster:
 // https://code.google.com/p/chromium/issues/detail?id=177555
 #if (defined(OS_WIN) && !defined(NDEBUG))
-#define MAYBE_PNACL(test_name) DISABLED_##test_name
+#  define MAYBE_PNACL(test_name) DISABLED_##test_name
 #else
-#define MAYBE_PNACL(test_name) test_name
+#  define MAYBE_PNACL(test_name) test_name
+#endif
+
+// NaCl glibc tests are included for x86 only, as there is no glibc support
+// for other architectures (ARM/MIPS).
+#if defined(ARCH_CPU_X86_FAMILY)
+#  define MAYBE_GLIBC(test_name) test_name
+#else
+#  define MAYBE_GLIBC(test_name) DISABLED_##test_name
 #endif
 
 // ASan does not work with libc-free context, so disable the test.
@@ -179,26 +187,12 @@ class NaClBrowserTestStatic : public NaClBrowserTestBase {
 #  define MAYBE_PNACL_NONSFI(test_case) DISABLED_##test_case
 #endif
 
-#if defined(ARCH_CPU_ARM_FAMILY) || defined(ARCH_CPU_MIPS_FAMILY)
-
-// There is no support for Glibc on ARM and MIPS NaCl.
 #define NACL_BROWSER_TEST_F(suite, name, body) \
 IN_PROC_BROWSER_TEST_F(suite##Newlib, name) \
 body \
-IN_PROC_BROWSER_TEST_F(suite##Pnacl, MAYBE_PNACL(name)) \
-body
-
-#else
-
-// Otherwise, we have Glibc, Newlib and Pnacl tests
-#define NACL_BROWSER_TEST_F(suite, name, body) \
-IN_PROC_BROWSER_TEST_F(suite##Newlib, name) \
-body \
-IN_PROC_BROWSER_TEST_F(suite##GLibc, name) \
+IN_PROC_BROWSER_TEST_F(suite##GLibc, MAYBE_GLIBC(name)) \
 body \
 IN_PROC_BROWSER_TEST_F(suite##Pnacl, MAYBE_PNACL(name)) \
 body
-
-#endif
 
 #endif  // CHROME_TEST_NACL_NACL_BROWSERTEST_UTIL_H_

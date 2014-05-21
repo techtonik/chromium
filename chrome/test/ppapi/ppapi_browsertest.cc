@@ -11,11 +11,11 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_navigator.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/test/base/javascript_test_observer.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "chrome/test/nacl/nacl_browsertest_util.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
+#include "content/public/test/javascript_test_observer.h"
 #include "content/public/test/test_renderer_host.h"
 
 using content::RenderViewHost;
@@ -57,14 +57,6 @@ using content::RenderViewHost;
     IN_PROC_BROWSER_TEST_F(OutOfProcessPPAPITest, test_name) { \
       RunTestWithSSLServer(STRIP_PREFIXES(test_name)); \
     }
-
-// NaCl glibc tests are included for x86 only, as there is no glibc support
-// for other architectures (ARM/MIPS).
-#if defined(ARCH_CPU_X86_FAMILY)
-#define MAYBE_GLIBC(test_name) test_name
-#else
-#define MAYBE_GLIBC(test_name) DISABLED_##test_name
-#endif
 
 #if defined(DISABLE_NACL)
 
@@ -547,7 +539,7 @@ IN_PROC_BROWSER_TEST_F(PPAPINaClNewlibTest, URLLoader3) {
 #else
 #define MAYBE_URLLoader_BasicFilePOST URLLoader_BasicFilePOST
 #endif
-IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, URLLoader0) {
+IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, MAYBE_GLIBC(URLLoader0)) {
   RunTestViaHTTP(
       LIST_TEST(URLLoader_BasicGET)
       LIST_TEST(URLLoader_BasicPOST)
@@ -557,13 +549,13 @@ IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, URLLoader0) {
   );
 }
 
-IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, URLLoader1) {
+IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, MAYBE_GLIBC(URLLoader1)) {
   RUN_URLLOADER_SUBTESTS_1;
 }
-IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, URLLoader2) {
+IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, MAYBE_GLIBC(URLLoader2)) {
   RUN_URLLOADER_SUBTESTS_2;
 }
-IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, URLLoader3) {
+IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, MAYBE_GLIBC(URLLoader3)) {
   RUN_URLLOADER_SUBTESTS_3;
 }
 IN_PROC_BROWSER_TEST_F(PPAPINaClPNaClTest, URLLoader0) {
@@ -692,7 +684,7 @@ TEST_PPAPI_OUT_OF_PROCESS(MAYBE_VarDeprecated)
 IN_PROC_BROWSER_TEST_F(OutOfProcessPPAPITest, MAYBE_PostMessage) {
   RUN_POSTMESSAGE_SUBTESTS;
 }
-IN_PROC_BROWSER_TEST_F(PPAPINaClNewlibTest, PostMessage) {
+IN_PROC_BROWSER_TEST_F(PPAPINaClNewlibTest, MAYBE_PostMessage) {
   RUN_POSTMESSAGE_SUBTESTS;
 }
 IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, MAYBE_GLIBC(PostMessage)) {
@@ -710,8 +702,8 @@ TEST_PPAPI_IN_PROCESS(Memory)
 TEST_PPAPI_OUT_OF_PROCESS(Memory)
 TEST_PPAPI_NACL(Memory)
 
-TEST_PPAPI_IN_PROCESS(VideoDecoder)
-TEST_PPAPI_OUT_OF_PROCESS(VideoDecoder)
+TEST_PPAPI_IN_PROCESS(VideoDecoderDev)
+TEST_PPAPI_OUT_OF_PROCESS(VideoDecoderDev)
 
 // FileIO tests.
 #define RUN_FILEIO_SUBTESTS \
@@ -859,7 +851,9 @@ IN_PROC_BROWSER_TEST_F(PPAPINaClNewlibTest, FileRef2) {
   RUN_FILEREF_SUBTESTS_2;
 }
 // Flaky on 32-bit linux bot; http://crbug.com/308908
-#if defined(OS_LINUX) && defined(ARCH_CPU_X86)
+// Glibc not available on ARM
+#if (defined(OS_LINUX) && defined(ARCH_CPU_X86)) \
+    || defined(ARCH_CPU_ARM_FAMILY)
 #define MAYBE_NaCl_Glibc_FileRef1 DISABLED_FileRef1
 #define MAYBE_NaCl_Glibc_FileRef2 DISABLED_FileRef2
 #else
@@ -1211,7 +1205,7 @@ IN_PROC_BROWSER_TEST_F(OutOfProcessPPAPITest, View_CreateInvisible) {
 IN_PROC_BROWSER_TEST_F(OutOfProcessPPAPITest, View_PageHideShow) {
   // The plugin will be loaded in the foreground tab and will send us a message.
   PPAPITestMessageHandler handler;
-  JavascriptTestObserver observer(
+  content::JavascriptTestObserver observer(
       browser()->tab_strip_model()->GetActiveWebContents(),
       &handler);
 

@@ -82,7 +82,9 @@ NACL_BROWSER_TEST_F(NaClBrowserTest, ProgressEvents, {
 // allowed.  Also not run on GLibc because it's a large test that is at risk of
 // causing timeouts.
 // crbug/338444
-#if defined(OS_WIN)
+// crbug.com/375103: fails on Mac after open sourcing PDF plugin.
+// crbug.com/375103: fails on Linux too after open sourcing PDF plugin.
+#if defined(OS_WIN) || defined(OS_MACOSX) || defined(OS_LINUX)
 #define MAYBE_Bad DISABLED_Bad
 #else
 #define MAYBE_Bad Bad
@@ -115,14 +117,15 @@ NACL_BROWSER_TEST_F(NaClBrowserTest, MAYBE_Crash, {
 IN_PROC_BROWSER_TEST_F(NaClBrowserTestNewlib, ManifestFile) {
   RunNaClIntegrationTest(FILE_PATH_LITERAL("pm_manifest_file_test.html"));
 }
-IN_PROC_BROWSER_TEST_F(NaClBrowserTestGLibc, ManifestFile) {
+IN_PROC_BROWSER_TEST_F(NaClBrowserTestGLibc, MAYBE_GLIBC(ManifestFile)) {
   RunNaClIntegrationTest(FILE_PATH_LITERAL("pm_manifest_file_test.html"));
 }
 IN_PROC_BROWSER_TEST_F(NaClBrowserTestNewlib, PreInitManifestFile) {
   RunNaClIntegrationTest(FILE_PATH_LITERAL(
       "pm_pre_init_manifest_file_test.html"));
 }
-IN_PROC_BROWSER_TEST_F(NaClBrowserTestGLibc, PreInitManifestFile) {
+IN_PROC_BROWSER_TEST_F(NaClBrowserTestGLibc,
+                       MAYBE_GLIBC(PreInitManifestFile)) {
   RunNaClIntegrationTest(FILE_PATH_LITERAL(
       "pm_pre_init_manifest_file_test.html"));
 }

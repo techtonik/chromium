@@ -41,6 +41,9 @@ AwBrowserContext* g_browser_context = NULL;
 
 }  // namespace
 
+// Data reduction proxy is disabled by default.
+bool AwBrowserContext::data_reduction_proxy_enabled_ = false;
+
 AwBrowserContext::AwBrowserContext(
     const FilePath path,
     JniDependencyFactory* native_factory)
@@ -73,14 +76,29 @@ AwBrowserContext* AwBrowserContext::FromWebContents(
   return static_cast<AwBrowserContext*>(web_contents->GetBrowserContext());
 }
 
+// static
+void AwBrowserContext::SetDataReductionProxyEnabled(bool enabled) {
+  // Cache the setting value. It is possible that data reduction proxy is
+  // not created yet.
+  data_reduction_proxy_enabled_ = enabled;
+  AwBrowserContext* context = AwBrowserContext::GetDefault();
+  // Can't enable Data reduction proxy if user pref service is not ready.
+  if (context == NULL || context->user_pref_service_.get() == NULL)
+    return;
+  DataReductionProxySettings* proxy_settings =
+      context->GetDataReductionProxySettings();
+  if (proxy_settings == NULL)
+    return;
+  proxy_settings->SetDataReductionProxyEnabled(data_reduction_proxy_enabled_);
+}
+
 void AwBrowserContext::PreMainMessageLoopRun() {
   cookie_store_ = CreateCookieStore(this);
-  // TODO(sgurun): A valid key will need to be supplied here.
-  DataReductionProxySettings::SetKey("test_key");
   DataReductionProxySettings::SetAllowed(true);
   DataReductionProxySettings::SetPromoAllowed(false);
   data_reduction_proxy_settings_.reset(
       new DataReductionProxySettings());
+  data_reduction_proxy_settings_->set_fallback_allowed(false);
 
   url_request_context_getter_ =
       new AwURLRequestContextGetter(GetPath(), cookie_store_.get());
@@ -170,9 +188,8 @@ void AwBrowserContext::CreateUserPrefServiceIfNecessary() {
       user_pref_service_.get(),
       GetRequestContext());
 
-  //TODO(sgurun): Attach this to the API. It is currently hard coded in a
-  // disabled state.
-  data_reduction_proxy_settings_->SetDataReductionProxyEnabled(false);
+  data_reduction_proxy_settings_->SetDataReductionProxyEnabled(
+      data_reduction_proxy_enabled_);
 }
 
 base::FilePath AwBrowserContext::GetPath() const {
@@ -269,8 +286,7 @@ AwBrowserContext::GetGeolocationPermissionContext() {
   return geolocation_permission_context_.get();
 }
 
-content::BrowserPluginGuestManagerDelegate*
-AwBrowserContext::GetGuestManagerDelegate() {
+content::BrowserPluginGuestManager* AwBrowserContext::GetGuestManager() {
   return NULL;
 }
 

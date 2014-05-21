@@ -58,7 +58,10 @@ void ServiceWorkerContextWrapper::Init(
           GetSequencedTaskRunnerWithShutdownBehavior(
               BrowserThread::GetBlockingPool()->GetSequenceToken(),
               base::SequencedWorkerPool::SKIP_ON_SHUTDOWN);
-  InitInternal(user_data_directory, database_task_runner, quota_manager_proxy);
+  scoped_refptr<base::MessageLoopProxy> disk_cache_thread =
+      BrowserThread::GetMessageLoopProxyForThread(BrowserThread::CACHE);
+  InitInternal(user_data_directory, database_task_runner,
+               disk_cache_thread, quota_manager_proxy);
 }
 
 void ServiceWorkerContextWrapper::Shutdown() {
@@ -124,8 +127,7 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
   }
 
   context()->UnregisterServiceWorker(
-      scope,
-      base::Bind(&PostResultToUIFromStatusOnIO, callback));
+      scope, base::Bind(&PostResultToUIFromStatusOnIO, callback));
 }
 
 void ServiceWorkerContextWrapper::GetServiceWorkerHost(
@@ -134,7 +136,7 @@ void ServiceWorkerContextWrapper::GetServiceWorkerHost(
     const ServiceWorkerHostCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   callback.Run(scoped_ptr<ServiceWorkerHost>(
-      new ServiceWorkerHostImpl(scope, context(), client)));
+      new ServiceWorkerHostImpl(scope, this, client)));
 }
 
 void ServiceWorkerContextWrapper::AddObserver(
@@ -147,16 +149,10 @@ void ServiceWorkerContextWrapper::RemoveObserver(
   observer_list_->RemoveObserver(observer);
 }
 
-void ServiceWorkerContextWrapper::InitForTesting(
-    const base::FilePath& user_data_directory,
-    base::SequencedTaskRunner* database_task_runner,
-    quota::QuotaManagerProxy* quota_manager_proxy) {
-  InitInternal(user_data_directory, database_task_runner, quota_manager_proxy);
-}
-
 void ServiceWorkerContextWrapper::InitInternal(
     const base::FilePath& user_data_directory,
     base::SequencedTaskRunner* database_task_runner,
+    base::MessageLoopProxy* disk_cache_thread,
     quota::QuotaManagerProxy* quota_manager_proxy) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
     BrowserThread::PostTask(
@@ -166,6 +162,7 @@ void ServiceWorkerContextWrapper::InitInternal(
                    this,
                    user_data_directory,
                    make_scoped_refptr(database_task_runner),
+                   make_scoped_refptr(disk_cache_thread),
                    make_scoped_refptr(quota_manager_proxy)));
     return;
   }
@@ -173,6 +170,7 @@ void ServiceWorkerContextWrapper::InitInternal(
   context_core_.reset(new ServiceWorkerContextCore(
       user_data_directory,
       database_task_runner,
+      disk_cache_thread,
       quota_manager_proxy,
       observer_list_,
       make_scoped_ptr(new ServiceWorkerProcessManager(this))));

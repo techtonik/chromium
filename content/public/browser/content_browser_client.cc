@@ -66,6 +66,10 @@ bool ContentBrowserClient::IsSuitableHost(RenderProcessHost* process_host,
   return true;
 }
 
+bool ContentBrowserClient::MayReuseHost(RenderProcessHost* process_host) {
+  return true;
+}
+
 bool ContentBrowserClient::ShouldTryToUseExistingProcessHost(
       BrowserContext* browser_context, const GURL& url) {
   return false;
@@ -280,6 +284,10 @@ LocationProvider* ContentBrowserClient::OverrideSystemLocationProvider() {
 }
 
 VibrationProvider* ContentBrowserClient::OverrideVibrationProvider() {
+  return NULL;
+}
+
+DevToolsManagerDelegate* ContentBrowserClient::GetDevToolsManagerDelegate() {
   return NULL;
 }
 

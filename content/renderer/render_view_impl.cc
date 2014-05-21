@@ -86,16 +86,16 @@
 #include "content/renderer/ime_event_guard.h"
 #include "content/renderer/input/input_handler_manager.h"
 #include "content/renderer/internal_document_state_data.h"
-#include "content/renderer/load_progress_tracker.h"
 #include "content/renderer/media/audio_device_factory.h"
-#include "content/renderer/media/media_stream_dependency_factory.h"
 #include "content/renderer/media/media_stream_dispatcher.h"
 #include "content/renderer/media/midi_dispatcher.h"
 #include "content/renderer/media/video_capture_impl_manager.h"
+#include "content/renderer/media/webrtc/peer_connection_dependency_factory.h"
 #include "content/renderer/memory_benchmarking_extension.h"
 #include "content/renderer/mhtml_generator.h"
 #include "content/renderer/push_messaging_dispatcher.h"
 #include "content/renderer/render_frame_impl.h"
+#include "content/renderer/render_frame_proxy.h"
 #include "content/renderer/render_process.h"
 #include "content/renderer/render_thread_impl.h"
 #include "content/renderer/render_view_impl_params.h"
@@ -672,7 +672,6 @@ RenderViewImpl::RenderViewImpl(RenderViewImplParams* params)
       pepper_last_mouse_event_target_(NULL),
 #endif
       enumeration_completion_id_(0),
-      load_progress_tracker_(new LoadProgressTracker(this)),
       session_storage_namespace_id_(params->session_storage_namespace_id),
       next_snapshot_id_(0) {
 }
@@ -692,6 +691,14 @@ void RenderViewImpl::Initialize(RenderViewImplParams* params) {
   // RenderFrameImpl::frameDetached().
   WebLocalFrame* web_frame = WebLocalFrame::create(main_render_frame);
   main_render_frame->SetWebFrame(web_frame);
+
+  if (params->proxy_routing_id != MSG_ROUTING_NONE) {
+    CHECK(params->swapped_out);
+    RenderFrameProxy* proxy =
+        RenderFrameProxy::CreateFrameProxy(params->proxy_routing_id,
+                                           params->main_frame_routing_id);
+    main_render_frame->set_render_frame_proxy(proxy);
+  }
 
   webwidget_ = WebView::create(this);
   webwidget_mouse_lock_target_.reset(new WebWidgetLockTarget(webwidget_));
@@ -908,6 +915,7 @@ RenderViewImpl* RenderViewImpl::Create(
     const base::string16& frame_name,
     bool is_renderer_created,
     bool swapped_out,
+    int32 proxy_routing_id,
     bool hidden,
     bool never_visible,
     int32 next_page_id,
@@ -925,6 +933,7 @@ RenderViewImpl* RenderViewImpl::Create(
                               frame_name,
                               is_renderer_created,
                               swapped_out,
+                              proxy_routing_id,
                               hidden,
                               never_visible,
                               next_page_id,
@@ -1055,8 +1064,7 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
       return true;
 
   bool handled = true;
-  bool msg_is_ok = true;
-  IPC_BEGIN_MESSAGE_MAP_EX(RenderViewImpl, message, msg_is_ok)
+  IPC_BEGIN_MESSAGE_MAP(RenderViewImpl, message)
     IPC_MESSAGE_HANDLER(InputMsg_ExecuteEditCommand, OnExecuteEditCommand)
     IPC_MESSAGE_HANDLER(InputMsg_MoveCaret, OnMoveCaret)
     IPC_MESSAGE_HANDLER(InputMsg_ScrollFocusedEditableNodeIntoRect,
@@ -1067,6 +1075,7 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ViewMsg_Stop, OnStop)
     IPC_MESSAGE_HANDLER(ViewMsg_SetName, OnSetName)
     IPC_MESSAGE_HANDLER(ViewMsg_CopyImageAt, OnCopyImageAt)
+    IPC_MESSAGE_HANDLER(ViewMsg_SaveImageAt, OnSaveImageAt)
     IPC_MESSAGE_HANDLER(ViewMsg_Find, OnFind)
     IPC_MESSAGE_HANDLER(ViewMsg_StopFinding, OnStopFinding)
     IPC_MESSAGE_HANDLER(ViewMsg_Zoom, OnZoom)
@@ -1097,7 +1106,7 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ViewMsg_ThemeChanged, OnThemeChanged)
     IPC_MESSAGE_HANDLER(ViewMsg_MoveOrResizeStarted, OnMoveOrResizeStarted)
     IPC_MESSAGE_HANDLER(ViewMsg_ClearFocusedElement, OnClearFocusedElement)
-    IPC_MESSAGE_HANDLER(ViewMsg_SetBackground, OnSetBackground)
+    IPC_MESSAGE_HANDLER(ViewMsg_SetBackgroundOpaque, OnSetBackgroundOpaque)
     IPC_MESSAGE_HANDLER(ViewMsg_EnablePreferredSizeChangedMode,
                         OnEnablePreferredSizeChangedMode)
     IPC_MESSAGE_HANDLER(ViewMsg_EnableAutoResize, OnEnableAutoResize)
@@ -1106,8 +1115,6 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
                         OnDisableScrollbarsForSmallWindows)
     IPC_MESSAGE_HANDLER(ViewMsg_SetRendererPrefs, OnSetRendererPrefs)
     IPC_MESSAGE_HANDLER(ViewMsg_MediaPlayerActionAt, OnMediaPlayerActionAt)
-    IPC_MESSAGE_HANDLER(ViewMsg_OrientationChangeEvent,
-                        OnOrientationChangeEvent)
     IPC_MESSAGE_HANDLER(ViewMsg_PluginActionAt, OnPluginActionAt)
     IPC_MESSAGE_HANDLER(ViewMsg_SetActive, OnSetActive)
     IPC_MESSAGE_HANDLER(ViewMsg_GetAllSavableResourceLinksForCurrentPage,
@@ -1126,6 +1133,7 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
                         OnReleaseDisambiguationPopupBitmap)
     IPC_MESSAGE_HANDLER(ViewMsg_WindowSnapshotCompleted,
                         OnWindowSnapshotCompleted)
+    IPC_MESSAGE_HANDLER(ViewMsg_SelectWordAroundCaret, OnSelectWordAroundCaret)
 #if defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(InputMsg_ActivateNearestFindResult,
                         OnActivateNearestFindResult)
@@ -1150,13 +1158,16 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_UNHANDLED(handled = RenderWidget::OnMessageReceived(message))
   IPC_END_MESSAGE_MAP()
 
-  if (!msg_is_ok) {
-    // The message had a handler, but its deserialization failed.
-    // Kill the renderer to avoid potential spoofing attacks.
-    CHECK(false) << "Unable to deserialize message in RenderViewImpl.";
-  }
-
   return handled;
+}
+
+void RenderViewImpl::OnSelectWordAroundCaret() {
+  if (!webview())
+    return;
+
+  handling_input_event_ = true;
+  webview()->focusedFrame()->selectWordAroundCaret();
+  handling_input_event_ = false;
 }
 
 void RenderViewImpl::OnNavigate(const FrameMsg_Navigate_Params& params) {
@@ -1210,6 +1221,10 @@ void RenderViewImpl::OnStop() {
 
 void RenderViewImpl::OnCopyImageAt(int x, int y) {
   webview()->copyImageAt(WebPoint(x, y));
+}
+
+void RenderViewImpl::OnSaveImageAt(int x, int y) {
+  webview()->saveImageAt(WebPoint(x, y));
 }
 
 void RenderViewImpl::OnUpdateTargetURLAck() {
@@ -1317,44 +1332,15 @@ void RenderViewImpl::OnPauseVideo() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Tell the embedding application that the title of the active page has changed
-void RenderViewImpl::UpdateTitle(WebFrame* frame,
-                                 const base::string16& title,
-                                 WebTextDirection title_direction) {
-  // Ignore all but top level navigations.
-  if (frame->parent())
-    return;
-
-  base::debug::TraceLog::GetInstance()->UpdateProcessLabel(
-      routing_id_, base::UTF16ToUTF8(title));
-
-  base::string16 shortened_title = title.substr(0, kMaxTitleChars);
-  Send(new ViewHostMsg_UpdateTitle(routing_id_, page_id_, shortened_title,
-                                   title_direction));
-}
-
-void RenderViewImpl::UpdateEncoding(WebFrame* frame,
-                                    const std::string& encoding_name) {
-  // Only update main frame's encoding_name.
-  if (webview()->mainFrame() == frame &&
-      last_encoding_name_ != encoding_name) {
-    // Save the encoding name for later comparing.
-    last_encoding_name_ = encoding_name;
-
-    Send(new ViewHostMsg_UpdateEncoding(routing_id_, last_encoding_name_));
-  }
-}
-
-// Sends the last committed session history state to the browser so it will be
-// saved before we navigate to a new page. This must be called *before* the
-// page ID has been updated so we know what it was.
+// Sends the current history state to the browser so it will be saved before we
+// navigate to a new page.
 void RenderViewImpl::UpdateSessionHistory(WebFrame* frame) {
   // If we have a valid page ID at this point, then it corresponds to the page
   // we are navigating away from.  Otherwise, this is the first navigation, so
   // there is no past session history to record.
   if (page_id_ == -1)
     return;
-  SendUpdateState(history_controller_->GetPreviousEntry());
+  SendUpdateState(history_controller_->GetCurrentEntry());
 }
 
 void RenderViewImpl::SendUpdateState(HistoryEntry* entry) {
@@ -1487,6 +1473,7 @@ WebView* RenderViewImpl::createView(WebLocalFrame* creator,
       base::string16(),  // WebCore will take care of setting the correct name.
       true,              // is_renderer_created
       false,             // swapped_out
+      MSG_ROUTING_NONE,  // proxy_routing_id
       params.disposition == NEW_BACKGROUND_TAB,  // hidden
       never_visible,
       1,  // next_page_id
@@ -1558,10 +1545,6 @@ bool RenderViewImpl::enumerateChosenDirectory(
 }
 
 void RenderViewImpl::FrameDidStartLoading(WebFrame* frame) {
-  if (load_progress_tracker_ != NULL) {
-    load_progress_tracker_->DidStartLoading(
-        RenderFrameImpl::FromWebFrame(frame)->GetRoutingID());
-  }
   DCHECK_GE(frames_in_progress_, 0);
   if (frames_in_progress_ == 0)
     FOR_EACH_OBSERVER(RenderViewObserver, observers_, DidStartLoading());
@@ -1569,10 +1552,6 @@ void RenderViewImpl::FrameDidStartLoading(WebFrame* frame) {
 }
 
 void RenderViewImpl::FrameDidStopLoading(WebFrame* frame) {
-  if (load_progress_tracker_ != NULL) {
-    load_progress_tracker_->DidStopLoading(
-        RenderFrameImpl::FromWebFrame(frame)->GetRoutingID());
-  }
   // TODO(japhet): This should be a DCHECK, but the pdf plugin sometimes
   // calls DidStopLoading() without a matching DidStartLoading().
   if (frames_in_progress_ == 0)
@@ -1581,14 +1560,6 @@ void RenderViewImpl::FrameDidStopLoading(WebFrame* frame) {
   if (frames_in_progress_ == 0) {
     DidStopLoadingIcons();
     FOR_EACH_OBSERVER(RenderViewObserver, observers_, DidStopLoading());
-  }
-}
-
-void RenderViewImpl::FrameDidChangeLoadProgress(WebFrame* frame,
-                                                double load_progress) {
-  if (load_progress_tracker_ != NULL) {
-    load_progress_tracker_->DidChangeLoadProgress(
-        RenderFrameImpl::FromWebFrame(frame)->GetRoutingID(), load_progress);
   }
 }
 
@@ -1961,8 +1932,6 @@ void RenderViewImpl::didActivateCompositor() {
         AsWeakPtr());
   }
 #endif
-
-  RenderWidget::didActivateCompositor();
 }
 
 void RenderViewImpl::didHandleGestureEvent(
@@ -2219,13 +2188,9 @@ void RenderViewImpl::FrameDidCommitProvisionalLoad(WebLocalFrame* frame,
   }
 }
 
-void RenderViewImpl::didClearWindowObject(WebLocalFrame* frame, int world_id) {
-  FOR_EACH_OBSERVER(RenderViewObserver, observers_,
-                    DidClearWindowObject(frame, world_id));
-
-  // Only install controllers into the main world.
-  if (world_id)
-    return;
+void RenderViewImpl::didClearWindowObject(WebLocalFrame* frame) {
+  FOR_EACH_OBSERVER(
+      RenderViewObserver, observers_, DidClearWindowObject(frame));
 
   if (enabled_bindings_& BINDINGS_POLICY_WEB_UI)
     WebUIExtension::Install(frame);
@@ -2240,15 +2205,6 @@ void RenderViewImpl::didClearWindowObject(WebLocalFrame* frame, int world_id) {
 
   if (command_line.HasSwitch(switches::kEnableMemoryBenchmarking))
     MemoryBenchmarkingExtension::Install(frame);
-}
-
-void RenderViewImpl::didReceiveTitle(WebLocalFrame* frame,
-                                     const WebString& title,
-                                     WebTextDirection direction) {
-  UpdateTitle(frame, title, direction);
-
-  // Also check whether we have new encoding name.
-  UpdateEncoding(frame, frame->view()->pageEncoding().utf8());
 }
 
 void RenderViewImpl::didChangeIcon(WebLocalFrame* frame,
@@ -2344,48 +2300,6 @@ void RenderViewImpl::SendFindReply(int request_id,
                                   selection_rect,
                                   ordinal,
                                   final_status_update));
-}
-
-bool RenderViewImpl::willCheckAndDispatchMessageEvent(
-    blink::WebLocalFrame* sourceFrame,
-    blink::WebFrame* targetFrame,
-    blink::WebSecurityOrigin target_origin,
-    blink::WebDOMMessageEvent event) {
-  if (!is_swapped_out_)
-    return false;
-
-  ViewMsg_PostMessage_Params params;
-  params.data = event.data().toString();
-  params.source_origin = event.origin();
-  if (!target_origin.isNull())
-    params.target_origin = target_origin.toString();
-
-  blink::WebMessagePortChannelArray channels = event.releaseChannels();
-  if (!channels.isEmpty()) {
-    std::vector<int> message_port_ids(channels.size());
-     // Extract the port IDs from the channel array.
-     for (size_t i = 0; i < channels.size(); ++i) {
-       WebMessagePortChannelImpl* webchannel =
-           static_cast<WebMessagePortChannelImpl*>(channels[i]);
-       message_port_ids[i] = webchannel->message_port_id();
-       webchannel->QueueMessages();
-       DCHECK_NE(message_port_ids[i], MSG_ROUTING_NONE);
-     }
-     params.message_port_ids = message_port_ids;
-  }
-
-  // Include the routing ID for the source frame (if one exists), which the
-  // browser process will translate into the routing ID for the equivalent
-  // frame in the target process.
-  params.source_routing_id = MSG_ROUTING_NONE;
-  if (sourceFrame) {
-    RenderViewImpl* source_view = FromWebView(sourceFrame->view());
-    if (source_view)
-      params.source_routing_id = source_view->routing_id();
-  }
-
-  Send(new ViewHostMsg_RouteMessageEvent(routing_id_, params));
-  return true;
 }
 
 blink::WebString RenderViewImpl::acceptLanguages() {
@@ -3043,12 +2957,13 @@ void RenderViewImpl::OnMediaPlayerActionAt(const gfx::Point& location,
     webview()->performMediaPlayerAction(action, location);
 }
 
-void RenderViewImpl::OnOrientationChangeEvent(int orientation) {
-  // Screen has rotated. 0 = default (portrait), 90 = one turn right, and so on.
+void RenderViewImpl::OnOrientationChange() {
+  // TODO(mlamouri): consumers of that event should be using DisplayObserver.
   FOR_EACH_OBSERVER(RenderViewObserver,
                     observers_,
-                    OrientationChangeEvent(orientation));
-  webview()->mainFrame()->sendOrientationChangeEvent(orientation);
+                    OrientationChangeEvent());
+
+  webview()->mainFrame()->sendOrientationChangeEvent();
 }
 
 void RenderViewImpl::OnPluginActionAt(const gfx::Point& location,
@@ -3268,13 +3183,11 @@ void RenderViewImpl::OnClearFocusedElement() {
     webview()->clearFocusedElement();
 }
 
-void RenderViewImpl::OnSetBackground(const SkBitmap& background) {
+void RenderViewImpl::OnSetBackgroundOpaque(bool opaque) {
   if (webview())
-    webview()->setIsTransparent(!background.empty());
+    webview()->setIsTransparent(!opaque);
   if (compositor_)
-    compositor_->setHasTransparentBackground(!background.empty());
-
-  SetBackground(background);
+    compositor_->setHasTransparentBackground(!opaque);
 }
 
 void RenderViewImpl::OnSetAccessibilityMode(AccessibilityMode new_mode) {
@@ -4084,6 +3997,41 @@ void RenderViewImpl::SetDeviceScaleFactorForTesting(float factor) {
   params.resizer_rect = WebRect();
   params.is_fullscreen = is_fullscreen();
   OnResize(params);
+}
+
+void RenderViewImpl::SetScreenOrientationForTesting(
+    const blink::WebScreenOrientationType& orientation) {
+  ViewMsg_Resize_Params params;
+  params.screen_info = screen_info_;
+  params.screen_info.orientationType = orientation;
+  // FIXME(ostap): This relationship between orientationType and
+  // orientationAngle is temporary. The test should be able to specify
+  // the angle in addition to the orientation type.
+  switch (orientation) {
+    case blink::WebScreenOrientationLandscapePrimary:
+      params.screen_info.orientationAngle = 90;
+      break;
+    case blink::WebScreenOrientationLandscapeSecondary:
+      params.screen_info.orientationAngle = -90;
+      break;
+    case blink::WebScreenOrientationPortraitSecondary:
+      params.screen_info.orientationAngle = 180;
+      break;
+    default:
+      params.screen_info.orientationAngle = 0;
+  }
+  params.new_size = size();
+  params.physical_backing_size = gfx::ToCeiledSize(
+      gfx::ScaleSize(size(), params.screen_info.deviceScaleFactor));
+  params.overdraw_bottom_height = 0.f;
+  params.resizer_rect = WebRect();
+  params.is_fullscreen = is_fullscreen();
+  OnResize(params);
+}
+
+void RenderViewImpl::SetDeviceColorProfileForTesting(
+    const std::vector<char>& color_profile) {
+  // TODO(noel): Add RenderViewImpl::SetDeviceColorProfile(color_profile).
 }
 
 void RenderViewImpl::ForceResizeForTesting(const gfx::Size& new_size) {

@@ -27,8 +27,7 @@
 #endif  // defined(OS_LINUX)
 
 #if defined(USE_AURA)
-#include "mojo/services/view_manager/root_node_manager.h"
-#include "mojo/services/view_manager/view_manager_connection.h"
+#include "mojo/shell/view_manager_loader.h"
 #endif
 
 namespace mojo {
@@ -52,35 +51,6 @@ class Setup {
 
 static base::LazyInstance<Setup> setup = LAZY_INSTANCE_INITIALIZER;
 
-#if defined(USE_AURA)
-class ViewManagerLoader : public ServiceLoader {
- public:
-  ViewManagerLoader() {}
-  virtual ~ViewManagerLoader() {}
-
- private:
-  virtual void LoadService(ServiceManager* manager,
-                           const GURL& url,
-                           ScopedShellHandle shell_handle) OVERRIDE {
-    scoped_ptr<Application> app(new Application(shell_handle.Pass()));
-    app->AddServiceConnector(
-        new ServiceConnector<services::view_manager::ViewManagerConnection,
-                             services::view_manager::RootNodeManager>(
-                                 &root_node_manager_));
-    apps_.push_back(app.release());
-  }
-
-  virtual void OnServiceError(ServiceManager* manager,
-                              const GURL& url) OVERRIDE {
-  }
-
-  services::view_manager::RootNodeManager root_node_manager_;
-  ScopedVector<Application> apps_;
-
-  DISALLOW_COPY_AND_ASSIGN(ViewManagerLoader);
-};
-#endif
-
 }  // namespace
 
 class Context::NativeViewportServiceLoader : public ServiceLoader {
@@ -91,7 +61,7 @@ class Context::NativeViewportServiceLoader : public ServiceLoader {
  private:
   virtual void LoadService(ServiceManager* manager,
                            const GURL& url,
-                           ScopedShellHandle service_handle) OVERRIDE {
+                           ScopedMessagePipeHandle service_handle) OVERRIDE {
     app_.reset(::CreateNativeViewportService(context_, service_handle.Pass()));
   }
 

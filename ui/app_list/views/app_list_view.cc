@@ -53,8 +53,6 @@ namespace app_list {
 
 namespace {
 
-void (*g_next_paint_callback)();
-
 // The margin from the edge to the speech UI.
 const int kSpeechUIMargin = 12;
 
@@ -73,7 +71,7 @@ bool SupportsShadow() {
           switches::kDisableDwmComposition)) {
     return false;
   }
-#elif defined(OS_LINUX) && !defined(USE_ASH)
+#elif defined(OS_LINUX) && !defined(OS_CHROMEOS)
   // Shadows are not supported on (non-ChromeOS) Linux.
   return false;
 #endif
@@ -200,15 +198,15 @@ bool AppListView::ShouldCenterWindow() const {
   return delegate_->ShouldCenterWindow();
 }
 
-gfx::Size AppListView::GetPreferredSize() {
+gfx::Size AppListView::GetPreferredSize() const {
   return app_list_main_view_->GetPreferredSize();
 }
 
-void AppListView::Paint(gfx::Canvas* canvas) {
-  views::BubbleDelegateView::Paint(canvas);
-  if (g_next_paint_callback) {
-    g_next_paint_callback();
-    g_next_paint_callback = NULL;
+void AppListView::Paint(gfx::Canvas* canvas, const views::CullSet& cull_set) {
+  views::BubbleDelegateView::Paint(canvas, cull_set);
+  if (!next_paint_callback_.is_null()) {
+    next_paint_callback_.Run();
+    next_paint_callback_.Reset();
   }
 }
 
@@ -250,8 +248,8 @@ void AppListView::RemoveObserver(AppListViewObserver* observer) {
 }
 
 // static
-void AppListView::SetNextPaintCallback(void (*callback)()) {
-  g_next_paint_callback = callback;
+void AppListView::SetNextPaintCallback(const base::Closure& callback) {
+  next_paint_callback_ = callback;
 }
 
 #if defined(OS_WIN)

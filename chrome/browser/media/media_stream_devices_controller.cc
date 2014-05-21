@@ -21,7 +21,7 @@
 #include "chrome/common/content_settings.h"
 #include "chrome/common/content_settings_pattern.h"
 #include "chrome/common/pref_names.h"
-#include "components/user_prefs/pref_registry_syncable.h"
+#include "components/pref_registry/pref_registry_syncable.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/common/media_stream_request.h"
@@ -31,7 +31,7 @@
 #include "ui/base/l10n/l10n_util.h"
 
 #if defined(OS_CHROMEOS)
-#include "chrome/browser/chromeos/login/user_manager.h"
+#include "chrome/browser/chromeos/login/users/user_manager.h"
 #endif
 
 using content::BrowserThread;

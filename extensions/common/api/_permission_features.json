@@ -17,6 +17,9 @@
 // Google employees: please update http://go/chrome-api-whitelist to map
 // hashes back to ids.
 
+// If you add a new platform_app permission please update the "stubs_app" test:
+// chrome/test/data/extensions/api_test/stubs_app/manifest.json
+
 {
   "dns": [
     {
@@ -33,6 +36,12 @@
       ]
     }
   ],
+  // Note: runtime is not actually a permission, but some systems check these
+  // values to verify restrictions.
+  "runtime": {
+    "channel": "stable",
+    "extension_types": ["extension", "legacy_packaged_app", "platform_app"]
+  },
   "socket": [
     {
       "channel": "stable",

@@ -90,37 +90,6 @@ bool NetworkState::PropertyChanged(const std::string& key,
     else
       error_.clear();
     return true;
-  } else if (key == IPConfigProperty(shill::kAddressProperty)) {
-    return GetStringValue(key, value, &ip_address_);
-  } else if (key == IPConfigProperty(shill::kGatewayProperty)) {
-    return GetStringValue(key, value, &gateway_);
-  } else if (key == IPConfigProperty(shill::kNameServersProperty)) {
-    const base::ListValue* dns_servers;
-    if (!value.GetAsList(&dns_servers))
-      return false;
-    dns_servers_.clear();
-    ConvertListValueToStringVector(*dns_servers, &dns_servers_);
-    return true;
-  } else if (key == IPConfigProperty(shill::kPrefixlenProperty)) {
-    return GetIntegerValue(key, value, &prefix_length_);
-  } else if (key == IPConfigProperty(
-      shill::kWebProxyAutoDiscoveryUrlProperty)) {
-    std::string url_string;
-    if (!GetStringValue(key, value, &url_string))
-      return false;
-    if (url_string.empty()) {
-      web_proxy_auto_discovery_url_ = GURL();
-    } else {
-      GURL gurl(url_string);
-      if (!gurl.is_valid()) {
-        web_proxy_auto_discovery_url_ = gurl;
-      } else {
-        NET_LOG_ERROR("Invalid WebProxyAutoDiscoveryUrl: " + url_string,
-                      path());
-        web_proxy_auto_discovery_url_ = GURL();
-      }
-    }
-    return true;
   } else if (key == shill::kActivationStateProperty) {
     return GetStringValue(key, value, &activation_state_);
   } else if (key == shill::kRoamingStateProperty) {
@@ -161,12 +130,22 @@ bool NetworkState::InitialPropertiesReceived(
   if (!properties.HasKey(shill::kTypeProperty)) {
     NET_LOG_ERROR("NetworkState has no type",
                   shill_property_util::GetNetworkIdFromProperties(properties));
-  } else {
-    changed |= UpdateName(properties);
+    return false;
   }
+  // Ensure that the network has a valid name.
+  changed |= UpdateName(properties);
+
+  // Set the has_ca_cert_nss_ property.
   bool had_ca_cert_nss = has_ca_cert_nss_;
   has_ca_cert_nss_ = IsCaCertNssSet(properties);
   changed |= had_ca_cert_nss != has_ca_cert_nss_;
+
+  // By convention, all visible WiFi networks have a SignalStrength > 0.
+  if (type() == shill::kTypeWifi) {
+    if (signal_strength_ <= 0)
+      signal_strength_ = 1;
+  }
+
   return changed;
 }
 
@@ -177,9 +156,10 @@ void NetworkState::GetStateProperties(base::DictionaryValue* dictionary) const {
   dictionary->SetStringWithoutPathExpansion(shill::kGuidProperty, guid());
   dictionary->SetStringWithoutPathExpansion(shill::kStateProperty,
                                             connection_state());
-  dictionary->SetStringWithoutPathExpansion(shill::kErrorProperty, error());
   dictionary->SetStringWithoutPathExpansion(shill::kSecurityProperty,
                                             security());
+  if (!error().empty())
+    dictionary->SetStringWithoutPathExpansion(shill::kErrorProperty, error());
 
   if (!NetworkTypePattern::Wireless().MatchesType(type()))
     return;
@@ -191,7 +171,7 @@ void NetworkState::GetStateProperties(base::DictionaryValue* dictionary) const {
                                              signal_strength());
 
   // Wifi properties
-  if (!NetworkTypePattern::WiFi().MatchesType(type())) {
+  if (NetworkTypePattern::WiFi().MatchesType(type())) {
     dictionary->SetStringWithoutPathExpansion(shill::kEapMethodProperty,
                                               eap_method());
   }
@@ -207,6 +187,45 @@ void NetworkState::GetStateProperties(base::DictionaryValue* dictionary) const {
                                               roaming());
     dictionary->SetBooleanWithoutPathExpansion(shill::kOutOfCreditsProperty,
                                                cellular_out_of_credits());
+  }
+}
+
+void NetworkState::IPConfigPropertiesChanged(
+    const base::DictionaryValue& properties) {
+  for (base::DictionaryValue::Iterator iter(properties);
+       !iter.IsAtEnd(); iter.Advance()) {
+    std::string key = iter.key();
+    const base::Value& value = iter.value();
+
+    if (key == shill::kAddressProperty) {
+      GetStringValue(key, value, &ip_address_);
+    } else if (key == shill::kGatewayProperty) {
+      GetStringValue(key, value, &gateway_);
+    } else if (key == shill::kNameServersProperty) {
+      const base::ListValue* dns_servers;
+      if (value.GetAsList(&dns_servers)) {
+        dns_servers_.clear();
+        ConvertListValueToStringVector(*dns_servers, &dns_servers_);
+      }
+    } else if (key == shill::kPrefixlenProperty) {
+      GetIntegerValue(key, value, &prefix_length_);
+    } else if (key == shill::kWebProxyAutoDiscoveryUrlProperty) {
+      std::string url_string;
+      if (GetStringValue(key, value, &url_string)) {
+        if (url_string.empty()) {
+          web_proxy_auto_discovery_url_ = GURL();
+        } else {
+          GURL gurl(url_string);
+          if (gurl.is_valid()) {
+            web_proxy_auto_discovery_url_ = gurl;
+          } else {
+            NET_LOG_ERROR("Invalid WebProxyAutoDiscoveryUrl: " + url_string,
+                          path());
+            web_proxy_auto_discovery_url_ = GURL();
+          }
+        }
+      }
+    }
   }
 }
 
@@ -243,6 +262,10 @@ std::string NetworkState::GetNetmask() const {
   return network_util::PrefixLengthToNetmask(prefix_length_);
 }
 
+void NetworkState::SetGuid(const std::string& guid) {
+  guid_ = guid;
+}
+
 bool NetworkState::UpdateName(const base::DictionaryValue& properties) {
   std::string updated_name =
       shill_property_util::GetNameFromProperties(path(), properties);
@@ -271,11 +294,6 @@ bool NetworkState::StateIsConnecting(const std::string& connection_state) {
 bool NetworkState::ErrorIsValid(const std::string& error) {
   // Shill uses "Unknown" to indicate an unset or cleared error state.
   return !error.empty() && error != kErrorUnknown;
-}
-
-// static
-std::string NetworkState::IPConfigProperty(const char* key) {
-  return base::StringPrintf("%s.%s", shill::kIPConfigProperty, key);
 }
 
 }  // namespace chromeos

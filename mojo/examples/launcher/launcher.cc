@@ -16,7 +16,6 @@
 #include "mojo/aura/window_tree_host_mojo.h"
 #include "mojo/examples/launcher/launcher.mojom.h"
 #include "mojo/public/cpp/bindings/allocation_scope.h"
-#include "mojo/public/cpp/bindings/remote_ptr.h"
 #include "mojo/public/cpp/gles2/gles2.h"
 #include "mojo/public/cpp/shell/application.h"
 #include "mojo/public/cpp/system/core.h"
@@ -151,7 +150,7 @@ class LauncherController : public views::TextfieldController {
     views::Widget::InitParams params(views::Widget::InitParams::TYPE_POPUP);
     params.parent = parent;
     params.bounds = parent->bounds();
-    params.can_activate = true;
+    params.activatable = views::Widget::InitParams::ACTIVATABLE_YES;
     widget->Init(params);
 
     views::View* container = new views::View;
@@ -189,37 +188,25 @@ class LauncherController : public views::TextfieldController {
   DISALLOW_COPY_AND_ASSIGN(LauncherController);
 };
 
-class LauncherImpl : public Application,
-                     public Launcher,
+class LauncherImpl : public InterfaceImpl<Launcher>,
                      public URLReceiver {
  public:
-  explicit LauncherImpl(MojoHandle shell_handle)
-      : Application(shell_handle),
+  explicit LauncherImpl(Application* app)
+      : app_(app),
         launcher_controller_(this),
         pending_show_(false) {
     screen_.reset(ScreenMojo::Create());
     gfx::Screen::SetScreenInstance(gfx::SCREEN_TYPE_NATIVE, screen_.get());
 
-    InterfacePipe<NativeViewport, AnyInterface> pipe;
-
-    AllocationScope scope;
-    shell()->Connect("mojo:mojo_native_viewport_service",
-                     pipe.handle_to_peer.Pass());
+    NativeViewportPtr viewport;
+    app_->ConnectTo("mojo:mojo_native_viewport_service", &viewport);
 
     window_tree_host_.reset(new WindowTreeHostMojo(
-        pipe.handle_to_self.Pass(), gfx::Rect(50, 50, 450, 60),
+        viewport.Pass(), gfx::Rect(50, 50, 450, 60),
         base::Bind(&LauncherImpl::HostContextCreated, base::Unretained(this))));
   }
 
  private:
-  // Overridden from Application:
-  virtual void AcceptConnection(const mojo::String& url,
-                                ScopedMessagePipeHandle handle) OVERRIDE {
-    launcher_client_.reset(
-        MakeScopedHandle(LauncherClientHandle(handle.release().value())).Pass(),
-        this);
-  }
-
   // Overridden from Launcher:
   virtual void Show() OVERRIDE {
     if (!window_tree_host_.get()) {
@@ -235,7 +222,7 @@ class LauncherImpl : public Application,
   // Overridden from URLReceiver:
   virtual void OnURLEntered(const std::string& url_text) OVERRIDE {
     AllocationScope scope;
-    launcher_client_->OnURLEntered(url_text);
+    client()->OnURLEntered(url_text);
   }
 
   void HostContextCreated() {
@@ -261,6 +248,7 @@ class LauncherImpl : public Application,
     }
   }
 
+  Application* app_;
   scoped_ptr<ScreenMojo> screen_;
   scoped_ptr<LauncherWindowTreeClient> window_tree_client_;
   scoped_ptr<aura::client::FocusClient> focus_client_;
@@ -269,7 +257,6 @@ class LauncherImpl : public Application,
 
   LauncherController launcher_controller_;
 
-  RemotePtr<LauncherClient> launcher_client_;
   scoped_ptr<aura::WindowTreeHost> window_tree_host_;
 
   bool pending_show_;
@@ -297,8 +284,10 @@ extern "C" LAUNCHER_EXPORT MojoResult CDECL MojoMain(
   //             MessageLoop is not of TYPE_UI. I think we need a way to build
   //             Aura that doesn't define platform-specific stuff.
   aura::Env::CreateInstance(true);
-  mojo::examples::LauncherImpl launcher(shell_handle);
-  loop.Run();
 
+  mojo::Application app(shell_handle);
+  app.AddService<mojo::examples::LauncherImpl>(&app);
+
+  loop.Run();
   return MOJO_RESULT_OK;
 }

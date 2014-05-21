@@ -58,6 +58,7 @@
 #include "chrome/browser/google/google_search_counter.h"
 #include "chrome/browser/google/google_util.h"
 #include "chrome/browser/gpu/gl_string_manager.h"
+#include "chrome/browser/gpu/three_d_api_observer.h"
 #include "chrome/browser/jankometer.h"
 #include "chrome/browser/media/media_capture_devices_dispatcher.h"
 #include "chrome/browser/metrics/field_trial_synchronizer.h"
@@ -86,7 +87,6 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profiles_state.h"
 #include "chrome/browser/shell_integration.h"
-#include "chrome/browser/three_d_api_observer.h"
 #include "chrome/browser/translate/translate_service.h"
 #include "chrome/browser/ui/app_list/app_list_service.h"
 #include "chrome/browser/ui/browser.h"
@@ -125,7 +125,6 @@
 #include "content/public/common/content_switches.h"
 #include "content/public/common/main_function_params.h"
 #include "extensions/browser/extension_protocols.h"
-#include "extensions/browser/extension_system.h"
 #include "grit/app_locale_settings.h"
 #include "grit/browser_resources.h"
 #include "grit/chromium_strings.h"
@@ -458,7 +457,7 @@ void LaunchDevToolsHandlerIfNeeded(const CommandLine& command_line) {
     std::string port_str =
         command_line.GetSwitchValueASCII(::switches::kRemoteDebuggingPort);
     int port;
-    if (base::StringToInt(port_str, &port) && port > 0 && port < 65535) {
+    if (base::StringToInt(port_str, &port) && port >= 0 && port < 65535) {
       g_browser_process->CreateDevToolsHttpProtocolHandler(
           chrome::HOST_DESKTOP_TYPE_NATIVE,
           "127.0.0.1",
@@ -630,7 +629,8 @@ void ChromeBrowserMainParts::StartMetricsRecording() {
     return;
   }
 
-  metrics->CheckForClonedInstall();
+  metrics->CheckForClonedInstall(
+      BrowserThread::GetMessageLoopProxyForThread(BrowserThread::FILE));
   const bool metrics_enabled = metrics->StartIfMetricsReportingEnabled();
   if (metrics_enabled) {
     // TODO(asvitkine): Since this function is not run on Android, RAPPOR is
@@ -1256,8 +1256,8 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   // NaClBrowserDelegateImpl is accessed inside PostProfileInit().
   // So make sure to create it before that.
 #if !defined(DISABLE_NACL)
-  NaClBrowserDelegateImpl* delegate = new NaClBrowserDelegateImpl(
-    extensions::ExtensionSystem::Get(profile_)->info_map());
+  NaClBrowserDelegateImpl* delegate =
+      new NaClBrowserDelegateImpl(browser_process_->profile_manager());
   nacl::NaClBrowser::SetDelegate(delegate);
 #endif
 

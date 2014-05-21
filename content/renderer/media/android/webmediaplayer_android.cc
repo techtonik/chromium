@@ -128,13 +128,14 @@ WebMediaPlayerAndroid::WebMediaPlayerAndroid(
   player_id_ = manager_->RegisterMediaPlayer(this);
 
 #if defined(VIDEO_HOLE)
-  if (manager_->ShouldUseVideoOverlayForEmbeddedEncryptedVideo()) {
+  force_use_overlay_embedded_video_ = CommandLine::ForCurrentProcess()->
+      HasSwitch(switches::kForceUseOverlayEmbeddedVideo);
+  if (force_use_overlay_embedded_video_ ||
+      manager_->ShouldUseVideoOverlayForEmbeddedEncryptedVideo()) {
     // Defer stream texture creation until we are sure it's necessary.
     needs_establish_peer_ = false;
     current_frame_ = VideoFrame::CreateBlackFrame(gfx::Size(1, 1));
   }
-  force_use_overlay_embedded_video_ = CommandLine::ForCurrentProcess()->
-      HasSwitch(switches::kForceUseOverlayEmbeddedVideo);
 #endif  // defined(VIDEO_HOLE)
   TryCreateStreamTextureProxyIfNeeded();
 }
@@ -439,6 +440,12 @@ const WebTimeRanges& WebMediaPlayerAndroid::buffered() {
   return buffered_;
 }
 
+WebTimeRanges WebMediaPlayerAndroid::buffered() const {
+  if (media_source_delegate_)
+    return media_source_delegate_->Buffered();
+  return buffered_;
+}
+
 double WebMediaPlayerAndroid::maxTimeSeekable() const {
   // If we haven't even gotten to ReadyStateHaveMetadata yet then just
   // return 0 so that the seekable range is empty.
@@ -448,7 +455,7 @@ double WebMediaPlayerAndroid::maxTimeSeekable() const {
   return duration();
 }
 
-bool WebMediaPlayerAndroid::didLoadingProgress() const {
+bool WebMediaPlayerAndroid::didLoadingProgress() {
   bool ret = did_loading_progress_;
   did_loading_progress_ = false;
   return ret;
@@ -1191,7 +1198,8 @@ const gfx::RectF WebMediaPlayerAndroid::GetBoundaryRectangle() {
 // Convert a WebString to ASCII, falling back on an empty string in the case
 // of a non-ASCII string.
 static std::string ToASCIIOrEmpty(const blink::WebString& string) {
-  return IsStringASCII(string) ? base::UTF16ToASCII(string) : std::string();
+  return base::IsStringASCII(string) ? base::UTF16ToASCII(string)
+                                     : std::string();
 }
 
 // Helper functions to report media EME related stats to UMA. They follow the

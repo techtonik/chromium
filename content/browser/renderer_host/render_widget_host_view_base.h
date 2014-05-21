@@ -53,8 +53,9 @@ class BrowserAccessibilityManager;
 class SyntheticGesture;
 class SyntheticGestureTarget;
 class WebCursor;
-struct WebPluginGeometry;
+struct DidOverscrollParams;
 struct NativeWebKeyboardEvent;
+struct WebPluginGeometry;
 
 // Basic implementation shared by concrete RenderWidgetHostView subclasses.
 class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
@@ -63,8 +64,9 @@ class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
   virtual ~RenderWidgetHostViewBase();
 
   // RenderWidgetHostView implementation.
-  virtual void SetBackground(const SkBitmap& background) OVERRIDE;
-  virtual const SkBitmap& GetBackground() OVERRIDE;
+  virtual void SetBackgroundOpaque(bool opaque) OVERRIDE;
+  virtual bool GetBackgroundOpaque() OVERRIDE;
+  virtual ui::TextInputClient* GetTextInputClient() OVERRIDE;
   virtual bool IsShowingContextMenu() const OVERRIDE;
   virtual void SetShowingContextMenu(bool showing_menu) OVERRIDE;
   virtual base::string16 GetSelectedText() const OVERRIDE;
@@ -169,6 +171,8 @@ class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
   // or ignored (when |ack_result| is CONSUMED).
   virtual void ProcessAckedTouchEvent(const TouchEventWithLatencyInfo& touch,
                                       InputEventAckState ack_result) {}
+
+  virtual void DidOverscroll(const DidOverscrollParams& params) {}
 
   virtual void DidStopFlinging() {}
 
@@ -275,8 +279,6 @@ class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
   // IsSurfaceAvailableForCopy() and HasAcceleratedSurface().
   virtual bool CanCopyToVideoFrame() const = 0;
 
-  // Called when accelerated compositing state changes.
-  virtual void OnAcceleratedCompositingStateChange() = 0;
   // Called when an accelerated compositing surface is initialized.
   virtual void AcceleratedSurfaceInitialized(int host_id, int route_id) = 0;
   // |params.window| and |params.surface_id| indicate which accelerated
@@ -378,9 +380,8 @@ class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
   // autofill...).
   blink::WebPopupType popup_type_;
 
-  // A custom background to paint behind the web content. This will be tiled
-  // horizontally. Can be null, in which case we fall back to painting white.
-  SkBitmap background_;
+  // When false, the background of the web content is not fully opaque.
+  bool background_opaque_;
 
   // While the mouse is locked, the cursor is hidden from the user. Mouse events
   // are still generated. However, the position they report is the last known

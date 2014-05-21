@@ -203,14 +203,6 @@
         'nine_image_painter.cc',
         'nine_image_painter.h',
         'overlay_transform.h',
-        'ozone/impl/file_surface_factory.cc',
-        'ozone/impl/file_surface_factory.h',
-        'ozone/surface_factory_ozone.cc',
-        'ozone/surface_factory_ozone.h',
-        'ozone/surface_ozone_egl.h',
-        'ozone/surface_ozone_canvas.h',
-        'ozone/overlay_candidates_ozone.cc',
-        'ozone/overlay_candidates_ozone.h',
         'pango_util.cc',
         'pango_util.h',
         'path.cc',
@@ -380,7 +372,7 @@
         }],
         ['use_x11==1', {
           'dependencies': [
-            'gfx_x11',
+            'x/gfx_x11.gyp:gfx_x11',
           ],
         }],
         ['use_pango==1', {
@@ -468,7 +460,9 @@
         'animation/tween_unittest.cc',
         'blit_unittest.cc',
         'break_list_unittest.cc',
+        'codec/jpeg_codec_unittest.cc',
         'codec/png_codec_unittest.cc',
+        'color_analysis_unittest.cc',
         'color_utils_unittest.cc',
         'display_unittest.cc',
         'geometry/box_unittest.cc',
@@ -523,6 +517,16 @@
             'interpolated_transform_unittest.cc',
           ],
         }],
+        ['OS == "android"', {
+          'sources': [
+            'android/scroller_unittest.cc',
+          ],
+        }],
+        ['OS == "android" and gtest_target_type == "shared_library"', {
+          'dependencies': [
+            '../../testing/android/native_test.gyp:native_test_native_code',
+          ],
+        }],
       ],
     }
   ],
@@ -539,16 +543,12 @@
          ],
          'variables': {
            'jni_gen_package': 'ui/gfx',
-           'jni_generator_ptr_type': 'long'
          },
          'includes': [ '../../build/jni_generator.gypi' ],
        },
      ],
     }],
-    # Special target to wrap a gtest_target_type==shared_library
-    # gfx_unittests into an android apk for execution.
-    # See base.gyp for TODO(jrg)s about this strategy.
-    ['OS == "android" and gtest_target_type == "shared_library"', {
+    ['OS == "android"', {
       'targets': [
         {
           'target_name': 'gfx_unittests_apk',
@@ -562,32 +562,6 @@
           'includes': [ '../../build/apk_test.gypi' ],
         },
       ],
-    }],
-    ['use_x11 == 1', {
-      'targets': [
-        {
-          'target_name': 'gfx_x11',
-          'type': '<(component)',
-          'dependencies': [
-            '../../base/base.gyp:base',
-            '../../build/linux/system.gyp:x11',
-            'gfx_geometry',
-          ],
-          'defines': [
-            'GFX_IMPLEMENTATION',
-          ],
-          'sources': [
-            'x/x11_atom_cache.cc',
-            'x/x11_atom_cache.h',
-            'x/x11_connection.cc',
-            'x/x11_connection.h',
-            'x/x11_error_tracker.cc',
-            'x/x11_error_tracker.h',
-            'x/x11_types.cc',
-            'x/x11_types.h',
-          ],
-        },
-      ]
     }],
   ],
 }

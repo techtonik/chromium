@@ -76,12 +76,12 @@
 #include "content/renderer/media/audio_message_filter.h"
 #include "content/renderer/media/audio_renderer_mixer_manager.h"
 #include "content/renderer/media/media_stream_center.h"
-#include "content/renderer/media/media_stream_dependency_factory.h"
 #include "content/renderer/media/midi_message_filter.h"
 #include "content/renderer/media/peer_connection_tracker.h"
 #include "content/renderer/media/renderer_gpu_video_accelerator_factories.h"
 #include "content/renderer/media/video_capture_impl_manager.h"
 #include "content/renderer/media/video_capture_message_filter.h"
+#include "content/renderer/media/webrtc/peer_connection_dependency_factory.h"
 #include "content/renderer/media/webrtc_identity_service.h"
 #include "content/renderer/p2p/socket_dispatcher.h"
 #include "content/renderer/render_process_impl.h"
@@ -377,7 +377,7 @@ void RenderThreadImpl::Init() {
 
   webrtc_identity_service_.reset(new WebRTCIdentityService());
 
-  media_stream_factory_.reset(new MediaStreamDependencyFactory(
+  media_stream_factory_.reset(new PeerConnectionDependencyFactory(
       p2p_socket_dispatcher_.get()));
   AddObserver(media_stream_factory_.get());
 #endif  // defined(ENABLE_WEBRTC)
@@ -395,6 +395,9 @@ void RenderThreadImpl::Init() {
   AddFilter((new IndexedDBMessageFilter(thread_safe_sender()))->GetFilter());
 
   AddFilter((new EmbeddedWorkerContextMessageFilter())->GetFilter());
+
+  gamepad_shared_memory_reader_.reset(new GamepadSharedMemoryReader());
+  AddObserver(gamepad_shared_memory_reader_.get());
 
   GetContentClient()->renderer()->RenderThreadStarted();
 
@@ -430,6 +433,14 @@ void RenderThreadImpl::Init() {
       command_line.HasSwitch(switches::kEnableGpuRasterization);
   is_gpu_rasterization_forced_ =
       command_line.HasSwitch(switches::kForceGpuRasterization);
+
+  if (command_line.HasSwitch(switches::kDisableDistanceFieldText)) {
+    is_distance_field_text_enabled_ = false;
+  } else if (command_line.HasSwitch(switches::kEnableDistanceFieldText)) {
+    is_distance_field_text_enabled_ = true;
+  } else {
+    is_distance_field_text_enabled_ = false;
+  }
 
   is_low_res_tiling_enabled_ = true;
   if (command_line.HasSwitch(switches::kDisableLowResTiling) &&
@@ -1156,7 +1167,7 @@ scoped_ptr<gfx::GpuMemoryBuffer> RenderThreadImpl::AllocateGpuMemoryBuffer(
   if (!success)
     return scoped_ptr<gfx::GpuMemoryBuffer>();
 
-  return GpuMemoryBufferImpl::Create(
+  return GpuMemoryBufferImpl::CreateFromHandle(
              handle, gfx::Size(width, height), internalformat)
       .PassAs<gfx::GpuMemoryBuffer>();
 }
@@ -1240,6 +1251,7 @@ void RenderThreadImpl::OnCreateNewView(const ViewMsg_New_Params& params) {
                          params.frame_name,
                          false,
                          params.swapped_out,
+                         params.proxy_routing_id,
                          params.hidden,
                          params.never_visible,
                          params.next_page_id,
@@ -1303,7 +1315,7 @@ blink::WebMediaStreamCenter* RenderThreadImpl::CreateMediaStreamCenter(
         ->OverrideCreateWebMediaStreamCenter(client);
     if (!media_stream_center_) {
       scoped_ptr<MediaStreamCenter> media_stream_center(
-          new MediaStreamCenter(client, GetMediaStreamDependencyFactory()));
+          new MediaStreamCenter(client, GetPeerConnectionDependencyFactory()));
       AddObserver(media_stream_center.get());
       media_stream_center_ = media_stream_center.release();
     }
@@ -1312,8 +1324,8 @@ blink::WebMediaStreamCenter* RenderThreadImpl::CreateMediaStreamCenter(
   return media_stream_center_;
 }
 
-MediaStreamDependencyFactory*
-RenderThreadImpl::GetMediaStreamDependencyFactory() {
+PeerConnectionDependencyFactory*
+RenderThreadImpl::GetPeerConnectionDependencyFactory() {
   return media_stream_factory_.get();
 }
 
@@ -1408,8 +1420,12 @@ void RenderThreadImpl::OnMemoryPressure(
       base::MemoryPressureListener::MEMORY_PRESSURE_CRITICAL) {
     // Trigger full v8 garbage collection on critical memory notification.
     v8::V8::LowMemoryNotification();
-    // Clear the image cache.
-    blink::WebImageCache::clear();
+
+    if (webkit_platform_support_) {
+      // Clear the image cache. Do not call into blink if it is not initialized.
+      blink::WebImageCache::clear();
+    }
+
     // Purge Skia font cache, by setting it to 0 and then again to the previous
     // limit.
     size_t font_cache_limit = SkGraphics::SetFontCacheLimit(0);
@@ -1455,9 +1471,11 @@ void RenderThreadImpl::SetFlingCurveParameters(
 }
 
 void RenderThreadImpl::SampleGamepads(blink::WebGamepads* data) {
-  if (!gamepad_shared_memory_reader_)
-    gamepad_shared_memory_reader_.reset(new GamepadSharedMemoryReader);
   gamepad_shared_memory_reader_->SampleGamepads(*data);
+}
+
+void RenderThreadImpl::SetGamepadListener(blink::WebGamepadListener* listener) {
+  gamepad_shared_memory_reader_->SetGamepadListener(listener);
 }
 
 void RenderThreadImpl::WidgetCreated() {

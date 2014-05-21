@@ -21,6 +21,10 @@ class Rect;
 class Size;
 }
 
+namespace ui {
+class TextInputClient;
+}
+
 namespace content {
 
 class RenderWidgetHost;
@@ -63,6 +67,13 @@ class CONTENT_EXPORT RenderWidgetHostView {
   virtual gfx::NativeViewId GetNativeViewId() const = 0;
   virtual gfx::NativeViewAccessible GetNativeViewAccessible() = 0;
 
+  // Returns a ui::TextInputClient to support text input or NULL if this RWHV
+  // doesn't support text input.
+  // Note: Not all the platforms use ui::InputMethod and ui::TextInputClient for
+  // text input.  Some platforms (Mac and Android for example) use their own
+  // text input system.
+  virtual ui::TextInputClient* GetTextInputClient() = 0;
+
   // Set focus to the associated View component.
   virtual void Focus() = 0;
   // Returns true if the View currently has the focus.
@@ -91,9 +102,9 @@ class CONTENT_EXPORT RenderWidgetHostView {
   virtual base::string16 GetSelectedText() const = 0;
 
   // Subclasses should override this method to do what is appropriate to set
-  // the custom background for their platform.
-  virtual void SetBackground(const SkBitmap& background) = 0;
-  virtual const SkBitmap& GetBackground() = 0;
+  // the background to be transparent or opaque.
+  virtual void SetBackgroundOpaque(bool opaque) = 0;
+  virtual bool GetBackgroundOpaque() = 0;
 
   // Return value indicates whether the mouse is locked successfully or not.
   virtual bool LockMouse() = 0;

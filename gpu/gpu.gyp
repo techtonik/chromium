@@ -281,14 +281,13 @@
         'config/gpu_util_unittest.cc',
       ],
       'conditions': [
-        ['OS == "android" and gtest_target_type == "shared_library"', {
+        ['OS == "android"', {
           'dependencies': [
             '../testing/android/native_test.gyp:native_test_native_code',
           ],
         }],
         # See http://crbug.com/162998#c4 for why this is needed.
-        # TODO(dmikurube): Kill linux_use_tcmalloc. http://crbug.com/345554
-        ['OS=="linux" and ((use_allocator!="none" and use_allocator!="see_use_tcmalloc") or (use_allocator=="see_use_tcmalloc" and linux_use_tcmalloc==1))', {
+        ['OS=="linux" and use_allocator!="none"', {
           'dependencies': [
             '../base/allocator/allocator.gyp:allocator',
           ],
@@ -351,7 +350,7 @@
         'command_buffer/tests/occlusion_query_unittest.cc',
       ],
       'conditions': [
-        ['OS == "android" and gtest_target_type == "shared_library"', {
+        ['OS == "android"', {
           'dependencies': [
             '../testing/android/native_test.gyp:native_test_native_code',
           ],
@@ -592,7 +591,7 @@
         },
       ],
     }],
-    ['OS == "android" and gtest_target_type == "shared_library"', {
+    ['OS == "android"', {
       'targets': [
         {
           'target_name': 'gl_tests_apk',

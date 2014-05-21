@@ -424,8 +424,8 @@ content::GeolocationPermissionContext*
   return ChromeGeolocationPermissionContextFactory::GetForProfile(this);
 }
 
-content::BrowserPluginGuestManagerDelegate*
-    OffTheRecordProfileImpl::GetGuestManagerDelegate() {
+content::BrowserPluginGuestManager*
+    OffTheRecordProfileImpl::GetGuestManager() {
   return GuestViewManager::FromBrowserContext(this);
 }
 
@@ -508,6 +508,16 @@ void OffTheRecordProfileImpl::ClearNetworkingHistorySince(
   // Still, fire the callback to indicate we have finished, otherwise the
   // BrowsingDataRemover will never be destroyed and the dialog will never be
   // closed. We must do this asynchronously in order to avoid reentrancy issues.
+  if (!completion.is_null()) {
+    BrowserThread::PostTask(BrowserThread::UI, FROM_HERE, completion);
+  }
+}
+
+void OffTheRecordProfileImpl::ClearDomainReliabilityMonitor(
+    domain_reliability::DomainReliabilityClearMode mode,
+    const base::Closure& completion) {
+  // Incognito profiles don't have Domain Reliability Monitors, so there's
+  // nothing to do here.
   if (!completion.is_null()) {
     BrowserThread::PostTask(BrowserThread::UI, FROM_HERE, completion);
   }

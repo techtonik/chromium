@@ -52,7 +52,7 @@
       'type': '<(component)',
       'dependencies': [
         '../base/base.gyp:base',
-	'../base/base.gyp:base_i18n',
+        '../base/base.gyp:base_i18n',
         '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
         '../crypto/crypto.gyp:crypto',
         '../gpu/gpu.gyp:command_buffer_common',
@@ -248,6 +248,7 @@
         'base/bit_reader_core.cc',
         'base/bit_reader_core.h',
         'base/bitstream_buffer.h',
+        'base/buffering_state.h',
         'base/buffers.h',
         'base/byte_queue.cc',
         'base/byte_queue.h',
@@ -391,6 +392,8 @@
         'filters/ffmpeg_video_decoder.h',
         'filters/file_data_source.cc',
         'filters/file_data_source.h',
+        'filters/frame_processor.cc',
+        'filters/frame_processor.h',
         'filters/frame_processor_base.cc',
         'filters/frame_processor_base.h',
         'filters/gpu_video_accelerator_factories.cc',
@@ -466,8 +469,12 @@
         'video/capture/file_video_capture_device.h',
         'video/capture/file_video_capture_device_factory.h',
         'video/capture/file_video_capture_device_factory.cc',
+        'video/capture/linux/video_capture_device_factory_linux.cc',
+        'video/capture/linux/video_capture_device_factory_linux.h',
         'video/capture/linux/video_capture_device_linux.cc',
         'video/capture/linux/video_capture_device_linux.h',
+        'video/capture/linux/video_capture_device_chromeos.cc',
+        'video/capture/linux/video_capture_device_chromeos.h',
         'video/capture/mac/avfoundation_glue.h',
         'video/capture/mac/avfoundation_glue.mm',
         'video/capture/mac/coremedia_glue.h',
@@ -475,6 +482,8 @@
         'video/capture/mac/platform_video_capturing_mac.h',
         'video/capture/mac/video_capture_device_avfoundation_mac.h',
         'video/capture/mac/video_capture_device_avfoundation_mac.mm',
+        'video/capture/mac/video_capture_device_factory_mac.h',
+        'video/capture/mac/video_capture_device_factory_mac.mm',
         'video/capture/mac/video_capture_device_mac.h',
         'video/capture/mac/video_capture_device_mac.mm',
         'video/capture/mac/video_capture_device_qtkit_mac.h',
@@ -631,6 +640,11 @@
             'formats/webm/chromeos/ebml_writer.h',
             'formats/webm/chromeos/webm_encoder.cc',
             'formats/webm/chromeos/webm_encoder.h',
+          ],
+        }],
+        ['OS!="ios"', {
+          'dependencies': [
+            '../third_party/libyuv/libyuv.gyp:libyuv',
           ],
         }],
         ['use_alsa==1', {
@@ -881,6 +895,8 @@
             'formats/mp4/es_descriptor.h',
             'formats/mp4/mp4_stream_parser.cc',
             'formats/mp4/mp4_stream_parser.h',
+            'formats/mp4/sample_to_group_iterator.cc',
+            'formats/mp4/sample_to_group_iterator.h',
             'formats/mp4/track_run_iterator.cc',
             'formats/mp4/track_run_iterator.h',
             'formats/mpeg/adts_constants.cc',
@@ -1041,6 +1057,7 @@
         'filters/ffmpeg_glue_unittest.cc',
         'filters/ffmpeg_video_decoder_unittest.cc',
         'filters/file_data_source_unittest.cc',
+        'filters/frame_processor_unittest.cc',
         'filters/h264_bit_reader_unittest.cc',
         'filters/h264_parser_unittest.cc',
         'filters/in_memory_url_protocol_unittest.cc',
@@ -1061,6 +1078,7 @@
         'midi/usb_midi_descriptor_parser_unittest.cc',
         'midi/usb_midi_input_stream_unittest.cc',
         'midi/usb_midi_output_stream_unittest.cc',
+        'video/capture/fake_video_capture_device_unittest.cc',
         'video/capture/video_capture_device_unittest.cc',
         'formats/common/offset_byte_queue_unittest.cc',
         'formats/webm/cluster_builder.cc',
@@ -1105,8 +1123,7 @@
         }],
         ['os_posix==1 and OS!="mac"', {
           'conditions': [
-            # TODO(dmikurube): Kill linux_use_tcmalloc. http://crbug.com/345554
-            ['(use_allocator!="none" and use_allocator!="see_use_tcmalloc") or (use_allocator=="see_use_tcmalloc" and linux_use_tcmalloc==1)', {
+            ['use_allocator!="none"', {
               'dependencies': [
                 '../base/allocator/allocator.gyp:allocator',
               ],
@@ -1176,6 +1193,7 @@
             'formats/mp4/box_reader_unittest.cc',
             'formats/mp4/es_descriptor_unittest.cc',
             'formats/mp4/mp4_stream_parser_unittest.cc',
+            'formats/mp4/sample_to_group_iterator_unittest.cc',
             'formats/mp4/track_run_iterator_unittest.cc',
             'formats/mpeg/adts_stream_parser_unittest.cc',
             'formats/mpeg/mp3_stream_parser_unittest.cc',
@@ -1190,6 +1208,11 @@
         # http://crbug.com/171009
         ['OS=="win" and target_arch=="x64"', {
           'msvs_disabled_warnings': [ 4267, ],
+        }],
+        ['OS=="mac"', {
+          'sources': [
+            'video/capture/mac/video_capture_device_factory_mac_unittest.mm',
+          ]
         }],
       ],
     },
@@ -1571,7 +1594,6 @@
           ],
           'variables': {
             'jni_gen_package': 'media',
-            'jni_generator_ptr_type': 'long',
           },
           'includes': ['../build/jni_generator.gypi'],
         },
@@ -1584,7 +1606,6 @@
           ],
           'variables': {
             'jni_gen_package': 'media',
-            'jni_generator_ptr_type': 'long',
           },
           'includes': ['../build/jni_generator.gypi'],
         },
@@ -1594,6 +1615,7 @@
           'sources': [
             'base/android/audio_decoder_job.cc',
             'base/android/audio_decoder_job.h',
+            'base/android/cdm_factory_android.cc',
             'base/android/media_codec_bridge.cc',
             'base/android/media_codec_bridge.h',
             'base/android/media_decoder_job.cc',
@@ -1615,6 +1637,7 @@
             'base/android/webaudio_media_codec_bridge.cc',
             'base/android/webaudio_media_codec_bridge.h',
             'base/android/webaudio_media_codec_info.h',
+            'base/cdm_factory.h',
           ],
           'dependencies': [
             '../base/base.gyp:base',
@@ -1699,8 +1722,7 @@
           'conditions': [
             ['os_posix==1 and OS!="mac"', {
               'conditions': [
-                # TODO(dmikurube): Kill linux_use_tcmalloc. http://crbug.com/345554
-                ['(use_allocator!="none" and use_allocator!="see_use_tcmalloc") or (use_allocator=="see_use_tcmalloc" and linux_use_tcmalloc==1)', {
+                ['use_allocator!="none"', {
                   'dependencies': [
                     '../base/allocator/allocator.gyp:allocator',
                   ],

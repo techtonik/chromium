@@ -44,28 +44,23 @@ class ExtensionMessageFilter;
 class QuotaLimitHeuristic;
 }
 
-#define EXTENSION_FUNCTION_VALIDATE(test) \
-  EXTENSION_FUNCTION_VALIDATE_INTERNAL(test, false)
-
-#define EXTENSION_FUNCTION_VALIDATE_TYPESAFE(test) \
-  EXTENSION_FUNCTION_VALIDATE_INTERNAL(test, RespondNow(BadMessage()))
-
 #ifdef NDEBUG
-#define EXTENSION_FUNCTION_VALIDATE_INTERNAL(test, failure) \
-  do {                                                      \
-    if (!(test)) {                                          \
-      bad_message_ = true;                                  \
-      return (failure);                                     \
-    }                                                       \
+#define EXTENSION_FUNCTION_VALIDATE(test) \
+  do {                                    \
+    if (!(test)) {                        \
+      bad_message_ = true;                \
+      return ValidationFailure(this);     \
+    }                                     \
   } while (0)
 #else   // NDEBUG
-#define EXTENSION_FUNCTION_VALIDATE_INTERNAL(test, failure) CHECK(test)
+#define EXTENSION_FUNCTION_VALIDATE(test) CHECK(test)
 #endif  // NDEBUG
 
-#define EXTENSION_FUNCTION_ERROR(error) do { \
-    error_ = error; \
-    bad_message_ = true; \
-    return false; \
+#define EXTENSION_FUNCTION_ERROR(error) \
+  do {                                  \
+    error_ = error;                     \
+    bad_message_ = true;                \
+    return ValidationFailure(this);     \
   } while (0)
 
 // Declares a callable extension function with the given |name|. You must also
@@ -144,6 +139,16 @@ class ExtensionFunction
 
   // Runs the function and returns the action to take when the caller is ready
   // to respond.
+  //
+  // Typical return values might be:
+  //   * RespondNow(NoArguments())
+  //   * RespondNow(SingleArgument(42))
+  //   * RespondNow(MultipleArguments(my_result.ToValue()))
+  //   * RespondNow(Error("Warp core breach"))
+  //   * RespondLater(), then later,
+  //     * Respond(NoArguments())
+  //     * ... etc.
+  //
   //
   // Callers must call Execute() on the return ResponseAction at some point,
   // exactly once.
@@ -258,6 +263,11 @@ class ExtensionFunction
   ResponseAction RespondNow(ResponseValue result);
   // Don't respond now, but promise to call Respond() later.
   ResponseAction RespondLater();
+
+  // This is the return value of the EXTENSION_FUNCTION_VALIDATE macro, which
+  // needs to work from Run(), RunAsync(), and RunSync(). The former of those
+  // has a different return type (ResponseAction) than the latter two (bool).
+  static ResponseAction ValidationFailure(ExtensionFunction* function);
 
   // If RespondLater() was used, functions must at some point call Respond()
   // with |result| as their result.
@@ -498,6 +508,9 @@ class AsyncExtensionFunction : public UIThreadExtensionFunction {
   // to respond immediately with an error.
   virtual bool RunAsync() = 0;
 
+  // ValidationFailure override to match RunAsync().
+  static bool ValidationFailure(AsyncExtensionFunction* function);
+
  private:
   virtual ResponseAction Run() OVERRIDE;
 };
@@ -522,6 +535,9 @@ class SyncExtensionFunction : public UIThreadExtensionFunction {
   // immediately with success, false to respond immediately with an error.
   virtual bool RunSync() = 0;
 
+  // ValidationFailure override to match RunSync().
+  static bool ValidationFailure(SyncExtensionFunction* function);
+
  private:
   virtual ResponseAction Run() OVERRIDE;
 };
@@ -539,6 +555,9 @@ class SyncIOThreadExtensionFunction : public IOThreadExtensionFunction {
   // respond immediately with success, false to respond immediately with an
   // error.
   virtual bool RunSync() = 0;
+
+  // ValidationFailure override to match RunSync().
+  static bool ValidationFailure(SyncIOThreadExtensionFunction* function);
 
  private:
   virtual ResponseAction Run() OVERRIDE;

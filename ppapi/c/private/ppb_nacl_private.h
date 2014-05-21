@@ -3,7 +3,7 @@
  * found in the LICENSE file.
  */
 
-/* From private/ppb_nacl_private.idl modified Mon May  5 13:49:42 2014. */
+/* From private/ppb_nacl_private.idl modified Mon May 19 11:12:19 2014. */
 
 #ifndef PPAPI_C_PRIVATE_PPB_NACL_PRIVATE_H_
 #define PPAPI_C_PRIVATE_PPB_NACL_PRIVATE_H_
@@ -228,6 +228,7 @@ struct PPB_NaCl_Private_1_0 {
    */
   void (*LaunchSelLdr)(
       PP_Instance instance,
+      PP_Bool main_service_runtime,
       const char* alleged_url,
       PP_Bool uses_irt,
       PP_Bool uses_ppapi,
@@ -239,7 +240,6 @@ struct PPB_NaCl_Private_1_0 {
       const struct PPP_ManifestService_1_0* manifest_service_interface,
       void* manifest_service_user_data,
       void* imc_handle,
-      struct PP_Var* error_message,
       struct PP_CompletionCallback callback);
   /* This function starts the IPC proxy so the nexe can communicate with the
    * browser.
@@ -326,18 +326,6 @@ struct PPB_NaCl_Private_1_0 {
                         PP_Bool length_is_computable,
                         uint64_t loaded_bytes,
                         uint64_t total_bytes);
-  /* Report that the attempt to open the nexe has finished. Opening the file
-   * may have failed, as indicated by a pp_error value that is not PP_OK or an
-   * fd of -1. Failure to stat the file to determine its length results in
-   * nexe_bytes_read being -1.
-   */
-  void (*NexeFileDidOpen)(PP_Instance instance,
-                          int32_t pp_error,
-                          int32_t fd,
-                          int32_t http_status,
-                          int64_t nexe_bytes_read,
-                          const char* url,
-                          int64_t time_since_open);
   /* Report that the nexe loaded successfully. */
   void (*ReportLoadSuccess)(PP_Instance instance,
                             const char* url,
@@ -384,14 +372,13 @@ struct PPB_NaCl_Private_1_0 {
   /* Returns the size of the nexe. */
   int64_t (*GetNexeSize)(PP_Instance instance);
   /* Performs accounting for requesting the NaCl manifest at the given URL. */
-  PP_Bool (*RequestNaClManifest)(PP_Instance instance,
-                                 const char* manifest_url,
-                                 PP_Bool* is_data_uri);
+  void (*RequestNaClManifest)(PP_Instance instance,
+                              const char* manifest_url,
+                              int32_t* manifest_id,
+                              struct PP_CompletionCallback callback);
   struct PP_Var (*GetManifestBaseURL)(PP_Instance instance);
   PP_Bool (*ResolvesRelativeToPluginBaseUrl)(PP_Instance instance,
                                              const char* url);
-  /* Returns the parsed contents of a data URL. */
-  struct PP_Var (*ParseDataURL)(const char* data_url);
   /* Processes the NaCl manifest once it's been retrieved.
    * TODO(teravest): Move the rest of the supporting logic out of the trusted
    * plugin.
@@ -399,19 +386,8 @@ struct PPB_NaCl_Private_1_0 {
   void (*ProcessNaClManifest)(PP_Instance instance, const char* program_url);
   /* Returns the manifest url as passed as a plugin argument. */
   struct PP_Var (*GetManifestURLArgument)(PP_Instance instance);
-  PP_Bool (*IsPNaCl)(PP_Instance instance);
   PP_Bool (*DevInterfacesEnabled)(PP_Instance instance);
-  /* Downloads the manifest into the buffer |data|, invoking
-   * |callback| when finished.
-   * TODO(teravest): Merge data URL parsing into this. */
-  void (*DownloadManifestToBuffer)(PP_Instance instance,
-                                   struct PP_Var* data,
-                                   struct PP_CompletionCallback callback);
   int32_t (*CreatePnaclManifest)(PP_Instance instance);
-  int32_t (*CreateJsonManifest)(PP_Instance instance,
-                                const char* manifest_base_url,
-                                const char* sandbox_isa,
-                                const char* manifest_data);
   void (*DestroyManifest)(PP_Instance instance, int32_t manifest_id);
   PP_Bool (*GetManifestProgramURL)(PP_Instance instance,
                                    int32_t manifest_id,
@@ -430,6 +406,21 @@ struct PPB_NaCl_Private_1_0 {
                                   const char* filename,
                                   struct PP_Var* llc_tool_name,
                                   struct PP_Var* ld_tool_name);
+  /* PP_Var string of attributes describing the CPU features supported
+   * by the current architecture. The string is a comma-delimited list
+   * of attributes supported by LLVM in its -mattr= option:
+   *   http://llvm.org/docs/CommandGuide/llc.html#cmdoption-mattr */
+  struct PP_Var (*GetCpuFeatureAttrs)(void);
+  /* Posts a message to the JavaScript object for the given instance.
+   * This method may be called on any thread.
+   */
+  void (*PostMessageToJavaScript)(PP_Instance instance, const char* message);
+  /* Downloads the .nexe file at the given URL to a file, and sets |handle|
+   * to a handle to a file containing its contents. */
+  void (*DownloadNexe)(PP_Instance instance,
+                       const char* url,
+                       PP_FileHandle* handle,
+                       struct PP_CompletionCallback callback);
 };
 
 typedef struct PPB_NaCl_Private_1_0 PPB_NaCl_Private;

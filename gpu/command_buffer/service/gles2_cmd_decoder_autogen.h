@@ -401,11 +401,6 @@ error::Error GLES2DecoderImpl::HandleCopyTexImage2D(
     LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, "glCopyTexImage2D", "height < 0");
     return error::kNoError;
   }
-  if (!validators_->texture_border.IsValid(border)) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_VALUE, "glCopyTexImage2D", "border GL_INVALID_VALUE");
-    return error::kNoError;
-  }
   DoCopyTexImage2D(target, level, internalformat, x, y, width, height, border);
   return error::kNoError;
 }
@@ -761,11 +756,6 @@ error::Error GLES2DecoderImpl::HandleFramebufferTexture2D(
   if (!validators_->texture_target.IsValid(textarget)) {
     LOCAL_SET_GL_ERROR_INVALID_ENUM(
         "glFramebufferTexture2D", textarget, "textarget");
-    return error::kNoError;
-  }
-  if (!validators_->zero_only.IsValid(level)) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_VALUE, "glFramebufferTexture2D", "level GL_INVALID_VALUE");
     return error::kNoError;
   }
   DoFramebufferTexture2D(target, attachment, textarget, texture, level);
@@ -2383,11 +2373,6 @@ error::Error GLES2DecoderImpl::HandleUniformMatrix2fv(
   }
   const GLfloat* value = GetSharedMemoryAs<const GLfloat*>(
       c.value_shm_id, c.value_shm_offset, data_size);
-  if (!validators_->false_only.IsValid(transpose)) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_VALUE, "glUniformMatrix2fv", "transpose GL_INVALID_VALUE");
-    return error::kNoError;
-  }
   if (value == NULL) {
     return error::kOutOfBounds;
   }
@@ -2410,11 +2395,6 @@ error::Error GLES2DecoderImpl::HandleUniformMatrix2fvImmediate(
   }
   const GLfloat* value =
       GetImmediateDataAs<const GLfloat*>(c, data_size, immediate_data_size);
-  if (!validators_->false_only.IsValid(transpose)) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_VALUE, "glUniformMatrix2fv", "transpose GL_INVALID_VALUE");
-    return error::kNoError;
-  }
   if (value == NULL) {
     return error::kOutOfBounds;
   }
@@ -2434,11 +2414,6 @@ error::Error GLES2DecoderImpl::HandleUniformMatrix3fv(
   }
   const GLfloat* value = GetSharedMemoryAs<const GLfloat*>(
       c.value_shm_id, c.value_shm_offset, data_size);
-  if (!validators_->false_only.IsValid(transpose)) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_VALUE, "glUniformMatrix3fv", "transpose GL_INVALID_VALUE");
-    return error::kNoError;
-  }
   if (value == NULL) {
     return error::kOutOfBounds;
   }
@@ -2461,11 +2436,6 @@ error::Error GLES2DecoderImpl::HandleUniformMatrix3fvImmediate(
   }
   const GLfloat* value =
       GetImmediateDataAs<const GLfloat*>(c, data_size, immediate_data_size);
-  if (!validators_->false_only.IsValid(transpose)) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_VALUE, "glUniformMatrix3fv", "transpose GL_INVALID_VALUE");
-    return error::kNoError;
-  }
   if (value == NULL) {
     return error::kOutOfBounds;
   }
@@ -2485,11 +2455,6 @@ error::Error GLES2DecoderImpl::HandleUniformMatrix4fv(
   }
   const GLfloat* value = GetSharedMemoryAs<const GLfloat*>(
       c.value_shm_id, c.value_shm_offset, data_size);
-  if (!validators_->false_only.IsValid(transpose)) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_VALUE, "glUniformMatrix4fv", "transpose GL_INVALID_VALUE");
-    return error::kNoError;
-  }
   if (value == NULL) {
     return error::kOutOfBounds;
   }
@@ -2512,11 +2477,6 @@ error::Error GLES2DecoderImpl::HandleUniformMatrix4fvImmediate(
   }
   const GLfloat* value =
       GetImmediateDataAs<const GLfloat*>(c, data_size, immediate_data_size);
-  if (!validators_->false_only.IsValid(transpose)) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_VALUE, "glUniformMatrix4fv", "transpose GL_INVALID_VALUE");
-    return error::kNoError;
-  }
   if (value == NULL) {
     return error::kOutOfBounds;
   }
@@ -2751,6 +2711,13 @@ error::Error GLES2DecoderImpl::HandleViewport(uint32_t immediate_data_size,
 error::Error GLES2DecoderImpl::HandleBlitFramebufferCHROMIUM(
     uint32_t immediate_data_size,
     const gles2::cmds::BlitFramebufferCHROMIUM& c) {
+  if (!features().chromium_framebuffer_multisample) {
+    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
+                       "glBlitFramebufferCHROMIUM",
+                       "function not available");
+    return error::kNoError;
+  }
+
   error::Error error;
   error = WillAccessBoundFramebufferForDraw();
   if (error != error::kNoError)
@@ -2781,6 +2748,13 @@ error::Error GLES2DecoderImpl::HandleBlitFramebufferCHROMIUM(
 error::Error GLES2DecoderImpl::HandleRenderbufferStorageMultisampleCHROMIUM(
     uint32_t immediate_data_size,
     const gles2::cmds::RenderbufferStorageMultisampleCHROMIUM& c) {
+  if (!features().chromium_framebuffer_multisample) {
+    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
+                       "glRenderbufferStorageMultisampleCHROMIUM",
+                       "function not available");
+    return error::kNoError;
+  }
+
   GLenum target = static_cast<GLenum>(c.target);
   GLsizei samples = static_cast<GLsizei>(c.samples);
   GLenum internalformat = static_cast<GLenum>(c.internalformat);
@@ -2823,6 +2797,13 @@ error::Error GLES2DecoderImpl::HandleRenderbufferStorageMultisampleCHROMIUM(
 error::Error GLES2DecoderImpl::HandleRenderbufferStorageMultisampleEXT(
     uint32_t immediate_data_size,
     const gles2::cmds::RenderbufferStorageMultisampleEXT& c) {
+  if (!features().multisampled_render_to_texture) {
+    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
+                       "glRenderbufferStorageMultisampleEXT",
+                       "function not available");
+    return error::kNoError;
+  }
+
   GLenum target = static_cast<GLenum>(c.target);
   GLsizei samples = static_cast<GLsizei>(c.samples);
   GLenum internalformat = static_cast<GLenum>(c.internalformat);
@@ -2862,6 +2843,13 @@ error::Error GLES2DecoderImpl::HandleRenderbufferStorageMultisampleEXT(
 error::Error GLES2DecoderImpl::HandleFramebufferTexture2DMultisampleEXT(
     uint32_t immediate_data_size,
     const gles2::cmds::FramebufferTexture2DMultisampleEXT& c) {
+  if (!features().multisampled_render_to_texture) {
+    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
+                       "glFramebufferTexture2DMultisampleEXT",
+                       "function not available");
+    return error::kNoError;
+  }
+
   GLenum target = static_cast<GLenum>(c.target);
   GLenum attachment = static_cast<GLenum>(c.attachment);
   GLenum textarget = static_cast<GLenum>(c.textarget);
@@ -2881,12 +2869,6 @@ error::Error GLES2DecoderImpl::HandleFramebufferTexture2DMultisampleEXT(
   if (!validators_->texture_target.IsValid(textarget)) {
     LOCAL_SET_GL_ERROR_INVALID_ENUM(
         "glFramebufferTexture2DMultisampleEXT", textarget, "textarget");
-    return error::kNoError;
-  }
-  if (!validators_->zero_only.IsValid(level)) {
-    LOCAL_SET_GL_ERROR(GL_INVALID_VALUE,
-                       "glFramebufferTexture2DMultisampleEXT",
-                       "level GL_INVALID_VALUE");
     return error::kNoError;
   }
   if (samples < 0) {
@@ -3356,6 +3338,13 @@ error::Error GLES2DecoderImpl::HandleTraceEndCHROMIUM(
 error::Error GLES2DecoderImpl::HandleDiscardFramebufferEXT(
     uint32_t immediate_data_size,
     const gles2::cmds::DiscardFramebufferEXT& c) {
+  if (!features().ext_discard_framebuffer) {
+    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
+                       "glDiscardFramebufferEXT",
+                       "function not available");
+    return error::kNoError;
+  }
+
   GLenum target = static_cast<GLenum>(c.target);
   GLsizei count = static_cast<GLsizei>(c.count);
   uint32_t data_size;
@@ -3379,6 +3368,13 @@ error::Error GLES2DecoderImpl::HandleDiscardFramebufferEXT(
 error::Error GLES2DecoderImpl::HandleDiscardFramebufferEXTImmediate(
     uint32_t immediate_data_size,
     const gles2::cmds::DiscardFramebufferEXTImmediate& c) {
+  if (!features().ext_discard_framebuffer) {
+    LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
+                       "glDiscardFramebufferEXT",
+                       "function not available");
+    return error::kNoError;
+  }
+
   GLenum target = static_cast<GLenum>(c.target);
   GLsizei count = static_cast<GLsizei>(c.count);
   uint32_t data_size;

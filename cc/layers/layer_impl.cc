@@ -243,8 +243,7 @@ void LayerImpl::ClearRenderSurfaceLayerList() {
     draw_properties_.render_surface->layer_list().clear();
 }
 
-scoped_ptr<SharedQuadState> LayerImpl::CreateSharedQuadState() const {
-  scoped_ptr<SharedQuadState> state = SharedQuadState::Create();
+void LayerImpl::PopulateSharedQuadState(SharedQuadState* state) const {
   state->SetAll(draw_properties_.target_space_transform,
                 draw_properties_.content_bounds,
                 draw_properties_.visible_content_rect,
@@ -252,7 +251,6 @@ scoped_ptr<SharedQuadState> LayerImpl::CreateSharedQuadState() const {
                 draw_properties_.is_clipped,
                 draw_properties_.opacity,
                 blend_mode_);
-  return state.Pass();
 }
 
 bool LayerImpl::WillDraw(DrawMode draw_mode,
@@ -1074,7 +1072,7 @@ void LayerImpl::CalculateContentsScale(float ideal_contents_scale,
 }
 
 void LayerImpl::SetScrollOffsetDelegate(
-    LayerScrollOffsetDelegate* scroll_offset_delegate) {
+    ScrollOffsetDelegate* scroll_offset_delegate) {
   // Having both a scroll parent and a scroll offset delegate is unsupported.
   DCHECK(!scroll_parent_);
   if (!scroll_offset_delegate && scroll_offset_delegate_) {
@@ -1500,6 +1498,11 @@ void LayerImpl::AsValueInto(base::DictionaryValue* state) const {
       NOTREACHED();
     }
   }
+}
+
+bool LayerImpl::IsDrawnRenderSurfaceLayerListMember() const {
+  return draw_properties_.last_drawn_render_surface_layer_list_id ==
+         layer_tree_impl_->current_render_surface_list_id();
 }
 
 size_t LayerImpl::GPUMemoryUsageInBytes() const { return 0; }

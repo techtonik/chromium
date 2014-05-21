@@ -523,6 +523,15 @@ const blink::WebTimeRanges& WebMediaPlayerImpl::buffered() {
   return buffered_web_time_ranges_;
 }
 
+blink::WebTimeRanges WebMediaPlayerImpl::buffered() const {
+  DCHECK(main_loop_->BelongsToCurrentThread());
+  media::Ranges<base::TimeDelta> buffered_time_ranges =
+      pipeline_.GetBufferedTimeRanges();
+  buffered_data_source_host_.AddBufferedTimeRanges(
+      &buffered_time_ranges, pipeline_.GetMediaDuration());
+  return ConvertToWebTimeRanges(buffered_time_ranges);
+}
+
 double WebMediaPlayerImpl::maxTimeSeekable() const {
   DCHECK(main_loop_->BelongsToCurrentThread());
 
@@ -537,7 +546,7 @@ double WebMediaPlayerImpl::maxTimeSeekable() const {
   return duration();
 }
 
-bool WebMediaPlayerImpl::didLoadingProgress() const {
+bool WebMediaPlayerImpl::didLoadingProgress() {
   DCHECK(main_loop_->BelongsToCurrentThread());
   bool pipeline_progress = pipeline_.DidLoadingProgress();
   bool data_progress = buffered_data_source_host_.DidLoadingProgress();
@@ -746,7 +755,8 @@ static void ReportMediaKeyExceptionToUMA(const std::string& method,
 // Convert a WebString to ASCII, falling back on an empty string in the case
 // of a non-ASCII string.
 static std::string ToASCIIOrEmpty(const blink::WebString& string) {
-  return IsStringASCII(string) ? base::UTF16ToASCII(string) : std::string();
+  return base::IsStringASCII(string) ? base::UTF16ToASCII(string)
+                                     : std::string();
 }
 
 WebMediaPlayer::MediaKeyException
@@ -1150,6 +1160,8 @@ void WebMediaPlayerImpl::StartPipeline() {
   UMA_HISTOGRAM_BOOLEAN("Media.MSE.Playback",
                         (load_type_ == LoadTypeMediaSource));
 
+  media::LogCB mse_log_cb;
+
   // Figure out which demuxer to use.
   if (load_type_ != LoadTypeMediaSource) {
     DCHECK(!chunk_demuxer_);
@@ -1163,10 +1175,12 @@ void WebMediaPlayerImpl::StartPipeline() {
     DCHECK(!chunk_demuxer_);
     DCHECK(!data_source_);
 
+    mse_log_cb = base::Bind(&LogMediaSourceError, media_log_);
+
     chunk_demuxer_ = new media::ChunkDemuxer(
         BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnDemuxerOpened),
         BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnNeedKey),
-        base::Bind(&LogMediaSourceError, media_log_),
+        mse_log_cb,
         true);
     demuxer_.reset(chunk_demuxer_);
   }
@@ -1180,7 +1194,8 @@ void WebMediaPlayerImpl::StartPipeline() {
 
   // Create our audio decoders and renderer.
   ScopedVector<media::AudioDecoder> audio_decoders;
-  audio_decoders.push_back(new media::FFmpegAudioDecoder(media_loop_));
+  audio_decoders.push_back(new media::FFmpegAudioDecoder(media_loop_,
+                                                         mse_log_cb));
   audio_decoders.push_back(new media::OpusAudioDecoder(media_loop_));
 
   scoped_ptr<media::AudioRenderer> audio_renderer(new media::AudioRendererImpl(

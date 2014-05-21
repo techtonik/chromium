@@ -38,8 +38,8 @@
 #include "chrome/browser/ui/omnibox/location_bar_util.h"
 #include "chrome/browser/ui/omnibox/omnibox_popup_model.h"
 #include "chrome/browser/ui/omnibox/omnibox_popup_view.h"
-#include "chrome/browser/ui/passwords/manage_passwords_bubble_ui_controller.h"
 #include "chrome/browser/ui/passwords/manage_passwords_icon.h"
+#include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/toolbar/origin_chip_info.h"
 #include "chrome/browser/ui/view_ids.h"
@@ -105,12 +105,10 @@ using views::View;
 
 namespace {
 
-#if !defined(OS_CHROMEOS)
-Browser* GetBrowserFromDelegate(LocationBarView::Delegate* delegate) {
-  WebContents* web_contents = delegate->GetWebContents();
-  return web_contents ? chrome::FindBrowserWithWebContents(web_contents) : NULL;
-}
-#endif
+// The search button images are made to look as if they overlay the normal edge
+// images, but to align things, the search button needs to be inset horizontally
+// by 1 px.
+const int kSearchButtonInset = 1;
 
 // Given a containing |height| and a |base_font_list|, shrinks the font size
 // until the font list will fit within |height| while having its cap height
@@ -156,6 +154,11 @@ gfx::FontList GetLargestFontListWithHeightBound(
     font_list = font_list.DeriveWithSizeDelta(-1);
   }
   return font_list;
+}
+
+int GetEditLeadingInternalSpace() {
+  // The textfield has 1 px of whitespace before the text in the RTL case only.
+  return base::i18n::IsRTL() ? 1 : 0;
 }
 
 // Functor for moving BookmarkManagerPrivate page actions to the right via
@@ -697,18 +700,53 @@ void LocationBarView::GetAccessibleState(ui::AXViewState* state) {
   }
 }
 
-gfx::Size LocationBarView::GetPreferredSize() {
-  gfx::Size background_min_size(border_painter_->GetMinimumSize());
+gfx::Size LocationBarView::GetPreferredSize() const {
+  // Compute minimum height.
+  gfx::Size min_size(border_painter_->GetMinimumSize());
   if (!IsInitialized())
-    return background_min_size;
-
-  gfx::Size origin_chip_view_min_size(origin_chip_view_->GetMinimumSize());
+    return min_size;
   gfx::Size search_button_min_size(search_button_->GetMinimumSize());
-  gfx::Size min_size(background_min_size);
   min_size.SetToMax(search_button_min_size);
-  min_size.set_width(origin_chip_view_min_size.width() +
-                     background_min_size.width() +
-                     search_button_min_size.width());
+
+  // Compute width of omnibox-leading content.
+  const int horizontal_edge_thickness = GetHorizontalEdgeThickness();
+  int leading_width = horizontal_edge_thickness;
+  // TODO(pkasting): Make the origin chip min width sane, and make the chip
+  // handle being shrunken down more gracefully; then uncomment this.
+  /*if (GetToolbarModel()->ShouldShowOriginChip())
+    leading_width += origin_chip_view_->GetMinimumSize().width();*/
+  if (ShouldShowKeywordBubble()) {
+    // The selected keyword view can collapse completely.
+  } else if (ShouldShowEVBubble()) {
+    leading_width += kBubblePadding +
+        ev_bubble_view_->GetMinimumSizeForLabelText(
+            GetToolbarModel()->GetEVCertName()).width();
+  } else if (!origin_chip_view_->visible()) {
+    leading_width +=
+        kItemPadding + location_icon_view_->GetMinimumSize().width();
+  }
+  leading_width += kItemPadding - GetEditLeadingInternalSpace();
+
+  // Compute width of omnibox-trailing content.
+  int trailing_width = search_button_->visible() ?
+      (search_button_->GetMinimumSize().width() + kSearchButtonInset) :
+      horizontal_edge_thickness;
+  trailing_width += IncrementalMinimumWidth(star_view_) +
+      IncrementalMinimumWidth(translate_icon_view_) +
+      IncrementalMinimumWidth(open_pdf_in_reader_view_) +
+      IncrementalMinimumWidth(manage_passwords_icon_view_) +
+      IncrementalMinimumWidth(zoom_view_) +
+      IncrementalMinimumWidth(generated_credit_card_view_) +
+      IncrementalMinimumWidth(mic_search_view_) + kItemPadding;
+  for (PageActionViews::const_iterator i(page_action_views_.begin());
+       i != page_action_views_.end(); ++i)
+    trailing_width += IncrementalMinimumWidth((*i));
+  for (ContentSettingViews::const_iterator i(content_setting_views_.begin());
+       i != content_setting_views_.end(); ++i)
+    trailing_width += IncrementalMinimumWidth((*i));
+
+  min_size.set_width(
+      leading_width + omnibox_view_->GetMinimumSize().width() + trailing_width);
   return min_size;
 }
 
@@ -717,16 +755,15 @@ void LocationBarView::Layout() {
     return;
 
   animated_host_label_->SetVisible(false);
-  origin_chip_view_->SetVisible(origin_chip_view_->ShouldShow());
+  origin_chip_view_->SetVisible(GetToolbarModel()->ShouldShowOriginChip());
   selected_keyword_view_->SetVisible(false);
   location_icon_view_->SetVisible(false);
   ev_bubble_view_->SetVisible(false);
   keyword_hint_view_->SetVisible(false);
 
-  // The textfield has 1 px of whitespace before the text in the RTL case only.
-  const int kEditLeadingInternalSpace = base::i18n::IsRTL() ? 1 : 0;
   LocationBarLayout leading_decorations(
-      LocationBarLayout::LEFT_EDGE, kItemPadding - kEditLeadingInternalSpace);
+      LocationBarLayout::LEFT_EDGE,
+      kItemPadding - GetEditLeadingInternalSpace());
   LocationBarLayout trailing_decorations(LocationBarLayout::RIGHT_EDGE,
                                          kItemPadding);
 
@@ -775,16 +812,15 @@ void LocationBarView::Layout() {
       origin_chip_view_->GetPreferredSize().width() : 0;
   origin_chip_view_->SetBounds(0, 0, origin_chip_width, height());
 
-  const base::string16 keyword(omnibox_view_->model()->keyword());
-  const bool is_keyword_hint(omnibox_view_->model()->is_keyword_hint());
   const int bubble_location_y = vertical_edge_thickness() + kBubblePadding;
+  const base::string16 keyword(omnibox_view_->model()->keyword());
   // In some cases (e.g. fullscreen mode) we may have 0 height.  We still want
   // to position our child views in this case, because other things may be
   // positioned relative to them (e.g. the "bookmark added" bubble if the user
   // hits ctrl-d).
   const int location_height = GetInternalHeight(false);
   const int bubble_height = std::max(location_height - (kBubblePadding * 2), 0);
-  if (!keyword.empty() && !is_keyword_hint) {
+  if (ShouldShowKeywordBubble()) {
     leading_decorations.AddDecoration(bubble_location_y, bubble_height, true, 0,
                                       kBubblePadding, kItemPadding,
                                       selected_keyword_view_);
@@ -805,9 +841,7 @@ void LocationBarView::Layout() {
         selected_keyword_view_->set_is_extension_icon(false);
       }
     }
-  } else if (!toolbar_origin_chip_view_ &&
-      !chrome::ShouldDisplayOriginChipV2() &&
-      (GetToolbarModel()->GetSecurityLevel(false) == ToolbarModel::EV_SECURE)) {
+  } else if (ShouldShowEVBubble()) {
     ev_bubble_view_->SetLabel(GetToolbarModel()->GetEVCertName());
     // The largest fraction of the omnibox that can be taken by the EV bubble.
     const double kMaxBubbleFraction = 0.5;
@@ -868,7 +902,8 @@ void LocationBarView::Layout() {
   }
   // Because IMEs may eat the tab key, we don't show "press tab to search" while
   // IME composition is in progress.
-  if (!keyword.empty() && is_keyword_hint && !omnibox_view_->IsImeComposing()) {
+  if (!keyword.empty() && omnibox_view_->model()->is_keyword_hint() &&
+      !omnibox_view_->IsImeComposing()) {
     trailing_decorations.AddDecoration(vertical_edge_thickness(),
                                        location_height, true, 0, kItemPadding,
                                        kItemPadding, keyword_hint_view_);
@@ -880,10 +915,6 @@ void LocationBarView::Layout() {
   const int horizontal_edge_thickness = GetHorizontalEdgeThickness();
   int full_width = width() - horizontal_edge_thickness - origin_chip_width;
 
-  // The search button images are made to look as if they overlay the normal
-  // edge images, but to align things, the search button needs to be inset
-  // horizontally by 1 px.
-  const int kSearchButtonInset = 1;
   const gfx::Size search_button_size(search_button_->GetPreferredSize());
   const int search_button_reserved_width =
       search_button_size.width() + kSearchButtonInset;
@@ -1043,6 +1074,11 @@ WebContents* LocationBarView::GetWebContents() {
 ////////////////////////////////////////////////////////////////////////////////
 // LocationBarView, private:
 
+// static
+int LocationBarView::IncrementalMinimumWidth(views::View* view) {
+  return view->visible() ? (kItemPadding + view->GetMinimumSize().width()) : 0;
+}
+
 int LocationBarView::GetHorizontalEdgeThickness() const {
   // In maximized popup mode, there isn't any edge.
   return (is_popup_mode_ && browser_ && browser_->window() &&
@@ -1186,19 +1222,20 @@ bool LocationBarView::RefreshManagePasswordsIconView() {
   if (!web_contents)
     return false;
   const bool was_visible = manage_passwords_icon_view_->visible();
-  ManagePasswordsBubbleUIController::FromWebContents(
+  ManagePasswordsUIController::FromWebContents(
       web_contents)->UpdateIconAndBubbleState(manage_passwords_icon_view_);
   return was_visible != manage_passwords_icon_view_->visible();
 }
 
 void LocationBarView::ShowFirstRunBubbleInternal() {
-#if !defined(OS_CHROMEOS)
   // First run bubble doesn't make sense for Chrome OS.
-  Browser* browser = GetBrowserFromDelegate(delegate_);
-  if (!browser)
-    return; // Possible when browser is shutting down.
-
-  FirstRunBubble::ShowBubble(browser, GetLocationBarAnchor());
+#if !defined(OS_CHROMEOS)
+  WebContents* web_contents = delegate_->GetWebContents();
+  if (!web_contents)
+    return;
+  Browser* browser = chrome::FindBrowserWithWebContents(web_contents);
+  if (browser)
+    FirstRunBubble::ShowBubble(browser, GetLocationBarAnchor());
 #endif
 }
 
@@ -1209,6 +1246,16 @@ void LocationBarView::AccessibilitySetValue(const base::string16& new_value) {
 bool LocationBarView::HasValidSuggestText() const {
   return suggested_text_view_->visible() &&
       !suggested_text_view_->size().IsEmpty();
+}
+
+bool LocationBarView::ShouldShowKeywordBubble() const {
+  return !omnibox_view_->model()->keyword().empty() &&
+      !omnibox_view_->model()->is_keyword_hint();
+}
+
+bool LocationBarView::ShouldShowEVBubble() const {
+  return !toolbar_origin_chip_view_ && !chrome::ShouldDisplayOriginChipV2() &&
+      (GetToolbarModel()->GetSecurityLevel(false) == ToolbarModel::EV_SECURE);
 }
 
 void LocationBarView::OnShowURLAnimationEnded() {
@@ -1410,18 +1457,6 @@ void LocationBarView::OnBoundsChanged(const gfx::Rect& previous_bounds) {
     popup->UpdatePopupAppearance();
 }
 
-void LocationBarView::OnFocus() {
-  // Focus the view widget first which implements accessibility for
-  // Chrome OS.  It is noop on Win. This should be removed once
-  // Chrome OS migrates to aura, which uses Views' textfield that receives
-  // focus. See crbug.com/106428.
-  NotifyAccessibilityEvent(ui::AX_EVENT_FOCUS, false);
-
-  // Then focus the native location view which implements accessibility for
-  // Windows.
-  omnibox_view_->SetFocus();
-}
-
 void LocationBarView::OnPaint(gfx::Canvas* canvas) {
   View::OnPaint(canvas);
 
@@ -1445,14 +1480,16 @@ void LocationBarView::OnPaint(gfx::Canvas* canvas) {
   // inner shadow which should be drawn over the contents.
 }
 
-void LocationBarView::PaintChildren(gfx::Canvas* canvas) {
+void LocationBarView::PaintChildren(gfx::Canvas* canvas,
+                                    const views::CullSet& cull_set) {
   // Paint all the children except for the origin chip and the search button,
   // which will be painted after the border.
-  for (int i = 0, count = child_count(); i < count; ++i)
+  for (int i = 0, count = child_count(); i < count; ++i) {
     if (!child_at(i)->layer() &&
         (child_at(i) != origin_chip_view_) &&
         (child_at(i) != search_button_))
-      child_at(i)->Paint(canvas);
+      child_at(i)->Paint(canvas, cull_set);
+  }
 
   // For non-InstantExtendedAPI cases, if necessary, show focus rect. As we need
   // the focus rect to appear on top of children we paint here rather than
@@ -1470,8 +1507,8 @@ void LocationBarView::PaintChildren(gfx::Canvas* canvas) {
 
   // The origin chip and the search button must be painted after the border so
   // that the border shadow is not drawn over them.
-  origin_chip_view_->Paint(canvas);
-  search_button_->Paint(canvas);
+  origin_chip_view_->Paint(canvas, cull_set);
+  search_button_->Paint(canvas, cull_set);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

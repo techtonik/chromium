@@ -52,8 +52,8 @@
 #include "chrome/common/extensions/extension_constants.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
+#include "components/pref_registry/pref_registry_syncable.h"
 #include "components/translate/core/common/language_detection_details.h"
-#include "components/user_prefs/pref_registry_syncable.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/notification_details.h"
@@ -1191,6 +1191,7 @@ bool TabsUpdateFunction::UpdateURL(const std::string &url_string,
         ScriptExecutor::JAVASCRIPT,
         url.GetContent(),
         ScriptExecutor::TOP_FRAME,
+        ScriptExecutor::DONT_MATCH_ABOUT_BLANK,
         UserScript::DOCUMENT_IDLE,
         ScriptExecutor::MAIN_WORLD,
         ScriptExecutor::DEFAULT_PROCESS,

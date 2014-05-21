@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "base/bind_helpers.h"
 #include "base/lazy_instance.h"
 #include "base/memory/ref_counted.h"
 #include "chrome/browser/extensions/api/bluetooth/bluetooth_api_utils.h"
@@ -295,9 +296,8 @@ bool BluetoothGetDeviceFunction::DoWork(
 
   scoped_ptr<GetDevice::Params> params(GetDevice::Params::Create(*args_));
   EXTENSION_FUNCTION_VALIDATE(params.get() != NULL);
-  const std::string& device_address = params->device_address;
 
-  BluetoothDevice* device = adapter->GetDevice(device_address);
+  BluetoothDevice* device = adapter->GetDevice(params->device_address);
   if (device) {
     bluetooth::Device extension_device;
     bluetooth::BluetoothDeviceToApiDevice(*device, &extension_device);
@@ -457,13 +457,36 @@ bool BluetoothConnectFunction::DoWork(scoped_refptr<BluetoothAdapter> adapter) {
 
   device->ConnectToProfile(
       bluetooth_profile,
-      base::Bind(&BluetoothConnectFunction::OnSuccessCallback, this),
+      base::Bind(&BluetoothConnectFunction::OnConnectedCallback,
+                 this,
+                 adapter,
+                 device->GetAddress()),
       base::Bind(&BluetoothConnectFunction::OnErrorCallback, this));
 
   return true;
 }
 
-void BluetoothConnectFunction::OnSuccessCallback() {
+void BluetoothConnectFunction::OnConnectedCallback(
+    scoped_refptr<device::BluetoothAdapter> adapter,
+    const std::string& device_address) {
+  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+
+  // TODO(tengs): Remove this once we have an API for starting the connection
+  // monitor.
+  BluetoothDevice* device = adapter->GetDevice(device_address);
+  if (!device) {
+    SetError(kInvalidDevice);
+    SendResponse(false);
+    return;
+  }
+  // Start the connection monitor, and return success even if this fails,
+  // as the connection was still opened successfully.
+  device->StartConnectionMonitor(
+      base::Bind(&BluetoothConnectFunction::OnMonitorStartedCallback, this),
+      base::Bind(&BluetoothConnectFunction::OnMonitorStartedCallback, this));
+}
+
+void BluetoothConnectFunction::OnMonitorStartedCallback() {
   DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
   SendResponse(true);
 }

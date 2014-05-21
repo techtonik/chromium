@@ -32,7 +32,6 @@
   'sources': [
     'public/common/assert_matching_enums.cc',
     'public/common/bindings_policy.h',
-    'public/common/browser_plugin_permission_type.h',
     'public/common/child_process_host.h',
     'public/common/child_process_host_delegate.cc',
     'public/common/child_process_host_delegate.h',
@@ -140,6 +139,7 @@
     'common/android/surface_texture_peer.cc',
     'common/android/surface_texture_peer.h',
     'common/appcache_messages.h',
+    'common/battery_status_messages.h',
     'common/browser_plugin/browser_plugin_constants.cc',
     'common/browser_plugin/browser_plugin_constants.h',
     'common/browser_plugin/browser_plugin_messages.h',
@@ -175,7 +175,6 @@
     'common/cursors/webcursor_aurax11.cc',
     'common/cursors/webcursor_mac.mm',
     'common/cursors/webcursor_ozone.cc',
-    'common/cursors/webcursor_win.cc',
     'common/database_messages.h',
     'common/date_time_suggestion.h',
     'common/desktop_notification_messages.h',
@@ -212,6 +211,8 @@
     'common/frame_param_macros.h',
     'common/gamepad_hardware_buffer.h',
     'common/gamepad_messages.h',
+    'common/gamepad_param_traits.cc',
+    'common/gamepad_param_traits.h',
     'common/gamepad_user_gesture.cc',
     'common/gamepad_user_gesture.h',
     'common/geolocation_messages.h',
@@ -303,7 +304,6 @@
     'common/input/gesture_event_stream_validator.h',
     'common/input/input_event.cc',
     'common/input/input_event.h',
-    'common/input/input_event_ack_state.h',
     'common/input/input_event_stream_validator.cc',
     'common/input/input_event_stream_validator.h',
     'common/input/input_param_traits.cc',
@@ -467,7 +467,6 @@
     ['use_aura==1', {
       'sources!': [
         'common/cursors/webcursor_mac.mm',
-        'common/cursors/webcursor_win.cc',
       ],
     }],
     ['OS=="ios"', {
@@ -524,7 +523,30 @@
         '../webkit/common/webkit_common.gyp:webkit_common',
         '../webkit/storage_browser.gyp:webkit_storage_browser',
         '../webkit/storage_common.gyp:webkit_storage_common',
-        'content.gyp:webkit_version',
+      ],
+      'actions': [
+        {
+          'action_name': 'generate_webkit_version',
+          'inputs': [
+            '<(script)',
+            '<(lastchange)',
+            '<(template)',
+          ],
+          'outputs': [
+            '<(SHARED_INTERMEDIATE_DIR)/webkit_version.h',
+          ],
+          'action': ['python',
+                     '<(script)',
+                     '-f', '<(lastchange)',
+                     '<(template)',
+                     '<@(_outputs)',
+          ],
+          'variables': {
+            'script': '<(DEPTH)/build/util/version.py',
+            'lastchange': '<(DEPTH)/build/util/LASTCHANGE.blink',
+            'template': 'webkit_version.h.in',
+          },
+        },
       ],
     }],
     ['OS=="mac"', {

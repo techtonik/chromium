@@ -41,7 +41,7 @@ AudioSender::AudioSender(scoped_refptr<CastEnvironment> cast_environment,
                          transport::CastTransportSender* const transport_sender)
     : cast_environment_(cast_environment),
       transport_sender_(transport_sender),
-      rtp_stats_(audio_config.frequency),
+      rtp_timestamp_helper_(audio_config.frequency),
       rtcp_feedback_(new LocalRtcpAudioSenderFeedback(this)),
       rtcp_(cast_environment,
             rtcp_feedback_.get(),
@@ -52,7 +52,8 @@ AudioSender::AudioSender(scoped_refptr<CastEnvironment> cast_environment,
             base::TimeDelta::FromMilliseconds(audio_config.rtcp_interval),
             audio_config.rtp_config.ssrc,
             audio_config.incoming_feedback_ssrc,
-            audio_config.rtcp_c_name),
+            audio_config.rtcp_c_name,
+            true),
       timers_initialized_(false),
       cast_initialization_cb_(STATUS_AUDIO_UNINITIALIZED),
       weak_factory_(this) {
@@ -74,9 +75,6 @@ AudioSender::AudioSender(scoped_refptr<CastEnvironment> cast_environment,
   transport_config.rtp.max_outstanding_frames =
       audio_config.rtp_config.max_delay_ms / 100 + 1;
   transport_sender_->InitializeAudio(transport_config);
-
-  transport_sender_->SubscribeAudioRtpStatsCallback(
-      base::Bind(&AudioSender::StoreStatistics, weak_factory_.GetWeakPtr()));
 }
 
 AudioSender::~AudioSender() {}
@@ -97,11 +95,13 @@ void AudioSender::InsertAudio(scoped_ptr<AudioBus> audio_bus,
 }
 
 void AudioSender::SendEncodedAudioFrame(
-    scoped_ptr<transport::EncodedAudioFrame> audio_frame,
-    const base::TimeTicks& recorded_time) {
+    scoped_ptr<transport::EncodedFrame> audio_frame) {
   DCHECK(cast_environment_->CurrentlyOn(CastEnvironment::MAIN));
+  DCHECK(!audio_frame->reference_time.is_null());
+  rtp_timestamp_helper_.StoreLatestTime(audio_frame->reference_time,
+                                        audio_frame->rtp_timestamp);
   InitializeTimers();
-  transport_sender_->InsertCodedAudioFrame(audio_frame.get(), recorded_time);
+  transport_sender_->InsertCodedAudioFrame(*audio_frame);
 }
 
 void AudioSender::ResendPackets(
@@ -130,20 +130,14 @@ void AudioSender::ScheduleNextRtcpReport() {
       time_to_next);
 }
 
-void AudioSender::StoreStatistics(
-    const transport::RtcpSenderInfo& sender_info,
-    base::TimeTicks time_sent,
-    uint32 rtp_timestamp) {
-  rtp_stats_.Store(sender_info, time_sent, rtp_timestamp);
-}
-
 void AudioSender::SendRtcpReport() {
   DCHECK(cast_environment_->CurrentlyOn(CastEnvironment::MAIN));
-  // We don't send audio logging messages since all captured audio frames will
-  // be sent.
-  transport::RtcpSenderLogMessage empty_msg;
-  rtp_stats_.UpdateInfo(cast_environment_->Clock()->NowTicks());
-  rtcp_.SendRtcpFromRtpSender(empty_msg, rtp_stats_.sender_info());
+  const base::TimeTicks now = cast_environment_->Clock()->NowTicks();
+  uint32 now_as_rtp_timestamp = 0;
+  if (rtp_timestamp_helper_.GetCurrentTimeAsRtpTimestamp(
+          now, &now_as_rtp_timestamp)) {
+    rtcp_.SendRtcpFromRtpSender(now, now_as_rtp_timestamp);
+  }
   ScheduleNextRtcpReport();
 }
 

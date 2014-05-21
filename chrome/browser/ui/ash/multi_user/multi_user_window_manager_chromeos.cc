@@ -21,7 +21,7 @@
 #include "base/strings/string_util.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
-#include "chrome/browser/chromeos/login/user_manager.h"
+#include "chrome/browser/chromeos/login/users/user_manager.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/ash/multi_user/multi_user_notification_blocker_chromeos.h"
@@ -198,8 +198,6 @@ class AppObserver : public apps::AppWindowRegistry::Observer {
     MultiUserWindowManagerChromeOS::GetInstance()->SetWindowOwner(window,
                                                                   user_id_);
   }
-  virtual void OnAppWindowIconChanged(apps::AppWindow* app_window) OVERRIDE {}
-  virtual void OnAppWindowRemoved(apps::AppWindow* app_window) OVERRIDE {}
 
  private:
   std::string user_id_;

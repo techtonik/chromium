@@ -24,7 +24,6 @@
 #include "base/threading/sequenced_worker_pool.h"
 #include "base/threading/thread.h"
 #include "base/threading/worker_pool.h"
-#include "base/time/default_tick_clock.h"
 #include "base/time/time.h"
 #include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
@@ -51,7 +50,6 @@
 #include "content/public/browser/cookie_store_factory.h"
 #include "net/base/host_mapping_rules.h"
 #include "net/base/net_util.h"
-#include "net/base/network_time_notifier.h"
 #include "net/base/sdch_manager.h"
 #include "net/cert/cert_verifier.h"
 #include "net/cert/cert_verify_proc.h"
@@ -102,7 +100,7 @@
 #endif
 
 #if defined(OS_CHROMEOS)
-#include "chrome/browser/chromeos/login/user_manager.h"
+#include "chrome/browser/chromeos/login/users/user_manager.h"
 #include "chrome/browser/chromeos/net/cert_verify_proc_chromeos.h"
 #endif
 
@@ -546,17 +544,15 @@ void IOThread::InitAsync() {
   globals_->host_resolver = CreateGlobalHostResolver(net_log_);
   UpdateDnsClientEnabled();
 #if defined(OS_CHROMEOS)
-  if (chromeos::UserManager::IsMultipleProfilesAllowed()) {
-    // Creates a CertVerifyProc that doesn't allow any profile-provided certs.
-    globals_->cert_verifier.reset(new net::MultiThreadedCertVerifier(
-        new chromeos::CertVerifyProcChromeOS()));
-  } else  // NOLINT Fallthrough to normal verifier if multiprofiles not allowed.
-#endif
-  {
+  // Creates a CertVerifyProc that doesn't allow any profile-provided certs.
+  globals_->cert_verifier.reset(new net::MultiThreadedCertVerifier(
+      new chromeos::CertVerifyProcChromeOS()));
+#else
     globals_->cert_verifier.reset(new net::MultiThreadedCertVerifier(
         net::CertVerifyProc::CreateDefault()));
-  }
-  globals_->transport_security_state.reset(new net::TransportSecurityState());
+#endif
+
+    globals_->transport_security_state.reset(new net::TransportSecurityState());
 #if !defined(USE_OPENSSL)
   // For now, Certificate Transparency is only implemented for platforms
   // that use NSS.
@@ -687,10 +683,6 @@ void IOThread::InitAsync() {
 
   globals_->proxy_script_fetcher_context.reset(
       ConstructProxyScriptFetcherContext(globals_, net_log_));
-
-  globals_->network_time_notifier.reset(
-      new net::NetworkTimeNotifier(
-          scoped_ptr<base::TickClock>(new base::DefaultTickClock())));
 
   sdch_manager_ = new net::SdchManager();
 
