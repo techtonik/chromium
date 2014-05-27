@@ -135,8 +135,14 @@ void ServiceWorkerContextWrapper::GetServiceWorkerHost(
     ServiceWorkerHostClient* client,
     const ServiceWorkerHostCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  callback.Run(scoped_ptr<ServiceWorkerHost>(
-      new ServiceWorkerHostImpl(scope, this, client)));
+  if (scope.is_empty()) {
+    // FinishRegistrationOnIO calls this function with empty scope to create a
+    // NULL response.
+    callback.Run(scoped_ptr<ServiceWorkerHost>());
+  } else {
+    callback.Run(scoped_ptr<ServiceWorkerHost>(
+        new ServiceWorkerHostImpl(scope, this, client)));
+  }
 }
 
 void ServiceWorkerContextWrapper::AddObserver(
@@ -184,15 +190,14 @@ void ServiceWorkerContextWrapper::FinishRegistrationOnIO(
     int64 registration_id,
     int64 version_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  //
-  // TODO: Do something if (status != SERVICE_WORKER_OK).
-  //
+  Scope scope_if_status_ok = (status == SERVICE_WORKER_OK) ? scope : GURL();
+
   BrowserThread::PostTask(
       BrowserThread::UI,
       FROM_HERE,
       base::Bind(&ServiceWorkerContextWrapper::GetServiceWorkerHost,
                  this,
-                 scope,
+                 scope_if_status_ok,
                  client,
                  callback));
 }
