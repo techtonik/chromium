@@ -16,6 +16,10 @@
 #include "mojo/services/view_manager/node_delegate.h"
 #include "mojo/services/view_manager/view_manager_export.h"
 
+namespace gfx {
+class Rect;
+}
+
 namespace mojo {
 namespace view_manager {
 namespace service {
@@ -51,11 +55,19 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
   const Node* GetNode(const NodeId& id) const;
 
   // Returns the View with the specified id.
-  View* GetView(const ViewId& id);
+  View* GetView(const ViewId& id) {
+    return const_cast<View*>(
+        const_cast<const ViewManagerConnection*>(this)->GetView(id));
+  }
+  const View* GetView(const ViewId& id) const;
 
   // The following methods are invoked after the corresponding change has been
   // processed. They do the appropriate bookkeeping and update the client as
   // necessary.
+  void ProcessNodeBoundsChanged(const Node* node,
+                                const gfx::Rect& old_bounds,
+                                const gfx::Rect& new_bounds,
+                                bool originated_change);
   void ProcessNodeHierarchyChanged(const Node* node,
                                    const Node* new_parent,
                                    const Node* old_parent,
@@ -75,11 +87,14 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
   typedef std::map<TransportConnectionSpecificViewId, View*> ViewMap;
   typedef base::hash_set<TransportNodeId> NodeIdSet;
 
-  // Returns true if this connection is allowed to delete the specified node.
+  // These functions return true if the corresponding mojom function is allowed
+  // for this connection.
+  bool CanRemoveNodeFromParent(const Node* node) const;
+  bool CanAddNode(const Node* parent, const Node* child) const;
   bool CanDeleteNode(const NodeId& node_id) const;
-
-  // Returns true if this connection is allowed to delete the specified view.
   bool CanDeleteView(const ViewId& view_id) const;
+  bool CanSetView(const Node* node, const ViewId& view_id) const;
+  bool CanGetNodeTree(const Node* node) const;
 
   // Deletes a node owned by this connection. Returns true on success. |source|
   // is the connection that originated the change.
@@ -90,19 +105,35 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
   bool DeleteViewImpl(ViewManagerConnection* source, const ViewId& view_id);
 
   // Sets the view associated with a node.
-  bool SetViewImpl(const NodeId& node_id, const ViewId& view_id);
+  bool SetViewImpl(Node* node, const ViewId& view_id);
 
   // If |node| is known (in |known_nodes_|) does nothing. Otherwise adds |node|
   // to |nodes|, marks |node| as known and recurses.
   void GetUnknownNodesFrom(const Node* node, std::vector<const Node*>* nodes);
 
+  // Removes |node| and all its descendants from |known_nodes_|. This does not
+  // recurse through nodes that were created by this connection.
+  void RemoveFromKnown(const Node* node);
+
+  // Returns true if |node| is a non-null and a descendant of |roots_| (or
+  // |roots_| is empty).
+  bool IsNodeDescendantOfRoots(const Node* node) const;
+
   // Returns true if notification should be sent of a hierarchy change. If true
   // is returned, any nodes that need to be sent to the client are added to
   // |to_send|.
-  bool ShouldNotifyOnHierarchyChange(const Node* node_id,
-                                     const Node* new_parent_id,
-                                     const Node* old_parent_id,
+  bool ShouldNotifyOnHierarchyChange(const Node* node,
+                                     const Node** new_parent,
+                                     const Node** old_parent,
                                      std::vector<const Node*>* to_send);
+
+  bool ProcessSetRoots(TransportConnectionId source_connection_id,
+                       const Array<TransportNodeId>& transport_node_ids);
+
+  // Converts an array of Nodes to INodes. This assumes all the nodes are valid
+  // for the client. The parent of nodes the client is not allowed to see are
+  // set to NULL (in the returned INodes).
+  Array<INode> NodesToINodes(const std::vector<const Node*>& nodes);
 
   // Overridden from IViewManager:
   virtual void CreateNode(TransportNodeId transport_node_id,
@@ -129,7 +160,15 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
                        const Callback<void(bool)>& callback) OVERRIDE;
   virtual void SetViewContents(TransportViewId view_id,
                                ScopedSharedBufferHandle buffer,
-                               uint32_t buffer_size) OVERRIDE;
+                               uint32_t buffer_size,
+                               const Callback<void(bool)>& callback) OVERRIDE;
+  virtual void SetRoots(
+      TransportConnectionId connection_id,
+      const Array<TransportNodeId>& transport_node_ids,
+      const Callback<void(bool)>& callback) OVERRIDE;
+  virtual void SetNodeBounds(TransportNodeId node_id,
+                             const Rect& bounds,
+                             const Callback<void(bool)>& callback) OVERRIDE;
 
   // Overridden from NodeDelegate:
   virtual void OnNodeHierarchyChanged(const Node* node,
@@ -151,6 +190,14 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
 
   // The set of nodes that has been communicated to the client.
   NodeIdSet known_nodes_;
+
+  // This is the set of nodes the connection can parent nodes to (in addition to
+  // any nodes created by this connection). If empty the connection can
+  // manipulate any nodes (except for deleting other connections nodes/views).
+  // The connection can not delete or move these. If this is set to a non-empty
+  // value and all the nodes are deleted (by another connection), then an
+  // invalid node is added here to ensure this connection is still constrained.
+  NodeIdSet roots_;
 
   DISALLOW_COPY_AND_ASSIGN(ViewManagerConnection);
 };

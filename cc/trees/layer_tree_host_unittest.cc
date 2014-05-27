@@ -20,6 +20,7 @@
 #include "cc/layers/solid_color_layer.h"
 #include "cc/layers/video_layer.h"
 #include "cc/output/begin_frame_args.h"
+#include "cc/output/compositor_frame_ack.h"
 #include "cc/output/copy_output_request.h"
 #include "cc/output/copy_output_result.h"
 #include "cc/output/output_surface.h"
@@ -1526,47 +1527,6 @@ class LayerTreeHostTestAtomicCommitWithPartialUpdate
 SINGLE_AND_MULTI_THREAD_DIRECT_RENDERER_TEST_F(
     LayerTreeHostTestAtomicCommitWithPartialUpdate);
 
-class LayerTreeHostTestFinishAllRendering : public LayerTreeHostTest {
- public:
-  LayerTreeHostTestFinishAllRendering() : once_(false), draw_count_(0) {}
-
-  virtual void BeginTest() OVERRIDE {
-    layer_tree_host()->SetNeedsRedraw();
-    PostSetNeedsCommitToMainThread();
-  }
-
-  virtual void DidCommitAndDrawFrame() OVERRIDE {
-    if (once_)
-      return;
-    once_ = true;
-    layer_tree_host()->SetNeedsRedraw();
-    {
-      base::AutoLock lock(lock_);
-      draw_count_ = 0;
-    }
-    layer_tree_host()->FinishAllRendering();
-    {
-      base::AutoLock lock(lock_);
-      EXPECT_EQ(0, draw_count_);
-    }
-    EndTest();
-  }
-
-  virtual void DrawLayersOnThread(LayerTreeHostImpl* impl) OVERRIDE {
-    base::AutoLock lock(lock_);
-    ++draw_count_;
-  }
-
-  virtual void AfterTest() OVERRIDE {}
-
- private:
-  bool once_;
-  base::Lock lock_;
-  int draw_count_;
-};
-
-SINGLE_AND_MULTI_THREAD_TEST_F(LayerTreeHostTestFinishAllRendering);
-
 class LayerTreeHostTestSurfaceNotAllocatedForLayersOutsideMemoryLimit
     : public LayerTreeHostTest {
  protected:
@@ -2036,7 +1996,7 @@ TEST(LayerTreeHostTest, LimitPartialUpdates) {
     settings.max_partial_texture_updates = 10;
 
     LayerTreeHostWithProxy host(&client, settings, proxy.Pass());
-    EXPECT_TRUE(host.InitializeOutputSurfaceIfNeeded());
+    host.OnCreateAndInitializeOutputSurfaceAttempted(true);
 
     EXPECT_EQ(0u, host.MaxPartialTextureUpdates());
   }
@@ -2054,7 +2014,7 @@ TEST(LayerTreeHostTest, LimitPartialUpdates) {
     settings.max_partial_texture_updates = 10;
 
     LayerTreeHostWithProxy host(&client, settings, proxy.Pass());
-    EXPECT_TRUE(host.InitializeOutputSurfaceIfNeeded());
+    host.OnCreateAndInitializeOutputSurfaceAttempted(true);
 
     EXPECT_EQ(5u, host.MaxPartialTextureUpdates());
   }
@@ -2072,7 +2032,7 @@ TEST(LayerTreeHostTest, LimitPartialUpdates) {
     settings.max_partial_texture_updates = 10;
 
     LayerTreeHostWithProxy host(&client, settings, proxy.Pass());
-    EXPECT_TRUE(host.InitializeOutputSurfaceIfNeeded());
+    host.OnCreateAndInitializeOutputSurfaceAttempted(true);
 
     EXPECT_EQ(10u, host.MaxPartialTextureUpdates());
   }
@@ -2088,7 +2048,8 @@ TEST(LayerTreeHostTest, PartialUpdatesWithGLRenderer) {
       new TestSharedBitmapManager());
   scoped_ptr<LayerTreeHost> host = LayerTreeHost::CreateSingleThreaded(
       &client, &client, shared_bitmap_manager.get(), settings);
-  EXPECT_TRUE(host->InitializeOutputSurfaceIfNeeded());
+  host->Composite(base::TimeTicks::Now());
+
   EXPECT_EQ(4u, host->settings().max_partial_texture_updates);
 }
 
@@ -2102,7 +2063,8 @@ TEST(LayerTreeHostTest, PartialUpdatesWithSoftwareRenderer) {
       new TestSharedBitmapManager());
   scoped_ptr<LayerTreeHost> host = LayerTreeHost::CreateSingleThreaded(
       &client, &client, shared_bitmap_manager.get(), settings);
-  EXPECT_TRUE(host->InitializeOutputSurfaceIfNeeded());
+  host->Composite(base::TimeTicks::Now());
+
   EXPECT_EQ(4u, host->settings().max_partial_texture_updates);
 }
 
@@ -2116,7 +2078,8 @@ TEST(LayerTreeHostTest, PartialUpdatesWithDelegatingRendererAndGLContent) {
       new TestSharedBitmapManager());
   scoped_ptr<LayerTreeHost> host = LayerTreeHost::CreateSingleThreaded(
       &client, &client, shared_bitmap_manager.get(), settings);
-  EXPECT_TRUE(host->InitializeOutputSurfaceIfNeeded());
+  host->Composite(base::TimeTicks::Now());
+
   EXPECT_EQ(0u, host->MaxPartialTextureUpdates());
 }
 
@@ -2131,7 +2094,8 @@ TEST(LayerTreeHostTest,
       new TestSharedBitmapManager());
   scoped_ptr<LayerTreeHost> host = LayerTreeHost::CreateSingleThreaded(
       &client, &client, shared_bitmap_manager.get(), settings);
-  EXPECT_TRUE(host->InitializeOutputSurfaceIfNeeded());
+  host->Composite(base::TimeTicks::Now());
+
   EXPECT_EQ(0u, host->MaxPartialTextureUpdates());
 }
 
@@ -2762,7 +2726,8 @@ class LayerTreeHostTestDeferredInitialize : public LayerTreeHostTest {
         TestWebGraphicsContext3D::Create());
 
     return FakeOutputSurface::CreateDeferredGL(
-        scoped_ptr<SoftwareOutputDevice>(new SoftwareOutputDevice));
+        scoped_ptr<SoftwareOutputDevice>(new SoftwareOutputDevice),
+        delegating_renderer());
   }
 
   virtual void DrawLayersOnThread(LayerTreeHostImpl* host_impl) OVERRIDE {
@@ -2821,6 +2786,24 @@ class LayerTreeHostTestDeferredInitialize : public LayerTreeHostTest {
     did_release_gl_ = true;
   }
 
+  virtual void SwapBuffersOnThread(LayerTreeHostImpl* host_impl,
+                                   bool result) OVERRIDE {
+    ASSERT_TRUE(result);
+    DelegatedFrameData* delegated_frame_data =
+        output_surface()->last_sent_frame().delegated_frame_data.get();
+    if (!delegated_frame_data)
+      return;
+
+    // Return all resources immediately.
+    TransferableResourceArray resources_to_return =
+        output_surface()->resources_held_by_parent();
+
+    CompositorFrameAck ack;
+    for (size_t i = 0; i < resources_to_return.size(); ++i)
+      output_surface()->ReturnResource(resources_to_return[i].id, &ack);
+    host_impl->ReclaimResources(&ack);
+  }
+
   virtual void AfterTest() OVERRIDE {
     EXPECT_TRUE(did_initialize_gl_);
     EXPECT_TRUE(did_release_gl_);
@@ -2834,7 +2817,7 @@ class LayerTreeHostTestDeferredInitialize : public LayerTreeHostTest {
   int last_source_frame_number_drawn_;
 };
 
-MULTI_THREAD_DIRECT_RENDERER_TEST_F(LayerTreeHostTestDeferredInitialize);
+MULTI_THREAD_TEST_F(LayerTreeHostTestDeferredInitialize);
 
 // Test for UI Resource management.
 class LayerTreeHostTestUIResource : public LayerTreeHostTest {
@@ -4696,19 +4679,13 @@ class LayerTreeHostTestGpuRasterizationDefault : public LayerTreeHostTest {
   }
 
   virtual void CommitCompleteOnThread(LayerTreeHostImpl* host_impl) OVERRIDE {
-    LayerImpl* root = host_impl->pending_tree()->root_layer();
-    PictureLayerImpl* layer_impl =
-        static_cast<PictureLayerImpl*>(root->children()[0]);
-
-    EXPECT_FALSE(layer_impl->use_gpu_rasterization());
+    EXPECT_FALSE(host_impl->pending_tree()->use_gpu_rasterization());
+    EXPECT_FALSE(host_impl->use_gpu_rasterization());
   }
 
   virtual void DidActivateTreeOnThread(LayerTreeHostImpl* host_impl) OVERRIDE {
-    LayerImpl* root = host_impl->active_tree()->root_layer();
-    PictureLayerImpl* layer_impl =
-        static_cast<PictureLayerImpl*>(root->children()[0]);
-
-    EXPECT_FALSE(layer_impl->use_gpu_rasterization());
+    EXPECT_FALSE(host_impl->active_tree()->use_gpu_rasterization());
+    EXPECT_FALSE(host_impl->use_gpu_rasterization());
     EndTest();
   }
 
@@ -4767,19 +4744,13 @@ class LayerTreeHostTestGpuRasterizationEnabled : public LayerTreeHostTest {
   }
 
   virtual void CommitCompleteOnThread(LayerTreeHostImpl* host_impl) OVERRIDE {
-    LayerImpl* root = host_impl->pending_tree()->root_layer();
-    PictureLayerImpl* layer_impl =
-        static_cast<PictureLayerImpl*>(root->children()[0]);
-
-    EXPECT_FALSE(layer_impl->use_gpu_rasterization());
+    EXPECT_FALSE(host_impl->pending_tree()->use_gpu_rasterization());
+    EXPECT_FALSE(host_impl->use_gpu_rasterization());
   }
 
   virtual void DidActivateTreeOnThread(LayerTreeHostImpl* host_impl) OVERRIDE {
-    LayerImpl* root = host_impl->active_tree()->root_layer();
-    PictureLayerImpl* layer_impl =
-        static_cast<PictureLayerImpl*>(root->children()[0]);
-
-    EXPECT_FALSE(layer_impl->use_gpu_rasterization());
+    EXPECT_FALSE(host_impl->active_tree()->use_gpu_rasterization());
+    EXPECT_FALSE(host_impl->use_gpu_rasterization());
     EndTest();
   }
 
@@ -4838,19 +4809,13 @@ class LayerTreeHostTestGpuRasterizationForced : public LayerTreeHostTest {
   }
 
   virtual void CommitCompleteOnThread(LayerTreeHostImpl* host_impl) OVERRIDE {
-    LayerImpl* root = host_impl->pending_tree()->root_layer();
-    PictureLayerImpl* layer_impl =
-        static_cast<PictureLayerImpl*>(root->children()[0]);
-
-    EXPECT_TRUE(layer_impl->use_gpu_rasterization());
+    EXPECT_TRUE(host_impl->pending_tree()->use_gpu_rasterization());
+    EXPECT_TRUE(host_impl->use_gpu_rasterization());
   }
 
   virtual void DidActivateTreeOnThread(LayerTreeHostImpl* host_impl) OVERRIDE {
-    LayerImpl* root = host_impl->active_tree()->root_layer();
-    PictureLayerImpl* layer_impl =
-        static_cast<PictureLayerImpl*>(root->children()[0]);
-
-    EXPECT_TRUE(layer_impl->use_gpu_rasterization());
+    EXPECT_TRUE(host_impl->active_tree()->use_gpu_rasterization());
+    EXPECT_TRUE(host_impl->use_gpu_rasterization());
     EndTest();
   }
 

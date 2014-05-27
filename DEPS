@@ -28,13 +28,13 @@ vars = {
   "libcxxabi_revision": "206024",
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
   "nacl_trunk": "http://src.chromium.org/native_client/trunk",
-  "webkit_revision": "174386",
+  "webkit_revision": "174692",
   "chromium_git": "https://chromium.googlesource.com",
   "chromiumos_git": "https://chromium.googlesource.com/chromiumos",
   "pdfium_git": "https://pdfium.googlesource.com",
   "skia_git": "https://skia.googlesource.com",
   "swig_revision": "230490",
-  "nacl_revision": "13199",
+  "nacl_revision": "13226",
   # After changing nacl_revision, run 'glient sync' and check native_client/DEPS
   # to update other nacl_*_revision's.
   "nacl_tools_revision": "13077",  # native_client/DEPS: tools_rev
@@ -45,19 +45,19 @@ vars = {
   "lss_revision": "26",
   "sfntly_revision": "228",
   "lighttpd_revision": "33737",
-  "skia_revision": "14795",
+  "skia_revision": "14862",
   "skia_hash": "24f6e29fc133f1082c73e2a96f30bee92e3123aa",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   "v8_branch": "trunk",
-  "v8_revision": "21393",
+  "v8_revision": "21446",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
   "webrtc_revision": "6189",
   "jsoncpp_revision": "248",
-  "nss_revision": "267366",
+  "nss_revision": "271760",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
@@ -65,7 +65,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openssl
   # and whatever else without interference from each other.
-  "openssl_revision": "269063",
+  "openssl_revision": "271781",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
@@ -77,7 +77,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFIum
   # and whatever else without interference from each other.
-  "pdfium_revision": "951f241bcf22f0095abe2f109adfdd9c19e76d70",
+  "pdfium_revision": "3ce25e68aa8f6d4b880ce4e0e9f123d117fcbd0c",
 }
 
 deps = {
@@ -101,7 +101,7 @@ deps = {
     Var("chromium_git") + "/angle/angle.git@" + Var("angle_revision"),
 
   "src/third_party/trace-viewer":
-    (Var("googlecode_url") % "trace-viewer") + "/trunk@1267",
+    (Var("googlecode_url") % "trace-viewer") + "/trunk@1275",
 
   "src/third_party/WebKit":
     Var("webkit_trunk") + "@" + Var("webkit_revision"),
@@ -218,7 +218,7 @@ deps = {
 
   "src/third_party/ffmpeg":
     Var("chromium_git") +
-    "/chromium/third_party/ffmpeg.git@d3a060bd1d6a4f43e9bc7d07f193b0513df4f244",
+    "/chromium/third_party/ffmpeg.git@7dd6164f6fe06017970107aba531e60fcc433282",
 
   "src/third_party/libjingle/source/talk":
     (Var("googlecode_url") % "webrtc") + "/trunk/talk@" +
@@ -226,7 +226,7 @@ deps = {
 
   "src/third_party/usrsctp/usrsctplib":
     (Var("googlecode_url") % "sctp-refimpl") +
-    "/trunk/KERN/usrsctp/usrsctplib@8838",
+    "/trunk/KERN/usrsctp/usrsctplib@8844",
 
   "src/third_party/libsrtp":
     "/trunk/deps/third_party/libsrtp@261337",
@@ -295,7 +295,7 @@ deps = {
 
   "src/third_party/webpagereplay":
     Var("chromium_git") + "/external/web-page-replay.git@" +
-    "4edb10429743bf53ef58ec9440e8034ae5f93ff5",
+    "d1447899a2176bc8700865e76ed70da329628abd",
 
   "src/third_party/pywebsocket/src":
     (Var("googlecode_url") % "pywebsocket") + "/trunk/src@790",
@@ -318,7 +318,7 @@ deps = {
 
   "src/third_party/libwebm/source":
     Var("chromium_git") +
-      "/webm/libwebm.git@fb6b6e64444c637f27d103fd113e0c7bf4f107dd",
+      "/webm/libwebm.git@acf788bedd1ddc0f4a8553c28a8b4e2266accbc9",
 
   "src/third_party/openssl":
     "/trunk/deps/third_party/openssl@" + Var("openssl_revision"),
@@ -517,7 +517,7 @@ deps_os = {
   "android": {
     "src/third_party/android_tools":
       Var("chromium_git") + "/android_tools.git" +
-      "@7de460f062350105c3eb284cdc6948ff50e1f6e1",
+      "@6fc0e1a090e97805a70f0e65377a9db4db3db8f5",
 
     "src/third_party/aosp":
       "/trunk/deps/third_party/aosp@148330",

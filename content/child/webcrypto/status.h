@@ -102,9 +102,6 @@ class CONTENT_EXPORT Status {
   // are incompatible with each other.
   static Status ErrorJwkUseAndKeyopsInconsistent();
 
-  // TODO(eroman): Private key import through JWK is not yet supported.
-  static Status ErrorJwkRsaPrivateKeyUnsupported();
-
   // The "kty" parameter was given and was a string, however it was
   // unrecognized.
   static Status ErrorJwkUnrecognizedKty();
@@ -114,6 +111,10 @@ class CONTENT_EXPORT Status {
   // 128-bits of key data must have been provided. If 192-bits of key data were
   // given that is an error.
   static Status ErrorJwkIncorrectKeyLength();
+
+  // The JWK was for an RSA private key but only partially provided the optional
+  // parameters (p, q, dq, dq, qi).
+  static Status ErrorJwkIncompleteOptionalRsaPrivateKey();
 
   // ------------------------------------
   // Other errors
@@ -139,9 +140,7 @@ class CONTENT_EXPORT Status {
 
   // The data provided to an encrypt/decrypt/sign/verify operation was too
   // large. This can either represent an internal limitation (for instance
-  // representing buffer lengths as uints), or an algorithm restriction (for
-  // instance RSAES can operation on messages relative to the length of the
-  // key's modulus).
+  // representing buffer lengths as uints).
   static Status ErrorDataTooLarge();
 
   // The data provided to an encrypt/decrypt/sign/verify operation was too

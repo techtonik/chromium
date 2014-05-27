@@ -23,6 +23,7 @@
 #include "native_client/src/include/portability.h"
 #include "native_client/src/include/portability_io.h"
 #include "native_client/src/include/portability_string.h"
+#include "native_client/src/public/nacl_file_info.h"
 #include "native_client/src/shared/platform/nacl_check.h"
 #include "native_client/src/trusted/desc/nacl_desc_wrapper.h"
 #include "native_client/src/trusted/nonnacl_util/sel_ldr_launcher.h"
@@ -48,27 +49,6 @@ namespace {
 const int64_t kTimeSmallMin = 1;         // in ms
 const int64_t kTimeSmallMax = 20000;     // in ms
 const uint32_t kTimeSmallBuckets = 100;
-
-// Converts a PP_FileHandle to a POSIX file descriptor.
-int32_t ConvertFileDescriptor(PP_FileHandle handle) {
-  PLUGIN_PRINTF(("ConvertFileDescriptor, handle=%d\n", handle));
-#if NACL_WINDOWS
-  int32_t file_desc = NACL_NO_FILE_DESC;
-  // On Windows, valid handles are 32 bit unsigned integers so this is safe.
-  file_desc = reinterpret_cast<intptr_t>(handle);
-  // Convert the Windows HANDLE from Pepper to a POSIX file descriptor.
-  int32_t posix_desc = _open_osfhandle(file_desc, _O_RDWR | _O_BINARY);
-  if (posix_desc == -1) {
-    // Close the Windows HANDLE if it can't be converted.
-    CloseHandle(reinterpret_cast<HANDLE>(file_desc));
-    return -1;
-  }
-  return posix_desc;
-#else
-  return handle;
-#endif
-}
-
 
 }  // namespace
 
@@ -111,7 +91,7 @@ void Plugin::HistogramEnumerateSelLdrLoadStatus(NaClErrorCode error_code) {
 }
 
 bool Plugin::LoadNaClModuleFromBackgroundThread(
-    nacl::DescWrapper* wrapper,
+    PP_FileHandle file_handle,
     NaClSubprocess* subprocess,
     int32_t manifest_id,
     const SelLdrStartParams& params) {
@@ -143,9 +123,12 @@ bool Plugin::LoadNaClModuleFromBackgroundThread(
   PLUGIN_PRINTF(("Plugin::LoadNaClModuleFromBackgroundThread "
                  "(service_runtime_started=%d)\n",
                  service_runtime_started));
-  if (!service_runtime_started) {
+  if (!service_runtime_started)
     return false;
-  }
+
+  // TODO(teravest): Get rid of this conversion to DescWrapper.
+  int32_t fd = ConvertFileDescriptor(file_handle, true);
+  nacl::DescWrapper* wrapper = wrapper_factory()->MakeFileDesc(fd, O_RDONLY);
 
   // Now actually load the nexe, which can happen on a background thread.
   bool nexe_loaded = service_runtime->LoadNexeAndStart(
@@ -269,8 +252,7 @@ bool Plugin::LoadNaClModuleContinuationIntern() {
 }
 
 NaClSubprocess* Plugin::LoadHelperNaClModule(const nacl::string& helper_url,
-                                             nacl::DescWrapper* wrapper,
-                                             int32_t manifest_id,
+                                             PP_FileHandle file_handle,
                                              ErrorInfo* error_info) {
   nacl::scoped_ptr<NaClSubprocess> nacl_subprocess(
       new NaClSubprocess("helper module", NULL, NULL));
@@ -296,7 +278,11 @@ NaClSubprocess* Plugin::LoadHelperNaClModule(const nacl::string& helper_url,
                            false /* enable_dyncode_syscalls */,
                            false /* enable_exception_handling */,
                            true /* enable_crash_throttling */);
-  if (!LoadNaClModuleFromBackgroundThread(wrapper, nacl_subprocess.get(),
+
+  // Helper NaCl modules always use the PNaCl manifest, as there is no
+  // corresponding NMF.
+  int32_t manifest_id = nacl_interface_->CreatePnaclManifest(pp_instance());
+  if (!LoadNaClModuleFromBackgroundThread(file_handle, nacl_subprocess.get(),
                                           manifest_id, params)) {
     return NULL;
   }
@@ -348,6 +334,8 @@ Plugin::Plugin(PP_Instance pp_instance)
       time_of_last_progress_event_(0),
       manifest_id_(-1),
       nexe_handle_(PP_kInvalidFileHandle),
+      nexe_token_lo_(0),
+      nexe_token_hi_(0),
       nacl_interface_(NULL),
       uma_interface_(this) {
   PLUGIN_PRINTF(("Plugin::Plugin (this=%p, pp_instance=%"
@@ -372,14 +360,6 @@ Plugin::~Plugin() {
                  static_cast<void*>(this)));
   // Destroy the coordinator while the rest of the data is still there
   pnacl_coordinator_.reset(NULL);
-
-  for (std::map<nacl::string, NaClFileInfoAutoCloser*>::iterator it =
-           url_file_info_map_.begin();
-       it != url_file_info_map_.end();
-       ++it) {
-    delete it->second;
-  }
-  url_downloaders_.erase(url_downloaders_.begin(), url_downloaders_.end());
 
   // Clean up accounting for our instance inside the NaCl interface.
   if (manifest_id_ != -1)
@@ -435,11 +415,23 @@ void Plugin::NexeFileDidOpen(int32_t pp_error) {
   if (pp_error != PP_OK)
     return;
 
-  int32_t desc = ConvertFileDescriptor(nexe_handle_);
+  NaClFileInfo nexe_file_info;
+  nexe_file_info.desc = ConvertFileDescriptor(nexe_handle_, true);
+  nexe_file_info.file_token.lo = nexe_token_lo_;
+  nexe_file_info.file_token.hi = nexe_token_hi_;
   nexe_handle_ = PP_kInvalidFileHandle;  // Clear out nexe handle.
+  nexe_token_lo_ = 0;
+  nexe_token_hi_ = 0;
+
+  NaClDesc *desc = NaClDescIoFromFileInfo(nexe_file_info, O_RDONLY);
+  if (desc == NULL)
+    return;
+  // nexe_file_info_ is handed to desc, clear out old copy.
+  memset(&nexe_file_info, 0, sizeof nexe_file_info);
+  nexe_file_info.desc = -1;
 
   nacl::scoped_ptr<nacl::DescWrapper>
-      wrapper(wrapper_factory()->MakeFileDesc(desc, O_RDONLY));
+      wrapper(wrapper_factory()->MakeGenericCleanup(desc));
   NaClLog(4, "NexeFileDidOpen: invoking LoadNaClModule\n");
   LoadNaClModule(
       wrapper.release(),
@@ -550,6 +542,8 @@ void Plugin::NaClManifestFileDidOpen(int32_t pp_error) {
       nacl_interface_->DownloadNexe(pp_instance(),
                                     program_url_.c_str(),
                                     &nexe_handle_,
+                                    &nexe_token_lo_,
+                                    &nexe_token_hi_,
                                     open_callback.pp_completion_callback());
       return;
     }
@@ -566,76 +560,15 @@ void Plugin::RequestNaClManifest(const nacl::string& url) {
                                        open_callback.pp_completion_callback());
 }
 
-void Plugin::UrlDidOpenForStreamAsFile(
-    int32_t pp_error,
-    FileDownloader* url_downloader,
-    pp::CompletionCallback callback) {
-  PLUGIN_PRINTF(("Plugin::UrlDidOpen (pp_error=%" NACL_PRId32
-                 ", url_downloader=%p)\n", pp_error,
-                 static_cast<void*>(url_downloader)));
-  url_downloaders_.erase(url_downloader);
-  nacl::scoped_ptr<FileDownloader> scoped_url_downloader(url_downloader);
-  NaClFileInfo tmp_info(scoped_url_downloader->GetFileInfo());
-  NaClFileInfoAutoCloser *info = new NaClFileInfoAutoCloser(&tmp_info);
-
-  if (pp_error != PP_OK) {
-    callback.Run(pp_error);
-    delete info;
-  } else if (info->get_desc() > NACL_NO_FILE_DESC) {
-    std::map<nacl::string, NaClFileInfoAutoCloser*>::iterator it =
-        url_file_info_map_.find(url_downloader->url());
-    if (it != url_file_info_map_.end())
-      delete it->second;
-    url_file_info_map_[url_downloader->url()] = info;
-    callback.Run(PP_OK);
-  } else {
-    callback.Run(PP_ERROR_FAILED);
-    delete info;
-  }
-}
-
-struct NaClFileInfo Plugin::GetFileInfo(const nacl::string& url) {
-  struct NaClFileInfo info;
-  memset(&info, 0, sizeof(info));
-  std::map<nacl::string, NaClFileInfoAutoCloser*>::iterator it =
-      url_file_info_map_.find(url);
-  if (it != url_file_info_map_.end()) {
-    info = it->second->get();
-    info.desc = DUP(info.desc);
-  } else {
-    info.desc = -1;
-  }
-  return info;
-}
-
-bool Plugin::StreamAsFile(const nacl::string& url,
+void Plugin::StreamAsFile(const nacl::string& url,
+                          PP_NaClFileInfo* file_info,
                           const pp::CompletionCallback& callback) {
   PLUGIN_PRINTF(("Plugin::StreamAsFile (url='%s')\n", url.c_str()));
-  FileDownloader* downloader = new FileDownloader();
-  downloader->Initialize(this);
-  url_downloaders_.insert(downloader);
-
-  // Untrusted loads are always relative to the page's origin.
-  if (!GetNaClInterface()->ResolvesRelativeToPluginBaseUrl(pp_instance(),
-                                                           url.c_str()))
-    return false;
-
-  // Try the fast path first. This will only block if the file is installed.
-  if (OpenURLFast(url, downloader)) {
-    UrlDidOpenForStreamAsFile(PP_OK, downloader, callback);
-    return true;
-  }
-
-  pp::CompletionCallback open_callback = callback_factory_.NewCallback(
-      &Plugin::UrlDidOpenForStreamAsFile, downloader, callback);
-  // If true, will always call the callback on success or failure.
-  return downloader->Open(url,
-                          DOWNLOAD_TO_FILE,
-                          open_callback,
-                          true,
-                          &UpdateDownloadProgress);
+  nacl_interface_->DownloadFile(pp_instance(),
+                                url.c_str(),
+                                file_info,
+                                callback.pp_completion_callback());
 }
-
 
 void Plugin::ReportLoadSuccess(uint64_t loaded_bytes, uint64_t total_bytes) {
   nacl_interface_->ReportLoadSuccess(
@@ -653,55 +586,6 @@ void Plugin::ReportLoadError(const ErrorInfo& error_info) {
 
 void Plugin::ReportLoadAbort() {
   nacl_interface_->ReportLoadAbort(pp_instance());
-}
-
-void Plugin::UpdateDownloadProgress(
-    PP_Instance pp_instance,
-    PP_Resource pp_resource,
-    int64_t /*bytes_sent*/,
-    int64_t /*total_bytes_to_be_sent*/,
-    int64_t bytes_received,
-    int64_t total_bytes_to_be_received) {
-  Instance* instance = pp::Module::Get()->InstanceForPPInstance(pp_instance);
-  if (instance != NULL) {
-    Plugin* plugin = static_cast<Plugin*>(instance);
-    // Rate limit progress events to a maximum of 100 per second.
-    int64_t time = NaClGetTimeOfDayMicroseconds();
-    int64_t elapsed = time - plugin->time_of_last_progress_event_;
-    const int64_t kTenMilliseconds = 10000;
-    if (elapsed > kTenMilliseconds) {
-      plugin->time_of_last_progress_event_ = time;
-
-      // Find the URL loader that sent this notification.
-      const FileDownloader* file_downloader =
-          plugin->FindFileDownloader(pp_resource);
-      nacl::string url;
-      if (file_downloader)
-        url = file_downloader->url();
-      LengthComputable length_computable = (total_bytes_to_be_received >= 0) ?
-          LENGTH_IS_COMPUTABLE : LENGTH_IS_NOT_COMPUTABLE;
-
-      plugin->EnqueueProgressEvent(PP_NACL_EVENT_PROGRESS,
-                                   url,
-                                   length_computable,
-                                   bytes_received,
-                                   total_bytes_to_be_received);
-    }
-  }
-}
-
-const FileDownloader* Plugin::FindFileDownloader(
-    PP_Resource url_loader) const {
-  const FileDownloader* file_downloader = NULL;
-  std::set<FileDownloader*>::const_iterator it = url_downloaders_.begin();
-  while (it != url_downloaders_.end()) {
-    if (url_loader == (*it)->url_loader()) {
-      file_downloader = (*it);
-      break;
-    }
-    ++it;
-  }
-  return file_downloader;
 }
 
 void Plugin::ReportSelLdrLoadStatus(int status) {
@@ -729,23 +613,6 @@ void Plugin::EnqueueProgressEvent(PP_NaClEventType event_type,
       length_computable == LENGTH_IS_COMPUTABLE ? PP_TRUE : PP_FALSE,
       loaded_bytes,
       total_bytes);
-}
-
-bool Plugin::OpenURLFast(const nacl::string& url,
-                         FileDownloader* downloader) {
-  uint64_t file_token_lo = 0;
-  uint64_t file_token_hi = 0;
-  PP_FileHandle file_handle =
-      nacl_interface()->OpenNaClExecutable(pp_instance(),
-                                           url.c_str(),
-                                           &file_token_lo, &file_token_hi);
-  // We shouldn't hit this if the file URL is in an installed app.
-  if (file_handle == PP_kInvalidFileHandle)
-    return false;
-
-  // FileDownloader takes ownership of the file handle.
-  downloader->OpenFast(url, file_handle, file_token_lo, file_token_hi);
-  return true;
 }
 
 bool Plugin::DocumentCanRequest(const std::string& url) {

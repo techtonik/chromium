@@ -183,11 +183,6 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
   // Disable GL multisampling if requested on command line.
   settings->setOpenGLMultisamplingEnabled(prefs.gl_multisampling_enabled);
 
-  // Enable privileged WebGL extensions for Chrome extensions or if requested
-  // on command line.
-  settings->setPrivilegedWebGLExtensionsEnabled(
-      prefs.privileged_webgl_extensions_enabled);
-
   // Enable WebGL errors to the JS console if requested.
   settings->setWebGLErrorsToConsoleEnabled(
       prefs.webgl_errors_to_console_enabled);
@@ -340,9 +335,6 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
       prefs.pinch_overlay_scrollbar_thickness);
   settings->setUseSolidColorScrollbars(prefs.use_solid_color_scrollbars);
   settings->setCompositorTouchHitTesting(prefs.compositor_touch_hit_testing);
-
-  settings->setThreadedHTMLParser(true);
-  settings->setUseThreadedHTMLParserForDataURLs(true);
 }
 
 }  // namespace content

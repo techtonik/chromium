@@ -2726,6 +2726,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Cras.StreamTimeoutMilliSeconds" units="milliseconds">
+  <owner>hychao@chromium.org</owner>
+  <summary>
+    The longest additional time CRAS(Chrome OS audio server) ever waits for a
+    stream exceeding the timeout threshold. This value is recorded per stream
+    when it gets removed and used to investigate the audio glitch/skip problem
+    on Chrome OS.
+  </summary>
+</histogram>
+
 <histogram name="Cros.ClickOnShelf" enum="CrosShelfClickTarget">
   <obsolete>
     Deprecated as of 12/2013. Default pinned apps trial is finished.
@@ -5990,7 +6000,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     The number of extensions per page that injected an ad and could have been
     stopped if the user had declined script injection. This is related to the
     ActivityLog metrics, ExtensionActivity.Ad*. Recorded upon page close or
-    navigation.
+    navigation. Only recorded if there was at least one ad injection detected.
   </summary>
 </histogram>
 
@@ -6012,7 +6022,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     The number of extensions per page that injected an ad and that could not
     have been stopped through script injection permission. This is related to
     the ActivityLog metrics, ExtensionActivity.Ad*. Recorded upon page close or
-    navigation.
+    navigation. Only recorded if there was at least one ad injection detected.
   </summary>
 </histogram>
 
@@ -6281,10 +6291,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Extensions.FileAccessAllowed">
   <owner>kalman@chromium.org</owner>
   <summary>
-    The number of installed extensions (and friends) that could have been given
-    access to the file:// scheme, and were. This excludes entities such as
-    platform apps (which don't have host permissions) and hosted apps (which
-    aren't shown on chrome://extensions). See also
+    The number of extensions (and friends) that could have been given access to
+    the file:// scheme, and were, for users that have at least one extension
+    that could have been given access. This excludes anything that doesn't show
+    up in chrome://extensions (platform apps, hosted apps, component
+    extensions), policy-installed extensions, and unpacked extensions. See also
     Extensions.FileAccessNotAllowed.
   </summary>
 </histogram>
@@ -6292,10 +6303,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Extensions.FileAccessNotAllowed">
   <owner>kalman@chromium.org</owner>
   <summary>
-    The number of installed extensions (and friends) that could have been given
-    access to the file:// scheme, but weren't. This excludes entities such as
-    platform apps (which don't have host permissions) and hosted apps (which
-    aren't shown on chrome://extensions). See also Extensions.FileAccessAllowed.
+    The number of extensions (and friends) that could have been given access to
+    the file:// scheme, but weren't, for users that have at least one extension
+    that could have been given access. This excludes anything that doesn't show
+    up in chrome://extensions (platform apps, hosted apps, component
+    extensions), policy-installed extensions, and unpacked extensions. See also
+    Extensions.FileAccessAllowed.
   </summary>
 </histogram>
 
@@ -6325,20 +6338,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Extensions.IncognitoAllowed">
   <owner>kalman@chromium.org</owner>
   <summary>
-    The number of installed extensions (and friends) that could have been
-    enabled in incognito, and were. This excludes entities such as platform apps
-    (which cannot be enabled) and hosted apps (which aren't shown on
-    chrome://extensions). See also Extensions.IncognitoNotAllowed.
+    The number of extensions (and friends) that could have been allowed in
+    incognito, and were, for users that have at least one extension that could
+    have been allowed. This excludes anything that doesn't show up in
+    chrome://extensions (platform apps, hosted apps, component extensions),
+    policy-installed extensions, and unpacked extensions. See also
+    Extensions.IncognitoNotAllowed.
   </summary>
 </histogram>
 
 <histogram name="Extensions.IncognitoNotAllowed">
   <owner>kalman@chromium.org</owner>
   <summary>
-    The number of installed extensions (and friends) that could have been
-    enabled in incognito, but weren't. This excludes entities such as platform
-    apps (which cannot be enabled) and hosted apps (which aren't shown on
-    chrome://extensions). See also Extensions.IncognitoAllowed.
+    The number of extensions (and friends) that could have been allowed in
+    incognito, but weren't, for users that have at least one extension that
+    could have been allowed. This excludes anything that doesn't show up in
+    chrome://extensions (platform apps, hosted apps, component extensions),
+    policy-installed extensions, and unpacked extensions. See also
+    Extensions.IncognitoAllowed.
   </summary>
 </histogram>
 
@@ -6619,6 +6636,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Number of extension loads on startup where it is necessary to reload the
     manifest because the extension is unpacked.
   </summary>
+</histogram>
+
+<histogram name="Extensions.ManifestVersion">
+  <owner>kalman@chromium.org</owner>
+  <summary>The manifest version of each loaded extension.</summary>
 </histogram>
 
 <histogram name="Extensions.NetworkDelay" units="milliseconds">
@@ -7810,6 +7832,31 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The time that the GPU process spends in initializing the GL surface, and
     collecting graphics information.
+  </summary>
+</histogram>
+
+<histogram name="HIDDetection.OOBEDevicesDetectedOnContinuePressed"
+    enum="HIDContinueScenarioType">
+  <owner>merkulova@chromium.org</owner>
+  <summary>
+    Which HID were detected when user pressed Continue on OOBE dialog. This
+    metric is specific to ChromeOS.
+  </summary>
+</histogram>
+
+<histogram name="HIDDetection.OOBEDialogShown">
+  <owner>merkulova@chromium.org</owner>
+  <summary>
+    Whether HID detection dialog was shown on OOBE. Logged on screen show or on
+    screen skip respectively. This metric is specific to ChromeOS.
+  </summary>
+</histogram>
+
+<histogram name="HIDDetection.TimesDialogShownPerOOBECompleted">
+  <owner>merkulova@chromium.org</owner>
+  <summary>
+    Records number of times the dialog was shown by the time OOBE is completed.
+    This metric is specific to ChromeOS.
   </summary>
 </histogram>
 
@@ -13413,6 +13460,32 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram
+    name="Net.QuicSession.ConnectionClose.HandshakeFailureBlackHole.QuicError"
+    enum="QuicErrorCodes">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    The QUIC error which caused a QUIC connection to be closed before the
+    hanshake was confirmed, in the case where no packets were received. This
+    provides a breakdown of the entires in
+    Net.QuicSession.ConnectionClose.HandshakeNotConfirmed.Reason where the value
+    is BLACK_HOLE.
+  </summary>
+</histogram>
+
+<histogram
+    name="Net.QuicSession.ConnectionClose.HandshakeFailureUnknown.QuicError"
+    enum="QuicErrorCodes">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    The QUIC error which caused a QUIC connection to be closed before the
+    hanshake was confirmed, in the case where at least 1 packet was received.
+    This provides a breakdown of the entires in
+    Net.QuicSession.ConnectionClose.HandshakeNotConfirmed.Reason where the value
+    is UNKNOWN.
+  </summary>
+</histogram>
+
 <histogram name="Net.QuicSession.ConnectionClose.HandshakeNotConfirmed.Reason"
     enum="QuicHandshakeFailureReason">
   <owner>rch@chromium.org</owner>
@@ -13568,7 +13641,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Net.QuicSession.PublicResetAddressMismatch"
     enum="QuicAddressMismatch">
-  <owner>rch@chromium.org</owner>
+  <owner>wtc@chromium.org</owner>
+  <summary>
+    When a public reset packet is received, whether the client IP address and
+    port number in it differ from the client IP address and port number in the
+    ServerHello handshake message. In the comparison, the first address is the
+    one in ServerHello and the second address is the one in public reset. Note:
+    this histogram is obsolete because it failed to treat IPv4-mapped IPv6
+    addresses as IPv4 addresses.
+  </summary>
+</histogram>
+
+<histogram name="Net.QuicSession.PublicResetAddressMismatch2"
+    enum="QuicAddressMismatch">
+  <owner>wtc@chromium.org</owner>
   <summary>
     When a public reset packet is received, whether the client IP address and
     port number in it differ from the client IP address and port number in the
@@ -23523,7 +23609,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The type of the default search engine that is loaded when a profile is
     opened or after a profile reset.  Note that at least one profile is opened
-    on startup.
+    on startup. Due to an error, there was a period from roughly May 9 2014 to
+    May 23 2014 during which this was not being logged.
   </summary>
 </histogram>
 
@@ -31154,6 +31241,33 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="WebRTC.PeerConnection.IPMetrics" enum="PeerConnectionCounters">
+  <owner>mallinath@chromium.org</owner>
+  <summary>
+    Counters on IPv4 and IPv6 usage in PeerConnection. These values are logged
+    once per PeerConnection.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.PeerConnection.IPv4Interfaces">
+  <owner>mallinath@chromium.org</owner>
+  <summary>
+    Number of IPv4 network interfaces discovered in a PeerConnection Session.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.PeerConnection.IPv6Interfaces">
+  <owner>mallinath@chromium.org</owner>
+  <summary>
+    Number of IPv6 network interfaces discovered in a PeerConnection Session.
+  </summary>
+</histogram>
+
+<histogram name="WebRTC.PeerConnection.TimeToConnect" units="milliseconds">
+  <owner>mallinath@chromium.org</owner>
+  <summary>Time to setup a peer to peer call with PeerConnection.</summary>
+</histogram>
+
 <histogram name="WebRTC.ReceivedAudioTrackDuration" units="milliseconds">
   <owner>perkj@chromium.org</owner>
   <summary>
@@ -32152,6 +32266,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <enum name="BrokenAlternateProtocolLocation" type="int">
   <int value="0" label="HTTP_STREAM_FACTORY_IMPL_JOB"/>
   <int value="1" label="QUIC_STREAM_FACTORY"/>
+  <int value="2" label="HTTP_STREAM_FACTORY_IMPL_JOB_ALT"/>
+  <int value="3" label="HTTP_STREAM_FACTORY_IMPL_JOB_MAIN"/>
 </enum>
 
 <enum name="CanvasContextType" type="int">
@@ -33351,8 +33467,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="EnterprisePolicies" type="int">
-<!-- Generated from
-     ../../../components/policy/resources/policy_templates.json -->
+<!-- Generated from ../../../components/policy/resources/policy_templates.json -->
 
   <int value="1" label="Configure the home page URL"/>
   <int value="2" label="Use New Tab Page as homepage"/>
@@ -33479,8 +33594,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="111" label="Set media disk cache size in bytes"/>
   <int value="112" label="Enterprise web store URL (deprecated)"/>
   <int value="113" label="Enterprise web store name (deprecated)"/>
-  <int value="114" label="Enable TLS domain-bound certificates extension"/>
-  <int value="115" label="Enable reporting memory info (JS heap size) to page"/>
+  <int value="114"
+      label="Enable TLS domain-bound certificates extension (deprecated)"/>
+  <int value="115"
+      label="Enable reporting memory info (JS heap size) to page (deprecated)"/>
   <int value="116" label="Proxy settings"/>
   <int value="117" label="Disable Print Preview"/>
   <int value="118" label="Disable SSL record splitting"/>
@@ -33631,7 +33748,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
              battery power"/>
   <int value="223" label="Enable creation of supervised users"/>
   <int value="224" label="Report device network interfaces"/>
-  <int value="225" label="Power mangement on the login screen"/>
+  <int value="225" label="Power management on the login screen"/>
   <int value="226"
       label="Action to take when the idle delay is reached while running on
              AC power"/>
@@ -33662,17 +33779,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="245" label="Ephemeral profile"/>
   <int value="246"
       label="Selects the strategy used to free up disk space during automatic
-             clean-up"/>
-  <int value="247"
-      label="Specify whether power management delays and the session length
-             limit should only start running after initial user activity in a
-             session"/>
+             clean-up (deprecated)"/>
+  <int value="247" label="Wait for initial user activity"/>
   <int value="248" label="Report device users"/>
   <int value="249" label="User avatar image"/>
   <int value="250" label="Enable network configuration prompt when offline"/>
-  <int value="251" label="Native Messaging blacklist"/>
-  <int value="252" label="Native Messaging whitelist"/>
-  <int value="253" label="Allow user-level Native Messaging hosts"/>
+  <int value="251" label="Configure native messaging blacklist"/>
+  <int value="252" label="Configure native messaging whitelist"/>
+  <int value="253"
+      label="Allow user-level Native Messaging hosts (installed without admin
+             permissions)."/>
   <int value="254"
       label="Limit the time for which a user authenticated via SAML can log
              in offline"/>
@@ -33684,13 +33800,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
       label="Power management settings when the user becomes idle"/>
   <int value="259" label="Screen lock delays"/>
   <int value="260" label="Media keys default to function keys"/>
-  <int value="261" label="Enable WPAD quick check"/>
+  <int value="261" label="Enable WPAD optimization"/>
   <int value="262" label="Wallpaper image"/>
   <int value="263"
       label="Enable the use of relay servers by the remote access host"/>
   <int value="264"
       label="Restrict the UDP port range used by the remote access host"/>
-  <int value="265" label="Enables the old web-based signin flows"/>
+  <int value="265" label="Enables the old web-based signin"/>
+  <int value="266" label="Block developer mode"/>
 </enum>
 
 <enum name="EnterprisePolicyInvalidations" type="int">
@@ -34727,6 +34844,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="772" label="FILESYSTEMPROVIDERINTERNAL_READFILEREQUESTEDSUCCESS"/>
   <int value="773" label="FILESYSTEMPROVIDERINTERNAL_READFILEREQUESTEDERROR"/>
   <int value="774" label="NETWORKINGPRIVATE_GETNETWORKS"/>
+  <int value="775" label="WEBVIEW_SETNAME"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -36166,6 +36284,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="12" label="SERVICE_ERROR"/>
 </enum>
 
+<enum name="HIDContinueScenarioType" type="int">
+  <summary>Possible detected devices combination on leaving dialog</summary>
+  <int value="0" label="Pointing device only detected."/>
+  <int value="1" label="Keyboard device only detected."/>
+  <int value="2" label="Both devices, pointing and keyboard, detected."/>
+</enum>
+
 <enum name="HistoryFaviconsRecoveryEnum" type="int">
   <summary>Error states noted in thumbnail_database.cc recovery code.</summary>
   <int value="0" label="RECOVERY_EVENT_RECOVERED">Successful recovery.</int>
@@ -37443,6 +37568,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="MappedCSSProperties" type="int">
+<!-- Generated from ../../../third_party/WebKit/Source/core/frame/UseCounter.cpp -->
+
 <!-- See http://src.chromium.org/viewvc/blink/trunk/Source/core/page/UseCounter.cpp -->
 
   <int value="1" label="Total Pages Measured"/>
@@ -37457,9 +37584,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="10" label="font-weight"/>
   <int value="11" label="text-rendering"/>
   <int value="12" label="webkit-font-feature-settings"/>
-  <int value="13" label="webkit-font-kerning"/>
+  <int value="13" label="font-kerning"/>
   <int value="14" label="webkit-font-smoothing"/>
-  <int value="15" label="webkit-font-variant-ligatures"/>
+  <int value="15" label="font-variant-ligatures"/>
   <int value="16" label="webkit-locale"/>
   <int value="17" label="webkit-text-orientation"/>
   <int value="18" label="webkit-writing-mode"/>
@@ -37674,27 +37801,27 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="227" label="webkit-columns"/>
   <int value="228" label="webkit-box-decoration-break"/>
   <int value="229" label="webkit-filter"/>
-  <int value="230" label="webkit-align-content"/>
-  <int value="231" label="webkit-align-items"/>
-  <int value="232" label="webkit-align-self"/>
-  <int value="233" label="webkit-flex"/>
-  <int value="234" label="webkit-flex-basis"/>
-  <int value="235" label="webkit-flex-direction"/>
-  <int value="236" label="webkit-flex-flow"/>
-  <int value="237" label="webkit-flex-grow"/>
-  <int value="238" label="webkit-flex-shrink"/>
-  <int value="239" label="webkit-flex-wrap"/>
-  <int value="240" label="webkit-justify-content"/>
+  <int value="230" label="align-content"/>
+  <int value="231" label="align-items"/>
+  <int value="232" label="align-self"/>
+  <int value="233" label="flex"/>
+  <int value="234" label="flex-basis"/>
+  <int value="235" label="flex-direction"/>
+  <int value="236" label="flex-flow"/>
+  <int value="237" label="flex-grow"/>
+  <int value="238" label="flex-shrink"/>
+  <int value="239" label="flex-wrap"/>
+  <int value="240" label="justify-content"/>
   <int value="241" label="webkit-font-size-delta"/>
-  <int value="242" label="webkit-grid-columns"/>
-  <int value="243" label="webkit-grid-rows"/>
-  <int value="244" label="webkit-grid-start"/>
-  <int value="245" label="webkit-grid-end"/>
-  <int value="246" label="webkit-grid-before"/>
-  <int value="247" label="webkit-grid-after"/>
-  <int value="248" label="webkit-grid-column"/>
-  <int value="249" label="webkit-grid-row"/>
-  <int value="250" label="webkit-grid-auto-flow"/>
+  <int value="242" label="grid-template-columns"/>
+  <int value="243" label="grid-template-rows"/>
+  <int value="244" label="grid-column-start"/>
+  <int value="245" label="grid-column-end"/>
+  <int value="246" label="grid-row-start"/>
+  <int value="247" label="grid-row-end"/>
+  <int value="248" label="grid-column"/>
+  <int value="249" label="grid-row"/>
+  <int value="250" label="grid-auto-flow"/>
   <int value="251" label="webkit-highlight"/>
   <int value="252" label="webkit-hyphenate-character"/>
   <int value="253" label="webkit-hyphenate-limit-after"/>
@@ -37747,7 +37874,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="300" label="webkit-min-logical-width"/>
   <int value="301" label="webkit-min-logical-height"/>
   <int value="302" label="webkit-nbsp-mode"/>
-  <int value="303" label="webkit-order"/>
+  <int value="303" label="order"/>
   <int value="304" label="webkit-padding-after"/>
   <int value="305" label="webkit-padding-before"/>
   <int value="306" label="webkit-padding-end"/>
@@ -37786,14 +37913,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="339" label="webkit-user-select"/>
   <int value="340" label="webkit-flow-into"/>
   <int value="341" label="webkit-flow-from"/>
-  <int value="342" label="webkit-region-overflow"/>
+  <int value="342" label="webkit-region-fragment"/>
   <int value="343" label="webkit-region-break-after"/>
   <int value="344" label="webkit-region-break-before"/>
   <int value="345" label="webkit-region-break-inside"/>
-  <int value="346" label="webkit-shape-inside"/>
-  <int value="347" label="webkit-shape-outside"/>
-  <int value="348" label="webkit-shape-margin"/>
-  <int value="349" label="webkit-shape-padding"/>
+  <int value="346" label="shape-inside"/>
+  <int value="347" label="shape-outside"/>
+  <int value="348" label="shape-margin"/>
+  <int value="349" label="shape-padding"/>
   <int value="350" label="webkit-wrap-flow"/>
   <int value="351" label="webkit-wrap-through"/>
   <int value="352" label="webkit-wrap"/>
@@ -37845,11 +37972,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="398" label="image-resolution"/>
   <int value="399" label="webkit-blend-mode"/>
   <int value="400" label="webkit-background-blend-mode"/>
-  <int value="401" label="webkit-text-decoration-line"/>
-  <int value="402" label="webkit-text-decoration-style"/>
-  <int value="403" label="webkit-text-decoration-color"/>
-  <int value="404" label="webkit-text-align-last"/>
-  <int value="405" label="webkit-text-underline-position"/>
+  <int value="401" label="text-decoration-line"/>
+  <int value="402" label="text-decoration-style"/>
+  <int value="403" label="text-decoration-color"/>
+  <int value="404" label="text-align-last"/>
+  <int value="405" label="text-underline-position"/>
   <int value="406" label="max-zoom"/>
   <int value="407" label="min-zoom"/>
   <int value="408" label="orientation"/>
@@ -37867,7 +37994,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="420" label="mix-blend-mode"/>
   <int value="421" label="touch-action"/>
   <int value="422" label="grid-area"/>
-  <int value="423" label="grid-template"/>
+  <int value="423" label="grid-template-areas"/>
   <int value="424" label="animation"/>
   <int value="425" label="animation-delay"/>
   <int value="426" label="animation-direction"/>
@@ -37882,6 +38009,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="435" label="mask-source-type"/>
   <int value="436" label="isolation"/>
   <int value="437" label="object-position"/>
+  <int value="438" label="internal-callback"/>
+  <int value="439" label="shape-image-threshold"/>
+  <int value="440" label="column-fill"/>
+  <int value="441" label="text-justify"/>
+  <int value="442" label="touch-action-delay"/>
+  <int value="443" label="justify-self"/>
+  <int value="444" label="scroll-behavior"/>
+  <int value="445" label="will-change"/>
+  <int value="446" label="transform"/>
+  <int value="447" label="transform-origin"/>
+  <int value="448" label="transform-style"/>
+  <int value="449" label="perspective"/>
+  <int value="450" label="perspective-origin"/>
+  <int value="451" label="backface-visibility"/>
+  <int value="452" label="grid-template"/>
+  <int value="453" label="grid"/>
 </enum>
 
 <enum name="MappedEditingCommands" type="int">
@@ -38120,10 +38263,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="0" label="No viewport tag"/>
   <int value="1" label="Viewport meta with device width"/>
   <int value="2" label="Viewport meta with constant width"/>
-  <int value="4" label="Viewport meta other"/>
-  <int value="5" label="HandheldFriendly meta"/>
-  <int value="6" label="MobileOptimized meta"/>
-  <int value="7" label="XHTML-MP document type"/>
+  <int value="3" label="Viewport meta other"/>
+  <int value="4" label="HandheldFriendly meta"/>
+  <int value="5" label="MobileOptimized meta"/>
+  <int value="6" label="XHTML-MP document type"/>
 </enum>
 
 <enum name="MigrationNssToPemNetworkTypes" type="int">
@@ -39832,6 +39975,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="4" label="Clicked 'Manage passwords'"/>
   <int value="5" label="Clicked 'Done'"/>
   <int value="6" label="Clicked 'Enable password manager'"/>
+</enum>
+
+<enum name="PeerConnectionCounters" type="int">
+  <int value="0" label="PeerConnection enabled with IPv4."/>
+  <int value="1" label="PeerConnection enabled with Ipv6."/>
+  <int value="2" label="IPv4 BestConnection."/>
+  <int value="3" label="IPv6 BestConnection."/>
 </enum>
 
 <enum name="PepperInterface" type="int">

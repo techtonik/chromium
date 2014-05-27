@@ -387,8 +387,6 @@ WebPreferences RenderViewHostImpl::GetWebkitPrefs(const GURL& url) {
 
   prefs.gl_multisampling_enabled =
       !command_line.HasSwitch(switches::kDisableGLMultisampling);
-  prefs.privileged_webgl_extensions_enabled =
-      command_line.HasSwitch(switches::kEnablePrivilegedWebGLExtensions);
   prefs.site_specific_quirks_enabled =
       !command_line.HasSwitch(switches::kDisableSiteSpecificQuirks);
   prefs.allow_file_access_from_file_urls =
@@ -1466,7 +1464,7 @@ void RenderViewHostImpl::DisownOpener() {
 }
 
 void RenderViewHostImpl::SetAccessibilityCallbackForTesting(
-    const base::Callback<void(ui::AXEvent)>& callback) {
+    const base::Callback<void(ui::AXEvent, int)>& callback) {
   accessibility_testing_callback_ = callback;
 }
 
@@ -1577,7 +1575,7 @@ void RenderViewHostImpl::OnAccessibilityEvents(
       ax_tree_.reset(new ui::AXTree(param.update));
     else
       CHECK(ax_tree_->Unserialize(param.update)) << ax_tree_->error();
-    accessibility_testing_callback_.Run(param.event_type);
+    accessibility_testing_callback_.Run(param.event_type, param.id);
   }
 }
 

@@ -94,13 +94,13 @@ extern const char kDisableMinimizeOnSecondLauncherItemClick[];
 extern const char kDisableNTPOtherSessionsMenu[];
 extern const char kDisableOfflineAutoReload[];
 extern const char kDisableOriginChip[];
-extern const char kDisableOriginChipV2[];
 extern const char kDisablePasswordManagerReauthentication[];
 extern const char kDisablePeopleSearch[];
 extern const char kDisablePnacl[];
 extern const char kDisablePopupBlocking[];
 extern const char kDisablePreconnect[];
 extern const char kDisablePrerenderLocalPredictor[];
+extern const char kDisablePrintPreview[];
 extern const char kDisablePromptOnRepost[];
 extern const char kDisableQuic[];
 extern const char kDisableQuicHttps[];
@@ -152,7 +152,6 @@ extern const char kEnableFastUnload[];
 extern const char kEnableIPv6[];
 extern const char kEnableLinkableEphemeralApps[];
 extern const char kEnableManagedStorage[];
-extern const char kEnableMetricsReportingForTesting[];
 extern const char kEnableNaCl[];
 extern const char kEnableNetBenchmarking[];
 extern const char kEnableNetworkTime[];
@@ -160,14 +159,8 @@ extern const char kEnableNpnHttpOnly[];
 extern const char kEnableOfflineAutoReload[];
 extern const char kEnableOfflineLoadStaleCache[];
 extern const char kDisableOfflineLoadStaleCache[];
-extern const char kEnableOriginChip[];
-extern const char kEnableOriginChipLeadingLocationBar[];
-extern const char kEnableOriginChipTrailingLocationBar[];
-extern const char kEnableOriginChipLeadingMenuButton[];
-extern const char kEnableOriginChipV2[];
-extern const char kEnableOriginChipV2HideOnMouseRelease[];
-extern const char kEnableOriginChipV2HideOnUserInput[];
-extern const char kEnableOriginChipV2OnSrp[];
+extern const char kEnableOriginChipAlways[];
+extern const char kEnableOriginChipOnSrp[];
 extern const char kEnablePanels[];
 extern const char kEnablePermissionsBubbles[];
 extern const char kEnableQueryExtraction[];
@@ -413,12 +406,6 @@ extern const char kDebugPrint[];
 
 #ifndef NDEBUG
 extern const char kFileManagerExtensionPath[];
-#endif
-
-#if defined(GOOGLE_CHROME_BUILD)
-extern const char kDisablePrintPreview[];
-#else
-extern const char kEnablePrintPreview[];
 #endif
 
 // DON'T ADD RANDOM STUFF HERE. Put it in the main section above in

@@ -200,6 +200,7 @@ class CONTENT_EXPORT WebContentsImpl
   virtual SiteInstance* GetSiteInstance() const OVERRIDE;
   virtual SiteInstance* GetPendingSiteInstance() const OVERRIDE;
   virtual bool IsLoading() const OVERRIDE;
+  virtual bool IsLoadingToDifferentDocument() const OVERRIDE;
   virtual bool IsWaitingForResponse() const OVERRIDE;
   virtual const net::LoadStateWithParam& GetLoadState() const OVERRIDE;
   virtual const base::string16& GetLoadStateHost() const OVERRIDE;
@@ -517,7 +518,7 @@ class CONTENT_EXPORT WebContentsImpl
       RenderViewHost* render_view_host,
       int opener_route_id,
       int proxy_routing_id,
-      CrossProcessFrameConnector* frame_connector) OVERRIDE;
+      bool for_main_frame) OVERRIDE;
   virtual void BeforeUnloadFiredFromRenderManager(
       bool proceed, const base::TimeTicks& proceed_time,
       bool* proceed_to_fire_unload) OVERRIDE;
@@ -937,6 +938,10 @@ class CONTENT_EXPORT WebContentsImpl
 
   // Indicates whether we're currently loading a resource.
   bool is_loading_;
+
+  // Indicates whether the current load is to a different document. Only valid
+  // if is_loading_ is true.
+  bool is_load_to_different_document_;
 
   // Indicates if the tab is considered crashed.
   base::TerminationStatus crashed_status_;

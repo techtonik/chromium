@@ -6,20 +6,18 @@
 
 #include <string>
 
-#include "base/command_line.h"
+#include "base/bind.h"
 #include "base/threading/platform_thread.h"
 #include "chrome/browser/metrics/metrics_state_manager.h"
-#include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
+#include "components/metrics/metrics_log_base.h"
 #include "components/metrics/metrics_service_observer.h"
+#include "components/metrics/test_metrics_service_client.h"
 #include "components/variations/metrics_util.h"
-#include "content/public/common/process_type.h"
-#include "content/public/common/webplugininfo.h"
 #include "content/public/test/test_browser_thread_bundle.h"
 #include "testing/gtest/include/gtest/gtest.h"
-#include "ui/gfx/size.h"
 
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/metrics/metrics_log_chromeos.h"
@@ -31,14 +29,12 @@ using metrics::MetricsLogManager;
 
 class TestMetricsService : public MetricsService {
  public:
-  explicit TestMetricsService(metrics::MetricsStateManager* state_manager)
-      : MetricsService(state_manager) {
-  }
+  TestMetricsService(metrics::MetricsStateManager* state_manager,
+                     metrics::MetricsServiceClient* client)
+      : MetricsService(state_manager, client) {}
   virtual ~TestMetricsService() {}
 
-  MetricsLogManager* log_manager() {
-    return &log_manager_;
-  }
+  using MetricsService::log_manager;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(TestMetricsService);
@@ -61,8 +57,10 @@ class TestMetricsLogChromeOS : public MetricsLogChromeOS {
 
 class TestMetricsLog : public MetricsLog {
  public:
-  TestMetricsLog(const std::string& client_id, int session_id)
-      : MetricsLog(client_id, session_id, MetricsLog::ONGOING_LOG) {
+  TestMetricsLog(const std::string& client_id,
+                 int session_id,
+                 metrics::MetricsServiceClient* client)
+      : MetricsLog(client_id, session_id, MetricsLog::ONGOING_LOG, client) {
 #if defined(OS_CHROMEOS)
     metrics_log_chromeos_.reset(new TestMetricsLogChromeOS(
         MetricsLog::uma_proto()));
@@ -71,18 +69,6 @@ class TestMetricsLog : public MetricsLog {
   virtual ~TestMetricsLog() {}
 
  private:
-  virtual gfx::Size GetScreenSize() const OVERRIDE {
-    return gfx::Size(1024, 768);
-  }
-
-  virtual float GetScreenDeviceScaleFactor() const OVERRIDE {
-    return 1.0f;
-  }
-
-  virtual int GetScreenCount() const OVERRIDE {
-    return 1;
-  }
-
   DISALLOW_COPY_AND_ASSIGN(TestMetricsLog);
 };
 
@@ -90,8 +76,12 @@ class MetricsServiceTest : public testing::Test {
  public:
   MetricsServiceTest()
       : testing_local_state_(TestingBrowserProcess::GetGlobal()),
-        metrics_state_manager_(metrics::MetricsStateManager::Create(
-            GetLocalState())) {
+        is_metrics_reporting_enabled_(false),
+        metrics_state_manager_(
+            metrics::MetricsStateManager::Create(
+                GetLocalState(),
+                base::Bind(&MetricsServiceTest::is_metrics_reporting_enabled,
+                           base::Unretained(this)))) {
   }
 
   virtual ~MetricsServiceTest() {
@@ -108,9 +98,7 @@ class MetricsServiceTest : public testing::Test {
 
   // Sets metrics reporting as enabled for testing.
   void EnableMetricsReporting() {
-    // TODO(asvitkine): Refactor the code to not need this flag and delete it.
-    CommandLine::ForCurrentProcess()->AppendSwitch(
-        switches::kEnableMetricsReportingForTesting);
+    is_metrics_reporting_enabled_ = true;
   }
 
   // Waits until base::TimeTicks::Now() no longer equals |value|. This should
@@ -139,8 +127,13 @@ class MetricsServiceTest : public testing::Test {
   }
 
  private:
+  bool is_metrics_reporting_enabled() const {
+    return is_metrics_reporting_enabled_;
+  }
+
   content::TestBrowserThreadBundle thread_bundle_;
   ScopedTestingLocalState testing_local_state_;
+  bool is_metrics_reporting_enabled_;
   scoped_ptr<metrics::MetricsStateManager> metrics_state_manager_;
 
   DISALLOW_COPY_AND_ASSIGN(MetricsServiceTest);
@@ -164,20 +157,12 @@ class TestMetricsServiceObserver : public MetricsServiceObserver {
 
 }  // namespace
 
-TEST_F(MetricsServiceTest, IsPluginProcess) {
-  EXPECT_TRUE(
-      MetricsService::IsPluginProcess(content::PROCESS_TYPE_PLUGIN));
-  EXPECT_TRUE(
-      MetricsService::IsPluginProcess(content::PROCESS_TYPE_PPAPI_PLUGIN));
-  EXPECT_FALSE(
-      MetricsService::IsPluginProcess(content::PROCESS_TYPE_GPU));
-}
-
 TEST_F(MetricsServiceTest, InitialStabilityLogAfterCleanShutDown) {
   EnableMetricsReporting();
   GetLocalState()->SetBoolean(prefs::kStabilityExitedCleanly, true);
 
-  TestMetricsService service(GetMetricsStateManager());
+  metrics::TestMetricsServiceClient client;
+  TestMetricsService service(GetMetricsStateManager(), &client);
   service.InitializeMetricsRecordingState();
   // No initial stability log should be generated.
   EXPECT_FALSE(service.log_manager()->has_unsent_logs());
@@ -192,10 +177,9 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCrash) {
 
   // Save an existing system profile to prefs, to correspond to what would be
   // saved from a previous session.
-  TestMetricsLog log("client", 1);
+  metrics::TestMetricsServiceClient client;
+  TestMetricsLog log("client", 1, &client);
   log.RecordEnvironment(std::vector<metrics::MetricsProvider*>(),
-                        std::vector<content::WebPluginInfo>(),
-                        GoogleUpdateMetrics(),
                         std::vector<variations::ActiveGroupId>());
 
   // Record stability build time and version from previous session, so that
@@ -203,11 +187,11 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCrash) {
   GetLocalState()->SetInt64(prefs::kStabilityStatsBuildTime,
                             MetricsLog::GetBuildTime());
   GetLocalState()->SetString(prefs::kStabilityStatsVersion,
-                             MetricsLog::GetVersionString());
+                             client.GetVersionString());
 
   GetLocalState()->SetBoolean(prefs::kStabilityExitedCleanly, false);
 
-  TestMetricsService service(GetMetricsStateManager());
+  TestMetricsService service(GetMetricsStateManager(), &client);
   service.InitializeMetricsRecordingState();
 
   // The initial stability log should be generated and persisted in unsent logs.
@@ -235,7 +219,8 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCrash) {
 }
 
 TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
-  MetricsService service(GetMetricsStateManager());
+  metrics::TestMetricsServiceClient client;
+  MetricsService service(GetMetricsStateManager(), &client);
 
   // Add two synthetic trials and confirm that they show up in the list.
   SyntheticTrialGroup trial1(metrics::HashName("TestTrial1"),
@@ -249,7 +234,8 @@ TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
   WaitUntilTimeChanges(base::TimeTicks::Now());
 
   service.log_manager_.BeginLoggingWithLog(
-      new MetricsLog("clientID", 1, MetricsLog::INITIAL_STABILITY_LOG));
+      scoped_ptr<metrics::MetricsLogBase>(new MetricsLog(
+          "clientID", 1, MetricsLog::INITIAL_STABILITY_LOG, &client)));
   // Save the time when the log was started (it's okay for this to be greater
   // than the time recorded by the above call since it's used to ensure the
   // value changes).
@@ -285,8 +271,8 @@ TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
 
   // Start a new log and ensure all three trials appear in it.
   service.log_manager_.FinishCurrentLog();
-  service.log_manager_.BeginLoggingWithLog(
-      new MetricsLog("clientID", 1, MetricsLog::ONGOING_LOG));
+  service.log_manager_.BeginLoggingWithLog(scoped_ptr<metrics::MetricsLogBase>(
+      new MetricsLog("clientID", 1, MetricsLog::ONGOING_LOG, &client)));
   service.GetCurrentSyntheticFieldTrials(&synthetic_trials);
   EXPECT_EQ(3U, synthetic_trials.size());
   EXPECT_TRUE(HasSyntheticTrial(synthetic_trials, "TestTrial1", "Group2"));
@@ -295,45 +281,9 @@ TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
   service.log_manager_.FinishCurrentLog();
 }
 
-TEST_F(MetricsServiceTest, MetricsReportingEnabled) {
-#if !defined(OS_CHROMEOS)
-  GetLocalState()->SetBoolean(prefs::kMetricsReportingEnabled, false);
-  EXPECT_FALSE(MetricsServiceHelper::IsMetricsReportingEnabled());
-  GetLocalState()->SetBoolean(prefs::kMetricsReportingEnabled, true);
-  EXPECT_TRUE(MetricsServiceHelper::IsMetricsReportingEnabled());
-  GetLocalState()->ClearPref(prefs::kMetricsReportingEnabled);
-  EXPECT_FALSE(MetricsServiceHelper::IsMetricsReportingEnabled());
-#else
-  // ChromeOS does not register prefs::kMetricsReportingEnabled and uses
-  // device settings for metrics reporting.
-  EXPECT_FALSE(MetricsServiceHelper::IsMetricsReportingEnabled());
-#endif
-}
-
-TEST_F(MetricsServiceTest, CrashReportingEnabled) {
-#if defined(GOOGLE_CHROME_BUILD)
-// ChromeOS has different device settings for crash reporting.
-#if !defined(OS_CHROMEOS)
-#if defined(OS_ANDROID)
-  const char* crash_pref = prefs::kCrashReportingEnabled;
-#else
-  const char* crash_pref = prefs::kMetricsReportingEnabled;
-#endif
-  GetLocalState()->SetBoolean(crash_pref, false);
-  EXPECT_FALSE(MetricsServiceHelper::IsCrashReportingEnabled());
-  GetLocalState()->SetBoolean(crash_pref, true);
-  EXPECT_TRUE(MetricsServiceHelper::IsCrashReportingEnabled());
-  GetLocalState()->ClearPref(crash_pref);
-  EXPECT_FALSE(MetricsServiceHelper::IsCrashReportingEnabled());
-#endif  // !defined(OS_CHROMEOS)
-#else  // defined(GOOGLE_CHROME_BUILD)
-  // Chromium branded browsers never have crash reporting enabled.
-  EXPECT_FALSE(MetricsServiceHelper::IsCrashReportingEnabled());
-#endif  // defined(GOOGLE_CHROME_BUILD)
-}
-
 TEST_F(MetricsServiceTest, MetricsServiceObserver) {
-  MetricsService service(GetMetricsStateManager());
+  metrics::TestMetricsServiceClient client;
+  MetricsService service(GetMetricsStateManager(), &client);
   TestMetricsServiceObserver observer1;
   TestMetricsServiceObserver observer2;
 

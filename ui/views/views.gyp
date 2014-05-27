@@ -244,6 +244,8 @@
         'controls/tree/tree_view.h',
         'controls/tree/tree_view_controller.cc',
         'controls/tree/tree_view_controller.h',
+        'corewm/cursor_height_provider_win.cc',
+        'corewm/cursor_height_provider_win.h',
         'corewm/tooltip.h',
         'corewm/tooltip_aura.cc',
         'corewm/tooltip_aura.h',
@@ -296,6 +298,7 @@
         'linux_ui/status_icon_linux.h',
         'linux_ui/status_icon_linux.cc',
         'linux_ui/window_button_order_observer.h',
+        'linux_ui/window_button_order_provider.cc',
         'metrics.cc',
         'metrics.h',
         'metrics_aura.cc',
@@ -446,6 +449,8 @@
         'window/native_frame_view.h',
         'window/non_client_view.cc',
         'window/non_client_view.h',
+        'window/window_button_order_provider.cc',
+        'window/window_button_order_provider.h',
         'window/window_resources.h',
         'window/window_shape.cc',
         'window/window_shape.h',
@@ -473,6 +478,9 @@
         ['OS=="linux" and chromeos==0', {
           'dependencies': [
             '../shell_dialogs/shell_dialogs.gyp:shell_dialogs',
+          ],
+          'sources!': [
+            'window/window_button_order_provider.cc',
           ],
         }, { # OS=="linux" and chromeos==0
           'sources/': [
@@ -553,6 +561,8 @@
         '..',
       ],
       'sources': [
+        'controls/textfield/textfield_test_api.cc',
+        'controls/textfield/textfield_test_api.h',
         'corewm/tooltip_controller_test_helper.cc',
         'corewm/tooltip_controller_test_helper.h',
         'test/capture_tracking_view.cc',
@@ -685,6 +695,7 @@
         'widget/root_view_unittest.cc',
         'widget/widget_unittest.cc',
         'widget/window_reorderer_unittest.cc',
+        'window/custom_frame_view_unittest.cc',
         'window/dialog_client_view_unittest.cc',
         'window/dialog_delegate_unittest.cc',
       ],

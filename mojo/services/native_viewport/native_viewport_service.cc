@@ -7,10 +7,10 @@
 #include "base/macros.h"
 #include "base/message_loop/message_loop.h"
 #include "base/time/time.h"
+#include "mojo/geometry/geometry_type_converters.h"
 #include "mojo/public/cpp/bindings/allocation_scope.h"
 #include "mojo/public/interfaces/shell/shell.mojom.h"
 #include "mojo/services/gles2/command_buffer_impl.h"
-#include "mojo/services/native_viewport/geometry_conversions.h"
 #include "mojo/services/native_viewport/native_viewport.h"
 #include "mojo/services/native_viewport/native_viewport.mojom.h"
 #include "ui/events/event.h"
@@ -192,4 +192,3 @@ MOJO_NATIVE_VIEWPORT_EXPORT mojo::Application*
   app->AddService<mojo::services::NativeViewportImpl>(context);
   return app;
 }
-

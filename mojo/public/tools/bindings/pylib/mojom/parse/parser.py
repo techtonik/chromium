@@ -138,12 +138,11 @@ class Parser(object):
       p[0] = _ListFromConcat(p[1], p[2])
 
   def p_field(self, p):
-    """field : typename NAME default ordinal SEMI"""
-    p[0] = ('FIELD', p[1], p[2], p[4], p[3])
+    """field : typename NAME ordinal default SEMI"""
+    p[0] = ('FIELD', p[1], p[2], p[3], p[4])
 
   def p_default(self, p):
     """default : EQUALS expression
-               | EQUALS expression_object
                | """
     if len(p) > 2:
       p[0] = p[2]
@@ -257,40 +256,6 @@ class Parser(object):
 
   ### Expressions ###
 
-  def p_expression_object(self, p):
-    """expression_object : expression_array
-                         | LBRACE expression_object_elements RBRACE """
-    if len(p) < 3:
-      p[0] = p[1]
-    else:
-      p[0] = ('OBJECT', p[2])
-
-  def p_expression_object_elements(self, p):
-    """expression_object_elements : expression_object
-                                  | expression_object COMMA expression_object_elements
-                                  | """
-    if len(p) == 2:
-      p[0] = _ListFromConcat(p[1])
-    elif len(p) > 3:
-      p[0] = _ListFromConcat(p[1], p[3])
-
-  def p_expression_array(self, p):
-    """expression_array : expression
-                        | LBRACKET expression_array_elements RBRACKET """
-    if len(p) < 3:
-      p[0] = p[1]
-    else:
-      p[0] = ('ARRAY', p[2])
-
-  def p_expression_array_elements(self, p):
-    """expression_array_elements : expression_object
-                                 | expression_object COMMA expression_array_elements
-                                 | """
-    if len(p) == 2:
-      p[0] = _ListFromConcat(p[1])
-    elif len(p) > 3:
-      p[0] = _ListFromConcat(p[1], p[3])
-
   # TODO(vtl): This is now largely redundant.
   def p_expression(self, p):
     """expression : binary_expression"""
@@ -342,7 +307,6 @@ class Parser(object):
 
   def p_constant(self, p):
     """constant : INT_CONST_DEC
-                | INT_CONST_OCT
                 | INT_CONST_HEX
                 | FLOAT_CONST
                 | CHAR_CONST

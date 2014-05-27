@@ -7,6 +7,7 @@
 
 #include "ash/accelerometer/accelerometer_observer.h"
 #include "ash/ash_export.h"
+#include "ash/display/display_manager.h"
 #include "base/macros.h"
 #include "base/memory/scoped_ptr.h"
 
@@ -16,6 +17,7 @@ class EventHandler;
 
 namespace ash {
 
+class MaximizeModeControllerTest;
 class MaximizeModeEventBlocker;
 
 // MaximizeModeController listens to accelerometer events and automatically
@@ -25,6 +27,10 @@ class ASH_EXPORT MaximizeModeController : public AccelerometerObserver {
  public:
   MaximizeModeController();
   virtual ~MaximizeModeController();
+
+  bool in_set_screen_rotation() const {
+    return in_set_screen_rotation_;
+  }
 
   // True if |rotation_lock_| has been set, and OnAccelerometerUpdated will not
   // change the display rotation.
@@ -48,6 +54,8 @@ class ASH_EXPORT MaximizeModeController : public AccelerometerObserver {
                                       const gfx::Vector3dF& lid) OVERRIDE;
 
  private:
+  friend class MaximizeModeControllerTest;
+
   // Detect hinge rotation from |base| and |lid| accelerometers and
   // automatically start / stop maximize mode.
   void HandleHingeRotation(const gfx::Vector3dF& base,
@@ -56,6 +64,10 @@ class ASH_EXPORT MaximizeModeController : public AccelerometerObserver {
   // Detect screen rotation from |lid| accelerometer and automatically rotate
   // screen.
   void HandleScreenRotation(const gfx::Vector3dF& lid);
+
+  // Sets the display rotation and suppresses display notifications.
+  void SetDisplayRotation(DisplayManager* display_manager,
+                          gfx::Display::Rotation rotation);
 
   // An event targeter controller which traps mouse and keyboard events while
   // maximize mode is engaged.
@@ -69,6 +81,9 @@ class ASH_EXPORT MaximizeModeController : public AccelerometerObserver {
 
   // Whether we have ever seen accelerometer data.
   bool have_seen_accelerometer_data_;
+
+  // True when the screen's orientation is being changed.
+  bool in_set_screen_rotation_;
 
   DISALLOW_COPY_AND_ASSIGN(MaximizeModeController);
 };

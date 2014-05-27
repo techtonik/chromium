@@ -215,6 +215,7 @@ LayerTreeHostImpl::LayerTreeHostImpl(
     int id)
     : client_(client),
       proxy_(proxy),
+      use_gpu_rasterization_(false),
       input_handler_client_(NULL),
       did_lock_scrolling_layer_(false),
       should_bubble_scrolls_(false),
@@ -301,11 +302,7 @@ LayerTreeHostImpl::~LayerTreeHostImpl() {
   recycle_tree_.reset();
   pending_tree_.reset();
   active_tree_.reset();
-  tile_manager_.reset();
-  resource_pool_.reset();
-  raster_worker_pool_.reset();
-  direct_raster_worker_pool_.reset();
-  staging_resource_pool_.reset();
+  DestroyTileManager();
 }
 
 void LayerTreeHostImpl::BeginMainFrameAborted(bool did_handle) {
@@ -572,7 +569,10 @@ static DrawMode GetDrawMode(OutputSurface* output_surface) {
     return DRAW_MODE_HARDWARE;
   } else {
     DCHECK_EQ(!output_surface->software_device(),
-              output_surface->capabilities().delegated_rendering);
+              output_surface->capabilities().delegated_rendering &&
+                  !output_surface->capabilities().deferred_gl_initialization)
+        << output_surface->capabilities().delegated_rendering << " "
+        << output_surface->capabilities().deferred_gl_initialization;
     return DRAW_MODE_SOFTWARE;
   }
 }
@@ -1520,6 +1520,26 @@ bool LayerTreeHostImpl::IsContextLost() {
   return renderer_ && renderer_->IsContextLost();
 }
 
+void LayerTreeHostImpl::SetUseGpuRasterization(bool use_gpu) {
+  if (use_gpu == use_gpu_rasterization_)
+    return;
+
+  use_gpu_rasterization_ = use_gpu;
+  ReleaseTreeResources();
+
+  // Replace existing tile manager with another one that uses appropriate
+  // rasterizer.
+  if (tile_manager_) {
+    DestroyTileManager();
+    CreateAndSetTileManager();
+  }
+
+  // We have released tilings for both active and pending tree.
+  // We would not have any content to draw until the pending tree is activated.
+  // Prevent the active tree from drawing until activation.
+  active_tree_->SetRequiresHighResToDraw();
+}
+
 const RendererCapabilitiesImpl&
 LayerTreeHostImpl::GetRendererCapabilities() const {
   return renderer_->Capabilities();
@@ -1773,13 +1793,10 @@ void LayerTreeHostImpl::SetNeedsRedraw() {
 
 ManagedMemoryPolicy LayerTreeHostImpl::ActualManagedMemoryPolicy() const {
   ManagedMemoryPolicy actual = cached_managed_memory_policy_;
-  bool any_tree_use_gpu_rasterization =
-      (active_tree_ && active_tree_->use_gpu_rasterization()) ||
-      (pending_tree_ && pending_tree_->use_gpu_rasterization());
   if (debug_state_.rasterize_only_visible_content) {
     actual.priority_cutoff_when_visible =
         gpu::MemoryAllocation::CUTOFF_ALLOW_REQUIRED_ONLY;
-  } else if (any_tree_use_gpu_rasterization) {
+  } else if (use_gpu_rasterization()) {
     actual.priority_cutoff_when_visible =
         gpu::MemoryAllocation::CUTOFF_ALLOW_NICE_TO_HAVE;
   }
@@ -1810,24 +1827,24 @@ void LayerTreeHostImpl::ReleaseTreeResources() {
   EvictAllUIResources();
 }
 
-void LayerTreeHostImpl::CreateAndSetRenderer(
-    OutputSurface* output_surface,
-    ResourceProvider* resource_provider,
-    bool skip_gl_renderer) {
+void LayerTreeHostImpl::CreateAndSetRenderer() {
   DCHECK(!renderer_);
-  if (output_surface->capabilities().delegated_rendering) {
+  DCHECK(output_surface_);
+  DCHECK(resource_provider_);
+
+  if (output_surface_->capabilities().delegated_rendering) {
     renderer_ = DelegatingRenderer::Create(
-        this, &settings_, output_surface, resource_provider);
-  } else if (output_surface->context_provider() && !skip_gl_renderer) {
+        this, &settings_, output_surface_.get(), resource_provider_.get());
+  } else if (output_surface_->context_provider()) {
     renderer_ = GLRenderer::Create(this,
                                    &settings_,
-                                   output_surface,
-                                   resource_provider,
+                                   output_surface_.get(),
+                                   resource_provider_.get(),
                                    texture_mailbox_deleter_.get(),
                                    settings_.highp_threshold_min);
-  } else if (output_surface->software_device()) {
+  } else if (output_surface_->software_device()) {
     renderer_ = SoftwareRenderer::Create(
-        this, &settings_, output_surface, resource_provider);
+        this, &settings_, output_surface_.get(), resource_provider_.get());
   }
   DCHECK(renderer_);
 
@@ -1843,67 +1860,96 @@ void LayerTreeHostImpl::CreateAndSetRenderer(
   client_->UpdateRendererCapabilitiesOnImplThread();
 }
 
-void LayerTreeHostImpl::CreateAndSetTileManager(
-    ResourceProvider* resource_provider,
-    ContextProvider* context_provider,
-    bool use_zero_copy,
-    bool use_one_copy,
-    bool allow_rasterize_on_demand) {
+void LayerTreeHostImpl::CreateAndSetTileManager() {
+  DCHECK(!tile_manager_);
   DCHECK(settings_.impl_side_painting);
-  DCHECK(resource_provider);
+  DCHECK(output_surface_);
+  DCHECK(resource_provider_);
   DCHECK(proxy_->ImplThreadTaskRunner());
 
+  ContextProvider* context_provider = output_surface_->context_provider();
   transfer_buffer_memory_limit_ =
       GetMaxTransferBufferUsageBytes(context_provider);
 
-  if (use_zero_copy) {
+  if (use_gpu_rasterization_ && context_provider) {
     resource_pool_ =
-        ResourcePool::Create(resource_provider,
+        ResourcePool::Create(resource_provider_.get(),
+                             GL_TEXTURE_2D,
+                             resource_provider_->best_texture_format());
+
+    raster_worker_pool_ =
+        DirectRasterWorkerPool::Create(proxy_->ImplThreadTaskRunner(),
+                                       resource_provider_.get(),
+                                       context_provider);
+  } else if (UseZeroCopyTextureUpload()) {
+    resource_pool_ =
+        ResourcePool::Create(resource_provider_.get(),
                              GetMapImageTextureTarget(context_provider),
-                             resource_provider->best_texture_format());
+                             resource_provider_->best_texture_format());
+
     raster_worker_pool_ =
         ImageRasterWorkerPool::Create(proxy_->ImplThreadTaskRunner(),
                                       RasterWorkerPool::GetTaskGraphRunner(),
-                                      resource_provider);
-  } else if (use_one_copy) {
+                                      resource_provider_.get());
+  } else if (UseOneCopyTextureUpload()) {
     // We need to create a staging resource pool when using copy rasterizer.
     staging_resource_pool_ =
-        ResourcePool::Create(resource_provider,
+        ResourcePool::Create(resource_provider_.get(),
                              GetMapImageTextureTarget(context_provider),
-                             resource_provider->best_texture_format());
+                             resource_provider_->best_texture_format());
     resource_pool_ =
-        ResourcePool::Create(resource_provider,
+        ResourcePool::Create(resource_provider_.get(),
                              GL_TEXTURE_2D,
-                             resource_provider->best_texture_format());
+                             resource_provider_->best_texture_format());
 
     raster_worker_pool_ = ImageCopyRasterWorkerPool::Create(
         proxy_->ImplThreadTaskRunner(),
         RasterWorkerPool::GetTaskGraphRunner(),
-        resource_provider,
+        resource_provider_.get(),
         staging_resource_pool_.get());
   } else {
+    resource_pool_ = ResourcePool::Create(
+        resource_provider_.get(),
+        GL_TEXTURE_2D,
+        resource_provider_->memory_efficient_texture_format());
+
     raster_worker_pool_ = PixelBufferRasterWorkerPool::Create(
         proxy_->ImplThreadTaskRunner(),
         RasterWorkerPool::GetTaskGraphRunner(),
-        resource_provider,
+        resource_provider_.get(),
         transfer_buffer_memory_limit_);
-    resource_pool_ = ResourcePool::Create(
-        resource_provider,
-        GL_TEXTURE_2D,
-        resource_provider->memory_efficient_texture_format());
   }
-  direct_raster_worker_pool_ = DirectRasterWorkerPool::Create(
-      proxy_->ImplThreadTaskRunner(), resource_provider, context_provider);
+
   tile_manager_ =
       TileManager::Create(this,
                           resource_pool_.get(),
                           raster_worker_pool_->AsRasterizer(),
-                          direct_raster_worker_pool_->AsRasterizer(),
-                          allow_rasterize_on_demand,
+                          GetRendererCapabilities().allow_rasterize_on_demand,
                           rendering_stats_instrumentation_);
 
   UpdateTileManagerMemoryPolicy(ActualManagedMemoryPolicy());
   need_to_update_visible_tiles_before_draw_ = false;
+}
+
+void LayerTreeHostImpl::DestroyTileManager() {
+  tile_manager_.reset();
+  resource_pool_.reset();
+  staging_resource_pool_.reset();
+  raster_worker_pool_.reset();
+}
+
+bool LayerTreeHostImpl::UseZeroCopyTextureUpload() const {
+  // Note: we use zero-copy by default when the renderer is using
+  // shared memory resources.
+  return (settings_.use_zero_copy ||
+          GetRendererCapabilities().using_shared_memory_resources) &&
+         GetRendererCapabilities().using_map_image;
+}
+
+bool LayerTreeHostImpl::UseOneCopyTextureUpload() const {
+  // Sync query support is required by one-copy rasterizer.
+  return settings_.use_one_copy && GetRendererCapabilities().using_map_image &&
+         resource_provider_->use_sync_query();
 }
 
 void LayerTreeHostImpl::EnforceZeroBudget(bool zero_budget) {
@@ -1923,55 +1969,32 @@ bool LayerTreeHostImpl::InitializeRenderer(
 
   // Note: order is important here.
   renderer_.reset();
-  tile_manager_.reset();
-  resource_pool_.reset();
-  staging_resource_pool_.reset();
-  raster_worker_pool_.reset();
-  direct_raster_worker_pool_.reset();
+  DestroyTileManager();
   resource_provider_.reset();
   output_surface_.reset();
 
   if (!output_surface->BindToClient(this))
     return false;
 
-  scoped_ptr<ResourceProvider> resource_provider =
-      ResourceProvider::Create(output_surface.get(),
+  output_surface_ = output_surface.Pass();
+  resource_provider_ =
+      ResourceProvider::Create(output_surface_.get(),
                                shared_bitmap_manager_,
                                settings_.highp_threshold_min,
                                settings_.use_rgba_4444_textures,
                                settings_.texture_id_allocation_chunk_size,
                                settings_.use_distance_field_text);
 
-  if (output_surface->capabilities().deferred_gl_initialization)
+  if (output_surface_->capabilities().deferred_gl_initialization)
     EnforceZeroBudget(true);
 
-  bool skip_gl_renderer = false;
-  CreateAndSetRenderer(
-      output_surface.get(), resource_provider.get(), skip_gl_renderer);
+  CreateAndSetRenderer();
 
   transfer_buffer_memory_limit_ =
-      GetMaxTransferBufferUsageBytes(output_surface->context_provider().get());
+      GetMaxTransferBufferUsageBytes(output_surface_->context_provider());
 
-  if (settings_.impl_side_painting) {
-    // Note: we use zero-copy rasterizer by default when the renderer is using
-    // shared memory resources.
-    bool use_zero_copy =
-        (settings_.use_zero_copy ||
-         GetRendererCapabilities().using_shared_memory_resources) &&
-        GetRendererCapabilities().using_map_image;
-
-    // Sync query support is required by one-copy rasterizer.
-    bool use_one_copy = settings_.use_one_copy &&
-                        GetRendererCapabilities().using_map_image &&
-                        resource_provider->use_sync_query();
-
-    CreateAndSetTileManager(
-        resource_provider.get(),
-        output_surface->context_provider().get(),
-        use_zero_copy,
-        use_one_copy,
-        GetRendererCapabilities().allow_rasterize_on_demand);
-  }
+  if (settings_.impl_side_painting)
+    CreateAndSetTileManager();
 
   // Initialize vsync parameters to sane values.
   const base::TimeDelta display_refresh_interval =
@@ -1981,20 +2004,15 @@ bool LayerTreeHostImpl::InitializeRenderer(
 
   // TODO(brianderson): Don't use a hard-coded parent draw time.
   base::TimeDelta parent_draw_time =
-      output_surface->capabilities().adjust_deadline_for_parent
+      output_surface_->capabilities().adjust_deadline_for_parent
           ? BeginFrameArgs::DefaultDeadlineAdjustment()
           : base::TimeDelta();
   client_->SetEstimatedParentDrawTime(parent_draw_time);
 
-  int max_frames_pending =
-      output_surface->capabilities().max_frames_pending;
+  int max_frames_pending = output_surface_->capabilities().max_frames_pending;
   if (max_frames_pending <= 0)
     max_frames_pending = OutputSurface::DEFAULT_MAX_FRAMES_PENDING;
   client_->SetMaxSwapsPendingOnImplThread(max_frames_pending);
-
-  resource_provider_ = resource_provider.Pass();
-  output_surface_ = output_surface.Pass();
-
   client_->OnCanDrawStateChanged(CanDraw());
 
   return true;
@@ -2015,9 +2033,7 @@ void LayerTreeHostImpl::DeferredInitialize() {
 
   resource_provider_->InitializeGL();
 
-  bool skip_gl_renderer = false;
-  CreateAndSetRenderer(
-      output_surface_.get(), resource_provider_.get(), skip_gl_renderer);
+  CreateAndSetRenderer();
 
   EnforceZeroBudget(false);
   client_->SetNeedsCommitOnImplThread();
@@ -2030,25 +2046,14 @@ void LayerTreeHostImpl::ReleaseGL() {
 
   ReleaseTreeResources();
   renderer_.reset();
-  tile_manager_.reset();
-  resource_pool_.reset();
-  raster_worker_pool_.reset();
-  direct_raster_worker_pool_.reset();
-  staging_resource_pool_.reset();
+  DestroyTileManager();
   resource_provider_->InitializeSoftware();
 
-  bool skip_gl_renderer = true;
-  CreateAndSetRenderer(
-      output_surface_.get(), resource_provider_.get(), skip_gl_renderer);
+  output_surface_->ReleaseContextProvider();
+  CreateAndSetRenderer();
 
   EnforceZeroBudget(true);
-  DCHECK(GetRendererCapabilities().using_map_image);
-  CreateAndSetTileManager(resource_provider_.get(),
-                          NULL,
-                          true,
-                          false,
-                          GetRendererCapabilities().allow_rasterize_on_demand);
-  DCHECK(tile_manager_);
+  CreateAndSetTileManager();
 
   client_->SetNeedsCommitOnImplThread();
 }

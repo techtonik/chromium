@@ -235,6 +235,7 @@ bool ChromeRenderViewObserver::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ChromeViewMsg_WebUIJavaScript, OnWebUIJavaScript)
     IPC_MESSAGE_HANDLER(ChromeViewMsg_SetClientSidePhishingDetection,
                         OnSetClientSidePhishingDetection)
+    IPC_MESSAGE_HANDLER(ChromeViewMsg_SetName, OnSetName)
     IPC_MESSAGE_HANDLER(ChromeViewMsg_SetVisuallyDeemphasized,
                         OnSetVisuallyDeemphasized)
     IPC_MESSAGE_HANDLER(ChromeViewMsg_GetFPS, OnGetFPS)
@@ -358,6 +359,13 @@ void ChromeRenderViewObserver::OnSetClientSidePhishingDetection(
 #endif
 }
 
+void ChromeRenderViewObserver::OnSetName(const std::string& name) {
+  if (!render_view()->GetWebView())
+    return;
+
+  render_view()->GetWebView()->mainFrame()->setName(WebString::fromUTF8(name));
+}
+
 void ChromeRenderViewObserver::OnSetVisuallyDeemphasized(bool deemphasized) {
   bool already_deemphasized = !!dimmed_color_overlay_.get();
   if (already_deemphasized == deemphasized)
@@ -389,10 +397,10 @@ void ChromeRenderViewObserver::DidStartLoading() {
 
 void ChromeRenderViewObserver::DidStopLoading() {
   WebFrame* main_frame = render_view()->GetWebView()->mainFrame();
-  GURL osd_url = main_frame->document().openSearchDescriptionURL();
-  if (!osd_url.is_empty()) {
+  GURL osdd_url = main_frame->document().openSearchDescriptionURL();
+  if (!osdd_url.is_empty()) {
     Send(new ChromeViewHostMsg_PageHasOSDD(
-        routing_id(), render_view()->GetPageId(), osd_url,
+        routing_id(), main_frame->document().url(), osdd_url,
         search_provider::AUTODETECTED_PROVIDER));
   }
 

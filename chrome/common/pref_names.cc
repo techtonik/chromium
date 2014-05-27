@@ -1367,15 +1367,6 @@ const char kMetricsReportingEnabled[] =
 const char kMetricsReportingEnabledTimestamp[] =
     "user_experience_metrics.client_id_timestamp";
 
-// A machine ID used to detect when underlying hardware changes. It is only
-// stored locally and never transmitted in metrics reports.
-const char kMetricsMachineId[] = "user_experience_metrics.machine_id";
-
-// Boolean that indicates a cloned install has been detected and the metrics
-// client id and low entropy source should be reset.
-const char kMetricsResetIds[] =
-    "user_experience_metrics.reset_metrics_ids";
-
 // Boolean that specifies whether or not crash reports are sent
 // over the network for analysis.
 #if defined(OS_ANDROID)
@@ -2039,6 +2030,9 @@ const char kDeviceEnrollmentAutoStart[] = "enrollment.auto_start";
 // Whether the user may exit enrollment.
 const char kDeviceEnrollmentCanExit[] = "enrollment.can_exit";
 
+// How many times HID detection OOBE dialog was shown.
+const char kTimesHIDDialogShown[] = "HIDDialog.shown_how_many_times";
+
 // Dictionary of per-user Least Recently Used input method (used at login
 // screen).
 extern const char kUsersLRUInputMethod[] = "UsersLRUInputMethod";
@@ -2056,6 +2050,9 @@ const char kInitialLocale[] = "intl.initial_locale";
 
 // A boolean pref of the OOBE complete flag (first OOBE part before login).
 const char kOobeComplete[] = "OobeComplete";
+
+// The name of the screen that has to be shown if OOBE has been interrupted.
+const char kOobeScreenPending[] = "OobeScreenPending";
 
 // A boolean pref of the device registered flag (second part after first login).
 const char kDeviceRegistered[] = "DeviceRegistered";

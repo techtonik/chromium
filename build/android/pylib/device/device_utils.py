@@ -9,50 +9,16 @@ Eventually, this will be based on adb_wrapper.
 """
 # pylint: disable=W0613
 
-import multiprocessing
-import os
-import sys
+import time
 
 import pylib.android_commands
 from pylib.device import adb_wrapper
 from pylib.device import decorators
 from pylib.device import device_errors
-
-CHROME_SRC_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
-sys.path.append(os.path.join(
-    CHROME_SRC_DIR, 'third_party', 'android_testrunner'))
-import errors
+from pylib.utils import parallelizer
 
 _DEFAULT_TIMEOUT = 30
 _DEFAULT_RETRIES = 3
-
-
-# multiprocessing map_async requires a top-level function for pickle library.
-def RebootDeviceSafe(device):
-  """Reboot a device, wait for it to start, and squelch timeout exceptions."""
-  try:
-    DeviceUtils(device).old_interface.Reboot(True)
-  except errors.DeviceUnresponsiveError as e:
-    return e
-
-
-def RebootDevices():
-  """Reboot all attached and online devices."""
-  devices = pylib.android_commands.GetAttachedDevices()
-  print 'Rebooting: %s' % devices
-  if devices:
-    pool = multiprocessing.Pool(len(devices))
-    results = pool.map_async(RebootDeviceSafe, devices).get(99999)
-
-    for device, result in zip(devices, results):
-      if result:
-        print '%s failed to startup.' % device
-
-    if any(results):
-      print 'RebootDevices() Warning: %s' % results
-    else:
-      print 'Reboots complete.'
 
 
 @decorators.WithExplicitTimeoutAndRetries(
@@ -106,9 +72,10 @@ class DeviceUtils(object):
       raise ValueError('Unsupported type passed for argument "device"')
     self._default_timeout = default_timeout
     self._default_retries = default_retries
+    assert(hasattr(self, decorators.DEFAULT_TIMEOUT_ATTR))
+    assert(hasattr(self, decorators.DEFAULT_RETRIES_ATTR))
 
-  @decorators.WithTimeoutAndRetriesFromInstance(
-      '_default_timeout', '_default_retries')
+  @decorators.WithTimeoutAndRetriesFromInstance()
   def IsOnline(self, timeout=None, retries=None):
     """ Checks whether the device is online.
 
@@ -122,8 +89,7 @@ class DeviceUtils(object):
     """
     return self.old_interface.IsOnline()
 
-  @decorators.WithTimeoutAndRetriesFromInstance(
-      '_default_timeout', '_default_retries')
+  @decorators.WithTimeoutAndRetriesFromInstance()
   def HasRoot(self, timeout=None, retries=None):
     """ Checks whether or not adbd has root privileges.
 
@@ -135,8 +101,7 @@ class DeviceUtils(object):
     """
     return self.old_interface.IsRootEnabled()
 
-  @decorators.WithTimeoutAndRetriesFromInstance(
-      '_default_timeout', '_default_retries')
+  @decorators.WithTimeoutAndRetriesFromInstance()
   def EnableRoot(self, timeout=None, retries=None):
     """ Restarts adbd with root privileges.
 
@@ -149,4 +114,71 @@ class DeviceUtils(object):
     if not self.old_interface.EnableAdbRoot():
       raise device_errors.CommandFailedError(
           'adb root', 'Could not enable root.')
+
+  @decorators.WithTimeoutAndRetriesFromInstance()
+  def GetExternalStoragePath(self, timeout=None, retries=None):
+    """ Get the device's path to its SD card.
+
+    Args:
+      timeout: Same as for |IsOnline|.
+      retries: Same as for |IsOnline|.
+    Returns:
+      The device's path to its SD card.
+    """
+    try:
+      return self.old_interface.GetExternalStorage()
+    except AssertionError as e:
+      raise device_errors.CommandFailedError(str(e))
+
+  @decorators.WithTimeoutAndRetriesFromInstance()
+  def WaitUntilFullyBooted(self, wifi=False, timeout=None, retries=None):
+    """ Wait for the device to fully boot.
+
+    This means waiting for the device to boot, the package manager to be
+    available, and the SD card to be ready. It can optionally mean waiting
+    for wifi to come up, too.
+
+    Args:
+      wifi: A boolean indicating if we should wait for wifi to come up or not.
+      timeout: Same as for |IsOnline|.
+      retries: Same as for |IsOnline|.
+    Raises:
+      CommandTimeoutError if one of the component waits times out.
+      DeviceUnreachableError if the device becomes unresponsive.
+    """
+    self.old_interface.WaitForSystemBootCompleted(timeout)
+    self.old_interface.WaitForDevicePm()
+    self.old_interface.WaitForSdCardReady(timeout)
+    if wifi:
+      while not 'Wi-Fi is enabled' in (
+          self.old_interface.RunShellCommand('dumpsys wifi')):
+        time.sleep(0.1)
+
+  def __str__(self):
+    """Returns the device serial."""
+    return self.old_interface.GetDevice()
+
+  @staticmethod
+  def parallel(devices=None, async=False):
+    """ Creates a Parallelizer to operate over the provided list of devices.
+
+    If |devices| is either |None| or an empty list, the Parallelizer will
+    operate over all attached devices.
+
+    Args:
+      devices: A list of either DeviceUtils instances or objects from
+               from which DeviceUtils instances can be constructed. If None,
+               all attached devices will be used.
+      async: If true, returns a Parallelizer that runs operations
+             asynchronously.
+    Returns:
+      A Parallelizer operating over |devices|.
+    """
+    if not devices or len(devices) == 0:
+      devices = pylib.android_commands.GetAttachedDevices()
+    parallelizer_type = (parallelizer.Parallelizer if async
+                         else parallelizer.SyncParallelizer)
+    return parallelizer_type([
+        d if isinstance(d, DeviceUtils) else DeviceUtils(d)
+        for d in devices])
 

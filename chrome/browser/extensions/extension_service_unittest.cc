@@ -678,7 +678,8 @@ class ExtensionServiceTest
                    content::NotificationService::AllSources());
     registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED,
                    content::NotificationService::AllSources());
-    registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_INSTALLED,
+    registrar_.Add(this,
+                   chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
                    content::NotificationService::AllSources());
   }
 
@@ -711,7 +712,7 @@ class ExtensionServiceTest
         loaded_.erase(i);
         break;
       }
-      case chrome::NOTIFICATION_EXTENSION_INSTALLED: {
+      case chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED: {
         const extensions::InstalledExtensionInfo* installed_info =
             content::Details<const extensions::InstalledExtensionInfo>(details)
                 .ptr();
@@ -3018,6 +3019,19 @@ bool IsExtension(const Extension* extension) {
   return extension->GetType() == Manifest::TYPE_EXTENSION;
 }
 
+#if defined(ENABLE_BLACKLIST_TESTS)
+std::set<std::string> StringSet(const std::string& s) {
+  std::set<std::string> set;
+  set.insert(s);
+  return set;
+}
+std::set<std::string> StringSet(const std::string& s1, const std::string& s2) {
+  std::set<std::string> set = StringSet(s1);
+  set.insert(s2);
+  return set;
+}
+#endif  // defined(ENABLE_BLACKLIST_TESTS)
+
 }  // namespace
 
 // Test adding a pending extension.
@@ -3645,6 +3659,35 @@ TEST_F(ExtensionServiceTest, GreylistUnknownDontChange) {
   EXPECT_TRUE(enabled_extensions.Contains(good2));
   EXPECT_FALSE(disabled_extensions.Contains(good2));
 }
+
+// Tests that blacklisted extensions cannot be reloaded, both those loaded
+// before and after extension service startup.
+TEST_F(ExtensionServiceTest, ReloadBlacklistedExtension) {
+  extensions::TestBlacklist test_blacklist;
+
+  InitializeGoodInstalledExtensionService();
+  test_blacklist.Attach(service_->blacklist_);
+
+  test_blacklist.SetBlacklistState(
+      good1, extensions::BLACKLISTED_MALWARE, false);
+  service_->Init();
+  test_blacklist.SetBlacklistState(
+      good2, extensions::BLACKLISTED_MALWARE, false);
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_EQ(StringSet(good0), registry_->enabled_extensions().GetIDs());
+  EXPECT_EQ(StringSet(good1, good2),
+            registry_->blacklisted_extensions().GetIDs());
+
+  service_->ReloadExtension(good1);
+  service_->ReloadExtension(good2);
+  base::RunLoop().RunUntilIdle();
+
+  EXPECT_EQ(StringSet(good0), registry_->enabled_extensions().GetIDs());
+  EXPECT_EQ(StringSet(good1, good2),
+            registry_->blacklisted_extensions().GetIDs());
+}
+
 #endif  // defined(ENABLE_BLACKLIST_TESTS)
 
 // Will not install extension blacklisted by policy.
@@ -6884,12 +6927,13 @@ TEST_F(ExtensionServiceTest, InstallBlacklistedExtension) {
       syncer::StringOrdinal(),
       false /* has requirement errors */,
       extensions::BLACKLISTED_MALWARE,
+      false /* is ephemeral */,
       false /* wait for idle */);
   base::RunLoop().RunUntilIdle();
 
   // Extension was installed but not loaded.
   EXPECT_TRUE(notifications.CheckNotifications(
-      chrome::NOTIFICATION_EXTENSION_INSTALLED));
+      chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED));
   EXPECT_TRUE(service_->GetInstalledExtension(id));
 
   EXPECT_FALSE(registry_->enabled_extensions().Contains(id));

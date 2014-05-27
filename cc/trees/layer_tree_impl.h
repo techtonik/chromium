@@ -88,6 +88,8 @@ class CC_EXPORT LayerTreeImpl {
   scoped_ptr<ScrollbarAnimationController> CreateScrollbarAnimationController(
       LayerImpl* scrolling_layer);
   void DidAnimateScrollOffset();
+  bool use_gpu_rasterization() const;
+  bool create_low_res_tiling() const;
 
   // Tree specific methods exposed to layer-impl tree.
   // ---------------------------------------------------------------------------
@@ -163,9 +165,6 @@ class CC_EXPORT LayerTreeImpl {
     sent_page_scale_delta_ = delta;
   }
   float sent_page_scale_delta() const { return sent_page_scale_delta_; }
-
-  void SetUseGpuRasterization(bool use_gpu);
-  bool use_gpu_rasterization() const { return use_gpu_rasterization_; }
 
   // Updates draw properties and render surface layer list, as well as tile
   // priorities.
@@ -298,7 +297,6 @@ class CC_EXPORT LayerTreeImpl {
   // List of visible layers for the most recently prepared frame.
   LayerImplList render_surface_layer_list_;
 
-  bool use_gpu_rasterization_;
   bool contents_textures_purged_;
   bool requires_high_res_to_draw_;
   bool viewport_size_invalid_;

@@ -248,12 +248,6 @@ void RecordAppLaunches(Profile* profile,
   }
 }
 
-bool IsNewTabURL(Profile* profile, const GURL& url) {
-  GURL ntp_url(chrome::kChromeUINewTabURL);
-  return url == ntp_url ||
-         (url.is_empty() && profile->GetHomePage() == ntp_url);
-}
-
 class WebContentsCloseObserver : public content::NotificationObserver {
  public:
   WebContentsCloseObserver() : contents_(NULL) {}
@@ -807,7 +801,7 @@ Browser* StartupBrowserCreatorImpl::OpenTabsInBrowser(
 #if defined(ENABLE_RLZ) && !defined(OS_IOS)
     if (process_startup && google_util::IsGoogleHomePageUrl(tabs[i].url)) {
       params.extra_headers = RLZTracker::GetAccessPointHttpHeader(
-          RLZTracker::CHROME_HOME_PAGE);
+          RLZTracker::ChromeHomePage());
     }
 #endif  // defined(ENABLE_RLZ) && !defined(OS_IOS)
 
@@ -845,7 +839,11 @@ void StartupBrowserCreatorImpl::AddInfoBarsIfNecessary(
     return;
 
   if (HasPendingUncleanExit(browser->profile())) {
-    if (!command_line_.HasSwitch(switches::kEnableSessionCrashedBubble) ||
+    // Can't use command_line_ here because command_line_ isn't set to have
+    // correct values when a profile window is opened after the browser starts
+    // up (via profile switcher). See function FindOrCreateNewWindowForProfile.
+    if (!CommandLine::ForCurrentProcess()->HasSwitch(
+            switches::kEnableSessionCrashedBubble) ||
         !ShowSessionCrashedBubble(browser))
       SessionCrashedInfoBarDelegate::Create(browser);
   }
@@ -933,7 +931,8 @@ void StartupBrowserCreatorImpl::AddStartupURLs(
       // If the first URL is the NTP, replace it with the sync promo. This
       // behavior is desired because completing or skipping the sync promo
       // causes a redirect to the NTP.
-      if (!startup_urls->empty() && IsNewTabURL(profile_, startup_urls->at(0)))
+      if (!startup_urls->empty() &&
+          startup_urls->at(0) == GURL(chrome::kChromeUINewTabURL))
         startup_urls->at(0) = sync_promo_url;
       else
         startup_urls->insert(startup_urls->begin(), sync_promo_url);

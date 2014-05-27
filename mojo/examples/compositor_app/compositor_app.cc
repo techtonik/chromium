@@ -8,12 +8,12 @@
 #include "base/macros.h"
 #include "base/message_loop/message_loop.h"
 #include "mojo/examples/compositor_app/compositor_host.h"
+#include "mojo/geometry/geometry_type_converters.h"
 #include "mojo/public/cpp/bindings/allocation_scope.h"
 #include "mojo/public/cpp/gles2/gles2.h"
 #include "mojo/public/cpp/shell/application.h"
 #include "mojo/public/cpp/system/core.h"
 #include "mojo/public/interfaces/shell/shell.mojom.h"
-#include "mojo/services/native_viewport/geometry_conversions.h"
 #include "mojo/services/native_viewport/native_viewport.mojom.h"
 #include "ui/gfx/rect.h"
 
@@ -36,7 +36,7 @@ class SampleApp : public Application, public NativeViewportClient {
     AllocationScope scope;
 
     ConnectTo("mojo:mojo_native_viewport_service", &viewport_);
-    viewport_->SetClient(this);
+    viewport_.set_client(this);
 
     viewport_->Create(gfx::Rect(10, 10, 800, 600));
     viewport_->Show();

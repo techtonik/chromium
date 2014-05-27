@@ -108,6 +108,8 @@ HttpStreamFactoryImpl::Job::Job(HttpStreamFactoryImpl* stream_factory,
       num_streams_(0),
       spdy_session_direct_(false),
       existing_available_pipeline_(false),
+      job_status_(STATUS_RUNNING),
+      other_job_status_(STATUS_RUNNING),
       ptr_factory_(this) {
   DCHECK(stream_factory);
   DCHECK(session);
@@ -516,6 +518,8 @@ int HttpStreamFactoryImpl::Job::RunLoop(int result) {
     }
 
     case OK:
+      job_status_ = STATUS_SUCCEEDED;
+      MaybeMarkAlternateProtocolBroken();
       next_state_ = STATE_DONE;
       if (new_spdy_session_.get()) {
         base::MessageLoop::current()->PostTask(
@@ -537,6 +541,11 @@ int HttpStreamFactoryImpl::Job::RunLoop(int result) {
       return ERR_IO_PENDING;
 
     default:
+      if (job_status_ != STATUS_BROKEN) {
+        DCHECK_EQ(STATUS_RUNNING, job_status_);
+        job_status_ = STATUS_FAILED;
+        MaybeMarkAlternateProtocolBroken();
+      }
       base::MessageLoop::current()->PostTask(
           FROM_HERE,
           base::Bind(&Job::OnStreamFailedCallback, ptr_factory_.GetWeakPtr(),
@@ -848,31 +857,32 @@ int HttpStreamFactoryImpl::Job::DoInitConnection() {
         request_info_.privacy_mode,
         net_log_,
         num_streams_);
-  } else {
-    // If we can't use a SPDY session, don't both checking for one after
-    // the hostname is resolved.
-    OnHostResolutionCallback resolution_callback = CanUseExistingSpdySession() ?
-        base::Bind(&Job::OnHostResolution, session_->spdy_session_pool(),
-                   GetSpdySessionKey()) :
-        OnHostResolutionCallback();
-    if (stream_factory_->for_websockets_) {
-      // TODO(ricea): Re-enable NPN when WebSockets over SPDY is supported.
-      SSLConfig websocket_server_ssl_config = server_ssl_config_;
-      websocket_server_ssl_config.next_protos.clear();
-      return InitSocketHandleForWebSocketRequest(
-          origin_url_, request_info_.extra_headers, request_info_.load_flags,
-          priority_, session_, proxy_info_, ShouldForceSpdySSL(),
-          want_spdy_over_npn, websocket_server_ssl_config, proxy_ssl_config_,
-          request_info_.privacy_mode, net_log_,
-          connection_.get(), resolution_callback, io_callback_);
-    }
-    return InitSocketHandleForHttpRequest(
+  }
+
+  // If we can't use a SPDY session, don't both checking for one after
+  // the hostname is resolved.
+  OnHostResolutionCallback resolution_callback = CanUseExistingSpdySession() ?
+      base::Bind(&Job::OnHostResolution, session_->spdy_session_pool(),
+                 GetSpdySessionKey()) :
+      OnHostResolutionCallback();
+  if (stream_factory_->for_websockets_) {
+    // TODO(ricea): Re-enable NPN when WebSockets over SPDY is supported.
+    SSLConfig websocket_server_ssl_config = server_ssl_config_;
+    websocket_server_ssl_config.next_protos.clear();
+    return InitSocketHandleForWebSocketRequest(
         origin_url_, request_info_.extra_headers, request_info_.load_flags,
         priority_, session_, proxy_info_, ShouldForceSpdySSL(),
-        want_spdy_over_npn, server_ssl_config_, proxy_ssl_config_,
+        want_spdy_over_npn, websocket_server_ssl_config, proxy_ssl_config_,
         request_info_.privacy_mode, net_log_,
         connection_.get(), resolution_callback, io_callback_);
   }
+
+  return InitSocketHandleForHttpRequest(
+      origin_url_, request_info_.extra_headers, request_info_.load_flags,
+      priority_, session_, proxy_info_, ShouldForceSpdySSL(),
+      want_spdy_over_npn, server_ssl_config_, proxy_ssl_config_,
+      request_info_.privacy_mode, net_log_,
+      connection_.get(), resolution_callback, io_callback_);
 }
 
 int HttpStreamFactoryImpl::Job::DoInitConnectionComplete(int result) {
@@ -979,21 +989,21 @@ int HttpStreamFactoryImpl::Job::DoInitConnectionComplete(int result) {
     return result;
   }
 
+  if (!ssl_started && result < 0 && original_url_.get()) {
+    job_status_ = STATUS_BROKEN;
+    MaybeMarkAlternateProtocolBroken();
+    return result;
+  }
+
   if (using_quic_) {
-    if (result < 0)
+    if (result < 0) {
+      job_status_ = STATUS_BROKEN;
+      MaybeMarkAlternateProtocolBroken();
       return result;
+    }
     stream_ = quic_request_.ReleaseStream();
     next_state_ = STATE_NONE;
     return OK;
-  }
-
-  if (!ssl_started && result < 0 && original_url_.get()) {
-    HistogramBrokenAlternateProtocolLocation(
-        BROKEN_ALTERNATE_PROTOCOL_LOCATION_HTTP_STREAM_FACTORY_IMPL_JOB);
-    // Mark the alternate protocol as broken and fallback.
-    session_->http_server_properties()->SetBrokenAlternateProtocol(
-        HostPortPair::FromURL(*original_url_));
-    return result;
   }
 
   if (result < 0 && !ssl_started)
@@ -1119,18 +1129,25 @@ int HttpStreamFactoryImpl::Job::DoCreateStream() {
     SpdySessionPool* spdy_pool = session_->spdy_session_pool();
     spdy_session = spdy_pool->FindAvailableSession(spdy_session_key, net_log_);
     if (!spdy_session) {
-      new_spdy_session_ =
+      base::WeakPtr<SpdySession> new_spdy_session =
           spdy_pool->CreateAvailableSessionFromSocket(spdy_session_key,
                                                       connection_.Pass(),
                                                       net_log_,
                                                       spdy_certificate_error_,
                                                       using_ssl_);
+      if (!new_spdy_session->HasAcceptableTransportSecurity()) {
+        new_spdy_session->CloseSessionOnError(
+            ERR_SPDY_INADEQUATE_TRANSPORT_SECURITY, "");
+        return ERR_SPDY_INADEQUATE_TRANSPORT_SECURITY;
+      }
+
+      new_spdy_session_ = new_spdy_session;
+      spdy_session_direct_ = direct;
       const HostPortPair& host_port_pair = spdy_session_key.host_port_pair();
       base::WeakPtr<HttpServerProperties> http_server_properties =
           session_->http_server_properties();
       if (http_server_properties)
         http_server_properties->SetSupportsSpdy(host_port_pair, true);
-      spdy_session_direct_ = direct;
 
       // Create a SpdyHttpStream attached to the session;
       // OnNewSpdySessionReadyCallback is not called until an event loop
@@ -1469,6 +1486,12 @@ void HttpStreamFactoryImpl::Job::ReportJobSuccededForRequest() {
   }
 }
 
+void HttpStreamFactoryImpl::Job::MarkOtherJobComplete(const Job& job) {
+  DCHECK_EQ(STATUS_RUNNING, other_job_status_);
+  other_job_status_ = job.job_status_;
+  MaybeMarkAlternateProtocolBroken();
+}
+
 bool HttpStreamFactoryImpl::Job::IsRequestEligibleForPipelining() {
   if (IsPreconnecting() || !request_) {
     return false;
@@ -1496,6 +1519,29 @@ bool HttpStreamFactoryImpl::Job::IsRequestEligibleForPipelining() {
   }
   return stream_factory_->http_pipelined_host_pool_.IsKeyEligibleForPipelining(
       *http_pipelining_key_.get());
+}
+
+void HttpStreamFactoryImpl::Job::MaybeMarkAlternateProtocolBroken() {
+  if (job_status_ == STATUS_RUNNING || other_job_status_ == STATUS_RUNNING)
+    return;
+
+  bool is_alternate_protocol_job = original_url_.get() != NULL;
+  if (is_alternate_protocol_job) {
+    if (job_status_ == STATUS_BROKEN && other_job_status_ == STATUS_SUCCEEDED) {
+      HistogramBrokenAlternateProtocolLocation(
+          BROKEN_ALTERNATE_PROTOCOL_LOCATION_HTTP_STREAM_FACTORY_IMPL_JOB_ALT);
+      session_->http_server_properties()->SetBrokenAlternateProtocol(
+          HostPortPair::FromURL(*original_url_));
+    }
+    return;
+  }
+
+  if (job_status_ == STATUS_SUCCEEDED && other_job_status_ == STATUS_BROKEN) {
+    HistogramBrokenAlternateProtocolLocation(
+        BROKEN_ALTERNATE_PROTOCOL_LOCATION_HTTP_STREAM_FACTORY_IMPL_JOB_MAIN);
+    session_->http_server_properties()->SetBrokenAlternateProtocol(
+        HostPortPair::FromURL(request_info_.url));
+  }
 }
 
 }  // namespace net

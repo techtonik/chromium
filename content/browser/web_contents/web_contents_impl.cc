@@ -211,28 +211,10 @@ bool ForEachFrameInternal(
   return true;
 }
 
-bool ForEachPendingFrameInternal(
-    const base::Callback<void(RenderFrameHost*)>& on_frame,
-    FrameTreeNode* node) {
-  RenderFrameHost* pending_frame_host =
-      node->render_manager()->pending_frame_host();
-  if (pending_frame_host)
-    on_frame.Run(pending_frame_host);
-  return true;
-}
-
 void SendToAllFramesInternal(IPC::Message* message, RenderFrameHost* rfh) {
   IPC::Message* message_copy = new IPC::Message(*message);
   message_copy->set_routing_id(rfh->GetRoutingID());
   rfh->Send(message_copy);
-}
-
-void RunRenderFrameDeleted(
-    ObserverList<WebContentsObserver>* observer_list,
-    RenderFrameHost* render_frame_host) {
-  FOR_EACH_OBSERVER(WebContentsObserver,
-                    *observer_list,
-                    RenderFrameDeleted(render_frame_host));
 }
 
 }  // namespace
@@ -334,6 +316,7 @@ WebContentsImpl::WebContentsImpl(
       frame_tree_(new NavigatorImpl(&controller_, this),
                   this, this, this, this),
       is_loading_(false),
+      is_load_to_different_document_(false),
       crashed_status_(base::TERMINATION_STATUS_STILL_RUNNING),
       crashed_error_code_(0),
       waiting_for_response_(false),
@@ -400,23 +383,30 @@ WebContentsImpl::~WebContentsImpl() {
       Source<WebContents>(this),
       NotificationService::NoDetails());
 
-  base::Callback<void(RenderFrameHost*)> run_render_frame_deleted_callback =
-      base::Bind(&RunRenderFrameDeleted, base::Unretained(&observers_));
-  frame_tree_.ForEach(base::Bind(&ForEachPendingFrameInternal,
-                                 run_render_frame_deleted_callback));
+  // Destroy all frame tree nodes except for the root; this notifies observers.
+  frame_tree_.ResetForMainFrameSwap();
+  GetRenderManager()->ResetProxyHosts();
 
-  RenderViewHost* pending_rvh = GetRenderManager()->pending_render_view_host();
-  if (pending_rvh) {
+  // Manually call the observer methods for the root frame tree node.
+  RenderFrameHostManager* root = GetRenderManager();
+  if (root->pending_frame_host()) {
     FOR_EACH_OBSERVER(WebContentsObserver,
                       observers_,
-                      RenderViewDeleted(pending_rvh));
+                      RenderFrameDeleted(root->pending_frame_host()));
   }
+  FOR_EACH_OBSERVER(WebContentsObserver,
+                    observers_,
+                    RenderFrameDeleted(root->current_frame_host()));
 
-  ForEachFrame(run_render_frame_deleted_callback);
+  if (root->pending_render_view_host()) {
+    FOR_EACH_OBSERVER(WebContentsObserver,
+                      observers_,
+                      RenderViewDeleted(root->pending_render_view_host()));
+  }
 
   FOR_EACH_OBSERVER(WebContentsObserver,
                     observers_,
-                    RenderViewDeleted(GetRenderManager()->current_host()));
+                    RenderViewDeleted(root->current_host()));
 
   FOR_EACH_OBSERVER(WebContentsObserver,
                     observers_,
@@ -834,8 +824,12 @@ bool WebContentsImpl::IsLoading() const {
   return is_loading_;
 }
 
+bool WebContentsImpl::IsLoadingToDifferentDocument() const {
+  return is_loading_ && is_load_to_different_document_;
+}
+
 bool WebContentsImpl::IsWaitingForResponse() const {
-  return waiting_for_response_;
+  return waiting_for_response_ && is_load_to_different_document_;
 }
 
 const net::LoadStateWithParam& WebContentsImpl::GetLoadState() const {
@@ -2980,6 +2974,7 @@ void WebContentsImpl::SetIsLoading(RenderViewHost* render_view_host,
 
   is_loading_ = is_loading;
   waiting_for_response_ = is_loading;
+  is_load_to_different_document_ = to_different_document;
 
   if (delegate_)
     delegate_->LoadingStateChanged(this, to_different_document);
@@ -3182,11 +3177,18 @@ void WebContentsImpl::WorkerCrashed(RenderFrameHost* render_frame_host) {
 
 void WebContentsImpl::ShowContextMenu(RenderFrameHost* render_frame_host,
                                       const ContextMenuParams& params) {
+  ContextMenuParams context_menu_params(params);
   // Allow WebContentsDelegates to handle the context menu operation first.
-  if (delegate_ && delegate_->HandleContextMenu(params))
+  if (GetBrowserPluginGuest()) {
+    WebContentsViewGuest* view_guest =
+        static_cast<WebContentsViewGuest*>(GetView());
+    context_menu_params = view_guest->ConvertContextMenuParams(params);
+  }
+  if (delegate_ && delegate_->HandleContextMenu(context_menu_params))
     return;
 
-  render_view_host_delegate_view_->ShowContextMenu(render_frame_host, params);
+  render_view_host_delegate_view_->ShowContextMenu(render_frame_host,
+                                                   context_menu_params);
 }
 
 void WebContentsImpl::RunJavaScriptMessage(
@@ -3876,7 +3878,7 @@ bool WebContentsImpl::CreateRenderViewForRenderManager(
     RenderViewHost* render_view_host,
     int opener_route_id,
     int proxy_routing_id,
-    CrossProcessFrameConnector* frame_connector) {
+    bool for_main_frame) {
   TRACE_EVENT0("browser", "WebContentsImpl::CreateRenderViewForRenderManager");
   // Can be NULL during tests.
   RenderWidgetHostViewBase* rwh_view;
@@ -3884,10 +3886,9 @@ bool WebContentsImpl::CreateRenderViewForRenderManager(
   // until RenderWidgetHost is attached to RenderFrameHost. We need to special
   // case this because RWH is still a base class of RenderViewHost, and child
   // frame RWHVs are unique in that they do not have their own WebContents.
-  if (frame_connector) {
+  if (!for_main_frame) {
     RenderWidgetHostViewChildFrame* rwh_view_child =
         new RenderWidgetHostViewChildFrame(render_view_host);
-    frame_connector->set_view(rwh_view_child);
     rwh_view = rwh_view_child;
   } else {
     rwh_view = view_->CreateViewForWidget(render_view_host);
@@ -3942,7 +3943,7 @@ bool WebContentsImpl::CreateRenderViewForInitialEmptyDocument() {
   return CreateRenderViewForRenderManager(GetRenderViewHost(),
                                           MSG_ROUTING_NONE,
                                           MSG_ROUTING_NONE,
-                                          NULL);
+                                          true);
 }
 
 #elif defined(OS_MACOSX)

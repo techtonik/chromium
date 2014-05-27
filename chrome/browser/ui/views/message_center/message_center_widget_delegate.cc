@@ -117,7 +117,7 @@ gfx::Size MessageCenterWidgetDelegate::GetPreferredSize() const {
   return gfx::Size(preferred_width, GetHeightForWidth(preferred_width));
 }
 
-gfx::Size MessageCenterWidgetDelegate::GetMaximumSize() {
+gfx::Size MessageCenterWidgetDelegate::GetMaximumSize() const {
   gfx::Size size = GetPreferredSize();
   return size;
 }
@@ -142,7 +142,6 @@ void MessageCenterWidgetDelegate::InitWidget() {
   params.opacity = views::Widget::InitParams::TRANSLUCENT_WINDOW;
   params.delegate = this;
   params.keep_on_top = true;
-  params.top_level = true;
 #if defined(USE_ASH)
   // This class is not used in Ash; there is another container for the message
   // center that's used there.  So, we must be in a Views + Ash environment.  We

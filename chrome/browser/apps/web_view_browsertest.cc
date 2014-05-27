@@ -130,7 +130,7 @@ class WebContentsHiddenObserver : public content::WebContentsObserver {
                             const base::Closure& hidden_callback)
       : WebContentsObserver(web_contents),
         hidden_callback_(hidden_callback),
-        hidden_observed_(true) {
+        hidden_observed_(false) {
   }
 
   // WebContentsObserver.
@@ -1080,6 +1080,10 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestReload) {
 
 IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestGetProcessId) {
   TestHelper("testGetProcessId", "web_view/shim", NEEDS_TEST_SERVER);
+}
+
+IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestHiddenBeforeNavigation) {
+  TestHelper("testHiddenBeforeNavigation", "web_view/shim", NO_TEST_SERVER);
 }
 
 IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestRemoveWebviewOnExit) {

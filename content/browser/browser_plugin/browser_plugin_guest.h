@@ -322,11 +322,9 @@ class CONTENT_EXPORT BrowserPluginGuest
   void OnNavigateGuest(int instance_id, const std::string& src);
   void OnPluginDestroyed(int instance_id);
   // Resizes the guest's web contents.
-  // Overridden in tests.
-  virtual void OnResizeGuest(
+  void OnResizeGuest(
       int instance_id, const BrowserPluginHostMsg_ResizeGuest_Params& params);
-  // Overridden in tests.
-  virtual void OnSetFocus(int instance_id, bool focused);
+  void OnSetFocus(int instance_id, bool focused);
   // Sets the name of the guest so that other guests in the same partition can
   // access it.
   void OnSetName(int instance_id, const std::string& name);
@@ -395,8 +393,7 @@ class CONTENT_EXPORT BrowserPluginGuest
   void OnShowPopup(const ViewHostMsg_ShowPopup_Params& params);
 #endif
   void OnShowWidget(int route_id, const gfx::Rect& initial_pos);
-  // Overridden in tests.
-  virtual void OnTakeFocus(bool reverse);
+  void OnTakeFocus(bool reverse);
   void OnUpdateFrameName(int frame_id,
                          bool is_top_level,
                          const std::string& name);

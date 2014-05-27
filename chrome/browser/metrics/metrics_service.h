@@ -13,47 +13,38 @@
 #include <vector>
 
 #include "base/basictypes.h"
+#include "base/files/file_path.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/scoped_vector.h"
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/field_trial.h"
+#include "base/metrics/histogram_flattener.h"
+#include "base/metrics/histogram_snapshot_manager.h"
 #include "base/metrics/user_metrics.h"
 #include "base/observer_list.h"
-#include "base/process/kill.h"
+#include "base/strings/string16.h"
 #include "base/threading/thread_checker.h"
 #include "base/time/time.h"
 #include "chrome/browser/metrics/metrics_log.h"
 #include "chrome/browser/metrics/tracking_synchronizer_observer.h"
-#include "chrome/common/metrics/metrics_service_base.h"
-#include "chrome/installer/util/google_update_settings.h"
+#include "components/metrics/metrics_log_manager.h"
 #include "components/metrics/metrics_provider.h"
 #include "components/metrics/metrics_service_observer.h"
 #include "components/variations/active_field_trials.h"
 #include "content/public/browser/browser_child_process_observer.h"
-#include "content/public/browser/notification_observer.h"
-#include "content/public/browser/notification_registrar.h"
 #include "content/public/browser/user_metrics.h"
 #include "net/url_request/url_fetcher_delegate.h"
 
-#if defined(OS_ANDROID)
-#include "chrome/browser/android/activity_type_ids.h"
-#endif
-
-class ChromeBrowserMetricsServiceObserver;
+class GoogleUpdateMetricsProviderWin;
 class MetricsReportingScheduler;
 class PrefService;
 class PrefRegistrySimple;
-class Profile;
-class TemplateURLService;
-
-namespace {
-class CrashesDOMHandler;
-class FlashDOMHandler;
-}
+class PluginMetricsProvider;
 
 namespace base {
 class DictionaryValue;
+class HistogramSamples;
 class MessageLoopProxy;
 }
 
@@ -62,31 +53,15 @@ struct ActiveGroupId;
 }
 
 namespace content {
-class RenderProcessHost;
-class WebContents;
-struct WebPluginInfo;
-}
-
-namespace extensions {
-class ExtensionDownloader;
-class ManifestFetchData;
-class MetricsPrivateGetIsCrashReportingEnabledFunction;
 }
 
 namespace metrics {
+class MetricsServiceClient;
 class MetricsStateManager;
 }
 
 namespace net {
 class URLFetcher;
-}
-
-namespace prerender {
-bool IsOmniboxEnabled(Profile* profile);
-}
-
-namespace system_logs {
-class ChromeInternalLogSource;
 }
 
 namespace tracked_objects {
@@ -114,11 +89,10 @@ struct SyntheticTrialGroup {
 };
 
 class MetricsService
-    : public chrome_browser_metrics::TrackingSynchronizerObserver,
+    : public base::HistogramFlattener,
+      public chrome_browser_metrics::TrackingSynchronizerObserver,
       public content::BrowserChildProcessObserver,
-      public content::NotificationObserver,
-      public net::URLFetcherDelegate,
-      public MetricsServiceBase {
+      public net::URLFetcherDelegate {
  public:
   // The execution phase of the browser.
   enum ExecutionPhase {
@@ -132,10 +106,12 @@ class MetricsService
     SHUTDOWN_COMPLETE = 700,
   };
 
-  // Creates the MetricsService with the given |state_manager|. Does not take
-  // ownership of |state_manager|, instead stores a weak pointer to it. Caller
-  // should ensure that |state_manager| is valid for the lifetime of this class.
-  explicit MetricsService(metrics::MetricsStateManager* state_manager);
+  // Creates the MetricsService with the given |state_manager| and |client|.
+  // Does not take ownership of |state_manager| or |client|; instead stores a
+  // weak pointer to each. Caller should ensure that |state_manager| and
+  // |client| are valid for the lifetime of this class.
+  MetricsService(metrics::MetricsStateManager* state_manager,
+                 metrics::MetricsServiceClient* client);
   virtual ~MetricsService();
 
   // Initializes metrics recording state. Updates various bookkeeping values in
@@ -185,28 +161,23 @@ class MetricsService
   // At startup, prefs needs to be called with a list of all the pref names and
   // types we'll be using.
   static void RegisterPrefs(PrefRegistrySimple* registry);
-#if defined(OS_ANDROID)
-  static void RegisterPrefsAndroid(PrefRegistrySimple* registry);
-#endif  // defined(OS_ANDROID)
 
-  // Set up notifications which indicate that a user is performing work. This is
-  // useful to allow some features to sleep, until the machine becomes active,
-  // such as precluding UMA uploads unless there was recent activity.
-  static void SetUpNotifications(content::NotificationRegistrar* registrar,
-                                 content::NotificationObserver* observer);
+  // HistogramFlattener:
+  virtual void RecordDelta(const base::HistogramBase& histogram,
+                           const base::HistogramSamples& snapshot) OVERRIDE;
+  virtual void InconsistencyDetected(
+      base::HistogramBase::Inconsistency problem) OVERRIDE;
+  virtual void UniqueInconsistencyDetected(
+      base::HistogramBase::Inconsistency problem) OVERRIDE;
+  virtual void InconsistencyDetectedInLoggedCount(int amount) OVERRIDE;
 
   // Implementation of content::BrowserChildProcessObserver
-  virtual void BrowserChildProcessHostConnected(
-      const content::ChildProcessData& data) OVERRIDE;
   virtual void BrowserChildProcessCrashed(
       const content::ChildProcessData& data) OVERRIDE;
-  virtual void BrowserChildProcessInstanceCreated(
-      const content::ChildProcessData& data) OVERRIDE;
 
-  // Implementation of content::NotificationObserver
-  virtual void Observe(int type,
-                       const content::NotificationSource& source,
-                       const content::NotificationDetails& details) OVERRIDE;
+  // This should be called when the application is not idle, i.e. the user seems
+  // to be interacting with the application.
+  void OnApplicationNotIdle();
 
   // Invoked when we get a WM_SESSIONEND. This places a value in prefs that is
   // reset when RecordCompletedSessionEnd is invoked.
@@ -215,18 +186,6 @@ class MetricsService
   // This should be called when the application is shutting down. It records
   // that session end was successful.
   void RecordCompletedSessionEnd();
-
-#if defined(OS_ANDROID)
-  // Called to log launch and crash stats to preferences.
-  void LogAndroidStabilityToPrefs(PrefService* pref);
-
-  // Converts crash stats stored in the preferences into histograms.
-  void ConvertAndroidStabilityPrefsToHistograms(PrefService* pref);
-
-  // Called when the Activity that the user interacts with is swapped out.
-  void OnForegroundActivityChanged(PrefService* pref,
-                                   ActivityTypeIds::Type type);
-#endif  // defined(OS_ANDROID)
 
 #if defined(OS_ANDROID) || defined(OS_IOS)
   // Called when the application is going into background mode.
@@ -248,12 +207,6 @@ class MetricsService
   // Saves in the preferences if the browser is running under a debugger.
   // This count is eventually send via UMA logs.
   void RecordBreakpadHasDebugger(bool has_debugger);
-
-#if defined(OS_WIN)
-  // Counts (and removes) the browser crash dump attempt signals left behind by
-  // any previous browser processes which generated a crash dump.
-  void CountBrowserCrashDumpAttempts();
-#endif  // OS_WIN
 
 #if defined(OS_CHROMEOS)
   // Records a Chrome OS crash.
@@ -289,6 +242,10 @@ class MetricsService
   void CheckForClonedInstall(
       scoped_refptr<base::SingleThreadTaskRunner> task_runner);
 
+ protected:
+  // Exposed for testing.
+  metrics::MetricsLogManager* log_manager() { return &log_manager_; }
+
  private:
   // The MetricsService has a lifecycle that is stored as a state.
   // See metrics_service.cc for description of this lifecycle.
@@ -308,8 +265,6 @@ class MetricsService
     NEED_TO_SHUTDOWN = ~CLEANLY_SHUTDOWN
   };
 
-  struct ChildProcessStats;
-
   typedef std::vector<SyntheticTrialGroup> SyntheticTrialGroups;
 
   // First part of the init task. Called on the FILE thread to load hardware
@@ -321,20 +276,13 @@ class MetricsService
   // loading plugin information.
   void OnInitTaskGotHardwareClass(const std::string& hardware_class);
 
-  // Callback from PluginService::GetPlugins() that continues the init task by
-  // launching a task to gather Google Update statistics.
-  void OnInitTaskGotPluginInfo(
-      const std::vector<content::WebPluginInfo>& plugins);
+  // Called after the Plugin init task has been completed that continues the
+  // init task by launching a task to gather Google Update statistics.
+  void OnInitTaskGotPluginInfo();
 
-  // Task launched by OnInitTaskGotPluginInfo() that continues the init task by
-  // loading Google Update statistics.  Called on a blocking pool thread.
-  static void InitTaskGetGoogleUpdateData(base::WeakPtr<MetricsService> self,
-                                          base::MessageLoopProxy* target_loop);
-
-  // Callback from InitTaskGetGoogleUpdateData() that continues the init task by
-  // loading profiler data.
-  void OnInitTaskGotGoogleUpdateData(
-      const GoogleUpdateMetrics& google_update_metrics);
+  // Called after GoogleUpdate init task has been completed that continues the
+  // init task by loading profiler data.
+  void OnInitTaskGotGoogleUpdateData();
 
   void OnUserAction(const std::string& action);
 
@@ -401,13 +349,7 @@ class MetricsService
   // Starts the process of uploading metrics data.
   void StartScheduledUpload();
 
-  // Starts collecting any data that should be added to a log just before it is
-  // closed.
-  void StartFinalLogInfoCollection();
-  // Callbacks for various stages of final log info collection. Do not call
-  // these directly.
-  void OnMemoryDetailCollectionDone();
-  void OnHistogramSynchronizationDone();
+  // Called by the client when final log info collection is complete.
   void OnFinalLogInfoCollectionDone();
 
   // Either closes the current log or creates and closes the initial log
@@ -443,32 +385,12 @@ class MetricsService
   // stored as a string.
   void IncrementLongPrefsValue(const char* path);
 
-  // Records a renderer process crash.
-  void LogRendererCrash(content::RenderProcessHost* host,
-                        base::TerminationStatus status,
-                        int exit_code);
-
-  // Records a renderer process hang.
-  void LogRendererHang();
-
   // Records that the browser was shut down cleanly.
   void LogCleanShutdown();
-
-  // Returns reference to ChildProcessStats corresponding to |data|.
-  ChildProcessStats& GetChildProcessStats(
-      const content::ChildProcessData& data);
-
-  // Saves plugin-related updates from the in-object buffer to Local State
-  // for retrieval next time we send a Profile log (generally next launch).
-  void RecordPluginChanges(PrefService* pref);
 
   // Records state that should be periodically saved, like uptime and
   // buffered plugin stability statistics.
   void RecordCurrentState(PrefService* pref);
-
-  // Logs the initiation of a page load and uses |web_contents| to do
-  // additional logging of the type of page loaded.
-  void LogLoadStarted(content::WebContents* web_contents);
 
   // Checks whether events should currently be logged.
   bool ShouldLogEvents();
@@ -476,29 +398,40 @@ class MetricsService
   // Sets the value of the specified path in prefs and schedules a save.
   void RecordBooleanPrefValue(const char* path, bool value);
 
-  // Returns true if process of type |type| should be counted as a plugin
-  // process, and false otherwise.
-  static bool IsPluginProcess(int process_type);
-
   // Returns a list of synthetic field trials that were active for the entire
   // duration of the current log.
   void GetCurrentSyntheticFieldTrials(
       std::vector<variations::ActiveGroupId>* synthetic_trials);
 
+  // Creates a new MetricsLog instance with the given |log_type|.
+  scoped_ptr<MetricsLog> CreateLog(MetricsLog::LogType log_type);
+
+  // Record complete list of histograms into the current log.
+  // Called when we close a log.
+  void RecordCurrentHistograms();
+
+  // Record complete list of stability histograms into the current log,
+  // i.e., histograms with the |kUmaStabilityHistogramFlag| flag set.
+  void RecordCurrentStabilityHistograms();
+
+  // Manager for the various in-flight logs.
+  metrics::MetricsLogManager log_manager_;
+
+  // |histogram_snapshot_manager_| prepares histogram deltas for transmission.
+  base::HistogramSnapshotManager histogram_snapshot_manager_;
+
   // Used to manage various metrics reporting state prefs, such as client id,
   // low entropy source and whether metrics reporting is enabled. Weak pointer.
-  metrics::MetricsStateManager* state_manager_;
+  metrics::MetricsStateManager* const state_manager_;
+
+  // Used to interact with the embedder. Weak pointer; must outlive |this|
+  // instance.
+  metrics::MetricsServiceClient* const client_;
 
   // Registered metrics providers.
   ScopedVector<metrics::MetricsProvider> metrics_providers_;
 
   base::ActionCallback action_callback_;
-
-  content::NotificationRegistrar registrar_;
-
-  // Set to true when |ResetMetricsIDsIfNecessary| is called for the first time.
-  // This prevents multiple resets within the same Chrome session.
-  bool metrics_ids_reset_check_performed_;
 
   // Indicate whether recording and reporting are currently happening.
   // These should not be set directly, but by calling SetRecording and
@@ -523,11 +456,13 @@ class MetricsService
   // empty string.
   std::string hardware_class_;
 
-  // The list of plugins which was retrieved on the file thread.
-  std::vector<content::WebPluginInfo> plugins_;
+#if defined(ENABLE_PLUGINS)
+  PluginMetricsProvider* plugin_metrics_provider_;
+#endif
 
-  // Google Update statistics, which were retrieved on a blocking pool thread.
-  GoogleUpdateMetrics google_update_metrics_;
+#if defined(OS_WIN)
+  GoogleUpdateMetricsProviderWin* google_update_metrics_provider_;
+#endif
 
   // The initial metrics log, used to record startup metrics (histograms and
   // profiler data). Note that if a crash occurred in the previous session, an
@@ -536,12 +471,6 @@ class MetricsService
 
   // The outstanding transmission appears as a URL Fetch operation.
   scoped_ptr<net::URLFetcher> current_fetch_;
-
-  // The TCP/UDP echo server to collect network connectivity stats.
-  std::string network_stats_server_;
-
-  // The HTTP pipelining test server.
-  std::string http_pipelining_test_server_;
 
   // Whether the MetricsService object has received any notifications since
   // the last time a transmission was sent.
@@ -557,9 +486,6 @@ class MetricsService
   WindowMap window_map_;
   int next_window_id_;
 
-  // Buffer of child process notifications for quick access.
-  std::map<base::string16, ChildProcessStats> child_process_stats_buffer_;
-
   // Weak pointers factory used to post task on different threads. All weak
   // pointers managed by this factory have the same lifetime as MetricsService.
   base::WeakPtrFactory<MetricsService> self_ptr_factory_;
@@ -574,9 +500,6 @@ class MetricsService
   // Indicates that an asynchronous reporting step is running.
   // This is used only for debugging.
   bool waiting_for_asynchronous_reporting_step_;
-
-  // Number of async histogram fetch requests in progress.
-  int num_async_histogram_fetches_in_progress_;
 
   // Stores the time of the first call to |GetUptimes()|.
   base::TimeTicks first_updated_time_;
@@ -599,7 +522,7 @@ class MetricsService
   // Confirms single-threaded access to |observers_| in debug builds.
   base::ThreadChecker thread_checker_;
 
-  friend class MetricsServiceHelper;
+  friend class ChromeMetricsServiceAccessor;
 
   FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, IsPluginProcess);
   FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, MetricsServiceObserver);
@@ -608,42 +531,6 @@ class MetricsService
   FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, RegisterSyntheticTrial);
 
   DISALLOW_COPY_AND_ASSIGN(MetricsService);
-};
-
-// This class limits and documents access to metrics service helper methods.
-// Since these methods are private, each user has to be explicitly declared
-// as a 'friend' below.
-class MetricsServiceHelper {
- private:
-  friend bool prerender::IsOmniboxEnabled(Profile* profile);
-  friend class ::ChromeBrowserMetricsServiceObserver;
-  friend class ChromeRenderMessageFilter;
-  friend class ::CrashesDOMHandler;
-  friend class extensions::ExtensionDownloader;
-  friend class extensions::ManifestFetchData;
-  friend class extensions::MetricsPrivateGetIsCrashReportingEnabledFunction;
-  friend class ::FlashDOMHandler;
-  friend class system_logs::ChromeInternalLogSource;
-  FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, MetricsReportingEnabled);
-  FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, CrashReportingEnabled);
-
-  // Returns true if prefs::kMetricsReportingEnabled is set.
-  // TODO(asvitkine): Consolidate the method in MetricsStateManager.
-  // TODO(asvitkine): This function does not report the correct value on
-  // Android and ChromeOS, see http://crbug.com/362192.
-  static bool IsMetricsReportingEnabled();
-
-  // Returns true if crash reporting is enabled.  This is set at the platform
-  // level for Android and ChromeOS, and otherwise is the same as
-  // IsMetricsReportingEnabled for desktop Chrome.
-  static bool IsCrashReportingEnabled();
-
-  // Registers/unregisters |observer| to receive MetricsLog notifications
-  // from metrics service.
-  static void AddMetricsServiceObserver(MetricsServiceObserver* observer);
-  static void RemoveMetricsServiceObserver(MetricsServiceObserver* observer);
-
-  DISALLOW_IMPLICIT_CONSTRUCTORS(MetricsServiceHelper);
 };
 
 #endif  // CHROME_BROWSER_METRICS_METRICS_SERVICE_H_

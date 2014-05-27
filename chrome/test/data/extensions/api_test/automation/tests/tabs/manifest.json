@@ -11,5 +11,5 @@
     }
   ],
   "permissions": ["tabs", "http://a.com/"],
-  "automation": true
+  "automation": {"interact": true}
 }
