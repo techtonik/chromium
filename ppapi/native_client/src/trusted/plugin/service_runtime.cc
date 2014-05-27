@@ -34,8 +34,8 @@
 #include "native_client/src/trusted/nonnacl_util/sel_ldr_launcher.h"
 
 #include "native_client/src/public/imc_types.h"
+#include "native_client/src/public/nacl_file_info.h"
 #include "native_client/src/trusted/service_runtime/nacl_error_code.h"
-#include "native_client/src/trusted/validator/nacl_file_info.h"
 
 #include "ppapi/c/pp_errors.h"
 #include "ppapi/cpp/core.h"
@@ -87,12 +87,6 @@ class OpenManifestEntryAsyncCallback {
 };
 
 namespace {
-
-// For doing crude quota enforcement on writes to temp files.
-// We do not allow a temp file bigger than 128 MB for now.
-// There is currently a limit of 32M for nexe text size, so 128M
-// should be plenty for static data
-const int64_t kMaxTempQuota = 0x8000000;
 
 class ManifestService {
  public:
@@ -368,9 +362,12 @@ void PluginReverseInterface::OpenManifestEntry_MainThreadContinuation(
   if (PnaclUrls::IsPnaclComponent(mapped_url)) {
     // Special PNaCl support files, that are installed on the
     // user machine.
-    int32_t fd = PnaclResources::GetPnaclFD(
-        plugin_,
+    PP_FileHandle handle = plugin_->nacl_interface()->GetReadonlyPnaclFd(
         PnaclUrls::PnaclComponentURLToFilename(mapped_url).c_str());
+    int32_t fd = -1;
+    if (handle != PP_kInvalidFileHandle)
+      fd = ConvertFileDescriptor(handle, true);
+
     if (fd < 0) {
       // We checked earlier if the pnacl component wasn't installed
       // yet, so this shouldn't happen. At this point, we can't do much
@@ -402,40 +399,29 @@ void PluginReverseInterface::OpenManifestEntry_MainThreadContinuation(
   // Callback is now delegated from p to open_cont. So, here we manually clear
   // complete callback.
   p->callback = NULL;
+
   pp::CompletionCallback stream_cc = WeakRefNewCallback(
       anchor_,
       this,
       &PluginReverseInterface::StreamAsFile_MainThreadContinuation,
       open_cont);
 
-  if (!plugin_->StreamAsFile(mapped_url, stream_cc)) {
-    NaClLog(4,
-            "OpenManifestEntry_MainThreadContinuation: "
-            "StreamAsFile failed\n");
-    // Here, StreamAsFile is failed and stream_cc is not called.
-    // However, open_cont will be released only by the invocation.
-    // So, we manually call it here with error.
-    stream_cc.Run(PP_ERROR_FAILED);
-    return;
-  }
-
-  NaClLog(4, "OpenManifestEntry_MainThreadContinuation: StreamAsFile okay\n");
-  // p is deleted automatically
+  plugin_->StreamAsFile(mapped_url, &open_cont->pp_file_info, stream_cc);
+  // p is deleted automatically.
 }
 
 void PluginReverseInterface::StreamAsFile_MainThreadContinuation(
     OpenManifestEntryResource* p,
     int32_t result) {
-  NaClLog(4,
-          "Entered StreamAsFile_MainThreadContinuation\n");
-
+  NaClLog(4, "Entered StreamAsFile_MainThreadContinuation\n");
   {
     nacl::MutexLocker take(&mu_);
     if (result == PP_OK) {
-      NaClLog(4, "StreamAsFile_MainThreadContinuation: GetFileInfo(%s)\n",
-              p->url.c_str());
-      *p->file_info = plugin_->GetFileInfo(p->url);
-
+      // We downloaded this file to temporary storage for this plugin; it's
+      // reasonable to provide a file descriptor with write access.
+      p->file_info->desc = ConvertFileDescriptor(p->pp_file_info.handle, false);
+      p->file_info->file_token.lo = p->pp_file_info.token_lo;
+      p->file_info->file_token.hi = p->pp_file_info.token_hi;
       NaClLog(4,
               "StreamAsFile_MainThreadContinuation: PP_OK, desc %d\n",
               p->file_info->desc);
@@ -476,34 +462,7 @@ void PluginReverseInterface::ReportExitStatus(int exit_status) {
 
 int64_t PluginReverseInterface::RequestQuotaForWrite(
     nacl::string file_id, int64_t offset, int64_t bytes_to_write) {
-  NaClLog(4,
-          "PluginReverseInterface::RequestQuotaForWrite:"
-          " (file_id='%s', offset=%" NACL_PRId64 ", bytes_to_write=%"
-          NACL_PRId64 ")\n", file_id.c_str(), offset, bytes_to_write);
-  uint64_t file_key = STRTOULL(file_id.c_str(), NULL, 10);
-  nacl::MutexLocker take(&mu_);
-  if (quota_files_.count(file_key) == 0) {
-    // Look up failed to find the requested quota managed resource.
-    NaClLog(4, "PluginReverseInterface::RequestQuotaForWrite: failed...\n");
-    return 0;
-  }
-
-  // Because we now only support this interface for tempfiles which are not
-  // pepper objects, we can just do some crude quota enforcement here rather
-  // than calling out to pepper from the main thread.
-  if (offset + bytes_to_write >= kMaxTempQuota)
-    return 0;
-
   return bytes_to_write;
-}
-
-void PluginReverseInterface::AddTempQuotaManagedFile(
-    const nacl::string& file_id) {
-  NaClLog(4, "PluginReverseInterface::AddTempQuotaManagedFile: "
-          "(file_id='%s')\n", file_id.c_str());
-  uint64_t file_key = STRTOULL(file_id.c_str(), NULL, 10);
-  nacl::MutexLocker take(&mu_);
-  quota_files_.insert(file_key);
 }
 
 ServiceRuntime::ServiceRuntime(Plugin* plugin,

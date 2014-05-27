@@ -187,7 +187,7 @@ VolumeInfo CreateVolumeInfoFromMountPointInfo(
     volume_info.device_type = disk->device_type();
     volume_info.system_path_prefix =
         base::FilePath(disk->system_path_prefix());
-    volume_info.drive_label = disk->drive_label();
+    volume_info.volume_label = disk->drive_label();
     volume_info.is_parent = disk->is_parent();
     volume_info.is_read_only = disk->is_read_only();
   } else {
@@ -217,13 +217,15 @@ VolumeInfo CreateProvidedFileSystemVolumeInfo(
     const chromeos::file_system_provider::ProvidedFileSystemInfo&
         file_system_info) {
   VolumeInfo volume_info;
+  volume_info.file_system_id = file_system_info.file_system_id();
+  volume_info.extension_id = file_system_info.extension_id();
+  volume_info.volume_label = file_system_info.file_system_name();
   volume_info.type = VOLUME_TYPE_PROVIDED;
   volume_info.mount_path = file_system_info.mount_path();
   volume_info.mount_condition = chromeos::disks::MOUNT_CONDITION_NONE;
   volume_info.is_parent = true;
   volume_info.is_read_only = true;
   volume_info.volume_id = GenerateVolumeId(volume_info);
-  volume_info.file_system_id = file_system_info.file_system_id();
   return volume_info;
 }
 
@@ -237,12 +239,12 @@ std::string GetMountPointNameForMediaStorage(
 }  // namespace
 
 VolumeInfo::VolumeInfo()
-    : file_system_id(0),
-      type(VOLUME_TYPE_GOOGLE_DRIVE),
+    : type(VOLUME_TYPE_GOOGLE_DRIVE),
       device_type(chromeos::DEVICE_TYPE_UNKNOWN),
       mount_condition(chromeos::disks::MOUNT_CONDITION_NONE),
       is_parent(false),
-      is_read_only(false) {}
+      is_read_only(false) {
+}
 
 VolumeInfo::~VolumeInfo() {
 }
@@ -290,21 +292,15 @@ void VolumeManager::Initialize() {
                                       new_path);
   }
 
-  static bool added_downloads = false;
-  if (base::SysInfo::IsRunningOnChromeOS() || !added_downloads) {
-    // Register 'Downloads' folder for the profile to the file system.
-    // On non-ChromeOS system (test+development), we should do this only for
-    // the first registered profile.
-    const base::FilePath downloads =
-        file_manager::util::GetDownloadsFolderForProfile(profile_);
-    const bool success = RegisterDownloadsMountPoint(profile_, downloads);
-    added_downloads = success;
-    DCHECK(success);
+  // Register 'Downloads' folder for the profile to the file system.
+  const base::FilePath downloads =
+      file_manager::util::GetDownloadsFolderForProfile(profile_);
+  const bool success = RegisterDownloadsMountPoint(profile_, downloads);
+  DCHECK(success);
 
-    DoMountEvent(chromeos::MOUNT_ERROR_NONE,
-                 CreateDownloadsVolumeInfo(downloads),
-                 kNotRemounting);
-  }
+  DoMountEvent(chromeos::MOUNT_ERROR_NONE,
+               CreateDownloadsVolumeInfo(downloads),
+               kNotRemounting);
 
   // Subscribe to DriveIntegrationService.
   if (drive_integration_service_) {

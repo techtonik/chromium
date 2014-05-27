@@ -13,6 +13,7 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/extensions/extension_service.h"
+#include "chrome/browser/extensions/extension_ui_util.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_info_cache.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -47,10 +48,10 @@ void CreateShortcutsInApplicationsMenu(Profile* profile,
       web_app::SHORTCUT_CREATION_AUTOMATED, creation_locations, profile, app);
 }
 
-bool ShouldCreateShortcutFor(const Extension* extension) {
+bool ShouldCreateShortcutFor(Profile* profile, const Extension* extension) {
   return extension->is_platform_app() &&
       extension->location() != extensions::Manifest::COMPONENT &&
-      extension->ShouldDisplayInAppLauncher();
+      extensions::ui_util::ShouldDisplayInAppLauncher(extension, profile);
 }
 
 }  // namespace
@@ -74,7 +75,8 @@ AppShortcutManager::AppShortcutManager(Profile* profile)
              content::BrowserThread::UI) ||
          content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
 
-  registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_INSTALLED,
+  registrar_.Add(this,
+                 chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
                  content::Source<Profile>(profile_));
   registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_UNINSTALLED,
                  content::Source<Profile>(profile_));
@@ -107,7 +109,7 @@ void AppShortcutManager::Observe(int type,
       OnceOffCreateShortcuts();
       break;
     }
-    case chrome::NOTIFICATION_EXTENSION_INSTALLED: {
+    case chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED: {
 #if defined(OS_MACOSX)
       if (!apps::IsAppShimsEnabled())
         break;
@@ -123,7 +125,7 @@ void AppShortcutManager::Observe(int type,
       if (installed_info->is_update) {
         web_app::UpdateAllShortcuts(
             base::UTF8ToUTF16(installed_info->old_name), profile_, extension);
-      } else if (ShouldCreateShortcutFor(extension)) {
+      } else if (ShouldCreateShortcutFor(profile_, extension)) {
         CreateShortcutsInApplicationsMenu(profile_, extension);
       }
       break;
@@ -178,7 +180,7 @@ void AppShortcutManager::OnceOffCreateShortcuts() {
   const extensions::ExtensionSet* apps = extension_service->extensions();
   for (extensions::ExtensionSet::const_iterator it = apps->begin();
        it != apps->end(); ++it) {
-    if (ShouldCreateShortcutFor(it->get()))
+    if (ShouldCreateShortcutFor(profile_, it->get()))
       CreateShortcutsInApplicationsMenu(profile_, it->get());
   }
 }

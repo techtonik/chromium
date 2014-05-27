@@ -16,6 +16,11 @@
       ],
       'sources': [
         'metrics/metrics_provider.h',
+        'metrics/cloned_install_detector.cc',
+        'metrics/cloned_install_detector.h',
+        'metrics/machine_id_provider.h',
+        'metrics/machine_id_provider_stub.cc',
+        'metrics/machine_id_provider_win.cc',
         'metrics/metrics_hashes.cc',
         'metrics/metrics_hashes.h',
         'metrics/metrics_log_base.cc',
@@ -36,6 +41,11 @@
         ['chromeos==1', {
           'dependencies': [
             'metrics_chromeos',
+          ],
+        }],
+        ['OS=="win"', {
+          'sources!': [
+            'metrics/machine_id_provider_stub.cc',
           ],
         }],
       ],
@@ -59,6 +69,26 @@
         'proto_out_dir': 'components/metrics/proto',
       },
       'includes': [ '../build/protoc.gypi' ],
+    },
+    {
+      # TODO(isherman): Remove all //chrome dependencies on this target, and
+      # merge the files in this target with components_unittests.
+      'target_name': 'metrics_test_support',
+      'type': 'static_library',
+      'include_dirs': [
+        '..',
+      ],
+      'dependencies': [
+        'component_metrics_proto',
+        'metrics',
+      ],
+      'export_dependent_settings': [
+        'component_metrics_proto',
+      ],
+      'sources': [
+        'metrics/test_metrics_service_client.cc',
+        'metrics/test_metrics_service_client.h',
+      ],
     },
   ],
   'conditions': [

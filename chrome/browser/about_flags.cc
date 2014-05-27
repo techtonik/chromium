@@ -361,22 +361,8 @@ const Experiment::Choice kSearchButtonInOmniboxChoices[] = {
 const Experiment::Choice kOriginChipChoices[] = {
   { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
   { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED, switches::kDisableOriginChip, ""},
-  { IDS_FLAGS_ORIGIN_CHIP_TRAILING_LOCATION_BAR,
-    switches::kEnableOriginChipTrailingLocationBar, ""},
-  { IDS_FLAGS_ORIGIN_CHIP_LEADING_LOCATION_BAR,
-    switches::kEnableOriginChipLeadingLocationBar, ""},
-  { IDS_FLAGS_ORIGIN_CHIP_LEADING_MENU_BUTTON,
-    switches::kEnableOriginChipLeadingMenuButton, ""}
-};
-const Experiment::Choice kOriginChipV2Choices[] = {
-  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
-  { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED, switches::kDisableOriginChipV2, ""},
-  { IDS_FLAGS_ORIGIN_CHIP_V2_HIDE_ON_MOUSE_RELEASE,
-    switches::kEnableOriginChipV2HideOnMouseRelease, ""},
-  { IDS_FLAGS_ORIGIN_CHIP_V2_HIDE_ON_USER_INPUT,
-    switches::kEnableOriginChipV2HideOnUserInput, ""},
-  { IDS_FLAGS_ORIGIN_CHIP_V2_ON_SRP,
-    switches::kEnableOriginChipV2OnSrp, ""}
+  { IDS_FLAGS_ORIGIN_CHIP_ALWAYS, switches::kEnableOriginChipAlways, ""},
+  { IDS_FLAGS_ORIGIN_CHIP_ON_SRP, switches::kEnableOriginChipOnSrp, ""}
 };
 
 const Experiment::Choice kTouchScrollingModeChoices[] = {
@@ -1186,13 +1172,6 @@ const Experiment kExperiments[] = {
     MULTI_VALUE_TYPE(kEnableSyncAppListChoices)
   },
 #endif
-  {
-    "enable-usermedia-screen-capture",
-    IDS_FLAGS_ENABLE_SCREEN_CAPTURE_NAME,
-    IDS_FLAGS_ENABLE_SCREEN_CAPTURE_DESCRIPTION,
-    kOsDesktop,
-    SINGLE_VALUE_TYPE(switches::kEnableUserMediaScreenCapturing)
-  },
 #if defined(OS_MACOSX)
   {
     "enable-avfoundation",
@@ -1429,7 +1408,7 @@ const Experiment kExperiments[] = {
     "enable-new-profile-management",
     IDS_FLAGS_ENABLE_NEW_PROFILE_MANAGEMENT_NAME,
     IDS_FLAGS_ENABLE_NEW_PROFILE_MANAGEMENT_DESCRIPTION,
-    kOsAndroid | kOsMac | kOsWin | kOsLinux,
+    kOsAndroid | kOsMac | kOsWin | kOsLinux | kOsCrOS,
     SINGLE_VALUE_TYPE(switches::kNewProfileManagement)
   },
   {
@@ -1529,13 +1508,6 @@ const Experiment kExperiments[] = {
     MULTI_VALUE_TYPE(kZeroCopyChoices)
   },
 #if defined(OS_CHROMEOS)
-  {
-    "disable-first-run-ui",
-    IDS_FLAGS_DISABLE_FIRST_RUN_UI_NAME,
-    IDS_FLAGS_DISABLE_FIRST_RUN_UI_DESCRIPTION,
-    kOsCrOS,
-    SINGLE_VALUE_TYPE(chromeos::switches::kDisableFirstRunUI)
-  },
   {
     "enable-first-run-ui-transitions",
     IDS_FLAGS_ENABLE_FIRST_RUN_UI_TRANSITIONS_NAME,
@@ -1661,18 +1633,11 @@ const Experiment kExperiments[] = {
     MULTI_VALUE_TYPE(kNumRasterThreadsChoices)
   },
   {
-    "origin-chip",
+    "origin-chip-in-omnibox",
     IDS_FLAGS_ORIGIN_CHIP_NAME,
     IDS_FLAGS_ORIGIN_CHIP_DESCRIPTION,
-    kOsCrOS | kOsWin | kOsLinux,
-    MULTI_VALUE_TYPE(kOriginChipChoices)
-  },
-  {
-    "origin-chip-in-omnibox",
-    IDS_FLAGS_ORIGIN_CHIP_V2_NAME,
-    IDS_FLAGS_ORIGIN_CHIP_V2_DESCRIPTION,
     kOsCrOS | kOsMac | kOsWin | kOsLinux,
-    MULTI_VALUE_TYPE(kOriginChipV2Choices)
+    MULTI_VALUE_TYPE(kOriginChipChoices)
   },
   {
     "search-button-in-omnibox",
@@ -1883,6 +1848,13 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_USER_CONSENT_FOR_EXTENSION_SCRIPTS_DESCRIPTION,
     kOsAll,
     SINGLE_VALUE_TYPE(extensions::switches::kEnableScriptsRequireAction)
+  },
+  {
+    "enable-harfbuzz-rendertext",
+    IDS_FLAGS_ENABLE_HARFBUZZ_RENDERTEXT_NAME,
+    IDS_FLAGS_ENABLE_HARFBUZZ_RENDERTEXT_DESCRIPTION,
+    kOsDesktop,
+    SINGLE_VALUE_TYPE(switches::kEnableHarfBuzzRenderText)
   },
 };
 

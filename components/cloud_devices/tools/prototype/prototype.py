@@ -12,6 +12,7 @@
     sudo apt-get install python-tornado
     sudo apt-get install python-pip
     sudo pip install google-api-python-client
+    sudo pip install ecdsa
 """
 
 import atexit
@@ -41,6 +42,7 @@ _DEVICE_STATE_FILE = 'device_state.json'
 _DEVICE_SETUP_SSID = "GCDPrototype.camera.privet"
 _DEVICE_NAME = "GCD Prototype"
 _DEVICE_TYPE = "camera"
+_DEVICE_PORT = 8080
 
 DEVICE_DRAFT = {
     'systemName': 'LEDFlasher',
@@ -389,7 +391,7 @@ class MDnsWrapper(object):
     cmd = [
         'avahi-publish',
         '-s', '--subtype=_%s._sub._privet._tcp' % _DEVICE_TYPE,
-        _DEVICE_NAME, '_privet._tcp', '8080',
+        _DEVICE_NAME, '_privet._tcp', '%s' % _DEVICE_PORT,
         'txtvers=2',
         'type=%s' % _DEVICE_TYPE,
         'ty=%s' % _DEVICE_NAME,
@@ -439,7 +441,8 @@ class CloudDevice(object):
           'api_key': ''
       }
       credentials_f = open(_API_CLIENT_FILE + '.samlpe', 'w')
-      credentials_f.write(json.dumps(credentials))
+      credentials_f.write(json.dumps(credentials, sort_keys=True,
+                                     indent=2, separators=(',', ': ')))
       credentials_f.close()
       raise Exception('Missing ' + _API_CLIENT_FILE)
 
@@ -734,16 +737,20 @@ class WebRequestHandler(WifiHandler.Delegate, CloudDevice.Delegate):
 
   @get_only
   def do_public_info(self, request, unused_response_func):
-    info = self.get_common_info().items() + {
-        'stype': self.session_handlers.keys()}.items()
-    self.real_send_response(request, 200, json.dumps(info))
+    info = dict(self.get_common_info().items() + {
+        'stype': self.session_handlers.keys()}.items())
+    self.real_send_response(request, 200, info)
 
   @post_provisioning
   @get_only
   def do_info(self, request, unused_response_func):
-    specific_info = {'x-privet-token': 'sample'}
-    info = self.get_common_info().items() + specific_info.items()
-    self.real_send_response(request, 200, json.dumps(info))
+    specific_info = {
+        'x-privet-token': 'sample',
+        'api': sorted(self.handlers.keys())
+    }
+    info = dict(self.get_common_info().items() + specific_info.items())
+    self.real_send_response(request, 200, info)
+    return True
 
   @post_only
   @wifi_provisioning
@@ -808,7 +815,7 @@ class WebRequestHandler(WifiHandler.Delegate, CloudDevice.Delegate):
         'step': step,
         'package': base64.b64encode(output_package)
     }
-    self.real_send_response(request, 200, json.dumps(return_obj))
+    self.real_send_response(request, 200, return_obj)
     self.post_session_cancel()
     return True
 
@@ -935,7 +942,7 @@ class WebRequestHandler(WifiHandler.Delegate, CloudDevice.Delegate):
 
   def handle_request(self, request):
     def response_func(code, data):
-      self.real_send_response(request, code, json.dumps(data))
+      self.real_send_response(request, code, data)
 
     handled = False
     if request.path in self.handlers:
@@ -949,6 +956,7 @@ class WebRequestHandler(WifiHandler.Delegate, CloudDevice.Delegate):
                             self.current_session.encrypt(data))
 
   def real_send_response(self, request, code, data):
+    data = json.dumps(data, sort_keys=True, indent=2, separators=(',', ': '))
     request.write('HTTP/1.1 %d Maybe OK\n' % code)
     request.write('Content-Type: application/json\n')
     request.write('Content-Length: %d\n' % len(data))
@@ -1005,7 +1013,7 @@ def main():
     handler.stop()
   atexit.register(logic_stop)
   server = HTTPServer(handler.handle_request)
-  server.listen(8080)
+  server.listen(_DEVICE_PORT)
 
   ioloop.start()
 

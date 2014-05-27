@@ -19,7 +19,7 @@
 #include "native_client/src/include/nacl_macros.h"
 #include "native_client/src/include/nacl_scoped_ptr.h"
 #include "native_client/src/include/nacl_string.h"
-#include "native_client/src/trusted/validator/nacl_file_info.h"
+#include "native_client/src/public/nacl_file_info.h"
 
 #include "ppapi/c/private/ppb_nacl_private.h"
 #include "ppapi/cpp/instance.h"
@@ -49,6 +49,8 @@ namespace plugin {
 
 class ErrorInfo;
 class Manifest;
+
+int32_t ConvertFileDescriptor(PP_FileHandle handle);
 
 class Plugin : public pp::Instance {
  public:
@@ -105,13 +107,12 @@ class Plugin : public pp::Instance {
   bool LoadNaClModuleContinuation(int32_t pp_error);
 
   // Load support.
-  // A helper SRPC NaCl module can be loaded given a DescWrapper.
+  // A helper SRPC NaCl module can be loaded given a PP_FileHandle.
   // Blocks until the helper module signals initialization is done.
   // Does not update nacl_module_origin().
   // Returns NULL or the NaClSubprocess of the new helper NaCl module.
   NaClSubprocess* LoadHelperNaClModule(const nacl::string& helper_url,
-                                       nacl::DescWrapper* wrapper,
-                                       int32_t manifest_id,
+                                       PP_FileHandle file_handle,
                                        ErrorInfo* error_info);
 
   enum LengthComputable {
@@ -148,16 +149,12 @@ class Plugin : public pp::Instance {
   // event.
   void DispatchProgressEvent(int32_t result);
 
-  // Requests a URL asynchronously resulting in a call to pp_callback with
-  // a PP_Error indicating status. On success an open file descriptor
-  // corresponding to the url body is recorded for further lookup.
-  bool StreamAsFile(const nacl::string& url,
+  // Requests a URL asynchronously, resulting in a call to |callback| with
+  // an error code indicating status. On success, writes file information to
+  // |file_info|.
+  void StreamAsFile(const nacl::string& url,
+                    PP_NaClFileInfo* file_info,
                     const pp::CompletionCallback& callback);
-
-  // Returns rich information for a file retrieved by StreamAsFile(). This info
-  // contains a file descriptor. The caller must take ownership of this
-  // descriptor.
-  struct NaClFileInfo GetFileInfo(const nacl::string& url);
 
   // A helper function that indicates if |url| can be requested by the document
   // under the same-origin policy. Strictly speaking, it may be possible for the
@@ -186,10 +183,10 @@ class Plugin : public pp::Instance {
   void HistogramEnumerateLoadStatus(PP_NaClError error_code);
   void HistogramEnumerateSelLdrLoadStatus(NaClErrorCode error_code);
 
-  // Load a nacl module from the file specified in wrapper.
+  // Load a nacl module from the file specified in file_handle.
   // Only to be used from a background (non-main) thread.
   // This will fully initialize the |subprocess| if the load was successful.
-  bool LoadNaClModuleFromBackgroundThread(nacl::DescWrapper* wrapper,
+  bool LoadNaClModuleFromBackgroundThread(PP_FileHandle file_handle,
                                           NaClSubprocess* subprocess,
                                           int32_t manifest_id,
                                           const SelLdrStartParams& params);
@@ -252,16 +249,6 @@ class Plugin : public pp::Instance {
   void HistogramStartupTimeSmall(const std::string& name, float dt);
   void HistogramStartupTimeMedium(const std::string& name, float dt);
 
-  // Callback used when loading a URL for SRPC-based StreamAsFile().
-  void UrlDidOpenForStreamAsFile(int32_t pp_error,
-                                 FileDownloader* url_downloader,
-                                 pp::CompletionCallback pp_callback);
-
-  // Open an app file by requesting a file descriptor from the browser. This
-  // method first checks that the url is for an installed file before making the
-  // request so it won't slow down non-installed file downloads.
-  bool OpenURLFast(const nacl::string& url, FileDownloader* downloader);
-
   void SetExitStatusOnMainThread(int32_t pp_error, int exit_status);
 
   // Keep track of the NaCl module subprocess that was spun up in the plugin.
@@ -278,32 +265,14 @@ class Plugin : public pp::Instance {
 
   nacl::scoped_ptr<PnaclCoordinator> pnacl_coordinator_;
 
-  // Keep track of the FileDownloaders created to fetch urls.
-  std::set<FileDownloader*> url_downloaders_;
-  // Keep track of file descriptors opened by StreamAsFile().
-  // These are owned by the browser.
-  std::map<nacl::string, NaClFileInfoAutoCloser*> url_file_info_map_;
-
-  // Callback to receive .nexe and .dso download progress notifications.
-  static void UpdateDownloadProgress(
-      PP_Instance pp_instance,
-      PP_Resource pp_resource,
-      int64_t bytes_sent,
-      int64_t total_bytes_to_be_sent,
-      int64_t bytes_received,
-      int64_t total_bytes_to_be_received);
-
-  // Finds the file downloader which owns the given URL loader. This is used
-  // in UpdateDownloadProgress to map a url loader back to the URL being
-  // downloaded.
-  const FileDownloader* FindFileDownloader(PP_Resource url_loader) const;
-
   int64_t time_of_last_progress_event_;
   int exit_status_;
 
   int32_t manifest_id_;
 
   PP_FileHandle nexe_handle_;
+  uint64_t nexe_token_lo_;
+  uint64_t nexe_token_hi_;
 
   const PPB_NaCl_Private* nacl_interface_;
   pp::UMAPrivate uma_interface_;

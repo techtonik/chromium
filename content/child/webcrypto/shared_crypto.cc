@@ -47,30 +47,6 @@ bool IsValidAesKeyLengthBytes(unsigned int length_bytes) {
   return length_bytes == 16 || length_bytes == 24 || length_bytes == 32;
 }
 
-Status ToPlatformSymKey(const blink::WebCryptoKey& key,
-                        platform::SymKey** out) {
-  *out = static_cast<platform::Key*>(key.handle())->AsSymKey();
-  if (!*out)
-    return Status::ErrorUnexpectedKeyType();
-  return Status::Success();
-}
-
-Status ToPlatformPublicKey(const blink::WebCryptoKey& key,
-                           platform::PublicKey** out) {
-  *out = static_cast<platform::Key*>(key.handle())->AsPublicKey();
-  if (!*out)
-    return Status::ErrorUnexpectedKeyType();
-  return Status::Success();
-}
-
-Status ToPlatformPrivateKey(const blink::WebCryptoKey& key,
-                            platform::PrivateKey** out) {
-  *out = static_cast<platform::Key*>(key.handle())->AsPrivateKey();
-  if (!*out)
-    return Status::ErrorUnexpectedKeyType();
-  return Status::Success();
-}
-
 const size_t kAesBlockSizeBytes = 16;
 
 Status EncryptDecryptAesCbc(EncryptOrDecrypt mode,
@@ -127,36 +103,44 @@ Status EncryptDecryptAesGcm(EncryptOrDecrypt mode,
       buffer);
 }
 
-Status EncryptRsaEsPkcs1v1_5(const blink::WebCryptoAlgorithm& algorithm,
-                             const blink::WebCryptoKey& key,
-                             const CryptoData& data,
-                             std::vector<uint8>* buffer) {
+Status EncryptRsaOaep(const blink::WebCryptoAlgorithm& algorithm,
+                      const blink::WebCryptoKey& key,
+                      const CryptoData& data,
+                      std::vector<uint8>* buffer) {
   platform::PublicKey* public_key;
   Status status = ToPlatformPublicKey(key, &public_key);
   if (status.IsError())
     return status;
 
-  // RSAES encryption does not support empty input
-  if (!data.byte_length())
-    return Status::ErrorDataTooSmall();
+  const blink::WebCryptoRsaOaepParams* params = algorithm.rsaOaepParams();
+  if (!params)
+    return Status::ErrorUnexpected();
 
-  return platform::EncryptRsaEsPkcs1v1_5(public_key, data, buffer);
+  return platform::EncryptRsaOaep(public_key,
+                                  key.algorithm().rsaHashedParams()->hash(),
+                                  CryptoData(params->optionalLabel()),
+                                  data,
+                                  buffer);
 }
 
-Status DecryptRsaEsPkcs1v1_5(const blink::WebCryptoAlgorithm& algorithm,
-                             const blink::WebCryptoKey& key,
-                             const CryptoData& data,
-                             std::vector<uint8>* buffer) {
+Status DecryptRsaOaep(const blink::WebCryptoAlgorithm& algorithm,
+                      const blink::WebCryptoKey& key,
+                      const CryptoData& data,
+                      std::vector<uint8>* buffer) {
   platform::PrivateKey* private_key;
   Status status = ToPlatformPrivateKey(key, &private_key);
   if (status.IsError())
     return status;
 
-  // RSAES decryption does not support empty input
-  if (!data.byte_length())
-    return Status::ErrorDataTooSmall();
+  const blink::WebCryptoRsaOaepParams* params = algorithm.rsaOaepParams();
+  if (!params)
+    return Status::ErrorUnexpected();
 
-  return platform::DecryptRsaEsPkcs1v1_5(private_key, data, buffer);
+  return platform::DecryptRsaOaep(private_key,
+                                  key.algorithm().rsaHashedParams()->hash(),
+                                  CryptoData(params->optionalLabel()),
+                                  data,
+                                  buffer);
 }
 
 Status SignHmac(const blink::WebCryptoAlgorithm& algorithm,
@@ -265,7 +249,6 @@ blink::WebCryptoAlgorithm KeyAlgorithmToImportAlgorithm(
     const blink::WebCryptoKeyAlgorithm& algorithm) {
   switch (algorithm.paramsType()) {
     case blink::WebCryptoKeyAlgorithmParamsTypeAes:
-    case blink::WebCryptoKeyAlgorithmParamsTypeRsa:
       return CreateAlgorithm(algorithm.id());
     case blink::WebCryptoKeyAlgorithmParamsTypeHmac:
       return CreateHmacImportAlgorithm(algorithm.hmacParams()->hash().id());
@@ -273,6 +256,8 @@ blink::WebCryptoAlgorithm KeyAlgorithmToImportAlgorithm(
       return CreateRsaHashedImportAlgorithm(
           algorithm.id(), algorithm.rsaHashedParams()->hash().id());
     case blink::WebCryptoKeyAlgorithmParamsTypeNone:
+      break;
+    default:
       break;
   }
   return blink::WebCryptoAlgorithm::createNull();
@@ -300,22 +285,24 @@ bool ValidateDeserializedKey(const blink::WebCryptoKey& key,
           key.algorithm().aesParams()->lengthBits())
         return false;
       break;
-    case blink::WebCryptoKeyAlgorithmParamsTypeRsa:
     case blink::WebCryptoKeyAlgorithmParamsTypeRsaHashed:
-      if (algorithm.rsaParams()->modulusLengthBits() !=
-          key.algorithm().rsaParams()->modulusLengthBits())
+      if (algorithm.rsaHashedParams()->modulusLengthBits() !=
+          key.algorithm().rsaHashedParams()->modulusLengthBits())
         return false;
-      if (algorithm.rsaParams()->publicExponent().size() !=
-          key.algorithm().rsaParams()->publicExponent().size())
+      if (algorithm.rsaHashedParams()->publicExponent().size() !=
+          key.algorithm().rsaHashedParams()->publicExponent().size())
         return false;
-      if (memcmp(algorithm.rsaParams()->publicExponent().data(),
-                 key.algorithm().rsaParams()->publicExponent().data(),
-                 key.algorithm().rsaParams()->publicExponent().size()) != 0)
+      if (memcmp(algorithm.rsaHashedParams()->publicExponent().data(),
+                 key.algorithm().rsaHashedParams()->publicExponent().data(),
+                 key.algorithm().rsaHashedParams()->publicExponent().size()) !=
+          0)
         return false;
       break;
     case blink::WebCryptoKeyAlgorithmParamsTypeNone:
     case blink::WebCryptoKeyAlgorithmParamsTypeHmac:
       break;
+    default:
+      return false;
   }
 
   return true;
@@ -355,21 +342,6 @@ Status UnwrapKeyRaw(const CryptoData& wrapped_key_data,
                                          usage_mask,
                                          key);
     }
-    case blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5: {
-      platform::PrivateKey* platform_wrapping_key;
-      Status status =
-          ToPlatformPrivateKey(wrapping_key, &platform_wrapping_key);
-      if (status.IsError())
-        return status;
-      if (!wrapped_key_data.byte_length())
-        return Status::ErrorDataTooSmall();
-      return platform::UnwrapSymKeyRsaEs(wrapped_key_data,
-                                         platform_wrapping_key,
-                                         algorithm,
-                                         extractable,
-                                         usage_mask,
-                                         key);
-    }
     default:
       return Status::ErrorUnsupported();
   }
@@ -393,14 +365,6 @@ Status WrapKeyRaw(const blink::WebCryptoKey& key_to_wrap,
       if (status.IsError())
         return status;
       return platform::WrapSymKeyAesKw(
-          platform_key, platform_wrapping_key, buffer);
-    }
-    case blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5: {
-      platform::PublicKey* platform_wrapping_key;
-      status = ToPlatformPublicKey(wrapping_key, &platform_wrapping_key);
-      if (status.IsError())
-        return status;
-      return platform::WrapSymKeyRsaEs(
           platform_key, platform_wrapping_key, buffer);
     }
     default:
@@ -433,8 +397,8 @@ Status DecryptDontCheckKeyUsage(const blink::WebCryptoAlgorithm& algorithm,
       return EncryptDecryptAesCbc(DECRYPT, algorithm, key, data, buffer);
     case blink::WebCryptoAlgorithmIdAesGcm:
       return EncryptDecryptAesGcm(DECRYPT, algorithm, key, data, buffer);
-    case blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5:
-      return DecryptRsaEsPkcs1v1_5(algorithm, key, data, buffer);
+    case blink::WebCryptoAlgorithmIdRsaOaep:
+      return DecryptRsaOaep(algorithm, key, data, buffer);
     case blink::WebCryptoAlgorithmIdAesKw:
       return DecryptAesKw(algorithm, key, data, buffer);
     default:
@@ -453,8 +417,8 @@ Status EncryptDontCheckUsage(const blink::WebCryptoAlgorithm& algorithm,
       return EncryptDecryptAesCbc(ENCRYPT, algorithm, key, data, buffer);
     case blink::WebCryptoAlgorithmIdAesGcm:
       return EncryptDecryptAesGcm(ENCRYPT, algorithm, key, data, buffer);
-    case blink::WebCryptoAlgorithmIdRsaEsPkcs1v1_5:
-      return EncryptRsaEsPkcs1v1_5(algorithm, key, data, buffer);
+    case blink::WebCryptoAlgorithmIdRsaOaep:
+      return EncryptRsaOaep(algorithm, key, data, buffer);
     default:
       return Status::ErrorUnsupported();
   }
@@ -605,17 +569,9 @@ Status GenerateKeyPair(const blink::WebCryptoAlgorithm& algorithm,
                        blink::WebCryptoKey* private_key) {
   // TODO(padolph): Handle other asymmetric algorithm key generation.
   switch (algorithm.paramsType()) {
-    case blink::WebCryptoAlgorithmParamsTypeRsaHashedKeyGenParams:
-    case blink::WebCryptoAlgorithmParamsTypeRsaKeyGenParams: {
-      const blink::WebCryptoRsaKeyGenParams* params = NULL;
-      blink::WebCryptoAlgorithm hash_or_null =
-          blink::WebCryptoAlgorithm::createNull();
-      if (algorithm.rsaHashedKeyGenParams()) {
-        params = algorithm.rsaHashedKeyGenParams();
-        hash_or_null = algorithm.rsaHashedKeyGenParams()->hash();
-      } else {
-        params = algorithm.rsaKeyGenParams();
-      }
+    case blink::WebCryptoAlgorithmParamsTypeRsaHashedKeyGenParams: {
+      const blink::WebCryptoRsaHashedKeyGenParams* params =
+          algorithm.rsaHashedKeyGenParams();
 
       if (!params->modulusLengthBits())
         return Status::ErrorGenerateRsaZeroModulus();
@@ -629,7 +585,6 @@ Status GenerateKeyPair(const blink::WebCryptoAlgorithm& algorithm,
                                           usage_mask,
                                           params->modulusLengthBits(),
                                           publicExponent,
-                                          hash_or_null,
                                           public_key,
                                           private_key);
     }
@@ -762,7 +717,14 @@ Status WrapKey(blink::WebCryptoKeyFormat format,
 
   switch (format) {
     case blink::WebCryptoKeyFormatRaw:
-      return WrapKeyRaw(key_to_wrap, wrapping_key, wrapping_algorithm, buffer);
+      if (wrapping_algorithm.id() == blink::WebCryptoAlgorithmIdAesKw) {
+        // AES-KW is a special case, due to NSS's implementation only
+        // supporting C_Wrap/C_Unwrap with AES-KW
+        return WrapKeyRaw(
+            key_to_wrap, wrapping_key, wrapping_algorithm, buffer);
+      }
+      return WrapKeyExportAndEncrypt(
+          format, key_to_wrap, wrapping_key, wrapping_algorithm, buffer);
     case blink::WebCryptoKeyFormatJwk:
       return WrapKeyExportAndEncrypt(
           format, key_to_wrap, wrapping_key, wrapping_algorithm, buffer);
@@ -790,13 +752,25 @@ Status UnwrapKey(blink::WebCryptoKeyFormat format,
 
   switch (format) {
     case blink::WebCryptoKeyFormatRaw:
-      return UnwrapKeyRaw(wrapped_key_data,
-                          wrapping_key,
-                          wrapping_algorithm,
-                          algorithm,
-                          extractable,
-                          usage_mask,
-                          key);
+      if (wrapping_algorithm.id() == blink::WebCryptoAlgorithmIdAesKw) {
+        // AES-KW is a special case, due to NSS's implementation only
+        // supporting C_Wrap/C_Unwrap with AES-KW
+        return UnwrapKeyRaw(wrapped_key_data,
+                            wrapping_key,
+                            wrapping_algorithm,
+                            algorithm,
+                            extractable,
+                            usage_mask,
+                            key);
+      }
+      return UnwrapKeyDecryptAndImport(format,
+                                       wrapped_key_data,
+                                       wrapping_key,
+                                       wrapping_algorithm,
+                                       algorithm,
+                                       extractable,
+                                       usage_mask,
+                                       key);
     case blink::WebCryptoKeyFormatJwk:
       return UnwrapKeyDecryptAndImport(format,
                                        wrapped_key_data,
@@ -846,6 +820,30 @@ bool DeserializeKeyForClone(const blink::WebCryptoKeyAlgorithm& algorithm,
   if (status.IsError())
     return false;
   return ValidateDeserializedKey(*key, algorithm, type);
+}
+
+Status ToPlatformSymKey(const blink::WebCryptoKey& key,
+                        platform::SymKey** out) {
+  *out = static_cast<platform::Key*>(key.handle())->AsSymKey();
+  if (!*out)
+    return Status::ErrorUnexpectedKeyType();
+  return Status::Success();
+}
+
+Status ToPlatformPublicKey(const blink::WebCryptoKey& key,
+                           platform::PublicKey** out) {
+  *out = static_cast<platform::Key*>(key.handle())->AsPublicKey();
+  if (!*out)
+    return Status::ErrorUnexpectedKeyType();
+  return Status::Success();
+}
+
+Status ToPlatformPrivateKey(const blink::WebCryptoKey& key,
+                            platform::PrivateKey** out) {
+  *out = static_cast<platform::Key*>(key.handle())->AsPrivateKey();
+  if (!*out)
+    return Status::ErrorUnexpectedKeyType();
+  return Status::Success();
 }
 
 }  // namespace webcrypto

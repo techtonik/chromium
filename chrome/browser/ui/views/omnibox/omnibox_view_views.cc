@@ -225,7 +225,7 @@ void OmniboxViewViews::OnTabChanged(const content::WebContents* web_contents) {
 }
 
 void OmniboxViewViews::Update() {
-  if (chrome::ShouldDisplayOriginChip() || chrome::ShouldDisplayOriginChipV2())
+  if (chrome::ShouldDisplayOriginChip())
     set_placeholder_text(GetHintText());
 
   const ToolbarModel::SecurityLevel old_security_level = security_level_;
@@ -335,6 +335,10 @@ void OmniboxViewViews::OnNativeThemeChanged(const ui::NativeTheme* theme) {
 }
 
 void OmniboxViewViews::ExecuteCommand(int command_id, int event_flags) {
+  // In the base class, touch text selection is deactivated when a command is
+  // executed. Since we are not always calling the base class implementation
+  // here, we need to deactivate touch text selection here, too.
+  DestroyTouchSelection();
   switch (command_id) {
     // These commands don't invoke the popup via OnBefore/AfterPossibleChange().
     case IDS_PASTE_AND_GO:
@@ -1026,8 +1030,7 @@ void OmniboxViewViews::UpdateContextMenu(ui::SimpleMenuModel* menu_contents) {
 
   menu_contents->AddSeparator(ui::NORMAL_SEPARATOR);
 
-  if (chrome::IsQueryExtractionEnabled() || chrome::ShouldDisplayOriginChip() ||
-      chrome::ShouldDisplayOriginChipV2()) {
+  if (chrome::IsQueryExtractionEnabled() || chrome::ShouldDisplayOriginChip()) {
     int select_all_position = menu_contents->GetIndexOfCommandId(
         IDS_APP_SELECT_ALL);
     DCHECK_GE(select_all_position, 0);

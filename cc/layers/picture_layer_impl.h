@@ -14,7 +14,6 @@
 #include "cc/resources/picture_layer_tiling.h"
 #include "cc/resources/picture_layer_tiling_set.h"
 #include "cc/resources/picture_pile_impl.h"
-#include "cc/trees/layer_tree_impl.h"
 #include "skia/ext/refptr.h"
 #include "third_party/skia/include/core/SkPicture.h"
 
@@ -132,10 +131,6 @@ class CC_EXPORT PictureLayerImpl
 
   virtual void RunMicroBenchmark(MicroBenchmarkImpl* benchmark) OVERRIDE;
 
-  bool use_gpu_rasterization() const {
-    return layer_tree_impl()->use_gpu_rasterization();
-  }
-
   // Functions used by tile manager.
   void DidUnregisterLayer();
   PictureLayerImpl* GetTwinLayer() { return twin_layer_; }
@@ -152,9 +147,6 @@ class CC_EXPORT PictureLayerImpl
   void SyncFromActiveLayer(const PictureLayerImpl* other);
   void ManageTilings(bool animating_transform_to_screen,
                      float maximum_animation_contents_scale);
-  bool ShouldHaveLowResTiling() const {
-    return should_use_low_res_tiling_ && !use_gpu_rasterization();
-  }
   virtual bool ShouldAdjustRasterScale(
       bool animating_transform_to_screen) const;
   virtual void RecalculateRasterScales(bool animating_transform_to_screen,
@@ -213,7 +205,6 @@ class CC_EXPORT PictureLayerImpl
   // A sanity state check to make sure UpdateTilePriorities only gets called
   // after a CalculateContentsScale/ManageTilings.
   bool should_update_tile_priorities_;
-  bool should_use_low_res_tiling_;
 
   bool layer_needs_to_register_itself_;
 

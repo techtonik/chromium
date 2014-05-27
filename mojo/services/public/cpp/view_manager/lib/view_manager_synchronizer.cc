@@ -12,6 +12,8 @@
 #include "mojo/services/public/cpp/view_manager/lib/view_private.h"
 #include "mojo/services/public/cpp/view_manager/lib/view_tree_node_private.h"
 #include "mojo/services/public/cpp/view_manager/util.h"
+#include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/gfx/codec/png_codec.h"
 
 namespace mojo {
 namespace view_manager {
@@ -99,7 +101,11 @@ class ViewManagerTransaction {
     // parent.)
     TYPE_HIERARCHY,
     // View replacement.
-    TYPE_SET_ACTIVE_VIEW
+    TYPE_SET_ACTIVE_VIEW,
+    // Node bounds.
+    TYPE_SET_BOUNDS,
+    // View contents
+    TYPE_SET_VIEW_CONTENTS
   };
 
   ViewManagerTransaction(TransactionType transaction_type,
@@ -305,6 +311,98 @@ class SetActiveViewTransaction : public ViewManagerTransaction {
   DISALLOW_COPY_AND_ASSIGN(SetActiveViewTransaction);
 };
 
+class SetBoundsTransaction : public ViewManagerTransaction {
+ public:
+  SetBoundsTransaction(TransportNodeId node_id,
+                       const gfx::Rect& bounds,
+                       ViewManagerSynchronizer* synchronizer)
+      : ViewManagerTransaction(TYPE_SET_BOUNDS, synchronizer),
+        node_id_(node_id),
+        bounds_(bounds) {}
+  virtual ~SetBoundsTransaction() {}
+
+ private:
+  // Overridden from ViewManagerTransaction:
+  virtual void DoCommit() OVERRIDE {
+    AllocationScope scope;
+    service()->SetNodeBounds(node_id_, bounds_, ActionCompletedCallback());
+  }
+  virtual void DoActionCompleted(bool success) OVERRIDE {
+    // TODO(beng): recovery?
+  }
+
+  const TransportNodeId node_id_;
+  const gfx::Rect bounds_;
+
+  DISALLOW_COPY_AND_ASSIGN(SetBoundsTransaction);
+};
+
+class SetViewContentsTransaction : public ViewManagerTransaction {
+ public:
+  SetViewContentsTransaction(TransportViewId view_id,
+                             const SkBitmap& contents,
+                             ViewManagerSynchronizer* synchronizer)
+      : ViewManagerTransaction(TYPE_SET_VIEW_CONTENTS, synchronizer),
+        view_id_(view_id),
+        contents_(contents) {}
+  virtual ~SetViewContentsTransaction() {}
+
+ private:
+  // Overridden from ViewManagerTransaction:
+  virtual void DoCommit() OVERRIDE {
+    std::vector<unsigned char> data;
+    gfx::PNGCodec::EncodeBGRASkBitmap(contents_, false, &data);
+
+    void* memory = NULL;
+    ScopedSharedBufferHandle duped;
+    bool result = CreateMapAndDupSharedBuffer(data.size(),
+                                              &memory,
+                                              &shared_state_handle_,
+                                              &duped);
+    if (!result)
+      return;
+
+    memcpy(memory, &data[0], data.size());
+
+    AllocationScope scope;
+    service()->SetViewContents(view_id_, duped.Pass(),
+                               static_cast<uint32_t>(data.size()),
+                               ActionCompletedCallback());
+  }
+  virtual void DoActionCompleted(bool success) OVERRIDE {
+    // TODO(beng): recovery?
+  }
+
+  bool CreateMapAndDupSharedBuffer(size_t size,
+                                   void** memory,
+                                   ScopedSharedBufferHandle* handle,
+                                   ScopedSharedBufferHandle* duped) {
+    MojoResult result = CreateSharedBuffer(NULL, size, handle);
+    if (result != MOJO_RESULT_OK)
+      return false;
+    DCHECK(handle->is_valid());
+
+    result = DuplicateBuffer(handle->get(), NULL, duped);
+    if (result != MOJO_RESULT_OK)
+      return false;
+    DCHECK(duped->is_valid());
+
+    result = MapBuffer(
+        handle->get(), 0, size, memory, MOJO_MAP_BUFFER_FLAG_NONE);
+    if (result != MOJO_RESULT_OK)
+      return false;
+    DCHECK(*memory);
+
+    return true;
+  }
+
+  const TransportViewId view_id_;
+  const SkBitmap contents_;
+  ScopedSharedBufferHandle shared_state_handle_;
+
+  DISALLOW_COPY_AND_ASSIGN(SetViewContentsTransaction);
+};
+
 ViewManagerSynchronizer::ViewManagerSynchronizer(ViewManager* view_manager)
     : view_manager_(view_manager),
       connected_(false),
@@ -315,7 +413,7 @@ ViewManagerSynchronizer::ViewManagerSynchronizer(ViewManager* view_manager)
       init_loop_(NULL) {
   ConnectTo(ViewManagerPrivate(view_manager_).shell(), "mojo:mojo_view_manager",
             &service_);
-  service_->SetClient(this);
+  service_.set_client(this);
 
   // Start a runloop. This loop is quit when the server tells us about the
   // connection (OnConnectionEstablished()).
@@ -399,6 +497,22 @@ void ViewManagerSynchronizer::SetActiveView(TransportNodeId node_id,
   Sync();
 }
 
+void ViewManagerSynchronizer::SetBounds(TransportNodeId node_id,
+                                        const gfx::Rect& bounds) {
+  DCHECK(connected_);
+  pending_transactions_.push_back(
+      new SetBoundsTransaction(node_id, bounds, this));
+  Sync();
+}
+
+void ViewManagerSynchronizer::SetViewContents(TransportViewId view_id,
+                                              const SkBitmap& contents) {
+  DCHECK(connected_);
+  pending_transactions_.push_back(
+      new SetViewContentsTransaction(view_id, contents, this));
+  Sync();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // ViewManagerSynchronizer, IViewManagerClient implementation:
 
@@ -421,6 +535,13 @@ void ViewManagerSynchronizer::OnConnectionEstablished(
 void ViewManagerSynchronizer::OnServerChangeIdAdvanced(
     uint32_t next_server_change_id) {
   next_server_change_id_ = next_server_change_id;
+}
+
+void ViewManagerSynchronizer::OnNodeBoundsChanged(uint32 node_id,
+                                                  const Rect& old_bounds,
+                                                  const Rect& new_bounds) {
+  ViewTreeNode* node = view_manager_->GetNodeById(node_id);
+  ViewTreeNodePrivate(node).LocalSetBounds(old_bounds, new_bounds);
 }
 
 void ViewManagerSynchronizer::OnNodeHierarchyChanged(

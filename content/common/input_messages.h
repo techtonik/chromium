@@ -23,7 +23,7 @@
 #include "content/common/input/touch_action.h"
 #include "ipc/ipc_message_macros.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
-#include "ui/events/latency_info.h"
+#include "ui/events/ipc/latency_info_param_traits.h"
 #include "ui/gfx/point.h"
 #include "ui/gfx/rect.h"
 #include "ui/gfx/vector2d_f.h"
@@ -84,8 +84,7 @@ IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(content::SyntheticPinchGestureParams)
   IPC_STRUCT_TRAITS_PARENT(content::SyntheticGestureParams)
-  IPC_STRUCT_TRAITS_MEMBER(zoom_in)
-  IPC_STRUCT_TRAITS_MEMBER(total_num_pixels_covered)
+  IPC_STRUCT_TRAITS_MEMBER(scale_factor)
   IPC_STRUCT_TRAITS_MEMBER(anchor)
   IPC_STRUCT_TRAITS_MEMBER(relative_pointer_speed_in_pixels_s)
 IPC_STRUCT_TRAITS_END()

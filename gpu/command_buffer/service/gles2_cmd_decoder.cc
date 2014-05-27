@@ -948,6 +948,8 @@ class GLES2DecoderImpl : public GLES2Decoder,
 
   void DoDrawBuffersEXT(GLsizei count, const GLenum* bufs);
 
+  void DoLoseContextCHROMIUM(GLenum current, GLenum other);
+
   // Creates a Program for the given program.
   Program* CreateProgram(
       GLuint client_id, GLuint service_id) {
@@ -1716,7 +1718,9 @@ class GLES2DecoderImpl : public GLES2Decoder,
   // Backbuffer attachments that are currently undefined.
   uint32 backbuffer_needs_clear_bits_;
 
-  // The current decoder error.
+  // The current decoder error communicates the decoder error through command
+  // processing functions that do not return the error value. Should be set only
+  // if not returning an error.
   error::Error current_decoder_error_;
 
   bool use_shader_translator_;
@@ -7164,6 +7168,7 @@ error::Error GLES2DecoderImpl::HandleVertexAttribDivisorANGLE(
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION,
         "glVertexAttribDivisorANGLE", "function not available");
+    return error::kNoError;
   }
   GLuint index = c.index;
   GLuint divisor = c.divisor;
@@ -8389,6 +8394,7 @@ void GLES2DecoderImpl::DoCopyTexImage2D(
   if (texture->IsImmutable()) {
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION, "glCopyTexImage2D", "texture is immutable");
+    return;
   }
   if (!texture_manager()->ValidForTarget(target, level, width, height, 1) ||
       border != 0) {
@@ -9442,23 +9448,6 @@ void GLES2DecoderImpl::LoseContext(uint32 reset_status) {
   current_decoder_error_ = error::kLostContext;
 }
 
-error::Error GLES2DecoderImpl::HandleLoseContextCHROMIUM(
-    uint32 immediate_data_size, const cmds::LoseContextCHROMIUM& c) {
-  GLenum current = static_cast<GLenum>(c.current);
-  GLenum other = static_cast<GLenum>(c.other);
-  if (!validators_->reset_status.IsValid(current)) {
-    LOCAL_SET_GL_ERROR_INVALID_ENUM(
-        "glLoseContextCHROMIUM", current, "current");
-  }
-  if (!validators_->reset_status.IsValid(other)) {
-    LOCAL_SET_GL_ERROR_INVALID_ENUM("glLoseContextCHROMIUM", other, "other");
-  }
-  group_->LoseContexts(other);
-  reset_status_ = current;
-  current_decoder_error_ = error::kLostContext;
-  return error::kLostContext;
-}
-
 error::Error GLES2DecoderImpl::HandleInsertSyncPointCHROMIUM(
     uint32 immediate_data_size, const cmds::InsertSyncPointCHROMIUM& c) {
   return error::kUnknownCommand;
@@ -10454,6 +10443,12 @@ void GLES2DecoderImpl::DoDrawBuffersEXT(
     glDrawBuffersARB(count, &mapped_buf);
     group_->set_draw_buffer(bufs[0]);
   }
+}
+
+void GLES2DecoderImpl::DoLoseContextCHROMIUM(GLenum current, GLenum other) {
+  group_->LoseContexts(other);
+  reset_status_ = current;
+  current_decoder_error_ = error::kLostContext;
 }
 
 bool GLES2DecoderImpl::ValidateAsyncTransfer(

@@ -67,7 +67,7 @@ const JwkToWebCryptoUsage kJwkWebCryptoUsageMap[] = {
     {"encrypt", blink::WebCryptoKeyUsageEncrypt},
     {"decrypt", blink::WebCryptoKeyUsageDecrypt},
     {"deriveKey", blink::WebCryptoKeyUsageDeriveKey},
-    // TODO(padolph): Add 'deriveBits' once supported by Blink.
+    {"deriveBits", blink::WebCryptoKeyUsageDeriveBits},
     {"sign", blink::WebCryptoKeyUsageSign},
     {"unwrapKey", blink::WebCryptoKeyUsageUnwrapKey},
     {"verify", blink::WebCryptoKeyUsageVerify},
@@ -177,6 +177,11 @@ bool CreateSecretKeyAlgorithm(const blink::WebCryptoAlgorithm& algorithm,
     default:
       return false;
   }
+}
+
+bool IsAlgorithmRsa(blink::WebCryptoAlgorithmId alg_id) {
+  return alg_id == blink::WebCryptoAlgorithmIdRsaOaep ||
+         alg_id == blink::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5;
 }
 
 }  // namespace webcrypto

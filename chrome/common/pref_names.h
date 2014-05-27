@@ -432,8 +432,6 @@ extern const char kMetricsOldClientID[];
 extern const char kMetricsOldLowEntropySource[];
 extern const char kMetricsReportingEnabled[];
 extern const char kMetricsReportingEnabledTimestamp[];
-extern const char kMetricsMachineId[];
-extern const char kMetricsResetIds[];
 // Android has it's own metric / crash reporting implemented in Android
 // Java code so kMetricsReportingEnabled doesn't make sense. We use this
 // to inform crashes_ui that we have enabled crash reporting.
@@ -706,11 +704,13 @@ extern const char kDeviceRobotAnyApiRefreshToken[];
 extern const char kDeviceEnrollmentRequisition[];
 extern const char kDeviceEnrollmentAutoStart[];
 extern const char kDeviceEnrollmentCanExit[];
+extern const char kTimesHIDDialogShown[];
 extern const char kUsersLRUInputMethod[];
 extern const char kEchoCheckedOffers[];
 extern const char kCachedMultiProfileUserBehavior[];
 extern const char kInitialLocale[];
 extern const char kOobeComplete[];
+extern const char kOobeScreenPending[];
 extern const char kDeviceRegistered[];
 extern const char kUsedPolicyCertificates[];
 extern const char kServerBackedDeviceState[];

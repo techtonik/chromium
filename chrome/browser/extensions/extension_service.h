@@ -193,16 +193,12 @@ class ExtensionService
 
   // Reloads the specified extension, sending the onLaunched() event to it if it
   // currently has any window showing.
-  void ReloadExtension(const std::string extension_id);
+  void ReloadExtension(const std::string& extension_id);
 
   // Uninstalls the specified extension. Callers should only call this method
   // with extensions that exist. |external_uninstall| is a magical parameter
   // that is only used to send information to ExtensionPrefs, which external
   // callers should never set to true.
-  //
-  // We pass the |extension_id| by value to avoid having it deleted from under
-  // us incase someone calls it with Extension::id() or another string that we
-  // are going to delete in this function.
   //
   // TODO(aa): Remove |external_uninstall| -- this information should be passed
   // to ExtensionPrefs some other way.
@@ -281,6 +277,7 @@ class ExtensionService
       const syncer::StringOrdinal& page_ordinal,
       bool has_requirement_errors,
       extensions::BlacklistState blacklist_state,
+      bool is_ephemeral,
       bool wait_for_idle);
 
   // Checks for delayed installation for all pending installs.
@@ -492,6 +489,7 @@ class ExtensionService
   void AddNewOrUpdatedExtension(const extensions::Extension* extension,
                                 extensions::Extension::State initial_state,
                                 extensions::BlacklistState blacklist_state,
+                                bool is_ephemeral,
                                 const syncer::StringOrdinal& page_ordinal,
                                 const std::string& install_parameter);
 
@@ -699,8 +697,8 @@ class ExtensionService
                            UnloadBlacklistedExtensionPolicy);
   FRIEND_TEST_ALL_PREFIXES(ExtensionServiceTest,
                            WillNotLoadBlacklistedExtensionsFromDirectory);
-  FRIEND_TEST_ALL_PREFIXES(ExtensionServiceTest,
-                           BlacklistedInPrefsFromStartup);
+  FRIEND_TEST_ALL_PREFIXES(ExtensionServiceTest, ReloadBlacklistedExtension);
+  FRIEND_TEST_ALL_PREFIXES(ExtensionServiceTest, BlacklistedInPrefsFromStartup);
   FRIEND_TEST_ALL_PREFIXES(ExtensionServiceTest,
                            GreylistedExtensionDisabled);
   FRIEND_TEST_ALL_PREFIXES(ExtensionServiceTest,

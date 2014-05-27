@@ -20,9 +20,11 @@
 #include "chrome/browser/extensions/test_extension_service.h"
 #include "chrome/browser/extensions/test_extension_system.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/services/gcm/fake_gcm_app_handler.h"
 #include "chrome/browser/services/gcm/fake_gcm_client.h"
 #include "chrome/browser/services/gcm/fake_gcm_client_factory.h"
 #include "chrome/browser/services/gcm/fake_signin_manager.h"
+#include "chrome/browser/services/gcm/gcm_driver.h"
 #include "chrome/browser/services/gcm/gcm_profile_service.h"
 #include "chrome/browser/services/gcm/gcm_profile_service_factory.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
@@ -167,7 +169,14 @@ class ExtensionGCMAppHandlerTest : public testing::Test {
  public:
   static KeyedService* BuildGCMProfileService(
       content::BrowserContext* context) {
-    return new gcm::GCMProfileService(static_cast<Profile*>(context));
+    return new gcm::GCMProfileService(
+        Profile::FromBrowserContext(context),
+        scoped_ptr<gcm::GCMClientFactory>(new gcm::FakeGCMClientFactory(
+            gcm::FakeGCMClient::NO_DELAY_START,
+            content::BrowserThread::GetMessageLoopProxyForThread(
+                content::BrowserThread::UI),
+            content::BrowserThread::GetMessageLoopProxyForThread(
+                content::BrowserThread::IO))));
   }
 
   ExtensionGCMAppHandlerTest()
@@ -209,15 +218,8 @@ class ExtensionGCMAppHandlerTest : public testing::Test {
     profile()->GetPrefs()->SetBoolean(prefs::kGCMChannelEnabled, true);
 
     // Create GCMProfileService that talks with fake GCMClient.
-    gcm::GCMProfileService* gcm_profile_service =
-        static_cast<gcm::GCMProfileService*>(
-            gcm::GCMProfileServiceFactory::GetInstance()->
-                SetTestingFactoryAndUse(
-                    profile(),
-                    &ExtensionGCMAppHandlerTest::BuildGCMProfileService));
-    scoped_ptr<gcm::GCMClientFactory> gcm_client_factory(
-        new gcm::FakeGCMClientFactory(gcm::FakeGCMClient::NO_DELAY_START));
-    gcm_profile_service->Initialize(gcm_client_factory.Pass());
+    gcm::GCMProfileServiceFactory::GetInstance()->SetTestingFactoryAndUse(
+        profile(), &ExtensionGCMAppHandlerTest::BuildGCMProfileService);
 
     // Create a fake version of ExtensionGCMAppHandler.
     gcm_app_handler_.reset(new FakeExtensionGCMAppHandler(profile(), &waiter_));
@@ -288,7 +290,7 @@ class ExtensionGCMAppHandlerTest : public testing::Test {
 
   void Register(const std::string& app_id,
                 const std::vector<std::string>& sender_ids) {
-    GetGCMProfileService()->Register(
+    GetGCMDriver()->Register(
         app_id,
         sender_ids,
         base::Bind(&ExtensionGCMAppHandlerTest::RegisterCompleted,
@@ -301,12 +303,12 @@ class ExtensionGCMAppHandlerTest : public testing::Test {
     waiter_.SignalCompleted();
   }
 
-  gcm::GCMProfileService* GetGCMProfileService() const {
-    return gcm::GCMProfileServiceFactory::GetForProfile(profile());
+  gcm::GCMDriver* GetGCMDriver() const {
+    return gcm::GCMProfileServiceFactory::GetForProfile(profile())->driver();
   }
 
   bool HasAppHandlers(const std::string& app_id) const {
-    return GetGCMProfileService()->app_handlers().count(app_id);
+    return GetGCMDriver()->app_handlers().count(app_id);
   }
 
   Profile* profile() const { return profile_.get(); }
@@ -380,11 +382,19 @@ TEST_F(ExtensionGCMAppHandlerTest, UnregisterOnExtensionUninstall) {
   waiter()->WaitUntilCompleted();
   EXPECT_EQ(gcm::GCMClient::SUCCESS, registration_result());
 
+  // Add another app handler in order to prevent the GCM service from being
+  // stopped when the extension is uninstalled. This is needed because otherwise
+  // we are not able to receive the unregistration result.
+  GetGCMDriver()->AddAppHandler("Foo", gcm_app_handler());
+
   // Unregistration should be triggered when the extension is uninstalled.
   UninstallExtension(extension);
   waiter()->WaitUntilCompleted();
   EXPECT_EQ(gcm::GCMClient::SUCCESS,
             gcm_app_handler()->unregistration_result());
+
+  // Clean up.
+  GetGCMDriver()->RemoveAppHandler("Foo");
 }
 
 }  // namespace extensions

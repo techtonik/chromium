@@ -559,10 +559,6 @@ class ServiceWorkerBlackBoxBrowserTest : public ServiceWorkerBrowserTest {
     continuation.Run();
   }
 
-  int RenderProcessID() {
-    return shell()->web_contents()->GetRenderProcessHost()->GetID();
-  }
-
   void FindRegistrationOnIO(const GURL& document_url,
                             ServiceWorkerStatusCode* status,
                             GURL* script_url,
@@ -592,7 +588,21 @@ class ServiceWorkerBlackBoxBrowserTest : public ServiceWorkerBrowserTest {
   }
 };
 
+static int CountRenderProcessHosts() {
+  int result = 0;
+  for (RenderProcessHost::iterator iter(RenderProcessHost::AllHostsIterator());
+       !iter.IsAtEnd();
+       iter.Advance()) {
+    result++;
+  }
+  return result;
+}
+
 IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
+  // Close the only window to be sure we're not re-using its RenderProcessHost.
+  shell()->Close();
+  EXPECT_EQ(0, CountRenderProcessHosts());
+
   const std::string kWorkerUrl = "/service_worker/fetch_event.js";
 
   // Unregistering nothing should return true.
@@ -605,6 +615,19 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
                    run_loop.QuitClosure()));
     run_loop.Run();
   }
+
+  // If we use a worker URL that doesn't exist, registration fails.
+  {
+    base::RunLoop run_loop;
+    public_context()->RegisterServiceWorker(
+        embedded_test_server()->GetURL("/*"),
+        embedded_test_server()->GetURL("/does/not/exist"),
+        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
+                   false,
+                   run_loop.QuitClosure()));
+    run_loop.Run();
+  }
+  EXPECT_EQ(0, CountRenderProcessHosts());
 
   // Register returns when the promise would be resolved.
   {
@@ -619,6 +642,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
             run_loop.QuitClosure()));
     run_loop.Run();
   }
+  EXPECT_EQ(1, CountRenderProcessHosts());
 
   // Registering again should succeed, although the algo still
   // might not be complete.
@@ -649,6 +673,9 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
                    run_loop.QuitClosure()));
     run_loop.Run();
   }
+  EXPECT_GE(1, CountRenderProcessHosts()) << "Unregistering doesn't stop the "
+                                             "workers eagerly, so their RPHs "
+                                             "can still be running.";
 
   // Should not be able to find it.
   {

@@ -82,7 +82,6 @@ LayerTreeImpl::LayerTreeImpl(LayerTreeHostImpl* layer_tree_host_impl)
       min_page_scale_factor_(0),
       max_page_scale_factor_(0),
       scrolling_layer_id_from_previous_tree_(0),
-      use_gpu_rasterization_(false),
       contents_textures_purged_(false),
       requires_high_res_to_draw_(false),
       viewport_size_invalid_(false),
@@ -215,8 +214,6 @@ void LayerTreeImpl::PushPropertiesTo(LayerTreeImpl* target_tree) {
   target_tree->set_source_frame_number(source_frame_number());
   target_tree->set_background_color(background_color());
   target_tree->set_has_transparent_background(has_transparent_background());
-
-  target_tree->use_gpu_rasterization_ = use_gpu_rasterization();
 
   if (ContentsTexturesPurged())
     target_tree->SetContentsTexturesPurged();
@@ -439,14 +436,6 @@ void LayerTreeImpl::ClearViewportLayers() {
   page_scale_layer_ = NULL;
   inner_viewport_scroll_layer_ = NULL;
   outer_viewport_scroll_layer_ = NULL;
-}
-
-void LayerTreeImpl::SetUseGpuRasterization(bool use_gpu) {
-  if (use_gpu == use_gpu_rasterization_)
-    return;
-
-  use_gpu_rasterization_ = use_gpu;
-  ReleaseResources();
 }
 
 void LayerTreeImpl::UpdateDrawProperties() {
@@ -747,6 +736,14 @@ LayerTreeImpl::CreateScrollbarAnimationController(LayerImpl* scrolling_layer) {
 
 void LayerTreeImpl::DidAnimateScrollOffset() {
   layer_tree_host_impl_->DidAnimateScrollOffset();
+}
+
+bool LayerTreeImpl::use_gpu_rasterization() const {
+  return layer_tree_host_impl_->use_gpu_rasterization();
+}
+
+bool LayerTreeImpl::create_low_res_tiling() const {
+  return layer_tree_host_impl_->create_low_res_tiling();
 }
 
 void LayerTreeImpl::SetNeedsRedraw() {

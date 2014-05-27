@@ -12,10 +12,14 @@
 #include "ash/test/display_manager_test_api.h"
 #include "ash/test/test_lock_state_controller_delegate.h"
 #include "ash/test/test_screenshot_delegate.h"
+#include "ash/test/test_system_tray_delegate.h"
 #include "ash/test/test_volume_control_delegate.h"
+#include "ash/wm/maximize_mode/internal_input_device_list.h"
+#include "ash/wm/maximize_mode/maximize_mode_event_blocker.h"
 #include "ui/aura/test/event_generator.h"
 #include "ui/events/event_handler.h"
 #include "ui/gfx/vector3d_f.h"
+#include "ui/message_center/message_center.h"
 
 namespace ash {
 
@@ -55,6 +59,21 @@ EventCounter::~EventCounter() {
 void EventCounter::OnEvent(ui::Event* event) {
   event_count_++;
 }
+
+// A test internal input device list which pretends that all events are from
+// internal devices to allow verifying that the event blocking works.
+class TestInternalInputDeviceList : public InternalInputDeviceList {
+ public:
+  TestInternalInputDeviceList() {}
+  virtual ~TestInternalInputDeviceList() {}
+
+  virtual bool IsEventFromInternalDevice(const ui::Event* event) OVERRIDE {
+    return true;
+  }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(TestInternalInputDeviceList);
+};
 
 }  // namespace
 
@@ -107,9 +126,21 @@ class MaximizeModeControllerTest : public test::AshTestBase {
     return Shell::GetInstance()->IsMaximizeModeWindowManagerEnabled();
   }
 
+  // Overrides the internal input device list for the current event targeters
+  // with one which always returns true.
+  void InstallTestInternalDeviceList() {
+    maximize_mode_controller()->event_blocker_->internal_devices_.reset(
+        new TestInternalInputDeviceList);
+  }
+
   gfx::Display::Rotation GetInternalDisplayRotation() const {
     return Shell::GetInstance()->display_manager()->GetDisplayInfo(
         gfx::Display::InternalDisplayId()).rotation();
+  }
+
+  void SetInternalDisplayRotation(gfx::Display::Rotation rotation) const {
+    Shell::GetInstance()->display_manager()->
+        SetDisplayRotation(gfx::Display::InternalDisplayId(), rotation);
   }
 
  private:
@@ -152,7 +183,7 @@ TEST_F(MaximizeModeControllerTest, EnterExitThresholds) {
 // Tests that when the hinge is nearly vertically aligned, the current state
 // persists as the computed angle is highly inaccurate in this orientation.
 TEST_F(MaximizeModeControllerTest, HingeAligned) {
-   // Laptop in normal orientation lid open 90 degrees.
+  // Laptop in normal orientation lid open 90 degrees.
   TriggerAccelerometerUpdate(gfx::Vector3dF(0.0f, 0.0f, 1.0f),
                              gfx::Vector3dF(-1.0f, 0.0f, 0.0f));
   EXPECT_FALSE(IsMaximizeModeStarted());
@@ -319,6 +350,7 @@ TEST_F(MaximizeModeControllerTest, BlocksKeyboardAndMouse) {
   TriggerAccelerometerUpdate(gfx::Vector3dF(0.0f, 0.0f, 1.0f),
                              gfx::Vector3dF(1.0f, 0.0f, 0.0f));
   ASSERT_TRUE(IsMaximizeModeStarted());
+  InstallTestInternalDeviceList();
 
   event_generator.PressKey(ui::VKEY_ESCAPE, 0);
   event_generator.ReleaseKey(ui::VKEY_ESCAPE, 0);
@@ -338,7 +370,7 @@ TEST_F(MaximizeModeControllerTest, BlocksKeyboardAndMouse) {
   EXPECT_EQ(0u, counter.event_count());
   counter.reset();
 
- // Touch should not be blocked.
+  // Touch should not be blocked.
   event_generator.PressTouch();
   event_generator.ReleaseTouch();
   EXPECT_GT(counter.event_count(), 0u);
@@ -502,5 +534,66 @@ TEST_F(MaximizeModeControllerTest, ExitingMaximizeModeClearRotationLock) {
   TriggerAccelerometerUpdate(base, gfx::Vector3dF(-1.0f, 0.0f, 0.0f));
   EXPECT_FALSE(maximize_mode_controller()->rotation_locked());
 }
+
+// The TrayDisplay class that is responsible for adding/updating MessageCenter
+// notifications is only added to the SystemTray on ChromeOS.
+#if defined(OS_CHROMEOS)
+// Tests that the screen rotation notifications are suppressed when
+// triggered by the accelerometer.
+TEST_F(MaximizeModeControllerTest, BlockRotationNotifications) {
+  test::TestSystemTrayDelegate* tray_delegate =
+      static_cast<test::TestSystemTrayDelegate*>(
+          Shell::GetInstance()->system_tray_delegate());
+  tray_delegate->set_should_show_display_notification(true);
+
+  message_center::MessageCenter* message_center =
+      message_center::MessageCenter::Get();
+
+  // Make sure notifications are still displayed when
+  // adjusting the screen rotation directly when not in maximize mode
+  ASSERT_FALSE(IsMaximizeModeStarted());
+  ASSERT_NE(gfx::Display::ROTATE_180, GetInternalDisplayRotation());
+  ASSERT_EQ(0u, message_center->NotificationCount());
+  ASSERT_FALSE(message_center->HasPopupNotifications());
+  SetInternalDisplayRotation(gfx::Display::ROTATE_180);
+  EXPECT_EQ(gfx::Display::ROTATE_180, GetInternalDisplayRotation());
+  EXPECT_EQ(1u, message_center->NotificationCount());
+  EXPECT_TRUE(message_center->HasPopupNotifications());
+
+  // Reset the screen rotation.
+  SetInternalDisplayRotation(gfx::Display::ROTATE_0);
+  // Clear all notifications
+  message_center->RemoveAllNotifications(false);
+  // Trigger maximize mode by opening to 270.
+  TriggerAccelerometerUpdate(gfx::Vector3dF(0.0f, 0.0f, -1.0f),
+                             gfx::Vector3dF(-1.0f, 0.0f, 0.0f));
+  EXPECT_TRUE(IsMaximizeModeStarted());
+  EXPECT_EQ(0u, message_center->NotificationCount());
+  EXPECT_FALSE(message_center->HasPopupNotifications());
+
+  // Make sure notifications are still displayed when
+  // adjusting the screen rotation directly when in maximize mode
+  ASSERT_NE(gfx::Display::ROTATE_270, GetInternalDisplayRotation());
+  SetInternalDisplayRotation(gfx::Display::ROTATE_270);
+  EXPECT_EQ(gfx::Display::ROTATE_270, GetInternalDisplayRotation());
+  EXPECT_EQ(1u, message_center->NotificationCount());
+  EXPECT_TRUE(message_center->HasPopupNotifications());
+
+  // Clear all notifications
+  message_center->RemoveAllNotifications(false);
+  EXPECT_EQ(0u, message_center->NotificationCount());
+  EXPECT_FALSE(message_center->HasPopupNotifications());
+
+  // Make sure notifications are blocked when adjusting the screen rotation
+  // via the accelerometer while in maximize mode
+  // Rotate the screen 90 degrees
+  ASSERT_NE(gfx::Display::ROTATE_90, GetInternalDisplayRotation());
+  TriggerAccelerometerUpdate(gfx::Vector3dF(0.0f, 1.0f, 0.0f),
+                             gfx::Vector3dF(0.0f, 1.0f, 0.0f));
+  ASSERT_EQ(gfx::Display::ROTATE_90, GetInternalDisplayRotation());
+  EXPECT_EQ(0u, message_center->NotificationCount());
+  EXPECT_FALSE(message_center->HasPopupNotifications());
+}
+#endif
 
 }  // namespace ash

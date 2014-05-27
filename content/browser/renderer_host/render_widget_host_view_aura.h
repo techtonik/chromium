@@ -174,6 +174,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   virtual void SelectionChanged(const base::string16& text,
                                 size_t offset,
                                 const gfx::Range& range) OVERRIDE;
+  virtual gfx::Size GetRequestedRendererSize() const OVERRIDE;
   virtual void SelectionBoundsChanged(
       const ViewHostMsg_SelectionBounds_Params& params) OVERRIDE;
   virtual void ScrollOffsetChanged() OVERRIDE;
@@ -259,9 +260,10 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   virtual void OnCandidateWindowHidden() OVERRIDE;
 
   // Overridden from gfx::DisplayObserver:
-  virtual void OnDisplayBoundsChanged(const gfx::Display& display) OVERRIDE;
   virtual void OnDisplayAdded(const gfx::Display& new_display) OVERRIDE;
   virtual void OnDisplayRemoved(const gfx::Display& old_display) OVERRIDE;
+  virtual void OnDisplayMetricsChanged(const gfx::Display& display,
+                                       uint32_t metrics) OVERRIDE;
 
   // Overridden from aura::WindowDelegate:
   virtual gfx::Size GetMinimumSize() const OVERRIDE;

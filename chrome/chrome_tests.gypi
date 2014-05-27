@@ -307,7 +307,6 @@
           ],
         }],
         ['OS=="win"', {
-          'msvs_large_pdb': 1,
           'include_dirs': [
             '../third_party/wtl/include',
           ],
@@ -403,6 +402,8 @@
         '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome/user_data_dir.h',
         '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome/embedded_automation_extension.cc',
         '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome/embedded_automation_extension.h',
+        '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome/mobile_device_list.cc',
+        '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome/mobile_device_list.h',
         'test/chromedriver/chrome/adb.h',
         'test/chromedriver/chrome/adb_impl.cc',
         'test/chromedriver/chrome/adb_impl.h',
@@ -426,6 +427,8 @@
         'test/chromedriver/chrome/debugger_tracker.h',
         'test/chromedriver/chrome/device_manager.cc',
         'test/chromedriver/chrome/device_manager.h',
+        'test/chromedriver/chrome/device_metrics.cc',
+        'test/chromedriver/chrome/device_metrics.h',
         'test/chromedriver/chrome/devtools_client.h',
         'test/chromedriver/chrome/devtools_client_impl.cc',
         'test/chromedriver/chrome/devtools_client_impl.h',
@@ -446,6 +449,10 @@
         'test/chromedriver/chrome/javascript_dialog_manager.h',
         'test/chromedriver/chrome/log.h',
         'test/chromedriver/chrome/log.cc',
+        'test/chromedriver/chrome/mobile_device.cc',
+        'test/chromedriver/chrome/mobile_device.h',
+        'test/chromedriver/chrome/mobile_emulation_override_manager.cc',
+        'test/chromedriver/chrome/mobile_emulation_override_manager.h',
         'test/chromedriver/chrome/navigation_tracker.cc',
         'test/chromedriver/chrome/navigation_tracker.h',
         'test/chromedriver/chrome/performance_logger.h',
@@ -550,6 +557,25 @@
                       'test/chromedriver/extension/manifest.json',
           ],
           'message': 'Generating sources for embedding automation extension',
+        },
+        {
+          'action_name': 'embed_mobile_devices_in_cpp',
+          'inputs': [
+            'test/chromedriver/cpp_source.py',
+            'test/chromedriver/embed_mobile_devices_in_cpp.py',
+            '../third_party/WebKit/Source/devtools/front_end/elements/OverridesView.js',
+          ],
+          'outputs': [
+            '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome/mobile_device_list.cc',
+            '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome/mobile_device_list.h',
+          ],
+          'action': [ 'python',
+                      'test/chromedriver/embed_mobile_devices_in_cpp.py',
+                      '--directory',
+                      '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome',
+                      '../third_party/WebKit/Source/devtools/front_end/elements/OverridesView.js',
+          ],
+          'message': 'Generating sources for embedding mobile devices in chromedriver',
         },
       ],
       # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
@@ -700,6 +726,7 @@
         'test/chromedriver/chrome/geolocation_override_manager_unittest.cc',
         'test/chromedriver/chrome/heap_snapshot_taker_unittest.cc',
         'test/chromedriver/chrome/javascript_dialog_manager_unittest.cc',
+        'test/chromedriver/chrome/mobile_emulation_override_manager_unittest.cc',
         'test/chromedriver/chrome/navigation_tracker_unittest.cc',
         'test/chromedriver/chrome/performance_logger_unittest.cc',
         'test/chromedriver/chrome/status_unittest.cc',
@@ -1789,7 +1816,6 @@
             '<(DEPTH)/third_party/wtl/include',
           ],
           'dependencies': [
-            'browser_tests_exe_pdb_workaround',
             'chrome_version_resources',
             'security_tests',  # run time dependency
           ],
@@ -1843,9 +1869,11 @@
           'dependencies': [
             'chrome',
             '../components/components.gyp:breakpad_stubs',
+            '../third_party/ocmock/ocmock.gyp:ocmock',
           ],
           'sources': [
             'browser/renderer_host/chrome_render_widget_host_view_mac_delegate_browsertest.cc',
+            'browser/renderer_host/chrome_render_widget_host_view_mac_history_swiper_browsertest.mm',
             'browser/spellchecker/spellcheck_message_filter_mac_browsertest.cc',
           ],
           'sources!': [
@@ -2108,7 +2136,6 @@
           'dependencies': [
             'chrome_version_resources',
           ],
-          'msvs_large_pdb': 1,
           'conditions': [
             ['win_use_allocator_shim==1', {
               'dependencies': [
@@ -2383,7 +2410,6 @@
           ],
         }],
         ['OS=="win"', {
-          'msvs_large_pdb': 1,
           'sources': [
             '<(SHARED_INTERMEDIATE_DIR)/chrome_version/other_version.rc',
             '<(SHARED_INTERMEDIATE_DIR)/ui/ui_resources/ui_unscaled_resources.rc',
@@ -2489,7 +2515,6 @@
           'sources': [
             '<(SHARED_INTERMEDIATE_DIR)/chrome_version/other_version.rc',
           ],
-          'msvs_large_pdb': 1,
           'include_dirs': [
             '<(DEPTH)/third_party/wtl/include',
           ],
@@ -2941,25 +2966,6 @@
           'sources': [
             'telemetry_gpu_test.isolate',
           ],
-        },
-      ],
-    }],
-    ['OS=="win"', {
-      'targets' : [
-        {
-          # This target is only depended upon in Windows.
-          'target_name': 'browser_tests_exe_pdb_workaround',
-          'type': 'static_library',
-          'sources': [ 'empty_pdb_workaround.cc' ],
-          'msvs_settings': {
-            'VCCLCompilerTool': {
-              # This *in the compile phase* must match the pdb name that's
-              # output by the final link. See empty_pdb_workaround.cc for
-              # more details.
-              'DebugInformationFormat': '3',
-              'ProgramDataBaseFileName': '<(PRODUCT_DIR)/browser_tests.exe.pdb',
-            },
-          },
         },
       ],
     }],

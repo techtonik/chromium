@@ -305,12 +305,10 @@ SyncServiceState SyncFileSystemService::GetSyncServiceState() {
 }
 
 void SyncFileSystemService::GetExtensionStatusMap(
-    std::map<GURL, std::string>* status_map) {
-  DCHECK(status_map);
-  status_map->clear();
-  remote_service_->GetOriginStatusMap(status_map);
-  if (v2_remote_service_)
-    v2_remote_service_->GetOriginStatusMap(status_map);
+    const ExtensionStatusMapCallback& callback) {
+  remote_service_->GetOriginStatusMap(
+      base::Bind(&SyncFileSystemService::DidGetExtensionStatusMap,
+                 AsWeakPtr(), callback));
 }
 
 void SyncFileSystemService::DumpFiles(const GURL& origin,
@@ -348,15 +346,6 @@ void SyncFileSystemService::GetFileSyncStatus(
     return;
   }
 
-  if (GetRemoteService(url.origin())->IsConflicting(url)) {
-    base::MessageLoopProxy::current()->PostTask(
-        FROM_HERE,
-        base::Bind(callback,
-                   SYNC_STATUS_OK,
-                   SYNC_FILE_STATUS_CONFLICTING));
-    return;
-  }
-
   local_service_->HasPendingLocalChanges(
       url,
       base::Bind(&SyncFileSystemService::DidGetLocalChangeStatus,
@@ -370,19 +359,6 @@ void SyncFileSystemService::AddSyncEventObserver(SyncEventObserver* observer) {
 void SyncFileSystemService::RemoveSyncEventObserver(
     SyncEventObserver* observer) {
   observers_.RemoveObserver(observer);
-}
-
-ConflictResolutionPolicy SyncFileSystemService::GetConflictResolutionPolicy(
-    const GURL& origin) {
-  return GetRemoteService(origin)->GetConflictResolutionPolicy(origin);
-}
-
-SyncStatusCode SyncFileSystemService::SetConflictResolutionPolicy(
-    const GURL& origin,
-    ConflictResolutionPolicy policy) {
-  UMA_HISTOGRAM_ENUMERATION("SyncFileSystem.ConflictResolutionPolicy",
-                            policy, CONFLICT_RESOLUTION_POLICY_MAX);
-  return GetRemoteService(origin)->SetConflictResolutionPolicy(origin, policy);
 }
 
 LocalChangeProcessor* SyncFileSystemService::GetLocalChangeProcessor(
@@ -429,7 +405,8 @@ void SyncFileSystemService::Initialize(
     profile_sync_service->AddObserver(this);
   }
 
-  registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_INSTALLED,
+  registrar_.Add(this,
+                 chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
                  content::Source<Profile>(profile_));
   registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED,
                  content::Source<Profile>(profile_));
@@ -578,6 +555,31 @@ void SyncFileSystemService::DidDumpV2Database(
   callback.Run(*v1list);
 }
 
+void SyncFileSystemService::DidGetExtensionStatusMap(
+    const ExtensionStatusMapCallback& callback,
+    scoped_ptr<RemoteFileSyncService::OriginStatusMap> status_map) {
+  if (!v2_remote_service_) {
+    callback.Run(*status_map);
+    return;
+  }
+
+  v2_remote_service_->GetOriginStatusMap(
+      base::Bind(&SyncFileSystemService::DidGetV2ExtensionStatusMap,
+                 AsWeakPtr(),
+                 callback,
+                 base::Passed(&status_map)));
+}
+
+void SyncFileSystemService::DidGetV2ExtensionStatusMap(
+    const ExtensionStatusMapCallback& callback,
+    scoped_ptr<RemoteFileSyncService::OriginStatusMap> status_map_v1,
+    scoped_ptr<RemoteFileSyncService::OriginStatusMap> status_map_v2) {
+  // Merge |status_map_v2| into |status_map_v1|.
+  status_map_v1->insert(status_map_v2->begin(), status_map_v2->end());
+
+  callback.Run(*status_map_v1);
+}
+
 void SyncFileSystemService::SetSyncEnabledForTesting(bool enabled) {
   sync_enabled_ = enabled;
   remote_service_->SetSyncEnabled(sync_enabled_);
@@ -645,7 +647,7 @@ void SyncFileSystemService::Observe(
   // Reload, Restart: UNLOADED(DISABLE) -> INSTALLED -> ENABLED.
   //
   switch (type) {
-    case chrome::NOTIFICATION_EXTENSION_INSTALLED:
+    case chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED:
       HandleExtensionInstalled(details);
       break;
     case chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED:
@@ -804,8 +806,6 @@ RemoteFileSyncService* SyncFileSystemService::GetRemoteService(
     v2_remote_service_->AddFileStatusObserver(this);
     v2_remote_service_->SetRemoteChangeProcessor(local_service_.get());
     v2_remote_service_->SetSyncEnabled(sync_enabled_);
-    v2_remote_service_->SetDefaultConflictResolutionPolicy(
-        remote_service_->GetDefaultConflictResolutionPolicy());
     remote_sync_runners_.push_back(v2_remote_syncer.release());
   }
   return v2_remote_service_.get();

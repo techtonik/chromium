@@ -419,6 +419,9 @@
       # print, UI, etc.
       'enable_printing%': 1,
 
+      # Windows prints using a PDF as the metafile from the renderer.
+      'win_pdf_metafile_for_printing%': 1,
+
       # Set the version of CLD.
       #   0: Don't specify the version. This option is for the Finch testing.
       #   1: Use only CLD1.
@@ -464,6 +467,10 @@
 
       # Enables autofill dialog and associated features; disabled by default.
       'enable_autofill_dialog%' : 0,
+
+      # Defaults Wallet integration in Autofill dialog to use production
+      # servers. Unofficial builds won't have the proper API keys.
+      'enable_prod_wallet_service%': 0,
 
       # Enables support for background apps.
       'enable_background%': 1,
@@ -545,6 +552,7 @@
       'data_reduction_proxy_probe_url%' : '',
       'enable_mdns%' : 0,
       'enable_service_discovery%': 0,
+      'enable_wifi_bootstrapping%': 0,
       'enable_hangout_services_extension%': 0,
 
        # Enable the Syzygy optimization step.
@@ -694,7 +702,13 @@
 
         # Enable autofill dialog for Android, Mac and Views-enabled platforms.
         ['toolkit_views==1 or (OS=="android" and android_webview_build==0) or OS=="mac"', {
-          'enable_autofill_dialog%': 1
+          'enable_autofill_dialog%': 1,
+
+          'conditions': [
+            ['buildtype=="Official"', {
+              'enable_prod_wallet_service%': 1,
+            }],
+          ]
         }],
 
         ['OS=="android"', {
@@ -905,6 +919,9 @@
           'data_reduction_dev_host%': 'http://proxy-dev.googlezip.net:80/',
           'data_reduction_fallback_host%': 'http://compress.googlezip.net:80/',
         }],
+        ['OS=="win" or OS=="mac"', {
+            'enable_wifi_bootstrapping%' : 1,
+        }],
       ],
 
       # Set this to 1 to enable use of concatenated impulse responses
@@ -1036,6 +1053,7 @@
     'enable_session_service%': '<(enable_session_service)',
     'enable_themes%': '<(enable_themes)',
     'enable_autofill_dialog%': '<(enable_autofill_dialog)',
+    'enable_prod_wallet_service%': '<(enable_prod_wallet_service)',
     'enable_background%': '<(enable_background)',
     'linux_use_bundled_gold%': '<(linux_use_bundled_gold)',
     'linux_use_bundled_binutils%': '<(linux_use_bundled_binutils)',
@@ -1046,6 +1064,7 @@
     'test_isolation_outdir%': '<(test_isolation_outdir)',
     'test_isolation_fail_on_missing': '<(test_isolation_fail_on_missing)',
     'enable_printing%': '<(enable_printing)',
+    'win_pdf_metafile_for_printing%': '<(win_pdf_metafile_for_printing)',
     'enable_spellcheck%': '<(enable_spellcheck)',
     'enable_google_now%': '<(enable_google_now)',
     'cld_version%': '<(cld_version)',
@@ -1082,6 +1101,7 @@
     'data_reduction_proxy_probe_url%': '<(data_reduction_proxy_probe_url)',
     'enable_mdns%' : '<(enable_mdns)',
     'enable_service_discovery%' : '<(enable_service_discovery)',
+    'enable_wifi_bootstrapping%': '<(enable_wifi_bootstrapping)',
     'enable_hangout_services_extension%' : '<(enable_hangout_services_extension)',
     'v8_optimized_debug%': '<(v8_optimized_debug)',
     'proprietary_codecs%': '<(proprietary_codecs)',
@@ -1383,6 +1403,11 @@
     'ozone_platform_egltest%': 0,
     'ozone_platform_ozonex%': 0,
     'ozone_platform_test%': 0,
+
+    # Chrome OS: whether to build ChromeVox from sources in the Chromium
+    # repository rather than using precompiled JavaScript in
+    # chrome/third_party/chromevox.  This is still experimental.
+    'use_migrated_chromevox%': 0,
 
     # Chrome OS: whether to also build the upcoming version of
     # ChromeVox, which can then be enabled via a command-line switch.
@@ -1956,6 +1981,9 @@
       }],
       ['notifications==1', {
         'grit_defines': ['-D', 'enable_notifications'],
+      }],
+      ['enable_wifi_bootstrapping==1', {
+        'grit_defines': ['-D', 'enable_wifi_bootstrapping'],
       }],
       ['enable_resource_whitelist_generation==1 and OS!="win"', {
         'grit_rc_header_format': ['-h', '#define {textual_id} _Pragma("whitelisted_resource_{numeric_id}") {numeric_id}'],
@@ -2597,6 +2625,9 @@
       ['enable_autofill_dialog==1', {
         'defines': ['ENABLE_AUTOFILL_DIALOG=1'],
       }],
+      ['enable_prod_wallet_service==1', {
+        'defines': ['ENABLE_PROD_WALLET_SERVICE=1'],
+      }],
       ['enable_background==1', {
         'defines': ['ENABLE_BACKGROUND=1'],
       }],
@@ -2617,6 +2648,9 @@
       }],
       ['enable_printing==2', {
         'defines': ['ENABLE_PRINTING=1'],
+      }],
+      ['OS=="win" and win_pdf_metafile_for_printing==1', {
+        'defines': ['WIN_PDF_METAFILE_FOR_PRINTING=1'],
       }],
       ['enable_spellcheck==1', {
         'defines': ['ENABLE_SPELLCHECK=1'],
@@ -2668,6 +2702,9 @@
       }],
       ['enable_service_discovery==1', {
         'defines' : [ 'ENABLE_SERVICE_DISCOVERY=1' ],
+      }],
+      ['enable_wifi_bootstrapping==1', {
+        'defines' : [ 'ENABLE_WIFI_BOOTSTRAPPING=1' ],
       }],
       ['enable_hangout_services_extension==1', {
         'defines': ['ENABLE_HANGOUT_SERVICES_EXTENSION=1'],
@@ -4814,6 +4851,7 @@
           'CERT_CHAIN_PARA_HAS_EXTRA_FIELDS',
           'WIN32_LEAN_AND_MEAN',
           '_ATL_NO_OPENGL',
+          '_HAS_EXCEPTIONS=0',
         ],
         'conditions': [
           ['buildtype=="Official"', {
@@ -4873,11 +4911,6 @@
               ],
             },
           ],
-          ['component=="static_library"', {
-            'defines': [
-              '_HAS_EXCEPTIONS=0',
-            ],
-          }],
           ['secure_atl', {
             'defines': [
               '_SECURE_ATL',
@@ -5198,7 +5231,7 @@
     ['gcc_version>=48 and android_webview_build==1 and host_os=="mac"', {
       'target_defaults': {
         'target_conditions': [
-          ['_toolset=="target"', {
+          ['_toolset=="host"', {
             'cflags!': [
               '-Wno-unused-local-typedefs',
             ],

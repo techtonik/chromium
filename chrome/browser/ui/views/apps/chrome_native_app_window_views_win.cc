@@ -26,6 +26,7 @@
 #include "chrome/common/chrome_icon_resources_win.h"
 #include "chrome/common/chrome_switches.h"
 #include "content/public/browser/browser_thread.h"
+#include "extensions/browser/extension_util.h"
 #include "extensions/common/extension.h"
 #include "grit/generated_resources.h"
 #include "ui/aura/remote_window_tree_host_win.h"
@@ -181,7 +182,8 @@ void ChromeNativeAppWindowViewsWin::InitializeDefaultWindow(
       base::Bind(&ChromeNativeAppWindowViewsWin::OnShortcutInfoLoaded,
                  weak_ptr_factory_.GetWeakPtr()));
 
-  EnsureCaptionStyleSet();
+  if (!create_params.transparent_background)
+    EnsureCaptionStyleSet();
   UpdateShelfMenu();
 }
 
@@ -230,7 +232,8 @@ void ChromeNativeAppWindowViewsWin::UpdateShelfMenu() {
     return;
 
   // Add item to install ephemeral apps.
-  if (extension->is_ephemeral()) {
+  if (extensions::util::IsEphemeralApp(extension->id(),
+                                       app_window()->browser_context())) {
     scoped_refptr<ShellLinkItem> link(new ShellLinkItem());
     link->set_title(l10n_util::GetStringUTF16(IDS_APP_INSTALL_TITLE));
     link->set_icon(chrome_path.value(),
@@ -245,5 +248,6 @@ void ChromeNativeAppWindowViewsWin::UpdateShelfMenu() {
     jumplist_updater.AddTasks(items);
   }
 
+  // Note that an empty jumplist must still be committed to clear all items.
   jumplist_updater.CommitUpdate();
 }

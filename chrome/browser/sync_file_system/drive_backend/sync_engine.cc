@@ -340,18 +340,16 @@ LocalChangeProcessor* SyncEngine::GetLocalChangeProcessor() {
   return this;
 }
 
-bool SyncEngine::IsConflicting(const fileapi::FileSystemURL& url) {
-  // TODO(tzik): Implement this before we support manual conflict resolution.
-  return false;
-}
-
 RemoteServiceState SyncEngine::GetCurrentState() const {
   return service_state_;
 }
 
-void SyncEngine::GetOriginStatusMap(OriginStatusMap* status_map) {
-  // TODO(peria): Make this route asynchronous.
-  sync_worker_->GetOriginStatusMap(status_map);
+void SyncEngine::GetOriginStatusMap(const StatusMapCallback& callback) {
+  worker_task_runner_->PostTask(
+      FROM_HERE,
+      base::Bind(&SyncWorker::GetOriginStatusMap,
+                 base::Unretained(sync_worker_.get()),
+                 RelayCallbackToCurrentThread(FROM_HERE, callback)));
 }
 
 void SyncEngine::DumpFiles(const GURL& origin,
@@ -380,46 +378,6 @@ void SyncEngine::SetSyncEnabled(bool enabled) {
       base::Bind(&SyncWorker::SetSyncEnabled,
                  base::Unretained(sync_worker_.get()),
                  enabled));
-}
-
-SyncStatusCode SyncEngine::SetDefaultConflictResolutionPolicy(
-    ConflictResolutionPolicy policy) {
-  // TODO(peria): Make this route asynchronous.
-  return sync_worker_->SetDefaultConflictResolutionPolicy(policy);
-}
-
-SyncStatusCode SyncEngine::SetConflictResolutionPolicy(
-    const GURL& origin,
-    ConflictResolutionPolicy policy) {
-  // TODO(peria): Make this route asynchronous.
-  return sync_worker_->SetConflictResolutionPolicy(origin, policy);
-}
-
-ConflictResolutionPolicy SyncEngine::GetDefaultConflictResolutionPolicy()
-    const {
-  // TODO(peria): Make this route asynchronous.
-  return sync_worker_->GetDefaultConflictResolutionPolicy();
-}
-
-ConflictResolutionPolicy SyncEngine::GetConflictResolutionPolicy(
-    const GURL& origin) const {
-  // TODO(peria): Make this route asynchronous.
-  return sync_worker_->GetConflictResolutionPolicy(origin);
-}
-
-void SyncEngine::GetRemoteVersions(
-    const fileapi::FileSystemURL& url,
-    const RemoteVersionsCallback& callback) {
-  // TODO(tzik): Implement this before we support manual conflict resolution.
-  callback.Run(SYNC_STATUS_FAILED, std::vector<Version>());
-}
-
-void SyncEngine::DownloadRemoteVersion(
-    const fileapi::FileSystemURL& url,
-    const std::string& version_id,
-    const DownloadVersionCallback& callback) {
-  // TODO(tzik): Implement this before we support manual conflict resolution.
-  callback.Run(SYNC_STATUS_FAILED, webkit_blob::ScopedFile());
 }
 
 void SyncEngine::PromoteDemotedChanges() {

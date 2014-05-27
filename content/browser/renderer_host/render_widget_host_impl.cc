@@ -581,8 +581,7 @@ void RenderWidgetHostImpl::WasResized() {
     return;
   }
 
-  gfx::Rect view_bounds = view_->GetViewBounds();
-  gfx::Size new_size(view_bounds.size());
+  gfx::Size new_size(view_->GetRequestedRendererSize());
 
   gfx::Size old_physical_backing_size = physical_backing_size_;
   physical_backing_size_ = view_->GetPhysicalBackingSize();
@@ -2020,6 +2019,10 @@ gfx::Rect RenderWidgetHostImpl::AccessibilityGetViewBounds() const {
 gfx::Point RenderWidgetHostImpl::AccessibilityOriginInScreen(
     const gfx::Rect& bounds) const {
   return view_->AccessibilityOriginInScreen(bounds);
+}
+
+void RenderWidgetHostImpl::AccessibilityHitTest(const gfx::Point& point) {
+  Send(new AccessibilityMsg_HitTest(GetRoutingID(), point));
 }
 
 void RenderWidgetHostImpl::AccessibilityFatalError() {

@@ -485,7 +485,7 @@ void BrowserView::InitStatusBubble() {
 
 void BrowserView::InitPermissionBubbleView() {
   permission_bubble_view_.reset(new PermissionBubbleViewViews(
-      GetLocationBarView()->GetLocationIconView()));
+      GetLocationBarView()->location_icon_view()));
 }
 
 gfx::Rect BrowserView::GetToolbarBounds() const {
@@ -1160,6 +1160,13 @@ void BrowserView::ShowBookmarkAppBubble(
 void BrowserView::ShowTranslateBubble(content::WebContents* web_contents,
                                       translate::TranslateStep step,
                                       TranslateErrors::Type error_type) {
+  if (contents_web_view_->HasFocus() &&
+      !GetLocationBarView()->IsMouseHovered()) {
+    content::RenderViewHost* rvh = web_contents->GetRenderViewHost();
+    if (rvh->IsFocusedElementEditable())
+      return;
+  }
+
   TranslateTabHelper* translate_tab_helper =
       TranslateTabHelper::FromWebContents(web_contents);
   LanguageState& language_state = translate_tab_helper->GetLanguageState();
@@ -1254,7 +1261,7 @@ void BrowserView::ShowWebsiteSettings(Profile* profile,
                                       const GURL& url,
                                       const content::SSLStatus& ssl) {
   WebsiteSettingsPopupView::ShowPopup(
-      GetLocationBarView()->GetLocationIconView(), profile,
+      GetLocationBarView()->location_icon_view(), profile,
       web_contents, url, ssl, browser_.get());
 }
 
@@ -2383,10 +2390,22 @@ void BrowserView::ShowAvatarBubbleFromAvatarButton(AvatarBubbleMode mode) {
       views::View::ConvertPointToScreen(button, &origin);
       gfx::Rect bounds(origin, size());
 
-      ProfileChooserView::BubbleViewMode view_mode =
-          (mode == BrowserWindow::AVATAR_BUBBLE_MODE_ACCOUNT_MANAGEMENT) ?
-          ProfileChooserView::BUBBLE_VIEW_MODE_ACCOUNT_MANAGEMENT :
-          ProfileChooserView::BUBBLE_VIEW_MODE_PROFILE_CHOOSER;
+      profiles::BubbleViewMode view_mode;
+      switch (mode) {
+        case AVATAR_BUBBLE_MODE_ACCOUNT_MANAGEMENT:
+          view_mode = profiles::BUBBLE_VIEW_MODE_ACCOUNT_MANAGEMENT;
+          break;
+        case AVATAR_BUBBLE_MODE_SIGNIN:
+          view_mode = profiles::BUBBLE_VIEW_MODE_GAIA_SIGNIN;
+          break;
+        case AVATAR_BUBBLE_MODE_REAUTH:
+          view_mode = profiles::BUBBLE_VIEW_MODE_GAIA_REAUTH;
+          break;
+        default:
+          view_mode = profiles::BUBBLE_VIEW_MODE_PROFILE_CHOOSER;
+          break;
+      }
+
       ProfileChooserView::ShowBubble(
           view_mode, button, views::BubbleBorder::TOP_RIGHT,
           views::BubbleBorder::ALIGN_EDGE_TO_ANCHOR_EDGE, bounds, browser());

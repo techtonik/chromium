@@ -30,8 +30,6 @@
             'public/test/nested_message_pump_android.cc',
             'public/test/nested_message_pump_android.h',
             'test/layouttest_support.cc',
-            'test/mock_webclipboard_impl.cc',
-            'test/mock_webclipboard_impl.h',
             'test/test_media_stream_client.cc',
             'test/test_media_stream_client.h',
             'test/test_video_frame_provider.cc',
@@ -175,6 +173,8 @@
         'test/mock_keyboard_driver_win.h',
         'test/mock_render_process.cc',
         'test/mock_render_process.h',
+        'test/mock_webclipboard_impl.cc',
+        'test/mock_webclipboard_impl.h',
         'test/mock_webframeclient.h',
         'test/mock_weburlloader.cc',
         'test/mock_weburlloader.h',
@@ -206,8 +206,16 @@
         'test/test_render_view_host_factory.h',
         'test/test_web_contents.cc',
         'test/test_web_contents.h',
+        'test/test_webkit_platform_support.cc',
+        'test/test_webkit_platform_support.h',
         'test/web_gesture_curve_mock.cc',
         'test/web_gesture_curve_mock.h',
+        'test/webkit_support.cc',
+        'test/webkit_support.h',
+        'test/webkit_unit_test_support.cc',
+        'test/webkit_unit_test_support.h',
+        'test/web_layer_tree_view_impl_for_testing.cc',
+        'test/web_layer_tree_view_impl_for_testing.h',
         'test/weburl_loader_mock.cc',
         'test/weburl_loader_mock.h',
         'test/weburl_loader_mock_factory.cc',
@@ -397,7 +405,10 @@
         'browser/child_process_security_policy_unittest.cc',
         'browser/compositor/software_browser_compositor_output_surface_unittest.cc',
         'browser/compositor/software_output_device_ozone_unittest.cc',
+        'browser/databases_table_unittest.cc',
+        'browser/database_quota_client_unittest.cc',
         'browser/database_tracker_unittest.cc',
+        'browser/database_util_unittest.cc',
         'browser/device_sensors/data_fetcher_shared_memory_base_unittest.cc',
         'browser/device_sensors/sensor_manager_android_unittest.cc',
         'browser/devtools/embedded_worker_devtools_manager_unittest.cc',
@@ -433,6 +444,7 @@
         'browser/fileapi/file_writer_delegate_unittest.cc',
         'browser/fileapi/fileapi_message_filter_unittest.cc',
         'browser/fileapi/isolated_context_unittest.cc',
+        'browser/fileapi/local_file_stream_reader_unittest.cc',
         'browser/fileapi/local_file_stream_writer_unittest.cc',
         'browser/fileapi/local_file_util_unittest.cc',
         'browser/fileapi/mock_file_change_observer.cc',
@@ -682,10 +694,6 @@
         'test/image_decoder_test.cc',
         'test/image_decoder_test.h',
         'test/run_all_unittests.cc',
-        '../webkit/browser/blob/local_file_stream_reader_unittest.cc',
-        '../webkit/browser/database/database_quota_client_unittest.cc',
-        '../webkit/browser/database/database_util_unittest.cc',
-        '../webkit/browser/database/databases_table_unittest.cc',
         '../webkit/child/multipart_response_delegate_unittest.cc',
       ],
       'conditions': [
@@ -1070,6 +1078,7 @@
             'app/mojo/mojo_browsertest.cc',
             'browser/accessibility/accessibility_mode_browsertest.cc',
             'browser/accessibility/accessibility_win_browsertest.cc',
+            'browser/accessibility/android_hit_testing_browsertest.cc',
             'browser/accessibility/cross_platform_accessibility_browsertest.cc',
             'browser/accessibility/dump_accessibility_tree_browsertest.cc',
             'browser/compositor/image_transport_factory_browsertest.cc',
@@ -1210,6 +1219,11 @@
               'sources!': [
                 'browser/accessibility/dump_accessibility_tree_browsertest.cc',
               ],
+            }],
+            ['OS!="android"', {
+              'sources!': [
+                'browser/accessibility/android_hit_testing_browsertest.cc',
+              ]
             }],
             ['OS=="android"', {
               'sources': [
@@ -1352,6 +1366,8 @@
           ],
         },
         {
+          # TODO(enne): Remove this once dependencies in Blink
+          # point to test_support_content instead.
           'target_name': 'content_webkit_unit_test_support',
           'type': 'static_library',
           'dependencies': [
@@ -1361,16 +1377,6 @@
             '..',
           ],
           'sources': [
-            'test/mock_webclipboard_impl.cc',
-            'test/mock_webclipboard_impl.h',
-            'test/test_webkit_platform_support.cc',
-            'test/test_webkit_platform_support.h',
-            'test/web_layer_tree_view_impl_for_testing.cc',
-            'test/web_layer_tree_view_impl_for_testing.h',
-            'test/webkit_support.cc',
-            'test/webkit_support.h',
-            'test/webkit_unit_test_support.cc',
-            'test/webkit_unit_test_support.h',
           ],
         },
       ],
