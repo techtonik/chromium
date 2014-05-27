@@ -622,9 +622,11 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
     public_context()->RegisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL("/does/not/exist"),
-        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
-                   false,
-                   run_loop.QuitClosure()));
+        NULL,
+        base::Bind(
+            &ServiceWorkerBlackBoxBrowserTest::ExpectServiceWorkerHostAndRun,
+            false,
+            run_loop.QuitClosure()));
     run_loop.Run();
   }
   EXPECT_EQ(0, CountRenderProcessHosts());
