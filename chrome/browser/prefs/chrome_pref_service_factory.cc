@@ -34,11 +34,12 @@
 #include "chrome/browser/profiles/file_path_verifier_win.h"
 #include "chrome/browser/profiles/profile_info_cache.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/search_engines/default_search_manager.h"
 #include "chrome/browser/search_engines/default_search_pref_migration.h"
 #include "chrome/browser/ui/profile_error_dialog.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/pref_names.h"
-#include "components/user_prefs/pref_registry_syncable.h"
+#include "components/pref_registry/pref_registry_syncable.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
 #include "extensions/browser/pref_names.h"
@@ -152,10 +153,30 @@ const PrefHashFilter::TrackedPreferenceMetadata kTrackedPrefs[] = {
     PrefHashFilter::ENFORCE_ON_LOAD,
     PrefHashFilter::TRACKING_STRATEGY_ATOMIC
   },
+  {
+    14, DefaultSearchManager::kDefaultSearchProviderDataPrefName,
+    PrefHashFilter::NO_ENFORCEMENT,
+    PrefHashFilter::TRACKING_STRATEGY_ATOMIC
+  },
+  {
+    // Protecting kPreferenceResetTime does two things:
+    //  1) It ensures this isn't accidently set by someone stomping the pref
+    //     file.
+    //  2) More importantly, it declares kPreferenceResetTime as a protected
+    //     pref which is required for it to be visible when queried via the
+    //     SegregatedPrefStore. This is because it's written directly in the
+    //     protected JsonPrefStore by that store's PrefHashFilter if there was
+    //     a reset in FilterOnLoad and SegregatedPrefStore will not look for it
+    //     in the protected JsonPrefStore unless it's declared as a protected
+    //     preference here.
+    15, prefs::kPreferenceResetTime,
+    PrefHashFilter::ENFORCE_ON_LOAD,
+    PrefHashFilter::TRACKING_STRATEGY_ATOMIC
+  },
 };
 
 // The count of tracked preferences IDs across all platforms.
-const size_t kTrackedPrefsReportingIDsCount = 14;
+const size_t kTrackedPrefsReportingIDsCount = 16;
 COMPILE_ASSERT(kTrackedPrefsReportingIDsCount >= arraysize(kTrackedPrefs),
                need_to_increment_ids_count);
 
@@ -170,6 +191,8 @@ enum SettingsEnforcementGroup {
   GROUP_ENFORCE_ALWAYS,
   // Also enforce extension settings.
   GROUP_ENFORCE_ALWAYS_WITH_EXTENSIONS,
+  // Also enforce extension settings and default search.
+  GROUP_ENFORCE_ALWAYS_WITH_EXTENSIONS_AND_DSE,
   // The default enforcement group contains all protection features.
   GROUP_ENFORCE_DEFAULT
 };
@@ -202,6 +225,9 @@ SettingsEnforcementGroup GetSettingsEnforcementGroup() {
     { chrome_prefs::internals::
           kSettingsEnforcementGroupEnforceAlwaysWithExtensions,
       GROUP_ENFORCE_ALWAYS_WITH_EXTENSIONS },
+    { chrome_prefs::internals::
+          kSettingsEnforcementGroupEnforceAlwaysWithExtensionsAndDSE,
+      GROUP_ENFORCE_ALWAYS_WITH_EXTENSIONS_AND_DSE },
   };
 
   // Use the strongest enforcement setting in the absence of a field trial
@@ -248,20 +274,24 @@ GetTrackingConfiguration() {
   for (size_t i = 0; i < arraysize(kTrackedPrefs); ++i) {
     PrefHashFilter::TrackedPreferenceMetadata data = kTrackedPrefs[i];
 
-    switch (enforcement_group) {
-      case GROUP_NO_ENFORCEMENT:
-        // Remove enforcement for all tracked preferences.
-        data.enforcement_level = PrefHashFilter::NO_ENFORCEMENT;
-        break;
-      case GROUP_ENFORCE_ON_LOAD:  // Falls through.
-      case GROUP_ENFORCE_ALWAYS:
-        // Keep the default enforcement level for this tracked preference.
-        break;
-      case GROUP_ENFORCE_ALWAYS_WITH_EXTENSIONS:  // Falls through.
-      case GROUP_ENFORCE_DEFAULT:
-        // Specifically enable extension settings enforcement.
-        if (data.name == extensions::pref_names::kExtensions)
-          data.enforcement_level = PrefHashFilter::ENFORCE_ON_LOAD;
+    if (GROUP_NO_ENFORCEMENT == enforcement_group) {
+      // Remove enforcement for all tracked preferences.
+      data.enforcement_level = PrefHashFilter::NO_ENFORCEMENT;
+    }
+
+    if (enforcement_group >= GROUP_ENFORCE_ALWAYS_WITH_EXTENSIONS &&
+        (data.name == extensions::pref_names::kExtensions ||
+         data.name == extensions::pref_names::kKnownDisabled)) {
+      // Specifically enable extension settings enforcement and ensure
+      // kKnownDisabled follows it in the Protected Preferences.
+      // TODO(gab): Get rid of kKnownDisabled altogether.
+      data.enforcement_level = PrefHashFilter::ENFORCE_ON_LOAD;
+    }
+
+    if (enforcement_group >= GROUP_ENFORCE_ALWAYS_WITH_EXTENSIONS_AND_DSE &&
+        data.name == DefaultSearchManager::kDefaultSearchProviderDataPrefName) {
+      // Specifically enable default search settings enforcement.
+      data.enforcement_level = PrefHashFilter::ENFORCE_ON_LOAD;
     }
 
     result.push_back(data);
@@ -283,7 +313,8 @@ void HandleReadError(PersistentPrefStore::PrefReadError error) {
     // an example problem that this can cause.
     // Do some diagnosis and try to avoid losing data.
     int message_id = 0;
-    if (error <= PersistentPrefStore::PREF_READ_ERROR_JSON_TYPE) {
+    if (error <= PersistentPrefStore::PREF_READ_ERROR_JSON_TYPE ||
+        error == PersistentPrefStore::PREF_READ_ERROR_LEVELDB_CORRUPTION) {
       message_id = IDS_PREFERENCES_CORRUPT_ERROR;
     } else if (error != PersistentPrefStore::PREF_READ_ERROR_NO_FILE) {
       message_id = IDS_PREFERENCES_UNREADABLE_ERROR;
@@ -393,6 +424,8 @@ const char kSettingsEnforcementGroupEnforceOnload[] = "enforce_on_load";
 const char kSettingsEnforcementGroupEnforceAlways[] = "enforce_always";
 const char kSettingsEnforcementGroupEnforceAlwaysWithExtensions[] =
     "enforce_always_with_extensions";
+const char kSettingsEnforcementGroupEnforceAlwaysWithExtensionsAndDSE[] =
+    "enforce_always_with_extensions_and_dse";
 
 }  // namespace internals
 
@@ -417,6 +450,7 @@ scoped_ptr<PrefService> CreateLocalState(
 scoped_ptr<PrefServiceSyncable> CreateProfilePrefs(
     const base::FilePath& profile_path,
     base::SequencedTaskRunner* pref_io_task_runner,
+    TrackedPreferenceValidationDelegate* validation_delegate,
     policy::PolicyService* policy_service,
     ManagedUserSettingsService* managed_user_settings,
     const scoped_refptr<PrefStore>& extension_prefs,
@@ -424,14 +458,15 @@ scoped_ptr<PrefServiceSyncable> CreateProfilePrefs(
     bool async) {
   TRACE_EVENT0("browser", "chrome_prefs::CreateProfilePrefs");
   PrefServiceSyncableFactory factory;
-  PrepareFactory(&factory,
-                 policy_service,
-                 managed_user_settings,
-                 scoped_refptr<PersistentPrefStore>(
-                     CreateProfilePrefStoreManager(profile_path)
-                         ->CreateProfilePrefStore(pref_io_task_runner)),
-                 extension_prefs,
-                 async);
+  PrepareFactory(
+      &factory,
+      policy_service,
+      managed_user_settings,
+      scoped_refptr<PersistentPrefStore>(
+          CreateProfilePrefStoreManager(profile_path)->CreateProfilePrefStore(
+              pref_io_task_runner, validation_delegate)),
+      extension_prefs,
+      async);
   scoped_ptr<PrefServiceSyncable> pref_service =
       factory.CreateSyncable(pref_registry.get());
 

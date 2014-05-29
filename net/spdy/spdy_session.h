@@ -180,7 +180,6 @@ class NET_EXPORT_PRIVATE SpdyStreamRequest {
 
   void Reset();
 
-  base::WeakPtrFactory<SpdyStreamRequest> weak_ptr_factory_;
   SpdyStreamType type_;
   base::WeakPtr<SpdySession> session_;
   base::WeakPtr<SpdyStream> stream_;
@@ -188,6 +187,8 @@ class NET_EXPORT_PRIVATE SpdyStreamRequest {
   RequestPriority priority_;
   BoundNetLog net_log_;
   CompletionCallback callback_;
+
+  base::WeakPtrFactory<SpdyStreamRequest> weak_ptr_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(SpdyStreamRequest);
 };
@@ -469,6 +470,10 @@ class NET_EXPORT SpdySession : public BufferedSpdyFramerVisitorInterface,
     return buffered_spdy_framer_->GetDataFrameMaximumPayload();
   }
 
+  // https://http2.github.io/http2-spec/#TLSUsage mandates minimum security
+  // standards for TLS.
+  bool HasAcceptableTransportSecurity() const;
+
   // Must be used only by |pool_|.
   base::WeakPtr<SpdySession> GetWeakPtr();
 
@@ -493,6 +498,8 @@ class NET_EXPORT SpdySession : public BufferedSpdyFramerVisitorInterface,
   FRIEND_TEST_ALL_PREFIXES(SpdySessionTest, SessionFlowControlNoReceiveLeaks);
   FRIEND_TEST_ALL_PREFIXES(SpdySessionTest, SessionFlowControlNoSendLeaks);
   FRIEND_TEST_ALL_PREFIXES(SpdySessionTest, SessionFlowControlEndToEnd);
+  FRIEND_TEST_ALL_PREFIXES(SpdySessionTest, StreamIdSpaceExhausted);
+  FRIEND_TEST_ALL_PREFIXES(SpdySessionTest, UnstallRacesWithStreamCreation);
 
   typedef std::deque<base::WeakPtr<SpdyStreamRequest> >
       PendingStreamRequestQueue;
@@ -684,7 +691,7 @@ class NET_EXPORT SpdySession : public BufferedSpdyFramerVisitorInterface,
   void CheckPingStatus(base::TimeTicks last_check_time);
 
   // Get a new stream id.
-  int GetNewStreamId();
+  SpdyStreamId GetNewStreamId();
 
   // Pushes the given frame with the given priority into the write
   // queue for the session.
@@ -925,12 +932,6 @@ class NET_EXPORT SpdySession : public BufferedSpdyFramerVisitorInterface,
   // or NULL, if the transport is not SSL.
   SSLClientSocket* GetSSLClientSocket() const;
 
-  // Used for posting asynchronous IO tasks.  We use this even though
-  // SpdySession is refcounted because we don't need to keep the SpdySession
-  // alive if the last reference is within a RunnableMethod.  Just revoke the
-  // method.
-  base::WeakPtrFactory<SpdySession> weak_factory_;
-
   // Whether Do{Read,Write}Loop() is in the call stack. Useful for
   // making sure we don't destroy ourselves prematurely in that case.
   bool in_io_loop_;
@@ -953,7 +954,7 @@ class NET_EXPORT SpdySession : public BufferedSpdyFramerVisitorInterface,
   // The read buffer used to read data from the socket.
   scoped_refptr<IOBuffer> read_buffer_;
 
-  int stream_hi_water_mark_;  // The next stream id to use.
+  SpdyStreamId stream_hi_water_mark_;  // The next stream id to use.
 
   // Queue, for each priority, of pending stream requests that have
   // not yet been satisfied.
@@ -1126,6 +1127,12 @@ class NET_EXPORT SpdySession : public BufferedSpdyFramerVisitorInterface,
   HostPortPair trusted_spdy_proxy_;
 
   TimeFunc time_func_;
+
+  // Used for posting asynchronous IO tasks.  We use this even though
+  // SpdySession is refcounted because we don't need to keep the SpdySession
+  // alive if the last reference is within a RunnableMethod.  Just revoke the
+  // method.
+  base::WeakPtrFactory<SpdySession> weak_factory_;
 };
 
 }  // namespace net

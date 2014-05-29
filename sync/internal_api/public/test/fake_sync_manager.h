@@ -97,7 +97,6 @@ class FakeSyncManager : public SyncManager {
       scoped_ptr<UnrecoverableErrorHandler> unrecoverable_error_handler,
       ReportUnrecoverableErrorFunction report_unrecoverable_error_function,
       CancelationSignal* cancelation_signal) OVERRIDE;
-  virtual void ThrowUnrecoverableError() OVERRIDE;
   virtual ModelTypeSet InitialSyncEndedTypes() OVERRIDE;
   virtual ModelTypeSet GetTypesWithEmptyProgressMarkerToken(
       ModelTypeSet types) OVERRIDE;
@@ -130,6 +129,13 @@ class FakeSyncManager : public SyncManager {
   virtual scoped_ptr<base::ListValue> GetAllNodesForType(
       syncer::ModelType type) OVERRIDE;
   virtual void RefreshTypes(ModelTypeSet types) OVERRIDE;
+  virtual void RegisterDirectoryTypeDebugInfoObserver(
+      syncer::TypeDebugInfoObserver* observer) OVERRIDE;
+  virtual void UnregisterDirectoryTypeDebugInfoObserver(
+      syncer::TypeDebugInfoObserver* observer) OVERRIDE;
+  virtual bool HasDirectoryTypeDebugInfoObserver(
+      syncer::TypeDebugInfoObserver* observer) OVERRIDE;
+  virtual void RequestEmitDebugInfo() OVERRIDE;
 
  private:
   scoped_refptr<base::SequencedTaskRunner> sync_task_runner_;

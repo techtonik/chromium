@@ -82,12 +82,6 @@ class NET_EXPORT_PRIVATE QuicSentPacketManager {
   void OnIncomingAck(const ReceivedPacketInfo& received_info,
                      QuicTime ack_receive_time);
 
-  // Discards any information for the packet corresponding to |sequence_number|.
-  // If this packet has been retransmitted, information on those packets
-  // will be discarded as well.  Also discards it from the congestion window if
-  // it is present.
-  void DiscardUnackedPacket(QuicPacketSequenceNumber sequence_number);
-
   // Returns true if the non-FEC packet |sequence_number| is unacked.
   bool IsUnacked(QuicPacketSequenceNumber sequence_number) const;
 
@@ -170,11 +164,6 @@ class NET_EXPORT_PRIVATE QuicSentPacketManager {
   friend class test::QuicConnectionPeer;
   friend class test::QuicSentPacketManagerPeer;
 
-  enum ReceivedByPeer {
-    RECEIVED_BY_PEER,
-    NOT_RECEIVED_BY_PEER,
-  };
-
   // The retransmission timer is a single timer which switches modes depending
   // upon connection state.
   enum RetransmissionTimeoutMode {
@@ -194,10 +183,6 @@ class NET_EXPORT_PRIVATE QuicSentPacketManager {
 
   // Process the incoming ack looking for newly ack'd data packets.
   void HandleAckForSentPackets(const ReceivedPacketInfo& received_info);
-
-  // Called when a packet is timed out, such as an RTO.  Removes the bytes from
-  // the congestion manager, but does not change the congestion window size.
-  void OnPacketAbandoned(QuicPacketSequenceNumber sequence_number);
 
   // Returns the current retransmission mode.
   RetransmissionTimeoutMode GetRetransmissionMode() const;
@@ -221,17 +206,20 @@ class NET_EXPORT_PRIVATE QuicSentPacketManager {
   const QuicTime::Delta GetRetransmissionDelay() const;
 
   // Update the RTT if the ack is for the largest acked sequence number.
-  void MaybeUpdateRTT(const ReceivedPacketInfo& received_info,
+  // Returns true if the rtt was updated.
+  bool MaybeUpdateRTT(const ReceivedPacketInfo& received_info,
                       const QuicTime& ack_receive_time);
-
-  // Chooses whether to nack retransmit any packets based on the receipt info.
-  // All acks have been handled before this method is invoked.
-  void MaybeRetransmitOnAckFrame(const ReceivedPacketInfo& received_info,
-                                 const QuicTime& ack_receive_time);
 
   // Invokes the loss detection algorithm and loses and retransmits packets if
   // necessary.
   void InvokeLossDetection(QuicTime time);
+
+  // Invokes OnCongestionEvent if |rtt_updated| is true, there are pending acks,
+  // or pending losses.  Clears pending acks and pending losses afterwards.
+  // |bytes_in_flight| is the number of bytes in flight before the losses or
+  // acks.
+  void MaybeInvokeCongestionEvent(bool rtt_updated,
+                                  QuicByteCount bytes_in_flight);
 
   // Marks |sequence_number| as having been revived by the peer, but not
   // received, so the packet remains pending if it is and the congestion control
@@ -239,13 +227,12 @@ class NET_EXPORT_PRIVATE QuicSentPacketManager {
   void MarkPacketRevived(QuicPacketSequenceNumber sequence_number,
                          QuicTime::Delta delta_largest_observed);
 
-  // Marks |sequence_number| as being fully handled, either due to receipt
-  // by the peer, or having been discarded as indecipherable.  Returns an
-  // iterator to the next remaining unacked packet.
+  // Removes the retransmittability and pending properties from the packet at
+  // |it| due to receipt by the peer.  Returns an iterator to the next remaining
+  // unacked packet.
   QuicUnackedPacketMap::const_iterator MarkPacketHandled(
-      QuicPacketSequenceNumber sequence_number,
-      QuicTime::Delta delta_largest_observed,
-      ReceivedByPeer received_by_peer);
+      QuicUnackedPacketMap::const_iterator it,
+      QuicTime::Delta delta_largest_observed);
 
   // Request that |sequence_number| be retransmitted after the other pending
   // retransmissions.  Does not add it to the retransmissions if it's already
@@ -290,6 +277,10 @@ class NET_EXPORT_PRIVATE QuicSentPacketManager {
   // Maximum number of tail loss probes to send before firing an RTO.
   size_t max_tail_loss_probes_;
   bool using_pacing_;
+
+  // Sets of packets acked and lost as a result of the last congestion event.
+  SendAlgorithmInterface::CongestionMap packets_acked_;
+  SendAlgorithmInterface::CongestionMap packets_lost_;
 
   DISALLOW_COPY_AND_ASSIGN(QuicSentPacketManager);
 };

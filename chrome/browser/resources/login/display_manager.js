@@ -173,10 +173,21 @@ cr.define('cr.ui.login', function() {
     forceKeyboardFlow_: false,
 
     /**
+     * Whether virtual keyboard is shown.
+     * @type {boolean}
+     */
+    virtualKeyboardShown_: false,
+
+    /**
      * Type of UI.
      * @type {string}
      */
     displayType_: DISPLAY_TYPE.UNKNOWN,
+
+    /**
+     * Error message (bubble) was shown. This is checked in tests.
+     */
+    errorMessageWasShownForTesting_: false,
 
     get displayType() {
       return this.displayType_;
@@ -221,6 +232,29 @@ cr.define('cr.ui.login', function() {
     },
 
     /**
+     * Virtual keyboard state (hidden/shown).
+     * @param {boolean} hidden Whether keyboard is shown.
+     */
+    get virtualKeyboardShown() {
+      return this.virtualKeyboardShown_;
+    },
+
+    set virtualKeyboardShown(shown) {
+      this.virtualKeyboardShown_ = shown;
+    },
+
+    /**
+     * Sets the current size of the client area (display size).
+     * @param {number} width client area width
+     * @param {number} height client area height
+     */
+    setClientAreaSize: function(width, height) {
+      var clientArea = $('outer-container');
+      var bottom = parseInt(window.getComputedStyle(clientArea).bottom);
+      clientArea.style.minHeight = (height - bottom) + 'px';
+    },
+
+    /**
      * Toggles background of main body between transparency and solid.
      * @param {boolean} solid Whether to show a solid background.
      */
@@ -240,6 +274,11 @@ cr.define('cr.ui.login', function() {
       if (value) {
         keyboard.initializeKeyboardFlow();
         cr.ui.DropDown.enableKeyboardFlow();
+        for (var i = 0; i < this.screens_.length; ++i) {
+          var screen = $(this.screens_[i]);
+          if (screen.enableKeyboardFlow)
+            screen.enableKeyboardFlow();
+        }
       }
     },
 
@@ -876,8 +915,10 @@ cr.define('cr.ui.login', function() {
     }
 
     var currentScreen = Oobe.getInstance().currentScreen;
-    if (currentScreen && typeof currentScreen.showErrorBubble === 'function')
+    if (currentScreen && typeof currentScreen.showErrorBubble === 'function') {
       currentScreen.showErrorBubble(loginAttempts, error);
+      this.errorMessageWasShownForTesting_ = true;
+    }
   };
 
   /**
@@ -907,6 +948,7 @@ cr.define('cr.ui.login', function() {
    */
   DisplayManager.clearErrors = function() {
     $('bubble').hide();
+    this.errorMessageWasShownForTesting_ = false;
   };
 
   /**

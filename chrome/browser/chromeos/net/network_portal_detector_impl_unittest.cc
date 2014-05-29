@@ -14,6 +14,7 @@
 #include "base/metrics/statistics_recorder.h"
 #include "base/run_loop.h"
 #include "chrome/browser/chromeos/net/network_portal_detector_impl.h"
+#include "chrome/browser/chromeos/net/network_portal_detector_strategy.h"
 #include "chrome/browser/chromeos/net/network_portal_detector_test_utils.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chromeos/chromeos_switches.h"
@@ -22,7 +23,6 @@
 #include "chromeos/dbus/shill_service_client.h"
 #include "chromeos/network/network_state.h"
 #include "chromeos/network/network_state_handler.h"
-#include "chromeos/network/shill_property_util.h"
 #include "components/captive_portal/captive_portal_detector.h"
 #include "components/captive_portal/captive_portal_testing_utils.h"
 #include "content/public/test/test_browser_thread_bundle.h"
@@ -134,11 +134,13 @@ class NetworkPortalDetectorImplTest
   }
 
   void enable_error_screen_strategy() {
-    network_portal_detector()->OnErrorScreenShow();
+    network_portal_detector()->SetStrategy(
+        PortalDetectorStrategy::STRATEGY_ID_ERROR_SCREEN);
   }
 
   void disable_error_screen_strategy() {
-    network_portal_detector()->OnErrorScreenHide();
+    network_portal_detector()->SetStrategy(
+        PortalDetectorStrategy::STRATEGY_ID_LOGIN_SCREEN);
   }
 
   void stop_detection() { network_portal_detector()->StopDetection(); }

@@ -193,12 +193,12 @@ URLRequestHttpJob::URLRequestHttpJob(
       request_time_snapshot_(),
       final_packet_time_(),
       filter_context_(new HttpFilterContext(this)),
-      weak_factory_(this),
       on_headers_received_callback_(
           base::Bind(&URLRequestHttpJob::OnHeadersReceivedCallback,
                      base::Unretained(this))),
       awaiting_callback_(false),
-      http_user_agent_settings_(http_user_agent_settings) {
+      http_user_agent_settings_(http_user_agent_settings),
+      weak_factory_(this) {
   URLRequestThrottlerManager* manager = request->context()->throttler_manager();
   if (manager)
     throttling_entry_ = manager->RegisterRequestUrl(request->url());
@@ -841,14 +841,13 @@ void URLRequestHttpJob::OnStartCompleted(int result) {
       NotifySSLCertificateError(info, true);
     } else {
       // Maybe overridable, maybe not. Ask the delegate to decide.
-      TransportSecurityState::DomainState domain_state;
       const URLRequestContext* context = request_->context();
-      const bool fatal = context->transport_security_state() &&
-          context->transport_security_state()->GetDomainState(
+      TransportSecurityState* state = context->transport_security_state();
+      const bool fatal =
+          state &&
+          state->ShouldSSLErrorsBeFatal(
               request_info_.url.host(),
-              SSLConfigService::IsSNIAvailable(context->ssl_config_service()),
-              &domain_state) &&
-          domain_state.ShouldSSLErrorsBeFatal();
+              SSLConfigService::IsSNIAvailable(context->ssl_config_service()));
       NotifySSLCertificateError(
           transaction_->GetResponseInfo()->ssl_info, fatal);
     }

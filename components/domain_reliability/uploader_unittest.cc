@@ -11,6 +11,7 @@
 #include "base/message_loop/message_loop_proxy.h"
 #include "components/domain_reliability/test_util.h"
 #include "content/public/test/test_browser_thread_bundle.h"
+#include "net/base/load_flags.h"
 #include "net/url_request/test_url_fetcher_factory.h"
 #include "net/url_request/url_fetcher_delegate.h"
 #include "net/url_request/url_request_context_getter.h"
@@ -18,6 +19,7 @@
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace domain_reliability {
+namespace {
 
 class DomainReliabilityUploaderTest : public testing::Test {
  protected:
@@ -29,13 +31,13 @@ class DomainReliabilityUploaderTest : public testing::Test {
         uploader_(DomainReliabilityUploader::Create(
             url_request_context_getter_)) {}
 
-  DomainReliabilityUploader::UploadCallback MakeUploadCallback(int index) {
+  DomainReliabilityUploader::UploadCallback MakeUploadCallback(size_t index) {
     return base::Bind(&DomainReliabilityUploaderTest::OnUploadComplete,
                       base::Unretained(this),
                       index);
   }
 
-  void OnUploadComplete(int index, bool success) {
+  void OnUploadComplete(size_t index, bool success) {
     EXPECT_FALSE(upload_complete_[index]);
     upload_complete_[index] = true;
     upload_successful_[index] = success;
@@ -46,8 +48,10 @@ class DomainReliabilityUploaderTest : public testing::Test {
   scoped_refptr<net::TestURLRequestContextGetter> url_request_context_getter_;
   scoped_ptr<DomainReliabilityUploader> uploader_;
 
-  std::map<int, bool> upload_complete_;
-  std::map<int, bool> upload_successful_;
+  // Whether the upload callback was called for a particular collector index.
+  std::map<size_t, bool> upload_complete_;
+  // Whether the upload to a particular collector was successful.
+  std::map<size_t, bool> upload_successful_;
 };
 
 TEST_F(DomainReliabilityUploaderTest, Create) {
@@ -61,13 +65,15 @@ TEST_F(DomainReliabilityUploaderTest, SuccessfulUpload) {
   net::TestURLFetcher* fetcher;
 
   std::string report_json = "{}";
-  GURL upload_url = GURL("https://test.example/upload");
+  GURL upload_url = GURL("https://example/upload");
   uploader_->UploadReport(report_json, upload_url, MakeUploadCallback(0));
 
   fetcher = url_fetcher_factory_.GetFetcherByID(0);
   EXPECT_TRUE(fetcher);
   EXPECT_EQ(report_json, fetcher->upload_data());
   EXPECT_EQ(upload_url, fetcher->GetOriginalURL());
+  EXPECT_TRUE(fetcher->GetLoadFlags() & net::LOAD_DO_NOT_SAVE_COOKIES);
+  EXPECT_TRUE(fetcher->GetLoadFlags() & net::LOAD_DO_NOT_SEND_COOKIES);
 
   fetcher->set_url(upload_url);
   fetcher->set_status(net::URLRequestStatus());
@@ -84,7 +90,7 @@ TEST_F(DomainReliabilityUploaderTest, FailedUpload) {
   net::TestURLFetcher* fetcher;
 
   std::string report_json = "{}";
-  GURL upload_url = GURL("https://test.example/upload");
+  GURL upload_url = GURL("https://example/upload");
   uploader_->UploadReport(report_json, upload_url, MakeUploadCallback(0));
 
   fetcher = url_fetcher_factory_.GetFetcherByID(0);
@@ -103,4 +109,5 @@ TEST_F(DomainReliabilityUploaderTest, FailedUpload) {
   EXPECT_FALSE(upload_successful_[0]);
 }
 
+}  // namespace
 }  // namespace domain_reliability

@@ -64,9 +64,7 @@ def _WebGLTestMessages(tab):
 
 class WebglConformanceValidator(page_test.PageTest):
   def __init__(self):
-    super(WebglConformanceValidator, self).__init__('ValidatePage',
-        attempts=1,
-        max_errors=10)
+    super(WebglConformanceValidator, self).__init__(attempts=1, max_errors=10)
 
   def ValidatePage(self, page, tab, results):
     if not _DidWebGLTestSucceed(tab):
@@ -83,14 +81,14 @@ class WebglConformanceValidator(page_test.PageTest):
 class WebglConformancePage(page_module.Page):
   def __init__(self, page_set, test):
     super(WebglConformancePage, self).__init__(
-      url='file://' + test, page_set=page_set, base_dir=page_set.base_dir)
-    self.name = ('WebglConformance.%s' %
-                 test.replace('/', '_').replace('-', '_').
-                 replace('\\', '_').rpartition('.')[0].replace('.', '_'))
+      url='file://' + test, page_set=page_set, base_dir=page_set.base_dir,
+      name=('WebglConformance.%s' %
+              test.replace('/', '_').replace('-', '_').
+                 replace('\\', '_').rpartition('.')[0].replace('.', '_')))
     self.script_to_evaluate_on_commit = conformance_harness_script
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {'javascript': 'webglTestHarness._finished', 'timeout': 120}))
 

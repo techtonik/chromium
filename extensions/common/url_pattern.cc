@@ -20,13 +20,13 @@ namespace {
 // TODO(aa): What about more obscure schemes like data: and javascript: ?
 // Note: keep this array in sync with kValidSchemeMasks.
 const char* kValidSchemes[] = {
-  content::kHttpScheme,
-  content::kHttpsScheme,
-  content::kFileScheme,
-  content::kFtpScheme,
-  content::kChromeUIScheme,
-  extensions::kExtensionScheme,
-  content::kFileSystemScheme,
+    url::kHttpScheme,
+    url::kHttpsScheme,
+    url::kFileScheme,
+    url::kFtpScheme,
+    content::kChromeUIScheme,
+    extensions::kExtensionScheme,
+    url::kFileSystemScheme,
 };
 
 const int kValidSchemeMasks[] = {
@@ -192,7 +192,7 @@ URLPattern::ParseResult URLPattern::Parse(const std::string& pattern) {
 
   if (!standard_scheme) {
     path_start_pos = host_start_pos;
-  } else if (scheme_ == content::kFileScheme) {
+  } else if (scheme_ == url::kFileScheme) {
     size_t host_end_pos = pattern.find(kPathSeparator, host_start_pos);
     if (host_end_pos == std::string::npos) {
       // Allow hostname omission.
@@ -365,7 +365,7 @@ bool URLPattern::MatchesScheme(const std::string& test) const {
 }
 
 bool URLPattern::MatchesHost(const std::string& host) const {
-  std::string test(content::kHttpScheme);
+  std::string test(url::kHttpScheme);
   test += content::kStandardSchemeSeparator;
   test += host;
   test += "/";
@@ -426,7 +426,7 @@ const std::string& URLPattern::GetAsString() const {
   std::string spec = scheme_ +
       (standard_scheme ? content::kStandardSchemeSeparator : ":");
 
-  if (scheme_ != content::kFileScheme && standard_scheme) {
+  if (scheme_ != url::kFileScheme && standard_scheme) {
     if (match_subdomains_) {
       spec += "*";
       if (!host_.empty())
@@ -493,7 +493,7 @@ bool URLPattern::MatchesAllSchemes(
 
 bool URLPattern::MatchesSecurityOriginHelper(const GURL& test) const {
   // Ignore hostname if scheme is file://.
-  if (scheme_ != content::kFileScheme && !MatchesHost(test))
+  if (scheme_ != url::kFileScheme && !MatchesHost(test))
     return false;
 
   if (!MatchesPortPattern(base::IntToString(test.EffectiveIntPort())))

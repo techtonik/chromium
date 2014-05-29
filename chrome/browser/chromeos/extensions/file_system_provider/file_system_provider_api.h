@@ -78,6 +78,102 @@ class FileSystemProviderInternalGetMetadataRequestedErrorFunction
   virtual bool RunWhenValid() OVERRIDE;
 };
 
+class FileSystemProviderInternalReadDirectoryRequestedSuccessFunction
+    : public FileSystemProviderInternalFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION(
+      "fileSystemProviderInternal.readDirectoryRequestedSuccess",
+      FILESYSTEMPROVIDERINTERNAL_READDIRECTORYREQUESTEDSUCCESS)
+
+ protected:
+  virtual ~FileSystemProviderInternalReadDirectoryRequestedSuccessFunction() {}
+  virtual bool RunWhenValid() OVERRIDE;
+};
+
+class FileSystemProviderInternalReadDirectoryRequestedErrorFunction
+    : public FileSystemProviderInternalFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION(
+      "fileSystemProviderInternal.readDirectoryRequestedError",
+      FILESYSTEMPROVIDERINTERNAL_READDIRECTORYREQUESTEDERROR)
+
+ protected:
+  virtual ~FileSystemProviderInternalReadDirectoryRequestedErrorFunction() {}
+  virtual bool RunWhenValid() OVERRIDE;
+};
+
+class FileSystemProviderInternalOpenFileRequestedSuccessFunction
+    : public FileSystemProviderInternalFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION(
+      "fileSystemProviderInternal.openFileRequestedSuccess",
+      FILESYSTEMPROVIDERINTERNAL_OPENFILEREQUESTEDSUCCESS)
+
+ protected:
+  virtual ~FileSystemProviderInternalOpenFileRequestedSuccessFunction() {}
+  virtual bool RunWhenValid() OVERRIDE;
+};
+
+class FileSystemProviderInternalOpenFileRequestedErrorFunction
+    : public FileSystemProviderInternalFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION(
+      "fileSystemProviderInternal.openFileRequestedError",
+      FILESYSTEMPROVIDERINTERNAL_OPENFILEREQUESTEDERROR)
+
+ protected:
+  virtual ~FileSystemProviderInternalOpenFileRequestedErrorFunction() {}
+  virtual bool RunWhenValid() OVERRIDE;
+};
+
+class FileSystemProviderInternalCloseFileRequestedSuccessFunction
+    : public FileSystemProviderInternalFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION(
+      "fileSystemProviderInternal.closeFileRequestedSuccess",
+      FILESYSTEMPROVIDERINTERNAL_CLOSEFILEREQUESTEDSUCCESS)
+
+ protected:
+  virtual ~FileSystemProviderInternalCloseFileRequestedSuccessFunction() {}
+  virtual bool RunWhenValid() OVERRIDE;
+};
+
+class FileSystemProviderInternalCloseFileRequestedErrorFunction
+    : public FileSystemProviderInternalFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION(
+      "fileSystemProviderInternal.closeFileRequestedError",
+      FILESYSTEMPROVIDERINTERNAL_CLOSEFILEREQUESTEDERROR)
+
+ protected:
+  virtual ~FileSystemProviderInternalCloseFileRequestedErrorFunction() {}
+  virtual bool RunWhenValid() OVERRIDE;
+};
+
+class FileSystemProviderInternalReadFileRequestedSuccessFunction
+    : public FileSystemProviderInternalFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION(
+      "fileSystemProviderInternal.readFileRequestedSuccess",
+      FILESYSTEMPROVIDERINTERNAL_READFILEREQUESTEDSUCCESS)
+
+ protected:
+  virtual ~FileSystemProviderInternalReadFileRequestedSuccessFunction() {}
+  virtual bool RunWhenValid() OVERRIDE;
+};
+
+class FileSystemProviderInternalReadFileRequestedErrorFunction
+    : public FileSystemProviderInternalFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION(
+      "fileSystemProviderInternal.readFileRequestedError",
+      FILESYSTEMPROVIDERINTERNAL_READFILEREQUESTEDERROR)
+
+ protected:
+  virtual ~FileSystemProviderInternalReadFileRequestedErrorFunction() {}
+  virtual bool RunWhenValid() OVERRIDE;
+};
+
 }  // namespace extensions
 
 #endif  // CHROME_BROWSER_CHROMEOS_EXTENSIONS_FILE_SYSTEM_PROVIDER_FILE_SYSTEM_PROVIDER_API_H_

@@ -17,11 +17,12 @@ namespace {
 
 class MockView : public PermissionBubbleView {
  public:
-  MockView() : shown_(false), delegate_(NULL) {}
+  MockView() : shown_(false), can_accept_updates_(true), delegate_(NULL) {}
   virtual ~MockView() {}
 
   void Clear() {
     shown_ = false;
+    can_accept_updates_ = true;
     delegate_ = NULL;
     permission_requests_.clear();
     permission_states_.clear();
@@ -46,10 +47,11 @@ class MockView : public PermissionBubbleView {
   }
 
   virtual bool CanAcceptRequestUpdate() OVERRIDE {
-    return true;
+    return can_accept_updates_;
   }
 
   bool shown_;
+  bool can_accept_updates_;
   Delegate* delegate_;
   std::vector<PermissionBubbleRequest*> permission_requests_;
   std::vector<bool> permission_states_;
@@ -62,12 +64,17 @@ class PermissionBubbleManagerTest : public ChromeRenderViewHostTestHarness {
   PermissionBubbleManagerTest()
       : ChromeRenderViewHostTestHarness(),
         request1_("test1"),
-        request2_("test2") {}
+        request2_("test2"),
+        iframe_request_same_domain_("iframe",
+                                    GURL("http://www.google.com/some/url")),
+        iframe_request_other_domain_("iframe",
+                                     GURL("http://www.youtube.com")) {}
   virtual ~PermissionBubbleManagerTest() {}
 
   virtual void SetUp() OVERRIDE {
     ChromeRenderViewHostTestHarness::SetUp();
     SetContents(CreateTestWebContents());
+    NavigateAndCommit(GURL("http://www.google.com"));
 
     manager_.reset(new PermissionBubbleManager(web_contents()));
   }
@@ -85,6 +92,15 @@ class PermissionBubbleManagerTest : public ChromeRenderViewHostTestHarness {
     manager_->Accept();
   }
 
+  void Closing() {
+    manager_->Closing();
+  }
+
+  void WaitForFrameLoad() {
+    manager_->DocumentLoadedInFrame(0, NULL);
+    base::MessageLoop::current()->RunUntilIdle();
+  }
+
   void WaitForCoalescing() {
     manager_->DocumentOnLoadCompletedInMainFrame();
     base::MessageLoop::current()->RunUntilIdle();
@@ -98,6 +114,8 @@ class PermissionBubbleManagerTest : public ChromeRenderViewHostTestHarness {
  protected:
   MockPermissionBubbleRequest request1_;
   MockPermissionBubbleRequest request2_;
+  MockPermissionBubbleRequest iframe_request_same_domain_;
+  MockPermissionBubbleRequest iframe_request_other_domain_;
   MockView view_;
   scoped_ptr<PermissionBubbleManager> manager_;
 };
@@ -315,7 +333,6 @@ TEST_F(PermissionBubbleManagerTest, DuplicateQueuedRequest) {
 }
 
 TEST_F(PermissionBubbleManagerTest, ForgetRequestsOnPageNavigation) {
-  NavigateAndCommit(GURL("http://www.google.com/"));
   manager_->SetView(&view_);
   manager_->AddRequest(&request1_);
   WaitForCoalescing();
@@ -329,4 +346,179 @@ TEST_F(PermissionBubbleManagerTest, ForgetRequestsOnPageNavigation) {
 
   EXPECT_TRUE(request1_.finished());
   EXPECT_TRUE(request2_.finished());
+}
+
+TEST_F(PermissionBubbleManagerTest, TestCancel) {
+  manager_->SetView(NULL);
+  manager_->AddRequest(&request1_);
+  WaitForCoalescing();
+
+  manager_->CancelRequest(&request1_);
+  EXPECT_TRUE(request1_.finished());
+  manager_->SetView(&view_);
+  EXPECT_FALSE(view_.shown_);
+
+  manager_->AddRequest(&request2_);
+  WaitForCoalescing();
+  EXPECT_TRUE(view_.shown_);
+}
+
+TEST_F(PermissionBubbleManagerTest, TestCancelWhileDialogShown) {
+  manager_->SetView(&view_);
+  manager_->AddRequest(&request1_);
+  WaitForCoalescing();
+
+  EXPECT_TRUE(view_.shown_);
+  EXPECT_FALSE(request1_.finished());
+  manager_->CancelRequest(&request1_);
+  EXPECT_TRUE(request1_.finished());
+}
+
+TEST_F(PermissionBubbleManagerTest, TestCancelWhileDialogShownNoUpdate) {
+  manager_->SetView(&view_);
+  view_.can_accept_updates_ = false;
+  manager_->AddRequest(&request1_);
+  WaitForCoalescing();
+
+  EXPECT_TRUE(view_.shown_);
+  EXPECT_FALSE(request1_.finished());
+  manager_->CancelRequest(&request1_);
+  EXPECT_TRUE(request1_.finished());
+  Closing();
+}
+
+TEST_F(PermissionBubbleManagerTest, TestCancelPendingRequest) {
+  manager_->SetView(&view_);
+  manager_->AddRequest(&request1_);
+  WaitForCoalescing();
+  manager_->AddRequest(&request2_);
+
+  EXPECT_TRUE(view_.shown_);
+  EXPECT_EQ(1u, view_.permission_requests_.size());
+  manager_->CancelRequest(&request2_);
+
+  EXPECT_TRUE(view_.shown_);
+  EXPECT_FALSE(request1_.finished());
+  EXPECT_TRUE(request2_.finished());
+}
+
+TEST_F(PermissionBubbleManagerTest, MainFrameNoRequestIFrameRequest) {
+  manager_->SetView(&view_);
+  manager_->AddRequest(&iframe_request_same_domain_);
+  WaitForCoalescing();
+  WaitForFrameLoad();
+
+  EXPECT_TRUE(view_.shown_);
+  Closing();
+  EXPECT_TRUE(iframe_request_same_domain_.finished());
+}
+
+TEST_F(PermissionBubbleManagerTest, MainFrameAndIFrameRequestSameDomain) {
+  manager_->SetView(&view_);
+  manager_->AddRequest(&request1_);
+  manager_->AddRequest(&iframe_request_same_domain_);
+  WaitForFrameLoad();
+  WaitForCoalescing();
+
+  EXPECT_TRUE(view_.shown_);
+  EXPECT_EQ(2u, view_.permission_requests_.size());
+  Closing();
+  EXPECT_TRUE(request1_.finished());
+  EXPECT_TRUE(iframe_request_same_domain_.finished());
+  EXPECT_FALSE(view_.shown_);
+}
+
+TEST_F(PermissionBubbleManagerTest, MainFrameAndIFrameRequestOtherDomain) {
+  manager_->SetView(&view_);
+  manager_->AddRequest(&request1_);
+  manager_->AddRequest(&iframe_request_other_domain_);
+  WaitForFrameLoad();
+  WaitForCoalescing();
+
+  EXPECT_TRUE(view_.shown_);
+  Closing();
+  EXPECT_TRUE(request1_.finished());
+  EXPECT_FALSE(iframe_request_other_domain_.finished());
+  EXPECT_TRUE(view_.shown_);
+  Closing();
+  EXPECT_TRUE(iframe_request_other_domain_.finished());
+}
+
+TEST_F(PermissionBubbleManagerTest, IFrameRequestWhenMainRequestVisible) {
+  manager_->SetView(&view_);
+  manager_->AddRequest(&request1_);
+  WaitForCoalescing();
+  EXPECT_TRUE(view_.shown_);
+
+  manager_->AddRequest(&iframe_request_same_domain_);
+  WaitForFrameLoad();
+  EXPECT_EQ(1u, view_.permission_requests_.size());
+  Closing();
+  EXPECT_TRUE(request1_.finished());
+  EXPECT_FALSE(iframe_request_same_domain_.finished());
+  EXPECT_TRUE(view_.shown_);
+  EXPECT_EQ(1u, view_.permission_requests_.size());
+  Closing();
+  EXPECT_TRUE(iframe_request_same_domain_.finished());
+}
+
+TEST_F(PermissionBubbleManagerTest,
+       IFrameRequestOtherDomainWhenMainRequestVisible) {
+  manager_->SetView(&view_);
+  manager_->AddRequest(&request1_);
+  WaitForCoalescing();
+  EXPECT_TRUE(view_.shown_);
+
+  manager_->AddRequest(&iframe_request_other_domain_);
+  WaitForFrameLoad();
+  Closing();
+  EXPECT_TRUE(request1_.finished());
+  EXPECT_FALSE(iframe_request_other_domain_.finished());
+  EXPECT_TRUE(view_.shown_);
+  Closing();
+  EXPECT_TRUE(iframe_request_other_domain_.finished());
+}
+
+TEST_F(PermissionBubbleManagerTest, IFrameUserGestureRequest) {
+  iframe_request_other_domain_.SetHasUserGesture();
+  manager_->SetView(&view_);
+  manager_->AddRequest(&request1_);
+  manager_->AddRequest(&iframe_request_other_domain_);
+  WaitForFrameLoad();
+  WaitForCoalescing();
+  manager_->AddRequest(&request2_);
+
+  EXPECT_TRUE(view_.shown_);
+  Closing();
+  EXPECT_TRUE(request1_.finished());
+  EXPECT_FALSE(iframe_request_other_domain_.finished());
+  EXPECT_FALSE(request2_.finished());
+  EXPECT_TRUE(view_.shown_);
+  Closing();
+  EXPECT_TRUE(iframe_request_other_domain_.finished());
+  EXPECT_FALSE(request2_.finished());
+}
+
+TEST_F(PermissionBubbleManagerTest, AllUserGestureRequests) {
+  iframe_request_other_domain_.SetHasUserGesture();
+  request2_.SetHasUserGesture();
+  manager_->SetView(&view_);
+  manager_->AddRequest(&request1_);
+  manager_->AddRequest(&iframe_request_other_domain_);
+  WaitForCoalescing();
+  WaitForFrameLoad();
+  manager_->AddRequest(&request2_);
+
+  EXPECT_TRUE(view_.shown_);
+  Closing();
+  EXPECT_TRUE(request1_.finished());
+  EXPECT_FALSE(request2_.finished());
+  EXPECT_FALSE(iframe_request_other_domain_.finished());
+  EXPECT_TRUE(view_.shown_);
+  Closing();
+  EXPECT_TRUE(request2_.finished());
+  EXPECT_FALSE(iframe_request_other_domain_.finished());
+  Closing();
+  EXPECT_TRUE(iframe_request_other_domain_.finished());
+  EXPECT_FALSE(view_.shown_);
 }

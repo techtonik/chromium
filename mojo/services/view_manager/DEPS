@@ -1,9 +1,18 @@
 include_rules = [
   "+mojo/aura",
+  "+mojo/geometry",
   "+mojo/services",
+  "+third_party/skia",
   "+ui/aura",
+  "+ui/base/cursor/cursor.h",
   "+ui/base/hit_test.h",
   "+ui/events",
   "+ui/gfx",
   "+ui/gl",
 ]
+
+specific_include_rules = {
+  "view_manager_connection_unittest.cc": [
+    "+mojo/service_manager/service_manager.h",
+  ],
+}

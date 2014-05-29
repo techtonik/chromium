@@ -11,6 +11,7 @@
 #include "chrome/browser/sync/glue/sync_backend_host_impl.h"
 #include "components/sync_driver/system_encryptor.h"
 #include "sync/internal_api/public/base/cancelation_signal.h"
+#include "sync/internal_api/public/sessions/type_debug_info_observer.h"
 #include "sync/internal_api/public/sync_encryption_handler.h"
 #include "url/gurl.h"
 
@@ -79,7 +80,8 @@ struct DoConfigureSyncerTypes {
 class SyncBackendHostCore
     : public base::RefCountedThreadSafe<SyncBackendHostCore>,
       public syncer::SyncEncryptionHandler::Observer,
-      public syncer::SyncManager::Observer {
+      public syncer::SyncManager::Observer,
+      public syncer::TypeDebugInfoObserver {
  public:
   SyncBackendHostCore(const std::string& name,
        const base::FilePath& sync_data_folder_path,
@@ -120,6 +122,17 @@ class SyncBackendHostCore
       syncer::Cryptographer* cryptographer) OVERRIDE;
   virtual void OnPassphraseTypeChanged(syncer::PassphraseType type,
                                        base::Time passphrase_time) OVERRIDE;
+
+  // TypeDebugInfoObserver implementation
+  virtual void OnCommitCountersUpdated(
+      syncer::ModelType type,
+      const syncer::CommitCounters& counters) OVERRIDE;
+  virtual void OnUpdateCountersUpdated(
+      syncer::ModelType type,
+      const syncer::UpdateCounters& counters) OVERRIDE;
+  virtual void OnStatusCountersUpdated(
+      syncer::ModelType type,
+      const syncer::StatusCounters& counters) OVERRIDE;
 
   // Forwards an invalidation state change to the sync manager.
   void DoOnInvalidatorStateChange(syncer::InvalidatorState state);
@@ -212,6 +225,14 @@ class SyncBackendHostCore
   void SendBufferedProtocolEventsAndEnableForwarding();
   void DisableProtocolEventForwarding();
 
+  // Enables the forwarding of directory type debug counters to the
+  // SyncBackendHost.  Also requests that updates to all counters be
+  // emitted right away to initialize any new listeners' states.
+  void EnableDirectoryTypeDebugInfoForwarding();
+
+  // Disables forwarding of directory type debug counters.
+  void DisableDirectoryTypeDebugInfoForwarding();
+
   // Delete the sync data folder to cleanup backend data.  Happens the first
   // time sync is enabled for a user (to prevent accidentally reusing old
   // sync databases), as well as shutdown when you're no longer syncing.
@@ -297,6 +318,9 @@ class SyncBackendHostCore
 
   // Set when we've been asked to forward sync protocol events to the frontend.
   bool forward_protocol_events_;
+
+  // Set when the forwarding of per-type debug counters is enabled.
+  bool forward_type_info_;
 
   base::WeakPtrFactory<SyncBackendHostCore> weak_ptr_factory_;
 

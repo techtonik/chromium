@@ -9,8 +9,9 @@ from telemetry.page import page_set as page_set_module
 
 class ToughPinchZoomCasesPage(page_module.Page):
 
-  def __init__(self, url, page_set):
-    super(ToughPinchZoomCasesPage, self).__init__(url=url, page_set=page_set)
+  def __init__(self, url, page_set, name=''):
+    super(ToughPinchZoomCasesPage, self).__init__(url=url, page_set=page_set,
+                                                  name=name)
     self.credentials_path = 'data/credentials.json'
     self.user_agent_type = 'desktop'
     self.archive_data_file = 'data/tough_pinch_zoom_cases.json'
@@ -29,7 +30,7 @@ class GoogleSearchPage(ToughPinchZoomCasesPage):
       page_set=page_set)
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'text': 'Next',
@@ -49,7 +50,7 @@ class GmailPage(ToughPinchZoomCasesPage):
     self.credentials = 'google'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'javascript' : (
@@ -70,14 +71,14 @@ class GoogleCalendarPage(ToughPinchZoomCasesPage):
     self.credentials = 'google'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction({'seconds':2}))
 
   def RunSmoothness(self, action_runner):
     action_runner.RunAction(PinchAction(
       {
         'left_anchor_percentage': 0.1,
-        'top_anchor_percentage': 0.1
+        'top_anchor_percentage': 0.3
       }))
 
 
@@ -105,7 +106,7 @@ class GooglePlusPage(ToughPinchZoomCasesPage):
     self.credentials = 'google'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'text': 'Home',
@@ -117,7 +118,7 @@ class GooglePlusPage(ToughPinchZoomCasesPage):
       {
         'element_function': '''
           function(callback) {
-            callback(document.getElementsByClassName("Ct")[0])
+            callback(document.getElementById("110031535020051778989-tab-bar"))
           }'''
       }))
 
@@ -134,7 +135,7 @@ class YoutubePage(ToughPinchZoomCasesPage):
     self.credentials = 'google'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction({'seconds':2}))
 
 class BlogSpotPage(ToughPinchZoomCasesPage):
@@ -147,12 +148,10 @@ class BlogSpotPage(ToughPinchZoomCasesPage):
   def __init__(self, page_set):
     super(BlogSpotPage, self).__init__(
       url='http://googlewebmastercentral.blogspot.com/',
-      page_set=page_set)
-
-    self.name = 'Blogger'
+      page_set=page_set, name='Blogger')
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'text': 'accessibility',
@@ -167,13 +166,11 @@ class FacebookPage(ToughPinchZoomCasesPage):
   def __init__(self, page_set):
     super(FacebookPage, self).__init__(
       url='http://www.facebook.com/barackobama',
-      page_set=page_set)
-
-    self.name = 'Facebook'
+      page_set=page_set, name='Facebook')
     self.credentials = 'facebook'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'text': 'About',
@@ -188,9 +185,7 @@ class LinkedinPage(ToughPinchZoomCasesPage):
   def __init__(self, page_set):
     super(LinkedinPage, self).__init__(
       url='http://www.linkedin.com/in/linustorvalds',
-      page_set=page_set)
-
-    self.name = 'LinkedIn'
+      page_set=page_set, name='LinkedIn')
 
 
 class WikipediaPage(ToughPinchZoomCasesPage):
@@ -200,9 +195,7 @@ class WikipediaPage(ToughPinchZoomCasesPage):
   def __init__(self, page_set):
     super(WikipediaPage, self).__init__(
       url='http://en.wikipedia.org/wiki/Wikipedia',
-      page_set=page_set)
-
-    self.name = 'Wikipedia (1 tab)'
+      page_set=page_set, name='Wikipedia (1 tab)')
 
 
 class TwitterPage(ToughPinchZoomCasesPage):
@@ -212,12 +205,10 @@ class TwitterPage(ToughPinchZoomCasesPage):
   def __init__(self, page_set):
     super(TwitterPage, self).__init__(
       url='https://twitter.com/katyperry',
-      page_set=page_set)
-
-    self.name = 'Twitter'
+      page_set=page_set, name='Twitter')
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction({'seconds':2}))
 
 class ESPNPage(ToughPinchZoomCasesPage):
@@ -227,9 +218,7 @@ class ESPNPage(ToughPinchZoomCasesPage):
   def __init__(self, page_set):
     super(ESPNPage, self).__init__(
       url='http://espn.go.com/nba',
-      page_set=page_set)
-
-    self.name = 'ESPN'
+      page_set=page_set, name='ESPN')
 
 
 class WeatherDotComPage(ToughPinchZoomCasesPage):
@@ -240,9 +229,7 @@ class WeatherDotComPage(ToughPinchZoomCasesPage):
     super(WeatherDotComPage, self).__init__(
       # pylint: disable=C0301
       url='http://www.weather.com/weather/right-now/Mountain+View+CA+94043',
-      page_set=page_set)
-
-    self.name = 'Weather.com'
+      page_set=page_set, name='Weather.com')
 
 
 class YahooGamePage(ToughPinchZoomCasesPage):
@@ -255,8 +242,28 @@ class YahooGamePage(ToughPinchZoomCasesPage):
       page_set=page_set)
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction({'seconds':2}))
+
+
+class YahooAnswersPage(ToughPinchZoomCasesPage):
+
+  """ Why: #1 Alexa reference """
+
+  def __init__(self, page_set):
+    super(YahooAnswersPage, self).__init__(
+      url='http://answers.yahoo.com',
+      page_set=page_set)
+
+  def RunSmoothness(self, action_runner):
+    action_runner.RunAction(PinchAction(
+      {
+        'element_function': '''
+          function(callback) {
+            callback(document.getElementById("ya-content-apps"))
+          }'''
+      }))
+
 
 class ToughPinchZoomCasesPageSet(page_set_module.PageSet):
 
@@ -301,8 +308,7 @@ class ToughPinchZoomCasesPageSet(page_set_module.PageSet):
     # Why: #1 Alexa recreation
     self.AddPage(ToughPinchZoomCasesPage('http://booking.com', self))
 
-    # Why: #1 Alexa reference
-    self.AddPage(ToughPinchZoomCasesPage('http://answers.yahoo.com', self))
+    self.AddPage(YahooAnswersPage(self))
 
     # Why: #1 Alexa sports
     self.AddPage(ToughPinchZoomCasesPage('http://sports.yahoo.com/', self))

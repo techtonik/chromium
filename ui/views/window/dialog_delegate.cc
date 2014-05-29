@@ -13,7 +13,6 @@
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_observer.h"
 #include "ui/views/window/dialog_client_view.h"
-#include "ui/wm/core/shadow_types.h"
 
 namespace views {
 
@@ -34,13 +33,10 @@ Widget* DialogDelegate::CreateDialogWidget(DialogDelegate* dialog,
     params.opacity = Widget::InitParams::TRANSLUCENT_WINDOW;
     params.remove_standard_frame = true;
   }
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS)
-  // Dialogs on Linux always have custom frames.
-  params.remove_standard_frame = true;
-#endif
   params.context = context;
   params.parent = parent;
-  params.top_level = true;
+  // TODO(msw): Add a matching shadow type and remove the bubble frame border?
+  params.shadow_type = views::Widget::InitParams::SHADOW_TYPE_NONE;
   widget->Init(params);
   return widget;
 }
@@ -156,18 +152,16 @@ NonClientFrameView* DialogDelegate::CreateNonClientFrameView(Widget* widget) {
 // static
 NonClientFrameView* DialogDelegate::CreateDialogFrameView(Widget* widget) {
   BubbleFrameView* frame = new BubbleFrameView(gfx::Insets());
-  const SkColor color = widget->GetNativeTheme()->GetSystemColor(
-      ui::NativeTheme::kColorId_DialogBackground);
-  frame->SetBubbleBorder(scoped_ptr<BubbleBorder>(new BubbleBorder(
-      BubbleBorder::FLOAT, BubbleBorder::SMALL_SHADOW, color)));
+  scoped_ptr<BubbleBorder> border(new BubbleBorder(
+      BubbleBorder::FLOAT, BubbleBorder::SMALL_SHADOW, SK_ColorRED));
+  border->set_use_theme_background_color(true);
+  frame->SetBubbleBorder(border.Pass());
   DialogDelegate* delegate = widget->widget_delegate()->AsDialogDelegate();
   if (delegate) {
     View* titlebar_view = delegate->CreateTitlebarExtraView();
     if (titlebar_view)
       frame->SetTitlebarExtraView(titlebar_view);
   }
-  // TODO(msw): Add a matching shadow type and remove the bubble frame border?
-  wm::SetShadowType(widget->GetNativeWindow(), wm::SHADOW_TYPE_NONE);
   return frame;
 }
 

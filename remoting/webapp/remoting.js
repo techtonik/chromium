@@ -14,6 +14,14 @@ var remoting = remoting || {};
  */
 remoting.isAppsV2 = false;
 
+
+/**
+ * @type {base.EventSource} An event source object for handling global events.
+ *    This is an interim hack.  Eventually, we should move functionalities
+ *    away from the remoting namespace and into smaller objects.
+ */
+remoting.testEvents;
+
 /**
  * Show the authorization consent UI and register a one-shot event handler to
  * continue the authorization process.
@@ -61,6 +69,8 @@ remoting.init = function() {
   if (remoting.isAppsV2) {
     remoting.identity = new remoting.Identity(consentRequired_);
     remoting.fullscreen = new remoting.FullscreenAppsV2();
+    remoting.windowFrame = new remoting.WindowFrame(
+        document.getElementById('title-bar'));
   } else {
     remoting.oauth2 = new remoting.OAuth2();
     if (!remoting.oauth2.isAuthenticated()) {
@@ -148,6 +158,14 @@ remoting.init = function() {
     };
     isWindowed_(onIsWindowed);
   }
+
+  remoting.testEvents = new base.EventSource();
+
+  /** @enum {string} */
+  remoting.testEvents.Names = {
+    uiModeChanged: 'uiModeChanged'
+  };
+  remoting.testEvents.defineEvents(base.values(remoting.testEvents.Names));
 };
 
 /**
@@ -172,15 +190,14 @@ remoting.createNpapiPlugin = function(container) {
   // Hiding the plugin means it doesn't load, so make it size zero instead.
   plugin.width = 0;
   plugin.height = 0;
-  container.appendChild(plugin);
 
   // Verify if the plugin was loaded successfully.
-  if (!plugin.hasOwnProperty('REQUESTED_ACCESS_CODE')) {
-    container.removeChild(plugin);
-    return null;
+  if (plugin.hasOwnProperty('REQUESTED_ACCESS_CODE')) {
+    container.appendChild(plugin);
+    return /** @type {remoting.HostPlugin} */ (plugin);
   }
 
-  return /** @type {remoting.HostPlugin} */ (plugin);
+  return null;
 };
 
 /**

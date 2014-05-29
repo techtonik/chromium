@@ -5,56 +5,85 @@
 #include "mojo/services/public/cpp/view_manager/view_tree_node.h"
 
 #include "base/logging.h"
+#include "base/strings/stringprintf.h"
+#include "mojo/services/public/cpp/view_manager/lib/view_tree_node_private.h"
+#include "mojo/services/public/cpp/view_manager/util.h"
 #include "mojo/services/public/cpp/view_manager/view_tree_node_observer.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace mojo {
-namespace services {
 namespace view_manager {
 
 // ViewTreeNode ----------------------------------------------------------------
 
 typedef testing::Test ViewTreeNodeTest;
 
+// Subclass with public ctor/dtor.
+class TestViewTreeNode : public ViewTreeNode {
+ public:
+  TestViewTreeNode() {
+    ViewTreeNodePrivate(this).set_id(1);
+  }
+  ~TestViewTreeNode() {}
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(TestViewTreeNode);
+};
+
 TEST_F(ViewTreeNodeTest, AddChild) {
-  ViewTreeNode v1;
-  ViewTreeNode* v11 = new ViewTreeNode;
-  v1.AddChild(v11);
+  TestViewTreeNode v1;
+  TestViewTreeNode v11;
+  v1.AddChild(&v11);
   EXPECT_EQ(1U, v1.children().size());
 }
 
 TEST_F(ViewTreeNodeTest, RemoveChild) {
-  ViewTreeNode v1;
-  ViewTreeNode* v11 = new ViewTreeNode;
-  v1.AddChild(v11);
+  TestViewTreeNode v1;
+  TestViewTreeNode v11;
+  v1.AddChild(&v11);
   EXPECT_EQ(1U, v1.children().size());
-  v1.RemoveChild(v11);
+  v1.RemoveChild(&v11);
   EXPECT_EQ(0U, v1.children().size());
 }
 
 TEST_F(ViewTreeNodeTest, Reparent) {
-  ViewTreeNode v1;
-  ViewTreeNode v2;
-  ViewTreeNode* v11 = new ViewTreeNode;
-  v1.AddChild(v11);
+  TestViewTreeNode v1;
+  TestViewTreeNode v2;
+  TestViewTreeNode v11;
+  v1.AddChild(&v11);
   EXPECT_EQ(1U, v1.children().size());
-  v2.AddChild(v11);
+  v2.AddChild(&v11);
   EXPECT_EQ(1U, v2.children().size());
   EXPECT_EQ(0U, v1.children().size());
 }
 
 TEST_F(ViewTreeNodeTest, Contains) {
-  ViewTreeNode v1;
+  TestViewTreeNode v1;
 
   // Direct descendant.
-  ViewTreeNode* v11 = new ViewTreeNode;
-  v1.AddChild(v11);
-  EXPECT_TRUE(v1.Contains(v11));
+  TestViewTreeNode v11;
+  v1.AddChild(&v11);
+  EXPECT_TRUE(v1.Contains(&v11));
 
   // Indirect descendant.
-  ViewTreeNode* v111 = new ViewTreeNode;
-  v11->AddChild(v111);
-  EXPECT_TRUE(v1.Contains(v111));
+  TestViewTreeNode v111;
+  v11.AddChild(&v111);
+  EXPECT_TRUE(v1.Contains(&v111));
+}
+
+TEST_F(ViewTreeNodeTest, GetChildById) {
+  TestViewTreeNode v1;
+  ViewTreeNodePrivate(&v1).set_id(1);
+  TestViewTreeNode v11;
+  ViewTreeNodePrivate(&v11).set_id(11);
+  v1.AddChild(&v11);
+  TestViewTreeNode v111;
+  ViewTreeNodePrivate(&v111).set_id(111);
+  v11.AddChild(&v111);
+
+  // Find direct & indirect descendents.
+  EXPECT_EQ(&v11, v1.GetChildById(v11.id()));
+  EXPECT_EQ(&v111, v1.GetChildById(v111.id()));
 }
 
 // ViewTreeNodeObserver --------------------------------------------------------
@@ -99,12 +128,11 @@ class TreeChangeObserver : public ViewTreeNodeObserver {
 
 // Adds/Removes v11 to v1.
 TEST_F(ViewTreeNodeObserverTest, TreeChange_SimpleAddRemove) {
-  ViewTreeNode v1;
+  TestViewTreeNode v1;
   TreeChangeObserver o1(&v1);
   EXPECT_TRUE(o1.received_params().empty());
 
-  ViewTreeNode v11;
-  v11.set_owned_by_parent(false);
+  TestViewTreeNode v11;
   TreeChangeObserver o11(&v11);
   EXPECT_TRUE(o11.received_params().empty());
 
@@ -162,17 +190,13 @@ TEST_F(ViewTreeNodeObserverTest, TreeChange_SimpleAddRemove) {
 //  +- v1112
 // Then adds/removes v111 from v11.
 TEST_F(ViewTreeNodeObserverTest, TreeChange_NestedAddRemove) {
-  ViewTreeNode v1, v11, v111, v1111, v1112;
+  TestViewTreeNode v1, v11, v111, v1111, v1112;
 
   // Root tree.
-  v11.set_owned_by_parent(false);
   v1.AddChild(&v11);
 
   // Tree to be attached.
-  v111.set_owned_by_parent(false);
-  v1111.set_owned_by_parent(false);
   v111.AddChild(&v1111);
-  v1112.set_owned_by_parent(false);
   v111.AddChild(&v1112);
 
   TreeChangeObserver o1(&v1), o11(&v11), o111(&v111), o1111(&v1111),
@@ -273,10 +297,7 @@ TEST_F(ViewTreeNodeObserverTest, TreeChange_NestedAddRemove) {
 }
 
 TEST_F(ViewTreeNodeObserverTest, TreeChange_Reparent) {
-  ViewTreeNode v1, v11, v12, v111;
-  v11.set_owned_by_parent(false);
-  v111.set_owned_by_parent(false);
-  v12.set_owned_by_parent(false);
+  TestViewTreeNode v1, v11, v12, v111;
   v1.AddChild(&v11);
   v1.AddChild(&v12);
   v11.AddChild(&v111);
@@ -325,6 +346,79 @@ TEST_F(ViewTreeNodeObserverTest, TreeChange_Reparent) {
   EXPECT_TRUE(TreeChangeParamsMatch(p111, o111.received_params().back()));
 }
 
+namespace {
+
+typedef std::vector<std::string> Changes;
+
+std::string NodeIdToString(TransportNodeId id) {
+  return (id == 0) ? "null" :
+      base::StringPrintf("%d,%d", HiWord(id), LoWord(id));
+}
+
+std::string RectToString(const gfx::Rect& rect) {
+  return base::StringPrintf("%d,%d %dx%d",
+                            rect.x(), rect.y(), rect.width(), rect.height());
+}
+
+std::string PhaseToString(ViewTreeNodeObserver::DispositionChangePhase phase) {
+  return phase == ViewTreeNodeObserver::DISPOSITION_CHANGING ?
+      "changing" : "changed";
+}
+
+class BoundsChangeObserver : public ViewTreeNodeObserver {
+ public:
+  explicit BoundsChangeObserver(ViewTreeNode* node) : node_(node) {
+    node_->AddObserver(this);
+  }
+  virtual ~BoundsChangeObserver() {
+    node_->RemoveObserver(this);
+  }
+
+  Changes GetAndClearChanges() {
+    Changes changes;
+    changes.swap(changes_);
+    return changes;
+  }
+
+ private:
+  // Overridden from ViewTreeNodeObserver:
+  virtual void OnNodeBoundsChange(ViewTreeNode* node,
+                                  const gfx::Rect& old_bounds,
+                                  const gfx::Rect& new_bounds,
+                                  DispositionChangePhase phase) OVERRIDE {
+    changes_.push_back(
+        base::StringPrintf(
+            "node=%s old_bounds=%s new_bounds=%s phase=%s",
+            NodeIdToString(node->id()).c_str(),
+            RectToString(old_bounds).c_str(),
+            RectToString(new_bounds).c_str(),
+            PhaseToString(phase).c_str()));
+  }
+
+  ViewTreeNode* node_;
+  Changes changes_;
+
+  DISALLOW_COPY_AND_ASSIGN(BoundsChangeObserver);
+};
+
+}  // namespace
+
+TEST_F(ViewTreeNodeObserverTest, SetBounds) {
+  TestViewTreeNode v1;
+  {
+    BoundsChangeObserver observer(&v1);
+    v1.SetBounds(gfx::Rect(0, 0, 100, 100));
+
+    Changes changes = observer.GetAndClearChanges();
+    EXPECT_EQ(2U, changes.size());
+    EXPECT_EQ(
+        "node=0,1 old_bounds=0,0 0x0 new_bounds=0,0 100x100 phase=changing",
+        changes[0]);
+    EXPECT_EQ(
+        "node=0,1 old_bounds=0,0 0x0 new_bounds=0,0 100x100 phase=changed",
+        changes[1]);
+  }
+}
+
 }  // namespace view_manager
-}  // namespace services
 }  // namespace mojo

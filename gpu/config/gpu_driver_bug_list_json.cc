@@ -19,7 +19,7 @@ const char kGpuDriverBugListJson[] = LONG_STRING_CONST(
 {
   "name": "gpu driver bug list",
   // Please update the version number whenever you change this file.
-  "version": "5.2",
+  "version": "5.7",
   "entries": [
     {
       "id": 1,
@@ -394,21 +394,6 @@ const char kGpuDriverBugListJson[] = LONG_STRING_CONST(
                     "0x0a04", "0x0a16", "0x0a22", "0x0a26", "0x0a2a"],
       "features": [
         "swizzle_rgba_for_async_readpixels"
-      ]
-    },
-    {
-      "id": 29,
-      "cr_bugs": [278606],
-      "description": "Testing fences is broken on Qualcomm.",
-      "os": {
-        "type": "android"
-      },
-      "gl_vendor": {
-        "op": "beginwith",
-        "value": "Qualcomm"
-      },
-      "features": [
-        "disable_async_readpixels"
       ]
     },
     {
@@ -946,6 +931,98 @@ const char kGpuDriverBugListJson[] = LONG_STRING_CONST(
       },
       "features": [
         "disable_oes_standard_derivatives"
+      ]
+    },
+    {
+      "id": 72,
+      "description": "Use virtual contexts on NVIDIA with GLES 3.1",
+      "cr_bugs": [369316],
+      "os": {
+        "type": "android"
+      },
+      "gl_type": "gles",
+      "gl_version": {
+        "op": "=",
+        "value": "3.1"
+      },
+      "gl_vendor": {
+        "op": "beginwith",
+        "value": "NVidia"
+      },
+      "features": [
+        "use_virtualized_gl_contexts"
+      ]
+    },
+    {
+      "id": 73,
+      "description": "Using D3D11 causes browser crashes on certain Intel GPUs",
+      "cr_bugs": [310808],
+      "os": {
+        "type": "win"
+      },
+      "vendor_id": "0x8086",
+      "features": [
+        "disable_d3d11"
+      ]
+    },
+)  // LONG_STRING_CONST macro
+// Avoid C2026 (string too big) error on VisualStudio.
+LONG_STRING_CONST(
+    {
+      "id": 74,
+      "cr_bugs": [278606],
+      "description": "Testing EGL sync fences is broken on Qualcomm before Android 4.4",
+      "os": {
+        "type": "android",
+        "version": {
+          "op": "<",
+          "value": "4.4"
+        }
+      },
+      "gl_vendor": {
+        "op": "beginwith",
+        "value": "Qualcomm"
+      },
+      "features": [
+        "disable_egl_khr_fence_sync"
+      ]
+    },
+    {
+      "id": 75,
+      "description": "Mali-400 support of EXT_multisampled_render_to_texture is buggy on Android < 4.3",
+      "cr_bugs": [362435],
+      "os": {
+        "type": "android",
+        "version": {
+          "op": "<",
+          "value": "4.3"
+        }
+      },
+      "gl_vendor": {
+        "op": "beginwith",
+        "value": "ARM"
+      },
+      "gl_renderer": {
+        "op": "contains",
+        "value": "Mali-400"
+      },
+      "features": [
+        "disable_multisampling"
+      ]
+    },
+    {
+      "id": 76,
+      "cr_bugs": [371530],
+      "description": "Testing EGL sync fences is broken on IMG",
+      "os": {
+        "type": "android"
+      },
+      "gl_vendor": {
+        "op": "beginwith",
+        "value": "Imagination Technologies"
+      },
+      "features": [
+        "disable_egl_khr_fence_sync"
       ]
     }
   ]

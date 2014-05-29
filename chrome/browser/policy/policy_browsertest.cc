@@ -56,6 +56,7 @@
 #include "chrome/browser/search_engines/template_url.h"
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
+#include "chrome/browser/translate/translate_browser_test_utils.h"
 #include "chrome/browser/translate/translate_infobar_delegate.h"
 #include "chrome/browser/translate/translate_service.h"
 #include "chrome/browser/translate/translate_tab_helper.h"
@@ -497,8 +498,7 @@ class WebContentsLoadedOrDestroyedWatcher
   void Wait();
 
   // Overridden WebContentsObserver methods.
-  virtual void WebContentsDestroyed(
-      content::WebContents* web_contents) OVERRIDE;
+  virtual void WebContentsDestroyed() OVERRIDE;
   virtual void DidStopLoading(
       content::RenderViewHost* render_view_host) OVERRIDE;
 
@@ -520,8 +520,7 @@ void WebContentsLoadedOrDestroyedWatcher::Wait() {
   message_loop_runner_->Run();
 }
 
-void WebContentsLoadedOrDestroyedWatcher::WebContentsDestroyed(
-    content::WebContents* web_contents) {
+void WebContentsLoadedOrDestroyedWatcher::WebContentsDestroyed() {
   message_loop_runner_->Quit();
 }
 
@@ -540,8 +539,6 @@ class TestAddAppWindowObserver : public apps::AppWindowRegistry::Observer {
 
   // apps::AppWindowRegistry::Observer:
   virtual void OnAppWindowAdded(apps::AppWindow* app_window) OVERRIDE;
-  virtual void OnAppWindowIconChanged(apps::AppWindow* app_window) OVERRIDE;
-  virtual void OnAppWindowRemoved(apps::AppWindow* app_window) OVERRIDE;
 
   apps::AppWindow* WaitForAppWindow();
 
@@ -566,12 +563,6 @@ TestAddAppWindowObserver::~TestAddAppWindowObserver() {
 void TestAddAppWindowObserver::OnAppWindowAdded(apps::AppWindow* app_window) {
   window_ = app_window;
   run_loop_.Quit();
-}
-
-void TestAddAppWindowObserver::OnAppWindowIconChanged(
-    apps::AppWindow* app_window) {}
-
-void TestAddAppWindowObserver::OnAppWindowRemoved(apps::AppWindow* app_window) {
 }
 
 apps::AppWindow* TestAddAppWindowObserver::WaitForAppWindow() {
@@ -709,7 +700,7 @@ class PolicyTest : public InProcessBrowserTest {
 
   void UninstallExtension(const std::string& id, bool expect_success) {
     content::WindowedNotificationObserver observer(
-        expect_success ? chrome::NOTIFICATION_EXTENSION_UNINSTALLED
+        expect_success ? chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED
                        : chrome::NOTIFICATION_EXTENSION_UNINSTALL_NOT_ALLOWED,
         content::NotificationService::AllSources());
     extension_service()->UninstallExtension(id, false, NULL);
@@ -1561,7 +1552,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, ExtensionInstallForcelist) {
   policies.Set(key::kExtensionInstallForcelist, POLICY_LEVEL_MANDATORY,
                POLICY_SCOPE_USER, forcelist.DeepCopy(), NULL);
   content::WindowedNotificationObserver observer(
-      chrome::NOTIFICATION_EXTENSION_INSTALLED,
+      chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
       content::NotificationService::AllSources());
   UpdateProviderPolicy(policies);
   observer.Wait();
@@ -1599,7 +1590,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, ExtensionInstallForcelist) {
   extensions::ExtensionUpdater::CheckParams params;
   params.install_immediately = true;
   content::WindowedNotificationObserver update_observer(
-      chrome::NOTIFICATION_EXTENSION_INSTALLED,
+      chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
       content::NotificationService::AllSources());
   updater->CheckNow(params);
   update_observer.Wait();
@@ -1702,6 +1693,12 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, MAYBE_ExtensionInstallSources) {
   const GURL referrer_url(URLRequestMockHTTPJob::GetMockUrl(
       base::FilePath(FILE_PATH_LITERAL("policy/*"))));
 
+  base::ScopedTempDir download_directory;
+  ASSERT_TRUE(download_directory.CreateUniqueTempDir());
+  DownloadPrefs* download_prefs =
+      DownloadPrefs::FromBrowserContext(browser()->profile());
+  download_prefs->SetDownloadPath(download_directory.path());
+
   const GURL download_page_url(URLRequestMockHTTPJob::GetMockUrl(base::FilePath(
       FILE_PATH_LITERAL("policy/extension_install_sources_test.html"))));
   ui_test_utils::NavigateToURL(browser(), download_page_url);
@@ -1723,7 +1720,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, MAYBE_ExtensionInstallSources) {
   UpdateProviderPolicy(policies);
 
   content::WindowedNotificationObserver observer(
-      chrome::NOTIFICATION_EXTENSION_INSTALLED,
+      chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
       content::NotificationService::AllSources());
   PerformClick(1, 0);
   observer.Wait();
@@ -1866,6 +1863,8 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, SavingBrowserHistoryDisabled) {
 
 // http://crbug.com/241691 PolicyTest.TranslateEnabled is failing regularly.
 IN_PROC_BROWSER_TEST_F(PolicyTest, DISABLED_TranslateEnabled) {
+  test::ScopedCLDDynamicDataHarness dynamic_data_scope;
+  ASSERT_NO_FATAL_FAILURE(dynamic_data_scope.Init());
   TranslateService::SetUseInfobar(true);
 
   // Verifies that translate can be forced enabled or disabled by policy.

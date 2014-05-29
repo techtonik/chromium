@@ -23,7 +23,7 @@ from telemetry.page.actions import action_runner as action_runner_module
 from telemetry.page.actions import interact
 
 
-class RecordPage(page_test.PageTest):
+class RecordPage(page_test.PageTest):  # pylint: disable=W0223
   def __init__(self, measurements):
     # This class overwrites PageTest.Run, so that the test method name is not
     # really used (except for throwing an exception if it doesn't exist).
@@ -73,7 +73,7 @@ class RecordPage(page_test.PageTest):
         continue
       if should_reload:
         self.RunNavigateSteps(page, tab)
-      action_runner = action_runner_module.ActionRunner(page, tab, self)
+      action_runner = action_runner_module.ActionRunner(tab)
       if interactive:
         action_runner.RunAction(interact.InteractAction())
       else:

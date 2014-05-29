@@ -204,6 +204,21 @@ class WebviewCaptureVisibleRegionFunction
   DISALLOW_COPY_AND_ASSIGN(WebviewCaptureVisibleRegionFunction);
 };
 
+class WebviewSetNameFunction : public WebviewExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("webview.setName", WEBVIEW_SETNAME);
+
+  WebviewSetNameFunction();
+
+ protected:
+  virtual ~WebviewSetNameFunction();
+
+ private:
+  virtual bool RunAsyncSafe(WebViewGuest* guest) OVERRIDE;
+
+  DISALLOW_COPY_AND_ASSIGN(WebviewSetNameFunction);
+};
+
 class WebviewSetZoomFunction : public WebviewExtensionFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("webview.setZoom", WEBVIEW_SETZOOM);
@@ -315,6 +330,23 @@ class WebviewSetPermissionFunction : public WebviewExtensionFunction {
   virtual bool RunAsyncSafe(WebViewGuest* guest) OVERRIDE;
 
   DISALLOW_COPY_AND_ASSIGN(WebviewSetPermissionFunction);
+};
+
+class WebviewShowContextMenuFunction : public WebviewExtensionFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("webview.showContextMenu",
+                             WEBVIEW_SHOWCONTEXTMENU);
+
+  WebviewShowContextMenuFunction();
+
+ protected:
+  virtual ~WebviewShowContextMenuFunction();
+
+ private:
+  // WebviewExtensionFunction implementation.
+  virtual bool RunAsyncSafe(WebViewGuest* guest) OVERRIDE;
+
+  DISALLOW_COPY_AND_ASSIGN(WebviewShowContextMenuFunction);
 };
 
 class WebviewOverrideUserAgentFunction: public WebviewExtensionFunction {

@@ -38,7 +38,17 @@ void Connector::CloseMessagePipe() {
   Close(message_pipe_.Pass());
 }
 
+ScopedMessagePipeHandle Connector::ReleaseMessagePipe() {
+  if (async_wait_id_) {
+    waiter_->CancelWait(waiter_, async_wait_id_);
+    async_wait_id_ = 0;
+  }
+  return message_pipe_.Pass();
+}
+
 bool Connector::Accept(Message* message) {
+  assert(message_pipe_.is_valid());
+
   if (error_)
     return false;
 
@@ -76,13 +86,6 @@ bool Connector::Accept(Message* message) {
   return true;
 }
 
-bool Connector::AcceptWithResponder(Message* message,
-                                    MessageReceiver* responder) {
-  // TODO(darin): Implement this!
-  assert(false);
-  return false;
-}
-
 // static
 void Connector::CallOnHandleReady(void* closure, MojoResult result) {
   Connector* self = static_cast<Connector*>(closure);
@@ -99,7 +102,7 @@ void Connector::OnHandleReady(MojoResult result) {
   }
 
   if (error_ && error_handler_)
-    error_handler_->OnError();
+    error_handler_->OnConnectionError();
 }
 
 void Connector::WaitToReadMore() {

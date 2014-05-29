@@ -2,42 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import "../public/interfaces/geometry/geometry.mojom"
+import "../public/interfaces/input_events/input_events.mojom"
+
 module mojo {
 
-struct Point {
-  float x;
-  float y;
-};
-
-struct Size {
-  float width;
-  float height;
-};
-
-struct Rect {
-  Point position;
-  Size size;
-};
-
-struct KeyData {
-  int32 key_code;
-  bool is_char;
-};
-
-struct TouchData {
-  int32 pointer_id;
-};
-
-struct Event {
-  int32 action;
-  int32 flags;
-  int64 time_stamp;
-  Point location;
-  KeyData key_data;
-  TouchData touch_data;
-};
-
-[Peer=NativeViewportClient]
+[Client=NativeViewportClient]
 interface NativeViewport {
   Create(Rect bounds);
   Show();
@@ -47,7 +17,6 @@ interface NativeViewport {
   CreateGLES2Context(handle<message_pipe> gles2_client);
 };
 
-[Peer=NativeViewport]
 interface NativeViewportClient {
   OnCreated();
   OnBoundsChanged(Rect bounds);

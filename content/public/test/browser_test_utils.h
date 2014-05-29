@@ -78,6 +78,9 @@ void SimulateMouseEvent(WebContents* web_contents,
                         blink::WebInputEvent::Type type,
                         const gfx::Point& point);
 
+// Taps the screen at |point|.
+void SimulateTapAt(WebContents* web_contents, const gfx::Point& point);
+
 // Sends a key press asynchronously.
 // The native code of the key event will be set to InvalidNativeKeycode().
 // |key_code| alone is good enough for scenarios that only need the char
@@ -223,7 +226,7 @@ class WebContentsDestroyedWatcher : public WebContentsObserver {
 
  private:
   // Overridden WebContentsObserver methods.
-  virtual void WebContentsDestroyed(WebContents* web_contents) OVERRIDE;
+  virtual void WebContentsDestroyed() OVERRIDE;
 
   scoped_refptr<MessageLoopRunner> message_loop_runner_;
 

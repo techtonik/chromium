@@ -47,6 +47,7 @@ namespace ui {
 class Accelerator;
 class Compositor;
 class DefaultThemeProvider;
+class InputMethod;
 class Layer;
 class NativeTheme;
 class OSExchangeData;
@@ -161,6 +162,14 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
       TRANSLUCENT_WINDOW,
     };
 
+    enum Activatable {
+      // Infer whether the window should be activatable from the window type.
+      ACTIVATABLE_DEFAULT,
+
+      ACTIVATABLE_YES,
+      ACTIVATABLE_NO
+    };
+
     enum Ownership {
       // Default. Creator is not responsible for managing the lifetime of the
       // Widget, it is destroyed when the corresponding NativeWidget is
@@ -169,6 +178,15 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
       // Used when the Widget is owned by someone other than the NativeWidget,
       // e.g. a scoped_ptr in tests.
       WIDGET_OWNS_NATIVE_WIDGET
+    };
+
+    enum ShadowType {
+      SHADOW_TYPE_DEFAULT,  // Use default shadow setting. It will be one of
+                            // the settings below depending on InitParams::type
+                            // and the native widget's type.
+      SHADOW_TYPE_NONE,     // Don't draw any shadow.
+      SHADOW_TYPE_DROP,     // Draw a drop shadow that emphasizes Z-order
+                            // relationship to other windows.
     };
 
     InitParams();
@@ -186,12 +204,12 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
     // non-window widgets.
     WindowOpacity opacity;
     bool accept_events;
-    bool can_activate;
+    Activatable activatable;
     bool keep_on_top;
     bool visible_on_all_workspaces;
     Ownership ownership;
     bool mirror_origin_in_rtl;
-    bool has_dropshadow;
+    ShadowType shadow_type;
     // Specifies that the system default caption and icon should not be
     // rendered, and that the client area should be equivalent to the window
     // area. Only used on some platforms (Windows and Linux).
@@ -217,10 +235,6 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
     // TODO(beng): Figure out if there's a better way to expose this, e.g. get
     // rid of NW subclasses and do this all via message handling.
     DesktopWindowTreeHost* desktop_window_tree_host;
-    // Whether this window is intended to be a toplevel window with no
-    // attachment to any other window. (This may be a transient window if
-    // |parent| is set.)
-    bool top_level;
     // Only used by NativeWidgetAura. Specifies the type of layer for the
     // aura::Window. Default is WINDOW_LAYER_TEXTURED.
     aura::WindowLayerType layer_type;
@@ -349,7 +363,7 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
 
   // Returns the accelerator given a command id. Returns false if there is
   // no accelerator associated with a given id, which is a common condition.
-  virtual bool GetAccelerator(int cmd_id, ui::Accelerator* accelerator);
+  virtual bool GetAccelerator(int cmd_id, ui::Accelerator* accelerator) const;
 
   // Forwarded from the RootView so that the widget can do any cleanup.
   void ViewHierarchyChanged(const View::ViewHierarchyChangedDetails& details);
@@ -541,6 +555,11 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
   InputMethod* GetInputMethod();
   const InputMethod* GetInputMethod() const;
 
+  // Returns the ui::InputMethod for this widget.
+  // TODO(yukishiino): Rename this method to GetInputMethod once we remove
+  // views::InputMethod.
+  ui::InputMethod* GetHostInputMethod();
+
   // Starts a drag operation for the specified view. This blocks until the drag
   // operation completes. |view| can be NULL.
   // If the view is non-NULL it can be accessed during the drag by calling
@@ -731,8 +750,8 @@ class VIEWS_EXPORT Widget : public internal::NativeWidgetDelegate,
   virtual void OnNativeWidgetCreated(bool desktop_widget) OVERRIDE;
   virtual void OnNativeWidgetDestroying() OVERRIDE;
   virtual void OnNativeWidgetDestroyed() OVERRIDE;
-  virtual gfx::Size GetMinimumSize() OVERRIDE;
-  virtual gfx::Size GetMaximumSize() OVERRIDE;
+  virtual gfx::Size GetMinimumSize() const OVERRIDE;
+  virtual gfx::Size GetMaximumSize() const OVERRIDE;
   virtual void OnNativeWidgetMove() OVERRIDE;
   virtual void OnNativeWidgetSizeChanged(const gfx::Size& new_size) OVERRIDE;
   virtual void OnNativeWidgetBeginUserBoundsChange() OVERRIDE;

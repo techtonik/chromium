@@ -12,7 +12,7 @@
 #include "base/compiler_specific.h"
 #include "base/memory/ref_counted.h"
 #include "base/observer_list.h"
-#include "chrome/browser/chromeos/login/oobe_display.h"
+#include "chrome/browser/chromeos/login/ui/oobe_display.h"
 #include "chrome/browser/ui/webui/chromeos/login/core_oobe_handler.h"
 #include "content/public/browser/web_ui_controller.h"
 
@@ -23,7 +23,6 @@ class DictionaryValue;
 namespace chromeos {
 class AppLaunchSplashScreenActor;
 class BaseScreenHandler;
-class CoreOobeHandler;
 class ErrorScreenHandler;
 class KioskAppMenuHandler;
 class KioskEnableScreenActor;
@@ -80,6 +79,7 @@ class OobeUI : public OobeDisplay,
   // OobeDisplay implementation:
   virtual void ShowScreen(WizardScreen* screen) OVERRIDE;
   virtual void HideScreen(WizardScreen* screen) OVERRIDE;
+  virtual CoreOobeActor* GetCoreOobeActor() OVERRIDE;
   virtual UpdateScreenActor* GetUpdateScreenActor() OVERRIDE;
   virtual NetworkScreenActor* GetNetworkScreenActor() OVERRIDE;
   virtual EulaScreenActor* GetEulaScreenActor() OVERRIDE;

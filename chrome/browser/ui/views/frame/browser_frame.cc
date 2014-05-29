@@ -108,8 +108,8 @@ void BrowserFrame::InitBrowserFrame() {
       chrome::HOST_DESKTOP_TYPE_ASH || chrome::ShouldOpenAshOnStartup()) {
     params.context = ash::Shell::GetPrimaryRootWindow();
 #if defined(OS_WIN)
-   // If this window is under ASH on Windows, we need it to be translucent.
-   params.opacity = views::Widget::InitParams::TRANSLUCENT_WINDOW;
+    // If this window is under ASH on Windows, we need it to be translucent.
+    params.opacity = views::Widget::InitParams::TRANSLUCENT_WINDOW;
 #endif
   }
 #endif
@@ -120,7 +120,7 @@ void BrowserFrame::InitBrowserFrame() {
   // windows and e.g app windows.
   const CommandLine& command_line = *CommandLine::ForCurrentProcess();
   const Browser& browser = *browser_view_->browser();
-  params.wm_class_class = ShellIntegrationLinux::GetProgramClassName();
+  params.wm_class_class = shell_integration_linux::GetProgramClassName();
   params.wm_class_name = params.wm_class_class;
   if (browser.is_app() && !browser.is_devtools()) {
     // This window is a hosted app or v1 packaged app.
@@ -191,6 +191,15 @@ bool BrowserFrame::UseCustomFrame() const {
   return use_custom_frame_pref_.GetValue();
 }
 
+bool BrowserFrame::ShouldSaveWindowPlacement() const {
+  return native_browser_frame_->ShouldSaveWindowPlacement();
+}
+
+void BrowserFrame::GetWindowPlacement(gfx::Rect* bounds,
+                                      ui::WindowShowState* show_state) const {
+  return native_browser_frame_->GetWindowPlacement(bounds, show_state);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // BrowserFrame, views::Widget overrides:
 
@@ -206,7 +215,7 @@ views::NonClientFrameView* BrowserFrame::CreateNonClientFrameView() {
 }
 
 bool BrowserFrame::GetAccelerator(int command_id,
-                                  ui::Accelerator* accelerator) {
+                                  ui::Accelerator* accelerator) const {
   return browser_view_->GetAccelerator(command_id, accelerator);
 }
 

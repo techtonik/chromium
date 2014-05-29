@@ -60,7 +60,7 @@ class TestQuicConnection : public QuicConnection {
                      QuicConnectionHelper* helper,
                      QuicPacketWriter* writer)
       : QuicConnection(connection_id, address, helper, writer, false,
-                       versions, kInitialFlowControlWindowForTest) {
+                       versions) {
   }
 
   void SetSendAlgorithm(SendAlgorithmInterface* send_algorithm) {
@@ -129,7 +129,7 @@ class QuicHttpStreamTest : public ::testing::TestWithParam<QuicVersion> {
         use_closing_stream_(false),
         read_buffer_(new IOBufferWithSize(4096)),
         connection_id_(2),
-        stream_id_(5),
+        stream_id_(kClientDataStreamId1),
         maker_(GetParam(), connection_id_),
         random_generator_(0) {
     IPAddressNumber ip;
@@ -184,12 +184,12 @@ class QuicHttpStreamTest : public ::testing::TestWithParam<QuicVersion> {
     EXPECT_CALL(*receive_algorithm_, RecordIncomingPacket(_, _, _)).
         Times(AnyNumber());
     EXPECT_CALL(*send_algorithm_,
-                OnPacketSent(_, _, _, _)).WillRepeatedly(Return(true));
+                OnPacketSent(_, _, _, _, _)).WillRepeatedly(Return(true));
     EXPECT_CALL(*send_algorithm_, RetransmissionDelay()).WillRepeatedly(
         Return(QuicTime::Delta::Zero()));
     EXPECT_CALL(*send_algorithm_, GetCongestionWindow()).WillRepeatedly(
         Return(kMaxPacketSize));
-    EXPECT_CALL(*send_algorithm_, TimeUntilSend(_, _)).
+    EXPECT_CALL(*send_algorithm_, TimeUntilSend(_, _, _)).
         WillRepeatedly(Return(QuicTime::Delta::Zero()));
     EXPECT_CALL(*send_algorithm_, BandwidthEstimate()).WillRepeatedly(
         Return(QuicBandwidth::Zero()));
@@ -212,7 +212,9 @@ class QuicHttpStreamTest : public ::testing::TestWithParam<QuicVersion> {
                               make_scoped_ptr((QuicServerInfo*)NULL),
                               QuicServerId(kServerHostname, kServerPort,
                                            false, PRIVACY_MODE_DISABLED),
-                              DefaultQuicConfig(), &crypto_config_, NULL));
+                              DefaultQuicConfig(),
+                              kInitialFlowControlWindowForTest, &crypto_config_,
+                              NULL));
     session_->GetCryptoStream()->CryptoConnect();
     EXPECT_TRUE(session_->IsCryptoHandshakeConfirmed());
     stream_.reset(use_closing_stream_ ?

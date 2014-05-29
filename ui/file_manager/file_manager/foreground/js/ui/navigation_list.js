@@ -33,7 +33,7 @@ NavigationListItem.prototype.decorate = function() {
   this.appendChild(this.iconDiv_);
 
   this.label_ = cr.doc.createElement('div');
-  this.label_.className = 'root-label';
+  this.label_.className = 'root-label entry-name';
   this.appendChild(this.label_);
 
   cr.defineProperty(this, 'lead', cr.PropertyKind.BOOL_ATTR);
@@ -52,11 +52,23 @@ NavigationListItem.prototype.setModelItem = function(modelItem) {
 
   var typeIcon;
   if (modelItem.isVolume) {
+    if (modelItem.volumeInfo.volumeType == 'provided') {
+      var backgroundImage = '-webkit-image-set(' +
+          'url(chrome://extension-icon/' + modelItem.volumeInfo.extensionId +
+              '/24/1) 1x, ' +
+          'url(chrome://extension-icon/' + modelItem.volumeInfo.extensionId +
+              '/48/1) 2x);';
+      // The icon div is not yet added to DOM, therefore it is impossible to
+      // use style.backgroundImage.
+      this.iconDiv_.setAttribute(
+          'style', 'background-image: ' + backgroundImage);
+    }
     typeIcon = modelItem.volumeInfo.volumeType;
   } else if (modelItem.isShortcut) {
     // Shortcuts are available for Drive only.
-    typeIcon = util.VolumeType.DRIVE;
+    typeIcon = VolumeManagerCommon.VolumeType.DRIVE;
   }
+
   this.iconDiv_.setAttribute('volume-type-icon', typeIcon);
 
   if (modelItem.isVolume) {
@@ -67,8 +79,12 @@ NavigationListItem.prototype.setModelItem = function(modelItem) {
   this.label_.textContent = modelItem.label;
 
   if (modelItem.isVolume &&
-      (modelItem.volumeInfo.volumeType === util.VolumeType.ARCHIVE ||
-       modelItem.volumeInfo.volumeType === util.VolumeType.REMOVABLE)) {
+      (modelItem.volumeInfo.volumeType ===
+           VolumeManagerCommon.VolumeType.ARCHIVE ||
+       modelItem.volumeInfo.volumeType ===
+           VolumeManagerCommon.VolumeType.REMOVABLE ||
+       modelItem.volumeInfo.volumeType ===
+           VolumeManagerCommon.VolumeType.PROVIDED)) {
     this.eject_ = cr.doc.createElement('div');
     // Block other mouse handlers.
     this.eject_.addEventListener(
@@ -100,9 +116,12 @@ NavigationListItem.prototype.maybeSetContextMenu = function(menu) {
   // The context menu is shown on the following items:
   // - Removable and Archive volumes
   // - Folder shortcuts
-  if (this.modelItem_.isVolume &&
-      (this.modelItem_.volumeInfo.volumeType === util.VolumeType.REMOVABLE ||
-       this.modelItem_.volumeInfo.volumeType === util.VolumeType.ARCHIVE) ||
+  if (this.modelItem_.isVolume && (this.modelItem_.volumeInfo.volumeType ===
+          VolumeManagerCommon.VolumeType.REMOVABLE ||
+      this.modelItem_.volumeInfo.volumeType ===
+          VolumeManagerCommon.VolumeType.ARCHIVE ||
+      this.modelItem_.volumeInfo.volumeType ===
+          VolumeManagerCommon.VolumeType.PROVIDED) ||
       this.modelItem_.isShortcut) {
     cr.ui.contextMenuHandler.setContextMenu(this, menu);
   }
@@ -307,7 +326,7 @@ NavigationList.prototype.activateModelItem_ = function(modelItem) {
         url,
         onEntryResolved,
         function() {
-          // Error, the entry can't be re-resolved. It may happen for shotrcuts
+          // Error, the entry can't be re-resolved. It may happen for shortcuts
           // which targets got removed after resolving the Entry during
           // initialization.
           this.dataModel.onItemNotFoundError(modelItem);

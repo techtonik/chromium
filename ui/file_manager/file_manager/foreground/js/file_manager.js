@@ -533,6 +533,15 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
     this.commandHandler.updateAvailability();
     this.document_.getElementById('drive-separator').hidden =
         !this.shouldShowDriveSettings();
+
+    // Force to update the gear menu position.
+    // TODO(hirono): Remove the workaround for the crbug.com/374093 after fixing
+    // it.
+    var gearMenu = this.document_.querySelector('#gear-menu');
+    gearMenu.style.left = '';
+    gearMenu.style.right = '';
+    gearMenu.style.top = '';
+    gearMenu.style.bottom = '';
   };
 
   /**
@@ -810,7 +819,7 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
     this.document_.addEventListener('keyup', this.onKeyUp_.bind(this));
 
     this.renameInput_ = this.document_.createElement('input');
-    this.renameInput_.className = 'rename';
+    this.renameInput_.className = 'rename entry-name';
 
     this.renameInput_.addEventListener(
         'keydown', this.onRenameInputKeyDown_.bind(this));
@@ -1047,7 +1056,8 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
     this.directoryTree_ = this.dialogDom_.querySelector('#directory-tree');
     DirectoryTree.decorate(this.directoryTree_,
                            this.directoryModel_,
-                           this.volumeManager_);
+                           this.volumeManager_,
+                           this.metadataCache_);
 
     this.navigationList_ = this.dialogDom_.querySelector('#navigation-list');
     NavigationList.decorate(this.navigationList_,
@@ -1068,7 +1078,7 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
 
     var driveVolume = this.volumeManager_.getVolumeInfo(entry);
     var visible = driveVolume && !driveVolume.error &&
-        driveVolume.volumeType === util.VolumeType.DRIVE;
+        driveVolume.volumeType === VolumeManagerCommon.VolumeType.DRIVE;
     this.dialogDom_.
         querySelector('.dialog-middlebar-contents').hidden = !visible;
     this.dialogDom_.querySelector('#middlebar-splitter').hidden = !visible;
@@ -1581,29 +1591,9 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
         return;
 
       var task = null;
-      // Handle restoring after crash, or the gallery action.
-      // TODO(mtomasz): Use the gallery action instead of just the gallery
-      //     field.
-      if (this.params_.gallery ||
-          this.params_.action === 'gallery' ||
-          this.params_.action === 'gallery-video') {
-        if (!opt_selectionEntry) {
-          // Non-existent file or a directory.
-          // Reloading while the Gallery is open with empty or multiple
-          // selection. Open the Gallery when the directory is scanned.
-          task = function() {
-            new FileTasks(this, this.params_).openGallery([]);
-          }.bind(this);
-        } else {
-          // The file or the directory exists.
-          task = function() {
-            new FileTasks(this, this.params_).openGallery([opt_selectionEntry]);
-          }.bind(this);
-        }
-      } else {
-        // TODO(mtomasz): Implement remounting archives after crash.
-        //                See: crbug.com/333139
-      }
+
+      // TODO(mtomasz): Implement remounting archives after crash.
+      //                See: crbug.com/333139
 
       // If there is a task to be run, run it after the scan is completed.
       if (task) {
@@ -1727,10 +1717,10 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
    */
   FileManager.prototype.isOnDrive = function() {
     var rootType = this.directoryModel_.getCurrentRootType();
-    return rootType === RootType.DRIVE ||
-           rootType === RootType.DRIVE_SHARED_WITH_ME ||
-           rootType === RootType.DRIVE_RECENT ||
-           rootType === RootType.DRIVE_OFFLINE;
+    return rootType === VolumeManagerCommon.RootType.DRIVE ||
+           rootType === VolumeManagerCommon.RootType.DRIVE_SHARED_WITH_ME ||
+           rootType === VolumeManagerCommon.RootType.DRIVE_RECENT ||
+           rootType === VolumeManagerCommon.RootType.DRIVE_OFFLINE;
   };
 
   /**
@@ -1877,64 +1867,6 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
         window.close();
       }
     }
-  };
-
-  /**
-   * Shows a modal-like file viewer/editor on top of the File Manager UI.
-   *
-   * @param {HTMLElement} popup Popup element.
-   * @param {function()} closeCallback Function to call after the popup is
-   *     closed.
-   */
-  FileManager.prototype.openFilePopup = function(popup, closeCallback) {
-    this.closeFilePopup();
-    this.filePopup_ = popup;
-    this.filePopupCloseCallback_ = closeCallback;
-    this.dialogDom_.insertBefore(
-        this.filePopup_, this.dialogDom_.querySelector('#iframe-drag-area'));
-    this.filePopup_.focus();
-    this.document_.body.setAttribute('overlay-visible', '');
-    this.document_.querySelector('#iframe-drag-area').hidden = false;
-  };
-
-  /**
-   * Closes the modal-like file viewer/editor popup.
-   */
-  FileManager.prototype.closeFilePopup = function() {
-    if (this.filePopup_) {
-      this.document_.body.removeAttribute('overlay-visible');
-      this.document_.querySelector('#iframe-drag-area').hidden = true;
-      // The window resize would not be processed properly while the relevant
-      // divs had 'display:none', force resize after the layout fired.
-      setTimeout(this.onResize_.bind(this), 0);
-      if (this.filePopup_.contentWindow &&
-          this.filePopup_.contentWindow.unload) {
-        this.filePopup_.contentWindow.unload();
-      }
-
-      if (this.filePopupCloseCallback_) {
-        this.filePopupCloseCallback_();
-        this.filePopupCloseCallback_ = null;
-      }
-
-      // These operations have to be in the end, otherwise v8 crashes on an
-      // assert. See: crbug.com/224174.
-      this.dialogDom_.removeChild(this.filePopup_);
-      this.filePopup_ = null;
-    }
-  };
-
-  /**
-   * Updates visibility of the draggable app region in the modal-like file
-   * viewer/editor.
-   *
-   * @param {boolean} visible True for visible, false otherwise.
-   */
-  FileManager.prototype.onFilePopupAppRegionChanged = function(visible) {
-    if (!this.filePopup_)
-      return;
-
-    this.document_.querySelector('#iframe-drag-area').hidden = !visible;
   };
 
   /**
@@ -2147,7 +2079,7 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
       }
 
       var basename = entry.name;
-      var splitted = PathUtil.splitExtension(basename);
+      var splitted = util.splitExtension(basename);
       var filename = splitted[0];
       var extension = splitted[1];
       var mime = props[0].contentMimeType;
@@ -2372,7 +2304,8 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
       this.dialogDom_.setAttribute('unformatted', '');
 
       var errorNode = this.dialogDom_.querySelector('#format-panel > .error');
-      if (volumeInfo.error == util.VolumeError.UNSUPPORTED_FILESYSTEM) {
+      if (volumeInfo.error ===
+          VolumeManagerCommon.VolumeError.UNSUPPORTED_FILESYSTEM) {
         errorNode.textContent = str('UNSUPPORTED_FILESYSTEM_WARNING');
       } else {
         errorNode.textContent = str('UNKNOWN_FILESYSTEM_WARNING');
@@ -2434,22 +2367,24 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
       return;
     var label = item.querySelector('.filename-label');
     var input = this.renameInput_;
+    var currentEntry = this.currentList_.dataModel.item(item.listIndex);
 
     input.value = label.textContent;
     item.setAttribute('renaming', '');
     label.parentNode.appendChild(input);
     input.focus();
+
     var selectionEnd = input.value.lastIndexOf('.');
-    if (selectionEnd == -1) {
-      input.select();
-    } else {
+    if (currentEntry.isFile && selectionEnd !== -1) {
       input.selectionStart = 0;
       input.selectionEnd = selectionEnd;
+    } else {
+      input.select();
     }
 
     // This has to be set late in the process so we don't handle spurious
     // blur events.
-    input.currentEntry = this.currentList_.dataModel.item(item.listIndex);
+    input.currentEntry = currentEntry;
     this.table_.startBatchUpdates();
     this.grid_.startBatchUpdates();
   };
@@ -2843,22 +2778,37 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
     var self = this;
     var list = self.currentList_;
     var tryCreate = function() {
-      self.directoryModel_.createDirectory(current(),
-                                           onSuccess, onError);
     };
 
     var onSuccess = function(entry) {
       metrics.recordUserAction('CreateNewFolder');
       list.selectedItem = entry;
+
+      self.table_.list.endBatchUpdates();
+      self.grid_.endBatchUpdates();
+
       self.initiateRename();
     };
 
     var onError = function(error) {
+      self.table_.list.endBatchUpdates();
+      self.grid_.endBatchUpdates();
+
       self.alert.show(strf('ERROR_CREATING_FOLDER', current(),
                            util.getFileErrorString(error.name)));
     };
 
-    tryCreate();
+    var onAbort = function() {
+      self.table_.list.endBatchUpdates();
+      self.grid_.endBatchUpdates();
+    };
+
+    this.table_.list.startBatchUpdates();
+    this.grid_.startBatchUpdates();
+    this.directoryModel_.createDirectory(current(),
+                                         onSuccess,
+                                         onError,
+                                         onAbort);
   };
 
   /**

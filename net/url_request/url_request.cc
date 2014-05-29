@@ -82,9 +82,8 @@ bool g_default_can_use_cookies = true;
 // at which each event occurred.  The API requires the time which the request
 // was blocked on each phase.  This function handles the conversion.
 //
-// In the case of reusing a SPDY session or HTTP pipeline, old proxy results may
-// have been reused, so proxy resolution times may be before the request was
-// started.
+// In the case of reusing a SPDY session, old proxy results may have been
+// reused, so proxy resolution times may be before the request was started.
 //
 // Due to preconnect and late binding, it is also possible for the connection
 // attempt to start before a request has been started, or proxy resolution
@@ -1065,13 +1064,11 @@ bool URLRequest::GetHSTSRedirect(GURL* redirect_url) const {
   const GURL& url = this->url();
   if (!url.SchemeIs("http"))
     return false;
-  TransportSecurityState::DomainState domain_state;
-  if (context()->transport_security_state() &&
-      context()->transport_security_state()->GetDomainState(
+  TransportSecurityState* state = context()->transport_security_state();
+  if (state &&
+      state->ShouldUpgradeToSSL(
           url.host(),
-          SSLConfigService::IsSNIAvailable(context()->ssl_config_service()),
-          &domain_state) &&
-      domain_state.ShouldUpgradeToSSL()) {
+          SSLConfigService::IsSNIAvailable(context()->ssl_config_service()))) {
     url::Replacements<char> replacements;
     const char kNewScheme[] = "https";
     replacements.SetScheme(kNewScheme, url::Component(0, strlen(kNewScheme)));

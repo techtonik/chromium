@@ -73,10 +73,6 @@ class AccountReconcilor : public KeyedService,
   class RefreshTokenFetcher;
   class UserIdFetcher;
 
-  bool IsPeriodicReconciliationRunning() const {
-    return reconciliation_timer_.IsRunning();
-  }
-
   bool IsRegisteredWithTokenService() const {
     return registered_with_token_service_;
   }
@@ -138,21 +134,19 @@ class AccountReconcilor : public KeyedService,
 
   void DeleteFetchers();
 
-  // Start and stop the periodic reconciliation.
-  void StartPeriodicReconciliation();
-  void StopPeriodicReconciliation();
-  void PeriodicReconciliation();
-
   // All actions with side effects.  Virtual so that they can be overridden
   // in tests.
   virtual void PerformMergeAction(const std::string& account_id);
   virtual void PerformAddToChromeAction(const std::string& account_id,
                                         int session_index);
   virtual void PerformLogoutAllAccountsAction();
+  virtual void PerformAddAccountToTokenService(
+      const std::string& account_id,
+      const std::string& refresh_token);
 
   // Used to remove an account from chrome and the cookie jar.
-  virtual void StartRemoveAction(const std::string& account_id);
-  virtual void FinishRemoveAction(
+  virtual void PerformStartRemoveAction(const std::string& account_id);
+  virtual void PerformFinishRemoveAction(
       const std::string& account_id,
       const GoogleServiceAuthError& error,
       const std::vector<std::pair<std::string, bool> >& accounts);
@@ -214,7 +208,6 @@ class AccountReconcilor : public KeyedService,
   // The SigninClient associated with this reconcilor.
   SigninClient* client_;
 
-  base::RepeatingTimer<AccountReconcilor> reconciliation_timer_;
   MergeSessionHelper merge_session_helper_;
   scoped_ptr<GaiaAuthFetcher> gaia_fetcher_;
   bool registered_with_token_service_;
@@ -222,6 +215,9 @@ class AccountReconcilor : public KeyedService,
   // True while the reconcilor is busy checking or managing the accounts in
   // this profile.
   bool is_reconcile_started_;
+
+  // True iff this is the first time the reconcilor is executing.
+  bool first_execution_;
 
   // Used during reconcile action.
   // These members are used used to validate the gaia cookie.  |gaia_accounts_|

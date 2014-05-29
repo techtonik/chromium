@@ -367,12 +367,20 @@ CommandHandler.COMMANDS_['unmount'] = {
     var rootType =
         locationInfo && locationInfo.isRootEntry && locationInfo.rootType;
 
-    event.canExecute = (rootType == RootType.ARCHIVE ||
-                        rootType == RootType.REMOVABLE);
+    event.canExecute = (rootType == VolumeManagerCommon.RootType.ARCHIVE ||
+                        rootType == VolumeManagerCommon.RootType.REMOVABLE ||
+                        rootType == VolumeManagerCommon.RootType.PROVIDED);
     event.command.setHidden(!event.canExecute);
-    event.command.label = rootType == RootType.ARCHIVE ?
-        str('CLOSE_ARCHIVE_BUTTON_LABEL') :
-        str('UNMOUNT_DEVICE_BUTTON_LABEL');
+
+    switch (rootType) {
+      case VolumeManagerCommon.RootType.ARCHIVE:
+      case VolumeManagerCommon.RootType.PROVIDED:
+        event.command.label = str('CLOSE_VOLUME_BUTTON_LABEL');
+        break;
+      case VolumeManagerCommon.RootType.REMOVABLE:
+        event.command.label = str('UNMOUNT_DEVICE_BUTTON_LABEL');
+        break;
+    }
   }
 };
 
@@ -413,7 +421,8 @@ CommandHandler.COMMANDS_['format'] = {
     if (!root)
       root = directoryModel.getCurrentDirEntry();
     var location = root && fileManager.volumeManager.getLocationInfo(root);
-    var removable = location && location.rootType === RootType.REMOVABLE;
+    var removable = location && location.rootType ===
+        VolumeManagerCommon.RootType.REMOVABLE;
     // Don't check if the volume is read-only. Unformatted volume is considered
     // read-only per VolumeInfo.isReadOnly, but can be formatted. An error will
     // be raised if formatting failed anyway.
@@ -785,7 +794,7 @@ CommandHandler.COMMANDS_['share'] = {
     var selection = fileManager.getSelection();
     var isDriveOffline =
         fileManager.volumeManager.getDriveConnectionState().type ===
-            util.DriveConnectionType.OFFLINE;
+            VolumeManagerCommon.DriveConnectionType.OFFLINE;
     event.canExecute = fileManager.isOnDrive() &&
         !isDriveOffline &&
         selection && selection.totalCount == 1;
@@ -896,3 +905,48 @@ CommandHandler.COMMANDS_['zoom-reset'] = {
   },
   canExecute: CommandUtil.canExecuteAlways
 };
+
+/**
+ * Open inspector for foreground page.
+ * @type {Command}
+ */
+CommandHandler.COMMANDS_['inspect-normal'] = {
+  execute: function(event, fileManager) {
+    chrome.fileBrowserPrivate.openInspector('normal');
+  },
+  canExecute: CommandUtil.canExecuteAlways
+};
+
+/**
+ * Open inspector for foreground page and bring focus to the console.
+ * @type {Command}
+ */
+CommandHandler.COMMANDS_['inspect-console'] = {
+  execute: function(event, fileManager) {
+    chrome.fileBrowserPrivate.openInspector('console');
+  },
+  canExecute: CommandUtil.canExecuteAlways
+};
+
+/**
+ * Open inspector for foreground page in inspect element mode.
+ * @type {Command}
+ */
+CommandHandler.COMMANDS_['inspect-element'] = {
+  execute: function(event, fileManager) {
+    chrome.fileBrowserPrivate.openInspector('element');
+  },
+  canExecute: CommandUtil.canExecuteAlways
+};
+
+/**
+ * Open inspector for background page.
+ * @type {Command}
+ */
+CommandHandler.COMMANDS_['inspect-background'] = {
+  execute: function(event, fileManager) {
+    chrome.fileBrowserPrivate.openInspector('background');
+  },
+  canExecute: CommandUtil.canExecuteAlways
+};
+

@@ -238,13 +238,6 @@ bool SyncManagerImpl::VisiblePropertiesDiffer(
   return false;
 }
 
-void SyncManagerImpl::ThrowUnrecoverableError() {
-  DCHECK(thread_checker_.CalledOnValidThread());
-  ReadTransaction trans(FROM_HERE, GetUserShare());
-  trans.GetWrappedTrans()->OnUnrecoverableError(
-      FROM_HERE, "Simulating unrecoverable error for testing purposes.");
-}
-
 ModelTypeSet SyncManagerImpl::InitialSyncEndedTypes() {
   return directory()->InitialSyncEndedTypes();
 }
@@ -1124,6 +1117,25 @@ SyncEncryptionHandler* SyncManagerImpl::GetEncryptionHandler() {
 ScopedVector<syncer::ProtocolEvent>
     SyncManagerImpl::GetBufferedProtocolEvents() {
   return protocol_event_buffer_.GetBufferedProtocolEvents();
+}
+
+void SyncManagerImpl::RegisterDirectoryTypeDebugInfoObserver(
+    syncer::TypeDebugInfoObserver* observer) {
+  model_type_registry_->RegisterDirectoryTypeDebugInfoObserver(observer);
+}
+
+void SyncManagerImpl::UnregisterDirectoryTypeDebugInfoObserver(
+    syncer::TypeDebugInfoObserver* observer) {
+  model_type_registry_->UnregisterDirectoryTypeDebugInfoObserver(observer);
+}
+
+bool SyncManagerImpl::HasDirectoryTypeDebugInfoObserver(
+    syncer::TypeDebugInfoObserver* observer) {
+  return model_type_registry_->HasDirectoryTypeDebugInfoObserver(observer);
+}
+
+void SyncManagerImpl::RequestEmitDebugInfo() {
+  model_type_registry_->RequestEmitDebugInfo();
 }
 
 // static.

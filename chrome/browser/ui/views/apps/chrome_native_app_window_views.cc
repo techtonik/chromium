@@ -40,6 +40,7 @@
 #include "ash/shell.h"
 #include "ash/wm/immersive_fullscreen_controller.h"
 #include "ash/wm/panels/panel_frame_view.h"
+#include "ash/wm/window_properties.h"
 #include "ash/wm/window_state.h"
 #include "ash/wm/window_state_delegate.h"
 #include "ash/wm/window_state_observer.h"
@@ -135,7 +136,7 @@ class NativeAppWindowStateDelegate : public ash::wm::WindowStateDelegate,
     window_state_->AddObserver(this);
     window_state_->window()->AddObserver(this);
   }
-  virtual ~NativeAppWindowStateDelegate(){
+  virtual ~NativeAppWindowStateDelegate() {
     if (window_state_) {
       window_state_->RemoveObserver(this);
       window_state_->window()->RemoveObserver(this);
@@ -211,9 +212,6 @@ void ChromeNativeAppWindowViews::InitializeDefaultWindow(
   init_params.delegate = this;
   init_params.remove_standard_frame = IsFrameless() || has_frame_color_;
   init_params.use_system_default_icon = true;
-  // TODO(erg): Conceptually, these are toplevel windows, but we theoretically
-  // could plumb context through to here in some cases.
-  init_params.top_level = true;
   if (create_params.transparent_background)
     init_params.opacity = views::Widget::InitParams::TRANSLUCENT_WINDOW;
   init_params.keep_on_top = create_params.always_on_top;
@@ -222,7 +220,7 @@ void ChromeNativeAppWindowViews::InitializeDefaultWindow(
   // Set up a custom WM_CLASS for app windows. This allows task switchers in
   // X11 environments to distinguish them from main browser windows.
   init_params.wm_class_name = web_app::GetWMClassFromAppName(app_name);
-  init_params.wm_class_class = ShellIntegrationLinux::GetProgramClassName();
+  init_params.wm_class_class = shell_integration_linux::GetProgramClassName();
   const char kX11WindowRoleApp[] = "app";
   init_params.wm_role_name = std::string(kX11WindowRoleApp);
 #endif
@@ -316,9 +314,6 @@ void ChromeNativeAppWindowViews::InitializePanelWindow(
 #else
   params.bounds = gfx::Rect(preferred_size_);
 #endif
-  // TODO(erg): Conceptually, these are toplevel windows, but we theoretically
-  // could plumb context through to here in some cases.
-  params.top_level = true;
   widget()->Init(params);
   widget()->set_focus_on_creation(create_params.focused);
 
@@ -387,25 +382,46 @@ ChromeNativeAppWindowViews::CreateNonStandardAppFrame() {
 
 // ui::BaseWindow implementation.
 
+gfx::Rect ChromeNativeAppWindowViews::GetRestoredBounds() const {
+#if defined(USE_ASH)
+  gfx::Rect* bounds = widget()->GetNativeWindow()->GetProperty(
+      ash::kRestoreBoundsOverrideKey);
+  if (bounds && !bounds->IsEmpty())
+    return *bounds;
+#endif
+  return widget()->GetRestoredBounds();
+}
+
 ui::WindowShowState ChromeNativeAppWindowViews::GetRestoredState() const {
+#if !defined(USE_ASH)
   if (IsMaximized())
     return ui::SHOW_STATE_MAXIMIZED;
-  if (IsFullscreen()) {
-#if defined(USE_ASH)
-    if (immersive_fullscreen_controller_.get() &&
-        immersive_fullscreen_controller_->IsEnabled()) {
-      // Restore windows which were previously in immersive fullscreen to
-      // maximized. Restoring the window to a different fullscreen type
-      // makes for a bad experience.
-      return ui::SHOW_STATE_MAXIMIZED;
-    }
-#endif
+  if (IsFullscreen())
     return ui::SHOW_STATE_FULLSCREEN;
-  }
-#if defined(USE_ASH)
+#else
   // Use kRestoreShowStateKey in case a window is minimized/hidden.
   ui::WindowShowState restore_state = widget()->GetNativeWindow()->GetProperty(
       aura::client::kRestoreShowStateKey);
+  if (widget()->GetNativeWindow()->GetProperty(
+          ash::kRestoreBoundsOverrideKey)) {
+    // If an override is given, we use that restore state (after filtering).
+    restore_state = widget()->GetNativeWindow()->GetProperty(
+                        ash::kRestoreShowStateOverrideKey);
+  } else {
+    // Otherwise first normal states are checked.
+    if (IsMaximized())
+      return ui::SHOW_STATE_MAXIMIZED;
+    if (IsFullscreen()) {
+      if (immersive_fullscreen_controller_.get() &&
+          immersive_fullscreen_controller_->IsEnabled()) {
+        // Restore windows which were previously in immersive fullscreen to
+        // maximized. Restoring the window to a different fullscreen type
+        // makes for a bad experience.
+        return ui::SHOW_STATE_MAXIMIZED;
+      }
+      return ui::SHOW_STATE_FULLSCREEN;
+    }
+  }
   // Whitelist states to return so that invalid and transient states
   // are not saved and used to restore windows when they are recreated.
   switch (restore_state) {
@@ -421,7 +437,7 @@ ui::WindowShowState ChromeNativeAppWindowViews::GetRestoredState() const {
     case ui::SHOW_STATE_END:
       return ui::SHOW_STATE_NORMAL;
   }
-#endif
+#endif  // !defined(USE_ASH)
   return ui::SHOW_STATE_NORMAL;
 }
 
@@ -531,15 +547,8 @@ views::NonClientFrameView* ChromeNativeAppWindowViews::CreateNonClientFrameView(
     return custom_frame_view;
   }
 #endif
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS)
-  // Linux always uses the non standard frame view because the OS draws the
-  // frame (if a frame is needed).
-  return CreateNonStandardAppFrame();
-#else
-  if (IsFrameless() || has_frame_color_)
-    return CreateNonStandardAppFrame();
-#endif
-  return CreateStandardDesktopAppFrame();
+  return (IsFrameless() || has_frame_color_) ?
+      CreateNonStandardAppFrame() : CreateStandardDesktopAppFrame();
 }
 
 bool ChromeNativeAppWindowViews::WidgetHasHitTestMask() const {
@@ -552,7 +561,7 @@ void ChromeNativeAppWindowViews::GetWidgetHitTestMask(gfx::Path* mask) const {
 
 // views::View implementation.
 
-gfx::Size ChromeNativeAppWindowViews::GetPreferredSize() {
+gfx::Size ChromeNativeAppWindowViews::GetPreferredSize() const {
   if (!preferred_size_.IsEmpty())
     return preferred_size_;
   return NativeAppWindowViews::GetPreferredSize();
@@ -657,8 +666,7 @@ void ChromeNativeAppWindowViews::UpdateShape(scoped_ptr<SkRegion> region) {
 
   aura::Window* native_window = widget()->GetNativeWindow();
   if (shape_) {
-    native_window->layer()->SetAlphaShape(
-        make_scoped_ptr(new SkRegion(*shape_)));
+    widget()->SetShape(new SkRegion(*shape_));
     if (!had_shape) {
       native_window->SetEventTargeter(scoped_ptr<ui::EventTargeter>(
           new ShapedAppWindowTargeter(native_window, this)));

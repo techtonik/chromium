@@ -26,7 +26,6 @@ var WEB_VIEW_ATTRIBUTE_MINWIDTH = 'minwidth';
 var WEB_VIEW_ATTRIBUTES = [
     'allowtransparency',
     'autosize',
-    'name',
     'partition',
     WEB_VIEW_ATTRIBUTE_MINHEIGHT,
     WEB_VIEW_ATTRIBUTE_MINWIDTH,
@@ -53,6 +52,9 @@ var CreateEvent = function(name) {
 //     behavior can be canceled. If the default action associated with the event
 //     is prevented, then its dispatch function will return false in its event
 //     handler. The event must have a custom handler for this to be meaningful.
+
+var FrameNameChangedEvent = CreateEvent('webview.onFrameNameChanged');
+
 var WEB_VIEW_EVENTS = {
   'close': {
     evt: CreateEvent('webview.onClose'),
@@ -65,6 +67,14 @@ var WEB_VIEW_EVENTS = {
   'contentload': {
     evt: CreateEvent('webview.onContentLoad'),
     fields: []
+  },
+  'contextmenu': {
+    evt: CreateEvent('webview.contextmenu'),
+    cancelable: true,
+    customHandler: function(webViewInternal, event, webViewEvent) {
+      webViewInternal.maybeHandleContextMenu(event, webViewEvent);
+    },
+    fields: ['items']
   },
   'dialog': {
     cancelable: true,
@@ -379,6 +389,16 @@ WebViewInternal.prototype.setupWebviewNodeProperties = function() {
     enumerable: true
   });
 
+  Object.defineProperty(this.webviewNode, 'name', {
+    get: function() {
+      return self.name;
+    },
+    set: function(value) {
+      self.webviewNode.setAttribute('name', value);
+    },
+    enumerable: true
+  });
+
   // We cannot use {writable: true} property descriptor because we want a
   // dynamic getter value.
   Object.defineProperty(this.webviewNode, 'contentWindow', {
@@ -438,7 +458,22 @@ WebViewInternal.prototype.handleWebviewAttributeMutation =
   // a BrowserPlugin property will update the corresponding BrowserPlugin
   // attribute, if necessary. See BrowserPlugin::UpdateDOMAttribute for more
   // details.
-  if (name == 'src') {
+  if (name == 'name') {
+    // We treat null attribute (attribute removed) and the empty string as
+    // one case.
+    oldValue = oldValue || '';
+    newValue = newValue || '';
+
+    if (oldValue === newValue) {
+      return;
+    }
+    this.name = newValue;
+    if (!this.instanceId) {
+      return;
+    }
+    WebView.setName(this.instanceId, newValue);
+    return;
+  } else if (name == 'src') {
     // We treat null attribute (attribute removed) and the empty string as
     // one case.
     oldValue = oldValue || '';
@@ -587,6 +622,21 @@ WebViewInternal.prototype.setupWebviewNodeEvents = function() {
 /**
  * @private
  */
+WebViewInternal.prototype.setupNameAttribute = function() {
+  var self = this;
+  FrameNameChangedEvent.addListener(function(event) {
+    self.name = event.name || '';
+    if (self.name === '') {
+      self.webviewNode.removeAttribute('name');
+    } else {
+      self.webviewNode.setAttribute('name', self.name);
+    }
+  }, {instanceId: self.instanceId});
+};
+
+/**
+ * @private
+ */
 WebViewInternal.prototype.setupEvent = function(eventName, eventInfo) {
   var self = this;
   var webviewNode = this.webviewNode;
@@ -656,9 +706,7 @@ WebViewInternal.prototype.handleDialogEvent =
   };
 
   var self = this;
-  var browserPluginNode = this.browserPluginNode;
   var webviewNode = this.webviewNode;
-
   var requestId = event.requestId;
   var actionTaken = false;
 
@@ -773,7 +821,6 @@ WebViewInternal.prototype.handleNewWindowEvent =
   };
 
   var self = this;
-  var browserPluginNode = this.browserPluginNode;
   var webviewNode = this.webviewNode;
 
   var requestId = event.requestId;
@@ -879,9 +926,7 @@ WebViewInternal.prototype.handlePermissionEvent =
     return;
   }
 
-  var browserPluginNode = this.browserPluginNode;
   var webviewNode = this.webviewNode;
-
   var decisionMade = false;
 
   var validateCall = function() {
@@ -1016,18 +1061,19 @@ WebViewInternal.prototype.attachWindowAndSetUpEvents = function(instanceId) {
   this.instanceId = instanceId;
   var params = {
     'api': 'webview',
-    'instanceId': this.viewInstanceId
+    'instanceId': this.viewInstanceId,
+    'name': this.name
   };
   if (this.userAgentOverride) {
     params['userAgentOverride'] = this.userAgentOverride;
   }
-  this.browserPluginNode['-internal-attach'](this.instanceId, params);
-
+  this.setupNameAttribute();
   var events = this.getEvents();
   for (var eventName in events) {
     this.setupEvent(eventName, events[eventName]);
   }
-  return true;
+
+  return this.browserPluginNode['-internal-attach'](this.instanceId, params);
 };
 
 // Registers browser plugin <object> custom element.
@@ -1183,6 +1229,21 @@ WebViewInternal.prototype.maybeAttachWebRequestEventToObject = function() {};
  */
 WebViewInternal.prototype.maybeGetExperimentalPermissions = function() {
   return [];
+};
+
+/**
+ * Calls to show contextmenu right away instead of dispatching a 'contextmenu'
+ * event.
+ * This will be overridden in web_view_experimental.js to implement contextmenu
+ * API.
+ * @private
+ */
+WebViewInternal.prototype.maybeHandleContextMenu = function(e, webViewEvent) {
+  var requestId = e.requestId;
+  // Setting |params| = undefined will show the context menu unmodified, hence
+  // the 'contextmenu' API is disabled for stable channel.
+  var params = undefined;
+  WebView.showContextMenu(this.instanceId, requestId, params);
 };
 
 /**

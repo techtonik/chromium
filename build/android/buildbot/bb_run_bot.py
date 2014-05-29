@@ -118,8 +118,7 @@ def GetBotStepMap():
   std_host_tests = ['check_webview_licenses', 'findbugs']
   std_build_steps = ['compile', 'zip_build']
   std_test_steps = ['extract_build']
-  std_tests = ['ui', 'unit']
-  fyi_tests = std_tests + ['mojo']
+  std_tests = ['ui', 'unit', 'mojo']
   telemetry_tests = ['telemetry_perf_unittests']
   flakiness_server = (
       '--flakiness-server=%s' % constants.UPSTREAM_FLAKINESS_SERVER)
@@ -160,7 +159,7 @@ def GetBotStepMap():
         H(compile_step + std_host_tests, target_arch='x86')),
       B('fyi-builder-rel', H(std_build_steps,  experimental)),
       B('fyi-tests', H(std_test_steps),
-        T(fyi_tests, ['--experimental', flakiness_server,
+        T(std_tests, ['--experimental', flakiness_server,
                       '--coverage-bucket', CHROMIUM_COVERAGE_BUCKET])),
       B('fyi-component-builder-tests-dbg',
         H(compile_step, extra_gyp='component=shared_library'),
@@ -274,6 +273,27 @@ def RunBotCommands(options, commands, env):
 
 
 def main(argv):
+  proc = subprocess.Popen(
+      ['/bin/hostname', '-f'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  hostname_stdout, hostname_stderr = proc.communicate()
+  if proc.returncode == 0:
+    print 'Running on: ' + hostname_stdout
+  else:
+    print >> sys.stderr, 'WARNING: failed to run hostname'
+    print >> sys.stderr, hostname_stdout
+    print >> sys.stderr, hostname_stderr
+    sys.exit(1)
+
+  # TODO(phajdan.jr): Remove hack for http://crbug.com/378779 .
+  if (hostname_stdout == 'build1-a1.perf.chromium.org' or
+      os.path.exists('/b/build/slave/Android_Builder__dbg_')):
+    if os.path.exists('/b/build/slave/Android_Builder__dbg_378779'):
+      print '/b/build/slave/Android_Builder__dbg_378779 exists, skipping'
+    else:
+      print 'CLEANING UP CHECKOUT DIRECTORY HACK SEE http://crbug.com/378779'
+      os.rename('/b/build/slave/Android_Builder__dbg_',
+                '/b/build/slave/Android_Builder__dbg_378779')
+
   parser = GetRunBotOptParser()
   options, args = parser.parse_args(argv[1:])
   if args:

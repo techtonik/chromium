@@ -7,6 +7,8 @@
 #include "base/lazy_instance.h"
 #include "base/message_loop/message_loop_proxy.h"
 #include "base/pickle.h"
+#include "base/strings/string16.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/threading/thread_local.h"
 #include "content/child/request_extra_data.h"
 #include "content/child/service_worker/service_worker_network_provider.h"
@@ -97,9 +99,6 @@ EmbeddedWorkerContextClient::EmbeddedWorkerContextClient(
 }
 
 EmbeddedWorkerContextClient::~EmbeddedWorkerContextClient() {
-  // g_worker_client_tls.Pointer()->Get() could be NULL if this gets
-  // deleted before workerContextStarted() is called.
-  g_worker_client_tls.Pointer()->Set(NULL);
 }
 
 bool EmbeddedWorkerContextClient::OnMessageReceived(
@@ -143,6 +142,8 @@ void EmbeddedWorkerContextClient::workerContextStarted(
   worker_task_runner_ = new WorkerThreadTaskRunner(
       WorkerTaskRunner::Instance()->CurrentWorkerId());
   DCHECK_NE(0, WorkerTaskRunner::Instance()->CurrentWorkerId());
+  // g_worker_client_tls.Pointer()->Get() could return NULL if this context
+  // gets deleted before workerContextStarted() is called.
   DCHECK(g_worker_client_tls.Pointer()->Get() == NULL);
   DCHECK(!script_context_);
   g_worker_client_tls.Pointer()->Set(this);
@@ -165,25 +166,20 @@ void EmbeddedWorkerContextClient::willDestroyWorkerContext() {
   // (while we're still on the worker thread).
   script_context_.reset();
 
-#if !defined(HAS_SERVICE_WORKER_CONTEXT_DESTROYED)
-  // TODO(kinuko): Remove this after blink side is landed.
-  main_thread_proxy_->PostTask(
-      FROM_HERE,
-      base::Bind(&CallWorkerContextDestroyedOnMainThread,
-                 embedded_worker_id_));
-#endif
+  // This also lets the message filter stop dispatching messages to
+  // this client.
+  g_worker_client_tls.Pointer()->Set(NULL);
 }
 
 void EmbeddedWorkerContextClient::workerContextDestroyed() {
-  // TODO(kinuko): Remove this ifdef after blink side is landed.
-#ifdef HAS_SERVICE_WORKER_CONTEXT_DESTROYED
+  DCHECK(g_worker_client_tls.Pointer()->Get() == NULL);
+
   // Now we should be able to free the WebEmbeddedWorker container on the
   // main thread.
   main_thread_proxy_->PostTask(
       FROM_HERE,
       base::Bind(&CallWorkerContextDestroyedOnMainThread,
                  embedded_worker_id_));
-#endif
 }
 
 void EmbeddedWorkerContextClient::reportException(
@@ -251,10 +247,25 @@ void EmbeddedWorkerContextClient::didHandleFetchEvent(
     int request_id,
     const blink::WebServiceWorkerResponse& web_response) {
   DCHECK(script_context_);
+#ifdef NEW_SERVICE_WORKER_RESPONSE_INTERFACE
+  std::map<std::string, std::string> headers;
+  const blink::WebVector<blink::WebString>& header_keys =
+      web_response.getHeaderKeys();
+  for (size_t i = 0; i < header_keys.size(); ++i) {
+    const base::string16& key = header_keys[i];
+    headers[base::UTF16ToUTF8(key)] =
+        base::UTF16ToUTF8(web_response.getHeader(key));
+  }
+  ServiceWorkerResponse response(web_response.status(),
+                                 web_response.statusText().utf8(),
+                                 headers);
+#else
+  // TODO(kinuko): Cleanup this once blink side patch is rolled.
   ServiceWorkerResponse response(web_response.statusCode(),
                                  web_response.statusText().utf8(),
                                  web_response.method().utf8(),
                                  std::map<std::string, std::string>());
+#endif
   script_context_->DidHandleFetchEvent(
       request_id, SERVICE_WORKER_FETCH_EVENT_RESULT_RESPONSE, response);
 }
@@ -284,6 +295,15 @@ EmbeddedWorkerContextClient::createServiceWorkerNetworkProvider(
 
   // Blink is responsible for deleting the returned object.
   return new WebServiceWorkerNetworkProviderImpl();
+}
+
+void EmbeddedWorkerContextClient::postMessageToClient(
+    int client_id,
+    const blink::WebString& message,
+    blink::WebMessagePortChannelArray* channels) {
+  DCHECK(script_context_);
+  script_context_->PostMessageToDocument(client_id, message,
+                                         make_scoped_ptr(channels));
 }
 
 void EmbeddedWorkerContextClient::OnMessageToWorker(

@@ -6,7 +6,7 @@
   'variables': {
     'conditions': [
       ['sysroot!=""', {
-        'pkg-config': '<(chroot_cmd) ./pkg-config-wrapper "<(sysroot)" "<(target_arch)"',
+        'pkg-config': '<(chroot_cmd) ./pkg-config-wrapper "<(sysroot)" "<(target_arch)" "<(system_libdir)"',
         # libgcrypt-config-wrapper invokes libgcrypt-config directly from the 
         # sysroot, so there's no need to prefix it with <(chroot_cmd).
         'libgcrypt-config': './libgcrypt-config-wrapper "<(sysroot)"',
@@ -22,9 +22,9 @@
     'linux_link_libbrlapi%': 0,
   },
   'conditions': [
-    [ 'chromeos==0', {
-      # Hide GTK and related dependencies for Chrome OS, so they won't get
-      # added back to Chrome OS. Don't try to use GTK on Chrome OS.
+    [ 'chromeos==0 and use_ozone==0', {
+      # Hide GTK and related dependencies for Chrome OS and Ozone, so they won't get
+      # added back to Chrome OS and Ozone. Don't try to use GTK on Chrome OS and Ozone.
       'targets': [
         {
           'target_name': 'gdk',
@@ -111,7 +111,7 @@
         },
       ],  # targets
     }],
-    [ 'use_x11==1', {
+    [ 'use_x11==1 or ozone_platform_ozonex==1', {
       # Hide X11 and related dependencies when use_x11=0
       'targets': [
         {
@@ -306,23 +306,6 @@
           },
         },
         {
-          'target_name': 'xscrnsaver',
-          'type': 'none',
-          'direct_dependent_settings': {
-            'cflags': [
-              '<!@(<(pkg-config) --cflags xscrnsaver)',
-            ],
-          },
-          'link_settings': {
-            'ldflags': [
-              '<!@(<(pkg-config) --libs-only-L --libs-only-other xscrnsaver)',
-            ],
-            'libraries': [
-              '<!@(<(pkg-config) --libs-only-l xscrnsaver)',
-            ],
-          },
-        },
-        {
           'target_name': 'xtst',
           'type': 'none',
           'toolsets': ['host', 'target'],
@@ -358,6 +341,27 @@
             }]
           ]
         }
+      ],  # targets
+    }],
+    ['use_x11==1 and chromeos==0', {
+      'targets': [
+        {
+          'target_name': 'xscrnsaver',
+          'type': 'none',
+          'direct_dependent_settings': {
+            'cflags': [
+              '<!@(<(pkg-config) --cflags xscrnsaver)',
+            ],
+          },
+          'link_settings': {
+            'ldflags': [
+              '<!@(<(pkg-config) --libs-only-L --libs-only-other xscrnsaver)',
+            ],
+            'libraries': [
+              '<!@(<(pkg-config) --libs-only-l xscrnsaver)',
+            ],
+          },
+        },
       ],  # targets
     }],
     ['use_evdev_gestures==1', {
@@ -746,7 +750,6 @@
                      '--link-directly=<(linux_link_libbrlapi)',
                      'brlapi_getHandleSize',
                      'brlapi_error_location',
-                     'brlapi_expandKeyCode',
                      'brlapi_strerror',
                      'brlapi__acceptKeys',
                      'brlapi__openConnection',

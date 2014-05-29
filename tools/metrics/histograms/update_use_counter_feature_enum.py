@@ -18,7 +18,7 @@ from update_histogram_enum import ReadHistogramValues
 from update_histogram_enum import UpdateHistogramEnum
 
 
-def print_enum_for_dashboard(enum_dict):
+def PrintEnumForDashboard(enum_dict):
   """Prints enum_items formatted for use in uma.py of Chromium dashboard."""
   for key in sorted(enum_dict.iterkeys()):
     print '  %d: \'%s\',' % (key, enum_dict[key])
@@ -33,16 +33,15 @@ if __name__ == '__main__':
                     'https://github.com/GoogleChrome/chromium-dashboard')
   options, args = parser.parse_args()
 
-  source_path = os.path.join(
-      '..', '..', '..',
-      'third_party', 'WebKit', 'Source', 'core', 'frame', 'UseCounter.h')
+  source_path = \
+      '../../../third_party/WebKit/Source/core/frame/UseCounter.h'
 
   START_MARKER = '^enum Feature {'
   END_MARKER = '^NumberOfFeatures'
 
   if options.dashboard:
     enum_dict = ReadHistogramValues(source_path, START_MARKER, END_MARKER)
-    print_enum_for_dashboard(enum_items)
+    PrintEnumForDashboard(enum_dict)
   else:
     UpdateHistogramEnum(
         histogram_enum_name='FeatureObserver',

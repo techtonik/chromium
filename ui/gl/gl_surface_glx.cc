@@ -21,6 +21,7 @@ extern "C" {
 #include "base/threading/thread.h"
 #include "base/time/time.h"
 #include "third_party/mesa/src/include/GL/osmesa.h"
+#include "ui/events/platform/platform_event_source.h"
 #include "ui/gfx/x/x11_connection.h"
 #include "ui/gfx/x/x11_types.h"
 #include "ui/gl/gl_bindings.h"
@@ -391,11 +392,12 @@ GLSurfaceGLX::~GLSurfaceGLX() {}
 
 NativeViewGLSurfaceGLX::NativeViewGLSurfaceGLX(gfx::AcceleratedWidget window)
   : parent_window_(window),
+    window_(0),
     config_(NULL) {
 }
 
 gfx::AcceleratedWidget NativeViewGLSurfaceGLX::GetDrawableHandle() const {
-  return parent_window_;
+  return window_;
 }
 
 bool NativeViewGLSurfaceGLX::Initialize() {
@@ -406,8 +408,34 @@ bool NativeViewGLSurfaceGLX::Initialize() {
     return false;
   }
   size_ = gfx::Size(attributes.width, attributes.height);
+  // Create a child window, with a CopyFromParent visual (to avoid inducing
+  // extra blits in the driver), that we can resize exactly in Resize(),
+  // correctly ordered with GL, so that we don't have invalid transient states.
+  // See https://crbug.com/326995.
+  window_ = XCreateWindow(g_display,
+                          parent_window_,
+                          0,
+                          0,
+                          size_.width(),
+                          size_.height(),
+                          0,
+                          CopyFromParent,
+                          InputOutput,
+                          CopyFromParent,
+                          0,
+                          NULL);
+  XMapWindow(g_display, window_);
 
-  gfx::AcceleratedWidget window_for_vsync = parent_window_;
+  ui::PlatformEventSource* event_source =
+      ui::PlatformEventSource::GetInstance();
+  // Can be NULL in tests, when we don't care about Exposes.
+  if (event_source) {
+    XSelectInput(g_display, window_, ExposureMask);
+    ui::PlatformEventSource::GetInstance()->AddPlatformEventDispatcher(this);
+  }
+  XFlush(g_display);
+
+  gfx::AcceleratedWidget window_for_vsync = window_;
 
   if (g_glx_oml_sync_control_supported)
     vsync_provider_.reset(new OMLSyncControlVSyncProvider(window_for_vsync));
@@ -418,10 +446,34 @@ bool NativeViewGLSurfaceGLX::Initialize() {
 }
 
 void NativeViewGLSurfaceGLX::Destroy() {
+  if (window_) {
+    ui::PlatformEventSource* event_source =
+        ui::PlatformEventSource::GetInstance();
+    if (event_source)
+      event_source->RemovePlatformEventDispatcher(this);
+    XDestroyWindow(g_display, window_);
+    XFlush(g_display);
+  }
+}
+
+bool NativeViewGLSurfaceGLX::CanDispatchEvent(const ui::PlatformEvent& event) {
+  return event->type == Expose && event->xexpose.window == window_;
+}
+
+uint32_t NativeViewGLSurfaceGLX::DispatchEvent(const ui::PlatformEvent& event) {
+  XEvent forwarded_event = *event;
+  forwarded_event.xexpose.window = parent_window_;
+  XSendEvent(g_display, parent_window_, False, ExposureMask,
+             &forwarded_event);
+  XFlush(g_display);
+  return ui::POST_DISPATCH_STOP_PROPAGATION;
 }
 
 bool NativeViewGLSurfaceGLX::Resize(const gfx::Size& size) {
   size_ = size;
+  glXWaitGL();
+  XResizeWindow(g_display, window_, size.width(), size.height());
+  glXWaitX();
   return true;
 }
 
@@ -467,10 +519,10 @@ void* NativeViewGLSurfaceGLX::GetConfig() {
     XWindowAttributes attributes;
     if (!XGetWindowAttributes(
         g_display,
-        parent_window_,
+        window_,
         &attributes)) {
       LOG(ERROR) << "XGetWindowAttributes failed for window " <<
-          parent_window_ << ".";
+          window_ << ".";
       return NULL;
     }
 
@@ -520,11 +572,6 @@ bool NativeViewGLSurfaceGLX::PostSubBuffer(
 
 VSyncProvider* NativeViewGLSurfaceGLX::GetVSyncProvider() {
   return vsync_provider_.get();
-}
-
-NativeViewGLSurfaceGLX::NativeViewGLSurfaceGLX()
-  : parent_window_(0),
-    config_(NULL) {
 }
 
 NativeViewGLSurfaceGLX::~NativeViewGLSurfaceGLX() {

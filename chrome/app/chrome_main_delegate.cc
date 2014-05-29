@@ -4,6 +4,7 @@
 
 #include "chrome/app/chrome_main_delegate.h"
 
+#include "base/base_paths.h"
 #include "base/command_line.h"
 #include "base/cpu.h"
 #include "base/files/file_path.h"
@@ -339,7 +340,7 @@ void InitializeUserDataDir() {
     std::string user_data_dir_string;
     scoped_ptr<base::Environment> environment(base::Environment::Create());
     if (environment->GetVar("CHROME_USER_DATA_DIR", &user_data_dir_string) &&
-        IsStringUTF8(user_data_dir_string)) {
+        base::IsStringUTF8(user_data_dir_string)) {
       user_data_dir = base::FilePath::FromUTF8Unsafe(user_data_dir_string);
     }
   }
@@ -476,6 +477,16 @@ bool ChromeMainDelegate::BasicStartupComplete(int* exit_code) {
 #endif
 
 #if defined(OS_CHROMEOS)
+  // Initialize primary user homedir (in multi-profile session) as it may be
+  // passed as a command line switch.
+  base::FilePath homedir;
+  if (command_line.HasSwitch(chromeos::switches::kHomedir)) {
+    homedir = base::FilePath(
+        command_line.GetSwitchValueASCII(chromeos::switches::kHomedir));
+    PathService::OverrideAndCreateIfNeeded(
+        base::DIR_HOME, homedir, true, false);
+  }
+
   // If we are recovering from a crash on ChromeOS, then we will do some
   // recovery using the diagnostics module, and then continue on. We fake up a
   // command line to tell it that we want it to recover, and to preserve the
@@ -855,11 +866,10 @@ bool ChromeMainDelegate::DelaySandboxInitialization(
       process_type == switches::kRelauncherProcess;
 }
 #elif defined(OS_POSIX) && !defined(OS_ANDROID)
-content::ZygoteForkDelegate* ChromeMainDelegate::ZygoteStarting() {
-#if defined(DISABLE_NACL)
-  return NULL;
-#else
-  return new NaClForkDelegate();
+void ChromeMainDelegate::ZygoteStarting(
+    ScopedVector<content::ZygoteForkDelegate>* delegates) {
+#if !defined(DISABLE_NACL)
+  nacl::AddNaClZygoteForkDelegates(delegates);
 #endif
 }
 

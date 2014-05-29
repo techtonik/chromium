@@ -28,6 +28,8 @@ class GLViewRendererManager {
 
   static GLViewRendererManager* GetInstance();
 
+  Key NullKey();
+
   Key PushBack(RendererType view);
 
   // |key| must be already in manager. Move renderer corresponding to |key| to

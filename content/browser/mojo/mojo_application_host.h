@@ -8,8 +8,7 @@
 #include "base/process/process_handle.h"
 #include "mojo/common/channel_init.h"
 #include "mojo/embedder/scoped_platform_handle.h"
-#include "mojo/public/cpp/bindings/remote_ptr.h"
-#include "mojo/public/interfaces/shell/shell.mojom.h"
+#include "mojo/public/interfaces/service_provider/service_provider.mojom.h"
 
 namespace IPC {
 class Sender;
@@ -25,7 +24,7 @@ namespace content {
 class MojoApplicationHost {
  public:
   MojoApplicationHost();
-  ~MojoApplicationHost();
+  virtual ~MojoApplicationHost();
 
   // Two-phase initialization:
   //  1- Init makes the shell_client() available synchronously.
@@ -35,12 +34,30 @@ class MojoApplicationHost {
 
   bool did_activate() const { return did_activate_; }
 
-  mojo::ShellClient* shell_client() { return shell_client_.get(); }
+  mojo::ServiceProvider* service_provider() {
+    DCHECK(child_service_provider_.get());
+    return child_service_provider_->client();
+  }
 
  private:
+  class ServiceProviderImpl
+      : public mojo::InterfaceImpl<mojo::ServiceProvider> {
+   public:
+    virtual void OnConnectionError() OVERRIDE {
+      // TODO(darin): How should we handle this error?
+    }
+
+    // mojo::ServiceProvider methods:
+    virtual void ConnectToService(
+        const mojo::String& url,
+        mojo::ScopedMessagePipeHandle handle) OVERRIDE;
+  };
+
   mojo::common::ChannelInit channel_init_;
   mojo::embedder::ScopedPlatformHandle client_handle_;
-  mojo::RemotePtr<mojo::ShellClient> shell_client_;
+
+  scoped_ptr<ServiceProviderImpl> child_service_provider_;
+
   bool did_activate_;
 
   DISALLOW_COPY_AND_ASSIGN(MojoApplicationHost);

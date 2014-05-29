@@ -29,7 +29,7 @@ cr.define('gcmInternals', function() {
   function displayDeviceInfo(info) {
     setIfExists(info, 'androidId', 'android-id');
     setIfExists(info, 'profileServiceCreated', 'profile-service-created');
-    setIfExists(info, 'gcmEnabledState', 'gcm-enabled-state');
+    setIfExists(info, 'gcmEnabled', 'gcm-enabled');
     setIfExists(info, 'signedInUserName', 'signed-in-username');
     setIfExists(info, 'gcmClientCreated', 'gcm-client-created');
     setIfExists(info, 'gcmClientState', 'gcm-client-state');
@@ -106,6 +106,19 @@ cr.define('gcmInternals', function() {
   }
 
   /**
+   * Refresh the log html table by clearing it first. If data is not empty, then
+   * it will be used to populate the table.
+   * @param {string} id ID of the log html table.
+   * @param {!Object} data A list of list of data items.
+   */
+  function refreshLogTable(id, data) {
+    removeAllChildNodes($(id));
+    if (data !== undefined) {
+      addRows($(id), data);
+    }
+  }
+
+  /**
    * Callback function accepting a dictionary of info items to be displayed.
    * @param {!Object} infos A dictionary of info items to be displayed.
    */
@@ -120,10 +133,11 @@ cr.define('gcmInternals', function() {
       displayDeviceInfo(infos.deviceInfo);
     }
 
-    removeAllChildNodes($('send-info'));
-    if (infos.sendInfo !== undefined) {
-      addRows($('send-info'), infos.sendInfo);
-    }
+    refreshLogTable('checkin-info', infos.checkinInfo);
+    refreshLogTable('connection-info', infos.connectionInfo);
+    refreshLogTable('registration-info', infos.registrationInfo);
+    refreshLogTable('receive-info', infos.receiveInfo);
+    refreshLogTable('send-info', infos.sendInfo);
   }
 
   // Return an object with all of the exports.

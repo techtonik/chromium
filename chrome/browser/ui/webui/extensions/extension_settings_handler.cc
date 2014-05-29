@@ -36,6 +36,7 @@
 #include "chrome/browser/extensions/extension_error_reporter.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
+#include "chrome/browser/extensions/extension_ui_util.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/extension_warning_set.h"
 #include "chrome/browser/extensions/install_verifier.h"
@@ -56,7 +57,7 @@
 #include "chrome/common/extensions/manifest_url_handler.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
-#include "components/user_prefs/pref_registry_syncable.h"
+#include "components/pref_registry/pref_registry_syncable.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/notification_source.h"
 #include "content/public/browser/notification_types.h"
@@ -630,7 +631,7 @@ void ExtensionSettingsHandler::Observe(
     }
     case chrome::NOTIFICATION_EXTENSION_LOADED_DEPRECATED:
     case chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED:
-    case chrome::NOTIFICATION_EXTENSION_UNINSTALLED:
+    case chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED:
     case chrome::NOTIFICATION_EXTENSION_UPDATE_DISABLED:
     case chrome::NOTIFICATION_EXTENSION_BROWSER_ACTION_VISIBILITY_CHANGED:
       MaybeUpdateAfterNotification();
@@ -739,7 +740,7 @@ void ExtensionSettingsHandler::HandleRequestExtensionsData(
   const ExtensionSet& enabled_set = registry->enabled_extensions();
   for (ExtensionSet::const_iterator extension = enabled_set.begin();
        extension != enabled_set.end(); ++extension) {
-    if ((*extension)->ShouldDisplayInExtensionSettings()) {
+    if (ui_util::ShouldDisplayInExtensionSettings(*extension, profile)) {
       extensions_list->Append(CreateExtensionDetailValue(
           extension->get(),
           GetInspectablePagesForExtension(extension->get(), true),
@@ -749,7 +750,7 @@ void ExtensionSettingsHandler::HandleRequestExtensionsData(
   const ExtensionSet& disabled_set = registry->disabled_extensions();
   for (ExtensionSet::const_iterator extension = disabled_set.begin();
        extension != disabled_set.end(); ++extension) {
-    if ((*extension)->ShouldDisplayInExtensionSettings()) {
+    if (ui_util::ShouldDisplayInExtensionSettings(*extension, profile)) {
       extensions_list->Append(CreateExtensionDetailValue(
           extension->get(),
           GetInspectablePagesForExtension(extension->get(), false),
@@ -760,7 +761,7 @@ void ExtensionSettingsHandler::HandleRequestExtensionsData(
   std::vector<ExtensionPage> empty_pages;
   for (ExtensionSet::const_iterator extension = terminated_set.begin();
        extension != terminated_set.end(); ++extension) {
-    if ((*extension)->ShouldDisplayInExtensionSettings()) {
+    if (ui_util::ShouldDisplayInExtensionSettings(*extension, profile)) {
       extensions_list->Append(CreateExtensionDetailValue(
           extension->get(),
           empty_pages,  // Terminated process has no active pages.
@@ -779,8 +780,7 @@ void ExtensionSettingsHandler::HandleRequestExtensionsData(
   // Promote the Chrome Apps & Extensions Developer Tools if they are not
   // installed and the user has not previously dismissed the warning.
   bool promote_apps_dev_tools = false;
-  if (GetCurrentChannel() <= chrome::VersionInfo::CHANNEL_DEV &&
-      !ExtensionRegistry::Get(Profile::FromWebUI(web_ui()))->
+  if (!ExtensionRegistry::Get(Profile::FromWebUI(web_ui()))->
           GetExtensionById(kAppsDeveloperToolsExtensionId,
                            ExtensionRegistry::EVERYTHING) &&
       !profile->GetPrefs()->GetBoolean(prefs::kExtensionsUIDismissedADTPromo)) {
@@ -1105,7 +1105,8 @@ void ExtensionSettingsHandler::MaybeRegisterForNotifications() {
                  content::Source<Profile>(profile));
   registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED,
                  content::Source<Profile>(profile));
-  registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_UNINSTALLED,
+  registrar_.Add(this,
+                 chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED,
                  content::Source<Profile>(profile));
   registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_UPDATE_DISABLED,
                  content::Source<Profile>(profile));

@@ -14,6 +14,7 @@
 #include "base/timer/timer.h"
 #include "build/build_config.h"
 #include "chrome/browser/devtools/devtools_window.h"
+#include "chrome/browser/signin/signin_header_helper.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/omnibox/omnibox_popup_model_observer.h"
@@ -208,7 +209,7 @@ class BrowserView : public BrowserWindow,
   // command id. This can be used to provide menu item shortcut hints etc.
   // Returns true if an accelerator was found for the specified |cmd_id|, false
   // otherwise.
-  bool GetAccelerator(int cmd_id, ui::Accelerator* accelerator);
+  bool GetAccelerator(int cmd_id, ui::Accelerator* accelerator) const;
 
   // Returns true if the specificed |accelerator| is registered with this view.
   bool IsAcceleratorRegistered(const ui::Accelerator& accelerator);
@@ -238,12 +239,6 @@ class BrowserView : public BrowserWindow,
   // Restores the focused view. This is also used to set the initial focus
   // when a new browser window is created.
   void RestoreFocus();
-
-  void SetWindowSwitcherButton(views::Button* button);
-
-  views::Button* window_switcher_button() {
-    return window_switcher_button_;
-  }
 
   // Called after the widget's fullscreen state is changed without going through
   // FullscreenController. This method does any processing which was skipped.
@@ -367,7 +362,8 @@ class BrowserView : public BrowserWindow,
       GetWebContentsModalDialogHost() OVERRIDE;
   virtual void ShowAvatarBubble(content::WebContents* web_contents,
                                 const gfx::Rect& rect) OVERRIDE;
-  virtual void ShowAvatarBubbleFromAvatarButton(AvatarBubbleMode mode) OVERRIDE;
+  virtual void ShowAvatarBubbleFromAvatarButton(AvatarBubbleMode mode,
+      signin::GAIAServiceType service_type) OVERRIDE;
   virtual void ShowPasswordGenerationBubble(
       const gfx::Rect& rect,
       const autofill::PasswordForm& form,
@@ -437,7 +433,7 @@ class BrowserView : public BrowserWindow,
   // Overridden from views::ClientView:
   virtual bool CanClose() OVERRIDE;
   virtual int NonClientHitTest(const gfx::Point& point) OVERRIDE;
-  virtual gfx::Size GetMinimumSize() OVERRIDE;
+  virtual gfx::Size GetMinimumSize() const OVERRIDE;
 
   // InfoBarContainer::Delegate overrides
   virtual SkColor GetInfoBarSeparatorColor() const OVERRIDE;
@@ -447,7 +443,8 @@ class BrowserView : public BrowserWindow,
   // Overridden from views::View:
   virtual const char* GetClassName() const OVERRIDE;
   virtual void Layout() OVERRIDE;
-  virtual void PaintChildren(gfx::Canvas* canvas) OVERRIDE;
+  virtual void PaintChildren(gfx::Canvas* canvas,
+                             const views::CullSet& cull_set) OVERRIDE;
   virtual void ViewHierarchyChanged(
       const ViewHierarchyChangedDetails& details) OVERRIDE;
   virtual void ChildPreferredSizeChanged(View* child) OVERRIDE;
@@ -633,11 +630,6 @@ class BrowserView : public BrowserWindow,
 
   // The Toolbar containing the navigation buttons, menus and the address bar.
   ToolbarView* toolbar_;
-
-  // This button sits next to the tabs on the right hand side and it is used
-  // only in windows metro metro mode to allow the user to flip among browser
-  // windows.
-  views::Button* window_switcher_button_;
 
   // The Bookmark Bar View for this window. Lazily created. May be NULL for
   // non-tabbed browsers like popups. May not be visible.

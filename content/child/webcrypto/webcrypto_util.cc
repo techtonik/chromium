@@ -67,7 +67,7 @@ const JwkToWebCryptoUsage kJwkWebCryptoUsageMap[] = {
     {"encrypt", blink::WebCryptoKeyUsageEncrypt},
     {"decrypt", blink::WebCryptoKeyUsageDecrypt},
     {"deriveKey", blink::WebCryptoKeyUsageDeriveKey},
-    // TODO(padolph): Add 'deriveBits' once supported by Blink.
+    {"deriveBits", blink::WebCryptoKeyUsageDeriveBits},
     {"sign", blink::WebCryptoKeyUsageSign},
     {"unwrapKey", blink::WebCryptoKeyUsageUnwrapKey},
     {"verify", blink::WebCryptoKeyUsageVerify},
@@ -114,13 +114,6 @@ base::ListValue* CreateJwkKeyOpsFromWebCryptoUsages(
   return jwk_key_ops;
 }
 
-bool IsHashAlgorithm(blink::WebCryptoAlgorithmId alg_id) {
-  return alg_id == blink::WebCryptoAlgorithmIdSha1 ||
-         alg_id == blink::WebCryptoAlgorithmIdSha256 ||
-         alg_id == blink::WebCryptoAlgorithmIdSha384 ||
-         alg_id == blink::WebCryptoAlgorithmIdSha512;
-}
-
 blink::WebCryptoAlgorithm GetInnerHashAlgorithm(
     const blink::WebCryptoAlgorithm& algorithm) {
   DCHECK(!algorithm.isNull());
@@ -144,7 +137,7 @@ blink::WebCryptoAlgorithm CreateAlgorithm(blink::WebCryptoAlgorithmId id) {
 
 blink::WebCryptoAlgorithm CreateHmacImportAlgorithm(
     blink::WebCryptoAlgorithmId hash_id) {
-  DCHECK(IsHashAlgorithm(hash_id));
+  DCHECK(blink::WebCryptoAlgorithm::isHash(hash_id));
   return blink::WebCryptoAlgorithm::adoptParamsAndCreate(
       blink::WebCryptoAlgorithmIdHmac,
       new blink::WebCryptoHmacImportParams(CreateAlgorithm(hash_id)));
@@ -153,7 +146,7 @@ blink::WebCryptoAlgorithm CreateHmacImportAlgorithm(
 blink::WebCryptoAlgorithm CreateRsaHashedImportAlgorithm(
     blink::WebCryptoAlgorithmId id,
     blink::WebCryptoAlgorithmId hash_id) {
-  DCHECK(IsHashAlgorithm(hash_id));
+  DCHECK(blink::WebCryptoAlgorithm::isHash(hash_id));
   DCHECK(id == blink::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5 ||
          id == blink::WebCryptoAlgorithmIdRsaOaep);
   return blink::WebCryptoAlgorithm::adoptParamsAndCreate(
@@ -184,6 +177,22 @@ bool CreateSecretKeyAlgorithm(const blink::WebCryptoAlgorithm& algorithm,
     default:
       return false;
   }
+}
+
+bool ContainsKeyUsages(blink::WebCryptoKeyUsageMask a,
+                       blink::WebCryptoKeyUsageMask b) {
+  return (a & b) == b;
+}
+
+bool IsAlgorithmRsa(blink::WebCryptoAlgorithmId alg_id) {
+  return alg_id == blink::WebCryptoAlgorithmIdRsaOaep ||
+         alg_id == blink::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5;
+}
+
+bool IsAlgorithmAsymmetric(blink::WebCryptoAlgorithmId alg_id) {
+  // TODO(padolph): include all other asymmetric algorithms once they are
+  // defined, e.g. EC and DH.
+  return IsAlgorithmRsa(alg_id);
 }
 
 }  // namespace webcrypto

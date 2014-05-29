@@ -313,9 +313,9 @@ bool URLDatabase::AutocompleteForPrefix(const std::string& prefix,
 
 bool URLDatabase::IsTypedHost(const std::string& host) {
   const char* schemes[] = {
-    content::kHttpScheme,
-    content::kHttpsScheme,
-    content::kFtpScheme
+    url::kHttpScheme,
+    url::kHttpsScheme,
+    url::kFtpScheme
   };
   URLRows dummy;
   for (size_t i = 0; i < arraysize(schemes); ++i) {

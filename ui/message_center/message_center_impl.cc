@@ -354,7 +354,9 @@ void PopupTimersController::TimerFinished(const std::string& id) {
   message_center_->MarkSinglePopupAsShown(id, false);
 }
 
-void PopupTimersController::OnNotificationDisplayed(const std::string& id) {
+void PopupTimersController::OnNotificationDisplayed(
+    const std::string& id,
+    const DisplaySource source) {
   OnNotificationUpdated(id);
 }
 
@@ -426,7 +428,9 @@ MessageCenterImpl::MessageCenterImpl()
   notification_queue_.reset(new internal::ChangeQueue());
 }
 
-MessageCenterImpl::~MessageCenterImpl() {}
+MessageCenterImpl::~MessageCenterImpl() {
+  SetNotifierSettingsProvider(NULL);
+}
 
 void MessageCenterImpl::AddObserver(MessageCenterObserver* observer) {
   observer_list_.AddObserver(observer);
@@ -476,6 +480,18 @@ void MessageCenterImpl::OnBlockingStateChanged(NotificationBlocker* blocker) {
   FOR_EACH_OBSERVER(MessageCenterObserver,
                     observer_list_,
                     OnBlockingStateChanged(blocker));
+}
+
+void MessageCenterImpl::UpdateIconImage(
+  const NotifierId& notifier_id,const gfx::Image& icon) {}
+
+void MessageCenterImpl::NotifierGroupChanged() {}
+
+void MessageCenterImpl::NotifierEnabledChanged(
+  const NotifierId& notifier_id, bool enabled) {
+  if (!enabled) {
+    RemoveNotificationsForNotifierId(notifier_id);
+  }
 }
 
 void MessageCenterImpl::SetVisibility(Visibility visibility) {
@@ -648,6 +664,20 @@ void MessageCenterImpl::RemoveNotification(const std::string& id,
                     OnNotificationRemoved(copied_id, by_user));
 }
 
+void MessageCenterImpl::RemoveNotificationsForNotifierId(
+    const NotifierId& notifier_id) {
+  NotificationList::Notifications notifications =
+      notification_list_->GetNotificationsByNotifierId(notifier_id);
+  for (NotificationList::Notifications::const_iterator iter =
+           notifications.begin(); iter != notifications.end(); ++iter) {
+    RemoveNotification((*iter)->id(), false);
+  }
+  if (!notifications.empty()) {
+    notification_cache_.Rebuild(
+        notification_list_->GetVisibleNotifications(blockers_));
+  }
+}
+
 void MessageCenterImpl::RemoveAllNotifications(bool by_user) {
   // Using not |blockers_| but an empty list since it wants to remove literally
   // all notifications.
@@ -750,19 +780,10 @@ void MessageCenterImpl::DisableNotificationsByNotifier(
     // TODO(mukai): SetNotifierEnabled can just accept notifier_id?
     Notifier notifier(notifier_id, base::string16(), true);
     settings_provider_->SetNotifierEnabled(notifier, false);
-  }
-
-  NotificationList::Notifications notifications =
-      notification_list_->GetNotificationsByNotifierId(notifier_id);
-  for (NotificationList::Notifications::const_iterator iter =
-           notifications.begin(); iter != notifications.end();) {
-    std::string id = (*iter)->id();
-    iter++;
-    RemoveNotification(id, false);
-  }
-  if (!notifications.empty()) {
-    notification_cache_.Rebuild(
-        notification_list_->GetVisibleNotifications(blockers_));
+    // The settings provider will call back to remove the notifications
+    // belonging to the notifier id.
+  } else {
+    RemoveNotificationsForNotifierId(notifier_id);
   }
 }
 
@@ -804,7 +825,9 @@ void MessageCenterImpl::MarkSinglePopupAsShown(const std::string& id,
       MessageCenterObserver, observer_list_, OnNotificationUpdated(id));
 }
 
-void MessageCenterImpl::DisplayedNotification(const std::string& id) {
+void MessageCenterImpl::DisplayedNotification(
+    const std::string& id,
+    const DisplaySource source) {
   if (!HasNotification(id))
     return;
 
@@ -816,12 +839,20 @@ void MessageCenterImpl::DisplayedNotification(const std::string& id) {
   if (delegate.get())
     delegate->Display();
   FOR_EACH_OBSERVER(
-      MessageCenterObserver, observer_list_, OnNotificationDisplayed(id));
+      MessageCenterObserver,
+      observer_list_,
+      OnNotificationDisplayed(id, source));
 }
 
 void MessageCenterImpl::SetNotifierSettingsProvider(
     NotifierSettingsProvider* provider) {
+  if (settings_provider_) {
+    settings_provider_->RemoveObserver(this);
+    settings_provider_ = NULL;
+  }
   settings_provider_ = provider;
+  if (settings_provider_)
+    settings_provider_->AddObserver(this);
 }
 
 NotifierSettingsProvider* MessageCenterImpl::GetNotifierSettingsProvider() {

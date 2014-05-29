@@ -150,6 +150,10 @@ base::Value* NetLogQuicCongestionFeedbackFrameCallback(
       dict->SetString("type", "TCP");
       dict->SetInteger("receive_window", frame->tcp.receive_window);
       break;
+    case kTCPBBR:
+      dict->SetString("type", "TCPBBR");
+      // TODO(rtenneti): Add support for BBR.
+      break;
   }
 
   return dict;
@@ -247,7 +251,7 @@ void UpdatePublicResetAddressMismatchHistogram(
   if (sample < 0) {
     return;
   }
-  UMA_HISTOGRAM_ENUMERATION("Net.QuicSession.PublicResetAddressMismatch",
+  UMA_HISTOGRAM_ENUMERATION("Net.QuicSession.PublicResetAddressMismatch2",
                             sample, QUIC_ADDRESS_MISMATCH_MAX);
 }
 
@@ -296,6 +300,12 @@ const char* GetConnectionDescriptionString() {
   return description;
 }
 
+// If |address| is an IPv4-mapped IPv6 address, returns ADDRESS_FAMILY_IPV4
+// instead of ADDRESS_FAMILY_IPV6. Othewise, behaves like GetAddressFamily().
+AddressFamily GetRealAddressFamily(const IPAddressNumber& address) {
+  return IsIPv4Mapped(address) ? ADDRESS_FAMILY_IPV4 :
+      GetAddressFamily(address);
+}
 
 }  // namespace
 
@@ -424,6 +434,13 @@ void QuicConnectionLogger:: OnPacketRetransmitted(
 void QuicConnectionLogger::OnPacketReceived(const IPEndPoint& self_address,
                                             const IPEndPoint& peer_address,
                                             const QuicEncryptedPacket& packet) {
+  if (local_address_from_self_.GetFamily() == ADDRESS_FAMILY_UNSPECIFIED) {
+    local_address_from_self_ = self_address;
+    UMA_HISTOGRAM_ENUMERATION("Net.QuicSession.ConnectionTypeFromSelf",
+                              GetRealAddressFamily(self_address.address()),
+                              ADDRESS_FAMILY_LAST);
+  }
+
   last_received_packet_size_ = packet.length();
   net_log_.AddEvent(
       NetLog::TYPE_QUIC_SESSION_PACKET_RECEIVED,
@@ -551,7 +568,7 @@ void QuicConnectionLogger::OnConnectionCloseFrame(
 void QuicConnectionLogger::OnPublicResetPacket(
     const QuicPublicResetPacket& packet) {
   net_log_.AddEvent(NetLog::TYPE_QUIC_SESSION_PUBLIC_RESET_PACKET_RECEIVED);
-  UpdatePublicResetAddressMismatchHistogram(client_address_,
+  UpdatePublicResetAddressMismatchHistogram(local_address_from_shlo_,
                                             packet.client_address);
 }
 
@@ -581,7 +598,11 @@ void QuicConnectionLogger::OnCryptoHandshakeMessageReceived(
     QuicSocketAddressCoder decoder;
     if (message.GetStringPiece(kCADR, &address) &&
         decoder.Decode(address.data(), address.size())) {
-      client_address_ = IPEndPoint(decoder.ip(), decoder.port());
+      local_address_from_shlo_ = IPEndPoint(decoder.ip(), decoder.port());
+      UMA_HISTOGRAM_ENUMERATION("Net.QuicSession.ConnectionTypeFromPeer",
+                                GetRealAddressFamily(
+                                    local_address_from_shlo_.address()),
+                                ADDRESS_FAMILY_LAST);
     }
   }
 }

@@ -14,16 +14,16 @@ class GmailAltTwoLabelsPage(page_module.Page):
   def __init__(self, page_set):
     super(GmailAltTwoLabelsPage, self).__init__(
       url='https://mail.google.com/mail/',
-      page_set=page_set)
+      page_set=page_set,
+      name='gmail_alt_two_labels')
 
     self.credentials_path = 'data/credentials.json'
     self.credentials = 'google'
     self.user_agent_type = 'desktop'
     self.archive_data_file = 'data/gmail_alt_two_labels.json'
-    self.name = 'gmail_alt_two_labels'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'javascript':

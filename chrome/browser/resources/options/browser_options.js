@@ -173,18 +173,27 @@ cr.define('options', function() {
 
       $('change-home-page').onclick = function(event) {
         OptionsPage.navigateToPage('homePageOverlay');
+        chrome.send('coreOptionsUserMetricsAction',
+                    ['Options_Homepage_ShowSettings']);
       };
 
       chrome.send('requestHotwordAvailable');
+      var hotwordIndicator = $('hotword-search-setting-indicator');
+      HotwordSearchSettingIndicator.decorate(hotwordIndicator);
+      hotwordIndicator.disabledOnErrorSection = $('hotword-search-enable');
 
       if ($('set-wallpaper')) {
         $('set-wallpaper').onclick = function(event) {
           chrome.send('openWallpaperManager');
+          chrome.send('coreOptionsUserMetricsAction',
+                      ['Options_OpenWallpaperManager']);
         };
       }
 
       $('themes-gallery').onclick = function(event) {
         window.open(loadTimeData.getString('themesGalleryURL'));
+        chrome.send('coreOptionsUserMetricsAction',
+                    ['Options_ThemesGallery']);
       };
       $('themes-reset').onclick = function(event) {
         chrome.send('themesReset');
@@ -831,17 +840,18 @@ cr.define('options', function() {
       $('sync-section').hidden = false;
       this.maybeShowUserSection_();
 
-      var subSection = $('sync-section').firstChild;
-      while (subSection) {
-        if (subSection.nodeType == Node.ELEMENT_NODE)
-          subSection.hidden = syncData.supervisedUser;
-        subSection = subSection.nextSibling;
-      }
+      if (cr.isChromeOS && syncData.supervisedUser) {
+        var subSection = $('sync-section').firstChild;
+        while (subSection) {
+          if (subSection.nodeType == Node.ELEMENT_NODE)
+            subSection.hidden = true;
+          subSection = subSection.nextSibling;
+        }
 
-      if (syncData.supervisedUser) {
         $('account-picture-wrapper').hidden = false;
         $('sync-general').hidden = false;
         $('sync-status').hidden = true;
+
         return;
       }
 
@@ -983,10 +993,14 @@ cr.define('options', function() {
 
     /**
      * Activates the Hotword section from the System settings page.
+     * @param {string} opt_error The error message to display.
+     * @param {string} opt_help_link The link to a troubleshooting page.
      * @private
      */
-    showHotwordSection_: function(opt_error) {
+    showHotwordSection_: function(opt_error, opt_help_link) {
       $('hotword-search').hidden = false;
+      $('hotword-search-setting-indicator').errorText = opt_error;
+      $('hotword-search-setting-indicator').helpLink = opt_help_link;
     },
 
     /**
@@ -1589,64 +1603,31 @@ cr.define('options', function() {
     },
 
     /**
-     * Toggles the bubble that shows which extension is controlling the search
-     * engine.
-     * @param {string} extensionId The ID of the extension controlling the
-     *     default search engine setting.
-     * @param {string} extensionName The name of the extension.
+     * Toggles the warning boxes that show which extension is controlling
+     * various settings of Chrome.
+     * @param {object} details A dictionary of ID+name pairs for each of the
+     *     settings controlled by an extension.
      * @private
      */
-    toggleSearchEngineControlled_: function(extensionId, extensionName) {
+    toggleExtensionIndicators_: function(details) {
       this.toggleExtensionControlledBox_('search-section-content',
                                          'search-engine-controlled',
-                                         extensionId,
-                                         extensionName);
-    },
-
-    /**
-     * Toggles the bubble that shows which extension is controlling the home
-     * page.
-     * @param {string} extensionId The ID of the extension controlling the
-     *     home page setting.
-     * @param {string} extensionName The name of the extension.
-     * @private
-     */
-    toggleHomepageControlled_: function(extensionId, extensionName) {
+                                         details.searchEngine.id,
+                                         details.searchEngine.name);
       this.toggleExtensionControlledBox_('extension-controlled-container',
                                          'homepage-controlled',
-                                         extensionId,
-                                         extensionName);
-    },
-
-    /**
-     * Toggles the bubble that shows which extension is controlling the new tab
-     * page.
-     * @param {string} extensionId The ID of the extension controlling the
-     *     new tab page setting.
-     * @param {string} extensionName The name of the extension.
-     * @private
-     */
-    toggleNewTabPageControlled_: function(extensionId, extensionName) {
-      this.toggleExtensionControlledBox_('newtab-section-content',
-                                         'newtab-controlled',
-                                         extensionId,
-                                         extensionName);
-    },
-
-    /**
-     * Toggles the bubble that shows which extension is controlling the startup
-     * pages.
-     * @param {string} extensionId The ID of the extension controlling the
-     *     startup pages setting.
-     * @param {string} extensionName The name of the extension.
-     * @private
-     */
-    toggleStartupPagesControlled_: function(extensionId, extensionName) {
+                                         details.homePage.id,
+                                         details.homePage.name);
       this.toggleExtensionControlledBox_('startup-section-content',
                                          'startpage-controlled',
-                                         extensionId,
-                                         extensionName);
+                                         details.startUpPage.id,
+                                         details.startUpPage.name);
+      this.toggleExtensionControlledBox_('newtab-section-content',
+                                         'newtab-controlled',
+                                         details.newTabPage.id,
+                                         details.newTabPage.name);
     },
+
 
     /**
      * Show/hide touchpad-related settings.
@@ -1823,10 +1804,7 @@ cr.define('options', function() {
     'showManagedUserImportSuccess',
     'showMouseControls',
     'showTouchpadControls',
-    'toggleHomepageControlled',
-    'toggleNewTabPageControlled',
-    'toggleSearchEngineControlled',
-    'toggleStartupPagesControlled',
+    'toggleExtensionIndicators',
     'updateAccountPicture',
     'updateAutoLaunchState',
     'updateDefaultBrowserState',

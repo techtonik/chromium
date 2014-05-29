@@ -31,6 +31,7 @@ class PrefService;
 class PrefServiceSyncable;
 class PrefStore;
 class Profile;
+class TrackedPreferenceValidationDelegate;
 
 namespace chrome_prefs {
 
@@ -41,6 +42,7 @@ extern const char kSettingsEnforcementGroupNoEnforcement[];
 extern const char kSettingsEnforcementGroupEnforceOnload[];
 extern const char kSettingsEnforcementGroupEnforceAlways[];
 extern const char kSettingsEnforcementGroupEnforceAlwaysWithExtensions[];
+extern const char kSettingsEnforcementGroupEnforceAlwaysWithExtensionsAndDSE[];
 
 }  // namespace internals
 
@@ -69,6 +71,7 @@ scoped_ptr<PrefService> CreateLocalState(
 scoped_ptr<PrefServiceSyncable> CreateProfilePrefs(
     const base::FilePath& pref_filename,
     base::SequencedTaskRunner* pref_io_task_runner,
+    TrackedPreferenceValidationDelegate* validation_delegate,
     policy::PolicyService* policy_service,
     ManagedUserSettingsService* managed_user_settings,
     const scoped_refptr<PrefStore>& extension_prefs,

@@ -28,6 +28,7 @@ class DirectoryTypeDebugInfoEmitter;
 class NonBlockingTypeProcessorCore;
 class NonBlockingTypeProcessor;
 class UpdateHandler;
+struct DataTypeState;
 
 typedef std::map<ModelType, UpdateHandler*> UpdateHandlerMap;
 typedef std::map<ModelType, CommitContributor*> CommitContributorMap;
@@ -56,6 +57,7 @@ class SYNC_EXPORT_PRIVATE ModelTypeRegistry {
   // Expects that the processor's ModelType is not currently enabled.
   void InitializeNonBlockingType(
       syncer::ModelType type,
+      const DataTypeState& data_type_state,
       scoped_refptr<base::SequencedTaskRunner> type_task_runner,
       base::WeakPtr<NonBlockingTypeProcessor> processor);
 
@@ -72,6 +74,14 @@ class SYNC_EXPORT_PRIVATE ModelTypeRegistry {
   UpdateHandlerMap* update_handler_map();
   CommitContributorMap* commit_contributor_map();
   DirectoryTypeDebugInfoEmitterMap* directory_type_debug_info_emitter_map();
+
+  void RegisterDirectoryTypeDebugInfoObserver(
+      syncer::TypeDebugInfoObserver* observer);
+  void UnregisterDirectoryTypeDebugInfoObserver(
+      syncer::TypeDebugInfoObserver* observer);
+  bool HasDirectoryTypeDebugInfoObserver(
+      syncer::TypeDebugInfoObserver* observer);
+  void RequestEmitDebugInfo();
 
  private:
   ModelTypeSet GetEnabledNonBlockingTypes() const;

@@ -42,10 +42,11 @@ class RemoteChangeProcessor;
 
 namespace drive_backend {
 
-class LocalToRemoteSyncer;
+class DriveServiceWrapper;
+class DriveUploaderWrapper;
 class MetadataDatabase;
-class RemoteToLocalSyncer;
-class SyncEngineInitializer;
+class RemoteChangeProcessorOnWorker;
+class RemoteChangeProcessorWrapper;
 class SyncTaskManager;
 class SyncWorker;
 
@@ -58,13 +59,15 @@ class SyncEngine : public RemoteFileSyncService,
   typedef Observer SyncServiceObserver;
 
   static scoped_ptr<SyncEngine> CreateForBrowserContext(
-      content::BrowserContext* context);
+      content::BrowserContext* context,
+      TaskLogger* task_logger);
   static void AppendDependsOnFactories(
       std::set<BrowserContextKeyedServiceFactory*>* factories);
 
   virtual ~SyncEngine();
 
   void Initialize(const base::FilePath& base_dir,
+                  TaskLogger* task_logger,
                   base::SequencedTaskRunner* file_task_runner,
                   leveldb::Env* env_override);
 
@@ -88,28 +91,12 @@ class SyncEngine : public RemoteFileSyncService,
   virtual void SetRemoteChangeProcessor(
       RemoteChangeProcessor* processor) OVERRIDE;
   virtual LocalChangeProcessor* GetLocalChangeProcessor() OVERRIDE;
-  virtual bool IsConflicting(const fileapi::FileSystemURL& url) OVERRIDE;
   virtual RemoteServiceState GetCurrentState() const OVERRIDE;
-  virtual void GetOriginStatusMap(OriginStatusMap* status_map) OVERRIDE;
-  virtual scoped_ptr<base::ListValue> DumpFiles(const GURL& origin) OVERRIDE;
-  virtual scoped_ptr<base::ListValue> DumpDatabase() OVERRIDE;
+  virtual void GetOriginStatusMap(const StatusMapCallback& callback) OVERRIDE;
+  virtual void DumpFiles(const GURL& origin,
+                         const ListCallback& callback) OVERRIDE;
+  virtual void DumpDatabase(const ListCallback& callback) OVERRIDE;
   virtual void SetSyncEnabled(bool enabled) OVERRIDE;
-  virtual SyncStatusCode SetDefaultConflictResolutionPolicy(
-      ConflictResolutionPolicy policy) OVERRIDE;
-  virtual SyncStatusCode SetConflictResolutionPolicy(
-      const GURL& origin,
-      ConflictResolutionPolicy policy) OVERRIDE;
-  virtual ConflictResolutionPolicy GetDefaultConflictResolutionPolicy()
-      const OVERRIDE;
-  virtual ConflictResolutionPolicy GetConflictResolutionPolicy(
-      const GURL& origin) const OVERRIDE;
-  virtual void GetRemoteVersions(
-      const fileapi::FileSystemURL& url,
-      const RemoteVersionsCallback& callback) OVERRIDE;
-  virtual void DownloadRemoteVersion(
-      const fileapi::FileSystemURL& url,
-      const std::string& version_id,
-      const DownloadVersionCallback& callback) OVERRIDE;
   virtual void PromoteDemotedChanges() OVERRIDE;
 
   // LocalChangeProcessor overrides.
@@ -137,9 +124,6 @@ class SyncEngine : public RemoteFileSyncService,
   MetadataDatabase* GetMetadataDatabase();
   SyncTaskManager* GetSyncTaskManagerForTesting();
 
-  // Notifies update of sync status to each observer.
-  void UpdateSyncEnabled(bool enabled);
-
   void OnPendingFileListUpdated(int item_count);
   void OnFileStatusChanged(const fileapi::FileSystemURL& url,
                            SyncFileStatus file_status,
@@ -164,7 +148,15 @@ class SyncEngine : public RemoteFileSyncService,
   void UpdateRegisteredApps();
 
   scoped_ptr<drive::DriveServiceInterface> drive_service_;
+  scoped_ptr<DriveServiceWrapper> drive_service_wrapper_;
   scoped_ptr<drive::DriveUploaderInterface> drive_uploader_;
+  scoped_ptr<DriveUploaderWrapper> drive_uploader_wrapper_;
+  RemoteChangeProcessor* remote_change_processor_;
+  scoped_ptr<RemoteChangeProcessorWrapper> remote_change_processor_wrapper_;
+
+  scoped_ptr<RemoteChangeProcessorOnWorker> remote_change_processor_on_worker_;
+
+  RemoteServiceState service_state_;
 
   // These external services are not owned by SyncEngine.
   // The owner of the SyncEngine is responsible for their lifetime.

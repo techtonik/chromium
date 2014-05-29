@@ -7,7 +7,7 @@
 #include "mojo/aura/context_factory_mojo.h"
 #include "mojo/public/c/gles2/gles2.h"
 #include "mojo/public/cpp/bindings/allocation_scope.h"
-#include "mojo/services/native_viewport/geometry_conversions.h"
+#include "mojo/services/public/cpp/geometry/geometry_type_converters.h"
 #include "ui/aura/env.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_event_dispatcher.h"
@@ -26,12 +26,14 @@ mojo::ContextFactoryMojo* WindowTreeHostMojo::context_factory_ = NULL;
 // WindowTreeHostMojo, public:
 
 WindowTreeHostMojo::WindowTreeHostMojo(
-    ScopedNativeViewportHandle viewport_handle,
+    NativeViewportPtr viewport,
     const gfx::Rect& bounds,
     const base::Callback<void()>& compositor_created_callback)
-    : native_viewport_(viewport_handle.Pass(), this),
+    : native_viewport_(viewport.Pass()),
       compositor_created_callback_(compositor_created_callback),
       bounds_(bounds) {
+  native_viewport_.set_client(this);
+
   AllocationScope scope;
   native_viewport_->Create(bounds);
 
@@ -46,6 +48,7 @@ WindowTreeHostMojo::WindowTreeHostMojo(
   }
   context_factory_ = new ContextFactoryMojo(gles2_handle.Pass());
   ui::ContextFactory::SetInstance(context_factory_);
+  aura::Env::GetInstance()->set_context_factory(context_factory_);
   CHECK(context_factory_) << "No GL bindings.";
 
   native_viewport_->CreateGLES2Context(gles2_client_handle.Pass());

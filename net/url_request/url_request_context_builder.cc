@@ -28,12 +28,18 @@
 #include "net/proxy/proxy_service.h"
 #include "net/ssl/ssl_config_service_defaults.h"
 #include "net/url_request/data_protocol_handler.h"
-#include "net/url_request/file_protocol_handler.h"
-#include "net/url_request/ftp_protocol_handler.h"
 #include "net/url_request/static_http_user_agent_settings.h"
 #include "net/url_request/url_request_context.h"
 #include "net/url_request/url_request_context_storage.h"
 #include "net/url_request/url_request_job_factory_impl.h"
+
+#if !defined(DISABLE_FILE_SUPPORT)
+#include "net/url_request/file_protocol_handler.h"
+#endif
+
+#if !defined(DISABLE_FTP_SUPPORT)
+#include "net/url_request/ftp_protocol_handler.h"
+#endif
 
 namespace net {
 
@@ -168,7 +174,6 @@ URLRequestContextBuilder::HttpCacheParams::~HttpCacheParams() {}
 URLRequestContextBuilder::HttpNetworkSessionParams::HttpNetworkSessionParams()
     : ignore_certificate_errors(false),
       host_mapping_rules(NULL),
-      http_pipelining_enabled(false),
       testing_fixed_http_port(0),
       testing_fixed_https_port(0),
       trusted_spdy_proxy() {}
@@ -187,7 +192,9 @@ URLRequestContextBuilder::SchemeFactory::~SchemeFactory() {
 
 URLRequestContextBuilder::URLRequestContextBuilder()
     : data_enabled_(false),
+#if !defined(DISABLE_FILE_SUPPORT)
       file_enabled_(false),
+#endif
 #if !defined(DISABLE_FTP_SUPPORT)
       ftp_enabled_(false),
 #endif
@@ -274,8 +281,6 @@ URLRequestContext* URLRequestContextBuilder::Build() {
       http_network_session_params_.ignore_certificate_errors;
   network_session_params.host_mapping_rules =
       http_network_session_params_.host_mapping_rules;
-  network_session_params.http_pipelining_enabled =
-      http_network_session_params_.http_pipelining_enabled;
   network_session_params.testing_fixed_http_port =
       http_network_session_params_.testing_fixed_http_port;
   network_session_params.testing_fixed_https_port =
@@ -313,11 +318,15 @@ URLRequestContext* URLRequestContextBuilder::Build() {
   URLRequestJobFactoryImpl* job_factory = new URLRequestJobFactoryImpl;
   if (data_enabled_)
     job_factory->SetProtocolHandler("data", new DataProtocolHandler);
+
+#if !defined(DISABLE_FILE_SUPPORT)
   if (file_enabled_) {
     job_factory->SetProtocolHandler(
     "file",
     new FileProtocolHandler(context->GetFileThread()->message_loop_proxy()));
   }
+#endif  // !defined(DISABLE_FILE_SUPPORT)
+
 #if !defined(DISABLE_FTP_SUPPORT)
   if (ftp_enabled_) {
     ftp_transaction_factory_.reset(
@@ -325,7 +334,8 @@ URLRequestContext* URLRequestContextBuilder::Build() {
     job_factory->SetProtocolHandler("ftp",
         new FtpProtocolHandler(ftp_transaction_factory_.get()));
   }
-#endif
+#endif  // !defined(DISABLE_FTP_SUPPORT)
+
   storage->set_job_factory(job_factory);
 
   // TODO(willchan): Support sdch.

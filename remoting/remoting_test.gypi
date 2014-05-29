@@ -17,6 +17,7 @@
         '../ppapi/ppapi.gyp:ppapi_cpp',
         '../testing/gmock.gyp:gmock',
         '../testing/gtest.gyp:gtest',
+        '../third_party/libyuv/libyuv.gyp:libyuv',
         '../third_party/webrtc/modules/modules.gyp:desktop_capture',
         '../ui/base/ui_base.gyp:ui_base',
         '../ui/gfx/gfx.gyp:gfx',
@@ -55,6 +56,7 @@
         'base/util_unittest.cc',
         'client/audio_player_unittest.cc',
         'client/key_event_mapper_unittest.cc',
+        'client/server_log_entry_client_unittest.cc',
         'client/plugin/normalizing_input_filter_cros_unittest.cc',
         'client/plugin/normalizing_input_filter_mac_unittest.cc',
         'codec/audio_encoder_opus_unittest.cc',
@@ -99,12 +101,12 @@
         'host/register_support_host_request_unittest.cc',
         'host/remote_input_filter_unittest.cc',
         'host/resizing_host_observer_unittest.cc',
-        'host/setup/me2me_native_messaging_host.cc',
-        'host/setup/me2me_native_messaging_host.h',
         'host/screen_capturer_fake.cc',
         'host/screen_capturer_fake.h',
         'host/screen_resolution_unittest.cc',
-        'host/server_log_entry_unittest.cc',
+        'host/server_log_entry_host_unittest.cc',
+        'host/setup/me2me_native_messaging_host.cc',
+        'host/setup/me2me_native_messaging_host.h',
         'host/setup/me2me_native_messaging_host_unittest.cc',
         'host/setup/oauth_helper_unittest.cc',
         'host/setup/pin_validator_unittest.cc',
@@ -122,6 +124,8 @@
         'jingle_glue/mock_objects.cc',
         'jingle_glue/mock_objects.h',
         'jingle_glue/network_settings_unittest.cc',
+        'jingle_glue/server_log_entry_unittest.cc',
+        'jingle_glue/server_log_entry_unittest.h',
         'protocol/authenticator_test_base.cc',
         'protocol/authenticator_test_base.h',
         'protocol/buffered_socket_writer_unittest.cc',
@@ -207,7 +211,7 @@
             'remoting_client_plugin',
           ],
         }],
-        [ 'OS=="android" and gtest_target_type=="shared_library"', {
+        [ 'OS=="android"', {
           'dependencies': [
             '../testing/android/native_test.gyp:native_test_native_code',
           ],
@@ -230,13 +234,24 @@
             ['exclude', '^base/resources_unittest\\.cc$'],
           ]
         }],
-        # TODO(dmikurube): Kill linux_use_tcmalloc. http://crbug.com/345554
-        [ 'OS == "linux" and ((use_allocator!="none" and use_allocator!="see_use_tcmalloc") or (use_allocator=="see_use_tcmalloc" and linux_use_tcmalloc==1))', {
+        [ 'OS == "linux" and use_allocator!="none"', {
           'dependencies': [
             '../base/allocator/allocator.gyp:allocator',
           ],
         }],
       ],  # end of 'conditions'
     },  # end of target 'remoting_unittests'
+    {
+      'target_name': 'remoting_browser_test_resources',
+      'type': 'none',
+      'copies': [
+        {
+          'destination': '<(PRODUCT_DIR)',
+            'files': [
+              '<@(remoting_webapp_js_browser_test_files)',
+            ],
+        },
+      ], #end of copies
+    },  # end of target 'remoting_browser_test_resources'
   ],  # end of targets
 }

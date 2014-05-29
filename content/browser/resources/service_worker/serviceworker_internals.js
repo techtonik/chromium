@@ -5,6 +5,22 @@
 cr.define('serviceworker', function() {
     'use strict';
 
+    function initialize() {
+        if (window.location.hash == "#iframe") {
+            // This page is loaded from chrome://inspect.
+            window.addEventListener('message', onMessage.bind(this), false);
+        }
+        update();
+    }
+
+    function onMessage(event) {
+        if (event.origin != 'chrome://inspect') {
+            return;
+        }
+        chrome.send(event.data.action,
+                    [event.data.partition_path, event.data.scope]);
+    }
+
     function update() {
         chrome.send('getAllRegistrations');
     }
@@ -15,7 +31,7 @@ cr.define('serviceworker', function() {
 
     // All commands are sent with the partition_path and scope, and
     // are all completed with 'onOperationComplete'.
-    var COMMANDS = ['unregister', 'start', 'stop', 'sync'];
+    var COMMANDS = ['unregister', 'start', 'stop', 'sync', 'inspect'];
     function commandHandler(command) {
         return function(event) {
             var link = event.target;
@@ -48,8 +64,34 @@ cr.define('serviceworker', function() {
 
     var allLogMessages = {};
 
+    // Send the active ServiceWorker information to chrome://inspect.
+    function sendToInspectPage(registrations, partition_id, partition_path) {
+        var workers = [];
+        for (var i = 0; i < registrations.length; i++) {
+            var registration = registrations[i];
+            if (!registration.active ||
+                registration.active.running_status != 'RUNNING') {
+                continue;
+            }
+            workers.push({
+                'partition_path': partition_path,
+                'scope': registration.scope,
+                'url': registration.script_url
+            })
+        }
+        window.parent.postMessage({
+            'partition_id': partition_id,
+            'workers': workers,
+        }, 'chrome://inspect')
+    }
+
     // Fired once per partition from the backend.
     function onPartitionData(registrations, partition_id, partition_path) {
+        if (window.location.hash == "#iframe") {
+            // This page is loaded from chrome://inspect.
+            sendToInspectPage(registrations, partition_id, partition_path);
+            return;
+        }
         var template;
         var container = $('serviceworker-list');
 
@@ -133,6 +175,14 @@ cr.define('serviceworker', function() {
         update();
     }
 
+    function onRegistrationStored(scope) {
+        update();
+    }
+
+    function onRegistrationDeleted(scope) {
+        update();
+    }
+
     function outputLogMessage(partition_id, version_id, message) {
         if (!(partition_id in allLogMessages)) {
             allLogMessages[partition_id] = {};
@@ -156,6 +206,7 @@ cr.define('serviceworker', function() {
     }
 
     return {
+        initialize: initialize,
         update: update,
         onOperationComplete: onOperationComplete,
         onPartitionData: onPartitionData,
@@ -164,7 +215,9 @@ cr.define('serviceworker', function() {
         onErrorReported: onErrorReported,
         onConsoleMessageReported: onConsoleMessageReported,
         onVersionStateChanged: onVersionStateChanged,
+        onRegistrationStored: onRegistrationStored,
+        onRegistrationDeleted: onRegistrationDeleted,
     };
 });
 
-document.addEventListener('DOMContentLoaded', serviceworker.update);
+document.addEventListener('DOMContentLoaded', serviceworker.initialize);

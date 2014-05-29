@@ -8,21 +8,22 @@
 #include <map>
 
 #include "mojo/public/cpp/bindings/lib/connector.h"
+#include "mojo/public/cpp/bindings/lib/filter_chain.h"
 #include "mojo/public/cpp/bindings/lib/shared_data.h"
 
 namespace mojo {
 namespace internal {
 
-class Router : public MessageReceiver {
+class Router : public MessageReceiverWithResponder {
  public:
-  // The Router takes ownership of |message_pipe|.
-  explicit Router(ScopedMessagePipeHandle message_pipe,
-                  MojoAsyncWaiter* waiter = GetDefaultAsyncWaiter());
+  Router(ScopedMessagePipeHandle message_pipe,
+         FilterChain filters,
+         MojoAsyncWaiter* waiter = GetDefaultAsyncWaiter());
   virtual ~Router();
 
   // Sets the receiver to handle messages read from the message pipe that do
   // not have the kMessageIsResponse flag set.
-  void set_incoming_receiver(MessageReceiver* receiver) {
+  void set_incoming_receiver(MessageReceiverWithResponder* receiver) {
     incoming_receiver_ = receiver;
   }
 
@@ -43,6 +44,14 @@ class Router : public MessageReceiver {
   // waiting to read from the pipe.
   bool encountered_error() const { return connector_.encountered_error(); }
 
+  void CloseMessagePipe() {
+    connector_.CloseMessagePipe();
+  }
+
+  ScopedMessagePipeHandle ReleaseMessagePipe() {
+    return connector_.ReleaseMessagePipe();
+  }
+
   // MessageReceiver implementation:
   virtual bool Accept(Message* message) MOJO_OVERRIDE;
   virtual bool AcceptWithResponder(Message* message, MessageReceiver* responder)
@@ -58,18 +67,18 @@ class Router : public MessageReceiver {
 
     // MessageReceiver implementation:
     virtual bool Accept(Message* message) MOJO_OVERRIDE;
-    virtual bool AcceptWithResponder(Message* message,
-                                     MessageReceiver* responder) MOJO_OVERRIDE;
+
    private:
     Router* router_;
   };
 
   bool HandleIncomingMessage(Message* message);
 
+  HandleIncomingMessageThunk thunk_;
+  FilterChain filters_;
   Connector connector_;
   SharedData<Router*> weak_self_;
-  MessageReceiver* incoming_receiver_;
-  HandleIncomingMessageThunk thunk_;
+  MessageReceiverWithResponder* incoming_receiver_;
   ResponderMap responders_;
   uint64_t next_request_id_;
 };

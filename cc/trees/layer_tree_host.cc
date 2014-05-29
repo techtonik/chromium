@@ -96,7 +96,6 @@ LayerTreeHost::LayerTreeHost(LayerTreeHostClient* client,
       client_(client),
       source_frame_number_(0),
       rendering_stats_instrumentation_(RenderingStatsInstrumentation::Create()),
-      output_surface_can_be_initialized_(true),
       output_surface_lost_(true),
       num_failed_recreate_attempts_(0),
       settings_(settings),
@@ -107,7 +106,6 @@ LayerTreeHost::LayerTreeHost(LayerTreeHostClient* client,
       page_scale_factor_(1.f),
       min_page_scale_factor_(1.f),
       max_page_scale_factor_(1.f),
-      trigger_idle_updates_(true),
       has_gpu_rasterization_trigger_(false),
       content_is_suitable_for_gpu_rasterization_(true),
       background_color_(SK_ColorWHITE),
@@ -350,6 +348,7 @@ void LayerTreeHost::FinishCommitOnImplThread(LayerTreeHostImpl* host_impl) {
 
   sync_tree->PassSwapPromises(&swap_promise_list_);
 
+  host_impl->SetUseGpuRasterization(UseGpuRasterization());
   host_impl->SetViewportSize(device_viewport_size_);
   host_impl->SetOverdrawBottomHeight(overdraw_bottom_height_);
   host_impl->SetDeviceScaleFactor(device_scale_factor_);
@@ -432,6 +431,7 @@ scoped_ptr<LayerTreeHostImpl> LayerTreeHost::CreateLayerTreeHostImpl(
                                 rendering_stats_instrumentation_.get(),
                                 shared_bitmap_manager_,
                                 id_);
+  host_impl->SetUseGpuRasterization(UseGpuRasterization());
   shared_bitmap_manager_ = NULL;
   if (settings_.calculate_top_controls_position &&
       host_impl->top_controls_manager()) {
@@ -452,15 +452,6 @@ void LayerTreeHost::DidLoseOutputSurface() {
   num_failed_recreate_attempts_ = 0;
   output_surface_lost_ = true;
   SetNeedsCommit();
-}
-
-bool LayerTreeHost::CompositeAndReadback(
-    void* pixels,
-    const gfx::Rect& rect_in_device_viewport) {
-  trigger_idle_updates_ = false;
-  bool ret = proxy_->CompositeAndReadback(pixels, rect_in_device_viewport);
-  trigger_idle_updates_ = true;
-  return ret;
 }
 
 void LayerTreeHost::FinishAllRendering() {
@@ -704,20 +695,15 @@ void LayerTreeHost::NotifyInputThrottledUntilCommit() {
 }
 
 void LayerTreeHost::Composite(base::TimeTicks frame_begin_time) {
-  if (!proxy_->HasImplThread())
-    static_cast<SingleThreadProxy*>(proxy_.get())->CompositeImmediately(
-        frame_begin_time);
-  else
-    SetNeedsCommit();
-}
-
-bool LayerTreeHost::InitializeOutputSurfaceIfNeeded() {
-  if (!output_surface_can_be_initialized_)
-    return false;
+  DCHECK(!proxy_->HasImplThread());
+  SingleThreadProxy* proxy = static_cast<SingleThreadProxy*>(proxy_.get());
 
   if (output_surface_lost_)
-    proxy_->CreateAndInitializeOutputSurface();
-  return !output_surface_lost_;
+    proxy->CreateAndInitializeOutputSurface();
+  if (output_surface_lost_)
+    return;
+
+  proxy->CompositeImmediately(frame_begin_time);
 }
 
 bool LayerTreeHost::UpdateLayers(ResourceUpdateQueue* queue) {
@@ -788,6 +774,10 @@ bool LayerTreeHost::UpdateLayers(Layer* root_layer,
 
     TRACE_EVENT0("cc", "LayerTreeHost::UpdateLayers::CalcDrawProps");
     bool can_render_to_separate_surface = true;
+    // TODO(vmpstr): Passing 0 as the current render surface layer list id means
+    // that we won't be able to detect if a layer is part of |update_list|.
+    // Change this if this information is required.
+    int render_surface_layer_list_id = 0;
     LayerTreeHostCommon::CalcDrawPropsMainInputs inputs(
         root_layer,
         device_viewport_size(),
@@ -799,7 +789,8 @@ bool LayerTreeHost::UpdateLayers(Layer* root_layer,
         settings_.can_use_lcd_text,
         can_render_to_separate_surface,
         settings_.layer_transforms_should_scale_layer_contents,
-        &update_list);
+        &update_list,
+        render_surface_layer_list_id);
     LayerTreeHostCommon::CalculateDrawProperties(&inputs);
 
     if (total_frames_used_for_lcd_text_metrics_ <=
@@ -833,7 +824,7 @@ bool LayerTreeHost::UpdateLayers(Layer* root_layer,
   bool need_more_updates = false;
   PaintLayerContents(
       update_list, queue, &did_paint_content, &need_more_updates);
-  if (trigger_idle_updates_ && need_more_updates) {
+  if (need_more_updates) {
     TRACE_EVENT0("cc", "LayerTreeHost::UpdateLayers::posting prepaint task");
     prepaint_callback_.Reset(base::Bind(&LayerTreeHost::TriggerPrepaint,
                                         base::Unretained(this)));
@@ -994,7 +985,7 @@ void LayerTreeHost::PaintLayerContents(
     if (it.represents_target_render_surface()) {
       PaintMasksForRenderSurface(
           *it, queue, did_paint_content, need_more_updates);
-    } else if (it.represents_itself() && it->DrawsContent()) {
+    } else if (it.represents_itself()) {
       DCHECK(!it->paint_properties().bounds.IsEmpty());
       *did_paint_content |= it->Update(queue, &occlusion_tracker);
       *need_more_updates |= it->NeedMoreUpdates();
@@ -1143,14 +1134,12 @@ scoped_ptr<base::Value> LayerTreeHost::AsValue() const {
   return state.PassAs<base::Value>();
 }
 
-void LayerTreeHost::AnimateLayers(base::TimeTicks time) {
+void LayerTreeHost::AnimateLayers(base::TimeTicks monotonic_time) {
   if (!settings_.accelerated_animation_enabled ||
       animation_registrar_->active_animation_controllers().empty())
     return;
 
   TRACE_EVENT0("cc", "LayerTreeHost::AnimateLayers");
-
-  double monotonic_time = (time - base::TimeTicks()).InSecondsF();
 
   AnimationRegistrar::AnimationControllerMap copy =
       animation_registrar_->active_animation_controllers();

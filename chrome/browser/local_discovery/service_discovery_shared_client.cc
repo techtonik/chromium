@@ -11,7 +11,6 @@
 #include "base/metrics/histogram.h"
 #include "base/path_service.h"
 #include "base/timer/elapsed_timer.h"
-#include "chrome/browser/local_discovery/service_discovery_client_utility.h"
 #include "chrome/installer/util/browser_distribution.h"
 #include "chrome/installer/util/firewall_manager_win.h"
 #endif  // OS_WIN
@@ -22,11 +21,15 @@
 
 #if defined(ENABLE_MDNS)
 #include "chrome/browser/local_discovery/service_discovery_client_mdns.h"
+#include "chrome/browser/local_discovery/service_discovery_client_utility.h"
 #endif  // ENABLE_MDNS
 
 namespace {
 
 #if defined(OS_WIN)
+
+bool g_is_firewall_ready = false;
+
 void ReportFirewallStats() {
   base::FilePath exe_path;
   if (!PathService::Get(base::FILE_EXE, &exe_path))
@@ -37,9 +40,9 @@ void ReportFirewallStats() {
                                          exe_path);
   if (!manager)
     return;
-  bool is_ready = manager->CanUseLocalPorts();
+  g_is_firewall_ready = manager->CanUseLocalPorts();
   UMA_HISTOGRAM_TIMES("LocalDiscovery.FirewallAccessTime", timer.Elapsed());
-  UMA_HISTOGRAM_BOOLEAN("LocalDiscovery.IsFirewallReady", is_ready);
+  UMA_HISTOGRAM_BOOLEAN("LocalDiscovery.IsFirewallReady", g_is_firewall_ready);
 }
 #endif  // OS_WIN
 
@@ -75,7 +78,7 @@ scoped_refptr<ServiceDiscoverySharedClient>
 
 #if defined(OS_MACOSX)
   return ServiceDiscoveryClientMacFactory::CreateInstance();
-#else
+#else  // OS_MACOSX
 
 #if defined(OS_WIN)
   static bool reported =
@@ -83,10 +86,12 @@ scoped_refptr<ServiceDiscoverySharedClient>
                               base::Bind(&ReportFirewallStats));
   // TODO(vitalybuka): Switch to |ServiceDiscoveryClientMdns| after we find what
   // to do with firewall for user-level installs. crbug.com/366408
-  return new ServiceDiscoveryClientUtility();
+  if (!g_is_firewall_ready)
+    return new ServiceDiscoveryClientUtility();
 #endif  // OS_WIN
+
   return new ServiceDiscoveryClientMdns();
-#endif
+#endif // OS_MACOSX
 }
 
 #else

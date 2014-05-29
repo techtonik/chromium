@@ -9,13 +9,13 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/threading/sequenced_worker_pool.h"
 #include "chrome/browser/chrome_notification_types.h"
-#include "chrome/browser/chromeos/login/login_display_host_impl.h"
 #include "chrome/browser/chromeos/login/login_manager_test.h"
 #include "chrome/browser/chromeos/login/managed/managed_user_test_base.h"
 #include "chrome/browser/chromeos/login/managed/supervised_user_authentication.h"
 #include "chrome/browser/chromeos/login/startup_utils.h"
-#include "chrome/browser/chromeos/login/supervised_user_manager.h"
-#include "chrome/browser/chromeos/login/webui_login_view.h"
+#include "chrome/browser/chromeos/login/ui/login_display_host_impl.h"
+#include "chrome/browser/chromeos/login/ui/webui_login_view.h"
+#include "chrome/browser/chromeos/login/users/supervised_user_manager.h"
 #include "chrome/browser/chromeos/net/network_portal_detector_test_impl.h"
 #include "chrome/browser/chromeos/settings/stub_cros_settings_provider.h"
 #include "chrome/browser/managed_mode/managed_user_constants.h"
@@ -37,9 +37,9 @@
 #include "sync/protocol/sync.pb.h"
 
 using testing::_;
-using chromeos::testing::ManagedUserTestBase;
-using chromeos::testing::kTestSupervisedUserDisplayName;
-using chromeos::testing::kTestManager;
+using chromeos::ManagedUserTestBase;
+using chromeos::kTestSupervisedUserDisplayName;
+using chromeos::kTestManager;
 
 namespace chromeos {
 
@@ -60,12 +60,12 @@ class SupervisedUserPasswordManagerTest : public ManagedUserTestBase {
 };
 
 IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PRE_PRE_PRE_PasswordChangeFromUserTest) {
+                       DISABLED_PRE_PRE_PRE_PasswordChangeFromUserTest) {
   PrepareUsers();
 }
 
 IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PRE_PRE_PasswordChangeFromUserTest) {
+                       DISABLED_PRE_PRE_PasswordChangeFromUserTest) {
   StartFlowLoginAsManager();
   FillNewUserData(kTestSupervisedUserDisplayName);
   StartUserCreation("managed-user-creation-next-button",
@@ -75,7 +75,7 @@ IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
 // Supervised user signs in, get sync notification about password update, and
 // schedules password migration.
 IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PRE_PasswordChangeFromUserTest) {
+                       DISABLED_PRE_PasswordChangeFromUserTest) {
   SigninAsSupervisedUser(true, 0, kTestSupervisedUserDisplayName);
 
   const User* user = UserManager::Get()->GetUsers().at(0);
@@ -98,20 +98,21 @@ IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
 
 // Supervised user signs in for second time, and actual password migration takes
 // place.
-IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest, PasswordChangeFromUserTest) {
+IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
+                       DISABLED_PasswordChangeFromUserTest) {
   EXPECT_CALL(*mock_homedir_methods_, MountEx(_, _, _, _)).Times(1);
   EXPECT_CALL(*mock_homedir_methods_, UpdateKeyEx(_, _, _, _, _)).Times(1);
   SigninAsSupervisedUser(false, 0, kTestSupervisedUserDisplayName);
-  ::testing::Mock::VerifyAndClearExpectations(mock_homedir_methods_);
+  testing::Mock::VerifyAndClearExpectations(mock_homedir_methods_);
 }
 
 IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PRE_PRE_PRE_PasswordChangeFromManagerTest) {
+                       DISABLED_PRE_PRE_PRE_PasswordChangeFromManagerTest) {
   PrepareUsers();
 }
 
 IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PRE_PRE_PasswordChangeFromManagerTest) {
+                       DISABLED_PRE_PRE_PasswordChangeFromManagerTest) {
   StartFlowLoginAsManager();
   FillNewUserData(kTestSupervisedUserDisplayName);
   StartUserCreation("managed-user-creation-next-button",
@@ -121,7 +122,7 @@ IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
 // Manager signs in, gets sync notification about supervised user password
 // update, and performs migration.
 IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PRE_PasswordChangeFromManagerTest) {
+                       DISABLED_PRE_PasswordChangeFromManagerTest) {
   const User* managed_user = UserManager::Get()->GetUsers().at(0);
 
   SigninAsManager(1);
@@ -156,25 +157,26 @@ IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
       sync_id, managed_users::kChromeOSPasswordData, password, true, false);
   content::RunAllPendingInMessageLoop();
 
-  ::testing::Mock::VerifyAndClearExpectations(mock_homedir_methods_);
+  testing::Mock::VerifyAndClearExpectations(mock_homedir_methods_);
 }
 
 // After that supervised user signs in, and no password change happens.
 IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PasswordChangeFromManagerTest) {
+                       DISABLED_PasswordChangeFromManagerTest) {
   EXPECT_CALL(*mock_homedir_methods_, MountEx(_, _, _, _)).Times(1);
   EXPECT_CALL(*mock_homedir_methods_, UpdateKeyEx(_, _, _, _, _)).Times(0);
   SigninAsSupervisedUser(false, 1, kTestSupervisedUserDisplayName);
-  ::testing::Mock::VerifyAndClearExpectations(mock_homedir_methods_);
+  testing::Mock::VerifyAndClearExpectations(mock_homedir_methods_);
 }
 
-IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PRE_PRE_PRE_PRE_PasswordChangeUserAndManagerTest) {
+IN_PROC_BROWSER_TEST_F(
+    SupervisedUserPasswordTest,
+    DISABLED_PRE_PRE_PRE_PRE_PasswordChangeUserAndManagerTest) {
   PrepareUsers();
 }
 
 IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PRE_PRE_PRE_PasswordChangeUserAndManagerTest) {
+                       DISABLED_PRE_PRE_PRE_PasswordChangeUserAndManagerTest) {
   StartFlowLoginAsManager();
   FillNewUserData(kTestSupervisedUserDisplayName);
   StartUserCreation("managed-user-creation-next-button",
@@ -184,7 +186,7 @@ IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
 // Supervised user signs in, get sync notification about password update, and
 // schedules password migration.
 IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PRE_PRE_PasswordChangeUserAndManagerTest) {
+                       DISABLED_PRE_PRE_PasswordChangeUserAndManagerTest) {
   SigninAsSupervisedUser(true, 0, kTestSupervisedUserDisplayName);
 
   const User* user = UserManager::Get()->GetUsers().at(0);
@@ -208,7 +210,7 @@ IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
 // After that manager signs in, and also detects password change. Manager
 // performs the migration.
 IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PRE_PasswordChangeUserAndManagerTest) {
+                       DISABLED_PRE_PasswordChangeUserAndManagerTest) {
   const User* managed_user = UserManager::Get()->GetUsers().at(0);
 
   SigninAsManager(1);
@@ -243,17 +245,17 @@ IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
       sync_id, managed_users::kChromeOSPasswordData, password, true, false);
   content::RunAllPendingInMessageLoop();
 
-  ::testing::Mock::VerifyAndClearExpectations(mock_homedir_methods_);
+  testing::Mock::VerifyAndClearExpectations(mock_homedir_methods_);
 }
 
 // When supervised user signs in, password is already migrated, so no migration
 // should be attempted.
 IN_PROC_BROWSER_TEST_F(SupervisedUserPasswordTest,
-                       PasswordChangeUserAndManagerTest) {
+                       DISABLED_PasswordChangeUserAndManagerTest) {
   EXPECT_CALL(*mock_homedir_methods_, MountEx(_, _, _, _)).Times(1);
   EXPECT_CALL(*mock_homedir_methods_, UpdateKeyEx(_, _, _, _, _)).Times(0);
   SigninAsSupervisedUser(false, 1, kTestSupervisedUserDisplayName);
-  ::testing::Mock::VerifyAndClearExpectations(mock_homedir_methods_);
+  testing::Mock::VerifyAndClearExpectations(mock_homedir_methods_);
 }
 
 }  // namespace chromeos

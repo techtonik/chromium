@@ -5,13 +5,14 @@
 #ifndef CHROME_BROWSER_UI_VIEWS_SESSION_CRASHED_BUBBLE_VIEW_H_
 #define CHROME_BROWSER_UI_VIEWS_SESSION_CRASHED_BUBBLE_VIEW_H_
 
+#include "base/memory/scoped_ptr.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_observer.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "ui/views/bubble/bubble_delegate.h"
 #include "ui/views/controls/button/button.h"
-#include "ui/views/controls/link_listener.h"
+#include "ui/views/controls/styled_label_listener.h"
 
 namespace views {
 class Checkbox;
@@ -33,7 +34,7 @@ class Browser;
 class SessionCrashedBubbleView
     : public views::BubbleDelegateView,
       public views::ButtonListener,
-      public views::LinkListener,
+      public views::StyledLabelListener,
       public content::WebContentsObserver,
       public content::NotificationObserver,
       public TabStripModelObserver {
@@ -41,10 +42,21 @@ class SessionCrashedBubbleView
   static void Show(Browser* browser);
 
  private:
+  // A helper class that listens to browser removal event.
+  class BrowserRemovalObserver;
+
   SessionCrashedBubbleView(views::View* anchor_view,
                            Browser* browser,
-                           content::WebContents* web_contents);
+                           content::WebContents* web_contents,
+                           bool offer_uma_optin);
   virtual ~SessionCrashedBubbleView();
+
+  // Creates and shows the session crashed bubble, with |offer_uma_optin|
+  // indicating whether the UMA opt-in checkbox should be shown. Called
+  // by Show after checking whether the UMA option should be presented and it
+  // takes ownership of |browser_observer|.
+  static void ShowForReal(scoped_ptr<BrowserRemovalObserver> browser_observer,
+                          bool offer_uma_optin);
 
   // WidgetDelegateView methods.
   virtual views::View* GetInitiallyFocusedView() OVERRIDE;
@@ -56,8 +68,9 @@ class SessionCrashedBubbleView
   virtual void ButtonPressed(views::Button* sender,
                              const ui::Event& event) OVERRIDE;
 
-  // views::LinkListener methods.
-  virtual void LinkClicked(views::Link* source, int event_floags) OVERRIDE;
+  // views::StyledLabelListener methods.
+  virtual void StyledLabelLinkClicked(const gfx::Range& range,
+                                      int event_flags) OVERRIDE;
 
   // content::WebContentsObserver methods.
   virtual void DidStartNavigationToPendingEntry(
@@ -110,6 +123,9 @@ class SessionCrashedBubbleView
 
   // Checkbox for the user to opt-in to UMA reporting.
   views::Checkbox* uma_option_;
+
+  // Whether or not the UMA opt-in option should be shown.
+  bool offer_uma_optin_;
 
   // Whether or not a navigation has started on current tab.
   bool started_navigation_;

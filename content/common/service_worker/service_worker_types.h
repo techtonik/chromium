@@ -28,6 +28,7 @@ const static int kInvalidServiceWorkerHandleId = -1;
 const static int kInvalidServiceWorkerProviderId = -1;
 const static int64 kInvalidServiceWorkerRegistrationId = -1;
 const static int64 kInvalidServiceWorkerVersionId = -1;
+const static int64 kInvalidServiceWorkerResourceId = -1;
 const static int64 kInvalidServiceWorkerResponseId = -1;
 
 // To dispatch fetch request from browser to child process.
@@ -58,15 +59,18 @@ enum ServiceWorkerFetchEventResult {
 // Represents a response to a fetch.
 struct CONTENT_EXPORT ServiceWorkerResponse {
   ServiceWorkerResponse();
+  // TODO(kinuko): Deprecate this once blink side patch is rolled.
   ServiceWorkerResponse(int status_code,
                         const std::string& status_text,
                         const std::string& method,
+                        const std::map<std::string, std::string>& headers);
+  ServiceWorkerResponse(int status_code,
+                        const std::string& status_text,
                         const std::map<std::string, std::string>& headers);
   ~ServiceWorkerResponse();
 
   int status_code;
   std::string status_text;
-  std::string method;
   std::map<std::string, std::string> headers;
 };
 

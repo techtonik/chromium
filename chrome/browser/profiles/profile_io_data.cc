@@ -94,8 +94,8 @@
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/drive/drive_protocol_handler.h"
 #include "chrome/browser/chromeos/login/startup_utils.h"
-#include "chrome/browser/chromeos/login/user.h"
-#include "chrome/browser/chromeos/login/user_manager.h"
+#include "chrome/browser/chromeos/login/users/user.h"
+#include "chrome/browser/chromeos/login/users/user_manager.h"
 #include "chrome/browser/chromeos/net/cert_verify_proc_chromeos.h"
 #include "chrome/browser/chromeos/policy/policy_cert_service.h"
 #include "chrome/browser/chromeos/policy/policy_cert_service_factory.h"
@@ -366,6 +366,7 @@ void ProfileIOData::InitializeOnUIThread(Profile* profile) {
 #endif
 
   params->profile = profile;
+  params->prerender_tracker = g_browser_process->prerender_tracker();
   profile_params_.reset(params.release());
 
   ChromeNetworkDelegate::InitializePrefsOnUIThread(
@@ -612,22 +613,22 @@ ProfileIOData* ProfileIOData::FromResourceContext(
 bool ProfileIOData::IsHandledProtocol(const std::string& scheme) {
   DCHECK_EQ(scheme, StringToLowerASCII(scheme));
   static const char* const kProtocolList[] = {
-    content::kFileScheme,
+    url::kFileScheme,
     content::kChromeDevToolsScheme,
     chrome::kDomDistillerScheme,
     extensions::kExtensionScheme,
     extensions::kExtensionResourceScheme,
     content::kChromeUIScheme,
-    content::kDataScheme,
+    url::kDataScheme,
 #if defined(OS_CHROMEOS)
     chrome::kDriveScheme,
 #endif  // defined(OS_CHROMEOS)
     content::kAboutScheme,
 #if !defined(DISABLE_FTP_SUPPORT)
-    content::kFtpScheme,
+    url::kFtpScheme,
 #endif  // !defined(DISABLE_FTP_SUPPORT)
-    content::kBlobScheme,
-    content::kFileSystemScheme,
+    url::kBlobScheme,
+    url::kFileSystemScheme,
     chrome::kChromeSearchScheme,
   };
   for (size_t i = 0; i < arraysize(kProtocolList); ++i) {
@@ -948,6 +949,7 @@ void ProfileIOData::Init(
   network_delegate->set_cookie_settings(profile_params_->cookie_settings.get());
   network_delegate->set_enable_do_not_track(&enable_do_not_track_);
   network_delegate->set_force_google_safe_search(&force_safesearch_);
+  network_delegate->set_prerender_tracker(profile_params_->prerender_tracker);
   network_delegate_.reset(network_delegate);
 
   fraudulent_certificate_reporter_.reset(
@@ -988,15 +990,11 @@ void ProfileIOData::Init(
 #if defined(OS_CHROMEOS)
   username_hash_ = profile_params_->username_hash;
   scoped_refptr<net::CertVerifyProc> verify_proc;
-  if (chromeos::UserManager::IsMultipleProfilesAllowed()) {
-    crypto::ScopedPK11Slot public_slot =
-        crypto::GetPublicSlotForChromeOSUser(username_hash_);
-    // The private slot won't be ready by this point. It shouldn't be necessary
-    // for cert trust purposes anyway.
-    verify_proc = new chromeos::CertVerifyProcChromeOS(public_slot.Pass());
-  } else {
-    verify_proc = net::CertVerifyProc::CreateDefault();
-  }
+  crypto::ScopedPK11Slot public_slot =
+      crypto::GetPublicSlotForChromeOSUser(username_hash_);
+  // The private slot won't be ready by this point. It shouldn't be necessary
+  // for cert trust purposes anyway.
+  verify_proc = new chromeos::CertVerifyProcChromeOS(public_slot.Pass());
   if (cert_verifier_) {
     cert_verifier_->InitializeOnIOThread(verify_proc);
     main_request_context_->set_cert_verifier(cert_verifier_.get());
@@ -1033,7 +1031,7 @@ scoped_ptr<net::URLRequestJobFactory> ProfileIOData::SetUpJobFactoryDefaults(
   // NOTE(willchan): Keep these protocol handlers in sync with
   // ProfileIOData::IsHandledProtocol().
   bool set_protocol = job_factory->SetProtocolHandler(
-      content::kFileScheme,
+      url::kFileScheme,
       new net::FileProtocolHandler(
           content::BrowserThread::GetBlockingPool()->
               GetTaskRunnerWithShutdownBehavior(
@@ -1053,7 +1051,7 @@ scoped_ptr<net::URLRequestJobFactory> ProfileIOData::SetUpJobFactoryDefaults(
       CreateExtensionResourceProtocolHandler());
   DCHECK(set_protocol);
   set_protocol = job_factory->SetProtocolHandler(
-      content::kDataScheme, new net::DataProtocolHandler());
+      url::kDataScheme, new net::DataProtocolHandler());
   DCHECK(set_protocol);
 #if defined(OS_CHROMEOS)
   if (!IsOffTheRecord() && profile_params_) {
@@ -1069,7 +1067,7 @@ scoped_ptr<net::URLRequestJobFactory> ProfileIOData::SetUpJobFactoryDefaults(
 #if !defined(DISABLE_FTP_SUPPORT)
   DCHECK(ftp_transaction_factory);
   job_factory->SetProtocolHandler(
-      content::kFtpScheme,
+      url::kFtpScheme,
       new net::FtpProtocolHandler(ftp_transaction_factory));
 #endif  // !defined(DISABLE_FTP_SUPPORT)
 

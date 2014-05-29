@@ -17,12 +17,12 @@
 #include "extensions/common/extension.h"
 
 class Browser;
-class ExtensionService;
 class PrefService;
 class Profile;
 
 namespace extensions {
 class ExtensionRegistry;
+class ExtensionSet;
 
 // Model for the browser actions toolbar.
 class ExtensionToolbarModel : public content::NotificationObserver,
@@ -141,6 +141,9 @@ class ExtensionToolbarModel : public content::NotificationObserver,
                        const content::NotificationSource& source,
                        const content::NotificationDetails& details) OVERRIDE;
 
+  // Callback when extensions are ready.
+  void OnReady();
+
   // ExtensionRegistryObserver implementation.
   virtual void OnExtensionLoaded(content::BrowserContext* browser_context,
                                  const Extension* extension) OVERRIDE;
@@ -148,16 +151,15 @@ class ExtensionToolbarModel : public content::NotificationObserver,
       content::BrowserContext* browser_context,
       const Extension* extension,
       UnloadedExtensionInfo::Reason reason) OVERRIDE;
+  virtual void OnExtensionUninstalled(content::BrowserContext* browser_context,
+                                      const Extension* extension) OVERRIDE;
 
   // To be called after the extension service is ready; gets loaded extensions
   // from the extension service and their saved order from the pref service
   // and constructs |toolbar_items_| from these data.
-  void InitializeExtensionList(ExtensionService* service);
-  void Populate(const ExtensionIdList& positions, ExtensionService* service);
-
-  // Fills |list| with extensions based on provided |order|.
-  void FillExtensionList(const ExtensionIdList& order,
-                         ExtensionService* service);
+  void InitializeExtensionList(const ExtensionSet& extensions);
+  void Populate(const ExtensionIdList& positions,
+                const ExtensionSet& extensions);
 
   // Save the model to prefs.
   void UpdatePrefs();
@@ -171,7 +173,6 @@ class ExtensionToolbarModel : public content::NotificationObserver,
 
   void AddExtension(const Extension* extension);
   void RemoveExtension(const Extension* extension);
-  void UninstalledExtension(const Extension* extension);
 
   // The Profile this toolbar model is for.
   Profile* profile_;

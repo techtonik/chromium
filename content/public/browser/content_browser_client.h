@@ -88,6 +88,7 @@ class BrowserPluginGuestDelegate;
 class BrowserPpapiHost;
 class BrowserURLHandler;
 class DesktopNotificationDelegate;
+class DevToolsManagerDelegate;
 class ExternalVideoSurfaceContainer;
 class LocationProvider;
 class MediaObserver;
@@ -150,6 +151,7 @@ class CONTENT_EXPORT ContentBrowserClient {
   // the delegate in the content embedder that will service the guest in the
   // content layer. The content layer takes ownership of the |guest_delegate|.
   virtual void GuestWebContentsCreated(
+      int guest_instance_id,
       SiteInstance* guest_site_instance,
       WebContents* guest_web_contents,
       WebContents* opener_web_contents,
@@ -233,6 +235,10 @@ class CONTENT_EXPORT ContentBrowserClient {
   // given |process_host|.
   virtual bool IsSuitableHost(RenderProcessHost* process_host,
                               const GURL& site_url);
+
+  // Returns whether a new view for a new site instance can be added to a
+  // given |process_host|.
+  virtual bool MayReuseHost(RenderProcessHost* process_host);
 
   // Returns whether a new process should be created or an existing one should
   // be reused based on the URL we want to load. This should return false,
@@ -445,7 +451,7 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual void RequestDesktopNotificationPermission(
       const GURL& source_origin,
       RenderFrameHost* render_frame_host,
-      base::Closure& callback) {}
+      const base::Closure& callback) {}
 
   // Checks if the given page has permission to show desktop notifications.
   // This is called on the IO thread.
@@ -479,7 +485,6 @@ class CONTENT_EXPORT ContentBrowserClient {
                                bool opener_suppressed,
                                content::ResourceContext* context,
                                int render_process_id,
-                               bool is_guest,
                                int opener_id,
                                bool* no_javascript_access);
 
@@ -593,6 +598,10 @@ class CONTENT_EXPORT ContentBrowserClient {
   // information.
   virtual VibrationProvider* OverrideVibrationProvider();
 
+  // Creates a new DevToolsManagerDelegate. The caller owns the returned value.
+  // It's valid to return NULL.
+  virtual DevToolsManagerDelegate* GetDevToolsManagerDelegate();
+
 #if defined(OS_POSIX) && !defined(OS_MACOSX)
   // Populates |mappings| with all files that need to be mapped before launching
   // a child process.
@@ -626,7 +635,7 @@ class CONTENT_EXPORT ContentBrowserClient {
   // if the default cookie store should be used
   // This is called on the IO thread.
   virtual net::CookieStore* OverrideCookieStoreForRenderProcess(
-      int render_process_id_);
+      int render_process_id);
 
 #if defined(VIDEO_HOLE)
   // Allows an embedder to provide its own ExternalVideoSurfaceContainer

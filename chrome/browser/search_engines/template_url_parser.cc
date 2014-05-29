@@ -16,11 +16,11 @@
 #include "chrome/browser/search_engines/search_terms_data.h"
 #include "chrome/browser/search_engines/template_url.h"
 #include "chrome/browser/search_engines/template_url_service.h"
-#include "chrome/common/url_constants.h"
 #include "libxml/parser.h"
 #include "libxml/xmlwriter.h"
 #include "ui/gfx/favicon_size.h"
 #include "url/gurl.h"
+#include "url/url_constants.h"
 
 namespace {
 
@@ -94,8 +94,8 @@ bool IsHTTPRef(const std::string& url) {
   if (url.empty())
     return true;
   GURL gurl(url);
-  return gurl.is_valid() && (gurl.SchemeIs(content::kHttpScheme) ||
-                             gurl.SchemeIs(content::kHttpsScheme));
+  return gurl.is_valid() && (gurl.SchemeIs(url::kHttpScheme) ||
+                             gurl.SchemeIs(url::kHttpsScheme));
 }
 
 }  // namespace
@@ -246,14 +246,14 @@ void TemplateURLParsingContext::EndElementImpl(void* ctx, const xmlChar* name) {
       break;
     case TemplateURLParsingContext::IMAGE: {
       GURL image_url(base::UTF16ToUTF8(context->string_));
-      if (image_url.SchemeIs(content::kDataScheme)) {
+      if (image_url.SchemeIs(url::kDataScheme)) {
         // TODO (jcampan): bug 1169256: when dealing with data URL, we need to
         // decode the data URL in the renderer. For now, we'll just point to the
         // favicon from the URL.
         context->derive_image_from_url_ = true;
       } else if (context->image_is_valid_for_favicon_ && image_url.is_valid() &&
-                 (image_url.SchemeIs(content::kHttpScheme) ||
-                  image_url.SchemeIs(content::kHttpsScheme))) {
+                 (image_url.SchemeIs(url::kHttpScheme) ||
+                  image_url.SchemeIs(url::kHttpsScheme))) {
         context->data_.favicon_url = image_url;
       }
       context->image_is_valid_for_favicon_ = false;

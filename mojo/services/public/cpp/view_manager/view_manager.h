@@ -5,18 +5,18 @@
 #ifndef MOJO_SERVICES_PUBLIC_CPP_VIEW_MANAGER_VIEW_MANAGER_H_
 #define MOJO_SERVICES_PUBLIC_CPP_VIEW_MANAGER_VIEW_MANAGER_H_
 
+#include <map>
+
 #include "base/basictypes.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/observer_list.h"
 #include "mojo/public/cpp/bindings/callback.h"
 #include "mojo/services/public/cpp/view_manager/view_tree_node.h"
 
 namespace mojo {
-class Shell;
-namespace services {
+class ServiceProvider;
 namespace view_manager {
 
-class ViewManagerObserver;
+class View;
 class ViewManagerSynchronizer;
 class ViewTreeNode;
 
@@ -27,37 +27,41 @@ class ViewTreeNode;
 // TODO: displays
 class ViewManager {
  public:
-  // This blocks on the connection being established.
+  explicit ViewManager(ServiceProvider* service_provider);
+  ~ViewManager();
+
+  // Connects to the View Manager service. This method must be called before
+  // using any other View Manager lib class or function.
+  // Blocks on establishing the connection and subsequently receiving a node
+  // tree from the service.
   // TODO(beng): blocking is currently achieved by running a nested runloop,
   //             which will dispatch all messages on all pipes while blocking.
   //             we should instead wait on the client pipe receiving a
   //             connection established message.
-  // TODO(beng): this constructor should optionally not block if supplied a
-  //             callback.
-  explicit ViewManager(Shell* shell);
-  ~ViewManager();
+  // TODO(beng): this method could optionally not block if supplied a callback.
+  void Init();
 
-  void BuildNodeTree(const mojo::Callback<void()>& callback);
+  ViewTreeNode* tree() { return tree_; }
 
-  ViewTreeNode* tree() { return tree_.get(); }
+  ViewTreeNode* GetNodeById(TransportNodeId id);
+  View* GetViewById(TransportViewId id);
 
  private:
   friend class ViewManagerPrivate;
+  typedef std::map<TransportNodeId, ViewTreeNode*> IdToNodeMap;
+  typedef std::map<TransportViewId, View*> IdToViewMap;
 
-  void AddObserver(ViewManagerObserver* observer);
-  void RemoveObserver(ViewManagerObserver* observer);
-
-  Shell* shell_;
+  ServiceProvider* service_provider_;
   scoped_ptr<ViewManagerSynchronizer> synchronizer_;
-  scoped_ptr<ViewTreeNode> tree_;
+  ViewTreeNode* tree_;
 
-  ObserverList<ViewManagerObserver> observers_;
+  IdToNodeMap nodes_;
+  IdToViewMap views_;
 
   DISALLOW_COPY_AND_ASSIGN(ViewManager);
 };
 
 }  // namespace view_manager
-}  // namespace services
 }  // namespace mojo
 
 #endif  // MOJO_SERVICES_PUBLIC_CPP_VIEW_MANAGER_VIEW_MANAGER_H_

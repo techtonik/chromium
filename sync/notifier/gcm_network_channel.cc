@@ -95,7 +95,7 @@ void RecordIncomingMessageStatus(IncomingMessageStatus status) {
 
 void RecordOutgoingMessageStatus(OutgoingMessageStatus status) {
   UMA_HISTOGRAM_ENUMERATION(kOutgoingMessageStatusHistogram,
-                            MESSAGE_DISCARDED,
+                            status,
                             OUTGOING_MESSAGE_STATUS_COUNT);
 }
 
@@ -421,6 +421,7 @@ std::string GCMNetworkChannelDiagnostic::GCMClientResultToString(
     ENUM_CASE(gcm::GCMClient::NOT_SIGNED_IN);
     ENUM_CASE(gcm::GCMClient::INVALID_PARAMETER);
     ENUM_CASE(gcm::GCMClient::ASYNC_OPERATION_PENDING);
+    ENUM_CASE(gcm::GCMClient::GCM_DISABLED);
   }
   NOTREACHED();
   return "";

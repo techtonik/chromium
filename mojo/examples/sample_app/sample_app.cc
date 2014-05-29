@@ -6,15 +6,14 @@
 #include <string>
 
 #include "mojo/examples/sample_app/gles2_client_impl.h"
+#include "mojo/public/cpp/application/application.h"
 #include "mojo/public/cpp/bindings/allocation_scope.h"
-#include "mojo/public/cpp/bindings/remote_ptr.h"
 #include "mojo/public/cpp/environment/environment.h"
 #include "mojo/public/cpp/gles2/gles2.h"
-#include "mojo/public/cpp/shell/application.h"
 #include "mojo/public/cpp/system/core.h"
 #include "mojo/public/cpp/system/macros.h"
 #include "mojo/public/cpp/utility/run_loop.h"
-#include "mojo/public/interfaces/shell/shell.mojom.h"
+#include "mojo/public/interfaces/service_provider/service_provider.mojom.h"
 #include "mojo/services/native_viewport/native_viewport.mojom.h"
 
 #if defined(WIN32)
@@ -30,14 +29,15 @@
 namespace mojo {
 namespace examples {
 
-class SampleApp : public Application, public mojo::NativeViewportClient {
+class SampleApp : public Application, public NativeViewportClient {
  public:
-  explicit SampleApp(MojoHandle shell_handle) : Application(shell_handle) {
-    InterfacePipe<NativeViewport, AnyInterface> viewport_pipe;
-    mojo::AllocationScope scope;
-    shell()->Connect("mojo:mojo_native_viewport_service",
-                     viewport_pipe.handle_to_peer.Pass());
-    viewport_.reset(viewport_pipe.handle_to_self.Pass(), this);
+  explicit SampleApp(MojoHandle service_provider_handle)
+      : Application(service_provider_handle) {
+    ConnectTo("mojo:mojo_native_viewport_service", &viewport_);
+    viewport_.set_client(this);
+
+    AllocationScope scope;
+
     Rect::Builder rect;
     Point::Builder point;
     point.set_x(10);
@@ -51,8 +51,8 @@ class SampleApp : public Application, public mojo::NativeViewportClient {
     viewport_->Show();
 
     MessagePipe gles2_pipe;
-    viewport_->CreateGLES2Context(gles2_pipe.handle1.Pass());
-    gles2_client_.reset(new GLES2ClientImpl(gles2_pipe.handle0.Pass()));
+    viewport_->CreateGLES2Context(gles2_pipe.handle0.Pass());
+    gles2_client_.reset(new GLES2ClientImpl(gles2_pipe.handle1.Pass()));
   }
 
   virtual ~SampleApp() {
@@ -72,7 +72,7 @@ class SampleApp : public Application, public mojo::NativeViewportClient {
   }
 
   virtual void OnEvent(const Event& event,
-                       const mojo::Callback<void()>& callback) MOJO_OVERRIDE {
+                       const Callback<void()>& callback) MOJO_OVERRIDE {
     if (!event.location().is_null())
       gles2_client_->HandleInputEvent(event);
     callback.Run();
@@ -80,19 +80,19 @@ class SampleApp : public Application, public mojo::NativeViewportClient {
 
  private:
   scoped_ptr<GLES2ClientImpl> gles2_client_;
-  RemotePtr<NativeViewport> viewport_;
+  NativeViewportPtr viewport_;
 };
 
 }  // namespace examples
 }  // namespace mojo
 
 extern "C" SAMPLE_APP_EXPORT MojoResult CDECL MojoMain(
-    MojoHandle shell_handle) {
+    MojoHandle service_provider_handle) {
   mojo::Environment env;
   mojo::RunLoop loop;
   mojo::GLES2Initializer gles2;
 
-  mojo::examples::SampleApp app(shell_handle);
+  mojo::examples::SampleApp app(service_provider_handle);
   loop.Run();
   return MOJO_RESULT_OK;
 }

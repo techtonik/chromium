@@ -227,7 +227,7 @@ input.managed-user-creation-manager-password,
   height: 32px;
   opacity: 0.8;
   padding: 20px;
-  width: 626px;
+  width: 646px;
 }
 
 .import-pod .import-pod-name {
@@ -347,6 +347,11 @@ input.managed-user-creation-manager-password,
   height: 400px;
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+#managed-user-creation-import .page-title-explanation {
+  padding-bottom: 10px;
+  padding-top: 6px;
 }
 
 .manager-pod .password-error,

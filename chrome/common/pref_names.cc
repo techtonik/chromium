@@ -867,6 +867,10 @@ const char kSAMLLastGAIASignInTime[] = "saml.last_gaia_sign_in_time";
 // The total number of seconds that the machine has spent sitting on the
 // OOBE screen.
 const char kTimeOnOobe[] = "settings.time_on_oobe";
+
+// The app/extension name who sets the current wallpaper. If current wallpaper
+// is set by the component wallpaper picker, it is set to an empty string.
+const char kCurrentWallpaperAppName[] = "wallpaper.app.name";
 #endif  // defined(OS_CHROMEOS)
 
 // The disabled messages in IPC logging.
@@ -1297,6 +1301,9 @@ extern const char kEasyUnlockShowTutorial[] = "easy_unlock.show_tutorial";
 // Preference storing Easy Unlock pairing data.
 extern const char kEasyUnlockPairing[] = "easy_unlock.pairing";
 
+// A cache of zero suggest results using JSON serialized into a string.
+const char kZeroSuggestCachedResults[] = "zerosuggest.cachedresults";
+
 // *************** LOCAL STATE ***************
 // These are attached to the machine/installation
 
@@ -1346,8 +1353,6 @@ const char kMetricsClientID[] = "user_experience_metrics.client_id2";
 const char kMetricsSessionID[] = "user_experience_metrics.session_id";
 const char kMetricsLowEntropySource[] =
     "user_experience_metrics.low_entropy_source2";
-const char kMetricsPermutedEntropyCache[] =
-    "user_experience_metrics.permuted_entropy_cache";
 
 // Old client id and low entropy source values, cleared the first time this
 // version is launched.
@@ -1366,34 +1371,12 @@ const char kMetricsReportingEnabled[] =
 const char kMetricsReportingEnabledTimestamp[] =
     "user_experience_metrics.client_id_timestamp";
 
-// A machine ID used to detect when underlying hardware changes. It is only
-// stored locally and never transmitted in metrics reports.
-const char kMetricsMachineId[] = "user_experience_metrics.machine_id";
-
-// Boolean that indicates a cloned install has been detected and the metrics
-// client id and low entropy source should be reset.
-const char kMetricsResetIds[] =
-    "user_experience_metrics.reset_metrics_ids";
-
 // Boolean that specifies whether or not crash reports are sent
 // over the network for analysis.
 #if defined(OS_ANDROID)
 const char kCrashReportingEnabled[] =
     "user_experience_metrics_crash.reporting_enabled";
 #endif
-
-// Array of strings that are each UMA logs that were supposed to be sent in the
-// first minute of a browser session. These logs include things like crash count
-// info, etc.
-const char kMetricsInitialLogs[] =
-    "user_experience_metrics.initial_logs_as_protobufs";
-
-// Array of strings that are each UMA logs that were not sent because the
-// browser terminated before these accumulated metrics could be sent.  These
-// logs typically include histograms and memory reports, as well as ongoing
-// user activities.
-const char kMetricsOngoingLogs[] =
-    "user_experience_metrics.ongoing_logs_as_protobufs";
 
 // 64-bit integer serialization of the base::Time from the last successful seed
 // fetch (i.e. when the Variations server responds with 200 or 304).
@@ -1802,17 +1785,6 @@ const char kDevToolsPortForwardingConfig[] = "devtools.port_forwarding_config";
 const char kDevToolsRemoteEnabled[] = "devtools.remote_enabled";
 #endif
 
-// An ID to uniquely identify this client to the invalidator service.
-const char kInvalidatorClientId[] = "invalidator.client_id";
-
-// Opaque state from the invalidation subsystem that is persisted via prefs.
-// The value is base 64 encoded.
-const char kInvalidatorInvalidationState[] = "invalidator.invalidation_state";
-
-// List of received invalidations that have not been acted on by any clients
-// yet.  Used to keep invalidation clients in sync in case of a restart.
-const char kInvalidatorSavedInvalidations[] = "invalidator.saved_invalidations";
-
 // Boolean indicating that TiclInvalidationService should use GCM channel.
 // False or lack of settings means XMPPPushClient channel.
 const char kInvalidationServiceUseGCMChannel[] =
@@ -2062,6 +2034,9 @@ const char kDeviceEnrollmentAutoStart[] = "enrollment.auto_start";
 // Whether the user may exit enrollment.
 const char kDeviceEnrollmentCanExit[] = "enrollment.can_exit";
 
+// How many times HID detection OOBE dialog was shown.
+const char kTimesHIDDialogShown[] = "HIDDialog.shown_how_many_times";
+
 // Dictionary of per-user Least Recently Used input method (used at login
 // screen).
 extern const char kUsersLRUInputMethod[] = "UsersLRUInputMethod";
@@ -2079,6 +2054,9 @@ const char kInitialLocale[] = "intl.initial_locale";
 
 // A boolean pref of the OOBE complete flag (first OOBE part before login).
 const char kOobeComplete[] = "OobeComplete";
+
+// The name of the screen that has to be shown if OOBE has been interrupted.
+const char kOobeScreenPending[] = "OobeScreenPending";
 
 // A boolean pref of the device registered flag (second part after first login).
 const char kDeviceRegistered[] = "DeviceRegistered";

@@ -545,7 +545,8 @@ GpuIDResult CollectGpuID(uint32* vendor_id, uint32* device_id) {
     base::HexStringToInt(base::UTF16ToASCII(device_string), &device);
     *vendor_id = vendor;
     *device_id = device;
-    return kGpuIDSuccess;
+    if (*vendor_id != 0 && *device_id != 0)
+      return kGpuIDSuccess;
   }
   return kGpuIDFailure;
 }
@@ -633,10 +634,8 @@ CollectInfoResult CollectDriverInfoGL(GPUInfo* gpu_info) {
   if (!gpu_info->driver_version.empty())
     return kCollectInfoSuccess;
 
-  std::string gl_version_string = gpu_info->gl_version_string;
-
   bool parsed = RE2::PartialMatch(
-      gl_version_string, "([\\d\\.]+)$", &gpu_info->driver_version);
+      gpu_info->gl_version, "([\\d\\.]+)$", &gpu_info->driver_version);
   return parsed ? kCollectInfoSuccess : kCollectInfoNonFatalFailure;
 }
 

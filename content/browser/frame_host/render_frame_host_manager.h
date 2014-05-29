@@ -57,14 +57,14 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
     // corresponding to this view host. If this method is not called and the
     // process is not shared, then the WebContentsImpl will act as though the
     // renderer is not running (i.e., it will render "sad tab"). This method is
-    // automatically called from LoadURL.
-    //
-    // If you are attaching to an already-existing RenderView, you should call
-    // InitWithExistingID.
+    // automatically called from LoadURL. |for_main_frame| indicates whether
+    // this RenderViewHost is used to render a top-level frame, so the
+    // appropriate RenderWidgetHostView type is used.
     virtual bool CreateRenderViewForRenderManager(
         RenderViewHost* render_view_host,
         int opener_route_id,
-        CrossProcessFrameConnector* cross_process_frame_connector) = 0;
+        int proxy_routing_id,
+        bool for_main_frame) = 0;
     virtual void BeforeUnloadFiredFromRenderManager(
         bool proceed, const base::TimeTicks& proceed_time,
         bool* proceed_to_fire_unload) = 0;
@@ -231,6 +231,7 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
   // Helper method to create and initialize a RenderFrameHost.  If |swapped_out|
   // is true, it will be initially placed on the swapped out hosts list.
   // Otherwise, it will be used for a pending cross-site navigation.
+  // Returns the routing id of the *view* associated with the frame.
   int CreateRenderFrame(SiteInstance* instance,
                         int opener_route_id,
                         bool swapped_out,
@@ -260,9 +261,6 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
                        const NotificationSource& source,
                        const NotificationDetails& details) OVERRIDE;
 
-  // Called when a RenderViewHost is about to be deleted.
-  void RenderViewDeleted(RenderViewHost* rvh);
-
   // Returns whether the given RenderFrameHost (or its associated
   // RenderViewHost) is on the list of swapped out RenderFrameHosts.
   bool IsRVHOnSwappedOutList(RenderViewHostImpl* rvh) const;
@@ -283,6 +281,10 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
   // Deletes a RenderFrameHost that was pending shutdown.
   void ClearPendingShutdownRFHForSiteInstance(int32 site_instance_id,
                                               RenderFrameHostImpl* rfh);
+
+  // Deletes any proxy hosts associated with this node. Used during destruction
+  // of WebContentsImpl.
+  void ResetProxyHosts();
 
  private:
   friend class RenderFrameHostManagerTest;
@@ -376,11 +378,16 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
                                                         bool hidden);
 
   // Sets up the necessary state for a new RenderViewHost with the given opener,
-  // if necessary.  Returns early if the RenderViewHost has already been
+  // if necessary.  It creates a RenderFrameProxy in the target renderer process
+  // with the given |proxy_routing_id|, which is used to route IPC messages when
+  // in swapped out state.  Returns early if the RenderViewHost has already been
   // initialized for another RenderFrameHost.
   // TODO(creis): opener_route_id is currently for the RenderViewHost but should
   // be for the RenderFrame, since frames can have openers.
-  bool InitRenderView(RenderViewHost* render_view_host, int opener_route_id);
+  bool InitRenderView(RenderViewHost* render_view_host,
+                      int opener_route_id,
+                      int proxy_routing_id,
+                      bool for_main_frame);
 
   // Sets the pending RenderFrameHost/WebUI to be the active one. Note that this
   // doesn't require the pending render_frame_host_ pointer to be non-NULL,
@@ -394,6 +401,11 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
 
   // Helper method to terminate the pending RenderViewHost.
   void CancelPending();
+
+  // Helper method to set the active RenderFrameHost. Returns the old
+  // RenderFrameHost and updates counts.
+  scoped_ptr<RenderFrameHostImpl> SetRenderFrameHost(
+      scoped_ptr<RenderFrameHostImpl> render_frame_host);
 
   RenderFrameHostImpl* UpdateStateForNavigate(
       const NavigationEntryImpl& entry);

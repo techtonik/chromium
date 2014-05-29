@@ -183,11 +183,6 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
   // Disable GL multisampling if requested on command line.
   settings->setOpenGLMultisamplingEnabled(prefs.gl_multisampling_enabled);
 
-  // Enable privileged WebGL extensions for Chrome extensions or if requested
-  // on command line.
-  settings->setPrivilegedWebGLExtensionsEnabled(
-      prefs.privileged_webgl_extensions_enabled);
-
   // Enable WebGL errors to the JS console if requested.
   settings->setWebGLErrorsToConsoleEnabled(
       prefs.webgl_errors_to_console_enabled);
@@ -196,8 +191,6 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
   settings->setMockScrollbarsEnabled(prefs.mock_scrollbars_enabled);
 
   settings->setLayerSquashingEnabled(prefs.layer_squashing_enabled);
-
-  settings->setThreadedHTMLParser(prefs.threaded_html_parser);
 
   // Enable gpu-accelerated compositing always.
   settings->setAcceleratedCompositingEnabled(true);
@@ -269,9 +262,6 @@ void ApplyWebPreferences(const WebPreferences& prefs, WebView* web_view) {
   settings->setDeviceSupportsTouch(prefs.device_supports_touch);
   settings->setDeviceSupportsMouse(prefs.device_supports_mouse);
   settings->setEnableTouchAdjustment(prefs.touch_adjustment_enabled);
-
-  settings->setFixedPositionCreatesStackingContext(
-      prefs.fixed_position_creates_stacking_context);
 
   settings->setDeferredImageDecodingEnabled(
       prefs.deferred_image_decoding_enabled);

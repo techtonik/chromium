@@ -7,6 +7,7 @@ from measurements import smoothness
 from telemetry import test
 
 
+@test.Disabled  # crbug.com/368767
 class SmoothnessTop25(test.Test):
   """Measures rendering statistics while scrolling down the top 25 web pages.
 
@@ -15,12 +16,13 @@ class SmoothnessTop25(test.Test):
   page_set = 'page_sets/top_25.py'
 
 
-@test.Disabled('mac')
+@test.Disabled('linux', 'mac', 'win')  # crbug.com/368767
 class SmoothnessToughCanvasCases(test.Test):
   test = smoothness.Smoothness
   page_set = 'page_sets/tough_canvas_cases.py'
 
 
+@test.Disabled  # crbug.com/373812
 class SmoothnessToughWebGLCases(test.Test):
   test = smoothness.Smoothness
   page_set = 'page_sets/tough_webgl_cases.py'
@@ -39,13 +41,12 @@ class SmoothnessKeyMobileSites(test.Test):
   page_set = 'page_sets/key_mobile_sites.py'
 
 
-@test.Disabled('android')  # crbug.com/350692
+@test.Disabled('android', 'mac')  # crbug.com/350692, crbug.com/368767
 class SmoothnessToughAnimationCases(test.Test):
   test = smoothness.Smoothness
   page_set = 'page_sets/tough_animation_cases.py'
 
 
-@test.Disabled('android')  # crbug.com/355952
 class SmoothnessKeySilkCases(test.Test):
   """Measures rendering statistics for the key silk cases without GPU
   rasterization
@@ -54,7 +55,6 @@ class SmoothnessKeySilkCases(test.Test):
   page_set = 'page_sets/key_silk_cases.py'
 
 
-@test.Disabled('android')  # crbug.com/355952
 class SmoothnessFastPathKeySilkCases(test.Test):
   """Measures rendering statistics for the key silk cases without GPU
   rasterization using bleeding edge rendering fast paths.
@@ -89,7 +89,6 @@ class SmoothnessGpuRasterizationKeyMobileSites(test.Test):
     silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
 
 
-@test.Disabled('android')  # crbug.com/355952
 class SmoothnessGpuRasterizationKeySilkCases(test.Test):
   """Measures rendering statistics for the key silk cases with GPU rasterization
   """
@@ -100,7 +99,6 @@ class SmoothnessGpuRasterizationKeySilkCases(test.Test):
     silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
 
 
-@test.Disabled('android')  # crbug.com/355952
 class SmoothnessFastPathGpuRasterizationKeySilkCases(
     SmoothnessGpuRasterizationKeySilkCases):
   """Measures rendering statistics for the key silk cases with GPU rasterization

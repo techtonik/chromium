@@ -661,7 +661,7 @@ void InstallerState::GetExistingExeVersions(
         FileVersionInfo::CreateFileVersionInfo(chrome_exe));
     if (file_version_info) {
       base::string16 version_string = file_version_info->file_version();
-      if (!version_string.empty() && IsStringASCII(version_string))
+      if (!version_string.empty() && base::IsStringASCII(version_string))
         existing_versions->insert(base::UTF16ToASCII(version_string));
     }
   }
@@ -742,8 +742,10 @@ void InstallerState::UpdateChannels() const {
   // Create the app's ClientState key if it doesn't exist.
   ChannelInfo channel_info;
   base::win::RegKey state_key;
-  LONG result = state_key.Create(root_key_, state_key_.c_str(),
-                                 KEY_QUERY_VALUE | KEY_SET_VALUE);
+  LONG result =
+      state_key.Create(root_key_,
+                       state_key_.c_str(),
+                       KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_32KEY);
   if (result == ERROR_SUCCESS) {
     channel_info.Initialize(state_key);
 
@@ -782,8 +784,10 @@ void InstallerState::UpdateChannels() const {
           continue;
         dist = product->distribution();
       }
-      result = state_key.Create(root_key_, dist->GetStateKey().c_str(),
-                                KEY_QUERY_VALUE | KEY_SET_VALUE);
+      result =
+          state_key.Create(root_key_,
+                           dist->GetStateKey().c_str(),
+                           KEY_QUERY_VALUE | KEY_SET_VALUE | KEY_WOW64_32KEY);
       if (result == ERROR_SUCCESS) {
         other_info.Initialize(state_key);
         if (!other_info.Equals(channel_info))

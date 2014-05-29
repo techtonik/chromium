@@ -32,7 +32,9 @@ class FakeServer {
 
     // Called after FakeServer has processed a successful commit. The types
     // updated as part of the commit are passed in |committed_model_types|.
-    virtual void OnCommit(syncer::ModelTypeSet committed_model_types) = 0;
+    virtual void OnCommit(
+        const std::string& committer_id,
+        syncer::ModelTypeSet committed_model_types) = 0;
   };
 
   FakeServer();
@@ -50,6 +52,11 @@ class FakeServer {
   // names.
   scoped_ptr<base::DictionaryValue> GetEntitiesAsDictionaryValue();
 
+  // Adds the FakeServerEntity* owned by |entity| to the server's collection
+  // of entities. This method makes no guarantees that the added entity will
+  // result in successful server operations.
+  void InjectEntity(scoped_ptr<FakeServerEntity> entity);
+
   // Adds |observer| to FakeServer's observer list. This should be called
   // before the Profile associated with |observer| is connected to the server.
   void AddObserver(Observer* observer);
@@ -66,12 +73,12 @@ class FakeServer {
                                sync_pb::GetUpdatesResponse* response);
 
   // Processes a Commit call.
-  bool HandleCommitRequest(const sync_pb::CommitMessage& commit,
+  bool HandleCommitRequest(const sync_pb::CommitMessage& message,
+                           const std::string& invalidator_client_id,
                            sync_pb::CommitResponse* response);
 
-  // Inserts the appropriate permanent items in |entities_|.
-  bool CreateDefaultPermanentItems(
-      const std::vector<syncer::ModelType>& first_time_types);
+  // Inserts the default permanent items in |entities_|.
+  bool CreateDefaultPermanentItems();
 
   // Inserts the mobile bookmarks folder entity in |entities_|.
   bool CreateMobileBookmarksPermanentItem();
@@ -117,11 +124,6 @@ class FakeServer {
 
   // All Keystore keys known to the server.
   std::vector<std::string> keystore_keys_;
-
-  // All ModelTypes for which permanent entities have been created. These types
-  // are kept track of so that permanent entities are not recreated for new
-  // clients.
-  syncer::ModelTypeSet created_permanent_entity_types_;
 
   // FakeServer's observers.
   ObserverList<Observer, true> observers_;

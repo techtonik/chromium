@@ -58,10 +58,10 @@
 #include "chrome/browser/google/google_search_counter.h"
 #include "chrome/browser/google/google_util.h"
 #include "chrome/browser/gpu/gl_string_manager.h"
+#include "chrome/browser/gpu/three_d_api_observer.h"
 #include "chrome/browser/jankometer.h"
 #include "chrome/browser/media/media_capture_devices_dispatcher.h"
 #include "chrome/browser/metrics/field_trial_synchronizer.h"
-#include "chrome/browser/metrics/metrics_log.h"
 #include "chrome/browser/metrics/metrics_service.h"
 #include "chrome/browser/metrics/thread_watcher.h"
 #include "chrome/browser/metrics/tracking_synchronizer.h"
@@ -86,7 +86,6 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profiles_state.h"
 #include "chrome/browser/shell_integration.h"
-#include "chrome/browser/three_d_api_observer.h"
 #include "chrome/browser/translate/translate_service.h"
 #include "chrome/browser/ui/app_list/app_list_service.h"
 #include "chrome/browser/ui/browser.h"
@@ -125,7 +124,6 @@
 #include "content/public/common/content_switches.h"
 #include "content/public/common/main_function_params.h"
 #include "extensions/browser/extension_protocols.h"
-#include "extensions/browser/extension_system.h"
 #include "grit/app_locale_settings.h"
 #include "grit/browser_resources.h"
 #include "grit/chromium_strings.h"
@@ -458,7 +456,7 @@ void LaunchDevToolsHandlerIfNeeded(const CommandLine& command_line) {
     std::string port_str =
         command_line.GetSwitchValueASCII(::switches::kRemoteDebuggingPort);
     int port;
-    if (base::StringToInt(port_str, &port) && port > 0 && port < 65535) {
+    if (base::StringToInt(port_str, &port) && port >= 0 && port < 65535) {
       g_browser_process->CreateDevToolsHttpProtocolHandler(
           chrome::HOST_DESKTOP_TYPE_NATIVE,
           "127.0.0.1",
@@ -555,9 +553,6 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
   // Must initialize metrics after labs have been converted into switches,
   // but before field trials are set up (so that client ID is available for
   // one-time randomized field trials).
-#if defined(ARCH_CPU_64_BITS)
-  MetricsLog::set_version_extension("-64");
-#endif  // defined(ARCH_CPU_64_BITS)
 
   // Initialize FieldTrialList to support FieldTrials that use one-time
   // randomization.
@@ -570,7 +565,6 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
     base::FieldTrial::EnableBenchmarking();
 
   // Ensure any field trials specified on the command line are initialized.
-  // Also stop the metrics service so that we don't pollute UMA.
   if (command_line->HasSwitch(switches::kForceFieldTrials)) {
     std::set<std::string> unforceable_field_trials;
 #if defined(OFFICIAL_BUILD)
@@ -630,7 +624,8 @@ void ChromeBrowserMainParts::StartMetricsRecording() {
     return;
   }
 
-  metrics->CheckForClonedInstall();
+  metrics->CheckForClonedInstall(
+      BrowserThread::GetMessageLoopProxyForThread(BrowserThread::FILE));
   const bool metrics_enabled = metrics->StartIfMetricsReportingEnabled();
   if (metrics_enabled) {
     // TODO(asvitkine): Since this function is not run on Android, RAPPOR is
@@ -1226,7 +1221,8 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
 
   // Profile creation ----------------------------------------------------------
 
-  MetricsService::SetExecutionPhase(MetricsService::CREATE_PROFILE);
+  MetricsService::SetExecutionPhase(MetricsService::CREATE_PROFILE,
+                                    g_browser_process->local_state());
   profile_ = CreatePrimaryProfile(parameters(),
                                   user_data_dir_,
                                   parsed_command_line());
@@ -1256,8 +1252,8 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   // NaClBrowserDelegateImpl is accessed inside PostProfileInit().
   // So make sure to create it before that.
 #if !defined(DISABLE_NACL)
-  NaClBrowserDelegateImpl* delegate = new NaClBrowserDelegateImpl(
-    extensions::ExtensionSystem::Get(profile_)->info_map());
+  NaClBrowserDelegateImpl* delegate =
+      new NaClBrowserDelegateImpl(browser_process_->profile_manager());
   nacl::NaClBrowser::SetDelegate(delegate);
 #endif
 
@@ -1400,7 +1396,8 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   // Start watching for hangs during startup. We disarm this hang detector when
   // ThreadWatcher takes over or when browser is shutdown or when
   // startup_watcher_ is deleted.
-  MetricsService::SetExecutionPhase(MetricsService::STARTUP_TIMEBOMB_ARM);
+  MetricsService::SetExecutionPhase(MetricsService::STARTUP_TIMEBOMB_ARM,
+                                    g_browser_process->local_state());
   startup_watcher_->Arm(base::TimeDelta::FromSeconds(300));
 
   // On mobile, need for clean shutdown arises only when the application comes
@@ -1408,7 +1405,7 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   // http://crbug.com/179143
 #if !defined(OS_ANDROID)
   // Start watching for a hang.
-  MetricsService::LogNeedForCleanShutdown();
+  MetricsService::LogNeedForCleanShutdown(g_browser_process->local_state());
 #endif
 
 #if defined(ENABLE_FULL_PRINTING)
@@ -1422,7 +1419,8 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
 #endif
 
   // Start watching all browser threads for responsiveness.
-  MetricsService::SetExecutionPhase(MetricsService::THREAD_WATCHER_START);
+  MetricsService::SetExecutionPhase(MetricsService::THREAD_WATCHER_START,
+                                    g_browser_process->local_state());
   ThreadWatcherList::StartWatchingAll(parsed_command_line());
 
 #if defined(OS_ANDROID)
@@ -1584,7 +1582,8 @@ bool ChromeBrowserMainParts::MainMessageLoopRun(int* result_code) {
 
   performance_monitor::PerformanceMonitor::GetInstance()->StartGatherCycle();
 
-  MetricsService::SetExecutionPhase(MetricsService::MAIN_MESSAGE_LOOP_RUN);
+  MetricsService::SetExecutionPhase(MetricsService::MAIN_MESSAGE_LOOP_RUN,
+                                    g_browser_process->local_state());
   run_loop.Run();
 
   return true;
@@ -1601,7 +1600,8 @@ void ChromeBrowserMainParts::PostMainMessageLoopRun() {
 
   // Start watching for jank during shutdown. It gets disarmed when
   // |shutdown_watcher_| object is destructed.
-  MetricsService::SetExecutionPhase(MetricsService::SHUTDOWN_TIMEBOMB_ARM);
+  MetricsService::SetExecutionPhase(MetricsService::SHUTDOWN_TIMEBOMB_ARM,
+                                    g_browser_process->local_state());
   shutdown_watcher_->Arm(base::TimeDelta::FromSeconds(300));
 
   // Disarm the startup hang detector time bomb if it is still Arm'ed.

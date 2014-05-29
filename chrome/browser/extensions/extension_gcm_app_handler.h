@@ -12,7 +12,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observer.h"
-#include "chrome/browser/services/gcm/gcm_app_handler.h"
+#include "components/gcm_driver/gcm_app_handler.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
 #include "extensions/browser/browser_context_keyed_api_factory.h"
@@ -26,6 +26,7 @@ class BrowserContext;
 }
 
 namespace gcm {
+class GCMDriver;
 class GCMProfileService;
 }
 
@@ -77,7 +78,7 @@ class ExtensionGCMAppHandler : public gcm::GCMAppHandler,
       const Extension* extension,
       UnloadedExtensionInfo::Reason reason) OVERRIDE;
 
-  gcm::GCMProfileService* GetGCMProfileService() const;
+  gcm::GCMDriver* GetGCMDriver() const;
 
   // BrowserContextKeyedAPI implementation.
   static const char* service_name() { return "ExtensionGCMAppHandler"; }

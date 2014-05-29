@@ -87,6 +87,13 @@ remoting.HostDispatcher.prototype.tryToInitialize_ = function() {
 };
 
 /**
+ * @return {remoting.HostPlugin}
+ */
+remoting.HostDispatcher.prototype.getNpapiHost = function() {
+  return this.npapiHost_;
+}
+
+/**
  * @param {remoting.HostController.Feature} feature The feature to test for.
  * @param {function(boolean):void} onDone
  * @return {void}
@@ -327,6 +334,9 @@ remoting.HostDispatcher.prototype.getUsageStatsConsent =
 };
 
 /**
+ * This function installs the host using the NPAPI plugin and should only be
+ * called on Windows.
+ *
  * @param {function(remoting.HostController.AsyncResult):void} onDone
  * @param {function(remoting.Error):void} onError
  * @return {void}

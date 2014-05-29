@@ -73,7 +73,6 @@
 #include "extensions/renderer/user_script_slave.h"
 #include "extensions/renderer/utils_native_handler.h"
 #include "extensions/renderer/v8_context_native_handler.h"
-#include "grit/common_resources.h"
 #include "grit/renderer_resources.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebURLRequest.h"
@@ -794,8 +793,11 @@ void Dispatcher::UpdateOriginPermissions(
   for (URLPatternSet::const_iterator i = origins.begin(); i != origins.end();
        ++i) {
     const char* schemes[] = {
-        content::kHttpScheme,     content::kHttpsScheme, content::kFileScheme,
-        content::kChromeUIScheme, content::kFtpScheme,
+        url::kHttpScheme,
+        url::kHttpsScheme,
+        url::kFileScheme,
+        content::kChromeUIScheme,
+        url::kFtpScheme,
     };
     for (size_t j = 0; j < arraysize(schemes); ++j) {
       if (i->MatchesScheme(schemes[j])) {
@@ -864,7 +866,8 @@ void Dispatcher::UpdateBindingsForContext(ScriptContext* context) {
     case Feature::CONTENT_SCRIPT_CONTEXT: {
       // Extension context; iterate through all the APIs and bind the available
       // ones.
-      FeatureProvider* api_feature_provider = FeatureProvider::GetAPIFeatures();
+      const FeatureProvider* api_feature_provider =
+          FeatureProvider::GetAPIFeatures();
       const std::vector<std::string>& apis =
           api_feature_provider->GetAllFeatureNames();
       for (std::vector<std::string>::const_iterator it = apis.begin();
@@ -1046,6 +1049,8 @@ void Dispatcher::PopulateSourceMap() {
   source_map_.RegisterSource("sendRequest", IDR_SEND_REQUEST_JS);
   source_map_.RegisterSource("setIcon", IDR_SET_ICON_JS);
   source_map_.RegisterSource("test", IDR_TEST_CUSTOM_BINDINGS_JS);
+  source_map_.RegisterSource("uncaught_exception_handler",
+                             IDR_UNCAUGHT_EXCEPTION_HANDLER_JS);
   source_map_.RegisterSource("unload_event", IDR_UNLOAD_EVENT_JS);
   source_map_.RegisterSource("utils", IDR_UTILS_JS);
 
@@ -1182,7 +1187,8 @@ v8::Handle<v8::Object> Dispatcher::GetOrCreateBindObjectIfAvailable(
   //  If app is available and app.window is not, just install app.
   //  If app.window is available and app is not, delete app and install
   //  app.window on a new object so app does not have to be loaded.
-  FeatureProvider* api_feature_provider = FeatureProvider::GetAPIFeatures();
+  const FeatureProvider* api_feature_provider =
+      FeatureProvider::GetAPIFeatures();
   std::string ancestor_name;
   bool only_ancestor_available = false;
 

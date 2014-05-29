@@ -7,6 +7,7 @@ include_rules = [
   "+sync/internal_api/public/events",
 
   # Other libraries.
+  "+components/onc",
   "+device/bluetooth",
   "+device/nfc",
   "+third_party/angle",       # For ANGLE version.
@@ -16,4 +17,6 @@ include_rules = [
   # DOM Distiller.
   "+components/dom_distiller/core",
   "+components/dom_distiller/webui",
+
+  "+components/invalidation",
 ]

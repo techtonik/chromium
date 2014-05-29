@@ -35,7 +35,8 @@ Widget* CreateBubbleWidget(BubbleDelegateView* bubble) {
     bubble_params.parent = bubble->parent_window();
   else if (bubble->anchor_widget())
     bubble_params.parent = bubble->anchor_widget()->GetNativeView();
-  bubble_params.can_activate = bubble->CanActivate();
+  bubble_params.activatable = bubble->CanActivate() ?
+      Widget::InitParams::ACTIVATABLE_YES : Widget::InitParams::ACTIVATABLE_NO;
   bubble->OnBeforeBubbleWidgetInit(&bubble_params, bubble_widget);
   bubble_widget->Init(bubble_params);
   return bubble_widget;
@@ -180,7 +181,7 @@ View* BubbleDelegateView::GetAnchorView() const {
   return ViewStorage::GetInstance()->RetrieveView(anchor_view_storage_id_);
 }
 
-gfx::Rect BubbleDelegateView::GetAnchorRect() {
+gfx::Rect BubbleDelegateView::GetAnchorRect() const {
   if (!GetAnchorView())
     return anchor_rect_;
 
@@ -244,7 +245,11 @@ void BubbleDelegateView::SetAnchorView(View* anchor_view) {
   if (anchor_view)
     view_storage->StoreView(anchor_view_storage_id_, anchor_view);
 
-  if (GetWidget())
+  // Do not update anchoring for NULL views; this could indicate that our
+  // NativeWindow is being destroyed, so it would be dangerous for us to update
+  // our anchor bounds at that point. (It's safe to skip this, since if we were
+  // to update the bounds when |anchor_view| is NULL, the bubble won't move.)
+  if (anchor_view && GetWidget())
     OnAnchorBoundsChanged();
 }
 

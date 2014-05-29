@@ -164,6 +164,7 @@ class GLES2DecoderTestBase : public ::testing::TestWithParam<bool> {
     bool request_stencil;
     bool bind_generates_resource;
     bool lose_context_when_out_of_memory;
+    bool use_native_vao;  // default is true.
   };
 
   void InitDecoder(const InitState& init);
@@ -586,6 +587,10 @@ class GLES2DecoderWithShaderTestBase : public GLES2DecoderTestBase {
   virtual void TearDown() OVERRIDE;
 
 };
+
+// SpecializedSetup specializations that are needed in multiple unittest files.
+template <>
+void GLES2DecoderTestBase::SpecializedSetup<cmds::LinkProgram, 0>(bool valid);
 
 }  // namespace gles2
 }  // namespace gpu

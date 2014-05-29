@@ -16,6 +16,7 @@
 #include "content/public/common/url_constants.h"
 #include "extensions/browser/event_router.h"
 #include "net/base/escape.h"
+#include "third_party/WebKit/public/web/WebInputEvent.h"
 
 using content::WebContents;
 
@@ -39,32 +40,38 @@ scoped_ptr<base::DictionaryValue> GuestViewBase::Event::GetArguments() {
   return args_.Pass();
 }
 
-GuestViewBase::GuestViewBase(WebContents* guest_web_contents,
-                             const std::string& embedder_extension_id,
-                             const base::WeakPtr<GuestViewBase>& opener)
+GuestViewBase::GuestViewBase(int guest_instance_id,
+                             WebContents* guest_web_contents,
+                             const std::string& embedder_extension_id)
     : guest_web_contents_(guest_web_contents),
       embedder_web_contents_(NULL),
       embedder_extension_id_(embedder_extension_id),
       embedder_render_process_id_(0),
       browser_context_(guest_web_contents->GetBrowserContext()),
-      guest_instance_id_(guest_web_contents->GetEmbeddedInstanceID()),
+      guest_instance_id_(guest_instance_id),
       view_instance_id_(guestview::kInstanceIDNone),
-      opener_(opener),
       weak_ptr_factory_(this) {
+  guest_web_contents->SetDelegate(this);
   webcontents_guestview_map.Get().insert(
       std::make_pair(guest_web_contents, this));
+  GuestViewManager::FromBrowserContext(browser_context_)->
+      AddGuest(guest_instance_id_, guest_web_contents);
 }
 
 // static
 GuestViewBase* GuestViewBase::Create(
+    int guest_instance_id,
     WebContents* guest_web_contents,
     const std::string& embedder_extension_id,
-    const std::string& view_type,
-    const base::WeakPtr<GuestViewBase>& opener) {
+    const std::string& view_type) {
   if (view_type == "webview") {
-    return new WebViewGuest(guest_web_contents, embedder_extension_id, opener);
+    return new WebViewGuest(guest_instance_id,
+                            guest_web_contents,
+                            embedder_extension_id);
   } else if (view_type == "adview") {
-    return new AdViewGuest(guest_web_contents, embedder_extension_id);
+    return new AdViewGuest(guest_instance_id,
+                           guest_web_contents,
+                           embedder_extension_id);
   }
   NOTREACHED();
   return NULL;
@@ -87,11 +94,16 @@ GuestViewBase* GuestViewBase::From(int embedder_process_id,
 
   content::WebContents* guest_web_contents =
       GuestViewManager::FromBrowserContext(host->GetBrowserContext())->
-          GetGuestByInstanceID(guest_instance_id, embedder_process_id);
+          GetGuestByInstanceIDSafely(guest_instance_id, embedder_process_id);
   if (!guest_web_contents)
     return NULL;
 
   return GuestViewBase::FromWebContents(guest_web_contents);
+}
+
+// static
+bool GuestViewBase::IsGuest(WebContents* web_contents) {
+  return !!GuestViewBase::FromWebContents(web_contents);
 }
 
 // static
@@ -146,8 +158,7 @@ void GuestViewBase::Attach(content::WebContents* embedder_web_contents,
   embedder_render_process_id_ =
       embedder_web_contents->GetRenderProcessHost()->GetID();
   args.GetInteger(guestview::kParameterInstanceId, &view_instance_id_);
-
-  std::pair<int, int> key(embedder_render_process_id_, guest_instance_id_);
+  extra_params_.reset(args.DeepCopy());
 
   // GuestViewBase::Attach is called prior to initialization (and initial
   // navigation) of the guest in the content layer in order to permit mapping
@@ -165,14 +176,14 @@ void GuestViewBase::Attach(content::WebContents* embedder_web_contents,
                  weak_ptr_factory_.GetWeakPtr()));
 }
 
-WebContents* GuestViewBase::GetOpener() const {
-  if (!opener_)
-    return NULL;
-  return opener_->guest_web_contents();
+void GuestViewBase::Destroy() {
+  if (!destruction_callback_.is_null())
+    destruction_callback_.Run(guest_web_contents());
+  delete guest_web_contents();
 }
 
-void GuestViewBase::SetOpener(WebContents* web_contents) {
-  GuestViewBase* guest = FromWebContents(web_contents);
+
+void GuestViewBase::SetOpener(GuestViewBase* guest) {
   if (guest && guest->IsViewType(GetViewType())) {
     opener_ = guest->AsWeakPtr();
     return;
@@ -180,10 +191,30 @@ void GuestViewBase::SetOpener(WebContents* web_contents) {
   opener_ = base::WeakPtr<GuestViewBase>();
 }
 
+void GuestViewBase::RegisterDestructionCallback(
+    const DestructionCallback& callback) {
+  destruction_callback_ = callback;
+}
+
+bool GuestViewBase::ShouldFocusPageAfterCrash() {
+  // Focus is managed elsewhere.
+  return false;
+}
+
+bool GuestViewBase::PreHandleGestureEvent(content::WebContents* source,
+                                         const blink::WebGestureEvent& event) {
+  return event.type == blink::WebGestureEvent::GesturePinchBegin ||
+      event.type == blink::WebGestureEvent::GesturePinchUpdate ||
+      event.type == blink::WebGestureEvent::GesturePinchEnd;
+}
+
 GuestViewBase::~GuestViewBase() {
   std::pair<int, int> key(embedder_render_process_id_, guest_instance_id_);
 
   webcontents_guestview_map.Get().erase(guest_web_contents());
+
+  GuestViewManager::FromBrowserContext(browser_context_)->
+      RemoveGuest(guest_instance_id_);
 
   pending_events_.clear();
 }
@@ -221,7 +252,6 @@ void GuestViewBase::DispatchEvent(Event* event) {
 void GuestViewBase::SendQueuedEvents() {
   if (!attached())
     return;
-
   while (!pending_events_.empty()) {
     linked_ptr<Event> event_ptr = pending_events_.front();
     pending_events_.pop_front();

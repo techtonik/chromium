@@ -271,6 +271,7 @@ class NATIVE_THEME_EXPORT NativeTheme {
     kColorId_TextfieldSelectionBackgroundFocused,
     // Tooltip
     kColorId_TooltipBackground,
+    kColorId_TooltipText,
     // Tree
     kColorId_TreeBackground,
     kColorId_TreeText,
@@ -320,10 +321,10 @@ class NATIVE_THEME_EXPORT NativeTheme {
   void AddObserver(NativeThemeObserver* observer);
   void RemoveObserver(NativeThemeObserver* observer);
 
- protected:
   // Notify observers of native theme changes.
   void NotifyObservers();
 
+ protected:
   NativeTheme();
   virtual ~NativeTheme();
 

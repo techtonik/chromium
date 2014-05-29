@@ -34,8 +34,9 @@ ShellContentBrowserClient* g_instance = NULL;
 
 }  // namespace
 
-ShellContentBrowserClient::ShellContentBrowserClient()
-    : browser_main_parts_(NULL) {
+ShellContentBrowserClient::ShellContentBrowserClient(
+    ShellBrowserMainDelegate* browser_main_delegate)
+    : browser_main_parts_(NULL), browser_main_delegate_(browser_main_delegate) {
   DCHECK(!g_instance);
   g_instance = this;
 }
@@ -53,7 +54,8 @@ content::BrowserContext* ShellContentBrowserClient::GetBrowserContext() {
 
 content::BrowserMainParts* ShellContentBrowserClient::CreateBrowserMainParts(
     const content::MainFunctionParams& parameters) {
-  browser_main_parts_ = new ShellBrowserMainParts(parameters);
+  browser_main_parts_ =
+      new ShellBrowserMainParts(parameters, browser_main_delegate_);
   return browser_main_parts_;
 }
 
@@ -98,12 +100,12 @@ bool ShellContentBrowserClient::IsHandledURL(const GURL& url) {
   // Keep in sync with ProtocolHandlers added in CreateRequestContext() and in
   // content::ShellURLRequestContextGetter::GetURLRequestContext().
   static const char* const kProtocolList[] = {
-      content::kBlobScheme,
+      url::kBlobScheme,
       content::kChromeDevToolsScheme,
       content::kChromeUIScheme,
-      content::kDataScheme,
-      content::kFileScheme,
-      content::kFileSystemScheme,
+      url::kDataScheme,
+      url::kFileScheme,
+      url::kFileSystemScheme,
       extensions::kExtensionScheme,
       extensions::kExtensionResourceScheme,
   };

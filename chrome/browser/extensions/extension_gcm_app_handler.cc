@@ -11,6 +11,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/services/gcm/gcm_profile_service.h"
 #include "chrome/browser/services/gcm/gcm_profile_service_factory.h"
+#include "components/gcm_driver/gcm_driver.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_source.h"
 #include "extensions/browser/extension_registry.h"
@@ -48,7 +49,7 @@ ExtensionGCMAppHandler::ExtensionGCMAppHandler(content::BrowserContext* context)
       weak_factory_(this) {
   extension_registry_observer_.Add(ExtensionRegistry::Get(profile_));
   registrar_.Add(this,
-                 chrome::NOTIFICATION_EXTENSION_UNINSTALLED,
+                 chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED,
                  content::Source<Profile>(profile_));
 
 #if !defined(OS_ANDROID)
@@ -63,7 +64,7 @@ ExtensionGCMAppHandler::~ExtensionGCMAppHandler() {
        extension != enabled_extensions.end();
        ++extension) {
     if (IsGCMPermissionEnabled(extension->get()))
-      GetGCMProfileService()->RemoveAppHandler((*extension)->id());
+      GetGCMDriver()->RemoveAppHandler((*extension)->id());
   }
 }
 
@@ -99,7 +100,7 @@ void ExtensionGCMAppHandler::OnExtensionLoaded(
     content::BrowserContext* browser_context,
     const Extension* extension) {
   if (IsGCMPermissionEnabled(extension))
-    GetGCMProfileService()->AddAppHandler(extension->id(), this);
+    GetGCMDriver()->AddAppHandler(extension->id(), this);
 }
 
 void ExtensionGCMAppHandler::OnExtensionUnloaded(
@@ -107,27 +108,27 @@ void ExtensionGCMAppHandler::OnExtensionUnloaded(
     const Extension* extension,
     UnloadedExtensionInfo::Reason reason) {
   if (IsGCMPermissionEnabled(extension))
-    GetGCMProfileService()->RemoveAppHandler(extension->id());
+    GetGCMDriver()->RemoveAppHandler(extension->id());
 }
 
 void ExtensionGCMAppHandler::Observe(
     int type,
     const content::NotificationSource& source,
     const content::NotificationDetails& details) {
-  DCHECK_EQ(chrome::NOTIFICATION_EXTENSION_UNINSTALLED, type);
+  DCHECK_EQ(chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED, type);
   const Extension* extension = content::Details<Extension>(details).ptr();
   if (IsGCMPermissionEnabled(extension)) {
-    GetGCMProfileService()->Unregister(
+    GetGCMDriver()->Unregister(
         extension->id(),
         base::Bind(&ExtensionGCMAppHandler::OnUnregisterCompleted,
                    weak_factory_.GetWeakPtr(),
                    extension->id()));
-    GetGCMProfileService()->RemoveAppHandler(extension->id());
+    GetGCMDriver()->RemoveAppHandler(extension->id());
   }
 }
 
-gcm::GCMProfileService* ExtensionGCMAppHandler::GetGCMProfileService() const {
-  return gcm::GCMProfileServiceFactory::GetForProfile(profile_);
+gcm::GCMDriver* ExtensionGCMAppHandler::GetGCMDriver() const {
+  return gcm::GCMProfileServiceFactory::GetForProfile(profile_)->driver();
 }
 
 void ExtensionGCMAppHandler::OnUnregisterCompleted(

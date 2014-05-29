@@ -7,25 +7,23 @@ import os
 import re
 import urlparse
 
-from telemetry.page.actions.navigate import NavigateAction
-
 
 class Page(object):
-  def __init__(self, url, page_set=None, base_dir=None):
-    self.url = url
+  def __init__(self, url, page_set=None, base_dir=None, name=''):
+    self._url = url
     self._page_set = page_set
     # Default value of base_dir is the directory of the file that defines the
     # class of this page instace.
     if base_dir is None:
       base_dir = os.path.dirname(inspect.getfile(self.__class__))
     self._base_dir = base_dir
+    self._name = name
 
     # These attributes can be set dynamically by the page.
     self.synthetic_delays = dict()
     self.startup_url = page_set.startup_url if page_set else ''
     self.credentials = None
     self.disabled = False
-    self.name = None
     self.script_to_evaluate_on_commit = None
     self._SchemeErrorCheck()
 
@@ -41,11 +39,29 @@ class Page(object):
         raise ValueError('startup_url with local file scheme is not supported')
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
+
+  def CanRunOnBrowser(self, browser_info):
+    """Override this to returns whether this page can be run on specific
+    browser.
+
+    Args:
+      browser_info: an instance of telemetry.core.browser_info.BrowserInfo
+    """
+    assert browser_info
+    return True
 
   @property
   def page_set(self):
     return self._page_set
+
+  @property
+  def name(self):
+    return self._name
+
+  @property
+  def url(self):
+    return self._url
 
   def GetSyntheticDelayCategories(self):
     result = []

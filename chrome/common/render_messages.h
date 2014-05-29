@@ -234,6 +234,10 @@ IPC_MESSAGE_CONTROL3(ChromeViewMsg_SetCacheCapacities,
 IPC_MESSAGE_CONTROL1(ChromeViewMsg_ClearCache,
                      bool /* on_navigation */)
 
+// Set the top-level frame to the provided name.
+IPC_MESSAGE_ROUTED1(ChromeViewMsg_SetName,
+                    std::string /* frame_name */)
+
 // For WebUI testing, this message requests JavaScript to be executed at a time
 // which is late enough to not be thrown out, and early enough to be before
 // onload events are fired.
@@ -315,6 +319,11 @@ IPC_MESSAGE_ROUTED1(ChromeViewMsg_SetAllowRunningInsecureContent,
                     bool /* allowed */)
 
 IPC_MESSAGE_ROUTED0(ChromeViewMsg_ReloadFrame)
+
+// Tells the renderer whether or not a file system access has been allowed.
+IPC_MESSAGE_ROUTED2(ChromeViewMsg_RequestFileSystemAccessAsyncResponse,
+                    int  /* request_id */,
+                    bool /* allowed */)
 
 // Sent when the profile changes the kSafeBrowsingEnabled preference.
 IPC_MESSAGE_ROUTED1(ChromeViewMsg_SetClientSidePhishingDetection,
@@ -427,11 +436,19 @@ IPC_SYNC_MESSAGE_CONTROL4_1(ChromeViewHostMsg_AllowDOMStorage,
 
 // Sent by the renderer process to check whether access to FileSystem is
 // granted by content settings.
-IPC_SYNC_MESSAGE_CONTROL3_1(ChromeViewHostMsg_AllowFileSystem,
+IPC_SYNC_MESSAGE_CONTROL3_1(ChromeViewHostMsg_RequestFileSystemAccessSync,
                             int /* render_frame_id */,
                             GURL /* origin_url */,
                             GURL /* top origin url */,
                             bool /* allowed */)
+
+// Sent by the renderer process to check whether access to FileSystem is
+// granted by content settings.
+IPC_MESSAGE_CONTROL4(ChromeViewHostMsg_RequestFileSystemAccessAsync,
+                    int /* render_frame_id */,
+                    int /* request_id */,
+                    GURL /* origin_url */,
+                    GURL /* top origin url */)
 
 // Sent by the renderer process to check whether access to Indexed DBis
 // granted by content settings.
@@ -465,6 +482,11 @@ IPC_SYNC_MESSAGE_CONTROL1_3(
     bool /* registered */,
     std::vector<base::string16> /* additional_param_names */,
     std::vector<base::string16> /* additional_param_values */)
+
+// Informs the browser of updated frame names.
+IPC_MESSAGE_ROUTED2(ChromeViewHostMsg_UpdateFrameName,
+                    bool /* is_top_level */,
+                    std::string /* name */)
 
 #if defined(ENABLE_PLUGIN_INSTALLATION)
 // Tells the browser to search for a plug-in that can handle the given MIME
@@ -524,8 +546,8 @@ IPC_MESSAGE_ROUTED0(ChromeViewMsg_NPAPINotSupported)
 // Notification that the page has an OpenSearch description document
 // associated with it.
 IPC_MESSAGE_ROUTED3(ChromeViewHostMsg_PageHasOSDD,
-                    int32 /* page_id */,
-                    GURL /* url of OS description document */,
+                    GURL /* page_url */,
+                    GURL /* osdd_url */,
                     search_provider::OSDDType)
 
 // Find out if the given url's security origin is installed as a search

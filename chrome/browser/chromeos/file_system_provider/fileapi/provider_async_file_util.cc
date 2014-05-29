@@ -8,7 +8,6 @@
 #include "base/files/file.h"
 #include "base/files/file_path.h"
 #include "base/logging.h"
-#include "base/platform_file.h"
 #include "chrome/browser/chromeos/file_system_provider/mount_path_util.h"
 #include "chrome/browser/chromeos/file_system_provider/provided_file_system_interface.h"
 #include "content/public/browser/browser_thread.h"
@@ -30,7 +29,7 @@ void GetFileInfoOnUIThread(
     const fileapi::AsyncFileUtil::GetFileInfoCallback& callback) {
   util::FileSystemURLParser parser(url);
   if (!parser.Parse()) {
-    callback.Run(base::File::FILE_ERROR_NOT_FOUND, base::File::Info());
+    callback.Run(base::File::FILE_ERROR_INVALID_OPERATION, base::File::Info());
     return;
   }
 
@@ -45,6 +44,33 @@ void OnGetFileInfo(const fileapi::AsyncFileUtil::GetFileInfoCallback& callback,
       BrowserThread::IO, FROM_HERE, base::Bind(callback, result, file_info));
 }
 
+// Executes ReadDirectory on the UI thread.
+void ReadDirectoryOnUIThread(
+    scoped_ptr<fileapi::FileSystemOperationContext> context,
+    const fileapi::FileSystemURL& url,
+    const fileapi::AsyncFileUtil::ReadDirectoryCallback& callback) {
+  util::FileSystemURLParser parser(url);
+  if (!parser.Parse()) {
+    callback.Run(base::File::FILE_ERROR_INVALID_OPERATION,
+                 fileapi::AsyncFileUtil::EntryList(),
+                 false /* has_more */);
+    return;
+  }
+
+  parser.file_system()->ReadDirectory(parser.file_path(), callback);
+}
+
+// Routes the response of ReadDirectory back to the IO thread.
+void OnReadDirectory(
+    const fileapi::AsyncFileUtil::ReadDirectoryCallback& callback,
+    base::File::Error result,
+    const fileapi::AsyncFileUtil::EntryList& entry_list,
+    bool has_more) {
+  BrowserThread::PostTask(BrowserThread::IO,
+                          FROM_HERE,
+                          base::Bind(callback, result, entry_list, has_more));
+}
+
 }  // namespace
 
 ProviderAsyncFileUtil::ProviderAsyncFileUtil() {}
@@ -57,20 +83,17 @@ void ProviderAsyncFileUtil::CreateOrOpen(
     int file_flags,
     const CreateOrOpenCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  base::PlatformFile platform_file = base::kInvalidPlatformFileValue;
-  if ((file_flags & base::PLATFORM_FILE_CREATE) ||
-      (file_flags & base::PLATFORM_FILE_OPEN_ALWAYS) ||
-      (file_flags & base::PLATFORM_FILE_CREATE_ALWAYS) ||
-      (file_flags & base::PLATFORM_FILE_OPEN_TRUNCATED)) {
-    callback.Run(base::File::FILE_ERROR_SECURITY,
-                 base::PassPlatformFile(&platform_file),
+  if ((file_flags & base::File::FLAG_CREATE) ||
+      (file_flags & base::File::FLAG_OPEN_ALWAYS) ||
+      (file_flags & base::File::FLAG_CREATE_ALWAYS) ||
+      (file_flags & base::File::FLAG_OPEN_TRUNCATED)) {
+    callback.Run(base::File(base::File::FILE_ERROR_ACCESS_DENIED),
                  base::Closure());
     return;
   }
 
   NOTIMPLEMENTED();
-  callback.Run(base::File::FILE_ERROR_NOT_FOUND,
-               base::PassPlatformFile(&platform_file),
+  callback.Run(base::File(base::File::FILE_ERROR_INVALID_OPERATION),
                base::Closure());
 }
 
@@ -79,7 +102,7 @@ void ProviderAsyncFileUtil::EnsureFileExists(
     const fileapi::FileSystemURL& url,
     const EnsureFileExistsCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  callback.Run(base::File::FILE_ERROR_SECURITY, false /* created */);
+  callback.Run(base::File::FILE_ERROR_ACCESS_DENIED, false /* created */);
 }
 
 void ProviderAsyncFileUtil::CreateDirectory(
@@ -89,7 +112,7 @@ void ProviderAsyncFileUtil::CreateDirectory(
     bool recursive,
     const StatusCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  callback.Run(base::File::FILE_ERROR_SECURITY);
+  callback.Run(base::File::FILE_ERROR_ACCESS_DENIED);
 }
 
 void ProviderAsyncFileUtil::GetFileInfo(
@@ -110,8 +133,12 @@ void ProviderAsyncFileUtil::ReadDirectory(
     const fileapi::FileSystemURL& url,
     const ReadDirectoryCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  NOTIMPLEMENTED();
-  callback.Run(base::File::FILE_ERROR_NOT_FOUND, EntryList(), false);
+  BrowserThread::PostTask(BrowserThread::UI,
+                          FROM_HERE,
+                          base::Bind(&ReadDirectoryOnUIThread,
+                                     base::Passed(&context),
+                                     url,
+                                     base::Bind(&OnReadDirectory, callback)));
 }
 
 void ProviderAsyncFileUtil::Touch(
@@ -121,7 +148,7 @@ void ProviderAsyncFileUtil::Touch(
     const base::Time& last_modified_time,
     const StatusCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  callback.Run(base::File::FILE_ERROR_SECURITY);
+  callback.Run(base::File::FILE_ERROR_ACCESS_DENIED);
 }
 
 void ProviderAsyncFileUtil::Truncate(
@@ -130,7 +157,7 @@ void ProviderAsyncFileUtil::Truncate(
     int64 length,
     const StatusCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  callback.Run(base::File::FILE_ERROR_SECURITY);
+  callback.Run(base::File::FILE_ERROR_ACCESS_DENIED);
 }
 
 void ProviderAsyncFileUtil::CopyFileLocal(
@@ -141,7 +168,7 @@ void ProviderAsyncFileUtil::CopyFileLocal(
     const CopyFileProgressCallback& progress_callback,
     const StatusCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  callback.Run(base::File::FILE_ERROR_SECURITY);
+  callback.Run(base::File::FILE_ERROR_ACCESS_DENIED);
 }
 
 void ProviderAsyncFileUtil::MoveFileLocal(
@@ -151,7 +178,7 @@ void ProviderAsyncFileUtil::MoveFileLocal(
     CopyOrMoveOption option,
     const StatusCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  callback.Run(base::File::FILE_ERROR_SECURITY);
+  callback.Run(base::File::FILE_ERROR_ACCESS_DENIED);
 }
 
 void ProviderAsyncFileUtil::CopyInForeignFile(
@@ -160,7 +187,7 @@ void ProviderAsyncFileUtil::CopyInForeignFile(
     const fileapi::FileSystemURL& dest_url,
     const StatusCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  callback.Run(base::File::FILE_ERROR_SECURITY);
+  callback.Run(base::File::FILE_ERROR_ACCESS_DENIED);
 }
 
 void ProviderAsyncFileUtil::DeleteFile(
@@ -168,7 +195,7 @@ void ProviderAsyncFileUtil::DeleteFile(
     const fileapi::FileSystemURL& url,
     const StatusCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  callback.Run(base::File::FILE_ERROR_SECURITY);
+  callback.Run(base::File::FILE_ERROR_ACCESS_DENIED);
 }
 
 void ProviderAsyncFileUtil::DeleteDirectory(
@@ -176,7 +203,7 @@ void ProviderAsyncFileUtil::DeleteDirectory(
     const fileapi::FileSystemURL& url,
     const StatusCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  callback.Run(base::File::FILE_ERROR_SECURITY);
+  callback.Run(base::File::FILE_ERROR_ACCESS_DENIED);
 }
 
 void ProviderAsyncFileUtil::DeleteRecursively(
@@ -184,7 +211,7 @@ void ProviderAsyncFileUtil::DeleteRecursively(
     const fileapi::FileSystemURL& url,
     const StatusCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  callback.Run(base::File::FILE_ERROR_SECURITY);
+  callback.Run(base::File::FILE_ERROR_ACCESS_DENIED);
 }
 
 void ProviderAsyncFileUtil::CreateSnapshotFile(
@@ -193,7 +220,7 @@ void ProviderAsyncFileUtil::CreateSnapshotFile(
     const CreateSnapshotFileCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   NOTIMPLEMENTED();
-  callback.Run(base::File::FILE_ERROR_NOT_FOUND,
+  callback.Run(base::File::FILE_ERROR_INVALID_OPERATION,
                base::File::Info(),
                base::FilePath(),
                scoped_refptr<webkit_blob::ShareableFileReference>());

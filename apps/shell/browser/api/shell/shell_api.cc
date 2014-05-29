@@ -53,7 +53,7 @@ ShellCreateWindowFunction::~ShellCreateWindowFunction() {
 
 ExtensionFunction::ResponseAction ShellCreateWindowFunction::Run() {
   scoped_ptr<CreateWindow::Params> params(CreateWindow::Params::Create(*args_));
-  EXTENSION_FUNCTION_VALIDATE_TYPESAFE(params.get());
+  EXTENSION_FUNCTION_VALIDATE(params.get());
 
   // Convert "main.html" to "chrome-extension:/<id>/main.html".
   GURL url = GetExtension()->GetResourceURL(params->url);
@@ -67,7 +67,7 @@ ExtensionFunction::ResponseAction ShellCreateWindowFunction::Run() {
   app_window->LoadURL(url);
 
   // Create the reply to send to the renderer.
-  return RespondNow(SingleArgument(CreateResult(app_window)));
+  return RespondNow(OneArgument(CreateResult(app_window)));
 }
 
 }  // namespace apps

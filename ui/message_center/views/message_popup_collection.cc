@@ -186,7 +186,8 @@ void MessagePopupCollection::UpdateWidgets() {
           toast, ui::AX_EVENT_ALERT);
     }
 
-    message_center_->DisplayedNotification((*iter)->id());
+    message_center_->DisplayedNotification(
+        (*iter)->id(), message_center::DISPLAY_SOURCE_POPUP);
   }
 }
 
@@ -449,20 +450,22 @@ void MessagePopupCollection::OnNotificationUpdated(
 
   for (NotificationList::PopupNotifications::iterator iter =
            notifications.begin(); iter != notifications.end(); ++iter) {
-    if ((*iter)->id() != notification_id)
+    Notification* notification = *iter;
+    DCHECK(notification);
+    ToastContentsView* toast_contents_view = *toast_iter;
+    DCHECK(toast_contents_view);
+
+    if (notification->id() != notification_id)
       continue;
 
     const RichNotificationData& optional_fields =
-        (*iter)->rich_notification_data();
+        notification->rich_notification_data();
     bool a11y_feedback_for_updates =
         optional_fields.should_make_spoken_feedback_for_popup_updates;
 
-    NotificationView* view =
-        NotificationView::Create(*toast_iter,
-                                 *(*iter),
-                                 true); // Create top-level notification.
-    view->set_context_menu_controller(context_menu_controller_.get());
-    (*toast_iter)->SetContents(view, a11y_feedback_for_updates);
+    toast_contents_view->UpdateContents(*notification,
+                                        a11y_feedback_for_updates);
+
     updated = true;
   }
 
@@ -558,14 +561,6 @@ void MessagePopupCollection::SetDisplayInfo(const gfx::Rect& work_area,
   RepositionWidgets();
 }
 
-void MessagePopupCollection::OnDisplayBoundsChanged(
-    const gfx::Display& display) {
-  if (display.id() != display_id_)
-    return;
-
-  SetDisplayInfo(display.work_area(), display.bounds());
-}
-
 void MessagePopupCollection::OnDisplayAdded(const gfx::Display& new_display) {
 }
 
@@ -575,6 +570,15 @@ void MessagePopupCollection::OnDisplayRemoved(const gfx::Display& old_display) {
     display_id_ = display.id();
     SetDisplayInfo(display.work_area(), display.bounds());
   }
+}
+
+void MessagePopupCollection::OnDisplayMetricsChanged(
+    const gfx::Display& display, uint32_t metrics) {
+  if (display.id() != display_id_)
+    return;
+
+  if (metrics & DISPLAY_METRIC_BOUNDS || metrics & DISPLAY_METRIC_WORK_AREA)
+    SetDisplayInfo(display.work_area(), display.bounds());
 }
 
 views::Widget* MessagePopupCollection::GetWidgetForTest(const std::string& id)

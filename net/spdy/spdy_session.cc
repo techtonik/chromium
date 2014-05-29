@@ -40,6 +40,8 @@
 #include "net/spdy/spdy_session_pool.h"
 #include "net/spdy/spdy_stream.h"
 #include "net/ssl/server_bound_cert_service.h"
+#include "net/ssl/ssl_cipher_suite_names.h"
+#include "net/ssl/ssl_connection_status_flags.h"
 
 namespace net {
 
@@ -49,8 +51,9 @@ const int kReadBufferSize = 8 * 1024;
 const int kDefaultConnectionAtRiskOfLossSeconds = 10;
 const int kHungIntervalSeconds = 10;
 
-// Always start at 1 for the first stream id.
+// As we always act as the client, start at 1 for the first stream id.
 const SpdyStreamId kFirstStreamId = 1;
+const SpdyStreamId kLastStreamId = 0x7fffffff;
 
 // Minimum seconds that unclaimed pushed streams will be kept in memory.
 const int kMinPushedStreamLifetimeSeconds = 300;
@@ -455,8 +458,7 @@ SpdySession::SpdySession(
     TimeFunc time_func,
     const HostPortPair& trusted_spdy_proxy,
     NetLog* net_log)
-    : weak_factory_(this),
-      in_io_loop_(false),
+    : in_io_loop_(false),
       spdy_session_key_(spdy_session_key),
       pool_(NULL),
       http_server_properties_(http_server_properties),
@@ -510,7 +512,8 @@ SpdySession::SpdySession(
       hung_interval_(
           base::TimeDelta::FromSeconds(kHungIntervalSeconds)),
       trusted_spdy_proxy_(trusted_spdy_proxy),
-      time_func_(time_func) {
+      time_func_(time_func),
+      weak_factory_(this) {
   DCHECK_GE(protocol_, kProtoSPDYMinimumVersion);
   DCHECK_LE(protocol_, kProtoSPDYMaximumVersion);
   DCHECK(HttpStreamFactory::spdy_enabled());
@@ -825,6 +828,9 @@ void SpdySession::ProcessPendingStreamRequests() {
     if (!pending_request)
       break;
 
+    // Note that this post can race with other stream creations, and it's
+    // possible that the un-stalled stream will be stalled again if it loses.
+    // TODO(jgraettinger): Provide stronger ordering guarantees.
     base::MessageLoop::current()->PostTask(
         FROM_HERE,
         base::Bind(&SpdySession::CompleteStreamRequest,
@@ -840,6 +846,34 @@ void SpdySession::AddPooledAlias(const SpdySessionKey& alias_key) {
 SpdyMajorVersion SpdySession::GetProtocolVersion() const {
   DCHECK(buffered_spdy_framer_.get());
   return buffered_spdy_framer_->protocol_version();
+}
+
+bool SpdySession::HasAcceptableTransportSecurity() const {
+  // If we're not even using TLS, we have no standards to meet.
+  if (!is_secure_) {
+    return true;
+  }
+
+  // We don't enforce transport security standards for older SPDY versions.
+  if (GetProtocolVersion() < SPDY4) {
+    return true;
+  }
+
+  SSLInfo ssl_info;
+  CHECK(connection_->socket()->GetSSLInfo(&ssl_info));
+
+  // HTTP/2 requires TLS 1.2+
+  if (SSLConnectionStatusToVersion(ssl_info.connection_status) <
+      SSL_CONNECTION_VERSION_TLS1_2) {
+    return false;
+  }
+
+  if (!IsSecureTLSCipherSuite(
+          SSLConnectionStatusToCipherSuite(ssl_info.connection_status))) {
+    return false;
+  }
+
+  return true;
 }
 
 base::WeakPtr<SpdySession> SpdySession::GetWeakPtr() {
@@ -1384,6 +1418,14 @@ int SpdySession::DoWrite() {
       scoped_ptr<SpdyStream> owned_stream =
           ActivateCreatedStream(stream.get());
       InsertActivatedStream(owned_stream.Pass());
+
+      if (stream_hi_water_mark_ > kLastStreamId) {
+        CHECK_EQ(stream->stream_id(), kLastStreamId);
+        // We've exhausted the stream ID space, and no new streams may be
+        // created after this one.
+        MakeUnavailable();
+        StartGoingAway(kLastStreamId, ERR_ABORTED);
+      }
     }
 
     in_flight_write_ = producer->ProduceBuffer();
@@ -1610,11 +1652,10 @@ void SpdySession::LogAbandonedActiveStream(ActiveStreamMap::const_iterator it,
   }
 }
 
-int SpdySession::GetNewStreamId() {
-  int id = stream_hi_water_mark_;
+SpdyStreamId SpdySession::GetNewStreamId() {
+  CHECK_LE(stream_hi_water_mark_, kLastStreamId);
+  SpdyStreamId id = stream_hi_water_mark_;
   stream_hi_water_mark_ += 2;
-  if (stream_hi_water_mark_ > 0x7fff)
-    stream_hi_water_mark_ = 1;
   return id;
 }
 
@@ -1982,6 +2023,17 @@ void SpdySession::OnSettings(bool clear_persisted) {
         NetLog::TYPE_SPDY_SESSION_RECV_SETTINGS,
         base::Bind(&NetLogSpdySettingsCallback, host_port_pair(),
                    clear_persisted));
+  }
+
+  if (GetProtocolVersion() >= SPDY4) {
+    // Send an acknowledgment of the setting.
+    SpdySettingsIR settings_ir;
+    settings_ir.set_is_ack(true);
+    EnqueueSessionWrite(
+        HIGHEST,
+        SETTINGS,
+        scoped_ptr<SpdyFrame>(
+            buffered_spdy_framer_->SerializeFrame(settings_ir)));
   }
 }
 
@@ -2841,13 +2893,16 @@ void SpdySession::CompleteStreamRequest(
     return;
 
   base::WeakPtr<SpdyStream> stream;
-  int rv = CreateStream(*pending_request, &stream);
+  int rv = TryCreateStream(pending_request, &stream);
 
   if (rv == OK) {
     DCHECK(stream);
     pending_request->OnRequestCompleteSuccess(stream);
-  } else {
-    DCHECK(!stream);
+    return;
+  }
+  DCHECK(!stream);
+
+  if (rv != ERR_IO_PENDING) {
     pending_request->OnRequestCompleteFailure(rv);
   }
 }

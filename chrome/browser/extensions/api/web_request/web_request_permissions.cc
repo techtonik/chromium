@@ -69,11 +69,11 @@ bool IsSensitiveURL(const GURL& url) {
 // covered by CanExtensionAccessURL.
 bool HasWebRequestScheme(const GURL& url) {
   return (url.SchemeIs(content::kAboutScheme) ||
-          url.SchemeIs(content::kFileScheme) ||
-          url.SchemeIs(content::kFileSystemScheme) ||
-          url.SchemeIs(content::kFtpScheme) ||
-          url.SchemeIs(content::kHttpScheme) ||
-          url.SchemeIs(content::kHttpsScheme) ||
+          url.SchemeIs(url::kFileScheme) ||
+          url.SchemeIs(url::kFileSystemScheme) ||
+          url.SchemeIs(url::kFtpScheme) ||
+          url.SchemeIs(url::kHttpScheme) ||
+          url.SchemeIs(url::kHttpsScheme) ||
           url.SchemeIs(extensions::kExtensionScheme));
 }
 

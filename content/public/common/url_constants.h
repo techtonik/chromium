@@ -6,6 +6,7 @@
 #define CONTENT_PUBLIC_COMMON_URL_CONSTANTS_H_
 
 #include "content/common/content_export.h"
+#include "url/url_constants.h"
 
 // Contains constants for known URLs and portions thereof.
 
@@ -15,18 +16,9 @@ namespace content {
 // TODO(jam): some of these don't below in the content layer, but are accessed
 // from there.
 CONTENT_EXPORT extern const char kAboutScheme[];
-CONTENT_EXPORT extern const char kBlobScheme[];
 CONTENT_EXPORT extern const char kChromeDevToolsScheme[];
 CONTENT_EXPORT extern const char kChromeUIScheme[];  // Used for WebUIs.
-CONTENT_EXPORT extern const char kDataScheme[];
-CONTENT_EXPORT extern const char kFileScheme[];
-CONTENT_EXPORT extern const char kFileSystemScheme[];
-CONTENT_EXPORT extern const char kFtpScheme[];
 CONTENT_EXPORT extern const char kGuestScheme[];
-CONTENT_EXPORT extern const char kHttpScheme[];
-CONTENT_EXPORT extern const char kHttpsScheme[];
-CONTENT_EXPORT extern const char kJavaScriptScheme[];
-CONTENT_EXPORT extern const char kMailToScheme[];
 CONTENT_EXPORT extern const char kMetadataScheme[];
 CONTENT_EXPORT extern const char kSwappedOutScheme[];
 CONTENT_EXPORT extern const char kViewSourceScheme[];
@@ -59,6 +51,7 @@ CONTENT_EXPORT extern const char kChromeUIHangURL[];
 CONTENT_EXPORT extern const char kChromeUIKillURL[];
 CONTENT_EXPORT extern const char kChromeUIPpapiFlashCrashURL[];
 CONTENT_EXPORT extern const char kChromeUIPpapiFlashHangURL[];
+CONTENT_EXPORT extern const char kChromeUIServiceWorkerInternalsURL[];
 
 // Used to separate a standard scheme and the hostname: "://".
 CONTENT_EXPORT extern const char kStandardSchemeSeparator[];

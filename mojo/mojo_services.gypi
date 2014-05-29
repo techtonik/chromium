@@ -18,6 +18,58 @@
       ],
     },
     {
+      'target_name': 'mojo_input_events_bindings',
+      'type': 'static_library',
+      'sources': [
+        'services/public/interfaces/input_events/input_events.mojom',
+      ],
+      'variables': {
+        'mojom_base_output_dir': 'mojo',
+      },
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'export_dependent_settings': [
+        'mojo_cpp_bindings',
+      ],
+      'dependencies': [
+        'mojo_cpp_bindings',
+        'mojo_geometry_bindings',
+      ],
+    },
+    {
+      'target_name': 'mojo_geometry_bindings',
+      'type': 'static_library',
+      'sources': [
+        'services/public/interfaces/geometry/geometry.mojom',
+      ],
+      'variables': {
+        'mojom_base_output_dir': 'mojo',
+      },
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'dependencies': [
+        'mojo_cpp_bindings',
+      ],
+      'export_dependent_settings': [
+        'mojo_cpp_bindings',
+      ],
+    },
+    {
+      'target_name': 'mojo_geometry_lib',
+      'type': '<(component)',
+      'defines': [
+        'MOJO_GEOMETRY_IMPLEMENTATION',
+      ],
+      'dependencies': [
+        '../ui/gfx/gfx.gyp:gfx_geometry',
+        'mojo_environment_chromium',
+        'mojo_geometry_bindings',
+        'mojo_system_impl',
+      ],
+      'sources': [
+        'services/public/cpp/geometry/lib/geometry_type_converters.cc',
+        'services/public/cpp/geometry/geometry_type_converters.h',
+      ],
+    },
+    {
       'target_name': 'mojo_gles2_bindings',
       'type': 'static_library',
       'sources': [
@@ -72,6 +124,8 @@
         'mojo_cpp_bindings',
       ],
       'dependencies': [
+        'mojo_geometry_bindings',
+        'mojo_input_events_bindings',
         'mojo_cpp_bindings',
       ],
     },
@@ -86,16 +140,17 @@
         '../ui/gfx/gfx.gyp:gfx_geometry',
         'mojo_common_lib',
         'mojo_environment_chromium',
+        'mojo_geometry_bindings',
+        'mojo_geometry_lib',
         'mojo_gles2_service',
         'mojo_native_viewport_bindings',
-        'mojo_shell_client',
+        'mojo_application',
         'mojo_system_impl',
       ],
       'defines': [
         'MOJO_NATIVE_VIEWPORT_IMPLEMENTATION',
       ],
       'sources': [
-        'services/native_viewport/geometry_conversions.h',
         'services/native_viewport/native_viewport.h',
         'services/native_viewport/native_viewport_android.cc',
         'services/native_viewport/native_viewport_mac.mm',
@@ -140,6 +195,7 @@
       ],
       'dependencies': [
         'mojo_cpp_bindings',
+        'mojo_geometry_bindings',
       ],
     },
     {
@@ -147,14 +203,20 @@
       'type': 'static_library',
       'dependencies': [
         '../base/base.gyp:base',
-        'mojo_shell_bindings',
+        '../skia/skia.gyp:skia',
+        '../ui/gfx/gfx.gyp:gfx',
+        '../ui/gfx/gfx.gyp:gfx_geometry',
+        'mojo_geometry_bindings',
+        'mojo_geometry_lib',
+        'mojo_service_provider_bindings',
         'mojo_view_manager_bindings',
         'mojo_view_manager_common',
       ],
       'sources': [
         'services/public/cpp/view_manager/lib/view.cc',
+        'services/public/cpp/view_manager/lib/view_private.cc',
+        'services/public/cpp/view_manager/lib/view_private.h',
         'services/public/cpp/view_manager/lib/view_manager.cc',
-        'services/public/cpp/view_manager/lib/view_manager_observer.h',
         'services/public/cpp/view_manager/lib/view_manager_private.cc',
         'services/public/cpp/view_manager/lib/view_manager_private.h',
         'services/public/cpp/view_manager/lib/view_manager_synchronizer.cc',
@@ -167,6 +229,7 @@
         'services/public/cpp/view_manager/view.h',
         'services/public/cpp/view_manager/view_manager.h',
         'services/public/cpp/view_manager/view_manager_types.h',
+        'services/public/cpp/view_manager/view_observer.h',
         'services/public/cpp/view_manager/view_tree_host.h',
         'services/public/cpp/view_manager/view_tree_node.h',
         'services/public/cpp/view_manager/view_tree_node_observer.h',
@@ -180,7 +243,8 @@
         '../base/base.gyp:test_support_base',
         '../testing/gtest.gyp:gtest',
         'mojo_environment_chromium',
-        'mojo_run_all_unittests',
+        'mojo_geometry_bindings',
+        'mojo_geometry_lib',
         'mojo_shell_test_support',
         'mojo_view_manager_bindings',
         'mojo_view_manager_lib',
@@ -190,6 +254,17 @@
         'services/public/cpp/view_manager/tests/view_manager_unittest.cc',
         'services/public/cpp/view_manager/tests/view_tree_host_unittest.cc',
         'services/public/cpp/view_manager/tests/view_tree_node_unittest.cc',
+      ],
+      'conditions': [
+        ['use_aura==1', {
+          'dependencies': [
+            'mojo_view_manager_run_unittests'
+          ],
+        }, {  # use_aura==0
+          'dependencies': [
+            'mojo_run_all_unittests',
+          ],
+        }]
       ],
     },
   ],
@@ -203,26 +278,34 @@
             '../base/base.gyp:base',
             '../skia/skia.gyp:skia',
             '../ui/aura/aura.gyp:aura',
+            '../ui/base/ui_base.gyp:ui_base',
+            '../ui/gfx/gfx.gyp:gfx',
             '../ui/gfx/gfx.gyp:gfx_geometry',
+            'mojo_aura_support',
             'mojo_common_lib',
             'mojo_environment_chromium',
+            'mojo_geometry_bindings',
+            'mojo_geometry_lib',
+            'mojo_gles2',
             'mojo_launcher_bindings',
             'mojo_native_viewport_bindings',
-            'mojo_shell_client',
+            'mojo_application',
             'mojo_system_impl',
             'mojo_view_manager_bindings',
             'mojo_view_manager_common',
           ],
           'sources': [
             'services/view_manager/ids.h',
+            'services/view_manager/main.cc',
             'services/view_manager/node.cc',
             'services/view_manager/node.h',
             'services/view_manager/node_delegate.h',
             'services/view_manager/root_node_manager.cc',
             'services/view_manager/root_node_manager.h',
+            'services/view_manager/root_view_manager.cc',
+            'services/view_manager/root_view_manager.h',
             'services/view_manager/view.cc',
             'services/view_manager/view.h',
-            'services/view_manager/view_manager.cc',
             'services/view_manager/view_manager_connection.cc',
             'services/view_manager/view_manager_connection.h',
             'services/view_manager/view_manager_export.h',
@@ -232,22 +315,44 @@
           ],
         },
         {
+          'target_name': 'mojo_view_manager_run_unittests',
+          'type': 'static_library',
+          'dependencies': [
+            '../base/base.gyp:base',
+            '../base/base.gyp:test_support_base',
+            '../ui/gl/gl.gyp:gl',
+          ],
+          'sources': [
+            'services/public/cpp/view_manager/lib/view_manager_test_suite.cc',
+            'services/public/cpp/view_manager/lib/view_manager_test_suite.h',
+            'services/public/cpp/view_manager/lib/view_manager_unittests.cc',
+          ],
+        },
+        {
           'target_name': 'mojo_view_manager_unittests',
           'type': 'executable',
           'dependencies': [
             '../base/base.gyp:base',
-            '../base/base.gyp:run_all_unittests',
+            '../base/base.gyp:test_support_base',
             '../skia/skia.gyp:skia',
             '../testing/gtest.gyp:gtest',
             '../ui/aura/aura.gyp:aura',
+            '../ui/gfx/gfx.gyp:gfx_geometry',
+            '../ui/gl/gl.gyp:gl',
+            'mojo_application',
             'mojo_environment_chromium',
-            'mojo_shell_client',
+            'mojo_geometry_bindings',
+            'mojo_geometry_lib',
+            'mojo_service_manager',
             'mojo_shell_test_support',
             'mojo_system_impl',
             'mojo_view_manager_bindings',
             'mojo_view_manager_common',
+            'mojo_view_manager_run_unittests',
           ],
           'sources': [
+            'services/view_manager/test_change_tracker.cc',
+            'services/view_manager/test_change_tracker.h',
             'services/view_manager/view_manager_connection_unittest.cc',
           ],
         },
@@ -273,7 +378,7 @@
             'mojo_dbus_service',
             'mojo_echo_bindings',
             'mojo_environment_chromium',
-            'mojo_shell_client',
+            'mojo_application',
             'mojo_system_impl',
           ],
           'sources': [

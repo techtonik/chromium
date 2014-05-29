@@ -45,10 +45,11 @@ class HttpPostProviderFactory;
 class InternalComponentsFactory;
 class JsBackend;
 class JsEventHandler;
+class ProtocolEvent;
 class SyncCoreProxy;
 class SyncEncryptionHandler;
-class ProtocolEvent;
 class SyncScheduler;
+class TypeDebugInfoObserver;
 struct Experiments;
 struct UserShare;
 
@@ -258,10 +259,6 @@ class SYNC_EXPORT SyncManager : public syncer::InvalidationHandler {
       ReportUnrecoverableErrorFunction report_unrecoverable_error_function,
       CancelationSignal* cancelation_signal) = 0;
 
-  // Throw an unrecoverable error from a transaction (mostly used for
-  // testing).
-  virtual void ThrowUnrecoverableError() = 0;
-
   virtual ModelTypeSet InitialSyncEndedTypes() = 0;
 
   // Returns those types within |types| that have an empty progress marker
@@ -361,6 +358,18 @@ class SYNC_EXPORT SyncManager : public syncer::InvalidationHandler {
 
   // Returns any buffered protocol events.  Does not clear the buffer.
   virtual ScopedVector<syncer::ProtocolEvent> GetBufferedProtocolEvents() = 0;
+
+  // Functions to manage registrations of DebugInfoObservers.
+  virtual void RegisterDirectoryTypeDebugInfoObserver(
+      syncer::TypeDebugInfoObserver* observer) = 0;
+  virtual void UnregisterDirectoryTypeDebugInfoObserver(
+      syncer::TypeDebugInfoObserver* observer) = 0;
+  virtual bool HasDirectoryTypeDebugInfoObserver(
+      syncer::TypeDebugInfoObserver* observer) = 0;
+
+  // Request that all current counter values be emitted as though they had just
+  // been updated.  Useful for initializing new observers' state.
+  virtual void RequestEmitDebugInfo() = 0;
 };
 
 }  // namespace syncer

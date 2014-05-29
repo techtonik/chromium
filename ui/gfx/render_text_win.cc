@@ -658,6 +658,7 @@ SelectionModel RenderTextWin::AdjacentWordSelectionModel(
 }
 
 Range RenderTextWin::GetGlyphBounds(size_t index) {
+  EnsureLayout();
   const size_t run_index =
       GetRunContainingCaret(SelectionModel(index, CURSOR_FORWARD));
   // Return edge bounds if the index is invalid or beyond the layout text size.
@@ -836,7 +837,7 @@ void RenderTextWin::DrawVisualText(Canvas* canvas) {
       for (size_t k = glyph_range.start(); k < glyph_range.end(); ++k) {
         pos[k - glyph_range.start()].set(
             SkIntToScalar(text_offset.x() + run->offsets[k].du + segment_x),
-            SkIntToScalar(text_offset.y() + run->offsets[k].dv));
+            SkIntToScalar(text_offset.y() - run->offsets[k].dv));
         segment_x += run->advance_widths[k];
       }
       pos.back().set(SkIntToScalar(text_offset.x() + segment_x),
@@ -1273,7 +1274,7 @@ SelectionModel RenderTextWin::LastSelectionModelInsideRun(
   return SelectionModel(position, CURSOR_FORWARD);
 }
 
-RenderText* RenderText::CreateInstance() {
+RenderText* RenderText::CreateNativeInstance() {
   return new RenderTextWin;
 }
 

@@ -115,7 +115,7 @@ class APP_LIST_EXPORT AppsGridView : public views::View,
   void UpdateDrag(Pointer pointer, const gfx::Point& point);
   void EndDrag(bool cancel);
   bool IsDraggedView(const views::View* view) const;
-  void ClearDragState(bool cancel_reparent);
+  void ClearDragState();
   void SetDragViewVisible(bool visible);
 
   // Set the drag and drop host for application links.
@@ -125,11 +125,14 @@ class APP_LIST_EXPORT AppsGridView : public views::View,
   // Prerenders the icons on and around |page_index|.
   void Prerender(int page_index);
 
+  // Return true if the |bounds_animator_| is animating |view|.
+  bool IsAnimatingView(views::View* view);
+
   bool has_dragged_view() const { return drag_view_ != NULL; }
   bool dragging() const { return drag_pointer_ != NONE; }
 
   // Overridden from views::View:
-  virtual gfx::Size GetPreferredSize() OVERRIDE;
+  virtual gfx::Size GetPreferredSize() const OVERRIDE;
   virtual void Layout() OVERRIDE;
   virtual bool OnKeyPressed(const ui::KeyEvent& event) OVERRIDE;
   virtual bool OnKeyReleased(const ui::KeyEvent& event) OVERRIDE;
@@ -175,8 +178,10 @@ class APP_LIST_EXPORT AppsGridView : public views::View,
   // root level grid view to end reparenting a folder item.
   // |events_forwarded_to_drag_drop_host|: True if the dragged item is dropped
   // to the drag_drop_host, eg. dropped on shelf.
+  // |cancel_drag|: True if the drag is ending because it has been canceled.
   void EndDragFromReparentItemInRootLevel(
-      bool events_forwarded_to_drag_drop_host);
+      bool events_forwarded_to_drag_drop_host,
+      bool cancel_drag);
 
   // Handles EndDrag event in the hidden folder grid view to end reparenting
   // a folder item.
@@ -201,8 +206,8 @@ class APP_LIST_EXPORT AppsGridView : public views::View,
     folder_delegate_ = folder_delegate;
   }
 
-  AppListItemView* activated_item_view() const {
-    return activated_item_view_;
+  AppListItemView* activated_folder_item_view() const {
+    return activated_folder_item_view_;
   }
 
  private:
@@ -398,9 +403,9 @@ class APP_LIST_EXPORT AppsGridView : public views::View,
   // Gets the bounds of the tile located at |row| and |col| on current page.
   gfx::Rect GetTileBounds(int row, int col) const;
 
-  // Returns true if the slot of |index| is the first empty slot next to the
-  // last item on the last page.
-  bool IsFirstEmptySlot(const Index& index) const;
+  // Returns true if the slot of |index| is the last possible slot to drop
+  // an item, i.e. first empty slot next to the last item on the last page.
+  bool IsLastPossibleDropTarget(const Index& index) const;
 
   // Gets the item view located at |slot| on the current page. If there is
   // no item located at |slot|, returns NULL.
@@ -492,6 +497,9 @@ class APP_LIST_EXPORT AppsGridView : public views::View,
   // Created when a drag is started (ie: drag exceeds the drag threshold), but
   // not Run() until supplied with a shortcut path.
   scoped_refptr<SynchronousDrag> synchronous_drag_;
+
+  // Whether to use SynchronousDrag to support dropping to task bar etc.
+  bool use_synchronous_drag_;
 #endif
 
   Pointer drag_pointer_;
@@ -530,8 +538,8 @@ class APP_LIST_EXPORT AppsGridView : public views::View,
 
   views::BoundsAnimator bounds_animator_;
 
-  // The most recent activated item view.
-  AppListItemView* activated_item_view_;
+  // The most recent activated folder item view.
+  AppListItemView* activated_folder_item_view_;
 
   // Tracks if drag_view_ is dragged out of the folder container bubble
   // when dragging a item inside a folder.

@@ -19,8 +19,8 @@
 namespace device {
 
 class BluetoothDiscoverySession;
-
-struct BluetoothOutOfBandPairingData;
+class BluetoothSocket;
+class BluetoothUUID;
 
 // BluetoothAdapter represents a local Bluetooth adapter which may be used to
 // interact with remote Bluetooth devices. As well as providing support for
@@ -83,11 +83,6 @@ class BluetoothAdapter : public base::RefCounted<BluetoothAdapter> {
   // called, in the success case the callback is simply not called.
   typedef base::Closure ErrorCallback;
 
-  // The BluetoothOutOfBandPairingDataCallback is used to return
-  // BluetoothOutOfBandPairingData to the caller.
-  typedef base::Callback<void(const BluetoothOutOfBandPairingData& data)>
-      BluetoothOutOfBandPairingDataCallback;
-
   // The InitCallback is used to trigger a callback after asynchronous
   // initialization, if initialization is asynchronous on the platform.
   typedef base::Callback<void()> InitCallback;
@@ -100,6 +95,9 @@ class BluetoothAdapter : public base::RefCounted<BluetoothAdapter> {
   // storing it into a |scoped_refptr|.
   static base::WeakPtr<BluetoothAdapter> CreateAdapter(
       const InitCallback& init_callback);
+
+  // Returns a weak pointer to an existing adapter for testing purposes only.
+  base::WeakPtr<BluetoothAdapter> GetWeakPtrForTesting();
 
   // Adds and removes observers for events on this bluetooth adapter. If
   // monitoring multiple adapters, check the |adapter| parameter of observer
@@ -188,11 +186,6 @@ class BluetoothAdapter : public base::RefCounted<BluetoothAdapter> {
   virtual BluetoothDevice* GetDevice(const std::string& address);
   virtual const BluetoothDevice* GetDevice(const std::string& address) const;
 
-  // Requests the local Out Of Band pairing data.
-  virtual void ReadLocalOutOfBandPairingData(
-      const BluetoothOutOfBandPairingDataCallback& callback,
-      const ErrorCallback& error_callback) = 0;
-
   // Possible priorities for AddPairingDelegate(), low is intended for
   // permanent UI and high is intended for interactive UI or applications.
   enum PairingDelegatePriority {
@@ -219,6 +212,38 @@ class BluetoothAdapter : public base::RefCounted<BluetoothAdapter> {
   // or NULL if no delegate is registered. Used to select the delegate for
   // incoming pairing requests.
   virtual BluetoothDevice::PairingDelegate* DefaultPairingDelegate();
+
+  // Creates an RFCOMM service on this adapter advertised with UUID |uuid|,
+  // listening on channel |channel|, which may be the constant |kChannelAuto|
+  // to automatically allocate one. The socket will require encryption unless
+  // |insecure| is set to true. |callback| will be called on success with a
+  // BluetoothSocket instance that is to be owned by the received.
+  // |error_callback| will be called on failure with a message indicating the
+  // cause.
+  typedef base::Callback<void(scoped_refptr<BluetoothSocket>)>
+      CreateServiceCallback;
+  typedef base::Callback<void(const std::string& message)>
+      CreateServiceErrorCallback;
+  static const int kChannelAuto;
+  virtual void CreateRfcommService(
+      const BluetoothUUID& uuid,
+      int channel,
+      bool insecure,
+      const CreateServiceCallback& callback,
+      const CreateServiceErrorCallback& error_callback) = 0;
+
+  // Creates an L2CAP service on this adapter advertised with UUID |uuid|,
+  // listening on PSM |psm|, which may be the constant |kPsmAuto| to
+  // automatically allocate one. |callback| will be called on success with a
+  // BluetoothSocket instance that is to be owned by the received.
+  // |error_callback| will be called on failure with a message indicating the
+  // cause.
+  static const int kPsmAuto;
+  virtual void CreateL2capService(
+      const BluetoothUUID& uuid,
+      int psm,
+      const CreateServiceCallback& callback,
+      const CreateServiceErrorCallback& error_callback) = 0;
 
  protected:
   friend class base::RefCounted<BluetoothAdapter>;

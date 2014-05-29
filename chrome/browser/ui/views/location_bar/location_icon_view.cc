@@ -5,7 +5,6 @@
 #include "chrome/browser/ui/views/location_bar/location_icon_view.h"
 
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/search/search.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "grit/generated_resources.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -26,7 +25,7 @@ bool LocationIconView::OnMousePressed(const ui::MouseEvent& event) {
         ui::CLIPBOARD_TYPE_SELECTION, &text);
     text = OmniboxView::SanitizeTextForPaste(text);
     OmniboxEditModel* model =
-        page_info_helper_.location_bar()->omnibox_view()->model();
+        page_info_helper_.location_bar()->GetOmniboxView()->model();
     if (model->CanPasteAndGo(text))
       model->PasteAndGo(text);
   }
@@ -41,6 +40,11 @@ void LocationIconView::OnMouseReleased(const ui::MouseEvent& event) {
   OnClickOrTap(event);
 }
 
+bool LocationIconView::OnMouseDragged(const ui::MouseEvent& event) {
+  page_info_helper_.location_bar()->GetOmniboxView()->CloseOmniboxPopup();
+  return false;
+}
+
 void LocationIconView::OnGestureEvent(ui::GestureEvent* event) {
   if (event->type() != ui::ET_GESTURE_TAP)
     return;
@@ -50,11 +54,8 @@ void LocationIconView::OnGestureEvent(ui::GestureEvent* event) {
 
 void LocationIconView::OnClickOrTap(const ui::LocatedEvent& event) {
   // Do not show page info if the user has been editing the location bar or the
-  // location bar is at the NTP.  Also skip showing the page info if the
-  // toolbar-based origin chip is being shown because it is responsible for
-  // showing the page info instead.
-  if (page_info_helper_.location_bar()->omnibox_view()->IsEditingOrEmpty() ||
-      chrome::ShouldDisplayOriginChip())
+  // location bar is at the NTP.
+  if (page_info_helper_.location_bar()->GetOmniboxView()->IsEditingOrEmpty())
     return;
 
   page_info_helper_.ProcessEvent(event);

@@ -17,8 +17,6 @@
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string16.h"
-#include "chrome/browser/autocomplete/autocomplete_match.h"
-#include "chrome/browser/autocomplete/history_provider_util.h"
 #include "chrome/browser/common/cancelable_request.h"
 #include "chrome/browser/history/history_db_task.h"
 #include "chrome/browser/history/history_types.h"
@@ -119,9 +117,11 @@ class InMemoryURLIndex : public content::NotificationObserver,
   // URLIndexPrivateData class. For a complete description of this function
   // refer to that class.  If |cursor_position| is base::string16::npos, the
   // function doesn't do anything special with the cursor; this is equivalent
-  // to the cursor being at the end.
+  // to the cursor being at the end.  In total, |max_matches| of items will be
+  // returned in the |ScoredHistoryMatches| vector.
   ScoredHistoryMatches HistoryItemsForTerms(const base::string16& term_string,
-                                            size_t cursor_position);
+                                            size_t cursor_position,
+                                            size_t max_matches);
 
   // Deletes the index entry, if any, for the given |url|.
   void DeleteURL(const GURL& url);

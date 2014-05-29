@@ -60,14 +60,11 @@ class BrowserStatusMonitor::LocalWebContentsObserver
       monitor_->SetShelfIDForBrowserWindowContents(browser, web_contents());
   }
 
-  virtual void WebContentsDestroyed(
-      content::WebContents* web_content) OVERRIDE {
-    if (web_content == web_contents()) {
-      // We can only come here when there was a non standard termination like
-      // an app got un-installed while running, etc.
-      monitor_->WebContentsDestroyed(web_content);
-      // |this| is gone now.
-    }
+  virtual void WebContentsDestroyed() OVERRIDE {
+    // We can only come here when there was a non standard termination like
+    // an app got un-installed while running, etc.
+    monitor_->WebContentsDestroyed(web_contents());
+    // |this| is gone now.
   }
 
  private:
@@ -227,11 +224,6 @@ void BrowserStatusMonitor::OnBrowserRemoved(Browser* browser) {
   UpdateBrowserItemState();
 }
 
-void BrowserStatusMonitor::OnDisplayBoundsChanged(
-    const gfx::Display& display) {
-  // Do nothing here.
-}
-
 void BrowserStatusMonitor::OnDisplayAdded(const gfx::Display& new_display) {
   // Add a new RootWindow and its ActivationClient to observed list.
   aura::Window* root_window = ash::Shell::GetInstance()->
@@ -249,6 +241,11 @@ void BrowserStatusMonitor::OnDisplayRemoved(const gfx::Display& old_display) {
   // When this is called, RootWindow of |old_display| is already removed.
   // Instead, we can remove RootWindow and its ActivationClient in the
   // OnWindowRemoved().
+  // Do nothing here.
+}
+
+void BrowserStatusMonitor::OnDisplayMetricsChanged(const gfx::Display&,
+                                                   uint32_t) {
   // Do nothing here.
 }
 

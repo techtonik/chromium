@@ -6,8 +6,16 @@
 
 namespace gcm {
 
+GCMClient::ChromeBuildInfo::ChromeBuildInfo()
+    : platform(PLATFORM_UNKNOWN),
+      channel(CHANNEL_UNKNOWN) {
+}
+
+GCMClient::ChromeBuildInfo::~ChromeBuildInfo() {
+}
+
 GCMClient::OutgoingMessage::OutgoingMessage()
-    : time_to_live(0) {
+    : time_to_live(kMaximumTTL) {
 }
 
 GCMClient::OutgoingMessage::~OutgoingMessage() {

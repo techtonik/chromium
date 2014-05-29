@@ -5,6 +5,7 @@
 #include "chrome/browser/profile_resetter/profile_resetter.h"
 
 #include "base/prefs/pref_service.h"
+#include "base/prefs/scoped_user_pref_update.h"
 #include "base/synchronization/cancellation_flag.h"
 #include "chrome/browser/browsing_data/browsing_data_helper.h"
 #include "chrome/browser/content_settings/host_content_settings_map.h"
@@ -170,7 +171,7 @@ void ProfileResetter::ResetDefaultSearchEngine() {
     const TemplateURL* default_search_provider =
         template_url_service_->GetDefaultSearchProvider();
     if (default_search_provider &&
-        default_search_provider->url_ref().HasGoogleBaseURLs())
+        default_search_provider->HasGoogleBaseURLs())
       GoogleURLTracker::RequestServerCheck(profile_, true);
 
     MarkAsDone(DEFAULT_SEARCH_ENGINE);

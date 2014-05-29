@@ -10,11 +10,11 @@
 #include "base/message_loop/message_loop.h"
 #include "mojo/aura/screen_mojo.h"
 #include "mojo/aura/window_tree_host_mojo.h"
+#include "mojo/public/cpp/application/application.h"
 #include "mojo/public/cpp/bindings/allocation_scope.h"
 #include "mojo/public/cpp/gles2/gles2.h"
-#include "mojo/public/cpp/shell/application.h"
 #include "mojo/public/cpp/system/core.h"
-#include "mojo/public/interfaces/shell/shell.mojom.h"
+#include "mojo/public/interfaces/service_provider/service_provider.mojom.h"
 #include "mojo/services/native_viewport/native_viewport.mojom.h"
 #include "ui/aura/client/default_capture_client.h"
 #include "ui/aura/client/window_tree_client.h"
@@ -113,17 +113,16 @@ class DemoWindowTreeClient : public aura::client::WindowTreeClient {
 
 class AuraDemo : public Application {
  public:
-  explicit AuraDemo(MojoHandle shell_handle) : Application(shell_handle) {
+  explicit AuraDemo(MojoHandle service_provider_handle)
+      : Application(service_provider_handle) {
     screen_.reset(ScreenMojo::Create());
     gfx::Screen::SetScreenInstance(gfx::SCREEN_TYPE_NATIVE, screen_.get());
 
-    InterfacePipe<NativeViewport, AnyInterface> pipe;
+    NativeViewportPtr native_viewport;
+    ConnectTo("mojo:mojo_native_viewport_service", &native_viewport);
 
-    mojo::AllocationScope scope;
-    shell()->Connect("mojo:mojo_native_viewport_service",
-                     pipe.handle_to_peer.Pass());
     window_tree_host_.reset(new WindowTreeHostMojo(
-        pipe.handle_to_self.Pass(),
+        native_viewport.Pass(),
         gfx::Rect(800, 600),
         base::Bind(&AuraDemo::HostContextCreated, base::Unretained(this))));
   }
@@ -178,8 +177,8 @@ class AuraDemo : public Application {
 }  // namespace mojo
 
 extern "C" AURA_DEMO_EXPORT MojoResult CDECL MojoMain(
-    MojoHandle shell_handle) {
-  CommandLine::Init(0, NULL);
+    MojoHandle service_provider_handle) {
+  base::CommandLine::Init(0, NULL);
   base::AtExitManager at_exit;
   base::MessageLoop loop;
   mojo::GLES2Initializer gles2;
@@ -188,7 +187,7 @@ extern "C" AURA_DEMO_EXPORT MojoResult CDECL MojoMain(
   //             MessageLoop is not of TYPE_UI. I think we need a way to build
   //             Aura that doesn't define platform-specific stuff.
   aura::Env::CreateInstance(true);
-  mojo::examples::AuraDemo app(shell_handle);
+  mojo::examples::AuraDemo app(service_provider_handle);
   loop.Run();
 
   return MOJO_RESULT_OK;

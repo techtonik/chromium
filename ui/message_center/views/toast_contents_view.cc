@@ -28,6 +28,8 @@
 #include "ui/views/widget/desktop_aura/desktop_native_widget_aura.h"
 #endif
 
+using gfx::Screen;
+
 namespace message_center {
 namespace {
 
@@ -40,7 +42,7 @@ const int kFadeInOutDuration = 200;
 }  // namespace.
 
 // static
-gfx::Size ToastContentsView::GetToastSizeForView(views::View* view) {
+gfx::Size ToastContentsView::GetToastSizeForView(const views::View* view) {
   int width = kNotificationWidth + view->GetInsets().width();
   return gfx::Size(width, view->GetHeightForWidth(width));
 }
@@ -84,6 +86,15 @@ void ToastContentsView::SetContents(MessageView* view,
   // The notification type should be ALERT, otherwise the accessibility message
   // won't be read for this view which returns ROLE_WINDOW.
   if (already_has_contents && a11y_feedback_for_updates)
+    NotifyAccessibilityEvent(ui::AX_EVENT_ALERT, false);
+}
+
+void ToastContentsView::UpdateContents(const Notification& notification,
+                                       bool a11y_feedback_for_updates) {
+  DCHECK_GT(child_count(), 0);
+  MessageView* message_view = static_cast<MessageView*>(child_at(0));
+  message_view->UpdateWithNotification(notification);
+  if (a11y_feedback_for_updates)
     NotifyAccessibilityEvent(ui::AX_EVENT_ALERT, false);
 }
 
@@ -225,10 +236,6 @@ void ToastContentsView::WindowClosing() {
     collection_->ForgetToast(this);
 }
 
-bool ToastContentsView::CanActivate() const {
-  return false;
-}
-
 void ToastContentsView::OnDisplayChanged() {
   views::Widget* widget = GetWidget();
   if (!widget)
@@ -238,8 +245,10 @@ void ToastContentsView::OnDisplayChanged() {
   if (!native_view || !collection_.get())
     return;
 
-  collection_->OnDisplayBoundsChanged(gfx::Screen::GetScreenFor(
-      native_view)->GetDisplayNearestWindow(native_view));
+  collection_->OnDisplayMetricsChanged(
+      Screen::GetScreenFor(native_view)->GetDisplayNearestWindow(native_view),
+      gfx::DisplayObserver::DISPLAY_METRIC_BOUNDS |
+          gfx::DisplayObserver::DISPLAY_METRIC_WORK_AREA);
 }
 
 void ToastContentsView::OnWorkAreaChanged() {
@@ -251,8 +260,9 @@ void ToastContentsView::OnWorkAreaChanged() {
   if (!native_view || !collection_.get())
     return;
 
-  collection_->OnDisplayBoundsChanged(gfx::Screen::GetScreenFor(
-      native_view)->GetDisplayNearestWindow(native_view));
+  collection_->OnDisplayMetricsChanged(
+      Screen::GetScreenFor(native_view)->GetDisplayNearestWindow(native_view),
+      gfx::DisplayObserver::DISPLAY_METRIC_WORK_AREA);
 }
 
 // views::View
@@ -273,7 +283,7 @@ void ToastContentsView::Layout() {
   }
 }
 
-gfx::Size ToastContentsView::GetPreferredSize() {
+gfx::Size ToastContentsView::GetPreferredSize() const {
   return child_count() ? GetToastSizeForView(child_at(0)) : gfx::Size();
 }
 
@@ -324,8 +334,6 @@ void ToastContentsView::CreateWidget(gfx::NativeView parent) {
   params.keep_on_top = true;
   if (parent)
     params.parent = parent;
-  else
-    params.top_level = true;
   params.opacity = views::Widget::InitParams::TRANSLUCENT_WINDOW;
   params.delegate = this;
   views::Widget* widget = new views::Widget();

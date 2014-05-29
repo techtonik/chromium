@@ -20,6 +20,7 @@
 #include "base/synchronization/waitable_event.h"
 #include "base/threading/thread.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/time/default_tick_clock.h"
 #include "chrome/browser/apps/chrome_apps_client.h"
 #include "chrome/browser/background/background_mode_manager.h"
 #include "chrome/browser/chrome_browser_main.h"
@@ -44,11 +45,12 @@
 #include "chrome/browser/io_thread.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/metrics/metrics_service.h"
+#include "chrome/browser/metrics/metrics_services_manager.h"
 #include "chrome/browser/metrics/thread_watcher.h"
-#include "chrome/browser/metrics/variations/variations_service.h"
 #include "chrome/browser/net/chrome_net_log.h"
 #include "chrome/browser/net/crl_set_fetcher.h"
 #include "chrome/browser/net/sdch_dictionary_fetcher.h"
+#include "chrome/browser/network_time/network_time_tracker.h"
 #include "chrome/browser/notifications/notification_ui_manager.h"
 #include "chrome/browser/plugins/chrome_plugin_service_filter.h"
 #include "chrome/browser/plugins/plugin_finder.h"
@@ -74,8 +76,8 @@
 #include "chrome/common/switch_utils.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/installer/util/google_update_constants.h"
+#include "chrome/installer/util/google_update_settings.h"
 #include "components/policy/core/common/policy_service.h"
-#include "components/rappor/rappor_service.h"
 #include "components/signin/core/common/profile_management_switches.h"
 #include "components/translate/core/browser/translate_download_manager.h"
 #include "content/public/browser/browser_thread.h"
@@ -143,8 +145,7 @@ using content::ResourceDispatcherHost;
 BrowserProcessImpl::BrowserProcessImpl(
     base::SequencedTaskRunner* local_state_task_runner,
     const CommandLine& command_line)
-    : created_metrics_service_(false),
-      created_watchdog_thread_(false),
+    : created_watchdog_thread_(false),
       created_browser_policy_connector_(false),
       created_profile_manager_(false),
       created_local_state_(false),
@@ -154,7 +155,9 @@ BrowserProcessImpl::BrowserProcessImpl(
       module_ref_count_(0),
       did_start_(false),
       download_status_updater_(new DownloadStatusUpdater),
-      local_state_task_runner_(local_state_task_runner) {
+      local_state_task_runner_(local_state_task_runner),
+      network_time_tracker_(new NetworkTimeTracker(
+          scoped_ptr<base::TickClock>(new base::DefaultTickClock()))) {
   g_browser_process = this;
   platform_part_.reset(new BrowserProcessPlatformPart());
 
@@ -205,15 +208,13 @@ void BrowserProcessImpl::StartTearDown() {
   BrowserThread::PostTask(BrowserThread::IO, FROM_HERE,
                           base::Bind(&SdchDictionaryFetcher::Shutdown));
 
-  // We need to destroy the MetricsService, RapporService, VariationsService,
-  // IntranetRedirectDetector, PromoResourceService, and SafeBrowsing
-  // ClientSideDetectionService (owned by the SafeBrowsingService) before the
-  // io_thread_ gets destroyed, since their destructors can call the URLFetcher
-  // destructor, which does a PostDelayedTask operation on the IO thread. (The
-  // IO thread will handle that URLFetcher operation before going away.)
-  metrics_service_.reset();
-  rappor_service_.reset();
-  variations_service_.reset();
+  // We need to destroy the MetricsServicesManager, IntranetRedirectDetector,
+  // PromoResourceService, and SafeBrowsing ClientSideDetectionService (owned by
+  // the SafeBrowsingService) before the io_thread_ gets destroyed, since their
+  // destructors can call the URLFetcher destructor, which does a
+  // PostDelayedTask operation on the IO thread. (The IO thread will handle that
+  // URLFetcher operation before going away.)
+  metrics_services_manager_.reset();
   intranet_redirect_detector_.reset();
 #if defined(FULL_SAFE_BROWSING) || defined(MOBILE_SAFE_BROWSING)
   if (safe_browsing_service_.get())
@@ -412,16 +413,12 @@ void BrowserProcessImpl::EndSession() {
 
 MetricsService* BrowserProcessImpl::metrics_service() {
   DCHECK(CalledOnValidThread());
-  if (!created_metrics_service_)
-    CreateMetricsService();
-  return metrics_service_.get();
+  return GetMetricsServicesManager()->GetMetricsService();
 }
 
 rappor::RapporService* BrowserProcessImpl::rappor_service() {
   DCHECK(CalledOnValidThread());
-  if (!rappor_service_.get())
-    rappor_service_.reset(new rappor::RapporService());
-  return rappor_service_.get();
+  return GetMetricsServicesManager()->GetRapporService();
 }
 
 IOThread* BrowserProcessImpl::io_thread() {
@@ -459,11 +456,7 @@ net::URLRequestContextGetter* BrowserProcessImpl::system_request_context() {
 
 chrome_variations::VariationsService* BrowserProcessImpl::variations_service() {
   DCHECK(CalledOnValidThread());
-  if (!variations_service_.get()) {
-    variations_service_.reset(
-        chrome_variations::VariationsService::Create(local_state()));
-  }
-  return variations_service_.get();
+  return GetMetricsServicesManager()->GetVariationsService();
 }
 
 BrowserProcessPlatformPart* BrowserProcessImpl::platform_part() {
@@ -628,6 +621,10 @@ WebRtcLogUploader* BrowserProcessImpl::webrtc_log_uploader() {
 }
 #endif
 
+NetworkTimeTracker* BrowserProcessImpl::network_time_tracker() {
+  return network_time_tracker_.get();
+}
+
 // static
 void BrowserProcessImpl::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterBooleanPref(prefs::kDefaultBrowserSettingEnabled,
@@ -782,13 +779,6 @@ void BrowserProcessImpl::ResourceDispatcherHostCreated() {
       base::Bind(&BrowserProcessImpl::ApplyAllowCrossOriginAuthPromptPolicy,
                  base::Unretained(this)));
   ApplyAllowCrossOriginAuthPromptPolicy();
-}
-
-void BrowserProcessImpl::CreateMetricsService() {
-  DCHECK(!created_metrics_service_ && metrics_service_.get() == NULL);
-  created_metrics_service_ = true;
-
-  metrics_service_.reset(new MetricsService);
 }
 
 void BrowserProcessImpl::CreateWatchdogThread() {
@@ -977,6 +967,13 @@ void BrowserProcessImpl::CreateSafeBrowsingService() {
   safe_browsing_service_ = SafeBrowsingService::CreateSafeBrowsingService();
   safe_browsing_service_->Initialize();
 #endif
+}
+
+MetricsServicesManager* BrowserProcessImpl::GetMetricsServicesManager() {
+  DCHECK(CalledOnValidThread());
+  if (!metrics_services_manager_)
+    metrics_services_manager_.reset(new MetricsServicesManager(local_state()));
+  return metrics_services_manager_.get();
 }
 
 void BrowserProcessImpl::ApplyDefaultBrowserPolicy() {

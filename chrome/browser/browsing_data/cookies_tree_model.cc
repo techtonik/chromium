@@ -72,7 +72,7 @@ std::string CanonicalizeHost(const GURL& url) {
   // "google.com".
 
   if (url.SchemeIsFile()) {
-    return std::string(content::kFileScheme) +
+    return std::string(url::kFileScheme) +
            content::kStandardSchemeSeparator;
   }
 
@@ -559,7 +559,7 @@ CookieTreeNode::DetailedInfo CookieTreeRootNode::GetDetailedInfo() const {
 // static
 base::string16 CookieTreeHostNode::TitleForUrl(const GURL& url) {
   const std::string file_origin_node_name(
-      std::string(content::kFileScheme) + content::kStandardSchemeSeparator);
+      std::string(url::kFileScheme) + content::kStandardSchemeSeparator);
   return base::UTF8ToUTF16(url.SchemeIsFile() ? file_origin_node_name
                                               : url.host());
 }
@@ -583,7 +583,7 @@ CookieTreeHostNode::~CookieTreeHostNode() {}
 
 const std::string CookieTreeHostNode::GetHost() const {
   const std::string file_origin_node_name(
-      std::string(content::kFileScheme) + content::kStandardSchemeSeparator);
+      std::string(url::kFileScheme) + content::kStandardSchemeSeparator);
   return url_.SchemeIsFile() ? file_origin_node_name : url_.host();
 }
 
@@ -1088,7 +1088,7 @@ void CookiesTreeModel::PopulateCookieInfoWithFilter(
         domain = domain.substr(1);
 
       // We treat secure cookies just the same as normal ones.
-      source_string = std::string(content::kHttpScheme) +
+      source_string = std::string(url::kHttpScheme) +
           content::kStandardSchemeSeparator + domain + "/";
     }
 
@@ -1235,7 +1235,7 @@ void CookiesTreeModel::PopulateServerBoundCertInfoWithFilter(
     if (!origin.is_valid()) {
       // Domain Bound Cert.  Make a valid URL to satisfy the
       // CookieTreeRootNode::GetOrCreateHostNode interface.
-      origin = GURL(std::string(content::kHttpsScheme) +
+      origin = GURL(std::string(url::kHttpsScheme) +
           content::kStandardSchemeSeparator +
           cert_info->server_identifier() + "/");
     }

@@ -152,9 +152,6 @@ const char kDisableFileSystem[]             = "disable-file-system";
 // Disables sending filters (SkImageFilter objects) between processes over IPC
 const char kDisableFiltersOverIPC[]         = "disable-filters-over-ipc";
 
-const char kDisableFixedPositionCreatesStackingContext[]
-    = "disable-fixed-position-creates-stacking-context";
-
 // Disable 3D inside of flapper.
 const char kDisableFlash3d[]                = "disable-flash-3d";
 
@@ -223,6 +220,9 @@ const char kDisablePrefixedEncryptedMedia[] =
 
 // Disables LCD text.
 const char kDisableLCDText[]                = "disable-lcd-text";
+
+// Disables distance field text.
+const char kDisableDistanceFieldText[]      = "disable-distance-field-text";
 
 // Disable LocalStorage.
 const char kDisableLocalStorage[]           = "disable-local-storage";
@@ -331,6 +331,10 @@ const char kEnableAcceleratedOverflowScroll[] =
 // Enables LCD text.
 const char kEnableLCDText[]                 = "enable-lcd-text";
 
+// Enables using signed distance fields when rendering text.
+// Only valid if GPU rasterization is enabled as well.
+const char kEnableDistanceFieldText[]       = "enable-distance-field-text";
+
 // Enables experimental feature that maps multiple RenderLayers to
 // one composited layer to avoid pathological layer counts.
 const char kEnableLayerSquashing[] =
@@ -338,9 +342,6 @@ const char kEnableLayerSquashing[] =
 
 // Enable experimental container node culling.
 const char kEnableContainerCulling[]        = "enable-container-culling";
-
-// Turns on extremely verbose logging of accessibility events.
-const char kEnableAccessibilityLogging[]    = "enable-accessibility-logging";
 
 // Use a BeginFrame signal from browser to renderer to schedule rendering.
 const char kEnableBeginFrameScheduling[]    = "enable-begin-frame-scheduling";
@@ -395,9 +396,6 @@ const char kEnableFileCookies[]             = "enable-file-cookies";
 // Enable the fast text autosizing implementation.
 const char kEnableFastTextAutosizing[]      = "enable-fast-text-autosizing";
 
-const char kEnableFixedPositionCreatesStackingContext[]
-    = "enable-fixed-position-creates-stacking-context";
-
 // Enable Gesture Tap Highlight
 const char kEnableGestureTapHighlight[]     = "enable-gesture-tap-highlight";
 
@@ -426,6 +424,12 @@ const char kEnableDirectWrite[]             = "enable-direct-write";
 
 // Use high resolution timers for TimeTicks.
 const char kEnableHighResolutionTime[]      = "enable-high-resolution-time";
+
+// Enable the Win32K process mitigation policy for renderer processes which
+// prevents them from invoking user32 and gdi32 system calls which enter
+// the kernel. This is only supported on Windows 8 and beyond.
+const char kEnableWin32kRendererLockDown[]
+    = "enable_win32k_renderer_lockdown";
 #endif
 
 // Paint content on the compositor thread instead of the main thread.
@@ -440,14 +444,6 @@ const char kEnableLogging[]                 = "enable-logging";
 
 // Enables the memory benchmarking extension
 const char kEnableMemoryBenchmarking[]      = "enable-memory-benchmarking";
-
-// On Windows, converts the page to the currently-installed monitor profile.
-// This does NOT enable color management for images. The source is still
-// assumed to be sRGB.
-const char kEnableMonitorProfile[]          = "enable-monitor-profile";
-
-// Enables use of cache if offline, even if it's stale
-const char kEnableOfflineCacheAccess[]      = "enable-offline-cache-access";
 
 // Enable rasterizer that writes directly to GPU memory.
 const char kEnableOneCopy[]                 = "enable-one-copy";
@@ -473,11 +469,6 @@ const char kEnablePreciseMemoryInfo[] = "enable-precise-memory-info";
 
 // Enable caching of pre-parsed JS script data.  See http://crbug.com/32407.
 const char kEnablePreparsedJsCaching[]      = "enable-preparsed-js-caching";
-
-// Enable privileged WebGL extensions; without this switch such extensions are
-// available only to Chrome extensions.
-const char kEnablePrivilegedWebGLExtensions[] =
-    "enable-privileged-webgl-extensions";
 
 // Enables the CSS multicol implementation that uses the regions implementation.
 const char kEnableRegionBasedColumns[] =
@@ -571,6 +562,9 @@ const char kEnableWebAnimationsSVG[]        = "enable-web-animations-svg";
 
 // Enables WebGL extensions not yet approved by the community.
 const char kEnableWebGLDraftExtensions[] = "enable-webgl-draft-extensions";
+
+// Enables WebGL rendering into a scanout buffer for overlay support.
+const char kEnableWebGLImageChromium[] = "enable-webgl-image-chromium";
 
 // Enables Web MIDI API.
 const char kEnableWebMIDI[]                 = "enable-web-midi";
@@ -883,9 +877,6 @@ extern const char kUIPrioritizeInGpuProcess[] =
 // Overrides the preferred discardable memory implementation.
 const char kUseDiscardableMemory[] = "use-discardable-memory";
 
-// Use fake device for MediaStream to replace actual camera and microphone.
-const char kUseFakeDeviceForMediaStream[] = "use-fake-device-for-media-stream";
-
 // Bypass the media stream infobar by selecting the default device for media
 // streams (e.g. WebRTC). Works with --use-fake-device-for-media-stream.
 const char kUseFakeUIForMediaStream[]     = "use-fake-ui-for-media-stream";
@@ -918,9 +909,6 @@ const char kValidateInputEventStream[] = "validate-input-event-stream";
 // kWaitForDebugger flag passed on or not.
 const char kWaitForDebuggerChildren[]       = "wait-for-debugger-children";
 
-// Overrides the amount of shared memory the webgl command buffer allocates
-const char kWebGLCommandBufferSizeKb[]      = "webgl-command-buffer-size-kb";
-
 // Causes the process to run as a worker subprocess.
 const char kWorkerProcess[]                 = "worker";
 
@@ -931,9 +919,9 @@ const char kZygoteCmdPrefix[]               = "zygote-cmd-prefix";
 const char kZygoteProcess[]                 = "zygote";
 
 #if defined(ENABLE_WEBRTC)
-// Enables audio processing in a MediaStreamTrack. When this flag is on, AEC,
-// NS and AGC will be done per MediaStreamTrack instead of in PeerConnection.
-const char kEnableAudioTrackProcessing[]    = "enable-audio-track-processing";
+// Disables audio processing in a MediaStreamTrack. When this flag is on, AEC,
+// NS and AGC will be done in PeerConnection instead of MediaStreamTrack.
+const char kDisableAudioTrackProcessing[]    = "disable-audio-track-processing";
 
 // Disables WebRTC device enumeration.
 const char kDisableDeviceEnumeration[]      = "disable-device-enumeration";
@@ -963,9 +951,6 @@ const char kDisableGestureRequirementForMediaFullscreen[] =
 // Disable user gesture requirement for media playback.
 const char kDisableGestureRequirementForMediaPlayback[] =
     "disable-gesture-requirement-for-media-playback";
-
-// Disable history logging for media elements.
-const char kDisableMediaHistoryLogging[]    = "disable-media-history";
 
 // Disable the click delay by sending click events during double tap.
 const char kDisableClickDelay[]             = "disable-click-delay";

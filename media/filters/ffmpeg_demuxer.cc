@@ -417,7 +417,6 @@ FFmpegDemuxer::FFmpegDemuxer(
       bitrate_(0),
       start_time_(kNoTimestamp()),
       liveness_(LIVENESS_UNKNOWN),
-      audio_disabled_(false),
       text_enabled_(false),
       duration_known_(false),
       need_key_cb_(need_key_cb),
@@ -463,17 +462,6 @@ void FFmpegDemuxer::Seek(base::TimeDelta time, const PipelineStatusCB& cb) {
                  flags),
       base::Bind(
           &FFmpegDemuxer::OnSeekFrameDone, weak_factory_.GetWeakPtr(), cb));
-}
-
-void FFmpegDemuxer::OnAudioRendererDisabled() {
-  DCHECK(task_runner_->BelongsToCurrentThread());
-  audio_disabled_ = true;
-  StreamVector::iterator iter;
-  for (iter = streams_.begin(); iter != streams_.end(); ++iter) {
-    if (*iter && (*iter)->type() == DemuxerStream::AUDIO) {
-      (*iter)->Stop();
-    }
-  }
 }
 
 void FFmpegDemuxer::Initialize(DemuxerHost* host,
@@ -906,10 +894,7 @@ void FFmpegDemuxer::OnReadFrameDone(ScopedAVPacket packet, int result) {
   // Defend against ffmpeg giving us a bad stream index.
   if (packet->stream_index >= 0 &&
       packet->stream_index < static_cast<int>(streams_.size()) &&
-      streams_[packet->stream_index] &&
-      (!audio_disabled_ ||
-       streams_[packet->stream_index]->type() != DemuxerStream::AUDIO)) {
-
+      streams_[packet->stream_index]) {
     // TODO(scherkus): Fix demuxing upstream to never return packets w/o data
     // when av_read_frame() returns success code. See bug comment for ideas:
     //
@@ -917,15 +902,7 @@ void FFmpegDemuxer::OnReadFrameDone(ScopedAVPacket packet, int result) {
     if (!packet->data) {
       ScopedAVPacket new_packet(new AVPacket());
       av_new_packet(new_packet.get(), 0);
-
-      new_packet->pts = packet->pts;
-      new_packet->dts = packet->dts;
-      new_packet->pos = packet->pos;
-      new_packet->duration = packet->duration;
-      new_packet->convergence_duration = packet->convergence_duration;
-      new_packet->flags = packet->flags;
-      new_packet->stream_index = packet->stream_index;
-
+      av_packet_copy_props(new_packet.get(), packet.get());
       packet.swap(new_packet);
     }
 
@@ -1002,10 +979,8 @@ void FFmpegDemuxer::StreamHasEnded() {
   DCHECK(task_runner_->BelongsToCurrentThread());
   StreamVector::iterator iter;
   for (iter = streams_.begin(); iter != streams_.end(); ++iter) {
-    if (!*iter ||
-        (audio_disabled_ && (*iter)->type() == DemuxerStream::AUDIO)) {
+    if (!*iter)
       continue;
-    }
     (*iter)->SetEndOfStream();
   }
 }
@@ -1025,8 +1000,7 @@ void FFmpegDemuxer::NotifyCapacityAvailable() {
 void FFmpegDemuxer::NotifyBufferingChanged() {
   DCHECK(task_runner_->BelongsToCurrentThread());
   Ranges<base::TimeDelta> buffered;
-  FFmpegDemuxerStream* audio =
-      audio_disabled_ ? NULL : GetFFmpegStream(DemuxerStream::AUDIO);
+  FFmpegDemuxerStream* audio = GetFFmpegStream(DemuxerStream::AUDIO);
   FFmpegDemuxerStream* video = GetFFmpegStream(DemuxerStream::VIDEO);
   if (audio && video) {
     buffered = audio->GetBufferedRanges().IntersectionWith(

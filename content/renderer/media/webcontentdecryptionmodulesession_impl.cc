@@ -36,7 +36,7 @@ void WebContentDecryptionModuleSessionImpl::initializeNewSession(
     const uint8* init_data, size_t init_data_length) {
   // TODO(ddorwin): Guard against this in supported types check and remove this.
   // Chromium only supports ASCII MIME types.
-  if (!IsStringASCII(mime_type)) {
+  if (!base::IsStringASCII(mime_type)) {
     NOTREACHED();
     OnSessionError(media::MediaKeys::kUnknownError, 0);
     return;
@@ -71,10 +71,9 @@ void WebContentDecryptionModuleSessionImpl::OnSessionCreated(
 
 void WebContentDecryptionModuleSessionImpl::OnSessionMessage(
     const std::vector<uint8>& message,
-    const std::string& destination_url) {
-  client_->message(message.empty() ? NULL : &message[0],
-                   message.size(),
-                   GURL(destination_url));
+    const GURL& destination_url) {
+  client_->message(
+      message.empty() ? NULL : &message[0], message.size(), destination_url);
 }
 
 void WebContentDecryptionModuleSessionImpl::OnSessionReady() {

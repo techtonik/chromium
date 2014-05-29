@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "ash/accelerators/accelerator_controller.h"
+
 #include "ash/accelerators/accelerator_table.h"
 #include "ash/accessibility_delegate.h"
 #include "ash/ash_switches.h"
@@ -18,6 +19,7 @@
 #include "ash/test/display_manager_test_api.h"
 #include "ash/test/test_screenshot_delegate.h"
 #include "ash/test/test_shell_delegate.h"
+#include "ash/test/test_volume_control_delegate.h"
 #include "ash/volume_control_delegate.h"
 #include "ash/wm/window_state.h"
 #include "ash/wm/window_util.h"
@@ -67,55 +69,6 @@ class ReleaseAccelerator : public ui::Accelerator {
       : ui::Accelerator(keycode, modifiers) {
     set_type(ui::ET_KEY_RELEASED);
   }
-};
-
-class DummyVolumeControlDelegate : public VolumeControlDelegate {
- public:
-  explicit DummyVolumeControlDelegate(bool consume)
-      : consume_(consume),
-        handle_volume_mute_count_(0),
-        handle_volume_down_count_(0),
-        handle_volume_up_count_(0) {
-  }
-  virtual ~DummyVolumeControlDelegate() {}
-
-  virtual bool HandleVolumeMute(const ui::Accelerator& accelerator) OVERRIDE {
-    ++handle_volume_mute_count_;
-    last_accelerator_ = accelerator;
-    return consume_;
-  }
-  virtual bool HandleVolumeDown(const ui::Accelerator& accelerator) OVERRIDE {
-    ++handle_volume_down_count_;
-    last_accelerator_ = accelerator;
-    return consume_;
-  }
-  virtual bool HandleVolumeUp(const ui::Accelerator& accelerator) OVERRIDE {
-    ++handle_volume_up_count_;
-    last_accelerator_ = accelerator;
-    return consume_;
-  }
-
-  int handle_volume_mute_count() const {
-    return handle_volume_mute_count_;
-  }
-  int handle_volume_down_count() const {
-    return handle_volume_down_count_;
-  }
-  int handle_volume_up_count() const {
-    return handle_volume_up_count_;
-  }
-  const ui::Accelerator& last_accelerator() const {
-    return last_accelerator_;
-  }
-
- private:
-  const bool consume_;
-  int handle_volume_mute_count_;
-  int handle_volume_down_count_;
-  int handle_volume_up_count_;
-  ui::Accelerator last_accelerator_;
-
-  DISALLOW_COPY_AND_ASSIGN(DummyVolumeControlDelegate);
 };
 
 class DummyBrightnessControlDelegate : public BrightnessControlDelegate {
@@ -638,32 +591,38 @@ TEST_F(AcceleratorControllerTest, MAYBE_ProcessOnce) {
       Shell::GetPrimaryRootWindow()->GetHost()->event_processor();
 #if defined(OS_WIN)
   MSG msg1 = { NULL, WM_KEYDOWN, ui::VKEY_A, 0 };
-  ui::TranslatedKeyEvent key_event1(msg1, false);
+  ui::KeyEvent key_event1(msg1, false);
+  key_event1.SetTranslated(true);
   ui::EventDispatchDetails details = dispatcher->OnEventFromSource(&key_event1);
   EXPECT_TRUE(key_event1.handled() || details.dispatcher_destroyed);
 
   MSG msg2 = { NULL, WM_CHAR, L'A', 0 };
-  ui::TranslatedKeyEvent key_event2(msg2, true);
+  ui::KeyEvent key_event2(msg2, true);
+  key_event2.SetTranslated(true);
   details = dispatcher->OnEventFromSource(&key_event2);
   EXPECT_FALSE(key_event2.handled() || details.dispatcher_destroyed);
 
   MSG msg3 = { NULL, WM_KEYUP, ui::VKEY_A, 0 };
-  ui::TranslatedKeyEvent key_event3(msg3, false);
+  ui::KeyEvent key_event3(msg3, false);
+  key_event3.SetTranslated(true);
   details = dispatcher->OnEventFromSource(&key_event3);
   EXPECT_FALSE(key_event3.handled() || details.dispatcher_destroyed);
 #elif defined(USE_X11)
   ui::ScopedXI2Event key_event;
   key_event.InitKeyEvent(ui::ET_KEY_PRESSED, ui::VKEY_A, 0);
-  ui::TranslatedKeyEvent key_event1(key_event, false);
+  ui::KeyEvent key_event1(key_event, false);
+  key_event1.SetTranslated(true);
   ui::EventDispatchDetails details = dispatcher->OnEventFromSource(&key_event1);
   EXPECT_TRUE(key_event1.handled() || details.dispatcher_destroyed);
 
-  ui::TranslatedKeyEvent key_event2(key_event, true);
+  ui::KeyEvent key_event2(key_event, true);
+  key_event2.SetTranslated(true);
   details = dispatcher->OnEventFromSource(&key_event2);
   EXPECT_FALSE(key_event2.handled() || details.dispatcher_destroyed);
 
   key_event.InitKeyEvent(ui::ET_KEY_RELEASED, ui::VKEY_A, 0);
-  ui::TranslatedKeyEvent key_event3(key_event, false);
+  ui::KeyEvent key_event3(key_event, false);
+  key_event3.SetTranslated(true);
   details = dispatcher->OnEventFromSource(&key_event3);
   EXPECT_FALSE(key_event3.handled() || details.dispatcher_destroyed);
 #endif
@@ -714,8 +673,8 @@ TEST_F(AcceleratorControllerTest, GlobalAccelerators) {
   const ui::Accelerator volume_down(ui::VKEY_VOLUME_DOWN, ui::EF_NONE);
   const ui::Accelerator volume_up(ui::VKEY_VOLUME_UP, ui::EF_NONE);
   {
-    DummyVolumeControlDelegate* delegate =
-        new DummyVolumeControlDelegate(false);
+    TestVolumeControlDelegate* delegate =
+        new TestVolumeControlDelegate(false);
     ash::Shell::GetInstance()->system_tray_delegate()->SetVolumeControlDelegate(
         scoped_ptr<VolumeControlDelegate>(delegate).Pass());
     EXPECT_EQ(0, delegate->handle_volume_mute_count());
@@ -732,7 +691,7 @@ TEST_F(AcceleratorControllerTest, GlobalAccelerators) {
     EXPECT_EQ(volume_up, delegate->last_accelerator());
   }
   {
-    DummyVolumeControlDelegate* delegate = new DummyVolumeControlDelegate(true);
+    TestVolumeControlDelegate* delegate = new TestVolumeControlDelegate(true);
     ash::Shell::GetInstance()->system_tray_delegate()->SetVolumeControlDelegate(
         scoped_ptr<VolumeControlDelegate>(delegate).Pass());
     EXPECT_EQ(0, delegate->handle_volume_mute_count());
@@ -1190,8 +1149,8 @@ TEST_F(AcceleratorControllerTest, DisallowedAtModalWindow) {
     EXPECT_TRUE(ProcessWithContext(volume_mute));
     EXPECT_TRUE(ProcessWithContext(volume_down));
     EXPECT_TRUE(ProcessWithContext(volume_up));
-    DummyVolumeControlDelegate* delegate =
-        new DummyVolumeControlDelegate(false);
+    TestVolumeControlDelegate* delegate =
+        new TestVolumeControlDelegate(false);
     ash::Shell::GetInstance()->system_tray_delegate()->SetVolumeControlDelegate(
         scoped_ptr<VolumeControlDelegate>(delegate).Pass());
     EXPECT_EQ(0, delegate->handle_volume_mute_count());
@@ -1208,7 +1167,7 @@ TEST_F(AcceleratorControllerTest, DisallowedAtModalWindow) {
     EXPECT_EQ(volume_up, delegate->last_accelerator());
   }
   {
-    DummyVolumeControlDelegate* delegate = new DummyVolumeControlDelegate(true);
+    TestVolumeControlDelegate* delegate = new TestVolumeControlDelegate(true);
     ash::Shell::GetInstance()->system_tray_delegate()->SetVolumeControlDelegate(
         scoped_ptr<VolumeControlDelegate>(delegate).Pass());
     EXPECT_EQ(0, delegate->handle_volume_mute_count());
@@ -1246,7 +1205,7 @@ TEST_F(AcceleratorControllerTest, DisallowedWithNoWindow) {
   for (size_t i = 0; i < kActionsNeedingWindowLength; ++i) {
     delegate->TriggerAccessibilityAlert(A11Y_ALERT_NONE);
     GetController()->PerformAction(kActionsNeedingWindow[i], dummy);
-    EXPECT_EQ(delegate->GetLastAccessibilityAlert(), A11Y_ALERT_NONE);
+    EXPECT_NE(delegate->GetLastAccessibilityAlert(), A11Y_ALERT_WINDOW_NEEDED);
   }
 
   // Don't alert if we have a minimized window either.
@@ -1254,7 +1213,7 @@ TEST_F(AcceleratorControllerTest, DisallowedWithNoWindow) {
   for (size_t i = 0; i < kActionsNeedingWindowLength; ++i) {
     delegate->TriggerAccessibilityAlert(A11Y_ALERT_NONE);
     GetController()->PerformAction(kActionsNeedingWindow[i], dummy);
-    EXPECT_EQ(delegate->GetLastAccessibilityAlert(), A11Y_ALERT_NONE);
+    EXPECT_NE(delegate->GetLastAccessibilityAlert(), A11Y_ALERT_WINDOW_NEEDED);
   }
 }
 

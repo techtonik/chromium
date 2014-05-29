@@ -48,6 +48,7 @@
 #include "chrome/installer/util/master_preferences.h"
 #include "chrome/installer/util/master_preferences_constants.h"
 #include "chrome/installer/util/util_constants.h"
+#include "chrome/installer/util/work_item.h"
 
 #include "installer_util_strings.h"  // NOLINT
 
@@ -531,11 +532,13 @@ class RegistryEntry {
   // Generate work_item tasks required to create current registry entry and
   // add them to the given work item list.
   void AddToWorkItemList(HKEY root, WorkItemList *items) const {
-    items->AddCreateRegKeyWorkItem(root, key_path_);
+    items->AddCreateRegKeyWorkItem(root, key_path_, WorkItem::kWow64Default);
     if (is_string_) {
-      items->AddSetRegValueWorkItem(root, key_path_, name_, value_, true);
+      items->AddSetRegValueWorkItem(
+          root, key_path_, WorkItem::kWow64Default, name_, value_, true);
     } else {
-      items->AddSetRegValueWorkItem(root, key_path_, name_, int_value_, true);
+      items->AddSetRegValueWorkItem(
+          root, key_path_, WorkItem::kWow64Default, name_, int_value_, true);
     }
   }
 
@@ -709,7 +712,9 @@ bool ElevateAndRegisterChrome(BrowserDistribution* dist,
   if (!base::PathExists(exe_path)) {
     HKEY reg_root = InstallUtil::IsPerUserInstall(chrome_exe.c_str()) ?
         HKEY_CURRENT_USER : HKEY_LOCAL_MACHINE;
-    RegKey key(reg_root, dist->GetUninstallRegPath().c_str(), KEY_READ);
+    RegKey key(reg_root,
+               dist->GetUninstallRegPath().c_str(),
+               KEY_READ | KEY_WOW64_32KEY);
     base::string16 uninstall_string;
     key.ReadValue(installer::kUninstallStringField, &uninstall_string);
     CommandLine command_line = CommandLine::FromString(uninstall_string);
@@ -1020,7 +1025,8 @@ void RemoveRunVerbOnWindows8(BrowserDistribution* dist,
     run_verb_key.append(ShellUtil::kRegShellPath);
     run_verb_key.push_back(base::FilePath::kSeparators[0]);
     run_verb_key.append(ShellUtil::kRegVerbRun);
-    InstallUtil::DeleteRegistryKey(root_key, run_verb_key);
+    InstallUtil::DeleteRegistryKey(root_key, run_verb_key,
+                                   WorkItem::kWow64Default);
   }
 }
 

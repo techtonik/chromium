@@ -62,7 +62,7 @@ const char kEnabled[] = "Enabled";
 DataReductionProxySettingsAndroid::DataReductionProxySettingsAndroid(
     JNIEnv* env, jobject obj) : DataReductionProxySettings() {
 #if defined(SPDY_PROXY_AUTH_VALUE)
-  SetKey(SPDY_PROXY_AUTH_VALUE);
+  set_key(SPDY_PROXY_AUTH_VALUE);
 #endif
   SetAllowed(IsIncludedInFieldTrialOrFlags());
   SetPromoAllowed(base::FieldTrialList::FindFullName(
@@ -71,7 +71,7 @@ DataReductionProxySettingsAndroid::DataReductionProxySettingsAndroid(
 
 DataReductionProxySettingsAndroid::DataReductionProxySettingsAndroid() {
 #if defined(SPDY_PROXY_AUTH_VALUE)
-  SetKey(SPDY_PROXY_AUTH_VALUE);
+  set_key(SPDY_PROXY_AUTH_VALUE);
 #endif
 }
 
@@ -225,6 +225,7 @@ void DataReductionProxySettingsAndroid::SetProxyConfigs(bool enabled,
 
   if (enabled) {
     config()->Enable(restricted,
+                     !fallback_allowed(),
                      DataReductionProxySettings::GetDataReductionProxyOrigin(),
                      GetDataReductionProxyFallback());
   } else {

@@ -151,7 +151,7 @@
                 "type": "array",
                 "items": {"type": "string"},
                 "optional": true,
-                "description": "Lets you restrict the item to apply only to documents whose URL matches one of the given patterns. (This applies to frames as well.) For details on the format of a pattern, see <a href='match_patterns.html'>Match Patterns</a>."
+                "description": "Lets you restrict the item to apply only to documents whose URL matches one of the given patterns. (This applies to frames as well.) For details on the format of a pattern, see <a href='match_patterns'>Match Patterns</a>."
               },
               "targetUrlPatterns": {
                 "type": "array",
@@ -611,6 +611,20 @@
         ]
       },
       {
+        "name": "setName",
+        "type": "function",
+        "parameters": [
+          {
+            "type": "integer",
+            "name": "instanceId"
+          },
+          {
+            "type": "string",
+            "name": "frameName"
+          }
+        ]
+      },
+      {
         "name": "setPermission",
         "type": "function",
         "parameters": [
@@ -642,6 +656,29 @@
                 "type": "boolean"
               }
             ]
+          }
+        ]
+      },
+      {
+        "name": "showContextMenu",
+        "type": "function",
+        "parameters": [
+          {
+            "type": "integer",
+            "name": "instanceId",
+            "description": "The instance ID of the guest &lt;webview&gt; process. This not exposed to developers through the API."
+          },
+          {
+            "type": "integer",
+            "name": "requestId",
+            "description": "The strictly increasing request counter that serves as ID for the context menu. This not exposed to developers through the API."
+          },
+          {
+            "type": "array",
+            "name": "itemsToShow",
+            "items": {"$ref": "ContextMenuItem"},
+            "description": "Items to be shown in the context menu. These are top level items as opposed to children items.",
+            "optional": true
           }
         ]
       },

@@ -5,6 +5,7 @@
 #include "cc/resources/raster_worker_pool.h"
 
 #include "base/time/time.h"
+#include "cc/debug/lap_timer.h"
 #include "cc/output/context_provider.h"
 #include "cc/resources/direct_raster_worker_pool.h"
 #include "cc/resources/image_copy_raster_worker_pool.h"
@@ -16,7 +17,6 @@
 #include "cc/resources/scoped_resource.h"
 #include "cc/test/fake_output_surface.h"
 #include "cc/test/fake_output_surface_client.h"
-#include "cc/test/lap_timer.h"
 #include "cc/test/test_context_support.h"
 #include "cc/test/test_shared_bitmap_manager.h"
 #include "cc/test/test_web_graphics_context_3d.h"
@@ -158,8 +158,8 @@ class RasterWorkerPoolPerfTestBase {
     shared_bitmap_manager_.reset(new TestSharedBitmapManager());
     resource_provider_ =
         ResourceProvider::Create(
-            output_surface_.get(), shared_bitmap_manager_.get(), 0, false, 1)
-            .Pass();
+            output_surface_.get(), shared_bitmap_manager_.get(), 0, false, 1,
+            false).Pass();
     staging_resource_pool_ = ResourcePool::Create(
         resource_provider_.get(), GL_TEXTURE_2D, RGBA_8888);
   }

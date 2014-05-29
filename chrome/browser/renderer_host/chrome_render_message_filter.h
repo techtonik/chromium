@@ -52,8 +52,7 @@ class ChromeRenderMessageFilter : public content::BrowserMessageFilter {
   };
 
   // content::BrowserMessageFilter methods:
-  virtual bool OnMessageReceived(const IPC::Message& message,
-                                 bool* message_was_ok) OVERRIDE;
+  virtual bool OnMessageReceived(const IPC::Message& message) OVERRIDE;
   virtual void OverrideThreadForMessage(
       const IPC::Message& message,
       content::BrowserThread::ID* thread) OVERRIDE;
@@ -137,10 +136,14 @@ class ChromeRenderMessageFilter : public content::BrowserMessageFilter {
                          const GURL& top_origin_url,
                          bool local,
                          bool* allowed);
-  void OnAllowFileSystem(int render_frame_id,
-                         const GURL& origin_url,
-                         const GURL& top_origin_url,
-                         bool* allowed);
+  void OnRequestFileSystemAccessSync(int render_frame_id,
+                                     const GURL& origin_url,
+                                     const GURL& top_origin_url,
+                                     bool* allowed);
+  void OnRequestFileSystemAccessAsync(int render_frame_id,
+                                      int  request_id,
+                                      const GURL& origin_url,
+                                      const GURL& top_origin_url);
   void OnAllowIndexedDB(int render_frame_id,
                         const GURL& origin_url,
                         const GURL& top_origin_url,

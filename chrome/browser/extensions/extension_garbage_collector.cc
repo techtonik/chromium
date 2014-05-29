@@ -28,6 +28,7 @@
 #include "extensions/browser/extension_system.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/file_util.h"
+#include "extensions/common/one_shot_event.h"
 
 namespace extensions {
 
@@ -54,7 +55,7 @@ void CheckExtensionDirectory(const base::FilePath& path,
 
   // Parse directory name as a potential extension ID.
   std::string extension_id;
-  if (IsStringASCII(basename.value())) {
+  if (base::IsStringASCII(basename.value())) {
     extension_id = base::UTF16ToASCII(basename.LossyDisplayName());
     if (!Extension::IdIsValid(extension_id))
       extension_id.clear();

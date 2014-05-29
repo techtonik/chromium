@@ -23,10 +23,10 @@
 #include "chrome/browser/undo/bookmark_undo_service_factory.h"
 #include "chrome/common/extensions/api/bookmark_manager_private.h"
 #include "chrome/common/pref_names.h"
-#include "components/bookmarks/core/browser/bookmark_model.h"
-#include "components/bookmarks/core/browser/bookmark_node_data.h"
-#include "components/bookmarks/core/browser/bookmark_utils.h"
-#include "components/bookmarks/core/browser/scoped_group_bookmark_actions.h"
+#include "components/bookmarks/browser/bookmark_model.h"
+#include "components/bookmarks/browser/bookmark_node_data.h"
+#include "components/bookmarks/browser/bookmark_utils.h"
+#include "components/bookmarks/browser/scoped_group_bookmark_actions.h"
 #include "components/user_prefs/user_prefs.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/web_contents.h"
@@ -223,13 +223,15 @@ void BookmarkManagerPrivateEventRouter::BookmarkMetaInfoChanged(
   }
 
   // Identify added fields:
-  for (BookmarkNode::MetaInfoMap::const_iterator it = new_meta_info->begin();
-       it != new_meta_info->end();
-       ++it) {
-    BookmarkNode::MetaInfoMap::const_iterator prev_meta_field =
-        prev_meta_info_.find(it->first);
-    if (prev_meta_field == prev_meta_info_.end())
-      changes.additional_properties[it->first] = it->second;
+  if (new_meta_info) {
+    for (BookmarkNode::MetaInfoMap::const_iterator it = new_meta_info->begin();
+         it != new_meta_info->end();
+         ++it) {
+      BookmarkNode::MetaInfoMap::const_iterator prev_meta_field =
+          prev_meta_info_.find(it->first);
+      if (prev_meta_field == prev_meta_info_.end())
+        changes.additional_properties[it->first] = it->second;
+    }
   }
 
   prev_meta_info_.clear();
@@ -730,7 +732,7 @@ bool BookmarkManagerPrivateRemoveTreesFunction::RunOnReady() {
 
   BookmarkModel* model = BookmarkModelFactory::GetForProfile(GetProfile());
 #if !defined(OS_ANDROID)
-  ScopedGroupBookmarkActions group_deletes(model);
+  bookmarks::ScopedGroupBookmarkActions group_deletes(model);
 #endif
   int64 id;
   for (size_t i = 0; i < params->id_list.size(); ++i) {

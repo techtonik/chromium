@@ -105,9 +105,9 @@
 #include "ash/shell.h"
 #include "chrome/browser/chromeos/accessibility/accessibility_util.h"
 #include "chrome/browser/chromeos/chromeos_utils.h"
-#include "chrome/browser/chromeos/login/user.h"
-#include "chrome/browser/chromeos/login/user_manager.h"
-#include "chrome/browser/chromeos/login/wallpaper_manager.h"
+#include "chrome/browser/chromeos/login/users/user.h"
+#include "chrome/browser/chromeos/login/users/user_manager.h"
+#include "chrome/browser/chromeos/login/users/wallpaper/wallpaper_manager.h"
 #include "chrome/browser/chromeos/policy/browser_policy_connector_chromeos.h"
 #include "chrome/browser/chromeos/reset/metrics.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
@@ -142,6 +142,21 @@ using content::OpenURLParams;
 using content::Referrer;
 using extensions::Extension;
 using extensions::ExtensionRegistry;
+
+namespace {
+
+#if defined(OS_WIN)
+void AppendExtensionData(const std::string& key,
+                         const Extension* extension,
+                         base::DictionaryValue* dict) {
+  scoped_ptr<base::DictionaryValue> details(new base::DictionaryValue);
+  details->SetString("id", extension ? extension->id() : std::string());
+  details->SetString("name", extension ? extension->name() : std::string());
+  dict->Set(key, details.release());
+}
+#endif  // defined(OS_WIN)
+
+}  // namespace
 
 namespace options {
 
@@ -251,7 +266,6 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
     { "hotwordConfirmEnable", IDS_HOTWORD_CONFIRM_BUBBLE_ENABLE },
     { "hotwordConfirmDisable", IDS_HOTWORD_CONFIRM_BUBBLE_DISABLE },
     { "hotwordConfirmMessage", IDS_HOTWORD_SEARCH_PREF_DESCRIPTION },
-    { "hotwordRetryDownloadButton", IDS_HOTWORD_RETRY_DOWNLOAD_BUTTON },
     { "hotwordAudioLoggingEnable", IDS_HOTWORD_AUDIO_LOGGING_ENABLE },
     { "importData", IDS_OPTIONS_IMPORT_DATA_BUTTON },
     { "improveBrowsingExperience", IDS_OPTIONS_IMPROVE_BROWSING_EXPERIENCE },
@@ -305,7 +319,6 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
     { "startupRestoreLastSession", IDS_OPTIONS_STARTUP_RESTORE_LAST_SESSION },
     { "settingsTitle", IDS_SETTINGS_TITLE },
     { "showAdvancedSettings", IDS_SETTINGS_SHOW_ADVANCED_SETTINGS },
-    { "sslCheckRevocation", IDS_OPTIONS_SSL_CHECKREVOCATION },
     { "startupSetPages", IDS_OPTIONS_STARTUP_SET_PAGES },
     { "startupShowNewTab", IDS_OPTIONS_STARTUP_SHOW_NEWTAB },
     { "startupShowPages", IDS_OPTIONS_STARTUP_SHOW_PAGES },
@@ -700,11 +713,6 @@ void BrowserOptionsHandler::RegisterMessages() {
                  base::Unretained(this)));
 
   web_ui()->RegisterMessageCallback(
-      "requestHotwordSetupRetry",
-      base::Bind(&BrowserOptionsHandler::HandleRequestHotwordSetupRetry,
-                 base::Unretained(this)));
-
-  web_ui()->RegisterMessageCallback(
       "launchEasyUnlockSetup",
       base::Bind(&BrowserOptionsHandler::HandleLaunchEasyUnlockSetup,
                base::Unretained(this)));
@@ -712,7 +720,7 @@ void BrowserOptionsHandler::RegisterMessages() {
   web_ui()->RegisterMessageCallback(
       "refreshExtensionControlIndicators",
       base::Bind(
-          &BrowserOptionsHandler::SetupExtensionControlledIndicators,
+          &BrowserOptionsHandler::HandleRefreshExtensionControlIndicators,
           base::Unretained(this)));
 #endif  // defined(OS_WIN)
 }
@@ -823,17 +831,14 @@ void BrowserOptionsHandler::InitializeHandler() {
                  base::Unretained(this)));
 
 #if defined(OS_WIN)
-  const base::ListValue* empty = NULL;
   profile_pref_registrar_.Add(
       prefs::kURLsToRestoreOnStartup,
       base::Bind(&BrowserOptionsHandler::SetupExtensionControlledIndicators,
-                 base::Unretained(this),
-                 empty));
+                 base::Unretained(this)));
   profile_pref_registrar_.Add(
       prefs::kHomePage,
       base::Bind(&BrowserOptionsHandler::SetupExtensionControlledIndicators,
-                 base::Unretained(this),
-                 empty));
+                 base::Unretained(this)));
 #endif  // defined(OS_WIN)
 
 #if defined(OS_CHROMEOS)
@@ -876,7 +881,7 @@ void BrowserOptionsHandler::InitializePage() {
   SetupManageCertificatesSection();
   SetupManagingSupervisedUsers();
   SetupEasyUnlock();
-  SetupExtensionControlledIndicators(NULL);
+  SetupExtensionControlledIndicators();
 
 #if defined(OS_CHROMEOS)
   SetupAccessibilityFeatures();
@@ -1103,7 +1108,7 @@ void BrowserOptionsHandler::OnTemplateURLServiceChanged() {
           template_url_service_->is_default_search_managed() ||
           template_url_service_->IsExtensionControlledDefaultSearch()));
 
-  SetupExtensionControlledIndicators(NULL);
+  SetupExtensionControlledIndicators();
 }
 
 void BrowserOptionsHandler::SetDefaultSearchEngine(
@@ -1136,14 +1141,14 @@ void BrowserOptionsHandler::AddTemplateUrlServiceObserver() {
 void BrowserOptionsHandler::OnExtensionLoaded(
     content::BrowserContext* browser_context,
     const Extension* extension) {
-  SetupExtensionControlledIndicators(NULL);
+  SetupExtensionControlledIndicators();
 }
 
 void BrowserOptionsHandler::OnExtensionUnloaded(
     content::BrowserContext* browser_context,
     const Extension* extension,
     extensions::UnloadedExtensionInfo::Reason reason) {
-  SetupExtensionControlledIndicators(NULL);
+  SetupExtensionControlledIndicators();
 }
 
 void BrowserOptionsHandler::Observe(
@@ -1256,18 +1261,18 @@ void BrowserOptionsHandler::DeleteProfile(const base::ListValue* args) {
 void BrowserOptionsHandler::ObserveThemeChanged() {
   Profile* profile = Profile::FromWebUI(web_ui());
   ThemeService* theme_service = ThemeServiceFactory::GetForProfile(profile);
-  bool is_native_theme = false;
+  bool is_system_theme = false;
 
 #if defined(OS_LINUX) && !defined(OS_CHROMEOS)
   bool profile_is_managed = profile->IsManaged();
-  is_native_theme = theme_service->UsingNativeTheme();
-  base::FundamentalValue native_theme_enabled(!is_native_theme &&
+  is_system_theme = theme_service->UsingSystemTheme();
+  base::FundamentalValue native_theme_enabled(!is_system_theme &&
                                               !profile_is_managed);
   web_ui()->CallJavascriptFunction("BrowserOptions.setNativeThemeButtonEnabled",
                                    native_theme_enabled);
 #endif
 
-  bool is_classic_theme = !is_native_theme &&
+  bool is_classic_theme = !is_system_theme &&
                           theme_service->UsingDefaultTheme();
   base::FundamentalValue enabled(!is_classic_theme);
   web_ui()->CallJavascriptFunction("BrowserOptions.setThemesResetButtonEnabled",
@@ -1284,7 +1289,7 @@ void BrowserOptionsHandler::ThemesReset(const base::ListValue* args) {
 void BrowserOptionsHandler::ThemesSetNative(const base::ListValue* args) {
   content::RecordAction(UserMetricsAction("Options_GtkThemeSet"));
   Profile* profile = Profile::FromWebUI(web_ui());
-  ThemeServiceFactory::GetForProfile(profile)->SetNativeTheme();
+  ThemeServiceFactory::GetForProfile(profile)->UseSystemTheme();
 }
 #endif
 
@@ -1314,18 +1319,14 @@ scoped_ptr<base::DictionaryValue>
 BrowserOptionsHandler::GetSyncStateDictionary() {
   scoped_ptr<base::DictionaryValue> sync_status(new base::DictionaryValue);
   Profile* profile = Profile::FromWebUI(web_ui());
-  if (profile->IsManaged()) {
-    sync_status->SetBoolean("supervisedUser", true);
-    sync_status->SetBoolean("signinAllowed", false);
-    return sync_status.Pass();
-  }
   if (profile->IsGuestSession()) {
     // Cannot display signin status when running in guest mode on chromeos
     // because there is no SigninManager.
     sync_status->SetBoolean("signinAllowed", false);
     return sync_status.Pass();
   }
-  sync_status->SetBoolean("supervisedUser", false);
+
+  sync_status->SetBoolean("supervisedUser", profile->IsManaged());
 
   bool signout_prohibited = false;
 #if !defined(OS_CHROMEOS)
@@ -1526,8 +1527,18 @@ void BrowserOptionsHandler::HandleRequestHotwordAvailable(
   Profile* profile = Profile::FromWebUI(web_ui());
   std::string group = base::FieldTrialList::FindFullName("VoiceTrigger");
   if (group != "" && group != "Disabled") {
-    if (HotwordServiceFactory::IsServiceAvailable(profile))
+    if (HotwordServiceFactory::IsServiceAvailable(profile)) {
       web_ui()->CallJavascriptFunction("BrowserOptions.showHotwordSection");
+    } else if (HotwordServiceFactory::IsHotwordAllowed(profile)) {
+      base::StringValue error_message(l10n_util::GetStringUTF16(
+          HotwordServiceFactory::GetCurrentError(profile)));
+      base::string16 hotword_help_url =
+          base::ASCIIToUTF16(chrome::kHotwordLearnMoreURL);
+      base::StringValue help_link(l10n_util::GetStringFUTF16(
+          IDS_HOTWORD_HELP_LINK, hotword_help_url));
+      web_ui()->CallJavascriptFunction("BrowserOptions.showHotwordSection",
+                                       error_message, help_link);
+    }
   }
 }
 
@@ -1536,11 +1547,9 @@ void BrowserOptionsHandler::HandleLaunchEasyUnlockSetup(
   easy_unlock::LaunchEasyUnlockSetup(Profile::FromWebUI(web_ui()));
 }
 
-void BrowserOptionsHandler::HandleRequestHotwordSetupRetry(
+void BrowserOptionsHandler::HandleRefreshExtensionControlIndicators(
     const base::ListValue* args) {
-  // TODO(joshtrask): invoke BrowserOptions.showHotwordSection again, passing
-  // the new error message if any.
-  HotwordServiceFactory::RetryHotwordExtension(Profile::FromWebUI(web_ui()));
+  SetupExtensionControlledIndicators();
 }
 
 #if defined(OS_CHROMEOS)
@@ -1735,40 +1744,23 @@ void BrowserOptionsHandler::SetupEasyUnlock() {
       has_pairing_value);
 }
 
-// Setup the UI for showing which settings are extension controlled.
-void BrowserOptionsHandler::SetupExtensionControlledIndicators(
-    const base::ListValue* args) {
+void BrowserOptionsHandler::SetupExtensionControlledIndicators() {
 #if defined(OS_WIN)
+  base::DictionaryValue extension_controlled;
+
   // Check if an extension is overriding the Search Engine.
   const extensions::Extension* extension = extensions::OverridesSearchEngine(
       Profile::FromWebUI(web_ui()), NULL);
-  base::StringValue extension_id(extension ? extension->id() : std::string());
-  base::StringValue extension_name(
-      extension ? extension->name() : std::string());
-  web_ui()->CallJavascriptFunction(
-      "BrowserOptions.toggleSearchEngineControlled",
-      extension_id,
-      extension_name);
+  AppendExtensionData("searchEngine", extension, &extension_controlled);
 
   // Check if an extension is overriding the Home page.
   extension = extensions::OverridesHomepage(Profile::FromWebUI(web_ui()), NULL);
-  extension_id = base::StringValue(extension ? extension->id() : std::string());
-  extension_name = base::StringValue(
-      extension ? extension->name() : std::string());
-  web_ui()->CallJavascriptFunction("BrowserOptions.toggleHomepageControlled",
-                                   extension_id,
-                                   extension_name);
+  AppendExtensionData("homePage", extension, &extension_controlled);
 
   // Check if an extension is overriding the Startup pages.
   extension = extensions::OverridesStartupPages(
       Profile::FromWebUI(web_ui()), NULL);
-  extension_id = base::StringValue(extension ? extension->id() : std::string());
-  extension_name = base::StringValue(
-      extension ? extension->name() : std::string());
-  web_ui()->CallJavascriptFunction(
-      "BrowserOptions.toggleStartupPagesControlled",
-      extension_id,
-      extension_name);
+  AppendExtensionData("startUpPage", extension, &extension_controlled);
 
   // Check if an extension is overriding the NTP page.
   GURL ntp_url(chrome::kChromeUINewTabURL);
@@ -1785,14 +1777,10 @@ void BrowserOptionsHandler::SetupExtensionControlledIndicators(
     extension = registry->GetExtensionById(ntp_url.host(),
                                            ExtensionRegistry::ENABLED);
   }
-  extension_id = base::StringValue(
-      extension ? extension->id() : std::string());
-  extension_name = base::StringValue(
-      extension ? extension->name() : std::string());
-  web_ui()->CallJavascriptFunction(
-      "BrowserOptions.toggleNewTabPageControlled",
-      extension_id,
-      extension_name);
+  AppendExtensionData("newTabPage", extension, &extension_controlled);
+
+  web_ui()->CallJavascriptFunction("BrowserOptions.toggleExtensionIndicators",
+                                   extension_controlled);
 #endif  // defined(OS_WIN)
 }
 

@@ -14,7 +14,7 @@ class ToughCanvasCasesPage(page_module.Page):
     self.archive_data_file = 'data/tough_canvas_cases.json'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         "javascript": "document.readyState == 'complete'"
@@ -50,12 +50,10 @@ class ToughCanvasCasesPageSet(page_set_module.PageSet):
 
     self.AddPage(MicrosofFirefliesPage(self))
 
-    # Failing on Nexus 5 (http://crbug.com/364248):
-    # 'http://geoapis.appspot.com/agdnZW9hcGlzchMLEgtFeGFtcGxlQ29kZRjh1wIM',
-
     urls_list = [
       'http://mudcu.be/labs/JS1k/BreathingGalaxies.html',
       'http://runway.countlessprojects.com/prototype/performance_test.html',
+      'http://geoapis.appspot.com/agdnZW9hcGlzchMLEgtFeGFtcGxlQ29kZRjh1wIM',
       # pylint: disable=C0301
       'http://ie.microsoft.com/testdrive/Performance/FishIETank/Default.html',
       'http://ie.microsoft.com/testdrive/Performance/SpeedReading/Default.html',

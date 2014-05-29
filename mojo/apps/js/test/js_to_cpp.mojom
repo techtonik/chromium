@@ -19,22 +19,37 @@ struct EchoArgs {
   double double_nan;
   string name;
   string[] string_array;
+  handle<message_pipe> message_handle;
+  handle<data_pipe_consumer> data_handle;
 };
 
-[Peer=JsSide]
+struct EchoArgsList {
+  EchoArgsList next;
+  EchoArgs item;
+};
+
+// Note: For messages which control test flow, pick numbers that are unlikely
+// to be hit as a result of our deliberate corruption of response messages.
 interface CppSide {
-  StartTest();  // Sent for all tests to notify that the JS side is now ready.
-  TestFinished();  // Sent in echo / bit-flip tests to indicate end.
+  // Sent for all tests to notify that the JS side is now ready.
+  StartTest@88888888();
+
+  // Indicates end for echo, bit-flip, and back-pointer tests.
+  TestFinished@99999999();
+
+  // Responses from specific tests.
   PingResponse();
-  EchoResponse(EchoArgs arg1, EchoArgs arg2);
-  BitFlipResponse(EchoArgs arg);
+  EchoResponse(EchoArgsList list);
+  BitFlipResponse(EchoArgsList arg);
+  BackPointerResponse(EchoArgsList arg);
 };
 
-[Peer=CppSide]
+[Client=CppSide]
 interface JsSide {
   Ping();
   Echo(int32 numIterations, EchoArgs arg);
   BitFlip(EchoArgs arg);
+  BackPointer(EchoArgs arg);
 };
 
 }

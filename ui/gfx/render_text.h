@@ -94,6 +94,7 @@ class SkiaTextRenderer {
     typedef std::pair<int, SkColor> Piece;
 
     Canvas* canvas_;
+    SkMatrix matrix_;
     const Point start_;
     SkPaint paint_;
     int total_length_;
@@ -176,6 +177,10 @@ struct Line {
   int baseline;
 };
 
+// Creates an SkTypeface from a font |family| name and a |gfx::Font::FontStyle|.
+skia::RefPtr<SkTypeface> CreateSkiaTypeface(const std::string& family,
+                                            int style);
+
 }  // namespace internal
 
 // RenderText represents an abstract model of styled text and its corresponding
@@ -186,7 +191,7 @@ class GFX_EXPORT RenderText {
  public:
   virtual ~RenderText();
 
-  // Creates a platform-specific RenderText instance.
+  // Creates a platform-specific or cross-platform RenderText instance.
   static RenderText* CreateInstance();
 
   const base::string16& text() const { return text_; }
@@ -288,11 +293,6 @@ class GFX_EXPORT RenderText {
   // If any index in |selection_model| is not a cursorable position (not on a
   // grapheme boundary), it is a no-op and returns false.
   bool MoveCursorTo(const SelectionModel& selection_model);
-
-  // Move the cursor to the position associated with the clicked point.
-  // If |select| is false, the selection start is moved to the same position.
-  // Returns true if the cursor position or selection range changed.
-  bool MoveCursorTo(const Point& point, bool select);
 
   // Set the selection_model_ based on |range|.
   // If the |range| start or end is greater than text length, it is modified
@@ -573,6 +573,9 @@ class GFX_EXPORT RenderText {
   FRIEND_TEST_ALL_PREFIXES(RenderTextTest, Multiline_NormalWidth);
   FRIEND_TEST_ALL_PREFIXES(RenderTextTest, Multiline_SufficientWidth);
   FRIEND_TEST_ALL_PREFIXES(RenderTextTest, Multiline_Newline);
+
+  // Creates a platform-specific RenderText instance.
+  static RenderText* CreateNativeInstance();
 
   // Set the cursor to |position|, with the caret trailing the previous
   // grapheme, or if there is no previous grapheme, leading the cursor position.

@@ -9,8 +9,8 @@ from telemetry.page import page_set as page_set_module
 
 class Top25Page(page_module.Page):
 
-  def __init__(self, url, page_set):
-    super(Top25Page, self).__init__(url=url, page_set=page_set)
+  def __init__(self, url, page_set, name=''):
+    super(Top25Page, self).__init__(url=url, page_set=page_set, name=name)
     self.credentials_path = 'data/credentials.json'
     self.user_agent_type = 'desktop'
     self.archive_data_file = 'data/top_25.json'
@@ -35,7 +35,7 @@ class GoogleWebSearchPage(Top25Page):
       page_set=page_set)
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'text' : 'Next',
@@ -148,7 +148,7 @@ class GmailPage(Top25Page):
     self.credentials = 'google'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'javascript': ('window.gmonkey !== undefined &&'
@@ -195,7 +195,7 @@ class GoogleCalendarPage(Top25Page):
     self.credentials = 'google'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'seconds': 2
@@ -356,13 +356,13 @@ class GoogleDocPage(Top25Page):
     super(GoogleDocPage, self).__init__(
       # pylint: disable=C0301
       url='https://docs.google.com/document/d/1X-IKNjtEnx-WW5JIKRLsyhz5sbsat3mfTpAPUSX3_s4/view',
-      page_set=page_set)
+      page_set=page_set,
+      name='Docs  (1 open document tab)')
 
-    self.name = 'Docs  (1 open document tab)'
     self.credentials = 'google'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'seconds': 2
@@ -395,7 +395,7 @@ class GooglePlusPage(Top25Page):
     self.credentials = 'google'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'text' : 'Home',
@@ -488,7 +488,7 @@ class YoutubePage(Top25Page):
     self.credentials = 'google'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'seconds': 2
@@ -503,12 +503,11 @@ class BlogspotPage(Top25Page):
   def __init__(self, page_set):
     super(BlogspotPage, self).__init__(
       url='http://googlewebmastercentral.blogspot.com/',
-      page_set=page_set)
-
-    self.name = 'Blogger'
+      page_set=page_set,
+      name='Blogger')
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'text' : 'accessibility',
@@ -557,12 +556,11 @@ class WordpressPage(Top25Page):
     super(WordpressPage, self).__init__(
       # pylint: disable=C0301
       url='http://en.blog.wordpress.com/2012/09/04/freshly-pressed-editors-picks-for-august-2012/',
-      page_set=page_set)
-
-    self.name = 'Wordpress'
+      page_set=page_set,
+      name='Wordpress')
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'condition': 'element',
@@ -608,13 +606,12 @@ class FacebookPage(Top25Page):
   def __init__(self, page_set):
     super(FacebookPage, self).__init__(
       url='http://www.facebook.com/barackobama',
-      page_set=page_set)
-
-    self.name = 'Facebook'
+      page_set=page_set,
+      name='Facebook')
     self.credentials = 'facebook'
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'text' : 'About',
@@ -679,9 +676,8 @@ class LinkedinPage(Top25Page):
   def __init__(self, page_set):
     super(LinkedinPage, self).__init__(
       url='http://www.linkedin.com/in/linustorvalds',
-      page_set=page_set)
-
-    self.name = 'LinkedIn'
+      page_set=page_set,
+      name='LinkedIn')
 
 
 class WikipediaPage(Top25Page):
@@ -691,9 +687,8 @@ class WikipediaPage(Top25Page):
   def __init__(self, page_set):
     super(WikipediaPage, self).__init__(
       url='http://en.wikipedia.org/wiki/Wikipedia',
-      page_set=page_set)
-
-    self.name = 'Wikipedia (1 tab)'
+      page_set=page_set,
+      name='Wikipedia (1 tab)')
 
 
 class TwitterPage(Top25Page):
@@ -703,12 +698,11 @@ class TwitterPage(Top25Page):
   def __init__(self, page_set):
     super(TwitterPage, self).__init__(
       url='https://twitter.com/katyperry',
-      page_set=page_set)
-
-    self.name = 'Twitter'
+      page_set=page_set,
+      name='Twitter')
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'seconds': 2
@@ -728,9 +722,8 @@ class PinterestPage(Top25Page):
   def __init__(self, page_set):
     super(PinterestPage, self).__init__(
       url='http://pinterest.com',
-      page_set=page_set)
-
-    self.name = 'Pinterest'
+      page_set=page_set,
+      name='Pinterest')
 
   def RunSmoothness(self, action_runner):
     action_runner.RunAction(ScrollAction(
@@ -746,9 +739,8 @@ class ESPNPage(Top25Page):
   def __init__(self, page_set):
     super(ESPNPage, self).__init__(
       url='http://espn.go.com',
-      page_set=page_set)
-
-    self.name = 'ESPN'
+      page_set=page_set,
+      name='ESPN')
 
   def RunSmoothness(self, action_runner):
     action_runner.RunAction(ScrollAction(
@@ -765,9 +757,8 @@ class WeatherDotComPage(Top25Page):
     super(WeatherDotComPage, self).__init__(
       # pylint: disable=C0301
       url='http://www.weather.com/weather/right-now/Mountain+View+CA+94043',
-      page_set=page_set)
-
-    self.name = 'Weather.com'
+      page_set=page_set,
+      name='Weather.com')
 
 
 class YahooGamesPage(Top25Page):
@@ -780,7 +771,7 @@ class YahooGamesPage(Top25Page):
       page_set=page_set)
 
   def RunNavigateSteps(self, action_runner):
-    action_runner.RunAction(NavigateAction())
+    action_runner.NavigateToPage(self)
     action_runner.RunAction(WaitAction(
       {
         'seconds': 2

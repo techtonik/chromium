@@ -10,6 +10,7 @@
 #include <string>
 
 #include "base/memory/scoped_ptr.h"
+#include "chrome/browser/ui/profile_chooser_constants.h"
 #import "chrome/browser/ui/cocoa/base_bubble_controller.h"
 
 class AvatarMenu;
@@ -24,21 +25,6 @@ class WebContents;
 // This window controller manages the bubble that displays a "menu" of profiles.
 // It is brought open by clicking on the avatar icon in the window frame.
 @interface ProfileChooserController : BaseBubbleController<NSTextViewDelegate> {
- @public
-  // Different views that can be displayed in the bubble.
-  enum BubbleViewMode {
-    // Shows a "fast profile switcher" view.
-    BUBBLE_VIEW_MODE_PROFILE_CHOOSER,
-    // Shows a list of accounts for the active user.
-    BUBBLE_VIEW_MODE_ACCOUNT_MANAGEMENT,
-    // Shows a web view for primary sign in.
-    BUBBLE_VIEW_MODE_GAIA_SIGNIN,
-    // Shows a web view for adding secondary accounts.
-    BUBBLE_VIEW_MODE_GAIA_ADD_ACCOUNT,
-    // Shows a view for confirming account removal.
-    BUBBLE_VIEW_MODE_ACCOUNT_REMOVAL
-  };
-
  @private
   // The menu that contains the data from the backend.
   scoped_ptr<AvatarMenu> avatarMenu_;
@@ -52,14 +38,14 @@ class WebContents;
 
   // The id for the account that the user has requested to remove from the
   // current profile. It is set in |showAccountRemovalView| and used in
-  // |removeAccountAndRelaunch|.
+  // |removeAccount|.
   std::string accountIdToRemove_;
 
   // Active view mode.
-  BubbleViewMode viewMode_;
+  profiles::BubbleViewMode viewMode_;
 
-  // Whether the tutorial card is showing in the last active view.
-  BOOL tutorialShowing_;
+  // The current tutorial mode.
+  profiles::TutorialMode tutorialMode_;
 
   // List of the full, un-elided accounts for the active profile. The keys are
   // generated used to tag the UI buttons, and the values are the original
@@ -75,13 +61,13 @@ class WebContents;
 
 - (id)initWithBrowser:(Browser*)browser
            anchoredAt:(NSPoint)point
-             withMode:(BubbleViewMode)mode;
+             withMode:(profiles::BubbleViewMode)mode;
 
 // Creates all the subviews of the avatar bubble for |viewToDisplay|.
-- (void)initMenuContentsWithView:(BubbleViewMode)viewToDisplay;
+- (void)initMenuContentsWithView:(profiles::BubbleViewMode)viewToDisplay;
 
 // Returns the view currently displayed by the bubble.
-- (BubbleViewMode)viewMode;
+- (profiles::BubbleViewMode)viewMode;
 
 // Switches to a given profile. |sender| is an ProfileChooserItemController.
 - (IBAction)switchToProfile:(id)sender;
@@ -114,8 +100,8 @@ class WebContents;
 // account from the active profile if possible.
 - (IBAction)showAccountRemovalView:(id)sender;
 
-// Removes the current account |accountIdToRemove_| and relaunches the browser.
-- (IBAction)removeAccountAndRelaunch:(id)sender;
+// Removes the current account |accountIdToRemove_|.
+- (IBAction)removeAccount:(id)sender;
 
 // Reset the WebContents used by the Gaia embedded view.
 - (void)cleanUpEmbeddedViewContents;
@@ -126,7 +112,7 @@ class WebContents;
 @interface ProfileChooserController (ExposedForTesting)
 - (id)initWithBrowser:(Browser*)browser
            anchoredAt:(NSPoint)point
-             withMode:(BubbleViewMode)mode;
+             withMode:(profiles::BubbleViewMode)mode;
 @end
 
 #endif  // CHROME_BROWSER_UI_COCOA_PROFILES_PROFILE_CHOOSER_CONTROLLER_H_
