@@ -11,8 +11,6 @@
 
 namespace content {
 
-class SiteInstance;
-
 // Represents the per-StoragePartition ServiceWorker data.  Must be used from
 // the UI thread.
 class ServiceWorkerContext {

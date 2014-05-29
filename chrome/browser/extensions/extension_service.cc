@@ -1418,8 +1418,10 @@ void ExtensionService::UnloadExtension(
         case UnloadedExtensionInfo::REASON_BLACKLIST:
           ServiceWorkerManager::Get(profile_)->UnregisterExtension(extension);
           break;
+        case UnloadedExtensionInfo::REASON_UNDEFINED:
         case UnloadedExtensionInfo::REASON_UPDATE:
         case UnloadedExtensionInfo::REASON_TERMINATE:
+        case UnloadedExtensionInfo::REASON_PROFILE_SHUTDOWN:
           break;
       }
     }

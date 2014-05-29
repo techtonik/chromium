@@ -166,16 +166,6 @@ void ServiceWorkerProcessManager::ReleaseWorkerProcess(int embedded_worker_id) {
   instance_info_.erase(info);
 }
 
-ServiceWorkerProcessManager::ProcessOrSite::ProcessOrSite(int process_id)
-    : process_id(process_id) {
-}
-ServiceWorkerProcessManager::ProcessOrSite::ProcessOrSite(
-    const scoped_refptr<SiteInstance>& site_instance)
-    : process_id(-1), site_instance(site_instance) {
-}
-ServiceWorkerProcessManager::ProcessOrSite::~ProcessOrSite() {
-}
-
 }  // namespace content
 
 namespace base {
