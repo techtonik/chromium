@@ -1775,6 +1775,32 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="BlinkGC.CollectGarbage" units="milliseconds">
+  <owner>haraken@chromium.org</owner>
+  <summary>Duration of time taken to run Heap::collectGarbage().</summary>
+</histogram>
+
+<histogram name="BlinkGC.PerformPendingSweep" units="milliseconds">
+  <owner>haraken@chromium.org</owner>
+  <summary>
+    Duration of time taken to run ThreadState::performPendingSweep().
+  </summary>
+</histogram>
+
+<histogram name="BlinkGC.TotalAllocatedSpace" units="KB">
+  <owner>haraken@chromium.org</owner>
+  <summary>
+    The total size of allocated space in OS when a Blink GC is triggered.
+  </summary>
+</histogram>
+
+<histogram name="BlinkGC.TotalObjectSpace" units="KB">
+  <owner>haraken@chromium.org</owner>
+  <summary>
+    The total size of object space in all threads when a Blink GC is triggered.
+  </summary>
+</histogram>
+
 <histogram name="Bluetooth.ConnectedDeviceCount" units="devices">
   <owner>keybuk@chromium.org</owner>
   <summary>
@@ -3371,6 +3397,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>The age of the cache's files (wall time). ShaderCache.</summary>
 </histogram>
 
+<histogram name="DiskCache.SizeStats2" units="kilobytes">
+  <owner>rvargas@chromium.org</owner>
+  <summary>The size distribution of data stored in the HTTP cache.</summary>
+</histogram>
+
 <histogram name="DiskCache.TotalIOTime" units="milliseconds">
   <obsolete>
     Deprecated.
@@ -4895,6 +4926,36 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="EasyUnlock.ClickedButton" enum="EasyUnlockButton">
+  <owner>joshwoodward@google.com</owner>
+  <owner>tbarzic@chromium.org</owner>
+  <summary>Button clicked in EasyUnlock app during setup process.</summary>
+</histogram>
+
+<histogram name="EasyUnlock.NotificationEvent"
+    enum="EasyUnlockNotificationEvent">
+  <owner>joshwoodward@google.com</owner>
+  <owner>tbarzic@chromium.org</owner>
+  <summary>
+    Tracks events related to notifications used by EasyUnlock feature. For
+    example a specific EasyUnlock notification being shown or clicked.
+  </summary>
+</histogram>
+
+<histogram name="EasyUnlock.SetupStateOnClose" enum="EasyUnlockSetupState">
+  <owner>joshwoodward@google.com</owner>
+  <owner>tbarzic@chromium.org</owner>
+  <summary>
+    The state of EasyUnlock setup when the app window was closed by user.
+  </summary>
+</histogram>
+
+<histogram name="EasyUnlock.UnlockEvent" enum="EasyUnlockUnlockEvent">
+  <owner>joshwoodward@google.com</owner>
+  <owner>tbarzic@chromium.org</owner>
+  <summary>Screen unlock events detected while EasyUnlock was enabled.</summary>
+</histogram>
+
 <histogram name="Enterprise.AutoEnrollmentExtraTime" units="milliseconds">
   <owner>joaodasilva@chromium.org</owner>
   <summary>
@@ -4927,6 +4988,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Events related to fetching, saving and loading DM server tokens. These are
     used to retrieve cloud policies.
+  </summary>
+</histogram>
+
+<histogram name="Enterprise.EnrolledPolicyHasDMToken" enum="Boolean">
+  <owner>tnagel@chromium.org</owner>
+  <summary>
+    Whether loading of device policy from file on an enterprise-enrolled
+    (checked against install_attributes.pb) Chrome OS device yields an
+    enterprise policy with a DM token.  Filled once during session startup,
+    after first successful device policy read.
   </summary>
 </histogram>
 
@@ -5070,7 +5141,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>pastarmovj@chromium.org</owner>
   <summary>
     Whether we were able to contact the AD Domain Controller. This check is
-    performed once at start-up.
+    performed once at start-up on Windows.
   </summary>
 </histogram>
 
@@ -5079,7 +5150,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>pastarmovj@chromium.org</owner>
   <summary>
     Enum of possible things that can fail while checking for enterprise env.
-    This check is performed once at start-up.
+    This check is performed once at start-up on Windows.
   </summary>
 </histogram>
 
@@ -5088,7 +5159,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>pastarmovj@chromium.org</owner>
   <summary>
     Whether the machine is part of an AD domain. This check is performed once at
-    start-up.
+    start-up on Windows.
   </summary>
 </histogram>
 
@@ -5097,9 +5168,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>joaodasilva@chromium.org</owner>
   <owner>pastarmovj@chromium.org</owner>
   <summary>
-    The number of disabled policy entries due to integrity violations while
-    parsing the policy data which happens on start-up and when the policy has
-    changed.
+    The number of disabled policy entries on Windows due to integrity violations
+    while parsing the policy data which happens on start-up and when the policy
+    has changed.
   </summary>
 </histogram>
 
@@ -5108,7 +5179,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>pastarmovj@chromium.org</owner>
   <summary>
     The rough Windows suite we are runnnig on. This check is performed once at
-    start-up.
+    start-up on Windows.
   </summary>
 </histogram>
 
@@ -6023,6 +6094,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     have been stopped through script injection permission. This is related to
     the ActivityLog metrics, ExtensionActivity.Ad*. Recorded upon page close or
     navigation. Only recorded if there was at least one ad injection detected.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.AdInjection.AdType" enum="InjectedAdType">
+  <owner>felt@chromium.org</owner>
+  <owner>rdevlin.cronin@chromium.org</owner>
+  <summary>The type of ad that was injected.</summary>
+</histogram>
+
+<histogram name="Extensions.AdInjection.InstallLocation"
+    enum="ExtensionLocation">
+  <owner>felt@chromium.org</owner>
+  <owner>rdevlin.cronin@chromium.org</owner>
+  <summary>
+    The install location of an ad-injecting extension. Recorded upon page close
+    for any extension that injected ads on that page.
   </summary>
 </histogram>
 
@@ -7990,6 +8077,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Hotword.AudioLoggingEnabled" enum="BooleanEnabled">
+  <owner>rlp@chromium.org</owner>
   <summary>
     The state of the hotword audio logging preference. This value is emitted
     each time the hotword availability is requested by the extension if the user
@@ -8013,6 +8101,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     download, disabled, etc.). This value is emitted each time the hotword
     availability is requested by the extension which typically happens each time
     a hotword search is initiated.
+  </summary>
+</histogram>
+
+<histogram name="Hotword.HotwordError" enum="HotwordError">
+  <owner>rlp@chromium.org</owner>
+  <summary>
+    Errors reported by the hotword service when determining if hotwording is
+    available. Non-errors are also reported so that errors can be seen as a
+    percentage of total requests.
   </summary>
 </histogram>
 
@@ -9033,6 +9130,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Time Non-IDB LevelDBEnv slept before successfully completing this operation.
     0 means success on the first try.
+  </summary>
+</histogram>
+
+<histogram name="LevelDBPrefStore.ReadErrors" enum="LevelDBPrefStoreErrorCodes">
+  <owner>dgrogan@chromium.org</owner>
+  <summary>
+    Bitfield that indicates errors and recovery that occurred when opening a
+    LevelDB preferences database.
   </summary>
 </histogram>
 
@@ -11205,6 +11310,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.AlternateProtocolUsage.1000Truncated"
+    enum="AlternateProtocolUsage">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    Breakdown of how requests which could potentially make use of an alternate
+    protocol use or don't use the protocol. Loaded data for 1000 servers and we
+    have persisted 1000 MRU servers.
+  </summary>
+</histogram>
+
+<histogram name="Net.AlternateProtocolUsage.200Truncated"
+    enum="AlternateProtocolUsage">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    Breakdown of how requests which could potentially make use of an alternate
+    protocol use or don't use the protocol. Loaded data for 200 servers and we
+    have persisted 1000 MRU servers.
+  </summary>
+</histogram>
+
 <histogram name="Net.AsyncResourceHandler_PendingDataCount">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -11697,6 +11822,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Net.CountOfPipelineCapableServers">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The total number of severs that support HTTP pipelining. This counts the
@@ -13571,6 +13699,28 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.QuicSession.MaxReordering">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    The maximum packet sequence number reordering observed by a QUIC connection.
+  </summary>
+</histogram>
+
+<histogram name="Net.QuicSession.MaxReorderingTime" units="percent">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    The ratio of the maximum reordering time of a QUIC packet to the min rtt.
+  </summary>
+</histogram>
+
+<histogram name="Net.QuicSession.MaxReorderingTimeLongRtt" units="percent">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    The ratio of the maximum reordering time of a QUIC packet to the min rtt,
+    only for those sessions with a min rtt larger than 100 ms.
+  </summary>
+</histogram>
+
 <histogram name="Net.QuicSession.NumOpenStreams">
   <owner>rch@chromium.org</owner>
   <summary>
@@ -14748,6 +14898,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.0.NetworkError" enum="NetErrorCodes">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The network error, if any, of the first pipeline connectivity request.
@@ -14755,6 +14908,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.0.ResponseCode">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The HTTP response code, if any, of the first pipeline connectivity response.
@@ -14762,11 +14918,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.0.Status" enum="HttpPipelineStatus">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The result of the first pipeline connectivity request.</summary>
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.1.NetworkError" enum="NetErrorCodes">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The network error, if any, of the second pipeline connectivity request.
@@ -14774,6 +14936,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.1.ResponseCode">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The HTTP response code, if any, of the second pipeline connectivity
@@ -14782,11 +14947,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.1.Status" enum="HttpPipelineStatus">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The result of the second pipeline connectivity request.</summary>
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.2.NetworkError" enum="NetErrorCodes">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The network error, if any, of the third pipeline connectivity request.
@@ -14794,6 +14965,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.2.ResponseCode">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The HTTP response code, if any, of the third pipeline connectivity response.
@@ -14801,11 +14975,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.2.Status" enum="HttpPipelineStatus">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The result of the third pipeline connectivity request.</summary>
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.3.NetworkError" enum="NetErrorCodes">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The network error, if any, of the fourth pipeline connectivity request.
@@ -14813,6 +14993,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.3.ResponseCode">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The HTTP response code, if any, of the fourth pipeline connectivity
@@ -14821,11 +15004,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.3.Status" enum="HttpPipelineStatus">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The result of the fourth pipeline connectivity request.</summary>
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.4.NetworkError" enum="NetErrorCodes">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The network error, if any, of the fifth pipeline connectivity request.
@@ -14833,6 +15022,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.4.ResponseCode">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The HTTP response code, if any, of the fifth pipeline connectivity response.
@@ -14840,11 +15032,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.4.Status" enum="HttpPipelineStatus">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The result of the fifth pipeline connectivity request.</summary>
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.5.NetworkError" enum="NetErrorCodes">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The network error, if any, of the stats pipeline connectivity request.
@@ -14852,6 +15050,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.5.ResponseCode">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The HTTP response code, if any, of the stats pipeline connectivity response.
@@ -14859,11 +15060,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.5.Status" enum="HttpPipelineStatus">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The result of the stats pipeline connectivity request.</summary>
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.AllHTTP11" enum="BooleanSuccess">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     True if all requests received by the pipelining test server were HTTP/1.1.
@@ -14871,6 +15078,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.CanarySuccess" enum="BooleanSuccess">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     True if the non-pipelined canary request sent immediately before the
@@ -14880,6 +15090,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.Depth">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The maximum depth of pipelined requests received by the test server.
@@ -14887,6 +15100,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="NetConnectivity.Pipeline.Success" enum="BooleanSuccess">
+  <obsolete>
+    Deprecated 05/2014, related field trial already long expired.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>True if the entire pipeline connectivity trial passed.</summary>
 </histogram>
@@ -16052,6 +16268,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Chrome OS network performance metric that tracks the length of a lease for a
     WiFi network at the time it expired without the DHCP client being able to
     renew it.
+  </summary>
+</histogram>
+
+<histogram name="Network.Shill.Wifi.FallbackDNSTestResult"
+    enum="FallbackDNSTestResult">
+  <owner>zqiu@chromium.org</owner>
+  <summary>
+    Chrome OS network performance metric that tracks the result of the fallback
+    DNS test. The fallback DNS test is performed when portal detection failed
+    due to DNS failure.
   </summary>
 </histogram>
 
@@ -21121,6 +21347,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Profile.DesktopMenu" enum="ProfileDesktopMenu">
+  <owner>mlerman@chromium.org</owner>
+  <summary>
+    Track user interactions that can be performed in the user menu and user
+    manager. The origin of the action, whether the an interaction in the content
+    area or some other source, is noted in the histogram suffix.
+  </summary>
+</histogram>
+
 <histogram name="Profile.ExtensionSize" units="MB">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>Size of the extension cookies database.</summary>
@@ -24028,6 +24263,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The time it takes for the ShortcutsProvider to perform a query after the
     user has typed N characters.
+  </summary>
+</histogram>
+
+<histogram name="Signin.AddAccount" enum="BooleanSuccess">
+  <owner>mlerman@chromium.org</owner>
+  <summary>
+    Track when chrome successfully adds an account. Failures are not tracked.
   </summary>
 </histogram>
 
@@ -33314,6 +33556,38 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="4" label="TTLS"/>
 </enum>
 
+<enum name="EasyUnlockButton" type="int">
+  <int value="0" label="Setup app launches"/>
+  <int value="1" label="Find device"/>
+  <int value="2" label="Pair device"/>
+  <int value="3" label="Try out"/>
+  <int value="4" label="Enable"/>
+  <int value="5" label="Disable"/>
+</enum>
+
+<enum name="EasyUnlockNotificationEvent" type="int">
+  <int value="0" label="Set up notification shown"/>
+  <int value="1" label="Set up notification clicked"/>
+  <int value="2" label="Try out notification shown"/>
+  <int value="3" label="Try out notification clicked"/>
+</enum>
+
+<enum name="EasyUnlockSetupState" type="int">
+  <int value="0" label="Success"/>
+  <int value="1" label="Scan (initial)"/>
+  <int value="2" label="Scan (in progress)"/>
+  <int value="3" label="Scan (error)"/>
+  <int value="4" label="Pairing (initial)"/>
+  <int value="5" label="Pairing (in progress)"/>
+  <int value="6" label="Pairing (error)"/>
+  <int value="7" label="Help"/>
+</enum>
+
+<enum name="EasyUnlockUnlockEvent" type="int">
+  <int value="0" label="Screen unlocked (total)"/>
+  <int value="1" label="Screen unlocked (via EasyUnlock)"/>
+</enum>
+
 <enum name="EnterpriseCheckError" type="int">
   <int value="0" label="Cound not get net join info."/>
   <int value="1" label="Cound not bind to domain controller."/>
@@ -34845,6 +35119,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="773" label="FILESYSTEMPROVIDERINTERNAL_READFILEREQUESTEDERROR"/>
   <int value="774" label="NETWORKINGPRIVATE_GETNETWORKS"/>
   <int value="775" label="WEBVIEW_SETNAME"/>
+  <int value="776" label="ENTERPRISE_PLATFORMKEYSINTERNAL_GENERATEKEY"/>
+  <int value="777" label="ENTERPRISE_PLATFORMKEYSINTERNAL_SIGN"/>
+  <int value="778" label="ENTERPRISE_PLATFORMKEYSINTERNAL_GETTOKENS"/>
+  <int value="779" label="ENTERPRISE_PLATFORMKEYS_GETCERTIFICATES"/>
+  <int value="780" label="ENTERPRISE_PLATFORMKEYS_IMPORTCERTIFICATE"/>
+  <int value="781" label="ENTERPRISE_PLATFORMKEYS_REMOVECERTIFICATE"/>
+  <int value="782" label="FILEBROWSERPRIVATE_OPENINSPECTOR"/>
+  <int value="784" label="MANAGEMENT_SETLAUNCHTYPE"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -35132,6 +35414,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="3" label="Unfused; lot ID NZVR7"/>
 </enum>
 
+<enum name="FallbackDNSTestResult" type="int">
+  <int value="0" label="Success"/>
+  <int value="1" label="Failure"/>
+</enum>
+
 <enum name="FallbackSSLVersion" type="int">
   <int value="0" label="FALLBACK_NONE">SSL version fallback did not occur.</int>
   <int value="1" label="FALLBACK_SSL3">Fell back on SSL 3.0.</int>
@@ -35140,7 +35427,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="FeatureObserver" type="int">
-<!-- Generated from ..\..\..\third_party\WebKit\Source\core\frame\UseCounter.h -->
+<!-- Generated from ../../../third_party/WebKit/Source/core/frame/UseCounter.h -->
 
   <int value="0" label="PageDestruction"/>
   <int value="1" label="LegacyNotifications"/>
@@ -35559,6 +35846,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="414" label="VTTCueRenderPositionNot50"/>
   <int value="415" label="VTTCueRenderSizeNot100"/>
   <int value="416" label="VTTCueRenderAlignNotMiddle"/>
+  <int value="417" label="ElementRequestPointerLock"/>
+  <int value="418" label="VTTCueRenderRtl"/>
+  <int value="419" label="PostMessageFromSecureToInsecure"/>
+  <int value="420" label="PostMessageFromInsecureToSecure"/>
+  <int value="421" label="DocumentExitPointerLock"/>
+  <int value="422" label="DocumentPointerLockElement"/>
+  <int value="423" label="MixedContentFont"/>
+  <int value="424" label="PrefixedCursorZoomIn"/>
+  <int value="425" label="PrefixedCursorZoomOut"/>
 </enum>
 
 <enum name="FFmpegCodecs" type="int">
@@ -36424,6 +36720,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="3" label="Disabled"/>
 </enum>
 
+<enum name="HotwordError" type="int">
+  <int value="0" label="No error"/>
+  <int value="1" label="Generic error"/>
+  <int value="2" label="NaCl error"/>
+  <int value="3" label="Microphone error"/>
+</enum>
+
 <enum name="HotwordPrefState" type="int">
   <int value="0" label="Preference not set"/>
   <int value="1" label="Hotwording enabled"/>
@@ -36663,6 +36966,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="Save Password"/>
   <int value="2" label="Never for this site (blacklist / exception)"/>
   <int value="3" label="InfoBar dismissed by clicking the 'X'"/>
+</enum>
+
+<enum name="InjectedAdType" type="int">
+  <int value="0" label="Invalid"/>
+  <int value="1" label="IFrame"/>
+  <int value="2" label="Embed"/>
+  <int value="3" label="Anchor"/>
 </enum>
 
 <enum name="InstantControllerEvent" type="int">
@@ -37398,6 +37708,36 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="18" label="NewLogger"/>
   <int value="19" label="SyncParent"/>
   <int value="20" label="GetChildren"/>
+</enum>
+
+<enum name="LevelDBPrefStoreErrorCodes" type="int">
+  <int value="1" label="OPENED"/>
+  <int value="5" label="REPAIRED | OPENED"/>
+  <int value="6" label="REPAIRED | DESTROYED"/>
+  <int value="7" label="REPAIRED | DESTROYED | OPENED"/>
+  <int value="12" label="REPAIRED | DESTROY_FAILED"/>
+  <int value="18" label="REPAIR_FAILED | DESTROYED"/>
+  <int value="19" label="REPAIR_FAILED | DESTROYED | OPENED"/>
+  <int value="24" label="REPAIR_FAILED | DESTROY_FAILED"/>
+  <int value="32" label="IO_ERROR"/>
+  <int value="36" label="REPAIRED | IO_ERROR"/>
+  <int value="38" label="REPAIRED | DESTROYED | IO_ERROR"/>
+  <int value="50" label="REPAIR_FAILED | DESTROYED | IO_ERROR"/>
+  <int value="65" label="OPENED | DATA_LOST"/>
+  <int value="69" label="REPAIRED | OPENED | DATA_LOST"/>
+  <int value="71" label="REPAIRED | DESTROYED | OPENED | DATA_LOST"/>
+  <int value="83" label="REPAIR_FAILED | DESTROYED | OPENED | DATA_LOST"/>
+  <int value="129" label="OPENED | ITER_NOT_OK"/>
+  <int value="133" label="REPAIRED | OPENED | ITER_NOT_OK"/>
+  <int value="135" label="REPAIRED | DESTROYED | OPENED | ITER_NOT_OK"/>
+  <int value="147" label="REPAIR_FAILED | DESTROYED | OPENED | ITER_NOT_OK"/>
+  <int value="193" label="OPENED | DATA_LOST | ITER_NOT_OK"/>
+  <int value="197" label="REPAIRED | OPENED | DATA_LOST | ITER_NOT_OK"/>
+  <int value="199"
+      label="REPAIRED | DESTROYED | OPENED | DATA_LOST | ITER_NOT_OK"/>
+  <int value="211"
+      label="REPAIR_FAILED | DESTROYED | OPENED | DATA_LOST | ITER_NOT_OK"/>
+  <int value="256" label="FILE_NOT_SPECIFIED"/>
 </enum>
 
 <enum name="LinkMonitorFailureType" type="int">
@@ -38596,6 +38936,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="NetErrorCodes" type="int">
+<!-- Generated from ../../../net/base/net_error_list.h -->
+
   <int value="0" label="OK"/>
   <int value="1" label="IO_PENDING"/>
   <int value="2" label="FAILED"/>
@@ -38619,6 +38961,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="20" label="BLOCKED_BY_CLIENT"/>
   <int value="21" label="NETWORK_CHANGED"/>
   <int value="22" label="BLOCKED_BY_ADMINISTRATOR"/>
+  <int value="23" label="SOCKET_IS_CONNECTED"/>
+  <int value="24" label="BLOCKED_ENROLLMENT_CHECK_PENDING"/>
   <int value="100" label="CONNECTION_CLOSED"/>
   <int value="101" label="CONNECTION_RESET"/>
   <int value="102" label="CONNECTION_REFUSED"/>
@@ -38662,7 +39006,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="140" label="HTTPS_PROXY_TUNNEL_RESPONSE"/>
   <int value="141" label="SSL_CLIENT_AUTH_SIGNATURE_FAILED"/>
   <int value="142" label="MSG_TOO_BIG"/>
-  <int value="143" label="KASPERSKY_ANTI_VIRUS_SSL_INTERCEPTION"/>
+  <int value="143" label="SPDY_SESSION_ALREADY_EXISTS"/>
   <int value="144" label="LIMIT_VIOLATION"/>
   <int value="145" label="WS_PROTOCOL_ERROR"/>
   <int value="146" label="PROTOCOL_SWITCHED"/>
@@ -38672,6 +39016,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="150" label="SSL_PINNED_KEY_NOT_IN_CERT_CHAIN"/>
   <int value="151" label="CLIENT_AUTH_CERT_TYPE_UNSUPPORTED"/>
   <int value="152" label="ORIGIN_BOUND_CERT_GENERATION_TYPE_MISMATCH"/>
+  <int value="153" label="SSL_DECRYPT_ERROR_ALERT"/>
+  <int value="154" label="WS_THROTTLE_QUEUE_TOO_LARGE"/>
+  <int value="155" label="TOO_MANY_SOCKET_STREAMS"/>
+  <int value="156" label="SSL_SERVER_CERT_CHANGED"/>
+  <int value="157" label="SSL_INAPPROPRIATE_FALLBACK"/>
+  <int value="158" label="CT_NO_SCTS_VERIFIED_OK"/>
+  <int value="159" label="SSL_UNRECOGNIZED_NAME_ALERT"/>
+  <int value="160" label="SOCKET_SET_RECEIVE_BUFFER_SIZE_ERROR"/>
+  <int value="161" label="SOCKET_SET_SEND_BUFFER_SIZE_ERROR"/>
+  <int value="162" label="SOCKET_RECEIVE_BUFFER_SIZE_UNCHANGEABLE"/>
+  <int value="163" label="SOCKET_SEND_BUFFER_SIZE_UNCHANGEABLE"/>
   <int value="200" label="CERT_COMMON_NAME_INVALID"/>
   <int value="201" label="CERT_DATE_INVALID"/>
   <int value="202" label="CERT_AUTHORITY_INVALID"/>
@@ -38684,6 +39039,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="209" label="CERT_NOT_IN_DNS"/>
   <int value="210" label="CERT_NON_UNIQUE_NAME"/>
   <int value="211" label="CERT_WEAK_KEY"/>
+  <int value="212" label="CERT_NAME_CONSTRAINT_VIOLATION"/>
+  <int value="213" label="CERT_END"/>
   <int value="300" label="INVALID_URL"/>
   <int value="301" label="DISALLOWED_URL_SCHEME"/>
   <int value="302" label="UNKNOWN_URL_SCHEME"/>
@@ -38728,6 +39085,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="355" label="INCOMPLETE_CHUNKED_ENCODING"/>
   <int value="356" label="QUIC_PROTOCOL_ERROR"/>
   <int value="357" label="RESPONSE_HEADERS_TRUNCATED"/>
+  <int value="358" label="QUIC_HANDSHAKE_FAILED"/>
+  <int value="359" label="REQUEST_FOR_SECURE_RESOURCE_OVER_INSECURE_QUIC"/>
+  <int value="360" label="SPDY_INADEQUATE_TRANSPORT_SECURITY"/>
   <int value="400" label="CACHE_MISS"/>
   <int value="401" label="CACHE_READ_FAILURE"/>
   <int value="402" label="CACHE_WRITE_FAILURE"/>
@@ -38735,8 +39095,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="404" label="CACHE_OPEN_FAILURE"/>
   <int value="405" label="CACHE_CREATE_FAILURE"/>
   <int value="406" label="CACHE_RACE"/>
-  <int value="407" label="CACHE_CACHE_CHECKSUM_READ_FAILURE"/>
-  <int value="408" label="CACHE_CACHE_CHECKSUM_MISMATCH"/>
+  <int value="407" label="CACHE_CHECKSUM_READ_FAILURE"/>
+  <int value="408" label="CACHE_CHECKSUM_MISMATCH"/>
   <int value="501" label="INSECURE_RESPONSE"/>
   <int value="502" label="NO_PRIVATE_KEY_FOR_CERT"/>
   <int value="503" label="ADD_USER_CERT_FAILED"/>
@@ -38759,6 +39119,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="710" label="KEY_GENERATION_FAILED"/>
   <int value="711" label="ORIGIN_BOUND_CERT_GENERATION_FAILED"/>
   <int value="712" label="PRIVATE_KEY_EXPORT_FAILED"/>
+  <int value="713" label="SELF_SIGNED_CERT_GENERATION_FAILED"/>
+  <int value="714" label="CERT_DATABASE_CHANGED"/>
   <int value="800" label="DNS_MALFORMED_RESPONSE"/>
   <int value="801" label="DNS_SERVER_REQUIRES_TCP"/>
   <int value="802" label="DNS_SERVER_FAILED"/>
@@ -40098,6 +40460,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1519132417" label="PPB_FileSystem;1.0"/>
   <int value="1520420939" label="PPB_MouseCursor;1.0"/>
   <int value="1528832860" label="PPB_FileChooser(Dev);0.6"/>
+  <int value="1577776196" label="PPB_InputEvent_Private;0.1"/>
   <int value="1641037564" label="PPB_VideoSource_Private;0.1"/>
   <int value="1645591549" label="PPB_Widget(Dev);0.3"/>
   <int value="1677958987" label="PPB_ImageData;1.0"/>
@@ -40834,6 +41197,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="4" label="Canceled"/>
 </enum>
 
+<enum name="ProfileDesktopMenu" type="int">
+  <int value="0" label="Locked in Menu">
+    User opened the user menu, and clicked lock.
+  </int>
+  <int value="1" label="Remove Account in Menu">
+    User opened the user menu, and removed an account.
+  </int>
+  <int value="2" label="Add Account in Menu">
+    User opened the user menu, and started adding an account.
+  </int>
+  <int value="3" label="Edit Profile Name in Menu">
+    User opened the user menu, and changed the profile name.
+  </int>
+  <int value="4" label="Edit Profile Image in Menu">
+    User opened the user menu, and started selecting a new profile image.
+  </int>
+</enum>
+
 <enum name="ProfileErrorType" type="int">
   <int value="0" label="History error"/>
   <int value="1" label="Preferences error"/>
@@ -41066,6 +41447,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="58" label="INVALID_BLOCKED_DATA"/>
   <int value="59" label="FLOW_CONTROL_ERROR"/>
   <int value="60" label="INVALID_STOP_WAITING_DATA"/>
+  <int value="61" label="UNENCRYPTED_STREAM_DATA"/>
+  <int value="62" label="CONNECTION_IP_POOLED"/>
 </enum>
 
 <enum name="QuicHandshakeFailureReason" type="int">
@@ -43190,6 +43573,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="32" label="Show Press"/>
   <int value="33" label="Tap Cancel"/>
   <int value="34" label="Edge swipe"/>
+  <int value="35" label="One-finger swipe"/>
 </enum>
 
 <enum name="UmaInitSequence" type="int">
@@ -46337,6 +46721,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <affected-histogram name="Prerender.TimeBetweenPrerenderRequests"/>
   <affected-histogram name="Prerender.TimeSinceLastRecentVisit"/>
   <affected-histogram name="Prerender.TimeUntilUsed2"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="Profile.DesktopMenu" separator=".">
+  <suffix name="NonGAIA" label="Interaction was not initiated from GAIA"/>
+  <suffix name="GAIASignout"
+      label="GAIA-initiated interaction indicating a service type of Signout"/>
+  <suffix name="GAIASignoutIncognito"
+      label="GAIA-initiated interaction indicating a service type of Signout
+             and go Incogntio"/>
+  <suffix name="GAIAAddSession"
+      label="GAIA-initiated interaction indicating a service type of Add a
+             Session"/>
+  <suffix name="GAIAReAuth"
+      label="GAIA-initiated interaction indicating a service type of
+             Reauthenticate this user"/>
+  <suffix name="GAIADefault"
+      label="GAIA-initiated interaction indicating the default service type"/>
+  <affected-histogram name="Profile.DesktopMenu"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="ProfilePictureDownload" separator=".">

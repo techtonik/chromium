@@ -2167,7 +2167,7 @@ gpu.dll!gpu::gles2::GLES2DecoderImpl::Initialize
 UNINITIALIZED READ
 name=bug_374105b
 ...
-gpu.dll!gpu::gles2::ShaderTranslator::GetStringForOptionsThatWouldEffectCompilation
+gpu.dll!gpu::gles2::ShaderTranslator::GetStringForOptionsThatWouldAffectCompilation
 *!gpu::gles2::ShaderTranslatorTest_OptionsString_Test::TestBody
 
 UNINITIALIZED READ
@@ -2178,3 +2178,11 @@ name=bug_374410
 UNINITIALIZED READ
 name=bug_376814
 *!content::PepperPluginInstanceImpl::UpdateLayer
+
+UNINITIALIZED READ
+name=bug_377728
+...
+*!Hunspell::suggest
+*!HunspellEngine::FillSuggestionList
+*!SpellcheckLanguage::SpellCheckWord
+*!SpellCheck::SpellCheckWord

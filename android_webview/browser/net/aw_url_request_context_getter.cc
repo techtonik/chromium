@@ -31,6 +31,7 @@
 #include "net/http/http_cache.h"
 #include "net/http/http_stream_factory.h"
 #include "net/proxy/proxy_service.h"
+#include "net/socket/next_proto.h"
 #include "net/url_request/data_protocol_handler.h"
 #include "net/url_request/file_protocol_handler.h"
 #include "net/url_request/protocol_intercept_job_factory.h"
@@ -90,6 +91,11 @@ void PopulateNetworkSessionParams(
   params->network_delegate = context->network_delegate();
   params->http_server_properties = context->http_server_properties();
   params->net_log = context->net_log();
+
+  // TODO(sgurun) remove once crbug.com/329681 is fixed.
+  params->next_protos = net::NextProtosSpdy31();
+  params->use_alternate_protocols = true;
+
   ApplyCmdlineOverridesToNetworkSessionParams(params);
 }
 
@@ -97,22 +103,22 @@ scoped_ptr<net::URLRequestJobFactory> CreateJobFactory(
     content::ProtocolHandlerMap* protocol_handlers) {
   scoped_ptr<AwURLRequestJobFactory> aw_job_factory(new AwURLRequestJobFactory);
   bool set_protocol = aw_job_factory->SetProtocolHandler(
-      content::kFileScheme,
+      url::kFileScheme,
       new net::FileProtocolHandler(
           content::BrowserThread::GetBlockingPool()->
               GetTaskRunnerWithShutdownBehavior(
                   base::SequencedWorkerPool::SKIP_ON_SHUTDOWN)));
   DCHECK(set_protocol);
   set_protocol = aw_job_factory->SetProtocolHandler(
-      content::kDataScheme, new net::DataProtocolHandler());
+      url::kDataScheme, new net::DataProtocolHandler());
   DCHECK(set_protocol);
   set_protocol = aw_job_factory->SetProtocolHandler(
-      content::kBlobScheme,
-      (*protocol_handlers)[content::kBlobScheme].release());
+      url::kBlobScheme,
+      (*protocol_handlers)[url::kBlobScheme].release());
   DCHECK(set_protocol);
   set_protocol = aw_job_factory->SetProtocolHandler(
-      content::kFileSystemScheme,
-      (*protocol_handlers)[content::kFileSystemScheme].release());
+      url::kFileSystemScheme,
+      (*protocol_handlers)[url::kFileSystemScheme].release());
   DCHECK(set_protocol);
   set_protocol = aw_job_factory->SetProtocolHandler(
       content::kChromeUIScheme,
@@ -235,10 +241,6 @@ void AwURLRequestContextGetter::InitializeURLRequestContext() {
 
   job_factory_ = CreateJobFactory(&protocol_handlers_);
   url_request_context_->set_job_factory(job_factory_.get());
-
-  // TODO(sgurun) remove once crbug.com/329681 is fixed. Should be
-  // called only once.
-  net::HttpStreamFactory::EnableNpnSpdy31();
 }
 
 net::URLRequestContext* AwURLRequestContextGetter::GetURLRequestContext() {

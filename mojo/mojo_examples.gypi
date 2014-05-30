@@ -15,8 +15,8 @@
         'mojo_environment_standalone',
         'mojo_geometry_bindings',
         'mojo_gles2',
+        'mojo_main_standalone',
         'mojo_native_viewport_bindings',
-        'mojo_shell_client',
         'mojo_system',
         'mojo_utility',
       ],
@@ -49,8 +49,8 @@
         'mojo_geometry_bindings',
         'mojo_geometry_lib',
         'mojo_gles2',
+        'mojo_main_chromium',
         'mojo_native_viewport_bindings',
-        'mojo_shell_client',
         'mojo_system_impl',
       ],
       'sources': [
@@ -75,12 +75,13 @@
         '../gpu/gpu.gyp:command_buffer_common',
         '../ppapi/ppapi.gyp:ppapi_c',
         '../ppapi/ppapi_internal.gyp:ppapi_example_gles2_spinning_cube',
+        '../ui/events/events.gyp:events_base',
         'mojo_common_lib',
         'mojo_environment_chromium',
         'mojo_geometry_bindings',
         'mojo_gles2',
+        'mojo_main_chromium',
         'mojo_native_viewport_bindings',
-        'mojo_shell_client',
         'mojo_system_impl',
       ],
       'defines': [
@@ -180,7 +181,7 @@
             'mojo_geometry_bindings',
             'mojo_geometry_lib',
             'mojo_gles2',
-            'mojo_shell_client',
+            'mojo_main_chromium',
             'mojo_system_impl'
           ],
           'sources': [
@@ -200,9 +201,6 @@
           'sources': [
             'examples/launcher/launcher.mojom',
           ],
-          'variables': {
-            'mojom_base_output_dir': 'mojo',
-          },
           'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
           'export_dependent_settings': [
             'mojo_cpp_bindings',
@@ -226,6 +224,7 @@
             '../ui/views/views.gyp:views',
             '../ui/wm/wm.gyp:wm',
             '../url/url.gyp:url_lib',
+            'mojo_application',
             'mojo_aura_support',
             'mojo_common_lib',
             'mojo_environment_chromium',
@@ -233,7 +232,6 @@
             'mojo_geometry_lib',
             'mojo_gles2',
             'mojo_launcher_bindings',
-            'mojo_shell_client',
             'mojo_system_impl',
           ],
           'sources': [
@@ -260,8 +258,8 @@
             'mojo_environment_chromium',
             'mojo_geometry_bindings',
             'mojo_gles2',
+            'mojo_main_chromium',
             'mojo_view_manager_lib',
-            'mojo_shell_client',
             'mojo_system_impl',
             'mojo_utility',
           ],
@@ -281,7 +279,7 @@
             'mojo_cpp_bindings',
             'mojo_environment_standalone',
             'mojo_echo_bindings',
-            'mojo_shell_client',
+            'mojo_main_standalone',
             'mojo_system',
             'mojo_utility',
           ],

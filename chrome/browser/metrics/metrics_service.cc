@@ -200,9 +200,6 @@
 #include "components/metrics/metrics_reporting_scheduler.h"
 #include "components/metrics/metrics_service_client.h"
 #include "components/variations/entropy_provider.h"
-#include "content/public/browser/child_process_data.h"
-#include "content/public/browser/render_process_host.h"
-#include "content/public/browser/user_metrics.h"
 #include "net/base/load_flags.h"
 #include "net/url_request/url_fetcher.h"
 
@@ -213,6 +210,7 @@
 
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/settings/cros_settings.h"
+#include "chrome/browser/metrics/chromeos_metrics_provider.h"
 #include "chromeos/system/statistics_provider.h"
 #endif
 
@@ -290,13 +288,12 @@ ResponseStatus ResponseCodeToStatus(int response_code) {
   }
 }
 
-void MarkAppCleanShutdownAndCommit() {
-  PrefService* pref = g_browser_process->local_state();
-  pref->SetBoolean(prefs::kStabilityExitedCleanly, true);
-  pref->SetInteger(prefs::kStabilityExecutionPhase,
-                   MetricsService::SHUTDOWN_COMPLETE);
+void MarkAppCleanShutdownAndCommit(PrefService* local_state) {
+  local_state->SetBoolean(prefs::kStabilityExitedCleanly, true);
+  local_state->SetInteger(prefs::kStabilityExecutionPhase,
+                          MetricsService::SHUTDOWN_COMPLETE);
   // Start writing right away (write happens on a different thread).
-  pref->CommitPendingWrite();
+  local_state->CommitPendingWrite();
 }
 
 }  // namespace
@@ -334,22 +331,11 @@ void MetricsService::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterIntegerPref(prefs::kStabilityLaunchCount, 0);
   registry->RegisterIntegerPref(prefs::kStabilityCrashCount, 0);
   registry->RegisterIntegerPref(prefs::kStabilityIncompleteSessionEndCount, 0);
-  registry->RegisterIntegerPref(prefs::kStabilityPageLoadCount, 0);
-  registry->RegisterIntegerPref(prefs::kStabilityRendererCrashCount, 0);
-  registry->RegisterIntegerPref(prefs::kStabilityExtensionRendererCrashCount,
-                                0);
-  registry->RegisterIntegerPref(prefs::kStabilityRendererHangCount, 0);
-  registry->RegisterIntegerPref(prefs::kStabilityChildProcessCrashCount, 0);
   registry->RegisterIntegerPref(prefs::kStabilityBreakpadRegistrationFail, 0);
   registry->RegisterIntegerPref(prefs::kStabilityBreakpadRegistrationSuccess,
                                 0);
   registry->RegisterIntegerPref(prefs::kStabilityDebuggerPresent, 0);
   registry->RegisterIntegerPref(prefs::kStabilityDebuggerNotPresent, 0);
-#if defined(OS_CHROMEOS)
-  registry->RegisterIntegerPref(prefs::kStabilityOtherUserCrashCount, 0);
-  registry->RegisterIntegerPref(prefs::kStabilityKernelCrashCount, 0);
-  registry->RegisterIntegerPref(prefs::kStabilitySystemUncleanShutdownCount, 0);
-#endif  // OS_CHROMEOS
 
   registry->RegisterStringPref(prefs::kStabilitySavedSystemProfile,
                                std::string());
@@ -360,11 +346,13 @@ void MetricsService::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterListPref(metrics::prefs::kMetricsOngoingLogs);
 
   registry->RegisterInt64Pref(prefs::kInstallDate, 0);
-  registry->RegisterInt64Pref(prefs::kUninstallMetricsPageLoadCount, 0);
   registry->RegisterInt64Pref(prefs::kUninstallLaunchCount, 0);
   registry->RegisterInt64Pref(prefs::kUninstallMetricsUptimeSec, 0);
   registry->RegisterInt64Pref(prefs::kUninstallLastLaunchTimeSec, 0);
   registry->RegisterInt64Pref(prefs::kUninstallLastObservedRunTimeSec, 0);
+
+  // TODO(asvitkine): Move this out of here.
+  ChromeStabilityMetricsProvider::RegisterPrefs(registry);
 
 #if defined(OS_ANDROID)
   // TODO(asvitkine): Move this out of here.
@@ -378,12 +366,13 @@ void MetricsService::RegisterPrefs(PrefRegistrySimple* registry) {
 }
 
 MetricsService::MetricsService(metrics::MetricsStateManager* state_manager,
-                               metrics::MetricsServiceClient* client)
-    : log_manager_(g_browser_process->local_state(),
-                   kUploadLogAvoidRetransmitSize),
+                               metrics::MetricsServiceClient* client,
+                               PrefService* local_state)
+    : log_manager_(local_state, kUploadLogAvoidRetransmitSize),
       histogram_snapshot_manager_(this),
       state_manager_(state_manager),
       client_(client),
+      local_state_(local_state),
       recording_active_(false),
       reporting_active_(false),
       test_mode_active_(false),
@@ -391,19 +380,19 @@ MetricsService::MetricsService(metrics::MetricsStateManager* state_manager,
       has_initial_stability_log_(false),
       idle_since_last_transmission_(false),
       session_id_(-1),
-      next_window_id_(0),
       self_ptr_factory_(this),
       state_saver_factory_(this),
       waiting_for_asynchronous_reporting_step_(false) {
   DCHECK(IsSingleThreaded());
   DCHECK(state_manager_);
   DCHECK(client_);
+  DCHECK(local_state_);
 
 #if defined(OS_ANDROID)
   // TODO(asvitkine): Move this out of MetricsService.
   RegisterMetricsProvider(
       scoped_ptr<metrics::MetricsProvider>(new AndroidMetricsProvider(
-          g_browser_process->local_state())));
+          local_state_)));
 #endif  // defined(OS_ANDROID)
 
   // TODO(asvitkine): Move these out of MetricsService.
@@ -423,19 +412,19 @@ MetricsService::MetricsService(metrics::MetricsStateManager* state_manager,
 #endif
 
 #if defined(ENABLE_PLUGINS)
-  plugin_metrics_provider_ = new PluginMetricsProvider(
-      g_browser_process->local_state());
+  plugin_metrics_provider_ = new PluginMetricsProvider(local_state_);
   RegisterMetricsProvider(scoped_ptr<metrics::MetricsProvider>(
       plugin_metrics_provider_));
 #endif
 
-  BrowserChildProcessObserver::Add(this);
+#if defined(OS_CHROMEOS)
+  RegisterMetricsProvider(
+      scoped_ptr<metrics::MetricsProvider>(new ChromeOSMetricsProvider));
+#endif
 }
 
 MetricsService::~MetricsService() {
   DisableRecording();
-
-  BrowserChildProcessObserver::Remove(this);
 }
 
 void MetricsService::InitializeMetricsRecordingState() {
@@ -563,19 +552,6 @@ void MetricsService::InconsistencyDetectedInLoggedCount(int amount) {
                        std::abs(amount));
 }
 
-void MetricsService::BrowserChildProcessCrashed(
-    const content::ChildProcessData& data) {
-  // TODO(asvitkine): Move this into ChromeStabilityStatsProvider.
-#if defined(ENABLE_PLUGINS)
-  // Exclude plugin crashes from the count below because we report them via
-  // a separate UMA metric.
-  if (PluginMetricsProvider::IsPluginProcess(data.process_type))
-    return;
-#endif
-
-  IncrementPrefValue(prefs::kStabilityChildProcessCrashCount);
-}
-
 void MetricsService::HandleIdleSinceLastTransmission(bool in_idle) {
   // If there wasn't a lot of action, maybe the computer was asleep, in which
   // case, the log transmissions should have stopped.  Here we start them up
@@ -604,7 +580,7 @@ void MetricsService::RecordCompletedSessionEnd() {
 void MetricsService::OnAppEnterBackground() {
   scheduler_->Stop();
 
-  MarkAppCleanShutdownAndCommit();
+  MarkAppCleanShutdownAndCommit(local_state_);
 
   // At this point, there's no way of knowing when the process will be
   // killed, so this has to be treated similar to a shutdown, closing and
@@ -620,25 +596,22 @@ void MetricsService::OnAppEnterBackground() {
 }
 
 void MetricsService::OnAppEnterForeground() {
-  PrefService* pref = g_browser_process->local_state();
-  pref->SetBoolean(prefs::kStabilityExitedCleanly, false);
-
+  local_state_->SetBoolean(prefs::kStabilityExitedCleanly, false);
   StartSchedulerIfNecessary();
 }
 #else
-void MetricsService::LogNeedForCleanShutdown() {
-  PrefService* pref = g_browser_process->local_state();
-  pref->SetBoolean(prefs::kStabilityExitedCleanly, false);
+void MetricsService::LogNeedForCleanShutdown(PrefService* local_state) {
+  local_state->SetBoolean(prefs::kStabilityExitedCleanly, false);
   // Redundant setting to be sure we call for a clean shutdown.
   clean_shutdown_status_ = NEED_TO_SHUTDOWN;
 }
 #endif  // defined(OS_ANDROID) || defined(OS_IOS)
 
 // static
-void MetricsService::SetExecutionPhase(ExecutionPhase execution_phase) {
+void MetricsService::SetExecutionPhase(ExecutionPhase execution_phase,
+                                       PrefService* local_state) {
   execution_phase_ = execution_phase;
-  PrefService* pref = g_browser_process->local_state();
-  pref->SetInteger(prefs::kStabilityExecutionPhase, execution_phase_);
+  local_state->SetInteger(prefs::kStabilityExecutionPhase, execution_phase_);
 }
 
 void MetricsService::RecordBreakpadRegistration(bool success) {
@@ -664,23 +637,23 @@ void MetricsService::RecordBreakpadHasDebugger(bool has_debugger) {
 // Initialization methods
 
 void MetricsService::InitializeMetricsState() {
-  PrefService* pref = g_browser_process->local_state();
-  DCHECK(pref);
+  local_state_->SetString(prefs::kStabilityStatsVersion,
+                          client_->GetVersionString());
+  local_state_->SetInt64(prefs::kStabilityStatsBuildTime,
+                         MetricsLog::GetBuildTime());
 
-  pref->SetString(prefs::kStabilityStatsVersion, client_->GetVersionString());
-  pref->SetInt64(prefs::kStabilityStatsBuildTime, MetricsLog::GetBuildTime());
+  session_id_ = local_state_->GetInteger(prefs::kMetricsSessionID);
 
-  session_id_ = pref->GetInteger(prefs::kMetricsSessionID);
-
-  if (!pref->GetBoolean(prefs::kStabilityExitedCleanly)) {
+  if (!local_state_->GetBoolean(prefs::kStabilityExitedCleanly)) {
     IncrementPrefValue(prefs::kStabilityCrashCount);
     // Reset flag, and wait until we call LogNeedForCleanShutdown() before
     // monitoring.
-    pref->SetBoolean(prefs::kStabilityExitedCleanly, true);
+    local_state_->SetBoolean(prefs::kStabilityExitedCleanly, true);
 
     // TODO(rtenneti): On windows, consider saving/getting execution_phase from
     // the registry.
-    int execution_phase = pref->GetInteger(prefs::kStabilityExecutionPhase);
+    int execution_phase =
+        local_state_->GetInteger(prefs::kStabilityExecutionPhase);
     UMA_HISTOGRAM_SPARSE_SLOWLY("Chrome.Browser.CrashedExecutionPhase",
                                 execution_phase);
 
@@ -692,30 +665,30 @@ void MetricsService::InitializeMetricsState() {
 
   // Update session ID.
   ++session_id_;
-  pref->SetInteger(prefs::kMetricsSessionID, session_id_);
+  local_state_->SetInteger(prefs::kMetricsSessionID, session_id_);
 
   // Stability bookkeeping
   IncrementPrefValue(prefs::kStabilityLaunchCount);
 
   DCHECK_EQ(UNINITIALIZED_PHASE, execution_phase_);
-  SetExecutionPhase(START_METRICS_RECORDING);
+  SetExecutionPhase(START_METRICS_RECORDING, local_state_);
 
-  if (!pref->GetBoolean(prefs::kStabilitySessionEndCompleted)) {
+  if (!local_state_->GetBoolean(prefs::kStabilitySessionEndCompleted)) {
     IncrementPrefValue(prefs::kStabilityIncompleteSessionEndCount);
     // This is marked false when we get a WM_ENDSESSION.
-    pref->SetBoolean(prefs::kStabilitySessionEndCompleted, true);
+    local_state_->SetBoolean(prefs::kStabilitySessionEndCompleted, true);
   }
 
   // Call GetUptimes() for the first time, thus allowing all later calls
   // to record incremental uptimes accurately.
   base::TimeDelta ignored_uptime_parameter;
   base::TimeDelta startup_uptime;
-  GetUptimes(pref, &startup_uptime, &ignored_uptime_parameter);
+  GetUptimes(local_state_, &startup_uptime, &ignored_uptime_parameter);
   DCHECK_EQ(0, startup_uptime.InMicroseconds());
   // For backwards compatibility, leave this intact in case Omaha is checking
   // them.  prefs::kStabilityLastTimestampSec may also be useless now.
   // TODO(jar): Delete these if they have no uses.
-  pref->SetInt64(prefs::kStabilityLaunchTimeSec, Time::Now().ToTimeT());
+  local_state_->SetInt64(prefs::kStabilityLaunchTimeSec, Time::Now().ToTimeT());
 
   // Bookkeeping for the uninstall metrics.
   IncrementLongPrefsValue(prefs::kUninstallLaunchCount);
@@ -846,6 +819,8 @@ void MetricsService::NotifyOnDidCreateMetricsLog() {
   DCHECK(thread_checker_.CalledOnValidThread());
   FOR_EACH_OBSERVER(
       MetricsServiceObserver, observers_, OnDidCreateMetricsLog());
+  for (size_t i = 0; i < metrics_providers_.size(); ++i)
+    metrics_providers_[i]->OnDidCreateMetricsLog();
 }
 
 //------------------------------------------------------------------------------
@@ -861,13 +836,7 @@ void MetricsService::ScheduleNextStateSave() {
 }
 
 void MetricsService::SaveLocalState() {
-  PrefService* pref = g_browser_process->local_state();
-  if (!pref) {
-    NOTREACHED();
-    return;
-  }
-
-  RecordCurrentState(pref);
+  RecordCurrentState(local_state_);
 
   // TODO(jar):110021 Does this run down the batteries????
   ScheduleNextStateSave();
@@ -932,10 +901,9 @@ void MetricsService::CloseCurrentLog() {
   std::vector<variations::ActiveGroupId> synthetic_trials;
   GetCurrentSyntheticFieldTrials(&synthetic_trials);
   current_log->RecordEnvironment(metrics_providers_.get(), synthetic_trials);
-  PrefService* pref = g_browser_process->local_state();
   base::TimeDelta incremental_uptime;
   base::TimeDelta uptime;
-  GetUptimes(pref, &incremental_uptime, &uptime);
+  GetUptimes(local_state_, &incremental_uptime, &uptime);
   current_log->RecordStabilityMetrics(metrics_providers_.get(),
                                       incremental_uptime, uptime);
 
@@ -1104,8 +1072,7 @@ void MetricsService::StageNewLog() {
 
 void MetricsService::PrepareInitialStabilityLog() {
   DCHECK_EQ(INITIALIZED, state_);
-  PrefService* pref = g_browser_process->local_state();
-  DCHECK_NE(0, pref->GetInteger(prefs::kStabilityCrashCount));
+  DCHECK_NE(0, local_state_->GetInteger(prefs::kStabilityCrashCount));
 
   scoped_ptr<MetricsLog> initial_stability_log(
       CreateLog(MetricsLog::INITIAL_STABILITY_LOG));
@@ -1151,10 +1118,9 @@ void MetricsService::PrepareInitialMetricsLog() {
   GetCurrentSyntheticFieldTrials(&synthetic_trials);
   initial_metrics_log_->RecordEnvironment(metrics_providers_.get(),
                                           synthetic_trials);
-  PrefService* pref = g_browser_process->local_state();
   base::TimeDelta incremental_uptime;
   base::TimeDelta uptime;
-  GetUptimes(pref, &incremental_uptime, &uptime);
+  GetUptimes(local_state_, &incremental_uptime, &uptime);
 
   // Histograms only get written to the current log, so make the new log current
   // before writing them.
@@ -1336,17 +1302,13 @@ void MetricsService::OnURLFetchComplete(const net::URLFetcher* source) {
 }
 
 void MetricsService::IncrementPrefValue(const char* path) {
-  PrefService* pref = g_browser_process->local_state();
-  DCHECK(pref);
-  int value = pref->GetInteger(path);
-  pref->SetInteger(path, value + 1);
+  int value = local_state_->GetInteger(path);
+  local_state_->SetInteger(path, value + 1);
 }
 
 void MetricsService::IncrementLongPrefsValue(const char* path) {
-  PrefService* pref = g_browser_process->local_state();
-  DCHECK(pref);
-  int64 value = pref->GetInt64(path);
-  pref->SetInt64(path, value + 1);
+  int64 value = local_state_->GetInt64(path);
+  local_state_->SetInt64(path, value + 1);
 }
 
 bool MetricsService::UmaMetricsProperlyShutdown() {
@@ -1396,8 +1358,11 @@ void MetricsService::GetCurrentSyntheticFieldTrials(
 }
 
 scoped_ptr<MetricsLog> MetricsService::CreateLog(MetricsLog::LogType log_type) {
-  return make_scoped_ptr(new MetricsLog(
-      state_manager_->client_id(), session_id_, log_type, client_));
+  return make_scoped_ptr(new MetricsLog(state_manager_->client_id(),
+                                        session_id_,
+                                        log_type,
+                                        client_,
+                                        local_state_));
 }
 
 void MetricsService::RecordCurrentHistograms() {
@@ -1414,33 +1379,16 @@ void MetricsService::RecordCurrentStabilityHistograms() {
 
 void MetricsService::LogCleanShutdown() {
   // Redundant hack to write pref ASAP.
-  MarkAppCleanShutdownAndCommit();
+  MarkAppCleanShutdownAndCommit(local_state_);
 
   // Redundant setting to assure that we always reset this value at shutdown
   // (and that we don't use some alternate path, and not call LogCleanShutdown).
   clean_shutdown_status_ = CLEANLY_SHUTDOWN;
 
   RecordBooleanPrefValue(prefs::kStabilityExitedCleanly, true);
-  PrefService* pref = g_browser_process->local_state();
-  pref->SetInteger(prefs::kStabilityExecutionPhase,
-                   MetricsService::SHUTDOWN_COMPLETE);
+  local_state_->SetInteger(prefs::kStabilityExecutionPhase,
+                           MetricsService::SHUTDOWN_COMPLETE);
 }
-
-#if defined(OS_CHROMEOS)
-void MetricsService::LogChromeOSCrash(const std::string &crash_type) {
-  if (crash_type == "user")
-    IncrementPrefValue(prefs::kStabilityOtherUserCrashCount);
-  else if (crash_type == "kernel")
-    IncrementPrefValue(prefs::kStabilityKernelCrashCount);
-  else if (crash_type == "uncleanshutdown")
-    IncrementPrefValue(prefs::kStabilitySystemUncleanShutdownCount);
-  else
-    NOTREACHED() << "Unexpected Chrome OS crash type " << crash_type;
-  // Wake up metrics logs sending if necessary now that new
-  // log data is available.
-  HandleIdleSinceLastTransmission(false);
-}
-#endif  // OS_CHROMEOS
 
 void MetricsService::LogPluginLoadingError(const base::FilePath& plugin_path) {
 #if defined(ENABLE_PLUGINS)
@@ -1458,12 +1406,8 @@ bool MetricsService::ShouldLogEvents() {
 
 void MetricsService::RecordBooleanPrefValue(const char* path, bool value) {
   DCHECK(IsSingleThreaded());
-
-  PrefService* pref = g_browser_process->local_state();
-  DCHECK(pref);
-
-  pref->SetBoolean(path, value);
-  RecordCurrentState(pref);
+  local_state_->SetBoolean(path, value);
+  RecordCurrentState(local_state_);
 }
 
 void MetricsService::RecordCurrentState(PrefService* pref) {
@@ -1473,4 +1417,3 @@ void MetricsService::RecordCurrentState(PrefService* pref) {
   plugin_metrics_provider_->RecordPluginChanges();
 #endif
 }
-

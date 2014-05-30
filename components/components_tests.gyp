@@ -97,6 +97,7 @@
             'domain_reliability/util_unittest.cc',
             'enhanced_bookmarks/image_store_unittest.cc',
             'feedback/feedback_uploader_unittest.cc',
+            'gcm_driver/gcm_driver_unittest.cc',
             'invalidation/invalidation_logger_unittest.cc',
             'json_schema/json_schema_validator_unittest.cc',
             'json_schema/json_schema_validator_unittest_base.cc',
@@ -243,6 +244,10 @@
 
             # Dependencies of feedback
             'components.gyp:feedback_component',
+            
+            # Dependencies of gcm
+            'components.gyp:gcm_driver',
+            'components.gyp:gcm_driver_test_support',
 
             # Dependencies of invalidation
             'components.gyp:invalidation',
@@ -360,6 +365,7 @@
                 ['include', '^bookmarks/'],
                 ['include', '^data_reduction_proxy/'],
                 ['include', '^dom_distiller/'],
+                ['include', '^gcm_driver/'],
                 ['include', '^invalidation/'],
                 ['include', '^json_schema/'],
                 ['include', '^keyed_service/core/'],
@@ -425,6 +431,7 @@
             }],
             ['OS == "android"', {
               'sources!': [
+                'feedback/feedback_uploader_unittest.cc',
                 'signin/core/browser/mutable_profile_oauth2_token_service_unittest.cc',
                 'storage_monitor/media_storage_util_unittest.cc',
                 'storage_monitor/storage_info_unittest.cc',
@@ -432,7 +439,11 @@
                 'usb_service/usb_context_unittest.cc',
                 'web_modal/web_contents_modal_dialog_manager_unittest.cc',
               ],
+              'dependencies': [
+                '../testing/android/native_test.gyp:native_test_native_code',
+              ],
               'dependencies!': [
+                'components.gyp:feedback_component',
                 'components.gyp:storage_monitor',
                 'components.gyp:storage_monitor_test_support',
                 'components.gyp:usb_service',
@@ -440,11 +451,6 @@
                 'components.gyp:web_modal_test_support',
                 '../third_party/libusb/libusb.gyp:libusb',
               ],
-            }],
-            ['OS == "android"', {
-              'dependencies': [
-                '../testing/android/native_test.gyp:native_test_native_code',
-              ]
             }],
             ['chromeos==1', {
               'sources': [
@@ -656,7 +662,7 @@
               'variables': {
                 'pak_inputs': [
                   '<(SHARED_INTERMEDIATE_DIR)/components/component_resources.pak',
-                  '<(SHARED_INTERMEDIATE_DIR)/components/strings/component_strings_en-US.pak',
+                  '<(SHARED_INTERMEDIATE_DIR)/components/strings/components_strings_en-US.pak',
                 ],
                 'pak_output': '<(PRODUCT_DIR)/components_resources.pak',
               },

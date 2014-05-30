@@ -411,16 +411,21 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
       // Hide the button until the image is hovered over.
       [changePhotoButton_ setHidden:YES];
     }
-
-    // Add the frame overlay last, so that both the photo and the button
-    // look like circles.
-    base::scoped_nsobject<NSImageView> frameOverlay(
-        [[NSImageView alloc] initWithFrame:bounds]);
-    [frameOverlay setImage:ui::ResourceBundle::GetSharedInstance().
-        GetNativeImageNamed(IDR_ICON_PROFILES_AVATAR_PHOTO_FRAME).AsNSImage()];
-    [self addSubview:frameOverlay];
   }
   return self;
+}
+
+- (void)drawRect:(NSRect)dirtyRect {
+  NSRect bounds = [self bounds];
+
+  // Display the profile picture as a circle.
+  NSBezierPath* path = [NSBezierPath bezierPathWithOvalInRect:bounds];
+  [path addClip];
+  [self.image drawAtPoint:bounds.origin
+                 fromRect:bounds
+                operation:NSCompositeSourceOver
+                 fraction:1.0];
+
 }
 
 - (void)editPhoto:(id)sender {
@@ -686,6 +691,10 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
 - (NSView*)createCurrentProfileLinksForItem:(const AvatarMenu::Item&)item
                                        rect:(NSRect)rect;
 
+// Creates the disclaimer text for supervised users, telling them that the
+// manager can view their history etc.
+- (NSView*)createSupervisedUserDisclaimerView;
+
 // Creates a main profile card for the guest user.
 - (NSView*)createGuestProfileView;
 
@@ -817,6 +826,8 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
 }
 
 - (IBAction)openTutorialLearnMoreURL:(id)sender {
+  ProfileMetrics::LogProfileUpgradeEnrollment(
+      ProfileMetrics::PROFILE_ENROLLMENT_LAUNCH_LEARN_MORE);
   // TODO(guohui): update |learnMoreUrl| once it is decided.
   const GURL learnMoreUrl("https://support.google.com/chrome/?hl=en#to");
   chrome::NavigateParams params(browser_->profile(), learnMoreUrl,
@@ -826,10 +837,14 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
 }
 
 - (IBAction)enableNewProfileManagementPreview:(id)sender {
+  ProfileMetrics::LogProfileUpgradeEnrollment(
+      ProfileMetrics::PROFILE_ENROLLMENT_ACCEPT_NEW_PROFILE_MGMT);
   profiles::EnableNewProfileManagementPreview();
 }
 
 - (IBAction)dismissTutorial:(id)sender {
+  ProfileMetrics::LogProfileUpgradeEnrollment(
+      ProfileMetrics::PROFILE_ENROLLMENT_CLOSE_WELCOME_CARD);
   // If the user manually dismissed the tutorial, never show it again by setting
   // the number of times shown to the maximum plus 1, so that later we could
   // distinguish between the dismiss case and the case when the tutorial is
@@ -840,6 +855,8 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
 }
 
 - (IBAction)showSendFeedbackTutorial:(id)sender {
+  ProfileMetrics::LogProfileUpgradeEnrollment(
+      ProfileMetrics::PROFILE_ENROLLMENT_SEND_FEEDBACK);
   tutorialMode_ = profiles::TUTORIAL_MODE_SEND_FEEDBACK;
   [self initMenuContentsWithView:profiles::BUBBLE_VIEW_MODE_PROFILE_CHOOSER];
 }
@@ -934,6 +951,8 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
       [[NSMutableArray alloc] init]);
   // Local and guest profiles cannot lock their profile.
   bool enableLock = false;
+  // Store the most recently displayed tutorial mode
+  profiles::TutorialMode lastTutorialMode = tutorialMode_;
 
   // Loop over the profiles in reverse, so that they are sorted by their
   // y-coordinate, and separate them into active and "other" profiles.
@@ -994,6 +1013,21 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
     yOffset = NSMaxY([accountsSeparator frame]);
   }
 
+  // For supervised users, add the disclaimer text.
+  if (browser_->profile()->IsManaged()) {
+    yOffset += kSmallVerticalSpacing;
+    NSView* disclaimerContainer = [self createSupervisedUserDisclaimerView];
+    [disclaimerContainer setFrameOrigin:NSMakePoint(0, yOffset)];
+    [container addSubview:disclaimerContainer];
+    yOffset = NSMaxY([disclaimerContainer frame]);
+    yOffset += kSmallVerticalSpacing;
+
+    NSBox* separator =
+        [self separatorWithFrame:NSMakeRect(0, yOffset, kFixedMenuWidth, 0)];
+    [container addSubview:separator];
+    yOffset = NSMaxY([separator frame]);
+  }
+
   // Active profile card.
   if (currentProfileView) {
     yOffset += kVerticalSpacing;
@@ -1006,6 +1040,11 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
     [tutorialView setFrameOrigin:NSMakePoint(0, yOffset)];
     [container addSubview:tutorialView];
     yOffset = NSMaxY([tutorialView frame]);
+    if (!switches::IsNewProfileManagement() &&
+        tutorialMode_ != lastTutorialMode) {
+      ProfileMetrics::LogProfileUpgradeEnrollment(
+          ProfileMetrics::PROFILE_ENROLLMENT_SHOW_PREVIEW_PROMO);
+    }
   } else {
     tutorialMode_ = profiles::TUTORIAL_MODE_NONE;
   }
@@ -1172,7 +1211,10 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
 
   // Profile options. This can be a link to the accounts view, the profile's
   // username for signed in users, or a "Sign in" button for local profiles.
-  if (!isGuestSession_) {
+  SigninManagerBase* signinManager =
+      SigninManagerFactory::GetForProfile(
+          browser_->profile()->GetOriginalProfile());
+  if (!isGuestSession_ && signinManager->IsSigninAllowed()) {
     NSView* linksContainer =
         [self createCurrentProfileLinksForItem:item
                                           rect:NSMakeRect(xOffset, yOffset,
@@ -1290,6 +1332,27 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
 
   [container addSubview:link];
   [container setFrameSize:rect.size];
+  return container.autorelease();
+}
+
+- (NSView*)createSupervisedUserDisclaimerView {
+  base::scoped_nsobject<NSView> container(
+      [[NSView alloc] initWithFrame:NSZeroRect]);
+
+  int yOffset = 0;
+  int availableTextWidth = kFixedMenuWidth - 2 * kHorizontalSpacing;
+
+  NSTextField* disclaimer = BuildLabel(
+      base::SysUTF16ToNSString(avatarMenu_->GetManagedUserInformation()),
+      NSMakePoint(kHorizontalSpacing, yOffset),
+      nil /* background_color */,
+      nil /* text_color */);
+  [disclaimer setFrameSize:NSMakeSize(availableTextWidth, 0)];
+  [GTMUILocalizerAndLayoutTweaker sizeToFitFixedWidthTextField:disclaimer];
+  yOffset = NSMaxY([disclaimer frame]);
+
+  [container addSubview:disclaimer];
+  [container setFrameSize:NSMakeSize(kFixedMenuWidth, yOffset)];
   return container.autorelease();
 }
 

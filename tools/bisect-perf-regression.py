@@ -981,8 +981,8 @@ class SourceControl(object):
     Returns:
       The return code of the call.
     """
-    return bisect_utils.RunGClient(['sync', '--revision',
-        revision, '--verbose', '--nohooks', '--reset', '--force'])
+    return bisect_utils.RunGClient(['sync', '--verbose', '--reset', '--force',
+        '--delete_unversioned_trees', '--nohooks', '--revision', revision])
 
   def SyncToRevisionWithRepo(self, timestamp):
     """Uses repo to sync all the underlying git depots to the specified
@@ -1429,7 +1429,8 @@ class BisectPerformanceMetrics(object):
           continue
 
         if (depot_data.get('recurse') and depot in depot_data.get('from')):
-          src_dir = depot_data.get('src') or depot_data.get('src_old')
+          src_dir = (deps_data.get(depot_data.get('src')) or
+                     deps_data.get(depot_data.get('src_old')))
           if src_dir:
             self.depot_cwd[depot_name] = os.path.join(self.src_cwd, src_dir[4:])
             re_results = rxp.search(deps_data.get(src_dir, ''))
@@ -1440,6 +1441,8 @@ class BisectPerformanceMetrics(object):
                              '%s' % (depot_name, depot))
               if not warning_text in self.warnings:
                 self.warnings.append(warning_text)
+          else:
+            results[depot_name] = None
       return results
     except ImportError:
       deps_file_contents = ReadStringFromFile(bisect_utils.FILE_DEPS_GIT)
@@ -2274,7 +2277,8 @@ class BisectPerformanceMetrics(object):
 
     if self.was_blink != is_blink:
       self.was_blink = is_blink
-      return bisect_utils.RemoveThirdPartyWebkitDirectory()
+      # Removes third_party/Webkit directory.
+      return bisect_utils.RemoveThirdPartyDirectory('Webkit')
     return True
 
   def PerformCrosChrootCleanup(self):
@@ -2310,7 +2314,13 @@ class BisectPerformanceMetrics(object):
       True if successful.
     """
     if depot == 'chromium':
-      if not bisect_utils.RemoveThirdPartyLibjingleDirectory():
+      # Removes third_party/libjingle. At some point, libjingle was causing
+      # issues syncing when using the git workflow (crbug.com/266324).
+      if not bisect_utils.RemoveThirdPartyDirectory('libjingle'):
+        return False
+      # Removes third_party/skia. At some point, skia was causing
+      #  issues syncing when using the git workflow (crbug.com/377951).
+      if not bisect_utils.RemoveThirdPartyDirectory('skia'):
         return False
       return self.PerformWebkitDirectoryCleanup(revision)
     elif depot == 'cros':
@@ -2536,12 +2546,12 @@ class BisectPerformanceMetrics(object):
         # backwards to try to match trunk revisions to bleeding_edge.
         self._FillInV8BleedingEdgeInfo(min_revision_data, max_revision_data)
 
-      if (min_revision_data['external'][next_depot] ==
-          max_revision_data['external'][next_depot]):
+      if (min_revision_data['external'].get(next_depot) ==
+          max_revision_data['external'].get(next_depot)):
         continue
 
-      if (min_revision_data['external'][next_depot] and
-          max_revision_data['external'][next_depot]):
+      if (min_revision_data['external'].get(next_depot) and
+          max_revision_data['external'].get(next_depot)):
         external_depot = next_depot
         break
 

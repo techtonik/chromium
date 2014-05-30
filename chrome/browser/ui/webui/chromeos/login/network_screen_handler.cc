@@ -36,7 +36,6 @@
 #include "chromeos/ime/extension_ime_util.h"
 #include "chromeos/network/network_handler.h"
 #include "chromeos/network/network_state_handler.h"
-#include "chromeos/network/shill_property_util.h"
 #include "grit/chromium_strings.h"
 #include "grit/generated_resources.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -311,6 +310,12 @@ void NetworkScreenHandler::OnLanguageChangedCallback(
   }
 
   self->ReloadLocalizedContent();
+
+  // We still do not have device owner, so owner settings are not applied.
+  // But Guest session can be started before owner is created, so we need to
+  // save locale settings directly here.
+  g_browser_process->local_state()->SetString(prefs::kApplicationLocale,
+                                              self->selected_language_code_);
 
   AccessibilityManager::Get()->OnLocaleChanged();
 }

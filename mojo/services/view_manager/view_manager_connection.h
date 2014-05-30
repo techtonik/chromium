@@ -40,10 +40,8 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
     : public InterfaceImpl<IViewManager>,
       public NodeDelegate {
  public:
-  ViewManagerConnection(RootNodeManager* root_node_manager);
+  explicit ViewManagerConnection(RootNodeManager* root_node_manager);
   virtual ~ViewManagerConnection();
-
-  virtual void OnConnectionEstablished() MOJO_OVERRIDE;
 
   TransportConnectionId id() const { return id_; }
 
@@ -60,6 +58,8 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
         const_cast<const ViewManagerConnection*>(this)->GetView(id));
   }
   const View* GetView(const ViewId& id) const;
+
+  void SetRoots(const Array<TransportNodeId>& node_ids);
 
   // The following methods are invoked after the corresponding change has been
   // processed. They do the appropriate bookkeeping and update the client as
@@ -82,6 +82,11 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
                           bool originated_change);
   void ProcessViewDeleted(const ViewId& view, bool originated_change);
 
+  // TODO(sky): move this to private section (currently can't because of
+  // bindings).
+  // InterfaceImp overrides:
+  virtual void OnConnectionError() MOJO_OVERRIDE;
+
  private:
   typedef std::map<TransportConnectionSpecificNodeId, Node*> NodeMap;
   typedef std::map<TransportConnectionSpecificViewId, View*> ViewMap;
@@ -95,6 +100,7 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
   bool CanDeleteView(const ViewId& view_id) const;
   bool CanSetView(const Node* node, const ViewId& view_id) const;
   bool CanGetNodeTree(const Node* node) const;
+  bool CanConnect(const mojo::Array<uint32_t>& node_ids) const;
 
   // Deletes a node owned by this connection. Returns true on success. |source|
   // is the connection that originated the change.
@@ -127,13 +133,10 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
                                      const Node** old_parent,
                                      std::vector<const Node*>* to_send);
 
-  bool ProcessSetRoots(TransportConnectionId source_connection_id,
-                       const Array<TransportNodeId>& transport_node_ids);
-
   // Converts an array of Nodes to INodes. This assumes all the nodes are valid
   // for the client. The parent of nodes the client is not allowed to see are
   // set to NULL (in the returned INodes).
-  Array<INode> NodesToINodes(const std::vector<const Node*>& nodes);
+  Array<INodePtr> NodesToINodes(const std::vector<const Node*>& nodes);
 
   // Overridden from IViewManager:
   virtual void CreateNode(TransportNodeId transport_node_id,
@@ -150,7 +153,7 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
       const Callback<void(bool)>& callback) OVERRIDE;
   virtual void GetNodeTree(
       TransportNodeId node_id,
-      const Callback<void(Array<INode>)>& callback) OVERRIDE;
+      const Callback<void(Array<INodePtr>)>& callback) OVERRIDE;
   virtual void CreateView(TransportViewId transport_view_id,
                           const Callback<void(bool)>& callback) OVERRIDE;
   virtual void DeleteView(TransportViewId transport_view_id,
@@ -162,13 +165,12 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
                                ScopedSharedBufferHandle buffer,
                                uint32_t buffer_size,
                                const Callback<void(bool)>& callback) OVERRIDE;
-  virtual void SetRoots(
-      TransportConnectionId connection_id,
-      const Array<TransportNodeId>& transport_node_ids,
-      const Callback<void(bool)>& callback) OVERRIDE;
   virtual void SetNodeBounds(TransportNodeId node_id,
-                             const Rect& bounds,
+                             RectPtr bounds,
                              const Callback<void(bool)>& callback) OVERRIDE;
+  virtual void Connect(const mojo::String& url,
+                       mojo::Array<uint32_t> node_ids,
+                       const mojo::Callback<void(bool)>& callback) OVERRIDE;
 
   // Overridden from NodeDelegate:
   virtual void OnNodeHierarchyChanged(const Node* node,
@@ -177,6 +179,9 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
   virtual void OnNodeViewReplaced(const Node* node,
                                   const View* new_view,
                                   const View* old_view) OVERRIDE;
+
+  // InterfaceImp overrides:
+  virtual void OnConnectionEstablished() MOJO_OVERRIDE;
 
   RootNodeManager* root_node_manager_;
 

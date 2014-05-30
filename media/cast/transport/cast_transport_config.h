@@ -25,14 +25,19 @@ enum RtcpMode {
   kRtcpReducedSize,  // Reduced-size RTCP mode is described by RFC 5506.
 };
 
-enum VideoCodec { kFakeSoftwareVideo, kVp8, kH264, kVideoCodecLast = kH264 };
+enum VideoCodec {
+  kUnknownVideoCodec,
+  kFakeSoftwareVideo,
+  kVp8,
+  kH264,
+  kVideoCodecLast = kH264
+};
 
 enum AudioCodec {
-  kFakeSoftwareAudio,
+  kUnknownAudioCodec,
   kOpus,
   kPcm16,
-  kExternalAudio,
-  kAudioCodecLast = kExternalAudio
+  kAudioCodecLast = kPcm16
 };
 
 struct RtpConfig {

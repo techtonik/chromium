@@ -140,9 +140,14 @@
           # Dependent APKs include this target's resources via
           # additional_res_dirs, additional_res_packages, and
           # additional_R_text_files.
-          'additional_res_dirs': ['<(res_crunched_dir)',
-                                  '<(res_v14_compatibility_dir)',
-                                  '<@(res_input_dirs)'],
+          'additional_res_dirs': [
+              # The order of these is important to ensure that the proper
+              # version (i.e. the crunched version) of resources takes
+              # precedence.
+              '<(res_crunched_dir)',
+              '<(res_v14_compatibility_dir)',
+              '<@(res_input_dirs)'
+              ],
           'additional_res_packages': ['<(R_package)'],
           'additional_R_text_files': ['<(R_text_file)'],
         },
@@ -156,8 +161,8 @@
             'android_manifest': '<(DEPTH)/build/android/AndroidManifest.xml',
             # Include the dependencies' res dirs so that references to
             # resources in dependencies can be resolved.
-            'all_res_dirs': ['<@(res_input_dirs)',
-                             '>@(dependencies_res_input_dirs)',],
+            'dependencies_res_dirs': ['<@(res_extra_dirs)',
+                                      '>@(dependencies_res_input_dirs)',],
             # Write the inputs list to a file, so that its mtime is updated when
             # the list of inputs changes.
             'inputs_list_file': '>|(java_resources.<(_target_name).gypcmd >@(resource_input_paths) >@(dependencies_res_files))'
@@ -177,8 +182,8 @@
             '--android-sdk', '<(android_sdk)',
             '--android-sdk-tools', '<(android_sdk_tools)',
             '--R-dir', '<(R_dir)',
-            '--res-dirs', '>(all_res_dirs)',
-            '--crunch-input-dir', '>(res_dir)',
+            '--dependencies-res-dirs', '>(dependencies_res_dirs)',
+            '--resource-dir', '<(res_dir)',
             '--crunch-output-dir', '<(res_crunched_dir)',
             '--android-manifest', '<(android_manifest)',
             '--non-constant-id',

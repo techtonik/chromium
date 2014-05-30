@@ -67,6 +67,7 @@
 #include "extensions/browser/extension_function_util.h"
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/file_reader.h"
+#include "extensions/common/constants.h"
 #include "extensions/common/error_utils.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_l10n_util.h"
@@ -1173,7 +1174,7 @@ bool TabsUpdateFunction::UpdateURL(const std::string &url_string,
 
   // JavaScript URLs can do the same kinds of things as cross-origin XHR, so
   // we need to check host permissions before allowing them.
-  if (url.SchemeIs(content::kJavaScriptScheme)) {
+  if (url.SchemeIs(url::kJavaScriptScheme)) {
     content::RenderProcessHost* process = web_contents_->GetRenderProcessHost();
     if (!PermissionsData::CanExecuteScriptOnPage(
             GetExtension(),
@@ -1210,7 +1211,7 @@ bool TabsUpdateFunction::UpdateURL(const std::string &url_string,
 
   // The URL of a tab contents never actually changes to a JavaScript URL, so
   // this check only makes sense in other cases.
-  if (!url.SchemeIs(content::kJavaScriptScheme))
+  if (!url.SchemeIs(url::kJavaScriptScheme))
     DCHECK_EQ(url.spec(), web_contents_->GetURL().spec());
 
   return true;

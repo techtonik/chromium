@@ -199,7 +199,6 @@
 #include "content/renderer/android/content_detector.h"
 #include "content/renderer/android/email_detector.h"
 #include "content/renderer/android/phone_number_detector.h"
-#include "content/renderer/media/android/renderer_media_player_manager.h"
 #include "net/android/network_library.h"
 #include "skia/ext/platform_canvas.h"
 #include "third_party/WebKit/public/platform/WebFloatPoint.h"
@@ -661,7 +660,6 @@ RenderViewImpl::RenderViewImpl(RenderViewImplParams* params)
       mouse_lock_dispatcher_(NULL),
 #if defined(OS_ANDROID)
       expected_content_intent_id_(0),
-      media_player_manager_(NULL),
 #endif
 #if defined(OS_WIN)
       focused_plugin_id_(-1),
@@ -787,10 +785,6 @@ void RenderViewImpl::Initialize(RenderViewImplParams* params) {
 #if defined(OS_MACOSX)
   new TextInputClientObserver(this);
 #endif  // defined(OS_MACOSX)
-
-#if defined(OS_ANDROID)
-  media_player_manager_ = new RendererMediaPlayerManager(this);
-#endif
 
   // The next group of objects all implement RenderViewObserver, so are deleted
   // along with the RenderView automatically.
@@ -1140,7 +1134,6 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ViewMsg_SelectPopupMenuItems, OnSelectPopupMenuItems)
     IPC_MESSAGE_HANDLER(ViewMsg_UpdateTopControlsState,
                         OnUpdateTopControlsState)
-    IPC_MESSAGE_HANDLER(ViewMsg_PauseVideo, OnPauseVideo)
     IPC_MESSAGE_HANDLER(ViewMsg_ExtractSmartClipData, OnExtractSmartClipData)
 #elif defined(OS_MACOSX)
     IPC_MESSAGE_HANDLER(ViewMsg_PluginImeCompositionCompleted,
@@ -1309,16 +1302,6 @@ void RenderViewImpl::OnSetInLiveResize(bool in_live_resize) {
     webview()->willStartLiveResize();
   else
     webview()->willEndLiveResize();
-}
-#endif
-
-#if defined(OS_ANDROID)
-void RenderViewImpl::OnPauseVideo() {
-  // Inform RendererMediaPlayerManager to release all video player resources.
-  // If something is in progress the resource will not be freed, it will
-  // only be freed once the tab is destroyed or if the user navigates away
-  // via WebMediaPlayerAndroid::Destroy.
-  media_player_manager_->ReleaseVideoResources();
 }
 #endif
 
@@ -1557,15 +1540,6 @@ void RenderViewImpl::FrameDidStopLoading(WebFrame* frame) {
 
 void RenderViewImpl::didCancelCompositionOnSelectionChange() {
   Send(new ViewHostMsg_ImeCancelComposition(routing_id()));
-}
-
-void RenderViewImpl::didExecuteCommand(const WebString& command_name) {
-  const std::string& name = base::UTF16ToUTF8(command_name);
-  if (StartsWithASCII(name, "Move", true) ||
-      StartsWithASCII(name, "Insert", true) ||
-      StartsWithASCII(name, "Delete", true))
-    return;
-  RenderThreadImpl::current()->RecordComputedAction(name);
 }
 
 bool RenderViewImpl::handleCurrentKeyboardEvent() {
@@ -1911,21 +1885,6 @@ bool RenderViewImpl::isPointerLocked() {
       webwidget_mouse_lock_target_.get());
 }
 
-void RenderViewImpl::didActivateCompositor() {
-#if !defined(OS_MACOSX)  // many events are unhandled - http://crbug.com/138003
-  RenderThreadImpl* render_thread = RenderThreadImpl::current();
-  // render_thread may be NULL in tests.
-  InputHandlerManager* input_handler_manager =
-      render_thread ? render_thread->input_handler_manager() : NULL;
-  if (input_handler_manager) {
-     input_handler_manager->AddInputHandler(
-        routing_id_,
-        compositor_->GetInputHandler(),
-        AsWeakPtr());
-  }
-#endif
-}
-
 void RenderViewImpl::didHandleGestureEvent(
     const WebGestureEvent& event,
     bool event_cancelled) {
@@ -1944,9 +1903,21 @@ void RenderViewImpl::didHandleGestureEvent(
 void RenderViewImpl::initializeLayerTreeView() {
   RenderWidget::initializeLayerTreeView();
   RenderWidgetCompositor* rwc = compositor();
-  if (!rwc || !webview() || !webview()->devToolsAgent())
+  if (!rwc)
     return;
-  webview()->devToolsAgent()->setLayerTreeId(rwc->GetLayerTreeId());
+  if (webview() && webview()->devToolsAgent())
+    webview()->devToolsAgent()->setLayerTreeId(rwc->GetLayerTreeId());
+
+#if !defined(OS_MACOSX)  // many events are unhandled - http://crbug.com/138003
+  RenderThreadImpl* render_thread = RenderThreadImpl::current();
+  // render_thread may be NULL in tests.
+  InputHandlerManager* input_handler_manager =
+      render_thread ? render_thread->input_handler_manager() : NULL;
+  if (input_handler_manager) {
+    input_handler_manager->AddInputHandler(
+        routing_id_, rwc->GetInputHandler(), AsWeakPtr());
+  }
+#endif
 }
 
 // blink::WebFrameClient -----------------------------------------------------
@@ -2088,7 +2059,7 @@ void RenderViewImpl::PopulateDocumentStateFromPending(
   InternalDocumentStateData* internal_data =
       InternalDocumentStateData::FromDocumentState(document_state);
 
-  if (!params.url.SchemeIs(kJavaScriptScheme) &&
+  if (!params.url.SchemeIs(url::kJavaScriptScheme) &&
       params.navigation_type == FrameMsg_Navigate_Type::RESTORE) {
     // We're doing a load of a page that was restored from the last session. By
     // default this prefers the cache over loading (LOAD_PREFERRING_CACHE) which
@@ -2125,7 +2096,7 @@ NavigationState* RenderViewImpl::CreateNavigationStateFromPending() {
   // A navigation resulting from loading a javascript URL should not be treated
   // as a browser initiated event.  Instead, we want it to look as if the page
   // initiated any load resulting from JS execution.
-  if (!params.url.SchemeIs(kJavaScriptScheme)) {
+  if (!params.url.SchemeIs(url::kJavaScriptScheme)) {
     navigation_state = NavigationState::CreateBrowserInitiated(
         params.page_id,
         params.pending_history_list_offset,
@@ -2907,6 +2878,8 @@ void RenderViewImpl::OnDisableScrollbarsForSmallWindows(
 void RenderViewImpl::OnSetRendererPrefs(
     const RendererPreferences& renderer_prefs) {
   double old_zoom_level = renderer_preferences_.default_zoom_level;
+  std::string old_accept_languages = renderer_preferences_.accept_languages;
+
   renderer_preferences_ = renderer_prefs;
   UpdateFontRenderingFromRendererPrefs();
 
@@ -2940,6 +2913,11 @@ void RenderViewImpl::OnSetRendererPrefs(
       ZoomValuesEqual(webview()->zoomLevel(), old_zoom_level)) {
     webview()->setZoomLevel(renderer_preferences_.default_zoom_level);
     zoomLevelChanged();
+  }
+
+  if (webview() &&
+      old_accept_languages != renderer_preferences_.accept_languages) {
+    webview()->acceptLanguagesChanged();
   }
 }
 
@@ -3087,7 +3065,12 @@ void RenderViewImpl::OnResize(const ViewMsg_Resize_Params& params) {
     UpdateScrollState(webview()->mainFrame());
   }
 
+  gfx::Size old_visible_viewport_size = visible_viewport_size_;
+
   RenderWidget::OnResize(params);
+
+  if (old_visible_viewport_size != visible_viewport_size_)
+    has_scrolled_focused_editable_node_into_rect_ = false;
 }
 
 void RenderViewImpl::DidInitiatePaint() {

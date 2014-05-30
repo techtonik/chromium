@@ -64,6 +64,7 @@ class TooltipController;
 namespace wm {
 class CompoundEventFilter;
 class InputMethodEventFilter;
+class NestedAcceleratorController;
 class ShadowController;
 class VisibilityController;
 class UserActivityDetector;
@@ -106,7 +107,6 @@ class MaximizeModeWindowManager;
 class MediaDelegate;
 class MouseCursorEventFilter;
 class MruWindowTracker;
-class NestedDispatcherController;
 class NewWindowDelegate;
 class OverlayEventFilter;
 class PartialMagnificationController;
@@ -331,6 +331,14 @@ class ASH_EXPORT Shell : public SystemModalContainerEventFilterDelegate,
 
   // Test if the MaximizeModeWindowManager is enabled or not.
   bool IsMaximizeModeWindowManagerEnabled();
+
+#if defined(OS_CHROMEOS)
+  // Test if MaximizeModeWindowManager is not enabled, and if
+  // MaximizeModeController is not currently setting a display rotation. Or if
+  // the |resolution_notification_controller_| is not showing its confirmation
+  // dialog. If true then changes to display settings can be saved.
+  bool ShouldSaveDisplaySettings();
+#endif
 
   AcceleratorController* accelerator_controller() {
     return accelerator_controller_.get();
@@ -623,7 +631,7 @@ class ASH_EXPORT Shell : public SystemModalContainerEventFilterDelegate,
   std::vector<WindowAndBoundsPair> to_restore_;
 
   scoped_ptr<UserMetricsRecorder> user_metrics_recorder_;
-  scoped_ptr<NestedDispatcherController> nested_dispatcher_controller_;
+  scoped_ptr< ::wm::NestedAcceleratorController> nested_accelerator_controller_;
   scoped_ptr<AcceleratorController> accelerator_controller_;
   scoped_ptr<ShellDelegate> delegate_;
   scoped_ptr<SystemTrayDelegate> system_tray_delegate_;

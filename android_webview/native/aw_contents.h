@@ -37,7 +37,7 @@ class AwContentsContainer;
 class AwContentsClientBridge;
 class AwPdfExporter;
 class AwWebContentsDelegate;
-class HardwareRenderer;
+class HardwareRendererInterface;
 class PermissionRequestHandler;
 
 // Native side of java-class of same name.
@@ -160,6 +160,9 @@ class AwContents : public FindHelper::Listener,
   void ClearMatches(JNIEnv* env, jobject obj);
   FindHelper* GetFindHelper();
 
+  // Per WebView Cookie Policy
+  bool AllowThirdPartyCookies();
+
   // FindHelper::Listener implementation.
   virtual void OnFindResultReceived(int active_ordinal,
                                     int match_count,
@@ -227,7 +230,7 @@ class AwContents : public FindHelper::Listener,
   scoped_ptr<AwContents> pending_contents_;
   SharedRendererState shared_renderer_state_;
   BrowserViewRenderer browser_view_renderer_;
-  scoped_ptr<HardwareRenderer> hardware_renderer_;
+  scoped_ptr<HardwareRendererInterface> hardware_renderer_;
   scoped_ptr<AwPdfExporter> pdf_exporter_;
   scoped_ptr<PermissionRequestHandler> permission_request_handler_;
 

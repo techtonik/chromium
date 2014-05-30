@@ -180,7 +180,7 @@ bool ParseHelper(Extension* extension,
       // to match all paths.
       pattern.SetPath("/*");
       int valid_schemes = pattern.valid_schemes();
-      if (pattern.MatchesScheme(content::kFileScheme) &&
+      if (pattern.MatchesScheme(url::kFileScheme) &&
           !PermissionsData::CanExecuteScriptEverywhere(extension)) {
         extension->set_wants_file_access(true);
         if (!(extension->creation_flags() & Extension::ALLOW_FILE_ACCESS))
@@ -433,12 +433,6 @@ bool PermissionsData::HasEffectiveAccessToAllHosts(const Extension* extension) {
 }
 
 // static
-bool PermissionsData::ShouldWarnAllHosts(const Extension* extension) {
-  base::AutoLock auto_lock(extension->permissions_data()->runtime_lock_);
-  return GetActivePermissions(extension)->ShouldWarnAllHosts();
-}
-
-// static
 PermissionMessages PermissionsData::GetPermissionMessages(
     const Extension* extension) {
   base::AutoLock auto_lock(extension->permissions_data()->runtime_lock_);
@@ -580,6 +574,12 @@ bool PermissionsData::CanCaptureVisiblePage(const Extension* extension,
 
 // static
 bool PermissionsData::RequiresActionForScriptExecution(
+    const Extension* extension) {
+  return RequiresActionForScriptExecution(extension, -1, GURL());
+}
+
+// static
+bool PermissionsData::RequiresActionForScriptExecution(
     const Extension* extension,
     int tab_id,
     const GURL& url) {
@@ -651,6 +651,11 @@ void PermissionsData::FinalizePermissions(Extension* extension) {
 
   initial_required_permissions_.reset();
   initial_optional_permissions_.reset();
+}
+
+bool PermissionsData::ShouldWarnAllHosts(const Extension* extension) {
+  base::AutoLock auto_lock(extension->permissions_data()->runtime_lock_);
+  return PermissionsData::GetActivePermissions(extension)->ShouldWarnAllHosts();
 }
 
 }  // namespace extensions

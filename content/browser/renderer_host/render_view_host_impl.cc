@@ -72,7 +72,6 @@
 #include "content/public/common/context_menu_params.h"
 #include "content/public/common/drop_data.h"
 #include "content/public/common/result_codes.h"
-#include "content/public/common/url_constants.h"
 #include "content/public/common/url_utils.h"
 #include "net/base/filename_util.h"
 #include "net/base/net_util.h"
@@ -87,12 +86,13 @@
 #include "ui/gfx/native_widget_types.h"
 #include "ui/native_theme/native_theme_switches.h"
 #include "ui/shell_dialogs/selected_file_info.h"
+#include "url/url_constants.h"
 #include "webkit/browser/fileapi/isolated_context.h"
 
 #if defined(OS_MACOSX)
 #include "content/browser/renderer_host/popup_menu_helper_mac.h"
 #elif defined(OS_ANDROID)
-#include "content/browser/media/android/browser_media_player_manager.h"
+#include "content/browser/media/android/media_web_contents_observer.h"
 #elif defined(OS_WIN)
 #include "base/win/win_util.h"
 #endif
@@ -224,7 +224,7 @@ RenderViewHostImpl::RenderViewHostImpl(
   }
 
 #if defined(OS_ANDROID)
-  media_player_manager_.reset(BrowserMediaPlayerManager::Create(this));
+  media_web_contents_observer_.reset(new MediaWebContentsObserver(this));
 #endif
 
   unload_event_monitor_timeout_.reset(new TimeoutMonitor(base::Bind(
@@ -461,9 +461,7 @@ WebPreferences RenderViewHostImpl::GetWebkitPrefs(const GURL& url) {
   }
 
   prefs.is_online = !net::NetworkChangeNotifier::IsOffline();
-
-  prefs.fixed_position_creates_stacking_context = !command_line.HasSwitch(
-      switches::kDisableFixedPositionCreatesStackingContext);
+  prefs.connection_type = net::NetworkChangeNotifier::GetConnectionType();
 
   prefs.gesture_tap_highlight_enabled = !command_line.HasSwitch(
       switches::kDisableGestureTapHighlight);
@@ -1003,10 +1001,6 @@ bool RenderViewHostImpl::OnMessageReceived(const IPC::Message& msg) {
     IPC_MESSAGE_HANDLER(ViewHostMsg_TakeFocus, OnTakeFocus)
     IPC_MESSAGE_HANDLER(ViewHostMsg_FocusedNodeChanged, OnFocusedNodeChanged)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ClosePage_ACK, OnClosePageACK)
-#if defined(OS_ANDROID)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_SelectionRootBoundsChanged,
-                        OnSelectionRootBoundsChanged)
-#endif
     IPC_MESSAGE_HANDLER(ViewHostMsg_DidZoomURL, OnDidZoomURL)
 #if defined(OS_MACOSX) || defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ShowPopup, OnShowPopup)
@@ -1219,15 +1213,6 @@ void RenderViewHostImpl::OnDidChangeScrollOffsetPinningForMainFrame(
 void RenderViewHostImpl::OnDidChangeNumWheelEvents(int count) {
 }
 
-#if defined(OS_ANDROID)
-void RenderViewHostImpl::OnSelectionRootBoundsChanged(
-    const gfx::Rect& bounds) {
-  if (view_) {
-    view_->SelectionRootBoundsChanged(bounds);
-  }
-}
-#endif
-
 void RenderViewHostImpl::OnRouteCloseEvent() {
   // Have the delegate route this to the active RenderViewHost.
   delegate_->RouteCloseEvent(this);
@@ -1255,7 +1240,7 @@ void RenderViewHostImpl::OnStartDragging(
       ChildProcessSecurityPolicyImpl::GetInstance();
 
   // Allow drag of Javascript URLs to enable bookmarklet drag to bookmark bar.
-  if (!filtered_data.url.SchemeIs(kJavaScriptScheme))
+  if (!filtered_data.url.SchemeIs(url::kJavaScriptScheme))
     process->FilterURL(true, &filtered_data.url);
   process->FilterURL(false, &filtered_data.html_base_url);
   // Filter out any paths that the renderer didn't have access to. This prevents

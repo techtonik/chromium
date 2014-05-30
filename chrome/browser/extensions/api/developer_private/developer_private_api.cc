@@ -101,7 +101,7 @@ GURL GetImageURLFromData(const std::string& contents) {
   base::Base64Encode(contents, &contents_base64);
 
   // TODO(dvh): make use of content::kDataScheme. Filed as crbug/297301.
-  const char kDataURLPrefix[] = "data:image;base64,";
+  const char kDataURLPrefix[] = "data:;base64,";
   return GURL(kDataURLPrefix + contents_base64);
 }
 
@@ -175,7 +175,7 @@ DeveloperPrivateAPI::DeveloperPrivateAPI(content::BrowserContext* context)
 DeveloperPrivateEventRouter::DeveloperPrivateEventRouter(Profile* profile)
     : profile_(profile) {
   int types[] = {chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
-                 chrome::NOTIFICATION_EXTENSION_UNINSTALLED,
+                 chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED,
                  chrome::NOTIFICATION_EXTENSION_LOADED_DEPRECATED,
                  chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED,
                  chrome::NOTIFICATION_EXTENSION_VIEW_REGISTERED,
@@ -222,7 +222,7 @@ void DeveloperPrivateEventRouter::Observe(
       extension =
           content::Details<const InstalledExtensionInfo>(details)->extension;
       break;
-    case chrome::NOTIFICATION_EXTENSION_UNINSTALLED:
+    case chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED:
       event_data.event_type = developer::EVENT_TYPE_UNINSTALLED;
       extension = content::Details<const Extension>(details).ptr();
       break;

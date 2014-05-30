@@ -1339,19 +1339,6 @@ void ExtensionPrefs::UpdateManifest(const Extension* extension) {
   }
 }
 
-base::FilePath ExtensionPrefs::GetExtensionPath(
-    const std::string& extension_id) {
-  const base::DictionaryValue* dict = GetExtensionPref(extension_id);
-  if (!dict)
-    return base::FilePath();
-
-  std::string path;
-  if (!dict->GetString(kPrefPath, &path))
-    return base::FilePath();
-
-  return install_directory_.Append(base::FilePath::FromUTF8Unsafe(path));
-}
-
 scoped_ptr<ExtensionInfo> ExtensionPrefs::GetInstalledInfoHelper(
     const std::string& extension_id,
     const base::DictionaryValue* extension) const {
@@ -1366,9 +1353,15 @@ scoped_ptr<ExtensionInfo> ExtensionPrefs::GetInstalledInfoHelper(
   // Make path absolute. Unpacked extensions will already have absolute paths,
   // otherwise make it so.
   Manifest::Location location = static_cast<Manifest::Location>(location_value);
+#if !defined(OS_CHROMEOS)
   if (!Manifest::IsUnpackedLocation(location)) {
     DCHECK(location == Manifest::COMPONENT ||
            !base::FilePath(path).IsAbsolute());
+#else
+  // On Chrome OS some extensions can be installed to shared location and
+  // thus use absolute paths in prefs.
+  if (!base::FilePath(path).IsAbsolute()) {
+#endif  // !defined(OS_CHROMEOS)
     path = install_directory_.Append(path).value();
   }
 
@@ -1640,12 +1633,26 @@ void ExtensionPrefs::RemoveEvictedEphemeralApp(
 }
 
 bool ExtensionPrefs::IsEphemeralApp(const std::string& extension_id) const {
+  // Hide the data of evicted ephemeral apps.
+  if (ReadPrefAsBooleanAndReturn(extension_id, kPrefEvictedEphemeralApp))
+    return false;
+
   if (ReadPrefAsBooleanAndReturn(extension_id, kPrefEphemeralApp))
     return true;
 
   // Ephemerality was previously stored in the creation flags, so we must also
   // check it for backcompatibility.
   return (GetCreationFlags(extension_id) & Extension::IS_EPHEMERAL) != 0;
+}
+
+void ExtensionPrefs::OnEphemeralAppPromoted(const std::string& extension_id) {
+  DCHECK(IsEphemeralApp(extension_id));
+
+  ScopedExtensionPrefUpdate update(prefs_, extension_id);
+  update->Set(kPrefEphemeralApp, new base::FundamentalValue(false));
+
+  DCHECK(!IsEvictedEphemeralApp(update.Get()));
+  update->Remove(kPrefEvictedEphemeralApp, NULL);
 }
 
 bool ExtensionPrefs::WasAppDraggedByUser(const std::string& extension_id) {
@@ -2142,10 +2149,8 @@ void ExtensionPrefs::PopulateExtensionInfoPrefs(
   if (blacklisted_for_malware)
     extension_dict->Set(kPrefBlacklist, new base::FundamentalValue(true));
 
-  if (is_ephemeral)
-    extension_dict->Set(kPrefEphemeralApp, new base::FundamentalValue(true));
-  else
-    extension_dict->Remove(kPrefEphemeralApp, NULL);
+  extension_dict->Set(kPrefEphemeralApp,
+                      new base::FundamentalValue(is_ephemeral));
 
   base::FilePath::StringType path = MakePathRelative(install_directory_,
                                                      extension->path());

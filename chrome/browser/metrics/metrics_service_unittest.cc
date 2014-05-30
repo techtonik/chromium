@@ -7,7 +7,9 @@
 #include <string>
 
 #include "base/bind.h"
+#include "base/prefs/testing_pref_service.h"
 #include "base/threading/platform_thread.h"
+#include "chrome/browser/google/google_util.h"
 #include "chrome/browser/metrics/metrics_state_manager.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/scoped_testing_local_state.h"
@@ -20,8 +22,8 @@
 #include "testing/gtest/include/gtest/gtest.h"
 
 #if defined(OS_CHROMEOS)
-#include "chrome/browser/metrics/metrics_log_chromeos.h"
-#endif  // OS_CHROMEOS
+#include "chromeos/login/login_state.h"
+#endif  // defined(OS_CHROMEOS)
 
 namespace {
 
@@ -30,8 +32,9 @@ using metrics::MetricsLogManager;
 class TestMetricsService : public MetricsService {
  public:
   TestMetricsService(metrics::MetricsStateManager* state_manager,
-                     metrics::MetricsServiceClient* client)
-      : MetricsService(state_manager, client) {}
+                     metrics::MetricsServiceClient* client,
+                     PrefService* local_state)
+      : MetricsService(state_manager, client, local_state) {}
   virtual ~TestMetricsService() {}
 
   using MetricsService::log_manager;
@@ -40,32 +43,18 @@ class TestMetricsService : public MetricsService {
   DISALLOW_COPY_AND_ASSIGN(TestMetricsService);
 };
 
-#if defined(OS_CHROMEOS)
-class TestMetricsLogChromeOS : public MetricsLogChromeOS {
- public:
-  explicit TestMetricsLogChromeOS(
-      metrics::ChromeUserMetricsExtension* uma_proto)
-      : MetricsLogChromeOS(uma_proto) {
-  }
-
- protected:
-  // Don't touch bluetooth information, as it won't be correctly initialized.
-  virtual void WriteBluetoothProto() OVERRIDE {
-  }
-};
-#endif  // OS_CHROMEOS
-
 class TestMetricsLog : public MetricsLog {
  public:
   TestMetricsLog(const std::string& client_id,
                  int session_id,
-                 metrics::MetricsServiceClient* client)
-      : MetricsLog(client_id, session_id, MetricsLog::ONGOING_LOG, client) {
-#if defined(OS_CHROMEOS)
-    metrics_log_chromeos_.reset(new TestMetricsLogChromeOS(
-        MetricsLog::uma_proto()));
-#endif  // OS_CHROMEOS
-  }
+                 metrics::MetricsServiceClient* client,
+                 PrefService* local_state)
+      : MetricsLog(client_id,
+                   session_id,
+                   MetricsLog::ONGOING_LOG,
+                   client,
+                   local_state) {}
+
   virtual ~TestMetricsLog() {}
 
  private:
@@ -74,27 +63,31 @@ class TestMetricsLog : public MetricsLog {
 
 class MetricsServiceTest : public testing::Test {
  public:
-  MetricsServiceTest()
-      : testing_local_state_(TestingBrowserProcess::GetGlobal()),
-        is_metrics_reporting_enabled_(false),
-        metrics_state_manager_(
-            metrics::MetricsStateManager::Create(
-                GetLocalState(),
-                base::Bind(&MetricsServiceTest::is_metrics_reporting_enabled,
-                           base::Unretained(this)))) {
+  MetricsServiceTest() : is_metrics_reporting_enabled_(false) {
+    MetricsService::RegisterPrefs(testing_local_state_.registry());
+    metrics_state_manager_ = metrics::MetricsStateManager::Create(
+        GetLocalState(),
+        base::Bind(&MetricsServiceTest::is_metrics_reporting_enabled,
+                   base::Unretained(this)));
+#if defined(OS_CHROMEOS)
+    // TODO(blundell): Remove this code once MetricsService no longer creates
+    // ChromeOSMetricsProvider. Also remove the #include of login_state.h.
+    // (http://crbug.com/375776)
+    if (!chromeos::LoginState::IsInitialized())
+      chromeos::LoginState::Initialize();
+#endif  // defined(OS_CHROMEOS)
   }
 
   virtual ~MetricsServiceTest() {
-    MetricsService::SetExecutionPhase(MetricsService::UNINITIALIZED_PHASE);
+    MetricsService::SetExecutionPhase(MetricsService::UNINITIALIZED_PHASE,
+                                      GetLocalState());
   }
 
   metrics::MetricsStateManager* GetMetricsStateManager() {
     return metrics_state_manager_.get();
   }
 
-  PrefService* GetLocalState() {
-    return testing_local_state_.Get();
-  }
+  PrefService* GetLocalState() { return &testing_local_state_; }
 
   // Sets metrics reporting as enabled for testing.
   void EnableMetricsReporting() {
@@ -132,8 +125,8 @@ class MetricsServiceTest : public testing::Test {
   }
 
   content::TestBrowserThreadBundle thread_bundle_;
-  ScopedTestingLocalState testing_local_state_;
   bool is_metrics_reporting_enabled_;
+  TestingPrefServiceSimple testing_local_state_;
   scoped_ptr<metrics::MetricsStateManager> metrics_state_manager_;
 
   DISALLOW_COPY_AND_ASSIGN(MetricsServiceTest);
@@ -162,7 +155,8 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCleanShutDown) {
   GetLocalState()->SetBoolean(prefs::kStabilityExitedCleanly, true);
 
   metrics::TestMetricsServiceClient client;
-  TestMetricsService service(GetMetricsStateManager(), &client);
+  TestMetricsService service(
+      GetMetricsStateManager(), &client, GetLocalState());
   service.InitializeMetricsRecordingState();
   // No initial stability log should be generated.
   EXPECT_FALSE(service.log_manager()->has_unsent_logs());
@@ -170,28 +164,35 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCleanShutDown) {
 }
 
 TEST_F(MetricsServiceTest, InitialStabilityLogAfterCrash) {
+  // TODO(asvitkine): Eliminate using |testing_local_state| in favor of using
+  // |GetLocalState()| once MetricsService no longer internally creates metrics
+  // providers that rely on g_browser_process->local_state() being correctly
+  // set up. crbug.com/375776.
+  ScopedTestingLocalState testing_local_state(
+      TestingBrowserProcess::GetGlobal());
+  TestingPrefServiceSimple* local_state = testing_local_state.Get();
   EnableMetricsReporting();
-  GetLocalState()->ClearPref(prefs::kStabilityExitedCleanly);
+  local_state->ClearPref(prefs::kStabilityExitedCleanly);
 
   // Set up prefs to simulate restarting after a crash.
 
   // Save an existing system profile to prefs, to correspond to what would be
   // saved from a previous session.
   metrics::TestMetricsServiceClient client;
-  TestMetricsLog log("client", 1, &client);
+  TestMetricsLog log("client", 1, &client, local_state);
   log.RecordEnvironment(std::vector<metrics::MetricsProvider*>(),
                         std::vector<variations::ActiveGroupId>());
 
   // Record stability build time and version from previous session, so that
   // stability metrics (including exited cleanly flag) won't be cleared.
-  GetLocalState()->SetInt64(prefs::kStabilityStatsBuildTime,
-                            MetricsLog::GetBuildTime());
-  GetLocalState()->SetString(prefs::kStabilityStatsVersion,
-                             client.GetVersionString());
+  local_state->SetInt64(prefs::kStabilityStatsBuildTime,
+                        MetricsLog::GetBuildTime());
+  local_state->SetString(prefs::kStabilityStatsVersion,
+                         client.GetVersionString());
 
-  GetLocalState()->SetBoolean(prefs::kStabilityExitedCleanly, false);
+  local_state->SetBoolean(prefs::kStabilityExitedCleanly, false);
 
-  TestMetricsService service(GetMetricsStateManager(), &client);
+  TestMetricsService service(GetMetricsStateManager(), &client, local_state);
   service.InitializeMetricsRecordingState();
 
   // The initial stability log should be generated and persisted in unsent logs.
@@ -220,7 +221,7 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCrash) {
 
 TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
   metrics::TestMetricsServiceClient client;
-  MetricsService service(GetMetricsStateManager(), &client);
+  MetricsService service(GetMetricsStateManager(), &client, GetLocalState());
 
   // Add two synthetic trials and confirm that they show up in the list.
   SyntheticTrialGroup trial1(metrics::HashName("TestTrial1"),
@@ -233,9 +234,12 @@ TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
   // Ensure that time has advanced by at least a tick before proceeding.
   WaitUntilTimeChanges(base::TimeTicks::Now());
 
-  service.log_manager_.BeginLoggingWithLog(
-      scoped_ptr<metrics::MetricsLogBase>(new MetricsLog(
-          "clientID", 1, MetricsLog::INITIAL_STABILITY_LOG, &client)));
+  service.log_manager_.BeginLoggingWithLog(scoped_ptr<metrics::MetricsLogBase>(
+      new MetricsLog("clientID",
+                     1,
+                     MetricsLog::INITIAL_STABILITY_LOG,
+                     &client,
+                     GetLocalState())));
   // Save the time when the log was started (it's okay for this to be greater
   // than the time recorded by the above call since it's used to ensure the
   // value changes).
@@ -271,8 +275,9 @@ TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
 
   // Start a new log and ensure all three trials appear in it.
   service.log_manager_.FinishCurrentLog();
-  service.log_manager_.BeginLoggingWithLog(scoped_ptr<metrics::MetricsLogBase>(
-      new MetricsLog("clientID", 1, MetricsLog::ONGOING_LOG, &client)));
+  service.log_manager_.BeginLoggingWithLog(
+      scoped_ptr<metrics::MetricsLogBase>(new MetricsLog(
+          "clientID", 1, MetricsLog::ONGOING_LOG, &client, GetLocalState())));
   service.GetCurrentSyntheticFieldTrials(&synthetic_trials);
   EXPECT_EQ(3U, synthetic_trials.size());
   EXPECT_TRUE(HasSyntheticTrial(synthetic_trials, "TestTrial1", "Group2"));
@@ -283,7 +288,7 @@ TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
 
 TEST_F(MetricsServiceTest, MetricsServiceObserver) {
   metrics::TestMetricsServiceClient client;
-  MetricsService service(GetMetricsStateManager(), &client);
+  MetricsService service(GetMetricsStateManager(), &client, GetLocalState());
   TestMetricsServiceObserver observer1;
   TestMetricsServiceObserver observer2;
 

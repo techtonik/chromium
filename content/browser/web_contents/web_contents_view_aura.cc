@@ -9,6 +9,7 @@
 #include "base/file_util.h"
 #include "base/metrics/histogram.h"
 #include "base/strings/utf_string_conversions.h"
+#include "content/browser/browser_plugin/browser_plugin_guest.h"
 #include "content/browser/download/drag_download_util.h"
 #include "content/browser/frame_host/interstitial_page_impl.h"
 #include "content/browser/frame_host/navigation_entry_impl.h"
@@ -98,13 +99,26 @@ bool ShouldNavigateBack(const NavigationController& controller,
          controller.CanGoBack();
 }
 
+// Update the |web contents| to be |visible|.
+void UpdateWebContentsVisibility(WebContentsImpl* web_contents, bool visible) {
+  if (visible) {
+    if (!web_contents->should_normally_be_visible())
+      web_contents->WasShown();
+  } else {
+    if (web_contents->should_normally_be_visible())
+      web_contents->WasHidden();
+  }
+}
+
 RenderWidgetHostViewAura* ToRenderWidgetHostViewAura(
     RenderWidgetHostView* view) {
   if (!view || RenderViewHostFactory::has_factory())
     return NULL;  // Can't cast to RenderWidgetHostViewAura in unit tests.
-  RenderProcessHostImpl* process = static_cast<RenderProcessHostImpl*>(
-      view->GetRenderWidgetHost()->GetProcess());
-  if (process->IsGuest())
+
+  RenderViewHost* rvh = RenderViewHost::From(view->GetRenderWidgetHost());
+  WebContentsImpl* web_contents = static_cast<WebContentsImpl*>(
+      rvh ? WebContents::FromRenderViewHost(rvh) : NULL);
+  if (BrowserPluginGuest::IsGuest(web_contents))
     return NULL;
   return static_cast<RenderWidgetHostViewAura*>(view);
 }
@@ -717,6 +731,7 @@ WebContentsViewAura::~WebContentsViewAura() {
     return;
 
   window_observer_.reset();
+  window_->RemoveObserver(this);
 
   // Window needs a valid delegate during its destructor, so we explicitly
   // delete it here.
@@ -1044,6 +1059,7 @@ void WebContentsViewAura::CreateView(
   window_->SetType(ui::wm::WINDOW_TYPE_CONTROL);
   window_->SetTransparent(false);
   window_->Init(aura::WINDOW_LAYER_NOT_DRAWN);
+  window_->AddObserver(this);
   aura::Window* root_window = context ? context->GetRootWindow() : NULL;
   if (root_window) {
     // There are places where there is no context currently because object
@@ -1067,7 +1083,7 @@ void WebContentsViewAura::CreateView(
   // The use cases for WindowObserver do not apply to Browser Plugins:
   // 1) guests do not support NPAPI plugins.
   // 2) guests' window bounds are supposed to come from its embedder.
-  if (!web_contents_->GetRenderProcessHost()->IsGuest())
+  if (!BrowserPluginGuest::IsGuest(web_contents_))
     window_observer_.reset(new WindowObserver(this));
 
   // delegate_->GetDragDestDelegate() creates a new delegate on every call.
@@ -1426,10 +1442,6 @@ void WebContentsViewAura::OnWindowDestroyed(aura::Window* window) {
 }
 
 void WebContentsViewAura::OnWindowTargetVisibilityChanged(bool visible) {
-  if (visible)
-    web_contents_->WasShown();
-  else
-    web_contents_->WasHidden();
 }
 
 bool WebContentsViewAura::HasHitTestMask() const {
@@ -1550,6 +1562,24 @@ int WebContentsViewAura::OnPerformDrop(const ui::DropTargetEvent& event) {
     drag_dest_delegate_->OnDrop();
   current_drop_data_.reset();
   return ConvertFromWeb(current_drag_op_);
+}
+
+void WebContentsViewAura::OnWindowParentChanged(aura::Window* window,
+                                                aura::Window* parent) {
+  // On Windows we will get called with a parent of NULL as part of the shut
+  // down process. As such we do only change the visibility when a parent gets
+  // set.
+  if (parent)
+    UpdateWebContentsVisibility(web_contents_, window->IsVisible());
+}
+
+void WebContentsViewAura::OnWindowVisibilityChanged(aura::Window* window,
+                                                    bool visible) {
+  // Ignore any visibility changes in the hierarchy below.
+  if (window != window_.get() && window_->Contains(window))
+    return;
+
+  UpdateWebContentsVisibility(web_contents_, visible);
 }
 
 }  // namespace content

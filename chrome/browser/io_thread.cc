@@ -34,7 +34,6 @@
 #include "chrome/browser/net/chrome_url_request_context.h"
 #include "chrome/browser/net/connect_interceptor.h"
 #include "chrome/browser/net/dns_probe_service.h"
-#include "chrome/browser/net/http_pipelining_compatibility_client.h"
 #include "chrome/browser/net/pref_proxy_config_tracker.h"
 #include "chrome/browser/net/proxy_service_factory.h"
 #include "chrome/browser/net/sdch_dictionary_fetcher.h"
@@ -42,7 +41,6 @@
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/chrome_version_info.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/common/url_constants.h"
 #include "components/data_reduction_proxy/browser/data_reduction_proxy_prefs.h"
 #include "components/data_reduction_proxy/browser/http_auth_handler_data_reduction_proxy.h"
 #include "components/policy/core/common/policy_service.h"
@@ -81,6 +79,7 @@
 #include "net/url_request/url_request_job_factory_impl.h"
 #include "net/url_request/url_request_throttler_manager.h"
 #include "net/websockets/websocket_job.h"
+#include "url/url_constants.h"
 
 #if defined(ENABLE_CONFIGURATION_POLICY)
 #include "policy/policy_constants.h"
@@ -395,7 +394,6 @@ SystemRequestContextLeakChecker::~SystemRequestContextLeakChecker() {
 IOThread::Globals::Globals()
     : system_request_context_leak_checker(this),
       ignore_certificate_errors(false),
-      http_pipelining_enabled(false),
       testing_fixed_http_port(0),
       testing_fixed_https_port(0),
       enable_user_alternate_protocol_ports(false) {
@@ -657,10 +655,10 @@ void IOThread::InitAsync() {
   TRACE_EVENT_END0("startup", "IOThread::InitAsync:HttpNetworkSession");
   scoped_ptr<net::URLRequestJobFactoryImpl> job_factory(
       new net::URLRequestJobFactoryImpl());
-  job_factory->SetProtocolHandler(content::kDataScheme,
+  job_factory->SetProtocolHandler(url::kDataScheme,
                                   new net::DataProtocolHandler());
   job_factory->SetProtocolHandler(
-      content::kFileScheme,
+      url::kFileScheme,
       new net::FileProtocolHandler(
           content::BrowserThread::GetBlockingPool()->
               GetTaskRunnerWithShutdownBehavior(
@@ -669,7 +667,7 @@ void IOThread::InitAsync() {
   globals_->proxy_script_fetcher_ftp_transaction_factory.reset(
       new net::FtpNetworkLayer(globals_->host_resolver.get()));
   job_factory->SetProtocolHandler(
-      content::kFtpScheme,
+      url::kFtpScheme,
       new net::FtpProtocolHandler(
           globals_->proxy_script_fetcher_ftp_transaction_factory.get()));
 #endif
@@ -767,18 +765,22 @@ void IOThread::InitializeNetworkOptions(const CommandLine& command_line) {
           command_line.GetSwitchValueASCII(switches::kUseSpdy);
       EnableSpdy(spdy_mode);
     } else if (command_line.HasSwitch(switches::kEnableSpdy4)) {
-      net::HttpStreamFactory::EnableNpnSpdy4Http2();
+      globals_->next_protos = net::NextProtosSpdy4Http2();
+      globals_->use_alternate_protocols.set(true);
     } else if (command_line.HasSwitch(switches::kDisableSpdy31)) {
-      net::HttpStreamFactory::EnableNpnSpdy3();
+      globals_->next_protos = net::NextProtosSpdy3();
+      globals_->use_alternate_protocols.set(true);
     } else if (command_line.HasSwitch(switches::kEnableNpnHttpOnly)) {
-      net::HttpStreamFactory::EnableNpnHttpOnly();
+      globals_->next_protos = net::NextProtosHttpOnly();
+      globals_->use_alternate_protocols.set(false);
     } else {
       if (spdy_trial_group == kSpdyFieldTrialDisabledGroupName &&
           !command_line.HasSwitch(switches::kEnableWebSocketOverSpdy)) {
-         net::HttpStreamFactory::set_spdy_enabled(false);
+        net::HttpStreamFactory::set_spdy_enabled(false);
       } else {
         // Use SPDY/3.1 by default.
-        net::HttpStreamFactory::EnableNpnSpdy31();
+        globals_->next_protos = net::NextProtosSpdy31();
+        globals_->use_alternate_protocols.set(true);
       }
     }
   }
@@ -821,20 +823,21 @@ void IOThread::EnableSpdy(const std::string& mode) {
       net::HttpStreamFactory::set_spdy_enabled(false);
     } else if (option == kDisableSSL) {
       globals_->spdy_default_protocol.set(net::kProtoSPDY3);
-      net::HttpStreamFactory::set_force_spdy_over_ssl(false);
-      net::HttpStreamFactory::set_force_spdy_always(true);
+      globals_->force_spdy_over_ssl.set(false);
+      globals_->force_spdy_always.set(true);
     } else if (option == kSSL) {
       globals_->spdy_default_protocol.set(net::kProtoSPDY3);
-      net::HttpStreamFactory::set_force_spdy_over_ssl(true);
-      net::HttpStreamFactory::set_force_spdy_always(true);
+      globals_->force_spdy_over_ssl.set(true);
+      globals_->force_spdy_always.set(true);
     } else if (option == kDisablePing) {
       globals_->enable_spdy_ping_based_connection_checking.set(false);
     } else if (option == kExclude) {
-      net::HttpStreamFactory::add_forced_spdy_exclusion(value);
+      globals_->forced_spdy_exclusions.insert(
+          net::HostPortPair::FromURL(GURL(value)));
     } else if (option == kDisableCompression) {
       globals_->enable_spdy_compression.set(false);
     } else if (option == kDisableAltProtocols) {
-      net::HttpStreamFactory::set_use_alternate_protocols(false);
+      globals_->use_alternate_protocols.set(false);
     } else if (option == kForceAltProtocols) {
       net::PortAlternateProtocolPair pair;
       pair.port = 443;
@@ -930,7 +933,6 @@ void IOThread::InitializeNetworkSessionParams(
   params->network_delegate = globals_->system_network_delegate.get();
   params->host_mapping_rules = globals_->host_mapping_rules.get();
   params->ignore_certificate_errors = globals_->ignore_certificate_errors;
-  params->http_pipelining_enabled = globals_->http_pipelining_enabled;
   params->testing_fixed_http_port = globals_->testing_fixed_http_port;
   params->testing_fixed_https_port = globals_->testing_fixed_https_port;
 
@@ -944,8 +946,14 @@ void IOThread::InitializeNetworkSessionParams(
       &params->enable_spdy_ping_based_connection_checking);
   globals_->spdy_default_protocol.CopyToIfSet(
       &params->spdy_default_protocol);
-  globals_->trusted_spdy_proxy.CopyToIfSet(
-      &params->trusted_spdy_proxy);
+  params->next_protos = globals_->next_protos;
+  globals_->trusted_spdy_proxy.CopyToIfSet(&params->trusted_spdy_proxy);
+  globals_->force_spdy_over_ssl.CopyToIfSet(&params->force_spdy_over_ssl);
+  globals_->force_spdy_always.CopyToIfSet(&params->force_spdy_always);
+  globals_->forced_spdy_exclusions = params->forced_spdy_exclusions;
+  globals_->use_alternate_protocols.CopyToIfSet(
+      &params->use_alternate_protocols);
+
   globals_->enable_quic.CopyToIfSet(&params->enable_quic);
   globals_->enable_quic_https.CopyToIfSet(&params->enable_quic_https);
   globals_->enable_quic_pacing.CopyToIfSet(

@@ -164,6 +164,8 @@ class CONTENT_EXPORT WebContentsImpl
     return geolocation_dispatcher_host_.get();
   }
 
+  bool should_normally_be_visible() { return should_normally_be_visible_; }
+
   // WebContents ------------------------------------------------------
   virtual WebContentsDelegate* GetDelegate() OVERRIDE;
   virtual void SetDelegate(WebContentsDelegate* delegate) OVERRIDE;
@@ -642,6 +644,7 @@ class CONTENT_EXPORT WebContentsImpl
   FRIEND_TEST_ALL_PREFIXES(FormStructureBrowserTest, HTMLFiles);
   FRIEND_TEST_ALL_PREFIXES(NavigationControllerTest, HistoryNavigate);
   FRIEND_TEST_ALL_PREFIXES(RenderFrameHostManagerTest, PageDoesBackAndReload);
+  FRIEND_TEST_ALL_PREFIXES(SitePerProcessBrowserTest, CrossSiteIframe);
 
   // So InterstitialPageImpl can access SetIsLoading.
   friend class InterstitialPageImpl;
@@ -671,6 +674,10 @@ class CONTENT_EXPORT WebContentsImpl
   // Deletes and removes from the map a destruction observer
   // watching |web_contents|. No-op if there is no such observer.
   void RemoveDestructionObserver(WebContentsImpl* web_contents);
+
+  // Traverses all the RenderFrameHosts in the FrameTree and creates a set
+  // all the unique RenderWidgetHosts.
+  std::set<RenderWidgetHostImpl*> GetRenderWidgetHostsInTree();
 
   // Callback function when showing JavaScript dialogs.  Takes in a routing ID
   // pair to identify the RenderFrameHost that opened the dialog, because it's
@@ -763,7 +770,6 @@ class CONTENT_EXPORT WebContentsImpl
                                const base::string16& sub_text);
   void OnHideValidationMessage();
   void OnMoveValidationMessage(const gfx::Rect& anchor_in_root_view);
-
 
   // Called by derived classes to indicate that we're no longer waiting for a
   // response. This won't actually update the throbber, but it will get picked

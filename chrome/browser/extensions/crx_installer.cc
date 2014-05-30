@@ -25,6 +25,7 @@
 #include "chrome/browser/extensions/convert_user_script.h"
 #include "chrome/browser/extensions/convert_web_app.h"
 #include "chrome/browser/extensions/crx_installer_error.h"
+#include "chrome/browser/extensions/extension_assets_manager.h"
 #include "chrome/browser/extensions/extension_error_reporter.h"
 #include "chrome/browser/extensions/extension_install_ui.h"
 #include "chrome/browser/extensions/extension_service.h"
@@ -41,6 +42,7 @@
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/resource_dispatcher_host.h"
 #include "content/public/browser/user_metrics.h"
+#include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/common/extension_icon_set.h"
 #include "extensions/common/feature_switch.h"
@@ -694,11 +696,20 @@ void CrxInstaller::CompleteInstall() {
     "Extensions.CrxInstallDirPathLength",
         install_directory_.value().length(), 0, 500, 100);
 
-  base::FilePath version_dir =
-      file_util::InstallExtension(unpacked_extension_root_,
-                                  extension()->id(),
-                                  extension()->VersionString(),
-                                  install_directory_);
+  ExtensionAssetsManager* assets_manager =
+      ExtensionAssetsManager::GetInstance();
+  assets_manager->InstallExtension(
+      extension(),
+      unpacked_extension_root_,
+      install_directory_,
+      profile(),
+      base::Bind(&CrxInstaller::ReloadExtensionAfterInstall, this));
+}
+
+void CrxInstaller::ReloadExtensionAfterInstall(
+    const base::FilePath& version_dir) {
+  DCHECK(installer_task_runner_->RunsTasksOnCurrentThread());
+
   if (version_dir.empty()) {
     ReportFailureFromFileThread(
         CrxInstallerError(
@@ -729,7 +740,6 @@ void CrxInstaller::CompleteInstall() {
     LOG(ERROR) << error << " " << extension_id << " " << download_url_;
     ReportFailureFromFileThread(CrxInstallerError(base::UTF8ToUTF16(error)));
   }
-
 }
 
 void CrxInstaller::ReportFailureFromFileThread(const CrxInstallerError& error) {

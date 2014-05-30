@@ -91,9 +91,6 @@
       'sources': [
         'shell/external_service.mojom',
       ],
-      'variables': {
-        'mojom_base_output_dir': 'mojo',
-      },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
         'mojo_cpp_bindings',
@@ -154,6 +151,8 @@
         'embedder/platform_handle.cc',
         'embedder/platform_handle.h',
         'embedder/platform_handle_utils.h',
+        'embedder/platform_handle_utils_posix.cc',
+        'embedder/platform_handle_utils_win.cc',
         'embedder/platform_handle_vector.h',
         'embedder/scoped_platform_handle.h',
         'system/channel.cc',
@@ -378,7 +377,6 @@
       ],
       'sources': [
         'environment/default_async_waiter.cc',
-        'environment/buffer_tls.cc',
         'environment/environment.cc',
       ],
       'include_dirs': [
@@ -402,8 +400,6 @@
       'sources': [
         'environment/default_async_waiter_impl.cc',
         'environment/default_async_waiter_impl.h',
-        'environment/buffer_tls_impl.cc',
-        'environment/buffer_tls_impl.h',
       ],
       'include_dirs': [
         '..',
@@ -422,7 +418,7 @@
         '../url/url.gyp:url_lib',
         'mojo_common_lib',
         'mojo_environment_chromium',
-        'mojo_shell_bindings',
+        'mojo_service_provider_bindings',
         'mojo_system_impl',
       ],
       'sources': [
@@ -435,7 +431,7 @@
       ],
       'export_dependent_settings': [
         '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
-        'mojo_shell_bindings',
+        'mojo_service_provider_bindings',
       ],
     },
     {
@@ -456,23 +452,6 @@
       ],
     },
     {
-      'target_name': 'mojo_geometry_lib',
-      'type': '<(component)',
-      'defines': [
-        'MOJO_GEOMETRY_IMPLEMENTATION',
-      ],
-      'dependencies': [
-        '../ui/gfx/gfx.gyp:gfx_geometry',
-        'mojo_environment_chromium',
-        'mojo_geometry_bindings',
-        'mojo_system_impl',
-      ],
-      'sources': [
-        'geometry/geometry_type_converters.cc',
-        'geometry/geometry_type_converters.h',
-      ],
-    },
-    {
       'target_name': 'mojo_shell_lib',
       'type': 'static_library',
       'dependencies': [
@@ -484,14 +463,11 @@
         'mojo_external_service_bindings',
         'mojo_gles2_impl',
         'mojo_service_manager',
-        'mojo_shell_bindings',
+        'mojo_service_provider_bindings',
         'mojo_system_impl',
         'mojo_native_viewport_service',
         'mojo_spy',
       ],
-      'variables': {
-        'mojom_base_output_dir': 'mojo',
-      },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'sources': [
         'shell/app_child_process.cc',
@@ -549,7 +525,7 @@
             # These are only necessary as long as we hard code use of ViewManager.
             '../skia/skia.gyp:skia',
             'mojo_gles2',
-            'mojo_shell_client',
+            'mojo_application',
             'mojo_view_manager',
             'mojo_view_manager_bindings',
           ],
@@ -606,11 +582,8 @@
         'mojo_environment_chromium',
         'mojo_run_all_unittests',
         'mojo_service_manager',
-        'mojo_shell_client',
+        'mojo_application',
       ],
-      'variables': {
-        'mojom_base_output_dir': 'mojo',
-      },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'sources': [
         'service_manager/service_manager_unittest.cc',
@@ -699,8 +672,8 @@
             'mojo_java_set_jni_headers',
           ],
           'sources': [
-            'android/javatests/src/org/chromium/mojo/system/CoreTest.java',
-            'android/system/src/org/chromium/mojo/system/CoreImpl.java',
+            'android/javatests/src/org/chromium/mojo/MojoTestCase.java',
+            'android/system/src/org/chromium/mojo/system/impl/CoreImpl.java',
             'services/native_viewport/android/src/org/chromium/mojo/NativeViewportAndroid.java',
             'shell/android/apk/src/org/chromium/mojo_shell_apk/MojoMain.java',
           ],
@@ -730,7 +703,7 @@
             'mojo_common_lib',
             'mojo_environment_chromium',
             'mojo_jni_headers',
-            'mojo_shell_bindings',
+            'mojo_service_provider_bindings',
             'mojo_shell_lib',
           ],
           'sources': [
@@ -748,8 +721,8 @@
             'mojo_jni_headers',
           ],
           'sources': [
-            'android/javatests/core_test.cc',
-            'android/javatests/core_test.h',
+            'android/javatests/mojo_test_case.cc',
+            'android/javatests/mojo_test_case.h',
             'android/javatests/init_library.cc',
           ],
         },
@@ -810,7 +783,7 @@
             'mojo_common_lib',
             'mojo_environment_chromium',
             'mojo_jni_headers',
-            'mojo_shell_bindings',
+            'mojo_service_provider_bindings',
             'mojo_shell_lib',
           ],
           'sources': [
@@ -849,7 +822,7 @@
             '../dbus/dbus.gyp:dbus',
             'mojo_common_lib',
             'mojo_external_service_bindings',
-            'mojo_shell_client',
+            'mojo_application',
             'mojo_system_impl',
           ],
           'sources': [

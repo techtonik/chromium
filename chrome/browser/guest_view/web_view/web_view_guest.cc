@@ -4,7 +4,6 @@
 
 #include "chrome/browser/guest_view/web_view/web_view_guest.h"
 
-#include "base/debug/stack_trace.h"
 #include "base/message_loop/message_loop.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
@@ -355,7 +354,8 @@ bool WebViewGuest::HandleContextMenu(
   return true;
 }
 
-void WebViewGuest::AddMessageToConsole(int32 level,
+bool WebViewGuest::AddMessageToConsole(WebContents* source,
+                                       int32 level,
                                        const base::string16& message,
                                        int32 line_no,
                                        const base::string16& source_id) {
@@ -367,9 +367,10 @@ void WebViewGuest::AddMessageToConsole(int32 level,
   args->SetString(webview::kSourceId, source_id);
   DispatchEvent(
       new GuestViewBase::Event(webview::kEventConsoleMessage, args.Pass()));
+  return true;
 }
 
-void WebViewGuest::Close() {
+void WebViewGuest::CloseContents(WebContents* source) {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   DispatchEvent(new GuestViewBase::Event(webview::kEventClose, args.Pass()));
 }
@@ -418,7 +419,8 @@ void WebViewGuest::EmbedderDestroyed() {
           view_instance_id()));
 }
 
-void WebViewGuest::FindReply(int request_id,
+void WebViewGuest::FindReply(WebContents* source,
+                             int request_id,
                              int number_of_matches,
                              const gfx::Rect& selection_rect,
                              int active_match_ordinal,
@@ -427,18 +429,8 @@ void WebViewGuest::FindReply(int request_id,
                          active_match_ordinal, final_update);
 }
 
-void WebViewGuest::GuestProcessGone(base::TerminationStatus status) {
-  // Cancel all find sessions in progress.
-  find_helper_.CancelAllFindSessions();
-
-  scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
-  args->SetInteger(webview::kProcessId,
-                   guest_web_contents()->GetRenderProcessHost()->GetID());
-  args->SetString(webview::kReason, TerminationStatusToString(status));
-  DispatchEvent(new GuestViewBase::Event(webview::kEventExit, args.Pass()));
-}
-
 void WebViewGuest::HandleKeyboardEvent(
+    WebContents* source,
     const content::NativeWebKeyboardEvent& event) {
   if (!attached())
     return;
@@ -460,7 +452,8 @@ bool WebViewGuest::IsDragAndDropEnabled() {
   return true;
 }
 
-void WebViewGuest::LoadProgressed(double progress) {
+void WebViewGuest::LoadProgressChanged(content::WebContents* source,
+                                       double progress) {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   args->SetString(guestview::kUrl, guest_web_contents()->GetURL().spec());
   args->SetDouble(webview::kProgress, progress);
@@ -492,7 +485,6 @@ void WebViewGuest::OnUpdateFrameName(bool is_top_level,
 
 WebViewGuest* WebViewGuest::CreateNewGuestWindow(
     const content::OpenURLParams& params) {
-
   GuestViewManager* guest_manager =
       GuestViewManager::FromBrowserContext(browser_context());
   // Allocate a new instance ID for the new guest.
@@ -531,7 +523,7 @@ WebViewGuest* WebViewGuest::CreateNewGuestWindow(
 
 // TODO(fsamuel): Find a reliable way to test the 'responsive' and
 // 'unresponsive' events.
-void WebViewGuest::RendererResponsive() {
+void WebViewGuest::RendererResponsive(content::WebContents* source) {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   args->SetInteger(webview::kProcessId,
       guest_web_contents()->GetRenderProcessHost()->GetID());
@@ -539,7 +531,7 @@ void WebViewGuest::RendererResponsive() {
       new GuestViewBase::Event(webview::kEventResponsive, args.Pass()));
 }
 
-void WebViewGuest::RendererUnresponsive() {
+void WebViewGuest::RendererUnresponsive(content::WebContents* source) {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   args->SetInteger(webview::kProcessId,
       guest_web_contents()->GetRenderProcessHost()->GetID());
@@ -872,6 +864,17 @@ bool WebViewGuest::OnMessageReceived(const IPC::Message& message,
   return handled;
 }
 
+void WebViewGuest::RenderProcessGone(base::TerminationStatus status) {
+  // Cancel all find sessions in progress.
+  find_helper_.CancelAllFindSessions();
+
+  scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
+  args->SetInteger(webview::kProcessId,
+                   guest_web_contents()->GetRenderProcessHost()->GetID());
+  args->SetString(webview::kReason, TerminationStatusToString(status));
+  DispatchEvent(new GuestViewBase::Event(webview::kEventExit, args.Pass()));
+}
+
 void WebViewGuest::WebContentsDestroyed() {
   // Clean up custom context menu items for this guest.
   extensions::MenuManager* menu_manager = extensions::MenuManager::Get(
@@ -979,6 +982,7 @@ void WebViewGuest::SizeChanged(const gfx::Size& old_size,
 }
 
 void WebViewGuest::RequestMediaAccessPermission(
+    content::WebContents* source,
     const content::MediaStreamRequest& request,
     const content::MediaResponseCallback& callback) {
   base::DictionaryValue request_info;
@@ -995,8 +999,9 @@ void WebViewGuest::RequestMediaAccessPermission(
 }
 
 void WebViewGuest::CanDownload(
-    const std::string& request_method,
+    content::RenderViewHost* render_view_host,
     const GURL& url,
+    const std::string& request_method,
     const base::Callback<void(bool)>& callback) {
   base::DictionaryValue request_info;
   request_info.Set(
@@ -1066,7 +1071,7 @@ void WebViewGuest::NavigateGuest(const std::string& src) {
       (!content::ChildProcessSecurityPolicy::GetInstance()->IsWebSafeScheme(
           url.scheme()) &&
       !url.SchemeIs(content::kAboutScheme)) ||
-      url.SchemeIs(content::kJavaScriptScheme);
+      url.SchemeIs(url::kJavaScriptScheme);
   if (scheme_is_blocked || !url.is_valid()) {
     std::string error_type;
     base::RemoveChars(net::ErrorToString(net::ERR_ABORTED), "net::",

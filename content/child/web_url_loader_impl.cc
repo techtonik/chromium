@@ -60,7 +60,6 @@ using blink::WebURLResponse;
 using webkit_glue::MultipartResponseDelegate;
 using webkit_glue::ResourceDevToolsInfo;
 using webkit_glue::ResourceLoaderBridge;
-using webkit_glue::ResourceResponseInfo;
 using webkit_glue::WebURLResponseExtraDataImpl;
 
 namespace content {
@@ -290,6 +289,9 @@ void WebURLLoaderImpl::Context::Cancel() {
   // its own pointer to the client.
   if (multipart_delegate_)
     multipart_delegate_->Cancel();
+  // Ditto for the ftp delegate.
+  if (ftp_listing_delegate_)
+    ftp_listing_delegate_->Cancel();
 
   // Do not make any further calls to the client.
   client_ = NULL;

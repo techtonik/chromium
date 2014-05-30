@@ -100,7 +100,6 @@ class PluginReverseInterface: public nacl::ReverseInterface {
  public:
   PluginReverseInterface(nacl::WeakRefAnchor* anchor,
                          Plugin* plugin,
-                         int32_t manifest_id,
                          ServiceRuntime* service_runtime,
                          pp::CompletionCallback init_done_cb,
                          pp::CompletionCallback crash_cb);
@@ -150,7 +149,6 @@ class PluginReverseInterface: public nacl::ReverseInterface {
   nacl::WeakRefAnchor* anchor_;  // holds a ref
   Plugin* plugin_;  // value may be copied, but should be used only in
                     // main thread in WeakRef-protected callbacks.
-  int32_t manifest_id_;
   ServiceRuntime* service_runtime_;
   NaClMutex mu_;
   NaClCondVar cv_;
@@ -166,7 +164,6 @@ class ServiceRuntime {
   // TODO(sehr): This class should also implement factory methods, using the
   // Start method below.
   ServiceRuntime(Plugin* plugin,
-                 int32_t manifest_id,
                  bool main_service_runtime,
                  bool uses_nonsfi_mode,
                  pp::CompletionCallback init_done_cb,
@@ -191,9 +188,9 @@ class ServiceRuntime {
   void SignalStartSelLdrDone();
 
   // Establish an SrpcClient to the sel_ldr instance and load the nexe.
-  // The nexe to be started is passed through |nacl_file_desc|.
+  // The nexe to be started is passed through |file_info|.
   // On success, returns true. On failure, returns false.
-  bool LoadNexeAndStart(nacl::DescWrapper* nacl_file_desc,
+  bool LoadNexeAndStart(PP_NaClFileInfo file_info,
                         const pp::CompletionCallback& crash_cb);
 
   // Starts the application channel to the nexe.
@@ -212,10 +209,12 @@ class ServiceRuntime {
 
   nacl::string GetCrashLogOutput();
 
+  bool main_service_runtime() const { return main_service_runtime_; }
+
  private:
   NACL_DISALLOW_COPY_AND_ASSIGN(ServiceRuntime);
   bool SetupCommandChannel();
-  bool LoadModule(nacl::DescWrapper* shm);
+  bool LoadModule(PP_NaClFileInfo file_info);
   bool InitReverseService();
   bool StartModule();
 

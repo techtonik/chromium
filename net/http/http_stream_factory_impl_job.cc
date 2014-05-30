@@ -20,10 +20,6 @@
 #include "net/base/net_util.h"
 #include "net/http/http_basic_stream.h"
 #include "net/http/http_network_session.h"
-#include "net/http/http_pipelined_connection.h"
-#include "net/http/http_pipelined_host.h"
-#include "net/http/http_pipelined_host_pool.h"
-#include "net/http/http_pipelined_stream.h"
 #include "net/http/http_proxy_client_socket.h"
 #include "net/http/http_proxy_client_socket_pool.h"
 #include "net/http/http_request_info.h"
@@ -99,15 +95,12 @@ HttpStreamFactoryImpl::Job::Job(HttpStreamFactoryImpl* stream_factory,
       using_quic_(false),
       quic_request_(session_->quic_stream_factory()),
       using_existing_quic_session_(false),
-      force_spdy_always_(HttpStreamFactory::force_spdy_always()),
-      force_spdy_over_ssl_(HttpStreamFactory::force_spdy_over_ssl()),
       spdy_certificate_error_(OK),
       establishing_tunnel_(false),
       was_npn_negotiated_(false),
       protocol_negotiated_(kProtoUnknown),
       num_streams_(0),
       spdy_session_direct_(false),
-      existing_available_pipeline_(false),
       job_status_(STATUS_RUNNING),
       other_job_status_(STATUS_RUNNING),
       ptr_factory_(this) {
@@ -300,7 +293,7 @@ bool HttpStreamFactoryImpl::Job::CanUseExistingSpdySession() const {
   // working.
   return request_info_.url.SchemeIs("https") ||
          proxy_info_.proxy_server().is_https() ||
-         force_spdy_always_;
+         session_->params().force_spdy_always;
 }
 
 void HttpStreamFactoryImpl::Job::OnStreamReadyCallback() {
@@ -346,6 +339,9 @@ void HttpStreamFactoryImpl::Job::OnNewSpdySessionReadyCallback() {
   // NULL at this point if the SpdySession closed immediately after creation.
   base::WeakPtr<SpdySession> spdy_session = new_spdy_session_;
   new_spdy_session_.reset();
+
+  // TODO(jgraettinger): Notify the factory, and let that notify |request_|,
+  // rather than notifying |request_| directly.
   if (IsOrphaned()) {
     if (spdy_session) {
       stream_factory_->OnNewSpdySessionReady(
@@ -625,7 +621,6 @@ int HttpStreamFactoryImpl::Job::DoStart() {
   origin_ = HostPortPair(request_info_.url.HostNoBrackets(), port);
   origin_url_ = stream_factory_->ApplyHostMappingRules(
       request_info_.url, &origin_);
-  http_pipelining_key_.reset(new HttpPipelinedHost::Key(origin_));
 
   net_log_.BeginEvent(NetLog::TYPE_HTTP_STREAM_JOB,
                       base::Bind(&NetLogHttpStreamJobCallback,
@@ -704,13 +699,15 @@ int HttpStreamFactoryImpl::Job::DoResolveProxyComplete(int result) {
 }
 
 bool HttpStreamFactoryImpl::Job::ShouldForceSpdySSL() const {
-  bool rv = force_spdy_always_ && force_spdy_over_ssl_;
-  return rv && !HttpStreamFactory::HasSpdyExclusion(origin_);
+  bool rv = session_->params().force_spdy_always &&
+      session_->params().force_spdy_over_ssl;
+  return rv && !session_->HasSpdyExclusion(origin_);
 }
 
 bool HttpStreamFactoryImpl::Job::ShouldForceSpdyWithoutSSL() const {
-  bool rv = force_spdy_always_ && !force_spdy_over_ssl_;
-  return rv && !HttpStreamFactory::HasSpdyExclusion(origin_);
+  bool rv = session_->params().force_spdy_always &&
+      !session_->params().force_spdy_over_ssl;
+  return rv && !session_->HasSpdyExclusion(origin_);
 }
 
 bool HttpStreamFactoryImpl::Job::ShouldForceQuic() const {
@@ -793,26 +790,6 @@ int HttpStreamFactoryImpl::Job::DoInitConnection() {
   } else if (request_ && (using_ssl_ || ShouldForceSpdyWithoutSSL())) {
     // Update the spdy session key for the request that launched this job.
     request_->SetSpdySessionKey(spdy_session_key);
-  } else if (IsRequestEligibleForPipelining()) {
-    // TODO(simonjam): With pipelining, we might be better off using fewer
-    // connections and thus should make fewer preconnections. Explore
-    // preconnecting fewer than the requested num_connections.
-    //
-    // Separate note: A forced pipeline is always available if one exists for
-    // this key. This is different than normal pipelines, which may be
-    // unavailable or unusable. So, there is no need to worry about a race
-    // between when a pipeline becomes available and when this job blocks.
-    existing_available_pipeline_ = stream_factory_->http_pipelined_host_pool_.
-        IsExistingPipelineAvailableForKey(*http_pipelining_key_.get());
-    if (existing_available_pipeline_) {
-      return OK;
-    } else {
-      bool was_new_key = request_->SetHttpPipeliningKey(
-          *http_pipelining_key_.get());
-      if (!was_new_key && session_->force_http_pipelining()) {
-        return ERR_IO_PENDING;
-      }
-    }
   }
 
   // OK, there's no available SPDY session. Let |waiting_job_| resume if it's
@@ -915,11 +892,6 @@ int HttpStreamFactoryImpl::Job::DoInitConnectionComplete(int result) {
   if (result < 0 && waiting_job_) {
     waiting_job_->Resume(this);
     waiting_job_ = NULL;
-  }
-
-  if (result < 0 && session_->force_http_pipelining()) {
-    stream_factory_->AbortPipelinedRequestsWithKey(
-        this, *http_pipelining_key_.get(), result, server_ssl_config_);
   }
 
   // |result| may be the result of any of the stacked pools. The following
@@ -1055,8 +1027,7 @@ int HttpStreamFactoryImpl::Job::DoWaitingUserAction(int result) {
 }
 
 int HttpStreamFactoryImpl::Job::DoCreateStream() {
-  DCHECK(connection_->socket() || existing_spdy_session_.get() ||
-         existing_available_pipeline_ || using_quic_);
+  DCHECK(connection_->socket() || existing_spdy_session_.get() || using_quic_);
 
   next_state_ = STATE_CREATE_STREAM_COMPLETE;
 
@@ -1071,31 +1042,12 @@ int HttpStreamFactoryImpl::Job::DoCreateStream() {
     bool using_proxy = (proxy_info_.is_http() || proxy_info_.is_https()) &&
                        (request_info_.url.SchemeIs("http") ||
                         request_info_.url.SchemeIs("ftp"));
-    if (stream_factory_->http_pipelined_host_pool_.
-            IsExistingPipelineAvailableForKey(*http_pipelining_key_.get())) {
-      DCHECK(!stream_factory_->for_websockets_);
-      stream_.reset(stream_factory_->http_pipelined_host_pool_.
-                    CreateStreamOnExistingPipeline(
-                        *http_pipelining_key_.get()));
-      CHECK(stream_.get());
-    } else if (stream_factory_->for_websockets_) {
+    if (stream_factory_->for_websockets_) {
       DCHECK(request_);
       DCHECK(request_->websocket_handshake_stream_create_helper());
       websocket_stream_.reset(
           request_->websocket_handshake_stream_create_helper()
               ->CreateBasicStream(connection_.Pass(), using_proxy));
-    } else if (!using_proxy && IsRequestEligibleForPipelining()) {
-      // TODO(simonjam): Support proxies.
-      stream_.reset(
-          stream_factory_->http_pipelined_host_pool_.CreateStreamOnNewPipeline(
-              *http_pipelining_key_.get(),
-              connection_.release(),
-              server_ssl_config_,
-              proxy_info_,
-              net_log_,
-              was_npn_negotiated_,
-              protocol_negotiated_));
-      CHECK(stream_.get());
     } else {
       stream_.reset(new HttpBasicStream(connection_.release(), using_proxy));
     }
@@ -1219,10 +1171,8 @@ void HttpStreamFactoryImpl::Job::ReturnToStateInitConnection(
     connection_->socket()->Disconnect();
   connection_->Reset();
 
-  if (request_) {
+  if (request_)
     request_->RemoveRequestFromSpdySessionRequestMap();
-    request_->RemoveRequestFromHttpPipeliningRequestMap();
-  }
 
   next_state_ = STATE_INIT_CONNECTION;
 }
@@ -1374,10 +1324,8 @@ int HttpStreamFactoryImpl::Job::ReconsiderProxyAfterError(int error) {
     if (connection_->socket())
       connection_->socket()->Disconnect();
     connection_->Reset();
-    if (request_) {
+    if (request_)
       request_->RemoveRequestFromSpdySessionRequestMap();
-      request_->RemoveRequestFromHttpPipeliningRequestMap();
-    }
     next_state_ = STATE_RESOLVE_PROXY_COMPLETE;
   } else {
     // If ReconsiderProxyAfterError() failed synchronously, it means
@@ -1472,17 +1420,28 @@ bool HttpStreamFactoryImpl::Job::IsOrphaned() const {
 }
 
 void HttpStreamFactoryImpl::Job::ReportJobSuccededForRequest() {
+  net::AlternateProtocolExperiment alternate_protocol_experiment =
+      ALTERNATE_PROTOCOL_NOT_PART_OF_EXPERIMENT;
+  base::WeakPtr<HttpServerProperties> http_server_properties =
+      session_->http_server_properties();
+  if (http_server_properties) {
+    alternate_protocol_experiment =
+        http_server_properties->GetAlternateProtocolExperiment();
+  }
   if (using_existing_quic_session_) {
     // If an existing session was used, then no TCP connection was
     // started.
-    HistogramAlternateProtocolUsage(ALTERNATE_PROTOCOL_USAGE_NO_RACE);
+    HistogramAlternateProtocolUsage(ALTERNATE_PROTOCOL_USAGE_NO_RACE,
+                                    alternate_protocol_experiment);
   } else if (original_url_) {
     // This job was the alternate protocol job, and hence won the race.
-    HistogramAlternateProtocolUsage(ALTERNATE_PROTOCOL_USAGE_WON_RACE);
+    HistogramAlternateProtocolUsage(ALTERNATE_PROTOCOL_USAGE_WON_RACE,
+                                    alternate_protocol_experiment);
   } else {
     // This job was the normal job, and hence the alternate protocol job lost
     // the race.
-    HistogramAlternateProtocolUsage(ALTERNATE_PROTOCOL_USAGE_LOST_RACE);
+    HistogramAlternateProtocolUsage(ALTERNATE_PROTOCOL_USAGE_LOST_RACE,
+                                    alternate_protocol_experiment);
   }
 }
 
@@ -1490,35 +1449,6 @@ void HttpStreamFactoryImpl::Job::MarkOtherJobComplete(const Job& job) {
   DCHECK_EQ(STATUS_RUNNING, other_job_status_);
   other_job_status_ = job.job_status_;
   MaybeMarkAlternateProtocolBroken();
-}
-
-bool HttpStreamFactoryImpl::Job::IsRequestEligibleForPipelining() {
-  if (IsPreconnecting() || !request_) {
-    return false;
-  }
-  if (stream_factory_->for_websockets_) {
-    return false;
-  }
-  if (session_->force_http_pipelining()) {
-    return true;
-  }
-  if (!session_->params().http_pipelining_enabled) {
-    return false;
-  }
-  if (using_ssl_) {
-    return false;
-  }
-  if (request_info_.method != "GET" && request_info_.method != "HEAD") {
-    return false;
-  }
-  if (request_info_.load_flags &
-      (net::LOAD_MAIN_FRAME | net::LOAD_SUB_FRAME | net::LOAD_PREFETCH |
-       net::LOAD_IS_DOWNLOAD)) {
-    // Avoid pipelining resources that may be streamed for a long time.
-    return false;
-  }
-  return stream_factory_->http_pipelined_host_pool_.IsKeyEligibleForPipelining(
-      *http_pipelining_key_.get());
 }
 
 void HttpStreamFactoryImpl::Job::MaybeMarkAlternateProtocolBroken() {

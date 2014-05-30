@@ -25,6 +25,7 @@ LaunchdInterceptionServer::LaunchdInterceptionServer(
       server_port_(MACH_PORT_NULL),
       server_queue_(NULL),
       server_source_(NULL),
+      did_forward_message_(false),
       sandbox_port_(MACH_PORT_NULL),
       compat_shim_(GetLaunchdCompatibilityShim()) {
 }
@@ -45,11 +46,6 @@ bool LaunchdInterceptionServer::Initialize() {
   if ((kr = mach_port_allocate(task, MACH_PORT_RIGHT_RECEIVE, &port)) !=
           KERN_SUCCESS) {
     MACH_LOG(ERROR, kr) << "Failed to allocate new bootstrap port.";
-    return false;
-  }
-  if ((kr = mach_port_insert_right(task, port, port, MACH_MSG_TYPE_MAKE_SEND))
-          != KERN_SUCCESS) {
-    MACH_LOG(ERROR, kr) << "Failed to insert send right on bootstrap port.";
     return false;
   }
   server_port_.reset(port);
@@ -107,6 +103,7 @@ void LaunchdInterceptionServer::ReceiveMessage() {
   // Zero out the buffers from handling any previous message.
   bzero(request, kBufferSize);
   bzero(reply, kBufferSize);
+  did_forward_message_ = false;
 
   // A Mach message server-once. The system library to run a message server
   // cannot be used here, because some requests are conditionally forwarded
@@ -130,9 +127,15 @@ void LaunchdInterceptionServer::ReceiveMessage() {
   // Process the message.
   DemuxMessage(request, reply);
 
-  // Free any descriptors in the message body.
-  mach_msg_destroy(request);
-  mach_msg_destroy(reply);
+  // Free any descriptors in the message body. If the message was forwarded,
+  // any descriptors would have been moved out of the process on send. If the
+  // forwarded message was sent from the process hosting this sandbox server,
+  // destroying the message could also destroy rights held outside the scope of
+  // this message server.
+  if (!did_forward_message_) {
+    mach_msg_destroy(request);
+    mach_msg_destroy(reply);
+  }
 }
 
 void LaunchdInterceptionServer::DemuxMessage(mach_msg_header_t* request,
@@ -259,7 +262,9 @@ void LaunchdInterceptionServer::ForwardMessage(mach_msg_header_t* request,
   request->msgh_bits = (request->msgh_bits & ~MACH_MSGH_BITS_PORTS_MASK) |
       MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, MACH_MSG_TYPE_MOVE_SEND_ONCE);
   kern_return_t kr = mach_msg_send(request);
-  if (kr != KERN_SUCCESS) {
+  if (kr == KERN_SUCCESS) {
+    did_forward_message_ = true;
+  } else {
     MACH_LOG(ERROR, kr) << "Unable to forward message to the real launchd.";
   }
 }

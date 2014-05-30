@@ -17,6 +17,7 @@
 #include "chrome/browser/extensions/extension_installer.h"
 #include "chrome/browser/extensions/sandboxed_unpacker.h"
 #include "chrome/browser/extensions/webstore_installer.h"
+#include "chrome/common/extensions/extension_constants.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/manifest.h"
 #include "sync/api/string_ordinal.h"
@@ -238,6 +239,10 @@ class CrxInstaller
   // Runs on File thread. Install the unpacked extension into the profile and
   // notify the frontend.
   void CompleteInstall();
+
+  // Reloads extension on File thread and reports installation result back
+  // to UI thread.
+  void ReloadExtensionAfterInstall(const base::FilePath& version_dir);
 
   // Result reporting.
   void ReportFailureFromFileThread(const CrxInstallerError& error);

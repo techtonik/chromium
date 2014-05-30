@@ -184,6 +184,7 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
   void SetAllowUniversalAccessFromFileURLs(bool allow);
   void SetAllowFileAccessFromFileURLs(bool allow);
   void OverridePreference(const std::string key, v8::Handle<v8::Value> value);
+  void SetAcceptLanguages(const std::string& accept_languages);
   void SetPluginsEnabled(bool enabled);
   void DumpEditingCallbacks();
   void DumpAsText();
@@ -383,6 +384,7 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
       .SetMethod("setAllowFileAccessFromFileURLs",
                  &TestRunnerBindings::SetAllowFileAccessFromFileURLs)
       .SetMethod("overridePreference", &TestRunnerBindings::OverridePreference)
+      .SetMethod("setAcceptLanguages", &TestRunnerBindings::SetAcceptLanguages)
       .SetMethod("setPluginsEnabled", &TestRunnerBindings::SetPluginsEnabled)
       .SetMethod("dumpEditingCallbacks",
                  &TestRunnerBindings::DumpEditingCallbacks)
@@ -918,6 +920,14 @@ void TestRunnerBindings::OverridePreference(const std::string key,
                                             v8::Handle<v8::Value> value) {
   if (runner_)
     runner_->OverridePreference(key, value);
+}
+
+void TestRunnerBindings::SetAcceptLanguages(
+    const std::string& accept_languages) {
+  if (!runner_)
+    return;
+
+  runner_->SetAcceptLanguages(accept_languages);
 }
 
 void TestRunnerBindings::SetPluginsEnabled(bool enabled) {
@@ -1537,7 +1547,7 @@ void TestRunner::setCustomTextOutput(std::string text) {
   has_custom_text_output_ = true;
 }
 
-bool TestRunner::shouldGeneratePixelResults() {
+bool TestRunner::ShouldGeneratePixelResults() {
   CheckResponseMimeType();
   return generate_pixel_results_;
 }
@@ -1554,12 +1564,12 @@ bool TestRunner::shouldDumpChildFramesAsText() const {
   return dump_child_frames_as_text_;
 }
 
-bool TestRunner::shouldDumpAsAudio() const {
+bool TestRunner::ShouldDumpAsAudio() const {
   return dump_as_audio_;
 }
 
-void TestRunner::getAudioData(std::vector<unsigned char>* bufferView) const {
-  *bufferView = audio_data_;
+void TestRunner::GetAudioData(std::vector<unsigned char>* buffer_view) const {
+  *buffer_view = audio_data_;
 }
 
 bool TestRunner::shouldDumpFrameLoadCallbacks() const {
@@ -1614,7 +1624,7 @@ bool TestRunner::shouldDumpResourceResponseMIMETypes() const {
   return test_is_running_ && dump_resource_reqponse_mime_types_;
 }
 
-WebPermissionClient* TestRunner::webPermissions() const {
+WebPermissionClient* TestRunner::GetWebPermissions() const {
   return web_permissions_.get();
 }
 
@@ -1630,7 +1640,7 @@ bool TestRunner::shouldDumpSpellCheckCallbacks() const {
   return dump_spell_check_callbacks_;
 }
 
-bool TestRunner::shouldDumpBackForwardList() const {
+bool TestRunner::ShouldDumpBackForwardList() const {
   return dump_back_forward_list_;
 }
 
@@ -2320,6 +2330,10 @@ void TestRunner::OverridePreference(const std::string key,
     delegate_->printMessage(std::string("CONSOLE MESSAGE: ") + message + "\n");
   }
   delegate_->applyPreferences();
+}
+
+void TestRunner::SetAcceptLanguages(const std::string& accept_languages) {
+  proxy_->SetAcceptLanguages(accept_languages);
 }
 
 void TestRunner::SetPluginsEnabled(bool enabled) {

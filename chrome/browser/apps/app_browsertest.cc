@@ -40,6 +40,7 @@
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/test/test_utils.h"
 #include "extensions/browser/event_router.h"
+#include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/pref_names.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
@@ -1118,7 +1119,7 @@ IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest,
 
 // This test verifies that http://crbug.com/297179 is fixed.
 IN_PROC_BROWSER_TEST_F(PlatformAppBrowserTest,
-                       ClosingWindowWhilePrintingShouldNotCrash) {
+                       DISABLED_ClosingWindowWhilePrintingShouldNotCrash) {
   ScopedPreviewTestingDelegate preview_delegate(false);
   ASSERT_TRUE(RunPlatformAppTest("platform_apps/print_api")) << message_;
   preview_delegate.WaitUntilPreviewIsReady();

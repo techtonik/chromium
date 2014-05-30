@@ -4,7 +4,6 @@
 
 #import "chrome/browser/app_controller_mac.h"
 
-#include "apps/app_shim/app_shim_mac.h"
 #include "apps/app_shim/extension_app_shim_handler_mac.h"
 #include "apps/app_window_registry.h"
 #include "base/auto_reset.h"
@@ -614,7 +613,7 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
     browserWindows.insert(browser->window()->GetNativeWindow());
   }
   if (!browserWindows.empty()) {
-    ui::FocusWindowSet(browserWindows, false);
+    ui::FocusWindowSetOnCurrentSpace(browserWindows);
   }
 }
 
@@ -1201,7 +1200,7 @@ class AppControllerProfileObserver : public ProfileInfoCacheObserver {
         // See http://crbug.com/309656.
         reopenTime_ = base::TimeTicks::Now();
       } else {
-        ui::FocusWindowSet(browserWindows, false);
+        ui::FocusWindowSetOnCurrentSpace(browserWindows);
       }
       // Return NO; we've done (or soon will do) the deminiaturize, so
       // AppKit shouldn't do anything.

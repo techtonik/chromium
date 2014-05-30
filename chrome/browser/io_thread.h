@@ -34,7 +34,6 @@ class CommandLine;
 
 namespace chrome_browser_net {
 class DnsProbeService;
-class HttpPipeliningCompatibilityClient;
 }
 
 namespace extensions {
@@ -150,20 +149,24 @@ class IOThread : public content::BrowserThreadDelegate {
     scoped_refptr<net::CookieStore> system_cookie_store;
     scoped_refptr<extensions::EventRouterForwarder>
         extension_event_router_forwarder;
-    scoped_ptr<chrome_browser_net::HttpPipeliningCompatibilityClient>
-        http_pipelining_compatibility_client;
     scoped_ptr<net::HostMappingRules> host_mapping_rules;
     scoped_ptr<net::HttpUserAgentSettings> http_user_agent_settings;
     bool ignore_certificate_errors;
-    bool http_pipelining_enabled;
     uint16 testing_fixed_http_port;
     uint16 testing_fixed_https_port;
+
     Optional<size_t> initial_max_spdy_concurrent_streams;
     Optional<bool> force_spdy_single_domain;
     Optional<bool> enable_spdy_compression;
     Optional<bool> enable_spdy_ping_based_connection_checking;
     Optional<net::NextProto> spdy_default_protocol;
+    net::NextProtoVector next_protos;
     Optional<string> trusted_spdy_proxy;
+    Optional<bool> force_spdy_over_ssl;
+    Optional<bool> force_spdy_always;
+    std::set<net::HostPortPair> forced_spdy_exclusions;
+    Optional<bool> use_alternate_protocols;
+
     Optional<bool> enable_quic;
     Optional<bool> enable_quic_https;
     Optional<bool> enable_quic_pacing;

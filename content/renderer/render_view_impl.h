@@ -155,7 +155,6 @@ struct FileChooserParams;
 struct RenderViewImplParams;
 
 #if defined(OS_ANDROID)
-class RendererMediaPlayerManager;
 class WebMediaPlayerProxyAndroid;
 #endif
 
@@ -393,7 +392,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual bool requestPointerLock();
   virtual void requestPointerUnlock();
   virtual bool isPointerLocked();
-  virtual void didActivateCompositor() OVERRIDE;
   virtual void didHandleGestureEvent(const blink::WebGestureEvent& event,
                                      bool event_cancelled) OVERRIDE;
   virtual void initializeLayerTreeView() OVERRIDE;
@@ -416,7 +414,6 @@ class CONTENT_EXPORT RenderViewImpl
       const blink::WebString& path,
       blink::WebFileChooserCompletion* chooser_completion);
   virtual void didCancelCompositionOnSelectionChange();
-  virtual void didExecuteCommand(const blink::WebString& command_name);
   virtual bool handleCurrentKeyboardEvent();
   virtual bool runFileChooser(
       const blink::WebFileChooserParams& params,
@@ -573,9 +570,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual void InstrumentDidBeginFrame() OVERRIDE;
   virtual void InstrumentDidCancelFrame() OVERRIDE;
   virtual void InstrumentWillComposite() OVERRIDE;
-#if defined(OS_ANDROID)
-  virtual void UpdateSelectionRootBounds() OVERRIDE;
-#endif
 
  protected:
   explicit RenderViewImpl(RenderViewImplParams* params);
@@ -775,9 +769,7 @@ class CONTENT_EXPORT RenderViewImpl
   void OnUpdateTopControlsState(bool enable_hiding,
                                 bool enable_showing,
                                 bool animate);
-  void OnPauseVideo();
   void OnExtractSmartClipData(const gfx::Rect& rect);
-  void GetSelectionRootBounds(gfx::Rect* bounds) const;
 #elif defined(OS_MACOSX)
   void OnPluginImeCompositionCompleted(const base::string16& text,
                                        int plugin_id);
@@ -1111,10 +1103,6 @@ class CONTENT_EXPORT RenderViewImpl
   // List of click-based content detectors.
   typedef std::vector< linked_ptr<ContentDetector> > ContentDetectorList;
   ContentDetectorList content_detectors_;
-
-  // The media player manager for managing all the media players on this view
-  // for communicating with the real media player objects in browser process.
-  RendererMediaPlayerManager* media_player_manager_;
 
   // A date/time picker object for date and time related input elements.
   scoped_ptr<RendererDateTimePicker> date_time_picker_client_;

@@ -260,7 +260,6 @@ TestingProfile::TestingProfile(
       resource_context_(NULL),
       delegate_(delegate),
       policy_service_(policy_service.release()) {
-
   // If no profile path was supplied, create one.
   if (profile_path_.empty()) {
     CreateTempProfileDir();
@@ -770,16 +769,16 @@ void TestingProfile::CancelMidiSysExPermissionRequest(
 void TestingProfile::RequestProtectedMediaIdentifierPermission(
     int render_process_id,
     int render_view_id,
-    int bridge_id,
-    int group_id,
-    const GURL& requesting_frame,
+    const GURL& origin,
     const ProtectedMediaIdentifierPermissionCallback& callback) {
   // Always reject requests for testing.
   callback.Run(false);
 }
 
 void TestingProfile::CancelProtectedMediaIdentifierPermissionRequests(
-    int group_id) {
+    int render_process_id,
+    int render_view_id,
+    const GURL& origin) {
 }
 
 net::URLRequestContextGetter* TestingProfile::GetRequestContextForExtensions() {
@@ -830,18 +829,6 @@ TestingProfile::GetGeolocationPermissionContext() {
 
 content::BrowserPluginGuestManager* TestingProfile::GetGuestManager() {
   return GuestViewManager::FromBrowserContext(this);
-}
-
-std::wstring TestingProfile::GetName() {
-  return std::wstring();
-}
-
-std::wstring TestingProfile::GetID() {
-  return id_;
-}
-
-void TestingProfile::SetID(const std::wstring& id) {
-  id_ = id;
 }
 
 bool TestingProfile::IsSameProfile(Profile *p) {

@@ -51,6 +51,7 @@ GuestViewBase::GuestViewBase(int guest_instance_id,
       guest_instance_id_(guest_instance_id),
       view_instance_id_(guestview::kInstanceIDNone),
       weak_ptr_factory_(this) {
+  guest_web_contents->SetDelegate(this);
   webcontents_guestview_map.Get().insert(
       std::make_pair(guest_web_contents, this));
   GuestViewManager::FromBrowserContext(browser_context_)->
@@ -98,6 +99,11 @@ GuestViewBase* GuestViewBase::From(int embedder_process_id,
     return NULL;
 
   return GuestViewBase::FromWebContents(guest_web_contents);
+}
+
+// static
+bool GuestViewBase::IsGuest(WebContents* web_contents) {
+  return !!GuestViewBase::FromWebContents(web_contents);
 }
 
 // static
@@ -190,6 +196,11 @@ void GuestViewBase::RegisterDestructionCallback(
   destruction_callback_ = callback;
 }
 
+bool GuestViewBase::ShouldFocusPageAfterCrash() {
+  // Focus is managed elsewhere.
+  return false;
+}
+
 bool GuestViewBase::PreHandleGestureEvent(content::WebContents* source,
                                          const blink::WebGestureEvent& event) {
   return event.type == blink::WebGestureEvent::GesturePinchBegin ||
@@ -223,7 +234,6 @@ void GuestViewBase::DispatchEvent(Event* event) {
   Profile* profile = Profile::FromBrowserContext(browser_context_);
 
   extensions::EventFilteringInfo info;
-  info.SetURL(GURL());
   info.SetInstanceID(guest_instance_id_);
   scoped_ptr<base::ListValue> args(new base::ListValue());
   args->Append(event->GetArguments().release());

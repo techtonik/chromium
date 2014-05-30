@@ -48,7 +48,6 @@ HttpStreamFactoryImpl::Request::~Request() {
     factory_->request_map_.erase(*it);
 
   RemoveRequestFromSpdySessionRequestMap();
-  RemoveRequestFromHttpPipeliningRequestMap();
 
   STLDeleteElements(&jobs_);
 }
@@ -61,18 +60,6 @@ void HttpStreamFactoryImpl::Request::SetSpdySessionKey(
       factory_->spdy_session_request_map_[spdy_session_key];
   DCHECK(!ContainsKey(request_set, this));
   request_set.insert(this);
-}
-
-bool HttpStreamFactoryImpl::Request::SetHttpPipeliningKey(
-    const HttpPipelinedHost::Key& http_pipelining_key) {
-  CHECK(!http_pipelining_key_.get());
-  http_pipelining_key_.reset(new HttpPipelinedHost::Key(http_pipelining_key));
-  bool was_new_key = !ContainsKey(factory_->http_pipelining_request_map_,
-                                  http_pipelining_key);
-  RequestVector& request_vector =
-      factory_->http_pipelining_request_map_[http_pipelining_key];
-  request_vector.push_back(this);
-  return was_new_key;
 }
 
 void HttpStreamFactoryImpl::Request::AttachJob(Job* job) {
@@ -131,16 +118,8 @@ void HttpStreamFactoryImpl::Request::OnStreamFailed(
     int status,
     const SSLConfig& used_ssl_config) {
   DCHECK_NE(OK, status);
-  // |job| should only be NULL if we're being canceled by a late bound
-  // HttpPipelinedConnection (one that was not created by a job in our |jobs_|
-  // set).
-  if (!job) {
-    DCHECK(!bound_job_.get());
-    DCHECK(!jobs_.empty());
-    // NOTE(willchan): We do *NOT* call OrphanJobs() here. The reason is because
-    // we *WANT* to cancel the unnecessary Jobs from other requests if another
-    // Job completes first.
-  } else if (!bound_job_.get()) {
+  DCHECK(job);
+  if (!bound_job_.get()) {
     // Hey, we've got other jobs! Maybe one of them will succeed, let's just
     // ignore this failure.
     if (jobs_.size() > 1) {
@@ -271,27 +250,13 @@ HttpStreamFactoryImpl::Request::RemoveRequestFromSpdySessionRequestMap() {
   }
 }
 
-void
-HttpStreamFactoryImpl::Request::RemoveRequestFromHttpPipeliningRequestMap() {
-  if (http_pipelining_key_.get()) {
-    HttpPipeliningRequestMap& http_pipelining_request_map =
-        factory_->http_pipelining_request_map_;
-    DCHECK(ContainsKey(http_pipelining_request_map, *http_pipelining_key_));
-    RequestVector& request_vector =
-        http_pipelining_request_map[*http_pipelining_key_];
-    for (RequestVector::iterator it = request_vector.begin();
-         it != request_vector.end(); ++it) {
-      if (*it == this) {
-        request_vector.erase(it);
-        break;
-      }
-    }
-    if (request_vector.empty())
-      http_pipelining_request_map.erase(*http_pipelining_key_);
-    http_pipelining_key_.reset();
-  }
-}
-
+// TODO(jgraettinger): Currently, HttpStreamFactoryImpl::Job notifies a
+// Request that the session is ready, which in turn notifies it's delegate,
+// and then it notifies HttpStreamFactoryImpl so that /other/ requests may
+// be woken, but only if the spdy_session is still okay. This is tough to grok.
+// Instead, see if Job can notify HttpStreamFactoryImpl only, and have one
+// path for notifying any requests waiting for the session (including the
+// request which spawned it).
 void HttpStreamFactoryImpl::Request::OnNewSpdySessionReady(
     Job* job,
     scoped_ptr<HttpStream> stream,
@@ -334,7 +299,7 @@ void HttpStreamFactoryImpl::Request::OnNewSpdySessionReady(
                              stream.release());
   }
   // |this| may be deleted after this point.
-  if (spdy_session) {
+  if (spdy_session && spdy_session->IsAvailable()) {
     factory->OnNewSpdySessionReady(spdy_session,
                                    direct,
                                    used_ssl_config,
@@ -359,7 +324,6 @@ void HttpStreamFactoryImpl::Request::OrphanJobsExcept(Job* job) {
 
 void HttpStreamFactoryImpl::Request::OrphanJobs() {
   RemoveRequestFromSpdySessionRequestMap();
-  RemoveRequestFromHttpPipeliningRequestMap();
 
   std::set<Job*> tmp;
   tmp.swap(jobs_);
@@ -370,8 +334,7 @@ void HttpStreamFactoryImpl::Request::OrphanJobs() {
 
 void HttpStreamFactoryImpl::Request::OnJobSucceeded(Job* job) {
   // |job| should only be NULL if we're being serviced by a late bound
-  // SpdySession or HttpPipelinedConnection (one that was not created by a job
-  // in our |jobs_| set).
+  // SpdySession (one that was not created by a job in our |jobs_| set).
   if (!job) {
     DCHECK(!bound_job_.get());
     DCHECK(!jobs_.empty());

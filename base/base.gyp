@@ -578,6 +578,7 @@
         'strings/sys_string_conversions_unittest.cc',
         'strings/utf_offset_string_conversions_unittest.cc',
         'strings/utf_string_conversions_unittest.cc',
+        'supports_user_data_unittest.cc',
         'sync_socket_unittest.cc',
         'synchronization/cancellation_flag_unittest.cc',
         'synchronization/condition_variable_unittest.cc',
@@ -1414,6 +1415,10 @@
               # Note there is no 64-bit support in the linker.
               'sources': [
                 'android/linker/linker_jni.cc',
+              ],
+              # The crazy linker is never instrumented.
+              'cflags!': [
+                '-finstrument-functions',
               ],
               'dependencies': [
                 '<(android_ndk_root)/crazy_linker.gyp:crazy_linker',

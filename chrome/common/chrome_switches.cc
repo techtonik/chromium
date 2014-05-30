@@ -174,10 +174,6 @@ const char kCloudPrintSetupProxy[]          = "cloud-print-setup-proxy";
 // for the browser process.
 const char kComponentUpdater[]              = "component-updater";
 
-// Causes the browser process to inspect loaded and registered DLLs for known
-// conflicts and warn the user.
-const char kConflictingModulesCheck[]       = "conflicting-modules-check";
-
 // Comma-separated list of BrowserThreads that cause browser process to crash
 // if the given browser thread is not responsive. UI,IO,DB,FILE,CACHE are the
 // list of BrowserThreads that are supported.
@@ -375,6 +371,9 @@ const char kDisableScriptedPrintThrottling[] =
 const char kDisableSearchButtonInOmnibox[]  =
     "disable-search-button-in-omnibox";
 
+// Disables using bubbles for session restore request.
+const char kDisableSessionCrashedBubble[] = "disable-session-crashed-bubble";
+
 // Disable SPDY/3.1. This is a temporary testing flag.
 const char kDisableSpdy31[]                 = "disable-spdy31";
 
@@ -569,6 +568,9 @@ const char kEnablePrivetStorage[]           = "enable-privet-storage";
 // during chrome_browser_main.
 const char kEnableProfiling[]               = "enable-profiling";
 
+// Enables showing a prominent UI for initiating the URL app creation flow.
+const char kEnableProminentURLAppFlow[]     = "enable-prominent-url-app-flow";
+
 // Enables query in the omnibox.
 const char kEnableQueryExtraction[]         = "enable-query-extraction";
 
@@ -629,9 +631,6 @@ const char kEnableSpellingAutoCorrect[]     = "enable-spelling-auto-correct";
 // service.
 const char kEnableSpellingFeedbackFieldTrial[] =
     "enable-spelling-feedback-field-trial";
-
-// Enables the stacked tabstrip.
-const char kEnableStackedTabStrip[]         = "enable-stacked-tab-strip";
 
 // Enables an experimental hosted app experience.
 const char kEnableStreamlinedHostedApps[]   = "enable-streamlined-hosted-apps";
@@ -703,11 +702,6 @@ const char kFastStart[]            = "fast-start";
 // on about:version. They don't have any effect.
 const char kFlagSwitchesBegin[]             = "flag-switches-begin";
 const char kFlagSwitchesEnd[]               = "flag-switches-end";
-
-// The file descriptor limit is set to the value of this switch, subject to the
-// OS hard limits. Useful for testing that file descriptor exhaustion is
-// handled gracefully.
-const char kFileDescriptorLimit[]           = "file-descriptor-limit";
 
 // Forces application mode. This hides certain system UI elements and forces
 // the app to be installed if it hasn't been already.
@@ -1189,10 +1183,6 @@ const char kSyncShortInitialRetryOverride[] =
 // Overrides the default server used for profile sync.
 const char kSyncServiceURL[]                = "sync-url";
 
-// Makes the sync code to throw an unrecoverable error after initialization.
-// Useful for testing unrecoverable error scenarios.
-const char kSyncThrowUnrecoverableError[]   = "sync-throw-unrecoverable-error";
-
 // Enables deferring sync backend initialization until user initiated changes
 // occur.
 const char kSyncDisableDeferredStartup[]     = "sync-disable-deferred-startup";
@@ -1346,9 +1336,6 @@ const char kEnableSpeechDispatcher[] = "enable-speech-dispatcher";
 #if defined(OS_MACOSX)
 // Prevents Chrome from quitting when Chrome Apps are open.
 const char kAppsKeepChromeAlive[]           = "apps-keep-chrome-alive";
-
-// Disables the creation and launch of app shims for platform apps.
-const char kDisableAppShims[]               = "disable-app-shims";
 
 // Forcibly disables Lion-style on newer OSes, to allow developers to test the
 // older, SnowLeopard-style fullscreen.
