@@ -38,6 +38,7 @@
 #include "cc/base/switches.h"
 #include "content/browser/appcache/appcache_dispatcher_host.h"
 #include "content/browser/appcache/chrome_appcache_service.h"
+#include "content/browser/battery_status/battery_status_message_filter.h"
 #include "content/browser/browser_child_process_host_impl.h"
 #include "content/browser/browser_main.h"
 #include "content/browser/browser_main_loop.h"
@@ -138,7 +139,6 @@
 #include "ipc/ipc_switches.h"
 #include "media/base/media_switches.h"
 #include "mojo/common/common_type_converters.h"
-#include "mojo/public/cpp/bindings/allocation_scope.h"
 #include "net/url_request/url_request_context_getter.h"
 #include "ppapi/shared_impl/ppapi_switches.h"
 #include "third_party/skia/include/core/SkBitmap.h"
@@ -630,13 +630,12 @@ void RenderProcessHostImpl::CreateMessageFilters() {
   // Add BrowserPluginMessageFilter to ensure it gets the first stab at messages
   // from guests.
   scoped_refptr<BrowserPluginMessageFilter> bp_message_filter(
-      new BrowserPluginMessageFilter(GetID(), IsGuest()));
+      new BrowserPluginMessageFilter(GetID()));
   AddFilter(bp_message_filter.get());
 
   scoped_refptr<RenderMessageFilter> render_message_filter(
       new RenderMessageFilter(
           GetID(),
-          IsGuest(),
 #if defined(ENABLE_PLUGINS)
           PluginServiceImpl::GetInstance(),
 #else
@@ -724,7 +723,7 @@ void RenderProcessHostImpl::CreateMessageFilters() {
   AddFilter(new PepperRendererConnection(GetID()));
 #endif
   AddFilter(new SpeechRecognitionDispatcherHost(
-      IsGuest(), GetID(), storage_partition_impl_->GetURLRequestContext()));
+      GetID(), storage_partition_impl_->GetURLRequestContext()));
   AddFilter(new FileAPIMessageFilter(
       GetID(),
       storage_partition_impl_->GetURLRequestContext(),
@@ -834,6 +833,7 @@ void RenderProcessHostImpl::CreateMessageFilters() {
   screen_orientation_dispatcher_host_ = new ScreenOrientationDispatcherHost();
   AddFilter(screen_orientation_dispatcher_host_);
   AddFilter(new PushMessagingMessageFilter());
+  AddFilter(new BatteryStatusMessageFilter());
 }
 
 int RenderProcessHostImpl::GetNextRoutingID() {
@@ -1062,7 +1062,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDomAutomationController,
     switches::kEnableAcceleratedFixedRootBackground,
     switches::kEnableAcceleratedOverflowScroll,
-    switches::kEnableADTSStreamParser,
     switches::kEnableBeginFrameScheduling,
     switches::kEnableBleedingEdgeRenderingFastPaths,
     switches::kEnableCompositingForFixedPosition,
@@ -1174,7 +1173,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnablePepperTesting,
 #endif
 #if defined(ENABLE_WEBRTC)
-    switches::kEnableAudioTrackProcessing,
+    switches::kDisableAudioTrackProcessing,
     switches::kDisableDeviceEnumeration,
     switches::kDisableWebRtcHWDecoding,
     switches::kDisableWebRtcHWEncoding,
@@ -1198,7 +1197,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
 #if defined(OS_WIN)
     switches::kEnableDirectWrite,
     switches::kEnableHighResolutionTime,
-    switches::kHighDPISupport,
 #endif
   };
   renderer_cmd->CopySwitchesFrom(browser_cmd, kSwitchNames,
@@ -2075,9 +2073,8 @@ void RenderProcessHostImpl::ConnectTo(
   mojo_activation_required_ = true;
   MaybeActivateMojo();
 
-  mojo::AllocationScope scope;
-  mojo_application_host_->shell_client()->AcceptConnection(service_name,
-                                                           handle.Pass());
+  mojo_application_host_->service_provider()->ConnectToService(
+      mojo::String::From(service_name), handle.Pass());
 }
 
 }  // namespace content

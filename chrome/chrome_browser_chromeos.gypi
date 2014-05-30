@@ -11,7 +11,7 @@
       'variables': {
         'conditions': [
           ['sysroot!=""', {
-            'pkg-config': '../build/linux/pkg-config-wrapper "<(sysroot)" "<(target_arch)"',
+            'pkg-config': '../build/linux/pkg-config-wrapper "<(sysroot)" "<(target_arch)" "<(system_libdir)"',
           }, {
             'pkg-config': 'pkg-config'
           }],
@@ -353,6 +353,8 @@
         'browser/chromeos/file_manager/file_watcher.h',
         'browser/chromeos/file_manager/fileapi_util.cc',
         'browser/chromeos/file_manager/fileapi_util.h',
+        'browser/chromeos/file_manager/filesystem_api_util.cc',
+        'browser/chromeos/file_manager/filesystem_api_util.h',
         'browser/chromeos/file_manager/mime_util.cc',
         'browser/chromeos/file_manager/mime_util.h',
         'browser/chromeos/file_manager/mounted_disk_monitor.cc',
@@ -500,6 +502,8 @@
         'browser/chromeos/login/auth/authenticator.h',
         'browser/chromeos/login/auth/extended_authenticator.cc',
         'browser/chromeos/login/auth/extended_authenticator.h',
+        'browser/chromeos/login/auth/key.cc',
+        'browser/chromeos/login/auth/key.h',
         'browser/chromeos/login/auth/login_performer.cc',
         'browser/chromeos/login/auth/login_performer.h',
         'browser/chromeos/login/auth/login_status_consumer.cc',
@@ -587,6 +591,8 @@
         'browser/chromeos/login/screens/eula_screen.cc',
         'browser/chromeos/login/screens/eula_screen.h',
         'browser/chromeos/login/screens/eula_screen_actor.h',
+        'browser/chromeos/login/screens/gaia_screen.cc',
+        'browser/chromeos/login/screens/gaia_screen.h',
         'browser/chromeos/login/screens/hid_detection_screen.cc',
         'browser/chromeos/login/screens/hid_detection_screen.h',
         'browser/chromeos/login/screens/hid_detection_screen_actor.h',
@@ -619,6 +625,8 @@
         'browser/chromeos/login/screens/user_image_screen.cc',
         'browser/chromeos/login/screens/user_image_screen.h',
         'browser/chromeos/login/screens/user_image_screen_actor.h',
+        'browser/chromeos/login/screens/user_selection_screen.cc',
+        'browser/chromeos/login/screens/user_selection_screen.h',
         'browser/chromeos/login/screens/wizard_screen.cc',
         'browser/chromeos/login/screens/wizard_screen.h',
         'browser/chromeos/login/screens/wrong_hwid_screen.cc',
@@ -752,6 +760,8 @@
         'browser/chromeos/ownership/owner_settings_service.h',
         'browser/chromeos/ownership/owner_settings_service_factory.cc',
         'browser/chromeos/ownership/owner_settings_service_factory.h',
+        'browser/chromeos/platform_keys/platform_keys.h',
+        'browser/chromeos/platform_keys/platform_keys_nss.cc',
         'browser/chromeos/policy/app_pack_updater.cc',
         'browser/chromeos/policy/app_pack_updater.h',
         'browser/chromeos/policy/auto_enrollment_client.cc',

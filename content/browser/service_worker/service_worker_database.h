@@ -172,6 +172,10 @@ class CONTENT_EXPORT ServiceWorkerDatabase {
   // Returns OK on success. Otherwise deletes nothing and returns an error.
   Status ClearPurgeableResourceIds(const std::set<int64>& ids);
 
+  // Moves |ids| from the uncommitted list to the purgeable list.
+  // Returns OK on success. Otherwise deletes nothing and returns an error.
+  Status PurgeUncommittedResourceIds(const std::set<int64>& ids);
+
   // Deletes all data for |origin|, namely, unique origin, registrations and
   // resource records. Resources are moved to the purgeable list. Returns OK if
   // they are successfully deleted or not found in the database. Otherwise,
@@ -179,9 +183,6 @@ class CONTENT_EXPORT ServiceWorkerDatabase {
   Status DeleteAllDataForOrigin(
       const GURL& origin,
       std::vector<int64>* newly_purgeable_resources);
-
-  bool is_disabled() const { return is_disabled_; }
-  bool was_corruption_detected() const { return was_corruption_detected_; }
 
  private:
   // Opens the database at the |path_|. This is lazily called when the first
@@ -236,6 +237,10 @@ class CONTENT_EXPORT ServiceWorkerDatabase {
   Status WriteResourceIds(
       const char* id_key_prefix,
       const std::set<int64>& ids);
+  Status WriteResourceIdsInBatch(
+      const char* id_key_prefix,
+      const std::set<int64>& ids,
+      leveldb::WriteBatch* batch);
 
   // Deletes resource ids for |id_key_prefix| from the database. Returns OK if
   // it's successfully deleted or not found in the database. Otherwise, returns
@@ -243,6 +248,10 @@ class CONTENT_EXPORT ServiceWorkerDatabase {
   Status DeleteResourceIds(
       const char* id_key_prefix,
       const std::set<int64>& ids);
+  Status DeleteResourceIdsInBatch(
+      const char* id_key_prefix,
+      const std::set<int64>& ids,
+      leveldb::WriteBatch* batch);
 
   // Reads the current schema version from the database. If the database hasn't
   // been written anything yet, sets |db_version| to 0 and returns OK.
@@ -276,16 +285,12 @@ class CONTENT_EXPORT ServiceWorkerDatabase {
   int64 next_avail_resource_id_;
   int64 next_avail_version_id_;
 
-  // True if a database error has occurred (e.g. cannot read data).
-  // If true, all database accesses will fail.
-  bool is_disabled_;
-
-  // True if a database corruption was detected.
-  bool was_corruption_detected_;
-
-  // True if a database was initialized, that is, the schema version was written
-  // in the database.
-  bool is_initialized_;
+  enum State {
+    UNINITIALIZED,
+    INITIALIZED,
+    DISABLED,
+  };
+  State state_;
 
   base::SequenceChecker sequence_checker_;
 

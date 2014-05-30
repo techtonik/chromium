@@ -6,15 +6,58 @@
       'sources': [
         'services/dbus_echo/echo.mojom',
       ],
-      'variables': {
-        'mojom_base_output_dir': 'mojo',
-      },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
         'mojo_cpp_bindings',
       ],
       'dependencies': [
         'mojo_cpp_bindings',
+      ],
+    },
+    {
+      'target_name': 'mojo_input_events_bindings',
+      'type': 'static_library',
+      'sources': [
+        'services/public/interfaces/input_events/input_events.mojom',
+      ],
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'export_dependent_settings': [
+        'mojo_cpp_bindings',
+      ],
+      'dependencies': [
+        'mojo_cpp_bindings',
+        'mojo_geometry_bindings',
+      ],
+    },
+    {
+      'target_name': 'mojo_geometry_bindings',
+      'type': 'static_library',
+      'sources': [
+        'services/public/interfaces/geometry/geometry.mojom',
+      ],
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'dependencies': [
+        'mojo_cpp_bindings',
+      ],
+      'export_dependent_settings': [
+        'mojo_cpp_bindings',
+      ],
+    },
+    {
+      'target_name': 'mojo_geometry_lib',
+      'type': '<(component)',
+      'defines': [
+        'MOJO_GEOMETRY_IMPLEMENTATION',
+      ],
+      'dependencies': [
+        '../ui/gfx/gfx.gyp:gfx_geometry',
+        'mojo_environment_chromium',
+        'mojo_geometry_bindings',
+        'mojo_system_impl',
+      ],
+      'sources': [
+        'services/public/cpp/geometry/lib/geometry_type_converters.cc',
+        'services/public/cpp/geometry/geometry_type_converters.h',
       ],
     },
     {
@@ -27,9 +70,6 @@
         'services/gles2/mojo_buffer_backing.cc',
         'services/gles2/mojo_buffer_backing.h',
       ],
-      'variables': {
-        'mojom_base_output_dir': 'mojo',
-      },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
         'mojo_cpp_bindings',
@@ -64,15 +104,13 @@
       'sources': [
         'services/native_viewport/native_viewport.mojom',
       ],
-      'variables': {
-        'mojom_base_output_dir': 'mojo',
-      },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
         'mojo_cpp_bindings',
       ],
       'dependencies': [
         'mojo_geometry_bindings',
+        'mojo_input_events_bindings',
         'mojo_cpp_bindings',
       ],
     },
@@ -85,13 +123,13 @@
         '../ui/events/events.gyp:events',
         '../ui/gfx/gfx.gyp:gfx',
         '../ui/gfx/gfx.gyp:gfx_geometry',
+        'mojo_application',
         'mojo_common_lib',
         'mojo_environment_chromium',
         'mojo_geometry_bindings',
         'mojo_geometry_lib',
         'mojo_gles2_service',
         'mojo_native_viewport_bindings',
-        'mojo_shell_client',
         'mojo_system_impl',
       ],
       'defines': [
@@ -133,9 +171,6 @@
       'sources': [
         'services/public/interfaces/view_manager/view_manager.mojom',
       ],
-      'variables': {
-        'mojom_base_output_dir': 'mojo',
-      },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
         'mojo_cpp_bindings',
@@ -155,7 +190,7 @@
         '../ui/gfx/gfx.gyp:gfx_geometry',
         'mojo_geometry_bindings',
         'mojo_geometry_lib',
-        'mojo_shell_bindings',
+        'mojo_service_provider_bindings',
         'mojo_view_manager_bindings',
         'mojo_view_manager_common',
       ],
@@ -235,8 +270,8 @@
             'mojo_geometry_lib',
             'mojo_gles2',
             'mojo_launcher_bindings',
+            'mojo_main_chromium',
             'mojo_native_viewport_bindings',
-            'mojo_shell_client',
             'mojo_system_impl',
             'mojo_view_manager_bindings',
             'mojo_view_manager_common',
@@ -286,10 +321,11 @@
             '../ui/aura/aura.gyp:aura',
             '../ui/gfx/gfx.gyp:gfx_geometry',
             '../ui/gl/gl.gyp:gl',
+            'mojo_application',
             'mojo_environment_chromium',
             'mojo_geometry_bindings',
             'mojo_geometry_lib',
-            'mojo_shell_client',
+            'mojo_service_manager',
             'mojo_shell_test_support',
             'mojo_system_impl',
             'mojo_view_manager_bindings',
@@ -297,6 +333,8 @@
             'mojo_view_manager_run_unittests',
           ],
           'sources': [
+            'services/view_manager/test_change_tracker.cc',
+            'services/view_manager/test_change_tracker.h',
             'services/view_manager/view_manager_connection_unittest.cc',
           ],
         },
@@ -318,11 +356,11 @@
             '../base/base.gyp:base',
             '../build/linux/system.gyp:dbus',
             '../dbus/dbus.gyp:dbus',
+            'mojo_application',
             'mojo_common_lib',
             'mojo_dbus_service',
             'mojo_echo_bindings',
             'mojo_environment_chromium',
-            'mojo_shell_client',
             'mojo_system_impl',
           ],
           'sources': [

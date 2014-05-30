@@ -9,9 +9,9 @@
 #include "base/location.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/services/gcm/gcm_driver.h"
 #include "chrome/browser/services/gcm/gcm_profile_service.h"
 #include "chrome/browser/services/gcm/gcm_profile_service_factory.h"
+#include "components/gcm_driver/gcm_driver.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_source.h"
 #include "extensions/browser/extension_registry.h"
@@ -49,7 +49,7 @@ ExtensionGCMAppHandler::ExtensionGCMAppHandler(content::BrowserContext* context)
       weak_factory_(this) {
   extension_registry_observer_.Add(ExtensionRegistry::Get(profile_));
   registrar_.Add(this,
-                 chrome::NOTIFICATION_EXTENSION_UNINSTALLED,
+                 chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED,
                  content::Source<Profile>(profile_));
 
 #if !defined(OS_ANDROID)
@@ -115,7 +115,7 @@ void ExtensionGCMAppHandler::Observe(
     int type,
     const content::NotificationSource& source,
     const content::NotificationDetails& details) {
-  DCHECK_EQ(chrome::NOTIFICATION_EXTENSION_UNINSTALLED, type);
+  DCHECK_EQ(chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED, type);
   const Extension* extension = content::Details<Extension>(details).ptr();
   if (IsGCMPermissionEnabled(extension)) {
     GetGCMDriver()->Unregister(

@@ -152,9 +152,6 @@ const char kDisableFileSystem[]             = "disable-file-system";
 // Disables sending filters (SkImageFilter objects) between processes over IPC
 const char kDisableFiltersOverIPC[]         = "disable-filters-over-ipc";
 
-const char kDisableFixedPositionCreatesStackingContext[]
-    = "disable-fixed-position-creates-stacking-context";
-
 // Disable 3D inside of flapper.
 const char kDisableFlash3d[]                = "disable-flash-3d";
 
@@ -398,9 +395,6 @@ const char kEnableFileCookies[]             = "enable-file-cookies";
 
 // Enable the fast text autosizing implementation.
 const char kEnableFastTextAutosizing[]      = "enable-fast-text-autosizing";
-
-const char kEnableFixedPositionCreatesStackingContext[]
-    = "enable-fixed-position-creates-stacking-context";
 
 // Enable Gesture Tap Highlight
 const char kEnableGestureTapHighlight[]     = "enable-gesture-tap-highlight";
@@ -925,9 +919,9 @@ const char kZygoteCmdPrefix[]               = "zygote-cmd-prefix";
 const char kZygoteProcess[]                 = "zygote";
 
 #if defined(ENABLE_WEBRTC)
-// Enables audio processing in a MediaStreamTrack. When this flag is on, AEC,
-// NS and AGC will be done per MediaStreamTrack instead of in PeerConnection.
-const char kEnableAudioTrackProcessing[]    = "enable-audio-track-processing";
+// Disables audio processing in a MediaStreamTrack. When this flag is on, AEC,
+// NS and AGC will be done in PeerConnection instead of MediaStreamTrack.
+const char kDisableAudioTrackProcessing[]    = "disable-audio-track-processing";
 
 // Disables WebRTC device enumeration.
 const char kDisableDeviceEnumeration[]      = "disable-device-enumeration";
@@ -950,10 +944,6 @@ const char kEnableWebRtcHWVp8Encoding[]     = "enable-webrtc-hw-vp8-encoding";
 #endif
 
 #if defined(OS_ANDROID)
-// Disable user gesture requirement for the media element to enter fullscreen.
-const char kDisableGestureRequirementForMediaFullscreen[] =
-    "disable-gesture-requirement-for-media-fullscreen";
-
 // Disable user gesture requirement for media playback.
 const char kDisableGestureRequirementForMediaPlayback[] =
     "disable-gesture-requirement-for-media-playback";

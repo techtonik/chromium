@@ -61,6 +61,7 @@
 #include "chrome/browser/prefs/browser_prefs.h"
 #include "chrome/browser/prefs/chrome_pref_service_factory.h"
 #include "chrome/browser/prefs/pref_service_syncable.h"
+#include "chrome/browser/prefs/tracked/tracked_preference_validation_delegate.h"
 #include "chrome/browser/prerender/prerender_manager_factory.h"
 #include "chrome/browser/profiles/bookmark_model_loaded_observer.h"
 #include "chrome/browser/profiles/chrome_version_service.h"
@@ -460,6 +461,7 @@ ProfileImpl::ProfileImpl(
       path_, sequenced_task_runner, create_mode == CREATE_MODE_SYNCHRONOUS);
 #endif
 
+  // TODO(grt): construct pref_validation_delegate_.
   {
     // On startup, preference loading is always synchronous so a scoped timer
     // will work here.
@@ -468,6 +470,7 @@ ProfileImpl::ProfileImpl(
     prefs_ = chrome_prefs::CreateProfilePrefs(
         path_,
         sequenced_task_runner,
+        pref_validation_delegate_.get(),
         profile_policy_connector_->policy_service(),
         managed_user_settings,
         new ExtensionPrefStore(
@@ -993,18 +996,14 @@ void ProfileImpl::CancelMidiSysExPermissionRequest(
 void ProfileImpl::RequestProtectedMediaIdentifierPermission(
     int render_process_id,
     int render_view_id,
-    int bridge_id,
-    int group_id,
-    const GURL& requesting_frame,
+    const GURL& origin,
     const ProtectedMediaIdentifierPermissionCallback& callback) {
 #if defined(OS_ANDROID)
   ProtectedMediaIdentifierPermissionContext* context =
       ProtectedMediaIdentifierPermissionContextFactory::GetForProfile(this);
   context->RequestProtectedMediaIdentifierPermission(render_process_id,
                                                      render_view_id,
-                                                     bridge_id,
-                                                     group_id,
-                                                     requesting_frame,
+                                                     origin,
                                                      callback);
 #else
   NOTIMPLEMENTED();
@@ -1013,11 +1012,14 @@ void ProfileImpl::RequestProtectedMediaIdentifierPermission(
 }
 
 void ProfileImpl::CancelProtectedMediaIdentifierPermissionRequests(
-    int group_id) {
+    int render_process_id,
+    int render_view_id,
+    const GURL& origin) {
 #if defined(OS_ANDROID)
   ProtectedMediaIdentifierPermissionContext* context =
       ProtectedMediaIdentifierPermissionContextFactory::GetForProfile(this);
-  context->CancelProtectedMediaIdentifierPermissionRequests(group_id);
+  context->CancelProtectedMediaIdentifierPermissionRequests(
+      render_process_id, render_view_id, origin);
 #else
   NOTIMPLEMENTED();
 #endif  // defined(OS_ANDROID)

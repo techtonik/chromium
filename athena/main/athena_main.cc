@@ -5,11 +5,11 @@
 #include "apps/shell/app/shell_main_delegate.h"
 #include "apps/shell/browser/shell_browser_main_delegate.h"
 #include "apps/shell/browser/shell_desktop_controller.h"
+#include "athena/main/athena_launcher.h"
 #include "athena/main/placeholder.h"
-#include "athena/screen/public/screen_manager.h"
-#include "athena/wm/public/window_manager.h"
 #include "content/public/app/content_main.h"
 #include "ui/aura/window_tree_host.h"
+#include "ui/wm/core/visibility_controller.h"
 
 class AthenaBrowserMainDelegate : public apps::ShellBrowserMainDelegate {
  public:
@@ -18,19 +18,13 @@ class AthenaBrowserMainDelegate : public apps::ShellBrowserMainDelegate {
 
   // apps::ShellBrowserMainDelegate:
   virtual void Start(content::BrowserContext* context) OVERRIDE {
-    athena::ScreenManager::Create(apps::ShellDesktopController::instance()
-                                      ->GetWindowTreeHost()
-                                      ->window());
-    athena::WindowManager::Create();
-
-    SetupBackgroundImage();
+    athena::StartAthena(apps::ShellDesktopController::instance()
+                            ->GetWindowTreeHost()
+                            ->window());
     CreateTestWindows();
   }
 
-  virtual void Shutdown() OVERRIDE {
-    athena::WindowManager::Shutdown();
-    athena::ScreenManager::Shutdown();
-  }
+  virtual void Shutdown() OVERRIDE { athena::ShutdownAthena(); }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(AthenaBrowserMainDelegate);

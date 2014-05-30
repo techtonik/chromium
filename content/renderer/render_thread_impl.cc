@@ -79,10 +79,12 @@
 #include "content/renderer/media/midi_message_filter.h"
 #include "content/renderer/media/peer_connection_tracker.h"
 #include "content/renderer/media/renderer_gpu_video_accelerator_factories.h"
+#include "content/renderer/media/rtc_peer_connection_handler.h"
 #include "content/renderer/media/video_capture_impl_manager.h"
 #include "content/renderer/media/video_capture_message_filter.h"
 #include "content/renderer/media/webrtc/peer_connection_dependency_factory.h"
 #include "content/renderer/media/webrtc_identity_service.h"
+#include "content/renderer/net_info_helper.h"
 #include "content/renderer/p2p/socket_dispatcher.h"
 #include "content/renderer/render_process_impl.h"
 #include "content/renderer/render_view_impl.h"
@@ -534,6 +536,8 @@ void RenderThreadImpl::Shutdown() {
   audio_message_filter_ = NULL;
 
 #if defined(ENABLE_WEBRTC)
+  RTCPeerConnectionHandler::DestructAllHandlers();
+
   peer_connection_factory_.reset();
 #endif
   RemoveFilter(vc_manager_->video_capture_message_filter());
@@ -558,6 +562,11 @@ void RenderThreadImpl::Shutdown() {
     RemoveFilter(input_event_filter_.get());
     input_event_filter_ = NULL;
   }
+
+  // RemoveEmbeddedWorkerRoute may be called while deleting
+  // EmbeddedWorkerDispatcher. So it must be deleted before deleting
+  // RenderThreadImpl.
+  embedded_worker_dispatcher_.reset();
 
   // Ramp down IDB before we ramp down WebKit (and V8), since IDB classes might
   // hold pointers to V8 objects (e.g., via pending requests).
@@ -1170,7 +1179,7 @@ scoped_ptr<gfx::GpuMemoryBuffer> RenderThreadImpl::AllocateGpuMemoryBuffer(
       .PassAs<gfx::GpuMemoryBuffer>();
 }
 
-void RenderThreadImpl::AcceptConnection(
+void RenderThreadImpl::ConnectToService(
     const mojo::String& service_name,
     mojo::ScopedMessagePipeHandle message_pipe) {
   // TODO(darin): Invent some kind of registration system to use here.
@@ -1350,11 +1359,15 @@ void RenderThreadImpl::OnPurgePluginListCache(bool reload_pages) {
   FOR_EACH_OBSERVER(RenderProcessObserver, observers_, PluginListChanged());
 }
 
-void RenderThreadImpl::OnNetworkStateChanged(bool online) {
+void RenderThreadImpl::OnNetworkStateChanged(
+    bool online,
+    net::NetworkChangeNotifier::ConnectionType type) {
   EnsureWebKitInitialized();
   WebNetworkStateNotifier::setOnLine(online);
-  FOR_EACH_OBSERVER(RenderProcessObserver, observers_,
-      NetworkStateChanged(online));
+  FOR_EACH_OBSERVER(
+      RenderProcessObserver, observers_, NetworkStateChanged(online));
+  WebNetworkStateNotifier::setWebConnectionType(
+      NetConnectionTypeToWebConnectionType(type));
 }
 
 void RenderThreadImpl::OnTempCrashWithData(const GURL& data) {

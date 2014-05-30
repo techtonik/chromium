@@ -609,7 +609,6 @@ void ExistingUserController::SetDisplayEmail(const std::string& email) {
 void ExistingUserController::ShowWrongHWIDScreen() {
   scoped_ptr<base::DictionaryValue> params;
   host_->StartWizard(WizardController::kWrongHWIDScreenName, params.Pass());
-  login_display_->OnFadeOut();
 }
 
 void ExistingUserController::Signout() {
@@ -654,26 +653,22 @@ void ExistingUserController::ShowEnrollmentScreen(bool is_auto_enrollment,
   }
   host_->StartWizard(WizardController::kEnrollmentScreenName,
                      params.Pass());
-  login_display_->OnFadeOut();
 }
 
 void ExistingUserController::ShowResetScreen() {
   scoped_ptr<base::DictionaryValue> params;
   host_->StartWizard(WizardController::kResetScreenName, params.Pass());
-  login_display_->OnFadeOut();
 }
 
 void ExistingUserController::ShowKioskEnableScreen() {
   scoped_ptr<base::DictionaryValue> params;
   host_->StartWizard(WizardController::kKioskEnableScreenName, params.Pass());
-  login_display_->OnFadeOut();
 }
 
 void ExistingUserController::ShowKioskAutolaunchScreen() {
   scoped_ptr<base::DictionaryValue> params;
   host_->StartWizard(WizardController::kKioskAutolaunchScreenName,
                      params.Pass());
-  login_display_->OnFadeOut();
 }
 
 void ExistingUserController::ShowTPMError() {
@@ -784,9 +779,6 @@ void ExistingUserController::OnLoginSuccess(const UserContext& user_context) {
                                     this);
 
   display_email_.clear();
-
-  // Notify LoginDisplay to allow it provide visual feedback to user.
-  login_display_->OnLoginSuccess(user_context.GetUserID());
 }
 
 void ExistingUserController::OnProfilePrepared(Profile* profile) {
@@ -811,7 +803,7 @@ void ExistingUserController::OnProfilePrepared(Profile* profile) {
     // Mark the device as registered., i.e. the second part of OOBE as
     // completed.
     if (!StartupUtils::IsDeviceRegistered())
-      StartupUtils::MarkDeviceRegistered();
+      StartupUtils::MarkDeviceRegistered(base::Closure());
 
     if (CommandLine::ForCurrentProcess()->HasSwitch(
           chromeos::switches::kOobeSkipPostLogin)) {
@@ -827,7 +819,6 @@ void ExistingUserController::OnProfilePrepared(Profile* profile) {
   // Inform |login_status_consumer_| about successful login.
   if (login_status_consumer_)
     login_status_consumer_->OnLoginSuccess(UserContext());
-  login_display_->OnFadeOut();
 }
 
 void ExistingUserController::OnOffTheRecordLoginSuccess() {
@@ -836,7 +827,7 @@ void ExistingUserController::OnOffTheRecordLoginSuccess() {
 
   // Mark the device as registered., i.e. the second part of OOBE as completed.
   if (!StartupUtils::IsDeviceRegistered())
-    StartupUtils::MarkDeviceRegistered();
+    StartupUtils::MarkDeviceRegistered(base::Closure());
 
   LoginUtils::Get()->CompleteOffTheRecordLogin(guest_mode_url_);
 

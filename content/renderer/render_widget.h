@@ -8,6 +8,7 @@
 #include <deque>
 #include <map>
 
+#include "base/auto_reset.h"
 #include "base/basictypes.h"
 #include "base/compiler_specific.h"
 #include "base/memory/ref_counted.h"
@@ -112,6 +113,16 @@ class CONTENT_EXPORT RenderWidget
   void RegisterSwappedOutChildFrame(RenderFrameImpl* frame);
   void UnregisterSwappedOutChildFrame(RenderFrameImpl* frame);
 
+  // Functions to track all RenderFrame objects associated with this
+  // RenderWidget.
+  void RegisterRenderFrame(RenderFrameImpl* frame);
+  void UnregisterRenderFrame(RenderFrameImpl* frame);
+
+#if defined(VIDEO_HOLE)
+  void RegisterVideoHoleFrame(RenderFrameImpl* frame);
+  void UnregisterVideoHoleFrame(RenderFrameImpl* frame);
+#endif  // defined(VIDEO_HOLE)
+
   // IPC::Listener
   virtual bool OnMessageReceived(const IPC::Message& msg) OVERRIDE;
 
@@ -158,6 +169,10 @@ class CONTENT_EXPORT RenderWidget
   void CleanupWindowInPluginMoves(gfx::PluginWindowHandle window);
 
   RenderWidgetCompositor* compositor() const;
+
+  const ui::LatencyInfo* current_event_latency_info() const {
+    return current_event_latency_info_;
+  }
 
   virtual scoped_ptr<cc::OutputSurface> CreateOutputSurface(bool fallback);
 
@@ -494,12 +509,6 @@ class CONTENT_EXPORT RenderWidget
   // by script, not by user input.
   virtual void didUpdateTextOfFocusedElementByNonUserInput();
 
-#if defined(OS_ANDROID)
-  // Checks if the selection root bounds have changed. If they have changed, the
-  // new value will be sent to the browser process.
-  virtual void UpdateSelectionRootBounds();
-#endif
-
   // Creates a 3D context associated with this view.
   scoped_ptr<WebGraphicsContext3DCommandBufferImpl> CreateGraphicsContext3D();
 
@@ -616,11 +625,6 @@ class CONTENT_EXPORT RenderWidget
   gfx::Rect selection_focus_rect_;
   gfx::Rect selection_anchor_rect_;
 
-  // Stores the current selection root bounds.
-#if defined(OS_ANDROID)
-  gfx::Rect selection_root_rect_;
-#endif
-
   // Stores the current composition character bounds.
   std::vector<gfx::Rect> composition_character_bounds_;
 
@@ -667,6 +671,8 @@ class CONTENT_EXPORT RenderWidget
   // Specified whether the compositor will run in its own thread.
   bool is_threaded_compositing_enabled_;
 
+  const ui::LatencyInfo* current_event_latency_info_;
+
   uint32 next_output_surface_id_;
 
 #if defined(OS_ANDROID)
@@ -701,9 +707,17 @@ class CONTENT_EXPORT RenderWidget
 
   scoped_ptr<ResizingModeSelector> resizing_mode_selector_;
 
-  // A list of swapped out RenderFrames that need to be notified
+  // Lists of swapped out RenderFrames that need to be notified
   // of compositing-related events (e.g. DidCommitCompositorFrame).
   ObserverList<RenderFrameImpl> swapped_out_frames_;
+#if defined(VIDEO_HOLE)
+  ObserverList<RenderFrameImpl> video_hole_frames_;
+#endif  // defined(VIDEO_HOLE)
+
+  // A list of RenderFrames associated with this RenderWidget. Notifications
+  // are sent to each frame in the list for events such as changing
+  // visibility state for example.
+  ObserverList<RenderFrameImpl> render_frames_;
 
   ui::MenuSourceType context_menu_source_type_;
   gfx::Point touch_editing_context_menu_location_;

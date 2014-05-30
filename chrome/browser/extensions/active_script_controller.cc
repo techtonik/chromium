@@ -11,6 +11,7 @@
 #include "base/stl_util.h"
 #include "chrome/browser/extensions/active_tab_permission_granter.h"
 #include "chrome/browser/extensions/extension_action.h"
+#include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/location_bar_controller.h"
 #include "chrome/browser/extensions/tab_helper.h"
 #include "chrome/browser/sessions/session_id.h"
@@ -75,7 +76,9 @@ bool ActiveScriptController::RequiresUserConsentForScriptInjection(
   if (!PermissionsData::RequiresActionForScriptExecution(
           extension,
           SessionID::IdForTab(web_contents()),
-          web_contents()->GetVisibleURL())) {
+          web_contents()->GetVisibleURL()) ||
+      util::AllowedScriptingOnAllUrls(extension->id(),
+                                      web_contents()->GetBrowserContext())) {
     return false;
   }
 
@@ -107,7 +110,7 @@ void ActiveScriptController::OnActiveTabPermissionGranted(
 }
 
 void ActiveScriptController::OnAdInjectionDetected(
-    const std::vector<std::string> ad_injectors) {
+    const std::set<std::string> ad_injectors) {
   // We're only interested in data if there are ad injectors detected.
   if (ad_injectors.empty())
     return;

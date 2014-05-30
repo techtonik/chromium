@@ -388,6 +388,7 @@ RenderWidget::RenderWidget(blink::WebPopupType popup_type,
       screen_info_(screen_info),
       device_scale_factor_(screen_info_.deviceScaleFactor),
       is_threaded_compositing_enabled_(false),
+      current_event_latency_info_(NULL),
       next_output_surface_id_(0),
 #if defined(OS_ANDROID)
       text_field_is_dirty_(false),
@@ -767,6 +768,8 @@ void RenderWidget::OnWasHidden() {
   TRACE_EVENT0("renderer", "RenderWidget::OnWasHidden");
   // Go into a mode where we stop generating paint and scrolling events.
   SetHidden(true);
+  FOR_EACH_OBSERVER(RenderFrameImpl, render_frames_,
+                    WasHidden());
 }
 
 void RenderWidget::OnWasShown(bool needs_repainting) {
@@ -777,6 +780,8 @@ void RenderWidget::OnWasShown(bool needs_repainting) {
 
   // See OnWasHidden
   SetHidden(false);
+  FOR_EACH_OBSERVER(RenderFrameImpl, render_frames_,
+                    WasShown());
 
   if (!needs_repainting)
     return;
@@ -911,6 +916,9 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
     return;
   base::AutoReset<WebInputEvent::Type> handling_event_type_resetter(
       &handling_event_type_, input_event->type);
+
+  base::AutoReset<const ui::LatencyInfo*> resetter(&current_event_latency_info_,
+                                                   &latency_info);
 
   base::TimeTicks start_time;
   if (base::TimeTicks::IsHighResNowFastAndReliable())
@@ -1082,7 +1090,8 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
       Send(response.release());
     }
   }
-  ignore_ack_for_mouse_move_from_debugger_ = false;
+  if (input_event->type == WebInputEvent::MouseMove)
+    ignore_ack_for_mouse_move_from_debugger_ = false;
 
 #if defined(OS_ANDROID)
   // Allow the IME to be shown when the focus changes as a consequence
@@ -1194,7 +1203,6 @@ void RenderWidget::willBeginCompositorFrame() {
   UpdateTextInputType();
 #if defined(OS_ANDROID)
   UpdateTextInputState(NO_SHOW_IME, FROM_NON_IME);
-  UpdateSelectionRootBounds();
 #endif
   UpdateSelectionBounds();
 }
@@ -1207,6 +1215,19 @@ void RenderWidget::didBecomeReadyForAdditionalInput() {
 void RenderWidget::DidCommitCompositorFrame() {
   FOR_EACH_OBSERVER(RenderFrameImpl, swapped_out_frames_,
                     DidCommitCompositorFrame());
+#if defined(VIDEO_HOLE)
+  // Not using FOR_EACH_OBSERVER because |swapped_out_frames_| and
+  // |video_hole_frames_| may have common frames.
+  if (!video_hole_frames_.might_have_observers())
+    return;
+  ObserverListBase<RenderFrameImpl>::Iterator iter(video_hole_frames_);
+  RenderFrameImpl* frame;
+  while ((frame = iter.GetNext()) != NULL) {
+    // Prevent duplicate notification of DidCommitCompositorFrame().
+    if (!swapped_out_frames_.HasObserver(frame))
+      frame->DidCommitCompositorFrame();
+  }
+#endif  // defined(VIDEO_HOLE)
 }
 
 void RenderWidget::didCommitAndDrawCompositorFrame() {
@@ -1520,10 +1541,14 @@ bool RenderWidget::ShouldHandleImeEvent() {
 
 bool RenderWidget::SendAckForMouseMoveFromDebugger() {
   if (handling_event_type_ == WebInputEvent::MouseMove) {
-    InputHostMsg_HandleInputEvent_ACK_Params ack;
-    ack.type = handling_event_type_;
-    ack.state = INPUT_EVENT_ACK_STATE_CONSUMED;
-    Send(new InputHostMsg_HandleInputEvent_ACK(routing_id_, ack));
+    // If we pause multiple times during a single mouse move event, we should
+    // only send ACK once.
+    if (!ignore_ack_for_mouse_move_from_debugger_) {
+      InputHostMsg_HandleInputEvent_ACK_Params ack;
+      ack.type = handling_event_type_;
+      ack.state = INPUT_EVENT_ACK_STATE_CONSUMED;
+      Send(new InputHostMsg_HandleInputEvent_ACK(routing_id_, ack));
+    }
     return true;
   }
   return false;
@@ -1616,9 +1641,6 @@ void RenderWidget::FinishHandlingImeEvent() {
   // While handling an ime event, text input state and selection bounds updates
   // are ignored. These must explicitly be updated once finished handling the
   // ime event.
-#if defined(OS_ANDROID)
-  UpdateSelectionRootBounds();
-#endif
   UpdateSelectionBounds();
 #if defined(OS_ANDROID)
   UpdateTextInputState(NO_SHOW_IME, FROM_IME);
@@ -1706,6 +1728,12 @@ void RenderWidget::UpdateTextInputState(ShowIme show_ime,
     if (p.is_non_ime_change)
       IncrementOutstandingImeEventAcks();
     text_field_is_dirty_ = false;
+#endif
+#if defined(USE_AURA)
+    Send(new ViewHostMsg_TextInputTypeChanged(routing_id(),
+                                              new_type,
+                                              text_input_mode_,
+                                              new_can_compose_inline));
 #endif
     Send(new ViewHostMsg_TextInputStateChanged(routing_id(), p));
 
@@ -2011,11 +2039,6 @@ void RenderWidget::didUpdateTextOfFocusedElementByNonUserInput() {
 #endif
 }
 
-#if defined(OS_ANDROID)
-void RenderWidget::UpdateSelectionRootBounds() {
-}
-#endif
-
 bool RenderWidget::HasTouchEventHandlersAt(const gfx::Point& point) const {
   return true;
 }
@@ -2095,5 +2118,23 @@ void RenderWidget::RegisterSwappedOutChildFrame(RenderFrameImpl* frame) {
 void RenderWidget::UnregisterSwappedOutChildFrame(RenderFrameImpl* frame) {
   swapped_out_frames_.RemoveObserver(frame);
 }
+
+void RenderWidget::RegisterRenderFrame(RenderFrameImpl* frame) {
+  render_frames_.AddObserver(frame);
+}
+
+void RenderWidget::UnregisterRenderFrame(RenderFrameImpl* frame) {
+  render_frames_.RemoveObserver(frame);
+}
+
+#if defined(VIDEO_HOLE)
+void RenderWidget::RegisterVideoHoleFrame(RenderFrameImpl* frame) {
+  video_hole_frames_.AddObserver(frame);
+}
+
+void RenderWidget::UnregisterVideoHoleFrame(RenderFrameImpl* frame) {
+  video_hole_frames_.RemoveObserver(frame);
+}
+#endif  // defined(VIDEO_HOLE)
 
 }  // namespace content

@@ -25,7 +25,6 @@
 #include "chromeos/network/onc/onc_signature.h"
 #include "chromeos/network/onc/onc_translator.h"
 #include "chromeos/network/onc/onc_utils.h"
-#include "chromeos/network/shill_property_util.h"
 #include "components/onc/onc_constants.h"
 #include "extensions/browser/extension_function_registry.h"
 
@@ -303,7 +302,7 @@ bool NetworkingPrivateGetNetworksFunction::RunAsync() {
       params->filter.limit ? *params->filter.limit : kDefaultNetworkListLimit;
   scoped_ptr<base::ListValue> network_properties_list =
       chromeos::network_util::TranslateNetworkListToONC(
-          pattern, configured_only, visible_only, limit);
+          pattern, configured_only, visible_only, limit, false /* debugging */);
   SetResult(network_properties_list.release());
   SendResponse(true);
   return true;
@@ -326,7 +325,8 @@ bool NetworkingPrivateGetVisibleNetworksFunction::RunAsync() {
   const bool visible_only = true;
   scoped_ptr<base::ListValue> network_properties_list =
       chromeos::network_util::TranslateNetworkListToONC(
-          pattern, configured_only, visible_only, kDefaultNetworkListLimit);
+          pattern, configured_only, visible_only, kDefaultNetworkListLimit,
+          false /* debugging */);
   SetResult(network_properties_list.release());
   SendResponse(true);
   return true;

@@ -47,6 +47,7 @@
 #include "content/public/browser/web_ui.h"
 #include "content/public/common/favicon_url.h"
 #include "extensions/browser/app_sorting.h"
+#include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/management_policy.h"
@@ -282,16 +283,17 @@ void AppLauncherHandler::Observe(int type,
       break;
     }
     case chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED:
-    case chrome::NOTIFICATION_EXTENSION_UNINSTALLED: {
+    case chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED: {
       const Extension* extension = NULL;
       bool uninstalled = false;
-      if (type == chrome::NOTIFICATION_EXTENSION_UNINSTALLED) {
+      if (type == chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED) {
         extension = content::Details<const Extension>(details).ptr();
         uninstalled = true;
       } else {  // NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED
         if (content::Details<UnloadedExtensionInfo>(details)->reason ==
             UnloadedExtensionInfo::REASON_UNINSTALL) {
-          // Uninstalls are tracked by NOTIFICATION_EXTENSION_UNINSTALLED.
+          // Uninstalls are tracked by
+          // NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED.
           return;
         }
         extension = content::Details<extensions::UnloadedExtensionInfo>(
@@ -378,20 +380,6 @@ void AppLauncherHandler::FillAppDictionary(base::DictionaryValue* dictionary) {
 
   dictionary->Set("apps", list);
 
-  // TODO(estade): remove these settings when the old NTP is removed. The new
-  // NTP does it in js.
-#if defined(OS_MACOSX)
-  // App windows are not yet implemented on mac.
-  dictionary->SetBoolean("disableAppWindowLaunch", true);
-  dictionary->SetBoolean("disableCreateAppShortcut", true);
-#endif
-
-#if defined(OS_CHROMEOS)
-  // Making shortcut does not make sense on ChromeOS because it does not have
-  // a desktop.
-  dictionary->SetBoolean("disableCreateAppShortcut", true);
-#endif
-
   const base::ListValue* app_page_names =
       prefs->GetList(prefs::kNtpAppPageNames);
   if (!app_page_names || !app_page_names->GetSize()) {
@@ -475,8 +463,9 @@ void AppLauncherHandler::HandleGetApps(const base::ListValue* args) {
                    content::Source<Profile>(profile));
     registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED,
         content::Source<Profile>(profile));
-    registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_UNINSTALLED,
-        content::Source<Profile>(profile));
+    registrar_.Add(this,
+                   chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED,
+                   content::Source<Profile>(profile));
     registrar_.Add(this,
                    chrome::NOTIFICATION_EXTENSION_LAUNCHER_REORDERED,
                    content::Source<AppSorting>(

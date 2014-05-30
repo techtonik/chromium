@@ -138,6 +138,8 @@
         'views/speech_view.h',
         'views/start_page_view.cc',
         'views/start_page_view.h',
+        'views/tile_item_view.cc',
+        'views/tile_item_view.h',
         'views/top_icon_animation_view.cc',
         'views/top_icon_animation_view.h',
       ],
@@ -185,6 +187,7 @@
         '../../base/base.gyp:base',
         '../gfx/gfx.gyp:gfx',
         '../gfx/gfx.gyp:gfx_geometry',
+        '../resources/ui_resources.gyp:ui_resources',
         'app_list',
       ],
       'sources': [
@@ -279,5 +282,45 @@
       # Disable c4267 warnings until we fix size_t to int truncations.
       'msvs_disabled_warnings': [ 4267, ],
     },
+  ],
+  'conditions': [
+    ['toolkit_views==1', {
+      'targets': [
+        {
+          'target_name': 'app_list_demo',
+          'type': 'executable',
+          'sources': [
+            '../../content/app/startup_helper_win.cc',
+            'views/app_list_demo.cc',
+          ],
+          'dependencies': [
+            '../../base/base.gyp:base',
+            '../../content/content.gyp:content',
+            '../../skia/skia.gyp:skia',
+            '../../url/url.gyp:url_lib',
+            '../base/ui_base.gyp:ui_base',
+            '../events/events.gyp:events',
+            '../resources/ui_resources.gyp:ui_resources',
+            '../resources/ui_resources.gyp:ui_test_pak',
+            '../views/views.gyp:views',
+            '../views_content_client/views_content_client.gyp:views_content_client',
+            'app_list',
+            'app_list_test_support',
+          ],
+          'conditions': [
+            ['OS=="win"', {
+              'msvs_settings': {
+                'VCLinkerTool': {
+                  'SubSystem': '2',  # Set /SUBSYSTEM:WINDOWS
+                },
+              },
+              'dependencies': [
+                '../../sandbox/sandbox.gyp:sandbox',
+              ],
+            }],
+          ],
+        },
+      ],
+    }],  # toolkit_views==1
   ],
 }

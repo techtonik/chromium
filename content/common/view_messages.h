@@ -36,6 +36,7 @@
 #include "media/audio/audio_parameters.h"
 #include "media/base/channel_layout.h"
 #include "media/base/media_log_event.h"
+#include "net/base/network_change_notifier.h"
 #include "third_party/WebKit/public/platform/WebFloatPoint.h"
 #include "third_party/WebKit/public/platform/WebFloatRect.h"
 #include "third_party/WebKit/public/platform/WebScreenInfo.h"
@@ -841,10 +842,11 @@ IPC_MESSAGE_ROUTED0(ViewMsg_WorkerScriptLoadFailed)
 // This message is sent only if the worker successfully loaded the script.
 IPC_MESSAGE_ROUTED0(ViewMsg_WorkerConnected)
 
-// Tells the renderer that the network state has changed and that
-// window.navigator.onLine should be updated for all WebViews.
-IPC_MESSAGE_CONTROL1(ViewMsg_NetworkStateChanged,
-                     bool /* online */)
+// Tells the renderer that the network state has changed so that
+// navigator.onLine and navigator.connection can be updated.
+IPC_MESSAGE_CONTROL2(ViewMsg_NetworkStateChanged,
+                     bool /* is_online */,
+                     net::NetworkChangeNotifier::ConnectionType /* type */)
 
 // Reply to ViewHostMsg_OpenChannelToPpapiBroker
 // Tells the renderer that the channel to the broker has been created.
@@ -941,9 +943,6 @@ IPC_MESSAGE_ROUTED1(ViewMsg_BeginFrame,
 // Sent by the browser when an IME update that requires acknowledgement has been
 // processed on the browser side.
 IPC_MESSAGE_ROUTED0(ViewMsg_ImeEventAck)
-
-// Sent by the browser when we should pause video playback.
-IPC_MESSAGE_ROUTED0(ViewMsg_PauseVideo);
 
 // Extracts the data at the given rect, returning it through the
 // ViewHostMsg_SmartClipDataExtracted IPC.
@@ -1201,7 +1200,8 @@ IPC_SYNC_MESSAGE_CONTROL2_0(ViewHostMsg_DeleteCookie,
 
 // Used to check if cookies are enabled for the given URL. This may block
 // waiting for a previous SetCookie message to be processed.
-IPC_SYNC_MESSAGE_CONTROL2_1(ViewHostMsg_CookiesEnabled,
+IPC_SYNC_MESSAGE_CONTROL3_1(ViewHostMsg_CookiesEnabled,
+                            int /* render_frame_id */,
                             GURL /* url */,
                             GURL /* first_party_for_cookies */,
                             bool /* cookies_enabled */)
@@ -1400,12 +1400,6 @@ IPC_MESSAGE_ROUTED3(ViewHostMsg_SelectionChanged,
 // Notification that the selection bounds have changed.
 IPC_MESSAGE_ROUTED1(ViewHostMsg_SelectionBoundsChanged,
                     ViewHostMsg_SelectionBounds_Params)
-
-#if defined(OS_ANDROID)
-// Notification that the selection root bounds have changed.
-IPC_MESSAGE_ROUTED1(ViewHostMsg_SelectionRootBoundsChanged,
-                    gfx::Rect /* bounds of the selection root */)
-#endif
 
 // Asks the browser to display the file chooser.  The result is returned in a
 // ViewMsg_RunFileChooserResponse message.

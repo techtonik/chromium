@@ -60,6 +60,22 @@ void SetAllowFileAccess(const std::string& extension_id,
                         content::BrowserContext* context,
                         bool allow);
 
+// Returns true if the extension with |extension_id| is allowed to execute
+// scripts on all urls (exempting chrome:// urls, etc) without explicit
+// user consent.
+// This should only be used with FeatureSwitch::scripts_require_action()
+// enabled.
+bool AllowedScriptingOnAllUrls(const std::string& extension_id,
+                               content::BrowserContext* context);
+
+// Sets whether the extension with |extension_id| is allowed to execute scripts
+// on all urls (exempting chrome:// urls, etc) without explicit user consent.
+// This should only be used with FeatureSwitch::scripts_require_action()
+// enabled.
+void SetAllowedScriptingOnAllUrls(const std::string& extension_id,
+                                  content::BrowserContext* context,
+                                  bool allowed);
+
 // Returns true if |extension_id| can be launched (possibly only after being
 // enabled).
 bool IsAppLaunchable(const std::string& extension_id,
@@ -68,6 +84,9 @@ bool IsAppLaunchable(const std::string& extension_id,
 // Returns true if |extension_id| can be launched without being enabled first.
 bool IsAppLaunchableWithoutEnabling(const std::string& extension_id,
                                     content::BrowserContext* context);
+
+// Returns true if |app| should be synced.
+bool ShouldSyncApp(const Extension* app, content::BrowserContext* context);
 
 // Returns true if |extension_id| is idle and it is safe to perform actions such
 // as updating.

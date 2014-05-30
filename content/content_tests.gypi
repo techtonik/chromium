@@ -30,8 +30,8 @@
             'public/test/nested_message_pump_android.cc',
             'public/test/nested_message_pump_android.h',
             'test/layouttest_support.cc',
-            'test/test_media_stream_client.cc',
-            'test/test_media_stream_client.h',
+            'test/test_media_stream_renderer_factory.cc',
+            'test/test_media_stream_renderer_factory.h',
             'test/test_video_frame_provider.cc',
             'test/test_video_frame_provider.h',
           ],
@@ -399,6 +399,7 @@
         'browser/appcache/mock_appcache_storage.cc',
         'browser/appcache/mock_appcache_storage.h',
         'browser/appcache/mock_appcache_storage_unittest.cc',
+        'browser/battery_status/battery_status_service_unittest.cc',
         'browser/browser_thread_unittest.cc',
         'browser/browser_url_handler_impl_unittest.cc',
         'browser/byte_stream_unittest.cc',
@@ -615,6 +616,7 @@
         'child/fileapi/webfilewriter_base_unittest.cc',
         'child/indexed_db/indexed_db_dispatcher_unittest.cc',
         'child/indexed_db/webidbcursor_impl_unittest.cc',
+        'child/multipart_response_delegate_unittest.cc',
         'child/npapi/plugin_lib_unittest.cc',
         'child/power_monitor_broadcast_source_unittest.cc',
         'child/resource_dispatcher_unittest.cc',
@@ -694,7 +696,6 @@
         'test/image_decoder_test.cc',
         'test/image_decoder_test.h',
         'test/run_all_unittests.cc',
-        '../webkit/child/multipart_response_delegate_unittest.cc',
       ],
       'conditions': [
         ['OS == "ios"', {
@@ -875,6 +876,7 @@
         ['OS == "android"', {
           'sources': [
             'browser/renderer_host/java/jni_helper_unittest.cc',
+            'renderer/java/gin_java_bridge_value_converter_unittest.cc',
           ],
           'sources!': [
             'browser/geolocation/network_location_provider_unittest.cc',
@@ -1006,11 +1008,6 @@
           'sources': [
             'test/data/web_ui_test_mojo_bindings.mojom',
           ],
-          # TODO(sky): this shouldn't be necessary. It's working around a bug in
-          # gyp.
-          'variables': {
-            'mojom_base_output_dir': 'content',
-          },
           'includes': [ '../mojo/public/tools/bindings/mojom_bindings_generator.gypi' ],
           'export_dependent_settings': [
             '../mojo/mojo.gyp:mojo_cpp_bindings',
@@ -1047,6 +1044,7 @@
             '../ppapi/ppapi_internal.gyp:ppapi_ipc',
             '../ppapi/ppapi_internal.gyp:ppapi_proxy',
             '../ppapi/ppapi_internal.gyp:ppapi_shared',
+            '../ppapi/ppapi_internal.gyp:ppapi_tests',
             '../ppapi/ppapi_internal.gyp:ppapi_unittest_shared',
             '../testing/gmock.gyp:gmock',
             '../testing/gtest.gyp:gtest',
@@ -1163,6 +1161,9 @@
             'test/accessibility_browser_test_utils.cc',
             'test/accessibility_browser_test_utils.h',
             'test/content_browser_test_test.cc',
+            'test/ppapi/ppapi_browsertest.cc',
+            'test/ppapi/ppapi_test.cc',
+            'test/ppapi/ppapi_test.h',
             'test/webui_resource_browsertest.cc',
           ],
           'conditions': [
@@ -1288,6 +1289,9 @@
               'sources!': [
                 'browser/plugin_service_impl_browsertest.cc',
                 'browser/plugin_data_remover_impl_browsertest.cc',
+                'test/ppapi/ppapi_browsertest.cc',
+                'test/ppapi/ppapi_test.cc',
+                'test/ppapi/ppapi_test.h',
               ],
             }],
             ['input_speech==0', {
@@ -1363,20 +1367,6 @@
           ],
           'sources': [
             'common/gpu/client/gl_helper_benchmark.cc',
-          ],
-        },
-        {
-          # TODO(enne): Remove this once dependencies in Blink
-          # point to test_support_content instead.
-          'target_name': 'content_webkit_unit_test_support',
-          'type': 'static_library',
-          'dependencies': [
-            'test_support_content',
-          ],
-          'include_dirs': [
-            '..',
-          ],
-          'sources': [
           ],
         },
       ],

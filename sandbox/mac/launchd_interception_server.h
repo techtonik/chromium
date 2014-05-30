@@ -70,7 +70,7 @@ class LaunchdInterceptionServer {
   const BootstrapSandbox* sandbox_;
 
   // The Mach port on which the server is receiving requests.
-  base::mac::ScopedMachPort server_port_;
+  base::mac::ScopedMachReceiveRight server_port_;
 
   // The dispatch queue used to service the server_source_.
   dispatch_queue_t server_queue_;
@@ -82,9 +82,12 @@ class LaunchdInterceptionServer {
   base::mac::ScopedMachVM request_buffer_;
   base::mac::ScopedMachVM reply_buffer_;
 
+  // Whether or not ForwardMessage() was called during ReceiveMessage().
+  bool did_forward_message_;
+
   // The Mach port handed out in reply to denied look up requests. All denied
   // requests share the same port, though nothing reads messages from it.
-  base::mac::ScopedMachPort sandbox_port_;
+  base::mac::ScopedMachReceiveRight sandbox_port_;
 
   // The compatibility shim that handles differences in message header IDs and
   // request/reply structures between different OS X versions.

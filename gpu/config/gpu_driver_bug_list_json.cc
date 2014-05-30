@@ -19,7 +19,7 @@ const char kGpuDriverBugListJson[] = LONG_STRING_CONST(
 {
   "name": "gpu driver bug list",
   // Please update the version number whenever you change this file.
-  "version": "5.5",
+  "version": "5.8",
   "entries": [
     {
       "id": 1,
@@ -982,6 +982,78 @@ LONG_STRING_CONST(
       "gl_vendor": {
         "op": "beginwith",
         "value": "Qualcomm"
+      },
+      "features": [
+        "disable_egl_khr_fence_sync"
+      ]
+    },
+    {
+      "id": 75,
+      "description": "Mali-400 support of EXT_multisampled_render_to_texture is buggy on Android < 4.3",
+      "cr_bugs": [362435],
+      "os": {
+        "type": "android",
+        "version": {
+          "op": "<",
+          "value": "4.3"
+        }
+      },
+      "gl_vendor": {
+        "op": "beginwith",
+        "value": "ARM"
+      },
+      "gl_renderer": {
+        "op": "contains",
+        "value": "Mali-400"
+      },
+      "features": [
+        "disable_multisampling"
+      ]
+    },
+    {
+      "id": 76,
+      "cr_bugs": [371530],
+      "description": "Testing EGL sync fences is broken on IMG",
+      "os": {
+        "type": "android"
+      },
+      "gl_vendor": {
+        "op": "beginwith",
+        "value": "Imagination Technologies"
+      },
+      "features": [
+        "disable_egl_khr_fence_sync"
+      ]
+    },
+    {
+      "id": 77,
+      "cr_bugs": [378691, 373360, 371530],
+      "description": "Testing fences is broken on Mali-400 MP drivers",
+      "os": {
+        "type": "android"
+      },
+      "gl_vendor": {
+        "op": "beginwith",
+        "value": "ARM"
+      },
+      "gl_renderer": {
+        "op": "beginwith",
+        "value": "Mali-400 MP"
+      },
+      "features": [
+        "disable_egl_khr_fence_sync"
+      ]
+    },
+    {
+      "id": 78,
+      "cr_bugs": [378691, 373360, 371530],
+      "description": "Testing fences is broken on Broadcom drivers",
+      "os": {
+        "type": "android"
+      },
+      "gl_vendor": {
+        "op": "beginwith",
+        "value": "Broadcom"
       },
       "features": [
         "disable_egl_khr_fence_sync"

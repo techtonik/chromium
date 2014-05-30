@@ -25,7 +25,6 @@
 #include "base/time/time.h"
 #include "base/tracked_objects.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/metrics/extension_metrics.h"
 #include "chrome/common/pref_names.h"
 #include "components/metrics/metrics_provider.h"
 #include "components/metrics/metrics_service_client.h"
@@ -46,10 +45,6 @@
 // http://blogs.msdn.com/oldnewthing/archive/2004/10/25/247180.aspx
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 #endif
-
-#if defined(OS_CHROMEOS)
-#include "chrome/browser/metrics/metrics_log_chromeos.h"
-#endif  // OS_CHROMEOS
 
 using metrics::MetricsLogBase;
 using metrics::ProfilerEventProto;
@@ -186,19 +181,16 @@ int64 RoundSecondsToHour(int64 time_in_seconds) {
 MetricsLog::MetricsLog(const std::string& client_id,
                        int session_id,
                        LogType log_type,
-                       metrics::MetricsServiceClient* client)
+                       metrics::MetricsServiceClient* client,
+                       PrefService* local_state)
     : MetricsLogBase(client_id,
                      session_id,
                      log_type,
                      client->GetVersionString()),
       client_(client),
       creation_time_(base::TimeTicks::Now()),
-      extension_metrics_(uma_proto()->client_id()) {
+      local_state_(local_state) {
   uma_proto()->mutable_system_profile()->set_channel(client_->GetChannel());
-
-#if defined(OS_CHROMEOS)
-  metrics_log_chromeos_.reset(new MetricsLogChromeOS(uma_proto()));
-#endif  // OS_CHROMEOS
 }
 
 MetricsLog::~MetricsLog() {}
@@ -211,7 +203,7 @@ void MetricsLog::RecordStabilityMetrics(
   DCHECK(HasEnvironment());
   DCHECK(!HasStabilityMetrics());
 
-  PrefService* pref = GetPrefService();
+  PrefService* pref = local_state_;
   DCHECK(pref);
 
   // Get stability attributes out of Local State, zeroing out stored values.
@@ -269,10 +261,6 @@ void MetricsLog::RecordGeneralMetrics(
     metrics_providers[i]->ProvideGeneralMetrics(uma_proto());
 }
 
-PrefService* MetricsLog::GetPrefService() {
-  return g_browser_process->local_state();
-}
-
 void MetricsLog::GetFieldTrialIds(
     std::vector<ActiveGroupId>* field_trial_ids) const {
   variations::GetFieldTrialActiveGroupIds(field_trial_ids);
@@ -313,16 +301,6 @@ void MetricsLog::WriteRealtimeStabilityAttributes(
   SystemProfileProto::Stability* stability =
       uma_proto()->mutable_system_profile()->mutable_stability();
 
-  int count = pref->GetInteger(prefs::kStabilityChildProcessCrashCount);
-  if (count) {
-    stability->set_child_process_crash_count(count);
-    pref->SetInteger(prefs::kStabilityChildProcessCrashCount, 0);
-  }
-
-#if defined(OS_CHROMEOS)
-  metrics_log_chromeos_->WriteRealtimeStabilityAttributes(pref);
-#endif  // OS_CHROMEOS
-
   const uint64 incremental_uptime_sec = incremental_uptime.InSeconds();
   if (incremental_uptime_sec)
     stability->set_incremental_uptime_sec(incremental_uptime_sec);
@@ -343,14 +321,14 @@ void MetricsLog::RecordEnvironment(
     system_profile->set_brand_code(brand_code);
 
   int enabled_date;
-  bool success = base::StringToInt(GetMetricsEnabledDate(GetPrefService()),
-                                   &enabled_date);
+  bool success =
+      base::StringToInt(GetMetricsEnabledDate(local_state_), &enabled_date);
   DCHECK(success);
 
   // Reduce granularity of the enabled_date field to nearest hour.
   system_profile->set_uma_enabled_date(RoundSecondsToHour(enabled_date));
 
-  int64 install_date = GetPrefService()->GetInt64(prefs::kInstallDate);
+  int64 install_date = local_state_->GetInt64(prefs::kInstallDate);
 
   // Reduce granularity of the install_date field to nearest hour.
   system_profile->set_install_date(RoundSecondsToHour(install_date));
@@ -387,16 +365,10 @@ void MetricsLog::RecordEnvironment(
   cpu->set_vendor_name(cpu_info.vendor_name());
   cpu->set_signature(cpu_info.signature());
 
-  extension_metrics_.WriteExtensionList(uma_proto()->mutable_system_profile());
-
   std::vector<ActiveGroupId> field_trial_ids;
   GetFieldTrialIds(&field_trial_ids);
   WriteFieldTrials(field_trial_ids, system_profile);
   WriteFieldTrials(synthetic_trials, system_profile);
-
-#if defined(OS_CHROMEOS)
-  metrics_log_chromeos_->LogChromeOSMetrics();
-#endif  // OS_CHROMEOS
 
   for (size_t i = 0; i < metrics_providers.size(); ++i)
     metrics_providers[i]->ProvideSystemProfileMetrics(system_profile);
@@ -405,7 +377,7 @@ void MetricsLog::RecordEnvironment(
   std::string base64_system_profile;
   if (system_profile->SerializeToString(&serialied_system_profile)) {
     base::Base64Encode(serialied_system_profile, &base64_system_profile);
-    PrefService* local_state = GetPrefService();
+    PrefService* local_state = local_state_;
     local_state->SetString(prefs::kStabilitySavedSystemProfile,
                            base64_system_profile);
     local_state->SetString(prefs::kStabilitySavedSystemProfileHash,
@@ -414,7 +386,7 @@ void MetricsLog::RecordEnvironment(
 }
 
 bool MetricsLog::LoadSavedEnvironmentFromPrefs() {
-  PrefService* local_state = GetPrefService();
+  PrefService* local_state = local_state_;
   const std::string base64_system_profile =
       local_state->GetString(prefs::kStabilitySavedSystemProfile);
   if (base64_system_profile.empty())

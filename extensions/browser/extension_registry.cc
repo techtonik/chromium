@@ -55,14 +55,23 @@ void ExtensionRegistry::TriggerOnUnloaded(
 
 void ExtensionRegistry::TriggerOnWillBeInstalled(const Extension* extension,
                                                  bool is_update,
+                                                 bool from_ephemeral,
                                                  const std::string& old_name) {
   DCHECK(is_update ==
          GenerateInstalledExtensionsSet()->Contains(extension->id()));
   DCHECK(is_update == !old_name.empty());
+  FOR_EACH_OBSERVER(
+      ExtensionRegistryObserver,
+      observers_,
+      OnExtensionWillBeInstalled(
+          browser_context_, extension, is_update, from_ephemeral, old_name));
+}
+
+void ExtensionRegistry::TriggerOnUninstalled(const Extension* extension) {
+  DCHECK(!GenerateInstalledExtensionsSet()->Contains(extension->id()));
   FOR_EACH_OBSERVER(ExtensionRegistryObserver,
                     observers_,
-                    OnExtensionWillBeInstalled(
-                        browser_context_, extension, is_update, old_name));
+                    OnExtensionUninstalled(browser_context_, extension));
 }
 
 const Extension* ExtensionRegistry::GetExtensionById(const std::string& id,

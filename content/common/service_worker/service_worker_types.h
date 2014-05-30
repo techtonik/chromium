@@ -61,13 +61,11 @@ struct CONTENT_EXPORT ServiceWorkerResponse {
   ServiceWorkerResponse();
   ServiceWorkerResponse(int status_code,
                         const std::string& status_text,
-                        const std::string& method,
                         const std::map<std::string, std::string>& headers);
   ~ServiceWorkerResponse();
 
   int status_code;
   std::string status_text;
-  std::string method;
   std::map<std::string, std::string> headers;
 };
 

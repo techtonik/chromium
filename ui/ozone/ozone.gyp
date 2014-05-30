@@ -43,6 +43,8 @@
         # 'chromeos' folder name.
         'common/chromeos/native_display_delegate_ozone.cc',
         'common/chromeos/native_display_delegate_ozone.h',
+        'common/chromeos/touchscreen_device_manager_ozone.cc',
+        'common/chromeos/touchscreen_device_manager_ozone.h',
         'ozone_platform.cc',
         'ozone_platform.h',
         'ozone_switches.cc',
@@ -90,7 +92,7 @@
         'platform/caca/caca.gypi',
       ],
     }],
-    ['<(ozone_platform_dri) == 1', {
+    ['<(ozone_platform_dri) == 1 or <(ozone_platform_gbm) == 1', {
       'includes': [
         'platform/dri/dri.gypi',
       ],
@@ -98,6 +100,11 @@
     ['<(ozone_platform_egltest) == 1', {
       'includes': [
         'platform/egltest/egltest.gypi',
+      ],
+    }],
+    ['<(ozone_platform_gbm) == 1', {
+      'includes': [
+        'platform/dri/gbm.gypi',
       ],
     }],
     ['<(ozone_platform_test) == 1', {

@@ -86,6 +86,7 @@
             '../ppapi/tools/ppapi_tools.gyp:*',
             '../printing/printing.gyp:*',
             '../skia/skia.gyp:*',
+            '../sync/tools/sync_tools.gyp:*',
             '../third_party/WebKit/public/all.gyp:*',
             '../third_party/cacheinvalidation/cacheinvalidation.gyp:*',
             '../third_party/codesighs/codesighs.gyp:*',
@@ -100,6 +101,7 @@
             '../third_party/modp_b64/modp_b64.gyp:*',
             '../third_party/npapi/npapi.gyp:*',
             '../third_party/ots/ots.gyp:*',
+            '../third_party/pdfium/samples/samples.gyp:*',
             '../third_party/qcms/qcms.gyp:*',
             '../tools/gn/gn.gyp:*',
             '../tools/perf/clear_system_cache/clear_system_cache.gyp:*',
@@ -660,6 +662,7 @@
             ['chromeos==0', {
               'dependencies': [
                 '../v8/src/d8.gyp:d8#host',
+                '../third_party/pdfium/samples/samples.gyp:pdfium_test',
               ],
             }],
             ['internal_filter_fuzzer==1', {
@@ -748,37 +751,31 @@
             '../tools/android/findbugs_plugin/findbugs_plugin.gyp:findbugs_plugin_test',
             '../ui/events/events.gyp:events_unittests',
             '../ui/ui_unittests.gyp:ui_unittests',
-          ],
-          'conditions': [
-            ['"<(gtest_target_type)"=="shared_library"', {
-              'dependencies': [
-                # Unit test bundles packaged as an apk.
-                '../android_webview/android_webview.gyp:android_webview_unittests_apk',
-                '../base/base.gyp:base_unittests_apk',
-                '../cc/cc_tests.gyp:cc_unittests_apk',
-                '../chrome/chrome.gyp:unit_tests_apk',
-                '../components/components_tests.gyp:components_unittests_apk',
-                '../content/content_shell_and_tests.gyp:content_browsertests_apk',
-                '../content/content_shell_and_tests.gyp:content_gl_tests_apk',
-                '../content/content_shell_and_tests.gyp:content_unittests_apk',
-                '../content/content_shell_and_tests.gyp:video_decode_accelerator_unittest_apk',
-                '../gpu/gpu.gyp:gl_tests_apk',
-                '../gpu/gpu.gyp:gpu_unittests_apk',
-                '../ipc/ipc.gyp:ipc_tests_apk',
-                '../media/media.gyp:media_unittests_apk',
-                '../net/net.gyp:net_unittests_apk',
-                '../sandbox/sandbox.gyp:sandbox_linux_jni_unittests_apk',
-                '../sql/sql.gyp:sql_unittests_apk',
-                '../sync/sync.gyp:sync_unit_tests_apk',
-                '../ui/events/events.gyp:events_unittests_apk',
-                '../ui/gfx/gfx_tests.gyp:gfx_unittests_apk',
-                '../ui/ui_unittests.gyp:ui_unittests_apk',
-                '../android_webview/android_webview.gyp:android_webview_test_apk',
-                '../chrome/chrome.gyp:chrome_shell_test_apk',
-                '../chrome/chrome.gyp:chrome_shell_uiautomator_tests',
-                '../webkit/renderer/compositor_bindings/compositor_bindings_tests.gyp:webkit_compositor_bindings_unittests_apk'
-              ],
-            }],
+            # Unit test bundles packaged as an apk.
+            '../android_webview/android_webview.gyp:android_webview_test_apk',
+            '../android_webview/android_webview.gyp:android_webview_unittests_apk',
+            '../base/base.gyp:base_unittests_apk',
+            '../cc/cc_tests.gyp:cc_unittests_apk',
+            '../chrome/chrome.gyp:chrome_shell_test_apk',
+            '../chrome/chrome.gyp:chrome_shell_uiautomator_tests',
+            '../chrome/chrome.gyp:unit_tests_apk',
+            '../components/components_tests.gyp:components_unittests_apk',
+            '../content/content_shell_and_tests.gyp:content_browsertests_apk',
+            '../content/content_shell_and_tests.gyp:content_gl_tests_apk',
+            '../content/content_shell_and_tests.gyp:content_unittests_apk',
+            '../content/content_shell_and_tests.gyp:video_decode_accelerator_unittest_apk',
+            '../gpu/gpu.gyp:gl_tests_apk',
+            '../gpu/gpu.gyp:gpu_unittests_apk',
+            '../ipc/ipc.gyp:ipc_tests_apk',
+            '../media/media.gyp:media_unittests_apk',
+            '../net/net.gyp:net_unittests_apk',
+            '../sandbox/sandbox.gyp:sandbox_linux_jni_unittests_apk',
+            '../sql/sql.gyp:sql_unittests_apk',
+            '../sync/sync.gyp:sync_unit_tests_apk',
+            '../ui/events/events.gyp:events_unittests_apk',
+            '../ui/gfx/gfx_tests.gyp:gfx_unittests_apk',
+            '../ui/ui_unittests.gyp:ui_unittests_apk',
+            '../webkit/renderer/compositor_bindings/compositor_bindings_tests.gyp:webkit_compositor_bindings_unittests_apk'
           ],
         },
         {
@@ -792,7 +789,7 @@
             'include_tests%': 0,
           },
           'conditions': [
-            ['"<(gtest_target_type)"=="shared_library" and include_tests==1', {
+            ['include_tests==1', {
               'dependencies': [
                 '../third_party/webrtc/build/apk_tests.gyp:*',
               ],
@@ -807,14 +804,8 @@
             '../content/content_shell_and_tests.gyp:content_browsertests',
             '../tools/android/android_tools.gyp:android_tools',
             '../tools/android/android_tools.gyp:memconsumer',
-          ],
-          'conditions': [
-            ['"<(gtest_target_type)"=="shared_library"', {
-              'dependencies': [
-                # Unit test bundles packaged as an apk.
-                '../content/content_shell_and_tests.gyp:content_browsertests_apk',
-              ],
-            }],
+            # Unit test bundles packaged as an apk.
+            '../content/content_shell_and_tests.gyp:content_browsertests_apk',
           ],
         },  # target_name: android_builder_chromium_webrtc
       ], # targets

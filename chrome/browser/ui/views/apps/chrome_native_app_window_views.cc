@@ -136,7 +136,7 @@ class NativeAppWindowStateDelegate : public ash::wm::WindowStateDelegate,
     window_state_->AddObserver(this);
     window_state_->window()->AddObserver(this);
   }
-  virtual ~NativeAppWindowStateDelegate(){
+  virtual ~NativeAppWindowStateDelegate() {
     if (window_state_) {
       window_state_->RemoveObserver(this);
       window_state_->window()->RemoveObserver(this);
@@ -220,7 +220,7 @@ void ChromeNativeAppWindowViews::InitializeDefaultWindow(
   // Set up a custom WM_CLASS for app windows. This allows task switchers in
   // X11 environments to distinguish them from main browser windows.
   init_params.wm_class_name = web_app::GetWMClassFromAppName(app_name);
-  init_params.wm_class_class = ShellIntegrationLinux::GetProgramClassName();
+  init_params.wm_class_class = shell_integration_linux::GetProgramClassName();
   const char kX11WindowRoleApp[] = "app";
   init_params.wm_role_name = std::string(kX11WindowRoleApp);
 #endif
@@ -667,8 +667,6 @@ void ChromeNativeAppWindowViews::UpdateShape(scoped_ptr<SkRegion> region) {
   aura::Window* native_window = widget()->GetNativeWindow();
   if (shape_) {
     widget()->SetShape(new SkRegion(*shape_));
-    native_window->layer()->SetAlphaShape(
-        make_scoped_ptr(new SkRegion(*shape_)));
     if (!had_shape) {
       native_window->SetEventTargeter(scoped_ptr<ui::EventTargeter>(
           new ShapedAppWindowTargeter(native_window, this)));

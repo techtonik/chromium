@@ -325,7 +325,6 @@ class RenderMessageFilter::OpenChannelToNpapiPluginCallback
 
 RenderMessageFilter::RenderMessageFilter(
     int render_process_id,
-    bool is_guest,
     PluginServiceImpl* plugin_service,
     BrowserContext* browser_context,
     net::URLRequestContextGetter* request_context,
@@ -344,7 +343,6 @@ RenderMessageFilter::RenderMessageFilter(
       incognito_(browser_context->IsOffTheRecord()),
       dom_storage_context_(dom_storage_context),
       render_process_id_(render_process_id),
-      is_guest_(is_guest),
       cpu_usage_(0),
       audio_manager_(audio_manager),
       media_internals_(media_internals) {
@@ -527,7 +525,6 @@ void RenderMessageFilter::OnCreateWindow(
           params.opener_suppressed,
           resource_context_,
           render_process_id_,
-          is_guest_,
           params.opener_id,
           &no_javascript_access);
 
@@ -666,6 +663,7 @@ void RenderMessageFilter::OnDeleteCookie(const GURL& url,
 }
 
 void RenderMessageFilter::OnCookiesEnabled(
+    int render_frame_id,
     const GURL& url,
     const GURL& first_party_for_cookies,
     bool* cookies_enabled) {
@@ -674,7 +672,7 @@ void RenderMessageFilter::OnCookiesEnabled(
   // host.
   *cookies_enabled = GetContentClient()->browser()->AllowGetCookie(
       url, first_party_for_cookies, net::CookieList(), resource_context_,
-      render_process_id_, MSG_ROUTING_CONTROL);
+      render_process_id_, render_frame_id);
 }
 
 #if defined(OS_MACOSX)

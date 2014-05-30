@@ -173,6 +173,7 @@ def GetIfChanged(file_path, bucket=None):
   """
   hash_path = file_path + '.sha1'
   if not os.path.exists(hash_path):
+    logging.warning('Hash file not found: %s' % hash_path)
     return False
 
   expected_hash = ReadHash(hash_path)

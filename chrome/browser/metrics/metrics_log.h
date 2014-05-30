@@ -12,17 +12,11 @@
 #include <vector>
 
 #include "base/basictypes.h"
-#include "chrome/browser/metrics/extension_metrics.h"
 #include "chrome/common/variations/variations_util.h"
 #include "components/metrics/metrics_log_base.h"
 #include "ui/gfx/size.h"
 
-class HashedExtensionMetrics;
 class PrefService;
-
-#if defined(OS_CHROMEOS)
-class MetricsLogChromeOS;
-#endif
 
 namespace base {
 class DictionaryValue;
@@ -51,13 +45,15 @@ class MetricsLog : public metrics::MetricsLogBase {
   // |client_id| is the identifier for this profile on this installation
   // |session_id| is an integer that's incremented on each application launch
   // |client| is used to interact with the embedder.
+  // |local_state| is the PrefService that this instance should use.
   // Note: |this| instance does not take ownership of the |client|, but rather
   // stores a weak pointer to it. The caller should ensure that the |client| is
   // valid for the lifetime of this class.
   MetricsLog(const std::string& client_id,
              int session_id,
              LogType log_type,
-             metrics::MetricsServiceClient* client);
+             metrics::MetricsServiceClient* client,
+             PrefService* local_state);
   virtual ~MetricsLog();
 
   // Records the current operating environment, including metrics provided by
@@ -107,18 +103,10 @@ class MetricsLog : public metrics::MetricsLogBase {
  protected:
   // Exposed for the sake of mocking in test code.
 
-  // Returns the PrefService from which to log metrics data.
-  virtual PrefService* GetPrefService();
-
   // Fills |field_trial_ids| with the list of initialized field trials name and
   // group ids.
   virtual void GetFieldTrialIds(
       std::vector<variations::ActiveGroupId>* field_trial_ids) const;
-
-  // Exposed to allow dependency injection for tests.
-#if defined(OS_CHROMEOS)
-  scoped_ptr<MetricsLogChromeOS> metrics_log_chromeos_;
-#endif
 
  private:
   FRIEND_TEST_ALL_PREFIXES(MetricsLogTest, ChromeOSStabilityData);
@@ -149,8 +137,7 @@ class MetricsLog : public metrics::MetricsLogBase {
   // The time when the current log was created.
   const base::TimeTicks creation_time_;
 
-  // For including information on which extensions are installed in reports.
-  HashedExtensionMetrics extension_metrics_;
+  PrefService* local_state_;
 
   DISALLOW_COPY_AND_ASSIGN(MetricsLog);
 };

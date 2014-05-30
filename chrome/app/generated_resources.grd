@@ -1157,6 +1157,9 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
           <message name="IDS_SAVE_PAGE" desc="The text label of the Save Page As menu item">
             Save page &amp;as...
           </message>
+          <message name="IDS_DISTILL_PAGE" desc="The text label of the 'Distill page' menu item">
+            Distill page
+          </message>
           <message name="IDS_PRINT" desc="The text label of the Print... menu item. Opens a dialog box to select print settings">
             &amp;Print...
           </message>
@@ -1230,6 +1233,9 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
           </message>
           <message name="IDS_SAVE_PAGE" desc="In Title Case: The text label of the Save Page As menu item">
             Save Page &amp;As...
+          </message>
+          <message name="IDS_DISTILL_PAGE" desc="The text label of the 'Distill Page' menu item">
+            Distill Page
           </message>
           <message name="IDS_PRINT" desc="In Title Case: The text label of the Print... menu item. Opens a dialog box to select print settings">
             &amp;Print...
@@ -4129,7 +4135,7 @@ Make sure you do not expose any sensitive information.
         <ph name="EXTENSION_NAME">$1<ex>Gmail Checker</ex></ph>
       </message>
       <message name="IDS_EXTENSION_LAUNCH_APP_PROMPT_HEADING" desc="First bold line in the content area of the app launch prompt. Asks the user if they want to launch a particular app.">
-        Launch "<ph name="EXTENSION_NAME">$1<ex>Gmail Checker</ex></ph>"?
+        Try "<ph name="EXTENSION_NAME">$1<ex>Gmail Checker</ex></ph>"?
       </message>
       <message name="IDS_EXTENSION_REMOTE_INSTALL_PROMPT_HEADING" desc="First bold line in the content area of the extension or app installation prompt. Asks the user if they want to enable a particular extension or app that was installed remotely.">
         Enable "<ph name="EXTENSION_NAME">$1<ex>Gmail Checker</ex></ph>"?
@@ -4185,7 +4191,7 @@ Make sure you do not expose any sensitive information.
       </message>
 
       <message name="IDS_EXTENSION_PERMISSION_LINE" desc="Template for item in list of privileges that an extension or app has">
-        • <ph name="PERMISSION">$1<ex>Access your data on all websites</ex></ph>
+          • <ph name="PERMISSION">$1<ex>Read and modify all your data on the websites you visit</ex></ph>
       </message>
       <message name="IDS_EXTENSION_RATING_COUNT" desc="Number of ratings an app or extensions has (displayed after star icons)">
         (<ph name="RATING_COUNT">$1<ex>46</ex></ph>)
@@ -4266,16 +4272,16 @@ Make sure you do not expose any sensitive information.
 
       <if expr="is_android">
         <message name="IDS_EXTENSION_PROMPT_WARNING_FULL_ACCESS" desc="Mobile: Permission string for full access to the device and all websites.">
-          Access all data on your device and the websites you visit
+          Read and modify all your data on your device and the websites you visit
         </message>
       </if>
       <if expr="not is_android">
         <message name="IDS_EXTENSION_PROMPT_WARNING_FULL_ACCESS" desc="Permission string for full access to the computer and all websites.">
-          Access all data on your computer and the websites you visit
+          Read and modify all your data on your computer and the websites you visit
         </message>
       </if>
       <message name="IDS_EXTENSION_PROMPT_WARNING_ALL_HOSTS" desc="Permission string for access to data on all websites.">
-        Access your data on all websites
+        Read and modify all your data on the websites you visit
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_FAVICON" desc="Permission string for access to favicons.">
         Access the icons of the websites you visit
@@ -4751,6 +4757,9 @@ Make sure you do not expose any sensitive information.
         </message>
         <message name="IDS_EXTENSIONS_ENABLE_ERROR_COLLECTION" desc="The checkbox for enabling error collection for an extension.">
           Collect errors
+        </message>
+        <message name="IDS_EXTENSIONS_ALLOW_ON_ALL_URLS" desc="The checkbox for allowing an extension to run scripts on all websites without explicit permission.">
+          Allow on all websites
         </message>
         <message name="IDS_EXTENSIONS_ALLOW_FILE_ACCESS" desc="The checkbox for allowing an extension access to run scripts on file URLs.">
           Allow access to file URLs
@@ -5363,12 +5372,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE" desc="The link for enabling a labs experiment.">
         Enable
       </message>
-      <message name="IDS_FLAGS_STACKED_TAB_STRIP_NAME" desc="Name of the 'Stacked Tabs' lab.">
-        Stacked Tabs
-      </message>
-      <message name="IDS_FLAGS_STACKED_TAB_STRIP_DESCRIPTION" desc="Description of the 'Stacked Tabs' lab.">
-        Tabs never shrink, instead they stack on top of each other when there is not enough space.
-      </message>
       <message name="IDS_FLAGS_ENABLE_NACL_NAME" desc="Name of the 'Enable Native Client' lab.">
         Native Client
       </message>
@@ -5496,12 +5499,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_DISABLE_COMPOSITOR_TOUCH_HIT_TESTING_DESCRIPTION" desc="Description of the disable compositor touch hit testing flags.">
         Disables an optimization intended to improve touch scrolling responsiveness.  Forces all touch events to go to the blink main thread to look for handlers, instead of potentially short-circuiting from the compositor thread.
-      </message>
-      <message name="IDS_FLAGS_CONFLICTS_CHECK_NAME" desc="Title of the run conflicts check flag">
-        Check for known conflicts with 3rd party modules.
-      </message>
-      <message name="IDS_FLAGS_CONFLICTS_CHECK_DESCRIPTION" desc="Description of the conflicts check flag">
-        Enables a background check that warns you when a software incompatibility is detected (ie. 3rd party modules that crash the browser).
       </message>
       <message name="IDS_FLAGS_COMPOSITED_LAYER_BORDERS" desc="Name of the 'Composited layer borders' lab.">
         Composited render layer borders
@@ -5751,12 +5748,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
           Enabling this option prevents web sites from accessing the WebAudio API.
         </message>
       </if>
-      <message name="IDS_FLAGS_FIXED_POSITION_CREATES_STACKING_CONTEXT_NAME" desc="Name of the 'Fixed position creates stacking context' lab.">
-        Fixed position elements create stacking contexts.
-      </message>
-      <message name="IDS_FLAGS_FIXED_POSITION_CREATES_STACKING_CONTEXT_DESCRIPTION" desc="Description for the flag to make fixed position elements create stacking contexts.">
-        Enabling this option makes all fixed position elements create new CSS stacking contexts.
-      </message>
       <message name="IDS_FLAGS_COMPOSITING_FOR_FIXED_POSITION_NAME" desc="Name of the 'Compositing for fixed position elements' lab.">
         Compositing for fixed position elements.
       </message>
@@ -5930,14 +5921,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_SPELLCHECK_AUTOCORRECT_DESCRIPTION" desc="Description for the flag to force synchronous spellchecking.">
         Turn on autocorrection of text while typing. Synchronous spellchecking is not compatible with this feature.
       </message>
-      <if expr="chromeos">
-        <message name="IDS_FLAGS_DOCKED_WINDOWS_NAME" desc="Name for the flag to disable docked windows feature.">
-          Disable docking of windows near screen edges.
-        </message>
-        <message name="IDS_FLAGS_DOCKED_WINDOWS_DESCRIPTION" desc="Description for the flag to disable docked windows feature.">
-          Turns off docking of windows near screen edges, a feature that provides an easier way to interact with panel and other small windows.
-        </message>
-      </if>
       <if expr="use_ash">
         <message name="IDS_FLAGS_DISABLE_MINIMIZE_ON_SECOND_LAUNCHER_ITEM_CLICK_NAME" desc="Name for the flag which allows to minimize a window upon launcher item click under certain conditions.">
           Disallow shelf to minimize-on-click.
@@ -6224,12 +6207,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_FLAGS_APPS_KEEP_CHROME_ALIVE_DESCRIPTION" desc="Description for the flag to prevent Chrome from quitting when Chrome Apps are open.">
           Prevent Chrome from quitting when Chrome Apps are open.
         </message>
-        <message name="IDS_FLAGS_DISABLE_APP_SHIMS_NAME" desc="Title for the flag to disable shortcuts for packaged apps from being added to Applications and from appearing in the dock.">
-          Disable packaged app shortcuts.
-        </message>
-        <message name="IDS_FLAGS_DISABLE_APP_SHIMS_DESCRIPTION" desc="Description for the flag to disable packaged apps appearing in the dock in OSX.">
-          Disables packaged app shortcuts from being added to Applications and from appearing in the dock.
-        </message>
         <message name="IDS_FLAGS_ENABLE_SIMPLIFIED_FULLSCREEN_NAME" desc="Title for the flag to enable a simplified Mac fullscreen interface.">
           Enables simplified fullscreen.
         </message>
@@ -6283,6 +6260,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
           If enabled, transitions during first-run tutorial are animated.
         </message>
       </if>
+      <message name="IDS_FLAGS_ENABLE_PROMINENT_URL_APP_FLOW_NAME" desc="Name of the flag to enable the prominent URL app creation flow.">
+        Enable the prominent URL app creation flow.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_PROMINENT_URL_APP_FLOW_DESCRIPTION" desc="Description for the flag to enable the prominent URL app creation flow.">
+        Enables a more prominent way to create URL apps. Does nothing if Streamlined Hosted Apps is not enabled.
+      </message>
       <message name="IDS_FLAGS_ENABLE_STREAMLINED_HOSTED_APPS_NAME" desc="Name of the flag to enable streamlined hosted apps.">
         Enable experimental streamlined hosted apps.
       </message>
@@ -6534,11 +6517,20 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_HOTWORD_CONFIRM_BUBBLE_DISABLE" desc="The button text that disallows the hotword voice search trigger.">
         Cancel
       </message>
-      <message name="IDS_HOTWORD_RETRY_DOWNLOAD_BUTTON" desc="The button text that retries a failed hotword setup in the settings page.">
-        Retry
+      <message name="IDS_HOTWORD_GENERIC_ERROR_MESSAGE" desc="The default error message text when no additional details are known.">
+        This feature is temporarily unavailable.
+      </message>
+      <message name="IDS_HOTWORD_NACL_DISABLED_ERROR_MESSAGE" desc="The error message text when hotwording fails because NaCl is disabled.">
+        <ph name="BEGIN_LINK">&lt;a target="_blank" href="chrome://plugins"&gt;</ph>Native Client plug-in<ph name="END_LINK">&lt;/a&gt;<ex>&lt;/a&gt;</ex></ph> needs to be enabled to use this feature.
+      </message>
+      <message name="IDS_HOTWORD_MICROPHONE_ERROR_MESSAGE" desc="The error message text when hotwording fails because the microphone isn't working.">
+        Mircophone is currently unavailable. <ph name="BEGIN_LINK">&lt;a target="_blank" href="chrome://settings/content#media-stream-settings"&gt;</ph>Manage microphone<ph name="END_LINK">&lt;/a&gt;<ex>&lt;/a&gt;</ex></ph>
       </message>
       <message name="IDS_HOTWORD_AUDIO_LOGGING_ENABLE" desc="A checkbox in the hotword confirm dialog that allows for sending audio of 'Ok, Google' plus a few seconds before back to Google to improve voice search.">
         Improve voice search by sending the sound of "Ok Google," and a few seconds before, to Google.
+      </message>
+      <message name="IDS_HOTWORD_HELP_LINK" desc="Text that provides a link to the help center troubleshooting page.">
+        <ph name="BEGIN_LINK">&lt;a target="_blank" href="$1"&gt;</ph>Help<ph name="END_LINK">&lt;/a&gt;<ex>&lt;/a&gt;</ex></ph>
       </message>
 
       <if expr="is_win">
@@ -7458,6 +7450,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_MANAGED_USER_AVATAR_LABEL" desc="A label for the supervised user which is used in the avatar menu and as a label in the titlebar.">
         Supervised user
       </message>
+      <message name="IDS_MANAGED_USER_NEW_AVATAR_LABEL" desc="Label shown in the new avatar menu for a supervised user.">
+        <ph name="PROFILE_DISPLAY_NAME">$1<ex>Markus</ex></ph> (Supervised)
+      </message>
 
       <!-- Supervised User Block Interstitial data -->
       <message name="IDS_BLOCK_INTERSTITIAL_TITLE" desc="A title for the supervised-user block interstitial page.">
@@ -7784,6 +7779,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </if>
       <message name="IDS_PPAPI_BROKER_TAB_LABEL" desc="Label for PPAPI broker tab on Content Settings dialog">
         Unsandboxed plug-in access
+      </message>
+      <message name="IDS_PPAPI_BROKER_HEADER" desc="Label for PPAPI broker tab exception management page on Content Settings dialog">
+        Unsandboxed plug-in access exceptions
       </message>
       <message name="IDS_PPAPI_BROKER_ALLOW_RADIO" desc="A radio button in Content Settings dialog to allow all sites to access the PPAPI broker.">
         Allow all sites to use a plug-in to access your computer
@@ -13860,10 +13858,10 @@ Do you accept?
       Add
     </message>
     <message name="IDS_WEBSTORE_RESULT_LAUNCH" desc="Text of button on WebStore search result for launching an ephemeral app.">
-      Launch
+      Try
     </message>
     <message name="IDS_WEBSTORE_RESULT_LAUNCH_APP_TOOLTIP" desc="Tooltip of button on WebStore search result for launching an ephemeral app.">
-      Launch app
+      Try app without installing
     </message>
 
     <!-- Extension Storage Monitor notification strings -->

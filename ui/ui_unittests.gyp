@@ -46,7 +46,6 @@
         '<@(_common_sources)',
         'base/accelerators/accelerator_manager_unittest.cc',
         'base/accelerators/menu_label_accelerator_util_linux_unittest.cc',
-        'base/clipboard/clipboard_unittest.cc',
         'base/clipboard/custom_data_helper_unittest.cc',
         'base/cocoa/base_view_unittest.mm',
         'base/cocoa/cocoa_base_utils_unittest.mm',
@@ -69,7 +68,6 @@
         'base/webui/web_ui_util_unittest.cc',
         'gfx/canvas_unittest.cc',
         'gfx/canvas_unittest_mac.mm',
-        'gfx/font_list_unittest.cc',
         'gfx/platform_font_mac_unittest.mm',
         'gfx/render_text_unittest.cc',
       ],
@@ -95,6 +93,18 @@
           # by ui_resources.gyp:ui_test_pak.
           'mac_bundle_resources': [
             '<(PRODUCT_DIR)/ui/en.lproj/locale.pak',
+          ],
+          'actions': [
+            {
+              'action_name': 'copy_test_data',
+              'variables': {
+                'test_data_files': [
+                  'base/test/data',
+                ],
+                'test_data_prefix' : 'ui',
+              },
+              'includes': [ '../build/copy_test_data_ios.gypi' ],
+            },
           ],
         }],
         ['OS == "win"', {
@@ -201,7 +211,6 @@
         ['use_ozone==1 and use_pango==0', {
           'sources!': [
             'gfx/canvas_unittest.cc',
-            'gfx/font_list_unittest.cc',
             'gfx/render_text_unittest.cc',
           ],
         }],

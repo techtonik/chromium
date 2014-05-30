@@ -15,11 +15,10 @@
 #include "mojo/aura/screen_mojo.h"
 #include "mojo/aura/window_tree_host_mojo.h"
 #include "mojo/examples/launcher/launcher.mojom.h"
-#include "mojo/public/cpp/bindings/allocation_scope.h"
+#include "mojo/public/cpp/application/application.h"
 #include "mojo/public/cpp/gles2/gles2.h"
-#include "mojo/public/cpp/shell/application.h"
 #include "mojo/public/cpp/system/core.h"
-#include "mojo/public/interfaces/shell/shell.mojom.h"
+#include "mojo/public/interfaces/service_provider/service_provider.mojom.h"
 #include "mojo/services/native_viewport/native_viewport.mojom.h"
 #include "ui/aura/client/aura_constants.h"
 #include "ui/aura/client/default_capture_client.h"
@@ -221,8 +220,7 @@ class LauncherImpl : public InterfaceImpl<Launcher>,
 
   // Overridden from URLReceiver:
   virtual void OnURLEntered(const std::string& url_text) OVERRIDE {
-    AllocationScope scope;
-    client()->OnURLEntered(url_text);
+    client()->OnURLEntered(String::From(url_text));
   }
 
   void HostContextCreated() {
@@ -266,8 +264,8 @@ class LauncherImpl : public InterfaceImpl<Launcher>,
 }  // namespace mojo
 
 extern "C" LAUNCHER_EXPORT MojoResult CDECL MojoMain(
-    MojoHandle shell_handle) {
-  CommandLine::Init(0, NULL);
+    MojoHandle service_provider_handle) {
+  base::CommandLine::Init(0, NULL);
   base::AtExitManager at_exit;
   base::i18n::InitializeICU();
 
@@ -285,7 +283,7 @@ extern "C" LAUNCHER_EXPORT MojoResult CDECL MojoMain(
   //             Aura that doesn't define platform-specific stuff.
   aura::Env::CreateInstance(true);
 
-  mojo::Application app(shell_handle);
+  mojo::Application app(service_provider_handle);
   app.AddService<mojo::examples::LauncherImpl>(&app);
 
   loop.Run();

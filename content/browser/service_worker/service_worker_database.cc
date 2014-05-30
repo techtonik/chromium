@@ -9,6 +9,7 @@
 #include "base/file_util.h"
 #include "base/location.h"
 #include "base/logging.h"
+#include "base/stl_util.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
@@ -240,9 +241,7 @@ ServiceWorkerDatabase::ServiceWorkerDatabase(const base::FilePath& path)
       next_avail_registration_id_(0),
       next_avail_resource_id_(0),
       next_avail_version_id_(0),
-      is_disabled_(false),
-      was_corruption_detected_(false),
-      is_initialized_(false) {
+      state_(UNINITIALIZED) {
   sequence_checker_.DetachFromSequence();
 }
 
@@ -423,30 +422,8 @@ ServiceWorkerDatabase::Status ServiceWorkerDatabase::WriteRegistration(
   BumpNextRegistrationIdIfNeeded(registration.registration_id, &batch);
   BumpNextVersionIdIfNeeded(registration.version_id, &batch);
 
-  // TODO(nhiroki): Skip to add the origin into the unique origin list if it
-  // has already been added.
   PutUniqueOriginToBatch(registration.scope.GetOrigin(), &batch);
-
   PutRegistrationDataToBatch(registration, &batch);
-
-  // Retrieve a previous version to sweep purgeable resources.
-  RegistrationData old_registration;
-  status = ReadRegistrationData(registration.registration_id,
-                                registration.scope.GetOrigin(),
-                                &old_registration);
-  if (status != STATUS_OK && status != STATUS_ERROR_NOT_FOUND)
-    return status;
-  if (status == STATUS_OK) {
-    DCHECK_LT(old_registration.version_id, registration.version_id);
-    // Currently resource sharing across versions and registrations is not
-    // suppported, so resource ids should not be overlapped between
-    // |registration| and |old_registration|.
-    // TODO(nhiroki): Add DCHECK to make sure the overlap does not exist.
-    status = DeleteResourceRecords(
-        old_registration.version_id, newly_purgeable_resources, &batch);
-    if (status != STATUS_OK)
-      return status;
-  }
 
   // Used for avoiding multiple writes for the same resource id or url.
   std::set<int64> pushed_resources;
@@ -465,6 +442,29 @@ ServiceWorkerDatabase::Status ServiceWorkerDatabase::WriteRegistration(
     // Delete a resource from the uncommitted list.
     batch.Delete(CreateResourceIdKey(
         kUncommittedResIdKeyPrefix, itr->resource_id));
+  }
+
+  // Retrieve a previous version to sweep purgeable resources.
+  RegistrationData old_registration;
+  status = ReadRegistrationData(registration.registration_id,
+                                registration.scope.GetOrigin(),
+                                &old_registration);
+  if (status != STATUS_OK && status != STATUS_ERROR_NOT_FOUND)
+    return status;
+  if (status == STATUS_OK) {
+    DCHECK_LT(old_registration.version_id, registration.version_id);
+    status = DeleteResourceRecords(
+        old_registration.version_id, newly_purgeable_resources, &batch);
+    if (status != STATUS_OK)
+      return status;
+
+    // Currently resource sharing across versions and registrations is not
+    // supported, so resource ids should not be overlapped between
+    // |registration| and |old_registration|.
+    std::set<int64> deleted_resources(newly_purgeable_resources->begin(),
+                                      newly_purgeable_resources->end());
+    DCHECK(base::STLSetIntersection<std::set<int64> >(
+        pushed_resources, deleted_resources).empty());
   }
 
   return WriteBatch(&batch);
@@ -595,6 +595,20 @@ ServiceWorkerDatabase::ClearPurgeableResourceIds(const std::set<int64>& ids) {
   return DeleteResourceIds(kPurgeableResIdKeyPrefix, ids);
 }
 
+ServiceWorkerDatabase::Status
+ServiceWorkerDatabase::PurgeUncommittedResourceIds(
+    const std::set<int64>& ids) {
+  leveldb::WriteBatch batch;
+  Status status = DeleteResourceIdsInBatch(
+      kUncommittedResIdKeyPrefix, ids, &batch);
+  if (status != STATUS_OK)
+    return status;
+  status = WriteResourceIdsInBatch(kPurgeableResIdKeyPrefix, ids, &batch);
+  if (status != STATUS_OK)
+    return status;
+  return WriteBatch(&batch);
+}
+
 ServiceWorkerDatabase::Status ServiceWorkerDatabase::DeleteAllDataForOrigin(
     const GURL& origin,
     std::vector<int64>* newly_purgeable_resources) {
@@ -635,7 +649,7 @@ ServiceWorkerDatabase::Status ServiceWorkerDatabase::LazyOpen(
   DCHECK(sequence_checker_.CalledOnValidSequencedThread());
 
   // Do not try to open a database if we tried and failed once.
-  if (is_disabled_)
+  if (state_ == DISABLED)
     return STATUS_ERROR_FAILED;
   if (IsOpen())
     return STATUS_OK;
@@ -676,7 +690,7 @@ ServiceWorkerDatabase::Status ServiceWorkerDatabase::LazyOpen(
     return status;
   DCHECK_LE(0, db_version);
   if (db_version > 0)
-    is_initialized_ = true;
+    state_ = INITIALIZED;
   return STATUS_OK;
 }
 
@@ -684,7 +698,7 @@ bool ServiceWorkerDatabase::IsNewOrNonexistentDatabase(
     ServiceWorkerDatabase::Status status) {
   if (status == STATUS_ERROR_NOT_FOUND)
     return true;
-  if (status == STATUS_OK && !is_initialized_)
+  if (status == STATUS_OK && state_ == UNINITIALIZED)
     return true;
   return false;
 }
@@ -847,6 +861,17 @@ ServiceWorkerDatabase::Status ServiceWorkerDatabase::ReadResourceIds(
 ServiceWorkerDatabase::Status ServiceWorkerDatabase::WriteResourceIds(
     const char* id_key_prefix,
     const std::set<int64>& ids) {
+  leveldb::WriteBatch batch;
+  Status status = WriteResourceIdsInBatch(id_key_prefix, ids, &batch);
+  if (status != STATUS_OK)
+    return status;
+  return WriteBatch(&batch);
+}
+
+ServiceWorkerDatabase::Status ServiceWorkerDatabase::WriteResourceIdsInBatch(
+    const char* id_key_prefix,
+    const std::set<int64>& ids,
+    leveldb::WriteBatch* batch) {
   DCHECK(sequence_checker_.CalledOnValidSequencedThread());
   DCHECK(id_key_prefix);
 
@@ -856,19 +881,28 @@ ServiceWorkerDatabase::Status ServiceWorkerDatabase::WriteResourceIds(
   if (ids.empty())
     return STATUS_OK;
 
-  leveldb::WriteBatch batch;
   for (std::set<int64>::const_iterator itr = ids.begin();
        itr != ids.end(); ++itr) {
     // Value should be empty.
-    batch.Put(CreateResourceIdKey(id_key_prefix, *itr), "");
+    batch->Put(CreateResourceIdKey(id_key_prefix, *itr), "");
   }
-
-  return WriteBatch(&batch);
+  return STATUS_OK;
 }
 
 ServiceWorkerDatabase::Status ServiceWorkerDatabase::DeleteResourceIds(
     const char* id_key_prefix,
     const std::set<int64>& ids) {
+  leveldb::WriteBatch batch;
+  Status status = DeleteResourceIdsInBatch(id_key_prefix, ids, &batch);
+  if (status != STATUS_OK)
+    return status;
+  return WriteBatch(&batch);
+}
+
+ServiceWorkerDatabase::Status ServiceWorkerDatabase::DeleteResourceIdsInBatch(
+    const char* id_key_prefix,
+    const std::set<int64>& ids,
+    leveldb::WriteBatch* batch) {
   DCHECK(sequence_checker_.CalledOnValidSequencedThread());
   DCHECK(id_key_prefix);
 
@@ -880,13 +914,11 @@ ServiceWorkerDatabase::Status ServiceWorkerDatabase::DeleteResourceIds(
   if (ids.empty())
     return STATUS_OK;
 
-  leveldb::WriteBatch batch;
   for (std::set<int64>::const_iterator itr = ids.begin();
        itr != ids.end(); ++itr) {
-    batch.Delete(CreateResourceIdKey(id_key_prefix, *itr));
+    batch->Delete(CreateResourceIdKey(id_key_prefix, *itr));
   }
-
-  return WriteBatch(&batch);
+  return STATUS_OK;
 }
 
 ServiceWorkerDatabase::Status ServiceWorkerDatabase::ReadDatabaseVersion(
@@ -923,12 +955,12 @@ ServiceWorkerDatabase::Status ServiceWorkerDatabase::ReadDatabaseVersion(
 ServiceWorkerDatabase::Status ServiceWorkerDatabase::WriteBatch(
     leveldb::WriteBatch* batch) {
   DCHECK(batch);
-  DCHECK(!is_disabled_);
+  DCHECK_NE(DISABLED, state_);
 
-  if (!is_initialized_) {
+  if (state_ == UNINITIALIZED) {
     // Write the database schema version.
     batch->Put(kDatabaseVersionKey, base::Int64ToString(kCurrentSchemaVersion));
-    is_initialized_ = true;
+    state_ = INITIALIZED;
   }
 
   leveldb::Status status = db_->Write(leveldb::WriteOptions(), batch);
@@ -956,7 +988,7 @@ void ServiceWorkerDatabase::BumpNextVersionIdIfNeeded(
 }
 
 bool ServiceWorkerDatabase::IsOpen() {
-  return db_.get() != NULL;
+  return db_ != NULL;
 }
 
 void ServiceWorkerDatabase::HandleError(
@@ -965,9 +997,7 @@ void ServiceWorkerDatabase::HandleError(
   // TODO(nhiroki): Add an UMA histogram.
   DLOG(ERROR) << "Failed at: " << from_here.ToString()
               << " with error: " << status.ToString();
-  is_disabled_ = true;
-  if (status.IsCorruption())
-    was_corruption_detected_ = true;
+  state_ = DISABLED;
   db_.reset();
 }
 

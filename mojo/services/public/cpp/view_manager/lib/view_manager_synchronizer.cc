@@ -6,8 +6,8 @@
 
 #include "base/bind.h"
 #include "base/run_loop.h"
-#include "mojo/public/cpp/shell/connect.h"
-#include "mojo/public/interfaces/shell/shell.mojom.h"
+#include "mojo/public/cpp/application/connect.h"
+#include "mojo/public/interfaces/service_provider/service_provider.mojom.h"
 #include "mojo/services/public/cpp/view_manager/lib/view_manager_private.h"
 #include "mojo/services/public/cpp/view_manager/lib/view_private.h"
 #include "mojo/services/public/cpp/view_manager/lib/view_tree_node_private.h"
@@ -26,13 +26,15 @@ uint32_t MakeTransportId(uint16_t connection_id, uint16_t local_id) {
 ViewTreeNode* AddNodeToViewManager(ViewManager* manager,
                                    ViewTreeNode* parent,
                                    TransportNodeId node_id,
-                                   TransportViewId view_id) {
+                                   TransportViewId view_id,
+                                   const gfx::Rect& bounds) {
   // We don't use the ctor that takes a ViewManager here, since it will call
   // back to the service and attempt to create a new node.
   ViewTreeNode* node = ViewTreeNodePrivate::LocalCreate();
   ViewTreeNodePrivate private_node(node);
   private_node.set_view_manager(manager);
   private_node.set_id(node_id);
+  private_node.LocalSetBounds(gfx::Rect(), bounds);
   if (parent)
     ViewTreeNodePrivate(parent).LocalAddChild(node);
   ViewManagerPrivate private_manager(manager);
@@ -54,22 +56,23 @@ ViewTreeNode* AddNodeToViewManager(ViewManager* manager,
 }
 
 ViewTreeNode* BuildNodeTree(ViewManager* manager,
-                            const Array<INode>& nodes) {
+                            const Array<INodePtr>& nodes) {
   std::vector<ViewTreeNode*> parents;
   ViewTreeNode* root = NULL;
   ViewTreeNode* last_node = NULL;
   for (size_t i = 0; i < nodes.size(); ++i) {
-    if (last_node && nodes[i].parent_id() == last_node->id()) {
+    if (last_node && nodes[i]->parent_id == last_node->id()) {
       parents.push_back(last_node);
     } else if (!parents.empty()) {
-      while (parents.back()->id() != nodes[i].parent_id())
+      while (parents.back()->id() != nodes[i]->parent_id)
         parents.pop_back();
     }
     ViewTreeNode* node = AddNodeToViewManager(
         manager,
         !parents.empty() ? parents.back() : NULL,
-        nodes[i].node_id(),
-        nodes[i].view_id());
+        nodes[i]->node_id,
+        nodes[i]->view_id,
+        nodes[i]->bounds.To<gfx::Rect>());
     if (!last_node)
       root = node;
     last_node = node;
@@ -324,8 +327,8 @@ class SetBoundsTransaction : public ViewManagerTransaction {
  private:
   // Overridden from ViewManagerTransaction:
   virtual void DoCommit() OVERRIDE {
-    AllocationScope scope;
-    service()->SetNodeBounds(node_id_, bounds_, ActionCompletedCallback());
+    service()->SetNodeBounds(
+        node_id_, Rect::From(bounds_), ActionCompletedCallback());
   }
   virtual void DoActionCompleted(bool success) OVERRIDE {
     // TODO(beng): recovery?
@@ -364,7 +367,6 @@ class SetViewContentsTransaction : public ViewManagerTransaction {
 
     memcpy(memory, &data[0], data.size());
 
-    AllocationScope scope;
     service()->SetViewContents(view_id_, duped.Pass(),
                                static_cast<uint32_t>(data.size()),
                                ActionCompletedCallback());
@@ -411,8 +413,10 @@ ViewManagerSynchronizer::ViewManagerSynchronizer(ViewManager* view_manager)
       next_server_change_id_(0),
       sync_factory_(this),
       init_loop_(NULL) {
-  ConnectTo(ViewManagerPrivate(view_manager_).shell(), "mojo:mojo_view_manager",
-            &service_);
+  ConnectToService(
+      ViewManagerPrivate(view_manager_).service_provider(),
+      "mojo:mojo_view_manager",
+      &service_);
   service_.set_client(this);
 
   // Start a runloop. This loop is quit when the server tells us about the
@@ -516,10 +520,10 @@ void ViewManagerSynchronizer::SetViewContents(TransportViewId view_id,
 ////////////////////////////////////////////////////////////////////////////////
 // ViewManagerSynchronizer, IViewManagerClient implementation:
 
-void ViewManagerSynchronizer::OnConnectionEstablished(
+void ViewManagerSynchronizer::OnViewManagerConnectionEstablished(
     TransportConnectionId connection_id,
     TransportChangeId next_server_change_id,
-    const Array<INode>& nodes) {
+    mojo::Array<INodePtr> nodes) {
   connected_ = true;
   connection_id_ = connection_id;
   next_server_change_id_ = next_server_change_id;
@@ -538,10 +542,11 @@ void ViewManagerSynchronizer::OnServerChangeIdAdvanced(
 }
 
 void ViewManagerSynchronizer::OnNodeBoundsChanged(uint32 node_id,
-                                                  const Rect& old_bounds,
-                                                  const Rect& new_bounds) {
+                                                  RectPtr old_bounds,
+                                                  RectPtr new_bounds) {
   ViewTreeNode* node = view_manager_->GetNodeById(node_id);
-  ViewTreeNodePrivate(node).LocalSetBounds(old_bounds, new_bounds);
+  ViewTreeNodePrivate(node).LocalSetBounds(old_bounds.To<gfx::Rect>(),
+                                           new_bounds.To<gfx::Rect>());
 }
 
 void ViewManagerSynchronizer::OnNodeHierarchyChanged(
@@ -549,7 +554,7 @@ void ViewManagerSynchronizer::OnNodeHierarchyChanged(
     uint32_t new_parent_id,
     uint32_t old_parent_id,
     TransportChangeId server_change_id,
-    const Array<INode>& nodes) {
+    mojo::Array<INodePtr> nodes) {
   // TODO: deal with |nodes|.
   next_server_change_id_ = server_change_id + 1;
 

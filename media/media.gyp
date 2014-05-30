@@ -37,7 +37,7 @@
         'use_pulseaudio%': 0,
       }],
       ['sysroot!=""', {
-        'pkg-config': '../build/linux/pkg-config-wrapper "<(sysroot)" "<(target_arch)"',
+        'pkg-config': '../build/linux/pkg-config-wrapper "<(sysroot)" "<(target_arch)" "<(system_libdir)"',
       }, {
         'pkg-config': 'pkg-config'
       }],
@@ -955,6 +955,7 @@
         '../ui/base/ui_base.gyp:ui_base',
         '../ui/gfx/gfx.gyp:gfx',
         '../ui/gfx/gfx.gyp:gfx_geometry',
+        '../url/url.gyp:url_lib',
       ],
       'sources': [
         'audio/android/audio_android_unittest.cc',
@@ -1149,13 +1150,9 @@
             'filters/pipeline_integration_test.cc',
             'filters/pipeline_integration_test_base.cc',
           ],
-          'conditions': [
-            ['gtest_target_type=="shared_library"', {
-              'dependencies': [
-                '../testing/android/native_test.gyp:native_test_native_code',
-                'player_android',
-              ],
-            }],
+          'dependencies': [
+            '../testing/android/native_test.gyp:native_test_native_code',
+            'player_android',
           ],
         }],
         ['OS=="linux"', {
@@ -1252,13 +1249,9 @@
           ],
         }],
         ['OS=="android"', {
-          'conditions': [
-            ['gtest_target_type=="shared_library"', {
-              'dependencies': [
-                '../testing/android/native_test.gyp:native_test_native_code',
-              ],
-            }],
-          ],
+            'dependencies': [
+              '../testing/android/native_test.gyp:native_test_native_code',
+            ],
         }],
         ['media_use_ffmpeg==1', {
           'dependencies': [
@@ -1517,7 +1510,7 @@
           'type': 'executable',
           'dependencies': [
             'media',
-	    'shared_memory_support',
+            'shared_memory_support',
             '../base/base.gyp:base',
             '../ui/gl/gl.gyp:gl',
             '../ui/gfx/gfx.gyp:gfx',
@@ -1548,9 +1541,7 @@
         },
       ],
     }],
-    # Special target to wrap a gtest_target_type==shared_library
-    # media_unittests into an android apk for execution.
-    ['OS=="android" and gtest_target_type=="shared_library"', {
+    ['OS=="android"', {
       'targets': [
         {
           'target_name': 'media_unittests_apk',

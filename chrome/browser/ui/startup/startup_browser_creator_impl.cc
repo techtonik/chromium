@@ -503,7 +503,7 @@ bool StartupBrowserCreatorImpl::OpenApplicationWindow(
     ChildProcessSecurityPolicy* policy =
         ChildProcessSecurityPolicy::GetInstance();
     if (policy->IsWebSafeScheme(url.scheme()) ||
-        url.SchemeIs(content::kFileScheme)) {
+        url.SchemeIs(url::kFileScheme)) {
       const extensions::Extension* extension =
           extensions::ExtensionRegistry::Get(profile)
               ->enabled_extensions().GetAppByURL(url);
@@ -838,14 +838,9 @@ void StartupBrowserCreatorImpl::AddInfoBarsIfNecessary(
   if (!browser || !profile_ || browser->tab_strip_model()->count() == 0)
     return;
 
-  if (HasPendingUncleanExit(browser->profile())) {
-    // Can't use command_line_ here because command_line_ isn't set to have
-    // correct values when a profile window is opened after the browser starts
-    // up (via profile switcher). See function FindOrCreateNewWindowForProfile.
-    if (!CommandLine::ForCurrentProcess()->HasSwitch(
-            switches::kEnableSessionCrashedBubble) ||
-        !ShowSessionCrashedBubble(browser))
-      SessionCrashedInfoBarDelegate::Create(browser);
+  if (HasPendingUncleanExit(browser->profile()) &&
+      !ShowSessionCrashedBubble(browser)) {
+    SessionCrashedInfoBarDelegate::Create(browser);
   }
 
   // The below info bars are only added to the first profile which is launched.

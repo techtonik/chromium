@@ -1401,6 +1401,7 @@
     'ozone_platform_caca%': 0,
     'ozone_platform_dri%': 0,
     'ozone_platform_egltest%': 0,
+    'ozone_platform_gbm%': 0,
     'ozone_platform_ozonex%': 0,
     'ozone_platform_test%': 0,
 
@@ -1455,13 +1456,25 @@
       # TODO(glider): set clang to 1 earlier for ASan and TSan builds so that
       # it takes effect here.
       ['os_posix==1 and OS!="mac" and OS!="ios" and clang==0 and asan==0 and lsan==0 and tsan==0 and msan==0', {
-        'host_gcc_version%': '<!pymod_do_main(compiler_version host compiler)',
         'conditions': [
           ['OS=="android"', {
             # We directly set the gcc versions since we know what we use.
             'gcc_version%': 48,
           }, {
             'gcc_version%': '<!pymod_do_main(compiler_version target compiler)',
+          }],
+          ['android_webview_build==1', {
+            # Android WebView uses a hermetic toolchain even for host, so set it
+            # manually here.
+            'conditions': [
+              ['host_os=="mac"', {
+                'host_gcc_version%': 42,
+              }, { # linux
+                'host_gcc_version%': 46,
+              }],
+            ],
+          }, {  # android_webview_build!=1
+            'host_gcc_version%': '<!pymod_do_main(compiler_version host compiler)',
           }],
         ],
       }, {
@@ -2276,6 +2289,11 @@
       # Targets are by default not nacl untrusted code.
       'nacl_untrusted_build%': 0,
 
+      # Enable a new Gamepad interface.
+      # TODO(cdumez): This is temporary and should go away once the chromium
+      # and blink interfaces are in sync, http://crbug.com/344556.
+      'enable_new_gamepad_api%': 1,
+
       'pnacl_compile_flags': [
         # pnacl uses the clang compiler so we need to suppress all the
         # same warnings as we do for clang.
@@ -2444,6 +2462,9 @@
       }],
       ['enable_hidpi==1', {
         'defines': ['ENABLE_HIDPI=1'],
+      }],
+      ['enable_new_gamepad_api==1', {
+        'defines': ['ENABLE_NEW_GAMEPAD_API=1'],
       }],
       ['native_discardable_memory==1', {
         'defines': ['DISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY'],
@@ -3898,7 +3919,9 @@
           }],
           ['order_profiling!=0 and (chromeos==1 or OS=="linux" or OS=="android")', {
             'target_conditions' : [
-              ['_toolset=="target"', {
+              # crazy_linker has an upstream gyp file we can't edit, and we
+              # don't want to instrument it.
+              ['_toolset=="target" and _target_name!="crazy_linker"', {
                 'cflags': [
                   '-finstrument-functions',
                   # Allow mmx intrinsics to inline, so that the
@@ -4851,7 +4874,6 @@
           'CERT_CHAIN_PARA_HAS_EXTRA_FIELDS',
           'WIN32_LEAN_AND_MEAN',
           '_ATL_NO_OPENGL',
-          '_HAS_EXCEPTIONS=0',
         ],
         'conditions': [
           ['buildtype=="Official"', {
@@ -4911,6 +4933,11 @@
               ],
             },
           ],
+          ['component=="static_library"', {
+            'defines': [
+              '_HAS_EXCEPTIONS=0',
+            ],
+          }],
           ['secure_atl', {
             'defines': [
               '_SECURE_ATL',
@@ -4943,6 +4970,12 @@
                 },
               },
             },
+            # https://code.google.com/p/chromium/issues/detail?id=372451#c20
+            # Warning 4702 ("Unreachable code") should be re-enabled once
+            # Express users are updated to VS2013 Update 2.
+            'msvs_disabled_warnings': [
+              4702
+            ],
             'msvs_settings': {
               'VCLinkerTool': {
                 # Explicitly required when using the ATL with express
@@ -4970,12 +5003,12 @@
           '$(VSInstallDir)/VC/atlmfc/include',
         ],
         'msvs_cygwin_shell': 0,
-        'msvs_disabled_warnings': [4351, 4355, 4396, 4503, 4819,
+        'msvs_disabled_warnings': [
+          4351, 4355, 4396, 4503, 4819,
           # TODO(maruel): These warnings are level 4. They will be slowly
           # removed as code is fixed.
           4100, 4121, 4125, 4127, 4130, 4131, 4189, 4201, 4238, 4244, 4245,
-          4310, 4428, 4481, 4505, 4510, 4512, 4530, 4610, 4611, 4701, 4702,
-          4706,
+          4310, 4428, 4481, 4505, 4510, 4512, 4530, 4610, 4611, 4701, 4706,
         ],
         'msvs_settings': {
           'VCCLCompilerTool': {

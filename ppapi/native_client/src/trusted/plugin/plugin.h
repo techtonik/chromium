@@ -66,13 +66,10 @@ class Plugin : public pp::Instance {
   // Handles document load, when the plugin is a MIME type handler.
   virtual bool HandleDocumentLoad(const pp::URLLoader& url_loader);
 
-  // ----- Plugin interface support.
-
   // Load support.
-  // NaCl module can be loaded given a DescWrapper.
   //
   // Starts NaCl module but does not wait until low-level
-  // initialization (e.g., ld.so dynamic loading of manifest files) is
+  // initialization (e.g. ld.so dynamic loading of manifest files) is
   // done.  The module will become ready later, asynchronously.  Other
   // event handlers should block until the module is ready before
   // trying to communicate with it, i.e., until nacl_ready_state is
@@ -84,9 +81,7 @@ class Plugin : public pp::Instance {
   // should include a time-out at which point we declare the
   // nacl_ready_state to be done, and let the normal crash detection
   // mechanism(s) take over.
-  //
-  // Updates nacl_module_origin() and nacl_module_url().
-  void LoadNaClModule(nacl::DescWrapper* wrapper,
+  void LoadNaClModule(PP_NaClFileInfo file_info,
                       bool uses_nonsfi_mode,
                       bool enable_dyncode_syscalls,
                       bool enable_exception_handling,
@@ -149,13 +144,6 @@ class Plugin : public pp::Instance {
   // event.
   void DispatchProgressEvent(int32_t result);
 
-  // Requests a URL asynchronously, resulting in a call to |callback| with
-  // an error code indicating status. On success, writes file information to
-  // |file_info|.
-  void StreamAsFile(const nacl::string& url,
-                    PP_NaClFileInfo* file_info,
-                    const pp::CompletionCallback& callback);
-
   // A helper function that indicates if |url| can be requested by the document
   // under the same-origin policy. Strictly speaking, it may be possible for the
   // document to request the URL using CORS even if this function returns false.
@@ -188,7 +176,6 @@ class Plugin : public pp::Instance {
   // This will fully initialize the |subprocess| if the load was successful.
   bool LoadNaClModuleFromBackgroundThread(PP_FileHandle file_handle,
                                           NaClSubprocess* subprocess,
-                                          int32_t manifest_id,
                                           const SelLdrStartParams& params);
 
   // Start sel_ldr from the main thread, given the start params.
@@ -204,7 +191,7 @@ class Plugin : public pp::Instance {
                              ServiceRuntime* service_runtime);
 
   void LoadNexeAndStart(int32_t pp_error,
-                        nacl::DescWrapper* wrapper,
+                        PP_NaClFileInfo file_info,
                         ServiceRuntime* service_runtime,
                         const pp::CompletionCallback& crash_cb);
 
@@ -268,11 +255,7 @@ class Plugin : public pp::Instance {
   int64_t time_of_last_progress_event_;
   int exit_status_;
 
-  int32_t manifest_id_;
-
-  PP_FileHandle nexe_handle_;
-  uint64_t nexe_token_lo_;
-  uint64_t nexe_token_hi_;
+  PP_NaClFileInfo nexe_file_info_;
 
   const PPB_NaCl_Private* nacl_interface_;
   pp::UMAPrivate uma_interface_;

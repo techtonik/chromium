@@ -469,10 +469,11 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest, FetchEvent_Response) {
   ServiceWorkerResponse response;
   FetchTestHelper("/service_worker/fetch_event.js", &result, &response);
   ASSERT_EQ(SERVICE_WORKER_FETCH_EVENT_RESULT_RESPONSE, result);
-  EXPECT_EQ(200, response.status_code);
-  EXPECT_EQ("OK", response.status_text);
-  EXPECT_EQ("GET", response.method);
+  EXPECT_EQ(301, response.status_code);
+  EXPECT_EQ("Moved Permanently", response.status_text);
   std::map<std::string, std::string> expected_headers;
+  expected_headers["Content-Language"] = "fi";
+  expected_headers["Content-Type"] = "text/html; charset=UTF-8";
   EXPECT_EQ(expected_headers, response.headers);
 }
 

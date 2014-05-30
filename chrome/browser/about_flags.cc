@@ -439,13 +439,6 @@ const Experiment::Choice kExtensionContentVerificationChoices[] = {
 // When adding a new choice, add it to the end of the list.
 const Experiment kExperiments[] = {
   {
-    "conflicting-modules-check",  // FLAGS:RECORD_UMA
-    IDS_FLAGS_CONFLICTS_CHECK_NAME,
-    IDS_FLAGS_CONFLICTS_CHECK_DESCRIPTION,
-    kOsWin,
-    SINGLE_VALUE_TYPE(switches::kConflictingModulesCheck)
-  },
-  {
     "ignore-gpu-blacklist",
     IDS_FLAGS_IGNORE_GPU_BLACKLIST_NAME,
     IDS_FLAGS_IGNORE_GPU_BLACKLIST_DESCRIPTION,
@@ -575,15 +568,6 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kDisableWebAudio)
   },
 #endif
-  {
-    "fixed-position-creates-stacking-context",
-    IDS_FLAGS_FIXED_POSITION_CREATES_STACKING_CONTEXT_NAME,
-    IDS_FLAGS_FIXED_POSITION_CREATES_STACKING_CONTEXT_DESCRIPTION,
-    kOsAll,
-    ENABLE_DISABLE_VALUE_TYPE(
-        switches::kEnableFixedPositionCreatesStackingContext,
-        switches::kDisableFixedPositionCreatesStackingContext)
-  },
   {
     "enable-compositing-for-fixed-position",
     IDS_FLAGS_COMPOSITING_FOR_FIXED_POSITION_NAME,
@@ -894,13 +878,6 @@ const Experiment kExperiments[] = {
   },
 #if defined(OS_CHROMEOS)
   {
-    "ash-disable-docked-windows",
-    IDS_FLAGS_DOCKED_WINDOWS_NAME,
-    IDS_FLAGS_DOCKED_WINDOWS_DESCRIPTION,
-    kOsCrOS,
-    SINGLE_VALUE_TYPE(ash::switches::kAshDisableDockedWindows)
-  },
-  {
     "network-portal-notification",
     IDS_FLAGS_NETWORK_PORTAL_NOTIFICATION_NAME,
     IDS_FLAGS_NETWORK_PORTAL_NOTIFICATION_DESCRIPTION,
@@ -923,13 +900,6 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ALLOW_NACL_SOCKET_API_DESCRIPTION,
     kOsDesktop,
     SINGLE_VALUE_TYPE_AND_VALUE(switches::kAllowNaClSocketAPI, "*")
-  },
-  {
-    "stacked-tab-strip",
-    IDS_FLAGS_STACKED_TAB_STRIP_NAME,
-    IDS_FLAGS_STACKED_TAB_STRIP_DESCRIPTION,
-    kOsWin,
-    SINGLE_VALUE_TYPE(switches::kEnableStackedTabStrip)
   },
   {
     "force-device-scale-factor",
@@ -1353,13 +1323,6 @@ const Experiment kExperiments[] = {
 #endif
 #if defined(OS_MACOSX)
   {
-    "disable-app-shims",
-    IDS_FLAGS_DISABLE_APP_SHIMS_NAME,
-    IDS_FLAGS_DISABLE_APP_SHIMS_DESCRIPTION,
-    kOsMac,
-    SINGLE_VALUE_TYPE(switches::kDisableAppShims)
-  },
-  {
     "enable-simplified-fullscreen",
     IDS_FLAGS_ENABLE_SIMPLIFIED_FULLSCREEN_NAME,
     IDS_FLAGS_ENABLE_SIMPLIFIED_FULLSCREEN_DESCRIPTION,
@@ -1531,6 +1494,13 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnableStreamlinedHostedApps)
   },
   {
+    "enable-prominent-url-app-flow",
+    IDS_FLAGS_ENABLE_PROMINENT_URL_APP_FLOW_NAME,
+    IDS_FLAGS_ENABLE_PROMINENT_URL_APP_FLOW_DESCRIPTION,
+    kOsWin | kOsCrOS | kOsLinux,
+    SINGLE_VALUE_TYPE(switches::kEnableProminentURLAppFlow)
+  },
+  {
     "enable-ephemeral-apps",
     IDS_FLAGS_ENABLE_EPHEMERAL_APPS_NAME,
     IDS_FLAGS_ENABLE_EPHEMERAL_APPS_DESCRIPTION,
@@ -1665,7 +1635,8 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_SESSION_CRASHED_BUBBLE_NAME,
     IDS_FLAGS_ENABLE_SESSION_CRASHED_BUBBLE_DESCRIPTION,
     kOsWin | kOsLinux,
-    SINGLE_VALUE_TYPE(switches::kEnableSessionCrashedBubble)
+    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableSessionCrashedBubble,
+                              switches::kDisableSessionCrashedBubble)
   },
   {
     "out-of-process-pdf",

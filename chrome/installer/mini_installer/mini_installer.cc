@@ -145,7 +145,9 @@ bool OpenClientStateKey(HKEY root_key, const wchar_t* app_guid, REGSAM access,
   PathString client_state_key;
   return client_state_key.assign(kApRegistryKeyBase) &&
          client_state_key.append(app_guid) &&
-         (key->Open(root_key, client_state_key.get(), access) == ERROR_SUCCESS);
+         (key->Open(root_key,
+                    client_state_key.get(),
+                    access | KEY_WOW64_32KEY) == ERROR_SUCCESS);
 }
 
 // This function sets the flag in registry to indicate that Google Update
@@ -752,12 +754,14 @@ bool ShouldDeleteExtractedFiles() {
 // executes setup.exe to do the install/upgrade.
 int WMain(HMODULE module) {
 #if defined(COMPONENT_BUILD)
-  static const wchar_t kComponentBuildIncompatibleMessage[] =
-      L"mini_installer.exe is incompatible with the component build, please run"
-      L" setup.exe with the same command line instead. See"
-      L" http://crbug.com/127233#c17 for details.";
-  ::MessageBox(NULL, kComponentBuildIncompatibleMessage, NULL, MB_ICONERROR);
-  return 1;
+  if (::GetEnvironmentVariable(L"MINI_INSTALLER_TEST", NULL, 0) == 0) {
+    static const wchar_t kComponentBuildIncompatibleMessage[] =
+        L"mini_installer.exe is incompatible with the component build, please"
+        L" run setup.exe with the same command line instead. See"
+        L" http://crbug.com/127233#c17 for details.";
+    ::MessageBox(NULL, kComponentBuildIncompatibleMessage, NULL, MB_ICONERROR);
+    return 1;
+  }
 #endif
 
   // Always start with deleting potential leftovers from previous installations.
@@ -774,6 +778,17 @@ int WMain(HMODULE module) {
   Configuration configuration;
   if (!configuration.Initialize())
     return exit_code;
+
+  if (configuration.query_component_build()) {
+    // Exit immediately with an exit code of 1 to indicate component build and 0
+    // to indicate static build. This is used by the tests in
+    // /src/chrome/test/mini_installer/.
+#if defined(COMPONENT_BUILD)
+    return 1;
+#else
+    return 0;
+#endif
+  }
 
   // If the --cleanup switch was specified on the command line, then that means
   // we should only do the cleanup and then exit.

@@ -217,6 +217,11 @@ void SendToAllFramesInternal(IPC::Message* message, RenderFrameHost* rfh) {
   rfh->Send(message_copy);
 }
 
+void AddRenderWidgetHostToSet(std::set<RenderWidgetHostImpl*>* set,
+                              RenderFrameHost* rfh) {
+  set->insert(static_cast<RenderFrameHostImpl*>(rfh)->GetRenderWidgetHost());
+}
+
 }  // namespace
 
 WebContents* WebContents::Create(const WebContents::CreateParams& params) {
@@ -938,12 +943,18 @@ base::TimeTicks WebContentsImpl::GetLastActiveTime() const {
 
 void WebContentsImpl::WasShown() {
   controller_.SetActive(true);
-  RenderWidgetHostView* rwhv = GetRenderWidgetHostView();
-  if (rwhv) {
-    rwhv->Show();
+
+  std::set<RenderWidgetHostImpl*> widgets = GetRenderWidgetHostsInTree();
+  for (std::set<RenderWidgetHostImpl*>::iterator iter = widgets.begin();
+       iter != widgets.end();
+       iter++) {
+    RenderWidgetHostView* rwhv = (*iter)->GetView();
+    if (rwhv) {
+      rwhv->Show();
 #if defined(OS_MACOSX)
-    rwhv->SetActive(true);
+      rwhv->SetActive(true);
 #endif
+    }
   }
 
   last_active_time_ = base::TimeTicks::Now();
@@ -971,9 +982,14 @@ void WebContentsImpl::WasHidden() {
     // removes the |GetRenderViewHost()|; then when we actually destroy the
     // window, OnWindowPosChanged() notices and calls WasHidden() (which
     // calls us).
-    RenderWidgetHostView* rwhv = GetRenderWidgetHostView();
-    if (rwhv)
-      rwhv->Hide();
+    std::set<RenderWidgetHostImpl*> widgets = GetRenderWidgetHostsInTree();
+    for (std::set<RenderWidgetHostImpl*>::iterator iter = widgets.begin();
+         iter != widgets.end();
+         iter++) {
+      RenderWidgetHostView* rwhv = (*iter)->GetView();
+      if (rwhv)
+        rwhv->Hide();
+    }
   }
 
   FOR_EACH_OBSERVER(WebContentsObserver, observers_, WasHidden());
@@ -1127,6 +1143,12 @@ void WebContentsImpl::AddObserver(WebContentsObserver* observer) {
 
 void WebContentsImpl::RemoveObserver(WebContentsObserver* observer) {
   observers_.RemoveObserver(observer);
+}
+
+std::set<RenderWidgetHostImpl*> WebContentsImpl::GetRenderWidgetHostsInTree() {
+  std::set<RenderWidgetHostImpl*> set;
+  ForEachFrame(base::Bind(&AddRenderWidgetHostToSet, base::Unretained(&set)));
+  return set;
 }
 
 void WebContentsImpl::Activate() {
@@ -1322,7 +1344,7 @@ void WebContentsImpl::CreateNewWindow(
   // script-related windows), by passing in the current SiteInstance.  However,
   // if the opener is being suppressed (in a non-guest), we create a new
   // SiteInstance in its own BrowsingInstance.
-  bool is_guest = GetRenderProcessHost()->IsGuest();
+  bool is_guest = BrowserPluginGuest::IsGuest(this);
 
   // If the opener is to be suppressed, the new window can be in any process.
   // Since routing ids are process specific, we must not have one passed in
@@ -1591,7 +1613,7 @@ WebContentsImpl* WebContentsImpl::GetCreatedWindow(int route_id) {
   RemoveDestructionObserver(new_contents);
 
   // Don't initialize the guest WebContents immediately.
-  if (new_contents->GetRenderProcessHost()->IsGuest())
+  if (BrowserPluginGuest::IsGuest(new_contents))
     return new_contents;
 
   if (!new_contents->GetRenderProcessHost()->HasConnection() ||
@@ -3397,11 +3419,6 @@ void WebContentsImpl::RenderViewTerminated(RenderViewHost* rvh,
   // probably will need to more granularly reset the state here.
   ResetLoadProgressState();
   loading_frames_in_progress_ = 0;
-
-#if defined(OS_ANDROID)
-  if (GetRenderViewHostImpl()->media_player_manager())
-    GetRenderViewHostImpl()->media_player_manager()->DestroyAllMediaPlayers();
-#endif
 
   FOR_EACH_OBSERVER(WebContentsObserver,
                     observers_,

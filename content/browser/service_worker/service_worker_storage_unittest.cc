@@ -150,13 +150,13 @@ class ServiceWorkerStorageTest : public testing::Test {
   }
 
   virtual void SetUp() OVERRIDE {
-    context_.reset(new ServiceWorkerContextCore(
-        base::FilePath(),
-        base::MessageLoopProxy::current(),
-        base::MessageLoopProxy::current(),
-        NULL,
-        NULL,
-        scoped_ptr<ServiceWorkerProcessManager>()));
+    context_.reset(
+        new ServiceWorkerContextCore(base::FilePath(),
+                                     base::MessageLoopProxy::current(),
+                                     base::MessageLoopProxy::current(),
+                                     NULL,
+                                     NULL,
+                                     NULL));
     context_ptr_ = context_->AsWeakPtr();
   }
 
@@ -496,7 +496,8 @@ TEST_F(ServiceWorkerStorageTest, InstallingRegistrationsAreFindable) {
   all_registrations.clear();
 
   // Notify storage of installation no longer happening.
-  storage()->NotifyDoneInstallingRegistration(live_registration);
+  storage()->NotifyDoneInstallingRegistration(
+      live_registration, NULL, SERVICE_WORKER_OK);
 
   // Once again, should not be findable.
   storage()->FindRegistrationForId(

@@ -31,7 +31,10 @@ void ConvertExtensionStatusToDictionary(
     const base::WeakPtr<ExtensionService>& extension_service,
     const base::Callback<void(const base::ListValue&)>& callback,
     const std::map<GURL, std::string>& status_map) {
-  DCHECK(!extension_service);
+  if (!extension_service) {
+    callback.Run(base::ListValue());
+    return;
+  }
 
   base::ListValue list;
   for (std::map<GURL, std::string>::const_iterator itr = status_map.begin();
@@ -78,13 +81,17 @@ void ExtensionStatusesHandler::GetExtensionStatusesAsDictionary(
 
   sync_file_system::SyncFileSystemService* sync_service =
       SyncFileSystemServiceFactory::GetForProfile(profile);
-  if (!sync_service)
+  if (!sync_service) {
+    callback.Run(base::ListValue());
     return;
+  }
 
   ExtensionService* extension_service =
       extensions::ExtensionSystem::Get(profile)->extension_service();
-  if (!extension_service)
+  if (!extension_service) {
+    callback.Run(base::ListValue());
     return;
+  }
 
   sync_service->GetExtensionStatusMap(base::Bind(
       &ConvertExtensionStatusToDictionary,

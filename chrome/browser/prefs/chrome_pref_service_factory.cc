@@ -313,7 +313,8 @@ void HandleReadError(PersistentPrefStore::PrefReadError error) {
     // an example problem that this can cause.
     // Do some diagnosis and try to avoid losing data.
     int message_id = 0;
-    if (error <= PersistentPrefStore::PREF_READ_ERROR_JSON_TYPE) {
+    if (error <= PersistentPrefStore::PREF_READ_ERROR_JSON_TYPE ||
+        error == PersistentPrefStore::PREF_READ_ERROR_LEVELDB_CORRUPTION) {
       message_id = IDS_PREFERENCES_CORRUPT_ERROR;
     } else if (error != PersistentPrefStore::PREF_READ_ERROR_NO_FILE) {
       message_id = IDS_PREFERENCES_UNREADABLE_ERROR;
@@ -449,6 +450,7 @@ scoped_ptr<PrefService> CreateLocalState(
 scoped_ptr<PrefServiceSyncable> CreateProfilePrefs(
     const base::FilePath& profile_path,
     base::SequencedTaskRunner* pref_io_task_runner,
+    TrackedPreferenceValidationDelegate* validation_delegate,
     policy::PolicyService* policy_service,
     ManagedUserSettingsService* managed_user_settings,
     const scoped_refptr<PrefStore>& extension_prefs,
@@ -456,14 +458,15 @@ scoped_ptr<PrefServiceSyncable> CreateProfilePrefs(
     bool async) {
   TRACE_EVENT0("browser", "chrome_prefs::CreateProfilePrefs");
   PrefServiceSyncableFactory factory;
-  PrepareFactory(&factory,
-                 policy_service,
-                 managed_user_settings,
-                 scoped_refptr<PersistentPrefStore>(
-                     CreateProfilePrefStoreManager(profile_path)
-                         ->CreateProfilePrefStore(pref_io_task_runner)),
-                 extension_prefs,
-                 async);
+  PrepareFactory(
+      &factory,
+      policy_service,
+      managed_user_settings,
+      scoped_refptr<PersistentPrefStore>(
+          CreateProfilePrefStoreManager(profile_path)->CreateProfilePrefStore(
+              pref_io_task_runner, validation_delegate)),
+      extension_prefs,
+      async);
   scoped_ptr<PrefServiceSyncable> pref_service =
       factory.CreateSyncable(pref_registry.get());
 

@@ -87,7 +87,6 @@ class RenderMessageFilter : public BrowserMessageFilter {
  public:
   // Create the filter.
   RenderMessageFilter(int render_process_id,
-                      bool is_guest,
                       PluginServiceImpl * plugin_service,
                       BrowserContext* browser_context,
                       net::URLRequestContextGetter* request_context,
@@ -149,7 +148,8 @@ class RenderMessageFilter : public BrowserMessageFilter {
                        IPC::Message* reply_msg);
   void OnDeleteCookie(const GURL& url,
                       const std::string& cookieName);
-  void OnCookiesEnabled(const GURL& url,
+  void OnCookiesEnabled(int render_frame_id,
+                        const GURL& url,
                         const GURL& first_party_for_cookies,
                         bool* cookies_enabled);
 
@@ -306,8 +306,6 @@ class RenderMessageFilter : public BrowserMessageFilter {
   scoped_refptr<DOMStorageContextWrapper> dom_storage_context_;
 
   int render_process_id_;
-
-  bool is_guest_;
 
   std::set<OpenChannelToNpapiPluginCallback*> plugin_host_clients_;
 

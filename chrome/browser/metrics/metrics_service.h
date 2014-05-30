@@ -32,8 +32,6 @@
 #include "components/metrics/metrics_provider.h"
 #include "components/metrics/metrics_service_observer.h"
 #include "components/variations/active_field_trials.h"
-#include "content/public/browser/browser_child_process_observer.h"
-#include "content/public/browser/user_metrics.h"
 #include "net/url_request/url_fetcher_delegate.h"
 
 class GoogleUpdateMetricsProviderWin;
@@ -46,6 +44,7 @@ namespace base {
 class DictionaryValue;
 class HistogramSamples;
 class MessageLoopProxy;
+class PrefService;
 }
 
 namespace variations {
@@ -91,7 +90,6 @@ struct SyntheticTrialGroup {
 class MetricsService
     : public base::HistogramFlattener,
       public chrome_browser_metrics::TrackingSynchronizerObserver,
-      public content::BrowserChildProcessObserver,
       public net::URLFetcherDelegate {
  public:
   // The execution phase of the browser.
@@ -106,12 +104,13 @@ class MetricsService
     SHUTDOWN_COMPLETE = 700,
   };
 
-  // Creates the MetricsService with the given |state_manager| and |client|.
-  // Does not take ownership of |state_manager| or |client|; instead stores a
-  // weak pointer to each. Caller should ensure that |state_manager| and
-  // |client| are valid for the lifetime of this class.
+  // Creates the MetricsService with the given |state_manager|, |client|, and
+  // |local_state|.  Does not take ownership of the paramaters; instead stores
+  // a weak pointer to each. Caller should ensure that the parameters are valid
+  // for the lifetime of this class.
   MetricsService(metrics::MetricsStateManager* state_manager,
-                 metrics::MetricsServiceClient* client);
+                 metrics::MetricsServiceClient* client,
+                 PrefService* local_state);
   virtual ~MetricsService();
 
   // Initializes metrics recording state. Updates various bookkeeping values in
@@ -171,10 +170,6 @@ class MetricsService
       base::HistogramBase::Inconsistency problem) OVERRIDE;
   virtual void InconsistencyDetectedInLoggedCount(int amount) OVERRIDE;
 
-  // Implementation of content::BrowserChildProcessObserver
-  virtual void BrowserChildProcessCrashed(
-      const content::ChildProcessData& data) OVERRIDE;
-
   // This should be called when the application is not idle, i.e. the user seems
   // to be interacting with the application.
   void OnApplicationNotIdle();
@@ -195,10 +190,11 @@ class MetricsService
   void OnAppEnterForeground();
 #else
   // Set the dirty flag, which will require a later call to LogCleanShutdown().
-  static void LogNeedForCleanShutdown();
+  static void LogNeedForCleanShutdown(PrefService* local_state);
 #endif  // defined(OS_ANDROID) || defined(OS_IOS)
 
-  static void SetExecutionPhase(ExecutionPhase execution_phase);
+  static void SetExecutionPhase(ExecutionPhase execution_phase,
+                                PrefService* local_state);
 
   // Saves in the preferences if the crash report registration was successful.
   // This count is eventually send via UMA logs.
@@ -207,11 +203,6 @@ class MetricsService
   // Saves in the preferences if the browser is running under a debugger.
   // This count is eventually send via UMA logs.
   void RecordBreakpadHasDebugger(bool has_debugger);
-
-#if defined(OS_CHROMEOS)
-  // Records a Chrome OS crash.
-  void LogChromeOSCrash(const std::string &crash_type);
-#endif
 
   bool recording_active() const;
   bool reporting_active() const;
@@ -431,6 +422,8 @@ class MetricsService
   // Registered metrics providers.
   ScopedVector<metrics::MetricsProvider> metrics_providers_;
 
+  PrefService* local_state_;
+
   base::ActionCallback action_callback_;
 
   // Indicate whether recording and reporting are currently happening.
@@ -479,13 +472,6 @@ class MetricsService
   // A number that identifies the how many times the app has been launched.
   int session_id_;
 
-  // Maps WebContentses (corresponding to tabs) or Browsers (corresponding to
-  // Windows) to a unique integer that we will use to identify them.
-  // |next_window_id_| is used to track which IDs we have used so far.
-  typedef std::map<uintptr_t, int> WindowMap;
-  WindowMap window_map_;
-  int next_window_id_;
-
   // Weak pointers factory used to post task on different threads. All weak
   // pointers managed by this factory have the same lifetime as MetricsService.
   base::WeakPtrFactory<MetricsService> self_ptr_factory_;
@@ -522,7 +508,7 @@ class MetricsService
   // Confirms single-threaded access to |observers_| in debug builds.
   base::ThreadChecker thread_checker_;
 
-  friend class ChromeMetricsServiceAccessor;
+  friend class MetricsServiceAccessor;
 
   FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, IsPluginProcess);
   FRIEND_TEST_ALL_PREFIXES(MetricsServiceTest, MetricsServiceObserver);

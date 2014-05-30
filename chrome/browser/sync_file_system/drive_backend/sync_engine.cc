@@ -134,7 +134,8 @@ void DidRegisterOrigin(const base::TimeTicks& start_time,
 }  // namespace
 
 scoped_ptr<SyncEngine> SyncEngine::CreateForBrowserContext(
-    content::BrowserContext* context) {
+    content::BrowserContext* context,
+    TaskLogger* task_logger) {
   scoped_refptr<base::SequencedWorkerPool> worker_pool(
       content::BrowserThread::GetBlockingPool());
   scoped_refptr<base::SequencedTaskRunner> drive_task_runner(
@@ -184,6 +185,7 @@ scoped_ptr<SyncEngine> SyncEngine::CreateForBrowserContext(
                      extension_service,
                      signin_manager));
   sync_engine->Initialize(GetSyncFileSystemDir(context->GetPath()),
+                          task_logger,
                           file_task_runner.get(),
                           NULL);
 
@@ -205,31 +207,36 @@ SyncEngine::~SyncEngine() {
   if (notification_manager_)
     notification_manager_->RemoveObserver(this);
 
-  // TODO(tzik): Destroy |sync_worker_| and |worker_observer_| on the worker.
+  WorkerObserver* worker_observer = worker_observer_.release();
+  if (!worker_task_runner_->DeleteSoon(FROM_HERE, worker_observer))
+    delete worker_observer;
+
+  SyncWorker* sync_worker = sync_worker_.release();
+  if (!worker_task_runner_->DeleteSoon(FROM_HERE, sync_worker))
+    delete sync_worker;
 }
 
 void SyncEngine::Initialize(const base::FilePath& base_dir,
+                            TaskLogger* task_logger,
                             base::SequencedTaskRunner* file_task_runner,
                             leveldb::Env* env_override) {
   // DriveServiceWrapper and DriveServiceOnWorker relay communications
   // between DriveService and syncers in SyncWorker.
-  scoped_ptr<drive::DriveServiceInterface>
-      drive_service_on_worker(
-          new DriveServiceOnWorker(drive_service_wrapper_->AsWeakPtr(),
-                                   base::MessageLoopProxy::current(),
-                                   worker_task_runner_));
-  scoped_ptr<drive::DriveUploaderInterface>
-      drive_uploader_on_worker(
-          new DriveUploaderOnWorker(drive_uploader_wrapper_->AsWeakPtr(),
-                                    base::MessageLoopProxy::current(),
-                                    worker_task_runner_));
-  scoped_ptr<SyncEngineContext>
-      sync_engine_context(
-          new SyncEngineContext(drive_service_on_worker.Pass(),
-                                drive_uploader_on_worker.Pass(),
+  scoped_ptr<drive::DriveServiceInterface> drive_service_on_worker(
+      new DriveServiceOnWorker(drive_service_wrapper_->AsWeakPtr(),
+                               base::MessageLoopProxy::current(),
+                               worker_task_runner_));
+  scoped_ptr<drive::DriveUploaderInterface> drive_uploader_on_worker(
+      new DriveUploaderOnWorker(drive_uploader_wrapper_->AsWeakPtr(),
                                 base::MessageLoopProxy::current(),
-                                worker_task_runner_,
-                                file_task_runner));
+                                worker_task_runner_));
+  scoped_ptr<SyncEngineContext> sync_engine_context(
+      new SyncEngineContext(drive_service_on_worker.Pass(),
+                            drive_uploader_on_worker.Pass(),
+                            task_logger,
+                            base::MessageLoopProxy::current(),
+                            worker_task_runner_,
+                            file_task_runner));
 
   worker_observer_.reset(
       new WorkerObserver(base::MessageLoopProxy::current(),
@@ -239,13 +246,16 @@ void SyncEngine::Initialize(const base::FilePath& base_dir,
   if (extension_service_)
     extension_service_weak_ptr = extension_service_->AsWeakPtr();
 
-  // TODO(peria): Use PostTask on |worker_task_runner_| to call this function.
-  sync_worker_ = SyncWorker::CreateOnWorker(
+  sync_worker_.reset(new SyncWorker(
       base_dir,
-      worker_observer_.get(),
       extension_service_weak_ptr,
       sync_engine_context.Pass(),
-      env_override);
+      env_override));
+  sync_worker_->AddObserver(worker_observer_.get());
+  worker_task_runner_->PostTask(
+      FROM_HERE,
+      base::Bind(&SyncWorker::Initialize,
+                 base::Unretained(sync_worker_.get())));
 
   if (notification_manager_)
     notification_manager_->AddObserver(this);

@@ -28,7 +28,7 @@
 #include "content/public/common/ssl_status.h"
 #include "content/public/common/url_constants.h"
 #include "content/public/renderer/render_view.h"
-#include "grit/component_strings.h"
+#include "grit/components_strings.h"
 #include "net/cert/cert_status_flags.h"
 #include "third_party/WebKit/public/platform/WebRect.h"
 #include "third_party/WebKit/public/platform/WebURLRequest.h"
@@ -254,8 +254,11 @@ void AutofillAgent::DidChangeScrollOffset(WebLocalFrame*) {
 void AutofillAgent::didRequestAutocomplete(
     const WebFormElement& form,
     const blink::WebAutocompleteParams& details) {
-  // TODO(estade): honor |details|.
+  didRequestAutocomplete(form);
+}
 
+void AutofillAgent::didRequestAutocomplete(
+    const WebFormElement& form) {
   // Disallow the dialog over non-https or broken https, except when the
   // ignore SSL flag is passed. See http://crbug.com/272512.
   // TODO(palmer): this should be moved to the browser process after frames

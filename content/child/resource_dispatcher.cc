@@ -32,7 +32,6 @@
 #include "webkit/common/resource_type.h"
 
 using webkit_glue::ResourceLoaderBridge;
-using webkit_glue::ResourceResponseInfo;
 
 namespace content {
 
@@ -84,8 +83,6 @@ class IPCResourceLoaderBridge : public ResourceLoaderBridge {
   virtual void SyncLoad(SyncLoadResponse* response) OVERRIDE;
 
  private:
-  RequestPeer* peer_;
-
   // The resource dispatcher for this loader.  The bridge doesn't own it, but
   // it's guaranteed to outlive the bridge.
   ResourceDispatcher* dispatcher_;
@@ -109,8 +106,7 @@ class IPCResourceLoaderBridge : public ResourceLoaderBridge {
 IPCResourceLoaderBridge::IPCResourceLoaderBridge(
     ResourceDispatcher* dispatcher,
     const RequestInfo& request_info)
-    : peer_(NULL),
-      dispatcher_(dispatcher),
+    : dispatcher_(dispatcher),
       request_id_(-1),
       routing_id_(request_info.routing_id),
       is_synchronous_request_(false) {
@@ -177,10 +173,8 @@ bool IPCResourceLoaderBridge::Start(RequestPeer* peer) {
     return false;
   }
 
-  peer_ = peer;
-
   // generate the request ID, and append it to the message
-  request_id_ = dispatcher_->AddPendingRequest(peer_,
+  request_id_ = dispatcher_->AddPendingRequest(peer,
                                                request_.resource_type,
                                                request_.origin_pid,
                                                frame_origin_,
@@ -593,8 +587,10 @@ void ResourceDispatcher::CancelPendingRequest(int request_id) {
     return;
   }
 
-  // |request_id| will be removed from |pending_requests_| when
-  // OnRequestComplete returns with ERR_ABORTED.
+  PendingRequestInfo& request_info = it->second;
+  ReleaseResourcesInMessageQueue(&request_info.deferred_message_queue);
+  pending_requests_.erase(it);
+
   message_sender()->Send(new ResourceHostMsg_CancelRequest(request_id));
 }
 

@@ -26,6 +26,10 @@
 #include "third_party/WebKit/public/web/WebHistoryCommitType.h"
 #include "ui/gfx/range/range.h"
 
+#if defined(OS_ANDROID)
+#include "content/renderer/media/android/renderer_media_player_manager.h"
+#endif
+
 class TransportDIB;
 struct FrameMsg_BuffersSwapped_Params;
 struct FrameMsg_CompositorFrameSwapped_Params;
@@ -54,7 +58,7 @@ class Rect;
 namespace content {
 
 class ChildFrameCompositingHelper;
-class MediaStreamClient;
+class MediaStreamRendererFactory;
 class NotificationProvider;
 class PepperPluginInstanceImpl;
 class RendererPpapiHost;
@@ -63,6 +67,11 @@ class RenderViewImpl;
 class RenderWidget;
 class RenderWidgetFullscreenPepper;
 struct CustomContextMenuContext;
+
+#if defined(OS_ANDROID)
+class RendererCdmManager;
+class RendererMediaPlayerManager;
+#endif
 
 class CONTENT_EXPORT RenderFrameImpl
     : public RenderFrame,
@@ -122,6 +131,10 @@ class CONTENT_EXPORT RenderFrameImpl
 
   // Notification from RenderView.
   virtual void OnStop();
+
+  // Notifications from RenderWidget.
+  void WasHidden();
+  void WasShown();
 
   // Start/Stop loading notifications.
   // TODO(nasko): Those are page-level methods at this time and come from
@@ -187,10 +200,6 @@ class CONTENT_EXPORT RenderFrameImpl
     const gfx::Range& replacement_range,
     bool keep_selection);
 #endif  // ENABLE_PLUGINS
-
-  // Overrides the MediaStreamClient used when creating MediaStream players.
-  // Must be called before any players are created.
-  void SetMediaStreamClientForTesting(MediaStreamClient* media_stream_client);
 
   // IPC::Sender
   virtual bool Send(IPC::Message* msg) OVERRIDE;
@@ -396,7 +405,7 @@ class CONTENT_EXPORT RenderFrameImpl
   friend class RenderFrameObserver;
   FRIEND_TEST_ALL_PREFIXES(RendererAccessibilityTest,
                            AccessibilityMessagesQueueWhileSwappedOut);
-    FRIEND_TEST_ALL_PREFIXES(RenderFrameImplTest,
+  FRIEND_TEST_ALL_PREFIXES(RenderFrameImplTest,
                            ShouldUpdateSelectionTextFromContextMenuParams);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest,
                            OnExtendSelectionAndDelete);
@@ -511,19 +520,26 @@ class CONTENT_EXPORT RenderFrameImpl
                                const blink::WebURLError& error,
                                bool replace);
 
-  // Initializes |media_stream_client_|, returning true if successful. Returns
+  // Initializes |web_user_media_client_|, returning true if successful. Returns
   // false if it wasn't possible to create a MediaStreamClient (e.g., WebRTC is
-  // disabled) in which case |media_stream_client_| is NULL.
-  bool InitializeMediaStreamClient();
+  // disabled) in which case |web_user_media_client_| is NULL.
+  bool InitializeUserMediaClient();
 
   blink::WebMediaPlayer* CreateWebMediaPlayerForMediaStream(
       const blink::WebURL& url,
       blink::WebMediaPlayerClient* client);
 
+  // Creates a factory object used for creating audio and video renderers.
+  // The method is virtual so that layouttests can override it.
+  virtual scoped_ptr<MediaStreamRendererFactory> CreateRendererFactory();
+
 #if defined(OS_ANDROID)
- blink::WebMediaPlayer* CreateAndroidWebMediaPlayer(
+  blink::WebMediaPlayer* CreateAndroidWebMediaPlayer(
       const blink::WebURL& url,
       blink::WebMediaPlayerClient* client);
+
+  RendererMediaPlayerManager* GetMediaPlayerManager();
+  RendererCdmManager* GetCdmManager();
 #endif
 
   // Stores the WebLocalFrame we are associated with.
@@ -589,9 +605,15 @@ class CONTENT_EXPORT RenderFrameImpl
   // Holds a reference to the service which provides desktop notifications.
   NotificationProvider* notification_provider_;
 
-  // MediaStreamClient attached to this frame; lazily initialized.
-  MediaStreamClient* media_stream_client_;
   blink::WebUserMediaClient* web_user_media_client_;
+
+#if defined(OS_ANDROID)
+  // These manage all media players and CDMs in this render frame for
+  // communicating with the real media player and CDM objects in the browser
+  // process. It's okay to use raw pointers since they are RenderFrameObservers.
+  RendererMediaPlayerManager* media_player_manager_;
+  RendererCdmManager* cdm_manager_;
+#endif
 
   base::WeakPtrFactory<RenderFrameImpl> weak_factory_;
 

@@ -60,6 +60,7 @@
 #include "content/renderer/media/audio_renderer_mixer_manager.h"
 #include "content/renderer/media/media_stream_dispatcher.h"
 #include "content/renderer/media/media_stream_impl.h"
+#include "content/renderer/media/media_stream_renderer_factory.h"
 #include "content/renderer/media/render_media_log.h"
 #include "content/renderer/media/webcontentdecryptionmodule_impl.h"
 #include "content/renderer/media/webmediaplayer_impl.h"
@@ -91,6 +92,7 @@
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebGlyphCache.h"
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
+#include "third_party/WebKit/public/web/WebMediaStreamRegistry.h"
 #include "third_party/WebKit/public/web/WebNavigationPolicy.h"
 #include "third_party/WebKit/public/web/WebPlugin.h"
 #include "third_party/WebKit/public/web/WebPluginParams.h"
@@ -120,8 +122,10 @@
 
 #include "content/common/gpu/client/context_provider_command_buffer.h"
 #include "content/renderer/android/synchronous_compositor_factory.h"
+#include "content/renderer/media/android/renderer_media_player_manager.h"
 #include "content/renderer/media/android/stream_texture_factory_impl.h"
 #include "content/renderer/media/android/webmediaplayer_android.h"
+#include "content/renderer/media/crypto/renderer_cdm_manager.h"
 #endif
 
 using blink::WebContextMenuData;
@@ -402,14 +406,19 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
       selection_range_(gfx::Range::InvalidRange()),
       handling_select_range_(false),
       notification_provider_(NULL),
-      media_stream_client_(NULL),
       web_user_media_client_(NULL),
+#if defined(OS_ANDROID)
+      media_player_manager_(NULL),
+      cdm_manager_(NULL),
+#endif
       weak_factory_(this) {
   RenderThread::Get()->AddRoute(routing_id_, this);
 
   std::pair<RoutingIDFrameMap::iterator, bool> result =
       g_routing_id_frame_map.Get().insert(std::make_pair(routing_id_, this));
   CHECK(result.second) << "Inserting a duplicate item.";
+
+  render_view_->RegisterRenderFrame(this);
 
 #if defined(OS_ANDROID)
   new JavaBridgeDispatcher(this);
@@ -423,6 +432,13 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
 RenderFrameImpl::~RenderFrameImpl() {
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, RenderFrameGone());
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, OnDestruct());
+
+#if defined(VIDEO_HOLE)
+  if (media_player_manager_)
+    render_view_->UnregisterVideoHoleFrame(this);
+#endif  // defined(VIDEO_HOLE)
+
+  render_view_->UnregisterRenderFrame(this);
   g_routing_id_frame_map.Get().erase(routing_id_);
   RenderThread::Get()->RemoveRoute(routing_id_);
 }
@@ -634,13 +650,6 @@ void RenderFrameImpl::OnImeConfirmComposition(
 }
 
 #endif  // ENABLE_PLUGINS
-
-void RenderFrameImpl::SetMediaStreamClientForTesting(
-    MediaStreamClient* media_stream_client) {
-  DCHECK(!media_stream_client_);
-  DCHECK(!web_user_media_client_);
-  media_stream_client_ = media_stream_client;
-}
 
 bool RenderFrameImpl::Send(IPC::Message* message) {
   if (is_detaching_) {
@@ -1251,6 +1260,8 @@ void RenderFrameImpl::LoadNavigationErrorPage(
 void RenderFrameImpl::DidCommitCompositorFrame() {
   if (compositing_helper_)
     compositing_helper_->DidCommitCompositorFrame();
+  FOR_EACH_OBSERVER(
+      RenderFrameObserver, observers_, DidCommitCompositorFrame());
 }
 
 RenderView* RenderFrameImpl::GetRenderView() {
@@ -1375,9 +1386,10 @@ blink::WebMediaPlayer* RenderFrameImpl::createMediaPlayer(
     blink::WebLocalFrame* frame,
     const blink::WebURL& url,
     blink::WebMediaPlayerClient* client) {
-  WebMediaPlayer* player = CreateWebMediaPlayerForMediaStream(url, client);
-  if (player)
-    return player;
+  blink::WebMediaStream web_stream(
+      blink::WebMediaStreamRegistry::lookupMediaStreamDescriptor(url));
+  if (!web_stream.isNull())
+    return CreateWebMediaPlayerForMediaStream(url, client);
 
 #if defined(OS_ANDROID)
   return CreateAndroidWebMediaPlayer(url, client);
@@ -1400,7 +1412,13 @@ RenderFrameImpl::createContentDecryptionModule(
     const blink::WebString& key_system) {
   DCHECK(!frame_ || frame_ == frame);
   return WebContentDecryptionModuleImpl::Create(
-      frame, security_origin, key_system);
+#if defined(ENABLE_PEPPER_CDMS)
+      frame,
+#elif defined(OS_ANDROID)
+      GetCdmManager(),
+#endif
+      security_origin,
+      key_system);
 }
 
 blink::WebApplicationCacheHost* RenderFrameImpl::createApplicationCacheHost(
@@ -2733,7 +2751,7 @@ void RenderFrameImpl::willStartUsingPeerConnectionHandler(
 
 blink::WebUserMediaClient* RenderFrameImpl::userMediaClient() {
   // This can happen in tests, in which case it's OK to return NULL.
-  if (!InitializeMediaStreamClient())
+  if (!InitializeUserMediaClient())
     return NULL;
 
   return web_user_media_client_;
@@ -2880,6 +2898,14 @@ void RenderFrameImpl::RemoveObserver(RenderFrameObserver* observer) {
 
 void RenderFrameImpl::OnStop() {
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, OnStop());
+}
+
+void RenderFrameImpl::WasHidden() {
+  FOR_EACH_OBSERVER(RenderFrameObserver, observers_, WasHidden());
+}
+
+void RenderFrameImpl::WasShown() {
+  FOR_EACH_OBSERVER(RenderFrameObserver, observers_, WasShown());
 }
 
 // Tell the embedding application that the URL of the active page has changed.
@@ -3222,14 +3248,14 @@ WebNavigationPolicy RenderFrameImpl::DecidePolicyForNavigation(
         (frame->isViewSourceModeEnabled() &&
             type != blink::WebNavigationTypeReload);
 
-    if (!should_fork && url.SchemeIs(kFileScheme)) {
+    if (!should_fork && url.SchemeIs(url::kFileScheme)) {
       // Fork non-file to file opens.  Check the opener URL if this is the
       // initial navigation in a newly opened window.
       GURL source_url(old_url);
       if (is_initial_navigation && source_url.is_empty() && frame->opener())
         source_url = frame->opener()->top()->document().url();
       DCHECK(!source_url.is_empty());
-      should_fork = !source_url.SchemeIs(kFileScheme);
+      should_fork = !source_url.SchemeIs(url::kFileScheme);
     }
 
     if (!should_fork) {
@@ -3397,8 +3423,8 @@ void RenderFrameImpl::SyncSelectionIfRequired() {
   GetRenderWidget()->UpdateSelectionBounds();
 }
 
-bool RenderFrameImpl::InitializeMediaStreamClient() {
-  if (media_stream_client_)
+bool RenderFrameImpl::InitializeUserMediaClient() {
+  if (web_user_media_client_)
     return true;
 
   if (!RenderThreadImpl::current())  // Will be NULL during unit tests.
@@ -3419,7 +3445,6 @@ bool RenderFrameImpl::InitializeMediaStreamClient() {
       render_view_.get(),
       render_view_->media_stream_dispatcher_,
       RenderThreadImpl::current()->GetPeerConnectionDependencyFactory());
-  media_stream_client_ = media_stream_impl;
   web_user_media_client_ = media_stream_impl;
   return true;
 #else
@@ -3431,21 +3456,28 @@ WebMediaPlayer* RenderFrameImpl::CreateWebMediaPlayerForMediaStream(
     const blink::WebURL& url,
     WebMediaPlayerClient* client) {
 #if defined(ENABLE_WEBRTC)
-  if (!InitializeMediaStreamClient()) {
-    LOG(ERROR) << "Failed to initialize MediaStreamClient";
-    return NULL;
-  }
-  if (media_stream_client_->IsMediaStream(url)) {
 #if defined(OS_ANDROID) && defined(ARCH_CPU_ARMEL)
-    bool found_neon =
-        (android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON) != 0;
-    UMA_HISTOGRAM_BOOLEAN("Platform.WebRtcNEONFound", found_neon);
+  bool found_neon =
+      (android_getCpuFeatures() & ANDROID_CPU_ARM_FEATURE_NEON) != 0;
+  UMA_HISTOGRAM_BOOLEAN("Platform.WebRtcNEONFound", found_neon);
 #endif  // defined(OS_ANDROID) && defined(ARCH_CPU_ARMEL)
-    return new WebMediaPlayerMS(frame_, client, weak_factory_.GetWeakPtr(),
-                                media_stream_client_, new RenderMediaLog());
-  }
-#endif  // defined(ENABLE_WEBRTC)
+  return new WebMediaPlayerMS(frame_, client, weak_factory_.GetWeakPtr(),
+                              new RenderMediaLog(),
+                              CreateRendererFactory());
+#else
   return NULL;
+#endif  // defined(ENABLE_WEBRTC)
+}
+
+scoped_ptr<MediaStreamRendererFactory>
+RenderFrameImpl::CreateRendererFactory() {
+#if defined(ENABLE_WEBRTC)
+  return scoped_ptr<MediaStreamRendererFactory>(
+      new MediaStreamRendererFactory());
+#else
+  return scoped_ptr<MediaStreamRendererFactory>(
+      static_cast<MediaStreamRendererFactory*>(NULL));
+#endif
 }
 
 #if defined(OS_ANDROID)
@@ -3477,19 +3509,36 @@ WebMediaPlayer* RenderFrameImpl::CreateAndroidWebMediaPlayer(
     }
 
     stream_texture_factory = StreamTextureFactoryImpl::Create(
-        context_provider, gpu_channel_host, render_view_->routing_id_);
+        context_provider, gpu_channel_host, routing_id_);
   }
 
   return new WebMediaPlayerAndroid(
       frame_,
       client,
       weak_factory_.GetWeakPtr(),
-      render_view_->media_player_manager_,
+      GetMediaPlayerManager(),
+      GetCdmManager(),
       stream_texture_factory,
       RenderThreadImpl::current()->GetMediaThreadMessageLoopProxy(),
       new RenderMediaLog());
 }
 
-#endif
+RendererMediaPlayerManager* RenderFrameImpl::GetMediaPlayerManager() {
+  if (!media_player_manager_) {
+    media_player_manager_ = new RendererMediaPlayerManager(this);
+#if defined(VIDEO_HOLE)
+    render_view_->RegisterVideoHoleFrame(this);
+#endif  // defined(VIDEO_HOLE)
+  }
+  return media_player_manager_;
+}
+
+RendererCdmManager* RenderFrameImpl::GetCdmManager() {
+  if (!cdm_manager_)
+    cdm_manager_ = new RendererCdmManager(this);
+  return cdm_manager_;
+}
+
+#endif  // defined(OS_ANDROID)
 
 }  // namespace content

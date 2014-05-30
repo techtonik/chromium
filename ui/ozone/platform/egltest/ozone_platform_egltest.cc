@@ -20,6 +20,7 @@
 
 #if defined(OS_CHROMEOS)
 #include "ui/ozone/common/chromeos/native_display_delegate_ozone.h"
+#include "ui/ozone/common/chromeos/touchscreen_device_manager_ozone.h"
 #endif
 
 #include <EGL/egl.h>
@@ -58,6 +59,8 @@ class SurfaceOzoneEgltest : public gfx::SurfaceOzoneEGL {
   }
 
   virtual intptr_t GetNativeWindow() OVERRIDE { return native_window_; }
+
+  virtual bool OnSwapBuffers() OVERRIDE { return true; }
 
   virtual bool ResizeNativeWindow(const gfx::Size& viewport_size) OVERRIDE {
     return true;
@@ -247,6 +250,11 @@ class OzonePlatformEgltest : public OzonePlatform {
   virtual scoped_ptr<NativeDisplayDelegate> CreateNativeDisplayDelegate()
       OVERRIDE {
     return scoped_ptr<NativeDisplayDelegate>(new NativeDisplayDelegateOzone());
+  }
+  virtual scoped_ptr<TouchscreenDeviceManager>
+      CreateTouchscreenDeviceManager() OVERRIDE {
+    return scoped_ptr<TouchscreenDeviceManager>(
+        new TouchscreenDeviceManagerOzone());
   }
 #endif
 

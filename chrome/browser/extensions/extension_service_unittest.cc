@@ -45,6 +45,7 @@
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_special_storage_policy.h"
 #include "chrome/browser/extensions/extension_sync_data.h"
+#include "chrome/browser/extensions/extension_sync_service.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/extensions/external_install_ui.h"
 #include "chrome/browser/extensions/external_policy_loader.h"
@@ -2316,7 +2317,14 @@ TEST_F(ExtensionServiceTest, PackExtensionOpenSSLKey) {
   InstallCRX(crx_path, INSTALL_NEW);
 }
 
-TEST_F(ExtensionServiceTest, InstallTheme) {
+#if defined(THREAD_SANITIZER)
+// Flaky under Tsan. http://crbug.com/377702
+#define MAYBE_InstallTheme DISABLED_InstallTheme
+#else
+#define MAYBE_InstallTheme InstallTheme
+#endif
+
+TEST_F(ExtensionServiceTest, MAYBE_InstallTheme) {
   InitializeEmptyExtensionService();
   service_->Init();
 
@@ -2620,7 +2628,6 @@ TEST_F(ExtensionServiceTest, InstallAppsWithUnlimitedStorage) {
   EXPECT_EQ(origin1, origin2);
   EXPECT_TRUE(profile_->GetExtensionSpecialStoragePolicy()->
       IsStorageUnlimited(origin2));
-
 
   // Uninstall one of them, unlimited storage should still be granted
   // to the origin.
@@ -3467,24 +3474,30 @@ TEST_F(ExtensionServiceTest, BlacklistedInPrefsFromStartup) {
   test_blacklist.SetBlacklistState(
       good1, extensions::BLACKLISTED_MALWARE, false);
 
+  // Extension service hasn't loaded yet, but IsExtensionEnabled reads out of
+  // prefs. Ensure it takes into account the blacklist state (crbug.com/373842).
+  EXPECT_FALSE(service_->IsExtensionEnabled(good0));
+  EXPECT_FALSE(service_->IsExtensionEnabled(good1));
+  EXPECT_TRUE(service_->IsExtensionEnabled(good2));
+
   service_->Init();
 
-  ASSERT_EQ(2u, registry_->blacklisted_extensions().size());
-  ASSERT_EQ(1u, registry_->enabled_extensions().size());
+  EXPECT_EQ(2u, registry_->blacklisted_extensions().size());
+  EXPECT_EQ(1u, registry_->enabled_extensions().size());
 
-  ASSERT_TRUE(registry_->blacklisted_extensions().Contains(good0));
-  ASSERT_TRUE(registry_->blacklisted_extensions().Contains(good1));
-  ASSERT_TRUE(registry_->enabled_extensions().Contains(good2));
+  EXPECT_TRUE(registry_->blacklisted_extensions().Contains(good0));
+  EXPECT_TRUE(registry_->blacklisted_extensions().Contains(good1));
+  EXPECT_TRUE(registry_->enabled_extensions().Contains(good2));
 
   // Give time for the blacklist to update.
   base::RunLoop().RunUntilIdle();
 
-  ASSERT_EQ(1u, registry_->blacklisted_extensions().size());
-  ASSERT_EQ(2u, registry_->enabled_extensions().size());
+  EXPECT_EQ(1u, registry_->blacklisted_extensions().size());
+  EXPECT_EQ(2u, registry_->enabled_extensions().size());
 
-  ASSERT_TRUE(registry_->enabled_extensions().Contains(good0));
-  ASSERT_TRUE(registry_->blacklisted_extensions().Contains(good1));
-  ASSERT_TRUE(registry_->enabled_extensions().Contains(good2));
+  EXPECT_TRUE(registry_->enabled_extensions().Contains(good0));
+  EXPECT_TRUE(registry_->blacklisted_extensions().Contains(good1));
+  EXPECT_TRUE(registry_->enabled_extensions().Contains(good2));
 }
 #endif  // defined(ENABLE_BLACKLIST_TESTS)
 

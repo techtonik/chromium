@@ -2,12 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(brettw) this file is a work in progress, it is not currently hooked up
-# to the build, but currently represents the state of content/common's deps.
-
 import("//build/config/features.gni")
 import("//build/config/ui.gni")
 import("//content/common/common.gni")
+import("//mojo/public/tools/bindings/mojom.gni")
 
 source_set("common") {
   # Only targets in the content tree can depend directly on this target.
@@ -17,12 +15,12 @@ source_set("common") {
                         ".", "//content")
 
   forward_dependent_configs_from = [
-    # TODO(GYP) convert these dependencies.
-    #"//third_party/WebKit/public:blink_headers",
+    "//gpu/command_buffer/common",
+    "//third_party/WebKit/public:blink_headers",
   ]
 
   configs += [
-    "//content:blink_headers_stub_config",
+    "//content:content_implementation",
     "//content:libjingle_stub_config",
   ]
 
@@ -39,8 +37,8 @@ source_set("common") {
     "//ui/gfx",
     "//ui/gfx/geometry",
     "//url",
+    "//third_party/WebKit/public:blink_headers",
     # TODO(GYP) convert these dependencies.
-    #"//third_party/WebKit/public:blink_headers",
     #'../third_party/libjingle/libjingle.gyp:libjingle',
     #'../ui/shell_dialogs/shell_dialogs.gyp:shell_dialogs',
   ]
@@ -70,8 +68,8 @@ source_set("common") {
     ]
   }
 
+  defines = []
   include_dirs = []
-  defines = [ "CONTENT_IMPLEMENTATION" ]
   libs = []
   ldflags = []
 
@@ -148,7 +146,7 @@ source_set("common") {
     include_dirs += [ "//third_party/khronos" ]
     configs += [ "//build/config/linux:xcomposite" ]
 
-    if (cpu_arch != "arm" || !is_chromos) {
+    if (cpu_arch != "arm" || !is_chromeos) {
       sources +=[
         "gpu/x_util.cc",
         "gpu/x_util.h",
@@ -237,9 +235,6 @@ source_set("common") {
   if (!is_win || !use_aura) {
     sources -= [ "cursors/webcursor_aurawin.cc" ]
   }
-  if (!use_aura || !use_x11) {
-    sources -= [ "cursors/webcursor_aurax11.cc" ]
-  }
 
   if (use_seccomp_bpf) {
     defines += [ "USE_SECCOMP_BPF" ]
@@ -267,3 +262,8 @@ source_set("common") {
   }
 }
 
+mojom("mojo_bindings") {
+  sources = [
+    "web_ui_setup.mojom",
+  ]
+}
