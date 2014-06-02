@@ -76,7 +76,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFIum
   # and whatever else without interference from each other.
-  "pdfium_revision": "7dc5172decb2e2fa8885561ff473902f6e16c707",
+  "pdfium_revision": "dbd4c06036f42d8dffe033ba112d6d7085dfe475",
 }
 
 deps = {
@@ -324,7 +324,7 @@ deps = {
 deps_os = {
   "win": {
     "src/chrome/tools/test/reference_build/chrome_win":
-      "/trunk/deps/reference_builds/chrome_win@254637",
+      "/trunk/deps/reference_builds/chrome_win@273882",
 
     "src/third_party/cygwin":
       "/trunk/deps/third_party/cygwin@231940",
@@ -438,7 +438,7 @@ deps_os = {
   },
   "mac": {
     "src/chrome/tools/test/reference_build/chrome_mac":
-      "/trunk/deps/reference_builds/chrome_mac@255182",
+      "/trunk/deps/reference_builds/chrome_mac@273882",
 
     "src/third_party/google_toolbox_for_mac/src":
       (Var("googlecode_url") % "google-toolbox-for-mac") + "/trunk@" +
@@ -463,7 +463,7 @@ deps_os = {
   "unix": {
     # Linux, really.
     "src/chrome/tools/test/reference_build/chrome_linux":
-      "/trunk/deps/reference_builds/chrome_linux64@254637",
+      "/trunk/deps/reference_builds/chrome_linux64@273882",
 
     "src/third_party/xdg-utils":
       "/trunk/deps/third_party/xdg-utils@203785",

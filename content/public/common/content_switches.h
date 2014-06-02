@@ -37,7 +37,6 @@ CONTENT_EXPORT extern const char kDisableAcceleratedFixedRootBackground[];
 CONTENT_EXPORT extern const char kDisableAcceleratedOverflowScroll[];
 CONTENT_EXPORT extern const char kDisableLayerSquashing[];
 CONTENT_EXPORT extern const char kDisableAcceleratedVideoDecode[];
-CONTENT_EXPORT extern const char kDisableAltWinstation[];
 CONTENT_EXPORT extern const char kDisableApplicationCache[];
 extern const char kDisableBackingStoreLimit[];
 CONTENT_EXPORT extern const char kDisableCompositingForFixedPosition[];
@@ -52,7 +51,6 @@ CONTENT_EXPORT extern const char kDisableEmbeddedSharedWorker[];
 CONTENT_EXPORT extern const char kDisableExperimentalWebGL[];
 CONTENT_EXPORT extern const char kDisableFastTextAutosizing[];
 CONTENT_EXPORT extern const char kDisableFileSystem[];
-CONTENT_EXPORT extern const char kDisableFiltersOverIPC[];
 CONTENT_EXPORT extern const char kDisableFlash3d[];
 CONTENT_EXPORT extern const char kDisableFlashStage3d[];
 CONTENT_EXPORT extern const char kDisableGestureTapHighlight[];
@@ -265,7 +263,6 @@ CONTENT_EXPORT extern const char kDisableDeviceEnumeration[];
 CONTENT_EXPORT extern const char kDisableWebRtcHWDecoding[];
 CONTENT_EXPORT extern const char kDisableWebRtcEncryption[];
 CONTENT_EXPORT extern const char kDisableWebRtcHWEncoding[];
-extern const char kEnableWebRtcTcpServerSocket[];
 CONTENT_EXPORT extern const char kEnableWebRtcHWVp8Encoding[];
 #endif
 

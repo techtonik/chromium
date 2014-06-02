@@ -948,6 +948,7 @@
         'browser/extensions/extension_function_test_utils.cc',
         'browser/extensions/extension_function_test_utils.h',
         'browser/extensions/extension_garbage_collector_unittest.cc',
+        'browser/extensions/extension_garbage_collector_chromeos_unittest.cc',
         'browser/extensions/extension_gcm_app_handler_unittest.cc',
         'browser/extensions/extension_icon_image_unittest.cc',
         'browser/extensions/extension_icon_manager_unittest.cc',
@@ -1073,6 +1074,8 @@
         'browser/media/native_desktop_media_list_unittest.cc',
         'browser/media/webrtc_log_uploader_unittest.cc',
         'browser/media/webrtc_log_util_unittest.cc',
+        'browser/media/webrtc_rtp_dump_handler_unittest.cc',
+        'browser/media/webrtc_rtp_dump_writer_unittest.cc',
         'browser/media_galleries/fileapi/native_media_file_util_unittest.cc',
         'browser/media_galleries/linux/mtp_device_object_enumerator_unittest.cc',
         'browser/media_galleries/mac/mtp_device_delegate_impl_mac_unittest.mm',
@@ -1336,7 +1339,6 @@
         'browser/sync/glue/non_ui_data_type_controller_mock.h',
         'browser/sync/glue/non_ui_data_type_controller_unittest.cc',
         'browser/sync/glue/search_engine_data_type_controller_unittest.cc',
-        'browser/sync/glue/shared_change_processor_unittest.cc',
         'browser/sync/glue/sync_backend_host_impl_unittest.cc',
         'browser/sync/glue/sync_backend_host_mock.cc',
         'browser/sync/glue/sync_backend_host_mock.h',
@@ -2278,6 +2280,8 @@
           'sources!': [
             'browser/media/webrtc_log_uploader_unittest.cc',
             'browser/media/webrtc_log_util_unittest.cc',
+            'browser/media/webrtc_rtp_dump_handler_unittest.cc',
+            'browser/media/webrtc_rtp_dump_writer_unittest.cc',
             'renderer/media/chrome_webrtc_log_message_delegate_unittest.cc',
           ],
         }],
@@ -2583,6 +2587,10 @@
 
             # URL elider is not used on android.
            'browser/ui/tests/elide_url_unittest.cc',
+
+            # GCMDriverAndroid is not yet implemented.
+            'browser/extensions/extension_gcm_app_handler_unittest.cc',
+            'browser/services/gcm/gcm_profile_service_unittest.cc',
           ],
           'sources/': [
             ['exclude', '^browser/captive_portal/'],

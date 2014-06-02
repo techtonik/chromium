@@ -175,7 +175,7 @@ class WebContents : public PageNavigator,
   virtual const GURL& GetVisibleURL() const = 0;
 
   // Gets the last committed URL. It represents the current page that is
-  // displayed in  this WebContents. It represents the current security
+  // displayed in this WebContents. It represents the current security
   // context.
   virtual const GURL& GetLastCommittedURL() const = 0;
 
@@ -452,9 +452,6 @@ class WebContents : public PageNavigator,
       const base::Callback<void(
           int64 /* size of the file */)>& callback) = 0;
 
-  // Returns true if the active NavigationEntry's page_id equals page_id.
-  virtual bool IsActiveEntry(int32 page_id) = 0;
-
   // Returns the contents MIME type after a navigation.
   virtual const std::string& GetContentsMimeType() const = 0;
 
@@ -494,9 +491,6 @@ class WebContents : public PageNavigator,
   // the getter only useful from within TAB_CLOSED notification
   virtual void SetClosedByUserGesture(bool value) = 0;
   virtual bool GetClosedByUserGesture() const = 0;
-
-  // Gets the zoom level for this tab.
-  virtual double GetZoomLevel() const = 0;
 
   // Gets the zoom percent for this tab.
   virtual int GetZoomPercent(bool* enable_increment,
@@ -564,10 +558,6 @@ class WebContents : public PageNavigator,
   // TODO: this doesn't really belong here. With site isolation, this should be
   // removed since we can then embed iframes in different processes.
   virtual bool IsSubframe() const = 0;
-
-  // Sets the zoom level for the current page and all BrowserPluginGuests
-  // within the page.
-  virtual void SetZoomLevel(double level) = 0;
 
   // Finds text on a page.
   virtual void Find(int request_id,

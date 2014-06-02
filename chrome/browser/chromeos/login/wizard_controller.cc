@@ -26,7 +26,7 @@
 #include "chrome/browser/chromeos/app_mode/kiosk_app_manager.h"
 #include "chrome/browser/chromeos/customization_document.h"
 #include "chrome/browser/chromeos/geolocation/simple_geolocation_provider.h"
-#include "chrome/browser/chromeos/login/enrollment/auto_enrollment_check_step.h"
+#include "chrome/browser/chromeos/login/enrollment/auto_enrollment_check_screen.h"
 #include "chrome/browser/chromeos/login/enrollment/enrollment_screen.h"
 #include "chrome/browser/chromeos/login/existing_user_controller.h"
 #include "chrome/browser/chromeos/login/helper.h"
@@ -125,6 +125,8 @@ const char WizardController::kKioskEnableScreenName[] = "kiosk-enable";
 const char WizardController::kKioskAutolaunchScreenName[] = "autolaunch";
 const char WizardController::kErrorScreenName[] = "error-message";
 const char WizardController::kTermsOfServiceScreenName[] = "tos";
+const char WizardController::kAutoEnrollmentCheckScreenName[] =
+  "auto-enrollment-check";
 const char WizardController::kWrongHWIDScreenName[] = "wrong-hwid";
 const char WizardController::kLocallyManagedUserCreationScreenName[] =
   "locally-managed-user-creation-flow";
@@ -169,7 +171,6 @@ WizardController::WizardController(chromeos::LoginDisplayHost* host,
       host_(host),
       oobe_display_(oobe_display),
       usage_statistics_reporting_(true),
-      skip_update_enroll_after_eula_(false),
       login_screen_started_(false),
       user_image_screen_return_to_previous_hack_(false),
       timezone_resolved_(false),
@@ -327,6 +328,17 @@ chromeos::WrongHWIDScreen* WizardController::GetWrongHWIDScreen() {
   return wrong_hwid_screen_.get();
 }
 
+chromeos::AutoEnrollmentCheckScreen*
+    WizardController::GetAutoEnrollmentCheckScreen() {
+  if (!auto_enrollment_check_screen_.get()) {
+    auto_enrollment_check_screen_.reset(
+        new chromeos::AutoEnrollmentCheckScreen(
+            this,
+            oobe_display_->GetAutoEnrollmentCheckScreenActor()));
+  }
+  return auto_enrollment_check_screen_.get();
+}
+
 chromeos::LocallyManagedUserCreationScreen*
     WizardController::GetLocallyManagedUserCreationScreen() {
   if (!locally_managed_user_creation_screen_.get()) {
@@ -482,6 +494,14 @@ void WizardController::ShowWrongHWIDScreen() {
   SetCurrentScreen(GetWrongHWIDScreen());
 }
 
+void WizardController::ShowAutoEnrollmentCheckScreen() {
+  VLOG(1) << "Showing Auto-enrollment check screen.";
+  SetStatusAreaVisible(true);
+  AutoEnrollmentCheckScreen* screen = GetAutoEnrollmentCheckScreen();
+  screen->set_auto_enrollment_controller(host_->GetAutoEnrollmentController());
+  SetCurrentScreen(screen);
+}
+
 void WizardController::ShowLocallyManagedUserCreationScreen() {
   VLOG(1) << "Showing Locally managed user creation screen screen.";
   SetStatusAreaVisible(true);
@@ -514,10 +534,6 @@ void WizardController::RemoveObserver(Observer* observer) {
 
 void WizardController::OnSessionStart() {
   FOR_EACH_OBSERVER(Observer, observer_list_, OnSessionStart());
-}
-
-void WizardController::SkipUpdateEnrollAfterEula() {
-  skip_update_enroll_after_eula_ = true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -554,7 +570,7 @@ void WizardController::OnConnectionFailed() {
 }
 
 void WizardController::OnUpdateCompleted() {
-  StartAutoEnrollmentCheck();
+  ShowAutoEnrollmentCheckScreen();
 }
 
 void WizardController::OnEulaAccepted() {
@@ -572,13 +588,7 @@ void WizardController::OnEulaAccepted() {
 #endif
   }
 
-  if (skip_update_enroll_after_eula_) {
-    PerformPostEulaActions();
-    PerformOOBECompletedActions();
-    ShowEnrollmentScreen();
-  } else {
-    InitiateOOBEUpdate();
-  }
+  InitiateOOBEUpdate();
 }
 
 void WizardController::OnUpdateErrorCheckingForUpdate() {
@@ -674,7 +684,6 @@ void WizardController::OnAutoEnrollmentDone() {
 }
 
 void WizardController::OnOOBECompleted() {
-  auto_enrollment_check_step_.reset();
   if (ShouldAutoStartEnrollment()) {
     ShowEnrollmentScreen();
   } else {
@@ -812,6 +821,8 @@ void WizardController::AdvanceToScreen(const std::string& screen_name) {
     ShowTermsOfServiceScreen();
   } else if (screen_name == kWrongHWIDScreenName) {
     ShowWrongHWIDScreen();
+  } else if (screen_name == kAutoEnrollmentCheckScreenName) {
+    ShowAutoEnrollmentCheckScreen();
   } else if (screen_name == kLocallyManagedUserCreationScreenName) {
     ShowLocallyManagedUserCreationScreen();
   } else if (screen_name == kAppLaunchSplashScreenName) {
@@ -1006,12 +1017,6 @@ void WizardController::OnLocalStateInitialized(bool /* succeeded */) {
   GetErrorScreen()->SetUIState(ErrorScreen::UI_STATE_LOCAL_STATE_ERROR);
   SetStatusAreaVisible(false);
   ShowErrorScreen();
-}
-
-void WizardController::StartAutoEnrollmentCheck() {
-  auto_enrollment_check_step_.reset(
-      new AutoEnrollmentCheckStep(this, host_->GetAutoEnrollmentController()));
-  auto_enrollment_check_step_->Start();
 }
 
 PrefService* WizardController::GetLocalState() {

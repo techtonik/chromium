@@ -106,10 +106,6 @@ class CONTENT_EXPORT BrowserPluginGuest : public WebContentsObserver {
   // the mouse has been successfully locked.
   bool LockMouse(bool allowed);
 
-  // Called when the embedder WebContents is destroyed to give the
-  // BrowserPluginGuest an opportunity to clean up after itself.
-  void EmbedderDestroyed();
-
   // Called when the embedder WebContents changes visibility.
   void EmbedderVisibilityChanged(bool visible);
 
@@ -199,8 +195,10 @@ class CONTENT_EXPORT BrowserPluginGuest : public WebContentsObserver {
   // Called when the drag started by this guest ends at an OS-level.
   void EndSystemDrag();
 
-  // |this| takes ownership of |delegate|.
-  void SetDelegate(BrowserPluginGuestDelegate* delegate);
+  void set_delegate(BrowserPluginGuestDelegate* delegate) {
+    DCHECK(!delegate_);
+    delegate_ = delegate;
+  }
 
   void RespondToPermissionRequest(int request_id,
                                   bool should_allow,
@@ -211,8 +209,6 @@ class CONTENT_EXPORT BrowserPluginGuest : public WebContentsObserver {
   static void set_factory_for_testing(BrowserPluginHostFactory* factory) {
     BrowserPluginGuest::factory_ = factory;
   }
-
-  void SetZoom(double zoom_factor);
 
   void PointerLockPermissionResponse(bool allow);
 
@@ -226,7 +222,7 @@ class CONTENT_EXPORT BrowserPluginGuest : public WebContentsObserver {
                      bool has_render_view,
                      WebContentsImpl* web_contents);
 
-  void WillDestroy(WebContents* web_contents);
+  void WillDestroy();
 
   bool InAutoSizeBounds(const gfx::Size& size) const;
 
@@ -400,7 +396,7 @@ class CONTENT_EXPORT BrowserPluginGuest : public WebContentsObserver {
   // once the guest is attached to a particular embedder.
   std::queue<IPC::Message*> pending_messages_;
 
-  scoped_ptr<BrowserPluginGuestDelegate> delegate_;
+  BrowserPluginGuestDelegate* delegate_;
 
   // Weak pointer used to ask GeolocationPermissionContext about geolocation
   // permission.

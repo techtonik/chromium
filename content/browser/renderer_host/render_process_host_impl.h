@@ -39,6 +39,9 @@ class BrowserDemuxerAndroid;
 class GpuMessageFilter;
 class MessagePortMessageFilter;
 class MojoApplicationHost;
+#if defined(ENABLE_WEBRTC)
+class P2PSocketDispatcherHost;
+#endif
 class PeerConnectionTrackerHost;
 class RendererMainThread;
 class RenderProcessHostMojoImpl;
@@ -79,7 +82,7 @@ class CONTENT_EXPORT RenderProcessHostImpl
  public:
   RenderProcessHostImpl(BrowserContext* browser_context,
                         StoragePartitionImpl* storage_partition_impl,
-                        bool is_guest);
+                        bool is_isolated_guest);
   virtual ~RenderProcessHostImpl();
 
   // RenderProcessHost implementation (public portion).
@@ -97,7 +100,7 @@ class CONTENT_EXPORT RenderProcessHostImpl
   virtual void WidgetRestored() OVERRIDE;
   virtual void WidgetHidden() OVERRIDE;
   virtual int VisibleWidgetCount() const OVERRIDE;
-  virtual bool IsGuest() const OVERRIDE;
+  virtual bool IsIsolatedGuest() const OVERRIDE;
   virtual StoragePartition* GetStoragePartition() const OVERRIDE;
   virtual bool FastShutdownIfPossible() OVERRIDE;
   virtual void DumpHandles() OVERRIDE;
@@ -126,6 +129,10 @@ class CONTENT_EXPORT RenderProcessHostImpl
   virtual void DisableAecDump() OVERRIDE;
   virtual void SetWebRtcLogMessageCallback(
       base::Callback<void(const std::string&)> callback) OVERRIDE;
+  virtual WebRtcStopRtpDumpCallback StartRtpDump(
+      bool incoming,
+      bool outgoing,
+      const WebRtcRtpPacketCallback& packet_callback) OVERRIDE;
 #endif
   virtual void ResumeDeferredNavigation(const GlobalRequestID& request_id)
       OVERRIDE;
@@ -222,8 +229,8 @@ class CONTENT_EXPORT RenderProcessHostImpl
     return message_port_message_filter_;
   }
 
-  void SetIsGuestForTesting(bool is_guest) {
-    is_guest_ = is_guest;
+  void set_is_isolated_guest_for_testing(bool is_isolated_guest) {
+    is_isolated_guest_ = is_isolated_guest;
   }
 
   // Called when the existence of the other renderer process which is connected
@@ -384,7 +391,7 @@ class CONTENT_EXPORT RenderProcessHostImpl
 
   // Indicates whether this is a RenderProcessHost of a Browser Plugin guest
   // renderer.
-  bool is_guest_;
+  bool is_isolated_guest_;
 
   // Forwards messages between WebRTCInternals in the browser process
   // and PeerConnectionTracker in the renderer process.
@@ -413,6 +420,10 @@ class CONTENT_EXPORT RenderProcessHostImpl
 
 #if defined(ENABLE_WEBRTC)
   base::Callback<void(const std::string&)> webrtc_log_message_callback_;
+
+  scoped_refptr<P2PSocketDispatcherHost> p2p_socket_dispatcher_host_;
+
+  WebRtcStopRtpDumpCallback stop_rtp_dump_callback_;
 #endif
 
   // Message filter and dispatcher for screen orientation.

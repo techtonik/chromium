@@ -65,32 +65,6 @@ struct ChromeViewHostMsg_GetPluginInfo_Status {
 
 namespace IPC {
 
-#if defined(OS_POSIX) && !defined(USE_AURA) && !defined(OS_ANDROID)
-
-// TODO(port): this shouldn't exist. However, the plugin stuff is really using
-// HWNDS (NativeView), and making Windows calls based on them. I've not figured
-// out the deal with plugins yet.
-// TODO(android): a gfx::NativeView is the same as a gfx::NativeWindow.
-template <>
-struct ParamTraits<gfx::NativeView> {
-  typedef gfx::NativeView param_type;
-  static void Write(Message* m, const param_type& p) {
-    NOTIMPLEMENTED();
-  }
-
-  static bool Read(const Message* m, PickleIterator* iter, param_type* p) {
-    NOTIMPLEMENTED();
-    *p = NULL;
-    return true;
-  }
-
-  static void Log(const param_type& p, std::string* l) {
-    l->append(base::StringPrintf("<gfx::NativeView>"));
-  }
-};
-
-#endif  // defined(OS_POSIX) && !defined(USE_AURA) && !defined(OS_ANDROID)
-
 template <>
 struct ParamTraits<ContentSettingsPattern> {
   typedef ContentSettingsPattern param_type;
@@ -264,6 +238,9 @@ IPC_MESSAGE_CONTROL2(ChromeViewMsg_SetFieldTrialGroup,
 
 // Asks the renderer to send back V8 heap stats.
 IPC_MESSAGE_CONTROL0(ChromeViewMsg_GetV8HeapStats)
+
+IPC_MESSAGE_ROUTED1(ChromeViewMsg_SetPageSequenceNumber,
+                    int /* page_seq_no */)
 
 IPC_MESSAGE_ROUTED0(ChromeViewMsg_DetermineIfPageSupportsInstant)
 
@@ -657,71 +634,71 @@ IPC_MESSAGE_CONTROL2(ChromeViewHostMsg_FPS,
 
 // Logs events from InstantExtended New Tab Pages.
 IPC_MESSAGE_ROUTED2(ChromeViewHostMsg_LogEvent,
-                    int /* page_id */,
+                    int /* page_seq_no */,
                     NTPLoggingEventType /* event */)
 
 // Logs an impression on one of the Most Visited tile on the InstantExtended
 // New Tab Page.
 IPC_MESSAGE_ROUTED3(ChromeViewHostMsg_LogMostVisitedImpression,
-                    int /* page_id */,
+                    int /* page_seq_no */,
                     int /* position */,
                     base::string16 /* provider */)
 
 // Logs a navigation on one of the Most Visited tile on the InstantExtended
 // New Tab Page.
 IPC_MESSAGE_ROUTED3(ChromeViewHostMsg_LogMostVisitedNavigation,
-                    int /* page_id */,
+                    int /* page_seq_no */,
                     int /* position */,
                     base::string16 /* provider */)
 
 // The Instant page asks for Chrome identity check against |identity|.
 IPC_MESSAGE_ROUTED2(ChromeViewHostMsg_ChromeIdentityCheck,
-                    int /* page_id */,
+                    int /* page_seq_no */,
                     base::string16 /* identity */)
 
 // Tells InstantExtended to set the omnibox focus state.
 IPC_MESSAGE_ROUTED2(ChromeViewHostMsg_FocusOmnibox,
-                    int /* page_id */,
+                    int /* page_seq_no */,
                     OmniboxFocusState /* state */)
 
 // Tells InstantExtended to paste text into the omnibox.  If text is empty,
 // the clipboard contents will be pasted. This causes the omnibox dropdown to
 // open.
 IPC_MESSAGE_ROUTED2(ChromeViewHostMsg_PasteAndOpenDropdown,
-                    int /* page_id */,
+                    int /* page_seq_no */,
                     base::string16 /* text to be pasted */)
 
 // Tells InstantExtended whether the embedded search API is supported.
 // See http://dev.chromium.org/embeddedsearch
 IPC_MESSAGE_ROUTED2(ChromeViewHostMsg_InstantSupportDetermined,
-                    int /* page_id */,
+                    int /* page_seq_no */,
                     bool /* result */)
 
 // Tells InstantExtended to delete a most visited item.
 IPC_MESSAGE_ROUTED2(ChromeViewHostMsg_SearchBoxDeleteMostVisitedItem,
-                    int /* page_id */,
+                    int /* page_seq_no */,
                     GURL /* url */)
 
 // Tells InstantExtended to navigate the active tab to a possibly privileged
 // URL.
 IPC_MESSAGE_ROUTED4(ChromeViewHostMsg_SearchBoxNavigate,
-                    int /* page_id */,
+                    int /* page_seq_no */,
                     GURL /* destination */,
                     WindowOpenDisposition /* disposition */,
                     bool /*is_most_visited_item_url*/)
 
 // Tells InstantExtended to undo all most visited item deletions.
 IPC_MESSAGE_ROUTED1(ChromeViewHostMsg_SearchBoxUndoAllMostVisitedDeletions,
-                    int /* page_id */)
+                    int /* page_seq_no */)
 
 // Tells InstantExtended to undo one most visited item deletion.
 IPC_MESSAGE_ROUTED2(ChromeViewHostMsg_SearchBoxUndoMostVisitedDeletion,
-                    int /* page_id */,
+                    int /* page_seq_no */,
                     GURL /* url */)
 
 // Tells InstantExtended whether the page supports voice search.
 IPC_MESSAGE_ROUTED2(ChromeViewHostMsg_SetVoiceSearchSupported,
-                    int /* page_id */,
+                    int /* page_seq_no */,
                     bool /* supported */)
 
 // Tells the renderer a list of URLs which should be bounced back to the browser

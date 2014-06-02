@@ -314,7 +314,7 @@ bool RenderViewHostImpl::CreateRenderView(
 
   // If it's enabled, tell the renderer to set up the Javascript bindings for
   // sending messages back to the browser.
-  if (GetProcess()->IsGuest())
+  if (GetProcess()->IsIsolatedGuest())
     DCHECK_EQ(0, enabled_bindings_);
   Send(new ViewMsg_AllowBindings(GetRoutingID(), enabled_bindings_));
   // Let our delegate know that we created a RenderView.
@@ -659,7 +659,7 @@ void RenderViewHostImpl::SetHasPendingCrossSiteRequest(
 
 void RenderViewHostImpl::SetWebUIHandle(mojo::ScopedMessagePipeHandle handle) {
   // Never grant any bindings to browser plugin guests.
-  if (GetProcess()->IsGuest()) {
+  if (GetProcess()->IsIsolatedGuest()) {
     NOTREACHED() << "Never grant bindings to a guest process.";
     return;
   }
@@ -822,7 +822,7 @@ RenderFrameHost* RenderViewHostImpl::GetMainFrame() {
 
 void RenderViewHostImpl::AllowBindings(int bindings_flags) {
   // Never grant any bindings to browser plugin guests.
-  if (GetProcess()->IsGuest()) {
+  if (GetProcess()->IsIsolatedGuest()) {
     NOTREACHED() << "Never grant bindings to a guest process.";
     return;
   }
@@ -1178,8 +1178,14 @@ void RenderViewHostImpl::OnRequestMove(const gfx::Rect& pos) {
   Send(new ViewMsg_Move_ACK(GetRoutingID()));
 }
 
-void RenderViewHostImpl::OnDocumentAvailableInMainFrame() {
+void RenderViewHostImpl::OnDocumentAvailableInMainFrame(
+    bool uses_temporary_zoom_level) {
   delegate_->DocumentAvailableInMainFrame(this);
+
+  HostZoomMapImpl* host_zoom_map = static_cast<HostZoomMapImpl*>(
+      HostZoomMap::GetForBrowserContext(GetProcess()->GetBrowserContext()));
+  host_zoom_map->SetUsesTemporaryZoomLevel(
+      GetProcess()->GetID(), GetRoutingID(), uses_temporary_zoom_level);
 }
 
 void RenderViewHostImpl::OnToggleFullscreen(bool enter_fullscreen) {
@@ -1579,17 +1585,14 @@ void RenderViewHostImpl::OnAccessibilityLocationChanges(
 }
 
 void RenderViewHostImpl::OnDidZoomURL(double zoom_level,
-                                      bool remember,
                                       const GURL& url) {
   HostZoomMapImpl* host_zoom_map = static_cast<HostZoomMapImpl*>(
       HostZoomMap::GetForBrowserContext(GetProcess()->GetBrowserContext()));
-  if (remember) {
-    host_zoom_map->
-        SetZoomLevelForHost(net::GetHostOrSpecFromURL(url), zoom_level);
-  } else {
-    host_zoom_map->SetTemporaryZoomLevel(
-        GetProcess()->GetID(), GetRoutingID(), zoom_level);
-  }
+
+  host_zoom_map->SetZoomLevelForView(GetProcess()->GetID(),
+                                     GetRoutingID(),
+                                     zoom_level,
+                                     net::GetHostOrSpecFromURL(url));
 }
 
 void RenderViewHostImpl::OnRunFileChooser(const FileChooserParams& params) {

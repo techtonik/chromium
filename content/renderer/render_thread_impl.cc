@@ -198,6 +198,7 @@ class RenderViewZoomer : public RenderViewVisitor {
     // Empty scheme works as wildcard that matches any scheme,
     if ((net::GetHostOrSpecFromURL(url) == host_) &&
         (scheme_.empty() || scheme_ == url.scheme())) {
+      webview->hidePopups();
       webview->setZoomLevel(zoom_level_);
     }
     return true;
@@ -1181,6 +1182,7 @@ scoped_ptr<gfx::GpuMemoryBuffer> RenderThreadImpl::AllocateGpuMemoryBuffer(
 
 void RenderThreadImpl::ConnectToService(
     const mojo::String& service_name,
+    const mojo::String& name,
     mojo::ScopedMessagePipeHandle message_pipe) {
   // TODO(darin): Invent some kind of registration system to use here.
   if (service_name.To<base::StringPiece>() == kRendererService_WebUISetup) {
