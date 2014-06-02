@@ -938,7 +938,8 @@ int RenderFrameHostManager::CreateRenderFrame(
       // gets a RenderViewHost in the SiteInstance of its opener WebContents.
       // If not used in the first navigation, this RVH is swapped out and is not
       // granted bindings, so we may need to grant them when swapping it in.
-      if (pending_web_ui() && !new_render_frame_host->GetProcess()->IsGuest()) {
+      if (pending_web_ui() &&
+          !new_render_frame_host->GetProcess()->IsIsolatedGuest()) {
         int required_bindings = pending_web_ui()->GetBindings();
         RenderViewHost* rvh = new_render_frame_host->render_view_host();
         if ((rvh->GetEnabledBindings() & required_bindings) !=
@@ -963,7 +964,6 @@ int RenderFrameHostManager::CreateRenderFrame(
     RenderViewHostImpl* render_view_host =
         new_render_frame_host->render_view_host();
     int proxy_routing_id = MSG_ROUTING_NONE;
-    frame_to_announce = new_render_frame_host.get();
 
     // Prevent the process from exiting while we're trying to navigate in it.
     // Otherwise, if the new RFH is swapped out already, store it.
@@ -987,6 +987,7 @@ int RenderFrameHostManager::CreateRenderFrame(
       CancelPending();
     }
     routing_id = render_view_host->GetRoutingID();
+    frame_to_announce = new_render_frame_host.get();
   }
 
   // Use this as our new pending RFH if it isn't swapped out.
@@ -1011,7 +1012,7 @@ bool RenderFrameHostManager::InitRenderView(RenderViewHost* render_view_host,
   // If the pending navigation is to a WebUI and the RenderView is not in a
   // guest process, tell the RenderViewHost about any bindings it will need
   // enabled.
-  if (pending_web_ui() && !render_view_host->GetProcess()->IsGuest()) {
+  if (pending_web_ui() && !render_view_host->GetProcess()->IsIsolatedGuest()) {
     render_view_host->AllowBindings(pending_web_ui()->GetBindings());
   } else {
     // Ensure that we don't create an unprivileged RenderView in a WebUI-enabled
@@ -1365,7 +1366,8 @@ RenderFrameHostImpl* RenderFrameHostManager::UpdateStateForNavigate(
     SetPendingWebUI(entry);
 
     // Make sure the new RenderViewHost has the right bindings.
-    if (pending_web_ui() && !render_frame_host_->GetProcess()->IsGuest()) {
+    if (pending_web_ui() &&
+        !render_frame_host_->GetProcess()->IsIsolatedGuest()) {
       render_frame_host_->render_view_host()->AllowBindings(
           pending_web_ui()->GetBindings());
     }

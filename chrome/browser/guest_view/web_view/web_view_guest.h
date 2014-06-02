@@ -16,7 +16,6 @@
 #include "chrome/common/extensions/api/webview.h"
 #include "content/public/browser/javascript_dialog_manager.h"
 #include "content/public/browser/notification_registrar.h"
-#include "content/public/browser/web_contents_observer.h"
 #include "third_party/WebKit/public/web/WebFindOptions.h"
 
 #if defined(OS_CHROMEOS)
@@ -36,16 +35,14 @@ namespace ui {
 class SimpleMenuModel;
 }  // namespace ui
 
-// A WebViewGuest is a WebContentsObserver on the guest WebContents of a
-// <webview> tag. It provides the browser-side implementation of the <webview>
-// API and manages the lifetime of <webview> extension events. WebViewGuest is
+// A WebViewGuest provides the browser-side implementation of the <webview> API
+// and manages the dispatch of <webview> extension events. WebViewGuest is
 // created on attachment. That is, when a guest WebContents is associated with
 // a particular embedder WebContents. This happens on either initial navigation
 // or through the use of the New Window API, when a new window is attached to
 // a particular <webview>.
 class WebViewGuest : public GuestView<WebViewGuest>,
-                     public content::NotificationObserver,
-                     public content::WebContentsObserver {
+                     public content::NotificationObserver {
  public:
   WebViewGuest(int guest_instance_id,
                content::WebContents* guest_web_contents,
@@ -66,13 +63,13 @@ class WebViewGuest : public GuestView<WebViewGuest>,
   // Sets the frame name of the guest.
   void SetName(const std::string& name);
 
+  // Set the zoom factor.
+  void SetZoom(double zoom_factor);
+
   // GuestViewBase implementation.
   virtual void Attach(content::WebContents* embedder_web_contents,
                       const base::DictionaryValue& args) OVERRIDE;
-
-  // BrowserPluginGuestDelegate public implementation.
-  virtual bool HandleContextMenu(
-      const content::ContextMenuParams& params) OVERRIDE;
+  virtual void EmbedderDestroyed() OVERRIDE;
 
   // WebContentsDelegate implementation.
   virtual bool AddMessageToConsole(content::WebContents* source,
@@ -89,6 +86,8 @@ class WebViewGuest : public GuestView<WebViewGuest>,
                          const gfx::Rect& selection_rect,
                          int active_match_ordinal,
                          bool final_update) OVERRIDE;
+  virtual bool HandleContextMenu(
+      const content::ContextMenuParams& params) OVERRIDE;
   virtual void HandleKeyboardEvent(
       content::WebContents* source,
       const content::NativeWebKeyboardEvent& event) OVERRIDE;
@@ -126,9 +125,8 @@ class WebViewGuest : public GuestView<WebViewGuest>,
                                   const GURL& target_url,
                                   content::WebContents* new_contents) OVERRIDE;
 
-  // GuestDelegate implementation.
+  // BrowserPluginGuestDelegate implementation.
   virtual void DidAttach() OVERRIDE;
-  virtual void EmbedderDestroyed() OVERRIDE;
   virtual bool IsDragAndDropEnabled() OVERRIDE;
   virtual void SizeChanged(const gfx::Size& old_size, const gfx::Size& new_size)
       OVERRIDE;
@@ -143,9 +141,6 @@ class WebViewGuest : public GuestView<WebViewGuest>,
   virtual void Observe(int type,
                        const content::NotificationSource& source,
                        const content::NotificationDetails& details) OVERRIDE;
-
-  // Set the zoom factor.
-  virtual void SetZoom(double zoom_factor) OVERRIDE;
 
   // Returns the current zoom factor.
   double GetZoom();

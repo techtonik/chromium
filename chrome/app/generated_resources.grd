@@ -2732,6 +2732,9 @@ Even if you have downloaded files from this website before, the website might ha
         <message name="IDS_CERT_DETAILS_NOT_AFTER" desc="The label of the Validity->Not After element in the details page of the certificate info dialog.">
           Not After
         </message>
+        <message name="IDS_CERT_DETAILS_UTC_TIMEZONE" desc="The string specifying the timezone in the Validity->Not Before and Validity->Not After elements in the details page of the certificate info dialog.">
+          (UTC)
+        </message>
         <message name="IDS_CERT_DETAILS_SUBJECT" desc="The label of the Subject element in the details page of the certificate info dialog. (In this case, subject refers to the entity the certificate was issued to.)">
           Subject
         </message>
@@ -5207,11 +5210,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </if>
 
       <!-- Packaged Apps -->
-      <if expr="is_win">
-        <message name="IDS_APP_INSTALL_TITLE" desc="Caption for installing an ephemeral app">
-          Install app
-        </message>
-      </if>
+      <message name="IDS_APP_INSTALL_TITLE" desc="Caption for installing an ephemeral app">
+        Install app
+      </message>
 
       <!-- Components -->
       <message name="IDS_COMPONENTS_TITLE" desc="Title for the chrome://components page.">
@@ -13419,8 +13420,14 @@ Do you accept?
     <message name="IDS_FLAGS_ENABLE_NEW_PROFILE_MANAGEMENT_NAME" desc="Title for the flag to enable the new profile management.">
       Enable new profile management system
     </message>
-    <message name="IDS_FLAGS_ENABLE_NEW_PROFILE_MANAGEMENT_DESCRIPTION" desc="Description for the flag to enable the new profile management">
-      Enables the new profile management system, including profile sign-out and the new avatar menu UI.
+    <message name="IDS_FLAGS_ENABLE_NEW_PROFILE_MANAGEMENT_DESCRIPTION" desc="Description for the flag to enable the new profile management.">
+      Enables the new profile management system, including profile lock and the new avatar menu UI.
+    </message>
+    <message name="IDS_FLAGS_ENABLE_ACCOUNT_CONSISTENCY_NAME" desc="Title for the flag to enable the account consistency between browser and cookie jar.">
+      Enable identity consistency between browser and cookie jar
+    </message>
+    <message name="IDS_FLAGS_ENABLE_ACCOUNT_CONSISTENCY_DESCRIPTION" desc="Description for the flag to enable the account consistency between browser and cookie jar.">
+      When enabled, the browser manages signing in and out of Google accounts.
     </message>
     <message name="IDS_FLAGS_ENABLE_FAST_USER_SWITCHING_NAME" desc="Title for the flag to enable fast user switching.">
       Enable fast user switching in the avatar menu

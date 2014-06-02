@@ -154,7 +154,6 @@ extern const char kEnableLinkableEphemeralApps[];
 extern const char kEnableManagedStorage[];
 extern const char kEnableNaCl[];
 extern const char kEnableNetBenchmarking[];
-extern const char kEnableNetworkTime[];
 extern const char kEnableNpnHttpOnly[];
 extern const char kEnableOfflineAutoReload[];
 extern const char kEnableOfflineLoadStaleCache[];
@@ -351,6 +350,7 @@ extern const char kPluginsMetadataServerURL[];
 
 #if defined(OS_ANDROID)
 extern const char kDisableCast[];
+extern const char kDisableContextualSearch[];
 extern const char kDisableNewNTP[];
 extern const char kDisableZeroSuggest[];
 extern const char kEnableAccessibilityTabSwitcher[];

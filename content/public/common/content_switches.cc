@@ -98,9 +98,6 @@ const char kDisableLayerSquashing[] =
 const char kDisableAcceleratedVideoDecode[] =
     "disable-accelerated-video-decode";
 
-// Disables the alternate window station for the renderer.
-const char kDisableAltWinstation[]          = "disable-winsta";
-
 // Disable the ApplicationCache.
 const char kDisableApplicationCache[]       = "disable-application-cache";
 
@@ -148,9 +145,6 @@ const char kDisableFastTextAutosizing[]     = "disable-fast-text-autosizing";
 
 // Disable FileSystem API.
 const char kDisableFileSystem[]             = "disable-file-system";
-
-// Disables sending filters (SkImageFilter objects) between processes over IPC
-const char kDisableFiltersOverIPC[]         = "disable-filters-over-ipc";
 
 // Disable 3D inside of flapper.
 const char kDisableFlash3d[]                = "disable-flash-3d";
@@ -935,9 +929,6 @@ const char kDisableWebRtcEncryption[]      = "disable-webrtc-encryption";
 
 // Disables HW encode acceleration for WebRTC.
 const char kDisableWebRtcHWEncoding[]       = "disable-webrtc-hw-encoding";
-
-// Enables WebRTC to open TCP server sockets.
-const char kEnableWebRtcTcpServerSocket[]   = "enable-webrtc-tcp-server-socket";
 
 // Enables VP8 HW encode acceleration for WebRTC.
 const char kEnableWebRtcHWVp8Encoding[]     = "enable-webrtc-hw-vp8-encoding";

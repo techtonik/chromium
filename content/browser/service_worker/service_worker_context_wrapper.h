@@ -62,6 +62,7 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
       const ServiceWorkerHostCallback& callback) OVERRIDE;
   virtual void UnregisterServiceWorker(const GURL& pattern,
                                        const ResultCallback& callback) OVERRIDE;
+  virtual void Terminate() OVERRIDE;
   virtual void GetServiceWorkerHost(
       const Scope& scope,
       ServiceWorkerHostClient* client,

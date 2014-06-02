@@ -391,7 +391,7 @@ void RenderProcessHost::SetMaxRendererProcessCount(size_t count) {
 RenderProcessHostImpl::RenderProcessHostImpl(
     BrowserContext* browser_context,
     StoragePartitionImpl* storage_partition_impl,
-    bool is_guest)
+    bool is_isolated_guest)
     : fast_shutdown_started_(false),
       deleting_soon_(false),
 #ifndef NDEBUG
@@ -407,7 +407,7 @@ RenderProcessHostImpl::RenderProcessHostImpl(
       storage_partition_impl_(storage_partition_impl),
       sudden_termination_allowed_(true),
       ignore_input_events_(false),
-      is_guest_(is_guest),
+      is_isolated_guest_(is_isolated_guest),
       gpu_observer_registered_(false),
       delayed_cleanup_needed_(false),
       within_process_died_observer_(false),
@@ -807,9 +807,10 @@ void RenderProcessHostImpl::CreateMessageFilters() {
   }
 
 #if defined(ENABLE_WEBRTC)
-  AddFilter(new P2PSocketDispatcherHost(
+  p2p_socket_dispatcher_host_ = new P2PSocketDispatcherHost(
       resource_context,
-      browser_context->GetRequestContextForRenderProcess(GetID())));
+      browser_context->GetRequestContextForRenderProcess(GetID()));
+  AddFilter(p2p_socket_dispatcher_host_);
 #endif
 
   AddFilter(new TraceMessageFilter());
@@ -941,8 +942,8 @@ int RenderProcessHostImpl::VisibleWidgetCount() const {
   return visible_widgets_;
 }
 
-bool RenderProcessHostImpl::IsGuest() const {
-  return is_guest_;
+bool RenderProcessHostImpl::IsIsolatedGuest() const {
+  return is_isolated_guest_;
 }
 
 StoragePartition* RenderProcessHostImpl::GetStoragePartition() const {
@@ -1037,7 +1038,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableDistanceFieldText,
     switches::kDisableFastTextAutosizing,
     switches::kDisableFileSystem,
-    switches::kDisableFiltersOverIPC,
     switches::kDisableGpuCompositing,
     switches::kDisableGpuVsync,
     switches::kDisableLowResTiling,
@@ -1178,7 +1178,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableWebRtcHWDecoding,
     switches::kDisableWebRtcHWEncoding,
     switches::kEnableWebRtcHWVp8Encoding,
-    switches::kEnableWebRtcTcpServerSocket,
 #endif
 #if defined(OS_ANDROID)
     switches::kDisableGestureRequirementForMediaPlayback,
@@ -1508,6 +1507,30 @@ void RenderProcessHostImpl::SetWebRtcLogMessageCallback(
     base::Callback<void(const std::string&)> callback) {
   webrtc_log_message_callback_ = callback;
 }
+
+RenderProcessHostImpl::WebRtcStopRtpDumpCallback
+RenderProcessHostImpl::StartRtpDump(
+    bool incoming,
+    bool outgoing,
+    const WebRtcRtpPacketCallback& packet_callback) {
+  if (!p2p_socket_dispatcher_host_)
+    return WebRtcStopRtpDumpCallback();
+
+  BrowserThread::PostTask(BrowserThread::IO,
+                          FROM_HERE,
+                          base::Bind(&P2PSocketDispatcherHost::StartRtpDump,
+                                     p2p_socket_dispatcher_host_,
+                                     incoming,
+                                     outgoing,
+                                     packet_callback));
+
+  if (stop_rtp_dump_callback_.is_null()) {
+    stop_rtp_dump_callback_ =
+        base::Bind(&P2PSocketDispatcherHost::StopRtpDumpOnUIThread,
+                   p2p_socket_dispatcher_host_);
+  }
+  return stop_rtp_dump_callback_;
+}
 #endif
 
 IPC::ChannelProxy* RenderProcessHostImpl::GetChannel() {
@@ -1583,7 +1606,7 @@ void RenderProcessHostImpl::FilterURL(RenderProcessHost* rph,
 
   // Do not allow browser plugin guests to navigate to non-web URLs, since they
   // cannot swap processes or grant bindings.
-  bool non_web_url_in_guest = rph->IsGuest() &&
+  bool non_web_url_in_guest = rph->IsIsolatedGuest() &&
       !(url->is_valid() && policy->IsWebSafeScheme(url->scheme()));
 
   if (non_web_url_in_guest || !policy->CanRequestURL(rph->GetID(), *url)) {
@@ -1611,7 +1634,7 @@ bool RenderProcessHostImpl::IsSuitableHost(
   // and non-guest storage gets mixed. In the future, we might consider enabling
   // the sharing of guests, in this case this check should be removed and
   // InSameStoragePartition should handle the possible sharing.
-  if (host->IsGuest())
+  if (host->IsIsolatedGuest())
     return false;
 
   // Check whether the given host and the intended site_url will be using the
@@ -2074,7 +2097,9 @@ void RenderProcessHostImpl::ConnectTo(
   MaybeActivateMojo();
 
   mojo_application_host_->service_provider()->ConnectToService(
-      mojo::String::From(service_name), handle.Pass());
+      mojo::String::From(service_name),
+      std::string(),
+      handle.Pass());
 }
 
 }  // namespace content

@@ -674,7 +674,8 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_CONTEXTUAL_SEARCH,
     IDS_FLAGS_ENABLE_CONTEXTUAL_SEARCH_DESCRIPTION,
     kOsAndroid,
-    SINGLE_VALUE_TYPE(switches::kEnableContextualSearch)
+    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableContextualSearch,
+                              switches::kDisableContextualSearch)
   },
 #endif
   {
@@ -1375,6 +1376,13 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kNewProfileManagement)
   },
   {
+    "enable-account-consistency",
+    IDS_FLAGS_ENABLE_ACCOUNT_CONSISTENCY_NAME,
+    IDS_FLAGS_ENABLE_ACCOUNT_CONSISTENCY_DESCRIPTION,
+    kOsAndroid | kOsMac | kOsWin | kOsLinux | kOsCrOS,
+    SINGLE_VALUE_TYPE(switches::kEnableAccountConsistency)
+  },
+  {
     "enable-fast-user-switching",
     IDS_FLAGS_ENABLE_FAST_USER_SWITCHING_NAME,
     IDS_FLAGS_ENABLE_FAST_USER_SWITCHING_DESCRIPTION,
@@ -1504,14 +1512,14 @@ const Experiment kExperiments[] = {
     "enable-ephemeral-apps",
     IDS_FLAGS_ENABLE_EPHEMERAL_APPS_NAME,
     IDS_FLAGS_ENABLE_EPHEMERAL_APPS_DESCRIPTION,
-    kOsWin | kOsLinux | kOsCrOS,
+    kOsAll,
     SINGLE_VALUE_TYPE(switches::kEnableEphemeralApps)
   },
   {
     "enable-linkable-ephemeral-apps",
     IDS_FLAGS_ENABLE_LINKABLE_EPHEMERAL_APPS_NAME,
     IDS_FLAGS_ENABLE_LINKABLE_EPHEMERAL_APPS_DESCRIPTION,
-    kOsWin | kOsLinux | kOsCrOS,
+    kOsAll,
     SINGLE_VALUE_TYPE(switches::kEnableLinkableEphemeralApps)
   },
   {
