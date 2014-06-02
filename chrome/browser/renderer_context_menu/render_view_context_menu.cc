@@ -372,8 +372,8 @@ void AddCustomItemsToMenu(const std::vector<content::MenuItem>& items,
 
 // Helper function to escape "&" as "&&".
 void EscapeAmpersands(base::string16* text) {
-  const base::char16 ampersand[] = {'&', 0};
-  base::ReplaceChars(*text, ampersand, base::ASCIIToUTF16("&&"), text);
+  base::ReplaceChars(*text, base::ASCIIToUTF16("&"), base::ASCIIToUTF16("&&"),
+                     text);
 }
 
 }  // namespace
@@ -1416,6 +1416,8 @@ bool RenderViewContextMenu::IsCommandIdChecked(int id) const {
 
 void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
   command_executed_ = true;
+  RecordUsedItem(id);
+
   // If this command is is added by one of our observers, we dispatch it to the
   // observer.
   ObserverListBase<RenderViewContextMenuObserver>::Iterator it(observers_);
@@ -1424,8 +1426,6 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
     if (observer->IsCommandIdSupported(id))
       return observer->ExecuteCommand(id);
   }
-
-  RecordUsedItem(id);
 
   RenderFrameHost* render_frame_host =
       RenderFrameHost::FromID(render_process_id_, render_frame_id_);

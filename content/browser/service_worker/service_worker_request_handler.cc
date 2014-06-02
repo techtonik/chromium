@@ -12,6 +12,8 @@
 #include "content/browser/service_worker/service_worker_utils.h"
 #include "content/common/service_worker/service_worker_types.h"
 #include "net/url_request/url_request.h"
+#include "net/url_request/url_request_interceptor.h"
+#include "webkit/browser/blob/blob_storage_context.h"
 
 namespace content {
 
@@ -20,11 +22,11 @@ namespace {
 int kUserDataKey;  // Key value is not important.
 
 class ServiceWorkerRequestInterceptor
-    : public net::URLRequestJobFactory::ProtocolHandler {
+    : public net::URLRequestInterceptor {
  public:
   ServiceWorkerRequestInterceptor() {}
   virtual ~ServiceWorkerRequestInterceptor() {}
-  virtual net::URLRequestJob* MaybeCreateJob(
+  virtual net::URLRequestJob* MaybeInterceptRequest(
       net::URLRequest* request,
       net::NetworkDelegate* network_delegate) const OVERRIDE {
     ServiceWorkerRequestHandler* handler =
@@ -52,6 +54,7 @@ bool IsSchemeAndMethodSupported(const net::URLRequest* request) {
 void ServiceWorkerRequestHandler::InitializeHandler(
     net::URLRequest* request,
     ServiceWorkerContextWrapper* context_wrapper,
+    webkit_blob::BlobStorageContext* blob_storage_context,
     int process_id,
     int provider_id,
     ResourceType::Type resource_type) {
@@ -71,7 +74,8 @@ void ServiceWorkerRequestHandler::InitializeHandler(
     return;
 
   scoped_ptr<ServiceWorkerRequestHandler> handler(
-      provider_host->CreateRequestHandler(resource_type));
+      provider_host->CreateRequestHandler(resource_type,
+                                          blob_storage_context->AsWeakPtr()));
   if (!handler)
     return;
 
@@ -84,9 +88,9 @@ ServiceWorkerRequestHandler* ServiceWorkerRequestHandler::GetHandler(
       request->GetUserData(&kUserDataKey));
 }
 
-scoped_ptr<net::URLRequestJobFactory::ProtocolHandler>
+scoped_ptr<net::URLRequestInterceptor>
 ServiceWorkerRequestHandler::CreateInterceptor() {
-  return make_scoped_ptr<net::URLRequestJobFactory::ProtocolHandler>(
+  return scoped_ptr<net::URLRequestInterceptor>(
       new ServiceWorkerRequestInterceptor);
 }
 
@@ -96,9 +100,11 @@ ServiceWorkerRequestHandler::~ServiceWorkerRequestHandler() {
 ServiceWorkerRequestHandler::ServiceWorkerRequestHandler(
     base::WeakPtr<ServiceWorkerContextCore> context,
     base::WeakPtr<ServiceWorkerProviderHost> provider_host,
+    base::WeakPtr<webkit_blob::BlobStorageContext> blob_storage_context,
     ResourceType::Type resource_type)
     : context_(context),
       provider_host_(provider_host),
+      blob_storage_context_(blob_storage_context),
       resource_type_(resource_type) {
 }
 

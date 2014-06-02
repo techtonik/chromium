@@ -75,6 +75,11 @@ class ServiceWorkerContext {
       ServiceWorkerHostClient* client,
       const ServiceWorkerHostCallback& callback) = 0;
 
+  // Synchronously releases all of the RenderProcessHosts that have Service
+  // Workers running inside them, and prevents any new Service Worker instances
+  // from starting up.
+  virtual void Terminate() = 0;
+
  protected:
   ServiceWorkerContext() {}
   virtual ~ServiceWorkerContext() {}

@@ -140,7 +140,7 @@ void ResetScreenHandler::ChooseAndApplyShowScenario() {
 
 void ResetScreenHandler::OnRollbackFlagFileCheckDone(
     scoped_ptr<bool> file_exists) {
-  if (!file_exists && !CommandLine::ForCurrentProcess()->HasSwitch(
+  if (!(*file_exists) && !CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableRollbackOption)) {
     rollback_available_ = false;
     ShowWithParams();
@@ -180,8 +180,8 @@ void ResetScreenHandler::DeclareLocalizedValues(
                 IDS_RESET_SCREEN_ROLLBACK_OPTION,
                 IDS_SHORT_PRODUCT_NAME);
   builder->AddF("resetRevertPromise",
-               IDS_RESET_SCREEN_PREPARING_REVERT_PROMISE,
-               IDS_SHORT_PRODUCT_NAME);
+                IDS_RESET_SCREEN_PREPARING_REVERT_PROMISE,
+                IDS_SHORT_PRODUCT_NAME);
   builder->AddF("resetRevertSpinnerMessage",
                 IDS_RESET_SCREEN_PREPARING_REVERT_SPINNER_MESSAGE,
                 IDS_SHORT_PRODUCT_NAME);

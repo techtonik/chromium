@@ -525,9 +525,6 @@ const char kEnableNaCl[]                    = "enable-nacl";
 // Enables the network-related benchmarking extensions.
 const char kEnableNetBenchmarking[]         = "enable-net-benchmarking";
 
-// Enables |NetworkTimeService| to convert local time to network time.
-const char kEnableNetworkTime[]             = "enable-network-time";
-
 // Enables NPN with HTTP. It means NPN is enabled but SPDY won't be used.
 // HTTP is still used for all requests.
 const char kEnableNpnHttpOnly[]             = "enable-npn-http";
@@ -1264,6 +1261,9 @@ const char kPluginsMetadataServerURL[]      = "plugins-metadata-server-url";
 // Disables support for playing videos on Chromecast devices.
 const char kDisableCast[]                    = "disable-cast";
 
+// Disables Contextual Search.
+const char kDisableContextualSearch[]        = "disable-contextual-search";
+
 // Disables the new NTP.
 const char kDisableNewNTP[]                  = "disable-new-ntp";
 
@@ -1277,8 +1277,8 @@ const char kEnableAccessibilityTabSwitcher[] =
 // Enables app install alerts.
 const char kEnableAppInstallAlerts[]        = "enable-app-install-alerts";
 
-// Enables Contextual Search
-const char kEnableContextualSearch[]        = "contextual-search";
+// Enables Contextual Search.
+const char kEnableContextualSearch[]        = "enable-contextual-search";
 
 // Enables the new NTP.
 const char kEnableNewNTP[]                  = "enable-new-ntp";

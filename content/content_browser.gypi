@@ -1698,8 +1698,6 @@
         ['exclude', '^browser/web_contents/touch_editable_impl_aura.h'],
         ['exclude', '^browser/renderer_host/ui_events_helper.cc'],
         ['exclude', '^browser/renderer_host/ui_events_helper.h'],
-        ['exclude', '^browser/context_factory.cc'],
-        ['exclude', '^public/browser/context_factory.h'],
       ],
     }],
     ['use_aura==1 or OS=="mac"', {
@@ -1709,6 +1707,8 @@
     }, {
       'sources/': [
         ['exclude', '^browser/compositor/'],
+        ['exclude', '^browser/context_factory.cc'],
+        ['exclude', '^public/browser/context_factory.h'],
       ]
     }],
     ['enable_plugins==1', {

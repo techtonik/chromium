@@ -26,6 +26,7 @@
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/child_process_security_policy.h"
 #include "content/public/browser/geolocation_permission_context.h"
+#include "content/public/browser/host_zoom_map.h"
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/notification_details.h"
@@ -33,6 +34,7 @@
 #include "content/public/browser/notification_source.h"
 #include "content/public/browser/notification_types.h"
 #include "content/public/browser/render_process_host.h"
+#include "content/public/browser/render_view_host.h"
 #include "content/public/browser/resource_request_details.h"
 #include "content/public/browser/site_instance.h"
 #include "content/public/browser/storage_partition.h"
@@ -177,7 +179,6 @@ WebViewGuest::WebViewGuest(int guest_instance_id,
    :  GuestView<WebViewGuest>(guest_instance_id,
                               guest_web_contents,
                               embedder_extension_id),
-      WebContentsObserver(guest_web_contents),
       script_executor_(new extensions::ScriptExecutor(guest_web_contents,
                                                       &script_observers_)),
       pending_context_menu_request_id_(0),
@@ -334,24 +335,22 @@ void WebViewGuest::Attach(WebContents* embedder_web_contents,
   AddWebViewToExtensionRendererState();
 }
 
-bool WebViewGuest::HandleContextMenu(
-    const content::ContextMenuParams& params) {
-  ContextMenuDelegate* menu_delegate =
-      ContextMenuDelegate::FromWebContents(guest_web_contents());
-  DCHECK(menu_delegate);
-
-  pending_menu_ = menu_delegate->BuildMenu(guest_web_contents(), params);
-
-  // Pass it to embedder.
-  int request_id = ++pending_context_menu_request_id_;
-  scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
-  scoped_ptr<base::ListValue> items =
-      MenuModelToValue(pending_menu_->menu_model());
-  args->Set(webview::kContextMenuItems, items.release());
-  args->SetInteger(webview::kRequestId, request_id);
-  DispatchEvent(new GuestViewBase::Event(webview::kEventContextMenu,
-                                         args.Pass()));
-  return true;
+void WebViewGuest::EmbedderDestroyed() {
+  // TODO(fsamuel): WebRequest event listeners for <webview> should survive
+  // reparenting of a <webview> within a single embedder. Right now, we keep
+  // around the browser state for the listener for the lifetime of the embedder.
+  // Ideally, the lifetime of the listeners should match the lifetime of the
+  // <webview> DOM node. Once http://crbug.com/156219 is resolved we can move
+  // the call to RemoveWebViewEventListenersOnIOThread back to
+  // WebViewGuest::WebContentsDestroyed.
+  content::BrowserThread::PostTask(
+      content::BrowserThread::IO,
+      FROM_HERE,
+      base::Bind(
+          &RemoveWebViewEventListenersOnIOThread,
+          browser_context(), embedder_extension_id(),
+          embedder_render_process_id(),
+          view_instance_id()));
 }
 
 bool WebViewGuest::AddMessageToConsole(WebContents* source,
@@ -401,24 +400,6 @@ void WebViewGuest::DidAttach() {
   }
 }
 
-void WebViewGuest::EmbedderDestroyed() {
-  // TODO(fsamuel): WebRequest event listeners for <webview> should survive
-  // reparenting of a <webview> within a single embedder. Right now, we keep
-  // around the browser state for the listener for the lifetime of the embedder.
-  // Ideally, the lifetime of the listeners should match the lifetime of the
-  // <webview> DOM node. Once http://crbug.com/156219 is resolved we can move
-  // the call to RemoveWebViewEventListenersOnIOThread back to
-  // WebViewGuest::WebContentsDestroyed.
-  content::BrowserThread::PostTask(
-      content::BrowserThread::IO,
-      FROM_HERE,
-      base::Bind(
-          &RemoveWebViewEventListenersOnIOThread,
-          browser_context(), embedder_extension_id(),
-          embedder_render_process_id(),
-          view_instance_id()));
-}
-
 void WebViewGuest::FindReply(WebContents* source,
                              int request_id,
                              int number_of_matches,
@@ -427,6 +408,26 @@ void WebViewGuest::FindReply(WebContents* source,
                              bool final_update) {
   find_helper_.FindReply(request_id, number_of_matches, selection_rect,
                          active_match_ordinal, final_update);
+}
+
+bool WebViewGuest::HandleContextMenu(
+    const content::ContextMenuParams& params) {
+  ContextMenuDelegate* menu_delegate =
+      ContextMenuDelegate::FromWebContents(guest_web_contents());
+  DCHECK(menu_delegate);
+
+  pending_menu_ = menu_delegate->BuildMenu(guest_web_contents(), params);
+
+  // Pass it to embedder.
+  int request_id = ++pending_context_menu_request_id_;
+  scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
+  scoped_ptr<base::ListValue> items =
+      MenuModelToValue(pending_menu_->menu_model());
+  args->Set(webview::kContextMenuItems, items.release());
+  args->SetInteger(webview::kRequestId, request_id);
+  DispatchEvent(new GuestViewBase::Event(webview::kEventContextMenu,
+                                         args.Pass()));
+  return true;
 }
 
 void WebViewGuest::HandleKeyboardEvent(
@@ -566,19 +567,6 @@ void WebViewGuest::Observe(int type,
       NOTREACHED() << "Unexpected notification sent.";
       break;
   }
-}
-
-void WebViewGuest::SetZoom(double zoom_factor) {
-  double zoom_level = content::ZoomFactorToZoomLevel(zoom_factor);
-  guest_web_contents()->SetZoomLevel(zoom_level);
-
-  scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
-  args->SetDouble(webview::kOldZoomFactor, current_zoom_factor_);
-  args->SetDouble(webview::kNewZoomFactor, zoom_factor);
-  DispatchEvent(
-      new GuestViewBase::Event(webview::kEventZoomChange, args.Pass()));
-
-  current_zoom_factor_ = zoom_factor;
 }
 
 double WebViewGuest::GetZoom() {
@@ -805,7 +793,7 @@ void WebViewGuest::DidCommitProvisionalLoadForFrame(
 
   // Update the current zoom factor for the new page.
   current_zoom_factor_ = content::ZoomLevelToZoomFactor(
-      guest_web_contents()->GetZoomLevel());
+      content::HostZoomMap::GetZoomLevel(guest_web_contents()));
 
   if (is_main_frame) {
     chromevox_injected_ = false;
@@ -822,8 +810,9 @@ void WebViewGuest::DidFailProvisionalLoad(
     const base::string16& error_description,
     content::RenderViewHost* render_view_host) {
   // Translate the |error_code| into an error string.
-  std::string error_type;
-  base::RemoveChars(net::ErrorToString(error_code), "net::", &error_type);
+  std::string error_type(net::ErrorToString(error_code));
+  DCHECK(StartsWithASCII(error_type, "net::", true));
+  error_type.erase(0, 5);
   LoadAbort(is_main_frame, validated_url, error_type);
 }
 
@@ -883,6 +872,7 @@ void WebViewGuest::WebContentsDestroyed() {
       embedder_extension_id(), view_instance_id()));
 
   RemoveWebViewFromExtensionRendererState(web_contents());
+  GuestViewBase::WebContentsDestroyed();
 }
 
 void WebViewGuest::UserAgentOverrideSet(const std::string& user_agent) {
@@ -902,6 +892,8 @@ void WebViewGuest::UserAgentOverrideSet(const std::string& user_agent) {
 }
 
 void WebViewGuest::RenderViewReady() {
+  // The guest RenderView should always live in an isolated guest process.
+  CHECK(guest_web_contents()->GetRenderProcessHost()->IsIsolatedGuest());
   Send(new ChromeViewMsg_SetName(guest_web_contents()->GetRoutingID(), name_));
 }
 
@@ -1073,9 +1065,9 @@ void WebViewGuest::NavigateGuest(const std::string& src) {
       !url.SchemeIs(content::kAboutScheme)) ||
       url.SchemeIs(url::kJavaScriptScheme);
   if (scheme_is_blocked || !url.is_valid()) {
-    std::string error_type;
-    base::RemoveChars(net::ErrorToString(net::ERR_ABORTED), "net::",
-                      &error_type);
+    std::string error_type(net::ErrorToString(net::ERR_ABORTED));
+    DCHECK(StartsWithASCII(error_type, "net::", true));
+    error_type.erase(0, 5);
     LoadAbort(true /* is_top_level */, url, error_type);
     return;
   }
@@ -1261,6 +1253,19 @@ void WebViewGuest::SetName(const std::string& name) {
   name_ = name;
 
   Send(new ChromeViewMsg_SetName(routing_id(), name_));
+}
+
+void WebViewGuest::SetZoom(double zoom_factor) {
+  double zoom_level = content::ZoomFactorToZoomLevel(zoom_factor);
+  content::HostZoomMap::SetZoomLevel(guest_web_contents(), zoom_level);
+
+  scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
+  args->SetDouble(webview::kOldZoomFactor, current_zoom_factor_);
+  args->SetDouble(webview::kNewZoomFactor, zoom_factor);
+  DispatchEvent(
+      new GuestViewBase::Event(webview::kEventZoomChange, args.Pass()));
+
+  current_zoom_factor_ = zoom_factor;
 }
 
 void WebViewGuest::Destroy() {

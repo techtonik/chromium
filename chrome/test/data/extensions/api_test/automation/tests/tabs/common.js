@@ -6,23 +6,36 @@ var assertEq = chrome.test.assertEq;
 var assertFalse = chrome.test.assertFalse;
 var assertTrue = chrome.test.assertTrue;
 
+var EventType = chrome.automation.EventType;
+var RoleType = chrome.automation.RoleType;
+var StateType = chrome.automation.StateType;
+
 var tree = null;
 
-function setUpAndRunTests(allTests) {
-  chrome.test.getConfig(function(config) {
-    assertTrue('testServer' in config, 'Expected testServer in config');
-    var url = 'http://a.com:PORT/index.html'
-        .replace(/PORT/, config.testServer.port);
+function createTab(url, callback) {
+  chrome.tabs.create({"url": url}, function(tab) {
+    callback(tab);
+  });
+}
 
-    function gotTree(returnedTree) {
-      tree = returnedTree;
-      tree.addEventListener('loadComplete', function() {
-        chrome.test.runTests(allTests);
+function setUpAndRunTests(allTests) {
+  getUrlFromConfig(function(url) {
+    createTab(url, function(unused_tab) {
+      chrome.automation.getTree(function (returnedTree) {
+        tree = returnedTree;
+        tree.addEventListener('loadComplete', function() {
+          chrome.test.runTests(allTests);
+        });
       });
-    }
-    chrome.tabs.create({ 'url': url }, function() {
-      chrome.automation.getTree(gotTree);
     });
   });
 }
 
+function getUrlFromConfig(callback) {
+  chrome.test.getConfig(function(config) {
+    assertTrue('testServer' in config, 'Expected testServer in config');
+    var url = 'http://a.com:PORT/index.html'
+        .replace(/PORT/, config.testServer.port);
+    callback(url)
+  });
+}

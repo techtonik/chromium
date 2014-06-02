@@ -110,6 +110,7 @@
       ],
       'dependencies': [
         'mojo_geometry_bindings',
+        'mojo_gles2_bindings',
         'mojo_input_events_bindings',
         'mojo_cpp_bindings',
       ],
@@ -286,10 +287,13 @@
             'services/view_manager/root_node_manager.h',
             'services/view_manager/root_view_manager.cc',
             'services/view_manager/root_view_manager.h',
+            'services/view_manager/root_view_manager_delegate.h',
             'services/view_manager/view.cc',
             'services/view_manager/view.h',
             'services/view_manager/view_manager_connection.cc',
             'services/view_manager/view_manager_connection.h',
+            'services/view_manager/view_manager_init_connection.cc',
+            'services/view_manager/view_manager_init_connection.h',
             'services/view_manager/view_manager_export.h',
           ],
           'defines': [
