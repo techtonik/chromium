@@ -36,6 +36,7 @@
 #include "media/audio/audio_parameters.h"
 #include "media/base/channel_layout.h"
 #include "media/base/media_log_event.h"
+#include "net/base/network_change_notifier.h"
 #include "third_party/WebKit/public/platform/WebFloatPoint.h"
 #include "third_party/WebKit/public/platform/WebFloatRect.h"
 #include "third_party/WebKit/public/platform/WebScreenInfo.h"
@@ -669,12 +670,6 @@ IPC_MESSAGE_ROUTED0(ViewMsg_DisownOpener)
 IPC_MESSAGE_ROUTED1(ViewMsg_Zoom,
                     content::PageZoom /* function */)
 
-// Set the zoom level for the current main frame.  If the level actually
-// changes, a ViewHostMsg_DidZoomURL message will be sent back to the browser
-// telling it what url got zoomed and what its current zoom level is.
-IPC_MESSAGE_ROUTED1(ViewMsg_SetZoomLevel,
-                    double /* zoom_level */)
-
 // Set the zoom level for a particular url that the renderer is in the
 // process of loading.  This will be stored, to be used if the load commits
 // and ignored otherwise.
@@ -841,10 +836,11 @@ IPC_MESSAGE_ROUTED0(ViewMsg_WorkerScriptLoadFailed)
 // This message is sent only if the worker successfully loaded the script.
 IPC_MESSAGE_ROUTED0(ViewMsg_WorkerConnected)
 
-// Tells the renderer that the network state has changed and that
-// window.navigator.onLine should be updated for all WebViews.
-IPC_MESSAGE_CONTROL1(ViewMsg_NetworkStateChanged,
-                     bool /* online */)
+// Tells the renderer that the network state has changed so that
+// navigator.onLine and navigator.connection can be updated.
+IPC_MESSAGE_CONTROL2(ViewMsg_NetworkStateChanged,
+                     bool /* is_online */,
+                     net::NetworkChangeNotifier::ConnectionType /* type */)
 
 // Reply to ViewHostMsg_OpenChannelToPpapiBroker
 // Tells the renderer that the channel to the broker has been created.
@@ -1124,7 +1120,8 @@ IPC_MESSAGE_ROUTED2(ViewHostMsg_UpdateTargetURL,
 // Sent when the document element is available for the top-level frame.  This
 // happens after the page starts loading, but before all resources are
 // finished.
-IPC_MESSAGE_ROUTED0(ViewHostMsg_DocumentAvailableInMainFrame)
+IPC_MESSAGE_ROUTED1(ViewHostMsg_DocumentAvailableInMainFrame,
+                    bool /* uses_temporary_zoom_level */)
 
 // Sent when the renderer loads a resource from its memory cache.
 // The security info is non empty if the resource was originally loaded over
@@ -1198,7 +1195,8 @@ IPC_SYNC_MESSAGE_CONTROL2_0(ViewHostMsg_DeleteCookie,
 
 // Used to check if cookies are enabled for the given URL. This may block
 // waiting for a previous SetCookie message to be processed.
-IPC_SYNC_MESSAGE_CONTROL2_1(ViewHostMsg_CookiesEnabled,
+IPC_SYNC_MESSAGE_CONTROL3_1(ViewHostMsg_CookiesEnabled,
+                            int /* render_frame_id */,
                             GURL /* url */,
                             GURL /* first_party_for_cookies */,
                             bool /* cookies_enabled */)
@@ -1398,12 +1396,6 @@ IPC_MESSAGE_ROUTED3(ViewHostMsg_SelectionChanged,
 IPC_MESSAGE_ROUTED1(ViewHostMsg_SelectionBoundsChanged,
                     ViewHostMsg_SelectionBounds_Params)
 
-#if defined(OS_ANDROID)
-// Notification that the selection root bounds have changed.
-IPC_MESSAGE_ROUTED1(ViewHostMsg_SelectionRootBoundsChanged,
-                    gfx::Rect /* bounds of the selection root */)
-#endif
-
 // Asks the browser to display the file chooser.  The result is returned in a
 // ViewMsg_RunFileChooserResponse message.
 IPC_MESSAGE_ROUTED1(ViewHostMsg_RunFileChooser,
@@ -1439,22 +1431,20 @@ IPC_MESSAGE_ROUTED1(ViewHostMsg_TextInputStateChanged,
 IPC_MESSAGE_ROUTED0(ViewHostMsg_ImeCancelComposition)
 
 // Sent when the renderer changes the zoom level for a particular url, so the
-// browser can update its records.  If remember is true, then url is used to
-// update the zoom level for all pages in that site.  Otherwise, the render
-// view's id is used so that only the menu is updated.
-IPC_MESSAGE_ROUTED3(ViewHostMsg_DidZoomURL,
+// browser can update its records.  If the view is a plugin doc, then url is
+// used to update the zoom level for all pages in that site.  Otherwise, the
+// render view's id is used so that only the menu is updated.
+IPC_MESSAGE_ROUTED2(ViewHostMsg_DidZoomURL,
                     double /* zoom_level */,
-                    bool /* remember */,
                     GURL /* url */)
 
 // Updates the minimum/maximum allowed zoom percent for this tab from the
 // default values.  If |remember| is true, then the zoom setting is applied to
 // other pages in the site and is saved, otherwise it only applies to this
 // tab.
-IPC_MESSAGE_ROUTED3(ViewHostMsg_UpdateZoomLimits,
+IPC_MESSAGE_ROUTED2(ViewHostMsg_UpdateZoomLimits,
                     int /* minimum_percent */,
-                    int /* maximum_percent */,
-                    bool /* remember */)
+                    int /* maximum_percent */)
 
 // Notify the browser that this render process can or can't be suddenly
 // terminated.

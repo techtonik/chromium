@@ -683,19 +683,19 @@ void RenderViewImpl::Initialize(RenderViewImplParams* params) {
   // Ensure we start with a valid next_page_id_ from the browser.
   DCHECK_GE(next_page_id_, 0);
 
-  RenderFrameImpl* main_render_frame = RenderFrameImpl::Create(
-      this, params->main_frame_routing_id);
+  main_render_frame_.reset(RenderFrameImpl::Create(
+      this, params->main_frame_routing_id));
   // The main frame WebLocalFrame object is closed by
   // RenderFrameImpl::frameDetached().
-  WebLocalFrame* web_frame = WebLocalFrame::create(main_render_frame);
-  main_render_frame->SetWebFrame(web_frame);
+  WebLocalFrame* web_frame = WebLocalFrame::create(main_render_frame_.get());
+  main_render_frame_->SetWebFrame(web_frame);
 
   if (params->proxy_routing_id != MSG_ROUTING_NONE) {
     CHECK(params->swapped_out);
     RenderFrameProxy* proxy =
         RenderFrameProxy::CreateFrameProxy(params->proxy_routing_id,
                                            params->main_frame_routing_id);
-    main_render_frame->set_render_frame_proxy(proxy);
+    main_render_frame_->set_render_frame_proxy(proxy);
   }
 
   webwidget_ = WebView::create(this);
@@ -757,7 +757,6 @@ void RenderViewImpl::Initialize(RenderViewImplParams* params) {
   webview()->settings()->setAllowConnectingInsecureWebSocket(
       command_line.HasSwitch(switches::kAllowInsecureWebSocketFromHttpsOrigin));
 
-  main_render_frame_.reset(main_render_frame);
   webview()->setMainFrame(main_render_frame_->GetWebFrame());
   main_render_frame_->Initialize();
 
@@ -1072,7 +1071,6 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ViewMsg_Find, OnFind)
     IPC_MESSAGE_HANDLER(ViewMsg_StopFinding, OnStopFinding)
     IPC_MESSAGE_HANDLER(ViewMsg_Zoom, OnZoom)
-    IPC_MESSAGE_HANDLER(ViewMsg_SetZoomLevel, OnSetZoomLevel)
     IPC_MESSAGE_HANDLER(ViewMsg_SetZoomLevelForLoadingURL,
                         OnSetZoomLevelForLoadingURL)
     IPC_MESSAGE_HANDLER(ViewMsg_SetPageEncoding, OnSetPageEncoding)
@@ -1885,21 +1883,6 @@ bool RenderViewImpl::isPointerLocked() {
       webwidget_mouse_lock_target_.get());
 }
 
-void RenderViewImpl::didActivateCompositor() {
-#if !defined(OS_MACOSX)  // many events are unhandled - http://crbug.com/138003
-  RenderThreadImpl* render_thread = RenderThreadImpl::current();
-  // render_thread may be NULL in tests.
-  InputHandlerManager* input_handler_manager =
-      render_thread ? render_thread->input_handler_manager() : NULL;
-  if (input_handler_manager) {
-     input_handler_manager->AddInputHandler(
-        routing_id_,
-        compositor_->GetInputHandler(),
-        AsWeakPtr());
-  }
-#endif
-}
-
 void RenderViewImpl::didHandleGestureEvent(
     const WebGestureEvent& event,
     bool event_cancelled) {
@@ -1918,9 +1901,21 @@ void RenderViewImpl::didHandleGestureEvent(
 void RenderViewImpl::initializeLayerTreeView() {
   RenderWidget::initializeLayerTreeView();
   RenderWidgetCompositor* rwc = compositor();
-  if (!rwc || !webview() || !webview()->devToolsAgent())
+  if (!rwc)
     return;
-  webview()->devToolsAgent()->setLayerTreeId(rwc->GetLayerTreeId());
+  if (webview() && webview()->devToolsAgent())
+    webview()->devToolsAgent()->setLayerTreeId(rwc->GetLayerTreeId());
+
+#if !defined(OS_MACOSX)  // many events are unhandled - http://crbug.com/138003
+  RenderThreadImpl* render_thread = RenderThreadImpl::current();
+  // render_thread may be NULL in tests.
+  InputHandlerManager* input_handler_manager =
+      render_thread ? render_thread->input_handler_manager() : NULL;
+  if (input_handler_manager) {
+    input_handler_manager->AddInputHandler(
+        routing_id_, rwc->GetInputHandler(), AsWeakPtr());
+  }
+#endif
 }
 
 // blink::WebFrameClient -----------------------------------------------------
@@ -2047,6 +2042,8 @@ void RenderViewImpl::didCreateDataSource(WebLocalFrame* frame,
       case WebURLRequest::ReturnCacheDataDontLoad:  // Don't re-post.
         document_state->set_load_type(DocumentState::LINK_LOAD_CACHE_ONLY);
         break;
+      default:
+        NOTREACHED();
     }
   }
 
@@ -2648,12 +2645,6 @@ void RenderViewImpl::OnZoom(PageZoom zoom) {
       zoom_level = static_cast<int>(old_zoom_level);
     }
   }
-  webview()->setZoomLevel(zoom_level);
-  zoomLevelChanged();
-}
-
-void RenderViewImpl::OnSetZoomLevel(double zoom_level) {
-  webview()->hidePopups();
   webview()->setZoomLevel(zoom_level);
   zoomLevelChanged();
 }
@@ -3644,8 +3635,10 @@ bool RenderViewImpl::ScheduleFileChooser(
 }
 
 blink::WebGeolocationClient* RenderViewImpl::geolocationClient() {
-  if (!geolocation_dispatcher_)
-    geolocation_dispatcher_ = new GeolocationDispatcher(this);
+  if (!geolocation_dispatcher_) {
+    geolocation_dispatcher_ = new GeolocationDispatcher(
+        main_render_frame_.get());
+  }
   return geolocation_dispatcher_;
 }
 
@@ -3657,22 +3650,16 @@ blink::WebSpeechRecognizer* RenderViewImpl::speechRecognizer() {
 
 void RenderViewImpl::zoomLimitsChanged(double minimum_level,
                                        double maximum_level) {
-  // For now, don't remember plugin zoom values.  We don't want to mix them with
-  // normal web content (i.e. a fixed layout plugin would usually want them
-  // different).
-  bool remember = !webview()->mainFrame()->document().isPluginDocument();
-
   int minimum_percent = static_cast<int>(
       ZoomLevelToZoomFactor(minimum_level) * 100);
   int maximum_percent = static_cast<int>(
       ZoomLevelToZoomFactor(maximum_level) * 100);
 
   Send(new ViewHostMsg_UpdateZoomLimits(
-      routing_id_, minimum_percent, maximum_percent, remember));
+      routing_id_, minimum_percent, maximum_percent));
 }
 
 void RenderViewImpl::zoomLevelChanged() {
-  bool remember = !webview()->mainFrame()->document().isPluginDocument();
   double zoom_level = webview()->zoomLevel();
 
   FOR_EACH_OBSERVER(RenderViewObserver, observers_, ZoomLevelChanged());
@@ -3683,7 +3670,7 @@ void RenderViewImpl::zoomLevelChanged() {
     // Tell the browser which url got zoomed so it can update the menu and the
     // saved values if necessary
     Send(new ViewHostMsg_DidZoomURL(
-        routing_id_, zoom_level, remember,
+        routing_id_, zoom_level,
         GURL(webview()->mainFrame()->document().url())));
   }
 }

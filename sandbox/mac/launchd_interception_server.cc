@@ -25,6 +25,7 @@ LaunchdInterceptionServer::LaunchdInterceptionServer(
       server_port_(MACH_PORT_NULL),
       server_queue_(NULL),
       server_source_(NULL),
+      did_forward_message_(false),
       sandbox_port_(MACH_PORT_NULL),
       compat_shim_(GetLaunchdCompatibilityShim()) {
 }
@@ -75,6 +76,12 @@ bool LaunchdInterceptionServer::Initialize() {
     return false;
   }
   sandbox_port_.reset(port);
+  if ((kr = mach_port_insert_right(task, sandbox_port_, sandbox_port_,
+          MACH_MSG_TYPE_MAKE_SEND) != KERN_SUCCESS)) {
+    MACH_LOG(ERROR, kr) << "Failed to allocate dummy sandbox port send right.";
+    return false;
+  }
+  sandbox_send_port_.reset(sandbox_port_);
 
   // Set up the dispatch queue to service the bootstrap port.
   // TODO(rsesek): Specify DISPATCH_QUEUE_SERIAL, in the 10.7 SDK. NULL means
@@ -102,6 +109,7 @@ void LaunchdInterceptionServer::ReceiveMessage() {
   // Zero out the buffers from handling any previous message.
   bzero(request, kBufferSize);
   bzero(reply, kBufferSize);
+  did_forward_message_ = false;
 
   // A Mach message server-once. The system library to run a message server
   // cannot be used here, because some requests are conditionally forwarded
@@ -125,9 +133,15 @@ void LaunchdInterceptionServer::ReceiveMessage() {
   // Process the message.
   DemuxMessage(request, reply);
 
-  // Free any descriptors in the message body.
-  mach_msg_destroy(request);
-  mach_msg_destroy(reply);
+  // Free any descriptors in the message body. If the message was forwarded,
+  // any descriptors would have been moved out of the process on send. If the
+  // forwarded message was sent from the process hosting this sandbox server,
+  // destroying the message could also destroy rights held outside the scope of
+  // this message server.
+  if (!did_forward_message_) {
+    mach_msg_destroy(request);
+    mach_msg_destroy(reply);
+  }
 }
 
 void LaunchdInterceptionServer::DemuxMessage(mach_msg_header_t* request,
@@ -177,10 +191,10 @@ void LaunchdInterceptionServer::HandleLookUp(mach_msg_header_t* request,
   // Find the Rule for this service. If one is not found, use
   // a safe default, POLICY_DENY_ERROR.
   const BootstrapSandboxPolicy* policy = sandbox_->PolicyForProcess(sender_pid);
-  const BootstrapSandboxPolicy::const_iterator it =
-      policy->find(request_service_name);
-  Rule rule(POLICY_DENY_ERROR);
-  if (it != policy->end())
+  const BootstrapSandboxPolicy::NamedRules::const_iterator it =
+      policy->rules.find(request_service_name);
+  Rule rule(policy->default_rule);
+  if (it != policy->rules.end())
     rule = it->second;
 
   if (rule.result == POLICY_ALLOW) {
@@ -208,16 +222,13 @@ void LaunchdInterceptionServer::HandleLookUp(mach_msg_header_t* request,
     else
       result_port = rule.substitute_port;
 
-    // Grant an additional send right on the result_port so that it can be
-    // sent to the sandboxed child process.
-    kern_return_t kr = mach_port_insert_right(mach_task_self(),
-        result_port, result_port, MACH_MSG_TYPE_MAKE_SEND);
-    if (kr != KERN_SUCCESS) {
-      MACH_LOG(ERROR, kr) << "Unable to insert right on result_port.";
-    }
-
     compat_shim_.look_up2_fill_reply(reply, result_port);
-    SendReply(reply);
+    // If the message was sent successfully, clear the result_port out of the
+    // message so that it is not destroyed at the end of ReceiveMessage. The
+    // above-inserted right has been moved out of the process, and destroying
+    // the message will unref yet another right.
+    if (SendReply(reply))
+      compat_shim_.look_up2_fill_reply(reply, MACH_PORT_NULL);
   } else {
     NOTREACHED();
   }
@@ -238,12 +249,12 @@ void LaunchdInterceptionServer::HandleSwapInteger(mach_msg_header_t* request,
   }
 }
 
-void LaunchdInterceptionServer::SendReply(mach_msg_header_t* reply) {
+bool LaunchdInterceptionServer::SendReply(mach_msg_header_t* reply) {
   kern_return_t kr = mach_msg(reply, MACH_SEND_MSG, reply->msgh_size, 0,
       MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
-  if (kr != KERN_SUCCESS) {
-    MACH_LOG(ERROR, kr) << "Unable to send intercepted reply message.";
-  }
+  MACH_LOG_IF(ERROR, kr != KERN_SUCCESS, kr)
+      << "Unable to send intercepted reply message.";
+  return kr == KERN_SUCCESS;
 }
 
 void LaunchdInterceptionServer::ForwardMessage(mach_msg_header_t* request,
@@ -254,7 +265,9 @@ void LaunchdInterceptionServer::ForwardMessage(mach_msg_header_t* request,
   request->msgh_bits = (request->msgh_bits & ~MACH_MSGH_BITS_PORTS_MASK) |
       MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, MACH_MSG_TYPE_MOVE_SEND_ONCE);
   kern_return_t kr = mach_msg_send(request);
-  if (kr != KERN_SUCCESS) {
+  if (kr == KERN_SUCCESS) {
+    did_forward_message_ = true;
+  } else {
     MACH_LOG(ERROR, kr) << "Unable to forward message to the real launchd.";
   }
 }

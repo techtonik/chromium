@@ -37,7 +37,7 @@ blink::WebGestureEvent CreateFlingCancelEvent(double time_stamp) {
   blink::WebGestureEvent gesture_event;
   gesture_event.timeStampSeconds = time_stamp;
   gesture_event.type = blink::WebGestureEvent::GestureFlingCancel;
-  gesture_event.sourceDevice = blink::WebGestureEvent::Touchscreen;
+  gesture_event.sourceDevice = blink::WebGestureDeviceTouchscreen;
   return gesture_event;
 }
 #endif  // defined(USE_AURA)
@@ -351,20 +351,6 @@ void RenderWidgetHostViewGuest::SelectionBoundsChanged(
   guest_params.focus_rect = guest_->ToGuestRect(params.focus_rect);
   rwhv->SelectionBoundsChanged(guest_params);
 }
-
-#if defined(OS_ANDROID)
-void RenderWidgetHostViewGuest::SelectionRootBoundsChanged(
-    const gfx::Rect& bounds) {
-  if (!guest_)
-    return;
-
-  RenderWidgetHostViewBase* rwhv = GetGuestRenderWidgetHostView();
-  if (!rwhv)
-    return;
-
-  rwhv->SelectionRootBoundsChanged(guest_->ToGuestRect(bounds));
-}
-#endif
 
 void RenderWidgetHostViewGuest::CopyFromCompositingSurface(
     const gfx::Rect& src_subrect,

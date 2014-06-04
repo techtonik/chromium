@@ -30,12 +30,21 @@ TEST_F(DesktopNativeWidgetAuraTest, CreateWithParentNotInRootWindow) {
   widget.Init(params);
 }
 
-// Verifies that the AURA windows making up a widget instance have the correct
+// Verifies that the Aura windows making up a widget instance have the correct
 // bounds after the widget is resized.
 TEST_F(DesktopNativeWidgetAuraTest, DesktopAuraWindowSizeTest) {
   Widget widget;
+
+  // On Linux we test this with popup windows because the WM may ignore the size
+  // suggestion for normal windows.
+#if defined(OS_LINUX)
+  Widget::InitParams init_params =
+      CreateParams(Widget::InitParams::TYPE_POPUP);
+#else
   Widget::InitParams init_params =
       CreateParams(Widget::InitParams::TYPE_WINDOW_FRAMELESS);
+#endif
+
   init_params.ownership = Widget::InitParams::WIDGET_OWNS_NATIVE_WIDGET;
   init_params.native_widget = new DesktopNativeWidgetAura(&widget);
   widget.Init(init_params);
@@ -189,8 +198,8 @@ TEST_F(DesktopNativeWidgetAuraTest, DontAccessContentWindowDuringDestruction) {
 }
 
 void QuitNestedLoopAndCloseWidget(scoped_ptr<Widget> widget,
-                                  aura::client::DispatcherClient* client) {
-  client->QuitNestedMessageLoop();
+                                  base::Closure* quit_runloop) {
+  quit_runloop->Run();
 }
 
 // Verifies that a widget can be destroyed when running a nested message-loop.
@@ -211,9 +220,13 @@ TEST_F(DesktopNativeWidgetAuraTest, WidgetCanBeDestroyedFromNestedLoop) {
   // Post a task that terminates the nested loop and destroyes the widget. This
   // task will be executed from the nested loop initiated with the call to
   // |RunWithDispatcher()| below.
+  aura::client::DispatcherRunLoop run_loop(client, NULL);
+  base::Closure quit_runloop = run_loop.QuitClosure();
   message_loop()->PostTask(FROM_HERE,
-      base::Bind(&QuitNestedLoopAndCloseWidget, base::Passed(&widget), client));
-  client->RunWithDispatcher(NULL);
+                           base::Bind(&QuitNestedLoopAndCloseWidget,
+                                      base::Passed(&widget),
+                                      base::Unretained(&quit_runloop)));
+  run_loop.Run();
 }
 
 }  // namespace views

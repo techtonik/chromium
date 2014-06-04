@@ -314,7 +314,7 @@ bool RenderViewHostImpl::CreateRenderView(
 
   // If it's enabled, tell the renderer to set up the Javascript bindings for
   // sending messages back to the browser.
-  if (GetProcess()->IsGuest())
+  if (GetProcess()->IsIsolatedGuest())
     DCHECK_EQ(0, enabled_bindings_);
   Send(new ViewMsg_AllowBindings(GetRoutingID(), enabled_bindings_));
   // Let our delegate know that we created a RenderView.
@@ -461,6 +461,7 @@ WebPreferences RenderViewHostImpl::GetWebkitPrefs(const GURL& url) {
   }
 
   prefs.is_online = !net::NetworkChangeNotifier::IsOffline();
+  prefs.connection_type = net::NetworkChangeNotifier::GetConnectionType();
 
   prefs.gesture_tap_highlight_enabled = !command_line.HasSwitch(
       switches::kDisableGestureTapHighlight);
@@ -658,7 +659,7 @@ void RenderViewHostImpl::SetHasPendingCrossSiteRequest(
 
 void RenderViewHostImpl::SetWebUIHandle(mojo::ScopedMessagePipeHandle handle) {
   // Never grant any bindings to browser plugin guests.
-  if (GetProcess()->IsGuest()) {
+  if (GetProcess()->IsIsolatedGuest()) {
     NOTREACHED() << "Never grant bindings to a guest process.";
     return;
   }
@@ -821,7 +822,7 @@ RenderFrameHost* RenderViewHostImpl::GetMainFrame() {
 
 void RenderViewHostImpl::AllowBindings(int bindings_flags) {
   // Never grant any bindings to browser plugin guests.
-  if (GetProcess()->IsGuest()) {
+  if (GetProcess()->IsIsolatedGuest()) {
     NOTREACHED() << "Never grant bindings to a guest process.";
     return;
   }
@@ -1000,10 +1001,6 @@ bool RenderViewHostImpl::OnMessageReceived(const IPC::Message& msg) {
     IPC_MESSAGE_HANDLER(ViewHostMsg_TakeFocus, OnTakeFocus)
     IPC_MESSAGE_HANDLER(ViewHostMsg_FocusedNodeChanged, OnFocusedNodeChanged)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ClosePage_ACK, OnClosePageACK)
-#if defined(OS_ANDROID)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_SelectionRootBoundsChanged,
-                        OnSelectionRootBoundsChanged)
-#endif
     IPC_MESSAGE_HANDLER(ViewHostMsg_DidZoomURL, OnDidZoomURL)
 #if defined(OS_MACOSX) || defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ShowPopup, OnShowPopup)
@@ -1181,8 +1178,14 @@ void RenderViewHostImpl::OnRequestMove(const gfx::Rect& pos) {
   Send(new ViewMsg_Move_ACK(GetRoutingID()));
 }
 
-void RenderViewHostImpl::OnDocumentAvailableInMainFrame() {
+void RenderViewHostImpl::OnDocumentAvailableInMainFrame(
+    bool uses_temporary_zoom_level) {
   delegate_->DocumentAvailableInMainFrame(this);
+
+  HostZoomMapImpl* host_zoom_map = static_cast<HostZoomMapImpl*>(
+      HostZoomMap::GetForBrowserContext(GetProcess()->GetBrowserContext()));
+  host_zoom_map->SetUsesTemporaryZoomLevel(
+      GetProcess()->GetID(), GetRoutingID(), uses_temporary_zoom_level);
 }
 
 void RenderViewHostImpl::OnToggleFullscreen(bool enter_fullscreen) {
@@ -1215,15 +1218,6 @@ void RenderViewHostImpl::OnDidChangeScrollOffsetPinningForMainFrame(
 
 void RenderViewHostImpl::OnDidChangeNumWheelEvents(int count) {
 }
-
-#if defined(OS_ANDROID)
-void RenderViewHostImpl::OnSelectionRootBoundsChanged(
-    const gfx::Rect& bounds) {
-  if (view_) {
-    view_->SelectionRootBoundsChanged(bounds);
-  }
-}
-#endif
 
 void RenderViewHostImpl::OnRouteCloseEvent() {
   // Have the delegate route this to the active RenderViewHost.
@@ -1591,17 +1585,14 @@ void RenderViewHostImpl::OnAccessibilityLocationChanges(
 }
 
 void RenderViewHostImpl::OnDidZoomURL(double zoom_level,
-                                      bool remember,
                                       const GURL& url) {
   HostZoomMapImpl* host_zoom_map = static_cast<HostZoomMapImpl*>(
       HostZoomMap::GetForBrowserContext(GetProcess()->GetBrowserContext()));
-  if (remember) {
-    host_zoom_map->
-        SetZoomLevelForHost(net::GetHostOrSpecFromURL(url), zoom_level);
-  } else {
-    host_zoom_map->SetTemporaryZoomLevel(
-        GetProcess()->GetID(), GetRoutingID(), zoom_level);
-  }
+
+  host_zoom_map->SetZoomLevelForView(GetProcess()->GetID(),
+                                     GetRoutingID(),
+                                     zoom_level,
+                                     net::GetHostOrSpecFromURL(url));
 }
 
 void RenderViewHostImpl::OnRunFileChooser(const FileChooserParams& params) {

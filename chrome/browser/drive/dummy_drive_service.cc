@@ -12,11 +12,12 @@ using google_apis::AppListCallback;
 using google_apis::AuthStatusCallback;
 using google_apis::AuthorizeAppCallback;
 using google_apis::CancelCallback;
+using google_apis::ChangeListCallback;
 using google_apis::DownloadActionCallback;
 using google_apis::EntryActionCallback;
+using google_apis::FileListCallback;
 using google_apis::GetContentCallback;
 using google_apis::GetResourceEntryCallback;
-using google_apis::GetResourceListCallback;
 using google_apis::GetShareUrlCallback;
 using google_apis::InitiateUploadCallback;
 using google_apis::ProgressCallback;
@@ -56,33 +57,33 @@ std::string DummyDriveService::GetRootResourceId() const {
   return "dummy_root";
 }
 
-CancelCallback DummyDriveService::GetAllResourceList(
-    const GetResourceListCallback& callback) { return CancelCallback(); }
+CancelCallback DummyDriveService::GetAllFileList(
+    const FileListCallback& callback) { return CancelCallback(); }
 
-CancelCallback DummyDriveService::GetResourceListInDirectory(
+CancelCallback DummyDriveService::GetFileListInDirectory(
     const std::string& directory_resource_id,
-    const GetResourceListCallback& callback) { return CancelCallback(); }
+    const FileListCallback& callback) { return CancelCallback(); }
 
 CancelCallback DummyDriveService::Search(
     const std::string& search_query,
-    const GetResourceListCallback& callback) { return CancelCallback(); }
+    const FileListCallback& callback) { return CancelCallback(); }
 
 CancelCallback DummyDriveService::SearchByTitle(
     const std::string& title,
     const std::string& directory_resource_id,
-    const GetResourceListCallback& callback) { return CancelCallback(); }
+    const FileListCallback& callback) { return CancelCallback(); }
 
 CancelCallback DummyDriveService::GetChangeList(
     int64 start_changestamp,
-    const GetResourceListCallback& callback) { return CancelCallback(); }
+    const ChangeListCallback& callback) { return CancelCallback(); }
 
 CancelCallback DummyDriveService::GetRemainingChangeList(
     const GURL& next_link,
-    const GetResourceListCallback& callback) { return CancelCallback(); }
+    const ChangeListCallback& callback) { return CancelCallback(); }
 
 CancelCallback DummyDriveService::GetRemainingFileList(
     const GURL& next_link,
-    const GetResourceListCallback& callback) { return CancelCallback(); }
+    const FileListCallback& callback) { return CancelCallback(); }
 
 CancelCallback DummyDriveService::GetResourceEntry(
     const std::string& resource_id,

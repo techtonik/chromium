@@ -28,29 +28,29 @@ vars = {
   "libcxxabi_revision": "206024",
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
   "nacl_trunk": "http://src.chromium.org/native_client/trunk",
-  "webkit_revision": "174973",
+  "webkit_revision": "175413",
   "chromium_git": "https://chromium.googlesource.com",
   "chromiumos_git": "https://chromium.googlesource.com/chromiumos",
   "pdfium_git": "https://pdfium.googlesource.com",
   "skia_git": "https://skia.googlesource.com",
   "swig_revision": "230490",
-  "nacl_revision": "13251",
+  "nacl_revision": "13267",
   # After changing nacl_revision, run 'glient sync' and check native_client/DEPS
   # to update other nacl_*_revision's.
   "nacl_tools_revision": "13077",  # native_client/DEPS: tools_rev
   "google_toolbox_for_mac_revision": "662",
-  "libaddressinput_revision": "176",
+  "libaddressinput_revision": "262",
   "libphonenumber_revision": "621",
   "libvpx_revision": "269083",
   "lss_revision": "26",
   "sfntly_revision": "228",
   "lighttpd_revision": "33737",
-  "skia_revision": "293a4b367ae5b89384c364737ef76099fd3f0101",
+  "skia_revision": "abc073376091e66f705674b825b1247148cb9c24",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   "v8_branch": "trunk",
-  "v8_revision": "21543",
+  "v8_revision": "21633",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
@@ -68,15 +68,15 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
-  "angle_revision": "28bcf4ffeb49322fa019e2778c1fdd20f61d9ea6",
+  "angle_revision": "d7e7d735ec75a6b0ff855447b20691c7fbb6c97e",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling build tools
   # and whatever else without interference from each other.
-  "buildtools_revision": "83ed7189066fd9b4b9ea15ffc2d4ab6d2da62571",
+  "buildtools_revision": "5d89977ce55240995d1596fe420b818468f5ec37",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFIum
   # and whatever else without interference from each other.
-  "pdfium_revision": "7dc5172decb2e2fa8885561ff473902f6e16c707",
+  "pdfium_revision": "dbd4c06036f42d8dffe033ba112d6d7085dfe475",
 }
 
 deps = {
@@ -145,7 +145,7 @@ deps = {
     (Var("googlecode_url") % "snappy") + "/trunk@80",
 
   "src/tools/grit":
-    (Var("googlecode_url") % "grit-i18n") + "/trunk@167",
+    (Var("googlecode_url") % "grit-i18n") + "/trunk@168",
 
   "src/tools/gyp":
     (Var("googlecode_url") % "gyp") + "/trunk@1921",
@@ -211,7 +211,7 @@ deps = {
 
   "src/third_party/ffmpeg":
     Var("chromium_git") +
-    "/chromium/third_party/ffmpeg.git@90d4238be2656ee9d6b8f0cdfa5f96d40e6ed7ad",
+    "/chromium/third_party/ffmpeg.git@96481cb9163681998d1407b0c951a4c951be1b04",
 
   "src/third_party/libjingle/source/talk":
     (Var("googlecode_url") % "webrtc") + "/trunk/talk@" +
@@ -258,7 +258,7 @@ deps = {
         "/trunk/jsoncpp/src/lib_json@" + Var("jsoncpp_revision"),
 
   "src/third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@1000",
+    (Var("googlecode_url") % "libyuv") + "/trunk@1007",
 
   "src/third_party/smhasher/src":
     (Var("googlecode_url") % "smhasher") + "/trunk@152",
@@ -324,7 +324,7 @@ deps = {
 deps_os = {
   "win": {
     "src/chrome/tools/test/reference_build/chrome_win":
-      "/trunk/deps/reference_builds/chrome_win@254637",
+      "/trunk/deps/reference_builds/chrome_win@273882",
 
     "src/third_party/cygwin":
       "/trunk/deps/third_party/cygwin@231940",
@@ -438,7 +438,7 @@ deps_os = {
   },
   "mac": {
     "src/chrome/tools/test/reference_build/chrome_mac":
-      "/trunk/deps/reference_builds/chrome_mac@255182",
+      "/trunk/deps/reference_builds/chrome_mac@273882",
 
     "src/third_party/google_toolbox_for_mac/src":
       (Var("googlecode_url") % "google-toolbox-for-mac") + "/trunk@" +
@@ -463,7 +463,7 @@ deps_os = {
   "unix": {
     # Linux, really.
     "src/chrome/tools/test/reference_build/chrome_linux":
-      "/trunk/deps/reference_builds/chrome_linux64@254637",
+      "/trunk/deps/reference_builds/chrome_linux64@273882",
 
     "src/third_party/xdg-utils":
       "/trunk/deps/third_party/xdg-utils@203785",
@@ -510,7 +510,7 @@ deps_os = {
   "android": {
     "src/third_party/android_tools":
       Var("chromium_git") + "/android_tools.git" +
-      "@6fc0e1a090e97805a70f0e65377a9db4db3db8f5",
+      "@ac519ee39778f7a1f2aac797a941a6b3db9d3882",
 
     "src/third_party/aosp":
       "/trunk/deps/third_party/aosp@148330",

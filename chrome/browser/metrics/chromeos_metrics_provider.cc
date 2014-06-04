@@ -13,7 +13,9 @@
 #include "chrome/browser/chromeos/login/users/user_manager.h"
 #include "chrome/browser/metrics/metrics_service.h"
 #include "chrome/common/pref_names.h"
+#include "chromeos/system/statistics_provider.h"
 #include "components/metrics/proto/chrome_user_metrics_extension.pb.h"
+#include "content/public/browser/browser_thread.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_adapter_factory.h"
 #include "device/bluetooth/bluetooth_device.h"
@@ -25,7 +27,7 @@
 #endif  // defined(USE_X11)
 
 using metrics::ChromeUserMetricsExtension;
-using metrics::PerfDataProto;
+using metrics::SampledProfile;
 using metrics::SystemProfileProto;
 typedef SystemProfileProto::Hardware::Bluetooth::PairedDevice PairedDevice;
 
@@ -94,7 +96,8 @@ void IncrementPrefValue(const char* path) {
 
 ChromeOSMetricsProvider::ChromeOSMetricsProvider()
     : registered_user_count_at_log_initialization_(false),
-      user_count_at_log_initialization_(0) {
+      user_count_at_log_initialization_(0),
+      weak_ptr_factory_(this) {
 }
 
 ChromeOSMetricsProvider::~ChromeOSMetricsProvider() {
@@ -132,22 +135,32 @@ void ChromeOSMetricsProvider::OnDidCreateMetricsLog() {
   }
 }
 
+void ChromeOSMetricsProvider::InitTaskGetHardwareClass(
+    const base::Closure& callback) {
+  // Run the (potentially expensive) task on the FILE thread to avoid blocking
+  // the UI thread.
+  content::BrowserThread::PostTaskAndReply(
+      content::BrowserThread::FILE,
+      FROM_HERE,
+      base::Bind(&ChromeOSMetricsProvider::InitTaskGetHardwareClassOnFileThread,
+                 weak_ptr_factory_.GetWeakPtr()),
+      callback);
+}
+
+void ChromeOSMetricsProvider::InitTaskGetHardwareClassOnFileThread() {
+  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::FILE));
+  chromeos::system::StatisticsProvider::GetInstance()->GetMachineStatistic(
+      "hardware_class", &hardware_class_);
+}
+
 void ChromeOSMetricsProvider::ProvideSystemProfileMetrics(
     metrics::SystemProfileProto* system_profile_proto) {
-  std::vector<PerfDataProto> perf_data;
-  if (perf_provider_.GetPerfData(&perf_data)) {
-    for (std::vector<PerfDataProto>::iterator iter = perf_data.begin();
-         iter != perf_data.end();
-         ++iter) {
-      uma_proto_->add_perf_data()->Swap(&(*iter));
-    }
-  }
-
   WriteBluetoothProto(system_profile_proto);
   UpdateMultiProfileUserCount(system_profile_proto);
 
   metrics::SystemProfileProto::Hardware* hardware =
       system_profile_proto->mutable_hardware();
+  hardware->set_hardware_class(hardware_class_);
   gfx::Display::TouchSupport has_touch = ui::GetInternalDisplayTouchSupport();
   if (has_touch == gfx::Display::TOUCH_SUPPORT_AVAILABLE)
     hardware->set_internal_display_supports_touch(true);
@@ -177,6 +190,18 @@ void ChromeOSMetricsProvider::ProvideStabilityMetrics(
   if (count) {
     stability_proto->set_unclean_system_shutdown_count(count);
     pref->SetInteger(prefs::kStabilitySystemUncleanShutdownCount, 0);
+  }
+}
+
+void ChromeOSMetricsProvider::ProvideGeneralMetrics(
+    metrics::ChromeUserMetricsExtension* uma_proto) {
+  std::vector<SampledProfile> sampled_profiles;
+  if (perf_provider_.GetSampledProfiles(&sampled_profiles)) {
+    for (std::vector<SampledProfile>::iterator iter = sampled_profiles.begin();
+         iter != sampled_profiles.end();
+         ++iter) {
+      uma_proto->add_sampled_profile()->Swap(&(*iter));
+    }
   }
 }
 

@@ -38,8 +38,8 @@ enum EventType {
   ET_GESTURE_TAP_CANCEL,
   ET_GESTURE_TAP_UNCONFIRMED, // User tapped, but the tap delay hasn't expired.
   ET_GESTURE_DOUBLE_TAP,
-  ET_GESTURE_BEGIN,  // Sent before any other gesture types.
-  ET_GESTURE_END,    // Sent after any other gestures.
+  ET_GESTURE_BEGIN,  // The first event sent when each finger is pressed.
+  ET_GESTURE_END,    // Sent for each released finger.
   ET_GESTURE_TWO_FINGER_TAP,
   ET_GESTURE_PINCH_BEGIN,
   ET_GESTURE_PINCH_END,
@@ -104,11 +104,13 @@ enum KeyEventFlags {
 
 // Flags specific to mouse events
 enum MouseEventFlags {
-  EF_IS_DOUBLE_CLICK    = 1 << 16,
-  EF_IS_TRIPLE_CLICK    = 1 << 17,
-  EF_IS_NON_CLIENT      = 1 << 18,
-  EF_FROM_TOUCH         = 1 << 19,  // Indicates this mouse event is generated
-                                    // from an unconsumed touch/gesture event.
+  EF_IS_DOUBLE_CLICK     = 1 << 16,
+  EF_IS_TRIPLE_CLICK     = 1 << 17,
+  EF_IS_NON_CLIENT       = 1 << 18,
+  EF_FROM_TOUCH          = 1 << 19,  // Indicates this mouse event is generated
+                                     // from an unconsumed touch/gesture event.
+  EF_TOUCH_ACCESSIBILITY = 1 << 20,  // Indicates this event was generated from
+                                     // touch accessibility mode.
 };
 
 // Result of dispatching an event.

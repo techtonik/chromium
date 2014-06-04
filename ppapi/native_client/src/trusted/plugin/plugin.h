@@ -110,27 +110,12 @@ class Plugin : public pp::Instance {
                                        PP_FileHandle file_handle,
                                        ErrorInfo* error_info);
 
-  enum LengthComputable {
-    LENGTH_IS_NOT_COMPUTABLE = 0,
-    LENGTH_IS_COMPUTABLE = 1
-  };
   // Report successful loading of a module.
   void ReportLoadSuccess(uint64_t loaded_bytes, uint64_t total_bytes);
   // Report an error that was encountered while loading a module.
   void ReportLoadError(const ErrorInfo& error_info);
   // Report loading a module was aborted, typically due to user action.
   void ReportLoadAbort();
-
-  // Dispatch a JavaScript event to indicate a key step in loading.
-  // |event_type| is a character string indicating which type of progress
-  // event (loadstart, progress, error, abort, load, loadend).  Events are
-  // enqueued on the JavaScript event loop, which then calls back through
-  // DispatchProgressEvent.
-  void EnqueueProgressEvent(PP_NaClEventType event_type,
-                            const nacl::string& url,
-                            LengthComputable length_computable,
-                            uint64_t loaded_bytes,
-                            uint64_t total_bytes);
 
   // Report the error code that sel_ldr produces when starting a nexe.
   void ReportSelLdrLoadStatus(int status);
@@ -176,7 +161,6 @@ class Plugin : public pp::Instance {
   // This will fully initialize the |subprocess| if the load was successful.
   bool LoadNaClModuleFromBackgroundThread(PP_FileHandle file_handle,
                                           NaClSubprocess* subprocess,
-                                          int32_t manifest_id,
                                           const SelLdrStartParams& params);
 
   // Start sel_ldr from the main thread, given the start params.
@@ -255,8 +239,6 @@ class Plugin : public pp::Instance {
 
   int64_t time_of_last_progress_event_;
   int exit_status_;
-
-  int32_t manifest_id_;
 
   PP_NaClFileInfo nexe_file_info_;
 

@@ -27,6 +27,8 @@ using ::gfx::MockGLInterface;
 using ::testing::_;
 using ::testing::DoAll;
 using ::testing::InSequence;
+using ::testing::Invoke;
+using ::testing::InvokeWithoutArgs;
 using ::testing::MatcherCast;
 using ::testing::Pointee;
 using ::testing::Return;
@@ -35,6 +37,7 @@ using ::testing::SetArgPointee;
 using ::testing::SetArgumentPointee;
 using ::testing::StrEq;
 using ::testing::StrictMock;
+using ::testing::WithArg;
 
 namespace {
 
@@ -152,6 +155,8 @@ void GLES2DecoderTestBase::InitDecoderWithCommandLine(
 
   gl_.reset(new StrictMock<MockGLInterface>());
   ::gfx::MockGLInterface::SetGLInterface(gl_.get());
+
+  SetupMockGLBehaviors();
 
   // Only create stream texture manager if extension is requested.
   std::vector<std::string> list;
@@ -722,6 +727,25 @@ void GLES2DecoderTestBase::SetupExpectationsForDepthMask(bool mask) {
   }
 }
 
+void GLES2DecoderTestBase::SetupExpectationsForStencilMask(uint32 front_mask,
+                                                           uint32 back_mask) {
+  if (ignore_cached_state_for_test_ ||
+      cached_stencil_front_mask_ != front_mask) {
+    cached_stencil_front_mask_ = front_mask;
+    EXPECT_CALL(*gl_, StencilMaskSeparate(GL_FRONT, front_mask))
+        .Times(1)
+        .RetiresOnSaturation();
+  }
+
+  if (ignore_cached_state_for_test_ ||
+      cached_stencil_back_mask_ != back_mask) {
+    cached_stencil_back_mask_ = back_mask;
+    EXPECT_CALL(*gl_, StencilMaskSeparate(GL_BACK, back_mask))
+        .Times(1)
+        .RetiresOnSaturation();
+  }
+}
+
 void GLES2DecoderTestBase::SetupExpectationsForEnableDisable(GLenum cap,
                                                              bool enable) {
   switch (cap) {
@@ -808,23 +832,7 @@ void GLES2DecoderTestBase::SetupExpectationsForApplyingDirtyState(
   SetupExpectationsForColorMask(
       color_mask_red, color_mask_green, color_mask_blue, color_mask_alpha);
   SetupExpectationsForDepthMask(depth_mask);
-
-  if (ignore_cached_state_for_test_ ||
-      cached_stencil_front_mask_ != front_stencil_mask) {
-    cached_stencil_front_mask_ = front_stencil_mask;
-    EXPECT_CALL(*gl_, StencilMaskSeparate(GL_FRONT, front_stencil_mask))
-        .Times(1)
-        .RetiresOnSaturation();
-  }
-
-  if (ignore_cached_state_for_test_ ||
-      cached_stencil_back_mask_ != back_stencil_mask) {
-    cached_stencil_back_mask_ = back_stencil_mask;
-    EXPECT_CALL(*gl_, StencilMaskSeparate(GL_BACK, back_stencil_mask))
-        .Times(1)
-        .RetiresOnSaturation();
-  }
-
+  SetupExpectationsForStencilMask(front_stencil_mask, back_stencil_mask);
   SetupExpectationsForEnableDisable(GL_DEPTH_TEST,
                                     framebuffer_has_depth && depth_enabled);
   SetupExpectationsForEnableDisable(GL_STENCIL_TEST,
@@ -1533,12 +1541,6 @@ void GLES2DecoderTestBase::AddExpectationsForSimulatedAttrib0WithError(
     EXPECT_CALL(*gl_, VertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, NULL))
         .Times(1)
         .RetiresOnSaturation();
-    EXPECT_CALL(*gl_, BindBuffer(GL_ARRAY_BUFFER, 0))
-        .Times(1)
-        .RetiresOnSaturation();
-    EXPECT_CALL(*gl_, VertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, NULL))
-        .Times(1)
-        .RetiresOnSaturation();
     EXPECT_CALL(*gl_, BindBuffer(GL_ARRAY_BUFFER, buffer_id))
         .Times(1)
         .RetiresOnSaturation();
@@ -1549,6 +1551,21 @@ void GLES2DecoderTestBase::AddExpectationsForSimulatedAttrib0(
     GLsizei num_vertices, GLuint buffer_id) {
   AddExpectationsForSimulatedAttrib0WithError(
       num_vertices, buffer_id, GL_NO_ERROR);
+}
+
+void GLES2DecoderTestBase::SetupMockGLBehaviors() {
+  ON_CALL(*gl_, BindVertexArrayOES(_))
+      .WillByDefault(Invoke(
+          &gl_states_,
+          &GLES2DecoderTestBase::MockGLStates::OnBindVertexArrayOES));
+  ON_CALL(*gl_, BindBuffer(GL_ARRAY_BUFFER, _))
+      .WillByDefault(WithArg<1>(Invoke(
+          &gl_states_,
+          &GLES2DecoderTestBase::MockGLStates::OnBindArrayBuffer)));
+  ON_CALL(*gl_, VertexAttribPointer(_, _, _, _, _, NULL))
+      .WillByDefault(InvokeWithoutArgs(
+          &gl_states_,
+          &GLES2DecoderTestBase::MockGLStates::OnVertexAttribNullPointer));
 }
 
 GLES2DecoderWithShaderTestBase::MockCommandBufferEngine::

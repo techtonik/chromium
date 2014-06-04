@@ -578,6 +578,7 @@
         'strings/sys_string_conversions_unittest.cc',
         'strings/utf_offset_string_conversions_unittest.cc',
         'strings/utf_string_conversions_unittest.cc',
+        'supports_user_data_unittest.cc',
         'sync_socket_unittest.cc',
         'synchronization/cancellation_flag_unittest.cc',
         'synchronization/condition_variable_unittest.cc',
@@ -997,6 +998,11 @@
         ['use_custom_libcxx==1', {
           'dependencies!': [
             '../third_party/libc++/libc++.gyp:libcxx_proxy',
+          ],
+        }],
+        ['tsan==1', {
+          'sources': [
+            'debug/tsan_suppressions.cc',
           ],
         }],
       ],

@@ -25,10 +25,16 @@ enum RtcpMode {
   kRtcpReducedSize,  // Reduced-size RTCP mode is described by RFC 5506.
 };
 
-enum VideoCodec { kFakeSoftwareVideo, kVp8, kH264, kVideoCodecLast = kH264 };
+enum VideoCodec {
+  kUnknownVideoCodec,
+  kFakeSoftwareVideo,
+  kVp8,
+  kH264,
+  kVideoCodecLast = kH264
+};
 
 enum AudioCodec {
-  kFakeSoftwareAudio,
+  kUnknownAudioCodec,
   kOpus,
   kPcm16,
   kAudioCodecLast = kPcm16
@@ -101,6 +107,10 @@ struct EncodedFrame {
   uint8* mutable_bytes() {
     return reinterpret_cast<uint8*>(string_as_array(&data));
   }
+
+  // Copies all data members except |data| to |dest|.
+  // Does not modify |dest->data|.
+  void CopyMetadataTo(EncodedFrame* dest) const;
 
   // This frame's dependency relationship with respect to other frames.
   Dependency dependency;

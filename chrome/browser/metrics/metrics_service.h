@@ -32,13 +32,13 @@
 #include "components/metrics/metrics_provider.h"
 #include "components/metrics/metrics_service_observer.h"
 #include "components/variations/active_field_trials.h"
-#include "net/url_request/url_fetcher_delegate.h"
 
 class GoogleUpdateMetricsProviderWin;
 class MetricsReportingScheduler;
 class PrefService;
 class PrefRegistrySimple;
 class PluginMetricsProvider;
+class ProfilerMetricsProvider;
 
 namespace base {
 class DictionaryValue;
@@ -55,6 +55,7 @@ namespace content {
 }
 
 namespace metrics {
+class MetricsLogUploader;
 class MetricsServiceClient;
 class MetricsStateManager;
 }
@@ -89,8 +90,7 @@ struct SyntheticTrialGroup {
 
 class MetricsService
     : public base::HistogramFlattener,
-      public chrome_browser_metrics::TrackingSynchronizerObserver,
-      public net::URLFetcherDelegate {
+      public chrome_browser_metrics::TrackingSynchronizerObserver {
  public:
   // The execution phase of the browser.
   enum ExecutionPhase {
@@ -258,14 +258,11 @@ class MetricsService
 
   typedef std::vector<SyntheticTrialGroup> SyntheticTrialGroups;
 
-  // First part of the init task. Called on the FILE thread to load hardware
-  // class information.
-  static void InitTaskGetHardwareClass(base::WeakPtr<MetricsService> self,
-                                       base::MessageLoopProxy* target_loop);
+  // Calls into the client to start metrics gathering.
+  void StartGatheringMetrics();
 
-  // Callback from InitTaskGetHardwareClass() that continues the init task by
-  // loading plugin information.
-  void OnInitTaskGotHardwareClass(const std::string& hardware_class);
+  // Callback that continues the init task by loading plugin information.
+  void OnInitTaskGotHardwareClass();
 
   // Called after the Plugin init task has been completed that continues the
   // init task by launching a task to gather Google Update statistics.
@@ -360,14 +357,8 @@ class MetricsService
   // Uploads the currently staged log (which must be non-null).
   void SendStagedLog();
 
-  // Prepared the staged log to be passed to the server. Upon return,
-  // current_fetch_ should be reset with its upload data set to a compressed
-  // copy of the staged log.
-  void PrepareFetchWithStagedLog();
-
-  // Implementation of net::URLFetcherDelegate. Called after transmission
-  // completes (either successfully or with failure).
-  virtual void OnURLFetchComplete(const net::URLFetcher* source) OVERRIDE;
+  // Called after transmission completes (either successfully or with failure).
+  void OnLogUploadComplete(int response_code);
 
   // Reads, increments and then sets the specified integer preference.
   void IncrementPrefValue(const char* path);
@@ -443,11 +434,7 @@ class MetricsService
   // Whether the initial stability log has been recorded during startup.
   bool has_initial_stability_log_;
 
-  // Chrome OS hardware class (e.g., hardware qualification ID). This
-  // class identifies the configured system components such as CPU,
-  // WiFi adapter, etc.  For non Chrome OS hosts, this will be an
-  // empty string.
-  std::string hardware_class_;
+  ProfilerMetricsProvider* profiler_metrics_provider_;
 
 #if defined(ENABLE_PLUGINS)
   PluginMetricsProvider* plugin_metrics_provider_;
@@ -462,8 +449,11 @@ class MetricsService
   // initial stability log may be sent before this.
   scoped_ptr<MetricsLog> initial_metrics_log_;
 
-  // The outstanding transmission appears as a URL Fetch operation.
-  scoped_ptr<net::URLFetcher> current_fetch_;
+  // Instance of the helper class for uploading logs.
+  scoped_ptr<metrics::MetricsLogUploader> log_uploader_;
+
+  // Whether there is a current log upload in progress.
+  bool log_upload_in_progress_;
 
   // Whether the MetricsService object has received any notifications since
   // the last time a transmission was sent.
@@ -471,13 +461,6 @@ class MetricsService
 
   // A number that identifies the how many times the app has been launched.
   int session_id_;
-
-  // Maps WebContentses (corresponding to tabs) or Browsers (corresponding to
-  // Windows) to a unique integer that we will use to identify them.
-  // |next_window_id_| is used to track which IDs we have used so far.
-  typedef std::map<uintptr_t, int> WindowMap;
-  WindowMap window_map_;
-  int next_window_id_;
 
   // Weak pointers factory used to post task on different threads. All weak
   // pointers managed by this factory have the same lifetime as MetricsService.
@@ -489,10 +472,6 @@ class MetricsService
 
   // The scheduler for determining when uploads should happen.
   scoped_ptr<MetricsReportingScheduler> scheduler_;
-
-  // Indicates that an asynchronous reporting step is running.
-  // This is used only for debugging.
-  bool waiting_for_asynchronous_reporting_step_;
 
   // Stores the time of the first call to |GetUptimes()|.
   base::TimeTicks first_updated_time_;

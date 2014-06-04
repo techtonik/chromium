@@ -109,6 +109,7 @@ ServiceWorkerStorage::~ServiceWorkerStorage() {
 void ServiceWorkerStorage::FindRegistrationForDocument(
     const GURL& document_url,
     const FindRegistrationCallback& callback) {
+  DCHECK(!document_url.has_ref());
   if (!LazyInitialize(base::Bind(
           &ServiceWorkerStorage::FindRegistrationForDocument,
           weak_factory_.GetWeakPtr(), document_url, callback))) {
@@ -578,12 +579,21 @@ void ServiceWorkerStorage::DidGetAllRegistrations(
     ServiceWorkerRegistrationInfo info;
     info.pattern = it->scope;
     info.script_url = it->script;
-    info.active_version.is_null = false;
-    if (it->is_active)
-      info.active_version.status = ServiceWorkerVersion::ACTIVE;
-    else
-      info.active_version.status = ServiceWorkerVersion::INSTALLED;
-    info.active_version.version_id = it->version_id;
+    info.registration_id = it->registration_id;
+    if (ServiceWorkerVersion* version =
+            context_->GetLiveVersion(it->version_id)) {
+      if (it->is_active)
+        info.active_version = version->GetInfo();
+      else
+        info.pending_version = version->GetInfo();
+    } else {
+      info.active_version.is_null = false;
+      if (it->is_active)
+        info.active_version.status = ServiceWorkerVersion::ACTIVE;
+      else
+        info.active_version.status = ServiceWorkerVersion::INSTALLED;
+      info.active_version.version_id = it->version_id;
+    }
     infos.push_back(info);
   }
 
@@ -660,7 +670,7 @@ ServiceWorkerStorage::GetOrCreateRegistration(
   if (version->status() == ServiceWorkerVersion::ACTIVE)
     registration->set_active_version(version);
   else if (version->status() == ServiceWorkerVersion::INSTALLED)
-    registration->set_pending_version(version);
+    registration->set_waiting_version(version);
   else
     NOTREACHED();
   // TODO(michaeln): Hmmm, what if DeleteReg was invoked after
@@ -671,6 +681,7 @@ ServiceWorkerStorage::GetOrCreateRegistration(
 ServiceWorkerRegistration*
 ServiceWorkerStorage::FindInstallingRegistrationForDocument(
     const GURL& document_url) {
+  DCHECK(!document_url.has_ref());
   // TODO(michaeln): if there are multiple matches the one with
   // the longest scope should win.
   for (RegistrationRefsById::const_iterator it =

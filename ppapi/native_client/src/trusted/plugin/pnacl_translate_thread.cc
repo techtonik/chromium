@@ -54,6 +54,7 @@ void GetLlcCommandLine(Plugin* plugin,
 
 PnaclTranslateThread::PnaclTranslateThread() : llc_subprocess_active_(false),
                                                ld_subprocess_active_(false),
+                                               subprocesses_aborted_(false),
                                                done_(false),
                                                compile_time_(0),
                                                obj_files_(NULL),
@@ -160,29 +161,37 @@ void PnaclTranslateThread::DoTranslate() {
     llc_out_files.push_back(invalid_desc_wrapper_);
 
   pp::Core* core = pp::Module::Get()->core();
+  int64_t llc_start_time = NaClGetTimeOfDayMicroseconds();
+  PP_FileHandle llc_file_handle = resources_->TakeLlcFileHandle();
+  // On success, ownership of llc_file_handle is transferred.
+  NaClSubprocess* llc_subprocess = plugin_->LoadHelperNaClModule(
+      resources_->GetLlcUrl(), llc_file_handle, &error_info);
+  if (llc_subprocess == NULL) {
+    if (llc_file_handle != PP_kInvalidFileHandle)
+      CloseFileHandle(llc_file_handle);
+    TranslateFailed(PP_NACL_ERROR_PNACL_LLC_SETUP,
+                    "Compile process could not be created: " +
+                    error_info.message());
+    return;
+  }
+  core->CallOnMainThread(0,
+                         coordinator_->GetUMATimeCallback(
+                             "NaCl.Perf.PNaClLoadTime.LoadCompiler",
+                             NaClGetTimeOfDayMicroseconds() - llc_start_time),
+                         PP_OK);
+
   {
     nacl::MutexLocker ml(&subprocess_mu_);
-    int64_t llc_start_time = NaClGetTimeOfDayMicroseconds();
-    PP_FileHandle llc_file_handle = resources_->TakeLlcFileHandle();
-
-    // On success, ownership of llc_file_handle is transferred.
-    llc_subprocess_.reset(plugin_->LoadHelperNaClModule(
-        resources_->GetLlcUrl(), llc_file_handle, &error_info));
-    if (llc_subprocess_.get() == NULL) {
-      if (llc_file_handle != PP_kInvalidFileHandle)
-        CloseFileHandle(llc_file_handle);
-      TranslateFailed(PP_NACL_ERROR_PNACL_LLC_SETUP,
-                      "Compile process could not be created: " +
-                      error_info.message());
+    // If we received a call to AbortSubprocesses() before we had a chance to
+    // set llc_subprocess_, shut down and clean up the subprocess started here.
+    if (subprocesses_aborted_) {
+      llc_subprocess->service_runtime()->Shutdown();
+      delete llc_subprocess;
       return;
     }
-
+    llc_subprocess_.reset(llc_subprocess);
+    llc_subprocess = NULL;
     llc_subprocess_active_ = true;
-    core->CallOnMainThread(0,
-                           coordinator_->GetUMATimeCallback(
-                               "NaCl.Perf.PNaClLoadTime.LoadCompiler",
-                               NaClGetTimeOfDayMicroseconds() - llc_start_time),
-                           PP_OK);
   }
 
   int64_t compile_start_time = NaClGetTimeOfDayMicroseconds();
@@ -330,29 +339,38 @@ bool PnaclTranslateThread::RunLdSubprocess() {
 
   nacl::DescWrapper* ld_out_file = nexe_file_->write_wrapper();
   pp::Core* core = pp::Module::Get()->core();
-  {
-    // Create LD process
-    nacl::MutexLocker ml(&subprocess_mu_);
-    int64_t ld_start_time = NaClGetTimeOfDayMicroseconds();
-    PP_FileHandle ld_file_handle = resources_->TakeLdFileHandle();
+  int64_t ld_start_time = NaClGetTimeOfDayMicroseconds();
+  PP_FileHandle ld_file_handle = resources_->TakeLdFileHandle();
+  // On success, ownership of ld_file_handle is transferred.
+  nacl::scoped_ptr<NaClSubprocess> ld_subprocess(
+      plugin_->LoadHelperNaClModule(resources_->GetLlcUrl(),
+                                    ld_file_handle,
+                                    &error_info));
+  if (ld_subprocess.get() == NULL) {
+    if (ld_file_handle != PP_kInvalidFileHandle)
+      CloseFileHandle(ld_file_handle);
+    TranslateFailed(PP_NACL_ERROR_PNACL_LD_SETUP,
+                    "Link process could not be created: " +
+                    error_info.message());
+    return false;
+  }
+  core->CallOnMainThread(0,
+                         coordinator_->GetUMATimeCallback(
+                             "NaCl.Perf.PNaClLoadTime.LoadLinker",
+                             NaClGetTimeOfDayMicroseconds() - ld_start_time),
+                         PP_OK);
 
-    // On success, ownership of ld_file_handle is transferred.
-    ld_subprocess_.reset(plugin_->LoadHelperNaClModule(
-        resources_->GetLdUrl(), ld_file_handle, &error_info));
-    if (ld_subprocess_ == NULL) {
-      if (ld_file_handle != PP_kInvalidFileHandle)
-        CloseFileHandle(ld_file_handle);
-      TranslateFailed(PP_NACL_ERROR_PNACL_LD_SETUP,
-                      "Link process could not be created: " +
-                      error_info.message());
+  {
+    nacl::MutexLocker ml(&subprocess_mu_);
+    // If we received a call to AbortSubprocesses() before we had a chance to
+    // set llc_subprocess_, shut down and clean up the subprocess started here.
+    if (subprocesses_aborted_) {
+      ld_subprocess->service_runtime()->Shutdown();
       return false;
     }
+    DCHECK(ld_subprocess_.get() == NULL);
+    ld_subprocess_.swap(ld_subprocess);
     ld_subprocess_active_ = true;
-    core->CallOnMainThread(0,
-                           coordinator_->GetUMATimeCallback(
-                               "NaCl.Perf.PNaClLoadTime.LoadLinker",
-                               NaClGetTimeOfDayMicroseconds() - ld_start_time),
-                           PP_OK);
   }
 
   int64_t link_start_time = NaClGetTimeOfDayMicroseconds();
@@ -426,6 +444,7 @@ void PnaclTranslateThread::AbortSubprocesses() {
     ld_subprocess_->service_runtime()->Shutdown();
     ld_subprocess_active_ = false;
   }
+  subprocesses_aborted_ = true;
   NaClXMutexUnlock(&subprocess_mu_);
   nacl::MutexLocker ml(&cond_mu_);
   done_ = true;

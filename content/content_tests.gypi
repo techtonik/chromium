@@ -450,6 +450,8 @@
         'browser/fileapi/local_file_util_unittest.cc',
         'browser/fileapi/mock_file_change_observer.cc',
         'browser/fileapi/mock_file_change_observer.h',
+        'browser/fileapi/mock_url_request_delegate.cc',
+        'browser/fileapi/mock_url_request_delegate.h',
         'browser/fileapi/native_file_util_unittest.cc',
         'browser/fileapi/obfuscated_file_util_unittest.cc',
         'browser/fileapi/plugin_private_file_system_backend_unittest.cc',
@@ -1008,11 +1010,6 @@
           'sources': [
             'test/data/web_ui_test_mojo_bindings.mojom',
           ],
-          # TODO(sky): this shouldn't be necessary. It's working around a bug in
-          # gyp.
-          'variables': {
-            'mojom_base_output_dir': 'content',
-          },
           'includes': [ '../mojo/public/tools/bindings/mojom_bindings_generator.gypi' ],
           'export_dependent_settings': [
             '../mojo/mojo.gyp:mojo_cpp_bindings',
@@ -1298,6 +1295,9 @@
                 'test/ppapi/ppapi_test.cc',
                 'test/ppapi/ppapi_test.h',
               ],
+              'dependencies!': [
+                '../ppapi/ppapi_internal.gyp:ppapi_tests',
+              ]
             }],
             ['input_speech==0', {
               'sources/': [

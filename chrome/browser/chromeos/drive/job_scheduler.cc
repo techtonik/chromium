@@ -10,6 +10,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "chrome/browser/chromeos/drive/file_system_util.h"
+#include "chrome/browser/drive/drive_api_util.h"
 #include "chrome/browser/drive/event_logger.h"
 #include "chrome/common/pref_names.h"
 #include "content/public/browser/browser_thread.h"
@@ -274,9 +275,9 @@ void JobScheduler::GetAllResourceList(
 
   JobEntry* new_job = CreateNewJob(TYPE_GET_ALL_RESOURCE_LIST);
   new_job->task = base::Bind(
-      &DriveServiceInterface::GetAllResourceList,
+      &DriveServiceInterface::GetAllFileList,
       base::Unretained(drive_service_),
-      base::Bind(&JobScheduler::OnGetResourceListJobDone,
+      base::Bind(&JobScheduler::OnGetFileListJobDone,
                  weak_ptr_factory_.GetWeakPtr(),
                  new_job->job_info.job_id,
                  callback));
@@ -293,10 +294,10 @@ void JobScheduler::GetResourceListInDirectory(
   JobEntry* new_job = CreateNewJob(
       TYPE_GET_RESOURCE_LIST_IN_DIRECTORY);
   new_job->task = base::Bind(
-      &DriveServiceInterface::GetResourceListInDirectory,
+      &DriveServiceInterface::GetFileListInDirectory,
       base::Unretained(drive_service_),
       directory_resource_id,
-      base::Bind(&JobScheduler::OnGetResourceListJobDone,
+      base::Bind(&JobScheduler::OnGetFileListJobDone,
                  weak_ptr_factory_.GetWeakPtr(),
                  new_job->job_info.job_id,
                  callback));
@@ -315,7 +316,7 @@ void JobScheduler::Search(
       &DriveServiceInterface::Search,
       base::Unretained(drive_service_),
       search_query,
-      base::Bind(&JobScheduler::OnGetResourceListJobDone,
+      base::Bind(&JobScheduler::OnGetFileListJobDone,
                  weak_ptr_factory_.GetWeakPtr(),
                  new_job->job_info.job_id,
                  callback));
@@ -334,7 +335,7 @@ void JobScheduler::GetChangeList(
       &DriveServiceInterface::GetChangeList,
       base::Unretained(drive_service_),
       start_changestamp,
-      base::Bind(&JobScheduler::OnGetResourceListJobDone,
+      base::Bind(&JobScheduler::OnGetChangeListJobDone,
                  weak_ptr_factory_.GetWeakPtr(),
                  new_job->job_info.job_id,
                  callback));
@@ -353,7 +354,7 @@ void JobScheduler::GetRemainingChangeList(
       &DriveServiceInterface::GetRemainingChangeList,
       base::Unretained(drive_service_),
       next_link,
-      base::Bind(&JobScheduler::OnGetResourceListJobDone,
+      base::Bind(&JobScheduler::OnGetChangeListJobDone,
                  weak_ptr_factory_.GetWeakPtr(),
                  new_job->job_info.job_id,
                  callback));
@@ -372,7 +373,7 @@ void JobScheduler::GetRemainingFileList(
       &DriveServiceInterface::GetRemainingFileList,
       base::Unretained(drive_service_),
       next_link,
-      base::Bind(&JobScheduler::OnGetResourceListJobDone,
+      base::Bind(&JobScheduler::OnGetFileListJobDone,
                  weak_ptr_factory_.GetWeakPtr(),
                  new_job->job_info.job_id,
                  callback));
@@ -898,16 +899,35 @@ bool JobScheduler::OnJobDone(JobID job_id, google_apis::GDataErrorCode error) {
   return !should_retry;
 }
 
-void JobScheduler::OnGetResourceListJobDone(
+void JobScheduler::OnGetFileListJobDone(
     JobID job_id,
     const google_apis::GetResourceListCallback& callback,
     google_apis::GDataErrorCode error,
-    scoped_ptr<google_apis::ResourceList> resource_list) {
+    scoped_ptr<google_apis::FileList> file_list) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   DCHECK(!callback.is_null());
 
-  if (OnJobDone(job_id, error))
-    callback.Run(error, resource_list.Pass());
+  if (OnJobDone(job_id, error)) {
+    callback.Run(error, file_list ?
+                 util::ConvertFileListToResourceList(*file_list) :
+                 scoped_ptr<google_apis::ResourceList>());
+  }
+}
+
+void JobScheduler::OnGetChangeListJobDone(
+    JobID job_id,
+    const google_apis::GetResourceListCallback& callback,
+    google_apis::GDataErrorCode error,
+    scoped_ptr<google_apis::ChangeList> change_list) {
+  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  DCHECK(!callback.is_null());
+
+  if (OnJobDone(job_id, error)) {
+    callback.Run(error, change_list ?
+                 util::ConvertChangeListToResourceList(*change_list) :
+                 scoped_ptr<google_apis::ResourceList>());
+
+  }
 }
 
 void JobScheduler::OnGetResourceEntryJobDone(

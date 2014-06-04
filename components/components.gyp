@@ -23,8 +23,8 @@
     'enhanced_bookmarks.gypi',
     'favicon.gypi',
     'favicon_base.gypi',
-    'feedback.gypi',  # crbug.com/368738
     'google.gypi',
+    'history.gypi',
     'infobars.gypi',
     'json_schema.gypi',
     'keyed_service.gypi',
@@ -55,21 +55,26 @@
         'navigation_interception.gypi',
         'plugins.gypi',
         'sessions.gypi',
-        'storage_monitor.gypi',
         'visitedlink.gypi',
         'web_contents_delegate_android.gypi',
         'web_modal.gypi',
       ],
     }],
+    ['OS != "android"', {
+      'includes': [
+        'feedback.gypi',
+      ]
+    }],
+    ['OS != "ios" and OS != "android"', {
+      'includes': [
+        'storage_monitor.gypi',
+        'usb_service.gypi',
+      ]
+    }],
     ['OS == "win" or OS == "mac"', {
       'includes': [
         'wifi.gypi',
       ],
-    }],
-    ['OS != "ios" and OS != "android"', {
-      'includes': [
-        'usb_service.gypi',
-      ]
     }],
     ['android_webview_build == 0', {
       # Android WebView fails to build if a dependency on these targets is

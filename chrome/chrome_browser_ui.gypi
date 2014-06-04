@@ -170,8 +170,6 @@
         'browser/ui/app_list/app_list_util.h',
         'browser/ui/app_list/app_list_view_delegate.cc',
         'browser/ui/app_list/app_list_view_delegate.h',
-        'browser/ui/app_list/chrome_signin_delegate.cc',
-        'browser/ui/app_list/chrome_signin_delegate.h',
         'browser/ui/app_list/drive/drive_app_converter.cc',
         'browser/ui/app_list/drive/drive_app_converter.h',
         'browser/ui/app_list/extension_app_item.cc',
@@ -371,6 +369,8 @@
         'browser/ui/ash/stub_user_accounts_delegate.h',
         'browser/ui/ash/system_tray_delegate_chromeos.cc',
         'browser/ui/ash/system_tray_delegate_chromeos.h',
+        'browser/ui/ash/system_tray_delegate_linux.cc',
+        'browser/ui/ash/system_tray_delegate_linux.h',
         'browser/ui/ash/system_tray_delegate_win.cc',
         'browser/ui/ash/system_tray_delegate_win.h',
         'browser/ui/ash/user_accounts_delegate_chromeos.cc',
@@ -1409,9 +1409,6 @@
         'browser/ui/tabs/tab_menu_model.h',
         'browser/ui/tabs/tab_resources.cc',
         'browser/ui/tabs/tab_resources.h',
-        'browser/ui/tabs/tab_strip_layout_type.h',
-        'browser/ui/tabs/tab_strip_layout_type_prefs.cc',
-        'browser/ui/tabs/tab_strip_layout_type_prefs.h',
         'browser/ui/tabs/tab_strip_model.cc',
         'browser/ui/tabs/tab_strip_model.h',
         'browser/ui/tabs/tab_strip_model_delegate.h',
@@ -2032,6 +2029,8 @@
         'browser/ui/webui/chromeos/login/app_launch_splash_screen_handler.h',
         'browser/ui/webui/chromeos/login/authenticated_user_email_retriever.cc',
         'browser/ui/webui/chromeos/login/authenticated_user_email_retriever.h',
+        'browser/ui/webui/chromeos/login/auto_enrollment_check_screen_handler.cc',
+        'browser/ui/webui/chromeos/login/auto_enrollment_check_screen_handler.h',
         'browser/ui/webui/chromeos/login/base_screen_handler.cc',
         'browser/ui/webui/chromeos/login/base_screen_handler.h',
         'browser/ui/webui/chromeos/login/base_screen_handler_utils.h',
@@ -2519,11 +2518,6 @@
             '../printing/printing.gyp:printing',
           ],
         }],
-        ['OS == "android"', {
-          'dependencies': [
-            '../third_party/openssl/openssl.gyp:openssl',
-          ],
-        }],
         ['OS!="android" and OS!="ios"', {
           'sources!': [
             'browser/ui/auto_login_infobar_delegate.cc',
@@ -2716,7 +2710,7 @@
           ],
           'dependencies': [
             # aura uses some of ash resources.
-            '../ash/ash.gyp:ash_resources',
+            '../ash/ash_resources.gyp:ash_resources',
             '../ui/aura/aura.gyp:aura',
             '../ui/keyboard/keyboard.gyp:keyboard',
             '../ui/keyboard/keyboard.gyp:keyboard_resources',
@@ -2743,11 +2737,6 @@
             }],
           ],
         }, { # else: use_aura==0
-          'sources!': [
-            'browser/ui/tabs/tab_strip_layout_type.h',
-            'browser/ui/tabs/tab_strip_layout_type_prefs.cc',
-            'browser/ui/tabs/tab_strip_layout_type_prefs.h',
-          ],
           'sources/': [
             ['exclude', '^browser/ui/views/frame/browser_desktop_window_tree_host.h'],
             ['exclude', '^browser/ui/views/frame/browser_desktop_window_tree_host_win.cc'],
@@ -2796,9 +2785,11 @@
         ['OS=="android"', {
           'dependencies': [
             '../components/components.gyp:web_contents_delegate_android',
+            '../third_party/openssl/openssl.gyp:openssl',
             'chrome_browser_jni_headers',
           ],
           'dependencies!': [
+             '../components/components.gyp:feedback_proto',
              '../third_party/libusb/libusb.gyp:libusb',
              '../ui/events/events.gyp:events',
              'chrome_browser_ui_views.gyp:browser_ui_views',

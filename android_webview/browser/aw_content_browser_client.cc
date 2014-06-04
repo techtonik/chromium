@@ -212,11 +212,10 @@ void AwContentBrowserClient::RenderProcessWillLaunch(
 net::URLRequestContextGetter* AwContentBrowserClient::CreateRequestContext(
     content::BrowserContext* browser_context,
     content::ProtocolHandlerMap* protocol_handlers,
-    content::ProtocolHandlerScopedVector protocol_interceptors) {
+    content::URLRequestInterceptorScopedVector request_interceptors) {
   DCHECK(browser_context_.get() == browser_context);
-  // TODO(mkosiba,kinuko): protocol_interceptors should be hooked up in the
-  // downstream. (crbug.com/350286)
-  return browser_context_->CreateRequestContext(protocol_handlers);
+  return browser_context_->CreateRequestContext(protocol_handlers,
+                                                request_interceptors.Pass());
 }
 
 net::URLRequestContextGetter*
@@ -225,10 +224,13 @@ AwContentBrowserClient::CreateRequestContextForStoragePartition(
     const base::FilePath& partition_path,
     bool in_memory,
     content::ProtocolHandlerMap* protocol_handlers,
-    content::ProtocolHandlerScopedVector protocol_interceptors) {
+    content::URLRequestInterceptorScopedVector request_interceptors) {
   DCHECK(browser_context_.get() == browser_context);
+  // TODO(mkosiba,kinuko): request_interceptors should be hooked up in the
+  // downstream. (crbug.com/350286)
   return browser_context_->CreateRequestContextForStoragePartition(
-      partition_path, in_memory, protocol_handlers);
+      partition_path, in_memory, protocol_handlers,
+      request_interceptors.Pass());
 }
 
 std::string AwContentBrowserClient::GetCanonicalEncodingNameByAliasName(

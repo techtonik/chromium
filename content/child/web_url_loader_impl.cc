@@ -58,7 +58,6 @@ using blink::WebURLLoaderClient;
 using blink::WebURLRequest;
 using blink::WebURLResponse;
 using webkit_glue::MultipartResponseDelegate;
-using webkit_glue::ResourceDevToolsInfo;
 using webkit_glue::ResourceLoaderBridge;
 using webkit_glue::WebURLResponseExtraDataImpl;
 
@@ -351,6 +350,8 @@ void WebURLLoaderImpl::Context::Start(const WebURLRequest& request,
       break;
     case WebURLRequest::UseProtocolCachePolicy:
       break;
+    default:
+      NOTREACHED();
   }
 
   if (request.reportUploadProgress())

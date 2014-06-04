@@ -28,6 +28,8 @@
 #include "chrome/browser/content_settings/host_content_settings_map.h"
 #include "chrome/browser/custom_handlers/protocol_handler_registry.h"
 #include "chrome/browser/custom_handlers/protocol_handler_registry_factory.h"
+#include "chrome/browser/devtools/devtools_network_controller.h"
+#include "chrome/browser/devtools/devtools_network_transaction_factory.h"
 #include "chrome/browser/download/download_service.h"
 #include "chrome/browser/download/download_service_factory.h"
 #include "chrome/browser/extensions/extension_resource_protocols.h"
@@ -71,9 +73,10 @@
 #include "net/url_request/data_protocol_handler.h"
 #include "net/url_request/file_protocol_handler.h"
 #include "net/url_request/ftp_protocol_handler.h"
-#include "net/url_request/protocol_intercept_job_factory.h"
 #include "net/url_request/url_request.h"
 #include "net/url_request/url_request_file_job.h"
+#include "net/url_request/url_request_intercepting_job_factory.h"
+#include "net/url_request/url_request_interceptor.h"
 #include "net/url_request/url_request_job_factory_impl.h"
 
 #if defined(ENABLE_CONFIGURATION_POLICY)
@@ -178,13 +181,13 @@ bool IsSupportedDevToolsURL(const GURL& url, base::FilePath* path) {
   return true;
 }
 
-class DebugDevToolsInterceptor
-    : public net::URLRequestJobFactory::ProtocolHandler {
+class DebugDevToolsInterceptor : public net::URLRequestInterceptor {
  public:
   DebugDevToolsInterceptor() {}
   virtual ~DebugDevToolsInterceptor() {}
 
-  virtual net::URLRequestJob* MaybeCreateJob(
+  // net::URLRequestInterceptor implementation.
+  virtual net::URLRequestJob* MaybeInterceptRequest(
       net::URLRequest* request,
       net::NetworkDelegate* network_delegate) const OVERRIDE {
     base::FilePath path;
@@ -690,7 +693,7 @@ ChromeURLRequestContext* ProfileIOData::GetIsolatedAppRequestContext(
     scoped_ptr<ProtocolHandlerRegistry::JobInterceptorFactory>
         protocol_handler_interceptor,
     content::ProtocolHandlerMap* protocol_handlers,
-    content::ProtocolHandlerScopedVector protocol_interceptors) const {
+    content::URLRequestInterceptorScopedVector request_interceptors) const {
   DCHECK(initialized_);
   ChromeURLRequestContext* context = NULL;
   if (ContainsKey(app_request_context_map_, partition_descriptor)) {
@@ -701,7 +704,7 @@ ChromeURLRequestContext* ProfileIOData::GetIsolatedAppRequestContext(
                                          partition_descriptor,
                                          protocol_handler_interceptor.Pass(),
                                          protocol_handlers,
-                                         protocol_interceptors.Pass());
+                                         request_interceptors.Pass());
     app_request_context_map_[partition_descriptor] = context;
   }
   DCHECK(context);
@@ -909,7 +912,7 @@ std::string ProfileIOData::GetSSLSessionCacheShard() {
 
 void ProfileIOData::Init(
     content::ProtocolHandlerMap* protocol_handlers,
-    content::ProtocolHandlerScopedVector protocol_interceptors) const {
+    content::URLRequestInterceptorScopedVector request_interceptors) const {
   // The basic logic is implemented here. The specific initialization
   // is done in InitializeInternal(), implemented by subtypes. Static helper
   // functions have been provided to assist in common operations.
@@ -1008,7 +1011,7 @@ void ProfileIOData::Init(
 #endif
 
   InitializeInternal(
-      profile_params_.get(), protocol_handlers, protocol_interceptors.Pass());
+      profile_params_.get(), protocol_handlers, request_interceptors.Pass());
 
   profile_params_.reset();
   initialized_ = true;
@@ -1023,7 +1026,7 @@ void ProfileIOData::ApplyProfileParamsToContext(
 
 scoped_ptr<net::URLRequestJobFactory> ProfileIOData::SetUpJobFactoryDefaults(
     scoped_ptr<net::URLRequestJobFactoryImpl> job_factory,
-    content::ProtocolHandlerScopedVector protocol_interceptors,
+    content::URLRequestInterceptorScopedVector request_interceptors,
     scoped_ptr<ProtocolHandlerRegistry::JobInterceptorFactory>
         protocol_handler_interceptor,
     net::NetworkDelegate* network_delegate,
@@ -1072,20 +1075,20 @@ scoped_ptr<net::URLRequestJobFactory> ProfileIOData::SetUpJobFactoryDefaults(
 #endif  // !defined(DISABLE_FTP_SUPPORT)
 
 #if defined(DEBUG_DEVTOOLS)
-  protocol_interceptors.push_back(new DebugDevToolsInterceptor);
+  request_interceptors.push_back(new DebugDevToolsInterceptor);
 #endif
 
   // Set up interceptors in the reverse order.
   scoped_ptr<net::URLRequestJobFactory> top_job_factory =
       job_factory.PassAs<net::URLRequestJobFactory>();
-  for (content::ProtocolHandlerScopedVector::reverse_iterator i =
-           protocol_interceptors.rbegin();
-       i != protocol_interceptors.rend();
+  for (content::URLRequestInterceptorScopedVector::reverse_iterator i =
+           request_interceptors.rbegin();
+       i != request_interceptors.rend();
        ++i) {
-    top_job_factory.reset(new net::ProtocolInterceptJobFactory(
+    top_job_factory.reset(new net::URLRequestInterceptingJobFactory(
         top_job_factory.Pass(), make_scoped_ptr(*i)));
   }
-  protocol_interceptors.weak_clear();
+  request_interceptors.weak_clear();
 
   if (protocol_handler_interceptor) {
     protocol_handler_interceptor->Chain(top_job_factory.Pass());
@@ -1142,28 +1145,44 @@ void ProfileIOData::DestroyResourceContext() {
   resource_context_.reset();
 }
 
-void ProfileIOData::PopulateNetworkSessionParams(
+scoped_ptr<net::HttpCache> ProfileIOData::CreateMainHttpFactory(
     const ProfileParams* profile_params,
-    net::HttpNetworkSession::Params* params) const {
-
+    net::HttpCache::BackendFactory* main_backend) const {
+  net::HttpNetworkSession::Params params;
   ChromeURLRequestContext* context = main_request_context();
 
   IOThread* const io_thread = profile_params->io_thread;
 
-  io_thread->InitializeNetworkSessionParams(params);
+  io_thread->InitializeNetworkSessionParams(&params);
 
-  params->host_resolver = context->host_resolver();
-  params->cert_verifier = context->cert_verifier();
-  params->server_bound_cert_service = context->server_bound_cert_service();
-  params->transport_security_state = context->transport_security_state();
-  params->cert_transparency_verifier = context->cert_transparency_verifier();
-  params->proxy_service = context->proxy_service();
-  params->ssl_session_cache_shard = GetSSLSessionCacheShard();
-  params->ssl_config_service = context->ssl_config_service();
-  params->http_auth_handler_factory = context->http_auth_handler_factory();
-  params->network_delegate = network_delegate();
-  params->http_server_properties = context->http_server_properties();
-  params->net_log = context->net_log();
+  params.host_resolver = context->host_resolver();
+  params.cert_verifier = context->cert_verifier();
+  params.server_bound_cert_service = context->server_bound_cert_service();
+  params.transport_security_state = context->transport_security_state();
+  params.cert_transparency_verifier = context->cert_transparency_verifier();
+  params.proxy_service = context->proxy_service();
+  params.ssl_session_cache_shard = GetSSLSessionCacheShard();
+  params.ssl_config_service = context->ssl_config_service();
+  params.http_auth_handler_factory = context->http_auth_handler_factory();
+  params.network_delegate = network_delegate();
+  params.http_server_properties = context->http_server_properties();
+  params.net_log = context->net_log();
+
+  network_controller_.reset(new DevToolsNetworkController());
+
+  net::HttpNetworkSession* session = new net::HttpNetworkSession(params);
+  return scoped_ptr<net::HttpCache>(new net::HttpCache(
+      new DevToolsNetworkTransactionFactory(network_controller_.get(), session),
+      context->net_log(), main_backend));
+}
+
+scoped_ptr<net::HttpCache> ProfileIOData::CreateHttpFactory(
+    net::HttpNetworkSession* shared_session,
+    net::HttpCache::BackendFactory* backend) const {
+  return scoped_ptr<net::HttpCache>(new net::HttpCache(
+      new DevToolsNetworkTransactionFactory(
+          network_controller_.get(), shared_session),
+      shared_session->net_log(), backend));
 }
 
 void ProfileIOData::SetCookieSettingsForTesting(

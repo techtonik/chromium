@@ -19,12 +19,14 @@ RootNodeManager::ScopedChange::ScopedChange(
     RootNodeManager::ChangeType change_type,
     bool is_delete_node)
     : root_(root),
-      change_type_(change_type) {
-  root_->PrepareForChange(connection, is_delete_node);
+      connection_id_(connection->id()),
+      change_type_(change_type),
+      is_delete_node_(is_delete_node) {
+  root_->PrepareForChange(this);
 }
 
 RootNodeManager::ScopedChange::~ScopedChange() {
-  root_->FinishChange(change_type_);
+  root_->FinishChange();
 }
 
 RootNodeManager::Context::Context() {
@@ -33,16 +35,17 @@ RootNodeManager::Context::Context() {
 }
 
 RootNodeManager::Context::~Context() {
+  aura::Env::DeleteInstance();
 }
 
-RootNodeManager::RootNodeManager(ServiceProvider* service_provider)
+RootNodeManager::RootNodeManager(ServiceProvider* service_provider,
+                                 RootViewManagerDelegate* view_manager_delegate)
     : service_provider_(service_provider),
       next_connection_id_(1),
       next_server_change_id_(1),
-      change_source_(kRootConnection),
-      is_processing_delete_node_(false),
-      root_view_manager_(service_provider, this),
-      root_(this, RootNodeId()) {
+      root_view_manager_(service_provider, this, view_manager_delegate),
+      root_(this, RootNodeId()),
+      current_change_(NULL) {
 }
 
 RootNodeManager::~RootNodeManager() {
@@ -68,14 +71,16 @@ void RootNodeManager::RemoveConnection(ViewManagerConnection* connection) {
   connections_created_by_connect_.erase(connection);
 }
 
+void RootNodeManager::InitialConnect(const std::string& url) {
+  CHECK(connection_map_.empty());
+  Array<TransportNodeId> roots(0);
+  ConnectImpl(String::From(url), roots);
+}
+
 void RootNodeManager::Connect(const String& url,
                               const Array<TransportNodeId>& node_ids) {
-  MessagePipe pipe;
-  service_provider_->ConnectToService(url, pipe.handle1.Pass());
-  ViewManagerConnection* connection = new ViewManagerConnection(this);
-  connection->SetRoots(node_ids);
-  BindToPipe(connection, pipe.handle0.Pass());
-  connections_created_by_connect_.insert(connection);
+  CHECK_GT(node_ids.size(), 0u);
+  ConnectImpl(url, node_ids)->set_delete_on_connection_error();
 }
 
 ViewManagerConnection* RootNodeManager::GetConnection(
@@ -94,6 +99,16 @@ Node* RootNodeManager::GetNode(const NodeId& id) {
 View* RootNodeManager::GetView(const ViewId& id) {
   ConnectionMap::iterator i = connection_map_.find(id.connection_id);
   return i == connection_map_.end() ? NULL : i->second->GetView(id);
+}
+
+void RootNodeManager::OnConnectionMessagedClient(TransportConnectionId id) {
+  if (current_change_)
+    current_change_->MarkConnectionAsMessaged(id);
+}
+
+bool RootNodeManager::DidConnectionMessageClient(
+    TransportConnectionId id) const {
+  return current_change_ && current_change_->DidMessageConnection(id);
 }
 
 void RootNodeManager::ProcessNodeBoundsChanged(const Node* node,
@@ -142,21 +157,31 @@ void RootNodeManager::ProcessViewDeleted(const ViewId& view) {
   }
 }
 
-void RootNodeManager::PrepareForChange(ViewManagerConnection* connection,
-                                       bool is_delete_node) {
+void RootNodeManager::PrepareForChange(ScopedChange* change) {
   // Should only ever have one change in flight.
-  DCHECK_EQ(kRootConnection, change_source_);
-  change_source_ = connection->id();
-  is_processing_delete_node_ = is_delete_node;
+  CHECK(!current_change_);
+  current_change_ = change;
 }
 
-void RootNodeManager::FinishChange(ChangeType change_type) {
+void RootNodeManager::FinishChange() {
   // PrepareForChange/FinishChange should be balanced.
-  DCHECK_NE(kRootConnection, change_source_);
-  change_source_ = 0;
-  is_processing_delete_node_ = false;
-  if (change_type == CHANGE_TYPE_ADVANCE_SERVER_CHANGE_ID)
+  CHECK(current_change_);
+  if (current_change_->change_type() == CHANGE_TYPE_ADVANCE_SERVER_CHANGE_ID)
     next_server_change_id_++;
+  current_change_ = NULL;
+}
+
+ViewManagerConnection* RootNodeManager::ConnectImpl(
+    const String& url,
+    const Array<TransportNodeId>& node_ids) {
+  MessagePipe pipe;
+  service_provider_->ConnectToService(
+      url, ViewManagerConnection::Client::Name_, pipe.handle1.Pass());
+  ViewManagerConnection* connection = new ViewManagerConnection(this);
+  connection->SetRoots(node_ids);
+  BindToPipe(connection, pipe.handle0.Pass());
+  connections_created_by_connect_.insert(connection);
+  return connection;
 }
 
 void RootNodeManager::OnNodeHierarchyChanged(const Node* node,

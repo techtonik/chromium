@@ -22,13 +22,14 @@
 #include "chrome/browser/extensions/component_loader.h"
 #include "chrome/browser/extensions/crx_installer.h"
 #include "chrome/browser/extensions/data_deleter.h"
+#include "chrome/browser/extensions/extension_assets_manager.h"
 #include "chrome/browser/extensions/extension_disabled_ui.h"
 #include "chrome/browser/extensions/extension_error_controller.h"
 #include "chrome/browser/extensions/extension_install_ui.h"
 #include "chrome/browser/extensions/extension_special_storage_policy.h"
 #include "chrome/browser/extensions/extension_sync_service.h"
 #include "chrome/browser/extensions/extension_util.h"
-#include "chrome/browser/extensions/external_install_ui.h"
+#include "chrome/browser/extensions/external_install_manager.h"
 #include "chrome/browser/extensions/external_provider_impl.h"
 #include "chrome/browser/extensions/install_verifier.h"
 #include "chrome/browser/extensions/installed_loader.h"
@@ -291,6 +292,8 @@ ExtensionService::ExtensionService(Profile* profile,
       browser_terminating_(false),
       installs_delayed_for_gc_(false),
       is_first_run_(false),
+      external_install_manager_(
+          new extensions::ExternalInstallManager(profile_)),
       shared_module_service_(new extensions::SharedModuleService(profile_)) {
   CHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
 
@@ -742,7 +745,7 @@ bool ExtensionService::UninstallExtension(
   UMA_HISTOGRAM_ENUMERATION("Extensions.UninstallType",
                             extension->GetType(), 100);
   RecordPermissionMessagesHistogram(extension.get(),
-                                    "Extensions.Permissions_Uninstall");
+                                    "Extensions.Permissions_Uninstall2");
 
   // Unload before doing more cleanup to ensure that nothing is hanging on to
   // any of these resources.
@@ -752,9 +755,11 @@ bool ExtensionService::UninstallExtension(
   if (!Manifest::IsUnpackedLocation(extension->location())) {
     if (!GetFileTaskRunner()->PostTask(
             FROM_HERE,
-            base::Bind(&extensions::file_util::UninstallExtension,
+            base::Bind(&ExtensionService::UninstallExtensionOnFileThread,
+                       extension->id(),
+                       profile_,
                        install_directory_,
-                       extension->id())))
+                       extension->path())))
       NOTREACHED();
   }
 
@@ -786,6 +791,17 @@ bool ExtensionService::UninstallExtension(
   UMA_HISTOGRAM_ENUMERATION("Extensions.ExtensionUninstalled", 1, 2);
 
   return true;
+}
+
+// static
+void ExtensionService::UninstallExtensionOnFileThread(
+    const std::string& id,
+    Profile* profile,
+    const base::FilePath& install_dir,
+    const base::FilePath& extension_path) {
+  extensions::ExtensionAssetsManager* assets_manager =
+      extensions::ExtensionAssetsManager::GetInstance();
+  assets_manager->UninstallExtension(id, profile, install_dir, extension_path);
 }
 
 bool ExtensionService::IsExtensionEnabled(
@@ -947,8 +963,8 @@ void ExtensionService::DisableUserExtensions(
 void ExtensionService::GrantPermissionsAndEnableExtension(
     const Extension* extension) {
   GrantPermissions(extension);
-  RecordPermissionMessagesHistogram(
-      extension, "Extensions.Permissions_ReEnable");
+  RecordPermissionMessagesHistogram(extension,
+                                    "Extensions.Permissions_ReEnable2");
   extension_prefs_->SetDidExtensionEscalatePermissions(extension, false);
   EnableExtension(extension->id());
 }
@@ -1338,7 +1354,7 @@ void ExtensionService::UpdateExternalExtensionAlert() {
   }
 
   if (extension) {
-    if (!extensions::HasExternalInstallError(this)) {
+    if (!external_install_manager_->HasExternalInstallError()) {
       if (extension_prefs_->IncrementAcknowledgePromptCount(extension->id()) >
               kMaxExtensionAcknowledgePromptCount) {
         // Stop prompting for this extension, and check if there's another
@@ -1367,10 +1383,8 @@ void ExtensionService::UpdateExternalExtensionAlert() {
       // (even if it's post-first run now).
       bool first_run = extension_prefs_->IsExternalInstallFirstRun(
           extension->id());
-      extensions::AddExternalInstallError(this, extension, first_run);
+      external_install_manager_->AddExternalInstallError(extension, first_run);
     }
-  } else {
-    extensions::RemoveExternalInstallError(this);
   }
 }
 
@@ -1720,8 +1734,8 @@ void ExtensionService::CheckPermissionsIncrease(const Extension* extension,
   } else if (is_privilege_increase) {
     disable_reasons |= Extension::DISABLE_PERMISSIONS_INCREASE;
     if (!extension_prefs_->DidExtensionEscalatePermissions(extension->id())) {
-      RecordPermissionMessagesHistogram(
-          extension, "Extensions.Permissions_AutoDisable");
+      RecordPermissionMessagesHistogram(extension,
+                                        "Extensions.Permissions_AutoDisable2");
     }
     extension_prefs_->SetExtensionState(extension->id(), Extension::DISABLED);
     extension_prefs_->SetDidExtensionEscalatePermissions(extension, true);
@@ -1826,8 +1840,8 @@ void ExtensionService::OnExtensionInstalled(
                               extension->GetType(), 100);
     UMA_HISTOGRAM_ENUMERATION("Extensions.InstallSource",
                               extension->location(), Manifest::NUM_LOCATIONS);
-    RecordPermissionMessagesHistogram(
-        extension, "Extensions.Permissions_Install");
+    RecordPermissionMessagesHistogram(extension,
+                                      "Extensions.Permissions_Install2");
   } else {
     UMA_HISTOGRAM_ENUMERATION("Extensions.UpdateType",
                               extension->GetType(), 100);

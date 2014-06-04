@@ -9,6 +9,7 @@
 
 #include "base/basictypes.h"
 #include "base/callback.h"
+#include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/threading/thread_checker.h"
 #include "chrome/browser/metrics/network_stats_uploader.h"
@@ -16,15 +17,24 @@
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
 
+class ChromeOSMetricsProvider;
 class MetricsService;
+
+namespace metrics {
+class MetricsStateManager;
+}
 
 // ChromeMetricsServiceClient provides an implementation of MetricsServiceClient
 // that depends on chrome/.
 class ChromeMetricsServiceClient : public metrics::MetricsServiceClient,
                                    public content::NotificationObserver {
  public:
-  ChromeMetricsServiceClient();
   virtual ~ChromeMetricsServiceClient();
+
+  // Factory function.
+  static scoped_ptr<ChromeMetricsServiceClient> Create(
+      metrics::MetricsStateManager* state_manager,
+      PrefService* local_state);
 
   // metrics::MetricsServiceClient:
   virtual void SetClientID(const std::string& client_id) OVERRIDE;
@@ -38,13 +48,20 @@ class ChromeMetricsServiceClient : public metrics::MetricsServiceClient,
       const base::Closure& done_callback) OVERRIDE;
   virtual void CollectFinalMetrics(const base::Closure& done_callback)
       OVERRIDE;
+  virtual scoped_ptr<metrics::MetricsLogUploader> CreateUploader(
+      const std::string& server_url,
+      const std::string& mime_type,
+      const base::Callback<void(int)>& on_upload_complete) OVERRIDE;
 
-  // Stores a weak pointer to the given |service|.
-  // TODO(isherman): Fix the memory ownership model so that this method is not
-  // needed: http://crbug.com/375248
-  void set_service(MetricsService* service) { service_ = service; }
+  MetricsService* metrics_service() { return metrics_service_.get(); }
 
  private:
+  explicit ChromeMetricsServiceClient(
+      metrics::MetricsStateManager* state_manager);
+
+  // Completes the two-phase initialization of ChromeMetricsServiceClient.
+  void Initialize();
+
   // Callbacks for various stages of final log info collection. Do not call
   // these directly.
   void OnMemoryDetailCollectionDone();
@@ -72,10 +89,17 @@ class ChromeMetricsServiceClient : public metrics::MetricsServiceClient,
 
   base::ThreadChecker thread_checker_;
 
-  // The MetricsService that |this| is a client of. Weak pointer.
-  MetricsService* service_;
+  // Weak pointer to the MetricsStateManager.
+  metrics::MetricsStateManager* metrics_state_manager_;
+
+  // The MetricsService that |this| is a client of.
+  scoped_ptr<MetricsService> metrics_service_;
 
   content::NotificationRegistrar registrar_;
+
+  // On ChromeOS, holds a weak pointer to the ChromeOSMetricsProvider instance
+  // that has been registered with MetricsService. On other platforms, is NULL.
+  ChromeOSMetricsProvider* chromeos_metrics_provider_;
 
   NetworkStatsUploader network_stats_uploader_;
 

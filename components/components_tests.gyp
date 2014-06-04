@@ -74,9 +74,11 @@
             'data_reduction_proxy/browser/data_reduction_proxy_auth_request_handler_unittest.cc',
             'data_reduction_proxy/browser/data_reduction_proxy_config_service_unittest.cc',
             'data_reduction_proxy/browser/data_reduction_proxy_metrics_unittest.cc',
+            'data_reduction_proxy/browser/data_reduction_proxy_params_unittest.cc',
             'data_reduction_proxy/browser/data_reduction_proxy_settings_unittest.cc',
             'data_reduction_proxy/browser/http_auth_handler_data_reduction_proxy_unittest.cc',
             'dom_distiller/core/article_entry_unittest.cc',
+            'dom_distiller/core/distilled_content_store_unittest.cc',
             'dom_distiller/core/distiller_unittest.cc',
             'dom_distiller/core/distiller_url_fetcher_unittest.cc',
             'dom_distiller/core/dom_distiller_database_unittest.cc',
@@ -97,7 +99,7 @@
             'domain_reliability/util_unittest.cc',
             'enhanced_bookmarks/image_store_unittest.cc',
             'feedback/feedback_uploader_unittest.cc',
-            'gcm_driver/gcm_driver_unittest.cc',
+            'gcm_driver/gcm_driver_desktop_unittest.cc',
             'invalidation/invalidation_logger_unittest.cc',
             'json_schema/json_schema_validator_unittest.cc',
             'json_schema/json_schema_validator_unittest_base.cc',
@@ -110,6 +112,8 @@
             'metrics/metrics_log_base_unittest.cc',
             'metrics/metrics_log_manager_unittest.cc',
             'metrics/metrics_reporting_scheduler_unittest.cc',
+            'metrics/metrics_state_manager_unittest.cc',
+            'metrics/net/compression_utils_unittest.cc',
             'metrics/persisted_logs_unittest.cc',
             'navigation_interception/intercept_navigation_resource_throttle_unittest.cc',
             'os_crypt/ie7_password_win_unittest.cc',
@@ -157,6 +161,7 @@
             'sync_driver/generic_change_processor_unittest.cc',
             'sync_driver/model_association_manager_unittest.cc',
             'sync_driver/non_blocking_data_type_controller_unittest.cc',
+            'sync_driver/shared_change_processor_unittest.cc',
             'sync_driver/sync_prefs_unittest.cc',
             'sync_driver/system_encryptor_unittest.cc',
             'test/run_all_unittests.cc',
@@ -260,6 +265,10 @@
 
             # Dependencies of language_usage_metrics
             'components.gyp:language_usage_metrics',
+
+            # Dependencies of metrics
+            'components.gyp:metrics',
+            'components.gyp:metrics_net',
 
             # Dependencies of os_crypt
             'components.gyp:os_crypt',
@@ -370,6 +379,7 @@
                 ['include', '^json_schema/'],
                 ['include', '^keyed_service/core/'],
                 ['include', '^language_usage_metrics/'],
+                ['include', '^metrics/'],
                 ['include', '^password_manager/'],
                 ['include', '^precache/core/'],
                 ['include', '^search_provider_logos/'],
@@ -431,6 +441,8 @@
             }],
             ['OS == "android"', {
               'sources!': [
+                'gcm_driver/gcm_driver_desktop_unittest.cc',
+                'feedback/feedback_uploader_unittest.cc',
                 'signin/core/browser/mutable_profile_oauth2_token_service_unittest.cc',
                 'storage_monitor/media_storage_util_unittest.cc',
                 'storage_monitor/storage_info_unittest.cc',
@@ -438,7 +450,11 @@
                 'usb_service/usb_context_unittest.cc',
                 'web_modal/web_contents_modal_dialog_manager_unittest.cc',
               ],
+              'dependencies': [
+                '../testing/android/native_test.gyp:native_test_native_code',
+              ],
               'dependencies!': [
+                'components.gyp:feedback_component',
                 'components.gyp:storage_monitor',
                 'components.gyp:storage_monitor_test_support',
                 'components.gyp:usb_service',
@@ -446,11 +462,6 @@
                 'components.gyp:web_modal_test_support',
                 '../third_party/libusb/libusb.gyp:libusb',
               ],
-            }],
-            ['OS == "android"', {
-              'dependencies': [
-                '../testing/android/native_test.gyp:native_test_native_code',
-              ]
             }],
             ['chromeos==1', {
               'sources': [

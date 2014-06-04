@@ -461,7 +461,6 @@ class End2EndTest : public ::testing::Test {
   void Configure(transport::VideoCodec video_codec,
                  transport::AudioCodec audio_codec,
                  int audio_sampling_frequency,
-                 bool external_audio_decoder,
                  int max_number_of_video_buffers_used) {
     audio_sender_config_.rtp_config.ssrc = 1;
     audio_sender_config_.rtp_config.max_delay_ms = kTargetPlayoutDelayMs;
@@ -479,10 +478,10 @@ class End2EndTest : public ::testing::Test {
     audio_receiver_config_.rtp_max_delay_ms = kTargetPlayoutDelayMs;
     audio_receiver_config_.rtp_payload_type =
         audio_sender_config_.rtp_config.payload_type;
-    audio_receiver_config_.use_external_decoder = external_audio_decoder;
     audio_receiver_config_.frequency = audio_sender_config_.frequency;
     audio_receiver_config_.channels = kAudioChannels;
-    audio_receiver_config_.codec = audio_sender_config_.codec;
+    audio_receiver_config_.max_frame_rate = 100;
+    audio_receiver_config_.codec.audio = audio_sender_config_.codec;
 
     test_receiver_audio_callback_->SetExpectedSamplingFrequency(
         audio_receiver_config_.frequency);
@@ -510,8 +509,10 @@ class End2EndTest : public ::testing::Test {
     video_receiver_config_.rtp_max_delay_ms = kTargetPlayoutDelayMs;
     video_receiver_config_.rtp_payload_type =
         video_sender_config_.rtp_config.payload_type;
-    video_receiver_config_.use_external_decoder = false;
-    video_receiver_config_.codec = video_sender_config_.codec;
+    video_receiver_config_.frequency = kVideoFrequency;
+    video_receiver_config_.channels = 1;
+    video_receiver_config_.max_frame_rate = video_sender_config_.max_frame_rate;
+    video_receiver_config_.codec.video = video_sender_config_.codec;
   }
 
   void SetReceiverSkew(double skew, base::TimeDelta offset) {
@@ -565,7 +566,7 @@ class End2EndTest : public ::testing::Test {
 
   void RequestAudioFrames(int count, bool with_check) {
     for (int i = 0; i < count; ++i) {
-      frame_receiver_->GetRawAudioFrame(
+      cast_receiver_->RequestDecodedAudioFrame(
           base::Bind(with_check ? &TestReceiverAudioCallback::CheckAudioFrame :
                                   &TestReceiverAudioCallback::IgnoreAudioFrame,
                      test_receiver_audio_callback_));
@@ -609,8 +610,6 @@ class End2EndTest : public ::testing::Test {
 
     audio_frame_input_ = cast_sender_->audio_frame_input();
     video_frame_input_ = cast_sender_->video_frame_input();
-
-    frame_receiver_ = cast_receiver_->frame_receiver();
 
     audio_bus_factory_.reset(
         new TestAudioBusFactory(audio_sender_config_.channels,
@@ -683,7 +682,7 @@ class End2EndTest : public ::testing::Test {
     video_ticks_.push_back(std::make_pair(
         testing_clock_receiver_->NowTicks(),
         playout_time));
-    frame_receiver_->GetRawVideoFrame(
+    cast_receiver_->RequestDecodedVideoFrame(
         base::Bind(&End2EndTest::BasicPlayerGotVideoFrame,
                    base::Unretained(this)));
   }
@@ -700,16 +699,16 @@ class End2EndTest : public ::testing::Test {
     audio_ticks_.push_back(std::make_pair(
         testing_clock_receiver_->NowTicks(),
         playout_time));
-    frame_receiver_->GetRawAudioFrame(
+    cast_receiver_->RequestDecodedAudioFrame(
         base::Bind(&End2EndTest::BasicPlayerGotAudioFrame,
                    base::Unretained(this)));
   }
 
   void StartBasicPlayer() {
-    frame_receiver_->GetRawVideoFrame(
+    cast_receiver_->RequestDecodedVideoFrame(
         base::Bind(&End2EndTest::BasicPlayerGotVideoFrame,
                    base::Unretained(this)));
-    frame_receiver_->GetRawAudioFrame(
+    cast_receiver_->RequestDecodedAudioFrame(
         base::Bind(&End2EndTest::BasicPlayerGotAudioFrame,
                    base::Unretained(this)));
   }
@@ -731,8 +730,8 @@ class End2EndTest : public ::testing::Test {
     }
   }
 
-  AudioReceiverConfig audio_receiver_config_;
-  VideoReceiverConfig video_receiver_config_;
+  FrameReceiverConfig audio_receiver_config_;
+  FrameReceiverConfig video_receiver_config_;
   AudioSenderConfig audio_sender_config_;
   VideoSenderConfig video_sender_config_;
 
@@ -767,7 +766,6 @@ class End2EndTest : public ::testing::Test {
   scoped_ptr<CastSender> cast_sender_;
   scoped_refptr<AudioFrameInput> audio_frame_input_;
   scoped_refptr<VideoFrameInput> video_frame_input_;
-  scoped_refptr<FrameReceiver> frame_receiver_;
 
   scoped_refptr<TestReceiverAudioCallback> test_receiver_audio_callback_;
   scoped_refptr<TestReceiverVideoCallback> test_receiver_video_callback_;
@@ -784,7 +782,7 @@ class End2EndTest : public ::testing::Test {
 };
 
 TEST_F(End2EndTest, LoopNoLossPcm16) {
-  Configure(transport::kVp8, transport::kPcm16, 32000, false, 1);
+  Configure(transport::kVp8, transport::kPcm16, 32000, 1);
   // Reduce video resolution to allow processing multiple frames within a
   // reasonable time frame.
   video_sender_config_.width = kVideoQcifWidth;
@@ -819,7 +817,7 @@ TEST_F(End2EndTest, LoopNoLossPcm16) {
     RequestAudioFrames(num_audio_frames, true);
     num_audio_frames_requested += num_audio_frames;
 
-    frame_receiver_->GetRawVideoFrame(
+    cast_receiver_->RequestDecodedVideoFrame(
         base::Bind(&TestReceiverVideoCallback::CheckVideoFrame,
                    test_receiver_video_callback_));
 
@@ -838,14 +836,14 @@ TEST_F(End2EndTest, LoopNoLossPcm16) {
 // This tests our external decoder interface for Audio.
 // Audio test without packet loss using raw PCM 16 audio "codec";
 TEST_F(End2EndTest, LoopNoLossPcm16ExternalDecoder) {
-  Configure(transport::kVp8, transport::kPcm16, 32000, true, 1);
+  Configure(transport::kVp8, transport::kPcm16, 32000, 1);
   Create();
 
   const int kNumIterations = 10;
   for (int i = 0; i < kNumIterations; ++i) {
     FeedAudioFrames(1, true);
     RunTasks(kAudioFrameDurationMs);
-    frame_receiver_->GetCodedAudioFrame(
+    cast_receiver_->RequestEncodedAudioFrame(
         base::Bind(&TestReceiverAudioCallback::CheckCodedAudioFrame,
                    test_receiver_audio_callback_));
   }
@@ -856,8 +854,7 @@ TEST_F(End2EndTest, LoopNoLossPcm16ExternalDecoder) {
 
 // This tests our Opus audio codec without video.
 TEST_F(End2EndTest, LoopNoLossOpus) {
-  Configure(transport::kVp8, transport::kOpus, kDefaultAudioSamplingRate,
-            false, 1);
+  Configure(transport::kVp8, transport::kOpus, kDefaultAudioSamplingRate, 1);
   Create();
 
   const int kNumIterations = 300;
@@ -883,8 +880,7 @@ TEST_F(End2EndTest, LoopNoLossOpus) {
 // in audio_receiver.cc for likely cause(s) of this bug.
 // http://crbug.com/356942
 TEST_F(End2EndTest, DISABLED_StartSenderBeforeReceiver) {
-  Configure(transport::kVp8, transport::kPcm16, kDefaultAudioSamplingRate,
-            false, 1);
+  Configure(transport::kVp8, transport::kPcm16, kDefaultAudioSamplingRate, 1);
   Create();
 
   int video_start = kVideoStart;
@@ -955,7 +951,7 @@ TEST_F(End2EndTest, DISABLED_StartSenderBeforeReceiver) {
     RequestAudioFrames(num_audio_frames, true);
     num_audio_frames_requested += num_audio_frames;
 
-    frame_receiver_->GetRawVideoFrame(
+    cast_receiver_->RequestDecodedVideoFrame(
         base::Bind(&TestReceiverVideoCallback::CheckVideoFrame,
                    test_receiver_video_callback_));
 
@@ -972,8 +968,7 @@ TEST_F(End2EndTest, DISABLED_StartSenderBeforeReceiver) {
 // This tests a network glitch lasting for 10 video frames.
 // Flaky. See crbug.com/351596.
 TEST_F(End2EndTest, DISABLED_GlitchWith3Buffers) {
-  Configure(transport::kVp8, transport::kOpus, kDefaultAudioSamplingRate,
-            false, 3);
+  Configure(transport::kVp8, transport::kOpus, kDefaultAudioSamplingRate, 3);
   video_sender_config_.rtp_config.max_delay_ms = 67;
   video_receiver_config_.rtp_max_delay_ms = 67;
   Create();
@@ -992,7 +987,7 @@ TEST_F(End2EndTest, DISABLED_GlitchWith3Buffers) {
         video_sender_config_.height,
         capture_time + base::TimeDelta::FromMilliseconds(kTargetPlayoutDelayMs),
         true);
-    frame_receiver_->GetRawVideoFrame(
+    cast_receiver_->RequestDecodedVideoFrame(
         base::Bind(&TestReceiverVideoCallback::CheckVideoFrame,
                    test_receiver_video_callback_));
     RunTasks(kFrameTimerMs);
@@ -1025,7 +1020,7 @@ TEST_F(End2EndTest, DISABLED_GlitchWith3Buffers) {
       capture_time + base::TimeDelta::FromMilliseconds(kTargetPlayoutDelayMs),
       true);
 
-  frame_receiver_->GetRawVideoFrame(
+  cast_receiver_->RequestDecodedVideoFrame(
       base::Bind(&TestReceiverVideoCallback::CheckVideoFrame,
                  test_receiver_video_callback_));
 
@@ -1036,8 +1031,7 @@ TEST_F(End2EndTest, DISABLED_GlitchWith3Buffers) {
 
 // Disabled due to flakiness and crashiness.  http://crbug.com/360951
 TEST_F(End2EndTest, DISABLED_DropEveryOtherFrame3Buffers) {
-  Configure(transport::kVp8, transport::kOpus, kDefaultAudioSamplingRate, false,
-            3);
+  Configure(transport::kVp8, transport::kOpus, kDefaultAudioSamplingRate, 3);
   video_sender_config_.rtp_config.max_delay_ms = 67;
   video_receiver_config_.rtp_max_delay_ms = 67;
   Create();
@@ -1062,7 +1056,7 @@ TEST_F(End2EndTest, DISABLED_DropEveryOtherFrame3Buffers) {
 
       // GetRawVideoFrame will not return the frame until we are close in
       // time before we should render the frame.
-      frame_receiver_->GetRawVideoFrame(
+      cast_receiver_->RequestDecodedVideoFrame(
           base::Bind(&TestReceiverVideoCallback::CheckVideoFrame,
                      test_receiver_video_callback_));
     }
@@ -1075,7 +1069,7 @@ TEST_F(End2EndTest, DISABLED_DropEveryOtherFrame3Buffers) {
 }
 
 TEST_F(End2EndTest, CryptoVideo) {
-  Configure(transport::kVp8, transport::kPcm16, 32000, false, 1);
+  Configure(transport::kVp8, transport::kPcm16, 32000, 1);
 
   video_sender_config_.rtp_config.aes_iv_mask =
       ConvertFromBase16String("1234567890abcdeffedcba0987654321");
@@ -1103,7 +1097,7 @@ TEST_F(End2EndTest, CryptoVideo) {
 
     RunTasks(kFrameTimerMs);
 
-    frame_receiver_->GetRawVideoFrame(
+    cast_receiver_->RequestDecodedVideoFrame(
         base::Bind(&TestReceiverVideoCallback::CheckVideoFrame,
                    test_receiver_video_callback_));
   }
@@ -1113,7 +1107,7 @@ TEST_F(End2EndTest, CryptoVideo) {
 }
 
 TEST_F(End2EndTest, CryptoAudio) {
-  Configure(transport::kVp8, transport::kPcm16, 32000, false, 1);
+  Configure(transport::kVp8, transport::kPcm16, 32000, 1);
 
   audio_sender_config_.rtp_config.aes_iv_mask =
       ConvertFromBase16String("abcdeffedcba12345678900987654321");
@@ -1142,7 +1136,7 @@ TEST_F(End2EndTest, CryptoAudio) {
 // Video test without packet loss - tests the logging aspects of the end2end,
 // but is basically equivalent to LoopNoLossPcm16.
 TEST_F(End2EndTest, VideoLogging) {
-  Configure(transport::kVp8, transport::kPcm16, 32000, false, 1);
+  Configure(transport::kVp8, transport::kPcm16, 32000, 1);
   Create();
 
   int video_start = kVideoStart;
@@ -1159,7 +1153,7 @@ TEST_F(End2EndTest, VideoLogging) {
     SendVideoFrame(video_start, capture_time);
     RunTasks(kFrameTimerMs);
 
-    frame_receiver_->GetRawVideoFrame(
+    cast_receiver_->RequestDecodedVideoFrame(
         base::Bind(&TestReceiverVideoCallback::CheckVideoFrame,
                    test_receiver_video_callback_));
 
@@ -1266,7 +1260,7 @@ TEST_F(End2EndTest, VideoLogging) {
 // Audio test without packet loss - tests the logging aspects of the end2end,
 // but is basically equivalent to LoopNoLossPcm16.
 TEST_F(End2EndTest, AudioLogging) {
-  Configure(transport::kVp8, transport::kPcm16, 32000, false, 1);
+  Configure(transport::kVp8, transport::kPcm16, 32000, 1);
   Create();
 
   int audio_diff = kFrameTimerMs;
@@ -1335,7 +1329,10 @@ TEST_F(End2EndTest, AudioLogging) {
         map_it->second.counter[FRAME_DECODED];
 
     EXPECT_GT(map_it->second.counter[FRAME_ACK_SENT], 0);
+    EXPECT_GT(map_it->second.counter[FRAME_ACK_RECEIVED], 0);
     expected_event_count_for_frame += map_it->second.counter[FRAME_ACK_SENT];
+    expected_event_count_for_frame +=
+        map_it->second.counter[FRAME_ACK_RECEIVED];
 
     // Verify that there were no other events logged with respect to this frame.
     // (i.e. Total event count = expected event count)
@@ -1344,7 +1341,7 @@ TEST_F(End2EndTest, AudioLogging) {
 }
 
 TEST_F(End2EndTest, BasicFakeSoftwareVideo) {
-  Configure(transport::kFakeSoftwareVideo, transport::kPcm16, 32000, false, 1);
+  Configure(transport::kFakeSoftwareVideo, transport::kPcm16, 32000, 1);
   Create();
   StartBasicPlayer();
   SetReceiverSkew(1.0, base::TimeDelta::FromMilliseconds(1));
@@ -1365,7 +1362,7 @@ TEST_F(End2EndTest, BasicFakeSoftwareVideo) {
 }
 
 TEST_F(End2EndTest, ReceiverClockFast) {
-  Configure(transport::kFakeSoftwareVideo, transport::kPcm16, 32000, false, 1);
+  Configure(transport::kFakeSoftwareVideo, transport::kPcm16, 32000, 1);
   Create();
   StartBasicPlayer();
   SetReceiverSkew(2.0, base::TimeDelta::FromMicroseconds(1234567));
@@ -1380,7 +1377,7 @@ TEST_F(End2EndTest, ReceiverClockFast) {
 }
 
 TEST_F(End2EndTest, ReceiverClockSlow) {
-  Configure(transport::kFakeSoftwareVideo, transport::kPcm16, 32000, false, 1);
+  Configure(transport::kFakeSoftwareVideo, transport::kPcm16, 32000, 1);
   Create();
   StartBasicPlayer();
   SetReceiverSkew(0.5, base::TimeDelta::FromMicroseconds(-765432));
@@ -1395,7 +1392,7 @@ TEST_F(End2EndTest, ReceiverClockSlow) {
 }
 
 TEST_F(End2EndTest, SmoothPlayoutWithFivePercentClockRateSkew) {
-  Configure(transport::kFakeSoftwareVideo, transport::kPcm16, 32000, false, 1);
+  Configure(transport::kFakeSoftwareVideo, transport::kPcm16, 32000, 1);
   Create();
   StartBasicPlayer();
   SetReceiverSkew(1.05, base::TimeDelta::FromMilliseconds(-42));
@@ -1416,7 +1413,7 @@ TEST_F(End2EndTest, SmoothPlayoutWithFivePercentClockRateSkew) {
 }
 
 TEST_F(End2EndTest, EvilNetwork) {
-  Configure(transport::kFakeSoftwareVideo, transport::kPcm16, 32000, false, 1);
+  Configure(transport::kFakeSoftwareVideo, transport::kPcm16, 32000, 1);
   receiver_to_sender_.SetPacketPipe(test::EvilNetwork().Pass());
   sender_to_receiver_.SetPacketPipe(test::EvilNetwork().Pass());
   Create();

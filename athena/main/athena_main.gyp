@@ -26,7 +26,31 @@
         'athena_main.cc',
         'placeholder.cc',
         'placeholder.h',
+        'placeholder_content.cc',
+        'placeholder_content.h',
+        'web_activity.cc',
+        'web_activity.h',
       ],
     },
+    {
+      'target_name': 'athena_shell',
+      'type': 'executable',
+      'dependencies': [
+        '../../base/base.gyp:base',
+        '../../base/base.gyp:base_i18n',
+        '../../skia/skia.gyp:skia',
+        '../../ui/accessibility/accessibility.gyp:ax_gen',
+        '../../ui/aura/aura.gyp:aura',
+        '../../ui/compositor/compositor.gyp:compositor_test_support',
+        '../../ui/gfx/gfx.gyp:gfx',
+        '../athena.gyp:athena_lib',
+        '../athena.gyp:athena_test_support',
+      ],
+      'sources': [
+        'athena_shell.cc',
+        'sample_activity.cc',
+        'sample_activity.h',
+      ],
+    }
   ],  # targets
 }

@@ -66,7 +66,7 @@ class ProfileImplIOData : public ProfileIOData {
     // these functions.
     scoped_refptr<ChromeURLRequestContextGetter> CreateMainRequestContextGetter(
         content::ProtocolHandlerMap* protocol_handlers,
-        content::ProtocolHandlerScopedVector protocol_interceptors,
+        content::URLRequestInterceptorScopedVector request_interceptors,
         PrefService* local_state,
         IOThread* io_thread) const;
     scoped_refptr<ChromeURLRequestContextGetter>
@@ -74,7 +74,8 @@ class ProfileImplIOData : public ProfileIOData {
             const base::FilePath& partition_path,
             bool in_memory,
             content::ProtocolHandlerMap* protocol_handlers,
-            content::ProtocolHandlerScopedVector protocol_interceptors) const;
+            content::URLRequestInterceptorScopedVector
+                request_interceptors) const;
 
     content::ResourceContext* GetResourceContext() const;
     // GetResourceContextNoInit() does not call LazyInitialize() so it can be
@@ -88,6 +89,9 @@ class ProfileImplIOData : public ProfileIOData {
         GetIsolatedMediaRequestContextGetter(
             const base::FilePath& partition_path,
             bool in_memory) const;
+
+    // Returns the DevToolsNetworkController attached to ProfileIOData.
+    DevToolsNetworkController* GetDevToolsNetworkController() const;
 
     // Deletes all network related data since |time|. It deletes transport
     // security state since |time| and also deletes HttpServerProperties data.
@@ -167,7 +171,7 @@ class ProfileImplIOData : public ProfileIOData {
   virtual void InitializeInternal(
       ProfileParams* profile_params,
       content::ProtocolHandlerMap* protocol_handlers,
-      content::ProtocolHandlerScopedVector protocol_interceptors)
+      content::URLRequestInterceptorScopedVector request_interceptors)
           const OVERRIDE;
   virtual void InitializeExtensionsRequestContext(
       ProfileParams* profile_params) const OVERRIDE;
@@ -177,7 +181,7 @@ class ProfileImplIOData : public ProfileIOData {
       scoped_ptr<ProtocolHandlerRegistry::JobInterceptorFactory>
           protocol_handler_interceptor,
       content::ProtocolHandlerMap* protocol_handlers,
-      content::ProtocolHandlerScopedVector protocol_interceptors)
+      content::URLRequestInterceptorScopedVector request_interceptors)
           const OVERRIDE;
   virtual ChromeURLRequestContext* InitializeMediaRequestContext(
       ChromeURLRequestContext* original_context,
@@ -190,7 +194,7 @@ class ProfileImplIOData : public ProfileIOData {
       scoped_ptr<ProtocolHandlerRegistry::JobInterceptorFactory>
           protocol_handler_interceptor,
       content::ProtocolHandlerMap* protocol_handlers,
-      content::ProtocolHandlerScopedVector protocol_interceptors)
+      content::URLRequestInterceptorScopedVector request_interceptors)
           const OVERRIDE;
   virtual ChromeURLRequestContext*
       AcquireIsolatedMediaRequestContext(

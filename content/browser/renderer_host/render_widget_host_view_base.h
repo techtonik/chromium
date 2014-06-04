@@ -80,10 +80,6 @@ class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
   // IPC::Listener implementation:
   virtual bool OnMessageReceived(const IPC::Message& msg) OVERRIDE;
 
-  // Called when a mousewheel event was not processed by the renderer.
-  // virtual for testing.
-  virtual void UnhandledWheelEvent(const blink::WebMouseWheelEvent& event);
-
   // Called by the host when the input flush has completed.
   void OnDidFlushInput();
 
@@ -140,6 +136,9 @@ class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
   // Called by the host when it requires an input flush; the flush call should
   // by synchronized with BeginFrame.
   virtual void OnSetNeedsFlushInput();
+
+  virtual void WheelEventAck(const blink::WebMouseWheelEvent& event,
+                             InputEventAckState ack_result);
 
   virtual void GestureEventAck(const blink::WebGestureEvent& event,
                                InputEventAckState ack_result);
@@ -323,9 +322,6 @@ class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
 #if defined(OS_ANDROID)
   virtual void ShowDisambiguationPopup(const gfx::Rect& target_rect,
                                        const SkBitmap& zoomed_bitmap) = 0;
-
-  // Notifies the View that the renderer selection root bounds has changed.
-  virtual void SelectionRootBoundsChanged(const gfx::Rect& bounds) = 0;
 
   // Instructs the view to not drop the surface even when the view is hidden.
   virtual void LockCompositingSurface() = 0;

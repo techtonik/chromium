@@ -173,13 +173,15 @@ class Dispatcher : public content::RenderProcessObserver {
                        const std::string& font_size);
   void OnShouldSuspend(const std::string& extension_id, int sequence_id);
   void OnSuspend(const std::string& extension_id);
+  void OnTransferBlobs(const std::vector<std::string>& blob_uuids);
   void OnUnloaded(const std::string& id);
   void OnUpdatePermissions(const ExtensionMsg_UpdatePermissions_Params& params);
   void OnUpdateTabSpecificPermissions(int page_id,
                                       int tab_id,
                                       const std::string& extension_id,
                                       const URLPatternSet& origin_set);
-  void OnUpdateUserScripts(base::SharedMemoryHandle scripts);
+  void OnUpdateUserScripts(base::SharedMemoryHandle scripts,
+                           const std::set<std::string>& extension_ids);
   void OnUsingWebRequestAPI(bool adblock,
                             bool adblock_plus,
                             bool other_webrequest);

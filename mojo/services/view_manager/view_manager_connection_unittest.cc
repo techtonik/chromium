@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "base/auto_reset.h"
 #include "base/bind.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/scoped_vector.h"
@@ -14,7 +15,7 @@
 #include "mojo/common/common_type_converters.h"
 #include "mojo/public/cpp/application/application.h"
 #include "mojo/public/cpp/application/connect.h"
-#include "mojo/public/cpp/bindings/allocation_scope.h"
+#include "mojo/public/cpp/bindings/lib/router.h"
 #include "mojo/public/cpp/environment/environment.h"
 #include "mojo/service_manager/service_manager.h"
 #include "mojo/services/public/cpp/geometry/geometry_type_converters.h"
@@ -27,156 +28,163 @@
 #include "ui/gfx/geometry/rect.h"
 
 namespace mojo {
-
-// TODO(sky): remove this when Darin is done with cleanup.
-template <typename T>
-class MOJO_COMMON_EXPORT TypeConverter<T, T> {
- public:
-  static T ConvertFrom(T input, Buffer* buf) {
-    return input;
-  }
-  static T ConvertTo(T input) {
-    return input;
-  }
-
-  MOJO_ALLOW_IMPLICIT_TYPE_CONVERSION();
-};
-
 namespace view_manager {
 namespace service {
 
 namespace {
 
-base::RunLoop* current_run_loop = NULL;
-
 const char kTestServiceURL[] = "mojo:test_url";
 
-void INodesToTestNodes(const Array<INode>& data,
-                       std::vector<TestNode>* test_nodes) {
-  for (size_t i = 0; i < data.size(); ++i) {
-    TestNode node;
-    node.parent_id = data[i].parent_id();
-    node.node_id = data[i].node_id();
-    node.view_id = data[i].view_id();
-    test_nodes->push_back(node);
-  }
-}
-
-// BackgroundConnection is used when a child ViewManagerConnection is created by
-// way of Connect(). BackgroundConnection is created on a background thread (the
-// thread where the shell lives). All public methods are to be invoked on the
-// main thread. They wait for a result (by spinning a nested message loop),
-// calling through to background thread, then the underlying IViewManager* and
-// respond back to the calling thread to return control to the test.
-class BackgroundConnection : public TestChangeTracker::Delegate {
+// ViewManagerProxy is a proxy to an IViewManager. It handles invoking
+// IViewManager functions on the right thread in a synchronous manner (each
+// IViewManager cover function blocks until the response from the IViewManager
+// is returned). In addition it tracks the set of IViewManagerClient messages
+// received by way of a vector of Changes. Use DoRunLoopUntilChangesCount() to
+// wait for a certain number of messages to be received.
+class ViewManagerProxy : public TestChangeTracker::Delegate {
  public:
-  BackgroundConnection(TestChangeTracker* tracker,
-                       base::MessageLoop* loop)
+  explicit ViewManagerProxy(TestChangeTracker* tracker)
       : tracker_(tracker),
-        main_loop_(loop),
-        background_loop_(base::MessageLoop::current()),
         view_manager_(NULL),
-        quit_count_(0) {
-    main_loop_->PostTask(FROM_HERE,
-                         base::Bind(&BackgroundConnection::SetInstance, this));
+        quit_count_(0),
+        router_(NULL) {
+    SetInstance(this);
   }
 
-  virtual ~BackgroundConnection() {
-    instance_ = NULL;
-  }
-
-  void set_view_manager(IViewManager* view_manager) {
-    view_manager_ = view_manager;
-  }
+  virtual ~ViewManagerProxy() {}
 
   // Runs a message loop until the single instance has been created.
-  static BackgroundConnection* WaitForInstance() {
+  static ViewManagerProxy* WaitForInstance() {
     if (!instance_)
       RunMainLoop();
-    return instance_;
+    ViewManagerProxy* instance = instance_;
+    instance_ = NULL;
+    return instance;
   }
 
   // Runs the main loop until |count| changes have been received.
   std::vector<Change> DoRunLoopUntilChangesCount(size_t count) {
-    background_loop_->PostTask(FROM_HERE,
-                               base::Bind(&BackgroundConnection::SetQuitCount,
-                                          base::Unretained(this), count));
-    // Run the current message loop. When the quit count is reached we'll quit.
+    DCHECK_EQ(0u, quit_count_);
+    if (tracker_->changes()->size() >= count) {
+      CopyChangesFromTracker();
+      return changes_;
+    }
+    quit_count_ = count - tracker_->changes()->size();
+    // Run the current message loop. When |count| Changes have been received,
+    // we'll quit.
     RunMainLoop();
     return changes_;
   }
 
-  // The following functions mirror that of IViewManager. They bounce the
-  // function to the right thread and return the result.
+  const std::vector<Change>& changes() const { return changes_; }
+
+  // Destroys the connection, blocking until done.
+  void Destroy() {
+    router_->CloseMessagePipe();
+  }
+
+  // The following functions are cover methods for IViewManager. They block
+  // until the result is received.
   bool CreateNode(TransportNodeId node_id) {
+    changes_.clear();
     bool result = false;
-    background_loop_->PostTask(
-        FROM_HERE,
-        base::Bind(&BackgroundConnection::CreateNodeOnBackgroundThread,
-                   base::Unretained(this), node_id, &result));
+    view_manager_->CreateNode(node_id,
+                              base::Bind(&ViewManagerProxy::GotResult,
+                                         base::Unretained(this), &result));
     RunMainLoop();
     return result;
   }
   bool AddNode(TransportNodeId parent,
                TransportNodeId child,
                TransportChangeId server_change_id) {
+    changes_.clear();
     bool result = false;
-    background_loop_->PostTask(
-        FROM_HERE,
-        base::Bind(&BackgroundConnection::AddNodeOnBackgroundThread,
-                   base::Unretained(this), parent, child, server_change_id,
-                   &result));
+    view_manager_->AddNode(parent, child, server_change_id,
+                           base::Bind(&ViewManagerProxy::GotResult,
+                                      base::Unretained(this), &result));
     RunMainLoop();
     return result;
   }
   bool RemoveNodeFromParent(TransportNodeId node_id,
                             TransportChangeId server_change_id) {
+    changes_.clear();
     bool result = false;
-    background_loop_->PostTask(
-        FROM_HERE,
-        base::Bind(
-            &BackgroundConnection::RemoveNodeFromParentOnBackgroundThread,
-            base::Unretained(this), node_id, server_change_id, &result));
+    view_manager_->RemoveNodeFromParent(node_id, server_change_id,
+        base::Bind(&ViewManagerProxy::GotResult,
+                   base::Unretained(this), &result));
     RunMainLoop();
     return result;
   }
   bool SetView(TransportNodeId node_id, TransportViewId view_id) {
+    changes_.clear();
     bool result = false;
-    background_loop_->PostTask(
-        FROM_HERE,
-        base::Bind(
-            &BackgroundConnection::SetViewOnBackgroundThread,
-            base::Unretained(this), node_id, view_id, &result));
+    view_manager_->SetView(node_id, view_id,
+                           base::Bind(&ViewManagerProxy::GotResult,
+                                      base::Unretained(this), &result));
     RunMainLoop();
     return result;
   }
   bool CreateView(TransportViewId view_id) {
+    changes_.clear();
     bool result = false;
-    background_loop_->PostTask(
-        FROM_HERE,
-        base::Bind(
-            &BackgroundConnection::CreateViewOnBackgroundThread,
-            base::Unretained(this), view_id, &result));
+    view_manager_->CreateView(view_id,
+                              base::Bind(&ViewManagerProxy::GotResult,
+                                         base::Unretained(this), &result));
     RunMainLoop();
     return result;
   }
   void GetNodeTree(TransportNodeId node_id, std::vector<TestNode>* nodes) {
-    background_loop_->PostTask(
-        FROM_HERE,
-        base::Bind(
-            &BackgroundConnection::GetNodeTreeOnBackgroundThread,
-            base::Unretained(this), node_id, nodes));
+    changes_.clear();
+    view_manager_->GetNodeTree(node_id,
+                               base::Bind(&ViewManagerProxy::GotNodeTree,
+                                          base::Unretained(this), nodes));
     RunMainLoop();
+  }
+  bool Connect(const std::vector<TransportNodeId>& nodes) {
+    changes_.clear();
+    base::AutoReset<bool> auto_reset(&in_connect_, true);
+    bool result = false;
+    view_manager_->Connect(kTestServiceURL, Array<TransportNodeId>::From(nodes),
+                           base::Bind(&ViewManagerProxy::GotResult,
+                                      base::Unretained(this), &result));
+    RunMainLoop();
+    return result;
+  }
+  bool DeleteNode(TransportNodeId node_id) {
+    changes_.clear();
+    bool result = false;
+    view_manager_->DeleteNode(node_id,
+                              base::Bind(&ViewManagerProxy::GotResult,
+                                         base::Unretained(this), &result));
+    RunMainLoop();
+    return result;
+  }
+  bool DeleteView(TransportViewId view_id) {
+    changes_.clear();
+    bool result = false;
+    view_manager_->DeleteView(view_id,
+                              base::Bind(&ViewManagerProxy::GotResult,
+                                         base::Unretained(this), &result));
+    RunMainLoop();
+    return result;
+  }
+  bool SetNodeBounds(TransportNodeId node_id, const gfx::Rect& bounds) {
+    changes_.clear();
+    bool result = false;
+    view_manager_->SetNodeBounds(node_id, Rect::From(bounds),
+                                 base::Bind(&ViewManagerProxy::GotResult,
+                                            base::Unretained(this), &result));
+    RunMainLoop();
+    return result;
   }
 
  private:
-  void SetQuitCount(size_t count) {
-    DCHECK_EQ(background_loop_, base::MessageLoop::current());
-    if (tracker_->changes()->size() >= count) {
-      QuitCountReached();
-      return;
-    }
-    quit_count_ = count - tracker_->changes()->size();
+  friend class TestViewManagerClientConnection;
+
+  void set_router(mojo::internal::Router* router) { router_ = router; }
+
+  void set_view_manager(IViewManager* view_manager) {
+    view_manager_ = view_manager;
   }
 
   static void RunMainLoop() {
@@ -188,92 +196,38 @@ class BackgroundConnection : public TestChangeTracker::Delegate {
   }
 
   void QuitCountReached() {
-    std::vector<Change> changes;
-    tracker_->changes()->swap(changes);
-    main_loop_->PostTask(
-        FROM_HERE,
-        base::Bind(&BackgroundConnection::QuitCountReachedOnMain,
-                   base::Unretained(this), changes));
-  }
-
-  void QuitCountReachedOnMain(const std::vector<Change>& changes) {
-    changes_ = changes;
-    DCHECK(main_run_loop_);
+    CopyChangesFromTracker();
     main_run_loop_->Quit();
   }
 
-  static void SetInstance(BackgroundConnection* instance) {
+  void CopyChangesFromTracker() {
+    std::vector<Change> changes;
+    tracker_->changes()->swap(changes);
+    changes_.swap(changes);
+  }
+
+  static void SetInstance(ViewManagerProxy* instance) {
     DCHECK(!instance_);
     instance_ = instance;
-    if (main_run_loop_)
+    // Connect() runs its own run loop that is quit when the result is
+    // received. Connect() also results in a new instance. If we quit here while
+    // waiting for a Connect() we would prematurely return before we got the
+    // result from Connect().
+    if (!in_connect_ && main_run_loop_)
       main_run_loop_->Quit();
   }
 
   // Callbacks from the various IViewManager functions.
-  void GotResultOnBackgroundThread(bool* result_cache, bool result) {
+  void GotResult(bool* result_cache, bool result) {
     *result_cache = result;
-    main_loop_->PostTask(
-        FROM_HERE,
-        base::Bind(&BackgroundConnection::QuitOnMainThread,
-                   base::Unretained(this)));
-  }
-
-  void GotNodeTreeOnBackgroundThread(std::vector<TestNode>* nodes,
-                                     const Array<INode>& results) {
-    INodesToTestNodes(results, nodes);
-    main_loop_->PostTask(
-        FROM_HERE,
-        base::Bind(&BackgroundConnection::QuitOnMainThread,
-                   base::Unretained(this)));
-  }
-
-  void QuitOnMainThread() {
     DCHECK(main_run_loop_);
     main_run_loop_->Quit();
   }
 
-  // The following functions correspond to the IViewManager functions. These run
-  // on the background thread.
-  void CreateNodeOnBackgroundThread(TransportNodeId node_id, bool* result) {
-    view_manager_->CreateNode(
-        node_id,
-        base::Bind(&BackgroundConnection::GotResultOnBackgroundThread,
-                   base::Unretained(this), result));
-  }
-  void AddNodeOnBackgroundThread(TransportNodeId parent,
-                                 TransportNodeId child,
-                                 TransportChangeId server_change_id,
-                                 bool* result) {
-    view_manager_->AddNode(
-        parent, child, server_change_id,
-        base::Bind(&BackgroundConnection::GotResultOnBackgroundThread,
-                   base::Unretained(this), result));
-  }
-  void RemoveNodeFromParentOnBackgroundThread(
-      TransportNodeId node_id,
-      TransportChangeId server_change_id,
-      bool* result) {
-    view_manager_->RemoveNodeFromParent(node_id, server_change_id,
-        base::Bind(&BackgroundConnection::GotResultOnBackgroundThread,
-                   base::Unretained(this), result));
-  }
-  void SetViewOnBackgroundThread(TransportNodeId node_id,
-                                 TransportViewId view_id,
-                                 bool* result) {
-    view_manager_->SetView(node_id, view_id,
-        base::Bind(&BackgroundConnection::GotResultOnBackgroundThread,
-                   base::Unretained(this), result));
-  }
-  void CreateViewOnBackgroundThread(TransportViewId view_id, bool* result) {
-    view_manager_->CreateView(view_id,
-        base::Bind(&BackgroundConnection::GotResultOnBackgroundThread,
-                   base::Unretained(this), result));
-  }
-  void GetNodeTreeOnBackgroundThread(TransportNodeId node_id,
-                                     std::vector<TestNode>* nodes) {
-    view_manager_->GetNodeTree(node_id,
-        base::Bind(&BackgroundConnection::GotNodeTreeOnBackgroundThread,
-                   base::Unretained(this), nodes));
+  void GotNodeTree(std::vector<TestNode>* nodes, Array<INodePtr> results) {
+    INodesToTestNodes(results, nodes);
+    DCHECK(main_run_loop_);
+    main_run_loop_->Quit();
   }
 
   // TestChangeTracker::Delegate:
@@ -282,16 +236,14 @@ class BackgroundConnection : public TestChangeTracker::Delegate {
       QuitCountReached();
   }
 
-  static BackgroundConnection* instance_;
+  static ViewManagerProxy* instance_;
   static base::RunLoop* main_run_loop_;
+  static bool in_connect_;
 
   TestChangeTracker* tracker_;
 
   // MessageLoop of the test.
   base::MessageLoop* main_loop_;
-
-  // MessageLoop BackgroundConnection lives on.
-  base::MessageLoop* background_loop_;
 
   IViewManager* view_manager_;
 
@@ -300,25 +252,30 @@ class BackgroundConnection : public TestChangeTracker::Delegate {
 
   std::vector<Change> changes_;
 
-  DISALLOW_COPY_AND_ASSIGN(BackgroundConnection);
+  mojo::internal::Router* router_;
+
+  DISALLOW_COPY_AND_ASSIGN(ViewManagerProxy);
 };
 
 // static
-BackgroundConnection* BackgroundConnection::instance_ = NULL;
+ViewManagerProxy* ViewManagerProxy::instance_ = NULL;
 
 // static
-base::RunLoop* BackgroundConnection::main_run_loop_ = NULL;
+base::RunLoop* ViewManagerProxy::main_run_loop_ = NULL;
+
+// static
+bool ViewManagerProxy::in_connect_ = false;
 
 class TestViewManagerClientConnection
     : public InterfaceImpl<IViewManagerClient> {
  public:
-  explicit TestViewManagerClientConnection(base::MessageLoop* loop)
-      : connection_(&tracker_, loop) {
+  TestViewManagerClientConnection() : connection_(&tracker_) {
     tracker_.set_delegate(&connection_);
   }
 
   // InterfaceImp:
   virtual void OnConnectionEstablished() OVERRIDE {
+    connection_.set_router(internal_state()->router());
     connection_.set_view_manager(client());
   }
 
@@ -326,27 +283,27 @@ class TestViewManagerClientConnection
   virtual void OnViewManagerConnectionEstablished(
       TransportConnectionId connection_id,
       TransportChangeId next_server_change_id,
-      const Array<INode>& nodes) OVERRIDE {
+      Array<INodePtr> nodes) OVERRIDE {
     tracker_.OnViewManagerConnectionEstablished(
-        connection_id, next_server_change_id, nodes);
+        connection_id, next_server_change_id, nodes.Pass());
   }
   virtual void OnServerChangeIdAdvanced(
       TransportChangeId next_server_change_id) OVERRIDE {
     tracker_.OnServerChangeIdAdvanced(next_server_change_id);
   }
   virtual void OnNodeBoundsChanged(TransportNodeId node_id,
-                                   const Rect& old_bounds,
-                                   const Rect& new_bounds) OVERRIDE {
-    tracker_.OnNodeBoundsChanged(node_id, old_bounds, new_bounds);
+                                   RectPtr old_bounds,
+                                   RectPtr new_bounds) OVERRIDE {
+    tracker_.OnNodeBoundsChanged(node_id, old_bounds.Pass(), new_bounds.Pass());
   }
   virtual void OnNodeHierarchyChanged(
       TransportNodeId node,
       TransportNodeId new_parent,
       TransportNodeId old_parent,
       TransportChangeId server_change_id,
-      const Array<INode>& nodes) OVERRIDE {
+      Array<INodePtr> nodes) OVERRIDE {
     tracker_.OnNodeHierarchyChanged(node, new_parent, old_parent,
-                                     server_change_id, nodes);
+                                    server_change_id, nodes.Pass());
   }
   virtual void OnNodeDeleted(TransportNodeId node,
                              TransportChangeId server_change_id) OVERRIDE {
@@ -363,26 +320,24 @@ class TestViewManagerClientConnection
 
  private:
   TestChangeTracker tracker_;
-  BackgroundConnection connection_;
+  ViewManagerProxy connection_;
 
   DISALLOW_COPY_AND_ASSIGN(TestViewManagerClientConnection);
 };
 
 // Used with IViewManager::Connect(). Creates a TestViewManagerClientConnection,
-// which creates and owns the BackgroundConnection.
+// which creates and owns the ViewManagerProxy.
 class ConnectServiceLoader : public ServiceLoader {
  public:
-  ConnectServiceLoader() : initial_loop_(base::MessageLoop::current()) {
-  }
-  virtual ~ConnectServiceLoader() {
-  }
+  ConnectServiceLoader() {}
+  virtual ~ConnectServiceLoader() {}
 
   // ServiceLoader:
   virtual void LoadService(ServiceManager* manager,
                            const GURL& url,
                            ScopedMessagePipeHandle shell_handle) OVERRIDE {
     scoped_ptr<Application> app(new Application(shell_handle.Pass()));
-    app->AddService<TestViewManagerClientConnection>(initial_loop_);
+    app->AddService<TestViewManagerClientConnection>();
     apps_.push_back(app.release());
   }
   virtual void OnServiceError(ServiceManager* manager,
@@ -390,155 +345,42 @@ class ConnectServiceLoader : public ServiceLoader {
   }
 
  private:
-  base::MessageLoop* initial_loop_;
   ScopedVector<Application> apps_;
 
   DISALLOW_COPY_AND_ASSIGN(ConnectServiceLoader);
 };
 
-// Sets |current_run_loop| and runs it. It is expected that someone else quits
-// the loop.
-void DoRunLoop() {
-  DCHECK(!current_run_loop);
-
-  base::RunLoop run_loop;
-  current_run_loop = &run_loop;
-  current_run_loop->Run();
-  current_run_loop = NULL;
-}
-
-// Boolean callback. Sets |result_cache| to the value of |result| and quits
-// the run loop.
-void BooleanCallback(bool* result_cache, bool result) {
-  *result_cache = result;
-  current_run_loop->Quit();
-}
-
-// Callback that results in a vector of INodes. The INodes are converted to
-// TestNodes.
-void INodesCallback(std::vector<TestNode>* test_nodes,
-                    const Array<INode>& data) {
-  INodesToTestNodes(data, test_nodes);
-  current_run_loop->Quit();
-}
-
 // Creates an id used for transport from the specified parameters.
-TransportNodeId CreateNodeId(TransportConnectionId connection_id,
-                             TransportConnectionSpecificNodeId node_id) {
+TransportNodeId BuildNodeId(TransportConnectionId connection_id,
+                            TransportConnectionSpecificNodeId node_id) {
   return (connection_id << 16) | node_id;
 }
 
 // Creates an id used for transport from the specified parameters.
-TransportViewId CreateViewId(TransportConnectionId connection_id,
-                             TransportConnectionSpecificViewId view_id) {
+TransportViewId BuildViewId(TransportConnectionId connection_id,
+                            TransportConnectionSpecificViewId view_id) {
   return (connection_id << 16) | view_id;
 }
 
-// Creates a node with the specified id. Returns true on success. Blocks until
-// we get back result from server.
-bool CreateNode(IViewManager* view_manager,
-                TransportConnectionId connection_id,
-                TransportConnectionSpecificNodeId node_id) {
-  bool result = false;
-  view_manager->CreateNode(CreateNodeId(connection_id, node_id),
-                           base::Bind(&BooleanCallback, &result));
-  DoRunLoop();
-  return result;
+// Callback from ViewManagerInitConnect(). |result| is the result of the
+// Connect() call and |run_loop| the nested RunLoop.
+void ViewManagerInitConnectCallback(bool* result_cache,
+                                    base::RunLoop* run_loop,
+                                    bool result) {
+  *result_cache = result;
+  run_loop->Quit();
 }
 
-// Deletes a view, blocking until done.
-bool DeleteNode(IViewManager* view_manager, TransportNodeId node_id) {
+// Resposible for establishing  connection to the viewmanager. Blocks until get
+// back result.
+bool ViewManagerInitConnect(IViewManagerInit* view_manager_init,
+                            const std::string& url) {
   bool result = false;
-  view_manager->DeleteNode(node_id, base::Bind(&BooleanCallback, &result));
-  DoRunLoop();
-  return result;
-}
-
-// Deletes a node, blocking until done.
-bool DeleteView(IViewManager* view_manager, TransportViewId view_id) {
-  bool result = false;
-  view_manager->DeleteView(view_id, base::Bind(&BooleanCallback, &result));
-  DoRunLoop();
-  return result;
-}
-
-bool SetNodeBounds(IViewManager* view_manager,
-                   TransportNodeId node_id,
-                   const gfx::Rect& bounds) {
-  bool result = false;
-  view_manager->SetNodeBounds(node_id, bounds,
-                              base::Bind(&BooleanCallback, &result));
-  DoRunLoop();
-  return result;
-}
-
-// Adds a node, blocking until done.
-bool AddNode(IViewManager* view_manager,
-             TransportNodeId parent,
-             TransportNodeId child,
-             TransportChangeId server_change_id) {
-  bool result = false;
-  view_manager->AddNode(parent, child, server_change_id,
-                        base::Bind(&BooleanCallback, &result));
-  DoRunLoop();
-  return result;
-}
-
-// Removes a node, blocking until done.
-bool RemoveNodeFromParent(IViewManager* view_manager,
-                          TransportNodeId node_id,
-                          TransportChangeId server_change_id) {
-  bool result = false;
-  view_manager->RemoveNodeFromParent(
-      node_id, server_change_id, base::Bind(&BooleanCallback, &result));
-  DoRunLoop();
-  return result;
-}
-
-void GetNodeTree(IViewManager* view_manager,
-                 TransportNodeId node_id,
-                 std::vector<TestNode>* nodes) {
-  view_manager->GetNodeTree(node_id, base::Bind(&INodesCallback, nodes));
-  DoRunLoop();
-}
-
-// Creates a view with the specified id. Returns true on success. Blocks until
-// we get back result from server.
-bool CreateView(IViewManager* view_manager,
-                TransportConnectionId connection_id,
-                TransportConnectionSpecificViewId id) {
-  bool result = false;
-  view_manager->CreateView(CreateViewId(connection_id, id),
-                           base::Bind(&BooleanCallback, &result));
-  DoRunLoop();
-  return result;
-}
-
-// Sets a view on the specified node. Returns true on success. Blocks until we
-// get back result from server.
-bool SetView(IViewManager* view_manager,
-             TransportNodeId node_id,
-             TransportViewId view_id) {
-  bool result = false;
-  view_manager->SetView(node_id, view_id,
-                        base::Bind(&BooleanCallback, &result));
-  DoRunLoop();
-  return result;
-}
-
-bool Connect(IViewManager* view_manager,
-             const std::string& url,
-             TransportNodeId id,
-             TransportNodeId id2) {
-  AllocationScope scope;
-  bool result = false;
-  std::vector<TransportNodeId> node_ids;
-  node_ids.push_back(id);
-  if (id2 != 0)
-    node_ids.push_back(id2);
-  view_manager->Connect(url, Array<uint32_t>::From(node_ids),
-                        base::Bind(&BooleanCallback, &result));
-  DoRunLoop();
+  base::RunLoop run_loop;
+  view_manager_init->Connect(url,
+                             base::Bind(&ViewManagerInitConnectCallback,
+                                        &result, &run_loop));
+  run_loop.Run();
   return result;
 }
 
@@ -546,272 +388,155 @@ bool Connect(IViewManager* view_manager,
 
 typedef std::vector<std::string> Changes;
 
-class MainLoopTrackerDelegate : public TestChangeTracker::Delegate {
- public:
-  explicit MainLoopTrackerDelegate(TestChangeTracker* tracker)
-      : tracker_(tracker),
-        quit_count_(0) {}
-
-  void DoRunLoopUntilChangesCount(size_t count) {
-    if (tracker_->changes()->size() >= count)
-      return;
-    quit_count_ = count - tracker_->changes()->size();
-    DoRunLoop();
-  }
-
-  // TestChangeTracker::Delegate:
-  virtual void OnChangeAdded() OVERRIDE {
-    if (quit_count_ > 0 && --quit_count_ == 0)
-      current_run_loop->Quit();
-  }
-
- private:
-  TestChangeTracker* tracker_;
-  size_t quit_count_;
-
-  DISALLOW_COPY_AND_ASSIGN(MainLoopTrackerDelegate);
-};
-
-class ViewManagerClientImpl : public IViewManagerClient {
- public:
-  ViewManagerClientImpl()
-      : id_(0),
-        next_server_change_id_(0),
-        main_loop_tracker_delegate_(&tracker_) {
-    tracker_.set_delegate(&main_loop_tracker_delegate_);
-  }
-
-  TransportConnectionId id() const { return id_; }
-
-  TransportChangeId next_server_change_id() const {
-    return next_server_change_id_;
-  }
-  const std::vector<TestNode>& initial_nodes() const {
-    return initial_nodes_;
-  }
-  const std::vector<TestNode>& hierarchy_changed_nodes() const {
-    return hierarchy_changed_nodes_;
-  }
-
-  Changes GetAndClearChanges() {
-    Changes changes = ChangesToDescription1(*tracker_.changes());
-    tracker_.changes()->clear();
-    return changes;
-  }
-
-  void ClearId() {
-    id_ = 0;
-  }
-
-  void WaitForId() {
-    DCHECK_EQ(0, id_);
-    DoRunLoopUntilChangesCount(1);
-  }
-
-  void DoRunLoopUntilChangesCount(size_t count) {
-    main_loop_tracker_delegate_.DoRunLoopUntilChangesCount(count);
-  }
-
- private:
-  // IViewManagerClient overrides:
-  virtual void OnViewManagerConnectionEstablished(
-      TransportConnectionId connection_id,
-      TransportChangeId next_server_change_id,
-      const Array<INode>& nodes) OVERRIDE {
-    id_ = connection_id;
-    next_server_change_id_ = next_server_change_id;
-    initial_nodes_.clear();
-    INodesToTestNodes(nodes, &initial_nodes_);
-    tracker_.OnViewManagerConnectionEstablished(
-        connection_id, next_server_change_id, nodes);
-  }
-  virtual void OnServerChangeIdAdvanced(
-      TransportChangeId next_server_change_id) OVERRIDE {
-    tracker_.OnServerChangeIdAdvanced(next_server_change_id);
-  }
-  virtual void OnNodeBoundsChanged(TransportNodeId node_id,
-                                   const Rect& old_bounds,
-                                   const Rect& new_bounds) OVERRIDE {
-    tracker_.OnNodeBoundsChanged(node_id, old_bounds, new_bounds);
-  }
-  virtual void OnNodeHierarchyChanged(
-      TransportNodeId node,
-      TransportNodeId new_parent,
-      TransportNodeId old_parent,
-      TransportChangeId server_change_id,
-      const Array<INode>& nodes) OVERRIDE {
-    tracker_.OnNodeHierarchyChanged(node, new_parent, old_parent,
-                                    server_change_id, nodes);
-    hierarchy_changed_nodes_.clear();
-    INodesToTestNodes(nodes, &hierarchy_changed_nodes_);
-  }
-  virtual void OnNodeDeleted(TransportNodeId node,
-                             TransportChangeId server_change_id) OVERRIDE {
-    tracker_.OnNodeDeleted(node, server_change_id);
-  }
-  virtual void OnViewDeleted(TransportViewId view) OVERRIDE {
-    tracker_.OnViewDeleted(view);
-  }
-  virtual void OnNodeViewReplaced(TransportNodeId node,
-                                  TransportViewId new_view_id,
-                                  TransportViewId old_view_id) OVERRIDE {
-    tracker_.OnNodeViewReplaced(node, new_view_id, old_view_id);
-  }
-
-  TransportConnectionId id_;
-  TransportChangeId next_server_change_id_;
-
-  // Set of nodes sent when connection created.
-  std::vector<TestNode> initial_nodes_;
-
-  // Nodes sent from last OnNodeHierarchyChanged.
-  std::vector<TestNode> hierarchy_changed_nodes_;
-
-  TestChangeTracker tracker_;
-  MainLoopTrackerDelegate main_loop_tracker_delegate_;
-
-  DISALLOW_COPY_AND_ASSIGN(ViewManagerClientImpl);
-};
-
 class ViewManagerConnectionTest : public testing::Test {
  public:
-  ViewManagerConnectionTest() : background_connection_(NULL) {}
+  ViewManagerConnectionTest() : connection_(NULL), connection2_(NULL) {}
 
   virtual void SetUp() OVERRIDE {
     test_helper_.Init();
 
-    ConnectToService(test_helper_.service_provider(),
-                     "mojo:mojo_view_manager",
-                     &view_manager_);
-    view_manager_.set_client(&client_);
-
-    client_.WaitForId();
-    client_.GetAndClearChanges();
-
     test_helper_.SetLoaderForURL(
         scoped_ptr<ServiceLoader>(new ConnectServiceLoader()),
         GURL(kTestServiceURL));
+
+    ConnectToService(test_helper_.service_provider(),
+                     "mojo:mojo_view_manager",
+                     &view_manager_init_);
+    ASSERT_TRUE(ViewManagerInitConnect(view_manager_init_.get(),
+                                       kTestServiceURL));
+
+    connection_ = ViewManagerProxy::WaitForInstance();
+    ASSERT_TRUE(connection_ != NULL);
+    connection_->DoRunLoopUntilChangesCount(1);
+  }
+
+  virtual void TearDown() OVERRIDE {
+    if (connection2_)
+      connection2_->Destroy();
+    if (connection_)
+      connection_->Destroy();
   }
 
  protected:
-  // Creates a second connection to the viewmanager.
-  void EstablishSecondConnection() {
-    ConnectToService(test_helper_.service_provider(),
-                     "mojo:mojo_view_manager",
-                     &view_manager2_);
-    view_manager2_.set_client(&client2_);
-
-    client2_.WaitForId();
-    client2_.GetAndClearChanges();
-  }
-
-  std::vector<Change> EstablishBackgroundConnectionWithRoots(
+  void EstablishSecondConnectionWithRoots(
       TransportNodeId id1,
       TransportNodeId id2) {
-    Connect(view_manager_.get(), kTestServiceURL, id1, id2);
-    background_connection_ = BackgroundConnection::WaitForInstance();
-    return background_connection_->DoRunLoopUntilChangesCount(1);
+    std::vector<TransportNodeId> node_ids;
+    node_ids.push_back(id1);
+    if (id2 != 0)
+      node_ids.push_back(id2);
+    ASSERT_TRUE(connection_->Connect(node_ids));
+    connection2_ = ViewManagerProxy::WaitForInstance();
+    ASSERT_TRUE(connection2_ != NULL);
+    connection2_->DoRunLoopUntilChangesCount(1);
+    ASSERT_EQ(1u, connection2_->changes().size());
   }
 
-  void EstablishBackgroundConnectionWithRoot1() {
-    std::vector<Change> changes(
-        EstablishBackgroundConnectionWithRoots(CreateNodeId(1, 1), 0));
-    if (HasFatalFailure())
-      return;
+  // Creates a second connection to the viewmanager.
+  void EstablishSecondConnection(bool create_initial_node) {
+    if (create_initial_node)
+      ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+    ASSERT_NO_FATAL_FAILURE(
+        EstablishSecondConnectionWithRoots(BuildNodeId(1, 1), 0));
+    const std::vector<Change>& changes(connection2_->changes());
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("OnConnectionEstablished", ChangesToDescription1(changes)[0]);
-    EXPECT_EQ("[node=1,1 parent=null view=null]",
-              ChangeNodeDescription(changes));
+    if (create_initial_node) {
+      EXPECT_EQ("[node=1,1 parent=null view=null]",
+                ChangeNodeDescription(changes));
+    }
   }
 
   void DestroySecondConnection() {
-    view_manager2_.reset();
+    connection2_->Destroy();
+    connection2_ = NULL;
   }
 
   base::MessageLoop loop_;
   shell::ShellTestHelper test_helper_;
 
-  ViewManagerClientImpl client_;
-  IViewManagerPtr view_manager_;
+  IViewManagerInitPtr view_manager_init_;
 
-  ViewManagerClientImpl client2_;
-  IViewManagerPtr view_manager2_;
-
-  BackgroundConnection* background_connection_;
+  ViewManagerProxy* connection_;
+  ViewManagerProxy* connection2_;
 
   DISALLOW_COPY_AND_ASSIGN(ViewManagerConnectionTest);
 };
 
 // Verifies client gets a valid id.
 TEST_F(ViewManagerConnectionTest, ValidId) {
+  EXPECT_EQ("OnConnectionEstablished",
+            ChangesToDescription1(connection_->changes())[0]);
+
   // All these tests assume 1 for the client id. The only real assertion here is
   // the client id is not zero, but adding this as rest of code here assumes 1.
-  EXPECT_EQ(1, client_.id());
+  EXPECT_EQ(1, connection_->changes()[0].connection_id);
 
   // Change ids start at 1 as well.
-  EXPECT_EQ(static_cast<TransportChangeId>(1), client_.next_server_change_id());
+  EXPECT_EQ(static_cast<TransportChangeId>(1),
+            connection_->changes()[0].change_id);
 }
 
 // Verifies two clients/connections get different ids.
 TEST_F(ViewManagerConnectionTest, TwoClientsGetDifferentConnectionIds) {
-  EstablishSecondConnection();
-  EXPECT_NE(0, client2_.id());
-  EXPECT_NE(client_.id(), client2_.id());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
+  EXPECT_EQ("OnConnectionEstablished",
+            ChangesToDescription1(connection2_->changes())[0]);
+
+  // It isn't strickly necessary that the second connection gets 2, but these
+  // tests are written assuming that is the case. The key thing is the
+  // connection ids of |connection_| and |connection2_| differ.
+  EXPECT_EQ(2, connection2_->changes()[0].connection_id);
+
+  // Change ids start at 1 as well.
+  EXPECT_EQ(static_cast<TransportChangeId>(1),
+            connection2_->changes()[0].change_id);
 }
 
 // Verifies client gets a valid id.
 TEST_F(ViewManagerConnectionTest, CreateNode) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+  EXPECT_TRUE(connection_->changes().empty());
 
   // Can't create a node with the same id.
-  ASSERT_FALSE(CreateNode(view_manager_.get(), 1, 1));
-}
+  ASSERT_FALSE(connection_->CreateNode(BuildNodeId(1, 1)));
+  EXPECT_TRUE(connection_->changes().empty());
 
-TEST_F(ViewManagerConnectionTest, CreateNodeFailsWithBogusConnectionId) {
-  EXPECT_FALSE(CreateNode(view_manager_.get(), 2, 1));
+  // Can't create a node with a bogus connection id.
+  EXPECT_FALSE(connection_->CreateNode(BuildNodeId(2, 1)));
+  EXPECT_TRUE(connection_->changes().empty());
 }
 
 TEST_F(ViewManagerConnectionTest, CreateViewFailsWithBogusConnectionId) {
-  EXPECT_FALSE(CreateView(view_manager_.get(), 2, 1));
+  EXPECT_FALSE(connection_->CreateView(BuildViewId(2, 1)));
+  EXPECT_TRUE(connection_->changes().empty());
 }
 
 // Verifies hierarchy changes.
 TEST_F(ViewManagerConnectionTest, AddRemoveNotify) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 3)));
 
-  EXPECT_TRUE(client_.GetAndClearChanges().empty());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
 
-  EstablishSecondConnection();
-  EXPECT_TRUE(client2_.GetAndClearChanges().empty());
-
-  // Make 2 a child of 1.
+  // Make 3 a child of 2.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(client_.id(), 1),
-                        CreateNodeId(client_.id(), 2),
-                        1));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 2), BuildNodeId(1, 3), 1));
+    EXPECT_TRUE(connection_->changes().empty());
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("ServerChangeIdAdvanced 2", changes[0]);
   }
 
-  // Remove 2 from its parent.
+  // Remove 3 from its parent.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(RemoveNodeFromParent(view_manager_.get(),
-                                     CreateNodeId(client_.id(), 2),
-                                     2));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
+    ASSERT_TRUE(connection_->RemoveNodeFromParent(BuildNodeId(1, 3), 2));
+    EXPECT_TRUE(connection_->changes().empty());
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("ServerChangeIdAdvanced 3", changes[0]);
   }
@@ -819,512 +544,335 @@ TEST_F(ViewManagerConnectionTest, AddRemoveNotify) {
 
 // Verifies AddNode fails when node is already in position.
 TEST_F(ViewManagerConnectionTest, AddNodeWithNoChange) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 3)));
 
-  EXPECT_TRUE(client_.GetAndClearChanges().empty());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
 
-  EstablishSecondConnection();
-  EXPECT_TRUE(client2_.GetAndClearChanges().empty());
-
-  // Make 2 a child of 1.
+  // Make 3 a child of 2.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(client_.id(), 1),
-                        CreateNodeId(client_.id(), 2),
-                        1));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 2), BuildNodeId(1, 3), 1));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("ServerChangeIdAdvanced 2", changes[0]);
   }
 
   // Try again, this should fail.
   {
-    AllocationScope scope;
-    EXPECT_FALSE(AddNode(view_manager_.get(),
-                         CreateNodeId(client_.id(), 1),
-                         CreateNodeId(client_.id(), 2),
-                         2));
-    Changes changes(client_.GetAndClearChanges());
-    EXPECT_TRUE(changes.empty());
+    EXPECT_FALSE(connection_->AddNode(BuildNodeId(1, 2), BuildNodeId(1, 3), 2));
   }
 }
 
 // Verifies AddNode fails when node is already in position.
 TEST_F(ViewManagerConnectionTest, AddAncestorFails) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 3)));
 
-  EXPECT_TRUE(client_.GetAndClearChanges().empty());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
 
-  EstablishSecondConnection();
-  EXPECT_TRUE(client2_.GetAndClearChanges().empty());
-
-  // Make 2 a child of 1.
+  // Make 3 a child of 2.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(client_.id(), 1),
-                        CreateNodeId(client_.id(), 2),
-                        1));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
-
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 2), BuildNodeId(1, 3), 1));
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("ServerChangeIdAdvanced 2", changes[0]);
   }
 
-  // Try to make 1 a child of 2, this should fail since 1 is an ancestor of 2.
+  // Try to make 2 a child of 3, this should fail since 2 is an ancestor of 3.
   {
-    AllocationScope scope;
-    EXPECT_FALSE(AddNode(view_manager_.get(),
-                         CreateNodeId(client_.id(), 2),
-                         CreateNodeId(client_.id(), 1),
-                         2));
-    Changes changes(client_.GetAndClearChanges());
-    EXPECT_TRUE(changes.empty());
+    EXPECT_FALSE(connection_->AddNode(BuildNodeId(1, 3), BuildNodeId(1, 2), 2));
   }
 }
 
 // Verifies adding with an invalid id fails.
 TEST_F(ViewManagerConnectionTest, AddWithInvalidServerId) {
   // Create two nodes.
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
 
   // Make 2 a child of 1. Supply an invalid change id, which should fail.
-  {
-    AllocationScope scope;
-    ASSERT_FALSE(AddNode(view_manager_.get(),
-                         CreateNodeId(client_.id(), 1),
-                         CreateNodeId(client_.id(), 2),
-                         0));
-    Changes changes(client_.GetAndClearChanges());
-    EXPECT_TRUE(changes.empty());
-  }
+  ASSERT_FALSE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 2), 0));
 }
 
 // Verifies adding to root sends right notifications.
 TEST_F(ViewManagerConnectionTest, AddToRoot) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 21));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 3));
-  EXPECT_TRUE(client_.GetAndClearChanges().empty());
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 21)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 3)));
 
-  EstablishSecondConnection();
-  EXPECT_TRUE(client2_.GetAndClearChanges().empty());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
 
   // Make 3 a child of 21.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(client_.id(), 21),
-                        CreateNodeId(client_.id(), 3),
-                        1));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 21), BuildNodeId(1, 3), 1));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("ServerChangeIdAdvanced 2", changes[0]);
   }
 
-  // Make 21 a child of the root.
+  // Make 21 a child of 1.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(0, 1),
-                        CreateNodeId(client_.id(), 21),
-                        2));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 21), 2));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ(
-        "HierarchyChanged change_id=2 node=1,21 new_parent=0,1 old_parent=null",
+        "HierarchyChanged change_id=2 node=1,21 new_parent=1,1 old_parent=null",
         changes[0]);
   }
 }
 
-// Verifies adding to root sends right notifications.
+// Verifies HierarchyChanged is correctly sent for various adds/removes.
 TEST_F(ViewManagerConnectionTest, NodeHierarchyChangedNodes) {
-  // Create nodes 1 and 11 with 1 parented to the root and 11 a child of 1.
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 11));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 11)));
+  // Make 11 a child of 2.
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 2), BuildNodeId(1, 11), 1));
 
-  // Make 11 a child of 1.
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
+
+  // Make 2 a child of 1.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(client_.id(), 1),
-                        CreateNodeId(client_.id(), 11),
-                        1));
-    ASSERT_TRUE(client_.GetAndClearChanges().empty());
-  }
-
-  EstablishSecondConnection();
-
-  // Make 1 a child of the root.
-  {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(0, 1),
-                        CreateNodeId(client_.id(), 1),
-                        2));
-    ASSERT_TRUE(client_.GetAndClearChanges().empty());
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 2), 2));
 
     // Client 2 should get a hierarchy change that includes the new nodes as it
     // has not yet seen them.
-    client2_.DoRunLoopUntilChangesCount(1);
-    Changes changes(client2_.GetAndClearChanges());
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ(
-        "HierarchyChanged change_id=2 node=1,1 new_parent=0,1 old_parent=null",
+        "HierarchyChanged change_id=2 node=1,2 new_parent=1,1 old_parent=null",
         changes[0]);
-    const std::vector<TestNode>& nodes(client2_.hierarchy_changed_nodes());
-    ASSERT_EQ(2u, nodes.size());
-    EXPECT_EQ("node=1,1 parent=0,1 view=null", nodes[0].ToString());
-    EXPECT_EQ("node=1,11 parent=1,1 view=null", nodes[1].ToString());
+    EXPECT_EQ("[node=1,2 parent=1,1 view=null],"
+              "[node=1,11 parent=1,2 view=null]",
+              ChangeNodeDescription(connection2_->changes()));
   }
 
-  // Remove 1 from the root.
+  // Add 1 to the root.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(RemoveNodeFromParent(view_manager_.get(),
-                                     CreateNodeId(client_.id(), 1),
-                                     3));
-    ASSERT_TRUE(client_.GetAndClearChanges().empty());
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 1), 3));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    Changes changes(client2_.GetAndClearChanges());
+    // Client 2 should get a hierarchy change that includes the new nodes as it
+    // has not yet seen them.
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ(
-        "HierarchyChanged change_id=3 node=1,1 new_parent=null old_parent=0,1",
+        "HierarchyChanged change_id=3 node=1,1 new_parent=null old_parent=null",
+        changes[0]);
+    EXPECT_EQ(std::string(), ChangeNodeDescription(connection2_->changes()));
+  }
+
+  // Remove 1 from its parent.
+  {
+    ASSERT_TRUE(connection_->RemoveNodeFromParent(BuildNodeId(1, 1), 4));
+    EXPECT_TRUE(connection_->changes().empty());
+
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
+    ASSERT_EQ(1u, changes.size());
+    EXPECT_EQ(
+        "HierarchyChanged change_id=4 node=1,1 new_parent=null old_parent=null",
         changes[0]);
   }
 
   // Create another node, 111, parent it to 11.
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 111));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 111)));
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(client_.id(), 11),
-                        CreateNodeId(client_.id(), 111),
-                        4));
-    ASSERT_TRUE(client_.GetAndClearChanges().empty());
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 11), BuildNodeId(1, 111),
+                                     5));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    Changes changes(client2_.GetAndClearChanges());
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
-    // Even though 11 isn't attached to the root client 2 is still notified of
-    // the change because it was told about 11.
     EXPECT_EQ(
-        "HierarchyChanged change_id=4 node=1,111 new_parent=1,11 "
+        "HierarchyChanged change_id=5 node=1,111 new_parent=1,11 "
         "old_parent=null", changes[0]);
-    const std::vector<TestNode>& nodes(client2_.hierarchy_changed_nodes());
-    ASSERT_EQ(1u, nodes.size());
-    EXPECT_EQ("node=1,111 parent=1,11 view=null", nodes[0].ToString());
+    EXPECT_EQ("[node=1,111 parent=1,11 view=null]",
+              ChangeNodeDescription(connection2_->changes()));
   }
 
   // Reattach 1 to the root.
   {
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(0, 1),
-                        CreateNodeId(client_.id(), 1),
-                        5));
-    ASSERT_TRUE(client_.GetAndClearChanges().empty());
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 1), 6));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    Changes changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ(
-        "HierarchyChanged change_id=5 node=1,1 new_parent=0,1 old_parent=null",
+        "HierarchyChanged change_id=6 node=1,1 new_parent=null old_parent=null",
         changes[0]);
-    ASSERT_TRUE(client2_.hierarchy_changed_nodes().empty());
+    EXPECT_EQ(std::string(), ChangeNodeDescription(connection2_->changes()));
   }
 }
 
 TEST_F(ViewManagerConnectionTest, NodeHierarchyChangedAddingKnownToUnknown) {
   // Create the following structure: root -> 1 -> 11 and 2->21 (2 has no
   // parent).
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 11));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 21));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 11)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 21)));
 
   // Set up the hierarchy.
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 1), 1));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 11), 2));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 2), BuildNodeId(1, 21), 3));
+
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(false));
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(0, 1),
-                        CreateNodeId(client_.id(), 1),
-                        1));
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(client_.id(), 1),
-                        CreateNodeId(client_.id(), 11),
-                        2));
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(client_.id(), 2),
-                        CreateNodeId(client_.id(), 21),
-                        3));
+    EXPECT_EQ("[node=1,1 parent=null view=null],"
+              "[node=1,11 parent=1,1 view=null]",
+              ChangeNodeDescription(connection2_->changes()));
   }
 
-  EstablishSecondConnection();
-
-  // Remove 11.
+  // Remove 11, should result in a delete (since 11 is no longer in connection
+  // 2's root).
   {
-    AllocationScope scope;
-    ASSERT_TRUE(RemoveNodeFromParent(view_manager_.get(),
-                                     CreateNodeId(client_.id(), 11),
-                                     4));
-    ASSERT_TRUE(client_.GetAndClearChanges().empty());
+    ASSERT_TRUE(connection_->RemoveNodeFromParent(BuildNodeId(1, 11), 4));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    Changes changes(client2_.GetAndClearChanges());
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
+    ASSERT_EQ(1u, changes.size());
+    EXPECT_EQ("NodeDeleted change_id=4 node=1,11", changes[0]);
+  }
+
+  // Add 2 to 1.
+  {
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 2), 5));
+
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ(
-        "HierarchyChanged change_id=4 node=1,11 new_parent=null old_parent=1,1",
+        "HierarchyChanged change_id=5 node=1,2 new_parent=1,1 old_parent=null",
         changes[0]);
-    EXPECT_TRUE(client2_.hierarchy_changed_nodes().empty());
+    EXPECT_EQ("[node=1,2 parent=1,1 view=null],"
+              "[node=1,21 parent=1,2 view=null]",
+              ChangeNodeDescription(connection2_->changes()));
   }
-
-  // Add 11 to 21. As client2 knows about 11 it should receive the new
-  // hierarchy.
-  {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(client_.id(), 21),
-                        CreateNodeId(client_.id(), 11),
-                        5));
-    ASSERT_TRUE(client_.GetAndClearChanges().empty());
-
-    client2_.DoRunLoopUntilChangesCount(1);
-    Changes changes(client2_.GetAndClearChanges());
-    ASSERT_EQ(1u, changes.size());
-    EXPECT_EQ(
-        "HierarchyChanged change_id=5 node=1,11 new_parent=1,21 "
-        "old_parent=null", changes[0]);
-    const std::vector<TestNode>& nodes(client2_.hierarchy_changed_nodes());
-    ASSERT_EQ(2u, nodes.size());
-    EXPECT_EQ("node=1,2 parent=null view=null", nodes[0].ToString());
-    EXPECT_EQ("node=1,21 parent=1,2 view=null", nodes[1].ToString());
-  }
-}
-
-// Verifies connection on told descendants of the root when connecting.
-TEST_F(ViewManagerConnectionTest, GetInitialNodesOnInit) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 21));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 3));
-  EXPECT_TRUE(client_.GetAndClearChanges().empty());
-
-  // Make 3 a child of 21.
-  {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(client_.id(), 21),
-                        CreateNodeId(client_.id(), 3),
-                        1));
-    ASSERT_TRUE(client_.GetAndClearChanges().empty());
-  }
-
-  // Make 21 a child of the root.
-  {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(0, 1),
-                        CreateNodeId(client_.id(), 21),
-                        2));
-    ASSERT_TRUE(client_.GetAndClearChanges().empty());
-  }
-
-  EstablishSecondConnection();
-  // Should get notification of children of the root.
-  const std::vector<TestNode>& nodes(client2_.initial_nodes());
-  ASSERT_EQ(3u, nodes.size());
-  EXPECT_EQ("node=0,1 parent=null view=null", nodes[0].ToString());
-  EXPECT_EQ("node=1,21 parent=0,1 view=null", nodes[1].ToString());
-  EXPECT_EQ("node=1,3 parent=1,21 view=null", nodes[2].ToString());
 }
 
 // Verifies DeleteNode works.
 TEST_F(ViewManagerConnectionTest, DeleteNode) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
-  EXPECT_TRUE(client_.GetAndClearChanges().empty());
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
 
-  EstablishSecondConnection();
-  EXPECT_TRUE(client2_.GetAndClearChanges().empty());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
 
   // Make 2 a child of 1.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(client_.id(), 1),
-                        CreateNodeId(client_.id(), 2),
-                        1));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
-
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 2), 1));
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
-    EXPECT_EQ("ServerChangeIdAdvanced 2", changes[0]);
+    EXPECT_EQ("HierarchyChanged change_id=1 node=1,2 new_parent=1,1 "
+              "old_parent=null", changes[0]);
   }
 
-  // Add 1 to the root
+  // Delete 2.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(0, 1),
-                        CreateNodeId(client_.id(), 1),
-                        2));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
+    ASSERT_TRUE(connection_->DeleteNode(BuildNodeId(1, 2)));
+    EXPECT_TRUE(connection_->changes().empty());
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
-    EXPECT_EQ(
-        "HierarchyChanged change_id=2 node=1,1 new_parent=0,1 old_parent=null",
-        changes[0]);
-  }
-
-  // Delete 1.
-  {
-    AllocationScope scope;
-    ASSERT_TRUE(DeleteNode(view_manager_.get(), CreateNodeId(client_.id(), 1)));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
-
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
-    ASSERT_EQ(1u, changes.size());
-    EXPECT_EQ("NodeDeleted change_id=3 node=1,1", changes[0]);
+    EXPECT_EQ("NodeDeleted change_id=2 node=1,2", changes[0]);
   }
 }
 
 // Verifies DeleteNode isn't allowed from a separate connection.
 TEST_F(ViewManagerConnectionTest, DeleteNodeFromAnotherConnectionDisallowed) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  EstablishSecondConnection();
-  EXPECT_FALSE(DeleteNode(view_manager2_.get(), CreateNodeId(client_.id(), 1)));
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
+  EXPECT_FALSE(connection2_->DeleteNode(BuildNodeId(1, 1)));
 }
 
 // Verifies DeleteView isn't allowed from a separate connection.
 TEST_F(ViewManagerConnectionTest, DeleteViewFromAnotherConnectionDisallowed) {
-  ASSERT_TRUE(CreateView(view_manager_.get(), 1, 1));
-  EstablishSecondConnection();
-  EXPECT_FALSE(DeleteView(view_manager2_.get(), CreateViewId(client_.id(), 1)));
+  ASSERT_TRUE(connection_->CreateView(BuildViewId(1, 1)));
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
+  EXPECT_FALSE(connection2_->DeleteView(BuildViewId(1, 1)));
 }
 
 // Verifies if a node was deleted and then reused that other clients are
 // properly notified.
-TEST_F(ViewManagerConnectionTest, ReusedDeletedId) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  EXPECT_TRUE(client_.GetAndClearChanges().empty());
+TEST_F(ViewManagerConnectionTest, ReuseDeletedNodeId) {
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
 
-  EstablishSecondConnection();
-
-  // Make 1 a child of the root.
+  // Add 2 to 1.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(0, 1),
-                        CreateNodeId(client_.id(), 1),
-                        1));
-    EXPECT_TRUE(client_.GetAndClearChanges().empty());
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 2), 1));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    Changes changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     EXPECT_EQ(
-        "HierarchyChanged change_id=1 node=1,1 new_parent=0,1 old_parent=null",
+        "HierarchyChanged change_id=1 node=1,2 new_parent=1,1 old_parent=null",
         changes[0]);
-    const std::vector<TestNode>& nodes(client2_.hierarchy_changed_nodes());
-    ASSERT_EQ(1u, nodes.size());
-    EXPECT_EQ("node=1,1 parent=0,1 view=null", nodes[0].ToString());
+    EXPECT_EQ("[node=1,2 parent=1,1 view=null]",
+              ChangeNodeDescription(connection2_->changes()));
   }
 
-  // Delete 1.
+  // Delete 2.
   {
-    AllocationScope scope;
-    ASSERT_TRUE(DeleteNode(view_manager_.get(), CreateNodeId(client_.id(), 1)));
-    EXPECT_TRUE(client_.GetAndClearChanges().empty());
+    ASSERT_TRUE(connection_->DeleteNode(BuildNodeId(1, 2)));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    Changes changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
-    EXPECT_EQ("NodeDeleted change_id=2 node=1,1", changes[0]);
+    EXPECT_EQ("NodeDeleted change_id=2 node=1,2", changes[0]);
   }
 
-  // Create 1 again, and add it back to the root. Should get the same
-  // notification.
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
+  // Create 2 again, and add it back to 1. Should get the same notification.
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
   {
-    AllocationScope scope;
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(0, 1),
-                        CreateNodeId(client_.id(), 1),
-                        3));
-    EXPECT_TRUE(client_.GetAndClearChanges().empty());
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 2), 3));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    Changes changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     EXPECT_EQ(
-        "HierarchyChanged change_id=3 node=1,1 new_parent=0,1 old_parent=null",
+        "HierarchyChanged change_id=3 node=1,2 new_parent=1,1 old_parent=null",
         changes[0]);
-    const std::vector<TestNode>& nodes(client2_.hierarchy_changed_nodes());
-    ASSERT_EQ(1u, nodes.size());
-    EXPECT_EQ("node=1,1 parent=0,1 view=null", nodes[0].ToString());
+    EXPECT_EQ("[node=1,2 parent=1,1 view=null]",
+              ChangeNodeDescription(connection2_->changes()));
   }
 }
 
 // Assertions around setting a view.
 TEST_F(ViewManagerConnectionTest, SetView) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
-  ASSERT_TRUE(CreateView(view_manager_.get(), 1, 11));
-  ASSERT_TRUE(AddNode(view_manager_.get(), 1, CreateNodeId(1, 1), 1));
-  ASSERT_TRUE(AddNode(view_manager_.get(), 1, CreateNodeId(1, 2), 2));
-  EXPECT_TRUE(client_.GetAndClearChanges().empty());
+  // Create nodes 1, 2 and 3 and the view 11. Nodes 2 and 3 are parented to 1.
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 3)));
+  ASSERT_TRUE(connection_->CreateView(BuildViewId(1, 11)));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 2), 1));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 3), 2));
 
-  EstablishSecondConnection();
-  EXPECT_TRUE(client2_.GetAndClearChanges().empty());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(false));
 
   // Set view 11 on node 1.
   {
-    ASSERT_TRUE(SetView(view_manager_.get(),
-                        CreateNodeId(client_.id(), 1),
-                        CreateViewId(client_.id(), 11)));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
+    ASSERT_TRUE(connection_->SetView(BuildNodeId(1, 1),
+                                     BuildViewId(1, 11)));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
-    EXPECT_EQ(
-        "ViewReplaced node=1,1 new_view=1,11 old_view=null",
-        changes[0]);
+    EXPECT_EQ("ViewReplaced node=1,1 new_view=1,11 old_view=null",
+              changes[0]);
   }
 
   // Set view 11 on node 2.
   {
-    ASSERT_TRUE(SetView(view_manager_.get(),
-                        CreateNodeId(client_.id(), 2),
-                        CreateViewId(client_.id(), 11)));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
+    ASSERT_TRUE(connection_->SetView(BuildNodeId(1, 2), BuildViewId(1, 11)));
 
-    client2_.DoRunLoopUntilChangesCount(2);
-    changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(2);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(2u, changes.size());
     EXPECT_EQ("ViewReplaced node=1,1 new_view=null old_view=1,11",
               changes[0]);
@@ -1335,90 +883,66 @@ TEST_F(ViewManagerConnectionTest, SetView) {
 
 // Verifies deleting a node with a view sends correct notifications.
 TEST_F(ViewManagerConnectionTest, DeleteNodeWithView) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
-  ASSERT_TRUE(CreateView(view_manager_.get(), 1, 11));
-  EXPECT_TRUE(client_.GetAndClearChanges().empty());
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 3)));
+  ASSERT_TRUE(connection_->CreateView(BuildViewId(1, 11)));
 
-  // Set view 11 on node 1.
-  ASSERT_TRUE(SetView(view_manager_.get(),
-                      CreateNodeId(client_.id(), 1),
-                      CreateViewId(client_.id(), 11)));
-  client_.GetAndClearChanges();
+  // Set view 11 on node 2.
+  ASSERT_TRUE(connection_->SetView(BuildNodeId(1, 2), BuildViewId(1, 11)));
 
-  EstablishSecondConnection();
-  EXPECT_TRUE(client2_.GetAndClearChanges().empty());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(false));
 
-  // Delete node 1. The second connection should not see this because the node
+  // Delete node 2. The second connection should not see this because the node
   // was not known to it.
   {
-    ASSERT_TRUE(DeleteNode(view_manager_.get(), CreateNodeId(client_.id(), 1)));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
+    ASSERT_TRUE(connection_->DeleteNode(BuildNodeId(1, 2)));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("ServerChangeIdAdvanced 2", changes[0]);
   }
 
-  // Parent 2 to the root.
-  ASSERT_TRUE(AddNode(view_manager_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(client_.id(), 2),
-                      2));
-  client2_.DoRunLoopUntilChangesCount(1);
-  client2_.GetAndClearChanges();
+  // Parent 3 to 1.
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 3), 2));
+  connection2_->DoRunLoopUntilChangesCount(1);
 
-  // Set view 11 on node 2.
+  // Set view 11 on node 3.
   {
-    ASSERT_TRUE(SetView(view_manager_.get(),
-                        CreateNodeId(client_.id(), 2),
-                        CreateViewId(client_.id(), 11)));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
+    ASSERT_TRUE(connection_->SetView(BuildNodeId(1, 3), BuildViewId(1, 11)));
 
-    client2_.DoRunLoopUntilChangesCount(1);
-    changes = client2_.GetAndClearChanges();
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
-    EXPECT_EQ("ViewReplaced node=1,2 new_view=1,11 old_view=null", changes[0]);
+    EXPECT_EQ("ViewReplaced node=1,3 new_view=1,11 old_view=null", changes[0]);
   }
 
-  // Delete node.
+  // Delete 3.
   {
-    ASSERT_TRUE(DeleteNode(view_manager_.get(), CreateNodeId(client_.id(), 2)));
-    Changes changes(client_.GetAndClearChanges());
-    ASSERT_TRUE(changes.empty());
+    ASSERT_TRUE(connection_->DeleteNode(BuildNodeId(1, 3)));
 
-    client2_.DoRunLoopUntilChangesCount(2);
-    changes = client2_.GetAndClearChanges();
-    ASSERT_EQ(2u, changes.size());
-    EXPECT_EQ("ViewReplaced node=1,2 new_view=null old_view=1,11", changes[0]);
-    EXPECT_EQ("NodeDeleted change_id=3 node=1,2", changes[1]);
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
+    ASSERT_EQ(1u, changes.size());
+    EXPECT_EQ("NodeDeleted change_id=3 node=1,3", changes[0]);
   }
 }
 
 // Sets view from one connection on another.
 TEST_F(ViewManagerConnectionTest, SetViewFromSecondConnection) {
-  EstablishSecondConnection();
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
 
-  // Create two nodes in first connection.
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
-
-  EXPECT_TRUE(client_.GetAndClearChanges().empty());
-  EXPECT_TRUE(client2_.GetAndClearChanges().empty());
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
 
   // Create a view in the second connection.
-  ASSERT_TRUE(CreateView(view_manager2_.get(), 2, 51));
+  ASSERT_TRUE(connection2_->CreateView(BuildViewId(2, 51)));
 
-  // Attach view to node 1 in the first connectoin.
+  // Attach view to node 1 in the first connection.
   {
-    ASSERT_TRUE(SetView(view_manager2_.get(),
-                        CreateNodeId(client_.id(), 1),
-                        CreateViewId(client2_.id(), 51)));
-    client_.DoRunLoopUntilChangesCount(1);
-    Changes changes(client_.GetAndClearChanges());
+    ASSERT_TRUE(connection2_->SetView(BuildNodeId(1, 1), BuildViewId(2, 51)));
+    connection_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("ViewReplaced node=1,1 new_view=2,51 old_view=null", changes[0]);
   }
@@ -1426,9 +950,8 @@ TEST_F(ViewManagerConnectionTest, SetViewFromSecondConnection) {
   // Shutdown the second connection and verify view is removed.
   {
     DestroySecondConnection();
-    client_.DoRunLoopUntilChangesCount(2);
-
-    Changes changes(client_.GetAndClearChanges());
+    connection_->DoRunLoopUntilChangesCount(2);
+    const Changes changes(ChangesToDescription1(connection_->changes()));
     ASSERT_EQ(2u, changes.size());
     EXPECT_EQ("ViewReplaced node=1,1 new_view=null old_view=2,51", changes[0]);
     EXPECT_EQ("ViewDeleted view=2,51", changes[1]);
@@ -1437,152 +960,126 @@ TEST_F(ViewManagerConnectionTest, SetViewFromSecondConnection) {
 
 // Assertions for GetNodeTree.
 TEST_F(ViewManagerConnectionTest, GetNodeTree) {
-  EstablishSecondConnection();
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(true));
 
-  // Create two nodes in first connection, 1 and 11 (11 is a child of 1).
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 11));
-  ASSERT_TRUE(AddNode(view_manager_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(client_.id(), 1),
-                      1));
-  ASSERT_TRUE(AddNode(view_manager_.get(),
-                      CreateNodeId(client_.id(), 1),
-                      CreateNodeId(client_.id(), 11),
-                      2));
+  // Create 11 in first connection and make it a child of 1.
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 11)));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 1), 1));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 11), 2));
 
-  // Create two nodes in second connection, 2 and 3, both children of the root.
-  ASSERT_TRUE(CreateNode(view_manager2_.get(), 2, 2));
-  ASSERT_TRUE(CreateNode(view_manager2_.get(), 2, 3));
-  ASSERT_TRUE(AddNode(view_manager2_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(client2_.id(), 2),
-                      3));
-  ASSERT_TRUE(AddNode(view_manager2_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(client2_.id(), 3),
-                      4));
+  // Create two nodes in second connection, 2 and 3, both children of 1.
+  ASSERT_TRUE(connection2_->CreateNode(BuildNodeId(2, 2)));
+  ASSERT_TRUE(connection2_->CreateNode(BuildNodeId(2, 3)));
+  ASSERT_TRUE(connection2_->AddNode(BuildNodeId(1, 1), BuildNodeId(2, 2), 3));
+  ASSERT_TRUE(connection2_->AddNode(BuildNodeId(1, 1), BuildNodeId(2, 3), 4));
 
   // Attach view to node 11 in the first connection.
-  ASSERT_TRUE(CreateView(view_manager_.get(), 1, 51));
-  ASSERT_TRUE(SetView(view_manager_.get(),
-                      CreateNodeId(client_.id(), 11),
-                      CreateViewId(client_.id(), 51)));
+  ASSERT_TRUE(connection_->CreateView(BuildViewId(1, 51)));
+  ASSERT_TRUE(connection_->SetView(BuildNodeId(1, 11), BuildViewId(1, 51)));
 
   // Verifies GetNodeTree() on the root.
   {
-    AllocationScope scope;
     std::vector<TestNode> nodes;
-    GetNodeTree(view_manager2_.get(), CreateNodeId(0, 1), &nodes);
+    connection_->GetNodeTree(BuildNodeId(0, 1), &nodes);
     ASSERT_EQ(5u, nodes.size());
     EXPECT_EQ("node=0,1 parent=null view=null", nodes[0].ToString());
     EXPECT_EQ("node=1,1 parent=0,1 view=null", nodes[1].ToString());
     EXPECT_EQ("node=1,11 parent=1,1 view=1,51", nodes[2].ToString());
-    EXPECT_EQ("node=2,2 parent=0,1 view=null", nodes[3].ToString());
-    EXPECT_EQ("node=2,3 parent=0,1 view=null", nodes[4].ToString());
+    EXPECT_EQ("node=2,2 parent=1,1 view=null", nodes[3].ToString());
+    EXPECT_EQ("node=2,3 parent=1,1 view=null", nodes[4].ToString());
   }
 
   // Verifies GetNodeTree() on the node 1,1.
   {
-    AllocationScope scope;
     std::vector<TestNode> nodes;
-    GetNodeTree(view_manager2_.get(), CreateNodeId(1, 1), &nodes);
-    ASSERT_EQ(2u, nodes.size());
-    EXPECT_EQ("node=1,1 parent=0,1 view=null", nodes[0].ToString());
+    connection2_->GetNodeTree(BuildNodeId(1, 1), &nodes);
+    ASSERT_EQ(4u, nodes.size());
+    EXPECT_EQ("node=1,1 parent=null view=null", nodes[0].ToString());
     EXPECT_EQ("node=1,11 parent=1,1 view=1,51", nodes[1].ToString());
+    EXPECT_EQ("node=2,2 parent=1,1 view=null", nodes[2].ToString());
+    EXPECT_EQ("node=2,3 parent=1,1 view=null", nodes[3].ToString());
+  }
+
+  // Connection 2 shouldn't be able to get the root tree.
+  {
+    std::vector<TestNode> nodes;
+    connection2_->GetNodeTree(BuildNodeId(0, 1), &nodes);
+    ASSERT_EQ(0u, nodes.size());
   }
 }
 
 TEST_F(ViewManagerConnectionTest, SetNodeBounds) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(AddNode(view_manager_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(1, 1),
-                      1));
-  EstablishSecondConnection();
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 1), 1));
 
-  AllocationScope scope;
-  ASSERT_TRUE(SetNodeBounds(view_manager_.get(),
-                            CreateNodeId(1, 1),
-                            gfx::Rect(0, 0, 100, 100)));
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(false));
 
-  client2_.DoRunLoopUntilChangesCount(1);
-  Changes changes(client2_.GetAndClearChanges());
+  ASSERT_TRUE(connection_->SetNodeBounds(BuildNodeId(1, 1),
+                                         gfx::Rect(0, 0, 100, 100)));
+
+  connection2_->DoRunLoopUntilChangesCount(1);
+  const Changes changes(ChangesToDescription1(connection2_->changes()));
   ASSERT_EQ(1u, changes.size());
   EXPECT_EQ("BoundsChanged node=1,1 old_bounds=0,0 0x0 new_bounds=0,0 100x100",
             changes[0]);
 
   // Should not be possible to change the bounds of a node created by another
   // connection.
-  ASSERT_FALSE(SetNodeBounds(view_manager2_.get(),
-                             CreateNodeId(1, 1),
-                             gfx::Rect(0, 0, 0, 0)));
+  ASSERT_FALSE(connection2_->SetNodeBounds(BuildNodeId(1, 1),
+                                           gfx::Rect(0, 0, 0, 0)));
 }
 
 // Various assertions around SetRoots.
 TEST_F(ViewManagerConnectionTest, SetRoots) {
   // Create 1, 2, and 3 in the first connection.
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 3));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 3)));
 
   // Parent 1 to the root.
-  ASSERT_TRUE(AddNode(view_manager_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(client_.id(), 1),
-                      1));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 1), 1));
 
   // Establish the second connection and give it the roots 1 and 3.
   {
-    std::vector<Change> changes(EstablishBackgroundConnectionWithRoots(
-                                    CreateNodeId(1, 1), CreateNodeId(1, 3)));
-    if (HasFatalFailure())
-      return;
+    ASSERT_NO_FATAL_FAILURE(EstablishSecondConnectionWithRoots(
+                                BuildNodeId(1, 1), BuildNodeId(1, 3)));
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
-    EXPECT_EQ("OnConnectionEstablished", ChangesToDescription1(changes)[0]);
+    EXPECT_EQ("OnConnectionEstablished", changes[0]);
     EXPECT_EQ("[node=1,1 parent=null view=null],"
               "[node=1,3 parent=null view=null]",
-              ChangeNodeDescription(changes));
+              ChangeNodeDescription(connection2_->changes()));
   }
 
   // Create 4 and add it to the root, connection 2 should only get id advanced.
   {
-    ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 4));
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(0, 1),
-                        CreateNodeId(client_.id(), 4),
-                        2));
-    Changes changes = ChangesToDescription1(
-        background_connection_->DoRunLoopUntilChangesCount(1));
+    ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 4)));
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 4), 2));
+
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("ServerChangeIdAdvanced 3", changes[0]);
   }
 
   // Move 4 under 3, this should expose 4 to the client.
   {
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(1, 3),
-                        CreateNodeId(1, 4),
-                        3));
-    std::vector<Change> changes =
-        background_connection_->DoRunLoopUntilChangesCount(1);
-    Changes change_strings(ChangesToDescription1(changes));
-    ASSERT_EQ(1u, change_strings.size());
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 3), BuildNodeId(1, 4), 3));
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
+    ASSERT_EQ(1u, changes.size());
     EXPECT_EQ(
         "HierarchyChanged change_id=3 node=1,4 new_parent=1,3 "
-        "old_parent=null", change_strings[0]);
+        "old_parent=null", changes[0]);
     EXPECT_EQ("[node=1,4 parent=1,3 view=null]",
-              ChangeNodeDescription(changes));
+              ChangeNodeDescription(connection2_->changes()));
   }
 
   // Move 4 under 2, since 2 isn't a root client should get a delete.
   {
-    ASSERT_TRUE(AddNode(view_manager_.get(),
-                        CreateNodeId(1, 2),
-                        CreateNodeId(1, 4),
-                        4));
-    Changes changes = ChangesToDescription1(
-        background_connection_->DoRunLoopUntilChangesCount(1));
+    ASSERT_TRUE(connection_->AddNode(BuildNodeId(1, 2), BuildNodeId(1, 4), 4));
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("NodeDeleted change_id=4 node=1,4", changes[0]);
   }
@@ -1590,11 +1087,10 @@ TEST_F(ViewManagerConnectionTest, SetRoots) {
   // Delete 4, client shouldn't receive a delete since it should no longer know
   // about 4.
   {
-    ASSERT_TRUE(DeleteNode(view_manager_.get(), CreateNodeId(client_.id(), 4)));
-    ASSERT_TRUE(client_.GetAndClearChanges().empty());
+    ASSERT_TRUE(connection_->DeleteNode(BuildNodeId(1, 4)));
 
-    Changes changes = ChangesToDescription1(
-        background_connection_->DoRunLoopUntilChangesCount(1));
+    connection2_->DoRunLoopUntilChangesCount(1);
+    const Changes changes(ChangesToDescription1(connection2_->changes()));
     ASSERT_EQ(1u, changes.size());
     EXPECT_EQ("ServerChangeIdAdvanced 6", changes[0]);
   }
@@ -1603,63 +1099,50 @@ TEST_F(ViewManagerConnectionTest, SetRoots) {
 // Verify AddNode fails when trying to manipulate nodes in other roots.
 TEST_F(ViewManagerConnectionTest, CantMoveNodesFromOtherRoot) {
   // Create 1 and 2 in the first connection.
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
 
-  ASSERT_NO_FATAL_FAILURE(EstablishBackgroundConnectionWithRoot1());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(false));
 
   // Try to move 2 to be a child of 1 from connection 2. This should fail as 2
   // should not be able to access 1.
-  ASSERT_FALSE(background_connection_->AddNode(
-                   CreateNodeId(1, 1), CreateNodeId(1, 2), 1));
+  ASSERT_FALSE(connection2_->AddNode(BuildNodeId(1, 1), BuildNodeId(1, 2), 1));
 
   // Try to reparent 1 to the root. A connection is not allowed to reparent its
   // roots.
-  ASSERT_FALSE(background_connection_->AddNode(CreateNodeId(0, 1),
-                                               CreateNodeId(1, 1), 1));
+  ASSERT_FALSE(connection2_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 1), 1));
 }
 
 // Verify RemoveNodeFromParent fails for nodes that are descendants of the
 // roots.
 TEST_F(ViewManagerConnectionTest, CantRemoveNodesInOtherRoots) {
   // Create 1 and 2 in the first connection and parent both to the root.
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
 
-  ASSERT_TRUE(AddNode(view_manager_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(client_.id(), 1),
-                      1));
-  ASSERT_TRUE(AddNode(view_manager_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(client_.id(), 2),
-                      2));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 1), 1));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 2), 2));
 
   // Establish the second connection and give it the root 1.
-  ASSERT_NO_FATAL_FAILURE(EstablishBackgroundConnectionWithRoot1());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(false));
 
   // Connection 2 should not be able to remove node 2 or 1 from its parent.
-  ASSERT_FALSE(background_connection_->RemoveNodeFromParent(
-                   CreateNodeId(1, 2), 3));
-  ASSERT_FALSE(background_connection_->RemoveNodeFromParent(CreateNodeId(1, 1),
-                                                            3));
+  ASSERT_FALSE(connection2_->RemoveNodeFromParent(BuildNodeId(1, 2), 3));
+  ASSERT_FALSE(connection2_->RemoveNodeFromParent(BuildNodeId(1, 1), 3));
 
   // Create nodes 10 and 11 in 2.
-  ASSERT_TRUE(background_connection_->CreateNode(CreateNodeId(2, 10)));
-  ASSERT_TRUE(background_connection_->CreateNode(CreateNodeId(2, 11)));
+  ASSERT_TRUE(connection2_->CreateNode(BuildNodeId(2, 10)));
+  ASSERT_TRUE(connection2_->CreateNode(BuildNodeId(2, 11)));
 
   // Parent 11 to 10.
-  ASSERT_TRUE(background_connection_->AddNode(CreateNodeId(2, 10),
-                                              CreateNodeId(2, 11), 3));
+  ASSERT_TRUE(connection2_->AddNode(BuildNodeId(2, 10), BuildNodeId(2, 11), 3));
   // Remove 11 from 10.
-  ASSERT_TRUE(background_connection_->RemoveNodeFromParent(
-                  CreateNodeId(2, 11), 4));
+  ASSERT_TRUE(connection2_->RemoveNodeFromParent( BuildNodeId(2, 11), 4));
 
   // Verify nothing was actually removed.
   {
-    AllocationScope scope;
     std::vector<TestNode> nodes;
-    GetNodeTree(view_manager_.get(), CreateNodeId(0, 1), &nodes);
+    connection_->GetNodeTree(BuildNodeId(0, 1), &nodes);
     ASSERT_EQ(3u, nodes.size());
     EXPECT_EQ("node=0,1 parent=null view=null", nodes[0].ToString());
     EXPECT_EQ("node=1,1 parent=0,1 view=null", nodes[1].ToString());
@@ -1670,80 +1153,56 @@ TEST_F(ViewManagerConnectionTest, CantRemoveNodesInOtherRoots) {
 // Verify SetView fails for nodes that are not descendants of the roots.
 TEST_F(ViewManagerConnectionTest, CantRemoveSetViewInOtherRoots) {
   // Create 1 and 2 in the first connection and parent both to the root.
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
 
-  ASSERT_TRUE(AddNode(view_manager_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(client_.id(), 1),
-                      1));
-  ASSERT_TRUE(AddNode(view_manager_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(client_.id(), 2),
-                      2));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 1), 1));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 2), 2));
 
-  ASSERT_NO_FATAL_FAILURE(EstablishBackgroundConnectionWithRoot1());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(false));
 
   // Create a view in the second connection.
-  ASSERT_TRUE(background_connection_->CreateView(CreateViewId(2, 51)));
+  ASSERT_TRUE(connection2_->CreateView(BuildViewId(2, 51)));
 
   // Connection 2 should be able to set the view on node 1 (it's root), but not
   // on 2.
-  ASSERT_TRUE(background_connection_->SetView(CreateNodeId(client_.id(), 1),
-                                              CreateViewId(2, 51)));
-  ASSERT_FALSE(background_connection_->SetView(CreateNodeId(client_.id(), 2),
-                                               CreateViewId(2, 51)));
+  ASSERT_TRUE(connection2_->SetView(BuildNodeId(1, 1), BuildViewId(2, 51)));
+  ASSERT_FALSE(connection2_->SetView(BuildNodeId(1, 2), BuildViewId(2, 51)));
 }
 
 // Verify GetNodeTree fails for nodes that are not descendants of the roots.
 TEST_F(ViewManagerConnectionTest, CantGetNodeTreeOfOtherRoots) {
   // Create 1 and 2 in the first connection and parent both to the root.
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 2));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 1)));
+  ASSERT_TRUE(connection_->CreateNode(BuildNodeId(1, 2)));
 
-  ASSERT_TRUE(AddNode(view_manager_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(client_.id(), 1),
-                      1));
-  ASSERT_TRUE(AddNode(view_manager_.get(),
-                      CreateNodeId(0, 1),
-                      CreateNodeId(client_.id(), 2),
-                      2));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 1), 1));
+  ASSERT_TRUE(connection_->AddNode(BuildNodeId(0, 1), BuildNodeId(1, 2), 2));
 
-  ASSERT_NO_FATAL_FAILURE(EstablishBackgroundConnectionWithRoot1());
+  ASSERT_NO_FATAL_FAILURE(EstablishSecondConnection(false));
 
-  AllocationScope scope;
   std::vector<TestNode> nodes;
 
   // Should get nothing for the root.
-  background_connection_->GetNodeTree(CreateNodeId(0, 1), &nodes);
+  connection2_->GetNodeTree(BuildNodeId(0, 1), &nodes);
   ASSERT_TRUE(nodes.empty());
 
   // Should get nothing for node 2.
-  background_connection_->GetNodeTree(CreateNodeId(1, 2), &nodes);
+  connection2_->GetNodeTree(BuildNodeId(1, 2), &nodes);
   ASSERT_TRUE(nodes.empty());
 
   // Should get node 1 if asked for.
-  background_connection_->GetNodeTree(CreateNodeId(1, 1), &nodes);
+  connection2_->GetNodeTree(BuildNodeId(1, 1), &nodes);
   ASSERT_EQ(1u, nodes.size());
   EXPECT_EQ("node=1,1 parent=null view=null", nodes[0].ToString());
 }
 
-// Verify GetNodeTree fails for nodes that are not descendants of the roots.
-TEST_F(ViewManagerConnectionTest, Connect) {
-  ASSERT_TRUE(CreateNode(view_manager_.get(), 1, 1));
-  ASSERT_TRUE(Connect(view_manager_.get(), kTestServiceURL, CreateNodeId(1, 1),
-                      0));
-  BackgroundConnection* instance = BackgroundConnection::WaitForInstance();
-  ASSERT_TRUE(instance != NULL);
-  Changes changes(
-      ChangesToDescription1(instance->DoRunLoopUntilChangesCount(1)));;
-  ASSERT_EQ(1u, changes.size());
-  EXPECT_EQ("OnConnectionEstablished", changes[0]);
-}
-
 // TODO(sky): add coverage of test that destroys connections and ensures other
 // connections get deletion notification (or advanced server id).
+
+// TODO(sky): need to better track changes to initial connection. For example,
+// that SetBounsdNodes/AddNode and the like don't result in messages to the
+// originating connection.
 
 }  // namespace service
 }  // namespace view_manager

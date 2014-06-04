@@ -601,6 +601,10 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   // Tests whether |rect| intersects this view's bounds.
   virtual bool HitTestRect(const gfx::Rect& rect) const;
 
+  // Returns true if this view or any of its descendants are permitted to
+  // be the target of an event.
+  virtual bool CanProcessEventsWithinSubtree() const;
+
   // Returns true if the mouse cursor is over |view| and mouse events are
   // enabled.
   bool IsMouseHovered();
@@ -727,6 +731,8 @@ class VIEWS_EXPORT View : public ui::LayerDelegate,
   virtual ui::EventTargeter* GetEventTargeter() OVERRIDE;
   virtual void ConvertEventToTarget(ui::EventTarget* target,
                                     ui::LocatedEvent* event) OVERRIDE;
+
+  const ui::EventTargeter* GetEventTargeter() const;
 
   // Overridden from ui::EventHandler:
   virtual void OnKeyEvent(ui::KeyEvent* event) OVERRIDE;

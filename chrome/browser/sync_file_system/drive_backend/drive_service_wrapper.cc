@@ -58,19 +58,19 @@ void DriveServiceWrapper::GetAboutResource(
 
 void DriveServiceWrapper::GetChangeList(
     int64 start_changestamp,
-    const google_apis::GetResourceListCallback& callback) {
+    const google_apis::ChangeListCallback& callback) {
   drive_service_->GetChangeList(start_changestamp, callback);
 }
 
 void DriveServiceWrapper::GetRemainingChangeList(
     const GURL& next_link,
-    const google_apis::GetResourceListCallback& callback) {
+    const google_apis::ChangeListCallback& callback) {
   drive_service_->GetRemainingChangeList(next_link, callback);
 }
 
 void DriveServiceWrapper::GetRemainingFileList(
     const GURL& next_link,
-    const google_apis::GetResourceListCallback& callback) {
+    const google_apis::FileListCallback& callback) {
   drive_service_->GetRemainingFileList(next_link, callback);
 }
 
@@ -80,11 +80,10 @@ void DriveServiceWrapper::GetResourceEntry(
   drive_service_->GetResourceEntry(resource_id, callback);
 }
 
-void DriveServiceWrapper::GetResourceListInDirectory(
+void DriveServiceWrapper::GetFileListInDirectory(
     const std::string& directory_resource_id,
-    const google_apis::GetResourceListCallback& callback) {
-  drive_service_->GetResourceListInDirectory(directory_resource_id,
-                                             callback);
+    const google_apis::FileListCallback& callback) {
+  drive_service_->GetFileListInDirectory(directory_resource_id, callback);
 }
 
 bool DriveServiceWrapper::HasRefreshToken() const {
@@ -102,7 +101,7 @@ void DriveServiceWrapper::RemoveResourceFromDirectory(
 void DriveServiceWrapper::SearchByTitle(
     const std::string& title,
     const std::string& directory_resource_id,
-    const google_apis::GetResourceListCallback& callback) {
+    const google_apis::FileListCallback& callback) {
   drive_service_->SearchByTitle(
       title, directory_resource_id, callback);
 }

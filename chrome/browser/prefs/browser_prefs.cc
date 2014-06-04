@@ -45,7 +45,7 @@
 #include "chrome/browser/net/predictor.h"
 #include "chrome/browser/net/pref_proxy_config_tracker_impl.h"
 #include "chrome/browser/net/ssl_config_service_manager.h"
-#include "chrome/browser/network_time/network_time_service.h"
+#include "chrome/browser/network_time/network_time_tracker.h"
 #include "chrome/browser/notifications/desktop_notification_service.h"
 #include "chrome/browser/notifications/message_center_notification_manager.h"
 #include "chrome/browser/pepper_flash_settings_manager.h"
@@ -137,6 +137,7 @@
 #include "chrome/browser/chromeos/customization_document.h"
 #include "chrome/browser/chromeos/display/display_preferences.h"
 #include "chrome/browser/chromeos/extensions/echo_private_api.h"
+#include "chrome/browser/chromeos/file_system_provider/service.h"
 #include "chrome/browser/chromeos/first_run/first_run.h"
 #include "chrome/browser/chromeos/login/default_pinned_apps_field_trial.h"
 #include "chrome/browser/chromeos/login/login_utils.h"
@@ -160,6 +161,7 @@
 #include "chrome/browser/chromeos/status/data_promo_notification.h"
 #include "chrome/browser/chromeos/system/automatic_reboot_manager.h"
 #include "chrome/browser/extensions/api/enterprise_platform_keys_private/enterprise_platform_keys_private_api.h"
+#include "chrome/browser/extensions/extension_assets_manager_chromeos.h"
 #include "chrome/browser/metrics/chromeos_metrics_provider.h"
 #include "chrome/browser/ui/webui/chromeos/charger_replacement_handler.h"
 #include "chrome/browser/ui/webui/chromeos/login/hid_detection_screen_handler.h"
@@ -181,7 +183,6 @@
 
 #if defined(TOOLKIT_VIEWS)
 #include "chrome/browser/ui/browser_view_prefs.h"
-#include "chrome/browser/ui/tabs/tab_strip_layout_type_prefs.h"
 #endif
 
 #if defined(USE_ASH)
@@ -234,6 +235,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
   IOThread::RegisterPrefs(registry);
   KeywordEditorController::RegisterPrefs(registry);
   MetricsService::RegisterPrefs(registry);
+  NetworkTimeTracker::RegisterPrefs(registry);
   PrefProxyConfigTrackerImpl::RegisterPrefs(registry);
   ProfileInfoCache::RegisterPrefs(registry);
   profiles::RegisterPrefs(registry);
@@ -305,6 +307,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
   chromeos::WallpaperManager::RegisterPrefs(registry);
   chromeos::StartupUtils::RegisterPrefs(registry);
   chromeos::echo_offer::RegisterPrefs(registry);
+  extensions::ExtensionAssetsManagerChromeOS::RegisterPrefs(registry);
   policy::AutoEnrollmentClient::RegisterPrefs(registry);
   policy::BrowserPolicyConnectorChromeOS::RegisterPrefs(registry);
   policy::DeviceCloudPolicyManagerChromeOS::RegisterPrefs(registry);
@@ -324,7 +327,6 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
 
 #if defined(TOOLKIT_VIEWS)
   RegisterBrowserViewLocalPrefs(registry);
-  RegisterTabStripLayoutTypePrefs(registry);
 #endif
 }
 
@@ -355,7 +357,6 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   MediaDeviceIDSalt::RegisterProfilePrefs(registry);
   MediaStreamDevicesController::RegisterProfilePrefs(registry);
   NetPrefObserver::RegisterProfilePrefs(registry);
-  NetworkTimeService::RegisterProfilePrefs(registry);
 
   password_manager::PasswordManager::RegisterProfilePrefs(registry);
   PrefProxyConfigTrackerImpl::RegisterProfilePrefs(registry);
@@ -432,6 +433,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   chromeos::attestation::PlatformVerificationFlow::RegisterProfilePrefs(
       registry);
   chromeos::first_run::RegisterProfilePrefs(registry);
+  chromeos::file_system_provider::RegisterProfilePrefs(registry);
   chromeos::MultiProfileUserController::RegisterProfilePrefs(registry);
   chromeos::Preferences::RegisterProfilePrefs(registry);
   chromeos::proxy_config::RegisterProfilePrefs(registry);
@@ -576,6 +578,10 @@ void MigrateBrowserPrefs(Profile* profile, PrefService* local_state) {
 
 #if defined(OS_CHROMEOS)
   chromeos::default_pinned_apps_field_trial::MigratePrefs(local_state);
+#endif
+
+#if defined(TOOLKIT_VIEWS)
+  MigrateBrowserTabStripPrefs(local_state);
 #endif
 }
 

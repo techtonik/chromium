@@ -409,19 +409,26 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
     observer7.Wait();
 
     content::Source<content::NavigationController> source1 = observer1.source();
-    EXPECT_TRUE(source1->GetWebContents()->GetRenderProcessHost()->IsGuest());
+    EXPECT_TRUE(source1->GetWebContents()->GetRenderProcessHost()->
+        IsIsolatedGuest());
     content::Source<content::NavigationController> source2 = observer2.source();
-    EXPECT_TRUE(source2->GetWebContents()->GetRenderProcessHost()->IsGuest());
+    EXPECT_TRUE(source2->GetWebContents()->GetRenderProcessHost()->
+        IsIsolatedGuest());
     content::Source<content::NavigationController> source3 = observer3.source();
-    EXPECT_TRUE(source3->GetWebContents()->GetRenderProcessHost()->IsGuest());
+    EXPECT_TRUE(source3->GetWebContents()->GetRenderProcessHost()->
+        IsIsolatedGuest());
     content::Source<content::NavigationController> source4 = observer4.source();
-    EXPECT_TRUE(source4->GetWebContents()->GetRenderProcessHost()->IsGuest());
+    EXPECT_TRUE(source4->GetWebContents()->GetRenderProcessHost()->
+        IsIsolatedGuest());
     content::Source<content::NavigationController> source5 = observer5.source();
-    EXPECT_TRUE(source5->GetWebContents()->GetRenderProcessHost()->IsGuest());
+    EXPECT_TRUE(source5->GetWebContents()->GetRenderProcessHost()->
+        IsIsolatedGuest());
     content::Source<content::NavigationController> source6 = observer6.source();
-    EXPECT_TRUE(source6->GetWebContents()->GetRenderProcessHost()->IsGuest());
+    EXPECT_TRUE(source6->GetWebContents()->GetRenderProcessHost()->
+        IsIsolatedGuest());
     content::Source<content::NavigationController> source7 = observer7.source();
-    EXPECT_TRUE(source7->GetWebContents()->GetRenderProcessHost()->IsGuest());
+    EXPECT_TRUE(source7->GetWebContents()->GetRenderProcessHost()->
+        IsIsolatedGuest());
 
     // Check that the first two tags use the same process and it is different
     // than the process used by the other two.
@@ -610,7 +617,8 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
 
     content::Source<content::NavigationController> source =
         guest_observer.source();
-    EXPECT_TRUE(source->GetWebContents()->GetRenderProcessHost()->IsGuest());
+    EXPECT_TRUE(source->GetWebContents()->GetRenderProcessHost()->
+        IsIsolatedGuest());
 
     bool satisfied = guest_loaded_listener.WaitUntilSatisfied();
     if (!satisfied)
@@ -1003,8 +1011,15 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestContentLoadEvent) {
 
 // http://crbug.com/326330
 IN_PROC_BROWSER_TEST_F(WebViewTest,
-                       DISABLED_Shim_TestDeclarativeWebRequestAPI) {
+                       Shim_TestDeclarativeWebRequestAPI) {
   TestHelper("testDeclarativeWebRequestAPI",
+             "web_view/shim",
+             NEEDS_TEST_SERVER);
+}
+
+IN_PROC_BROWSER_TEST_F(WebViewTest,
+                       Shim_TestDeclarativeWebRequestAPISendMessage) {
+  TestHelper("testDeclarativeWebRequestAPISendMessage",
              "web_view/shim",
              NEEDS_TEST_SERVER);
 }
@@ -1119,7 +1134,8 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestRemoveWebviewOnExit) {
 
   content::Source<content::NavigationController> source =
       guest_observer.source();
-  EXPECT_TRUE(source->GetWebContents()->GetRenderProcessHost()->IsGuest());
+  EXPECT_TRUE(source->GetWebContents()->GetRenderProcessHost()->
+      IsIsolatedGuest());
 
   ASSERT_TRUE(guest_loaded_listener.WaitUntilSatisfied());
 
@@ -1201,7 +1217,7 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, MAYBE_InterstitialTeardown) {
   // Wait for interstitial page to be shown in guest.
   content::WebContents* guest_web_contents = new_client.WaitForGuestCreated();
   SetBrowserClientForTesting(old_client);
-  ASSERT_TRUE(guest_web_contents->GetRenderProcessHost()->IsGuest());
+  ASSERT_TRUE(guest_web_contents->GetRenderProcessHost()->IsIsolatedGuest());
   WaitForInterstitial(guest_web_contents);
 
   // Now close the app while interstitial page being shown in guest.
@@ -1906,7 +1922,7 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, GeolocationAPIEmbedderHasAccessDeny) {
 
 // GeolocationAPI* test 3 of 3.
 IN_PROC_BROWSER_TEST_F(WebViewTest,
-                       GeolocationAPIEmbedderHasAccessMultipleBridgeIdAllow) {
+                       DISABLED_GeolocationAPIEmbedderHasAccessMultipleBridgeIdAllow) {
   TestHelper("testMultipleBridgeIdAllow",
              "web_view/geolocation/embedder_has_permission",
              NEEDS_TEST_SERVER);

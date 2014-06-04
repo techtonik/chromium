@@ -9,7 +9,6 @@
 
 #include <vector>
 
-#include "mojo/public/cpp/bindings/allocation_scope.h"
 #include "mojo/public/interfaces/service_provider/service_provider.mojom.h"
 
 namespace mojo {
@@ -63,9 +62,9 @@ class ServiceConnectorBase {
  public:
   class Owner : public ServiceProvider {
    public:
+    Owner();
     Owner(ScopedMessagePipeHandle service_provider_handle);
     virtual ~Owner();
-    ServiceProvider* service_provider() { return service_provider_.get(); }
     virtual void AddServiceConnector(
         internal::ServiceConnectorBase* service_connector) = 0;
     virtual void RemoveServiceConnector(
@@ -78,20 +77,23 @@ class ServiceConnectorBase {
     }
     ServiceProviderPtr service_provider_;
   };
-  ServiceConnectorBase() : owner_(NULL) {}
+  ServiceConnectorBase(const std::string& name) : name_(name), owner_(NULL) {}
   virtual ~ServiceConnectorBase();
-  ServiceProvider* service_provider() { return owner_->service_provider(); }
   virtual void ConnectToService(const std::string& url,
+                                const std::string& name,
                                 ScopedMessagePipeHandle client_handle) = 0;
+  std::string name() const { return name_; }
 
  protected:
+  std::string name_;
   Owner* owner_;
 };
 
 template <class ServiceImpl, typename Context=void>
 class ServiceConnector : public internal::ServiceConnectorBase {
  public:
-  ServiceConnector(Context* context = NULL) : context_(context) {}
+  ServiceConnector(const std::string& name, Context* context = NULL)
+      : ServiceConnectorBase(name), context_(context) {}
 
   virtual ~ServiceConnector() {
     ConnectionList doomed;
@@ -104,6 +106,7 @@ class ServiceConnector : public internal::ServiceConnectorBase {
   }
 
   virtual void ConnectToService(const std::string& url,
+                                const std::string& name,
                                 ScopedMessagePipeHandle handle) MOJO_OVERRIDE {
     ServiceConnection<ServiceImpl, Context>* impl =
         ServiceConstructor<ServiceImpl, Context>::New(context_);

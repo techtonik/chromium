@@ -522,10 +522,15 @@ def ExtractZip(filename, output_dir, verbose=True):
   # handle links and file bits (executable), which is much
   # easier then trying to do that with ZipInfo options.
   #
+  # The Mac Version of unzip unfortunately does not support Zip64, whereas
+  # the python module does, so we have to fallback to the python zip module
+  # on Mac if the filesize is greater than 4GB.
+  #
   # On Windows, try to use 7z if it is installed, otherwise fall back to python
   # zip module and pray we don't have files larger than 512MB to unzip.
   unzip_cmd = None
-  if IsMac() or IsLinux():
+  if ((IsMac() and os.path.getsize(filename) < 4 * 1024 * 1024 * 1024)
+      or IsLinux()):
     unzip_cmd = ['unzip', '-o']
   elif IsWindows() and os.path.exists('C:\\Program Files\\7-Zip\\7z.exe'):
     unzip_cmd = ['C:\\Program Files\\7-Zip\\7z.exe', 'x', '-y']
@@ -541,12 +546,16 @@ def ExtractZip(filename, output_dir, verbose=True):
     if result:
       raise IOError('unzip failed: %s => %s' % (str(command), result))
   else:
-    assert IsWindows()
+    assert IsWindows() or IsMac()
     zf = zipfile.ZipFile(filename)
     for name in zf.namelist():
       if verbose:
         print 'Extracting %s' % name
       zf.extract(name, output_dir)
+      if IsMac():
+        # Restore permission bits.
+        os.chmod(os.path.join(output_dir, name),
+                 zf.getinfo(name).external_attr >> 16L)
 
 
 def RunProcess(command):
@@ -1429,16 +1438,17 @@ class BisectPerformanceMetrics(object):
           continue
 
         if (depot_data.get('recurse') and depot in depot_data.get('from')):
-          src_dir = (deps_data.get(depot_data.get('src')) or
-                     deps_data.get(depot_data.get('src_old')))
+          depot_data_src = depot_data.get('src') or depot_data.get('src_old')
+          src_dir = deps_data.get(depot_data_src)
           if src_dir:
-            self.depot_cwd[depot_name] = os.path.join(self.src_cwd, src_dir[4:])
-            re_results = rxp.search(deps_data.get(src_dir, ''))
+            self.depot_cwd[depot_name] = os.path.join(self.src_cwd,
+                                                      depot_data_src[4:])
+            re_results = rxp.search(src_dir)
             if re_results:
               results[depot_name] = re_results.group('revision')
             else:
               warning_text = ('Couldn\'t parse revision for %s while bisecting '
-                             '%s' % (depot_name, depot))
+                              '%s' % (depot_name, depot))
               if not warning_text in self.warnings:
                 self.warnings.append(warning_text)
           else:

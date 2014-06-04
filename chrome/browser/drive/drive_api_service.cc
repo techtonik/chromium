@@ -25,24 +25,25 @@
 #include "net/url_request/url_request_context_getter.h"
 
 using content::BrowserThread;
+using google_apis::AboutResourceCallback;
 using google_apis::AppList;
 using google_apis::AppListCallback;
 using google_apis::AuthStatusCallback;
 using google_apis::AuthorizeAppCallback;
 using google_apis::CancelCallback;
 using google_apis::ChangeList;
+using google_apis::ChangeListCallback;
 using google_apis::DownloadActionCallback;
 using google_apis::EntryActionCallback;
 using google_apis::FileList;
+using google_apis::FileListCallback;
 using google_apis::FileResource;
 using google_apis::GDATA_OTHER_ERROR;
 using google_apis::GDATA_PARSE_ERROR;
 using google_apis::GDataErrorCode;
-using google_apis::AboutResourceCallback;
 using google_apis::GetContentCallback;
 using google_apis::GetResourceEntryCallback;
 using google_apis::GetResourceEntryRequest;
-using google_apis::GetResourceListCallback;
 using google_apis::GetShareUrlCallback;
 using google_apis::HTTP_NOT_IMPLEMENTED;
 using google_apis::HTTP_SUCCESS;
@@ -51,7 +52,6 @@ using google_apis::Link;
 using google_apis::ProgressCallback;
 using google_apis::RequestSender;
 using google_apis::ResourceEntry;
-using google_apis::ResourceList;
 using google_apis::UploadRangeCallback;
 using google_apis::UploadRangeResponse;
 using google_apis::drive::AboutGetRequest;
@@ -105,7 +105,7 @@ const char kFileResourceFields[] =
     "kind,id,title,createdDate,sharedWithMeDate,mimeType,"
     "md5Checksum,fileSize,labels/trashed,imageMediaMetadata/width,"
     "imageMediaMetadata/height,imageMediaMetadata/rotation,etag,"
-    "parents/parentLink,alternateLink,"
+    "parents(id,parentLink),alternateLink,"
     "modifiedDate,lastViewedByMeDate,shared";
 const char kFileResourceOpenWithLinksFields[] =
     "kind,id,openWithLinks/*";
@@ -113,23 +113,15 @@ const char kFileListFields[] =
     "kind,items(kind,id,title,createdDate,sharedWithMeDate,"
     "mimeType,md5Checksum,fileSize,labels/trashed,imageMediaMetadata/width,"
     "imageMediaMetadata/height,imageMediaMetadata/rotation,etag,"
-    "parents/parentLink,alternateLink,"
+    "parents(id,parentLink),alternateLink,"
     "modifiedDate,lastViewedByMeDate,shared),nextLink";
 const char kChangeListFields[] =
     "kind,items(file(kind,id,title,createdDate,sharedWithMeDate,"
     "mimeType,md5Checksum,fileSize,labels/trashed,imageMediaMetadata/width,"
     "imageMediaMetadata/height,imageMediaMetadata/rotation,etag,"
-    "parents/parentLink,alternateLink,modifiedDate,lastViewedByMeDate,shared),"
-    "deleted,id,fileId,modificationDate),nextLink,largestChangeId";
-
-// Callback invoked when the parsing of resource list is completed,
-// regardless whether it is succeeded or not.
-void DidConvertToResourceListOnBlockingPool(
-    const GetResourceListCallback& callback,
-    scoped_ptr<ResourceList> resource_list) {
-  GDataErrorCode error = resource_list ? HTTP_SUCCESS : GDATA_PARSE_ERROR;
-  callback.Run(error, resource_list.Pass());
-}
+    "parents(id,parentLink),alternateLink,modifiedDate,"
+    "lastViewedByMeDate,shared),deleted,id,fileId,modificationDate),nextLink,"
+    "largestChangeId";
 
 // Converts the FileResource value to ResourceEntry and runs |callback| on the
 // UI thread.
@@ -154,64 +146,6 @@ void ConvertFileEntryToResourceEntryAndRun(
   }
 
   callback.Run(error, entry.Pass());
-}
-
-// Thin adapter of ConvertFileListToResourceList.
-scoped_ptr<ResourceList> ConvertFileListToResourceList(
-    scoped_ptr<FileList> file_list) {
-  return util::ConvertFileListToResourceList(*file_list);
-}
-
-// Converts the FileList value to ResourceList on blocking pool and runs
-// |callback| on the UI thread.
-void ConvertFileListToResourceListOnBlockingPoolAndRun(
-    scoped_refptr<base::TaskRunner> blocking_task_runner,
-    const GetResourceListCallback& callback,
-    GDataErrorCode error,
-    scoped_ptr<FileList> value) {
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
-  DCHECK(!callback.is_null());
-
-  if (!value) {
-    callback.Run(error, scoped_ptr<ResourceList>());
-    return;
-  }
-
-  // Convert the value on blocking pool.
-  base::PostTaskAndReplyWithResult(
-      blocking_task_runner.get(),
-      FROM_HERE,
-      base::Bind(&ConvertFileListToResourceList, base::Passed(&value)),
-      base::Bind(&DidConvertToResourceListOnBlockingPool, callback));
-}
-
-// Thin adapter of ConvertChangeListToResourceList.
-scoped_ptr<ResourceList> ConvertChangeListToResourceList(
-    scoped_ptr<ChangeList> change_list) {
-  return util::ConvertChangeListToResourceList(*change_list);
-}
-
-// Converts the FileList value to ResourceList on blocking pool and runs
-// |callback| on the UI thread.
-void ConvertChangeListToResourceListOnBlockingPoolAndRun(
-    scoped_refptr<base::TaskRunner> blocking_task_runner,
-    const GetResourceListCallback& callback,
-    GDataErrorCode error,
-    scoped_ptr<ChangeList> value) {
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
-  DCHECK(!callback.is_null());
-
-  if (!value) {
-    callback.Run(error, scoped_ptr<ResourceList>());
-    return;
-  }
-
-  // Convert the value on blocking pool.
-  base::PostTaskAndReplyWithResult(
-      blocking_task_runner.get(),
-      FROM_HERE,
-      base::Bind(&ConvertChangeListToResourceList, base::Passed(&value)),
-      base::Bind(&DidConvertToResourceListOnBlockingPool, callback));
 }
 
 // Converts the FileResource value to ResourceEntry for upload range request,
@@ -311,7 +245,7 @@ void DriveAPIService::Initialize(const std::string& account_id) {
   scopes.push_back(kDriveAppsReadonlyScope);
   scopes.push_back(util::kDriveAppsScope);
 
-  // GData WAPI token for GetShareUrl() and GetResourceListInDirectoryByWapi().
+  // GData WAPI token for GetShareUrl().
   scopes.push_back(util::kDocsListScope);
 
   sender_.reset(new RequestSender(
@@ -347,24 +281,22 @@ std::string DriveAPIService::GetRootResourceId() const {
   return kDriveApiRootDirectoryResourceId;
 }
 
-CancelCallback DriveAPIService::GetAllResourceList(
-    const GetResourceListCallback& callback) {
+CancelCallback DriveAPIService::GetAllFileList(
+    const FileListCallback& callback) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   DCHECK(!callback.is_null());
 
   FilesListRequest* request = new FilesListRequest(
-      sender_.get(), url_generator_,
-      base::Bind(&ConvertFileListToResourceListOnBlockingPoolAndRun,
-                 blocking_task_runner_, callback));
+      sender_.get(), url_generator_, callback);
   request->set_max_results(kMaxNumFilesResourcePerRequest);
   request->set_q("trashed = false");  // Exclude trashed files.
   request->set_fields(kFileListFields);
   return sender_->StartRequestWithRetry(request);
 }
 
-CancelCallback DriveAPIService::GetResourceListInDirectory(
+CancelCallback DriveAPIService::GetFileListInDirectory(
     const std::string& directory_resource_id,
-    const GetResourceListCallback& callback) {
+    const FileListCallback& callback) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   DCHECK(!directory_resource_id.empty());
   DCHECK(!callback.is_null());
@@ -377,9 +309,7 @@ CancelCallback DriveAPIService::GetResourceListInDirectory(
   // to client side.
   // We aren't interested in files in trash in this context, neither.
   FilesListRequest* request = new FilesListRequest(
-      sender_.get(), url_generator_,
-      base::Bind(&ConvertFileListToResourceListOnBlockingPoolAndRun,
-                 blocking_task_runner_, callback));
+      sender_.get(), url_generator_, callback);
   request->set_max_results(kMaxNumFilesResourcePerRequest);
   request->set_q(base::StringPrintf(
       "'%s' in parents and trashed = false",
@@ -390,15 +320,13 @@ CancelCallback DriveAPIService::GetResourceListInDirectory(
 
 CancelCallback DriveAPIService::Search(
     const std::string& search_query,
-    const GetResourceListCallback& callback) {
+    const FileListCallback& callback) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   DCHECK(!search_query.empty());
   DCHECK(!callback.is_null());
 
   FilesListRequest* request = new FilesListRequest(
-      sender_.get(), url_generator_,
-      base::Bind(&ConvertFileListToResourceListOnBlockingPoolAndRun,
-                 blocking_task_runner_, callback));
+      sender_.get(), url_generator_, callback);
   request->set_max_results(kMaxNumFilesResourcePerRequestForSearch);
   request->set_q(drive::util::TranslateQuery(search_query));
   request->set_fields(kFileListFields);
@@ -408,7 +336,7 @@ CancelCallback DriveAPIService::Search(
 CancelCallback DriveAPIService::SearchByTitle(
     const std::string& title,
     const std::string& directory_resource_id,
-    const GetResourceListCallback& callback) {
+    const FileListCallback& callback) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   DCHECK(!title.empty());
   DCHECK(!callback.is_null());
@@ -424,9 +352,7 @@ CancelCallback DriveAPIService::SearchByTitle(
   query += " and trashed = false";
 
   FilesListRequest* request = new FilesListRequest(
-      sender_.get(), url_generator_,
-      base::Bind(&ConvertFileListToResourceListOnBlockingPoolAndRun,
-                 blocking_task_runner_, callback));
+      sender_.get(), url_generator_, callback);
   request->set_max_results(kMaxNumFilesResourcePerRequest);
   request->set_q(query);
   request->set_fields(kFileListFields);
@@ -435,14 +361,12 @@ CancelCallback DriveAPIService::SearchByTitle(
 
 CancelCallback DriveAPIService::GetChangeList(
     int64 start_changestamp,
-    const GetResourceListCallback& callback) {
+    const ChangeListCallback& callback) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   DCHECK(!callback.is_null());
 
   ChangesListRequest* request = new ChangesListRequest(
-      sender_.get(), url_generator_,
-      base::Bind(&ConvertChangeListToResourceListOnBlockingPoolAndRun,
-                 blocking_task_runner_, callback));
+      sender_.get(), url_generator_, callback);
   request->set_max_results(kMaxNumFilesResourcePerRequest);
   request->set_start_change_id(start_changestamp);
   request->set_fields(kChangeListFields);
@@ -451,15 +375,13 @@ CancelCallback DriveAPIService::GetChangeList(
 
 CancelCallback DriveAPIService::GetRemainingChangeList(
     const GURL& next_link,
-    const GetResourceListCallback& callback) {
+    const ChangeListCallback& callback) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   DCHECK(!next_link.is_empty());
   DCHECK(!callback.is_null());
 
   ChangesListNextPageRequest* request = new ChangesListNextPageRequest(
-      sender_.get(),
-      base::Bind(&ConvertChangeListToResourceListOnBlockingPoolAndRun,
-                 blocking_task_runner_, callback));
+      sender_.get(), callback);
   request->set_next_link(next_link);
   request->set_fields(kChangeListFields);
   return sender_->StartRequestWithRetry(request);
@@ -467,15 +389,13 @@ CancelCallback DriveAPIService::GetRemainingChangeList(
 
 CancelCallback DriveAPIService::GetRemainingFileList(
     const GURL& next_link,
-    const GetResourceListCallback& callback) {
+    const FileListCallback& callback) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   DCHECK(!next_link.is_empty());
   DCHECK(!callback.is_null());
 
   FilesListNextPageRequest* request = new FilesListNextPageRequest(
-      sender_.get(),
-      base::Bind(&ConvertFileListToResourceListOnBlockingPoolAndRun,
-                 blocking_task_runner_, callback));
+      sender_.get(), callback);
   request->set_next_link(next_link);
   request->set_fields(kFileListFields);
   return sender_->StartRequestWithRetry(request);

@@ -30,9 +30,6 @@ namespace {
 // a tile is of solid color.
 const bool kUseColorEstimator = true;
 
-// Minimum width/height of a pile that would require analysis for tiles.
-const int kMinDimensionsForAnalysis = 256;
-
 class DisableLCDTextFilter : public SkDrawFilter {
  public:
   // SkDrawFilter interface.
@@ -397,8 +394,10 @@ TileManager::TileManager(
       rendering_stats_instrumentation_(rendering_stats_instrumentation),
       did_initialize_visible_tile_(false),
       did_check_for_completed_tasks_since_last_schedule_tasks_(true),
-      check_if_ready_to_activate_pending_(false),
-      weak_ptr_factory_(this) {
+      ready_to_activate_check_notifier_(
+          task_runner_,
+          base::Bind(&TileManager::CheckIfReadyToActivate,
+                     base::Unretained(this))) {
   rasterizer_->SetClient(this);
 }
 
@@ -537,7 +536,7 @@ void TileManager::DidFinishRunningTasks() {
   }
 
   DCHECK(IsReadyToActivate());
-  ScheduleCheckIfReadyToActivate();
+  ready_to_activate_check_notifier_.Schedule();
 }
 
 void TileManager::DidFinishRunningTasksRequiredForActivation() {
@@ -549,7 +548,7 @@ void TileManager::DidFinishRunningTasksRequiredForActivation() {
   if (!all_tiles_required_for_activation_have_memory_)
     return;
 
-  ScheduleCheckIfReadyToActivate();
+  ready_to_activate_check_notifier_.Schedule();
 }
 
 void TileManager::GetTilesWithAssignedBins(PrioritizedTileSet* tiles) {
@@ -1108,24 +1107,6 @@ scoped_refptr<RasterTask> TileManager::CreateRasterTask(Tile* tile) {
     existing_pixel_refs[id] = decode_task;
   }
 
-  // We analyze picture before rasterization to detect solid-color tiles.
-  // If the tile is detected as such there is no need to raster or upload.
-  // It is drawn directly as a solid-color quad saving raster and upload cost.
-  // The analysis step is however expensive and is not justified when doing
-  // gpu rasterization where there is no upload.
-  //
-  // Additionally, we do not want to do the analysis if the layer that produced
-  // this tile is narrow, since more likely than not the tile would not be
-  // solid. We use the picture pile size as a proxy for layer size, since it
-  // represents the recorded (and thus rasterizable) content.
-  // Note that this last optimization is a heuristic that ensures that we don't
-  // spend too much time analyzing tiles on a multitude of small layers, as it
-  // is likely that these layers have some non-solid content.
-  gfx::Size pile_size = tile->picture_pile()->tiling_rect().size();
-  bool analyze_picture = !tile->use_gpu_rasterization() &&
-                         std::min(pile_size.width(), pile_size.height()) >=
-                             kMinDimensionsForAnalysis;
-
   return make_scoped_refptr(
       new RasterTaskImpl(const_resource,
                          tile->picture_pile(),
@@ -1136,7 +1117,7 @@ scoped_refptr<RasterTask> TileManager::CreateRasterTask(Tile* tile) {
                          tile->layer_id(),
                          static_cast<const void*>(tile),
                          tile->source_frame_number(),
-                         analyze_picture,
+                         tile->use_picture_analysis(),
                          rendering_stats_instrumentation_,
                          base::Bind(&TileManager::OnRasterTaskCompleted,
                                     base::Unretained(this),
@@ -1465,10 +1446,23 @@ bool TileManager::RasterTileIterator::RasterOrderComparator::operator()(
       b_tile->priority_for_tree_priority(tree_priority_);
   bool prioritize_low_res = tree_priority_ == SMOOTHNESS_TAKES_PRIORITY;
 
-  if (b_priority.resolution != a_priority.resolution) {
-    return (prioritize_low_res && b_priority.resolution == LOW_RESOLUTION) ||
-           (!prioritize_low_res && b_priority.resolution == HIGH_RESOLUTION) ||
-           (a_priority.resolution == NON_IDEAL_RESOLUTION);
+  // Now we have to return true iff b is higher priority than a.
+
+  // If the bin is the same but the resolution is not, then the order will be
+  // determined by whether we prioritize low res or not.
+  if (b_priority.priority_bin == a_priority.priority_bin &&
+      b_priority.resolution != a_priority.resolution) {
+    // Non ideal resolution should be sorted lower than other resolutions.
+    if (a_priority.resolution == NON_IDEAL_RESOLUTION)
+      return true;
+
+    if (b_priority.resolution == NON_IDEAL_RESOLUTION)
+      return false;
+
+    if (prioritize_low_res)
+      return b_priority.resolution == LOW_RESOLUTION;
+
+    return b_priority.resolution == HIGH_RESOLUTION;
   }
 
   return b_priority.IsHigherPriorityThan(a_priority);
@@ -1655,21 +1649,8 @@ bool TileManager::IsReadyToActivate() const {
   return true;
 }
 
-void TileManager::ScheduleCheckIfReadyToActivate() {
-  if (check_if_ready_to_activate_pending_)
-    return;
-
-  task_runner_->PostTask(FROM_HERE,
-                         base::Bind(&TileManager::CheckIfReadyToActivate,
-                                    weak_ptr_factory_.GetWeakPtr()));
-  check_if_ready_to_activate_pending_ = true;
-}
-
 void TileManager::CheckIfReadyToActivate() {
   TRACE_EVENT0("cc", "TileManager::CheckIfReadyToActivate");
-
-  DCHECK(check_if_ready_to_activate_pending_);
-  check_if_ready_to_activate_pending_ = false;
 
   rasterizer_->CheckForCompletedTasks();
   did_check_for_completed_tasks_since_last_schedule_tasks_ = true;

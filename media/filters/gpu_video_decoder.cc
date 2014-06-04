@@ -117,6 +117,14 @@ void GpuVideoDecoder::Stop() {
 }
 
 static bool IsCodedSizeSupported(const gfx::Size& coded_size) {
+#if defined(OS_WIN)
+  // Windows Media Foundation H.264 decoding does not support decoding videos
+  // with any dimension smaller than 48 pixels:
+  // http://msdn.microsoft.com/en-us/library/windows/desktop/dd797815
+  if (coded_size.width() < 48 || coded_size.height() < 48)
+    return false;
+#endif
+
   // Only non-Windows, Ivy Bridge+ platforms can support more than 1920x1080.
   // We test against 1088 to account for 16x16 macroblocks.
   if (coded_size.width() <= 1920 && coded_size.height() <= 1088)
@@ -212,8 +220,7 @@ void GpuVideoDecoder::DestroyPictureBuffers(PictureBufferMap* buffers) {
 void GpuVideoDecoder::DestroyVDA() {
   DCheckGpuVideoAcceleratorFactoriesTaskRunnerIsCurrent();
 
-  if (vda_)
-    vda_.release()->Destroy();
+  vda_.reset();
 
   // Not destroying PictureBuffers in |picture_buffers_at_display_| yet, since
   // their textures may still be in use by the user of this GpuVideoDecoder.

@@ -26,6 +26,7 @@
 #include "content/child/service_worker/web_service_worker_provider_impl.h"
 #include "content/child/web_socket_stream_handle_impl.h"
 #include "content/child/webmessageportchannel_impl.h"
+#include "content/child/websocket_bridge.h"
 #include "content/common/clipboard_messages.h"
 #include "content/common/frame_messages.h"
 #include "content/common/input_messages.h"
@@ -51,6 +52,7 @@
 #include "content/renderer/context_menu_params_builder.h"
 #include "content/renderer/devtools/devtools_agent.h"
 #include "content/renderer/dom_automation_controller.h"
+#include "content/renderer/geolocation_dispatcher.h"
 #include "content/renderer/history_controller.h"
 #include "content/renderer/history_serialization.h"
 #include "content/renderer/image_loading_helper.h"
@@ -411,6 +413,7 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
       media_player_manager_(NULL),
       cdm_manager_(NULL),
 #endif
+      geolocation_dispatcher_(NULL),
       weak_factory_(this) {
   RenderThread::Get()->AddRoute(routing_id_, this);
 
@@ -1412,7 +1415,13 @@ RenderFrameImpl::createContentDecryptionModule(
     const blink::WebString& key_system) {
   DCHECK(!frame_ || frame_ == frame);
   return WebContentDecryptionModuleImpl::Create(
-      frame, security_origin, key_system);
+#if defined(ENABLE_PEPPER_CDMS)
+      frame,
+#elif defined(OS_ANDROID)
+      GetCdmManager(),
+#endif
+      security_origin,
+      key_system);
 }
 
 blink::WebApplicationCacheHost* RenderFrameImpl::createApplicationCacheHost(
@@ -1624,13 +1633,6 @@ void RenderFrameImpl::didAddMessageToConsole(
   }
 
   if (shouldReportDetailedMessageForSource(source_name)) {
-    FOR_EACH_OBSERVER(
-        RenderViewObserver, render_view_->observers(),
-        DetailedConsoleMessageAdded(message.text,
-                                    source_name,
-                                    stack_trace,
-                                    source_line,
-                                    static_cast<int32>(log_severity)));
     FOR_EACH_OBSERVER(
         RenderFrameObserver, observers_,
         DetailedConsoleMessageAdded(message.text,
@@ -2038,9 +2040,14 @@ void RenderFrameImpl::didCreateDocumentElement(blink::WebLocalFrame* frame) {
   if (url.is_valid() && url.spec() != kAboutBlankURL) {
     // TODO(nasko): Check if webview()->mainFrame() is the same as the
     // frame->tree()->top().
-    if (frame == render_view_->webview()->mainFrame()) {
+    blink::WebFrame* main_frame = render_view_->webview()->mainFrame();
+    if (frame == main_frame) {
+      // For now, don't remember plugin zoom values.  We don't want to mix them
+      // with normal web content (i.e. a fixed layout plugin would usually want
+      // them different).
       render_view_->Send(new ViewHostMsg_DocumentAvailableInMainFrame(
-          render_view_->GetRoutingID()));
+          render_view_->GetRoutingID(),
+          main_frame->document().isPluginDocument()));
     }
   }
 
@@ -2730,8 +2737,15 @@ void RenderFrameImpl::willOpenSocketStream(
   impl->SetUserData(handle, new SocketStreamHandleData(routing_id_));
 }
 
+void RenderFrameImpl::willOpenWebSocket(blink::WebSocketHandle* handle) {
+  WebSocketBridge* impl = static_cast<WebSocketBridge*>(handle);
+  impl->set_render_frame_id(routing_id_);
+}
+
 blink::WebGeolocationClient* RenderFrameImpl::geolocationClient() {
-  return render_view_->geolocationClient();
+  if (!geolocation_dispatcher_)
+    geolocation_dispatcher_ = new GeolocationDispatcher(this);
+  return geolocation_dispatcher_;
 }
 
 void RenderFrameImpl::willStartUsingPeerConnectionHandler(

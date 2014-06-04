@@ -98,6 +98,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
   int64 version_id() const { return version_id_; }
   int64 registration_id() const { return registration_id_; }
   const GURL& script_url() const { return script_url_; }
+  const GURL& scope() const { return scope_; }
   RunningStatus running_status() const {
     return static_cast<RunningStatus>(embedded_worker_->status());
   }
@@ -186,8 +187,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // Adds and removes |provider_host| as a controllee of this ServiceWorker.
   void AddControllee(ServiceWorkerProviderHost* provider_host);
   void RemoveControllee(ServiceWorkerProviderHost* provider_host);
-  void AddPendingControllee(ServiceWorkerProviderHost* provider_host);
-  void RemovePendingControllee(ServiceWorkerProviderHost* provider_host);
+  void AddWaitingControllee(ServiceWorkerProviderHost* provider_host);
+  void RemoveWaitingControllee(ServiceWorkerProviderHost* provider_host);
 
   // Returns if it has controllee.
   bool HasControllee() const { return !controllee_map_.empty(); }

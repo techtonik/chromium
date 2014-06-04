@@ -108,6 +108,10 @@ class LocalRtcpTransport : public transport::PacedPacketSender {
     return false;
   }
 
+  virtual void CancelSendingPacket(
+      const transport::PacketKey& packet_key) OVERRIDE {
+  }
+
  private:
   bool drop_packets_;
   bool short_delay_;
@@ -140,7 +144,7 @@ class RtcpPeer : public Rtcp {
              local_ssrc,
              remote_ssrc,
              c_name,
-             true) {}
+             AUDIO_EVENT) {}
 
   using Rtcp::OnReceivedNtp;
   using Rtcp::OnReceivedLipSyncInfo;
@@ -215,7 +219,7 @@ TEST_F(RtcpTest, TimeToSend) {
             kSenderSsrc,
             kReceiverSsrc,
             kCName,
-            true);
+            AUDIO_EVENT);
   receiver_to_sender_.set_rtcp_receiver(&rtcp);
   EXPECT_LE(start_time, rtcp.TimeToSendNextRtcpReport());
   EXPECT_GE(
@@ -237,7 +241,7 @@ TEST_F(RtcpTest, BasicSenderReport) {
             kSenderSsrc,
             kReceiverSsrc,
             kCName,
-            true);
+            AUDIO_EVENT);
   sender_to_receiver_.set_rtcp_receiver(&rtcp);
   rtcp.SendRtcpFromRtpSender(base::TimeTicks(), 0);
 }
@@ -253,7 +257,7 @@ TEST_F(RtcpTest, BasicReceiverReport) {
             kSenderSsrc,
             kReceiverSsrc,
             kCName,
-            true);
+            AUDIO_EVENT);
   receiver_to_sender_.set_rtcp_receiver(&rtcp);
   rtcp.SendRtcpFromRtpReceiver(NULL, NULL);
 }
@@ -272,7 +276,7 @@ TEST_F(RtcpTest, BasicCast) {
             kSenderSsrc,
             kSenderSsrc,
             kCName,
-            true);
+            AUDIO_EVENT);
   receiver_to_sender_.set_rtcp_receiver(&rtcp);
   RtcpCastMessage cast_message(kSenderSsrc);
   cast_message.ack_frame_id_ = kAckFrameId;
@@ -299,7 +303,7 @@ TEST_F(RtcpTest, RttReducedSizeRtcp) {
                      kReceiverSsrc,
                      kSenderSsrc,
                      kCName,
-                     true);
+                     AUDIO_EVENT);
 
   // Media sender.
   Rtcp rtcp_sender(cast_environment_,
@@ -312,7 +316,7 @@ TEST_F(RtcpTest, RttReducedSizeRtcp) {
                    kSenderSsrc,
                    kReceiverSsrc,
                    kCName,
-                   true);
+                   AUDIO_EVENT);
 
   sender_to_receiver_.set_rtcp_receiver(&rtcp_receiver);
   receiver_to_sender_.set_rtcp_receiver(&rtcp_sender);
@@ -355,7 +359,7 @@ TEST_F(RtcpTest, Rtt) {
                      kReceiverSsrc,
                      kSenderSsrc,
                      kCName,
-                     true);
+                     AUDIO_EVENT);
 
   // Media sender.
   Rtcp rtcp_sender(cast_environment_,
@@ -368,7 +372,7 @@ TEST_F(RtcpTest, Rtt) {
                    kSenderSsrc,
                    kReceiverSsrc,
                    kCName,
-                   true);
+                   AUDIO_EVENT);
 
   receiver_to_sender_.set_rtcp_receiver(&rtcp_sender);
   sender_to_receiver_.set_rtcp_receiver(&rtcp_receiver);
@@ -448,7 +452,7 @@ TEST_F(RtcpTest, RttWithPacketLoss) {
                      kReceiverSsrc,
                      kSenderSsrc,
                      kCName,
-                     true);
+                     AUDIO_EVENT);
 
   // Media sender.
   Rtcp rtcp_sender(cast_environment_,
@@ -461,7 +465,7 @@ TEST_F(RtcpTest, RttWithPacketLoss) {
                    kSenderSsrc,
                    kReceiverSsrc,
                    kCName,
-                   true);
+                   AUDIO_EVENT);
 
   receiver_to_sender_.set_rtcp_receiver(&rtcp_sender);
   sender_to_receiver_.set_rtcp_receiver(&rtcp_receiver);

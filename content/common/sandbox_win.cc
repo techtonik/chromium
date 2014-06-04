@@ -45,6 +45,7 @@ const wchar_t* const kTroublesomeDlls[] = {
   L"adialhk.dll",                 // Kaspersky Internet Security.
   L"acpiz.dll",                   // Unknown.
   L"akinsofthook32.dll",          // Akinsoft Software Engineering.
+  L"avcuf64.dll",                 // Bit Defender Internet Security x64.
   L"avgrsstx.dll",                // AVG 8.
   L"babylonchromepi.dll",         // Babylon translator.
   L"btkeyind.dll",                // Widcomm Bluetooth.
@@ -358,10 +359,7 @@ bool AddPolicyForSandboxedProcess(sandbox::TargetPolicy* policy) {
   // Prevents the renderers from manipulating low-integrity processes.
   policy->SetDelayedIntegrityLevel(sandbox::INTEGRITY_LEVEL_UNTRUSTED);
 
-  bool use_winsta = !CommandLine::ForCurrentProcess()->HasSwitch(
-                        switches::kDisableAltWinstation);
-
-  if (sandbox::SBOX_ALL_OK !=  policy->SetAlternateDesktop(use_winsta)) {
+  if (sandbox::SBOX_ALL_OK !=  policy->SetAlternateDesktop(true)) {
     DLOG(WARNING) << "Failed to apply desktop security to the renderer";
   }
 

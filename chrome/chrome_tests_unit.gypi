@@ -47,9 +47,6 @@
       'sources': [
         'app/chrome_main_delegate.cc',
         'app/chrome_main_delegate.h',
-        'browser/android/bookmarks/partner_bookmarks_shim_unittest.cc',
-        'browser/android/mock_google_location_settings_helper.cc',
-        'browser/android/mock_google_location_settings_helper.h',
         'browser/browsing_data/mock_browsing_data_appcache_helper.cc',
         'browser/browsing_data/mock_browsing_data_appcache_helper.h',
         'browser/browsing_data/mock_browsing_data_cookie_helper.cc',
@@ -373,7 +370,7 @@
           ],
         }],
         ['OS=="android"', {
-          '!dependencies': [
+          'dependencies!': [
             '../components/components.gyp:storage_monitor_test_support',
           ],
           'sources/': [
@@ -585,6 +582,13 @@
         'app/chrome_dll.rc',
         # All unittests in browser, common, renderer and service.
         'browser/about_flags_unittest.cc',
+        'browser/android/bookmarks/partner_bookmarks_shim_unittest.cc',
+        # mock_google_location_settings_helper could logically go in
+        # test_support_unit. However tests suites in the internal repository
+        # depend on an alternate implementation so instead each test suite
+        # includes the relevant version directly.
+        'browser/android/mock_google_location_settings_helper.cc',
+        'browser/android/mock_google_location_settings_helper.h',
         'browser/app_controller_mac_unittest.mm',
         'browser/apps/ephemeral_app_service_unittest.cc',
         'browser/autocomplete/autocomplete_input_unittest.cc',
@@ -820,6 +824,7 @@
         'browser/diagnostics/diagnostics_model_unittest.cc',
         'browser/diagnostics/diagnostics_controller_unittest.cc',
         'browser/devtools/devtools_contents_resizing_strategy_unittest.cc',
+        'browser/devtools/devtools_network_controller_unittest.cc',
         'browser/download/all_download_item_notifier_unittest.cc',
         'browser/download/chrome_download_manager_delegate_unittest.cc',
         'browser/download/download_history_unittest.cc',
@@ -853,7 +858,6 @@
         'browser/extensions/api/activity_log_private/activity_log_private_api_unittest.cc',
         'browser/extensions/api/alarms/alarms_api_unittest.cc',
         'browser/extensions/api/api_resource_manager_unittest.cc',
-        'browser/extensions/api/bluetooth/bluetooth_api_unittest.cc',
         'browser/extensions/api/bluetooth/bluetooth_event_router_unittest.cc',
         'browser/extensions/api/bookmarks/bookmark_api_helpers_unittest.cc',
         'browser/extensions/api/cast_channel/cast_channel_api_unittest.cc',
@@ -944,6 +948,7 @@
         'browser/extensions/extension_function_test_utils.cc',
         'browser/extensions/extension_function_test_utils.h',
         'browser/extensions/extension_garbage_collector_unittest.cc',
+        'browser/extensions/extension_garbage_collector_chromeos_unittest.cc',
         'browser/extensions/extension_gcm_app_handler_unittest.cc',
         'browser/extensions/extension_icon_image_unittest.cc',
         'browser/extensions/extension_icon_manager_unittest.cc',
@@ -1044,6 +1049,7 @@
         'browser/invalidation/ticl_invalidation_service_unittest.cc',
         'browser/invalidation/ticl_profile_settings_provider_unittest.cc',
         'browser/local_discovery/gcd_api_flow_unittest.cc',
+        'browser/local_discovery/gcd_registration_ticket_request_unittest.cc',
         'browser/local_discovery/privet_confirm_api_flow_unittest.cc',
         'browser/local_discovery/privet_http_unittest.cc',
         'browser/local_discovery/privet_url_fetcher_unittest.cc',
@@ -1069,6 +1075,8 @@
         'browser/media/native_desktop_media_list_unittest.cc',
         'browser/media/webrtc_log_uploader_unittest.cc',
         'browser/media/webrtc_log_util_unittest.cc',
+        'browser/media/webrtc_rtp_dump_handler_unittest.cc',
+        'browser/media/webrtc_rtp_dump_writer_unittest.cc',
         'browser/media_galleries/fileapi/native_media_file_util_unittest.cc',
         'browser/media_galleries/linux/mtp_device_object_enumerator_unittest.cc',
         'browser/media_galleries/mac/mtp_device_delegate_impl_mac_unittest.mm',
@@ -1085,13 +1093,12 @@
         'browser/media_galleries/win/mtp_device_object_enumerator_unittest.cc',
         'browser/metrics/chrome_metrics_service_accessor_unittest.cc',
         'browser/metrics/cloned_install_detector_unittest.cc',
-        'browser/metrics/compression_utils_unittest.cc',
         'browser/metrics/extensions_metrics_provider_unittest.cc',
         'browser/metrics/gpu_metrics_provider_unittest.cc',
         'browser/metrics/metrics_log_unittest.cc',
         'browser/metrics/metrics_service_unittest.cc',
-        'browser/metrics/metrics_state_manager_unittest.cc',
         'browser/metrics/plugin_metrics_provider_unittest.cc',
+        'browser/metrics/profiler_metrics_provider_unittest.cc',
         'browser/metrics/thread_watcher_unittest.cc',
         'browser/metrics/thread_watcher_android_unittest.cc',
         'browser/metrics/time_ticks_experiment_unittest.cc',
@@ -1156,7 +1163,9 @@
         'browser/policy/cloud/user_policy_signin_service_unittest.cc',
         'browser/policy/file_selection_dialogs_policy_handler_unittest.cc',
         'browser/policy/javascript_policy_handler_unittest.cc',
+        'browser/policy/managed_bookmarks_policy_handler_unittest.cc',
         'browser/policy/policy_path_parser_unittest.cc',
+        'browser/policy/profile_policy_connector_unittest.cc',
         'browser/policy/url_blacklist_manager_unittest.cc',
         'browser/predictors/autocomplete_action_predictor_table_unittest.cc',
         'browser/predictors/autocomplete_action_predictor_unittest.cc',
@@ -1286,8 +1295,8 @@
         'browser/shell_integration_linux_unittest.cc',
         'browser/shell_integration_win_unittest.cc',
         'browser/signin/account_reconcilor_unittest.cc',
+        'browser/signin/account_service_flag_fetcher_unittest.cc',
         'browser/signin/local_auth_unittest.cc',
-        'browser/signin/profile_oauth2_token_service_request_unittest.cc',
         'browser/signin/signin_error_notifier_ash_unittest.cc',
         'browser/signin/signin_global_error_unittest.cc',
         'browser/signin/signin_manager_unittest.cc',
@@ -1332,7 +1341,6 @@
         'browser/sync/glue/non_ui_data_type_controller_mock.h',
         'browser/sync/glue/non_ui_data_type_controller_unittest.cc',
         'browser/sync/glue/search_engine_data_type_controller_unittest.cc',
-        'browser/sync/glue/shared_change_processor_unittest.cc',
         'browser/sync/glue/sync_backend_host_impl_unittest.cc',
         'browser/sync/glue/sync_backend_host_mock.cc',
         'browser/sync/glue/sync_backend_host_mock.h',
@@ -1904,6 +1912,9 @@
         'renderer/net/renderer_predictor_unittest.cc',
         'renderer/plugins/plugin_uma_unittest.cc',
         'renderer/prerender/prerender_dispatcher_unittest.cc',
+        'renderer/resources/extensions/notifications_custom_bindings.js',
+        'renderer/resources/extensions/notifications_custom_bindings.gtestjs',
+        'renderer/resources/extensions/notifications_test_util.js',
         'renderer/safe_browsing/features_unittest.cc',
         'renderer/safe_browsing/murmurhash3_util_unittest.cc',
         'renderer/safe_browsing/phishing_term_feature_extractor_unittest.cc',
@@ -2004,6 +2015,7 @@
             '../components/components.gyp:data_reduction_proxy_test_support',
             '../components/components_strings.gyp:components_strings',
             '../device/bluetooth/bluetooth.gyp:device_bluetooth_mocks',
+            '../extensions/extensions_resources.gyp:extensions_resources',
             '../extensions/extensions_strings.gyp:extensions_strings',
             '../gpu/gpu.gyp:gpu_unittest_utils',
             '../media/media.gyp:media_test_support',
@@ -2119,8 +2131,8 @@
             'browser/ui/app_list/search/tokenized_string_unittest.cc',
           ],
           'dependencies': [
-            '../ash/ash.gyp:ash_resources',
             '../ash/ash.gyp:ash_test_support',
+            '../ash/ash_resources.gyp:ash_resources',
             '../ash/ash_strings.gyp:ash_strings',
           ],
           # We eventually want to compile both in Win Aura builds, see
@@ -2274,12 +2286,14 @@
           'sources!': [
             'browser/media/webrtc_log_uploader_unittest.cc',
             'browser/media/webrtc_log_util_unittest.cc',
+            'browser/media/webrtc_rtp_dump_handler_unittest.cc',
+            'browser/media/webrtc_rtp_dump_writer_unittest.cc',
             'renderer/media/chrome_webrtc_log_message_delegate_unittest.cc',
           ],
         }],
         ['chromeos==1', {
           'dependencies': [
-            '../ash/ash.gyp:ash_resources',
+            '../ash/ash_resources.gyp:ash_resources',
           ],
           'sources!': [
             'browser/extensions/api/messaging/native_message_process_host_unittest.cc',
@@ -2579,6 +2593,10 @@
 
             # URL elider is not used on android.
            'browser/ui/tests/elide_url_unittest.cc',
+
+            # GCMDriverAndroid is not yet implemented.
+            'browser/extensions/extension_gcm_app_handler_unittest.cc',
+            'browser/services/gcm/gcm_profile_service_unittest.cc',
           ],
           'sources/': [
             ['exclude', '^browser/captive_portal/'],

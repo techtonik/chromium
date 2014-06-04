@@ -183,11 +183,11 @@ VolumeInfo CreateVolumeInfoFromMountPointInfo(
   volume_info.source_path = base::FilePath(mount_point.source_path);
   volume_info.mount_path = base::FilePath(mount_point.mount_path);
   volume_info.mount_condition = mount_point.mount_condition;
+  volume_info.volume_label = volume_info.mount_path.BaseName().AsUTF8Unsafe();
   if (disk) {
     volume_info.device_type = disk->device_type();
     volume_info.system_path_prefix =
         base::FilePath(disk->system_path_prefix());
-    volume_info.volume_label = disk->drive_label();
     volume_info.is_parent = disk->is_parent();
     volume_info.is_read_only = disk->is_read_only();
   } else {
@@ -729,9 +729,9 @@ void VolumeManager::OnRemovableStorageAttached(
   const std::string base_name = base::UTF16ToUTF8(info.model_name());
 
   // Assign a fresh volume ID based on the volume name.
-  std::string id = kMtpVolumeIdPrefix + base_name;
-  for (int i = 2; mounted_volumes_.count(id); ++i)
-    id = kMtpVolumeIdPrefix + base_name + base::StringPrintf(" (%d)", i);
+  std::string label = base_name;
+  for (int i = 2; mounted_volumes_.count(kMtpVolumeIdPrefix + label); ++i)
+    label = base_name + base::StringPrintf(" (%d)", i);
 
   bool result =
       fileapi::ExternalMountPoints::GetSystemInstance()->RegisterFileSystem(
@@ -750,7 +750,8 @@ void VolumeManager::OnRemovableStorageAttached(
   volume_info.mount_condition = chromeos::disks::MOUNT_CONDITION_NONE;
   volume_info.is_parent = true;
   volume_info.is_read_only = true;
-  volume_info.volume_id = id;
+  volume_info.volume_id = kMtpVolumeIdPrefix + label;
+  volume_info.volume_label = label;
   volume_info.source_path = path;
   volume_info.device_type = chromeos::DEVICE_TYPE_MOBILE;
   DoMountEvent(chromeos::MOUNT_ERROR_NONE, volume_info, false);

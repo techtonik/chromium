@@ -186,13 +186,11 @@ void OpenManifestEntryResource::MaybeRunCallback(int32_t pp_error) {
 PluginReverseInterface::PluginReverseInterface(
     nacl::WeakRefAnchor* anchor,
     Plugin* plugin,
-    int32_t manifest_id,
     ServiceRuntime* service_runtime,
     pp::CompletionCallback init_done_cb,
     pp::CompletionCallback crash_cb)
       : anchor_(anchor),
         plugin_(plugin),
-        manifest_id_(manifest_id),
         service_runtime_(service_runtime),
         shutting_down_(false),
         init_done_cb_(init_done_cb),
@@ -321,11 +319,12 @@ void PluginReverseInterface::OpenManifestEntry_MainThreadContinuation(
 
   PP_Var pp_mapped_url;
   PP_PNaClOptions pnacl_options = {PP_FALSE, PP_FALSE, 2};
-  if (!GetNaClInterface()->ManifestResolveKey(plugin_->pp_instance(),
-                                              manifest_id_,
-                                              p->url.c_str(),
-                                              &pp_mapped_url,
-                                              &pnacl_options)) {
+  if (!GetNaClInterface()->ManifestResolveKey(
+          plugin_->pp_instance(),
+          PP_FromBool(!service_runtime_->main_service_runtime()),
+          p->url.c_str(),
+          &pp_mapped_url,
+          &pnacl_options)) {
     NaClLog(4, "OpenManifestEntry_MainThreadContinuation: ResolveKey failed\n");
     // Failed, and error_info has the details on what happened.  Wake
     // up requesting thread -- we are done.
@@ -358,39 +357,6 @@ void PluginReverseInterface::OpenManifestEntry_MainThreadContinuation(
     p->MaybeRunCallback(PP_OK);
     return;
   }
-
-  if (PnaclUrls::IsPnaclComponent(mapped_url)) {
-    // Special PNaCl support files, that are installed on the
-    // user machine.
-    PP_FileHandle handle = plugin_->nacl_interface()->GetReadonlyPnaclFd(
-        PnaclUrls::PnaclComponentURLToFilename(mapped_url).c_str());
-    int32_t fd = -1;
-    if (handle != PP_kInvalidFileHandle)
-      fd = ConvertFileDescriptor(handle, true);
-
-    if (fd < 0) {
-      // We checked earlier if the pnacl component wasn't installed
-      // yet, so this shouldn't happen. At this point, we can't do much
-      // anymore, so just continue with an invalid fd.
-      NaClLog(4,
-              "OpenManifestEntry_MainThreadContinuation: "
-              "GetReadonlyPnaclFd failed\n");
-    }
-    {
-      nacl::MutexLocker take(&mu_);
-      *p->op_complete_ptr = true;  // done!
-      // TODO(ncbray): enable the fast loading and validation paths for this
-      // type of file.
-      p->file_info->desc = fd;
-      NaClXCondVarBroadcast(&cv_);
-    }
-    NaClLog(4,
-            "OpenManifestEntry_MainThreadContinuation: GetPnaclFd okay\n");
-    p->MaybeRunCallback(PP_OK);
-    return;
-  }
-
-  // Hereafter, normal files.
 
   // Because p is owned by the callback of this invocation, so it is necessary
   // to create another instance.
@@ -469,7 +435,6 @@ int64_t PluginReverseInterface::RequestQuotaForWrite(
 }
 
 ServiceRuntime::ServiceRuntime(Plugin* plugin,
-                               int32_t manifest_id,
                                bool main_service_runtime,
                                bool uses_nonsfi_mode,
                                pp::CompletionCallback init_done_cb,
@@ -479,9 +444,7 @@ ServiceRuntime::ServiceRuntime(Plugin* plugin,
       uses_nonsfi_mode_(uses_nonsfi_mode),
       reverse_service_(NULL),
       anchor_(new nacl::WeakRefAnchor()),
-      rev_interface_(new PluginReverseInterface(anchor_, plugin,
-                                                manifest_id,
-                                                this,
+      rev_interface_(new PluginReverseInterface(anchor_, plugin, this,
                                                 init_done_cb, crash_cb)),
       start_sel_ldr_done_(false) {
   NaClSrpcChannelInitialize(&command_channel_);

@@ -186,9 +186,7 @@ class CC_EXPORT LayerTreeHost {
   bool has_gpu_rasterization_trigger() const {
     return has_gpu_rasterization_trigger_;
   }
-  void set_has_gpu_rasterization_trigger(bool has_trigger) {
-    has_gpu_rasterization_trigger_ = has_trigger;
-  }
+  void SetHasGpuRasterizationTrigger(bool has_trigger);
   bool UseGpuRasterization() const;
 
   void SetViewportSize(const gfx::Size& device_viewport_size);
@@ -275,9 +273,12 @@ class CC_EXPORT LayerTreeHost {
   bool UsingSharedMemoryResources();
   int id() const { return id_; }
 
-  bool ScheduleMicroBenchmark(const std::string& benchmark_name,
-                              scoped_ptr<base::Value> value,
-                              const MicroBenchmark::DoneCallback& callback);
+  // Returns the id of the benchmark on success, 0 otherwise.
+  int ScheduleMicroBenchmark(const std::string& benchmark_name,
+                             scoped_ptr<base::Value> value,
+                             const MicroBenchmark::DoneCallback& callback);
+  // Returns true if the message was successfully delivered and handled.
+  bool SendMessageToMicroBenchmark(int id, scoped_ptr<base::Value> value);
 
   // When a SwapPromiseMonitor is created on the main thread, it calls
   // InsertSwapPromiseMonitor() to register itself with LayerTreeHost.
@@ -347,6 +348,7 @@ class CC_EXPORT LayerTreeHost {
   typedef std::list<UIResourceRequest> UIResourceRequestQueue;
   UIResourceRequestQueue ui_resource_request_queue_;
 
+  void RecordGpuRasterizationHistogram();
   void CalculateLCDTextMetricsCallback(Layer* layer);
 
   void NotifySwapPromiseMonitorsOfSetNeedsCommit();
@@ -392,6 +394,7 @@ class CC_EXPORT LayerTreeHost {
   bool trigger_idle_updates_;
   bool has_gpu_rasterization_trigger_;
   bool content_is_suitable_for_gpu_rasterization_;
+  bool gpu_rasterization_histogram_recorded_;
 
   SkColor background_color_;
   bool has_transparent_background_;

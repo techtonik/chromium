@@ -2560,7 +2560,8 @@ void SpdySession::OnWindowUpdate(SpdyStreamId stream_id,
 }
 
 void SpdySession::OnPushPromise(SpdyStreamId stream_id,
-                                SpdyStreamId promised_stream_id) {
+                                SpdyStreamId promised_stream_id,
+                                const SpdyHeaderBlock& headers) {
   // TODO(akalin): Handle PUSH_PROMISE frames.
 }
 

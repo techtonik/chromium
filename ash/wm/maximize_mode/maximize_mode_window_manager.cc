@@ -31,7 +31,7 @@ void CancelOverview() {
   WindowSelectorController* controller =
       Shell::GetInstance()->window_selector_controller();
   if (controller && controller->IsSelecting())
-    controller->OnSelectionCanceled();
+    controller->OnSelectionEnded();
 }
 
 }  // namespace
@@ -138,7 +138,7 @@ void MaximizeModeWindowManager::OnTouchEvent(ui::TouchEvent* event) {
     return;
 
   wm::WindowState* window_state = wm::GetWindowState(window);
-  if (!window_state->IsFullscreen())
+  if (!window_state->IsFullscreen() || window_state->in_immersive_fullscreen())
     return;
 
   // Test that the touch happened in the top or bottom lines.

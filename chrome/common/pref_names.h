@@ -14,6 +14,7 @@
 #include "components/autofill/core/common/autofill_pref_names.h"
 #include "components/bookmarks/common/bookmark_pref_names.h"
 #include "components/data_reduction_proxy/common/data_reduction_proxy_pref_names.h"
+#include "components/metrics/metrics_pref_names.h"
 #include "components/signin/core/common/signin_pref_names.h"
 
 namespace prefs {
@@ -175,7 +176,6 @@ extern const char kAlternateProtocolServers[];
 extern const char kDisabledSchemes[];
 #if defined(OS_ANDROID) || defined(OS_IOS)
 extern const char kLastPolicyCheckTime[];
-extern const char kManagedBookmarks[];
 #endif
 extern const char kInstantUIZeroSuggestUrlPrefix[];
 extern const char kMultipleProfilePrefMigration[];
@@ -277,6 +277,7 @@ extern const char kSAMLOfflineSigninTimeLimit[];
 extern const char kSAMLLastGAIASignInTime[];
 extern const char kTimeOnOobe[];
 extern const char kCurrentWallpaperAppName[];
+extern const char kFileSystemProviderMounted[];
 #endif  // defined(OS_CHROMEOS)
 extern const char kIpcDisabledMessages[];
 extern const char kShowHomeButton[];
@@ -426,13 +427,8 @@ extern const char kGLVersionString[];
 
 extern const char kEulaAccepted[];
 
-extern const char kMetricsClientID[];
-extern const char kMetricsSessionID[];
-extern const char kMetricsLowEntropySource[];
-extern const char kMetricsOldClientID[];
-extern const char kMetricsOldLowEntropySource[];
 extern const char kMetricsReportingEnabled[];
-extern const char kMetricsReportingEnabledTimestamp[];
+
 // Android has it's own metric / crash reporting implemented in Android
 // Java code so kMetricsReportingEnabled doesn't make sense. We use this
 // to inform crashes_ui that we have enabled crash reporting.
@@ -716,6 +712,7 @@ extern const char kDeviceRegistered[];
 extern const char kUsedPolicyCertificates[];
 extern const char kServerBackedDeviceState[];
 extern const char kCustomizationDefaultWallpaperURL[];
+extern const char kLogoutStartedLast[];
 #endif
 
 extern const char kClearPluginLSODataEnabled[];
@@ -728,7 +725,7 @@ extern const char kChromeOsReleaseChannel[];
 
 extern const char kPerformanceTracingEnabled[];
 
-extern const char kTabStripLayoutType[];
+extern const char kTabStripStackedLayout[];
 
 extern const char kRegisteredBackgroundContents[];
 
@@ -746,6 +743,8 @@ extern const char kBuiltInDnsClientEnabled[];
 
 extern const char kRegisteredProtocolHandlers[];
 extern const char kIgnoredProtocolHandlers[];
+extern const char kPolicyRegisteredProtocolHandlers[];
+extern const char kPolicyIgnoredProtocolHandlers[];
 extern const char kCustomHandlersEnabled[];
 
 #if defined(OS_MACOSX)
@@ -790,28 +789,8 @@ extern const char kShowLogoutButtonInTray[];
 #endif
 
 #if defined(USE_AURA)
-extern const char kFlingVelocityCap[];
-extern const char kLongPressTimeInSeconds[];
-extern const char kMaxDistanceBetweenTapsForDoubleTap[];
-extern const char kMaxDistanceForTwoFingerTapInPixels[];
-extern const char kMaxSecondsBetweenDoubleClick[];
 extern const char kMaxSeparationForGestureTouchesInPixels[];
-extern const char kMaxSwipeDeviationRatio[];
-extern const char kMaxTouchDownDurationInSecondsForClick[];
-extern const char kMaxTouchMoveInPixelsForClick[];
-extern const char kMinDistanceForPinchScrollInPixels[];
-extern const char kMinFlickSpeedSquared[];
-extern const char kMinPinchUpdateDistanceInPixels[];
-extern const char kMinRailBreakVelocity[];
-extern const char kMinScrollDeltaSquared[];
-extern const char kMinSwipeSpeed[];
-extern const char kMinTouchDownDurationInSecondsForClick[];
-extern const char kPointsBufferedForVelocity[];
-extern const char kRailBreakProportion[];
-extern const char kRailStartProportion[];
-extern const char kScrollPredictionSeconds[];
 extern const char kSemiLongPressTimeInSeconds[];
-extern const char kShowPressDelayInMS[];
 extern const char kTabScrubActivationDelayInMS[];
 extern const char kFlingAccelerationCurveCoefficient0[];
 extern const char kFlingAccelerationCurveCoefficient1[];
@@ -858,7 +837,7 @@ extern const char kShowAppLauncherPromo[];
 
 extern const char kAppLaunchForMetroRestart[];
 extern const char kAppLaunchForMetroRestartProfile[];
-extern const char kAppShortcutsHaveBeenCreated[];
+extern const char kAppShortcutsVersion[];
 
 extern const char kModuleConflictBubbleShown[];
 

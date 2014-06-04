@@ -84,6 +84,7 @@
 #include "content/renderer/media/video_capture_message_filter.h"
 #include "content/renderer/media/webrtc/peer_connection_dependency_factory.h"
 #include "content/renderer/media/webrtc_identity_service.h"
+#include "content/renderer/net_info_helper.h"
 #include "content/renderer/p2p/socket_dispatcher.h"
 #include "content/renderer/render_process_impl.h"
 #include "content/renderer/render_view_impl.h"
@@ -197,6 +198,7 @@ class RenderViewZoomer : public RenderViewVisitor {
     // Empty scheme works as wildcard that matches any scheme,
     if ((net::GetHostOrSpecFromURL(url) == host_) &&
         (scheme_.empty() || scheme_ == url.scheme())) {
+      webview->hidePopups();
       webview->setZoomLevel(zoom_level_);
     }
     return true;
@@ -807,17 +809,10 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
 
   webkit::SetSharedMemoryAllocationFunction(AllocateSharedMemoryFunction);
 
-  // Limit use of the scaled image cache to when deferred image decoding
-  // is enabled.
-  // TODO(reveman): Allow use of this cache on Android once
-  // SkDiscardablePixelRef is used for decoded images. crbug.com/330041
-  bool use_skia_scaled_image_cache = false;
-#if !defined(OS_ANDROID)
-  use_skia_scaled_image_cache =
-      command_line.HasSwitch(switches::kEnableDeferredImageDecoding) ||
-      is_impl_side_painting_enabled_;
-#endif
-  if (!use_skia_scaled_image_cache)
+  // Limit use of the scaled image cache to when deferred image decoding is
+  // enabled.
+  if (!command_line.HasSwitch(switches::kEnableDeferredImageDecoding) &&
+      !is_impl_side_painting_enabled_)
     SkGraphics::SetImageCacheByteLimit(0u);
 }
 
@@ -1180,6 +1175,7 @@ scoped_ptr<gfx::GpuMemoryBuffer> RenderThreadImpl::AllocateGpuMemoryBuffer(
 
 void RenderThreadImpl::ConnectToService(
     const mojo::String& service_name,
+    const mojo::String& name,
     mojo::ScopedMessagePipeHandle message_pipe) {
   // TODO(darin): Invent some kind of registration system to use here.
   if (service_name.To<base::StringPiece>() == kRendererService_WebUISetup) {
@@ -1358,11 +1354,15 @@ void RenderThreadImpl::OnPurgePluginListCache(bool reload_pages) {
   FOR_EACH_OBSERVER(RenderProcessObserver, observers_, PluginListChanged());
 }
 
-void RenderThreadImpl::OnNetworkStateChanged(bool online) {
+void RenderThreadImpl::OnNetworkStateChanged(
+    bool online,
+    net::NetworkChangeNotifier::ConnectionType type) {
   EnsureWebKitInitialized();
   WebNetworkStateNotifier::setOnLine(online);
-  FOR_EACH_OBSERVER(RenderProcessObserver, observers_,
-      NetworkStateChanged(online));
+  FOR_EACH_OBSERVER(
+      RenderProcessObserver, observers_, NetworkStateChanged(online));
+  WebNetworkStateNotifier::setWebConnectionType(
+      NetConnectionTypeToWebConnectionType(type));
 }
 
 void RenderThreadImpl::OnTempCrashWithData(const GURL& data) {

@@ -71,7 +71,8 @@ class SyncEngine::WorkerObserver : public SyncWorker::Observer {
 
   virtual void OnPendingFileListUpdated(int item_count) OVERRIDE {
     if (ui_task_runner_->RunsTasksOnCurrentThread()) {
-      sync_engine_->OnPendingFileListUpdated(item_count);
+      if (sync_engine_)
+        sync_engine_->OnPendingFileListUpdated(item_count);
       return;
     }
 
@@ -87,8 +88,9 @@ class SyncEngine::WorkerObserver : public SyncWorker::Observer {
                                    SyncAction sync_action,
                                    SyncDirection direction) OVERRIDE {
     if (ui_task_runner_->RunsTasksOnCurrentThread()) {
-      sync_engine_->OnFileStatusChanged(
-          url, file_status, sync_action, direction);
+      if (sync_engine_)
+        sync_engine_->OnFileStatusChanged(
+            url, file_status, sync_action, direction);
       return;
     }
 
@@ -102,7 +104,8 @@ class SyncEngine::WorkerObserver : public SyncWorker::Observer {
   virtual void UpdateServiceState(RemoteServiceState state,
                                   const std::string& description) OVERRIDE {
     if (ui_task_runner_->RunsTasksOnCurrentThread()) {
-      sync_engine_->UpdateServiceState(state, description);
+      if (sync_engine_)
+        sync_engine_->UpdateServiceState(state, description);
       return;
     }
 
@@ -391,14 +394,10 @@ void SyncEngine::SetSyncEnabled(bool enabled) {
 }
 
 void SyncEngine::PromoteDemotedChanges() {
-  MetadataDatabase* metadata_db = GetMetadataDatabase();
-  if (metadata_db && metadata_db->HasLowPriorityDirtyTracker()) {
-    metadata_db->PromoteLowerPriorityTrackersToNormal();
-    FOR_EACH_OBSERVER(
-        Observer,
-        service_observers_,
-        OnRemoteChangeQueueUpdated(metadata_db->CountDirtyTracker()));
-  }
+  worker_task_runner_->PostTask(
+      FROM_HERE,
+      base::Bind(&SyncWorker::PromoteDemotedChanges,
+                 base::Unretained(sync_worker_.get())));
 }
 
 void SyncEngine::ApplyLocalChange(
@@ -417,10 +416,6 @@ void SyncEngine::ApplyLocalChange(
                  url,
                  RelayCallbackToCurrentThread(
                      FROM_HERE, callback)));
-}
-
-SyncTaskManager* SyncEngine::GetSyncTaskManagerForTesting() {
-  return sync_worker_->GetSyncTaskManager();
 }
 
 void SyncEngine::OnNotificationReceived() {
@@ -467,11 +462,6 @@ drive::DriveUploaderInterface* SyncEngine::GetDriveUploader() {
   return drive_uploader_.get();
 }
 
-MetadataDatabase* SyncEngine::GetMetadataDatabase() {
-  // TODO(peria): Post task
-  return sync_worker_->GetMetadataDatabase();
-}
-
 SyncEngine::SyncEngine(
     scoped_ptr<drive::DriveServiceInterface> drive_service,
     scoped_ptr<drive::DriveUploaderInterface> drive_uploader,
@@ -516,11 +506,11 @@ void SyncEngine::UpdateServiceState(RemoteServiceState state,
       OnRemoteServiceStateUpdated(state, description));
 }
 
-void SyncEngine::UpdateRegisteredApps() {
+void SyncEngine::UpdateRegisteredAppsForTesting() {
   if (!extension_service_)
     return;
 
-  MetadataDatabase* metadata_db = GetMetadataDatabase();
+  MetadataDatabase* metadata_db = sync_worker_->GetMetadataDatabase();
   DCHECK(metadata_db);
   std::vector<std::string> app_ids;
   metadata_db->GetRegisteredAppIDs(&app_ids);

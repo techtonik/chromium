@@ -75,6 +75,7 @@ int GetDragSelectionDelay() {
   return 100;
 }
 
+// Get the default command for a given key |event| and selection state.
 int GetCommandForKeyEvent(const ui::KeyEvent& event, bool has_selection) {
   if (event.type() != ui::ET_KEY_PRESSED || event.IsUnicodeKeyCode())
     return kNoCommand;
@@ -147,6 +148,7 @@ int GetCommandForKeyEvent(const ui::KeyEvent& event, bool has_selection) {
 }
 
 #if defined(OS_LINUX) && !defined(OS_CHROMEOS)
+// Convert a custom text edit |command| to the equivalent views command ID.
 int GetViewsCommand(const ui::TextEditCommandAuraLinux& command, bool rtl) {
   const bool select = command.extend_selection();
   switch (command.command_id()) {
@@ -253,10 +255,14 @@ Textfield::Textfield()
       controller_(NULL),
       read_only_(false),
       default_width_in_chars_(0),
-      text_color_(SK_ColorBLACK),
       use_default_text_color_(true),
-      background_color_(SK_ColorWHITE),
       use_default_background_color_(true),
+      use_default_selection_text_color_(true),
+      use_default_selection_background_color_(true),
+      text_color_(SK_ColorBLACK),
+      background_color_(SK_ColorWHITE),
+      selection_text_color_(SK_ColorWHITE),
+      selection_background_color_(SK_ColorBLUE),
       placeholder_text_color_(kDefaultPlaceholderTextColor),
       text_input_type_(ui::TEXT_INPUT_TYPE_TEXT),
       performing_user_action_(false),
@@ -381,6 +387,48 @@ void Textfield::SetBackgroundColor(SkColor color) {
 void Textfield::UseDefaultBackgroundColor() {
   use_default_background_color_ = true;
   UpdateBackgroundColor();
+}
+
+SkColor Textfield::GetSelectionTextColor() const {
+  return use_default_selection_text_color_ ?
+      GetNativeTheme()->GetSystemColor(
+          ui::NativeTheme::kColorId_TextfieldSelectionColor) :
+      selection_text_color_;
+}
+
+void Textfield::SetSelectionTextColor(SkColor color) {
+  selection_text_color_ = color;
+  use_default_selection_text_color_ = false;
+  GetRenderText()->set_selection_color(GetSelectionTextColor());
+  SchedulePaint();
+}
+
+void Textfield::UseDefaultSelectionTextColor() {
+  use_default_selection_text_color_ = true;
+  GetRenderText()->set_selection_color(GetSelectionTextColor());
+  SchedulePaint();
+}
+
+SkColor Textfield::GetSelectionBackgroundColor() const {
+  return use_default_selection_background_color_ ?
+      GetNativeTheme()->GetSystemColor(
+          ui::NativeTheme::kColorId_TextfieldSelectionBackgroundFocused) :
+      selection_background_color_;
+}
+
+void Textfield::SetSelectionBackgroundColor(SkColor color) {
+  selection_background_color_ = color;
+  use_default_selection_background_color_ = false;
+  GetRenderText()->set_selection_background_focused_color(
+      GetSelectionBackgroundColor());
+  SchedulePaint();
+}
+
+void Textfield::UseDefaultSelectionBackgroundColor() {
+  use_default_selection_background_color_ = true;
+  GetRenderText()->set_selection_background_focused_color(
+      GetSelectionBackgroundColor());
+  SchedulePaint();
 }
 
 bool Textfield::GetCursorEnabled() const {
@@ -600,19 +648,15 @@ void Textfield::OnMouseReleased(const ui::MouseEvent& event) {
 
 bool Textfield::OnKeyPressed(const ui::KeyEvent& event) {
   bool handled = controller_ && controller_->HandleKeyEvent(this, event);
-  if (handled)
-    return true;
 
 #if defined(OS_LINUX) && !defined(OS_CHROMEOS)
   ui::TextEditKeyBindingsDelegateAuraLinux* delegate =
       ui::GetTextEditKeyBindingsDelegate();
   std::vector<ui::TextEditCommandAuraLinux> commands;
-  if (delegate) {
-    if (!delegate->MatchEvent(event, &commands))
-      return false;
+  if (!handled && delegate && delegate->MatchEvent(event, &commands)) {
     const bool rtl = GetTextDirection() == base::i18n::RIGHT_TO_LEFT;
     for (size_t i = 0; i < commands.size(); ++i) {
-      int command = GetViewsCommand(commands[i], rtl);
+      const int command = GetViewsCommand(commands[i], rtl);
       if (IsCommandIdEnabled(command)) {
         ExecuteCommand(command);
         handled = true;
@@ -623,11 +667,11 @@ bool Textfield::OnKeyPressed(const ui::KeyEvent& event) {
 #endif
 
   const int command = GetCommandForKeyEvent(event, HasSelection());
-  if (IsCommandIdEnabled(command)) {
+  if (!handled && IsCommandIdEnabled(command)) {
     ExecuteCommand(command);
-    return true;
+    handled = true;
   }
-  return false;
+  return handled;
 }
 
 ui::TextInputClient* Textfield::GetTextInputClient() {
@@ -872,7 +916,7 @@ void Textfield::OnFocus() {
   GetRenderText()->set_focused(true);
   cursor_visible_ = true;
   SchedulePaint();
-  GetInputMethod()->OnTextInputTypeChanged(this);
+  GetInputMethod()->OnFocus();
   OnCaretBoundsChanged();
 
   const size_t caret_blink_ms = Textfield::GetCaretBlinkMs();
@@ -888,7 +932,7 @@ void Textfield::OnFocus() {
 
 void Textfield::OnBlur() {
   GetRenderText()->set_focused(false);
-  GetInputMethod()->OnTextInputTypeChanged(this);
+  GetInputMethod()->OnBlur();
   cursor_repaint_timer_.Stop();
   if (cursor_visible_) {
     cursor_visible_ = false;
@@ -910,11 +954,9 @@ void Textfield::OnNativeThemeChanged(const ui::NativeTheme* theme) {
   render_text->SetColor(GetTextColor());
   UpdateBackgroundColor();
   render_text->set_cursor_color(GetTextColor());
-  render_text->set_selection_color(theme->GetSystemColor(
-      ui::NativeTheme::kColorId_TextfieldSelectionColor));
-  render_text->set_selection_background_focused_color(theme->GetSystemColor(
-      ui::NativeTheme::kColorId_TextfieldSelectionBackgroundFocused));
-
+  render_text->set_selection_color(GetSelectionTextColor());
+  render_text->set_selection_background_focused_color(
+      GetSelectionBackgroundColor());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1120,7 +1162,7 @@ void Textfield::ExecuteCommand(int command_id, int event_flags) {
   bool rtl = GetTextDirection() == base::i18n::RIGHT_TO_LEFT;
   gfx::VisualCursorDirection begin = rtl ? gfx::CURSOR_RIGHT : gfx::CURSOR_LEFT;
   gfx::VisualCursorDirection end = rtl ? gfx::CURSOR_LEFT : gfx::CURSOR_RIGHT;
-  gfx::Range selection_range = GetSelectedRange();
+  gfx::SelectionModel selection_model = GetSelectionModel();
 
   OnBeforeUserAction();
   switch (command_id) {
@@ -1208,7 +1250,7 @@ void Textfield::ExecuteCommand(int command_id, int event_flags) {
       break;
   }
 
-  cursor_changed |= GetSelectedRange() != selection_range;
+  cursor_changed |= GetSelectionModel() != selection_model;
   if (cursor_changed)
     UpdateSelectionClipboard();
   UpdateAfterChange(text_changed, cursor_changed);

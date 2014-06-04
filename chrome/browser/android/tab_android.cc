@@ -13,6 +13,7 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/content_settings/tab_specific_content_settings.h"
 #include "chrome/browser/google/google_url_tracker.h"
+#include "chrome/browser/google/google_url_tracker_factory.h"
 #include "chrome/browser/google/google_util.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/prerender/prerender_contents.h"
@@ -375,7 +376,8 @@ TabAndroid::TabLoadStatus TabAndroid::LoadUrl(JNIEnv* env,
                                               jbyteArray j_post_data,
                                               jint page_transition,
                                               jstring j_referrer_url,
-                                              jint referrer_policy) {
+                                              jint referrer_policy,
+                                              jboolean is_renderer_initiated) {
   content::ContentViewCore* content_view = GetContentViewCore();
   if (!content_view)
     return PAGE_LOAD_FAILED;
@@ -413,7 +415,10 @@ TabAndroid::TabLoadStatus TabAndroid::LoadUrl(JNIEnv* env,
     // infobar.
     if (google_util::IsGoogleSearchUrl(fixed_url) &&
         (page_transition & content::PAGE_TRANSITION_GENERATED)) {
-      GoogleURLTracker::GoogleURLSearchCommitted(GetProfile());
+      GoogleURLTracker* tracker =
+          GoogleURLTrackerFactory::GetForProfile(GetProfile());
+      if (tracker)
+        tracker->SearchCommitted();
     }
 
     // Record UMA "ShowHistory" here. That way it'll pick up both user
@@ -452,6 +457,7 @@ TabAndroid::TabLoadStatus TabAndroid::LoadUrl(JNIEnv* env,
       search_tab_helper->Submit(search_terms);
       return DEFAULT_PAGE_LOAD;
     }
+    load_params.is_renderer_initiated = is_renderer_initiated;
     content_view->LoadUrl(load_params);
   }
   return DEFAULT_PAGE_LOAD;

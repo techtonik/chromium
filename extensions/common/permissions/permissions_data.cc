@@ -433,12 +433,6 @@ bool PermissionsData::HasEffectiveAccessToAllHosts(const Extension* extension) {
 }
 
 // static
-bool PermissionsData::ShouldWarnAllHosts(const Extension* extension) {
-  base::AutoLock auto_lock(extension->permissions_data()->runtime_lock_);
-  return GetActivePermissions(extension)->ShouldWarnAllHosts();
-}
-
-// static
 PermissionMessages PermissionsData::GetPermissionMessages(
     const Extension* extension) {
   base::AutoLock auto_lock(extension->permissions_data()->runtime_lock_);
@@ -580,16 +574,23 @@ bool PermissionsData::CanCaptureVisiblePage(const Extension* extension,
 
 // static
 bool PermissionsData::RequiresActionForScriptExecution(
+    const Extension* extension) {
+  return RequiresActionForScriptExecution(extension, -1, GURL());
+}
+
+// static
+bool PermissionsData::RequiresActionForScriptExecution(
     const Extension* extension,
     int tab_id,
     const GURL& url) {
   // For now, the user should be notified when an extension with all hosts
-  // permission tries to execute a script on a page, with exceptions for policy-
-  // enabled and component extensions. If this doesn't meet those criteria,
-  // return immediately.
+  // permission tries to execute a script on a page. Exceptions for policy-
+  // enabled and component extensions, and extensions which are whitelisted to
+  // execute scripts everywhere.
   if (!extension->ShouldDisplayInExtensionSettings() ||
       Manifest::IsPolicyLocation(extension->location()) ||
       Manifest::IsComponentLocation(extension->location()) ||
+      CanExecuteScriptEverywhere(extension) ||
       !ShouldWarnAllHosts(extension)) {
     return false;
   }
@@ -651,6 +652,11 @@ void PermissionsData::FinalizePermissions(Extension* extension) {
 
   initial_required_permissions_.reset();
   initial_optional_permissions_.reset();
+}
+
+bool PermissionsData::ShouldWarnAllHosts(const Extension* extension) {
+  base::AutoLock auto_lock(extension->permissions_data()->runtime_lock_);
+  return PermissionsData::GetActivePermissions(extension)->ShouldWarnAllHosts();
 }
 
 }  // namespace extensions

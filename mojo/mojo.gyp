@@ -51,6 +51,7 @@
         'mojo_service_manager_unittests',
         'mojo_shell',
         'mojo_shell_lib',
+        'mojo_shell_tests',
         'mojo_system',
         'mojo_system_impl',
         'mojo_system_unittests',
@@ -62,8 +63,11 @@
         ['use_aura==1', {
           'dependencies': [
             'mojo_aura_demo',
+            'mojo_aura_demo_init',
             'mojo_launcher',
-            'mojo_sample_view_manager_app',
+            'mojo_demo_launcher',
+            'mojo_embedded_app',
+            'mojo_window_manager',
             'mojo_view_manager',
             'mojo_view_manager_unittests',
           ],
@@ -91,9 +95,6 @@
       'sources': [
         'shell/external_service.mojom',
       ],
-      'variables': {
-        'mojom_base_output_dir': 'mojo',
-      },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
         'mojo_cpp_bindings',
@@ -154,6 +155,8 @@
         'embedder/platform_handle.cc',
         'embedder/platform_handle.h',
         'embedder/platform_handle_utils.h',
+        'embedder/platform_handle_utils_posix.cc',
+        'embedder/platform_handle_utils_win.cc',
         'embedder/platform_handle_vector.h',
         'embedder/scoped_platform_handle.h',
         'system/channel.cc',
@@ -244,6 +247,7 @@
         'system/data_pipe_unittest.cc',
         'system/dispatcher_unittest.cc',
         'system/local_data_pipe_unittest.cc',
+        'system/memory_unittest.cc',
         'system/message_pipe_dispatcher_unittest.cc',
         'system/message_pipe_unittest.cc',
         'system/multiprocess_message_pipe_unittest.cc',
@@ -378,7 +382,6 @@
       ],
       'sources': [
         'environment/default_async_waiter.cc',
-        'environment/buffer_tls.cc',
         'environment/environment.cc',
       ],
       'include_dirs': [
@@ -402,8 +405,6 @@
       'sources': [
         'environment/default_async_waiter_impl.cc',
         'environment/default_async_waiter_impl.h',
-        'environment/buffer_tls_impl.cc',
-        'environment/buffer_tls_impl.h',
       ],
       'include_dirs': [
         '..',
@@ -472,9 +473,6 @@
         'mojo_native_viewport_service',
         'mojo_spy',
       ],
-      'variables': {
-        'mojom_base_output_dir': 'mojo',
-      },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'sources': [
         'shell/app_child_process.cc',
@@ -578,6 +576,29 @@
       ],
     },
     {
+      'target_name': 'mojo_shell_tests',
+      'type': 'executable',
+      'dependencies': [
+        '../base/base.gyp:base',
+        '../base/base.gyp:test_support_base',
+        '../testing/gtest.gyp:gtest',
+        # TODO(vtl): We don't currently need this, but I imagine we will soon.
+        # '../ui/gl/gl.gyp:gl',
+        '../url/url.gyp:url_lib',
+        'mojo_common_lib',
+        'mojo_environment_chromium',
+        'mojo_service_manager',
+        'mojo_shell_lib',
+        'mojo_system_impl',
+      ],
+      'sources': [
+        'shell/child_process_host_unittest.cc',
+        'shell/shell_test_base.cc',
+        'shell/shell_test_base.h',
+        'shell/shell_test_main.cc',
+      ],
+    },
+    {
       'target_name': 'mojo_service_manager_unittests',
       'type': 'executable',
       'dependencies': [
@@ -591,9 +612,6 @@
         'mojo_service_manager',
         'mojo_application',
       ],
-      'variables': {
-        'mojom_base_output_dir': 'mojo',
-      },
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'sources': [
         'service_manager/service_manager_unittest.cc',

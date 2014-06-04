@@ -34,11 +34,9 @@ class InfoBar;
 // change, and if necessary prompting the user to see if they want to change to
 // using it.  The current and last prompted values are saved to prefs.
 //
-// Most consumers should only call GoogleURL(), which is guaranteed to
-// synchronously return a value at all times (even during startup or in unittest
-// mode).  Consumers who need to be notified when things change should register
-// a callback that provides the original and updated values via
-// RegisterCallback().
+// Most consumers should only call google_url().  Consumers who need to be
+// notified when things change should register a callback that provides the
+// original and updated values via RegisterCallback().
 //
 // To protect users' privacy and reduce server load, no updates will be
 // performed (ever) unless at least one consumer registers interest by calling
@@ -61,22 +59,16 @@ class GoogleURLTracker : public net::URLFetcherDelegate,
   };
 
   static const char kDefaultGoogleHomepage[];
-  static const char kSearchDomainCheckURL[];
 
-  // Only the GoogleURLTrackerFactory and tests should call this.  No code other
-  // than the GoogleURLTracker itself should actually use
-  // GoogleURLTrackerFactory::GetForProfile().
+  // Only the GoogleURLTrackerFactory and tests should call this.
   GoogleURLTracker(Profile* profile,
                    scoped_ptr<GoogleURLTrackerClient> client,
                    Mode mode);
 
   virtual ~GoogleURLTracker();
 
-  // Returns the current Google URL.  This will return a valid URL even if
-  // |profile| is NULL or a testing profile.
-  //
-  // This is the only function most code should ever call.
-  static GURL GoogleURL(Profile* profile);
+  // Returns the current Google homepage URL.
+  const GURL& google_url() const { return google_url_; }
 
   // Requests that the tracker perform a server check to update the Google URL
   // as necessary.  If |force| is false, this will happen at most once per
@@ -85,44 +77,40 @@ class GoogleURLTracker : public net::URLFetcherDelegate,
   // will occur immediately, if no other checks have been made during this run).
   // If |force| is true, and the tracker has already performed any requested
   // check, it will check again.
-  //
-  // When |profile| is NULL or a testing profile, this function does nothing.
-  static void RequestServerCheck(Profile* profile, bool force);
+  void RequestServerCheck(bool force);
 
   // Notifies the tracker that the user has started a Google search.
   // If prompting is necessary, we then listen for the subsequent pending
-  // navigation to get the appropriate NavigationController. When the load
+  // navigation to get the appropriate NavigationHelper. When the load
   // commits, we'll show the infobar.
-  //
-  // When |profile| is NULL or a testing profile, this function does nothing.
-  static void GoogleURLSearchCommitted(Profile* profile);
+  void SearchCommitted();
 
   // No one but GoogleURLTrackerInfoBarDelegate or test code should call these.
   void AcceptGoogleURL(bool redo_searches);
   void CancelGoogleURL();
-  const GURL& google_url() const { return google_url_; }
   const GURL& fetched_google_url() const { return fetched_google_url_; }
 
   // No one but GoogleURLTrackerMapEntry should call this.
-  void DeleteMapEntryForService(const InfoBarService* infobar_service);
+  void DeleteMapEntryForManager(
+      const infobars::InfoBarManager* infobar_manager);
 
-  // Called by the client after SearchCommitted() registers listeners, to
-  // indicate that we've received the "load now pending" notification.
+  // Called by the client after SearchCommitted() registers listeners,
+  // to indicate that we've received the "load now pending" notification.
   // |nav_helper| is the GoogleURLTrackerNavigationHelper associated with this
-  // navigation; |infobar_service| is the InfoBarService of the associated tab;
+  // navigation; |infobar_manager| is the InfoBarManager of the associated tab;
   // and |pending_id| is the unique ID of the newly pending NavigationEntry.
   // If there is already a visible GoogleURLTracker infobar for this tab, this
   // function resets its associated pending entry ID to the new ID.  Otherwise
   // this function creates a map entry for the associated tab.
   virtual void OnNavigationPending(
       scoped_ptr<GoogleURLTrackerNavigationHelper> nav_helper,
-      InfoBarService* infobar_service,
+      infobars::InfoBarManager* infobar_manager,
       int pending_id);
 
   // Called by the navigation observer once a load we're watching commits.
-  // |infobar_service| is the same as for OnNavigationPending();
+  // |infobar_manager| is the same as for OnNavigationPending();
   // |search_url| is guaranteed to be valid.
-  virtual void OnNavigationCommitted(InfoBarService* infobar_service,
+  virtual void OnNavigationCommitted(infobars::InfoBarManager* infobar_manager,
                                      const GURL& search_url);
 
   // Called by the navigation observer when a tab closes.
@@ -133,8 +121,12 @@ class GoogleURLTracker : public net::URLFetcherDelegate,
 
  private:
   friend class GoogleURLTrackerTest;
+  friend class SyncTest;
 
-  typedef std::map<const InfoBarService*, GoogleURLTrackerMapEntry*> EntryMap;
+  typedef std::map<const infobars::InfoBarManager*, GoogleURLTrackerMapEntry*>
+      EntryMap;
+
+  static const char kSearchDomainCheckURL[];
 
   // net::URLFetcherDelegate:
   virtual void OnURLFetchComplete(const net::URLFetcher* source) OVERRIDE;
@@ -158,11 +150,6 @@ class GoogleURLTracker : public net::URLFetcherDelegate,
   // it and can currently do so.
   void StartFetchIfDesirable();
 
-  // Called each time the user performs a search.  This checks whether we need
-  // to prompt the user about a domain change, and if so, starts listening for
-  // the notifications sent when the actual load is triggered.
-  void SearchCommitted();
-
   // Closes all map entries.  If |redo_searches| is true, this also triggers
   // each tab with an infobar to re-perform the user's search, but on the new
   // Google TLD.
@@ -185,13 +172,6 @@ class GoogleURLTracker : public net::URLFetcherDelegate,
   Profile* profile_;
 
   scoped_ptr<GoogleURLTrackerClient> client_;
-
-  // Creates an infobar and adds it to the provided InfoBarService.  Returns the
-  // infobar on success or NULL on failure.  The caller does not own the
-  // returned object, the InfoBarService does.
-  base::Callback<
-      infobars::InfoBar*(InfoBarService*, GoogleURLTracker*, const GURL&)>
-      infobar_creator_;
 
   GURL google_url_;
   GURL fetched_google_url_;

@@ -24,11 +24,9 @@ namespace metrics {
 // This class provides base functionality for logging metrics data.
 class MetricsLogBase {
  public:
-  // TODO(asvitkine): Remove the NO_LOG value.
   enum LogType {
     INITIAL_STABILITY_LOG,  // The initial log containing stability stats.
     ONGOING_LOG,            // Subsequent logs in a session.
-    NO_LOG,                 // Placeholder value for when there is no log.
   };
 
   // Creates a new metrics log of the specified type.
@@ -73,11 +71,6 @@ class MetricsLogBase {
   int num_events() const {
     return uma_proto_.omnibox_event_size() +
            uma_proto_.user_action_event_size();
-  }
-
-  void set_hardware_class(const std::string& hardware_class) {
-    uma_proto_.mutable_system_profile()->mutable_hardware()->set_hardware_class(
-        hardware_class);
   }
 
   LogType log_type() const { return log_type_; }

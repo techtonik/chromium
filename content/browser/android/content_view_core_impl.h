@@ -88,7 +88,8 @@ class ContentViewCoreImpl : public ContentViewCore,
       jbyteArray post_data,
       jstring base_url_for_data_url,
       jstring virtual_url_for_data_url,
-      jboolean can_load_local_resources);
+      jboolean can_load_local_resources,
+      jboolean is_renderer_initiated);
   base::android::ScopedJavaLocalRef<jstring> GetURL(JNIEnv* env, jobject) const;
   jboolean IsIncognito(JNIEnv* env, jobject obj);
   void SendOrientationChangeEvent(JNIEnv* env, jobject obj, jint orientation);
@@ -218,6 +219,8 @@ class ContentViewCoreImpl : public ContentViewCore,
                             jint y,
                             jint width,
                             jint height);
+
+  void SetBackgroundOpaque(JNIEnv* env, jobject jobj, jboolean opaque);
 
   jint GetCurrentRenderProcessId(JNIEnv* env, jobject obj);
 

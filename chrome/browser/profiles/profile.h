@@ -15,9 +15,9 @@
 #include "components/domain_reliability/clear_mode.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/content_browser_client.h"
-#include "net/url_request/url_request_job_factory.h"
 
 class ChromeAppCacheService;
+class DevToolsNetworkController;
 class ExtensionService;
 class ExtensionSpecialStoragePolicy;
 class FaviconService;
@@ -265,7 +265,7 @@ class Profile : public content::BrowserContext {
   // TODO(ajwong): Remove once http://crbug.com/159193 is resolved.
   virtual net::URLRequestContextGetter* CreateRequestContext(
       content::ProtocolHandlerMap* protocol_handlers,
-      content::ProtocolHandlerScopedVector protocol_interceptors) = 0;
+      content::URLRequestInterceptorScopedVector request_interceptors) = 0;
 
   // Creates the net::URLRequestContextGetter for a StoragePartition. Should
   // only be called once per partition_path per ContentBrowserClient object.
@@ -277,7 +277,7 @@ class Profile : public content::BrowserContext {
       const base::FilePath& partition_path,
       bool in_memory,
       content::ProtocolHandlerMap* protocol_handlers,
-      content::ProtocolHandlerScopedVector protocol_interceptors) = 0;
+      content::URLRequestInterceptorScopedVector request_interceptors) = 0;
 
   // Returns the last directory that was chosen for uploading or opening a file.
   virtual base::FilePath last_selected_directory() = 0;
@@ -312,6 +312,9 @@ class Profile : public content::BrowserContext {
 
   // Returns the Predictor object used for dns prefetch.
   virtual chrome_browser_net::Predictor* GetNetworkPredictor() = 0;
+
+  // Returns the DevToolsNetworkController for this profile.
+  virtual DevToolsNetworkController* GetDevToolsNetworkController() = 0;
 
   // Deletes all network related data since |time|. It deletes transport
   // security state since |time| and it also deletes HttpServerProperties data.

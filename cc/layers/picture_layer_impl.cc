@@ -39,6 +39,9 @@ const float kCpuSkewportTargetTimeInFrames = 60.0f;
 // Don't pre-rasterize on the GPU (except for kBackflingGuardDistancePixels in
 // TileManager::BinFromTilePriority).
 const float kGpuSkewportTargetTimeInFrames = 0.0f;
+
+// Minimum width/height of a layer that would require analysis for tiles.
+const int kMinDimensionsForAnalysis = 256;
 }  // namespace
 
 namespace cc {
@@ -552,8 +555,26 @@ scoped_refptr<Tile> PictureLayerImpl::CreateTile(PictureLayerTiling* tiling,
   int flags = 0;
   if (is_using_lcd_text_)
     flags |= Tile::USE_LCD_TEXT;
-  if (layer_tree_impl()->use_gpu_rasterization())
-    flags |= Tile::USE_GPU_RASTERIZATION;
+
+  // We analyze picture before rasterization to detect solid-color tiles.
+  // If the tile is detected as such there is no need to raster or upload.
+  // It is drawn directly as a solid-color quad saving memory, raster and upload
+  // cost. The analysis step is however expensive and may not be justified when
+  // doing gpu rasterization which runs on the compositor thread and where there
+  // is no upload.
+  // TODO(alokp): Revisit the decision to avoid analysis for gpu rasterization
+  // becuase it too can potentially benefit from memory savings.
+  if (!layer_tree_impl()->use_gpu_rasterization()) {
+    // Additionally, we do not want to do the analysis if the layer is too
+    // narrow, since more likely than not the tile would not be solid. Note that
+    // this last optimization is a heuristic that ensures that we don't spend
+    // too much time analyzing tiles on a multitude of small layers, as it is
+    // likely that these layers have some non-solid content.
+    int min_dimension = std::min(bounds().width(), bounds().height());
+    if (min_dimension >= kMinDimensionsForAnalysis)
+      flags |= Tile::USE_PICTURE_ANALYSIS;
+  }
+
   return layer_tree_impl()->tile_manager()->CreateTile(
       pile_.get(),
       content_rect.size(),
@@ -841,26 +862,28 @@ void PictureLayerImpl::MarkVisibleResourcesAsRequired() const {
   const PictureLayerTiling* twin_high_res = NULL;
   const PictureLayerTiling* twin_low_res = NULL;
 
-  // As a simplification, only allow activating to skip twin tiles that the
-  // active layer is also missing when both this layer and its twin have 2
-  // tilings (high and low).  This avoids having to iterate/track coverage of
-  // non-ideal tilings during the last draw call on the active layer.
-  if (high_res && low_res && tilings_->num_tilings() == 2 &&
-      twin_layer_ && twin_layer_->tilings_->num_tilings() == 2) {
-    twin_low_res = GetTwinTiling(low_res);
-    if (twin_low_res)
-      twin_high_res = GetTwinTiling(high_res);
-  }
-  // If this layer and its twin have different bounds or transforms, then don't
-  // compare them and only allow activating to high res tiles, since tiles on
-  // each layer will occupy different areas of the screen.
-  if (!twin_high_res || !twin_low_res ||
-      twin_layer_->layer_tree_impl()->RequiresHighResToDraw() ||
-      bounds() != twin_layer_->bounds() ||
-      draw_properties().screen_space_transform !=
-          twin_layer_->draw_properties().screen_space_transform) {
-    twin_high_res = NULL;
-    twin_low_res = NULL;
+  if (twin_layer_) {
+    // As a simplification, only allow activating to skip twin tiles that the
+    // active layer is also missing when both this layer and its twin have
+    // "simple" sets of tilings: only 2 tilings (high and low) or only 1 high
+    // res tiling. This avoids having to iterate/track coverage of non-ideal
+    // tilings during the last draw call on the active layer.
+    if (tilings_->num_tilings() <= 2 &&
+        twin_layer_->tilings_->num_tilings() <= tilings_->num_tilings()) {
+      twin_low_res = low_res ? GetTwinTiling(low_res) : NULL;
+      twin_high_res = high_res ? GetTwinTiling(high_res) : NULL;
+    }
+
+    // If this layer and its twin have different transforms, then don't compare
+    // them and only allow activating to high res tiles, since tiles on each
+    // layer will be in different places on screen.
+    if (twin_layer_->layer_tree_impl()->RequiresHighResToDraw() ||
+        bounds() != twin_layer_->bounds() ||
+        draw_properties().screen_space_transform !=
+            twin_layer_->draw_properties().screen_space_transform) {
+      twin_high_res = NULL;
+      twin_low_res = NULL;
+    }
   }
 
   // As a second pass, mark as required any visible high res tiles not filled in
@@ -870,9 +893,11 @@ void PictureLayerImpl::MarkVisibleResourcesAsRequired() const {
     // As an optional third pass, if a high res tile was skipped because its
     // twin was also missing, then fall back to mark low res tiles as required
     // in case the active twin is substituting those for missing high res
-    // content.
-    MarkVisibleTilesAsRequired(
-        low_res, twin_low_res, contents_scale_x(), rect, missing_region);
+    // content. Only suitable, when low res is enabled.
+    if (low_res) {
+      MarkVisibleTilesAsRequired(
+          low_res, twin_low_res, contents_scale_x(), rect, missing_region);
+    }
   }
 }
 

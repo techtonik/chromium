@@ -73,7 +73,7 @@
 #include "extensions/renderer/user_script_slave.h"
 #include "extensions/renderer/utils_native_handler.h"
 #include "extensions/renderer/v8_context_native_handler.h"
-#include "grit/renderer_resources.h"
+#include "grit/extensions_renderer_resources.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebURLRequest.h"
 #include "third_party/WebKit/public/web/WebCustomElement.h"
@@ -461,6 +461,7 @@ bool Dispatcher::OnControlMessageReceived(const IPC::Message& message) {
   IPC_MESSAGE_HANDLER(ExtensionMsg_SetSystemFont, OnSetSystemFont)
   IPC_MESSAGE_HANDLER(ExtensionMsg_ShouldSuspend, OnShouldSuspend)
   IPC_MESSAGE_HANDLER(ExtensionMsg_Suspend, OnSuspend)
+  IPC_MESSAGE_HANDLER(ExtensionMsg_TransferBlobs, OnTransferBlobs)
   IPC_MESSAGE_HANDLER(ExtensionMsg_Unloaded, OnUnloaded)
   IPC_MESSAGE_HANDLER(ExtensionMsg_UpdatePermissions, OnUpdatePermissions)
   IPC_MESSAGE_HANDLER(ExtensionMsg_UpdateTabSpecificPermissions,
@@ -680,6 +681,10 @@ void Dispatcher::OnSuspend(const std::string& extension_id) {
   RenderThread::Get()->Send(new ExtensionHostMsg_SuspendAck(extension_id));
 }
 
+void Dispatcher::OnTransferBlobs(const std::vector<std::string>& blob_uuids) {
+  RenderThread::Get()->Send(new ExtensionHostMsg_TransferBlobsAck(blob_uuids));
+}
+
 void Dispatcher::OnUnloaded(const std::string& id) {
   extensions_.Remove(id);
   active_extension_ids_.erase(id);
@@ -759,9 +764,24 @@ void Dispatcher::OnUpdateTabSpecificPermissions(
       this, page_id, tab_id, extension_id, origin_set);
 }
 
-void Dispatcher::OnUpdateUserScripts(base::SharedMemoryHandle scripts) {
-  DCHECK(base::SharedMemory::IsHandleValid(scripts)) << "Bad scripts handle";
-  user_script_slave_->UpdateScripts(scripts);
+void Dispatcher::OnUpdateUserScripts(
+    base::SharedMemoryHandle scripts,
+    const std::set<std::string>& extension_ids) {
+  if (!base::SharedMemory::IsHandleValid(scripts)) {
+    NOTREACHED() << "Bad scripts handle";
+    return;
+  }
+
+  for (std::set<std::string>::const_iterator iter = extension_ids.begin();
+       iter != extension_ids.end();
+       ++iter) {
+    if (!Extension::IdIsValid(*iter)) {
+      NOTREACHED() << "Invalid extension id: " << *iter;
+      return;
+    }
+  }
+
+  user_script_slave_->UpdateScripts(scripts, extension_ids);
   UpdateActiveExtensions();
 }
 

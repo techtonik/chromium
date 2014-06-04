@@ -43,10 +43,6 @@ namespace content {
 // static
 BrowserPluginHostFactory* BrowserPluginGuest::factory_ = NULL;
 
-namespace {
-
-}  // namespace
-
 class BrowserPluginGuest::EmbedderWebContentsObserver
     : public WebContentsObserver {
  public:
@@ -58,11 +54,7 @@ class BrowserPluginGuest::EmbedderWebContentsObserver
   virtual ~EmbedderWebContentsObserver() {
   }
 
-  // WebContentsObserver:
-  virtual void WebContentsDestroyed() OVERRIDE {
-    browser_plugin_guest_->EmbedderDestroyed();
-  }
-
+  // WebContentsObserver implementation.
   virtual void WasShown() OVERRIDE {
     browser_plugin_guest_->EmbedderVisibilityChanged(true);
   }
@@ -99,13 +91,15 @@ BrowserPluginGuest::BrowserPluginGuest(
       last_text_input_type_(ui::TEXT_INPUT_TYPE_NONE),
       last_input_mode_(ui::TEXT_INPUT_MODE_DEFAULT),
       last_can_compose_inline_(true),
+      delegate_(NULL),
       weak_ptr_factory_(this) {
   DCHECK(web_contents);
 }
 
-void BrowserPluginGuest::WillDestroy(WebContents* web_contents) {
-  DCHECK_EQ(web_contents, GetWebContents());
+void BrowserPluginGuest::WillDestroy() {
   is_in_destruction_ = true;
+  embedder_web_contents_ = NULL;
+  delegate_ = NULL;
 }
 
 base::WeakPtr<BrowserPluginGuest> BrowserPluginGuest::AsWeakPtr() {
@@ -117,13 +111,6 @@ bool BrowserPluginGuest::LockMouse(bool allowed) {
     return false;
 
   return embedder_web_contents()->GotResponseToLockMouseRequest(allowed);
-}
-
-void BrowserPluginGuest::EmbedderDestroyed() {
-  embedder_web_contents_ = NULL;
-  if (delegate_)
-    delegate_->EmbedderDestroyed();
-  Destroy();
 }
 
 void BrowserPluginGuest::Destroy() {
@@ -301,7 +288,7 @@ BrowserPluginGuest* BrowserPluginGuest::Create(
     delegate->RegisterDestructionCallback(
         base::Bind(&BrowserPluginGuest::WillDestroy,
                    base::Unretained(guest)));
-    guest->SetDelegate(delegate);
+    guest->set_delegate(delegate);
   }
   return guest;
 }
@@ -355,11 +342,6 @@ void BrowserPluginGuest::EmbedderVisibilityChanged(bool visible) {
   UpdateVisibility();
 }
 
-void BrowserPluginGuest::SetZoom(double zoom_factor) {
-  if (delegate_)
-    delegate_->SetZoom(zoom_factor);
-}
-
 void BrowserPluginGuest::PointerLockPermissionResponse(bool allow) {
   SendMessageToEmbedder(
       new BrowserPluginMsg_SetMouseLock(instance_id(), allow));
@@ -407,11 +389,6 @@ void BrowserPluginGuest::EndSystemDrag() {
   guest_rvh->DragSourceSystemDragEnded();
 }
 
-void BrowserPluginGuest::SetDelegate(BrowserPluginGuestDelegate* delegate) {
-  DCHECK(!delegate_);
-  delegate_.reset(delegate);
-}
-
 void BrowserPluginGuest::SendQueuedMessages() {
   if (!attached())
     return;
@@ -433,24 +410,8 @@ void BrowserPluginGuest::DidCommitProvisionalLoadForFrame(
   RecordAction(base::UserMetricsAction("BrowserPlugin.Guest.DidNavigate"));
 }
 
-void BrowserPluginGuest::DidStopLoading(RenderViewHost* render_view_host) {
-  bool enable_dragdrop = delegate_ && delegate_->IsDragAndDropEnabled();
-  if (!enable_dragdrop) {
-    // Initiating a drag from inside a guest is currently not supported without
-    // the kEnableBrowserPluginDragDrop flag on a linux platform. So inject some
-    // JS to disable it. http://crbug.com/161112
-    const char script[] = "window.addEventListener('dragstart', function() { "
-                          "  window.event.preventDefault(); "
-                          "});";
-    render_view_host->GetMainFrame()->ExecuteJavaScript(
-        base::ASCIIToUTF16(script));
-  }
-}
-
 void BrowserPluginGuest::RenderViewReady() {
   RenderViewHost* rvh = GetWebContents()->GetRenderViewHost();
-  // The guest RenderView should always live in a guest process.
-  CHECK(rvh->GetProcess()->IsGuest());
   // TODO(fsamuel): Investigate whether it's possible to update state earlier
   // here (see http://crbug.com/158151).
   Send(new InputMsg_SetFocus(routing_id(), focused_));

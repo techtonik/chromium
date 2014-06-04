@@ -100,9 +100,6 @@ const char kAppModeAuthCode[]               = "app-mode-auth-code";
 // Value of OAuth2 refresh token for --force-app-mode.
 const char kAppModeOAuth2Token[]            = "app-mode-oauth-token";
 
-// Experimental native frame support for packaged apps.
-const char kAppsUseNativeFrame[]            = "apps-use-native-frame";
-
 // Enables overriding the path for the default authentication extension.
 const char kAuthExtensionPath[]             = "auth-ext-path";
 
@@ -525,9 +522,6 @@ const char kEnableNaCl[]                    = "enable-nacl";
 // Enables the network-related benchmarking extensions.
 const char kEnableNetBenchmarking[]         = "enable-net-benchmarking";
 
-// Enables |NetworkTimeService| to convert local time to network time.
-const char kEnableNetworkTime[]             = "enable-network-time";
-
 // Enables NPN with HTTP. It means NPN is enabled but SPDY won't be used.
 // HTTP is still used for all requests.
 const char kEnableNpnHttpOnly[]             = "enable-npn-http";
@@ -567,6 +561,9 @@ const char kEnablePrivetStorage[]           = "enable-privet-storage";
 // Some tracking will still take place at startup, but it will be turned off
 // during chrome_browser_main.
 const char kEnableProfiling[]               = "enable-profiling";
+
+// Enables showing a prominent UI for initiating the URL app creation flow.
+const char kEnableProminentURLAppFlow[]     = "enable-prominent-url-app-flow";
 
 // Enables query in the omnibox.
 const char kEnableQueryExtraction[]         = "enable-query-extraction";
@@ -628,9 +625,6 @@ const char kEnableSpellingAutoCorrect[]     = "enable-spelling-auto-correct";
 // service.
 const char kEnableSpellingFeedbackFieldTrial[] =
     "enable-spelling-feedback-field-trial";
-
-// Enables the stacked tabstrip.
-const char kEnableStackedTabStrip[]         = "enable-stacked-tab-strip";
 
 // Enables an experimental hosted app experience.
 const char kEnableStreamlinedHostedApps[]   = "enable-streamlined-hosted-apps";
@@ -703,11 +697,6 @@ const char kFastStart[]            = "fast-start";
 const char kFlagSwitchesBegin[]             = "flag-switches-begin";
 const char kFlagSwitchesEnd[]               = "flag-switches-end";
 
-// The file descriptor limit is set to the value of this switch, subject to the
-// OS hard limits. Useful for testing that file descriptor exhaustion is
-// handled gracefully.
-const char kFileDescriptorLimit[]           = "file-descriptor-limit";
-
 // Forces application mode. This hides certain system UI elements and forces
 // the app to be installed if it hasn't been already.
 const char kForceAppMode[]                  = "force-app-mode";
@@ -720,9 +709,6 @@ const char kForceFirstRun[]                 = "force-first-run";
 // header, specified as a 64-bit encoded list of numeric experiment ids. Ids
 // prefixed with the character "t" will be treated as Trigger Variation Ids.
 const char kForceVariationIds[]             = "force-variation-ids";
-
-// Specifies an alternate URL to use for speaking to Google. Useful for testing.
-const char kGoogleBaseURL[]                 = "google-base-url";
 
 // Specifies a custom name for the GSSAPI library to load.
 const char kGSSAPILibraryName[]             = "gssapi-library-name";
@@ -1068,10 +1054,6 @@ const char kRendererPrintPreview[]          = "renderer-print-preview";
 // list hasn't been enabled (as in kEnableAppList) yet.
 const char kResetAppListInstallState[]      = "reset-app-list-install-state";
 
-// Forces a reset of the one-time-randomized FieldTrials on this client, also
-// known as the Chrome Variations state.
-const char kResetVariationState[]           = "reset-variation-state";
-
 // Indicates the last session should be restored on startup. This overrides the
 // preferences value and is primarily intended for testing. The value of this
 // switch is the number of tabs to wait until loaded before 'load completed' is
@@ -1269,6 +1251,9 @@ const char kPluginsMetadataServerURL[]      = "plugins-metadata-server-url";
 // Disables support for playing videos on Chromecast devices.
 const char kDisableCast[]                    = "disable-cast";
 
+// Disables Contextual Search.
+const char kDisableContextualSearch[]        = "disable-contextual-search";
+
 // Disables the new NTP.
 const char kDisableNewNTP[]                  = "disable-new-ntp";
 
@@ -1282,8 +1267,8 @@ const char kEnableAccessibilityTabSwitcher[] =
 // Enables app install alerts.
 const char kEnableAppInstallAlerts[]        = "enable-app-install-alerts";
 
-// Enables Contextual Search
-const char kEnableContextualSearch[]        = "contextual-search";
+// Enables Contextual Search.
+const char kEnableContextualSearch[]        = "enable-contextual-search";
 
 // Enables the new NTP.
 const char kEnableNewNTP[]                  = "enable-new-ntp";

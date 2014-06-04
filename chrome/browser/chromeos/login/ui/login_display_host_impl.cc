@@ -158,7 +158,7 @@ void DetermineAndSaveHardwareKeyboard(const std::string& locale,
   if (!layout.empty()) {
     std::vector<std::string> layouts;
     base::SplitString(layout, ',', &layouts);
-    manager->MigrateXkbInputMethods(&layouts);
+    manager->MigrateInputMethods(&layouts);
 
     PrefService* prefs = g_browser_process->local_state();
     prefs->SetString(prefs::kHardwareKeyboardLayout, JoinString(layouts, ","));
@@ -910,14 +910,14 @@ void LoginDisplayHostImpl::OnKeyboardBoundsChanging(
     if (GetOobeUI()) {
       GetOobeUI()->GetCoreOobeActor()->ShowControlBar(true);
       if (login::LoginScrollIntoViewEnabled())
-        GetOobeUI()->GetCoreOobeActor()->SetKeyboardState(false);
+        GetOobeUI()->GetCoreOobeActor()->SetKeyboardState(false, new_bounds);
     }
   } else if (!new_bounds.IsEmpty() && keyboard_bounds_.IsEmpty()) {
     // Keyboard has been shown.
     if (GetOobeUI()) {
       GetOobeUI()->GetCoreOobeActor()->ShowControlBar(false);
       if (login::LoginScrollIntoViewEnabled())
-        GetOobeUI()->GetCoreOobeActor()->SetKeyboardState(true);
+        GetOobeUI()->GetCoreOobeActor()->SetKeyboardState(true, new_bounds);
     }
   }
 

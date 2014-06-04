@@ -283,9 +283,9 @@ net::URLRequestContextGetter* OffTheRecordProfileImpl::GetRequestContext() {
 
 net::URLRequestContextGetter* OffTheRecordProfileImpl::CreateRequestContext(
     content::ProtocolHandlerMap* protocol_handlers,
-    content::ProtocolHandlerScopedVector protocol_interceptors) {
+    content::URLRequestInterceptorScopedVector request_interceptors) {
   return io_data_->CreateMainRequestContextGetter(
-      protocol_handlers, protocol_interceptors.Pass()).get();
+      protocol_handlers, request_interceptors.Pass()).get();
 }
 
 net::URLRequestContextGetter*
@@ -387,12 +387,12 @@ OffTheRecordProfileImpl::CreateRequestContextForStoragePartition(
     const base::FilePath& partition_path,
     bool in_memory,
     content::ProtocolHandlerMap* protocol_handlers,
-    content::ProtocolHandlerScopedVector protocol_interceptors) {
+    content::URLRequestInterceptorScopedVector request_interceptors) {
   return io_data_->CreateIsolatedAppRequestContextGetter(
       partition_path,
       in_memory,
       protocol_handlers,
-      protocol_interceptors.Pass()).get();
+      request_interceptors.Pass()).get();
 }
 
 content::ResourceContext* OffTheRecordProfileImpl::GetResourceContext() {
@@ -498,6 +498,11 @@ chrome_browser_net::Predictor* OffTheRecordProfileImpl::GetNetworkPredictor() {
   // We do not store information about websites visited in OTR profiles which
   // is necessary for a Predictor, so we do not have a Predictor at all.
   return NULL;
+}
+
+DevToolsNetworkController*
+OffTheRecordProfileImpl::GetDevToolsNetworkController() {
+  return io_data_->GetDevToolsNetworkController();
 }
 
 void OffTheRecordProfileImpl::ClearNetworkingHistorySince(

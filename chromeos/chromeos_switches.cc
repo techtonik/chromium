@@ -36,6 +36,10 @@ const char kDisableDemoMode[] = "disable-demo-mode";
 // Disable Genius App and use the original Help App instead.
 const char kDisableGeniusApp[] = "disable-genius-app";
 
+// Disable lock UI (user pods) scrolling into view with CSS change when virtual
+// keyboard is shown.
+const char kDisableLockScrollIntoView[]    = "disable-lock-scroll-into-view";
+
 // Avoid doing expensive animations upon login.
 const char kDisableLoginAnimations[] = "disable-login-animations";
 
@@ -75,6 +79,9 @@ const char kEnableConsumerManagement[] = "enable-consumer-management";
 // If this switch is set, Chrome OS login screen uses |EmbeddedSignin| endpoint
 // of GAIA.
 const char kEnableEmbeddedSignin[] = "enable-embedded-signin";
+
+// Enabled sharing assets for installed default apps.
+const char kEnableExtensionAssetsSharing[]  = "enable-extension-assets-sharing";
 
 // Enables MTP support in Files.app.
 const char kEnableFileManagerMTP[] = "enable-filemanager-mtp";

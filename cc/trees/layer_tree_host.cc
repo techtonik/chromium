@@ -108,6 +108,7 @@ LayerTreeHost::LayerTreeHost(LayerTreeHostClient* client,
       max_page_scale_factor_(1.f),
       has_gpu_rasterization_trigger_(false),
       content_is_suitable_for_gpu_rasterization_(true),
+      gpu_rasterization_histogram_recorded_(false),
       background_color_(SK_ColorWHITE),
       has_transparent_background_(false),
       partial_texture_update_requests_(0),
@@ -349,6 +350,8 @@ void LayerTreeHost::FinishCommitOnImplThread(LayerTreeHostImpl* host_impl) {
   sync_tree->PassSwapPromises(&swap_promise_list_);
 
   host_impl->SetUseGpuRasterization(UseGpuRasterization());
+  RecordGpuRasterizationHistogram();
+
   host_impl->SetViewportSize(device_viewport_size_);
   host_impl->SetOverdrawBottomHeight(overdraw_bottom_height_);
   host_impl->SetDeviceScaleFactor(device_scale_factor_);
@@ -392,8 +395,6 @@ void LayerTreeHost::FinishCommitOnImplThread(LayerTreeHostImpl* host_impl) {
   }
 
   micro_benchmark_controller_.ScheduleImplBenchmarks(host_impl);
-
-  source_frame_number_++;
 }
 
 void LayerTreeHost::WillCommit() {
@@ -414,6 +415,7 @@ void LayerTreeHost::UpdateHudLayer() {
 }
 
 void LayerTreeHost::CommitComplete() {
+  source_frame_number_++;
   client_->DidCommit();
 }
 
@@ -584,6 +586,7 @@ void LayerTreeHost::SetRootLayer(scoped_refptr<Layer> root_layer) {
   // Reset gpu rasterization flag.
   // This flag is sticky until a new tree comes along.
   content_is_suitable_for_gpu_rasterization_ = true;
+  gpu_rasterization_histogram_recorded_ = false;
 
   SetNeedsFullTreeSync();
 }
@@ -613,6 +616,18 @@ bool LayerTreeHost::UseGpuRasterization() const {
   } else {
     return false;
   }
+}
+
+void LayerTreeHost::SetHasGpuRasterizationTrigger(bool has_trigger) {
+  if (has_trigger == has_gpu_rasterization_trigger_)
+    return;
+
+  has_gpu_rasterization_trigger_ = has_trigger;
+  TRACE_EVENT_INSTANT1("cc",
+                       "LayerTreeHost::SetHasGpuRasterizationTrigger",
+                       TRACE_EVENT_SCOPE_THREAD,
+                       "has_trigger",
+                       has_gpu_rasterization_trigger_);
 }
 
 void LayerTreeHost::SetViewportSize(const gfx::Size& device_viewport_size) {
@@ -735,6 +750,31 @@ static Layer* FindFirstScrollableLayer(Layer* layer) {
   }
 
   return NULL;
+}
+
+void LayerTreeHost::RecordGpuRasterizationHistogram() {
+  // Gpu rasterization is only supported when impl-side painting is enabled.
+  if (gpu_rasterization_histogram_recorded_ || !settings_.impl_side_painting)
+    return;
+
+  // Record how widely gpu rasterization is enabled.
+  // This number takes device/gpu whitelisting/backlisting into account.
+  // Note that we do not consider the forced gpu rasterization mode, which is
+  // mostly used for debugging purposes.
+  UMA_HISTOGRAM_BOOLEAN("Renderer4.GpuRasterizationEnabled",
+                        settings_.gpu_rasterization_enabled);
+  if (settings_.gpu_rasterization_enabled) {
+    UMA_HISTOGRAM_BOOLEAN("Renderer4.GpuRasterizationTriggered",
+                          has_gpu_rasterization_trigger_);
+    UMA_HISTOGRAM_BOOLEAN("Renderer4.GpuRasterizationSuitableContent",
+                          content_is_suitable_for_gpu_rasterization_);
+    // Record how many pages actually get gpu rasterization when enabled.
+    UMA_HISTOGRAM_BOOLEAN("Renderer4.GpuRasterizationUsed",
+                          (has_gpu_rasterization_trigger_ &&
+                           content_is_suitable_for_gpu_rasterization_));
+  }
+
+  gpu_rasterization_histogram_recorded_ = true;
 }
 
 void LayerTreeHost::CalculateLCDTextMetricsCallback(Layer* layer) {
@@ -1217,12 +1257,17 @@ void LayerTreeHost::RegisterViewportLayers(
   outer_viewport_scroll_layer_ = outer_viewport_scroll_layer;
 }
 
-bool LayerTreeHost::ScheduleMicroBenchmark(
+int LayerTreeHost::ScheduleMicroBenchmark(
     const std::string& benchmark_name,
     scoped_ptr<base::Value> value,
     const MicroBenchmark::DoneCallback& callback) {
   return micro_benchmark_controller_.ScheduleRun(
       benchmark_name, value.Pass(), callback);
+}
+
+bool LayerTreeHost::SendMessageToMicroBenchmark(int id,
+                                                scoped_ptr<base::Value> value) {
+  return micro_benchmark_controller_.SendMessage(id, value.Pass());
 }
 
 void LayerTreeHost::InsertSwapPromiseMonitor(SwapPromiseMonitor* monitor) {

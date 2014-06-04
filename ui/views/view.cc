@@ -849,6 +849,9 @@ View* View::GetEventHandlerForRect(const gfx::Rect& rect) {
   for (int i = child_count() - 1; i >= 0; --i) {
     View* child = child_at(i);
 
+    if (!child->CanProcessEventsWithinSubtree())
+      continue;
+
     // Ignore any children which are invisible or do not intersect |rect|.
     if (!child->visible())
       continue;
@@ -904,6 +907,10 @@ View* View::GetEventHandlerForRect(const gfx::Rect& rect) {
   return rect_view ? rect_view : point_view;
 }
 
+bool View::CanProcessEventsWithinSubtree() const {
+  return true;
+}
+
 View* View::GetTooltipHandlerForPoint(const gfx::Point& point) {
   if (!HitTestPoint(point))
     return NULL;
@@ -913,6 +920,9 @@ View* View::GetTooltipHandlerForPoint(const gfx::Point& point) {
   for (int i = child_count() - 1; i >= 0; --i) {
     View* child = child_at(i);
     if (!child->visible())
+      continue;
+
+    if (!child->CanProcessEventsWithinSubtree())
       continue;
 
     gfx::Point point_in_child_coords(point);
@@ -1055,6 +1065,8 @@ void View::OnMouseEvent(ui::MouseEvent* event) {
       break;
 
     case ui::ET_MOUSE_ENTERED:
+      if (event->flags() & ui::EF_TOUCH_ACCESSIBILITY)
+        NotifyAccessibilityEvent(ui::AX_EVENT_HOVER, true);
       OnMouseEntered(*event);
       break;
 
@@ -1112,6 +1124,10 @@ scoped_ptr<ui::EventTargetIterator> View::GetChildIterator() const {
 }
 
 ui::EventTargeter* View::GetEventTargeter() {
+  return targeter_.get();
+}
+
+const ui::EventTargeter* View::GetEventTargeter() const {
   return targeter_.get();
 }
 

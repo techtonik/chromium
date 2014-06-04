@@ -43,6 +43,10 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
   explicit ViewManagerConnection(RootNodeManager* root_node_manager);
   virtual ~ViewManagerConnection();
 
+  // Used to mark this connection as originating from a call to
+  // IViewManager::Connect(). When set OnConnectionError() deletes |this|.
+  void set_delete_on_connection_error() { delete_on_connection_error_ = true; }
+
   TransportConnectionId id() const { return id_; }
 
   // Returns the Node with the specified id.
@@ -136,7 +140,7 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
   // Converts an array of Nodes to INodes. This assumes all the nodes are valid
   // for the client. The parent of nodes the client is not allowed to see are
   // set to NULL (in the returned INodes).
-  Array<INode> NodesToINodes(const std::vector<const Node*>& nodes);
+  Array<INodePtr> NodesToINodes(const std::vector<const Node*>& nodes);
 
   // Overridden from IViewManager:
   virtual void CreateNode(TransportNodeId transport_node_id,
@@ -153,7 +157,7 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
       const Callback<void(bool)>& callback) OVERRIDE;
   virtual void GetNodeTree(
       TransportNodeId node_id,
-      const Callback<void(Array<INode>)>& callback) OVERRIDE;
+      const Callback<void(Array<INodePtr>)>& callback) OVERRIDE;
   virtual void CreateView(TransportViewId transport_view_id,
                           const Callback<void(bool)>& callback) OVERRIDE;
   virtual void DeleteView(TransportViewId transport_view_id,
@@ -166,10 +170,10 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
                                uint32_t buffer_size,
                                const Callback<void(bool)>& callback) OVERRIDE;
   virtual void SetNodeBounds(TransportNodeId node_id,
-                             const Rect& bounds,
+                             RectPtr bounds,
                              const Callback<void(bool)>& callback) OVERRIDE;
   virtual void Connect(const mojo::String& url,
-                       const mojo::Array<uint32_t>& node_ids,
+                       mojo::Array<uint32_t> node_ids,
                        const mojo::Callback<void(bool)>& callback) OVERRIDE;
 
   // Overridden from NodeDelegate:
@@ -185,9 +189,8 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
 
   RootNodeManager* root_node_manager_;
 
-  // Id of this connection as assigned by RootNodeManager. Assigned in
-  // OnConnectionEstablished().
-  TransportConnectionId id_;
+  // Id of this connection as assigned by RootNodeManager.
+  const TransportConnectionId id_;
 
   NodeMap node_map_;
 
@@ -203,6 +206,9 @@ class MOJO_VIEW_MANAGER_EXPORT ViewManagerConnection
   // value and all the nodes are deleted (by another connection), then an
   // invalid node is added here to ensure this connection is still constrained.
   NodeIdSet roots_;
+
+  // See description above setter.
+  bool delete_on_connection_error_;
 
   DISALLOW_COPY_AND_ASSIGN(ViewManagerConnection);
 };

@@ -15,6 +15,7 @@
 #include "base/synchronization/lock.h"
 #include "chrome/browser/browsing_data/browsing_data_helper.h"
 #include "chrome/browser/browsing_data/browsing_data_remover.h"
+#include "chrome/browser/google/google_profile_helper.h"
 #include "chrome/browser/google/google_util.h"
 #include "chrome/browser/net/url_request_mock_util.h"
 #include "chrome/browser/profiles/profile.h"
@@ -89,8 +90,9 @@ bool WARN_UNUSED_RESULT IsDisplayingNetError(Browser* browser,
                                              net::Error error_code) {
   // Get the error as a string, and remove the leading "net::", which is not
   // included on error pages.
-  std::string error_string = net::ErrorToString(error_code);
-  base::RemoveChars(error_string, "net:", &error_string);
+  std::string error_string(net::ErrorToString(error_code));
+  DCHECK(StartsWithASCII(error_string, "net::", true));
+  error_string.erase(0, 5);
 
   return IsDisplayingText(browser, error_string);
 }
@@ -413,9 +415,12 @@ class ErrorPageTest : public InProcessBrowserTest {
     // calls URLRequestFilter::ClearHandlers(), |protocol_handler_| can become
     // invalid.
     BrowserThread::PostTask(
-        BrowserThread::IO, FROM_HERE,
+        BrowserThread::IO,
+        FROM_HERE,
         base::Bind(&InstallMockProtocolHandlers,
-                   google_util::GetGoogleSearchURL(browser()->profile()),
+                   google_util::GetGoogleSearchURL(
+                       google_profile_helper::GetGoogleHomePageURL(
+                           browser()->profile())),
                    base::Passed(&owned_handler)));
   }
 

@@ -533,3 +533,44 @@ name=https://code.google.com/p/drmemory/issues/detail?id=1545
 system call NtGdiCreateCompatibleDC
 GDI32.dll!CreateCompatibleDC
 skia.dll!LogFontTypeface::onGetTableData
+
+HANDLE LEAK
+name=http://crbug.com/379000
+system call NtCreate*
+...
+*!disk_cache::MappedFile::Init
+*!disk_cache::BlockFiles::OpenBlockFile
+*!disk_cache::BlockFiles::Init
+*!disk_cache::BackendImpl::SyncInit
+*!disk_cache::BackendIO::ExecuteBackendOperation
+*!base::internal::Invoker<>::Run
+*!base::MessageLoop::RunTask
+*!base::MessageLoop::DeferOrRunPendingTask
+*!base::MessageLoop::DoWork
+*!base::MessagePumpForIO::DoRunLoop
+*!base::MessagePumpWin::Run
+*!base::MessageLoop::RunHandler
+*!base::Thread::Run
+*!content::BrowserThreadImpl::CacheThreadRun
+*!content::BrowserThreadImpl::Run
+
+UNADDRESSABLE ACCESS
+name=http://crbug.com/379204
+...
+*!WTF::MessageQueue<>::waitForMessageWithTimeout
+*!WebCore::WorkerRunLoop::run
+*!WebCore::WorkerRunLoop::run
+*!WebCore::WorkerThread::workerThread
+*!WTF::threadEntryPoint
+
+GDI USAGE ERROR
+name=379774
+system call NtUserCallOneParam.RELEASEDC
+USER32.dll!ReleaseDC
+*!std::_Tree<>::_Erase
+*!std::_Tree<>::erase
+*!DefaultSingletonTraits<>::Delete
+*!Singleton<>::OnExit
+*!base::AtExitManager::ProcessCallbacksNow
+*!base::AtExitManager::~AtExitManager
+*!base::TestSuite::~TestSuite

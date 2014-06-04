@@ -90,6 +90,7 @@ WindowState::WindowState(aura::Window* window)
       can_consume_system_keys_(false),
       top_row_keys_are_function_keys_(false),
       unminimize_to_restore_bounds_(false),
+      in_immersive_fullscreen_(false),
       hide_shelf_when_fullscreen_(true),
       minimum_visibility_(false),
       can_be_dragged_(true),
@@ -99,6 +100,10 @@ WindowState::WindowState(aura::Window* window)
 }
 
 WindowState::~WindowState() {
+  // WindowState is registered as an owned property of |window_|, and window
+  // unregisters all of its observers in its d'tor before destroying its
+  // properties. As a result, window_->RemoveObserver() doesn't need to (and
+  // shouldn't) be called here.
 }
 
 bool WindowState::HasDelegate() const {

@@ -24,6 +24,9 @@
 
 using google_apis::AboutResource;
 using google_apis::AppList;
+using google_apis::ChangeList;
+using google_apis::ChangeResource;
+using google_apis::FileList;
 using google_apis::GDATA_NO_CONNECTION;
 using google_apis::GDATA_OTHER_ERROR;
 using google_apis::GDataErrorCode;
@@ -37,7 +40,6 @@ using google_apis::HTTP_SUCCESS;
 using google_apis::Link;
 using google_apis::ProgressCallback;
 using google_apis::ResourceEntry;
-using google_apis::ResourceList;
 using google_apis::UploadRangeResponse;
 
 namespace drive {
@@ -116,144 +118,144 @@ class FakeDriveServiceTest : public testing::Test {
   FakeDriveService fake_service_;
 };
 
-TEST_F(FakeDriveServiceTest, GetAllResourceList) {
+TEST_F(FakeDriveServiceTest, GetAllFileList) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
-  fake_service_.GetAllResourceList(
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+  scoped_ptr<FileList> file_list;
+  fake_service_.GetAllFileList(
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
   // Do some sanity check.
-  EXPECT_EQ(15U, resource_list->entries().size());
-  EXPECT_EQ(1, fake_service_.resource_list_load_count());
+  EXPECT_EQ(15U, file_list->items().size());
+  EXPECT_EQ(1, fake_service_.file_list_load_count());
 }
 
-TEST_F(FakeDriveServiceTest, GetAllResourceList_Offline) {
+TEST_F(FakeDriveServiceTest, GetAllFileList_Offline) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
   fake_service_.set_offline(true);
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
-  fake_service_.GetAllResourceList(
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+  scoped_ptr<FileList> file_list;
+  fake_service_.GetAllFileList(
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(GDATA_NO_CONNECTION, error);
-  EXPECT_FALSE(resource_list);
+  EXPECT_FALSE(file_list);
 }
 
-TEST_F(FakeDriveServiceTest, GetResourceListInDirectory_InRootDirectory) {
+TEST_F(FakeDriveServiceTest, GetFileListInDirectory_InRootDirectory) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
-  fake_service_.GetResourceListInDirectory(
+  scoped_ptr<FileList> file_list;
+  fake_service_.GetFileListInDirectory(
       fake_service_.GetRootResourceId(),
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
   // Do some sanity check. There are 8 entries in the root directory.
-  EXPECT_EQ(8U, resource_list->entries().size());
+  EXPECT_EQ(8U, file_list->items().size());
   EXPECT_EQ(1, fake_service_.directory_load_count());
 }
 
-TEST_F(FakeDriveServiceTest, GetResourceListInDirectory_InNonRootDirectory) {
+TEST_F(FakeDriveServiceTest, GetFileListInDirectory_InNonRootDirectory) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
-  fake_service_.GetResourceListInDirectory(
+  scoped_ptr<FileList> file_list;
+  fake_service_.GetFileListInDirectory(
       "folder:1_folder_resource_id",
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
   // Do some sanity check. There is three entries in 1_folder_resource_id
   // directory.
-  EXPECT_EQ(3U, resource_list->entries().size());
+  EXPECT_EQ(3U, file_list->items().size());
   EXPECT_EQ(1, fake_service_.directory_load_count());
 }
 
-TEST_F(FakeDriveServiceTest, GetResourceListInDirectory_Offline) {
+TEST_F(FakeDriveServiceTest, GetFileListInDirectory_Offline) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
   fake_service_.set_offline(true);
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
-  fake_service_.GetResourceListInDirectory(
+  scoped_ptr<FileList> file_list;
+  fake_service_.GetFileListInDirectory(
       fake_service_.GetRootResourceId(),
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(GDATA_NO_CONNECTION, error);
-  EXPECT_FALSE(resource_list);
+  EXPECT_FALSE(file_list);
 }
 
 TEST_F(FakeDriveServiceTest, Search) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<FileList> file_list;
   fake_service_.Search(
       "File",  // search_query
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
   // Do some sanity check. There are 4 entries that contain "File" in their
   // titles.
-  EXPECT_EQ(4U, resource_list->entries().size());
+  EXPECT_EQ(4U, file_list->items().size());
 }
 
 TEST_F(FakeDriveServiceTest, Search_WithAttribute) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<FileList> file_list;
   fake_service_.Search(
       "title:1.txt",  // search_query
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
   // Do some sanity check. There are 4 entries that contain "1.txt" in their
   // titles.
-  EXPECT_EQ(4U, resource_list->entries().size());
+  EXPECT_EQ(4U, file_list->items().size());
 }
 
 TEST_F(FakeDriveServiceTest, Search_MultipleQueries) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<FileList> file_list;
   fake_service_.Search(
       "Directory 1",  // search_query
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
   // There are 2 entries that contain both "Directory" and "1" in their titles.
-  EXPECT_EQ(2U, resource_list->entries().size());
+  EXPECT_EQ(2U, file_list->items().size());
 
   fake_service_.Search(
       "\"Directory 1\"",  // search_query
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
   // There is 1 entry that contain "Directory 1" in its title.
-  EXPECT_EQ(1U, resource_list->entries().size());
+  EXPECT_EQ(1U, file_list->items().size());
 }
 
 TEST_F(FakeDriveServiceTest, Search_Offline) {
@@ -261,14 +263,14 @@ TEST_F(FakeDriveServiceTest, Search_Offline) {
   fake_service_.set_offline(true);
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<FileList> file_list;
   fake_service_.Search(
       "Directory 1",  // search_query
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(GDATA_NO_CONNECTION, error);
-  EXPECT_FALSE(resource_list);
+  EXPECT_FALSE(file_list);
 }
 
 TEST_F(FakeDriveServiceTest, Search_Deleted) {
@@ -282,17 +284,17 @@ TEST_F(FakeDriveServiceTest, Search_Deleted) {
   EXPECT_EQ(HTTP_NO_CONTENT, error);
 
   error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<FileList> file_list;
   fake_service_.Search(
       "File",  // search_query
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
   // Do some sanity check. There are 4 entries that contain "File" in their
   // titles and one of them is deleted.
-  EXPECT_EQ(3U, resource_list->entries().size());
+  EXPECT_EQ(3U, file_list->items().size());
 }
 
 TEST_F(FakeDriveServiceTest, Search_Trashed) {
@@ -305,53 +307,53 @@ TEST_F(FakeDriveServiceTest, Search_Trashed) {
   EXPECT_EQ(HTTP_SUCCESS, error);
 
   error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<FileList> file_list;
   fake_service_.Search(
       "File",  // search_query
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
   // Do some sanity check. There are 4 entries that contain "File" in their
   // titles and one of them is deleted.
-  EXPECT_EQ(3U, resource_list->entries().size());
+  EXPECT_EQ(3U, file_list->items().size());
 }
 
 TEST_F(FakeDriveServiceTest, SearchByTitle) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<FileList> file_list;
   fake_service_.SearchByTitle(
       "1.txt",  // title
       fake_service_.GetRootResourceId(),  // directory_resource_id
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
   // Do some sanity check. There are 2 entries that contain "1.txt" in their
   // titles directly under the root directory.
-  EXPECT_EQ(2U, resource_list->entries().size());
+  EXPECT_EQ(2U, file_list->items().size());
 }
 
 TEST_F(FakeDriveServiceTest, SearchByTitle_EmptyDirectoryResourceId) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<FileList> file_list;
   fake_service_.SearchByTitle(
       "1.txt",  // title
       "",  // directory resource id
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
   // Do some sanity check. There are 4 entries that contain "1.txt" in their
   // titles.
-  EXPECT_EQ(4U, resource_list->entries().size());
+  EXPECT_EQ(4U, file_list->items().size());
 }
 
 TEST_F(FakeDriveServiceTest, SearchByTitle_Offline) {
@@ -359,34 +361,34 @@ TEST_F(FakeDriveServiceTest, SearchByTitle_Offline) {
   fake_service_.set_offline(true);
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<FileList> file_list;
   fake_service_.SearchByTitle(
       "Directory 1",  // title
       fake_service_.GetRootResourceId(),  // directory_resource_id
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(GDATA_NO_CONNECTION, error);
-  EXPECT_FALSE(resource_list);
+  EXPECT_FALSE(file_list);
 }
 
 TEST_F(FakeDriveServiceTest, GetChangeList_NoNewEntries) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<ChangeList> change_list;
   fake_service_.GetChangeList(
       fake_service_.about_resource().largest_change_id() + 1,
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &change_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(change_list);
   EXPECT_EQ(fake_service_.about_resource().largest_change_id(),
-            resource_list->largest_changestamp());
+            change_list->largest_change_id());
   // This should be empty as the latest changestamp was passed to
-  // GetResourceList(), hence there should be no new entries.
-  EXPECT_EQ(0U, resource_list->entries().size());
+  // GetChangeList(), hence there should be no new entries.
+  EXPECT_EQ(0U, change_list->items().size());
   // It's considered loaded even if the result is empty.
   EXPECT_EQ(1, fake_service_.change_list_load_count());
 }
@@ -402,19 +404,20 @@ TEST_F(FakeDriveServiceTest, GetChangeList_WithNewEntry) {
 
   // Get the resource list newer than old_largest_change_id.
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<ChangeList> change_list;
   fake_service_.GetChangeList(
       old_largest_change_id + 1,
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &change_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(change_list);
   EXPECT_EQ(fake_service_.about_resource().largest_change_id(),
-            resource_list->largest_changestamp());
+            change_list->largest_change_id());
   // The result should only contain the newly created directory.
-  ASSERT_EQ(1U, resource_list->entries().size());
-  EXPECT_EQ("new directory", resource_list->entries()[0]->title());
+  ASSERT_EQ(1U, change_list->items().size());
+  ASSERT_TRUE(change_list->items()[0]->file());
+  EXPECT_EQ("new directory", change_list->items()[0]->file()->title());
   EXPECT_EQ(1, fake_service_.change_list_load_count());
 }
 
@@ -423,14 +426,14 @@ TEST_F(FakeDriveServiceTest, GetChangeList_Offline) {
   fake_service_.set_offline(true);
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<ChangeList> change_list;
   fake_service_.GetChangeList(
       654321,  // start_changestamp
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &change_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(GDATA_NO_CONNECTION, error);
-  EXPECT_FALSE(resource_list);
+  EXPECT_FALSE(change_list);
 }
 
 TEST_F(FakeDriveServiceTest, GetChangeList_DeletedEntry) {
@@ -449,22 +452,22 @@ TEST_F(FakeDriveServiceTest, GetChangeList_DeletedEntry) {
 
   // Get the resource list newer than old_largest_change_id.
   error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<ChangeList> change_list;
   fake_service_.GetChangeList(
       old_largest_change_id + 1,
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &change_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(change_list);
   EXPECT_EQ(fake_service_.about_resource().largest_change_id(),
-            resource_list->largest_changestamp());
+            change_list->largest_change_id());
   // The result should only contain the deleted file.
-  ASSERT_EQ(1U, resource_list->entries().size());
-  const ResourceEntry& entry = *resource_list->entries()[0];
-  EXPECT_EQ("file:2_file_resource_id", entry.resource_id());
-  EXPECT_TRUE(entry.title().empty());
-  EXPECT_TRUE(entry.deleted());
+  ASSERT_EQ(1U, change_list->items().size());
+  const ChangeResource& item = *change_list->items()[0];
+  EXPECT_EQ("file:2_file_resource_id", item.file_id());
+  EXPECT_FALSE(item.file());
+  EXPECT_TRUE(item.is_deleted());
   EXPECT_EQ(1, fake_service_.change_list_load_count());
 }
 
@@ -483,137 +486,127 @@ TEST_F(FakeDriveServiceTest, GetChangeList_TrashedEntry) {
 
   // Get the resource list newer than old_largest_change_id.
   error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<ChangeList> change_list;
   fake_service_.GetChangeList(
       old_largest_change_id + 1,
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &change_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(change_list);
   EXPECT_EQ(fake_service_.about_resource().largest_change_id(),
-            resource_list->largest_changestamp());
+            change_list->largest_change_id());
   // The result should only contain the trashed file.
-  ASSERT_EQ(1U, resource_list->entries().size());
-  const ResourceEntry& entry = *resource_list->entries()[0];
-  EXPECT_EQ("file:2_file_resource_id", entry.resource_id());
-  EXPECT_TRUE(entry.deleted());
+  ASSERT_EQ(1U, change_list->items().size());
+  const ChangeResource& item = *change_list->items()[0];
+  EXPECT_EQ("file:2_file_resource_id", item.file_id());
+  ASSERT_TRUE(item.file());
+  EXPECT_TRUE(item.file()->labels().is_trashed());
   EXPECT_EQ(1, fake_service_.change_list_load_count());
 }
 
-TEST_F(FakeDriveServiceTest, GetRemainingChangeList_GetAllResourceList) {
+TEST_F(FakeDriveServiceTest, GetRemainingFileList_GetAllFileList) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
   fake_service_.set_default_max_results(6);
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
-  fake_service_.GetAllResourceList(
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+  scoped_ptr<FileList> file_list;
+  fake_service_.GetAllFileList(
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
 
   // Do some sanity check.
   // The number of results is 14 entries. Thus, it should split into three
   // chunks: 6, 6, and then 2.
-  EXPECT_EQ(6U, resource_list->entries().size());
-  EXPECT_EQ(1, fake_service_.resource_list_load_count());
+  EXPECT_EQ(6U, file_list->items().size());
+  EXPECT_EQ(1, fake_service_.file_list_load_count());
 
   // Second page loading.
-  const google_apis::Link* next_link =
-      resource_list->GetLinkByType(Link::LINK_NEXT);
-  ASSERT_TRUE(next_link);
-  // Keep the next url before releasing the |resource_list|.
-  GURL next_url(next_link->href());
+  // Keep the next url before releasing the |file_list|.
+  GURL next_url(file_list->next_link());
 
   error = GDATA_OTHER_ERROR;
-  resource_list.reset();
-  fake_service_.GetRemainingChangeList(
+  file_list.reset();
+  fake_service_.GetRemainingFileList(
       next_url,
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
 
-  EXPECT_EQ(6U, resource_list->entries().size());
-  EXPECT_EQ(1, fake_service_.resource_list_load_count());
+  EXPECT_EQ(6U, file_list->items().size());
+  EXPECT_EQ(1, fake_service_.file_list_load_count());
 
   // Third page loading.
-  next_link = resource_list->GetLinkByType(Link::LINK_NEXT);
-  ASSERT_TRUE(next_link);
-  next_url = GURL(next_link->href());
+  next_url = file_list->next_link();
 
   error = GDATA_OTHER_ERROR;
-  resource_list.reset();
-  fake_service_.GetRemainingChangeList(
+  file_list.reset();
+  fake_service_.GetRemainingFileList(
       next_url,
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
 
-  EXPECT_EQ(3U, resource_list->entries().size());
-  EXPECT_EQ(1, fake_service_.resource_list_load_count());
+  EXPECT_EQ(3U, file_list->items().size());
+  EXPECT_EQ(1, fake_service_.file_list_load_count());
 }
 
-TEST_F(FakeDriveServiceTest,
-       GetRemainingFileList_GetResourceListInDirectory) {
+TEST_F(FakeDriveServiceTest, GetRemainingFileList_GetFileListInDirectory) {
   ASSERT_TRUE(test_util::SetUpTestEntries(&fake_service_));
   fake_service_.set_default_max_results(3);
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
-  fake_service_.GetResourceListInDirectory(
+  scoped_ptr<FileList> file_list;
+  fake_service_.GetFileListInDirectory(
       fake_service_.GetRootResourceId(),
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
 
   // Do some sanity check.
   // The number of results is 8 entries. Thus, it should split into three
   // chunks: 3, 3, and then 2.
-  EXPECT_EQ(3U, resource_list->entries().size());
+  EXPECT_EQ(3U, file_list->items().size());
   EXPECT_EQ(1, fake_service_.directory_load_count());
 
   // Second page loading.
-  const google_apis::Link* next_link =
-      resource_list->GetLinkByType(Link::LINK_NEXT);
-  ASSERT_TRUE(next_link);
-  // Keep the next url before releasing the |resource_list|.
-  GURL next_url(next_link->href());
+  // Keep the next url before releasing the |file_list|.
+  GURL next_url = file_list->next_link();
 
   error = GDATA_OTHER_ERROR;
-  resource_list.reset();
+  file_list.reset();
   fake_service_.GetRemainingFileList(
       next_url,
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
 
-  EXPECT_EQ(3U, resource_list->entries().size());
+  EXPECT_EQ(3U, file_list->items().size());
   EXPECT_EQ(1, fake_service_.directory_load_count());
 
   // Third page loading.
-  next_link = resource_list->GetLinkByType(Link::LINK_NEXT);
-  ASSERT_TRUE(next_link);
-  next_url = GURL(next_link->href());
+  next_url = file_list->next_link();
 
   error = GDATA_OTHER_ERROR;
-  resource_list.reset();
+  file_list.reset();
   fake_service_.GetRemainingFileList(
       next_url,
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
 
-  EXPECT_EQ(2U, resource_list->entries().size());
+  EXPECT_EQ(2U, file_list->items().size());
   EXPECT_EQ(1, fake_service_.directory_load_count());
 }
 
@@ -622,37 +615,34 @@ TEST_F(FakeDriveServiceTest, GetRemainingFileList_Search) {
   fake_service_.set_default_max_results(2);
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<FileList> file_list;
   fake_service_.Search(
       "File",  // search_query
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
 
   // Do some sanity check.
   // The number of results is 4 entries. Thus, it should split into two
   // chunks: 2, and then 2
-  EXPECT_EQ(2U, resource_list->entries().size());
+  EXPECT_EQ(2U, file_list->items().size());
 
   // Second page loading.
-  const google_apis::Link* next_link =
-      resource_list->GetLinkByType(Link::LINK_NEXT);
-  ASSERT_TRUE(next_link);
-  // Keep the next url before releasing the |resource_list|.
-  GURL next_url(next_link->href());
+  // Keep the next url before releasing the |file_list|.
+  GURL next_url = file_list->next_link();
 
   error = GDATA_OTHER_ERROR;
-  resource_list.reset();
+  file_list.reset();
   fake_service_.GetRemainingFileList(
       next_url,
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &file_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(file_list);
 
-  EXPECT_EQ(2U, resource_list->entries().size());
+  EXPECT_EQ(2U, file_list->items().size());
 }
 
 TEST_F(FakeDriveServiceTest, GetRemainingChangeList_GetChangeList) {
@@ -669,56 +659,51 @@ TEST_F(FakeDriveServiceTest, GetRemainingChangeList_GetChangeList) {
   }
 
   GDataErrorCode error = GDATA_OTHER_ERROR;
-  scoped_ptr<ResourceList> resource_list;
+  scoped_ptr<ChangeList> change_list;
   fake_service_.GetChangeList(
       old_largest_change_id + 1,  // start_changestamp
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &change_list));
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(change_list);
 
   // Do some sanity check.
   // The number of results is 5 entries. Thus, it should split into three
   // chunks: 2, 2 and then 1.
-  EXPECT_EQ(2U, resource_list->entries().size());
+  EXPECT_EQ(2U, change_list->items().size());
   EXPECT_EQ(1, fake_service_.change_list_load_count());
 
   // Second page loading.
-  const google_apis::Link* next_link =
-      resource_list->GetLinkByType(Link::LINK_NEXT);
-  ASSERT_TRUE(next_link);
-  // Keep the next url before releasing the |resource_list|.
-  GURL next_url(next_link->href());
+  // Keep the next url before releasing the |change_list|.
+  GURL next_url = change_list->next_link();
 
   error = GDATA_OTHER_ERROR;
-  resource_list.reset();
+  change_list.reset();
   fake_service_.GetRemainingChangeList(
       next_url,
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &change_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(change_list);
 
-  EXPECT_EQ(2U, resource_list->entries().size());
+  EXPECT_EQ(2U, change_list->items().size());
   EXPECT_EQ(1, fake_service_.change_list_load_count());
 
   // Third page loading.
-  next_link = resource_list->GetLinkByType(Link::LINK_NEXT);
-  ASSERT_TRUE(next_link);
-  next_url = GURL(next_link->href());
+  next_url = change_list->next_link();
 
   error = GDATA_OTHER_ERROR;
-  resource_list.reset();
+  change_list.reset();
   fake_service_.GetRemainingChangeList(
       next_url,
-      test_util::CreateCopyResultCallback(&error, &resource_list));
+      test_util::CreateCopyResultCallback(&error, &change_list));
   base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(HTTP_SUCCESS, error);
-  ASSERT_TRUE(resource_list);
+  ASSERT_TRUE(change_list);
 
-  EXPECT_EQ(1U, resource_list->entries().size());
+  EXPECT_EQ(1U, change_list->items().size());
   EXPECT_EQ(1, fake_service_.change_list_load_count());
 }
 

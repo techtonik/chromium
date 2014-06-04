@@ -8,8 +8,10 @@
     'external_ozone_platforms': [],
     'external_ozone_platform_files': [],
     'external_ozone_platform_deps': [],
+    'external_ozone_platform_unittest_deps': [],
     'internal_ozone_platforms': [],
     'internal_ozone_platform_deps': [],
+    'internal_ozone_platform_unittest_deps': [],
   },
   'targets': [
     {
@@ -85,6 +87,21 @@
         }],
       ]
     },
+    {
+      'target_name': 'ozone_unittests',
+      'type': '<(gtest_target_type)',
+      'sources': [
+        'run_all_unittests.cc',
+      ],
+      'dependencies': [
+        'ozone',
+        '../../base/base.gyp:base',
+        '../../base/base.gyp:test_support_base',
+        '../../testing/gtest.gyp:gtest',
+        '<@(external_ozone_platform_unittest_deps)',
+        '<@(internal_ozone_platform_unittest_deps)',
+      ],
+    },
   ],
   'conditions': [
     ['<(ozone_platform_caca) == 1', {
@@ -92,7 +109,7 @@
         'platform/caca/caca.gypi',
       ],
     }],
-    ['<(ozone_platform_dri) == 1', {
+    ['<(ozone_platform_dri) == 1 or <(ozone_platform_gbm) == 1', {
       'includes': [
         'platform/dri/dri.gypi',
       ],
@@ -100,6 +117,11 @@
     ['<(ozone_platform_egltest) == 1', {
       'includes': [
         'platform/egltest/egltest.gypi',
+      ],
+    }],
+    ['<(ozone_platform_gbm) == 1', {
+      'includes': [
+        'platform/dri/gbm.gypi',
       ],
     }],
     ['<(ozone_platform_test) == 1', {

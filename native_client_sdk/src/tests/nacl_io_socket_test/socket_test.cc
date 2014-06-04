@@ -584,15 +584,7 @@ TEST_F(SocketTestUDP, Listen) {
   EXPECT_EQ(errno, ENOTSUP);
 }
 
-// Temporarily disable the TCP Listen test on PNaCl;
-// TODO(sbc): Re-enable once we fix the issue: http://crbug/377084
-#ifdef __pnacl__
-#define MAYBE_Listen DISABLED_Listen
-#else
-#define MAYBE_Listen Listen
-#endif
-
-TEST_F(SocketTestTCP, MAYBE_Listen) {
+TEST_F(SocketTestTCP, Listen) {
   sockaddr_in addr;
   socklen_t addrlen = sizeof(addr);
   const char* client_greeting = "hello";
@@ -625,18 +617,42 @@ TEST_F(SocketTestTCP, MAYBE_Listen) {
 
   // Pass in addrlen that is larger than our actual address to make
   // sure that it is correctly set back to sizeof(sockaddr_in)
-  addrlen = sizeof(addr) + 10;
-  int new_socket = ki_accept(server_sock, (sockaddr*)&addr, &addrlen);
+  sockaddr_in client_addr[2];
+  sockaddr_in cmp_addr;
+  memset(&client_addr[0], 0, sizeof(client_addr[0]));
+  memset(&client_addr[1], 0xab, sizeof(client_addr[1]));
+  memset(&cmp_addr, 0xab, sizeof(cmp_addr));
+  addrlen = sizeof(client_addr[0]) + 10;
+  int new_socket = ki_accept(server_sock, (sockaddr*)&client_addr[0],
+                             &addrlen);
   ASSERT_GT(new_socket, -1)
     << "accept failed with " << errno << ": " << strerror(errno);
+  ASSERT_EQ(addrlen, sizeof(sockaddr_in));
+  // Check that client_addr[1] and cmp_addr are the same (not overwritten).
+  ASSERT_EQ(0, memcmp(&client_addr[1], &cmp_addr, sizeof(cmp_addr)));
+  ASSERT_EQ(0xabab, client_addr[1].sin_port);
 
   // Verify addr and addrlen were set correctly
   ASSERT_EQ(addrlen, sizeof(sockaddr_in));
-  sockaddr_in client_addr;
-  ASSERT_EQ(0, ki_getsockname(client_sock, (sockaddr*)&client_addr, &addrlen));
-  ASSERT_EQ(client_addr.sin_family, addr.sin_family);
-  ASSERT_EQ(client_addr.sin_port, addr.sin_port);
-  ASSERT_EQ(client_addr.sin_addr.s_addr, addr.sin_addr.s_addr);
+  ASSERT_EQ(0, ki_getsockname(client_sock, (sockaddr*)&client_addr[1],
+                              &addrlen));
+  ASSERT_EQ(client_addr[1].sin_family, client_addr[0].sin_family);
+  ASSERT_EQ(client_addr[1].sin_port, client_addr[0].sin_port);
+  ASSERT_EQ(client_addr[1].sin_addr.s_addr, client_addr[0].sin_addr.s_addr);
+
+  // Try a call where the supplied len is smaller than the expected length.
+  // The API should only write up to that amount, but should return the
+  // expected length.
+  sockaddr_in client_addr2;
+  memset(&client_addr2, 0, sizeof(client_addr2));
+  socklen_t truncated_len = sizeof(client_addr2.sin_family);
+  ASSERT_GT(sizeof(sockaddr_in), truncated_len);
+  ASSERT_EQ(0, ki_getsockname(client_sock, (sockaddr*)&client_addr2,
+                              &truncated_len));
+  ASSERT_EQ(sizeof(sockaddr_in), truncated_len);
+  ASSERT_EQ(client_addr2.sin_family, client_addr[0].sin_family);
+  ASSERT_EQ(client_addr2.sin_port, 0);
+  ASSERT_EQ(client_addr2.sin_addr.s_addr, 0);
 
   // Recv greeting from client and send reply
   char inbuf[512];

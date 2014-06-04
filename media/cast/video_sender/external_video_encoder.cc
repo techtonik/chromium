@@ -108,6 +108,9 @@ class LocalVideoEncodeAcceleratorClient
       case transport::kFakeSoftwareVideo:
         NOTREACHED() << "Fake software video encoder cannot be external";
         break;
+      case transport::kUnknownVideoCodec:
+        NOTREACHED() << "Video codec not specified";
+        break;
     }
     codec_ = video_config.codec;
     max_frame_rate_ = video_config.max_frame_rate;
@@ -131,9 +134,7 @@ class LocalVideoEncodeAcceleratorClient
     DCHECK(encoder_task_runner_);
     DCHECK(encoder_task_runner_->RunsTasksOnCurrentThread());
 
-    if (video_encode_accelerator_) {
-      video_encode_accelerator_.release()->Destroy();
-    }
+    video_encode_accelerator_.reset();
   }
 
   void SetBitRate(uint32 bit_rate) {
@@ -165,9 +166,7 @@ class LocalVideoEncodeAcceleratorClient
     DCHECK(encoder_task_runner_->RunsTasksOnCurrentThread());
     VLOG(1) << "ExternalVideoEncoder NotifyError: " << error;
 
-    if (video_encode_accelerator_) {
-      video_encode_accelerator_.release()->Destroy();
-    }
+    video_encode_accelerator_.reset();
     cast_environment_->PostTask(
         CastEnvironment::MAIN,
         FROM_HERE,

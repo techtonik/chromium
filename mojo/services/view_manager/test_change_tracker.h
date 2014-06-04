@@ -63,6 +63,10 @@ std::vector<std::string> ChangesToDescription1(
 // if change.size() != 1.
 std::string ChangeNodeDescription(const std::vector<Change>& changes);
 
+// Converts INodes to TestNodes.
+void INodesToTestNodes(const Array<INodePtr>& data,
+                       std::vector<TestNode>* test_nodes);
+
 // TestChangeTracker is used to record IViewManagerClient functions. It notifies
 // a delegate any time a change is added.
 class TestChangeTracker {
@@ -89,16 +93,16 @@ class TestChangeTracker {
   void OnViewManagerConnectionEstablished(
       TransportConnectionId connection_id,
       TransportChangeId next_server_change_id,
-      const Array<INode>& nodes);
+      Array<INodePtr> nodes);
   void OnServerChangeIdAdvanced(TransportChangeId change_id);
   void OnNodeBoundsChanged(TransportNodeId node_id,
-                           const Rect& old_bounds,
-                           const Rect& new_bounds);
+                           RectPtr old_bounds,
+                           RectPtr new_bounds);
   void OnNodeHierarchyChanged(TransportNodeId node_id,
                               TransportNodeId new_parent_id,
                               TransportNodeId old_parent_id,
                               TransportChangeId server_change_id,
-                              const Array<INode>& nodes);
+                              Array<INodePtr> nodes);
   void OnNodeDeleted(TransportNodeId node_id,
                      TransportChangeId server_change_id);
   void OnViewDeleted(TransportViewId view_id);

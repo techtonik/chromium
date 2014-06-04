@@ -1,4 +1,4 @@
-#a Copyright (c) 2012 The Chromium Authors. All rights reserved.
+# Copyright (c) 2012 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -7,9 +7,6 @@
     'chromium_code': 1,
     'grit_out_dir': '<(SHARED_INTERMEDIATE_DIR)/chrome',
   },
-  'includes': [
-    'ash_resources.gypi',
-  ],
   'targets': [
     {
       'target_name': 'ash',
@@ -43,8 +40,8 @@
         '../ui/web_dialogs/web_dialogs.gyp:web_dialogs',
         '../ui/wm/wm.gyp:wm',
         '../url/url.gyp:url_lib',
+        'ash_resources.gyp:ash_resources',
         'ash_strings.gyp:ash_strings',
-        'ash_resources',
       ],
       'defines': [
         'ASH_IMPLEMENTATION',
@@ -57,8 +54,8 @@
         'accelerators/accelerator_controller.h',
         'accelerators/nested_accelerator_delegate.cc',
         'accelerators/nested_accelerator_delegate.h',
-        'accelerators/accelerator_filter.cc',
-        'accelerators/accelerator_filter.h',
+        'accelerators/accelerator_delegate.cc',
+        'accelerators/accelerator_delegate.h',
         'accelerators/accelerator_table.cc',
         'accelerators/accelerator_table.h',
         'accelerators/debug_commands.cc',
@@ -597,6 +594,8 @@
         'wm/window_cycle_controller.h',
         'wm/window_cycle_list.cc',
         'wm/window_cycle_list.h',
+        'wm/overview/transparent_activate_window_button.cc',
+        'wm/overview/transparent_activate_window_button.h',
         'wm/overview/window_selector_controller.cc',
         'wm/overview/window_selector_controller.h',
         'wm/overview/window_selector_delegate.h',
@@ -761,9 +760,9 @@
         '../ui/views/views.gyp:views',
         '../ui/web_dialogs/web_dialogs.gyp:web_dialogs',
         '../url/url.gyp:url_lib',
-        'ash_strings.gyp:ash_strings',
         'ash',
-        'ash_resources',
+        'ash_resources.gyp:ash_resources',
+        'ash_strings.gyp:ash_strings',
       ],
       'defines': [
         'ASH_WITH_CONTENT_IMPLEMENTATION',
@@ -790,7 +789,7 @@
         '../ui/app_list/app_list.gyp:app_list_test_support',
         '../ui/views/views.gyp:views_test_support',
         'ash',
-        'ash_resources',
+        'ash_resources.gyp:ash_resources',
       ],
       'sources': [
         'desktop_background/desktop_background_controller_test_api.cc',
@@ -807,6 +806,8 @@
         'test/ash_test_helper.h',
         'test/ash_test_views_delegate.cc',
         'test/ash_test_views_delegate.h',
+        'test/child_modal_window.cc',
+        'test/child_modal_window.h',
         'test/cursor_manager_test_api.cc',
         'test/cursor_manager_test_api.h',
         'test/display_manager_test_api.cc',
@@ -904,9 +905,9 @@
         '../ui/web_dialogs/web_dialogs.gyp:web_dialogs_test_support',
         '../ui/wm/wm.gyp:wm',
         '../url/url.gyp:url_lib',
-        'ash_strings.gyp:ash_strings',
         'ash',
-        'ash_resources',
+        'ash_resources.gyp:ash_resources',
+        'ash_strings.gyp:ash_strings',
         'ash_test_support',
         'ash_with_content',
       ],
@@ -937,7 +938,7 @@
         'drag_drop/drag_drop_tracker_unittest.cc',
         'extended_desktop_unittest.cc',
         'focus_cycler_unittest.cc',
-        'frame/caption_buttons/frame_caption_button_container_view_unittest.cc', 
+        'frame/caption_buttons/frame_caption_button_container_view_unittest.cc',
         'frame/caption_buttons/frame_size_button_unittest.cc',
         'frame/custom_frame_view_ash_unittest.cc',
         'frame/default_header_painter_unittest.cc',
@@ -1126,13 +1127,14 @@
         '../ui/views/views.gyp:views',
         '../ui/views/views.gyp:views_test_support',
         'ash',
-        'ash_resources',
+        'ash_resources.gyp:ash_resources',
         'ash_strings.gyp:ash_strings',
+        'ash_test_support',
         'ash_with_content',
       ],
       'sources': [
         '../content/app/startup_helper_win.cc',
-        '../ui/views/test/test_views_delegate.cc',
+        '../ui/views/test/test_views_delegate_aura.cc',
         'shell/app_list.cc',
         'shell/bubble.cc',
         'shell/content_client/shell_browser_main_parts.cc',

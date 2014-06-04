@@ -81,6 +81,7 @@ HttpNetworkSession::Params::Params()
       force_spdy_over_ssl(true),
       force_spdy_always(false),
       use_alternate_protocols(false),
+      enable_websocket_over_spdy(false),
       enable_quic(false),
       enable_quic_https(false),
       enable_quic_port_selection(true),
@@ -92,7 +93,7 @@ HttpNetworkSession::Params::Params()
       quic_max_packet_length(kDefaultMaxPacketSize),
       enable_user_alternate_protocol_ports(false),
       quic_crypto_client_stream_factory(NULL) {
-  quic_supported_versions.push_back(QUIC_VERSION_17);
+  quic_supported_versions.push_back(QUIC_VERSION_18);
 }
 
 HttpNetworkSession::Params::~Params() {}

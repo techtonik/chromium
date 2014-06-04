@@ -8,17 +8,11 @@
 #include <string>
 #include <vector>
 
-#include "base/auto_reset.h"
-#include "base/bind.h"
-#include "base/bind_helpers.h"
-#include "base/callback.h"
 #include "base/command_line.h"
-#include "base/message_loop/message_loop.h"
 #include "base/pickle.h"
 #include "base/strings/string16.h"
 #include "base/strings/utf_string_conversions.h"
 #include "grit/ui_strings.h"
-#include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/clipboard/clipboard.h"
 #include "ui/base/clipboard/scoped_clipboard_writer.h"
 #include "ui/base/dragdrop/drag_drop_types.h"
@@ -36,7 +30,6 @@
 #include "ui/views/ime/mock_input_method.h"
 #include "ui/views/test/test_views_delegate.h"
 #include "ui/views/test/views_test_base.h"
-#include "ui/views/widget/native_widget_private.h"
 #include "ui/views/widget/widget.h"
 #include "url/gurl.h"
 
@@ -81,20 +74,6 @@ class TestTextfield : public views::Textfield {
   bool key_received_;
 
   DISALLOW_COPY_AND_ASSIGN(TestTextfield);
-};
-
-// A helper class for use with ui::TextInputClient::GetTextFromRange().
-class GetTextHelper {
- public:
-  GetTextHelper() {}
-
-  void set_text(const base::string16& text) { text_ = text; }
-  const base::string16& text() const { return text_; }
-
- private:
-  base::string16 text_;
-
-  DISALLOW_COPY_AND_ASSIGN(GetTextHelper);
 };
 
 // Convenience to make constructing a GestureEvent simpler.
@@ -665,35 +644,6 @@ TEST_F(TextfieldTest, FocusTraversalTest) {
   EXPECT_EQ(1, GetFocusedView()->id());
 }
 
-// Verify that the text input client properly tracks changing focus between text
-// fields. See crbug/365741.
-TEST_F(TextfieldTest, TextInputClientFollowsFocusChange) {
-  InitTextfields(2);
-  textfield_->RequestFocus();
-
-  EXPECT_EQ(textfield_, input_method_->GetTextInputClient());
-
-  widget_->GetFocusManager()->AdvanceFocus(false);
-  Textfield* second = static_cast<Textfield*>(GetFocusedView());
-  EXPECT_EQ(2, second->id());
-  EXPECT_EQ(second, input_method_->GetTextInputClient());
-
-  ui::MouseEvent click(ui::ET_MOUSE_PRESSED, gfx::Point(), gfx::Point(),
-                       ui::EF_LEFT_MOUSE_BUTTON, ui::EF_LEFT_MOUSE_BUTTON);
-  textfield_->OnMousePressed(click);
-  EXPECT_EQ(textfield_, input_method_->GetTextInputClient());
-
-  input_method_->Clear();
-
-  // Verify that blur does not reset text input client if field does not
-  // have focus.
-  second->OnBlur();
-  EXPECT_FALSE(input_method_->text_input_type_changed());
-  // Verify that blur on the focused text field resets the text input client.
-  textfield_->OnBlur();
-  EXPECT_TRUE(input_method_->text_input_type_changed());
-}
-
 TEST_F(TextfieldTest, ContextMenuDisplayTest) {
   InitTextfield();
   EXPECT_TRUE(textfield_->context_menu_controller());
@@ -1103,15 +1053,9 @@ TEST_F(TextfieldTest, TextInputClientTest) {
   EXPECT_TRUE(client->GetSelectionRange(&range));
   EXPECT_EQ(gfx::Range(1, 4), range);
 
-  // This code can't be compiled because of a bug in base::Callback.
-#if 0
-  GetTextHelper helper;
-  base::Callback<void(base::string16)> callback =
-      base::Bind(&GetTextHelper::set_text, base::Unretained(&helper));
-
-  EXPECT_TRUE(client->GetTextFromRange(range, callback));
-  EXPECT_STR_EQ("123", helper.text());
-#endif
+  base::string16 substring;
+  EXPECT_TRUE(client->GetTextFromRange(range, &substring));
+  EXPECT_STR_EQ("123", substring);
 
   EXPECT_TRUE(client->DeleteRange(range));
   EXPECT_STR_EQ("0456789", textfield_->text());

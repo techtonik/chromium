@@ -46,6 +46,7 @@
       'sources': [
         '../apps/app_shim/app_shim_quit_interactive_uitest_mac.mm',
         '../apps/app_window_interactive_uitest.cc',
+        '../ui/base/clipboard/clipboard_unittest.cc',
         '../ui/views/controls/webview/webview_interactive_uitest.cc',
         '../ui/views/corewm/desktop_capture_controller_unittest.cc',
         '../ui/views/widget/widget_interactive_uitest.cc',
@@ -259,7 +260,7 @@
         }],
         ['chromeos==1', {
           'dependencies': [
-            '../ash/ash.gyp:ash_resources',
+            '../ash/ash_resources.gyp:ash_resources',
             '../chromeos/chromeos.gyp:chromeos',
           ],
           'conditions': [
@@ -563,7 +564,7 @@
           'inputs': [
             'test/chromedriver/cpp_source.py',
             'test/chromedriver/embed_mobile_devices_in_cpp.py',
-            '../third_party/WebKit/Source/devtools/front_end/elements/OverridesView.js',
+            '../third_party/WebKit/Source/devtools/front_end/sdk/OverridesSupport.js',
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome/mobile_device_list.cc',
@@ -573,7 +574,7 @@
                       'test/chromedriver/embed_mobile_devices_in_cpp.py',
                       '--directory',
                       '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome',
-                      '../third_party/WebKit/Source/devtools/front_end/elements/OverridesView.js',
+                      '../third_party/WebKit/Source/devtools/front_end/sdk/OverridesSupport.js',
           ],
           'message': 'Generating sources for embedding mobile devices in chromedriver',
         },
@@ -903,6 +904,7 @@
         'browser/chrome_main_browsertest.cc',
         'browser/chrome_plugin_browsertest.cc',
         'browser/chrome_security_exploit_browsertest.cc',
+        'browser/chrome_service_worker_browsertest.cc',
         'browser/chrome_switches_browsertest.cc',
         'browser/chromeos/accessibility/accessibility_manager_browsertest.cc',
         'browser/chromeos/accessibility/magnification_manager_browsertest.cc',
@@ -947,6 +949,8 @@
         'browser/chromeos/login/crash_restore_browsertest.cc',
         'browser/chromeos/login/demo_mode/demo_app_launcher_browsertest.cc',
         'browser/chromeos/login/enrollment/enrollment_screen_browsertest.cc',
+        'browser/chromeos/login/enrollment/mock_auto_enrollment_check_screen.cc',
+        'browser/chromeos/login/enrollment/mock_auto_enrollment_check_screen.h',
         'browser/chromeos/login/enrollment/mock_enrollment_screen.cc',
         'browser/chromeos/login/enrollment/mock_enrollment_screen.h',
         'browser/chromeos/login/existing_user_controller_browsertest.cc',
@@ -1023,6 +1027,7 @@
         'browser/devtools/device/adb/mock_adb_server.cc',
         'browser/devtools/device/adb/mock_adb_server.h',
         'browser/devtools/device/port_forwarding_browsertest.cc',
+        'browser/devtools/device/usb/devtools_android_bridge_browsertest.cc',
         'browser/devtools/devtools_sanity_browsertest.cc',
         'browser/dom_distiller/dom_distiller_viewer_source_browsertest.cc',
         'browser/dom_distiller/tab_utils_browsertest.cc',
@@ -1326,6 +1331,7 @@
         'browser/renderer_host/render_process_host_chrome_browsertest.cc',
         'browser/renderer_host/web_cache_manager_browsertest.cc',
         'browser/repost_form_warning_browsertest.cc',
+        'browser/resources/chromeos/chromevox/common/aria_util_test.js',
         'browser/safe_browsing/local_safebrowsing_test_server.cc',
         'browser/safe_browsing/safe_browsing_blocking_page_test.cc',
         'browser/safe_browsing/safe_browsing_service_browsertest.cc',
@@ -2019,7 +2025,7 @@
           ]
         }],
         ['enable_autofill_dialog!=1 or OS=="android" or OS=="ios"', {
-          '!dependencies': [
+          'dependencies!': [
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput',
           ],
         }],
@@ -2037,6 +2043,11 @@
         }, {
           'sources/': [
             ['exclude', '^test/remoting'],
+          ],
+        }],
+        ['use_x11==1', {
+          'dependencies': [
+            '../tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',
           ],
         }],
       ],  # conditions

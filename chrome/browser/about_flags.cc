@@ -674,7 +674,8 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_CONTEXTUAL_SEARCH,
     IDS_FLAGS_ENABLE_CONTEXTUAL_SEARCH_DESCRIPTION,
     kOsAndroid,
-    SINGLE_VALUE_TYPE(switches::kEnableContextualSearch)
+    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableContextualSearch,
+                              switches::kDisableContextualSearch)
   },
 #endif
   {
@@ -878,13 +879,6 @@ const Experiment kExperiments[] = {
   },
 #if defined(OS_CHROMEOS)
   {
-    "ash-disable-docked-windows",
-    IDS_FLAGS_DOCKED_WINDOWS_NAME,
-    IDS_FLAGS_DOCKED_WINDOWS_DESCRIPTION,
-    kOsCrOS,
-    SINGLE_VALUE_TYPE(ash::switches::kAshDisableDockedWindows)
-  },
-  {
     "network-portal-notification",
     IDS_FLAGS_NETWORK_PORTAL_NOTIFICATION_NAME,
     IDS_FLAGS_NETWORK_PORTAL_NOTIFICATION_DESCRIPTION,
@@ -907,13 +901,6 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ALLOW_NACL_SOCKET_API_DESCRIPTION,
     kOsDesktop,
     SINGLE_VALUE_TYPE_AND_VALUE(switches::kAllowNaClSocketAPI, "*")
-  },
-  {
-    "stacked-tab-strip",
-    IDS_FLAGS_STACKED_TAB_STRIP_NAME,
-    IDS_FLAGS_STACKED_TAB_STRIP_DESCRIPTION,
-    kOsWin,
-    SINGLE_VALUE_TYPE(switches::kEnableStackedTabStrip)
   },
   {
     "force-device-scale-factor",
@@ -1282,13 +1269,6 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnableTcpFastOpen)
   },
   {
-    "apps-use-native-frame",
-    IDS_FLAGS_ENABLE_NATIVE_FRAMES_FOR_APPS_NAME,
-    IDS_FLAGS_ENABLE_NATIVE_FRAMES_FOR_APPS_DESCRIPTION,
-    kOsMac,
-    SINGLE_VALUE_TYPE(switches::kAppsUseNativeFrame)
-  },
-  {
     "enable-syncfs-directory-operation",
     IDS_FLAGS_ENABLE_SYNC_DIRECTORY_OPERATION_NAME,
     IDS_FLAGS_ENABLE_SYNC_DIRECTORY_OPERATION_DESCRIPTION,
@@ -1387,6 +1367,13 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_NEW_PROFILE_MANAGEMENT_DESCRIPTION,
     kOsAndroid | kOsMac | kOsWin | kOsLinux | kOsCrOS,
     SINGLE_VALUE_TYPE(switches::kNewProfileManagement)
+  },
+  {
+    "enable-account-consistency",
+    IDS_FLAGS_ENABLE_ACCOUNT_CONSISTENCY_NAME,
+    IDS_FLAGS_ENABLE_ACCOUNT_CONSISTENCY_DESCRIPTION,
+    kOsAndroid | kOsMac | kOsWin | kOsLinux | kOsCrOS,
+    SINGLE_VALUE_TYPE(switches::kEnableAccountConsistency)
   },
   {
     "enable-fast-user-switching",
@@ -1508,17 +1495,24 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnableStreamlinedHostedApps)
   },
   {
+    "enable-prominent-url-app-flow",
+    IDS_FLAGS_ENABLE_PROMINENT_URL_APP_FLOW_NAME,
+    IDS_FLAGS_ENABLE_PROMINENT_URL_APP_FLOW_DESCRIPTION,
+    kOsWin | kOsCrOS | kOsLinux,
+    SINGLE_VALUE_TYPE(switches::kEnableProminentURLAppFlow)
+  },
+  {
     "enable-ephemeral-apps",
     IDS_FLAGS_ENABLE_EPHEMERAL_APPS_NAME,
     IDS_FLAGS_ENABLE_EPHEMERAL_APPS_DESCRIPTION,
-    kOsWin | kOsLinux | kOsCrOS,
+    kOsAll,
     SINGLE_VALUE_TYPE(switches::kEnableEphemeralApps)
   },
   {
     "enable-linkable-ephemeral-apps",
     IDS_FLAGS_ENABLE_LINKABLE_EPHEMERAL_APPS_NAME,
     IDS_FLAGS_ENABLE_LINKABLE_EPHEMERAL_APPS_DESCRIPTION,
-    kOsWin | kOsLinux | kOsCrOS,
+    kOsAll,
     SINGLE_VALUE_TYPE(switches::kEnableLinkableEphemeralApps)
   },
   {
@@ -1834,6 +1828,15 @@ const Experiment kExperiments[] = {
     kOsDesktop,
     SINGLE_VALUE_TYPE(switches::kEnableHarfBuzzRenderText)
   },
+#if defined(OS_ANDROID)
+  {
+    "enable-answers-in-suggest",
+    IDS_FLAGS_ENABLE_ANSWERS_IN_SUGGEST_NAME,
+    IDS_FLAGS_ENABLE_ANSWERS_IN_SUGGEST_DESCRIPTION,
+    kOsAndroid,
+    SINGLE_VALUE_TYPE(switches::kEnableAnswersInSuggest)
+  },
+#endif
 };
 
 const Experiment* experiments = kExperiments;

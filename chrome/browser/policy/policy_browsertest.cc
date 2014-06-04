@@ -57,7 +57,6 @@
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/translate/translate_browser_test_utils.h"
-#include "chrome/browser/translate/translate_infobar_delegate.h"
 #include "chrome/browser/translate/translate_service.h"
 #include "chrome/browser/translate/translate_tab_helper.h"
 #include "chrome/browser/ui/bookmarks/bookmark_bar.h"
@@ -89,6 +88,7 @@
 #include "components/policy/core/common/policy_pref_names.h"
 #include "components/policy/core/common/policy_service.h"
 #include "components/policy/core/common/policy_service_impl.h"
+#include "components/translate/core/browser/translate_infobar_delegate.h"
 #include "content/public/browser/browser_child_process_host_iterator.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
@@ -1370,7 +1370,8 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, DeveloperToolsDisabled) {
                POLICY_SCOPE_USER, base::Value::CreateBooleanValue(true), NULL);
   content::WindowedNotificationObserver close_observer(
       content::NOTIFICATION_WEB_CONTENTS_DESTROYED,
-      content::Source<content::WebContents>(devtools_window->web_contents()));
+      content::Source<content::WebContents>(
+          devtools_window->web_contents_for_test()));
   UpdateProviderPolicy(policies);
   // wait for devtools close
   close_observer.Wait();

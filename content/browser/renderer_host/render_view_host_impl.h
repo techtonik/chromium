@@ -488,16 +488,13 @@ class CONTENT_EXPORT RenderViewHostImpl
   void OnUpdateTargetURL(int32 page_id, const GURL& url);
   void OnClose();
   void OnRequestMove(const gfx::Rect& pos);
-  void OnDocumentAvailableInMainFrame();
+  void OnDocumentAvailableInMainFrame(bool uses_temporary_zoom_level);
   void OnToggleFullscreen(bool enter_fullscreen);
   void OnDidContentsPreferredSizeChange(const gfx::Size& new_size);
   void OnDidChangeScrollOffset();
   void OnDidChangeScrollOffsetPinningForMainFrame(bool is_pinned_to_left,
                                                   bool is_pinned_to_right);
   void OnDidChangeNumWheelEvents(int count);
-#if defined(OS_ANDROID)
-  void OnSelectionRootBoundsChanged(const gfx::Rect& bounds);
-#endif
   void OnPasteFromSelectionClipboard();
   void OnRouteCloseEvent();
   void OnRouteMessageEvent(const ViewMsg_PostMessage_Params& params);
@@ -517,7 +514,7 @@ class CONTENT_EXPORT RenderViewHostImpl
       const std::vector<AccessibilityHostMsg_EventParams>& params);
   void OnAccessibilityLocationChanges(
       const std::vector<AccessibilityHostMsg_LocationChangeParams>& params);
-  void OnDidZoomURL(double zoom_level, bool remember, const GURL& url);
+  void OnDidZoomURL(double zoom_level, const GURL& url);
   void OnRunFileChooser(const FileChooserParams& params);
   void OnFocusedNodeTouched(bool editable);
 

@@ -359,8 +359,11 @@ IPC_MESSAGE_ROUTED1(ExtensionMsg_ExecuteCode,
 // Notification that the user scripts have been updated. It has one
 // SharedMemoryHandle argument consisting of the pickled script data. This
 // handle is valid in the context of the renderer.
-IPC_MESSAGE_CONTROL1(ExtensionMsg_UpdateUserScripts,
-                     base::SharedMemoryHandle)
+// If |changed_extensions| is not empty, only the extensions in that set will
+// be updated. Otherwise, all extensions will be updated.
+IPC_MESSAGE_CONTROL2(ExtensionMsg_UpdateUserScripts,
+                     base::SharedMemoryHandle,
+                     std::set<std::string> /* changed extensions */)
 
 // Tell the render view which browser window it's being attached to.
 IPC_MESSAGE_ROUTED1(ExtensionMsg_UpdateBrowserWindowId,
@@ -454,6 +457,14 @@ IPC_MESSAGE_ROUTED0(ExtensionMsg_AppWindowClosed)
 // each tab to keep the browser updated about changes.
 IPC_MESSAGE_CONTROL1(ExtensionMsg_WatchPages,
                      std::vector<std::string> /* CSS selectors */)
+
+// Send by the browser to indicate a Blob handle has been transferred to the
+// renderer. This is sent after the actual extension response, and depends on
+// the sequential nature of IPCs so that the blob has already been caught.
+// This is a separate control message, so that the renderer process will send
+// an acknowledgement even if the RenderView has closed or navigated away.
+IPC_MESSAGE_CONTROL1(ExtensionMsg_TransferBlobs,
+                     std::vector<std::string> /* blob_uuids */)
 
 // Messages sent from the renderer to the browser.
 
@@ -572,9 +583,21 @@ IPC_MESSAGE_ROUTED3(ExtensionHostMsg_ContentScriptsExecuting,
                     int32 /* page_id of the _topmost_ frame */,
                     GURL /* url of the _topmost_ frame */)
 
-IPC_MESSAGE_ROUTED2(ExtensionHostMsg_NotifyExtensionScriptExecution,
+// Sent from the renderer to the browser to request permission for a content
+// script to execute on a given page.
+// If request id is -1, this signals that the request has already ran, and this
+// merely serves as a notification. This happens when the feature to disable
+// scripts running without user consent is not enabled.
+IPC_MESSAGE_ROUTED3(ExtensionHostMsg_RequestContentScriptPermission,
                     std::string /* extension id */,
-                    int /* page id */)
+                    int /* page id */,
+                    int /* request id */)
+
+// Sent from the browser to the renderer in reply to a
+// RequestContentScriptPermission message, granting permission for a content
+// script to run.
+IPC_MESSAGE_ROUTED1(ExtensionMsg_GrantContentScriptPermission,
+                    int /* request id */)
 
 // Sent by the renderer when a web page is checking if its app is installed.
 IPC_MESSAGE_ROUTED3(ExtensionHostMsg_GetAppInstallState,
@@ -642,3 +665,7 @@ IPC_MESSAGE_CONTROL2(ExtensionHostMsg_AddDOMActionToActivityLog,
 //   to change.
 IPC_MESSAGE_ROUTED1(ExtensionHostMsg_OnWatchedPageChange,
                     std::vector<std::string> /* Matching CSS selectors */)
+
+// Sent by the renderer when it has received a Blob handle from the browser.
+IPC_MESSAGE_CONTROL1(ExtensionHostMsg_TransferBlobsAck,
+                     std::vector<std::string> /* blob_uuids */)

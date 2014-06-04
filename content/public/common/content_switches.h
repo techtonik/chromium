@@ -37,7 +37,6 @@ CONTENT_EXPORT extern const char kDisableAcceleratedFixedRootBackground[];
 CONTENT_EXPORT extern const char kDisableAcceleratedOverflowScroll[];
 CONTENT_EXPORT extern const char kDisableLayerSquashing[];
 CONTENT_EXPORT extern const char kDisableAcceleratedVideoDecode[];
-CONTENT_EXPORT extern const char kDisableAltWinstation[];
 CONTENT_EXPORT extern const char kDisableApplicationCache[];
 extern const char kDisableBackingStoreLimit[];
 CONTENT_EXPORT extern const char kDisableCompositingForFixedPosition[];
@@ -52,7 +51,6 @@ CONTENT_EXPORT extern const char kDisableEmbeddedSharedWorker[];
 CONTENT_EXPORT extern const char kDisableExperimentalWebGL[];
 CONTENT_EXPORT extern const char kDisableFastTextAutosizing[];
 CONTENT_EXPORT extern const char kDisableFileSystem[];
-CONTENT_EXPORT extern const char kDisableFiltersOverIPC[];
 CONTENT_EXPORT extern const char kDisableFlash3d[];
 CONTENT_EXPORT extern const char kDisableFlashStage3d[];
 CONTENT_EXPORT extern const char kDisableGestureTapHighlight[];
@@ -121,14 +119,6 @@ extern const char kEnableGpuClientTracing[];
 CONTENT_EXPORT extern const char kEnableGpuRasterization[];
 CONTENT_EXPORT extern const char kEnableLowResTiling[];
 CONTENT_EXPORT extern const char kEnableHighDpiCompositingForFixedPosition[];
-#if defined(OS_WIN)
-CONTENT_EXPORT extern const char kDisableLegacyIntermediateWindow[];
-CONTENT_EXPORT extern const char kEnableDirectWrite[];
-// This switch will be removed when we enable the win32K lockdown process
-// mitigation.
-CONTENT_EXPORT extern const char kEnableWin32kRendererLockDown[];
-CONTENT_EXPORT extern const char kEnableHighResolutionTime[];
-#endif
 CONTENT_EXPORT extern const char kEnableImplSidePainting[];
 CONTENT_EXPORT extern const char kEnableInbandTextTracks[];
 CONTENT_EXPORT extern const char kEnableLCDText[];
@@ -248,6 +238,7 @@ CONTENT_EXPORT extern const char kUIPrioritizeInGpuProcess[];
 CONTENT_EXPORT extern const char kUseDiscardableMemory[];
 CONTENT_EXPORT extern const char kUseFakeUIForMediaStream[];
 CONTENT_EXPORT extern const char kUseMobileUserAgent[];
+extern const char kUseSurfaces[];
 extern const char kUtilityCmdPrefix[];
 CONTENT_EXPORT extern const char kUtilityProcess[];
 extern const char kUtilityProcessAllowedDir[];
@@ -265,12 +256,10 @@ CONTENT_EXPORT extern const char kDisableDeviceEnumeration[];
 CONTENT_EXPORT extern const char kDisableWebRtcHWDecoding[];
 CONTENT_EXPORT extern const char kDisableWebRtcEncryption[];
 CONTENT_EXPORT extern const char kDisableWebRtcHWEncoding[];
-extern const char kEnableWebRtcTcpServerSocket[];
 CONTENT_EXPORT extern const char kEnableWebRtcHWVp8Encoding[];
 #endif
 
 #if defined(OS_ANDROID)
-CONTENT_EXPORT extern const char kDisableGestureRequirementForMediaFullscreen[];
 CONTENT_EXPORT extern const char kDisableGestureRequirementForMediaPlayback[];
 CONTENT_EXPORT extern const char kDisableClickDelay[];
 CONTENT_EXPORT extern const char kDisableOverscrollEdgeEffect[];
@@ -291,6 +280,18 @@ CONTENT_EXPORT extern const char kDisablePanelFitting[];
 #if defined(OS_MACOSX) && !defined(OS_IOS)
 extern const char kEnableCarbonInterposing[];
 extern const char kDisableCoreAnimationPlugins[];
+#endif
+
+#if defined(OS_WIN)
+// This switch contains the device scale factor passed to certain processes
+// like renderers, etc.
+CONTENT_EXPORT extern const char kDeviceScaleFactor[];
+CONTENT_EXPORT extern const char kDisableLegacyIntermediateWindow[];
+CONTENT_EXPORT extern const char kEnableDirectWrite[];
+CONTENT_EXPORT extern const char kEnableHighResolutionTime[];
+// This switch will be removed when we enable the win32K lockdown process
+// mitigation.
+CONTENT_EXPORT extern const char kEnableWin32kRendererLockDown[];
 #endif
 
 // DON'T ADD RANDOM STUFF HERE. Put it in the main section above in

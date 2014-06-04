@@ -34,7 +34,7 @@ MessagePipeDispatcher::MessagePipeDispatcher()
 
 void MessagePipeDispatcher::Init(scoped_refptr<MessagePipe> message_pipe,
                                  unsigned port) {
-  DCHECK(message_pipe.get());
+  DCHECK(message_pipe);
   DCHECK(port == 0 || port == 1);
 
   message_pipe_ = message_pipe;
@@ -104,7 +104,7 @@ scoped_refptr<MessagePipeDispatcher> MessagePipeDispatcher::Deserialize(
 
 MessagePipeDispatcher::~MessagePipeDispatcher() {
   // |Close()|/|CloseImplNoLock()| should have taken care of the pipe.
-  DCHECK(!message_pipe_.get());
+  DCHECK(!message_pipe_);
 }
 
 MessagePipe* MessagePipeDispatcher::GetMessagePipeNoLock() const {
@@ -150,7 +150,7 @@ MojoResult MessagePipeDispatcher::WriteMessageImplNoLock(
 
   lock().AssertAcquired();
 
-  if (!VerifyUserPointer<void>(bytes, num_bytes))
+  if (!VerifyUserPointerWithSize<1>(bytes, num_bytes))
     return MOJO_RESULT_INVALID_ARGUMENT;
   if (num_bytes > kMaxMessageNumBytes)
     return MOJO_RESULT_RESOURCE_EXHAUSTED;
@@ -168,9 +168,9 @@ MojoResult MessagePipeDispatcher::ReadMessageImplNoLock(
   lock().AssertAcquired();
 
   if (num_bytes) {
-    if (!VerifyUserPointer<uint32_t>(num_bytes, 1))
+    if (!VerifyUserPointer<uint32_t>(num_bytes))
       return MOJO_RESULT_INVALID_ARGUMENT;
-    if (!VerifyUserPointer<void>(bytes, *num_bytes))
+    if (!VerifyUserPointerWithSize<1>(bytes, *num_bytes))
       return MOJO_RESULT_INVALID_ARGUMENT;
   }
 

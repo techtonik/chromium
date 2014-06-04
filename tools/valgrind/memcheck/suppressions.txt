@@ -4208,13 +4208,6 @@
    fun:_ZN7content23AudioInputDeviceManager23EnumerateOnDeviceThread*
 }
 {
-   bug_158510
-   Memcheck:Uninitialized
-   fun:_ZN7WebCore11RenderTable6layoutEv
-   ...
-   fun:_ZN7WebCore11RenderBlock6layoutEv
-}
-{
    bug_158514
    Memcheck:Uninitialized
    ...
@@ -5447,20 +5440,6 @@
    fun:_ZN7content12_GLOBAL__N_121ClearOriginOnIOThreadEjRK4GURLRK13scoped_refptrIN3net23URLRequestContextGetterEERKS4_IN5quota12QuotaManagerEE
 }
 {
-   bug_258466
-   Memcheck:Leak
-   fun:_Znw*
-   fun:_ZN22ChromeBrowserMainParts25PreMainMessageLoopRunImplEv
-   fun:_ZN22ChromeBrowserMainParts21PreMainMessageLoopRunEv
-   fun:_ZN7content15BrowserMainLoop13CreateThreadsEv
-   fun:_ZN7content21BrowserMainRunnerImpl10InitializeERKNS_18MainFunctionParamsE
-   fun:_ZN7content11BrowserMainERKNS_18MainFunctionParamsE
-   fun:_ZN7content23RunNamedProcessTypeMainERKSsRKNS_18MainFunctionParamsEPNS_19ContentMainDelegateE
-   fun:_ZN7content21ContentMainRunnerImpl3RunEv
-   fun:_ZN7content11ContentMainEiPPKcPNS_19ContentMainDelegateE
-   fun:ChromeMain
-}
-{
    bug_258132a
    Memcheck:Leak
    fun:_Znw*
@@ -5929,6 +5908,14 @@
    fun:_ZN11webkit_glue16WebURLLoaderImpl7Context18OnCompletedRequestEibRKSsRKN4base9TimeTicksE
 }
 {
+   bug_328092
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN7content16WebURLLoaderImplC1Ev
+   fun:_ZN7content17BlinkPlatformImpl15createURLLoaderEv
+   fun:_ZN7WebCore14ResourceLoader5startEv
+}
+{
    bug_329960
    Memcheck:Leak
    fun:_Znw*
@@ -6289,9 +6276,7 @@
    fun:_ZN3WTF10fastMallocEm
    fun:_ZN3WTF10RefCountedIN7WebCore11ScriptStateEEnwEm
    fun:_ZN7WebCore11ScriptState6createEN2v86HandleINS1_7ContextEEEN3WTF10PassRefPtrINS_15DOMWrapperWorldEEE
-   fun:_ZN7WebCore22WorkerScriptController25initializeContextIfNeededEv
-   fun:_ZN7WebCore22WorkerScriptController8evaluateERKN3WTF6StringES4_RKNS1_12TextPositionEPNS_31WorkerGlobalScopeExecutionStateE
-   fun:_ZN7WebCore22WorkerScriptController8evaluateERKNS_16ScriptSourceCodeEPN3WTF6RefPtrINS_10ErrorEventEEE
+   ...
    fun:_ZN7WebCore12WorkerThread12workerThreadEv
    fun:_ZN7WebCore12WorkerThread17workerThreadStartEPv
    fun:_ZN3WTFL16threadEntryPointEPv
@@ -6366,6 +6351,17 @@
    fun:_ZN4mojo9RemotePtrINS_11ShellClientEE5StateC1ENS_16ScopedHandleBaseINS_17MessagePipeHandleEEEPNS_5ShellEPNS_12ErrorHandlerEP15MojoAsyncWaiter
    fun:_ZN4mojo9RemotePtrINS_11ShellClientEE5resetENS_16ScopedHandleBaseINS_15InterfaceHandleIS1_EEEEPNS_5ShellEPNS_12ErrorHandlerEP15MojoAsyncWaiter
    fun:_ZN7content19MojoApplicationHost4InitEv
+}
+{
+   bug_367809_d
+   Memcheck:Leak
+   fun:_Znw*
+   ...
+   fun:_ZN7content21RenderProcessHostImpl4InitEv
+   ...
+   fun:_ZN7content5Shell7LoadURLERK4GURL
+   fun:_ZN7content20WebKitTestController20PrepareForLayoutTestERK4GURLRKN4base8FilePathEbRKSs
+   fun:_ZN12_GLOBAL__N_110RunOneTestERKSsPbRK10scoped_ptrIN7content17BrowserMainRunnerEN4base14DefaultDeleterIS5_EEE
 }
 {
    bug_369843
@@ -6470,4 +6466,45 @@
    Memcheck:Leak
    fun:_Znw*
    fun:_ZN7content27ServiceWorkerContextWrapper12InitInternalERKN4base8FilePathEPNS1_19SequencedTaskRunnerEPNS1_16MessageLoopProxyEPN5quota17QuotaManagerProxyE
+}
+{
+   bug_379359
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN7content27ServiceWorkerContextWrapperC1EPNS_14BrowserContextE
+   fun:_ZN7content20StoragePartitionImpl6CreateEPNS_14BrowserContextEbRKN4base8FilePathE
+   fun:_ZN7content23StoragePartitionImplMap3GetERKSsS2_b
+   fun:_ZN7content12_GLOBAL__N_129GetStoragePartitionFromConfigEPNS_14BrowserContextERKSsS4_b
+   fun:_ZN7content14BrowserContext19GetStoragePartitionEPS0_PNS_12SiteInstanceE
+   fun:_ZN7content14BrowserContext26GetDefaultStoragePartitionEPS0_
+   fun:_ZN7content21ShellBrowserMainParts21PreMainMessageLoopRunEv
+   fun:_ZN7content15BrowserMainLoop21PreMainMessageLoopRunEv
+}
+{
+   bug_379943
+   Memcheck:Leak
+   fun:_Znw*
+   ...
+   fun:_ZN7content23CreateFileSystemContextEPNS_14BrowserContextERKN4base8FilePathEbPN5quota17QuotaManagerProxyE
+   fun:_ZN7content20StoragePartitionImpl6CreateEPNS_14BrowserContextEbRKN4base8FilePathE
+   fun:_ZN7content23StoragePartitionImplMap3GetERKSsS2_b
+   fun:_ZN7content12_GLOBAL__N_129GetStoragePartitionFromConfigEPNS_14BrowserContextERKSsS4_b
+   fun:_ZN7content14BrowserContext19GetStoragePartitionEPS0_PNS_12SiteInstanceE
+   fun:_ZN7content14BrowserContext26GetDefaultStoragePartitionEPS0_
+   fun:_ZN7content21ShellBrowserMainParts21PreMainMessageLoopRunEv
+   fun:_ZN7content15BrowserMainLoop21PreMainMessageLoopRunEv
+}
+{
+   bug_380575
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN9__gnu_cxx13new_allocatorISt13_Rb_tree_nodeISt4pairIKSsPN3net20URLRequestJobFactory15ProtocolHandlerEEEE8allocateEmPKv
+   ...
+   fun:_ZNSt8_Rb_treeISsSt4pairIKSsPN3net20URLRequestJobFactory15ProtocolHandlerEESt10_Select1stIS6_ESt4lessISsESaIS6_EE17_M_insert_unique_ESt23_Rb_tree_const_iteratorIS6_ERKS6_
+   fun:_ZNSt3mapISsPN3net20URLRequestJobFactory15ProtocolHandlerESt4lessISsESaISt4pairIKSsS3_EEE6insertESt17_Rb_tree_iteratorIS8_ERKS8_
+   fun:_ZNSt3mapISsPN3net20URLRequestJobFactory15ProtocolHandlerESt4lessISsESaISt4pairIKSsS3_EEEixERS7_
+   fun:_ZN3net24URLRequestJobFactoryImpl18SetProtocolHandlerERKSsPNS_20URLRequestJobFactory15ProtocolHandlerE
+   ...
+   fun:_ZN7content28ShellURLRequestContextGetter20GetURLRequestContextEv
+   fun:_ZN7content21ChromeAppCacheService20InitializeOnIOThreadERKN4base8FilePathEPNS_15ResourceContextEPN3net23URLRequestContextGetterE13scoped_refptrIN5quota20SpecialStoragePolicyEE
 }

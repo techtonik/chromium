@@ -35,24 +35,6 @@ ArrayDataTraits<bool>::BitRef::operator bool() const {
 }
 
 // static
-void ArraySerializationHelper<Handle, true>::ClearHandles(
-    const ArrayHeader* header,
-    ElementType* elements) {
-  for (uint32_t i = 0; i < header->num_elements; ++i)
-    elements[i].set_value(MOJO_HANDLE_INVALID);
-}
-
-// static
-void ArraySerializationHelper<Handle, true>::CloseHandles(
-    const ArrayHeader* header,
-    ElementType* elements) {
-  for (uint32_t i = 0; i < header->num_elements; ++i) {
-    if (elements[i].is_valid())
-      CloseRaw(elements[i]);
-  }
-}
-
-// static
 void ArraySerializationHelper<Handle, true>::EncodePointersAndHandles(
     const ArrayHeader* header,
     ElementType* elements,
@@ -62,12 +44,21 @@ void ArraySerializationHelper<Handle, true>::EncodePointersAndHandles(
 }
 
 // static
-bool ArraySerializationHelper<Handle, true>::DecodePointersAndHandles(
+void ArraySerializationHelper<Handle, true>::DecodePointersAndHandles(
     const ArrayHeader* header,
     ElementType* elements,
-    Message* message) {
+    std::vector<Handle>* handles) {
+  for (uint32_t i = 0; i < header->num_elements; ++i)
+    DecodeHandle(&elements[i], handles);
+}
+
+// static
+bool ArraySerializationHelper<Handle, true>::ValidateElements(
+    const ArrayHeader* header,
+    const ElementType* elements,
+    BoundsChecker* bounds_checker) {
   for (uint32_t i = 0; i < header->num_elements; ++i) {
-    if (!DecodeHandle(&elements[i], message->mutable_handles()))
+    if (!bounds_checker->ClaimHandle(elements[i]))
       return false;
   }
   return true;

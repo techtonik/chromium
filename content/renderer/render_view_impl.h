@@ -392,7 +392,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual bool requestPointerLock();
   virtual void requestPointerUnlock();
   virtual bool isPointerLocked();
-  virtual void didActivateCompositor() OVERRIDE;
   virtual void didHandleGestureEvent(const blink::WebGestureEvent& event,
                                      bool event_cancelled) OVERRIDE;
   virtual void initializeLayerTreeView() OVERRIDE;
@@ -571,9 +570,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual void InstrumentDidBeginFrame() OVERRIDE;
   virtual void InstrumentDidCancelFrame() OVERRIDE;
   virtual void InstrumentWillComposite() OVERRIDE;
-#if defined(OS_ANDROID)
-  virtual void UpdateSelectionRootBounds() OVERRIDE;
-#endif
 
  protected:
   explicit RenderViewImpl(RenderViewImplParams* params);
@@ -750,7 +746,6 @@ class CONTENT_EXPORT RenderViewImpl
   void OnSetPageEncoding(const std::string& encoding_name);
   void OnSetRendererPrefs(const RendererPreferences& renderer_prefs);
   void OnSetWebUIProperty(const std::string& name, const std::string& value);
-  void OnSetZoomLevel(double zoom_level);
   void OnSetZoomLevelForLoadingURL(const GURL& url, double zoom_level);
   void OnStop();
   void OnStopFinding(StopFindAction action);
@@ -774,7 +769,6 @@ class CONTENT_EXPORT RenderViewImpl
                                 bool enable_showing,
                                 bool animate);
   void OnExtractSmartClipData(const gfx::Rect& rect);
-  void GetSelectionRootBounds(gfx::Rect* bounds) const;
 #elif defined(OS_MACOSX)
   void OnPluginImeCompositionCompleted(const base::string16& text,
                                        int plugin_id);
