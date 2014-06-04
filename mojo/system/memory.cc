@@ -7,18 +7,33 @@
 #include <limits>
 
 #include "base/logging.h"
+#include "build/build_config.h"
 
 namespace mojo {
 namespace system {
 
 namespace internal {
 
+template <size_t alignment>
+bool IsAligned(const void* pointer) {
+  return reinterpret_cast<uintptr_t>(pointer) % alignment == 0;
+}
+
+#if defined(COMPILER_MSVC) && defined(ARCH_CPU_32_BITS)
+// MSVS (2010, 2013) sometimes (on the stack) aligns, e.g., |int64_t|s (for
+// which |__alignof(int64_t)| is 8) to 4-byte boundaries. http://goo.gl/Y2n56T
+template <>
+bool IsAligned<8>(const void* pointer) {
+  return reinterpret_cast<uintptr_t>(pointer) % 4 == 0;
+}
+#endif
+
 template <size_t size, size_t alignment>
 bool MOJO_SYSTEM_IMPL_EXPORT VerifyUserPointerHelper(const void* pointer) {
   // TODO(vtl): If running in kernel mode, do a full verification. For now, just
   // check that it's non-null and aligned. (A faster user mode implementation is
   // also possible if this check is skipped.)
-  return !!pointer && reinterpret_cast<uintptr_t>(pointer) % alignment == 0;
+  return !!pointer && IsAligned<alignment>(pointer);
 }
 
 // Explicitly instantiate the sizes we need. Add instantiations as needed.
@@ -37,8 +52,7 @@ bool VerifyUserPointerWithCountHelper(const void* pointer, size_t count) {
   // TODO(vtl): If running in kernel mode, do a full verification. For now, just
   // check that it's non-null and aligned if |count| is nonzero. (A faster user
   // mode implementation is also possible if this check is skipped.)
-  return count == 0 ||
-         (!!pointer && reinterpret_cast<uintptr_t>(pointer) % alignment == 0);
+  return count == 0 || (!!pointer && IsAligned<alignment>(pointer));
 }
 
 // Explicitly instantiate the sizes we need. Add instantiations as needed.
@@ -56,8 +70,7 @@ bool VerifyUserPointerWithSize(const void* pointer, size_t size) {
   // TODO(vtl): If running in kernel mode, do a full verification. For now, just
   // check that it's non-null and aligned. (A faster user mode implementation is
   // also possible if this check is skipped.)
-  return size == 0 ||
-         (!!pointer && reinterpret_cast<uintptr_t>(pointer) % alignment == 0);
+  return size == 0 || (!!pointer && internal::IsAligned<alignment>(pointer));
 }
 
 // Explicitly instantiate the alignments we need. Add instantiations as needed.

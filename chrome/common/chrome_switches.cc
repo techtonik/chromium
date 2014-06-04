@@ -100,9 +100,6 @@ const char kAppModeAuthCode[]               = "app-mode-auth-code";
 // Value of OAuth2 refresh token for --force-app-mode.
 const char kAppModeOAuth2Token[]            = "app-mode-oauth-token";
 
-// Experimental native frame support for packaged apps.
-const char kAppsUseNativeFrame[]            = "apps-use-native-frame";
-
 // Enables overriding the path for the default authentication extension.
 const char kAuthExtensionPath[]             = "auth-ext-path";
 
@@ -713,9 +710,6 @@ const char kForceFirstRun[]                 = "force-first-run";
 // prefixed with the character "t" will be treated as Trigger Variation Ids.
 const char kForceVariationIds[]             = "force-variation-ids";
 
-// Specifies an alternate URL to use for speaking to Google. Useful for testing.
-const char kGoogleBaseURL[]                 = "google-base-url";
-
 // Specifies a custom name for the GSSAPI library to load.
 const char kGSSAPILibraryName[]             = "gssapi-library-name";
 
@@ -1059,10 +1053,6 @@ const char kRendererPrintPreview[]          = "renderer-print-preview";
 // doesn't prevent the app list from running, it just makes Chrome think the app
 // list hasn't been enabled (as in kEnableAppList) yet.
 const char kResetAppListInstallState[]      = "reset-app-list-install-state";
-
-// Forces a reset of the one-time-randomized FieldTrials on this client, also
-// known as the Chrome Variations state.
-const char kResetVariationState[]           = "reset-variation-state";
 
 // Indicates the last session should be restored on startup. This overrides the
 // preferences value and is primarily intended for testing. The value of this

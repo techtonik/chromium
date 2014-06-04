@@ -10,6 +10,7 @@
 
 #include "mojo/public/cpp/bindings/lib/bindings_internal.h"
 #include "mojo/public/cpp/bindings/lib/bindings_serialization.h"
+#include "mojo/public/cpp/bindings/lib/bounds_checker.h"
 #include "mojo/public/cpp/bindings/lib/buffer.h"
 
 namespace mojo {
@@ -105,9 +106,14 @@ struct ArraySerializationHelper<T, false> {
                                        std::vector<Handle>* handles) {
   }
 
-  static bool DecodePointersAndHandles(const ArrayHeader* header,
+  static void DecodePointersAndHandles(const ArrayHeader* header,
                                        ElementType* elements,
-                                       Message* message) {
+                                       std::vector<Handle>* handles) {
+  }
+
+  static bool ValidateElements(const ArrayHeader* header,
+                               const ElementType* elements,
+                               BoundsChecker* bounds_checker) {
     return true;
   }
 };
@@ -120,9 +126,13 @@ struct ArraySerializationHelper<Handle, true> {
                                        ElementType* elements,
                                        std::vector<Handle>* handles);
 
-  static bool DecodePointersAndHandles(const ArrayHeader* header,
+  static void DecodePointersAndHandles(const ArrayHeader* header,
                                        ElementType* elements,
-                                       Message* message);
+                                       std::vector<Handle>* handles);
+
+  static bool ValidateElements(const ArrayHeader* header,
+                               const ElementType* elements,
+                               BoundsChecker* bounds_checker);
 };
 
 template <typename H>
@@ -136,11 +146,18 @@ struct ArraySerializationHelper<H, true> {
         header, elements, handles);
   }
 
-  static bool DecodePointersAndHandles(const ArrayHeader* header,
+  static void DecodePointersAndHandles(const ArrayHeader* header,
                                        ElementType* elements,
-                                       Message* message) {
-    return ArraySerializationHelper<Handle, true>::DecodePointersAndHandles(
-        header, elements, message);
+                                       std::vector<Handle>* handles) {
+    ArraySerializationHelper<Handle, true>::DecodePointersAndHandles(
+        header, elements, handles);
+  }
+
+  static bool ValidateElements(const ArrayHeader* header,
+                               const ElementType* elements,
+                               BoundsChecker* bounds_checker) {
+    return ArraySerializationHelper<Handle, true>::ValidateElements(
+        header, elements, bounds_checker);
   }
 };
 
@@ -155,12 +172,21 @@ struct ArraySerializationHelper<P*, false> {
       Encode(&elements[i], handles);
   }
 
-  static bool DecodePointersAndHandles(const ArrayHeader* header,
+  static void DecodePointersAndHandles(const ArrayHeader* header,
                                        ElementType* elements,
-                                       Message* message) {
+                                       std::vector<Handle>* handles) {
+    for (uint32_t i = 0; i < header->num_elements; ++i)
+      Decode(&elements[i], handles);
+  }
+
+  static bool ValidateElements(const ArrayHeader* header,
+                               const ElementType* elements,
+                               BoundsChecker* bounds_checker) {
     for (uint32_t i = 0; i < header->num_elements; ++i) {
-      if (!Decode(&elements[i], message))
+      if (!ValidateEncodedPointer(&elements[i].offset) ||
+          !P::Validate(DecodePointerRaw(&elements[i].offset), bounds_checker)) {
         return false;
+      }
     }
     return true;
   }
@@ -180,6 +206,26 @@ class Array_Data {
                        Traits::GetStorageSize(num_elements);
     return new (buf->Allocate(num_bytes)) Array_Data<T>(num_bytes,
                                                         num_elements);
+  }
+
+  static bool Validate(const void* data, BoundsChecker* bounds_checker) {
+    if (!data)
+      return true;
+    if (!IsAligned(data))
+      return false;
+    if (!bounds_checker->IsValidRange(data, sizeof(ArrayHeader)))
+      return false;
+    const ArrayHeader* header = static_cast<const ArrayHeader*>(data);
+    if (header->num_bytes < (sizeof(Array_Data<T>) +
+                             Traits::GetStorageSize(header->num_elements))) {
+      return false;
+    }
+    if (!bounds_checker->ClaimMemory(data, header->num_bytes))
+      return false;
+
+    const Array_Data<T>* object = static_cast<const Array_Data<T>*>(data);
+    return Helper::ValidateElements(&object->header_, object->storage(),
+                                    bounds_checker);
   }
 
   size_t size() const { return header_.num_elements; }
@@ -208,8 +254,8 @@ class Array_Data {
     Helper::EncodePointersAndHandles(&header_, storage(), handles);
   }
 
-  bool DecodePointersAndHandles(Message* message) {
-    return Helper::DecodePointersAndHandles(&header_, storage(), message);
+  void DecodePointersAndHandles(std::vector<Handle>* handles) {
+    Helper::DecodePointersAndHandles(&header_, storage(), handles);
   }
 
  private:

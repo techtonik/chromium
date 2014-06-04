@@ -187,8 +187,6 @@ TEST_PPAPI_NACL(Console)
 #else
 #define MAYBE_Core Core
 #endif
-TEST_PPAPI_IN_PROCESS(MAYBE_Core)
-TEST_PPAPI_OUT_OF_PROCESS(MAYBE_Core)
 TEST_PPAPI_NACL(MAYBE_Core)
 
 // Non-NaCl TraceEvent tests are in content/test/ppapi/ppapi_browsertest.cc.
@@ -543,8 +541,7 @@ TEST_PPAPI_NACL(MAYBE_URLRequest_CreateAndIsURLRequestInfo)
 
 TEST_PPAPI_IN_PROCESS_VIA_HTTP(URLRequest_SetProperty)
 TEST_PPAPI_OUT_OF_PROCESS_VIA_HTTP(URLRequest_SetProperty)
-// http://crbug.com/167150
-TEST_PPAPI_NACL(DISABLED_URLRequest_SetProperty)
+TEST_PPAPI_NACL(URLRequest_SetProperty)
 TEST_PPAPI_IN_PROCESS_VIA_HTTP(URLRequest_AppendDataToBody)
 TEST_PPAPI_OUT_OF_PROCESS_VIA_HTTP(URLRequest_AppendDataToBody)
 TEST_PPAPI_NACL(URLRequest_AppendDataToBody)

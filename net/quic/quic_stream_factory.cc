@@ -749,7 +749,7 @@ int QuicStreamFactory::CreateSession(
       new QuicConnection(connection_id, addr, helper_.get(), writer.get(),
                          false, supported_versions_);
   writer->SetConnection(connection);
-  connection->options()->max_packet_length = max_packet_length_;
+  connection->set_max_packet_length(max_packet_length_);
 
   InitializeCachedStateInCryptoConfig(server_id, server_info);
 
@@ -782,6 +782,7 @@ void QuicStreamFactory::ActivateSession(
     const QuicServerId& server_id,
     QuicClientSession* session) {
   DCHECK(!HasActiveSession(server_id));
+  UMA_HISTOGRAM_COUNTS("Net.QuicActiveSessions", active_sessions_.size());
   active_sessions_[server_id] = session;
   session_aliases_[session].insert(server_id);
   const IpAliasKey ip_alias_key(session->connection()->peer_address(),
@@ -834,16 +835,39 @@ void QuicStreamFactory::ProcessGoingAwaySession(
   UMA_HISTOGRAM_COUNTS("Net.QuicHandshakeNotConfirmedNumPacketsReceived",
                        stats.packets_received);
 
-  if (session_was_active) {
-    // TODO(rch):  In the special case where the session has received no
-    // packets from the peer, we should consider blacklisting this
-    // differently so that we still race TCP but we don't consider the
-    // session connected until the handshake has been confirmed.
-    HistogramBrokenAlternateProtocolLocation(
-        BROKEN_ALTERNATE_PROTOCOL_LOCATION_QUIC_STREAM_FACTORY);
-    http_server_properties_->SetBrokenAlternateProtocol(
-        server_id.host_port_pair());
-  }
+  if (!session_was_active)
+    return;
+
+  const HostPortPair& server = server_id.host_port_pair();
+  // Don't try to change the alternate-protocol state, if the
+  // alternate-protocol state is unknown.
+  if (!http_server_properties_->HasAlternateProtocol(server))
+    return;
+
+  // TODO(rch):  In the special case where the session has received no
+  // packets from the peer, we should consider blacklisting this
+  // differently so that we still race TCP but we don't consider the
+  // session connected until the handshake has been confirmed.
+  HistogramBrokenAlternateProtocolLocation(
+      BROKEN_ALTERNATE_PROTOCOL_LOCATION_QUIC_STREAM_FACTORY);
+  PortAlternateProtocolPair alternate =
+      http_server_properties_->GetAlternateProtocol(server);
+  DCHECK_EQ(QUIC, alternate.protocol);
+
+  // Since the session was active, there's no longer an
+  // HttpStreamFactoryImpl::Job running which can mark it broken, unless the
+  // TCP job also fails. So to avoid not using QUIC when we otherwise could,
+  // we mark it as broken, and then immediately re-enable it. This leaves
+  // QUIC as "recently broken" which means that 0-RTT will be disabled but
+  // we'll still race.
+  http_server_properties_->SetBrokenAlternateProtocol(server);
+  http_server_properties_->ClearAlternateProtocol(server);
+  http_server_properties_->SetAlternateProtocol(
+      server, alternate.port, alternate.protocol);
+  DCHECK_EQ(QUIC,
+            http_server_properties_->GetAlternateProtocol(server).protocol);
+  DCHECK(http_server_properties_->WasAlternateProtocolRecentlyBroken(
+      server));
 }
 
 }  // namespace net

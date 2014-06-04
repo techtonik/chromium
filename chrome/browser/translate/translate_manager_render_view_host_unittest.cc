@@ -15,7 +15,6 @@
 #include "chrome/browser/extensions/test_extension_system.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/renderer_context_menu/render_view_context_menu_test_util.h"
-#include "chrome/browser/translate/translate_infobar_delegate.h"
 #include "chrome/browser/translate/translate_service.h"
 #include "chrome/browser/translate/translate_tab_helper.h"
 #include "chrome/browser/ui/translate/translate_bubble_factory.h"
@@ -31,6 +30,7 @@
 #include "components/translate/content/common/translate_messages.h"
 #include "components/translate/core/browser/translate_accept_languages.h"
 #include "components/translate/core/browser/translate_download_manager.h"
+#include "components/translate/core/browser/translate_infobar_delegate.h"
 #include "components/translate/core/browser/translate_language_list.h"
 #include "components/translate/core/browser/translate_manager.h"
 #include "components/translate/core/browser/translate_prefs.h"
@@ -94,7 +94,10 @@ class TranslateManagerRenderViewHostTest
   void SimulateNavigation(const GURL& url,
                           const std::string& lang,
                           bool page_translatable) {
-    NavigateAndCommit(url);
+    if (rvh()->GetMainFrame()->GetLastCommittedURL() == url)
+      Reload();
+    else
+      NavigateAndCommit(url);
     SimulateOnTranslateLanguageDetermined(lang, page_translatable);
   }
 
@@ -794,7 +797,8 @@ TEST_F(TranslateManagerRenderViewHostTest, ReloadFromLocationBar) {
   NavEntryCommittedObserver nav_observer(web_contents());
   web_contents()->GetController().LoadURL(
       url, content::Referrer(), content::PAGE_TRANSITION_TYPED, std::string());
-  rvh_tester()->SendNavigate(0, url);
+  rvh_tester()->SendNavigateWithTransition(
+      0, url, content::PAGE_TRANSITION_TYPED);
 
   // Test that we are really getting a same page navigation, the test would be
   // useless if it was not the case.

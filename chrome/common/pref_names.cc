@@ -476,11 +476,6 @@ const char kDisabledSchemes[] = "protocol.disabled_schemes";
 // recorded on Android so that retries aren't attempted on every startup.
 // Instead the cloud policy registration is retried at least 1 or 3 days later.
 const char kLastPolicyCheckTime[] = "policy.last_policy_check_time";
-
-// A list of bookmarks to include in a Managed Bookmarks root node. Each
-// list item is a dictionary containing a "name" and an "url" entry, detailing
-// the bookmark name and target URL respectively.
-const char kManagedBookmarks[] = "policy.managed_bookmarks";
 #endif
 
 // Prefix URL for the experimental Instant ZeroSuggest provider.
@@ -871,6 +866,10 @@ const char kTimeOnOobe[] = "settings.time_on_oobe";
 // The app/extension name who sets the current wallpaper. If current wallpaper
 // is set by the component wallpaper picker, it is set to an empty string.
 const char kCurrentWallpaperAppName[] = "wallpaper.app.name";
+
+// List of mounted file systems via the File System Provider API. Used to
+// restore them after a reboot.
+const char kFileSystemProviderMounted[] = "file_system_provider.mounted";
 #endif  // defined(OS_CHROMEOS)
 
 // The disabled messages in IPC logging.
@@ -1346,30 +1345,10 @@ const char kDisableSSLRecordSplitting[] = "ssl.ssl_record_splitting.disabled";
 // A boolean pref of the EULA accepted flag.
 const char kEulaAccepted[] = "EulaAccepted";
 
-// The metrics client GUID, entropy source and session ID.
-// Note: The names client_id2 and low_entropy_source2 are a result of creating
-// new prefs to do a one-time reset of the previous values.
-const char kMetricsClientID[] = "user_experience_metrics.client_id2";
-const char kMetricsSessionID[] = "user_experience_metrics.session_id";
-const char kMetricsLowEntropySource[] =
-    "user_experience_metrics.low_entropy_source2";
-
-// Old client id and low entropy source values, cleared the first time this
-// version is launched.
-// TODO(asvitkine): Delete these after a few releases have gone by and old
-// values have been cleaned up. http://crbug.com/357704
-const char kMetricsOldClientID[] = "user_experience_metrics.client_id";
-const char kMetricsOldLowEntropySource[] =
-    "user_experience_metrics.low_entropy_source";
-
 // Boolean that specifies whether or not crash reporting and metrics reporting
 // are sent over the network for analysis.
 const char kMetricsReportingEnabled[] =
     "user_experience_metrics.reporting_enabled";
-// Date/time when the user opted in to UMA and generated the client id for the
-// very first time (local machine time, stored as a 64-bit time_t value).
-const char kMetricsReportingEnabledTimestamp[] =
-    "user_experience_metrics.client_id_timestamp";
 
 // Boolean that specifies whether or not crash reports are sent
 // over the network for analysis.
@@ -2075,6 +2054,10 @@ const char kServerBackedDeviceState[] = "server_backed_device_state";
 // since wallpaper was cached.
 const char kCustomizationDefaultWallpaperURL[] =
     "customization.default_wallpaper_url";
+
+// System uptime, when last logout started.
+// This is saved to file and cleared after chrome process starts.
+const char kLogoutStartedLast[] = "chromeos.logout-started";
 #endif
 
 // Whether there is a Flash version installed that supports clearing LSO data.
@@ -2257,6 +2240,14 @@ const char kRegisteredProtocolHandlers[] =
 const char kIgnoredProtocolHandlers[] =
   "custom_handlers.ignored_protocol_handlers";
 
+// List of protocol handlers registered by policy.
+const char kPolicyRegisteredProtocolHandlers[] =
+    "custom_handlers.policy.registered_protocol_handlers";
+
+// List of protocol handlers the policy has requested to be ignored.
+const char kPolicyIgnoredProtocolHandlers[] =
+    "custom_handlers.policy.ignored_protocol_handlers";
+
 // Whether user-specified handlers for protocols and content types can be
 // specified.
 const char kCustomHandlersEnabled[] = "custom_handlers.enabled";
@@ -2330,49 +2321,10 @@ const char kShowLogoutButtonInTray[] = "show_logout_button_in_tray";
 
 #if defined(USE_AURA)
 // Tuning settings for gestures.
-const char kFlingVelocityCap[] = "gesture.fling_velocity_cap";
-const char kLongPressTimeInSeconds[] =
-    "gesture.long_press_time_in_seconds";
-const char kMaxDistanceBetweenTapsForDoubleTap[] =
-    "gesture.max_distance_between_taps_for_double_tap";
-const char kMaxDistanceForTwoFingerTapInPixels[] =
-    "gesture.max_distance_for_two_finger_tap_in_pixels";
-const char kMaxSecondsBetweenDoubleClick[] =
-    "gesture.max_seconds_between_double_click";
 const char kMaxSeparationForGestureTouchesInPixels[] =
     "gesture.max_separation_for_gesture_touches_in_pixels";
-const char kMaxSwipeDeviationRatio[] =
-    "gesture.max_swipe_deviation_ratio";
-const char kMaxTouchDownDurationInSecondsForClick[] =
-    "gesture.max_touch_down_duration_in_seconds_for_click";
-const char kMaxTouchMoveInPixelsForClick[] =
-    "gesture.max_touch_move_in_pixels_for_click";
-const char kMinDistanceForPinchScrollInPixels[] =
-    "gesture.min_distance_for_pinch_scroll_in_pixels";
-const char kMinFlickSpeedSquared[] =
-    "gesture.min_flick_speed_squared";
-const char kMinPinchUpdateDistanceInPixels[] =
-    "gesture.min_pinch_update_distance_in_pixels";
-const char kMinRailBreakVelocity[] =
-    "gesture.min_rail_break_velocity";
-const char kMinScrollDeltaSquared[] =
-    "gesture.min_scroll_delta_squared";
-const char kMinSwipeSpeed[] =
-    "gesture.min_swipe_speed";
-const char kMinTouchDownDurationInSecondsForClick[] =
-    "gesture.min_touch_down_duration_in_seconds_for_click";
-const char kPointsBufferedForVelocity[] =
-    "gesture.points_buffered_for_velocity";
-const char kRailBreakProportion[] =
-    "gesture.rail_break_proportion";
-const char kRailStartProportion[] =
-    "gesture.rail_start_proportion";
-const char kScrollPredictionSeconds[] =
-    "gesture.scroll_prediction_seconds";
 const char kSemiLongPressTimeInSeconds[] =
     "gesture.semi_long_press_time_in_seconds";
-const char kShowPressDelayInMS[] =
-    "gesture.show_press_delay_in_ms";
 const char kTabScrubActivationDelayInMS[] =
     "gesture.tab_scrub_activation_delay_in_ms";
 const char kFlingAccelerationCurveCoefficient0[] =
@@ -2473,9 +2425,9 @@ const char kAppLaunchForMetroRestart[] = "apps.app_launch_for_metro_restart";
 const char kAppLaunchForMetroRestartProfile[] =
     "apps.app_launch_for_metro_restart_profile";
 
-// A boolean that indicates whether app shortcuts have been created.
-// On a transition from false to true, shortcuts are created for all apps.
-const char kAppShortcutsHaveBeenCreated[] = "apps.shortcuts_have_been_created";
+// An integer that is incremented whenever changes are made to app shortcuts.
+// Increasing this causes all app shortcuts to be recreated.
+const char kAppShortcutsVersion[] = "apps.shortcuts_version";
 
 // How often the bubble has been shown.
 extern const char kModuleConflictBubbleShown[] = "module_conflict.bubble_shown";

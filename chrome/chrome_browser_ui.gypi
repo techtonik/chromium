@@ -170,8 +170,6 @@
         'browser/ui/app_list/app_list_util.h',
         'browser/ui/app_list/app_list_view_delegate.cc',
         'browser/ui/app_list/app_list_view_delegate.h',
-        'browser/ui/app_list/chrome_signin_delegate.cc',
-        'browser/ui/app_list/chrome_signin_delegate.h',
         'browser/ui/app_list/drive/drive_app_converter.cc',
         'browser/ui/app_list/drive/drive_app_converter.h',
         'browser/ui/app_list/extension_app_item.cc',
@@ -2712,7 +2710,7 @@
           ],
           'dependencies': [
             # aura uses some of ash resources.
-            '../ash/ash.gyp:ash_resources',
+            '../ash/ash_resources.gyp:ash_resources',
             '../ui/aura/aura.gyp:aura',
             '../ui/keyboard/keyboard.gyp:keyboard',
             '../ui/keyboard/keyboard.gyp:keyboard_resources',

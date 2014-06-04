@@ -74,9 +74,11 @@
             'data_reduction_proxy/browser/data_reduction_proxy_auth_request_handler_unittest.cc',
             'data_reduction_proxy/browser/data_reduction_proxy_config_service_unittest.cc',
             'data_reduction_proxy/browser/data_reduction_proxy_metrics_unittest.cc',
+            'data_reduction_proxy/browser/data_reduction_proxy_params_unittest.cc',
             'data_reduction_proxy/browser/data_reduction_proxy_settings_unittest.cc',
             'data_reduction_proxy/browser/http_auth_handler_data_reduction_proxy_unittest.cc',
             'dom_distiller/core/article_entry_unittest.cc',
+            'dom_distiller/core/distilled_content_store_unittest.cc',
             'dom_distiller/core/distiller_unittest.cc',
             'dom_distiller/core/distiller_url_fetcher_unittest.cc',
             'dom_distiller/core/dom_distiller_database_unittest.cc',
@@ -110,6 +112,8 @@
             'metrics/metrics_log_base_unittest.cc',
             'metrics/metrics_log_manager_unittest.cc',
             'metrics/metrics_reporting_scheduler_unittest.cc',
+            'metrics/metrics_state_manager_unittest.cc',
+            'metrics/net/compression_utils_unittest.cc',
             'metrics/persisted_logs_unittest.cc',
             'navigation_interception/intercept_navigation_resource_throttle_unittest.cc',
             'os_crypt/ie7_password_win_unittest.cc',
@@ -262,6 +266,10 @@
             # Dependencies of language_usage_metrics
             'components.gyp:language_usage_metrics',
 
+            # Dependencies of metrics
+            'components.gyp:metrics',
+            'components.gyp:metrics_net',
+
             # Dependencies of os_crypt
             'components.gyp:os_crypt',
 
@@ -371,6 +379,7 @@
                 ['include', '^json_schema/'],
                 ['include', '^keyed_service/core/'],
                 ['include', '^language_usage_metrics/'],
+                ['include', '^metrics/'],
                 ['include', '^password_manager/'],
                 ['include', '^precache/core/'],
                 ['include', '^search_provider_logos/'],

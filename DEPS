@@ -28,29 +28,29 @@ vars = {
   "libcxxabi_revision": "206024",
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
   "nacl_trunk": "http://src.chromium.org/native_client/trunk",
-  "webkit_revision": "174973",
+  "webkit_revision": "175413",
   "chromium_git": "https://chromium.googlesource.com",
   "chromiumos_git": "https://chromium.googlesource.com/chromiumos",
   "pdfium_git": "https://pdfium.googlesource.com",
   "skia_git": "https://skia.googlesource.com",
   "swig_revision": "230490",
-  "nacl_revision": "13251",
+  "nacl_revision": "13267",
   # After changing nacl_revision, run 'glient sync' and check native_client/DEPS
   # to update other nacl_*_revision's.
   "nacl_tools_revision": "13077",  # native_client/DEPS: tools_rev
   "google_toolbox_for_mac_revision": "662",
-  "libaddressinput_revision": "258",
+  "libaddressinput_revision": "262",
   "libphonenumber_revision": "621",
   "libvpx_revision": "269083",
   "lss_revision": "26",
   "sfntly_revision": "228",
   "lighttpd_revision": "33737",
-  "skia_revision": "5744bbee6fa65f9d532587b6539fa0f104dda98b",
+  "skia_revision": "abc073376091e66f705674b825b1247148cb9c24",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   "v8_branch": "trunk",
-  "v8_revision": "21543",
+  "v8_revision": "21633",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
@@ -72,7 +72,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling build tools
   # and whatever else without interference from each other.
-  "buildtools_revision": "83ed7189066fd9b4b9ea15ffc2d4ab6d2da62571",
+  "buildtools_revision": "5d89977ce55240995d1596fe420b818468f5ec37",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFIum
   # and whatever else without interference from each other.
@@ -145,7 +145,7 @@ deps = {
     (Var("googlecode_url") % "snappy") + "/trunk@80",
 
   "src/tools/grit":
-    (Var("googlecode_url") % "grit-i18n") + "/trunk@167",
+    (Var("googlecode_url") % "grit-i18n") + "/trunk@168",
 
   "src/tools/gyp":
     (Var("googlecode_url") % "gyp") + "/trunk@1921",
@@ -211,7 +211,7 @@ deps = {
 
   "src/third_party/ffmpeg":
     Var("chromium_git") +
-    "/chromium/third_party/ffmpeg.git@90d4238be2656ee9d6b8f0cdfa5f96d40e6ed7ad",
+    "/chromium/third_party/ffmpeg.git@96481cb9163681998d1407b0c951a4c951be1b04",
 
   "src/third_party/libjingle/source/talk":
     (Var("googlecode_url") % "webrtc") + "/trunk/talk@" +
@@ -258,7 +258,7 @@ deps = {
         "/trunk/jsoncpp/src/lib_json@" + Var("jsoncpp_revision"),
 
   "src/third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@1000",
+    (Var("googlecode_url") % "libyuv") + "/trunk@1007",
 
   "src/third_party/smhasher/src":
     (Var("googlecode_url") % "smhasher") + "/trunk@152",

@@ -281,8 +281,12 @@ void ExternalInstallError::InstallUIProceed() {
     ExtensionSystem::Get(browser_context_)
         ->extension_service()
         ->GrantPermissionsAndEnableExtension(extension);
+    // Since the manager listens for the extension to be loaded, this will
+    // remove the error...
+  } else {
+    // ... Otherwise we have to do it explicitly.
+    manager_->RemoveExternalInstallError();
   }
-  manager_->RemoveExternalInstallError();
 }
 
 void ExternalInstallError::InstallUIAbort(bool user_initiated) {
@@ -292,8 +296,12 @@ void ExternalInstallError::InstallUIAbort(bool user_initiated) {
         ->UninstallExtension(extension_id_,
                              false,  // Not externally uninstalled.
                              NULL);  // Ignore error.
+    // Since the manager listens for the extension to be removed, this will
+    // remove the error...
+  } else {
+    // ... Otherwise we have to do it explicitly.
+    manager_->RemoveExternalInstallError();
   }
-  manager_->RemoveExternalInstallError();
 }
 
 void ExternalInstallError::AcknowledgeExtension() {

@@ -58,11 +58,11 @@ ViewManagerConnection::~ViewManagerConnection() {
         this, root_node_manager_,
         RootNodeManager::CHANGE_TYPE_ADVANCE_SERVER_CHANGE_ID, true);
     while (!node_map_.empty()) {
-      Node* node = node_map_.begin()->second;
+      scoped_ptr<Node> node(node_map_.begin()->second);
       Node* parent = node->GetParent();
       const NodeId node_id(node->id());
       if (parent)
-        parent->Remove(node);
+        parent->Remove(node.get());
       root_node_manager_->ProcessNodeDeleted(node_id);
       node_map_.erase(NodeIdToTransportId(node_id));
     }
@@ -127,6 +127,7 @@ void ViewManagerConnection::ProcessNodeHierarchyChanged(
       RemoveFromKnown(node);
       client()->OnNodeDeleted(NodeIdToTransportId(node->id()),
                               server_change_id);
+      root_node_manager_->OnConnectionMessagedClient(id_);
       return;
     }
   }
@@ -185,9 +186,12 @@ void ViewManagerConnection::ProcessNodeDeleted(
 
   if (in_known) {
     client()->OnNodeDeleted(NodeIdToTransportId(node), server_change_id);
-  } else if (root_node_manager_->IsProcessingChange()) {
+    root_node_manager_->OnConnectionMessagedClient(id_);
+  } else if (root_node_manager_->IsProcessingChange() &&
+             !root_node_manager_->DidConnectionMessageClient(id_)) {
     client()->OnServerChangeIdAdvanced(
         root_node_manager_->next_server_change_id() + 1);
+    root_node_manager_->OnConnectionMessagedClient(id_);
   }
 }
 

@@ -33,9 +33,12 @@ group("root") {
     "//components/translate:translate_core_browser",
     "//components/translate:translate_core_common",
     "//components/url_matcher",
+    #"//content/public/browser",  # Exists but doesn't build yet.
+    "//content/public/child",
     "//content/public/common",
     "//content/public/renderer",
     "//crypto",
+    "//dbus",
     "//device/usb",
     #"//extensions/common/api:extensions_api",
     "//gin",
@@ -45,8 +48,8 @@ group("root") {
     "//mojo",
     "//net",
     "//ppapi:ppapi_c",
-    "//sandbox",
-    #"//sdch",
+    #"//sandbox",
+    "//sdch",
     "//skia",
     "//sql",
     "//third_party/angle:translator",
@@ -59,6 +62,7 @@ group("root") {
     "//third_party/libusb",
     "//third_party/libwebm",
     "//third_party/libwebp",
+    "//third_party/mesa",
     "//third_party/ots",
     "//third_party/protobuf:protobuf_lite",
     "//third_party/qcms",
@@ -84,13 +88,14 @@ group("root") {
     "//ui/strings",
     "//ui/surface",
     "//url",
-    "//v8:mksnapshot",
+    "//v8:v8",
     "//webkit/browser:storage",
     "//webkit/child",
   ]
 
   if (is_linux) {
     deps += [
+      "//third_party/fontconfig",
       "//third_party/freetype2",
     ]
   }
@@ -101,11 +106,19 @@ group("root") {
     ]
   }
 
+  if (is_win || is_mac || is_chromeos) {
+    # RLZ works on these platforms.
+    deps += [
+      "//rlz:rlz_lib",
+    ]
+  }
+
   if (is_android) {
     deps -= [
       "//cc",
       "//content/public/common",
       "//content/public/renderer",
+      "//dbus",
       "//ppapi:ppapi_c",
       "//third_party/libusb",
       #"//third_party/WebKit/Source/platform",
