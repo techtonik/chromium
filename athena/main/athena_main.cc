@@ -7,6 +7,7 @@
 #include "apps/shell/browser/shell_desktop_controller.h"
 #include "athena/main/athena_launcher.h"
 #include "athena/main/placeholder.h"
+#include "athena/main/placeholder_content.h"
 #include "content/public/app/content_main.h"
 #include "ui/aura/window_tree_host.h"
 #include "ui/wm/core/visibility_controller.h"
@@ -18,13 +19,19 @@ class AthenaBrowserMainDelegate : public apps::ShellBrowserMainDelegate {
 
   // apps::ShellBrowserMainDelegate:
   virtual void Start(content::BrowserContext* context) OVERRIDE {
-    athena::StartAthena(apps::ShellDesktopController::instance()
-                            ->GetWindowTreeHost()
-                            ->window());
+    athena::StartAthena(
+        apps::ShellDesktopController::instance()->host()->window());
     CreateTestWindows();
+    CreateTestPages(context);
   }
 
   virtual void Shutdown() OVERRIDE { athena::ShutdownAthena(); }
+
+  virtual apps::ShellDesktopController* CreateDesktopController() OVERRIDE {
+    // TODO(mukai): create Athena's own ShellDesktopController subclass so that
+    // it can initialize its own window manager logic.
+    return new apps::ShellDesktopController();
+  }
 
  private:
   DISALLOW_COPY_AND_ASSIGN(AthenaBrowserMainDelegate);

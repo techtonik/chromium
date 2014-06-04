@@ -74,7 +74,6 @@
 #include "ui/gfx/screen.h"
 #include "ui/gfx/size_conversions.h"
 #include "ui/gl/gl_switches.h"
-#include "ui/gl/io_surface_support_mac.h"
 
 using content::BrowserAccessibility;
 using content::BrowserAccessibilityManager;
@@ -2027,8 +2026,12 @@ void RenderWidgetHostViewMac::UnlockMouse() {
     render_widget_host_->LostMouseLock();
 }
 
-void RenderWidgetHostViewMac::UnhandledWheelEvent(
-    const blink::WebMouseWheelEvent& event) {
+void RenderWidgetHostViewMac::WheelEventAck(
+    const blink::WebMouseWheelEvent& event,
+    InputEventAckState ack_result) {
+  if (ack_result == INPUT_EVENT_ACK_STATE_CONSUMED)
+    return;
+
   // Only record a wheel event as unhandled if JavaScript handlers got a chance
   // to see it (no-op wheel events are ignored by the event dispatcher)
   if (event.deltaX || event.deltaY)

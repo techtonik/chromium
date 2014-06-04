@@ -54,10 +54,12 @@ void ExternalInstallManager::AddExternalInstallError(const Extension* extension,
 }
 
 void ExternalInstallManager::RemoveExternalInstallError() {
-  error_.reset();
-  ExtensionSystem::Get(browser_context_)
-      ->extension_service()
-      ->UpdateExternalExtensionAlert();
+  if (error_.get()) {
+    error_.reset();
+    ExtensionSystem::Get(browser_context_)
+        ->extension_service()
+        ->UpdateExternalExtensionAlert();
+  }
 }
 
 bool ExternalInstallManager::HasExternalInstallError() const {

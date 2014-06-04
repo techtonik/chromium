@@ -168,6 +168,12 @@ void ActiveScriptController::OnNavigated() {
   pending_requests_.clear();
 }
 
+void ActiveScriptController::OnExtensionUnloaded(const Extension* extension) {
+  PendingRequestMap::iterator iter = pending_requests_.find(extension->id());
+  if (iter != pending_requests_.end())
+    pending_requests_.erase(iter);
+}
+
 void ActiveScriptController::RunPendingForExtension(
     const Extension* extension) {
   DCHECK(extension);

@@ -931,7 +931,8 @@ void RenderWidgetHostViewAndroid::SynchronousFrameMetadata(
 }
 
 void RenderWidgetHostViewAndroid::SetOverlayVideoMode(bool enabled) {
-  layer_->SetContentsOpaque(!enabled);
+  if (layer_)
+    layer_->SetContentsOpaque(!enabled);
 }
 
 void RenderWidgetHostViewAndroid::SynchronousCopyContents(
@@ -1090,11 +1091,6 @@ void RenderWidgetHostViewAndroid::ProcessAckedTouchEvent(
 
 void RenderWidgetHostViewAndroid::SetScrollOffsetPinning(
     bool is_pinned_to_left, bool is_pinned_to_right) {
-  // intentionally empty, like RenderWidgetHostViewViews
-}
-
-void RenderWidgetHostViewAndroid::UnhandledWheelEvent(
-    const blink::WebMouseWheelEvent& event) {
   // intentionally empty, like RenderWidgetHostViewViews
 }
 

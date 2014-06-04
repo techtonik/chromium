@@ -335,6 +335,7 @@
     {
       'library_name': 'zlib1g',
       'dependencies=': [],
+      'run_before_build': 'zlib1g.sh',
       'includes': ['standard_instrumented_library_target.gypi'],
     },
     {

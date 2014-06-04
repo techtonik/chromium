@@ -31,6 +31,7 @@
         '../third_party/zlib/zlib.gyp:*',
         '../ui/accessibility/accessibility.gyp:*',
         '../ui/base/ui_base.gyp:*',
+        '../ui/display/display.gyp:display_unittests',
         '../ui/snapshot/snapshot.gyp:*',
         '../url/url.gyp:*',
       ],
@@ -258,6 +259,7 @@
         '../net/net.gyp:net_unittests',
         '../sql/sql.gyp:sql_unittests',
         '../sync/sync.gyp:sync_unit_tests',
+        '../ui/display/display.gyp:display_unittests',
         '../ui/gfx/gfx_tests.gyp:gfx_unittests',
         '../ui/ui_unittests.gyp:ui_unittests',
         '../url/url.gyp:url_unittests',
@@ -301,9 +303,7 @@
           'dependencies': [
             '../chrome/chrome.gyp:crash_service',
             '../chrome/chrome.gyp:installer_util_unittests',
-            '../chrome/chrome.gyp:mini_installer_test',
-            # mini_installer_tests depends on mini_installer. This should be
-            # defined in installer.gyp.
+            # ../chrome/test/mini_installer requires mini_installer.
             '../chrome/installer/mini_installer.gyp:mini_installer',
             '../chrome_elf/chrome_elf.gyp:chrome_elf_unittests',
             '../content/content_shell_and_tests.gyp:copy_test_netscape_plugin',
@@ -958,7 +958,6 @@
             '../chrome/chrome.gyp:gcapi_test',
             '../chrome/chrome.gyp:installer_util_unittests',
             '../chrome/chrome.gyp:interactive_ui_tests',
-            '../chrome/chrome.gyp:mini_installer_test',
             '../chrome/chrome.gyp:performance_browser_tests',
             '../chrome/chrome.gyp:sync_integration_tests',
             '../chrome/chrome.gyp:unit_tests',
@@ -967,8 +966,7 @@
             '../content/content_shell_and_tests.gyp:content_browsertests',
             '../content/content_shell_and_tests.gyp:content_unittests',
             '../content/content_shell_and_tests.gyp:copy_test_netscape_plugin',
-            # mini_installer_tests depends on mini_installer. This should be
-            # defined in installer.gyp.
+            # ../chrome/test/mini_installer requires mini_installer.
             '../chrome/installer/mini_installer.gyp:mini_installer',
             '../courgette/courgette.gyp:courgette_unittests',
             '../device/device_tests.gyp:device_unittests',
@@ -1136,6 +1134,7 @@
             '../ui/app_list/app_list.gyp:*',
             '../ui/aura/aura.gyp:*',
             '../ui/compositor/compositor.gyp:*',
+            '../ui/display/display.gyp:display_unittests',
             '../ui/events/events.gyp:*',
             '../ui/gfx/gfx_tests.gyp:gfx_unittests',
             '../ui/keyboard/keyboard.gyp:*',

@@ -119,6 +119,7 @@ static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_MediaStreamVideoTrack_0_1
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_MediaStreamVideoTrack_1_0;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_MessageLoop_1_0;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_Messaging_1_0;
+static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_Messaging_1_1;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_MouseLock_1_0;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_NetAddress_1_0;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_NetworkList_1_0;
@@ -1185,6 +1186,25 @@ static void Pnacl_M14_PPB_Messaging_PostMessage(PP_Instance instance, struct PP_
 
 /* End wrapper methods for PPB_Messaging_1_0 */
 
+/* Begin wrapper methods for PPB_Messaging_1_1 */
+
+static void Pnacl_M37_PPB_Messaging_PostMessage(PP_Instance instance, struct PP_Var* message) {
+  const struct PPB_Messaging_1_1 *iface = Pnacl_WrapperInfo_PPB_Messaging_1_1.real_iface;
+  iface->PostMessage(instance, *message);
+}
+
+static int32_t Pnacl_M37_PPB_Messaging_RegisterMessageHandler(PP_Instance instance, void* user_data, const struct PPP_MessageHandler_0_1* handler, PP_Resource message_loop) {
+  const struct PPB_Messaging_1_1 *iface = Pnacl_WrapperInfo_PPB_Messaging_1_1.real_iface;
+  return iface->RegisterMessageHandler(instance, user_data, handler, message_loop);
+}
+
+static void Pnacl_M37_PPB_Messaging_UnregisterMessageHandler(PP_Instance instance) {
+  const struct PPB_Messaging_1_1 *iface = Pnacl_WrapperInfo_PPB_Messaging_1_1.real_iface;
+  iface->UnregisterMessageHandler(instance);
+}
+
+/* End wrapper methods for PPB_Messaging_1_1 */
+
 /* Not generating wrapper methods for PPB_MouseCursor_1_0 */
 
 /* Begin wrapper methods for PPB_MouseLock_1_0 */
@@ -1895,6 +1915,8 @@ static void Pnacl_M18_PPB_WebSocket_GetURL(struct PP_Var* _struct_result, PP_Res
 /* Not generating wrapper methods for PPP_Instance_1_0 */
 
 /* Not generating wrapper methods for PPP_Instance_1_1 */
+
+/* Not generating wrapper methods for PPP_MessageHandler_0_1 */
 
 /* Begin wrapper methods for PPP_Messaging_1_0 */
 
@@ -3219,9 +3241,9 @@ static int32_t Pnacl_M25_PPB_NaCl_Private_BrokerDuplicateHandle(PP_FileHandle so
   return iface->BrokerDuplicateHandle(source_handle, process_id, target_handle, desired_access, options);
 }
 
-static PP_FileHandle Pnacl_M25_PPB_NaCl_Private_GetReadonlyPnaclFd(const char* filename) {
+static PP_FileHandle Pnacl_M25_PPB_NaCl_Private_GetReadonlyPnaclFd(const char* url) {
   const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  return iface->GetReadonlyPnaclFd(filename);
+  return iface->GetReadonlyPnaclFd(url);
 }
 
 static PP_FileHandle Pnacl_M25_PPB_NaCl_Private_CreateTemporaryFile(PP_Instance instance) {
@@ -4516,6 +4538,12 @@ static const struct PPB_Messaging_1_0 Pnacl_Wrappers_PPB_Messaging_1_0 = {
     .PostMessage = (void (*)(PP_Instance instance, struct PP_Var message))&Pnacl_M14_PPB_Messaging_PostMessage
 };
 
+static const struct PPB_Messaging_1_1 Pnacl_Wrappers_PPB_Messaging_1_1 = {
+    .PostMessage = (void (*)(PP_Instance instance, struct PP_Var message))&Pnacl_M37_PPB_Messaging_PostMessage,
+    .RegisterMessageHandler = (int32_t (*)(PP_Instance instance, void* user_data, const struct PPP_MessageHandler_0_1* handler, PP_Resource message_loop))&Pnacl_M37_PPB_Messaging_RegisterMessageHandler,
+    .UnregisterMessageHandler = (void (*)(PP_Instance instance))&Pnacl_M37_PPB_Messaging_UnregisterMessageHandler
+};
+
 /* Not generating wrapper interface for PPB_MouseCursor_1_0 */
 
 static const struct PPB_MouseLock_1_0 Pnacl_Wrappers_PPB_MouseLock_1_0 = {
@@ -4714,6 +4742,8 @@ static const struct PPB_WebSocket_1_0 Pnacl_Wrappers_PPB_WebSocket_1_0 = {
 /* Not generating wrapper interface for PPP_Instance_1_0 */
 
 /* Not generating wrapper interface for PPP_Instance_1_1 */
+
+/* Not generating wrapper interface for PPP_MessageHandler_0_1 */
 
 static const struct PPP_Messaging_1_0 Pnacl_Wrappers_PPP_Messaging_1_0 = {
     .HandleMessage = &Pnacl_M14_PPP_Messaging_HandleMessage
@@ -5119,7 +5149,7 @@ static const struct PPB_NaCl_Private_1_0 Pnacl_Wrappers_PPB_NaCl_Private_1_0 = {
     .UrandomFD = (int32_t (*)(void))&Pnacl_M25_PPB_NaCl_Private_UrandomFD,
     .Are3DInterfacesDisabled = (PP_Bool (*)(void))&Pnacl_M25_PPB_NaCl_Private_Are3DInterfacesDisabled,
     .BrokerDuplicateHandle = (int32_t (*)(PP_FileHandle source_handle, uint32_t process_id, PP_FileHandle* target_handle, uint32_t desired_access, uint32_t options))&Pnacl_M25_PPB_NaCl_Private_BrokerDuplicateHandle,
-    .GetReadonlyPnaclFd = (PP_FileHandle (*)(const char* filename))&Pnacl_M25_PPB_NaCl_Private_GetReadonlyPnaclFd,
+    .GetReadonlyPnaclFd = (PP_FileHandle (*)(const char* url))&Pnacl_M25_PPB_NaCl_Private_GetReadonlyPnaclFd,
     .CreateTemporaryFile = (PP_FileHandle (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_CreateTemporaryFile,
     .GetNumberOfProcessors = (int32_t (*)(void))&Pnacl_M25_PPB_NaCl_Private_GetNumberOfProcessors,
     .IsNonSFIModeEnabled = (PP_Bool (*)(void))&Pnacl_M25_PPB_NaCl_Private_IsNonSFIModeEnabled,
@@ -5523,6 +5553,12 @@ static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_MessageLoop_1_0 = {
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_Messaging_1_0 = {
   .iface_macro = PPB_MESSAGING_INTERFACE_1_0,
   .wrapped_iface = (const void *) &Pnacl_Wrappers_PPB_Messaging_1_0,
+  .real_iface = NULL
+};
+
+static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_Messaging_1_1 = {
+  .iface_macro = PPB_MESSAGING_INTERFACE_1_1,
+  .wrapped_iface = (const void *) &Pnacl_Wrappers_PPB_Messaging_1_1,
   .real_iface = NULL
 };
 
@@ -6026,6 +6062,7 @@ static struct __PnaclWrapperInfo *s_ppb_wrappers[] = {
   &Pnacl_WrapperInfo_PPB_MediaStreamVideoTrack_1_0,
   &Pnacl_WrapperInfo_PPB_MessageLoop_1_0,
   &Pnacl_WrapperInfo_PPB_Messaging_1_0,
+  &Pnacl_WrapperInfo_PPB_Messaging_1_1,
   &Pnacl_WrapperInfo_PPB_MouseLock_1_0,
   &Pnacl_WrapperInfo_PPB_NetAddress_1_0,
   &Pnacl_WrapperInfo_PPB_NetworkList_1_0,

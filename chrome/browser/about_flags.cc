@@ -1269,13 +1269,6 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnableTcpFastOpen)
   },
   {
-    "apps-use-native-frame",
-    IDS_FLAGS_ENABLE_NATIVE_FRAMES_FOR_APPS_NAME,
-    IDS_FLAGS_ENABLE_NATIVE_FRAMES_FOR_APPS_DESCRIPTION,
-    kOsMac,
-    SINGLE_VALUE_TYPE(switches::kAppsUseNativeFrame)
-  },
-  {
     "enable-syncfs-directory-operation",
     IDS_FLAGS_ENABLE_SYNC_DIRECTORY_OPERATION_NAME,
     IDS_FLAGS_ENABLE_SYNC_DIRECTORY_OPERATION_DESCRIPTION,
@@ -1835,6 +1828,15 @@ const Experiment kExperiments[] = {
     kOsDesktop,
     SINGLE_VALUE_TYPE(switches::kEnableHarfBuzzRenderText)
   },
+#if defined(OS_ANDROID)
+  {
+    "enable-answers-in-suggest",
+    IDS_FLAGS_ENABLE_ANSWERS_IN_SUGGEST_NAME,
+    IDS_FLAGS_ENABLE_ANSWERS_IN_SUGGEST_DESCRIPTION,
+    kOsAndroid,
+    SINGLE_VALUE_TYPE(switches::kEnableAnswersInSuggest)
+  },
+#endif
 };
 
 const Experiment* experiments = kExperiments;

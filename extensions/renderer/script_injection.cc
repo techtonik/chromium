@@ -19,7 +19,7 @@
 #include "extensions/renderer/extension_helper.h"
 #include "extensions/renderer/script_context.h"
 #include "extensions/renderer/user_script_slave.h"
-#include "grit/renderer_resources.h"
+#include "grit/extensions_renderer_resources.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebFrame.h"
 #include "third_party/WebKit/public/web/WebScriptSource.h"
@@ -226,10 +226,14 @@ void ScriptInjection::FrameDetached(blink::WebFrame* frame) {
            pending_injections_.begin();
        iter != pending_injections_.end();) {
     if ((*iter)->web_frame == frame)
-      pending_injections_.erase(iter);
+      iter = pending_injections_.erase(iter);
     else
       ++iter;
   }
+}
+
+void ScriptInjection::SetScript(scoped_ptr<UserScript> script) {
+  script_.reset(script.release());
 }
 
 bool ScriptInjection::WantsToRun(blink::WebFrame* frame,

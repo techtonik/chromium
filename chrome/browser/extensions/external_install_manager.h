@@ -49,6 +49,9 @@ class ExternalInstallManager : public ExtensionRegistryObserver,
   // Returns the current install error, if one exists.
   const ExternalInstallError* error() { return error_.get(); }
 
+  // Returns a mutable copy of the error for testing purposes.
+  ExternalInstallError* error_for_testing() { return error_.get(); }
+
  private:
   // ExtensionRegistryObserver implementation.
   virtual void OnExtensionLoaded(content::BrowserContext* browser_context,

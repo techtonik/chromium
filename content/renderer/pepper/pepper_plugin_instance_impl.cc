@@ -1305,6 +1305,21 @@ void PepperPluginInstanceImpl::PostMessageToJavaScript(PP_Var message) {
   message_channel_->PostMessageToJavaScript(message);
 }
 
+int32_t PepperPluginInstanceImpl::RegisterMessageHandler(
+    PP_Instance instance,
+    void* user_data,
+    const PPP_MessageHandler_0_1* handler,
+    PP_Resource message_loop) {
+  // Not supported in-process.
+  NOTIMPLEMENTED();
+  return PP_ERROR_FAILED;
+}
+
+void PepperPluginInstanceImpl::UnregisterMessageHandler(PP_Instance instance) {
+  // Not supported in-process.
+  NOTIMPLEMENTED();
+}
+
 base::string16 PepperPluginInstanceImpl::GetSelectedText(bool html) {
   // Keep a reference on the stack. See NOTE above.
   scoped_refptr<PepperPluginInstanceImpl> ref(this);
@@ -3175,6 +3190,9 @@ void PepperPluginInstanceImpl::DidDataFromWebURLResponse(
     const blink::WebURLResponse& response,
     int pending_host_id,
     const ppapi::URLResponseInfoData& data) {
+  if (is_deleted_)
+    return;
+
   RendererPpapiHostImpl* host_impl = module_->renderer_ppapi_host();
 
   if (host_impl->in_process_router()) {

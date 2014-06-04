@@ -103,7 +103,6 @@
 
 #if defined(OS_MACOSX)
 #include "base/mac/foundation_util.h"
-#include "ui/gl/io_surface_support_mac.h"
 #endif
 
 // Cross-Site Navigations
@@ -1233,7 +1232,7 @@ bool WebContentsImpl::HandleGestureEvent(
   // Some platforms (eg. Mac) send GesturePinch events for trackpad pinch-zoom.
   // Use them to implement browser zoom, as for HandleWheelEvent above.
   if (event.type == blink::WebInputEvent::GesturePinchUpdate &&
-      event.sourceDevice == blink::WebGestureEvent::Touchpad) {
+      event.sourceDevice == blink::WebGestureDeviceTouchpad) {
     // The scale difference necessary to trigger a zoom action. Derived from
     // experimentation to find a value that feels reasonable.
     const float kZoomStepValue = 0.6f;
@@ -2480,7 +2479,7 @@ void WebContentsImpl::SetMainFrameMimeType(const std::string& mime_type) {
   contents_mime_type_ = mime_type;
 }
 
-bool WebContentsImpl::CanOverscrollContent() {
+bool WebContentsImpl::CanOverscrollContent() const {
   if (delegate_)
     return delegate_->CanOverscrollContent();
 

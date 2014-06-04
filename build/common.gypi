@@ -166,6 +166,9 @@
         'sysroot%': '',
         'chroot_cmd%': '',
 
+        # The system libdir used for this ABI.
+        'system_libdir%': 'lib',
+
         'conditions': [
           # Ash needs Aura.
           ['use_aura==0', {
@@ -261,6 +264,7 @@
       'arm_version%': '<(arm_version)',
       'sysroot%': '<(sysroot)',
       'chroot_cmd%': '<(chroot_cmd)',
+      'system_libdir%': '<(system_libdir)',
 
       # Set to 1 to enable fast builds. Set to 2 for even faster builds
       # (it disables debug info for fastest compilation - only for use
@@ -288,8 +292,6 @@
       # Detect NEON support at run-time.
       'arm_neon_optional%': 0,
 
-      # The system libdir used for this ABI.
-      'system_libdir%': 'lib',
 
       # Use libjpeg-turbo as the JPEG codec used by Chromium.
       'use_libjpeg_turbo%': 1,
@@ -555,6 +557,9 @@
       'spdy_proxy_auth_property%' : '',
       'spdy_proxy_auth_value%' : '',
       'data_reduction_proxy_probe_url%' : '',
+      'data_reduction_proxy_ssl_origin%' : '',
+      'data_reduction_proxy_alt_origin%' : '',
+      'data_reduction_proxy_alt_fallback_origin%' : '',
       'enable_mdns%' : 0,
       'enable_service_discovery%': 0,
       'enable_wifi_bootstrapping%': 0,
@@ -750,7 +755,7 @@
           'chromium_win_pch%': 1
         }],
 
-        ['chromeos==1 or OS=="android" or OS=="ios"', {
+        ['chromeos==1 or OS=="android" or OS=="ios" or desktop_linux==1', {
           'enable_plugin_installation%': 0,
         }, {
           'enable_plugin_installation%': 1,
@@ -1105,6 +1110,9 @@
     'spdy_proxy_auth_property%': '<(spdy_proxy_auth_property)',
     'spdy_proxy_auth_value%': '<(spdy_proxy_auth_value)',
     'data_reduction_proxy_probe_url%': '<(data_reduction_proxy_probe_url)',
+    'data_reduction_proxy_ssl_origin%' : '<(data_reduction_proxy_ssl_origin)',
+    'data_reduction_proxy_alt_origin%' : '<(data_reduction_proxy_alt_origin)',
+    'data_reduction_proxy_alt_fallback_origin%' : '<(data_reduction_proxy_alt_fallback_origin)',
     'enable_mdns%' : '<(enable_mdns)',
     'enable_service_discovery%' : '<(enable_service_discovery)',
     'enable_wifi_bootstrapping%': '<(enable_wifi_bootstrapping)',
@@ -2718,6 +2726,18 @@
       ['data_reduction_proxy_probe_url != ""', {
         'defines': [
           'DATA_REDUCTION_PROXY_PROBE_URL="<(data_reduction_proxy_probe_url)"'],
+      }],
+      ['data_reduction_proxy_ssl_origin != ""', {
+        'defines': [
+          'DATA_REDUCTION_PROXY_SSL_ORIGIN="<(data_reduction_proxy_ssl_origin)"'],
+      }],
+      ['data_reduction_proxy_alt_origin != ""', {
+        'defines': [
+          'DATA_REDUCTION_PROXY_ALT_ORIGIN="<(data_reduction_proxy_alt_origin)"'],
+      }],
+      ['data_reduction_proxy_alt_fallback_origin != ""', {
+        'defines': [
+          'DATA_REDUCTION_PROXY_ALT_FALLBACK_ORIGIN="<(data_reduction_proxy_alt_fallback_origin)"'],
       }],
       ['enable_mdns==1', {
         'defines': ['ENABLE_MDNS=1'],

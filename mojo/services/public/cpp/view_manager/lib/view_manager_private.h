@@ -19,10 +19,16 @@ class ViewManagerPrivate {
   explicit ViewManagerPrivate(ViewManager* manager);
   ~ViewManagerPrivate();
 
-  ViewManagerSynchronizer* synchronizer() {
-    return manager_->synchronizer_.get();
+  void NotifyReady() {
+    manager_->ready_callback_.Run(manager_);
   }
-  ServiceProvider* service_provider() { return manager_->service_provider_; }
+
+  ViewManagerSynchronizer* synchronizer() {
+    return manager_->synchronizer_;
+  }
+  void set_synchronizer(ViewManagerSynchronizer* synchronizer) {
+    manager_->synchronizer_ = synchronizer;
+  }
 
   void set_root(ViewTreeNode* root) { manager_->tree_ = root; }
 

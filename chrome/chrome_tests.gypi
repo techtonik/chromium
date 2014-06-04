@@ -260,7 +260,7 @@
         }],
         ['chromeos==1', {
           'dependencies': [
-            '../ash/ash.gyp:ash_resources',
+            '../ash/ash_resources.gyp:ash_resources',
             '../chromeos/chromeos.gyp:chromeos',
           ],
           'conditions': [
@@ -564,7 +564,7 @@
           'inputs': [
             'test/chromedriver/cpp_source.py',
             'test/chromedriver/embed_mobile_devices_in_cpp.py',
-            '../third_party/WebKit/Source/devtools/front_end/elements/OverridesView.js',
+            '../third_party/WebKit/Source/devtools/front_end/sdk/OverridesSupport.js',
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome/mobile_device_list.cc',
@@ -574,7 +574,7 @@
                       'test/chromedriver/embed_mobile_devices_in_cpp.py',
                       '--directory',
                       '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome',
-                      '../third_party/WebKit/Source/devtools/front_end/elements/OverridesView.js',
+                      '../third_party/WebKit/Source/devtools/front_end/sdk/OverridesSupport.js',
           ],
           'message': 'Generating sources for embedding mobile devices in chromedriver',
         },
@@ -1027,6 +1027,7 @@
         'browser/devtools/device/adb/mock_adb_server.cc',
         'browser/devtools/device/adb/mock_adb_server.h',
         'browser/devtools/device/port_forwarding_browsertest.cc',
+        'browser/devtools/device/usb/devtools_android_bridge_browsertest.cc',
         'browser/devtools/devtools_sanity_browsertest.cc',
         'browser/dom_distiller/dom_distiller_viewer_source_browsertest.cc',
         'browser/dom_distiller/tab_utils_browsertest.cc',
@@ -2041,6 +2042,11 @@
         }, {
           'sources/': [
             ['exclude', '^test/remoting'],
+          ],
+        }],
+        ['use_x11==1', {
+          'dependencies': [
+            '../tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',
           ],
         }],
       ],  # conditions

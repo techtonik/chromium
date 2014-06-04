@@ -65,7 +65,9 @@
 #include "ui/gl/gl_surface.h"
 
 #if defined(OS_MACOSX)
-#include "ui/gl/io_surface_support_mac.h"
+#include <IOSurface/IOSurfaceAPI.h>
+// Note that this must be included after gl_bindings.h to avoid conflicts.
+#include <OpenGL/CGLIOSurface.h>
 #endif
 
 #if defined(OS_WIN)
@@ -1760,7 +1762,7 @@ class GLES2DecoderImpl : public GLES2Decoder,
   bool service_logging_;
 
 #if defined(OS_MACOSX)
-  typedef std::map<GLuint, CFTypeRef> TextureToIOSurfaceMap;
+  typedef std::map<GLuint, IOSurfaceRef> TextureToIOSurfaceMap;
   TextureToIOSurfaceMap texture_to_io_surface_map_;
 #endif
 
@@ -3069,7 +3071,8 @@ bool GLES2DecoderImpl::CheckFramebufferValid(
           offscreen_target_color_format_) & 0x0008) != 0 ? 0 : 1);
       state_.SetDeviceColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
       glClearStencil(0);
-      glStencilMask(-1);
+      state_.SetDeviceStencilMaskSeparate(GL_FRONT, -1);
+      state_.SetDeviceStencilMaskSeparate(GL_BACK, -1);
       glClearDepth(1.0f);
       state_.SetDeviceDepthMask(GL_TRUE);
       state_.SetDeviceCapabilityState(GL_SCISSOR_TEST, false);
@@ -5032,7 +5035,8 @@ void GLES2DecoderImpl::ClearUnclearedAttachments(
   if (framebuffer->HasUnclearedAttachment(GL_STENCIL_ATTACHMENT) ||
       framebuffer->HasUnclearedAttachment(GL_DEPTH_STENCIL_ATTACHMENT)) {
     glClearStencil(0);
-    glStencilMask(-1);
+    state_.SetDeviceStencilMaskSeparate(GL_FRONT, -1);
+    state_.SetDeviceStencilMaskSeparate(GL_BACK, -1);
     clear_bits |= GL_STENCIL_BUFFER_BIT;
   }
 
@@ -7824,7 +7828,8 @@ bool GLES2DecoderImpl::ClearLevel(
       return false;
     }
     glClearStencil(0);
-    glStencilMask(-1);
+    state_.SetDeviceStencilMaskSeparate(GL_FRONT, -1);
+    state_.SetDeviceStencilMaskSeparate(GL_BACK, -1);
     glClearDepth(1.0f);
     state_.SetDeviceDepthMask(GL_TRUE);
     state_.SetDeviceCapabilityState(GL_SCISSOR_TEST, false);
@@ -9748,7 +9753,7 @@ void GLES2DecoderImpl::ReleaseIOSurfaceForTexture(GLuint texture_id) {
       texture_id);
   if (it != texture_to_io_surface_map_.end()) {
     // Found a previous IOSurface bound to this texture; release it.
-    CFTypeRef surface = it->second;
+    IOSurfaceRef surface = it->second;
     CFRelease(surface);
     texture_to_io_surface_map_.erase(it);
   }
@@ -9763,14 +9768,6 @@ void GLES2DecoderImpl::DoTexImageIOSurface2DCHROMIUM(
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION,
         "glTexImageIOSurface2DCHROMIUM", "only supported on desktop GL.");
-    return;
-  }
-
-  IOSurfaceSupport* surface_support = IOSurfaceSupport::Initialize();
-  if (!surface_support) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_OPERATION,
-        "glTexImageIOSurface2DCHROMIUM", "only supported on 10.6.");
     return;
   }
 
@@ -9802,7 +9799,7 @@ void GLES2DecoderImpl::DoTexImageIOSurface2DCHROMIUM(
   // plugin process might allocate and release an IOSurface before
   // this process gets a chance to look it up. Hold on to any old
   // IOSurface in this case.
-  CFTypeRef surface = surface_support->IOSurfaceLookup(io_surface_id);
+  IOSurfaceRef surface = IOSurfaceLookup(io_surface_id);
   if (!surface) {
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION,
@@ -9820,7 +9817,7 @@ void GLES2DecoderImpl::DoTexImageIOSurface2DCHROMIUM(
   CGLContextObj context =
       static_cast<CGLContextObj>(context_->GetHandle());
 
-  CGLError err = surface_support->CGLTexImageIOSurface2D(
+  CGLError err = CGLTexImageIOSurface2D(
       context,
       target,
       GL_RGBA,
