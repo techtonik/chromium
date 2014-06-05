@@ -225,8 +225,12 @@ class IpcMessagePrinter(Printer):
 
     def to_string(self):
         message_type = self.header()['type']
+        try:
+          type = self.val.dynamic_type
+        except:
+          type = self.val.type
         return '%s of kind %s line %s' % (
-            self.val.dynamic_type,
+            type,
             (message_type >> 16).cast(gdb.lookup_type('IPCMessageStart')),
             message_type & 0xffff)
 

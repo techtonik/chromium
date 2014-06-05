@@ -408,6 +408,8 @@
         'browser/renderer_startup_helper.h',
         'browser/runtime_data.cc',
         'browser/runtime_data.h',
+        'browser/service_worker_manager.cc',
+        'browser/service_worker_manager.h',
         'browser/update_observer.h',
         'browser/value_store/leveldb_value_store.cc',
         'browser/value_store/leveldb_value_store.h',

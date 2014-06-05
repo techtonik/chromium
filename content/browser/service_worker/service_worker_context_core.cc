@@ -183,7 +183,7 @@ void ServiceWorkerContextCore::RegistrationComplete(
     ServiceWorkerRegistration* registration,
     ServiceWorkerVersion* version) {
   if (status != SERVICE_WORKER_OK) {
-    DCHECK(!version);
+    DCHECK(!version) << ServiceWorkerStatusToString(status);
     callback.Run(status,
                  kInvalidServiceWorkerRegistrationId,
                  kInvalidServiceWorkerVersionId);

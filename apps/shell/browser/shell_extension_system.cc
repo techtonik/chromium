@@ -64,6 +64,9 @@ bool ShellExtensionSystem::LoadAndLaunchApp(const base::FilePath& app_dir) {
 
   RegisterExtensionWithRequestContexts(extension);
 
+  if (BackgroundInfo::HasServiceWorker(extension))
+    ServiceWorkerManager::Get(browser_context_)->RegisterExtension(extension);
+
   content::NotificationService::current()->Notify(
       chrome::NOTIFICATION_EXTENSION_LOADED_DEPRECATED,
       content::Source<BrowserContext>(browser_context_),
