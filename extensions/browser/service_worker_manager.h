@@ -11,6 +11,7 @@
 
 namespace content {
 class ServiceWorkerContext;
+class ServiceWorkerHost;
 class ServiceWorkerRegistration;
 class StoragePartition;
 }
@@ -69,10 +70,10 @@ class ServiceWorkerManager : public KeyedService {
       const ExtensionId& ext_id) const;
   inline base::WeakPtr<ServiceWorkerManager> WeakThis();
 
-  void FinishRegistration(const ExtensionId& extension_id,
-                          bool success);
-  void FinishUnregistration(const ExtensionId& extension_id,
-                            bool success);
+  void FinishRegistration(
+      const ExtensionId& extension_id,
+      scoped_ptr<content::ServiceWorkerHost> service_worker_host);
+  void FinishUnregistration(const ExtensionId& extension_id, bool success);
 
   content::BrowserContext* const context_;
 

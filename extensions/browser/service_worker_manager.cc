@@ -11,6 +11,7 @@
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/service_worker_context.h"
+#include "content/public/browser/service_worker_host.h"
 #include "content/public/browser/storage_partition.h"
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_system.h"
@@ -29,11 +30,14 @@ using content::BrowserThread;
 ServiceWorkerManager::State::State()
     : registration(UNREGISTERED), outstanding_state_changes(0) {
 }
-ServiceWorkerManager::State::~State() {}
+ServiceWorkerManager::State::~State() {
+}
 
 ServiceWorkerManager::ServiceWorkerManager(BrowserContext* context)
-    : context_(context), weak_this_factory_(this) {}
-ServiceWorkerManager::~ServiceWorkerManager() {}
+    : context_(context), weak_this_factory_(this) {
+}
+ServiceWorkerManager::~ServiceWorkerManager() {
+}
 
 ServiceWorkerManager* ServiceWorkerManager::Get(
     content::BrowserContext* context) {
@@ -70,13 +74,20 @@ void ServiceWorkerManager::RegisterExtension(const Extension* extension) {
   GetSWContext(extension->id())->RegisterServiceWorker(
       extension->GetResourceURL("/*"),
       service_worker_script,
+      //
+      //
+      // TODO Register a client
+      //
+      //
+      NULL,
       base::Bind(&ServiceWorkerManager::FinishRegistration,
                  WeakThis(),
                  extension->id()));
 }
 
-void ServiceWorkerManager::FinishRegistration(const ExtensionId& extension_id,
-                                              bool success) {
+void ServiceWorkerManager::FinishRegistration(
+    const ExtensionId& extension_id,
+    scoped_ptr<content::ServiceWorkerHost> service_worker_host) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   State& ext_state = states_[extension_id];
   --ext_state.outstanding_state_changes;
@@ -86,7 +97,12 @@ void ServiceWorkerManager::FinishRegistration(const ExtensionId& extension_id,
 
   DCHECK_EQ(ext_state.registration, REGISTERING);
   std::vector<Closure> to_run;
-  if (success) {
+  if (service_worker_host) {
+    //
+    //
+    // TODO Keep the service worker host around
+    //
+    //
     ext_state.registration = REGISTERED;
     to_run.swap(ext_state.registration_succeeded);
     ext_state.registration_failed.clear();
@@ -194,7 +210,7 @@ void ServiceWorkerManager::WhenUnregistered(
   }
 
   State& state = it->second;
-  switch(state.registration) {
+  switch (state.registration) {
     case REGISTERED:
     case REGISTERING:
       base::MessageLoop::current()->PostTask(from_here, failure);
@@ -234,9 +250,11 @@ void ServiceWorkerManagerFactory::SetInstanceForTesting(
 ServiceWorkerManagerFactory::ServiceWorkerManagerFactory()
     : BrowserContextKeyedServiceFactory(
           "ServiceWorkerManager",
-          BrowserContextDependencyManager::GetInstance()) {}
+          BrowserContextDependencyManager::GetInstance()) {
+}
 
-ServiceWorkerManagerFactory::~ServiceWorkerManagerFactory() {}
+ServiceWorkerManagerFactory::~ServiceWorkerManagerFactory() {
+}
 
 KeyedService* ServiceWorkerManagerFactory::BuildServiceInstanceFor(
     content::BrowserContext* context) const {
