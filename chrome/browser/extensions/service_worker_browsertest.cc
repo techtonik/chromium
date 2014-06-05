@@ -87,7 +87,7 @@ class IOThreadInstallUninstallTest {
               registration->script_url());
     EXPECT_EQ(GURL("chrome-extension://" + ext_id_ + "/*"),
               registration->pattern());
-    EXPECT_TRUE(registration->pending_version() ||
+    EXPECT_TRUE(registration->waiting_version() ||
                 registration->active_version());
   }
 
