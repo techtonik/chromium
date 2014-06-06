@@ -98,12 +98,8 @@ void ServiceWorkerManager::FinishRegistration(
   DCHECK_EQ(ext_state.registration, REGISTERING);
   std::vector<Closure> to_run;
   if (service_worker_host) {
-    //
-    //
-    // TODO Keep the service worker host around
-    //
-    //
     ext_state.registration = REGISTERED;
+    ext_state.service_worker_host.reset(service_worker_host.Pass());
     to_run.swap(ext_state.registration_succeeded);
     ext_state.registration_failed.clear();
   } else {
@@ -223,6 +219,15 @@ void ServiceWorkerManager::WhenUnregistered(
       state.unregistration_failed.push_back(failure);
       break;
   }
+}
+
+content::ServiceWorkerHost* ServiceWorkerManager::GetServiceWorkerHost(
+    ExtensionId extension_id) {
+  base::hash_map<ExtensionId, State>::iterator it =
+      states_.find(extension->id());
+  if (it == states_.end())
+    return NULL;
+  return it->second.service_worker_host.get();
 }
 
 WeakPtr<ServiceWorkerManager> ServiceWorkerManager::WeakThis() {

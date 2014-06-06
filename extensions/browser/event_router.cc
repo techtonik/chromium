@@ -185,14 +185,14 @@ EventRouter::~EventRouter() {}
 
 void EventRouter::AddEventListener(const std::string& event_name,
                                    content::RenderProcessHost* process,
+                                   content::ServiceWorkerHost* service_worker,
                                    const std::string& extension_id) {
-  //
-  //
-  // TODO Enable creating service worker listeners.
-  //
-  //
-  listeners_.AddListener(scoped_ptr<EventListener>(new EventListener(
-      event_name, extension_id, process, NULL, scoped_ptr<DictionaryValue>())));
+  listeners_.AddListener(scoped_ptr<EventListener>(
+      new EventListener(event_name,
+                        extension_id,
+                        process,
+                        service_worker,
+                        scoped_ptr<DictionaryValue>())));
 }
 
 void EventRouter::RemoveEventListener(const std::string& event_name,

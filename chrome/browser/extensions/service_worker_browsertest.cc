@@ -89,6 +89,8 @@ class IOThreadInstallUninstallTest {
               registration->pattern());
     EXPECT_TRUE(registration->waiting_version() ||
                 registration->active_version());
+    EXPECT_TRUE(
+        ServiceWorkerManager::Get(profile())->GetServiceWorkerHost(ext_id_));
   }
 
   const scoped_refptr<ServiceWorkerContextWrapper> service_worker_context_;

@@ -29,6 +29,7 @@ class PrefService;
 namespace content {
 class BrowserContext;
 class RenderProcessHost;
+class ServiceWorkerHost;
 }
 
 namespace extensions {
@@ -99,6 +100,7 @@ class EventRouter : public content::NotificationObserver,
   // mode extension.
   void AddEventListener(const std::string& event_name,
                         content::RenderProcessHost* process,
+                        content::ServiceWorkerHost* service_worker,
                         const std::string& extension_id);
   void RemoveEventListener(const std::string& event_name,
                            content::RenderProcessHost* process,
