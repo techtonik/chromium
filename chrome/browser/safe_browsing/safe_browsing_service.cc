@@ -19,7 +19,6 @@
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
-#include "chrome/browser/metrics/metrics_service.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/safe_browsing/client_side_detection_service.h"
@@ -35,6 +34,7 @@
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
+#include "components/metrics/metrics_service.h"
 #include "components/startup_metric_utils/startup_metric_utils.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/cookie_crypto_delegate.h"
@@ -46,6 +46,11 @@
 
 #if defined(OS_WIN)
 #include "chrome/installer/util/browser_distribution.h"
+#endif
+
+#if defined(OS_ANDROID)
+#include <string>
+#include "base/metrics/field_trial.h"
 #endif
 
 using content::BrowserThread;
@@ -166,6 +171,15 @@ SafeBrowsingService* SafeBrowsingService::CreateSafeBrowsingService() {
     factory_ = g_safe_browsing_service_factory_impl.Pointer();
   return factory_->CreateSafeBrowsingService();
 }
+
+#if defined(OS_ANDROID)
+// static
+bool SafeBrowsingService::IsEnabledByFieldTrial() {
+  const std::string experiment_name =
+      base::FieldTrialList::FindFullName("SafeBrowsingAndroid");
+  return experiment_name == "Enabled";
+}
+#endif
 
 SafeBrowsingService::SafeBrowsingService()
     : protocol_manager_(NULL),

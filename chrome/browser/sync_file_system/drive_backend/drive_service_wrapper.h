@@ -6,6 +6,7 @@
 #define CHROME_BROWSER_SYNC_FILE_SYSTEM_DRIVE_BACKEND_DRIVE_SERVICE_WRAPPER_H_
 
 #include "base/memory/weak_ptr.h"
+#include "base/sequence_checker.h"
 #include "chrome/browser/drive/drive_service_interface.h"
 
 namespace sync_file_system {
@@ -23,7 +24,7 @@ class DriveServiceWrapper : public base::SupportsWeakPtr<DriveServiceWrapper> {
       const std::string& parent_resource_id,
       const std::string& directory_title,
       const drive::DriveServiceInterface::AddNewDirectoryOptions& options,
-      const google_apis::GetResourceEntryCallback& callback);
+      const google_apis::FileResourceCallback& callback);
 
   void DeleteResource(
       const std::string& resource_id,
@@ -52,15 +53,13 @@ class DriveServiceWrapper : public base::SupportsWeakPtr<DriveServiceWrapper> {
       const GURL& next_link,
       const google_apis::FileListCallback& callback);
 
-  void GetResourceEntry(
+  void GetFileResource(
       const std::string& resource_id,
-      const google_apis::GetResourceEntryCallback& callback);
+      const google_apis::FileResourceCallback& callback);
 
   void GetFileListInDirectory(
       const std::string& directory_resource_id,
       const google_apis::FileListCallback& callback);
-
-  bool HasRefreshToken() const;
 
   void RemoveResourceFromDirectory(
       const std::string& parent_resource_id,
@@ -74,6 +73,7 @@ class DriveServiceWrapper : public base::SupportsWeakPtr<DriveServiceWrapper> {
 
  private:
   drive::DriveServiceInterface* drive_service_;
+  base::SequenceChecker sequece_checker_;
 
   DISALLOW_COPY_AND_ASSIGN(DriveServiceWrapper);
 };

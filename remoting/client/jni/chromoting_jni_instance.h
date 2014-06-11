@@ -34,6 +34,7 @@ class LogToServer;
 }
 
 class VideoRenderer;
+class TokenFetcherProxy;
 
 // ClientUserInterface that indirectly makes and receives JNI calls.
 class ChromotingJniInstance
@@ -57,6 +58,17 @@ class ChromotingJniInstance
   // Terminates the current connection (if it hasn't already failed) and cleans
   // up. Must be called before destruction.
   void Cleanup();
+
+  // Requests the android app to fetch a third-party token.
+  void FetchThirdPartyToken(
+      const GURL& token_url,
+      const std::string& client_id,
+      const std::string& scope,
+      const base::WeakPtr<TokenFetcherProxy> token_fetcher_proxy);
+
+  // Called by the android app when the token is fetched.
+  void HandleOnThirdPartyTokenFetched(const std::string& token,
+                                      const std::string& shared_secret);
 
   // Provides the user's PIN and resumes the host authentication attempt. Call
   // on the UI thread once the user has finished entering this PIN into the UI,
@@ -153,6 +165,7 @@ class ChromotingJniInstance
   XmppSignalStrategy::XmppServerConfig xmpp_config_;
   scoped_ptr<XmppSignalStrategy> signaling_;  // Must outlive client_
   scoped_ptr<client::LogToServer> log_to_server_;
+  base::WeakPtr<TokenFetcherProxy> token_fetcher_proxy_;
 
   // Pass this the user's PIN once we have it. To be assigned and accessed on
   // the UI thread, but must be posted to the network thread to call it.
@@ -173,6 +186,8 @@ class ChromotingJniInstance
   bool stats_logging_enabled_;
 
   friend class base::RefCountedThreadSafe<ChromotingJniInstance>;
+
+  base::WeakPtrFactory<ChromotingJniInstance> weak_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(ChromotingJniInstance);
 };

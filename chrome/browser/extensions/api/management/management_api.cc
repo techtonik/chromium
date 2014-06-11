@@ -90,7 +90,7 @@ AutoConfirmForTest auto_confirm_for_test = DO_NOT_SKIP;
 std::vector<std::string> CreateWarningsList(const Extension* extension) {
   std::vector<std::string> warnings_list;
   PermissionMessages warnings =
-      PermissionsData::GetPermissionMessages(extension);
+      extension->permissions_data()->GetPermissionMessages();
   for (PermissionMessages::const_iterator iter = warnings.begin();
        iter != warnings.end(); ++iter) {
     warnings_list.push_back(base::UTF16ToUTF8(iter->message()));
@@ -193,7 +193,7 @@ scoped_ptr<management::ExtensionInfo> CreateExtensionInfo(
   }
 
   const std::set<std::string> perms =
-      extension.GetActivePermissions()->GetAPIsAsStrings();
+      extension.permissions_data()->active_permissions()->GetAPIsAsStrings();
   if (!perms.empty()) {
     std::set<std::string>::const_iterator perms_iter;
     for (perms_iter = perms.begin(); perms_iter != perms.end(); ++perms_iter)
@@ -203,7 +203,7 @@ scoped_ptr<management::ExtensionInfo> CreateExtensionInfo(
   if (!extension.is_hosted_app()) {
     // Skip host permissions for hosted apps.
     const URLPatternSet host_perms =
-        extension.GetActivePermissions()->explicit_hosts();
+        extension.permissions_data()->active_permissions()->explicit_hosts();
     if (!host_perms.is_empty()) {
       for (URLPatternSet::const_iterator iter = host_perms.begin();
            iter != host_perms.end(); ++iter) {

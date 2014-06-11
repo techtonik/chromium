@@ -70,12 +70,13 @@ ChromeExtensionsDispatcherDelegate::CreateScriptContext(
 
 void ChromeExtensionsDispatcherDelegate::InitOriginPermissions(
     const extensions::Extension* extension,
-    extensions::Feature::Context context_type) {
+    bool is_extension_active) {
   // TODO(jstritar): We should try to remove this special case. Also, these
   // whitelist entries need to be updated when the kManagement permission
   // changes.
-  if (context_type == extensions::Feature::BLESSED_EXTENSION_CONTEXT &&
-      extension->HasAPIPermission(extensions::APIPermission::kManagement)) {
+  if (is_extension_active &&
+      extension->permissions_data()->HasAPIPermission(
+          extensions::APIPermission::kManagement)) {
     blink::WebSecurityPolicy::addOriginAccessWhitelistEntry(
         extension->url(),
         blink::WebString::fromUTF8(content::kChromeUIScheme),
@@ -159,7 +160,6 @@ void ChromeExtensionsDispatcherDelegate::PopulateSourceMap(
   source_map->RegisterSource("automation", IDR_AUTOMATION_CUSTOM_BINDINGS_JS);
   source_map->RegisterSource("automationEvent", IDR_AUTOMATION_EVENT_JS);
   source_map->RegisterSource("automationNode", IDR_AUTOMATION_NODE_JS);
-  source_map->RegisterSource("automationTree", IDR_AUTOMATION_TREE_JS);
   source_map->RegisterSource("browserAction",
                              IDR_BROWSER_ACTION_CUSTOM_BINDINGS_JS);
   source_map->RegisterSource("declarativeContent",
@@ -276,7 +276,8 @@ void ChromeExtensionsDispatcherDelegate::RequireAdditionalModules(
   // The API will be automatically set up when first used.
   if (context_type == extensions::Feature::BLESSED_EXTENSION_CONTEXT ||
       context_type == extensions::Feature::UNBLESSED_EXTENSION_CONTEXT) {
-    if (extension->HasAPIPermission(extensions::APIPermission::kWebView)) {
+    if (extension->permissions_data()->HasAPIPermission(
+            extensions::APIPermission::kWebView)) {
       module_system->Require("webView");
       if (extensions::GetCurrentChannel() <= chrome::VersionInfo::CHANNEL_DEV) {
         module_system->Require("webViewExperimental");
@@ -303,7 +304,8 @@ void ChromeExtensionsDispatcherDelegate::RequireAdditionalModules(
       is_within_platform_app) {
     if (CommandLine::ForCurrentProcess()->HasSwitch(
             ::switches::kEnableAdview)) {
-      if (extension->HasAPIPermission(extensions::APIPermission::kAdView)) {
+      if (extension->permissions_data()->HasAPIPermission(
+              extensions::APIPermission::kAdView)) {
         module_system->Require("adView");
       } else {
         module_system->Require("denyAdView");
@@ -335,8 +337,7 @@ void ChromeExtensionsDispatcherDelegate::ClearTabSpecificPermissions(
     const extensions::Extension* extension =
         dispatcher->extensions()->GetByID(*it);
     if (extension)
-      extensions::PermissionsData::ClearTabSpecificPermissions(extension,
-                                                               tab_id);
+      extension->permissions_data()->ClearTabSpecificPermissions(tab_id);
   }
 }
 
@@ -360,8 +361,7 @@ void ChromeExtensionsDispatcherDelegate::UpdateTabSpecificPermissions(
   if (!extension)
     return;
 
-  extensions::PermissionsData::UpdateTabSpecificPermissions(
-      extension,
+  extension->permissions_data()->UpdateTabSpecificPermissions(
       tab_id,
       new extensions::PermissionSet(extensions::APIPermissionSet(),
                                     extensions::ManifestPermissionSet(),

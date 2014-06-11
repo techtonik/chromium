@@ -530,7 +530,7 @@ void ExtensionInstallPrompt::ConfirmStandaloneInstall(
     const ExtensionInstallPrompt::Prompt& prompt) {
   DCHECK(ui_loop_ == base::MessageLoop::current());
   extension_ = extension;
-  permissions_ = extension->GetActivePermissions();
+  permissions_ = extension->permissions_data()->active_permissions();
   delegate_ = delegate;
   prompt_ = prompt;
 
@@ -556,7 +556,7 @@ void ExtensionInstallPrompt::ConfirmInstall(
     const ShowDialogCallback& show_dialog_callback) {
   DCHECK(ui_loop_ == base::MessageLoop::current());
   extension_ = extension;
-  permissions_ = extension->GetActivePermissions();
+  permissions_ = extension->permissions_data()->active_permissions();
   delegate_ = delegate;
   prompt_.set_type(INSTALL_PROMPT);
   show_dialog_callback_ = show_dialog_callback;
@@ -583,7 +583,7 @@ void ExtensionInstallPrompt::ConfirmReEnable(Delegate* delegate,
                                              const Extension* extension) {
   DCHECK(ui_loop_ == base::MessageLoop::current());
   extension_ = extension;
-  permissions_ = extension->GetActivePermissions();
+  permissions_ = extension->permissions_data()->active_permissions();
   delegate_ = delegate;
   bool is_remote_install =
       install_ui_->profile() &&
@@ -607,7 +607,7 @@ void ExtensionInstallPrompt::ConfirmExternalInstall(
     const Prompt& prompt) {
   DCHECK(ui_loop_ == base::MessageLoop::current());
   extension_ = extension;
-  permissions_ = extension->GetActivePermissions();
+  permissions_ = extension->permissions_data()->active_permissions();
   delegate_ = delegate;
   prompt_ = prompt;
   show_dialog_callback_ = show_dialog_callback;
@@ -634,7 +634,7 @@ void ExtensionInstallPrompt::ReviewPermissions(
     const std::vector<base::FilePath>& retained_file_paths) {
   DCHECK(ui_loop_ == base::MessageLoop::current());
   extension_ = extension;
-  permissions_ = extension->GetActivePermissions();
+  permissions_ = extension->permissions_data()->active_permissions();
   prompt_.set_retained_files(retained_file_paths);
   delegate_ = delegate;
   prompt_.set_type(POST_INSTALL_PERMISSIONS_PROMPT);
@@ -708,18 +708,21 @@ void ExtensionInstallPrompt::ShowConfirmation() {
   else
     prompt_.set_experiment(ExtensionInstallPromptExperiment::ControlGroup());
 
-  if (permissions_.get() &&
-      (!extension_ ||
-       !extensions::PermissionsData::ShouldSkipPermissionWarnings(
-           extension_))) {
-    Manifest::Type extension_type = extension_ ?
-        extension_->GetType() : Manifest::TYPE_UNKNOWN;
-    prompt_.SetPermissions(
-        extensions::PermissionMessageProvider::Get()->
-            GetWarningMessages(permissions_, extension_type));
-    prompt_.SetPermissionsDetails(
-        extensions::PermissionMessageProvider::Get()->
-            GetWarningMessagesDetails(permissions_, extension_type));
+  if (permissions_.get()) {
+    if (extension_) {
+      const extensions::PermissionsData* permissions_data =
+          extension_->permissions_data();
+      prompt_.SetPermissions(permissions_data->GetPermissionMessageStrings());
+      prompt_.SetPermissionsDetails(
+          permissions_data->GetPermissionMessageDetailsStrings());
+    } else {
+      const extensions::PermissionMessageProvider* message_provider =
+          extensions::PermissionMessageProvider::Get();
+      prompt_.SetPermissions(message_provider->GetWarningMessages(
+          permissions_, Manifest::TYPE_UNKNOWN));
+      prompt_.SetPermissionsDetails(message_provider->GetWarningMessagesDetails(
+          permissions_, Manifest::TYPE_UNKNOWN));
+    }
   }
 
   switch (prompt_.type()) {

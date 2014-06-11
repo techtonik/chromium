@@ -21,8 +21,8 @@
 #define APPLICATION_EXPORT __attribute__((visibility("default")))
 #endif
 
-// DSOs can either implement MojoMain directly or utilize the
-// mojo_main_{standalone|chromium} gyp targets and implement
+// DSOs can either implement MojoMain directly or include
+// mojo_main_{standalone|chromium}.cc in their project and implement
 // Application::Create();
 // TODO(davemoore): Establish this as part of our SDK for third party mojo
 // application writers.
@@ -100,10 +100,10 @@ class Application : public internal::ServiceConnectorBase::Owner {
  protected:
   // ServiceProvider methods.
   // Override this to dispatch to correct service when there's more than one.
-  // TODO(davemoore): Augment this with name registration.
-  virtual void ConnectToService(const mojo::String& url,
-                                const mojo::String& name,
-                                ScopedMessagePipeHandle client_handle)
+  virtual void ConnectToService(const mojo::String& service_url,
+                                const mojo::String& service_name,
+                                ScopedMessagePipeHandle client_handle,
+                                const mojo::String& requestor_url)
       MOJO_OVERRIDE;
 
  private:

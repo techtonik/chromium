@@ -221,6 +221,16 @@ var ENTRIES = {
       'text/plain', SharedOption.NONE, 'Jan 18, 2038 1:02 AM',
       'My Desktop Background.png', '272 bytes', 'PNG image'),
 
+  image2: new TestEntryInfo(
+      EntryType.FILE, 'image2.png', 'image2.png',
+      'image/png', SharedOption.NONE, 'Jan 18, 2038 1:02 AM',
+      'image2.png', '272 bytes', 'PNG image'),
+
+  image3: new TestEntryInfo(
+      EntryType.FILE, 'image3.jpg', 'image3.jpg',
+      'image/jpg', SharedOption.NONE, 'Jan 18, 2038 1:02 AM',
+      'image3.jpg', '272 bytes', 'JPEG image'),
+
   beautiful: new TestEntryInfo(
       EntryType.FILE, 'music.ogg', 'Beautiful Song.ogg',
       'text/plain', SharedOption.NONE, 'Nov 12, 2086 12:00 PM',
@@ -262,6 +272,21 @@ var ENTRIES = {
       EntryType.DIRECTORY, null, 'A/B/C',
       null, SharedOption.NONE, 'Jan 1, 2000 1:00 AM',
       'C', '--', 'Folder'),
+
+  directoryD: new TestEntryInfo(
+      EntryType.DIRECTORY, null, 'D',
+      null, SharedOption.NONE, 'Jan 1, 2000 1:00 AM',
+      'D', '--', 'Folder'),
+
+  directoryE: new TestEntryInfo(
+      EntryType.DIRECTORY, null, 'D/E',
+      null, SharedOption.NONE, 'Jan 1, 2000 1:00 AM',
+      'E', '--', 'Folder'),
+
+  directoryF: new TestEntryInfo(
+      EntryType.DIRECTORY, null, 'D/E/F',
+      null, SharedOption.NONE, 'Jan 1, 2000 1:00 AM',
+      'F', '--', 'Folder'),
 
   zipArchive: new TestEntryInfo(
       EntryType.FILE, 'archive.zip', 'archive.zip',

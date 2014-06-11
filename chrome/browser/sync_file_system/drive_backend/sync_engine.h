@@ -13,6 +13,7 @@
 #include "base/observer_list.h"
 #include "chrome/browser/drive/drive_notification_observer.h"
 #include "chrome/browser/drive/drive_service_interface.h"
+#include "chrome/browser/sync_file_system/drive_backend/callback_tracker.h"
 #include "chrome/browser/sync_file_system/local_change_processor.h"
 #include "chrome/browser/sync_file_system/remote_file_sync_service.h"
 #include "chrome/browser/sync_file_system/sync_action.h"
@@ -20,6 +21,7 @@
 #include "net/base/network_change_notifier.h"
 
 class ExtensionServiceInterface;
+class ProfileOAuth2TokenService;
 class SigninManagerBase;
 
 namespace base {
@@ -36,6 +38,10 @@ namespace leveldb {
 class Env;
 }
 
+namespace net {
+class URLRequestContextGetter;
+}
+
 namespace sync_file_system {
 
 class RemoteChangeProcessor;
@@ -48,7 +54,7 @@ class MetadataDatabase;
 class RemoteChangeProcessorOnWorker;
 class RemoteChangeProcessorWrapper;
 class SyncTaskManager;
-class SyncWorker;
+class SyncWorkerInterface;
 
 class SyncEngine : public RemoteFileSyncService,
                    public LocalChangeProcessor,
@@ -65,11 +71,17 @@ class SyncEngine : public RemoteFileSyncService,
       std::set<BrowserContextKeyedServiceFactory*>* factories);
 
   virtual ~SyncEngine();
+  void Reset();
 
-  void Initialize(const base::FilePath& base_dir,
-                  TaskLogger* task_logger,
-                  base::SequencedTaskRunner* file_task_runner,
-                  leveldb::Env* env_override);
+  // Can be called more than once.
+  void Initialize();
+
+  void InitializeForTesting(
+      scoped_ptr<drive::DriveServiceInterface> drive_service,
+      scoped_ptr<drive::DriveUploaderInterface> drive_uploader);
+  void InitializeInternal(
+      scoped_ptr<drive::DriveServiceInterface> drive_service,
+      scoped_ptr<drive::DriveUploaderInterface> drive_uploader);
 
   // RemoteFileSyncService overrides.
   virtual void AddServiceObserver(SyncServiceObserver* observer) OVERRIDE;
@@ -119,9 +131,6 @@ class SyncEngine : public RemoteFileSyncService,
   virtual void OnNetworkChanged(
       net::NetworkChangeNotifier::ConnectionType type) OVERRIDE;
 
-  drive::DriveServiceInterface* GetDriveService();
-  drive::DriveUploaderInterface* GetDriveUploader();
-
   void OnPendingFileListUpdated(int item_count);
   void OnFileStatusChanged(const fileapi::FileSystemURL& url,
                            SyncFileStatus file_status,
@@ -136,28 +145,28 @@ class SyncEngine : public RemoteFileSyncService,
   friend class DriveBackendSyncTest;
   friend class SyncEngineTest;
 
-  SyncEngine(scoped_ptr<drive::DriveServiceInterface> drive_service,
-             scoped_ptr<drive::DriveUploaderInterface> drive_uploader,
+  SyncEngine(base::SingleThreadTaskRunner* ui_task_runner,
              base::SequencedTaskRunner* worker_task_runner,
+             base::SequencedTaskRunner* file_task_runner,
+             base::SequencedTaskRunner* drive_task_runner,
+             const base::FilePath& sync_file_system_dir,
+             TaskLogger* task_logger,
              drive::DriveNotificationManager* notification_manager,
              ExtensionServiceInterface* extension_service,
-             SigninManagerBase* signin_manager);
+             SigninManagerBase* signin_manager,
+             ProfileOAuth2TokenService* token_service,
+             net::URLRequestContextGetter* request_context,
+             leveldb::Env* env_override);
 
-  // TODO(peria): Migrate this method into test code.
-  // This method is not thread safe, because it requires to access metadata
-  // database which may live in another thread.
-  void UpdateRegisteredAppsForTesting();
+  SyncStatusCallback TrackCallback(const SyncStatusCallback& callback);
 
-  scoped_ptr<drive::DriveServiceInterface> drive_service_;
-  scoped_ptr<DriveServiceWrapper> drive_service_wrapper_;
-  scoped_ptr<drive::DriveUploaderInterface> drive_uploader_;
-  scoped_ptr<DriveUploaderWrapper> drive_uploader_wrapper_;
-  RemoteChangeProcessor* remote_change_processor_;
-  scoped_ptr<RemoteChangeProcessorWrapper> remote_change_processor_wrapper_;
+  scoped_refptr<base::SingleThreadTaskRunner> ui_task_runner_;
+  scoped_refptr<base::SequencedTaskRunner> worker_task_runner_;
+  scoped_refptr<base::SequencedTaskRunner> file_task_runner_;
+  scoped_refptr<base::SequencedTaskRunner> drive_task_runner_;
 
-  scoped_ptr<RemoteChangeProcessorOnWorker> remote_change_processor_on_worker_;
-
-  RemoteServiceState service_state_;
+  const base::FilePath sync_file_system_dir_;
+  TaskLogger* task_logger_;
 
   // These external services are not owned by SyncEngine.
   // The owner of the SyncEngine is responsible for their lifetime.
@@ -166,13 +175,32 @@ class SyncEngine : public RemoteFileSyncService,
   drive::DriveNotificationManager* notification_manager_;
   ExtensionServiceInterface* extension_service_;
   SigninManagerBase* signin_manager_;
+  ProfileOAuth2TokenService* token_service_;
+
+  scoped_refptr<net::URLRequestContextGetter> request_context_;
+
+  scoped_ptr<drive::DriveServiceInterface> drive_service_;
+  scoped_ptr<DriveServiceWrapper> drive_service_wrapper_;
+  scoped_ptr<drive::DriveUploaderInterface> drive_uploader_;
+  scoped_ptr<DriveUploaderWrapper> drive_uploader_wrapper_;
+
+  RemoteChangeProcessor* remote_change_processor_;  // Not owned.
+  scoped_ptr<RemoteChangeProcessorWrapper> remote_change_processor_wrapper_;
+  // Delete this on worker.
+  scoped_ptr<RemoteChangeProcessorOnWorker> remote_change_processor_on_worker_;
+
+  RemoteServiceState service_state_;
+  bool sync_enabled_;
+
+  // Delete them on worker.
+  scoped_ptr<WorkerObserver> worker_observer_;
+  scoped_ptr<SyncWorkerInterface> sync_worker_;
 
   ObserverList<SyncServiceObserver> service_observers_;
   ObserverList<FileStatusObserver> file_status_observers_;
+  leveldb::Env* env_override_;
 
-  scoped_ptr<WorkerObserver> worker_observer_;
-  scoped_ptr<SyncWorker> sync_worker_;
-  scoped_refptr<base::SequencedTaskRunner> worker_task_runner_;
+  CallbackTracker callback_tracker_;
 
   base::WeakPtrFactory<SyncEngine> weak_ptr_factory_;
   DISALLOW_COPY_AND_ASSIGN(SyncEngine);

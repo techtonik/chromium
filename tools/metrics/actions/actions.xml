@@ -7397,6 +7397,13 @@ should be able to be added at any place in this file.
   </description>
 </action>
 
+<action name="MobilePreviewPageSingleTap">
+  <owner>ksimbili@chromium.org</owner>
+  <description>
+    User taped on the page while the preview page is being shown.
+  </description>
+</action>
+
 <action name="MobilePreviewPageTabClose">
   <owner>ksimbili@chromium.org</owner>
   <description>User closes the tab while preview page is loaded.</description>
@@ -9360,6 +9367,17 @@ should be able to be added at any place in this file.
 <action name="PeopleSearch_SendEmail">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+</action>
+
+<action name="PermissionBubbleIFrameRequestQueued">
+  <owner>gbillock@chromium.org</owner>
+  <owner>leng@chromium.org</owner>
+  <description>
+    A website with a domain that is not the same as the main frame's domain
+    requested a permission and that permission was queued because an existing
+    permission request was already visible, or because an existing request for
+    the main frame's domain is pending.
+  </description>
 </action>
 
 <action name="PermissionBubbleRequest">

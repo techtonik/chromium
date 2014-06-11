@@ -10,8 +10,6 @@
 #include "base/basictypes.h"
 #include "base/command_line.h"
 #include "base/format_macros.h"
-#include "base/guid.h"
-#include "base/i18n/case_conversion.h"
 #include "base/i18n/icu_string_conversions.h"
 #include "base/i18n/rtl.h"
 #include "base/logging.h"
@@ -28,7 +26,7 @@
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/chrome_version_info.h"
-#include "chrome/common/url_constants.h"
+#include "components/metrics/proto/omnibox_input_type.pb.h"
 #include "extensions/common/constants.h"
 #include "google_apis/google_api_keys.h"
 #include "net/base/escape.h"
@@ -68,6 +66,7 @@ const char kGoogleBookmarkBarPinnedParameter[] = "google:bookmarkBarPinned";
 const char kGoogleCurrentPageUrlParameter[] = "google:currentPageUrl";
 const char kGoogleCursorPositionParameter[] = "google:cursorPosition";
 const char kGoogleForceInstantResultsParameter[] = "google:forceInstantResults";
+const char kGoogleInputTypeParameter[] = "google:inputType";
 const char kGoogleInstantExtendedEnabledParameter[] =
     "google:instantExtendedEnabledParameter";
 const char kGoogleInstantExtendedEnabledKey[] =
@@ -202,6 +201,7 @@ bool ShowingSearchTermsOnSRP() {
 TemplateURLRef::SearchTermsArgs::SearchTermsArgs(
     const base::string16& search_terms)
     : search_terms(search_terms),
+      input_type(metrics::OmniboxInputType::INVALID),
       accepted_suggestion(NO_SUGGESTIONS_AVAILABLE),
       cursor_position(base::string16::npos),
       omnibox_start_margin(-1),
@@ -567,6 +567,8 @@ bool TemplateURLRef::ParseParameter(size_t start,
     replacements->push_back(Replacement(GOOGLE_CURRENT_PAGE_URL, start));
   } else if (parameter == kGoogleCursorPositionParameter) {
     replacements->push_back(Replacement(GOOGLE_CURSOR_POSITION, start));
+  } else if (parameter == kGoogleForceInstantResultsParameter) {
+    replacements->push_back(Replacement(GOOGLE_FORCE_INSTANT_RESULTS, start));
   } else if (parameter == kGoogleImageOriginalHeight) {
     replacements->push_back(
         Replacement(TemplateURLRef::GOOGLE_IMAGE_ORIGINAL_HEIGHT, start));
@@ -581,8 +583,9 @@ bool TemplateURLRef::ParseParameter(size_t start,
   } else if (parameter == kGoogleImageURLParameter) {
     replacements->push_back(Replacement(TemplateURLRef::GOOGLE_IMAGE_URL,
                                         start));
-  } else if (parameter == kGoogleForceInstantResultsParameter) {
-    replacements->push_back(Replacement(GOOGLE_FORCE_INSTANT_RESULTS, start));
+  } else if (parameter == kGoogleInputTypeParameter) {
+    replacements->push_back(Replacement(TemplateURLRef::GOOGLE_INPUT_TYPE,
+                                        start));
   } else if (parameter == kGoogleInstantExtendedEnabledParameter) {
     replacements->push_back(Replacement(GOOGLE_INSTANT_EXTENDED_ENABLED,
                                         start));
@@ -903,6 +906,12 @@ std::string TemplateURLRef::HandleReplacements(
                           &url);
         break;
 
+      case GOOGLE_INPUT_TYPE:
+        DCHECK(!i->is_post_param);
+        HandleReplacement(
+            "oit", base::IntToString(search_terms_args.input_type), *i, &url);
+        break;
+
       case GOOGLE_INSTANT_EXTENDED_ENABLED:
         DCHECK(!i->is_post_param);
         HandleReplacement(std::string(),
@@ -1052,39 +1061,6 @@ std::string TemplateURLRef::HandleReplacements(
     EncodeFormData(post_params_, post_content);
 
   return url;
-}
-
-
-// TemplateURLData ------------------------------------------------------------
-
-TemplateURLData::TemplateURLData()
-    : show_in_default_list(false),
-      safe_for_autoreplace(false),
-      id(0),
-      date_created(base::Time::Now()),
-      last_modified(base::Time::Now()),
-      created_by_policy(false),
-      usage_count(0),
-      prepopulate_id(0),
-      sync_guid(base::GenerateGUID()),
-      keyword_(base::ASCIIToUTF16("dummy")),
-      url_("x") {
-}
-
-TemplateURLData::~TemplateURLData() {
-}
-
-void TemplateURLData::SetKeyword(const base::string16& keyword) {
-  DCHECK(!keyword.empty());
-
-  // Case sensitive keyword matching is confusing. As such, we force all
-  // keywords to be lower case.
-  keyword_ = base::i18n::ToLower(keyword);
-}
-
-void TemplateURLData::SetURL(const std::string& url) {
-  DCHECK(!url.empty());
-  url_ = url;
 }
 
 

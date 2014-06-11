@@ -485,6 +485,7 @@ WARN_UNUSED_RESULT static leveldb::Status GetMaxObjectStoreId(
 
 class DefaultLevelDBFactory : public LevelDBFactory {
  public:
+  DefaultLevelDBFactory() {}
   virtual leveldb::Status OpenLevelDB(const base::FilePath& file_name,
                                       const LevelDBComparator* comparator,
                                       scoped_ptr<LevelDBDatabase>* db,
@@ -495,6 +496,9 @@ class DefaultLevelDBFactory : public LevelDBFactory {
       OVERRIDE {
     return LevelDBDatabase::Destroy(file_name);
   }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(DefaultLevelDBFactory);
 };
 
 static bool GetBlobKeyGeneratorCurrentNumber(
@@ -1880,11 +1884,13 @@ leveldb::Status IndexedDBBackingStore::PutRecord(
   v.append(value.bits);
 
   leveldb_transaction->Put(object_store_data_key, &v);
-  transaction->PutBlobInfo(database_id,
-                           object_store_id,
-                           object_store_data_key,
-                           &value.blob_info,
-                           handles);
+  s = transaction->PutBlobInfoIfNeeded(database_id,
+                                       object_store_id,
+                                       object_store_data_key,
+                                       &value.blob_info,
+                                       handles);
+  if (!s.ok())
+    return s;
   DCHECK(!handles->size());
 
   const std::string exists_entry_key =
@@ -1933,8 +1939,10 @@ leveldb::Status IndexedDBBackingStore::DeleteRecord(
   const std::string object_store_data_key = ObjectStoreDataKey::Encode(
       database_id, object_store_id, record_identifier.primary_key());
   leveldb_transaction->Remove(object_store_data_key);
-  transaction->PutBlobInfo(
+  leveldb::Status s = transaction->PutBlobInfoIfNeeded(
       database_id, object_store_id, object_store_data_key, NULL, NULL);
+  if (!s.ok())
+    return s;
 
   const std::string exists_entry_key = ExistsEntryKey::Encode(
       database_id, object_store_id, record_identifier.primary_key());
@@ -2224,15 +2232,17 @@ class IndexedDBBackingStore::Transaction::ChainedBlobWriterImpl
   scoped_refptr<IndexedDBBackingStore::BlobWriteCallback> callback_;
   scoped_ptr<FileWriterDelegate> delegate_;
   bool aborted_;
+
+  DISALLOW_COPY_AND_ASSIGN(ChainedBlobWriterImpl);
 };
 
 class LocalWriteClosure : public FileWriterDelegate::DelegateWriteCallback,
                           public base::RefCounted<LocalWriteClosure> {
  public:
   LocalWriteClosure(IndexedDBBackingStore::Transaction::ChainedBlobWriter*
-                        chained_blob_writer_,
+                        chained_blob_writer,
                     base::TaskRunner* task_runner)
-      : chained_blob_writer_(chained_blob_writer_),
+      : chained_blob_writer_(chained_blob_writer),
         task_runner_(task_runner),
         bytes_written_(-1) {}
 
@@ -2289,6 +2299,8 @@ class LocalWriteClosure : public FileWriterDelegate::DelegateWriteCallback,
   IndexedDBBackingStore::Transaction::ChainedBlobWriter* chained_blob_writer_;
   base::TaskRunner* task_runner_;
   int64 bytes_written_;
+
+  DISALLOW_COPY_AND_ASSIGN(LocalWriteClosure);
 };
 
 bool IndexedDBBackingStore::WriteBlobFile(
@@ -3213,6 +3225,8 @@ class ObjectStoreKeyCursorImpl : public IndexedDBBackingStore::Cursor {
  private:
   explicit ObjectStoreKeyCursorImpl(const ObjectStoreKeyCursorImpl* other)
       : IndexedDBBackingStore::Cursor(other) {}
+
+  DISALLOW_COPY_AND_ASSIGN(ObjectStoreKeyCursorImpl);
 };
 
 bool ObjectStoreKeyCursorImpl::LoadCurrentRow() {
@@ -3275,6 +3289,8 @@ class ObjectStoreCursorImpl : public IndexedDBBackingStore::Cursor {
         current_value_(other->current_value_) {}
 
   IndexedDBValue current_value_;
+
+  DISALLOW_COPY_AND_ASSIGN(ObjectStoreCursorImpl);
 };
 
 bool ObjectStoreCursorImpl::LoadCurrentRow() {
@@ -3359,6 +3375,8 @@ class IndexKeyCursorImpl : public IndexedDBBackingStore::Cursor {
         primary_key_(new IndexedDBKey(*other->primary_key_)) {}
 
   scoped_ptr<IndexedDBKey> primary_key_;
+
+  DISALLOW_COPY_AND_ASSIGN(IndexKeyCursorImpl);
 };
 
 bool IndexKeyCursorImpl::LoadCurrentRow() {
@@ -3473,6 +3491,8 @@ class IndexCursorImpl : public IndexedDBBackingStore::Cursor {
   scoped_ptr<IndexedDBKey> primary_key_;
   IndexedDBValue current_value_;
   std::string primary_leveldb_key_;
+
+  DISALLOW_COPY_AND_ASSIGN(IndexCursorImpl);
 };
 
 bool IndexCursorImpl::LoadCurrentRow() {
@@ -4053,6 +4073,8 @@ class IndexedDBBackingStore::Transaction::BlobWriteCallbackWrapper
 
   IndexedDBBackingStore::Transaction* transaction_;
   scoped_refptr<BlobWriteCallback> callback_;
+
+  DISALLOW_COPY_AND_ASSIGN(BlobWriteCallbackWrapper);
 };
 
 void IndexedDBBackingStore::Transaction::WriteNewBlobs(
@@ -4125,6 +4147,37 @@ IndexedDBBackingStore::BlobChangeRecord::Clone() const {
   for (iter = handles_.begin(); iter != handles_.end(); ++iter)
     record->handles_.push_back(new webkit_blob::BlobDataHandle(**iter));
   return record.Pass();
+}
+
+leveldb::Status IndexedDBBackingStore::Transaction::PutBlobInfoIfNeeded(
+    int64 database_id,
+    int64 object_store_id,
+    const std::string& object_store_data_key,
+    std::vector<IndexedDBBlobInfo>* blob_info,
+    ScopedVector<webkit_blob::BlobDataHandle>* handles) {
+  if (!blob_info || blob_info->empty()) {
+    blob_change_map_.erase(object_store_data_key);
+    incognito_blob_map_.erase(object_store_data_key);
+
+    BlobEntryKey blob_entry_key;
+    StringPiece leveldb_key_piece(object_store_data_key);
+    if (!BlobEntryKey::FromObjectStoreDataKey(&leveldb_key_piece,
+                                              &blob_entry_key)) {
+      NOTREACHED();
+      return InternalInconsistencyStatus();
+    }
+    std::string value;
+    bool found = false;
+    leveldb::Status s =
+        transaction()->Get(blob_entry_key.Encode(), &value, &found);
+    if (!s.ok())
+      return s;
+    if (!found)
+      return leveldb::Status::OK();
+  }
+  PutBlobInfo(
+      database_id, object_store_id, object_store_data_key, blob_info, handles);
+  return leveldb::Status::OK();
 }
 
 // This is storing an info, even if empty, even if the previous key had no blob

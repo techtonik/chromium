@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "chrome/browser/metrics/metrics_service.h"
+#include "components/metrics/metrics_service.h"
 
 #include <string>
 
@@ -13,7 +13,7 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
-#include "components/metrics/metrics_log_base.h"
+#include "components/metrics/metrics_log.h"
 #include "components/metrics/metrics_service_observer.h"
 #include "components/metrics/metrics_state_manager.h"
 #include "components/metrics/test_metrics_service_client.h"
@@ -157,7 +157,7 @@ class TestMetricsServiceObserver : public MetricsServiceObserver {
 
 TEST_F(MetricsServiceTest, InitialStabilityLogAfterCleanShutDown) {
   EnableMetricsReporting();
-  GetLocalState()->SetBoolean(prefs::kStabilityExitedCleanly, true);
+  GetLocalState()->SetBoolean(metrics::prefs::kStabilityExitedCleanly, true);
 
   metrics::TestMetricsServiceClient client;
   TestMetricsService service(
@@ -177,7 +177,7 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCrash) {
       TestingBrowserProcess::GetGlobal());
   TestingPrefServiceSimple* local_state = testing_local_state.Get();
   EnableMetricsReporting();
-  local_state->ClearPref(prefs::kStabilityExitedCleanly);
+  local_state->ClearPref(metrics::prefs::kStabilityExitedCleanly);
 
   // Set up prefs to simulate restarting after a crash.
 
@@ -190,12 +190,12 @@ TEST_F(MetricsServiceTest, InitialStabilityLogAfterCrash) {
 
   // Record stability build time and version from previous session, so that
   // stability metrics (including exited cleanly flag) won't be cleared.
-  local_state->SetInt64(prefs::kStabilityStatsBuildTime,
+  local_state->SetInt64(metrics::prefs::kStabilityStatsBuildTime,
                         MetricsLog::GetBuildTime());
-  local_state->SetString(prefs::kStabilityStatsVersion,
+  local_state->SetString(metrics::prefs::kStabilityStatsVersion,
                          client.GetVersionString());
 
-  local_state->SetBoolean(prefs::kStabilityExitedCleanly, false);
+  local_state->SetBoolean(metrics::prefs::kStabilityExitedCleanly, false);
 
   TestMetricsService service(GetMetricsStateManager(), &client, local_state);
   service.InitializeMetricsRecordingState();
@@ -239,7 +239,7 @@ TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
   // Ensure that time has advanced by at least a tick before proceeding.
   WaitUntilTimeChanges(base::TimeTicks::Now());
 
-  service.log_manager_.BeginLoggingWithLog(scoped_ptr<metrics::MetricsLogBase>(
+  service.log_manager_.BeginLoggingWithLog(scoped_ptr<MetricsLog>(
       new MetricsLog("clientID",
                      1,
                      MetricsLog::INITIAL_STABILITY_LOG,
@@ -281,7 +281,7 @@ TEST_F(MetricsServiceTest, RegisterSyntheticTrial) {
   // Start a new log and ensure all three trials appear in it.
   service.log_manager_.FinishCurrentLog();
   service.log_manager_.BeginLoggingWithLog(
-      scoped_ptr<metrics::MetricsLogBase>(new MetricsLog(
+      scoped_ptr<MetricsLog>(new MetricsLog(
           "clientID", 1, MetricsLog::ONGOING_LOG, &client, GetLocalState())));
   service.GetCurrentSyntheticFieldTrials(&synthetic_trials);
   EXPECT_EQ(3U, synthetic_trials.size());

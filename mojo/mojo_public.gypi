@@ -143,6 +143,8 @@
         'public/cpp/bindings/tests/string_unittest.cc',
         'public/cpp/bindings/tests/struct_unittest.cc',
         'public/cpp/bindings/tests/type_conversion_unittest.cc',
+        'public/cpp/bindings/tests/validation_test_input_parser.cc',
+        'public/cpp/bindings/tests/validation_test_input_parser.h',
         'public/cpp/bindings/tests/validation_unittest.cc',
       ],
     },
@@ -220,6 +222,7 @@
       ],
     },
     {
+      # GN version: //mojo/public/cpp/bindings
       'target_name': 'mojo_cpp_bindings',
       'type': 'static_library',
       'include_dirs': [
@@ -273,9 +276,12 @@
         'public/cpp/bindings/lib/string_serialization.h',
         'public/cpp/bindings/lib/string_serialization.cc',
         'public/cpp/bindings/lib/sync_dispatcher.cc',
+        'public/cpp/bindings/lib/validation_errors.cc',
+        'public/cpp/bindings/lib/validation_errors.h',
       ],
     },
     {
+      # GN version: //mojo/public/js/bindings
       'target_name': 'mojo_js_bindings',
       'type': 'static_library',
       'include_dirs': [
@@ -350,6 +356,22 @@
       ],
     },
     {
+      # GN version: //mojo/public/interfaces/interface_provider:interface_provider
+      'target_name': 'mojo_interface_provider_bindings',
+      'type': 'static_library',
+      'sources': [
+        'public/interfaces/interface_provider/interface_provider.mojom',
+      ],
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'dependencies': [
+        'mojo_cpp_bindings',
+      ],
+      'export_dependent_settings': [
+        'mojo_cpp_bindings',
+      ],
+    },
+    {
+      # GN version: //mojo/public/interfaces/service_provider:service_provider
       'target_name': 'mojo_service_provider_bindings',
       'type': 'static_library',
       'sources': [
@@ -378,32 +400,6 @@
       ],
       'export_dependent_settings': [
         'mojo_service_provider_bindings',
-      ],
-    },
-    {
-      'target_name': 'mojo_main_standalone',
-      'type': 'static_library',
-      'sources': [
-        'public/cpp/application/lib/mojo_main_standalone.cc',
-      ],
-      'dependencies': [
-        'mojo_application',
-      ],
-      'export_dependent_settings': [
-        'mojo_application',
-      ],
-    },
-    {
-      'target_name': 'mojo_main_chromium',
-      'type': 'static_library',
-      'sources': [
-        'public/cpp/application/lib/mojo_main_chromium.cc',
-      ],
-      'dependencies': [
-        'mojo_application',
-      ],
-      'export_dependent_settings': [
-        'mojo_application',
       ],
     },
   ],

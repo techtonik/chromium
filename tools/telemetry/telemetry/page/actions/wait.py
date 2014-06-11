@@ -1,4 +1,4 @@
-# Copyright (c) 2012 The Chromium Authors. All rights reserved.
+# Copyright 2012 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -42,6 +42,9 @@ class WaitAction(page_action.PageAction):
                                    'null)'
                   '.singleNodeValue' % re.escape(self.xpath))
         tab.WaitForJavaScriptExpression('%s != null' % code, self.timeout)
+      elif hasattr(self, 'element_function'):
+        tab.WaitForJavaScriptExpression(
+            '%s != null' % self.element_function, self.timeout)
       else:
         raise page_action.PageActionFailed(
             'No element condition given to wait')

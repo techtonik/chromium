@@ -6,8 +6,14 @@
 #define COMPONENTS_GOOGLE_GOOGLE_URL_TRACKER_CLIENT_H_
 
 #include "base/macros.h"
+#include "url/gurl.h"
 
 class GoogleURLTracker;
+class PrefService;
+
+namespace net {
+class URLRequestContextGetter;
+}
 
 // Interface by which GoogleURLTracker communicates with its embedder.
 class GoogleURLTrackerClient {
@@ -30,6 +36,25 @@ class GoogleURLTrackerClient {
 
   // Returns whether background networking is enabled.
   virtual bool IsBackgroundNetworkingEnabled() = 0;
+
+  // Returns the PrefService that the GoogleURLTracker should use.
+  virtual PrefService* GetPrefs() = 0;
+
+  // Returns the URL request context information that the GoogleURLTracker
+  // should use.
+  virtual net::URLRequestContextGetter* GetRequestContext() = 0;
+
+  // Returns whether |url| is for a Google domain.
+  // TODO(blundell): Eliminate this method in favor of having callers call
+  // google_util::IsGoogleDomainURL() directly once google_util is
+  // componentized. crbug.com/381088
+  virtual bool IsGoogleDomainURL(const GURL& url) = 0;
+
+  // Appends the Google locale as a param to |url|.
+  // TODO(blundell): Eliminate this method in favor of having callers call
+  // google_util::AppendGoogleLocaleParam() directly once google_util is
+  // componentized. crbug.com/381088
+  virtual GURL AppendGoogleLocaleParam(const GURL& url) = 0;
 
  protected:
   GoogleURLTracker* google_url_tracker() { return google_url_tracker_; }

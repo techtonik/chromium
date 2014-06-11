@@ -7,6 +7,7 @@
 
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
+#include "base/sequence_checker.h"
 #include "chrome/browser/drive/drive_service_interface.h"
 
 namespace base {
@@ -35,7 +36,7 @@ class DriveServiceOnWorker : public drive::DriveServiceInterface {
       const std::string& parent_resource_id,
       const std::string& directory_title,
       const AddNewDirectoryOptions& options,
-      const google_apis::GetResourceEntryCallback& callback) OVERRIDE;
+      const google_apis::FileResourceCallback& callback) OVERRIDE;
 
   virtual google_apis::CancelCallback DeleteResource(
       const std::string& resource_id,
@@ -66,9 +67,9 @@ class DriveServiceOnWorker : public drive::DriveServiceInterface {
       const GURL& next_link,
       const google_apis::FileListCallback& callback) OVERRIDE;
 
-  virtual google_apis::CancelCallback GetResourceEntry(
+  virtual google_apis::CancelCallback GetFileResource(
       const std::string& resource_id,
-      const google_apis::GetResourceEntryCallback& callback) OVERRIDE;
+      const google_apis::FileResourceCallback& callback) OVERRIDE;
 
   virtual google_apis::CancelCallback GetFileListInDirectory(
       const std::string& directory_resource_id,
@@ -117,14 +118,14 @@ class DriveServiceOnWorker : public drive::DriveServiceInterface {
       const std::string& parent_resource_id,
       const std::string& new_title,
       const base::Time& last_modified,
-      const google_apis::GetResourceEntryCallback& callback) OVERRIDE;
+      const google_apis::FileResourceCallback& callback) OVERRIDE;
   virtual google_apis::CancelCallback UpdateResource(
       const std::string& resource_id,
       const std::string& parent_resource_id,
       const std::string& new_title,
       const base::Time& last_modified,
       const base::Time& last_viewed_by_me,
-      const google_apis::GetResourceEntryCallback& callback) OVERRIDE;
+      const google_apis::FileResourceCallback& callback) OVERRIDE;
   virtual google_apis::CancelCallback RenameResource(
       const std::string& resource_id,
       const std::string& new_title,
@@ -153,12 +154,12 @@ class DriveServiceOnWorker : public drive::DriveServiceInterface {
       int64 content_length,
       const std::string& content_type,
       const base::FilePath& local_file_path,
-      const google_apis::UploadRangeCallback& callback,
+      const google_apis::drive::UploadRangeCallback& callback,
       const google_apis::ProgressCallback& progress_callback) OVERRIDE;
   virtual google_apis::CancelCallback GetUploadStatus(
       const GURL& upload_url,
       int64 content_length,
-      const google_apis::UploadRangeCallback& callback) OVERRIDE;
+      const google_apis::drive::UploadRangeCallback& callback) OVERRIDE;
   virtual google_apis::CancelCallback AuthorizeApp(
       const std::string& resource_id,
       const std::string& app_id,
@@ -176,6 +177,8 @@ class DriveServiceOnWorker : public drive::DriveServiceInterface {
   base::WeakPtr<DriveServiceWrapper> wrapper_;
   scoped_refptr<base::SingleThreadTaskRunner> ui_task_runner_;
   scoped_refptr<base::SequencedTaskRunner> worker_task_runner_;
+
+  base::SequenceChecker sequence_checker_;
 
   DISALLOW_COPY_AND_ASSIGN(DriveServiceOnWorker);
 };

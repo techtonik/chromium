@@ -451,21 +451,9 @@ extern const char kProfilesNumCreated[];
 extern const char kProfileInfoCache[];
 extern const char kProfileCreatedByVersion[];
 
-extern const char kStabilityExecutionPhase[];
-extern const char kStabilityExitedCleanly[];
-extern const char kStabilityStatsVersion[];
-extern const char kStabilityStatsBuildTime[];
-extern const char kStabilitySessionEndCompleted[];
-extern const char kStabilityLaunchCount[];
-extern const char kStabilityCrashCount[];
-extern const char kStabilityIncompleteSessionEndCount[];
 extern const char kStabilityPageLoadCount[];
-extern const char kStabilitySavedSystemProfile[];
-extern const char kStabilitySavedSystemProfileHash[];
 extern const char kStabilityRendererCrashCount[];
 extern const char kStabilityExtensionRendererCrashCount[];
-extern const char kStabilityLaunchTimeSec[];
-extern const char kStabilityLastTimestampSec[];
 extern const char kStabilityRendererHangCount[];
 extern const char kStabilityChildProcessCrashCount[];
 extern const char kStabilityOtherUserCrashCount[];
@@ -478,11 +466,6 @@ extern const char kStabilityLaunchedActivityCounts[];
 extern const char kStabilityCrashedActivityCounts[];
 #endif
 
-extern const char kStabilityBreakpadRegistrationSuccess[];
-extern const char kStabilityBreakpadRegistrationFail[];
-extern const char kStabilityDebuggerPresent[];
-extern const char kStabilityDebuggerNotPresent[];
-
 extern const char kStabilityPluginStats[];
 extern const char kStabilityPluginName[];
 extern const char kStabilityPluginLaunches[];
@@ -492,8 +475,6 @@ extern const char kStabilityPluginLoadingErrors[];
 
 extern const char kInstallDate[];
 extern const char kUninstallMetricsPageLoadCount[];
-extern const char kUninstallLaunchCount[];
-extern const char kUninstallMetricsUptimeSec[];
 extern const char kUninstallLastLaunchTimeSec[];
 extern const char kUninstallLastObservedRunTimeSec[];
 
@@ -535,8 +516,6 @@ extern const char kContentSettingsWindowLastTabIndex[];
 extern const char kCertificateManagerWindowLastTabIndex[];
 extern const char kShowFirstRunBubbleOption[];
 
-extern const char kLastKnownGoogleURL[];
-extern const char kLastPromptedGoogleURL[];
 extern const char kLastKnownIntranetRedirectOrigin[];
 
 extern const char kCountryIDAtInstall[];
@@ -675,7 +654,6 @@ extern const char kVideoCaptureAllowed[];
 extern const char kVideoCaptureAllowedUrls[];
 
 extern const char kHotwordSearchEnabled[];
-extern const char kHotwordOptInPopupTimesShown[];
 extern const char kHotwordAudioLoggingEnabled[];
 
 #if defined(OS_ANDROID)
@@ -849,8 +827,6 @@ extern const char kWatchdogExtensionActive[];
 extern const char kWatchdogExtensionActiveOld[];
 
 extern const char kProfilePreferenceHashes[];
-
-extern const char kNetworkTimeMapping[];
 
 #if defined(OS_ANDROID)
 extern const char kPartnerBookmarkMappings[];

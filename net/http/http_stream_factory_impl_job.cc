@@ -339,6 +339,9 @@ void HttpStreamFactoryImpl::Job::OnNewSpdySessionReadyCallback() {
   // NULL at this point if the SpdySession closed immediately after creation.
   base::WeakPtr<SpdySession> spdy_session = new_spdy_session_;
   new_spdy_session_.reset();
+
+  // TODO(jgraettinger): Notify the factory, and let that notify |request_|,
+  // rather than notifying |request_| directly.
   if (IsOrphaned()) {
     if (spdy_session) {
       stream_factory_->OnNewSpdySessionReady(
@@ -472,7 +475,10 @@ int HttpStreamFactoryImpl::Job::RunLoop(int result) {
 
   switch (result) {
     case ERR_PROXY_AUTH_REQUESTED: {
-      CHECK(connection_.get());
+      UMA_HISTOGRAM_BOOLEAN("Net.ProxyAuthRequested.HasConnection",
+                            connection_.get() != NULL);
+      if (!connection_.get())
+        return ERR_PROXY_AUTH_REQUESTED_WITH_NO_CONNECTION;
       CHECK(connection_->socket());
       CHECK(establishing_tunnel_);
 

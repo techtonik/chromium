@@ -1,34 +1,42 @@
-// Copyright (c) 2013 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef MOJO_AURA_WINDOW_TREE_HOST_MOJO_H_
-#define MOJO_AURA_WINDOW_TREE_HOST_MOJO_H_
+#ifndef MOJO_EXAMPLES_AURA_DEMO_WINDOW_TREE_HOST_VIEW_MANAGER_H_
+#define MOJO_EXAMPLES_AURA_DEMO_WINDOW_TREE_HOST_VIEW_MANAGER_H_
 
-#include "base/bind.h"
-#include "mojo/services/native_viewport/native_viewport.mojom.h"
 #include "ui/aura/window_tree_host.h"
 #include "ui/events/event_source.h"
-#include "ui/gfx/rect.h"
+#include "ui/gfx/geometry/rect.h"
+
+class SkBitmap;
 
 namespace ui {
-class ContextFactory;
+class Compositor;
 }
 
 namespace mojo {
 
-class ContextFactoryMojo;
+class WindowTreeHostMojoDelegate;
 
-class WindowTreeHostMojo : public aura::WindowTreeHost,
-                           public ui::EventSource,
-                           public NativeViewportClient {
+class WindowTreeHostMojo : public aura::WindowTreeHost, public ui::EventSource {
  public:
-  WindowTreeHostMojo(NativeViewportPtr viewport,
-                     const gfx::Rect& bounds,
-                     const base::Callback<void()>& compositor_created_callback);
+  WindowTreeHostMojo(const gfx::Rect& bounds,
+                     WindowTreeHostMojoDelegate* delegate);
   virtual ~WindowTreeHostMojo();
 
-  gfx::Rect bounds() const { return bounds_; }
+  // Returns the WindowTreeHostMojo for the specified compositor.
+  static WindowTreeHostMojo* ForCompositor(ui::Compositor* compositor);
+
+  const gfx::Rect& bounds() const { return bounds_; }
+
+  // Sets the contents to show in this WindowTreeHost. This forwards to the
+  // delegate.
+  void SetContents(const SkBitmap& contents);
+
+  ui::EventDispatchDetails SendEventToProcessor(ui::Event* event) {
+    return ui::EventSource::SendEventToProcessor(event);
+  }
 
  private:
   // WindowTreeHost:
@@ -50,23 +58,13 @@ class WindowTreeHostMojo : public aura::WindowTreeHost,
   // ui::EventSource:
   virtual ui::EventProcessor* GetEventProcessor() OVERRIDE;
 
-  // Overridden from NativeViewportClient:
-  virtual void OnCreated() OVERRIDE;
-  virtual void OnDestroyed() OVERRIDE;
-  virtual void OnBoundsChanged(RectPtr bounds) OVERRIDE;
-  virtual void OnEvent(EventPtr event,
-                       const mojo::Callback<void()>& callback) OVERRIDE;
-
-  static ContextFactoryMojo* context_factory_;
-
-  NativeViewportPtr native_viewport_;
-  base::Callback<void()> compositor_created_callback_;
-
   gfx::Rect bounds_;
+
+  WindowTreeHostMojoDelegate* delegate_;
 
   DISALLOW_COPY_AND_ASSIGN(WindowTreeHostMojo);
 };
 
 }  // namespace mojo
 
-#endif  // MOJO_AURA_WINDOW_TREE_HOST_MOJO_H_
+#endif  // MOJO_EXAMPLES_AURA_DEMO_WINDOW_TREE_HOST_VIEW_MANAGER_H_

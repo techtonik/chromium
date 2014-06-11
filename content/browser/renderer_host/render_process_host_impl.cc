@@ -354,6 +354,27 @@ void AddIntegerValue(CFMutableDictionaryRef dictionary,
 }
 #endif
 
+const char kSessionStorageHolderKey[] = "kSessionStorageHolderKey";
+
+class SessionStorageHolder : public base::SupportsUserData::Data {
+ public:
+  SessionStorageHolder() {}
+  virtual ~SessionStorageHolder() {}
+
+  void Hold(const SessionStorageNamespaceMap& sessions, int view_route_id) {
+    session_storage_namespaces_awaiting_close_[view_route_id] = sessions;
+  }
+
+  void Release(int old_route_id) {
+    session_storage_namespaces_awaiting_close_.erase(old_route_id);
+  }
+
+ private:
+  std::map<int, SessionStorageNamespaceMap >
+      session_storage_namespaces_awaiting_close_;
+  DISALLOW_COPY_AND_ASSIGN(SessionStorageHolder);
+};
+
 }  // namespace
 
 RendererMainThreadFactoryFunction g_renderer_main_thread_factory = NULL;
@@ -569,12 +590,11 @@ bool RenderProcessHostImpl::Init() {
   // Setup the IPC channel.
   const std::string channel_id =
       IPC::Channel::GenerateVerifiedChannelID(std::string());
-  channel_.reset(
-          new IPC::ChannelProxy(channel_id,
-                                IPC::Channel::MODE_SERVER,
-                                this,
-                                BrowserThread::GetMessageLoopProxyForThread(
-                                    BrowserThread::IO).get()));
+  channel_ = IPC::ChannelProxy::Create(
+      channel_id,
+      IPC::Channel::MODE_SERVER,
+      this,
+      BrowserThread::GetMessageLoopProxyForThread(BrowserThread::IO).get());
 
   // Setup the Mojo channel.
   mojo_application_host_.reset(new MojoApplicationHost());
@@ -1147,7 +1167,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableWebGLImageChromium,
     switches::kEnableWebMIDI,
     switches::kEnableZeroCopy,
-    switches::kForceCompositingMode,
     switches::kForceDeviceScaleFactor,
     switches::kFullMemoryCrashReport,
     switches::kIgnoreResolutionLimitsForAcceleratedVideoDecode,
@@ -1168,7 +1187,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kShowPaintRects,
     switches::kSitePerProcess,
     switches::kStatsCollectionController,
-    switches::kTestSandbox,
     switches::kTestType,
     switches::kTouchEvents,
     switches::kTraceToConsole,
@@ -1232,7 +1250,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableSandboxLogging,
 #endif
 #if defined(OS_WIN)
-    switches::kEnableDirectWrite,
+    switches::kDisableDirectWrite,
     switches::kEnableHighResolutionTime,
 #endif
   };
@@ -1355,6 +1373,7 @@ bool RenderProcessHostImpl::OnMessageReceived(const IPC::Message& msg) {
       IPC_MESSAGE_HANDLER_DELAY_REPLY(
           ChildProcessHostMsg_SyncAllocateGpuMemoryBuffer,
           OnAllocateGpuMemoryBuffer)
+      IPC_MESSAGE_HANDLER(ViewHostMsg_Close_ACK, OnCloseACK)
       // Adding single handlers for your service here is fine, but once your
       // service needs more than one handler, please extract them into a new
       // message filter and add that filter to CreateMessageFilters().
@@ -1486,6 +1505,7 @@ void RenderProcessHostImpl::Cleanup() {
     gpu_message_filter_ = NULL;
     message_port_message_filter_ = NULL;
     screen_orientation_dispatcher_host_ = NULL;
+    RemoveUserData(kSessionStorageHolderKey);
 
     // Remove ourself from the list of renderer processes so that we can't be
     // reused in between now and when the Delete task runs.
@@ -1633,15 +1653,15 @@ void RenderProcessHostImpl::FilterURL(RenderProcessHost* rph,
     // This is because the browser treats navigation to an empty GURL as a
     // navigation to the home page. This is often a privileged page
     // (chrome://newtab/) which is exactly what we don't want.
-    *url = GURL(kAboutBlankURL);
+    *url = GURL(url::kAboutBlankURL);
     RecordAction(base::UserMetricsAction("FilterURLTermiate_Invalid"));
     return;
   }
 
-  if (url->SchemeIs(kAboutScheme)) {
+  if (url->SchemeIs(url::kAboutScheme)) {
     // The renderer treats all URLs in the about: scheme as being about:blank.
     // Canonicalize about: URLs to about:blank.
-    *url = GURL(kAboutBlankURL);
+    *url = GURL(url::kAboutBlankURL);
     RecordAction(base::UserMetricsAction("FilterURLTermiate_About"));
   }
 
@@ -1655,7 +1675,7 @@ void RenderProcessHostImpl::FilterURL(RenderProcessHost* rph,
     // URL.  This prevents us from storing the blocked URL and becoming confused
     // later.
     VLOG(1) << "Blocked URL " << url->spec();
-    *url = GURL(kAboutBlankURL);
+    *url = GURL(url::kAboutBlankURL);
     RecordAction(base::UserMetricsAction("FilterURLTermiate_Blocked"));
   }
 }
@@ -1899,6 +1919,7 @@ void RenderProcessHostImpl::ProcessDied(bool already_dead) {
   gpu_message_filter_ = NULL;
   message_port_message_filter_ = NULL;
   screen_orientation_dispatcher_host_ = NULL;
+  RemoveUserData(kSessionStorageHolderKey);
 
   IDMap<IPC::Listener>::iterator iter(&listeners_);
   while (!iter.IsAtEnd()) {
@@ -1967,6 +1988,24 @@ RenderProcessHostImpl::screen_orientation_dispatcher_host() const {
   return make_scoped_refptr(screen_orientation_dispatcher_host_);
 }
 
+void RenderProcessHostImpl::ReleaseOnCloseACK(
+    RenderProcessHost* host,
+    const SessionStorageNamespaceMap& sessions,
+    int view_route_id) {
+  DCHECK(host);
+  if (sessions.empty())
+    return;
+  SessionStorageHolder* holder = static_cast<SessionStorageHolder*>
+      (host->GetUserData(kSessionStorageHolderKey));
+  if (!holder) {
+    holder = new SessionStorageHolder();
+    host->SetUserData(
+        kSessionStorageHolderKey,
+        holder);
+  }
+  holder->Hold(sessions, view_route_id);
+}
+
 void RenderProcessHostImpl::OnShutdownRequest() {
   // Don't shut down if there are active RenderViews, or if there are pending
   // RenderViews being swapped back in.
@@ -2014,16 +2053,19 @@ void RenderProcessHostImpl::SetBackgrounded(bool backgrounded) {
   // is to not invoke the SetPriorityClass API if the dll is loaded.
   if (GetModuleHandle(L"cbstext.dll"))
     return;
+#endif  // OS_WIN
 
-  // Windows Vista+ has a fancy process backgrounding mode that can only be set
-  // from within the process.  So notify the child process of background state.
+  // Notify the child process of background state.
   Send(new ChildProcessMsg_SetProcessBackgrounded(backgrounded));
-#else
 
+#if !defined(OS_WIN)
   // Backgrounding may require elevated privileges not available to renderer
   // processes, so control backgrounding from the process host.
+
+  // Windows Vista+ has a fancy process backgrounding mode that can only be set
+  // from within the process.
   child_process_launcher_->SetProcessBackgrounded(backgrounded);
-#endif  // OS_WIN
+#endif  // !OS_WIN
 }
 
 void RenderProcessHostImpl::OnProcessLaunched() {
@@ -2079,6 +2121,14 @@ RenderProcessHostImpl::audio_renderer_host() const {
 void RenderProcessHostImpl::OnUserMetricsRecordAction(
     const std::string& action) {
   RecordComputedAction(action);
+}
+
+void RenderProcessHostImpl::OnCloseACK(int old_route_id) {
+  SessionStorageHolder* holder = static_cast<SessionStorageHolder*>
+      (GetUserData(kSessionStorageHolderKey));
+  if (!holder)
+    return;
+  holder->Release(old_route_id);
 }
 
 void RenderProcessHostImpl::OnSavedPageAsMHTML(int job_id, int64 data_size) {
@@ -2151,7 +2201,8 @@ void RenderProcessHostImpl::ConnectTo(
   mojo_application_host_->service_provider()->ConnectToService(
       mojo::String::From(service_name),
       std::string(),
-      handle.Pass());
+      handle.Pass(),
+      mojo::String());
 }
 
 void RenderProcessHostImpl::OnAllocateGpuMemoryBuffer(uint32 width,

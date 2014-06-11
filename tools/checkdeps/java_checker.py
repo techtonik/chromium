@@ -1,4 +1,4 @@
-# Copyright (c) 2012 The Chromium Authors. All rights reserved.
+# Copyright 2014 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -39,28 +39,25 @@ class JavaChecker(object):
     self._classmap = {}
     self._PrescanFiles()
 
-  def _IgnoreDir(self, d):
-    # Skip hidden directories.
-    if d.startswith('.'):
-      return True
-    # Skip the "out" directory, as dealing with generated files is awkward.
-    # We don't want paths like "out/Release/lib.java" in our DEPS files.
-    # TODO(husky): We need some way of determining the "real" path to
-    # a generated file -- i.e., where it would be in source control if
-    # it weren't generated.
-    if d == 'out':
-      return True
-    # Skip third-party directories.
-    if d in ('third_party', 'ThirdParty'):
-      return True
-    return False
-
   def _PrescanFiles(self):
     for root, dirs, files in os.walk(self._base_directory):
       # Skip unwanted subdirectories. TODO(husky): it would be better to do
       # this via the skip_child_includes flag in DEPS files. Maybe hoist this
       # prescan logic into checkdeps.py itself?
-      dirs[:] = [d for d in dirs if not self._IgnoreDir(d)]
+      for d in dirs:
+        # Skip hidden directories.
+        if d.startswith('.'):
+          dirs.remove(d)
+        # Skip the "out" directory, as dealing with generated files is awkward.
+        # We don't want paths like "out/Release/lib.java" in our DEPS files.
+        # TODO(husky): We need some way of determining the "real" path to
+        # a generated file -- i.e., where it would be in source control if
+        # it weren't generated.
+        if d == 'out':
+          dirs.remove(d)
+        # Skip third-party directories.
+        if d in ('third_party', 'ThirdParty'):
+          dirs.remove(d)
       for f in files:
         if f.endswith('.java'):
           self._PrescanFile(os.path.join(root, f))

@@ -574,13 +574,13 @@ class LayerTreeHostTestUndrawnLayersDamageLater : public LayerTreeHostTest {
     // and each damage should be the bounding box of it and its child. If this
     // was working improperly, the damage might not include its childs bounding
     // box.
-    switch (layer_tree_host()->source_frame_number()) {
-      case 1:
+    switch (host_impl->active_tree()->source_frame_number()) {
+      case 0:
         EXPECT_RECT_EQ(gfx::Rect(root_layer_->bounds()), root_damage_rect);
         break;
+      case 1:
       case 2:
       case 3:
-      case 4:
         EXPECT_RECT_EQ(gfx::Rect(child_layer_->bounds()), root_damage_rect);
         break;
       default:
@@ -1001,7 +1001,6 @@ class ContentLayerWithUpdateTracking : public ContentLayer {
  private:
   explicit ContentLayerWithUpdateTracking(ContentLayerClient* client)
       : ContentLayer(client), paint_contents_count_(0) {
-    SetAnchorPoint(gfx::PointF(0.f, 0.f));
     SetBounds(gfx::Size(10, 10));
     SetIsDrawable(true);
   }
@@ -1091,12 +1090,10 @@ class LayerTreeHostTestDeviceScaleFactorScalesViewportAndLayers
 
     root_layer_->SetIsDrawable(true);
     root_layer_->SetBounds(gfx::Size(30, 30));
-    root_layer_->SetAnchorPoint(gfx::PointF(0.f, 0.f));
 
     child_layer_->SetIsDrawable(true);
     child_layer_->SetPosition(gfx::Point(2, 2));
     child_layer_->SetBounds(gfx::Size(10, 10));
-    child_layer_->SetAnchorPoint(gfx::PointF(0.f, 0.f));
 
     layer_tree_host()->SetRootLayer(root_layer_);
 
@@ -1340,7 +1337,7 @@ MULTI_THREAD_DELEGATING_RENDERER_NOIMPL_TEST_F(
 static void SetLayerPropertiesForTesting(Layer* layer,
                                          Layer* parent,
                                          const gfx::Transform& transform,
-                                         const gfx::PointF& anchor,
+                                         const gfx::Point3F& transform_origin,
                                          const gfx::PointF& position,
                                          const gfx::Size& bounds,
                                          bool opaque) {
@@ -1348,7 +1345,7 @@ static void SetLayerPropertiesForTesting(Layer* layer,
   if (parent)
     parent->AddChild(layer);
   layer->SetTransform(transform);
-  layer->SetAnchorPoint(anchor);
+  layer->SetTransformOrigin(transform_origin);
   layer->SetPosition(position);
   layer->SetBounds(bounds);
   layer->SetContentsOpaque(opaque);
@@ -1726,7 +1723,7 @@ class LayerTreeHostTestEvictTextures : public LayerTreeHostTest {
     SetLayerPropertiesForTesting(layer_.get(),
                                  0,
                                  identity_matrix,
-                                 gfx::PointF(0.f, 0.f),
+                                 gfx::Point3F(0.f, 0.f, 0.f),
                                  gfx::PointF(0.f, 0.f),
                                  gfx::Size(10, 20),
                                  true);
@@ -1893,7 +1890,6 @@ class LayerTreeHostTestContinuousInvalidate : public LayerTreeHostTest {
     content_layer_ = ContentLayer::Create(&client_);
     content_layer_->SetBounds(gfx::Size(10, 10));
     content_layer_->SetPosition(gfx::PointF(0.f, 0.f));
-    content_layer_->SetAnchorPoint(gfx::PointF(0.f, 0.f));
     content_layer_->SetIsDrawable(true);
     layer_tree_host()->root_layer()->AddChild(content_layer_);
 
@@ -2545,7 +2541,6 @@ class LayerTreeHostTestIOSurfaceDrawing : public LayerTreeHostTest {
 
     scoped_refptr<IOSurfaceLayer> io_surface_layer = IOSurfaceLayer::Create();
     io_surface_layer->SetBounds(gfx::Size(10, 10));
-    io_surface_layer->SetAnchorPoint(gfx::PointF());
     io_surface_layer->SetIsDrawable(true);
     io_surface_layer->SetContentsOpaque(true);
     io_surface_layer->SetIOSurfaceProperties(io_surface_id_, io_surface_size_);
@@ -2953,7 +2948,6 @@ class PushPropertiesCountingLayerImpl : public LayerImpl {
   PushPropertiesCountingLayerImpl(LayerTreeImpl* tree_impl, int id)
       : LayerImpl(tree_impl, id),
         push_properties_count_(0) {
-    SetAnchorPoint(gfx::PointF());
     SetBounds(gfx::Size(1, 1));
   }
 };
@@ -2987,7 +2981,6 @@ class PushPropertiesCountingLayer : public Layer {
  private:
   PushPropertiesCountingLayer()
       : push_properties_count_(0), persist_needs_push_properties_(false) {
-    SetAnchorPoint(gfx::PointF());
     SetBounds(gfx::Size(1, 1));
     SetIsDrawable(true);
   }
@@ -4013,19 +4006,16 @@ class LayerTreeHostTestPushHiddenLayer : public LayerTreeHostTest {
  protected:
   virtual void SetupTree() OVERRIDE {
     root_layer_ = Layer::Create();
-    root_layer_->SetAnchorPoint(gfx::PointF());
     root_layer_->SetPosition(gfx::Point());
     root_layer_->SetBounds(gfx::Size(10, 10));
 
     parent_layer_ = SolidColorLayer::Create();
-    parent_layer_->SetAnchorPoint(gfx::PointF());
     parent_layer_->SetPosition(gfx::Point());
     parent_layer_->SetBounds(gfx::Size(10, 10));
     parent_layer_->SetIsDrawable(true);
     root_layer_->AddChild(parent_layer_);
 
     child_layer_ = SolidColorLayer::Create();
-    child_layer_->SetAnchorPoint(gfx::PointF());
     child_layer_->SetPosition(gfx::Point());
     child_layer_->SetBounds(gfx::Size(10, 10));
     child_layer_->SetIsDrawable(true);
@@ -4086,7 +4076,6 @@ class LayerTreeHostTestUpdateLayerInEmptyViewport : public LayerTreeHostTest {
 
   virtual void SetupTree() OVERRIDE {
     root_layer_ = FakePictureLayer::Create(&client_);
-    root_layer_->SetAnchorPoint(gfx::PointF());
     root_layer_->SetBounds(gfx::Size(10, 10));
 
     layer_tree_host()->SetRootLayer(root_layer_);
@@ -4210,7 +4199,7 @@ class LayerTreeHostTestMaxTransferBufferUsageBytes : public LayerTreeHostTest {
 
     // Expect that the transfer buffer memory used is equal to the
     // MaxTransferBufferUsageBytes value set in CreateOutputSurface.
-    EXPECT_EQ(1024 * 1024u, context->GetTransferBufferMemoryUsedBytes());
+    EXPECT_EQ(1024 * 1024u, context->max_used_transfer_buffer_usage_bytes());
     EndTest();
   }
 

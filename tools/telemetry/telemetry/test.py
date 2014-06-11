@@ -1,4 +1,4 @@
-# Copyright (c) 2013 The Chromium Authors. All rights reserved.
+# Copyright 2013 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -17,8 +17,8 @@ from telemetry.page import page_runner
 from telemetry.page import cloud_storage
 from telemetry.page import page_set
 from telemetry.page import page_test
-from telemetry.page import page_test_results
 from telemetry.page import test_expectations
+from telemetry.results import page_test_results
 
 
 Disabled = decorators.Disabled
@@ -38,7 +38,11 @@ class Test(command_line.Command):
     if hasattr(cls, 'tag'):
       name += '.' + cls.tag
     if hasattr(cls, 'page_set'):
-      name += '.' + os.path.basename(os.path.splitext(cls.page_set)[0])
+      if isinstance(cls.page_set, basestring):
+        # TODO(dtu): Remove this code path after crbug.com/362293.
+        name += '.' + os.path.basename(os.path.splitext(cls.page_set)[0])
+      else:
+        name += '.' + cls.page_set.Name()
     return name
 
   @classmethod
@@ -164,6 +168,18 @@ class Test(command_line.Command):
     return cls.test
 
   @classmethod
+  def PageSetClass(cls):
+    """Get the PageSet for this Test.
+
+    If the Test has no PageSet, raises NotImplementedError.
+    """
+    if not hasattr(cls, 'page_set'):
+      raise NotImplementedError('This test has no "page_set" attribute.')
+    if not issubclass(cls.page_set, page_set.PageSet):
+      raise TypeError('"%s" is not a PageSet.' % cls.page_set.__name__)
+    return cls.page_set
+
+  @classmethod
   def CreatePageSet(cls, options):  # pylint: disable=W0613
     """Get the page set this test will run on.
 
@@ -172,8 +188,12 @@ class Test(command_line.Command):
     """
     if not hasattr(cls, 'page_set'):
       raise NotImplementedError('This test has no "page_set" attribute.')
-    return page_set.PageSet.FromFile(
-        file_path=os.path.join(util.GetBaseDir(), cls.page_set))
+    if isinstance(cls.page_set, basestring):
+      # TODO(dtu): Remove this code path after crbug.com/362293.
+      return page_set.PageSet.FromFile(
+          file_path=os.path.join(util.GetBaseDir(), cls.page_set))
+    else:
+      return cls.PageSetClass()()
 
   @classmethod
   def CreateExpectations(cls, ps):  # pylint: disable=W0613

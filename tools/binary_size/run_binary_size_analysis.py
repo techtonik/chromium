@@ -455,26 +455,41 @@ def RunElfSymbolizer(outfile, library, addr2line_binary, nm_binary, jobs):
   symbolizer = elf_symbolizer.ELFSymbolizer(library, addr2line_binary,
                                             map_address_symbol,
                                             max_concurrent_jobs=jobs)
-  for line in nm_output_lines:
-    match = sNmPattern.match(line)
-    if match:
-      location = match.group(5)
-      if not location:
-        addr = int(match.group(1), 16)
-        size = int(match.group(2), 16)
-        if addr in address_symbol:  # Already looked up, shortcut ELFSymbolizer.
-          map_address_symbol(address_symbol[addr], addr)
-          continue
-        elif size == 0:
-          # Save time by not looking up empty symbols (do they even exist?)
-          print('Empty symbol: ' + line)
-        else:
-          symbolizer.SymbolizeAsync(addr, addr)
-          continue
+  user_interrupted = False
+  try:
+    for line in nm_output_lines:
+      match = sNmPattern.match(line)
+      if match:
+        location = match.group(5)
+        if not location:
+          addr = int(match.group(1), 16)
+          size = int(match.group(2), 16)
+          if addr in address_symbol:  # Already looked up, shortcut
+                                      # ELFSymbolizer.
+            map_address_symbol(address_symbol[addr], addr)
+            continue
+          elif size == 0:
+            # Save time by not looking up empty symbols (do they even exist?)
+            print('Empty symbol: ' + line)
+          else:
+            symbolizer.SymbolizeAsync(addr, addr)
+            continue
 
-    progress.skip_count += 1
+      progress.skip_count += 1
+  except KeyboardInterrupt:
+    user_interrupted = True
+    print('Interrupting - killing subprocesses. Please wait.')
 
-  symbolizer.Join()
+  try:
+    symbolizer.Join()
+  except KeyboardInterrupt:
+    # Don't want to abort here since we will be finished in a few seconds.
+    user_interrupted = True
+    print('Patience you must have my young padawan.')
+
+  if user_interrupted:
+    print('Skipping the rest of the file mapping. '
+          'Output will not be fully classified.')
 
   with open(outfile, 'w') as out:
     for line in nm_output_lines:
@@ -483,15 +498,16 @@ def RunElfSymbolizer(outfile, library, addr2line_binary, nm_binary, jobs):
         location = match.group(5)
         if not location:
           addr = int(match.group(1), 16)
-          symbol = address_symbol[addr]
-          path = '??'
-          if symbol.source_path is not None:
-            path = symbol.source_path
-          line_number = 0
-          if symbol.source_line is not None:
-            line_number = symbol.source_line
-          out.write('%s\t%s:%d\n' % (line, path, line_number))
-          continue
+          symbol = address_symbol.get(addr)
+          if symbol is not None:
+            path = '??'
+            if symbol.source_path is not None:
+              path = symbol.source_path
+            line_number = 0
+            if symbol.source_line is not None:
+              line_number = symbol.source_line
+            out.write('%s\t%s:%d\n' % (line, path, line_number))
+            continue
 
       out.write('%s\n' % line)
 
@@ -500,7 +516,8 @@ def RunElfSymbolizer(outfile, library, addr2line_binary, nm_binary, jobs):
 
 def RunNm(binary, nm_binary):
   print('Starting nm')
-  cmd = [nm_binary, '-C', '--print-size', binary]
+  cmd = [nm_binary, '-C', '--print-size', '--size-sort', '--reverse-sort',
+         binary]
   nm_process = subprocess.Popen(cmd,
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
@@ -544,6 +561,35 @@ def _find_in_system_path(binary):
       return binary_path
   return None
 
+def CheckDebugFormatSupport(library, addr2line_binary):
+  """Kills the program if debug data is in an unsupported format.
+
+  There are two common versions of the DWARF debug formats and
+  since we are right now transitioning from DWARF2 to newer formats,
+  it's possible to have a mix of tools that are not compatible. Detect
+  that and abort rather than produce meaningless output."""
+  tool_output = subprocess.check_output([addr2line_binary, '--version'])
+  version_re = re.compile(r'^GNU [^ ]+ .* (\d+).(\d+).*?$', re.M)
+  parsed_output = version_re.match(tool_output)
+  major = int(parsed_output.group(1))
+  minor = int(parsed_output.group(2))
+  supports_dwarf4 = major > 2 or major == 2 and minor > 22
+
+  if supports_dwarf4:
+    return
+
+  print('Checking version of debug information in %s.' % library)
+  debug_info = subprocess.check_output(['readelf', '--debug-dump=info',
+                                       '--dwarf-depth=1', library])
+  dwarf_version_re = re.compile(r'^\s+Version:\s+(\d+)$', re.M)
+  parsed_dwarf_format_output = dwarf_version_re.search(debug_info)
+  version = int(parsed_dwarf_format_output.group(1))
+  if version > 2:
+    print('The supplied tools only support DWARF2 debug data but the binary\n' +
+          'uses DWARF%d. Update the tools or compile the binary\n' % version +
+          'with -gdwarf-2.')
+    sys.exit(1)
+
 
 def main():
   usage = """%prog [options]
@@ -586,7 +632,7 @@ def main():
                     'library. This is to be used when the addr2line in '
                     'the path is not for the right architecture or '
                     'of the right version.')
-  parser.add_option('--jobs',
+  parser.add_option('--jobs', type='int',
                     help='number of jobs to use for the parallel '
                     'addr2line processing pool; defaults to 1. More '
                     'jobs greatly improve throughput but eat RAM like '
@@ -638,8 +684,10 @@ def main():
     assert nm_binary, 'Unable to find nm in the path. Use --nm-binary '\
         'to specify location.'
 
-  print('nm: %s' % nm_binary)
   print('addr2line: %s' % addr2line_binary)
+  print('nm: %s' % nm_binary)
+
+  CheckDebugFormatSupport(opts.library, addr2line_binary)
 
   symbols = GetNmSymbols(opts.nm_in, opts.nm_out, opts.library,
                          opts.jobs, opts.verbose is True,
@@ -678,12 +726,10 @@ def main():
                                 'template')
     shutil.copy(os.path.join(d3_src, 'LICENSE'), d3_out)
     shutil.copy(os.path.join(d3_src, 'd3.js'), d3_out)
-    print('Copying index.html')
     shutil.copy(os.path.join(template_src, 'index.html'), opts.destdir)
     shutil.copy(os.path.join(template_src, 'D3SymbolTreeMap.js'), opts.destdir)
 
-  if opts.verbose:
-    print 'Report saved to ' + opts.destdir + '/index.html'
+  print 'Report saved to ' + opts.destdir + '/index.html'
 
 
 if __name__ == '__main__':

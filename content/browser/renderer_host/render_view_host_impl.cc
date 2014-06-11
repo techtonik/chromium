@@ -91,10 +91,12 @@
 
 #if defined(OS_MACOSX)
 #include "content/browser/renderer_host/popup_menu_helper_mac.h"
-#elif defined(OS_ANDROID)
-#include "content/browser/media/android/media_web_contents_observer.h"
 #elif defined(OS_WIN)
 #include "base/win/win_util.h"
+#endif
+
+#if defined(ENABLE_BROWSER_CDMS)
+#include "content/browser/media/media_web_contents_observer.h"
 #endif
 
 using base::TimeDelta;
@@ -223,7 +225,7 @@ RenderViewHostImpl::RenderViewHostImpl(
                    GetProcess()->GetID(), GetRoutingID()));
   }
 
-#if defined(OS_ANDROID)
+#if defined(ENABLE_BROWSER_CDMS)
   media_web_contents_observer_.reset(new MediaWebContentsObserver(this));
 #endif
 
@@ -410,8 +412,6 @@ WebPreferences RenderViewHostImpl::GetWebkitPrefs(const GURL& url) {
       !command_line.HasSwitch(switches::kDisableDeferredFilters);
   prefs.container_culling_enabled =
       command_line.HasSwitch(switches::kEnableContainerCulling);
-  prefs.lazy_layout_enabled =
-      command_line.HasSwitch(switches::kEnableExperimentalWebPlatformFeatures);
   prefs.region_based_columns_enabled =
       command_line.HasSwitch(switches::kEnableRegionBasedColumns);
 
@@ -460,8 +460,9 @@ WebPreferences RenderViewHostImpl::GetWebkitPrefs(const GURL& url) {
     prefs.javascript_enabled = true;
   }
 
-  prefs.is_online = !net::NetworkChangeNotifier::IsOffline();
   prefs.connection_type = net::NetworkChangeNotifier::GetConnectionType();
+  prefs.is_online =
+      prefs.connection_type != net::NetworkChangeNotifier::CONNECTION_NONE;
 
   prefs.gesture_tap_highlight_enabled = !command_line.HasSwitch(
       switches::kDisableGestureTapHighlight);
@@ -988,10 +989,6 @@ bool RenderViewHostImpl::OnMessageReceived(const IPC::Message& msg) {
                         OnDidContentsPreferredSizeChange)
     IPC_MESSAGE_HANDLER(ViewHostMsg_DidChangeScrollOffset,
                         OnDidChangeScrollOffset)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_DidChangeScrollOffsetPinningForMainFrame,
-                        OnDidChangeScrollOffsetPinningForMainFrame)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_DidChangeNumWheelEvents,
-                        OnDidChangeNumWheelEvents)
     IPC_MESSAGE_HANDLER(ViewHostMsg_RouteCloseEvent,
                         OnRouteCloseEvent)
     IPC_MESSAGE_HANDLER(ViewHostMsg_RouteMessageEvent, OnRouteMessageEvent)
@@ -1037,6 +1034,15 @@ void RenderViewHostImpl::Shutdown() {
       opener->increment_in_flight_event_count();
     }
     run_modal_opener_id_ = MSG_ROUTING_NONE;
+  }
+
+  // We can't release the SessionStorageNamespace until our peer
+  // in the renderer has wound down.
+  if (GetProcess()->HasConnection()) {
+    RenderProcessHostImpl::ReleaseOnCloseACK(
+        GetProcess(),
+        delegate_->GetSessionStorageNamespaceMap(),
+        GetRoutingID());
   }
 
   RenderWidgetHostImpl::Shutdown();
@@ -1208,15 +1214,6 @@ void RenderViewHostImpl::OnRenderAutoResized(const gfx::Size& new_size) {
 void RenderViewHostImpl::OnDidChangeScrollOffset() {
   if (view_)
     view_->ScrollOffsetChanged();
-}
-
-void RenderViewHostImpl::OnDidChangeScrollOffsetPinningForMainFrame(
-    bool is_pinned_to_left, bool is_pinned_to_right) {
-  if (view_)
-    view_->SetScrollOffsetPinning(is_pinned_to_left, is_pinned_to_right);
-}
-
-void RenderViewHostImpl::OnDidChangeNumWheelEvents(int count) {
 }
 
 void RenderViewHostImpl::OnRouteCloseEvent() {

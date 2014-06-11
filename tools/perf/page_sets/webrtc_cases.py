@@ -24,14 +24,8 @@ class Page1(WebrtcCasesPage):
 
   def RunWebrtc(self, action_runner):
     action_runner.NavigateToPage(self)
-    action_runner.RunAction(WaitAction(
-      {
-        'seconds': 10
-      }))
-    action_runner.RunAction(JavascriptAction(
-      {
-        'expression': 'checkForErrors();'
-      }))
+    action_runner.Wait(10)
+    action_runner.ExecuteJavaScript('checkForErrors();')
 
 
 class Page2(WebrtcCasesPage):
@@ -48,18 +42,12 @@ class Page2(WebrtcCasesPage):
       {
         'selector': 'button[id="btn1"]'
       }))
-    action_runner.RunAction(WaitAction(
-      {
-        'seconds': 2
-      }))
+    action_runner.Wait(2)
     action_runner.RunAction(ClickElementAction(
       {
         'selector': 'button[id="btn2"]'
       }))
-    action_runner.RunAction(WaitAction(
-      {
-        'seconds': 10
-      }))
+    action_runner.Wait(10)
     action_runner.RunAction(ClickElementAction(
       {
         'selector': 'button[id="btn3"]'
@@ -70,18 +58,12 @@ class Page2(WebrtcCasesPage):
       {
         'selector': 'button[id="btn1"]'
       }))
-    action_runner.RunAction(WaitAction(
-      {
-        'seconds': 2
-      }))
+    action_runner.Wait(2)
     action_runner.RunAction(ClickElementAction(
       {
         'selector': 'button[id="btn2"]'
       }))
-    action_runner.RunAction(WaitAction(
-      {
-        'seconds': 10
-      }))
+    action_runner.Wait(10)
     action_runner.RunAction(ClickElementAction(
       {
         'selector': 'button[id="btn3"]'

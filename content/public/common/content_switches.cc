@@ -552,9 +552,6 @@ const char kEnableZeroCopy[]                = "enable-zero-copy";
 // Load NPAPI plugins from the specified directory.
 const char kExtraPluginDir[]                = "extra-plugin-dir";
 
-// Enable force_compositing_mode in layout tests.
-const char kForceCompositingMode[]          = "force-compositing-mode";
-
 // Some field trials may be randomized in the browser, and the randomly selected
 // outcome needs to be propagated to the renderer. For instance, this is used
 // to modify histograms recorded in the renderer, or to get the renderer to
@@ -798,9 +795,6 @@ const char kTabCaptureUpscaleQuality[]      = "tab-capture-upscale-quality";
 const char kTestingFixedHttpPort[]          = "testing-fixed-http-port";
 const char kTestingFixedHttpsPort[]         = "testing-fixed-https-port";
 
-// Runs the security test for the renderer sandbox.
-const char kTestSandbox[]                   = "test-sandbox";
-
 // Type of the current test harness ("browser" or "ui").
 const char kTestType[]                      = "test-type";
 
@@ -969,11 +963,11 @@ const char kDisableCoreAnimationPlugins[] =
 // Device scale factor passed to certain processes like renderers, etc.
 const char kDeviceScaleFactor[]     = "device-scale-factor";
 
+// Disables the DirectWrite font rendering system on windows.
+const char kDisableDirectWrite[]             = "disable-direct-write";
+
 // Disable the Legacy Window which corresponds to the size of the WebContents.
 const char kDisableLegacyIntermediateWindow[] = "disable-legacy-window";
-
-// Enables the DirectWrite font rendering system on windows.
-const char kEnableDirectWrite[]             = "enable-direct-write";
 
 // Use high resolution timers for TimeTicks.
 const char kEnableHighResolutionTime[]      = "enable-high-resolution-time";

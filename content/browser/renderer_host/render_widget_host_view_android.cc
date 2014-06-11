@@ -35,7 +35,7 @@
 #include "content/browser/gpu/gpu_data_manager_impl.h"
 #include "content/browser/gpu/gpu_process_host_ui_shim.h"
 #include "content/browser/gpu/gpu_surface_tracker.h"
-#include "content/browser/media/android/media_web_contents_observer.h"
+#include "content/browser/media/media_web_contents_observer.h"
 #include "content/browser/renderer_host/compositor_impl_android.h"
 #include "content/browser/renderer_host/dip_util.h"
 #include "content/browser/renderer_host/image_transport_factory_android.h"
@@ -688,11 +688,13 @@ void RenderWidgetHostViewAndroid::CopyFromCompositingSurface(
   DCHECK(frame_provider_);
   scoped_refptr<cc::DelegatedRendererLayer> delegated_layer =
       cc::DelegatedRendererLayer::Create(frame_provider_);
-  delegated_layer->SetDisplaySize(texture_size_in_layer_);
   delegated_layer->SetBounds(content_size_in_layer_);
   delegated_layer->SetHideLayerAndSubtree(true);
   delegated_layer->SetIsDrawable(true);
   delegated_layer->SetContentsOpaque(true);
+  gfx::Transform layer_scale(
+      device_scale_factor, 0.f, 0.f, device_scale_factor, 0.f, 0.f);
+  delegated_layer->SetTransform(layer_scale);
   compositor->AttachLayerForReadback(delegated_layer);
 
   readback_layer = delegated_layer;
@@ -812,11 +814,23 @@ void RenderWidgetHostViewAndroid::SwapDelegatedFrame(
   }
 
   if (layer_.get()) {
-    layer_->SetDisplaySize(texture_size_in_layer_);
     layer_->SetIsDrawable(true);
     layer_->SetContentsOpaque(true);
     layer_->SetBounds(content_size_in_layer_);
     layer_->SetNeedsDisplay();
+    // DelegatedRendererLayer scales the frame data from physical space to DIPs
+    // by inverting the frame's device scale factor, assuming that the browser
+    // compositor will map from DIPs back to physical pixels using its own
+    // device scale factor. However, the Android browser compositor always uses
+    // a device scale factor of 1.0, so we have to transform the delegated
+    // layer by the device scale to get it into the same physical pixel space as
+    // the rest of the UI.
+    const gfx::Display& display =
+        gfx::Screen::GetNativeScreen()->GetPrimaryDisplay();
+    float device_scale_factor = display.device_scale_factor();
+    gfx::Transform layer_scale(
+        device_scale_factor, 0.f, 0.f, device_scale_factor, 0.f, 0.f);
+    layer_->SetTransform(layer_scale);
   }
 
   base::Closure ack_callback =
@@ -1087,11 +1101,6 @@ void RenderWidgetHostViewAndroid::ProcessAckedTouchEvent(
     const TouchEventWithLatencyInfo& touch, InputEventAckState ack_result) {
   const bool event_consumed = ack_result == INPUT_EVENT_ACK_STATE_CONSUMED;
   gesture_provider_.OnTouchEventAck(event_consumed);
-}
-
-void RenderWidgetHostViewAndroid::SetScrollOffsetPinning(
-    bool is_pinned_to_left, bool is_pinned_to_right) {
-  // intentionally empty, like RenderWidgetHostViewViews
 }
 
 void RenderWidgetHostViewAndroid::GestureEventAck(

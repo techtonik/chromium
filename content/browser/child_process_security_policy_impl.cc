@@ -8,7 +8,6 @@
 #include "base/files/file_path.h"
 #include "base/logging.h"
 #include "base/metrics/histogram.h"
-#include "base/platform_file.h"
 #include "base/stl_util.h"
 #include "base/strings/string_util.h"
 #include "content/browser/plugin_process_host.h"
@@ -274,7 +273,7 @@ class ChildProcessSecurityPolicyImpl::SecurityState {
  private:
   typedef std::map<std::string, bool> SchemeMap;
 
-  typedef int FilePermissionFlags;  // bit-set of PlatformFileFlags
+  typedef int FilePermissionFlags;  // bit-set of base::File::Flags
   typedef std::map<base::FilePath, FilePermissionFlags> FileMap;
   typedef std::map<std::string, FilePermissionFlags> FileSystemMap;
   typedef std::set<base::FilePath> FileSet;
@@ -317,7 +316,7 @@ ChildProcessSecurityPolicyImpl::ChildProcessSecurityPolicyImpl() {
   RegisterWebSafeScheme(url::kFileSystemScheme);
 
   // We know about the following pseudo schemes and treat them specially.
-  RegisterPseudoScheme(kAboutScheme);
+  RegisterPseudoScheme(url::kAboutScheme);
   RegisterPseudoScheme(url::kJavaScriptScheme);
   RegisterPseudoScheme(kViewSourceScheme);
 }
@@ -618,7 +617,7 @@ bool ChildProcessSecurityPolicyImpl::CanRequestURL(
       return CanRequestURL(child_id, child_url);
     }
 
-    if (LowerCaseEqualsASCII(url.spec(), kAboutBlankURL))
+    if (LowerCaseEqualsASCII(url.spec(), url::kAboutBlankURL))
       return true;  // Every child process can request <about:blank>.
 
     // URLs like <about:memory> and <about:crash> shouldn't be requestable by

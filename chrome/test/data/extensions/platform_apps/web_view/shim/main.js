@@ -507,7 +507,9 @@ function testDestroyOnEventListener() {
     if (url != e.url)
       return;
     ++loadCommitCount;
-    if (loadCommitCount == 1) {
+    if (loadCommitCount == 2) {
+      // Pass in a timeout so that we can catch if any additional loadcommit
+      // occurs.
       setTimeout(function() {
         embedder.test.succeed();
       }, 0);
@@ -518,10 +520,12 @@ function testDestroyOnEventListener() {
 
   // The test starts from here, by setting the src to |url|.
   webview.addEventListener('loadcommit', function(e) {
+    window.console.log('loadcommit1');
     webview.parentNode.removeChild(webview);
     loadCommitCommon(e);
   });
   webview.addEventListener('loadcommit', function(e) {
+    window.console.log('loadcommit2');
     loadCommitCommon(e);
   });
   webview.setAttribute('src', url);
@@ -579,17 +583,43 @@ function testCannotMutateEventName() {
 // been set raises an exception.
 function testPartitionRaisesException() {
   var webview = document.createElement('webview');
-  webview.setAttribute('partition', arguments.callee.name);
-  webview.setAttribute('src', 'data:text/html,trigger navigation');
-  document.body.appendChild(webview);
-  setTimeout(function() {
+  var partitionAttribute = arguments.callee.name;
+  webview.setAttribute('partition', partitionAttribute);
+
+  var loadstopHandler = function(e) {
     try {
       webview.partition = 'illegal';
       embedder.test.fail();
     } catch (e) {
+      embedder.test.assertEq(partitionAttribute, webview.partition);
       embedder.test.succeed();
     }
-  }, 0);
+  };
+  webview.addEventListener('loadstop', loadstopHandler);
+
+  document.body.appendChild(webview);
+  webview.setAttribute('src', 'data:text/html,trigger navigation');
+}
+
+// This test verifies that removing partition attribute after navigation does
+// not work, i.e. the partition remains the same.
+function testPartitionRemovalAfterNavigationFails() {
+  var webview = document.createElement('webview');
+  document.body.appendChild(webview);
+
+  var partition = 'testme';
+  webview.setAttribute('partition', partition);
+
+  var loadstopHandler = function(e) {
+    window.console.log('webview.loadstop');
+    // Removing after navigation should not change the partition.
+    webview.removeAttribute('partition');
+    embedder.test.assertEq('testme', webview.partition);
+    embedder.test.succeed();
+  };
+  webview.addEventListener('loadstop', loadstopHandler);
+
+  webview.setAttribute('src', 'data:text/html,<html><body>guest</body></html>');
 }
 
 function testExecuteScriptFail() {
@@ -1684,6 +1714,8 @@ embedder.test.testList = {
   'testDestroyOnEventListener': testDestroyOnEventListener,
   'testCannotMutateEventName': testCannotMutateEventName,
   'testPartitionRaisesException': testPartitionRaisesException,
+  'testPartitionRemovalAfterNavigationFails':
+      testPartitionRemovalAfterNavigationFails,
   'testExecuteScriptFail': testExecuteScriptFail,
   'testExecuteScript': testExecuteScript,
   'testExecuteScriptIsAbortedWhenWebViewSourceIsChanged':

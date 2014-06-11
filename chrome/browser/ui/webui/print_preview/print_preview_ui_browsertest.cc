@@ -33,11 +33,6 @@ using task_manager::browsertest_util::MatchAnyTab;
 using task_manager::browsertest_util::MatchPrint;
 using task_manager::browsertest_util::WaitForTaskManagerRows;
 
-// http://crbug.com/375126: these tests fail after pdf plugin was open sourced.
-// They must not have been running before since these bots didn't have the PDf
-// plugin.
-#if !defined(ADDRESS_SANITIZER)
-
 namespace {
 
 class PrintPreviewTest : public InProcessBrowserTest {
@@ -52,6 +47,10 @@ class PrintPreviewTest : public InProcessBrowserTest {
     nav_observer.StopWatchingNewWebContents();
   }
 };
+
+// The two tests below are failing on Linux LSAN
+// crbug.com/382523
+#if !defined(ADDRESS_SANITIZER)
 
 IN_PROC_BROWSER_TEST_F(PrintPreviewTest, PrintCommands) {
   // We start off at about:blank page.
@@ -105,8 +104,13 @@ IN_PROC_BROWSER_TEST_F(PrintPreviewTest, MAYBE_TaskManagerNewPrintPreview) {
   ASSERT_NO_FATAL_FAILURE(WaitForTaskManagerRows(1, MatchPrint("about:blank")));
 }
 
+#endif
+
 // Disable the test for mac as it started being flaky, see http://crbug/367665.
 #if defined(OS_MACOSX) && !defined(OS_IOS)
+#define MAYBE_TaskManagerExistingPrintPreview DISABLED_TaskManagerExistingPrintPreview
+// Disable the test for Linux LSAN, see http://crbug.com/382764.
+#elif defined(OS_LINUX) && defined(ADDRESS_SANITIZER)
 #define MAYBE_TaskManagerExistingPrintPreview DISABLED_TaskManagerExistingPrintPreview
 #else
 #define MAYBE_TaskManagerExistingPrintPreview TaskManagerExistingPrintPreview
@@ -204,5 +208,3 @@ IN_PROC_BROWSER_TEST_F(PrintPreviewTest, NoCrashOnCloseWithOtherTabs) {
 #endif
 
 }  // namespace
-
-#endif

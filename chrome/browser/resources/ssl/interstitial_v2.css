@@ -1,0 +1,126 @@
+/* Copyright 2014 The Chromium Authors. All rights reserved.
+   Use of this source code is governed by a BSD-style license that can be
+   found in the LICENSE file. */
+
+a {
+  color: #585858;
+}
+
+body {
+  background: rgb(247, 247, 247);
+  color: #585858;
+  font-size: 125%;
+}
+
+body.safe-browsing {
+  background: rgb(217, 69, 61);
+  color: rgb(255, 255, 255);
+}
+
+button {
+  background: rgb(76, 142, 250);
+  border: 0;
+  border-radius: 2px;
+  box-sizing: border-box;
+  color: #fff;
+  cursor: pointer;
+  float: right;
+  font-size: .875em;
+  height: 36px;
+  margin: -6px 0 0;
+  padding: 8px 24px;
+}
+
+button:hover {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .50);
+}
+
+button:active {
+  background: rgb(50, 102, 213);
+}
+
+#details {
+  color: #696969;
+  margin: 45px 0 150px 0;
+}
+
+#details-button {
+  color: #696969;
+  font-size: .875em;
+}
+
+#error-code {
+  color: black;
+  opacity: .35;
+  text-transform: uppercase;
+}
+
+h1 {
+  -webkit-margin-after: 16px;
+  color: #585858;
+  font-size: 1.6em;
+  font-weight: normal;
+  line-height: 1.75em;
+}
+
+.hidden {
+  display: none;
+}
+
+.icon {
+  background-repeat: no-repeat;
+  background-size: 100%;
+  height: 72px;
+  margin: 0 0 40px;
+  width: 72px;
+}
+
+.interstitial-wrapper {
+  box-sizing: border-box;
+  font-size: 1em;
+  line-height: 1.6em;
+  margin: 10% auto 0;
+  max-width: 600px;
+  width: 100%;
+}
+
+.nav-wrapper {
+  margin-top: 84px;
+}
+
+.nav-wrapper::after {
+  clear: both;
+  content: '';
+  display: table;
+  width: 100%;
+}
+
+#details p:not(:first-of-type) {
+  margin-top: 39px;
+}
+
+.safe-browsing a {
+  color: rgb(255, 255, 255);
+}
+
+.safe-browsing button {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.safe-browsing .icon {
+  background: -webkit-image-set(
+      url('../safe_browsing/images/1x/stop_sign.png') 1x,
+      url('../safe_browsing/images/2x/stop_sign.png') 2x);
+}
+
+.ssl .icon {
+  background: -webkit-image-set(
+      url('images/1x/brokenssl_red.png') 1x,
+      url('images/2x/brokenssl_red.png') 2x);
+}
+
+@media (max-width: 700px) {
+  .interstitial-wrapper {
+    padding: 0 10%;
+  }
+}

@@ -7,6 +7,7 @@ var CMD_DONT_PROCEED = 0;
 var CMD_PROCEED = 1;
 var CMD_MORE = 2;
 var CMD_RELOAD = 3;
+var CMD_HELP = 4;
 
 var keyPressState = 0;
 
@@ -38,6 +39,17 @@ function sharedSetup() {
     e.preventDefault();
   });
   document.addEventListener('keypress', keyPressHandler);
+}
+
+// This applies SSL-specific styling to the V2 security interstitials.
+function applySSLStyle() {
+  $('explanation-paragraph').innerHTML =
+      loadTimeData.getString('explanationParagraph');
+  $('explanation-paragraph').classList.toggle('hidden');
+  $('final-paragraph').innerHTML = loadTimeData.getString('finalParagraph');
+  $('final-paragraph').classList.toggle('hidden');
+
+  $('body').classList.add('ssl');
 }
 
 document.addEventListener('DOMContentLoaded', sharedSetup);

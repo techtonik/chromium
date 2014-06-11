@@ -266,14 +266,6 @@ cr.define('cr.ui.login', function() {
     setVirtualKeyboardSize: function(width, height) {
       this.virtualKeyboardWidth_ = width;
       this.virtualKeyboardHeight_ = height;
-
-      // Special case for screen lock. http://crbug.com/377904
-      // In case of virtual keyboard adjuct work area.
-      if (this.displayType == DISPLAY_TYPE.LOCK) {
-        var bottom = (height) ? height : $('login-header-bar').offsetHeight;
-        var clientArea = $('outer-container');
-        clientArea.style.bottom = cr.ui.toCssPx(bottom);
-      }
     },
 
     /**
@@ -339,6 +331,11 @@ cr.define('cr.ui.login', function() {
         if (currentStepId == SCREEN_GAIA_SIGNIN ||
             currentStepId == SCREEN_ACCOUNT_PICKER) {
           chrome.send('toggleEnrollmentScreen');
+        } else if (currentStepId == SCREEN_OOBE_NETWORK ||
+                   currentStepId == SCREEN_OOBE_EULA) {
+          // In this case update check will be skipped and OOBE will
+          // proceed straight to enrollment screen when EULA is accepted.
+          chrome.send('skipUpdateEnrollAfterEula');
         } else if (currentStepId == SCREEN_OOBE_ENROLLMENT) {
           // This accelerator is also used to manually cancel auto-enrollment.
           if (this.currentScreen.cancelAutoEnrollment)

@@ -154,10 +154,8 @@ void ScriptInjection::InjectIfAllowed(blink::WebFrame* frame,
   // valid tab id (if we don't have a tab id, we have no UI surface to ask for
   // user consent).
   if (tab_id != -1 &&
-      PermissionsData::RequiresActionForScriptExecution(
-          extension,
-          tab_id,
-          frame->top()->document().url())) {
+      extension->permissions_data()->RequiresActionForScriptExecution(
+          extension, tab_id, frame->top()->document().url())) {
     int64 request_id = kInvalidRequestId;
     int page_id = top_render_view->GetPageId();
 
@@ -256,13 +254,16 @@ bool ScriptInjection::WantsToRun(blink::WebFrame* frame,
   GURL effective_document_url = ScriptContext::GetEffectiveDocumentURL(
       frame, document_url, script_->match_about_blank());
 
-  if (!PermissionsData::CanExecuteScriptOnPage(extension,
-                                               effective_document_url,
-                                               frame->top()->document().url(),
-                                               kNoTabId,
-                                               script_.get(),
-                                               kNoProcessId,
-                                               NULL /* ignore error */)) {
+  if (!script_->MatchesURL(effective_document_url))
+    return false;
+
+  if (!extension->permissions_data()->CanRunContentScriptOnPage(
+          extension,
+          effective_document_url,
+          frame->top()->document().url(),
+          kNoTabId,
+          kNoProcessId,
+          NULL /* ignore error */)) {
     return false;
   }
 

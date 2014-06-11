@@ -757,8 +757,7 @@ void DelegatedFrameHost::OnCompositingEnded(
     ui::Compositor* compositor) {
 }
 
-void DelegatedFrameHost::OnCompositingAborted(
-    ui::Compositor* compositor) {
+void DelegatedFrameHost::OnCompositingAborted(ui::Compositor* compositor) {
 }
 
 void DelegatedFrameHost::OnCompositingLockStateChanged(
