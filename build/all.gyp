@@ -293,6 +293,7 @@
             '../remoting/remoting.gyp:remoting_unittests',
             '../third_party/WebKit/public/all.gyp:all_blink',
             '../third_party/cacheinvalidation/cacheinvalidation.gyp:cacheinvalidation_unittests',
+            '../third_party/leveldatabase/leveldatabase.gyp:env_chromium_unittests',
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput_unittests',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber_unittests',
             '../tools/telemetry/telemetry.gyp:*',
@@ -745,6 +746,7 @@
             '../sandbox/sandbox.gyp:sandbox_linux_unittests_stripped',
             '../sql/sql.gyp:sql_unittests',
             '../sync/sync.gyp:sync_unit_tests',
+            '../third_party/leveldatabase/leveldatabase.gyp:env_chromium_unittests',
             '../third_party/WebKit/public/all.gyp:*',
             '../tools/android/android_tools.gyp:android_tools',
             '../tools/android/android_tools.gyp:memconsumer',
@@ -850,6 +852,7 @@
             '../sql/sql.gyp:sql_unittests',
             '../sync/sync.gyp:sync_unit_tests',
             '../third_party/cacheinvalidation/cacheinvalidation.gyp:cacheinvalidation_unittests',
+            '../third_party/leveldatabase/leveldatabase.gyp:env_chromium_unittests',
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput_unittests',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber_unittests',
             '../tools/perf/clear_system_cache/clear_system_cache.gyp:*',
@@ -885,6 +888,7 @@
             '../sql/sql.gyp:sql_unittests',
             '../sync/sync.gyp:sync_unit_tests',
             '../third_party/cacheinvalidation/cacheinvalidation.gyp:cacheinvalidation_unittests',
+            '../third_party/leveldatabase/leveldatabase.gyp:env_chromium_unittests',
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput_unittests',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber_unittests',
             '../tools/perf/clear_system_cache/clear_system_cache.gyp:*',
@@ -935,6 +939,7 @@
             '../sql/sql.gyp:sql_unittests',
             '../sync/sync.gyp:sync_unit_tests',
             '../third_party/cacheinvalidation/cacheinvalidation.gyp:cacheinvalidation_unittests',
+            '../third_party/leveldatabase/leveldatabase.gyp:env_chromium_unittests',
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput_unittests',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber_unittests',
             '../ui/gfx/gfx_tests.gyp:gfx_unittests',
@@ -981,6 +986,7 @@
             '../sql/sql.gyp:sql_unittests',
             '../sync/sync.gyp:sync_unit_tests',
             '../third_party/cacheinvalidation/cacheinvalidation.gyp:cacheinvalidation_unittests',
+            '../third_party/leveldatabase/leveldatabase.gyp:env_chromium_unittests',
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput_unittests',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber_unittests',
             '../tools/perf/clear_system_cache/clear_system_cache.gyp:*',
@@ -1054,6 +1060,7 @@
             '../sql/sql.gyp:sql_unittests',
             '../sync/sync.gyp:sync_unit_tests',
             '../third_party/cacheinvalidation/cacheinvalidation.gyp:cacheinvalidation_unittests',
+            '../third_party/leveldatabase/leveldatabase.gyp:env_chromium_unittests',
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput_unittests',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber_unittests',
             '../url/url.gyp:url_unittests',
@@ -1075,6 +1082,7 @@
               'type': 'none',
               'dependencies': [
                 '../base/base.gyp:base_unittests',
+                '../chrome/chrome.gyp:browser_tests',
                 '../chrome/chrome.gyp:crash_service',
                 '../chrome/chrome.gyp:gcapi_dll',
                 '../chrome/chrome.gyp:pack_policy_templates',
@@ -1224,5 +1232,18 @@
         }, # target_name: chromium_swarm_tests
       ],
     }],
-  ], # conditions
+    ['OS=="mac" and toolkit_views==1', {
+      'targets': [
+        {
+          'target_name': 'macviews_builder',
+          'type': 'none',
+          'dependencies': [
+            '../ui/views/examples/examples.gyp:views_examples_with_content_exe',
+            '../ui/views/views.gyp:views',
+            '../ui/views/views.gyp:views_unittests',
+          ],
+        },  # target_name: macviews_builder
+      ],  # targets
+    }],  # os=='mac' and toolkit_views==1
+  ],  # conditions
 }

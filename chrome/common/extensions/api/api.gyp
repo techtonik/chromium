@@ -77,6 +77,7 @@
               'file_system_provider_internal.idl',
               'font_settings.json',
               'gcm.json',
+              'guest_view_internal.json',
               'hangouts_private.idl',
               'hid.idl',
               'history.json',
@@ -137,14 +138,10 @@
               'schema_files': [
                 # These should be eliminated. See crbug.com/305852.
                 'activity_log_private.json',
-                'alarms.idl',
                 'app_window.idl',
-                'context_menus.json',
-                'downloads.idl',
                 'events.json',
                 'file_system.idl',
                 'manifest_types.json',
-                'omnibox.json',
                 'permissions.json',
                 'sync_file_system.idl',
                 'tab_capture.idl',

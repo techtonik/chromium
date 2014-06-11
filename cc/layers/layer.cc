@@ -6,6 +6,7 @@
 
 #include <algorithm>
 
+#include "base/atomic_sequence_num.h"
 #include "base/debug/trace_event.h"
 #include "base/location.h"
 #include "base/metrics/histogram.h"
@@ -28,7 +29,7 @@
 
 namespace cc {
 
-static int s_next_layer_id = 1;
+base::StaticAtomicSequenceNumber g_next_layer_id;
 
 scoped_refptr<Layer> Layer::Create() {
   return make_scoped_refptr(new Layer());
@@ -38,7 +39,8 @@ Layer::Layer()
     : needs_push_properties_(false),
       num_dependents_need_push_properties_(false),
       stacking_order_changed_(false),
-      layer_id_(s_next_layer_id++),
+      // Layer IDs start from 1.
+      layer_id_(g_next_layer_id.GetNext() + 1),
       ignore_set_needs_commit_(false),
       parent_(NULL),
       layer_tree_host_(NULL),
@@ -61,20 +63,14 @@ Layer::Layer()
       force_render_surface_(false),
       is_3d_sorted_(false),
       transform_is_invertible_(true),
-      anchor_point_(0.5f, 0.5f),
       background_color_(0),
       opacity_(1.f),
       blend_mode_(SkXfermode::kSrcOver_Mode),
-      anchor_point_z_(0.f),
       scroll_parent_(NULL),
       clip_parent_(NULL),
       replica_layer_(NULL),
       raster_scale_(0.f),
       client_(NULL) {
-  if (layer_id_ == INT_MAX) {
-    s_next_layer_id = 1;
-  }
-
   layer_animation_controller_ = LayerAnimationController::Create(layer_id_);
   layer_animation_controller_->AddValueObserver(this);
   layer_animation_controller_->set_value_provider(this);
@@ -371,22 +367,6 @@ void Layer::RequestCopyOfOutput(
   SetNeedsCommit();
 }
 
-void Layer::SetAnchorPoint(const gfx::PointF& anchor_point) {
-  DCHECK(IsPropertyChangeAllowed());
-  if (anchor_point_ == anchor_point)
-    return;
-  anchor_point_ = anchor_point;
-  SetNeedsCommit();
-}
-
-void Layer::SetAnchorPointZ(float anchor_point_z) {
-  DCHECK(IsPropertyChangeAllowed());
-  if (anchor_point_z_ == anchor_point_z)
-    return;
-  anchor_point_z_ = anchor_point_z;
-  SetNeedsCommit();
-}
-
 void Layer::SetBackgroundColor(SkColor background_color) {
   DCHECK(IsPropertyChangeAllowed());
   if (background_color_ == background_color)
@@ -595,6 +575,14 @@ void Layer::SetTransform(const gfx::Transform& transform) {
     return;
   transform_ = transform;
   transform_is_invertible_ = transform.IsInvertible();
+  SetNeedsCommit();
+}
+
+void Layer::SetTransformOrigin(const gfx::Point3F& transform_origin) {
+  DCHECK(IsPropertyChangeAllowed());
+  if (transform_origin_ == transform_origin)
+    return;
+  transform_origin_ = transform_origin;
   SetNeedsCommit();
 }
 
@@ -866,8 +854,7 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
   bool use_paint_properties = paint_properties_.source_frame_number ==
                               layer_tree_host_->source_frame_number();
 
-  layer->SetAnchorPoint(anchor_point_);
-  layer->SetAnchorPointZ(anchor_point_z_);
+  layer->SetTransformOrigin(transform_origin_);
   layer->SetBackgroundColor(background_color_);
   layer->SetBounds(use_paint_properties ? paint_properties_.bounds
                                         : bounds_);

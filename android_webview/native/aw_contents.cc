@@ -20,7 +20,7 @@
 #include "android_webview/common/aw_hit_test_data.h"
 #include "android_webview/common/aw_switches.h"
 #include "android_webview/common/devtools_instrumentation.h"
-#include "android_webview/native/aw_autofill_manager_delegate.h"
+#include "android_webview/native/aw_autofill_client.h"
 #include "android_webview/native/aw_browser_dependency_factory.h"
 #include "android_webview/native/aw_contents_client_bridge.h"
 #include "android_webview/native/aw_contents_io_thread_client_impl.h"
@@ -30,6 +30,7 @@
 #include "android_webview/native/java_browser_view_renderer_helper.h"
 #include "android_webview/native/permission/aw_permission_request.h"
 #include "android_webview/native/permission/permission_request_handler.h"
+#include "android_webview/native/permission/protected_media_id_permission_request.h"
 #include "android_webview/native/state_serializer.h"
 #include "android_webview/public/browser/draw_gl.h"
 #include "base/android/jni_android.h"
@@ -152,6 +153,14 @@ AwContents* AwContents::FromID(int render_process_id, int render_view_id) {
   return FromWebContents(web_contents);
 }
 
+// static
+AwBrowserPermissionRequestDelegate* AwBrowserPermissionRequestDelegate::FromID(
+    int render_process_id, int render_view_id) {
+  AwContents* aw_contents = AwContents::FromID(render_process_id,
+                                               render_view_id);
+  return implicit_cast<AwBrowserPermissionRequestDelegate*>(aw_contents);
+}
+
 AwContents::AwContents(scoped_ptr<WebContents> web_contents)
     : web_contents_(web_contents.Pass()),
       shared_renderer_state_(
@@ -174,8 +183,8 @@ AwContents::AwContents(scoped_ptr<WebContents> web_contents)
   permission_request_handler_.reset(
       new PermissionRequestHandler(this, web_contents_.get()));
 
-  AwAutofillManagerDelegate* autofill_manager_delegate =
-      AwAutofillManagerDelegate::FromWebContents(web_contents_.get());
+  AwAutofillClient* autofill_manager_delegate =
+      AwAutofillClient::FromWebContents(web_contents_.get());
   InitDataReductionProxyIfNecessary();
   if (autofill_manager_delegate)
     InitAutofillIfNecessary(autofill_manager_delegate->GetSaveFormData());
@@ -220,7 +229,7 @@ void AwContents::SetSaveFormData(bool enabled) {
   // We need to check for the existence, since autofill_manager_delegate
   // may not be created when the setting is false.
   if (ContentAutofillDriver::FromWebContents(web_contents_.get())) {
-    AwAutofillManagerDelegate::FromWebContents(web_contents_.get())->
+    AwAutofillClient::FromWebContents(web_contents_.get())->
         SetSaveFormData(enabled);
   }
 }
@@ -242,21 +251,21 @@ void AwContents::InitAutofillIfNecessary(bool enabled) {
 
   AwBrowserContext::FromWebContents(web_contents)->
       CreateUserPrefServiceIfNecessary();
-  AwAutofillManagerDelegate::CreateForWebContents(web_contents);
+  AwAutofillClient::CreateForWebContents(web_contents);
   ContentAutofillDriver::CreateForWebContentsAndDelegate(
       web_contents,
-      AwAutofillManagerDelegate::FromWebContents(web_contents),
+      AwAutofillClient::FromWebContents(web_contents),
       l10n_util::GetDefaultLocale(),
       AutofillManager::DISABLE_AUTOFILL_DOWNLOAD_MANAGER);
 }
 
-void AwContents::SetAwAutofillManagerDelegate(jobject delegate) {
+void AwContents::SetAwAutofillClient(jobject client) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   JNIEnv* env = AttachCurrentThread();
   ScopedJavaLocalRef<jobject> obj = java_ref_.get(env);
   if (obj.is_null())
     return;
-  Java_AwContents_setAwAutofillManagerDelegate(env, obj.obj(), delegate);
+  Java_AwContents_setAwAutofillClient(env, obj.obj(), client);
 }
 
 AwContents::~AwContents() {
@@ -589,6 +598,21 @@ void AwContents::PreauthorizePermission(
     jlong resources) {
   permission_request_handler_->PreauthorizePermission(
       GURL(base::android::ConvertJavaStringToUTF8(env, origin)), resources);
+}
+
+void AwContents::RequestProtectedMediaIdentifierPermission(
+    const GURL& origin,
+    const content::BrowserContext::
+        ProtectedMediaIdentifierPermissionCallback& callback) {
+  permission_request_handler_->SendRequest(
+      scoped_ptr<AwPermissionRequestDelegate>(
+          new ProtectedMediaIdPermissionRequest(origin, callback)));
+}
+
+void AwContents::CancelProtectedMediaIdentifierPermissionRequests(
+    const GURL& origin) {
+  permission_request_handler_->CancelRequest(
+      origin, AwPermissionRequest::ProtectedMediaId);
 }
 
 void AwContents::FindAllAsync(JNIEnv* env, jobject obj, jstring search_string) {

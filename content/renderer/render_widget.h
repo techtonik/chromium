@@ -274,11 +274,6 @@ class CONTENT_EXPORT RenderWidget
   void UpdateCompositionInfo(bool should_update_range);
 #endif
 
-#if defined(OS_MACOSX)
-  void DidChangeScrollbarsForMainFrame(bool has_horizontal_scrollbar,
-                                       bool has_vertical_scrollbar);
-#endif  // defined(OS_MACOSX)
-
 #if defined(OS_ANDROID)
   void DidChangeBodyBackgroundColor(SkColor bg_color);
 #endif
@@ -351,7 +346,7 @@ class CONTENT_EXPORT RenderWidget
   void OnCursorVisibilityChange(bool is_visible);
   void OnMouseCaptureLost();
   virtual void OnSetFocus(bool enable);
-  void OnClose();
+  virtual void OnClose();
   void OnCreatingNewAck();
   virtual void OnResize(const ViewMsg_Resize_Params& params);
   void OnChangeResizeRect(const gfx::Rect& resizer_rect);
@@ -398,6 +393,7 @@ class CONTENT_EXPORT RenderWidget
   void AutoResizeCompositor();
 
   virtual void SetDeviceScaleFactor(float device_scale_factor);
+  virtual bool SetDeviceColorProfile(const std::vector<char>& color_profile);
 
   virtual void OnOrientationChange();
 
@@ -411,8 +407,6 @@ class CONTENT_EXPORT RenderWidget
   virtual void DidFlushPaint() {}
 
   virtual GURL GetURLForGraphicsContext3D();
-
-  virtual bool ForceCompositingModeEnabled();
 
   // Gets the scroll offset of this widget, if this widget has a notion of
   // scroll offset.
@@ -662,6 +656,9 @@ class CONTENT_EXPORT RenderWidget
   // |screen_info_| on some platforms, and defaults to 1 on other platforms.
   float device_scale_factor_;
 
+  // The device color profile on supported platforms.
+  std::vector<char> device_color_profile_;
+
   // State associated with synthetic gestures. Synthetic gestures are processed
   // in-order, so a queue is sufficient to identify the correct state for a
   // completed gesture.
@@ -690,12 +687,6 @@ class CONTENT_EXPORT RenderWidget
   // have the actual content.
   SkColor body_background_color_;
 #endif
-
-#if defined(OS_MACOSX)
-  // These store the "has scrollbars" state last sent to the browser.
-  bool cached_has_main_frame_horizontal_scrollbar_;
-  bool cached_has_main_frame_vertical_scrollbar_;
-#endif  // defined(OS_MACOSX)
 
   scoped_ptr<ScreenMetricsEmulator> screen_metrics_emulator_;
 

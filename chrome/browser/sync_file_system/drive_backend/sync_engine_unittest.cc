@@ -113,16 +113,22 @@ class SyncEngineTest
         fake_drive_service(new drive::FakeDriveService);
 
     sync_engine_.reset(new drive_backend::SyncEngine(
-        fake_drive_service.Pass(),
-        scoped_ptr<drive::DriveUploaderInterface>(),
-        base::MessageLoopProxy::current(),
-        NULL /* notification_manager */,
+        base::MessageLoopProxy::current(),  // ui_task_runner
+        base::MessageLoopProxy::current(),  // worker_task_runner
+        base::MessageLoopProxy::current(),  // file_task_runner
+        base::MessageLoopProxy::current(),  // drive_task_runner
+        profile_dir_.path(),
+        NULL,  // task_logger
+        NULL,  // notification_manager
         extension_service_.get(),
-        NULL /* signin_manager */));
-    sync_engine_->Initialize(profile_dir_.path(),
-                             NULL,
-                             base::MessageLoopProxy::current(),
-                             in_memory_env_.get());
+        NULL,  // signin_manager
+        NULL,  // token_service
+        NULL,  // request_context
+        in_memory_env_.get()));
+
+    sync_engine_->InitializeForTesting(
+        fake_drive_service.Pass(),
+        scoped_ptr<drive::DriveUploaderInterface>());
     sync_engine_->SetSyncEnabled(true);
     base::RunLoop().RunUntilIdle();
   }
@@ -136,11 +142,7 @@ class SyncEngineTest
   MockExtensionService* extension_service() { return extension_service_.get(); }
   SyncEngine* sync_engine() { return sync_engine_.get(); }
 
-  void UpdateRegisteredApps() {
-    sync_engine_->UpdateRegisteredAppsForTesting();
-  }
-
-  SyncTaskManager* GetSyncEngineTaskManager() {
+  SyncTaskManager* GetSyncTaskManager() {
     return sync_engine_->sync_worker_->GetSyncTaskManager();
   }
 
@@ -152,7 +154,11 @@ class SyncEngineTest
   }
 
   MetadataDatabase* metadata_database() {
-    return sync_engine()->sync_worker_->GetMetadataDatabase();
+    return sync_engine_->sync_worker_->GetMetadataDatabase();
+  }
+
+  void SetHasRefreshToken(bool has_refresh_token) {
+    sync_engine_->sync_worker_->SetHasRefreshToken(has_refresh_token);
   }
 
  private:
@@ -198,52 +204,6 @@ TEST_F(SyncEngineTest, EnableOrigin) {
   ASSERT_FALSE(metadata_database()->FindAppRootTracker(kAppID, &tracker));
 }
 
-TEST_F(SyncEngineTest, UpdateRegisteredApps) {
-  SyncStatusCode sync_status = SYNC_STATUS_UNKNOWN;
-  for (int i = 0; i < 3; i++) {
-    scoped_refptr<const extensions::Extension> extension =
-        extensions::ExtensionBuilder()
-        .SetManifest(extensions::DictionaryBuilder()
-                     .Set("name", "foo")
-                     .Set("version", "1.0")
-                     .Set("manifest_version", 2))
-        .SetID(base::StringPrintf("app_%d", i))
-        .Build();
-    extension_service()->AddExtension(extension.get());
-    GURL origin = extensions::Extension::GetBaseURLFromExtensionId(
-        extension->id());
-    sync_status = SYNC_STATUS_UNKNOWN;
-    sync_engine()->RegisterOrigin(origin, CreateResultReceiver(&sync_status));
-    base::RunLoop().RunUntilIdle();
-    EXPECT_EQ(SYNC_STATUS_OK, sync_status);
-  }
-
-  FileTracker tracker;
-
-  ASSERT_TRUE(metadata_database()->FindAppRootTracker("app_0", &tracker));
-  EXPECT_EQ(TRACKER_KIND_APP_ROOT, tracker.tracker_kind());
-
-  ASSERT_TRUE(metadata_database()->FindAppRootTracker("app_1", &tracker));
-  EXPECT_EQ(TRACKER_KIND_APP_ROOT, tracker.tracker_kind());
-
-  ASSERT_TRUE(metadata_database()->FindAppRootTracker("app_2", &tracker));
-  EXPECT_EQ(TRACKER_KIND_APP_ROOT, tracker.tracker_kind());
-
-  extension_service()->DisableExtension("app_1");
-  extension_service()->UninstallExtension("app_2");
-  ASSERT_FALSE(extension_service()->GetInstalledExtension("app_2"));
-  UpdateRegisteredApps();
-  base::RunLoop().RunUntilIdle();
-
-  ASSERT_TRUE(metadata_database()->FindAppRootTracker("app_0", &tracker));
-  EXPECT_EQ(TRACKER_KIND_APP_ROOT, tracker.tracker_kind());
-
-  ASSERT_TRUE(metadata_database()->FindAppRootTracker("app_1", &tracker));
-  EXPECT_EQ(TRACKER_KIND_DISABLED_APP_ROOT, tracker.tracker_kind());
-
-  ASSERT_FALSE(metadata_database()->FindAppRootTracker("app_2", &tracker));
-}
-
 TEST_F(SyncEngineTest, GetOriginStatusMap) {
   FileTracker tracker;
   SyncStatusCode sync_status = SYNC_STATUS_UNKNOWN;
@@ -281,7 +241,10 @@ TEST_F(SyncEngineTest, GetOriginStatusMap) {
 TEST_F(SyncEngineTest, UpdateServiceState) {
   EXPECT_EQ(REMOTE_SERVICE_OK, sync_engine()->GetCurrentState());
 
-  GetSyncEngineTaskManager()->ScheduleTask(
+  // Assume an user is in login state.
+  sync_engine()->OnReadyToSendRequests();
+
+  GetSyncTaskManager()->ScheduleTask(
       FROM_HERE,
       base::Bind(&EmptyTask, SYNC_STATUS_AUTHENTICATION_FAILED),
       SyncTaskManager::PRIORITY_MED,
@@ -290,7 +253,7 @@ TEST_F(SyncEngineTest, UpdateServiceState) {
                  SYNC_STATUS_AUTHENTICATION_FAILED,
                  REMOTE_SERVICE_AUTHENTICATION_REQUIRED));
 
-  GetSyncEngineTaskManager()->ScheduleTask(
+  GetSyncTaskManager()->ScheduleTask(
       FROM_HERE,
       base::Bind(&EmptyTask, SYNC_STATUS_ACCESS_FORBIDDEN),
       SyncTaskManager::PRIORITY_MED,
@@ -299,7 +262,7 @@ TEST_F(SyncEngineTest, UpdateServiceState) {
                  SYNC_STATUS_ACCESS_FORBIDDEN,
                  REMOTE_SERVICE_AUTHENTICATION_REQUIRED));
 
-  GetSyncEngineTaskManager()->ScheduleTask(
+  GetSyncTaskManager()->ScheduleTask(
       FROM_HERE,
       base::Bind(&EmptyTask, SYNC_STATUS_SERVICE_TEMPORARILY_UNAVAILABLE),
       SyncTaskManager::PRIORITY_MED,
@@ -308,7 +271,7 @@ TEST_F(SyncEngineTest, UpdateServiceState) {
                  SYNC_STATUS_SERVICE_TEMPORARILY_UNAVAILABLE,
                  REMOTE_SERVICE_TEMPORARY_UNAVAILABLE));
 
-  GetSyncEngineTaskManager()->ScheduleTask(
+  GetSyncTaskManager()->ScheduleTask(
       FROM_HERE,
       base::Bind(&EmptyTask, SYNC_STATUS_NETWORK_ERROR),
       SyncTaskManager::PRIORITY_MED,
@@ -317,7 +280,7 @@ TEST_F(SyncEngineTest, UpdateServiceState) {
                  SYNC_STATUS_NETWORK_ERROR,
                  REMOTE_SERVICE_TEMPORARY_UNAVAILABLE));
 
-  GetSyncEngineTaskManager()->ScheduleTask(
+  GetSyncTaskManager()->ScheduleTask(
       FROM_HERE,
       base::Bind(&EmptyTask, SYNC_STATUS_ABORT),
       SyncTaskManager::PRIORITY_MED,
@@ -326,7 +289,7 @@ TEST_F(SyncEngineTest, UpdateServiceState) {
                  SYNC_STATUS_ABORT,
                  REMOTE_SERVICE_TEMPORARY_UNAVAILABLE));
 
-  GetSyncEngineTaskManager()->ScheduleTask(
+  GetSyncTaskManager()->ScheduleTask(
       FROM_HERE,
       base::Bind(&EmptyTask, SYNC_STATUS_FAILED),
       SyncTaskManager::PRIORITY_MED,
@@ -335,7 +298,7 @@ TEST_F(SyncEngineTest, UpdateServiceState) {
                  SYNC_STATUS_FAILED,
                  REMOTE_SERVICE_TEMPORARY_UNAVAILABLE));
 
-  GetSyncEngineTaskManager()->ScheduleTask(
+  GetSyncTaskManager()->ScheduleTask(
       FROM_HERE,
       base::Bind(&EmptyTask, SYNC_DATABASE_ERROR_CORRUPTION),
       SyncTaskManager::PRIORITY_MED,
@@ -344,7 +307,7 @@ TEST_F(SyncEngineTest, UpdateServiceState) {
                  SYNC_DATABASE_ERROR_CORRUPTION,
                  REMOTE_SERVICE_DISABLED));
 
-  GetSyncEngineTaskManager()->ScheduleTask(
+  GetSyncTaskManager()->ScheduleTask(
       FROM_HERE,
       base::Bind(&EmptyTask, SYNC_DATABASE_ERROR_IO_ERROR),
       SyncTaskManager::PRIORITY_MED,
@@ -353,7 +316,7 @@ TEST_F(SyncEngineTest, UpdateServiceState) {
                  SYNC_DATABASE_ERROR_IO_ERROR,
                  REMOTE_SERVICE_DISABLED));
 
-  GetSyncEngineTaskManager()->ScheduleTask(
+  GetSyncTaskManager()->ScheduleTask(
       FROM_HERE,
       base::Bind(&EmptyTask, SYNC_DATABASE_ERROR_FAILED),
       SyncTaskManager::PRIORITY_MED,
@@ -362,7 +325,7 @@ TEST_F(SyncEngineTest, UpdateServiceState) {
                  SYNC_DATABASE_ERROR_FAILED,
                  REMOTE_SERVICE_DISABLED));
 
-  GetSyncEngineTaskManager()->ScheduleSyncTask(
+  GetSyncTaskManager()->ScheduleSyncTask(
       FROM_HERE,
       scoped_ptr<SyncTask>(new MockSyncTask(false)),
       SyncTaskManager::PRIORITY_MED,
@@ -371,7 +334,7 @@ TEST_F(SyncEngineTest, UpdateServiceState) {
                  SYNC_STATUS_OK,
                  REMOTE_SERVICE_DISABLED));
 
-  GetSyncEngineTaskManager()->ScheduleSyncTask(
+  GetSyncTaskManager()->ScheduleSyncTask(
       FROM_HERE,
       scoped_ptr<SyncTask>(new MockSyncTask(true)),
       SyncTaskManager::PRIORITY_MED,

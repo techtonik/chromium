@@ -12,7 +12,6 @@
 #include "ui/app_list/app_list_constants.h"
 #include "ui/app_list/app_list_model.h"
 #include "ui/app_list/app_list_view_delegate.h"
-#include "ui/app_list/pagination_model.h"
 #include "ui/app_list/speech_ui_model.h"
 #include "ui/app_list/views/app_list_background.h"
 #include "ui/app_list/views/app_list_folder_view.h"
@@ -32,7 +31,6 @@
 #include "ui/gfx/path.h"
 #include "ui/gfx/skia_util.h"
 #include "ui/views/bubble/bubble_frame_view.h"
-#include "ui/views/bubble/bubble_window_targeter.h"
 #include "ui/views/controls/textfield/textfield.h"
 #include "ui/views/layout/fill_layout.h"
 #include "ui/views/widget/widget.h"
@@ -40,6 +38,7 @@
 #if defined(USE_AURA)
 #include "ui/aura/window.h"
 #include "ui/aura/window_tree_host.h"
+#include "ui/views/bubble/bubble_window_targeter.h"
 #if defined(OS_WIN)
 #include "ui/base/win/shell.h"
 #endif
@@ -165,26 +164,26 @@ AppListView::~AppListView() {
 
 void AppListView::InitAsBubbleAttachedToAnchor(
     gfx::NativeView parent,
-    PaginationModel* pagination_model,
+    int initial_apps_page,
     views::View* anchor,
     const gfx::Vector2d& anchor_offset,
     views::BubbleBorder::Arrow arrow,
     bool border_accepts_events) {
   SetAnchorView(anchor);
   InitAsBubbleInternal(
-      parent, pagination_model, arrow, border_accepts_events, anchor_offset);
+      parent, initial_apps_page, arrow, border_accepts_events, anchor_offset);
 }
 
 void AppListView::InitAsBubbleAtFixedLocation(
     gfx::NativeView parent,
-    PaginationModel* pagination_model,
+    int initial_apps_page,
     const gfx::Point& anchor_point_in_screen,
     views::BubbleBorder::Arrow arrow,
     bool border_accepts_events) {
   SetAnchorView(NULL);
   SetAnchorRect(gfx::Rect(anchor_point_in_screen, gfx::Size()));
   InitAsBubbleInternal(
-      parent, pagination_model, arrow, border_accepts_events, gfx::Vector2d());
+      parent, initial_apps_page, arrow, border_accepts_events, gfx::Vector2d());
 }
 
 void AppListView::SetBubbleArrow(views::BubbleBorder::Arrow arrow) {
@@ -274,40 +273,38 @@ void AppListView::SetNextPaintCallback(const base::Closure& callback) {
 
 #if defined(OS_WIN)
 HWND AppListView::GetHWND() const {
-#if defined(USE_AURA)
   gfx::NativeWindow window =
       GetWidget()->GetTopLevelWidget()->GetNativeWindow();
   return window->GetHost()->GetAcceleratedWidget();
-#else
-  return GetWidget()->GetTopLevelWidget()->GetNativeWindow();
-#endif
 }
 #endif
 
+PaginationModel* AppListView::GetAppsPaginationModel() {
+  return app_list_main_view_->contents_view()
+      ->apps_container_view()
+      ->apps_grid_view()
+      ->pagination_model();
+}
+
 void AppListView::InitAsBubbleInternal(gfx::NativeView parent,
-                                       PaginationModel* pagination_model,
+                                       int initial_apps_page,
                                        views::BubbleBorder::Arrow arrow,
                                        bool border_accepts_events,
                                        const gfx::Vector2d& anchor_offset) {
-  app_list_main_view_ = new AppListMainView(delegate_.get(),
-                                            pagination_model,
-                                            parent);
+  app_list_main_view_ =
+      new AppListMainView(delegate_.get(), initial_apps_page, parent);
   AddChildView(app_list_main_view_);
-#if defined(USE_AURA)
   app_list_main_view_->SetPaintToLayer(true);
   app_list_main_view_->SetFillsBoundsOpaquely(false);
   app_list_main_view_->layer()->SetMasksToBounds(true);
-#endif
 
   // Speech recognition is available only when the start page exists.
-  if (delegate_ && delegate_->GetSpeechRecognitionContents()) {
+  if (delegate_ && delegate_->IsSpeechRecognitionEnabled()) {
     speech_view_ = new SpeechView(delegate_.get());
     speech_view_->SetVisible(false);
-#if defined(USE_AURA)
     speech_view_->SetPaintToLayer(true);
     speech_view_->SetFillsBoundsOpaquely(false);
     speech_view_->layer()->SetOpacity(0.0f);
-#endif
     AddChildView(speech_view_);
   }
 
@@ -503,7 +500,6 @@ void AppListView::OnSpeechRecognitionStateChanged(
   if (recognizing)
     speech_view_->Reset();
 
-#if defined(USE_AURA)
   animation_observer_->set_frame(GetBubbleFrameView());
   gfx::Transform speech_transform;
   speech_transform.Translate(
@@ -540,13 +536,6 @@ void AppListView::OnSpeechRecognitionStateChanged(
     speech_view_->SetVisible(true);
   else
     app_list_main_view_->SetVisible(true);
-#else
-  speech_view_->SetVisible(recognizing);
-  app_list_main_view_->SetVisible(!recognizing);
-
-  // Needs to schedule paint of AppListView itself, to repaint the background.
-  GetBubbleFrameView()->SchedulePaint();
-#endif
 }
 
 }  // namespace app_list

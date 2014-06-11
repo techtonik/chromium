@@ -85,6 +85,8 @@
         'common/chrome_version_info.h',
         'common/cloud_print/cloud_print_class_mac.h',
         'common/cloud_print/cloud_print_class_mac.mm',
+        'common/cloud_print/cloud_print_cdd_conversion.cc',
+        'common/cloud_print/cloud_print_cdd_conversion.h',
         'common/cloud_print/cloud_print_constants.cc',
         'common/cloud_print/cloud_print_constants.h',
         'common/cloud_print/cloud_print_helpers.cc',
@@ -390,7 +392,6 @@
             ['exclude', '^common/nacl_'],
             ['exclude', '^common/pepper_flash\\.'],
             ['exclude', '^common/profiling\\.'],
-            ['exclude', '^common/service_process_util_'],
             ['exclude', '^common/spellcheck_'],
             ['exclude', '^common/validation_message_'],
             ['exclude', '^common/web_apps\\.'],
@@ -408,9 +409,22 @@
             '<(DEPTH)/breakpad/src',
           ],
         }],
-        ['enable_printing!=0', {
+        ['enable_printing==0', {
+          'sources!': [
+            'common/print_messages.cc',
+            'common/print_messages.h',
+          ]
+        }, {
           'dependencies': [
             '<(DEPTH)/printing/printing.gyp:printing',
+          ],
+        }],
+        ['enable_printing!=1', {
+          'sources!' : [
+            'common/service_messages.h',
+          ],
+          'sources/': [
+            ['exclude', '^common/service_process_util_'],
           ],
         }],
         ['enable_service_discovery==1', {
@@ -488,12 +502,6 @@
         ['enable_webrtc==0', {
           'sources!': [
             'common/media/webrtc_logging_messages.h',
-          ]
-        }],
-        ['enable_printing==0', {
-          'sources!': [
-            'common/print_messages.cc',
-            'common/print_messages.h',
           ]
         }],
         ['configuration_policy==1', {

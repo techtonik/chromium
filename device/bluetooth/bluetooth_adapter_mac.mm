@@ -14,6 +14,7 @@
 #include "base/compiler_specific.h"
 #include "base/containers/hash_tables.h"
 #include "base/location.h"
+#include "base/mac/sdk_forward_declarations.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/sequenced_task_runner.h"
 #include "base/single_thread_task_runner.h"
@@ -23,26 +24,6 @@
 #include "device/bluetooth/bluetooth_device_mac.h"
 #include "device/bluetooth/bluetooth_socket_mac.h"
 #include "device/bluetooth/bluetooth_uuid.h"
-
-// Replicate specific 10.7 SDK declarations for building with prior SDKs.
-#if !defined(MAC_OS_X_VERSION_10_7) || \
-MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_7
-
-@interface IOBluetoothHostController (LionSDKDeclarations)
-- (NSString*)nameAsString;
-- (BluetoothHCIPowerState)powerState;
-@end
-
-@protocol IOBluetoothDeviceInquiryDelegate
-- (void)deviceInquiryStarted:(IOBluetoothDeviceInquiry*)sender;
-- (void)deviceInquiryDeviceFound:(IOBluetoothDeviceInquiry*)sender
-                          device:(IOBluetoothDevice*)device;
-- (void)deviceInquiryComplete:(IOBluetoothDeviceInquiry*)sender
-                        error:(IOReturn)error
-                      aborted:(BOOL)aborted;
-@end
-
-#endif  // MAC_OS_X_VERSION_10_7
 
 @interface BluetoothAdapterMacDelegate
     : NSObject <IOBluetoothDeviceInquiryDelegate> {
@@ -178,11 +159,11 @@ bool BluetoothAdapterMac::IsDiscovering() const {
 void BluetoothAdapterMac::CreateRfcommService(
     const BluetoothUUID& uuid,
     int channel,
-    bool insecure,
     const CreateServiceCallback& callback,
     const CreateServiceErrorCallback& error_callback) {
-  // TODO(keybuk): implement.
-  NOTIMPLEMENTED();
+  scoped_refptr<BluetoothSocketMac> socket = BluetoothSocketMac::CreateSocket();
+  socket->ListenUsingRfcomm(
+      this, uuid, channel, base::Bind(callback, socket), error_callback);
 }
 
 void BluetoothAdapterMac::CreateL2capService(
@@ -190,8 +171,9 @@ void BluetoothAdapterMac::CreateL2capService(
     int psm,
     const CreateServiceCallback& callback,
     const CreateServiceErrorCallback& error_callback) {
-  // TODO(keybuk): implement.
-  NOTIMPLEMENTED();
+  scoped_refptr<BluetoothSocketMac> socket = BluetoothSocketMac::CreateSocket();
+  socket->ListenUsingL2cap(
+      this, uuid, psm, base::Bind(callback, socket), error_callback);
 }
 
 void BluetoothAdapterMac::AddDiscoverySession(

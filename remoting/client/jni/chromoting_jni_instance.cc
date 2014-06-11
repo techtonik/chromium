@@ -15,6 +15,7 @@
 #include "remoting/client/jni/chromoting_jni_runtime.h"
 #include "remoting/client/log_to_server.h"
 #include "remoting/client/software_video_renderer.h"
+#include "remoting/client/token_fetcher_proxy.h"
 #include "remoting/jingle_glue/chromium_port_allocator.h"
 #include "remoting/jingle_glue/chromium_socket_factory.h"
 #include "remoting/jingle_glue/network_settings.h"
@@ -47,7 +48,8 @@ ChromotingJniInstance::ChromotingJniInstance(ChromotingJniRuntime* jni_runtime,
     : jni_runtime_(jni_runtime),
       host_id_(host_id),
       create_pairing_(false),
-      stats_logging_enabled_(false) {
+      stats_logging_enabled_(false),
+      weak_factory_(this) {
   DCHECK(jni_runtime_->ui_task_runner()->BelongsToCurrentThread());
 
   // Intialize XMPP config.
@@ -103,6 +105,47 @@ void ChromotingJniInstance::Cleanup() {
       FROM_HERE,
       base::Bind(&ChromotingJniInstance::DisconnectFromHostOnNetworkThread,
                  this));
+}
+
+void ChromotingJniInstance::FetchThirdPartyToken(
+    const GURL& token_url,
+    const std::string& client_id,
+    const std::string& scope,
+    base::WeakPtr<TokenFetcherProxy> token_fetcher_proxy) {
+  DCHECK(jni_runtime_->network_task_runner()->BelongsToCurrentThread());
+  DCHECK(!token_fetcher_proxy_.get());
+
+  __android_log_print(ANDROID_LOG_INFO,
+                      "ThirdPartyAuth",
+                      "Fetching Third Party Token from user.");
+
+  token_fetcher_proxy_ = token_fetcher_proxy;
+  jni_runtime_->ui_task_runner()->PostTask(
+      FROM_HERE,
+      base::Bind(&ChromotingJniRuntime::FetchThirdPartyToken,
+                 base::Unretained(jni_runtime_),
+                 token_url,
+                 client_id,
+                 scope));
+}
+
+void ChromotingJniInstance::HandleOnThirdPartyTokenFetched(
+    const std::string& token,
+    const std::string& shared_secret) {
+  DCHECK(jni_runtime_->network_task_runner()->BelongsToCurrentThread());
+
+  __android_log_print(
+      ANDROID_LOG_INFO, "ThirdPartyAuth", "Third Party Token Fetched.");
+
+  if (token_fetcher_proxy_.get()) {
+    token_fetcher_proxy_->OnTokenFetched(token, shared_secret);
+    token_fetcher_proxy_.reset();
+  } else {
+    __android_log_print(
+        ANDROID_LOG_WARN,
+        "ThirdPartyAuth",
+        "Ignored OnThirdPartyTokenFetched() without a pending fetch.");
+  }
 }
 
 void ChromotingJniInstance::ProvideSecret(const std::string& pin,
@@ -276,8 +319,11 @@ protocol::CursorShapeStub* ChromotingJniInstance::GetCursorShapeStub() {
 
 scoped_ptr<protocol::ThirdPartyClientAuthenticator::TokenFetcher>
     ChromotingJniInstance::GetTokenFetcher(const std::string& host_public_key) {
-  // Return null to indicate that third-party authentication is unsupported.
-  return scoped_ptr<protocol::ThirdPartyClientAuthenticator::TokenFetcher>();
+  return scoped_ptr<protocol::ThirdPartyClientAuthenticator::TokenFetcher>(
+      new TokenFetcherProxy(
+          base::Bind(&ChromotingJniInstance::FetchThirdPartyToken,
+                     weak_factory_.GetWeakPtr()),
+          host_public_key));
 }
 
 void ChromotingJniInstance::InjectClipboardEvent(

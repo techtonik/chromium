@@ -135,10 +135,8 @@ void WifiManagerNonChromeos::WifiServiceWrapper::Start() {
 
   wifi_service_->SetEventObservers(
       base::MessageLoopProxy::current(),
-      base::Bind(&WifiServiceWrapper::OnNetworksChangedEvent,
-                 base::Unretained(this)),
-      base::Bind(&WifiServiceWrapper::OnNetworkListChangedEvent,
-                 base::Unretained(this)));
+      base::Bind(&WifiServiceWrapper::OnNetworksChangedEvent, AsWeakPtr()),
+      base::Bind(&WifiServiceWrapper::OnNetworkListChangedEvent, AsWeakPtr()));
 
   net::NetworkChangeNotifier::AddNetworkChangeObserver(this);
 }
@@ -181,7 +179,8 @@ void WifiManagerNonChromeos::WifiServiceWrapper::ConfigureAndConnectPskNetwork(
   if (FindAndConfigureNetwork(ssid, password, &network_guid)) {
     ConnectToNetworkByID(network_guid, callback);
   } else {
-    PostClosure(base::Bind(callback, false /* success */));
+    if (!callback.is_null())
+      PostClosure(base::Bind(callback, false /* success */));
   }
 }
 
@@ -208,7 +207,8 @@ void WifiManagerNonChromeos::WifiServiceWrapper::OnNetworksChangedEvent(
   connecting_network_guid_.clear();
   connect_failure_callback_.Cancel();
 
-  PostClosure(base::Bind(connect_success_callback_, true));
+  if (!connect_success_callback_.is_null())
+    PostClosure(base::Bind(connect_success_callback_, true));
 
   connect_success_callback_.Reset();
 }
@@ -240,7 +240,8 @@ void WifiManagerNonChromeos::WifiServiceWrapper::ConnectToNetworkByID(
   }
 
   if (IsConnected(network_guid)) {
-    PostClosure(base::Bind(callback, true /* success */));
+    if (!callback.is_null())
+      PostClosure(base::Bind(callback, true /* success */));
     return;
   }
 
@@ -413,7 +414,7 @@ void WifiManagerNonChromeos::WifiServiceWrapper::PostClosure(
       base::Bind(&WifiManagerNonChromeos::PostClosure, wifi_manager_, closure));
 }
 
-scoped_ptr<WifiManager> WifiManager::Create() {
+scoped_ptr<WifiManager> WifiManager::CreateDefault() {
   return scoped_ptr<WifiManager>(new WifiManagerNonChromeos());
 }
 

@@ -18,7 +18,6 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
 #include "extensions/browser/event_router.h"
-#include "net/base/escape.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
 
 using content::WebContents;
@@ -135,29 +134,6 @@ bool GuestViewBase::IsGuest(WebContents* web_contents) {
 }
 
 // static
-bool GuestViewBase::GetGuestPartitionConfigForSite(
-    const GURL& site,
-    std::string* partition_domain,
-    std::string* partition_name,
-    bool* in_memory) {
-  if (!site.SchemeIs(content::kGuestScheme))
-    return false;
-
-  // Since guest URLs are only used for packaged apps, there must be an app
-  // id in the URL.
-  CHECK(site.has_host());
-  *partition_domain = site.host();
-  // Since persistence is optional, the path must either be empty or the
-  // literal string.
-  *in_memory = (site.path() != "/persist");
-  // The partition name is user supplied value, which we have encoded when the
-  // URL was created, so it needs to be decoded.
-  *partition_name =
-      net::UnescapeURLComponent(site.query(), net::UnescapeRule::NORMAL);
-  return true;
-}
-
-// static
 void GuestViewBase::GetDefaultContentSettingRules(
     RendererContentSettingRules* rules,
     bool incognito) {
@@ -211,6 +187,7 @@ void GuestViewBase::Attach(content::WebContents* embedder_web_contents,
 }
 
 void GuestViewBase::Destroy() {
+  WillDestroy();
   if (!destruction_callback_.is_null())
     destruction_callback_.Run();
   delete guest_web_contents();
@@ -242,6 +219,7 @@ void GuestViewBase::DidStopLoading(content::RenderViewHost* render_view_host) {
 }
 
 void GuestViewBase::WebContentsDestroyed() {
+  GuestDestroyed();
   delete this;
 }
 

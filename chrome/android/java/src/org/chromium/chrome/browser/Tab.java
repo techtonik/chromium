@@ -232,6 +232,11 @@ public class Tab implements NavigationClient {
                 for (TabObserver observer : mObservers) observer.onUrlUpdated(Tab.this);
             }
         }
+
+        @Override
+        public void visibleSSLStateChanged() {
+            for (TabObserver observer : mObservers) observer.onSSLStateUpdated(Tab.this);
+        }
     }
 
     private class TabContextMenuPopulator extends ContextMenuPopulatorWrapper {
@@ -324,7 +329,7 @@ public class Tab implements NavigationClient {
      * Adds a {@link TabObserver} to be notified on {@link Tab} changes.
      * @param observer The {@link TabObserver} to add.
      */
-    public final void addObserver(TabObserver observer) {
+    public void addObserver(TabObserver observer) {
         mObservers.addObserver(observer);
     }
 
@@ -332,7 +337,7 @@ public class Tab implements NavigationClient {
      * Removes a {@link TabObserver}.
      * @param observer The {@link TabObserver} to remove.
      */
-    public final void removeObserver(TabObserver observer) {
+    public void removeObserver(TabObserver observer) {
         mObservers.removeObserver(observer);
     }
 
@@ -699,6 +704,16 @@ public class Tab implements NavigationClient {
         pushNativePageStateToNavigationEntry();
         for (TabObserver observer : mObservers) observer.onContentChanged(this);
         destroyNativePageInternal(previousNativePage);
+    }
+
+    /**
+     * Replaces the current NativePage with a empty stand-in for a NativePage. This can be used
+     * to reduce memory pressure.
+     */
+    public void freezeNativePage() {
+        if (mNativePage == null || mNativePage instanceof FrozenNativePage) return;
+        assert mNativePage.getView().getParent() == null : "Cannot freeze visible native page";
+        mNativePage = FrozenNativePage.freeze(mNativePage);
     }
 
     /**

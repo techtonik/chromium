@@ -142,8 +142,6 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
   virtual gfx::GLSurfaceHandle GetCompositingSurface() OVERRIDE;
   virtual void ProcessAckedTouchEvent(const TouchEventWithLatencyInfo& touch,
                                       InputEventAckState ack_result) OVERRIDE;
-  virtual void SetScrollOffsetPinning(
-      bool is_pinned_to_left, bool is_pinned_to_right) OVERRIDE;
   virtual InputEventAckState FilterInputEvent(
       const blink::WebInputEvent& input_event) OVERRIDE;
   virtual void OnSetNeedsFlushInput() OVERRIDE;
@@ -310,6 +308,9 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
 
   // The most recent content size that was pushed to the texture layer.
   gfx::Size content_size_in_layer_;
+
+  // The device scale of the last received frame.
+  float device_scale_factor_;
 
   // The output surface id of the last received frame.
   uint32_t last_output_surface_id_;

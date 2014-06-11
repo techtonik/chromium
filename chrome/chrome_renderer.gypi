@@ -60,6 +60,8 @@
         'renderer/extensions/chrome_extension_helper.h',
         'renderer/extensions/chrome_extensions_dispatcher_delegate.cc',
         'renderer/extensions/chrome_extensions_dispatcher_delegate.h',
+        'renderer/extensions/chrome_extensions_render_frame_observer.cc',
+        'renderer/extensions/chrome_extensions_render_frame_observer.h',
         'renderer/extensions/chrome_extensions_renderer_client.cc',
         'renderer/extensions/chrome_extensions_renderer_client.h',
         'renderer/extensions/chrome_v8_context.cc',
@@ -163,7 +165,6 @@
         'renderer/resources/extensions/page_action_custom_bindings.js',
         'renderer/resources/extensions/page_actions_custom_bindings.js',
         'renderer/resources/extensions/page_capture_custom_bindings.js',
-        'renderer/resources/extensions/platform_app.js',
         'renderer/resources/extensions/pepper_request.js',
         'renderer/resources/extensions/system_indicator_custom_bindings.js',
         'renderer/resources/extensions/tts_custom_bindings.js',
@@ -316,6 +317,12 @@
             ['exclude', '^renderer/safe_browsing/'],
           ],
         }],
+        ['enable_extensions==0', {
+          'sources!': [
+            'renderer/extensions/chrome_extensions_render_frame_observer.cc',
+            'renderer/extensions/chrome_extensions_render_frame_observer.h',
+          ],
+        }],
         ['enable_webrtc==0', {
           'sources!': [
             'renderer/extensions/cast_streaming_native_handler.cc',
@@ -363,14 +370,6 @@
             'renderer/extensions/tts_custom_bindings.cc',
             'renderer/prerender/prerender_media_load_deferrer.cc',
             'renderer/prerender/prerender_media_load_deferrer.h',
-          ],
-        }],
-        ['OS=="win" and target_arch=="ia32"', {
-          'sources': [
-            # TODO(scottmg): This is a workaround for
-            # http://crbug.com/348525 that affects VS2013 before Update 2.
-            # This should be removed once Update 2 is released.
-            '../build/win/ftol3.obj',
           ],
         }],
         ['OS=="win"', {

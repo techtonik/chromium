@@ -6,7 +6,6 @@
 #define CHROME_BROWSER_UI_VIEWS_BOOKMARKS_BOOKMARK_BAR_VIEW_H_
 
 #include <set>
-#include <string>
 
 #include "base/basictypes.h"
 #include "base/compiler_specific.h"
@@ -14,6 +13,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/prefs/pref_change_registrar.h"
 #include "chrome/browser/bookmarks/bookmark_stats.h"
+#include "chrome/browser/bookmarks/chrome_bookmark_client.h"
 #include "chrome/browser/ui/bookmarks/bookmark_bar.h"
 #include "chrome/browser/ui/bookmarks/bookmark_bar_instructions_delegate.h"
 #include "chrome/browser/ui/views/bookmarks/bookmark_bubble_view_observer.h"
@@ -31,6 +31,7 @@
 class BookmarkContextMenu;
 class Browser;
 class BrowserView;
+class ChromeBookmarkClient;
 class Profile;
 
 namespace content {
@@ -219,7 +220,7 @@ class BookmarkBarView : public DetachableToolbarView,
                                    int old_index,
                                    const BookmarkNode* node,
                                    const std::set<GURL>& removed_urls) OVERRIDE;
-  virtual void BookmarkAllNodesRemoved(
+  virtual void BookmarkAllUserNodesRemoved(
       BookmarkModel* model,
       const std::set<GURL>& removed_urls) OVERRIDE;
   virtual void BookmarkNodeChanged(BookmarkModel* model,
@@ -260,7 +261,7 @@ class BookmarkBarView : public DetachableToolbarView,
   friend class BookmarkBarViewEventTestBase;
   FRIEND_TEST_ALL_PREFIXES(BookmarkBarViewTest, SwitchProfile);
   FRIEND_TEST_ALL_PREFIXES(BookmarkBarViewTest,
-                           NoAppsShortcutWithoutInstantExtended);
+                           ManagedShowAppsShortcutInBookmarksBar);
   FRIEND_TEST_ALL_PREFIXES(BookmarkBarViewInstantExtendedTest,
                            AppsShortcutVisibility);
 
@@ -274,6 +275,8 @@ class BookmarkBarView : public DetachableToolbarView,
   // Creates recent bookmark button and when visible button as well as
   // calculating the preferred height.
   void Init();
+
+  BookmarkModel* model() { return client_->model(); }
 
   // NOTE: unless otherwise stated all methods that take an int for an index are
   // in terms of the bookmark bar view. Typically the view index and model index
@@ -300,6 +303,9 @@ class BookmarkBarView : public DetachableToolbarView,
 
   // Creates the button showing the other bookmarked items.
   views::MenuButton* CreateOtherBookmarkedButton();
+
+  // Creates the button showing the managed bookmarks items.
+  views::MenuButton* CreateManagedBookmarksButton();
 
   // Creates the button used when not all bookmark buttons fit.
   views::MenuButton* CreateOverflowButton();
@@ -362,9 +368,9 @@ class BookmarkBarView : public DetachableToolbarView,
   // Updates the colors for all the child objects in the bookmarks bar.
   void UpdateColors();
 
-  // Updates the visibility of |other_bookmarked_button_|. Also shows or hide
-  // the separator if required.
-  void UpdateOtherBookmarksVisibility();
+  // Updates the visibility of |other_bookmarked_button_| and
+  // |managed_bookmarks_button_|. Also shows or hides the separator if required.
+  void UpdateButtonsVisibility();
 
   // Updates the visibility of |bookmarks_separator_view_|.
   void UpdateBookmarksSeparatorVisibility();
@@ -381,9 +387,9 @@ class BookmarkBarView : public DetachableToolbarView,
   // Used for opening urls.
   content::PageNavigator* page_navigator_;
 
-  // Model providing details as to the starred entries/folders that should be
-  // shown. This is owned by the Profile.
-  BookmarkModel* model_;
+  // ChromeBookmarkClient that owns the model whose entries and folders are
+  // shown in this view. This is owned by the Profile.
+  ChromeBookmarkClient* client_;
 
   // Used to manage showing a Menu, either for the most recently bookmarked
   // entries, or for the starred folder.
@@ -400,6 +406,9 @@ class BookmarkBarView : public DetachableToolbarView,
 
   // Shows the other bookmark entries.
   views::MenuButton* other_bookmarked_button_;
+
+  // Shows the managed bookmarks entries.
+  views::MenuButton* managed_bookmarks_button_;
 
   // Shows the Apps page shortcut.
   views::TextButton* apps_page_shortcut_;

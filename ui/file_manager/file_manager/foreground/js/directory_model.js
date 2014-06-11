@@ -32,6 +32,8 @@ function DirectoryModel(singleSelection, fileFilter, fileWatcher,
   this.scanFailures_ = 0;
   this.changeDirectorySequence_ = 0;
 
+  this.directoryChangeQueue_ = new AsyncUtil.Queue();
+
   this.fileFilter_ = fileFilter;
   this.fileFilter_.addEventListener('changed',
                                     this.onFilterChanged_.bind(this));
@@ -167,8 +169,6 @@ DirectoryModel.prototype.updateSelectionAndPublishEvent_ =
 DirectoryModel.prototype.onWatcherDirectoryChanged_ = function() {
   // Clear the metadata cache since something in this directory has changed.
   var directoryEntry = this.getCurrentDirEntry();
-  if (!util.isFakeEntry(directoryEntry))
-    this.metadataCache_.clearRecursively(directoryEntry, '*');
 
   this.rescanSoon();
 };
@@ -278,8 +278,14 @@ DirectoryModel.prototype.scheduleRescan = function(delay) {
     clearTimeout(this.rescanTimeoutId_);
   }
 
+  var sequence = this.changeDirectorySequence_;
+
   this.rescanTime_ = Date.now() + delay;
-  this.rescanTimeoutId_ = setTimeout(this.rescan.bind(this), delay);
+  this.rescanTimeoutId_ = setTimeout(function() {
+    this.rescanTimeoutId_ = null;
+    if (sequence === this.changeDirectorySequence_)
+      this.rescan();
+  }.bind(this), delay);
 };
 
 /**
@@ -312,9 +318,13 @@ DirectoryModel.prototype.rescan = function() {
   var dirContents = this.currentDirContents_.clone();
   dirContents.setFileList([]);
 
+  var sequence = this.changeDirectorySequence_;
+
   var successCallback = (function() {
-    this.replaceDirectoryContents_(dirContents);
-    cr.dispatchSimpleEvent(this, 'rescan-completed');
+    if (sequence === this.changeDirectorySequence_) {
+      this.replaceDirectoryContents_(dirContents);
+      cr.dispatchSimpleEvent(this, 'rescan-completed');
+    }
   }).bind(this);
 
   this.scan_(dirContents,
@@ -329,11 +339,12 @@ DirectoryModel.prototype.rescan = function() {
  *
  * @param {DirectoryContentes} newDirContents New DirectoryContents instance to
  *     replace currentDirContents_.
- * @param {function()=} opt_callback Called on success.
+ * @param {function(boolean)} callback Callback with result. True if the scan
+ *     is completed successfully, false if the scan is failed.
  * @private
  */
 DirectoryModel.prototype.clearAndScan_ = function(newDirContents,
-                                                  opt_callback) {
+                                                  callback) {
   if (this.currentDirContents_.isScanning())
     this.currentDirContents_.cancelScan();
   this.currentDirContents_ = newDirContents;
@@ -348,22 +359,46 @@ DirectoryModel.prototype.clearAndScan_ = function(newDirContents,
     this.runningScan_ = null;
   }
 
+  var sequence = this.changeDirectorySequence_;
+  var cancelled = false;
+
   var onDone = function() {
+    if (cancelled)
+      return;
+
     cr.dispatchSimpleEvent(this, 'scan-completed');
-    if (opt_callback)
-      opt_callback();
+    callback(true);
   }.bind(this);
 
   var onFailed = function() {
+    if (cancelled)
+      return;
+
     cr.dispatchSimpleEvent(this, 'scan-failed');
+    callback(false);
   }.bind(this);
 
   var onUpdated = function() {
+    if (cancelled)
+      return;
+
+    if (this.changeDirectorySequence_ !== sequence) {
+      cancelled = true;
+      cr.dispatchSimpleEvent(this, 'scan-cancelled');
+      callback(false);
+      return;
+    }
+
     cr.dispatchSimpleEvent(this, 'scan-updated');
   }.bind(this);
 
   var onCancelled = function() {
+    if (cancelled)
+      return;
+
+    cancelled = true;
     cr.dispatchSimpleEvent(this, 'scan-cancelled');
+    callback(false);
   }.bind(this);
 
   // Clear the table, and start scanning.
@@ -460,6 +495,7 @@ DirectoryModel.prototype.replaceDirectoryContents_ = function(dirContents) {
     var leadIndex = this.fileListSelection_.leadIndex;
     var leadEntry = this.getLeadEntry_();
 
+    this.currentDirContents_.dispose();
     this.currentDirContents_ = dirContents;
     dirContents.replaceContextFileList();
 
@@ -602,8 +638,7 @@ DirectoryModel.prototype.createDirectory = function(name,
     return;
   }
 
-  var tracker = this.createDirectoryChangeTracker();
-  tracker.start();
+  var sequence = this.changeDirectorySequence_;
 
   new Promise(entry.getDirectory.bind(
       entry, name, {create: true, exclusive: true})).
@@ -612,17 +647,16 @@ DirectoryModel.prototype.createDirectory = function(name,
         // Refresh the cache.
         this.metadataCache_.clear([newEntry], '*');
         return new Promise(function(onFulfilled, onRejected) {
-          this.metadataCache_.get([newEntry],
-                                  'filesystem',
-                                  onFulfilled.bind(null, newEntry));
+          this.metadataCache_.getOne(newEntry,
+                                     'filesystem',
+                                     onFulfilled.bind(null, newEntry));
         }.bind(this));
       }.bind(this)).
 
       then(function(newEntry) {
         // Do not change anything or call the callback if current
         // directory changed.
-        tracker.stop();
-        if (tracker.hasChanged) {
+        if (this.changeDirectorySequence_ !== sequence) {
           abortCallback();
           return;
         }
@@ -641,7 +675,6 @@ DirectoryModel.prototype.createDirectory = function(name,
           successCallback(newEntry);
         }
       }.bind(this), function(reason) {
-        tracker.stop();
         errorCallback(reason);
       });
 };
@@ -668,26 +701,38 @@ DirectoryModel.prototype.changeDirectoryEntry = function(
   this.changeDirectorySequence_++;
   this.clearSearch_();
 
-  var promise = new Promise(
-      function(onFulfilled, onRejected) {
-        this.fileWatcher_.changeWatchedDirectory(dirEntry, onFulfilled);
-      }.bind(this)).
-
-      then(function(sequence) {
-        return new Promise(function(onFulfilled, onRejected) {
-          if (this.changeDirectorySequence_ !== sequence)
+  this.directoryChangeQueue_.run(function(sequence, queueTaskCallback) {
+    this.fileWatcher_.changeWatchedDirectory(
+        dirEntry,
+        function() {
+          if (this.changeDirectorySequence_ !== sequence) {
+            queueTaskCallback();
             return;
+          }
 
           var newDirectoryContents = this.createDirectoryContents_(
               this.currentFileListContext_, dirEntry, '');
-          if (!newDirectoryContents)
+          if (!newDirectoryContents) {
+            queueTaskCallback();
             return;
+          }
 
-          var previousDirEntry = this.currentDirContents_.getDirectoryEntry();
-          this.clearAndScan_(newDirectoryContents, opt_callback);
+          var previousDirEntry =
+              this.currentDirContents_.getDirectoryEntry();
+          this.clearAndScan_(
+              newDirectoryContents,
+              function(result) {
+                // Calls the callback of the method when successful.
+                if (result && opt_callback)
+                  opt_callback();
 
-          // For tests that open the dialog to empty directories, everything is
-          // loaded at this point.
+                // Notify that the current task of this.directoryChangeQueue_
+                // is completed.
+                setTimeout(queueTaskCallback);
+              });
+
+          // For tests that open the dialog to empty directories, everything
+          // is loaded at this point.
           util.testSendMessage('directory-change-complete');
 
           var event = new Event('directory-changed');
@@ -695,7 +740,7 @@ DirectoryModel.prototype.changeDirectoryEntry = function(
           event.newDirEntry = dirEntry;
           this.dispatchEvent(event);
         }.bind(this));
-      }.bind(this, this.changeDirectorySequence_));
+  }.bind(this, this.changeDirectorySequence_));
 };
 
 /**
@@ -903,25 +948,39 @@ DirectoryModel.prototype.search = function(query,
     return;
   }
 
-  if (!(query || '').trimLeft()) {
-    if (this.isSearching()) {
-      var newDirContents = this.createDirectoryContents_(
-          this.currentFileListContext_,
-          currentDirEntry);
-      this.clearAndScan_(newDirContents);
+  this.changeDirectorySequence_++;
+  this.directoryChangeQueue_.run(function(sequence, callback) {
+    if (this.changeDirectorySequence_ !== sequence) {
+      callback();
+      return;
     }
-    return;
-  }
 
-  var newDirContents = this.createDirectoryContents_(
-      this.currentFileListContext_, currentDirEntry, query);
-  if (!newDirContents)
-    return;
+    if (!(query || '').trimLeft()) {
+      if (this.isSearching()) {
+        var newDirContents = this.createDirectoryContents_(
+            this.currentFileListContext_,
+            currentDirEntry);
+        this.clearAndScan_(newDirContents,
+                           callback);
+      } else {
+        callback();
+      }
+      return;
+    }
 
-  this.onSearchCompleted_ = onSearchRescan;
-  this.onClearSearch_ = onClearSearch;
-  this.addEventListener('scan-completed', this.onSearchCompleted_);
-  this.clearAndScan_(newDirContents);
+    var newDirContents = this.createDirectoryContents_(
+        this.currentFileListContext_, currentDirEntry, query);
+    if (!newDirContents) {
+      callback();
+      return;
+    }
+
+    this.onSearchCompleted_ = onSearchRescan;
+    this.onClearSearch_ = onClearSearch;
+    this.addEventListener('scan-completed', this.onSearchCompleted_);
+    this.clearAndScan_(newDirContents,
+                       callback);
+  }.bind(this, this.changeDirectorySequence_));
 };
 
 /**

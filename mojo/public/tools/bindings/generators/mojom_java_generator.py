@@ -79,11 +79,8 @@ def GetNameForElement(element):
   raise Exception("Unexpected element: " % element)
 
 def ParseStringAttribute(attribute):
-  if isinstance(attribute, basestring):
-    return attribute
-  assert attribute[0] == 'EXPRESSION'
-  assert len(attribute[1]) == 1
-  return attribute[1][0][1:-1].encode('string_escape')
+  assert isinstance(attribute, basestring)
+  return attribute
 
 def GetPackage(module):
   if 'JavaPackage' in module.attributes:
@@ -112,7 +109,7 @@ def GetJavaType(kind):
     return "int"
   return _spec_to_java_type[kind.spec]
 
-def TranslateConstants(token, module):
+def ExpressionToText(token):
   def _TranslateNamedValue(named_value):
     entity_name = GetNameForElement(named_value)
     if named_value.parent_kind:
@@ -130,12 +127,6 @@ def TranslateConstants(token, module):
     return token + 'L'
   return token
 
-def ExpressionToText(value, module):
-  if value[0] != "EXPRESSION":
-    raise Exception("Expected EXPRESSION, got" + value)
-  return "".join(generator.ExpressionMapper(value,
-      lambda token: TranslateConstants(token, module)))
-
 def GetConstantsMainEntityName(module):
   if 'JavaConstantsClassName' in module.attributes:
     return ParseStringAttribute(module.attributes['JavaConstantsClassName'])
@@ -150,7 +141,6 @@ class Generator(generator.Generator):
     "expression_to_text": ExpressionToText,
     "java_type": GetJavaType,
     "name": GetNameForElement,
-    "verify_token_type": generator.VerifyTokenType,
   }
 
   def GetJinjaExports(self):
@@ -158,6 +148,13 @@ class Generator(generator.Generator):
       "module": self.module,
       "package": GetPackage(self.module),
     }
+
+  @UseJinja("java_templates/enum.java.tmpl", filters=java_filters,
+            lstrip_blocks=True, trim_blocks=True)
+  def GenerateEnumSource(self, enum):
+    exports = self.GetJinjaExports()
+    exports.update({"enum": enum})
+    return exports
 
   @UseJinja("java_templates/constants.java.tmpl", filters=java_filters,
             lstrip_blocks=True, trim_blocks=True)
@@ -180,6 +177,10 @@ class Generator(generator.Generator):
         except:
           # Ignore errors on directory creation.
           pass
+
+    for enum in self.module.enums:
+      self.Write(self.GenerateEnumSource(enum),
+                 "%s.java" % GetNameForElement(enum))
 
     if self.module.constants:
       self.Write(self.GenerateConstantsSource(self.module),

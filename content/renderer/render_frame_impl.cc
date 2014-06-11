@@ -127,6 +127,9 @@
 #include "content/renderer/media/android/renderer_media_player_manager.h"
 #include "content/renderer/media/android/stream_texture_factory_impl.h"
 #include "content/renderer/media/android/webmediaplayer_android.h"
+#endif
+
+#if defined(ENABLE_BROWSER_CDMS)
 #include "content/renderer/media/crypto/renderer_cdm_manager.h"
 #endif
 
@@ -169,6 +172,11 @@ namespace content {
 
 namespace {
 
+const char kDefaultAcceptHeader[] =
+    "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/"
+    "*;q=0.8";
+const char kAcceptHeader[] = "Accept";
+
 const size_t kExtraCharsBeforeAndAfterSelection = 100;
 
 typedef std::map<int, RenderFrameImpl*> RoutingIDFrameMap;
@@ -195,7 +203,7 @@ WebURLResponseExtraDataImpl* GetExtraDataFromResponse(
 
 void GetRedirectChain(WebDataSource* ds, std::vector<GURL>* result) {
   // Replace any occurrences of swappedout:// with about:blank.
-  const WebURL& blank_url = GURL(kAboutBlankURL);
+  const WebURL& blank_url = GURL(url::kAboutBlankURL);
   WebVector<WebURL> urls;
   ds->redirectChain(urls);
   result->reserve(urls.size());
@@ -411,6 +419,8 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
       web_user_media_client_(NULL),
 #if defined(OS_ANDROID)
       media_player_manager_(NULL),
+#endif
+#if defined(ENABLE_BROWSER_CDMS)
       cdm_manager_(NULL),
 #endif
       geolocation_dispatcher_(NULL),
@@ -436,10 +446,10 @@ RenderFrameImpl::~RenderFrameImpl() {
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, RenderFrameGone());
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, OnDestruct());
 
-#if defined(VIDEO_HOLE)
+#if defined(OS_ANDROID) && defined(VIDEO_HOLE)
   if (media_player_manager_)
     render_view_->UnregisterVideoHoleFrame(this);
-#endif  // defined(VIDEO_HOLE)
+#endif
 
   render_view_->UnregisterRenderFrame(this);
   g_routing_id_frame_map.Get().erase(routing_id_);
@@ -1417,7 +1427,7 @@ RenderFrameImpl::createContentDecryptionModule(
   return WebContentDecryptionModuleImpl::Create(
 #if defined(ENABLE_PEPPER_CDMS)
       frame,
-#elif defined(OS_ANDROID)
+#elif defined(ENABLE_BROWSER_CDMS)
       GetCdmManager(),
 #endif
       security_origin,
@@ -2037,7 +2047,7 @@ void RenderFrameImpl::didCreateDocumentElement(blink::WebLocalFrame* frame) {
 
   // Notify the browser about non-blank documents loading in the top frame.
   GURL url = frame->document().url();
-  if (url.is_valid() && url.spec() != kAboutBlankURL) {
+  if (url.is_valid() && url.spec() != url::kAboutBlankURL) {
     // TODO(nasko): Check if webview()->mainFrame() is the same as the
     // frame->tree()->top().
     blink::WebFrame* main_frame = render_view_->webview()->mainFrame();
@@ -2353,6 +2363,17 @@ void RenderFrameImpl::willSendRequest(
   if (request.url().isEmpty())
     return;
 
+  // Set the first party for cookies url if it has not been set yet (new
+  // requests). For redirects, it is updated by WebURLLoaderImpl.
+  if (request.firstPartyForCookies().isEmpty()) {
+    if (request.targetType() == blink::WebURLRequest::TargetIsMainFrame) {
+      request.setFirstPartyForCookies(request.url());
+    } else {
+      request.setFirstPartyForCookies(
+          frame->top()->document().firstPartyForCookies());
+    }
+  }
+
   WebFrame* top_frame = frame->top();
   if (!top_frame)
     top_frame = frame;
@@ -2402,6 +2423,15 @@ void RenderFrameImpl::willSendRequest(
       else
         request.setHTTPHeaderField("User-Agent", custom_user_agent);
     }
+  }
+
+  // Add the default accept header for frame request if it has not been set
+  // already.
+  if ((request.targetType() == blink::WebURLRequest::TargetIsMainFrame ||
+       request.targetType() == blink::WebURLRequest::TargetIsSubframe) &&
+      request.httpHeaderField(WebString::fromUTF8(kAcceptHeader)).isEmpty()) {
+    request.setHTTPHeaderField(WebString::fromUTF8(kAcceptHeader),
+                               WebString::fromUTF8(kDefaultAcceptHeader));
   }
 
   // Attach |should_replace_current_entry| state to requests so that, should
@@ -2659,23 +2689,6 @@ void RenderFrameImpl::didFirstVisuallyNonEmptyLayout(
 #endif
 }
 
-void RenderFrameImpl::didChangeContentsSize(blink::WebLocalFrame* frame,
-                                            const blink::WebSize& size) {
-  DCHECK(!frame_ || frame_ == frame);
-#if defined(OS_MACOSX)
-  if (frame->parent())
-    return;
-
-  WebView* frameView = frame->view();
-  if (!frameView)
-    return;
-
-  GetRenderWidget()->DidChangeScrollbarsForMainFrame(
-      frame->hasHorizontalScrollbar(),
-      frame->hasVerticalScrollbar());
-#endif  // defined(OS_MACOSX)
-}
-
 void RenderFrameImpl::didChangeScrollOffset(blink::WebLocalFrame* frame) {
   DCHECK(!frame_ || frame_ == frame);
   // TODO(nasko): Move implementation here. Needed methods:
@@ -2914,6 +2927,10 @@ void RenderFrameImpl::WasHidden() {
 
 void RenderFrameImpl::WasShown() {
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, WasShown());
+}
+
+bool RenderFrameImpl::IsHidden() {
+  return GetRenderWidget()->is_hidden();
 }
 
 // Tell the embedding application that the URL of the active page has changed.
@@ -3236,7 +3253,8 @@ WebNavigationPolicy RenderFrameImpl::DecidePolicyForNavigation(
   // browser process, and issue a special POST navigation in WebKit (via
   // FrameLoader::loadFrameRequest). See ResourceDispatcher and WebURLLoaderImpl
   // for examples of how to send the httpBody data.
-  if (!frame->parent() && is_content_initiated && !url.SchemeIs(kAboutScheme)) {
+  if (!frame->parent() && is_content_initiated &&
+      !url.SchemeIs(url::kAboutScheme)) {
     bool send_referrer = false;
 
     // All navigations to or from WebUI URLs or within WebUI-enabled
@@ -3296,7 +3314,7 @@ WebNavigationPolicy RenderFrameImpl::DecidePolicyForNavigation(
   // (see below).
   bool is_fork =
       // Must start from a tab showing about:blank, which is later redirected.
-      old_url == GURL(kAboutBlankURL) &&
+      old_url == GURL(url::kAboutBlankURL) &&
       // Must be the first real navigation of the tab.
       render_view_->historyBackListCount() < 1 &&
       render_view_->historyForwardListCount() < 1 &&
@@ -3541,12 +3559,14 @@ RendererMediaPlayerManager* RenderFrameImpl::GetMediaPlayerManager() {
   return media_player_manager_;
 }
 
+#endif  // defined(OS_ANDROID)
+
+#if defined(ENABLE_BROWSER_CDMS)
 RendererCdmManager* RenderFrameImpl::GetCdmManager() {
   if (!cdm_manager_)
     cdm_manager_ = new RendererCdmManager(this);
   return cdm_manager_;
 }
-
-#endif  // defined(OS_ANDROID)
+#endif  // defined(ENABLE_BROWSER_CDMS)
 
 }  // namespace content

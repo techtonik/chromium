@@ -223,9 +223,6 @@ char kTSanDefaultSuppressions[] =
 "race:webrtc::VCMCodecDataBase::DeregisterReceiveCodec\n"
 "race:webrtc::GainControlImpl::set_stream_analog_level\n"
 
-// http://crbug.com/345251
-"race:cc::s_next_layer_id\n"
-
 // http://crbug.com/345618
 "race:WebCore::AudioDestinationNode::render\n"
 
@@ -278,6 +275,7 @@ char kTSanDefaultSuppressions[] =
 "race:SandboxIPCHandler::HandleFontMatchRequest\n"
 "race:SkFontConfigInterfaceDirect::matchFamilyName\n"
 "race:SkFontConfigInterface::GetSingletonDirectInterface\n"
+"race:FcStrStaticName\n"
 
 // http://crbug.com/372807
 "deadlock:net::X509Certificate::CreateCertificateListFromBytes\n"
@@ -291,6 +289,9 @@ char kTSanDefaultSuppressions[] =
 
 // False positive in libc's tzset_internal, http://crbug.com/379738.
 "race:tzset_internal\n"
+
+// http://crbug.com/380554
+"deadlock:g_type_add_interface_static\n"
 
 // End of suppressions.
 ;  // Please keep this semicolon.

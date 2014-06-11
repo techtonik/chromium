@@ -100,6 +100,8 @@ enum KeyEventFlags {
   EF_IME_FABRICATED_KEY = 1 << 17,  // Key event fabricated by the underlying
                                     // IME without a user action.
                                     // (Linux X11 only)
+  EF_IS_REPEAT          = 1 << 18,
+  EF_FUNCTION_KEY       = 1 << 19,  // Key originates from function key row
 };
 
 // Flags specific to mouse events

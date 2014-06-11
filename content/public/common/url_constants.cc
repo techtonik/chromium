@@ -6,8 +6,6 @@
 
 namespace content {
 
-const char kAboutScheme[] = "about";
-
 // Before adding new chrome schemes please check with security@chromium.org.
 // There are security implications associated with introducing new schemes.
 const char kChromeDevToolsScheme[] = "chrome-devtools";
@@ -17,7 +15,6 @@ const char kMetadataScheme[] = "metadata";
 const char kSwappedOutScheme[] = "swappedout";
 const char kViewSourceScheme[] = "view-source";
 
-const char kAboutBlankURL[] = "about:blank";
 const char kAboutSrcDocURL[] = "about:srcdoc";
 
 const char kChromeUIAppCacheInternalsHost[] = "appcache-internals";
@@ -45,8 +42,6 @@ const char kChromeUIPpapiFlashCrashURL[] = "chrome://ppapiflashcrash";
 const char kChromeUIPpapiFlashHangURL[] = "chrome://ppapiflashhang";
 const char kChromeUIServiceWorkerInternalsURL[] =
     "chrome://serviceworker-internals";
-
-const char kStandardSchemeSeparator[] = "://";
 
 // This error URL is loaded in normal web renderer processes, so it should not
 // have a chrome:// scheme that might let it be confused with a WebUI page.

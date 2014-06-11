@@ -28,35 +28,35 @@ vars = {
   "libcxxabi_revision": "206024",
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
   "nacl_trunk": "http://src.chromium.org/native_client/trunk",
-  "webkit_revision": "175413",
+  "webkit_revision": "175916",
   "chromium_git": "https://chromium.googlesource.com",
   "chromiumos_git": "https://chromium.googlesource.com/chromiumos",
   "pdfium_git": "https://pdfium.googlesource.com",
   "skia_git": "https://skia.googlesource.com",
   "swig_revision": "230490",
-  "nacl_revision": "13267",
+  "nacl_revision": "13309",
   # After changing nacl_revision, run 'glient sync' and check native_client/DEPS
   # to update other nacl_*_revision's.
   "nacl_tools_revision": "13077",  # native_client/DEPS: tools_rev
   "google_toolbox_for_mac_revision": "662",
-  "libaddressinput_revision": "262",
+  "libaddressinput_revision": "265",
   "libphonenumber_revision": "621",
   "libvpx_revision": "269083",
   "lss_revision": "26",
-  "sfntly_revision": "228",
+  "sfntly_revision": "239",
   "lighttpd_revision": "33737",
-  "skia_revision": "abc073376091e66f705674b825b1247148cb9c24",
+  "skia_revision": "5713352a64936428d37a721382d021f4a9002172",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   "v8_branch": "trunk",
-  "v8_revision": "21633",
+  "v8_revision": "21682",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
-  "webrtc_revision": "6261",
+  "webrtc_revision": "6352",
   "jsoncpp_revision": "248",
-  "nss_revision": "271760",
+  "nss_revision": "275589",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
@@ -64,7 +64,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openssl
   # and whatever else without interference from each other.
-  "openssl_revision": "271781",
+  "openssl_revision": "275836",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
@@ -76,12 +76,12 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFIum
   # and whatever else without interference from each other.
-  "pdfium_revision": "dbd4c06036f42d8dffe033ba112d6d7085dfe475",
+  "pdfium_revision": "9e16edd0ffb834e87da76fe6b0fe4aef39312685",
 }
 
 deps = {
   "src/breakpad/src":
-    (Var("googlecode_url") % "google-breakpad") + "/trunk/src@1331",
+    (Var("googlecode_url") % "google-breakpad") + "/trunk/src@1338",
 
   "src/buildtools":
     Var("chromium_git") + "/chromium/buildtools.git@" +
@@ -98,6 +98,9 @@ deps = {
 
   "src/third_party/angle":
     Var("chromium_git") + "/angle/angle.git@" + Var("angle_revision"),
+
+  "src/third_party/colorama/src":
+    Var("chromium_git") + "/external/colorama.git@799604a1041e9b3bc5d2789ecbd7e8db2e18e6b8",
 
   "src/third_party/trace-viewer":
     (Var("googlecode_url") % "trace-viewer") + "/trunk@1281",
@@ -148,7 +151,7 @@ deps = {
     (Var("googlecode_url") % "grit-i18n") + "/trunk@168",
 
   "src/tools/gyp":
-    (Var("googlecode_url") % "gyp") + "/trunk@1921",
+    (Var("googlecode_url") % "gyp") + "/trunk@1927",
 
   "src/tools/swarming_client":
     Var("chromium_git") + "/external/swarming.client.git@" +
@@ -177,7 +180,7 @@ deps = {
 
   "src/third_party/brotli/src":
     Var("chromium_git") +
-    "/external/font-compression-reference.git@0829e37293abc2523a1d2b0f4d68ff7b5fcd8e01",
+    "/external/font-compression-reference.git@6cef49677dc4c650ef6e3f56041e0a41803afa8c",
 
   "src/tools/page_cycler/acid3":
     "/trunk/deps/page_cycler/acid3@171600",
@@ -187,9 +190,6 @@ deps = {
 
   "src/chrome/test/data/perf/frame_rate/content":
     "/trunk/deps/frame_rate/content@93671",
-
-  "src/chrome/test/data/perf/third_party/octane":
-    (Var("googlecode_url") % "octane-benchmark") + "/trunk@19",
 
   "src/third_party/bidichecker":
     (Var("googlecode_url") % "bidichecker") + "/trunk/lib@4",
@@ -211,7 +211,7 @@ deps = {
 
   "src/third_party/ffmpeg":
     Var("chromium_git") +
-    "/chromium/third_party/ffmpeg.git@96481cb9163681998d1407b0c951a4c951be1b04",
+    "/chromium/third_party/ffmpeg.git@9caa384561d53a85b4d86bf6ab7426c1362914cf",
 
   "src/third_party/libjingle/source/talk":
     (Var("googlecode_url") % "webrtc") + "/trunk/talk@" +
@@ -288,7 +288,7 @@ deps = {
 
   "src/third_party/webpagereplay":
     Var("chromium_git") + "/external/web-page-replay.git@" +
-    "d1447899a2176bc8700865e76ed70da329628abd",
+    "b62c02d3b64cf00a2f65a82cca0721aa42c3d6ad",
 
   "src/third_party/pywebsocket/src":
     (Var("googlecode_url") % "pywebsocket") + "/trunk/src@790",
@@ -297,7 +297,7 @@ deps = {
     "/trunk/deps/third_party/opus@256783",
 
   "src/media/cdm/ppapi/api":
-    "/trunk/deps/cdm@262570",
+    "/trunk/deps/cdm@273356",
 
   "src/third_party/mesa/src":
     "/trunk/deps/third_party/mesa@265279",
@@ -311,7 +311,7 @@ deps = {
 
   "src/third_party/libwebm/source":
     Var("chromium_git") +
-      "/webm/libwebm.git@acf788bedd1ddc0f4a8553c28a8b4e2266accbc9",
+      "/webm/libwebm.git@8be63972fdd7ae8c041778f8ba674ade903395c9",
 
   "src/third_party/openssl":
     "/trunk/deps/third_party/openssl@" + Var("openssl_revision"),
@@ -394,7 +394,6 @@ deps_os = {
     "src/chrome/test/data/extensions/api_test/permissions/nacl_enabled/bin": None,
     "src/chrome/test/data/perf/canvas_bench": None,
     "src/chrome/test/data/perf/frame_rate/content": None,
-    "src/chrome/test/data/perf/third_party/octane": None,
     "src/media/cdm/ppapi/api": None,
     "src/native_client": None,
     "src/native_client/src/third_party/ppapi": None,
@@ -405,8 +404,6 @@ deps_os = {
     "src/third_party/ffmpeg": None,
     "src/third_party/hunspell_dictionaries": None,
     "src/third_party/hunspell": None,
-    "src/third_party/libaddressinput/src/cpp": None,
-    "src/third_party/libaddressinput/src/testdata": None,
     "src/third_party/libc++/trunk": None,
     "src/third_party/libc++abi/trunk": None,
     "src/third_party/libexif/sources": None,
@@ -478,7 +475,7 @@ deps_os = {
     # For Linux and Chromium OS.
     "src/third_party/cros_system_api":
       Var("chromiumos_git") + "/platform/system_api.git" +
-      "@7837af4f429eb20ca62f32a8dc6019b5b8b9078e",
+      "@ba73627b396a7773203a6c554ae2cc759d52eb2b",
 
     # Note that this is different from Android's freetype repo.
     "src/third_party/freetype2/src":
@@ -510,7 +507,7 @@ deps_os = {
   "android": {
     "src/third_party/android_tools":
       Var("chromium_git") + "/android_tools.git" +
-      "@ac519ee39778f7a1f2aac797a941a6b3db9d3882",
+      "@c6e658065e7ad80477390424bb5388da6e936d07",
 
     "src/third_party/aosp":
       "/trunk/deps/third_party/aosp@148330",
@@ -551,10 +548,6 @@ deps_os = {
 
     "src/third_party/eyesfree/src/android/java/src/com/googlecode/eyesfree/braille":
       (Var("googlecode_url") % "eyes-free") + "/trunk/braille/client/src/com/googlecode/eyesfree/braille@797",
-
-    # Android shouldn't use this address validation library.
-    "src/third_party/libaddressinput/src/cpp": None,
-    "src/third_party/libaddressinput/src/testdata": None,
   },
 }
 
@@ -582,7 +575,6 @@ skip_child_includes = [
   "metro_driver",
   "native_client_sdk",
   "o3d",
-  "pdf",
   "sdch",
   "skia",
   "testing",
@@ -767,6 +759,26 @@ hooks = [
                 "--bucket", "chromium-eu-strip",
                 "-s", "src/build/linux/bin/eu-strip.sha1",
     ],
+  },
+  # Pull libaddressinput strings to work better with translation tools.
+  {
+    "name": "libaddressinput-strings",
+    "pattern": ".",
+    "action": [
+        "python",
+        "src/third_party/libaddressinput/chromium/tools/update-strings.py",
+    ],
+  },
+  {
+    "name": "drmemory",
+    "pattern": ".",
+    "action": [ "download_from_google_storage",
+                "--no_resume",
+                "--platform=win32",
+                "--no_auth",
+                "--bucket", "chromium-drmemory",
+                "-s", "src/third_party/drmemory/drmemory-windows-sfx.exe.sha1",
+              ],
   },
   {
     # A change to a .gyp, .gypi, or to GYP itself should run the generator.

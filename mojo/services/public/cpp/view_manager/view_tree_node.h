@@ -9,6 +9,7 @@
 
 #include "base/basictypes.h"
 #include "base/observer_list.h"
+#include "mojo/public/cpp/bindings/array.h"
 #include "mojo/services/public/cpp/view_manager/view_manager_types.h"
 #include "ui/gfx/geometry/rect.h"
 
@@ -33,7 +34,7 @@ class ViewTreeNode {
   void Destroy();
 
   // Configuration.
-  TransportNodeId id() const { return id_; }
+  Id id() const { return id_; }
 
   // Geometric disposition.
   const gfx::Rect& bounds() { return bounds_; }
@@ -53,11 +54,14 @@ class ViewTreeNode {
 
   bool Contains(ViewTreeNode* child) const;
 
-  ViewTreeNode* GetChildById(TransportNodeId id);
+  ViewTreeNode* GetChildById(Id id);
 
   // View.
   void SetActiveView(View* view);
   View* active_view() { return active_view_; }
+
+  // Embedding.
+  void Embed(const String& url);
 
  protected:
   // This class is subclassed only by test classes that provide a public ctor.
@@ -76,7 +80,7 @@ class ViewTreeNode {
   void LocalSetBounds(const gfx::Rect& old_bounds, const gfx::Rect& new_bounds);
 
   ViewManager* manager_;
-  TransportNodeId id_;
+  Id id_;
   ViewTreeNode* parent_;
   Children children_;
 

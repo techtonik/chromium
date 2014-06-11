@@ -11,6 +11,7 @@
 
 #include "base/basictypes.h"
 #include "base/bind.h"
+#include "base/bind_helpers.h"
 #include "base/callback.h"
 #include "base/command_line.h"
 #include "base/compiler_specific.h"
@@ -25,6 +26,8 @@
 #include "build/build_config.h"
 #include "chrome/browser/bookmarks/enhanced_bookmarks_features.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/browsing_data/browsing_data_helper.h"
+#include "chrome/browser/browsing_data/browsing_data_remover.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/defaults.h"
 #include "chrome/browser/invalidation/invalidation_service_factory.h"
@@ -160,6 +163,18 @@ static const base::FilePath::CharType kSyncBackupDataFolderName[] =
 // Default delay in seconds to start backup/rollback backend.
 const int kBackupStartDelay = 10;
 
+namespace {
+
+void ClearBrowsingData(Profile* profile, base::Time start, base::Time end) {
+  // BrowsingDataRemover deletes itself when it's done.
+  BrowsingDataRemover* remover = BrowsingDataRemover::CreateForRange(
+      profile, start, end);
+  remover->Remove(BrowsingDataRemover::REMOVE_ALL,
+                  BrowsingDataHelper::ALL);
+}
+
+}  // anonymous namespace
+
 bool ShouldShowActionOnUI(
     const syncer::SyncProtocolError& error) {
   return (error.action != syncer::UNKNOWN_ACTION &&
@@ -215,7 +230,8 @@ ProfileSyncService::ProfileSyncService(
                      startup_controller_weak_factory_.GetWeakPtr(),
                      ROLLBACK)),
       backend_mode_(IDLE),
-      backup_start_delay_(base::TimeDelta::FromSeconds(kBackupStartDelay)) {
+      backup_start_delay_(base::TimeDelta::FromSeconds(kBackupStartDelay)),
+      clear_browsing_data_(base::Bind(&ClearBrowsingData)) {
   DCHECK(profile);
   // By default, dev, canary, and unbranded Chromium users will go to the
   // development servers. Development servers have more features than standard
@@ -307,6 +323,18 @@ void ProfileSyncService::Initialize() {
   startup_controller_.TryStart();
 
   backup_rollback_controller_.Start(backup_start_delay_);
+
+#if defined(OS_WIN) || defined(OS_MACOSX) || (defined(OS_LINUX) && !defined(OS_CHROMEOS))
+  if (CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kSyncDisableBackup)) {
+    profile_->GetIOTaskRunner()->PostDelayedTask(
+        FROM_HERE,
+        base::Bind(base::IgnoreResult(base::DeleteFile),
+                   profile_->GetPath().Append(kSyncBackupDataFolderName),
+                   true),
+        backup_start_delay_);
+  }
+#endif
 }
 
 void ProfileSyncService::TrySyncDatatypePrefRecovery() {
@@ -524,6 +552,13 @@ SyncCredentials ProfileSyncService::GetCredentials() {
 bool ProfileSyncService::ShouldDeleteSyncFolder() {
   if (backend_mode_ == SYNC)
     return !HasSyncSetupCompleted();
+
+  // Start fresh if it's the first time backup after user stopped syncing.
+  // This is needed because backup DB may contain items deleted by user during
+  // sync period and can cause back-from-dead issues.
+  if (backend_mode_ == BACKUP && !sync_prefs_.GetFirstSyncTime().is_null())
+    return true;
+
   return false;
 }
 
@@ -538,7 +573,7 @@ void ProfileSyncService::InitializeBackend(bool delete_stale_data) {
   scoped_refptr<net::URLRequestContextGetter> request_context_getter(
       profile_->GetRequestContext());
 
-  if (delete_stale_data)
+  if (backend_mode_ == SYNC && delete_stale_data)
     ClearStaleErrors();
 
   scoped_ptr<syncer::UnrecoverableErrorHandler>
@@ -643,6 +678,9 @@ void ProfileSyncService::StartUpSlowBackendComponents(
 
   backend_mode_ = mode;
 
+  if (backend_mode_ == ROLLBACK)
+    ClearBrowsingDataSinceFirstSync();
+
   base::FilePath sync_folder = backend_mode_ == SYNC ?
       base::FilePath(kSyncDataFolderName) :
       base::FilePath(kSyncBackupDataFolderName);
@@ -663,6 +701,8 @@ void ProfileSyncService::StartUpSlowBackendComponents(
   // we'll want to start from a fresh SyncDB, so delete any old one that might
   // be there.
   InitializeBackend(ShouldDeleteSyncFolder());
+
+  UpdateFirstSyncTimePref();
 }
 
 void ProfileSyncService::OnGetTokenSuccess(
@@ -978,10 +1018,8 @@ void ProfileSyncService::UpdateBackendInitUMA(bool success) {
 }
 
 void ProfileSyncService::PostBackendInitialization() {
-  if (backend_mode_ == BACKUP || backend_mode_ == ROLLBACK) {
-    ConfigureDataTypeManager();
-    return;
-  }
+  // Never get here for backup / restore.
+  DCHECK_EQ(backend_mode_, SYNC);
 
   if (protocol_event_observers_.might_have_observers()) {
     backend_->RequestBufferedProtocolEventsAndEnableForwarding();
@@ -1057,7 +1095,18 @@ void ProfileSyncService::OnBackendInitialized(
   sync_js_controller_.AttachJsBackend(js_backend);
   debug_info_listener_ = debug_info_listener;
 
-  PostBackendInitialization();
+  // Give the DataTypeControllers a handle to the now initialized backend
+  // as a UserShare.
+  for (DataTypeController::TypeMap::iterator it =
+       directory_data_type_controllers_.begin();
+       it != directory_data_type_controllers_.end(); ++it) {
+    it->second->OnUserShareReady(GetUserShare());
+  }
+
+  if (backend_mode_ == BACKUP || backend_mode_ == ROLLBACK)
+    ConfigureDataTypeManager();
+  else
+    PostBackendInitialization();
 }
 
 void ProfileSyncService::OnSyncCycleCompleted() {
@@ -1410,7 +1459,7 @@ void ProfileSyncService::OnConfigureDone(
     if (configure_status_ == DataTypeManager::OK ||
         configure_status_ == DataTypeManager::PARTIAL_SUCCESS) {
       StartSyncingWithServer();
-    } else {
+    } else if (!expect_sync_configuration_aborted_) {
       DVLOG(1) << "Backup/rollback backend failed to configure.";
       ShutdownImpl(browser_sync::SyncBackendHost::STOP_AND_CLAIM_THREAD);
     }
@@ -1978,6 +2027,11 @@ base::Value* ProfileSyncService::GetTypeStatusMap() const {
           ", " + error.message();
       type_status->SetString("status", "error");
       type_status->SetString("value", error_text);
+    } else if (syncer::IsProxyType(type) && passive_types.Has(type)) {
+      // Show a proxy type in "ok" state unless it is disabled by user.
+      DCHECK(!throttled_types.Has(type));
+      type_status->SetString("status", "ok");
+      type_status->SetString("value", "Passive");
     } else if (throttled_types.Has(type) && passive_types.Has(type)) {
       type_status->SetString("status", "warning");
       type_status->SetString("value", "Passive, Throttled");
@@ -2474,4 +2528,28 @@ bool ProfileSyncService::HasSyncingBackend() const {
 
 void ProfileSyncService::SetBackupStartDelayForTest(base::TimeDelta delay) {
   backup_start_delay_ = delay;
+}
+
+void ProfileSyncService::UpdateFirstSyncTimePref() {
+  if (signin_->GetEffectiveUsername().empty()) {
+    // Clear if user's not signed in and rollback is done.
+    if (backend_mode_ == BACKUP)
+      sync_prefs_.ClearFirstSyncTime();
+  } else if (sync_prefs_.GetFirstSyncTime().is_null()) {
+    // Set if user is signed in and time was not set before.
+    sync_prefs_.SetFirstSyncTime(base::Time::Now());
+  }
+}
+
+void ProfileSyncService::ClearBrowsingDataSinceFirstSync() {
+  base::Time first_sync_time = sync_prefs_.GetFirstSyncTime();
+  if (first_sync_time.is_null())
+    return;
+
+  clear_browsing_data_.Run(profile_, first_sync_time, base::Time::Now());
+}
+
+void ProfileSyncService::SetClearingBrowseringDataForTesting(
+    base::Callback<void(Profile*, base::Time, base::Time)> c) {
+  clear_browsing_data_ = c;
 }

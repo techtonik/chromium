@@ -347,6 +347,7 @@ WebContentsImpl::WebContentsImpl(
       render_view_message_source_(NULL),
       fullscreen_widget_routing_id_(MSG_ROUTING_NONE),
       is_subframe_(false),
+      touch_emulation_enabled_(false),
       last_dialog_suppressed_(false) {
   for (size_t i = 0; i < g_created_callbacks.Get().size(); i++)
     g_created_callbacks.Get().at(i).Run(this);
@@ -533,8 +534,6 @@ bool WebContentsImpl::OnMessageReceived(RenderViewHost* render_view_host,
     IPC_MESSAGE_HANDLER(ViewHostMsg_WebUISend, OnWebUISend)
     IPC_MESSAGE_HANDLER(ViewHostMsg_RequestPpapiBrokerPermission,
                         OnRequestPpapiBrokerPermission)
-    IPC_MESSAGE_HANDLER_GENERIC(BrowserPluginHostMsg_AllocateInstanceID,
-                                OnBrowserPluginMessage(message))
     IPC_MESSAGE_HANDLER_GENERIC(BrowserPluginHostMsg_Attach,
                                 OnBrowserPluginMessage(message))
     IPC_MESSAGE_HANDLER(ImageHostMsg_DidDownloadImage, OnDidDownloadImage)
@@ -613,7 +612,7 @@ void WebContentsImpl::SetDelegate(WebContentsDelegate* delegate) {
     delegate_->Attach(this);
     // Ensure the visible RVH reflects the new delegate's preferences.
     if (view_)
-      view_->SetOverscrollControllerEnabled(delegate->CanOverscrollContent());
+      view_->SetOverscrollControllerEnabled(CanOverscrollContent());
   }
 }
 
@@ -1659,6 +1658,10 @@ SessionStorageNamespace* WebContentsImpl::GetSessionStorageNamespace(
   return controller_.GetSessionStorageNamespace(instance);
 }
 
+SessionStorageNamespaceMap WebContentsImpl::GetSessionStorageNamespaceMap() {
+  return controller_.GetSessionStorageNamespaceMap();
+}
+
 FrameTree* WebContentsImpl::GetFrameTree() {
   return &frame_tree_;
 }
@@ -1692,6 +1695,12 @@ void WebContentsImpl::OnMoveValidationMessage(
 void WebContentsImpl::DidSendScreenRects(RenderWidgetHostImpl* rwh) {
   if (browser_plugin_embedder_)
     browser_plugin_embedder_->DidSendScreenRects();
+}
+
+void WebContentsImpl::OnTouchEmulationEnabled(bool enabled) {
+  touch_emulation_enabled_ = enabled;
+  if (view_)
+    view_->SetOverscrollControllerEnabled(CanOverscrollContent());
 }
 
 void WebContentsImpl::UpdatePreferredSize(const gfx::Size& pref_size) {
@@ -2263,7 +2272,7 @@ void WebContentsImpl::InsertCSS(const std::string& css) {
 
 bool WebContentsImpl::FocusLocationBarByDefault() {
   NavigationEntry* entry = controller_.GetVisibleEntry();
-  if (entry && entry->GetURL() == GURL(kAboutBlankURL))
+  if (entry && entry->GetURL() == GURL(url::kAboutBlankURL))
     return true;
   return delegate_ && delegate_->ShouldFocusLocationBarByDefault(this);
 }
@@ -2452,10 +2461,9 @@ void WebContentsImpl::DidNavigateMainFramePostCommit(
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
                     DidNavigateMainFrame(details, params));
 
-  if (delegate_) {
+  if (delegate_)
     delegate_->DidNavigateMainFramePostCommit(this);
-    view_->SetOverscrollControllerEnabled(delegate_->CanOverscrollContent());
-  }
+  view_->SetOverscrollControllerEnabled(CanOverscrollContent());
 }
 
 void WebContentsImpl::DidNavigateAnyFramePostCommit(
@@ -2480,6 +2488,10 @@ void WebContentsImpl::SetMainFrameMimeType(const std::string& mime_type) {
 }
 
 bool WebContentsImpl::CanOverscrollContent() const {
+  // Disable overscroll when touch emulation is on. See crbug.com/369938.
+  if (touch_emulation_enabled_)
+    return false;
+
   if (delegate_)
     return delegate_->CanOverscrollContent();
 
@@ -2913,8 +2925,8 @@ void WebContentsImpl::OnFirstVisuallyNonEmptyPaint() {
 }
 
 void WebContentsImpl::DidChangeVisibleSSLState() {
-  FOR_EACH_OBSERVER(WebContentsObserver, observers_,
-                    DidChangeVisibleSSLState());
+  if (delegate_)
+    delegate_->VisibleSSLStateChanged(this);
 }
 
 void WebContentsImpl::NotifyBeforeFormRepostWarningShow() {
@@ -3291,7 +3303,7 @@ void WebContentsImpl::RenderViewCreated(RenderViewHost* render_view_host) {
     return;
 
   if (delegate_)
-    view_->SetOverscrollControllerEnabled(delegate_->CanOverscrollContent());
+    view_->SetOverscrollControllerEnabled(CanOverscrollContent());
 
   NotificationService::current()->Notify(
       NOTIFICATION_WEB_CONTENTS_RENDER_VIEW_HOST_CREATED,
@@ -3793,7 +3805,7 @@ void WebContentsImpl::NotifySwappedFromRenderManager(RenderViewHost* old_host,
 
   // Make sure the visible RVH reflects the new delegate's preferences.
   if (delegate_)
-    view_->SetOverscrollControllerEnabled(delegate_->CanOverscrollContent());
+    view_->SetOverscrollControllerEnabled(CanOverscrollContent());
 
   view_->RenderViewSwappedIn(new_host);
 }

@@ -51,7 +51,7 @@ function FullWindowVideoControls(
   this.inactivityWatcher_ = new MouseInactivityWatcher(playerContainer);
   this.__defineGetter__('inactivityWatcher', function() {
     return this.inactivityWatcher_;
-  });
+  }.wrap(this));
 
   this.inactivityWatcher_.check();
 }
@@ -60,6 +60,7 @@ FullWindowVideoControls.prototype = { __proto__: VideoControls.prototype };
 
 /**
  * Displays error message.
+ *
  * @param {string} message Message id.
  * @private
  */
@@ -110,6 +111,7 @@ function VideoPlayer() {
   this.controls_ = null;
   this.videoElement_ = null;
   this.videos_ = null;
+  this.currentPos_ = 0;
 
   Object.seal(this);
 }
@@ -126,9 +128,37 @@ VideoPlayer.prototype = {
  * @param {Array.<Object.<string, Object>>} videos List of videos.
  */
 VideoPlayer.prototype.prepare = function(videos) {
-  document.ondragstart = function(e) { e.preventDefault() };
-
   this.videos_ = videos;
+
+  var preventDefault = function(event) { event.preventDefault(); }.wrap(null);
+
+  document.ondragstart = preventDefault;
+
+  var maximizeButton = document.querySelector('.maximize-button');
+  maximizeButton.addEventListener(
+    'click',
+    function() {
+      var appWindow = chrome.app.window.current();
+      if (appWindow.isMaximized())
+        appWindow.restore();
+      else
+        appWindow.maximize();
+    }.wrap(null));
+  maximizeButton.addEventListener('mousedown', preventDefault);
+
+  var minimizeButton = document.querySelector('.minimize-button');
+  minimizeButton.addEventListener(
+    'click',
+    function() {
+      chrome.app.window.current().minimize()
+    }.wrap(null));
+  minimizeButton.addEventListener('mousedown', preventDefault);
+
+  var closeButton = document.querySelector('.close-button');
+  closeButton.addEventListener(
+    'click',
+    function() { close(); }.wrap(null));
+  closeButton.addEventListener('mousedown', preventDefault);
 
   this.controls_ = new FullWindowVideoControls(
       document.querySelector('#video-player'),
@@ -139,10 +169,23 @@ VideoPlayer.prototype.prepare = function(videos) {
     if (this.controls_.decodeErrorOccured &&
         // Ignore shortcut keys
         !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
-      this.playVideo();
+      this.reloadCurrentVideo_(function() {
+        this.videoElement_.play();
+      }.wrap(this));
       e.preventDefault();
     }
   }.wrap(this);
+
+  var arrowRight = document.querySelector('.arrow-box .arrow.right');
+  arrowRight.addEventListener('click', this.advance_.wrap(this, 1));
+  var arrowLeft = document.querySelector('.arrow-box .arrow.left');
+  arrowLeft.addEventListener('click', this.advance_.wrap(this, 0));
+
+  var videoPlayerElement = document.querySelector('#video-player');
+  if (videos.length > 1)
+    videoPlayerElement.setAttribute('multiple', true);
+  else
+    videoPlayerElement.removeAttribute('multiple');
 
   document.addEventListener('keydown', reloadVideo, true);
   document.addEventListener('click', reloadVideo, true);
@@ -163,7 +206,7 @@ function unload() {
  * Loads the video file.
  * @param {string} url URL of the video file.
  * @param {string} title Title of the video file.
- * @param {function(number, number)=} opt_callback Completion callback.
+ * @param {function()=} opt_callback Completion callback.
  * @private
  */
 VideoPlayer.prototype.loadVideo_ = function(url, title, opt_callback) {
@@ -171,7 +214,20 @@ VideoPlayer.prototype.loadVideo_ = function(url, title, opt_callback) {
 
   document.title = title;
 
-  // Re-enables ui and hide error message if already displayed.
+  document.querySelector('#title').innerText = title;
+
+  var videoPlayerElement = document.querySelector('#video-player');
+  if (this.currentPos_ === (this.videos_.length - 1))
+    videoPlayerElement.setAttribute('last-video', true);
+  else
+    videoPlayerElement.removeAttribute('last-video');
+
+  if (this.currentPos_ === 0)
+    videoPlayerElement.setAttribute('first-video', true);
+  else
+    videoPlayerElement.removeAttribute('first-video');
+
+  // Re-enables ui and hides error message if already displayed.
   document.querySelector('#video-player').removeAttribute('disabled');
   document.querySelector('#error').removeAttribute('visible');
   this.controls.inactivityWatcher.disabled = false;
@@ -183,18 +239,25 @@ VideoPlayer.prototype.loadVideo_ = function(url, title, opt_callback) {
 
   this.videoElement_.src = url;
   this.videoElement_.load();
-  if (opt_callback)
-    this.videoElement_.addEventListener('loadedmetadata', opt_callback);
+
+  if (opt_callback) {
+    var handler = function(currentPos, event) {
+      console.log('loaded: ', currentPos, this.currentPos_);
+      if (currentPos === this.currentPos_)
+        opt_callback();
+      this.videoElement_.removeEventListener('loadedmetadata', handler);
+    }.wrap(this, this.currentPos_);
+
+    this.videoElement_.addEventListener('loadedmetadata', handler);
+  }
 };
 
 /**
- * Plays the video.
+ * Plays the first video.
  */
-VideoPlayer.prototype.playVideo = function() {
-  var currentVideo = this.videos_[0];
-  this.loadVideo_(currentVideo.fileUrl,
-                  currentVideo.entry.name,
-                  this.onVideoReady_.wrap(this));
+VideoPlayer.prototype.playFirstVideo = function() {
+  this.currentPos_ = 0;
+  this.reloadCurrentVideo_(this.onFirstVideoReady_.wrap(this));
 };
 
 /**
@@ -208,10 +271,10 @@ VideoPlayer.prototype.unloadVideo = function() {
 };
 
 /**
- * Called when the video is ready after starting to load.
+ * Called when the first video is ready after starting to load.
  * @private
  */
-VideoPlayer.prototype.onVideoReady_ = function() {
+VideoPlayer.prototype.onFirstVideoReady_ = function() {
   // TODO: chrome.app.window soon will be able to resize the content area.
   // Until then use approximate title bar height.
   var TITLE_HEIGHT = 33;
@@ -255,10 +318,37 @@ VideoPlayer.prototype.onVideoReady_ = function() {
 };
 
 /**
+ * Advances to the next (or previous) track.
+ *
+ * @param {boolean} direction True to the next, false to the previous.
+ * @private
+ */
+VideoPlayer.prototype.advance_ = function(direction) {
+  var newPos = this.currentPos_ + (direction ? 1 : -1);
+  if (0 <= newPos && newPos < this.videos_.length) {
+    this.currentPos_ = newPos;
+    this.reloadCurrentVideo_(function() {
+      this.videoElement_.play();
+    }.wrap(this));
+  }
+};
+
+/**
+ * Reloads the current video.
+ *
+ * @param {function()=} opt_callback Completion callback.
+ * @private
+ */
+VideoPlayer.prototype.reloadCurrentVideo_ = function(opt_callback) {
+  var currentVideo = this.videos_[this.currentPos_];
+  this.loadVideo_(currentVideo.fileUrl, currentVideo.entry.name, opt_callback);
+};
+
+/**
  * Initialize the list of videos.
  * @param {function(Array.<Object>)} callback Called with the video list when
  *     it is ready.
- **/
+ */
 function initVideos(callback) {
   if (window.videos) {
     var videos = window.videos;
@@ -272,7 +362,7 @@ function initVideos(callback) {
         var videos = window.videos;
         window.videos = null;
         callback(videos);
-      });
+      }.wrap(null));
 }
 
 var player = new VideoPlayer();
@@ -280,12 +370,12 @@ var player = new VideoPlayer();
 /**
  * Initializes the strings.
  * @param {function()} callback Called when the sting data is ready.
- **/
+ */
 function initStrings(callback) {
   chrome.fileBrowserPrivate.getStrings(function(strings) {
     loadTimeData.data = strings;
     callback();
-  });
+  }.wrap(null));
 }
 
 var initPromise = Promise.all(
@@ -296,5 +386,5 @@ var initPromise = Promise.all(
 initPromise.then(function(results) {
   var videos = results[0];
   player.prepare(videos);
-  return new Promise(player.playVideo.wrap(player));
-});
+  return new Promise(player.playFirstVideo.wrap(player));
+}.wrap(null));

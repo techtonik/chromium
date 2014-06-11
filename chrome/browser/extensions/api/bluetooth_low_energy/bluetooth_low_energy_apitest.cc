@@ -505,7 +505,7 @@ IN_PROC_BROWSER_TEST_F(BluetoothLowEnergyApiTest, CharacteristicProperties) {
            Return(BluetoothGattCharacteristic::kPropertyExtendedProperties))
       .WillOnce(Return(BluetoothGattCharacteristic::kPropertyReliableWrite))
       .WillOnce(
-           Return(BluetoothGattCharacteristic::kPropertyWriteableAuxiliaries))
+           Return(BluetoothGattCharacteristic::kPropertyWritableAuxiliaries))
       .WillOnce(Return(
           BluetoothGattCharacteristic::kPropertyBroadcast |
           BluetoothGattCharacteristic::kPropertyRead |
@@ -516,7 +516,7 @@ IN_PROC_BROWSER_TEST_F(BluetoothLowEnergyApiTest, CharacteristicProperties) {
           BluetoothGattCharacteristic::kPropertyAuthenticatedSignedWrites |
           BluetoothGattCharacteristic::kPropertyExtendedProperties |
           BluetoothGattCharacteristic::kPropertyReliableWrite |
-          BluetoothGattCharacteristic::kPropertyWriteableAuxiliaries));
+          BluetoothGattCharacteristic::kPropertyWritableAuxiliaries));
 
   ExtensionTestMessageListener listener("ready", true);
   ASSERT_TRUE(LoadExtension(test_data_dir_.AppendASCII(
@@ -950,6 +950,15 @@ IN_PROC_BROWSER_TEST_F(BluetoothLowEnergyApiTest, WriteDescriptorValue) {
   event_router()->GattCharacteristicRemoved(service0_.get(), chrc0_.get());
   event_router()->GattServiceRemoved(device_.get(), service0_.get());
   event_router()->DeviceRemoved(mock_adapter_, device_.get());
+}
+
+IN_PROC_BROWSER_TEST_F(BluetoothLowEnergyApiTest, PermissionDenied) {
+  ResultCatcher catcher;
+  catcher.RestrictToProfile(browser()->profile());
+
+  ASSERT_TRUE(LoadExtension(test_data_dir_.AppendASCII(
+      "bluetooth_low_energy/permission_denied")));
+  EXPECT_TRUE(catcher.GetNextResult()) << catcher.message();
 }
 
 }  // namespace

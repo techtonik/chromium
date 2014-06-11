@@ -98,8 +98,12 @@
             'domain_reliability/uploader_unittest.cc',
             'domain_reliability/util_unittest.cc',
             'enhanced_bookmarks/image_store_unittest.cc',
+            'feedback/feedback_common_unittest.cc',
+            'feedback/feedback_data_unittest.cc',
             'feedback/feedback_uploader_unittest.cc',
+            'gcm_driver/gcm_client_impl_unittest.cc',
             'gcm_driver/gcm_driver_desktop_unittest.cc',
+            'gcm_driver/gcm_stats_recorder_impl_unittest.cc',
             'invalidation/invalidation_logger_unittest.cc',
             'json_schema/json_schema_validator_unittest.cc',
             'json_schema/json_schema_validator_unittest_base.cc',
@@ -109,13 +113,14 @@
             'language_usage_metrics/language_usage_metrics_unittest.cc',
             'metrics/machine_id_provider_win_unittest.cc',
             'metrics/metrics_hashes_unittest.cc',
-            'metrics/metrics_log_base_unittest.cc',
             'metrics/metrics_log_manager_unittest.cc',
+            'metrics/metrics_log_unittest.cc',
             'metrics/metrics_reporting_scheduler_unittest.cc',
             'metrics/metrics_state_manager_unittest.cc',
             'metrics/net/compression_utils_unittest.cc',
             'metrics/persisted_logs_unittest.cc',
             'navigation_interception/intercept_navigation_resource_throttle_unittest.cc',
+            'network_time/network_time_tracker_unittest.cc',
             'os_crypt/ie7_password_win_unittest.cc',
             'os_crypt/keychain_password_mac_unittest.mm',
             'os_crypt/os_crypt_unittest.cc',
@@ -256,6 +261,7 @@
 
             # Dependencies of invalidation
             'components.gyp:invalidation',
+            'components.gyp:invalidation_test_support',
 
             # Dependencies of json_schema
             'components.gyp:json_schema',
@@ -269,6 +275,10 @@
             # Dependencies of metrics
             'components.gyp:metrics',
             'components.gyp:metrics_net',
+            'components.gyp:metrics_test_support',
+
+            # Dependencies of network_time
+            'components.gyp:network_time',
 
             # Dependencies of os_crypt
             'components.gyp:os_crypt',
@@ -380,6 +390,7 @@
                 ['include', '^keyed_service/core/'],
                 ['include', '^language_usage_metrics/'],
                 ['include', '^metrics/'],
+                ['include', '^network_time/'],
                 ['include', '^password_manager/'],
                 ['include', '^precache/core/'],
                 ['include', '^search_provider_logos/'],
@@ -421,6 +432,7 @@
                 'nacl/browser/pnacl_host_unittest.cc',
                 'nacl/browser/pnacl_translation_cache_unittest.cc',
                 'nacl/browser/test_nacl_browser_delegate.cc',
+                'nacl/zygote/nacl_fork_delegate_linux_unittest.cc',
               ],
               'dependencies': [
                 'nacl.gyp:nacl_browser',
@@ -441,8 +453,12 @@
             }],
             ['OS == "android"', {
               'sources!': [
+                'gcm_driver/gcm_client_impl_unittest.cc',
                 'gcm_driver/gcm_driver_desktop_unittest.cc',
+                'feedback/feedback_common_unittest.cc',
+                'feedback/feedback_data_unittest.cc',
                 'feedback/feedback_uploader_unittest.cc',
+                'gcm_driver/gcm_stats_recorder_impl_unittest.cc',
                 'signin/core/browser/mutable_profile_oauth2_token_service_unittest.cc',
                 'storage_monitor/media_storage_util_unittest.cc',
                 'storage_monitor/storage_info_unittest.cc',
@@ -463,6 +479,19 @@
                 '../third_party/libusb/libusb.gyp:libusb',
               ],
             }],
+            ['OS != "android"', {
+              'sources': [
+                'invalidation/fake_invalidator_unittest.cc',
+                'invalidation/gcm_network_channel_unittest.cc',
+                'invalidation/invalidation_notifier_unittest.cc',
+                'invalidation/invalidator_registrar_unittest.cc',
+                'invalidation/non_blocking_invalidator_unittest.cc',
+                'invalidation/p2p_invalidator_unittest.cc',
+                'invalidation/push_client_channel_unittest.cc',
+                'invalidation/sync_invalidation_listener_unittest.cc',
+                'invalidation/sync_system_resources_unittest.cc',
+              ],
+            }],
             ['chromeos==1', {
               'sources': [
                 'metrics/chromeos/serialization_utils_unittest.cc',
@@ -479,6 +508,17 @@
               'dependencies': [
                 '../dbus/dbus.gyp:dbus',
                 '../device/media_transfer_protocol/media_transfer_protocol.gyp:device_media_transfer_protocol',
+              ],
+            }],
+            ['OS=="linux" and use_udev==0', {
+              'dependencies!': [
+                '../third_party/libusb/libusb.gyp:libusb',
+                'components.gyp:storage_monitor',
+                'components.gyp:storage_monitor_test_support',
+              ],
+              'sources/': [
+                ['exclude', '^storage_monitor/'],
+                ['exclude', '^usb_service/'],
               ],
             }],
             ['OS=="win" and win_use_allocator_shim==1', {
@@ -505,6 +545,7 @@
                 'policy/core/browser/browser_policy_connector_unittest.cc',
                 'policy/core/browser/configuration_policy_handler_unittest.cc',
                 'policy/core/browser/configuration_policy_pref_store_unittest.cc',
+                'policy/core/browser/managed_bookmarks_tracker_unittest.cc',
                 'policy/core/browser/url_blacklist_policy_handler_unittest.cc',
                 'policy/core/common/async_policy_provider_unittest.cc',
                 'policy/core/common/cloud/cloud_policy_client_unittest.cc',

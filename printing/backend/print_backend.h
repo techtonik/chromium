@@ -38,34 +38,28 @@ struct PRINTING_EXPORT PrinterSemanticCapsAndDefaults {
   PrinterSemanticCapsAndDefaults();
   ~PrinterSemanticCapsAndDefaults();
 
-  bool color_changeable;
-  bool color_default;
-
-#if defined(USE_CUPS)
-  ColorModel color_model;
-  ColorModel bw_model;
-#endif
-
-#if defined(OS_WIN)
   bool collate_capable;
   bool collate_default;
 
   bool copies_capable;
 
+  bool duplex_capable;
+  DuplexMode duplex_default;
+
+  bool color_changeable;
+  bool color_default;
+  ColorModel color_model;
+  ColorModel bw_model;
+
   struct Paper {
     std::string name;
     gfx::Size size_um;
   };
-
   std::vector<Paper> papers;
   Paper default_paper;
 
   std::vector<gfx::Size> dpis;
   gfx::Size default_dpi;
-#endif
-
-  bool duplex_capable;
-  DuplexMode duplex_default;
 };
 
 struct PRINTING_EXPORT PrinterCapsAndDefaults {

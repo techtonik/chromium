@@ -2131,7 +2131,7 @@ name=bug_371991
 system call NtWriteFile parameter #5
 KERNELBASE.dll!WriteFile
 KERNEL32.dll!WriteFile*
-ipc.dll!IPC::Channel::ChannelImpl::ProcessOutgoingMessages
+*!IPC::Channel*::ProcessOutgoingMessages
 
 UNINITIALIZED READ
 name=bug_372254
@@ -2160,10 +2160,6 @@ UNINITIALIZED READ
 name=bug_374410
 *!ui::NativeThemeWin::PaintScrollbarTrack
 *!ui::NativeThemeWin::PaintDirect
-
-UNINITIALIZED READ
-name=bug_376814
-*!content::PepperPluginInstanceImpl::UpdateLayer
 
 UNINITIALIZED READ
 name=bug_377728

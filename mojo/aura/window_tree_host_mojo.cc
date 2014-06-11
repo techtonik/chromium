@@ -1,56 +1,94 @@
-// Copyright (c) 2013 The Chromium Authors. All rights reserved.
+// Copyright 2014 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include "mojo/aura/window_tree_host_mojo.h"
 
-#include "mojo/aura/context_factory_mojo.h"
-#include "mojo/public/c/gles2/gles2.h"
-#include "mojo/services/public/cpp/geometry/geometry_type_converters.h"
+#include <vector>
+
+#include "mojo/aura/window_tree_host_mojo_delegate.h"
 #include "ui/aura/env.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_event_dispatcher.h"
-#include "ui/compositor/compositor.h"
 #include "ui/events/event.h"
 #include "ui/events/event_constants.h"
-#include "ui/gfx/geometry/insets.h"
-#include "ui/gfx/geometry/rect.h"
 
 namespace mojo {
+namespace {
 
-// static
-mojo::ContextFactoryMojo* WindowTreeHostMojo::context_factory_ = NULL;
+const char kTreeHostsKey[] = "tree_hosts";
+
+typedef std::vector<WindowTreeHostMojo*> Managers;
+
+class TreeHosts : public base::SupportsUserData::Data {
+ public:
+  TreeHosts() {}
+  virtual ~TreeHosts() {}
+
+  static TreeHosts* Get() {
+    TreeHosts* hosts = static_cast<TreeHosts*>(
+        aura::Env::GetInstance()->GetUserData(kTreeHostsKey));
+    if (!hosts) {
+      hosts = new TreeHosts;
+      aura::Env::GetInstance()->SetUserData(kTreeHostsKey, hosts);
+    }
+    return hosts;
+  }
+
+  void Add(WindowTreeHostMojo* manager) {
+    managers_.push_back(manager);
+  }
+
+  void Remove(WindowTreeHostMojo* manager) {
+    Managers::iterator i = std::find(managers_.begin(), managers_.end(),
+                                     manager);
+    DCHECK(i != managers_.end());
+    managers_.erase(i);
+  }
+
+  const std::vector<WindowTreeHostMojo*> managers() const {
+    return managers_;
+  }
+
+ private:
+  Managers managers_;
+
+  DISALLOW_COPY_AND_ASSIGN(TreeHosts);
+};
+
+}  // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
 // WindowTreeHostMojo, public:
 
-WindowTreeHostMojo::WindowTreeHostMojo(
-    NativeViewportPtr viewport,
-    const gfx::Rect& bounds,
-    const base::Callback<void()>& compositor_created_callback)
-    : native_viewport_(viewport.Pass()),
-      compositor_created_callback_(compositor_created_callback),
-      bounds_(bounds) {
-  native_viewport_.set_client(this);
-  native_viewport_->Create(Rect::From(bounds));
+WindowTreeHostMojo::WindowTreeHostMojo(const gfx::Rect& bounds,
+                                       WindowTreeHostMojoDelegate* delegate)
+    : bounds_(bounds),
+      delegate_(delegate) {
+  CreateCompositor(GetAcceleratedWidget());
 
-  MessagePipe pipe;
-  native_viewport_->CreateGLES2Context(
-      MakeRequest<CommandBuffer>(pipe.handle0.Pass()));
-
-  // The ContextFactory must exist before any Compositors are created.
-  if (context_factory_) {
-    delete context_factory_;
-    context_factory_ = NULL;
-  }
-  context_factory_ = new ContextFactoryMojo(pipe.handle1.Pass());
-  aura::Env::GetInstance()->set_context_factory(context_factory_);
-  CHECK(context_factory_) << "No GL bindings.";
+  TreeHosts::Get()->Add(this);
 }
 
 WindowTreeHostMojo::~WindowTreeHostMojo() {
+  TreeHosts::Get()->Remove(this);
   DestroyCompositor();
   DestroyDispatcher();
+}
+
+// static
+WindowTreeHostMojo* WindowTreeHostMojo::ForCompositor(
+    ui::Compositor* compositor) {
+  const Managers& managers = TreeHosts::Get()->managers();
+  for (size_t i = 0; i < managers.size(); ++i) {
+    if (managers[i]->compositor() == compositor)
+      return managers[i];
+  }
+  return NULL;
+}
+
+void WindowTreeHostMojo::SetContents(const SkBitmap& contents) {
+  delegate_->CompositorContentsChanged(contents);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -67,12 +105,9 @@ gfx::AcceleratedWidget WindowTreeHostMojo::GetAcceleratedWidget() {
 
 void WindowTreeHostMojo::Show() {
   window()->Show();
-  native_viewport_->Show();
 }
 
 void WindowTreeHostMojo::Hide() {
-  native_viewport_->Hide();
-  window()->Hide();
 }
 
 gfx::Rect WindowTreeHostMojo::GetBounds() const {
@@ -80,7 +115,7 @@ gfx::Rect WindowTreeHostMojo::GetBounds() const {
 }
 
 void WindowTreeHostMojo::SetBounds(const gfx::Rect& bounds) {
-  native_viewport_->SetBounds(Rect::From(bounds));
+  window()->SetBounds(gfx::Rect(bounds.size()));
 }
 
 gfx::Point WindowTreeHostMojo::GetLocationOnNativeScreen() const {
@@ -100,7 +135,8 @@ void WindowTreeHostMojo::PostNativeEvent(
   NOTIMPLEMENTED();
 }
 
-void WindowTreeHostMojo::OnDeviceScaleFactorChanged(float device_scale_factor) {
+void WindowTreeHostMojo::OnDeviceScaleFactorChanged(
+    float device_scale_factor) {
   NOTIMPLEMENTED();
 }
 
@@ -122,52 +158,5 @@ void WindowTreeHostMojo::OnCursorVisibilityChangedNative(bool show) {
 ui::EventProcessor* WindowTreeHostMojo::GetEventProcessor() {
   return dispatcher();
 }
-
-////////////////////////////////////////////////////////////////////////////////
-// WindowTreeHostMojo, NativeViewportClient implementation:
-
-void WindowTreeHostMojo::OnCreated() {
-  CreateCompositor(GetAcceleratedWidget());
-  compositor_created_callback_.Run();
-}
-
-void WindowTreeHostMojo::OnBoundsChanged(RectPtr bounds) {
-  bounds_ = bounds.To<gfx::Rect>();
-  window()->SetBounds(gfx::Rect(bounds_.size()));
-  OnHostResized(bounds_.size());
-}
-
-void WindowTreeHostMojo::OnDestroyed() {
-  base::MessageLoop::current()->Quit();
-}
-
-void WindowTreeHostMojo::OnEvent(EventPtr event,
-                                 const mojo::Callback<void()>& callback) {
-  switch (event->action) {
-    case ui::ET_MOUSE_PRESSED:
-    case ui::ET_MOUSE_DRAGGED:
-    case ui::ET_MOUSE_RELEASED:
-    case ui::ET_MOUSE_MOVED:
-    case ui::ET_MOUSE_ENTERED:
-    case ui::ET_MOUSE_EXITED: {
-      gfx::Point location(event->location->x, event->location->y);
-      ui::MouseEvent ev(static_cast<ui::EventType>(event->action), location,
-                        location, event->flags, 0);
-      SendEventToProcessor(&ev);
-      break;
-    }
-    case ui::ET_KEY_PRESSED:
-    case ui::ET_KEY_RELEASED: {
-      ui::KeyEvent ev(
-          static_cast<ui::EventType>(event->action),
-          static_cast<ui::KeyboardCode>(event->key_data->key_code),
-          event->flags, event->key_data->is_char);
-      SendEventToProcessor(&ev);
-      break;
-    }
-    // TODO(beng): touch, etc.
-  }
-  callback.Run();
-};
 
 }  // namespace mojo

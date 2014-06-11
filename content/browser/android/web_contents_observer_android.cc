@@ -227,6 +227,17 @@ void WebContentsObserverAndroid::DidFinishLoad(
       env, obj.obj(), frame_id, jstring_url.obj(), is_main_frame);
 }
 
+void WebContentsObserverAndroid::DocumentLoadedInFrame(
+    int64 frame_id,
+    RenderViewHost* render_view_host) {
+  JNIEnv* env = AttachCurrentThread();
+  ScopedJavaLocalRef<jobject> obj(weak_java_observer_.get(env));
+  if (obj.is_null())
+    return;
+  Java_WebContentsObserverAndroid_documentLoadedInFrame(
+      env, obj.obj(), frame_id);
+}
+
 void WebContentsObserverAndroid::NavigationEntryCommitted(
     const LoadCommittedDetails& load_details) {
   JNIEnv* env = AttachCurrentThread();
@@ -234,14 +245,6 @@ void WebContentsObserverAndroid::NavigationEntryCommitted(
   if (obj.is_null())
     return;
   Java_WebContentsObserverAndroid_navigationEntryCommitted(env, obj.obj());
-}
-
-void WebContentsObserverAndroid::DidChangeVisibleSSLState() {
-  JNIEnv* env = AttachCurrentThread();
-  ScopedJavaLocalRef<jobject> obj(weak_java_observer_.get(env));
-  if (obj.is_null())
-    return;
-  Java_WebContentsObserverAndroid_didChangeVisibleSSLState(env, obj.obj());
 }
 
 void WebContentsObserverAndroid::DidAttachInterstitialPage() {

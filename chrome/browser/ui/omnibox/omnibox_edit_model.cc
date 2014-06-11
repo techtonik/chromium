@@ -27,7 +27,6 @@
 #include "chrome/browser/command_updater.h"
 #include "chrome/browser/extensions/api/omnibox/omnibox_api.h"
 #include "chrome/browser/favicon/favicon_tab_helper.h"
-#include "chrome/browser/google/google_url_tracker.h"
 #include "chrome/browser/google/google_url_tracker_factory.h"
 #include "chrome/browser/net/predictor.h"
 #include "chrome/browser/omnibox/omnibox_log.h"
@@ -57,6 +56,7 @@
 #include "chrome/common/net/url_fixer_upper.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
+#include "components/google/core/browser/google_url_tracker.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/notification_service.h"
@@ -489,7 +489,7 @@ void OmniboxEditModel::AdjustTextForCopy(int sel_min,
       url->SchemeIs(url::kHttpScheme) && perm_url.host() == url->host()) {
     *write_url = true;
     base::string16 http = base::ASCIIToUTF16(url::kHttpScheme) +
-        base::ASCIIToUTF16(content::kStandardSchemeSeparator);
+        base::ASCIIToUTF16(url::kStandardSchemeSeparator);
     if (text->compare(0, http.length(), http) != 0)
       *text = http + *text;
   }
@@ -756,7 +756,8 @@ void OmniboxEditModel::OpenMatch(AutocompleteMatch match,
       -1,  // don't yet know tab ID; set later if appropriate
       ClassifyPage(),
       elapsed_time_since_user_first_modified_omnibox,
-      match.inline_autocompletion.length(),
+      match.allowed_to_be_default_match ? match.inline_autocompletion.length() :
+          base::string16::npos,
       elapsed_time_since_last_change_to_default_match,
       (!popup_model()->IsOpen() || !pasted_text.empty()) ?
           fake_single_entry_result : result());
@@ -1438,7 +1439,7 @@ AutocompleteInput::PageClassification OmniboxEditModel::ClassifyPage() const {
   const std::string& url = gurl.spec();
   if (url == chrome::kChromeUINewTabURL)
     return AutocompleteInput::NTP;
-  if (url == content::kAboutBlankURL)
+  if (url == url::kAboutBlankURL)
     return AutocompleteInput::BLANK;
   if (url == profile()->GetPrefs()->GetString(prefs::kHomePage))
     return AutocompleteInput::HOME_PAGE;

@@ -62,17 +62,14 @@ class GeolocationDispatcher;
 class MediaStreamRendererFactory;
 class NotificationProvider;
 class PepperPluginInstanceImpl;
+class RendererCdmManager;
+class RendererMediaPlayerManager;
 class RendererPpapiHost;
 class RenderFrameObserver;
 class RenderViewImpl;
 class RenderWidget;
 class RenderWidgetFullscreenPepper;
 struct CustomContextMenuContext;
-
-#if defined(OS_ANDROID)
-class RendererCdmManager;
-class RendererMediaPlayerManager;
-#endif
 
 class CONTENT_EXPORT RenderFrameImpl
     : public RenderFrame,
@@ -225,6 +222,7 @@ class CONTENT_EXPORT RenderFrameImpl
                                  const blink::WebURLRequest& request,
                                  blink::WebNavigationPolicy policy) OVERRIDE;
   virtual void ExecuteJavaScript(const base::string16& javascript) OVERRIDE;
+  virtual bool IsHidden() OVERRIDE;
 
   // blink::WebFrameClient implementation:
   virtual blink::WebPlugin* createPlugin(blink::WebLocalFrame* frame,
@@ -353,8 +351,6 @@ class CONTENT_EXPORT RenderFrameImpl
                                         v8::Handle<v8::Context> context,
                                         int world_id);
   virtual void didFirstVisuallyNonEmptyLayout(blink::WebLocalFrame* frame);
-  virtual void didChangeContentsSize(blink::WebLocalFrame* frame,
-                                     const blink::WebSize& size);
   virtual void didChangeScrollOffset(blink::WebLocalFrame* frame);
   virtual void willInsertBody(blink::WebLocalFrame* frame);
   virtual void reportFindInPageMatchCount(int request_id,
@@ -541,6 +537,9 @@ class CONTENT_EXPORT RenderFrameImpl
       blink::WebMediaPlayerClient* client);
 
   RendererMediaPlayerManager* GetMediaPlayerManager();
+#endif
+
+#if defined(ENABLE_BROWSER_CDMS)
   RendererCdmManager* GetCdmManager();
 #endif
 
@@ -610,10 +609,16 @@ class CONTENT_EXPORT RenderFrameImpl
   blink::WebUserMediaClient* web_user_media_client_;
 
 #if defined(OS_ANDROID)
-  // These manage all media players and CDMs in this render frame for
-  // communicating with the real media player and CDM objects in the browser
-  // process. It's okay to use raw pointers since they are RenderFrameObservers.
+  // Manages all media players in this render frame for communicating with the
+  // real media player in the browser process. It's okay to use a raw pointer
+  // since it's a RenderFrameObserver.
   RendererMediaPlayerManager* media_player_manager_;
+#endif
+
+#if defined(ENABLE_BROWSER_CDMS)
+  // Manage all CDMs in this render frame for communicating with the real CDM in
+  // the browser process. It's okay to use a raw pointer since it's a
+  // RenderFrameObserver.
   RendererCdmManager* cdm_manager_;
 #endif
 

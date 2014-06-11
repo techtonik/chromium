@@ -6,56 +6,59 @@
 
 #include "base/bind.h"
 #include "base/message_loop/message_loop.h"
+#include "mojo/public/cpp/application/application.h"
 #include "mojo/public/cpp/application/connect.h"
 #include "mojo/public/interfaces/service_provider/service_provider.mojom.h"
-#include "mojo/services/public/cpp/view_manager/lib/view_manager_private.h"
 #include "mojo/services/public/cpp/view_manager/lib/view_private.h"
 #include "mojo/services/public/cpp/view_manager/lib/view_tree_node_private.h"
 #include "mojo/services/public/cpp/view_manager/util.h"
+#include "mojo/services/public/cpp/view_manager/view_manager_delegate.h"
+#include "mojo/services/public/cpp/view_manager/view_observer.h"
+#include "mojo/services/public/cpp/view_manager/view_tree_node_observer.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/gfx/codec/png_codec.h"
 
 namespace mojo {
 namespace view_manager {
 
-uint32_t MakeTransportId(uint16_t connection_id, uint16_t local_id) {
+Id MakeTransportId(ConnectionSpecificId connection_id,
+                   ConnectionSpecificId local_id) {
   return (connection_id << 16) | local_id;
 }
 
 // Helper called to construct a local node/view object from transport data.
-ViewTreeNode* AddNodeToViewManager(ViewManager* manager,
+ViewTreeNode* AddNodeToViewManager(ViewManagerSynchronizer* synchronizer,
                                    ViewTreeNode* parent,
-                                   TransportNodeId node_id,
-                                   TransportViewId view_id,
+                                   Id node_id,
+                                   Id view_id,
                                    const gfx::Rect& bounds) {
   // We don't use the ctor that takes a ViewManager here, since it will call
   // back to the service and attempt to create a new node.
   ViewTreeNode* node = ViewTreeNodePrivate::LocalCreate();
   ViewTreeNodePrivate private_node(node);
-  private_node.set_view_manager(manager);
+  private_node.set_view_manager(synchronizer);
   private_node.set_id(node_id);
   private_node.LocalSetBounds(gfx::Rect(), bounds);
   if (parent)
     ViewTreeNodePrivate(parent).LocalAddChild(node);
-  ViewManagerPrivate private_manager(manager);
-  private_manager.AddNode(node->id(), node);
+  synchronizer->AddNode(node);
 
   // View.
   if (view_id != 0) {
     View* view = ViewPrivate::LocalCreate();
     ViewPrivate private_view(view);
-    private_view.set_view_manager(manager);
+    private_view.set_view_manager(synchronizer);
     private_view.set_id(view_id);
     private_view.set_node(node);
     // TODO(beng): this broadcasts notifications locally... do we want this? I
     //             don't think so. same story for LocalAddChild above!
     private_node.LocalSetActiveView(view);
-    private_manager.AddView(view->id(), view);
+    synchronizer->AddView(view);
   }
   return node;
 }
 
-ViewTreeNode* BuildNodeTree(ViewManager* manager,
+ViewTreeNode* BuildNodeTree(ViewManagerSynchronizer* synchronizer,
                             const Array<INodePtr>& nodes) {
   std::vector<ViewTreeNode*> parents;
   ViewTreeNode* root = NULL;
@@ -68,7 +71,7 @@ ViewTreeNode* BuildNodeTree(ViewManager* manager,
         parents.pop_back();
     }
     ViewTreeNode* node = AddNodeToViewManager(
-        manager,
+        synchronizer,
         !parents.empty() ? parents.back() : NULL,
         nodes[i]->node_id,
         nodes[i]->view_id,
@@ -79,6 +82,30 @@ ViewTreeNode* BuildNodeTree(ViewManager* manager,
   }
   return root;
 }
+
+// Responsible for removing a root from the ViewManager when that node is
+// destroyed.
+class RootObserver : public ViewTreeNodeObserver {
+ public:
+  explicit RootObserver(ViewTreeNode* root) : root_(root) {}
+  virtual ~RootObserver() {}
+
+ private:
+  // Overridden from ViewTreeNodeObserver:
+  virtual void OnNodeDestroy(ViewTreeNode* node,
+                             DispositionChangePhase phase) OVERRIDE {
+    DCHECK_EQ(node, root_);
+    if (phase != ViewTreeNodeObserver::DISPOSITION_CHANGED)
+      return;
+    static_cast<ViewManagerSynchronizer*>(
+        ViewTreeNodePrivate(root_).view_manager())->RemoveRoot(root_);
+    delete this;
+  }
+
+  ViewTreeNode* root_;
+
+  DISALLOW_COPY_AND_ASSIGN(RootObserver);
+};
 
 class ViewManagerTransaction {
  public:
@@ -93,30 +120,8 @@ class ViewManagerTransaction {
   bool committed() const { return committed_; }
 
  protected:
-  enum TransactionType {
-    // View creation and destruction.
-    TYPE_CREATE_VIEW,
-    TYPE_DESTROY_VIEW,
-    // Node creation and destruction.
-    TYPE_CREATE_VIEW_TREE_NODE,
-    TYPE_DESTROY_VIEW_TREE_NODE,
-    // Modifications to the hierarchy (addition of or removal of nodes from a
-    // parent.)
-    TYPE_HIERARCHY,
-    // View replacement.
-    TYPE_SET_ACTIVE_VIEW,
-    // Node bounds.
-    TYPE_SET_BOUNDS,
-    // View contents
-    TYPE_SET_VIEW_CONTENTS,
-    // Embed.
-    TYPE_EMBED
-  };
-
-  ViewManagerTransaction(TransactionType transaction_type,
-                         ViewManagerSynchronizer* synchronizer)
-      : transaction_type_(transaction_type),
-        committed_(false),
+  explicit ViewManagerTransaction(ViewManagerSynchronizer* synchronizer)
+      : committed_(false),
         synchronizer_(synchronizer) {
   }
 
@@ -129,7 +134,7 @@ class ViewManagerTransaction {
 
   IViewManager* service() { return synchronizer_->service_; }
 
-  TransportChangeId GetAndAdvanceNextServerChangeId() {
+  Id GetAndAdvanceNextServerChangeId() {
     return synchronizer_->next_server_change_id_++;
   }
 
@@ -146,7 +151,6 @@ class ViewManagerTransaction {
     synchronizer_->RemoveFromPendingQueue(this);
   }
 
-  const TransactionType transaction_type_;
   bool committed_;
   ViewManagerSynchronizer* synchronizer_;
 
@@ -155,9 +159,8 @@ class ViewManagerTransaction {
 
 class CreateViewTransaction : public ViewManagerTransaction {
  public:
-  CreateViewTransaction(TransportViewId view_id,
-                        ViewManagerSynchronizer* synchronizer)
-      : ViewManagerTransaction(TYPE_CREATE_VIEW, synchronizer),
+  CreateViewTransaction(Id view_id, ViewManagerSynchronizer* synchronizer)
+      : ViewManagerTransaction(synchronizer),
         view_id_(view_id) {}
   virtual ~CreateViewTransaction() {}
 
@@ -170,16 +173,15 @@ class CreateViewTransaction : public ViewManagerTransaction {
     // TODO(beng): failure.
   }
 
-  const TransportViewId view_id_;
+  const Id view_id_;
 
   DISALLOW_COPY_AND_ASSIGN(CreateViewTransaction);
 };
 
 class DestroyViewTransaction : public ViewManagerTransaction {
  public:
-  DestroyViewTransaction(TransportViewId view_id,
-                         ViewManagerSynchronizer* synchronizer)
-      : ViewManagerTransaction(TYPE_DESTROY_VIEW, synchronizer),
+  DestroyViewTransaction(Id view_id, ViewManagerSynchronizer* synchronizer)
+      : ViewManagerTransaction(synchronizer),
         view_id_(view_id) {}
   virtual ~DestroyViewTransaction() {}
 
@@ -192,16 +194,16 @@ class DestroyViewTransaction : public ViewManagerTransaction {
     // TODO(beng): recovery?
   }
 
-  const TransportViewId view_id_;
+  const Id view_id_;
 
   DISALLOW_COPY_AND_ASSIGN(DestroyViewTransaction);
 };
 
 class CreateViewTreeNodeTransaction : public ViewManagerTransaction {
  public:
-  CreateViewTreeNodeTransaction(TransportNodeId node_id,
+  CreateViewTreeNodeTransaction(Id node_id,
                                 ViewManagerSynchronizer* synchronizer)
-      : ViewManagerTransaction(TYPE_CREATE_VIEW_TREE_NODE, synchronizer),
+      : ViewManagerTransaction(synchronizer),
         node_id_(node_id) {}
   virtual ~CreateViewTreeNodeTransaction() {}
 
@@ -217,29 +219,30 @@ class CreateViewTreeNodeTransaction : public ViewManagerTransaction {
     //             out what to do.
   }
 
-  const TransportNodeId node_id_;
+  const Id node_id_;
 
   DISALLOW_COPY_AND_ASSIGN(CreateViewTreeNodeTransaction);
 };
 
 class DestroyViewTreeNodeTransaction : public ViewManagerTransaction {
  public:
-  DestroyViewTreeNodeTransaction(TransportNodeId node_id,
+  DestroyViewTreeNodeTransaction(Id node_id,
                                  ViewManagerSynchronizer* synchronizer)
-      : ViewManagerTransaction(TYPE_DESTROY_VIEW_TREE_NODE, synchronizer),
+      : ViewManagerTransaction(synchronizer),
         node_id_(node_id) {}
   virtual ~DestroyViewTreeNodeTransaction() {}
 
  private:
   // Overridden from ViewManagerTransaction:
   virtual void DoCommit() OVERRIDE {
+    GetAndAdvanceNextServerChangeId();
     service()->DeleteNode(node_id_, ActionCompletedCallback());
   }
   virtual void DoActionCompleted(bool success) OVERRIDE {
     // TODO(beng): recovery?
   }
 
-  const TransportNodeId node_id_;
+  const Id node_id_;
   DISALLOW_COPY_AND_ASSIGN(DestroyViewTreeNodeTransaction);
 };
 
@@ -250,10 +253,10 @@ class HierarchyTransaction : public ViewManagerTransaction {
     TYPE_REMOVE
   };
   HierarchyTransaction(HierarchyChangeType hierarchy_change_type,
-                       TransportNodeId child_id,
-                       TransportNodeId parent_id,
+                       Id child_id,
+                       Id parent_id,
                        ViewManagerSynchronizer* synchronizer)
-      : ViewManagerTransaction(TYPE_HIERARCHY, synchronizer),
+      : ViewManagerTransaction(synchronizer),
         hierarchy_change_type_(hierarchy_change_type),
         child_id_(child_id),
         parent_id_(parent_id) {}
@@ -285,18 +288,18 @@ class HierarchyTransaction : public ViewManagerTransaction {
   }
 
   const HierarchyChangeType hierarchy_change_type_;
-  const TransportNodeId child_id_;
-  const TransportNodeId parent_id_;
+  const Id child_id_;
+  const Id parent_id_;
 
   DISALLOW_COPY_AND_ASSIGN(HierarchyTransaction);
 };
 
 class SetActiveViewTransaction : public ViewManagerTransaction {
  public:
-  SetActiveViewTransaction(TransportNodeId node_id,
-                           TransportViewId view_id,
+  SetActiveViewTransaction(Id node_id,
+                           Id view_id,
                            ViewManagerSynchronizer* synchronizer)
-      : ViewManagerTransaction(TYPE_SET_ACTIVE_VIEW, synchronizer),
+      : ViewManagerTransaction(synchronizer),
         node_id_(node_id),
         view_id_(view_id) {}
   virtual ~SetActiveViewTransaction() {}
@@ -310,18 +313,18 @@ class SetActiveViewTransaction : public ViewManagerTransaction {
     // TODO(beng): recovery?
   }
 
-  const TransportNodeId node_id_;
-  const TransportViewId view_id_;
+  const Id node_id_;
+  const Id view_id_;
 
   DISALLOW_COPY_AND_ASSIGN(SetActiveViewTransaction);
 };
 
 class SetBoundsTransaction : public ViewManagerTransaction {
  public:
-  SetBoundsTransaction(TransportNodeId node_id,
+  SetBoundsTransaction(Id node_id,
                        const gfx::Rect& bounds,
                        ViewManagerSynchronizer* synchronizer)
-      : ViewManagerTransaction(TYPE_SET_BOUNDS, synchronizer),
+      : ViewManagerTransaction(synchronizer),
         node_id_(node_id),
         bounds_(bounds) {}
   virtual ~SetBoundsTransaction() {}
@@ -336,7 +339,7 @@ class SetBoundsTransaction : public ViewManagerTransaction {
     // TODO(beng): recovery?
   }
 
-  const TransportNodeId node_id_;
+  const Id node_id_;
   const gfx::Rect bounds_;
 
   DISALLOW_COPY_AND_ASSIGN(SetBoundsTransaction);
@@ -344,10 +347,10 @@ class SetBoundsTransaction : public ViewManagerTransaction {
 
 class SetViewContentsTransaction : public ViewManagerTransaction {
  public:
-  SetViewContentsTransaction(TransportViewId view_id,
+  SetViewContentsTransaction(Id view_id,
                              const SkBitmap& contents,
                              ViewManagerSynchronizer* synchronizer)
-      : ViewManagerTransaction(TYPE_SET_VIEW_CONTENTS, synchronizer),
+      : ViewManagerTransaction(synchronizer),
         view_id_(view_id),
         contents_(contents) {}
   virtual ~SetViewContentsTransaction() {}
@@ -400,7 +403,7 @@ class SetViewContentsTransaction : public ViewManagerTransaction {
     return true;
   }
 
-  const TransportViewId view_id_;
+  const Id view_id_;
   const SkBitmap contents_;
   ScopedSharedBufferHandle shared_state_handle_;
 
@@ -410,9 +413,9 @@ class SetViewContentsTransaction : public ViewManagerTransaction {
 class EmbedTransaction : public ViewManagerTransaction {
  public:
   EmbedTransaction(const String& url,
-                   TransportNodeId node_id,
+                   Id node_id,
                    ViewManagerSynchronizer* synchronizer)
-      : ViewManagerTransaction(TYPE_EMBED, synchronizer),
+      : ViewManagerTransaction(synchronizer),
         url_(url),
         node_id_(node_id) {}
   virtual ~EmbedTransaction() {}
@@ -420,69 +423,76 @@ class EmbedTransaction : public ViewManagerTransaction {
  private:
   // Overridden from ViewManagerTransaction:
   virtual void DoCommit() OVERRIDE {
-    std::vector<TransportNodeId> ids;
+    std::vector<Id> ids;
     ids.push_back(node_id_);
-    service()->Connect(url_, Array<TransportNodeId>::From(ids),
-                       ActionCompletedCallback());
+    service()->Embed(url_, Array<Id>::From(ids), ActionCompletedCallback());
   }
   virtual void DoActionCompleted(bool success) OVERRIDE {
     // TODO(beng): recovery?
   }
 
   const String url_;
-  const TransportNodeId node_id_;
+  const Id node_id_;
 
   DISALLOW_COPY_AND_ASSIGN(EmbedTransaction);
 };
 
-ViewManagerSynchronizer::ViewManagerSynchronizer(ViewManager* view_manager)
-    : view_manager_(view_manager),
-      connected_(false),
+ViewManagerSynchronizer::ViewManagerSynchronizer(ViewManagerDelegate* delegate)
+    : connected_(false),
       connection_id_(0),
       next_id_(1),
       next_server_change_id_(0),
-      sync_factory_(this) {
-  ViewManagerPrivate(view_manager).set_synchronizer(this);
-}
+      delegate_(delegate) {}
 
 ViewManagerSynchronizer::~ViewManagerSynchronizer() {
-  view_manager_.reset();
+  while (!nodes_.empty()) {
+    IdToNodeMap::iterator it = nodes_.begin();
+    if (OwnsNode(it->second->id()))
+      it->second->Destroy();
+    else
+      nodes_.erase(it);
+  }
+  while (!views_.empty()) {
+    IdToViewMap::iterator it = views_.begin();
+    if (OwnsView(it->second->id()))
+      it->second->Destroy();
+    else
+      views_.erase(it);
+  }
 }
 
-TransportNodeId ViewManagerSynchronizer::CreateViewTreeNode() {
+Id ViewManagerSynchronizer::CreateViewTreeNode() {
   DCHECK(connected_);
-  const TransportNodeId node_id(
-      MakeTransportId(connection_id_, ++next_id_));
+  const Id node_id(MakeTransportId(connection_id_, ++next_id_));
   pending_transactions_.push_back(
       new CreateViewTreeNodeTransaction(node_id, this));
   Sync();
   return node_id;
 }
 
-void ViewManagerSynchronizer::DestroyViewTreeNode(TransportNodeId node_id) {
+void ViewManagerSynchronizer::DestroyViewTreeNode(Id node_id) {
   DCHECK(connected_);
   pending_transactions_.push_back(
       new DestroyViewTreeNodeTransaction(node_id, this));
   Sync();
 }
 
-TransportViewId ViewManagerSynchronizer::CreateView() {
+Id ViewManagerSynchronizer::CreateView() {
   DCHECK(connected_);
-  const TransportNodeId view_id(
-      MakeTransportId(connection_id_, ++next_id_));
+  const Id view_id(MakeTransportId(connection_id_, ++next_id_));
   pending_transactions_.push_back(new CreateViewTransaction(view_id, this));
   Sync();
   return view_id;
 }
 
-void ViewManagerSynchronizer::DestroyView(TransportViewId view_id) {
+void ViewManagerSynchronizer::DestroyView(Id view_id) {
   DCHECK(connected_);
   pending_transactions_.push_back(new DestroyViewTransaction(view_id, this));
   Sync();
 }
 
-void ViewManagerSynchronizer::AddChild(TransportNodeId child_id,
-                                       TransportNodeId parent_id) {
+void ViewManagerSynchronizer::AddChild(Id child_id,
+                                       Id parent_id) {
   DCHECK(connected_);
   pending_transactions_.push_back(
       new HierarchyTransaction(HierarchyTransaction::TYPE_ADD,
@@ -492,8 +502,7 @@ void ViewManagerSynchronizer::AddChild(TransportNodeId child_id,
   Sync();
 }
 
-void ViewManagerSynchronizer::RemoveChild(TransportNodeId child_id,
-                                          TransportNodeId parent_id) {
+void ViewManagerSynchronizer::RemoveChild(Id child_id, Id parent_id) {
   DCHECK(connected_);
   pending_transactions_.push_back(
       new HierarchyTransaction(HierarchyTransaction::TYPE_REMOVE,
@@ -503,31 +512,29 @@ void ViewManagerSynchronizer::RemoveChild(TransportNodeId child_id,
   Sync();
 }
 
-bool ViewManagerSynchronizer::OwnsNode(TransportNodeId id) const {
+bool ViewManagerSynchronizer::OwnsNode(Id id) const {
   return HiWord(id) == connection_id_;
 }
 
-bool ViewManagerSynchronizer::OwnsView(TransportViewId id) const {
+bool ViewManagerSynchronizer::OwnsView(Id id) const {
   return HiWord(id) == connection_id_;
 }
 
-void ViewManagerSynchronizer::SetActiveView(TransportNodeId node_id,
-                                            TransportViewId view_id) {
+void ViewManagerSynchronizer::SetActiveView(Id node_id, Id view_id) {
   DCHECK(connected_);
   pending_transactions_.push_back(
       new SetActiveViewTransaction(node_id, view_id, this));
   Sync();
 }
 
-void ViewManagerSynchronizer::SetBounds(TransportNodeId node_id,
-                                        const gfx::Rect& bounds) {
+void ViewManagerSynchronizer::SetBounds(Id node_id, const gfx::Rect& bounds) {
   DCHECK(connected_);
   pending_transactions_.push_back(
       new SetBoundsTransaction(node_id, bounds, this));
   Sync();
 }
 
-void ViewManagerSynchronizer::SetViewContents(TransportViewId view_id,
+void ViewManagerSynchronizer::SetViewContents(Id view_id,
                                               const SkBitmap& contents) {
   DCHECK(connected_);
   pending_transactions_.push_back(
@@ -535,11 +542,53 @@ void ViewManagerSynchronizer::SetViewContents(TransportViewId view_id,
   Sync();
 }
 
-void ViewManagerSynchronizer::Embed(const String& url,
-                                    TransportNodeId node_id) {
+void ViewManagerSynchronizer::Embed(const String& url, Id node_id) {
   DCHECK(connected_);
   pending_transactions_.push_back(new EmbedTransaction(url, node_id, this));
   Sync();
+}
+
+void ViewManagerSynchronizer::AddNode(ViewTreeNode* node) {
+  DCHECK(nodes_.find(node->id()) == nodes_.end());
+  nodes_[node->id()] = node;
+}
+
+void ViewManagerSynchronizer::RemoveNode(Id node_id) {
+  IdToNodeMap::iterator it = nodes_.find(node_id);
+  if (it != nodes_.end())
+    nodes_.erase(it);
+}
+
+void ViewManagerSynchronizer::AddView(View* view) {
+  DCHECK(views_.find(view->id()) == views_.end());
+  views_[view->id()] = view;
+}
+
+void ViewManagerSynchronizer::RemoveView(Id view_id) {
+  IdToViewMap::iterator it = views_.find(view_id);
+  if (it != views_.end())
+    views_.erase(it);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ViewManagerSynchronizer, ViewManager implementation:
+
+const std::string& ViewManagerSynchronizer::GetEmbedderURL() const {
+  return creator_url_;
+}
+
+const std::vector<ViewTreeNode*>& ViewManagerSynchronizer::GetRoots() const {
+  return roots_;
+}
+
+ViewTreeNode* ViewManagerSynchronizer::GetNodeById(Id id) {
+  IdToNodeMap::const_iterator it = nodes_.find(id);
+  return it != nodes_.end() ? it->second : NULL;
+}
+
+View* ViewManagerSynchronizer::GetViewById(Id id) {
+  IdToViewMap::const_iterator it = views_.find(id);
+  return it != views_.end() ? it->second : NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -553,84 +602,100 @@ void ViewManagerSynchronizer::OnConnectionEstablished() {
 // ViewManagerSynchronizer, IViewManagerClient implementation:
 
 void ViewManagerSynchronizer::OnViewManagerConnectionEstablished(
-    TransportConnectionId connection_id,
-    TransportChangeId next_server_change_id,
-    mojo::Array<INodePtr> nodes) {
+    ConnectionSpecificId connection_id,
+    const String& creator_url,
+    Id next_server_change_id,
+    Array<INodePtr> nodes) {
   connected_ = true;
   connection_id_ = connection_id;
+  creator_url_ = TypeConverter<String, std::string>::ConvertFrom(creator_url);
   next_server_change_id_ = next_server_change_id;
 
-  ViewManagerPrivate private_manager(view_manager());
-  private_manager.set_root(BuildNodeTree(view_manager(), nodes));
-  Sync();
-  private_manager.NotifyReady();
+  DCHECK(pending_transactions_.empty());
+  AddRoot(BuildNodeTree(this, nodes));
+}
+
+void ViewManagerSynchronizer::OnRootsAdded(Array<INodePtr> nodes) {
+  AddRoot(BuildNodeTree(this, nodes));
 }
 
 void ViewManagerSynchronizer::OnServerChangeIdAdvanced(
-    uint32_t next_server_change_id) {
+    Id next_server_change_id) {
   next_server_change_id_ = next_server_change_id;
 }
 
-void ViewManagerSynchronizer::OnNodeBoundsChanged(uint32 node_id,
+void ViewManagerSynchronizer::OnNodeBoundsChanged(Id node_id,
                                                   RectPtr old_bounds,
                                                   RectPtr new_bounds) {
-  ViewTreeNode* node = view_manager()->GetNodeById(node_id);
+  ViewTreeNode* node = GetNodeById(node_id);
   ViewTreeNodePrivate(node).LocalSetBounds(old_bounds.To<gfx::Rect>(),
                                            new_bounds.To<gfx::Rect>());
 }
 
 void ViewManagerSynchronizer::OnNodeHierarchyChanged(
-    uint32_t node_id,
-    uint32_t new_parent_id,
-    uint32_t old_parent_id,
-    TransportChangeId server_change_id,
+    Id node_id,
+    Id new_parent_id,
+    Id old_parent_id,
+    Id server_change_id,
     mojo::Array<INodePtr> nodes) {
   // TODO: deal with |nodes|.
   next_server_change_id_ = server_change_id + 1;
 
-  BuildNodeTree(view_manager(), nodes);
+  BuildNodeTree(this, nodes);
 
-  ViewTreeNode* new_parent = view_manager()->GetNodeById(new_parent_id);
-  ViewTreeNode* old_parent = view_manager()->GetNodeById(old_parent_id);
-  ViewTreeNode* node = view_manager()->GetNodeById(node_id);
+  ViewTreeNode* new_parent = GetNodeById(new_parent_id);
+  ViewTreeNode* old_parent = GetNodeById(old_parent_id);
+  ViewTreeNode* node = GetNodeById(node_id);
   if (new_parent)
     ViewTreeNodePrivate(new_parent).LocalAddChild(node);
   else
     ViewTreeNodePrivate(old_parent).LocalRemoveChild(node);
 }
 
-void ViewManagerSynchronizer::OnNodeDeleted(uint32_t node_id,
-                                            uint32_t server_change_id) {
+void ViewManagerSynchronizer::OnNodeDeleted(Id node_id, Id server_change_id) {
   next_server_change_id_ = server_change_id + 1;
 
-  ViewTreeNode* node = view_manager()->GetNodeById(node_id);
+  ViewTreeNode* node = GetNodeById(node_id);
   if (node)
     ViewTreeNodePrivate(node).LocalDestroy();
 }
 
-void ViewManagerSynchronizer::OnNodeViewReplaced(uint32_t node_id,
-                                                 uint32_t new_view_id,
-                                                 uint32_t old_view_id) {
-  ViewTreeNode* node = view_manager()->GetNodeById(node_id);
-  View* new_view = view_manager()->GetViewById(new_view_id);
+void ViewManagerSynchronizer::OnNodeViewReplaced(Id node_id,
+                                                 Id new_view_id,
+                                                 Id old_view_id) {
+  ViewTreeNode* node = GetNodeById(node_id);
+  View* new_view = GetViewById(new_view_id);
   if (!new_view && new_view_id != 0) {
     // This client wasn't aware of this View until now.
     new_view = ViewPrivate::LocalCreate();
     ViewPrivate private_view(new_view);
-    private_view.set_view_manager(view_manager());
+    private_view.set_view_manager(this);
     private_view.set_id(new_view_id);
     private_view.set_node(node);
-    ViewManagerPrivate(view_manager()).AddView(new_view->id(), new_view);
+    AddView(new_view);
   }
-  View* old_view = view_manager()->GetViewById(old_view_id);
+  View* old_view = GetViewById(old_view_id);
   DCHECK_EQ(old_view, node->active_view());
   ViewTreeNodePrivate(node).LocalSetActiveView(new_view);
 }
 
-void ViewManagerSynchronizer::OnViewDeleted(uint32_t view_id) {
-  View* view = view_manager()->GetViewById(view_id);
+void ViewManagerSynchronizer::OnViewDeleted(Id view_id) {
+  View* view = GetViewById(view_id);
   if (view)
     ViewPrivate(view).LocalDestroy();
+}
+
+void ViewManagerSynchronizer::OnViewInputEvent(
+    Id view_id,
+    EventPtr event,
+    const Callback<void()>& ack_callback) {
+  View* view = GetViewById(view_id);
+  if (view) {
+    FOR_EACH_OBSERVER(ViewObserver,
+                      *ViewPrivate(view).observers(),
+                      OnViewInputEvent(view, event));
+  }
+  ack_callback.Run();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -655,6 +720,37 @@ void ViewManagerSynchronizer::RemoveFromPendingQueue(
   pending_transactions_.erase(pending_transactions_.begin());
   if (pending_transactions_.empty() && !changes_acked_callback_.is_null())
     changes_acked_callback_.Run();
+}
+
+void ViewManagerSynchronizer::AddRoot(ViewTreeNode* root) {
+  // A new root must not already exist as a root or be contained by an existing
+  // hierarchy visible to this view manager.
+  std::vector<ViewTreeNode*>::const_iterator it = roots_.begin();
+  for (; it != roots_.end(); ++it) {
+    if (*it == root || (*it)->Contains(root))
+      return;
+  }
+  roots_.push_back(root);
+  root->AddObserver(new RootObserver(root));
+  delegate_->OnRootAdded(this, root);
+}
+
+void ViewManagerSynchronizer::RemoveRoot(ViewTreeNode* root) {
+  std::vector<ViewTreeNode*>::iterator it =
+      std::find(roots_.begin(), roots_.end(), root);
+  if (it != roots_.end()) {
+    roots_.erase(it);
+    delegate_->OnRootRemoved(this, root);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// ViewManager, public:
+
+// static
+void ViewManager::Create(Application* application,
+                         ViewManagerDelegate* delegate) {
+  application->AddService<ViewManagerSynchronizer>(delegate);
 }
 
 }  // namespace view_manager

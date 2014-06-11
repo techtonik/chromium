@@ -48,6 +48,9 @@
         <button href="#" class="sync"
             jsvalues=".cmdArgs:{partition_id:$partition_id,version_id:version_id}"
             jsdisplay="$this.running_status == 'RUNNING'">Sync</button>
+        <button href="#" class="push"
+            jsvalues=".cmdArgs:{partition_id:$partition_id,version_id:version_id}"
+            jsdisplay="$this.running_status == 'RUNNING'">Push</button>
         <button href="#" class="inspect"
             jsvalues=".cmdArgs:{process_id:process_id,devtools_agent_route_id:devtools_agent_route_id}"
             jsdisplay="$this.running_status == 'RUNNING'">Inspect</button>
@@ -73,8 +76,8 @@
         Active worker:
         <div transclude="serviceworker-version-template"></div>
       </div>
-      <div jsselect="$this.pending">
-        Pending worker:
+      <div jsselect="$this.waiting">
+        Waiting worker:
         <div transclude="serviceworker-version-template"></div>
       </div>
       <div class="registration-controls" jsdisplay="!$this.unregistered">

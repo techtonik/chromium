@@ -220,13 +220,13 @@ class DriveServiceInterface {
       const GURL& next_link,
       const google_apis::FileListCallback& callback) = 0;
 
-  // Fetches single entry metadata from server. The entry's resource id equals
+  // Fetches single entry metadata from server. The entry's file id equals
   // |resource_id|.
   // Upon completion, invokes |callback| with results on the calling thread.
   // |callback| must not be null.
-  virtual google_apis::CancelCallback GetResourceEntry(
+  virtual google_apis::CancelCallback GetFileResource(
       const std::string& resource_id,
-      const google_apis::GetResourceEntryCallback& callback) = 0;
+      const google_apis::FileResourceCallback& callback) = 0;
 
   // Fetches an url for the sharing dialog for a single entry with id
   // |resource_id|, to be embedded in a webview or an iframe with origin
@@ -280,7 +280,7 @@ class DriveServiceInterface {
       const std::string& parent_resource_id,
       const std::string& new_title,
       const base::Time& last_modified,
-      const google_apis::GetResourceEntryCallback& callback) = 0;
+      const google_apis::FileResourceCallback& callback) = 0;
 
   // Updates a resource with |resource_id| to the directory of
   // |parent_resource_id| with renaming to |new_title|.
@@ -296,7 +296,7 @@ class DriveServiceInterface {
       const std::string& new_title,
       const base::Time& last_modified,
       const base::Time& last_viewed_by_me,
-      const google_apis::GetResourceEntryCallback& callback) = 0;
+      const google_apis::FileResourceCallback& callback) = 0;
 
   // Renames a document or collection identified by its |resource_id|
   // to the UTF-8 encoded |new_title|. Upon completion,
@@ -337,7 +337,7 @@ class DriveServiceInterface {
       const std::string& parent_resource_id,
       const std::string& directory_title,
       const AddNewDirectoryOptions& options,
-      const google_apis::GetResourceEntryCallback& callback) = 0;
+      const google_apis::FileResourceCallback& callback) = 0;
 
   // Downloads a file with |resourced_id|. The downloaded file will
   // be stored at |local_cache_path| location. Upon completion, invokes
@@ -389,7 +389,7 @@ class DriveServiceInterface {
       int64 content_length,
       const std::string& content_type,
       const base::FilePath& local_file_path,
-      const google_apis::UploadRangeCallback& callback,
+      const google_apis::drive::UploadRangeCallback& callback,
       const google_apis::ProgressCallback& progress_callback) = 0;
 
   // Gets the current status of the uploading to |upload_url| from the server.
@@ -399,7 +399,7 @@ class DriveServiceInterface {
   virtual google_apis::CancelCallback GetUploadStatus(
       const GURL& upload_url,
       int64 content_length,
-      const google_apis::UploadRangeCallback& callback) = 0;
+      const google_apis::drive::UploadRangeCallback& callback) = 0;
 
   // Authorizes a Drive app with the id |app_id| to open the given file.
   // Upon completion, invokes |callback| with the link to open the file with

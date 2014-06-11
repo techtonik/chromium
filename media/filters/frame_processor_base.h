@@ -149,15 +149,22 @@ class MEDIA_EXPORT FrameProcessorBase {
   // frames for the track |id| to |stream|.
   bool AddTrack(StreamParser::TrackId id, ChunkDemuxerStream* stream);
 
+  // Updates the internal mapping of TrackId to track buffer for the track
+  // buffer formerly associated with |old_id| to be associated with |new_id|.
+  // Returns false to indicate failure due to either no existing track buffer
+  // for |old_id| or collision with previous track buffer already mapped to
+  // |new_id|. Otherwise returns true.
+  bool UpdateTrack(StreamParser::TrackId old_id, StreamParser::TrackId new_id);
+
   // Resets state for the coded frame processing algorithm as described in steps
   // 2-5 of the MSE Reset Parser State algorithm described at
   // http://www.w3.org/TR/media-source/#sourcebuffer-reset-parser-state
   void Reset();
 
-  // Resets the preroll buffer used for partial append window trimming of audio
-  // buffers.  Must be called if the audio config is changed between calls to
-  // ProcessFrames().
-  void clear_audio_preroll_buffer() { audio_preroll_buffer_ = NULL; }
+  // Must be called when the audio config is updated.  Used to manage when
+  // the preroll buffer is cleared and the allowed "fudge" factor between
+  // preroll buffers.
+  void OnPossibleAudioConfigUpdate(const AudioDecoderConfig& config);
 
  protected:
   typedef std::map<StreamParser::TrackId, MseTrackBuffer*> TrackBufferMap;
@@ -211,6 +218,10 @@ class MEDIA_EXPORT FrameProcessorBase {
   // The last audio buffer seen by the frame processor that was removed because
   // it was entirely before the start of the append window.
   scoped_refptr<StreamParserBuffer> audio_preroll_buffer_;
+
+  // The AudioDecoderConfig associated with buffers handed to ProcessFrames().
+  AudioDecoderConfig current_audio_config_;
+  base::TimeDelta sample_duration_;
 
   DISALLOW_COPY_AND_ASSIGN(FrameProcessorBase);
 };

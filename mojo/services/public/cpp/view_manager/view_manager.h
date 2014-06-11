@@ -5,63 +5,37 @@
 #ifndef MOJO_SERVICES_PUBLIC_CPP_VIEW_MANAGER_VIEW_MANAGER_H_
 #define MOJO_SERVICES_PUBLIC_CPP_VIEW_MANAGER_VIEW_MANAGER_H_
 
-#include <map>
+#include <string>
+#include <vector>
 
-#include "base/basictypes.h"
-#include "base/callback.h"
-#include "base/memory/scoped_ptr.h"
-#include "mojo/public/cpp/bindings/callback.h"
-#include "mojo/services/public/cpp/view_manager/view_tree_node.h"
+#include "mojo/services/public/cpp/view_manager/view_manager_types.h"
 
 namespace mojo {
 class Application;
 namespace view_manager {
 
 class View;
-class ViewManagerSynchronizer;
+class ViewManagerDelegate;
 class ViewTreeNode;
 
-// Approximately encapsulates the View Manager service.
-// Has a synchronizer that keeps a client model in sync with the service.
-// Owned by the connection.
-//
-// TODO: displays
 class ViewManager {
  public:
-  ~ViewManager();
+  // Delegate is owned by the caller.
+  static void Create(Application* application, ViewManagerDelegate* delegate);
 
-  // |ready_callback| is run when the ViewManager connection is established
-  // and ready to use.
-  static void Create(
-      Application* application,
-      const base::Callback<void(ViewManager*)> ready_callback);
-  // Blocks until ViewManager is ready to use.
-  static ViewManager* CreateBlocking(Application* application);
+  // Returns the URL of the application that embedded this application.
+  virtual const std::string& GetEmbedderURL() const = 0;
 
-  ViewTreeNode* tree() { return tree_; }
+  // Returns all root nodes known to this connection.
+  virtual const std::vector<ViewTreeNode*>& GetRoots() const = 0;
 
-  ViewTreeNode* GetNodeById(TransportNodeId id);
-  View* GetViewById(TransportViewId id);
+  // Returns a Node or View known to this connection.
+  virtual ViewTreeNode* GetNodeById(Id id) = 0;
+  virtual View* GetViewById(Id id) = 0;
 
-  void Embed(const String& url, ViewTreeNode* node);
+ protected:
+  virtual ~ViewManager() {}
 
- private:
-  friend class ViewManagerPrivate;
-  typedef std::map<TransportNodeId, ViewTreeNode*> IdToNodeMap;
-  typedef std::map<TransportViewId, View*> IdToViewMap;
-
-  ViewManager(Application* application,
-              const base::Callback<void(ViewManager*)> ready_callback);
-
-  base::Callback<void(ViewManager*)> ready_callback_;
-
-  ViewManagerSynchronizer* synchronizer_;
-  ViewTreeNode* tree_;
-
-  IdToNodeMap nodes_;
-  IdToViewMap views_;
-
-  DISALLOW_COPY_AND_ASSIGN(ViewManager);
 };
 
 }  // namespace view_manager

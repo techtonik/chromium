@@ -175,6 +175,7 @@ class CONTENT_EXPORT IndexedDBBackingStore
   class BlobWriteCallback : public base::RefCounted<BlobWriteCallback> {
    public:
     virtual void Run(bool succeeded) = 0;
+
    protected:
     virtual ~BlobWriteCallback() {}
     friend class base::RefCounted<BlobWriteCallback>;
@@ -333,6 +334,9 @@ class CONTENT_EXPORT IndexedDBBackingStore
     scoped_ptr<LevelDBIterator> iterator_;
     scoped_ptr<IndexedDBKey> current_key_;
     IndexedDBBackingStore::RecordIdentifier record_identifier_;
+
+   private:
+    DISALLOW_COPY_AND_ASSIGN(Cursor);
   };
 
   virtual scoped_ptr<Cursor> OpenObjectStoreKeyCursor(
@@ -403,6 +407,12 @@ class CONTENT_EXPORT IndexedDBBackingStore
       backing_store_ = NULL;
       transaction_ = NULL;
     }
+    leveldb::Status PutBlobInfoIfNeeded(
+        int64 database_id,
+        int64 object_store_id,
+        const std::string& object_store_data_key,
+        std::vector<IndexedDBBlobInfo>*,
+        ScopedVector<webkit_blob::BlobDataHandle>* handles);
     void PutBlobInfo(int64 database_id,
                      int64 object_store_id,
                      const std::string& object_store_data_key,
@@ -459,6 +469,7 @@ class CONTENT_EXPORT IndexedDBBackingStore
       virtual ~ChainedBlobWriter() {}
       friend class base::RefCounted<ChainedBlobWriter>;
     };
+
     class ChainedBlobWriterImpl;
 
     typedef std::vector<WriteDescriptor> WriteDescriptorVec;
@@ -562,6 +573,8 @@ class CONTENT_EXPORT IndexedDBBackingStore
   // will hold a reference to this backing store.
   IndexedDBActiveBlobRegistry active_blob_registry_;
   base::OneShotTimer<IndexedDBBackingStore> close_timer_;
+
+  DISALLOW_COPY_AND_ASSIGN(IndexedDBBackingStore);
 };
 
 }  // namespace content
