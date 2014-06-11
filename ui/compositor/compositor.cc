@@ -26,6 +26,7 @@
 #include "ui/compositor/compositor_vsync_manager.h"
 #include "ui/compositor/dip_util.h"
 #include "ui/compositor/layer.h"
+#include "ui/compositor/layer_animator_collection.h"
 #include "ui/gfx/frame_time.h"
 #include "ui/gl/gl_context.h"
 #include "ui/gl/gl_switches.h"
@@ -84,9 +85,9 @@ Compositor::Compositor(gfx::AcceleratedWidget widget,
       waiting_on_compositing_end_(false),
       draw_on_compositing_end_(false),
       swap_state_(SWAP_NONE),
+      layer_animator_collection_(this),
       schedule_draw_factory_(this) {
   root_web_layer_ = cc::Layer::Create();
-  root_web_layer_->SetAnchorPoint(gfx::PointF(0.f, 0.f));
 
   CommandLine* command_line = CommandLine::ForCurrentProcess();
 
@@ -99,8 +100,10 @@ Compositor::Compositor(gfx::AcceleratedWidget widget,
   settings.main_frame_before_activation_enabled = false;
   settings.throttle_frame_production =
       !command_line->HasSwitch(switches::kDisableGpuVsync);
+#if !defined(OS_MACOSX)
   settings.partial_swap_enabled =
       !command_line->HasSwitch(cc::switches::kUIDisablePartialSwap);
+#endif
 #if defined(OS_CHROMEOS)
   settings.per_tile_painting_enabled = true;
 #endif
@@ -217,8 +220,10 @@ void Compositor::Draw() {
   if (!IsLocked()) {
     // TODO(nduca): Temporary while compositor calls
     // compositeImmediately() directly.
+    base::TimeTicks now = gfx::FrameTime::Now();
+    Animate(now);
     Layout();
-    host_->Composite(gfx::FrameTime::Now());
+    host_->Composite(now);
   }
   if (swap_state_ == SWAP_NONE)
     NotifyEnd();
@@ -276,6 +281,12 @@ void Compositor::RemoveObserver(CompositorObserver* observer) {
 
 bool Compositor::HasObserver(CompositorObserver* observer) {
   return observer_list_.HasObserver(observer);
+}
+
+void Compositor::Animate(base::TimeTicks frame_begin_time) {
+  layer_animator_collection_.Progress(frame_begin_time);
+  if (layer_animator_collection_.HasActiveAnimators())
+    host_->SetNeedsAnimate();
 }
 
 void Compositor::Layout() {
@@ -341,6 +352,10 @@ void Compositor::DidAbortSwapBuffers() {
   FOR_EACH_OBSERVER(CompositorObserver,
                     observer_list_,
                     OnCompositingAborted(this));
+}
+
+void Compositor::ScheduleAnimationForLayerCollection() {
+  host_->SetNeedsAnimate();
 }
 
 const cc::LayerTreeDebugState& Compositor::GetLayerTreeDebugState() const {

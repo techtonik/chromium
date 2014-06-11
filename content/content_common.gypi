@@ -284,8 +284,6 @@
       'common/gpu/media/gpu_video_decode_accelerator.h',
       'common/gpu/media/gpu_video_encode_accelerator.cc',
       'common/gpu/media/gpu_video_encode_accelerator.h',
-      'common/gpu/media/video_decode_accelerator_impl.cc',
-      'common/gpu/media/video_decode_accelerator_impl.h',
       'common/gpu/stream_texture_android.cc',
       'common/gpu/stream_texture_android.h',
       'common/gpu/sync_point_manager.cc',
@@ -566,6 +564,8 @@
       'sources': [
         'common/gpu/client/gpu_memory_buffer_impl_io_surface.cc',
         'common/gpu/client/gpu_memory_buffer_impl_io_surface.h',
+        'common/gpu/media/vt_video_decode_accelerator.cc',
+        'common/gpu/media/vt_video_decode_accelerator.h',
       ],
       'sources!': [
         'common/plugin_list_posix.cc',

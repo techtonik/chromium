@@ -4,6 +4,7 @@
 
 import("//build/config/linux/pkg_config.gni")
 import("//build/config/sysroot.gni")
+import("//build/config/ui.gni")
 
 config("sdk") {
   if (sysroot != "") {
@@ -52,6 +53,16 @@ pkg_config("dbus") {
   packages = [ "dbus-1" ]
 }
 
+if (use_evdev_gestures) {
+  pkg_config("libevdev-cros") {
+    packages = [ "libevdev-cros" ]
+  }
+
+  pkg_config("libgestures") {
+    packages = [ "libgestures" ]
+  }
+}
+
 config("x11") {
   # Don't bother running pkg-config for these X related libraries since it just
   # returns the same libs, and forking pkg-config is slow.
@@ -75,6 +86,10 @@ config("xcomposite") {
 
 config("xext") {
   libs = [ "Xext" ]
+}
+
+config("xrandr") {
+  libs = [ "xrandr" ]
 }
 
 config("libcap") {

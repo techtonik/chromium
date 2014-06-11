@@ -3,43 +3,122 @@
 // found in the LICENSE file.
 
 #include "base/basictypes.h"
+#include "base/bind.h"
+#include "mojo/examples/window_manager/window_manager.mojom.h"
 #include "mojo/public/cpp/application/application.h"
 #include "mojo/services/public/cpp/view_manager/view.h"
 #include "mojo/services/public/cpp/view_manager/view_manager.h"
+#include "mojo/services/public/cpp/view_manager/view_manager_delegate.h"
+#include "mojo/services/public/cpp/view_manager/view_observer.h"
 #include "mojo/services/public/cpp/view_manager/view_tree_node.h"
+#include "ui/events/event_constants.h"
+
+#if defined CreateWindow
+#undef CreateWindow
+#endif
+
+using mojo::view_manager::Id;
+using mojo::view_manager::View;
+using mojo::view_manager::ViewManager;
+using mojo::view_manager::ViewManagerDelegate;
+using mojo::view_manager::ViewObserver;
+using mojo::view_manager::ViewTreeNode;
+using mojo::view_manager::ViewTreeNodeObserver;
 
 namespace mojo {
 namespace examples {
 
-class WindowManager : public Application {
+class WindowManager;
+
+class WindowManagerConnection : public InterfaceImpl<IWindowManager> {
  public:
-  WindowManager() {}
+  explicit WindowManagerConnection(WindowManager* window_manager)
+      : window_manager_(window_manager) {}
+  virtual ~WindowManagerConnection() {}
+
+ private:
+  // Overridden from IWindowManager:
+  virtual void CloseWindow(Id node_id) OVERRIDE;
+
+  WindowManager* window_manager_;
+
+  DISALLOW_COPY_AND_ASSIGN(WindowManagerConnection);
+};
+
+class WindowManager : public Application,
+                      public ViewObserver,
+                      public ViewManagerDelegate {
+ public:
+  WindowManager() : view_manager_(NULL) {}
   virtual ~WindowManager() {}
+
+  void CloseWindow(Id node_id) {
+    ViewTreeNode* node = view_manager_->GetNodeById(node_id);
+    DCHECK(node);
+    node->Destroy();
+  }
 
  private:
   // Overridden from Application:
   virtual void Initialize() MOJO_OVERRIDE {
-    view_manager_ = view_manager::ViewManager::CreateBlocking(this);
-    view_manager::ViewTreeNode* node =
-        view_manager::ViewTreeNode::Create(view_manager_);
-    view_manager_->tree()->AddChild(node);
-    node->SetBounds(gfx::Rect(800, 600));
-
-    view_manager::View* view = view_manager::View::Create(view_manager_);
-    node->SetActiveView(view);
-    view->SetColor(SK_ColorBLUE);
-
-    view_manager::ViewTreeNode* embedded =
-        view_manager::ViewTreeNode::Create(view_manager_);
-    node->AddChild(embedded);
-    embedded->SetBounds(gfx::Rect(50, 50, 200, 200));
-    view_manager_->Embed("mojo:mojo_embedded_app", embedded);
+    AddService<WindowManagerConnection>(this);
+    ViewManager::Create(this, this);
   }
 
-  view_manager::ViewManager* view_manager_;
+    // Overridden from ViewObserver:
+  virtual void OnViewInputEvent(View* view, const EventPtr& event) OVERRIDE {
+    if (event->action == ui::ET_MOUSE_RELEASED) {
+      if (event->flags & ui::EF_LEFT_MOUSE_BUTTON)
+        CreateWindow("mojo:mojo_embedded_app");
+      else if (event->flags & ui::EF_RIGHT_MOUSE_BUTTON)
+        CreateWindow("mojo:mojo_nesting_app");
+      else if (event->flags & ui::EF_MIDDLE_MOUSE_BUTTON)
+        CreateWindow("mojo:mojo_browser");
+    }
+  }
+
+  // Overridden from ViewManagerDelegate:
+  virtual void OnRootAdded(ViewManager* view_manager,
+                           ViewTreeNode* root) OVERRIDE {
+    DCHECK(!view_manager_);
+    view_manager_ = view_manager;
+
+    ViewTreeNode* node = ViewTreeNode::Create(view_manager);
+    view_manager->GetRoots().front()->AddChild(node);
+    node->SetBounds(gfx::Rect(800, 600));
+    parent_node_id_ = node->id();
+
+    View* view = View::Create(view_manager);
+    node->SetActiveView(view);
+    view->SetColor(SK_ColorBLUE);
+    view->AddObserver(this);
+  }
+
+  void CreateWindow(const String& url) {
+    ViewTreeNode* node = view_manager_->GetNodeById(parent_node_id_);
+
+    gfx::Rect bounds(50, 50, 200, 200);
+    if (!node->children().empty()) {
+      gfx::Point position = node->children().back()->bounds().origin();
+      position.Offset(50, 50);
+      bounds.set_origin(position);
+    }
+
+    ViewTreeNode* embedded = ViewTreeNode::Create(view_manager_);
+    node->AddChild(embedded);
+    embedded->SetBounds(bounds);
+    embedded->Embed(url);
+  }
+
+  ViewManager* view_manager_;
+  Id parent_node_id_;
 
   DISALLOW_COPY_AND_ASSIGN(WindowManager);
 };
+
+void WindowManagerConnection::CloseWindow(Id node_id) {
+  window_manager_->CloseWindow(node_id);
+}
 
 }  // namespace examples
 

@@ -126,17 +126,18 @@ public abstract class WebContentsObserverAndroid {
     }
 
     /**
+     * Notifies that the document has finished loading for the given frame.
+     * @param frameId A positive, non-zero integer identifying the navigating frame.
+     */
+    @CalledByNative
+    public void documentLoadedInFrame(long frameId) {
+    }
+
+    /**
      * Notifies that a navigation entry has been committed.
      */
     @CalledByNative
     public void navigationEntryCommitted() {
-    }
-
-    /**
-     * Invoked when visible SSL state changes.
-     */
-    @CalledByNative
-    public void didChangeVisibleSSLState() {
     }
 
     /**

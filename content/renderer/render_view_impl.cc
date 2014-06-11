@@ -20,6 +20,7 @@
 #include "base/lazy_instance.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/message_loop/message_loop_proxy.h"
+#include "base/metrics/field_trial.h"
 #include "base/metrics/histogram.h"
 #include "base/path_service.h"
 #include "base/process/kill.h"
@@ -78,7 +79,6 @@
 #include "content/renderer/dom_storage/webstoragenamespace_impl.h"
 #include "content/renderer/drop_data_builder.h"
 #include "content/renderer/external_popup_menu.h"
-#include "content/renderer/geolocation_dispatcher.h"
 #include "content/renderer/gpu/render_widget_compositor.h"
 #include "content/renderer/history_controller.h"
 #include "content/renderer/history_serialization.h"
@@ -472,6 +472,11 @@ static bool ShouldUseAcceleratedFixedRootBackground(float device_scale_factor) {
   return DeviceScaleEnsuresTextQuality(device_scale_factor);
 }
 
+static bool ShouldUseExpandedHeuristicsForGpuRasterization() {
+  return base::FieldTrialList::FindFullName(
+             "GpuRasterizationExpandedContentWhitelist") == "Enabled";
+}
+
 static FaviconURL::IconType ToFaviconType(blink::WebIconURL::Type type) {
   switch (type) {
     case blink::WebIconURL::TypeFavicon:
@@ -645,11 +650,8 @@ RenderViewImpl::RenderViewImpl(RenderViewImplParams* params)
 #if defined(OS_ANDROID)
       top_controls_constraints_(cc::BOTH),
 #endif
-      cached_is_main_frame_pinned_to_left_(false),
-      cached_is_main_frame_pinned_to_right_(false),
       has_scrolled_focused_editable_node_into_rect_(false),
       push_messaging_dispatcher_(NULL),
-      geolocation_dispatcher_(NULL),
       speech_recognition_dispatcher_(NULL),
       media_stream_dispatcher_(NULL),
       browser_plugin_manager_(NULL),
@@ -751,6 +753,8 @@ void RenderViewImpl::Initialize(RenderViewImplParams* params) {
       ShouldUseAcceleratedFixedRootBackground(device_scale_factor_));
   webview()->settings()->setCompositedScrollingForFramesEnabled(
       ShouldUseCompositedScrollingForFrames(device_scale_factor_));
+  webview()->settings()->setUseExpandedHeuristicsForGpuRasterization(
+      ShouldUseExpandedHeuristicsForGpuRasterization());
 
   ApplyWebPreferences(webkit_preferences_, webview());
 
@@ -1736,10 +1740,6 @@ void RenderViewImpl::focusedNodeChanged(const WebNode& node) {
   FOR_EACH_OBSERVER(RenderViewObserver, observers_, FocusedNodeChanged(node));
 }
 
-void RenderViewImpl::numberOfWheelEventHandlersChanged(unsigned num_handlers) {
-  Send(new ViewHostMsg_DidChangeNumWheelEvents(routing_id_, num_handlers));
-}
-
 void RenderViewImpl::didUpdateLayout() {
   FOR_EACH_OBSERVER(RenderViewObserver, observers_, DidUpdateLayout());
 
@@ -2033,6 +2033,7 @@ void RenderViewImpl::didCreateDataSource(WebLocalFrame* frame,
         document_state->set_load_type(DocumentState::LINK_LOAD_NORMAL);
         break;
       case WebURLRequest::ReloadIgnoringCacheData:  // reload.
+      case WebURLRequest::ReloadBypassingCache:  // end-to-end reload.
         document_state->set_load_type(DocumentState::LINK_LOAD_RELOAD);
         break;
       case WebURLRequest::ReturnCacheDataElseLoad:  // allow stale data.
@@ -2223,22 +2224,6 @@ BrowserPluginManager* RenderViewImpl::GetBrowserPluginManager() {
 }
 
 void RenderViewImpl::UpdateScrollState(WebFrame* frame) {
-  WebSize offset = frame->scrollOffset();
-  WebSize minimum_offset = frame->minimumScrollOffset();
-  WebSize maximum_offset = frame->maximumScrollOffset();
-
-  bool is_pinned_to_left = offset.width <= minimum_offset.width;
-  bool is_pinned_to_right = offset.width >= maximum_offset.width;
-
-  if (is_pinned_to_left != cached_is_main_frame_pinned_to_left_ ||
-      is_pinned_to_right != cached_is_main_frame_pinned_to_right_) {
-    Send(new ViewHostMsg_DidChangeScrollOffsetPinningForMainFrame(
-          routing_id_, is_pinned_to_left, is_pinned_to_right));
-
-    cached_is_main_frame_pinned_to_left_ = is_pinned_to_left;
-    cached_is_main_frame_pinned_to_right_ = is_pinned_to_right;
-  }
-
   Send(new ViewHostMsg_DidChangeScrollOffset(routing_id_));
 }
 
@@ -2366,10 +2351,6 @@ int RenderViewImpl::GetEnabledBindings() const {
 
 bool RenderViewImpl::GetContentStateImmediately() const {
   return send_content_state_immediately_;
-}
-
-float RenderViewImpl::GetFilteredTimePerFrame() const {
-  return 0.0f;
 }
 
 blink::WebPageVisibilityState RenderViewImpl::GetVisibilityState() const {
@@ -3227,12 +3208,19 @@ void RenderViewImpl::OnPluginImeCompositionCompleted(const base::string16& text,
 }
 #endif  // OS_MACOSX
 
+void RenderViewImpl::OnClose() {
+  if (closing_)
+    RenderThread::Get()->Send(new ViewHostMsg_Close_ACK(routing_id_));
+  RenderWidget::OnClose();
+}
+
 void RenderViewImpl::Close() {
   // We need to grab a pointer to the doomed WebView before we destroy it.
   WebView* doomed = webview();
   RenderWidget::Close();
   g_view_map.Get().erase(doomed);
   g_routing_id_view_map.Get().erase(routing_id_);
+  RenderThread::Get()->Send(new ViewHostMsg_Close_ACK(routing_id_));
 }
 
 void RenderViewImpl::DidHandleKeyEvent() {
@@ -3344,10 +3332,6 @@ GURL RenderViewImpl::GetURLForGraphicsContext3D() {
     return GURL(webview()->mainFrame()->document().url());
   else
     return GURL("chrome://gpu/RenderViewImpl::CreateGraphicsContext3D");
-}
-
-bool RenderViewImpl::ForceCompositingModeEnabled() {
-  return webkit_preferences_.force_compositing_mode;
 }
 
 void RenderViewImpl::OnSetFocus(bool enable) {
@@ -3483,6 +3467,16 @@ void RenderViewImpl::SetDeviceScaleFactor(float device_scale_factor) {
 
   if (browser_plugin_manager_.get())
     browser_plugin_manager_->UpdateDeviceScaleFactor(device_scale_factor_);
+}
+
+bool RenderViewImpl::SetDeviceColorProfile(
+    const std::vector<char>& profile) {
+  bool changed = RenderWidget::SetDeviceColorProfile(profile);
+  if (changed && webview()) {
+    // TODO(noel): notify the webview() of the color profile change so it
+    // can update and repaint all color profiled page elements.
+  }
+  return changed;
 }
 
 ui::TextInputType RenderViewImpl::GetTextInputType() {
@@ -3632,14 +3626,6 @@ bool RenderViewImpl::ScheduleFileChooser(
     Send(new ViewHostMsg_RunFileChooser(routing_id_, params));
   }
   return true;
-}
-
-blink::WebGeolocationClient* RenderViewImpl::geolocationClient() {
-  if (!geolocation_dispatcher_) {
-    geolocation_dispatcher_ = new GeolocationDispatcher(
-        main_render_frame_.get());
-  }
-  return geolocation_dispatcher_;
 }
 
 blink::WebSpeechRecognizer* RenderViewImpl::speechRecognizer() {
@@ -3996,7 +3982,7 @@ void RenderViewImpl::SetScreenOrientationForTesting(
 
 void RenderViewImpl::SetDeviceColorProfileForTesting(
     const std::vector<char>& color_profile) {
-  // TODO(noel): Add RenderViewImpl::SetDeviceColorProfile(color_profile).
+  SetDeviceColorProfile(color_profile);
 }
 
 void RenderViewImpl::ForceResizeForTesting(const gfx::Size& new_size) {

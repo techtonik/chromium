@@ -32,7 +32,7 @@
 #include "chrome/browser/sessions/tab_restore_service_delegate.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
 #include "chrome/browser/signin/signin_header_helper.h"
-#include "chrome/browser/translate/translate_tab_helper.h"
+#include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/ui/accelerator_utils.h"
 #include "chrome/browser/ui/bookmarks/bookmark_utils.h"
 #include "chrome/browser/ui/browser.h"
@@ -63,6 +63,7 @@
 #include "chrome/common/pref_names.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/browser/bookmark_utils.h"
+#include "components/translate/core/browser/language_state.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/navigation_controller.h"
@@ -174,19 +175,22 @@ void BookmarkCurrentPageInternal(Browser* browser) {
   WebContents* web_contents =
       browser->tab_strip_model()->GetActiveWebContents();
   GetURLAndTitleToBookmark(web_contents, &url, &title);
-  bool was_bookmarked = model->IsBookmarked(url);
-  if (!was_bookmarked && web_contents->GetBrowserContext()->IsOffTheRecord()) {
+  bool is_bookmarked_by_any = model->IsBookmarked(url);
+  if (!is_bookmarked_by_any &&
+      web_contents->GetBrowserContext()->IsOffTheRecord()) {
     // If we're incognito the favicon may not have been saved. Save it now
     // so that bookmarks have an icon for the page.
     FaviconTabHelper::FromWebContents(web_contents)->SaveFavicon();
   }
+  bool was_bookmarked_by_user = bookmark_utils::IsBookmarkedByUser(model, url);
   bookmark_utils::AddIfNotBookmarked(model, url, title);
+  bool is_bookmarked_by_user = bookmark_utils::IsBookmarkedByUser(model, url);
   // Make sure the model actually added a bookmark before showing the star. A
   // bookmark isn't created if the url is invalid.
-  if (browser->window()->IsActive() && model->IsBookmarked(url)) {
+  if (browser->window()->IsActive() && is_bookmarked_by_user) {
     // Only show the bubble if the window is active, otherwise we may get into
     // weird situations where the bubble is deleted as soon as it is shown.
-    browser->window()->ShowBookmarkBubble(url, was_bookmarked);
+    browser->window()->ShowBookmarkBubble(url, was_bookmarked_by_user);
   }
 }
 
@@ -762,14 +766,14 @@ void Translate(Browser* browser) {
 
   WebContents* web_contents =
       browser->tab_strip_model()->GetActiveWebContents();
-  TranslateTabHelper* translate_tab_helper =
-      TranslateTabHelper::FromWebContents(web_contents);
+  ChromeTranslateClient* chrome_translate_client =
+      ChromeTranslateClient::FromWebContents(web_contents);
 
   translate::TranslateStep step = translate::TRANSLATE_STEP_BEFORE_TRANSLATE;
-  if (translate_tab_helper) {
-    if (translate_tab_helper->GetLanguageState().translation_pending())
+  if (chrome_translate_client) {
+    if (chrome_translate_client->GetLanguageState().translation_pending())
       step = translate::TRANSLATE_STEP_TRANSLATING;
-    else if (translate_tab_helper->GetLanguageState().IsPageTranslated())
+    else if (chrome_translate_client->GetLanguageState().IsPageTranslated())
       step = translate::TRANSLATE_STEP_AFTER_TRANSLATE;
   }
   browser->window()->ShowTranslateBubble(

@@ -78,6 +78,13 @@ public class ChromeShellToolbar extends LinearLayout {
         if (progress == 100) postDelayed(mClearProgressRunnable, COMPLETED_PROGRESS_TIMEOUT_MS);
     }
 
+    /**
+     * Closes the suggestion popup.
+     */
+    public void hideSuggestions() {
+        if (mSuggestionPopup != null) mSuggestionPopup.hideSuggestions();
+    }
+
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
@@ -104,7 +111,6 @@ public class ChromeShellToolbar extends LinearLayout {
                     return false;
                 }
 
-                mSuggestionPopup.dismissPopup();
                 mTab.loadUrlWithSanitization(mUrlTextView.getText().toString());
                 mUrlTextView.clearFocus();
                 setKeyboardVisibilityForUrl(false);
@@ -118,6 +124,7 @@ public class ChromeShellToolbar extends LinearLayout {
                 setKeyboardVisibilityForUrl(hasFocus);
                 if (!hasFocus) {
                     mUrlTextView.setText(mTab.getContentViewCore().getUrl());
+                    mSuggestionPopup.dismissPopup();
                 }
             }
         });

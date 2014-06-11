@@ -427,17 +427,16 @@ class WizardControllerFlowTest : public WizardControllerTest {
     NetworkPortalDetector::CaptivePortalState online_state;
     online_state.status = NetworkPortalDetector::CAPTIVE_PORTAL_STATUS_ONLINE;
     online_state.response_code = 204;
+
     // Default detworks happens to be usually "eth1" in tests.
+    const NetworkState* default_network =
+        NetworkHandler::Get()->network_state_handler()->DefaultNetwork();
+
     network_portal_detector_->SetDefaultNetworkPathForTesting(
-        NetworkHandler::Get()
-            ->network_state_handler()
-            ->DefaultNetwork()
-            ->path());
+        default_network->path(),
+        default_network->guid());
     network_portal_detector_->SetDetectionResultsForTesting(
-        NetworkHandler::Get()
-            ->network_state_handler()
-            ->DefaultNetwork()
-            ->path(),
+        default_network->path(),
         online_state);
   }
 
@@ -571,6 +570,47 @@ IN_PROC_BROWSER_TEST_F(WizardControllerFlowTest, ControlFlowErrorUpdate) {
   OnExit(ScreenObserver::ENTERPRISE_AUTO_ENROLLMENT_CHECK_COMPLETED);
 
   EXPECT_FALSE(ExistingUserController::current_controller() == NULL);
+}
+
+IN_PROC_BROWSER_TEST_F(WizardControllerFlowTest, ControlFlowSkipUpdateEnroll) {
+  EXPECT_EQ(WizardController::default_controller()->GetNetworkScreen(),
+            WizardController::default_controller()->current_screen());
+  EXPECT_CALL(*mock_update_screen_, StartNetworkCheck()).Times(0);
+  EXPECT_CALL(*mock_eula_screen_, Show()).Times(1);
+  EXPECT_CALL(*mock_update_screen_, Show()).Times(0);
+  EXPECT_CALL(*mock_network_screen_, Hide()).Times(1);
+  OnExit(ScreenObserver::NETWORK_CONNECTED);
+
+  EXPECT_EQ(WizardController::default_controller()->GetEulaScreen(),
+            WizardController::default_controller()->current_screen());
+  EXPECT_CALL(*mock_eula_screen_, Hide()).Times(1);
+  EXPECT_CALL(*mock_update_screen_, StartNetworkCheck()).Times(0);
+  EXPECT_CALL(*mock_update_screen_, Show()).Times(0);
+  WizardController::default_controller()->SkipUpdateEnrollAfterEula();
+  EXPECT_CALL(*mock_enrollment_screen_->actor(),
+              SetParameters(mock_enrollment_screen_,
+                            EnrollmentScreenActor::ENROLLMENT_MODE_MANUAL,
+                            ""))
+      .Times(1);
+  EXPECT_CALL(*mock_auto_enrollment_check_screen_, Show()).Times(1);
+  OnExit(ScreenObserver::EULA_ACCEPTED);
+  content::RunAllPendingInMessageLoop();
+
+  EXPECT_EQ(
+      WizardController::default_controller()->GetAutoEnrollmentCheckScreen(),
+      WizardController::default_controller()->current_screen());
+  EXPECT_CALL(*mock_auto_enrollment_check_screen_, Hide()).Times(1);
+  EXPECT_CALL(*mock_enrollment_screen_, Show()).Times(1);
+  EXPECT_CALL(*mock_enrollment_screen_, Hide()).Times(0);
+  OnExit(ScreenObserver::ENTERPRISE_AUTO_ENROLLMENT_CHECK_COMPLETED);
+  content::RunAllPendingInMessageLoop();
+
+  EXPECT_EQ(WizardController::default_controller()->GetEnrollmentScreen(),
+            WizardController::default_controller()->current_screen());
+  EXPECT_TRUE(ExistingUserController::current_controller() == NULL);
+  EXPECT_EQ("ethernet,wifi,cellular",
+            NetworkHandler::Get()->network_state_handler()
+            ->GetCheckPortalListForTest());
 }
 
 IN_PROC_BROWSER_TEST_F(WizardControllerFlowTest, ControlFlowEulaDeclined) {

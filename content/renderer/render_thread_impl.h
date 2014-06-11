@@ -421,9 +421,10 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
 
   // mojo::ServiceProvider implementation:
   virtual void ConnectToService(
+      const mojo::String& service_url,
       const mojo::String& service_name,
-      const mojo::String& name,
-      mojo::ScopedMessagePipeHandle message_pipe) OVERRIDE;
+      mojo::ScopedMessagePipeHandle message_pipe,
+      const mojo::String& requestor_url) OVERRIDE;
 
   void Init();
 
@@ -433,8 +434,7 @@ class CONTENT_EXPORT RenderThreadImpl : public RenderThread,
   void OnCreateNewView(const ViewMsg_New_Params& params);
   void OnTransferBitmap(const SkBitmap& bitmap, int resource_id);
   void OnPurgePluginListCache(bool reload_pages);
-  void OnNetworkStateChanged(bool online,
-                             net::NetworkChangeNotifier::ConnectionType type);
+  void OnNetworkTypeChanged(net::NetworkChangeNotifier::ConnectionType type);
   void OnGetAccessibilityTree();
   void OnTempCrashWithData(const GURL& data);
   void OnUpdateTimezone();

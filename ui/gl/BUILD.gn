@@ -117,6 +117,7 @@ component("gl") {
     "//gpu/command_buffer/common",
     "//third_party/mesa:mesa_headers",
     "//skia",
+    "//ui/events/platform",
     "//ui/gfx",
     "//ui/gfx/geometry",
   ]
@@ -292,7 +293,9 @@ action("generate_gl_bindings") {
   args = [
     "--header-paths=" +
         rebase_path("//third_party/khronos", root_build_dir) + ":" +
-        rebase_path("//third_party/mesa/src/include", root_build_dir),
+        rebase_path("//third_party/mesa/src/include", root_build_dir) + ":" +
+        rebase_path("//ui/gl", root_build_dir) + ":" +
+        rebase_path("//gpu", root_build_dir),
     rebase_path(gl_binding_output_dir, root_build_dir),
   ]
 }
@@ -320,7 +323,14 @@ source_set("gl_unittest_utils") {
 }
 
 if (is_android) {
+  generate_jar_jni("surface_jni_headers") {
+    jni_package = "ui/gl"
+    classes = [ "android/view/Surface.class" ]
+  }
+
   generate_jni("gl_jni_headers") {
+    deps = [ ":surface_jni_headers" ]
+    forward_dependent_configs_from = [ ":surface_jni_headers" ]
     sources = [
       "../android/java/src/org/chromium/ui/gl/SurfaceTextureListener.java",
       "../android/java/src/org/chromium/ui/gl/SurfaceTexturePlatformWrapper.java",

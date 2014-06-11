@@ -48,10 +48,31 @@ class WebViewGuest : public GuestView<WebViewGuest>,
                content::WebContents* guest_web_contents,
                const std::string& embedder_extension_id);
 
+  // For WebViewGuest, we create special guest processes, which host the
+  // tag content separately from the main application that embeds the tag.
+  // A <webview> can specify both the partition name and whether the storage
+  // for that partition should be persisted. Each tag gets a SiteInstance with
+  // a specially formatted URL, based on the application it is hosted by and
+  // the partition requested by it. The format for that URL is:
+  // chrome-guest://partition_domain/persist?partition_name
+  static bool GetGuestPartitionConfigForSite(const GURL& site,
+                                             std::string* partition_domain,
+                                             std::string* partition_name,
+                                             bool* in_memory);
+
   // Returns guestview::kInstanceIDNone if |contents| does not correspond to a
   // WebViewGuest.
   static int GetViewInstanceId(content::WebContents* contents);
+  // Parses partition related parameters from |extra_params|.
+  // |storage_partition_id| is the parsed partition ID and |persist_storage|
+  // specifies whether or not the partition is in memory.
+  static void ParsePartitionParam(const base::DictionaryValue* extra_params,
+                                  std::string* storage_partition_id,
+                                  bool* persist_storage);
   static const char Type[];
+
+  // Request navigating the guest to the provided |src| URL.
+  void NavigateGuest(const std::string& src);
 
   typedef std::vector<linked_ptr<webview_api::ContextMenuItem> > MenuItemVector;
   // Shows the context menu for the guest.
@@ -71,7 +92,9 @@ class WebViewGuest : public GuestView<WebViewGuest>,
                       const base::DictionaryValue& args) OVERRIDE;
   virtual void DidStopLoading() OVERRIDE;
   virtual void EmbedderDestroyed() OVERRIDE;
+  virtual void GuestDestroyed() OVERRIDE;
   virtual bool IsDragAndDropEnabled() const OVERRIDE;
+  virtual void WillDestroy() OVERRIDE;
 
   // WebContentsDelegate implementation.
   virtual bool AddMessageToConsole(content::WebContents* source,
@@ -128,15 +151,13 @@ class WebViewGuest : public GuestView<WebViewGuest>,
                                   content::WebContents* new_contents) OVERRIDE;
 
   // BrowserPluginGuestDelegate implementation.
-  virtual void DidAttach() OVERRIDE;
+  virtual void DidAttach(const base::DictionaryValue& extra_params) OVERRIDE;
   virtual void SizeChanged(const gfx::Size& old_size, const gfx::Size& new_size)
       OVERRIDE;
   virtual void RequestPointerLockPermission(
       bool user_gesture,
       bool last_unlocked_by_target,
       const base::Callback<void(bool)>& callback) OVERRIDE;
-  virtual void NavigateGuest(const std::string& src) OVERRIDE;
-  virtual void Destroy() OVERRIDE;
 
   // NotificationObserver implementation.
   virtual void Observe(int type,
@@ -299,7 +320,6 @@ class WebViewGuest : public GuestView<WebViewGuest>,
       const IPC::Message& message,
       content::RenderFrameHost* render_frame_host) OVERRIDE;
   virtual void RenderProcessGone(base::TerminationStatus status) OVERRIDE;
-  virtual void WebContentsDestroyed() OVERRIDE;
   virtual void UserAgentOverrideSet(const std::string& user_agent) OVERRIDE;
   virtual void RenderViewReady() OVERRIDE;
 

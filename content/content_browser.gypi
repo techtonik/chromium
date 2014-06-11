@@ -325,6 +325,8 @@
       'browser/battery_status/battery_status_message_filter.h',
       'browser/battery_status/battery_status_service.cc',
       'browser/battery_status/battery_status_service.h',
+      'browser/bootstrap_sandbox_mac.cc',
+      'browser/bootstrap_sandbox_mac.h',
       'browser/browser_child_process_host_impl.cc',
       'browser/browser_child_process_host_impl.h',
       'browser/browser_context.cc',
@@ -338,7 +340,6 @@
       'browser/browser_plugin/browser_plugin_embedder.h',
       'browser/browser_plugin/browser_plugin_guest.cc',
       'browser/browser_plugin/browser_plugin_guest.h',
-      'browser/browser_plugin/browser_plugin_host_factory.h',
       'browser/browser_plugin/browser_plugin_message_filter.cc',
       'browser/browser_plugin/browser_plugin_message_filter.h',
       'browser/browser_plugin/browser_plugin_popup_menu_helper_mac.h',
@@ -792,8 +793,6 @@
       'browser/media/android/media_drm_credential_manager.h',
       'browser/media/android/media_resource_getter_impl.cc',
       'browser/media/android/media_resource_getter_impl.h',
-      'browser/media/android/media_web_contents_observer.cc',
-      'browser/media/android/media_web_contents_observer.h',
       'browser/media/capture/audio_mirroring_manager.cc',
       'browser/media/capture/audio_mirroring_manager.h',
       'browser/media/capture/content_video_capture_device_core.cc',
@@ -820,13 +819,6 @@
       'browser/media/webrtc_identity_store.h',
       'browser/media/webrtc_identity_store_backend.cc',
       'browser/media/webrtc_identity_store_backend.h',
-      'browser/media/webrtc_internals.cc',
-      'browser/media/webrtc_internals.h',
-      'browser/media/webrtc_internals_message_handler.cc',
-      'browser/media/webrtc_internals_message_handler.h',
-      'browser/media/webrtc_internals_ui.cc',
-      'browser/media/webrtc_internals_ui.h',
-      'browser/media/webrtc_internals_ui_observer.h',
       'browser/message_port_message_filter.cc',
       'browser/message_port_message_filter.h',
       'browser/message_port_service.cc',
@@ -1192,6 +1184,8 @@
       'browser/service_worker/service_worker_fetch_dispatcher.h',
       'browser/service_worker/service_worker_handle.cc',
       'browser/service_worker/service_worker_handle.h',
+      'browser/service_worker/service_worker_histograms.cc',
+      'browser/service_worker/service_worker_histograms.h',
       'browser/service_worker/service_worker_host_impl.cc',
       'browser/service_worker/service_worker_host_impl.h',
       'browser/service_worker/service_worker_info.cc',
@@ -1493,7 +1487,7 @@
         '../third_party/WebKit/public/blink.gyp:blink',
       ],
     }],
-    ['OS!="mac" and OS!="ios"', {
+    ['OS!="ios"', {
       'dependencies': [
         '../sandbox/sandbox.gyp:sandbox',
       ],
@@ -1513,6 +1507,13 @@
         '../jingle/jingle.gyp:jingle_glue',
       ],
       'sources': [
+        'browser/media/webrtc_internals.cc',
+        'browser/media/webrtc_internals.h',
+        'browser/media/webrtc_internals_message_handler.cc',
+        'browser/media/webrtc_internals_message_handler.h',
+        'browser/media/webrtc_internals_ui.cc',
+        'browser/media/webrtc_internals_ui.h',
+        'browser/media/webrtc_internals_ui_observer.h',
         'browser/renderer_host/media/peer_connection_tracker_host.cc',
         'browser/renderer_host/media/peer_connection_tracker_host.h',
         'browser/renderer_host/media/webrtc_identity_service_host.cc',
@@ -1763,6 +1764,15 @@
     }, {  # OS != "linux" or use_dbus==0
       'sources!': [
         'browser/geolocation/wifi_data_provider_linux.cc',
+      ],
+    }],
+    ['enable_browser_cdms==1', {
+      'sources': [
+        'browser/media/cdm/browser_cdm_manager.cc',
+        'browser/media/cdm/browser_cdm_manager.h',
+        # This works on Android because enable_browser_cdms==1 on Android.
+        'browser/media/media_web_contents_observer.cc',
+        'browser/media/media_web_contents_observer.h',
       ],
     }],
   ],

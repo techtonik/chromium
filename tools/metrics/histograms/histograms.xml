@@ -5028,6 +5028,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Enterprise.IOSPolicies">
+  <owner>joaodasilva@chromium.org</owner>
+  <summary>
+    Number of policies loaded at startup on iOS, and when a change is detected
+    at runtime.
+  </summary>
+</histogram>
+
 <histogram name="Enterprise.ONC.PolicyValidation" enum="BooleanSuccess">
   <owner>joaodasilva@chromium.org</owner>
   <summary>Result of the OpenNetworkConfiguration policy validation.</summary>
@@ -13872,6 +13880,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.ProxyAuthRequested.HasConnection">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    When a PROXY_AUTH_REQUESTED error code is handled in
+    net::HttpStreamFactoryImpl::Job::RunLoop, this is true if connection_ has an
+    associated value.
+  </summary>
+</histogram>
+
 <histogram name="Net.ProxyPollConfigurationTime">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -14214,6 +14231,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>The reason a QUIC handshake failed.</summary>
 </histogram>
 
+<histogram
+    name="Net.QuicSession.ConnectionClose.NumOpenStreams.HandshakeTimedOut">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    The number of streams open when a QUIC session crypto handshake timed out.
+  </summary>
+</histogram>
+
 <histogram name="Net.QuicSession.ConnectionClose.NumOpenStreams.TimedOut">
   <owner>rch@chromium.org</owner>
   <summary>The number of streams open when a QUIC session timed out.</summary>
@@ -14279,6 +14304,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rch@chromium.org</owner>
   <summary>
     The value of the TCP cubic sender's CWND when the session is closed.
+  </summary>
+</histogram>
+
+<histogram name="Net.QuicSession.HandshakeConfirmedTime" units="Milliseconds">
+  <owner>rch@chromium.org</owner>
+  <summary>
+    The elapsed time between starting the crypto handshake, and receiving
+    confirmation from the server.
   </summary>
 </histogram>
 
@@ -22056,7 +22089,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rlp@chromium.org</owner>
   <summary>
     Counts the number of signed-in profiles on a user's machine when Chrome
-    starts up, among cases with at least one profile.
+    starts up.
   </summary>
 </histogram>
 
@@ -22068,6 +22101,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rlp@chromium.org</owner>
   <summary>
     Counts the number of profiles that are signed in to Chrome when Chrome
+    starts up.
+  </summary>
+</histogram>
+
+<histogram name="Profile.NumberOfSignedInProfilesWithGAIAIcons">
+  <owner>mlerman@chromium.org</owner>
+  <summary>
+    Counts the number of signed-in profiles that are using the GAIA image as the
+    avatar icon. This is counted when a profile is loaded, including when Chrome
     starts up.
   </summary>
 </histogram>
@@ -23171,6 +23213,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="SafeBrowsing.EnabledSettingChanged" enum="BooleanEnabled">
+  <owner>feng@chromium.org</owner>
+  <summary>
+    Records the user action that enables/disables safe browsing feature in the
+    Settings page on Android.
+  </summary>
+</histogram>
+
 <histogram name="SB.BloomFilter" units="milliseconds">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -23972,6 +24022,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>The size of all the chunk URLs in an update response.</summary>
 </histogram>
 
+<histogram name="SB2.UpdateSizeBackground" units="bytes">
+  <owner>feng@chromium.org</owner>
+  <summary>
+    The size of all the chunk URLs in an update response when Chrome is in the
+    foreground.
+  </summary>
+</histogram>
+
+<histogram name="SB2.UpdateSizeForeground" units="bytes">
+  <owner>feng@chromium.org</owner>
+  <summary>
+    The size of all the chunk URLs in an update response when Chrome is in the
+    background.
+  </summary>
+</histogram>
+
 <histogram name="SB2.UpdateUrls">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The number of chunk URLs in an update response.</summary>
@@ -24011,8 +24077,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>mattm@chromium.org</owner>
   <summary>
     Records the total time it takes for the SafeBrowsing download service to
-    check whether the content of a download is malicious or not. This histogram
-    only includes requests that are sent to the SafeBrowsing server.
+    check whether the content of a download is malicious or not, including file
+    feature extraction, whitelist checking, and server ping. This histogram only
+    includes checks that sent a ping to the SafeBrowsing server. It does not
+    include requests that were cancelled, but does include requests that
+    received a bad response.
   </summary>
 </histogram>
 
@@ -24020,6 +24089,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>mattm@chromium.org</owner>
   <summary>
     The net error code for all CheckClientDownloadRequest URLFetchers.
+  </summary>
+</histogram>
+
+<histogram name="SBClientDownload.DownloadRequestNetworkDuration"
+    units="milliseconds">
+  <owner>mattm@chromium.org</owner>
+  <summary>
+    Records the time it takes for the SafeBrowsing download service ping. It is
+    not recorded for requests that were cancelled.
+  </summary>
+</histogram>
+
+<histogram name="SBClientDownload.DownloadRequestNetworkStats"
+    enum="SBClientDownloadCheckDownloadStats">
+  <owner>mattm@chromium.org</owner>
+  <summary>
+    Records the results of SafeBrowsing binary download checks which caused a
+    server ping.
   </summary>
 </histogram>
 
@@ -24035,6 +24122,27 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     For CheckClientDownloadRequest URLFetchers with successful status, the HTTP
     response code that was received.
+  </summary>
+</histogram>
+
+<histogram name="SBClientDownload.DownloadRequestTimeoutDuration"
+    units="milliseconds">
+  <owner>mattm@chromium.org</owner>
+  <summary>
+    Records the portion of the SafeBrowsing download service check starting with
+    the point CheckClientDownloadRequest::StartTimeout() is called. It is
+    recorded regardless if a ping was sent or not. It is not recorded for
+    requests that were cancelled.
+  </summary>
+</histogram>
+
+<histogram name="SBClientDownload.DownloadRequestTimeoutStats"
+    enum="SBClientDownloadCheckDownloadStats">
+  <owner>mattm@chromium.org</owner>
+  <summary>
+    For SafeBrowsing binary download checks which reached the
+    CheckClientDownloadRequest::StartTimeout() call, records the final result
+    (once the check finishes or is cancelled).
   </summary>
 </histogram>
 
@@ -24514,6 +24622,51 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Records result of fetching and parsing OEM customization manifest. See
     ServicesCustomizationDocument class for more info. Used only on Chrome OS.
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorker.Database.OpenResult"
+    enum="ServiceWorkerDatabaseStatus">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    Records result of opening a database for ServiceWorkerDatabase.
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorker.Database.ReadResult"
+    enum="ServiceWorkerDatabaseStatus">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>Records result of read operations in ServiceWorkerDatabase.</summary>
+</histogram>
+
+<histogram name="ServiceWorker.Database.WriteResult"
+    enum="ServiceWorkerDatabaseStatus">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    Records result of write operations in ServiceWorkerDatabase.
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorker.DiskCache.InitResult">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    Records result of opening a disk cache for ServiceWorkerDiskCache.
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorker.DiskCache.ReadResponseResult"
+    enum="ServiceWorkerReadResponseResult">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    Records result of reading response from ServiceWorkerDiskCache.
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorker.DiskCache.WriteResponseResult"
+    enum="ServiceWorkerWriteResponseResult">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    Records result of writing response into ServiceWorkerDiskCache.
   </summary>
 </histogram>
 
@@ -31736,6 +31889,34 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>The success or failure of web fonts CORS-enabled fetching.</summary>
 </histogram>
 
+<histogram name="WebFont.DiskCache.ReuseCount.Evict">
+  <owner>kenjibaheux@chromium.org</owner>
+  <owner>ksakamoto@chromium.org</owner>
+  <summary>
+    When a cache entry for a font in Google Fonts is evicted, records the reuse
+    count of the cache entry.
+  </summary>
+</histogram>
+
+<histogram name="WebFont.DiskCache.ReuseCount.Hit">
+  <owner>kenjibaheux@chromium.org</owner>
+  <owner>ksakamoto@chromium.org</owner>
+  <summary>
+    Recorded upon a cache hit for a font in Google Fonts. Records the reuse
+    count of the cache entry.
+  </summary>
+</histogram>
+
+<histogram name="WebFont.DiskCacheHit" enum="WebFontDiskCacheHit">
+  <owner>kenjibaheux@chromium.org</owner>
+  <owner>ksakamoto@chromium.org</owner>
+  <summary>
+    Whether the font was in the cache or not. &quot;Previously in the
+    cache&quot; means there was an evicted entry for the font in the cache.
+    Recorded upon a disk cache query for a font in Google Fonts.
+  </summary>
+</histogram>
+
 <histogram name="WebFont.DownloadTime.0.Under10KB" units="milliseconds">
   <owner>kenjibaheux@chromium.org</owner>
   <owner>ksakamoto@chromium.org</owner>
@@ -32320,7 +32501,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="WrenchMenu.RecentTabsSubMenu" enum="RecentTabsAction">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>rpop@chromium.org</owner>
   <summary>
     The number of times each tab or window restore option in the Recent Tabs
     submenu is clicked.
@@ -34733,6 +34914,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
       label="Restrict the UDP port range used by the remote access host"/>
   <int value="265" label="Enables the old web-based signin"/>
   <int value="266" label="Block developer mode"/>
+  <int value="267" label="Show the apps shortcut in the bookmark bar"/>
 </enum>
 
 <enum name="EnterprisePolicyInvalidations" type="int">
@@ -35014,8 +35196,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="28" label="DELETED_FILEBROWSERPRIVATE_ISFULLSCREEN"/>
   <int value="29" label="AUTOTESTPRIVATE_LOGOUT"/>
   <int value="30" label="EXPERIMENTAL_HISTORY_GETMOSTVISITED"/>
-  <int value="31" label="BLUETOOTH_DISCONNECT"/>
-  <int value="32" label="BLUETOOTH_SETOUTOFBANDPAIRINGDATA"/>
+  <int value="31" label="DELETED_BLUETOOTH_DISCONNECT"/>
+  <int value="32" label="DELETED_BLUETOOTH_SETOUTOFBANDPAIRINGDATA"/>
   <int value="33" label="BOOKMARKMANAGERPRIVATE_CANPASTE"/>
   <int value="34" label="AUTOTESTPRIVATE_RESTART"/>
   <int value="35" label="USB_CLAIMINTERFACE"/>
@@ -35121,7 +35303,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="135" label="CONTEXTMENUS_UPDATE"/>
   <int value="136" label="BOOKMARKS_SEARCH"/>
   <int value="137" label="EXPERIMENTAL_APP_CLEARALLNOTIFICATIONS"/>
-  <int value="138" label="BLUETOOTH_GETLOCALOUTOFBANDPAIRINGDATA"/>
+  <int value="138" label="DELETED_BLUETOOTH_GETLOCALOUTOFBANDPAIRINGDATA"/>
   <int value="139" label="SYSTEMPRIVATE_GETUPDATESTATUS"/>
   <int value="140" label="FONTSETTINGS_CLEARMINIMUMFONTSIZE"/>
   <int value="141" label="DELETED_FILEBROWSERPRIVATE_GETFILELOCATIONS"/>
@@ -35259,11 +35441,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="272" label="PAGEACTIONS_DISABLEFORTAB"/>
   <int value="273" label="DEVELOPERPRIVATE_ALLOWFILEACCESS"/>
   <int value="274" label="FILEBROWSERPRIVATE_REMOVEMOUNT"/>
-  <int value="275" label="BLUETOOTH_CONNECT"/>
+  <int value="275" label="DELETED_BLUETOOTH_CONNECT"/>
   <int value="276" label="TABCAPTURE_CAPTURE"/>
   <int value="277" label="NOTIFICATIONS_CREATE"/>
   <int value="278" label="TABS_DUPLICATE"/>
-  <int value="279" label="BLUETOOTH_WRITE"/>
+  <int value="279" label="DELETED_BLUETOOTH_WRITE"/>
   <int value="280" label="PAGEACTION_SHOW"/>
   <int value="281" label="WALLPAPERPRIVATE_GETTHUMBNAIL"/>
   <int value="282" label="DOWNLOADS_PAUSE"/>
@@ -35329,7 +35511,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="342" label="BROWSERACTION_SETPOPUP"/>
   <int value="343" label="TABS_GETSELECTED"/>
   <int value="344" label="FONTSETTINGS_GETFONT"/>
-  <int value="345" label="BLUETOOTH_READ"/>
+  <int value="345" label="DELETED_BLUETOOTH_READ"/>
   <int value="346" label="WEBREQUESTINTERNAL_EVENTHANDLED"/>
   <int value="347" label="EVENTS_ADDRULES"/>
   <int value="348" label="CONTEXTMENUS_CREATE"/>
@@ -35437,8 +35619,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="450" label="NETWORKINGPRIVATE_GETMANAGEDPROPERTIES"/>
   <int value="451" label="LOCATION_WATCHLOCATION"/>
   <int value="452" label="LOCATION_CLEARWATCH"/>
-  <int value="453" label="BLUETOOTH_ADDPROFILE"/>
-  <int value="454" label="BLUETOOTH_REMOVEPROFILE"/>
+  <int value="453" label="DELETED_BLUETOOTH_ADDPROFILE"/>
+  <int value="454" label="DELETED_BLUETOOTH_REMOVEPROFILE"/>
   <int value="455" label="DELETED_BLUETOOTH_GETPROFILES"/>
   <int value="456" label="EXPERIMENTAL_IDENTITY_REMOVECACHEDAUTHTOKEN"/>
   <int value="457" label="AUDIO_GETINFO"/>
@@ -35701,10 +35883,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="709" label="BLUETOOTHPRIVATE_SETPAIRINGRESPONSE"/>
   <int value="710" label="NETWORKINGPRIVATE_GETCAPTIVEPORTALSTATUS"/>
   <int value="711" label="AUTOMATIONINTERNAL_PERFORMACTION"/>
-  <int value="712" label="BLUETOOTH_UPDATE_SOCKET"/>
-  <int value="713" label="BLUETOOTH_SET_SOCKET_PAUSED"/>
-  <int value="714" label="BLUETOOTH_GET_SOCKET"/>
-  <int value="715" label="BLUETOOTH_GET_SOCKETS"/>
+  <int value="712" label="DELETED_BLUETOOTH_UPDATE_SOCKET"/>
+  <int value="713" label="DELETED_BLUETOOTH_SET_SOCKET_PAUSED"/>
+  <int value="714" label="DELETED_BLUETOOTH_GET_SOCKET"/>
+  <int value="715" label="DELETED_BLUETOOTH_GET_SOCKETS"/>
   <int value="716" label="FILESYSTEMPROVIDER_UNMOUNT"/>
   <int value="717" label="FILESYSTEMPROVIDERINTERNAL_UNMOUNTREQUESTEDSUCCESS"/>
   <int value="718" label="FILESYSTEMPROVIDERINTERNAL_UNMOUNTREQUESTEDERROR"/>
@@ -35780,6 +35962,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="783" label="STREAMSPRIVATE_ABORT"/>
   <int value="784" label="MANAGEMENT_SETLAUNCHTYPE"/>
   <int value="785" label="MANAGEMENT_GENERATEAPPFORLINK"/>
+  <int value="786" label="GUESTVIEWINTERNAL_ALLOCATEINSTANCEID"/>
+  <int value="787" label="WEBVIEW_NAVIGATE"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -41008,6 +41192,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="286711" label="PPB_FlashFullscreen;0.1"/>
   <int value="2804066" label="PPB_AudioConfig;1.1"/>
   <int value="8760108" label="PPB_Testing_Private;1.0"/>
+  <int value="12033600" label="PPB_Compositor;0.1"/>
   <int value="13662160" label="PPB_CharSet(Dev);0.4"/>
   <int value="22816901" label="PPB_FileChooser(Dev);0.5"/>
   <int value="28187368" label="PPB_IMEInputEvent(Dev);0.2"/>
@@ -41015,12 +41200,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="62905097" label="PPB_TrueTypeFont(Dev);0.1"/>
   <int value="79708274" label="PPB_TCPSocket;1.1"/>
   <int value="110360074" label="PPB_Var;1.1"/>
+  <int value="126651696" label="PPB_ContentDecryptor_Private;0.12"/>
   <int value="138418890" label="PPB_Memory(Dev);0.1"/>
   <int value="153443470" label="PPB_URLResponseInfo;1.0"/>
   <int value="153532707" label="PPB_Buffer(Dev);0.4"/>
   <int value="156766028" label="PPB_UMA_Private;0.3"/>
   <int value="162107265" label="PPB_NetworkMonitor;1.0"/>
   <int value="180906214" label="PPB_Instance_Private;0.1"/>
+  <int value="206043276" label="PPB_CompositorLayer;0.1"/>
   <int value="221802429" label="PPB_URLUtil(Dev);0.7"/>
   <int value="225125520" label="PPB_Find(Private);0.3"/>
   <int value="226206264" label="PPB_FileRef;1.1"/>
@@ -41260,6 +41447,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="LOAD_FAILED"/>
   <int value="2" label="ENTRY_POINT_MISSING"/>
   <int value="3" label="INIT_FAILED"/>
+  <int value="4" label="FILE_MISSING"/>
 </enum>
 
 <enum name="PNaClOptionsOptLevelEnum" type="int">
@@ -42780,6 +42968,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="8" label="SERVICE_UTILITY_SEMANTIC_CAPS_REQUEST"/>
   <int value="9" label="SERVICE_UTILITY_SEMANTIC_CAPS_SUCCEEDED"/>
   <int value="10" label="SERVICE_UTILITY_SEMANTIC_CAPS_FAILED"/>
+</enum>
+
+<enum name="ServiceWorkerDatabaseStatus" type="int">
+  <int value="0" label="OK"/>
+  <int value="1" label="Not Found Error"/>
+  <int value="2" label="IO Error"/>
+  <int value="3" label="Corruption Error"/>
+  <int value="4" label="Operation Error"/>
+</enum>
+
+<enum name="ServiceWorkerReadResponseResult" type="int">
+  <int value="0" label="OK"/>
+  <int value="1" label="Read headers error"/>
+  <int value="2" label="Read data error"/>
+</enum>
+
+<enum name="ServiceWorkerWriteResponseResult" type="int">
+  <int value="0" label="OK"/>
+  <int value="1" label="Write headers error"/>
+  <int value="2" label="Write data error"/>
 </enum>
 
 <enum name="SessionStartupPref" type="int">
@@ -44694,6 +44902,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="Served from data URL"/>
 </enum>
 
+<enum name="WebFontDiskCacheHit" type="int">
+  <int value="0" label="Not in the cache"/>
+  <int value="1" label="In the cache"/>
+  <int value="2" label="Previously in the cache"/>
+</enum>
+
 <enum name="WebFontUsageType" type="int">
   <int value="0" label="Styled, and used"/>
   <int value="1" label="Styled, but not used"/>
@@ -45783,6 +45997,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <suffix name="CONNECTION_4G" label="mobile 4G are tallied."/>
   <suffix name="CONNECTION_NONE"
       label="NO(?) network are tallied (should be empty)."/>
+  <suffix name="CONNECTION_BLUETOOTH"
+      label="Bluetooth are tallied, but this may include connections to a
+             mobile hotspot."/>
   <affected-histogram
       name="Net.QuicSession.21CumulativePacketsReceived_First21"/>
   <affected-histogram
@@ -47859,6 +48076,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram_suffixes name="TrackedSplitPreferences" separator=".">
   <suffix name="extensions.settings" label="Extension IDs dictionary"/>
   <affected-histogram name="Settings.TrackedSplitPreferenceChanged"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="WebFontFamily">
+  <suffix name="roboto" label="Roboto font"/>
+  <suffix name="opensans" label="Open Sans font"/>
+  <suffix name="others" label="Fonts other than Roboto and Open Sans"/>
+  <affected-histogram name="WebFont.DiskCache.ReuseCount.Evict"/>
+  <affected-histogram name="WebFont.DiskCache.ReuseCount.Hit"/>
+  <affected-histogram name="WebFont.DiskCacheHit"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="WebStoreLinkExperiment">

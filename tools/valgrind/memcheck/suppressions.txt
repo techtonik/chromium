@@ -701,20 +701,6 @@
    fun:_ZN19WebSharedWorkerStub9OnConnectEii
 }
 {
-   # GTK tooltip doesn't always initialize variables.
-   # https://bugzilla.gnome.org/show_bug.cgi?id=554686
-   tooltip_554686
-   Memcheck:Uninitialized
-   fun:child_location_foreach
-   fun:gtk_fixed_forall
-   ...
-   fun:find_widget_under_pointer
-   fun:gtk_tooltip_show_tooltip
-   fun:tooltip_popup_timeout
-   fun:gdk_threads_dispatch
-   fun:g_timeout_dispatch
-}
-{
    bug_29675
    Memcheck:Leak
    fun:_Znw*
@@ -2378,61 +2364,6 @@
    fun:_ZN3net9HttpCache17CreateTransactionEP10scoped_ptrINS_15HttpTransactionEE
    ...
    fun:_ZN3net13CookieMonster17CookieMonsterTask14InvokeCallbackEN4base8CallbackIFvvEEE
-}
-{
-   bug_96369
-   Memcheck:Leak
-   fun:malloc
-   fun:g_malloc
-   fun:g_slice_alloc
-   fun:g_slice_alloc0
-   fun:g_type_create_instance
-   fun:g_object_constructor
-   fun:g_object_newv
-   fun:g_object_new
-   fun:_gdk_window_impl_new
-   fun:gdk_window_ensure_native
-   fun:gdk_x11_drawable_get_xid
-   fun:_ZN20GtkNativeViewManager14GetIdForWidgetEP10_GtkWidget
-   fun:_ZNK7content23RenderWidgetHostViewGtk15GetNativeViewIdEv
-}
-{
-   bug_96402
-   Memcheck:Leak
-   fun:malloc
-   fun:g_malloc
-   fun:g_slice_alloc
-   fun:g_slice_alloc0
-   fun:g_type_create_instance
-   fun:g_object_constructor
-   fun:g_object_newv
-   fun:g_object_new
-   fun:_gdk_window_impl_new
-   fun:gdk_window_ensure_native
-   fun:gdk_x11_drawable_get_xid
-   ...
-   fun:g_closure_invoke
-   fun:signal_emit_unlocked_R
-   fun:g_signal_emit_valist
-   fun:g_signal_emit
-   fun:gtk_widget_realize
-   fun:gtk_widget_set_parent
-}
-{
-   bug_96407
-   Memcheck:Leak
-   fun:malloc
-   fun:g_malloc
-   fun:g_slice_alloc
-   fun:g_slice_alloc0
-   fun:g_type_create_instance
-   fun:g_object_constructor
-   fun:g_object_newv
-   fun:g_object_new
-   fun:_gdk_window_impl_new
-   fun:gdk_window_ensure_native
-   fun:gdk_x11_drawable_get_xid
-   fun:_ZN19TestWebViewDelegate20CreatePluginDelegateE*
 }
 {
    bug_96568a
@@ -4389,18 +4320,6 @@
    fun:_ZN10extensions11ImageLoader15LoadImagesAsyncEPKNS_9ExtensionERKSt6vectorINS0_19ImageRepresentationESaIS5_EERKN4base8CallbackIFvRKN3gfx5ImageEEEE
 }
 {
-   bug_166818
-   Memcheck:Leak
-   fun:malloc
-   fun:g_malloc
-   ...
-   fun:gdk_pixbuf_loader_load_module
-   fun:gdk_pixbuf_loader_close
-   fun:_ZN2ui12_GLOBAL__N_110LoadPixbufEPN4base22RefCountedStaticMemoryEb
-   fun:_ZN2ui14ResourceBundle19GetNativeImageNamedEiNS0_8ImageRTLE
-   fun:_ZN2ui14ResourceBundle19GetNativeImageNamedEi
-}
-{
    bug_166819
    Memcheck:Leak
    fun:_Znw*
@@ -4650,65 +4569,6 @@
    fun:_ZN13WebTestRunner12WebTestProxyI11WebViewHostP9TestShellE12createPluginEPN5blink8WebFrameERKNS5_15WebPluginParamsE
    fun:_ZN5blink21FrameLoaderClientImpl12createPluginERKN7WebCore7IntSizeEPNS1_17HTMLPlugInElementERKNS1_4KURLERKN3WTF6VectorINSA_6String*
    fun:_ZN7WebCore14SubframeLoader10loadPluginEPNS_22HTMLPlugInImageElementERKNS_4KURLERKN3WTF6StringERKNS6_6VectorIS7*
-}
-{
-   bug_176888
-   Memcheck:Leak
-   fun:malloc
-   fun:strdup
-   fun:p11_kit_registered_module_to_name
-   fun:gnutls_pkcs11_init
-   fun:gnutls_global_init
-   fun:_ZN12_GLOBAL__N_117GcryptInitializer4InitEv
-   fun:_ZN12_GLOBAL__N_117GcryptInitializerC*
-   fun:_ZN4base25DefaultLazyInstanceTraitsIN12_GLOBAL__N_117GcryptInitializerEE3NewEPv
-}
-{
-   bug_176889_a
-   Memcheck:Uninitialized
-   fun:inflateReset2
-   fun:inflateInit2_
-   fun:png_create_read_struct_2
-   obj:/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-png.so
-   obj:/usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so.0.2600.1
-   fun:gdk_pixbuf_loader*
-}
-{
-   bug_176889_b
-   Memcheck:Uninitialized
-   fun:sse2_composite_over_8888_8888
-   ...
-   fun:gdk_pixbuf_loader_close
-}
-{
-   bug_176889_c
-   Memcheck:Uninitialized
-   fun:sse2_combine_over_u
-   ...
-   fun:gdk_pixbuf_loader_close
-}
-{
-   bug_176889_d
-   Memcheck:Uninitialized
-   obj:*/librsvg-2.so*
-   fun:rsvg_handle_get_pixbuf_sub
-   obj:*/libpixbufloader-svg.so
-   fun:gdk_pixbuf_loader_close
-}
-{
-   bug_176889_e
-   Memcheck:Uninitialized
-   fun:gdk_pixbuf_saturate_and_pixelate
-}
-{
-   bug_176889_f
-   Memcheck:Uninitialized
-   fun:cache_magic_matchlet_compare
-   fun:__gio_xdg_cache_get_mime_type_for_data
-   fun:g_content_type_guess
-   obj:/usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so.0.2600.1
-   obj:/usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so.0.2600.1
-   fun:gdk_pixbuf_loader_close
 }
 {
    bug_176891a
@@ -5811,21 +5671,19 @@
    fun:_ZN12_GLOBAL__N_119test_pm_conversionsEP9GrContextPiS2_
    fun:_ZN9GrContext19createPMToUPMEffectEP9GrTexturebRK8SkMatrix
    fun:_ZN9GrContext22readRenderTargetPixelsEP14GrRenderTargetiiii13GrPixelConfigPvmj
-   fun:_ZN11SkGpuDevice12onReadPixelsERK8SkBitmapiiN8SkCanvas10Config8888E
-   fun:_ZN12SkBaseDevice10readPixelsEP8SkBitmapiiN8SkCanvas10Config8888E
-   fun:_ZN8SkCanvas10readPixelsEP8SkBitmapiiNS_10Config8888E
-   fun:_ZN14DeferredDevice12onReadPixelsERK8SkBitmapiiN8SkCanvas10Config8888E
-   fun:_ZN12SkBaseDevice10readPixelsEP8SkBitmapiiN8SkCanvas10Config8888E
-   fun:_ZN8SkCanvas10readPixelsEP8SkBitmapiiNS_10Config8888E
-   fun:_ZN7WebCore15GraphicsContext10readPixelsEP8SkBitmapiiN8SkCanvas10Config8888E
-   fun:_ZN7WebCore12getImageDataILNS_8MultiplyE1EEEN3WTF10PassRefPtrINS2_17Uint8ClampedArrayEEERKNS_7IntRectEPNS_15GraphicsContextERKNS_7IntSizeE
-   fun:_ZNK7WebCore11ImageBuffer24getUnmultipliedImageDataERKNS_7IntRectENS0_16CoordinateSystemE
-   fun:_ZNK7WebCore24CanvasRenderingContext2D12getImageDataENS_11ImageBuffer16CoordinateSystemEffffRNS_14ExceptionStateE
-   fun:_ZNK7WebCore24CanvasRenderingContext2D12getImageDataEffffRNS_14ExceptionStateE
+   fun:_ZN11SkGpuDevice12onReadPixelsE*
+   fun:_ZN12SkBaseDevice10readPixelsE*
+   fun:_ZN8SkCanvas10readPixelsE*
+   fun:_ZN*DeferredDevice12onReadPixelsE*
+   fun:_ZN12SkBaseDevice10readPixelsE*
+   fun:_ZN8SkCanvas10readPixelsE*
+   fun:_ZN7WebCore15GraphicsContext10readPixelsE*
+   fun:_ZN7WebCore12getImageDataILNS_8MultiplyE*
+   fun:_ZNK7WebCore11ImageBuffer24getUnmultipliedImageDataE*
+   fun:_ZNK7WebCore24CanvasRenderingContext2D12getImageDataE*
+   ...
    fun:_ZN7WebCore34CanvasRenderingContext2DV8InternalL18getImageDataMethodERKN2v820FunctionCallbackInfoINS1_5ValueEEE
    fun:_ZN7WebCore34CanvasRenderingContext2DV8InternalL26getImageDataMethodCallbackERKN2v820FunctionCallbackInfoINS1_5ValueEEE
-   fun:_ZN2v88internal25FunctionCallbackArguments4CallEPFvRKNS_20FunctionCallbackInfoINS_5ValueEEEE
-   fun:_ZN2v88internalL19HandleApiCallHelperILb0EEEPNS0_11MaybeObjectENS0_12_GLOBAL__N_116BuiltinArgumentsILNS0_21BuiltinExtraArgumentsE1EEEPNS0_7IsolateE
 }
 {
    bug_309468
@@ -6507,4 +6365,58 @@
    ...
    fun:_ZN7content28ShellURLRequestContextGetter20GetURLRequestContextEv
    fun:_ZN7content21ChromeAppCacheService20InitializeOnIOThreadERKN4base8FilePathEPNS_15ResourceContextEPN3net23URLRequestContextGetterE13scoped_refptrIN5quota20SpecialStoragePolicyEE
+}
+{
+   bug_381065
+   Memcheck:Leak
+   fun:_Znw*
+   ...
+   fun:_ZN7WebCore18ModulesInitializer20registerEventFactoryEv
+   fun:_ZN7WebCore15CoreInitializer4initEv
+   fun:_ZN5blink19initializeWithoutV8EPNS_8PlatformE
+   fun:_ZN5blink10initializeEPNS_8PlatformE
+   fun:_ZN7content25TestWebKitPlatformSupportC2Ev
+   fun:_ZN7content25TestWebKitPlatformSupportC1Ev
+   fun:_ZN7content17UnitTestTestSuiteC2EPN4base9TestSuiteE
+   fun:_ZN7content17UnitTestTestSuiteC1EPN4base9TestSuiteE
+}
+{
+   bug_381156
+   Memcheck:Uninitialized
+   ...
+   fun:_ZN*14SkTDynamicHashI10SkFlatData*
+   fun:_ZN16SkFlatDictionaryI7SkPaintNS0_16FlatteningTraitsEE24findAndReturnMutableFlatERKS0_
+   fun:_ZN16SkFlatDictionaryI7SkPaintNS0_16FlatteningTraitsEE17findAndReturnFlatERKS0_
+   fun:_ZN15SkPictureRecord16getFlatPaintDataERK7SkPaint
+   fun:_ZN15SkPictureRecord11addPaintPtrEPK7SkPaint
+   fun:_ZN15SkPictureRecord8addPaintERK7SkPaint
+   fun:_ZN15SkPictureRecord8drawPathERK6SkPathRK7SkPaint
+   fun:_ZN12SkBBoxRecord8drawPathERK6SkPathRK7SkPaint
+   fun:_ZN7WebCore15GraphicsContext8drawPathERK6SkPathRK7SkPaint
+   fun:_ZN7WebCore15GraphicsContext10strokePathERKNS_4PathE
+   fun:_ZNK7WebCore14RenderSVGShape11strokeShapeEPNS_15GraphicsContextE
+   fun:_ZNK7WebCore13RenderSVGPath11strokeShapeEPNS_15GraphicsContextE
+   fun:_ZN7WebCore27RenderSVGResourceSolidColor17postApplyResourceEPNS_12RenderObjectERPNS_15GraphicsContextEtPKNS_4PathEPKNS_14RenderSVGShapeE
+   fun:_ZN7WebCore14RenderSVGShape11strokeShapeEPNS_11RenderStyleEPNS_15GraphicsContextE
+   fun:_ZN7WebCore14RenderSVGShape5paintERNS_9PaintInfoERKNS_11LayoutPointE
+   fun:_ZN7WebCore9RenderBox5paintERNS_9PaintInfoERKNS_11LayoutPointE
+   fun:_ZN7WebCore13RenderSVGRoot13paintReplacedERNS_9PaintInfoERKNS_11LayoutPointE
+   fun:_ZN7WebCore14RenderReplaced5paintERNS_9PaintInfoERKNS_11LayoutPointE
+   fun:_ZN7WebCore11RenderBlock18paintAsInlineBlockEPNS_12RenderObjectERNS_9PaintInfoERKNS_11LayoutPointE
+}
+{
+   bug_381584
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN4base8internal20PostTaskAndReplyImpl16PostTaskAndReplyERKN15tracked_objects8LocationERKNS_8CallbackIFvvEEESA_
+   fun:_ZN4base10TaskRunner16PostTaskAndReplyERKN15tracked_objects8LocationERKNS_8CallbackIFvvEEES9_
+   fun:_ZN4base26PostTaskAndReplyWithResultI13scoped_refptrIN8chromeos8OwnerKeyEES4_EEbPNS_10TaskRunnerERKN15tracked_objects8LocationERKNS_8CallbackIFT_vEEERKNSB_IFvT0_EEE
+   fun:_ZN8chromeos23SessionManagerOperation14EnsureOwnerKeyERKN4base8CallbackIFvvEEE
+   fun:_ZN8chromeos23SessionManagerOperation12StartLoadingEv
+   fun:_ZN8chromeos21LoadSettingsOperation3RunEv
+   fun:_ZN8chromeos23SessionManagerOperation5StartEPNS_20SessionManagerClientE13scoped_refptrINS_12OwnerKeyUtilEES3_INS_8OwnerKeyEE
+   fun:_ZN8chromeos21DeviceSettingsService18StartNextOperationEv
+   fun:_ZN8chromeos21DeviceSettingsService7EnqueueEPNS_23SessionManagerOperationE
+   fun:_ZN8chromeos21DeviceSettingsService11EnqueueLoadEb
+   fun:_ZN8chromeos21DeviceSettingsService4LoadEv
 }

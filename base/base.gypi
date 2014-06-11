@@ -194,8 +194,12 @@
           'files/file_path_constants.cc',
           'files/file_path_watcher.cc',
           'files/file_path_watcher.h',
+          'files/file_path_watcher_fsevents.cc',
+          'files/file_path_watcher_fsevents.h',
           'files/file_path_watcher_kqueue.cc',
+          'files/file_path_watcher_kqueue.h',
           'files/file_path_watcher_linux.cc',
+          'files/file_path_watcher_mac.cc',
           'files/file_path_watcher_stub.cc',
           'files/file_path_watcher_win.cc',
           'files/file_posix.cc',
@@ -327,7 +331,6 @@
           'memory/ref_counted_delete_on_message_loop.h',
           'memory/ref_counted_memory.cc',
           'memory/ref_counted_memory.h',
-          'memory/scoped_handle.h',
           'memory/scoped_open_process.h',
           'memory/scoped_policy.h',
           'memory/scoped_ptr.h',
@@ -357,6 +360,7 @@
           'message_loop/message_pump_default.h',
           'message_loop/message_pump_win.cc',
           'message_loop/message_pump_win.h',
+          'message_loop/timer_slack.h',
           'metrics/sample_map.cc',
           'metrics/sample_map.h',
           'metrics/sample_vector.cc',
@@ -751,7 +755,10 @@
                'file_util.cc',
                'file_util_posix.cc',
                'files/file_enumerator_posix.cc',
+               'files/file_path_watcher_fsevents.cc',
+               'files/file_path_watcher_fsevents.h',
                'files/file_path_watcher_kqueue.cc',
+               'files/file_path_watcher_kqueue.h',
                'files/file_proxy.cc',
                'files/file_util_proxy.cc',
                'memory/shared_memory_posix.cc',
@@ -772,7 +779,7 @@
               ['include', '^threading/platform_thread_linux\\.cc$'],
             ],
           }],
-          ['OS == "android" and _toolset == "target"', {
+          ['OS == "android" and _toolset == "target" and >(nacl_untrusted_build)==0', {
            'sources': [
              'memory/discardable_memory_ashmem_allocator.cc',
              'memory/discardable_memory_ashmem_allocator.h',
@@ -783,7 +790,10 @@
           ['OS == "android" and >(nacl_untrusted_build)==0', {
             'sources!': [
               'base_paths_posix.cc',
+              'files/file_path_watcher_fsevents.cc',
+              'files/file_path_watcher_fsevents.h',
               'files/file_path_watcher_kqueue.cc',
+              'files/file_path_watcher_kqueue.h',
               'files/file_path_watcher_stub.cc',
               'power_monitor/power_monitor_device_source_posix.cc',
             ],
@@ -848,6 +858,9 @@
               ['include', '^process/.*_ios\.(cc|mm)$'],
               ['include', '^process/memory_stubs\.cc$'],
               ['include', '^process/process_handle_posix\.cc$'],
+              ['exclude', 'files/file_path_watcher_fsevents.cc'],
+              ['exclude', 'files/file_path_watcher_fsevents.h'],
+              ['include', 'files/file_path_watcher_mac.cc'],
             ],
             'sources': [
               'process/memory_stubs.cc',
@@ -863,6 +876,9 @@
               ['include', '(^|/)(cocoa|mac)/'],
               ['exclude', '_ios(_unittest)?\\.(h|cc|mm?)$'],
               ['exclude', '(^|/)ios/'],
+              ['exclude', 'files/file_path_watcher_fsevents.cc'],
+              ['exclude', 'files/file_path_watcher_fsevents.h'],
+              ['include', 'files/file_path_watcher_mac.cc'],
             ]
           }],
           # For now, just test the *BSD platforms enough to exclude them.
@@ -881,7 +897,10 @@
             ],
             'sources!': [
               'event_recorder_stubs.cc',
+              'files/file_path_watcher_fsevents.cc',
+              'files/file_path_watcher_fsevents.h',
               'files/file_path_watcher_kqueue.cc',
+              'files/file_path_watcher_kqueue.h',
               'files/file_path_watcher_stub.cc',
               'message_loop/message_pump_libevent.cc',
               'posix/file_descriptor_shuffle.cc',
@@ -898,7 +917,10 @@
           }],
           ['OS == "linux" and >(nacl_untrusted_build)==0', {
             'sources!': [
+              'files/file_path_watcher_fsevents.cc',
+              'files/file_path_watcher_fsevents.h',
               'files/file_path_watcher_kqueue.cc',
+              'files/file_path_watcher_kqueue.h',
               'files/file_path_watcher_stub.cc',
             ],
           }],

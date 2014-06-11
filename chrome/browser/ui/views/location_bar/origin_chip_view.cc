@@ -145,6 +145,8 @@ OriginChipView::OriginChipView(LocationBarView* location_bar_view,
       profile_(profile),
       showing_16x16_icon_(false),
       fade_in_animation_(this) {
+  EnableCanvasFlippingForRTLUI(true);
+
   scoped_refptr<SafeBrowsingService> sb_service =
       g_browser_process->safe_browsing_service();
   // May not be set for unit tests.
@@ -152,8 +154,6 @@ OriginChipView::OriginChipView(LocationBarView* location_bar_view,
     sb_service->ui_manager()->AddObserver(this);
 
   SetFontList(font_list);
-
-  image()->EnableCanvasFlippingForRTLUI(false);
 
   // TODO(gbillock): Would be nice to just use stock LabelButton stuff here.
   location_icon_view_ = new LocationIconView(location_bar_view_);
@@ -164,12 +164,12 @@ OriginChipView::OriginChipView(LocationBarView* location_bar_view,
 
   ev_label_ = new views::Label(base::string16(), GetFontList());
   ev_label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-  ev_label_->SetElideBehavior(views::Label::NO_ELIDE);
+  ev_label_->SetElideBehavior(gfx::TRUNCATE);
   AddChildView(ev_label_);
 
   host_label_ = new views::Label(base::string16(), GetFontList());
   host_label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-  host_label_->SetElideBehavior(views::Label::NO_ELIDE);
+  host_label_->SetElideBehavior(gfx::TRUNCATE);
   AddChildView(host_label_);
 
   fade_in_animation_.SetTweenType(gfx::Tween::LINEAR_OUT_SLOW_IN);

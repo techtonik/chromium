@@ -12,10 +12,12 @@
       'type': 'executable',
       'dependencies': [
         '../athena.gyp:athena_lib',
+        '../athena.gyp:athena_content_lib',
         '../../apps/shell/app_shell.gyp:app_shell_lib',
         '../../skia/skia.gyp:skia',
         '../../ui/accessibility/accessibility.gyp:ax_gen',
         '../../ui/views/views.gyp:views',
+        '../../url/url.gyp:url_lib',
       ],
       'include_dirs': [
         '../..',
@@ -26,10 +28,6 @@
         'athena_main.cc',
         'placeholder.cc',
         'placeholder.h',
-        'placeholder_content.cc',
-        'placeholder_content.h',
-        'web_activity.cc',
-        'web_activity.h',
       ],
     },
     {
@@ -48,8 +46,6 @@
       ],
       'sources': [
         'athena_shell.cc',
-        'sample_activity.cc',
-        'sample_activity.h',
       ],
     }
   ],  # targets

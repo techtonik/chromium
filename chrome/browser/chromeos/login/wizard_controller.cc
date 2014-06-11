@@ -93,7 +93,8 @@ const char *kResumableScreens[] = {
   chromeos::WizardController::kUpdateScreenName,
   chromeos::WizardController::kEulaScreenName,
   chromeos::WizardController::kEnrollmentScreenName,
-  chromeos::WizardController::kTermsOfServiceScreenName
+  chromeos::WizardController::kTermsOfServiceScreenName,
+  chromeos::WizardController::kAutoEnrollmentCheckScreenName
 };
 
 // Checks flag for HID-detection screen show.
@@ -171,6 +172,7 @@ WizardController::WizardController(chromeos::LoginDisplayHost* host,
       host_(host),
       oobe_display_(oobe_display),
       usage_statistics_reporting_(true),
+      skip_update_enroll_after_eula_(false),
       login_screen_started_(false),
       user_image_screen_return_to_previous_hack_(false),
       timezone_resolved_(false),
@@ -536,6 +538,10 @@ void WizardController::OnSessionStart() {
   FOR_EACH_OBSERVER(Observer, observer_list_, OnSessionStart());
 }
 
+void WizardController::SkipUpdateEnrollAfterEula() {
+  skip_update_enroll_after_eula_ = true;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // WizardController, ExitHandlers:
 void WizardController::OnHIDDetectionCompleted() {
@@ -588,7 +594,12 @@ void WizardController::OnEulaAccepted() {
 #endif
   }
 
-  InitiateOOBEUpdate();
+  if (skip_update_enroll_after_eula_) {
+    PerformPostEulaActions();
+    ShowAutoEnrollmentCheckScreen();
+  } else {
+    InitiateOOBEUpdate();
+  }
 }
 
 void WizardController::OnUpdateErrorCheckingForUpdate() {
@@ -875,7 +886,10 @@ void WizardController::OnExit(ExitCodes exit_code) {
       ShowNetworkScreen();
       break;
     case ENTERPRISE_AUTO_ENROLLMENT_CHECK_COMPLETED:
-      OnOOBECompleted();
+      if (skip_update_enroll_after_eula_)
+        ShowEnrollmentScreen();
+      else
+        OnOOBECompleted();
       break;
     case ENTERPRISE_ENROLLMENT_COMPLETED:
       OnEnrollmentDone();

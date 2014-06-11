@@ -83,6 +83,9 @@ FileManager.prototype = {
   get fileTransferController() {
     return this.fileTransferController_;
   },
+  get fileOperationManager() {
+    return this.fileOperationManager_;
+  },
   get backgroundPage() {
     return this.backgroundPage_;
   },
@@ -1266,7 +1269,7 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
       var locationInfo = this.volumeManager_.getLocationInfo(entry);
       if (!locationInfo)
         return;
-      this.metadataCache_.get(entry, 'thumbnail|drive', function(metadata) {
+      this.metadataCache_.getOne(entry, 'thumbnail|drive', function(metadata) {
         var thumbnailLoader_ = new ThumbnailLoader(
             entry,
             ThumbnailLoader.LoaderType.CANVAS,
@@ -1598,9 +1601,29 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
         return;
 
       var task = null;
-
-      // TODO(mtomasz): Implement remounting archives after crash.
-      //                See: crbug.com/333139
+      // Handle restoring after crash, or the gallery action.
+      // TODO(mtomasz): Use the gallery action instead of just the gallery
+      //     field.
+      if (this.params_.gallery ||
+          this.params_.action === 'gallery' ||
+          this.params_.action === 'gallery-video') {
+        if (!opt_selectionEntry) {
+          // Non-existent file or a directory.
+          // Reloading while the Gallery is open with empty or multiple
+          // selection. Open the Gallery when the directory is scanned.
+          task = function() {
+            new FileTasks(this, this.params_).openGallery([]);
+          }.bind(this);
+        } else {
+          // The file or the directory exists.
+          task = function() {
+            new FileTasks(this, this.params_).openGallery([opt_selectionEntry]);
+          }.bind(this);
+        }
+      } else {
+        // TODO(mtomasz): Implement remounting archives after crash.
+        //                See: crbug.com/333139
+      }
 
       // If there is a task to be run, run it after the scan is completed.
       if (task) {
@@ -1877,6 +1900,64 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
   };
 
   /**
+   * Shows a modal-like file viewer/editor on top of the File Manager UI.
+   *
+   * @param {HTMLElement} popup Popup element.
+   * @param {function()} closeCallback Function to call after the popup is
+   *     closed.
+   */
+  FileManager.prototype.openFilePopup = function(popup, closeCallback) {
+    this.closeFilePopup();
+    this.filePopup_ = popup;
+    this.filePopupCloseCallback_ = closeCallback;
+    this.dialogDom_.insertBefore(
+        this.filePopup_, this.dialogDom_.querySelector('#iframe-drag-area'));
+    this.filePopup_.focus();
+    this.document_.body.setAttribute('overlay-visible', '');
+    this.document_.querySelector('#iframe-drag-area').hidden = false;
+  };
+
+  /**
+   * Closes the modal-like file viewer/editor popup.
+   */
+  FileManager.prototype.closeFilePopup = function() {
+    if (this.filePopup_) {
+      this.document_.body.removeAttribute('overlay-visible');
+      this.document_.querySelector('#iframe-drag-area').hidden = true;
+      // The window resize would not be processed properly while the relevant
+      // divs had 'display:none', force resize after the layout fired.
+      setTimeout(this.onResize_.bind(this), 0);
+      if (this.filePopup_.contentWindow &&
+          this.filePopup_.contentWindow.unload) {
+        this.filePopup_.contentWindow.unload();
+      }
+
+      if (this.filePopupCloseCallback_) {
+        this.filePopupCloseCallback_();
+        this.filePopupCloseCallback_ = null;
+      }
+
+      // These operations have to be in the end, otherwise v8 crashes on an
+      // assert. See: crbug.com/224174.
+      this.dialogDom_.removeChild(this.filePopup_);
+      this.filePopup_ = null;
+    }
+  };
+
+  /**
+   * Updates visibility of the draggable app region in the modal-like file
+   * viewer/editor.
+   *
+   * @param {boolean} visible True for visible, false otherwise.
+   */
+  FileManager.prototype.onFilePopupAppRegionChanged = function(visible) {
+    if (!this.filePopup_)
+      return;
+
+    this.document_.querySelector('#iframe-drag-area').hidden = !visible;
+  };
+
+  /**
    * @return {Array.<Entry>} List of all entries in the current directory.
    */
   FileManager.prototype.getAllEntriesInCurrentDirectory = function() {
@@ -1905,20 +1986,6 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
    */
   FileManager.prototype.getCurrentDirectoryEntry = function() {
     return this.directoryModel_ && this.directoryModel_.getCurrentDirEntry();
-  };
-
-  /**
-   * Deletes the selected file and directories recursively.
-   */
-  FileManager.prototype.deleteSelection = function() {
-    // TODO(mtomasz): Remove this temporary dialog. crbug.com/167364
-    var entries = this.getSelection().entries;
-    var message = entries.length == 1 ?
-        strf('GALLERY_CONFIRM_DELETE_ONE', entries[0].name) :
-        strf('GALLERY_CONFIRM_DELETE_SOME', entries.length);
-    this.confirm.show(message, function() {
-      this.fileOperationManager_.deleteEntries(entries);
-    }.bind(this));
   };
 
   /**
@@ -2079,8 +2146,8 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
       return;
     }
 
-    this.metadataCache_.get([entry], 'drive', function(props) {
-      if (!props || !props[0] || !props[0].contentMimeType) {
+    this.metadataCache_.getOne(entry, 'drive', function(prop) {
+      if (!prop || !prop.contentMimeType) {
         onFailure();
         return;
       }
@@ -2089,7 +2156,7 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
       var splitted = util.splitExtension(basename);
       var filename = splitted[0];
       var extension = splitted[1];
-      var mime = props[0].contentMimeType;
+      var mime = prop.contentMimeType;
 
       // Returns with failure if the file has neither extension nor mime.
       if (!extension || !mime) {
@@ -2268,20 +2335,20 @@ var BOTTOM_MARGIN_FOR_PREVIEW_PANEL_PX = 52;
    * @private
    */
   FileManager.prototype.onDirectoryChanged_ = function(event) {
-    var newCurrentVolumeInfo = this.volumeManager_.getVolumeInfo(
+    var oldCurrentVolumeInfo = this.currentVolumeInfo_;
+
+    // Remember the current volume info.
+    this.currentVolumeInfo_ = this.volumeManager_.getVolumeInfo(
         event.newDirEntry);
 
     // If volume has changed, then update the gear menu.
-    if (this.currentVolumeInfo_ !== newCurrentVolumeInfo) {
+    if (oldCurrentVolumeInfo !== this.currentVolumeInfo_) {
       this.updateGearMenu_();
       // If the volume has changed, and it was previously set, then do not
       // close on unmount anymore.
-      if (this.currentVolumeInfo_)
+      if (oldCurrentVolumeInfo)
         this.closeOnUnmount_ = false;
     }
-
-    // Remember the current volume info.
-    this.currentVolumeInfo_ = newCurrentVolumeInfo;
 
     this.selectionHandler_.onFileSelectionChanged();
     this.ui_.searchBox.clear();

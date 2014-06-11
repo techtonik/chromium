@@ -54,8 +54,8 @@ class VisibilityComparator
   // Returns true if |n1| preceeds |n2|.
   bool operator()(const BookmarkPermanentNode* n1,
                   const BookmarkPermanentNode* n2) {
-    bool n1_visible = client_->IsPermanentNodeVisible(n1->type());
-    bool n2_visible = client_->IsPermanentNodeVisible(n2->type());
+    bool n1_visible = client_->IsPermanentNodeVisible(n1);
+    bool n2_visible = client_->IsPermanentNodeVisible(n2);
     return n1_visible != n2_visible && n1_visible;
   }
 
@@ -150,7 +150,7 @@ void BookmarkModel::Load(
 
 const BookmarkNode* BookmarkModel::GetParentForNewNodes() {
   std::vector<const BookmarkNode*> nodes =
-      bookmark_utils::GetMostRecentlyModifiedFolders(this, 1);
+      bookmark_utils::GetMostRecentlyModifiedUserFolders(this, 1);
   DCHECK(!nodes.empty());  // This list is always padded with default folders.
   return nodes[0];
 }
@@ -197,12 +197,12 @@ void BookmarkModel::Remove(const BookmarkNode* parent, int index) {
   RemoveAndDeleteNode(AsMutable(parent->GetChild(index)));
 }
 
-void BookmarkModel::RemoveAll() {
+void BookmarkModel::RemoveAllUserBookmarks() {
   std::set<GURL> removed_urls;
   ScopedVector<BookmarkNode> removed_nodes;
 
   FOR_EACH_OBSERVER(BookmarkModelObserver, observers_,
-                    OnWillRemoveAllBookmarks(this));
+                    OnWillRemoveAllUserBookmarks(this));
 
   BeginExtensiveChanges();
   // Skip deleting permanent nodes. Permanent bookmark nodes are the root and
@@ -212,6 +212,10 @@ void BookmarkModel::RemoveAll() {
     base::AutoLock url_lock(url_lock_);
     for (int i = 0; i < root_.child_count(); ++i) {
       BookmarkNode* permanent_node = root_.GetChild(i);
+
+      if (!client_->CanBeEditedByUser(permanent_node))
+        continue;
+
       for (int j = permanent_node->child_count() - 1; j >= 0; --j) {
         BookmarkNode* child_node = permanent_node->GetChild(j);
         removed_nodes.push_back(child_node);
@@ -224,7 +228,11 @@ void BookmarkModel::RemoveAll() {
     store_->ScheduleSave();
 
   FOR_EACH_OBSERVER(BookmarkModelObserver, observers_,
-                    BookmarkAllNodesRemoved(this, removed_urls));
+                    BookmarkAllUserNodesRemoved(this, removed_urls));
+}
+
+void BookmarkModel::RemoveAll() {
+  RemoveAllUserBookmarks();
 }
 
 void BookmarkModel::Move(const BookmarkNode* node,
@@ -319,7 +327,7 @@ void BookmarkModel::SetTitle(const BookmarkNode* node,
   if (node->GetTitle() == title)
     return;
 
-  if (is_permanent_node(node)) {
+  if (is_permanent_node(node) && !client_->CanSetPermanentNodeTitle(node)) {
     NOTREACHED();
     return;
   }
@@ -431,6 +439,8 @@ void BookmarkModel::DeleteNodeMetaInfo(const BookmarkNode* node,
 void BookmarkModel::SetNodeSyncTransactionVersion(
     const BookmarkNode* node,
     int64 sync_transaction_version) {
+  DCHECK(client_->CanSyncNode(node));
+
   if (sync_transaction_version == node->sync_transaction_version())
     return;
 
@@ -497,15 +507,19 @@ void BookmarkModel::GetNodesByURL(const GURL& url,
   }
 }
 
-const BookmarkNode* BookmarkModel::GetMostRecentlyAddedNodeForURL(
+const BookmarkNode* BookmarkModel::GetMostRecentlyAddedUserNodeForURL(
     const GURL& url) {
   std::vector<const BookmarkNode*> nodes;
   GetNodesByURL(url, &nodes);
-  if (nodes.empty())
-    return NULL;
-
   std::sort(nodes.begin(), nodes.end(), &bookmark_utils::MoreRecentlyAdded);
-  return nodes.front();
+
+  // Look for the first node that the user can edit.
+  for (size_t i = 0; i < nodes.size(); ++i) {
+    if (client_->CanBeEditedByUser(nodes[i]))
+      return nodes[i];
+  }
+
+  return NULL;
 }
 
 bool BookmarkModel::HasBookmarks() {
@@ -519,7 +533,7 @@ bool BookmarkModel::IsBookmarked(const GURL& url) {
 }
 
 void BookmarkModel::GetBookmarks(
-    std::vector<BookmarkService::URLAndTitle>* bookmarks) {
+    std::vector<BookmarkModel::URLAndTitle>* bookmarks) {
   base::AutoLock url_lock(url_lock_);
   const GURL* last_url = NULL;
   for (NodesOrderedByURLSet::iterator i = nodes_ordered_by_url_set_.begin();
@@ -527,7 +541,7 @@ void BookmarkModel::GetBookmarks(
     const GURL* url = &((*i)->url());
     // Only add unique URLs.
     if (!last_url || *url != *last_url) {
-      BookmarkService::URLAndTitle bookmark;
+      BookmarkModel::URLAndTitle bookmark;
       bookmark.url = *url;
       bookmark.title = (*i)->GetTitle();
       bookmarks->push_back(bookmark);
@@ -614,6 +628,8 @@ const BookmarkNode* BookmarkModel::AddURLWithCreationTimeAndMetaInfo(
 }
 
 void BookmarkModel::SortChildren(const BookmarkNode* parent) {
+  DCHECK(client_->CanBeEditedByUser(parent));
+
   if (!parent || !parent->is_folder() || is_root_node(parent) ||
       parent->child_count() <= 1) {
     return;
@@ -641,6 +657,8 @@ void BookmarkModel::SortChildren(const BookmarkNode* parent) {
 void BookmarkModel::ReorderChildren(
     const BookmarkNode* parent,
     const std::vector<const BookmarkNode*>& ordered_nodes) {
+  DCHECK(client_->CanBeEditedByUser(parent));
+
   // Ensure that all children in |parent| are in |ordered_nodes|.
   DCHECK_EQ(static_cast<size_t>(parent->child_count()), ordered_nodes.size());
   for (size_t i = 0; i < ordered_nodes.size(); ++i)
@@ -688,8 +706,8 @@ void BookmarkModel::ClearStore() {
 
 void BookmarkModel::SetPermanentNodeVisible(BookmarkNode::Type type,
                                             bool value) {
-  AsMutable(PermanentNode(type))->set_visible(
-      value || client_->IsPermanentNodeVisible(type));
+  BookmarkPermanentNode* node = AsMutable(PermanentNode(type));
+  node->set_visible(value || client_->IsPermanentNodeVisible(node));
 }
 
 const BookmarkPermanentNode* BookmarkModel::PermanentNode(
@@ -758,18 +776,24 @@ void BookmarkModel::DoneLoading(scoped_ptr<BookmarkLoadDetails> details) {
   mobile_node_ = details->release_mobile_folder_node();
   index_.reset(details->release_index());
 
+  // Get any extra nodes and take ownership of them at the |root_|.
+  std::vector<BookmarkPermanentNode*> extra_nodes;
+  details->release_extra_nodes(&extra_nodes);
+
   // WARNING: order is important here, various places assume the order is
   // constant (but can vary between embedders with the initial visibility
   // of permanent nodes).
-  BookmarkPermanentNode* root_children[] = {
-      bookmark_bar_node_, other_node_, mobile_node_,
-  };
-  std::stable_sort(root_children,
-                   root_children + arraysize(root_children),
+  std::vector<BookmarkPermanentNode*> root_children;
+  root_children.push_back(bookmark_bar_node_);
+  root_children.push_back(other_node_);
+  root_children.push_back(mobile_node_);
+  for (size_t i = 0; i < extra_nodes.size(); ++i)
+    root_children.push_back(extra_nodes[i]);
+  std::stable_sort(root_children.begin(),
+                   root_children.end(),
                    VisibilityComparator(client_));
-  for (size_t i = 0; i < arraysize(root_children); ++i) {
+  for (size_t i = 0; i < root_children.size(); ++i)
     root_.Add(root_children[i], static_cast<int>(i));
-  }
 
   root_.SetMetaInfoMap(details->model_meta_info_map());
   root_.set_sync_transaction_version(details->model_sync_transaction_version());
@@ -883,7 +907,8 @@ BookmarkPermanentNode* BookmarkModel::CreatePermanentNode(
          type == BookmarkNode::MOBILE);
   BookmarkPermanentNode* node =
       new BookmarkPermanentNode(generate_next_node_id());
-  node->set_visible(client_->IsPermanentNodeVisible(type));
+  node->set_type(type);
+  node->set_visible(client_->IsPermanentNodeVisible(node));
 
   int title_id;
   switch (type) {
@@ -902,7 +927,6 @@ BookmarkPermanentNode* BookmarkModel::CreatePermanentNode(
       break;
   }
   node->SetTitle(l10n_util::GetStringUTF16(title_id));
-  node->set_type(type);
   return node;
 }
 
@@ -984,6 +1008,7 @@ scoped_ptr<BookmarkLoadDetails> BookmarkModel::CreateLoadDetails(
       bb_node,
       other_node,
       mobile_node,
+      client_->GetLoadExtraNodesCallback(),
       new BookmarkIndex(client_, index_urls_, accept_languages),
       next_node_id_));
 }

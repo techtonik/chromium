@@ -34,6 +34,7 @@
 #include "ash/touch/touch_observer_hud.h"
 #include "ash/wm/always_on_top_controller.h"
 #include "ash/wm/dock/docked_window_layout_manager.h"
+#include "ash/wm/lock_layout_manager.h"
 #include "ash/wm/panels/attached_panel_window_targeter.h"
 #include "ash/wm/panels/panel_layout_manager.h"
 #include "ash/wm/panels/panel_window_event_handler.h"
@@ -306,7 +307,7 @@ class CrosAccessibilityObserver : public AccessibilityObserver {
 
   DISALLOW_COPY_AND_ASSIGN(CrosAccessibilityObserver);
 };
-#endif // OS_CHROMEOS
+#endif  // OS_CHROMEOS
 
 }  // namespace
 
@@ -526,6 +527,11 @@ void RootWindowController::OnWallpaperAnimationFinished(views::Widget* widget) {
 void RootWindowController::CloseChildWindows() {
   mouse_event_target_.reset();
 
+  // Remove observer as deactivating keyboard causes |docked_layout_manager_|
+  // to fire notifications.
+  if (docked_layout_manager_ && shelf_ && shelf_->shelf_layout_manager())
+    docked_layout_manager_->RemoveObserver(shelf_->shelf_layout_manager());
+
   // Deactivate keyboard container before closing child windows and shutting
   // down associated layout managers.
   DeactivateKeyboard(keyboard::KeyboardController::GetInstance());
@@ -537,8 +543,6 @@ void RootWindowController::CloseChildWindows() {
   }
   // docked_layout_manager_ needs to be shut down before windows are destroyed.
   if (docked_layout_manager_) {
-    if (shelf_ && shelf_->shelf_layout_manager())
-      docked_layout_manager_->RemoveObserver(shelf_->shelf_layout_manager());
     docked_layout_manager_->Shutdown();
     docked_layout_manager_ = NULL;
   }
@@ -688,6 +692,7 @@ void RootWindowController::ActivateKeyboard(
     keyboard_controller->AddObserver(shelf()->shelf_layout_manager());
     keyboard_controller->AddObserver(panel_layout_manager_);
     keyboard_controller->AddObserver(docked_layout_manager_);
+    keyboard_controller->AddObserver(workspace_controller_->layout_manager());
     Shell::GetInstance()->delegate()->VirtualKeyboardActivated(true);
   }
   aura::Window* parent = GetContainer(
@@ -722,6 +727,8 @@ void RootWindowController::DeactivateKeyboard(
       keyboard_controller->RemoveObserver(shelf()->shelf_layout_manager());
       keyboard_controller->RemoveObserver(panel_layout_manager_);
       keyboard_controller->RemoveObserver(docked_layout_manager_);
+      keyboard_controller->RemoveObserver(
+          workspace_controller_->layout_manager());
       Shell::GetInstance()->delegate()->VirtualKeyboardActivated(false);
     }
   }
@@ -1008,7 +1015,13 @@ void RootWindowController::CreateContainersInRootWindow(
       kShellWindowId_LockScreenContainer,
       "LockScreenContainer",
       lock_screen_containers);
-  lock_container->SetLayoutManager(new WorkspaceLayoutManager(lock_container));
+  if (CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kAshDisableLockLayoutManager)) {
+    lock_container->SetLayoutManager(
+            new WorkspaceLayoutManager(lock_container));
+  } else {
+    lock_container->SetLayoutManager(new LockLayoutManager(lock_container));
+  }
   SetUsesScreenCoordinates(lock_container);
   // TODO(beng): stopsevents
 

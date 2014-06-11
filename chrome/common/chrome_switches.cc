@@ -215,10 +215,6 @@ const char kDisableAsyncDns[]               = "disable-async-dns";
 const char kDisableAuthNegotiateCnameLookup[] =
     "disable-auth-negotiate-cname-lookup";
 
-// Disables background mode (background apps will not keep chrome running in
-// the background).
-const char kDisableBackgroundMode[]         = "disable-background-mode";
-
 // Disable several subsystems which run network requests in the background.
 // This is for use when doing network performance testing to avoid noise in the
 // measurements.
@@ -352,11 +348,6 @@ const char kDisableQuicPortSelection[]      = "disable-quic-port-selection";
 const char kDisableQuicTimeBasedLossDetection[] =
     "disable-quic-time-based-loss-detection";
 
-// Prevents the URLs of BackgroundContents from being remembered and
-// re-launched when the browser restarts.
-const char kDisableRestoreBackgroundContents[] =
-    "disable-restore-background-contents";
-
 // Prevents the save password bubble from being enabled.
 const char kDisableSavePasswordBubble[] = "disable-save-password-bubble";
 
@@ -390,10 +381,6 @@ const char kDisableSyncSyncedNotifications[] =
 // representation of model types, e.g.:
 // --disable-synctypes='Typed URLs, Bookmarks, Autofill Profiles'
 const char kDisableSyncTypes[]              = "disable-sync-types";
-
-// Disables some security measures when accessing user media devices like
-// webcams and microphones, especially on non-HTTPS pages.
-const char kDisableUserMediaSecurity[]      = "disable-user-media-security";
 
 // Disables the backend service for web resources.
 const char kDisableWebResources[]           = "disable-web-resources";
@@ -811,6 +798,10 @@ const char kLoadComponentExtension[]        = "load-component-extension";
 // Loads an extension from the specified directory.
 const char kLoadExtension[]                 = "load-extension";
 
+// Controls which version of the malware and phishing interstitials is shown.
+const char kMalwareInterstitialVersionV2[]  = "malware-interstitial-v2";
+const char kMalwareInterstitialVersionV3[]  = "malware-interstitial-v3";
+
 // Makes Chrome default browser
 const char kMakeDefaultBrowser[]            = "make-default-browser";
 
@@ -1139,6 +1130,11 @@ const char kSpellingServiceFeedbackUrl[] = "spelling-service-feedback-url";
 const char kSpellingServiceFeedbackIntervalSeconds[] =
     "spelling-service-feedback-interval-seconds";
 
+// Controls which version of the TLS/SSL interstitial is shown.
+const char kSSLInterstitialVersionV1[]         = "ssl-interstitial-v1";
+const char kSSLInterstitialVersionV2Gray[]     = "ssl-interstitial-v2-gray";
+const char kSSLInterstitialVersionV2Colorful[] = "ssl-interstitial-v2-colorful";
+
 // Specifies the maximum SSL/TLS version ("ssl3", "tls1", "tls1.1", or
 // "tls1.2").
 const char kSSLVersionMax[]                 = "ssl-version-max";
@@ -1186,8 +1182,11 @@ const char kSyncEnableGetUpdateAvoidance[]   =
 const char kSyncfsEnableDirectoryOperation[] =
     "enable-syncfs-directory-operation";
 
-// Enables backup/rollback of user's data.
-const char kSyncEnableBackupRollback[] = "enable-sync-backup-rollback";
+// Disable data backup when user's not signed in.
+const char kSyncDisableBackup[] = "disable-sync-backup";
+
+// Enable data rollback when receiving sync rollback command.
+const char kSyncEnableRollback[] = "enable-sync-rollback";
 
 // Passes the name of the current running automated test to Chrome.
 const char kTestName[]                      = "test-name";

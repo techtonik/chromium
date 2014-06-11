@@ -196,10 +196,10 @@ class WrenchMenuModel::HelpMenuModel : public ui::SimpleMenuModel {
  private:
   void Build(Browser* browser) {
     int help_string_id = IDS_HELP_PAGE;
-#if defined(OS_CHROMEOS)
+#if defined(OS_CHROMEOS) && defined(OFFICIAL_BUILD)
     if (!CommandLine::ForCurrentProcess()->HasSwitch(
             chromeos::switches::kDisableGeniusApp)) {
-      help_string_id = IDS_GENIUS_APP_NAME;
+      help_string_id = IDS_GET_HELP;
     }
 #endif
     AddItemWithStringId(IDC_HELP_PAGE_VIA_MENU, help_string_id);
@@ -634,11 +634,15 @@ void WrenchMenuModel::Build(bool is_new_menu) {
 
   AddItemWithStringId(IDC_OPTIONS, IDS_SETTINGS);
 
+// On ChromeOS we don't want the about menu option.
+#if !defined(OS_CHROMEOS)
+  AddItem(IDC_ABOUT, l10n_util::GetStringUTF16(IDS_ABOUT));
+#endif
+
 #if defined(GOOGLE_CHROME_BUILD)
   help_menu_model_.reset(new HelpMenuModel(this, browser_));
   AddSubMenuWithStringId(IDC_HELP_MENU, IDS_HELP_MENU,
                          help_menu_model_.get());
-  AddSeparator(ui::NORMAL_SEPARATOR);
 #endif
 
 #if defined(OS_CHROMEOS)
@@ -660,6 +664,7 @@ void WrenchMenuModel::Build(bool is_new_menu) {
   AddGlobalErrorMenuItems();
 
   if (is_new_menu) {
+    AddSeparator(ui::NORMAL_SEPARATOR);
     AddSubMenuWithStringId(IDC_ZOOM_MENU, IDS_MORE_TOOLS_MENU,
                            tools_menu_model_.get());
   }

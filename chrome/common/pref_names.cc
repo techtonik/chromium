@@ -1376,52 +1376,9 @@ const char kVariationsSeedHash[] = "variations_seed_hash";
 // Digital signature of the binary variations seed data, base64-encoded.
 const char kVariationsSeedSignature[] = "variations_seed_signature";
 
-// An enum value to indicate the execution phase the browser was in.
-const char kStabilityExecutionPhase[] =
-    "user_experience_metrics.stability.execution_phase";
-
-// True if the previous run of the program exited cleanly.
-const char kStabilityExitedCleanly[] =
-    "user_experience_metrics.stability.exited_cleanly";
-
-// Version string of previous run, which is used to assure that stability
-// metrics reported under current version reflect stability of the same version.
-const char kStabilityStatsVersion[] =
-    "user_experience_metrics.stability.stats_version";
-
-// Build time, in seconds since an epoch, which is used to assure that stability
-// metrics reported reflect stability of the same build.
-const char kStabilityStatsBuildTime[] =
-    "user_experience_metrics.stability.stats_buildtime";
-
-// False if we received a session end and either we crashed during processing
-// the session end or ran out of time and windows terminated us.
-const char kStabilitySessionEndCompleted[] =
-    "user_experience_metrics.stability.session_end_completed";
-
-// Number of times the application was launched since last report.
-const char kStabilityLaunchCount[] =
-    "user_experience_metrics.stability.launch_count";
-
-// Number of times the application exited uncleanly since the last report.
-const char kStabilityCrashCount[] =
-    "user_experience_metrics.stability.crash_count";
-
-// Number of times the session end did not complete.
-const char kStabilityIncompleteSessionEndCount[] =
-    "user_experience_metrics.stability.incomplete_session_end_count";
-
 // Number of times a page load event occurred since the last report.
 const char kStabilityPageLoadCount[] =
     "user_experience_metrics.stability.page_load_count";
-
-// Base64 encoded serialized UMA system profile proto from the previous session.
-const char kStabilitySavedSystemProfile[] =
-    "user_experience_metrics.stability.saved_system_profile";
-
-// SHA-1 hash of the serialized UMA system profile proto (hex encoded).
-const char kStabilitySavedSystemProfileHash[] =
-    "user_experience_metrics.stability.saved_system_profile_hash";
 
 // Number of times a renderer process crashed since the last report.
 const char kStabilityRendererCrashCount[] =
@@ -1430,15 +1387,6 @@ const char kStabilityRendererCrashCount[] =
 // Number of times an extension renderer process crashed since the last report.
 const char kStabilityExtensionRendererCrashCount[] =
     "user_experience_metrics.stability.extension_renderer_crash_count";
-
-// Time when the app was last launched, in seconds since the epoch.
-const char kStabilityLaunchTimeSec[] =
-    "user_experience_metrics.stability.launch_time_sec";
-
-// Time when the app was last known to be running, in seconds since
-// the epoch.
-const char kStabilityLastTimestampSec[] =
-    "user_experience_metrics.stability.last_timestamp_sec";
 
 // This is the location of a list of dictionaries of plugin stability stats.
 const char kStabilityPluginStats[] =
@@ -1492,22 +1440,6 @@ const char kStabilityCrashedActivityCounts[] =
     "user_experience_metrics.stability.crashed_activity_counts";
 #endif
 
-// Number of times the browser has been able to register crash reporting.
-const char kStabilityBreakpadRegistrationSuccess[] =
-    "user_experience_metrics.stability.breakpad_registration_ok";
-
-// Number of times the browser has failed to register crash reporting.
-const char kStabilityBreakpadRegistrationFail[] =
-    "user_experience_metrics.stability.breakpad_registration_fail";
-
-// Number of times the browser has been run under a debugger.
-const char kStabilityDebuggerPresent[] =
-    "user_experience_metrics.stability.debugger_present";
-
-// Number of times the browser has not been run under a debugger.
-const char kStabilityDebuggerNotPresent[] =
-    "user_experience_metrics.stability.debugger_not_present";
-
 // The keys below are used for the dictionaries in the
 // kStabilityPluginStats list.
 const char kStabilityPluginName[] = "name";
@@ -1523,8 +1455,6 @@ const char kStabilityPluginLoadingErrors[] = "loading_errors";
 const char kInstallDate[] = "uninstall_metrics.installation_date2";
 const char kUninstallMetricsPageLoadCount[] =
     "uninstall_metrics.page_load_count";
-const char kUninstallLaunchCount[] = "uninstall_metrics.launch_count";
-const char kUninstallMetricsUptimeSec[] = "uninstall_metrics.uptime_sec";
 const char kUninstallLastLaunchTimeSec[] =
     "uninstall_metrics.last_launch_time_sec";
 const char kUninstallLastObservedRunTimeSec[] =
@@ -1630,17 +1560,6 @@ const char kCertificateManagerWindowLastTabIndex[] =
 // Integer that specifies if the first run bubble should be shown.
 // This preference is only registered by the first-run procedure.
 const char kShowFirstRunBubbleOption[] = "show-first-run-bubble-option";
-
-// String containing the last known Google URL.  We re-detect this on startup in
-// most cases, and use it to send traffic to the correct Google host or with the
-// correct Google domain/country code for whatever location the user is in.
-const char kLastKnownGoogleURL[] = "browser.last_known_google_url";
-
-// String containing the last prompted Google URL to the user.
-// If the user is using .x TLD for Google URL and gets prompted about .y TLD
-// for Google URL, and says "no", we should leave the search engine set to .x
-// but not prompt again until the domain changes away from .y.
-const char kLastPromptedGoogleURL[] = "browser.last_prompted_google_url";
 
 // String containing the last known intranet redirect URL, if any.  See
 // intranet_redirect_detector.h for more information.
@@ -1921,12 +1840,6 @@ const char kVideoCaptureAllowedUrls[] = "hardware.video_capture_allowed_urls";
 // A boolean pref that controls the enabled-state of hotword search voice
 // trigger.
 const char kHotwordSearchEnabled[] = "hotword.search_enabled_2";
-
-// An integer pref that keeps track of how many times the opt in popup for
-// hotword void search has been shown to the user. After this pref has reached
-// the maximum number of times as defined by the HotwordService, the popup is no
-// longer shown.
-const char kHotwordOptInPopupTimesShown[] = "hotword.opt_in_popup_times_shown";
 
 // A boolean pref that controls whether the sound of "Ok, Google" plus a few
 // seconds of audio data before is sent back to improve voice search.
@@ -2451,10 +2364,6 @@ const char kWatchdogExtensionActiveOld[] =
 // hashes of profile prefs that we track to detect changes that happen outside
 // of Chrome.
 const char kProfilePreferenceHashes[] = "profile.preference_hashes";
-
-// Stores a pair of local time and corresponding network time to bootstrap
-// network time tracker when browser starts.
-const char kNetworkTimeMapping[] = "network_time.network_time_mapping";
 
 #if defined(OS_ANDROID)
 // A list of partner bookmark rename/remove mappings.

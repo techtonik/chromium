@@ -93,6 +93,7 @@ void Connector::CallOnHandleReady(void* closure, MojoResult result) {
 }
 
 void Connector::OnHandleReady(MojoResult result) {
+  assert(async_wait_id_ != 0);
   async_wait_id_ = 0;
 
   if (result == MOJO_RESULT_OK) {
@@ -117,7 +118,7 @@ void Connector::WaitToReadMore() {
 void Connector::ReadMore() {
   while (true) {
     bool receiver_result = false;
-    MojoResult rv =  ReadAndDispatchMessage(
+    MojoResult rv = ReadAndDispatchMessage(
         message_pipe_.get(), incoming_receiver_, &receiver_result);
     if (rv == MOJO_RESULT_SHOULD_WAIT) {
       WaitToReadMore();
