@@ -28,8 +28,8 @@
 #include "chrome/browser/search_engines/template_url.h"
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
+#include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/translate/translate_service.h"
-#include "chrome/browser/translate/translate_tab_helper.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_instant_controller.h"
@@ -52,6 +52,7 @@
 #include "chrome/browser/ui/views/location_bar/origin_chip_view.h"
 #include "chrome/browser/ui/views/location_bar/page_action_image_view.h"
 #include "chrome/browser/ui/views/location_bar/page_action_with_badge_view.h"
+#include "chrome/browser/ui/views/location_bar/search_button.h"
 #include "chrome/browser/ui/views/location_bar/selected_keyword_view.h"
 #include "chrome/browser/ui/views/location_bar/star_view.h"
 #include "chrome/browser/ui/views/location_bar/translate_icon_view.h"
@@ -62,6 +63,7 @@
 #include "chrome/browser/ui/zoom/zoom_controller.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
+#include "components/translate/core/browser/language_state.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
@@ -89,8 +91,6 @@
 #include "ui/views/border.h"
 #include "ui/views/button_drag_utils.h"
 #include "ui/views/controls/button/image_button.h"
-#include "ui/views/controls/button/label_button.h"
-#include "ui/views/controls/button/label_button_border.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/widget/widget.h"
 
@@ -170,11 +170,12 @@ class IsPageActionViewRightAligned {
       : extension_service_(extension_service) {}
 
   bool operator()(PageActionWithBadgeView* page_action_view) {
-    return extensions::PermissionsData::HasAPIPermission(
-        extension_service_->GetExtensionById(
-            page_action_view->image_view()->page_action()->extension_id(),
-            false),
-        extensions::APIPermission::kBookmarkManagerPrivate);
+    return extension_service_
+        ->GetExtensionById(
+              page_action_view->image_view()->page_action()->extension_id(),
+              false)
+        ->permissions_data()
+        ->HasAPIPermission(extensions::APIPermission::kBookmarkManagerPrivate);
   }
 
  private:
@@ -392,37 +393,7 @@ void LocationBarView::Init() {
   star_view_->SetVisible(false);
   AddChildView(star_view_);
 
-  search_button_ = new views::LabelButton(this, base::string16());
-  search_button_->set_triggerable_event_flags(
-      ui::EF_LEFT_MOUSE_BUTTON | ui::EF_MIDDLE_MOUSE_BUTTON);
-  search_button_->SetStyle(views::Button::STYLE_BUTTON);
-  search_button_->SetFocusable(false);
-  search_button_->set_min_size(gfx::Size());
-  scoped_ptr<views::LabelButtonBorder> search_button_border(
-      new views::LabelButtonBorder(search_button_->style()));
-  search_button_border->set_insets(gfx::Insets());
-  const int kSearchButtonNormalImages[] = IMAGE_GRID(IDR_OMNIBOX_SEARCH_BUTTON);
-  search_button_border->SetPainter(
-      false, views::Button::STATE_NORMAL,
-      views::Painter::CreateImageGridPainter(kSearchButtonNormalImages));
-  const int kSearchButtonHoveredImages[] =
-      IMAGE_GRID(IDR_OMNIBOX_SEARCH_BUTTON_HOVER);
-  search_button_border->SetPainter(
-      false, views::Button::STATE_HOVERED,
-      views::Painter::CreateImageGridPainter(kSearchButtonHoveredImages));
-  const int kSearchButtonPressedImages[] =
-      IMAGE_GRID(IDR_OMNIBOX_SEARCH_BUTTON_PRESSED);
-  search_button_border->SetPainter(
-      false, views::Button::STATE_PRESSED,
-      views::Painter::CreateImageGridPainter(kSearchButtonPressedImages));
-  search_button_border->SetPainter(false, views::Button::STATE_DISABLED, NULL);
-  search_button_border->SetPainter(true, views::Button::STATE_NORMAL, NULL);
-  search_button_border->SetPainter(true, views::Button::STATE_HOVERED, NULL);
-  search_button_border->SetPainter(true, views::Button::STATE_PRESSED, NULL);
-  search_button_border->SetPainter(true, views::Button::STATE_DISABLED, NULL);
-  search_button_->SetBorder(search_button_border.PassAs<views::Border>());
-  const int kSearchButtonWidth = 56;
-  search_button_->set_min_size(gfx::Size(kSearchButtonWidth, 0));
+  search_button_ = new SearchButton(this);
   search_button_->SetVisible(false);
   AddChildView(search_button_);
 
@@ -1277,8 +1248,8 @@ void LocationBarView::RefreshTranslateIcon() {
   WebContents* web_contents = GetWebContents();
   if (!web_contents)
     return;
-  LanguageState& language_state = TranslateTabHelper::FromWebContents(
-      web_contents)->GetLanguageState();
+  LanguageState& language_state =
+      ChromeTranslateClient::FromWebContents(web_contents)->GetLanguageState();
   bool enabled = language_state.translate_enabled();
   command_updater()->UpdateCommandEnabled(IDC_TRANSLATE_PAGE, enabled);
   translate_icon_view_->SetVisible(enabled);
@@ -1696,10 +1667,7 @@ void LocationBarView::OnChanged() {
         ((conditions == chrome::DISPLAY_SEARCH_BUTTON_FOR_STR_OR_IIP) &&
          toolbar_model->input_in_progress())));
   search_button_->SetVisible(!is_popup_mode_ && meets_conditions);
-  search_button_->SetImage(
-      views::Button::STATE_NORMAL,
-      *GetThemeProvider()->GetImageSkiaNamed((icon_id == IDR_OMNIBOX_SEARCH) ?
-          IDR_OMNIBOX_SEARCH_BUTTON_LOUPE : IDR_OMNIBOX_SEARCH_BUTTON_ARROW));
+  search_button_->UpdateIcon(icon_id == IDR_OMNIBOX_SEARCH);
 
   origin_chip_view_->OnChanged();
 

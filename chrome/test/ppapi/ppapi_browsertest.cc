@@ -630,12 +630,7 @@ TEST_PPAPI_NACL(Memory)
 #define MAYBE_FileIO DISABLED_FileIO
 #define MAYBE_FileIO_Private DISABLED_FileIO_Private
 #else
-// Flaky on Mac and Win. http://crbug.com/377599
-#if defined(OS_MACOSX) || defined(OS_WIN)
-#define MAYBE_FileIO DISABLED_FileIO
-#else
 #define MAYBE_FileIO FileIO
-#endif  // OS_MACOSX || OS_WIN
 #define MAYBE_FileIO_Private FileIO_Private
 #endif
 
@@ -1122,8 +1117,8 @@ IN_PROC_BROWSER_TEST_F(OutOfProcessPPAPITest, View_PageHideShow) {
 
   // Make a new tab to cause the original one to hide, this should trigger the
   // next phase of the test.
-  chrome::NavigateParams params(browser(), GURL(content::kAboutBlankURL),
-                                content::PAGE_TRANSITION_LINK);
+  chrome::NavigateParams params(
+      browser(), GURL(url::kAboutBlankURL), content::PAGE_TRANSITION_LINK);
   params.disposition = NEW_FOREGROUND_TAB;
   ui_test_utils::NavigateToURL(&params);
 
@@ -1209,7 +1204,11 @@ TEST_PPAPI_NACL(MouseCursor)
 
 TEST_PPAPI_NACL(NetworkProxy)
 
+// TODO(scottmg): Disabled with DirectWrite investigating, probably sandbox-
+// related. http://crbug.com/382729
+#if !defined(OS_WIN)
 TEST_PPAPI_NACL(TrueTypeFont)
+#endif
 
 // VideoDestination doesn't work in content_browsertests.
 TEST_PPAPI_OUT_OF_PROCESS(VideoDestination)

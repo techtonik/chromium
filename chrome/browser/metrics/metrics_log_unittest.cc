@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "chrome/browser/metrics/metrics_log.h"
+#include "components/metrics/metrics_log.h"
 
 #include <string>
 
@@ -17,26 +17,16 @@
 #include "base/strings/stringprintf.h"
 #include "base/threading/sequenced_worker_pool.h"
 #include "base/time/time.h"
-#include "chrome/browser/google/google_util.h"
-#include "chrome/browser/metrics/metrics_service.h"
-#include "chrome/browser/prefs/browser_prefs.h"
-#include "chrome/common/chrome_version_info.h"
-#include "chrome/common/pref_names.h"
 #include "components/metrics/metrics_hashes.h"
+#include "components/metrics/metrics_pref_names.h"
 #include "components/metrics/metrics_provider.h"
+#include "components/metrics/metrics_state_manager.h"
 #include "components/metrics/proto/profiler_event.pb.h"
 #include "components/metrics/proto/system_profile.pb.h"
 #include "components/metrics/test_metrics_service_client.h"
 #include "components/variations/active_field_trials.h"
-#include "content/public/browser/browser_thread.h"
-#include "content/public/test/test_browser_thread_bundle.h"
-#include "content/public/test/test_utils.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "url/gurl.h"
-
-#if defined(OS_CHROMEOS)
-#include "chromeos/login/login_state.h"
-#endif  // defined(OS_CHROMEOS)
 
 using base::TimeDelta;
 
@@ -82,7 +72,6 @@ class TestMetricsLog : public MetricsLog {
 
  private:
   void InitPrefs() {
-    prefs_->SetInt64(prefs::kInstallDate, kInstallDate);
     prefs_->SetString(metrics::prefs::kMetricsReportingEnabledTimestamp,
                       base::Int64ToString(kEnabledDate));
   }
@@ -108,22 +97,11 @@ class TestMetricsLog : public MetricsLog {
 class MetricsLogTest : public testing::Test {
  public:
   MetricsLogTest() {
-    MetricsService::RegisterPrefs(prefs_.registry());
-#if defined(OS_CHROMEOS)
-    // TODO(blundell): Remove this code once MetricsService no longer creates
-    // ChromeOSMetricsProvider. Also remove the #include of login_state.h
-    // (http://crbug.com/375776)
-    if (!chromeos::LoginState::IsInitialized())
-      chromeos::LoginState::Initialize();
-#endif  // defined(OS_CHROMEOS)
+    MetricsLog::RegisterPrefs(prefs_.registry());
+    metrics::MetricsStateManager::RegisterPrefs(prefs_.registry());
   }
 
   virtual ~MetricsLogTest() {
-#if defined(OS_CHROMEOS)
-    // TODO(blundell): Remove this code once MetricsService no longer creates
-    // ChromeOSMetricsProvider.
-    chromeos::LoginState::Shutdown();
-#endif  // defined(OS_CHROMEOS)
   }
 
  protected:
@@ -167,13 +145,12 @@ class MetricsLogTest : public testing::Test {
   TestingPrefServiceSimple prefs_;
 
  private:
-  content::TestBrowserThreadBundle thread_bundle_;
-
   DISALLOW_COPY_AND_ASSIGN(MetricsLogTest);
 };
 
 TEST_F(MetricsLogTest, RecordEnvironment) {
   metrics::TestMetricsServiceClient client;
+  client.set_install_date(kInstallDate);
   TestMetricsLog log(
       kClientId, kSessionId, MetricsLog::ONGOING_LOG, &client, &prefs_);
 
@@ -189,7 +166,7 @@ TEST_F(MetricsLogTest, RecordEnvironment) {
 
   // Check that the system profile has also been written to prefs.
   const std::string base64_system_profile =
-      prefs_.GetString(prefs::kStabilitySavedSystemProfile);
+      prefs_.GetString(metrics::prefs::kStabilitySavedSystemProfile);
   EXPECT_FALSE(base64_system_profile.empty());
   std::string serialied_system_profile;
   EXPECT_TRUE(base::Base64Decode(base64_system_profile,
@@ -200,10 +177,12 @@ TEST_F(MetricsLogTest, RecordEnvironment) {
 }
 
 TEST_F(MetricsLogTest, LoadSavedEnvironmentFromPrefs) {
-  const char* kSystemProfilePref = prefs::kStabilitySavedSystemProfile;
-  const char* kSystemProfileHashPref = prefs::kStabilitySavedSystemProfileHash;
+  const char* kSystemProfilePref = metrics::prefs::kStabilitySavedSystemProfile;
+  const char* kSystemProfileHashPref =
+      metrics::prefs::kStabilitySavedSystemProfileHash;
 
   metrics::TestMetricsServiceClient client;
+  client.set_install_date(kInstallDate);
 
   // The pref value is empty, so loading it from prefs should fail.
   {

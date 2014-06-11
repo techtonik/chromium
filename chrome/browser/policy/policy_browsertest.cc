@@ -56,9 +56,9 @@
 #include "chrome/browser/search_engines/template_url.h"
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
+#include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/translate/translate_browser_test_utils.h"
 #include "chrome/browser/translate/translate_service.h"
-#include "chrome/browser/translate/translate_tab_helper.h"
 #include "chrome/browser/ui/bookmarks/bookmark_bar.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
@@ -88,6 +88,7 @@
 #include "components/policy/core/common/policy_pref_names.h"
 #include "components/policy/core/common/policy_service.h"
 #include "components/policy/core/common/policy_service_impl.h"
+#include "components/translate/core/browser/language_state.h"
 #include "components/translate/core/browser/translate_infobar_delegate.h"
 #include "content/public/browser/browser_child_process_host_iterator.h"
 #include "content/public/browser/browser_context.h"
@@ -219,8 +220,8 @@ void RedirectHostsToTestData(const char* const urls[], size_t size) {
   for (size_t i = 0; i < size; ++i) {
     const GURL url(urls[i]);
     EXPECT_TRUE(url.is_valid());
-    filter->AddUrlProtocolHandler(url,
-        URLRequestMockHTTPJob::CreateProtocolHandler(base_path));
+    filter->AddUrlInterceptor(
+        url, URLRequestMockHTTPJob::CreateInterceptor(base_path));
   }
 }
 
@@ -940,7 +941,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, DefaultSearchProvider) {
   EXPECT_EQ(expected, web_contents->GetURL());
 
   // Verify that searching from the omnibox can be disabled.
-  ui_test_utils::NavigateToURL(browser(), GURL(content::kAboutBlankURL));
+  ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL));
   policies.Set(key::kDefaultSearchProviderEnabled, POLICY_LEVEL_MANDATORY,
                POLICY_SCOPE_USER, base::Value::CreateBooleanValue(false), NULL);
   EXPECT_TRUE(service->GetDefaultSearchProvider());
@@ -949,7 +950,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, DefaultSearchProvider) {
   ui_test_utils::SendToOmniboxAndSubmit(location_bar, "should not work");
   // This means that submitting won't trigger any action.
   EXPECT_FALSE(model->CurrentMatch(NULL).destination_url.is_valid());
-  EXPECT_EQ(GURL(content::kAboutBlankURL), web_contents->GetURL());
+  EXPECT_EQ(GURL(url::kAboutBlankURL), web_contents->GetURL());
 }
 
 IN_PROC_BROWSER_TEST_F(PolicyTest, PolicyPreprocessing) {
@@ -1159,7 +1160,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, Disable3DAPIs) {
   if (!content::GpuDataManager::GetInstance()->GpuAccessAllowed(NULL))
     return;
 
-  ui_test_utils::NavigateToURL(browser(), GURL(content::kAboutBlankURL));
+  ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL));
   // WebGL is enabled by default.
   content::WebContents* contents =
       browser()->tab_strip_model()->GetActiveWebContents();
@@ -1751,7 +1752,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, HomepageLocation) {
             browser()->profile()->GetHomePage());
   content::WebContents* contents =
       browser()->tab_strip_model()->GetActiveWebContents();
-  EXPECT_EQ(GURL(content::kAboutBlankURL), contents->GetURL());
+  EXPECT_EQ(GURL(url::kAboutBlankURL), contents->GetURL());
   EXPECT_TRUE(chrome::ExecuteCommand(browser(), IDC_HOME));
   EXPECT_EQ(GURL(chrome::kChromeUIPolicyURL), contents->GetURL());
 
@@ -1816,7 +1817,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, Javascript) {
                POLICY_SCOPE_USER, base::Value::CreateBooleanValue(false), NULL);
   UpdateProviderPolicy(policies);
   // Reload the page.
-  ui_test_utils::NavigateToURL(browser(), GURL(content::kAboutBlankURL));
+  ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL));
   EXPECT_FALSE(IsJavascriptEnabled(contents));
   // Developer tools still work when javascript is disabled.
   EXPECT_TRUE(chrome::IsCommandEnabled(browser(), IDC_DEV_TOOLS));
@@ -1827,13 +1828,13 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, Javascript) {
   EXPECT_TRUE(IsJavascriptEnabled(contents));
 
   // The javascript content setting policy overrides the javascript policy.
-  ui_test_utils::NavigateToURL(browser(), GURL(content::kAboutBlankURL));
+  ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL));
   EXPECT_FALSE(IsJavascriptEnabled(contents));
   policies.Set(key::kDefaultJavaScriptSetting, POLICY_LEVEL_MANDATORY,
                POLICY_SCOPE_USER,
                base::Value::CreateIntegerValue(CONTENT_SETTING_ALLOW), NULL);
   UpdateProviderPolicy(policies);
-  ui_test_utils::NavigateToURL(browser(), GURL(content::kAboutBlankURL));
+  ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL));
   EXPECT_TRUE(IsJavascriptEnabled(contents));
 }
 
@@ -1898,10 +1899,10 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, DISABLED_TranslateEnabled) {
   language_observer1.Wait();
 
   // Verify the translation detected for this tab.
-  TranslateTabHelper* translate_tab_helper =
-      TranslateTabHelper::FromWebContents(contents);
-  ASSERT_TRUE(translate_tab_helper);
-  LanguageState& language_state = translate_tab_helper->GetLanguageState();
+  ChromeTranslateClient* chrome_translate_client =
+      ChromeTranslateClient::FromWebContents(contents);
+  ASSERT_TRUE(chrome_translate_client);
+  LanguageState& language_state = chrome_translate_client->GetLanguageState();
   EXPECT_EQ("fr", language_state.original_language());
   EXPECT_TRUE(language_state.page_needs_translation());
   EXPECT_FALSE(language_state.translation_pending());
@@ -2641,8 +2642,8 @@ IN_PROC_BROWSER_TEST_F(PolicyStatisticsCollectorTest, Startup) {
   // CompleteInitialization() task has executed as well.
   content::RunAllPendingInMessageLoop();
 
-  GURL kAboutHistograms = GURL(std::string(content::kAboutScheme) +
-                               std::string(content::kStandardSchemeSeparator) +
+  GURL kAboutHistograms = GURL(std::string(url::kAboutScheme) +
+                               std::string(url::kStandardSchemeSeparator) +
                                std::string(content::kChromeUIHistogramHost));
   ui_test_utils::NavigateToURL(browser(), kAboutHistograms);
   content::WebContents* contents =

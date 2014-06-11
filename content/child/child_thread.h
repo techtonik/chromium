@@ -172,9 +172,10 @@ class CONTENT_EXPORT ChildThread
 
   // mojo::ServiceProvider implementation:
   virtual void ConnectToService(
-      const mojo::String& url,
-      const mojo::String& name,
-      mojo::ScopedMessagePipeHandle message_pipe) OVERRIDE;
+      const mojo::String& service_url,
+      const mojo::String& service_name,
+      mojo::ScopedMessagePipeHandle message_pipe,
+      const mojo::String& requestor_url) OVERRIDE;
 
  private:
   class ChildThreadMessageRouter : public MessageRouter {
@@ -194,9 +195,7 @@ class CONTENT_EXPORT ChildThread
   void OnSetProfilerStatus(tracked_objects::ThreadData::Status status);
   void OnGetChildProfilerData(int sequence_number);
   void OnDumpHandles();
-#if defined(OS_WIN)
   void OnProcessBackgrounded(bool background);
-#endif
 #ifdef IPC_MESSAGE_LOG_ENABLED
   void OnSetIPCLoggingEnabled(bool enable);
 #endif

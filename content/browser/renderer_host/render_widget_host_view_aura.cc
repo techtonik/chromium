@@ -623,7 +623,6 @@ void RenderWidgetHostViewAura::SetBounds(const gfx::Rect& rect) {
     }
   }
 
-  SnapToPhysicalPixelBoundary();
   InternalSetBounds(gfx::Rect(relative_origin, rect.size()));
 }
 
@@ -987,15 +986,14 @@ void RenderWidgetHostViewAura::SnapToPhysicalPixelBoundary() {
 
   gfx::Vector2dF fudge = view_offset_snapped - view_offset;
   fudge.Scale(1.0 / current_device_scale_factor_);
-  gfx::Transform fudge_transform;
-  fudge_transform.Translate(fudge.x(), fudge.y());
-  GetLayer()->cc_layer()->SetTransform(fudge_transform);
+  GetLayer()->SetSubpixelPositionOffset(fudge);
 }
 
 void RenderWidgetHostViewAura::InternalSetBounds(const gfx::Rect& rect) {
   if (HasDisplayPropertyChanged(window_))
     host_->InvalidateScreenInfo();
 
+  SnapToPhysicalPixelBoundary();
   // Don't recursively call SetBounds if this bounds update is the result of
   // a Window::SetBoundsInternal call.
   if (!in_bounds_changed_)
@@ -1224,11 +1222,6 @@ RenderWidgetHostViewAura::CreateSyntheticGestureTarget() {
       new SyntheticGestureTargetAura(host_));
 }
 
-void RenderWidgetHostViewAura::SetScrollOffsetPinning(
-    bool is_pinned_to_left, bool is_pinned_to_right) {
-  // Not needed. Mac-only.
-}
-
 InputEventAckState RenderWidgetHostViewAura::FilterInputEvent(
     const blink::WebInputEvent& input_event) {
   bool consumed = false;
@@ -1347,17 +1340,18 @@ void RenderWidgetHostViewAura::SetCompositionText(
   if (!host_)
     return;
 
-  // ui::CompositionUnderline should be identical to
-  // blink::WebCompositionUnderline, so that we can do reinterpret_cast safely.
-  COMPILE_ASSERT(sizeof(ui::CompositionUnderline) ==
-                 sizeof(blink::WebCompositionUnderline),
-                 ui_CompositionUnderline__WebKit_WebCompositionUnderline_diff);
-
   // TODO(suzhe): convert both renderer_host and renderer to use
   // ui::CompositionText.
-  const std::vector<blink::WebCompositionUnderline>& underlines =
-      reinterpret_cast<const std::vector<blink::WebCompositionUnderline>&>(
-          composition.underlines);
+  std::vector<blink::WebCompositionUnderline> underlines;
+  underlines.reserve(composition.underlines.size());
+  for (std::vector<ui::CompositionUnderline>::const_iterator it =
+           composition.underlines.begin();
+       it != composition.underlines.end(); ++it) {
+    underlines.push_back(blink::WebCompositionUnderline(it->start_offset,
+                                                        it->end_offset,
+                                                        it->color,
+                                                        it->thick));
+  }
 
   // TODO(suzhe): due to a bug of webkit, we can't use selection range with
   // composition string. See: https://bugs.webkit.org/show_bug.cgi?id=37788
@@ -1587,6 +1581,13 @@ void RenderWidgetHostViewAura::OnCandidateWindowUpdated() {
 
 void RenderWidgetHostViewAura::OnCandidateWindowHidden() {
   host_->CandidateWindowHidden();
+}
+
+bool RenderWidgetHostViewAura::IsEditingCommandEnabled(int command_id) {
+  return false;
+}
+
+void RenderWidgetHostViewAura::ExecuteEditingCommand(int command_id) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -177,8 +177,6 @@ class WEBKIT_GPU_EXPORT WebGraphicsContext3DImpl
                                     WGC3Denum pname,
                                     WGC3Dint* value);
 
-  virtual Attributes getContextAttributes();
-
   virtual WGC3Denum getError();
 
   virtual void getFloatv(WGC3Denum pname, WGC3Dfloat* value);
@@ -475,7 +473,11 @@ class WEBKIT_GPU_EXPORT WebGraphicsContext3DImpl
   virtual void genMailboxCHROMIUM(WGC3Dbyte* mailbox);
   virtual void produceTextureCHROMIUM(WGC3Denum target,
                                       const WGC3Dbyte* mailbox);
+  virtual void produceTextureDirectCHROMIUM(WebGLId texture, WGC3Denum target,
+                                      const WGC3Dbyte* mailbox);
   virtual void consumeTextureCHROMIUM(WGC3Denum target,
+                                      const WGC3Dbyte* mailbox);
+  virtual WebGLId createAndConsumeTextureCHROMIUM(WGC3Denum target,
                                       const WGC3Dbyte* mailbox);
 
   virtual void insertEventMarkerEXT(const WGC3Dchar* marker);
@@ -560,9 +562,7 @@ class WEBKIT_GPU_EXPORT WebGraphicsContext3DImpl
  protected:
   friend class WebGraphicsContext3DErrorMessageCallback;
 
-  WebGraphicsContext3DImpl(
-      const Attributes& attributes,
-      bool lose_context_when_out_of_memory);
+  WebGraphicsContext3DImpl();
   virtual ~WebGraphicsContext3DImpl();
 
   ::gpu::gles2::GLES2ImplementationErrorMessageCallback*
@@ -583,8 +583,6 @@ class WEBKIT_GPU_EXPORT WebGraphicsContext3DImpl
       error_message_callback_;
   scoped_ptr<WebGraphicsContext3DErrorMessageCallback>
       client_error_message_callback_;
-
-  blink::WebGraphicsContext3D::Attributes attributes_;
 
   // Errors raised by synthesizeGLError().
   std::vector<WGC3Denum> synthetic_errors_;

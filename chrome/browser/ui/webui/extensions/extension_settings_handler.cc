@@ -165,6 +165,7 @@ ExtensionSettingsHandler::ExtensionSettingsHandler()
       warning_service_observer_(this),
       error_console_observer_(this),
       extension_prefs_observer_(this),
+      extension_registry_observer_(this),
       should_do_verification_check_(false) {
 }
 
@@ -183,6 +184,7 @@ ExtensionSettingsHandler::ExtensionSettingsHandler(ExtensionService* service,
       warning_service_observer_(this),
       error_console_observer_(this),
       extension_prefs_observer_(this),
+      extension_registry_observer_(this),
       should_do_verification_check_(false) {
 }
 
@@ -262,7 +264,8 @@ base::DictionaryValue* ExtensionSettingsHandler::CreateExtensionDetailValue(
   //   on those specified in the permissions.
   bool wants_all_urls =
       FeatureSwitch::scripts_require_action()->IsEnabled() &&
-      PermissionsData::RequiresActionForScriptExecution(extension);
+      extension->permissions_data()->RequiresActionForScriptExecution(
+          extension);
   extension_data->SetBoolean("wantsAllUrls", wants_all_urls);
   extension_data->SetBoolean(
       "allowAllUrls",
@@ -650,9 +653,6 @@ void ExtensionSettingsHandler::Observe(
       MaybeUpdateAfterNotification();
       break;
     }
-    case chrome::NOTIFICATION_EXTENSION_LOADED_DEPRECATED:
-    case chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED:
-    case chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED:
     case chrome::NOTIFICATION_EXTENSION_UPDATE_DISABLED:
     case chrome::NOTIFICATION_EXTENSION_BROWSER_ACTION_VISIBILITY_CHANGED:
       MaybeUpdateAfterNotification();
@@ -669,6 +669,25 @@ void ExtensionSettingsHandler::Observe(
     default:
       NOTREACHED();
   }
+}
+
+void ExtensionSettingsHandler::OnExtensionLoaded(
+    content::BrowserContext* browser_context,
+    const Extension* extension) {
+  MaybeUpdateAfterNotification();
+}
+
+void ExtensionSettingsHandler::OnExtensionUnloaded(
+    content::BrowserContext* browser_context,
+    const Extension* extension,
+    UnloadedExtensionInfo::Reason reason) {
+  MaybeUpdateAfterNotification();
+}
+
+void ExtensionSettingsHandler::OnExtensionUninstalled(
+    content::BrowserContext* browser_context,
+    const Extension* extension) {
+  MaybeUpdateAfterNotification();
 }
 
 void ExtensionSettingsHandler::OnExtensionDisableReasonsChanged(
@@ -1065,7 +1084,8 @@ void ExtensionSettingsHandler::HandlePermissionsMessage(
   extension_id_prompting_ = extension->id();
   prompt_.reset(new ExtensionInstallPrompt(web_contents()));
   std::vector<base::FilePath> retained_file_paths;
-  if (extension->HasAPIPermission(APIPermission::kFileSystem)) {
+  if (extension->permissions_data()->HasAPIPermission(
+          APIPermission::kFileSystem)) {
     std::vector<apps::SavedFileEntry> retained_file_entries =
         apps::SavedFilesService::Get(Profile::FromWebUI(
             web_ui()))->GetAllFileEntries(extension_id_prompting_);
@@ -1134,14 +1154,6 @@ void ExtensionSettingsHandler::MaybeRegisterForNotifications() {
   Profile* profile = Profile::FromWebUI(web_ui());
 
   // Register for notifications that we need to reload the page.
-  registrar_.Add(this,
-                 chrome::NOTIFICATION_EXTENSION_LOADED_DEPRECATED,
-                 content::Source<Profile>(profile));
-  registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_UNLOADED_DEPRECATED,
-                 content::Source<Profile>(profile));
-  registrar_.Add(this,
-                 chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED,
-                 content::Source<Profile>(profile));
   registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_UPDATE_DISABLED,
                  content::Source<Profile>(profile));
   registrar_.Add(this, chrome::NOTIFICATION_EXTENSION_HOST_CREATED,
@@ -1159,10 +1171,11 @@ void ExtensionSettingsHandler::MaybeRegisterForNotifications() {
   registrar_.Add(this,
                  chrome::NOTIFICATION_EXTENSION_HOST_DESTROYED,
                  content::NotificationService::AllBrowserContextsAndSources());
-
   registrar_.Add(this,
                  content::NOTIFICATION_RENDER_WIDGET_HOST_DESTROYED,
                  content::NotificationService::AllBrowserContextsAndSources());
+
+  extension_registry_observer_.Add(ExtensionRegistry::Get(profile));
 
   content::WebContentsObserver::Observe(web_ui()->GetWebContents());
 

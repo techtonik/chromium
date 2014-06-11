@@ -73,10 +73,7 @@ const char kThrottledErrorDescription[] =
 
 class HeaderFlattener : public WebHTTPHeaderVisitor {
  public:
-  explicit HeaderFlattener(int load_flags)
-      : load_flags_(load_flags),
-        has_accept_header_(false) {
-  }
+  explicit HeaderFlattener() : has_accept_header_(false) {}
 
   virtual void visitHeader(const WebString& name, const WebString& value) {
     // Headers are latin1.
@@ -86,16 +83,6 @@ class HeaderFlattener : public WebHTTPHeaderVisitor {
     // Skip over referrer headers found in the header map because we already
     // pulled it out as a separate parameter.
     if (LowerCaseEqualsASCII(name_latin1, "referer"))
-      return;
-
-    // Skip over "Cache-Control: max-age=0" header if the corresponding
-    // load flag is already specified. FrameLoader sets both the flag and
-    // the extra header -- the extra header is redundant since our network
-    // implementation will add the necessary headers based on load flags.
-    // See http://code.google.com/p/chromium/issues/detail?id=3434.
-    if ((load_flags_ & net::LOAD_VALIDATE_CACHE) &&
-        LowerCaseEqualsASCII(name_latin1, "cache-control") &&
-        LowerCaseEqualsASCII(value_latin1, "max-age=0"))
       return;
 
     if (LowerCaseEqualsASCII(name_latin1, "accept"))
@@ -119,7 +106,6 @@ class HeaderFlattener : public WebHTTPHeaderVisitor {
   }
 
  private:
-  int load_flags_;
   std::string buffer_;
   bool has_accept_header_;
 };
@@ -232,6 +218,8 @@ class WebURLLoaderImpl::Context : public base::RefCounted<Context>,
   void SetDefersLoading(bool value);
   void DidChangePriority(WebURLRequest::Priority new_priority,
                          int intra_priority_value);
+  bool AttachThreadedDataReceiver(
+      blink::WebThreadedDataReceiver* threaded_data_receiver);
   void Start(const WebURLRequest& request,
              SyncLoadResponse* sync_load_response);
 
@@ -309,6 +297,14 @@ void WebURLLoaderImpl::Context::DidChangePriority(
         ConvertWebKitPriorityToNetPriority(new_priority), intra_priority_value);
 }
 
+bool WebURLLoaderImpl::Context::AttachThreadedDataReceiver(
+    blink::WebThreadedDataReceiver* threaded_data_receiver) {
+  if (bridge_)
+    return bridge_->AttachThreadedDataReceiver(threaded_data_receiver);
+
+  return false;
+}
+
 void WebURLLoaderImpl::Context::Start(const WebURLRequest& request,
                                       SyncLoadResponse* sync_load_response) {
   DCHECK(!bridge_.get());
@@ -336,11 +332,14 @@ void WebURLLoaderImpl::Context::Start(const WebURLRequest& request,
       request.httpHeaderField(WebString::fromUTF8("Referer")).latin1());
   const std::string& method = request.httpMethod().latin1();
 
-  int load_flags = net::LOAD_NORMAL;
+  int load_flags = net::LOAD_NORMAL | net::LOAD_ENABLE_LOAD_TIMING;
   switch (request.cachePolicy()) {
     case WebURLRequest::ReloadIgnoringCacheData:
       // Required by LayoutTests/http/tests/misc/refresh-headers.php
       load_flags |= net::LOAD_VALIDATE_CACHE;
+      break;
+    case WebURLRequest::ReloadBypassingCache:
+      load_flags |= net::LOAD_BYPASS_CACHE;
       break;
     case WebURLRequest::ReturnCacheDataElseLoad:
       load_flags |= net::LOAD_PREFERRING_CACHE;
@@ -356,8 +355,6 @@ void WebURLLoaderImpl::Context::Start(const WebURLRequest& request,
 
   if (request.reportUploadProgress())
     load_flags |= net::LOAD_ENABLE_UPLOAD_PROGRESS;
-  if (request.reportLoadTiming())
-    load_flags |= net::LOAD_ENABLE_LOAD_TIMING;
   if (request.reportRawHeaders())
     load_flags |= net::LOAD_REPORT_RAW_HEADERS;
 
@@ -374,7 +371,7 @@ void WebURLLoaderImpl::Context::Start(const WebURLRequest& request,
     load_flags |= net::LOAD_DO_NOT_PROMPT_FOR_LOGIN;
   }
 
-  HeaderFlattener flattener(load_flags);
+  HeaderFlattener flattener;
   request.visitHTTPHeaderFields(&flattener);
 
   // TODO(brettw) this should take parameter encoding into account when
@@ -877,6 +874,11 @@ void WebURLLoaderImpl::setDefersLoading(bool value) {
 void WebURLLoaderImpl::didChangePriority(WebURLRequest::Priority new_priority,
                                          int intra_priority_value) {
   context_->DidChangePriority(new_priority, intra_priority_value);
+}
+
+bool WebURLLoaderImpl::attachThreadedDataReceiver(
+    blink::WebThreadedDataReceiver* threaded_data_receiver) {
+  return context_->AttachThreadedDataReceiver(threaded_data_receiver);
 }
 
 }  // namespace content

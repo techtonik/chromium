@@ -19,7 +19,8 @@ _SITE = 'http://commondatastorage.googleapis.com'
 
 class Site(object):
   CONTINUOUS = _SITE + '/chromium-browser-continuous'
-  SNAPSHOT = _SITE + '/chromium-browser-snapshots'
+  CHROMIUM_SNAPSHOT = _SITE + '/chromium-browser-snapshots'
+  BLINK_SNAPSHOT = _SITE + '/chromium-webkit-snapshots'
 
 
 def GetLatestRevision(site=Site.CONTINUOUS):

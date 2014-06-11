@@ -24,6 +24,7 @@ AppListTestViewDelegate::AppListTestViewDelegate()
       next_profile_app_count_(0),
       model_(new AppListTestModel),
       speech_ui_(SPEECH_RECOGNITION_OFF) {
+  model_->SetFoldersEnabled(true);
 }
 
 AppListTestViewDelegate::~AppListTestViewDelegate() {}
@@ -90,12 +91,15 @@ gfx::ImageSkia AppListTestViewDelegate::GetWindowIcon() {
   return gfx::ImageSkia();
 }
 
-content::WebContents* AppListTestViewDelegate::GetStartPageContents() {
+#if defined(TOOLKIT_VIEWS)
+views::View* AppListTestViewDelegate::CreateStartPageWebView(
+    const gfx::Size& size) {
   return NULL;
 }
+#endif
 
-content::WebContents* AppListTestViewDelegate::GetSpeechRecognitionContents() {
-  return NULL;
+bool AppListTestViewDelegate::IsSpeechRecognitionEnabled() {
+  return false;
 }
 
 const AppListViewDelegate::Users& AppListTestViewDelegate::GetUsers() const {

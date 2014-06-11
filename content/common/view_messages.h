@@ -567,6 +567,7 @@ IPC_MESSAGE_ROUTED1(ViewMsg_UpdateWebPreferences,
 IPC_MESSAGE_CONTROL0(ViewMsg_TimezoneChange)
 
 // Tells the render view to close.
+// Expects a Close_ACK message when finished.
 IPC_MESSAGE_ROUTED0(ViewMsg_Close)
 
 IPC_STRUCT_BEGIN(ViewMsg_Resize_Params)
@@ -836,10 +837,9 @@ IPC_MESSAGE_ROUTED0(ViewMsg_WorkerScriptLoadFailed)
 // This message is sent only if the worker successfully loaded the script.
 IPC_MESSAGE_ROUTED0(ViewMsg_WorkerConnected)
 
-// Tells the renderer that the network state has changed so that
-// navigator.onLine and navigator.connection can be updated.
-IPC_MESSAGE_CONTROL2(ViewMsg_NetworkStateChanged,
-                     bool /* is_online */,
+// Tells the renderer that the network type has changed so that navigator.onLine
+// and navigator.connection can be updated.
+IPC_MESSAGE_CONTROL1(ViewMsg_NetworkTypeChanged,
                      net::NetworkChangeNotifier::ConnectionType /* type */)
 
 // Reply to ViewHostMsg_OpenChannelToPpapiBroker
@@ -1101,6 +1101,11 @@ IPC_MESSAGE_ROUTED5(ViewHostMsg_Find_Reply,
                     int /* active_match_ordinal */,
                     bool /* final_update */)
 
+// Indicates that the render view has been closed in respose to a
+// Close message.
+IPC_MESSAGE_CONTROL1(ViewHostMsg_Close_ACK,
+                     int /* old_route_id */);
+
 // Indicates that the current page has been closed, after a ClosePage
 // message.
 IPC_MESSAGE_ROUTED0(ViewHostMsg_ClosePage_ACK)
@@ -1281,15 +1286,6 @@ IPC_MESSAGE_ROUTED1(ViewHostMsg_DidContentsPreferredSizeChange,
 // is not sent at all when threaded compositing is enabled while
 // ViewHostMsg_DidChangeScrollOffset works properly in this case.
 IPC_MESSAGE_ROUTED0(ViewHostMsg_DidChangeScrollOffset)
-
-// Notifies that the pinned-to-side state of the content changed.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_DidChangeScrollOffsetPinningForMainFrame,
-                    bool /* pinned_to_left */,
-                    bool /* pinned_to_right */)
-
-// Notifies that the number of JavaScript scroll handlers changed.
-IPC_MESSAGE_ROUTED1(ViewHostMsg_DidChangeNumWheelEvents,
-                    int /* count */)
 
 // Notifies whether there are JavaScript touch event handlers or not.
 IPC_MESSAGE_ROUTED1(ViewHostMsg_HasTouchEventHandlers,
@@ -1682,11 +1678,6 @@ IPC_MESSAGE_ROUTED2(ViewHostMsg_PluginFocusChanged,
 
 // Instructs the browser to start plugin IME.
 IPC_MESSAGE_ROUTED0(ViewHostMsg_StartPluginIme)
-
-// Notifies that the scrollbars-visible state of the content changed.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_DidChangeScrollbarsForMainFrame,
-                    bool /* has_horizontal_scrollbar */,
-                    bool /* has_vertical_scrollbar */)
 
 #elif defined(OS_WIN)
 // Request that the given font characters be loaded by the browser so it's

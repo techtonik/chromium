@@ -259,7 +259,7 @@ void Dispatcher::DidCreateScriptContext(
   script_context_set_.Add(context);
 
   if (extension) {
-    InitOriginPermissions(extension, context_type);
+    InitOriginPermissions(extension);
   }
 
   {
@@ -735,7 +735,7 @@ void Dispatcher::OnUpdatePermissions(
   scoped_refptr<const PermissionSet> delta = new PermissionSet(
       apis, manifest_permissions, explicit_hosts, scriptable_hosts);
   scoped_refptr<const PermissionSet> old_active =
-      extension->GetActivePermissions();
+      extension->permissions_data()->active_permissions();
   UpdatedExtensionPermissionsInfo::Reason reason =
       static_cast<UpdatedExtensionPermissionsInfo::Reason>(reason_id);
 
@@ -750,7 +750,7 @@ void Dispatcher::OnUpdatePermissions(
       break;
   }
 
-  PermissionsData::SetActivePermissions(extension, new_active);
+  extension->permissions_data()->SetActivePermissions(new_active);
   UpdateOriginPermissions(reason, extension, explicit_hosts);
   UpdateBindings(extension->id());
 }
@@ -797,13 +797,13 @@ void Dispatcher::UpdateActiveExtensions() {
   delegate_->OnActiveExtensionsUpdated(active_extensions);
 }
 
-void Dispatcher::InitOriginPermissions(const Extension* extension,
-                                       Feature::Context context_type) {
-  delegate_->InitOriginPermissions(extension, context_type);
+void Dispatcher::InitOriginPermissions(const Extension* extension) {
+  delegate_->InitOriginPermissions(extension,
+                                   IsExtensionActive(extension->id()));
   UpdateOriginPermissions(
       UpdatedExtensionPermissionsInfo::ADDED,
       extension,
-      PermissionsData::GetEffectiveHostPermissions(extension));
+      extension->permissions_data()->GetEffectiveHostPermissions());
 }
 
 void Dispatcher::UpdateOriginPermissions(

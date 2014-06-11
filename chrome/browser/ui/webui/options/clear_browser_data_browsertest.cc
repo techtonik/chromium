@@ -29,16 +29,6 @@ class ClearBrowserDataBrowserTest : public OptionsUIBrowserTest {
     return element_enabled;
   }
 
-  bool IsElementInFocus(const std::string& selector) {
-    bool element_in_focus = false;
-    EXPECT_TRUE(content::ExecuteScriptAndExtractBool(
-        GetSettingsFrame(),
-        "window.domAutomationController.send(document.querySelector('" +
-            selector + "') == document.activeElement);",
-        &element_in_focus));
-    return element_in_focus;
-  }
-
  private:
   void GetElementEnabledState(
       const std::string& selector,
@@ -53,15 +43,12 @@ class ClearBrowserDataBrowserTest : public OptionsUIBrowserTest {
 
 IN_PROC_BROWSER_TEST_F(ClearBrowserDataBrowserTest,
                        CommitButtonDisabledWhileDeletionInProgress) {
-  const char kTimePeriodSelectorId[] = "#clear-browser-data-time-period";
   const char kCommitButtonId[] = "#clear-browser-data-commit";
   BrowsingDataRemoverCompletionInhibitor completion_inhibitor;
 
   // Navigate to the Clear Browsing Data dialog to ensure that the commit button
   // is initially enabled, usable, and gets disabled after having been pressed.
-  // Furthermore, verify that the time period combo-box gets the initial focus.
   NavigateToSettingsSubpage(chrome::kClearBrowserDataSubPage);
-  EXPECT_TRUE(IsElementInFocus(kTimePeriodSelectorId));
   ASSERT_NO_FATAL_FAILURE(ClickElement(kCommitButtonId));
   EXPECT_FALSE(IsElementEnabled(kCommitButtonId));
 

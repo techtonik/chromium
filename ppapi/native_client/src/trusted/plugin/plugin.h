@@ -110,24 +110,10 @@ class Plugin : public pp::Instance {
                                        PP_FileHandle file_handle,
                                        ErrorInfo* error_info);
 
-  // Report successful loading of a module.
-  void ReportLoadSuccess(uint64_t loaded_bytes, uint64_t total_bytes);
   // Report an error that was encountered while loading a module.
   void ReportLoadError(const ErrorInfo& error_info);
-  // Report loading a module was aborted, typically due to user action.
-  void ReportLoadAbort();
-
-  // Report the error code that sel_ldr produces when starting a nexe.
-  void ReportSelLdrLoadStatus(int status);
 
   nacl::DescWrapperFactory* wrapper_factory() const { return wrapper_factory_; }
-
-  // Requests a NaCl manifest download from a |url| relative to the page origin.
-  void RequestNaClManifest(const nacl::string& url);
-
-  // Called back by CallOnMainThread.  Dispatches the first enqueued progress
-  // event.
-  void DispatchProgressEvent(int32_t result);
 
   // A helper function that indicates if |url| can be requested by the document
   // under the same-origin policy. Strictly speaking, it may be possible for the
@@ -153,8 +139,6 @@ class Plugin : public pp::Instance {
   // Histogram helper functions, internal to Plugin so they can use
   // uma_interface_ normally.
   void HistogramTimeSmall(const std::string& name, int64_t ms);
-  void HistogramEnumerateLoadStatus(PP_NaClError error_code);
-  void HistogramEnumerateSelLdrLoadStatus(NaClErrorCode error_code);
 
   // Load a nacl module from the file specified in file_handle.
   // Only to be used from a background (non-main) thread.
@@ -171,14 +155,22 @@ class Plugin : public pp::Instance {
                                pp::CompletionCallback callback);
 
   // Signals that StartSelLdr has finished.
+  // This is invoked on the main thread.
   void SignalStartSelLdrDone(int32_t pp_error,
                              bool* started,
                              ServiceRuntime* service_runtime);
 
+  // Signals that the nexe is started.
+  // This is invoked on the main thread.
+  void SignalNexeStarted(int32_t pp_error,
+                         bool* started,
+                         ServiceRuntime* service_runtime);
+
+  // This is invoked on the main thread.
   void LoadNexeAndStart(int32_t pp_error,
-                        PP_NaClFileInfo file_info,
                         ServiceRuntime* service_runtime,
-                        const pp::CompletionCallback& crash_cb);
+                        PP_NaClFileInfo file_info,
+                        const pp::CompletionCallback& callback);
 
   // Callback used when getting the URL for the .nexe file.  If the URL loading
   // is successful, the file descriptor is opened and can be passed to sel_ldr
@@ -216,11 +208,6 @@ class Plugin : public pp::Instance {
   // Processes the JSON manifest string and starts loading the nexe.
   void ProcessNaClManifest(const nacl::string& manifest_json);
 
-  // Logs timing information to a UMA histogram, and also logs the same timing
-  // information divided by the size of the nexe to another histogram.
-  void HistogramStartupTimeSmall(const std::string& name, float dt);
-  void HistogramStartupTimeMedium(const std::string& name, float dt);
-
   void SetExitStatusOnMainThread(int32_t pp_error, int exit_status);
 
   // Keep track of the NaCl module subprocess that was spun up in the plugin.
@@ -237,7 +224,6 @@ class Plugin : public pp::Instance {
 
   nacl::scoped_ptr<PnaclCoordinator> pnacl_coordinator_;
 
-  int64_t time_of_last_progress_event_;
   int exit_status_;
 
   PP_NaClFileInfo nexe_file_info_;

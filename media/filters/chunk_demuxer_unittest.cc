@@ -66,6 +66,7 @@ const int kVideoTrackEntryHeaderSize =
 const int kVideoTrackNum = 1;
 const int kAudioTrackNum = 2;
 const int kTextTrackNum = 3;
+const int kAlternateTextTrackNum = 4;
 
 const int kAudioBlockDuration = 23;
 const int kVideoBlockDuration = 33;
@@ -178,9 +179,32 @@ class ChunkDemuxerTest : public ::testing::TestWithParam<bool> {
   }
 
   void CreateInitSegment(int stream_flags,
-                         bool is_audio_encrypted, bool is_video_encrypted,
+                         bool is_audio_encrypted,
+                         bool is_video_encrypted,
                          scoped_ptr<uint8[]>* buffer,
                          int* size) {
+    CreateInitSegmentInternal(
+        stream_flags, is_audio_encrypted, is_video_encrypted, buffer, false,
+        size);
+  }
+
+  void CreateInitSegmentWithAlternateTextTrackNum(int stream_flags,
+                                                  bool is_audio_encrypted,
+                                                  bool is_video_encrypted,
+                                                  scoped_ptr<uint8[]>* buffer,
+                                                  int* size) {
+    DCHECK(stream_flags & HAS_TEXT);
+    CreateInitSegmentInternal(
+        stream_flags, is_audio_encrypted, is_video_encrypted, buffer, true,
+        size);
+  }
+
+  void CreateInitSegmentInternal(int stream_flags,
+                                 bool is_audio_encrypted,
+                                 bool is_video_encrypted,
+                                 scoped_ptr<uint8[]>* buffer,
+                                 bool use_alternate_text_track_id,
+                                 int* size) {
     bool has_audio = (stream_flags & HAS_AUDIO) != 0;
     bool has_video = (stream_flags & HAS_VIDEO) != 0;
     bool has_text = (stream_flags & HAS_TEXT) != 0;
@@ -223,13 +247,18 @@ class ChunkDemuxerTest : public ::testing::TestWithParam<bool> {
       //
       // This is the track entry for a text track,
       // TrackEntry [AE], size=30
-      //   TrackNum [D7], size=1, val=3
-      //   TrackUID [73] [C5], size=1, value=3
+      //   TrackNum [D7], size=1, val=3 (or 4 if use_alternate_text_track_id)
+      //   TrackUID [73] [C5], size=1, value=3 (must remain constant for same
+      //     track, even if TrackNum changes)
       //   TrackType [83], size=1, val=0x11
       //   CodecId [86], size=18, val="D_WEBVTT/SUBTITLES"
-      const char str[] = "\xAE\x9E\xD7\x81\x03\x73\xC5\x81\x03"
-                         "\x83\x81\x11\x86\x92"
-                         "D_WEBVTT/SUBTITLES";
+      char str[] = "\xAE\x9E\xD7\x81\x03\x73\xC5\x81\x03"
+                   "\x83\x81\x11\x86\x92"
+                   "D_WEBVTT/SUBTITLES";
+      DCHECK_EQ(str[4], kTextTrackNum);
+      if (use_alternate_text_track_id)
+        str[4] = kAlternateTextTrackNum;
+
       const int len = strlen(str);
       DCHECK_EQ(len, 32);
       const uint8* const buf = reinterpret_cast<const uint8*>(str);
@@ -358,7 +387,8 @@ class ChunkDemuxerTest : public ::testing::TestWithParam<bool> {
       case kAudioTrackNum:
         block_duration = kAudioBlockDuration;
         break;
-      case kTextTrackNum:
+      case kTextTrackNum:  // Fall-through.
+      case kAlternateTextTrackNum:
         block_duration = kTextBlockDuration;
         break;
     }
@@ -396,7 +426,8 @@ class ChunkDemuxerTest : public ::testing::TestWithParam<bool> {
       if (i == 0)
         cb.SetClusterTimecode(timestamp_in_ms);
 
-      if (track_number == kTextTrackNum) {
+      if (track_number == kTextTrackNum ||
+          track_number == kAlternateTextTrackNum) {
         cb.AddBlockGroup(track_number, timestamp_in_ms, kTextBlockDuration,
                          block_flags, &data[0], data.size());
       } else {
@@ -1145,6 +1176,51 @@ TEST_P(ChunkDemuxerTest, InitText) {
     ShutdownDemuxer();
     demuxer_.reset();
   }
+}
+
+TEST_P(ChunkDemuxerTest, SingleTextTrackIdChange) {
+  // Test with 1 video stream, 1 audio, and 1 text stream. Send a second init
+  // segment in which the text track ID changes. Verify appended buffers before
+  // and after the second init segment map to the same underlying track buffers.
+  CreateNewDemuxer();
+  DemuxerStream* text_stream = NULL;
+  TextTrackConfig text_config;
+  EXPECT_CALL(host_, AddTextStream(_, _))
+      .WillOnce(DoAll(SaveArg<0>(&text_stream),
+                      SaveArg<1>(&text_config)));
+  ASSERT_TRUE(InitDemuxerWithEncryptionInfo(
+      HAS_TEXT | HAS_AUDIO | HAS_VIDEO, false, false));
+  DemuxerStream* audio_stream = demuxer_->GetStream(DemuxerStream::AUDIO);
+  DemuxerStream* video_stream = demuxer_->GetStream(DemuxerStream::VIDEO);
+  ASSERT_TRUE(audio_stream);
+  ASSERT_TRUE(video_stream);
+  ASSERT_TRUE(text_stream);
+
+  AppendSingleStreamCluster(kSourceId, kAudioTrackNum, "0K 23K");
+  AppendSingleStreamCluster(kSourceId, kVideoTrackNum, "0K 30");
+  AppendSingleStreamCluster(kSourceId, kTextTrackNum, "10K");
+  CheckExpectedRanges(kSourceId, "{ [0,46) }");
+
+  scoped_ptr<uint8[]> info_tracks;
+  int info_tracks_size = 0;
+  CreateInitSegmentWithAlternateTextTrackNum(HAS_TEXT | HAS_AUDIO | HAS_VIDEO,
+                                             false, false,
+                                             &info_tracks, &info_tracks_size);
+  demuxer_->AppendData(kSourceId, info_tracks.get(), info_tracks_size,
+                       append_window_start_for_next_append_,
+                       append_window_end_for_next_append_,
+                       &timestamp_offset_map_[kSourceId]);
+
+  AppendSingleStreamCluster(kSourceId, kAudioTrackNum, "46K 69K");
+  AppendSingleStreamCluster(kSourceId, kVideoTrackNum, "60K");
+  AppendSingleStreamCluster(kSourceId, kAlternateTextTrackNum, "45K");
+
+  CheckExpectedRanges(kSourceId, "{ [0,92) }");
+  CheckExpectedBuffers(audio_stream, "0 23 46 69");
+  CheckExpectedBuffers(video_stream, "0 30 60");
+  CheckExpectedBuffers(text_stream, "10 45");
+
+  ShutdownDemuxer();
 }
 
 // Make sure that the demuxer reports an error if Shutdown()
@@ -3030,17 +3106,6 @@ TEST_P(ChunkDemuxerTest, GCDuringSeek) {
   CheckExpectedRanges(kSourceId, "{ [500,592) [792,815) }");
 }
 
-TEST_P(ChunkDemuxerTest, RemoveBeforeInitSegment) {
-    EXPECT_CALL(*this, DemuxerOpened());
-    demuxer_->Initialize(
-        &host_, CreateInitDoneCB(kNoTimestamp(), PIPELINE_OK), true);
-
-    EXPECT_EQ(ChunkDemuxer::kOk, AddId(kSourceId, HAS_AUDIO | HAS_VIDEO));
-
-    demuxer_->Remove(kSourceId, base::TimeDelta::FromMilliseconds(0),
-                     base::TimeDelta::FromMilliseconds(1));
-}
-
 TEST_P(ChunkDemuxerTest, AppendWindow_Video) {
   ASSERT_TRUE(InitDemuxer(HAS_VIDEO));
   DemuxerStream* stream = demuxer_->GetStream(DemuxerStream::VIDEO);
@@ -3267,6 +3332,33 @@ TEST_P(ChunkDemuxerTest, Remove_AudioVideoText) {
   CheckExpectedBuffers(audio_stream, "1 21 41 61 81 101 121 141");
   CheckExpectedBuffers(video_stream, "1 31 61 91 121 151 181");
   CheckExpectedBuffers(text_stream, "1 101 201");
+}
+
+TEST_P(ChunkDemuxerTest, Remove_StartAtDuration) {
+  ASSERT_TRUE(InitDemuxer(HAS_AUDIO));
+  DemuxerStream* audio_stream = demuxer_->GetStream(DemuxerStream::AUDIO);
+
+  // Set the duration to something small so that the append that
+  // follows updates the duration to reflect the end of the appended data.
+  EXPECT_CALL(host_, SetDuration(
+      base::TimeDelta::FromMilliseconds(1)));
+  demuxer_->SetDuration(0.001);
+
+  EXPECT_CALL(host_, SetDuration(
+      base::TimeDelta::FromMilliseconds(160)));
+  AppendSingleStreamCluster(kSourceId, kAudioTrackNum,
+                            "0K 20K 40K 60K 80K 100K 120K 140K");
+
+  CheckExpectedRanges(kSourceId, "{ [0,160) }");
+  CheckExpectedBuffers(audio_stream, "0 20 40 60 80 100 120 140");
+
+  demuxer_->Remove(kSourceId,
+                   base::TimeDelta::FromSecondsD(demuxer_->GetDuration()),
+                   kInfiniteDuration());
+
+  Seek(base::TimeDelta());
+  CheckExpectedRanges(kSourceId, "{ [0,160) }");
+  CheckExpectedBuffers(audio_stream, "0 20 40 60 80 100 120 140");
 }
 
 // Verifies that a Seek() will complete without text cues for

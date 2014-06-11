@@ -93,7 +93,6 @@ class WebDOMMessageEvent;
 class WebDataSource;
 class WebDateTimeChooserCompletion;
 class WebDragData;
-class WebGeolocationClient;
 class WebGestureEvent;
 class WebIconURL;
 class WebImage;
@@ -127,12 +126,10 @@ class WebURLResponseExtraDataImpl;
 
 namespace content {
 class BrowserPluginManager;
-class DeviceOrientationDispatcher;
 class DevToolsAgent;
 class DocumentState;
 class ExternalPopupMenu;
 class FaviconHelper;
-class GeolocationDispatcher;
 class HistoryController;
 class HistoryEntry;
 class ImageResourceFetcher;
@@ -437,7 +434,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual void focusNext();
   virtual void focusPrevious();
   virtual void focusedNodeChanged(const blink::WebNode& node);
-  virtual void numberOfWheelEventHandlersChanged(unsigned num_handlers);
   virtual void didUpdateLayout();
 #if defined(OS_ANDROID)
   virtual bool didTapMultipleTargets(
@@ -452,7 +448,6 @@ class CONTENT_EXPORT RenderViewImpl
       const blink::WebAXObject& obj, blink::WebAXEvent event);
   virtual void didUpdateInspectorSetting(const blink::WebString& key,
                                          const blink::WebString& value);
-  virtual blink::WebGeolocationClient* geolocationClient();
   virtual blink::WebSpeechRecognizer* speechRecognizer();
   virtual void zoomLimitsChanged(double minimum_level, double maximum_level);
   virtual void zoomLevelChanged();
@@ -502,7 +497,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual bool ShouldDisplayScrollbars(int width, int height) const OVERRIDE;
   virtual int GetEnabledBindings() const OVERRIDE;
   virtual bool GetContentStateImmediately() const OVERRIDE;
-  virtual float GetFilteredTimePerFrame() const OVERRIDE;
   virtual blink::WebPageVisibilityState GetVisibilityState() const OVERRIDE;
   virtual void DidStartLoading() OVERRIDE;
   virtual void DidStopLoading() OVERRIDE;
@@ -529,6 +523,7 @@ class CONTENT_EXPORT RenderViewImpl
 
  protected:
   // RenderWidget overrides:
+  virtual void OnClose() OVERRIDE;
   virtual void Close() OVERRIDE;
   virtual void OnResize(const ViewMsg_Resize_Params& params) OVERRIDE;
   virtual void DidInitiatePaint() OVERRIDE;
@@ -546,7 +541,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual void OnWasHidden() OVERRIDE;
   virtual void OnWasShown(bool needs_repainting) OVERRIDE;
   virtual GURL GetURLForGraphicsContext3D() OVERRIDE;
-  virtual bool ForceCompositingModeEnabled() OVERRIDE;
   virtual void OnImeSetComposition(
       const base::string16& text,
       const std::vector<blink::WebCompositionUnderline>& underlines,
@@ -556,6 +550,8 @@ class CONTENT_EXPORT RenderViewImpl
                                        const gfx::Range& replacement_range,
                                        bool keep_selection) OVERRIDE;
   virtual void SetDeviceScaleFactor(float device_scale_factor) OVERRIDE;
+  virtual bool SetDeviceColorProfile(
+      const std::vector<char>& color_profile) OVERRIDE;
   virtual void OnOrientationChange() OVERRIDE;
   virtual ui::TextInputType GetTextInputType() OVERRIDE;
   virtual void GetSelectionBounds(gfx::Rect* start, gfx::Rect* end) OVERRIDE;
@@ -1038,11 +1034,6 @@ class CONTENT_EXPORT RenderViewImpl
   // states for the sizes).
   base::OneShotTimer<RenderViewImpl> check_preferred_size_timer_;
 
-  // These store the "is main frame is scrolled all the way to the left
-  // or right" state that was last sent to the browser.
-  bool cached_is_main_frame_pinned_to_left_;
-  bool cached_is_main_frame_pinned_to_right_;
-
   // Bookkeeping to suppress redundant scroll and focus requests for an already
   // scrolled and focused editable node.
   bool has_scrolled_focused_editable_node_into_rect_;
@@ -1059,15 +1050,9 @@ class CONTENT_EXPORT RenderViewImpl
   // The push messaging dispatcher attached to this view, lazily initialized.
   PushMessagingDispatcher* push_messaging_dispatcher_;
 
-  // The geolocation dispatcher attached to this view, lazily initialized.
-  GeolocationDispatcher* geolocation_dispatcher_;
-
   // The speech recognition dispatcher attached to this view, lazily
   // initialized.
   SpeechRecognitionDispatcher* speech_recognition_dispatcher_;
-
-  // Device orientation dispatcher attached to this view; lazily initialized.
-  DeviceOrientationDispatcher* device_orientation_dispatcher_;
 
   // MediaStream dispatcher attached to this view; lazily initialized.
   MediaStreamDispatcher* media_stream_dispatcher_;

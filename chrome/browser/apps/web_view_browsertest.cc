@@ -764,6 +764,19 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, EmbedderVisibilityChanged) {
     loop_runner->Run();
 }
 
+// This test verifies that reloading the embedder reloads the guest (and doest
+// not crash).
+IN_PROC_BROWSER_TEST_F(WebViewTest, ReloadEmbedder) {
+  // Just load a guest from other test, we do not want to add a separate
+  // platform_app for this test.
+  LoadAppWithGuest("web_view/visibility_changed");
+
+  ExtensionTestMessageListener launched_again_listener("WebViewTest.LAUNCHED",
+                                                       false);
+  GetEmbedderWebContents()->GetController().Reload(false);
+  ASSERT_TRUE(launched_again_listener.WaitUntilSatisfied());
+}
+
 IN_PROC_BROWSER_TEST_F(WebViewTest, AcceptTouchEvents) {
   LoadAppWithGuest("web_view/accept_touch_events");
 
@@ -899,9 +912,7 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestLoadProgressEvent) {
   TestHelper("testLoadProgressEvent", "web_view/shim", NO_TEST_SERVER);
 }
 
-// WebViewTest.Shim_TestDestroyOnEventListener is flaky, so disable it.
-// http://crbug.com/255106
-IN_PROC_BROWSER_TEST_F(WebViewTest, DISABLED_Shim_TestDestroyOnEventListener) {
+IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestDestroyOnEventListener) {
   TestHelper("testDestroyOnEventListener", "web_view/shim", NO_TEST_SERVER);
 }
 
@@ -909,17 +920,13 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestCannotMutateEventName) {
   TestHelper("testCannotMutateEventName", "web_view/shim", NO_TEST_SERVER);
 }
 
-// http://crbug.com/267304
-#if defined(OS_WIN)
-#define MAYBE_Shim_TestPartitionRaisesException \
-  DISABLED_Shim_TestPartitionRaisesException
-#else
-#define MAYBE_Shim_TestPartitionRaisesException \
-  Shim_TestPartitionRaisesException
-#endif
+IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestPartitionRaisesException) {
+  TestHelper("testPartitionRaisesException", "web_view/shim", NO_TEST_SERVER);
+}
 
-IN_PROC_BROWSER_TEST_F(WebViewTest, MAYBE_Shim_TestPartitionRaisesException) {
-  TestHelper("testPartitionRaisesException",
+IN_PROC_BROWSER_TEST_F(WebViewTest,
+                       Shim_TestPartitionRemovalAfterNavigationFails) {
+  TestHelper("testPartitionRemovalAfterNavigationFails",
              "web_view/shim",
              NO_TEST_SERVER);
 }
@@ -1922,7 +1929,7 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, GeolocationAPIEmbedderHasAccessDeny) {
 
 // GeolocationAPI* test 3 of 3.
 IN_PROC_BROWSER_TEST_F(WebViewTest,
-                       DISABLED_GeolocationAPIEmbedderHasAccessMultipleBridgeIdAllow) {
+                       GeolocationAPIEmbedderHasAccessMultipleBridgeIdAllow) {
   TestHelper("testMultipleBridgeIdAllow",
              "web_view/geolocation/embedder_has_permission",
              NEEDS_TEST_SERVER);

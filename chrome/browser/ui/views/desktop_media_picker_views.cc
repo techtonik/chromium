@@ -8,17 +8,18 @@
 #include "chrome/browser/media/desktop_media_list.h"
 #include "chrome/browser/media/desktop_media_list_observer.h"
 #include "chrome/browser/ui/ash/ash_util.h"
-#include "components/web_modal/web_contents_modal_dialog_host.h"
+#include "chrome/browser/ui/views/constrained_window_views.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
-#include "components/web_modal/web_contents_modal_dialog_manager_delegate.h"
 #include "content/public/browser/browser_thread.h"
 #include "grit/generated_resources.h"
 #include "ui/aura/window_tree_host.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/events/event_constants.h"
 #include "ui/events/keycodes/keyboard_codes.h"
 #include "ui/gfx/canvas.h"
 #include "ui/native_theme/native_theme.h"
 #include "ui/views/background.h"
+#include "ui/views/bubble/bubble_frame_view.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/controls/scroll_view.h"
@@ -30,8 +31,6 @@
 #include "ui/wm/core/shadow_types.h"
 
 using content::DesktopMediaID;
-using web_modal::WebContentsModalDialogManager;
-using web_modal::WebContentsModalDialogManagerDelegate;
 
 namespace {
 
@@ -57,6 +56,10 @@ content::DesktopMediaID::Id AcceleratedWidgetToDesktopMediaId(
 #else
   return static_cast<content::DesktopMediaID::Id>(accelerated_widget);
 #endif
+}
+
+int GetMediaListViewHeightForRows(size_t rows) {
+  return kListItemHeight * rows;
 }
 
 class DesktopMediaListView;
@@ -97,6 +100,7 @@ class DesktopMediaSourceView : public views::View {
   virtual void OnFocus() OVERRIDE;
   virtual void OnBlur() OVERRIDE;
   virtual bool OnMousePressed(const ui::MouseEvent& event) OVERRIDE;
+  virtual void OnGestureEvent(ui::GestureEvent* event) OVERRIDE;
 
  private:
   DesktopMediaListView* parent_;
@@ -173,12 +177,15 @@ class DesktopMediaPickerDialogView : public views::DialogDelegateView {
   virtual void Layout() OVERRIDE;
 
   // views::DialogDelegateView overrides.
+  virtual ui::ModalType GetModalType() const OVERRIDE;
   virtual base::string16 GetWindowTitle() const OVERRIDE;
   virtual bool IsDialogButtonEnabled(ui::DialogButton button) const OVERRIDE;
   virtual base::string16 GetDialogButtonLabel(
       ui::DialogButton button) const OVERRIDE;
   virtual bool Accept() OVERRIDE;
   virtual void DeleteDelegate() OVERRIDE;
+
+  void OnMediaListRowsChanged();
 
  private:
   DesktopMediaPickerViews* parent_;
@@ -336,6 +343,23 @@ bool DesktopMediaSourceView::OnMousePressed(const ui::MouseEvent& event) {
   return true;
 }
 
+void DesktopMediaSourceView::OnGestureEvent(ui::GestureEvent* event) {
+  if (event->type() == ui::ET_GESTURE_TAP &&
+      event->details().tap_count() == 2) {
+    RequestFocus();
+    parent_->OnDoubleClick();
+    event->SetHandled();
+    return;
+  }
+
+  // Detect tap gesture using ET_GESTURE_TAP_DOWN so the view also gets focused
+  // on the long tap (when the tap gesture starts).
+  if (event->type() == ui::ET_GESTURE_TAP_DOWN) {
+    RequestFocus();
+    event->SetHandled();
+  }
+}
+
 DesktopMediaListView::DesktopMediaListView(
     DesktopMediaPickerDialogView* parent,
     scoped_ptr<DesktopMediaList> media_list)
@@ -373,7 +397,7 @@ DesktopMediaSourceView* DesktopMediaListView::GetSelection() {
 
 gfx::Size DesktopMediaListView::GetPreferredSize() const {
   int total_rows = (child_count() + kListColumns - 1) / kListColumns;
-  return gfx::Size(kTotalListWidth, kListItemHeight * total_rows);
+  return gfx::Size(kTotalListWidth, GetMediaListViewHeightForRows(total_rows));
 }
 
 void DesktopMediaListView::Layout() {
@@ -453,6 +477,9 @@ void DesktopMediaListView::OnSourceAdded(int index) {
   AddChildViewAt(source_view, index);
 
   PreferredSizeChanged();
+
+  if (child_count() % kListColumns == 1)
+    parent_->OnMediaListRowsChanged();
 }
 
 void DesktopMediaListView::OnSourceRemoved(int index) {
@@ -468,6 +495,9 @@ void DesktopMediaListView::OnSourceRemoved(int index) {
     OnSelectionChanged();
 
   PreferredSizeChanged();
+
+  if (child_count() % kListColumns == 0)
+    parent_->OnMediaListRowsChanged();
 }
 
 void DesktopMediaListView::OnSourceMoved(int old_index, int new_index) {
@@ -516,6 +546,8 @@ DesktopMediaPickerDialogView::DesktopMediaPickerDialogView(
   AddChildView(label_);
 
   scroll_view_->SetContents(list_view_);
+  scroll_view_->ClipHeightTo(
+      GetMediaListViewHeightForRows(1), GetMediaListViewHeightForRows(2));
   AddChildView(scroll_view_);
 
   // If |parent_web_contents| is set, the picker will be shown modal to the
@@ -523,45 +555,37 @@ DesktopMediaPickerDialogView::DesktopMediaPickerDialogView(
   // created for the picker. Note that |parent_window| may also be NULL if
   // parent web contents is not set. In this case the picker will be parented
   // by a root window.
-  WebContentsModalDialogManager* web_contents_modal_dialog_manager = NULL;
-  if (parent_web_contents) {
-    web_contents_modal_dialog_manager =
-        WebContentsModalDialogManager::FromWebContents(parent_web_contents);
-    DCHECK(web_contents_modal_dialog_manager);
-    WebContentsModalDialogManagerDelegate* delegate =
-        web_contents_modal_dialog_manager->delegate();
-    DCHECK(delegate);
-    views::Widget::CreateWindowAsFramelessChild(
-        this,
-        delegate->GetWebContentsModalDialogHost()->GetHostView());
-  } else {
-    DialogDelegate::CreateDialogWidget(this, context, parent_window);
-  }
+  views::Widget* widget = NULL;
+  if (parent_web_contents)
+    widget = CreateWebModalDialogViews(this, parent_web_contents);
+  else
+    widget = DialogDelegate::CreateDialogWidget(this, context, parent_window);
 
   // DesktopMediaList needs to know the ID of the picker window which
   // matches the ID it gets from the OS. Depending on the OS and configuration
   // we get this ID differently.
   content::DesktopMediaID::Id dialog_window_id = 0;
-
 #if defined(USE_ASH)
-  if (chrome::IsNativeWindowInAsh(GetWidget()->GetNativeWindow())) {
+  if (chrome::IsNativeWindowInAsh(widget->GetNativeWindow())) {
     dialog_window_id = content::DesktopMediaID::RegisterAuraWindow(
-        GetWidget()->GetNativeWindow()).id;
-  } else
+        widget->GetNativeWindow()).id;
+    DCHECK_NE(dialog_window_id, 0);
+  }
 #endif
-  {
+  if (dialog_window_id == 0) {
     dialog_window_id = AcceleratedWidgetToDesktopMediaId(
-        GetWidget()->GetNativeWindow()->GetHost()->
-            GetAcceleratedWidget());
+        widget->GetNativeWindow()->GetHost()->GetAcceleratedWidget());
   }
 
   list_view_->StartUpdating(dialog_window_id);
 
   if (parent_web_contents) {
-    web_contents_modal_dialog_manager->ShowModalDialog(
-        GetWidget()->GetNativeView());
+    web_modal::WebContentsModalDialogManager* manager =
+        web_modal::WebContentsModalDialogManager::FromWebContents(
+            parent_web_contents);
+    manager->ShowModalDialog(widget->GetNativeView());
   } else {
-    GetWidget()->Show();
+    widget->Show();
   }
 }
 
@@ -572,12 +596,23 @@ void DesktopMediaPickerDialogView::DetachParent() {
 }
 
 gfx::Size DesktopMediaPickerDialogView::GetPreferredSize() const {
-  return gfx::Size(600, 500);
+  static const size_t kDialogViewWidth = 600;
+  const gfx::Insets title_insets = views::BubbleFrameView::GetTitleInsets();
+  size_t label_height =
+      label_->GetHeightForWidth(kDialogViewWidth - title_insets.height() * 2);
+
+  return gfx::Size(kDialogViewWidth,
+                   views::kPanelVertMargin * 2 + label_height +
+                       views::kPanelVerticalSpacing +
+                       scroll_view_->GetPreferredSize().height());
 }
 
 void DesktopMediaPickerDialogView::Layout() {
+  // DialogDelegate uses the bubble style frame.
+  const gfx::Insets title_insets = views::BubbleFrameView::GetTitleInsets();
   gfx::Rect rect = GetLocalBounds();
-  rect.Inset(views::kPanelHorizMargin, views::kPanelVertMargin);
+
+  rect.Inset(title_insets.left(), views::kPanelVertMargin);
 
   gfx::Rect label_rect(rect.x(), rect.y(), rect.width(),
                        label_->GetHeightForWidth(rect.width()));
@@ -587,6 +622,10 @@ void DesktopMediaPickerDialogView::Layout() {
   scroll_view_->SetBounds(
       rect.x(), scroll_view_top,
       rect.width(), rect.height() - scroll_view_top);
+}
+
+ui::ModalType DesktopMediaPickerDialogView::GetModalType() const {
+  return ui::MODAL_TYPE_CHILD;
 }
 
 base::string16 DesktopMediaPickerDialogView::GetWindowTitle() const {
@@ -639,8 +678,16 @@ void DesktopMediaPickerDialogView::OnDoubleClick() {
   GetDialogClientView()->AcceptWindow();
 }
 
-DesktopMediaPickerViews::DesktopMediaPickerViews()
-    : dialog_(NULL) {
+void DesktopMediaPickerDialogView::OnMediaListRowsChanged() {
+  gfx::Rect widget_bound = GetWidget()->GetWindowBoundsInScreen();
+
+  int new_height = widget_bound.height() - scroll_view_->height() +
+      scroll_view_->GetPreferredSize().height();
+
+  GetWidget()->CenterWindow(gfx::Size(widget_bound.width(), new_height));
+}
+
+DesktopMediaPickerViews::DesktopMediaPickerViews() : dialog_(NULL) {
 }
 
 DesktopMediaPickerViews::~DesktopMediaPickerViews() {
@@ -663,8 +710,7 @@ void DesktopMediaPickerViews::Show(content::WebContents* web_contents,
       media_list.Pass());
 }
 
-void DesktopMediaPickerViews::NotifyDialogResult(
-    DesktopMediaID source) {
+void DesktopMediaPickerViews::NotifyDialogResult(DesktopMediaID source) {
   // Once this method is called the |dialog_| will close and destroy itself.
   dialog_->DetachParent();
   dialog_ = NULL;

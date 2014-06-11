@@ -150,7 +150,6 @@ AutofillAgent::~AutofillAgent() {}
 bool AutofillAgent::OnMessageReceived(const IPC::Message& message) {
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(AutofillAgent, message)
-    IPC_MESSAGE_HANDLER(AutofillMsg_Ping, OnPing)
     IPC_MESSAGE_HANDLER(AutofillMsg_FillForm, OnFillForm)
     IPC_MESSAGE_HANDLER(AutofillMsg_PreviewForm, OnPreviewForm)
     IPC_MESSAGE_HANDLER(AutofillMsg_FieldTypePredictionsAvailable,
@@ -293,6 +292,7 @@ void AutofillAgent::didRequestAutocomplete(
         WebConsoleMessage::LevelLog,
         WebString(base::ASCIIToUTF16("requestAutocomplete: ") +
                       base::ASCIIToUTF16(error_message)));
+    form.document().frame()->addMessageToConsole(console_message);
     WebFormElement(form).finishRequestAutocomplete(
         WebFormElement::AutocompleteResultErrorDisabled);
     return;
@@ -453,10 +453,6 @@ void AutofillAgent::OnFillForm(int query_id, const FormData& form) {
   FillForm(form, element_);
   Send(new AutofillHostMsg_DidFillAutofillFormData(routing_id(),
                                                    base::TimeTicks::Now()));
-}
-
-void AutofillAgent::OnPing() {
-  Send(new AutofillHostMsg_PingAck(routing_id()));
 }
 
 void AutofillAgent::OnPreviewForm(int query_id, const FormData& form) {

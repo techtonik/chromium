@@ -48,6 +48,7 @@
 #include "content/public/common/url_constants.h"
 #include "extensions/common/constants.h"
 #include "ipc/ipc_message_macros.h"
+#include "net/base/escape.h"
 #include "net/base/net_errors.h"
 #include "third_party/WebKit/public/web/WebFindOptions.h"
 #include "ui/base/models/simple_menu_model.h"
@@ -141,6 +142,12 @@ static std::string PermissionTypeToString(WebViewPermissionType type) {
   }
 }
 
+std::string GetStoragePartitionIdFromSiteURL(const GURL& site_url) {
+  const std::string& partition_id = site_url.query();
+  bool persist_storage = site_url.path().find("persist") != std::string::npos;
+  return (persist_storage ? webview::kPersistPrefix : "") + partition_id;
+}
+
 void RemoveWebViewEventListenersOnIOThread(
     void* profile,
     const std::string& extension_id,
@@ -210,15 +217,69 @@ WebViewGuest::WebViewGuest(int guest_instance_id,
 }
 
 // static
+bool WebViewGuest::GetGuestPartitionConfigForSite(
+    const GURL& site,
+    std::string* partition_domain,
+    std::string* partition_name,
+    bool* in_memory) {
+  if (!site.SchemeIs(content::kGuestScheme))
+    return false;
+
+  // Since guest URLs are only used for packaged apps, there must be an app
+  // id in the URL.
+  CHECK(site.has_host());
+  *partition_domain = site.host();
+  // Since persistence is optional, the path must either be empty or the
+  // literal string.
+  *in_memory = (site.path() != "/persist");
+  // The partition name is user supplied value, which we have encoded when the
+  // URL was created, so it needs to be decoded.
+  *partition_name =
+      net::UnescapeURLComponent(site.query(), net::UnescapeRule::NORMAL);
+  return true;
+}
+
+// static
 const char WebViewGuest::Type[] = "webview";
 
-// static.
+// static
 int WebViewGuest::GetViewInstanceId(WebContents* contents) {
   WebViewGuest* guest = FromWebContents(contents);
   if (!guest)
     return guestview::kInstanceIDNone;
 
   return guest->view_instance_id();
+}
+
+// static
+void WebViewGuest::ParsePartitionParam(
+    const base::DictionaryValue* extra_params,
+    std::string* storage_partition_id,
+    bool* persist_storage) {
+  std::string partition_str;
+  if (!extra_params->GetString(webview::kStoragePartitionId, &partition_str)) {
+    return;
+  }
+
+  // Since the "persist:" prefix is in ASCII, StartsWith will work fine on
+  // UTF-8 encoded |partition_id|. If the prefix is a match, we can safely
+  // remove the prefix without splicing in the middle of a multi-byte codepoint.
+  // We can use the rest of the string as UTF-8 encoded one.
+  if (StartsWithASCII(partition_str, "persist:", true)) {
+    size_t index = partition_str.find(":");
+    CHECK(index != std::string::npos);
+    // It is safe to do index + 1, since we tested for the full prefix above.
+    *storage_partition_id = partition_str.substr(index + 1);
+
+    if (storage_partition_id->empty()) {
+      // TODO(lazyboy): Better way to deal with this error.
+      return;
+    }
+    *persist_storage = true;
+  } else {
+    *storage_partition_id = partition_str;
+    *persist_storage = false;
+  }
 }
 
 // static
@@ -359,8 +420,24 @@ void WebViewGuest::EmbedderDestroyed() {
           view_instance_id()));
 }
 
+void WebViewGuest::GuestDestroyed() {
+  // Clean up custom context menu items for this guest.
+  extensions::MenuManager* menu_manager = extensions::MenuManager::Get(
+      Profile::FromBrowserContext(browser_context()));
+  menu_manager->RemoveAllContextItems(extensions::MenuItem::ExtensionKey(
+      embedder_extension_id(), view_instance_id()));
+
+  RemoveWebViewFromExtensionRendererState(web_contents());
+}
+
 bool WebViewGuest::IsDragAndDropEnabled() const {
   return true;
+}
+
+void WebViewGuest::WillDestroy() {
+  if (!attached() && GetOpener())
+    GetOpener()->pending_new_windows_.erase(this);
+  DestroyUnattachedWindows();
 }
 
 bool WebViewGuest::AddMessageToConsole(WebContents* source,
@@ -384,7 +461,11 @@ void WebViewGuest::CloseContents(WebContents* source) {
   DispatchEvent(new GuestViewBase::Event(webview::kEventClose, args.Pass()));
 }
 
-void WebViewGuest::DidAttach() {
+void WebViewGuest::DidAttach(const base::DictionaryValue& extra_params) {
+  std::string src;
+  if (extra_params.GetString("src", &src) && !src.empty())
+    NavigateGuest(src);
+
   if (GetOpener()) {
     // We need to do a navigation here if the target URL has changed between
     // the time the WebContents was created and the time it was attached.
@@ -501,16 +582,14 @@ WebViewGuest* WebViewGuest::CreateNewGuestWindow(
   // We pull the partition information from the site's URL, which is of the
   // form guest://site/{persist}?{partition_name}.
   const GURL& site_url = guest_web_contents()->GetSiteInstance()->GetSiteURL();
-
   scoped_ptr<base::DictionaryValue> create_params(extra_params()->DeepCopy());
-  const std::string& storage_partition_id = site_url.query();
-  bool persist_storage =
-      site_url.path().find("persist") != std::string::npos;
+  const std::string storage_partition_id =
+      GetStoragePartitionIdFromSiteURL(site_url);
+  create_params->SetString(webview::kStoragePartitionId, storage_partition_id);
+
   WebContents* new_guest_web_contents =
       guest_manager->CreateGuest(guest_web_contents()->GetSiteInstance(),
                                  instance_id,
-                                 storage_partition_id,
-                                 persist_storage,
                                  create_params.Pass());
   WebViewGuest* new_guest =
       WebViewGuest::FromWebContents(new_guest_web_contents);
@@ -865,17 +944,6 @@ void WebViewGuest::RenderProcessGone(base::TerminationStatus status) {
   DispatchEvent(new GuestViewBase::Event(webview::kEventExit, args.Pass()));
 }
 
-void WebViewGuest::WebContentsDestroyed() {
-  // Clean up custom context menu items for this guest.
-  extensions::MenuManager* menu_manager = extensions::MenuManager::Get(
-      Profile::FromBrowserContext(browser_context()));
-  menu_manager->RemoveAllContextItems(extensions::MenuItem::ExtensionKey(
-      embedder_extension_id(), view_instance_id()));
-
-  RemoveWebViewFromExtensionRendererState(web_contents());
-  GuestViewBase::WebContentsDestroyed();
-}
-
 void WebViewGuest::UserAgentOverrideSet(const std::string& user_agent) {
   content::NavigationController& controller =
       guest_web_contents()->GetController();
@@ -1062,8 +1130,8 @@ void WebViewGuest::NavigateGuest(const std::string& src) {
   // chrome://settings.
   bool scheme_is_blocked =
       (!content::ChildProcessSecurityPolicy::GetInstance()->IsWebSafeScheme(
-          url.scheme()) &&
-      !url.SchemeIs(content::kAboutScheme)) ||
+           url.scheme()) &&
+       !url.SchemeIs(url::kAboutScheme)) ||
       url.SchemeIs(url::kJavaScriptScheme);
   if (scheme_is_blocked || !url.is_valid()) {
     std::string error_type(net::ErrorToString(net::ERR_ABORTED));
@@ -1269,13 +1337,6 @@ void WebViewGuest::SetZoom(double zoom_factor) {
   current_zoom_factor_ = zoom_factor;
 }
 
-void WebViewGuest::Destroy() {
-  if (!attached() && GetOpener())
-    GetOpener()->pending_new_windows_.erase(this);
-  DestroyUnattachedWindows();
-  GuestViewBase::Destroy();
-}
-
 void WebViewGuest::AddNewContents(content::WebContents* source,
                                   content::WebContents* new_contents,
                                   WindowOpenDisposition disposition,
@@ -1360,6 +1421,10 @@ void WebViewGuest::RequestNewWindowPermission(
     return;
   const NewWindowInfo& new_window_info = it->second;
 
+  // Retrieve the opener partition info if we have it.
+  const GURL& site_url = new_contents->GetSiteInstance()->GetSiteURL();
+  std::string storage_partition_id = GetStoragePartitionIdFromSiteURL(site_url);
+
   base::DictionaryValue request_info;
   request_info.Set(webview::kInitialHeight,
                    base::Value::CreateIntegerValue(initial_bounds.height()));
@@ -1371,6 +1436,10 @@ void WebViewGuest::RequestNewWindowPermission(
                    base::Value::CreateStringValue(new_window_info.name));
   request_info.Set(webview::kWindowID,
                    base::Value::CreateIntegerValue(guest->guest_instance_id()));
+  // We pass in partition info so that window-s created through newwindow
+  // API can use it to set their partition attribute.
+  request_info.Set(webview::kStoragePartitionId,
+                   base::Value::CreateStringValue(storage_partition_id));
   request_info.Set(webview::kWindowOpenDisposition,
                    base::Value::CreateStringValue(
                        WindowOpenDispositionToString(disposition)));

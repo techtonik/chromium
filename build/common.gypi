@@ -41,7 +41,7 @@
               ['OS=="win" or OS=="mac" or OS=="ios"', {
                 'host_arch%': 'ia32',
               }, {
-                'host_arch%': '<!(python <(DEPTH)/build/linux/detect_host_arch.py)',
+                'host_arch%': '<!pymod_do_main(detect_host_arch)',
               }],
             ],
           },
@@ -982,6 +982,8 @@
       'google_api_key%': '',
       'google_default_client_id%': '',
       'google_default_client_secret%': '',
+      # Native Client is enabled by default.
+      'disable_nacl%': '0',
     },
 
     # Copy conditionally-set variables out one scope.
@@ -1347,8 +1349,8 @@
     # Disable Dart by default.
     'enable_dart%': 0,
 
-    # Native Client is enabled by default.
-    'disable_nacl%': 0,
+    # Copy out the setting of disable_nacl.
+    'disable_nacl%': '<(disable_nacl)',
 
     # Portable Native Client is enabled by default.
     'disable_pnacl%': 0,
@@ -1867,6 +1869,12 @@
         'enable_pepper_cdms%': 1,
       }, {
         'enable_pepper_cdms%': 0,
+      }],
+
+      ['OS=="android"', {
+        'enable_browser_cdms%': 1,
+      }, {
+        'enable_browser_cdms%': 0,
       }],
 
       # Native Client glibc toolchain is enabled
@@ -2466,6 +2474,9 @@
       ['enable_pepper_cdms==1', {
         'defines': ['ENABLE_PEPPER_CDMS'],
       }],
+      ['enable_browser_cdms==1', {
+        'defines': ['ENABLE_BROWSER_CDMS'],
+      }],
       ['configuration_policy==1', {
         'defines': ['ENABLE_CONFIGURATION_POLICY'],
       }],
@@ -2971,6 +2982,9 @@
         'msvs_configuration_platform': 'x64',
         'msvs_settings': {
           'VCLinkerTool': {
+            # Make sure to understand http://crbug.com/361720 if you want to
+            # increase this.
+            'MinimumRequiredVersion': '5.02',  # Server 2003.
             'TargetMachine': '17', # x86 - 64
             'AdditionalLibraryDirectories!':
               ['<(windows_sdk_path)/Lib/win8/um/x86'],

@@ -12,6 +12,7 @@
 #include "base/task_runner_util.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/browser/service_worker/service_worker_disk_cache.h"
+#include "content/browser/service_worker/service_worker_histograms.h"
 #include "content/browser/service_worker/service_worker_info.h"
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/browser/service_worker/service_worker_utils.h"
@@ -64,6 +65,8 @@ ServiceWorkerStatusCode DatabaseStatusToStatusCode(
       return SERVICE_WORKER_OK;
     case ServiceWorkerDatabase::STATUS_ERROR_NOT_FOUND:
       return SERVICE_WORKER_ERROR_NOT_FOUND;
+    case ServiceWorkerDatabase::STATUS_ERROR_MAX:
+      NOTREACHED();
     default:
       return SERVICE_WORKER_ERROR_FAILED;
   }
@@ -569,13 +572,17 @@ void ServiceWorkerStorage::DidGetAllRegistrations(
   std::vector<ServiceWorkerRegistrationInfo> infos;
   for (RegistrationList::const_iterator it = registrations->begin();
        it != registrations->end(); ++it) {
-    DCHECK(pushed_registrations.insert(it->registration_id).second);
+    const bool inserted =
+        pushed_registrations.insert(it->registration_id).second;
+    DCHECK(inserted);
+
     ServiceWorkerRegistration* registration =
         context_->GetLiveRegistration(it->registration_id);
     if (registration) {
       infos.push_back(registration->GetInfo());
       continue;
     }
+
     ServiceWorkerRegistrationInfo info;
     info.pattern = it->scope;
     info.script_url = it->script;
@@ -585,7 +592,7 @@ void ServiceWorkerStorage::DidGetAllRegistrations(
       if (it->is_active)
         info.active_version = version->GetInfo();
       else
-        info.pending_version = version->GetInfo();
+        info.waiting_version = version->GetInfo();
     } else {
       info.active_version.is_null = false;
       if (it->is_active)
@@ -682,17 +689,19 @@ ServiceWorkerRegistration*
 ServiceWorkerStorage::FindInstallingRegistrationForDocument(
     const GURL& document_url) {
   DCHECK(!document_url.has_ref());
-  // TODO(michaeln): if there are multiple matches the one with
-  // the longest scope should win.
+
+  LongestScopeMatcher matcher(document_url);
+  ServiceWorkerRegistration* match = NULL;
+
+  // TODO(nhiroki): This searches over installing registrations linearly and it
+  // couldn't be scalable. Maybe the regs should be partitioned by origin.
   for (RegistrationRefsById::const_iterator it =
            installing_registrations_.begin();
        it != installing_registrations_.end(); ++it) {
-    if (ServiceWorkerUtils::ScopeMatches(
-            it->second->pattern(), document_url)) {
-      return it->second;
-    }
+    if (matcher.MatchLongest(it->second->pattern()))
+      match = it->second;
   }
-  return NULL;
+  return match;
 }
 
 ServiceWorkerRegistration*
@@ -751,6 +760,7 @@ void ServiceWorkerStorage::OnDiskCacheInitialized(int rv) {
     disk_cache_->Disable();
     state_ = DISABLED;
   }
+  ServiceWorkerHistograms::CountInitDiskCacheResult(rv == net::OK);
 }
 
 void ServiceWorkerStorage::StartPurgingResources(
@@ -896,20 +906,20 @@ void ServiceWorkerStorage::FindForDocumentInDB(
     return;
   }
 
-  // Find one with a pattern match.
-  // TODO(michaeln): if there are multiple matches the one with
-  // the longest scope should win.
   ServiceWorkerDatabase::RegistrationData data;
   ResourceList resources;
   status = ServiceWorkerDatabase::STATUS_ERROR_NOT_FOUND;
-  for (RegistrationList::const_iterator it = registrations.begin();
-       it != registrations.end(); ++it) {
-    if (!ServiceWorkerUtils::ScopeMatches(it->scope, document_url))
-      continue;
-    status = database->ReadRegistration(it->registration_id, origin,
-                                        &data, &resources);
-    break;  // We're done looping.
+
+  // Find one with a pattern match.
+  LongestScopeMatcher matcher(document_url);
+  int64 match = kInvalidServiceWorkerRegistrationId;
+  for (size_t i = 0; i < registrations.size(); ++i) {
+    if (matcher.MatchLongest(registrations[i].scope))
+      match = registrations[i].registration_id;
   }
+
+  if (match != kInvalidServiceWorkerRegistrationId)
+    status = database->ReadRegistration(match, origin, &data, &resources);
 
   original_task_runner->PostTask(
       FROM_HERE,

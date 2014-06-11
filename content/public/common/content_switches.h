@@ -158,7 +158,6 @@ CONTENT_EXPORT extern const char kEnableWebGLImageChromium[];
 CONTENT_EXPORT extern const char kEnableWebMIDI[];
 CONTENT_EXPORT extern const char kEnableZeroCopy[];
 CONTENT_EXPORT extern const char kExtraPluginDir[];
-CONTENT_EXPORT extern const char kForceCompositingMode[];
 CONTENT_EXPORT extern const char kForceFieldTrials[];
 CONTENT_EXPORT extern const char kForceGpuRasterization[];
 CONTENT_EXPORT extern const char kForceRendererAccessibility[];
@@ -223,7 +222,6 @@ CONTENT_EXPORT extern const char kTabCaptureDownscaleQuality[];
 CONTENT_EXPORT extern const char kTabCaptureUpscaleQuality[];
 CONTENT_EXPORT extern const char kTestingFixedHttpPort[];
 CONTENT_EXPORT extern const char kTestingFixedHttpsPort[];
-CONTENT_EXPORT extern const char kTestSandbox[];
 CONTENT_EXPORT extern const char kTestType[];
 CONTENT_EXPORT extern const char kTouchScrollingMode[];
 CONTENT_EXPORT extern const char kTouchScrollingModeAsyncTouchmove[];
@@ -286,8 +284,8 @@ extern const char kDisableCoreAnimationPlugins[];
 // This switch contains the device scale factor passed to certain processes
 // like renderers, etc.
 CONTENT_EXPORT extern const char kDeviceScaleFactor[];
+CONTENT_EXPORT extern const char kDisableDirectWrite[];
 CONTENT_EXPORT extern const char kDisableLegacyIntermediateWindow[];
-CONTENT_EXPORT extern const char kEnableDirectWrite[];
 CONTENT_EXPORT extern const char kEnableHighResolutionTime[];
 // This switch will be removed when we enable the win32K lockdown process
 // mitigation.

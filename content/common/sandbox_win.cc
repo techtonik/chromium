@@ -41,10 +41,12 @@ namespace {
 // For more information about how this list is generated, and how to get off
 // of it, see:
 // https://sites.google.com/a/chromium.org/dev/Home/third-party-developers
+// If the size of this list exceeds 64, change kTroublesomeDllsMaxCount.
 const wchar_t* const kTroublesomeDlls[] = {
   L"adialhk.dll",                 // Kaspersky Internet Security.
   L"acpiz.dll",                   // Unknown.
   L"akinsofthook32.dll",          // Akinsoft Software Engineering.
+  L"assistant_x64.dll",           // Unknown.
   L"avcuf64.dll",                 // Bit Defender Internet Security x64.
   L"avgrsstx.dll",                // AVG 8.
   L"babylonchromepi.dll",         // Babylon translator.
@@ -331,7 +333,6 @@ bool AddGenericPolicy(sandbox::TargetPolicy* policy) {
 #endif  // NDEBUG
 
   AddGenericDllEvictionPolicy(policy);
-
   return true;
 }
 
@@ -494,10 +495,14 @@ void SetJobLevel(const CommandLine& cmd_line,
                  sandbox::JobLevel job_level,
                  uint32 ui_exceptions,
                  sandbox::TargetPolicy* policy) {
-  if (ShouldSetJobLevel(cmd_line))
+  if (ShouldSetJobLevel(cmd_line)) {
+#ifdef _WIN64
+    policy->SetJobMemoryLimit(4ULL * 1024 * 1024 * 1024);
+#endif
     policy->SetJobLevel(job_level, ui_exceptions);
-  else
+  } else {
     policy->SetJobLevel(sandbox::JOB_NONE, 0);
+  }
 }
 
 // TODO(jschuh): Need get these restrictions applied to NaCl and Pepper.
@@ -562,7 +567,7 @@ bool ShouldUseDirectWrite() {
   // 2670838, so a Win7 check is sufficient. We do not currently attempt to
   // support Vista, where SP2 and the Platform Update are required.
   const CommandLine& command_line = *CommandLine::ForCurrentProcess();
-  return command_line.HasSwitch(switches::kEnableDirectWrite) &&
+  return !command_line.HasSwitch(switches::kDisableDirectWrite) &&
          base::win::GetVersion() >= base::win::VERSION_WIN7;
 }
 
@@ -608,8 +613,13 @@ base::ProcessHandle StartSandboxedProcess(
      type_str == switches::kRendererProcess &&
      browser_command_line.HasSwitch(
         switches::kEnableWin32kRendererLockDown)) {
-   mitigations |= sandbox::MITIGATION_WIN32K_DISABLE;
- }
+    if (policy->AddRule(sandbox::TargetPolicy::SUBSYS_WIN32K_LOCKDOWN,
+                        sandbox::TargetPolicy::FAKE_USER_GDI_INIT,
+                        NULL) != sandbox::SBOX_ALL_OK) {
+      return 0;
+    }
+    mitigations |= sandbox::MITIGATION_WIN32K_DISABLE;
+  }
 
   if (policy->SetProcessMitigations(mitigations) != sandbox::SBOX_ALL_OK)
     return 0;

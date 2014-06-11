@@ -567,10 +567,9 @@ bool SourceState::OnNewConfigs(
         DVLOG(1) << "Failed to add audio track to frame processor.";
         return false;
       }
-    } else {
-      frame_processor_->clear_audio_preroll_buffer();
     }
 
+    frame_processor_->OnPossibleAudioConfigUpdate(audio_config);
     success &= audio_->UpdateAudioConfig(audio_config, log_cb_);
   }
 
@@ -624,8 +623,17 @@ bool SourceState::OnNewConfigs(
         success &= false;
         MEDIA_LOG(log_cb_) << "New text track config does not match old one.";
       } else {
-        text_stream_map_.clear();
-        text_stream_map_[config_itr->first] = text_stream;
+        StreamParser::TrackId old_id = stream_itr->first;
+        StreamParser::TrackId new_id = config_itr->first;
+        if (new_id != old_id) {
+          if (frame_processor_->UpdateTrack(old_id, new_id)) {
+            text_stream_map_.clear();
+            text_stream_map_[config_itr->first] = text_stream;
+          } else {
+            success &= false;
+            MEDIA_LOG(log_cb_) << "Error remapping single text track number";
+          }
+        }
       }
     } else {
       for (TextConfigItr config_itr = text_configs.begin();
@@ -1323,6 +1331,16 @@ void ChunkDemuxer::Remove(const std::string& id, TimeDelta start,
 
   DCHECK(!id.empty());
   CHECK(IsValidId(id));
+  DCHECK(start >= base::TimeDelta()) << start.InSecondsF();
+  DCHECK(start < end) << "start " << start.InSecondsF()
+                      << " end " << end.InSecondsF();
+  DCHECK(duration_ != kNoTimestamp());
+  DCHECK(start <= duration_) << "start " << start.InSecondsF()
+                             << " duration " << duration_.InSecondsF();
+
+  if (start == duration_)
+    return;
+
   source_state_map_[id]->Remove(start, end, duration_);
 }
 

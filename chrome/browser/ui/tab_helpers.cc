@@ -15,10 +15,9 @@
 #include "chrome/browser/password_manager/chrome_password_manager_client.h"
 #include "chrome/browser/prerender/prerender_tab_helper.h"
 #include "chrome/browser/sessions/session_tab_helper.h"
-#include "chrome/browser/ssl/ssl_tab_helper.h"
 #include "chrome/browser/tab_contents/navigation_metrics_recorder.h"
-#include "chrome/browser/translate/translate_tab_helper.h"
-#include "chrome/browser/ui/autofill/tab_autofill_manager_delegate.h"
+#include "chrome/browser/translate/chrome_translate_client.h"
+#include "chrome/browser/ui/autofill/chrome_autofill_client.h"
 #include "chrome/browser/ui/blocked_content/popup_blocker_tab_helper.h"
 #include "chrome/browser/ui/bookmarks/bookmark_tab_helper.h"
 #include "chrome/browser/ui/find_bar/find_tab_helper.h"
@@ -113,17 +112,17 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
 
   // --- Common tab helpers ---
 
-  autofill::TabAutofillManagerDelegate::CreateForWebContents(web_contents);
+  autofill::ChromeAutofillClient::CreateForWebContents(web_contents);
   autofill::ContentAutofillDriver::CreateForWebContentsAndDelegate(
       web_contents,
-      autofill::TabAutofillManagerDelegate::FromWebContents(web_contents),
+      autofill::ChromeAutofillClient::FromWebContents(web_contents),
       g_browser_process->GetApplicationLocale(),
       autofill::AutofillManager::ENABLE_AUTOFILL_DOWNLOAD_MANAGER);
   BookmarkTabHelper::CreateForWebContents(web_contents);
   chrome_browser_net::NetErrorTabHelper::CreateForWebContents(web_contents);
-  ChromePasswordManagerClient::CreateForWebContentsWithAutofillManagerDelegate(
+  ChromePasswordManagerClient::CreateForWebContentsWithAutofillClient(
       web_contents,
-      autofill::TabAutofillManagerDelegate::FromWebContents(web_contents));
+      autofill::ChromeAutofillClient::FromWebContents(web_contents));
   CoreTabHelper::CreateForWebContents(web_contents);
   extensions::TabHelper::CreateForWebContents(web_contents);
   FaviconTabHelper::CreateForWebContents(web_contents);
@@ -138,9 +137,8 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
       web_contents,
       ChromePasswordManagerClient::GetManagerFromWebContents(web_contents));
   SearchTabHelper::CreateForWebContents(web_contents);
-  SSLTabHelper::CreateForWebContents(web_contents);
   TabSpecificContentSettings::CreateForWebContents(web_contents);
-  TranslateTabHelper::CreateForWebContents(web_contents);
+  ChromeTranslateClient::CreateForWebContents(web_contents);
 
   // --- Platform-specific tab helpers ---
 

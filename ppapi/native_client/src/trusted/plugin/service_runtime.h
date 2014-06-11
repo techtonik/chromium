@@ -46,7 +46,6 @@ struct SelLdrStartParams {
                     bool uses_irt,
                     bool uses_ppapi,
                     bool uses_nonsfi_mode,
-                    bool enable_dev_interfaces,
                     bool enable_dyncode_syscalls,
                     bool enable_exception_handling,
                     bool enable_crash_throttling)
@@ -54,7 +53,6 @@ struct SelLdrStartParams {
         uses_irt(uses_irt),
         uses_ppapi(uses_ppapi),
         uses_nonsfi_mode(uses_nonsfi_mode),
-        enable_dev_interfaces(enable_dev_interfaces),
         enable_dyncode_syscalls(enable_dyncode_syscalls),
         enable_exception_handling(enable_exception_handling),
         enable_crash_throttling(enable_crash_throttling) {
@@ -183,15 +181,22 @@ class ServiceRuntime {
 
   // Signal to waiting threads that StartSelLdr is complete (either
   // successfully or unsuccessfully).
-  // Done externally, in case external users want to write to shared
-  // memory that is yet to be fenced.
   void SignalStartSelLdrDone();
+
+  // If starting the nexe from a background thread, wait for the nexe to
+  // actually start.
+  void WaitForNexeStart();
+
+  // Signal to waiting threads that LoadNexeAndStart is complete (either
+  // successfully or unsuccessfully).
+  void SignalNexeStarted();
 
   // Establish an SrpcClient to the sel_ldr instance and load the nexe.
   // The nexe to be started is passed through |file_info|.
-  // On success, returns true. On failure, returns false.
-  bool LoadNexeAndStart(PP_NaClFileInfo file_info,
-                        const pp::CompletionCallback& crash_cb);
+  // Upon completion |callback| is invoked with status code.
+  // This function must be called on the main thread.
+  void LoadNexeAndStart(PP_NaClFileInfo file_info,
+                        const pp::CompletionCallback& callback);
 
   // Starts the application channel to the nexe.
   SrpcClient* SetupAppChannel();
@@ -213,9 +218,16 @@ class ServiceRuntime {
 
  private:
   NACL_DISALLOW_COPY_AND_ASSIGN(ServiceRuntime);
+  struct LoadNexeAndStartData;
+  void LoadNexeAndStartAfterLoadModule(
+      LoadNexeAndStartData* data, int32_t pp_error);
+  void DidLoadNexeAndStart(LoadNexeAndStartData* data, int32_t pp_error);
+
   bool SetupCommandChannel();
-  bool LoadModule(PP_NaClFileInfo file_info);
   bool InitReverseService();
+  void LoadModule(PP_NaClFileInfo file_info,
+                  pp::CompletionCallback callback);
+  void DidLoadModule(pp::CompletionCallback callback, int32_t pp_error);
   bool StartModule();
 
   NaClSrpcChannel command_channel_;
@@ -229,10 +241,11 @@ class ServiceRuntime {
 
   PluginReverseInterface* rev_interface_;
 
-  // Mutex and CondVar to protect start_sel_ldr_done_.
+  // Mutex and CondVar to protect start_sel_ldr_done_ and nexe_started_.
   NaClMutex mu_;
   NaClCondVar cond_;
   bool start_sel_ldr_done_;
+  bool nexe_started_;
 };
 
 }  // namespace plugin

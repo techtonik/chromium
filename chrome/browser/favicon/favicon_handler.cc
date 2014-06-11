@@ -108,9 +108,9 @@ bool HasExpiredOrIncompleteResult(
   if (it != bitmap_results.end())
     return true;
 
-   // Any favicon size is good if the desired size is 0.
-   if (desired_size_in_dip == 0)
-     return false;
+  // Any favicon size is good if the desired size is 0.
+  if (desired_size_in_dip == 0)
+    return false;
 
   // Check if the favicon for at least one of the scale factors is missing.
   // |bitmap_results| should always be complete for data inserted by
@@ -127,7 +127,7 @@ bool HasExpiredOrIncompleteResult(
       FaviconUtil::GetFaviconScaleFactors();
   for (size_t i = 0; i < scale_factors.size(); ++i) {
     int edge_size_in_pixel = floor(
-        desired_size_in_dip * ui::GetImageScale(scale_factors[i]));
+        desired_size_in_dip * ui::GetScaleForScaleFactor(scale_factors[i]));
     std::vector<gfx::Size>::iterator it = std::find(favicon_sizes.begin(),
         favicon_sizes.end(), gfx::Size(edge_size_in_pixel, edge_size_in_pixel));
     if (it == favicon_sizes.end())
@@ -354,18 +354,16 @@ void FaviconHandler::OnUpdateFaviconURL(
       image_urls_.push_back(*i);
   }
 
-  // TODO(davemoore) Should clear on empty url. Currently we ignore it.
-  // This appears to be what FF does as well.
-  if (image_urls_.empty())
-    return;
-
   if (!client_->GetFaviconService())
     return;
 
   if (download_largest_icon_)
     SortAndPruneImageUrls();
 
-  ProcessCurrentUrl();
+  // TODO(davemoore) Should clear on empty url. Currently we ignore it.
+  // This appears to be what FF does as well.
+  if (!image_urls_.empty())
+    ProcessCurrentUrl();
 }
 
 void FaviconHandler::ProcessCurrentUrl() {
