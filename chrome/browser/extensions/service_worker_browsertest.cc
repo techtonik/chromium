@@ -61,7 +61,9 @@ class IOThreadInstallUninstallTest {
       Profile* profile,
       const scoped_refptr<ServiceWorkerContextWrapper>& service_worker_context,
       const ExtensionId& ext_id)
-      : service_worker_context_(service_worker_context), ext_id_(ext_id) {}
+      : profile_(profile),
+        service_worker_context_(service_worker_context),
+        ext_id_(ext_id) {}
 
   void TestInstall(const base::Closure& continuation) {
     content::ServiceWorkerStorage* sw_storage =
