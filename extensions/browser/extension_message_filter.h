@@ -33,7 +33,6 @@ class InfoMap;
 class ExtensionMessageFilter : public content::BrowserMessageFilter {
  public:
   ExtensionMessageFilter(int render_process_id,
-                         int i,
                          content::BrowserContext* context);
 
   int render_process_id() { return render_process_id_; }

@@ -99,7 +99,7 @@ void ServiceWorkerManager::FinishRegistration(
   std::vector<Closure> to_run;
   if (service_worker_host) {
     ext_state.registration = REGISTERED;
-    ext_state.service_worker_host.reset(service_worker_host.Pass());
+    ext_state.service_worker_host.reset(service_worker_host.release());
     to_run.swap(ext_state.registration_succeeded);
     ext_state.registration_failed.clear();
   } else {
@@ -223,8 +223,7 @@ void ServiceWorkerManager::WhenUnregistered(
 
 content::ServiceWorkerHost* ServiceWorkerManager::GetServiceWorkerHost(
     ExtensionId extension_id) {
-  base::hash_map<ExtensionId, State>::iterator it =
-      states_.find(extension->id());
+  base::hash_map<ExtensionId, State>::iterator it = states_.find(extension_id);
   if (it == states_.end())
     return NULL;
   return it->second.service_worker_host.get();

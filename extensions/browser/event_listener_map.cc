@@ -27,7 +27,6 @@ EventListener::EventListener(const std::string& event_name,
       service_worker_(service_worker),
       filter_(filter.Pass()),
       matcher_id_(-1) {
-  CHECK(!(process && service_worker));
 }
 
 EventListener::~EventListener() {}

@@ -13,6 +13,7 @@
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/info_map.h"
 #include "extensions/browser/process_manager.h"
+#include "extensions/browser/service_worker_manager.h"
 #include "extensions/common/extension_messages.h"
 #include "ipc/ipc_message_macros.h"
 
@@ -22,10 +23,9 @@ using content::RenderProcessHost;
 namespace extensions {
 
 ExtensionMessageFilter::ExtensionMessageFilter(int render_process_id,
-                                               int i,
                                                content::BrowserContext* context)
     : BrowserMessageFilter(ExtensionMsgStart),
-      render_process_id_(render_process_id + i),
+      render_process_id_(render_process_id),
       browser_context_(context),
       extension_info_map_(ExtensionSystem::Get(context)->info_map()),
       weak_ptr_factory_(this) {
@@ -100,14 +100,12 @@ void ExtensionMessageFilter::OnExtensionAddListener(
   RenderProcessHost* process = RenderProcessHost::FromID(render_process_id_);
   if (!process)
     return;
-  content::ServiceWorkerHost* service_worker =
-      ServiceWorkerManager::Get(browser_context_)
-          ->GetServiceWorkerHost(extension_id);
-  if (service_worker)
-    process = NULL;
   EventRouter* router = EventRouter::Get(browser_context_);
   if (!router)
     return;
+  content::ServiceWorkerHost* service_worker =
+      ServiceWorkerManager::Get(browser_context_)
+          ->GetServiceWorkerHost(extension_id);
   router->AddEventListener(event_name, process, service_worker, extension_id);
 }
 

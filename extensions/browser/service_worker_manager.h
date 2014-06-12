@@ -5,6 +5,7 @@
 #include "base/callback_forward.h"
 #include "base/memory/singleton.h"
 #include "base/memory/weak_ptr.h"
+#include "base/memory/linked_ptr.h"
 #include "components/keyed_service/content/browser_context_keyed_service_factory.h"
 #include "components/keyed_service/core/keyed_service.h"
 #include "extensions/common/extension.h"
@@ -95,7 +96,7 @@ class ServiceWorkerManager : public KeyedService {
   struct State {
     RegistrationState registration;
     int outstanding_state_changes;
-    scoped_ptr<content::ServiceWorkerHost> service_worker_host;
+    linked_ptr<content::ServiceWorkerHost> service_worker_host;
     // These two can be non-empty during REGISTERING.
     std::vector<base::Closure> registration_succeeded;
     std::vector<base::Closure> registration_failed;

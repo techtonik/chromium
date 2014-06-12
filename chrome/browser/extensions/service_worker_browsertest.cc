@@ -58,6 +58,7 @@ const char kServiceWorkerManifest[] =
 class IOThreadInstallUninstallTest {
  public:
   IOThreadInstallUninstallTest(
+      Profile* profile,
       const scoped_refptr<ServiceWorkerContextWrapper>& service_worker_context,
       const ExtensionId& ext_id)
       : service_worker_context_(service_worker_context), ext_id_(ext_id) {}
@@ -90,9 +91,10 @@ class IOThreadInstallUninstallTest {
     EXPECT_TRUE(registration->waiting_version() ||
                 registration->active_version());
     EXPECT_TRUE(
-        ServiceWorkerManager::Get(profile())->GetServiceWorkerHost(ext_id_));
+        ServiceWorkerManager::Get(profile_)->GetServiceWorkerHost(ext_id_));
   }
 
+  Profile* profile_;
   const scoped_refptr<ServiceWorkerContextWrapper> service_worker_context_;
   const ExtensionId ext_id_;
 };
@@ -131,6 +133,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
   }
 
   IOThreadInstallUninstallTest test_obj(
+      profile(),
       static_cast<ServiceWorkerContextWrapper*>(
           GetSWContext(profile(), extension->id())),
       extension->id());
