@@ -106,6 +106,14 @@ void EventRouter::DispatchExtensionMessage(IPC::Sender* ipc_sender,
                                            ListValue* event_args,
                                            UserGestureState user_gesture,
                                            const EventFilteringInfo& info) {
+  fprintf(stderr,
+          "%s:%s:%d %s\n",
+          __FILE__,
+          __FUNCTION__,
+          __LINE__,
+          event_name.c_str());
+  LOG(INFO) << event_name;
+
   NotifyApiEventDispatched(browser_context_id,
                            extension_id,
                            event_name,
