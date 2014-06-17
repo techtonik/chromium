@@ -229,9 +229,11 @@ class EventRouter : public content::NotificationObserver,
                          const linked_ptr<Event>& event,
                          std::set<EventDispatchIdentifier>* already_dispatched);
 
-  // Dispatches the event to the specified extension running in |process|.
+  // Dispatches the event to the specified extension running in |process|,
+  // and specifically to the |service_worker_host| if non-NULL.
   void DispatchEventToProcess(const std::string& extension_id,
                               content::RenderProcessHost* process,
+                              content::ServiceWorkerHost* service_worker_host,
                               const linked_ptr<Event>& event);
 
   // Returns false when the event is scoped to a context and the listening

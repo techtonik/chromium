@@ -14,6 +14,7 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/render_process_host.h"
+#include "content/public/browser/service_worker_host.h"
 #include "extensions/browser/api_activity_monitor.h"
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_prefs.h"
@@ -505,17 +506,10 @@ void EventRouter::DispatchEventImpl(const std::string& restrict_to_extension_id,
     if (restrict_to_extension_id.empty() ||
         restrict_to_extension_id == listener->extension_id()) {
       if (listener->process() && !ContainsKey(already_dispatched, listener)) {
-        DispatchEventToProcess(
-            listener->extension_id(), listener->process(), event);
-      } else if (listener->service_worker() &&
-                 !ContainsKey(already_dispatched, listener)) {
-        //
-        //
-        // TODO: Make a DispatchEventToServieWorker.
-        //
-        //
-          DispatchEventToProcess(
-              listener->extension_id(), listener->process(), event);
+        DispatchEventToProcess(listener->extension_id(),
+                               listener->process(),
+                               listener->service_worker(),
+                               event);
       }
     }
   }
@@ -552,9 +546,11 @@ void EventRouter::DispatchLazyEvent(
   }
 }
 
-void EventRouter::DispatchEventToProcess(const std::string& extension_id,
-                                         content::RenderProcessHost* process,
-                                         const linked_ptr<Event>& event) {
+void EventRouter::DispatchEventToProcess(
+    const std::string& extension_id,
+    content::RenderProcessHost* process,
+    content::ServiceWorkerHost* service_worker_host,
+    const linked_ptr<Event>& event) {
   const Extension* extension =
       ExtensionRegistry::Get(browser_context_)->enabled_extensions().GetByID(
           extension_id);
@@ -591,9 +587,16 @@ void EventRouter::DispatchEventToProcess(const std::string& extension_id,
                                       event->event_args.get());
   }
 
-  DispatchExtensionMessage(process, listener_context, extension->id(),
-                           event->event_name, event->event_args.get(),
-                           event->user_gesture, event->filter_info);
+  IPC::Sender* ipc_sender =
+      service_worker_host ? implicit_cast<IPC::Sender*>(service_worker_host)
+                          : implicit_cast<IPC::Sender*>(process);
+  DispatchExtensionMessage(ipc_sender,
+                           listener_context,
+                           extension->id(),
+                           event->event_name,
+                           event->event_args.get(),
+                           event->user_gesture,
+                           event->filter_info);
   IncrementInFlightEvents(listener_context, extension);
 }
 
@@ -705,8 +708,8 @@ void EventRouter::DispatchPendingEvent(const linked_ptr<Event>& event,
 
   if (listeners_.HasProcessListener(host->render_process_host(),
                                     host->extension()->id())) {
-    DispatchEventToProcess(host->extension()->id(),
-                           host->render_process_host(), event);
+    DispatchEventToProcess(
+        host->extension()->id(), host->render_process_host(), NULL, event);
   }
 }
 
