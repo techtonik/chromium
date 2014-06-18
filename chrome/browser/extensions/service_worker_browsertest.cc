@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "apps/browser/api/app_runtime/app_runtime_api.h"
 #include "base/bind_helpers.h"
 #include "base/callback_helpers.h"
 #include "chrome/browser/extensions/extension_browsertest.h"
@@ -21,6 +22,12 @@ namespace {
 using content::BrowserThread;
 using content::ServiceWorkerContextWrapper;
 
+void FailTest(const std::string& message,
+                     const base::Closure& continuation) {
+  ADD_FAILURE() << message;
+  continuation.Run();
+}
+
 // Exists as a browser test because ExtensionHosts are hard to create without
 // a real browser.
 class ExtensionServiceWorkerBrowserTest : public ExtensionBrowserTest {
@@ -32,6 +39,19 @@ class ExtensionServiceWorkerBrowserTest : public ExtensionBrowserTest {
     ExtensionBrowserTest::SetUpCommandLine(command_line);
     command_line->AppendSwitch(switches::kEnableServiceWorker);
   }
+
+  void WaitUntilRegistered(const Extension* extension) {
+    base::RunLoop run_loop;
+    ServiceWorkerManager::Get(profile())
+        ->WhenRegistered(extension,
+                         FROM_HERE,
+                         run_loop.QuitClosure(),
+                         base::Bind(FailTest,
+                                    "Extension wasn't being registered",
+                                    run_loop.QuitClosure()));
+    run_loop.Run();
+  }
+
   extensions::ScopedCurrentChannel trunk_channel_;
   TestExtensionDir ext_dir_;
 };
@@ -101,12 +121,6 @@ class IOThreadInstallUninstallTest {
   const ExtensionId ext_id_;
 };
 
-static void FailTest(const std::string& message,
-                     const base::Closure& continuation) {
-  ADD_FAILURE() << message;
-  continuation.Run();
-}
-
 static void ShutdownWorkers(
     const scoped_refptr<ServiceWorkerContextWrapper>& wrapper) {
   wrapper->context()->embedded_worker_registry()->Shutdown();
@@ -120,19 +134,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
 
   scoped_refptr<const Extension> extension =
       LoadExtension(ext_dir_.unpacked_path());
-  ASSERT_TRUE(extension.get());
-
-  {
-    base::RunLoop run_loop;
-    ServiceWorkerManager::Get(profile())
-        ->WhenRegistered(extension.get(),
-                         FROM_HERE,
-                         run_loop.QuitClosure(),
-                         base::Bind(FailTest,
-                                    "Extension wasn't being registered",
-                                    run_loop.QuitClosure()));
-    run_loop.Run();
-  }
+  WaitUntilRegistered(extension.get());
 
   IOThreadInstallUninstallTest test_obj(
       profile(),
@@ -181,15 +183,15 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
-                       DISABLED_ExecuteScript) {
+                       SendOnLaunched) {
   ext_dir_.WriteManifest(kServiceWorkerManifest);
   ext_dir_.WriteFile(FILE_PATH_LITERAL("service_worker.js"), "");
+
   scoped_refptr<const Extension> extension =
       LoadExtension(ext_dir_.unpacked_path());
-  ASSERT_TRUE(extension.get());
+  WaitUntilRegistered(extension.get());
 
-  EXPECT_EQ("Hello.",
-            ExecuteScriptInBackgroundPage(extension->id(), "return 'Hello.'"));
+  apps::AppEventRouter::DispatchOnLaunchedEvent(profile(), extension);
 }
 
 }  // namespace
