@@ -60,6 +60,11 @@ class ServiceWorkerManager : public KeyedService {
                         const base::Closure& failure);
 
   // Returns the ServiceWorkerHost for an extension, or NULL if none registered.
+  //
+  //
+  // TODO: Needs lifetime control, event listeners are holding onto this.
+  //
+  //
   content::ServiceWorkerHost* GetServiceWorkerHost(ExtensionId extension_id);
 
  private:
