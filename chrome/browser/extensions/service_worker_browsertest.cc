@@ -22,8 +22,7 @@ namespace {
 using content::BrowserThread;
 using content::ServiceWorkerContextWrapper;
 
-void FailTest(const std::string& message,
-                     const base::Closure& continuation) {
+void FailTest(const std::string& message, const base::Closure& continuation) {
   ADD_FAILURE() << message;
   continuation.Run();
 }
@@ -71,6 +70,18 @@ const char kServiceWorkerManifest[] =
     "  \"app\": {"
     "    \"service_worker\": {"
     "      \"script\": \"service_worker.js\""
+    "    }"
+    "  }"
+    "}";
+
+const char kEventPageManifest[] =
+    "{"
+    "  \"name\": \"\","
+    "  \"manifest_version\": 2,"
+    "  \"version\": \"1\","
+    "  \"app\": {"
+    "    \"background\": {"
+    "      \"scripts\": [\"background.js\"]"
     "    }"
     "  }"
     "}";
@@ -183,14 +194,30 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
-                       SendOnLaunched) {
+                       SendOnLaunched_BackgroundPageForTesting) {
+  ext_dir_.WriteManifest(kEventPageManifest);
+  ext_dir_.WriteFile(
+      FILE_PATH_LITERAL("background.js"),
+      "chrome.app.runtime.onLaunched.addListener(function() {});");
+
+  scoped_refptr<const Extension> extension =
+      LoadExtension(ext_dir_.unpacked_path());
+
+  fprintf(stderr, "\n\n\n%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
+  apps::AppEventRouter::DispatchOnLaunchedEvent(profile(), extension);
+}
+
+IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, SendOnLaunched) {
   ext_dir_.WriteManifest(kServiceWorkerManifest);
-  ext_dir_.WriteFile(FILE_PATH_LITERAL("service_worker.js"), "");
+  ext_dir_.WriteFile(
+      FILE_PATH_LITERAL("service_worker.js"),
+      "chrome.app.runtime.onLaunched.addListener(function() {});");
 
   scoped_refptr<const Extension> extension =
       LoadExtension(ext_dir_.unpacked_path());
   WaitUntilRegistered(extension.get());
 
+  fprintf(stderr, "\n\n\n%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
   apps::AppEventRouter::DispatchOnLaunchedEvent(profile(), extension);
 }
 
