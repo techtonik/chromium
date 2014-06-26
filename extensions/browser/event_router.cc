@@ -25,6 +25,7 @@
 #include "extensions/browser/lazy_background_task_queue.h"
 #include "extensions/browser/process_manager.h"
 #include "extensions/browser/process_map.h"
+#include "extensions/browser/service_worker_manager.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_api.h"
 #include "extensions/common/extension_messages.h"
@@ -106,14 +107,6 @@ void EventRouter::DispatchExtensionMessage(IPC::Sender* ipc_sender,
                                            ListValue* event_args,
                                            UserGestureState user_gesture,
                                            const EventFilteringInfo& info) {
-  fprintf(stderr,
-          "%s:%s:%d %s\n",
-          __FILE__,
-          __FUNCTION__,
-          __LINE__,
-          event_name.c_str());
-  LOG(INFO) << event_name;
-
   NotifyApiEventDispatched(browser_context_id,
                            extension_id,
                            event_name,
@@ -258,8 +251,15 @@ void EventRouter::OnListenerRemoved(const EventListener* listener) {
 
 void EventRouter::AddLazyEventListener(const std::string& event_name,
                                        const std::string& extension_id) {
-  scoped_ptr<EventListener> listener(new EventListener(
-      event_name, extension_id, NULL, NULL, scoped_ptr<DictionaryValue>()));
+  content::ServiceWorkerHost* service_worker =
+      ServiceWorkerManager::Get(browser_context_)
+          ->GetServiceWorkerHost(extension_id);
+  scoped_ptr<EventListener> listener(
+      new EventListener(event_name,
+                        extension_id,
+                        NULL,
+                        service_worker,
+                        scoped_ptr<DictionaryValue>()));
   bool is_new = listeners_.AddListener(listener.Pass());
 
   if (is_new) {
@@ -272,8 +272,12 @@ void EventRouter::AddLazyEventListener(const std::string& event_name,
 
 void EventRouter::RemoveLazyEventListener(const std::string& event_name,
                                           const std::string& extension_id) {
-  EventListener listener(
-      event_name, extension_id, NULL, NULL, scoped_ptr<DictionaryValue>());
+  EventListener listener(event_name,
+                         extension_id,
+                         NULL,
+                         ServiceWorkerManager::Get(browser_context_)
+                             ->GetServiceWorkerHost(extension_id),
+                         scoped_ptr<DictionaryValue>());
   bool did_exist = listeners_.RemoveListener(&listener);
 
   if (did_exist) {
@@ -513,7 +517,8 @@ void EventRouter::DispatchEventImpl(const std::string& restrict_to_extension_id,
     const EventListener* listener = *it;
     if (restrict_to_extension_id.empty() ||
         restrict_to_extension_id == listener->extension_id()) {
-      if (listener->process() && !ContainsKey(already_dispatched, listener)) {
+      if ((listener->process() || listener->service_worker()) &&
+          !ContainsKey(already_dispatched, listener)) {
         DispatchEventToProcess(listener->extension_id(),
                                listener->process(),
                                listener->service_worker(),
