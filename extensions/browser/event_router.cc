@@ -573,13 +573,22 @@ void EventRouter::DispatchEventToProcess(
   if (!extension)
     return;
 
-  BrowserContext* listener_context = process->GetBrowserContext();
-  ProcessMap* process_map = ProcessMap::Get(listener_context);
-  // If the event is privileged, only send to extension processes. Otherwise,
-  // it's OK to send to normal renderers (e.g., for content scripts).
-  if (ExtensionAPI::GetSharedInstance()->IsPrivileged(event->event_name) &&
-      !process_map->Contains(extension->id(), process->GetID())) {
-    return;
+  BrowserContext* listener_context =
+      process ? process->GetBrowserContext() : NULL;
+
+  // If the event is privileged, only send to extension processes / service
+  // workers. Otherwise, it's OK to send to normal renderers (e.g., for content
+  // scripts).
+  if (ExtensionAPI::GetSharedInstance()->IsPrivileged(event->event_name)) {
+    if (listener_context) {
+      if (!ProcessMap::Get(listener_context)
+               ->Contains(extension->id(), process->GetID())) {
+        return;
+      }
+    } else if (!ServiceWorkerManager::Get(browser_context_)
+                    ->GetServiceWorkerHost(extension_id)) {
+      return;
+    }
   }
 
   // If the event is restricted to a URL, only dispatch if the extension has
@@ -592,7 +601,14 @@ void EventRouter::DispatchEventToProcess(
     return;
   }
 
-  if (!CanDispatchEventToBrowserContext(listener_context, extension, event))
+  //
+  //
+  // TODO: In the service worker case process will be NULL and thus
+  // listener_context NULL. We won't be able to evaluate this correctly.
+  //
+  //
+  if (listener_context &&
+      !CanDispatchEventToBrowserContext(listener_context, extension, event))
     return;
 
   if (!event->will_dispatch_callback.is_null()) {
