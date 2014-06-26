@@ -194,7 +194,7 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
-                       SendOnLaunched_BackgroundPageForTesting) {
+                       DISABLED_SendOnLaunched_BackgroundPageForTesting) {
   ext_dir_.WriteManifest(kEventPageManifest);
   ext_dir_.WriteFile(
       FILE_PATH_LITERAL("background.js"),
@@ -207,7 +207,8 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
   apps::AppEventRouter::DispatchOnLaunchedEvent(profile(), extension);
 }
 
-IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, SendOnLaunched) {
+IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
+                       DISABLED_SendOnLaunched) {
   ext_dir_.WriteManifest(kServiceWorkerManifest);
   ext_dir_.WriteFile(
       FILE_PATH_LITERAL("service_worker.js"),
