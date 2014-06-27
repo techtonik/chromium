@@ -98,11 +98,11 @@ class ServiceWorkerManager : public KeyedService {
     // ServiceWorkerContext.
     UNREGISTERING,
   };
-  // Stores vector of <success, failure> pairs of Closure objects.
+  // Stores vector of <success, failure> pairs of callbacks.
   class VectorOfClosurePairs
       : public std::vector<std::pair<base::Closure, base::Closure> > {
    public:
-    // Runs all closures then clears the vector.
+    // Runs all success / failure callbacks and then clears the vector.
     void RunSuccessCallbacksAndClear();
     void RunFailureCallbacksAndClear();
   };
