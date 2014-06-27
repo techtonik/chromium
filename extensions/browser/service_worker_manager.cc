@@ -99,12 +99,11 @@ void ServiceWorkerManager::FinishRegistration(
   if (service_worker_host) {
     ext_state.registration = REGISTERED;
     ext_state.service_worker_host.reset(service_worker_host.release());
-    ext_state.registration_succeeded.RunAllAndClear();
-    ext_state.registration_failed.clear();
+    ext_state.registration_callbacks.RunSuccessCallbacksAndClear();
   } else {
     LOG(ERROR) << "Service Worker Registration failed for extension "
                << extension_id;
-    ext_state.registration_failed.RunAllAndClear();
+    ext_state.registration_callbacks.RunFailureCallbacksAndClear();
     states_.erase(extension_id);
   }
 }
@@ -144,14 +143,13 @@ void ServiceWorkerManager::FinishUnregistration(const ExtensionId& extension_id,
 
   DCHECK_EQ(ext_state.registration, UNREGISTERING);
   if (success) {
-    ext_state.unregistration_succeeded.RunAllAndClear();
+    ext_state.unregistration_callbacks.RunSuccessCallbacksAndClear();
     states_.erase(extension_id);
   } else {
     LOG(ERROR) << "Service Worker Unregistration failed for extension "
                << extension_id;
     ext_state.registration = REGISTERED;
-    ext_state.unregistration_failed.RunAllAndClear();
-    ext_state.unregistration_succeeded.clear();
+    ext_state.unregistration_callbacks.RunFailureCallbacksAndClear();
   }
 }
 
@@ -177,8 +175,7 @@ void ServiceWorkerManager::WhenRegistered(
       base::MessageLoop::current()->PostTask(from_here, success);
       break;
     case REGISTERING:
-      state.registration_succeeded.push_back(success);
-      state.registration_failed.push_back(failure);
+      state.registration_callbacks.push_back(std::make_pair(success, failure));
       break;
   }
 }
@@ -205,8 +202,8 @@ void ServiceWorkerManager::WhenUnregistered(
       base::MessageLoop::current()->PostTask(from_here, success);
       break;
     case UNREGISTERING:
-      state.unregistration_succeeded.push_back(success);
-      state.unregistration_failed.push_back(failure);
+      state.unregistration_callbacks.push_back(
+          std::make_pair(success, failure));
       break;
   }
 }
@@ -223,9 +220,16 @@ WeakPtr<ServiceWorkerManager> ServiceWorkerManager::WeakThis() {
   return weak_this_factory_.GetWeakPtr();
 }
 
-void ServiceWorkerManager::VectorOfClosures::RunAllAndClear() {
+void ServiceWorkerManager::VectorOfClosurePairs::RunSuccessCallbacksAndClear() {
   for (size_t i = 0; i < size(); ++i) {
-    at(i).Run();
+    at(i).first.Run();
+  }
+  clear();
+}
+
+void ServiceWorkerManager::VectorOfClosurePairs::RunFailureCallbacksAndClear() {
+  for (size_t i = 0; i < size(); ++i) {
+    at(i).second.Run();
   }
   clear();
 }

@@ -98,21 +98,22 @@ class ServiceWorkerManager : public KeyedService {
     // ServiceWorkerContext.
     UNREGISTERING,
   };
-  class VectorOfClosures : public std::vector<base::Closure> {
+  // Stores vector of <success, failure> pairs of Closure objects.
+  class VectorOfClosurePairs
+      : public std::vector<std::pair<base::Closure, base::Closure> > {
    public:
-     // Runs all closures then clears the vector.
-     void RunAllAndClear();
+    // Runs all closures then clears the vector.
+    void RunSuccessCallbacksAndClear();
+    void RunFailureCallbacksAndClear();
   };
   struct State {
     RegistrationState registration;
     int outstanding_state_changes;
     linked_ptr<content::ServiceWorkerHost> service_worker_host;
-    // These two can be non-empty during REGISTERING.
-    VectorOfClosures registration_succeeded;
-    VectorOfClosures registration_failed;
-    // These two can be non-empty during UNREGISTERING.
-    VectorOfClosures unregistration_succeeded;
-    VectorOfClosures unregistration_failed;
+    // Can be non-empty during REGISTERING.
+    VectorOfClosurePairs registration_callbacks;
+    // Can be non-empty during UNREGISTERING.
+    VectorOfClosurePairs unregistration_callbacks;
     State();
     ~State();
   };
