@@ -96,21 +96,16 @@ void ServiceWorkerManager::FinishRegistration(
     return;
 
   DCHECK_EQ(ext_state.registration, REGISTERING);
-  std::vector<Closure> to_run;
   if (service_worker_host) {
     ext_state.registration = REGISTERED;
     ext_state.service_worker_host.reset(service_worker_host.release());
-    to_run.swap(ext_state.registration_succeeded);
+    ext_state.registration_succeeded.RunAllAndClear();
     ext_state.registration_failed.clear();
   } else {
     LOG(ERROR) << "Service Worker Registration failed for extension "
                << extension_id;
-    to_run.swap(ext_state.registration_failed);
+    ext_state.registration_failed.RunAllAndClear();
     states_.erase(extension_id);
-  }
-
-  for (size_t i = 0; i < to_run.size(); ++i) {
-    to_run[i].Run();
   }
 }
 
@@ -148,20 +143,15 @@ void ServiceWorkerManager::FinishUnregistration(const ExtensionId& extension_id,
     return;
 
   DCHECK_EQ(ext_state.registration, UNREGISTERING);
-  std::vector<Closure> to_run;
   if (success) {
-    to_run.swap(ext_state.unregistration_succeeded);
+    ext_state.unregistration_succeeded.RunAllAndClear();
     states_.erase(extension_id);
   } else {
     LOG(ERROR) << "Service Worker Unregistration failed for extension "
                << extension_id;
     ext_state.registration = REGISTERED;
-    to_run.swap(ext_state.unregistration_failed);
+    ext_state.unregistration_failed.RunAllAndClear();
     ext_state.unregistration_succeeded.clear();
-  }
-
-  for (size_t i = 0; i < to_run.size(); ++i) {
-    to_run[i].Run();
   }
 }
 
@@ -231,6 +221,13 @@ content::ServiceWorkerHost* ServiceWorkerManager::GetServiceWorkerHost(
 
 WeakPtr<ServiceWorkerManager> ServiceWorkerManager::WeakThis() {
   return weak_this_factory_.GetWeakPtr();
+}
+
+void ServiceWorkerManager::VectorOfClosures::RunAllAndClear() {
+  for (size_t i = 0; i < size(); ++i) {
+    at(i).Run();
+  }
+  clear();
 }
 
 // ServiceWorkerManagerFactory
