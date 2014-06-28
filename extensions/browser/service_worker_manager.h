@@ -69,10 +69,8 @@ class ServiceWorkerManager : public KeyedService {
       const ExtensionId& ext_id) const;
   inline base::WeakPtr<ServiceWorkerManager> WeakThis();
 
-  void FinishRegistration(const ExtensionId& extension_id,
-                          bool success);
-  void FinishUnregistration(const ExtensionId& extension_id,
-                            bool success);
+  void FinishRegistration(const ExtensionId& extension_id, bool success);
+  void FinishUnregistration(const ExtensionId& extension_id, bool success);
 
   content::BrowserContext* const context_;
 
@@ -88,9 +86,14 @@ class ServiceWorkerManager : public KeyedService {
     // ServiceWorkerContext.
     UNREGISTERING,
   };
+  struct SuccessFailureClosurePair {
+    SuccessFailureClosurePair(base::Closure success, base::Closure failure);
+    ~SuccessFailureClosurePair();
+    base::Closure success;
+    base::Closure failure;
+  };
   // Stores vector of <success, failure> pairs of callbacks.
-  class VectorOfClosurePairs
-      : public std::vector<std::pair<base::Closure, base::Closure> > {
+  class VectorOfClosurePairs : public std::vector<SuccessFailureClosurePair> {
    public:
     // Runs all success / failure callbacks and then clears the vector.
     void RunSuccessCallbacksAndClear();
