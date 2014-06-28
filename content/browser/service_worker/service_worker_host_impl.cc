@@ -23,12 +23,34 @@ void OnRegistrationFoundSendMessage(
     IPC::Message* message,
     ServiceWorkerStatusCode status,
     const scoped_refptr<ServiceWorkerRegistration>& registration) {
-  if (status != SERVICE_WORKER_OK || !registration->active_version()) {
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
+  if (status != SERVICE_WORKER_OK) {  // || !registration->active_version()) {
+    //
+    //
     // TODO(scheib) Inform the Host client that we failed to send?
+    //
+    //
+    fprintf(stderr,
+            "%s:%s:%d returning early %d, ok:%d, active %d\n",
+            __FILE__,
+            __FUNCTION__,
+            __LINE__,
+            status,
+            status == SERVICE_WORKER_OK,
+            !!registration->active_version());
     return;
   }
   CHECK(message);  // Check pointer before taking a reference to it.
+  //
+  //
   // TODO(scheib) Inform the Host client that we failed to send (via callback)?
+  //
+  //
+  fprintf(stderr,
+          "%s:%s:%d ok, calling registration->active_version()->SendMessage\n",
+          __FILE__,
+          __FUNCTION__,
+          __LINE__);
   registration->active_version()->SendMessage(
       *message, ServiceWorkerVersion::StatusCallback());
 }
@@ -36,6 +58,7 @@ void OnRegistrationFoundSendMessage(
 void SendOnIO(scoped_refptr<ServiceWorkerContextWrapper> context_wrapper,
               const GURL scope,
               IPC::Message* message) {
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
   //
   //
   // TODO: Optimize by keeping a reference to Registration.
@@ -87,6 +110,7 @@ bool ServiceWorkerHostImpl::HasActiveVersion() {
 }
 
 bool ServiceWorkerHostImpl::Send(IPC::Message* message) {
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   BrowserThread::PostTask(
       BrowserThread::IO,

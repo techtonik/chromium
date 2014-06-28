@@ -116,6 +116,7 @@ void EventRouter::DispatchExtensionMessage(IPC::Sender* ipc_sender,
   args.Set(0, new base::StringValue(event_name));
   args.Set(1, event_args);
   args.Set(2, info.AsValue().release());
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
   ipc_sender->Send(new ExtensionMsg_MessageInvoke(
       MSG_ROUTING_CONTROL,
       extension_id,

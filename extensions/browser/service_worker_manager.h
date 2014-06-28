@@ -59,6 +59,14 @@ class ServiceWorkerManager : public KeyedService {
                         const base::Closure& success,
                         const base::Closure& failure);
 
+  // Calls |success| when |extension| has an active service worker.  If
+  // |extension| does not have a pending active version or starts being
+  // unregistered completes, calls |failure| instead.
+  void WhenActive(const Extension* extension,
+                  const tracked_objects::Location& from_here,
+                  const base::Closure& success,
+                  const base::Closure& failure);
+
   // Returns the ServiceWorkerHost for an extension, or NULL if none registered.
   //
   //
@@ -114,6 +122,8 @@ class ServiceWorkerManager : public KeyedService {
     VectorOfClosurePairs registration_callbacks;
     // Can be non-empty during UNREGISTERING.
     VectorOfClosurePairs unregistration_callbacks;
+    // Can be non-empty any time.
+    VectorOfClosurePairs activation_callbacks;
     State();
     ~State();
   };

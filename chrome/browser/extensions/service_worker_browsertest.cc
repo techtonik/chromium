@@ -51,6 +51,18 @@ class ExtensionServiceWorkerBrowserTest : public ExtensionBrowserTest {
     run_loop.Run();
   }
 
+  void WaitUntilActive(const Extension* extension) {
+    base::RunLoop run_loop;
+    ServiceWorkerManager::Get(profile())
+        ->WhenActive(extension,
+                     FROM_HERE,
+                     run_loop.QuitClosure(),
+                     base::Bind(FailTest,
+                                "Extension failed to become active.",
+                                run_loop.QuitClosure()));
+    run_loop.Run();
+  }
+
   extensions::ScopedCurrentChannel trunk_channel_;
   TestExtensionDir ext_dir_;
 };
@@ -191,6 +203,16 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
                                       run_loop.QuitClosure()));
     run_loop.Run();
   }
+}
+
+IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, WaitUntilActive) {
+  ext_dir_.WriteManifest(kServiceWorkerManifest);
+  ext_dir_.WriteFile(FILE_PATH_LITERAL("service_worker.js"), "");
+
+  scoped_refptr<const Extension> extension =
+      LoadExtension(ext_dir_.unpacked_path());
+  WaitUntilRegistered(extension.get());
+  WaitUntilActive(extension.get());
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,

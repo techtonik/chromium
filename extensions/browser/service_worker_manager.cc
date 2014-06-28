@@ -208,6 +208,37 @@ void ServiceWorkerManager::WhenUnregistered(
   }
 }
 
+void ServiceWorkerManager::WhenActive(
+    const Extension* extension,
+    const tracked_objects::Location& from_here,
+    const base::Closure& success,
+    const base::Closure& failure) {
+  base::hash_map<ExtensionId, State>::iterator it =
+      states_.find(extension->id());
+  if (it == states_.end()) {
+    base::MessageLoop::current()->PostTask(from_here, failure);
+    return;
+  }
+
+  State& state = it->second;
+  switch (state.registration) {
+    case UNREGISTERED:
+    case UNREGISTERING:
+      base::MessageLoop::current()->PostTask(from_here, failure);
+      break;
+    case REGISTERED:
+      if (state.service_worker_host->HasActiveVersion()) {
+        base::MessageLoop::current()->PostTask(from_here, success);
+      } else {
+        state.activation_callbacks.push_back(std::make_pair(success, failure));
+      }
+      break;
+    case REGISTERING:
+      state.activation_callbacks.push_back(std::make_pair(success, failure));
+      break;
+  }
+}
+
 content::ServiceWorkerHost* ServiceWorkerManager::GetServiceWorkerHost(
     ExtensionId extension_id) {
   base::hash_map<ExtensionId, State>::iterator it = states_.find(extension_id);
