@@ -41,6 +41,7 @@ EventType EventTypeFromNative(const base::NativeEvent& native_event) {
     case NSOtherMouseDragged:
       return ET_MOUSE_DRAGGED;
     case NSMouseMoved:
+      return ET_MOUSE_MOVED;
     case NSScrollWheel:
       return ET_MOUSEWHEEL;
     case NSMouseEntered:
@@ -223,6 +224,10 @@ KeyboardCode KeyboardCodeFromNative(const base::NativeEvent& native_event) {
 
 const char* CodeFromNative(const base::NativeEvent& native_event) {
   return CodeFromNSEvent(native_event);
+}
+
+uint32 PlatformKeycodeFromNative(const base::NativeEvent& native_event) {
+  return native_event.keyCode;
 }
 
 }  // namespace ui

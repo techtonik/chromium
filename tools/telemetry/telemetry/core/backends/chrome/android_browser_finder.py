@@ -25,11 +25,6 @@ CHROME_PACKAGE_NAMES = {
       ['org.chromium.content_shell_apk',
        android_browser_backend.ContentShellBackendSettings,
        'ContentShell.apk'],
-  # TODO(tonyg): rename android-chromium-testshell to android-chrome-shell
-  'android-chromium-testshell':
-      ['org.chromium.chrome.shell',
-       android_browser_backend.ChromeShellBackendSettings,
-       'ChromeShell.apk'],
   'android-chrome-shell':
       ['org.chromium.chrome.shell',
        android_browser_backend.ChromeShellBackendSettings,
@@ -72,7 +67,7 @@ class PossibleAndroidBrowser(possible_browser.PossibleBrowser):
   """A launchable android browser instance."""
   def __init__(self, browser_type, finder_options, backend_settings, apk_name):
     super(PossibleAndroidBrowser, self).__init__(browser_type, 'android',
-        finder_options)
+        finder_options, backend_settings.supports_tab_control)
     assert browser_type in ALL_BROWSER_TYPES, \
         'Please add %s to ALL_BROWSER_TYPES' % browser_type
     self._backend_settings = backend_settings

@@ -53,6 +53,8 @@ class BookmarkEventRouter : public BookmarkModelObserver {
                                  int old_index,
                                  const BookmarkNode* new_parent,
                                  int new_index) OVERRIDE;
+  virtual void OnWillAddBookmarkNode(BookmarkModel* model,
+                                     BookmarkNode* node) OVERRIDE;
   virtual void BookmarkNodeAdded(BookmarkModel* model,
                                  const BookmarkNode* parent,
                                  int index) OVERRIDE;
@@ -127,6 +129,9 @@ class BookmarksFunction : public ChromeAsyncExtensionFunction,
 
   // RunAsync semantic equivalent called when the bookmarks are ready.
   virtual bool RunOnReady() = 0;
+
+  // Helper to get the BookmarkModel.
+  BookmarkModel* GetBookmarkModel();
 
   // Helper to get the ChromeBookmarkClient.
   ChromeBookmarkClient* GetChromeBookmarkClient();

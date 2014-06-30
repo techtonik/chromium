@@ -39,6 +39,25 @@ sys.path.append(elf_symbolizer_path)
 import symbols.elf_symbolizer as elf_symbolizer  # pylint: disable=F0401
 
 
+# Node dictionary keys. These are output in json read by the webapp so
+# keep them short to save file size.
+# Note: If these change, the webapp must also change.
+NODE_TYPE_KEY = 'k'
+NODE_NAME_KEY = 'n'
+NODE_CHILDREN_KEY = 'children'
+NODE_SYMBOL_TYPE_KEY = 't'
+NODE_SYMBOL_SIZE_KEY = 'value'
+NODE_MAX_DEPTH_KEY = 'maxDepth'
+NODE_LAST_PATH_ELEMENT_KEY = 'lastPathElement'
+
+# The display name of the bucket where we put symbols without path.
+NAME_NO_PATH_BUCKET = '(No Path)'
+
+# Try to keep data buckets smaller than this to avoid killing the
+# graphing lib.
+BIG_BUCKET_LIMIT = 3000
+
+
 # TODO(andrewhayden): Only used for legacy reports. Delete.
 def FormatBytes(byte_count):
   """Pretty-print a number of bytes."""
@@ -63,44 +82,111 @@ def SymbolTypeToHuman(symbol_type):
 
 
 def _MkChild(node, name):
-  child = node['children'].get(name)
+  child = node[NODE_CHILDREN_KEY].get(name)
   if child is None:
-    child = {'n': name, 'children': {}}
-    node['children'][name] = child
+    child = {NODE_NAME_KEY: name,
+             NODE_CHILDREN_KEY: {}}
+    node[NODE_CHILDREN_KEY][name] = child
   return child
+
+
+
+def SplitNoPathBucket(node):
+  """NAME_NO_PATH_BUCKET can be too large for the graphing lib to
+  handle. Split it into sub-buckets in that case."""
+  root_children = node[NODE_CHILDREN_KEY]
+  if NAME_NO_PATH_BUCKET in root_children:
+    no_path_bucket = root_children[NAME_NO_PATH_BUCKET]
+    old_children = no_path_bucket[NODE_CHILDREN_KEY]
+    count = 0
+    for symbol_type, symbol_bucket in old_children.iteritems():
+      count += len(symbol_bucket[NODE_CHILDREN_KEY])
+    if count > BIG_BUCKET_LIMIT:
+      new_children = {}
+      no_path_bucket[NODE_CHILDREN_KEY] = new_children
+      current_bucket = None
+      index = 0
+      for symbol_type, symbol_bucket in old_children.iteritems():
+        for symbol_name, value in symbol_bucket[NODE_CHILDREN_KEY].iteritems():
+          if index % BIG_BUCKET_LIMIT == 0:
+            group_no = (index / BIG_BUCKET_LIMIT) + 1
+            current_bucket = _MkChild(no_path_bucket,
+                                      '%s subgroup %d' % (NAME_NO_PATH_BUCKET,
+                                                          group_no))
+            assert not NODE_TYPE_KEY in node or node[NODE_TYPE_KEY] == 'p'
+            node[NODE_TYPE_KEY] = 'p'  # p for path
+          index += 1
+          symbol_size = value[NODE_SYMBOL_SIZE_KEY]
+          AddSymbolIntoFileNode(current_bucket, symbol_type,
+                                symbol_name, symbol_size)
 
 
 def MakeChildrenDictsIntoLists(node):
   largest_list_len = 0
-  if 'children' in node:
-    largest_list_len = len(node['children'])
+  if NODE_CHILDREN_KEY in node:
+    largest_list_len = len(node[NODE_CHILDREN_KEY])
     child_list = []
-    for child in node['children'].itervalues():
+    for child in node[NODE_CHILDREN_KEY].itervalues():
       child_largest_list_len = MakeChildrenDictsIntoLists(child)
       if child_largest_list_len > largest_list_len:
         largest_list_len = child_largest_list_len
       child_list.append(child)
-    node['children'] = child_list
+    node[NODE_CHILDREN_KEY] = child_list
 
   return largest_list_len
 
 
-def MakeCompactTree(symbols):
-  result = {'n': '/', 'children': {}, 'k': 'p', 'maxDepth': 0}
+def AddSymbolIntoFileNode(node, symbol_type, symbol_name, symbol_size):
+  """Puts symbol into the file path node |node|.
+  Returns the number of added levels in tree. I.e. returns 2."""
+
+  # 'node' is the file node and first step is to find its symbol-type bucket.
+  node[NODE_LAST_PATH_ELEMENT_KEY] = True
+  node = _MkChild(node, symbol_type)
+  assert not NODE_TYPE_KEY in node or node[NODE_TYPE_KEY] == 'b'
+  node[NODE_SYMBOL_TYPE_KEY] = symbol_type
+  node[NODE_TYPE_KEY] = 'b'  # b for bucket
+
+  # 'node' is now the symbol-type bucket. Make the child entry.
+  node = _MkChild(node, symbol_name)
+  if NODE_CHILDREN_KEY in node:
+    if node[NODE_CHILDREN_KEY]:
+      logging.warning('A container node used as symbol for %s.' % symbol_name)
+    # This is going to be used as a leaf so no use for child list.
+    del node[NODE_CHILDREN_KEY]
+  node[NODE_SYMBOL_SIZE_KEY] = symbol_size
+  node[NODE_SYMBOL_TYPE_KEY] = symbol_type
+  node[NODE_TYPE_KEY] = 's'  # s for symbol
+
+  return 2  # Depth of the added subtree.
+
+
+def MakeCompactTree(symbols, symbol_path_origin_dir):
+  result = {NODE_NAME_KEY: '/',
+            NODE_CHILDREN_KEY: {},
+            NODE_TYPE_KEY: 'p',
+            NODE_MAX_DEPTH_KEY: 0}
   seen_symbol_with_path = False
+  cwd = os.path.abspath(os.getcwd())
   for symbol_name, symbol_type, symbol_size, file_path in symbols:
 
     if 'vtable for ' in symbol_name:
-      symbol_type = '@' # hack to categorize these separately
+      symbol_type = '@'  # hack to categorize these separately
     # Take path like '/foo/bar/baz', convert to ['foo', 'bar', 'baz']
-    if file_path:
-      file_path = os.path.normpath(file_path)
+    if file_path and file_path != "??":
+      file_path = os.path.abspath(os.path.join(symbol_path_origin_dir,
+                                               file_path))
+      # Let the output structure be relative to $CWD if inside $CWD,
+      # otherwise relative to the disk root. This is to avoid
+      # unnecessary click-through levels in the output.
+      if file_path.startswith(cwd + os.sep):
+        file_path = file_path[len(cwd):]
+      if file_path.startswith('/'):
+        file_path = file_path[1:]
       seen_symbol_with_path = True
     else:
-      file_path = '(No Path)'
+      file_path = NAME_NO_PATH_BUCKET
 
-    if file_path.startswith('/'):
-      file_path = file_path[1:]
     path_parts = file_path.split('/')
 
     # Find pre-existing node in tree, or update if it already exists
@@ -112,36 +198,22 @@ def MakeCompactTree(symbols):
         continue
       depth += 1
       node = _MkChild(node, path_part)
-      assert not 'k' in node or node['k'] == 'p'
-      node['k'] = 'p' # p for path
+      assert not NODE_TYPE_KEY in node or node[NODE_TYPE_KEY] == 'p'
+      node[NODE_TYPE_KEY] = 'p'  # p for path
 
-    # 'node' is now the file node. Find the symbol-type bucket.
-    node['lastPathElement'] = True
-    node = _MkChild(node, symbol_type)
-    assert not 'k' in node or node['k'] == 'b'
-    node['t'] = symbol_type
-    node['k'] = 'b' # b for bucket
-    depth += 1
-
-    # 'node' is now the symbol-type bucket. Make the child entry.
-    node = _MkChild(node, symbol_name)
-    if 'children' in node:
-      if node['children']:
-        logging.warning('A container node used as symbol for %s.' % symbol_name)
-      # This is going to be used as a leaf so no use for child list.
-      del node['children']
-    node['value'] = symbol_size
-    node['t'] = symbol_type
-    node['k'] = 's' # s for symbol
-    depth += 1
-    result['maxDepth'] = max(result['maxDepth'], depth)
+    depth += AddSymbolIntoFileNode(node, symbol_type, symbol_name, symbol_size)
+    result[NODE_MAX_DEPTH_KEY] = max(result[NODE_MAX_DEPTH_KEY], depth)
 
   if not seen_symbol_with_path:
     logging.warning('Symbols lack paths. Data will not be structured.')
 
+  # The (no path) bucket can be extremely large if we failed to get
+  # path information. Split it into subgroups if needed.
+  SplitNoPathBucket(result)
+
   largest_list_len = MakeChildrenDictsIntoLists(result)
 
-  if largest_list_len > 1000:
+  if largest_list_len > BIG_BUCKET_LIMIT:
     logging.warning('There are sections with %d nodes. '
                     'Results might be unusable.' % largest_list_len)
   return result
@@ -281,11 +353,12 @@ def JsonifyTree(tree, name):
           'data': { '$area': tree['size'] },
           'children': children }
 
-def DumpCompactTree(symbols, outfile):
-  tree_root = MakeCompactTree(symbols)
+def DumpCompactTree(symbols, symbol_path_origin_dir, outfile):
+  tree_root = MakeCompactTree(symbols, symbol_path_origin_dir)
   with open(outfile, 'w') as out:
-    out.write('var tree_data = ')
-    json.dump(tree_root, out)
+    out.write('var tree_data=')
+    # Use separators without whitespace to get a smaller file.
+    json.dump(tree_root, out, separators=(',', ':'))
   print('Writing %d bytes json' % os.path.getsize(outfile))
 
 
@@ -417,9 +490,12 @@ class Progress():
     self.collisions = 0
     self.time_last_output = time.time()
     self.count_last_output = 0
+    self.disambiguations = 0
+    self.was_ambiguous = 0
 
 
-def RunElfSymbolizer(outfile, library, addr2line_binary, nm_binary, jobs):
+def RunElfSymbolizer(outfile, library, addr2line_binary, nm_binary, jobs,
+                     disambiguate, src_path):
   nm_output = RunNm(library, nm_binary)
   nm_output_lines = nm_output.splitlines()
   nm_output_lines_len = len(nm_output_lines)
@@ -432,8 +508,16 @@ def RunElfSymbolizer(outfile, library, addr2line_binary, nm_binary, jobs):
       #                                   str(address_symbol[addr].name))
       progress.collisions += 1
     else:
+      if symbol.disambiguated:
+        progress.disambiguations += 1
+      if symbol.was_ambiguous:
+        progress.was_ambiguous += 1
+
       address_symbol[addr] = symbol
 
+    progress_output()
+
+  def progress_output():
     progress_chunk = 100
     if progress.count % progress_chunk == 0:
       time_now = time.time()
@@ -449,12 +533,25 @@ def RunElfSymbolizer(outfile, library, addr2line_binary, nm_binary, jobs):
           speed = 0
         progress_percent = (100.0 * (progress.count + progress.skip_count) /
                             nm_output_lines_len)
-        print('%.1f%%: Looked up %d symbols (%d collisions) - %.1f lookups/s.' %
-              (progress_percent, progress.count, progress.collisions, speed))
+        disambiguation_percent = 0
+        if progress.disambiguations != 0:
+          disambiguation_percent = (100.0 * progress.disambiguations /
+                                    progress.was_ambiguous)
 
+        sys.stdout.write('\r%.1f%%: Looked up %d symbols (%d collisions, '
+              '%d disambiguations where %.1f%% succeeded)'
+              '- %.1f lookups/s.' %
+              (progress_percent, progress.count, progress.collisions,
+               progress.disambiguations, disambiguation_percent, speed))
+
+  # In case disambiguation was disabled, we remove the source path (which upon
+  # being set signals the symbolizer to enable disambiguation)
+  if not disambiguate:
+    src_path = None
   symbolizer = elf_symbolizer.ELFSymbolizer(library, addr2line_binary,
                                             map_address_symbol,
-                                            max_concurrent_jobs=jobs)
+                                            max_concurrent_jobs=jobs,
+                                            source_root_path=src_path)
   user_interrupted = False
   try:
     for line in nm_output_lines:
@@ -487,9 +584,13 @@ def RunElfSymbolizer(outfile, library, addr2line_binary, nm_binary, jobs):
     user_interrupted = True
     print('Patience you must have my young padawan.')
 
+  print ''
+
   if user_interrupted:
     print('Skipping the rest of the file mapping. '
           'Output will not be fully classified.')
+
+  symbol_path_origin_dir = os.path.dirname(os.path.abspath(library))
 
   with open(outfile, 'w') as out:
     for line in nm_output_lines:
@@ -502,7 +603,8 @@ def RunElfSymbolizer(outfile, library, addr2line_binary, nm_binary, jobs):
           if symbol is not None:
             path = '??'
             if symbol.source_path is not None:
-              path = symbol.source_path
+              path = os.path.abspath(os.path.join(symbol_path_origin_dir,
+                                                  symbol.source_path))
             line_number = 0
             if symbol.source_line is not None:
               line_number = symbol.source_line
@@ -534,14 +636,15 @@ def RunNm(binary, nm_binary):
 
 
 def GetNmSymbols(nm_infile, outfile, library, jobs, verbose,
-                 addr2line_binary, nm_binary):
+                 addr2line_binary, nm_binary, disambiguate, src_path):
   if nm_infile is None:
     if outfile is None:
       outfile = tempfile.NamedTemporaryFile(delete=False).name
 
     if verbose:
       print 'Running parallel addr2line, dumping symbols to ' + outfile
-    RunElfSymbolizer(outfile, library, addr2line_binary, nm_binary, jobs)
+    RunElfSymbolizer(outfile, library, addr2line_binary, nm_binary, jobs,
+                     disambiguate, src_path)
 
     nm_infile = outfile
 
@@ -651,6 +754,15 @@ def main():
                     'This argument is only valid when using --library.')
   parser.add_option('--legacy', action='store_true',
                     help='emit legacy binary size report instead of modern')
+  parser.add_option('--disable-disambiguation', action='store_true',
+                    help='disables the disambiguation process altogether,'
+                    ' NOTE: this may, depending on your toolchain, produce'
+                    ' output with some symbols at the top layer if addr2line'
+                    ' could not get the entire source path.')
+  parser.add_option('--source-path', default='./',
+                    help='the path to the source code of the output binary, '
+                    'default set to current directory. Used in the'
+                    ' disambiguation process.')
   opts, _args = parser.parse_args()
 
   if ((not opts.library) and (not opts.nm_in)) or (opts.library and opts.nm_in):
@@ -691,7 +803,9 @@ def main():
 
   symbols = GetNmSymbols(opts.nm_in, opts.nm_out, opts.library,
                          opts.jobs, opts.verbose is True,
-                         addr2line_binary, nm_binary)
+                         addr2line_binary, nm_binary,
+                         opts.disable_disambiguation is None,
+                         opts.source_path)
   if not os.path.exists(opts.destdir):
     os.makedirs(opts.destdir, 0755)
 
@@ -714,7 +828,13 @@ def main():
     shutil.copy(os.path.join('tools', 'binary_size', 'legacy_template',
                              'index.html'), opts.destdir)
   else: # modern report
-    DumpCompactTree(symbols, os.path.join(opts.destdir, 'data.js'))
+    if opts.library:
+      symbol_path_origin_dir = os.path.dirname(os.path.abspath(opts.library))
+    else:
+      # Just a guess. Hopefully all paths in the input file are absolute.
+      symbol_path_origin_dir = os.path.abspath(os.getcwd())
+    data_js_file_name = os.path.join(opts.destdir, 'data.js')
+    DumpCompactTree(symbols, symbol_path_origin_dir, data_js_file_name)
     d3_out = os.path.join(opts.destdir, 'd3')
     if not os.path.exists(d3_out):
       os.makedirs(d3_out, 0755)

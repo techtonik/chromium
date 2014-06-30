@@ -7,7 +7,6 @@
 #include "base/prefs/pref_service.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/extensions/extension_icon_image.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/profiles/profile.h"
@@ -18,6 +17,7 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
 #include "content/public/browser/web_contents.h"
+#include "extensions/browser/extension_icon_image.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/manifest_handlers/icons_handler.h"
@@ -81,13 +81,17 @@ int StringForChromeHost(const GURL& url) {
 
 }  // namespace
 
-OriginChipInfo::OriginChipInfo(
-    extensions::IconImage::Observer* owner,
-    Profile* profile)
+OriginChipInfo::OriginChipInfo(extensions::IconImage::Observer* owner,
+                               Profile* profile)
     : owner_(owner),
-      profile_(profile) {}
+      profile_(profile),
+      security_level_(ToolbarModel::NONE),
+      is_url_malware_(false),
+      icon_(IDR_PRODUCT_LOGO_16) {
+}
 
-OriginChipInfo::~OriginChipInfo() {}
+OriginChipInfo::~OriginChipInfo() {
+}
 
 bool OriginChipInfo::Update(const content::WebContents* web_contents,
                             const ToolbarModel* toolbar_model) {

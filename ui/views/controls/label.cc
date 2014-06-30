@@ -19,7 +19,6 @@
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/insets.h"
-#include "ui/gfx/shadow_value.h"
 #include "ui/gfx/text_elider.h"
 #include "ui/gfx/text_utils.h"
 #include "ui/gfx/utf16_indexing.h"
@@ -105,26 +104,10 @@ void Label::SetBackgroundColor(SkColor color) {
   RecalculateColors();
 }
 
-void Label::SetShadowColors(SkColor enabled_color, SkColor disabled_color) {
-  enabled_shadow_color_ = enabled_color;
-  disabled_shadow_color_ = disabled_color;
-  has_shadow_ = true;
-}
-
-void Label::SetShadowOffset(int x, int y) {
-  shadow_offset_.SetPoint(x, y);
-}
-
-void Label::ClearEmbellishing() {
-  has_shadow_ = false;
-}
-
 void Label::SetHorizontalAlignment(gfx::HorizontalAlignment alignment) {
-  // If the View's UI layout is right-to-left and directionality_mode_ is
-  // USE_UI_DIRECTIONALITY, we need to flip the alignment so that the alignment
-  // settings take into account the text directionality.
-  if (base::i18n::IsRTL() && (directionality_mode_ == USE_UI_DIRECTIONALITY) &&
-      (alignment != gfx::ALIGN_CENTER)) {
+  // If the UI layout is right-to-left, flip the alignment direction.
+  if (base::i18n::IsRTL() &&
+      (alignment == gfx::ALIGN_LEFT || alignment == gfx::ALIGN_RIGHT)) {
     alignment = (alignment == gfx::ALIGN_LEFT) ?
         gfx::ALIGN_RIGHT : gfx::ALIGN_LEFT;
   }
@@ -132,6 +115,15 @@ void Label::SetHorizontalAlignment(gfx::HorizontalAlignment alignment) {
     horizontal_alignment_ = alignment;
     SchedulePaint();
   }
+}
+
+gfx::HorizontalAlignment Label::GetHorizontalAlignment() const {
+  if (horizontal_alignment_ != gfx::ALIGN_TO_HEAD)
+    return horizontal_alignment_;
+
+  const base::i18n::TextDirection dir =
+      base::i18n::GetFirstStrongCharacterDirection(layout_text());
+  return dir == base::i18n::RIGHT_TO_LEFT ? gfx::ALIGN_RIGHT : gfx::ALIGN_LEFT;
 }
 
 void Label::SetLineHeight(int height) {
@@ -327,18 +319,8 @@ void Label::PaintText(gfx::Canvas* canvas,
   if (elide_behavior_ == gfx::FADE_TAIL) {
     canvas->DrawFadedString(text, font_list_, color, text_bounds, flags);
   } else {
-    gfx::ShadowValues shadows;
-    if (has_shadow_) {
-      shadows.push_back(gfx::ShadowValue(shadow_offset_, shadow_blur_,
-          enabled() ? enabled_shadow_color_ : disabled_shadow_color_));
-    }
     canvas->DrawStringRectWithShadows(text, font_list_, color, text_bounds,
-                                      line_height_, flags, shadows);
-
-    if (SkColorGetA(halo_color_) != SK_AlphaTRANSPARENT) {
-      canvas->DrawStringRectWithHalo(text, font_list_, color, halo_color_,
-                                     text_bounds, flags);
-    }
+                                      line_height_, flags, shadows_);
   }
 
   if (HasFocus()) {
@@ -365,6 +347,8 @@ gfx::Size Label::GetTextSize() const {
     gfx::Canvas::SizeStringInt(
         layout_text(), font_list_, &w, &h, line_height_, flags);
     text_size_.SetSize(w, h);
+    const gfx::Insets shadow_margin = -gfx::ShadowValue::GetMargin(shadows_);
+    text_size_.Enlarge(shadow_margin.width(), shadow_margin.height());
     text_size_valid_ = true;
   }
 
@@ -396,6 +380,7 @@ void Label::OnNativeThemeChanged(const ui::NativeTheme* theme) {
 void Label::Init(const base::string16& text, const gfx::FontList& font_list) {
   font_list_ = font_list;
   enabled_color_set_ = disabled_color_set_ = background_color_set_ = false;
+  subpixel_rendering_enabled_ = true;
   auto_color_readability_ = true;
   UpdateColorsFromTheme(ui::NativeTheme::instance());
   horizontal_alignment_ = gfx::ALIGN_CENTER;
@@ -405,13 +390,7 @@ void Label::Init(const base::string16& text, const gfx::FontList& font_list) {
   allow_character_break_ = false;
   elide_behavior_ = gfx::ELIDE_TAIL;
   collapse_when_hidden_ = false;
-  directionality_mode_ = USE_UI_DIRECTIONALITY;
-  enabled_shadow_color_ = 0;
-  disabled_shadow_color_ = 0;
-  shadow_offset_.SetPoint(1, 1);
-  has_shadow_ = false;
-  shadow_blur_ = 0;
-  halo_color_ = SK_ColorTRANSPARENT;
+  directionality_mode_ = gfx::DIRECTIONALITY_FROM_UI;
   cached_heights_.resize(kCachedSizeLimit);
   ResetCachedSize();
 
@@ -430,43 +409,41 @@ void Label::RecalculateColors() {
 }
 
 gfx::Rect Label::GetTextBounds() const {
-  gfx::Rect available_rect(GetAvailableRect());
+  gfx::Rect available(GetAvailableRect());
   gfx::Size text_size(GetTextSize());
-  text_size.set_width(std::min(available_rect.width(), text_size.width()));
-
-  gfx::Insets insets = GetInsets();
-  gfx::Point text_origin(insets.left(), insets.top());
-  switch (horizontal_alignment_) {
+  text_size.set_width(std::min(available.width(), text_size.width()));
+  gfx::Point origin(GetInsets().left(), GetInsets().top());
+  switch (GetHorizontalAlignment()) {
     case gfx::ALIGN_LEFT:
       break;
     case gfx::ALIGN_CENTER:
-      // We put any extra margin pixel on the left rather than the right.  We
-      // used to do this because measurement on Windows used
-      // GetTextExtentPoint32(), which could report a value one too large on the
-      // right; we now use DrawText(), and who knows if it can also do this.
-      text_origin.Offset((available_rect.width() + 1 - text_size.width()) / 2,
-                         0);
+      // Put any extra margin pixel on the left to match the legacy behavior
+      // from the use of GetTextExtentPoint32() on Windows.
+      origin.Offset((available.width() + 1 - text_size.width()) / 2, 0);
       break;
     case gfx::ALIGN_RIGHT:
-      text_origin.set_x(available_rect.right() - text_size.width());
+      origin.set_x(available.right() - text_size.width());
       break;
     default:
       NOTREACHED();
       break;
   }
-  text_origin.Offset(0,
-      std::max(0, (available_rect.height() - text_size.height())) / 2);
-  return gfx::Rect(text_origin, text_size);
+  origin.Offset(0, std::max(0, (available.height() - text_size.height())) / 2);
+  return gfx::Rect(origin, text_size);
 }
 
 int Label::ComputeDrawStringFlags() const {
   int flags = 0;
 
   // We can't use subpixel rendering if the background is non-opaque.
-  if (SkColorGetA(background_color_) != 0xFF)
+  if (SkColorGetA(background_color_) != 0xFF || !subpixel_rendering_enabled_)
     flags |= gfx::Canvas::NO_SUBPIXEL_RENDERING;
 
-  if (directionality_mode_ == AUTO_DETECT_DIRECTIONALITY) {
+  if (directionality_mode_ == gfx::DIRECTIONALITY_FORCE_LTR) {
+    flags |= gfx::Canvas::FORCE_LTR_DIRECTIONALITY;
+  } else if (directionality_mode_ == gfx::DIRECTIONALITY_FORCE_RTL) {
+    flags |= gfx::Canvas::FORCE_RTL_DIRECTIONALITY;
+  } else if (directionality_mode_ == gfx::DIRECTIONALITY_FROM_TEXT) {
     base::i18n::TextDirection direction =
         base::i18n::GetFirstStrongCharacterDirection(layout_text());
     if (direction == base::i18n::RIGHT_TO_LEFT)
@@ -475,7 +452,7 @@ int Label::ComputeDrawStringFlags() const {
       flags |= gfx::Canvas::FORCE_LTR_DIRECTIONALITY;
   }
 
-  switch (horizontal_alignment_) {
+  switch (GetHorizontalAlignment()) {
     case gfx::ALIGN_LEFT:
       flags |= gfx::Canvas::TEXT_ALIGN_LEFT;
       break;
@@ -484,6 +461,9 @@ int Label::ComputeDrawStringFlags() const {
       break;
     case gfx::ALIGN_RIGHT:
       flags |= gfx::Canvas::TEXT_ALIGN_RIGHT;
+      break;
+    default:
+      NOTREACHED();
       break;
   }
 

@@ -8,6 +8,7 @@
 #include "base/command_line.h"
 #include "base/compiler_specific.h"
 #include "base/files/file_path.h"
+#include "base/memory/scoped_ptr.h"
 #include "base/prefs/pref_service.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/sys_info.h"
@@ -30,7 +31,7 @@
 #include "chrome/browser/sessions/session_backend.h"
 #include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/translate/chrome_translate_client.h"
-#include "chrome/browser/translate/translate_browser_test_utils.h"
+#include "chrome/browser/translate/cld_data_harness.h"
 #include "chrome/browser/ui/app_modal_dialogs/app_modal_dialog.h"
 #include "chrome/browser/ui/app_modal_dialogs/app_modal_dialog_queue.h"
 #include "chrome/browser/ui/app_modal_dialogs/javascript_app_modal_dialog.h"
@@ -833,7 +834,7 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, MAYBE_BeforeUnloadVsBeforeReload) {
   alert->native_dialog()->CancelAppModalDialog();
 
   // Navigate to another url, and check that we get a "before unload" dialog.
-  GURL url2(std::string("about:blank"));
+  GURL url2(url::kAboutBlankURL);
   browser()->OpenURL(OpenURLParams(
       url2, Referrer(), CURRENT_TAB, content::PAGE_TRANSITION_TYPED, false));
 
@@ -894,7 +895,7 @@ IN_PROC_BROWSER_TEST_F(BeforeUnloadAtQuitWithTwoWindows,
   ui_test_utils::BrowserAddedObserver browser_added_observer;
   chrome::NewEmptyWindow(browser()->profile(), chrome::GetActiveDesktop());
   Browser* second_window = browser_added_observer.WaitForSingleNewBrowser();
-  ui_test_utils::NavigateToURL(second_window, GURL("about:blank"));
+  ui_test_utils::NavigateToURL(second_window, GURL(url::kAboutBlankURL));
 
   // Tell the application to quit. IDC_EXIT calls AttemptUserExit, which on
   // everything but ChromeOS allows unload handlers to block exit. On that
@@ -1405,11 +1406,11 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, ShouldShowLocationBar) {
 
 // Tests that the CLD (Compact Language Detection) works properly.
 IN_PROC_BROWSER_TEST_F(BrowserTest, PageLanguageDetection) {
-  test::ScopedCLDDynamicDataHarness dynamic_data_scope;
-  ASSERT_NO_FATAL_FAILURE(dynamic_data_scope.Init());
+  scoped_ptr<test::CldDataHarness> cld_data_harness =
+      test::CreateCldDataHarness();
+  ASSERT_NO_FATAL_FAILURE(cld_data_harness->Init());
   ASSERT_TRUE(test_server()->Start());
 
-  //std::string lang;
   LanguageDetectionDetails details;
 
   // Open a new tab with a page in English.
@@ -2134,10 +2135,9 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, WindowOpenClose) {
   EXPECT_EQ(title, title_watcher.WaitAndGetTitle());
 }
 
-// GTK doesn't use the Browser's fullscreen state.
 // TODO(linux_aura) http://crbug.com/163931
 // Mac disabled: http://crbug.com/169820
-#if !defined(TOOLKIT_GTK) && !defined(OS_MACOSX) && \
+#if !defined(OS_MACOSX) && \
     !(defined(OS_LINUX) && !defined(OS_CHROMEOS) && defined(USE_AURA))
 IN_PROC_BROWSER_TEST_F(BrowserTest, FullscreenBookmarkBar) {
 #if defined(OS_WIN) && defined(USE_ASH)
@@ -2184,9 +2184,9 @@ class KioskModeTest : public BrowserTest {
   }
 };
 
-#if defined(OS_MACOSX) || (defined(OS_LINUX) && !defined(OS_CHROMEOS) && defined(USE_AURA))
-// http://crbug.com/103912
-// TODO(linux_aura) http://crbug.com/163931
+#if defined(OS_MACOSX) || (defined(OS_LINUX) && !defined(OS_CHROMEOS))
+// Mac: http://crbug.com/103912
+// Linux: http://crbug.com/163931
 #define MAYBE_EnableKioskModeTest DISABLED_EnableKioskModeTest
 #else
 #define MAYBE_EnableKioskModeTest EnableKioskModeTest

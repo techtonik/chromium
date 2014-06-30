@@ -13,7 +13,6 @@ import sys
 from pylib import android_commands
 from pylib import constants
 from pylib.device import device_utils
-from pylib.utils import apk_helper
 
 
 def AddInstallAPKOption(option_parser):
@@ -22,8 +21,8 @@ def AddInstallAPKOption(option_parser):
                            help=('DEPRECATED The name of the apk containing the'
                                  ' application (with the .apk extension).'))
   option_parser.add_option('--apk_package',
-                           help=('The package name used by the apk containing '
-                                 'the application.'))
+                           help=('DEPRECATED The package name used by the apk '
+                                 'containing the application.'))
   option_parser.add_option('--keep_data',
                            action='store_true',
                            default=False,
@@ -38,6 +37,8 @@ def AddInstallAPKOption(option_parser):
                            dest='build_type',
                            help='If set, run test suites under out/Release. '
                            'Default is env var BUILDTYPE or Debug.')
+  option_parser.add_option('-d', '--device', dest='device',
+                           help='Target device for apk to install on.')
 
 
 def ValidateInstallAPKOption(option_parser, options, args):
@@ -71,14 +72,18 @@ def main(argv):
   ValidateInstallAPKOption(parser, options, args)
 
   devices = android_commands.GetAttachedDevices()
+
+  if options.device:
+    if options.device not in devices:
+      raise Exception('Error: %s not in attached devices %s' % (options.device,
+                      ','.join(devices)))
+    devices = [options.device]
+
   if not devices:
     raise Exception('Error: no connected devices')
 
-  if not options.apk_package:
-    options.apk_package = apk_helper.GetPackageName(options.apk)
-
-  device_utils.DeviceUtils.parallel(devices).old_interface.ManagedInstall(
-      options.apk, options.keep_data, options.apk_package).pFinish(None)
+  device_utils.DeviceUtils.parallel(devices).Install(
+      options.apk, reinstall=options.keep_data)
 
 
 if __name__ == '__main__':

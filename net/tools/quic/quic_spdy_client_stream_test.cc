@@ -32,7 +32,6 @@ class QuicSpdyClientStreamTest : public TestWithParam<QuicVersion> {
         session_(QuicServerId("example.com", 80, false, PRIVACY_MODE_DISABLED),
                  DefaultQuicConfig(),
                  connection_,
-                 kInitialFlowControlWindowForTest,
                  &crypto_config_),
         body_("hello world") {
     crypto_config_.SetDefaults();
@@ -45,7 +44,11 @@ class QuicSpdyClientStreamTest : public TestWithParam<QuicVersion> {
     // New streams rely on having the peer's flow control receive window
     // negotiated in the config.
     session_.config()->SetInitialFlowControlWindowToSend(
-        kInitialFlowControlWindowForTest);
+        kInitialSessionFlowControlWindowForTest);
+    session_.config()->SetInitialStreamFlowControlWindowToSend(
+        kInitialStreamFlowControlWindowForTest);
+    session_.config()->SetInitialSessionFlowControlWindowToSend(
+        kInitialSessionFlowControlWindowForTest);
     stream_.reset(new QuicSpdyClientStream(3, &session_));
   }
 

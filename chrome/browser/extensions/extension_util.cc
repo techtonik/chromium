@@ -21,6 +21,7 @@
 #include "extensions/browser/extension_util.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_icon_set.h"
+#include "extensions/common/features/simple_feature.h"
 #include "extensions/common/manifest.h"
 #include "extensions/common/manifest_handlers/incognito_info.h"
 #include "grit/theme_resources.h"
@@ -34,7 +35,23 @@ namespace {
 // all urls without explicit permission.
 const char kExtensionAllowedOnAllUrlsPrefName[] =
     "extension_can_script_all_urls";
+
+// Returns true if |extension_id| for an external component extension should
+// always be enabled in incognito windows.
+bool IsWhitelistedForIncognito(const std::string& extension_id) {
+  static const char* kExtensionWhitelist[] = {
+    "D5736E4B5CF695CB93A2FB57E4FDC6E5AFAB6FE2",  // http://crbug.com/312900
+    "D57DE394F36DC1C3220E7604C575D29C51A6C495",  // http://crbug.com/319444
+    "3F65507A3B39259B38C8173C6FFA3D12DF64CCE9"   // http://crbug.com/371562
+  };
+
+  return extensions::SimpleFeature::IsIdInList(
+      extension_id,
+      std::set<std::string>(
+          kExtensionWhitelist,
+          kExtensionWhitelist + arraysize(kExtensionWhitelist)));
 }
+}  // namespace
 
 bool IsIncognitoEnabled(const std::string& extension_id,
                         content::BrowserContext* context) {
@@ -47,6 +64,10 @@ bool IsIncognitoEnabled(const std::string& extension_id,
     // work in incognito mode.
     if (extension->location() == Manifest::COMPONENT)
       return true;
+    if (extension->location() == Manifest::EXTERNAL_COMPONENT &&
+        IsWhitelistedForIncognito(extension_id)) {
+      return true;
+    }
   }
 
   return ExtensionPrefs::Get(context)->IsIncognitoEnabled(extension_id);
@@ -170,8 +191,9 @@ void SetAllowedScriptingOnAllUrls(const std::string& extension_id,
 
 bool IsAppLaunchable(const std::string& extension_id,
                      content::BrowserContext* context) {
-  return !(ExtensionPrefs::Get(context)->GetDisableReasons(extension_id) &
-           Extension::DISABLE_UNSUPPORTED_REQUIREMENT);
+  int reason = ExtensionPrefs::Get(context)->GetDisableReasons(extension_id);
+  return !((reason & Extension::DISABLE_UNSUPPORTED_REQUIREMENT) ||
+           (reason & Extension::DISABLE_CORRUPTED));
 }
 
 bool IsAppLaunchableWithoutEnabling(const std::string& extension_id,
@@ -180,9 +202,16 @@ bool IsAppLaunchableWithoutEnabling(const std::string& extension_id,
       extension_id, ExtensionRegistry::ENABLED) != NULL;
 }
 
+bool ShouldSyncExtension(const Extension* extension,
+                         content::BrowserContext* context) {
+  return sync_helper::IsSyncableExtension(extension) &&
+         !ExtensionPrefs::Get(context)->DoNotSync(extension->id());
+}
+
 bool ShouldSyncApp(const Extension* app, content::BrowserContext* context) {
   return sync_helper::IsSyncableApp(app) &&
-      !util::IsEphemeralApp(app->id(), context);
+         !util::IsEphemeralApp(app->id(), context) &&
+         !ExtensionPrefs::Get(context)->DoNotSync(app->id());
 }
 
 bool IsExtensionIdle(const std::string& extension_id,
@@ -249,22 +278,10 @@ bool SiteHasIsolatedStorage(const GURL& extension_site_url,
                             content::BrowserContext* context) {
   const Extension* extension = ExtensionRegistry::Get(context)->
       enabled_extensions().GetExtensionOrAppByURL(extension_site_url);
-  if (extension)
-    return AppIsolationInfo::HasIsolatedStorage(extension);
+  if (!extension)
+    return false;
 
-  if (extension_site_url.SchemeIs(kExtensionScheme)) {
-    // The site URL may also be from an evicted ephemeral app. We do not
-    // immediately delete their data when they are removed from extension
-    // system.
-    ExtensionPrefs* prefs = ExtensionPrefs::Get(context);
-    DCHECK(prefs);
-    scoped_ptr<ExtensionInfo> info = prefs->GetEvictedEphemeralAppInfo(
-        extension_site_url.host());
-    if (info.get())
-      return HasIsolatedStorage(*info);
-  }
-
-  return false;
+  return AppIsolationInfo::HasIsolatedStorage(extension);
 }
 
 const gfx::ImageSkia& GetDefaultAppIcon() {

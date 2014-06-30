@@ -44,6 +44,7 @@
 #include "content/public/browser/user_metrics.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_system.h"
+#include "extensions/browser/install_flag.h"
 #include "extensions/common/extension_icon_set.h"
 #include "extensions/common/feature_switch.h"
 #include "extensions/common/file_util.h"
@@ -130,11 +131,8 @@ CrxInstaller::CrxInstaller(base::WeakPtr<ExtensionService> service_weak,
       off_store_install_allow_reason_(OffStoreInstallDisallowed),
       did_handle_successfully_(true),
       error_on_unsupported_requirements_(false),
-      has_requirement_errors_(false),
-      blacklist_state_(extensions::NOT_BLACKLISTED),
-      install_wait_for_idle_(true),
       update_from_settings_page_(false),
-      is_ephemeral_(false),
+      install_flags_(kInstallFlagNone),
       installer_(service_weak->profile()) {
   installer_task_runner_ = service_weak->GetFileTaskRunner();
   if (!approval)
@@ -164,7 +162,7 @@ CrxInstaller::CrxInstaller(base::WeakPtr<ExtensionService> service_weak,
   }
 
   show_dialog_callback_ = approval->show_dialog_callback;
-  is_ephemeral_ = approval->is_ephemeral;
+  set_is_ephemeral(approval->is_ephemeral);
 }
 
 CrxInstaller::~CrxInstaller() {
@@ -231,19 +229,14 @@ void CrxInstaller::InstallWebApp(const WebApplicationInfo& web_app) {
 
   if (!installer_task_runner_->PostTask(
           FROM_HERE,
-          base::Bind(&CrxInstaller::ConvertWebAppOnFileThread,
-                     this,
-                     web_app,
-                     install_directory_)))
+          base::Bind(&CrxInstaller::ConvertWebAppOnFileThread, this, web_app)))
     NOTREACHED();
 }
 
 void CrxInstaller::ConvertWebAppOnFileThread(
-    const WebApplicationInfo& web_app,
-    const base::FilePath& install_directory) {
-  base::string16 error;
-  scoped_refptr<Extension> extension(
-      ConvertWebAppToExtension(web_app, base::Time::Now(), install_directory));
+    const WebApplicationInfo& web_app) {
+  scoped_refptr<Extension> extension(ConvertWebAppToExtension(
+      web_app, base::Time::Now(), install_directory_));
   if (!extension.get()) {
     // Validation should have stopped any potential errors before getting here.
     NOTREACHED() << "Could not convert web app to extension.";
@@ -528,7 +521,7 @@ void CrxInstaller::OnRequirementsChecked(
           base::UTF8ToUTF16(JoinString(requirement_errors, ' '))));
       return;
     }
-    has_requirement_errors_ = true;
+    install_flags_ |= kInstallFlagHasRequirementErrors;
   }
 
   ExtensionSystem::Get(profile())->blacklist()->IsBlacklisted(
@@ -542,10 +535,12 @@ void CrxInstaller::OnBlacklistChecked(
   if (!service_weak_)
     return;
 
-  blacklist_state_ = blacklist_state;
+  if (blacklist_state == extensions::BLACKLISTED_MALWARE) {
+    install_flags_ |= kInstallFlagIsBlacklistedForMalware;
+  }
 
-  if ((blacklist_state_ == extensions::BLACKLISTED_MALWARE ||
-       blacklist_state_ == extensions::BLACKLISTED_UNKNOWN) &&
+  if ((blacklist_state == extensions::BLACKLISTED_MALWARE ||
+       blacklist_state == extensions::BLACKLISTED_UNKNOWN) &&
       !allow_silent_install_) {
     // User tried to install a blacklisted extension. Show an error and
     // refuse to install it.
@@ -817,12 +812,8 @@ void CrxInstaller::ReportSuccessFromUIThread() {
     }
   }
 
-  service_weak_->OnExtensionInstalled(extension(),
-                                      page_ordinal_,
-                                      has_requirement_errors_,
-                                      blacklist_state_,
-                                      is_ephemeral_,
-                                      install_wait_for_idle_);
+  service_weak_->OnExtensionInstalled(
+      extension(), page_ordinal_, install_flags_);
   NotifyCrxInstallComplete(true);
 }
 

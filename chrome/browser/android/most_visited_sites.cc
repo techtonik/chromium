@@ -12,13 +12,16 @@
 #include "base/android/jni_string.h"
 #include "base/android/scoped_java_ref.h"
 #include "base/callback.h"
+#include "base/metrics/histogram.h"
+#include "base/metrics/sparse_histogram.h"
+#include "base/strings/string_number_conversions.h"
+#include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/history/top_sites.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_android.h"
-#include "chrome/browser/search/suggestions/proto/suggestions.pb.h"
 #include "chrome/browser/search/suggestions/suggestions_service.h"
 #include "chrome/browser/search/suggestions/suggestions_service_factory.h"
 #include "chrome/browser/search/suggestions/suggestions_source.h"
@@ -46,6 +49,35 @@ using suggestions::SuggestionsServiceFactory;
 
 namespace {
 
+// Total number of tiles displayed.
+const char kNumTilesHistogramName[] = "NewTabPage.NumberOfTiles";
+// Tracking thumbnails.
+const char kNumLocalThumbnailTilesHistogramName[] =
+    "NewTabPage.NumberOfThumbnailTiles";
+const char kNumEmptyTilesHistogramName[] = "NewTabPage.NumberOfGrayTiles";
+const char kNumServerTilesHistogramName[] = "NewTabPage.NumberOfExternalTiles";
+// Client suggestion opened.
+const char kOpenedItemClientHistogramName[] = "NewTabPage.MostVisited.client";
+// Control group suggestion opened.
+const char kOpenedItemControlHistogramName[] = "NewTabPage.MostVisited.client0";
+// Server suggestion opened, no provider.
+const char kOpenedItemServerHistogramName[] = "NewTabPage.MostVisited.server";
+// Server suggestion opened with provider.
+const char kOpenedItemServerProviderHistogramFormat[] =
+    "NewTabPage.MostVisited.server%d";
+// Client impression.
+const char kImpressionClientHistogramName[] =
+    "NewTabPage.SuggestionsImpression.client";
+// Control group impression.
+const char kImpressionControlHistogramName[] =
+    "NewTabPage.SuggestionsImpression.client0";
+// Server suggestion impression, no provider.
+const char kImpressionServerHistogramName[] =
+    "NewTabPage.SuggestionsImpression.server";
+// Server suggestion impression with provider.
+const char kImpressionServerHistogramFormat[] =
+    "NewTabPage.SuggestionsImpression.server%d";
+
 void ExtractMostVisitedTitlesAndURLs(
     const history::MostVisitedURLList& visited_list,
     std::vector<base::string16>* titles,
@@ -70,38 +102,10 @@ SkBitmap ExtractThumbnail(const base::RefCountedMemory& image_data) {
   return image.get() ? *image : SkBitmap();
 }
 
-void OnObtainedThumbnail(
-    ScopedJavaGlobalRef<jobject>* bitmap,
-    ScopedJavaGlobalRef<jobject>* j_callback) {
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
-  JNIEnv* env = AttachCurrentThread();
-  Java_ThumbnailCallback_onMostVisitedURLsThumbnailAvailable(
-      env, j_callback->obj(), bitmap->obj());
-}
-
 void AddForcedURLOnUIThread(scoped_refptr<history::TopSites> top_sites,
                             const GURL& url) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   top_sites->AddForcedURL(url, base::Time::Now());
-}
-
-void OnSuggestionsThumbnailAvailable(
-    ScopedJavaGlobalRef<jobject>* j_callback,
-    const GURL& url,
-    const SkBitmap* bitmap) {
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
-  JNIEnv* env = AttachCurrentThread();
-
-  ScopedJavaGlobalRef<jobject>* j_bitmap_ref =
-      new ScopedJavaGlobalRef<jobject>();
-  if (bitmap) {
-    j_bitmap_ref->Reset(
-        env,
-        gfx::ConvertToJavaBitmap(bitmap).obj());
-  }
-
-  Java_ThumbnailCallback_onMostVisitedURLsThumbnailAvailable(
-      env, j_callback->obj(), j_bitmap_ref->obj());
 }
 
 // Runs on the DB thread.
@@ -109,6 +113,7 @@ void GetUrlThumbnailTask(
     std::string url_string,
     scoped_refptr<TopSites> top_sites,
     ScopedJavaGlobalRef<jobject>* j_callback,
+    MostVisitedSites::LookupSuccessCallback lookup_success_ui_callback,
     base::Closure lookup_failed_ui_callback) {
   JNIEnv* env = AttachCurrentThread();
 
@@ -136,6 +141,7 @@ void GetUrlThumbnailTask(
     if (!lookup_failed_ui_callback.is_null()) {
       BrowserThread::PostTask(
           BrowserThread::UI, FROM_HERE, lookup_failed_ui_callback);
+      delete j_bitmap_ref;
       return;
     }
   }
@@ -146,25 +152,30 @@ void GetUrlThumbnailTask(
       new ScopedJavaGlobalRef<jobject>(*j_callback);
   BrowserThread::PostTask(
       BrowserThread::UI, FROM_HERE,
-      base::Bind(
-          &OnObtainedThumbnail,
-          base::Owned(j_bitmap_ref), base::Owned(j_callback_pass)));
+      base::Bind(lookup_success_ui_callback, base::Owned(j_bitmap_ref),
+                 base::Owned(j_callback_pass)));
 }
 
-void GetSuggestionsThumbnailOnUIThread(
-    SuggestionsService* suggestions_service,
-    const std::string& url_string,
-    ScopedJavaGlobalRef<jobject>* j_callback) {
-  suggestions_service->GetPageThumbnail(
-      GURL(url_string),
-      base::Bind(&OnSuggestionsThumbnailAvailable,
-                 base::Owned(new ScopedJavaGlobalRef<jobject>(*j_callback))));
+// Log an event for a given |histogram| at a given element |position|. This
+// routine exists because regular histogram macros are cached thus can't be used
+// if the name of the histogram will change at a given call site.
+void LogHistogramEvent(const std::string& histogram, int position,
+                       int num_sites) {
+  base::HistogramBase* counter = base::LinearHistogram::FactoryGet(
+      histogram,
+      1,
+      num_sites,
+      num_sites + 1,
+      base::Histogram::kUmaTargetedHistogramFlag);
+  counter->Add(position);
 }
 
 }  // namespace
 
 MostVisitedSites::MostVisitedSites(Profile* profile)
-    : profile_(profile), num_sites_(0), weak_ptr_factory_(this) {
+    : profile_(profile), num_sites_(0), is_control_group_(false),
+      num_local_thumbs_(0), num_server_thumbs_(0), num_empty_thumbs_(0),
+      weak_ptr_factory_(this) {
   // Register the debugging page for the Suggestions Service and the thumbnails
   // debugging page.
   content::URLDataSource::Add(profile_,
@@ -177,6 +188,10 @@ MostVisitedSites::~MostVisitedSites() {
 
 void MostVisitedSites::Destroy(JNIEnv* env, jobject obj) {
   delete this;
+}
+
+void MostVisitedSites::OnLoadingComplete(JNIEnv* env, jobject obj) {
+  RecordUMAMetrics();
 }
 
 void MostVisitedSites::SetMostVisitedURLsObserver(JNIEnv* env,
@@ -219,15 +234,21 @@ void MostVisitedSites::GetURLThumbnail(JNIEnv* env,
   SuggestionsService* suggestions_service =
       SuggestionsServiceFactory::GetForProfile(profile_);
   base::Closure lookup_failed_callback = suggestions_service ?
-      base::Bind(&GetSuggestionsThumbnailOnUIThread,
+      base::Bind(&MostVisitedSites::GetSuggestionsThumbnailOnUIThread,
+                 weak_ptr_factory_.GetWeakPtr(),
                  suggestions_service, url_string,
                  base::Owned(new ScopedJavaGlobalRef<jobject>(*j_callback))) :
       base::Closure();
+  LookupSuccessCallback lookup_success_callback =
+      base::Bind(&MostVisitedSites::OnObtainedThumbnail,
+                 weak_ptr_factory_.GetWeakPtr());
+
   BrowserThread::PostTask(
       BrowserThread::DB, FROM_HERE,
           base::Bind(
               &GetUrlThumbnailTask, url_string, top_sites,
-              base::Owned(j_callback), lookup_failed_callback));
+              base::Owned(j_callback), lookup_success_callback,
+              lookup_failed_callback));
 }
 
 void MostVisitedSites::BlacklistUrl(JNIEnv* env,
@@ -253,6 +274,32 @@ void MostVisitedSites::BlacklistUrl(JNIEnv* env,
               &MostVisitedSites::OnSuggestionsProfileAvailable,
               weak_ptr_factory_.GetWeakPtr(),
               base::Owned(new ScopedJavaGlobalRef<jobject>(observer_))));
+      break;
+    }
+  }
+}
+
+void MostVisitedSites::RecordOpenedMostVisitedItem(JNIEnv* env,
+                                                   jobject obj,
+                                                   jint index) {
+  switch (mv_source_) {
+    case TOP_SITES: {
+      const std::string histogram = is_control_group_ ?
+          kOpenedItemControlHistogramName : kOpenedItemClientHistogramName;
+      LogHistogramEvent(histogram, index, num_sites_);
+      break;
+    }
+    case SUGGESTIONS_SERVICE: {
+      if (server_suggestions_.suggestions_size() > index) {
+        if (server_suggestions_.suggestions(index).providers_size()) {
+          std::string histogram = base::StringPrintf(
+              kOpenedItemServerProviderHistogramFormat,
+              server_suggestions_.suggestions(index).providers(0));
+          LogHistogramEvent(histogram, index, num_sites_);
+        } else {
+          UMA_HISTOGRAM_SPARSE_SLOWLY(kOpenedItemServerHistogramName, index);
+        }
+      }
       break;
     }
   }
@@ -313,6 +360,14 @@ void MostVisitedSites::OnMostVisitedURLsAvailable(
 
   mv_source_ = TOP_SITES;
 
+  int num_tiles = urls.size();
+  UMA_HISTOGRAM_SPARSE_SLOWLY(kNumTilesHistogramName, num_tiles);
+  const std::string histogram = is_control_group_ ?
+      kImpressionControlHistogramName : kImpressionClientHistogramName;
+  for (int i = 0; i < num_tiles; ++i) {
+    LogHistogramEvent(histogram, i, num_sites_);
+  }
+
   JNIEnv* env = AttachCurrentThread();
   Java_MostVisitedURLsObserver_onMostVisitedURLsAvailable(
       env,
@@ -324,22 +379,40 @@ void MostVisitedSites::OnMostVisitedURLsAvailable(
 void MostVisitedSites::OnSuggestionsProfileAvailable(
     ScopedJavaGlobalRef<jobject>* j_observer,
     const SuggestionsProfile& suggestions_profile) {
-  size_t size = suggestions_profile.suggestions_size();
-  if (size == 0) {
-    // No suggestions data available, initiate Top Sites query.
+  int size = suggestions_profile.suggestions_size();
+
+  // Determine if the user is in a control group (they would have received
+  // suggestions, but are in a group where they shouldn't).
+  is_control_group_ = size && SuggestionsService::IsControlGroup();
+
+  // If no suggestions data is available or the user is in a control group,
+  // initiate Top Sites query.
+  if (is_control_group_ || !size) {
     InitiateTopSitesQuery();
     return;
   }
 
   std::vector<base::string16> titles;
   std::vector<std::string> urls;
-  for (size_t i = 0; i < size; ++i) {
+
+  int i = 0;
+  for (; i < size && i < num_sites_; ++i) {
     const ChromeSuggestion& suggestion = suggestions_profile.suggestions(i);
     titles.push_back(base::UTF8ToUTF16(suggestion.title()));
     urls.push_back(suggestion.url());
+    if (suggestion.providers_size()) {
+      std::string histogram = base::StringPrintf(
+          kImpressionServerHistogramFormat, suggestion.providers(0));
+      LogHistogramEvent(histogram, i, num_sites_);
+    } else {
+      UMA_HISTOGRAM_SPARSE_SLOWLY(kImpressionServerHistogramName, i);
+    }
   }
+  UMA_HISTOGRAM_SPARSE_SLOWLY(kNumTilesHistogramName, i);
 
   mv_source_ = SUGGESTIONS_SERVICE;
+  // Keep a copy of the suggestions for eventual logging.
+  server_suggestions_ = suggestions_profile;
 
   JNIEnv* env = AttachCurrentThread();
   Java_MostVisitedURLsObserver_onMostVisitedURLsAvailable(
@@ -347,6 +420,63 @@ void MostVisitedSites::OnSuggestionsProfileAvailable(
       j_observer->obj(),
       ToJavaArrayOfStrings(env, titles).obj(),
       ToJavaArrayOfStrings(env, urls).obj());
+}
+
+void MostVisitedSites::OnObtainedThumbnail(
+    ScopedJavaGlobalRef<jobject>* bitmap,
+    ScopedJavaGlobalRef<jobject>* j_callback) {
+  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  JNIEnv* env = AttachCurrentThread();
+  if (bitmap->obj()) {
+    num_local_thumbs_++;
+  } else {
+    num_empty_thumbs_++;
+  }
+  Java_ThumbnailCallback_onMostVisitedURLsThumbnailAvailable(
+      env, j_callback->obj(), bitmap->obj());
+}
+
+void MostVisitedSites::GetSuggestionsThumbnailOnUIThread(
+    SuggestionsService* suggestions_service,
+    const std::string& url_string,
+    ScopedJavaGlobalRef<jobject>* j_callback) {
+  suggestions_service->GetPageThumbnail(
+      GURL(url_string),
+      base::Bind(&MostVisitedSites::OnSuggestionsThumbnailAvailable,
+                 weak_ptr_factory_.GetWeakPtr(),
+                 base::Owned(new ScopedJavaGlobalRef<jobject>(*j_callback))));
+}
+
+void MostVisitedSites::OnSuggestionsThumbnailAvailable(
+    ScopedJavaGlobalRef<jobject>* j_callback,
+    const GURL& url,
+    const SkBitmap* bitmap) {
+  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  JNIEnv* env = AttachCurrentThread();
+
+  ScopedJavaGlobalRef<jobject>* j_bitmap_ref =
+      new ScopedJavaGlobalRef<jobject>();
+  if (bitmap) {
+    num_server_thumbs_++;
+    j_bitmap_ref->Reset(
+        env,
+        gfx::ConvertToJavaBitmap(bitmap).obj());
+  } else {
+    num_empty_thumbs_++;
+  }
+
+  Java_ThumbnailCallback_onMostVisitedURLsThumbnailAvailable(
+      env, j_callback->obj(), j_bitmap_ref->obj());
+}
+
+void MostVisitedSites::RecordUMAMetrics() {
+  UMA_HISTOGRAM_SPARSE_SLOWLY(kNumLocalThumbnailTilesHistogramName,
+                              num_local_thumbs_);
+  num_local_thumbs_ = 0;
+  UMA_HISTOGRAM_SPARSE_SLOWLY(kNumEmptyTilesHistogramName, num_empty_thumbs_);
+  num_empty_thumbs_ = 0;
+  UMA_HISTOGRAM_SPARSE_SLOWLY(kNumServerTilesHistogramName, num_server_thumbs_);
+  num_server_thumbs_ = 0;
 }
 
 static jlong Init(JNIEnv* env, jobject obj, jobject jprofile) {

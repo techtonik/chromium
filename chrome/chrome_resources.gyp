@@ -10,6 +10,7 @@
   },
   'targets': [
     {
+      # GN version: //chrome:extra_resources
       'target_name': 'chrome_extra_resources',
       'type': 'none',
       # These resources end up in resources.pak because they are resources
@@ -17,6 +18,7 @@
       # it easier for us to reference them internally.
       'actions': [
         {
+          # GN version: //chrome/browser/resources:memory_internals_resources
           'action_name': 'generate_memory_internals_resources',
           'variables': {
             'grit_grd_file': 'browser/resources/memory_internals_resources.grd',
@@ -24,6 +26,7 @@
           'includes': [ '../build/grit_action.gypi' ],
         },
         {
+          # GN version: //chrome/browser/resources:net_internals_resources
           'action_name': 'generate_net_internals_resources',
           'variables': {
             'grit_grd_file': 'browser/resources/net_internals_resources.grd',
@@ -31,6 +34,7 @@
           'includes': [ '../build/grit_action.gypi' ],
         },
         {
+          # GN version: //chrome/browser/resources:invalidations_resources
           'action_name': 'generate_invalidations_resources',
           'variables': {
             'grit_grd_file': 'browser/resources/invalidations_resources.grd',
@@ -38,6 +42,7 @@
           'includes': ['../build/grit_action.gypi' ],
         },
         {
+          # GN version: //chrome/browser/resources:password_manager_internals_resources
           'action_name': 'generate_password_manager_internals_resources',
           'variables': {
             'grit_grd_file': 'browser/resources/password_manager_internals_resources.grd',
@@ -45,6 +50,7 @@
           'includes': [ '../build/grit_action.gypi' ],
         },
         {
+          # GN version: //chrome/browser/resources:signin_internals_resources
           'action_name': 'generate_signin_internals_resources',
           'variables': {
             'grit_grd_file': 'browser/resources/signin_internals_resources.grd',
@@ -52,6 +58,7 @@
           'includes': ['../build/grit_action.gypi' ],
         },
         {
+          # GN version: //chrome/browser/resources:sync_internals_resources
           'action_name': 'generate_sync_internals_resources',
           'variables': {
             'grit_grd_file': 'browser/resources/sync_internals_resources.grd',
@@ -59,6 +66,7 @@
           'includes': [ '../build/grit_action.gypi' ],
         },
         {
+          # GN version: //chrome/browser/resources:translate_internals_resources
           'action_name': 'generate_translate_internals_resources',
           'variables': {
             'grit_grd_file': 'browser/resources/translate_internals_resources.grd',
@@ -130,6 +138,7 @@
       ],
     },
     {
+      # GN version: //chrome/browser:chrome_internal_resources_gen
       'target_name': 'chrome_internal_resources_gen',
       'type': 'none',
       'conditions': [
@@ -166,6 +175,8 @@
       # to run grit would list its own .grd files, but unfortunately some
       # of the static libraries currently have circular dependencies among
       # generated headers.
+      #
+      # GN version: //chrome:resources
       'target_name': 'chrome_resources',
       'type': 'none',
       'dependencies': [
@@ -175,6 +186,7 @@
       ],
       'actions': [
         {
+          # GN version: //chrome/browser:resources
           'action_name': 'generate_browser_resources',
           'variables': {
             'grit_grd_file': 'browser/browser_resources.grd',
@@ -187,6 +199,7 @@
           'includes': [ '../build/grit_action.gypi' ],
         },
         {
+          # GN version: //chrome/common:resources
           'action_name': 'generate_common_resources',
           'variables': {
             'grit_grd_file': 'common/common_resources.grd',
@@ -194,6 +207,7 @@
           'includes': [ '../build/grit_action.gypi' ],
         },
         {
+          # GN version: //chrome/renderer:resources
           'action_name': 'generate_renderer_resources',
           'variables': {
             'grit_grd_file': 'renderer/resources/renderer_resources.grd',
@@ -205,6 +219,7 @@
         ['enable_extensions==1', {
           'actions': [
             {
+              # GN version: //chrome/common:extensions_api_resources
               'action_name': 'generate_extensions_api_resources',
               'variables': {
                 'grit_grd_file': 'common/extensions_api_resources.grd',
@@ -221,10 +236,13 @@
       # to run grit would list its own .grd files, but unfortunately some
       # of the static libraries currently have circular dependencies among
       # generated headers.
+      #
+      # GN version: //chrome:strings
       'target_name': 'chrome_strings',
       'type': 'none',
       'actions': [
         {
+          # GN version: //chrome/app/resources:locale_settings
           'action_name': 'generate_locale_settings',
           'variables': {
             'grit_grd_file': 'app/resources/locale_settings.grd',
@@ -232,6 +250,7 @@
           'includes': [ '../build/grit_action.gypi' ],
         },
         {
+          # GN version: //chrome/app:chromium_strings
           'action_name': 'generate_chromium_strings',
           'variables': {
             'grit_grd_file': 'app/chromium_strings.grd',
@@ -239,6 +258,7 @@
           'includes': [ '../build/grit_action.gypi' ],
         },
         {
+          # GN version: //chrome/app:generated_resources
           'action_name': 'generate_generated_resources',
           'variables': {
             'grit_grd_file': 'app/generated_resources.grd',
@@ -246,6 +266,7 @@
           'includes': [ '../build/grit_action.gypi' ],
         },
         {
+          # GN version: //chrome/app:google_chrome_strings
           'action_name': 'generate_google_chrome_strings',
           'variables': {
             'grit_grd_file': 'app/google_chrome_strings.grd',
@@ -327,6 +348,7 @@
       'includes': [ '../build/grit_target.gypi' ],
     },
     {
+      # GN version: //chrome/app/theme:theme_resources
       'target_name': 'theme_resources',
       'type': 'none',
       'dependencies': [
@@ -502,6 +524,7 @@
       'includes': [ '../build/grit_target.gypi' ],
     },
     {
+      # GN version: //chrome/browser:about_credits
       'target_name': 'about_credits',
       'type': 'none',
       'actions': [

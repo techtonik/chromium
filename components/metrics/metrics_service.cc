@@ -222,7 +222,7 @@ const int kEventLimit = 2400;
 // will discard the log, and not try to retransmit it.  We also don't persist
 // the log to the prefs for transmission during the next chrome session if this
 // limit is exceeded.
-const size_t kUploadLogAvoidRetransmitSize = 50000;
+const size_t kUploadLogAvoidRetransmitSize = 100 * 1024;
 
 // Interval, in minutes, between state saves.
 const int kSaveStateIntervalMinutes = 5;
@@ -300,6 +300,8 @@ void MetricsService::RegisterPrefs(PrefRegistrySimple* registry) {
 
   registry->RegisterListPref(metrics::prefs::kMetricsInitialLogs);
   registry->RegisterListPref(metrics::prefs::kMetricsOngoingLogs);
+  registry->RegisterListPref(metrics::prefs::kMetricsInitialLogsOld);
+  registry->RegisterListPref(metrics::prefs::kMetricsOngoingLogsOld);
 
   registry->RegisterInt64Pref(metrics::prefs::kUninstallLaunchCount, 0);
   registry->RegisterInt64Pref(metrics::prefs::kUninstallMetricsUptimeSec, 0);

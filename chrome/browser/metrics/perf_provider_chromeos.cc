@@ -13,6 +13,7 @@
 #include "base/rand_util.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/threading/sequenced_worker_pool.h"
+#include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/metrics/perf_provider_chromeos.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
@@ -21,6 +22,7 @@
 #include "chrome/common/chrome_switches.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/dbus/debug_daemon_client.h"
+#include "content/public/browser/notification_service.h"
 
 namespace {
 
@@ -36,6 +38,21 @@ const size_t kPerfCommandDurationDefaultSeconds = 2;
 // too much memory. If the size of cached protobufs exceeds this value, stop
 // collecting further perf data. The current value is 4 MB.
 const size_t kCachedPerfDataProtobufSizeThreshold = 4 * 1024 * 1024;
+
+// There may be too many suspends to collect a profile each time there is a
+// resume. To limit the number of profiles, collect one for 1 in 10 resumes.
+// Adjust this number as needed.
+const int kResumeSamplingFactor = 10;
+
+// There may be too many session restores to collect a profile each time. Limit
+// the collection rate by collecting one per 10 restores. Adjust this number as
+// needed.
+const int kRestoreSessionSamplingFactor = 10;
+
+// This is used to space out session restore collections in the face of several
+// notifications in a short period of time. There should be no less than this
+// much time between collections. The current value is 30 seconds.
+const int kMinIntervalBetweenSessionRestoreCollectionsMs = 30 * 1000;
 
 // Enumeration representing success and various failure modes for collecting and
 // sending perf data.
@@ -108,6 +125,17 @@ PerfProvider::PerfProvider()
   // Register the login observer with LoginState.
   chromeos::LoginState::Get()->AddObserver(&login_observer_);
 
+  // Register as an observer of power manager events.
+  chromeos::DBusThreadManager::Get()->GetPowerManagerClient()->
+      AddObserver(this);
+
+  // Register as an observer of session restore.
+  // TODO(sque): clean this up to use something other than notifications.
+  session_restore_registrar_.Add(
+      this,
+      chrome::NOTIFICATION_SESSION_RESTORE_DONE,
+      content::NotificationService::AllBrowserContextsAndSources());
+
   // Check the login state. At the time of writing, this class is instantiated
   // before login. A subsequent login would activate the profiling. However,
   // that behavior may change in the future so that the user is already logged
@@ -143,6 +171,68 @@ void PerfProvider::LoginObserver::LoggedInStateChanged() {
     perf_provider_->OnUserLoggedIn();
   else
     perf_provider_->Deactivate();
+}
+
+void PerfProvider::SuspendDone(const base::TimeDelta& sleep_duration) {
+  // A zero value for the suspend duration indicates that the suspend was
+  // canceled. Do not collect anything if that's the case.
+  if (sleep_duration == base::TimeDelta())
+    return;
+
+  // Do not collect a profile unless logged in. The system behavior when closing
+  // the lid or idling when not logged in is currently to shut down instead of
+  // suspending. But it's good to enforce the rule here in case that changes.
+  if (!IsNormalUserLoggedIn())
+    return;
+
+  // Collect a profile only 1/|kResumeSamplingFactor| of the time, to avoid
+  // collecting too much data.
+  if (base::RandGenerator(kResumeSamplingFactor) != 0)
+    return;
+
+  // Fill out a SampledProfile protobuf that will contain the collected data.
+  scoped_ptr<SampledProfile> sampled_profile(new SampledProfile);
+  sampled_profile->set_trigger_event(SampledProfile::RESUME_FROM_SUSPEND);
+  sampled_profile->set_suspend_duration_ms(sleep_duration.InMilliseconds());
+  // TODO(sque): Vary the time after resume at which to collect a profile.
+  // http://crbug.com/358778.
+  sampled_profile->set_ms_after_resume(0);
+  CollectIfNecessary(sampled_profile.Pass());
+}
+
+void PerfProvider::Observe(int type,
+                           const content::NotificationSource& source,
+                           const content::NotificationDetails& details) {
+  // Only handle session restore notifications.
+  DCHECK_EQ(type, chrome::NOTIFICATION_SESSION_RESTORE_DONE);
+
+  // Collect a profile only 1/|kRestoreSessionSamplingFactor| of the time, to
+  // avoid collecting too much data and potentially causing UI latency.
+  if (base::RandGenerator(kRestoreSessionSamplingFactor) != 0)
+    return;
+
+  const base::TimeDelta min_interval =
+      base::TimeDelta::FromMilliseconds(
+          kMinIntervalBetweenSessionRestoreCollectionsMs);
+  const base::TimeDelta time_since_last_collection =
+      (base::TimeTicks::Now() - last_session_restore_collection_time_);
+  // Do not collect if there hasn't been enough elapsed time since the last
+  // collection.
+  if (!last_session_restore_collection_time_.is_null() &&
+      time_since_last_collection < min_interval) {
+    return;
+  }
+
+  // Fill out a SampledProfile protobuf that will contain the collected data.
+  scoped_ptr<SampledProfile> sampled_profile(new SampledProfile);
+  sampled_profile->set_trigger_event(SampledProfile::RESTORE_SESSION);
+  // TODO(sque): Vary the time after restore at which to collect a profile,
+  // and find a way to determine the number of tabs restored.
+  // http://crbug.com/358778.
+  sampled_profile->set_ms_after_restore(0);
+
+  CollectIfNecessary(sampled_profile.Pass());
+  last_session_restore_collection_time_ = base::TimeTicks::Now();
 }
 
 void PerfProvider::OnUserLoggedIn() {
@@ -181,7 +271,7 @@ void PerfProvider::ScheduleCollection() {
 }
 
 void PerfProvider::CollectIfNecessary(
-    SampledProfile::TriggerEvent trigger_event) {
+    scoped_ptr<SampledProfile> sampled_profile) {
   DCHECK(CalledOnValidThread());
 
   // Do not collect further data if we've already collected a substantial amount
@@ -215,17 +305,20 @@ void PerfProvider::CollectIfNecessary(
                       base::Bind(&PerfProvider::ParseProtoIfValid,
                                  weak_factory_.GetWeakPtr(),
                                  base::Passed(&incognito_observer),
-                                 trigger_event));
+                                 base::Passed(&sampled_profile)));
 }
 
 void PerfProvider::DoPeriodicCollection() {
-  CollectIfNecessary(SampledProfile::PERIODIC_COLLECTION);
+  scoped_ptr<SampledProfile> sampled_profile(new SampledProfile);
+  sampled_profile->set_trigger_event(SampledProfile::PERIODIC_COLLECTION);
+
+  CollectIfNecessary(sampled_profile.Pass());
   ScheduleCollection();
 }
 
 void PerfProvider::ParseProtoIfValid(
     scoped_ptr<WindowedIncognitoObserver> incognito_observer,
-    SampledProfile::TriggerEvent trigger_event,
+    scoped_ptr<SampledProfile> sampled_profile,
     const std::vector<uint8>& data) {
   DCHECK(CalledOnValidThread());
 
@@ -244,7 +337,9 @@ void PerfProvider::ParseProtoIfValid(
   // extra metadata.
   cached_perf_data_.resize(cached_perf_data_.size() + 1);
   SampledProfile& collection_data = cached_perf_data_.back();
-  collection_data.set_trigger_event(trigger_event);
+  collection_data.Swap(sampled_profile.get());
+
+  // Fill out remaining fields of the SampledProfile protobuf.
   collection_data.set_ms_after_boot(
       perf_data_proto.timestamp_sec() * base::Time::kMillisecondsPerSecond);
 
@@ -252,7 +347,9 @@ void PerfProvider::ParseProtoIfValid(
   collection_data.
       set_ms_after_login((base::TimeTicks::Now() - login_time_)
           .InMilliseconds());
-  *collection_data.mutable_perf_data() = perf_data_proto;
+
+  // Finally, store the perf data itself.
+  collection_data.mutable_perf_data()->Swap(&perf_data_proto);
 }
 
 }  // namespace metrics

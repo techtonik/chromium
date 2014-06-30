@@ -57,6 +57,12 @@ remoting.ClientPlugin = function(plugin, onExtensionMessage) {
   this.fetchPinHandler = function (supportsPairing) {};
   /** @param {string} data Remote gnubbyd data. */
   this.onGnubbyAuthHandler = function(data) {};
+  /**
+   * @param {string} url
+   * @param {number} hotspotX
+   * @param {number} hotspotY
+   */
+  this.updateMouseCursorImage = function(url, hotspotX, hotspotY) {};
 
   /** @type {remoting.MediaSourceRenderer} */
   this.mediaSourceRenderer_ = null;
@@ -84,7 +90,10 @@ remoting.ClientPlugin = function(plugin, onExtensionMessage) {
   this.plugin.addEventListener('message', function(event) {
       that.handleMessage_(event.data);
     }, false);
-  window.setTimeout(this.showPluginForClickToPlay_.bind(this), 500);
+
+  if (remoting.settings.CLIENT_PLUGIN_TYPE == 'native') {
+    window.setTimeout(this.showPluginForClickToPlay_.bind(this), 500);
+  }
 };
 
 /**
@@ -138,7 +147,6 @@ remoting.ClientPlugin.prototype.handleMessage_ = function(rawMessage) {
       /** @type {{method:string, data:Object.<string,*>}} */
       ((typeof(rawMessage) == 'string') ? jsonParseSafe(rawMessage)
                                         : rawMessage);
-
   if (!message || !('method' in message) || !('data' in message)) {
     console.error('Received invalid message from the plugin:', rawMessage);
     return;
@@ -169,9 +177,8 @@ remoting.ClientPlugin.prototype.handleMessageMethod_ = function(message) {
   };
 
   if (message.method == 'hello') {
-    // Reset the size in case we had to enlarge it to support click-to-play.
-    this.plugin.style.width = '0px';
-    this.plugin.style.height = '0px';
+    // Resize in case we had to enlarge it to support click-to-play.
+    this.hidePluginForClickToPlay_();
     this.pluginApiVersion_ = getNumberAttr(message.data, 'apiVersion');
     this.pluginApiMinVersion_ = getNumberAttr(message.data, 'apiMinVersion');
 
@@ -327,8 +334,41 @@ remoting.ClientPlugin.prototype.handleMessageMethod_ = function(message) {
       console.error('Unexpected mediaSourceData.');
       return;
     }
+    // keyframe flag may be absent from the message.
+    var keyframe = !!message.data['keyframe'];
     this.mediaSourceRenderer_.onIncomingData(
-        (/** @type {ArrayBuffer} */ message.data['buffer']));
+        (/** @type {ArrayBuffer} */ message.data['buffer']), keyframe);
+
+  } else if (message.method == 'unsetCursorShape') {
+    this.updateMouseCursorImage('', 0, 0);
+
+  } else if (message.method == 'setCursorShape') {
+    var width = getNumberAttr(message.data, 'width');
+    var height = getNumberAttr(message.data, 'height');
+    var hotspotX = getNumberAttr(message.data, 'hotspotX');
+    var hotspotY = getNumberAttr(message.data, 'hotspotY');
+    var srcArrayBuffer = getObjectAttr(message.data, 'data');
+
+    var canvas =
+        /** @type {HTMLCanvasElement} */ (document.createElement('canvas'));
+    canvas.width = width;
+    canvas.height = height;
+
+    var context =
+        /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
+    var imageData = context.getImageData(0, 0, width, height);
+    base.debug.assert(srcArrayBuffer instanceof ArrayBuffer);
+    var src = new Uint8Array(/** @type {ArrayBuffer} */(srcArrayBuffer));
+    var dest = imageData.data;
+    for (var i = 0; i < /** @type {number} */(dest.length); i += 4) {
+      dest[i] = src[i + 2];
+      dest[i + 1] = src[i + 1];
+      dest[i + 2] = src[i];
+      dest[i + 3] = src[i + 3];
+    }
+
+    context.putImageData(imageData, 0, 0);
+    this.updateMouseCursorImage(canvas.toDataURL(), hotspotX, hotspotY);
   }
 };
 
@@ -431,6 +471,8 @@ remoting.ClientPlugin.prototype.connect = function(
   } else if (navigator.userAgent.match(/\bCrOS\b/)) {
     keyFilter = 'cros';
   }
+  this.plugin.postMessage(JSON.stringify(
+      { method: 'delegateLargeCursors', data: {} }));
   this.plugin.postMessage(JSON.stringify(
     { method: 'connect', data: {
         hostJid: hostJid,
@@ -701,10 +743,22 @@ remoting.ClientPlugin.prototype.showPluginForClickToPlay_ = function() {
     this.plugin.style.width = width + 'px';
     this.plugin.style.height = height + 'px';
     // Center the plugin just underneath the "Connnecting..." dialog.
-    var parentNode = this.plugin.parentNode;
     var dialog = document.getElementById('client-dialog');
     var dialogRect = dialog.getBoundingClientRect();
-    parentNode.style.top = (dialogRect.bottom + 16) + 'px';
-    parentNode.style.left = (window.innerWidth - width) / 2 + 'px';
+    this.plugin.style.top = (dialogRect.bottom + 16) + 'px';
+    this.plugin.style.left = (window.innerWidth - width) / 2 + 'px';
+    this.plugin.style.position = 'fixed';
   }
+};
+
+/**
+ * Undo the CSS rules needed to make the plugin clickable for click-to-play.
+ * @private
+ */
+remoting.ClientPlugin.prototype.hidePluginForClickToPlay_ = function() {
+  this.plugin.style.width = '';
+  this.plugin.style.height = '';
+  this.plugin.style.top = '';
+  this.plugin.style.left = '';
+  this.plugin.style.position = '';
 };

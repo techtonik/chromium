@@ -18,8 +18,7 @@ TestLoginUtils::~TestLoginUtils() {}
 
 void TestLoginUtils::PrepareProfile(
     const UserContext& user_context,
-    const std::string& display_email,
-    bool has_cookies,
+    bool has_auth_cookies,
     bool has_active_session,
     Delegate* delegate) {
   if (user_context != expected_user_context_)
@@ -36,7 +35,9 @@ scoped_refptr<Authenticator> TestLoginUtils::CreateAuthenticator(
   return new MockAuthenticator(consumer, expected_user_context_);
 }
 
-void TestLoginUtils::InitRlzDelayed(Profile* user_profile) {
+bool TestLoginUtils::RestartToApplyPerSessionFlagsIfNeed(Profile* profile,
+                                                         bool early_restart) {
+  return false;
 }
 
 }  // namespace chromeos

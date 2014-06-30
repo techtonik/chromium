@@ -22,12 +22,12 @@
 #include "chrome/browser/history/history_notifications.h"
 #include "chrome/browser/history/thumbnail_database.h"
 #include "chrome/browser/history/top_sites.h"
-#include "chrome/common/thumbnail_score.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chrome/tools/profiles/thumbnail-inl.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/browser/bookmark_utils.h"
 #include "components/bookmarks/test/test_bookmark_client.h"
+#include "components/history/core/common/thumbnail_score.h"
 #include "components/history/core/test/history_client_fake_bookmarks.h"
 #include "content/public/test/test_browser_thread.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -129,7 +129,7 @@ class ExpireHistoryTest : public testing::Test,
       main_db_.reset();
 
     base::FilePath thumb_name = path().Append(kThumbnailFile);
-    thumb_db_.reset(new ThumbnailDatabase);
+    thumb_db_.reset(new ThumbnailDatabase(NULL));
     if (thumb_db_->Init(thumb_name) != sql::INIT_OK)
       thumb_db_.reset();
 

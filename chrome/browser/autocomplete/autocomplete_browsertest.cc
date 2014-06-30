@@ -7,9 +7,9 @@
 #include "base/path_service.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/autocomplete/autocomplete_input.h"
 #include "chrome/browser/autocomplete/autocomplete_match.h"
 #include "chrome/browser/autocomplete/autocomplete_provider.h"
+#include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/extensions/extension_browsertest.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/unpacked_installer.h"
@@ -30,6 +30,8 @@
 #include "chrome/test/base/in_process_browser_test.h"
 #include "chrome/test/base/test_switches.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/autocomplete/autocomplete_input.h"
+#include "components/metrics/proto/omnibox_event.pb.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/notification_types.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -138,7 +140,8 @@ IN_PROC_BROWSER_TEST_F(AutocompleteBrowserTest, MAYBE_Autocomplete) {
     omnibox_view->model()->SetInputInProgress(true);
     autocomplete_controller->Start(AutocompleteInput(
         base::ASCIIToUTF16("chrome"), base::string16::npos, base::string16(),
-        GURL(), AutocompleteInput::NTP, true, false, true, false));
+        GURL(), metrics::OmniboxEventProto::NTP, true, false, true, false,
+        ChromeAutocompleteSchemeClassifier(browser()->profile())));
 
     EXPECT_TRUE(autocomplete_controller->done());
     EXPECT_FALSE(location_bar->GetDestinationURL().is_valid());

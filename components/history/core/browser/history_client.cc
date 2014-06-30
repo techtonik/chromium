@@ -16,6 +16,13 @@ bool HistoryClient::IsBookmarked(const GURL& url) {
 void HistoryClient::GetBookmarks(std::vector<URLAndTitle>* bookmarks) {
 }
 
+void HistoryClient::NotifyProfileError(sql::InitStatus init_status) {
+}
+
+bool HistoryClient::ShouldReportDatabaseError() {
+  return false;
+}
+
 HistoryClient::HistoryClient() {
 }
 

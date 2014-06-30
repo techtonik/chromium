@@ -9,11 +9,11 @@
 #include "base/memory/scoped_ptr.h"
 #include "content/child/blink_platform_impl.h"
 #include "content/common/content_export.h"
+#include "content/renderer/compositor_bindings/web_compositor_support_impl.h"
 #include "content/renderer/webpublicsuffixlist_impl.h"
 #include "third_party/WebKit/public/platform/WebGraphicsContext3D.h"
 #include "third_party/WebKit/public/platform/WebIDBFactory.h"
 #include "third_party/WebKit/public/platform/WebScreenOrientationType.h"
-#include "webkit/renderer/compositor_bindings/web_compositor_support_impl.h"
 
 namespace base {
 class MessageLoopProxy;
@@ -32,16 +32,17 @@ class WebBatteryStatus;
 class WebDeviceMotionData;
 class WebDeviceOrientationData;
 class WebGraphicsContext3DProvider;
-class WebScreenOrientationListener;
 }
 
 namespace content {
 class BatteryStatusDispatcher;
+class DeviceLightEventPump;
 class DeviceMotionEventPump;
 class DeviceOrientationEventPump;
 class QuotaMessageFilter;
 class RendererClipboardClient;
-class ScreenOrientationDispatcher;
+class RenderView;
+class RendererGamepadProvider;
 class ThreadSafeSender;
 class WebClipboardImpl;
 class WebDatabaseObserverImpl;
@@ -136,6 +137,7 @@ class CONTENT_EXPORT RendererWebKitPlatformSupportImpl
   virtual blink::WebCompositorSupport* compositorSupport();
   virtual blink::WebString convertIDNToUnicode(
       const blink::WebString& host, const blink::WebString& languages);
+  virtual void setDeviceLightListener(blink::WebDeviceLightListener* listener);
   virtual void setDeviceMotionListener(
       blink::WebDeviceMotionListener* listener);
   virtual void setDeviceOrientationListener(
@@ -146,13 +148,12 @@ class CONTENT_EXPORT RendererWebKitPlatformSupportImpl
       blink::WebStorageQuotaCallbacks);
   virtual void vibrate(unsigned int milliseconds);
   virtual void cancelVibration();
-  virtual void setScreenOrientationListener(
-      blink::WebScreenOrientationListener*);
-  virtual void lockOrientation(blink::WebScreenOrientationLockType,
-                               blink::WebLockOrientationCallback*);
-  virtual void unlockOrientation();
   virtual void setBatteryStatusListener(
       blink::WebBatteryStatusListener* listener);
+
+  void set_gamepad_provider(RendererGamepadProvider* provider) {
+    gamepad_provider_ = provider;
+  }
 
   // Disables the WebSandboxSupport implementation for testing.
   // Tests that do not set up a full sandbox environment should call
@@ -163,17 +164,8 @@ class CONTENT_EXPORT RendererWebKitPlatformSupportImpl
   // Returns the previous |enable| value.
   static bool SetSandboxEnabledForTesting(bool enable);
 
-  // Set WebGamepads to return when sampleGamepads() is invoked.
-  static void SetMockGamepadsForTesting(const blink::WebGamepads& pads);
-
-  // Notifies blink::WebGamepadListener about a new gamepad if a listener
-  // has been set via setGamepadListener.
-  static void MockGamepadConnected(int index, const blink::WebGamepad& pad);
-
-  // Notifies blink::WebGamepadListener that a gamepad has been disconnected if
-  // a listener has been set via setGamepadListener.
-  static void MockGamepadDisconnected(int index, const blink::WebGamepad& pad);
-
+  //  Set a double to return when setDeviceLightListener is invoked.
+  static void SetMockDeviceLightDataForTesting(double data);
   // Set WebDeviceMotionData to return when setDeviceMotionListener is invoked.
   static void SetMockDeviceMotionDataForTesting(
       const blink::WebDeviceMotionData& data);
@@ -181,11 +173,6 @@ class CONTENT_EXPORT RendererWebKitPlatformSupportImpl
   // is invoked.
   static void SetMockDeviceOrientationDataForTesting(
       const blink::WebDeviceOrientationData& data);
-  // Forces the screen orientation for testing purposes.
-  static void SetMockScreenOrientationForTesting(
-      blink::WebScreenOrientationType);
-  // Resets the mock screen orientation data used for testing.
-  static void ResetMockScreenOrientationForTesting();
 
   // Notifies blink::WebBatteryStatusListener that battery status has changed.
   static void MockBatteryStatusChangedForTesting(
@@ -197,7 +184,6 @@ class CONTENT_EXPORT RendererWebKitPlatformSupportImpl
 
  private:
   bool CheckPreparsedJsCachingEnabled() const;
-  void EnsureScreenOrientationDispatcher();
 
   scoped_ptr<RendererClipboardClient> clipboard_client_;
   scoped_ptr<WebClipboardImpl> clipboard_;
@@ -226,6 +212,7 @@ class CONTENT_EXPORT RendererWebKitPlatformSupportImpl
 
   WebPublicSuffixListImpl public_suffix_list_;
 
+  scoped_ptr<DeviceLightEventPump> device_light_event_pump_;
   scoped_ptr<DeviceMotionEventPump> device_motion_event_pump_;
   scoped_ptr<DeviceOrientationEventPump> device_orientation_event_pump_;
 
@@ -236,13 +223,13 @@ class CONTENT_EXPORT RendererWebKitPlatformSupportImpl
 
   scoped_ptr<WebDatabaseObserverImpl> web_database_observer_impl_;
 
-  webkit::WebCompositorSupportImpl compositor_support_;
-
-  scoped_ptr<ScreenOrientationDispatcher> screen_orientation_dispatcher_;
+  WebCompositorSupportImpl compositor_support_;
 
   scoped_ptr<blink::WebScrollbarBehavior> web_scrollbar_behavior_;
 
   scoped_ptr<BatteryStatusDispatcher> battery_status_dispatcher_;
+
+  RendererGamepadProvider* gamepad_provider_;
 
   DISALLOW_COPY_AND_ASSIGN(RendererWebKitPlatformSupportImpl);
 };

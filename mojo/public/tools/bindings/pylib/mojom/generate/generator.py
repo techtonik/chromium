@@ -34,6 +34,14 @@ def GetDataHeader(exported, struct):
   struct.exported = exported
   return struct
 
+def ExpectedArraySize(kind):
+  if isinstance(kind, mojom.FixedArray):
+    return kind.length
+  return 0
+
+def IsArrayKind(kind):
+  return isinstance(kind, (mojom.Array, mojom.FixedArray))
+
 def IsStringKind(kind):
   return kind.spec == 's'
 
@@ -41,7 +49,8 @@ def IsEnumKind(kind):
   return isinstance(kind, mojom.Enum)
 
 def IsObjectKind(kind):
-  return isinstance(kind, (mojom.Struct, mojom.Array)) or IsStringKind(kind)
+  return isinstance(kind, (mojom.Struct, mojom.Array, mojom.FixedArray)) or \
+         IsStringKind(kind)
 
 def IsHandleKind(kind):
   return kind.spec.startswith('h') or \
@@ -88,3 +97,11 @@ class Generator(object):
 
   def GenerateFiles(self, args):
     raise NotImplementedError("Subclasses must override/implement this method")
+
+  def GetJinjaParameters(self):
+    """Returns default constructor parameters for the jinja environment."""
+    return {}
+
+  def GetGlobals(self):
+    """Returns global mappings for the template generation."""
+    return {}

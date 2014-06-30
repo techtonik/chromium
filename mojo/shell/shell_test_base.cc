@@ -8,8 +8,8 @@
 #include "base/file_util.h"
 #include "base/files/file_path.h"
 #include "base/logging.h"
+#include "base/path_service.h"
 #include "build/build_config.h"
-#include "mojo/shell/context.h"
 #include "net/base/filename_util.h"
 #include "url/gurl.h"
 
@@ -23,34 +23,26 @@ ShellTestBase::ShellTestBase() {
 ShellTestBase::~ShellTestBase() {
 }
 
-void ShellTestBase::InitMojo() {
-  DCHECK(!message_loop_);
-  DCHECK(!shell_context_);
-  message_loop_.reset(new base::MessageLoop());
-  shell_context_.reset(new Context());
-}
-
-void ShellTestBase::LaunchServiceInProcess(
+ScopedMessagePipeHandle ShellTestBase::LaunchServiceInProcess(
     const GURL& service_url,
-    const std::string& service_name,
-    ScopedMessagePipeHandle client_handle) {
-  DCHECK(message_loop_);
-  DCHECK(shell_context_);
-
-  base::FilePath base_dir = base::MakeAbsoluteFilePath(
-      base::CommandLine::ForCurrentProcess()->GetProgram().DirName());
-  // On Mac and Windows, libraries are dumped beside the executables.
-#if defined(OS_MACOSX) || defined(OS_WIN)
-  base::FilePath service_dir(base_dir);
+    const std::string& service_name) {
+  base::FilePath base_dir;
+  CHECK(PathService::Get(base::DIR_EXE, &base_dir));
+  // On android, the library is bundled with the app.
+#if defined(OS_ANDROID)
+  // On Android, the library is bundled with the app.
+  base::FilePath service_dir;
+  CHECK(PathService::Get(base::DIR_MODULE, &service_dir));
 #else
-  // On Linux, they're under lib/.
-  base::FilePath service_dir(base_dir.AppendASCII("lib"));
+  // On other platforms, "loadable modules" are dumped beside the executables.
+  base::FilePath service_dir;
+  CHECK(PathService::Get(base::DIR_EXE, &service_dir));
 #endif
-  shell_context_->mojo_url_resolver()->set_origin(
+  shell_context_.mojo_url_resolver()->set_origin(
       net::FilePathToFileURL(service_dir).spec());
 
-  shell_context_->service_manager()->ConnectToService(
-      service_url, service_name, client_handle.Pass(), GURL());
+  return shell_context_.service_manager()->ConnectToServiceByName(
+      service_url, service_name).Pass();
 }
 
 }  // namespace test

@@ -16,6 +16,7 @@
 #include "base/logging.h"
 #include "base/message_loop/message_loop_proxy.h"
 #include "base/strings/string_util.h"
+#include "base/sys_byteorder.h"
 #include "jni/MediaDrmBridge_jni.h"
 
 #include "widevine_cdm_version.h"  // In SHARED_INTERMEDIATE_DIR.
@@ -73,6 +74,7 @@ class KeySystemUuidManager {
   KeySystemUuidManager();
   UUID GetUUID(const std::string& key_system);
   void AddMapping(const std::string& key_system, const UUID& uuid);
+  std::vector<std::string> GetPlatformKeySystemNames();
 
  private:
   typedef base::hash_map<std::string, UUID> KeySystemUuidMap;
@@ -103,6 +105,17 @@ void KeySystemUuidManager::AddMapping(const std::string& key_system,
   if (it != key_system_uuid_map_.end())
     return;
   key_system_uuid_map_[key_system] = uuid;
+}
+
+std::vector<std::string> KeySystemUuidManager::GetPlatformKeySystemNames() {
+  std::vector<std::string> key_systems;
+  for (KeySystemUuidMap::iterator it = key_system_uuid_map_.begin();
+       it != key_system_uuid_map_.end(); ++it) {
+    // Rule out the key system handled by Chrome explicitly.
+    if (it->first != kWidevineKeySystem)
+      key_systems.push_back(it->first);
+  }
+  return key_systems;
 }
 
 base::LazyInstance<KeySystemUuidManager>::Leaky g_key_system_uuid_manager =
@@ -264,10 +277,18 @@ bool MediaDrmBridge::IsSecurityLevelSupported(const std::string& key_system,
   return media_drm_bridge->SetSecurityLevel(security_level);
 }
 
-//static
-void MediaDrmBridge::AddKeySystemUuidMapping(const std::string& key_system,
-                                             const std::vector<uint8>& uuid) {
+static void AddKeySystemUuidMapping(JNIEnv* env, jclass clazz,
+                                    jstring j_key_system,
+                                    jobject j_buffer) {
+  std::string key_system = ConvertJavaStringToUTF8(env, j_key_system);
+  uint8* buffer = static_cast<uint8*>(env->GetDirectBufferAddress(j_buffer));
+  UUID uuid(buffer, buffer + 16);
   g_key_system_uuid_manager.Get().AddMapping(key_system, uuid);
+}
+
+// static
+std::vector<std::string> MediaDrmBridge::GetPlatformKeySystemNames() {
+  return g_key_system_uuid_manager.Get().GetPlatformKeySystemNames();
 }
 
 // static
@@ -423,10 +444,6 @@ void MediaDrmBridge::UpdateSession(uint32 session_id,
       base::android::ToJavaByteArray(env, response, response_length);
   Java_MediaDrmBridge_updateSession(
       env, j_media_drm_.obj(), session_id, j_response.obj());
-
-  // TODO(xhwang/jrummell): Move this when usableKeyIds/keyschange are
-  // implemented.
-  player_tracker_.NotifyNewKey();
 }
 
 void MediaDrmBridge::ReleaseSession(uint32 session_id) {
@@ -501,6 +518,9 @@ void MediaDrmBridge::OnSessionReady(JNIEnv* env,
                                     jint j_session_id) {
   uint32 session_id = j_session_id;
   session_ready_cb_.Run(session_id);
+  // TODO(xhwang/jrummell): Move this when usableKeyIds/keyschange are
+  // implemented.
+  player_tracker_.NotifyNewKey();
 }
 
 void MediaDrmBridge::OnSessionClosed(JNIEnv* env,

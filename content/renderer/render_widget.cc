@@ -16,6 +16,7 @@
 #include "base/metrics/histogram.h"
 #include "base/stl_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/sys_info.h"
 #include "build/build_config.h"
 #include "cc/base/switches.h"
 #include "cc/debug/benchmark_instrumentation.h"
@@ -43,6 +44,7 @@
 #include "content/renderer/input/input_handler_manager.h"
 #include "content/renderer/pepper/pepper_plugin_instance_impl.h"
 #include "content/renderer/render_frame_impl.h"
+#include "content/renderer/render_frame_proxy.h"
 #include "content/renderer/render_process.h"
 #include "content/renderer/render_thread_impl.h"
 #include "content/renderer/renderer_webkitplatformsupport_impl.h"
@@ -72,7 +74,6 @@
 
 #if defined(OS_ANDROID)
 #include <android/keycodes.h>
-#include "base/android/sys_utils.h"
 #include "content/renderer/android/synchronous_compositor_factory.h"
 #endif
 
@@ -262,14 +263,12 @@ void RenderWidget::ScreenMetricsEmulator::Apply(
     applied_widget_rect_.set_height(original_size_.height());
 
   if (params_.fitToView && !original_size_.IsEmpty()) {
-    int width_with_gutter =
-        std::max(original_size_.width() - 2 * params_.viewInsets.width, 1);
-    int height_with_gutter =
-        std::max(original_size_.height() - 2 * params_.viewInsets.height, 1);
+    int original_width = std::max(original_size_.width(), 1);
+    int original_height = std::max(original_size_.height(), 1);
     float width_ratio =
-        static_cast<float>(applied_widget_rect_.width()) / width_with_gutter;
+        static_cast<float>(applied_widget_rect_.width()) / original_width;
     float height_ratio =
-        static_cast<float>(applied_widget_rect_.height()) / height_with_gutter;
+        static_cast<float>(applied_widget_rect_.height()) / original_height;
     float ratio = std::max(1.0f, std::max(width_ratio, height_ratio));
     scale_ = 1.f / ratio;
 
@@ -279,8 +278,8 @@ void RenderWidget::ScreenMetricsEmulator::Apply(
     offset_.set_y(
         (original_size_.height() - scale_ * applied_widget_rect_.height()) / 2);
   } else {
-    scale_ = 1.f;
-    offset_.SetPoint(0, 0);
+    scale_ = params_.scale;
+    offset_.SetPoint(params_.offset.x, params_.offset.y);
   }
 
   if (params_.screenPosition == WebDeviceEmulationParams::Desktop) {
@@ -405,6 +404,7 @@ RenderWidget::RenderWidget(blink::WebPopupType popup_type,
   is_threaded_compositing_enabled_ =
       CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableThreadedCompositing);
+  device_color_profile_.push_back('0');
 }
 
 RenderWidget::~RenderWidget() {
@@ -574,6 +574,8 @@ bool RenderWidget::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(InputMsg_HandleInputEvent, OnHandleInputEvent)
     IPC_MESSAGE_HANDLER(InputMsg_CursorVisibilityChange,
                         OnCursorVisibilityChange)
+    IPC_MESSAGE_HANDLER(InputMsg_ImeSetComposition, OnImeSetComposition)
+    IPC_MESSAGE_HANDLER(InputMsg_ImeConfirmComposition, OnImeConfirmComposition)
     IPC_MESSAGE_HANDLER(InputMsg_MouseCaptureLost, OnMouseCaptureLost)
     IPC_MESSAGE_HANDLER(InputMsg_SetFocus, OnSetFocus)
     IPC_MESSAGE_HANDLER(InputMsg_SyntheticGestureCompleted,
@@ -590,8 +592,6 @@ bool RenderWidget::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ViewMsg_CandidateWindowUpdated,
                         OnCandidateWindowUpdated)
     IPC_MESSAGE_HANDLER(ViewMsg_CandidateWindowHidden, OnCandidateWindowHidden)
-    IPC_MESSAGE_HANDLER(ViewMsg_ImeSetComposition, OnImeSetComposition)
-    IPC_MESSAGE_HANDLER(ViewMsg_ImeConfirmComposition, OnImeConfirmComposition)
     IPC_MESSAGE_HANDLER(ViewMsg_Repaint, OnRepaint)
     IPC_MESSAGE_HANDLER(ViewMsg_SetTextDirection, OnSetTextDirection)
     IPC_MESSAGE_HANDLER(ViewMsg_Move_ACK, OnRequestMoveAck)
@@ -859,10 +859,8 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
     DCHECK(is_threaded_compositing_enabled_ ||
            RenderThreadImpl::current()->layout_test_mode());
     cc::ResourceFormat format = cc::RGBA_8888;
-#if defined(OS_ANDROID)
-    if (base::android::SysUtils::IsLowEndDevice())
+    if (base::SysInfo::IsLowEndDevice())
       format = cc::RGB_565;
-#endif
     return scoped_ptr<cc::OutputSurface>(
         new MailboxOutputSurface(
             routing_id(),
@@ -1191,10 +1189,7 @@ void RenderWidget::willBeginCompositorFrame() {
   // The following two can result in further layout and possibly
   // enable GPU acceleration so they need to be called before any painting
   // is done.
-  UpdateTextInputType();
-#if defined(OS_ANDROID)
   UpdateTextInputState(NO_SHOW_IME, FROM_NON_IME);
-#endif
   UpdateSelectionBounds();
 }
 
@@ -1204,20 +1199,11 @@ void RenderWidget::didBecomeReadyForAdditionalInput() {
 }
 
 void RenderWidget::DidCommitCompositorFrame() {
-  FOR_EACH_OBSERVER(RenderFrameImpl, swapped_out_frames_,
+  FOR_EACH_OBSERVER(RenderFrameProxy, render_frame_proxies_,
                     DidCommitCompositorFrame());
 #if defined(VIDEO_HOLE)
-  // Not using FOR_EACH_OBSERVER because |swapped_out_frames_| and
-  // |video_hole_frames_| may have common frames.
-  if (!video_hole_frames_.might_have_observers())
-    return;
-  ObserverListBase<RenderFrameImpl>::Iterator iter(video_hole_frames_);
-  RenderFrameImpl* frame;
-  while ((frame = iter.GetNext()) != NULL) {
-    // Prevent duplicate notification of DidCommitCompositorFrame().
-    if (!swapped_out_frames_.HasObserver(frame))
-      frame->DidCommitCompositorFrame();
-  }
+  FOR_EACH_OBSERVER(RenderFrameImpl, video_hole_frames_,
+                    DidCommitCompositorFrame());
 #endif  // defined(VIDEO_HOLE)
 }
 
@@ -1437,7 +1423,7 @@ void RenderWidget::OnImeSetComposition(
     // If we failed to set the composition text, then we need to let the browser
     // process to cancel the input method's ongoing composition session, to make
     // sure we are in a consistent state.
-    Send(new ViewHostMsg_ImeCancelComposition(routing_id()));
+    Send(new InputHostMsg_ImeCancelComposition(routing_id()));
   }
 #if defined(OS_MACOSX) || defined(USE_AURA)
   UpdateCompositionInfo(true);
@@ -1504,11 +1490,17 @@ void RenderWidget::OnUpdateScreenRects(const gfx::Rect& view_screen_rect,
   Send(new ViewHostMsg_UpdateScreenRects_ACK(routing_id()));
 }
 
-#if defined(OS_ANDROID)
-void RenderWidget::OnShowImeIfNeeded() {
-  UpdateTextInputState(SHOW_IME_IF_NEEDED, FROM_NON_IME);
+void RenderWidget::showImeIfNeeded() {
+  OnShowImeIfNeeded();
 }
 
+void RenderWidget::OnShowImeIfNeeded() {
+#if defined(OS_ANDROID) || defined(USE_AURA)
+  UpdateTextInputState(SHOW_IME_IF_NEEDED, FROM_NON_IME);
+#endif
+}
+
+#if defined(OS_ANDROID)
 void RenderWidget::IncrementOutstandingImeEventAcks() {
   ++outstanding_ime_acks_;
 }
@@ -1644,43 +1636,6 @@ void RenderWidget::FinishHandlingImeEvent() {
 #endif
 }
 
-void RenderWidget::UpdateTextInputType() {
-  // On Windows, not only an IME but also an on-screen keyboard relies on the
-  // latest TextInputType to optimize its layout and functionality. Thus
-  // |input_method_is_active_| is no longer an appropriate condition to suppress
-  // TextInputTypeChanged IPC on Windows.
-  // TODO(yukawa, yoichio): Consider to stop checking |input_method_is_active_|
-  // on other platforms as well as Windows if the overhead is acceptable.
-#if !defined(OS_WIN)
-  if (!input_method_is_active_)
-    return;
-#endif
-
-  ui::TextInputType new_type = GetTextInputType();
-  if (IsDateTimeInput(new_type))
-    return;  // Not considered as a text input field in WebKit/Chromium.
-
-  bool new_can_compose_inline = CanComposeInline();
-
-  blink::WebTextInputInfo new_info;
-  if (webwidget_)
-    new_info = webwidget_->textInputInfo();
-  const ui::TextInputMode new_mode = ConvertInputMode(new_info.inputMode);
-
-  if (text_input_type_ != new_type
-      || can_compose_inline_ != new_can_compose_inline
-      || text_input_mode_ != new_mode) {
-    Send(new ViewHostMsg_TextInputTypeChanged(routing_id(),
-                                              new_type,
-                                              new_mode,
-                                              new_can_compose_inline));
-    text_input_type_ = new_type;
-    can_compose_inline_ = new_can_compose_inline;
-    text_input_mode_ = new_mode;
-  }
-}
-
-#if defined(OS_ANDROID) || defined(USE_AURA)
 void RenderWidget::UpdateTextInputState(ShowIme show_ime,
                                         ChangeSource change_source) {
   if (handling_ime_event_)
@@ -1694,6 +1649,7 @@ void RenderWidget::UpdateTextInputState(ShowIme show_ime,
   blink::WebTextInputInfo new_info;
   if (webwidget_)
     new_info = webwidget_->textInputInfo();
+  const ui::TextInputMode new_mode = ConvertInputMode(new_info.inputMode);
 
   bool new_can_compose_inline = CanComposeInline();
 
@@ -1701,6 +1657,7 @@ void RenderWidget::UpdateTextInputState(ShowIme show_ime,
   // shown.
   if (show_ime == SHOW_IME_IF_NEEDED ||
       (text_input_type_ != new_type ||
+       text_input_mode_ != new_mode ||
        text_input_info_ != new_info ||
        can_compose_inline_ != new_can_compose_inline)
 #if defined(OS_ANDROID)
@@ -1709,6 +1666,7 @@ void RenderWidget::UpdateTextInputState(ShowIme show_ime,
       ) {
     ViewHostMsg_TextInputState_Params p;
     p.type = new_type;
+    p.mode = new_mode;
     p.value = new_info.value.utf8();
     p.selection_start = new_info.selectionStart;
     p.selection_end = new_info.selectionEnd;
@@ -1726,20 +1684,14 @@ void RenderWidget::UpdateTextInputState(ShowIme show_ime,
       IncrementOutstandingImeEventAcks();
     text_field_is_dirty_ = false;
 #endif
-#if defined(USE_AURA)
-    Send(new ViewHostMsg_TextInputTypeChanged(routing_id(),
-                                              new_type,
-                                              text_input_mode_,
-                                              new_can_compose_inline));
-#endif
     Send(new ViewHostMsg_TextInputStateChanged(routing_id(), p));
 
     text_input_info_ = new_info;
     text_input_type_ = new_type;
+    text_input_mode_ = new_mode;
     can_compose_inline_ = new_can_compose_inline;
   }
 }
-#endif
 
 void RenderWidget::GetSelectionBounds(gfx::Rect* focus, gfx::Rect* anchor) {
   WebRect focus_webrect;
@@ -1835,7 +1787,7 @@ void RenderWidget::UpdateCompositionInfo(bool should_update_range) {
     return;
   composition_character_bounds_ = character_bounds;
   composition_range_ = range;
-  Send(new ViewHostMsg_ImeCompositionRangeChanged(
+  Send(new InputHostMsg_ImeCompositionRangeChanged(
       routing_id(), composition_range_, composition_character_bounds_));
 }
 
@@ -1910,7 +1862,7 @@ void RenderWidget::resetInputMethod() {
     // If a composition text exists, then we need to let the browser process
     // to cancel the input method's ongoing composition session.
     if (webwidget_->confirmComposition())
-      Send(new ViewHostMsg_ImeCancelComposition(routing_id()));
+      Send(new InputHostMsg_ImeCancelComposition(routing_id()));
   }
 
 #if defined(OS_MACOSX) || defined(USE_AURA)
@@ -2066,7 +2018,7 @@ RenderWidget::CreateGraphicsContext3D() {
   // uploads, after which we are just wasting memory. Since we don't
   // know our upload throughput yet, this just caps our memory usage.
   size_t divider = 1;
-  if (base::android::SysUtils::IsLowEndDevice())
+  if (base::SysInfo::IsLowEndDevice())
     divider = 6;
   // For reference Nexus10 can upload 1MB in about 2.5ms.
   const double max_mb_uploaded_per_ms = 2.0 / (5 * divider);
@@ -2093,12 +2045,12 @@ RenderWidget::CreateGraphicsContext3D() {
   return context.Pass();
 }
 
-void RenderWidget::RegisterSwappedOutChildFrame(RenderFrameImpl* frame) {
-  swapped_out_frames_.AddObserver(frame);
+void RenderWidget::RegisterRenderFrameProxy(RenderFrameProxy* proxy) {
+  render_frame_proxies_.AddObserver(proxy);
 }
 
-void RenderWidget::UnregisterSwappedOutChildFrame(RenderFrameImpl* frame) {
-  swapped_out_frames_.RemoveObserver(frame);
+void RenderWidget::UnregisterRenderFrameProxy(RenderFrameProxy* proxy) {
+  render_frame_proxies_.RemoveObserver(proxy);
 }
 
 void RenderWidget::RegisterRenderFrame(RenderFrameImpl* frame) {

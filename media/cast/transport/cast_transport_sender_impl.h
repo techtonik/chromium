@@ -46,9 +46,8 @@ class CastTransportSenderImpl : public CastTransportSender {
 
   virtual ~CastTransportSenderImpl();
 
-  virtual void InitializeAudio(const CastTransportAudioConfig& config) OVERRIDE;
-
-  virtual void InitializeVideo(const CastTransportVideoConfig& config) OVERRIDE;
+  virtual void InitializeAudio(const CastTransportRtpConfig& config) OVERRIDE;
+  virtual void InitializeVideo(const CastTransportRtpConfig& config) OVERRIDE;
 
   // CastTransportSender implementation.
   virtual void SetPacketReceiver(const PacketReceiverCallback& packet_receiver)
@@ -66,7 +65,9 @@ class CastTransportSenderImpl : public CastTransportSender {
                                      const std::string& c_name) OVERRIDE;
 
   virtual void ResendPackets(bool is_audio,
-                             const MissingFramesAndPacketsMap& missing_packets)
+                             const MissingFramesAndPacketsMap& missing_packets,
+                             bool cancel_rtx_if_not_in_list,
+                             base::TimeDelta dedupe_window)
       OVERRIDE;
 
  private:

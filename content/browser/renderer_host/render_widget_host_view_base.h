@@ -22,6 +22,7 @@
 #include "content/common/input/input_event_ack_state.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "ipc/ipc_listener.h"
+#include "third_party/WebKit/public/platform/WebScreenOrientationType.h"
 #include "third_party/WebKit/public/web/WebPopupType.h"
 #include "third_party/WebKit/public/web/WebTextDirection.h"
 #include "ui/base/ime/text_input_mode.h"
@@ -37,8 +38,8 @@ class SkBitmap;
 struct AccessibilityHostMsg_EventParams;
 struct GpuHostMsg_AcceleratedSurfaceBuffersSwapped_Params;
 struct GpuHostMsg_AcceleratedSurfacePostSubBuffer_Params;
-struct ViewHostMsg_TextInputState_Params;
 struct ViewHostMsg_SelectionBounds_Params;
+struct ViewHostMsg_TextInputState_Params;
 
 namespace media {
 class VideoFrame;
@@ -219,9 +220,8 @@ class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
   virtual void SetIsLoading(bool is_loading) = 0;
 
   // Updates the type of the input method attached to the view.
-  virtual void TextInputTypeChanged(ui::TextInputType type,
-                                    ui::TextInputMode mode,
-                                    bool can_compose_inline) = 0;
+  virtual void TextInputStateChanged(
+      const ViewHostMsg_TextInputState_Params& params) = 0;
 
   // Cancel the ongoing composition of the input method attached to the view.
   virtual void ImeCancelComposition() = 0;
@@ -309,12 +309,20 @@ class CONTENT_EXPORT RenderWidgetHostViewBase : public RenderWidgetHostView,
   // returned only if the accelerated surface size matches.
   virtual bool HasAcceleratedSurface(const gfx::Size& desired_size) = 0;
 
+  // Returns the orientation type based on the current display state.
+  static blink::WebScreenOrientationType GetOrientationTypeFromDisplay(
+      const gfx::Display& display);
+
   virtual void GetScreenInfo(blink::WebScreenInfo* results) = 0;
 
   // Gets the bounds of the window, in screen coordinates.
   virtual gfx::Rect GetBoundsInRootWindow() = 0;
 
   virtual gfx::GLSurfaceHandle GetCompositingSurface() = 0;
+
+  virtual void OnTextSurroundingSelectionResponse(const base::string16& content,
+                                                  size_t start_offset,
+                                                  size_t end_offset) {};
 
 #if defined(OS_ANDROID)
   virtual void ShowDisambiguationPopup(const gfx::Rect& target_rect,

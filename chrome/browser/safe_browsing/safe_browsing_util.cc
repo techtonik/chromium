@@ -7,8 +7,9 @@
 #include "base/logging.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
-#include "chrome/browser/google/google_util.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/safe_browsing/chunk.pb.h"
+#include "components/google/core/browser/google_util.h"
 #include "crypto/sha2.h"
 #include "net/base/escape.h"
 #include "url/gurl.h"
@@ -25,6 +26,16 @@ SBFullHash SBFullHashForString(const base::StringPiece& str) {
   crypto::SHA256HashString(str, &h.full_hash, sizeof(h.full_hash));
   return h;
 }
+
+// SBCachedFullHashResult ------------------------------------------------------
+
+SBCachedFullHashResult::SBCachedFullHashResult() {}
+
+SBCachedFullHashResult::SBCachedFullHashResult(
+    const base::Time& in_expire_after)
+    : expire_after(in_expire_after) {}
+
+SBCachedFullHashResult::~SBCachedFullHashResult() {}
 
 // SBChunkData -----------------------------------------------------------------
 
@@ -464,32 +475,6 @@ void GeneratePatternsToCheck(const GURL& url, std::vector<std::string>* urls) {
   }
 }
 
-int GetHashIndex(const SBFullHash& hash,
-                 const std::vector<SBFullHashResult>& full_hashes) {
-  for (size_t i = 0; i < full_hashes.size(); ++i) {
-    if (SBFullHashEqual(hash, full_hashes[i].hash))
-      return static_cast<int>(i);
-  }
-  return -1;
-}
-
-int GetUrlHashIndex(const GURL& url,
-                    const std::vector<SBFullHashResult>& full_hashes) {
-  if (full_hashes.empty())
-    return -1;
-
-  std::vector<std::string> patterns;
-  GeneratePatternsToCheck(url, &patterns);
-
-  for (size_t i = 0; i < patterns.size(); ++i) {
-    SBFullHash key = SBFullHashForString(patterns[i]);
-    int index = GetHashIndex(key, full_hashes);
-    if (index != -1)
-      return index;
-  }
-  return -1;
-}
-
 GURL GeneratePhishingReportUrl(const std::string& report_page,
                                const std::string& url_to_report,
                                bool is_client_side_detection) {
@@ -508,7 +493,8 @@ GURL GeneratePhishingReportUrl(const std::string& report_page,
   GURL report_url(report_page + base::StringPrintf(kReportParams,
                                                    client_name.c_str(),
                                                    current_esc.c_str()));
-  return google_util::AppendGoogleLocaleParam(report_url);
+  return google_util::AppendGoogleLocaleParam(
+      report_url, g_browser_process->GetApplicationLocale());
 }
 
 SBFullHash StringToSBFullHash(const std::string& hash_in) {

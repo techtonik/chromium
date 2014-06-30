@@ -46,12 +46,16 @@
 #    By default, the package given in AndroidManifest.xml will be used.
 #  use_chromium_linker - Enable the content dynamic linker that allows sharing the
 #    RELRO section of the native libraries between the different processes.
+#  load_library_from_zip_file - When using the dynamic linker, load the library
+#    directly out of the zip file.
 #  enable_chromium_linker_tests - Enable the content dynamic linker test support
 #    code. This allows a test APK to inject a Linker.TestRunner instance at
 #    runtime. Should only be used by the chromium_linker_test_apk target!!
 #  never_lint - Set to 1 to not run lint on this target.
 {
   'variables': {
+    'tested_apk_obfuscated_jar_path%': '/',
+    'tested_apk_dex_path%': '/',
     'additional_input_paths': [],
     'input_jars_paths': [],
     'library_dexed_jars_paths': [],
@@ -92,10 +96,10 @@
     'jar_stamp': '<(intermediate_dir)/jar.stamp',
     'obfuscate_stamp': '<(intermediate_dir)/obfuscate.stamp',
     'strip_stamp': '<(intermediate_dir)/strip.stamp',
-    'classes_dir': '<(intermediate_dir)/classes',
-    'classes_final_dir': '<(intermediate_dir)/classes_instr',
+    'classes_dir': '<(intermediate_dir)/classes/2',
     'javac_includes': [],
     'jar_excluded_classes': [],
+    'javac_jar_path': '<(intermediate_dir)/<(_target_name).javac.jar',
     'jar_path': '<(PRODUCT_DIR)/lib.java/<(jar_name)',
     'obfuscated_jar_path': '<(intermediate_dir)/obfuscated.jar',
     'test_jar_path': '<(PRODUCT_DIR)/test.lib.java/<(apk_name).jar',
@@ -122,6 +126,7 @@
         'native_lib_target%': '',
         'native_lib_version_name%': '',
         'use_chromium_linker%' : 0,
+        'load_library_from_zip_file%' : 0,
         'enable_chromium_linker_tests%': 0,
         'is_test_apk%': 0,
       },
@@ -147,6 +152,7 @@
     'native_lib_version_name%': '',
     'use_chromium_linker%' : 0,
     'enable_chromium_linker_tests%': 0,
+    'load_library_from_zip_file%' : 0,
     'emma_instrument%': '<(emma_instrument)',
     'apk_package_native_libs_dir': '<(apk_package_native_libs_dir)',
     'unsigned_standalone_apk_path': '<(unsigned_standalone_apk_path)',
@@ -156,8 +162,17 @@
   # direct_dependent_settings, but a variable set by a direct_dependent_settings
   # cannot be lifted in a dependent to all_dependent_settings.
   'all_dependent_settings': {
+    'conditions': [
+      ['proguard_enabled == "true"', {
+        'variables': {
+          'proguard_enabled': 'true',
+        }
+      }],
+    ],
     'variables': {
       'apk_output_jar_path': '<(jar_path)',
+      'tested_apk_obfuscated_jar_path': '<(obfuscated_jar_path)',
+      'tested_apk_dex_path': '<(dex_path)',
     },
   },
   'conditions': [
@@ -264,6 +279,17 @@
                   'linker_gcc_preprocess_defines': [],
                 },
               }],
+              ['load_library_from_zip_file == 1', {
+                'variables': {
+                  'linker_load_from_zip_file_preprocess_defines': [
+                    '--defines', 'ENABLE_CHROMIUM_LINKER_LIBRARY_IN_ZIP_FILE',
+                  ],
+                }
+              }, {
+                'variables': {
+                  'linker_load_from_zip_file_preprocess_defines': [],
+                },
+              }],
               ['enable_chromium_linker_tests == 1', {
                 'variables': {
                   'linker_tests_gcc_preprocess_defines': [
@@ -277,6 +303,7 @@
               }],
             ],
             'gcc_preprocess_defines': [
+              '<@(linker_load_from_zip_file_preprocess_defines)',
               '<@(linker_gcc_preprocess_defines)',
               '<@(linker_tests_gcc_preprocess_defines)',
             ],
@@ -395,6 +422,9 @@
           'includes': [ 'android/finalize_apk_action.gypi']
         },
       ],
+      'dependencies': [
+        '<(DEPTH)/build/android/rezip.gyp:rezip#host',
+      ],
     }],
     ['gyp_managed_install == 1', {
       'actions': [
@@ -426,6 +456,9 @@
             '--configuration-name=<(CONFIGURATION_NAME)',
           ],
         },
+      ],
+      'dependencies': [
+        '<(DEPTH)/build/android/rezip.gyp:rezip#host',
       ],
     }],
     ['is_test_apk == 1', {
@@ -528,14 +561,17 @@
       ],
       'outputs': [
         '<(compile_stamp)',
+        '<(javac_jar_path)',
       ],
       'action': [
         'python', '<(DEPTH)/build/android/gyp/javac.py',
-        '--output-dir=<(classes_dir)',
+        '--classes-dir=<(classes_dir)',
         '--classpath=>(input_jars_paths) <(android_sdk_jar)',
         '--src-gendirs=>(gen_src_dirs)',
         '--javac-includes=<(javac_includes)',
         '--chromium-code=<(chromium_code)',
+        '--jar-path=<(javac_jar_path)',
+        '--jar-excluded-classes=<(jar_excluded_classes)',
         '--stamp=<(compile_stamp)',
         '>@(java_sources)',
       ],
@@ -559,57 +595,46 @@
       'includes': [ 'android/lint_action.gypi' ],
     },
     {
-      'action_name': 'instr_classes_<(_target_name)',
-      'message': 'Instrumenting <(_target_name) classes',
+      'action_name': 'instr_jar_<(_target_name)',
+      'message': 'Instrumenting <(_target_name) jar',
       'variables': {
-        'input_path': '<(classes_dir)',
-        'output_path': '<(classes_final_dir)',
+        'input_path': '<(javac_jar_path)',
+        'output_path': '<(jar_path)',
         'stamp_path': '<(instr_stamp)',
-        'instr_type': 'classes',
+        'instr_type': 'jar',
       },
-      'inputs': [
-        '<(compile_stamp)',
-      ],
       'outputs': [
         '<(instr_stamp)',
-      ],
-      'includes': [ 'android/instr_action.gypi' ],
-    },
-    {
-      'action_name': 'jar_<(_target_name)',
-      'message': 'Creating <(_target_name) jar',
-      'inputs': [
-        '<(DEPTH)/build/android/gyp/util/build_utils.py',
-        '<(DEPTH)/build/android/gyp/util/md5_check.py',
-        '<(DEPTH)/build/android/gyp/jar.py',
-        '<(instr_stamp)',
-      ],
-      'outputs': [
-        '<(jar_stamp)',
         '<(jar_path)',
       ],
-      'action': [
-        'python', '<(DEPTH)/build/android/gyp/jar.py',
-        '--classes-dir=<(classes_final_dir)',
-        '--jar-path=<(jar_path)',
-        '--excluded-classes=<(jar_excluded_classes)',
-        '--stamp=<(jar_stamp)',
-      ]
+      'inputs': [
+        '<(javac_jar_path)',
+      ],
+      'includes': [ 'android/instr_action.gypi' ],
     },
     {
       'action_name': 'obfuscate_<(_target_name)',
       'message': 'Obfuscating <(_target_name)',
       'variables': {
         'additional_obfuscate_options': [],
+        'additional_obfuscate_input_paths': [],
         'proguard_out_dir': '<(intermediate_dir)/proguard',
         'proguard_input_jar_paths': [
           '>@(input_jars_paths)',
           '<(jar_path)',
         ],
-        'conditions': [
+        'target_conditions': [
           ['is_test_apk == 1', {
             'additional_obfuscate_options': [
               '--testapp',
+            ],
+          }],
+          ['is_test_apk == 1 and tested_apk_obfuscated_jar_path != "/"', {
+            'additional_obfuscate_options': [
+              '--tested-apk-obfuscated-jar-path', '>(tested_apk_obfuscated_jar_path)',
+            ],
+            'additional_obfuscate_input_paths': [
+              '>(tested_apk_obfuscated_jar_path).info',
             ],
           }],
           ['proguard_enabled == "true"', {
@@ -617,6 +642,10 @@
               '--proguard-enabled',
             ],
           }],
+        ],
+        'obfuscate_input_jars_paths': [
+          '>@(input_jars_paths)',
+          '<(jar_path)',
         ],
       },
       'conditions': [
@@ -630,15 +659,16 @@
         '<(DEPTH)/build/android/gyp/apk_obfuscate.py',
         '<(DEPTH)/build/android/gyp/util/build_utils.py',
         '>@(proguard_flags_paths)',
-        '>@(proguard_input_jar_paths)',
+        '>@(obfuscate_input_jars_paths)',
+        '>@(additional_obfuscate_input_paths)',
+        '<(instr_stamp)',
       ],
       'outputs': [
-        # This lists obfuscate_stamp instead of obfuscated_jar_path because
-        # ant only writes the latter if the md5 of the inputs changes.
         '<(obfuscate_stamp)',
 
         # In non-Release builds, these paths will all be empty files.
         '<(obfuscated_jar_path)',
+        '<(obfuscated_jar_path).info',
         '<(obfuscated_jar_path).dump',
         '<(obfuscated_jar_path).seeds',
         '<(obfuscated_jar_path).mapping',
@@ -654,34 +684,51 @@
         '--android-sdk-jar', '<(android_sdk_jar)',
 
         '--input-jars-paths=>(proguard_input_jar_paths)',
+        '--proguard-configs=>(proguard_flags_paths)',
+
+
         '--test-jar-path', '<(test_jar_path)',
         '--obfuscated-jar-path', '<(obfuscated_jar_path)',
 
         '--proguard-jar-path', '<(android_sdk_root)/tools/proguard/lib/proguard.jar',
 
-        '--proguard-config-files=<(proguard_flags_paths)',
         '--stamp', '<(obfuscate_stamp)',
 
-        '<@(additional_obfuscate_options)',
+        '>@(additional_obfuscate_options)',
       ],
     },
     {
       'action_name': 'dex_<(_target_name)',
       'variables': {
-        'conditions': [
-          ['emma_instrument != 0', {
-            'dex_no_locals': 1,
-            'dex_input_paths': [ '<(emma_device_jar)' ],
-          }],
+        'dex_input_paths': [
+          '>@(library_dexed_jars_paths)',
+          '<(jar_path)',
         ],
-        'dex_input_paths': [ '>@(library_dexed_jars_paths)' ],
-        'dex_generated_input_dirs': [ '<(classes_final_dir)' ],
         'output_path': '<(dex_path)',
         'proguard_enabled_input_path': '<(obfuscated_jar_path)',
       },
-      'conditions': [
-        ['proguard_enabled == "true"', { 'inputs': [ '<(obfuscate_stamp)' ] },
-                                       { 'inputs': [ '<(instr_stamp)' ] }],
+      'target_conditions': [
+        ['emma_instrument != 0', {
+          'dex_no_locals': 1,
+          'dex_input_paths': [
+            '<(emma_device_jar)'
+          ],
+        }],
+        ['is_test_apk == 1 and tested_apk_dex_path != "/"', {
+          'variables': {
+            'dex_additional_options': [
+              '--excluded-paths-file', '>(tested_apk_dex_path).inputs'
+            ],
+          },
+          'inputs': [
+            '>(tested_apk_dex_path).inputs',
+          ],
+        }],
+        ['proguard_enabled == "true"', {
+          'inputs': [ '<(obfuscate_stamp)' ]
+        }, {
+          'inputs': [ '<(instr_stamp)' ]
+        }],
       ],
       'includes': [ 'android/dex_action.gypi' ],
     },

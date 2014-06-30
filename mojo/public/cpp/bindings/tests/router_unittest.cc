@@ -109,7 +109,7 @@ class RouterTest : public testing::Test {
   }
 
   virtual void SetUp() MOJO_OVERRIDE {
-    CreateMessagePipe(&handle0_, &handle1_);
+    CreateMessagePipe(NULL, &handle0_, &handle1_);
   }
 
   virtual void TearDown() MOJO_OVERRIDE {
@@ -142,6 +142,31 @@ TEST_F(RouterTest, BasicRequestResponse) {
   router0.AcceptWithResponder(&request, new MessageAccumulator(&message_queue));
 
   PumpMessages();
+
+  EXPECT_FALSE(message_queue.IsEmpty());
+
+  Message response;
+  message_queue.Pop(&response);
+
+  EXPECT_EQ(std::string("world"),
+            std::string(reinterpret_cast<const char*>(response.payload())));
+}
+
+TEST_F(RouterTest, BasicRequestResponse_Synchronous) {
+  internal::Router router0(handle0_.Pass(), internal::FilterChain());
+  internal::Router router1(handle1_.Pass(), internal::FilterChain());
+
+  ResponseGenerator generator;
+  router1.set_incoming_receiver(&generator);
+
+  Message request;
+  AllocRequestMessage(1, "hello", &request);
+
+  internal::MessageQueue message_queue;
+  router0.AcceptWithResponder(&request, new MessageAccumulator(&message_queue));
+
+  router1.WaitForIncomingMessage();
+  router0.WaitForIncomingMessage();
 
   EXPECT_FALSE(message_queue.IsEmpty());
 

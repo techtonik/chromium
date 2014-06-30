@@ -6,18 +6,20 @@
 #include <string>
 
 #include "mojo/examples/sample_app/gles2_client_impl.h"
-#include "mojo/public/cpp/application/application.h"
+#include "mojo/public/cpp/application/application_connection.h"
+#include "mojo/public/cpp/application/application_delegate.h"
+#include "mojo/public/cpp/application/application_impl.h"
 #include "mojo/public/cpp/gles2/gles2.h"
 #include "mojo/public/cpp/system/core.h"
 #include "mojo/public/cpp/system/macros.h"
 #include "mojo/public/cpp/utility/run_loop.h"
 #include "mojo/public/interfaces/service_provider/service_provider.mojom.h"
-#include "mojo/services/native_viewport/native_viewport.mojom.h"
+#include "mojo/services/public/interfaces/native_viewport/native_viewport.mojom.h"
 
 namespace mojo {
 namespace examples {
 
-class SampleApp : public Application, public NativeViewportClient {
+class SampleApp : public ApplicationDelegate, public NativeViewportClient {
  public:
   SampleApp() {}
 
@@ -26,8 +28,8 @@ class SampleApp : public Application, public NativeViewportClient {
     MOJO_ALLOW_UNUSED GLES2ClientImpl* leaked = gles2_client_.release();
   }
 
-  virtual void Initialize() MOJO_OVERRIDE {
-    ConnectTo("mojo:mojo_native_viewport_service", &viewport_);
+  virtual void Initialize(ApplicationImpl* app) MOJO_OVERRIDE {
+    app->ConnectToService("mojo:mojo_native_viewport_service", &viewport_);
     viewport_.set_client(this);
 
     RectPtr rect(Rect::New());
@@ -77,7 +79,7 @@ class SampleApp : public Application, public NativeViewportClient {
 }  // namespace examples
 
 // static
-Application* Application::Create() {
+ApplicationDelegate* ApplicationDelegate::Create() {
   return new examples::SampleApp();
 }
 

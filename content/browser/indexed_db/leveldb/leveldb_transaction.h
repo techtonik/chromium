@@ -9,6 +9,7 @@
 #include <set>
 #include <string>
 
+#include "base/gtest_prod_util.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/strings/string_piece.h"
@@ -23,21 +24,27 @@ class LevelDBWriteBatch;
 class CONTENT_EXPORT LevelDBTransaction
     : public base::RefCounted<LevelDBTransaction> {
  public:
-  explicit LevelDBTransaction(LevelDBDatabase* db);
 
   void Put(const base::StringPiece& key, std::string* value);
   void Remove(const base::StringPiece& key);
-  leveldb::Status Get(const base::StringPiece& key,
-                      std::string* value,
-                      bool* found);
-  leveldb::Status Commit();
+  virtual leveldb::Status Get(const base::StringPiece& key,
+                              std::string* value,
+                              bool* found);
+  virtual leveldb::Status Commit();
   void Rollback();
 
   scoped_ptr<LevelDBIterator> CreateIterator();
 
- private:
+ protected:
   virtual ~LevelDBTransaction();
+  explicit LevelDBTransaction(LevelDBDatabase* db);
+  friend class IndexedDBClassFactory;
+
+ private:
   friend class base::RefCounted<LevelDBTransaction>;
+  FRIEND_TEST_ALL_PREFIXES(LevelDBDatabaseTest, Transaction);
+  FRIEND_TEST_ALL_PREFIXES(LevelDBDatabaseTest, TransactionCommitTest);
+  FRIEND_TEST_ALL_PREFIXES(LevelDBDatabaseTest, TransactionIterator);
 
   struct Record {
     Record();

@@ -60,7 +60,12 @@ NACL_BROWSER_TEST_F(NaClBrowserTest, ExitStatusNeg2, {
       "pm_exit_status_test.html?trigger=exitneg2&expected_exit=254"));
 })
 
-NACL_BROWSER_TEST_F(NaClBrowserTest, PPAPICore, {
+#if defined(ADDRESS_SANITIZER)
+#define Maybe_PPAPICore DISABLED_PPAPICore
+#else
+#define Maybe_PPAPICore PPAPICore
+#endif
+NACL_BROWSER_TEST_F(NaClBrowserTest, Maybe_PPAPICore, {
   RunNaClIntegrationTest(FILE_PATH_LITERAL("ppapi_ppb_core.html"));
 })
 
@@ -82,9 +87,7 @@ NACL_BROWSER_TEST_F(NaClBrowserTest, ProgressEvents, {
 // allowed.  Also not run on GLibc because it's a large test that is at risk of
 // causing timeouts.
 // crbug/338444
-// crbug.com/375103: fails on Mac after open sourcing PDF plugin.
-// crbug.com/375103: fails on Linux too after open sourcing PDF plugin.
-#if defined(OS_WIN) || defined(OS_MACOSX) || defined(OS_LINUX)
+#if defined(OS_WIN)
 #define MAYBE_Bad DISABLED_Bad
 #else
 #define MAYBE_Bad Bad

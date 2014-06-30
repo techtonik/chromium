@@ -22,6 +22,7 @@
 #include "chrome/common/chrome_switches.h"
 #include "components/signin/core/browser/profile_oauth2_token_service.h"
 #include "components/signin/core/browser/signin_manager.h"
+#include "components/signin/core/common/profile_management_switches.h"
 
 const std::string kEmail = "user@gmail.com";
 const std::string kSecondaryEmail = "user2@gmail.com";
@@ -74,11 +75,6 @@ class ProfileChooserControllerTest : public CocoaProfileTest {
     [controller_ showWindow:nil];
   }
 
-  void EnableNewProfileManagement() {
-    CommandLine::ForCurrentProcess()->AppendSwitch(
-        switches::kNewProfileManagement);
-  }
-
   void EnableNewAvatarMenuOnly() {
     CommandLine::ForCurrentProcess()->AppendSwitch(switches::kNewAvatarMenu);
   }
@@ -101,7 +97,8 @@ class ProfileChooserControllerTest : public CocoaProfileTest {
 };
 
 TEST_F(ProfileChooserControllerTest, InitialLayoutWithNewManagement) {
-  EnableNewProfileManagement();
+  switches::EnableNewProfileManagementForTesting(
+      CommandLine::ForCurrentProcess());
   StartProfileChooserController();
 
   NSArray* subviews = [[[controller() window] contentView] subviews];
@@ -201,7 +198,8 @@ TEST_F(ProfileChooserControllerTest, InitialLayoutWithNewMenu) {
 }
 
 TEST_F(ProfileChooserControllerTest, InitialLayoutWithFastUserSwitcher) {
-  EnableNewProfileManagement();
+  switches::EnableNewProfileManagementForTesting(
+      CommandLine::ForCurrentProcess());
   EnableFastUserSwitching();
   StartProfileChooserController();
 
@@ -284,8 +282,9 @@ TEST_F(ProfileChooserControllerTest, OtherProfilesSortedAlphabetically) {
 }
 
 TEST_F(ProfileChooserControllerTest,
-    LocalProfileActiveCardLinksWithNewManagement) {
-  EnableNewProfileManagement();
+       LocalProfileActiveCardLinksWithNewManagement) {
+  switches::EnableNewProfileManagementForTesting(
+      CommandLine::ForCurrentProcess());
   StartProfileChooserController();
   NSArray* subviews = [[[controller() window] contentView] subviews];
   EXPECT_EQ(1U, [subviews count]);
@@ -320,8 +319,9 @@ TEST_F(ProfileChooserControllerTest,
 }
 
 TEST_F(ProfileChooserControllerTest,
-    SignedInProfileActiveCardLinksWithNewManagement) {
-  EnableNewProfileManagement();
+       SignedInProfileActiveCardLinksWithNewManagement) {
+  switches::EnableNewProfileManagementForTesting(
+      CommandLine::ForCurrentProcess());
   // Sign in the first profile.
   ProfileInfoCache* cache = testing_profile_manager()->profile_info_cache();
   cache->SetUserNameOfProfileAtIndex(0, base::ASCIIToUTF16(kEmail));
@@ -365,7 +365,8 @@ TEST_F(ProfileChooserControllerTest,
 }
 
 TEST_F(ProfileChooserControllerTest, AccountManagementLayout) {
-  EnableNewProfileManagement();
+  switches::EnableNewProfileManagementForTesting(
+      CommandLine::ForCurrentProcess());
   // Sign in the first profile.
   ProfileInfoCache* cache = testing_profile_manager()->profile_info_cache();
   cache->SetUserNameOfProfileAtIndex(0, base::ASCIIToUTF16(kEmail));
@@ -391,16 +392,21 @@ TEST_F(ProfileChooserControllerTest, AccountManagementLayout) {
   // and one option buttons view.
   EXPECT_EQ(5U, [subviews count]);
 
-  // There should be two buttons in the option buttons view.
+  // There should be two buttons and a separator in the option buttons view.
   NSArray* buttonSubviews = [[subviews objectAtIndex:0] subviews];
-  const SEL buttonSelectors[] = { @selector(showUserManager:),
-                                  @selector(lockProfile:) };
-  EXPECT_EQ(2U, [buttonSubviews count]);
-  for (NSUInteger i = 0; i < [buttonSubviews count]; ++i) {
-    NSButton* button = static_cast<NSButton*>([buttonSubviews objectAtIndex:i]);
-    EXPECT_EQ(buttonSelectors[i], [button action]);
-    EXPECT_EQ(controller(), [button target]);
-  }
+  EXPECT_EQ(3U, [buttonSubviews count]);
+
+  NSButton* notYouButton =
+      static_cast<NSButton*>([buttonSubviews objectAtIndex:0]);
+  EXPECT_EQ(@selector(showUserManager:), [notYouButton action]);
+  EXPECT_EQ(controller(), [notYouButton target]);
+
+  EXPECT_TRUE([[buttonSubviews objectAtIndex:1] isKindOfClass:[NSBox class]]);
+
+  NSButton* lockButton =
+      static_cast<NSButton*>([buttonSubviews objectAtIndex:2]);
+  EXPECT_EQ(@selector(lockProfile:), [lockButton action]);
+  EXPECT_EQ(controller(), [lockButton target]);
 
   // There should be a separator.
   EXPECT_TRUE([[subviews objectAtIndex:1] isKindOfClass:[NSBox class]]);

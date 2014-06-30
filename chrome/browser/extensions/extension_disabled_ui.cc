@@ -21,7 +21,6 @@
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_uninstall_dialog.h"
 #include "chrome/browser/extensions/extension_util.h"
-#include "chrome/browser/extensions/image_loader.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/global_error/global_error.h"
@@ -33,6 +32,7 @@
 #include "content/public/browser/notification_registrar.h"
 #include "content/public/browser/notification_source.h"
 #include "extensions/browser/extension_util.h"
+#include "extensions/browser/image_loader.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_icon_set.h"
@@ -165,6 +165,7 @@ class ExtensionDisabledGlobalError
   virtual void OnBubbleViewDidClose(Browser* browser) OVERRIDE;
   virtual void BubbleViewAcceptButtonPressed(Browser* browser) OVERRIDE;
   virtual void BubbleViewCancelButtonPressed(Browser* browser) OVERRIDE;
+  virtual bool ShouldCloseOnDeactivate() const OVERRIDE;
 
   // ExtensionUninstallDialog::Delegate implementation.
   virtual void ExtensionUninstallAccepted() OVERRIDE;
@@ -354,6 +355,13 @@ void ExtensionDisabledGlobalError::BubbleViewCancelButtonPressed(
                  uninstall_dialog_->AsWeakPtr(),
                  extension_));
 #endif  // !defined(OS_ANDROID)
+}
+
+bool ExtensionDisabledGlobalError::ShouldCloseOnDeactivate() const {
+  // Since this indicates that an extension was disabled, we should definitely
+  // have the user acknowledge it, rather than having the bubble disappear when
+  // a new window pops up.
+  return false;
 }
 
 void ExtensionDisabledGlobalError::ExtensionUninstallAccepted() {

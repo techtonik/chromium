@@ -31,10 +31,13 @@
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_function_dispatcher.h"
 #include "extensions/common/extension.h"
+#include "extensions/common/permissions/permission_set.h"
+#include "extensions/common/permissions/permissions_data.h"
 #include "google_apis/gaia/gaia_urls.h"
 #include "url/gurl.h"
 
 #if defined(OS_CHROMEOS)
+#include "chrome/browser/chromeos/login/session/session_manager.h"
 #include "chrome/browser/chromeos/login/users/user_manager.h"
 #include "chrome/browser/chromeos/policy/browser_policy_connector_chromeos.h"
 #include "chrome/browser/chromeos/settings/device_oauth2_token_service.h"
@@ -219,12 +222,6 @@ void IdentityAPI::OnAccountRemoved(const AccountIds& ids) {}
 
 void IdentityAPI::OnAccountSignInChanged(const AccountIds& ids,
                                          bool is_signed_in) {
-  const std::string primary_account_id = GetPrimaryAccountId(browser_context_);
-  if (primary_account_id != ids.account_key &&
-      !switches::IsExtensionsMultiAccount()) {
-    return;
-  }
-
   api::identity::AccountInfo account_info;
   account_info.id = ids.gaia;
 
@@ -315,31 +312,38 @@ bool IdentityGetAuthTokenFunction::RunAsync() {
     return false;
   }
 
-  if (oauth2_info.scopes.size() == 0) {
-    error_ = identity_constants::kInvalidScopes;
-    return false;
-  }
-
   std::set<std::string> scopes(oauth2_info.scopes.begin(),
                                oauth2_info.scopes.end());
 
   std::string account_key = GetPrimaryAccountId(GetProfile());
 
-  if (params->details.get() && params->details->account.get()) {
-    std::string detail_key =
-        extensions::IdentityAPI::GetFactoryInstance()
-            ->Get(GetProfile())
-            ->FindAccountKeyByGaiaId(params->details->account->id);
+  if (params->details.get()) {
+    if (params->details->account.get()) {
+      std::string detail_key =
+          extensions::IdentityAPI::GetFactoryInstance()
+              ->Get(GetProfile())
+              ->FindAccountKeyByGaiaId(params->details->account->id);
 
-    if (detail_key != account_key) {
-      if (detail_key.empty() || !switches::IsExtensionsMultiAccount()) {
-        // TODO(courage): should this be a different error?
-        error_ = identity_constants::kUserNotSignedIn;
-        return false;
+      if (detail_key != account_key) {
+        if (detail_key.empty() || !switches::IsExtensionsMultiAccount()) {
+          // TODO(courage): should this be a different error?
+          error_ = identity_constants::kUserNotSignedIn;
+          return false;
+        }
+
+        account_key = detail_key;
       }
-
-      account_key = detail_key;
     }
+
+    if (params->details->scopes.get()) {
+      scopes = std::set<std::string>(params->details->scopes->begin(),
+                                     params->details->scopes->end());
+    }
+  }
+
+  if (scopes.size() == 0) {
+    error_ = identity_constants::kInvalidScopes;
+    return false;
   }
 
   token_key_.reset(
@@ -442,10 +446,6 @@ void IdentityGetAuthTokenFunction::StartMintTokenFlow(
 
 void IdentityGetAuthTokenFunction::CompleteMintTokenFlow() {
   IdentityMintRequestQueue::MintType type = mint_token_flow_type_;
-
-  const OAuth2Info& oauth2_info = OAuth2Info::GetOAuth2Info(GetExtension());
-  std::set<std::string> scopes(oauth2_info.scopes.begin(),
-                               oauth2_info.scopes.end());
 
   extensions::IdentityAPI::GetFactoryInstance()
       ->Get(GetProfile())
@@ -674,8 +674,9 @@ void IdentityGetAuthTokenFunction::StartLoginAccessTokenRequest() {
   if (chrome::IsRunningInForcedAppMode()) {
     std::string app_client_id;
     std::string app_client_secret;
-    if (chromeos::UserManager::Get()->GetAppModeChromeClientOAuthInfo(
-           &app_client_id, &app_client_secret)) {
+    if (chromeos::SessionManager::GetInstance()->
+            GetAppModeChromeClientOAuthInfo(&app_client_id,
+                                            &app_client_secret)) {
       login_token_request_ =
           service->StartRequestForClient(token_key_->account_id,
                                          app_client_id,
@@ -704,31 +705,26 @@ void IdentityGetAuthTokenFunction::ShowLoginPopup() {
 
 void IdentityGetAuthTokenFunction::ShowOAuthApprovalDialog(
     const IssueAdviceInfo& issue_advice) {
-  const OAuth2Info& oauth2_info = OAuth2Info::GetOAuth2Info(GetExtension());
   const std::string locale = g_browser_process->local_state()->GetString(
       prefs::kApplicationLocale);
 
-  gaia_web_auth_flow_.reset(new GaiaWebAuthFlow(this,
-                                                GetProfile(),
-                                                token_key_->account_id,
-                                                GetExtension()->id(),
-                                                oauth2_info,
-                                                locale));
+  gaia_web_auth_flow_.reset(new GaiaWebAuthFlow(
+      this, GetProfile(), token_key_.get(), oauth2_client_id_, locale));
   gaia_web_auth_flow_->Start();
 }
 
 OAuth2MintTokenFlow* IdentityGetAuthTokenFunction::CreateMintTokenFlow(
     const std::string& login_access_token) {
-  const OAuth2Info& oauth2_info = OAuth2Info::GetOAuth2Info(GetExtension());
-
   OAuth2MintTokenFlow* mint_token_flow = new OAuth2MintTokenFlow(
       GetProfile()->GetRequestContext(),
       this,
-      OAuth2MintTokenFlow::Parameters(login_access_token,
-                                      GetExtension()->id(),
-                                      oauth2_client_id_,
-                                      oauth2_info.scopes,
-                                      gaia_mint_token_mode_));
+      OAuth2MintTokenFlow::Parameters(
+          login_access_token,
+          GetExtension()->id(),
+          oauth2_client_id_,
+          std::vector<std::string>(token_key_->scopes.begin(),
+                                   token_key_->scopes.end()),
+          gaia_mint_token_mode_));
   return mint_token_flow;
 }
 
@@ -762,6 +758,29 @@ std::string IdentityGetAuthTokenFunction::GetOAuth2ClientId() const {
     client_id = GaiaUrls::GetInstance()->oauth2_chrome_client_id();
   }
   return client_id;
+}
+
+IdentityGetProfileUserInfoFunction::IdentityGetProfileUserInfoFunction() {
+}
+
+IdentityGetProfileUserInfoFunction::~IdentityGetProfileUserInfoFunction() {
+}
+
+ExtensionFunction::ResponseAction IdentityGetProfileUserInfoFunction::Run() {
+  if (GetProfile()->IsOffTheRecord()) {
+    return RespondNow(Error(identity_constants::kOffTheRecord));
+  }
+
+  api::identity::ProfileUserInfo profile_user_info;
+  if (GetExtension()->permissions_data()->HasAPIPermission(
+          APIPermission::kIdentityEmail)) {
+    profile_user_info.email =
+        GetProfile()->GetPrefs()->GetString(prefs::kGoogleServicesUsername);
+  }
+  profile_user_info.id =
+      GetProfile()->GetPrefs()->GetString(prefs::kGoogleServicesUserAccountId);
+
+  return RespondNow(OneArgument(profile_user_info.ToValue().release()));
 }
 
 IdentityRemoveCachedAuthTokenFunction::IdentityRemoveCachedAuthTokenFunction() {

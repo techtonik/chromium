@@ -24,6 +24,7 @@
 #include "cc/layers/video_layer.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/renderer/render_frame.h"
+#include "content/renderer/compositor_bindings/web_layer_impl.h"
 #include "content/renderer/media/buffered_data_source.h"
 #include "content/renderer/media/crypto/key_systems.h"
 #include "content/renderer/media/render_media_log.h"
@@ -71,7 +72,6 @@
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
 #include "third_party/WebKit/public/web/WebView.h"
 #include "v8/include/v8.h"
-#include "webkit/renderer/compositor_bindings/web_layer_impl.h"
 
 #if defined(ENABLE_PEPPER_CDMS)
 #include "content/renderer/media/crypto/pepper_cdm_wrapper_impl.h"
@@ -137,6 +137,10 @@ COMPILE_ASSERT_MATCHING_ENUM(UseCredentials);
   (DCHECK(main_loop_->BelongsToCurrentThread()), \
   media::BindToCurrentLoop(base::Bind(function, AsWeakPtr())))
 
+#define BIND_TO_RENDER_LOOP1(function, arg1) \
+  (DCHECK(main_loop_->BelongsToCurrentThread()), \
+  media::BindToCurrentLoop(base::Bind(function, AsWeakPtr(), arg1)))
+
 static void LogMediaSourceError(const scoped_refptr<media::MediaLog>& media_log,
                                 const std::string& error) {
   media_log->AddEvent(media_log->CreateMediaSourceErrorEvent(error));
@@ -161,6 +165,7 @@ WebMediaPlayerImpl::WebMediaPlayerImpl(
       playback_rate_(0.0f),
       pending_seek_(false),
       pending_seek_seconds_(0.0f),
+      should_notify_time_changed_(false),
       client_(client),
       delegate_(delegate),
       defer_load_cb_(params.defer_load_cb()),
@@ -168,7 +173,6 @@ WebMediaPlayerImpl::WebMediaPlayerImpl(
       incremented_externally_allocated_memory_(false),
       gpu_factories_(RenderThreadImpl::current()->GetGpuFactories()),
       supports_save_(true),
-      starting_(false),
       chunk_demuxer_(NULL),
       // Threaded compositing isn't enabled universally yet.
       compositor_task_runner_(
@@ -341,7 +345,7 @@ void WebMediaPlayerImpl::seek(double seconds) {
 
   base::TimeDelta seek_time = ConvertSecondsToTimestamp(seconds);
 
-  if (starting_ || seeking_) {
+  if (seeking_) {
     pending_seek_ = true;
     pending_seek_seconds_ = seconds;
     if (chunk_demuxer_)
@@ -363,7 +367,7 @@ void WebMediaPlayerImpl::seek(double seconds) {
   // Kick off the asynchronous seek!
   pipeline_.Seek(
       seek_time,
-      BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineSeek));
+      BIND_TO_RENDER_LOOP1(&WebMediaPlayerImpl::OnPipelineSeeked, true));
 }
 
 void WebMediaPlayerImpl::setRate(double rate) {
@@ -899,10 +903,10 @@ void WebMediaPlayerImpl::InvalidateOnMainThread() {
   client_->repaint();
 }
 
-void WebMediaPlayerImpl::OnPipelineSeek(PipelineStatus status) {
-  DVLOG(1) << __FUNCTION__ << "(" << status << ")";
+void WebMediaPlayerImpl::OnPipelineSeeked(bool time_changed,
+                                          PipelineStatus status) {
+  DVLOG(1) << __FUNCTION__ << "(" << time_changed << ", " << status << ")";
   DCHECK(main_loop_->BelongsToCurrentThread());
-  starting_ = false;
   seeking_ = false;
   if (pending_seek_) {
     pending_seek_ = false;
@@ -919,7 +923,7 @@ void WebMediaPlayerImpl::OnPipelineSeek(PipelineStatus status) {
   if (paused_)
     paused_time_ = pipeline_.GetMediaTime();
 
-  client_->timeChanged();
+  should_notify_time_changed_ = time_changed;
 }
 
 void WebMediaPlayerImpl::OnPipelineEnded() {
@@ -964,7 +968,7 @@ void WebMediaPlayerImpl::OnPipelineMetadata(
   if (hasVideo()) {
     DCHECK(!video_weblayer_);
     video_weblayer_.reset(
-        new webkit::WebLayerImpl(cc::VideoLayer::Create(compositor_)));
+        new WebLayerImpl(cc::VideoLayer::Create(compositor_)));
     video_weblayer_->setOpaque(opaque_);
     client_->setWebLayer(video_weblayer_.get());
   }
@@ -974,19 +978,26 @@ void WebMediaPlayerImpl::OnPipelineMetadata(
   InvalidateOnMainThread();
 }
 
-void WebMediaPlayerImpl::OnPipelinePrerollCompleted() {
-  DVLOG(1) << __FUNCTION__;
+void WebMediaPlayerImpl::OnPipelineBufferingStateChanged(
+    media::BufferingState buffering_state) {
+  DVLOG(1) << __FUNCTION__ << "(" << buffering_state << ")";
 
-  // Only transition to ReadyStateHaveEnoughData if we don't have
-  // any pending seeks because the transition can cause Blink to
-  // report that the most recent seek has completed.
-  if (!pending_seek_) {
-    SetReadyState(WebMediaPlayer::ReadyStateHaveEnoughData);
+  // Ignore buffering state changes until we've completed all outstanding seeks.
+  if (seeking_ || pending_seek_)
+    return;
 
-    // TODO(scherkus): This should be handled by HTMLMediaElement and controls
-    // should know when to invalidate themselves http://crbug.com/337015
-    InvalidateOnMainThread();
-  }
+  // TODO(scherkus): Handle other buffering states when Pipeline starts using
+  // them and translate them ready state changes http://crbug.com/144683
+  DCHECK_EQ(buffering_state, media::BUFFERING_HAVE_ENOUGH);
+  SetReadyState(WebMediaPlayer::ReadyStateHaveEnoughData);
+
+  // Blink expects a timeChanged() in response to a seek().
+  if (should_notify_time_changed_)
+    client_->timeChanged();
+
+  // TODO(scherkus): This should be handled by HTMLMediaElement and controls
+  // should know when to invalidate themselves http://crbug.com/337015
+  InvalidateOnMainThread();
 }
 
 void WebMediaPlayerImpl::OnDemuxerOpened() {
@@ -1199,14 +1210,14 @@ void WebMediaPlayerImpl::StartPipeline() {
   }
 
   // ... and we're ready to go!
-  starting_ = true;
+  seeking_ = true;
   pipeline_.Start(
       filter_collection.Pass(),
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineEnded),
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineError),
-      BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineSeek),
+      BIND_TO_RENDER_LOOP1(&WebMediaPlayerImpl::OnPipelineSeeked, false),
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineMetadata),
-      BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelinePrerollCompleted),
+      BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnPipelineBufferingStateChanged),
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnDurationChanged));
 }
 

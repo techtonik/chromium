@@ -36,37 +36,11 @@ namespace {
 
 void EmptyStatusCallback(SyncStatusCode status) {}
 
-void QueryAppStatusOnUIThread(
-    const base::WeakPtr<ExtensionServiceInterface>& extension_service_ptr,
-    const std::vector<std::string>* app_ids,
-    SyncWorker::AppStatusMap* status,
-    const base::Closure& callback) {
-  ExtensionServiceInterface* extension_service = extension_service_ptr.get();
-  if (!extension_service) {
-    callback.Run();
-    return;
-  }
-
-  for (std::vector<std::string>::const_iterator itr = app_ids->begin();
-       itr != app_ids->end(); ++itr) {
-    const std::string& app_id = *itr;
-    if (!extension_service->GetInstalledExtension(app_id))
-      (*status)[app_id] = SyncWorker::APP_STATUS_UNINSTALLED;
-    else if (!extension_service->IsExtensionEnabled(app_id))
-      (*status)[app_id] = SyncWorker::APP_STATUS_DISABLED;
-    else
-      (*status)[app_id] = SyncWorker::APP_STATUS_ENABLED;
-  }
-
-  callback.Run();
-}
-
 }  // namespace
 
 SyncWorker::SyncWorker(
     const base::FilePath& base_dir,
     const base::WeakPtr<ExtensionServiceInterface>& extension_service,
-    scoped_ptr<SyncEngineContext> sync_engine_context,
     leveldb::Env* env_override)
     : base_dir_(base_dir),
       env_override_(env_override),
@@ -79,21 +53,25 @@ SyncWorker::SyncWorker(
           CONFLICT_RESOLUTION_POLICY_LAST_WRITE_WIN),
       network_available_(false),
       extension_service_(extension_service),
-      context_(sync_engine_context.Pass()),
       has_refresh_token_(false),
       weak_ptr_factory_(this) {
   sequence_checker_.DetachFromSequence();
   DCHECK(base_dir_.IsAbsolute());
 }
 
-SyncWorker::~SyncWorker() {}
+SyncWorker::~SyncWorker() {
+  observers_.Clear();
+}
 
-void SyncWorker::Initialize() {
+void SyncWorker::Initialize(scoped_ptr<SyncEngineContext> context) {
   DCHECK(sequence_checker_.CalledOnValidSequencedThread());
   DCHECK(!task_manager_);
 
+  context_ = context.Pass();
+
   task_manager_.reset(new SyncTaskManager(
-      weak_ptr_factory_.GetWeakPtr(), 0 /* maximum_background_task */));
+      weak_ptr_factory_.GetWeakPtr(), 0 /* maximum_background_task */,
+      context_->GetWorkerTaskRunner()));
   task_manager_->Initialize(SYNC_STATUS_OK);
 
   PostInitializeTask();
@@ -115,8 +93,7 @@ void SyncWorker::RegisterOrigin(
   scoped_ptr<RegisterAppTask> task(
       new RegisterAppTask(context_.get(), origin.host()));
   if (task->CanFinishImmediately()) {
-    context_->GetUITaskRunner()->PostTask(
-        FROM_HERE, base::Bind(callback, SYNC_STATUS_OK));
+    callback.Run(SYNC_STATUS_OK);
     return;
   }
 
@@ -337,7 +314,7 @@ void SyncWorker::OnNotificationReceived() {
   MaybeScheduleNextTask();
 }
 
-void SyncWorker::OnReadyToSendRequests(const std::string& account_id) {
+void SyncWorker::OnReadyToSendRequests() {
   DCHECK(sequence_checker_.CalledOnValidSequencedThread());
 
   has_refresh_token_ = true;
@@ -346,8 +323,7 @@ void SyncWorker::OnReadyToSendRequests(const std::string& account_id) {
     return;
   UpdateServiceState(REMOTE_SERVICE_OK, "Authenticated");
 
-  if (!GetMetadataDatabase() && !account_id.empty()) {
-    GetDriveService()->Initialize(account_id);
+  if (!GetMetadataDatabase()) {
     PostInitializeTask();
     return;
   }
@@ -383,27 +359,8 @@ void SyncWorker::OnNetworkChanged(
   network_available_ = new_network_availability;
 }
 
-drive::DriveServiceInterface* SyncWorker::GetDriveService() {
-  DCHECK(sequence_checker_.CalledOnValidSequencedThread());
-  return context_->GetDriveService();
-}
-
-drive::DriveUploaderInterface* SyncWorker::GetDriveUploader() {
-  DCHECK(sequence_checker_.CalledOnValidSequencedThread());
-  return context_->GetDriveUploader();
-}
-
-MetadataDatabase* SyncWorker::GetMetadataDatabase() {
-  DCHECK(sequence_checker_.CalledOnValidSequencedThread());
-  return context_->GetMetadataDatabase();
-}
-
-SyncTaskManager* SyncWorker::GetSyncTaskManager() {
-  DCHECK(sequence_checker_.CalledOnValidSequencedThread());
-  return task_manager_.get();
-}
-
 void SyncWorker::DetachFromSequence() {
+  task_manager_->DetachFromSequence();
   context_->DetachFromSequence();
   sequence_checker_.DetachFromSequence();
 }
@@ -423,8 +380,7 @@ void SyncWorker::DoDisableApp(const std::string& app_id,
   if (GetMetadataDatabase()) {
     GetMetadataDatabase()->DisableApp(app_id, callback);
   } else {
-    context_->GetUITaskRunner()->PostTask(
-        FROM_HERE, base::Bind(callback, SYNC_STATUS_OK));
+    callback.Run(SYNC_STATUS_OK);
   }
 }
 
@@ -435,8 +391,7 @@ void SyncWorker::DoEnableApp(const std::string& app_id,
   if (GetMetadataDatabase()) {
     GetMetadataDatabase()->EnableApp(app_id, callback);
   } else {
-    context_->GetUITaskRunner()->PostTask(
-        FROM_HERE, base::Bind(callback, SYNC_STATUS_OK));
+    callback.Run(SYNC_STATUS_OK);
   }
 }
 
@@ -498,13 +453,38 @@ void SyncWorker::UpdateRegisteredApps() {
 
   context_->GetUITaskRunner()->PostTask(
       FROM_HERE,
-      base::Bind(&QueryAppStatusOnUIThread,
+      base::Bind(&SyncWorker::QueryAppStatusOnUIThread,
                  extension_service_,
                  base::Owned(app_ids.release()),
                  app_status,
                  RelayCallbackToTaskRunner(
                      context_->GetWorkerTaskRunner(),
                      FROM_HERE, callback)));
+}
+
+void SyncWorker::QueryAppStatusOnUIThread(
+    const base::WeakPtr<ExtensionServiceInterface>& extension_service_ptr,
+    const std::vector<std::string>* app_ids,
+    AppStatusMap* status,
+    const base::Closure& callback) {
+  ExtensionServiceInterface* extension_service = extension_service_ptr.get();
+  if (!extension_service) {
+    callback.Run();
+    return;
+  }
+
+  for (std::vector<std::string>::const_iterator itr = app_ids->begin();
+       itr != app_ids->end(); ++itr) {
+    const std::string& app_id = *itr;
+    if (!extension_service->GetInstalledExtension(app_id))
+      (*status)[app_id] = APP_STATUS_UNINSTALLED;
+    else if (!extension_service->IsExtensionEnabled(app_id))
+      (*status)[app_id] = APP_STATUS_DISABLED;
+    else
+      (*status)[app_id] = APP_STATUS_ENABLED;
+  }
+
+  callback.Run();
 }
 
 void SyncWorker::DidQueryAppStatus(const AppStatusMap* app_status) {
@@ -746,6 +726,21 @@ void SyncWorker::UpdateServiceState(RemoteServiceState state,
   FOR_EACH_OBSERVER(
       Observer, observers_,
       UpdateServiceState(GetCurrentState(), description));
+}
+
+drive::DriveServiceInterface* SyncWorker::GetDriveService() {
+  DCHECK(sequence_checker_.CalledOnValidSequencedThread());
+  return context_->GetDriveService();
+}
+
+drive::DriveUploaderInterface* SyncWorker::GetDriveUploader() {
+  DCHECK(sequence_checker_.CalledOnValidSequencedThread());
+  return context_->GetDriveUploader();
+}
+
+MetadataDatabase* SyncWorker::GetMetadataDatabase() {
+  DCHECK(sequence_checker_.CalledOnValidSequencedThread());
+  return context_->GetMetadataDatabase();
 }
 
 }  // namespace drive_backend

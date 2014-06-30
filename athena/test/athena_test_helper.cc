@@ -6,6 +6,7 @@
 
 #include "athena/main/athena_launcher.h"
 #include "athena/test/sample_activity_factory.h"
+#include "athena/test/test_app_model_builder.h"
 #include "base/message_loop/message_loop.h"
 #include "base/run_loop.h"
 #include "ui/aura/client/aura_constants.h"
@@ -55,7 +56,8 @@ void AthenaTestHelper::SetUp(ui::ContextFactory* context_factory) {
 
   ui::InitializeInputMethodForTesting();
 
-  test_screen_.reset(aura::TestScreen::Create());
+  const gfx::Size host_size(800, 600);
+  test_screen_.reset(aura::TestScreen::Create(host_size));
   gfx::Screen::SetScreenInstance(gfx::SCREEN_TYPE_NATIVE, test_screen_.get());
   host_.reset(test_screen_->CreateHostForPrimaryDisplay());
 
@@ -72,9 +74,11 @@ void AthenaTestHelper::SetUp(ui::ContextFactory* context_factory) {
 
   root_window()->Show();
   // Ensure width != height so tests won't confuse them.
-  host()->SetBounds(gfx::Rect(800, 600));
+  host()->SetBounds(gfx::Rect(host_size));
 
-  athena::StartAthena(root_window(), new SampleActivityFactory());
+  athena::StartAthena(root_window(),
+                      new SampleActivityFactory(),
+                      new TestAppModelBuilder());
 }
 
 void AthenaTestHelper::TearDown() {

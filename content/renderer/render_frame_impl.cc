@@ -10,6 +10,7 @@
 #include "base/auto_reset.h"
 #include "base/command_line.h"
 #include "base/debug/alias.h"
+#include "base/debug/asan_invalid_access.h"
 #include "base/debug/dump_without_crashing.h"
 #include "base/i18n/char_iterator.h"
 #include "base/metrics/histogram.h"
@@ -63,6 +64,7 @@
 #include "content/renderer/media/media_stream_dispatcher.h"
 #include "content/renderer/media/media_stream_impl.h"
 #include "content/renderer/media/media_stream_renderer_factory.h"
+#include "content/renderer/media/midi_dispatcher.h"
 #include "content/renderer/media/render_media_log.h"
 #include "content/renderer/media/webcontentdecryptionmodule_impl.h"
 #include "content/renderer/media/webmediaplayer_impl.h"
@@ -76,6 +78,7 @@
 #include "content/renderer/render_widget_fullscreen_pepper.h"
 #include "content/renderer/renderer_webapplicationcachehost_impl.h"
 #include "content/renderer/renderer_webcolorchooser_impl.h"
+#include "content/renderer/screen_orientation/screen_orientation_dispatcher.h"
 #include "content/renderer/shared_worker_repository.h"
 #include "content/renderer/v8_value_converter_impl.h"
 #include "content/renderer/websharedworker_proxy.h"
@@ -103,6 +106,7 @@
 #include "third_party/WebKit/public/web/WebSearchableFormData.h"
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
 #include "third_party/WebKit/public/web/WebSecurityPolicy.h"
+#include "third_party/WebKit/public/web/WebSurroundingText.h"
 #include "third_party/WebKit/public/web/WebUserGestureIndicator.h"
 #include "third_party/WebKit/public/web/WebView.h"
 #include "webkit/child/weburlresponse_extradata_impl.h"
@@ -241,37 +245,19 @@ NOINLINE static void CrashIntentionally() {
   *zero = 0;
 }
 
-#if defined(SYZYASAN)
-NOINLINE static void CorruptMemoryBlock() {
-  // NOTE(sebmarchand): We intentionally corrupt a memory block here in order to
-  //     trigger an Address Sanitizer (ASAN) error report.
-  static const int kArraySize = 5;
-  int* array = new int[kArraySize];
-  // Encapsulate the invalid memory access into a try-catch statement to prevent
-  // this function from being instrumented. This way the underflow won't be
-  // detected but the corruption will (as the allocator will still be hooked).
-  __try {
-    int dummy = array[-1]--;
-    // Make sure the assignments to the dummy value aren't optimized away.
-    base::debug::Alias(&array);
-  } __except (EXCEPTION_EXECUTE_HANDLER) {
-  }
-  delete[] array;
-}
-#endif
-
 #if defined(ADDRESS_SANITIZER) || defined(SYZYASAN)
 NOINLINE static void MaybeTriggerAsanError(const GURL& url) {
   // NOTE(rogerm): We intentionally perform an invalid heap access here in
   //     order to trigger an Address Sanitizer (ASAN) error report.
-  static const char kCrashDomain[] = "crash";
-  static const char kHeapOverflow[] = "/heap-overflow";
-  static const char kHeapUnderflow[] = "/heap-underflow";
-  static const char kUseAfterFree[] = "/use-after-free";
+  const char kCrashDomain[] = "crash";
+  const char kHeapOverflow[] = "/heap-overflow";
+  const char kHeapUnderflow[] = "/heap-underflow";
+  const char kUseAfterFree[] = "/use-after-free";
 #if defined(SYZYASAN)
-  static const char kCorruptHeapBlock[] = "/corrupt-heap-block";
+  const char kCorruptHeapBlock[] = "/corrupt-heap-block";
+  const char kCorruptHeap[] = "/corrupt-heap";
 #endif
-  static const int kArraySize = 5;
+  const int kArraySize = 5;
 
   if (!url.DomainIs(kCrashDomain, sizeof(kCrashDomain) - 1))
     return;
@@ -279,25 +265,20 @@ NOINLINE static void MaybeTriggerAsanError(const GURL& url) {
   if (!url.has_path())
     return;
 
-  scoped_ptr<int[]> array(new int[kArraySize]);
   std::string crash_type(url.path());
-  int dummy = 0;
   if (crash_type == kHeapOverflow) {
-    dummy = array[kArraySize];
+    base::debug::AsanHeapOverflow();
   } else if (crash_type == kHeapUnderflow ) {
-    dummy = array[-1];
+    base::debug::AsanHeapUnderflow();
   } else if (crash_type == kUseAfterFree) {
-    int* dangling = array.get();
-    array.reset();
-    dummy = dangling[kArraySize / 2];
+    base::debug::AsanHeapUseAfterFree();
 #if defined(SYZYASAN)
   } else if (crash_type == kCorruptHeapBlock) {
-    CorruptMemoryBlock();
+    base::debug::AsanCorruptHeapBlock();
+  } else if (crash_type == kCorruptHeap) {
+    base::debug::AsanCorruptHeap();
 #endif
   }
-
-  // Make sure the assignments to the dummy value aren't optimized away.
-  base::debug::Alias(&dummy);
 }
 #endif  // ADDRESS_SANITIZER || SYZYASAN
 
@@ -417,6 +398,7 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
       handling_select_range_(false),
       notification_provider_(NULL),
       web_user_media_client_(NULL),
+      midi_dispatcher_(NULL),
 #if defined(OS_ANDROID)
       media_player_manager_(NULL),
 #endif
@@ -424,12 +406,13 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
       cdm_manager_(NULL),
 #endif
       geolocation_dispatcher_(NULL),
+      screen_orientation_dispatcher_(NULL),
       weak_factory_(this) {
-  RenderThread::Get()->AddRoute(routing_id_, this);
-
   std::pair<RoutingIDFrameMap::iterator, bool> result =
       g_routing_id_frame_map.Get().insert(std::make_pair(routing_id_, this));
   CHECK(result.second) << "Inserting a duplicate item.";
+
+  RenderThread::Get()->AddRoute(routing_id_, this);
 
   render_view_->RegisterRenderFrame(this);
 
@@ -512,7 +495,8 @@ void RenderFrameImpl::PepperTextInputTypeChanged(
   if (instance != render_view_->focused_pepper_plugin())
     return;
 
-  GetRenderWidget()->UpdateTextInputType();
+  GetRenderWidget()->UpdateTextInputState(
+      RenderWidget::NO_SHOW_IME, RenderWidget::FROM_NON_IME);
   if (render_view_->renderer_accessibility())
     render_view_->renderer_accessibility()->FocusedNodeChanged(WebNode());
 }
@@ -528,7 +512,7 @@ void RenderFrameImpl::PepperCancelComposition(
     PepperPluginInstanceImpl* instance) {
   if (instance != render_view_->focused_pepper_plugin())
     return;
-  Send(new ViewHostMsg_ImeCancelComposition(render_view_->GetRoutingID()));;
+  Send(new InputHostMsg_ImeCancelComposition(render_view_->GetRoutingID()));;
 #if defined(OS_MACOSX) || defined(USE_AURA)
   GetRenderWidget()->UpdateCompositionInfo(true);
 #endif
@@ -699,10 +683,6 @@ bool RenderFrameImpl::OnMessageReceived(const IPC::Message& msg) {
     IPC_MESSAGE_HANDLER(FrameMsg_Navigate, OnNavigate)
     IPC_MESSAGE_HANDLER(FrameMsg_BeforeUnload, OnBeforeUnload)
     IPC_MESSAGE_HANDLER(FrameMsg_SwapOut, OnSwapOut)
-    IPC_MESSAGE_HANDLER(FrameMsg_BuffersSwapped, OnBuffersSwapped)
-    IPC_MESSAGE_HANDLER_GENERIC(FrameMsg_CompositorFrameSwapped,
-                                OnCompositorFrameSwapped(msg))
-    IPC_MESSAGE_HANDLER(FrameMsg_ChildFrameProcessGone, OnChildFrameProcessGone)
     IPC_MESSAGE_HANDLER(FrameMsg_ContextMenuClosed, OnContextMenuClosed)
     IPC_MESSAGE_HANDLER(FrameMsg_CustomContextMenuAction,
                         OnCustomContextMenuAction)
@@ -718,19 +698,23 @@ bool RenderFrameImpl::OnMessageReceived(const IPC::Message& msg) {
     IPC_MESSAGE_HANDLER(InputMsg_Unselect, OnUnselect)
     IPC_MESSAGE_HANDLER(InputMsg_Replace, OnReplace)
     IPC_MESSAGE_HANDLER(InputMsg_ReplaceMisspelling, OnReplaceMisspelling)
+    IPC_MESSAGE_HANDLER(InputMsg_ExtendSelectionAndDelete,
+                        OnExtendSelectionAndDelete)
+    IPC_MESSAGE_HANDLER(InputMsg_SetCompositionFromExistingText,
+                        OnSetCompositionFromExistingText)
     IPC_MESSAGE_HANDLER(FrameMsg_CSSInsertRequest, OnCSSInsertRequest)
     IPC_MESSAGE_HANDLER(FrameMsg_JavaScriptExecuteRequest,
                         OnJavaScriptExecuteRequest)
     IPC_MESSAGE_HANDLER(FrameMsg_SetEditableSelectionOffsets,
                         OnSetEditableSelectionOffsets)
-    IPC_MESSAGE_HANDLER(FrameMsg_SetCompositionFromExistingText,
-                        OnSetCompositionFromExistingText)
-    IPC_MESSAGE_HANDLER(FrameMsg_ExtendSelectionAndDelete,
-                        OnExtendSelectionAndDelete)
+    IPC_MESSAGE_HANDLER(FrameMsg_Reload, OnReload)
+    IPC_MESSAGE_HANDLER(FrameMsg_TextSurroundingSelectionRequest,
+                        OnTextSurroundingSelectionRequest)
+    IPC_MESSAGE_HANDLER(FrameMsg_AddStyleSheetByURL,
+                        OnAddStyleSheetByURL)
 #if defined(OS_MACOSX)
     IPC_MESSAGE_HANDLER(InputMsg_CopyToFindPboard, OnCopyToFindPboard)
 #endif
-    IPC_MESSAGE_HANDLER(FrameMsg_Reload, OnReload)
   IPC_END_MESSAGE_MAP()
 
   return handled;
@@ -741,7 +725,8 @@ void RenderFrameImpl::OnNavigate(const FrameMsg_Navigate_Params& params) {
   if (!render_view_->webview())
     return;
 
-  render_view_->OnNavigate(params);
+  FOR_EACH_OBSERVER(
+      RenderViewObserver, render_view_->observers_, Navigate(params.url));
 
   bool is_reload = RenderViewImpl::IsReload(params);
   WebURLRequest::CachePolicy cache_policy =
@@ -919,6 +904,11 @@ void RenderFrameImpl::OnNavigate(const FrameMsg_Navigate_Params& params) {
   render_view_->pending_navigation_params_.reset();
 }
 
+void RenderFrameImpl::BindServiceRegistry(
+    mojo::ScopedMessagePipeHandle service_provider_handle) {
+  service_registry_.BindRemoteServiceProvider(service_provider_handle.Pass());
+}
+
 void RenderFrameImpl::OnBeforeUnload() {
   // TODO(creis): Right now, this is only called on the main frame.  Make the
   // browser process send dispatchBeforeUnloadEvent to every frame that needs
@@ -982,9 +972,6 @@ void RenderFrameImpl::OnSwapOut(int proxy_routing_id) {
     // beforeunload handler. For now, we just run it a second time silently.
     render_view_->NavigateToSwappedOutURL(frame_);
 
-    if (frame_->parent())
-      render_view_->RegisterSwappedOutChildFrame(this);
-
     // Let WebKit know that this view is hidden so it can drop resources and
     // stop compositing.
     // TODO(creis): Support this for subframes as well.
@@ -1005,42 +992,6 @@ void RenderFrameImpl::OnSwapOut(int proxy_routing_id) {
   // start using the RenderFrameProxy, if one is created.
   if (proxy)
     set_render_frame_proxy(proxy);
-}
-
-void RenderFrameImpl::OnBuffersSwapped(
-    const FrameMsg_BuffersSwapped_Params& params) {
-  if (!compositing_helper_.get()) {
-    compositing_helper_ =
-        ChildFrameCompositingHelper::CreateCompositingHelperForRenderFrame(
-            frame_, this, routing_id_);
-    compositing_helper_->EnableCompositing(true);
-  }
-  compositing_helper_->OnBuffersSwapped(
-      params.size,
-      params.mailbox,
-      params.gpu_route_id,
-      params.gpu_host_id,
-      render_view_->GetWebView()->deviceScaleFactor());
-}
-
-void RenderFrameImpl::OnCompositorFrameSwapped(const IPC::Message& message) {
-  FrameMsg_CompositorFrameSwapped::Param param;
-  if (!FrameMsg_CompositorFrameSwapped::Read(&message, &param))
-    return;
-  scoped_ptr<cc::CompositorFrame> frame(new cc::CompositorFrame);
-  param.a.frame.AssignTo(frame.get());
-
-  if (!compositing_helper_.get()) {
-    compositing_helper_ =
-        ChildFrameCompositingHelper::CreateCompositingHelperForRenderFrame(
-            frame_, this, routing_id_);
-    compositing_helper_->EnableCompositing(true);
-  }
-  compositing_helper_->OnCompositorFrameSwapped(frame.Pass(),
-                                                param.a.producing_route_id,
-                                                param.a.output_surface_id,
-                                                param.a.producing_host_id,
-                                                param.a.shared_memory_handle);
 }
 
 void RenderFrameImpl::OnContextMenuClosed(
@@ -1209,9 +1160,32 @@ void RenderFrameImpl::OnExtendSelectionAndDelete(int before, int after) {
   frame_->extendSelectionAndDelete(before, after);
 }
 
-
 void RenderFrameImpl::OnReload(bool ignore_cache) {
   frame_->reload(ignore_cache);
+}
+
+void RenderFrameImpl::OnTextSurroundingSelectionRequest(size_t max_length) {
+  blink::WebSurroundingText surroundingText;
+  surroundingText.initialize(frame_->selectionRange(), max_length);
+
+  if (surroundingText.isNull()) {
+    // |surroundingText| might not be correctly initialized, for example if
+    // |frame_->selectionRange().isNull()|, in other words, if there was no
+    // selection.
+    Send(new FrameHostMsg_TextSurroundingSelectionResponse(
+        routing_id_, base::string16(), 0, 0));
+    return;
+  }
+
+  Send(new FrameHostMsg_TextSurroundingSelectionResponse(
+      routing_id_,
+      surroundingText.textContent(),
+      surroundingText.startOffsetInTextContent(),
+      surroundingText.endOffsetInTextContent()));
+}
+
+void RenderFrameImpl::OnAddStyleSheetByURL(const std::string& url) {
+  frame_->addStyleSheetByURL(WebString::fromUTF8(url));
 }
 
 bool RenderFrameImpl::ShouldUpdateSelectionTextFromContextMenuParams(
@@ -1271,8 +1245,6 @@ void RenderFrameImpl::LoadNavigationErrorPage(
 }
 
 void RenderFrameImpl::DidCommitCompositorFrame() {
-  if (compositing_helper_)
-    compositing_helper_->DidCommitCompositorFrame();
   FOR_EACH_OBSERVER(
       RenderFrameObserver, observers_, DidCommitCompositorFrame());
 }
@@ -1349,9 +1321,8 @@ void RenderFrameImpl::ExecuteJavaScript(const base::string16& javascript) {
   OnJavaScriptExecuteRequest(javascript, 0, false);
 }
 
-void RenderFrameImpl::OnChildFrameProcessGone() {
-  if (compositing_helper_)
-    compositing_helper_->ChildFrameGone();
+ServiceRegistry* RenderFrameImpl::GetServiceRegistry() {
+  return &service_registry_;
 }
 
 // blink::WebFrameClient implementation ----------------------------------------
@@ -1366,7 +1337,7 @@ blink::WebPlugin* RenderFrameImpl::createPlugin(
     return plugin;
   }
 
-  if (base::UTF16ToASCII(params.mimeType) == kBrowserPluginMimeType) {
+  if (base::UTF16ToUTF8(params.mimeType) == kBrowserPluginMimeType) {
     return render_view_->GetBrowserPluginManager()->CreateBrowserPlugin(
         render_view_.get(), frame, false);
   }
@@ -1547,8 +1518,6 @@ void RenderFrameImpl::frameDetached(blink::WebFrame* frame) {
   bool is_subframe = !!frame->parent();
 
   Send(new FrameHostMsg_Detach(routing_id_));
-
-  render_view_->UnregisterSwappedOutChildFrame(this);
 
   // The |is_detaching_| flag disables Send(). FrameHostMsg_Detach must be
   // sent before setting |is_detaching_| to true. In contrast, Observers
@@ -1967,7 +1936,7 @@ void RenderFrameImpl::didCommitProvisionalLoad(
     // UpdateSessionHistory and update page_id_ even in this case, so that
     // the current entry gets a state update and so that we don't send a
     // state update to the wrong entry when we swap back in.
-    if (render_view_->GetLoadingUrl(frame) != GURL(kSwappedOutURL)) {
+    if (GetLoadingUrl() != GURL(kSwappedOutURL)) {
       // Advance our offset in session history, applying the length limit.
       // There is now no forward history.
       render_view_->history_list_offset_++;
@@ -2010,9 +1979,19 @@ void RenderFrameImpl::didCommitProvisionalLoad(
     }
   }
 
-  render_view_->FrameDidCommitProvisionalLoad(frame, is_new_navigation);
+  FOR_EACH_OBSERVER(RenderViewObserver, render_view_->observers_,
+                    DidCommitProvisionalLoad(frame, is_new_navigation));
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_,
                     DidCommitProvisionalLoad(is_new_navigation));
+
+  if (!frame->parent()) {  // Only for top frames.
+    RenderThreadImpl* render_thread_impl = RenderThreadImpl::current();
+    if (render_thread_impl) {  // Can be NULL in tests.
+      render_thread_impl->histogram_customizer()->
+          RenderViewNavigatedToHost(GURL(GetLoadingUrl()).host(),
+                                    RenderViewImpl::GetRenderViewCount());
+    }
+  }
 
   // Remember that we've already processed this request, so we don't update
   // the session history again.  We do this regardless of whether this is
@@ -2191,6 +2170,14 @@ void RenderFrameImpl::didUpdateCurrentHistoryItem(blink::WebLocalFrame* frame) {
   render_view_->didUpdateCurrentHistoryItem(frame);
 }
 
+void RenderFrameImpl::didChangeBrandColor() {
+  if (frame_->parent())
+    return;
+
+  Send(new FrameHostMsg_DidChangeBrandColor(
+      routing_id_, frame_->document().brandColor()));
+}
+
 blink::WebNotificationPresenter* RenderFrameImpl::notificationPresenter() {
   return notification_provider_;
 }
@@ -2202,17 +2189,14 @@ void RenderFrameImpl::didChangeSelection(bool is_empty_selection) {
   if (is_empty_selection)
     selection_text_.clear();
 
-  // UpdateTextInputType should be called before SyncSelectionIfRequired.
-  // UpdateTextInputType may send TextInputTypeChanged to notify the focus
+  // UpdateTextInputState should be called before SyncSelectionIfRequired.
+  // UpdateTextInputState may send TextInputStateChanged to notify the focus
   // was changed, and SyncSelectionIfRequired may send SelectionChanged
   // to notify the selection was changed.  Focus change should be notified
   // before selection change.
-  GetRenderWidget()->UpdateTextInputType();
+  GetRenderWidget()->UpdateTextInputState(
+      RenderWidget::NO_SHOW_IME, RenderWidget::FROM_NON_IME);
   SyncSelectionIfRequired();
-#if defined(OS_ANDROID)
-  GetRenderWidget()->UpdateTextInputState(RenderWidget::NO_SHOW_IME,
-                                          RenderWidget::FROM_NON_IME);
-#endif
 }
 
 blink::WebColorChooser* RenderFrameImpl::createColorChooser(
@@ -2779,7 +2763,9 @@ blink::WebUserMediaClient* RenderFrameImpl::userMediaClient() {
 }
 
 blink::WebMIDIClient* RenderFrameImpl::webMIDIClient() {
-  return render_view_->webMIDIClient();
+  if (!midi_dispatcher_)
+    midi_dispatcher_ = new MidiDispatcher(this);
+  return midi_dispatcher_;
 }
 
 bool RenderFrameImpl::willCheckAndDispatchMessageEvent(
@@ -2893,6 +2879,13 @@ void RenderFrameImpl::initializeChildFrame(const blink::WebRect& frame_rect,
       routing_id_, frame_rect, scale_factor));
 }
 
+blink::WebScreenOrientationClient*
+    RenderFrameImpl::webScreenOrientationClient() {
+  if (!screen_orientation_dispatcher_)
+    screen_orientation_dispatcher_ = new ScreenOrientationDispatcher(this);
+  return screen_orientation_dispatcher_;
+}
+
 void RenderFrameImpl::DidPlay(blink::WebMediaPlayer* player) {
   Send(new FrameHostMsg_MediaPlayingNotification(
       routing_id_, reinterpret_cast<int64>(player), player->hasVideo(),
@@ -2962,7 +2955,7 @@ void RenderFrameImpl::UpdateURL(blink::WebFrame* frame) {
   params.security_info = response.securityInfo();
 
   // Set the URL to be displayed in the browser UI to the user.
-  params.url = render_view_->GetLoadingUrl(frame);
+  params.url = GetLoadingUrl();
   DCHECK(!is_swapped_out_ || params.url == GURL(kSwappedOutURL));
 
   if (frame->document().baseURL() != params.url)
@@ -3506,6 +3499,15 @@ RenderFrameImpl::CreateRendererFactory() {
 #endif
 }
 
+GURL RenderFrameImpl::GetLoadingUrl() const {
+  WebDataSource* ds = frame_->dataSource();
+  if (ds->hasUnreachableURL())
+    return ds->unreachableURL();
+
+  const WebURLRequest& request = ds->request();
+  return request.url();
+}
+
 #if defined(OS_ANDROID)
 
 WebMediaPlayer* RenderFrameImpl::CreateAndroidWebMediaPlayer(
@@ -3523,8 +3525,7 @@ WebMediaPlayer* RenderFrameImpl::CreateAndroidWebMediaPlayer(
   if (GetRenderWidget()->UsingSynchronousRendererCompositor()) {
     SynchronousCompositorFactory* factory =
         SynchronousCompositorFactory::GetInstance();
-    stream_texture_factory = factory->CreateStreamTextureFactory(
-        render_view_->routing_id_);
+    stream_texture_factory = factory->CreateStreamTextureFactory(routing_id_);
   } else {
     scoped_refptr<webkit::gpu::ContextProviderWebContext> context_provider =
         RenderThreadImpl::current()->SharedMainThreadContextProvider();

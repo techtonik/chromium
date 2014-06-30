@@ -10,7 +10,6 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/values.h"
 #include "base/version.h"
-#include "chrome/browser/omaha_query_params/omaha_query_params.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search/hotword_service.h"
 #include "chrome/browser/ui/app_list/app_list_controller_delegate.h"
@@ -20,6 +19,7 @@
 #include "chrome/browser/ui/host_desktop.h"
 #include "chrome/browser/ui/webui/extensions/extension_icon_source.h"
 #include "chrome/common/pref_names.h"
+#include "components/omaha_query_params/omaha_query_params.h"
 #include "content/public/browser/web_ui.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
@@ -181,7 +181,7 @@ void StartPageHandler::HandleInitialize(const base::ListValue* args) {
 
   web_ui()->CallJavascriptFunction(
       "appList.startPage.setNaclArch",
-      base::StringValue(chrome::OmahaQueryParams::GetNaclArch()));
+      base::StringValue(omaha_query_params::OmahaQueryParams::GetNaclArch()));
 
   if (!app_list::switches::IsExperimentalAppListEnabled()) {
     web_ui()->CallJavascriptFunction(
@@ -248,6 +248,8 @@ void StartPageHandler::HandleSpeechRecognition(const base::ListValue* args) {
     new_state = SPEECH_RECOGNITION_IN_SPEECH;
   else if (state_string == "STOPPING")
     new_state = SPEECH_RECOGNITION_STOPPING;
+  else if (state_string == "NETWORK_ERROR")
+    new_state = SPEECH_RECOGNITION_NETWORK_ERROR;
 
   StartPageService* service =
       StartPageService::Get(Profile::FromWebUI(web_ui()));

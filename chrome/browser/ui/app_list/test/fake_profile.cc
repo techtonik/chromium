@@ -56,41 +56,7 @@ FakeProfile::GetMediaRequestContextForStoragePartition(
   return NULL;
 }
 
-void FakeProfile::RequestMidiSysExPermission(
-    int render_process_id,
-    int render_view_id,
-    int bridge_id,
-    const GURL& requesting_frame,
-    bool user_gesture,
-    const MidiSysExPermissionCallback& callback) {
-}
-
-void FakeProfile::CancelMidiSysExPermissionRequest(
-    int render_process_id,
-    int render_view_id,
-    int bridge_id,
-    const GURL& requesting_frame) {
-}
-
-void FakeProfile::RequestProtectedMediaIdentifierPermission(
-    int render_process_id,
-    int render_view_id,
-    const GURL& origin,
-    const ProtectedMediaIdentifierPermissionCallback& callback) {
-}
-
-void FakeProfile::CancelProtectedMediaIdentifierPermissionRequests(
-    int render_process_id,
-    int render_view_id,
-    const GURL& origin) {
-}
-
 content::ResourceContext* FakeProfile::GetResourceContext() {
-  return NULL;
-}
-
-content::GeolocationPermissionContext*
-FakeProfile::GetGeolocationPermissionContext() {
   return NULL;
 }
 
@@ -99,6 +65,10 @@ content::BrowserPluginGuestManager* FakeProfile::GetGuestManager() {
 }
 
 quota::SpecialStoragePolicy* FakeProfile::GetSpecialStoragePolicy() {
+  return NULL;
+}
+
+content::PushMessagingService* FakeProfile::GetPushMessagingService() {
   return NULL;
 }
 
@@ -121,7 +91,7 @@ Profile* FakeProfile::GetOriginalProfile() {
   return this;
 }
 
-bool FakeProfile::IsManaged() {
+bool FakeProfile::IsSupervised() {
   return false;
 }
 
@@ -130,10 +100,6 @@ history::TopSites* FakeProfile::GetTopSites() {
 }
 
 history::TopSites* FakeProfile::GetTopSitesWithoutCreating() {
-  return NULL;
-}
-
-ExtensionService* FakeProfile::GetExtensionService() {
   return NULL;
 }
 
@@ -215,11 +181,6 @@ DevToolsNetworkController* FakeProfile::GetDevToolsNetworkController() {
 
 void FakeProfile::ClearNetworkingHistorySince(
     base::Time time,
-    const base::Closure& completion) {
-}
-
-void FakeProfile::ClearDomainReliabilityMonitor(
-    domain_reliability::DomainReliabilityClearMode mode,
     const base::Closure& completion) {
 }
 

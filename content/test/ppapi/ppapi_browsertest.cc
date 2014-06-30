@@ -108,6 +108,8 @@ TEST_PPAPI_OUT_OF_PROCESS(MediaStreamVideoTrack)
 TEST_PPAPI_IN_PROCESS(Memory)
 TEST_PPAPI_OUT_OF_PROCESS(Memory)
 
+TEST_PPAPI_OUT_OF_PROCESS(MessageHandler)
+
 TEST_PPAPI_OUT_OF_PROCESS(MessageLoop_Basics)
 TEST_PPAPI_OUT_OF_PROCESS(MessageLoop_Post)
 
@@ -121,11 +123,7 @@ TEST_PPAPI_OUT_OF_PROCESS(DISABLED_Scrollbar)
 TEST_PPAPI_IN_PROCESS(TraceEvent)
 TEST_PPAPI_OUT_OF_PROCESS(TraceEvent)
 
-// TODO(scottmg): Disabled with DirectWrite investigating, probably sandbox-
-// related. http://crbug.com/382729
-#if !defined(OS_WIN)
 TEST_PPAPI_OUT_OF_PROCESS(TrueTypeFont)
-#endif
 
 TEST_PPAPI_IN_PROCESS(URLUtil)
 TEST_PPAPI_OUT_OF_PROCESS(URLUtil)
@@ -144,6 +142,8 @@ TEST_PPAPI_OUT_OF_PROCESS(MAYBE_VarDeprecated)
 
 TEST_PPAPI_IN_PROCESS(VarResource)
 TEST_PPAPI_OUT_OF_PROCESS(VarResource)
+
+TEST_PPAPI_OUT_OF_PROCESS(VideoDecoder)
 
 TEST_PPAPI_IN_PROCESS(VideoDecoderDev)
 TEST_PPAPI_OUT_OF_PROCESS(VideoDecoderDev)

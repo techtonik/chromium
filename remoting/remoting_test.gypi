@@ -85,6 +85,7 @@
         'host/ipc_desktop_environment_unittest.cc',
         'host/it2me/it2me_native_messaging_host_unittest.cc',
         'host/json_host_config_unittest.cc',
+        'host/linux/audio_pipe_reader_unittest.cc',
         'host/linux/unicode_to_keysym_unittest.cc',
         'host/linux/x_server_clipboard_unittest.cc',
         'host/local_input_monitor_unittest.cc',
@@ -113,6 +114,7 @@
         'host/setup/pin_validator_unittest.cc',
         'host/shaped_screen_capturer_unittest.cc',
         'host/token_validator_factory_impl_unittest.cc',
+        'host/video_frame_recorder_unittest.cc',
         'host/video_scheduler_unittest.cc',
         'host/win/rdp_client_unittest.cc',
         'host/win/worker_process_launcher.cc',
@@ -254,5 +256,71 @@
         },
       ], #end of copies
     },  # end of target 'remoting_browser_test_resources'
+    {
+      'target_name': 'remoting_webapp_unittest',
+      'type': 'none',
+      'variables': {
+        'output_dir': '<(PRODUCT_DIR)/remoting/unittests',
+      },
+      'copies': [
+        {
+          'destination': '<(output_dir)/qunit',
+          'files': [
+            '../third_party/qunit/src/',
+          ],
+        },
+        {
+          'destination': '<(output_dir)/blanketjs',
+          'files': [
+            '../third_party/blanketjs/src/',
+          ],
+        },
+        {
+          'destination': '<(output_dir)/sinonjs',
+          'files': [
+            '../third_party/sinonjs/src/',
+          ],
+        },
+        {
+          'destination': '<(output_dir)',
+          'files': [
+            '<@(remoting_webapp_main_html_js_files)',
+          ],
+        },
+        {
+          'destination': '<(output_dir)',
+          'files': [
+            '<@(remoting_webapp_unittest_cases)'
+          ],
+        },
+      ],
+      'actions': [
+        {
+          'action_name': 'Build Remoting Webapp ut.html',
+          'inputs': [
+            'webapp/build-html.py',
+            '<(remoting_webapp_unittest_template_main)',
+            '<@(remoting_webapp_main_html_js_files)',
+            '<@(remoting_webapp_unittest_exclude_files)',
+            '<@(remoting_webapp_unittest_cases)'
+          ],
+          'outputs': [
+            '<(PRODUCT_DIR)/ut.html',
+          ],
+          'action': [
+            'python', 'webapp/build-html.py',
+            '<(output_dir)/unittest.html',
+            '<(remoting_webapp_unittest_template_main)',
+            # GYP automatically removes subsequent duplicated command line
+            # arguments.  Therefore, the excludejs flag must be set before the
+            # instrumentedjs flag or else GYP will ignore the files in the
+            # exclude list.
+            '--exclude-js', '<@(remoting_webapp_unittest_exclude_files)',
+            '--js', '<@(remoting_webapp_unittest_cases)',
+            '--instrument-js', '<@(remoting_webapp_main_html_js_files)',
+           ],
+        },
+      ],
+    },  # end of target 'remoting_webapp_js_unittest'
   ],  # end of targets
 }

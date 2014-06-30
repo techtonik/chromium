@@ -15,6 +15,7 @@
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/notification_source.h"
+#include "extensions/browser/api/app_runtime/app_runtime_api.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
@@ -81,8 +82,8 @@ bool ShellExtensionSystem::LoadApp(const base::FilePath& app_dir) {
 void ShellExtensionSystem::LaunchApp() {
   // Send the onLaunched event.
   DCHECK(extension_.get());
-  apps::ShellAPI::DispatchOnLaunchedEvent(event_router_.get(),
-                                          extension_.get());
+  AppRuntimeEventRouter::DispatchOnLaunchedEvent(browser_context_,
+                                                 extension_.get());
 }
 
 void ShellExtensionSystem::Shutdown() {
@@ -181,6 +182,12 @@ const OneShotEvent& ShellExtensionSystem::ready() const {
 
 ContentVerifier* ShellExtensionSystem::content_verifier() {
   return NULL;
+}
+
+scoped_ptr<ExtensionSet> ShellExtensionSystem::GetDependentExtensions(
+    const Extension* extension) {
+  scoped_ptr<ExtensionSet> empty(new ExtensionSet());
+  return empty.PassAs<ExtensionSet>();
 }
 
 }  // namespace extensions

@@ -69,6 +69,7 @@ namespace content {
 class ExternalPopupMenu;
 class PepperPluginInstanceImpl;
 class RenderFrameImpl;
+class RenderFrameProxy;
 class RenderWidgetCompositor;
 class RenderWidgetTest;
 class ResizingModeSelector;
@@ -110,8 +111,8 @@ class CONTENT_EXPORT RenderWidget
   }
 
   // Functions to track out-of-process frames for special notifications.
-  void RegisterSwappedOutChildFrame(RenderFrameImpl* frame);
-  void UnregisterSwappedOutChildFrame(RenderFrameImpl* frame);
+  void RegisterRenderFrameProxy(RenderFrameProxy* proxy);
+  void UnregisterRenderFrameProxy(RenderFrameProxy* proxy);
 
   // Functions to track all RenderFrame objects associated with this
   // RenderWidget.
@@ -156,6 +157,7 @@ class CONTENT_EXPORT RenderWidget
   virtual void resetInputMethod();
   virtual void didHandleGestureEvent(const blink::WebGestureEvent& event,
                                      bool event_cancelled);
+  virtual void showImeIfNeeded();
 
   // Begins the compositor's scheduler to start producing frames.
   void StartCompositor();
@@ -235,10 +237,6 @@ class CONTENT_EXPORT RenderWidget
   void OnSwapBuffersComplete();
   void OnSwapBuffersAborted();
 
-  // Checks if the text input state and compose inline mode have been changed.
-  // If they are changed, the new value will be sent to the browser process.
-  void UpdateTextInputType();
-
   // Checks if the selection bounds have been changed. If they are changed,
   // the new value will be sent to the browser process.
   void UpdateSelectionBounds();
@@ -247,7 +245,6 @@ class CONTENT_EXPORT RenderWidget
 
   void OnShowHostContextMenu(ContextMenuParams* params);
 
-#if defined(OS_ANDROID) || defined(USE_AURA)
   enum ShowIme {
     SHOW_IME_IF_NEEDED,
     NO_SHOW_IME,
@@ -265,7 +262,6 @@ class CONTENT_EXPORT RenderWidget
   // IME events. This is when the text change did not originate from the IME in
   // the browser side, such as changes by JavaScript or autofill.
   void UpdateTextInputState(ShowIme show_ime, ChangeSource change_source);
-#endif
 
 #if defined(OS_MACOSX) || defined(USE_AURA)
   // Checks if the composition range or composition character bounds have been
@@ -374,9 +370,9 @@ class CONTENT_EXPORT RenderWidget
   void OnGetFPS();
   void OnUpdateScreenRects(const gfx::Rect& view_screen_rect,
                            const gfx::Rect& window_screen_rect);
-#if defined(OS_ANDROID)
   void OnShowImeIfNeeded();
 
+#if defined(OS_ANDROID)
   // Whenever an IME event that needs an acknowledgement is sent to the browser,
   // the number of outstanding IME events that needs acknowledgement should be
   // incremented. All IME events will be dropped until we receive an ack from
@@ -698,9 +694,9 @@ class CONTENT_EXPORT RenderWidget
 
   scoped_ptr<ResizingModeSelector> resizing_mode_selector_;
 
-  // Lists of swapped out RenderFrames that need to be notified
-  // of compositing-related events (e.g. DidCommitCompositorFrame).
-  ObserverList<RenderFrameImpl> swapped_out_frames_;
+  // Lists of RenderFrameProxy objects that need to be notified of
+  // compositing-related events (e.g. DidCommitCompositorFrame).
+  ObserverList<RenderFrameProxy> render_frame_proxies_;
 #if defined(VIDEO_HOLE)
   ObserverList<RenderFrameImpl> video_hole_frames_;
 #endif  // defined(VIDEO_HOLE)

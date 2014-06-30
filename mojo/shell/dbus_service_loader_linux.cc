@@ -16,8 +16,8 @@
 #include "dbus/message.h"
 #include "dbus/object_path.h"
 #include "dbus/object_proxy.h"
-#include "mojo/common/channel_init.h"
 #include "mojo/dbus/dbus_external_service.h"
+#include "mojo/embedder/channel_init.h"
 #include "mojo/embedder/platform_channel_pair.h"
 #include "mojo/shell/context.h"
 #include "mojo/shell/external_service.mojom.h"
@@ -64,7 +64,7 @@ class DBusServiceLoader::LoadContext {
     CHECK(bus_->SetUpAsyncOperations());
 
     embedder::PlatformChannelPair channel_pair;
-    channel_init_.reset(new common::ChannelInit);
+    channel_init_.reset(new embedder::ChannelInit);
     mojo::ScopedMessagePipeHandle bootstrap_message_pipe =
         channel_init_->Init(channel_pair.PassServerHandle().release().fd,
                             loader_->context_->task_runners()->io_runner());
@@ -133,7 +133,7 @@ class DBusServiceLoader::LoadContext {
   const GURL url_;
   ScopedMessagePipeHandle service_provider_handle_;
   KeepAlive keep_alive_;
-  scoped_ptr<common::ChannelInit> channel_init_;
+  scoped_ptr<embedder::ChannelInit> channel_init_;
   ExternalServicePtr external_service_;
 
   DISALLOW_COPY_AND_ASSIGN(LoadContext);
@@ -152,11 +152,11 @@ DBusServiceLoader::~DBusServiceLoader() {
 
 void DBusServiceLoader::LoadService(ServiceManager* manager,
                                     const GURL& url,
-                                    ScopedMessagePipeHandle service_handle) {
+                                    ScopedMessagePipeHandle shell_handle) {
   DCHECK(url.SchemeIs("dbus"));
   DCHECK(url_to_load_context_.find(url) == url_to_load_context_.end());
   url_to_load_context_[url] =
-      new LoadContext(this, bus_, url, service_handle.Pass());
+      new LoadContext(this, bus_, url, shell_handle.Pass());
 }
 
 void DBusServiceLoader::OnServiceError(ServiceManager* manager,

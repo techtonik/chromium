@@ -18,11 +18,21 @@ var DEFAULT_MEDIA_FILE = 'http://shadi.kir/alcatraz/Chrome_44-enc_av.webm';
 // Key ID used for init data.
 var KEY_ID = '0123456789012345';
 
+// Unique strings to identify test result expectations.
+var KEY_ERROR = 'KEY_ERROR';
+var FILE_IO_TEST_RESULT_HEADER = 'FILEIOTESTRESULT';
+var FILE_IO_TEST_SUCCESS = 'FILE_IO_TEST_SUCCESS';
+var PREFIXED_API_LOAD_SESSION_HEADER = 'LOAD_SESSION|';
+var NOTSUPPORTEDERROR = 'NOTSUPPORTEDERROR';
+
 // Available EME key systems to use.
 var PREFIXED_CLEARKEY = 'webkit-org.w3.clearkey';
 var CLEARKEY = 'org.w3.clearkey';
 var EXTERNAL_CLEARKEY = 'org.chromium.externalclearkey';
 var WIDEVINE_KEYSYSTEM = 'com.widevine.alpha';
+var FILE_IO_TEST_KEYSYSTEM = 'org.chromium.externalclearkey.fileiotest';
+var EME_PREFIXED_VERSION = 'Prefixed EME (v 0.1b)';
+var EME_UNPREFIXED_VERSION = 'Unprefixed EME (Working draft)';
 
 // Key system name:value map to show on the document page.
 var KEY_SYSTEMS = {
@@ -42,11 +52,17 @@ var MEDIA_TYPES = {
 
 // Update the EME versions list by checking runtime support by the browser.
 var EME_VERSIONS_OPTIONS = {};
-var video = document.createElement('video');
-if (video.webkitAddKey)
-  EME_VERSIONS_OPTIONS['Prefixed EME (v 0.1b)'] = 'true';
-if (video.setMediaKeys)
-  EME_VERSIONS_OPTIONS['Unprefixed EME (Working draft)'] = 'false';
+EME_VERSIONS_OPTIONS[EME_UNPREFIXED_VERSION] = EME_UNPREFIXED_VERSION;
+EME_VERSIONS_OPTIONS[EME_PREFIXED_VERSION] = EME_PREFIXED_VERSION;
+
+var EME_DISABLED_OPTIONS = [];
+var PROMISES_SUPPORTED = false;
+if (!document.createElement('video').webkitAddKey)
+  EME_DISABLED_OPTIONS.push(EME_PREFIXED_VERSION);
+if (!document.createElement('video').setMediaKeys)
+  EME_DISABLED_OPTIONS.push(EME_UNPREFIXED_VERSION);
+else
+  PROMISES_SUPPORTED = MediaKeys.create != undefined;
 
 // Global document elements ID's.
 var VIDEO_ELEMENT_ID = 'video';
@@ -54,7 +70,7 @@ var MEDIA_FILE_ELEMENT_ID = 'mediaFile';
 var LICENSE_SERVER_ELEMENT_ID = 'licenseServer';
 var KEYSYSTEM_ELEMENT_ID = 'keySystemList';
 var MEDIA_TYPE_ELEMENT_ID = 'mediaTypeList';
-var USE_SRC_ELEMENT_ID = 'useSRC';
+var USE_MSE_ELEMENT_ID = 'useMSE';
 var USE_PREFIXED_EME_ID = 'usePrefixedEME';
 
 // These variables get updated every second, so better to have global pointers.

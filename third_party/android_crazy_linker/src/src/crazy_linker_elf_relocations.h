@@ -6,6 +6,7 @@
 #define CRAZY_LINKER_ELF_RELOCATIONS_H
 
 #include <string.h>
+#include <unistd.h>
 
 #include "elf_traits.h"
 
@@ -43,6 +44,12 @@ class ElfRelocations {
                 SymbolResolver* resolver,
                 Error* error);
 
+#ifdef __arm__
+  // Register ARM packed relocations to apply.
+  // |arm_packed_relocs| is a pointer to packed relocations data.
+  void RegisterArmPackedRelocs(uint8_t* arm_packed_relocs);
+#endif
+
   // This function is used to adjust relocated addresses in a copy of an
   // existing section of an ELF binary. I.e. |src_addr|...|src_addr + size|
   // must be inside the mapped ELF binary, this function will first copy its
@@ -56,11 +63,50 @@ class ElfRelocations {
                        size_t size);
 
  private:
-  bool ApplyRelocs(const ELF::Rel* relocs,
-                   size_t relocs_count,
-                   const ElfSymbols* symbols,
-                   SymbolResolver* resolver,
-                   Error* error);
+  bool ResolveSymbol(unsigned rel_type,
+                     unsigned rel_symbol,
+                     const ElfSymbols* symbols,
+                     SymbolResolver* resolver,
+                     ELF::Addr reloc,
+                     ELF::Addr* sym_addr,
+                     Error* error);
+  bool ApplyRelaReloc(const ELF::Rela* rela,
+                      ELF::Addr sym_addr,
+                      bool resolved,
+                      Error* error);
+  bool ApplyRelReloc(const ELF::Rel* rel,
+                     ELF::Addr sym_addr,
+                     bool resolved,
+                     Error* error);
+  bool ApplyRelaRelocs(const ELF::Rela* relocs,
+                       size_t relocs_count,
+                       const ElfSymbols* symbols,
+                       SymbolResolver* resolver,
+                       Error* error);
+  bool ApplyRelRelocs(const ELF::Rel* relocs,
+                      size_t relocs_count,
+                      const ElfSymbols* symbols,
+                      SymbolResolver* resolver,
+                      Error* error);
+  void AdjustRelocation(ELF::Word rel_type,
+                        ELF::Addr src_reloc,
+                        size_t dst_delta,
+                        size_t map_delta);
+  void RelocateRela(size_t src_addr,
+                    size_t dst_addr,
+                    size_t map_addr,
+                    size_t size);
+  void RelocateRel(size_t src_addr,
+                   size_t dst_addr,
+                   size_t map_addr,
+                   size_t size);
+
+#ifdef __arm__
+  // Apply ARM packed relocations.
+  // On error, return false and set |error| message.  No-op if no packed
+  // relocations were registered.
+  bool ApplyArmPackedRelocs(Error* error);
+#endif
 
 #if defined(__mips__)
   bool RelocateMipsGot(const ElfSymbols* symbols,
@@ -72,18 +118,23 @@ class ElfRelocations {
   size_t phdr_count_;
   size_t load_bias_;
 
-  const ELF::Rel* plt_relocations_;
-  size_t plt_relocations_count_;
+  ELF::Addr relocations_type_;
+  ELF::Addr plt_relocations_;
+  size_t plt_relocations_size_;
   ELF::Addr* plt_got_;
 
-  const ELF::Rel* relocations_;
-  size_t relocations_count_;
+  ELF::Addr relocations_;
+  size_t relocations_size_;
 
 #if defined(__mips__)
   // MIPS-specific relocation fields.
   ELF::Word mips_symtab_count_;
   ELF::Word mips_local_got_count_;
   ELF::Word mips_gotsym_;
+#endif
+
+#if defined(__arm__)
+  uint8_t* arm_packed_relocs_;
 #endif
 
   bool has_text_relocations_;

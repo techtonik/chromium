@@ -156,9 +156,7 @@ void GcmInternalsUIMessageHandler::ReturnResults(
                           gcm::GCMProfileService::IsGCMEnabled(profile));
   if (profile_service) {
     device_info->SetString("signedInUserName",
-                           profile_service->driver()->SignedInUserName());
-    device_info->SetBoolean("gcmClientReady",
-                            profile_service->driver()->IsGCMClientReady());
+                           profile_service->SignedInUserName());
   }
   if (stats) {
     results.SetBoolean("isRecording", stats->is_recording);
@@ -227,10 +225,8 @@ void GcmInternalsUIMessageHandler::RequestAllInfo(
   gcm::GCMProfileService* profile_service =
     gcm::GCMProfileServiceFactory::GetForProfile(profile);
 
-  if (!profile_service) {
+  if (!profile_service || !profile_service->driver()) {
     ReturnResults(profile, NULL, NULL);
-  } else if (profile_service->driver()->SignedInUserName().empty()) {
-    ReturnResults(profile, profile_service, NULL);
   } else {
     profile_service->driver()->GetGCMStatistics(
         base::Bind(&GcmInternalsUIMessageHandler::RequestGCMStatisticsFinished,
@@ -258,7 +254,7 @@ void GcmInternalsUIMessageHandler::SetRecording(const base::ListValue* args) {
     ReturnResults(profile, NULL, NULL);
     return;
   }
-  if (profile_service->driver()->SignedInUserName().empty()) {
+  if (profile_service->SignedInUserName().empty()) {
     ReturnResults(profile, profile_service, NULL);
     return;
   }

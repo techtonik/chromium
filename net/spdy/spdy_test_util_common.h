@@ -457,9 +457,27 @@ class SpdyTestUtil {
                                const char* status,
                                const char* location);
 
+  SpdyFrame* ConstructInitialSpdyPushFrame(scoped_ptr<SpdyHeaderBlock> headers,
+                                           int stream_id,
+                                           int associated_stream_id);
+
   SpdyFrame* ConstructSpdyPushHeaders(int stream_id,
                                       const char* const extra_headers[],
                                       int extra_header_count);
+
+  // Construct a SPDY syn (HEADERS or SYN_STREAM, depending on protocol
+  // version) carrying exactly the given headers and priority.
+  SpdyFrame* ConstructSpdySyn(int stream_id,
+                              const SpdyHeaderBlock& headers,
+                              RequestPriority priority,
+                              bool compressed,
+                              bool fin) const;
+
+  // Construct a SPDY reply (HEADERS or SYN_REPLY, depending on protocol
+  // version) carrying exactly the given headers, and the default priority
+  // (or no priority, depending on protocl version).
+  // The |headers| parameter variant is preferred.
+  SpdyFrame* ConstructSpdyReply(int stream_id, const SpdyHeaderBlock& headers);
 
   // Constructs a standard SPDY SYN_REPLY frame to match the SPDY GET.
   // |extra_headers| are the extra header-value pairs, which typically
@@ -528,6 +546,7 @@ class SpdyTestUtil {
 
   // For versions below SPDY4, adds the version HTTP/1.1 header.
   void MaybeAddVersionHeader(SpdyFrameWithNameValueBlockIR* frame_ir) const;
+  void MaybeAddVersionHeader(SpdyHeaderBlock* block) const;
 
   // Maps |priority| to SPDY version priority, and sets it on |frame_ir|.
   void SetPriority(RequestPriority priority, SpdySynStreamIR* frame_ir) const;

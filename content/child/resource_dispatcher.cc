@@ -194,12 +194,10 @@ void IPCResourceLoaderBridge::Cancel() {
     return;
   }
 
-  if (!is_synchronous_request_)
+  if (!is_synchronous_request_) {
+    // This also removes the the request from the dispatcher.
     dispatcher_->CancelPendingRequest(request_id_);
-
-  // We can't remove the request ID from the resource dispatcher because more
-  // data might be pending. Sending the cancel message may cause more data
-  // to be flushed, and will then cause a complete message to be sent.
+  }
 }
 
 void IPCResourceLoaderBridge::SetDefersLoading(bool value) {
@@ -612,11 +610,10 @@ void ResourceDispatcher::CancelPendingRequest(int request_id) {
     return;
   }
 
-  PendingRequestInfo& request_info = it->second;
-  ReleaseResourcesInMessageQueue(&request_info.deferred_message_queue);
-  pending_requests_.erase(it);
-
+  // Cancel the request, and clean it up so the bridge will receive no more
+  // messages.
   message_sender_->Send(new ResourceHostMsg_CancelRequest(request_id));
+  RemovePendingRequest(request_id);
 }
 
 void ResourceDispatcher::SetDefersLoading(int request_id, bool value) {
@@ -653,12 +650,16 @@ bool ResourceDispatcher::AttachThreadedDataReceiver(
     int request_id, blink::WebThreadedDataReceiver* threaded_data_receiver) {
   PendingRequestInfo* request_info = GetPendingRequestInfo(request_id);
   DCHECK(request_info);
-  DCHECK(!request_info->threaded_data_provider);
-  request_info->threaded_data_provider = new ThreadedDataProvider(
-      request_id, threaded_data_receiver, request_info->buffer,
-      request_info->buffer_size);
 
-  return true;
+  if (request_info->buffer != NULL) {
+    DCHECK(!request_info->threaded_data_provider);
+    request_info->threaded_data_provider = new ThreadedDataProvider(
+        request_id, threaded_data_receiver, request_info->buffer,
+        request_info->buffer_size);
+    return true;
+  }
+
+  return false;
 }
 
 ResourceDispatcher::PendingRequestInfo::PendingRequestInfo()
