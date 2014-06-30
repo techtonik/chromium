@@ -36,7 +36,8 @@ class ExtensionServiceWorkerBrowserTest : public ExtensionBrowserTest {
 
   virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
     ExtensionBrowserTest::SetUpCommandLine(command_line);
-    command_line->AppendSwitch(switches::kEnableServiceWorker);
+    command_line->AppendSwitch(
+        switches::kEnableExperimentalWebPlatformFeatures);
   }
 
   void WaitUntilRegistered(const Extension* extension) {
