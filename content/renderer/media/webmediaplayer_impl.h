@@ -47,15 +47,13 @@ class GpuVideoAcceleratorFactories;
 class MediaLog;
 }
 
-namespace webkit {
-class WebLayerImpl;
-}
 
 namespace content {
 class BufferedDataSource;
 class VideoFrameCompositor;
 class WebAudioSourceProviderImpl;
 class WebContentDecryptionModuleImpl;
+class WebLayerImpl;
 class WebMediaPlayerDelegate;
 class WebMediaPlayerParams;
 class WebTextTrackImpl;
@@ -165,11 +163,11 @@ class WebMediaPlayerImpl
   //   2) Compositing not available
   void InvalidateOnMainThread();
 
-  void OnPipelineSeek(media::PipelineStatus status);
+  void OnPipelineSeeked(bool time_changed, media::PipelineStatus status);
   void OnPipelineEnded();
   void OnPipelineError(media::PipelineStatus error);
   void OnPipelineMetadata(media::PipelineMetadata metadata);
-  void OnPipelinePrerollCompleted();
+  void OnPipelineBufferingStateChanged(media::BufferingState buffering_state);
   void OnDemuxerOpened();
   void OnKeyAdded(const std::string& session_id);
   void OnKeyError(const std::string& session_id,
@@ -292,6 +290,10 @@ class WebMediaPlayerImpl
   bool pending_seek_;
   double pending_seek_seconds_;
 
+  // Tracks whether to issue time changed notifications during buffering state
+  // changes.
+  bool should_notify_time_changed_;
+
   blink::WebMediaPlayerClient* client_;
 
   base::WeakPtr<WebMediaPlayerDelegate> delegate_;
@@ -311,8 +313,6 @@ class WebMediaPlayerImpl
   scoped_refptr<WebAudioSourceProviderImpl> audio_source_provider_;
 
   bool supports_save_;
-
-  bool starting_;
 
   // These two are mutually exclusive:
   //   |data_source_| is used for regular resource loads.
@@ -337,7 +337,7 @@ class WebMediaPlayerImpl
 
   // The compositor layer for displaying the video content when using composited
   // playback.
-  scoped_ptr<webkit::WebLayerImpl> video_weblayer_;
+  scoped_ptr<WebLayerImpl> video_weblayer_;
 
   // Text track objects get a unique index value when they're created.
   int text_track_index_;

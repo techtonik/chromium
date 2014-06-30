@@ -17,14 +17,14 @@ source_set("child") {
   deps = [
     "//base",
     "//components/tracing",
-    "//mojo/public/interfaces/service_provider",
+    "//mojo/environment:chromium",
+    "//mojo/public/interfaces/interface_provider",
     "//skia",
     "//third_party/icu",
     "//ui/base",
     "//ui/gfx",
     "//ui/gfx/geometry",
     "//url",
-    #'../mojo/mojo.gyp:mojo_environment_chromium',  # TODO(GYP)
   ]
 
   if (!use_default_render_theme) {
@@ -88,7 +88,7 @@ source_set("child") {
   } else {
     deps += [
       "//crypto:platform",
-      #"//third_party/WebKit/public:blink",  # TODO(GYP)
+      "//third_party/WebKit/public:blink",
       "//third_party/npapi",
       "//webkit:resources",
       "//webkit:strings",
@@ -102,7 +102,7 @@ source_set("child") {
     sources -= [ "npapi/webplugin_delegate_impl_mac.mm" ]
   }
 
-  if (is_win) {
+  if (is_win || !use_aura) {
     sources -= [ "npapi/webplugin_delegate_impl_aura.cc" ]
   }
 

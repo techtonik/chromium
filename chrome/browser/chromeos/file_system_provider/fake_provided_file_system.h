@@ -11,13 +11,11 @@
 #include "chrome/browser/chromeos/file_system_provider/provided_file_system_info.h"
 #include "chrome/browser/chromeos/file_system_provider/provided_file_system_interface.h"
 
+class Profile;
+
 namespace net {
 class IOBuffer;
 }  // namespace net
-
-namespace extensions {
-class EventRouter;
-}  // namespace extensions
 
 namespace chromeos {
 namespace file_system_provider {
@@ -42,7 +40,8 @@ class FakeProvidedFileSystem : public ProvidedFileSystemInterface {
       const fileapi::AsyncFileUtil::StatusCallback& callback) OVERRIDE;
   virtual void GetMetadata(
       const base::FilePath& entry_path,
-      const fileapi::AsyncFileUtil::GetFileInfoCallback& callback) OVERRIDE;
+      const ProvidedFileSystemInterface::GetMetadataCallback& callback)
+      OVERRIDE;
   virtual void ReadDirectory(
       const base::FilePath& directory_path,
       const fileapi::AsyncFileUtil::ReadDirectoryCallback& callback) OVERRIDE;
@@ -65,7 +64,7 @@ class FakeProvidedFileSystem : public ProvidedFileSystemInterface {
   // Factory callback, to be used in Service::SetFileSystemFactory(). The
   // |event_router| argument can be NULL.
   static ProvidedFileSystemInterface* Create(
-      extensions::EventRouter* event_router,
+      Profile* profile,
       const ProvidedFileSystemInfo& file_system_info);
 
  private:

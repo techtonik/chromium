@@ -668,6 +668,18 @@ bool MediaGalleriesPreferences::LookUpGalleryByPath(
     const base::FilePath& path,
     MediaGalleryPrefInfo* gallery_info) const {
   DCHECK(IsInitialized());
+
+  // First check if the path matches an imported gallery.
+  for (MediaGalleriesPrefInfoMap::const_iterator it =
+           known_galleries_.begin(); it != known_galleries_.end(); ++it) {
+    const std::string& device_id = it->second.device_id;
+    if (iapps::PathIndicatesIPhotoLibrary(device_id, path) ||
+        iapps::PathIndicatesITunesLibrary(device_id, path)) {
+      *gallery_info = it->second;
+      return true;
+    }
+  }
+
   StorageInfo info;
   base::FilePath relative_path;
   if (!MediaStorageUtil::GetDeviceInfoFromPath(path, &info, &relative_path)) {
@@ -1031,7 +1043,8 @@ MediaGalleryPrefIdSet MediaGalleriesPreferences::GalleriesForExtension(
     } else {
       MediaGalleriesPrefInfoMap::const_iterator gallery =
           known_galleries_.find(it->pref_id);
-      DCHECK(gallery != known_galleries_.end());
+      // TODO(tommycli): Change to DCHECK after fixing http://crbug.com/374330.
+      CHECK(gallery != known_galleries_.end());
       if (!gallery->second.IsBlackListedType()) {
         result.insert(it->pref_id);
       } else {

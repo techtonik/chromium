@@ -14,6 +14,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "base/process/process_handle.h"
+#include "content/common/mojo/service_registry_impl.h"
 #include "content/public/common/javascript_message_type.h"
 #include "content/public/common/referrer.h"
 #include "content/public/renderer/render_frame.h"
@@ -31,8 +32,6 @@
 #endif
 
 class TransportDIB;
-struct FrameMsg_BuffersSwapped_Params;
-struct FrameMsg_CompositorFrameSwapped_Params;
 struct FrameMsg_Navigate_Params;
 
 namespace blink {
@@ -40,7 +39,6 @@ class WebGeolocationClient;
 class WebInputEvent;
 class WebMouseEvent;
 class WebContentDecryptionModule;
-class WebMIDIClient;
 class WebMediaPlayer;
 class WebNotificationPresenter;
 class WebSecurityOrigin;
@@ -60,6 +58,7 @@ namespace content {
 class ChildFrameCompositingHelper;
 class GeolocationDispatcher;
 class MediaStreamRendererFactory;
+class MidiDispatcher;
 class NotificationProvider;
 class PepperPluginInstanceImpl;
 class RendererCdmManager;
@@ -69,6 +68,7 @@ class RenderFrameObserver;
 class RenderViewImpl;
 class RenderWidget;
 class RenderWidgetFullscreenPepper;
+class ScreenOrientationDispatcher;
 struct CustomContextMenuContext;
 
 class CONTENT_EXPORT RenderFrameImpl
@@ -223,6 +223,7 @@ class CONTENT_EXPORT RenderFrameImpl
                                  blink::WebNavigationPolicy policy) OVERRIDE;
   virtual void ExecuteJavaScript(const base::string16& javascript) OVERRIDE;
   virtual bool IsHidden() OVERRIDE;
+  virtual ServiceRegistry* GetServiceRegistry() OVERRIDE;
 
   // blink::WebFrameClient implementation:
   virtual blink::WebPlugin* createPlugin(blink::WebLocalFrame* frame,
@@ -308,6 +309,7 @@ class CONTENT_EXPORT RenderFrameImpl
                                      const blink::WebHistoryItem& item,
                                      blink::WebHistoryCommitType commit_type);
   virtual void didUpdateCurrentHistoryItem(blink::WebLocalFrame* frame);
+  virtual void didChangeBrandColor();
   virtual blink::WebNotificationPresenter* notificationPresenter();
   virtual void didChangeSelection(bool is_empty_selection);
   virtual blink::WebColorChooser* createColorChooser(
@@ -386,6 +388,7 @@ class CONTENT_EXPORT RenderFrameImpl
   virtual void forwardInputEvent(const blink::WebInputEvent* event);
   virtual void initializeChildFrame(const blink::WebRect& frame_rect,
                                     float scale_factor);
+  virtual blink::WebScreenOrientationClient* webScreenOrientationClient();
 
   // WebMediaPlayerDelegate implementation:
   virtual void DidPlay(blink::WebMediaPlayer* player) OVERRIDE;
@@ -395,6 +398,11 @@ class CONTENT_EXPORT RenderFrameImpl
   // TODO(nasko): Make all tests in RenderViewImplTest friends and then move
   // this back to private member.
   void OnNavigate(const FrameMsg_Navigate_Params& params);
+
+  // Binds this render frame's service registry to a handle to the remote
+  // service registry.
+  void BindServiceRegistry(
+      mojo::ScopedMessagePipeHandle service_provider_handle);
 
  protected:
   RenderFrameImpl(RenderViewImpl* render_view, int32 routing_id);
@@ -430,9 +438,6 @@ class CONTENT_EXPORT RenderFrameImpl
   // content/common/*_messages.h for the message that the function is handling.
   void OnBeforeUnload();
   void OnSwapOut(int proxy_routing_id);
-  void OnChildFrameProcessGone();
-  void OnBuffersSwapped(const FrameMsg_BuffersSwapped_Params& params);
-  void OnCompositorFrameSwapped(const IPC::Message& message);
   void OnShowContextMenu(const gfx::Point& location);
   void OnContextMenuClosed(const CustomContextMenuContext& custom_context);
   void OnCustomContextMenuAction(const CustomContextMenuContext& custom_context,
@@ -459,6 +464,8 @@ class CONTENT_EXPORT RenderFrameImpl
       const std::vector<blink::WebCompositionUnderline>& underlines);
   void OnExtendSelectionAndDelete(int before, int after);
   void OnReload(bool ignore_cache);
+  void OnTextSurroundingSelectionRequest(size_t max_length);
+  void OnAddStyleSheetByURL(const std::string& url);
 #if defined(OS_MACOSX)
   void OnCopyToFindPboard();
 #endif
@@ -530,6 +537,9 @@ class CONTENT_EXPORT RenderFrameImpl
   // Creates a factory object used for creating audio and video renderers.
   // The method is virtual so that layouttests can override it.
   virtual scoped_ptr<MediaStreamRendererFactory> CreateRendererFactory();
+
+  // Returns the URL being loaded by the |frame_|'s request.
+  GURL GetLoadingUrl() const;
 
 #if defined(OS_ANDROID)
   blink::WebMediaPlayer* CreateAndroidWebMediaPlayer(
@@ -608,6 +618,9 @@ class CONTENT_EXPORT RenderFrameImpl
 
   blink::WebUserMediaClient* web_user_media_client_;
 
+  // MidiClient attached to this frame; lazily initialized.
+  MidiDispatcher* midi_dispatcher_;
+
 #if defined(OS_ANDROID)
   // Manages all media players in this render frame for communicating with the
   // real media player in the browser process. It's okay to use a raw pointer
@@ -624,6 +637,11 @@ class CONTENT_EXPORT RenderFrameImpl
 
   // The geolocation dispatcher attached to this view, lazily initialized.
   GeolocationDispatcher* geolocation_dispatcher_;
+
+  ServiceRegistryImpl service_registry_;
+
+  // The screen orientation dispatcher attached to the view, lazily initialized.
+  ScreenOrientationDispatcher* screen_orientation_dispatcher_;
 
   base::WeakPtrFactory<RenderFrameImpl> weak_factory_;
 

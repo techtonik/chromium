@@ -40,7 +40,7 @@
 #include "ui/base/x/x11_util_internal.h"
 #include "ui/events/event_utils.h"
 #include "ui/events/keycodes/keyboard_code_conversion_x.h"
-#include "ui/events/x/device_data_manager.h"
+#include "ui/events/x/device_data_manager_x11.h"
 #include "ui/events/x/touch_factory_x11.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/image/image_skia.h"
@@ -227,7 +227,7 @@ class XCustomCursorCache {
 }  // namespace
 
 bool IsXInput2Available() {
-  return DeviceDataManager::GetInstance()->IsXInput2Available();
+  return DeviceDataManagerX11::GetInstance()->IsXInput2Available();
 }
 
 static SharedMemorySupport DoQuerySharedMemorySupport(XDisplay* dpy) {
@@ -399,7 +399,7 @@ int CoalescePendingMotionEvents(const XEvent* xev,
 
     if (next_event.type == GenericEvent &&
         next_event.xgeneric.evtype == event_type &&
-        !ui::DeviceDataManager::GetInstance()->IsCMTGestureEvent(
+        !ui::DeviceDataManagerX11::GetInstance()->IsCMTGestureEvent(
             &next_event)) {
       XIDeviceEvent* next_xievent =
           static_cast<XIDeviceEvent*>(next_event.xcookie.data);
@@ -461,6 +461,37 @@ void HideHostCursor() {
                                          &black, &black, 0, 0);
   XFreePixmap(xdisplay, blank);
   return invisible_cursor;
+}
+
+void SetUseOSWindowFrame(XID window, bool use_os_window_frame) {
+  // This data structure represents additional hints that we send to the window
+  // manager and has a direct lineage back to Motif, which defined this de facto
+  // standard. This struct doesn't seem 64-bit safe though, but it's what GDK
+  // does.
+  typedef struct {
+    unsigned long flags;
+    unsigned long functions;
+    unsigned long decorations;
+    long input_mode;
+    unsigned long status;
+  } MotifWmHints;
+
+  MotifWmHints motif_hints;
+  memset(&motif_hints, 0, sizeof(motif_hints));
+  // Signals that the reader of the _MOTIF_WM_HINTS property should pay
+  // attention to the value of |decorations|.
+  motif_hints.flags = (1L << 1);
+  motif_hints.decorations = use_os_window_frame ? 1 : 0;
+
+  ::Atom hint_atom = GetAtom("_MOTIF_WM_HINTS");
+  XChangeProperty(gfx::GetXDisplay(),
+                  window,
+                  hint_atom,
+                  hint_atom,
+                  32,
+                  PropModeReplace,
+                  reinterpret_cast<unsigned char*>(&motif_hints),
+                  sizeof(MotifWmHints)/sizeof(long));
 }
 
 bool IsShapeExtensionAvailable() {
@@ -853,6 +884,14 @@ bool SetIntArrayProperty(XID window,
                   reinterpret_cast<const unsigned char*>(data.get()),
                   value.size());  // num items
   return !err_tracker.FoundNewError();
+}
+
+bool SetAtomProperty(XID window,
+                     const std::string& name,
+                     const std::string& type,
+                     Atom value) {
+  std::vector<Atom> values(1, value);
+  return SetAtomArrayProperty(window, name, type, values);
 }
 
 bool SetAtomArrayProperty(XID window,

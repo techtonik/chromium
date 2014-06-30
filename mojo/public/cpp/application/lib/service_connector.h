@@ -12,6 +12,8 @@
 #include "mojo/public/interfaces/service_provider/service_provider.mojom.h"
 
 namespace mojo {
+class ApplicationConnection;
+
 namespace internal {
 
 template <class ServiceImpl, typename Context>
@@ -23,8 +25,10 @@ class ServiceConnector;
 template <class ServiceImpl, typename Context>
 class ServiceConnection : public ServiceImpl {
  public:
-  ServiceConnection() : ServiceImpl() {}
-  ServiceConnection(Context* context) : ServiceImpl(context) {}
+  explicit ServiceConnection(ApplicationConnection* connection)
+      : ServiceImpl(connection) {}
+  ServiceConnection(ApplicationConnection* connection,
+                    Context* context) : ServiceImpl(connection, context) {}
 
   virtual void OnConnectionError() MOJO_OVERRIDE {
     service_connector_->RemoveConnection(static_cast<ServiceImpl*>(this));
@@ -41,52 +45,45 @@ private:
   }
 
   ServiceConnector<ServiceImpl, Context>* service_connector_;
+
+  MOJO_DISALLOW_COPY_AND_ASSIGN(ServiceConnection);
 };
 
 template <typename ServiceImpl, typename Context>
 struct ServiceConstructor {
-  static ServiceConnection<ServiceImpl, Context>* New(Context* context) {
-    return new ServiceConnection<ServiceImpl, Context>(context);
+  static ServiceConnection<ServiceImpl, Context>* New(
+      ApplicationConnection* connection,
+      Context* context) {
+    return new ServiceConnection<ServiceImpl, Context>(
+        connection, context);
   }
 };
 
 template <typename ServiceImpl>
 struct ServiceConstructor<ServiceImpl, void> {
  public:
-  static ServiceConnection<ServiceImpl, void>* New(void* context) {
-    return new ServiceConnection<ServiceImpl, void>();
+  static ServiceConnection<ServiceImpl, void>* New(
+      ApplicationConnection* connection,
+      void* context) {
+    return new ServiceConnection<ServiceImpl, void>(connection);
   }
 };
 
 class ServiceConnectorBase {
  public:
-  class Owner : public ServiceProvider {
-   public:
-    Owner();
-    Owner(ScopedMessagePipeHandle service_provider_handle);
-    virtual ~Owner();
-    virtual void AddServiceConnector(
-        internal::ServiceConnectorBase* service_connector) = 0;
-    virtual void RemoveServiceConnector(
-        internal::ServiceConnectorBase* service_connector) = 0;
-
-   protected:
-    void set_service_connector_owner(ServiceConnectorBase* service_connector,
-                                     Owner* owner) {
-      service_connector->owner_ = owner;
-    }
-    ServiceProviderPtr service_provider_;
-  };
-  ServiceConnectorBase(const std::string& name) : name_(name), owner_(NULL) {}
+  ServiceConnectorBase(const std::string& name);
   virtual ~ServiceConnectorBase();
-  virtual void ConnectToService(const std::string& url,
-                                const std::string& name,
+  virtual void ConnectToService(const std::string& name,
                                 ScopedMessagePipeHandle client_handle) = 0;
   std::string name() const { return name_; }
+  void set_application_connection(ApplicationConnection* connection) {
+      application_connection_ = connection; }
 
  protected:
   std::string name_;
-  Owner* owner_;
+  ApplicationConnection* application_connection_;
+
+  MOJO_DISALLOW_COPY_AND_ASSIGN(ServiceConnectorBase);
 };
 
 template <class ServiceImpl, typename Context=void>
@@ -105,11 +102,11 @@ class ServiceConnector : public internal::ServiceConnectorBase {
     assert(connections_.empty());  // No one should have added more!
   }
 
-  virtual void ConnectToService(const std::string& url,
-                                const std::string& name,
+  virtual void ConnectToService(const std::string& name,
                                 ScopedMessagePipeHandle handle) MOJO_OVERRIDE {
     ServiceConnection<ServiceImpl, Context>* impl =
-        ServiceConstructor<ServiceImpl, Context>::New(context_);
+        ServiceConstructor<ServiceImpl, Context>::New(application_connection_,
+                                                      context_);
     impl->set_service_connector(this);
     BindToPipe(impl, handle.Pass());
 
@@ -123,8 +120,6 @@ class ServiceConnector : public internal::ServiceConnectorBase {
       if (*it == impl) {
         delete impl;
         connections_.erase(it);
-        if (connections_.empty())
-          owner_->RemoveServiceConnector(this);
         return;
       }
     }
@@ -136,6 +131,8 @@ class ServiceConnector : public internal::ServiceConnectorBase {
   typedef std::vector<ServiceImpl*> ConnectionList;
   ConnectionList connections_;
   Context* context_;
+
+  MOJO_DISALLOW_COPY_AND_ASSIGN(ServiceConnector);
 };
 
 }  // namespace internal

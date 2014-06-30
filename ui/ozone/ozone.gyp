@@ -15,18 +15,48 @@
   },
   'targets': [
     {
+      'target_name': 'ozone_base',
+      'type': '<(component)',
+      'dependencies': [
+        '<(DEPTH)/base/base.gyp:base',
+        '<(DEPTH)/skia/skia.gyp:skia',
+        '<(DEPTH)/ui/gfx/gfx.gyp:gfx_geometry',
+      ],
+      'defines': [
+        'OZONE_BASE_IMPLEMENTATION',
+      ],
+      'sources': [
+        'public/cursor_factory_ozone.cc',
+        'public/cursor_factory_ozone.h',
+        'public/event_factory_ozone.cc',
+        'public/event_factory_ozone.h',
+        'public/gpu_platform_support.cc',
+        'public/gpu_platform_support.h',
+        'public/gpu_platform_support_host.cc',
+        'public/gpu_platform_support_host.h',
+        'public/overlay_candidates_ozone.cc',
+        'public/overlay_candidates_ozone.h',
+        'public/surface_factory_ozone.cc',
+        'public/surface_factory_ozone.h',
+        'public/surface_ozone_canvas.h',
+        'public/surface_ozone_egl.h',
+      ],
+    },
+    {
       'target_name': 'ozone',
       'type': '<(component)',
       'dependencies': [
         '<(DEPTH)/base/base.gyp:base',
+        '<(DEPTH)/ipc/ipc.gyp:ipc',
+        '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/ui/events/events.gyp:events',
         '<(DEPTH)/ui/events/ozone/events_ozone.gyp:events_ozone',
         '<(DEPTH)/ui/gfx/gfx.gyp:gfx',
         '<(DEPTH)/ui/gfx/gfx.gyp:gfx_geometry',
-        '<(DEPTH)/ui/gfx/ozone/gfx_ozone.gyp:gfx_ozone',
-        '<(DEPTH)/skia/skia.gyp:skia',
+        '<(DEPTH)/ui/gfx/ipc/gfx_ipc.gyp:gfx_ipc',
         '<@(external_ozone_platform_deps)',
         '<@(internal_ozone_platform_deps)',
+        'ozone_base',
       ],
       'defines': [
         'OZONE_IMPLEMENTATION',
@@ -56,6 +86,8 @@
         'common/chromeos/native_display_delegate_ozone.h',
         'common/chromeos/touchscreen_device_manager_ozone.cc',
         'common/chromeos/touchscreen_device_manager_ozone.h',
+        'common/gpu/ozone_gpu_message_generator.cc',
+        'common/gpu/ozone_gpu_message_generator.h',
         'ozone_platform.cc',
         'ozone_platform.h',
         'ozone_switches.cc',
@@ -122,7 +154,7 @@
             '<(DEPTH)/ui/display/display.gyp:display_types',
           ],
         }],
-      ]
+      ],
     },
     {
       'target_name': 'ozone_unittests',
@@ -131,7 +163,7 @@
         'run_all_unittests.cc',
       ],
       'dependencies': [
-        'ozone',
+        'ozone_base',
         '../../base/base.gyp:base',
         '../../base/base.gyp:test_support_base',
         '../../testing/gtest.gyp:gtest',

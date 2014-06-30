@@ -7,8 +7,10 @@
 #include "dbus/exported_object.h"
 #include "dbus/message.h"
 #include "dbus/object_path.h"
-#include "mojo/common/channel_init.h"
-#include "mojo/public/cpp/application/application.h"
+#include "mojo/embedder/channel_init.h"
+#include "mojo/public/cpp/application/application_connection.h"
+#include "mojo/public/cpp/application/application_delegate.h"
+#include "mojo/public/cpp/application/application_impl.h"
 #include "mojo/public/interfaces/service_provider/service_provider.mojom.h"
 #include "mojo/shell/external_service.mojom.h"
 
@@ -43,17 +45,24 @@ class DBusExternalServiceBase {
   const std::string service_name_;
   scoped_refptr<dbus::Bus> bus_;
   dbus::ExportedObject* exported_object_;  // Owned by bus_;
-  scoped_ptr<common::ChannelInit> channel_init_;
+  scoped_ptr<embedder::ChannelInit> channel_init_;
   DISALLOW_COPY_AND_ASSIGN(DBusExternalServiceBase);
 };
 
 template <class ServiceImpl>
-class DBusExternalService : public DBusExternalServiceBase {
+class DBusExternalService : public DBusExternalServiceBase,
+                            public ApplicationDelegate {
  public:
   explicit DBusExternalService(const std::string& service_name)
       : DBusExternalServiceBase(service_name) {
   }
   virtual ~DBusExternalService() {}
+
+  virtual bool ConfigureIncomingConnection(ApplicationConnection* connection)
+      MOJO_OVERRIDE {
+    connection->AddService<ServiceImpl>();
+    return true;
+  }
 
  protected:
   virtual void Connect(ScopedMessagePipeHandle client_handle) OVERRIDE {
@@ -74,8 +83,7 @@ class DBusExternalService : public DBusExternalServiceBase {
     }
     virtual void Activate(ScopedMessagePipeHandle service_provider_handle)
         OVERRIDE {
-      app_.reset(new Application(service_provider_handle.Pass()));
-      app_->AddService<ServiceImpl>();
+      app_.reset(new ApplicationImpl(service_, service_provider_handle.Pass()));
     }
    private:
     DBusExternalService* service_;

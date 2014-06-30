@@ -24,6 +24,7 @@
 #include "base/time/time.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/bookmarks/chrome_bookmark_client.h"
+#include "chrome/browser/bookmarks/chrome_bookmark_client_factory.h"
 #include "chrome/browser/sync/glue/bookmark_change_processor.h"
 #include "chrome/browser/sync/glue/bookmark_model_associator.h"
 #include "chrome/common/chrome_switches.h"
@@ -33,7 +34,7 @@
 #include "components/bookmarks/test/bookmark_test_helpers.h"
 #include "components/sync_driver/data_type_error_handler.h"
 #include "components/sync_driver/data_type_error_handler_mock.h"
-#include "content/public/test/test_browser_thread.h"
+#include "content/public/test/test_browser_thread_bundle.h"
 #include "sync/api/sync_error.h"
 #include "sync/internal_api/public/change_record.h"
 #include "sync/internal_api/public/read_node.h"
@@ -48,7 +49,6 @@
 
 namespace browser_sync {
 
-using content::BrowserThread;
 using syncer::BaseNode;
 using testing::_;
 using testing::InvokeWithoutArgs;
@@ -319,11 +319,9 @@ class ProfileSyncServiceBookmarkTest : public testing::Test {
 
   ProfileSyncServiceBookmarkTest()
       : model_(NULL),
-        ui_thread_(BrowserThread::UI, &message_loop_),
-        file_thread_(BrowserThread::FILE, &message_loop_),
+        thread_bundle_(content::TestBrowserThreadBundle::DEFAULT),
         local_merge_result_(syncer::BOOKMARKS),
-        syncer_merge_result_(syncer::BOOKMARKS) {
-  }
+        syncer_merge_result_(syncer::BOOKMARKS) {}
 
   virtual ~ProfileSyncServiceBookmarkTest() {
     StopSync();
@@ -402,7 +400,7 @@ class ProfileSyncServiceBookmarkTest : public testing::Test {
     // This noticeably speeds up the unit tests that request it.
     if (save == DONT_SAVE_TO_STORAGE)
       model_->ClearStore();
-    message_loop_.RunUntilIdle();
+    base::MessageLoop::current()->RunUntilIdle();
   }
 
   int GetSyncBookmarkCount() {
@@ -541,7 +539,7 @@ class ProfileSyncServiceBookmarkTest : public testing::Test {
     }
     model_associator_.reset();
 
-    message_loop_.RunUntilIdle();
+    base::MessageLoop::current()->RunUntilIdle();
 
     // TODO(akalin): Actually close the database and flush it to disk
     // (and make StartSync reload from disk).  This would require
@@ -551,7 +549,7 @@ class ProfileSyncServiceBookmarkTest : public testing::Test {
   void UnloadBookmarkModel() {
     profile_.CreateBookmarkModel(false /* delete_bookmarks */);
     model_ = NULL;
-    message_loop_.RunUntilIdle();
+    base::MessageLoop::current()->RunUntilIdle();
   }
 
   bool InitSyncNodeFromChromeNode(const BookmarkNode* bnode,
@@ -637,7 +635,7 @@ class ProfileSyncServiceBookmarkTest : public testing::Test {
     ASSERT_TRUE(bnode);
 
     ChromeBookmarkClient* client =
-        BookmarkModelFactory::GetChromeBookmarkClientForProfile(&profile_);
+        ChromeBookmarkClientFactory::GetForProfile(&profile_);
     ASSERT_TRUE(client);
     ASSERT_FALSE(client->IsDescendantOfManagedNode(bnode));
 
@@ -740,12 +738,7 @@ class ProfileSyncServiceBookmarkTest : public testing::Test {
   scoped_ptr<BookmarkModelAssociator> model_associator_;
 
  private:
-  // Used by both |ui_thread_| and |file_thread_|.
-  base::MessageLoop message_loop_;
-  content::TestBrowserThread ui_thread_;
-  // Needed by |model_|.
-  content::TestBrowserThread file_thread_;
-
+  content::TestBrowserThreadBundle thread_bundle_;
   syncer::SyncMergeResult local_merge_result_;
   syncer::SyncMergeResult syncer_merge_result_;
 };
@@ -2018,7 +2011,7 @@ void ProfileSyncServiceBookmarkTestWithData::GetTransactionVersions(
     const BookmarkNode* root,
     BookmarkNodeVersionMap* node_versions) {
   ChromeBookmarkClient* client =
-      BookmarkModelFactory::GetChromeBookmarkClientForProfile(&profile_);
+      ChromeBookmarkClientFactory::GetForProfile(&profile_);
   ASSERT_TRUE(client);
 
   node_versions->clear();

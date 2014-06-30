@@ -28,9 +28,6 @@ class NewAvatarButton : public views::MenuButton,
                   Browser* browser);
   virtual ~NewAvatarButton();
 
-  // views::TextButton:
-  virtual void OnPaintText(gfx::Canvas* canvas, PaintButtonMode mode) OVERRIDE;
-
  private:
   friend class NewAvatarMenuButtonTest;
   friend class ProfileChooserViewBrowserTest;
@@ -45,6 +42,8 @@ class NewAvatarButton : public views::MenuButton,
   virtual void OnProfileNameChanged(
       const base::FilePath& profile_path,
       const base::string16& old_profile_name) OVERRIDE;
+  virtual void OnProfileSupervisedUserIdChanged(
+      const base::FilePath& profile_path) OVERRIDE;
 
   // SigninErrorController::Observer:
   virtual void OnErrorChanged() OVERRIDE;

@@ -154,9 +154,6 @@ const char kDisableFlashStage3d[]           = "disable-flash-stage3d";
 
 const char kDisableGestureTapHighlight[]    = "disable-gesture-tap-highlight";
 
-// Disable GL multisampling.
-const char kDisableGLMultisampling[]        = "disable-gl-multisampling";
-
 // Disables GPU hardware acceleration.  If software renderer is not in place,
 // then the GPU process won't launch.
 const char kDisableGpu[]                    = "disable-gpu";
@@ -249,9 +246,6 @@ const char kDisableRemoteFonts[]            = "disable-remote-fonts";
 // Turns off the accessibility in the renderer.
 const char kDisableRendererAccessibility[]  = "disable-renderer-accessibility";
 
-// Disables the new layout/paint system which paints after layout is complete.
-const char kDisableRepaintAfterLayout[]     = "disable-repaint-after-layout";
-
 // Disable the seccomp filter sandbox (seccomp-bpf) (Linux only).
 const char kDisableSeccompFilterSandbox[]   = "disable-seccomp-filter-sandbox";
 
@@ -273,16 +267,8 @@ const char kDisableSmoothScrolling[]        = "disable-smooth-scrolling";
 // Disables the use of a 3D software rasterizer.
 const char kDisableSoftwareRasterizer[]     = "disable-software-rasterizer";
 
-// Disable False Start in SSL and TLS connections.
-const char kDisableSSLFalseStart[]          = "disable-ssl-false-start";
-
 // Disable multithreaded GPU compositing of web content.
 const char kDisableThreadedCompositing[]     = "disable-threaded-compositing";
-
-// Disable accelerated overflow scrolling in corner cases (that would not be
-// handled by enable-accelerated-overflow-scroll).
-const char kDisableUniversalAcceleratedOverflowScroll[] =
-    "disable-universal-accelerated-overflow-scroll";
 
 // Don't enforce the same-origin policy. (Used by people testing their sites.)
 const char kDisableWebSecurity[]            = "disable-web-security";
@@ -451,10 +437,6 @@ const char kEnablePreparsedJsCaching[]      = "enable-preparsed-js-caching";
 const char kEnableRegionBasedColumns[] =
     "enable-region-based-columns";
 
-// Enables the new layout/paint system which paints after layout is complete.
-const char kEnableRepaintAfterLayout[] =
-    "enable-repaint-after-layout";
-
 // Enables targeted style recalculation optimizations.
 const char kEnableTargetedStyleRecalc[] =
     "enable-targeted-style-recalc";
@@ -495,10 +477,6 @@ const char kEnableStatsTable[]              = "enable-stats-table";
 // cookies on cross-site requests.
 const char kEnableStrictSiteIsolation[]     = "enable-strict-site-isolation";
 
-// Enable support for ServiceWorker. See
-// https://github.com/slightlyoff/ServiceWorker for more information.
-const char kEnableServiceWorker[]           = "enable-service-worker";
-
 // Enable support for sync events in ServiceWorkers.
 const char kEnableServiceWorkerSync[]       = "enable-service-worker-sync";
 
@@ -508,10 +486,6 @@ const char kEnableTcpFastOpen[]             = "enable-tcp-fastopen";
 
 // Enable multithreaded GPU compositing of web content.
 const char kEnableThreadedCompositing[]     = "enable-threaded-compositing";
-
-// Enable accelerated overflow scrolling in all cases.
-const char kEnableUniversalAcceleratedOverflowScroll[] =
-    "enable-universal-accelerated-overflow-scroll";
 
 // Enable screen capturing support for MediaStream API.
 const char kEnableUserMediaScreenCapturing[] =
@@ -615,6 +589,10 @@ const char kIgnoreGpuBlacklist[]            = "ignore-gpu-blacklist";
 
 // Run the GPU process as a thread in the browser process.
 const char kInProcessGPU[]                  = "in-process-gpu";
+
+// Overrides the timeout, in seconds, that a child process waits for a
+// connection from the browser before killing itself.
+const char kIPCConnectionTimeout[]          = "ipc-connection-timeout";
 
 // Specifies the flags passed to JS engine
 const char kJavaScriptFlags[]               = "js-flags";
@@ -839,6 +817,8 @@ const char kTraceStartupDuration[]          = "trace-startup-duration";
 // all events since startup.
 const char kTraceStartupFile[]              = "trace-startup-file";
 
+// Sets the target URL for uploading tracing data.
+const char kTraceUploadURL[]                = "trace-upload-url";
 
 
 // Prioritizes the UI's command stream in the GPU process
@@ -897,9 +877,6 @@ const char kZygoteProcess[]                 = "zygote";
 // NS and AGC will be done in PeerConnection instead of MediaStreamTrack.
 const char kDisableAudioTrackProcessing[]    = "disable-audio-track-processing";
 
-// Disables WebRTC device enumeration.
-const char kDisableDeviceEnumeration[]      = "disable-device-enumeration";
-
 // Disables HW decode acceleration for WebRTC.
 const char kDisableWebRtcHWDecoding[]       = "disable-webrtc-hw-decoding";
 
@@ -948,6 +925,10 @@ const char kDisableWebAudio[]               = "disable-webaudio";
 #if defined(OS_CHROMEOS)
 // Disables panel fitting (used for mirror mode).
 const char kDisablePanelFitting[]           = "disable-panel-fitting";
+
+// Enables VA-API accelerated video encode.
+const char kEnableVaapiAcceleratedVideoEncode[] =
+    "enable-vaapi-accelerated-video-encode";
 #endif
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)

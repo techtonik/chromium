@@ -588,7 +588,7 @@ std::string EventTypeToString(ui::EventType type) {
 
     default:
       // We should explicitly require each event type.
-      NOTREACHED();
+      NOTREACHED() << "Received unexpected event: " << type;
       break;
   }
   return "";
@@ -606,9 +606,16 @@ std::string EventTypesToString(const EventFilterRecorder::Events& events) {
 
 }  // namespace
 
+#if defined(OS_WIN) && defined(ARCH_CPU_X86)
+#define MAYBE(x) DISABLED_##x
+#else
+#define MAYBE(x) x
+#endif
+
 // Verifies a repost mouse event targets the window with capture (if there is
 // one).
-TEST_F(WindowEventDispatcherTest, RepostTargetsCaptureWindow) {
+// Flaky on 32-bit Windows bots.  http://crbug.com/388290
+TEST_F(WindowEventDispatcherTest, MAYBE(RepostTargetsCaptureWindow)) {
   // Set capture on |window| generate a mouse event (that is reposted) and not
   // over |window| and verify |window| gets it (|window| gets it because it has
   // capture).
@@ -744,12 +751,15 @@ TEST_F(WindowEventDispatcherTest, TouchMovesHeld) {
   // Check that we don't immediately dispatch the TOUCH_MOVED event.
   ui::TouchEvent touch_moved_event(
       ui::ET_TOUCH_MOVED, touch_location, 0, ui::EventTimeForNow());
+  ui::TouchEvent touch_moved_event2 = touch_moved_event;
+  ui::TouchEvent touch_moved_event3 = touch_moved_event;
+
   DispatchEventUsingWindowDispatcher(&touch_moved_event);
   EXPECT_TRUE(recorder.events().empty());
 
   // Check that on ReleasePointerMoves, held events are not dispatched
   // immediately, but posted instead.
-  DispatchEventUsingWindowDispatcher(&touch_moved_event);
+  DispatchEventUsingWindowDispatcher(&touch_moved_event2);
   host()->dispatcher()->ReleasePointerMoves();
   EXPECT_TRUE(recorder.events().empty());
 
@@ -763,7 +773,7 @@ TEST_F(WindowEventDispatcherTest, TouchMovesHeld) {
       ui::ET_TOUCH_RELEASED, touch_location, 0, ui::EventTimeForNow());
   recorder.Reset();
   host()->dispatcher()->HoldPointerMoves();
-  DispatchEventUsingWindowDispatcher(&touch_moved_event);
+  DispatchEventUsingWindowDispatcher(&touch_moved_event3);
   DispatchEventUsingWindowDispatcher(&touch_released_event);
   EXPECT_EQ("TOUCH_MOVED TOUCH_RELEASED GESTURE_TAP GESTURE_END",
             EventTypesToString(recorder.events()));
@@ -773,20 +783,21 @@ TEST_F(WindowEventDispatcherTest, TouchMovesHeld) {
   EXPECT_TRUE(recorder.events().empty());
 }
 
+// This event handler requests the dispatcher to start holding pointer-move
+// events when it receives the first scroll-update gesture.
 class HoldPointerOnScrollHandler : public ui::test::TestEventHandler {
  public:
   HoldPointerOnScrollHandler(WindowEventDispatcher* dispatcher,
-                                  EventFilterRecorder* filter)
+                             EventFilterRecorder* filter)
       : dispatcher_(dispatcher),
         filter_(filter),
-        holding_moves_(false) {
-  }
+        holding_moves_(false) {}
   virtual ~HoldPointerOnScrollHandler() {}
 
  private:
+  // ui::test::TestEventHandler:
   virtual void OnGestureEvent(ui::GestureEvent* gesture) OVERRIDE {
-    if (gesture->type() == ui::ET_GESTURE_SCROLL_UPDATE) {
-      CHECK(!holding_moves_);
+    if (!holding_moves_ && gesture->type() == ui::ET_GESTURE_SCROLL_UPDATE) {
       holding_moves_ = true;
       dispatcher_->HoldPointerMoves();
       filter_->Reset();
@@ -825,13 +836,49 @@ TEST_F(WindowEventDispatcherTest, TouchMovesHeldOnScroll) {
   // along with the subsequent events (i.e. touch-release, scroll-end, and
   // gesture-end).
   const EventFilterRecorder::Events& events = recorder.events();
-  EXPECT_EQ("TOUCH_MOVED TOUCH_RELEASED GESTURE_SCROLL_END GESTURE_END",
-            EventTypesToString(events));
+  EXPECT_EQ(
+      "TOUCH_MOVED GESTURE_SCROLL_UPDATE TOUCH_RELEASED "
+      "GESTURE_SCROLL_END GESTURE_END",
+      EventTypesToString(events));
   ASSERT_EQ(2u, recorder.touch_locations().size());
   EXPECT_EQ(gfx::Point(-40, 10).ToString(),
             recorder.touch_locations()[0].ToString());
   EXPECT_EQ(gfx::Point(-40, 10).ToString(),
             recorder.touch_locations()[1].ToString());
+}
+
+// Tests that a 'held' touch-event does contribute to gesture event when it is
+// dispatched.
+TEST_F(WindowEventDispatcherTest, HeldTouchMoveContributesToGesture) {
+  EventFilterRecorder recorder;
+  root_window()->AddPreTargetHandler(&recorder);
+
+  const gfx::Point location(20, 20);
+  ui::TouchEvent press(
+      ui::ET_TOUCH_PRESSED, location, 0, ui::EventTimeForNow());
+  DispatchEventUsingWindowDispatcher(&press);
+  EXPECT_TRUE(recorder.HasReceivedEvent(ui::ET_TOUCH_PRESSED));
+  recorder.Reset();
+
+  host()->dispatcher()->HoldPointerMoves();
+
+  ui::TouchEvent move(ui::ET_TOUCH_MOVED,
+                      location + gfx::Vector2d(100, 100),
+                      0,
+                      ui::EventTimeForNow());
+  DispatchEventUsingWindowDispatcher(&move);
+  EXPECT_FALSE(recorder.HasReceivedEvent(ui::ET_TOUCH_MOVED));
+  EXPECT_FALSE(recorder.HasReceivedEvent(ui::ET_GESTURE_SCROLL_BEGIN));
+  recorder.Reset();
+
+  host()->dispatcher()->ReleasePointerMoves();
+  EXPECT_FALSE(recorder.HasReceivedEvent(ui::ET_TOUCH_MOVED));
+  RunAllPendingInMessageLoop();
+  EXPECT_TRUE(recorder.HasReceivedEvent(ui::ET_TOUCH_MOVED));
+  EXPECT_TRUE(recorder.HasReceivedEvent(ui::ET_GESTURE_SCROLL_BEGIN));
+  EXPECT_TRUE(recorder.HasReceivedEvent(ui::ET_GESTURE_SCROLL_UPDATE));
+
+  root_window()->RemovePreTargetHandler(&recorder);
 }
 
 // Tests that synthetic mouse events are ignored when mouse
@@ -869,10 +916,18 @@ TEST_F(WindowEventDispatcherTest, DispatchSyntheticMouseEvents) {
   root_window()->RemovePreTargetHandler(&recorder);
 }
 
+#if defined(OS_WIN) && defined(ARCH_CPU_X86)
+#define MAYBE(x) DISABLED_##x
+#else
+#define MAYBE(x) x
+#endif
+
 // Tests synthetic mouse events generated when window bounds changes such that
 // the cursor previously outside the window becomes inside, or vice versa.
 // Do not synthesize events if the window ignores events or is invisible.
-TEST_F(WindowEventDispatcherTest, SynthesizeMouseEventsOnWindowBoundsChanged) {
+// Flaky on 32-bit Windows bots.  http://crbug.com/388272
+TEST_F(WindowEventDispatcherTest,
+       MAYBE(SynthesizeMouseEventsOnWindowBoundsChanged)) {
   test::TestWindowDelegate delegate;
   scoped_ptr<aura::Window> window(CreateTestWindowWithDelegate(
       &delegate, 1234, gfx::Rect(5, 5, 100, 100), root_window()));
@@ -1895,8 +1950,10 @@ TEST_F(WindowEventDispatcherTestInHighDPI, TouchMovesHeldOnScroll) {
   // along with the subsequent events (i.e. touch-release, scroll-end, and
   // gesture-end).
   const EventFilterRecorder::Events& events = recorder.events();
-  EXPECT_EQ("TOUCH_MOVED TOUCH_RELEASED GESTURE_SCROLL_END GESTURE_END",
-            EventTypesToString(events));
+  EXPECT_EQ(
+      "TOUCH_MOVED GESTURE_SCROLL_UPDATE TOUCH_RELEASED "
+      "GESTURE_SCROLL_END GESTURE_END",
+      EventTypesToString(events));
   ASSERT_EQ(2u, recorder.touch_locations().size());
   EXPECT_EQ(gfx::Point(-40, 10).ToString(),
             recorder.touch_locations()[0].ToString());

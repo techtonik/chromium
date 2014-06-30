@@ -5,6 +5,7 @@
 {
   'targets': [
     {
+      # GN version: //chrome/browser/devtools
       'target_name': 'debugger',
       'type': 'static_library',
       'variables': { 'enable_wexit_time_destructors': 1, },
@@ -68,6 +69,8 @@
         'browser/devtools/devtools_network_conditions.h',
         'browser/devtools/devtools_network_controller.cc',
         'browser/devtools/devtools_network_controller.h',
+        'browser/devtools/devtools_network_interceptor.cc',
+        'browser/devtools/devtools_network_interceptor.h',
         'browser/devtools/devtools_network_transaction.cc',
         'browser/devtools/devtools_network_transaction.h',
         'browser/devtools/devtools_network_transaction_factory.cc',

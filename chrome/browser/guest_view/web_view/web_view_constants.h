@@ -32,6 +32,9 @@ extern const char kEventSizeChanged[];
 extern const char kEventUnresponsive[];
 extern const char kEventZoomChange[];
 
+// Event related constants.
+extern const char kWebViewEventPrefix[];
+
 // Parameters/properties on events.
 extern const char kContextMenuItems[];
 extern const char kDefaultPromptText[];
@@ -54,6 +57,7 @@ extern const char kOldURL[];
 extern const char kPermission[];
 extern const char kPermissionTypeDialog[];
 extern const char kPermissionTypeDownload[];
+extern const char kPermissionTypeFileSystem[];
 extern const char kPermissionTypeGeolocation[];
 extern const char kPermissionTypeLoadPlugin[];
 extern const char kPermissionTypeMedia[];

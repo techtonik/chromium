@@ -4,29 +4,61 @@
 
 #include "chrome/browser/extensions/api/guest_view/guest_view_internal_api.h"
 
+#include "chrome/browser/guest_view/guest_view_base.h"
 #include "chrome/browser/guest_view/guest_view_manager.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/extensions/api/guest_view_internal.h"
+#include "content/public/browser/render_process_host.h"
+#include "content/public/browser/render_view_host.h"
 #include "extensions/common/permissions/permissions_data.h"
+
+namespace {
+const char* kWebViewPermissionRequiredError =
+    "\"webview\" permission is required for allocating instance ID.";
+}  // namespace
 
 namespace extensions {
 
-GuestViewInternalAllocateInstanceIdFunction::
-    GuestViewInternalAllocateInstanceIdFunction() {
+GuestViewInternalCreateGuestFunction::
+    GuestViewInternalCreateGuestFunction() {
 }
 
-bool GuestViewInternalAllocateInstanceIdFunction::RunAsync() {
-  EXTENSION_FUNCTION_VALIDATE(!args_->GetSize());
+bool GuestViewInternalCreateGuestFunction::RunAsync() {
+  std::string view_type;
+  EXTENSION_FUNCTION_VALIDATE(args_->GetString(0, &view_type));
 
-  // Check if we have "webview" permission.
-  CHECK(GetExtension()->permissions_data()->HasAPIPermission(
-            APIPermission::kWebView));
+  base::DictionaryValue* create_params;
+  EXTENSION_FUNCTION_VALIDATE(args_->GetDictionary(1, &create_params));
 
-  int instanceId = GuestViewManager::FromBrowserContext(browser_context())
-                       ->GetNextInstanceID();
-  SetResult(base::Value::CreateIntegerValue(instanceId));
-  SendResponse(true);
+  if (!GetExtension()->permissions_data()->HasAPIPermission(
+          APIPermission::kWebView)) {
+    LOG(ERROR) << kWebViewPermissionRequiredError;
+    error_ = kWebViewPermissionRequiredError;
+    SendResponse(false);
+  }
+
+  GuestViewManager* guest_view_manager =
+      GuestViewManager::FromBrowserContext(browser_context());
+
+  GuestViewManager::WebContentsCreatedCallback callback =
+      base::Bind(&GuestViewInternalCreateGuestFunction::CreateGuestCallback,
+                 this);
+  guest_view_manager->CreateGuest(view_type,
+                                  extension_id(),
+                                  render_view_host()->GetProcess()->GetID(),
+                                  *create_params,
+                                  callback);
+
   return true;
+}
+
+void GuestViewInternalCreateGuestFunction::CreateGuestCallback(
+    content::WebContents* guest_web_contents) {
+  if (!guest_web_contents)
+    return;
+  GuestViewBase* guest = GuestViewBase::FromWebContents(guest_web_contents);
+  SetResult(base::Value::CreateIntegerValue(guest->GetGuestInstanceID()));
+  SendResponse(true);
 }
 
 }  // namespace extensions

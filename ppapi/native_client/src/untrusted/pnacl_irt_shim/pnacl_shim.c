@@ -7,7 +7,6 @@
 #include "ppapi/native_client/src/untrusted/pnacl_irt_shim/pnacl_shim.h"
 
 #include "ppapi/c/ppb.h"
-#include "ppapi/c/dev/ppb_alarms_dev.h"
 #include "ppapi/c/dev/ppb_audio_input_dev.h"
 #include "ppapi/c/dev/ppb_device_ref_dev.h"
 #include "ppapi/c/dev/ppb_file_chooser_dev.h"
@@ -145,7 +144,6 @@ static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_VarDictionary_1_0;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_VideoDecoder_0_1;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_WebSocket_1_0;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPP_Messaging_1_0;
-static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_Alarms_Dev_0_1;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_AudioInput_Dev_0_3;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_AudioInput_Dev_0_4;
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_DeviceRef_Dev_0_1;
@@ -1921,6 +1919,8 @@ static int32_t Pnacl_M36_PPB_VideoDecoder_Reset(PP_Resource video_decoder, struc
 
 /* Not generating wrapper methods for PPB_View_1_1 */
 
+/* Not generating wrapper methods for PPB_View_1_2 */
+
 /* Begin wrapper methods for PPB_WebSocket_1_0 */
 
 static PP_Resource Pnacl_M18_PPB_WebSocket_Create(PP_Instance instance) {
@@ -2031,40 +2031,6 @@ static void Pnacl_M14_PPP_Messaging_HandleMessage(PP_Instance instance, struct P
 /* Not generating wrapper methods for PPB_FileChooserTrusted_0_6 */
 
 /* Not generating wrapper methods for PPB_URLLoaderTrusted_0_3 */
-
-/* Begin wrapper methods for PPB_Alarms_Dev_0_1 */
-
-static void Pnacl_M33_PPB_Alarms_Dev_Create(PP_Instance instance, struct PP_Var* name, const struct PP_Alarms_AlarmCreateInfo_Dev* alarm_info) {
-  const struct PPB_Alarms_Dev_0_1 *iface = Pnacl_WrapperInfo_PPB_Alarms_Dev_0_1.real_iface;
-  iface->Create(instance, *name, alarm_info);
-}
-
-static int32_t Pnacl_M33_PPB_Alarms_Dev_Get(PP_Instance instance, struct PP_Var* name, struct PP_Alarms_Alarm_Dev* alarm, struct PP_CompletionCallback* callback) {
-  const struct PPB_Alarms_Dev_0_1 *iface = Pnacl_WrapperInfo_PPB_Alarms_Dev_0_1.real_iface;
-  return iface->Get(instance, *name, alarm, *callback);
-}
-
-static int32_t Pnacl_M33_PPB_Alarms_Dev_GetAll(PP_Instance instance, struct PP_Alarms_Alarm_Array_Dev* alarms, struct PP_ArrayOutput* array_allocator, struct PP_CompletionCallback* callback) {
-  const struct PPB_Alarms_Dev_0_1 *iface = Pnacl_WrapperInfo_PPB_Alarms_Dev_0_1.real_iface;
-  return iface->GetAll(instance, alarms, *array_allocator, *callback);
-}
-
-static void Pnacl_M33_PPB_Alarms_Dev_Clear(PP_Instance instance, struct PP_Var* name) {
-  const struct PPB_Alarms_Dev_0_1 *iface = Pnacl_WrapperInfo_PPB_Alarms_Dev_0_1.real_iface;
-  iface->Clear(instance, *name);
-}
-
-static void Pnacl_M33_PPB_Alarms_Dev_ClearAll(PP_Instance instance) {
-  const struct PPB_Alarms_Dev_0_1 *iface = Pnacl_WrapperInfo_PPB_Alarms_Dev_0_1.real_iface;
-  iface->ClearAll(instance);
-}
-
-static uint32_t Pnacl_M33_PPB_Alarms_Dev_AddOnAlarmListener(PP_Instance instance, PP_Alarms_OnAlarm_Dev callback, void* user_data) {
-  const struct PPB_Alarms_Dev_0_1 *iface = Pnacl_WrapperInfo_PPB_Alarms_Dev_0_1.real_iface;
-  return iface->AddOnAlarmListener(instance, callback, user_data);
-}
-
-/* End wrapper methods for PPB_Alarms_Dev_0_1 */
 
 /* Begin wrapper methods for PPB_AudioInput_Dev_0_3 */
 
@@ -3309,13 +3275,11 @@ static int32_t Pnacl_M33_PPB_IsolatedFileSystem_Private_Open(PP_Instance instanc
 
 /* End wrapper methods for PPB_IsolatedFileSystem_Private_0_2 */
 
-/* Not generating wrapper methods for PPP_ManifestService_1_0 */
-
 /* Begin wrapper methods for PPB_NaCl_Private_1_0 */
 
-static void Pnacl_M25_PPB_NaCl_Private_LaunchSelLdr(PP_Instance instance, PP_Bool main_service_runtime, const char* alleged_url, PP_Bool uses_irt, PP_Bool uses_ppapi, PP_Bool uses_nonsfi_mode, PP_Bool enable_ppapi_dev, PP_Bool enable_dyncode_syscalls, PP_Bool enable_exception_handling, PP_Bool enable_crash_throttling, const struct PPP_ManifestService_1_0* manifest_service_interface, void* manifest_service_user_data, void* imc_handle, struct PP_CompletionCallback* callback) {
+static void Pnacl_M25_PPB_NaCl_Private_LaunchSelLdr(PP_Instance instance, PP_Bool main_service_runtime, const char* alleged_url, const struct PP_NaClFileInfo* nexe_file_info, PP_Bool uses_irt, PP_Bool uses_ppapi, PP_Bool uses_nonsfi_mode, PP_Bool enable_ppapi_dev, PP_Bool enable_dyncode_syscalls, PP_Bool enable_exception_handling, PP_Bool enable_crash_throttling, void* imc_handle, struct PP_CompletionCallback* callback) {
   const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  iface->LaunchSelLdr(instance, main_service_runtime, alleged_url, uses_irt, uses_ppapi, uses_nonsfi_mode, enable_ppapi_dev, enable_dyncode_syscalls, enable_exception_handling, enable_crash_throttling, manifest_service_interface, manifest_service_user_data, imc_handle, *callback);
+  iface->LaunchSelLdr(instance, main_service_runtime, alleged_url, nexe_file_info, uses_irt, uses_ppapi, uses_nonsfi_mode, enable_ppapi_dev, enable_dyncode_syscalls, enable_exception_handling, enable_crash_throttling, imc_handle, *callback);
 }
 
 static PP_Bool Pnacl_M25_PPB_NaCl_Private_StartPpapiProxy(PP_Instance instance) {
@@ -3363,9 +3327,9 @@ static int32_t Pnacl_M25_PPB_NaCl_Private_GetNexeFd(PP_Instance instance, const 
   return iface->GetNexeFd(instance, pexe_url, abi_version, opt_level, headers, extra_flags, is_hit, nexe_handle, *callback);
 }
 
-static void Pnacl_M25_PPB_NaCl_Private_ReportTranslationFinished(PP_Instance instance, PP_Bool success) {
+static void Pnacl_M25_PPB_NaCl_Private_ReportTranslationFinished(PP_Instance instance, PP_Bool success, int32_t opt_level, int64_t pexe_size, int64_t compile_time_us) {
   const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  iface->ReportTranslationFinished(instance, success);
+  iface->ReportTranslationFinished(instance, success, opt_level, pexe_size, compile_time_us);
 }
 
 static void Pnacl_M25_PPB_NaCl_Private_DispatchEvent(PP_Instance instance, PP_NaClEventType event_type, const char* resource_url, PP_Bool length_is_computable, uint64_t loaded_bytes, uint64_t total_bytes) {
@@ -3473,11 +3437,6 @@ static PP_Bool Pnacl_M25_PPB_NaCl_Private_GetManifestProgramURL(PP_Instance inst
   return iface->GetManifestProgramURL(instance, full_url, pnacl_options, uses_nonsfi_mode);
 }
 
-static PP_Bool Pnacl_M25_PPB_NaCl_Private_ManifestResolveKey(PP_Instance instance, PP_Bool helper_process, const char* key, struct PP_Var* full_url, struct PP_PNaClOptions* pnacl_options) {
-  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  return iface->ManifestResolveKey(instance, helper_process, key, full_url, pnacl_options);
-}
-
 static PP_Bool Pnacl_M25_PPB_NaCl_Private_GetPnaclResourceInfo(PP_Instance instance, const char* filename, struct PP_Var* llc_tool_name, struct PP_Var* ld_tool_name) {
   const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
   return iface->GetPnaclResourceInfo(instance, filename, llc_tool_name, ld_tool_name);
@@ -3498,14 +3457,24 @@ static void Pnacl_M25_PPB_NaCl_Private_DownloadNexe(PP_Instance instance, const 
   iface->DownloadNexe(instance, url, file_info, *callback);
 }
 
-static void Pnacl_M25_PPB_NaCl_Private_DownloadFile(PP_Instance instance, const char* url, struct PP_NaClFileInfo* file_info, struct PP_CompletionCallback* callback) {
-  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
-  iface->DownloadFile(instance, url, file_info, *callback);
-}
-
 static void Pnacl_M25_PPB_NaCl_Private_ReportSelLdrStatus(PP_Instance instance, int32_t load_status, int32_t max_status) {
   const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
   iface->ReportSelLdrStatus(instance, load_status, max_status);
+}
+
+static void Pnacl_M25_PPB_NaCl_Private_LogTranslateTime(const char* histogram_name, int64_t time_us) {
+  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
+  iface->LogTranslateTime(histogram_name, time_us);
+}
+
+static void Pnacl_M25_PPB_NaCl_Private_OpenManifestEntry(PP_Instance instance, PP_Bool is_helper_process, const char* key, struct PP_NaClFileInfo* file_info, struct PP_CompletionCallback* callback) {
+  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
+  iface->OpenManifestEntry(instance, is_helper_process, key, file_info, *callback);
+}
+
+static void Pnacl_M25_PPB_NaCl_Private_SetPNaClStartTime(PP_Instance instance) {
+  const struct PPB_NaCl_Private_1_0 *iface = Pnacl_WrapperInfo_PPB_NaCl_Private_1_0.real_iface;
+  iface->SetPNaClStartTime(instance);
 }
 
 /* End wrapper methods for PPB_NaCl_Private_1_0 */
@@ -4831,6 +4800,8 @@ static const struct PPB_VideoDecoder_0_1 Pnacl_Wrappers_PPB_VideoDecoder_0_1 = {
 
 /* Not generating wrapper interface for PPB_View_1_1 */
 
+/* Not generating wrapper interface for PPB_View_1_2 */
+
 static const struct PPB_WebSocket_1_0 Pnacl_Wrappers_PPB_WebSocket_1_0 = {
     .Create = (PP_Resource (*)(PP_Instance instance))&Pnacl_M18_PPB_WebSocket_Create,
     .IsWebSocket = (PP_Bool (*)(PP_Resource resource))&Pnacl_M18_PPB_WebSocket_IsWebSocket,
@@ -4877,15 +4848,6 @@ static const struct PPP_Messaging_1_0 Pnacl_Wrappers_PPP_Messaging_1_0 = {
 /* Not generating wrapper interface for PPB_FileChooserTrusted_0_6 */
 
 /* Not generating wrapper interface for PPB_URLLoaderTrusted_0_3 */
-
-static const struct PPB_Alarms_Dev_0_1 Pnacl_Wrappers_PPB_Alarms_Dev_0_1 = {
-    .Create = (void (*)(PP_Instance instance, struct PP_Var name, const struct PP_Alarms_AlarmCreateInfo_Dev* alarm_info))&Pnacl_M33_PPB_Alarms_Dev_Create,
-    .Get = (int32_t (*)(PP_Instance instance, struct PP_Var name, struct PP_Alarms_Alarm_Dev* alarm, struct PP_CompletionCallback callback))&Pnacl_M33_PPB_Alarms_Dev_Get,
-    .GetAll = (int32_t (*)(PP_Instance instance, struct PP_Alarms_Alarm_Array_Dev* alarms, struct PP_ArrayOutput array_allocator, struct PP_CompletionCallback callback))&Pnacl_M33_PPB_Alarms_Dev_GetAll,
-    .Clear = (void (*)(PP_Instance instance, struct PP_Var name))&Pnacl_M33_PPB_Alarms_Dev_Clear,
-    .ClearAll = (void (*)(PP_Instance instance))&Pnacl_M33_PPB_Alarms_Dev_ClearAll,
-    .AddOnAlarmListener = (uint32_t (*)(PP_Instance instance, PP_Alarms_OnAlarm_Dev callback, void* user_data))&Pnacl_M33_PPB_Alarms_Dev_AddOnAlarmListener
-};
 
 static const struct PPB_AudioInput_Dev_0_3 Pnacl_Wrappers_PPB_AudioInput_Dev_0_3 = {
     .Create = (PP_Resource (*)(PP_Instance instance))&Pnacl_M25_PPB_AudioInput_Dev_Create,
@@ -5256,10 +5218,8 @@ static const struct PPB_IsolatedFileSystem_Private_0_2 Pnacl_Wrappers_PPB_Isolat
     .Open = (int32_t (*)(PP_Instance instance, PP_IsolatedFileSystemType_Private type, PP_Resource* file_system, struct PP_CompletionCallback callback))&Pnacl_M33_PPB_IsolatedFileSystem_Private_Open
 };
 
-/* Not generating wrapper interface for PPP_ManifestService_1_0 */
-
 static const struct PPB_NaCl_Private_1_0 Pnacl_Wrappers_PPB_NaCl_Private_1_0 = {
-    .LaunchSelLdr = (void (*)(PP_Instance instance, PP_Bool main_service_runtime, const char* alleged_url, PP_Bool uses_irt, PP_Bool uses_ppapi, PP_Bool uses_nonsfi_mode, PP_Bool enable_ppapi_dev, PP_Bool enable_dyncode_syscalls, PP_Bool enable_exception_handling, PP_Bool enable_crash_throttling, const struct PPP_ManifestService_1_0* manifest_service_interface, void* manifest_service_user_data, void* imc_handle, struct PP_CompletionCallback callback))&Pnacl_M25_PPB_NaCl_Private_LaunchSelLdr,
+    .LaunchSelLdr = (void (*)(PP_Instance instance, PP_Bool main_service_runtime, const char* alleged_url, const struct PP_NaClFileInfo* nexe_file_info, PP_Bool uses_irt, PP_Bool uses_ppapi, PP_Bool uses_nonsfi_mode, PP_Bool enable_ppapi_dev, PP_Bool enable_dyncode_syscalls, PP_Bool enable_exception_handling, PP_Bool enable_crash_throttling, void* imc_handle, struct PP_CompletionCallback callback))&Pnacl_M25_PPB_NaCl_Private_LaunchSelLdr,
     .StartPpapiProxy = (PP_Bool (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_StartPpapiProxy,
     .UrandomFD = (int32_t (*)(void))&Pnacl_M25_PPB_NaCl_Private_UrandomFD,
     .Are3DInterfacesDisabled = (PP_Bool (*)(void))&Pnacl_M25_PPB_NaCl_Private_Are3DInterfacesDisabled,
@@ -5269,7 +5229,7 @@ static const struct PPB_NaCl_Private_1_0 Pnacl_Wrappers_PPB_NaCl_Private_1_0 = {
     .GetNumberOfProcessors = (int32_t (*)(void))&Pnacl_M25_PPB_NaCl_Private_GetNumberOfProcessors,
     .IsNonSFIModeEnabled = (PP_Bool (*)(void))&Pnacl_M25_PPB_NaCl_Private_IsNonSFIModeEnabled,
     .GetNexeFd = (int32_t (*)(PP_Instance instance, const char* pexe_url, uint32_t abi_version, uint32_t opt_level, const char* headers, const char* extra_flags, PP_Bool* is_hit, PP_FileHandle* nexe_handle, struct PP_CompletionCallback callback))&Pnacl_M25_PPB_NaCl_Private_GetNexeFd,
-    .ReportTranslationFinished = (void (*)(PP_Instance instance, PP_Bool success))&Pnacl_M25_PPB_NaCl_Private_ReportTranslationFinished,
+    .ReportTranslationFinished = (void (*)(PP_Instance instance, PP_Bool success, int32_t opt_level, int64_t pexe_size, int64_t compile_time_us))&Pnacl_M25_PPB_NaCl_Private_ReportTranslationFinished,
     .DispatchEvent = (void (*)(PP_Instance instance, PP_NaClEventType event_type, const char* resource_url, PP_Bool length_is_computable, uint64_t loaded_bytes, uint64_t total_bytes))&Pnacl_M25_PPB_NaCl_Private_DispatchEvent,
     .ReportLoadSuccess = (void (*)(PP_Instance instance, const char* url, uint64_t loaded_bytes, uint64_t total_bytes))&Pnacl_M25_PPB_NaCl_Private_ReportLoadSuccess,
     .ReportLoadError = (void (*)(PP_Instance instance, PP_NaClError error, const char* error_message))&Pnacl_M25_PPB_NaCl_Private_ReportLoadError,
@@ -5291,13 +5251,14 @@ static const struct PPB_NaCl_Private_1_0 Pnacl_Wrappers_PPB_NaCl_Private_1_0 = {
     .ProcessNaClManifest = (void (*)(PP_Instance instance, const char* program_url))&Pnacl_M25_PPB_NaCl_Private_ProcessNaClManifest,
     .DevInterfacesEnabled = (PP_Bool (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_DevInterfacesEnabled,
     .GetManifestProgramURL = (PP_Bool (*)(PP_Instance instance, struct PP_Var* full_url, struct PP_PNaClOptions* pnacl_options, PP_Bool* uses_nonsfi_mode))&Pnacl_M25_PPB_NaCl_Private_GetManifestProgramURL,
-    .ManifestResolveKey = (PP_Bool (*)(PP_Instance instance, PP_Bool helper_process, const char* key, struct PP_Var* full_url, struct PP_PNaClOptions* pnacl_options))&Pnacl_M25_PPB_NaCl_Private_ManifestResolveKey,
     .GetPnaclResourceInfo = (PP_Bool (*)(PP_Instance instance, const char* filename, struct PP_Var* llc_tool_name, struct PP_Var* ld_tool_name))&Pnacl_M25_PPB_NaCl_Private_GetPnaclResourceInfo,
     .GetCpuFeatureAttrs = (struct PP_Var (*)(void))&Pnacl_M25_PPB_NaCl_Private_GetCpuFeatureAttrs,
     .PostMessageToJavaScript = (void (*)(PP_Instance instance, const char* message))&Pnacl_M25_PPB_NaCl_Private_PostMessageToJavaScript,
     .DownloadNexe = (void (*)(PP_Instance instance, const char* url, struct PP_NaClFileInfo* file_info, struct PP_CompletionCallback callback))&Pnacl_M25_PPB_NaCl_Private_DownloadNexe,
-    .DownloadFile = (void (*)(PP_Instance instance, const char* url, struct PP_NaClFileInfo* file_info, struct PP_CompletionCallback callback))&Pnacl_M25_PPB_NaCl_Private_DownloadFile,
-    .ReportSelLdrStatus = (void (*)(PP_Instance instance, int32_t load_status, int32_t max_status))&Pnacl_M25_PPB_NaCl_Private_ReportSelLdrStatus
+    .ReportSelLdrStatus = (void (*)(PP_Instance instance, int32_t load_status, int32_t max_status))&Pnacl_M25_PPB_NaCl_Private_ReportSelLdrStatus,
+    .LogTranslateTime = (void (*)(const char* histogram_name, int64_t time_us))&Pnacl_M25_PPB_NaCl_Private_LogTranslateTime,
+    .OpenManifestEntry = (void (*)(PP_Instance instance, PP_Bool is_helper_process, const char* key, struct PP_NaClFileInfo* file_info, struct PP_CompletionCallback callback))&Pnacl_M25_PPB_NaCl_Private_OpenManifestEntry,
+    .SetPNaClStartTime = (void (*)(PP_Instance instance))&Pnacl_M25_PPB_NaCl_Private_SetPNaClStartTime
 };
 
 static const struct PPB_NetAddress_Private_0_1 Pnacl_Wrappers_PPB_NetAddress_Private_0_1 = {
@@ -5814,12 +5775,6 @@ static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPP_Messaging_1_0 = {
   .real_iface = NULL
 };
 
-static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_Alarms_Dev_0_1 = {
-  .iface_macro = PPB_ALARMS_DEV_INTERFACE_0_1,
-  .wrapped_iface = (const void *) &Pnacl_Wrappers_PPB_Alarms_Dev_0_1,
-  .real_iface = NULL
-};
-
 static struct __PnaclWrapperInfo Pnacl_WrapperInfo_PPB_AudioInput_Dev_0_3 = {
   .iface_macro = PPB_AUDIO_INPUT_DEV_INTERFACE_0_3,
   .wrapped_iface = (const void *) &Pnacl_Wrappers_PPB_AudioInput_Dev_0_3,
@@ -6211,7 +6166,6 @@ static struct __PnaclWrapperInfo *s_ppb_wrappers[] = {
   &Pnacl_WrapperInfo_PPB_VarDictionary_1_0,
   &Pnacl_WrapperInfo_PPB_VideoDecoder_0_1,
   &Pnacl_WrapperInfo_PPB_WebSocket_1_0,
-  &Pnacl_WrapperInfo_PPB_Alarms_Dev_0_1,
   &Pnacl_WrapperInfo_PPB_AudioInput_Dev_0_3,
   &Pnacl_WrapperInfo_PPB_AudioInput_Dev_0_4,
   &Pnacl_WrapperInfo_PPB_DeviceRef_Dev_0_1,

@@ -20,7 +20,6 @@
 #include "cc/layers/io_surface_layer_impl.h"
 #include "cc/layers/layer_impl.h"
 #include "cc/layers/painted_scrollbar_layer_impl.h"
-#include "cc/layers/quad_sink.h"
 #include "cc/layers/render_surface_impl.h"
 #include "cc/layers/solid_color_layer_impl.h"
 #include "cc/layers/solid_color_scrollbar_layer_impl.h"
@@ -152,7 +151,6 @@ class LayerTreeHostImplTest : public testing::Test,
     current_priority_cutoff_value_ = priority_cutoff;
     return reduce_memory_result_;
   }
-  virtual void SendManagedMemoryStats() OVERRIDE {}
   virtual bool IsInsideDraw() OVERRIDE { return false; }
   virtual void RenewTreePriority() OVERRIDE {}
   virtual void PostDelayedScrollbarFadeOnImplThread(
@@ -538,7 +536,7 @@ TEST_F(LayerTreeHostImplTest, ScrollWithoutRenderer) {
 
   // We should not crash when trying to scroll after the renderer initialization
   // fails.
-  EXPECT_EQ(InputHandler::ScrollIgnored,
+  EXPECT_EQ(InputHandler::ScrollStarted,
             host_impl_->ScrollBegin(gfx::Point(), InputHandler::Wheel));
 }
 
@@ -1362,11 +1360,10 @@ class LayerTreeHostImplOverridePhysicalTime : public LayerTreeHostImpl {
       SolidColorScrollbarLayerImpl::Create(                                   \
           host_impl_->active_tree(), 4, VERTICAL, 10, 0, false, true);        \
   EXPECT_FLOAT_EQ(0.f, scrollbar->opacity());                                 \
-  scrollbar->SetScrollLayerById(2);                                           \
-  scrollbar->SetClipLayerById(1);                                             \
                                                                               \
   scroll->AddChild(contents.Pass());                                          \
   root->AddChild(scroll.Pass());                                              \
+  scrollbar->SetScrollLayerAndClipLayerByIds(2, 1);                           \
   root->AddChild(scrollbar.PassAs<LayerImpl>());                              \
                                                                               \
   host_impl_->active_tree()->SetRootLayer(root.Pass());                       \
@@ -1525,11 +1522,10 @@ void LayerTreeHostImplTest::SetupMouseMoveAtWithDeviceScale(
   scrollbar->SetBounds(gfx::Size(15, viewport_size.height()));
   scrollbar->SetContentBounds(gfx::Size(15, viewport_size.height()));
   scrollbar->SetPosition(gfx::Point(285, 0));
-  scrollbar->SetClipLayerById(1);
-  scrollbar->SetScrollLayerById(2);
 
   scroll->AddChild(contents.Pass());
   root->AddChild(scroll.Pass());
+  scrollbar->SetScrollLayerAndClipLayerByIds(2, 1);
   root->AddChild(scrollbar.PassAs<LayerImpl>());
 
   host_impl_->active_tree()->SetRootLayer(root.Pass());
@@ -1641,8 +1637,7 @@ TEST_F(LayerTreeHostImplTest, CompositorFrameMetadata) {
   }
 }
 
-// TODO(enne): Convert this to PictureLayerImpl
-class DidDrawCheckLayer : public TiledLayerImpl {
+class DidDrawCheckLayer : public LayerImpl {
  public:
   static scoped_ptr<LayerImpl> Create(LayerTreeImpl* tree_impl, int id) {
     return scoped_ptr<LayerImpl>(new DidDrawCheckLayer(tree_impl, id));
@@ -1653,18 +1648,19 @@ class DidDrawCheckLayer : public TiledLayerImpl {
     will_draw_called_ = true;
     if (will_draw_returns_false_)
       return false;
-    return TiledLayerImpl::WillDraw(draw_mode, provider);
+    return LayerImpl::WillDraw(draw_mode, provider);
   }
 
-  virtual void AppendQuads(QuadSink* quad_sink,
+  virtual void AppendQuads(RenderPass* render_pass,
+                           const OcclusionTracker<LayerImpl>& occlusion_tracker,
                            AppendQuadsData* append_quads_data) OVERRIDE {
     append_quads_called_ = true;
-    TiledLayerImpl::AppendQuads(quad_sink, append_quads_data);
+    LayerImpl::AppendQuads(render_pass, occlusion_tracker, append_quads_data);
   }
 
   virtual void DidDraw(ResourceProvider* provider) OVERRIDE {
     did_draw_called_ = true;
-    TiledLayerImpl::DidDraw(provider);
+    LayerImpl::DidDraw(provider);
   }
 
   bool will_draw_called() const { return will_draw_called_; }
@@ -1681,7 +1677,7 @@ class DidDrawCheckLayer : public TiledLayerImpl {
 
  protected:
   DidDrawCheckLayer(LayerTreeImpl* tree_impl, int id)
-      : TiledLayerImpl(tree_impl, id),
+      : LayerImpl(tree_impl, id),
         will_draw_returns_false_(false),
         will_draw_called_(false),
         append_quads_called_(false),
@@ -1689,14 +1685,7 @@ class DidDrawCheckLayer : public TiledLayerImpl {
     SetBounds(gfx::Size(10, 10));
     SetContentBounds(gfx::Size(10, 10));
     SetDrawsContent(true);
-    set_skips_draw(false);
     draw_properties().visible_content_rect = gfx::Rect(0, 0, 10, 10);
-
-    scoped_ptr<LayerTilingData> tiler =
-        LayerTilingData::Create(gfx::Size(100, 100),
-                                LayerTilingData::HAS_BORDER_TEXELS);
-    tiler->SetTilingRect(gfx::Rect(content_bounds()));
-    SetTilingData(*tiler.get());
   }
 
  private:
@@ -1872,69 +1861,60 @@ class MissingTextureAnimatingLayer : public DidDrawCheckLayer {
   static scoped_ptr<LayerImpl> Create(LayerTreeImpl* tree_impl,
                                       int id,
                                       bool tile_missing,
-                                      bool skips_draw,
+                                      bool had_incomplete_tile,
                                       bool animating,
                                       ResourceProvider* resource_provider) {
-    return scoped_ptr<LayerImpl>(new MissingTextureAnimatingLayer(
-        tree_impl,
-        id,
-        tile_missing,
-        skips_draw,
-        animating,
-        resource_provider));
+    return scoped_ptr<LayerImpl>(
+        new MissingTextureAnimatingLayer(tree_impl,
+                                         id,
+                                         tile_missing,
+                                         had_incomplete_tile,
+                                         animating,
+                                         resource_provider));
   }
 
-  virtual void AppendQuads(QuadSink* quad_sink,
+  virtual void AppendQuads(RenderPass* render_pass,
+                           const OcclusionTracker<LayerImpl>& occlusion_tracker,
                            AppendQuadsData* append_quads_data) OVERRIDE {
-    TiledLayerImpl::AppendQuads(quad_sink, append_quads_data);
-    if (tile_missing_)
+    LayerImpl::AppendQuads(render_pass, occlusion_tracker, append_quads_data);
+    if (had_incomplete_tile_)
       append_quads_data->had_incomplete_tile = true;
+    if (tile_missing_)
+      append_quads_data->num_missing_tiles++;
   }
 
  private:
   MissingTextureAnimatingLayer(LayerTreeImpl* tree_impl,
                                int id,
                                bool tile_missing,
-                               bool skips_draw,
+                               bool had_incomplete_tile,
                                bool animating,
                                ResourceProvider* resource_provider)
-      : DidDrawCheckLayer(tree_impl, id), tile_missing_(tile_missing) {
-    scoped_ptr<LayerTilingData> tiling_data =
-        LayerTilingData::Create(gfx::Size(10, 10),
-                                LayerTilingData::NO_BORDER_TEXELS);
-    tiling_data->SetTilingRect(gfx::Rect(bounds()));
-    SetTilingData(*tiling_data.get());
-    set_skips_draw(skips_draw);
-    if (!tile_missing) {
-      ResourceProvider::ResourceId resource =
-          resource_provider->CreateResource(gfx::Size(1, 1),
-                                            GL_CLAMP_TO_EDGE,
-                                            ResourceProvider::TextureUsageAny,
-                                            RGBA_8888);
-      resource_provider->AllocateForTesting(resource);
-      PushTileProperties(0, 0, resource, gfx::Rect(), false);
-    }
+      : DidDrawCheckLayer(tree_impl, id),
+        tile_missing_(tile_missing),
+        had_incomplete_tile_(had_incomplete_tile) {
     if (animating)
       AddAnimatedTransformToLayer(this, 10.0, 3, 0);
   }
 
   bool tile_missing_;
+  bool had_incomplete_tile_;
 };
 
-TEST_F(LayerTreeHostImplTest, PrepareToDrawSucceedsWhenNoTexturesMissing) {
+TEST_F(LayerTreeHostImplTest, PrepareToDrawSucceedsOnDefault) {
   host_impl_->active_tree()->SetRootLayer(
       DidDrawCheckLayer::Create(host_impl_->active_tree(), 1));
   DidDrawCheckLayer* root =
       static_cast<DidDrawCheckLayer*>(host_impl_->active_tree()->root_layer());
 
   bool tile_missing = false;
-  bool skips_draw = false;
+  bool had_incomplete_tile = false;
   bool is_animating = false;
   root->AddChild(
       MissingTextureAnimatingLayer::Create(host_impl_->active_tree(),
                                            2,
                                            tile_missing,
-                                           skips_draw,
+                                           had_incomplete_tile,
                                            is_animating,
                                            host_impl_->resource_provider()));
 
@@ -1951,13 +1931,13 @@ TEST_F(LayerTreeHostImplTest, PrepareToDrawSucceedsWithAnimatedLayer) {
   DidDrawCheckLayer* root =
       static_cast<DidDrawCheckLayer*>(host_impl_->active_tree()->root_layer());
   bool tile_missing = false;
-  bool skips_draw = false;
+  bool had_incomplete_tile = false;
   bool is_animating = true;
   root->AddChild(
       MissingTextureAnimatingLayer::Create(host_impl_->active_tree(),
                                            2,
                                            tile_missing,
-                                           skips_draw,
+                                           had_incomplete_tile,
                                            is_animating,
                                            host_impl_->resource_provider()));
 
@@ -1968,23 +1948,20 @@ TEST_F(LayerTreeHostImplTest, PrepareToDrawSucceedsWithAnimatedLayer) {
   host_impl_->DidDrawAllLayers(frame);
 }
 
-TEST_F(LayerTreeHostImplTest,
-       PrepareToDrawSucceedsWithNonAnimatedMissingTexture) {
-  // When a texture is missing and we're not animating, we draw as usual with
-  // checkerboarding.
+TEST_F(LayerTreeHostImplTest, PrepareToDrawSucceedsWithMissingTiles) {
   host_impl_->active_tree()->SetRootLayer(
       DidDrawCheckLayer::Create(host_impl_->active_tree(), 3));
   DidDrawCheckLayer* root =
       static_cast<DidDrawCheckLayer*>(host_impl_->active_tree()->root_layer());
 
   bool tile_missing = true;
-  bool skips_draw = false;
+  bool had_incomplete_tile = false;
   bool is_animating = false;
   root->AddChild(
       MissingTextureAnimatingLayer::Create(host_impl_->active_tree(),
                                            4,
                                            tile_missing,
-                                           skips_draw,
+                                           had_incomplete_tile,
                                            is_animating,
                                            host_impl_->resource_provider()));
   LayerTreeHostImpl::FrameData frame;
@@ -1993,21 +1970,42 @@ TEST_F(LayerTreeHostImplTest,
   host_impl_->DidDrawAllLayers(frame);
 }
 
-TEST_F(LayerTreeHostImplTest, PrepareToDrawFailsWhenAnimationUsesCheckerboard) {
-  // When a texture is missing and we're animating, we don't want to draw
-  // anything.
+TEST_F(LayerTreeHostImplTest, PrepareToDrawSucceedsWithIncompleteTile) {
+  host_impl_->active_tree()->SetRootLayer(
+      DidDrawCheckLayer::Create(host_impl_->active_tree(), 3));
+  DidDrawCheckLayer* root =
+      static_cast<DidDrawCheckLayer*>(host_impl_->active_tree()->root_layer());
+
+  bool tile_missing = false;
+  bool had_incomplete_tile = true;
+  bool is_animating = false;
+  root->AddChild(
+      MissingTextureAnimatingLayer::Create(host_impl_->active_tree(),
+                                           4,
+                                           tile_missing,
+                                           had_incomplete_tile,
+                                           is_animating,
+                                           host_impl_->resource_provider()));
+  LayerTreeHostImpl::FrameData frame;
+  EXPECT_EQ(DRAW_SUCCESS, host_impl_->PrepareToDraw(&frame));
+  host_impl_->DrawLayers(&frame, gfx::FrameTime::Now());
+  host_impl_->DidDrawAllLayers(frame);
+}
+
+TEST_F(LayerTreeHostImplTest,
+       PrepareToDrawFailsWithAnimationAndMissingTilesUsesCheckerboard) {
   host_impl_->active_tree()->SetRootLayer(
       DidDrawCheckLayer::Create(host_impl_->active_tree(), 5));
   DidDrawCheckLayer* root =
       static_cast<DidDrawCheckLayer*>(host_impl_->active_tree()->root_layer());
   bool tile_missing = true;
-  bool skips_draw = false;
+  bool had_incomplete_tile = false;
   bool is_animating = true;
   root->AddChild(
       MissingTextureAnimatingLayer::Create(host_impl_->active_tree(),
                                            6,
                                            tile_missing,
-                                           skips_draw,
+                                           had_incomplete_tile,
                                            is_animating,
                                            host_impl_->resource_provider()));
   LayerTreeHostImpl::FrameData frame;
@@ -2018,20 +2016,19 @@ TEST_F(LayerTreeHostImplTest, PrepareToDrawFailsWhenAnimationUsesCheckerboard) {
 }
 
 TEST_F(LayerTreeHostImplTest,
-       PrepareToDrawSucceedsWithMissingSkippedAnimatedLayer) {
-  // When the layer skips draw and we're animating, we still draw the frame.
+       PrepareToDrawSucceedsWithAnimationAndIncompleteTiles) {
   host_impl_->active_tree()->SetRootLayer(
-      DidDrawCheckLayer::Create(host_impl_->active_tree(), 7));
+      DidDrawCheckLayer::Create(host_impl_->active_tree(), 5));
   DidDrawCheckLayer* root =
       static_cast<DidDrawCheckLayer*>(host_impl_->active_tree()->root_layer());
   bool tile_missing = false;
-  bool skips_draw = true;
+  bool had_incomplete_tile = true;
   bool is_animating = true;
   root->AddChild(
       MissingTextureAnimatingLayer::Create(host_impl_->active_tree(),
-                                           8,
+                                           6,
                                            tile_missing,
-                                           skips_draw,
+                                           had_incomplete_tile,
                                            is_animating,
                                            host_impl_->resource_provider()));
   LayerTreeHostImpl::FrameData frame;
@@ -2040,21 +2037,19 @@ TEST_F(LayerTreeHostImplTest,
   host_impl_->DidDrawAllLayers(frame);
 }
 
-TEST_F(LayerTreeHostImplTest,
-       PrepareToDrawSucceedsWhenHighResRequiredButNoMissingTextures) {
-  // When the layer skips draw and we're animating, we still draw the frame.
+TEST_F(LayerTreeHostImplTest, PrepareToDrawSucceedsWhenHighResRequired) {
   host_impl_->active_tree()->SetRootLayer(
       DidDrawCheckLayer::Create(host_impl_->active_tree(), 7));
   DidDrawCheckLayer* root =
       static_cast<DidDrawCheckLayer*>(host_impl_->active_tree()->root_layer());
   bool tile_missing = false;
-  bool skips_draw = false;
+  bool had_incomplete_tile = false;
   bool is_animating = false;
   root->AddChild(
       MissingTextureAnimatingLayer::Create(host_impl_->active_tree(),
                                            8,
                                            tile_missing,
-                                           skips_draw,
+                                           had_incomplete_tile,
                                            is_animating,
                                            host_impl_->resource_provider()));
   host_impl_->active_tree()->SetRequiresHighResToDraw();
@@ -2065,26 +2060,48 @@ TEST_F(LayerTreeHostImplTest,
 }
 
 TEST_F(LayerTreeHostImplTest,
-       PrepareToDrawFailsWhenHighResRequiredAndMissingTextures) {
-  // When the layer skips draw and we're animating, we still draw the frame.
+       PrepareToDrawFailsWhenHighResRequiredAndIncompleteTiles) {
   host_impl_->active_tree()->SetRootLayer(
       DidDrawCheckLayer::Create(host_impl_->active_tree(), 7));
   DidDrawCheckLayer* root =
       static_cast<DidDrawCheckLayer*>(host_impl_->active_tree()->root_layer());
-  bool tile_missing = true;
-  bool skips_draw = false;
+  bool tile_missing = false;
+  bool had_incomplete_tile = true;
   bool is_animating = false;
   root->AddChild(
       MissingTextureAnimatingLayer::Create(host_impl_->active_tree(),
                                            8,
                                            tile_missing,
-                                           skips_draw,
+                                           had_incomplete_tile,
                                            is_animating,
                                            host_impl_->resource_provider()));
   host_impl_->active_tree()->SetRequiresHighResToDraw();
   LayerTreeHostImpl::FrameData frame;
   EXPECT_EQ(DRAW_ABORTED_MISSING_HIGH_RES_CONTENT,
             host_impl_->PrepareToDraw(&frame));
+  host_impl_->DrawLayers(&frame, gfx::FrameTime::Now());
+  host_impl_->DidDrawAllLayers(frame);
+}
+
+TEST_F(LayerTreeHostImplTest,
+       PrepareToDrawSucceedsWhenHighResRequiredAndMissingTile) {
+  host_impl_->active_tree()->SetRootLayer(
+      DidDrawCheckLayer::Create(host_impl_->active_tree(), 7));
+  DidDrawCheckLayer* root =
+      static_cast<DidDrawCheckLayer*>(host_impl_->active_tree()->root_layer());
+  bool tile_missing = true;
+  bool had_incomplete_tile = false;
+  bool is_animating = false;
+  root->AddChild(
+      MissingTextureAnimatingLayer::Create(host_impl_->active_tree(),
+                                           8,
+                                           tile_missing,
+                                           had_incomplete_tile,
+                                           is_animating,
+                                           host_impl_->resource_provider()));
+  host_impl_->active_tree()->SetRequiresHighResToDraw();
+  LayerTreeHostImpl::FrameData frame;
+  EXPECT_EQ(DRAW_SUCCESS, host_impl_->PrepareToDraw(&frame));
   host_impl_->DrawLayers(&frame, gfx::FrameTime::Now());
   host_impl_->DidDrawAllLayers(frame);
 }
@@ -3156,6 +3173,42 @@ TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
             scroll_layer->TotalScrollOffset().ToString());
 }
 
+void CheckLayerScrollDelta(LayerImpl* layer, gfx::Vector2dF scroll_delta) {
+  const gfx::Transform target_space_transform =
+      layer->draw_properties().target_space_transform;
+  EXPECT_TRUE(target_space_transform.IsScaleOrTranslation());
+  gfx::Point translated_point;
+  target_space_transform.TransformPoint(&translated_point);
+  gfx::Point expected_point = gfx::Point() - ToRoundedVector2d(scroll_delta);
+  EXPECT_EQ(expected_point.ToString(), translated_point.ToString());
+}
+
+TEST_F(LayerTreeHostImplTest,
+       ExternalRootLayerScrollOffsetDelegationReflectedInNextDraw) {
+  TestScrollOffsetDelegate scroll_delegate;
+  host_impl_->SetViewportSize(gfx::Size(10, 20));
+  LayerImpl* scroll_layer = SetupScrollAndContentsLayers(gfx::Size(100, 100));
+  LayerImpl* clip_layer = scroll_layer->parent()->parent();
+  clip_layer->SetBounds(gfx::Size(10, 20));
+  host_impl_->SetRootLayerScrollOffsetDelegate(&scroll_delegate);
+
+  // Draw first frame to clear any pending draws and check scroll.
+  DrawFrame();
+  CheckLayerScrollDelta(scroll_layer, gfx::Vector2dF(0.f, 0.f));
+  EXPECT_FALSE(host_impl_->active_tree()->needs_update_draw_properties());
+
+  // Set external scroll delta on delegate and notify LayerTreeHost.
+  gfx::Vector2dF scroll_delta(10.f, 10.f);
+  scroll_delegate.set_getter_return_value(scroll_delta);
+  host_impl_->OnRootLayerDelegatedScrollOffsetChanged();
+
+  // Check scroll delta reflected in layer.
+  DrawFrame();
+  CheckLayerScrollDelta(scroll_layer, scroll_delta);
+
+  host_impl_->SetRootLayerScrollOffsetDelegate(NULL);
+}
+
 TEST_F(LayerTreeHostImplTest, OverscrollRoot) {
   SetupScrollAndContentsLayers(gfx::Size(100, 100));
   host_impl_->SetViewportSize(gfx::Size(50, 50));
@@ -3428,7 +3481,8 @@ class BlendStateCheckLayer : public LayerImpl {
                                                           resource_provider));
   }
 
-  virtual void AppendQuads(QuadSink* quad_sink,
+  virtual void AppendQuads(RenderPass* render_pass,
+                           const OcclusionTracker<LayerImpl>& occlusion_tracker,
                            AppendQuadsData* append_quads_data) OVERRIDE {
     quads_appended_ = true;
 
@@ -3439,7 +3493,8 @@ class BlendStateCheckLayer : public LayerImpl {
       opaque_rect = opaque_content_rect_;
     gfx::Rect visible_quad_rect = quad_rect_;
 
-    SharedQuadState* shared_quad_state = quad_sink->CreateSharedQuadState();
+    SharedQuadState* shared_quad_state =
+        render_pass->CreateAndAppendSharedQuadState();
     PopulateSharedQuadState(shared_quad_state);
 
     scoped_ptr<TileDrawQuad> test_blending_draw_quad = TileDrawQuad::Create();
@@ -3454,7 +3509,7 @@ class BlendStateCheckLayer : public LayerImpl {
     test_blending_draw_quad->visible_rect = quad_visible_rect_;
     EXPECT_EQ(blend_, test_blending_draw_quad->ShouldDrawWithBlending());
     EXPECT_EQ(has_render_surface_, !!render_surface());
-    quad_sink->Append(test_blending_draw_quad.PassAs<DrawQuad>());
+    render_pass->AppendDrawQuad(test_blending_draw_quad.PassAs<DrawQuad>());
   }
 
   void SetExpectation(bool blend, bool has_render_surface) {
@@ -4186,9 +4241,11 @@ class FakeLayerWithQuads : public LayerImpl {
     return scoped_ptr<LayerImpl>(new FakeLayerWithQuads(tree_impl, id));
   }
 
-  virtual void AppendQuads(QuadSink* quad_sink,
+  virtual void AppendQuads(RenderPass* render_pass,
+                           const OcclusionTracker<LayerImpl>& occlusion_tracker,
                            AppendQuadsData* append_quads_data) OVERRIDE {
-    SharedQuadState* shared_quad_state = quad_sink->CreateSharedQuadState();
+    SharedQuadState* shared_quad_state =
+        render_pass->CreateAndAppendSharedQuadState();
     PopulateSharedQuadState(shared_quad_state);
 
     SkColor gray = SkColorSetRGB(100, 100, 100);
@@ -4197,7 +4254,7 @@ class FakeLayerWithQuads : public LayerImpl {
     scoped_ptr<SolidColorDrawQuad> my_quad = SolidColorDrawQuad::Create();
     my_quad->SetNew(
         shared_quad_state, quad_rect, visible_quad_rect, gray, false);
-    quad_sink->Append(my_quad.PassAs<DrawQuad>());
+    render_pass->AppendDrawQuad(my_quad.PassAs<DrawQuad>());
   }
 
  private:
@@ -6519,57 +6576,30 @@ TEST_F(LayerTreeHostImplWithImplicitLimitsTest, ImplicitMemoryLimits) {
             150u * 1024u * 1024u);
 }
 
-TEST_F(LayerTreeHostImplTest, UpdateTilesForMasksWithNoVisibleContent) {
-  gfx::Size bounds(100000, 100);
+TEST_F(LayerTreeHostImplTest, ExternalTransformReflectedInNextDraw) {
+  const gfx::Size layer_size(100, 100);
+  gfx::Transform external_transform;
+  const gfx::Rect external_viewport(layer_size);
+  const gfx::Rect external_clip(layer_size);
+  const bool valid_for_tile_management = true;
+  LayerImpl* layer = SetupScrollAndContentsLayers(layer_size);
 
-  host_impl_->CreatePendingTree();
+  host_impl_->SetExternalDrawConstraints(external_transform,
+                                         external_viewport,
+                                         external_clip,
+                                         valid_for_tile_management);
+  DrawFrame();
+  EXPECT_TRANSFORMATION_MATRIX_EQ(
+      external_transform, layer->draw_properties().target_space_transform);
 
-  scoped_ptr<LayerImpl> root = LayerImpl::Create(host_impl_->pending_tree(), 1);
-
-  scoped_ptr<FakePictureLayerImpl> layer_with_mask =
-      FakePictureLayerImpl::Create(host_impl_->pending_tree(), 2);
-
-  layer_with_mask->SetBounds(bounds);
-
-  scoped_ptr<FakePictureLayerImpl> mask =
-      FakePictureLayerImpl::Create(host_impl_->pending_tree(), 3);
-
-  mask->SetIsMask(true);
-  mask->SetBounds(bounds);
-
-  FakePictureLayerImpl* pending_mask_content = mask.get();
-  layer_with_mask->SetMaskLayer(mask.PassAs<LayerImpl>());
-
-  scoped_ptr<FakePictureLayerImpl> child_of_layer_with_mask =
-      FakePictureLayerImpl::Create(host_impl_->pending_tree(), 4);
-
-  child_of_layer_with_mask->SetBounds(bounds);
-  child_of_layer_with_mask->SetDrawsContent(true);
-
-  layer_with_mask->AddChild(child_of_layer_with_mask.PassAs<LayerImpl>());
-
-  root->AddChild(layer_with_mask.PassAs<LayerImpl>());
-
-  host_impl_->pending_tree()->SetRootLayer(root.Pass());
-
-  gfx::Rect r1 = pending_mask_content->visible_rect_for_tile_priority();
-  ASSERT_EQ(0, r1.x());
-  ASSERT_EQ(0, r1.y());
-  ASSERT_EQ(0, r1.width());
-  ASSERT_EQ(0, r1.height());
-
-  host_impl_->ActivatePendingTree();
-
-  host_impl_->active_tree()->UpdateDrawProperties();
-
-  ASSERT_EQ(2u, host_impl_->active_tree()->RenderSurfaceLayerList().size());
-
-  FakePictureLayerImpl* active_mask_content =
-      static_cast<FakePictureLayerImpl*>(
-          host_impl_->active_tree()->root_layer()->children()[0]->mask_layer());
-  gfx::Rect r2 = active_mask_content->visible_rect_for_tile_priority();
-
-  ASSERT_TRUE(!r2.IsEmpty());
+  external_transform.Translate(20, 20);
+  host_impl_->SetExternalDrawConstraints(external_transform,
+                                         external_viewport,
+                                         external_clip,
+                                         valid_for_tile_management);
+  DrawFrame();
+  EXPECT_TRANSFORMATION_MATRIX_EQ(
+      external_transform, layer->draw_properties().target_space_transform);
 }
 
 }  // namespace

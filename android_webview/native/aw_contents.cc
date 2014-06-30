@@ -13,12 +13,10 @@
 #include "android_webview/browser/deferred_gpu_command_service.h"
 #include "android_webview/browser/gpu_memory_buffer_factory_impl.h"
 #include "android_webview/browser/hardware_renderer.h"
-#include "android_webview/browser/hardware_renderer_legacy.h"
 #include "android_webview/browser/net_disk_cache_remover.h"
 #include "android_webview/browser/renderer_host/aw_resource_dispatcher_host_delegate.h"
 #include "android_webview/browser/scoped_app_gl_state_restore.h"
 #include "android_webview/common/aw_hit_test_data.h"
-#include "android_webview/common/aw_switches.h"
 #include "android_webview/common/devtools_instrumentation.h"
 #include "android_webview/native/aw_autofill_client.h"
 #include "android_webview/native/aw_browser_dependency_factory.h"
@@ -30,7 +28,7 @@
 #include "android_webview/native/java_browser_view_renderer_helper.h"
 #include "android_webview/native/permission/aw_permission_request.h"
 #include "android_webview/native/permission/permission_request_handler.h"
-#include "android_webview/native/permission/protected_media_id_permission_request.h"
+#include "android_webview/native/permission/simple_permission_request.h"
 #include "android_webview/native/state_serializer.h"
 #include "android_webview/public/browser/draw_gl.h"
 #include "base/android/jni_android.h"
@@ -294,6 +292,13 @@ jlong AwContents::GetWebContents(JNIEnv* env, jobject obj) {
 
 void AwContents::Destroy(JNIEnv* env, jobject obj) {
   java_ref_.reset();
+
+  // We clear the contents_client_bridge_ here so that we break the link with
+  // the java peer. This is important for the popup window case, where we are
+  // swapping AwContents out that share the same java AwContentsClientBridge.
+  // See b/15074651.
+  contents_client_bridge_.reset();
+
   // We do not delete AwContents immediately. Some applications try to delete
   // Webview in ShouldOverrideUrlLoading callback, which is a sync IPC from
   // Webkit.
@@ -353,7 +358,6 @@ void AwContents::DrawGL(AwDrawGLInfo* draw_info) {
 
   if (!shared_renderer_state_.IsHardwareAllowed()) {
     hardware_renderer_.reset();
-    shared_renderer_state_.SetHardwareInitialized(false);
     return;
   }
 
@@ -361,27 +365,12 @@ void AwContents::DrawGL(AwDrawGLInfo* draw_info) {
     return;
 
   if (!hardware_renderer_) {
-    DCHECK(!shared_renderer_state_.IsHardwareInitialized());
-    if (switches::UbercompEnabled()) {
-      hardware_renderer_.reset(new HardwareRenderer(&shared_renderer_state_));
-    } else {
-      hardware_renderer_.reset(
-          new HardwareRendererLegacy(&shared_renderer_state_));
-    }
-    shared_renderer_state_.SetHardwareInitialized(true);
+    hardware_renderer_.reset(new HardwareRenderer(&shared_renderer_state_));
   }
 
-  scoped_ptr<DrawGLResult> result(new DrawGLResult);
-  if (hardware_renderer_->DrawGL(state_restore.stencil_enabled(),
-                                 state_restore.framebuffer_binding_ext(),
-                                 draw_info,
-                                 result.get())) {
-    if (switches::UbercompEnabled()) {
-      browser_view_renderer_.DidDrawDelegated(result.Pass());
-    } else {
-      browser_view_renderer_.DidDrawGL(result.Pass());
-    }
-  }
+  hardware_renderer_->DrawGL(state_restore.stencil_enabled(),
+                             state_restore.framebuffer_binding_ext(),
+                             draw_info);
 }
 
 namespace {
@@ -602,17 +591,47 @@ void AwContents::PreauthorizePermission(
 
 void AwContents::RequestProtectedMediaIdentifierPermission(
     const GURL& origin,
-    const content::BrowserContext::
-        ProtectedMediaIdentifierPermissionCallback& callback) {
+    const base::Callback<void(bool)>& callback) {
   permission_request_handler_->SendRequest(
-      scoped_ptr<AwPermissionRequestDelegate>(
-          new ProtectedMediaIdPermissionRequest(origin, callback)));
+      scoped_ptr<AwPermissionRequestDelegate>(new SimplePermissionRequest(
+          origin, AwPermissionRequest::ProtectedMediaId, callback)));
 }
 
 void AwContents::CancelProtectedMediaIdentifierPermissionRequests(
     const GURL& origin) {
   permission_request_handler_->CancelRequest(
       origin, AwPermissionRequest::ProtectedMediaId);
+}
+
+void AwContents::RequestGeolocationPermission(
+    const GURL& origin,
+    const base::Callback<void(bool)>& callback) {
+  JNIEnv* env = AttachCurrentThread();
+  ScopedJavaLocalRef<jobject> obj = java_ref_.get(env);
+  if (obj.is_null())
+    return;
+
+  if (Java_AwContents_useLegacyGeolocationPermissionAPI(env, obj.obj())) {
+    ShowGeolocationPrompt(origin, callback);
+    return;
+  }
+  permission_request_handler_->SendRequest(
+      scoped_ptr<AwPermissionRequestDelegate>(new SimplePermissionRequest(
+          origin, AwPermissionRequest::Geolocation, callback)));
+}
+
+void AwContents::CancelGeolocationPermissionRequests(const GURL& origin) {
+  JNIEnv* env = AttachCurrentThread();
+  ScopedJavaLocalRef<jobject> obj = java_ref_.get(env);
+  if (obj.is_null())
+    return;
+
+  if (Java_AwContents_useLegacyGeolocationPermissionAPI(env, obj.obj())) {
+    HideGeolocationPrompt(origin);
+    return;
+  }
+  permission_request_handler_->CancelRequest(
+      origin, AwPermissionRequest::Geolocation);
 }
 
 void AwContents::FindAllAsync(JNIEnv* env, jobject obj, jstring search_string) {
@@ -842,7 +861,7 @@ void AwContents::OnDetachedFromWindow(JNIEnv* env, jobject obj) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
   shared_renderer_state_.SetHardwareAllowed(false);
 
-  bool hardware_initialized = shared_renderer_state_.IsHardwareInitialized();
+  bool hardware_initialized = browser_view_renderer_.hardware_enabled();
   if (hardware_initialized) {
     bool draw_functor_succeeded = RequestDrawGL(NULL, true);
     if (!draw_functor_succeeded) {
@@ -1114,10 +1133,6 @@ void AwContents::TrimMemory(JNIEnv* env,
                             jint level,
                             jboolean visible) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
-
-  if (!shared_renderer_state_.IsHardwareInitialized())
-    return;
-
   browser_view_renderer_.TrimMemory(level, visible);
 }
 

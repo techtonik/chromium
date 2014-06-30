@@ -33,6 +33,7 @@
 #include "content/shell/renderer/shell_render_process_observer.h"
 #include "content/shell/renderer/test_runner/WebTask.h"
 #include "content/shell/renderer/test_runner/WebTestInterfaces.h"
+#include "content/shell/renderer/test_runner/mock_screen_orientation_client.h"
 #include "content/shell/renderer/test_runner/web_test_proxy.h"
 #include "content/shell/renderer/test_runner/web_test_runner.h"
 #include "net/base/filename_util.h"
@@ -201,20 +202,9 @@ void WebKitTestRunner::setEditCommand(const std::string& name,
   render_view()->SetEditCommandForNextKeyEvent(name, value);
 }
 
-void WebKitTestRunner::setGamepadData(const WebGamepads& gamepads) {
-  SetMockGamepads(gamepads);
-}
-
-void WebKitTestRunner::didConnectGamepad(
-    int index,
-    const blink::WebGamepad& gamepad) {
-  MockGamepadConnected(index, gamepad);
-}
-
-void WebKitTestRunner::didDisconnectGamepad(
-    int index,
-    const blink::WebGamepad& gamepad) {
-  MockGamepadDisconnected(index, gamepad);
+void WebKitTestRunner::setGamepadProvider(
+    RendererGamepadProvider* provider) {
+  SetMockGamepadProvider(provider);
 }
 
 void WebKitTestRunner::setDeviceMotionData(const WebDeviceMotionData& data) {
@@ -228,11 +218,16 @@ void WebKitTestRunner::setDeviceOrientationData(
 
 void WebKitTestRunner::setScreenOrientation(
     const WebScreenOrientationType& orientation) {
-  SetMockScreenOrientation(render_view(), orientation);
+  MockScreenOrientationClient* mock_client =
+      proxy()->GetScreenOrientationClientMock();
+  mock_client->UpdateDeviceOrientation(render_view()->GetWebView()->mainFrame(),
+                                       orientation);
 }
 
 void WebKitTestRunner::resetScreenOrientation() {
-  ResetMockScreenOrientation();
+  MockScreenOrientationClient* mock_client =
+      proxy()->GetScreenOrientationClientMock();
+  mock_client->ResetData();
 }
 
 void WebKitTestRunner::didChangeBatteryStatus(

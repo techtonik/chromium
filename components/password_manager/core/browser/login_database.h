@@ -51,8 +51,14 @@ class LoginDatabase {
   // Removes all logins created from |delete_begin| onwards (inclusive) and
   // before |delete_end|. You may use a null Time value to do an unbounded
   // delete in either direction.
-  bool RemoveLoginsCreatedBetween(const base::Time delete_begin,
-                                  const base::Time delete_end);
+  bool RemoveLoginsCreatedBetween(base::Time delete_begin,
+                                  base::Time delete_end);
+
+  // Removes all logins synced from |delete_begin| onwards (inclusive) and
+  // before |delete_end|. You may use a null Time value to do an unbounded
+  // delete in either direction.
+  bool RemoveLoginsSyncedBetween(base::Time delete_begin,
+                                 base::Time delete_end);
 
   // Loads a list of matching password forms into the specified vector |forms|.
   // The list will contain all possibly relevant entries to the observed |form|,
@@ -64,8 +70,16 @@ class LoginDatabase {
   // You may use a null Time value to do an unbounded search in either
   // direction.
   bool GetLoginsCreatedBetween(
-      const base::Time begin,
-      const base::Time end,
+      base::Time begin,
+      base::Time end,
+      std::vector<autofill::PasswordForm*>* forms) const;
+
+  // Loads all logins synced from |begin| onwards (inclusive) and before |end|.
+  // You may use a null Time value to do an unbounded search in either
+  // direction.
+  bool GetLoginsSyncedBetween(
+      base::Time begin,
+      base::Time end,
       std::vector<autofill::PasswordForm*>* forms) const;
 
   // Loads the complete list of autofillable password forms (i.e., not blacklist

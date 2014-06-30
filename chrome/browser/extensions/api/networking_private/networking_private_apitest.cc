@@ -17,7 +17,6 @@
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/chromeos/login/helper.h"
-#include "chrome/browser/chromeos/net/network_portal_detector.h"
 #include "chrome/browser/chromeos/net/network_portal_detector_test_impl.h"
 #include "chromeos/chromeos_switches.h"
 #include "chromeos/dbus/cryptohome_client.h"
@@ -28,6 +27,7 @@
 #include "chromeos/dbus/shill_profile_client.h"
 #include "chromeos/dbus/shill_service_client.h"
 #include "chromeos/network/onc/onc_utils.h"
+#include "chromeos/network/portal_detector/network_portal_detector.h"
 #include "components/onc/onc_constants.h"
 #include "components/policy/core/browser/browser_policy_connector.h"
 #include "components/policy/core/common/external_data_fetcher.h"
@@ -225,8 +225,6 @@ class ExtensionNetworkingPrivateApiTest
         "stub_cellular1",
         shill::kRoamingStateProperty,
         base::StringValue(shill::kRoamingStateHome));
-    DBusThreadManager::Get()->GetShillManagerClient()->GetTestInterface()->
-        SortManagerServices();
     content::RunAllPendingInMessageLoop();
   }
 
@@ -263,7 +261,6 @@ class ExtensionNetworkingPrivateApiTest
 
     device_test_->ClearDevices();
     service_test_->ClearServices();
-    profile_test->ClearProfiles();
 
     // Sends a notification about the added profile.
     profile_test->AddProfile(kUser1ProfilePath, userhash_);
@@ -354,8 +351,6 @@ class ExtensionNetworkingPrivateApiTest
 
     AddService("stub_vpn1", "vpn1", shill::kTypeVPN, shill::kStateOnline);
 
-    manager_test_->SortManagerServices();
-
     content::RunAllPendingInMessageLoop();
   }
 #else  // !defined(OS_CHROMEOS)
@@ -427,11 +422,14 @@ IN_PROC_BROWSER_TEST_F(ExtensionNetworkingPrivateApiTest,
 #if defined(OS_CHROMEOS)
 // TODO(stevenjb/mef): Fix these on non-Chrome OS, crbug.com/371442.
 IN_PROC_BROWSER_TEST_F(ExtensionNetworkingPrivateApiTest, GetNetworks) {
-  // Remove "stub_wifi2" from the visible list.
-  manager_test_->RemoveManagerService("stub_wifi2", false);
+  // Hide stub_wifi2.
+  service_test_->SetServiceProperty("stub_wifi2",
+                                    shill::kVisibleProperty,
+                                    base::FundamentalValue(false));
   // Add a couple of additional networks that are not configured (saved).
   AddService("stub_wifi3", "wifi3", shill::kTypeWifi, shill::kStateIdle);
   AddService("stub_wifi4", "wifi4", shill::kTypeWifi, shill::kStateIdle);
+  content::RunAllPendingInMessageLoop();
   EXPECT_TRUE(RunNetworkingSubtest("getNetworks")) << message_;
 }
 

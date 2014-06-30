@@ -454,7 +454,6 @@
     { "name": "google.tm", "include_subdomains": true, "pins": "google" },
     { "name": "google.tn", "include_subdomains": true, "pins": "google" },
     { "name": "google.to", "include_subdomains": true, "pins": "google" },
-    { "name": "google.tp", "include_subdomains": true, "pins": "google" },
     { "name": "google.tt", "include_subdomains": true, "pins": "google" },
     { "name": "google.us", "include_subdomains": true, "pins": "google" },
     { "name": "google.uz", "include_subdomains": true, "pins": "google" },
@@ -785,6 +784,8 @@
     { "name": "reviews.anime.my", "include_subdomains": true, "mode": "force-https" },
     { "name": "miku.hatsune.my", "include_subdomains": true, "mode": "force-https" },
     { "name": "webcollect.org.uk", "include_subdomains": true, "mode": "force-https" },
+    { "name": "www.capitainetrain.com", "mode": "force-https" },
+    { "name": "accounts.firefox.com", "include_subdomains": true, "mode": "force-https" },
 
     // Entries that are only valid if the client supports SNI.
     { "name": "gmail.com", "mode": "force-https", "pins": "google", "snionly": true },

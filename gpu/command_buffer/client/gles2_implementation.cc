@@ -386,11 +386,6 @@ void GLES2Implementation::SetSurfaceVisible(bool visible) {
     FreeEverything();
 }
 
-void GLES2Implementation::SendManagedMemoryStats(
-    const ManagedMemoryStats& stats) {
-  gpu_control_->SendManagedMemoryStats(stats);
-}
-
 void GLES2Implementation::WaitForCmd() {
   TRACE_EVENT0("gpu", "GLES2::WaitForCmd");
   helper_->CommandBufferHelper::Finish();
@@ -1123,14 +1118,14 @@ void GLES2Implementation::DeleteShaderStub(
 
 GLint GLES2Implementation::GetAttribLocationHelper(
     GLuint program, const char* name) {
-  typedef cmds::GetAttribLocationBucket::Result Result;
+  typedef cmds::GetAttribLocation::Result Result;
   Result* result = GetResultAs<Result*>();
   if (!result) {
     return -1;
   }
   *result = -1;
   SetBucketAsCString(kResultBucketId, name);
-  helper_->GetAttribLocationBucket(
+  helper_->GetAttribLocation(
       program, kResultBucketId, GetResultShmId(), GetResultShmOffset());
   WaitForCmd();
   helper_->SetBucketSize(kResultBucketId, 0);
@@ -1152,14 +1147,14 @@ GLint GLES2Implementation::GetAttribLocation(
 
 GLint GLES2Implementation::GetUniformLocationHelper(
     GLuint program, const char* name) {
-  typedef cmds::GetUniformLocationBucket::Result Result;
+  typedef cmds::GetUniformLocation::Result Result;
   Result* result = GetResultAs<Result*>();
   if (!result) {
     return -1;
   }
   *result = -1;
   SetBucketAsCString(kResultBucketId, name);
-  helper_->GetUniformLocationBucket(program, kResultBucketId,
+  helper_->GetUniformLocation(program, kResultBucketId,
                                     GetResultShmId(), GetResultShmOffset());
   WaitForCmd();
   helper_->SetBucketSize(kResultBucketId, 0);
@@ -3858,7 +3853,7 @@ void GLES2Implementation::FreeAllAsyncUploadBuffers() {
 }
 
 void GLES2Implementation::AsyncTexImage2DCHROMIUM(
-    GLenum target, GLint level, GLint internalformat, GLsizei width,
+    GLenum target, GLint level, GLenum internalformat, GLsizei width,
     GLsizei height, GLint border, GLenum format, GLenum type,
     const void* pixels) {
   GPU_CLIENT_SINGLE_THREAD_CHECK();

@@ -16,7 +16,6 @@
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/favicon/favicon_service.h"
 #include "chrome/browser/favicon/favicon_service_factory.h"
-#include "chrome/browser/favicon/favicon_util.h"
 #include "chrome/browser/history/history_db_task.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/history/history_types.h"
@@ -31,6 +30,7 @@
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/browser/bookmark_model_observer.h"
 #include "components/bookmarks/browser/bookmark_utils.h"
+#include "components/favicon_base/favicon_util.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/models/tree_node_iterator.h"
@@ -151,7 +151,8 @@ int CountNodesWithTitlesMatching(BookmarkModel* model,
 
 // Checks if the favicon data in |bitmap_a| and |bitmap_b| are equivalent.
 // Returns true if they match.
-bool FaviconBitmapsMatch(const SkBitmap& bitmap_a, const SkBitmap& bitmap_b) {
+bool FaviconRawBitmapsMatch(const SkBitmap& bitmap_a,
+                            const SkBitmap& bitmap_b) {
   if (bitmap_a.getSize() == 0U && bitmap_b.getSize() == 0U)
     return true;
   if ((bitmap_a.getSize() != bitmap_b.getSize()) ||
@@ -301,7 +302,7 @@ bool FaviconsMatch(BookmarkModel* model_a,
       1.0f).sk_bitmap();
   SkBitmap bitmap_b = image_b.AsImageSkia().GetRepresentation(
       1.0f).sk_bitmap();
-  return FaviconBitmapsMatch(bitmap_a, bitmap_b);
+  return FaviconRawBitmapsMatch(bitmap_a, bitmap_b);
 }
 
 // Does a deep comparison of BookmarkNode fields in |model_a| and |model_b|.
@@ -767,11 +768,10 @@ int CountFoldersWithTitlesMatching(int profile, const std::string& title) {
 gfx::Image CreateFavicon(SkColor color) {
   const int dip_width = 16;
   const int dip_height = 16;
-  std::vector<ui::ScaleFactor> favicon_scale_factors =
-      FaviconUtil::GetFaviconScaleFactors();
+  std::vector<float> favicon_scales = favicon_base::GetFaviconScales();
   gfx::ImageSkia favicon;
-  for (size_t i = 0; i < favicon_scale_factors.size(); ++i) {
-    float scale = ui::GetScaleForScaleFactor(favicon_scale_factors[i]);
+  for (size_t i = 0; i < favicon_scales.size(); ++i) {
+    float scale = favicon_scales[i];
     int pixel_width = dip_width * scale;
     int pixel_height = dip_height * scale;
     SkBitmap bmp;

@@ -34,13 +34,18 @@
         'mojo_common_unittests',
         'mojo_cpp_bindings',
         'mojo_geometry_lib',
+        'mojo_html_viewer',
         'mojo_js',
         'mojo_js_bindings',
         'mojo_js_unittests',
+        'mojo_launcher',
         'mojo_message_generator',
         'mojo_native_viewport_service',
         'mojo_network_service',
         'mojo_pepper_container_app',
+        'mojo_png_viewer',
+        'mojo_profile_service',
+        'mojo_public_application_unittests',
         'mojo_public_test_utils',
         'mojo_public_bindings_unittests',
         'mojo_public_environment_unittests',
@@ -70,6 +75,8 @@
             'mojo_browser',
             'mojo_demo_launcher',
             'mojo_embedded_app',
+            'mojo_keyboard',
+            'mojo_media_viewer',
             'mojo_nesting_app',
             'mojo_window_manager',
             'mojo_view_manager',
@@ -136,6 +143,7 @@
       ],
     },
     {
+      # GN version: //mojo/system
       'target_name': 'mojo_system_impl',
       'type': '<(component)',
       'dependencies': [
@@ -148,6 +156,8 @@
         'MOJO_USE_SYSTEM_IMPL',
       ],
       'sources': [
+        'embedder/channel_init.cc',
+        'embedder/channel_init.h',
         'embedder/embedder.cc',
         'embedder/embedder.h',
         'embedder/platform_channel_pair.cc',
@@ -177,6 +187,7 @@
         'system/dispatcher.cc',
         'system/dispatcher.h',
         'system/entrypoints.cc',
+        'system/handle_signals_state.h',
         'system/handle_table.cc',
         'system/handle_table.h',
         'system/local_data_pipe.cc',
@@ -311,6 +322,7 @@
       ],
     },
     {
+      # GN version: //mojo/common
       'target_name': 'mojo_common_lib',
       'type': '<(component)',
       'defines': [
@@ -326,14 +338,10 @@
         'mojo_system_impl',
       ],
       'sources': [
-        'common/channel_init.cc',
-        'common/channel_init.h',
         'common/common_type_converters.cc',
         'common/common_type_converters.h',
         'common/data_pipe_utils.cc',
         'common/data_pipe_utils.h',
-        'common/environment_data.cc',
-        'common/environment_data.h',
         'common/handle_watcher.cc',
         'common/handle_watcher.h',
         'common/message_pump_mojo.cc',
@@ -382,6 +390,7 @@
       ],
     },
     {
+      # GN version: //mojo/environment:chromium
       'target_name': 'mojo_environment_chromium',
       'type': 'static_library',
       'dependencies': [
@@ -389,8 +398,10 @@
         'mojo_environment_chromium_impl',
       ],
       'sources': [
-        'environment/default_async_waiter.cc',
         'environment/environment.cc',
+        # TODO(vtl): This is kind of ugly. (See TODO in logging.h.)
+        "public/cpp/environment/logging.h",
+        "public/cpp/environment/lib/logging.h",
       ],
       'include_dirs': [
         '..',
@@ -400,6 +411,7 @@
       ],
     },
     {
+      # GN version: //mojo/environment:chromium_impl
       'target_name': 'mojo_environment_chromium_impl',
       'type': '<(component)',
       'defines': [
@@ -413,12 +425,15 @@
       'sources': [
         'environment/default_async_waiter_impl.cc',
         'environment/default_async_waiter_impl.h',
+        'environment/default_logger_impl.cc',
+        'environment/default_logger_impl.h',
       ],
       'include_dirs': [
         '..',
       ],
     },
     {
+      # GN version: //mojo/service_manager
       'target_name': 'mojo_service_manager',
       'type': '<(component)',
       'defines': [
@@ -473,10 +488,12 @@
         '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
         '../net/net.gyp:net',
         '../url/url.gyp:url_lib',
+        'mojo_application',
         'mojo_external_service_bindings',
         'mojo_gles2_impl',
         'mojo_native_viewport_service',
         'mojo_network_bindings',
+        'mojo_profile_service',
         'mojo_service_manager',
         'mojo_service_provider_bindings',
         'mojo_spy',
@@ -510,6 +527,8 @@
         'shell/mojo_url_resolver.h',
         'shell/out_of_process_dynamic_service_runner.cc',
         'shell/out_of_process_dynamic_service_runner.h',
+        'shell/profile_service_loader.cc',
+        'shell/profile_service_loader.h',
         'shell/run.cc',
         'shell/run.h',
         'shell/switches.cc',
@@ -533,7 +552,6 @@
             # These are only necessary as long as we hard code use of ViewManager.
             '../skia/skia.gyp:skia',
             'mojo_gles2',
-            'mojo_application',
             'mojo_view_manager',
             'mojo_view_manager_bindings',
           ],
@@ -574,13 +592,20 @@
         'mojo_shell_lib',
         'mojo_system_impl',
       ],
+      'conditions': [
+        ['use_ozone==1', {
+          'dependencies': [
+            '../ui/ozone/ozone.gyp:ozone',
+          ],
+        }],
+      ],
       'sources': [
         'shell/desktop/mojo_main.cc',
       ],
     },
     {
       'target_name': 'mojo_shell_tests',
-      'type': 'executable',
+      'type': '<(gtest_target_type)',
       'dependencies': [
         '../base/base.gyp:base',
         '../base/base.gyp:test_support_base',
@@ -593,6 +618,7 @@
         'mojo_service_manager',
         'mojo_shell_lib',
         'mojo_system_impl',
+        'mojo_test_service',
         'mojo_test_service_bindings',
       ],
       'sources': [
@@ -601,6 +627,13 @@
         'shell/shell_test_base.h',
         'shell/shell_test_base_unittest.cc',
         'shell/shell_test_main.cc',
+      ],
+      'conditions': [
+        ['OS == "android"', {
+          'dependencies': [
+            '../testing/android/native_test.gyp:native_test_native_code',
+          ],
+        }],
       ],
     },
     {
@@ -750,6 +783,9 @@
             '../base/base.gyp:test_support_base',
             'libmojo_system_java',
             'mojo_jni_headers',
+          ],
+          'defines': [
+            'UNIT_TEST'  # As exported from testing/gtest.gyp:gtest.
           ],
           'sources': [
             'android/javatests/mojo_test_case.cc',
@@ -925,12 +961,37 @@
             '../ui/views/views.gyp:views',
             '../ui/wm/wm.gyp:wm',
             'mojo_aura_support',
+            'mojo_views_support_internal',
           ],
           'sources': [
             'views/native_widget_view_manager.cc',
             'views/native_widget_view_manager.h',
             'views/views_init.cc',
             'views/views_init.h',
+          ],
+        },
+        {
+          'target_name': 'mojo_views_support_internal',
+          'type': '<(component)',
+          'dependencies': [
+            '../base/base.gyp:base',
+            '../base/base.gyp:base_i18n',
+            '../base/base.gyp:base_static',
+            '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
+            '../skia/skia.gyp:skia',
+            '../skia/skia.gyp:skia',
+            '../third_party/icu/icu.gyp:icui18n',
+            '../third_party/icu/icu.gyp:icuuc',
+            '../ui/base/ui_base.gyp:ui_base',
+            '../ui/gfx/gfx.gyp:gfx',
+          ],
+          'sources': [
+            'views/mojo_views_export.h',
+            'views/views_init_internal.cc',
+            'views/views_init_internal.h',
+          ],
+          'defines': [
+            'MOJO_VIEWS_IMPLEMENTATION',
           ],
         },
       ],

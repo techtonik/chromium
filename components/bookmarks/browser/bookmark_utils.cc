@@ -25,6 +25,7 @@
 #include "url/gurl.h"
 
 using base::Time;
+using bookmarks::BookmarkClient;
 
 namespace {
 
@@ -332,6 +333,10 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
       user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
   registry->RegisterBooleanPref(
       prefs::kShowAppsShortcutInBookmarkBar,
+      true,
+      user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
+  registry->RegisterBooleanPref(
+      prefs::kShowManagedBookmarksInBookmarkBar,
       true,
       user_prefs::PrefRegistrySyncable::SYNCABLE_PREF);
 }

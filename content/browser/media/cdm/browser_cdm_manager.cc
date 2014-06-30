@@ -6,12 +6,11 @@
 
 #include "base/command_line.h"
 #include "content/common/media/cdm_messages.h"
-#include "content/public/browser/browser_context.h"
+#include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/common/content_client.h"
 #include "content/public/common/content_switches.h"
 #include "media/base/browser_cdm.h"
 #include "media/base/browser_cdm_factory.h"
@@ -41,6 +40,10 @@ BrowserCdmManager::BrowserCdmManager(RenderFrameHost* render_frame_host)
 }
 
 BrowserCdmManager::~BrowserCdmManager() {
+  // During the tear down process, OnDestroyCdm() may or may not be called
+  // (e.g. WebContents may be destroyed before the render process is killed). So
+  // we cannot DCHECK(cdm_map_.empty()) here. Instead, all CDMs in |cdm_map_|
+  // will be destroyed here because they are owned by BrowserCdmManager.
 }
 
 BrowserCdm* BrowserCdmManager::GetCdm(int cdm_id) {
@@ -144,9 +147,6 @@ void BrowserCdmManager::OnCreateSession(
     return;
   }
 
-  BrowserContext* context =
-      web_contents_->GetRenderProcessHost()->GetBrowserContext();
-
   std::map<int, GURL>::const_iterator iter =
       cdm_security_origin_map_.find(cdm_id);
   if (iter == cdm_security_origin_map_.end()) {
@@ -155,16 +155,19 @@ void BrowserCdmManager::OnCreateSession(
     return;
   }
 
-  context->RequestProtectedMediaIdentifierPermission(
-      web_contents_->GetRenderProcessHost()->GetID(),
-      web_contents_->GetRenderViewHost()->GetRoutingID(),
+  base::Closure cancel_callback;
+  GetContentClient()->browser()->RequestProtectedMediaIdentifierPermission(
+      web_contents_,
       iter->second,
       base::Bind(&BrowserCdmManager::CreateSessionIfPermitted,
                  weak_ptr_factory_.GetWeakPtr(),
                  cdm_id,
                  session_id,
                  mime_type,
-                 init_data));
+                 init_data),
+      &cancel_callback);
+  if (!cancel_callback.is_null())
+    cdm_cancel_permision_map_[cdm_id] = cancel_callback;
 }
 
 void BrowserCdmManager::OnUpdateSession(
@@ -209,16 +212,10 @@ void BrowserCdmManager::OnDestroyCdm(int cdm_id) {
 }
 
 void BrowserCdmManager::CancelAllPendingSessionCreations(int cdm_id) {
-  BrowserContext* context =
-      web_contents_->GetRenderProcessHost()->GetBrowserContext();
-  std::map<int, GURL>::const_iterator iter =
-      cdm_security_origin_map_.find(cdm_id);
-  if (iter == cdm_security_origin_map_.end())
-    return;
-  context->CancelProtectedMediaIdentifierPermissionRequests(
-      web_contents_->GetRenderProcessHost()->GetID(),
-      web_contents_->GetRenderViewHost()->GetRoutingID(),
-      iter->second);
+  if (cdm_cancel_permision_map_.count(cdm_id)) {
+    cdm_cancel_permision_map_[cdm_id].Run();
+    cdm_cancel_permision_map_.erase(cdm_id);
+  }
 }
 
 void BrowserCdmManager::AddCdm(int cdm_id,
@@ -252,6 +249,7 @@ void BrowserCdmManager::RemoveCdm(int cdm_id) {
   // in unprefixed EME implementation.
   cdm_map_.erase(cdm_id);
   cdm_security_origin_map_.erase(cdm_id);
+  cdm_cancel_permision_map_.erase(cdm_id);
 }
 
 int BrowserCdmManager::RoutingID() {
@@ -268,6 +266,7 @@ void BrowserCdmManager::CreateSessionIfPermitted(
     const std::string& content_type,
     const std::vector<uint8>& init_data,
     bool permitted) {
+  cdm_cancel_permision_map_.erase(cdm_id);
   if (!permitted) {
     OnSessionError(cdm_id, session_id, MediaKeys::kUnknownError, 0);
     return;

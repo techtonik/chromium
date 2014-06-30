@@ -17,11 +17,13 @@ namespace sandbox {
 
 MachMessageServer::MachMessageServer(
     MessageDemuxer* demuxer,
+    mach_port_t server_receive_right,
     mach_msg_size_t buffer_size)
     : demuxer_(demuxer),
-      server_port_(MACH_PORT_NULL),
+      server_port_(server_receive_right),
       server_queue_(NULL),
       server_source_(NULL),
+      source_canceled_(dispatch_semaphore_create(0)),
       buffer_size_(
           mach_vm_round_page(buffer_size + sizeof(mach_msg_audit_trailer_t))),
       did_forward_message_(false) {
@@ -29,8 +31,13 @@ MachMessageServer::MachMessageServer(
 }
 
 MachMessageServer::~MachMessageServer() {
-  if (server_source_)
+  if (server_source_) {
+    dispatch_source_cancel(server_source_);
     dispatch_release(server_source_);
+
+    dispatch_semaphore_wait(source_canceled_, DISPATCH_TIME_FOREVER);
+    dispatch_release(source_canceled_);
+  }
   if (server_queue_)
     dispatch_release(server_queue_);
 }
@@ -39,14 +46,17 @@ bool MachMessageServer::Initialize() {
   mach_port_t task = mach_task_self();
   kern_return_t kr;
 
-  // Allocate a port for use as a new server port.
-  mach_port_t port;
-  if ((kr = mach_port_allocate(task, MACH_PORT_RIGHT_RECEIVE, &port)) !=
-          KERN_SUCCESS) {
-    MACH_LOG(ERROR, kr) << "Failed to allocate new server port.";
-    return false;
+  // Allocate a port for use as a new server port if one was not passed to the
+  // constructor.
+  if (!server_port_.is_valid()) {
+    mach_port_t port;
+    if ((kr = mach_port_allocate(task, MACH_PORT_RIGHT_RECEIVE, &port)) !=
+            KERN_SUCCESS) {
+      MACH_LOG(ERROR, kr) << "Failed to allocate new server port.";
+      return false;
+    }
+    server_port_.reset(port);
   }
-  server_port_.reset(port);
 
   // Allocate the message request and reply buffers.
   const int kMachMsgMemoryFlags = VM_MAKE_TAG(VM_MEMORY_MACH_MSG) |
@@ -76,6 +86,9 @@ bool MachMessageServer::Initialize() {
   server_source_ = dispatch_source_create(DISPATCH_SOURCE_TYPE_MACH_RECV,
       server_port_.get(), 0, server_queue_);
   dispatch_source_set_event_handler(server_source_, ^{ ReceiveMessage(); });
+  dispatch_source_set_cancel_handler(server_source_, ^{
+      dispatch_semaphore_signal(source_canceled_);
+  });
   dispatch_resume(server_source_);
 
   return true;

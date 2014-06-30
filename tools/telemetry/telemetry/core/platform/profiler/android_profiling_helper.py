@@ -11,6 +11,11 @@ import re
 import shutil
 import subprocess
 
+try:
+  import sqlite3
+except ImportError:
+  sqlite3 = None
+
 from telemetry.core import util
 from telemetry.core.platform.profiler import android_prebuilt_profiler_helper
 
@@ -36,7 +41,7 @@ def _ElfSectionMd5Sum(elf_file, section):
 def _FindMatchingUnstrippedLibraryOnHost(device, lib):
   lib_base = os.path.basename(lib)
 
-  device_md5 = device.old_interface.RunShellCommandWithSU('md5 "%s"' % lib)[0]
+  device_md5 = device.RunShellCommand('md5 "%s"' % lib, as_root=True)[0]
   device_md5 = device_md5.split(' ', 1)[0]
 
   def FindMatchingStrippedLibrary(out_path):
@@ -107,6 +112,27 @@ def GetRequiredLibrariesForPerfProfile(profile_file):
         continue
       libs.add(lib)
   return libs
+
+
+def GetRequiredLibrariesForVTuneProfile(profile_file):
+  """Returns the set of libraries necessary to symbolize a given VTune profile.
+
+  Args:
+    profile_file: Path to VTune profile to analyse.
+
+  Returns:
+    A set of required library file names.
+  """
+  db_file = os.path.join(profile_file, 'sqlite-db', 'dicer.db')
+  conn = sqlite3.connect(db_file)
+
+  try:
+    # The 'dd_module_file' table lists all libraries on the device. Only the
+    # ones with 'bin_located_path' are needed for the profile.
+    query = 'SELECT bin_path, bin_located_path FROM dd_module_file'
+    return set(row[0] for row in conn.cursor().execute(query) if row[1])
+  finally:
+    conn.close()
 
 
 def CreateSymFs(device, symfs_dir, libraries, use_symlinks=True):

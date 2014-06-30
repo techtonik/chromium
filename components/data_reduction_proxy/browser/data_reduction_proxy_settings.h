@@ -15,15 +15,14 @@
 #include "base/threading/thread_checker.h"
 #include "components/data_reduction_proxy/browser/data_reduction_proxy_configurator.h"
 #include "components/data_reduction_proxy/browser/data_reduction_proxy_params.h"
+#include "components/data_reduction_proxy/browser/data_reduction_proxy_usage_stats.h"
 #include "net/base/network_change_notifier.h"
 #include "net/url_request/url_fetcher_delegate.h"
 
 class PrefService;
 
 namespace net {
-class AuthChallengeInfo;
 class HostPortPair;
-class HttpAuthCache;
 class HttpNetworkSession;
 class HttpResponseHeaders;
 class URLFetcher;
@@ -41,41 +40,41 @@ const unsigned int kNumDaysInHistorySummary = 30;
 COMPILE_ASSERT(kNumDaysInHistorySummary <= kNumDaysInHistory,
                DataReductionProxySettings_summary_too_long);
 
-  // Values of the UMA DataReductionProxy.StartupState histogram.
-  // This enum must remain synchronized with DataReductionProxyStartupState
-  // in metrics/histograms/histograms.xml.
-  enum ProxyStartupState {
-    PROXY_NOT_AVAILABLE = 0,
-    PROXY_DISABLED,
-    PROXY_ENABLED,
-    PROXY_STARTUP_STATE_COUNT,
-  };
+// Values of the UMA DataReductionProxy.StartupState histogram.
+// This enum must remain synchronized with DataReductionProxyStartupState
+// in metrics/histograms/histograms.xml.
+enum ProxyStartupState {
+  PROXY_NOT_AVAILABLE = 0,
+  PROXY_DISABLED,
+  PROXY_ENABLED,
+  PROXY_STARTUP_STATE_COUNT,
+};
 
-  // Values of the UMA DataReductionProxy.ProbeURL histogram.
-  // This enum must remain synchronized with
-  // DataReductionProxyProbeURLFetchResult in metrics/histograms/histograms.xml.
-  // TODO(marq): Rename these histogram buckets with s/DISABLED/RESTRICTED/, so
-  //     their names match the behavior they track.
-  enum ProbeURLFetchResult {
-    // The probe failed because the Internet was disconnected.
-    INTERNET_DISCONNECTED = 0,
+// Values of the UMA DataReductionProxy.ProbeURL histogram.
+// This enum must remain synchronized with
+// DataReductionProxyProbeURLFetchResult in metrics/histograms/histograms.xml.
+// TODO(marq): Rename these histogram buckets with s/DISABLED/RESTRICTED/, so
+//     their names match the behavior they track.
+enum ProbeURLFetchResult {
+  // The probe failed because the Internet was disconnected.
+  INTERNET_DISCONNECTED = 0,
 
-    // The probe failed for any other reason, and as a result, the proxy was
-    // disabled.
-    FAILED_PROXY_DISABLED,
+  // The probe failed for any other reason, and as a result, the proxy was
+  // disabled.
+  FAILED_PROXY_DISABLED,
 
-    // The probe failed, but the proxy was already restricted.
-    FAILED_PROXY_ALREADY_DISABLED,
+  // The probe failed, but the proxy was already restricted.
+  FAILED_PROXY_ALREADY_DISABLED,
 
-    // THe probe succeeded, and as a result the proxy was restricted.
-    SUCCEEDED_PROXY_ENABLED,
+  // The probe succeeded, and as a result the proxy was restricted.
+  SUCCEEDED_PROXY_ENABLED,
 
-    // The probe succeeded, but the proxy was already restricted.
-    SUCCEEDED_PROXY_ALREADY_ENABLED,
+  // The probe succeeded, but the proxy was already restricted.
+  SUCCEEDED_PROXY_ALREADY_ENABLED,
 
-    // This must always be last.
-    PROBE_URL_FETCH_RESULT_COUNT
-  };
+  // This must always be last.
+  PROBE_URL_FETCH_RESULT_COUNT
+};
 
 // Central point for configuring the data reduction proxy.
 // This object lives on the UI thread and all of its methods are expected to
@@ -95,6 +94,10 @@ class DataReductionProxySettings
 
   DataReductionProxyParams* params() const {
     return params_.get();
+  }
+
+  DataReductionProxyUsageStats* usage_stats() const {
+     return usage_stats_;
   }
 
   // Initializes the data reduction proxy with profile and local state prefs,
@@ -122,26 +125,11 @@ class DataReductionProxySettings
   void SetProxyConfigurator(
       scoped_ptr<DataReductionProxyConfigurator> configurator);
 
-  // If proxy authentication is compiled in, pre-cache authentication
-  // keys for all configured proxies in |session|.
-  static void InitDataReductionProxySession(
-      net::HttpNetworkSession* session,
-      const DataReductionProxyParams* params);
-
-  // Returns true if |auth_info| represents an authentication challenge from
-  // a compatible, configured proxy.
-  bool IsAcceptableAuthChallenge(net::AuthChallengeInfo* auth_info);
-
-  // Returns a UTF16 string suitable for use as an authentication token in
-  // response to the challenge represented by |auth_info|. If the token can't
-  // be correctly generated for |auth_info|, returns an empty UTF16 string.
-  base::string16 GetTokenForAuthChallenge(net::AuthChallengeInfo* auth_info);
-
   // Returns true if the proxy is enabled.
   bool IsDataReductionProxyEnabled();
 
   // Returns true if the alternative proxy is enabled.
-  bool IsDataReductionProxyAlternativeEnabled();
+  bool IsDataReductionProxyAlternativeEnabled() const;
 
   // Returns true if the proxy is managed by an adminstrator's policy.
   bool IsDataReductionProxyManaged();
@@ -163,6 +151,15 @@ class DataReductionProxySettings
   // data reduction proxy. Each element in the vector contains one day of data.
   ContentLengthList GetDailyOriginalContentLengths();
 
+  // Returns whether the data reduction proxy is unreachable. Returns true
+  // if no request has successfully completed through proxy, even though atleast
+  // some of them should have.
+  bool IsDataReductionProxyUnreachable();
+
+  // Set the data reduction proxy usage stats.
+  void SetDataReductionProxyUsageStats(
+      DataReductionProxyUsageStats* usage_stats);
+
   // Returns an vector containing the aggregate received HTTP content in the
   // last |kNumDaysInHistory| days.
   ContentLengthList GetDailyReceivedContentLengths();
@@ -173,7 +170,13 @@ class DataReductionProxySettings
  protected:
   void InitPrefMembers();
 
-  virtual net::URLFetcher* GetURLFetcher();
+  // Returns a fetcher for the probe to check if OK for the proxy to use SPDY.
+  // Virtual for testing.
+  virtual net::URLFetcher* GetURLFetcherForAvailabilityCheck();
+
+  // Returns a fetcher to warm up the connection to the data reduction proxy.
+  // Virtual for testing.
+  virtual net::URLFetcher* GetURLFetcherForWarmup();
 
   // Virtualized for unit test support.
   virtual PrefService* GetOriginalProfilePrefs();
@@ -255,12 +258,6 @@ class DataReductionProxySettings
   // NetworkChangeNotifier::IPAddressObserver:
   virtual void OnIPAddressChanged() OVERRIDE;
 
-  // Underlying implementation of InitDataReductionProxySession(), factored
-  // out to be testable without creating a full HttpNetworkSession.
-  static void InitDataReductionAuthentication(
-      net::HttpAuthCache* auth_cache,
-      const DataReductionProxyParams* params);
-
   void OnProxyEnabledPrefChange();
   void OnProxyAlternativeEnabledPrefChange();
 
@@ -273,6 +270,12 @@ class DataReductionProxySettings
   // failure.
   void ProbeWhetherDataReductionProxyIsAvailable();
 
+  // Warms the connection to the data reduction proxy.
+  void WarmProxyConnection();
+
+  // Generic method to get a URL fetcher.
+  net::URLFetcher* GetBaseURLFetcher(const GURL& gurl, int load_flags);
+
   // Returns a UTF16 string that's the hash of the configured authentication
   // |key| and |salt|. Returns an empty UTF16 string if no key is configured or
   // the data reduction proxy feature isn't available.
@@ -284,6 +287,8 @@ class DataReductionProxySettings
   bool enabled_by_user_;
 
   scoped_ptr<net::URLFetcher> fetcher_;
+  scoped_ptr<net::URLFetcher> warmup_fetcher_;
+
   BooleanPrefMember spdy_proxy_auth_enabled_;
   BooleanPrefMember data_reduction_proxy_alternative_enabled_;
 
@@ -297,6 +302,7 @@ class DataReductionProxySettings
   base::ThreadChecker thread_checker_;
 
   scoped_ptr<DataReductionProxyParams> params_;
+  DataReductionProxyUsageStats* usage_stats_;
 
   DISALLOW_COPY_AND_ASSIGN(DataReductionProxySettings);
 };

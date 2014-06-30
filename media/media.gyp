@@ -412,12 +412,12 @@
         'filters/h264_parser.h',
         'filters/in_memory_url_protocol.cc',
         'filters/in_memory_url_protocol.h',
-        'filters/legacy_frame_processor.cc',
-        'filters/legacy_frame_processor.h',
         'filters/opus_audio_decoder.cc',
         'filters/opus_audio_decoder.h',
         'filters/skcanvas_video_renderer.cc',
         'filters/skcanvas_video_renderer.h',
+        'filters/source_buffer_platform.cc',
+        'filters/source_buffer_platform.h',
         'filters/source_buffer_stream.cc',
         'filters/source_buffer_stream.h',
         'filters/stream_parser_factory.cc',
@@ -463,6 +463,8 @@
         'midi/usb_midi_jack.h',
         'midi/usb_midi_output_stream.cc',
         'midi/usb_midi_output_stream.h',
+        'ozone/media_ozone_platform.cc',
+        'ozone/media_ozone_platform.h',
         'video/capture/android/video_capture_device_android.cc',
         'video/capture/android/video_capture_device_android.h',
         'video/capture/android/video_capture_device_factory_android.cc',
@@ -657,6 +659,13 @@
             'formats/webm/chromeos/webm_encoder.h',
           ],
         }],
+        # For VaapiVideoEncodeAccelerator.
+        ['target_arch != "arm" and chromeos == 1 and use_x11 == 1', {
+          'sources': [
+            'filters/h264_bitstream_buffer.cc',
+            'filters/h264_bitstream_buffer.h',
+          ],
+        }],
         ['OS!="ios"', {
           'dependencies': [
             '../third_party/libyuv/libyuv.gyp:libyuv',
@@ -724,6 +733,49 @@
               ],
             }],
           ],
+        }],
+        ['use_ozone==1', {
+          'variables': {
+            'platform_list_txt_file': '<(SHARED_INTERMEDIATE_DIR)/ui/ozone/platform_list.txt',
+            'constructor_list_cc_file': '<(INTERMEDIATE_DIR)/media/ozone/constructor_list.cc',
+          },
+          'include_dirs': [
+              # Used for the generated listing header (ui/ozone/platform_list.h)
+              '<(SHARED_INTERMEDIATE_DIR)',
+          ],
+          'sources': [
+            '<(constructor_list_cc_file)',
+          ],
+          'dependencies': [
+            '../ui/ozone/ozone.gyp:ozone',
+          ],
+          'actions': [
+            {
+              # Ozone platform objects are auto-generated using similar
+              # patterns for naming and classes constructors. Here we build the
+              # object MediaOzonePlatform.
+              'action_name': 'generate_constructor_list',
+              'variables': {
+                'generator_path': '../ui/ozone/generate_constructor_list.py',
+              },
+              'inputs': [
+                '<(generator_path)',
+                '<(platform_list_txt_file)',
+              ],
+              'outputs': [
+                '<(constructor_list_cc_file)',
+              ],
+              'action': [
+                'python',
+                '<(generator_path)',
+                '--platform_list=<(platform_list_txt_file)',
+                '--output_cc=<(constructor_list_cc_file)',
+                '--namespace=media',
+                '--typename=MediaOzonePlatform',
+                '--include="media/ozone/media_ozone_platform.h"'
+              ],
+            },
+          ]
         }],
         ['OS!="linux"', {
           'sources!': [
@@ -1052,6 +1104,7 @@
         'cdm/json_web_key_unittest.cc',
         'ffmpeg/ffmpeg_common_unittest.cc',
         'filters/audio_clock_unittest.cc',
+        'filters/audio_decoder_unittest.cc',
         'filters/audio_decoder_selector_unittest.cc',
         'filters/audio_file_reader_unittest.cc',
         'filters/audio_renderer_algorithm_unittest.cc',
@@ -1067,7 +1120,6 @@
         'filters/fake_video_decoder.cc',
         'filters/fake_video_decoder.h',
         'filters/fake_video_decoder_unittest.cc',
-        'filters/ffmpeg_audio_decoder_unittest.cc',
         'filters/ffmpeg_demuxer_unittest.cc',
         'filters/ffmpeg_glue_unittest.cc',
         'filters/ffmpeg_video_decoder_unittest.cc',
@@ -1076,7 +1128,6 @@
         'filters/h264_bit_reader_unittest.cc',
         'filters/h264_parser_unittest.cc',
         'filters/in_memory_url_protocol_unittest.cc',
-        'filters/opus_audio_decoder_unittest.cc',
         'filters/pipeline_integration_test.cc',
         'filters/pipeline_integration_test_base.cc',
         'filters/skcanvas_video_renderer_unittest.cc',
@@ -1150,15 +1201,14 @@
             'audio/audio_input_volume_unittest.cc',
             'base/container_names_unittest.cc',
             'ffmpeg/ffmpeg_common_unittest.cc',
+            'filters/audio_decoder_unittest.cc',
             'filters/audio_file_reader_unittest.cc',
             'filters/blocking_url_protocol_unittest.cc',
-            'filters/ffmpeg_audio_decoder_unittest.cc',
             'filters/ffmpeg_demuxer_unittest.cc',
             'filters/ffmpeg_glue_unittest.cc',
             'filters/ffmpeg_h264_to_annex_b_bitstream_converter_unittest.cc',
             'filters/ffmpeg_video_decoder_unittest.cc',
             'filters/in_memory_url_protocol_unittest.cc',
-            'filters/opus_audio_decoder_unittest.cc',
             'filters/pipeline_integration_test.cc',
             'filters/pipeline_integration_test_base.cc',
           ],
@@ -1178,6 +1228,11 @@
                 'USE_CRAS',
               ],
             }],
+          ],
+        }],
+        ['target_arch != "arm" and chromeos == 1 and use_x11 == 1', {
+          'sources': [
+            'filters/h264_bitstream_buffer_unittest.cc',
           ],
         }],
         ['use_alsa==0', {

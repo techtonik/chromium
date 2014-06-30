@@ -20,7 +20,6 @@
 #include "chrome/browser/extensions/api/commands/command_service.h"
 #include "chrome/browser/extensions/tab_helper.h"
 #include "chrome/browser/favicon/favicon_tab_helper.h"
-#include "chrome/browser/google/google_util.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/platform_util.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
@@ -63,6 +62,7 @@
 #include "chrome/common/pref_names.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/bookmarks/browser/bookmark_utils.h"
+#include "components/google/core/browser/google_util.h"
 #include "components/translate/core/browser/language_state.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "content/public/browser/devtools_agent_host.h"
@@ -79,6 +79,7 @@
 #include "content/public/common/url_utils.h"
 #include "content/public/common/user_agent.h"
 #include "extensions/browser/extension_registry.h"
+#include "extensions/browser/extension_system.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_set.h"
 #include "net/base/escape.h"
@@ -518,7 +519,8 @@ void OpenCurrentURL(Browser* browser) {
       TabStripModel::ADD_FORCE_INDEX | TabStripModel::ADD_INHERIT_OPENER;
   Navigate(&params);
 
-  DCHECK(browser->profile()->GetExtensionService());
+  DCHECK(extensions::ExtensionSystem::Get(
+      browser->profile())->extension_service());
   const extensions::Extension* extension =
       extensions::ExtensionRegistry::Get(browser->profile())
           ->enabled_extensions().GetAppByURL(url);
@@ -1047,7 +1049,7 @@ void ShowAppMenu(Browser* browser) {
 void ShowAvatarMenu(Browser* browser) {
   browser->window()->ShowAvatarBubbleFromAvatarButton(
       BrowserWindow::AVATAR_BUBBLE_MODE_DEFAULT,
-      signin::GAIA_SERVICE_TYPE_NONE);
+      signin::ManageAccountsParams());
 }
 
 void OpenUpdateChromeDialog(Browser* browser) {

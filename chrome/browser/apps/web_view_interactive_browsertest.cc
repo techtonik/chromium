@@ -11,6 +11,8 @@
 #include "chrome/browser/chrome_content_browser_client.h"
 #include "chrome/browser/extensions/extension_test_message_listener.h"
 #include "chrome/browser/guest_view/guest_view_base.h"
+#include "chrome/browser/guest_view/guest_view_manager.h"
+#include "chrome/browser/guest_view/guest_view_manager_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/renderer_context_menu/render_view_context_menu_browsertest_util.h"
 #include "chrome/browser/renderer_context_menu/render_view_context_menu_test_util.h"
@@ -20,6 +22,7 @@
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
+#include "content/public/browser/render_widget_host_iterator.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_switches.h"
@@ -32,13 +35,77 @@
 
 using apps::AppWindow;
 
+class TestGuestViewManager : public GuestViewManager {
+ public:
+  explicit TestGuestViewManager(content::BrowserContext* context) :
+      GuestViewManager(context),
+      web_contents_(NULL) {}
+
+  content::WebContents* WaitForGuestCreated() {
+    if (web_contents_)
+      return web_contents_;
+
+    message_loop_runner_ = new content::MessageLoopRunner;
+    message_loop_runner_->Run();
+    return web_contents_;
+  }
+
+ private:
+  // GuestViewManager override:
+  virtual void AddGuest(int guest_instance_id,
+                        content::WebContents* guest_web_contents) OVERRIDE{
+    GuestViewManager::AddGuest(guest_instance_id, guest_web_contents);
+    web_contents_ = guest_web_contents;
+
+    if (message_loop_runner_)
+      message_loop_runner_->Quit();
+  }
+
+  content::WebContents* web_contents_;
+  scoped_refptr<content::MessageLoopRunner> message_loop_runner_;
+};
+
+// Test factory for creating test instances of GuestViewManager.
+class TestGuestViewManagerFactory : public GuestViewManagerFactory {
+ public:
+  TestGuestViewManagerFactory() :
+      test_guest_view_manager_(NULL) {}
+
+  virtual ~TestGuestViewManagerFactory() {}
+
+  virtual GuestViewManager* CreateGuestViewManager(
+      content::BrowserContext* context) OVERRIDE {
+    return GetManager(context);
+  }
+
+  TestGuestViewManager* GetManager(content::BrowserContext* context) {
+    if (!test_guest_view_manager_) {
+      test_guest_view_manager_ = new TestGuestViewManager(context);
+    }
+    return test_guest_view_manager_;
+  }
+
+ private:
+  TestGuestViewManager* test_guest_view_manager_;
+
+  DISALLOW_COPY_AND_ASSIGN(TestGuestViewManagerFactory);
+};
+
 class WebViewInteractiveTest
     : public extensions::PlatformAppBrowserTest {
  public:
   WebViewInteractiveTest()
-      : corner_(gfx::Point()),
+      : guest_web_contents_(NULL),
+        embedder_web_contents_(NULL),
+        corner_(gfx::Point()),
         mouse_click_result_(false),
-        first_click_(true) {}
+        first_click_(true) {
+    GuestViewManager::set_factory_for_testing(&factory_);
+  }
+
+  TestGuestViewManager* GetGuestViewManager() {
+    return factory_.GetManager(browser()->profile());
+  }
 
   void MoveMouseInsideWindowWithListener(gfx::Point point,
                                          const std::string& message) {
@@ -156,13 +223,7 @@ class WebViewInteractiveTest
       return scoped_ptr<ExtensionTestMessageListener>();
     }
 
-    ExtensionTestMessageListener launched_listener("Launched", false);
-    LoadAndLaunchPlatformApp(app_location.c_str());
-    if (!launched_listener.WaitUntilSatisfied()) {
-      LOG(ERROR) << "TEST DID NOT LAUNCH.";
-      return scoped_ptr<ExtensionTestMessageListener>();
-    }
-
+    LoadAndLaunchPlatformApp(app_location.c_str(), "Launched");
     if (!ui_test_utils::ShowAndFocusNativeWindow(GetPlatformAppWindow())) {
       LOG(ERROR) << "UNABLE TO FOCUS TEST WINDOW.";
       return scoped_ptr<ExtensionTestMessageListener>();
@@ -196,6 +257,8 @@ class WebViewInteractiveTest
 
     ASSERT_TRUE(done_listener);
     ASSERT_TRUE(done_listener->WaitUntilSatisfied());
+
+    guest_web_contents_ = GetGuestViewManager()->WaitForGuestCreated();
   }
 
   void RunTest(const std::string& app_name) {
@@ -213,14 +276,9 @@ class WebViewInteractiveTest
     ui_test_utils::UrlLoadObserver guest_observer(
         guest_url, content::NotificationService::AllSources());
 
-    ExtensionTestMessageListener guest_connected_listener("connected", false);
-    LoadAndLaunchPlatformApp(app_name.c_str());
+    LoadAndLaunchPlatformApp(app_name.c_str(), "connected");
 
     guest_observer.Wait();
-
-    // Wait until the guest process reports that it has established a message
-    // channel with the app.
-    ASSERT_TRUE(guest_connected_listener.WaitUntilSatisfied());
     content::Source<content::NavigationController> source =
         guest_observer.source();
     EXPECT_TRUE(source->GetWebContents()->GetRenderProcessHost()->
@@ -273,30 +331,81 @@ class WebViewInteractiveTest
     rwh->ForwardMouseEvent(mouse_event);
   }
 
-  // TODO(lazyboy): implement
   class PopupCreatedObserver {
    public:
-    PopupCreatedObserver() : created_(false), last_render_widget_host_(NULL) {
+    explicit PopupCreatedObserver()
+        : initial_widget_count_(0),
+          last_render_widget_host_(NULL),
+          seen_new_widget_(false) {}
+
+    ~PopupCreatedObserver() {}
+
+    void Wait() {
+      size_t current_widget_count = CountWidgets();
+      if (!seen_new_widget_ &&
+          current_widget_count == initial_widget_count_ + 1) {
+        seen_new_widget_ = true;
+      }
+
+      // If we haven't seen any new widget or we get 0 size widget, we need to
+      // schedule waiting.
+      bool needs_to_schedule_wait = true;
+
+      if (seen_new_widget_) {
+        gfx::Rect popup_bounds =
+            last_render_widget_host_->GetView()->GetViewBounds();
+        if (!popup_bounds.size().IsEmpty())
+          needs_to_schedule_wait = false;
+      }
+
+      if (needs_to_schedule_wait) {
+        ScheduleWait();
+      } else {
+        // We are done.
+        if (message_loop_)
+          message_loop_->Quit();
+      }
+
+      if (!message_loop_) {
+        message_loop_ = new content::MessageLoopRunner;
+        message_loop_->Run();
+      }
     }
-    virtual ~PopupCreatedObserver() {
-    }
-    void Reset() {
-      created_ = false;
-    }
-    void Start() {
-      if (created_)
-        return;
-      message_loop_ = new content::MessageLoopRunner;
-      message_loop_->Run();
-    }
+
+    void Init() { initial_widget_count_ = CountWidgets(); }
+
+    // Returns the last widget created.
     content::RenderWidgetHost* last_render_widget_host() {
       return last_render_widget_host_;
     }
 
    private:
-    scoped_refptr<content::MessageLoopRunner> message_loop_;
-    bool created_;
+    void ScheduleWait() {
+      base::MessageLoop::current()->PostDelayedTask(
+          FROM_HERE,
+          base::Bind(&PopupCreatedObserver::Wait, base::Unretained(this)),
+          base::TimeDelta::FromMilliseconds(200));
+    }
+
+    size_t CountWidgets() {
+      scoped_ptr<content::RenderWidgetHostIterator> widgets(
+          content::RenderWidgetHost::GetRenderWidgetHosts());
+      size_t num_widgets = 0;
+      while (content::RenderWidgetHost* widget = widgets->GetNextHost()) {
+        if (widget->IsRenderView())
+          continue;
+        ++num_widgets;
+        last_render_widget_host_ = widget;
+      }
+      return num_widgets;
+    }
+
+    size_t initial_widget_count_;
     content::RenderWidgetHost* last_render_widget_host_;
+    scoped_refptr<content::MessageLoopRunner> message_loop_;
+    bool seen_new_widget_;
+
+    DISALLOW_COPY_AND_ASSIGN(PopupCreatedObserver);
   };
 
   void WaitForTitle(const char* title) {
@@ -308,36 +417,17 @@ class WebViewInteractiveTest
   }
 
   void PopupTestHelper(const gfx::Point& padding) {
-    PopupCreatedObserver popup_created_observer;
-    popup_created_observer.Reset();
-
+    PopupCreatedObserver popup_observer;
+    popup_observer.Init();
+    // Press alt+DOWN to open popup.
+    bool alt = true;
     content::SimulateKeyPress(
-        guest_web_contents(),
-        ui::VKEY_C,  // C to autocomplete.
-        false, false, false, false);
+        guest_web_contents(), ui::VKEY_DOWN, false, false, alt, false);
+    popup_observer.Wait();
 
-    WaitForTitle("PASSED1");
-
-    popup_created_observer.Start();
-
-    content::RenderWidgetHost* popup_rwh = NULL;
-    popup_rwh = popup_created_observer.last_render_widget_host();
-    // Popup must be present.
-    ASSERT_TRUE(popup_rwh);
-    ASSERT_TRUE(!popup_rwh->IsRenderView());
-    ASSERT_TRUE(popup_rwh->GetView());
-
-    base::string16 expected_title = base::ASCIIToUTF16("PASSED2");
-    base::string16 error_title = base::ASCIIToUTF16("FAILED");
-    content::TitleWatcher title_watcher(guest_web_contents(), expected_title);
-    title_watcher.AlsoWaitForTitle(error_title);
-    EXPECT_TRUE(content::ExecuteScript(guest_web_contents(),
-                                       "changeTitle();"));
-    ASSERT_EQ(expected_title, title_watcher.WaitAndGetTitle());
-
+    content::RenderWidgetHost* popup_rwh =
+        popup_observer.last_render_widget_host();
     gfx::Rect popup_bounds = popup_rwh->GetView()->GetViewBounds();
-    // (2, 2) is expected to lie on the first datalist element.
-    SimulateRWHMouseClick(popup_rwh, blink::WebMouseEvent::ButtonLeft, 2, 2);
 
     content::RenderViewHost* embedder_rvh =
         GetFirstAppWindowWebContents()->GetRenderViewHost();
@@ -356,7 +446,9 @@ class WebViewInteractiveTest
     EXPECT_LE(std::abs(diff.x() - left_spacing), threshold_px);
     EXPECT_LE(std::abs(diff.y() - top_spacing), threshold_px);
 
-    WaitForTitle("PASSED3");
+    // Close the popup.
+    content::SimulateKeyPress(
+        guest_web_contents(), ui::VKEY_ESCAPE, false, false, false, false);
   }
 
   void DragTestStep1() {
@@ -412,6 +504,7 @@ class WebViewInteractiveTest
   }
 
  protected:
+  TestGuestViewManagerFactory factory_;
   content::WebContents* guest_web_contents_;
   content::WebContents* embedder_web_contents_;
   gfx::Point corner_;
@@ -420,38 +513,6 @@ class WebViewInteractiveTest
   // Only used in drag/drop test.
   base::Closure quit_closure_;
   std::string last_drop_data_;
-};
-
-// Used to get notified when a guest is created.
-class GuestContentBrowserClient : public chrome::ChromeContentBrowserClient {
- public:
-  GuestContentBrowserClient() : web_contents_(NULL) {}
-
-  content::WebContents* WaitForGuestCreated() {
-    if (web_contents_)
-      return web_contents_;
-
-    message_loop_runner_ = new content::MessageLoopRunner;
-    message_loop_runner_->Run();
-    return web_contents_;
-  }
-
- private:
-  // ChromeContentBrowserClient implementation:
-  virtual void GuestWebContentsAttached(
-      content::WebContents* guest_web_contents,
-      content::WebContents* embedder_web_contents,
-      const base::DictionaryValue& extra_params) OVERRIDE {
-    ChromeContentBrowserClient::GuestWebContentsAttached(
-        guest_web_contents, embedder_web_contents, extra_params);
-    web_contents_ = guest_web_contents;
-
-    if (message_loop_runner_)
-      message_loop_runner_->Quit();
-  }
-
-  content::WebContents* web_contents_;
-  scoped_refptr<content::MessageLoopRunner> message_loop_runner_;
 };
 
 // ui_test_utils::SendMouseMoveSync doesn't seem to work on OS_MACOSX, and
@@ -616,11 +677,7 @@ IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, Focus_BlurEvent) {
 
 // Tests that guests receive edit commands and respond appropriately.
 IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, EditCommands) {
-  ExtensionTestMessageListener guest_connected_listener("connected", false);
-  LoadAndLaunchPlatformApp("web_view/edit_commands");
-  // Wait until the guest process reports that it has established a message
-  // channel with the app.
-  ASSERT_TRUE(guest_connected_listener.WaitUntilSatisfied());
+  LoadAndLaunchPlatformApp("web_view/edit_commands", "connected");
 
   ASSERT_TRUE(ui_test_utils::ShowAndFocusNativeWindow(
       GetPlatformAppWindow()));
@@ -752,32 +809,20 @@ IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, ExecuteCode) {
       "platform_apps/web_view/common", "execute_code")) << message_;
 }
 
-// This test used the old Autofill UI, which has been removed.
-// See crbug.com/259438
-IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, DISABLED_PopupPositioning) {
-  SetupTest(
-      "web_view/popup_positioning",
-      "/extensions/platform_apps/web_view/popup_positioning/guest.html");
+IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, PopupPositioningBasic) {
+  TestHelper("testBasic", "web_view/popup_positioning", NO_TEST_SERVER);
   ASSERT_TRUE(guest_web_contents());
-
   PopupTestHelper(gfx::Point());
 
-  // moveTo a random location and run the steps again.
-  EXPECT_TRUE(content::ExecuteScript(embedder_web_contents(),
-                                     "window.moveTo(16, 20);"));
-  PopupTestHelper(gfx::Point());
+  // TODO(lazyboy): Move the embedder window to a random location and
+  // make sure we keep rendering popups correct in webview.
 }
 
 // Tests that moving browser plugin (without resize/UpdateRects) correctly
 // repositions popup.
-// Started flakily failing after a Blink roll: http://crbug.com/245332
-IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, DISABLED_PopupPositioningMoved) {
-  SetupTest(
-      "web_view/popup_positioning_moved",
-      "/extensions/platform_apps/web_view/popup_positioning_moved"
-      "/guest.html");
+IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, PopupPositioningMoved) {
+  TestHelper("testMoved", "web_view/popup_positioning", NO_TEST_SERVER);
   ASSERT_TRUE(guest_web_contents());
-
   PopupTestHelper(gfx::Point(20, 0));
 }
 
@@ -786,10 +831,7 @@ IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, DISABLED_PopupPositioningMoved) {
 // of simulating mouse drag code's dependency on platforms.
 #if defined(OS_CHROMEOS)
 IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, DragDropWithinWebView) {
-  ExtensionTestMessageListener guest_connected_listener("connected", false);
-  LoadAndLaunchPlatformApp("web_view/dnd_within_webview");
-  ASSERT_TRUE(guest_connected_listener.WaitUntilSatisfied());
-
+  LoadAndLaunchPlatformApp("web_view/dnd_within_webview", "connected");
   ASSERT_TRUE(ui_test_utils::ShowAndFocusNativeWindow(GetPlatformAppWindow()));
 
   embedder_web_contents_ = GetFirstAppWindowWebContents();
@@ -832,10 +874,7 @@ IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, Navigation) {
 }
 
 IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, Navigation_BackForwardKeys) {
-  ExtensionTestMessageListener launched_listener("Launched", false);
-  LoadAndLaunchPlatformApp("web_view/navigation");
-  ASSERT_TRUE(launched_listener.WaitUntilSatisfied());
-
+  LoadAndLaunchPlatformApp("web_view/navigation", "Launched");
   ASSERT_TRUE(ui_test_utils::ShowAndFocusNativeWindow(
       GetPlatformAppWindow()));
   // Flush any pending events to make sure we start with a clean slate.
@@ -881,25 +920,16 @@ IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest,
 // view upon step #3. We simply read the input type's state after #3 to
 // make sure it's not TEXT_INPUT_TYPE_NONE.
 IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, Focus_FocusRestored) {
-  GuestContentBrowserClient new_client;
-  content::ContentBrowserClient* old_client =
-      SetBrowserClientForTesting(&new_client);
-
-  content::WebContents* embedder_web_contents = NULL;
-  scoped_ptr<ExtensionTestMessageListener> done_listener(
-      RunAppHelper("testFocusRestored", "web_view/focus", NO_TEST_SERVER,
-                   &embedder_web_contents));
-  ASSERT_TRUE(done_listener->WaitUntilSatisfied());
-  content::WebContents* guest_web_contents = new_client.WaitForGuestCreated();
-  // Reset the browser client so that we do not notice any unexpected behavior.
-  SetBrowserClientForTesting(old_client);
-  ASSERT_TRUE(guest_web_contents);
+  TestHelper("testFocusRestored", "web_view/focus", NO_TEST_SERVER);
+  content::WebContents* embedder_web_contents = GetFirstAppWindowWebContents();
+  ASSERT_TRUE(embedder_web_contents);
+  ASSERT_TRUE(guest_web_contents());
 
   // 1) We click on the guest so that we get a focus event.
   ExtensionTestMessageListener next_step_listener("TEST_STEP_PASSED", false);
   next_step_listener.set_failure_message("TEST_STEP_FAILED");
   {
-    content::SimulateMouseClickAt(guest_web_contents,
+    content::SimulateMouseClickAt(guest_web_contents(),
                                   0,
                                   blink::WebMouseEvent::ButtonLeft,
                                   gfx::Point(10, 10));
@@ -929,7 +959,7 @@ IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, Focus_FocusRestored) {
   // input element, then we ensure text_input_type is properly set.
   next_step_listener.Reset();
   {
-    content::SimulateMouseClickAt(guest_web_contents,
+    content::SimulateMouseClickAt(guest_web_contents(),
                                   0,
                                   blink::WebMouseEvent::ButtonLeft,
                                   gfx::Point(10, 10));
@@ -953,7 +983,7 @@ IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, Focus_FocusRestored) {
 
 // ui::TextInputClient is NULL for mac and android.
 #if !defined(OS_MACOSX) && !defined(OS_ANDROID)
-IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, Focus_InputMethod) {
+IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, DISABLED_Focus_InputMethod) {
   content::WebContents* embedder_web_contents = NULL;
   scoped_ptr<ExtensionTestMessageListener> done_listener(
       RunAppHelper("testInputMethod", "web_view/focus", NO_TEST_SERVER,

@@ -53,8 +53,8 @@ FileGrid.decorate = function(self, metadataCache, volumeManager) {
     return item;
   };
 
-  self.relayoutAggregation_ =
-      new AsyncUtil.Aggregation(self.relayoutImmediately_.bind(self));
+  self.relayoutRateLimiter_ =
+      new AsyncUtil.RateLimiter(self.relayoutImmediately_.bind(self));
 };
 
 /**
@@ -62,12 +62,13 @@ FileGrid.decorate = function(self, metadataCache, volumeManager) {
  * @param {string} type Type of metadata changed.
  * @param {Object.<string, Object>} props Map from entry URLs to metadata props.
  */
-FileGrid.prototype.updateListItemsMetadata = function(type, props) {
+FileGrid.prototype.updateListItemsMetadata = function(type, entries) {
+  var urls = util.entriesToURLs(entries);
   var boxes = this.querySelectorAll('.img-container');
   for (var i = 0; i < boxes.length; i++) {
     var box = boxes[i];
     var entry = this.dataModel.item(this.getListItemAncestor(box));
-    if (!entry || !(entry.toURL() in props))
+    if (!entry || !(entry.toURL() in urls))
       continue;
 
     FileGrid.decorateThumbnailBox(box,
@@ -83,7 +84,7 @@ FileGrid.prototype.updateListItemsMetadata = function(type, props) {
  * Redraws the UI. Skips multiple consecutive calls.
  */
 FileGrid.prototype.relayout = function() {
-  this.relayoutAggregation_.run();
+  this.relayoutRateLimiter_.run();
 };
 
 /**

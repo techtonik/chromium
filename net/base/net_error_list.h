@@ -96,7 +96,7 @@ NET_ERROR(SOCKET_IS_CONNECTED, -23)
 
 // The request was blocked because the forced reenrollment check is still
 // pending. This error can only occur on ChromeOS.
-// The error can be emitted by code in c/b/policy/policy_helpers.cc.
+// The error can be emitted by code in chrome/browser/policy/policy_helpers.cc.
 NET_ERROR(BLOCKED_ENROLLMENT_CHECK_PENDING, -24)
 
 // A connection was closed (corresponding to a TCP FIN).
@@ -645,6 +645,9 @@ NET_ERROR(CACHE_CHECKSUM_READ_FAILURE, -407)
 // SimpleCache backend, but not by any URLRequest methods or members.
 NET_ERROR(CACHE_CHECKSUM_MISMATCH, -408)
 
+// Internal error code for the HTTP cache. The cache lock timeout has fired.
+NET_ERROR(CACHE_LOCK_TIMEOUT, -409)
+
 // The server's response was insecure (e.g. there was a cert error).
 NET_ERROR(INSECURE_RESPONSE, -501)
 
@@ -731,6 +734,9 @@ NET_ERROR(SELF_SIGNED_CERT_GENERATION_FAILED, -713)
 
 // The certificate database changed in some way.
 NET_ERROR(CERT_DATABASE_CHANGED, -714)
+
+// Failure to import Channel ID.
+NET_ERROR(CHANNEL_ID_IMPORT_FAILED, -715)
 
 // DNS error codes.
 

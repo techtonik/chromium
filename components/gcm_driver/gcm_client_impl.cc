@@ -250,6 +250,7 @@ scoped_ptr<ConnectionFactory> GCMInternalsBuilder::BuildConnectionFactory(
 GCMClientImpl::GCMClientImpl(scoped_ptr<GCMInternalsBuilder> internals_builder)
     : internals_builder_(internals_builder.Pass()),
       state_(UNINITIALIZED),
+      delegate_(NULL),
       clock_(internals_builder_->BuildClock()),
       url_request_context_getter_(NULL),
       pending_registration_requests_deleter_(&pending_registration_requests_),
@@ -265,7 +266,6 @@ GCMClientImpl::~GCMClientImpl() {
 void GCMClientImpl::Initialize(
     const ChromeBuildInfo& chrome_build_info,
     const base::FilePath& path,
-    const std::vector<std::string>& account_ids,
     const scoped_refptr<base::SequencedTaskRunner>& blocking_task_runner,
     const scoped_refptr<net::URLRequestContextGetter>&
         url_request_context_getter,
@@ -283,7 +283,6 @@ void GCMClientImpl::Initialize(
   network_session_ = new net::HttpNetworkSession(*network_session_params);
 
   chrome_build_info_ = chrome_build_info;
-  account_ids_ = account_ids;
 
   gcm_store_.reset(
       new GCMStoreImpl(path, blocking_task_runner, encryptor.Pass()));
@@ -341,6 +340,7 @@ void GCMClientImpl::InitializeMCSClient(
       network_session_,
       net_log_.net_log(),
       &recorder_);
+  connection_factory_->SetConnectionListener(this);
   mcs_client_ = internals_builder_->BuildMCSClient(
       chrome_build_info_.version,
       clock_.get(),
@@ -400,7 +400,6 @@ void GCMClientImpl::StartCheckin() {
   CheckinRequest::RequestInfo request_info(device_checkin_info_.android_id,
                                            device_checkin_info_.secret,
                                            gservices_settings_.digest(),
-                                           account_ids_,
                                            chrome_build_proto);
   checkin_request_.reset(
       new CheckinRequest(gservices_settings_.GetCheckinURL(),
@@ -502,8 +501,10 @@ void GCMClientImpl::UpdateRegistrationCallback(bool success) {
 }
 
 void GCMClientImpl::Stop() {
+  weak_ptr_factory_.InvalidateWeakPtrs();
   device_checkin_info_.Reset();
   connection_factory_.reset();
+  delegate_->OnDisconnected();
   mcs_client_.reset();
   checkin_request_.reset();
   pending_registration_requests_.clear();
@@ -711,8 +712,9 @@ GCMClient::GCMStatistics GCMClientImpl::GetStatistics() const {
   stats.is_recording = recorder_.is_recording();
   stats.gcm_client_state = GetStateString();
   stats.connection_client_created = mcs_client_.get() != NULL;
+  if (connection_factory_.get())
+    stats.connection_state = connection_factory_->GetConnectionStateString();
   if (mcs_client_.get()) {
-    stats.connection_state = mcs_client_->GetStateString();
     stats.send_queue_size = mcs_client_->GetSendQueueSize();
     stats.resend_queue_size = mcs_client_->GetResendQueueSize();
   }
@@ -729,6 +731,18 @@ GCMClient::GCMStatistics GCMClientImpl::GetStatistics() const {
 
 void GCMClientImpl::OnActivityRecorded() {
   delegate_->OnActivityRecorded();
+}
+
+void GCMClientImpl::OnConnected(const GURL& current_server,
+                                const net::IPEndPoint& ip_endpoint) {
+  // TODO(gcm): expose current server in debug page.
+  delegate_->OnActivityRecorded();
+  delegate_->OnConnected(ip_endpoint);
+}
+
+void GCMClientImpl::OnDisconnected() {
+  delegate_->OnActivityRecorded();
+  delegate_->OnDisconnected();
 }
 
 void GCMClientImpl::OnMessageReceivedFromMCS(const gcm::MCSMessage& message) {

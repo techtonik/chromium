@@ -38,7 +38,6 @@ class MockDemuxer : public Demuxer {
   MOCK_METHOD1(Stop, void(const base::Closure& callback));
   MOCK_METHOD0(OnAudioRendererDisabled, void());
   MOCK_METHOD1(GetStream, DemuxerStream*(DemuxerStream::Type));
-  MOCK_CONST_METHOD0(GetStartTime, base::TimeDelta());
   MOCK_CONST_METHOD0(GetTimelineOffset, base::Time());
   MOCK_CONST_METHOD0(GetLiveness, Liveness());
 
@@ -144,8 +143,8 @@ class MockAudioRenderer : public AudioRenderer {
   MOCK_METHOD7(Initialize, void(DemuxerStream* stream,
                                 const PipelineStatusCB& init_cb,
                                 const StatisticsCB& statistics_cb,
-                                const base::Closure& underflow_cb,
                                 const TimeCB& time_cb,
+                                const BufferingStateCB& buffering_state_cb,
                                 const base::Closure& ended_cb,
                                 const PipelineStatusCB& error_cb));
   MOCK_METHOD0(StartRendering, void());
@@ -153,7 +152,7 @@ class MockAudioRenderer : public AudioRenderer {
   MOCK_METHOD1(Flush, void(const base::Closure& callback));
   MOCK_METHOD1(Stop, void(const base::Closure& callback));
   MOCK_METHOD1(SetPlaybackRate, void(float playback_rate));
-  MOCK_METHOD2(Preroll, void(base::TimeDelta time, const PipelineStatusCB& cb));
+  MOCK_METHOD1(StartPlayingFrom, void(base::TimeDelta time));
   MOCK_METHOD1(SetVolume, void(float volume));
   MOCK_METHOD0(ResumeAfterUnderflow, void());
 

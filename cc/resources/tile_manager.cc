@@ -30,18 +30,6 @@ namespace {
 // a tile is of solid color.
 const bool kUseColorEstimator = true;
 
-class DisableLCDTextFilter : public SkDrawFilter {
- public:
-  // SkDrawFilter interface.
-  virtual bool filter(SkPaint* paint, SkDrawFilter::Type type) OVERRIDE {
-    if (type != SkDrawFilter::kText_Type)
-      return true;
-
-    paint->setLCDRenderText(false);
-    return true;
-  }
-};
-
 class RasterTaskImpl : public RasterTask {
  public:
   RasterTaskImpl(
@@ -145,9 +133,6 @@ class RasterTaskImpl : public RasterTask {
     switch (raster_mode_) {
       case LOW_QUALITY_RASTER_MODE:
         draw_filter = skia::AdoptRef(new skia::PaintSimplifier);
-        break;
-      case HIGH_QUALITY_NO_LCD_RASTER_MODE:
-        draw_filter = skia::AdoptRef(new DisableLCDTextFilter);
         break;
       case HIGH_QUALITY_RASTER_MODE:
         break;
@@ -386,8 +371,6 @@ TileManager::TileManager(
       prioritized_tiles_dirty_(false),
       all_tiles_that_need_to_be_rasterized_have_memory_(true),
       all_tiles_required_for_activation_have_memory_(true),
-      memory_required_bytes_(0),
-      memory_nice_to_have_bytes_(0),
       bytes_releasable_(0),
       resources_releasable_(0),
       ever_exceeded_memory_budget_(false),
@@ -420,13 +403,6 @@ TileManager::~TileManager() {
 
   DCHECK_EQ(0u, bytes_releasable_);
   DCHECK_EQ(0u, resources_releasable_);
-
-  for (std::vector<PictureLayerImpl*>::iterator it = layers_.begin();
-       it != layers_.end();
-       ++it) {
-    (*it)->DidUnregisterLayer();
-  }
-  layers_.clear();
 }
 
 void TileManager::Release(Tile* tile) {
@@ -554,10 +530,6 @@ void TileManager::DidFinishRunningTasksRequiredForActivation() {
 void TileManager::GetTilesWithAssignedBins(PrioritizedTileSet* tiles) {
   TRACE_EVENT0("cc", "TileManager::GetTilesWithAssignedBins");
 
-  // Compute new stats to be return by GetMemoryStats().
-  memory_required_bytes_ = 0;
-  memory_nice_to_have_bytes_ = 0;
-
   const TileMemoryLimitPolicy memory_policy = global_state_.memory_limit_policy;
   const TreePriority tree_priority = global_state_.tree_priority;
 
@@ -600,18 +572,6 @@ void TileManager::GetTilesWithAssignedBins(PrioritizedTileSet* tiles) {
       active_bin = NEVER_BIN;
     if (!tile_is_ready_to_draw && pending_is_non_ideal)
       pending_bin = NEVER_BIN;
-
-    if (!tile_is_ready_to_draw || tile_version.requires_resource()) {
-      // The bin that the tile would have if the GPU memory manager had
-      // a maximally permissive policy, send to the GPU memory manager
-      // to determine policy.
-      ManagedTileBin gpu_memmgr_stats_bin = std::min(active_bin, pending_bin);
-      if ((gpu_memmgr_stats_bin == NOW_BIN) ||
-          (gpu_memmgr_stats_bin == NOW_AND_READY_TO_DRAW_BIN))
-        memory_required_bytes_ += BytesConsumedIfAllocated(tile);
-      if (gpu_memmgr_stats_bin != NEVER_BIN)
-        memory_nice_to_have_bytes_ += BytesConsumedIfAllocated(tile);
-    }
 
     ManagedTileBin tree_bin[NUM_TREES];
     tree_bin[ACTIVE_TREE] = kBinPolicyMap[memory_policy][active_bin];
@@ -676,19 +636,6 @@ void TileManager::GetTilesWithAssignedBins(PrioritizedTileSet* tiles) {
   }
 }
 
-void TileManager::CleanUpLayers() {
-  for (size_t i = 0; i < layers_.size(); ++i) {
-    if (layers_[i]->IsDrawnRenderSurfaceLayerListMember())
-      continue;
-
-    layers_[i]->DidUnregisterLayer();
-    std::swap(layers_[i], layers_.back());
-    layers_.pop_back();
-    --i;
-    prioritized_tiles_dirty_ = true;
-  }
-}
-
 void TileManager::ManageTiles(const GlobalStateThatImpactsTilePriority& state) {
   TRACE_EVENT0("cc", "TileManager::ManageTiles");
 
@@ -697,8 +644,6 @@ void TileManager::ManageTiles(const GlobalStateThatImpactsTilePriority& state) {
     global_state_ = state;
     prioritized_tiles_dirty_ = true;
   }
-
-  CleanUpLayers();
 
   // We need to call CheckForCompletedTasks() once in-between each call
   // to ScheduleTasks() to prevent canceled tasks from being scheduled.
@@ -749,21 +694,10 @@ bool TileManager::UpdateVisibleTiles() {
   return did_initialize_visible_tile;
 }
 
-void TileManager::GetMemoryStats(size_t* memory_required_bytes,
-                                 size_t* memory_nice_to_have_bytes,
-                                 size_t* memory_allocated_bytes,
-                                 size_t* memory_used_bytes) const {
-  *memory_required_bytes = memory_required_bytes_;
-  *memory_nice_to_have_bytes = memory_nice_to_have_bytes_;
-  *memory_allocated_bytes = resource_pool_->total_memory_usage_bytes();
-  *memory_used_bytes = resource_pool_->acquired_memory_usage_bytes();
-}
-
 scoped_ptr<base::Value> TileManager::BasicStateAsValue() const {
   scoped_ptr<base::DictionaryValue> state(new base::DictionaryValue());
   state->SetInteger("tile_count", tiles_.size());
   state->Set("global_state", global_state_.AsValue().release());
-  state->Set("memory_requirements", GetMemoryRequirementsAsValue().release());
   return state.PassAs<base::Value>();
 }
 
@@ -773,25 +707,6 @@ scoped_ptr<base::Value> TileManager::AllTilesAsValue() const {
     state->Append(it->second->AsValue().release());
 
   return state.PassAs<base::Value>();
-}
-
-scoped_ptr<base::Value> TileManager::GetMemoryRequirementsAsValue() const {
-  scoped_ptr<base::DictionaryValue> requirements(new base::DictionaryValue());
-
-  size_t memory_required_bytes;
-  size_t memory_nice_to_have_bytes;
-  size_t memory_allocated_bytes;
-  size_t memory_used_bytes;
-  GetMemoryStats(&memory_required_bytes,
-                 &memory_nice_to_have_bytes,
-                 &memory_allocated_bytes,
-                 &memory_used_bytes);
-  requirements->SetInteger("memory_required_bytes", memory_required_bytes);
-  requirements->SetInteger("memory_nice_to_have_bytes",
-                           memory_nice_to_have_bytes);
-  requirements->SetInteger("memory_allocated_bytes", memory_allocated_bytes);
-  requirements->SetInteger("memory_used_bytes", memory_used_bytes);
-  return requirements.PassAs<base::Value>();
 }
 
 void TileManager::AssignGpuMemoryToTiles(
@@ -991,7 +906,7 @@ void TileManager::FreeResourcesForTile(Tile* tile) {
 void TileManager::FreeUnusedResourcesForTile(Tile* tile) {
   DCHECK(tile->IsReadyToDraw());
   ManagedTileState& mts = tile->managed_state();
-  RasterMode used_mode = HIGH_QUALITY_NO_LCD_RASTER_MODE;
+  RasterMode used_mode = LOW_QUALITY_RASTER_MODE;
   for (int mode = 0; mode < NUM_RASTER_MODES; ++mode) {
     if (mts.tile_versions[mode].IsReadyToDraw()) {
       used_mode = static_cast<RasterMode>(mode);
@@ -1175,7 +1090,6 @@ void TileManager::OnRasterTaskCompleted(
 
   ++update_visible_tiles_stats_.completed_count;
 
-  tile_version.set_has_text(analysis.has_text);
   if (analysis.is_solid_color) {
     tile_version.set_solid_color(analysis.solid_color);
     resource_pool_->ReleaseResource(resource.Pass());
@@ -1219,38 +1133,28 @@ scoped_refptr<Tile> TileManager::CreateTile(PicturePileImpl* picture_pile,
   return tile;
 }
 
-void TileManager::RegisterPictureLayerImpl(PictureLayerImpl* layer) {
-  DCHECK(std::find(layers_.begin(), layers_.end(), layer) == layers_.end());
-  layers_.push_back(layer);
-}
-
-void TileManager::UnregisterPictureLayerImpl(PictureLayerImpl* layer) {
-  std::vector<PictureLayerImpl*>::iterator it =
-      std::find(layers_.begin(), layers_.end(), layer);
-  DCHECK(it != layers_.end());
-  layers_.erase(it);
-}
-
 void TileManager::GetPairedPictureLayers(
     std::vector<PairedPictureLayer>* paired_layers) const {
+  const std::vector<PictureLayerImpl*>& layers = client_->GetPictureLayers();
+
   paired_layers->clear();
   // Reserve a maximum possible paired layers.
-  paired_layers->reserve(layers_.size());
+  paired_layers->reserve(layers.size());
 
-  for (std::vector<PictureLayerImpl*>::const_iterator it = layers_.begin();
-       it != layers_.end();
+  for (std::vector<PictureLayerImpl*>::const_iterator it = layers.begin();
+       it != layers.end();
        ++it) {
     PictureLayerImpl* layer = *it;
 
-    // This is a recycle tree layer, we can safely skip since the tiles on this
-    // layer have to be accessible via the active tree.
-    if (!layer->IsOnActiveOrPendingTree())
+    // TODO(vmpstr): Iterators and should handle this instead. crbug.com/381704
+    if (!layer->HasValidTilePriorities())
       continue;
 
     PictureLayerImpl* twin_layer = layer->GetTwinLayer();
 
-    // If the twin layer is recycled, it is not a valid twin.
-    if (twin_layer && !twin_layer->IsOnActiveOrPendingTree())
+    // Ignore the twin layer when tile priorities are invalid.
+    // TODO(vmpstr): Iterators should handle this instead. crbug.com/381704
+    if (twin_layer && !twin_layer->HasValidTilePriorities())
       twin_layer = NULL;
 
     PairedPictureLayer paired_layer;
@@ -1450,6 +1354,8 @@ bool TileManager::RasterTileIterator::RasterOrderComparator::operator()(
 
   // If the bin is the same but the resolution is not, then the order will be
   // determined by whether we prioritize low res or not.
+  // TODO(vmpstr): Remove this when TilePriority is no longer a member of Tile
+  // class but instead produced by the iterators.
   if (b_priority.priority_bin == a_priority.priority_bin &&
       b_priority.resolution != a_priority.resolution) {
     // Non ideal resolution should be sorted lower than other resolutions.
@@ -1623,12 +1529,27 @@ bool TileManager::EvictionTileIterator::EvictionOrderComparator::operator()(
       a_tile->priority_for_tree_priority(tree_priority_);
   const TilePriority& b_priority =
       b_tile->priority_for_tree_priority(tree_priority_);
-  bool prioritize_low_res = tree_priority_ != SMOOTHNESS_TAKES_PRIORITY;
+  bool prioritize_low_res = tree_priority_ == SMOOTHNESS_TAKES_PRIORITY;
 
-  if (b_priority.resolution != a_priority.resolution) {
-    return (prioritize_low_res && b_priority.resolution == LOW_RESOLUTION) ||
-           (!prioritize_low_res && b_priority.resolution == HIGH_RESOLUTION) ||
-           (a_priority.resolution == NON_IDEAL_RESOLUTION);
+  // Now we have to return true iff b is lower priority than a.
+
+  // If the bin is the same but the resolution is not, then the order will be
+  // determined by whether we prioritize low res or not.
+  // TODO(vmpstr): Remove this when TilePriority is no longer a member of Tile
+  // class but instead produced by the iterators.
+  if (b_priority.priority_bin == a_priority.priority_bin &&
+      b_priority.resolution != a_priority.resolution) {
+    // Non ideal resolution should be sorted higher than other resolutions.
+    if (a_priority.resolution == NON_IDEAL_RESOLUTION)
+      return false;
+
+    if (b_priority.resolution == NON_IDEAL_RESOLUTION)
+      return true;
+
+    if (prioritize_low_res)
+      return a_priority.resolution == LOW_RESOLUTION;
+
+    return a_priority.resolution == HIGH_RESOLUTION;
   }
   return a_priority.IsHigherPriorityThan(b_priority);
 }
@@ -1639,8 +1560,10 @@ void TileManager::SetRasterizerForTesting(Rasterizer* rasterizer) {
 }
 
 bool TileManager::IsReadyToActivate() const {
-  for (std::vector<PictureLayerImpl*>::const_iterator it = layers_.begin();
-       it != layers_.end();
+  const std::vector<PictureLayerImpl*>& layers = client_->GetPictureLayers();
+
+  for (std::vector<PictureLayerImpl*>::const_iterator it = layers.begin();
+       it != layers.end();
        ++it) {
     if (!(*it)->AllTilesRequiredForActivationAreReadyToDraw())
       return false;

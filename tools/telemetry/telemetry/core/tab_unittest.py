@@ -4,12 +4,13 @@
 
 import logging
 
-from telemetry import test
+from telemetry import benchmark
 from telemetry.core import bitmap
+from telemetry.core import video
 from telemetry.core import util
 from telemetry.core import exceptions
 from telemetry.core.backends.chrome import tracing_backend
-from telemetry.core.timeline import model
+from telemetry.timeline import model
 from telemetry.unittest import tab_test_case
 
 
@@ -27,7 +28,7 @@ class FakePlatform(object):
 
   def StopVideoCapture(self):
     self._is_video_capture_running = False
-    return []
+    return video.Video(None)
 
   def SetFullPerformanceModeEnabled(self, enabled):
     pass
@@ -56,11 +57,8 @@ class TabTest(tab_test_case.TabTestCase):
                       lambda: self._tab.Navigate('chrome://crash',
                                                  timeout=5))
 
+  @benchmark.Enabled('has tabs')
   def testActivateTab(self):
-    if not self._browser.supports_tab_control:
-      logging.warning('Browser does not support tab control, skipping test.')
-      return
-
     util.WaitFor(lambda: _IsDocumentVisible(self._tab), timeout=5)
     new_tab = self._browser.tabs.New()
     new_tab.Navigate('about:blank')
@@ -89,10 +87,7 @@ class TabTest(tab_test_case.TabTestCase):
     self.assertFalse(self._tab.is_video_capture_running)
     self._tab.StartVideoCapture(min_bitrate_mbps=2)
     self.assertTrue(self._tab.is_video_capture_running)
-    try:
-      self._tab.StopVideoCapture().next()
-    except Exception:
-      pass
+    self.assertIsNotNone(self._tab.StopVideoCapture())
     self.assertFalse(self._tab.is_video_capture_running)
     self._tab.browser._platform = original_platform
 
@@ -160,7 +155,7 @@ class GpuTabTest(tab_test_case.TabTestCase):
     super(GpuTabTest, self).setUp()
 
   # Test flaky on mac: http://crbug.com/358664
-  @test.Disabled('android', 'mac')
+  @benchmark.Disabled('android', 'mac')
   def testScreenshot(self):
     if not self._tab.screenshot_supported:
       logging.warning('Browser does not support screenshots, skipping test.')

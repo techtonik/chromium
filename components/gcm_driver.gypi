@@ -23,6 +23,7 @@
         'gcm_driver/default_gcm_app_handler.h',
         'gcm_driver/gcm_activity.cc',
         'gcm_driver/gcm_activity.h',
+        'gcm_driver/gcm_app_handler.cc',
         'gcm_driver/gcm_app_handler.h',
         'gcm_driver/gcm_client.cc',
         'gcm_driver/gcm_client.h',
@@ -97,7 +98,7 @@
           ],
         }],
       ],
-    },    
+    },
   ],
   'conditions': [
     ['OS == "android"', {
@@ -107,6 +108,9 @@
           'type': 'none',
           'dependencies': [
             '../base/base.gyp:base',
+            # TODO(johnme): Fix the layering violation of depending on content/
+            '../content/content.gyp:content_java',
+            '../sync/sync.gyp:sync_java',
           ],
           'variables': {
             'java_in_dir': 'gcm_driver/android/java',

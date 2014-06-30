@@ -26,8 +26,11 @@
 #include "ui/gfx/favicon_size.h"
 
 using base::Time;
+using bookmarks::BookmarkClient;
+using bookmarks::BookmarkExpandedStateTracker;
 using bookmarks::BookmarkIndex;
 using bookmarks::BookmarkLoadDetails;
+using bookmarks::BookmarkMatch;
 using bookmarks::BookmarkStorage;
 
 namespace {
@@ -229,10 +232,6 @@ void BookmarkModel::RemoveAllUserBookmarks() {
 
   FOR_EACH_OBSERVER(BookmarkModelObserver, observers_,
                     BookmarkAllUserNodesRemoved(this, removed_urls));
-}
-
-void BookmarkModel::RemoveAll() {
-  RemoveAllUserBookmarks();
 }
 
 void BookmarkModel::Move(const BookmarkNode* node,
@@ -879,6 +878,9 @@ void BookmarkModel::RemoveNodeAndGetRemovedUrls(BookmarkNode* node,
 BookmarkNode* BookmarkModel::AddNode(BookmarkNode* parent,
                                      int index,
                                      BookmarkNode* node) {
+  FOR_EACH_OBSERVER(BookmarkModelObserver, observers_,
+                    OnWillAddBookmarkNode(this, node));
+
   parent->Add(node, index);
 
   if (store_.get())

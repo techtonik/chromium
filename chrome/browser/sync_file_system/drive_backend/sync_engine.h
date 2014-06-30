@@ -18,11 +18,11 @@
 #include "chrome/browser/sync_file_system/remote_file_sync_service.h"
 #include "chrome/browser/sync_file_system/sync_action.h"
 #include "chrome/browser/sync_file_system/sync_direction.h"
+#include "components/signin/core/browser/signin_manager_base.h"
 #include "net/base/network_change_notifier.h"
 
 class ExtensionServiceInterface;
 class ProfileOAuth2TokenService;
-class SigninManagerBase;
 
 namespace base {
 class SequencedTaskRunner;
@@ -60,9 +60,10 @@ class SyncEngine : public RemoteFileSyncService,
                    public LocalChangeProcessor,
                    public drive::DriveNotificationObserver,
                    public drive::DriveServiceObserver,
-                   public net::NetworkChangeNotifier::NetworkChangeObserver {
+                   public net::NetworkChangeNotifier::NetworkChangeObserver,
+                   public SigninManagerBase::Observer {
  public:
-  typedef Observer SyncServiceObserver;
+  typedef RemoteFileSyncService::Observer SyncServiceObserver;
 
   static scoped_ptr<SyncEngine> CreateForBrowserContext(
       content::BrowserContext* context,
@@ -78,10 +79,12 @@ class SyncEngine : public RemoteFileSyncService,
 
   void InitializeForTesting(
       scoped_ptr<drive::DriveServiceInterface> drive_service,
-      scoped_ptr<drive::DriveUploaderInterface> drive_uploader);
+      scoped_ptr<drive::DriveUploaderInterface> drive_uploader,
+      scoped_ptr<SyncWorkerInterface> sync_worker);
   void InitializeInternal(
       scoped_ptr<drive::DriveServiceInterface> drive_service,
-      scoped_ptr<drive::DriveUploaderInterface> drive_uploader);
+      scoped_ptr<drive::DriveUploaderInterface> drive_uploader,
+      scoped_ptr<SyncWorkerInterface> sync_worker);
 
   // RemoteFileSyncService overrides.
   virtual void AddServiceObserver(SyncServiceObserver* observer) OVERRIDE;
@@ -131,13 +134,11 @@ class SyncEngine : public RemoteFileSyncService,
   virtual void OnNetworkChanged(
       net::NetworkChangeNotifier::ConnectionType type) OVERRIDE;
 
-  void OnPendingFileListUpdated(int item_count);
-  void OnFileStatusChanged(const fileapi::FileSystemURL& url,
-                           SyncFileStatus file_status,
-                           SyncAction sync_action,
-                           SyncDirection direction);
-  void UpdateServiceState(RemoteServiceState state,
-                          const std::string& description);
+  // SigninManagerBase::Observer overrides.
+  virtual void GoogleSigninFailed(const GoogleServiceAuthError& error) OVERRIDE;
+  virtual void GoogleSigninSucceeded(const std::string& username,
+                                     const std::string& password) OVERRIDE;
+  virtual void GoogleSignedOut(const std::string& username) OVERRIDE;
 
  private:
   class WorkerObserver;
@@ -157,6 +158,15 @@ class SyncEngine : public RemoteFileSyncService,
              ProfileOAuth2TokenService* token_service,
              net::URLRequestContextGetter* request_context,
              leveldb::Env* env_override);
+
+  // Called by WorkerObserver.
+  void OnPendingFileListUpdated(int item_count);
+  void OnFileStatusChanged(const fileapi::FileSystemURL& url,
+                           SyncFileStatus file_status,
+                           SyncAction sync_action,
+                           SyncDirection direction);
+  void UpdateServiceState(RemoteServiceState state,
+                          const std::string& description);
 
   SyncStatusCallback TrackCallback(const SyncStatusCallback& callback);
 

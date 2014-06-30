@@ -13,9 +13,9 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/browsing_data/browsing_data_helper.h"
 #include "chrome/browser/browsing_data/browsing_data_remover.h"
-#include "chrome/browser/google/google_util.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/pref_names.h"
+#include "components/google/core/browser/google_util.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/web_ui.h"
 #include "grit/chromium_strings.h"
@@ -103,10 +103,8 @@ void ClearBrowserDataHandler::GetLocalizedValues(
   RegisterStrings(localized_strings, resources, arraysize(resources));
   RegisterTitle(localized_strings, "clearBrowserDataOverlay",
                 IDS_CLEAR_BROWSING_DATA_TITLE);
-  localized_strings->SetString(
-      "clearBrowsingDataLearnMoreUrl",
-      google_util::StringAppendGoogleLocaleParam(
-          kClearBrowsingDataLearnMoreUrl));
+  localized_strings->SetString("clearBrowsingDataLearnMoreUrl",
+                               kClearBrowsingDataLearnMoreUrl);
 
   ui::Accelerator acc(ui::VKEY_N, ui::EF_CONTROL_DOWN | ui::EF_SHIFT_DOWN);
   localized_strings->SetString(
@@ -142,7 +140,7 @@ void ClearBrowserDataHandler::GetLocalizedValues(
   }
   localized_strings->Set("clearBrowserDataTimeList", time_list);
   localized_strings->SetBoolean("showDeleteBrowsingHistoryCheckboxes",
-                                !Profile::FromWebUI(web_ui())->IsManaged());
+                                !Profile::FromWebUI(web_ui())->IsSupervised());
 }
 
 void ClearBrowserDataHandler::RegisterMessages() {

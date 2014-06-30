@@ -31,6 +31,9 @@ class ResourceProvider;
 
 class CC_EXPORT TileManagerClient {
  public:
+  // Returns the set of layers that the tile manager should consider for raster.
+  virtual const std::vector<PictureLayerImpl*>& GetPictureLayers() = 0;
+
   // Called when all tiles marked as required for activation are ready to draw.
   virtual void NotifyReadyToActivate() = 0;
 
@@ -182,16 +185,8 @@ class CC_EXPORT TileManager : public RasterizerClient,
                                  int source_frame_number,
                                  int flags);
 
-  void RegisterPictureLayerImpl(PictureLayerImpl* layer);
-  void UnregisterPictureLayerImpl(PictureLayerImpl* layer);
-
   scoped_ptr<base::Value> BasicStateAsValue() const;
   scoped_ptr<base::Value> AllTilesAsValue() const;
-  void GetMemoryStats(size_t* memory_required_bytes,
-                      size_t* memory_nice_to_have_bytes,
-                      size_t* memory_allocated_bytes,
-                      size_t* memory_used_bytes) const;
-
   const MemoryHistory::Entry& memory_stats_from_last_assign() const {
     return memory_stats_from_last_assign_;
   }
@@ -202,7 +197,7 @@ class CC_EXPORT TileManager : public RasterizerClient,
     for (size_t i = 0; i < tiles.size(); ++i) {
       ManagedTileState& mts = tiles[i]->managed_state();
       ManagedTileState::TileVersion& tile_version =
-          mts.tile_versions[HIGH_QUALITY_NO_LCD_RASTER_MODE];
+          mts.tile_versions[HIGH_QUALITY_RASTER_MODE];
 
       tile_version.resource_ = resource_pool_->AcquireResource(gfx::Size(1, 1));
 
@@ -288,9 +283,7 @@ class CC_EXPORT TileManager : public RasterizerClient,
   scoped_refptr<ImageDecodeTask> CreateImageDecodeTask(Tile* tile,
                                                        SkPixelRef* pixel_ref);
   scoped_refptr<RasterTask> CreateRasterTask(Tile* tile);
-  scoped_ptr<base::Value> GetMemoryRequirementsAsValue() const;
   void UpdatePrioritizedTileSetIfNeeded();
-  void CleanUpLayers();
 
   bool IsReadyToActivate() const;
   void CheckIfReadyToActivate();
@@ -309,9 +302,6 @@ class CC_EXPORT TileManager : public RasterizerClient,
 
   bool all_tiles_that_need_to_be_rasterized_have_memory_;
   bool all_tiles_required_for_activation_have_memory_;
-
-  size_t memory_required_bytes_;
-  size_t memory_nice_to_have_bytes_;
 
   size_t bytes_releasable_;
   size_t resources_releasable_;
@@ -342,8 +332,6 @@ class CC_EXPORT TileManager : public RasterizerClient,
   RasterTaskQueue raster_queue_;
 
   std::vector<scoped_refptr<RasterTask> > orphan_raster_tasks_;
-
-  std::vector<PictureLayerImpl*> layers_;
 
   UniqueNotifier ready_to_activate_check_notifier_;
 

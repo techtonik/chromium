@@ -11,6 +11,7 @@
 #include "mojo/public/cpp/bindings/lib/filter_chain.h"
 #include "mojo/public/cpp/bindings/lib/message_header_validator.h"
 #include "mojo/public/cpp/bindings/lib/router.h"
+#include "mojo/public/cpp/environment/environment.h"
 
 namespace mojo {
 namespace internal {
@@ -37,8 +38,9 @@ class InterfacePtrState {
     std::swap(other->router_, router_);
   }
 
-  void ConfigureProxy(ScopedMessagePipeHandle handle,
-                      MojoAsyncWaiter* waiter = GetDefaultAsyncWaiter()) {
+  void ConfigureProxy(
+      ScopedMessagePipeHandle handle,
+      const MojoAsyncWaiter* waiter = Environment::GetDefaultAsyncWaiter()) {
     assert(!proxy_);
     assert(!router_);
 
@@ -52,6 +54,11 @@ class InterfacePtrState {
     router_->set_incoming_receiver(&proxy->stub);
 
     proxy_ = proxy;
+  }
+
+  bool WaitForIncomingMethodCall() {
+    assert(router_);
+    return router_->WaitForIncomingMessage();
   }
 
   void set_client(typename Interface::Client* client) {

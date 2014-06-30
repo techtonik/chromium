@@ -54,6 +54,8 @@ _TEST_CODE_EXCLUDED_PATHS = (
     r'chrome[/\\]browser[/\\]automation[/\\].*',
     # Non-production example code.
     r'mojo[/\\]examples[/\\].*',
+    # Launcher for running iOS tests on the simulator.
+    r'testing[/\\]iossim[/\\]iossim\.mm$',
 )
 
 _TEST_ONLY_WARNING = (
@@ -384,7 +386,7 @@ def _CheckNoDEPSGIT(input_api, output_api):
       'Never commit changes to .DEPS.git. This file is maintained by an\n'
       'automated system based on what\'s in DEPS and your changes will be\n'
       'overwritten.\n'
-      'See http://code.google.com/p/chromium/wiki/UsingNewGit#Rolling_DEPS\n'
+      'See https://sites.google.com/a/chromium.org/dev/developers/how-tos/get-the-code#Rolling_DEPS\n'
       'for more information')]
   return []
 

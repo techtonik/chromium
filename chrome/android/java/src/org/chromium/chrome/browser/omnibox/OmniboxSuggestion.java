@@ -19,6 +19,7 @@ public class OmniboxSuggestion {
     private final String mDescription;
     private final String mAnswerContents;
     private final String mAnswerType;
+    private final SuggestionAnswer mAnswer;
     private final String mFillIntoEdit;
     private final String mUrl;
     private final String mFormattedUrl;
@@ -52,9 +53,10 @@ public class OmniboxSuggestion {
         SEARCH_SUGGEST_PERSONALIZED (11), // A personalized suggested search.
         SEARCH_SUGGEST_PROFILE (12), // A personalized suggested search for a
                                      // Google+ profile.
-        SEARCH_OTHER_ENGINE   (13), // A search with a non-default engine.
-        OPEN_HISTORY_PAGE     (17); // A synthetic result that opens the history page
-                                    // to search for the input.
+        SEARCH_OTHER_ENGINE   (13),  // A search with a non-default engine.
+        OPEN_HISTORY_PAGE     (17),  // A synthetic result that opens the history page
+                                     // to search for the input.
+        SEARCH_SUGGEST_ANSWER (18);  // A short result for a suggested search.
 
         private final int mNativeType;
 
@@ -103,6 +105,14 @@ public class OmniboxSuggestion {
         mFormattedUrl = formattedUrl;
         mIsStarred = isStarred;
         mIsDeletable = isDeletable;
+
+        if (!TextUtils.isEmpty(mAnswerContents)) {
+            // If any errors are encountered parsing the answer contents, this will return null and
+            // hasAnswer will return false, just as if there were no answer contents at all.
+            mAnswer = SuggestionAnswer.parseAnswerContents(mAnswerContents);
+        } else {
+            mAnswer = null;
+        }
     }
 
     /* TODO(groby): Remove - see http://crbug.com/375482 */
@@ -137,6 +147,14 @@ public class OmniboxSuggestion {
         return mAnswerType;
     }
 
+    public SuggestionAnswer getAnswer() {
+        return mAnswer;
+    }
+
+    public boolean hasAnswer() {
+        return mAnswer != null;
+    }
+
     public String getFillIntoEdit() {
         return mFillIntoEdit;
     }
@@ -162,6 +180,13 @@ public class OmniboxSuggestion {
 
     public boolean isDeletable() {
         return mIsDeletable;
+    }
+
+    /**
+     * @return The relevance score of this suggestion.
+     */
+    public int getRelevance() {
+        return mRelevance;
     }
 
     @Override

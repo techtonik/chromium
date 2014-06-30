@@ -8,6 +8,7 @@
 #include "base/timer/timer.h"
 #include "base/values.h"
 #include "ui/chromeos/ui_chromeos_export.h"
+#include "ui/events/event.h"
 #include "ui/events/event_rewriter.h"
 #include "ui/events/gesture_detection/gesture_detector.h"
 #include "ui/gfx/geometry/point.h"
@@ -29,8 +30,9 @@ class TouchEvent;
 //
 // At a high-level, single-finger events are used for accessibility -
 // exploring the screen gets turned into mouse moves (which can then be
-// spoken by an accessibility service running), a double-tap simulates a
-// click, and gestures can be used to send high-level accessibility commands.
+// spoken by an accessibility service running), a single tap while the user
+// is in touch exploration or a double-tap simulates a click, and gestures
+// can be used to send high-level accessibility commands.
 // When two or more fingers are pressed initially, from then on the events
 // are passed through, but with the initial finger removed - so if you swipe
 // down with two fingers, the running app will see a one-finger swipe.
@@ -53,11 +55,21 @@ class TouchEvent;
 // If the user taps and releases their finger, after 300 ms from the initial
 // touch, a single mouse move is fired.
 //
+// While in touch exploration mode, the user can perform a single tap
+// if the user releases their finger and taps before 300 ms passes.
+// This will result in a click on the last successful touch exploration
+// location. This allows the user to perform a single tap
+// anywhere to activate it.
+//
 // If the user double-taps, the second tap is passed through, allowing the
 // user to click - however, the double-tap location is changed to the location
 // of the last successful touch exploration - that allows the user to explore
 // anywhere on the screen, hear its description, then double-tap anywhere
 // to activate it.
+//
+// If the user enters touch exploration mode, they can click without lifting
+// their touch exploration finger by tapping anywhere else on the screen with
+// a second finger, while the touch exploration finger is still pressed.
 //
 // If the user adds a second finger during the grace period, they enter
 // passthrough mode. In this mode, the first finger is ignored but all
@@ -86,7 +98,8 @@ class UI_CHROMEOS_EXPORT TouchExplorationController :
  private:
   // Overridden from ui::EventRewriter
   virtual ui::EventRewriteStatus RewriteEvent(
-      const ui::Event& event, scoped_ptr<ui::Event>* rewritten_event) OVERRIDE;
+      const ui::Event& event,
+      scoped_ptr<ui::Event>* rewritten_event) OVERRIDE;
   virtual ui::EventRewriteStatus NextDispatchEvent(
       const ui::Event& last_event, scoped_ptr<ui::Event>* new_event) OVERRIDE;
 
@@ -95,7 +108,7 @@ class UI_CHROMEOS_EXPORT TouchExplorationController :
       const ui::TouchEvent& event, scoped_ptr<ui::Event>* rewritten_event);
   ui::EventRewriteStatus InSingleTapPressed(
       const ui::TouchEvent& event, scoped_ptr<ui::Event>* rewritten_event);
-  ui::EventRewriteStatus InSingleTapReleased(
+  ui::EventRewriteStatus InSingleTapOrTouchExploreReleased(
       const ui::TouchEvent& event, scoped_ptr<ui::Event>* rewritten_event);
   ui::EventRewriteStatus InDoubleTapPressed(
       const ui::TouchEvent& event, scoped_ptr<ui::Event>* rewritten_event);
@@ -103,7 +116,8 @@ class UI_CHROMEOS_EXPORT TouchExplorationController :
       const ui::TouchEvent& event, scoped_ptr<ui::Event>* rewritten_event);
   ui::EventRewriteStatus InPassthroughMinusOne(
       const ui::TouchEvent& event, scoped_ptr<ui::Event>* rewritten_event);
-
+  ui::EventRewriteStatus InTouchExploreSecondPress(
+      const ui::TouchEvent& event, scoped_ptr<ui::Event>* rewritten_event);
   // This timer is started every time we get the first press event, and
   // it fires after the double-click timeout elapses (300 ms by default).
   // If the user taps and releases within 300 ms and doesn't press again,
@@ -136,6 +150,13 @@ class UI_CHROMEOS_EXPORT TouchExplorationController :
     // we dispatch a mouse move at the location of the first tap.
     SINGLE_TAP_RELEASED,
 
+    // The user was in touch explore mode and released the finger.
+    // If another touch press occurs within the grace period, a single
+    // tap click occurs. This state differs from SINGLE_TAP_RELEASED
+    // In that if a second tap doesn't occur within the grace period,
+    // there is no mouse move dispatched.
+    TOUCH_EXPLORE_RELEASED,
+
     // The user tapped once, and before the grace period expired, pressed
     // one finger down to begin a double-tap, but has not released it yet.
     DOUBLE_TAP_PRESSED,
@@ -157,7 +178,21 @@ class UI_CHROMEOS_EXPORT TouchExplorationController :
     // the user starts a scroll with 2 fingers, they can release either one
     // and continue the scrolling.
     PASSTHROUGH_MINUS_ONE,
+
+    // The user was in touch exploration, but has placed down another finger.
+    // If the user releases the second finger, a touch press and release
+    // will go through at the last touch explore location. If the user
+    // releases the touch explore finger, the other finger will continue with
+    // touch explore. Any fingers pressed past the first two are ignored.
+    TOUCH_EXPLORE_SECOND_PRESS,
   };
+
+  void VlogState(const char* function_name);
+
+  void VlogEvent(const ui::TouchEvent& event, const char* function_name);
+
+  // Gets enum name from integer value.
+  const char* EnumStateToString(State state);
 
   aura::Window* root_window_;
 
@@ -179,9 +214,9 @@ class UI_CHROMEOS_EXPORT TouchExplorationController :
   // A copy of the event from the initial touch press.
   scoped_ptr<ui::TouchEvent> initial_press_;
 
-  // The last location where we synthesized a mouse move event.
-  // When the user double-taps, we send the passed-through tap here.
-  gfx::PointF last_touch_exploration_location_;
+  // The last synthesized mouse move event. When the user double-taps,
+  // we send the passed-through tap to the location of this event.
+  scoped_ptr<ui::TouchEvent> last_touch_exploration_;
 
   // A timer to fire the mouse move event after the double-tap delay.
   base::OneShotTimer<TouchExplorationController> tap_timer_;
@@ -193,6 +228,12 @@ class UI_CHROMEOS_EXPORT TouchExplorationController :
   // A default gesture detector config, so we can share the same
   // timeout and pixel slop constants.
   ui::GestureDetector::Config gesture_detector_config_;
+
+  // The previous state entered.
+  State prev_state_;
+
+  // A copy of the previous event passed.
+  scoped_ptr<ui::TouchEvent> prev_event_;
 
   DISALLOW_COPY_AND_ASSIGN(TouchExplorationController);
 };

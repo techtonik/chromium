@@ -72,11 +72,15 @@ template("mojom") {
       "{{source}}",
       "--use_chromium_bundled_pylibs",
       "-d", rebase_path("//", root_build_dir),
+      "-I", rebase_path("//", root_build_dir),
       "-o", rebase_path(target_gen_dir, root_build_dir),
     ]
   }
 
   source_set(target_name) {
+    if (defined(invoker.visibility)) {
+      visibility = invoker.visibility
+    }
     sources = process_file_template(invoker.sources, generator_cpp_outputs)
     data = process_file_template(invoker.sources, generator_js_outputs)
     deps = [
@@ -85,4 +89,3 @@ template("mojom") {
     ]
   }
 }
-

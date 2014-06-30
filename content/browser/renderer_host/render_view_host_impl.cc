@@ -48,11 +48,9 @@
 #include "content/common/frame_messages.h"
 #include "content/common/input_messages.h"
 #include "content/common/inter_process_time_ticks_converter.h"
-#include "content/common/mojo/mojo_service_names.h"
 #include "content/common/speech_recognition_messages.h"
 #include "content/common/swapped_out_messages.h"
 #include "content/common/view_messages.h"
-#include "content/common/web_ui_setup.mojom.h"
 #include "content/public/browser/ax_event_notification_details.h"
 #include "content/public/browser/browser_accessibility_state.h"
 #include "content/public/browser/browser_context.h"
@@ -387,8 +385,6 @@ WebPreferences RenderViewHostImpl::GetWebkitPrefs(const GURL& url) {
       GpuProcessHost::gpu_enabled() &&
       !command_line.HasSwitch(switches::kDisableFlashStage3d);
 
-  prefs.gl_multisampling_enabled =
-      !command_line.HasSwitch(switches::kDisableGLMultisampling);
   prefs.site_specific_quirks_enabled =
       !command_line.HasSwitch(switches::kDisableSiteSpecificQuirks);
   prefs.allow_file_access_from_file_urls =
@@ -658,27 +654,6 @@ void RenderViewHostImpl::SetHasPendingCrossSiteRequest(
       GetProcess()->GetID(), GetRoutingID(), has_pending_request);
 }
 
-void RenderViewHostImpl::SetWebUIHandle(mojo::ScopedMessagePipeHandle handle) {
-  // Never grant any bindings to browser plugin guests.
-  if (GetProcess()->IsIsolatedGuest()) {
-    NOTREACHED() << "Never grant bindings to a guest process.";
-    return;
-  }
-
-  if ((enabled_bindings_ & BINDINGS_POLICY_WEB_UI) == 0) {
-    NOTREACHED() << "You must grant bindings before setting the handle";
-    return;
-  }
-
-  DCHECK(renderer_initialized_);
-
-  WebUISetupPtr web_ui_setup;
-  static_cast<RenderProcessHostImpl*>(GetProcess())->ConnectTo(
-      kRendererService_WebUISetup, &web_ui_setup);
-
-  web_ui_setup->SetWebUIHandle(GetRoutingID(), handle.Pass());
-}
-
 #if defined(OS_ANDROID)
 void RenderViewHostImpl::ActivateNearestFindResult(int request_id,
                                                    float x,
@@ -766,7 +741,8 @@ void RenderViewHostImpl::DragTargetDragEnter(
 
     std::string register_name;
     std::string filesystem_id = isolated_context->RegisterFileSystemForPath(
-        file_system_url.type(), file_system_url.path(), &register_name);
+        file_system_url.type(), file_system_url.filesystem_id(),
+        file_system_url.path(), &register_name);
     policy->GrantReadFileSystem(renderer_id, filesystem_id);
 
     // Note: We are using the origin URL provided by the sender here. It may be
@@ -1188,10 +1164,14 @@ void RenderViewHostImpl::OnDocumentAvailableInMainFrame(
     bool uses_temporary_zoom_level) {
   delegate_->DocumentAvailableInMainFrame(this);
 
+  if (!uses_temporary_zoom_level)
+    return;
+
   HostZoomMapImpl* host_zoom_map = static_cast<HostZoomMapImpl*>(
       HostZoomMap::GetForBrowserContext(GetProcess()->GetBrowserContext()));
-  host_zoom_map->SetUsesTemporaryZoomLevel(
-      GetProcess()->GetID(), GetRoutingID(), uses_temporary_zoom_level);
+  host_zoom_map->SetTemporaryZoomLevel(GetProcess()->GetID(),
+                                       GetRoutingID(),
+                                       host_zoom_map->GetDefaultZoomLevel());
 }
 
 void RenderViewHostImpl::OnToggleFullscreen(bool enter_fullscreen) {
@@ -1432,6 +1412,15 @@ bool RenderViewHostImpl::IsWaitingForUnloadACK() const {
          rvh_state_ == STATE_WAITING_FOR_CLOSE ||
          rvh_state_ == STATE_PENDING_SHUTDOWN ||
          rvh_state_ == STATE_PENDING_SWAP_OUT;
+}
+
+void RenderViewHostImpl::OnTextSurroundingSelectionResponse(
+    const base::string16& content,
+    size_t start_offset,
+    size_t end_offset) {
+  if (!view_)
+    return;
+  view_->OnTextSurroundingSelectionResponse(content, start_offset, end_offset);
 }
 
 void RenderViewHostImpl::ExitFullscreen() {

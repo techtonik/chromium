@@ -18,15 +18,16 @@
 #include "chrome/browser/chromeos/login/managed/supervised_user_authentication.h"
 #include "chrome/browser/chromeos/login/screens/error_screen.h"
 #include "chrome/browser/chromeos/login/screens/screen_observer.h"
+#include "chrome/browser/chromeos/login/signin_specifics.h"
 #include "chrome/browser/chromeos/login/users/avatar/user_image.h"
 #include "chrome/browser/chromeos/login/users/avatar/user_image_manager.h"
 #include "chrome/browser/chromeos/login/users/supervised_user_manager.h"
 #include "chrome/browser/chromeos/login/wizard_controller.h"
-#include "chrome/browser/managed_mode/managed_user_constants.h"
-#include "chrome/browser/managed_mode/managed_user_shared_settings_service.h"
-#include "chrome/browser/managed_mode/managed_user_shared_settings_service_factory.h"
-#include "chrome/browser/managed_mode/managed_user_sync_service.h"
-#include "chrome/browser/managed_mode/managed_user_sync_service_factory.h"
+#include "chrome/browser/supervised_user/supervised_user_constants.h"
+#include "chrome/browser/supervised_user/supervised_user_shared_settings_service.h"
+#include "chrome/browser/supervised_user/supervised_user_shared_settings_service_factory.h"
+#include "chrome/browser/supervised_user/supervised_user_sync_service.h"
+#include "chrome/browser/supervised_user/supervised_user_sync_service_factory.h"
 #include "chromeos/network/network_state.h"
 #include "content/public/browser/browser_thread.h"
 #include "grit/generated_resources.h"
@@ -206,7 +207,8 @@ void LocallyManagedUserCreationScreen::AuthenticateManager(
 
   UserContext user_context(manager_id);
   user_context.SetKey(Key(manager_password));
-  ExistingUserController::current_controller()->Login(user_context);
+  ExistingUserController::current_controller()->Login(user_context,
+                                                      SigninSpecifics());
 }
 
 void LocallyManagedUserCreationScreen::CreateManagedUser(
@@ -239,13 +241,13 @@ void LocallyManagedUserCreationScreen::ImportManagedUser(
   std::string avatar;
   bool exists;
   int avatar_index = ManagedUserCreationController::kDummyAvatarIndex;
-  user_info->GetString(ManagedUserSyncService::kName, &display_name);
-  user_info->GetString(ManagedUserSyncService::kMasterKey, &master_key);
-  user_info->GetString(ManagedUserSyncService::kPasswordSignatureKey,
+  user_info->GetString(SupervisedUserSyncService::kName, &display_name);
+  user_info->GetString(SupervisedUserSyncService::kMasterKey, &master_key);
+  user_info->GetString(SupervisedUserSyncService::kPasswordSignatureKey,
                        &signature_key);
-  user_info->GetString(ManagedUserSyncService::kPasswordEncryptionKey,
+  user_info->GetString(SupervisedUserSyncService::kPasswordEncryptionKey,
                        &encryption_key);
-  user_info->GetString(ManagedUserSyncService::kChromeOsAvatar, &avatar);
+  user_info->GetString(SupervisedUserSyncService::kChromeOsAvatar, &avatar);
   user_info->GetBoolean(kUserExists, &exists);
 
   // We should not get here with existing user selected, so just display error.
@@ -260,14 +262,14 @@ void LocallyManagedUserCreationScreen::ImportManagedUser(
     return;
   }
 
-  ManagedUserSyncService::GetAvatarIndex(avatar, &avatar_index);
+  SupervisedUserSyncService::GetAvatarIndex(avatar, &avatar_index);
 
   const base::DictionaryValue* password_data = NULL;
-  ManagedUserSharedSettingsService* shared_settings_service =
-      ManagedUserSharedSettingsServiceFactory::GetForBrowserContext(
+  SupervisedUserSharedSettingsService* shared_settings_service =
+      SupervisedUserSharedSettingsServiceFactory::GetForBrowserContext(
           controller_->GetManagerProfile());
   const base::Value* value = shared_settings_service->GetValue(
-      user_id, managed_users::kChromeOSPasswordData);
+      user_id, supervised_users::kChromeOSPasswordData);
 
   bool password_right_here = value && value->GetAsDictionary(&password_data) &&
                              !password_data->empty();
@@ -303,9 +305,9 @@ void LocallyManagedUserCreationScreen::ImportManagedUserWithPassword(
   std::string avatar;
   bool exists;
   int avatar_index = ManagedUserCreationController::kDummyAvatarIndex;
-  user_info->GetString(ManagedUserSyncService::kName, &display_name);
-  user_info->GetString(ManagedUserSyncService::kMasterKey, &master_key);
-  user_info->GetString(ManagedUserSyncService::kChromeOsAvatar, &avatar);
+  user_info->GetString(SupervisedUserSyncService::kName, &display_name);
+  user_info->GetString(SupervisedUserSyncService::kMasterKey, &master_key);
+  user_info->GetString(SupervisedUserSyncService::kChromeOsAvatar, &avatar);
   user_info->GetBoolean(kUserExists, &exists);
 
   // We should not get here with existing user selected, so just display error.
@@ -320,7 +322,7 @@ void LocallyManagedUserCreationScreen::ImportManagedUserWithPassword(
     return;
   }
 
-  ManagedUserSyncService::GetAvatarIndex(avatar, &avatar_index);
+  SupervisedUserSyncService::GetAvatarIndex(avatar, &avatar_index);
 
   controller_->StartImport(display_name,
                            password,
@@ -348,14 +350,15 @@ void LocallyManagedUserCreationScreen::OnManagerFullyAuthenticated(
 
   last_page_ = kNameOfNewUserParametersScreen;
   CHECK(!sync_service_);
-  sync_service_ = ManagedUserSyncServiceFactory::GetForProfile(manager_profile);
+  sync_service_ = SupervisedUserSyncServiceFactory::GetForProfile(
+      manager_profile);
   sync_service_->AddObserver(this);
-  OnManagedUsersChanged();
+  OnSupervisedUsersChanged();
 }
 
-void LocallyManagedUserCreationScreen::OnManagedUsersChanged() {
+void LocallyManagedUserCreationScreen::OnSupervisedUsersChanged() {
   CHECK(sync_service_);
-  sync_service_->GetManagedUsersAsync(
+  sync_service_->GetSupervisedUsersAsync(
       base::Bind(&LocallyManagedUserCreationScreen::OnGetManagedUsers,
                  weak_factory_.GetWeakPtr()));
 }
@@ -417,7 +420,7 @@ void LocallyManagedUserCreationScreen::OnCreationTimeout() {
 void LocallyManagedUserCreationScreen::OnLongCreationWarning() {
   if (actor_) {
     actor_->ShowStatusMessage(true /* progress */, l10n_util::GetStringUTF16(
-        IDS_PROFILES_CREATE_MANAGED_JUST_SIGNED_IN));
+        IDS_PROFILES_CREATE_SUPERVISED_JUST_SIGNED_IN));
   }
 }
 
@@ -431,7 +434,7 @@ bool LocallyManagedUserCreationScreen::FindUserByDisplayName(
     const base::DictionaryValue* user_info =
         static_cast<const base::DictionaryValue*>(&it.value());
     base::string16 user_display_name;
-    if (user_info->GetString(ManagedUserSyncService::kName,
+    if (user_info->GetString(SupervisedUserSyncService::kName,
                              &user_display_name)) {
       if (display_name == user_display_name) {
         if (out_id)
@@ -502,17 +505,17 @@ void LocallyManagedUserCreationScreen::OnGetManagedUsers(
 
     int avatar_index = ManagedUserCreationController::kDummyAvatarIndex;
     std::string chromeos_avatar;
-    if (local_copy->GetString(ManagedUserSyncService::kChromeOsAvatar,
+    if (local_copy->GetString(SupervisedUserSyncService::kChromeOsAvatar,
                               &chromeos_avatar) &&
         !chromeos_avatar.empty() &&
-        ManagedUserSyncService::GetAvatarIndex(
+        SupervisedUserSyncService::GetAvatarIndex(
             chromeos_avatar, &avatar_index)) {
       ui_copy->SetString(kAvatarURLKey, GetDefaultImageUrl(avatar_index));
     } else {
       int i = base::RandInt(kFirstDefaultImageIndex, kDefaultImagesCount - 1);
       local_copy->SetString(
-          ManagedUserSyncService::kChromeOsAvatar,
-          ManagedUserSyncService::BuildAvatarString(i));
+          SupervisedUserSyncService::kChromeOsAvatar,
+          SupervisedUserSyncService::BuildAvatarString(i));
       local_copy->SetBoolean(kRandomAvatarKey, true);
       ui_copy->SetString(kAvatarURLKey, GetDefaultImageUrl(i));
     }
@@ -521,7 +524,7 @@ void LocallyManagedUserCreationScreen::OnGetManagedUsers(
     ui_copy->SetBoolean(kUserExists, false);
 
     base::string16 display_name;
-    local_copy->GetString(ManagedUserSyncService::kName, &display_name);
+    local_copy->GetString(SupervisedUserSyncService::kName, &display_name);
 
     if (supervised_user_manager->FindBySyncId(it.key())) {
       local_copy->SetBoolean(kUserExists, true);
@@ -534,11 +537,11 @@ void LocallyManagedUserCreationScreen::OnGetManagedUsers(
       local_copy->SetString(kUserConflict, kUserConflictName);
       ui_copy->SetString(kUserConflict, kUserConflictName);
     }
-    ui_copy->SetString(ManagedUserSyncService::kName, display_name);
+    ui_copy->SetString(SupervisedUserSyncService::kName, display_name);
 
     std::string signature_key;
     bool has_password =
-        local_copy->GetString(ManagedUserSyncService::kPasswordSignatureKey,
+        local_copy->GetString(SupervisedUserSyncService::kPasswordSignatureKey,
                               &signature_key) &&
         !signature_key.empty();
 

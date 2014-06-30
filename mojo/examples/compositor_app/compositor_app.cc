@@ -7,26 +7,26 @@
 
 #include "base/macros.h"
 #include "mojo/examples/compositor_app/compositor_host.h"
-#include "mojo/public/cpp/application/application.h"
+#include "mojo/public/cpp/application/application_delegate.h"
+#include "mojo/public/cpp/application/application_impl.h"
 #include "mojo/public/cpp/gles2/gles2.h"
 #include "mojo/public/cpp/system/core.h"
 #include "mojo/public/interfaces/service_provider/service_provider.mojom.h"
-#include "mojo/services/native_viewport/native_viewport.mojom.h"
 #include "mojo/services/public/cpp/geometry/geometry_type_converters.h"
+#include "mojo/services/public/interfaces/native_viewport/native_viewport.mojom.h"
 #include "ui/gfx/rect.h"
 
 namespace mojo {
 namespace examples {
 
-class SampleApp : public Application, public NativeViewportClient {
+class SampleApp : public ApplicationDelegate, public NativeViewportClient {
  public:
   SampleApp() {}
   virtual ~SampleApp() {}
 
-  virtual void Initialize() OVERRIDE {
-    ConnectTo("mojo:mojo_native_viewport_service", &viewport_);
+  virtual void Initialize(ApplicationImpl* app) OVERRIDE {
+    app->ConnectToService("mojo:mojo_native_viewport_service", &viewport_);
     viewport_.set_client(this);
-
     viewport_->Create(Rect::From(gfx::Rect(10, 10, 800, 600)));
     viewport_->Show();
 
@@ -62,7 +62,7 @@ class SampleApp : public Application, public NativeViewportClient {
 }  // namespace examples
 
 // static
-Application* Application::Create() {
+ApplicationDelegate* ApplicationDelegate::Create() {
   return new examples::SampleApp();
 }
 

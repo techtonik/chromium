@@ -5,7 +5,7 @@
 #ifndef CHROME_BROWSER_SYNC_SESSIONS_SESSION_DATA_TYPE_CONTROLLER_H_
 #define CHROME_BROWSER_SYNC_SESSIONS_SESSION_DATA_TYPE_CONTROLLER_H_
 
-#include "chrome/browser/sync/glue/ui_data_type_controller.h"
+#include "components/sync_driver/ui_data_type_controller.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
 
@@ -20,7 +20,7 @@ class SessionDataTypeController : public UIDataTypeController,
  public:
   SessionDataTypeController(SyncApiComponentFactory* factory,
                             Profile* profile,
-                            ProfileSyncService* service);
+                            const DisableTypeCallback& disable_callback);
 
   // NotificationObserver interface.
   virtual void Observe(int type,

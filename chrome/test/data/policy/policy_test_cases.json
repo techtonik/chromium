@@ -1575,6 +1575,17 @@
     ]
   },
 
+  "RegisteredProtocolHandlers": {
+    "os": ["win", "linux", "mac", "chromeos"],
+    "can_be_recommended": true,
+    "test_policy": { "RegisteredProtocolHandlers": {"protocol": "test", "url": "http://example.com/%s", "default": "true"} },
+    "pref_mappings": [
+      { "pref": "custom_handlers.policy.registered_protocol_handlers",
+        "check_for_mandatory": false
+      }
+    ]
+  },
+
   "HideWebStoreIcon": {
     "os": ["win", "linux", "mac", "chromeos"],
     "test_policy": { "HideWebStoreIcon": true },
@@ -2100,6 +2111,26 @@
     "test_policy": { "NativeMessagingUserLevelHosts": false },
     "pref_mappings": [
       { "pref": "native_messaging.user_level_hosts" }
+    ]
+  },
+
+  "EnableDeprecatedWebPlatformFeatures": {
+    "os": ["win", "linux", "mac", "chromeos"],
+    "test_policy": {
+      "EnableDeprecatedWebPlatformFeatures": [
+        "ShowModalDialog_EffectiveUntil20150430"
+      ]
+    },
+    "pref_mappings": [
+      { "pref": "enable_deprecated_web_platform_features" }
+    ]
+  },
+
+  "TouchVirtualKeyboardEnabled": {
+    "os": ["chromeos"],
+    "test_policy": { "TouchVirtualKeyboardEnabled": false },
+    "pref_mappings": [
+      { "pref": "ui.touch_virtual_keyboard_enabled" }
     ]
   },
 

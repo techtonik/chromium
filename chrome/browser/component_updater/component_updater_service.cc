@@ -15,7 +15,6 @@
 #include "base/files/file_path.h"
 #include "base/logging.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "base/sequenced_task_runner.h"
 #include "base/stl_util.h"
@@ -23,6 +22,7 @@
 #include "base/timer/timer.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/component_updater/component_unpacker.h"
+#include "chrome/browser/component_updater/component_updater_configurator.h"
 #include "chrome/browser/component_updater/component_updater_ping_manager.h"
 #include "chrome/browser/component_updater/component_updater_utils.h"
 #include "chrome/browser/component_updater/crx_downloader.h"
@@ -53,7 +53,7 @@ bool IsVersionNewer(const Version& current, const std::string& proposed) {
 // Returns true if a differential update is available, it has not failed yet,
 // and the configuration allows it.
 bool CanTryDiffUpdate(const CrxUpdateItem* update_item,
-                      const ComponentUpdateService::Configurator& config) {
+                      const Configurator& config) {
   return HasDiffUpdate(update_item) && !update_item->diff_update_failed &&
          config.DeltasEnabled();
 }
@@ -145,7 +145,7 @@ void UnblockandReapAllThrottles(CUResourceThrottle::WeakPtrVector* throttles) {
 // thread.
 class CrxUpdateService : public ComponentUpdateService, public OnDemandUpdater {
  public:
-  explicit CrxUpdateService(ComponentUpdateService::Configurator* config);
+  explicit CrxUpdateService(Configurator* config);
   virtual ~CrxUpdateService();
 
   // Overrides for ComponentUpdateService.
@@ -155,8 +155,8 @@ class CrxUpdateService : public ComponentUpdateService, public OnDemandUpdater {
   virtual Status Stop() OVERRIDE;
   virtual Status RegisterComponent(const CrxComponent& component) OVERRIDE;
   virtual std::vector<std::string> GetComponentIDs() const OVERRIDE;
-  virtual CrxUpdateItem* GetComponentDetails(
-      const std::string& component_id) const OVERRIDE;
+  virtual bool GetComponentDetails(const std::string& component_id,
+                                   CrxUpdateItem* item) const OVERRIDE;
   virtual OnDemandUpdater& GetOnDemandUpdater() OVERRIDE;
 
   // Overrides for OnDemandUpdater.
@@ -245,7 +245,7 @@ class CrxUpdateService : public ComponentUpdateService, public OnDemandUpdater {
 
   Status GetServiceStatus(const CrxUpdateItem::Status status);
 
-  scoped_ptr<ComponentUpdateService::Configurator> config_;
+  scoped_ptr<Configurator> config_;
 
   scoped_ptr<UpdateChecker> update_checker_;
 
@@ -274,10 +274,9 @@ class CrxUpdateService : public ComponentUpdateService, public OnDemandUpdater {
 
 //////////////////////////////////////////////////////////////////////////////
 
-CrxUpdateService::CrxUpdateService(ComponentUpdateService::Configurator* config)
+CrxUpdateService::CrxUpdateService(Configurator* config)
     : config_(config),
-      ping_manager_(
-          new PingManager(config->PingUrl(), config->RequestContext())),
+      ping_manager_(new PingManager(*config)),
       blocking_task_runner_(
           BrowserThread::GetBlockingPool()->
               GetSequencedTaskRunnerWithShutdownBehavior(
@@ -523,10 +522,13 @@ std::vector<std::string> CrxUpdateService::GetComponentIDs() const {
   return component_ids;
 }
 
-CrxUpdateItem* CrxUpdateService::GetComponentDetails(
-    const std::string& component_id) const {
+bool CrxUpdateService::GetComponentDetails(const std::string& component_id,
+                                           CrxUpdateItem* item) const {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
-  return FindUpdateItemById(component_id);
+  const CrxUpdateItem* crx_update_item(FindUpdateItemById(component_id));
+  if (crx_update_item)
+    *item = *crx_update_item;
+  return crx_update_item != NULL;
 }
 
 OnDemandUpdater& CrxUpdateService::GetOnDemandUpdater() {
@@ -626,8 +628,7 @@ bool CrxUpdateService::CheckForUpdates() {
     return false;
 
   update_checker_ =
-      UpdateChecker::Create(config_->UpdateUrl(),
-                            config_->RequestContext(),
+      UpdateChecker::Create(*config_,
                             base::Bind(&CrxUpdateService::UpdateCheckComplete,
                                        base::Unretained(this))).Pass();
   return update_checker_->CheckForUpdates(items_to_check,
@@ -1086,8 +1087,7 @@ void CUResourceThrottle::Unblock() {
 
 // The component update factory. Using the component updater as a singleton
 // is the job of the browser process.
-ComponentUpdateService* ComponentUpdateServiceFactory(
-    ComponentUpdateService::Configurator* config) {
+ComponentUpdateService* ComponentUpdateServiceFactory(Configurator* config) {
   DCHECK(config);
   return new CrxUpdateService(config);
 }

@@ -310,9 +310,6 @@ void DesktopNotificationService::RegisterProfilePrefs(
   registry->RegisterListPref(
       prefs::kMessageCenterDisabledSystemComponentIds,
       user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
-  registry->RegisterListPref(
-      prefs::kMessageCenterEnabledSyncNotifierIds,
-      user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
   ExtensionWelcomeNotification::RegisterProfilePrefs(registry);
 }
 
@@ -383,7 +380,7 @@ std::string DesktopNotificationService::AddIconNotification(
                             blink::WebTextDirectionDefault,
                             base::string16(), replace_id, delegate);
   g_browser_process->notification_ui_manager()->Add(notification, profile);
-  return notification.notification_id();
+  return notification.delegate_id();
 }
 
 DesktopNotificationService::DesktopNotificationService(
@@ -396,8 +393,6 @@ DesktopNotificationService::DesktopNotificationService(
   OnStringListPrefChanged(
       prefs::kMessageCenterDisabledSystemComponentIds,
       &disabled_system_component_ids_);
-  OnStringListPrefChanged(
-      prefs::kMessageCenterEnabledSyncNotifierIds, &enabled_sync_notifier_ids_);
   disabled_extension_id_pref_.Init(
       prefs::kMessageCenterDisabledExtensionIds,
       profile_->GetPrefs(),
@@ -414,14 +409,6 @@ DesktopNotificationService::DesktopNotificationService(
           base::Unretained(this),
           base::Unretained(prefs::kMessageCenterDisabledSystemComponentIds),
           base::Unretained(&disabled_system_component_ids_)));
-  enabled_sync_notifier_id_pref_.Init(
-      prefs::kMessageCenterEnabledSyncNotifierIds,
-      profile_->GetPrefs(),
-      base::Bind(
-          &DesktopNotificationService::OnStringListPrefChanged,
-          base::Unretained(this),
-          base::Unretained(prefs::kMessageCenterEnabledSyncNotifierIds),
-          base::Unretained(&enabled_sync_notifier_ids_)));
   registrar_.Add(this,
                  chrome::NOTIFICATION_EXTENSION_UNINSTALLED_DEPRECATED,
                  content::Source<Profile>(profile_));
@@ -627,9 +614,6 @@ bool DesktopNotificationService::IsNotifierEnabled(
       // We do not disable system component notifications.
       return true;
 #endif
-    case NotifierId::SYNCED_NOTIFICATION_SERVICE:
-      return enabled_sync_notifier_ids_.find(notifier_id.id) !=
-          enabled_sync_notifier_ids_.end();
   }
 
   NOTREACHED();
@@ -659,13 +643,6 @@ void DesktopNotificationService::SetNotifierEnabled(
 #else
       return;
 #endif
-      break;
-    case NotifierId::SYNCED_NOTIFICATION_SERVICE:
-      pref_name = prefs::kMessageCenterEnabledSyncNotifierIds;
-      // Adding a new item if |enabled| == true, since synced notification
-      // services are opt-in.
-      add_new_item = enabled;
-      id.reset(new base::StringValue(notifier_id.id));
       break;
     default:
       NOTREACHED();

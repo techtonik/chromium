@@ -150,6 +150,7 @@ AutofillAgent::~AutofillAgent() {}
 bool AutofillAgent::OnMessageReceived(const IPC::Message& message) {
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(AutofillAgent, message)
+    IPC_MESSAGE_HANDLER(AutofillMsg_Ping, OnPing)
     IPC_MESSAGE_HANDLER(AutofillMsg_FillForm, OnFillForm)
     IPC_MESSAGE_HANDLER(AutofillMsg_PreviewForm, OnPreviewForm)
     IPC_MESSAGE_HANDLER(AutofillMsg_FieldTypePredictionsAvailable,
@@ -281,7 +282,10 @@ void AutofillAgent::didRequestAutocomplete(
   } else if (!WebFormElementToFormData(form,
                                        WebFormControlElement(),
                                        REQUIRE_AUTOCOMPLETE,
-                                       EXTRACT_OPTIONS,
+                                       static_cast<ExtractMask>(
+                                           EXTRACT_VALUE |
+                                           EXTRACT_OPTION_TEXT |
+                                           EXTRACT_OPTIONS),
                                        &form_data,
                                        NULL)) {
     error_message = "failed to parse form.";
@@ -453,6 +457,10 @@ void AutofillAgent::OnFillForm(int query_id, const FormData& form) {
   FillForm(form, element_);
   Send(new AutofillHostMsg_DidFillAutofillFormData(routing_id(),
                                                    base::TimeTicks::Now()));
+}
+
+void AutofillAgent::OnPing() {
+  Send(new AutofillHostMsg_PingAck(routing_id()));
 }
 
 void AutofillAgent::OnPreviewForm(int query_id, const FormData& form) {

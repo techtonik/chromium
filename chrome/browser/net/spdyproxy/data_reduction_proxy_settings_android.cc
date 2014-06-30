@@ -149,34 +149,6 @@ DataReductionProxySettingsAndroid::GetContentLengths(JNIEnv* env,
                                     received_content_length);
 }
 
-jboolean DataReductionProxySettingsAndroid::IsAcceptableAuthChallenge(
-    JNIEnv* env,
-    jobject obj,
-    jstring host,
-    jstring realm) {
-  scoped_refptr<net::AuthChallengeInfo> auth_info(new net::AuthChallengeInfo);
-  auth_info->realm = ConvertJavaStringToUTF8(env, realm);
-  auth_info->challenger =
-      net::HostPortPair::FromString(ConvertJavaStringToUTF8(env, host));
-  return DataReductionProxySettings::IsAcceptableAuthChallenge(auth_info.get());
-}
-
-ScopedJavaLocalRef<jstring>
-DataReductionProxySettingsAndroid::GetTokenForAuthChallenge(JNIEnv* env,
-                                                            jobject obj,
-                                                            jstring host,
-                                                            jstring realm) {
-  scoped_refptr<net::AuthChallengeInfo> auth_info(new net::AuthChallengeInfo);
-  auth_info->realm = ConvertJavaStringToUTF8(env, realm);
-  auth_info->challenger =
-      net::HostPortPair::FromString(ConvertJavaStringToUTF8(env, host));
-
-  // If an empty string != null in Java, then here we should test for the
-  // token being empty and return a java null.
-  return ConvertUTF16ToJavaString(env,
-      DataReductionProxySettings::GetTokenForAuthChallenge(auth_info.get()));
- }
-
 ScopedJavaLocalRef<jlongArray>
 DataReductionProxySettingsAndroid::GetDailyOriginalContentLengths(
     JNIEnv* env, jobject obj) {
@@ -189,6 +161,12 @@ DataReductionProxySettingsAndroid::GetDailyReceivedContentLengths(
     JNIEnv* env, jobject obj) {
   return GetDailyContentLengths(
       env, data_reduction_proxy::prefs::kDailyHttpReceivedContentLength);
+}
+
+jboolean DataReductionProxySettingsAndroid::IsDataReductionProxyUnreachable(
+    JNIEnv* env, jobject obj) {
+  DCHECK(usage_stats());
+  return usage_stats()->isDataReductionProxyUnreachable();
 }
 
 // static

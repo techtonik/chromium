@@ -109,8 +109,8 @@ QuicErrorCode QuicNegotiableUint32::ProcessPeerHello(
     return error;
   }
   if (hello_type == SERVER && value > max_value_) {
-    *error_details = "Invalid value received for " +
-        QuicUtils::TagToString(tag_);
+    *error_details =
+        "Invalid value received for " + QuicUtils::TagToString(tag_);
     return QUIC_INVALID_NEGOTIATED_VALUE;
   }
 
@@ -228,7 +228,8 @@ bool QuicFixedUint32::HasSendValue() const {
 }
 
 uint32 QuicFixedUint32::GetSendValue() const {
-  LOG_IF(DFATAL, !has_send_value_) << "No send value to get for tag:" << tag_;
+  LOG_IF(DFATAL, !has_send_value_)
+      << "No send value to get for tag:" << QuicUtils::TagToString(tag_);
   return send_value_;
 }
 
@@ -243,7 +244,7 @@ bool QuicFixedUint32::HasReceivedValue() const {
 
 uint32 QuicFixedUint32::GetReceivedValue() const {
   LOG_IF(DFATAL, !has_receive_value_)
-      << "No receive value to get for tag:" << tag_;
+      << "No receive value to get for tag:" << QuicUtils::TagToString(tag_);
   return receive_value_;
 }
 
@@ -295,7 +296,8 @@ bool QuicFixedTag::HasSendValue() const {
 }
 
 uint32 QuicFixedTag::GetSendValue() const {
-  LOG_IF(DFATAL, !has_send_value_) << "No send value to get for tag:" << tag_;
+  LOG_IF(DFATAL, !has_send_value_)
+      << "No send value to get for tag:" << QuicUtils::TagToString(tag_);
   return send_value_;
 }
 
@@ -310,7 +312,7 @@ bool QuicFixedTag::HasReceivedValue() const {
 
 uint32 QuicFixedTag::GetReceivedValue() const {
   LOG_IF(DFATAL, !has_receive_value_)
-      << "No receive value to get for tag:" << tag_;
+      << "No receive value to get for tag:" << QuicUtils::TagToString(tag_);
   return receive_value_;
 }
 
@@ -362,7 +364,8 @@ bool QuicFixedTagVector::HasSendValues() const {
 }
 
 QuicTagVector QuicFixedTagVector::GetSendValues() const {
-  LOG_IF(DFATAL, !has_send_values_) << "No send values to get for tag:" << tag_;
+  LOG_IF(DFATAL, !has_send_values_)
+      << "No send values to get for tag:" << QuicUtils::TagToString(tag_);
   return send_values_;
 }
 
@@ -377,7 +380,7 @@ bool QuicFixedTagVector::HasReceivedValues() const {
 
 QuicTagVector QuicFixedTagVector::GetReceivedValues() const {
   LOG_IF(DFATAL, !has_receive_values_)
-      << "No receive value to get for tag:" << tag_;
+      << "No receive value to get for tag:" << QuicUtils::TagToString(tag_);
   return receive_values_;
 }
 
@@ -423,7 +426,7 @@ QuicErrorCode QuicFixedTagVector::ProcessPeerHello(
 
 QuicConfig::QuicConfig()
     : congestion_feedback_(kCGST, PRESENCE_REQUIRED),
-      congestion_options_(kCOPT, PRESENCE_OPTIONAL),
+      connection_options_(kCOPT, PRESENCE_OPTIONAL),
       loss_detection_(kLOSS, PRESENCE_OPTIONAL),
       idle_connection_state_lifetime_seconds_(kICSL, PRESENCE_REQUIRED),
       keepalive_timeout_seconds_(kKATO, PRESENCE_OPTIONAL),
@@ -433,7 +436,13 @@ QuicConfig::QuicConfig()
       initial_round_trip_time_us_(kIRTT, PRESENCE_OPTIONAL),
       // TODO(rjshade): Make this PRESENCE_REQUIRED when retiring
       // QUIC_VERSION_17.
-      initial_flow_control_window_bytes_(kIFCW, PRESENCE_OPTIONAL) {
+      initial_flow_control_window_bytes_(kIFCW, PRESENCE_OPTIONAL),
+      // TODO(rjshade): Make this PRESENCE_REQUIRED when retiring
+      // QUIC_VERSION_19.
+      initial_stream_flow_control_window_bytes_(kSFCW, PRESENCE_OPTIONAL),
+      // TODO(rjshade): Make this PRESENCE_REQUIRED when retiring
+      // QUIC_VERSION_19.
+      initial_session_flow_control_window_bytes_(kCFCW, PRESENCE_OPTIONAL) {
 }
 
 QuicConfig::~QuicConfig() {}
@@ -448,17 +457,17 @@ QuicTag QuicConfig::congestion_feedback() const {
   return congestion_feedback_.GetTag();
 }
 
-void QuicConfig::SetCongestionOptionsToSend(
-    const QuicTagVector& congestion_options) {
-  congestion_options_.SetSendValues(congestion_options);
+void QuicConfig::SetConnectionOptionsToSend(
+    const QuicTagVector& connection_options) {
+  connection_options_.SetSendValues(connection_options);
 }
 
-bool QuicConfig::HasReceivedCongestionOptions() const {
-  return congestion_options_.HasReceivedValues();
+bool QuicConfig::HasReceivedConnectionOptions() const {
+  return connection_options_.HasReceivedValues();
 }
 
-QuicTagVector QuicConfig::ReceivedCongestionOptions() const {
-  return congestion_options_.GetReceivedValues();
+QuicTagVector QuicConfig::ReceivedConnectionOptions() const {
+  return connection_options_.GetReceivedValues();
 }
 
 void QuicConfig::SetLossDetectionToSend(QuicTag loss_detection) {
@@ -534,15 +543,69 @@ uint32 QuicConfig::ReceivedInitialRoundTripTimeUs() const {
 }
 
 void QuicConfig::SetInitialFlowControlWindowToSend(uint32 window_bytes) {
+  if (window_bytes < kDefaultFlowControlSendWindow) {
+    LOG(DFATAL) << "Initial flow control receive window (" << window_bytes
+                << ") cannot be set lower than default ("
+                << kDefaultFlowControlSendWindow << ").";
+    window_bytes = kDefaultFlowControlSendWindow;
+  }
   initial_flow_control_window_bytes_.SetSendValue(window_bytes);
 }
 
+uint32 QuicConfig::GetInitialFlowControlWindowToSend() const {
+  return initial_flow_control_window_bytes_.GetSendValue();
+}
+
 bool QuicConfig::HasReceivedInitialFlowControlWindowBytes() const {
-  return initial_flow_control_window_bytes_.HasReceivedValue();;
+  return initial_flow_control_window_bytes_.HasReceivedValue();
 }
 
 uint32 QuicConfig::ReceivedInitialFlowControlWindowBytes() const {
   return initial_flow_control_window_bytes_.GetReceivedValue();
+}
+
+void QuicConfig::SetInitialStreamFlowControlWindowToSend(uint32 window_bytes) {
+  if (window_bytes < kDefaultFlowControlSendWindow) {
+    LOG(DFATAL) << "Initial stream flow control receive window ("
+                << window_bytes << ") cannot be set lower than default ("
+                << kDefaultFlowControlSendWindow << ").";
+    window_bytes = kDefaultFlowControlSendWindow;
+  }
+  initial_stream_flow_control_window_bytes_.SetSendValue(window_bytes);
+}
+
+uint32 QuicConfig::GetInitialStreamFlowControlWindowToSend() const {
+  return initial_stream_flow_control_window_bytes_.GetSendValue();
+}
+
+bool QuicConfig::HasReceivedInitialStreamFlowControlWindowBytes() const {
+  return initial_stream_flow_control_window_bytes_.HasReceivedValue();
+}
+
+uint32 QuicConfig::ReceivedInitialStreamFlowControlWindowBytes() const {
+  return initial_stream_flow_control_window_bytes_.GetReceivedValue();
+}
+
+void QuicConfig::SetInitialSessionFlowControlWindowToSend(uint32 window_bytes) {
+  if (window_bytes < kDefaultFlowControlSendWindow) {
+    LOG(DFATAL) << "Initial session flow control receive window ("
+                << window_bytes << ") cannot be set lower than default ("
+                << kDefaultFlowControlSendWindow << ").";
+    window_bytes = kDefaultFlowControlSendWindow;
+  }
+  initial_session_flow_control_window_bytes_.SetSendValue(window_bytes);
+}
+
+uint32 QuicConfig::GetInitialSessionFlowControlWindowToSend() const {
+  return initial_session_flow_control_window_bytes_.GetSendValue();
+}
+
+bool QuicConfig::HasReceivedInitialSessionFlowControlWindowBytes() const {
+  return initial_session_flow_control_window_bytes_.HasReceivedValue();
+}
+
+uint32 QuicConfig::ReceivedInitialSessionFlowControlWindowBytes() const {
+  return initial_session_flow_control_window_bytes_.GetReceivedValue();
 }
 
 bool QuicConfig::negotiated() {
@@ -570,6 +633,10 @@ void QuicConfig::SetDefaults() {
                                   kDefaultMaxStreamsPerConnection);
   max_time_before_crypto_handshake_ = QuicTime::Delta::FromSeconds(
       kDefaultMaxTimeForCryptoHandshakeSecs);
+
+  SetInitialFlowControlWindowToSend(kDefaultFlowControlSendWindow);
+  SetInitialStreamFlowControlWindowToSend(kDefaultFlowControlSendWindow);
+  SetInitialSessionFlowControlWindowToSend(kDefaultFlowControlSendWindow);
 }
 
 void QuicConfig::EnablePacing(bool enable_pacing) {
@@ -590,7 +657,9 @@ void QuicConfig::ToHandshakeMessage(CryptoHandshakeMessage* out) const {
   initial_round_trip_time_us_.ToHandshakeMessage(out);
   loss_detection_.ToHandshakeMessage(out);
   initial_flow_control_window_bytes_.ToHandshakeMessage(out);
-  congestion_options_.ToHandshakeMessage(out);
+  initial_stream_flow_control_window_bytes_.ToHandshakeMessage(out);
+  initial_session_flow_control_window_bytes_.ToHandshakeMessage(out);
+  connection_options_.ToHandshakeMessage(out);
 }
 
 QuicErrorCode QuicConfig::ProcessPeerHello(
@@ -629,11 +698,19 @@ QuicErrorCode QuicConfig::ProcessPeerHello(
         peer_hello, hello_type, error_details);
   }
   if (error == QUIC_NO_ERROR) {
+    error = initial_stream_flow_control_window_bytes_.ProcessPeerHello(
+        peer_hello, hello_type, error_details);
+  }
+  if (error == QUIC_NO_ERROR) {
+    error = initial_session_flow_control_window_bytes_.ProcessPeerHello(
+        peer_hello, hello_type, error_details);
+  }
+  if (error == QUIC_NO_ERROR) {
     error = loss_detection_.ProcessPeerHello(
         peer_hello, hello_type, error_details);
   }
   if (error == QUIC_NO_ERROR) {
-    error = congestion_options_.ProcessPeerHello(
+    error = connection_options_.ProcessPeerHello(
         peer_hello, hello_type, error_details);
   }
   return error;

@@ -19,14 +19,12 @@
 #include "base/synchronization/waitable_event.h"
 #include "components/bookmarks/browser/bookmark_client.h"
 #include "components/bookmarks/browser/bookmark_node.h"
+#include "components/keyed_service/core/keyed_service.h"
 #include "ui/gfx/image/image.h"
 #include "url/gurl.h"
 
-class BookmarkExpandedStateTracker;
 class BookmarkModelObserver;
-struct BookmarkMatch;
 class PrefService;
-class ScopedGroupBookmarkActions;
 
 namespace base {
 class FilePath;
@@ -34,10 +32,13 @@ class SequencedTaskRunner;
 }
 
 namespace bookmarks {
+class BookmarkCodecTest;
+class BookmarkExpandedStateTracker;
 class BookmarkIndex;
 class BookmarkLoadDetails;
 class BookmarkStorage;
 class ScopedGroupBookmarkActions;
+struct BookmarkMatch;
 }
 
 namespace favicon_base {
@@ -58,7 +59,7 @@ class TestBookmarkClient;
 //
 // You should NOT directly create a BookmarkModel, instead go through the
 // BookmarkModelFactory.
-class BookmarkModel {
+class BookmarkModel : public KeyedService {
  public:
   struct URLAndTitle {
     GURL url;
@@ -67,11 +68,11 @@ class BookmarkModel {
 
   // |index_urls| says whether URLs should be stored in the BookmarkIndex
   // in addition to bookmark titles.
-  BookmarkModel(BookmarkClient* client, bool index_urls);
-  ~BookmarkModel();
+  BookmarkModel(bookmarks::BookmarkClient* client, bool index_urls);
+  virtual ~BookmarkModel();
 
-  // Invoked prior to destruction to release any necessary resources.
-  void Shutdown();
+  // KeyedService:
+  virtual void Shutdown() OVERRIDE;
 
   // Loads the bookmarks. This is called upon creation of the
   // BookmarkModel. You need not invoke this directly.
@@ -135,10 +136,6 @@ class BookmarkModel {
   // Observers are only notified when all nodes have been removed. There is no
   // notification for individual node removals.
   void RemoveAllUserBookmarks();
-
-  // DEPRECATED: use RemoveAllUserBookmarks instead. This method will be
-  // removed. http://crbug.com/49598
-  void RemoveAll();
 
   // Moves |node| to |new_parent| and inserts it at the given |index|.
   void Move(const BookmarkNode* node,
@@ -244,10 +241,9 @@ class BookmarkModel {
 
   // Returns up to |max_count| of bookmarks containing each term from |text|
   // in either the title or the URL.
-  void GetBookmarksMatching(
-      const base::string16& text,
-      size_t max_count,
-      std::vector<BookmarkMatch>* matches);
+  void GetBookmarksMatching(const base::string16& text,
+                            size_t max_count,
+                            std::vector<bookmarks::BookmarkMatch>* matches);
 
   // Sets the store to NULL, making it so the BookmarkModel does not persist
   // any changes to disk. This is only useful during testing to speed up
@@ -259,7 +255,7 @@ class BookmarkModel {
 
   // Returns the object responsible for tracking the set of expanded nodes in
   // the bookmark editor.
-  BookmarkExpandedStateTracker* expanded_state_tracker() {
+  bookmarks::BookmarkExpandedStateTracker* expanded_state_tracker() {
     return expanded_state_tracker_.get();
   }
 
@@ -289,11 +285,10 @@ class BookmarkModel {
   void OnFaviconChanged(const std::set<GURL>& urls);
 
   // Returns the client used by this BookmarkModel.
-  BookmarkClient* client() const { return client_; }
+  bookmarks::BookmarkClient* client() const { return client_; }
 
  private:
-  friend class BookmarkCodecTest;
-  friend class BookmarkModelTest;
+  friend class bookmarks::BookmarkCodecTest;
   friend class bookmarks::BookmarkStorage;
   friend class bookmarks::ScopedGroupBookmarkActions;
   friend class test::TestBookmarkClient;
@@ -385,7 +380,7 @@ class BookmarkModel {
   scoped_ptr<bookmarks::BookmarkLoadDetails> CreateLoadDetails(
       const std::string& accept_languages);
 
-  BookmarkClient* const client_;
+  bookmarks::BookmarkClient* const client_;
 
   // Whether the initial set of data has been loaded.
   bool loaded_;
@@ -429,7 +424,7 @@ class BookmarkModel {
   // See description of IsDoingExtensiveChanges above.
   int extensive_changes_;
 
-  scoped_ptr<BookmarkExpandedStateTracker> expanded_state_tracker_;
+  scoped_ptr<bookmarks::BookmarkExpandedStateTracker> expanded_state_tracker_;
 
   DISALLOW_COPY_AND_ASSIGN(BookmarkModel);
 };

@@ -20,7 +20,10 @@
 
 namespace cc {
 
+template <typename LayerType>
+class OcclusionTracker;
 class PictureLayerTiling;
+class PicturePileImpl;
 
 class CC_EXPORT PictureLayerTilingClient {
  public:
@@ -29,7 +32,7 @@ class CC_EXPORT PictureLayerTilingClient {
   virtual scoped_refptr<Tile> CreateTile(
     PictureLayerTiling* tiling,
     const gfx::Rect& content_rect) = 0;
-  virtual void UpdatePile(Tile* tile) = 0;
+  virtual PicturePileImpl* GetPile() = 0;
   virtual gfx::Size CalculateTileSize(
     const gfx::Size& content_bounds) const = 0;
   virtual const Region* GetInvalidation() = 0;
@@ -129,8 +132,6 @@ class CC_EXPORT PictureLayerTiling {
   void RemoveTilesInRegion(const Region& layer_region);
   void CreateMissingTilesInLiveTilesRect();
 
-  void SetCanUseLCDText(bool can_use_lcd_text);
-
   void SetClient(PictureLayerTilingClient* client);
   void set_resolution(TileResolution resolution) { resolution_ = resolution; }
   TileResolution resolution() const { return resolution_; }
@@ -208,10 +209,14 @@ class CC_EXPORT PictureLayerTiling {
 
   void Reset();
 
-  void UpdateTilePriorities(WhichTree tree,
-                            const gfx::Rect& visible_layer_rect,
-                            float layer_contents_scale,
-                            double current_frame_time_in_seconds);
+  void UpdateTilePriorities(
+      WhichTree tree,
+      const gfx::Rect& visible_layer_rect,
+      float layer_contents_scale,
+      double current_frame_time_in_seconds,
+      const OcclusionTracker<LayerImpl>* occlusion_tracker,
+      const LayerImpl* render_target,
+      const gfx::Transform& draw_transform);
 
   // Copies the src_tree priority into the dst_tree priority for all tiles.
   // The src_tree priority is reset to the lowest priority possible.  This
