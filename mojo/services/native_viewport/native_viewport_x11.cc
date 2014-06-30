@@ -9,6 +9,7 @@
 
 #include "base/message_loop/message_loop.h"
 #include "ui/events/event.h"
+#include "ui/events/event_utils.h"
 #include "ui/events/platform/platform_event_dispatcher.h"
 #include "ui/events/platform/platform_event_source.h"
 #include "ui/events/platform/x11/x11_event_source.h"
@@ -17,6 +18,20 @@
 
 namespace mojo {
 namespace services {
+
+bool override_redirect = false;
+
+namespace test {
+
+void EnableTestNativeViewport() {
+  // Without the override_redirect BlockUntilWindowMapped() may never finish
+  // (we don't necessarily get the mapped notify). This often happens with
+  // tests.
+  // TODO: decide if we really want the override redirect here.
+  override_redirect = true;
+}
+
+}  // namespace test
 
 class NativeViewportX11 : public NativeViewport,
                           public ui::PlatformEventDispatcher {
@@ -38,7 +53,7 @@ class NativeViewportX11 : public NativeViewport,
 
     XSetWindowAttributes swa;
     memset(&swa, 0, sizeof(swa));
-    swa.override_redirect = False;
+    swa.override_redirect = override_redirect ? True : False;
 
     bounds_ = bounds;
     window_ = XCreateWindow(
@@ -120,7 +135,7 @@ class NativeViewportX11 : public NativeViewport,
       case MotionNotify:
         return true;
       case ClientMessage:
-        return event->xclient.message_type != atom_wm_protocols_;
+        return event->xclient.message_type == atom_wm_protocols_;
       default:
         return false;
     }
@@ -132,12 +147,18 @@ class NativeViewportX11 : public NativeViewport,
       if (protocol == atom_wm_delete_window_)
         delegate_->OnDestroyed();
     } else if (event->type == KeyPress || event->type == KeyRelease) {
-      ui::KeyEvent key_event(event, true);
+      ui::KeyEvent key_event(event, false);
       delegate_->OnEvent(&key_event);
     } else if (event->type == ButtonPress || event->type == ButtonRelease ||
                event->type == MotionNotify) {
-      ui::MouseEvent mouse_event(event);
-      delegate_->OnEvent(&mouse_event);
+      ui::EventType event_type = ui::EventTypeFromNative(event);
+      if (event_type == ui::ET_MOUSEWHEEL) {
+        ui::MouseWheelEvent mouse_event(event);
+        delegate_->OnEvent(&mouse_event);
+      } else {
+        ui::MouseEvent mouse_event(event);
+        delegate_->OnEvent(&mouse_event);
+      }
     }
     return ui::POST_DISPATCH_NONE;
   }

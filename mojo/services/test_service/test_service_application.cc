@@ -2,32 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "mojo/public/cpp/application/application.h"
-#include "mojo/public/cpp/system/macros.h"
+#include "mojo/services/test_service/test_service_application.h"
+
+#include <assert.h>
+
+#include "mojo/public/cpp/application/application_connection.h"
+#include "mojo/public/cpp/utility/run_loop.h"
 #include "mojo/services/test_service/test_service_impl.h"
 
 namespace mojo {
 namespace test {
-namespace {
 
-class TestServiceApplication : public Application {
- public:
-  TestServiceApplication() {}
-  virtual ~TestServiceApplication() {}
+TestServiceApplication::TestServiceApplication() : ref_count_(0) {
+}
 
-  virtual void Initialize() MOJO_OVERRIDE {
-    AddService<TestServiceImpl>();
-  }
+TestServiceApplication::~TestServiceApplication() {
+}
 
- private:
-  MOJO_DISALLOW_COPY_AND_ASSIGN(TestServiceApplication);
-};
+bool TestServiceApplication::ConfigureIncomingConnection(
+    ApplicationConnection* connection) {
+  connection->AddService<TestServiceImpl>(this);
+  return true;
+}
 
-}  // namespace
+void TestServiceApplication::AddRef() {
+  assert(ref_count_ >= 0);
+  ref_count_++;
+}
+
+void TestServiceApplication::ReleaseRef() {
+  assert(ref_count_ > 0);
+  ref_count_--;
+  if (ref_count_ <= 0)
+    RunLoop::current()->Quit();
+}
+
 }  // namespace test
 
 // static
-Application* Application::Create() {
+ApplicationDelegate* ApplicationDelegate::Create() {
   return new mojo::test::TestServiceApplication();
 }
 

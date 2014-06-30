@@ -23,8 +23,6 @@ class ChromeGoogleURLTrackerClient : public GoogleURLTrackerClient,
   virtual bool IsBackgroundNetworkingEnabled() OVERRIDE;
   virtual PrefService* GetPrefs() OVERRIDE;
   virtual net::URLRequestContextGetter* GetRequestContext() OVERRIDE;
-  virtual bool IsGoogleDomainURL(const GURL& url) OVERRIDE;
-  virtual GURL AppendGoogleLocaleParam(const GURL& url) OVERRIDE;
 
  private:
   // content::NotificationObserver:

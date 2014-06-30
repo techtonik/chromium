@@ -642,7 +642,6 @@ TEST(PermissionsTest, PermissionMessages) {
   // These are considered "nuisance" or "trivial" permissions that don't need
   // a prompt.
   skip.insert(APIPermission::kActiveTab);
-  skip.insert(APIPermission::kAdView);
   skip.insert(APIPermission::kAlarms);
   skip.insert(APIPermission::kAlwaysOnTopWindows);
   skip.insert(APIPermission::kAudio);
@@ -732,6 +731,7 @@ TEST(PermissionsTest, PermissionMessages) {
   skip.insert(APIPermission::kFileBrowserHandlerInternal);
   skip.insert(APIPermission::kFileBrowserPrivate);
   skip.insert(APIPermission::kFirstRunPrivate);
+  skip.insert(APIPermission::kGcdPrivate);
   skip.insert(APIPermission::kHotwordPrivate);
   skip.insert(APIPermission::kIdentityPrivate);
   skip.insert(APIPermission::kInfobars);
@@ -824,19 +824,6 @@ TEST(PermissionsTest, SuppressedPermissionMessages) {
   {
     APIPermissionSet api_permissions;
     api_permissions.insert(APIPermission::kTab);
-    api_permissions.insert(APIPermission::kHistory);
-    scoped_refptr<PermissionSet> permissions(
-        new PermissionSet(api_permissions, ManifestPermissionSet(),
-                          URLPatternSet(), URLPatternSet()));
-    PermissionMessages messages =
-        PermissionMessageProvider::Get()->GetPermissionMessages(
-            permissions, Manifest::TYPE_EXTENSION);
-    EXPECT_EQ(1u, messages.size());
-    EXPECT_EQ(PermissionMessage::kBrowsingHistory, messages[0].id());
-  }
-  {
-    APIPermissionSet api_permissions;
-    api_permissions.insert(APIPermission::kTab);
     URLPatternSet hosts;
     hosts.AddPattern(URLPattern(URLPattern::SCHEME_CHROMEUI,
                                 "chrome://favicon/"));
@@ -876,6 +863,50 @@ TEST(PermissionsTest, SuppressedPermissionMessages) {
             permissions, Manifest::TYPE_EXTENSION);
     EXPECT_EQ(1u, messages.size());
     EXPECT_EQ(PermissionMessage::kHostsAll, messages[0].id());
+  }
+  {
+    APIPermissionSet api_permissions;
+    URLPatternSet hosts;
+    hosts.AddPattern(URLPattern(URLPattern::SCHEME_CHROMEUI, "*://*/*"));
+    api_permissions.insert(APIPermission::kDeclarativeWebRequest);
+    scoped_refptr<PermissionSet> permissions(new PermissionSet(
+        api_permissions, ManifestPermissionSet(), hosts, URLPatternSet()));
+    PermissionMessages messages =
+        PermissionMessageProvider::Get()->GetPermissionMessages(
+            permissions, Manifest::TYPE_EXTENSION);
+    EXPECT_EQ(1u, messages.size());
+    EXPECT_EQ(PermissionMessage::kHostsAll, messages[0].id());
+  }
+  {
+    APIPermissionSet api_permissions;
+    api_permissions.insert(APIPermission::kHistory);
+    api_permissions.insert(APIPermission::kTab);
+    api_permissions.insert(APIPermission::kTopSites);
+    api_permissions.insert(APIPermission::kProcesses);
+    api_permissions.insert(APIPermission::kWebNavigation);
+    scoped_refptr<PermissionSet> permissions(
+        new PermissionSet(api_permissions, ManifestPermissionSet(),
+                          URLPatternSet(), URLPatternSet()));
+    PermissionMessages messages =
+        PermissionMessageProvider::Get()->GetPermissionMessages(
+            permissions, Manifest::TYPE_EXTENSION);
+    EXPECT_EQ(1u, messages.size());
+    EXPECT_EQ(PermissionMessage::kBrowsingHistory, messages[0].id());
+  }
+  {
+    APIPermissionSet api_permissions;
+    api_permissions.insert(APIPermission::kTab);
+    api_permissions.insert(APIPermission::kTopSites);
+    api_permissions.insert(APIPermission::kProcesses);
+    api_permissions.insert(APIPermission::kWebNavigation);
+    scoped_refptr<PermissionSet> permissions(
+        new PermissionSet(api_permissions, ManifestPermissionSet(),
+                          URLPatternSet(), URLPatternSet()));
+    PermissionMessages messages =
+        PermissionMessageProvider::Get()->GetPermissionMessages(
+            permissions, Manifest::TYPE_EXTENSION);
+    EXPECT_EQ(1u, messages.size());
+    EXPECT_EQ(PermissionMessage::kTabs, messages[0].id());
   }
 }
 
@@ -949,7 +980,7 @@ TEST(PermissionsTest, GetWarningMessages_Plugins) {
 #else
   ASSERT_EQ(1u, warnings.size());
   EXPECT_EQ(
-      "Read and modify all your data on your computer and the websites "
+      "Read and change all your data on your computer and the websites "
       "you visit",
       base::UTF16ToUTF8(warnings[0]));
 #endif
@@ -992,6 +1023,9 @@ TEST(PermissionsTest, GetWarningMessages_CombinedSessions) {
   {
     APIPermissionSet api_permissions;
     api_permissions.insert(APIPermission::kTab);
+    api_permissions.insert(APIPermission::kTopSites);
+    api_permissions.insert(APIPermission::kProcesses);
+    api_permissions.insert(APIPermission::kWebNavigation);
     api_permissions.insert(APIPermission::kSessions);
     scoped_refptr<PermissionSet> permissions(
         new PermissionSet(api_permissions, ManifestPermissionSet(),
@@ -1001,28 +1035,16 @@ TEST(PermissionsTest, GetWarningMessages_CombinedSessions) {
             permissions, Manifest::TYPE_EXTENSION);
     EXPECT_EQ(1u, messages.size());
     EXPECT_EQ(l10n_util::GetStringUTF16(
-                  IDS_EXTENSION_PROMPT_WARNING_TABS_AND_SESSIONS),
+                  IDS_EXTENSION_PROMPT_WARNING_HISTORY_READ_AND_SESSIONS),
               messages[0]);
   }
   {
     APIPermissionSet api_permissions;
     api_permissions.insert(APIPermission::kHistory);
-    api_permissions.insert(APIPermission::kSessions);
-    scoped_refptr<PermissionSet> permissions(
-        new PermissionSet(api_permissions, ManifestPermissionSet(),
-                          URLPatternSet(), URLPatternSet()));
-    std::vector<base::string16> messages =
-        PermissionMessageProvider::Get()->GetWarningMessages(
-            permissions, Manifest::TYPE_EXTENSION);
-    EXPECT_EQ(1u, messages.size());
-    EXPECT_EQ(l10n_util::GetStringUTF16(
-                  IDS_EXTENSION_PROMPT_WARNING_BROWSING_HISTORY_AND_SESSIONS),
-              messages[0]);
-  }
-  {
-    APIPermissionSet api_permissions;
     api_permissions.insert(APIPermission::kTab);
-    api_permissions.insert(APIPermission::kHistory);
+    api_permissions.insert(APIPermission::kTopSites);
+    api_permissions.insert(APIPermission::kProcesses);
+    api_permissions.insert(APIPermission::kWebNavigation);
     api_permissions.insert(APIPermission::kSessions);
     scoped_refptr<PermissionSet> permissions(
         new PermissionSet(api_permissions, ManifestPermissionSet(),
@@ -1032,7 +1054,7 @@ TEST(PermissionsTest, GetWarningMessages_CombinedSessions) {
             permissions, Manifest::TYPE_EXTENSION);
     EXPECT_EQ(1u, messages.size());
     EXPECT_EQ(l10n_util::GetStringUTF16(
-                  IDS_EXTENSION_PROMPT_WARNING_BROWSING_HISTORY_AND_SESSIONS),
+                  IDS_EXTENSION_PROMPT_WARNING_HISTORY_WRITE_AND_SESSIONS),
               messages[0]);
   }
 }
@@ -1058,7 +1080,7 @@ TEST(PermissionsTest, GetWarningMessages_DeclarativeWebRequest) {
       provider->GetWarningMessages(set, extension->GetType());
   EXPECT_TRUE(Contains(warnings, "Block parts of web pages"));
   EXPECT_FALSE(Contains(
-      warnings, "Read and modify all your data on the websites you visit"));
+      warnings, "Read and change all your data on the websites you visit"));
 
   // Now verify that declarativeWebRequest does not produce a message when host
   // permissions do cover all hosts.
@@ -1068,7 +1090,7 @@ TEST(PermissionsTest, GetWarningMessages_DeclarativeWebRequest) {
   warnings = provider->GetWarningMessages(set, extension->GetType());
   EXPECT_FALSE(Contains(warnings, "Block parts of web pages"));
   EXPECT_TRUE(Contains(
-      warnings, "Read and modify all your data on the websites you visit"));
+      warnings, "Read and change all your data on the websites you visit"));
 }
 
 TEST(PermissionsTest, GetWarningMessages_Serial) {

@@ -14,22 +14,11 @@
 #include "base/gtest_prod_util.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "webkit/browser/appcache/appcache.h"
-#include "webkit/browser/appcache/appcache_disk_cache.h"
-#include "webkit/browser/appcache/appcache_group.h"
-#include "webkit/browser/appcache/appcache_response.h"
-#include "webkit/browser/appcache/appcache_storage.h"
-
-using appcache::AppCache;
-using appcache::AppCacheDiskCache;
-using appcache::AppCacheEntry;
-using appcache::AppCacheGroup;
-using appcache::AppCacheInfoCollection;
-using appcache::AppCacheResponseReader;
-using appcache::AppCacheResponseWriter;
-using appcache::AppCacheServiceImpl;
-using appcache::AppCacheStorage;
-using appcache::kNoCacheId;
+#include "content/browser/appcache/appcache.h"
+#include "content/browser/appcache/appcache_disk_cache.h"
+#include "content/browser/appcache/appcache_group.h"
+#include "content/browser/appcache/appcache_response.h"
+#include "content/browser/appcache/appcache_storage.h"
 
 namespace content {
 FORWARD_DECLARE_TEST(AppCacheServiceImplTest, DeleteAppCachesForOrigin);
@@ -188,7 +177,7 @@ class MockAppCacheStorage : public AppCacheStorage {
     simulate_find_sub_resource_ = true;
     simulated_found_entry_ = entry;
     simulated_found_fallback_entry_ = fallback_entry;
-    simulated_found_cache_id_ = kNoCacheId;  // N/A to sub resource loads
+    simulated_found_cache_id_ = kAppCacheNoCacheId; // N/A to sub resource loads
     simulated_found_manifest_url_ = GURL();  // N/A to sub resource loads
     simulated_found_group_id_ = 0;  // N/A to sub resource loads
     simulated_found_network_namespace_ = network_namespace;

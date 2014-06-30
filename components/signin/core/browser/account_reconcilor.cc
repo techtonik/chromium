@@ -52,7 +52,8 @@ class AccountReconcilor::RefreshTokenFetcher
  public:
   RefreshTokenFetcher(AccountReconcilor* reconcilor,
                       const std::string& account_id,
-                      int session_index);
+                      int session_index,
+                      const std::string& signin_scoped_device_id);
   virtual ~RefreshTokenFetcher() {}
 
  private:
@@ -76,9 +77,11 @@ class AccountReconcilor::RefreshTokenFetcher
 AccountReconcilor::RefreshTokenFetcher::RefreshTokenFetcher(
     AccountReconcilor* reconcilor,
     const std::string& account_id,
-    int session_index)
+    int session_index,
+    const std::string& signin_scoped_device_id)
     : SigninOAuthHelper(reconcilor->client()->GetURLRequestContext(),
                         base::IntToString(session_index),
+                        signin_scoped_device_id,
                         this),
       reconcilor_(reconcilor),
       account_id_(account_id),
@@ -359,8 +362,10 @@ void AccountReconcilor::GoogleSignedOut(const std::string& username) {
 }
 
 void AccountReconcilor::PerformMergeAction(const std::string& account_id) {
-  if (!switches::IsNewProfileManagement())
+  if (!switches::IsNewProfileManagement()) {
+    MarkAccountAsAddedToCookie(account_id);
     return;
+  }
   VLOG(1) << "AccountReconcilor::PerformMergeAction: " << account_id;
   merge_session_helper_.LogIn(account_id);
 }
@@ -396,16 +401,20 @@ void AccountReconcilor::PerformFinishRemoveAction(
   // Wait for the next ReconcileAction if there is an error.
 }
 
-void AccountReconcilor::PerformAddToChromeAction(const std::string& account_id,
-                                                 int session_index) {
-  if (!switches::IsNewProfileManagement())
+void AccountReconcilor::PerformAddToChromeAction(
+    const std::string& account_id,
+    int session_index,
+    const std::string& signin_scoped_device_id) {
+  if (!switches::IsNewProfileManagement()) {
+    MarkAccountAsAddedToChrome(account_id);
     return;
+  }
   VLOG(1) << "AccountReconcilor::PerformAddToChromeAction:"
           << " account=" << account_id << " session_index=" << session_index;
 
 #if !defined(OS_ANDROID) && !defined(OS_IOS)
-  refresh_token_fetchers_.push_back(
-      new RefreshTokenFetcher(this, account_id, session_index));
+  refresh_token_fetchers_.push_back(new RefreshTokenFetcher(
+      this, account_id, session_index, signin_scoped_device_id));
 #endif
 }
 
@@ -575,6 +584,19 @@ void AccountReconcilor::OnGetTokenFailure(
   HandleFailedAccountIdCheck(account_id);
 }
 
+void AccountReconcilor::OnNewProfileManagementFlagChanged(
+    bool new_flag_status) {
+  if (new_flag_status) {
+    // The reconciler may have been newly created just before this call, or may
+    // have already existed and in mid-reconcile. To err on the safe side, force
+    // a restart.
+    Shutdown();
+    Initialize(true);
+  } else {
+    Shutdown();
+  }
+}
+
 void AccountReconcilor::FinishReconcile() {
   // Make sure that the process of validating the gaia cookie and the oauth2
   // tokens individually is done before proceeding with reconciliation.
@@ -587,9 +609,11 @@ void AccountReconcilor::FinishReconcile() {
 
   DCHECK(add_to_cookie_.empty());
   DCHECK(add_to_chrome_.empty());
+  int number_gaia_accounts = gaia_accounts_.size();
   bool are_primaries_equal =
-      gaia_accounts_.size() > 0 &&
+      number_gaia_accounts > 0 &&
       gaia::AreEmailsSame(primary_account_, gaia_accounts_[0].first);
+
 
   if (are_primaries_equal) {
     // Determine if we need to merge accounts from gaia cookie to chrome.
@@ -643,20 +667,24 @@ void AccountReconcilor::FinishReconcile() {
     }
   }
 
+  std::string signin_scoped_device_id = client_->GetSigninScopedDeviceId();
   // For each account in the gaia cookie not known to chrome,
-  // PerformAddToChromeAction.
+  // PerformAddToChromeAction. Make a copy of |add_to_chrome| since calls to
+  // PerformAddToChromeAction() may modify this array.
+  std::vector<std::pair<std::string, int> > add_to_chrome_copy = add_to_chrome_;
   for (std::vector<std::pair<std::string, int> >::const_iterator i =
-           add_to_chrome_.begin();
-       i != add_to_chrome_.end();
+           add_to_chrome_copy.begin();
+       i != add_to_chrome_copy.end();
        ++i) {
-    PerformAddToChromeAction(i->first, i->second);
+    PerformAddToChromeAction(i->first, i->second, signin_scoped_device_id);
   }
 
   signin_metrics::LogSigninAccountReconciliation(valid_chrome_accounts_.size(),
                                                  added_to_cookie,
                                                  add_to_chrome_.size(),
                                                  are_primaries_equal,
-                                                 first_execution_);
+                                                 first_execution_,
+                                                 number_gaia_accounts);
   first_execution_ = false;
   CalculateIfReconcileIsDone();
   ScheduleStartReconcileIfChromeAccountsChanged();
@@ -693,13 +721,9 @@ void AccountReconcilor::ScheduleStartReconcileIfChromeAccountsChanged() {
   }
 }
 
-void AccountReconcilor::MergeSessionCompleted(
-    const std::string& account_id,
-    const GoogleServiceAuthError& error) {
-  VLOG(1) << "AccountReconcilor::MergeSessionCompleted: account_id="
-          << account_id;
-
-  // Remove the account from the list that is being merged.
+// Remove the account from the list that is being merged.
+void AccountReconcilor::MarkAccountAsAddedToCookie(
+    const std::string& account_id) {
   for (std::vector<std::string>::iterator i = add_to_cookie_.begin();
        i != add_to_cookie_.end();
        ++i) {
@@ -708,7 +732,15 @@ void AccountReconcilor::MergeSessionCompleted(
       break;
     }
   }
+}
 
+void AccountReconcilor::MergeSessionCompleted(
+    const std::string& account_id,
+    const GoogleServiceAuthError& error) {
+  VLOG(1) << "AccountReconcilor::MergeSessionCompleted: account_id="
+          << account_id;
+
+  MarkAccountAsAddedToCookie(account_id);
   CalculateIfReconcileIsDone();
   ScheduleStartReconcileIfChromeAccountsChanged();
 }
@@ -735,13 +767,9 @@ void AccountReconcilor::PerformAddAccountToTokenService(
   token_service_->UpdateCredentials(account_id, refresh_token);
 }
 
-void AccountReconcilor::HandleRefreshTokenFetched(
-    const std::string& account_id,
-    const std::string& refresh_token) {
-  if (!refresh_token.empty()) {
-    PerformAddAccountToTokenService(account_id, refresh_token);
-  }
-  // Remove the account from the list that is being updated.
+// Remove the account from the list that is being updated.
+void AccountReconcilor::MarkAccountAsAddedToChrome(
+    const std::string& account_id) {
   for (std::vector<std::pair<std::string, int> >::iterator i =
            add_to_chrome_.begin();
        i != add_to_chrome_.end();
@@ -751,6 +779,14 @@ void AccountReconcilor::HandleRefreshTokenFetched(
       break;
     }
   }
+}
 
+void AccountReconcilor::HandleRefreshTokenFetched(
+    const std::string& account_id,
+    const std::string& refresh_token) {
+  if (!refresh_token.empty())
+    PerformAddAccountToTokenService(account_id, refresh_token);
+
+  MarkAccountAsAddedToChrome(account_id);
   CalculateIfReconcileIsDone();
 }

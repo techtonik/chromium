@@ -240,7 +240,7 @@ void Canvas::DrawStringRectWithShadows(const base::string16& text,
 #endif
 
   scoped_ptr<RenderText> render_text(RenderText::CreateInstance());
-  render_text->SetTextShadows(shadows);
+  render_text->set_shadows(shadows);
 
   if (flags & MULTI_LINE) {
     WordWrapBehavior wrap_behavior = IGNORE_LONG_WORDS;
@@ -375,8 +375,15 @@ void Canvas::DrawFadedString(const base::string16& text,
     return;
   }
 
-  // Align to content directionality instead of centering and fading both ends.
-  if (!(flags & TEXT_ALIGN_LEFT) && !(flags & TEXT_ALIGN_RIGHT)) {
+  // Align with forced content directionality, overriding alignment flags.
+  if (flags & FORCE_RTL_DIRECTIONALITY) {
+    flags &= ~(TEXT_ALIGN_CENTER | TEXT_ALIGN_LEFT);
+    flags |= TEXT_ALIGN_RIGHT;
+  } else if (flags & FORCE_LTR_DIRECTIONALITY) {
+    flags &= ~(TEXT_ALIGN_CENTER | TEXT_ALIGN_RIGHT);
+    flags |= TEXT_ALIGN_LEFT;
+  } else if (!(flags & TEXT_ALIGN_LEFT) && !(flags & TEXT_ALIGN_RIGHT)) {
+    // Also align with content directionality instead of fading both ends.
     flags &= ~TEXT_ALIGN_CENTER;
     const bool is_rtl = base::i18n::GetFirstStrongCharacterDirection(text) ==
                         base::i18n::RIGHT_TO_LEFT;

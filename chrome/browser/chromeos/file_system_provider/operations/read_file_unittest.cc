@@ -206,6 +206,7 @@ TEST_F(FileSystemProviderOperationsReadFileTest, OnSuccess) {
 
   const std::string data = "ABCDE";
   const bool has_more = false;
+  const int execution_time = 0;
 
   base::ListValue value_as_list;
   value_as_list.Set(0, new base::StringValue(kFileSystemId));
@@ -213,6 +214,7 @@ TEST_F(FileSystemProviderOperationsReadFileTest, OnSuccess) {
   value_as_list.Set(
       2, base::BinaryValue::CreateWithCopiedBuffer(data.c_str(), data.size()));
   value_as_list.Set(3, new base::FundamentalValue(has_more));
+  value_as_list.Set(4, new base::FundamentalValue(execution_time));
 
   scoped_ptr<Params> params(Params::Create(value_as_list));
   ASSERT_TRUE(params.get());
@@ -231,9 +233,6 @@ TEST_F(FileSystemProviderOperationsReadFileTest, OnSuccess) {
 }
 
 TEST_F(FileSystemProviderOperationsReadFileTest, OnError) {
-  using extensions::api::file_system_provider_internal::ReadFileRequestedError::
-      Params;
-
   LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
   CallbackLogger callback_logger;
 
@@ -251,7 +250,9 @@ TEST_F(FileSystemProviderOperationsReadFileTest, OnError) {
 
   EXPECT_TRUE(read_file.Execute(kRequestId));
 
-  read_file.OnError(kRequestId, base::File::FILE_ERROR_TOO_MANY_OPENED);
+  read_file.OnError(kRequestId,
+                    scoped_ptr<RequestValue>(new RequestValue()),
+                    base::File::FILE_ERROR_TOO_MANY_OPENED);
 
   ASSERT_EQ(1u, callback_logger.events().size());
   CallbackLogger::Event* event = callback_logger.events()[0];

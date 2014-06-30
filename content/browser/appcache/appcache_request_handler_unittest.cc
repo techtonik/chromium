@@ -12,6 +12,10 @@
 #include "base/message_loop/message_loop.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/threading/thread.h"
+#include "content/browser/appcache/appcache.h"
+#include "content/browser/appcache/appcache_backend_impl.h"
+#include "content/browser/appcache/appcache_request_handler.h"
+#include "content/browser/appcache/appcache_url_request_job.h"
 #include "content/browser/appcache/mock_appcache_policy.h"
 #include "content/browser/appcache/mock_appcache_service.h"
 #include "net/base/net_errors.h"
@@ -22,21 +26,6 @@
 #include "net/url_request/url_request_error_job.h"
 #include "net/url_request/url_request_job_factory.h"
 #include "testing/gtest/include/gtest/gtest.h"
-#include "webkit/browser/appcache/appcache.h"
-#include "webkit/browser/appcache/appcache_backend_impl.h"
-#include "webkit/browser/appcache/appcache_request_handler.h"
-#include "webkit/browser/appcache/appcache_url_request_job.h"
-
-using appcache::AppCache;
-using appcache::AppCacheBackendImpl;
-using appcache::AppCacheEntry;
-using appcache::AppCacheFrontend;
-using appcache::AppCacheGroup;
-using appcache::AppCacheHost;
-using appcache::AppCacheInfo;
-using appcache::AppCacheRequestHandler;
-using appcache::AppCacheURLRequestJob;
-using appcache::kNoCacheId;
 
 namespace content {
 
@@ -47,17 +36,17 @@ class AppCacheRequestHandlerTest : public testing::Test {
   class MockFrontend : public AppCacheFrontend {
    public:
     virtual void OnCacheSelected(
-        int host_id, const appcache::AppCacheInfo& info) OVERRIDE {}
+        int host_id, const AppCacheInfo& info) OVERRIDE {}
 
     virtual void OnStatusChanged(const std::vector<int>& host_ids,
-                                 appcache::Status status) OVERRIDE {}
+                                 AppCacheStatus status) OVERRIDE {}
 
     virtual void OnEventRaised(const std::vector<int>& host_ids,
-                               appcache::EventID event_id) OVERRIDE {}
+                               AppCacheEventID event_id) OVERRIDE {}
 
-    virtual void OnErrorEventRaised(const std::vector<int>& host_ids,
-                                    const appcache::ErrorDetails& details)
-        OVERRIDE {}
+    virtual void OnErrorEventRaised(
+        const std::vector<int>& host_ids,
+        const AppCacheErrorDetails& details) OVERRIDE {}
 
     virtual void OnProgressEventRaised(const std::vector<int>& host_ids,
                                        const GURL& url,
@@ -66,7 +55,7 @@ class AppCacheRequestHandlerTest : public testing::Test {
     }
 
     virtual void OnLogMessage(int host_id,
-                              appcache::LogLevel log_level,
+                              AppCacheLogLevel log_level,
                               const std::string& message) OVERRIDE {
     }
 
@@ -292,10 +281,10 @@ class AppCacheRequestHandlerTest : public testing::Test {
     EXPECT_FALSE(job_->is_waiting());
     EXPECT_TRUE(job_->is_delivering_network_response());
 
-    int64 cache_id = kNoCacheId;
+    int64 cache_id = kAppCacheNoCacheId;
     GURL manifest_url;
     handler_->GetExtraResponseInfo(&cache_id, &manifest_url);
-    EXPECT_EQ(kNoCacheId, cache_id);
+    EXPECT_EQ(kAppCacheNoCacheId, cache_id);
     EXPECT_EQ(GURL(), manifest_url);
     EXPECT_EQ(0, handler_->found_group_id_);
 
@@ -344,7 +333,7 @@ class AppCacheRequestHandlerTest : public testing::Test {
     EXPECT_FALSE(job_->is_waiting());
     EXPECT_TRUE(job_->is_delivering_appcache_response());
 
-    int64 cache_id = kNoCacheId;
+    int64 cache_id = kAppCacheNoCacheId;
     GURL manifest_url;
     handler_->GetExtraResponseInfo(&cache_id, &manifest_url);
     EXPECT_EQ(1, cache_id);
@@ -429,7 +418,7 @@ class AppCacheRequestHandlerTest : public testing::Test {
     EXPECT_TRUE(job_.get());
     EXPECT_TRUE(job_->is_delivering_appcache_response());
 
-    int64 cache_id = kNoCacheId;
+    int64 cache_id = kAppCacheNoCacheId;
     GURL manifest_url;
     handler_->GetExtraResponseInfo(&cache_id, &manifest_url);
     EXPECT_EQ(1, cache_id);

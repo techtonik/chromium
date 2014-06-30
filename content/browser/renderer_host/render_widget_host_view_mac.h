@@ -6,6 +6,7 @@
 #define CONTENT_BROWSER_RENDERER_HOST_RENDER_WIDGET_HOST_VIEW_MAC_H_
 
 #import <Cocoa/Cocoa.h>
+#include <IOSurface/IOSurfaceAPI.h>
 #include <list>
 #include <map>
 #include <string>
@@ -29,8 +30,12 @@
 #include "ipc/ipc_sender.h"
 #include "third_party/WebKit/public/web/WebCompositionUnderline.h"
 #include "ui/base/cocoa/base_view.h"
+#include "ui/base/cocoa/remote_layer_api.h"
+
+struct ViewHostMsg_TextInputState_Params;
 
 namespace content {
+class BrowserCompositorviewMac;
 class CompositingIOSurfaceMac;
 class CompositingIOSurfaceContext;
 class RenderWidgetHostViewMac;
@@ -43,7 +48,6 @@ class Compositor;
 class Layer;
 }
 
-@class BrowserCompositorViewMac;
 @class CompositingIOSurfaceLayer;
 @class FullscreenWindowManager;
 @protocol RenderWidgetHostViewMacDelegate;
@@ -212,6 +216,7 @@ class RenderWidgetHostImpl;
 class CONTENT_EXPORT RenderWidgetHostViewMac
     : public RenderWidgetHostViewBase,
       public DelegatedFrameHostClient,
+      public BrowserCompositorViewMacClient,
       public IPC::Sender,
       public SoftwareFrameManagerClient,
       public CompositingIOSurfaceLayerClient {
@@ -271,9 +276,8 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   virtual void Blur() OVERRIDE;
   virtual void UpdateCursor(const WebCursor& cursor) OVERRIDE;
   virtual void SetIsLoading(bool is_loading) OVERRIDE;
-  virtual void TextInputTypeChanged(ui::TextInputType type,
-                                    ui::TextInputMode input_mode,
-                                    bool can_compose_inline) OVERRIDE;
+  virtual void TextInputStateChanged(
+      const ViewHostMsg_TextInputState_Params& params) OVERRIDE;
   virtual void ImeCancelComposition() OVERRIDE;
   virtual void ImeCompositionRangeChanged(
       const gfx::Range& range,
@@ -359,7 +363,7 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
 
   // Update the IOSurface to be drawn and call setNeedsDisplay on
   // |cocoa_view_|.
-  void CompositorSwapBuffers(uint64 surface_handle,
+  void CompositorSwapBuffers(IOSurfaceID surface_handle,
                              const gfx::Size& size,
                              float scale_factor,
                              const std::vector<ui::LatencyInfo>& latency_info);
@@ -418,6 +422,9 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   // The compositing or software layers will be added as sublayers to this.
   base::scoped_nsobject<CALayer> background_layer_;
 
+  // The CoreAnimation layer hosted by the GPU process.
+  base::scoped_nsobject<CALayerHost> remote_layer_host_;
+
   // The CoreAnimation layer for software compositing. This should be NULL
   // when software compositing is not in use.
   base::scoped_nsobject<SoftwareLayer> software_layer_;
@@ -429,9 +436,12 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   scoped_refptr<CompositingIOSurfaceContext> compositing_iosurface_context_;
 
   // Delegated frame management and compositior.
-  base::scoped_nsobject<BrowserCompositorViewMac> browser_compositor_view_;
   scoped_ptr<DelegatedFrameHost> delegated_frame_host_;
   scoped_ptr<ui::Layer> root_layer_;
+
+  // Container for the NSView drawn by the browser compositor. This will never
+  // be NULL, but may be invalid (see its IsValid method).
+  scoped_ptr<BrowserCompositorViewMac> browser_compositor_view_;
 
   // This holds the current software compositing framebuffer, if any.
   scoped_ptr<SoftwareFrameManager> software_frame_manager_;
@@ -505,6 +515,12 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   virtual gfx::Size ConvertViewSizeToPixel(const gfx::Size& size) OVERRIDE;
   virtual DelegatedFrameHost* GetDelegatedFrameHost() const OVERRIDE;
 
+  // BrowserCompositorViewMacClient implementation.
+  virtual void BrowserCompositorViewFrameSwapped(
+      const std::vector<ui::LatencyInfo>& latency_info) OVERRIDE;
+  virtual NSView* BrowserCompositorSuperview() OVERRIDE;
+  virtual ui::Layer* BrowserCompositorRootLayer() OVERRIDE;
+
  private:
   friend class RenderWidgetHostViewMacTest;
 
@@ -526,6 +542,9 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   // Shuts down the render_widget_host_.  This is a separate function so we can
   // invoke it from the message loop.
   void ShutdownHost();
+
+  void EnsureBrowserCompositorView();
+  void DestroyBrowserCompositorView();
 
   void EnsureSoftwareLayer();
   void DestroySoftwareLayer();

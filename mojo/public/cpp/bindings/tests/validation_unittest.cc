@@ -5,14 +5,24 @@
 #include <stdio.h>
 
 #include <algorithm>
-#include <sstream>
 #include <string>
 #include <vector>
 
+#include "mojo/public/c/system/macros.h"
+#include "mojo/public/cpp/bindings/interface_impl.h"
+#include "mojo/public/cpp/bindings/interface_ptr.h"
+#include "mojo/public/cpp/bindings/lib/connector.h"
+#include "mojo/public/cpp/bindings/lib/filter_chain.h"
 #include "mojo/public/cpp/bindings/lib/message_header_validator.h"
+#include "mojo/public/cpp/bindings/lib/router.h"
 #include "mojo/public/cpp/bindings/lib/validation_errors.h"
+#include "mojo/public/cpp/bindings/message.h"
 #include "mojo/public/cpp/bindings/tests/validation_test_input_parser.h"
+#include "mojo/public/cpp/environment/environment.h"
+#include "mojo/public/cpp/system/core.h"
 #include "mojo/public/cpp/test_support/test_support.h"
+#include "mojo/public/cpp/utility/run_loop.h"
+#include "mojo/public/interfaces/bindings/tests/validation_test_interfaces.mojom.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace mojo {
@@ -28,21 +38,25 @@ void Append(std::vector<uint8_t>* data_vector, T data) {
 
 bool TestInputParser(const std::string& input,
                      bool expected_result,
-                     const std::vector<uint8_t>& expected_parsed_input) {
-  std::vector<uint8_t> parsed_input;
+                     const std::vector<uint8_t>& expected_data,
+                     size_t expected_num_handles) {
+  std::vector<uint8_t> data;
+  size_t num_handles;
   std::string error_message;
 
-  bool result = ParseValidationTestInput(input, &parsed_input, &error_message);
+  bool result = ParseValidationTestInput(input, &data, &num_handles,
+                                         &error_message);
   if (expected_result) {
     if (result && error_message.empty() &&
-        expected_parsed_input == parsed_input) {
+        expected_data == data && expected_num_handles == num_handles) {
       return true;
     }
 
     // Compare with an empty string instead of checking |error_message.empty()|,
     // so that the message will be printed out if the two are not equal.
     EXPECT_EQ(std::string(), error_message);
-    EXPECT_EQ(expected_parsed_input, parsed_input);
+    EXPECT_EQ(expected_data, data);
+    EXPECT_EQ(expected_num_handles, num_handles);
     return false;
   }
 
@@ -83,13 +97,15 @@ bool ReadFile(const std::string& path, std::string* result) {
   return size == size_read;
 }
 
-bool ReadAndParseDataFile(const std::string& path, std::vector<uint8_t>* data) {
+bool ReadAndParseDataFile(const std::string& path,
+                          std::vector<uint8_t>* data,
+                          size_t* num_handles) {
   std::string input;
   if (!ReadFile(path, &input))
     return false;
 
   std::string error_message;
-  if (!ParseValidationTestInput(input, data, &error_message)) {
+  if (!ParseValidationTestInput(input, data, num_handles, &error_message)) {
     ADD_FAILURE() << error_message;
     return false;
   }
@@ -116,23 +132,50 @@ bool ReadResultFile(const std::string& path, std::string* result) {
 }
 
 std::string GetPath(const std::string& root, const std::string& suffix) {
-  return "mojo/public/interfaces/bindings/tests/data/" + root + suffix;
+  return "mojo/public/interfaces/bindings/tests/data/validation/" +
+      root + suffix;
 }
 
-void RunValidationTest(const std::string& root, std::string (*func)(Message*)) {
+// |message| should be a newly created object.
+bool ReadTestCase(const std::string& test,
+                  Message* message,
+                  std::string* expected) {
   std::vector<uint8_t> data;
-  ASSERT_TRUE(ReadAndParseDataFile(GetPath(root, ".data"), &data));
+  size_t num_handles;
+  if (!ReadAndParseDataFile(GetPath(test, ".data"), &data, &num_handles) ||
+      !ReadResultFile(GetPath(test, ".expected"), expected)) {
+    return false;
+  }
 
-  std::string expected;
-  ASSERT_TRUE(ReadResultFile(GetPath(root, ".expected"), &expected));
-
-  Message message;
-  message.AllocUninitializedData(static_cast<uint32_t>(data.size()));
+  message->AllocUninitializedData(static_cast<uint32_t>(data.size()));
   if (!data.empty())
-    memcpy(message.mutable_data(), &data[0], data.size());
+    memcpy(message->mutable_data(), &data[0], data.size());
+  message->mutable_handles()->resize(num_handles);
 
-  std::string result = func(&message);
-  EXPECT_EQ(expected, result) << "failed test: " << root;
+  return true;
+}
+
+void RunValidationTests(const std::string& prefix,
+                        MessageReceiver* test_message_receiver) {
+  std::vector<std::string> names =
+      EnumerateSourceRootRelativeDirectory(GetPath("", ""));
+  std::vector<std::string> tests = GetMatchingTests(names, prefix);
+
+  for (size_t i = 0; i < tests.size(); ++i) {
+    Message message;
+    std::string expected;
+    ASSERT_TRUE(ReadTestCase(tests[i], &message, &expected));
+
+    std::string result;
+    mojo::internal::ValidationErrorObserverForTesting observer;
+    bool unused MOJO_ALLOW_UNUSED = test_message_receiver->Accept(&message);
+    if (observer.last_error() == mojo::internal::VALIDATION_ERROR_NONE)
+      result = "PASS";
+    else
+      result = mojo::internal::ValidationErrorToString(observer.last_error());
+
+    EXPECT_EQ(expected, result) << "failed test: " << tests[i];
+  }
 }
 
 class DummyMessageReceiver : public MessageReceiver {
@@ -142,23 +185,93 @@ class DummyMessageReceiver : public MessageReceiver {
   }
 };
 
-std::string DumpMessageHeader(Message* message) {
-  internal::ValidationErrorObserverForTesting observer;
-  DummyMessageReceiver not_reached_receiver;
-  internal::MessageHeaderValidator validator(&not_reached_receiver);
-  bool rv = validator.Accept(message);
-  if (!rv) {
-    EXPECT_NE(internal::VALIDATION_ERROR_NONE, observer.last_error());
-    return internal::ValidationErrorToString(observer.last_error());
+class ValidationIntegrationTest : public testing::Test {
+ public:
+  ValidationIntegrationTest() : test_message_receiver_(NULL) {
   }
 
-  std::ostringstream os;
-  os << "num_bytes: " << message->header()->num_bytes << "\n"
-     << "num_fields: " << message->header()->num_fields << "\n"
-     << "name: " << message->header()->name << "\n"
-     << "flags: " << message->header()->flags;
-  return os.str();
-}
+  virtual ~ValidationIntegrationTest() {
+  }
+
+  virtual void SetUp() MOJO_OVERRIDE {
+    ScopedMessagePipeHandle tester_endpoint;
+    ASSERT_EQ(MOJO_RESULT_OK,
+              CreateMessagePipe(NULL, &tester_endpoint, &testee_endpoint_));
+    test_message_receiver_ =
+        new TestMessageReceiver(this, tester_endpoint.Pass());
+  }
+
+  virtual void TearDown() MOJO_OVERRIDE {
+    delete test_message_receiver_;
+    test_message_receiver_ = NULL;
+
+    // Make sure that the other end receives the OnConnectionError()
+    // notification.
+    PumpMessages();
+  }
+
+  MessageReceiver* test_message_receiver() {
+    return test_message_receiver_;
+  }
+
+  ScopedMessagePipeHandle testee_endpoint() {
+    return testee_endpoint_.Pass();
+  }
+
+ private:
+  class TestMessageReceiver : public MessageReceiver {
+   public:
+    TestMessageReceiver(ValidationIntegrationTest* owner,
+                        ScopedMessagePipeHandle handle)
+        : owner_(owner),
+          connector_(handle.Pass()) {
+    }
+    virtual ~TestMessageReceiver() {
+    }
+
+    virtual bool Accept(Message* message) MOJO_OVERRIDE {
+      bool rv = connector_.Accept(message);
+      owner_->PumpMessages();
+      return rv;
+    }
+
+   public:
+    ValidationIntegrationTest* owner_;
+    mojo::internal::Connector connector_;
+  };
+
+  void PumpMessages() {
+    loop_.RunUntilIdle();
+  }
+
+  Environment env_;
+  RunLoop loop_;
+  TestMessageReceiver* test_message_receiver_;
+  ScopedMessagePipeHandle testee_endpoint_;
+};
+
+class IntegrationTestInterface1Client : public IntegrationTestInterface1 {
+ public:
+  virtual ~IntegrationTestInterface1Client() {
+  }
+
+  virtual void Method0(BasicStructPtr param0) MOJO_OVERRIDE {
+  }
+};
+
+class IntegrationTestInterface1Impl
+    : public InterfaceImpl<IntegrationTestInterface1> {
+ public:
+  virtual ~IntegrationTestInterface1Impl() {
+  }
+
+  virtual void Method0(BasicStructPtr param0) MOJO_OVERRIDE {
+  }
+
+  virtual void OnConnectionError() MOJO_OVERRIDE {
+    delete this;
+  }
+};
 
 TEST(ValidationTest, InputParser) {
   {
@@ -172,14 +285,14 @@ TEST(ValidationTest, InputParser) {
     std::string input;
     std::vector<uint8_t> expected;
 
-    EXPECT_TRUE(TestInputParser(input, true, expected));
+    EXPECT_TRUE(TestInputParser(input, true, expected, 0));
   }
   {
     // Test input that only consists of comments and whitespaces.
     std::string input = "    \t  // hello world \n\r \t// the answer is 42   ";
     std::vector<uint8_t> expected;
 
-    EXPECT_TRUE(TestInputParser(input, true, expected));
+    EXPECT_TRUE(TestInputParser(input, true, expected, 0));
   }
   {
     std::string input = "[u1]0x10// hello world !! \n\r  \t [u2]65535 \n"
@@ -192,7 +305,7 @@ TEST(ValidationTest, InputParser) {
     Append(&expected, static_cast<uint8_t>(0));
     Append(&expected, static_cast<uint8_t>(0xff));
 
-    EXPECT_TRUE(TestInputParser(input, true, expected));
+    EXPECT_TRUE(TestInputParser(input, true, expected, 0));
   }
   {
     std::string input = "[s8]-0x800 [s1]-128\t[s2]+0 [s4]-40";
@@ -202,7 +315,7 @@ TEST(ValidationTest, InputParser) {
     Append(&expected, static_cast<int16_t>(0));
     Append(&expected, static_cast<int32_t>(-40));
 
-    EXPECT_TRUE(TestInputParser(input, true, expected));
+    EXPECT_TRUE(TestInputParser(input, true, expected, 0));
   }
   {
     std::string input = "[b]00001011 [b]10000000  // hello world\r [b]00000000";
@@ -211,7 +324,7 @@ TEST(ValidationTest, InputParser) {
     Append(&expected, static_cast<uint8_t>(128));
     Append(&expected, static_cast<uint8_t>(0));
 
-    EXPECT_TRUE(TestInputParser(input, true, expected));
+    EXPECT_TRUE(TestInputParser(input, true, expected, 0));
   }
   {
     std::string input = "[f]+.3e9 [d]-10.03";
@@ -219,7 +332,7 @@ TEST(ValidationTest, InputParser) {
     Append(&expected, +.3e9f);
     Append(&expected, -10.03);
 
-    EXPECT_TRUE(TestInputParser(input, true, expected));
+    EXPECT_TRUE(TestInputParser(input, true, expected, 0));
   }
   {
     std::string input = "[dist4]foo 0 [dist8]bar 0 [anchr]foo [anchr]bar";
@@ -229,7 +342,14 @@ TEST(ValidationTest, InputParser) {
     Append(&expected, static_cast<uint64_t>(9));
     Append(&expected, static_cast<uint8_t>(0));
 
-    EXPECT_TRUE(TestInputParser(input, true, expected));
+    EXPECT_TRUE(TestInputParser(input, true, expected, 0));
+  }
+  {
+    std::string input = "// This message has handles! \n[handles]50 [u8]2";
+    std::vector<uint8_t> expected;
+    Append(&expected, static_cast<uint64_t>(2));
+
+    EXPECT_TRUE(TestInputParser(input, true, expected, 50));
   }
 
   // Test some failure cases.
@@ -237,32 +357,65 @@ TEST(ValidationTest, InputParser) {
     const char* error_inputs[] = {
       "/ hello world",
       "[u1]x",
+      "[u2]-1000",
       "[u1]0x100",
       "[s2]-0x8001",
       "[b]1",
       "[b]1111111k",
       "[dist4]unmatched",
       "[anchr]hello [dist8]hello",
+      "[dist4]a [dist4]a [anchr]a",
+      "[dist4]a [anchr]a [dist4]a [anchr]a",
+      "0 [handles]50",
       NULL
     };
 
     for (size_t i = 0; error_inputs[i]; ++i) {
       std::vector<uint8_t> expected;
-      if (!TestInputParser(error_inputs[i], false, expected))
+      if (!TestInputParser(error_inputs[i], false, expected, 0))
         ADD_FAILURE() << "Unexpected test result for: " << error_inputs[i];
     }
   }
 }
 
-TEST(ValidationTest, TestAll) {
-  std::vector<std::string> names =
-      EnumerateSourceRootRelativeDirectory(GetPath("", ""));
+TEST(ValidationTest, Conformance) {
+  DummyMessageReceiver dummy_receiver;
+  mojo::internal::FilterChain validators(&dummy_receiver);
+  validators.Append<mojo::internal::MessageHeaderValidator>();
+  validators.Append<ConformanceTestInterface::RequestValidator_>();
 
-  std::vector<std::string> header_tests =
-      GetMatchingTests(names, "validate_header_");
+  RunValidationTests("conformance_", validators.GetHead());
+}
 
-  for (size_t i = 0; i < header_tests.size(); ++i)
-    RunValidationTest(header_tests[i], &DumpMessageHeader);
+TEST_F(ValidationIntegrationTest, InterfacePtr) {
+  // Test that InterfacePtr<X> applies the correct validators and they don't
+  // conflict with each other:
+  //   - MessageHeaderValidator
+  //   - X::Client::RequestValidator_
+  //   - X::ResponseValidator_
+
+  IntegrationTestInterface1Client interface1_client;
+  IntegrationTestInterface2Ptr interface2_ptr =
+      MakeProxy<IntegrationTestInterface2>(testee_endpoint().Pass());
+  interface2_ptr.set_client(&interface1_client);
+  interface2_ptr.internal_state()->router()->EnableTestingMode();
+
+  RunValidationTests("integration_", test_message_receiver());
+}
+
+TEST_F(ValidationIntegrationTest, InterfaceImpl) {
+  // Test that InterfaceImpl<X> applies the correct validators and they don't
+  // conflict with each other:
+  //   - MessageHeaderValidator
+  //   - X::RequestValidator_
+  //   - X::Client::ResponseValidator_
+
+  // |interface1_impl| will delete itself when the pipe is closed.
+  IntegrationTestInterface1Impl* interface1_impl =
+      BindToPipe(new IntegrationTestInterface1Impl(), testee_endpoint().Pass());
+  interface1_impl->internal_state()->router()->EnableTestingMode();
+
+  RunValidationTests("integration_", test_message_receiver());
 }
 
 }  // namespace

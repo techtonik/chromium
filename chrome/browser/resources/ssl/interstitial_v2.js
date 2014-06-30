@@ -11,10 +11,13 @@ function setupEvents() {
   var overridable = loadTimeData.getBoolean('overridable');
   var ssl = loadTimeData.getBoolean('ssl');
 
-  if (ssl)
-    applySSLStyle();
-  else
-    applySafeBrowsingStyle();
+  if (ssl) {
+    $('body').classList.add('ssl');
+    setupSSLFinchTrial();  /* From ssl_errors_common.js. */
+  } else {
+    $('body').classList.add('safe-browsing');
+    setupMalwareFinchExperiment();  /* From safe_browsing_v3.js. */
+  }
 
   $('primary-button').addEventListener('click', function() {
     if (!ssl)
@@ -29,20 +32,33 @@ function setupEvents() {
     $('proceed-link').addEventListener('click', function(event) {
       sendCommand(ssl ? CMD_PROCEED : SB_CMD_PROCEED);
     });
+  } else if (!ssl) {
+    $('final-paragraph').classList.add('hidden');
   }
 
-  if (!(ssl && overridable)) {  // Overridable SSL page doesn't have this link.
+  if (ssl && overridable) {
+    $('proceed-link').classList.add('small-link');
+  } else {
+    // Overridable SSL page doesn't have this link.
     $('help-link').addEventListener('click', function(event) {
       if (ssl)
         sendCommand(CMD_HELP);
       else if (loadTimeData.getBoolean('phishing'))
-        sendCommand(SB_CMD_REPORT_ERROR);
+        sendCommand(SB_CMD_LEARN_MORE_2);
       else
         sendCommand(SB_CMD_SHOW_DIAGNOSTIC);
     });
+  }
 
+  if (ssl && !overridable) {
     $('error-code').textContent = loadTimeData.getString('errorCode');
     $('error-code').classList.remove('hidden');
+  }
+
+  if (ssl && $('clock-link')) {
+    $('clock-link').addEventListener('click', function(event) {
+      sendCommand(CMD_CLOCK);
+    });
   }
 
   $('details-button').addEventListener('click', function(event) {
@@ -58,6 +74,7 @@ function setupEvents() {
   });
 
   preventDefaultOnPoundLinkClicks();
+  setupCheckbox();
 }
 
 document.addEventListener('DOMContentLoaded', setupEvents);

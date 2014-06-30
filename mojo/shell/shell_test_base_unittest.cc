@@ -42,16 +42,13 @@ void PingCallback(base::MessageLoop* message_loop, bool* was_run) {
 }
 
 TEST_F(ShellTestBaseTest, LaunchServiceInProcess) {
-  InitMojo();
-
   InterfacePtr<mojo::test::ITestService> test_service;
 
   {
-    MessagePipe mp;
-    test_service.Bind(mp.handle0.Pass());
-    LaunchServiceInProcess(GURL("mojo:mojo_test_service"),
-                           mojo::test::ITestService::Name_,
-                           mp.handle1.Pass());
+    ScopedMessagePipeHandle service_handle =
+        LaunchServiceInProcess(GURL("mojo:mojo_test_service"),
+                               mojo::test::ITestService::Name_);
+    test_service.Bind(service_handle.Pass());
   }
 
   bool was_run = false;
@@ -72,16 +69,13 @@ TEST_F(ShellTestBaseTest, LaunchServiceInProcess) {
 // Tests that launching a service in process fails properly if the service
 // doesn't exist.
 TEST_F(ShellTestBaseTest, LaunchServiceInProcessInvalidService) {
-  InitMojo();
-
   InterfacePtr<mojo::test::ITestService> test_service;
 
   {
-    MessagePipe mp;
-    test_service.Bind(mp.handle0.Pass());
-    LaunchServiceInProcess(GURL("mojo:non_existent_service"),
-                           mojo::test::ITestService::Name_,
-                           mp.handle1.Pass());
+    ScopedMessagePipeHandle service_handle =
+        LaunchServiceInProcess(GURL("mojo:non_existent_service"),
+                               mojo::test::ITestService::Name_);
+    test_service.Bind(service_handle.Pass());
   }
 
   bool was_run = false;

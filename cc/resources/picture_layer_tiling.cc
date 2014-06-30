@@ -12,6 +12,7 @@
 #include "cc/base/math_util.h"
 #include "cc/resources/tile.h"
 #include "cc/resources/tile_priority.h"
+#include "cc/trees/occlusion_tracker.h"
 #include "ui/gfx/point_conversions.h"
 #include "ui/gfx/rect_conversions.h"
 #include "ui/gfx/safe_integer_conversions.h"
@@ -120,11 +121,6 @@ Tile* PictureLayerTiling::CreateTile(int i,
   if (tile.get())
     tiles_[key] = tile;
   return tile.get();
-}
-
-void PictureLayerTiling::SetCanUseLCDText(bool can_use_lcd_text) {
-  for (TileMap::iterator it = tiles_.begin(); it != tiles_.end(); ++it)
-    it->second->set_can_use_lcd_text(can_use_lcd_text);
 }
 
 void PictureLayerTiling::CreateMissingTilesInLiveTilesRect() {
@@ -424,7 +420,10 @@ void PictureLayerTiling::UpdateTilePriorities(
     WhichTree tree,
     const gfx::Rect& visible_layer_rect,
     float layer_contents_scale,
-    double current_frame_time_in_seconds) {
+    double current_frame_time_in_seconds,
+    const OcclusionTracker<LayerImpl>* occlusion_tracker,
+    const LayerImpl* render_target,
+    const gfx::Transform& draw_transform) {
   if (!NeedsUpdateForFrameAtTime(current_frame_time_in_seconds)) {
     // This should never be zero for the purposes of has_ever_been_updated().
     DCHECK_NE(current_frame_time_in_seconds, 0.0);
@@ -484,6 +483,19 @@ void PictureLayerTiling::UpdateTilePriorities(
     Tile* tile = find->second.get();
 
     tile->SetPriority(tree, now_priority);
+
+    // Set whether tile is occluded or not.
+    bool is_occluded = false;
+    if (occlusion_tracker) {
+      gfx::Rect tile_query_rect = ScaleToEnclosingRect(
+          IntersectRects(tile->content_rect(), visible_rect_in_content_space),
+          1.0f / contents_scale_);
+      // TODO(vmpstr): Remove render_target and draw_transform from the
+      // parameters so they can be hidden from the tiling.
+      is_occluded = occlusion_tracker->Occluded(
+          render_target, tile_query_rect, draw_transform);
+    }
+    tile->set_is_occluded(is_occluded);
   }
 
   // Assign soon priority to skewport tiles.
@@ -595,6 +607,7 @@ void PictureLayerTiling::DidBecomeRecycled() {
 }
 
 void PictureLayerTiling::DidBecomeActive() {
+  PicturePileImpl* active_pile = client_->GetPile();
   for (TileMap::const_iterator it = tiles_.begin(); it != tiles_.end(); ++it) {
     it->second->SetPriority(ACTIVE_TREE, it->second->priority(PENDING_TREE));
     it->second->SetPriority(PENDING_TREE, TilePriority());
@@ -605,13 +618,14 @@ void PictureLayerTiling::DidBecomeActive() {
     // will cause PicturePileImpls and their clones to get deleted once the
     // corresponding PictureLayerImpl and any in flight raster jobs go out of
     // scope.
-    client_->UpdatePile(it->second.get());
+    it->second->set_picture_pile(active_pile);
   }
 }
 
 void PictureLayerTiling::UpdateTilesToCurrentPile() {
+  PicturePileImpl* pile = client_->GetPile();
   for (TileMap::const_iterator it = tiles_.begin(); it != tiles_.end(); ++it) {
-    client_->UpdatePile(it->second.get());
+    it->second->set_picture_pile(pile);
   }
 }
 

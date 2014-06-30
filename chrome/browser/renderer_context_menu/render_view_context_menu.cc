@@ -23,7 +23,6 @@
 #include "chrome/browser/app_mode/app_mode_utils.h"
 #include "chrome/browser/autocomplete/autocomplete_classifier.h"
 #include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
-#include "chrome/browser/autocomplete/autocomplete_input.h"
 #include "chrome/browser/autocomplete/autocomplete_match.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
@@ -34,7 +33,6 @@
 #include "chrome/browser/download/download_stats.h"
 #include "chrome/browser/extensions/devtools_util.h"
 #include "chrome/browser/extensions/extension_service.h"
-#include "chrome/browser/google/google_util.h"
 #include "chrome/browser/guest_view/web_view/web_view_guest.h"
 #include "chrome/browser/plugins/chrome_plugin_service_filter.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
@@ -44,8 +42,6 @@
 #include "chrome/browser/renderer_context_menu/spellchecker_submenu_observer.h"
 #include "chrome/browser/renderer_context_menu/spelling_menu_observer.h"
 #include "chrome/browser/search/search.h"
-#include "chrome/browser/search_engines/search_terms_data.h"
-#include "chrome/browser/search_engines/template_url.h"
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/spellchecker/spellcheck_host_metrics.h"
@@ -67,6 +63,9 @@
 #include "chrome/common/render_messages.h"
 #include "chrome/common/spellcheck_messages.h"
 #include "chrome/common/url_constants.h"
+#include "components/google/core/browser/google_util.h"
+#include "components/metrics/proto/omnibox_input_type.pb.h"
+#include "components/search_engines/template_url.h"
 #include "components/translate/core/browser/translate_download_manager.h"
 #include "components/translate/core/browser/translate_manager.h"
 #include "components/translate/core/browser/translate_prefs.h"
@@ -826,12 +825,13 @@ void RenderViewContextMenu::AppendImageItems() {
 }
 
 void RenderViewContextMenu::AppendSearchWebForImageItems() {
+  TemplateURLService* service =
+      TemplateURLServiceFactory::GetForProfile(profile_);
   const TemplateURL* const default_provider =
-      TemplateURLServiceFactory::GetForProfile(profile_)->
-          GetDefaultSearchProvider();
+      service->GetDefaultSearchProvider();
   if (params_.has_image_contents && default_provider &&
       !default_provider->image_url().empty() &&
-      default_provider->image_url_ref().IsValid()) {
+      default_provider->image_url_ref().IsValid(service->search_terms_data())) {
     menu_model_.AddItem(
         IDC_CONTENT_CONTEXT_SEARCHWEBFORIMAGE,
         l10n_util::GetStringFUTF16(IDS_CONTENT_CONTEXT_SEARCHWEBFORIMAGE,
@@ -974,8 +974,8 @@ void RenderViewContextMenu::AppendSearchProvider() {
 
   AutocompleteMatch match;
   AutocompleteClassifierFactory::GetForProfile(profile_)->Classify(
-      params_.selection_text, false, false, AutocompleteInput::INVALID_SPEC,
-      &match, NULL);
+      params_.selection_text, false, false,
+      metrics::OmniboxEventProto::INVALID_SPEC, &match, NULL);
   selection_navigation_url_ = match.destination_url;
   if (!selection_navigation_url_.is_valid())
     return;
@@ -1837,8 +1837,7 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
           SearchEngineTabHelper::FromWebContents(source_web_contents_);
       if (search_engine_tab_helper &&
           search_engine_tab_helper->delegate()) {
-        base::string16 keyword(
-            TemplateURLService::GenerateKeyword(params_.page_url));
+        base::string16 keyword(TemplateURL::GenerateKeyword(params_.page_url));
         TemplateURLData data;
         data.short_name = keyword;
         data.SetKeyword(keyword);
@@ -1847,7 +1846,7 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
             TemplateURL::GenerateFaviconURL(params_.page_url.GetOrigin());
         // Takes ownership of the TemplateURL.
         search_engine_tab_helper->delegate()->
-            ConfirmAddSearchProvider(new TemplateURL(profile_, data), profile_);
+            ConfirmAddSearchProvider(new TemplateURL(data), profile_);
       }
       break;
     }

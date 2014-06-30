@@ -107,7 +107,6 @@ class NET_EXPORT HttpNetworkSession
     bool enable_websocket_over_spdy;
 
     bool enable_quic;
-    bool enable_quic_https;
     bool enable_quic_port_selection;
     bool enable_quic_pacing;
     bool enable_quic_time_based_loss_detection;
@@ -120,6 +119,7 @@ class NET_EXPORT HttpNetworkSession
     bool enable_user_alternate_protocol_ports;
     QuicCryptoClientStreamFactory* quic_crypto_client_stream_factory;
     QuicVersionVector quic_supported_versions;
+    QuicTagVector quic_connection_options;
   };
 
   enum SocketPoolType {

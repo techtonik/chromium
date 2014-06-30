@@ -22,6 +22,7 @@
 #include "content/public/test/test_browser_thread.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
+using bookmarks::BookmarkMatch;
 using content::BrowserThread;
 
 class TestProfileWriter : public ProfileWriter {
@@ -94,18 +95,17 @@ class ProfileWriterTest : public testing::Test {
         HistoryServiceFactory::GetForProfile(profile,
                                              Profile::EXPLICIT_ACCESS);
     history::QueryOptions options;
-    CancelableRequestConsumer history_request_consumer;
+    base::CancelableTaskTracker history_task_tracker;
     history_service->QueryHistory(
         base::string16(),
         options,
-        &history_request_consumer,
         base::Bind(&ProfileWriterTest::HistoryQueryComplete,
-                   base::Unretained(this)));
+                   base::Unretained(this)),
+        &history_task_tracker);
     base::MessageLoop::current()->Run();
   }
 
-  void HistoryQueryComplete(HistoryService::Handle handle,
-                            history::QueryResults* results) {
+  void HistoryQueryComplete(history::QueryResults* results) {
     base::MessageLoop::current()->Quit();
     history_count_ = results->size();
   }

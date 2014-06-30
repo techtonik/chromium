@@ -23,23 +23,25 @@
 #include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
 #include "chrome/browser/autocomplete/autocomplete_provider_listener.h"
 #include "chrome/browser/autocomplete/autocomplete_result.h"
+#include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/autocomplete/keyword_provider.h"
-#include "chrome/browser/autocomplete/url_prefix.h"
-#include "chrome/browser/google/google_util.h"
 #include "chrome/browser/history/history_service.h"
 #include "chrome/browser/history/history_service_factory.h"
-#include "chrome/browser/history/in_memory_database.h"
 #include "chrome/browser/metrics/variations/variations_http_header_provider.h"
 #include "chrome/browser/omnibox/omnibox_field_trial.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search/search.h"
-#include "chrome/browser/search_engines/template_url_prepopulate_data.h"
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/ui/search/instant_controller.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
+#include "components/autocomplete/url_prefix.h"
+#include "components/google/core/browser/google_util.h"
+#include "components/history/core/browser/in_memory_database.h"
+#include "components/history/core/browser/keyword_search_term.h"
 #include "components/metrics/proto/omnibox_input_type.pb.h"
+#include "components/search_engines/template_url_prepopulate_data.h"
 #include "content/public/browser/user_metrics.h"
 #include "grit/generated_resources.h"
 #include "net/base/escape.h"
@@ -163,7 +165,7 @@ void SearchProvider::UpdateMatchContentsClass(const base::string16& input_text,
 
 // static
 int SearchProvider::CalculateRelevanceForKeywordVerbatim(
-    AutocompleteInput::Type type,
+    metrics::OmniboxInputType::Type type,
     bool prefer_keyword) {
   // This function is responsible for scoring verbatim query matches
   // for non-extension keywords.  KeywordProvider::CalculateRelevance()
@@ -207,7 +209,8 @@ void SearchProvider::Start(const AutocompleteInput& input,
     keyword_provider = NULL;
 
   const TemplateURL* default_provider = model->GetDefaultSearchProvider();
-  if (default_provider && !default_provider->SupportsReplacement())
+  if (default_provider &&
+      !default_provider->SupportsReplacement(model->search_terms_data()))
     default_provider = NULL;
 
   if (keyword_provider == default_provider)
@@ -343,7 +346,9 @@ void SearchProvider::LogFetchComplete(bool success, bool is_keyword) {
   // non-keyword mode.
   const TemplateURL* default_url = providers_.GetDefaultProviderURL();
   if (!is_keyword && default_url &&
-      (TemplateURLPrepopulateData::GetEngineType(*default_url) ==
+      (TemplateURLPrepopulateData::GetEngineType(
+          *default_url,
+          providers_.template_url_service()->search_terms_data()) ==
        SEARCH_ENGINE_GOOGLE)) {
     const base::TimeDelta elapsed_time =
         base::TimeTicks::Now() - time_suggest_request_sent_;
@@ -644,11 +649,11 @@ net::URLFetcher* SearchProvider::CreateSuggestFetcher(
   search_term_args.input_type = input.type();
   search_term_args.cursor_position = input.cursor_position();
   search_term_args.page_classification = input.current_page_classification();
-  if (CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableAnswersInSuggest))
+  if (OmniboxFieldTrial::EnableAnswersInSuggest())
     search_term_args.session_token = GetSessionToken();
   GURL suggest_url(template_url->suggestions_url_ref().ReplaceSearchTerms(
-      search_term_args));
+      search_term_args,
+      providers_.template_url_service()->search_terms_data()));
   if (!suggest_url.is_valid())
     return NULL;
   // Send the current page URL if user setting and URL requirements are met and
@@ -659,7 +664,8 @@ net::URLFetcher* SearchProvider::CreateSuggestFetcher(
     search_term_args.current_page_url = current_page_url_.spec();
     // Create the suggest URL again with the current page URL.
     suggest_url = GURL(template_url->suggestions_url_ref().ReplaceSearchTerms(
-        search_term_args));
+        search_term_args,
+        providers_.template_url_service()->search_terms_data()));
   }
 
   suggest_results_pending_++;
@@ -1096,10 +1102,12 @@ AutocompleteMatch SearchProvider::NavigationToMatch(
   size_t inline_autocomplete_offset = (prefix == NULL) ?
       base::string16::npos : (match_start + input.length());
   match.fill_into_edit +=
-      AutocompleteInput::FormattedStringWithEquivalentMeaning(navigation.url(),
+      AutocompleteInput::FormattedStringWithEquivalentMeaning(
+          navigation.url(),
           net::FormatUrl(navigation.url(), languages, format_types,
                          net::UnescapeRule::SPACES, NULL, NULL,
-                         &inline_autocomplete_offset));
+                         &inline_autocomplete_offset),
+          ChromeAutocompleteSchemeClassifier(profile_));
   // Preserve the forced query '?' prefix in |match.fill_into_edit|.
   // Otherwise, user edits to a suggestion would show non-Search results.
   if (input_.type() == metrics::OmniboxInputType::FORCED_QUERY) {

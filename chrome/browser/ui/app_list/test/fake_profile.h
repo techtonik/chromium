@@ -20,7 +20,6 @@ class URLRequestContextGetter;
 
 namespace content {
 class DownloadManagerDelegate;
-class GeolocationPermissionContext;
 class ResourceContext;
 }
 
@@ -45,41 +44,18 @@ class FakeProfile : public Profile {
       GetMediaRequestContextForStoragePartition(
           const base::FilePath& partition_path,
           bool in_memory) OVERRIDE;
-  virtual void RequestMidiSysExPermission(
-      int render_process_id,
-      int render_view_id,
-      int bridge_id,
-      const GURL& requesting_frame,
-      bool user_gesture,
-      const MidiSysExPermissionCallback& callback) OVERRIDE;
-  virtual void CancelMidiSysExPermissionRequest(
-        int render_process_id,
-        int render_view_id,
-        int bridge_id,
-        const GURL& requesting_frame) OVERRIDE;
-  virtual void RequestProtectedMediaIdentifierPermission(
-      int render_process_id,
-      int render_view_id,
-      const GURL& origin,
-      const ProtectedMediaIdentifierPermissionCallback& callback) OVERRIDE;
-  virtual void CancelProtectedMediaIdentifierPermissionRequests(
-      int render_process_id,
-      int render_view_id,
-      const GURL& origin) OVERRIDE;
   virtual content::ResourceContext* GetResourceContext() OVERRIDE;
-  virtual content::GeolocationPermissionContext*
-      GetGeolocationPermissionContext() OVERRIDE;
   virtual content::BrowserPluginGuestManager* GetGuestManager() OVERRIDE;
   virtual quota::SpecialStoragePolicy* GetSpecialStoragePolicy() OVERRIDE;
+  virtual content::PushMessagingService* GetPushMessagingService() OVERRIDE;
   virtual scoped_refptr<base::SequencedTaskRunner> GetIOTaskRunner() OVERRIDE;
   virtual Profile* GetOffTheRecordProfile() OVERRIDE;
   virtual void DestroyOffTheRecordProfile() OVERRIDE;
   virtual bool HasOffTheRecordProfile() OVERRIDE;
   virtual Profile* GetOriginalProfile() OVERRIDE;
-  virtual bool IsManaged() OVERRIDE;
+  virtual bool IsSupervised() OVERRIDE;
   virtual history::TopSites* GetTopSites() OVERRIDE;
   virtual history::TopSites* GetTopSitesWithoutCreating() OVERRIDE;
-  virtual ExtensionService* GetExtensionService() OVERRIDE;
   virtual ExtensionSpecialStoragePolicy*
       GetExtensionSpecialStoragePolicy() OVERRIDE;
   virtual PrefService* GetPrefs() OVERRIDE;
@@ -114,9 +90,6 @@ class FakeProfile : public Profile {
   virtual DevToolsNetworkController* GetDevToolsNetworkController() OVERRIDE;
   virtual void ClearNetworkingHistorySince(
       base::Time time, const base::Closure& completion) OVERRIDE;
-  virtual void ClearDomainReliabilityMonitor(
-      domain_reliability::DomainReliabilityClearMode mode,
-      const base::Closure& completion) OVERRIDE;
   virtual GURL GetHomePage() OVERRIDE;
   virtual bool WasCreatedByVersionOrLater(const std::string& version) OVERRIDE;
   virtual void SetExitType(ExitType exit_type) OVERRIDE;

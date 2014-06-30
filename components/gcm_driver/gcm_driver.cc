@@ -7,9 +7,22 @@
 #include <algorithm>
 
 #include "base/logging.h"
+#include "base/metrics/field_trial.h"
 #include "components/gcm_driver/gcm_app_handler.h"
 
 namespace gcm {
+
+namespace {
+const char kGCMFieldTrialName[] = "GCM";
+const char kGCMFieldTrialEnabledGroupName[] = "Enabled";
+}  // namespace
+
+// static
+bool GCMDriver::IsAllowedForAllUsers() {
+  std::string group_name =
+      base::FieldTrialList::FindFullName(kGCMFieldTrialName);
+  return group_name == kGCMFieldTrialEnabledGroupName;
+}
 
 GCMDriver::GCMDriver() {
 }
@@ -148,7 +161,7 @@ void GCMDriver::AddAppHandler(const std::string& app_id,
                               GCMAppHandler* handler) {
   DCHECK(!app_id.empty());
   DCHECK(handler);
-  DCHECK(app_handlers_.find(app_id) == app_handlers_.end());
+  DCHECK_EQ(app_handlers_.count(app_id), 0u);
   app_handlers_[app_id] = handler;
 }
 
@@ -158,8 +171,18 @@ void GCMDriver::RemoveAppHandler(const std::string& app_id) {
 }
 
 GCMAppHandler* GCMDriver::GetAppHandler(const std::string& app_id) {
+  // Look for exact match.
   GCMAppHandlerMap::const_iterator iter = app_handlers_.find(app_id);
-  return iter == app_handlers_.end() ? &default_app_handler_ : iter->second;
+  if (iter != app_handlers_.end())
+    return iter->second;
+
+  // Ask the handlers whether they know how to handle it.
+  for (iter = app_handlers_.begin(); iter != app_handlers_.end(); ++iter) {
+    if (iter->second->CanHandle(app_id))
+      return iter->second;
+  }
+
+  return &default_app_handler_;
 }
 
 bool GCMDriver::HasRegisterCallback(const std::string& app_id) {

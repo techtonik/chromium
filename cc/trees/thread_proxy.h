@@ -72,7 +72,6 @@ class CC_EXPORT ThreadProxy : public Proxy,
     bool can_cancel_commit;
     bool defer_commits;
 
-    base::CancelableClosure output_surface_creation_callback;
     RendererCapabilities renderer_capabilities_main_thread_copy;
 
     scoped_ptr<BeginMainFrameAndCommitState> pending_deferred_commit;
@@ -199,7 +198,6 @@ class CC_EXPORT ThreadProxy : public Proxy,
   virtual bool ReduceContentsTextureMemoryOnImplThread(size_t limit_bytes,
                                                        int priority_cutoff)
       OVERRIDE;
-  virtual void SendManagedMemoryStats() OVERRIDE;
   virtual bool IsInsideDraw() OVERRIDE;
   virtual void RenewTreePriority() OVERRIDE;
   virtual void PostDelayedScrollbarFadeOnImplThread(
@@ -242,8 +240,10 @@ class CC_EXPORT ThreadProxy : public Proxy,
   void DidCommitAndDrawFrame();
   void DidCompleteSwapBuffers();
   void SetAnimationEvents(scoped_ptr<AnimationEventsVector> queue);
+  void DidLoseOutputSurface();
   void CreateAndInitializeOutputSurface();
-  void DoCreateAndInitializeOutputSurface();
+  void DidInitializeOutputSurface(bool success,
+                                  const RendererCapabilities& capabilities);
   void SendCommitRequestToImplThreadIfNeeded();
 
   // Called on impl thread.
@@ -261,11 +261,9 @@ class CC_EXPORT ThreadProxy : public Proxy,
   void HasInitializedOutputSurfaceOnImplThread(
       CompletionEvent* completion,
       bool* has_initialized_output_surface);
-  virtual void InitializeOutputSurfaceOnImplThread(
-      CompletionEvent* completion,
-      scoped_ptr<OutputSurface> output_surface,
-      bool* success,
-      RendererCapabilities* capabilities);
+  void DeleteContentsTexturesOnImplThread(CompletionEvent* completion);
+  void InitializeOutputSurfaceOnImplThread(
+      scoped_ptr<OutputSurface> output_surface);
   void FinishGLOnImplThread(CompletionEvent* completion);
   void LayerTreeHostClosedOnImplThread(CompletionEvent* completion);
   DrawResult DrawSwapInternal(bool forced_draw);

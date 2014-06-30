@@ -1677,49 +1677,16 @@ TEST_P(SpdyNetworkTransactionTest, Put) {
   request.method = "PUT";
   request.url = GURL("http://www.google.com/");
 
-  const SpdyHeaderInfo kSynStartHeader = {
-    SYN_STREAM,             // Kind = Syn
-    1,                      // Stream ID
-    0,                      // Associated stream ID
-    ConvertRequestPriorityToSpdyPriority(
-        LOWEST, spdy_util_.spdy_version()),
-    kSpdyCredentialSlotUnused,
-    CONTROL_FLAG_FIN,       // Control Flags
-    false,                  // Compressed
-    RST_STREAM_INVALID,     // Status
-    NULL,                   // Data
-    0,                      // Length
-    DATA_FLAG_NONE          // Data Flags
-  };
   scoped_ptr<SpdyHeaderBlock> put_headers(
       spdy_util_.ConstructPutHeaderBlock("http://www.google.com", 0));
-  scoped_ptr<SpdyFrame> req(spdy_util_.ConstructSpdyFrame(
-      kSynStartHeader, put_headers.Pass()));
+  scoped_ptr<SpdyFrame> req(
+      spdy_util_.ConstructSpdySyn(1, *put_headers, LOWEST, false, true));
   MockWrite writes[] = {
     CreateMockWrite(*req),
   };
 
+  scoped_ptr<SpdyFrame> resp(spdy_util_.ConstructSpdyGetSynReply(NULL, 0, 1));
   scoped_ptr<SpdyFrame> body(spdy_util_.ConstructSpdyBodyFrame(1, true));
-  const SpdyHeaderInfo kSynReplyHeader = {
-    SYN_REPLY,              // Kind = SynReply
-    1,                      // Stream ID
-    0,                      // Associated stream ID
-    ConvertRequestPriorityToSpdyPriority(
-        LOWEST, spdy_util_.spdy_version()),
-    kSpdyCredentialSlotUnused,
-    CONTROL_FLAG_NONE,      // Control Flags
-    false,                  // Compressed
-    RST_STREAM_INVALID,     // Status
-    NULL,                   // Data
-    0,                      // Length
-    DATA_FLAG_NONE          // Data Flags
-  };
-  scoped_ptr<SpdyHeaderBlock> reply_headers(new SpdyHeaderBlock());
-  (*reply_headers)[spdy_util_.GetStatusKey()] = "200";
-  (*reply_headers)[spdy_util_.GetVersionKey()] = "HTTP/1.1";
-  (*reply_headers)["content-length"] = "1234";
-  scoped_ptr<SpdyFrame> resp(spdy_util_.ConstructSpdyFrame(
-      kSynReplyHeader, reply_headers.Pass()));
   MockRead reads[] = {
     CreateMockRead(*resp),
     CreateMockRead(*body),
@@ -1744,50 +1711,16 @@ TEST_P(SpdyNetworkTransactionTest, Head) {
   request.method = "HEAD";
   request.url = GURL("http://www.google.com/");
 
-  const SpdyHeaderInfo kSynStartHeader = {
-    SYN_STREAM,             // Kind = Syn
-    1,                      // Stream ID
-    0,                      // Associated stream ID
-    ConvertRequestPriorityToSpdyPriority(
-        LOWEST, spdy_util_.spdy_version()),
-    kSpdyCredentialSlotUnused,
-    CONTROL_FLAG_FIN,       // Control Flags
-    false,                  // Compressed
-    RST_STREAM_INVALID,     // Status
-    NULL,                   // Data
-    0,                      // Length
-    DATA_FLAG_NONE          // Data Flags
-  };
   scoped_ptr<SpdyHeaderBlock> head_headers(
       spdy_util_.ConstructHeadHeaderBlock("http://www.google.com", 0));
-  scoped_ptr<SpdyFrame> req(spdy_util_.ConstructSpdyFrame(
-      kSynStartHeader, head_headers.Pass()));
+  scoped_ptr<SpdyFrame> req(
+      spdy_util_.ConstructSpdySyn(1, *head_headers, LOWEST, false, true));
   MockWrite writes[] = {
     CreateMockWrite(*req),
   };
 
+  scoped_ptr<SpdyFrame> resp(spdy_util_.ConstructSpdyGetSynReply(NULL, 0, 1));
   scoped_ptr<SpdyFrame> body(spdy_util_.ConstructSpdyBodyFrame(1, true));
-  const SpdyHeaderInfo kSynReplyHeader = {
-    SYN_REPLY,              // Kind = SynReply
-    1,                      // Stream ID
-    0,                      // Associated stream ID
-    ConvertRequestPriorityToSpdyPriority(
-        LOWEST, spdy_util_.spdy_version()),
-    kSpdyCredentialSlotUnused,
-    CONTROL_FLAG_NONE,      // Control Flags
-    false,                  // Compressed
-    RST_STREAM_INVALID,     // Status
-    NULL,                   // Data
-    0,                      // Length
-    DATA_FLAG_NONE          // Data Flags
-  };
-  scoped_ptr<SpdyHeaderBlock> reply_headers(new SpdyHeaderBlock());
-  (*reply_headers)[spdy_util_.GetStatusKey()] = "200";
-  (*reply_headers)[spdy_util_.GetVersionKey()] = "HTTP/1.1";
-  (*reply_headers)["content-length"] = "1234";
-  scoped_ptr<SpdyFrame> resp(spdy_util_.ConstructSpdyFrame(
-      kSynReplyHeader,
-      reply_headers.Pass()));
   MockRead reads[] = {
     CreateMockRead(*resp),
     CreateMockRead(*body),
@@ -2019,13 +1952,10 @@ TEST_P(SpdyNetworkTransactionTest, NullPost) {
 
   // When request.upload_data_stream is NULL for post, content-length is
   // expected to be 0.
-  SpdySynStreamIR syn_ir(1);
-  syn_ir.set_name_value_block(
-      *spdy_util_.ConstructPostHeaderBlock(kRequestUrl, 0));
-  syn_ir.set_fin(true);  // No body.
-  syn_ir.set_priority(ConvertRequestPriorityToSpdyPriority(
-      LOWEST, spdy_util_.spdy_version()));
-  scoped_ptr<SpdyFrame> req(framer.SerializeFrame(syn_ir));
+  scoped_ptr<SpdyHeaderBlock> req_block(
+      spdy_util_.ConstructPostHeaderBlock(kRequestUrl, 0));
+  scoped_ptr<SpdyFrame> req(
+      spdy_util_.ConstructSpdySyn(1, *req_block, LOWEST, false, true));
 
   MockWrite writes[] = {
     CreateMockWrite(*req),
@@ -2066,13 +1996,10 @@ TEST_P(SpdyNetworkTransactionTest, EmptyPost) {
 
   const uint64 kContentLength = 0;
 
-  SpdySynStreamIR syn_ir(1);
-  syn_ir.set_name_value_block(
-      *spdy_util_.ConstructPostHeaderBlock(kRequestUrl, kContentLength));
-  syn_ir.set_fin(true);  // No body.
-  syn_ir.set_priority(ConvertRequestPriorityToSpdyPriority(
-      LOWEST, spdy_util_.spdy_version()));
-  scoped_ptr<SpdyFrame> req(framer.SerializeFrame(syn_ir));
+  scoped_ptr<SpdyHeaderBlock> req_block(
+      spdy_util_.ConstructPostHeaderBlock(kRequestUrl, kContentLength));
+  scoped_ptr<SpdyFrame> req(
+      spdy_util_.ConstructSpdySyn(1, *req_block, LOWEST, false, true));
 
   MockWrite writes[] = {
     CreateMockWrite(*req),
@@ -2523,7 +2450,6 @@ TEST_P(SpdyNetworkTransactionTest, DeleteSessionOnReadCallback) {
 
 // Send a spdy request to www.google.com that gets redirected to www.foo.com.
 TEST_P(SpdyNetworkTransactionTest, RedirectGetRequest) {
-  const SpdyHeaderInfo kSynStartHeader = spdy_util_.MakeSpdyHeader(SYN_STREAM);
   scoped_ptr<SpdyHeaderBlock> headers(
       spdy_util_.ConstructGetHeaderBlock("http://www.google.com/"));
   (*headers)["user-agent"] = "";
@@ -2534,10 +2460,10 @@ TEST_P(SpdyNetworkTransactionTest, RedirectGetRequest) {
   (*headers2)["accept-encoding"] = "gzip,deflate";
 
   // Setup writes/reads to www.google.com
-  scoped_ptr<SpdyFrame> req(spdy_util_.ConstructSpdyFrame(
-      kSynStartHeader, headers.Pass()));
-  scoped_ptr<SpdyFrame> req2(spdy_util_.ConstructSpdyFrame(
-      kSynStartHeader, headers2.Pass()));
+  scoped_ptr<SpdyFrame> req(
+      spdy_util_.ConstructSpdySyn(1, *headers, LOWEST, false, true));
+  scoped_ptr<SpdyFrame> req2(
+      spdy_util_.ConstructSpdySyn(1, *headers2, LOWEST, false, true));
   scoped_ptr<SpdyFrame> resp(spdy_util_.ConstructSpdyGetSynReplyRedirect(1));
   MockWrite writes[] = {
     CreateMockWrite(*req, 1),
@@ -2602,8 +2528,6 @@ TEST_P(SpdyNetworkTransactionTest, RedirectGetRequest) {
 // Send a spdy request to www.google.com. Get a pushed stream that redirects to
 // www.foo.com.
 TEST_P(SpdyNetworkTransactionTest, RedirectServerPush) {
-  const SpdyHeaderInfo kSynStartHeader = spdy_util_.MakeSpdyHeader(SYN_STREAM);
-
   scoped_ptr<SpdyHeaderBlock> headers(
       spdy_util_.ConstructGetHeaderBlock("http://www.google.com/"));
   (*headers)["user-agent"] = "";
@@ -2611,7 +2535,7 @@ TEST_P(SpdyNetworkTransactionTest, RedirectServerPush) {
 
   // Setup writes/reads to www.google.com
   scoped_ptr<SpdyFrame> req(
-      spdy_util_.ConstructSpdyFrame(kSynStartHeader, headers.Pass()));
+      spdy_util_.ConstructSpdySyn(1, *headers, LOWEST, false, true));
   scoped_ptr<SpdyFrame> resp(spdy_util_.ConstructSpdyGetSynReply(NULL, 0, 1));
   scoped_ptr<SpdyFrame> rep(
       spdy_util_.ConstructSpdyPush(NULL,
@@ -2642,7 +2566,7 @@ TEST_P(SpdyNetworkTransactionTest, RedirectServerPush) {
   (*headers2)["user-agent"] = "";
   (*headers2)["accept-encoding"] = "gzip,deflate";
   scoped_ptr<SpdyFrame> req2(
-      spdy_util_.ConstructSpdyFrame(kSynStartHeader, headers2.Pass()));
+      spdy_util_.ConstructSpdySyn(1, *headers2, LOWEST, false, true));
   scoped_ptr<SpdyFrame> resp2(spdy_util_.ConstructSpdyGetSynReply(NULL, 0, 1));
   scoped_ptr<SpdyFrame> body2(spdy_util_.ConstructSpdyBodyFrame(1, true));
   MockWrite writes2[] = {
@@ -3091,10 +3015,11 @@ TEST_P(SpdyNetworkTransactionTest, ServerPushMultipleDataFrameInterrupted) {
 
 TEST_P(SpdyNetworkTransactionTest, ServerPushInvalidAssociatedStreamID0) {
   if (spdy_util_.spdy_version() == SPDY4) {
-    // TODO(jgraettinger): We don't support associated stream
-    // checks in SPDY4 yet.
+    // PUSH_PROMISE with stream id 0 is connection-level error.
+    // TODO(baranovich): Test session going away.
     return;
   }
+
   scoped_ptr<SpdyFrame> stream1_syn(
       spdy_util_.ConstructSpdyGet(NULL, 0, false, 1, LOWEST, true));
   scoped_ptr<SpdyFrame> stream1_body(
@@ -3156,11 +3081,6 @@ TEST_P(SpdyNetworkTransactionTest, ServerPushInvalidAssociatedStreamID0) {
 }
 
 TEST_P(SpdyNetworkTransactionTest, ServerPushInvalidAssociatedStreamID9) {
-  if (spdy_util_.spdy_version() == SPDY4) {
-    // TODO(jgraettinger): We don't support associated stream
-    // checks in SPDY4 yet.
-    return;
-  }
   scoped_ptr<SpdyFrame> stream1_syn(
       spdy_util_.ConstructSpdyGet(NULL, 0, false, 1, LOWEST, true));
   scoped_ptr<SpdyFrame> stream1_body(
@@ -3239,15 +3159,8 @@ TEST_P(SpdyNetworkTransactionTest, ServerPushNoURL) {
   (*incomplete_headers)["hello"] = "bye";
   (*incomplete_headers)[spdy_util_.GetStatusKey()] = "200 OK";
   (*incomplete_headers)[spdy_util_.GetVersionKey()] = "HTTP/1.1";
-  scoped_ptr<SpdyFrame> stream2_syn(
-      spdy_util_.ConstructSpdyControlFrame(incomplete_headers.Pass(),
-                                           false,
-                                           2,  // Stream ID
-                                           LOWEST,
-                                           SYN_STREAM,
-                                           CONTROL_FLAG_NONE,
-                                           // Associated stream ID
-                                           1));
+  scoped_ptr<SpdyFrame> stream2_syn(spdy_util_.ConstructInitialSpdyPushFrame(
+      incomplete_headers.Pass(), 2, 1));
   MockRead reads[] = {
     CreateMockRead(*stream1_reply, 2),
     CreateMockRead(*stream2_syn, 3),
@@ -3382,23 +3295,8 @@ TEST_P(SpdyNetworkTransactionTest, SynReplyHeaders) {
 // Verify that various SynReply headers parse vary fields correctly
 // through the HTTP layer, and the response matches the request.
 TEST_P(SpdyNetworkTransactionTest, SynReplyHeadersVary) {
-  static const SpdyHeaderInfo syn_reply_info = {
-    SYN_REPLY,                              // Syn Reply
-    1,                                      // Stream ID
-    0,                                      // Associated Stream ID
-    ConvertRequestPriorityToSpdyPriority(
-        LOWEST, spdy_util_.spdy_version()),
-    kSpdyCredentialSlotUnused,
-    CONTROL_FLAG_NONE,                      // Control Flags
-    false,                                  // Compressed
-    RST_STREAM_INVALID,                     // Status
-    NULL,                                   // Data
-    0,                                      // Data Length
-    DATA_FLAG_NONE                          // Data Flags
-  };
   // Modify the following data to change/add test cases:
   struct SynReplyTests {
-    const SpdyHeaderInfo* syn_reply;
     bool vary_matches;
     int num_headers[2];
     const char* extra_headers[2][16];
@@ -3406,7 +3304,6 @@ TEST_P(SpdyNetworkTransactionTest, SynReplyHeadersVary) {
     // Test the case of a multi-valued cookie.  When the value is delimited
     // with NUL characters, it needs to be unfolded into multiple headers.
     {
-      &syn_reply_info,
       true,
       { 1, 4 },
       { { "cookie",   "val1,val2",
@@ -3420,7 +3317,6 @@ TEST_P(SpdyNetworkTransactionTest, SynReplyHeadersVary) {
         }
       }
     }, {    // Multiple vary fields.
-      &syn_reply_info,
       true,
       { 2, 5 },
       { { "friend",   "barney",
@@ -3436,7 +3332,6 @@ TEST_P(SpdyNetworkTransactionTest, SynReplyHeadersVary) {
         }
       }
     }, {    // Test a '*' vary field.
-      &syn_reply_info,
       false,
       { 1, 4 },
       { { "cookie",   "val1,val2",
@@ -3450,7 +3345,6 @@ TEST_P(SpdyNetworkTransactionTest, SynReplyHeadersVary) {
         }
       }
     }, {    // Multiple comma-separated vary fields.
-      &syn_reply_info,
       true,
       { 2, 4 },
       { { "friend",   "barney",
@@ -3479,12 +3373,12 @@ TEST_P(SpdyNetworkTransactionTest, SynReplyHeadersVary) {
     };
 
     // Construct the reply.
+    SpdyHeaderBlock reply_headers;
+    AppendToHeaderBlock(test_cases[i].extra_headers[1],
+                        test_cases[i].num_headers[1],
+                        &reply_headers);
     scoped_ptr<SpdyFrame> frame_reply(
-      spdy_util_.ConstructSpdyFrame(*test_cases[i].syn_reply,
-                                    test_cases[i].extra_headers[1],
-                                    test_cases[i].num_headers[1],
-                                    NULL,
-                                    0));
+        spdy_util_.ConstructSpdyReply(1, reply_headers));
 
     scoped_ptr<SpdyFrame> body(spdy_util_.ConstructSpdyBodyFrame(1, true));
     MockRead reads[] = {
@@ -3539,10 +3433,6 @@ TEST_P(SpdyNetworkTransactionTest, SynReplyHeadersVary) {
     }
 
     // Construct the expected header reply string.
-    SpdyHeaderBlock reply_headers;
-    AppendToHeaderBlock(test_cases[i].extra_headers[1],
-                        test_cases[i].num_headers[1],
-                        &reply_headers);
     std::string expected_reply =
         spdy_util_.ConstructSpdyReplyString(reply_headers);
     EXPECT_EQ(expected_reply, lines) << i;
@@ -3551,21 +3441,6 @@ TEST_P(SpdyNetworkTransactionTest, SynReplyHeadersVary) {
 
 // Verify that we don't crash on invalid SynReply responses.
 TEST_P(SpdyNetworkTransactionTest, InvalidSynReply) {
-  const SpdyHeaderInfo kSynStartHeader = {
-    SYN_REPLY,              // Kind = SynReply
-    1,                      // Stream ID
-    0,                      // Associated stream ID
-    ConvertRequestPriorityToSpdyPriority(
-        LOWEST, spdy_util_.spdy_version()),
-    kSpdyCredentialSlotUnused,
-    CONTROL_FLAG_NONE,      // Control Flags
-    false,                  // Compressed
-    RST_STREAM_INVALID,     // Status
-    NULL,                   // Data
-    0,                      // Length
-    DATA_FLAG_NONE          // Data Flags
-  };
-
   struct InvalidSynReplyTests {
     int num_headers;
     const char* headers[10];
@@ -3600,12 +3475,11 @@ TEST_P(SpdyNetworkTransactionTest, InvalidSynReply) {
       CreateMockWrite(*rst),
     };
 
-    scoped_ptr<SpdyFrame> resp(
-       spdy_util_.ConstructSpdyFrame(kSynStartHeader,
-                                     NULL, 0,
-                                     test_cases[i].headers,
-                                     test_cases[i].num_headers));
-    scoped_ptr<SpdyFrame> body(spdy_util_.ConstructSpdyBodyFrame(1, true));
+    // Construct the reply.
+    SpdyHeaderBlock reply_headers;
+    AppendToHeaderBlock(
+        test_cases[i].headers, test_cases[i].num_headers, &reply_headers);
+    scoped_ptr<SpdyFrame> resp(spdy_util_.ConstructSpdyReply(1, reply_headers));
     MockRead reads[] = {
       CreateMockRead(*resp),
       MockRead(ASYNC, 0, 0)  // EOF
@@ -4142,22 +4016,13 @@ TEST_P(SpdyNetworkTransactionTest, BufferedAll) {
   MockWrite writes[] = { CreateMockWrite(*req) };
 
   // 5 data frames in a single read.
-  SpdySynReplyIR reply_ir(1);
-  reply_ir.SetHeader(spdy_util_.GetStatusKey(), "200");
-  reply_ir.SetHeader(spdy_util_.GetVersionKey(), "HTTP/1.1");
-
-  scoped_ptr<SpdyFrame> syn_reply(framer.SerializeFrame(reply_ir));
+  scoped_ptr<SpdyFrame> reply(spdy_util_.ConstructSpdyGetSynReply(NULL, 0, 1));
   scoped_ptr<SpdyFrame> data_frame(
       framer.CreateDataFrame(1, "message", 7, DATA_FLAG_NONE));
   scoped_ptr<SpdyFrame> data_frame_fin(
       framer.CreateDataFrame(1, "message", 7, DATA_FLAG_FIN));
-  const SpdyFrame* frames[5] = {
-    syn_reply.get(),
-    data_frame.get(),
-    data_frame.get(),
-    data_frame.get(),
-    data_frame_fin.get()
-  };
+  const SpdyFrame* frames[5] = {reply.get(), data_frame.get(), data_frame.get(),
+                                data_frame.get(), data_frame_fin.get()};
   char combined_frames[200];
   int combined_frames_len =
       CombineFrames(frames, arraysize(frames),
@@ -4390,8 +4255,7 @@ TEST_P(SpdyNetworkTransactionTest, BufferedCancelled) {
 // the settings in the HttpServerProperties.
 TEST_P(SpdyNetworkTransactionTest, SettingsSaved) {
   if (spdy_util_.spdy_version() >= SPDY4) {
-    // SPDY4 doesn't support flags on individual settings, and
-    // has no concept of settings persistence.
+    // SPDY4 doesn't support settings persistence.
     return;
   }
   static const SpdyHeaderInfo kSynReplyInfo = {
@@ -4498,7 +4362,10 @@ TEST_P(SpdyNetworkTransactionTest, SettingsSaved) {
 // Test that when there are settings saved that they are sent back to the
 // server upon session establishment.
 TEST_P(SpdyNetworkTransactionTest, SettingsPlayback) {
-  // TODO(jgraettinger): Remove settings persistence mechanisms altogether.
+  if (spdy_util_.spdy_version() >= SPDY4) {
+    // SPDY4 doesn't support settings persistence.
+    return;
+  }
   static const SpdyHeaderInfo kSynReplyInfo = {
     SYN_REPLY,                              // Syn Reply
     1,                                      // Stream ID
@@ -5205,13 +5072,7 @@ TEST_P(SpdyNetworkTransactionTest, ServerPushWithHeaders) {
   spdy_util_.AddUrlToHeaderBlock(
       "http://www.google.com/foo.dat", initial_headers.get());
   scoped_ptr<SpdyFrame> stream2_syn(
-      spdy_util_.ConstructSpdyControlFrame(initial_headers.Pass(),
-                                           false,
-                                           2,
-                                           LOWEST,
-                                           SYN_STREAM,
-                                           CONTROL_FLAG_NONE,
-                                           1));
+      spdy_util_.ConstructInitialSpdyPushFrame(initial_headers.Pass(), 2, 1));
 
   scoped_ptr<SpdyHeaderBlock> late_headers(new SpdyHeaderBlock());
   (*late_headers)["hello"] = "bye";
@@ -5274,13 +5135,7 @@ TEST_P(SpdyNetworkTransactionTest, ServerPushClaimBeforeHeaders) {
   spdy_util_.AddUrlToHeaderBlock(
       "http://www.google.com/foo.dat", initial_headers.get());
   scoped_ptr<SpdyFrame> stream2_syn(
-      spdy_util_.ConstructSpdyControlFrame(initial_headers.Pass(),
-                                           false,
-                                           2,
-                                           LOWEST,
-                                           SYN_STREAM,
-                                           CONTROL_FLAG_NONE,
-                                           1));
+      spdy_util_.ConstructInitialSpdyPushFrame(initial_headers.Pass(), 2, 1));
 
   scoped_ptr<SpdyHeaderBlock> late_headers(new SpdyHeaderBlock());
   (*late_headers)["hello"] = "bye";
@@ -5385,6 +5240,7 @@ TEST_P(SpdyNetworkTransactionTest, ServerPushClaimBeforeHeaders) {
   EXPECT_TRUE(data.at_write_eof());
 }
 
+// TODO(baranovich): HTTP 2 does not allow multiple HEADERS frames
 TEST_P(SpdyNetworkTransactionTest, ServerPushWithTwoHeaderFrames) {
   // We push a stream and attempt to claim it before the headers come down.
   scoped_ptr<SpdyFrame> stream1_syn(
@@ -5396,16 +5252,14 @@ TEST_P(SpdyNetworkTransactionTest, ServerPushWithTwoHeaderFrames) {
   };
 
   scoped_ptr<SpdyHeaderBlock> initial_headers(new SpdyHeaderBlock());
+  if (spdy_util_.spdy_version() < SPDY4) {
+    // In SPDY4 PUSH_PROMISE headers won't show up in the response headers.
+    (*initial_headers)["alpha"] = "beta";
+  }
   spdy_util_.AddUrlToHeaderBlock(
       "http://www.google.com/foo.dat", initial_headers.get());
   scoped_ptr<SpdyFrame> stream2_syn(
-      spdy_util_.ConstructSpdyControlFrame(initial_headers.Pass(),
-                                           false,
-                                           2,
-                                           LOWEST,
-                                           SYN_STREAM,
-                                           CONTROL_FLAG_NONE,
-                                           1));
+      spdy_util_.ConstructInitialSpdyPushFrame(initial_headers.Pass(), 2, 1));
 
   scoped_ptr<SpdyHeaderBlock> middle_headers(new SpdyHeaderBlock());
   (*middle_headers)["hello"] = "bye";
@@ -5512,24 +5366,9 @@ TEST_P(SpdyNetworkTransactionTest, ServerPushWithTwoHeaderFrames) {
   EXPECT_TRUE(response2.headers.get() != NULL);
   EXPECT_EQ("HTTP/1.1 200 OK", response2.headers->GetStatusLine());
 
-  // Verify we got all the headers
-  if (spdy_util_.spdy_version() < SPDY3) {
-    EXPECT_TRUE(response2.headers->HasHeaderValue(
-        "url",
-        "http://www.google.com/foo.dat"));
-  } else {
-    EXPECT_TRUE(response2.headers->HasHeaderValue(
-        "scheme", "http"));
-    EXPECT_TRUE(response2.headers->HasHeaderValue(
-        "path", "/foo.dat"));
-    if (spdy_util_.spdy_version() < SPDY4) {
-      EXPECT_TRUE(response2.headers->HasHeaderValue(
-          "host", "www.google.com"));
-    } else {
-      EXPECT_TRUE(response2.headers->HasHeaderValue(
-          "authority", "www.google.com"));
-    }
-  }
+  // Verify we got all the headers from all header blocks.
+  if (spdy_util_.spdy_version() < SPDY4)
+    EXPECT_TRUE(response2.headers->HasHeaderValue("alpha", "beta"));
   EXPECT_TRUE(response2.headers->HasHeaderValue("hello", "bye"));
   EXPECT_TRUE(response2.headers->HasHeaderValue("status", "200"));
 
@@ -5555,13 +5394,7 @@ TEST_P(SpdyNetworkTransactionTest, ServerPushWithNoStatusHeaderFrames) {
   spdy_util_.AddUrlToHeaderBlock(
       "http://www.google.com/foo.dat", initial_headers.get());
   scoped_ptr<SpdyFrame> stream2_syn(
-      spdy_util_.ConstructSpdyControlFrame(initial_headers.Pass(),
-                                           false,
-                                           2,
-                                           LOWEST,
-                                           SYN_STREAM,
-                                           CONTROL_FLAG_NONE,
-                                           1));
+      spdy_util_.ConstructInitialSpdyPushFrame(initial_headers.Pass(), 2, 1));
 
   scoped_ptr<SpdyHeaderBlock> middle_headers(new SpdyHeaderBlock());
   (*middle_headers)["hello"] = "bye";
@@ -5660,21 +5493,11 @@ TEST_P(SpdyNetworkTransactionTest, SynReplyWithHeaders) {
   scoped_ptr<SpdyFrame> rst(
       spdy_util_.ConstructSpdyRstStream(1, RST_STREAM_PROTOCOL_ERROR));
   MockWrite writes[] = {
-    CreateMockWrite(*req),
-    CreateMockWrite(*rst),
- };
+      CreateMockWrite(*req), CreateMockWrite(*rst),
+  };
 
-  scoped_ptr<SpdyHeaderBlock> initial_headers(new SpdyHeaderBlock());
-  (*initial_headers)[spdy_util_.GetStatusKey()] = "200 OK";
-  (*initial_headers)[spdy_util_.GetVersionKey()] = "HTTP/1.1";
   scoped_ptr<SpdyFrame> stream1_reply(
-      spdy_util_.ConstructSpdyControlFrame(initial_headers.Pass(),
-                                           false,
-                                           1,
-                                           LOWEST,
-                                           SYN_REPLY,
-                                           CONTROL_FLAG_NONE,
-                                           0));
+      spdy_util_.ConstructSpdyGetSynReply(NULL, 0, 1));
 
   scoped_ptr<SpdyHeaderBlock> late_headers(new SpdyHeaderBlock());
   (*late_headers)["hello"] = "bye";
@@ -5714,17 +5537,8 @@ TEST_P(SpdyNetworkTransactionTest, SynReplyWithLateHeaders) {
     CreateMockWrite(*rst),
   };
 
-  scoped_ptr<SpdyHeaderBlock> initial_headers(new SpdyHeaderBlock());
-  (*initial_headers)[spdy_util_.GetStatusKey()] = "200 OK";
-  (*initial_headers)[spdy_util_.GetVersionKey()] = "HTTP/1.1";
   scoped_ptr<SpdyFrame> stream1_reply(
-      spdy_util_.ConstructSpdyControlFrame(initial_headers.Pass(),
-                                           false,
-                                           1,
-                                           LOWEST,
-                                           SYN_REPLY,
-                                           CONTROL_FLAG_NONE,
-                                           0));
+      spdy_util_.ConstructSpdyGetSynReply(NULL, 0, 1));
 
   scoped_ptr<SpdyHeaderBlock> late_headers(new SpdyHeaderBlock());
   (*late_headers)["hello"] = "bye";
@@ -5758,11 +5572,6 @@ TEST_P(SpdyNetworkTransactionTest, SynReplyWithLateHeaders) {
 }
 
 TEST_P(SpdyNetworkTransactionTest, ServerPushCrossOriginCorrectness) {
-  if (spdy_util_.spdy_version() == SPDY4) {
-    // TODO(jgraettinger): We don't support associated stream
-    // checks in SPDY4 yet.
-    return;
-  }
   // In this test we want to verify that we can't accidentally push content
   // which can't be pushed by this content server.
   // This test assumes that:

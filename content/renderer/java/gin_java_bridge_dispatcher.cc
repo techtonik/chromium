@@ -15,7 +15,8 @@
 namespace content {
 
 GinJavaBridgeDispatcher::GinJavaBridgeDispatcher(RenderFrame* render_frame)
-    : RenderFrameObserver(render_frame) {
+    : RenderFrameObserver(render_frame),
+      inside_did_clear_window_object_(false) {
 }
 
 GinJavaBridgeDispatcher::~GinJavaBridgeDispatcher() {
@@ -31,7 +32,32 @@ bool GinJavaBridgeDispatcher::OnMessageReceived(const IPC::Message& msg) {
   return handled;
 }
 
+namespace {
+
+class ScopedFlag {
+ public:
+  ScopedFlag(bool* flag) : flag_(flag) {
+    DCHECK(!*flag_);
+    *flag_ = true;
+  }
+  ~ScopedFlag() {
+    DCHECK(*flag_);
+    *flag_ = false;
+  }
+ private:
+  bool* flag_;
+
+  DISALLOW_COPY_AND_ASSIGN(ScopedFlag);
+};
+
+}  // namespace
+
 void GinJavaBridgeDispatcher::DidClearWindowObject() {
+  // Accessing window object when adding properties to it may trigger
+  // a nested call to DidClearWindowObject.
+  if (inside_did_clear_window_object_)
+    return;
+  ScopedFlag flag(&inside_did_clear_window_object_);
   for (NamedObjectMap::const_iterator iter = named_objects_.begin();
        iter != named_objects_.end(); ++iter) {
     // Always create a new GinJavaBridgeObject, so we don't pull any of the V8
@@ -88,14 +114,16 @@ bool GinJavaBridgeDispatcher::HasJavaMethod(ObjectID object_id,
 scoped_ptr<base::Value> GinJavaBridgeDispatcher::InvokeJavaMethod(
     ObjectID object_id,
     const std::string& method_name,
-    const base::ListValue& arguments) {
+    const base::ListValue& arguments,
+    GinJavaBridgeError* error) {
   base::ListValue result_wrapper;
   render_frame()->Send(
       new GinJavaBridgeHostMsg_InvokeMethod(routing_id(),
                                             object_id,
                                             method_name,
                                             arguments,
-                                            &result_wrapper));
+                                            &result_wrapper,
+                                            error));
   base::Value* result;
   if (result_wrapper.Get(0, &result)) {
     return scoped_ptr<base::Value>(result->DeepCopy());

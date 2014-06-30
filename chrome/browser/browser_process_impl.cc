@@ -49,8 +49,8 @@
 #include "chrome/browser/metrics/thread_watcher.h"
 #include "chrome/browser/net/chrome_net_log.h"
 #include "chrome/browser/net/crl_set_fetcher.h"
-#include "chrome/browser/net/sdch_dictionary_fetcher.h"
 #include "chrome/browser/notifications/notification_ui_manager.h"
+#include "chrome/browser/omaha_query_params/chrome_omaha_query_params_delegate.h"
 #include "chrome/browser/plugins/chrome_plugin_service_filter.h"
 #include "chrome/browser/plugins/plugin_finder.h"
 #include "chrome/browser/prefs/browser_prefs.h"
@@ -79,6 +79,7 @@
 #include "components/gcm_driver/gcm_driver.h"
 #include "components/metrics/metrics_service.h"
 #include "components/network_time/network_time_tracker.h"
+#include "components/omaha_query_params/omaha_query_params.h"
 #include "components/policy/core/common/policy_service.h"
 #include "components/signin/core/common/profile_management_switches.h"
 #include "components/translate/core/browser/translate_download_manager.h"
@@ -92,17 +93,10 @@
 #include "content/public/browser/storage_partition.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension_l10n_util.h"
-#include "google_apis/gaia/identity_provider.h"
 #include "net/socket/client_socket_pool_manager.h"
 #include "net/url_request/url_request_context_getter.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/message_center/message_center.h"
-
-#if defined(ENABLE_CONFIGURATION_POLICY)
-#include "components/policy/core/browser/browser_policy_connector.h"
-#else
-#include "components/policy/core/common/policy_service_stub.h"
-#endif  // defined(ENABLE_CONFIGURATION_POLICY)
 
 #if defined(OS_WIN)
 #include "base/win/windows_version.h"
@@ -111,8 +105,11 @@
 #include "chrome/browser/chrome_browser_main_mac.h"
 #endif
 
-#if defined(USE_AURA)
-#include "ui/aura/env.h"
+#if defined(OS_ANDROID)
+#include "components/gcm_driver/gcm_driver_android.h"
+#else
+#include "chrome/browser/services/gcm/gcm_desktop_utils.h"
+#include "components/gcm_driver/gcm_client_factory.h"
 #endif
 
 #if !defined(OS_ANDROID) && !defined(OS_IOS)
@@ -120,26 +117,22 @@
 #include "components/storage_monitor/storage_monitor.h"
 #endif
 
+#if defined(USE_AURA)
+#include "ui/aura/env.h"
+#endif
+
+#if defined(ENABLE_CONFIGURATION_POLICY)
+#include "components/policy/core/browser/browser_policy_connector.h"
+#else
+#include "components/policy/core/common/policy_service_stub.h"
+#endif  // defined(ENABLE_CONFIGURATION_POLICY)
+
 #if defined(ENABLE_PLUGIN_INSTALLATION)
 #include "chrome/browser/plugins/plugins_resource_service.h"
 #endif
 
 #if defined(ENABLE_WEBRTC)
 #include "chrome/browser/media/webrtc_log_uploader.h"
-#endif
-
-#if defined(OS_CHROMEOS)
-#include "chrome/browser/chromeos/settings/device_identity_provider.h"
-#include "chrome/browser/chromeos/settings/device_oauth2_token_service_factory.h"
-#elif !defined(OS_ANDROID)
-#include "google_apis/gaia/dummy_identity_provider.h"
-#endif
-
-#if defined(OS_ANDROID)
-#include "components/gcm_driver/gcm_driver_android.h"
-#else
-#include "chrome/browser/services/gcm/gcm_desktop_utils.h"
-#include "components/gcm_driver/gcm_client_factory.h"
 #endif
 
 #if (defined(OS_WIN) || defined(OS_LINUX)) && !defined(OS_CHROMEOS)
@@ -196,7 +189,10 @@ BrowserProcessImpl::BrowserProcessImpl(
   InitIdleMonitor();
 #endif
 
+#if defined(ENABLE_EXTENSIONS)
   apps::AppsClient::Set(ChromeAppsClient::GetInstance());
+#endif
+
   extensions::ExtensionsClient::Set(
       extensions::ChromeExtensionsClient::GetInstance());
 
@@ -208,6 +204,9 @@ BrowserProcessImpl::BrowserProcessImpl(
   ExtensionRendererState::GetInstance()->Init();
 
   message_center::MessageCenter::Initialize();
+
+  omaha_query_params::OmahaQueryParams::SetDelegate(
+      ChromeOmahaQueryParamsDelegate::GetInstance());
 }
 
 BrowserProcessImpl::~BrowserProcessImpl() {
@@ -218,13 +217,6 @@ BrowserProcessImpl::~BrowserProcessImpl() {
 
 void BrowserProcessImpl::StartTearDown() {
     TRACE_EVENT0("shutdown", "BrowserProcessImpl::StartTearDown");
-  // We need to shutdown the SdchDictionaryFetcher as it regularly holds
-  // a pointer to a URLFetcher, and that URLFetcher (upon destruction) will do
-  // a PostDelayedTask onto the IO thread.  This shutdown call will both discard
-  // any pending URLFetchers, and avoid creating any more.
-  BrowserThread::PostTask(BrowserThread::IO, FROM_HERE,
-                          base::Bind(&SdchDictionaryFetcher::Shutdown));
-
   // We need to destroy the MetricsServicesManager, IntranetRedirectDetector,
   // PromoResourceService, and SafeBrowsing ClientSideDetectionService (owned by
   // the SafeBrowsingService) before the io_thread_ gets destroyed, since their
@@ -794,7 +786,7 @@ BrowserProcessImpl::component_updater() {
   if (!component_updater_.get()) {
     if (!BrowserThread::CurrentlyOn(BrowserThread::UI))
       return NULL;
-    component_updater::ComponentUpdateService::Configurator* configurator =
+    component_updater::Configurator* configurator =
         component_updater::MakeChromeComponentUpdaterConfigurator(
             CommandLine::ForCurrentProcess(),
             io_thread()->system_url_request_context_getter());
@@ -838,7 +830,9 @@ void BrowserProcessImpl::CreateWatchdogThread() {
   created_watchdog_thread_ = true;
 
   scoped_ptr<WatchDogThread> thread(new WatchDogThread());
-  if (!thread->Start())
+  base::Thread::Options options;
+  options.timer_slack = base::TIMER_SLACK_MAXIMUM;
+  if (!thread->StartWithOptions(options))
     return;
   watchdog_thread_.swap(thread);
 }
@@ -1031,14 +1025,13 @@ void BrowserProcessImpl::CreateGCMDriver() {
   CHECK(PathService::Get(chrome::DIR_GLOBAL_GCM_STORE, &store_path));
   gcm_driver_ = gcm::CreateGCMDriverDesktop(
       make_scoped_ptr(new gcm::GCMClientFactory),
-#if defined(OS_CHROMEOS)
-      scoped_ptr<IdentityProvider>(new chromeos::DeviceIdentityProvider(
-          chromeos::DeviceOAuth2TokenServiceFactory::Get())),
-#else
-      scoped_ptr<IdentityProvider>(new DummyIdentityProvider),
-#endif  // defined(OS_CHROMEOS)
       store_path,
       system_request_context());
+  // Sign-in is not required for device-level GCM usage. So we just call
+  // OnSignedIn to assume always signed-in. Note that GCM will not be started
+  // at this point since no one has asked for it yet.
+  // TODO(jianli): To be removed when sign-in enforcement is dropped.
+  gcm_driver_->OnSignedIn();
 #endif  // defined(OS_ANDROID)
 }
 

@@ -4,12 +4,14 @@
 
 #include "chrome/browser/prefs/browser_prefs.h"
 
-#include "apps/prefs.h"
+#include <string>
+
 #include "base/debug/trace_event.h"
 #include "base/prefs/pref_registry_simple.h"
 #include "base/prefs/pref_service.h"
 #include "chrome/browser/about_flags.h"
 #include "chrome/browser/accessibility/invert_bubble_prefs.h"
+#include "chrome/browser/apps/drive/drive_app_mapping.h"
 #include "chrome/browser/apps/shortcut_manager.h"
 #include "chrome/browser/autocomplete/zero_suggest_provider.h"
 #include "chrome/browser/background/background_mode_manager.h"
@@ -37,6 +39,7 @@
 #include "chrome/browser/metrics/variations/variations_service.h"
 #include "chrome/browser/net/http_server_properties_manager.h"
 #include "chrome/browser/net/net_pref_observer.h"
+#include "chrome/browser/net/prediction_options.h"
 #include "chrome/browser/net/predictor.h"
 #include "chrome/browser/net/pref_proxy_config_tracker_impl.h"
 #include "chrome/browser/net/ssl_config_service_manager.h"
@@ -57,7 +60,6 @@
 #include "chrome/browser/renderer_host/pepper/device_id_fetcher.h"
 #include "chrome/browser/renderer_host/web_cache_manager.h"
 #include "chrome/browser/search/search.h"
-#include "chrome/browser/search_engines/template_url_prepopulate_data.h"
 #include "chrome/browser/services/gcm/gcm_profile_service.h"
 #include "chrome/browser/signin/easy_unlock.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
@@ -89,6 +91,7 @@
 #include "components/password_manager/core/browser/password_manager.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/rappor/rappor_service.h"
+#include "components/search_engines/template_url_prepopulate_data.h"
 #include "components/sync_driver/sync_prefs.h"
 #include "components/translate/core/browser/translate_prefs.h"
 #include "content/public/browser/render_process_host.h"
@@ -105,6 +108,7 @@
 #endif
 
 #if defined(ENABLE_EXTENSIONS)
+#include "apps/prefs.h"
 #include "chrome/browser/extensions/activity_log/activity_log.h"
 #include "chrome/browser/extensions/api/commands/command_service.h"
 #include "chrome/browser/extensions/api/tabs/tabs_api.h"
@@ -112,9 +116,9 @@
 #endif
 
 #if defined(ENABLE_MANAGED_USERS)
-#include "chrome/browser/managed_mode/managed_user_service.h"
-#include "chrome/browser/managed_mode/managed_user_shared_settings_service.h"
-#include "chrome/browser/managed_mode/managed_user_sync_service.h"
+#include "chrome/browser/supervised_user/supervised_user_service.h"
+#include "chrome/browser/supervised_user/supervised_user_shared_settings_service.h"
+#include "chrome/browser/supervised_user/supervised_user_sync_service.h"
 #endif
 
 #if defined(ENABLE_SERVICE_DISCOVERY)
@@ -144,8 +148,8 @@
 #include "chrome/browser/chromeos/file_system_provider/service.h"
 #include "chrome/browser/chromeos/first_run/first_run.h"
 #include "chrome/browser/chromeos/login/default_pinned_apps_field_trial.h"
-#include "chrome/browser/chromeos/login/login_utils.h"
 #include "chrome/browser/chromeos/login/saml/saml_offline_signin_limiter.h"
+#include "chrome/browser/chromeos/login/session/session_manager.h"
 #include "chrome/browser/chromeos/login/startup_utils.h"
 #include "chrome/browser/chromeos/login/users/avatar/user_image_manager.h"
 #include "chrome/browser/chromeos/login/users/avatar/user_image_sync_observer.h"
@@ -170,7 +174,9 @@
 #include "chrome/browser/ui/webui/chromeos/charger_replacement_handler.h"
 #include "chrome/browser/ui/webui/chromeos/login/hid_detection_screen_handler.h"
 #include "chrome/browser/ui/webui/chromeos/login/network_screen_handler.h"
+#include "chrome/browser/ui/webui/chromeos/login/reset_screen_handler.h"
 #include "chrome/browser/ui/webui/chromeos/login/signin_screen_handler.h"
+#include "components/invalidation/invalidator_storage.h"
 #else
 #include "chrome/browser/extensions/default_apps.h"
 #endif
@@ -183,6 +189,7 @@
 
 #if defined(OS_WIN)
 #include "chrome/browser/apps/app_launch_for_metro_restart_win.h"
+#include "chrome/browser/component_updater/sw_reporter_installer_win.h"
 #endif
 
 #if defined(TOOLKIT_VIEWS)
@@ -296,14 +303,15 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
   chromeos::default_pinned_apps_field_trial::RegisterPrefs(registry);
   chromeos::language_prefs::RegisterPrefs(registry);
   chromeos::KioskAppManager::RegisterPrefs(registry);
-  chromeos::LoginUtils::RegisterPrefs(registry);
   chromeos::MultiProfileUserController::RegisterPrefs(registry);
   chromeos::HIDDetectionScreenHandler::RegisterPrefs(registry);
   chromeos::NetworkScreenHandler::RegisterPrefs(registry);
   chromeos::Preferences::RegisterPrefs(registry);
   chromeos::proxy_config::RegisterPrefs(registry);
   chromeos::RegisterDisplayLocalStatePrefs(registry);
+  chromeos::ResetScreenHandler::RegisterPrefs(registry);
   chromeos::ServicesCustomizationDocument::RegisterPrefs(registry);
+  chromeos::SessionManager::RegisterPrefs(registry);
   chromeos::SigninScreenHandler::RegisterPrefs(registry);
   chromeos::system::AutomaticRebootManager::RegisterPrefs(registry);
   chromeos::UserImageManager::RegisterPrefs(registry);
@@ -312,6 +320,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
   chromeos::StartupUtils::RegisterPrefs(registry);
   chromeos::echo_offer::RegisterPrefs(registry);
   extensions::ExtensionAssetsManagerChromeOS::RegisterPrefs(registry);
+  invalidation::InvalidatorStorage::RegisterPrefs(registry);
   policy::AutoEnrollmentClient::RegisterPrefs(registry);
   policy::BrowserPolicyConnectorChromeOS::RegisterPrefs(registry);
   policy::DeviceCloudPolicyManagerChromeOS::RegisterPrefs(registry);
@@ -326,6 +335,7 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
 
 #if defined(OS_WIN)
   app_metro_launch::RegisterPrefs(registry);
+  component_updater::RegisterPrefsForSwReporter(registry);
   password_manager::PasswordManager::RegisterLocalPrefs(registry);
 #endif
 
@@ -338,7 +348,6 @@ void RegisterLocalState(PrefRegistrySimple* registry) {
 void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   TRACE_EVENT0("browser", "chrome::RegisterUserPrefs");
   // User prefs. Please keep this list alphabetized.
-  apps::RegisterProfilePrefs(registry);
   autofill::AutofillManager::RegisterProfilePrefs(registry);
   bookmark_utils::RegisterProfilePrefs(registry);
   sync_driver::SyncPrefs::RegisterProfilePrefs(registry);
@@ -347,9 +356,11 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   chrome_browser_net::HttpServerPropertiesManager::RegisterProfilePrefs(
       registry);
   chrome_browser_net::Predictor::RegisterProfilePrefs(registry);
+  chrome_browser_net::RegisterPredictionOptionsProfilePrefs(registry);
   chrome_prefs::RegisterProfilePrefs(registry);
   DownloadPrefs::RegisterProfilePrefs(registry);
   easy_unlock::RegisterProfilePrefs(registry);
+  gcm::GCMProfileService::RegisterProfilePrefs(registry);
   HostContentSettingsMap::RegisterProfilePrefs(registry);
   IncognitoModePrefs::RegisterProfilePrefs(registry);
   InstantUI::RegisterProfilePrefs(registry);
@@ -358,7 +369,6 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   MediaDeviceIDSalt::RegisterProfilePrefs(registry);
   MediaStreamDevicesController::RegisterProfilePrefs(registry);
   NetPrefObserver::RegisterProfilePrefs(registry);
-
   password_manager::PasswordManager::RegisterProfilePrefs(registry);
   PrefProxyConfigTrackerImpl::RegisterProfilePrefs(registry);
   PrefsTabHelper::RegisterProfilePrefs(registry);
@@ -371,7 +381,6 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   TemplateURLPrepopulateData::RegisterProfilePrefs(registry);
   TranslatePrefs::RegisterProfilePrefs(registry);
   ZeroSuggestProvider::RegisterProfilePrefs(registry);
-  gcm::GCMProfileService::RegisterProfilePrefs(registry);
 
 #if defined(ENABLE_AUTOFILL_DIALOG)
   autofill::AutofillDialogController::RegisterProfilePrefs(registry);
@@ -382,6 +391,7 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
 #endif
 
 #if defined(ENABLE_EXTENSIONS)
+  apps::RegisterProfilePrefs(registry);
   extensions::ActivityLog::RegisterProfilePrefs(registry);
   extensions::launch_util::RegisterProfilePrefs(registry);
 #endif
@@ -396,9 +406,9 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
 #endif
 
 #if defined(ENABLE_MANAGED_USERS)
-  ManagedUserService::RegisterProfilePrefs(registry);
-  ManagedUserSharedSettingsService::RegisterProfilePrefs(registry);
-  ManagedUserSyncService::RegisterProfilePrefs(registry);
+  SupervisedUserService::RegisterProfilePrefs(registry);
+  SupervisedUserSharedSettingsService::RegisterProfilePrefs(registry);
+  SupervisedUserSyncService::RegisterProfilePrefs(registry);
 #endif
 
 #if defined(ENABLE_NOTIFICATIONS)
@@ -418,12 +428,12 @@ void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry) {
   autofill::GeneratedCreditCardBubbleController::RegisterUserPrefs(registry);
   DeviceIDFetcher::RegisterProfilePrefs(registry);
   DevToolsWindow::RegisterProfilePrefs(registry);
+  DriveAppMapping::RegisterProfilePrefs(registry);
   extensions::CommandService::RegisterProfilePrefs(registry);
   extensions::ExtensionSettingsHandler::RegisterProfilePrefs(registry);
   extensions::TabsCaptureVisibleTabFunction::RegisterProfilePrefs(registry);
   first_run::RegisterProfilePrefs(registry);
   NewTabUI::RegisterProfilePrefs(registry);
-  notifier::ChromeNotifierService::RegisterProfilePrefs(registry);
   PepperFlashSettingsManager::RegisterProfilePrefs(registry);
   PinnedTabCodec::RegisterProfilePrefs(registry);
   PluginsUI::RegisterProfilePrefs(registry);
@@ -518,8 +528,12 @@ void MigrateUserPrefs(Profile* profile) {
   TranslatePrefs::MigrateUserPrefs(prefs, prefs::kAcceptLanguages);
 
 #if defined(ENABLE_MANAGED_USERS)
-  ManagedUserService::MigrateUserPrefs(prefs);
+  SupervisedUserService::MigrateUserPrefs(prefs);
 #endif
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+  autofill::AutofillManager::MigrateUserPrefs(prefs);
+#endif  // defined(OS_MACOSX) && !defined(OS_IOS)
 }
 
 void MigrateBrowserPrefs(Profile* profile, PrefService* local_state) {

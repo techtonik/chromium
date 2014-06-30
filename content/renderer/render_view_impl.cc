@@ -88,7 +88,6 @@
 #include "content/renderer/internal_document_state_data.h"
 #include "content/renderer/media/audio_device_factory.h"
 #include "content/renderer/media/media_stream_dispatcher.h"
-#include "content/renderer/media/midi_dispatcher.h"
 #include "content/renderer/media/video_capture_impl_manager.h"
 #include "content/renderer/media/webrtc/peer_connection_dependency_factory.h"
 #include "content/renderer/memory_benchmarking_extension.h"
@@ -431,20 +430,6 @@ static bool ShouldUseCompositedScrollingForFrames(
   return DeviceScaleEnsuresTextQuality(device_scale_factor);
 }
 
-static bool ShouldUseUniversalAcceleratedCompositingForOverflowScroll() {
-  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
-
-  if (command_line.HasSwitch(
-          switches::kDisableUniversalAcceleratedOverflowScroll))
-    return false;
-
-  if (command_line.HasSwitch(
-          switches::kEnableUniversalAcceleratedOverflowScroll))
-    return true;
-
-  return false;
-}
-
 static bool ShouldUseTransitionCompositing(float device_scale_factor) {
   const CommandLine& command_line = *CommandLine::ForCurrentProcess();
 
@@ -647,6 +632,7 @@ RenderViewImpl::RenderViewImpl(RenderViewImplParams* params)
       history_list_length_(0),
       frames_in_progress_(0),
       target_url_status_(TARGET_NONE),
+      uses_temporary_zoom_level_(false),
 #if defined(OS_ANDROID)
       top_controls_constraints_(cc::BOTH),
 #endif
@@ -655,7 +641,6 @@ RenderViewImpl::RenderViewImpl(RenderViewImplParams* params)
       speech_recognition_dispatcher_(NULL),
       media_stream_dispatcher_(NULL),
       browser_plugin_manager_(NULL),
-      midi_dispatcher_(NULL),
       devtools_agent_(NULL),
       accessibility_mode_(AccessibilityModeOff),
       renderer_accessibility_(NULL),
@@ -745,8 +730,6 @@ void RenderViewImpl::Initialize(RenderViewImplParams* params) {
       ShouldUseFixedPositionCompositing(device_scale_factor_));
   webview()->settings()->setAcceleratedCompositingForOverflowScrollEnabled(
       ShouldUseAcceleratedCompositingForOverflowScroll(device_scale_factor_));
-  webview()->settings()->setCompositorDrivenAcceleratedScrollingEnabled(
-      ShouldUseUniversalAcceleratedCompositingForOverflowScroll());
   webview()->settings()->setAcceleratedCompositingForTransitionEnabled(
       ShouldUseTransitionCompositing(device_scale_factor_));
   webview()->settings()->setAcceleratedCompositingForFixedRootBackgroundEnabled(
@@ -890,6 +873,11 @@ RenderView* RenderView::FromRoutingID(int routing_id) {
   return RenderViewImpl::FromRoutingID(routing_id);
 }
 
+/* static */
+size_t RenderViewImpl::GetRenderViewCount() {
+  return g_view_map.Get().size();
+}
+
 /*static*/
 void RenderView::ForEach(RenderViewVisitor* visitor) {
   ViewMap* views = g_view_map.Pointer();
@@ -989,7 +977,7 @@ void RenderViewImpl::PepperFocusChanged(PepperPluginInstanceImpl* instance,
   else if (focused_pepper_plugin_ == instance)
     focused_pepper_plugin_ = NULL;
 
-  UpdateTextInputType();
+  UpdateTextInputState(NO_SHOW_IME, FROM_NON_IME);
   UpdateSelectionBounds();
 }
 
@@ -1068,7 +1056,6 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
                         OnScrollFocusedEditableNodeIntoRect)
     IPC_MESSAGE_HANDLER(InputMsg_SetEditCommandsForNextKeyEvent,
                         OnSetEditCommandsForNextKeyEvent)
-    IPC_MESSAGE_HANDLER(FrameMsg_Navigate, OnNavigate)
     IPC_MESSAGE_HANDLER(ViewMsg_Stop, OnStop)
     IPC_MESSAGE_HANDLER(ViewMsg_CopyImageAt, OnCopyImageAt)
     IPC_MESSAGE_HANDLER(ViewMsg_SaveImageAt, OnSaveImageAt)
@@ -1077,6 +1064,8 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ViewMsg_Zoom, OnZoom)
     IPC_MESSAGE_HANDLER(ViewMsg_SetZoomLevelForLoadingURL,
                         OnSetZoomLevelForLoadingURL)
+    IPC_MESSAGE_HANDLER(ViewMsg_SetZoomLevelForView,
+                        OnSetZoomLevelForView)
     IPC_MESSAGE_HANDLER(ViewMsg_SetPageEncoding, OnSetPageEncoding)
     IPC_MESSAGE_HANDLER(ViewMsg_ResetPageEncodingToDefault,
                         OnResetPageEncodingToDefault)
@@ -1128,6 +1117,7 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
                         OnReleaseDisambiguationPopupBitmap)
     IPC_MESSAGE_HANDLER(ViewMsg_WindowSnapshotCompleted,
                         OnWindowSnapshotCompleted)
+    IPC_MESSAGE_HANDLER(ViewMsg_ForceRedraw, OnForceRedraw)
     IPC_MESSAGE_HANDLER(ViewMsg_SelectWordAroundCaret, OnSelectWordAroundCaret)
 #if defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(InputMsg_ActivateNearestFindResult,
@@ -1162,10 +1152,6 @@ void RenderViewImpl::OnSelectWordAroundCaret() {
   handling_input_event_ = true;
   webview()->focusedFrame()->selectWordAroundCaret();
   handling_input_event_ = false;
-}
-
-void RenderViewImpl::OnNavigate(const FrameMsg_Navigate_Params& params) {
-  FOR_EACH_OBSERVER(RenderViewObserver, observers_, Navigate(params.url));
 }
 
 bool RenderViewImpl::IsBackForwardToStaleEntry(
@@ -1347,6 +1333,19 @@ bool RenderViewImpl::SendAndRunNestedMessageLoop(IPC::SyncMessage* message) {
 void RenderViewImpl::GetWindowSnapshot(const WindowSnapshotCallback& callback) {
   int id = next_snapshot_id_++;
   pending_snapshots_.insert(std::make_pair(id, callback));
+  ui::LatencyInfo latency_info;
+  latency_info.AddLatencyNumber(ui::WINDOW_OLD_SNAPSHOT_FRAME_NUMBER_COMPONENT,
+                                0,
+                                id);
+  scoped_ptr<cc::SwapPromiseMonitor> latency_info_swap_promise_monitor;
+  if (RenderWidgetCompositor* rwc = compositor()) {
+    latency_info_swap_promise_monitor =
+        rwc->CreateLatencyInfoSwapPromiseMonitor(&latency_info).Pass();
+  }
+  ScheduleCompositeWithForcedRedraw();
+}
+
+void RenderViewImpl::OnForceRedraw(int id) {
   ui::LatencyInfo latency_info;
   latency_info.AddLatencyNumber(ui::WINDOW_SNAPSHOT_FRAME_NUMBER_COMPONENT,
                                 0,
@@ -1541,7 +1540,7 @@ void RenderViewImpl::FrameDidStopLoading(WebFrame* frame) {
 }
 
 void RenderViewImpl::didCancelCompositionOnSelectionChange() {
-  Send(new ViewHostMsg_ImeCancelComposition(routing_id()));
+  Send(new InputHostMsg_ImeCancelComposition(routing_id()));
 }
 
 bool RenderViewImpl::handleCurrentKeyboardEvent() {
@@ -2135,23 +2134,6 @@ void RenderViewImpl::ProcessViewLayoutFlags(const CommandLine& command_line) {
   webview()->setPageScaleFactorLimits(1, maxPageScaleFactor);
 }
 
-void RenderViewImpl::FrameDidCommitProvisionalLoad(WebLocalFrame* frame,
-                                                   bool is_new_navigation) {
-  FOR_EACH_OBSERVER(RenderViewObserver, observers_,
-                    DidCommitProvisionalLoad(frame, is_new_navigation));
-
-  // TODO(nasko): Transition this code to RenderFrameImpl, since g_view_map is
-  // not accessible from there.
-  if (!frame->parent()) {  // Only for top frames.
-    RenderThreadImpl* render_thread_impl = RenderThreadImpl::current();
-    if (render_thread_impl) {  // Can be NULL in tests.
-      render_thread_impl->histogram_customizer()->
-          RenderViewNavigatedToHost(GURL(GetLoadingUrl(frame)).host(),
-                                    g_view_map.Get().size());
-    }
-  }
-}
-
 void RenderViewImpl::didClearWindowObject(WebLocalFrame* frame) {
   FOR_EACH_OBSERVER(
       RenderViewObserver, observers_, DidClearWindowObject(frame));
@@ -2369,15 +2351,6 @@ void RenderViewImpl::SyncNavigationState() {
   if (!webview())
     return;
   SendUpdateState(history_controller_->GetCurrentEntry());
-}
-
-GURL RenderViewImpl::GetLoadingUrl(blink::WebFrame* frame) const {
-  WebDataSource* ds = frame->dataSource();
-  if (ds->hasUnreachableURL())
-    return ds->unreachableURL();
-
-  const WebURLRequest& request = ds->request();
-  return request.url();
 }
 
 blink::WebPlugin* RenderViewImpl::GetWebPluginForFind() {
@@ -2638,6 +2611,14 @@ void RenderViewImpl::OnSetZoomLevelForLoadingURL(const GURL& url,
   // the zoom level from this map will be effectively resetting text zoom level.
   host_zoom_levels_[url] = zoom_level;
 #endif
+}
+
+void RenderViewImpl::OnSetZoomLevelForView(bool uses_temporary_zoom_level,
+                                           double level) {
+  uses_temporary_zoom_level_ = uses_temporary_zoom_level;
+
+  webview()->hidePopups();
+  webview()->setZoomLevel(level);
 }
 
 void RenderViewImpl::OnSetPageEncoding(const std::string& encoding_name) {
@@ -3699,12 +3680,6 @@ blink::WebPageVisibilityState RenderViewImpl::visibilityState() const {
   return current_state;
 }
 
-blink::WebMIDIClient* RenderViewImpl::webMIDIClient() {
-  if (!midi_dispatcher_)
-    midi_dispatcher_ = new MidiDispatcher(this);
-  return midi_dispatcher_;
-}
-
 blink::WebPushClient* RenderViewImpl::webPushClient() {
   if (!push_messaging_dispatcher_)
     push_messaging_dispatcher_ = new PushMessagingDispatcher(this);
@@ -3944,36 +3919,6 @@ void RenderViewImpl::SetDeviceScaleFactorForTesting(float factor) {
   params.new_size = size();
   params.physical_backing_size =
       gfx::ToCeiledSize(gfx::ScaleSize(size(), factor));
-  params.overdraw_bottom_height = 0.f;
-  params.resizer_rect = WebRect();
-  params.is_fullscreen = is_fullscreen();
-  OnResize(params);
-}
-
-void RenderViewImpl::SetScreenOrientationForTesting(
-    const blink::WebScreenOrientationType& orientation) {
-  ViewMsg_Resize_Params params;
-  params.screen_info = screen_info_;
-  params.screen_info.orientationType = orientation;
-  // FIXME(ostap): This relationship between orientationType and
-  // orientationAngle is temporary. The test should be able to specify
-  // the angle in addition to the orientation type.
-  switch (orientation) {
-    case blink::WebScreenOrientationLandscapePrimary:
-      params.screen_info.orientationAngle = 90;
-      break;
-    case blink::WebScreenOrientationLandscapeSecondary:
-      params.screen_info.orientationAngle = -90;
-      break;
-    case blink::WebScreenOrientationPortraitSecondary:
-      params.screen_info.orientationAngle = 180;
-      break;
-    default:
-      params.screen_info.orientationAngle = 0;
-  }
-  params.new_size = size();
-  params.physical_backing_size = gfx::ToCeiledSize(
-      gfx::ScaleSize(size(), params.screen_info.deviceScaleFactor));
   params.overdraw_bottom_height = 0.f;
   params.resizer_rect = WebRect();
   params.is_fullscreen = is_fullscreen();

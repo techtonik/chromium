@@ -213,6 +213,10 @@ def AddCommandLineArgs(parser):
       help='Run against live sites and ignore the Web Page Replay archives.')
   parser.add_option_group(group)
 
+  parser.add_option('-d', '--also-run-disabled-tests',
+                    dest='run_disabled_tests',
+                    action='store_true', default=False,
+                    help='Ignore @Disabled and @Enabled restrictions.')
 
 def ProcessCommandLineArgs(parser, args):
   page_filter.PageFilter.ProcessCommandLineArgs(parser, args)
@@ -230,7 +234,9 @@ def ProcessCommandLineArgs(parser, args):
 def _PrepareAndRunPage(test, page_set, expectations, finder_options,
                        browser_options, page, credentials_path,
                        possible_browser, results, state):
-  if browser_options.wpr_mode != wpr_modes.WPR_RECORD:
+  if finder_options.use_live_sites:
+    browser_options.wpr_mode = wpr_modes.WPR_OFF
+  elif browser_options.wpr_mode != wpr_modes.WPR_RECORD:
     browser_options.wpr_mode = (
         wpr_modes.WPR_REPLAY
         if page.archive_path and os.path.isfile(page.archive_path)
@@ -304,9 +310,11 @@ def _UpdatePageSetArchivesIfChanged(page_set):
     try:
       cloud_storage.GetIfChanged(
           os.path.join(page_set.base_dir, page_set.credentials_path))
-    except (cloud_storage.CredentialsError, cloud_storage.PermissionError):
-      logging.warning('Cannot retrieve credential file: %s',
-                      page_set.credentials_path)
+    except (cloud_storage.CredentialsError, cloud_storage.PermissionError,
+            cloud_storage.CloudStorageError) as e:
+      logging.warning('Cannot retrieve credential file %s due to cloud storage '
+                      'error %s', page_set.credentials_path, str(e))
+
   # Scan every serving directory for .sha1 files
   # and download them from Cloud Storage. Assume all data is public.
   all_serving_dirs = page_set.serving_dirs.copy()
@@ -324,7 +332,7 @@ def _UpdatePageSetArchivesIfChanged(page_set):
             os.path.join(dirpath, filename))
         if extension != '.sha1':
           continue
-        cloud_storage.GetIfChanged(path)
+        cloud_storage.GetIfChanged(path, page_set.bucket)
 
 
 def Run(test, page_set, expectations, finder_options):
@@ -348,11 +356,15 @@ def Run(test, page_set, expectations, finder_options):
 
   browser_options = possible_browser.finder_options.browser_options
   browser_options.browser_type = possible_browser.browser_type
-  browser_options.platform = possible_browser.platform
   test.CustomizeBrowserOptions(browser_options)
 
-  if not decorators.IsEnabled(
-      test, browser_options.browser_type, browser_options.platform):
+  should_run = decorators.IsEnabled(test, possible_browser)
+
+  should_run = should_run or finder_options.run_disabled_tests
+
+  if not should_run:
+    logging.warning('You are trying to run a disabled test.')
+    logging.warning('Pass --also-run-disabled-tests to squelch this message.')
     return results
 
   # Reorder page set based on options.

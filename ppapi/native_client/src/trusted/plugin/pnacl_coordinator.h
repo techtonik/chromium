@@ -79,16 +79,8 @@ class PnaclCoordinator: public CallbackSource<FileStreamData> {
   // have been compiled.
   pp::CompletionCallback GetCompileProgressCallback(int64_t bytes_compiled);
 
-  // Return a callback that should be notified when an interesting UMA timing
-  // is ready to be reported.
-  pp::CompletionCallback GetUMATimeCallback(const nacl::string& event_name,
-                                            int64_t microsecs);
-
   // Get the last known load progress.
   void GetCurrentProgress(int64_t* bytes_loaded, int64_t* bytes_total);
-
-  // Return true if the total progress to report (w/ progress events) is known.
-  bool ExpectedProgressKnown() { return expected_pexe_size_ != -1; }
 
   // Return true if we should delay the progress event reporting.
   // This delay approximates:
@@ -116,11 +108,6 @@ class PnaclCoordinator: public CallbackSource<FileStreamData> {
   // caching metadata.
   void BitcodeStreamDidOpen(int32_t pp_error);
 
-  // Callback for when the resource info JSON file has been read.
-  void ResourceInfoWasRead(int32_t pp_error);
-
-  // Callback for when llc and ld have been downloaded.
-  void ResourcesDidLoad(int32_t pp_error);
   // Invoked when we've gotten a temp FD for the nexe, either with the nexe
   // data, or a writeable fd to save to.
   void NexeFdDidOpen(int32_t pp_error);
@@ -140,10 +127,6 @@ class PnaclCoordinator: public CallbackSource<FileStreamData> {
 
   // Invoked when the read descriptor for nexe_file_ is created.
   void NexeReadDidOpen(int32_t pp_error);
-
-  // Invoked when a UMA timing measurement from the translate thread is ready.
-  void DoUMATimeMeasure(
-      int32_t pp_error, const nacl::string& event_name, int64_t microsecs);
 
   // Bring control back to the plugin by invoking the
   // |translate_notify_callback_|.  This does not set the ErrorInfo report,
@@ -194,7 +177,6 @@ class PnaclCoordinator: public CallbackSource<FileStreamData> {
   nacl::scoped_ptr<nacl::DescWrapper> invalid_desc_wrapper_;
   // Number of split modules (threads) for llc
   int split_module_count_;
-  int num_object_files_opened_;
 
   // Translated nexe file, produced by the linker.
   nacl::scoped_ptr<TempFile> temp_nexe_file_;
@@ -213,7 +195,6 @@ class PnaclCoordinator: public CallbackSource<FileStreamData> {
   bool error_already_reported_;
 
   // State for timing and size information for UMA stats.
-  int64_t pnacl_init_time_;
   int64_t pexe_size_;  // Count as we stream -- will converge to pexe size.
   int64_t pexe_bytes_compiled_;  // Count as we compile.
   int64_t expected_pexe_size_;   // Expected download total (-1 if unknown).

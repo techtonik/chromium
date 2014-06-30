@@ -26,8 +26,8 @@ namespace content {
 
 namespace {
 
-const char kDisabledErrorMessage[] =
-    "ServiceWorker is disabled";
+const char kShutdownErrorMessage[] =
+    "The Service Worker system has shutdown.";
 const char kDomainMismatchErrorMessage[] =
     "Scope and scripts do not have the same origin";
 
@@ -35,6 +35,22 @@ const uint32 kFilteredMessageClasses[] = {
   ServiceWorkerMsgStart,
   EmbeddedWorkerMsgStart,
 };
+
+bool CanRegisterServiceWorker(const GURL& document_url,
+                              const GURL& pattern,
+                              const GURL& script_url) {
+  // TODO: Respect Chrome's content settings, if we add a setting for
+  // controlling whether Service Worker is allowed.
+  return document_url.GetOrigin() == pattern.GetOrigin() &&
+         document_url.GetOrigin() == script_url.GetOrigin();
+}
+
+bool CanUnregisterServiceWorker(const GURL& document_url,
+                                const GURL& pattern) {
+  // TODO: Respect Chrome's content settings, if we add a setting for
+  // controlling whether Service Worker is allowed.
+  return document_url.GetOrigin() == pattern.GetOrigin();
+}
 
 }  // namespace
 
@@ -70,8 +86,8 @@ void ServiceWorkerDispatcherHost::Init(
       render_process_id_, this);
 }
 
-void ServiceWorkerDispatcherHost::OnFilterAdded(IPC::Channel* channel) {
-  BrowserMessageFilter::OnFilterAdded(channel);
+void ServiceWorkerDispatcherHost::OnFilterAdded(IPC::Sender* sender) {
+  BrowserMessageFilter::OnFilterAdded(sender);
   channel_ready_ = true;
   std::vector<IPC::Message*> messages;
   pending_messages_.release(&messages);
@@ -108,6 +124,8 @@ bool ServiceWorkerDispatcherHost::OnMessageReceived(
                         OnWorkerStarted)
     IPC_MESSAGE_HANDLER(EmbeddedWorkerHostMsg_WorkerStopped,
                         OnWorkerStopped)
+    IPC_MESSAGE_HANDLER(EmbeddedWorkerHostMsg_DidPauseAfterDownload,
+                        OnPausedAfterDownload)
     IPC_MESSAGE_HANDLER(EmbeddedWorkerHostMsg_ReportException,
                         OnReportException)
     IPC_MESSAGE_HANDLER(EmbeddedWorkerHostMsg_ReportConsoleMessage,
@@ -152,24 +170,12 @@ void ServiceWorkerDispatcherHost::OnRegisterServiceWorker(
     int provider_id,
     const GURL& pattern,
     const GURL& script_url) {
-  if (!GetContext() || !ServiceWorkerUtils::IsFeatureEnabled()) {
+  if (!GetContext()) {
     Send(new ServiceWorkerMsg_ServiceWorkerRegistrationError(
         thread_id,
         request_id,
-        WebServiceWorkerError::ErrorTypeDisabled,
-        base::ASCIIToUTF16(kDisabledErrorMessage)));
-    return;
-  }
-
-  // TODO(alecflett): This check is insufficient for release. Add a
-  // ServiceWorker-specific policy query in
-  // ChildProcessSecurityImpl. See http://crbug.com/311631.
-  if (pattern.GetOrigin() != script_url.GetOrigin()) {
-    Send(new ServiceWorkerMsg_ServiceWorkerRegistrationError(
-        thread_id,
-        request_id,
-        WebServiceWorkerError::ErrorTypeSecurity,
-        base::ASCIIToUTF16(kDomainMismatchErrorMessage)));
+        WebServiceWorkerError::ErrorTypeAbort,
+        base::ASCIIToUTF16(kShutdownErrorMessage)));
     return;
   }
 
@@ -179,7 +185,24 @@ void ServiceWorkerDispatcherHost::OnRegisterServiceWorker(
     BadMessageReceived();
     return;
   }
+  if (!provider_host->IsContextAlive()) {
+    Send(new ServiceWorkerMsg_ServiceWorkerRegistrationError(
+        thread_id,
+        request_id,
+        WebServiceWorkerError::ErrorTypeAbort,
+        base::ASCIIToUTF16(kShutdownErrorMessage)));
+    return;
+  }
 
+  if (!CanRegisterServiceWorker(
+      provider_host->document_url(), pattern, script_url)) {
+    Send(new ServiceWorkerMsg_ServiceWorkerRegistrationError(
+        thread_id,
+        request_id,
+        WebServiceWorkerError::ErrorTypeSecurity,
+        base::ASCIIToUTF16(kDomainMismatchErrorMessage)));
+    return;
+  }
   GetContext()->RegisterServiceWorker(
       pattern,
       script_url,
@@ -196,15 +219,12 @@ void ServiceWorkerDispatcherHost::OnUnregisterServiceWorker(
     int request_id,
     int provider_id,
     const GURL& pattern) {
-  // TODO(alecflett): This check is insufficient for release. Add a
-  // ServiceWorker-specific policy query in
-  // ChildProcessSecurityImpl. See http://crbug.com/311631.
-  if (!GetContext() || !ServiceWorkerUtils::IsFeatureEnabled()) {
+  if (!GetContext()) {
     Send(new ServiceWorkerMsg_ServiceWorkerRegistrationError(
         thread_id,
         request_id,
-        blink::WebServiceWorkerError::ErrorTypeDisabled,
-        base::ASCIIToUTF16(kDisabledErrorMessage)));
+        blink::WebServiceWorkerError::ErrorTypeAbort,
+        base::ASCIIToUTF16(kShutdownErrorMessage)));
     return;
   }
 
@@ -212,6 +232,23 @@ void ServiceWorkerDispatcherHost::OnUnregisterServiceWorker(
       render_process_id_, provider_id);
   if (!provider_host) {
     BadMessageReceived();
+    return;
+  }
+  if (!provider_host->IsContextAlive()) {
+    Send(new ServiceWorkerMsg_ServiceWorkerRegistrationError(
+        thread_id,
+        request_id,
+        blink::WebServiceWorkerError::ErrorTypeAbort,
+        base::ASCIIToUTF16(kShutdownErrorMessage)));
+    return;
+  }
+
+  if (!CanUnregisterServiceWorker(provider_host->document_url(), pattern)) {
+    Send(new ServiceWorkerMsg_ServiceWorkerRegistrationError(
+        thread_id,
+        request_id,
+        WebServiceWorkerError::ErrorTypeSecurity,
+        base::ASCIIToUTF16(kDomainMismatchErrorMessage)));
     return;
   }
 
@@ -227,7 +264,7 @@ void ServiceWorkerDispatcherHost::OnPostMessageToWorker(
     int handle_id,
     const base::string16& message,
     const std::vector<int>& sent_message_port_ids) {
-  if (!GetContext() || !ServiceWorkerUtils::IsFeatureEnabled())
+  if (!GetContext())
     return;
 
   ServiceWorkerHandle* handle = handles_.Lookup(handle_id);
@@ -275,10 +312,14 @@ void ServiceWorkerDispatcherHost::OnSetHostedVersionId(
     return;
   ServiceWorkerProviderHost* provider_host =
       GetContext()->GetProviderHost(render_process_id_, provider_id);
-  if (!provider_host || !provider_host->SetHostedVersionId(version_id)) {
+  if (!provider_host) {
     BadMessageReceived();
     return;
   }
+  if (!provider_host->IsContextAlive())
+    return;
+  if (!provider_host->SetHostedVersionId(version_id))
+    BadMessageReceived();
 }
 
 void ServiceWorkerDispatcherHost::RegistrationComplete(
@@ -309,30 +350,46 @@ void ServiceWorkerDispatcherHost::RegistrationComplete(
 void ServiceWorkerDispatcherHost::OnWorkerScriptLoaded(int embedded_worker_id) {
   if (!GetContext())
     return;
-  GetContext()->embedded_worker_registry()->OnWorkerScriptLoaded(
-      render_process_id_, embedded_worker_id);
+  EmbeddedWorkerRegistry* registry = GetContext()->embedded_worker_registry();
+  if (!registry->CanHandle(embedded_worker_id))
+    return;
+  registry->OnWorkerScriptLoaded(render_process_id_, embedded_worker_id);
 }
 
 void ServiceWorkerDispatcherHost::OnWorkerScriptLoadFailed(
     int embedded_worker_id) {
   if (!GetContext())
     return;
-  GetContext()->embedded_worker_registry()->OnWorkerScriptLoadFailed(
-      render_process_id_, embedded_worker_id);
+  EmbeddedWorkerRegistry* registry = GetContext()->embedded_worker_registry();
+  if (!registry->CanHandle(embedded_worker_id))
+    return;
+  registry->OnWorkerScriptLoadFailed(render_process_id_, embedded_worker_id);
 }
 
 void ServiceWorkerDispatcherHost::OnWorkerStarted(
     int thread_id, int embedded_worker_id) {
   if (!GetContext())
     return;
-  GetContext()->embedded_worker_registry()->OnWorkerStarted(
-      render_process_id_, thread_id, embedded_worker_id);
+  EmbeddedWorkerRegistry* registry = GetContext()->embedded_worker_registry();
+  if (!registry->CanHandle(embedded_worker_id))
+    return;
+  registry->OnWorkerStarted(render_process_id_, thread_id, embedded_worker_id);
 }
 
 void ServiceWorkerDispatcherHost::OnWorkerStopped(int embedded_worker_id) {
   if (!GetContext())
     return;
-  GetContext()->embedded_worker_registry()->OnWorkerStopped(
+  EmbeddedWorkerRegistry* registry = GetContext()->embedded_worker_registry();
+  if (!registry->CanHandle(embedded_worker_id))
+    return;
+  registry->OnWorkerStopped(render_process_id_, embedded_worker_id);
+}
+
+void ServiceWorkerDispatcherHost::OnPausedAfterDownload(
+    int embedded_worker_id) {
+  if (!GetContext())
+    return;
+  GetContext()->embedded_worker_registry()->OnPausedAfterDownload(
       render_process_id_, embedded_worker_id);
 }
 
@@ -344,12 +401,14 @@ void ServiceWorkerDispatcherHost::OnReportException(
     const GURL& source_url) {
   if (!GetContext())
     return;
-  GetContext()->embedded_worker_registry()->OnReportException(
-      embedded_worker_id,
-      error_message,
-      line_number,
-      column_number,
-      source_url);
+  EmbeddedWorkerRegistry* registry = GetContext()->embedded_worker_registry();
+  if (!registry->CanHandle(embedded_worker_id))
+    return;
+  registry->OnReportException(embedded_worker_id,
+                              error_message,
+                              line_number,
+                              column_number,
+                              source_url);
 }
 
 void ServiceWorkerDispatcherHost::OnReportConsoleMessage(
@@ -357,13 +416,15 @@ void ServiceWorkerDispatcherHost::OnReportConsoleMessage(
     const EmbeddedWorkerHostMsg_ReportConsoleMessage_Params& params) {
   if (!GetContext())
     return;
-  GetContext()->embedded_worker_registry()->OnReportConsoleMessage(
-      embedded_worker_id,
-      params.source_identifier,
-      params.message_level,
-      params.message,
-      params.line_number,
-      params.source_url);
+  EmbeddedWorkerRegistry* registry = GetContext()->embedded_worker_registry();
+  if (!registry->CanHandle(embedded_worker_id))
+    return;
+  registry->OnReportConsoleMessage(embedded_worker_id,
+                                   params.source_identifier,
+                                   params.message_level,
+                                   params.message,
+                                   params.line_number,
+                                   params.source_url);
 }
 
 void ServiceWorkerDispatcherHost::OnIncrementServiceWorkerRefCount(

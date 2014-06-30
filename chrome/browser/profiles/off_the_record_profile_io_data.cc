@@ -28,6 +28,8 @@
 #include "content/public/browser/resource_context.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension.h"
+#include "net/base/sdch_dictionary_fetcher.h"
+#include "net/base/sdch_manager.h"
 #include "net/ftp/ftp_network_layer.h"
 #include "net/http/http_cache.h"
 #include "net/http/http_network_session.h"
@@ -161,6 +163,13 @@ void OffTheRecordProfileIOData::Handle::LazyInitialize() const {
   io_data_->safe_browsing_enabled()->MoveToThread(
       BrowserThread::GetMessageLoopProxyForThread(BrowserThread::IO));
 #endif
+#if defined(OS_ANDROID) || defined(OS_IOS)
+  io_data_->data_reduction_proxy_enabled()->Init(
+      data_reduction_proxy::prefs::kDataReductionProxyEnabled,
+      profile_->GetPrefs());
+  io_data_->data_reduction_proxy_enabled()->MoveToThread(
+      BrowserThread::GetMessageLoopProxyForThread(BrowserThread::IO));
+#endif
   io_data_->InitializeOnUIThread(profile_);
 }
 
@@ -244,6 +253,19 @@ void OffTheRecordProfileIOData::InitializeInternal(
       ftp_factory_.get());
   main_context->set_job_factory(main_job_factory_.get());
 
+  // Setup the SDCHManager for this profile.
+  sdch_manager_.reset(new net::SdchManager);
+  sdch_manager_->set_sdch_fetcher(
+      new net::SdchDictionaryFetcher(
+          sdch_manager_.get(),
+          // SdchDictionaryFetcher takes a reference to the Getter, and
+          // hence implicitly takes ownership.
+          new net::TrivialURLRequestContextGetter(
+              main_context,
+              content::BrowserThread::GetMessageLoopProxyForThread(
+                  content::BrowserThread::IO))));
+  main_context->set_sdch_manager(sdch_manager_.get());
+
 #if defined(ENABLE_EXTENSIONS)
   InitializeExtensionsRequestContext(profile_params);
 #endif
@@ -271,9 +293,11 @@ void OffTheRecordProfileIOData::
       content::CreateCookieStore(content::CookieStoreConfig())->
           GetCookieMonster();
   // Enable cookies for devtools and extension URLs.
-  const char* schemes[] = {content::kChromeDevToolsScheme,
-                           extensions::kExtensionScheme};
-  extensions_cookie_store->SetCookieableSchemes(schemes, 2);
+  const char* const schemes[] = {
+      content::kChromeDevToolsScheme,
+      extensions::kExtensionScheme
+  };
+  extensions_cookie_store->SetCookieableSchemes(schemes, arraysize(schemes));
   extensions_context->set_cookie_store(extensions_cookie_store);
 
   scoped_ptr<net::URLRequestJobFactoryImpl> extensions_job_factory(

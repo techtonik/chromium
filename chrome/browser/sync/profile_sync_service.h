@@ -50,11 +50,15 @@
 #include "sync/js/sync_js_controller.h"
 #include "url/gurl.h"
 
-class ManagedUserSigninManagerWrapper;
 class Profile;
 class ProfileOAuth2TokenService;
 class ProfileSyncComponentsFactory;
+class SupervisedUserSigninManagerWrapper;
 class SyncErrorController;
+
+namespace base {
+class CommandLine;
+};
 
 namespace browser_sync {
 class BackendMigrator;
@@ -263,7 +267,7 @@ class ProfileSyncService : public ProfileSyncServiceBase,
   ProfileSyncService(
       ProfileSyncComponentsFactory* factory,
       Profile* profile,
-      ManagedUserSigninManagerWrapper* signin_wrapper,
+      scoped_ptr<SupervisedUserSigninManagerWrapper> signin_wrapper,
       ProfileOAuth2TokenService* oauth2_token_service,
       browser_sync::ProfileSyncServiceStartBehavior start_behavior);
   virtual ~ProfileSyncService();
@@ -340,8 +344,8 @@ class ProfileSyncService : public ProfileSyncServiceBase,
   // in a message that allows the component to delete its local sync state.
   void InitializeNonBlockingType(
       syncer::ModelType type,
-      scoped_refptr<base::SequencedTaskRunner> task_runner,
-      base::WeakPtr<syncer::NonBlockingTypeProcessor> processor);
+      const scoped_refptr<base::SequencedTaskRunner>& task_runner,
+      const base::WeakPtr<syncer::ModelTypeSyncProxyImpl>& proxy);
 
   // Return the active OpenTabsUIDelegate. If sessions is not enabled or not
   // currently syncing, returns NULL.
@@ -545,12 +549,16 @@ class ProfileSyncService : public ProfileSyncServiceBase,
       const tracked_objects::Location& from_here,
       const std::string& message) OVERRIDE;
 
-  // Called when a datatype wishes to disable itself due to having hit an
-  // unrecoverable error.
-  virtual void DisableBrokenDatatype(
-      syncer::ModelType type,
-      const tracked_objects::Location& from_here,
-      std::string message);
+  // Called when a datatype wishes to disable itself. Note, this does not change
+  // preferred state of a datatype and is not persisted across restarts.
+  virtual void DisableDatatype(syncer::ModelType type,
+                               const tracked_objects::Location& from_here,
+                               std::string message);
+
+  // Called to re-enable a type disabled by DisableDatatype(..). Note, this does
+  // not change the preferred state of a datatype, and is not persisted across
+  // restarts.
+  void ReenableDatatype(syncer::ModelType type);
 
   // The functions below (until ActivateDataType()) should only be
   // called if sync_initialized() is true.
@@ -769,6 +777,11 @@ class ProfileSyncService : public ProfileSyncServiceBase,
   void SetClearingBrowseringDataForTesting(
       base::Callback<void(Profile*, base::Time, base::Time)> c);
 
+  // Return the base URL of the Sync Server.
+  static GURL GetSyncServiceURL(const base::CommandLine& command_line);
+
+  void StartStopBackupForTesting();
+
  protected:
   // Helper to configure the priority data types.
   void ConfigurePriorityDataTypes();
@@ -956,7 +969,7 @@ class ProfileSyncService : public ProfileSyncServiceBase,
 
   // TODO(ncarter): Put this in a profile, once there is UI for it.
   // This specifies where to find the sync server.
-  GURL sync_service_url_;
+  const GURL sync_service_url_;
 
   // The last time we detected a successful transition from SYNCING state.
   // Our backend notifies us whenever we should take a new snapshot.
@@ -988,7 +1001,7 @@ class ProfileSyncService : public ProfileSyncServiceBase,
 
   // Encapsulates user signin - used to set/get the user's authenticated
   // email address.
-  scoped_ptr<ManagedUserSigninManagerWrapper> signin_;
+  const scoped_ptr<SupervisedUserSigninManagerWrapper> signin_;
 
   // Information describing an unrecoverable error.
   UnrecoverableErrorReason unrecoverable_error_reason_;
@@ -1060,7 +1073,7 @@ class ProfileSyncService : public ProfileSyncServiceBase,
   scoped_ptr<base::Thread> sync_thread_;
 
   // ProfileSyncService uses this service to get access tokens.
-  ProfileOAuth2TokenService* oauth2_token_service_;
+  ProfileOAuth2TokenService* const oauth2_token_service_;
 
   // ProfileSyncService needs to remember access token in order to invalidate it
   // with OAuth2TokenService.
@@ -1093,6 +1106,7 @@ class ProfileSyncService : public ProfileSyncServiceBase,
   GoogleServiceAuthError last_get_token_error_;
   base::Time next_token_request_time_;
 
+  // Locally owned SyncableService implementations.
   scoped_ptr<SessionsSyncManager> sessions_sync_manager_;
 
   scoped_ptr<syncer::NetworkResources> network_resources_;

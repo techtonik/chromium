@@ -38,26 +38,6 @@
 using password_manager::PasswordManagerInternalsService;
 using password_manager::PasswordManagerInternalsServiceFactory;
 
-namespace {
-
-bool IsTheHotNewBubbleUIEnabled() {
-#if !defined(USE_AURA)
-  return false;
-#endif
-  CommandLine* command_line = CommandLine::ForCurrentProcess();
-  if (command_line->HasSwitch(switches::kDisableSavePasswordBubble))
-    return false;
-
-  if (command_line->HasSwitch(switches::kEnableSavePasswordBubble))
-    return true;
-
-  std::string group_name =
-      base::FieldTrialList::FindFullName("PasswordManagerUI");
-  return group_name == "Bubble";
-}
-
-} // namespace
-
 DEFINE_WEB_CONTENTS_USER_DATA_KEY(ChromePasswordManagerClient);
 
 // static
@@ -106,11 +86,7 @@ void ChromePasswordManagerClient::PromptUserToSavePassword(
   if (IsTheHotNewBubbleUIEnabled()) {
     ManagePasswordsUIController* manage_passwords_ui_controller =
         ManagePasswordsUIController::FromWebContents(web_contents());
-    if (manage_passwords_ui_controller) {
-      manage_passwords_ui_controller->OnPasswordSubmitted(form_to_save);
-    } else {
-      delete form_to_save;
-    }
+    manage_passwords_ui_controller->OnPasswordSubmitted(form_to_save);
   } else {
     std::string uma_histogram_suffix(
         password_manager::metrics_util::GroupIdToString(
@@ -213,13 +189,7 @@ void ChromePasswordManagerClient::OnLogRouterAvailabilityChanged(
     return;
   can_use_log_router_ = router_can_be_used;
 
-  if (!web_contents())
-    return;
-
-  // Also inform the renderer process to start or stop logging.
-  web_contents()->GetRenderViewHost()->Send(new AutofillMsg_ChangeLoggingState(
-      web_contents()->GetRenderViewHost()->GetRoutingID(),
-      can_use_log_router_));
+  NotifyRendererOfLoggingAvailability();
 }
 
 void ChromePasswordManagerClient::LogSavePasswordProgress(
@@ -275,6 +245,8 @@ bool ChromePasswordManagerClient::OnMessageReceived(
                         ShowPasswordEditingPopup)
     IPC_MESSAGE_HANDLER(AutofillHostMsg_HidePasswordGenerationPopup,
                         HidePasswordGenerationPopup)
+    IPC_MESSAGE_HANDLER(AutofillHostMsg_PasswordAutofillAgentConstructed,
+                        NotifyRendererOfLoggingAvailability)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   return handled;
@@ -330,7 +302,34 @@ void ChromePasswordManagerClient::ShowPasswordEditingPopup(
 #endif  // defined(USE_AURA) || defined(OS_MACOSX)
 }
 
+void ChromePasswordManagerClient::NotifyRendererOfLoggingAvailability() {
+  if (!web_contents())
+    return;
+
+  web_contents()->GetRenderViewHost()->Send(new AutofillMsg_SetLoggingState(
+      web_contents()->GetRenderViewHost()->GetRoutingID(),
+      can_use_log_router_));
+}
+
 void ChromePasswordManagerClient::CommitFillPasswordForm(
     autofill::PasswordFormFillData* data) {
   driver_.FillPasswordForm(*data);
+}
+
+bool ChromePasswordManagerClient::IsTheHotNewBubbleUIEnabled() {
+#if !defined(USE_AURA)
+  return false;
+#endif
+  CommandLine* command_line = CommandLine::ForCurrentProcess();
+  if (command_line->HasSwitch(switches::kDisableSavePasswordBubble))
+    return false;
+
+  if (command_line->HasSwitch(switches::kEnableSavePasswordBubble))
+    return true;
+
+  std::string group_name =
+      base::FieldTrialList::FindFullName("PasswordManagerUI");
+
+  // The bubble should be the default case that runs on the bots.
+  return group_name != "Infobar";
 }

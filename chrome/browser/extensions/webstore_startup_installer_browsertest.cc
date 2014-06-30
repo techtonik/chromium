@@ -9,8 +9,6 @@
 #include "chrome/browser/extensions/startup_helper.h"
 #include "chrome/browser/extensions/webstore_installer_test.h"
 #include "chrome/browser/infobars/infobar_service.h"
-#include "chrome/browser/managed_mode/managed_user_service.h"
-#include "chrome/browser/managed_mode/managed_user_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -25,6 +23,7 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/browser_test_utils.h"
 #include "extensions/browser/extension_host.h"
+#include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/common/extension_builder.h"
 #include "extensions/common/value_builder.h"
@@ -64,8 +63,9 @@ IN_PROC_BROWSER_TEST_F(WebstoreStartupInstallerTest, Install) {
 
   RunTest("runTest");
 
-  const extensions::Extension* extension = browser()->profile()->
-      GetExtensionService()->GetExtensionById(kTestExtensionId, false);
+  const extensions::Extension* extension =
+      extensions::ExtensionRegistry::Get(
+          browser()->profile())->enabled_extensions().GetByID(kTestExtensionId);
   EXPECT_TRUE(extension);
 }
 
@@ -171,17 +171,17 @@ IN_PROC_BROWSER_TEST_F(WebstoreStartupInstallerTest, InstallFromHostedApp) {
   EXPECT_TRUE(extension_service->extensions()->Contains(kTestExtensionId));
 }
 
-class WebstoreStartupInstallerManagedUsersTest
+class WebstoreStartupInstallerSupervisedUsersTest
     : public WebstoreStartupInstallerTest {
  public:
   // InProcessBrowserTest overrides:
   virtual void SetUpCommandLine(base::CommandLine* command_line) OVERRIDE {
     WebstoreStartupInstallerTest::SetUpCommandLine(command_line);
-    command_line->AppendSwitchASCII(switches::kManagedUserId, "asdf");
+    command_line->AppendSwitchASCII(switches::kSupervisedUserId, "asdf");
   }
 };
 
-IN_PROC_BROWSER_TEST_F(WebstoreStartupInstallerManagedUsersTest,
+IN_PROC_BROWSER_TEST_F(WebstoreStartupInstallerSupervisedUsersTest,
                        InstallProhibited) {
 #if defined(OS_WIN) && defined(USE_ASH)
   // Disable this test in Metro+Ash for now (http://crbug.com/262796).

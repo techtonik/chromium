@@ -10,6 +10,7 @@
 #include "base/location.h"
 #include "base/message_loop/message_loop.h"
 #include "base/message_loop/message_loop_proxy.h"
+#include "base/metrics/field_trial.h"
 #include "base/run_loop.h"
 #include "base/strings/string_util.h"
 #include "base/test/test_simple_task_runner.h"
@@ -19,8 +20,6 @@
 #include "components/gcm_driver/fake_gcm_client_factory.h"
 #include "components/gcm_driver/gcm_app_handler.h"
 #include "components/gcm_driver/gcm_client_factory.h"
-#include "google_apis/gaia/fake_identity_provider.h"
-#include "google_apis/gaia/fake_oauth2_token_service.h"
 #include "net/url_request/url_request_context_getter.h"
 #include "net/url_request/url_request_test_util.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -109,12 +108,10 @@ class GCMDriverTest : public testing::Test {
   void UnregisterCompleted(GCMClient::Result result);
 
   base::ScopedTempDir temp_dir_;
-  FakeOAuth2TokenService token_service_;
-  scoped_ptr<FakeIdentityProvider> identity_provider_owner_;
-  FakeIdentityProvider* identity_provider_;
   scoped_refptr<base::TestSimpleTaskRunner> task_runner_;
   base::MessageLoopForUI message_loop_;
   base::Thread io_thread_;
+  base::FieldTrialList field_trial_list_;
   scoped_ptr<GCMDriver> driver_;
   scoped_ptr<FakeGCMAppHandler> gcm_app_handler_;
 
@@ -130,14 +127,12 @@ class GCMDriverTest : public testing::Test {
 };
 
 GCMDriverTest::GCMDriverTest()
-    : identity_provider_(NULL),
-      task_runner_(new base::TestSimpleTaskRunner()),
+    : task_runner_(new base::TestSimpleTaskRunner()),
       io_thread_("IOThread"),
+      field_trial_list_(NULL),
       registration_result_(GCMClient::UNKNOWN_ERROR),
       send_result_(GCMClient::UNKNOWN_ERROR),
       unregistration_result_(GCMClient::UNKNOWN_ERROR) {
-  identity_provider_owner_.reset(new FakeIdentityProvider(&token_service_));
-  identity_provider_ = identity_provider_owner_.get();
 }
 
 GCMDriverTest::~GCMDriverTest() {
@@ -196,7 +191,6 @@ void GCMDriverTest::CreateDriver(
           gcm_client_start_mode,
           base::MessageLoopProxy::current(),
           io_thread_.message_loop_proxy())).Pass(),
-      identity_provider_owner_.PassAs<IdentityProvider>(),
       GCMClient::ChromeBuildInfo(),
       temp_dir_.path(),
       request_context,
@@ -218,14 +212,13 @@ void GCMDriverTest::RemoveAppHandlers() {
 }
 
 void GCMDriverTest::SignIn(const std::string& account_id) {
-  token_service_.AddAccount(account_id);
-  identity_provider_->LogIn(account_id);
+  driver_->OnSignedIn();
   PumpIOLoop();
   PumpUILoop();
 }
 
 void GCMDriverTest::SignOut() {
-  identity_provider_->LogOut();
+  driver_->Purge();
   PumpIOLoop();
   PumpUILoop();
 }
@@ -297,7 +290,7 @@ void GCMDriverTest::UnregisterCompleted(GCMClient::Result result) {
     async_operation_completed_callback_.Run();
 }
 
-TEST_F(GCMDriverTest, CreateGCMDriverBeforeSignIn) {
+TEST_F(GCMDriverTest, Create) {
   // Create GCMDriver first. GCM is not started.
   CreateDriver(FakeGCMClient::NO_DELAY_START);
   EXPECT_FALSE(driver()->IsStarted());
@@ -305,23 +298,32 @@ TEST_F(GCMDriverTest, CreateGCMDriverBeforeSignIn) {
   // Sign in. GCM is still not started.
   SignIn(kTestAccountID1);
   EXPECT_FALSE(driver()->IsStarted());
+  EXPECT_FALSE(driver()->IsConnected());
+  EXPECT_FALSE(gcm_app_handler()->connected());
 
-  // GCM will be started only after both sign-in and app handler being
+  // GCM will be started only after both sign-in and app handler being added.
   AddAppHandlers();
   EXPECT_TRUE(driver()->IsStarted());
+  PumpIOLoop();
+  EXPECT_TRUE(driver()->IsConnected());
+  EXPECT_TRUE(gcm_app_handler()->connected());
 }
 
-TEST_F(GCMDriverTest, CreateGCMDriverAfterSignIn) {
-  // Sign in. Nothings happens since GCMDriver is not created.
-  SignIn(kTestAccountID1);
+TEST_F(GCMDriverTest, CreateByFieldTrial) {
+  ASSERT_TRUE(base::FieldTrialList::CreateFieldTrial("GCM", "Enabled"));
 
-  // Create GCMDriver after sign-in. GCM is not started.
+  // Create GCMDriver first. GCM is not started.
   CreateDriver(FakeGCMClient::NO_DELAY_START);
   EXPECT_FALSE(driver()->IsStarted());
+  EXPECT_FALSE(driver()->IsConnected());
+  EXPECT_FALSE(gcm_app_handler()->connected());
 
-  // GCM will be started only after both sign-in and app handler being
+  // GCM will be started after app handler is added.
   AddAppHandlers();
   EXPECT_TRUE(driver()->IsStarted());
+  PumpIOLoop();
+  EXPECT_TRUE(driver()->IsConnected());
+  EXPECT_TRUE(gcm_app_handler()->connected());
 }
 
 TEST_F(GCMDriverTest, Shutdown) {
@@ -333,6 +335,8 @@ TEST_F(GCMDriverTest, Shutdown) {
 
   driver()->Shutdown();
   EXPECT_FALSE(HasAppHandlers());
+  EXPECT_FALSE(driver()->IsConnected());
+  EXPECT_FALSE(gcm_app_handler()->connected());
 }
 
 TEST_F(GCMDriverTest, SignInAndSignOutOnGCMEnabled) {
@@ -342,12 +346,10 @@ TEST_F(GCMDriverTest, SignInAndSignOutOnGCMEnabled) {
 
   // GCMClient should be started after sign-in.
   SignIn(kTestAccountID1);
-  EXPECT_TRUE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STARTED, GetGCMClient()->status());
 
   // GCMClient should be checked out after sign-out.
   SignOut();
-  EXPECT_FALSE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::CHECKED_OUT, GetGCMClient()->status());
 }
 
@@ -361,12 +363,10 @@ TEST_F(GCMDriverTest, SignInAndSignOutOnGCMDisabled) {
 
   // GCMClient should not be started after sign-in.
   SignIn(kTestAccountID1);
-  EXPECT_FALSE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::UNINITIALIZED, GetGCMClient()->status());
 
   // Check-out should still be performed after sign-out.
   SignOut();
-  EXPECT_FALSE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::CHECKED_OUT, GetGCMClient()->status());
 }
 
@@ -376,19 +376,16 @@ TEST_F(GCMDriverTest, SignOutAndThenSignIn) {
 
   // GCMClient should be started after sign-in.
   SignIn(kTestAccountID1);
-  EXPECT_TRUE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STARTED, GetGCMClient()->status());
 
   // GCMClient should be checked out after sign-out.
   SignOut();
-  EXPECT_FALSE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::CHECKED_OUT, GetGCMClient()->status());
 
   // Sign-in with a different account.
   SignIn(kTestAccountID2);
 
   // GCMClient should be started again.
-  EXPECT_TRUE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STARTED, GetGCMClient()->status());
 }
 
@@ -398,7 +395,6 @@ TEST_F(GCMDriverTest, DisableAndReenableGCM) {
   SignIn(kTestAccountID1);
 
   // GCMClient should be started.
-  EXPECT_TRUE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STARTED, GetGCMClient()->status());
 
   // Disables the GCM.
@@ -407,7 +403,6 @@ TEST_F(GCMDriverTest, DisableAndReenableGCM) {
   PumpUILoop();
 
   // GCMClient should be stopped.
-  EXPECT_FALSE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STOPPED, GetGCMClient()->status());
 
   // Enables the GCM.
@@ -416,7 +411,6 @@ TEST_F(GCMDriverTest, DisableAndReenableGCM) {
   PumpUILoop();
 
   // GCMClient should be started.
-  EXPECT_TRUE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STARTED, GetGCMClient()->status());
 
   // Disables the GCM.
@@ -425,14 +419,12 @@ TEST_F(GCMDriverTest, DisableAndReenableGCM) {
   PumpUILoop();
 
   // GCMClient should be stopped.
-  EXPECT_FALSE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STOPPED, GetGCMClient()->status());
 
   // Sign out.
   SignOut();
 
   // GCMClient should be checked out.
-  EXPECT_FALSE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::CHECKED_OUT, GetGCMClient()->status());
 }
 
@@ -441,42 +433,36 @@ TEST_F(GCMDriverTest, StartOrStopGCMOnDemand) {
   SignIn(kTestAccountID1);
 
   // GCMClient is not started.
-  EXPECT_FALSE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::UNINITIALIZED, GetGCMClient()->status());
 
   // GCMClient is started after an app handler has been added.
   driver()->AddAppHandler(kTestAppID1, gcm_app_handler());
   PumpIOLoop();
   PumpUILoop();
-  EXPECT_TRUE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STARTED, GetGCMClient()->status());
 
   // Add another app handler.
   driver()->AddAppHandler(kTestAppID2, gcm_app_handler());
   PumpIOLoop();
   PumpUILoop();
-  EXPECT_TRUE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STARTED, GetGCMClient()->status());
 
   // GCMClient remains active after one app handler is gone.
   driver()->RemoveAppHandler(kTestAppID1);
   PumpIOLoop();
   PumpUILoop();
-  EXPECT_TRUE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STARTED, GetGCMClient()->status());
 
   // GCMClient should be stopped after the last app handler is gone.
   driver()->RemoveAppHandler(kTestAppID2);
   PumpIOLoop();
   PumpUILoop();
-  EXPECT_FALSE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STOPPED, GetGCMClient()->status());
 
   // GCMClient is restarted after an app handler has been added.
   driver()->AddAppHandler(kTestAppID2, gcm_app_handler());
   PumpIOLoop();
   PumpUILoop();
-  EXPECT_TRUE(driver()->IsGCMClientReady());
   EXPECT_EQ(FakeGCMClient::STARTED, GetGCMClient()->status());
 }
 

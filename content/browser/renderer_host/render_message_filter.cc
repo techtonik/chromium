@@ -29,6 +29,7 @@
 #include "content/browser/renderer_host/render_process_host_impl.h"
 #include "content/browser/renderer_host/render_view_host_delegate.h"
 #include "content/browser/renderer_host/render_widget_helper.h"
+#include "content/browser/transition_request_manager.h"
 #include "content/common/child_process_host_impl.h"
 #include "content/common/child_process_messages.h"
 #include "content/common/cookie_data.h"
@@ -405,6 +406,8 @@ bool RenderMessageFilter::OnMessageReceived(const IPC::Message& message) {
 #endif
     IPC_MESSAGE_HANDLER_GENERIC(ViewHostMsg_SwapCompositorFrame,
         render_widget_helper_->DidReceiveBackingStoreMsg(message))
+    IPC_MESSAGE_HANDLER_GENERIC(ViewHostMsg_UpdateRect,
+        render_widget_helper_->DidReceiveBackingStoreMsg(message))
     IPC_MESSAGE_HANDLER(DesktopNotificationHostMsg_CheckPermission,
                         OnCheckNotificationPermission)
     IPC_MESSAGE_HANDLER(ChildProcessHostMsg_SyncAllocateSharedMemory,
@@ -435,6 +438,8 @@ bool RenderMessageFilter::OnMessageReceived(const IPC::Message& message) {
 #if defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(ViewHostMsg_RunWebAudioMediaCodec, OnWebAudioMediaCodec)
 #endif
+    IPC_MESSAGE_HANDLER(FrameHostMsg_SetHasPendingTransitionRequest,
+                        OnSetHasPendingTransitionRequest)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
 
@@ -1171,9 +1176,11 @@ void RenderMessageFilter::OnDidLose3DContext(
 #if defined(OS_WIN)
 void RenderMessageFilter::OnPreCacheFontCharacters(const LOGFONT& font,
                                                    const base::string16& str) {
-  // TODO(scottmg): Move this to FontCacheDispatcher, http://crbug.com/356346.
-  if (!ShouldUseDirectWrite())
-    return;
+  // TODO(scottmg): pdf/ppapi still require the renderer to be able to precache
+  // GDI fonts (http://crbug.com/383227), even when using DirectWrite.
+  // Eventually this shouldn't be added and should be moved to
+  // FontCacheDispatcher too. http://crbug.com/356346.
+
   // First, comments from FontCacheDispatcher::OnPreCacheFont do apply here too.
   // Except that for True Type fonts,
   // GetTextMetrics will not load the font in memory.
@@ -1215,5 +1222,11 @@ void RenderMessageFilter::OnWebAudioMediaCodec(
       true);
 }
 #endif
+
+void RenderMessageFilter::OnSetHasPendingTransitionRequest(int render_frame_id,
+                                                           bool is_transition) {
+  TransitionRequestManager::GetInstance()->SetHasPendingTransitionRequest(
+      render_process_id_, render_frame_id, is_transition);
+}
 
 }  // namespace content

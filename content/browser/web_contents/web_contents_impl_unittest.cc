@@ -449,7 +449,6 @@ TEST_F(WebContentsImplTest, NavigateToExcessivelyLongURL) {
 // Test that navigating across a site boundary creates a new RenderViewHost
 // with a new SiteInstance.  Going back should do the same.
 TEST_F(WebContentsImplTest, CrossSiteBoundaries) {
-  contents()->transition_cross_site = true;
   TestRenderViewHost* orig_rvh = test_rvh();
   RenderFrameHostImpl* orig_rfh =
       contents()->GetFrameTree()->root()->current_frame_host();
@@ -550,7 +549,6 @@ TEST_F(WebContentsImplTest, CrossSiteBoundaries) {
 // Test that navigating across a site boundary after a crash creates a new
 // RVH without requiring a cross-site transition (i.e., PENDING state).
 TEST_F(WebContentsImplTest, CrossSiteBoundariesAfterCrash) {
-  contents()->transition_cross_site = true;
   TestRenderViewHost* orig_rvh = test_rvh();
   int orig_rvh_delete_count = 0;
   orig_rvh->set_delete_counter(&orig_rvh_delete_count);
@@ -596,7 +594,6 @@ TEST_F(WebContentsImplTest, CrossSiteBoundariesAfterCrash) {
 // both contentses to a new site will place both contentses in a single
 // SiteInstance.
 TEST_F(WebContentsImplTest, NavigateTwoTabsCrossSite) {
-  contents()->transition_cross_site = true;
   TestRenderViewHost* orig_rvh = test_rvh();
   SiteInstance* instance1 = contents()->GetSiteInstance();
 
@@ -609,7 +606,6 @@ TEST_F(WebContentsImplTest, NavigateTwoTabsCrossSite) {
   // Open a new contents with the same SiteInstance, navigated to the same site.
   scoped_ptr<TestWebContents> contents2(
       TestWebContents::Create(browser_context(), instance1));
-  contents2->transition_cross_site = true;
   contents2->GetController().LoadURL(url, Referrer(),
                                     PAGE_TRANSITION_TYPED,
                                     std::string());
@@ -655,11 +651,14 @@ TEST_F(WebContentsImplTest, NavigateTwoTabsCrossSite) {
   EXPECT_EQ(instance2a, instance2b);
 }
 
-TEST_F(WebContentsImplTest, NavigateDoesNotUseUpSiteInstance) {
+// The embedder can request sites for certain urls not be be assigned to the
+// SiteInstance through ShouldAssignSiteForURL() in content browser client,
+// allowing to reuse the renderer backing certain chrome urls for subsequent
+// navigation. The test verifies that the override is honored.
+TEST_F(WebContentsImplTest, NavigateFromSitelessUrl) {
   WebContentsImplTestBrowserClient browser_client;
   SetBrowserClientForTesting(&browser_client);
 
-  contents()->transition_cross_site = true;
   TestRenderViewHost* orig_rvh = test_rvh();
   RenderFrameHostImpl* orig_rfh =
       contents()->GetFrameTree()->root()->current_frame_host();
@@ -745,10 +744,95 @@ TEST_F(WebContentsImplTest, NavigateDoesNotUseUpSiteInstance) {
   EXPECT_EQ(pending_rvh_delete_count, 1);
 }
 
+// Regression test for http://crbug.com/386542 - variation of
+// NavigateFromSitelessUrl in which the original navigation is a session
+// restore.
+TEST_F(WebContentsImplTest, NavigateFromRestoredSitelessUrl) {
+  WebContentsImplTestBrowserClient browser_client;
+  SetBrowserClientForTesting(&browser_client);
+  SiteInstanceImpl* orig_instance =
+      static_cast<SiteInstanceImpl*>(contents()->GetSiteInstance());
+  TestRenderViewHost* orig_rvh = test_rvh();
+
+  // Restore a navigation entry for URL that should not assign site to the
+  // SiteInstance.
+  browser_client.set_assign_site_for_url(false);
+  const GURL native_url("non-site-url://stuffandthings");
+  std::vector<NavigationEntry*> entries;
+  NavigationEntry* entry = NavigationControllerImpl::CreateNavigationEntry(
+      native_url, Referrer(), PAGE_TRANSITION_LINK, false, std::string(),
+      browser_context());
+  entry->SetPageID(0);
+  entries.push_back(entry);
+  controller().Restore(
+      0,
+      NavigationController::RESTORE_LAST_SESSION_EXITED_CLEANLY,
+      &entries);
+  ASSERT_EQ(0u, entries.size());
+  ASSERT_EQ(1, controller().GetEntryCount());
+  controller().GoToIndex(0);
+  contents()->TestDidNavigate(orig_rvh, 0, native_url, PAGE_TRANSITION_RELOAD);
+  EXPECT_EQ(orig_instance, contents()->GetSiteInstance());
+  EXPECT_EQ(GURL(), contents()->GetSiteInstance()->GetSiteURL());
+  EXPECT_FALSE(orig_instance->HasSite());
+
+  // Navigate to a regular site and verify that the SiteInstance was kept.
+  browser_client.set_assign_site_for_url(true);
+  const GURL url("http://www.google.com");
+  controller().LoadURL(
+      url, Referrer(), PAGE_TRANSITION_TYPED, std::string());
+  contents()->TestDidNavigate(orig_rvh, 2, url, PAGE_TRANSITION_TYPED);
+  EXPECT_EQ(orig_instance, contents()->GetSiteInstance());
+
+  // Cleanup.
+  DeleteContents();
+}
+
+// Complement for NavigateFromRestoredSitelessUrl, verifying that when a regular
+// tab is restored, the SiteInstance will change upon navigation.
+TEST_F(WebContentsImplTest, NavigateFromRestoredRegularUrl) {
+  WebContentsImplTestBrowserClient browser_client;
+  SetBrowserClientForTesting(&browser_client);
+  SiteInstanceImpl* orig_instance =
+      static_cast<SiteInstanceImpl*>(contents()->GetSiteInstance());
+  TestRenderViewHost* orig_rvh = test_rvh();
+
+  // Restore a navigation entry for a regular URL ensuring that the embedder
+  // ShouldAssignSiteForUrl override is disabled (i.e. returns true).
+  browser_client.set_assign_site_for_url(true);
+  const GURL regular_url("http://www.yahoo.com");
+  std::vector<NavigationEntry*> entries;
+  NavigationEntry* entry = NavigationControllerImpl::CreateNavigationEntry(
+      regular_url, Referrer(), PAGE_TRANSITION_LINK, false, std::string(),
+      browser_context());
+  entry->SetPageID(0);
+  entries.push_back(entry);
+  controller().Restore(
+      0,
+      NavigationController::RESTORE_LAST_SESSION_EXITED_CLEANLY,
+      &entries);
+  ASSERT_EQ(0u, entries.size());
+  ASSERT_EQ(1, controller().GetEntryCount());
+  controller().GoToIndex(0);
+  contents()->TestDidNavigate(orig_rvh, 0, regular_url, PAGE_TRANSITION_RELOAD);
+  EXPECT_EQ(orig_instance, contents()->GetSiteInstance());
+  EXPECT_TRUE(orig_instance->HasSite());
+
+  // Navigate to another site and verify that a new SiteInstance was created.
+  const GURL url("http://www.google.com");
+  controller().LoadURL(
+      url, Referrer(), PAGE_TRANSITION_TYPED, std::string());
+  contents()->TestDidNavigate(
+      contents()->GetPendingRenderViewHost(), 2, url, PAGE_TRANSITION_TYPED);
+  EXPECT_NE(orig_instance, contents()->GetSiteInstance());
+
+  // Cleanup.
+  DeleteContents();
+}
+
 // Test that we can find an opener RVH even if it's pending.
 // http://crbug.com/176252.
 TEST_F(WebContentsImplTest, FindOpenerRVHWhenPending) {
-  contents()->transition_cross_site = true;
   TestRenderViewHost* orig_rvh = test_rvh();
 
   // Navigate to a URL.
@@ -778,7 +862,6 @@ TEST_F(WebContentsImplTest, FindOpenerRVHWhenPending) {
 // Tests that WebContentsImpl uses the current URL, not the SiteInstance's site,
 // to determine whether a navigation is cross-site.
 TEST_F(WebContentsImplTest, CrossSiteComparesAgainstCurrentPage) {
-  contents()->transition_cross_site = true;
   RenderViewHost* orig_rvh = rvh();
   SiteInstance* instance1 = contents()->GetSiteInstance();
 
@@ -792,7 +875,6 @@ TEST_F(WebContentsImplTest, CrossSiteComparesAgainstCurrentPage) {
   // Open a related contents to a second site.
   scoped_ptr<TestWebContents> contents2(
       TestWebContents::Create(browser_context(), instance1));
-  contents2->transition_cross_site = true;
   const GURL url2("http://www.yahoo.com");
   contents2->GetController().LoadURL(url2, Referrer(),
                                     PAGE_TRANSITION_TYPED,
@@ -830,7 +912,6 @@ TEST_F(WebContentsImplTest, CrossSiteComparesAgainstCurrentPage) {
 // Test that the onbeforeunload and onunload handlers run when navigating
 // across site boundaries.
 TEST_F(WebContentsImplTest, CrossSiteUnloadHandlers) {
-  contents()->transition_cross_site = true;
   TestRenderViewHost* orig_rvh = test_rvh();
   SiteInstance* instance1 = contents()->GetSiteInstance();
 
@@ -882,7 +963,6 @@ TEST_F(WebContentsImplTest, CrossSiteUnloadHandlers) {
 // navigate to a different URL and have it displayed, canceling the slow
 // navigation.
 TEST_F(WebContentsImplTest, CrossSiteNavigationPreempted) {
-  contents()->transition_cross_site = true;
   TestRenderViewHost* orig_rvh = test_rvh();
   SiteInstance* instance1 = contents()->GetSiteInstance();
 
@@ -917,8 +997,6 @@ TEST_F(WebContentsImplTest, CrossSiteNavigationPreempted) {
 }
 
 TEST_F(WebContentsImplTest, CrossSiteNavigationBackPreempted) {
-  contents()->transition_cross_site = true;
-
   // Start with a web ui page, which gets a new RVH with WebUI bindings.
   const GURL url1("chrome://blah");
   controller().LoadURL(
@@ -1021,7 +1099,6 @@ TEST_F(WebContentsImplTest, CrossSiteNavigationBackPreempted) {
 // Test that during a slow cross-site navigation, a sub-frame navigation in the
 // original renderer will not cancel the slow navigation (bug 42029).
 TEST_F(WebContentsImplTest, CrossSiteNavigationNotPreemptedByFrame) {
-  contents()->transition_cross_site = true;
   TestRenderViewHost* orig_rvh = test_rvh();
 
   // Navigate to URL.  First URL should use first RenderViewHost.
@@ -1057,8 +1134,6 @@ TEST_F(WebContentsImplTest, CrossSiteNavigationNotPreemptedByFrame) {
 // We should only preempt the cross-site navigation if the previous renderer
 // has started a new navigation.  See http://crbug.com/79176.
 TEST_F(WebContentsImplTest, CrossSiteNotPreemptedDuringBeforeUnload) {
-  contents()->transition_cross_site = true;
-
   // Navigate to NTP URL.
   const GURL url("chrome://blah");
   controller().LoadURL(
@@ -1094,7 +1169,6 @@ TEST_F(WebContentsImplTest, CrossSiteNotPreemptedDuringBeforeUnload) {
 // is almost ready to be displayed, and the original renderer is only given a
 // short chance to run an unload handler.  Prevents regression of bug 23942.
 TEST_F(WebContentsImplTest, CrossSiteCantPreemptAfterUnload) {
-  contents()->transition_cross_site = true;
   TestRenderViewHost* orig_rvh = test_rvh();
   SiteInstance* instance1 = contents()->GetSiteInstance();
 
@@ -1152,7 +1226,6 @@ TEST_F(WebContentsImplTest, CrossSiteCantPreemptAfterUnload) {
 // Test that a cross-site navigation that doesn't commit after the unload
 // handler doesn't leave the contents in a stuck state.  http://crbug.com/88562
 TEST_F(WebContentsImplTest, CrossSiteNavigationCanceled) {
-  contents()->transition_cross_site = true;
   TestRenderViewHost* orig_rvh = test_rvh();
   SiteInstance* instance1 = contents()->GetSiteInstance();
 

@@ -10,7 +10,7 @@
 #include "base/memory/scoped_vector.h"
 #include "mojo/embedder/embedder.h"
 #include "mojo/gles2/gles2_support_impl.h"
-#include "mojo/public/cpp/application/application.h"
+#include "mojo/public/cpp/application/application_impl.h"
 #include "mojo/service_manager/background_service_loader.h"
 #include "mojo/service_manager/service_loader.h"
 #include "mojo/service_manager/service_manager.h"
@@ -18,6 +18,7 @@
 #include "mojo/shell/dynamic_service_loader.h"
 #include "mojo/shell/in_process_dynamic_service_runner.h"
 #include "mojo/shell/out_of_process_dynamic_service_runner.h"
+#include "mojo/shell/profile_service_loader.h"
 #include "mojo/shell/switches.h"
 #include "mojo/spy/spy.h"
 
@@ -54,7 +55,7 @@ class Setup {
   DISALLOW_COPY_AND_ASSIGN(Setup);
 };
 
-static base::LazyInstance<Setup> setup = LAZY_INSTANCE_INITIALIZER;
+static base::LazyInstance<Setup>::Leaky setup = LAZY_INSTANCE_INITIALIZER;
 
 }  // namespace
 
@@ -66,8 +67,8 @@ class Context::NativeViewportServiceLoader : public ServiceLoader {
  private:
   virtual void LoadService(ServiceManager* manager,
                            const GURL& url,
-                           ScopedMessagePipeHandle service_handle) OVERRIDE {
-    app_.reset(::CreateNativeViewportService(context_, service_handle.Pass()));
+                           ScopedMessagePipeHandle shell_handle) OVERRIDE {
+    app_.reset(::CreateNativeViewportService(context_, shell_handle.Pass()));
   }
 
   virtual void OnServiceError(ServiceManager* manager,
@@ -75,7 +76,7 @@ class Context::NativeViewportServiceLoader : public ServiceLoader {
   }
 
   Context* context_;
-  scoped_ptr<Application> app_;
+  scoped_ptr<ApplicationImpl> app_;
   DISALLOW_COPY_AND_ASSIGN(NativeViewportServiceLoader);
 };
 
@@ -118,6 +119,10 @@ Context::Context()
       scoped_ptr<ServiceLoader>(new DBusServiceLoader(this)),
       "dbus");
 #endif  // defined(OS_LINUX)
+
+  service_manager_.SetLoaderForURL(
+      scoped_ptr<ServiceLoader>(new ProfileServiceLoader()),
+      GURL("mojo:profile_service"));
 
   if (cmdline->HasSwitch(switches::kSpy)) {
     spy_.reset(new mojo::Spy(&service_manager_,

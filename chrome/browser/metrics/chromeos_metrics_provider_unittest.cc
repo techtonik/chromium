@@ -18,11 +18,16 @@
 #include "chromeos/dbus/fake_bluetooth_gatt_service_client.h"
 #include "chromeos/dbus/fake_bluetooth_input_client.h"
 #include "chromeos/dbus/fake_dbus_thread_manager.h"
+#include "chromeos/dbus/power_manager_client.h"
 #include "chromeos/login/login_state.h"
 #include "components/metrics/proto/system_profile.pb.h"
 #include "content/public/test/test_browser_thread_bundle.h"
 #include "content/public/test/test_utils.h"
 #include "testing/gtest/include/gtest/gtest.h"
+
+#if defined(USE_X11)
+#include "ui/events/x/device_data_manager_x11.h"
+#endif
 
 using chromeos::DBusThreadManager;
 using chromeos::BluetoothAdapterClient;
@@ -40,6 +45,8 @@ using chromeos::FakeBluetoothGattDescriptorClient;
 using chromeos::FakeBluetoothGattServiceClient;
 using chromeos::FakeBluetoothInputClient;
 using chromeos::FakeDBusThreadManager;
+using chromeos::PowerManagerClient;
+using chromeos::STUB_DBUS_CLIENT_IMPLEMENTATION;
 
 class ChromeOSMetricsProviderTest : public testing::Test {
  public:
@@ -47,6 +54,10 @@ class ChromeOSMetricsProviderTest : public testing::Test {
 
  protected:
   virtual void SetUp() OVERRIDE {
+#if defined(USE_X11)
+    ui::DeviceDataManagerX11::CreateInstance();
+#endif
+
     // Set up the fake Bluetooth environment,
     scoped_ptr<FakeDBusThreadManager> fake_dbus_thread_manager(
         new FakeDBusThreadManager);
@@ -68,6 +79,12 @@ class ChromeOSMetricsProviderTest : public testing::Test {
     fake_dbus_thread_manager->SetBluetoothAgentManagerClient(
         scoped_ptr<BluetoothAgentManagerClient>(
             new FakeBluetoothAgentManagerClient));
+
+    // Set up a PowerManagerClient instance for PerfProvider.
+    fake_dbus_thread_manager->SetPowerManagerClient(
+        scoped_ptr<PowerManagerClient>(
+            PowerManagerClient::Create(STUB_DBUS_CLIENT_IMPLEMENTATION)));
+
     DBusThreadManager::InitializeForTesting(fake_dbus_thread_manager.release());
 
     // Grab pointers to members of the thread manager for easier testing.

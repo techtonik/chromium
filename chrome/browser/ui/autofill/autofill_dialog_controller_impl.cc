@@ -390,8 +390,13 @@ scoped_ptr<DialogNotification> GetWalletError(
       break;
 
     case wallet::WalletClient::INVALID_PARAMS:
-      error_ids = IDS_AUTOFILL_WALLET_UPGRADE_CHROME_ERROR;
-      error_code = 42;
+      // TODO(estade): re-enable this code when we can distinguish between
+      // Chrome-triggered errors and merchant-triggered ones. See
+      // http://crbug.com/354897
+      // error_ids = IDS_AUTOFILL_WALLET_UPGRADE_CHROME_ERROR;
+      // error_code = 42;
+      error_ids = IDS_AUTOFILL_WALLET_BAD_TRANSACTION_AMOUNT;
+      error_code = 76;
       break;
 
     case wallet::WalletClient::BUYER_ACCOUNT_ERROR:
@@ -434,7 +439,14 @@ scoped_ptr<DialogNotification> GetWalletError(
       error_code = 75;
       break;
 
-    default:
+    case wallet::WalletClient::SPENDING_LIMIT_EXCEEDED:
+      error_ids = IDS_AUTOFILL_WALLET_BAD_TRANSACTION_AMOUNT;
+      break;
+
+    // Handled in the prior switch().
+    case wallet::WalletClient::UNVERIFIED_KNOW_YOUR_CUSTOMER_STATUS:
+    case wallet::WalletClient::BUYER_LEGAL_ADDRESS_NOT_SUPPORTED:
+      NOTREACHED();
       break;
   }
 
@@ -654,9 +666,6 @@ AutofillDialogControllerImpl::~AutofillDialogControllerImpl() {
 
 bool CountryFilter(const std::set<base::string16>& possible_values,
                    const std::string& country_code) {
-  if (!i18ninput::CountryIsFullySupported(country_code))
-    return false;
-
   if (!possible_values.empty() &&
       !possible_values.count(base::ASCIIToUTF16(country_code))) {
     return false;
@@ -767,6 +776,17 @@ void AutofillDialogControllerImpl::Show() {
       base::Bind(CountryFilter,
                  form_structure_.PossibleValues(ADDRESS_HOME_COUNTRY))));
 
+  // If the form has a country <select> but none of the options are valid, bail.
+  if (billing_country_combobox_model_->GetItemCount() == 0 ||
+      shipping_country_combobox_model_->GetItemCount() == 0) {
+    callback_.Run(AutofillClient::AutocompleteResultErrorDisabled,
+                  base::ASCIIToUTF16("No valid/supported country options"
+                                     " found."),
+                  NULL);
+    delete this;
+    return;
+  }
+
   // Log any relevant UI metrics and security exceptions.
   GetMetricLogger().LogDialogUiEvent(AutofillMetrics::DIALOG_UI_SHOWN);
 
@@ -808,6 +828,11 @@ void AutofillDialogControllerImpl::Show() {
       base::Bind(common::ServerTypeMatchesField, SECTION_SHIPPING),
       base::Bind(NullGetInfo),
       g_browser_process->GetApplicationLocale());
+
+  transaction_amount_ = form_structure_.GetUniqueValue(
+      HTML_TYPE_TRANSACTION_AMOUNT);
+  transaction_currency_ = form_structure_.GetUniqueValue(
+      HTML_TYPE_TRANSACTION_CURRENCY);
 
   account_chooser_model_.reset(
       new AccountChooserModel(this,
@@ -1093,7 +1118,7 @@ void AutofillDialogControllerImpl::GetWalletItems() {
   // The "Loading..." page should be showing now, which should cause the
   // account chooser to hide.
   view_->UpdateAccountChooser();
-  wallet_client->GetWalletItems();
+  wallet_client->GetWalletItems(transaction_amount_, transaction_currency_);
 }
 
 void AutofillDialogControllerImpl::HideSignIn() {
@@ -3031,9 +3056,7 @@ void AutofillDialogControllerImpl::SuggestionsUpdated() {
       for (size_t i = 0; i < profiles.size(); ++i) {
         const AutofillProfile& profile = *profiles[i];
         if (!i18ninput::AddressHasCompleteAndVerifiedData(
-                profile, g_browser_process->GetApplicationLocale()) ||
-            !i18ninput::CountryIsFullySupported(
-                base::UTF16ToASCII(profile.GetRawInfo(ADDRESS_HOME_COUNTRY)))) {
+                profile, g_browser_process->GetApplicationLocale())) {
           continue;
         }
 
@@ -3514,8 +3537,18 @@ base::string16 AutofillDialogControllerImpl::CreditCardNumberValidityMessage(
   if (!IsPayingWithWallet() &&
       ShouldDisallowCcType(CreditCard::TypeForDisplay(
           CreditCard::GetCreditCardType(number)))) {
-    return l10n_util::GetStringUTF16(
-        IDS_AUTOFILL_DIALOG_VALIDATION_UNACCEPTED_CREDIT_CARD_TYPE);
+    int ids = IDS_AUTOFILL_DIALOG_VALIDATION_UNACCEPTED_GENERIC_CARD;
+    const char* const type = CreditCard::GetCreditCardType(number);
+    if (type == kAmericanExpressCard)
+      ids = IDS_AUTOFILL_DIALOG_VALIDATION_UNACCEPTED_AMEX;
+    else if (type == kDiscoverCard)
+      ids = IDS_AUTOFILL_DIALOG_VALIDATION_UNACCEPTED_DISCOVER;
+    else if (type == kMasterCard)
+      ids = IDS_AUTOFILL_DIALOG_VALIDATION_UNACCEPTED_MASTERCARD;
+    else if (type == kVisaCard)
+      ids = IDS_AUTOFILL_DIALOG_VALIDATION_UNACCEPTED_VISA;
+
+    return l10n_util::GetStringUTF16(ids);
   }
 
   base::string16 message;

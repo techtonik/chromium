@@ -27,6 +27,7 @@ class FrameTreeNode;
 class NavigationControllerImpl;
 class NavigationEntry;
 class NavigationEntryImpl;
+class RenderFrameHost;
 class RenderFrameHostDelegate;
 class RenderFrameHostImpl;
 class RenderFrameHostManagerTest;
@@ -72,8 +73,9 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
         RenderViewHost* render_view_host) = 0;
     virtual void UpdateRenderViewSizeForRenderManager() = 0;
     virtual void CancelModalDialogsForRenderManager() = 0;
-    virtual void NotifySwappedFromRenderManager(
-        RenderViewHost* old_host, RenderViewHost* new_host) = 0;
+    virtual void NotifySwappedFromRenderManager(RenderFrameHost* old_host,
+                                                RenderFrameHost* new_host,
+                                                bool is_main_frame) = 0;
     virtual NavigationControllerImpl&
         GetControllerForRenderManager() = 0;
 
@@ -154,6 +156,8 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
   // there is no current one.
   RenderWidgetHostView* GetRenderWidgetHostView() const;
 
+  RenderFrameProxyHost* GetProxyToParent();
+
   // Returns the pending RenderFrameHost, or NULL if there is no pending one.
   RenderFrameHostImpl* pending_frame_host() const {
     return pending_render_frame_host_.get();
@@ -217,6 +221,16 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
       const Referrer& referrer,
       PageTransition page_transition,
       bool should_replace_current_entry);
+
+  // Received a response from CrossSiteResourceHandler. If the navigation
+  // specifies a transition, this is called and the navigation will not resume
+  // until ResumeResponseDeferredAtStart.
+  void OnDeferredAfterResponseStarted(
+      const GlobalRequestID& global_request_id,
+      RenderFrameHostImpl* pending_render_frame_host);
+
+  // Resume navigation paused after receiving response headers.
+  void ResumeResponseDeferredAtStart();
 
   // The RenderFrameHost has been swapped out, so we should resume the pending
   // network response and allow the pending RenderFrameHost to commit.
@@ -454,6 +468,10 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
   // Tracks information about any current pending cross-process navigation.
   scoped_ptr<PendingNavigationParams> pending_nav_params_;
 
+  // Tracks information about any navigation paused after receiving response
+  // headers.
+  scoped_ptr<GlobalRequestID> response_started_id_;
+
   // If either of these is non-NULL, the pending navigation is to a chrome:
   // page. The scoped_ptr is used if pending_web_ui_ != web_ui_, the WeakPtr is
   // used for when they reference the same object. If either is non-NULL, the
@@ -475,13 +493,6 @@ class CONTENT_EXPORT RenderFrameHostManager : public NotificationObserver {
   InterstitialPageImpl* interstitial_page_;
 
   NotificationRegistrar registrar_;
-
-  // When |render_frame_host_| is in a different process from its parent in
-  // the frame tree, this class connects its associated RenderWidgetHostView
-  // to the proxy RenderFrameHost for the parent's renderer process. NULL
-  // when |render_frame_host_| is the frame tree root or is in the same
-  // process as its parent.
-  CrossProcessFrameConnector* cross_process_frame_connector_;
 
   base::WeakPtrFactory<RenderFrameHostManager> weak_factory_;
 

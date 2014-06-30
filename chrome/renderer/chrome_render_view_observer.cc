@@ -127,7 +127,7 @@ bool RetrieveMetaTagContent(const WebFrame* main_frame,
       if (!child.isElementNode())
         continue;
       WebElement elem = child.to<WebElement>();
-      if (elem.hasTagName("meta")) {
+      if (elem.hasHTMLTagName("meta")) {
         if (elem.hasAttribute("name") && elem.hasAttribute("content")) {
           std::string name = elem.getAttribute("name").utf8();
           if (name == meta_tag_name) {
@@ -174,12 +174,14 @@ ChromeRenderViewObserver::~ChromeRenderViewObserver() {
 bool ChromeRenderViewObserver::OnMessageReceived(const IPC::Message& message) {
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(ChromeRenderViewObserver, message)
+#if !defined(OS_ANDROID) && !defined(OS_IOS)
     IPC_MESSAGE_HANDLER(ChromeViewMsg_WebUIJavaScript, OnWebUIJavaScript)
-    IPC_MESSAGE_HANDLER(ChromeViewMsg_SetClientSidePhishingDetection,
-                        OnSetClientSidePhishingDetection)
+#endif
+#if defined(ENABLE_EXTENSIONS)
     IPC_MESSAGE_HANDLER(ChromeViewMsg_SetName, OnSetName)
     IPC_MESSAGE_HANDLER(ChromeViewMsg_SetVisuallyDeemphasized,
                         OnSetVisuallyDeemphasized)
+#endif
 #if defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(ChromeViewMsg_UpdateTopControlsState,
                         OnUpdateTopControlsState)
@@ -188,6 +190,8 @@ bool ChromeRenderViewObserver::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ChromeViewMsg_RetrieveMetaTagContent,
                         OnRetrieveMetaTagContent)
 #endif
+    IPC_MESSAGE_HANDLER(ChromeViewMsg_SetClientSidePhishingDetection,
+                        OnSetClientSidePhishingDetection)
     IPC_MESSAGE_HANDLER(ChromeViewMsg_SetWindowFeatures, OnSetWindowFeatures)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
@@ -195,10 +199,12 @@ bool ChromeRenderViewObserver::OnMessageReceived(const IPC::Message& message) {
   return handled;
 }
 
+#if !defined(OS_ANDROID) && !defined(OS_IOS)
 void ChromeRenderViewObserver::OnWebUIJavaScript(
     const base::string16& javascript) {
   webui_javascript_.push_back(javascript);
 }
+#endif
 
 #if defined(OS_ANDROID)
 void ChromeRenderViewObserver::OnUpdateTopControlsState(
@@ -294,17 +300,16 @@ void ChromeRenderViewObserver::OnSetClientSidePhishingDetection(
     bool enable_phishing_detection) {
 #if defined(FULL_SAFE_BROWSING) && !defined(OS_CHROMEOS)
   phishing_classifier_ = enable_phishing_detection ?
-      safe_browsing::PhishingClassifierDelegate::Create(
-          render_view(), NULL) :
+      safe_browsing::PhishingClassifierDelegate::Create(render_view(), NULL) :
       NULL;
 #endif
 }
 
+#if defined(ENABLE_EXTENSIONS)
 void ChromeRenderViewObserver::OnSetName(const std::string& name) {
-  if (!render_view()->GetWebView())
-    return;
-
-  render_view()->GetWebView()->mainFrame()->setName(WebString::fromUTF8(name));
+  blink::WebView* web_view = render_view()->GetWebView();
+  if (web_view)
+    web_view->mainFrame()->setName(WebString::fromUTF8(name));
 }
 
 void ChromeRenderViewObserver::OnSetVisuallyDeemphasized(bool deemphasized) {
@@ -321,6 +326,7 @@ void ChromeRenderViewObserver::OnSetVisuallyDeemphasized(bool deemphasized) {
     dimmed_color_overlay_.reset();
   }
 }
+#endif
 
 void ChromeRenderViewObserver::DidStartLoading() {
   if ((render_view()->GetEnabledBindings() & content::BINDINGS_POLICY_WEB_UI) &&
@@ -415,7 +421,7 @@ void ChromeRenderViewObserver::CapturePageInfo(int page_id,
   UMA_HISTOGRAM_TIMES(kTranslateCaptureText,
                       base::TimeTicks::Now() - capture_begin_time);
   if (translate_helper_)
-    translate_helper_->PageCaptured(page_id, contents);
+    translate_helper_->PageCaptured(contents);
 
   // TODO(shess): Is indexing "Full text search" indexing?  In that
   // case more of this can go.
@@ -506,7 +512,7 @@ bool ChromeRenderViewObserver::HasRefreshMetaTag(WebFrame* frame) {
     if (!node.isElementNode())
       continue;
     WebElement element = node.to<WebElement>();
-    if (!element.hasTagName(tag_name))
+    if (!element.hasHTMLTagName(tag_name))
       continue;
     WebString value = element.getAttribute(attribute_name);
     if (value.isNull() || !LowerCaseEqualsASCII(value, "refresh"))

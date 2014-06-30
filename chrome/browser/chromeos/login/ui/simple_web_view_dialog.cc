@@ -19,7 +19,6 @@
 #include "chrome/browser/ui/content_settings/content_setting_bubble_model_delegate.h"
 #include "chrome/browser/ui/toolbar/toolbar_model_impl.h"
 #include "chrome/browser/ui/view_ids.h"
-#include "chrome/browser/ui/views/location_bar/location_icon_view.h"
 #include "chrome/browser/ui/views/toolbar/reload_button.h"
 #include "components/password_manager/core/browser/password_manager.h"
 #include "content/public/browser/navigation_controller.h"
@@ -112,6 +111,9 @@ class StubBubbleModelDelegate : public ContentSettingBubbleModelDelegate {
   }
 
   virtual void ShowContentSettingsPage(ContentSettingsType type) OVERRIDE {
+  }
+
+  virtual void ShowLearnMorePage(ContentSettingsType type) OVERRIDE {
   }
 
  private:

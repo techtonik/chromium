@@ -71,6 +71,9 @@ class BluetoothDeviceChromeOS
       const device::BluetoothUUID& uuid,
       const ConnectToServiceCallback& callback,
       const ConnectToServiceErrorCallback& error_callback) OVERRIDE;
+  virtual void CreateGattConnection(
+      const GattConnectionCallback& callback,
+      const ConnectErrorCallback& error_callback) OVERRIDE;
   virtual void StartConnectionMonitor(
       const base::Closure& callback,
       const ErrorCallback& error_callback) OVERRIDE;
@@ -116,6 +119,7 @@ class BluetoothDeviceChromeOS
                        const ConnectErrorCallback& error_callback);
   void OnConnect(bool after_pairing,
                  const base::Closure& callback);
+  void OnCreateGattConnection(const GattConnectionCallback& callback);
   void OnConnectError(bool after_pairing,
                       const ConnectErrorCallback& error_callback,
                       const std::string& error_name,

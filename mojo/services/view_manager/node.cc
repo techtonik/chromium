@@ -44,6 +44,11 @@ Node::~Node() {
     window_.parent()->RemoveChild(&window_);
 }
 
+// static
+Node* Node::NodeForWindow(aura::Window* window) {
+  return window->GetProperty(kNodeKey);
+}
+
 const Node* Node::GetParent() const {
   if (!window_.parent())
     return NULL;
@@ -56,6 +61,13 @@ void Node::Add(Node* child) {
 
 void Node::Remove(Node* child) {
   window_.RemoveChild(&child->window_);
+}
+
+void Node::Reorder(Node* child, Node* relative, OrderDirection direction) {
+  if (direction == ORDER_ABOVE)
+    window_.StackChildAbove(child->window(), relative->window());
+  else if (direction == ORDER_BELOW)
+    window_.StackChildBelow(child->window(), relative->window());
 }
 
 const Node* Node::GetRoot() const {
@@ -83,6 +95,17 @@ std::vector<Node*> Node::GetChildren() {
 
 bool Node::Contains(const Node* node) const {
   return node && window_.Contains(&(node->window_));
+}
+
+bool Node::IsVisible() const {
+  return window_.TargetVisibility();
+}
+
+void Node::SetVisible(bool value) {
+  if (value)
+    window_.Show();
+  else
+    window_.Hide();
 }
 
 void Node::SetView(View* view) {

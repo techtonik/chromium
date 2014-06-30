@@ -2,8 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 import os
-import sys
-import unittest
+from telemetry.results import base_test_results_unittest
 
 from telemetry.page import page_set
 from telemetry.results import page_test_results
@@ -16,7 +15,7 @@ class NonPrintingPageTestResults(
   def _PrintPerfResult(self, *args):
     pass
 
-class PageTestResultsTest(unittest.TestCase):
+class PageTestResultsTest(base_test_results_unittest.BaseTestResultsUnittest):
   def setUp(self):
     self.page_set = page_set.PageSet(file_path=os.path.dirname(__file__))
     self.page_set.AddPageWithDefaultRunNavigate("http://www.bar.com/")
@@ -27,20 +26,13 @@ class PageTestResultsTest(unittest.TestCase):
   def pages(self):
     return self.page_set.pages
 
-  def CreateException(self):
-    try:
-      raise Exception('Intentional exception')
-    except Exception:
-      return sys.exc_info()
-
   def test_failures(self):
     results = NonPrintingPageTestResults()
     results.AddFailure(self.pages[0], self.CreateException())
     results.AddSuccess(self.pages[1])
     self.assertEquals(results.pages_that_had_failures,
                       set([self.pages[0]]))
-    self.assertEquals(results.successes,
-                      [self.pages[1].display_name])
+    self.assertEquals(results.successes, [self.pages[1]])
 
   def test_errors(self):
     results = NonPrintingPageTestResults()
@@ -48,8 +40,7 @@ class PageTestResultsTest(unittest.TestCase):
     results.AddSuccess(self.pages[1])
     self.assertEquals(results.pages_that_had_errors,
                       set([self.pages[0]]))
-    self.assertEquals(results.successes,
-                      [self.pages[1].display_name])
+    self.assertEquals(results.successes, [self.pages[1]])
 
   def test_errors_and_failures(self):
     results = NonPrintingPageTestResults()
@@ -58,5 +49,4 @@ class PageTestResultsTest(unittest.TestCase):
     results.AddSuccess(self.pages[2])
     self.assertEquals(results.pages_that_had_errors_or_failures,
                       set([self.pages[0], self.pages[1]]))
-    self.assertEquals(results.successes,
-                      [self.pages[2].display_name])
+    self.assertEquals(results.successes, [self.pages[2]])

@@ -16,7 +16,6 @@
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/autocomplete/autocomplete_classifier.h"
 #include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
-#include "chrome/browser/autocomplete/autocomplete_input.h"
 #include "chrome/browser/autocomplete/autocomplete_match.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/command_updater.h"
@@ -49,8 +48,9 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/toolbar/wrench_menu_model.h"
 #include "chrome/browser/upgrade_detector.h"
-#include "chrome/common/net/url_fixer_upper.h"
 #include "chrome/common/pref_names.h"
+#include "components/metrics/proto/omnibox_event.pb.h"
+#include "components/url_fixer/url_fixer.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_service.h"
@@ -815,8 +815,8 @@ class NotificationBridge
     NOTIMPLEMENTED();
 
   // Get the first URL and fix it up.
-  GURL url(URLFixerUpper::FixupURL(
-      base::SysNSStringToUTF8([urls objectAtIndex:0]), std::string()));
+  GURL url(url_fixer::FixupURL(base::SysNSStringToUTF8([urls objectAtIndex:0]),
+                               std::string()));
 
   if (url.SchemeIs(url::kJavaScriptScheme)) {
     browser_->window()->GetLocationBar()->GetOmniboxView()->SetUserText(
@@ -836,8 +836,8 @@ class NotificationBridge
   // If the input is plain text, classify the input and make the URL.
   AutocompleteMatch match;
   AutocompleteClassifierFactory::GetForProfile(browser_->profile())->Classify(
-      base::SysNSStringToUTF16(text), false, false, AutocompleteInput::BLANK,
-      &match, NULL);
+      base::SysNSStringToUTF16(text), false, false,
+      metrics::OmniboxEventProto::BLANK, &match, NULL);
   GURL url(match.destination_url);
 
   OpenURLParams params(

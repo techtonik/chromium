@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import "network_error.mojom"
+import "mojo/services/public/interfaces/network/network_error.mojom"
 
 module mojo {
 
@@ -48,6 +48,12 @@ struct URLResponse {
 
   // The HTTP response headers.
   string[] headers;
+
+  // The MIME type of the response body.
+  string mime_type;
+
+  // The character set of the response body.
+  string charset;
 };
 
 [Client=URLLoaderClient]

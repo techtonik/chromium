@@ -21,9 +21,8 @@
 #include "chrome/browser/history/history_types.h"
 #include "chrome/browser/history/thumbnail_database.h"
 #include "chrome/browser/history/visit_tracker.h"
-#include "components/search_engines/template_url_id.h"
+#include "components/history/core/browser/keyword_id.h"
 #include "sql/init_status.h"
-#include "ui/base/layout.h"
 
 class TestingProfile;
 class TypedUrlSyncableService;
@@ -126,8 +125,7 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   // actually be deleted.
   void Closing();
 
-  // See NotifyRenderProcessHostDestruction.
-  void NotifyRenderProcessHostDestruction(const void* host);
+  void ClearCachedDataForContextID(ContextID context_id);
 
   // Navigation ----------------------------------------------------------------
 
@@ -135,14 +133,7 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   void AddPage(const HistoryAddPageArgs& request);
   virtual void SetPageTitle(const GURL& url, const base::string16& title);
   void AddPageNoVisitForBookmark(const GURL& url, const base::string16& title);
-
-  // Updates the database backend with a page's ending time stamp information.
-  // The page can be identified by the combination of the pointer to
-  // a RenderProcessHost, the page id and the url.
-  //
-  // The given pointer will not be dereferenced, it is only used for
-  // identification purposes, hence it is a void*.
-  void UpdateWithPageEndTime(const void* host,
+  void UpdateWithPageEndTime(ContextID context_id,
                              int32 page_id,
                              const GURL& url,
                              base::Time end_ts);
@@ -158,33 +149,36 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   void IterateURLs(
       const scoped_refptr<visitedlink::VisitedLinkDelegate::URLEnumerator>&
           enumerator);
-  void QueryURL(scoped_refptr<QueryURLRequest> request,
-                const GURL& url,
-                bool want_visits);
-  void QueryHistory(scoped_refptr<QueryHistoryRequest> request,
-                    const base::string16& text_query,
-                    const QueryOptions& options);
-  void QueryRedirectsFrom(scoped_refptr<QueryRedirectsRequest> request,
-                          const GURL& url);
-  void QueryRedirectsTo(scoped_refptr<QueryRedirectsRequest> request,
-                        const GURL& url);
+  void QueryURL(const GURL& url,
+                bool want_visits,
+                QueryURLResult* query_url_result);
+  void QueryHistory(const base::string16& text_query,
+                    const QueryOptions& options,
+                    QueryResults* query_results);
+
+  // Computes the most recent URL(s) that the given canonical URL has
+  // redirected to. There may be more than one redirect in a row, so this
+  // function will fill the given array with the entire chain. If there are
+  // no redirects for the most recent visit of the URL, or the URL is not
+  // in history, the array will be empty.
+  void QueryRedirectsFrom(const GURL& url, RedirectList* redirects);
+
+  // Similar to above function except computes a chain of redirects to the
+  // given URL. Stores the most recent list of redirects ending at |url| in the
+  // given RedirectList. For example, if we have the redirect list A -> B -> C,
+  // then calling this function with url=C would fill redirects with {B, A}.
+  void QueryRedirectsTo(const GURL& url, RedirectList* redirects);
 
   void GetVisibleVisitCountToHost(
       scoped_refptr<GetVisibleVisitCountToHostRequest> request,
       const GURL& url);
 
-  // TODO(Nik): remove. Use QueryMostVisitedURLs instead.
-  void QueryTopURLsAndRedirects(
-      scoped_refptr<QueryTopURLsAndRedirectsRequest> request,
-      int result_count);
-
   // Request the |result_count| most visited URLs and the chain of
   // redirects leading to each of these URLs. |days_back| is the
   // number of days of history to use. Used by TopSites.
-  void QueryMostVisitedURLs(
-      scoped_refptr<QueryMostVisitedURLsRequest> request,
-      int result_count,
-      int days_back);
+  void QueryMostVisitedURLs(int result_count,
+                            int days_back,
+                            MostVisitedURLList* result);
 
   // Request the |result_count| URLs and the chain of redirects
   // leading to each of these URLs, filterd and sorted based on the |filter|.
@@ -195,63 +189,37 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
       const history::VisitFilter& filter,
       bool debug);
 
-  // QueryMostVisitedURLs without the request.
-  void QueryMostVisitedURLsImpl(int result_count,
-                                int days_back,
-                                MostVisitedURLList* result);
-
-  // Computes the most recent URL(s) that the given canonical URL has
-  // redirected to and returns true on success. There may be more than one
-  // redirect in a row, so this function will fill the given array with the
-  // entire chain. If there are no redirects for the most recent visit of the
-  // URL, or the URL is not in history, returns false.
-  //
-  // Backend for QueryRedirectsFrom.
-  bool GetMostRecentRedirectsFrom(const GURL& url,
-                                  history::RedirectList* redirects);
-
-  // Similar to above function except computes a chain of redirects to the
-  // given URL. Stores the most recent list of redirects ending at |url| in the
-  // given RedirectList. For example, if we have the redirect list A -> B -> C,
-  // then calling this function with url=C would fill redirects with {B, A}.
-  bool GetMostRecentRedirectsTo(const GURL& url,
-                                history::RedirectList* redirects);
-
   // Favicon -------------------------------------------------------------------
 
   void GetFavicons(
       const std::vector<GURL>& icon_urls,
       int icon_types,
-      int desired_size_in_dip,
-      const std::vector<ui::ScaleFactor>& desired_scale_factors,
-      std::vector<favicon_base::FaviconBitmapResult>* bitmap_results);
+      const std::vector<int>& desired_sizes,
+      std::vector<favicon_base::FaviconRawBitmapResult>* bitmap_results);
 
   void GetLargestFaviconForURL(
       const GURL& page_url,
       const std::vector<int>& icon_types,
       int minimum_size_in_pixels,
-      favicon_base::FaviconBitmapResult* bitmap_result);
+      favicon_base::FaviconRawBitmapResult* bitmap_result);
 
   void GetFaviconsForURL(
       const GURL& page_url,
       int icon_types,
-      int desired_size_in_dip,
-      const std::vector<ui::ScaleFactor>& desired_scale_factors,
-      std::vector<favicon_base::FaviconBitmapResult>* bitmap_results);
+      const std::vector<int>& desired_sizes,
+      std::vector<favicon_base::FaviconRawBitmapResult>* bitmap_results);
 
   void GetFaviconForID(
       favicon_base::FaviconID favicon_id,
-      int desired_size_in_dip,
-      ui::ScaleFactor desired_scale_factor,
-      std::vector<favicon_base::FaviconBitmapResult>* bitmap_results);
+      int desired_size,
+      std::vector<favicon_base::FaviconRawBitmapResult>* bitmap_results);
 
   void UpdateFaviconMappingsAndFetch(
       const GURL& page_url,
       const std::vector<GURL>& icon_urls,
       int icon_types,
-      int desired_size_in_dip,
-      const std::vector<ui::ScaleFactor>& desired_scale_factors,
-      std::vector<favicon_base::FaviconBitmapResult>* bitmap_results);
+      const std::vector<int>& desired_sizes,
+      std::vector<favicon_base::FaviconRawBitmapResult>* bitmap_results);
 
   void MergeFavicon(const GURL& page_url,
                     const GURL& icon_url,
@@ -259,10 +227,10 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
                     scoped_refptr<base::RefCountedMemory> bitmap_data,
                     const gfx::Size& pixel_size);
 
-  void SetFavicons(
-      const GURL& page_url,
-      favicon_base::IconType icon_type,
-      const std::vector<favicon_base::FaviconBitmapData>& favicon_bitmap_data);
+  void SetFavicons(const GURL& page_url,
+                   favicon_base::IconType icon_type,
+                   const std::vector<favicon_base::FaviconRawBitmapData>&
+                       favicon_bitmap_data);
 
   void SetFaviconsOutOfDateForPage(const GURL& page_url);
 
@@ -279,30 +247,17 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   bool CreateDownload(const history::DownloadRow& history_info);
   void RemoveDownloads(const std::set<uint32>& ids);
 
-  // Segment usage -------------------------------------------------------------
-
-  void QuerySegmentUsage(scoped_refptr<QuerySegmentUsageRequest> request,
-                         const base::Time from_time,
-                         int max_result_count);
-  void DeleteOldSegmentData();
-
   // Keyword search terms ------------------------------------------------------
 
   void SetKeywordSearchTermsForURL(const GURL& url,
-                                   TemplateURLID keyword_id,
+                                   KeywordID keyword_id,
                                    const base::string16& term);
 
-  void DeleteAllSearchTermsForKeyword(TemplateURLID keyword_id);
-
-  void GetMostRecentKeywordSearchTerms(
-      scoped_refptr<GetMostRecentKeywordSearchTermsRequest> request,
-      TemplateURLID keyword_id,
-      const base::string16& prefix,
-      int max_count);
+  void DeleteAllSearchTermsForKeyword(KeywordID keyword_id);
 
   void DeleteKeywordSearchTermForURL(const GURL& url);
 
-  void DeleteMatchingURLsForKeyword(TemplateURLID keyword_id,
+  void DeleteMatchingURLsForKeyword(KeywordID keyword_id,
                                     const base::string16& term);
 
 #if defined(OS_ANDROID)
@@ -378,7 +333,10 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
                                          int max_visits,
                                          VisitVector* visits);
 
-  virtual bool UpdateURL(URLID id, const history::URLRow& url);
+  // For each element in |urls|, updates the pre-existing URLRow in the database
+  // with the same ID; or ignores the element if no such row exists. Returns the
+  // number of records successfully updated.
+  virtual size_t UpdateURLs(const history::URLRows& urls);
 
   // While adding visits in batch, the source needs to be provided.
   virtual bool AddVisits(const GURL& url,
@@ -481,6 +439,7 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest, DeleteAll);
   FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest, DeleteAllThenAddData);
   FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest, AddPagesWithDetails);
+  FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest, UpdateURLs);
   FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest, ImportedFaviconsTest);
   FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest, URLsNoLongerBookmarked);
   FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest, StripUsernamePasswordTest);
@@ -658,9 +617,8 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
       const GURL* page_url,
       const std::vector<GURL>& icon_urls,
       int icon_types,
-      int desired_size_in_dip,
-      const std::vector<ui::ScaleFactor>& desired_scale_factors,
-      std::vector<favicon_base::FaviconBitmapResult>* results);
+      const std::vector<int>& desired_sizes,
+      std::vector<favicon_base::FaviconRawBitmapResult>* results);
 
   // Set the favicon bitmaps for |icon_id|.
   // For each entry in |favicon_bitmap_data|, if a favicon bitmap already
@@ -672,19 +630,19 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   // data at |icon_id| is changed as a result of calling this method.
   // Computing |favicon_bitmaps_changed| requires additional database queries
   // so should be avoided if unnecessary.
-  void SetFaviconBitmaps(
-      favicon_base::FaviconID icon_id,
-      const std::vector<favicon_base::FaviconBitmapData>& favicon_bitmap_data,
-      bool* favicon_bitmaps_changed);
+  void SetFaviconBitmaps(favicon_base::FaviconID icon_id,
+                         const std::vector<favicon_base::FaviconRawBitmapData>&
+                             favicon_bitmap_data,
+                         bool* favicon_bitmaps_changed);
 
   // Returns true if |favicon_bitmap_data| passed to SetFavicons() is valid.
   // Criteria:
   // 1) |favicon_bitmap_data| contains no more than
   //      kMaxFaviconsPerPage unique icon URLs.
   //      kMaxFaviconBitmapsPerIconURL favicon bitmaps for each icon URL.
-  // 2) FaviconBitmapData::bitmap_data contains non NULL bitmap data.
+  // 2) FaviconRawBitmapData::bitmap_data contains non NULL bitmap data.
   bool ValidateSetFaviconsParams(const std::vector<
-      favicon_base::FaviconBitmapData>& favicon_bitmap_data) const;
+      favicon_base::FaviconRawBitmapData>& favicon_bitmap_data) const;
 
   // Returns true if the bitmap data at |bitmap_id| equals |new_bitmap_data|.
   bool IsFaviconBitmapDataEqual(
@@ -693,36 +651,36 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
 
   // Returns true if there are favicons for |page_url| and one of the types in
   // |icon_types|.
-  // |favicon_bitmap_results| is set to the favicon bitmaps which most closely
-  // match |desired_size_in_dip| and |desired_scale_factors|. If
-  // |desired_size_in_dip| is 0, the largest favicon bitmap with one of the icon
-  // types in |icon_types| is returned. If |icon_types| contains multiple icon
-  // types and there are several matched icon types in the database, results
-  // will only be returned for a single icon type in the priority of
-  // TOUCH_PRECOMPOSED_ICON, TOUCH_ICON, and FAVICON. See the comment for
+  // |favicon_bitmap_results| is set to the favicon bitmaps whose edge sizes
+  // most closely match |desired_sizes|. If |desired_sizes| has a '0' entry, the
+  // largest favicon bitmap with one of the icon types in |icon_types| is
+  // returned. If |icon_types| contains multiple icon types and there are
+  // several matched icon types in the database, results will only be returned
+  // for a single icon type in the priority of TOUCH_PRECOMPOSED_ICON,
+  // TOUCH_ICON, and FAVICON. See the comment for
   // GetFaviconResultsForBestMatch() for more details on how
   // |favicon_bitmap_results| is constructed.
   bool GetFaviconsFromDB(
       const GURL& page_url,
       int icon_types,
-      const int desired_size_in_dip,
-      const std::vector<ui::ScaleFactor>& desired_scale_factors,
-      std::vector<favicon_base::FaviconBitmapResult>* favicon_bitmap_results);
+      const std::vector<int>& desired_sizes,
+      std::vector<favicon_base::FaviconRawBitmapResult>*
+          favicon_bitmap_results);
 
-  // Returns the favicon bitmaps which most closely match |desired_size_in_dip|
-  // and |desired_scale_factors| in |favicon_bitmap_results|. If
-  // |desired_size_in_dip| is 0, only the largest favicon bitmap is returned.
-  // Goodness is computed via SelectFaviconBitmapIDs(). It is computed on a
-  // per favicon id basis, thus all |favicon_bitmap_results| are guaranteed to
-  // be for the same FaviconID. |favicon_bitmap_results| will have at most one
-  // entry for each desired scale factor. There will be less entries if the same
-  // favicon bitmap is the best result for multiple scale factors.
+  // Returns the favicon bitmaps whose edge sizes most closely match
+  // |desired_sizes| in |favicon_bitmap_results|. If |desired_sizes| has a '0'
+  // entry, only the largest favicon bitmap is returned. Goodness is computed
+  // via SelectFaviconFrameIndices(). It is computed on a per FaviconID basis,
+  // thus all |favicon_bitmap_results| are guaranteed to be for the same
+  // FaviconID. |favicon_bitmap_results| will have at most one entry for each
+  // desired edge size. There will be fewer entries if the same favicon bitmap
+  // is the best result for multiple edge sizes.
   // Returns true if there were no errors.
   bool GetFaviconBitmapResultsForBestMatch(
       const std::vector<favicon_base::FaviconID>& candidate_favicon_ids,
-      int desired_size_in_dip,
-      const std::vector<ui::ScaleFactor>& desired_scale_factors,
-      std::vector<favicon_base::FaviconBitmapResult>* favicon_bitmap_results);
+      const std::vector<int>& desired_sizes,
+      std::vector<favicon_base::FaviconRawBitmapResult>*
+          favicon_bitmap_results);
 
   // Maps the favicon ids in |icon_ids| to |page_url| (and all redirects)
   // for |icon_type|.

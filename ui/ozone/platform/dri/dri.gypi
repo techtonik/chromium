@@ -29,7 +29,6 @@
         '../events/ozone/events_ozone.gyp:events_ozone_evdev',
         '../gfx/gfx.gyp:gfx',
         '../gfx/gfx.gyp:gfx_geometry',
-        '../gfx/ozone/gfx_ozone.gyp:gfx_ozone',
       ],
       'defines': [
         'OZONE_IMPLEMENTATION',
@@ -43,6 +42,8 @@
         'chromeos/native_display_delegate_dri.h',
         'cursor_factory_evdev_dri.cc',
         'cursor_factory_evdev_dri.h',
+        'dri_console_buffer.cc',
+        'dri_console_buffer.h',
         'dri_buffer.cc',
         'dri_buffer.h',
         'dri_surface.cc',
@@ -59,6 +60,8 @@
         'hardware_display_controller.h',
         'ozone_platform_dri.cc',
         'ozone_platform_dri.h',
+        'scoped_drm_types.cc',
+        'scoped_drm_types.h',
         'screen_manager.cc',
         'screen_manager.h',
         'scanout_surface.h',
@@ -73,13 +76,12 @@
         '../../build/linux/system.gyp:dridrm',
         '../../skia/skia.gyp:skia',
         '../gfx/gfx.gyp:gfx_geometry',
-        '../gfx/ozone/gfx_ozone.gyp:gfx_ozone',
+        'ozone_platform_dri',
       ],
       'export_dependent_settings': [
         '../../build/linux/system.gyp:dridrm',
         '../../skia/skia.gyp:skia',
         '../gfx/gfx.gyp:gfx_geometry',
-        '../gfx/ozone/gfx_ozone.gyp:gfx_ozone',
       ],
       'direct_dependent_settings': {
         'sources': [

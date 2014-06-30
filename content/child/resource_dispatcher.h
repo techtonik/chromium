@@ -53,8 +53,8 @@ class CONTENT_EXPORT ResourceDispatcher : public IPC::Listener {
 
   // Creates a ResourceLoaderBridge for this type of dispatcher, this is so
   // this can be tested regardless of the ResourceLoaderBridge::Create
-  // implementation.
-  webkit_glue::ResourceLoaderBridge* CreateBridge(
+  // implementation.  Virtual for tests.
+  virtual webkit_glue::ResourceLoaderBridge* CreateBridge(
       const RequestInfo& request_info);
 
   // Adds a request from the |pending_requests_| list, returning the new
@@ -70,7 +70,8 @@ class CONTENT_EXPORT ResourceDispatcher : public IPC::Listener {
   // request was found and removed.
   bool RemovePendingRequest(int request_id);
 
-  // Cancels a request in the |pending_requests_| list.
+  // Cancels a request in the |pending_requests_| list.  The request will be
+  // removed from the dispatcher as well.
   void CancelPendingRequest(int request_id);
 
   // Toggles the is_deferred attribute for the specified request.

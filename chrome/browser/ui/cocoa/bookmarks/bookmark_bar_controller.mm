@@ -12,6 +12,7 @@
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/bookmarks/bookmark_stats.h"
 #include "chrome/browser/bookmarks/chrome_bookmark_client.h"
+#include "chrome/browser/bookmarks/chrome_bookmark_client_factory.h"
 #include "chrome/browser/prefs/incognito_mode_prefs.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/themes/theme_properties.h"
@@ -253,9 +254,9 @@ void RecordAppLaunch(Profile* profile, GURL url) {
 
     browser_ = browser;
     initialWidth_ = initialWidth;
-    bookmarkClient_ = BookmarkModelFactory::GetChromeBookmarkClientForProfile(
-        browser_->profile());
-    bookmarkModel_ = bookmarkClient_->model();
+    bookmarkModel_ = BookmarkModelFactory::GetForProfile(browser_->profile());
+    bookmarkClient_ =
+        ChromeBookmarkClientFactory::GetForProfile(browser_->profile());
     buttons_.reset([[NSMutableArray alloc] init]);
     delegate_ = delegate;
     resizeDelegate_ = resizeDelegate;
@@ -510,10 +511,11 @@ void RecordAppLaunch(Profile* profile, GURL url) {
   [self showBookmarkBarWithAnimation:NO];
 }
 
-- (void)updateAppsPageShortcutButtonVisibility {
-  if (!appsPageShortcutButton_.get())
+- (void)updateExtraButtonsVisibility {
+  if (!appsPageShortcutButton_.get() || !managedBookmarksButton_.get())
     return;
   [self setAppsPageShortcutButtonVisibility];
+  [self setManagedBookmarksButtonVisibility];
   [self resetAllButtonPositionsWithAnimation:NO];
   [self reconfigureBookmarkBar];
 }
@@ -580,8 +582,12 @@ void RecordAppLaunch(Profile* profile, GURL url) {
   if (!node)
     return defaultImage_;
 
-  // TODO(joaodasilva): return the "Managed Bookmarks" icon here for the
-  // managed node.
+  if (node == bookmarkClient_->managed_node()) {
+    // Most users never see this node, so the image is only loaded if needed.
+    ResourceBundle& rb = ResourceBundle::GetSharedInstance();
+    return rb.GetNativeImageNamed(IDR_BOOKMARK_BAR_FOLDER_MANAGED).ToNSImage();
+  }
+
   if (node->is_folder())
     return folderImage_;
 
@@ -1169,7 +1175,9 @@ void RecordAppLaunch(Profile* profile, GURL url) {
   if (!managedBookmarksButton_.get())
     return NO;
 
-  BOOL visible = ![managedBookmarksButton_ bookmarkNode]->empty();
+  PrefService* prefs = browser_->profile()->GetPrefs();
+  BOOL visible = ![managedBookmarksButton_ bookmarkNode]->empty() &&
+                 prefs->GetBoolean(prefs::kShowManagedBookmarksInBookmarkBar);
   BOOL currentVisibility = ![managedBookmarksButton_ isHidden];
   if (currentVisibility != visible) {
     [managedBookmarksButton_ setHidden:!visible];
@@ -1220,7 +1228,16 @@ void RecordAppLaunch(Profile* profile, GURL url) {
 // Creates the button for "Managed Bookmarks", but does not position it.
 - (void)createManagedBookmarksButton {
   if (managedBookmarksButton_.get()) {
+    // The node's title might have changed if the user signed in or out.
+    // Make sure it's up to date now.
+    const BookmarkNode* node = bookmarkClient_->managed_node();
+    NSString* title = base::SysUTF16ToNSString(node->GetTitle());
+    NSCell* cell = [managedBookmarksButton_ cell];
+    [cell setTitle:title];
+
+    // Its visibility may have changed too.
     [self setManagedBookmarksButtonVisibility];
+
     return;
   }
 

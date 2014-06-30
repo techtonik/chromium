@@ -1659,7 +1659,8 @@ class EvictionTestLayerImpl : public LayerImpl {
   }
   virtual ~EvictionTestLayerImpl() {}
 
-  virtual void AppendQuads(QuadSink* quad_sink,
+  virtual void AppendQuads(RenderPass* render_pass,
+                           const OcclusionTracker<LayerImpl>& occlusion_tracker,
                            AppendQuadsData* append_quads_data) OVERRIDE {
     ASSERT_TRUE(has_texture_);
     ASSERT_NE(0u, layer_tree_impl()->resource_provider()->num_resources());
@@ -2210,7 +2211,11 @@ class LayerTreeHostTestLCDNotification : public LayerTreeHostTest {
   };
 
   virtual void SetupTree() OVERRIDE {
-    scoped_refptr<ContentLayer> root_layer = ContentLayer::Create(&client_);
+    scoped_refptr<Layer> root_layer;
+    if (layer_tree_host()->settings().impl_side_painting)
+      root_layer = PictureLayer::Create(&client_);
+    else
+      root_layer = ContentLayer::Create(&client_);
     root_layer->SetIsDrawable(true);
     root_layer->SetBounds(gfx::Size(1, 1));
 
@@ -2231,7 +2236,7 @@ class LayerTreeHostTestLCDNotification : public LayerTreeHostTest {
   virtual void DidCommit() OVERRIDE {
     switch (layer_tree_host()->source_frame_number()) {
       case 1:
-        // The first update consists one LCD notification and one paint.
+        // The first update consists of one LCD notification and one paint.
         EXPECT_EQ(1, client_.lcd_notification_count());
         EXPECT_EQ(1, client_.paint_count());
         // LCD text must have been enabled on the layer.
@@ -2250,7 +2255,7 @@ class LayerTreeHostTestLCDNotification : public LayerTreeHostTest {
         // No need to request a commit - setting opacity will do it.
         break;
       default:
-        // Verify that there is not extra commit due to layer invalidation.
+        // Verify that there is no extra commit due to layer invalidation.
         EXPECT_EQ(3, layer_tree_host()->source_frame_number());
         // LCD notification count should have incremented due to
         // change in layer opacity.
@@ -2268,7 +2273,7 @@ class LayerTreeHostTestLCDNotification : public LayerTreeHostTest {
   NotificationClient client_;
 };
 
-SINGLE_THREAD_TEST_F(LayerTreeHostTestLCDNotification);
+SINGLE_AND_MULTI_THREAD_TEST_F(LayerTreeHostTestLCDNotification);
 
 // Verify that the BeginFrame notification is used to initiate rendering.
 class LayerTreeHostTestBeginFrameNotification : public LayerTreeHostTest {
@@ -4627,7 +4632,8 @@ class LayerTreeHostTestHighResRequiredAfterEvictingUIResources
   scoped_ptr<FakeScopedUIResource> ui_resource_;
 };
 
-MULTI_THREAD_TEST_F(LayerTreeHostTestHighResRequiredAfterEvictingUIResources);
+// This test is flaky, see http://crbug.com/386199
+// MULTI_THREAD_TEST_F(LayerTreeHostTestHighResRequiredAfterEvictingUIResources)
 
 class LayerTreeHostTestGpuRasterizationDefault : public LayerTreeHostTest {
  protected:

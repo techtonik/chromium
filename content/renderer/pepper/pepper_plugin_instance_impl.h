@@ -17,6 +17,7 @@
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string16.h"
 #include "cc/layers/content_layer_client.h"
+#include "cc/layers/layer.h"
 #include "cc/layers/texture_layer_client.h"
 #include "content/common/content_export.h"
 #include "content/public/renderer/pepper_plugin_instance.h"
@@ -102,6 +103,7 @@ namespace content {
 class ContentDecryptorDelegate;
 class FullscreenContainer;
 class MessageChannel;
+class PepperCompositorHost;
 class PepperGraphics2DHost;
 class PluginModule;
 class PluginObject;
@@ -300,6 +302,12 @@ class CONTENT_EXPORT PepperPluginInstanceImpl
 
   // Send the message on to the plugin.
   void HandleMessage(ppapi::ScopedPPVar message);
+
+  // Send the message synchronously to the plugin, and get a result. Returns
+  // true if the plugin handled the message, false if it didn't. The plugin
+  // won't handle the message if it has not registered a PPP_MessageHandler.
+  bool HandleBlockingMessage(ppapi::ScopedPPVar message,
+                             ppapi::ScopedPPVar* result);
 
   // Returns true if the plugin is processing a user gesture.
   bool IsProcessingUserGesture();
@@ -627,7 +635,10 @@ class CONTENT_EXPORT PepperPluginInstanceImpl
   // - we are not in Flash full-screen mode (or transitioning to it)
   // Otherwise it destroys the layer.
   // It does either operation lazily.
-  void UpdateLayer();
+  // device_changed: true if the bound device has been changed, and
+  // UpdateLayer() will be forced to recreate the layer and attaches to the
+  // container.
+  void UpdateLayer(bool device_changed);
 
   // Internal helper function for PrintPage().
   bool PrintPageHelper(PP_PrintPageNumberRange_Dev* page_ranges,
@@ -687,6 +698,7 @@ class CONTENT_EXPORT PepperPluginInstanceImpl
 
   // NULL until we have been initialized.
   blink::WebPluginContainer* container_;
+  scoped_refptr<cc::Layer> compositor_layer_;
   scoped_refptr<cc::TextureLayer> texture_layer_;
   scoped_ptr<blink::WebLayer> web_layer_;
   bool layer_bound_to_fullscreen_;
@@ -710,9 +722,10 @@ class CONTENT_EXPORT PepperPluginInstanceImpl
   // same as the default values.
   bool sent_initial_did_change_view_;
 
-  // The current device context for painting in 2D and 3D.
+  // The current device context for painting in 2D, 3D or compositor.
   scoped_refptr<PPB_Graphics3D_Impl> bound_graphics_3d_;
   PepperGraphics2DHost* bound_graphics_2d_platform_;
+  PepperCompositorHost* bound_compositor_;
 
   // We track two types of focus, one from WebKit, which is the focus among
   // all elements of the page, one one from the browser, which is whether the

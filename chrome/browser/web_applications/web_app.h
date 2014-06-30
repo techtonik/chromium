@@ -96,11 +96,18 @@ enum ShortcutCreationReason {
   SHORTCUT_CREATION_AUTOMATED,
 };
 
+// Called by GetInfoForApp after fetching the ShortcutInfo and FileHandlersInfo.
+typedef base::Callback<void(const ShortcutInfo&,
+                            const extensions::FileHandlersInfo&)> InfoCallback;
+
+// Called by UpdateShortcutInfoAndIconForApp after loading the icon.
 typedef base::Callback<void(const ShortcutInfo&)> ShortcutInfoCallback;
 
+#if defined(TOOLKIT_VIEWS)
 // Extracts shortcut info of the given WebContents.
 void GetShortcutInfoForTab(content::WebContents* web_contents,
                            ShortcutInfo* info);
+#endif
 
 // Updates web app shortcut of the WebContents. This function checks and
 // updates web app icon and shortcuts if needed. For icon, the check is based
@@ -196,6 +203,11 @@ std::string GetWMClassFromAppName(std::string app_name);
 #endif
 
 namespace internals {
+
+// Loads relevant info structs for the app and calls |callback|.
+void GetInfoForApp(const extensions::Extension* extension,
+                   Profile* profile,
+                   const InfoCallback& callback);
 
 #if defined(OS_WIN)
 // Returns the Windows user-level shortcut paths that are specified in
