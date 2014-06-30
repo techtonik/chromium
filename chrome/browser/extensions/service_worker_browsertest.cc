@@ -28,6 +28,11 @@ class ExtensionServiceWorkerBrowserTest : public ExtensionBrowserTest {
   ExtensionServiceWorkerBrowserTest()
       : trunk_channel_(chrome::VersionInfo::CHANNEL_UNKNOWN) {}
 
+  virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
+    ExtensionBrowserTest::SetUpCommandLine(command_line);
+    command_line->AppendSwitch(
+        switches::kEnableExperimentalWebPlatformFeatures);
+  }
   extensions::ScopedCurrentChannel trunk_channel_;
   TestExtensionDir ext_dir_;
 };
