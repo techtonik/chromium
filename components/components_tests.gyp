@@ -1,4 +1,4 @@
-# Copyright 2012 The Chromium Authors. All rights reserved.
+# Copyright 2014 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -18,6 +18,7 @@
           'type': '<(gtest_target_type)',
           'sources': [
             'auto_login_parser/auto_login_parser_unittest.cc',
+            'autocomplete/autocomplete_input_unittest.cc',
             'autofill/content/browser/content_autofill_driver_unittest.cc',
             'autofill/content/browser/request_autocomplete_manager_unittest.cc',
             'autofill/content/browser/wallet/full_wallet_unittest.cc',
@@ -68,6 +69,7 @@
             'bookmarks/browser/bookmark_index_unittest.cc',
             'bookmarks/browser/bookmark_model_unittest.cc',
             'bookmarks/browser/bookmark_utils_unittest.cc',
+            'breakpad/app/crash_keys_win_unittest.cc',
             'captive_portal/captive_portal_detector_unittest.cc',
             'cloud_devices/common/cloud_devices_urls_unittest.cc',
             'cloud_devices/common/printer_description_unittest.cc',
@@ -75,13 +77,14 @@
             'data_reduction_proxy/browser/data_reduction_proxy_config_service_unittest.cc',
             'data_reduction_proxy/browser/data_reduction_proxy_metrics_unittest.cc',
             'data_reduction_proxy/browser/data_reduction_proxy_params_unittest.cc',
+            'data_reduction_proxy/browser/data_reduction_proxy_protocol_unittest.cc',
             'data_reduction_proxy/browser/data_reduction_proxy_settings_unittest.cc',
-            'data_reduction_proxy/browser/http_auth_handler_data_reduction_proxy_unittest.cc',
+            'data_reduction_proxy/browser/data_reduction_proxy_usage_stats_unittest.cc',
+            'data_reduction_proxy/common/data_reduction_proxy_headers_unittest.cc',
             'dom_distiller/core/article_entry_unittest.cc',
             'dom_distiller/core/distilled_content_store_unittest.cc',
             'dom_distiller/core/distiller_unittest.cc',
             'dom_distiller/core/distiller_url_fetcher_unittest.cc',
-            'dom_distiller/core/dom_distiller_database_unittest.cc',
             'dom_distiller/core/dom_distiller_model_unittest.cc',
             'dom_distiller/core/dom_distiller_service_unittest.cc',
             'dom_distiller/core/dom_distiller_store_unittest.cc',
@@ -97,13 +100,17 @@
             'domain_reliability/test_util.h',
             'domain_reliability/uploader_unittest.cc',
             'domain_reliability/util_unittest.cc',
+            'enhanced_bookmarks/image_store_ios_unittest.mm',
             'enhanced_bookmarks/image_store_unittest.cc',
+            'enhanced_bookmarks/metadata_accessor_unittest.cc',
             'feedback/feedback_common_unittest.cc',
             'feedback/feedback_data_unittest.cc',
             'feedback/feedback_uploader_unittest.cc',
             'gcm_driver/gcm_client_impl_unittest.cc',
             'gcm_driver/gcm_driver_desktop_unittest.cc',
             'gcm_driver/gcm_stats_recorder_impl_unittest.cc',
+            'history/core/browser/url_database_unittest.cc',
+            'history/core/common/thumbnail_score_unittest.cc',
             'invalidation/invalidation_logger_unittest.cc',
             'json_schema/json_schema_validator_unittest.cc',
             'json_schema/json_schema_validator_unittest_base.cc',
@@ -111,16 +118,19 @@
             'keyed_service/content/browser_context_dependency_manager_unittest.cc',
             'keyed_service/core/dependency_graph_unittest.cc',
             'language_usage_metrics/language_usage_metrics_unittest.cc',
+            'leveldb_proto/proto_database_impl_unittest.cc',
+            'metrics/compression_utils_unittest.cc',
             'metrics/machine_id_provider_win_unittest.cc',
             'metrics/metrics_hashes_unittest.cc',
             'metrics/metrics_log_manager_unittest.cc',
             'metrics/metrics_log_unittest.cc',
             'metrics/metrics_reporting_scheduler_unittest.cc',
+            'metrics/metrics_service_unittest.cc',
             'metrics/metrics_state_manager_unittest.cc',
-            'metrics/net/compression_utils_unittest.cc',
             'metrics/persisted_logs_unittest.cc',
             'navigation_interception/intercept_navigation_resource_throttle_unittest.cc',
             'network_time/network_time_tracker_unittest.cc',
+            'omaha_query_params/omaha_query_params_unittest.cc',
             'os_crypt/ie7_password_win_unittest.cc',
             'os_crypt/keychain_password_mac_unittest.mm',
             'os_crypt/os_crypt_unittest.cc',
@@ -162,6 +172,7 @@
             'storage_monitor/storage_monitor_mac_unittest.mm',
             'storage_monitor/storage_monitor_unittest.cc',
             'storage_monitor/storage_monitor_win_unittest.cc',
+            'sync_driver/non_ui_data_type_controller_unittest.cc',
             'sync_driver/data_type_manager_impl_unittest.cc',
             'sync_driver/generic_change_processor_unittest.cc',
             'sync_driver/model_association_manager_unittest.cc',
@@ -169,6 +180,7 @@
             'sync_driver/shared_change_processor_unittest.cc',
             'sync_driver/sync_prefs_unittest.cc',
             'sync_driver/system_encryptor_unittest.cc',
+            'sync_driver/ui_data_type_controller_unittest.cc',
             'test/run_all_unittests.cc',
             'translate/core/browser/language_state_unittest.cc',
             'translate/core/browser/translate_browser_metrics_unittest.cc',
@@ -182,6 +194,7 @@
             'url_matcher/substring_set_matcher_unittest.cc',
             'url_matcher/url_matcher_factory_unittest.cc',
             'url_matcher/url_matcher_unittest.cc',
+            'url_fixer/url_fixer_unittest.cc',
             'variations/active_field_trials_unittest.cc',
             'variations/caching_permuted_entropy_provider_unittest.cc',
             'variations/entropy_provider_unittest.cc',
@@ -217,12 +230,19 @@
             # Dependencies of auto_login_parser
             'components.gyp:auto_login_parser',
 
+            # Dependencies of autocomplete
+            'components.gyp:autocomplete',
+            'components.gyp:autocomplete_test_support',
+
             # Dependencies of autofill
             'components.gyp:autofill_core_browser',
             'components.gyp:autofill_core_common',
             'components.gyp:autofill_core_test_support',
             'components_strings.gyp:components_strings',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber',
+
+            # Dependencies of breakpad
+            'components.gyp:breakpad_test_support',
 
             # Dependencies of bookmarks
             'components.gyp:bookmarks_browser',
@@ -254,10 +274,14 @@
 
             # Dependencies of feedback
             'components.gyp:feedback_component',
-            
+
             # Dependencies of gcm
             'components.gyp:gcm_driver',
             'components.gyp:gcm_driver_test_support',
+
+            # Dependencies of history
+            'components.gyp:history_core_browser',
+            'components.gyp:history_core_common',
 
             # Dependencies of invalidation
             'components.gyp:invalidation',
@@ -272,6 +296,11 @@
             # Dependencies of language_usage_metrics
             'components.gyp:language_usage_metrics',
 
+            # Dependencies of leveldb_proto
+            '../third_party/leveldatabase/leveldatabase.gyp:leveldatabase',
+            'components.gyp:leveldb_proto',
+            'components.gyp:leveldb_proto_test_support',
+
             # Dependencies of metrics
             'components.gyp:metrics',
             'components.gyp:metrics_net',
@@ -279,6 +308,9 @@
 
             # Dependencies of network_time
             'components.gyp:network_time',
+
+            # Dependencies of omaha_query_params
+            'components.gyp:omaha_query_params',
 
             # Dependencies of os_crypt
             'components.gyp:os_crypt',
@@ -290,6 +322,9 @@
             # Dependencies of precache/core
             'components.gyp:password_manager_core_browser',
             'components.gyp:precache_core',
+
+            # Dependencies of pref_registry
+            'components.gyp:pref_registry_test_support',
 
             # Dependencies of query_parser
             'components.gyp:query_parser',
@@ -312,6 +347,10 @@
             'components.gyp:translate_core_browser',
             'components.gyp:translate_core_common',
             'components.gyp:translate_core_language_detection',
+
+            # Dependencies of url_fixer
+            'components.gyp:url_fixer',
+            '../url/url.gyp:url_lib',
 
             # Dependencies of variations
             'components.gyp:variations',
@@ -384,11 +423,14 @@
                 ['include', '^bookmarks/'],
                 ['include', '^data_reduction_proxy/'],
                 ['include', '^dom_distiller/'],
+                ['include', '^enhanced_bookmarks/'],
                 ['include', '^gcm_driver/'],
+                ['include', '^history/'],
                 ['include', '^invalidation/'],
                 ['include', '^json_schema/'],
                 ['include', '^keyed_service/core/'],
                 ['include', '^language_usage_metrics/'],
+                ['include', '^leveldb_proto/'],
                 ['include', '^metrics/'],
                 ['include', '^network_time/'],
                 ['include', '^password_manager/'],
@@ -397,6 +439,7 @@
                 ['include', '^signin/'],
                 ['include', '^sync_driver/'],
                 ['include', '^translate/'],
+                ['include', '^url_fixer/'],
                 ['include', '^variations/'],
               ],
               'dependencies': [
@@ -490,6 +533,7 @@
                 'invalidation/push_client_channel_unittest.cc',
                 'invalidation/sync_invalidation_listener_unittest.cc',
                 'invalidation/sync_system_resources_unittest.cc',
+                'invalidation/ticl_invalidation_service_unittest.cc',
               ],
             }],
             ['chromeos==1', {

@@ -202,8 +202,6 @@ class AutofillInteractiveTest : public InProcessBrowserTest {
 
   // InProcessBrowserTest:
   virtual void SetUpOnMainThread() OVERRIDE {
-    TranslateService::SetUseInfobar(true);
-
     // Don't want Keychain coming up on Mac.
     test::DisableSystemServices(browser()->profile()->GetPrefs());
 
@@ -483,6 +481,35 @@ IN_PROC_BROWSER_TEST_F(AutofillInteractiveTest, AutofillSelectViaTab) {
 
   // The form should be filled.
   ExpectFilledTestForm();
+}
+
+// Test that a field is still autofillable after the previously autofilled
+// value is deleted.
+IN_PROC_BROWSER_TEST_F(AutofillInteractiveTest, OnDeleteValueAfterAutofill) {
+  CreateTestProfile();
+
+  // Load the test page.
+  ASSERT_NO_FATAL_FAILURE(ui_test_utils::NavigateToURL(browser(),
+      GURL(std::string(kDataURIPrefix) + kTestFormString)));
+
+  // Invoke and accept the Autofill popup and verify the form was filled.
+  FocusFirstNameField();
+  SendKeyToPageAndWait(ui::VKEY_M);
+  SendKeyToPopupAndWait(ui::VKEY_DOWN);
+  SendKeyToPopupAndWait(ui::VKEY_RETURN);
+  ExpectFilledTestForm();
+
+  // Delete the value of a filled field.
+  ASSERT_TRUE(content::ExecuteScript(
+      GetRenderViewHost(),
+      "document.getElementById('firstname').value = '';"));
+  ExpectFieldValue("firstname", "");
+
+  // Invoke and accept the Autofill popup and verify the field was filled.
+  SendKeyToPageAndWait(ui::VKEY_M);
+  SendKeyToPopupAndWait(ui::VKEY_DOWN);
+  SendKeyToPopupAndWait(ui::VKEY_RETURN);
+  ExpectFieldValue("firstname", "Milton");
 }
 
 // Test that a JavaScript oninput event is fired after auto-filling a form.
@@ -928,6 +955,10 @@ IN_PROC_BROWSER_TEST_F(AutofillInteractiveTest, AutofillAfterReload) {
 }
 
 IN_PROC_BROWSER_TEST_F(AutofillInteractiveTest, AutofillAfterTranslate) {
+  // TODO(port): Test corresponding bubble translate UX: http://crbug.com/383235
+  if (TranslateService::IsTranslateBubbleEnabled())
+    return;
+
   CreateTestProfile();
 
   GURL url(std::string(kDataURIPrefix) +

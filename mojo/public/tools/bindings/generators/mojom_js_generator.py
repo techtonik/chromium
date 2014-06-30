@@ -41,7 +41,7 @@ def JavaScriptDefaultValue(field):
   if isinstance(field.kind, mojom.Struct):
     return "null"
   if isinstance(field.kind, mojom.Array):
-    return "[]"
+    return "null"
   if isinstance(field.kind, mojom.Interface) or \
      isinstance(field.kind, mojom.InterfaceRequest):
     return _kind_to_javascript_default_value[mojom.MSGPIPE]
@@ -164,6 +164,7 @@ class Generator(generator.Generator):
   @UseJinja("js_templates/module.js.tmpl", filters=js_filters)
   def GenerateJsModule(self):
     return {
+      "namespace": self.module.namespace,
       "imports": self.GetImports(),
       "kinds": self.module.kinds,
       "enums": self.module.enums,

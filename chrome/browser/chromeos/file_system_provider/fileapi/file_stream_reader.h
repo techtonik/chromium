@@ -18,6 +18,7 @@ class AsyncFileUtil;
 namespace chromeos {
 namespace file_system_provider {
 
+struct EntryMetadata;
 class ProvidedFileSystemInterface;
 
 // Implements a streamed file reader. It is lazily initialized by the first call
@@ -45,6 +46,10 @@ class FileStreamReader : public webkit_blob::FileStreamReader {
       const net::Int64CompletionCallback& callback) OVERRIDE;
 
  private:
+  // Called when Read() operation is completed with either a success of an
+  // error.
+  void OnReadCompleted(net::CompletionCallback callback, int result);
+
   // Initializes the reader by opening the file. When completed with success,
   // runs the |pending_closure|. Otherwise, calls the |error_callback|.
   void Initialize(const base::Closure& pending_closure,
@@ -72,8 +77,8 @@ class FileStreamReader : public webkit_blob::FileStreamReader {
   // or an error.
   void OnGetMetadataForGetLengthReceived(
       const net::Int64CompletionCallback& callback,
-      base::File::Error result,
-      const base::File::Info& file_info);
+      const EntryMetadata& metadata,
+      base::File::Error result);
 
   // Same as Read(), but called after initializing is completed.
   void ReadAfterInitialized(scoped_refptr<net::IOBuffer> buffer,

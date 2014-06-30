@@ -12,7 +12,7 @@
 #include "content/public/common/sandbox_linux.h"
 
 #if defined(ADDRESS_SANITIZER) || defined(MEMORY_SANITIZER) || \
-    defined(LEAK_SANITIZER)
+    defined(LEAK_SANITIZER) || defined(UNDEFINED_SANITIZER)
 #include <sanitizer/common_interface_defs.h>
 #endif
 
@@ -33,7 +33,7 @@ class LinuxSandbox {
   // This isn't the full list, values < 32 are reserved for methods called from
   // Skia.
   enum LinuxSandboxIPCMethods {
-    METHOD_GET_FONT_FAMILY_FOR_CHAR = 32,
+    METHOD_GET_FALLBACK_FONT_FOR_CHAR = 32,
     METHOD_LOCALTIME = 33,
     DEPRECATED_METHOD_GET_CHILD_WITH_INODE = 34,
     METHOD_GET_STYLE_FOR_STRIKE = 35,
@@ -88,7 +88,7 @@ class LinuxSandbox {
   bool LimitAddressSpace(const std::string& process_type);
 
 #if defined(ADDRESS_SANITIZER) || defined(MEMORY_SANITIZER) || \
-    defined(LEAK_SANITIZER)
+    defined(LEAK_SANITIZER) || defined(UNDEFINED_SANITIZER)
   __sanitizer_sandbox_arguments* sanitizer_args() const {
     return sanitizer_args_.get();
   };
@@ -133,7 +133,7 @@ class LinuxSandbox {
   bool yama_is_enforcing_;  // Accurate if pre_initialized_.
   scoped_ptr<sandbox::SetuidSandboxClient> setuid_sandbox_client_;
 #if defined(ADDRESS_SANITIZER) || defined(MEMORY_SANITIZER) || \
-    defined(LEAK_SANITIZER)
+    defined(LEAK_SANITIZER) || defined(UNDEFINED_SANITIZER)
   scoped_ptr<__sanitizer_sandbox_arguments> sanitizer_args_;
 #endif
 

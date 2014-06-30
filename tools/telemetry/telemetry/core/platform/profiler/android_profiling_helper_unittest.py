@@ -3,11 +3,12 @@
 # found in the LICENSE file.
 import glob
 import os
+import pickle
 import re
 import shutil
 import tempfile
 
-from telemetry import test
+from telemetry import benchmark
 from telemetry.core import util
 from telemetry.core.platform.profiler import android_profiling_helper
 from telemetry.unittest import simple_mock
@@ -62,7 +63,38 @@ class TestAndroidProfilingHelper(tab_test_case.TabTestCase):
     finally:
       android_profiling_helper.subprocess = real_subprocess
 
-  @test.Enabled('android')
+  @benchmark.Enabled('android')
+  def testGetRequiredLibrariesForVTuneProfile(self):
+    vtune_db_output = os.path.join(
+        util.GetUnittestDataDir(), 'sample_vtune_db_output')
+    with open(vtune_db_output, 'rb') as f:
+      vtune_db_output = pickle.load(f)
+
+    mock_cursor = simple_mock.MockObject()
+    mock_cursor.ExpectCall(
+        'execute').WithArgs(simple_mock.DONT_CARE).WillReturn(vtune_db_output)
+
+    mock_conn = simple_mock.MockObject()
+    mock_conn.ExpectCall('cursor').WillReturn(mock_cursor)
+    mock_conn.ExpectCall('close')
+
+    mock_sqlite3 = simple_mock.MockObject()
+    mock_sqlite3.ExpectCall(
+        'connect').WithArgs(simple_mock.DONT_CARE).WillReturn(mock_conn)
+
+    real_sqlite3 = android_profiling_helper.sqlite3
+    android_profiling_helper.sqlite3 = mock_sqlite3
+    try:
+      libs = android_profiling_helper.GetRequiredLibrariesForVTuneProfile('foo')
+      self.assertEqual(libs, set([
+          '/data/app-lib/com.google.android.apps.chrome-1/libchrome.2019.0.so',
+          '/system/lib/libdvm.so',
+          '/system/lib/libc.so',
+          '/system/lib/libm.so']))
+    finally:
+      android_profiling_helper.sqlite3 = real_sqlite3
+
+  @benchmark.Enabled('android')
   def testCreateSymFs(self):
     # pylint: disable=W0212
     browser_pid = self._browser._browser_backend.pid
@@ -91,7 +123,7 @@ class TestAndroidProfilingHelper(tab_test_case.TabTestCase):
     finally:
       shutil.rmtree(symfs_dir)
 
-  @test.Enabled('android')
+  @benchmark.Enabled('android')
   def testGetToolchainBinaryPath(self):
     with tempfile.NamedTemporaryFile() as libc:
       self._device.old_interface.PullFileFromDevice('/system/lib/libc.so',

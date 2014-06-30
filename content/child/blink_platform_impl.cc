@@ -26,6 +26,7 @@
 #include "base/synchronization/waitable_event.h"
 #include "base/sys_info.h"
 #include "base/time/time.h"
+#include "content/child/child_thread.h"
 #include "content/child/content_child_helpers.h"
 #include "content/child/fling_curve_configuration.h"
 #include "content/child/web_discardable_memory_impl.h"
@@ -48,7 +49,6 @@
 #include "ui/base/layout.h"
 
 #if defined(OS_ANDROID)
-#include "base/android/sys_utils.h"
 #include "content/child/fling_animator_impl_android.h"
 #endif
 
@@ -402,7 +402,11 @@ BlinkPlatformImpl::~BlinkPlatformImpl() {
 }
 
 WebURLLoader* BlinkPlatformImpl::createURLLoader() {
-  return new WebURLLoaderImpl;
+  ChildThread* child_thread = ChildThread::current();
+  // There may be no child thread in RenderViewTests.  These tests can still use
+  // data URLs to bypass the ResourceDispatcher.
+  return new WebURLLoaderImpl(
+      child_thread ? child_thread->resource_dispatcher() : NULL);
 }
 
 WebSocketStreamHandle* BlinkPlatformImpl::createSocketStreamHandle() {
@@ -1054,7 +1058,7 @@ BlinkPlatformImpl::allocateAndLockDiscardableMemory(size_t bytes) {
 
 size_t BlinkPlatformImpl::maxDecodedImageBytes() {
 #if defined(OS_ANDROID)
-  if (base::android::SysUtils::IsLowEndDevice()) {
+  if (base::SysInfo::IsLowEndDevice()) {
     // Limit image decoded size to 3M pixels on low end devices.
     // 4 is maximum number of bytes per pixel.
     return 3 * 1024 * 1024 * 4;

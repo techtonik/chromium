@@ -10,7 +10,6 @@
 #include "base/files/scoped_temp_dir.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "base/platform_file.h"
 #include "base/run_loop.h"
 #include "chrome/browser/chromeos/file_system_provider/fake_provided_file_system.h"
 #include "chrome/browser/chromeos/file_system_provider/fileapi/file_stream_reader.h"
@@ -93,7 +92,7 @@ class FileSystemProviderFileStreamReader : public testing::Test {
 
     ServiceFactory::GetInstance()->SetTestingFactory(profile_, &CreateService);
     Service* service = Service::Get(profile_);  // Owned by its factory.
-    service->SetFileSystemFactoryForTests(
+    service->SetFileSystemFactoryForTesting(
         base::Bind(&FakeProvidedFileSystem::Create));
 
     const bool result = service->MountFileSystem(

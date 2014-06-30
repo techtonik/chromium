@@ -22,6 +22,7 @@
 #include "net/base/load_flags.h"
 #include "net/base/net_errors.h"
 #include "net/http/http_response_headers.h"
+#include "net/url_request/url_request.h"
 #include "third_party/WebKit/public/platform/WebURLLoaderClient.h"
 #include "third_party/WebKit/public/platform/WebURLResponse.h"
 #include "webkit/child/multipart_response_delegate.h"
@@ -212,9 +213,18 @@ bool PluginURLFetcher::OnReceivedRedirect(
   // It's unfortunate that this logic of when a redirect's method changes is
   // in url_request.cc, but weburlloader_impl.cc and this file have to duplicate
   // it instead of passing that information.
-  int response_code = info.headers->response_code();
-  if (response_code != 307)
-    method_ = "GET";
+  int response_code;
+  if (info.headers) {
+    response_code = info.headers->response_code();
+  } else {
+    // A redirect may have NULL headers if it came from URLRequestRedirectJob.
+    //
+    // TODO(davidben): Get the actual response code from the browser. Either
+    // fake enough of headers to have a response code or pass it down as part of
+    // https://crbug.com/384609.
+    response_code = 307;
+  }
+  method_ = net::URLRequest::ComputeMethodForRedirect(method_, response_code);
   GURL old_url = url_;
   url_ = new_url;
   first_party_for_cookies_ = new_first_party_for_cookies;

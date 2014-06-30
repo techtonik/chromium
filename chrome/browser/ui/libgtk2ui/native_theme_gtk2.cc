@@ -7,6 +7,8 @@
 #include <gtk/gtk.h>
 
 #include "chrome/browser/ui/libgtk2ui/chrome_gtk_menu_subclasses.h"
+#include "chrome/browser/ui/libgtk2ui/gtk2_ui.h"
+#include "chrome/browser/ui/libgtk2ui/gtk2_util.h"
 #include "chrome/browser/ui/libgtk2ui/skia_utils_gtk2.h"
 #include "ui/gfx/color_utils.h"
 #include "ui/gfx/path.h"
@@ -121,6 +123,33 @@ NativeThemeGtk2::~NativeThemeGtk2() {
   fake_menu_.Destroy();
 }
 
+gfx::Size NativeThemeGtk2::GetPartSize(Part part,
+                                       State state,
+                                       const ExtraParams& extra) const {
+  if (part == kComboboxArrow)
+    return gfx::Size(12, 12);
+
+  return ui::NativeThemeBase::GetPartSize(part, state, extra);
+}
+
+void NativeThemeGtk2::Paint(SkCanvas* canvas,
+                            Part part,
+                            State state,
+                            const gfx::Rect& rect,
+                            const ExtraParams& extra) const {
+  if (rect.IsEmpty())
+    return;
+
+  switch (part) {
+    case kComboboxArrow:
+      PaintComboboxArrow(canvas, GetGtkState(state), rect);
+      return;
+
+    default:
+      NativeThemeBase::Paint(canvas, part, state, rect, extra);
+  }
+}
+
 SkColor NativeThemeGtk2::GetSystemColor(ColorId color_id) const {
   return GdkColorToSkColor(GetSystemGdkColor(color_id));
 }
@@ -227,25 +256,20 @@ GdkColor NativeThemeGtk2::GetSystemGdkColor(ColorId color_id) const {
     case kColorId_ButtonBackgroundColor:
       return GetButtonStyle()->bg[GTK_STATE_NORMAL];
     case kColorId_ButtonEnabledColor:
+    case kColorId_BlueButtonEnabledColor:
       return GetButtonStyle()->text[GTK_STATE_NORMAL];
     case kColorId_ButtonDisabledColor:
+    case kColorId_BlueButtonDisabledColor:
       return GetButtonStyle()->text[GTK_STATE_INSENSITIVE];
     case kColorId_ButtonHighlightColor:
       return GetButtonStyle()->base[GTK_STATE_SELECTED];
     case kColorId_ButtonHoverColor:
+    case kColorId_BlueButtonHoverColor:
       return GetButtonStyle()->text[GTK_STATE_PRELIGHT];
     case kColorId_ButtonHoverBackgroundColor:
       return GetButtonStyle()->bg[GTK_STATE_PRELIGHT];
-    // TODO(estade): determine a more distinct color for the Blue
-    // buttons.
-    case kColorId_BlueButtonEnabledColor:
-      return GetButtonStyle()->text[GTK_STATE_NORMAL];
-    case kColorId_BlueButtonDisabledColor:
-      return GetButtonStyle()->text[GTK_STATE_INSENSITIVE];
-    case kColorId_BlueButtonHighlightColor:
-      return GetButtonStyle()->base[GTK_STATE_SELECTED];
-    case kColorId_BlueButtonHoverColor:
-      return GetButtonStyle()->text[GTK_STATE_PRELIGHT];
+    case kColorId_BlueButtonPressedColor:
+      return GetButtonStyle()->text[GTK_STATE_ACTIVE];
 
     // Textfield
     case kColorId_TextfieldDefaultColor:
@@ -364,7 +388,7 @@ GtkStyle* NativeThemeGtk2::GetEntryStyle() const {
   if (!fake_entry_.get()) {
     fake_entry_.Own(gtk_entry_new());
 
-    // The fake entry needs to be in the window so it can be realized sow e can
+    // The fake entry needs to be in the window so it can be realized so we can
     // use the computed parts of the style.
     gtk_container_add(GTK_CONTAINER(GetRealizedWindow()), fake_entry_.get());
     gtk_widget_realize(fake_entry_.get());
@@ -418,6 +442,44 @@ GtkStyle* NativeThemeGtk2::GetMenuItemStyle() const {
   }
 
   return gtk_rc_get_style(fake_menu_item_);
+}
+
+void NativeThemeGtk2::PaintComboboxArrow(SkCanvas* canvas,
+                                         GtkStateType state,
+                                         const gfx::Rect& rect) const {
+  GdkPixmap* pm = gdk_pixmap_new(gtk_widget_get_window(GetRealizedWindow()),
+                                 rect.width(),
+                                 rect.height(),
+                                 -1);
+  // Paint the background.
+  gtk_paint_flat_box(GetWindowStyle(),
+                     pm,
+                     state,
+                     GTK_SHADOW_NONE,
+                     NULL,
+                     GetRealizedWindow(),
+                     NULL, 0, 0, rect.width(), rect.height());
+  gtk_paint_arrow(GetWindowStyle(),
+                  pm,
+                  state,
+                  GTK_SHADOW_NONE,
+                  NULL,
+                  GetRealizedWindow(),
+                  NULL,
+                  GTK_ARROW_DOWN,
+                  true,
+                  0, 0, rect.width(), rect.height());
+  GdkPixbuf* pb = gdk_pixbuf_get_from_drawable(NULL,
+                                               pm,
+                                               gdk_drawable_get_colormap(pm),
+                                               0, 0,
+                                               0, 0,
+                                               rect.width(), rect.height());
+  SkBitmap arrow = GdkPixbufToImageSkia(pb);
+  canvas->drawBitmap(arrow, rect.x(), rect.y());
+
+  g_object_unref(pb);
+  g_object_unref(pm);
 }
 
 }  // namespace libgtk2ui

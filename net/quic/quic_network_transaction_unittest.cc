@@ -493,7 +493,6 @@ TEST_P(QuicNetworkTransactionTest, UseAlternateProtocolForQuic) {
 TEST_P(QuicNetworkTransactionTest, UseAlternateProtocolForQuicForHttps) {
   params_.origin_to_force_quic_on =
       HostPortPair::FromString("www.google.com:443");
-  params_.enable_quic_https = true;
 
   MockRead http_reads[] = {
     MockRead("HTTP/1.1 200 OK\r\n"),
@@ -860,7 +859,7 @@ TEST_P(QuicNetworkTransactionTest, FailedZeroRttBrokenAlternateProtocol) {
   EXPECT_TRUE(quic_data.at_write_eof());
 }
 
-TEST_P(QuicNetworkTransactionTest, HangingZeroRttFallback) {
+TEST_P(QuicNetworkTransactionTest, DISABLED_HangingZeroRttFallback) {
   // Alternate-protocol job
   MockRead quic_reads[] = {
     MockRead(ASYNC, ERR_IO_PENDING),

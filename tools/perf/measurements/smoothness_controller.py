@@ -4,7 +4,7 @@
 import sys
 
 from measurements import smooth_gesture_util
-from telemetry.core.timeline.model import TimelineModel
+from telemetry.timeline.model import TimelineModel
 from telemetry.page import page_measurement
 from telemetry.page.actions import action_runner
 from telemetry.web_perf import timeline_interaction_record as tir_module
@@ -26,7 +26,9 @@ class SmoothnessController(object):
     self._interaction = None
 
   def Start(self, page, tab):
-    custom_categories = ['webkit.console', 'benchmark']
+    # FIXME: Remove webkit.console when blink.console lands in chromium and
+    # the ref builds are updated. crbug.com/386847
+    custom_categories = ['webkit.console', 'blink.console', 'benchmark']
     custom_categories += page.GetSyntheticDelayCategories()
     tab.browser.StartTracing(','.join(custom_categories), 60)
     if tab.browser.platform.IsRawDisplayFrameRateSupported():

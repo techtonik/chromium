@@ -15,6 +15,7 @@
 #include "base/basictypes.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/strings/string_piece.h"
+#include "base/time/time.h"
 #include "chrome/browser/safe_browsing/chunk_range.h"
 
 namespace safe_browsing {
@@ -89,6 +90,16 @@ struct SBFullHashResult {
   SBFullHash hash;
   // TODO(shess): Refactor to allow ListType here.
   int list_id;
+};
+
+// Caches individual response from GETHASH request.
+struct SBCachedFullHashResult {
+  SBCachedFullHashResult();
+  explicit SBCachedFullHashResult(const base::Time& in_expire_after);
+  ~SBCachedFullHashResult();
+
+  base::Time expire_after;
+  std::vector<SBFullHashResult> full_hashes;
 };
 
 // Contains information about a list in the database.
@@ -201,15 +212,6 @@ void GeneratePathsToCheck(const GURL& url, std::vector<std::string>* paths);
 
 // Given a URL, returns all the patterns we need to check.
 void GeneratePatternsToCheck(const GURL& url, std::vector<std::string>* urls);
-
-int GetHashIndex(const SBFullHash& hash,
-                 const std::vector<SBFullHashResult>& full_hashes);
-
-// Given a URL, compare all the possible host + path full hashes to the set of
-// provided full hashes.  Returns the index of the match if one is found, or -1
-// otherwise.
-int GetUrlHashIndex(const GURL& url,
-                    const std::vector<SBFullHashResult>& full_hashes);
 
 GURL GeneratePhishingReportUrl(const std::string& report_page,
                                const std::string& url_to_report,

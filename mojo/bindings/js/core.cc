@@ -31,16 +31,16 @@ MojoResult CloseHandle(gin::Handle<gin::HandleWrapper> handle) {
 }
 
 MojoResult WaitHandle(mojo::Handle handle,
-                      MojoWaitFlags flags,
+                      MojoHandleSignals signals,
                       MojoDeadline deadline) {
-  return MojoWait(handle.value(), flags, deadline);
+  return MojoWait(handle.value(), signals, deadline);
 }
 
 MojoResult WaitMany(
     const std::vector<mojo::Handle>& handles,
-    const std::vector<MojoWaitFlags>& flags,
+    const std::vector<MojoHandleSignals>& signals,
     MojoDeadline deadline) {
-  return mojo::WaitMany(handles, flags, deadline);
+  return mojo::WaitMany(handles, signals, deadline);
 }
 
 gin::Dictionary CreateMessagePipe(const gin::Arguments& args) {
@@ -242,10 +242,9 @@ v8::Local<v8::Value> Core::GetModule(v8::Isolate* isolate) {
 
         .SetValue("DEADLINE_INDEFINITE", MOJO_DEADLINE_INDEFINITE)
 
-        .SetValue("WAIT_FLAG_NONE", MOJO_WAIT_FLAG_NONE)
-        .SetValue("WAIT_FLAG_READABLE", MOJO_WAIT_FLAG_READABLE)
-        .SetValue("WAIT_FLAG_READABLE", MOJO_WAIT_FLAG_READABLE)
-        .SetValue("WAIT_FLAG_EVERYTHING", MOJO_WAIT_FLAG_EVERYTHING)
+        .SetValue("HANDLE_SIGNAL_NONE", MOJO_HANDLE_SIGNAL_NONE)
+        .SetValue("HANDLE_SIGNAL_READABLE", MOJO_HANDLE_SIGNAL_READABLE)
+        .SetValue("HANDLE_SIGNAL_READABLE", MOJO_HANDLE_SIGNAL_READABLE)
 
         .SetValue("WRITE_MESSAGE_FLAG_NONE", MOJO_WRITE_MESSAGE_FLAG_NONE)
 

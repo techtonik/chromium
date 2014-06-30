@@ -34,6 +34,7 @@
         'animation/tween_unittest.cc',
         'blit_unittest.cc',
         'break_list_unittest.cc',
+        'canvas_unittest.cc',
         'codec/jpeg_codec_unittest.cc',
         'codec/png_codec_unittest.cc',
         'color_analysis_unittest.cc',
@@ -58,6 +59,7 @@
         'range/range_mac_unittest.mm',
         'range/range_unittest.cc',
         'range/range_win_unittest.cc',
+        'render_text_unittest.cc',
         'sequential_id_generator_unittest.cc',
         'shadow_value_unittest.cc',
         'skbitmap_operations_unittest.cc',
@@ -110,14 +112,21 @@
         }],
         ['use_ozone==1 and use_pango==0', {
           'sources!': [
+            'canvas_unittest.cc',
             'font_list_unittest.cc',
             'font_unittest.cc',
+            'render_text_unittest.cc',
             'text_elider_unittest.cc',
           ],
         }],
         ['OS == "android"', {
           'dependencies': [
             '../../testing/android/native_test.gyp:native_test_native_code',
+          ],
+        }],
+        ['OS=="android" or OS=="ios"', {
+          'sources!': [
+            'render_text_unittest.cc',
           ],
         }],
       ],

@@ -15,7 +15,6 @@
 #include "chrome/browser/sync_file_system/drive_backend/sync_engine_context.h"
 #include "chrome/browser/sync_file_system/drive_backend/sync_task.h"
 #include "chrome/browser/sync_file_system/drive_backend/sync_task_manager.h"
-#include "chrome/browser/sync_file_system/drive_backend/sync_worker.h"
 #include "chrome/browser/sync_file_system/sync_file_system_test_util.h"
 #include "content/public/test/test_browser_thread_bundle.h"
 #include "extensions/common/extension.h"
@@ -124,9 +123,8 @@ class SyncWorkerTest : public testing::Test,
     sync_worker_.reset(new SyncWorker(
         profile_dir_.path(),
         extension_service_->AsWeakPtr(),
-        sync_engine_context.Pass(),
         in_memory_env_.get()));
-    sync_worker_->Initialize();
+    sync_worker_->Initialize(sync_engine_context.Pass());
 
     sync_worker_->SetSyncEnabled(true);
     base::RunLoop().RunUntilIdle();
@@ -146,7 +144,7 @@ class SyncWorkerTest : public testing::Test,
   }
 
   SyncTaskManager* GetSyncTaskManager() {
-    return sync_worker_->GetSyncTaskManager();
+    return sync_worker_->task_manager_.get();
   }
 
   void CheckServiceState(SyncStatusCode expected_sync_status,

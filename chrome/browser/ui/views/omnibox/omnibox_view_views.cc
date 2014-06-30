@@ -10,8 +10,8 @@
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/app/chrome_command_ids.h"
-#include "chrome/browser/autocomplete/autocomplete_input.h"
 #include "chrome/browser/autocomplete/autocomplete_match.h"
+#include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/command_updater.h"
 #include "chrome/browser/search/search.h"
 #include "chrome/browser/ui/omnibox/omnibox_edit_controller.h"
@@ -22,6 +22,7 @@
 #include "chrome/browser/ui/views/omnibox/omnibox_popup_contents_view.h"
 #include "chrome/browser/ui/views/settings_api_bubble_helper_views.h"
 #include "chrome/browser/ui/views/website_settings/website_settings_popup_view.h"
+#include "components/autocomplete/autocomplete_input.h"
 #include "components/bookmarks/browser/bookmark_node_data.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/common/constants.h"
@@ -561,10 +562,9 @@ void OmniboxViewViews::ShowImeIfNeeded() {
 }
 
 void OmniboxViewViews::OnMatchOpened(const AutocompleteMatch& match,
-                                     Profile* profile,
-                                     content::WebContents* web_contents) const {
+                                     content::WebContents* web_contents) {
   extensions::MaybeShowExtensionControlledSearchNotification(
-      profile, web_contents, match);
+      profile(), web_contents, match);
 }
 
 int OmniboxViewViews::GetOmniboxTextLength() const {
@@ -580,7 +580,8 @@ void OmniboxViewViews::EmphasizeURLComponents() {
   // be treated as a search or a navigation, and is the same method the Paste
   // And Go system uses.
   url::Component scheme, host;
-  AutocompleteInput::ParseForEmphasizeComponents(text(), &scheme, &host);
+  AutocompleteInput::ParseForEmphasizeComponents(
+      text(), ChromeAutocompleteSchemeClassifier(profile()), &scheme, &host);
   bool grey_out_url = text().substr(scheme.begin, scheme.len) ==
       base::UTF8ToUTF16(extensions::kExtensionScheme);
   bool grey_base = model()->CurrentTextIsURL() &&
@@ -944,7 +945,7 @@ void OmniboxViewViews::OnWriteDragData(ui::OSExchangeData* data) {
     if (is_all_selected)
       model()->GetDataForURLExport(&url, &title, &favicon);
     button_drag_utils::SetURLAndDragImage(url, title, favicon.AsImageSkia(),
-                                          data, GetWidget());
+                                          NULL, data, GetWidget());
     data->SetURL(url, title);
   }
 }

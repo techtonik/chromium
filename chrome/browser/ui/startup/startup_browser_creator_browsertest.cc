@@ -15,15 +15,15 @@
 #include "chrome/browser/extensions/launch_util.h"
 #include "chrome/browser/first_run/first_run.h"
 #include "chrome/browser/infobars/infobar_service.h"
-#include "chrome/browser/managed_mode/managed_mode_navigation_observer.h"
-#include "chrome/browser/managed_mode/managed_user_service.h"
-#include "chrome/browser/managed_mode/managed_user_service_factory.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_impl.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/sessions/session_restore.h"
 #include "chrome/browser/signin/signin_promo.h"
+#include "chrome/browser/supervised_user/supervised_user_navigation_observer.h"
+#include "chrome/browser/supervised_user/supervised_user_service.h"
+#include "chrome/browser/supervised_user/supervised_user_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_finder.h"
@@ -998,16 +998,16 @@ IN_PROC_BROWSER_TEST_F(StartupBrowserCreatorTest, ProfilesLaunchedAfterCrash) {
   EXPECT_EQ(1U, infobar_service->infobar_count());
 }
 
-class ManagedModeBrowserCreatorTest : public InProcessBrowserTest {
+class SupervisedUserBrowserCreatorTest : public InProcessBrowserTest {
  protected:
   virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
     InProcessBrowserTest::SetUpCommandLine(command_line);
-    command_line->AppendSwitchASCII(switches::kManagedUserId, "asdf");
+    command_line->AppendSwitchASCII(switches::kSupervisedUserId, "asdf");
   }
 };
 
-IN_PROC_BROWSER_TEST_F(ManagedModeBrowserCreatorTest,
-                       StartupManagedModeProfile) {
+IN_PROC_BROWSER_TEST_F(SupervisedUserBrowserCreatorTest,
+                       StartupSupervisedUserProfile) {
   StartupBrowserCreator browser_creator;
 
   // Do a simple non-process-startup browser launch.

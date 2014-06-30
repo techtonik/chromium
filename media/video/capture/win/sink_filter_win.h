@@ -23,6 +23,7 @@ namespace media {
 // http://msdn.microsoft.com/en-us/library/dd757532.aspx
 // 30323449-0000-0010-8000-00AA00389B71.
 extern GUID kMediaSubTypeI420;
+
 // UYVY synonym with BT709 color components, used in HD video. This variation
 // might appear in non-USB capture cards and it's implemented as a normal YUV
 // pixel format with the characters HDYC encoded in the first array word.

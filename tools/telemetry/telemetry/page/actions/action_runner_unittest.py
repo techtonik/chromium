@@ -2,14 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+from telemetry import benchmark
+from telemetry.core import exceptions
 from telemetry.core import util
 from telemetry.core.backends.chrome import tracing_backend
-from telemetry.core.timeline import model
+from telemetry.timeline import model
+from telemetry.page.actions import gesture_action
 from telemetry.page.actions import action_runner as action_runner_module
-from telemetry.page.actions import page_action
 # pylint: disable=W0401,W0614
 from telemetry.page.actions.all_page_actions import *
-from telemetry.unittest import tab_test_case
 from telemetry.unittest import tab_test_case
 from telemetry.web_perf import timeline_interaction_record as tir_module
 
@@ -47,13 +48,13 @@ class ActionRunnerTest(tab_test_case.TabTestCase):
   def testWaitForNavigate(self):
     self.Navigate('page_with_link.html')
     action_runner = action_runner_module.ActionRunner(self._tab)
-    action_runner.RunAction(ClickElementAction({'xpath': 'id("clickme")'}))
+    action_runner.ClickElement('#clickme')
     action_runner.WaitForNavigate()
 
     self.assertTrue(self._tab.EvaluateJavaScript(
         'document.readyState == "interactive" || '
         'document.readyState == "complete"'))
-    self.assertEquals(
+    self.assertEqual(
         self._tab.EvaluateJavaScript('document.location.pathname;'),
         '/blank.html')
 
@@ -77,11 +78,11 @@ class ActionRunnerTest(tab_test_case.TabTestCase):
 
     action_runner.ExecuteJavaScript('window.testing = 219;')
     action_runner.WaitForJavaScriptCondition(
-        'window.testing == 219', timeout=1)
+        'window.testing == 219', timeout_in_seconds=1)
     action_runner.ExecuteJavaScript(
         'window.setTimeout(function() { window.testing = 220; }, 1000);')
     action_runner.WaitForJavaScriptCondition(
-        'window.testing == 220', timeout=2)
+        'window.testing == 220', timeout_in_seconds=2)
     self.assertEqual(220, self._tab.EvaluateJavaScript('window.testing'))
 
   def testWaitForElement(self):
@@ -95,8 +96,8 @@ class ActionRunnerTest(tab_test_case.TabTestCase):
         '  el.textContent = "foo";'
         '  document.body.appendChild(el);'
         '})()')
-    action_runner.WaitForElement('#test1', timeout=1)
-    action_runner.WaitForElement(text='foo', timeout=1)
+    action_runner.WaitForElement('#test1', timeout_in_seconds=1)
+    action_runner.WaitForElement(text='foo', timeout_in_seconds=1)
     action_runner.WaitForElement(
         element_function='document.getElementById("test1")')
     action_runner.ExecuteJavaScript(
@@ -105,12 +106,12 @@ class ActionRunnerTest(tab_test_case.TabTestCase):
         '  el.id = "test2";'
         '  document.body.appendChild(el);'
         '}, 500)')
-    action_runner.WaitForElement('#test2', timeout=2)
+    action_runner.WaitForElement('#test2', timeout_in_seconds=2)
     action_runner.ExecuteJavaScript(
         'window.setTimeout(function() {'
         '  document.getElementById("test2").textContent = "bar";'
         '}, 500)')
-    action_runner.WaitForElement(text='bar', timeout=2)
+    action_runner.WaitForElement(text='bar', timeout_in_seconds=2)
     action_runner.ExecuteJavaScript(
         'window.setTimeout(function() {'
         '  var el = document.createElement("div");'
@@ -131,22 +132,93 @@ class ActionRunnerTest(tab_test_case.TabTestCase):
         '  el.textContent = "foo";'
         '  document.body.appendChild(el);'
         '})()')
-    action_runner.WaitForElement('#test1', timeout=1)
+    action_runner.WaitForElement('#test1', timeout_in_seconds=1)
     def WaitForElement():
-      action_runner.WaitForElement(text='oo', timeout=1)
+      action_runner.WaitForElement(text='oo', timeout_in_seconds=1)
     self.assertRaises(util.TimeoutException, WaitForElement)
 
-  def testWaitForElementWithConflictingParams(self):
+  def testClickElement(self):
+    self.Navigate('page_with_clickables.html')
     action_runner = action_runner_module.ActionRunner(self._tab)
-    def WaitForElement1():
-      action_runner.WaitForElement(selector='div', text='foo', timeout=1)
-    self.assertRaises(page_action.PageActionFailed, WaitForElement1)
 
-    def WaitForElement2():
-      action_runner.WaitForElement(selector='div', element_function='foo',
-                                   timeout=1)
-    self.assertRaises(page_action.PageActionFailed, WaitForElement2)
+    action_runner.ExecuteJavaScript('valueSettableByTest = 1;')
+    action_runner.ClickElement('#test')
+    self.assertEqual(1, action_runner.EvaluateJavaScript('valueToTest'))
 
-    def WaitForElement3():
-      action_runner.WaitForElement(text='foo', element_function='', timeout=1)
-    self.assertRaises(page_action.PageActionFailed, WaitForElement3)
+    action_runner.ExecuteJavaScript('valueSettableByTest = 2;')
+    action_runner.ClickElement(text='Click/tap me')
+    self.assertEqual(2, action_runner.EvaluateJavaScript('valueToTest'))
+
+    action_runner.ExecuteJavaScript('valueSettableByTest = 3;')
+    action_runner.ClickElement(
+        element_function='document.body.firstElementChild;')
+    self.assertEqual(3, action_runner.EvaluateJavaScript('valueToTest'))
+
+    def WillFail():
+      action_runner.ClickElement('#notfound')
+    self.assertRaises(exceptions.EvaluateException, WillFail)
+
+  @benchmark.Disabled('debug')
+  def testTapElement(self):
+    self.Navigate('page_with_clickables.html')
+    action_runner = action_runner_module.ActionRunner(self._tab)
+
+    action_runner.ExecuteJavaScript('valueSettableByTest = 1;')
+    action_runner.TapElement('#test')
+    self.assertEqual(1, action_runner.EvaluateJavaScript('valueToTest'))
+
+    action_runner.ExecuteJavaScript('valueSettableByTest = 2;')
+    action_runner.TapElement(text='Click/tap me')
+    self.assertEqual(2, action_runner.EvaluateJavaScript('valueToTest'))
+
+    action_runner.ExecuteJavaScript('valueSettableByTest = 3;')
+    action_runner.TapElement(
+        element_function='document.body.firstElementChild')
+    self.assertEqual(3, action_runner.EvaluateJavaScript('valueToTest'))
+
+    def WillFail():
+      action_runner.TapElement('#notfound')
+    self.assertRaises(exceptions.EvaluateException, WillFail)
+
+  def testScroll(self):
+    if not gesture_action.GestureAction.IsGestureSourceTypeSupported(
+        self._tab, 'touch'):
+      return
+
+    self.Navigate('page_with_swipeables.html')
+    action_runner = action_runner_module.ActionRunner(self._tab)
+
+    action_runner.ScrollElement(
+        selector='#left-right', direction='right', left_start_ratio=0.9)
+    self.assertTrue(action_runner.EvaluateJavaScript(
+        'document.querySelector("#left-right").scrollLeft') > 75)
+    action_runner.ScrollElement(
+        selector='#top-bottom', direction='down', top_start_ratio=0.9)
+    self.assertTrue(action_runner.EvaluateJavaScript(
+        'document.querySelector("#top-bottom").scrollTop') > 75)
+
+    action_runner.ScrollPage(direction='right', left_start_ratio=0.9,
+                             distance=100)
+    self.assertTrue(action_runner.EvaluateJavaScript(
+        'document.body.scrollLeft') > 75)
+
+  def testSwipe(self):
+    if not gesture_action.GestureAction.IsGestureSourceTypeSupported(
+        self._tab, 'touch'):
+      return
+
+    self.Navigate('page_with_swipeables.html')
+    action_runner = action_runner_module.ActionRunner(self._tab)
+
+    action_runner.SwipeElement(
+        selector='#left-right', direction='left', left_start_ratio=0.9)
+    self.assertTrue(action_runner.EvaluateJavaScript(
+        'document.querySelector("#left-right").scrollLeft') > 75)
+    action_runner.SwipeElement(
+        selector='#top-bottom', direction='up', top_start_ratio=0.9)
+    self.assertTrue(action_runner.EvaluateJavaScript(
+        'document.querySelector("#top-bottom").scrollTop') > 75)
+
+    action_runner.SwipePage(direction='left', left_start_ratio=0.9)
+    self.assertTrue(action_runner.EvaluateJavaScript(
+        'document.body.scrollLeft') > 75)

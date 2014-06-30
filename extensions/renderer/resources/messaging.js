@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// This contains unprivileged javascript APIs for extensions and apps.  It
-// can be loaded by any extension-related context, such as content scripts or
-// background pages. See user_script_slave.cc for script that is loaded by
-// content scripts only.
+// chrome.runtime.messaging API implementation.
 
   // TODO(kalman): factor requiring chrome out of here.
   var chrome = requireNative('chrome').GetChrome();
   var Event = require('event_bindings').Event;
   var lastError = require('lastError');
   var logActivity = requireNative('activityLogger');
+  var logging = requireNative('logging');
   var messagingNatives = requireNative('messaging_natives');
   var processNatives = requireNative('process');
   var unloadEvent = require('unload_event');
@@ -227,8 +225,10 @@
     // channels were opened to and from the same process, closing one would
     // close both.
     var extensionId = processNatives.GetExtensionId();
-    if (targetExtensionId != extensionId)
-      return false;  // not for us
+
+    // messaging_bindings.cc should ensure that this method only gets called for
+    // the right extension.
+    logging.CHECK(targetExtensionId == extensionId);
 
     if (ports[getOppositePortId(portId)])
       return false;  // this channel was opened by us, so ignore it

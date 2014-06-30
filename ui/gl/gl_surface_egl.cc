@@ -34,7 +34,7 @@ extern "C" {
 #endif
 
 #if defined (USE_OZONE)
-#include "ui/gfx/ozone/surface_factory_ozone.h"
+#include "ui/ozone/public/surface_factory_ozone.h"
 #endif
 
 #if !defined(EGL_FIXED_SIZE_ANGLE)
@@ -129,7 +129,7 @@ bool GLSurfaceEGL::InitializeOneOff() {
 
 #if defined(USE_OZONE)
   const EGLint* config_attribs =
-      SurfaceFactoryOzone::GetInstance()->GetEGLSurfaceProperties(
+      ui::SurfaceFactoryOzone::GetInstance()->GetEGLSurfaceProperties(
           kConfigAttribs);
 #else
   const EGLint* config_attribs = kConfigAttribs;
@@ -169,6 +169,13 @@ bool GLSurfaceEGL::InitializeOneOff() {
   g_egl_window_fixed_size_supported =
       HasEGLExtension("EGL_ANGLE_window_fixed_size");
 
+  // TODO(oetuaho@nvidia.com): Surfaceless is disabled on Android as a temporary
+  // workaround, since code written for Android WebView takes different paths
+  // based on whether GL surface objects have underlying EGL surface handles,
+  // conflicting with the use of surfaceless. See https://crbug.com/382349
+#if defined(OS_ANDROID)
+  DCHECK(!g_egl_surfaceless_context_supported);
+#else
   // Check if SurfacelessEGL is supported.
   g_egl_surfaceless_context_supported =
       HasEGLExtension("EGL_KHR_surfaceless_context");
@@ -189,6 +196,7 @@ bool GLSurfaceEGL::InitializeOneOff() {
       context->ReleaseCurrent(surface.get());
     }
   }
+#endif
 
   initialized = true;
 
@@ -480,10 +488,6 @@ NativeViewGLSurfaceEGL::~NativeViewGLSurfaceEGL() {
   if (window_)
     ANativeWindow_release(window_);
 #endif
-}
-
-void NativeViewGLSurfaceEGL::SetHandle(EGLSurface surface) {
-  surface_ = surface;
 }
 
 PbufferGLSurfaceEGL::PbufferGLSurfaceEGL(const gfx::Size& size)

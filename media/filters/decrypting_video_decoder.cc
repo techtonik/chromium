@@ -31,7 +31,7 @@ DecryptingVideoDecoder::DecryptingVideoDecoder(
       weak_factory_(this) {}
 
 void DecryptingVideoDecoder::Initialize(const VideoDecoderConfig& config,
-                                        bool live_mode,
+                                        bool /* low_delay */,
                                         const PipelineStatusCB& status_cb,
                                         const OutputCB& output_cb) {
   DVLOG(2) << "Initialize()";
@@ -82,7 +82,6 @@ void DecryptingVideoDecoder::Decode(const scoped_refptr<DecoderBuffer>& buffer,
 
   // Return empty frames if decoding has finished.
   if (state_ == kDecodeFinished) {
-    output_cb_.Run(VideoFrame::CreateEOSFrame());
     base::ResetAndReturn(&decode_cb_).Run(kOk);
     return;
   }
@@ -233,8 +232,9 @@ void DecryptingVideoDecoder::DeliverFrame(
   DCHECK(!decode_cb_.is_null());
   DCHECK(pending_buffer_to_decode_.get());
 
-  TRACE_EVENT_ASYNC_END0(
-      "media", "DecryptingVideoDecoder::DecodePendingBuffer", trace_id_);
+  TRACE_EVENT_ASYNC_END2(
+      "media", "DecryptingVideoDecoder::DecodePendingBuffer", trace_id_,
+      "buffer_size", buffer_size, "status", status);
 
   bool need_to_try_again_if_nokey_is_returned = key_added_while_decode_pending_;
   key_added_while_decode_pending_ = false;
@@ -276,12 +276,8 @@ void DecryptingVideoDecoder::DeliverFrame(
 
   if (status == Decryptor::kNeedMoreData) {
     DVLOG(2) << "DeliverFrame() - kNeedMoreData";
-    if (scoped_pending_buffer_to_decode->end_of_stream()) {
-      state_ = kDecodeFinished;
-      output_cb_.Run(media::VideoFrame::CreateEOSFrame());
-    } else {
-      state_ = kIdle;
-    }
+    state_ = scoped_pending_buffer_to_decode->end_of_stream() ? kDecodeFinished
+                                                              : kIdle;
     base::ResetAndReturn(&decode_cb_).Run(kOk);
     return;
   }
@@ -289,8 +285,17 @@ void DecryptingVideoDecoder::DeliverFrame(
   DCHECK_EQ(status, Decryptor::kSuccess);
   // No frame returned with kSuccess should be end-of-stream frame.
   DCHECK(!frame->end_of_stream());
-  state_ = kIdle;
   output_cb_.Run(frame);
+
+  if (scoped_pending_buffer_to_decode->end_of_stream()) {
+    // Set |pending_buffer_to_decode_| back as we need to keep flushing the
+    // decryptor.
+    pending_buffer_to_decode_ = scoped_pending_buffer_to_decode;
+    DecodePendingBuffer();
+    return;
+  }
+
+  state_ = kIdle;
   base::ResetAndReturn(&decode_cb_).Run(kOk);
 }
 

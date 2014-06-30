@@ -31,7 +31,7 @@ class DataProviderMessageFilter : public IPC::MessageFilter {
       int request_id);
 
   // IPC::ChannelProxy::MessageFilter
-  virtual void OnFilterAdded(IPC::Channel* channel) OVERRIDE FINAL;
+  virtual void OnFilterAdded(IPC::Sender* sender) OVERRIDE FINAL;
   virtual bool OnMessageReceived(const IPC::Message& message) OVERRIDE FINAL;
 
  private:
@@ -70,7 +70,7 @@ DataProviderMessageFilter::DataProviderMessageFilter(
   DCHECK(main_thread_message_loop != NULL);
 }
 
-void DataProviderMessageFilter::OnFilterAdded(IPC::Channel* channel) {
+void DataProviderMessageFilter::OnFilterAdded(IPC::Sender* sender) {
   DCHECK(io_message_loop_->BelongsToCurrentThread());
 
   main_thread_message_loop_->PostTask(FROM_HERE,
@@ -175,12 +175,23 @@ void ThreadedDataProvider::Stop() {
   // pointers we've passed to the filter.
   main_thread_weak_factory_.InvalidateWeakPtrs();
 
+  blink::WebThread* current_background_thread =
+      threaded_data_receiver_->backgroundThread();
+
   // We can't destroy this instance directly; we need to bounce a message over
   // to the background thread and back to make sure nothing else will access it
-  // there, before we can destruct it.
-  background_thread_.message_loop()->PostTask(FROM_HERE,
-      base::Bind(&ThreadedDataProvider::StopOnBackgroundThread,
-                 base::Unretained(this)));
+  // there, before we can destruct it. We also need to make sure the background
+  // thread is still alive, since Blink could have shut down at this point
+  // and freed the thread.
+  if (current_background_thread) {
+    // We should never end up with a different parser thread than from when the
+    // ThreadedDataProvider gets created.
+    DCHECK(current_background_thread ==
+        static_cast<WebThreadImpl*>(&background_thread_));
+    background_thread_.message_loop()->PostTask(FROM_HERE,
+        base::Bind(&ThreadedDataProvider::StopOnBackgroundThread,
+                   base::Unretained(this)));
+  }
 }
 
 void ThreadedDataProvider::StopOnBackgroundThread() {

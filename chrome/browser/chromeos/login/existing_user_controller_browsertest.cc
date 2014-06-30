@@ -242,7 +242,7 @@ IN_PROC_BROWSER_TEST_F(ExistingUserControllerTest, ExistingUserLogin) {
   EXPECT_CALL(*mock_login_utils_, CreateAuthenticator(_))
       .Times(1)
       .WillOnce(WithArg<0>(CreateAuthenticator(user_context)));
-  EXPECT_CALL(*mock_login_utils_, PrepareProfile(user_context, _, _, _, _))
+  EXPECT_CALL(*mock_login_utils_, PrepareProfile(user_context, _, _, _))
       .Times(1)
       .WillOnce(InvokeWithoutArgs(&profile_prepared_cb_,
                                   &base::Callback<void(void)>::Run));
@@ -258,7 +258,7 @@ IN_PROC_BROWSER_TEST_F(ExistingUserControllerTest, ExistingUserLogin) {
   EXPECT_CALL(*mock_user_manager_, IsCurrentUserNew())
       .Times(AnyNumber())
       .WillRepeatedly(Return(false));
-  existing_user_controller()->Login(user_context);
+  existing_user_controller()->Login(user_context, SigninSpecifics());
   content::RunAllPendingInMessageLoop();
 }
 
@@ -308,7 +308,7 @@ IN_PROC_BROWSER_TEST_F(ExistingUserControllerTest,
       base::Bind(&MockUserManager::AddUser,
                  base::Unretained(mock_user_manager_),
                  kNewUsername);
-  EXPECT_CALL(*mock_login_utils_, PrepareProfile(user_context, _, _, _, _))
+  EXPECT_CALL(*mock_login_utils_, PrepareProfile(user_context, _, _, _))
       .Times(1)
       .WillOnce(DoAll(
           InvokeWithoutArgs(&add_user_cb,
@@ -432,7 +432,7 @@ class ExistingUserControllerPublicSessionTest
     EXPECT_CALL(*mock_login_utils_, CreateAuthenticator(_))
         .Times(1)
         .WillOnce(WithArg<0>(CreateAuthenticator(user_context)));
-    EXPECT_CALL(*mock_login_utils_, PrepareProfile(user_context, _, _, _, _))
+    EXPECT_CALL(*mock_login_utils_, PrepareProfile(user_context, _, _, _))
         .Times(1)
         .WillOnce(InvokeWithoutArgs(&profile_prepared_cb_,
                                     &base::Callback<void(void)>::Run));
@@ -577,7 +577,7 @@ IN_PROC_BROWSER_TEST_F(ExistingUserControllerPublicSessionTest,
   ASSERT_TRUE(auto_login_timer());
 
   // Log in and check that it stopped the timer.
-  existing_user_controller()->Login(user_context);
+  existing_user_controller()->Login(user_context, SigninSpecifics());
   EXPECT_TRUE(is_login_in_progress());
   ASSERT_TRUE(auto_login_timer());
   EXPECT_FALSE(auto_login_timer()->IsRunning());

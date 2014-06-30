@@ -71,6 +71,9 @@ class DataTypeController
   typedef base::Callback<void(syncer::ModelType,
                               syncer::SyncError)> ModelLoadCallback;
 
+  typedef base::Callback<void(const tracked_objects::Location& location,
+                              const std::string&)> DisableTypeCallback;
+
   typedef std::map<syncer::ModelType,
                    scoped_refptr<DataTypeController> > TypeMap;
   typedef std::map<syncer::ModelType, DataTypeController::State> StateMap;
@@ -133,12 +136,20 @@ class DataTypeController
   // UserShare handle to associate model data with.
   void OnUserShareReady(syncer::UserShare* share);
 
+  // Whether the DataTypeController is ready to start. This is useful if the
+  // datatype itself must make the decision about whether it should be enabled
+  // at all (and therefore whether the initial download of the sync data for
+  // the type should be performed).
+  // Returns true by default.
+  virtual bool ReadyForStart() const;
+
  protected:
   friend class base::RefCountedDeleteOnMessageLoop<DataTypeController>;
   friend class base::DeleteHelper<DataTypeController>;
 
   DataTypeController(scoped_refptr<base::MessageLoopProxy> ui_thread,
-                     const base::Closure& error_callback);
+                     const base::Closure& error_callback,
+                     const DisableTypeCallback& disable_callback);
 
   // If the DTC is waiting for models to load, once the models are
   // loaded the datatype service will call this function on DTC to let
@@ -147,20 +158,18 @@ class DataTypeController
 
   virtual ~DataTypeController();
 
-  // Handles the reporting of unrecoverable error. It records stuff in
-  // UMA and reports to breakpad.
-  // Virtual for testing purpose.
-  virtual void RecordUnrecoverableError(
-      const tracked_objects::Location& from_here,
-      const std::string& message);
-
   syncer::UserShare* user_share() const;
-
- private:
-  syncer::UserShare* user_share_;
+  DisableTypeCallback disable_callback();
 
   // The callback that will be invoked when an unrecoverable error occurs.
+  // TODO(sync): protected for use by legacy controllers.
   base::Closure error_callback_;
+
+ private:
+  // TODO(tim): Bug 383480. Do we need two callbacks?
+  DisableTypeCallback disable_callback_;
+
+  syncer::UserShare* user_share_;
 };
 
 }  // namespace browser_sync

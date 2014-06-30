@@ -50,12 +50,14 @@ class DownloadItem;
 class GeolocationDispatcherHost;
 class InterstitialPageImpl;
 class JavaScriptDialogManager;
+class MidiDispatcherHost;
 class PowerSaveBlocker;
 class RenderViewHost;
 class RenderViewHostDelegateView;
 class RenderViewHostImpl;
 class RenderWidgetHostImpl;
 class SavePackage;
+class ScreenOrientationDispatcherHost;
 class SiteInstance;
 class TestWebContents;
 class WebContentsDelegate;
@@ -161,6 +163,10 @@ class CONTENT_EXPORT WebContentsImpl
 
   GeolocationDispatcherHost* geolocation_dispatcher_host() {
     return geolocation_dispatcher_host_.get();
+  }
+
+  ScreenOrientationDispatcherHost* screen_orientation_dispatcher_host() {
+    return screen_orientation_dispatcher_host_.get();
   }
 
   bool should_normally_be_visible() { return should_normally_be_visible_; }
@@ -325,6 +331,8 @@ class CONTENT_EXPORT WebContentsImpl
   virtual void DidStartLoading(RenderFrameHost* render_frame_host,
                                bool to_different_document) OVERRIDE;
   virtual void SwappedOut(RenderFrameHost* render_frame_host) OVERRIDE;
+  virtual void DidDeferAfterResponseStarted() OVERRIDE;
+  virtual bool WillHandleDeferAfterResponseStarted() OVERRIDE;
   virtual void WorkerCrashed(RenderFrameHost* render_frame_host) OVERRIDE;
   virtual void ShowContextMenu(RenderFrameHost* render_frame_host,
                                const ContextMenuParams& params) OVERRIDE;
@@ -468,7 +476,7 @@ class CONTENT_EXPORT WebContentsImpl
       const GURL& url,
       PageTransition transition_type) OVERRIDE;
   virtual void DidNavigateMainFramePreCommit(
-      const FrameHostMsg_DidCommitProvisionalLoad_Params& params) OVERRIDE;
+      bool navigation_is_within_page) OVERRIDE;
   virtual void DidNavigateMainFramePostCommit(
       const LoadCommittedDetails& details,
       const FrameHostMsg_DidCommitProvisionalLoad_Params& params) OVERRIDE;
@@ -525,8 +533,9 @@ class CONTENT_EXPORT WebContentsImpl
       RenderViewHost* render_view_host) OVERRIDE;
   virtual void UpdateRenderViewSizeForRenderManager() OVERRIDE;
   virtual void CancelModalDialogsForRenderManager() OVERRIDE;
-  virtual void NotifySwappedFromRenderManager(
-      RenderViewHost* old_host, RenderViewHost* new_host) OVERRIDE;
+  virtual void NotifySwappedFromRenderManager(RenderFrameHost* old_host,
+                                              RenderFrameHost* new_host,
+                                              bool is_main_frame) OVERRIDE;
   virtual int CreateOpenerRenderViewsForRenderManager(
       SiteInstance* instance) OVERRIDE;
   virtual NavigationControllerImpl&
@@ -624,6 +633,10 @@ class CONTENT_EXPORT WebContentsImpl
   // currently focused frame.
   void SelectRange(const gfx::Point& start, const gfx::Point& end);
 
+  // Notifies the main frame that it can continue navigation (if it was deferred
+  // immediately at first response).
+  void ResumeResponseDeferredAtStart();
+
  private:
   friend class TestNavigationObserver;
   friend class WebContentsAddedObserver;
@@ -673,8 +686,8 @@ class CONTENT_EXPORT WebContentsImpl
   void RemoveDestructionObserver(WebContentsImpl* web_contents);
 
   // Traverses all the RenderFrameHosts in the FrameTree and creates a set
-  // all the unique RenderWidgetHosts.
-  std::set<RenderWidgetHostImpl*> GetRenderWidgetHostsInTree();
+  // all the unique RenderWidgetHostViews.
+  std::set<RenderWidgetHostView*> GetRenderWidgetHostViewsInTree();
 
   // Callback function when showing JavaScript dialogs.  Takes in a routing ID
   // pair to identify the RenderFrameHost that opened the dialog, because it's
@@ -695,6 +708,7 @@ class CONTENT_EXPORT WebContentsImpl
                          const IPC::Message& message);
 
   // IPC message handlers.
+  void OnBrandColorChanged(SkColor brand_color);
   void OnDidLoadResourceFromMemoryCache(const GURL& url,
                                         const std::string& security_info,
                                         const std::string& http_request,
@@ -838,7 +852,8 @@ class CONTENT_EXPORT WebContentsImpl
   // Misc non-view stuff -------------------------------------------------------
 
   // Helper functions for sending notifications.
-  void NotifySwapped(RenderViewHost* old_host, RenderViewHost* new_host);
+  void NotifyViewSwapped(RenderViewHost* old_host, RenderViewHost* new_host);
+  void NotifyFrameSwapped(RenderFrameHost* old_host, RenderFrameHost* new_host);
   void NotifyDisconnected();
 
   void SetEncoding(const std::string& encoding);
@@ -1115,6 +1130,12 @@ class CONTENT_EXPORT WebContentsImpl
   // Routing id of the shown fullscreen widget or MSG_ROUTING_NONE otherwise.
   int fullscreen_widget_routing_id_;
 
+  // At the time the fullscreen widget was being shut down, did it have focus?
+  // This is used to restore focus to the WebContentsView after both: 1) the
+  // fullscreen widget is destroyed, and 2) the WebContentsDelegate has
+  // completed making layout changes to effect an exit from fullscreen mode.
+  bool fullscreen_widget_had_focus_at_shutdown_;
+
   // Maps the ids of pending image downloads to their callbacks
   typedef std::map<int, ImageDownloadCallback> ImageDownloadMap;
   ImageDownloadMap image_download_map_;
@@ -1130,6 +1151,11 @@ class CONTENT_EXPORT WebContentsImpl
   bool last_dialog_suppressed_;
 
   scoped_ptr<GeolocationDispatcherHost> geolocation_dispatcher_host_;
+
+  scoped_ptr<MidiDispatcherHost> midi_dispatcher_host_;
+
+  scoped_ptr<ScreenOrientationDispatcherHost>
+      screen_orientation_dispatcher_host_;
 
   DISALLOW_COPY_AND_ASSIGN(WebContentsImpl);
 };

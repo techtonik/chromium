@@ -29,6 +29,12 @@ class BookmarkModelObserver {
                                  const BookmarkNode* new_parent,
                                  int new_index) = 0;
 
+  // Invoked prior to adding a bookmark node, and in particular, prior to adding
+  // it to the parent. This function can be used to alter the contents of the
+  // node before BookmarkNodeAdded listeners know about it.
+  virtual void OnWillAddBookmarkNode(BookmarkModel* model,
+                                     BookmarkNode* node) {}
+
   // Invoked when a node has been added.
   virtual void BookmarkNodeAdded(BookmarkModel* model,
                                  const BookmarkNode* parent,
@@ -101,21 +107,15 @@ class BookmarkModelObserver {
 
   // Invoked before all non-permanent bookmark nodes that are editable by
   // the user are removed.
-  virtual void OnWillRemoveAllUserBookmarks(BookmarkModel* model);
+  virtual void OnWillRemoveAllUserBookmarks(BookmarkModel* model) {}
 
   // Invoked when all non-permanent bookmark nodes that are editable by the
   // user have been removed.
   // |removed_urls| is populated with the urls which no longer have any
   // bookmarks associated with them.
-  virtual void BookmarkAllUserNodesRemoved(BookmarkModel* model,
-                                           const std::set<GURL>& removed_urls);
-
-  // These deprecated methods will be removed once all implementations are
-  // updated. http://crbug.com/49598
-  virtual void OnWillRemoveAllBookmarks(BookmarkModel* model) {}
-  virtual void BookmarkAllNodesRemoved(
+  virtual void BookmarkAllUserNodesRemoved(
       BookmarkModel* model,
-      const std::set<GURL>& removed_urls) {}
+      const std::set<GURL>& removed_urls) = 0;
 
   // Invoked before a set of model changes that is initiated by a single user
   // action. For example, this is called a single time when pasting from the

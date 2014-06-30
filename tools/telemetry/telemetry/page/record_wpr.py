@@ -8,7 +8,7 @@ import sys
 import tempfile
 import time
 
-from telemetry import test
+from telemetry import benchmark
 from telemetry.core import browser_options
 from telemetry.core import discover
 from telemetry.core import wpr_modes
@@ -19,7 +19,6 @@ from telemetry.page import page_test
 from telemetry.page import profile_creator
 from telemetry.page import test_expectations
 from telemetry.page.actions import action_runner as action_runner_module
-from telemetry.page.actions import interact
 from telemetry.results import page_measurement_results
 
 
@@ -70,7 +69,7 @@ class RecordPage(page_test.PageTest):  # pylint: disable=W0223
         self.RunNavigateSteps(page, tab)
       action_runner = action_runner_module.ActionRunner(tab)
       if interactive:
-        action_runner.RunAction(interact.InteractAction())
+        action_runner.PauseInteractive()
       else:
         self._RunMethod(page, action_name, action_runner)
       should_reload = True
@@ -89,7 +88,7 @@ def Main(base_dir):
       # Filter out unneeded ProfileCreators (crbug.com/319573).
       if not issubclass(cls, profile_creator.ProfileCreator)
       }
-  tests = discover.DiscoverClasses(base_dir, base_dir, test.Test,
+  tests = discover.DiscoverClasses(base_dir, base_dir, benchmark.Benchmark,
                                    index_by_class_name=True)
 
   options = browser_options.BrowserFinderOptions()
@@ -136,13 +135,14 @@ def Main(base_dir):
   if results.errors or results.failures:
     logging.warning('Some pages failed. The recording has not been updated for '
                     'these pages.')
-    logging.warning('Failed pages:\n%s',
-                    '\n'.join(zip(*results.errors + results.failures)[0]))
+    logging.warning('Failed pages:\n%s', '\n'.join(
+        p.display_name for p in zip(*results.errors + results.failures)[0]))
 
   if results.skipped:
     logging.warning('Some pages were skipped. The recording has not been '
                     'updated for these pages.')
-    logging.warning('Skipped pages:\n%s', '\n'.join(zip(*results.skipped)[0]))
+    logging.warning('Skipped pages:\n%s', '\n'.join(
+        p.display_name for p in zip(*results.skipped)[0]))
 
   if results.successes:
     # Update the metadata for the pages which were recorded.

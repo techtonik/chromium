@@ -12,7 +12,6 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/first_run/first_run.h"
 #include "chrome/browser/google/google_brand.h"
-#include "chrome/browser/google/google_util.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_info_cache.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -22,6 +21,7 @@
 #include "chrome/common/net/url_util.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
+#include "components/google/core/browser/google_util.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/signin/core/common/profile_management_switches.h"
@@ -43,11 +43,6 @@ using content::WebContents;
 using net::GetValueForKeyInQuery;
 
 namespace {
-
-const char kSignInPromoQueryKeyAutoClose[] = "auto_close";
-const char kSignInPromoQueryKeyContinue[] = "continue";
-const char kSignInPromoQueryKeySource[] = "source";
-const char kSignInPromoQueryKeyConstrained[] = "constrained";
 
 // Gaia cannot support about:blank as a continue URL, so using a hosted blank
 // page instead.
@@ -100,8 +95,8 @@ bool ShouldShowPromo(Profile* profile) {
   if (net::NetworkChangeNotifier::IsOffline())
     return false;
 
-  // Don't show for managed profiles.
-  if (profile->IsManaged())
+  // Don't show for supervised profiles.
+  if (profile->IsSupervised())
     return false;
 
   // Display the signin promo if the user is not signed in.
@@ -285,6 +280,17 @@ Source GetSourceForPromoURL(const GURL& url) {
 bool IsAutoCloseEnabledInURL(const GURL& url) {
   std::string value;
   if (GetValueForKeyInQuery(url, kSignInPromoQueryKeyAutoClose, &value)) {
+    int enabled = 0;
+    if (base::StringToInt(value, &enabled) && enabled == 1)
+      return true;
+  }
+  return false;
+}
+
+bool ShouldShowAccountManagement(const GURL& url) {
+  std::string value;
+  if (GetValueForKeyInQuery(
+          url, kSignInPromoQueryKeyShowAccountManagement, &value)) {
     int enabled = 0;
     if (base::StringToInt(value, &enabled) && enabled == 1)
       return true;

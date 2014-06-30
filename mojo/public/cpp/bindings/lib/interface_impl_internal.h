@@ -9,6 +9,7 @@
 #include "mojo/public/cpp/bindings/interface_ptr.h"
 #include "mojo/public/cpp/bindings/lib/filter_chain.h"
 #include "mojo/public/cpp/bindings/lib/message_header_validator.h"
+#include "mojo/public/cpp/environment/environment.h"
 #include "mojo/public/cpp/system/macros.h"
 
 namespace mojo {
@@ -44,14 +45,14 @@ class InterfaceImplState : public ErrorHandler {
 
   void BindProxy(
       InterfacePtr<Interface>* ptr,
-      MojoAsyncWaiter* waiter = GetDefaultAsyncWaiter()) {
+      const MojoAsyncWaiter* waiter = Environment::GetDefaultAsyncWaiter()) {
     MessagePipe pipe;
     ptr->Bind(pipe.handle0.Pass(), waiter);
     Bind(pipe.handle1.Pass(), waiter);
   }
 
   void Bind(ScopedMessagePipeHandle handle,
-            MojoAsyncWaiter* waiter) {
+            const MojoAsyncWaiter* waiter) {
     assert(!router_);
 
     FilterChain filters;
@@ -66,6 +67,11 @@ class InterfaceImplState : public ErrorHandler {
     proxy_ = new typename Client::Proxy_(router_);
 
     instance()->OnConnectionEstablished();
+  }
+
+  bool WaitForIncomingMethodCall() {
+    assert(router_);
+    return router_->WaitForIncomingMessage();
   }
 
   Router* router() { return router_; }

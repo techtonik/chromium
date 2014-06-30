@@ -14,6 +14,7 @@
 #include "content/common/content_export.h"
 #include "content/common/content_param_traits.h"
 #include "content/common/cookie_data.h"
+#include "content/common/date_time_suggestion.h"
 #include "content/common/navigation_gesture.h"
 #include "content/common/pepper_renderer_instance_data.h"
 #include "content/common/view_message_enums.h"
@@ -29,7 +30,6 @@
 #include "content/public/common/stop_find_action.h"
 #include "content/public/common/three_d_api_types.h"
 #include "content/public/common/window_container_type.h"
-#include "content/common/date_time_suggestion.h"
 #include "ipc/ipc_channel_handle.h"
 #include "ipc/ipc_message_macros.h"
 #include "ipc/ipc_platform_file.h"
@@ -49,6 +49,7 @@
 #include "ui/base/ime/text_input_mode.h"
 #include "ui/base/ime/text_input_type.h"
 #include "ui/base/ui_base_types.h"
+#include "ui/gfx/ipc/gfx_param_traits.h"
 #include "ui/gfx/point.h"
 #include "ui/gfx/range/range.h"
 #include "ui/gfx/rect.h"
@@ -363,6 +364,9 @@ IPC_STRUCT_BEGIN(ViewHostMsg_TextInputState_Params)
   // The type of input field
   IPC_STRUCT_MEMBER(ui::TextInputType, type)
 
+  // The mode of input field
+  IPC_STRUCT_MEMBER(ui::TextInputMode, mode)
+
   // The value of the input field
   IPC_STRUCT_MEMBER(std::string, value)
 
@@ -502,8 +506,15 @@ IPC_STRUCT_END()
 
 // Messages sent from the browser to the renderer.
 
+#if defined(OS_ANDROID)
 // Tells the renderer to cancel an opened date/time dialog.
 IPC_MESSAGE_ROUTED0(ViewMsg_CancelDateTimeDialog)
+
+// Replaces a date time input field.
+IPC_MESSAGE_ROUTED1(ViewMsg_ReplaceDateTime,
+                    double /* dialog_value */)
+
+#endif
 
 // Get all savable resource links from current webpage, include main
 // frame and sub-frame.
@@ -630,10 +641,6 @@ IPC_MESSAGE_ROUTED3(ViewMsg_Find,
 IPC_MESSAGE_ROUTED1(ViewMsg_StopFinding,
                     content::StopFindAction /* action */)
 
-// Replaces a date time input field.
-IPC_MESSAGE_ROUTED1(ViewMsg_ReplaceDateTime,
-                    double /* dialog_value */)
-
 // Copies the image at location x, y to the clipboard (if there indeed is an
 // image at that location).
 IPC_MESSAGE_ROUTED2(ViewMsg_CopyImageAt,
@@ -686,6 +693,11 @@ IPC_MESSAGE_CONTROL3(ViewMsg_SetZoomLevelForCurrentURL,
                      std::string /* host */,
                      double /* zoom_level */)
 
+// Set the zoom level for a particular render view.
+IPC_MESSAGE_ROUTED2(ViewMsg_SetZoomLevelForView,
+                    bool /* uses_temporary_zoom_level */,
+                    double /* zoom_level */)
+
 // Change encoding of page in the renderer.
 IPC_MESSAGE_ROUTED1(ViewMsg_SetPageEncoding,
                     std::string /*new encoding name*/)
@@ -723,20 +735,6 @@ IPC_MESSAGE_ROUTED1(ViewMsg_SetInputMethodActive,
 IPC_MESSAGE_ROUTED0(ViewMsg_CandidateWindowShown)
 IPC_MESSAGE_ROUTED0(ViewMsg_CandidateWindowUpdated)
 IPC_MESSAGE_ROUTED0(ViewMsg_CandidateWindowHidden)
-
-// This message sends a string being composed with an input method.
-IPC_MESSAGE_ROUTED4(
-    ViewMsg_ImeSetComposition,
-    base::string16, /* text */
-    std::vector<blink::WebCompositionUnderline>, /* underlines */
-    int, /* selectiont_start */
-    int /* selection_end */)
-
-// This message confirms an ongoing composition.
-IPC_MESSAGE_ROUTED3(ViewMsg_ImeConfirmComposition,
-                    base::string16 /* text */,
-                    gfx::Range /* replacement_range */,
-                    bool /* keep_selection */)
 
 // Used to notify the render-view that we have received a target URL. Used
 // to prevent target URLs spamming the browser.
@@ -887,7 +885,7 @@ IPC_MESSAGE_ROUTED3(ViewMsg_WindowSnapshotCompleted,
                     std::vector<unsigned char> /* png */)
 
 #if defined(OS_MACOSX)
-IPC_ENUM_TRAITS_MAX_VALUE(blink::ScrollerStyle, blink::ScrollerStyleOverlay);
+IPC_ENUM_TRAITS_MAX_VALUE(blink::ScrollerStyle, blink::ScrollerStyleOverlay)
 
 // Notification of a change in scrollbar appearance and/or behavior.
 IPC_MESSAGE_CONTROL5(ViewMsg_UpdateScrollbarTheme,
@@ -980,6 +978,10 @@ IPC_MESSAGE_ROUTED2(ViewMsg_ReclaimCompositorResources,
                     cc::CompositorFrameAck /* ack */)
 
 IPC_MESSAGE_ROUTED0(ViewMsg_SelectWordAroundCaret)
+
+// Sent by the browser to ask the renderer to redraw.
+IPC_MESSAGE_ROUTED1(ViewMsg_ForceRedraw,
+                    int /* request_id */)
 
 // -----------------------------------------------------------------------------
 // Messages sent from the renderer to the browser.
@@ -1104,7 +1106,7 @@ IPC_MESSAGE_ROUTED5(ViewHostMsg_Find_Reply,
 // Indicates that the render view has been closed in respose to a
 // Close message.
 IPC_MESSAGE_CONTROL1(ViewHostMsg_Close_ACK,
-                     int /* old_route_id */);
+                     int /* old_route_id */)
 
 // Indicates that the current page has been closed, after a ClosePage
 // message.
@@ -1414,17 +1416,9 @@ IPC_MESSAGE_ROUTED1(ViewHostMsg_TakeFocus,
 IPC_MESSAGE_ROUTED1(ViewHostMsg_OpenDateTimeDialog,
                     ViewHostMsg_DateTimeDialogValue_Params /* value */)
 
-IPC_MESSAGE_ROUTED3(ViewHostMsg_TextInputTypeChanged,
-                    ui::TextInputType /* TextInputType of the focused node */,
-                    ui::TextInputMode /* TextInputMode of the focused node */,
-                    bool /* can_compose_inline in the focused node */)
-
 // Required for updating text input state.
 IPC_MESSAGE_ROUTED1(ViewHostMsg_TextInputStateChanged,
                     ViewHostMsg_TextInputState_Params /* input state params */)
-
-// Required for cancelling an ongoing input method composition.
-IPC_MESSAGE_ROUTED0(ViewHostMsg_ImeCancelComposition)
 
 // Sent when the renderer changes the zoom level for a particular url, so the
 // browser can update its records.  If the view is a plugin doc, then url is
@@ -1657,11 +1651,9 @@ IPC_MESSAGE_ROUTED1(ViewHostMsg_SetNeedsBeginFrame,
                     bool /* enabled */)
 
 // Reply to the ViewMsg_ExtractSmartClipData message.
-// TODO(juhui24.lee@samsung.com): this should be changed to a vector of structs
-// instead of encoding the data as a string which is not allowed normally. Since
-// ths is only used in Android WebView, it's allowed temporarily.
-// http://crbug.com/330872
-IPC_MESSAGE_ROUTED1(ViewHostMsg_SmartClipDataExtracted, base::string16)
+IPC_MESSAGE_ROUTED2(ViewHostMsg_SmartClipDataExtracted,
+                    base::string16 /* result */,
+                    gfx::Rect /* rect */)
 
 #elif defined(OS_MACOSX)
 // Request that the browser load a font into shared memory for us.
@@ -1707,15 +1699,6 @@ IPC_SYNC_MESSAGE_CONTROL2_1(ViewHostMsg_AllocTransportDIB,
 // renderer is finished with them.
 IPC_MESSAGE_CONTROL1(ViewHostMsg_FreeTransportDIB,
                      TransportDIB::Id /* DIB id */)
-#endif
-
-#if defined(OS_MACOSX) || defined(USE_AURA)
-// On Mac and Aura IME can request composition character bounds
-// synchronously (see crbug.com/120597). This IPC message sends the character
-// bounds after every composition change to always have correct bound info.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_ImeCompositionRangeChanged,
-                    gfx::Range /* composition range */,
-                    std::vector<gfx::Rect> /* character bounds */)
 #endif
 
 // Adding a new message? Stick to the sort order above: first platform

@@ -6,10 +6,12 @@
 #include "base/callback.h"
 #include "base/command_line.h"
 #include "base/run_loop.h"
+#include "base/strings/utf_string_conversions.h"
 #include "content/browser/fileapi/chrome_blob_storage_context.h"
 #include "content/browser/service_worker/embedded_worker_instance.h"
 #include "content/browser/service_worker/embedded_worker_registry.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
+#include "content/browser/service_worker/service_worker_context_observer.h"
 #include "content/browser/service_worker/service_worker_context_wrapper.h"
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/browser/service_worker/service_worker_test_utils.h"
@@ -28,6 +30,8 @@
 #include "content/public/test/content_browser_test_utils.h"
 #include "content/shell/browser/shell.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "net/test/embedded_test_server/http_request.h"
+#include "net/test/embedded_test_server/http_response.h"
 #include "webkit/browser/blob/blob_data_handle.h"
 #include "webkit/browser/blob/blob_storage_context.h"
 #include "webkit/common/blob/blob_data.h"
@@ -113,6 +117,61 @@ void ReadResponseBody(std::string* body,
                       blob_data_handle->data()->items()[0].length());
 }
 
+void ExpectResultAndRun(bool expected,
+                        const base::Closure& continuation,
+                        bool actual) {
+  EXPECT_EQ(expected, actual);
+  continuation.Run();
+}
+
+class WorkerActivatedObserver
+    : public ServiceWorkerContextObserver,
+      public base::RefCountedThreadSafe<WorkerActivatedObserver> {
+ public:
+  explicit WorkerActivatedObserver(ServiceWorkerContextWrapper* context)
+      : context_(context) {}
+  void Init() {
+    RunOnIOThread(base::Bind(&WorkerActivatedObserver::InitOnIOThread, this));
+  }
+  // ServiceWorkerContextObserver overrides.
+  virtual void OnVersionStateChanged(int64 version_id) OVERRIDE {
+    DCHECK_CURRENTLY_ON(BrowserThread::IO);
+    const ServiceWorkerVersion* version =
+        context_->context()->GetLiveVersion(version_id);
+    if (version->status() == ServiceWorkerVersion::ACTIVE) {
+      context_->RemoveObserver(this);
+      BrowserThread::PostTask(BrowserThread::UI,
+                              FROM_HERE,
+                              base::Bind(&WorkerActivatedObserver::Quit, this));
+    }
+  }
+  void Wait() { run_loop_.Run(); }
+
+ private:
+  friend class base::RefCountedThreadSafe<WorkerActivatedObserver>;
+  virtual ~WorkerActivatedObserver() {}
+  void InitOnIOThread() { context_->AddObserver(this); }
+  void Quit() { run_loop_.Quit(); }
+
+  base::RunLoop run_loop_;
+  ServiceWorkerContextWrapper* context_;
+  DISALLOW_COPY_AND_ASSIGN(WorkerActivatedObserver);
+};
+
+scoped_ptr<net::test_server::HttpResponse> VerifyServiceWorkerHeaderInRequest(
+    const net::test_server::HttpRequest& request) {
+  EXPECT_EQ(request.relative_url, "/service_worker/generated_sw.js");
+  std::map<std::string, std::string>::const_iterator it =
+      request.headers.find("Service-Worker");
+  EXPECT_TRUE(it != request.headers.end());
+  EXPECT_EQ("script", it->second);
+
+  scoped_ptr<net::test_server::BasicHttpResponse> http_response(
+      new net::test_server::BasicHttpResponse());
+  http_response->set_content_type("text/javascript");
+  return http_response.PassAs<net::test_server::HttpResponse>();
+}
+
 }  // namespace
 
 class ServiceWorkerBrowserTest : public ContentBrowserTest {
@@ -120,7 +179,8 @@ class ServiceWorkerBrowserTest : public ContentBrowserTest {
   typedef ServiceWorkerBrowserTest self;
 
   virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
-    command_line->AppendSwitch(switches::kEnableServiceWorker);
+    command_line->AppendSwitch(
+        switches::kEnableExperimentalWebPlatformFeatures);
   }
 
   virtual void SetUpOnMainThread() OVERRIDE {
@@ -165,7 +225,8 @@ class EmbeddedWorkerBrowserTest : public ServiceWorkerBrowserTest,
   typedef EmbeddedWorkerBrowserTest self;
 
   EmbeddedWorkerBrowserTest()
-      : last_worker_status_(EmbeddedWorkerInstance::STOPPED) {}
+      : last_worker_status_(EmbeddedWorkerInstance::STOPPED),
+        pause_mode_(DONT_PAUSE) {}
   virtual ~EmbeddedWorkerBrowserTest() {}
 
   virtual void TearDownOnIOThread() OVERRIDE {
@@ -194,6 +255,7 @@ class EmbeddedWorkerBrowserTest : public ServiceWorkerBrowserTest,
         service_worker_version_id,
         scope,
         script_url,
+        pause_mode_ != DONT_PAUSE,
         processes,
         base::Bind(&EmbeddedWorkerBrowserTest::StartOnIOThread2, this));
   }
@@ -234,6 +296,14 @@ class EmbeddedWorkerBrowserTest : public ServiceWorkerBrowserTest,
     last_worker_status_ = worker_->status();
     BrowserThread::PostTask(BrowserThread::UI, FROM_HERE, done_closure_);
   }
+  virtual void OnPausedAfterDownload() OVERRIDE {
+    if (pause_mode_ == PAUSE_THEN_RESUME)
+      worker_->ResumeAfterDownload();
+    else if (pause_mode_ == PAUSE_THEN_STOP)
+      worker_->Stop();
+    else
+      ASSERT_TRUE(false);
+  }
   virtual void OnReportException(const base::string16& error_message,
                                  int line_number,
                                  int column_number,
@@ -249,6 +319,12 @@ class EmbeddedWorkerBrowserTest : public ServiceWorkerBrowserTest,
 
   scoped_ptr<EmbeddedWorkerInstance> worker_;
   EmbeddedWorkerInstance::Status last_worker_status_;
+
+  enum {
+    DONT_PAUSE,
+    PAUSE_THEN_RESUME,
+    PAUSE_THEN_STOP,
+  } pause_mode_;
 
   // Called by EmbeddedWorkerInstance::Observer overrides so that
   // test code can wait for the worker status notifications.
@@ -380,7 +456,8 @@ class ServiceWorkerVersionBrowserTest : public ServiceWorkerBrowserTest {
     ServiceWorkerFetchRequest request(
         embedded_test_server()->GetURL("/service_worker/empty.html"),
         "GET",
-        std::map<std::string, std::string>());
+        std::map<std::string, std::string>(),
+        false);
     version_->SetStatus(ServiceWorkerVersion::ACTIVE);
     version_->DispatchFetchEvent(
         request, CreateResponseReceiver(BrowserThread::UI, done,
@@ -424,6 +501,27 @@ IN_PROC_BROWSER_TEST_F(EmbeddedWorkerBrowserTest, StartAndStop) {
                           base::Bind(&self::StopOnIOThread, this));
   stop_run_loop.Run();
 
+  ASSERT_EQ(EmbeddedWorkerInstance::STOPPED, last_worker_status_);
+}
+
+IN_PROC_BROWSER_TEST_F(EmbeddedWorkerBrowserTest, StartPaused_ThenResume) {
+  pause_mode_ = PAUSE_THEN_RESUME;
+  base::RunLoop start_run_loop;
+  done_closure_ = start_run_loop.QuitClosure();
+  BrowserThread::PostTask(BrowserThread::IO, FROM_HERE,
+                          base::Bind(&self::StartOnIOThread, this));
+  start_run_loop.Run();
+  ASSERT_EQ(EmbeddedWorkerInstance::RUNNING, last_worker_status_);
+}
+
+IN_PROC_BROWSER_TEST_F(EmbeddedWorkerBrowserTest,
+                       StartPaused_ThenStop) {
+  pause_mode_ = PAUSE_THEN_STOP;
+  base::RunLoop start_run_loop;
+  done_closure_ = start_run_loop.QuitClosure();
+  BrowserThread::PostTask(BrowserThread::IO, FROM_HERE,
+                          base::Bind(&self::StartOnIOThread, this));
+  start_run_loop.Run();
   ASSERT_EQ(EmbeddedWorkerInstance::STOPPED, last_worker_status_);
 }
 
@@ -475,6 +573,15 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest,
                        InstallWithWaitUntil_Fulfilled) {
   InstallTestHelper("/service_worker/worker_install_fulfilled.js",
                     SERVICE_WORKER_OK);
+}
+
+// Check that ServiceWorker script requests set a "Service-Worker: script"
+// header.
+IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest,
+                       ServiceWorkerScriptHeader) {
+  embedded_test_server()->RegisterRequestHandler(
+      base::Bind(&VerifyServiceWorkerHeaderInRequest));
+  InstallTestHelper("/service_worker/generated_sw.js", SERVICE_WORKER_OK);
 }
 
 IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest,
@@ -563,24 +670,38 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest, SyncEventHandled) {
   EXPECT_EQ(200, response.status_code);
 }
 
+IN_PROC_BROWSER_TEST_F(ServiceWorkerBrowserTest, Reload) {
+  const std::string kPageUrl = "/service_worker/reload.html";
+  const std::string kWorkerUrl = "/service_worker/fetch_event_reload.js";
+  {
+    scoped_refptr<WorkerActivatedObserver> observer =
+        new WorkerActivatedObserver(wrapper());
+    observer->Init();
+    public_context()->RegisterServiceWorker(
+        embedded_test_server()->GetURL(kPageUrl),
+        embedded_test_server()->GetURL(kWorkerUrl),
+        base::Bind(&ExpectResultAndRun, true, base::Bind(&base::DoNothing)));
+    observer->Wait();
+  }
+  NavigateToURL(shell(), embedded_test_server()->GetURL(kPageUrl));
+  EXPECT_EQ(base::UTF8ToUTF16("reload=false"),
+            shell()->web_contents()->GetTitle());
+  ReloadBlockUntilNavigationsComplete(shell(), 1);
+  EXPECT_EQ(base::UTF8ToUTF16("reload=true"),
+            shell()->web_contents()->GetTitle());
+  shell()->Close();
+  {
+    base::RunLoop run_loop;
+    public_context()->UnregisterServiceWorker(
+        embedded_test_server()->GetURL(kPageUrl),
+        base::Bind(&ExpectResultAndRun, true, run_loop.QuitClosure()));
+    run_loop.Run();
+  }
+}
+
 class ServiceWorkerBlackBoxBrowserTest : public ServiceWorkerBrowserTest {
  public:
   typedef ServiceWorkerBlackBoxBrowserTest self;
-
-  static void ExpectServiceWorkerHostAndRun(
-      bool expected,
-      const base::Closure& continuation,
-      scoped_ptr<ServiceWorkerHost> actual) {
-    EXPECT_EQ(expected, !!actual.get());
-    continuation.Run();
-  }
-
-  static void ExpectResultAndRun(bool expected,
-                                 const base::Closure& continuation,
-                                 bool actual) {
-    EXPECT_EQ(expected, actual);
-    continuation.Run();
-  }
 
   void FindRegistrationOnIO(const GURL& document_url,
                             ServiceWorkerStatusCode* status,
@@ -621,7 +742,13 @@ static int CountRenderProcessHosts() {
   return result;
 }
 
-IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
+// Crashes on Android: http://crbug.com/387045
+#if defined(OS_ANDROID)
+#define MAYBE_Registration DISABLED_Registration
+#else
+#define MAYBE_Registration Registration
+#endif
+IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, MAYBE_Registration) {
   // Close the only window to be sure we're not re-using its RenderProcessHost.
   shell()->Close();
   EXPECT_EQ(0, CountRenderProcessHosts());
@@ -633,9 +760,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
     base::RunLoop run_loop;
     public_context()->UnregisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
-        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
-                   true,
-                   run_loop.QuitClosure()));
+        base::Bind(&ExpectResultAndRun, true, run_loop.QuitClosure()));
     run_loop.Run();
   }
 
@@ -645,11 +770,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
     public_context()->RegisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL("/does/not/exist"),
-        NULL,
-        base::Bind(
-            &ServiceWorkerBlackBoxBrowserTest::ExpectServiceWorkerHostAndRun,
-            false,
-            run_loop.QuitClosure()));
+        base::Bind(&ExpectResultAndRun, false, run_loop.QuitClosure()));
     run_loop.Run();
   }
   EXPECT_EQ(0, CountRenderProcessHosts());
@@ -660,11 +781,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
     public_context()->RegisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL(kWorkerUrl),
-        NULL,
-        base::Bind(
-            &ServiceWorkerBlackBoxBrowserTest::ExpectServiceWorkerHostAndRun,
-            true,
-            run_loop.QuitClosure()));
+        base::Bind(&ExpectResultAndRun, true, run_loop.QuitClosure()));
     run_loop.Run();
   }
   EXPECT_EQ(1, CountRenderProcessHosts());
@@ -676,11 +793,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
     public_context()->RegisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL(kWorkerUrl),
-        NULL,
-        base::Bind(
-            &ServiceWorkerBlackBoxBrowserTest::ExpectServiceWorkerHostAndRun,
-            true,
-            run_loop.QuitClosure()));
+        base::Bind(&ExpectResultAndRun, true, run_loop.QuitClosure()));
     run_loop.Run();
   }
 
@@ -693,9 +806,7 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, Registration) {
     base::RunLoop run_loop;
     public_context()->UnregisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
-        base::Bind(&ServiceWorkerBlackBoxBrowserTest::ExpectResultAndRun,
-                   true,
-                   run_loop.QuitClosure()));
+        base::Bind(&ExpectResultAndRun, true, run_loop.QuitClosure()));
     run_loop.Run();
   }
   EXPECT_GE(1, CountRenderProcessHosts()) << "Unregistering doesn't stop the "

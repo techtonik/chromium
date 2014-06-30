@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <algorithm>
+
 #include "ash/accessibility_delegate.h"
 #include "ash/drag_drop/drag_drop_controller.h"
 #include "ash/root_window_controller.h"
@@ -20,6 +22,7 @@
 #include "ash/wm/overview/window_selector.h"
 #include "ash/wm/overview/window_selector_controller.h"
 #include "ash/wm/overview/window_selector_item.h"
+#include "ash/wm/panels/panel_layout_manager.h"
 #include "ash/wm/window_state.h"
 #include "ash/wm/window_util.h"
 #include "ash/wm/wm_event.h"
@@ -41,6 +44,7 @@
 #include "ui/gfx/transform.h"
 #include "ui/views/controls/label.h"
 #include "ui/views/widget/native_widget_aura.h"
+#include "ui/views/widget/widget_delegate.h"
 #include "ui/wm/core/window_util.h"
 #include "ui/wm/public/activation_delegate.h"
 
@@ -99,6 +103,18 @@ class WindowSelectorTest : public test::AshTestBase {
     test::TestShelfDelegate::instance()->AddShelfItem(window);
     shelf_view_test()->RunMessageLoopUntilAnimationsDone();
     return window;
+  }
+
+  views::Widget* CreatePanelWindowWidget(const gfx::Rect& bounds) {
+    views::Widget* widget = new views::Widget;
+    views::Widget::InitParams params;
+    params.bounds = bounds;
+    params.type = views::Widget::InitParams::TYPE_PANEL;
+    params.ownership = views::Widget::InitParams::WIDGET_OWNS_NATIVE_WIDGET;
+    widget->Init(params);
+    widget->Show();
+    ParentWindowInPrimaryRootWindow(widget->GetNativeWindow());
+    return widget;
   }
 
   bool WindowsOverlapping(aura::Window* window1, aura::Window* window2) {
@@ -186,8 +202,26 @@ class WindowSelectorTest : public test::AshTestBase {
         SelectedWindow()->SelectionWindow();
   }
 
-  views::Widget* GetLabelWidget(ash::WindowSelectorItem* window) {
-    return window->window_label_.get();
+  views::Widget* GetCloseButton(ash::WindowSelectorItem* window) {
+    return window->close_button_.get();
+  }
+
+  views::Label* GetLabelView(ash::WindowSelectorItem* window) {
+    return window->window_label_view_;
+  }
+
+  // Tests that a window is contained within a given WindowSelectorItem, and
+  // that both the window and its matching close button are within the same
+  // screen.
+  void IsWindowAndCloseButtonInScreen(aura::Window* window,
+                                      WindowSelectorItem* window_item) {
+    aura::Window* root_window = window_item->GetRootWindow();
+    EXPECT_TRUE(window_item->Contains(window));
+    EXPECT_TRUE(root_window->GetBoundsInScreen().Contains(
+        ToEnclosingRect(GetTransformedTargetBounds(window))));
+    EXPECT_TRUE(root_window->GetBoundsInScreen().Contains(
+        ToEnclosingRect(GetTransformedTargetBounds(
+            GetCloseButton(window_item)->GetNativeView()))));
   }
 
   test::ShelfViewTestAPI* shelf_view_test() {
@@ -575,7 +609,7 @@ TEST_F(WindowSelectorTest, ClickModalWindowParent) {
 }
 
 // Tests that windows remain on the display they are currently on in overview
-// mode.
+// mode, and that the close buttons are on matching displays.
 TEST_F(WindowSelectorTest, MultipleDisplays) {
   if (!SupportsMultipleDisplays())
     return;
@@ -614,23 +648,22 @@ TEST_F(WindowSelectorTest, MultipleDisplays) {
   EXPECT_EQ(root_windows[1], panel3->GetRootWindow());
   EXPECT_EQ(root_windows[1], panel4->GetRootWindow());
 
-  EXPECT_TRUE(root_windows[0]->GetBoundsInScreen().Contains(
-      ToEnclosingRect(GetTransformedTargetBounds(window1.get()))));
-  EXPECT_TRUE(root_windows[0]->GetBoundsInScreen().Contains(
-      ToEnclosingRect(GetTransformedTargetBounds(window2.get()))));
-  EXPECT_TRUE(root_windows[1]->GetBoundsInScreen().Contains(
-      ToEnclosingRect(GetTransformedTargetBounds(window3.get()))));
-  EXPECT_TRUE(root_windows[1]->GetBoundsInScreen().Contains(
-      ToEnclosingRect(GetTransformedTargetBounds(window4.get()))));
+  const std::vector<WindowSelectorItem*>& primary_window_items =
+      GetWindowItemsForRoot(0);
+  const std::vector<WindowSelectorItem*>& secondary_window_items =
+      GetWindowItemsForRoot(1);
 
-  EXPECT_TRUE(root_windows[0]->GetBoundsInScreen().Contains(
-      ToEnclosingRect(GetTransformedTargetBounds(panel1.get()))));
-  EXPECT_TRUE(root_windows[0]->GetBoundsInScreen().Contains(
-      ToEnclosingRect(GetTransformedTargetBounds(panel2.get()))));
-  EXPECT_TRUE(root_windows[1]->GetBoundsInScreen().Contains(
-      ToEnclosingRect(GetTransformedTargetBounds(panel3.get()))));
-  EXPECT_TRUE(root_windows[1]->GetBoundsInScreen().Contains(
-      ToEnclosingRect(GetTransformedTargetBounds(panel4.get()))));
+  // Window indices are based on top-down order. The reverse of our creation.
+  IsWindowAndCloseButtonInScreen(window1.get(), primary_window_items[2]);
+  IsWindowAndCloseButtonInScreen(window2.get(), primary_window_items[1]);
+  IsWindowAndCloseButtonInScreen(window3.get(), secondary_window_items[2]);
+  IsWindowAndCloseButtonInScreen(window4.get(), secondary_window_items[1]);
+
+  IsWindowAndCloseButtonInScreen(panel1.get(), primary_window_items[0]);
+  IsWindowAndCloseButtonInScreen(panel2.get(), primary_window_items[0]);
+  IsWindowAndCloseButtonInScreen(panel3.get(), secondary_window_items[0]);
+  IsWindowAndCloseButtonInScreen(panel4.get(), secondary_window_items[0]);
+
   EXPECT_TRUE(WindowsOverlapping(panel1.get(), panel2.get()));
   EXPECT_TRUE(WindowsOverlapping(panel3.get(), panel4.get()));
   EXPECT_FALSE(WindowsOverlapping(panel1.get(), panel3.get()));
@@ -714,24 +747,31 @@ TEST_F(WindowSelectorTest, DISABLED_DragDropInProgress) {
 TEST_F(WindowSelectorTest, CreateLabelUnderWindow) {
   scoped_ptr<aura::Window> window(CreateWindow(gfx::Rect(0, 0, 100, 100)));
   base::string16 window_title = base::UTF8ToUTF16("My window");
-  window->set_title(window_title);
+  window->SetTitle(window_title);
   ToggleOverview();
   WindowSelectorItem* window_item = GetWindowItemsForRoot(0).back();
-  views::Widget* widget = GetLabelWidget(window_item);
-  // Has the label widget been created?
-  ASSERT_TRUE(widget);
-  views::Label* label = static_cast<views::Label*>(widget->GetContentsView());
+  views::Label* label = GetLabelView(window_item);
+  // Has the label view been created?
+  ASSERT_TRUE(label);
+
   // Verify the label matches the window title.
   EXPECT_EQ(label->text(), window_title);
+
+  // Update the window title and check that the label is updated, too.
+  base::string16 updated_title = base::UTF8ToUTF16("Updated title");
+  window->SetTitle(updated_title);
+  EXPECT_EQ(label->text(), updated_title);
+
   // Labels are located based on target_bounds, not the actual window item
   // bounds.
   gfx::Rect target_bounds(window_item->target_bounds());
   gfx::Rect expected_label_bounds(target_bounds.x(),
-                                  target_bounds.bottom(),
+                                  target_bounds.bottom() - label->
+                                      GetPreferredSize().height(),
                                   target_bounds.width(),
                                   label->GetPreferredSize().height());
-  gfx::Rect real_label_bounds = widget->GetNativeWindow()->bounds();
-  EXPECT_EQ(widget->GetNativeWindow()->bounds(), real_label_bounds);
+  gfx::Rect real_label_bounds = label->GetWidget()->GetNativeWindow()->bounds();
+  EXPECT_EQ(real_label_bounds, expected_label_bounds);
 }
 
 // Tests that a label is created for the active panel in a group of panels in
@@ -741,17 +781,29 @@ TEST_F(WindowSelectorTest, CreateLabelUnderPanel) {
   scoped_ptr<aura::Window> panel2(CreatePanelWindow(gfx::Rect(0, 0, 100, 100)));
   base::string16 panel1_title = base::UTF8ToUTF16("My panel");
   base::string16 panel2_title = base::UTF8ToUTF16("Another panel");
-  panel1->set_title(panel1_title);
-  panel2->set_title(panel2_title);
+  base::string16 updated_panel1_title = base::UTF8ToUTF16("WebDriver Torso");
+  base::string16 updated_panel2_title = base::UTF8ToUTF16("Da panel");
+  panel1->SetTitle(panel1_title);
+  panel2->SetTitle(panel2_title);
   wm::ActivateWindow(panel1.get());
   ToggleOverview();
   WindowSelectorItem* window_item = GetWindowItemsForRoot(0).back();
-  views::Widget* widget = GetLabelWidget(window_item);
-  // Has the label widget been created?
-  ASSERT_TRUE(widget);
-  views::Label* label = static_cast<views::Label*>(widget->GetContentsView());
+  views::Label* label = GetLabelView(window_item);
+  // Has the label view been created?
+  ASSERT_TRUE(label);
+
   // Verify the label matches the active window title.
   EXPECT_EQ(label->text(), panel1_title);
+  // Verify that updating the title also updates the label.
+  panel1->SetTitle(updated_panel1_title);
+  EXPECT_EQ(label->text(), updated_panel1_title);
+  // After destroying the first panel, the label should match the second panel.
+  panel1.reset();
+  label = GetLabelView(window_item);
+  EXPECT_EQ(label->text(), panel2_title);
+  // Also test updating the title on the second panel.
+  panel2->SetTitle(updated_panel2_title);
+  EXPECT_EQ(label->text(), updated_panel2_title);
 }
 
 // Tests that overview updates the window positions if the display orientation
@@ -885,6 +937,81 @@ TEST_F(WindowSelectorTest, SelectWindowWithReturnKey) {
   SendKey(ui::VKEY_RETURN);
   EXPECT_FALSE(IsSelecting());
   EXPECT_TRUE(wm::IsActiveWindow(window2.get()));
+}
+
+// Tests that overview mode hides the callout widget.
+TEST_F(WindowSelectorTest, WindowOverviewHidesCalloutWidgets) {
+  scoped_ptr<aura::Window> panel1(CreatePanelWindow(gfx::Rect(0, 0, 100, 100)));
+  scoped_ptr<aura::Window> panel2(CreatePanelWindow(gfx::Rect(0, 0, 100, 100)));
+  PanelLayoutManager* panel_manager =
+        static_cast<PanelLayoutManager*>(panel1->parent()->layout_manager());
+
+  // By default, panel callout widgets are visible.
+  EXPECT_TRUE(
+      panel_manager->GetCalloutWidgetForPanel(panel1.get())->IsVisible());
+  EXPECT_TRUE(
+      panel_manager->GetCalloutWidgetForPanel(panel2.get())->IsVisible());
+
+  // Toggling the overview should hide the callout widgets.
+  ToggleOverview();
+  EXPECT_FALSE(
+      panel_manager->GetCalloutWidgetForPanel(panel1.get())->IsVisible());
+  EXPECT_FALSE(
+      panel_manager->GetCalloutWidgetForPanel(panel2.get())->IsVisible());
+
+  // Ending the overview should show them again.
+  ToggleOverview();
+  EXPECT_TRUE(
+      panel_manager->GetCalloutWidgetForPanel(panel1.get())->IsVisible());
+  EXPECT_TRUE(
+      panel_manager->GetCalloutWidgetForPanel(panel2.get())->IsVisible());
+}
+
+// Tests that when panels are grouped that the close button only closes the
+// currently active panel. After the removal window selection should still be
+// active, and the label should have changed. Removing the last panel should
+// cause selection to end.
+TEST_F(WindowSelectorTest, CloseButtonOnPanels) {
+  scoped_ptr<views::Widget> widget1(CreatePanelWindowWidget(
+      gfx::Rect(0, 0, 300, 100)));
+  scoped_ptr<views::Widget> widget2(CreatePanelWindowWidget(
+      gfx::Rect(100, 0, 100, 100)));
+  aura::Window* window1 = widget1->GetNativeWindow();
+  aura::Window* window2 = widget2->GetNativeWindow();
+  base::string16 panel1_title = base::UTF8ToUTF16("Panel 1");
+  base::string16 panel2_title = base::UTF8ToUTF16("Panel 2");
+  window1->SetTitle(panel1_title);
+  window2->SetTitle(panel2_title);
+  wm::ActivateWindow(window1);
+  ToggleOverview();
+
+  gfx::RectF bounds1 = GetTransformedBoundsInRootWindow(window1);
+  gfx::Point point1(bounds1.top_right().x() - 1, bounds1.top_right().y() - 1);
+  aura::test::EventGenerator event_generator1(window1->GetRootWindow(), point1);
+
+  EXPECT_FALSE(widget1->IsClosed());
+  event_generator1.ClickLeftButton();
+  EXPECT_TRUE(widget1->IsClosed());
+  RunAllPendingInMessageLoop();
+  EXPECT_TRUE(IsSelecting());
+  WindowSelectorItem* window_item = GetWindowItemsForRoot(0).front();
+  EXPECT_FALSE(window_item->empty());
+  EXPECT_TRUE(window_item->Contains(window2));
+  EXPECT_TRUE(GetCloseButton(window_item)->IsVisible());
+
+
+  views::Label* label = GetLabelView(window_item);
+  EXPECT_EQ(label->text(), panel2_title);
+
+  gfx::RectF bounds2 = GetTransformedBoundsInRootWindow(window2);
+  gfx::Point point2(bounds2.top_right().x() - 1, bounds2.top_right().y() - 1);
+  aura::test::EventGenerator event_generator2(window2->GetRootWindow(), point2);
+
+  EXPECT_FALSE(widget2->IsClosed());
+  event_generator2.ClickLeftButton();
+  EXPECT_TRUE(widget2->IsClosed());
+  RunAllPendingInMessageLoop();
+  EXPECT_FALSE(IsSelecting());
 }
 
 }  // namespace ash

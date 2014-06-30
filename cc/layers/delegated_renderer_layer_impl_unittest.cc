@@ -5,7 +5,6 @@
 #include "cc/layers/delegated_renderer_layer_impl.h"
 
 #include "cc/base/scoped_ptr_vector.h"
-#include "cc/layers/quad_sink.h"
 #include "cc/layers/solid_color_layer_impl.h"
 #include "cc/quads/render_pass_draw_quad.h"
 #include "cc/quads/solid_color_draw_quad.h"
@@ -530,7 +529,8 @@ class DelegatedRendererLayerImplTestTransform
                                 child_pass_clip_rect,
                                 child_pass_clipped,
                                 1.f,
-                                SkXfermode::kSrcOver_Mode);
+                                SkXfermode::kSrcOver_Mode,
+                                0);
 
       scoped_ptr<SolidColorDrawQuad> color_quad;
       color_quad = SolidColorDrawQuad::Create();
@@ -570,7 +570,8 @@ class DelegatedRendererLayerImplTestTransform
                               root_pass_clip_rect,
                               root_pass_clipped,
                               1.f,
-                              SkXfermode::kSrcOver_Mode);
+                              SkXfermode::kSrcOver_Mode,
+                              0);
 
     scoped_ptr<RenderPassDrawQuad> render_pass_quad =
         RenderPassDrawQuad::Create();
@@ -973,7 +974,8 @@ class DelegatedRendererLayerImplTestClip
                                 child_pass_clip_rect,
                                 child_pass_clipped,
                                 1.f,
-                                SkXfermode::kSrcOver_Mode);
+                                SkXfermode::kSrcOver_Mode,
+                                0);
 
       scoped_ptr<SolidColorDrawQuad> color_quad;
       color_quad = SolidColorDrawQuad::Create();
@@ -1011,7 +1013,8 @@ class DelegatedRendererLayerImplTestClip
                               root_pass_clip_rect,
                               root_pass_clipped,
                               1.f,
-                              SkXfermode::kSrcOver_Mode);
+                              SkXfermode::kSrcOver_Mode,
+                              0);
 
     scoped_ptr<RenderPassDrawQuad> render_pass_quad =
         RenderPassDrawQuad::Create();

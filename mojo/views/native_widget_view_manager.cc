@@ -8,13 +8,15 @@
 #include "mojo/services/public/cpp/input_events/input_events_type_converters.h"
 #include "mojo/services/public/cpp/view_manager/view.h"
 #include "ui/aura/client/aura_constants.h"
+#include "ui/aura/client/default_capture_client.h"
 #include "ui/aura/window.h"
 #include "ui/aura/window_event_dispatcher.h"
+#include "ui/base/ime/input_method.h"
 #include "ui/base/ime/input_method_delegate.h"
 #include "ui/base/ime/input_method_factory.h"
-#include "ui/base/ime/mock_input_method.h"
 #include "ui/base/ime/text_input_client.h"
 #include "ui/wm/core/base_focus_rules.h"
+#include "ui/wm/core/capture_controller.h"
 #include "ui/wm/core/focus_controller.h"
 
 namespace mojo {
@@ -34,50 +36,14 @@ class FocusRulesImpl : public wm::BaseFocusRules {
   DISALLOW_COPY_AND_ASSIGN(FocusRulesImpl);
 };
 
-class InputMethodImpl : public ui::MockInputMethod {
- public:
-  explicit InputMethodImpl(ui::internal::InputMethodDelegate* delegate)
-      : MockInputMethod(delegate),
-        delegate_(delegate) {
-  }
-  virtual ~InputMethodImpl() {
-  }
-
-  // MockInputMethod:
-  virtual bool DispatchKeyEvent(const ui::KeyEvent& event) OVERRIDE {
-    // If no text input client, do nothing.
-    if (!GetTextInputClient())
-      return DispatchKeyEventPostIME(event);
-
-    const bool handled = DispatchKeyEventPostIME(event);
-    if (event.type() == ui::ET_KEY_PRESSED && GetTextInputClient()) {
-      const uint16 ch = event.GetCharacter();
-      if (ch) {
-        GetTextInputClient()->InsertChar(ch, event.flags());
-        return true;
-      }
-    }
-    return handled;
-  }
-
- private:
-  bool DispatchKeyEventPostIME(const ui::KeyEvent& event) const {
-    return delegate_ && delegate_->DispatchKeyEventPostIME(event);
-  }
-
-  ui::internal::InputMethodDelegate* delegate_;
-
-  DISALLOW_COPY_AND_ASSIGN(InputMethodImpl);
-};
-
 class MinimalInputEventFilter : public ui::internal::InputMethodDelegate,
                                 public ui::EventHandler {
  public:
   explicit MinimalInputEventFilter(aura::Window* root)
-      : root_(root) {
-    ui::SetUpInputMethodFactoryForTesting();
-    input_method_.reset(new InputMethodImpl(this));
-    ui::InitializeInputMethod();
+      : root_(root),
+        input_method_(
+            ui::CreateInputMethod(this, gfx::kNullAcceleratedWidget).Pass()) {
+    ui::InitializeInputMethodForTesting();
     input_method_->Init(true);
     root_->AddPreTargetHandler(this);
     root_->SetProperty(aura::client::kRootWindowInputMethodKey,
@@ -122,11 +88,11 @@ class MinimalInputEventFilter : public ui::internal::InputMethodDelegate,
 }  // namespace
 
 NativeWidgetViewManager::NativeWidgetViewManager(
-    views::internal::NativeWidgetDelegate* delegate, view_manager::View* view)
+    views::internal::NativeWidgetDelegate* delegate, view_manager::Node* node)
     : NativeWidgetAura(delegate),
-      view_(view) {
-  view_->AddObserver(this);
-  window_tree_host_.reset(new WindowTreeHostMojo(gfx::Rect(800, 600), this));
+      node_(node) {
+  node_->active_view()->AddObserver(this);
+  window_tree_host_.reset(new WindowTreeHostMojo(node_, this));
   window_tree_host_->InitHost();
 
   ime_filter_.reset(
@@ -139,10 +105,14 @@ NativeWidgetViewManager::NativeWidgetViewManager(
   aura::client::SetActivationClient(window_tree_host_->window(),
                                     focus_client_.get());
   window_tree_host_->window()->AddPreTargetHandler(focus_client_.get());
+
+  aura::client::SetCaptureClient(
+      window_tree_host_->window(),
+      new aura::client::DefaultCaptureClient(window_tree_host_->window()));
 }
 
 NativeWidgetViewManager::~NativeWidgetViewManager() {
-  view_->RemoveObserver(this);
+  node_->active_view()->RemoveObserver(this);
 }
 
 void NativeWidgetViewManager::InitNativeWidget(
@@ -150,11 +120,13 @@ void NativeWidgetViewManager::InitNativeWidget(
   views::Widget::InitParams params(in_params);
   params.parent = window_tree_host_->window();
   NativeWidgetAura::InitNativeWidget(params);
+  capture_client_.reset(
+      new wm::ScopedCaptureClient(window_tree_host_->window()));
 }
 
 void NativeWidgetViewManager::CompositorContentsChanged(
     const SkBitmap& bitmap) {
-  view_->SetContents(bitmap);
+  node_->active_view()->SetContents(bitmap);
 }
 
 void NativeWidgetViewManager::OnViewInputEvent(view_manager::View* view,

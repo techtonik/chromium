@@ -8,24 +8,27 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/chrome_notification_types.h"
+#include "chrome/browser/content_settings/tab_specific_content_settings.h"
 #include "chrome/browser/extensions/api/web_request/web_request_api.h"
-#include "chrome/browser/extensions/api/webview/webview_api.h"
+#include "chrome/browser/extensions/api/web_view/web_view_internal_api.h"
 #include "chrome/browser/extensions/chrome_extension_web_contents_observer.h"
 #include "chrome/browser/extensions/extension_renderer_state.h"
 #include "chrome/browser/extensions/menu_manager.h"
 #include "chrome/browser/extensions/script_executor.h"
 #include "chrome/browser/favicon/favicon_tab_helper.h"
+#include "chrome/browser/geolocation/geolocation_permission_context.h"
+#include "chrome/browser/geolocation/geolocation_permission_context_factory.h"
 #include "chrome/browser/guest_view/guest_view_constants.h"
 #include "chrome/browser/guest_view/guest_view_manager.h"
 #include "chrome/browser/guest_view/web_view/web_view_constants.h"
 #include "chrome/browser/guest_view/web_view/web_view_permission_types.h"
 #include "chrome/browser/renderer_context_menu/context_menu_delegate.h"
 #include "chrome/browser/renderer_context_menu/render_view_context_menu.h"
+#include "chrome/browser/ui/pdf/pdf_tab_helper.h"
 #include "chrome/common/chrome_version_info.h"
 #include "chrome/common/render_messages.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/child_process_security_policy.h"
-#include "content/public/browser/geolocation_permission_context.h"
 #include "content/public/browser/host_zoom_map.h"
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/navigation_entry.h"
@@ -109,9 +112,6 @@ static std::string TerminationStatusToString(base::TerminationStatus status) {
     case base::TERMINATION_STATUS_PROCESS_WAS_KILLED:
       return "killed";
     case base::TERMINATION_STATUS_PROCESS_CRASHED:
-#if defined(OS_ANDROID)
-    case base::TERMINATION_STATUS_OOM_PROTECTED:
-#endif
       return "crashed";
     case base::TERMINATION_STATUS_MAX_ENUM:
       break;
@@ -124,6 +124,8 @@ static std::string PermissionTypeToString(WebViewPermissionType type) {
   switch (type) {
     case WEB_VIEW_PERMISSION_TYPE_DOWNLOAD:
       return webview::kPermissionTypeDownload;
+    case WEB_VIEW_PERMISSION_TYPE_FILESYSTEM:
+      return webview::kPermissionTypeFileSystem;
     case WEB_VIEW_PERMISSION_TYPE_GEOLOCATION:
       return webview::kPermissionTypeGeolocation;
     case WEB_VIEW_PERMISSION_TYPE_JAVASCRIPT_DIALOG:
@@ -176,44 +178,50 @@ void AttachWebViewHelpers(WebContents* contents) {
   printing::PrintViewManagerBasic::CreateForWebContents(contents);
 #endif  // defined(ENABLE_FULL_PRINTING)
 #endif  // defined(ENABLE_PRINTING)
+  PDFTabHelper::CreateForWebContents(contents);
+}
+
+void ParsePartitionParam(const base::DictionaryValue& create_params,
+                         std::string* storage_partition_id,
+                         bool* persist_storage) {
+  std::string partition_str;
+  if (!create_params.GetString(webview::kStoragePartitionId, &partition_str)) {
+    return;
+  }
+
+  // Since the "persist:" prefix is in ASCII, StartsWith will work fine on
+  // UTF-8 encoded |partition_id|. If the prefix is a match, we can safely
+  // remove the prefix without splicing in the middle of a multi-byte codepoint.
+  // We can use the rest of the string as UTF-8 encoded one.
+  if (StartsWithASCII(partition_str, "persist:", true)) {
+    size_t index = partition_str.find(":");
+    CHECK(index != std::string::npos);
+    // It is safe to do index + 1, since we tested for the full prefix above.
+    *storage_partition_id = partition_str.substr(index + 1);
+
+    if (storage_partition_id->empty()) {
+      // TODO(lazyboy): Better way to deal with this error.
+      return;
+    }
+    *persist_storage = true;
+  } else {
+    *storage_partition_id = partition_str;
+    *persist_storage = false;
+  }
 }
 
 }  // namespace
 
-WebViewGuest::WebViewGuest(int guest_instance_id,
-                           WebContents* guest_web_contents,
-                           const std::string& embedder_extension_id)
-   :  GuestView<WebViewGuest>(guest_instance_id,
-                              guest_web_contents,
-                              embedder_extension_id),
-      script_executor_(new extensions::ScriptExecutor(guest_web_contents,
-                                                      &script_observers_)),
+WebViewGuest::WebViewGuest(content::BrowserContext* browser_context,
+                           int guest_instance_id)
+   :  GuestView<WebViewGuest>(browser_context, guest_instance_id),
       pending_context_menu_request_id_(0),
       next_permission_request_id_(0),
       is_overriding_user_agent_(false),
-      pending_reload_on_attachment_(false),
       main_frame_id_(0),
       chromevox_injected_(false),
       find_helper_(this),
       javascript_dialog_helper_(this) {
-  notification_registrar_.Add(
-      this, content::NOTIFICATION_LOAD_COMPLETED_MAIN_FRAME,
-      content::Source<WebContents>(guest_web_contents));
-
-  notification_registrar_.Add(
-      this, content::NOTIFICATION_RESOURCE_RECEIVED_REDIRECT,
-      content::Source<WebContents>(guest_web_contents));
-
-#if defined(OS_CHROMEOS)
-  chromeos::AccessibilityManager* accessibility_manager =
-      chromeos::AccessibilityManager::Get();
-  CHECK(accessibility_manager);
-  accessibility_subscription_ = accessibility_manager->RegisterCallback(
-      base::Bind(&WebViewGuest::OnAccessibilityStatusChanged,
-                 base::Unretained(this)));
-#endif
-
-  AttachWebViewHelpers(guest_web_contents);
 }
 
 // static
@@ -252,37 +260,6 @@ int WebViewGuest::GetViewInstanceId(WebContents* contents) {
 }
 
 // static
-void WebViewGuest::ParsePartitionParam(
-    const base::DictionaryValue* extra_params,
-    std::string* storage_partition_id,
-    bool* persist_storage) {
-  std::string partition_str;
-  if (!extra_params->GetString(webview::kStoragePartitionId, &partition_str)) {
-    return;
-  }
-
-  // Since the "persist:" prefix is in ASCII, StartsWith will work fine on
-  // UTF-8 encoded |partition_id|. If the prefix is a match, we can safely
-  // remove the prefix without splicing in the middle of a multi-byte codepoint.
-  // We can use the rest of the string as UTF-8 encoded one.
-  if (StartsWithASCII(partition_str, "persist:", true)) {
-    size_t index = partition_str.find(":");
-    CHECK(index != std::string::npos);
-    // It is safe to do index + 1, since we tested for the full prefix above.
-    *storage_partition_id = partition_str.substr(index + 1);
-
-    if (storage_partition_id->empty()) {
-      // TODO(lazyboy): Better way to deal with this error.
-      return;
-    }
-    *persist_storage = true;
-  } else {
-    *storage_partition_id = partition_str;
-    *persist_storage = false;
-  }
-}
-
-// static
 void WebViewGuest::RecordUserInitiatedUMA(const PermissionResponseInfo& info,
                                           bool allow) {
   if (allow) {
@@ -294,6 +271,10 @@ void WebViewGuest::RecordUserInitiatedUMA(const PermissionResponseInfo& info,
       case WEB_VIEW_PERMISSION_TYPE_DOWNLOAD:
         content::RecordAction(
             UserMetricsAction("WebView.PermissionAllow.Download"));
+        break;
+      case WEB_VIEW_PERMISSION_TYPE_FILESYSTEM:
+        content::RecordAction(
+            UserMetricsAction("WebView.PermissionAllow.FileSystem"));
         break;
       case WEB_VIEW_PERMISSION_TYPE_GEOLOCATION:
         content::RecordAction(
@@ -326,6 +307,10 @@ void WebViewGuest::RecordUserInitiatedUMA(const PermissionResponseInfo& info,
       case WEB_VIEW_PERMISSION_TYPE_DOWNLOAD:
         content::RecordAction(
             UserMetricsAction("WebView.PermissionDeny.Download"));
+        break;
+      case WEB_VIEW_PERMISSION_TYPE_FILESYSTEM:
+        content::RecordAction(
+            UserMetricsAction("WebView.PermissionDeny.FileSystem"));
         break;
       case WEB_VIEW_PERMISSION_TYPE_GEOLOCATION:
         content::RecordAction(
@@ -373,29 +358,131 @@ scoped_ptr<base::ListValue> WebViewGuest::MenuModelToValue(
   return items.Pass();
 }
 
-void WebViewGuest::Attach(WebContents* embedder_web_contents,
-                          const base::DictionaryValue& args) {
+void WebViewGuest::CreateWebContents(
+    const std::string& embedder_extension_id,
+    int embedder_render_process_id,
+    const base::DictionaryValue& create_params,
+    const WebContentsCreatedCallback& callback) {
+  content::RenderProcessHost* embedder_render_process_host =
+      content::RenderProcessHost::FromID(embedder_render_process_id);
+  std::string storage_partition_id;
+  bool persist_storage = false;
+  std::string storage_partition_string;
+  ParsePartitionParam(create_params, &storage_partition_id, &persist_storage);
+  // Validate that the partition id coming from the renderer is valid UTF-8,
+  // since we depend on this in other parts of the code, such as FilePath
+  // creation. If the validation fails, treat it as a bad message and kill the
+  // renderer process.
+  if (!base::IsStringUTF8(storage_partition_id)) {
+    content::RecordAction(
+        base::UserMetricsAction("BadMessageTerminate_BPGM"));
+    base::KillProcess(
+        embedder_render_process_host->GetHandle(),
+        content::RESULT_CODE_KILLED_BAD_MESSAGE, false);
+    return;
+  }
+  std::string url_encoded_partition = net::EscapeQueryParamValue(
+      storage_partition_id, false);
+  // The SiteInstance of a given webview tag is based on the fact that it's
+  // a guest process in addition to which platform application the tag
+  // belongs to and what storage partition is in use, rather than the URL
+  // that the tag is being navigated to.
+  GURL guest_site(base::StringPrintf("%s://%s/%s?%s",
+                                     content::kGuestScheme,
+                                     embedder_extension_id.c_str(),
+                                     persist_storage ? "persist" : "",
+                                     url_encoded_partition.c_str()));
+
+  // If we already have a webview tag in the same app using the same storage
+  // partition, we should use the same SiteInstance so the existing tag and
+  // the new tag can script each other.
+  GuestViewManager* guest_view_manager =
+      GuestViewManager::FromBrowserContext(
+          embedder_render_process_host->GetBrowserContext());
+  content::SiteInstance* guest_site_instance =
+      guest_view_manager->GetGuestSiteInstance(guest_site);
+  if (!guest_site_instance) {
+    // Create the SiteInstance in a new BrowsingInstance, which will ensure
+    // that webview tags are also not allowed to send messages across
+    // different partitions.
+    guest_site_instance = content::SiteInstance::CreateForURL(
+        embedder_render_process_host->GetBrowserContext(), guest_site);
+  }
+  WebContents::CreateParams params(
+      embedder_render_process_host->GetBrowserContext(),
+      guest_site_instance);
+  params.guest_delegate = this;
+  callback.Run(WebContents::Create(params));
+}
+
+void WebViewGuest::DidAttachToEmbedder() {
   std::string name;
-  args.GetString(webview::kName, &name);
-  // If the guest window's name is empty, then the WebView tag's name is
-  // assigned. Otherwise, the guest window's name takes precedence over the
-  // WebView tag's name.
-  if (name_.empty())
-    name_ = name;
+  if (extra_params()->GetString(webview::kName, &name)) {
+    // If the guest window's name is empty, then the WebView tag's name is
+    // assigned. Otherwise, the guest window's name takes precedence over the
+    // WebView tag's name.
+    if (name_.empty())
+      name_ = name;
+  }
   ReportFrameNameChange(name_);
 
   std::string user_agent_override;
-  if (args.GetString(webview::kParameterUserAgentOverride,
-                     &user_agent_override)) {
+  if (extra_params()->GetString(webview::kParameterUserAgentOverride,
+                                &user_agent_override)) {
     SetUserAgentOverride(user_agent_override);
   } else {
     SetUserAgentOverride("");
   }
 
-  GuestViewBase::Attach(embedder_web_contents, args);
+  std::string src;
+  if (extra_params()->GetString("src", &src) && !src.empty())
+    NavigateGuest(src);
 
-  AddWebViewToExtensionRendererState();
+  if (GetOpener()) {
+    // We need to do a navigation here if the target URL has changed between
+    // the time the WebContents was created and the time it was attached.
+    // We also need to do an initial navigation if a RenderView was never
+    // created for the new window in cases where there is no referrer.
+    PendingWindowMap::iterator it =
+        GetOpener()->pending_new_windows_.find(this);
+    if (it != GetOpener()->pending_new_windows_.end()) {
+      const NewWindowInfo& new_window_info = it->second;
+      if (new_window_info.changed || !guest_web_contents()->HasOpener())
+        NavigateGuest(new_window_info.url.spec());
+    } else {
+      NOTREACHED();
+    }
+
+    // Once a new guest is attached to the DOM of the embedder page, then the
+    // lifetime of the new guest is no longer managed by the opener guest.
+    GetOpener()->pending_new_windows_.erase(this);
+  }
 }
+
+void WebViewGuest::DidInitialize() {
+  script_executor_.reset(new extensions::ScriptExecutor(guest_web_contents(),
+                                                        &script_observers_));
+
+  notification_registrar_.Add(
+      this, content::NOTIFICATION_LOAD_COMPLETED_MAIN_FRAME,
+      content::Source<WebContents>(guest_web_contents()));
+
+  notification_registrar_.Add(
+      this, content::NOTIFICATION_RESOURCE_RECEIVED_REDIRECT,
+      content::Source<WebContents>(guest_web_contents()));
+
+#if defined(OS_CHROMEOS)
+  chromeos::AccessibilityManager* accessibility_manager =
+      chromeos::AccessibilityManager::Get();
+  CHECK(accessibility_manager);
+  accessibility_subscription_ = accessibility_manager->RegisterCallback(
+      base::Bind(&WebViewGuest::OnAccessibilityStatusChanged,
+                 base::Unretained(this)));
+#endif
+
+  AttachWebViewHelpers(guest_web_contents());
+}
+
 
 void WebViewGuest::DidStopLoading() {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
@@ -459,36 +546,6 @@ bool WebViewGuest::AddMessageToConsole(WebContents* source,
 void WebViewGuest::CloseContents(WebContents* source) {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   DispatchEvent(new GuestViewBase::Event(webview::kEventClose, args.Pass()));
-}
-
-void WebViewGuest::DidAttach(const base::DictionaryValue& extra_params) {
-  std::string src;
-  if (extra_params.GetString("src", &src) && !src.empty())
-    NavigateGuest(src);
-
-  if (GetOpener()) {
-    // We need to do a navigation here if the target URL has changed between
-    // the time the WebContents was created and the time it was attached.
-    // We also need to do an initial navigation if a RenderView was never
-    // created for the new window in cases where there is no referrer.
-    PendingWindowMap::iterator it =
-        GetOpener()->pending_new_windows_.find(this);
-    if (it != GetOpener()->pending_new_windows_.end()) {
-      const NewWindowInfo& new_window_info = it->second;
-      NavigateGuest(new_window_info.url.spec());
-    } else {
-      NOTREACHED();
-    }
-
-    // Once a new guest is attached to the DOM of the embedder page, then the
-    // lifetime of the new guest is no longer managed by the opener guest.
-    GetOpener()->pending_new_windows_.erase(this);
-  }
-
-  if (pending_reload_on_attachment_) {
-    pending_reload_on_attachment_ = false;
-    guest_web_contents()->GetController().Reload(false);
-  }
 }
 
 void WebViewGuest::FindReply(WebContents* source,
@@ -571,28 +628,32 @@ void WebViewGuest::OnUpdateFrameName(bool is_top_level,
   ReportFrameNameChange(name);
 }
 
-WebViewGuest* WebViewGuest::CreateNewGuestWindow(
+void WebViewGuest::CreateNewGuestWebViewWindow(
     const content::OpenURLParams& params) {
   GuestViewManager* guest_manager =
       GuestViewManager::FromBrowserContext(browser_context());
-  // Allocate a new instance ID for the new guest.
-  int instance_id = guest_manager->GetNextInstanceID();
-
   // Set the attach params to use the same partition as the opener.
   // We pull the partition information from the site's URL, which is of the
   // form guest://site/{persist}?{partition_name}.
   const GURL& site_url = guest_web_contents()->GetSiteInstance()->GetSiteURL();
-  scoped_ptr<base::DictionaryValue> create_params(extra_params()->DeepCopy());
   const std::string storage_partition_id =
       GetStoragePartitionIdFromSiteURL(site_url);
-  create_params->SetString(webview::kStoragePartitionId, storage_partition_id);
+  base::DictionaryValue create_params;
+  create_params.SetString(webview::kStoragePartitionId, storage_partition_id);
 
-  WebContents* new_guest_web_contents =
-      guest_manager->CreateGuest(guest_web_contents()->GetSiteInstance(),
-                                 instance_id,
-                                 create_params.Pass());
-  WebViewGuest* new_guest =
-      WebViewGuest::FromWebContents(new_guest_web_contents);
+  guest_manager->CreateGuest(
+      WebViewGuest::Type,
+      embedder_extension_id(),
+      embedder_web_contents()->GetRenderProcessHost()->GetID(),
+      create_params,
+      base::Bind(&WebViewGuest::NewGuestWebViewCallback,
+                 base::Unretained(this), params));
+}
+
+void WebViewGuest::NewGuestWebViewCallback(
+    const content::OpenURLParams& params,
+    content::WebContents* guest_web_contents) {
+  WebViewGuest* new_guest = WebViewGuest::FromWebContents(guest_web_contents);
   new_guest->SetOpener(this);
 
   // Take ownership of |new_guest|.
@@ -603,8 +664,6 @@ WebViewGuest* WebViewGuest::CreateNewGuestWindow(
   RequestNewWindowPermission(params.disposition, gfx::Rect(),
                              params.user_gesture,
                              new_guest->guest_web_contents());
-
-  return new_guest;
 }
 
 // TODO(fsamuel): Find a reliable way to test the 'responsive' and
@@ -661,7 +720,7 @@ double WebViewGuest::GetZoom() {
 void WebViewGuest::Find(
     const base::string16& search_text,
     const blink::WebFindOptions& options,
-    scoped_refptr<extensions::WebviewFindFunction> find_function) {
+    scoped_refptr<extensions::WebViewInternalFindFunction> find_function) {
   find_helper_.Find(guest_web_contents(), search_text, options, find_function);
 }
 
@@ -679,6 +738,28 @@ void WebViewGuest::Reload() {
   // Chromium's repost warning. We might want to implement a separate API
   // for registering a callback if a repost is about to happen.
   guest_web_contents()->GetController().Reload(false);
+}
+
+void WebViewGuest::RequestFileSystemPermission(
+    const GURL& url,
+    bool allowed_by_default,
+    const base::Callback<void(bool)>& callback) {
+  base::DictionaryValue request_info;
+  request_info.Set(guestview::kUrl, base::Value::CreateStringValue(url.spec()));
+  RequestPermission(
+      WEB_VIEW_PERMISSION_TYPE_FILESYSTEM,
+      request_info,
+      base::Bind(&WebViewGuest::OnWebViewFileSystemPermissionResponse,
+                 base::Unretained(this),
+                 callback),
+      allowed_by_default);
+}
+
+void WebViewGuest::OnWebViewFileSystemPermissionResponse(
+    const base::Callback<void(bool)>& callback,
+    bool allow,
+    const std::string& user_input) {
+  callback.Run(allow && attached());
 }
 
 void WebViewGuest::RequestGeolocationPermission(
@@ -723,20 +804,19 @@ void WebViewGuest::OnWebViewGeolocationPermissionResponse(
     return;
   }
 
-  content::GeolocationPermissionContext* geolocation_context =
-      browser_context()->GetGeolocationPermissionContext();
-
-  DCHECK(geolocation_context);
-  geolocation_context->RequestGeolocationPermission(
-      embedder_web_contents(),
-      // The geolocation permission request here is not initiated
-      // through WebGeolocationPermissionRequest. We are only interested
-      // in the fact whether the embedder/app has geolocation
-      // permission. Therefore we use an invalid |bridge_id|.
-      -1 /* bridge_id */,
-      embedder_web_contents()->GetLastCommittedURL(),
-      user_gesture,
-      callback);
+  Profile* profile = Profile::FromBrowserContext(browser_context());
+  GeolocationPermissionContextFactory::GetForProfile(profile)->
+      RequestGeolocationPermission(
+          embedder_web_contents(),
+          // The geolocation permission request here is not initiated
+          // through WebGeolocationPermissionRequest. We are only interested
+          // in the fact whether the embedder/app has geolocation
+          // permission. Therefore we use an invalid |bridge_id|.
+          -1,
+          embedder_web_contents()->GetLastCommittedURL(),
+          user_gesture,
+          callback,
+          NULL);
 }
 
 void WebViewGuest::CancelGeolocationPermissionRequest(int bridge_id) {
@@ -810,6 +890,8 @@ WebViewGuest::SetPermissionResult WebViewGuest::SetPermission(
 
 void WebViewGuest::SetUserAgentOverride(
     const std::string& user_agent_override) {
+  if (!attached())
+    return;
   is_overriding_user_agent_ = !user_agent_override.empty();
   if (is_overriding_user_agent_) {
     content::RecordAction(UserMetricsAction("WebView.Guest.OverrideUA"));
@@ -850,6 +932,78 @@ bool WebViewGuest::ClearData(const base::Time remove_since,
       base::Time::Now(),
       callback);
   return true;
+}
+
+// static
+void WebViewGuest::FileSystemAccessedAsync(int render_process_id,
+                                           int render_frame_id,
+                                           int request_id,
+                                           const GURL& url,
+                                           bool blocked_by_policy) {
+  WebViewGuest* guest =
+      WebViewGuest::FromFrameID(render_process_id, render_frame_id);
+  DCHECK(guest);
+  guest->RequestFileSystemPermission(
+      url,
+      !blocked_by_policy,
+      base::Bind(&WebViewGuest::FileSystemAccessedAsyncResponse,
+                 render_process_id,
+                 render_frame_id,
+                 request_id,
+                 url));
+}
+
+// static
+void WebViewGuest::FileSystemAccessedAsyncResponse(int render_process_id,
+                                                   int render_frame_id,
+                                                   int request_id,
+                                                   const GURL& url,
+                                                   bool allowed) {
+  TabSpecificContentSettings::FileSystemAccessed(
+      render_process_id, render_frame_id, url, !allowed);
+  content::RenderFrameHost* render_frame_host =
+      content::RenderFrameHost::FromID(render_process_id, render_frame_id);
+  if (!render_frame_host)
+    return;
+  render_frame_host->Send(
+      new ChromeViewMsg_RequestFileSystemAccessAsyncResponse(
+          render_frame_id, request_id, allowed));
+}
+
+// static
+void WebViewGuest::FileSystemAccessedSync(int render_process_id,
+                                          int render_frame_id,
+                                          const GURL& url,
+                                          bool blocked_by_policy,
+                                          IPC::Message* reply_msg) {
+  WebViewGuest* guest =
+      WebViewGuest::FromFrameID(render_process_id, render_frame_id);
+  DCHECK(guest);
+  guest->RequestFileSystemPermission(
+      url,
+      !blocked_by_policy,
+      base::Bind(&WebViewGuest::FileSystemAccessedSyncResponse,
+                 render_process_id,
+                 render_frame_id,
+                 url,
+                 reply_msg));
+}
+
+// static
+void WebViewGuest::FileSystemAccessedSyncResponse(int render_process_id,
+                                                  int render_frame_id,
+                                                  const GURL& url,
+                                                  IPC::Message* reply_msg,
+                                                  bool allowed) {
+  TabSpecificContentSettings::FileSystemAccessed(
+      render_process_id, render_frame_id, url, !allowed);
+  ChromeViewHostMsg_RequestFileSystemAccessSync::WriteReplyParams(reply_msg,
+                                                                  allowed);
+  content::RenderFrameHost* render_frame_host =
+      content::RenderFrameHost::FromID(render_process_id, render_frame_id);
+  if (!render_frame_id)
+    return;
+  render_frame_host->Send(reply_msg);
 }
 
 WebViewGuest::~WebViewGuest() {
@@ -945,18 +1099,14 @@ void WebViewGuest::RenderProcessGone(base::TerminationStatus status) {
 }
 
 void WebViewGuest::UserAgentOverrideSet(const std::string& user_agent) {
+  if (!attached())
+    return;
   content::NavigationController& controller =
       guest_web_contents()->GetController();
   content::NavigationEntry* entry = controller.GetVisibleEntry();
   if (!entry)
     return;
   entry->SetIsOverridingUserAgent(!user_agent.empty());
-  if (!attached()) {
-    // We cannot reload now because all resource loads are suspended until
-    // attachment.
-    pending_reload_on_attachment_ = true;
-    return;
-  }
   guest_web_contents()->GetController().Reload(false);
 }
 
@@ -1003,20 +1153,20 @@ void WebViewGuest::AddWebViewToExtensionRendererState() {
   }
   DCHECK(embedder_extension_id() == partition_domain);
 
-  ExtensionRendererState::WebViewInfo webview_info;
-  webview_info.embedder_process_id = embedder_render_process_id();
-  webview_info.instance_id = view_instance_id();
-  webview_info.partition_id =  partition_id;
-  webview_info.embedder_extension_id = embedder_extension_id();
+  ExtensionRendererState::WebViewInfo web_view_info;
+  web_view_info.embedder_process_id = embedder_render_process_id();
+  web_view_info.instance_id = view_instance_id();
+  web_view_info.partition_id = partition_id;
+  web_view_info.embedder_extension_id = embedder_extension_id();
 
   content::BrowserThread::PostTask(
-      content::BrowserThread::IO, FROM_HERE,
-      base::Bind(
-          &ExtensionRendererState::AddWebView,
-          base::Unretained(ExtensionRendererState::GetInstance()),
-          guest_web_contents()->GetRenderProcessHost()->GetID(),
-          guest_web_contents()->GetRoutingID(),
-          webview_info));
+      content::BrowserThread::IO,
+      FROM_HERE,
+      base::Bind(&ExtensionRendererState::AddWebView,
+                 base::Unretained(ExtensionRendererState::GetInstance()),
+                 guest_web_contents()->GetRenderProcessHost()->GetID(),
+                 guest_web_contents()->GetRoutingID(),
+                 web_view_info));
 }
 
 // static
@@ -1029,6 +1179,17 @@ void WebViewGuest::RemoveWebViewFromExtensionRendererState(
           base::Unretained(ExtensionRendererState::GetInstance()),
           web_contents->GetRenderProcessHost()->GetID(),
           web_contents->GetRoutingID()));
+}
+
+content::WebContents* WebViewGuest::CreateNewGuestWindow(
+    const content::WebContents::CreateParams& create_params) {
+  GuestViewManager* guest_manager =
+      GuestViewManager::FromBrowserContext(browser_context());
+  return guest_manager->CreateGuestWithWebContentsParams(
+      WebViewGuest::Type,
+      embedder_extension_id(),
+      embedder_web_contents()->GetRenderProcessHost()->GetID(),
+      create_params);
 }
 
 void WebViewGuest::SizeChanged(const gfx::Size& old_size,
@@ -1097,6 +1258,13 @@ void WebViewGuest::RequestPointerLockPermission(
                  base::Unretained(this),
                  callback),
       false /* allowed_by_default */);
+}
+
+void WebViewGuest::WillAttachToEmbedder() {
+  // We must install the mapping from guests to WebViews prior to resuming
+  // suspended resource loads so that the WebRequest API will catch resource
+  // requests.
+  AddWebViewToExtensionRendererState();
 }
 
 content::JavaScriptDialogManager*
@@ -1365,8 +1533,9 @@ content::WebContents* WebViewGuest::OpenURLFromTab(
         opener->pending_new_windows_.find(this);
     if (it == opener->pending_new_windows_.end())
       return NULL;
-    const NewWindowInfo& old_target_url = it->second;
-    NewWindowInfo new_window_info(params.url, old_target_url.name);
+    const NewWindowInfo& info = it->second;
+    NewWindowInfo new_window_info(params.url, info.name);
+    new_window_info.changed = new_window_info.url != info.url;
     it->second = new_window_info;
     return NULL;
   }
@@ -1376,7 +1545,8 @@ content::WebContents* WebViewGuest::OpenURLFromTab(
     return source;
   }
 
-  return CreateNewGuestWindow(params)->guest_web_contents();
+  CreateNewGuestWebViewWindow(params);
+  return NULL;
 }
 
 void WebViewGuest::WebContentsCreated(WebContents* source_contents,
@@ -1435,7 +1605,8 @@ void WebViewGuest::RequestNewWindowPermission(
   request_info.Set(webview::kName,
                    base::Value::CreateStringValue(new_window_info.name));
   request_info.Set(webview::kWindowID,
-                   base::Value::CreateIntegerValue(guest->guest_instance_id()));
+                   base::Value::CreateIntegerValue(
+                      guest->GetGuestInstanceID()));
   // We pass in partition info so that window-s created through newwindow
   // API can use it to set their partition attribute.
   request_info.Set(webview::kStoragePartitionId,
@@ -1448,7 +1619,7 @@ void WebViewGuest::RequestNewWindowPermission(
                     request_info,
                     base::Bind(&WebViewGuest::OnWebViewNewWindowResponse,
                                base::Unretained(this),
-                               guest->guest_instance_id()),
+                               guest->GetGuestInstanceID()),
                                false /* allowed_by_default */);
 }
 

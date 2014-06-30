@@ -9,10 +9,21 @@
 
 namespace rappor {
 
+// Test that extracting the sample works correctly for different schemes.
+TEST(RapporSamplingTest, GetDomainAndRegistrySampleFromGURLTest) {
+  EXPECT_EQ("google.com", GetDomainAndRegistrySampleFromGURL(
+      GURL("https://www.GoOgLe.com:80/blah")));
+  EXPECT_EQ("file://", GetDomainAndRegistrySampleFromGURL(
+      GURL("file://foo/bar/baz")));
+  EXPECT_EQ("chrome-extension://abc1234", GetDomainAndRegistrySampleFromGURL(
+      GURL("chrome-extension://abc1234/foo.html")));
+  EXPECT_EQ("chrome-search://local-ntp", GetDomainAndRegistrySampleFromGURL(
+      GURL("chrome-search://local-ntp/local-ntp.html")));
+}
+
 // Make sure recording a sample during tests, when the Rappor service is NULL,
 // doesn't cause a crash.
 TEST(RapporSamplingTest, SmokeTest) {
-  SampleDomainAndRegistryFromHost(std::string(), std::string());
   SampleDomainAndRegistryFromGURL(std::string(), GURL());
 }
 

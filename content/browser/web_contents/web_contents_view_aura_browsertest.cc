@@ -267,9 +267,14 @@ class WebContentsViewAuraTest : public ContentBrowserTest {
   DISALLOW_COPY_AND_ASSIGN(WebContentsViewAuraTest);
 };
 
-// Flaky on Windows and ChromeOS: http://crbug.com/305722
-IN_PROC_BROWSER_TEST_F(WebContentsViewAuraTest,
-    DISABLED_OverscrollNavigation) {
+// Flaky on Windows: http://crbug.com/305722
+#if defined(OS_WIN)
+#define MAYBE_OverscrollNavigation DISABLED_OverscrollNavigation
+#else
+#define MAYBE_OverscrollNavigation OverscrollNavigation
+#endif
+
+IN_PROC_BROWSER_TEST_F(WebContentsViewAuraTest, MAYBE_OverscrollNavigation) {
   TestOverscrollNavigation(false);
 }
 
@@ -377,9 +382,15 @@ IN_PROC_BROWSER_TEST_F(WebContentsViewAuraTest,
 //  - interactively, when user does an overscroll gesture
 //  - interactively, when user navigates in history without the overscroll
 //    gesture.
-// Flaky on Windows and ChromeOS (http://crbug.com/357311). Might be related to
+// Flaky on Windows (http://crbug.com/357311). Might be related to
 // OverscrollNavigation test.
-IN_PROC_BROWSER_TEST_F(WebContentsViewAuraTest, DISABLED_OverscrollScreenshot) {
+#if defined(OS_WIN)
+#define MAYBE_OverscrollScreenshot DISABLED_OverscrollScreenshot
+#else
+#define MAYBE_OverscrollScreenshot OverscrollScreenshot
+#endif
+
+IN_PROC_BROWSER_TEST_F(WebContentsViewAuraTest, MAYBE_OverscrollScreenshot) {
   // Disable the test for WinXP.  See http://crbug/294116.
 #if defined(OS_WIN)
   if (base::win::GetVersion() < base::win::VERSION_VISTA) {
@@ -553,6 +564,34 @@ IN_PROC_BROWSER_TEST_F(WebContentsViewAuraTest,
   screenshot_manager()->WaitUntilScreenshotIsReady();
 
   EXPECT_EQ(NULL, screenshot_manager()->screenshot_taken_for());
+}
+
+// Tests that navigations resulting from reloads and history.replaceState
+// do not capture screenshots while navigations resulting from
+// histrory.pushState do.
+IN_PROC_BROWSER_TEST_F(WebContentsViewAuraTest, ReplaceStateReloadPushState) {
+  ASSERT_NO_FATAL_FAILURE(
+      StartTestWithPage("files/overscroll_navigation.html"));
+  WebContentsImpl* web_contents =
+      static_cast<WebContentsImpl*>(shell()->web_contents());
+  RenderFrameHost* main_frame = web_contents->GetMainFrame();
+
+  set_min_screenshot_interval(0);
+  screenshot_manager()->Reset();
+  ExecuteSyncJSFunction(main_frame, "use_replace_state()");
+  screenshot_manager()->WaitUntilScreenshotIsReady();
+  // history.replaceState shouldn't capture a screenshot
+  EXPECT_FALSE(screenshot_manager()->screenshot_taken_for());
+  screenshot_manager()->Reset();
+  web_contents->GetController().Reload(true);
+  WaitForLoadStop(web_contents);
+  // reloading the page shouldn't capture a screenshot
+  EXPECT_FALSE(screenshot_manager()->screenshot_taken_for());
+  screenshot_manager()->Reset();
+  ExecuteSyncJSFunction(main_frame, "use_push_state()");
+  screenshot_manager()->WaitUntilScreenshotIsReady();
+  // pushing a state should capture a screenshot
+  EXPECT_TRUE(screenshot_manager()->screenshot_taken_for());
 }
 
 // TODO(sadrul): This test is disabled because it reparents in a way the

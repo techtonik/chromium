@@ -85,7 +85,7 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
   virtual ~Pipeline();
 
   // Build a pipeline to using the given filter collection to construct a filter
-  // chain, executing |seek_cb| when the initial seek/preroll has completed.
+  // chain, executing |seek_cb| when the initial seek has completed.
   //
   // |filter_collection| must be a complete collection containing a demuxer,
   // audio/video decoders, and audio/video renderers. Failing to do so will
@@ -99,9 +99,8 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
   //   |metadata_cb| will be executed when the content duration, container video
   //                 size, start time, and whether the content has audio and/or
   //                 video in supported formats are known.
-  //   |preroll_completed_cb| will be executed when all renderers have buffered
-  //                          enough data to satisfy preroll and are ready to
-  //                          start playback.
+  //   |buffering_state_cb| will be executed whenever there are changes in the
+  //                        overall buffering state of the pipeline.
   //   |duration_change_cb| optional callback that will be executed whenever the
   //                        presentation duration changes.
   // It is an error to call this method after the pipeline has already started.
@@ -110,7 +109,7 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
              const PipelineStatusCB& error_cb,
              const PipelineStatusCB& seek_cb,
              const PipelineMetadataCB& metadata_cb,
-             const base::Closure& preroll_completed_cb,
+             const BufferingStateCB& buffering_state_cb,
              const base::Closure& duration_change_cb);
 
   // Asynchronously stops the pipeline, executing |stop_cb| when the pipeline
@@ -177,6 +176,9 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
   // Gets the current pipeline statistics.
   PipelineStatistics GetStatistics() const;
 
+  void set_underflow_disabled_for_testing(bool disabled) {
+    underflow_disabled_for_testing_ = disabled;
+  }
   void SetClockForTesting(Clock* clock);
   void SetErrorForTesting(PipelineStatus status);
 
@@ -309,8 +311,6 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
   void DoStop(const PipelineStatusCB& done_cb);
   void OnStopCompleted(PipelineStatus status);
 
-  void OnAudioUnderflow();
-
   // Collection of callback methods and helpers for tracking changes in
   // buffering state and transition from paused/underflow states and playing
   // states.
@@ -319,11 +319,11 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
   //   - A waiting to non-waiting transition indicates preroll has completed
   //     and StartPlayback() should be called
   //   - A non-waiting to waiting transition indicates underflow has occurred
-  //     and StartWaitingForEnoughData() should be called
+  //     and PausePlayback() should be called
   void BufferingStateChanged(BufferingState* buffering_state,
                              BufferingState new_buffering_state);
   bool WaitingForEnoughData() const;
-  void StartWaitingForEnoughData();
+  void PausePlayback();
   void StartPlayback();
 
   void PauseClockAndStopRendering_Locked();
@@ -391,6 +391,9 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
   // Member that tracks the current state.
   State state_;
 
+  // The timestamp to start playback from after starting/seeking has completed.
+  base::TimeDelta start_timestamp_;
+
   // Whether we've received the audio/video/text ended events.
   bool audio_ended_;
   bool video_ended_;
@@ -409,7 +412,7 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
   base::Closure ended_cb_;
   PipelineStatusCB error_cb_;
   PipelineMetadataCB metadata_cb_;
-  base::Closure preroll_completed_cb_;
+  BufferingStateCB buffering_state_cb_;
   base::Closure duration_change_cb_;
 
   // Contains the demuxer and renderers to use when initializing.
@@ -426,11 +429,9 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
 
   PipelineStatistics statistics_;
 
-  // Time of pipeline creation; is non-zero only until the pipeline first
-  // reaches "kStarted", at which point it is used & zeroed out.
-  base::TimeTicks creation_time_;
-
   scoped_ptr<SerialRunner> pending_callbacks_;
+
+  bool underflow_disabled_for_testing_;
 
   base::ThreadChecker thread_checker_;
 

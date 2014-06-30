@@ -14,8 +14,9 @@ import sys
 import tempfile
 import zipfile
 
-CHROMIUM_SRC = os.path.join(os.path.dirname(__file__),
-                            os.pardir, os.pardir, os.pardir, os.pardir)
+CHROMIUM_SRC = os.path.normpath(
+    os.path.join(os.path.dirname(__file__),
+                 os.pardir, os.pardir, os.pardir, os.pardir))
 COLORAMA_ROOT = os.path.join(CHROMIUM_SRC,
                              'third_party', 'colorama', 'src')
 
@@ -41,7 +42,10 @@ def DeleteDirectory(dir_path):
     shutil.rmtree(dir_path)
 
 
-def Touch(path):
+def Touch(path, fail_if_missing=False):
+  if fail_if_missing and not os.path.exists(path):
+    raise Exception(path + ' doesn\'t exist.')
+
   MakeDirectory(os.path.dirname(path))
   with open(path, 'a'):
     os.utime(path, None)
@@ -79,17 +83,19 @@ def CheckOptions(options, parser, required=None):
     if getattr(options, option_name) is None:
       parser.error('--%s is required' % option_name.replace('_', '-'))
 
+
 def WriteJson(obj, path, only_if_changed=False):
   old_dump = None
   if os.path.exists(path):
     with open(path, 'r') as oldfile:
       old_dump = oldfile.read()
 
-  new_dump = json.dumps(obj)
+  new_dump = json.dumps(obj, sort_keys=True, indent=2, separators=(',', ': '))
 
   if not only_if_changed or old_dump != new_dump:
     with open(path, 'w') as outfile:
       outfile.write(new_dump)
+
 
 def ReadJson(path):
   with open(path, 'r') as jsonfile:
@@ -170,9 +176,9 @@ def IsDeviceReady():
 
 def CheckZipPath(name):
   if os.path.normpath(name) != name:
-    raise Exception('Non-canonical zip path: %s, %s' % name)
+    raise Exception('Non-canonical zip path: %s' % name)
   if os.path.isabs(name):
-    raise Exception('Absolute zip path: %s, %s' % name)
+    raise Exception('Absolute zip path: %s' % name)
 
 
 def ExtractAll(zip_path, path=None, no_clobber=True):
@@ -197,7 +203,7 @@ def ExtractAll(zip_path, path=None, no_clobber=True):
 def DoZip(inputs, output, base_dir):
   with zipfile.ZipFile(output, 'w') as outfile:
     for f in inputs:
-      CheckZipPath(f)
+      CheckZipPath(os.path.relpath(f, base_dir))
       outfile.write(f, os.path.relpath(f, base_dir))
 
 
@@ -209,3 +215,40 @@ def PrintBigWarning(message):
   print '*****     ' * 8
   PrintWarning(message)
   print '*****     ' * 8
+
+
+def GetPythonDependencies():
+  """Gets the paths of imported non-system python modules.
+
+  A path is assumed to be a "system" import if it is outside of chromium's
+  src/. The paths will be relative to the current directory.
+  """
+  module_paths = (m.__file__ for m in sys.modules.itervalues()
+                  if m is not None and hasattr(m, '__file__'))
+
+  abs_module_paths = map(os.path.abspath, module_paths)
+
+  non_system_module_paths = [
+      p for p in abs_module_paths if p.startswith(CHROMIUM_SRC)]
+  def ConvertPycToPy(s):
+    if s.endswith('.pyc'):
+      return s[:-1]
+    return s
+
+  non_system_module_paths = map(ConvertPycToPy, non_system_module_paths)
+  non_system_module_paths = map(os.path.relpath, non_system_module_paths)
+  return sorted(set(non_system_module_paths))
+
+
+def AddDepfileOption(parser):
+  parser.add_option('--depfile',
+                    help='Path to depfile. This must be specified as the '
+                    'action\'s first output.')
+
+
+def WriteDepfile(path, dependencies):
+  with open(path, 'w') as depfile:
+    depfile.write(path)
+    depfile.write(': ')
+    depfile.write(' '.join(dependencies))
+    depfile.write('\n')

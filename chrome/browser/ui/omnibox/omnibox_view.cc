@@ -12,11 +12,11 @@
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/autocomplete/autocomplete_match.h"
 #include "chrome/browser/search/search.h"
-#include "chrome/browser/search_engines/template_url.h"
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/ui/omnibox/omnibox_edit_controller.h"
 #include "chrome/browser/ui/toolbar/toolbar_model.h"
+#include "components/search_engines/template_url.h"
 #include "grit/generated_resources.h"
 #include "ui/base/clipboard/clipboard.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -109,7 +109,7 @@ void OmniboxView::OpenMatch(const AutocompleteMatch& match,
     return;
   model_->OpenMatch(
       match, disposition, alternate_nav_url, pasted_text, selected_line);
-  OnMatchOpened(match, model_->profile(), controller_->GetWebContents());
+  OnMatchOpened(match, controller_->GetWebContents());
 }
 
 bool OmniboxView::IsEditingOrEmpty() const {
@@ -207,8 +207,8 @@ bool OmniboxView::IsIndicatingQueryRefinement() const {
 }
 
 void OmniboxView::OnMatchOpened(const AutocompleteMatch& match,
-                                Profile* profile,
-                                content::WebContents* web_contents) const {}
+                                content::WebContents* web_contents) {
+}
 
 OmniboxView::OmniboxView(Profile* profile,
                          OmniboxEditController* controller,

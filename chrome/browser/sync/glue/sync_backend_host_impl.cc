@@ -256,7 +256,7 @@ void SyncBackendHostImpl::StopSyncingForShutdown() {
   notification_registrar_.RemoveAll();
 
   // Stop non-blocking sync types from sending any more requests to the syncer.
-  sync_core_proxy_.reset();
+  sync_context_proxy_.reset();
 
   DCHECK(registrar_->sync_thread()->IsRunning());
 
@@ -347,8 +347,15 @@ void SyncBackendHostImpl::ConfigureDataTypes(
       GetDataTypesInState(FATAL, config_state_map);
   syncer::ModelTypeSet crypto_types =
       GetDataTypesInState(CRYPTO, config_state_map);
+  syncer::ModelTypeSet unready_types =
+      GetDataTypesInState(UNREADY, config_state_map);
   disabled_types.PutAll(fatal_types);
+
+  // TODO(zea): These types won't be fully purged if they are subsequently
+  // disabled by the user. Fix that. See crbug.com/386778
   disabled_types.PutAll(crypto_types);
+  disabled_types.PutAll(unready_types);
+
   syncer::ModelTypeSet active_types =
       GetDataTypesInState(CONFIGURE_ACTIVE, config_state_map);
   syncer::ModelTypeSet clean_first_types =
@@ -392,6 +399,7 @@ void SyncBackendHostImpl::ConfigureDataTypes(
   syncer::ModelTypeSet inactive_types =
       GetDataTypesInState(CONFIGURE_INACTIVE, config_state_map);
   types_to_purge.RemoveAll(inactive_types);
+  types_to_purge.RemoveAll(unready_types);
 
   // If a type has already been disabled and unapplied or journaled, it will
   // not be part of the |types_to_purge| set, and therefore does not need
@@ -451,10 +459,11 @@ syncer::UserShare* SyncBackendHostImpl::GetUserShare() const {
   return core_->sync_manager()->GetUserShare();
 }
 
-scoped_ptr<syncer::SyncCoreProxy> SyncBackendHostImpl::GetSyncCoreProxy() {
-  return sync_core_proxy_.get() ?
-      scoped_ptr<syncer::SyncCoreProxy>(sync_core_proxy_->Clone()) :
-      scoped_ptr<syncer::SyncCoreProxy>();
+scoped_ptr<syncer::SyncContextProxy>
+SyncBackendHostImpl::GetSyncContextProxy() {
+  return sync_context_proxy_.get() ? scoped_ptr<syncer::SyncContextProxy>(
+                                         sync_context_proxy_->Clone())
+                                   : scoped_ptr<syncer::SyncContextProxy>();
 }
 
 SyncBackendHostImpl::Status SyncBackendHostImpl::GetDetailedStatus() {
@@ -637,11 +646,11 @@ void SyncBackendHostImpl::HandleInitializationSuccessOnFrontendLoop(
     const syncer::WeakHandle<syncer::JsBackend> js_backend,
     const syncer::WeakHandle<syncer::DataTypeDebugInfoListener>
         debug_info_listener,
-    syncer::SyncCoreProxy* sync_core_proxy) {
+    syncer::SyncContextProxy* sync_context_proxy) {
   DCHECK_EQ(base::MessageLoop::current(), frontend_loop_);
 
-  if (sync_core_proxy)
-    sync_core_proxy_ = sync_core_proxy->Clone();
+  if (sync_context_proxy)
+    sync_context_proxy_ = sync_context_proxy->Clone();
 
   if (!frontend_)
     return;

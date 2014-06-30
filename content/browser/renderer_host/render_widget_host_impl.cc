@@ -192,7 +192,8 @@ RenderWidgetHostImpl::RenderWidgetHostImpl(RenderWidgetHostDelegate* delegate,
       allow_privileged_mouse_lock_(false),
       has_touch_handler_(false),
       weak_factory_(this),
-      last_input_number_(static_cast<int64>(GetProcess()->GetID()) << 32) {
+      last_input_number_(static_cast<int64>(GetProcess()->GetID()) << 32),
+      next_browser_snapshot_id_(0) {
   CHECK(delegate_);
   if (routing_id_ == MSG_ROUTING_NONE) {
     routing_id_ = process_->GetNextRoutingID();
@@ -442,6 +443,8 @@ bool RenderWidgetHostImpl::OnMessageReceived(const IPC::Message &msg) {
   IPC_BEGIN_MESSAGE_MAP(RenderWidgetHostImpl, msg)
     IPC_MESSAGE_HANDLER(InputHostMsg_QueueSyntheticGesture,
                         OnQueueSyntheticGesture)
+    IPC_MESSAGE_HANDLER(InputHostMsg_ImeCancelComposition,
+                        OnImeCancelComposition)
     IPC_MESSAGE_HANDLER(ViewHostMsg_RenderViewReady, OnRenderViewReady)
     IPC_MESSAGE_HANDLER(ViewHostMsg_RenderProcessGone, OnRenderProcessGone)
     IPC_MESSAGE_HANDLER(ViewHostMsg_Close, OnClose)
@@ -458,10 +461,8 @@ bool RenderWidgetHostImpl::OnMessageReceived(const IPC::Message &msg) {
     IPC_MESSAGE_HANDLER(ViewHostMsg_SetCursor, OnSetCursor)
     IPC_MESSAGE_HANDLER(ViewHostMsg_SetTouchEventEmulationEnabled,
                         OnSetTouchEventEmulationEnabled)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_TextInputTypeChanged,
-                        OnTextInputTypeChanged)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_ImeCancelComposition,
-                        OnImeCancelComposition)
+    IPC_MESSAGE_HANDLER(ViewHostMsg_TextInputStateChanged,
+                        OnTextInputStateChanged)
     IPC_MESSAGE_HANDLER(ViewHostMsg_LockMouse, OnLockMouse)
     IPC_MESSAGE_HANDLER(ViewHostMsg_UnlockMouse, OnUnlockMouse)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ShowDisambiguationPopup,
@@ -480,7 +481,7 @@ bool RenderWidgetHostImpl::OnMessageReceived(const IPC::Message &msg) {
                         OnCompositorSurfaceBuffersSwapped)
 #endif
 #if defined(OS_MACOSX) || defined(USE_AURA)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_ImeCompositionRangeChanged,
+    IPC_MESSAGE_HANDLER(InputHostMsg_ImeCompositionRangeChanged,
                         OnImeCompositionRangeChanged)
 #endif
     IPC_MESSAGE_UNHANDLED(handled = false)
@@ -1162,6 +1163,13 @@ void RenderWidgetHostImpl::InvalidateScreenInfo() {
   screen_info_.reset();
 }
 
+void RenderWidgetHostImpl::GetSnapshotFromBrowser(
+    const base::Callback<void(const unsigned char*,size_t)> callback) {
+  int id = next_browser_snapshot_id_++;
+  pending_browser_snapshots_.insert(std::make_pair(id, callback));
+  Send(new ViewMsg_ForceRedraw(GetRoutingID(), id));
+}
+
 void RenderWidgetHostImpl::OnSelectionChanged(const base::string16& text,
                                               size_t offset,
                                               const gfx::Range& range) {
@@ -1255,7 +1263,7 @@ void RenderWidgetHostImpl::ImeSetComposition(
     const std::vector<blink::WebCompositionUnderline>& underlines,
     int selection_start,
     int selection_end) {
-  Send(new ViewMsg_ImeSetComposition(
+  Send(new InputMsg_ImeSetComposition(
             GetRoutingID(), text, underlines, selection_start, selection_end));
 }
 
@@ -1263,12 +1271,12 @@ void RenderWidgetHostImpl::ImeConfirmComposition(
     const base::string16& text,
     const gfx::Range& replacement_range,
     bool keep_selection) {
-  Send(new ViewMsg_ImeConfirmComposition(
+  Send(new InputMsg_ImeConfirmComposition(
         GetRoutingID(), text, replacement_range, keep_selection));
 }
 
 void RenderWidgetHostImpl::ImeCancelComposition() {
-  Send(new ViewMsg_ImeSetComposition(GetRoutingID(), base::string16(),
+  Send(new InputMsg_ImeSetComposition(GetRoutingID(), base::string16(),
             std::vector<blink::WebCompositionUnderline>(), 0, 0));
 }
 
@@ -1624,12 +1632,10 @@ void RenderWidgetHostImpl::OnSetTouchEventEmulationEnabled(
   }
 }
 
-void RenderWidgetHostImpl::OnTextInputTypeChanged(
-    ui::TextInputType type,
-    ui::TextInputMode input_mode,
-    bool can_compose_inline) {
+void RenderWidgetHostImpl::OnTextInputStateChanged(
+    const ViewHostMsg_TextInputState_Params& params) {
   if (view_)
-    view_->TextInputTypeChanged(type, input_mode, can_compose_inline);
+    view_->TextInputStateChanged(params);
 }
 
 #if defined(OS_MACOSX) || defined(USE_AURA)
@@ -2159,6 +2165,12 @@ void RenderWidgetHostImpl::ComputeTouchLatency(
 
 void RenderWidgetHostImpl::FrameSwapped(const ui::LatencyInfo& latency_info) {
   ui::LatencyInfo::LatencyComponent window_snapshot_component;
+  if (latency_info.FindLatency(ui::WINDOW_OLD_SNAPSHOT_FRAME_NUMBER_COMPONENT,
+                               GetLatencyComponentId(),
+                               &window_snapshot_component)) {
+    WindowOldSnapshotReachedScreen(
+        static_cast<int>(window_snapshot_component.sequence_number));
+  }
   if (latency_info.FindLatency(ui::WINDOW_SNAPSHOT_FRAME_NUMBER_COMPONENT,
                                GetLatencyComponentId(),
                                &window_snapshot_component)) {
@@ -2218,7 +2230,7 @@ void RenderWidgetHostImpl::WindowSnapshotAsyncCallback(
       routing_id, snapshot_id, snapshot_size, png_data->data()));
 }
 
-void RenderWidgetHostImpl::WindowSnapshotReachedScreen(int snapshot_id) {
+void RenderWidgetHostImpl::WindowOldSnapshotReachedScreen(int snapshot_id) {
   DCHECK(base::MessageLoopForUI::IsCurrent());
 
   std::vector<unsigned char> png;
@@ -2254,6 +2266,53 @@ void RenderWidgetHostImpl::WindowSnapshotReachedScreen(int snapshot_id) {
                  snapshot_size));
 }
 
+void RenderWidgetHostImpl::WindowSnapshotReachedScreen(int snapshot_id) {
+  DCHECK(base::MessageLoopForUI::IsCurrent());
+
+  gfx::Rect view_bounds = GetView()->GetViewBounds();
+  gfx::Rect snapshot_bounds(view_bounds.size());
+
+  std::vector<unsigned char> png;
+  if (ui::GrabViewSnapshot(
+      GetView()->GetNativeView(), &png, snapshot_bounds)) {
+    OnSnapshotDataReceived(snapshot_id, &png.front(), png.size());
+    return;
+  }
+
+  ui::GrabViewSnapshotAsync(
+      GetView()->GetNativeView(),
+      snapshot_bounds,
+      base::ThreadTaskRunnerHandle::Get(),
+      base::Bind(&RenderWidgetHostImpl::OnSnapshotDataReceivedAsync,
+                 weak_factory_.GetWeakPtr(),
+                 snapshot_id));
+}
+
+void RenderWidgetHostImpl::OnSnapshotDataReceived(int snapshot_id,
+                                                  const unsigned char* data,
+                                                  size_t size) {
+  // Any pending snapshots with a lower ID than the one received are considered
+  // to be implicitly complete, and returned the same snapshot data.
+  PendingSnapshotMap::iterator it = pending_browser_snapshots_.begin();
+  while(it != pending_browser_snapshots_.end()) {
+      if (it->first <= snapshot_id) {
+        it->second.Run(data, size);
+        pending_browser_snapshots_.erase(it++);
+      } else {
+        ++it;
+      }
+  }
+}
+
+void RenderWidgetHostImpl::OnSnapshotDataReceivedAsync(
+    int snapshot_id,
+    scoped_refptr<base::RefCountedBytes> png_data) {
+  if (png_data)
+    OnSnapshotDataReceived(snapshot_id, png_data->front(), png_data->size());
+  else
+    OnSnapshotDataReceived(snapshot_id, NULL, 0);
+}
+
 // static
 void RenderWidgetHostImpl::CompositorFrameDrawn(
     const std::vector<ui::LatencyInfo>& latency_info) {
@@ -2264,7 +2323,8 @@ void RenderWidgetHostImpl::CompositorFrameDrawn(
          b != latency_info[i].latency_components.end();
          ++b) {
       if (b->first.first == ui::INPUT_EVENT_LATENCY_BEGIN_RWH_COMPONENT ||
-          b->first.first == ui::WINDOW_SNAPSHOT_FRAME_NUMBER_COMPONENT) {
+          b->first.first == ui::WINDOW_SNAPSHOT_FRAME_NUMBER_COMPONENT ||
+          b->first.first == ui::WINDOW_OLD_SNAPSHOT_FRAME_NUMBER_COMPONENT) {
         // Matches with GetLatencyComponentId
         int routing_id = b->first.second & 0xffffffff;
         int process_id = (b->first.second >> 32) & 0xffffffff;
@@ -2288,7 +2348,8 @@ void RenderWidgetHostImpl::AddLatencyInfoComponentIds(
       latency_info->latency_components.begin();
   while (lc != latency_info->latency_components.end()) {
     ui::LatencyComponentType component_type = lc->first.first;
-    if (component_type == ui::WINDOW_SNAPSHOT_FRAME_NUMBER_COMPONENT) {
+    if (component_type == ui::WINDOW_SNAPSHOT_FRAME_NUMBER_COMPONENT ||
+        component_type == ui::WINDOW_OLD_SNAPSHOT_FRAME_NUMBER_COMPONENT) {
       // Generate a new component entry with the correct component ID
       ui::LatencyInfo::LatencyMap::key_type key =
           std::make_pair(component_type, GetLatencyComponentId());

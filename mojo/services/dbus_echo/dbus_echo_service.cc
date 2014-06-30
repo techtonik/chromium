@@ -9,8 +9,8 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/message_loop/message_loop.h"
 #include "base/run_loop.h"
-#include "mojo/common/channel_init.h"
 #include "mojo/dbus/dbus_external_service.h"
+#include "mojo/embedder/channel_init.h"
 #include "mojo/embedder/embedder.h"
 #include "mojo/public/cpp/environment/environment.h"
 #include "mojo/services/dbus_echo/echo.mojom.h"
@@ -18,7 +18,7 @@
 namespace {
 class EchoServiceImpl : public mojo::InterfaceImpl<mojo::EchoService> {
  public:
-  EchoServiceImpl() {}
+  explicit EchoServiceImpl(mojo::ApplicationConnection* connection) {}
   virtual ~EchoServiceImpl() {}
 
  protected:
@@ -45,7 +45,6 @@ int main(int argc, char** argv) {
                        false,    // Timestamp
                        false);   // Tick count
 
-  mojo::Environment env;
   mojo::embedder::Init();
 
   base::MessageLoopForIO message_loop;

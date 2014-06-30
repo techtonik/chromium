@@ -21,6 +21,8 @@ ScreenManager::ScreenManager(
 }
 
 ScreenManager::~ScreenManager() {
+  STLDeleteContainerPairSecondPointers(
+      controllers_.begin(), controllers_.end());
 }
 
 void ScreenManager::RemoveDisplayController(uint32_t crtc, uint32_t connector) {
@@ -112,16 +114,13 @@ ScreenManager::FindDisplayController(uint32_t crtc, uint32_t connector) {
 }
 
 void ScreenManager::ForceInitializationOfPrimaryDisplay() {
-  drmModeRes* resources = drmModeGetResources(dri_->get_fd());
-  DCHECK(resources) << "Failed to get DRM resources";
   ScopedVector<HardwareDisplayControllerInfo> displays =
-      GetAvailableDisplayControllerInfos(dri_->get_fd(), resources);
-  drmModeFreeResources(resources);
+      GetAvailableDisplayControllerInfos(dri_->get_fd());
 
   CHECK_NE(0u, displays.size());
 
-  drmModePropertyRes* dpms =
-      dri_->GetProperty(displays[0]->connector(), "DPMS");
+  ScopedDrmPropertyPtr dpms(
+      dri_->GetProperty(displays[0]->connector(), "DPMS"));
   if (dpms)
     dri_->SetProperty(displays[0]->connector()->connector_id,
                       dpms->prop_id,

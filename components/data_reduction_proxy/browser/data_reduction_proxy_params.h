@@ -5,19 +5,25 @@
 #ifndef COMPONENTS_DATA_REDUCTION_PROXY_BROWSER_DATA_REDUCTION_PROXY_PARAMS_H_
 #define COMPONENTS_DATA_REDUCTION_PROXY_BROWSER_DATA_REDUCTION_PROXY_PARAMS_H_
 
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "base/macros.h"
+#include "net/base/host_port_pair.h"
 #include "url/gurl.h"
 
-namespace data_reduction_proxy {
+namespace net {
+class URLRequest;
+}
 
-// Provides initialization parameters. Proxy origins, the probe url, and the
-// authentication key are taken from flags if available and from preprocessor
-// constants otherwise. Only the key may be changed after construction.
+namespace data_reduction_proxy {
+// Provides initialization parameters. Proxy origins, and the probe url are
+// are taken from flags if available and from preprocessor constants otherwise.
+// The DataReductionProxySettings class and others use this class to determine
+// the necessary DNS names to configure use of the data reduction proxy.
 class DataReductionProxyParams {
  public:
-
   static const unsigned int kAllowed = (1 << 0);
   static const unsigned int kFallbackAllowed = (1 << 1);
   static const unsigned int kAlternativeAllowed = (1 << 2);
@@ -41,17 +47,14 @@ class DataReductionProxyParams {
   // hinting.
   static bool IsIncludedInPreconnectHintingFieldTrial();
 
-  // Returns true if the authentication key was set on the command line.
-  static bool IsKeySetOnCommandLine();
-
   // Constructs configuration parameters. If |kAllowed|, then the standard
   // data reduction proxy configuration is allowed to be used. If
   // |kfallbackAllowed| a fallback proxy can be used if the primary proxy is
   // bypassed or disabled. If |kAlternativeAllowed| then an alternative proxy
   // configuration is allowed to be used. This alternative configuration would
   // replace the primary and fallback proxy configurations if enabled. Finally
-  // if |kPromoAllowed|, the client may show a promotion for the data
-  // reduction proxy.
+  // if |kPromoAllowed|, the client may show a promotion for the data reduction
+  // proxy.
   //
   // A standard configuration has a primary proxy, and a fallback proxy for
   // HTTP traffic. The alternative configuration has a different primary and
@@ -60,6 +63,30 @@ class DataReductionProxyParams {
   DataReductionProxyParams(int flags);
 
   virtual ~DataReductionProxyParams();
+
+  // Returns true if a data reduction proxy was used for the given |request|.
+  // If true, |proxy_servers.first| will contain the name of the proxy that was
+  // used. |proxy_servers.second| will contain the name of the data reduction
+  // proxy server that would be used if |proxy_server.first| is bypassed, if one
+  // exists. |proxy_servers| can be NULL if the caller isn't interested in its
+  // values.
+  virtual bool WasDataReductionProxyUsed(
+      const net::URLRequest* request,
+      std::pair<GURL, GURL>* proxy_servers) const;
+
+  // Returns true if the specified |host_port_pair| matches a data reduction
+  // proxy. If true, |proxy_servers.first| will contain the name of the proxy
+  // that matches. |proxy_servers.second| will contain the name of the
+  // data reduction proxy server that would be used if |proxy_server.first| is
+  // bypassed, if one exists. |proxy_servers| can be NULL if the caller isn't
+  // interested in its values. Virtual for testing.
+  virtual bool IsDataReductionProxy(const net::HostPortPair& host_port_pair,
+                                    std::pair<GURL, GURL>* proxy_servers) const;
+
+  // Returns true if this request will be sent through the data request proxy
+  // based on applying the param rules to the URL. We do not check bad proxy
+  // list.
+  virtual bool IsDataReductionProxyEligible(const net::URLRequest* request);
 
   // Returns the data reduction proxy primary origin.
   const GURL& origin() const {
@@ -92,14 +119,9 @@ class DataReductionProxyParams {
     return probe_url_;
   }
 
-  // Set the proxy authentication key.
-  void set_key(const std::string& key) {
-    key_ = key;
-  }
-
-  // Returns the proxy authentication key.
-  const std::string& key() const {
-    return key_;
+  // Returns the URL to fetch to warm the data reduction proxy connection.
+  const GURL& warmup_url() const {
+    return warmup_url_;
   }
 
   // Returns true if the data reduction proxy configuration may be used.
@@ -129,23 +151,27 @@ class DataReductionProxyParams {
   // list of data reduction proxies that may be used.
   DataReductionProxyList GetAllowedProxies() const;
 
+  // Returns true if any proxy origins are set on the command line.
+  bool is_configured_on_command_line() const {
+    return configured_on_command_line_;
+  }
+
  protected:
   // Test constructor that optionally won't call Init();
   DataReductionProxyParams(int flags,
                            bool should_call_init);
 
-  // Initialize the values of the proxies, probe URL, and key from command
+  // Initialize the values of the proxies, and probe URL, from command
   // line flags and preprocessor constants, and check that there are
   // corresponding definitions for the allowed configurations.
   bool Init(bool allowed, bool fallback_allowed, bool alt_allowed);
 
-  // Initialize the values of the proxies, probe URL, and key from command
+  // Initialize the values of the proxies, and probe URL from command
   // line flags and preprocessor constants.
   void InitWithoutChecks();
 
   // Returns the corresponding string from preprocessor constants if defined,
   // and an empty string otherwise.
-  virtual std::string GetDefaultKey() const;
   virtual std::string GetDefaultDevOrigin() const;
   virtual std::string GetDefaultOrigin() const;
   virtual std::string GetDefaultFallbackOrigin() const;
@@ -153,6 +179,7 @@ class DataReductionProxyParams {
   virtual std::string GetDefaultAltOrigin() const;
   virtual std::string GetDefaultAltFallbackOrigin() const;
   virtual std::string GetDefaultProbeURL() const;
+  virtual std::string GetDefaultWarmupURL() const;
 
  private:
   GURL origin_;
@@ -161,14 +188,14 @@ class DataReductionProxyParams {
   GURL alt_origin_;
   GURL alt_fallback_origin_;
   GURL probe_url_;
-
-  std::string key_;
+  GURL warmup_url_;
 
   bool allowed_;
   const bool fallback_allowed_;
   bool alt_allowed_;
   const bool promo_allowed_;
 
+  bool configured_on_command_line_;
 
   DISALLOW_COPY_AND_ASSIGN(DataReductionProxyParams);
 };

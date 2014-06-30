@@ -11,6 +11,7 @@
 
 #include "mojo/public/cpp/bindings/error_handler.h"
 #include "mojo/public/cpp/bindings/lib/interface_ptr_internal.h"
+#include "mojo/public/cpp/environment/environment.h"
 #include "mojo/public/cpp/system/macros.h"
 
 namespace mojo {
@@ -45,6 +46,14 @@ class InterfacePtr {
     internal_state_.Swap(&doomed);
   }
 
+  // Blocks the current thread for the first incoming method call, i.e., either
+  // a call to a client method or a callback method. Returns |true| if a method
+  // has been called, |false| in case of error. It must only be called on a
+  // bound object.
+  bool WaitForIncomingMethodCall() {
+    return internal_state_.WaitForIncomingMethodCall();
+  }
+
   // This method configures the InterfacePtr<..> to be a proxy to a remote
   // object on the other end of the given pipe.
   //
@@ -55,8 +64,9 @@ class InterfacePtr {
   // ResetAndReturnMessagePipe. Then create a new InterfacePtr<..> on another
   // thread, and bind the new InterfacePtr<..> to the message pipe on that
   // thread.
-  void Bind(ScopedMessagePipeHandle handle,
-            MojoAsyncWaiter* waiter = GetDefaultAsyncWaiter()) {
+  void Bind(
+      ScopedMessagePipeHandle handle,
+      const MojoAsyncWaiter* waiter = Environment::GetDefaultAsyncWaiter()) {
     reset();
     internal_state_.ConfigureProxy(handle.Pass(), waiter);
   }
@@ -110,7 +120,7 @@ class InterfacePtr {
 template <typename Interface>
 InterfacePtr<Interface> MakeProxy(
     ScopedMessagePipeHandle handle,
-    MojoAsyncWaiter* waiter = GetDefaultAsyncWaiter()) {
+    const MojoAsyncWaiter* waiter = Environment::GetDefaultAsyncWaiter()) {
   InterfacePtr<Interface> ptr;
   if (handle.is_valid())
     ptr.Bind(handle.Pass(), waiter);

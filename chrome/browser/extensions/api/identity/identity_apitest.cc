@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "base/command_line.h"
+#include "base/prefs/pref_service.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/values.h"
@@ -33,6 +34,7 @@
 #include "chrome/test/base/test_switches.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/signin/core/common/profile_management_switches.h"
+#include "components/signin/core/common/signin_pref_names.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/notification_source.h"
 #include "content/public/test/test_utils.h"
@@ -300,6 +302,8 @@ class MockGetAuthTokenFunction : public IdentityGetAuthTokenFunction {
   bool scope_ui_shown() const {
     return scope_ui_shown_;
   }
+
+  const ExtensionTokenKey* extension_token_key() { return token_key_.get(); }
 
   virtual void StartLoginAccessTokenRequest() OVERRIDE {
     if (login_access_token_result_) {
@@ -579,6 +583,74 @@ IN_PROC_BROWSER_TEST_F(IdentityOldProfilesGetAccountsFunctionTest,
   std::vector<std::string> only_primary;
   only_primary.push_back("1");
   EXPECT_TRUE(ExpectGetAccounts(only_primary));
+}
+
+class IdentityGetProfileUserInfoFunctionTest : public ExtensionBrowserTest {
+ protected:
+  scoped_ptr<api::identity::ProfileUserInfo> RunGetProfileUserInfo() {
+    scoped_refptr<IdentityGetProfileUserInfoFunction> func(
+        new IdentityGetProfileUserInfoFunction);
+    func->set_extension(utils::CreateEmptyExtension(kExtensionId).get());
+    scoped_ptr<base::Value> value(
+        utils::RunFunctionAndReturnSingleResult(func.get(), "[]", browser()));
+    return api::identity::ProfileUserInfo::FromValue(*value.get());
+  }
+
+  scoped_ptr<api::identity::ProfileUserInfo> RunGetProfileUserInfoWithEmail() {
+    scoped_refptr<IdentityGetProfileUserInfoFunction> func(
+        new IdentityGetProfileUserInfoFunction);
+    func->set_extension(CreateExtensionWithEmailPermission());
+    scoped_ptr<base::Value> value(
+        utils::RunFunctionAndReturnSingleResult(func.get(), "[]", browser()));
+    return api::identity::ProfileUserInfo::FromValue(*value.get());
+  }
+
+ private:
+  scoped_refptr<Extension> CreateExtensionWithEmailPermission() {
+    scoped_ptr<base::DictionaryValue> test_extension_value(
+        utils::ParseDictionary(
+            "{\"name\": \"Test\", \"version\": \"1.0\", "
+            "\"permissions\": [\"identity.email\"]}"));
+    return utils::CreateExtension(test_extension_value.get());
+  }
+};
+
+IN_PROC_BROWSER_TEST_F(IdentityGetProfileUserInfoFunctionTest, NotSignedIn) {
+  scoped_ptr<api::identity::ProfileUserInfo> info =
+      RunGetProfileUserInfoWithEmail();
+  EXPECT_TRUE(info->email.empty());
+  EXPECT_TRUE(info->id.empty());
+}
+
+IN_PROC_BROWSER_TEST_F(IdentityGetProfileUserInfoFunctionTest, SignedIn) {
+  profile()->GetPrefs()
+      ->SetString(prefs::kGoogleServicesUsername, "president@example.com");
+  profile()->GetPrefs()
+      ->SetString(prefs::kGoogleServicesUserAccountId, "12345");
+
+  scoped_ptr<api::identity::ProfileUserInfo> info =
+      RunGetProfileUserInfoWithEmail();
+  EXPECT_EQ("president@example.com", info->email);
+  EXPECT_EQ("12345", info->id);
+}
+
+IN_PROC_BROWSER_TEST_F(IdentityGetProfileUserInfoFunctionTest,
+                       NotSignedInNoEmail) {
+  scoped_ptr<api::identity::ProfileUserInfo> info = RunGetProfileUserInfo();
+  EXPECT_TRUE(info->email.empty());
+  EXPECT_TRUE(info->id.empty());
+}
+
+IN_PROC_BROWSER_TEST_F(IdentityGetProfileUserInfoFunctionTest,
+                       SignedInNoEmail) {
+  profile()->GetPrefs()->SetString(prefs::kGoogleServicesUsername,
+                                   "president@example.com");
+  profile()->GetPrefs()->SetString(prefs::kGoogleServicesUserAccountId,
+                                   "12345");
+
+  scoped_ptr<api::identity::ProfileUserInfo> info = RunGetProfileUserInfo();
+  EXPECT_TRUE(info->email.empty());
+  EXPECT_EQ("12345", info->id);
 }
 
 class GetAuthTokenFunctionTest : public AsyncExtensionBrowserTest {
@@ -1515,6 +1587,77 @@ IN_PROC_BROWSER_TEST_F(GetAuthTokenFunctionTest, MultiSecondaryUser) {
 }
 
 // TODO(courage): negative cases for secondary accounts
+
+IN_PROC_BROWSER_TEST_F(GetAuthTokenFunctionTest, ScopesDefault) {
+  scoped_refptr<MockGetAuthTokenFunction> func(new MockGetAuthTokenFunction());
+  scoped_refptr<const Extension> extension(CreateExtension(CLIENT_ID | SCOPES));
+  func->set_extension(extension.get());
+  EXPECT_CALL(*func.get(), HasLoginToken()).WillOnce(Return(true));
+  TestOAuth2MintTokenFlow* flow = new TestOAuth2MintTokenFlow(
+      TestOAuth2MintTokenFlow::MINT_TOKEN_SUCCESS, func.get());
+  EXPECT_CALL(*func.get(), CreateMintTokenFlow(_)).WillOnce(Return(flow));
+  scoped_ptr<base::Value> value(
+      utils::RunFunctionAndReturnSingleResult(func.get(), "[{}]", browser()));
+  std::string access_token;
+  EXPECT_TRUE(value->GetAsString(&access_token));
+  EXPECT_EQ(std::string(kAccessToken), access_token);
+
+  const ExtensionTokenKey* token_key = func->extension_token_key();
+  EXPECT_EQ(2ul, token_key->scopes.size());
+  EXPECT_TRUE(ContainsKey(token_key->scopes, "scope1"));
+  EXPECT_TRUE(ContainsKey(token_key->scopes, "scope2"));
+}
+
+IN_PROC_BROWSER_TEST_F(GetAuthTokenFunctionTest, ScopesEmpty) {
+  scoped_refptr<MockGetAuthTokenFunction> func(new MockGetAuthTokenFunction());
+  scoped_refptr<const Extension> extension(CreateExtension(CLIENT_ID | SCOPES));
+  func->set_extension(extension.get());
+
+  std::string error(utils::RunFunctionAndReturnError(
+      func.get(), "[{\"scopes\": []}]", browser()));
+
+  EXPECT_EQ(errors::kInvalidScopes, error);
+}
+
+IN_PROC_BROWSER_TEST_F(GetAuthTokenFunctionTest, ScopesEmail) {
+  scoped_refptr<MockGetAuthTokenFunction> func(new MockGetAuthTokenFunction());
+  scoped_refptr<const Extension> extension(CreateExtension(CLIENT_ID | SCOPES));
+  func->set_extension(extension.get());
+  EXPECT_CALL(*func.get(), HasLoginToken()).WillOnce(Return(true));
+  TestOAuth2MintTokenFlow* flow = new TestOAuth2MintTokenFlow(
+      TestOAuth2MintTokenFlow::MINT_TOKEN_SUCCESS, func.get());
+  EXPECT_CALL(*func.get(), CreateMintTokenFlow(_)).WillOnce(Return(flow));
+  scoped_ptr<base::Value> value(utils::RunFunctionAndReturnSingleResult(
+      func.get(), "[{\"scopes\": [\"email\"]}]", browser()));
+  std::string access_token;
+  EXPECT_TRUE(value->GetAsString(&access_token));
+  EXPECT_EQ(std::string(kAccessToken), access_token);
+
+  const ExtensionTokenKey* token_key = func->extension_token_key();
+  EXPECT_EQ(1ul, token_key->scopes.size());
+  EXPECT_TRUE(ContainsKey(token_key->scopes, "email"));
+}
+
+IN_PROC_BROWSER_TEST_F(GetAuthTokenFunctionTest, ScopesEmailFooBar) {
+  scoped_refptr<MockGetAuthTokenFunction> func(new MockGetAuthTokenFunction());
+  scoped_refptr<const Extension> extension(CreateExtension(CLIENT_ID | SCOPES));
+  func->set_extension(extension.get());
+  EXPECT_CALL(*func.get(), HasLoginToken()).WillOnce(Return(true));
+  TestOAuth2MintTokenFlow* flow = new TestOAuth2MintTokenFlow(
+      TestOAuth2MintTokenFlow::MINT_TOKEN_SUCCESS, func.get());
+  EXPECT_CALL(*func.get(), CreateMintTokenFlow(_)).WillOnce(Return(flow));
+  scoped_ptr<base::Value> value(utils::RunFunctionAndReturnSingleResult(
+      func.get(), "[{\"scopes\": [\"email\", \"foo\", \"bar\"]}]", browser()));
+  std::string access_token;
+  EXPECT_TRUE(value->GetAsString(&access_token));
+  EXPECT_EQ(std::string(kAccessToken), access_token);
+
+  const ExtensionTokenKey* token_key = func->extension_token_key();
+  EXPECT_EQ(3ul, token_key->scopes.size());
+  EXPECT_TRUE(ContainsKey(token_key->scopes, "email"));
+  EXPECT_TRUE(ContainsKey(token_key->scopes, "foo"));
+  EXPECT_TRUE(ContainsKey(token_key->scopes, "bar"));
+}
 
 class RemoveCachedAuthTokenFunctionTest : public ExtensionBrowserTest {
  protected:

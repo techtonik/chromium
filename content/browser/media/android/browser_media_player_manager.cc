@@ -59,28 +59,25 @@ ContentViewCoreImpl* BrowserMediaPlayerManager::GetContentViewCore() const {
 }
 
 MediaPlayerAndroid* BrowserMediaPlayerManager::CreateMediaPlayer(
-    MediaPlayerHostMsg_Initialize_Type type,
-    int player_id,
-    const GURL& url,
-    const GURL& first_party_for_cookies,
-    int demuxer_client_id,
+    const MediaPlayerHostMsg_Initialize_Params& media_player_params,
     bool hide_url_log,
     MediaPlayerManager* manager,
     BrowserDemuxerAndroid* demuxer) {
-  switch (type) {
+  switch (media_player_params.type) {
     case MEDIA_PLAYER_TYPE_URL: {
       const std::string user_agent = GetContentClient()->GetUserAgent();
       MediaPlayerBridge* media_player_bridge = new MediaPlayerBridge(
-          player_id,
-          url,
-          first_party_for_cookies,
+          media_player_params.player_id,
+          media_player_params.url,
+          media_player_params.first_party_for_cookies,
           user_agent,
           hide_url_log,
           manager,
           base::Bind(&BrowserMediaPlayerManager::OnMediaResourcesRequested,
                      weak_ptr_factory_.GetWeakPtr()),
           base::Bind(&BrowserMediaPlayerManager::OnMediaResourcesReleased,
-                     weak_ptr_factory_.GetWeakPtr()));
+                     weak_ptr_factory_.GetWeakPtr()),
+          media_player_params.frame_url);
       BrowserMediaPlayerManager* browser_media_player_manager =
           static_cast<BrowserMediaPlayerManager*>(manager);
       ContentViewCoreImpl* content_view_core_impl =
@@ -92,8 +89,9 @@ MediaPlayerAndroid* BrowserMediaPlayerManager::CreateMediaPlayer(
         // TODO(qinmin): extract the metadata once the user decided to load
         // the page.
         browser_media_player_manager->OnMediaMetadataChanged(
-            player_id, base::TimeDelta(), 0, 0, false);
-      } else if (!content_view_core_impl->ShouldBlockMediaRequest(url)) {
+            media_player_params.player_id, base::TimeDelta(), 0, 0, false);
+      } else if (!content_view_core_impl->ShouldBlockMediaRequest(
+            media_player_params.url)) {
         media_player_bridge->Initialize();
       }
       return media_player_bridge;
@@ -101,13 +99,14 @@ MediaPlayerAndroid* BrowserMediaPlayerManager::CreateMediaPlayer(
 
     case MEDIA_PLAYER_TYPE_MEDIA_SOURCE: {
       return new MediaSourcePlayer(
-          player_id,
+          media_player_params.player_id,
           manager,
           base::Bind(&BrowserMediaPlayerManager::OnMediaResourcesRequested,
                      weak_ptr_factory_.GetWeakPtr()),
           base::Bind(&BrowserMediaPlayerManager::OnMediaResourcesReleased,
                      weak_ptr_factory_.GetWeakPtr()),
-          demuxer->CreateDemuxer(demuxer_client_id));
+          demuxer->CreateDemuxer(media_player_params.demuxer_client_id),
+          media_player_params.frame_url);
     }
   }
 
@@ -124,7 +123,12 @@ BrowserMediaPlayerManager::BrowserMediaPlayerManager(
       weak_ptr_factory_(this) {
 }
 
-BrowserMediaPlayerManager::~BrowserMediaPlayerManager() {}
+BrowserMediaPlayerManager::~BrowserMediaPlayerManager() {
+  // During the tear down process, OnDestroyPlayer() may or may not be called
+  // (e.g. the WebContents may be destroyed before the render process). So
+  // we cannot DCHECK(players_.empty()) here. Instead, all media players in
+  // |players_| will be destroyed here because |player_| is a ScopedVector.
+}
 
 void BrowserMediaPlayerManager::FullscreenPlayerPlay() {
   MediaPlayerAndroid* player = GetFullscreenPlayer();
@@ -306,14 +310,6 @@ MediaPlayerAndroid* BrowserMediaPlayerManager::GetPlayer(int player_id) {
   return NULL;
 }
 
-void BrowserMediaPlayerManager::DestroyAllMediaPlayers() {
-  players_.clear();
-  if (fullscreen_player_id_ != -1) {
-    video_view_.reset();
-    fullscreen_player_id_ = -1;
-  }
-}
-
 void BrowserMediaPlayerManager::RequestFullScreen(int player_id) {
   if (fullscreen_player_id_ == player_id)
     return;
@@ -323,6 +319,8 @@ void BrowserMediaPlayerManager::RequestFullScreen(int player_id) {
     OnError(player_id, MediaPlayerAndroid::MEDIA_ERROR_DECODE);
     return;
   }
+
+  Send(new MediaPlayerMsg_RequestFullscreen(RoutingID(), player_id));
 }
 
 #if defined(VIDEO_HOLE)
@@ -421,23 +419,22 @@ void BrowserMediaPlayerManager::OnExitFullscreen(int player_id) {
 }
 
 void BrowserMediaPlayerManager::OnInitialize(
-    MediaPlayerHostMsg_Initialize_Type type,
-    int player_id,
-    const GURL& url,
-    const GURL& first_party_for_cookies,
-    int demuxer_client_id) {
-  DCHECK(type != MEDIA_PLAYER_TYPE_MEDIA_SOURCE || demuxer_client_id > 0)
+    const MediaPlayerHostMsg_Initialize_Params& media_player_params) {
+  DCHECK(media_player_params.type != MEDIA_PLAYER_TYPE_MEDIA_SOURCE ||
+      media_player_params.demuxer_client_id > 0)
       << "Media source players must have positive demuxer client IDs: "
-      << demuxer_client_id;
+      << media_player_params.demuxer_client_id;
 
-  RemovePlayer(player_id);
+  RemovePlayer(media_player_params.player_id);
 
   RenderProcessHostImpl* host = static_cast<RenderProcessHostImpl*>(
       web_contents()->GetRenderProcessHost());
   MediaPlayerAndroid* player = CreateMediaPlayer(
-      type, player_id, url, first_party_for_cookies, demuxer_client_id,
+      media_player_params,
+
       host->GetBrowserContext()->IsOffTheRecord(), this,
       host->browser_demuxer_android());
+
   if (!player)
     return;
 

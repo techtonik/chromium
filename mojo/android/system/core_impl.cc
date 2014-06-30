@@ -15,7 +15,7 @@
 #include "mojo/embedder/embedder.h"
 #include "mojo/public/c/environment/async_waiter.h"
 #include "mojo/public/c/system/core.h"
-#include "mojo/public/cpp/environment/default_async_waiter.h"
+#include "mojo/public/cpp/environment/environment.h"
 
 namespace {
 
@@ -70,9 +70,9 @@ static jint WaitMany(JNIEnv* env,
 
   const size_t nb_handles = buffer_size / record_size;
   const MojoHandle* handle_start = static_cast<const MojoHandle*>(buffer_start);
-  const MojoWaitFlags* flags_start =
-      static_cast<const MojoWaitFlags*>(handle_start + nb_handles);
-  return MojoWaitMany(handle_start, flags_start, nb_handles, deadline);
+  const MojoHandleSignals* signals_start =
+      static_cast<const MojoHandleSignals*>(handle_start + nb_handles);
+  return MojoWaitMany(handle_start, signals_start, nb_handles, deadline);
 }
 
 static jobject CreateMessagePipe(JNIEnv* env, jobject jcaller) {
@@ -129,9 +129,9 @@ static jint Close(JNIEnv* env, jobject jcaller, jint mojo_handle) {
 static jint Wait(JNIEnv* env,
                  jobject jcaller,
                  jint mojo_handle,
-                 jint flags,
+                 jint signals,
                  jlong deadline) {
-  return MojoWait(mojo_handle, flags, deadline);
+  return MojoWait(mojo_handle, signals, deadline);
 }
 
 static jint WriteMessage(JNIEnv* env,
@@ -322,20 +322,15 @@ static int Unmap(JNIEnv* env, jobject jcaller, jobject buffer) {
 static jobject AsyncWait(JNIEnv* env,
                          jobject jcaller,
                          jint mojo_handle,
-                         jint flags,
+                         jint signals,
                          jlong deadline,
                          jobject callback) {
   AsyncWaitCallbackData* callback_data =
       new AsyncWaitCallbackData(env, jcaller, callback);
   MojoAsyncWaitID cancel_id;
   if (static_cast<MojoHandle>(mojo_handle) != MOJO_HANDLE_INVALID) {
-    MojoAsyncWaiter* async_waiter = mojo::GetDefaultAsyncWaiter();
-    cancel_id = async_waiter->AsyncWait(async_waiter,
-                                        mojo_handle,
-                                        flags,
-                                        deadline,
-                                        AsyncWaitCallback,
-                                        callback_data);
+    cancel_id = mojo::Environment::GetDefaultAsyncWaiter()->AsyncWait(
+        mojo_handle, signals, deadline, AsyncWaitCallback, callback_data);
   } else {
     cancel_id = kInvalidHandleCancelID;
     base::MessageLoop::current()->PostTask(
@@ -362,8 +357,7 @@ static void CancelAsyncWait(JNIEnv* env,
   }
   scoped_ptr<AsyncWaitCallbackData> deleter(
       reinterpret_cast<AsyncWaitCallbackData*>(data_ptr));
-  MojoAsyncWaiter* async_waiter = mojo::GetDefaultAsyncWaiter();
-  async_waiter->CancelWait(async_waiter, id);
+  mojo::Environment::GetDefaultAsyncWaiter()->CancelWait(id);
 }
 
 bool RegisterCoreImpl(JNIEnv* env) {

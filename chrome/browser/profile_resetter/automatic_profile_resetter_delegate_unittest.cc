@@ -20,12 +20,11 @@
 #include "base/values.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/chrome_notification_types.h"
-#include "chrome/browser/extensions/extension_service_unittest.h"
+#include "chrome/browser/extensions/extension_service.h"
+#include "chrome/browser/extensions/extension_service_test_base.h"
 #include "chrome/browser/google/google_brand.h"
 #include "chrome/browser/profile_resetter/brandcoded_default_settings.h"
 #include "chrome/browser/profile_resetter/profile_reset_global_error.h"
-#include "chrome/browser/search_engines/default_search_manager.h"
-#include "chrome/browser/search_engines/template_url_prepopulate_data.h"
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/search_engines/template_url_service_test_util.h"
@@ -35,6 +34,8 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/testing_pref_service_syncable.h"
 #include "chrome/test/base/testing_profile.h"
+#include "components/search_engines/default_search_manager.h"
+#include "components/search_engines/template_url_prepopulate_data.h"
 #include "content/public/browser/notification_service.h"
 #include "net/http/http_response_headers.h"
 #include "net/url_request/test_url_fetcher_factory.h"
@@ -161,14 +162,14 @@ void ServicePendingBrancodedConfigFetch(net::TestURLFetcher* fetcher,
 // ExtensionServiceTestBase sets up a TestingProfile with the ExtensionService,
 // we then add the TemplateURLService, so the ProfileResetter can be exercised.
 class AutomaticProfileResetterDelegateTest
-    : public ExtensionServiceTestBase,
+    : public extensions::ExtensionServiceTestBase,
       public TemplateURLServiceTestUtilBase {
  protected:
   AutomaticProfileResetterDelegateTest() {}
   virtual ~AutomaticProfileResetterDelegateTest() {}
 
   virtual void SetUp() OVERRIDE {
-    ExtensionServiceTestBase::SetUp();
+    extensions::ExtensionServiceTestBase::SetUp();
     ExtensionServiceInitParams params = CreateDefaultInitParams();
     params.pref_file.clear();  // Prescribes a TestingPrefService to be created.
     InitializeExtensionService(params);
@@ -179,7 +180,7 @@ class AutomaticProfileResetterDelegateTest
 
   virtual void TearDown() OVERRIDE {
     resetter_delegate_.reset();
-    ExtensionServiceTestBase::TearDown();
+    extensions::ExtensionServiceTestBase::TearDown();
   }
 
   scoped_ptr<TemplateURL> CreateTestTemplateURL() {
@@ -205,7 +206,7 @@ class AutomaticProfileResetterDelegateTest
     data.input_encodings.push_back("UTF-8");
     data.safe_for_autoreplace = true;
 
-    return scoped_ptr<TemplateURL>(new TemplateURL(profile(), data));
+    return scoped_ptr<TemplateURL>(new TemplateURL(data));
   }
 
   void ExpectNoPendingBrandcodedConfigFetch() {

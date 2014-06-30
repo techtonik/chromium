@@ -88,6 +88,7 @@
 #endif  // defined(OS_MACOSX)
 
 #if defined(OS_LINUX)
+#include <gtk/gtk.h>
 #include "remoting/host/audio_capturer_linux.h"
 #endif  // defined(OS_LINUX)
 
@@ -98,11 +99,6 @@
 #include "remoting/host/pairing_registry_delegate_win.h"
 #include "remoting/host/win/session_desktop_environment.h"
 #endif  // defined(OS_WIN)
-
-#if defined(TOOLKIT_GTK)
-#include "ui/gfx/gtk_util.h"
-#endif  // defined(TOOLKIT_GTK)
-
 using remoting::protocol::PairingRegistry;
 
 namespace {
@@ -123,6 +119,9 @@ const char kAuthSocknameSwitchName[] = "ssh-auth-sockname";
 // The command line switch used by the parent to request the host to signal it
 // when it is successfully started.
 const char kSignalParentSwitchName[] = "signal-parent";
+
+// Command line switch used to enable VP9 encoding.
+const char kEnableVp9SwitchName[] = "enable-vp9";
 
 // Value used for --host-config option to indicate that the path must be read
 // from stdin.
@@ -287,6 +286,7 @@ class HostProcess
   std::string serialized_config_;
   std::string host_owner_;
   bool use_service_account_;
+  bool enable_vp9_;
 
   scoped_ptr<policy_hack::PolicyWatcher> policy_watcher_;
   std::string host_domain_;
@@ -331,6 +331,7 @@ HostProcess::HostProcess(scoped_ptr<ChromotingHostContext> context,
     : context_(context.Pass()),
       state_(HOST_INITIALIZING),
       use_service_account_(false),
+      enable_vp9_(false),
       host_username_match_required_(false),
       allow_nat_traversal_(true),
       allow_relay_(true),
@@ -816,6 +817,14 @@ bool HostProcess::ApplyConfig(scoped_ptr<JsonHostConfig> config) {
     host_owner_ = xmpp_server_config_.username;
     use_service_account_ = false;
   }
+
+  // Allow offering of VP9 encoding to be overridden by the command-line.
+  if (CommandLine::ForCurrentProcess()->HasSwitch(kEnableVp9SwitchName)) {
+    enable_vp9_ = true;
+  } else {
+    config->GetBoolean(kEnableVp9ConfigPath, &enable_vp9_);
+  }
+
   return true;
 }
 
@@ -1156,14 +1165,13 @@ void HostProcess::StartHost() {
     signaling_connector_->EnableOAuth(oauth_token_getter_.get());
   }
 
-  uint32 network_flags = allow_nat_traversal_ ?
-      NetworkSettings::NAT_TRAVERSAL_STUN : 0;
-
-  if (allow_relay_)
-    network_flags |= NetworkSettings::NAT_TRAVERSAL_RELAY;
-
-  if (allow_relay_ || allow_nat_traversal_)
-    network_flags |= NetworkSettings::NAT_TRAVERSAL_OUTGOING;
+  uint32 network_flags = 0;
+  if (allow_nat_traversal_) {
+    network_flags = NetworkSettings::NAT_TRAVERSAL_STUN |
+                    NetworkSettings::NAT_TRAVERSAL_OUTGOING;
+    if (allow_relay_)
+      network_flags |= NetworkSettings::NAT_TRAVERSAL_RELAY;
+  }
 
   NetworkSettings network_settings(network_flags);
 
@@ -1189,6 +1197,13 @@ void HostProcess::StartHost() {
       context_->video_encode_task_runner(),
       context_->network_task_runner(),
       context_->ui_task_runner()));
+
+  if (enable_vp9_) {
+    scoped_ptr<protocol::CandidateSessionConfig> config =
+        host_->protocol_config()->Clone();
+    config->EnableVideoCodec(protocol::ChannelConfig::CODEC_VP9);
+    host_->set_protocol_config(config.Pass());
+  }
 
   // TODO(simonmorris): Get the maximum session duration from a policy.
 #if defined(OS_LINUX)
@@ -1326,12 +1341,12 @@ void HostProcess::OnCrash(const std::string& function_name,
 }
 
 int HostProcessMain() {
-#if defined(TOOLKIT_GTK)
+#if defined(OS_LINUX)
   // Required for any calls into GTK functions, such as the Disconnect and
   // Continue windows, though these should not be used for the Me2Me case
   // (crbug.com/104377).
-  gfx::GtkInitFromCommandLine(*CommandLine::ForCurrentProcess());
-#endif  // TOOLKIT_GTK
+  gtk_init(NULL, NULL);
+#endif
 
   // Enable support for SSL server sockets, which must be done while still
   // single-threaded.

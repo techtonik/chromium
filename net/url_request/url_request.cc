@@ -12,7 +12,6 @@
 #include "base/lazy_instance.h"
 #include "base/memory/singleton.h"
 #include "base/message_loop/message_loop.h"
-#include "base/metrics/histogram.h"
 #include "base/metrics/stats_counters.h"
 #include "base/metrics/user_metrics.h"
 #include "base/stl_util.h"
@@ -141,12 +140,6 @@ void ConvertRealLoadTimesToBlockingTimes(
 
 }  // namespace
 
-URLRequest::ProtocolFactory*
-URLRequest::Deprecated::RegisterProtocolFactory(const std::string& scheme,
-                                                ProtocolFactory* factory) {
-  return URLRequest::RegisterProtocolFactory(scheme, factory);
-}
-
 void URLRequest::Deprecated::RegisterRequestInterceptor(
     Interceptor* interceptor) {
   URLRequest::RegisterRequestInterceptor(interceptor);
@@ -242,13 +235,6 @@ URLRequest::~URLRequest() {
   if (status_.status() == URLRequestStatus::FAILED)
     net_error = status_.error();
   net_log_.EndEventWithNetErrorCode(NetLog::TYPE_REQUEST_ALIVE, net_error);
-}
-
-// static
-URLRequest::ProtocolFactory* URLRequest::RegisterProtocolFactory(
-    const string& scheme, ProtocolFactory* factory) {
-  return URLRequestJobManager::GetInstance()->RegisterProtocolFactory(scheme,
-                                                                      factory);
 }
 
 // static
@@ -525,12 +511,12 @@ bool URLRequest::GetResponseCookies(ResponseCookies* cookies) {
   return job_->GetResponseCookies(cookies);
 }
 
-void URLRequest::GetMimeType(string* mime_type) {
+void URLRequest::GetMimeType(string* mime_type) const {
   DCHECK(job_.get());
   job_->GetMimeType(mime_type);
 }
 
-void URLRequest::GetCharset(string* charset) {
+void URLRequest::GetCharset(string* charset) const {
   DCHECK(job_.get());
   job_->GetCharset(charset);
 }
@@ -562,7 +548,7 @@ void URLRequest::SetDefaultCookiePolicyToBlock() {
 
 // static
 bool URLRequest::IsHandledProtocol(const std::string& scheme) {
-  return URLRequestJobManager::GetInstance()->SupportsScheme(scheme);
+  return URLRequestJobManager::SupportsScheme(scheme);
 }
 
 // static
@@ -608,8 +594,6 @@ std::string URLRequest::ComputeMethodForRedirect(
 void URLRequest::SetReferrer(const std::string& referrer) {
   DCHECK(!is_pending_);
   GURL referrer_url(referrer);
-  UMA_HISTOGRAM_BOOLEAN("Net.URLRequest_SetReferrer_IsEmptyOrValid",
-                        referrer_url.is_empty() || referrer_url.is_valid());
   if (referrer_url.is_valid()) {
     referrer_ = referrer_url.GetAsReferrer().spec();
   } else {
@@ -627,6 +611,9 @@ void URLRequest::set_delegate(Delegate* delegate) {
 }
 
 void URLRequest::Start() {
+  // Some values can be NULL, but the job factory must not be.
+  DCHECK(context_->job_factory());
+
   DCHECK_EQ(network_delegate_, context_->network_delegate());
   // Anything that sets |blocked_by_| before start should have cleaned up after
   // itself.

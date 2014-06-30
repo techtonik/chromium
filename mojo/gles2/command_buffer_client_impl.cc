@@ -48,7 +48,7 @@ void CommandBufferDelegate::DrawAnimationFrame() {}
 
 CommandBufferClientImpl::CommandBufferClientImpl(
     CommandBufferDelegate* delegate,
-    MojoAsyncWaiter* async_waiter,
+    const MojoAsyncWaiter* async_waiter,
     ScopedMessagePipeHandle command_buffer_handle)
     : delegate_(delegate),
       shared_state_(NULL),
@@ -200,12 +200,6 @@ void CommandBufferClientImpl::SignalQuery(uint32 query,
 }
 
 void CommandBufferClientImpl::SetSurfaceVisible(bool visible) {
-  // TODO(piman)
-  NOTIMPLEMENTED();
-}
-
-void CommandBufferClientImpl::SendManagedMemoryStats(
-    const gpu::ManagedMemoryStats& stats) {
   // TODO(piman)
   NOTIMPLEMENTED();
 }

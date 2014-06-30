@@ -29,6 +29,9 @@ namespace {
 // is also stopped without delay)
 const int64 kStopWorkerDelay = 30;  // 30 secs.
 
+// Default delay for scheduled update.
+const int kUpdateDelaySeconds = 10;
+
 void RunSoon(const base::Closure& callback) {
   if (!callback.is_null())
     base::MessageLoop::current()->PostTask(FROM_HERE, callback);
@@ -149,11 +152,12 @@ ServiceWorkerVersionInfo ServiceWorkerVersion::GetInfo() {
 }
 
 void ServiceWorkerVersion::StartWorker(const StatusCallback& callback) {
-  StartWorkerWithCandidateProcesses(std::vector<int>(), callback);
+  StartWorkerWithCandidateProcesses(std::vector<int>(), false, callback);
 }
 
 void ServiceWorkerVersion::StartWorkerWithCandidateProcesses(
     const std::vector<int>& possible_process_ids,
+    bool pause_after_download,
     const StatusCallback& callback) {
   switch (running_status()) {
     case RUNNING:
@@ -170,6 +174,7 @@ void ServiceWorkerVersion::StartWorkerWithCandidateProcesses(
             version_id_,
             scope_,
             script_url_,
+            pause_after_download,
             possible_process_ids,
             base::Bind(&ServiceWorkerVersion::RunStartWorkerCallbacksOnError,
                        weak_factory_.GetWeakPtr()));
@@ -193,6 +198,27 @@ void ServiceWorkerVersion::StopWorker(const StatusCallback& callback) {
   stop_callbacks_.push_back(callback);
 }
 
+void ServiceWorkerVersion::ScheduleUpdate() {
+  if (update_timer_.IsRunning()) {
+    update_timer_.Reset();
+    return;
+  }
+  update_timer_.Start(
+      FROM_HERE, base::TimeDelta::FromSeconds(kUpdateDelaySeconds),
+      base::Bind(&ServiceWorkerVersion::StartUpdate,
+                 weak_factory_.GetWeakPtr()));
+}
+
+void ServiceWorkerVersion::DeferScheduledUpdate() {
+  if (update_timer_.IsRunning())
+    update_timer_.Reset();
+}
+
+void ServiceWorkerVersion::StartUpdate() {
+  update_timer_.Stop();
+  // TODO(michaeln): write me
+}
+
 void ServiceWorkerVersion::SendMessage(
     const IPC::Message& message, const StatusCallback& callback) {
   if (running_status() != RUNNING) {
@@ -213,7 +239,6 @@ void ServiceWorkerVersion::DispatchInstallEvent(
     int active_version_id,
     const StatusCallback& callback) {
   DCHECK_EQ(NEW, status()) << status();
-  SetStatus(INSTALLING);
 
   if (running_status() != RUNNING) {
     // Schedule calling this method after starting the worker.
@@ -492,6 +517,8 @@ void ServiceWorkerVersion::DispatchInstallEventAfterStartWorker(
     const StatusCallback& callback) {
   DCHECK_EQ(RUNNING, running_status())
       << "Worker stopped too soon after it was started.";
+  SetStatus(INSTALLING);
+
   int request_id = install_callbacks_.Add(new StatusCallback(callback));
   ServiceWorkerStatusCode status = embedded_worker_->SendMessage(
       ServiceWorkerMsg_InstallEvent(request_id, active_version_id));
@@ -505,6 +532,7 @@ void ServiceWorkerVersion::DispatchActivateEventAfterStartWorker(
     const StatusCallback& callback) {
   DCHECK_EQ(RUNNING, running_status())
       << "Worker stopped too soon after it was started.";
+
   int request_id = activate_callbacks_.Add(new StatusCallback(callback));
   ServiceWorkerStatusCode status =
       embedded_worker_->SendMessage(ServiceWorkerMsg_ActivateEvent(request_id));

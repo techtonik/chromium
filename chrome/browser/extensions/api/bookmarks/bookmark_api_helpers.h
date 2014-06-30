@@ -38,10 +38,15 @@ void AddNodeFoldersOnly(ChromeBookmarkClient* client,
                             api::bookmarks::BookmarkTreeNode> >* nodes,
                         bool recurse);
 
-bool RemoveNode(ChromeBookmarkClient* client,
+bool RemoveNode(BookmarkModel* model,
+                ChromeBookmarkClient* client,
                 int64 id,
                 bool recursive,
                 std::string* error);
+
+// Get meta info from |node| and all it's children recursively.
+void GetMetaInfo(const BookmarkNode& node,
+                 base::DictionaryValue* id_to_meta_info_map);
 
 }  // namespace bookmark_api_helpers
 }  // namespace extensions

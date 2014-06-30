@@ -26,7 +26,6 @@
 #include "extensions/common/extension.h"
 
 namespace extensions {
-class EventRouter;
 class ExtensionRegistry;
 }  // namespace extensions
 
@@ -55,7 +54,7 @@ class Service : public KeyedService,
                 public extensions::ExtensionRegistryObserver {
  public:
   typedef base::Callback<ProvidedFileSystemInterface*(
-      extensions::EventRouter* event_router,
+      Profile* profile,
       const ProvidedFileSystemInfo& file_system_info)>
       FileSystemFactoryCallback;
 
@@ -64,7 +63,7 @@ class Service : public KeyedService,
 
   // Sets a custom ProvidedFileSystemInterface factory. Used by unit tests,
   // where an event router is not available.
-  void SetFileSystemFactoryForTests(
+  void SetFileSystemFactoryForTesting(
       const FileSystemFactoryCallback& factory_callback);
 
   // Mounts a file system provided by an extension with the |extension_id|.

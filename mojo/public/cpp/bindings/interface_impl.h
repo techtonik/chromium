@@ -7,6 +7,7 @@
 
 #include "mojo/public/cpp/bindings/interface_request.h"
 #include "mojo/public/cpp/bindings/lib/interface_impl_internal.h"
+#include "mojo/public/cpp/environment/environment.h"
 #include "mojo/public/cpp/system/macros.h"
 
 namespace mojo {
@@ -26,6 +27,14 @@ class InterfaceImpl : public internal::InterfaceImplBase<Interface> {
   // and becomes non-null after OnClientConnected. NOTE: It remains non-null
   // until this instance is deleted.
   Client* client() { return internal_state_.client(); }
+
+  // Blocks the current thread for the first incoming method call, i.e., either
+  // a call to a method or a client callback method. Returns |true| if a method
+  // has been called, |false| in case of error. It must only be called on a
+  // bound object.
+  bool WaitForIncomingMethodCall() {
+    return internal_state_.WaitForIncomingMethodCall();
+  }
 
   // Called when the client has connected to this instance.
   virtual void OnConnectionEstablished() {}
@@ -57,9 +66,10 @@ class InterfaceImpl : public internal::InterfaceImplBase<Interface> {
 //
 // Before returning, the instance's OnConnectionEstablished method is called.
 template <typename Impl>
-Impl* BindToPipe(Impl* instance,
-                 ScopedMessagePipeHandle handle,
-                 MojoAsyncWaiter* waiter = GetDefaultAsyncWaiter()) {
+Impl* BindToPipe(
+    Impl* instance,
+    ScopedMessagePipeHandle handle,
+    const MojoAsyncWaiter* waiter = Environment::GetDefaultAsyncWaiter()) {
   instance->internal_state()->Bind(handle.Pass(), waiter);
   return instance;
 }
@@ -75,9 +85,10 @@ Impl* BindToPipe(Impl* instance,
 //
 // Before returning, the instance's OnConnectionEstablished method is called.
 template <typename Impl, typename Interface>
-Impl* BindToProxy(Impl* instance,
-                  InterfacePtr<Interface>* ptr,
-                  MojoAsyncWaiter* waiter = GetDefaultAsyncWaiter()) {
+Impl* BindToProxy(
+    Impl* instance,
+    InterfacePtr<Interface>* ptr,
+    const MojoAsyncWaiter* waiter = Environment::GetDefaultAsyncWaiter()) {
   instance->internal_state()->BindProxy(ptr, waiter);
   return instance;
 }
@@ -94,9 +105,10 @@ Impl* BindToProxy(Impl* instance,
 // Before returning, the instance will receive a SetClient call, providing it
 // with a proxy to the client on the other end of the pipe.
 template <typename Impl, typename Interface>
-Impl* BindToRequest(Impl* instance,
-                    InterfaceRequest<Interface>* request,
-                    MojoAsyncWaiter* waiter = GetDefaultAsyncWaiter()) {
+Impl* BindToRequest(
+    Impl* instance,
+    InterfaceRequest<Interface>* request,
+    const MojoAsyncWaiter* waiter = Environment::GetDefaultAsyncWaiter()) {
   return BindToPipe(instance, request->PassMessagePipe(), waiter);
 }
 

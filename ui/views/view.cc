@@ -782,7 +782,7 @@ void View::Paint(gfx::Canvas* canvas, const CullSet& cull_set) {
     // propagation to our children.
     if (IsPaintRoot()) {
       if (!bounds_tree_)
-        bounds_tree_.reset(new gfx::RTree(2, 5));
+        bounds_tree_.reset(new BoundsTree(2, 5));
 
       // Recompute our bounds tree as needed.
       UpdateRootBounds(bounds_tree_.get(), gfx::Vector2d());
@@ -798,7 +798,8 @@ void View::Paint(gfx::Canvas* canvas, const CullSet& cull_set) {
       // our canvas bounds.
       scoped_ptr<base::hash_set<intptr_t> > damaged_views(
           new base::hash_set<intptr_t>());
-      bounds_tree_->Query(canvas_bounds, damaged_views.get());
+      bounds_tree_->AppendIntersectingRecords(
+          canvas_bounds, damaged_views.get());
       // Construct a CullSet to wrap the damaged views set, it will delete it
       // for us on scope exit.
       CullSet paint_root_cull_set(damaged_views.Pass());
@@ -912,7 +913,7 @@ bool View::CanProcessEventsWithinSubtree() const {
 }
 
 View* View::GetTooltipHandlerForPoint(const gfx::Point& point) {
-  if (!HitTestPoint(point))
+  if (!HitTestPoint(point) || !CanProcessEventsWithinSubtree())
     return NULL;
 
   // Walk the child Views recursively looking for the View that most
@@ -920,9 +921,6 @@ View* View::GetTooltipHandlerForPoint(const gfx::Point& point) {
   for (int i = child_count() - 1; i >= 0; --i) {
     View* child = child_at(i);
     if (!child->visible())
-      continue;
-
-    if (!child->CanProcessEventsWithinSubtree())
       continue;
 
     gfx::Point point_in_child_coords(point);
@@ -1103,9 +1101,9 @@ const InputMethod* View::GetInputMethod() const {
   return widget ? widget->GetInputMethod() : NULL;
 }
 
-scoped_ptr<ui::EventTargeter>
-View::SetEventTargeter(scoped_ptr<ui::EventTargeter> targeter) {
-  scoped_ptr<ui::EventTargeter> old_targeter = targeter_.Pass();
+scoped_ptr<ViewTargeter>
+View::SetEventTargeter(scoped_ptr<ViewTargeter> targeter) {
+  scoped_ptr<ViewTargeter> old_targeter = targeter_.Pass();
   targeter_ = targeter.Pass();
   return old_targeter.Pass();
 }
@@ -1124,10 +1122,6 @@ scoped_ptr<ui::EventTargetIterator> View::GetChildIterator() const {
 }
 
 ui::EventTargeter* View::GetEventTargeter() {
-  return targeter_.get();
-}
-
-const ui::EventTargeter* View::GetEventTargeter() const {
   return targeter_.get();
 }
 
@@ -1870,7 +1864,7 @@ void View::DoRemoveChildView(View* view,
 
     // Remove the bounds of this child and any of its descendants from our
     // paint root bounds tree.
-    gfx::RTree* bounds_tree = GetBoundsTreeFromPaintRoot();
+    BoundsTree* bounds_tree = GetBoundsTreeFromPaintRoot();
     if (bounds_tree)
       view->RemoveRootBounds(bounds_tree);
 
@@ -2081,7 +2075,7 @@ void View::SetRootBoundsDirty(bool origin_changed) {
   }
 }
 
-void View::UpdateRootBounds(gfx::RTree* tree, const gfx::Vector2d& offset) {
+void View::UpdateRootBounds(BoundsTree* tree, const gfx::Vector2d& offset) {
   // No need to recompute bounds if we haven't flagged ours as dirty.
   TRACE_EVENT1("views", "View::UpdateRootBounds", "class", GetClassName());
 
@@ -2106,7 +2100,7 @@ void View::UpdateRootBounds(gfx::RTree* tree, const gfx::Vector2d& offset) {
   }
 }
 
-void View::RemoveRootBounds(gfx::RTree* tree) {
+void View::RemoveRootBounds(BoundsTree* tree) {
   tree->Remove(reinterpret_cast<intptr_t>(this));
 
   root_bounds_dirty_ = true;
@@ -2117,8 +2111,8 @@ void View::RemoveRootBounds(gfx::RTree* tree) {
   }
 }
 
-gfx::RTree* View::GetBoundsTreeFromPaintRoot() {
-  gfx::RTree* bounds_tree = bounds_tree_.get();
+View::BoundsTree* View::GetBoundsTreeFromPaintRoot() {
+  BoundsTree* bounds_tree = bounds_tree_.get();
   View* paint_root = this;
   while (!bounds_tree && !paint_root->IsPaintRoot()) {
     // Assumption is that if IsPaintRoot() is false then parent_ is valid.

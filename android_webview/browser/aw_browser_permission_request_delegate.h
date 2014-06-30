@@ -5,7 +5,7 @@
 #ifndef ANDROID_WEBVIEW_BROWSER_AW_BROWSER_PERMISSION_REQUEST_DELEGATE_H_
 #define ANDROID_WEBVIEW_BROWSER_AW_BROWSER_PERMISSION_REQUEST_DELEGATE_H_
 
-#include "content/public/browser/browser_context.h"
+#include "base/callback_forward.h"
 #include "url/gurl.h"
 
 namespace android_webview {
@@ -20,11 +20,16 @@ class AwBrowserPermissionRequestDelegate {
 
   virtual void RequestProtectedMediaIdentifierPermission(
       const GURL& origin,
-      const content::BrowserContext::
-          ProtectedMediaIdentifierPermissionCallback& callback) = 0;
+      const base::Callback<void(bool)>& callback) = 0;
 
   virtual void CancelProtectedMediaIdentifierPermissionRequests(
       const GURL& origin) = 0;
+
+  virtual void RequestGeolocationPermission(
+      const GURL& origin,
+      const base::Callback<void(bool)>& callback) = 0;
+
+  virtual void CancelGeolocationPermissionRequests(const GURL& origin) = 0;
 
  protected:
   AwBrowserPermissionRequestDelegate() {}

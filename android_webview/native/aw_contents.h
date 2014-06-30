@@ -38,7 +38,7 @@ class AwContentsContainer;
 class AwContentsClientBridge;
 class AwPdfExporter;
 class AwWebContentsDelegate;
-class HardwareRendererInterface;
+class HardwareRenderer;
 class PermissionRequestHandler;
 
 // Native side of java-class of same name.
@@ -134,9 +134,6 @@ class AwContents : public FindHelper::Listener,
 
   void DrawGL(AwDrawGLInfo* draw_info);
 
-  // Geolocation API support
-  void ShowGeolocationPrompt(const GURL& origin, base::Callback<void(bool)>);
-  void HideGeolocationPrompt(const GURL& origin);
   void InvokeGeolocationCallback(JNIEnv* env,
                                  jobject obj,
                                  jboolean value,
@@ -159,10 +156,15 @@ class AwContents : public FindHelper::Listener,
   // AwBrowserPermissionRequestDelegate implementation.
   virtual void RequestProtectedMediaIdentifierPermission(
       const GURL& origin,
-      const content::BrowserContext::
-          ProtectedMediaIdentifierPermissionCallback& callback) OVERRIDE;
+      const base::Callback<void(bool)>& callback) OVERRIDE;
   virtual void CancelProtectedMediaIdentifierPermissionRequests(
       const GURL& origin) OVERRIDE;
+  virtual void RequestGeolocationPermission(
+      const GURL& origin,
+      const base::Callback<void(bool)>& callback) OVERRIDE;
+  virtual void CancelGeolocationPermissionRequests(
+      const GURL& origin) OVERRIDE;
+
 
   // Find-in-page API and related methods.
   void FindAllAsync(JNIEnv* env, jobject obj, jstring search_string);
@@ -230,6 +232,10 @@ class AwContents : public FindHelper::Listener,
 
   void InitializeHardwareDrawIfNeeded();
 
+  // Geolocation API support
+  void ShowGeolocationPrompt(const GURL& origin, base::Callback<void(bool)>);
+  void HideGeolocationPrompt(const GURL& origin);
+
   JavaObjectWeakGlobalRef java_ref_;
   scoped_ptr<content::WebContents> web_contents_;
   scoped_ptr<AwWebContentsDelegate> web_contents_delegate_;
@@ -240,7 +246,7 @@ class AwContents : public FindHelper::Listener,
   scoped_ptr<AwContents> pending_contents_;
   SharedRendererState shared_renderer_state_;
   BrowserViewRenderer browser_view_renderer_;
-  scoped_ptr<HardwareRendererInterface> hardware_renderer_;
+  scoped_ptr<HardwareRenderer> hardware_renderer_;
   scoped_ptr<AwPdfExporter> pdf_exporter_;
   scoped_ptr<PermissionRequestHandler> permission_request_handler_;
 

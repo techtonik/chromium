@@ -17,7 +17,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "chrome/app/chrome_command_ids.h"
-#include "chrome/browser/google/google_util.h"
+#include "chrome/browser/browser_process.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_info_cache.h"
@@ -39,8 +39,10 @@
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
+#include "components/google/core/browser/google_util.h"
 #include "components/signin/core/browser/profile_oauth2_token_service.h"
 #include "components/signin/core/browser/signin_error_controller.h"
+#include "components/signin/core/browser/signin_metrics.h"
 #include "components/signin/core/common/profile_management_switches.h"
 #include "components/sync_driver/sync_prefs.h"
 #include "content/public/browser/render_view_host.h"
@@ -221,16 +223,21 @@ void SyncSetupHandler::GetStaticLocalizedValues(
       GetStringFUTF16(IDS_SYNC_ENCRYPTION_SECTION_MESSAGE, product_name));
   localized_strings->SetString(
       "passphraseRecover",
-      GetStringFUTF16(IDS_SYNC_PASSPHRASE_RECOVER,
-                      base::ASCIIToUTF16(
-                          google_util::StringAppendGoogleLocaleParam(
-                              chrome::kSyncGoogleDashboardURL))));
-  localized_strings->SetString("stopSyncingExplanation",
+      GetStringFUTF16(
+          IDS_SYNC_PASSPHRASE_RECOVER,
+          base::ASCIIToUTF16(
+              google_util::AppendGoogleLocaleParam(
+                  GURL(chrome::kSyncGoogleDashboardURL),
+                  g_browser_process->GetApplicationLocale()).spec())));
+  localized_strings->SetString(
+      "stopSyncingExplanation",
       l10n_util::GetStringFUTF16(
           IDS_SYNC_STOP_SYNCING_EXPLANATION_LABEL,
           l10n_util::GetStringUTF16(IDS_PRODUCT_NAME),
-          base::ASCIIToUTF16(google_util::StringAppendGoogleLocaleParam(
-              chrome::kSyncGoogleDashboardURL))));
+          base::ASCIIToUTF16(
+              google_util::AppendGoogleLocaleParam(
+                  GURL(chrome::kSyncGoogleDashboardURL),
+                  g_browser_process->GetApplicationLocale()).spec())));
   localized_strings->SetString("deleteProfileLabel",
       l10n_util::GetStringUTF16(IDS_SYNC_STOP_DELETE_PROFILE_LABEL));
   localized_strings->SetString("stopSyncingTitle",
@@ -523,7 +530,7 @@ void SyncSetupHandler::DisplayGaiaLoginInNewTabOrWindow() {
     if (switches::IsNewProfileManagement()) {
       browser->window()->ShowAvatarBubbleFromAvatarButton(
           BrowserWindow::AVATAR_BUBBLE_MODE_REAUTH,
-          signin::GAIA_SERVICE_TYPE_NONE);
+          signin::ManageAccountsParams());
     } else {
       url = signin::GetReauthURL(browser->profile(),
                                  error_controller->error_account_id());
@@ -532,7 +539,7 @@ void SyncSetupHandler::DisplayGaiaLoginInNewTabOrWindow() {
     if (switches::IsNewProfileManagement()) {
       browser->window()->ShowAvatarBubbleFromAvatarButton(
           BrowserWindow::AVATAR_BUBBLE_MODE_SIGNIN,
-          signin::GAIA_SERVICE_TYPE_NONE);
+          signin::ManageAccountsParams());
     } else {
       url = signin::GetPromoURL(signin::SOURCE_SETTINGS, true);
     }
@@ -799,7 +806,8 @@ void SyncSetupHandler::HandleStartSignin(const base::ListValue* args) {
 void SyncSetupHandler::HandleStopSyncing(const base::ListValue* args) {
   if (GetSyncService())
     ProfileSyncService::SyncEvent(ProfileSyncService::STOP_FROM_OPTIONS);
-  SigninManagerFactory::GetForProfile(GetProfile())->SignOut();
+  SigninManagerFactory::GetForProfile(GetProfile())->SignOut(
+      signin_metrics::USER_CLICKED_SIGNOUT_SETTINGS);
 
   bool delete_profile = false;
   if (args->GetBoolean(0, &delete_profile) && delete_profile) {
@@ -829,23 +837,26 @@ void SyncSetupHandler::CloseSyncSetup() {
       if (configuring_sync_) {
         ProfileSyncService::SyncEvent(
             ProfileSyncService::CANCEL_DURING_CONFIGURE);
-      }
 
-      // If the user clicked "Cancel" while setting up sync, disable sync
-      // because we don't want the sync backend to remain in the initialized
-      // state. Note: In order to disable sync across restarts on Chrome OS, we
-      // must call StopSyncingPermanently(), which suppresses sync startup in
-      // addition to disabling it.
-      if (sync_service) {
-        DVLOG(1) << "Sync setup aborted by user action";
-        sync_service->StopSyncingPermanently();
-#if !defined(OS_CHROMEOS)
-        // Sign out the user on desktop Chrome if they click cancel during
-        // initial setup.
-        // TODO(rsimha): Revisit this for M30. See http://crbug.com/252049.
-        if (sync_service->FirstSetupInProgress())
-          SigninManagerFactory::GetForProfile(GetProfile())->SignOut();
-#endif
+        // If the user clicked "Cancel" while setting up sync, disable sync
+        // because we don't want the sync backend to remain in the
+        // first-setup-incomplete state.
+        // Note: In order to disable sync across restarts on Chrome OS,
+        // we must call StopSyncingPermanently(), which suppresses sync startup
+        // in addition to disabling it.
+        if (sync_service) {
+          DVLOG(1) << "Sync setup aborted by user action";
+          sync_service->StopSyncingPermanently();
+  #if !defined(OS_CHROMEOS)
+          // Sign out the user on desktop Chrome if they click cancel during
+          // initial setup.
+          // TODO(rsimha): Revisit this for M30. See http://crbug.com/252049.
+          if (sync_service->FirstSetupInProgress()) {
+            SigninManagerFactory::GetForProfile(GetProfile())->SignOut(
+                signin_metrics::ABORT_SIGNIN);
+          }
+  #endif
+        }
       }
     }
 

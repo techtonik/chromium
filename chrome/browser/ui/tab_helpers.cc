@@ -7,7 +7,6 @@
 #include "base/command_line.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/content_settings/tab_specific_content_settings.h"
-#include "chrome/browser/extensions/tab_helper.h"
 #include "chrome/browser/favicon/favicon_tab_helper.h"
 #include "chrome/browser/history/history_tab_helper.h"
 #include "chrome/browser/infobars/infobar_service.h"
@@ -63,8 +62,12 @@
 #include "chrome/browser/captive_portal/captive_portal_tab_helper.h"
 #endif
 
+#if defined(ENABLE_EXTENSIONS)
+#include "chrome/browser/extensions/tab_helper.h"
+#endif
+
 #if defined(ENABLE_MANAGED_USERS)
-#include "chrome/browser/managed_mode/managed_mode_navigation_observer.h"
+#include "chrome/browser/supervised_user/supervised_user_navigation_observer.h"
 #endif
 
 #if defined(ENABLE_PRINTING)
@@ -124,7 +127,6 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
       web_contents,
       autofill::ChromeAutofillClient::FromWebContents(web_contents));
   CoreTabHelper::CreateForWebContents(web_contents);
-  extensions::TabHelper::CreateForWebContents(web_contents);
   FaviconTabHelper::CreateForWebContents(web_contents);
   FindTabHelper::CreateForWebContents(web_contents);
   HistoryTabHelper::CreateForWebContents(web_contents);
@@ -175,8 +177,12 @@ void TabHelpers::AttachTabHelpers(WebContents* web_contents) {
   CaptivePortalTabHelper::CreateForWebContents(web_contents);
 #endif
 
+#if defined(ENABLE_EXTENSIONS)
+  extensions::TabHelper::CreateForWebContents(web_contents);
+#endif
+
 #if defined(ENABLE_MANAGED_USERS)
-  ManagedModeNavigationObserver::CreateForWebContents(web_contents);
+  SupervisedUserNavigationObserver::CreateForWebContents(web_contents);
 #endif
 
 #if defined(ENABLE_PRINTING) && !defined(OS_ANDROID)

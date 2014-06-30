@@ -143,7 +143,7 @@ WindowGrid::WindowGrid(aura::Window* root_window,
       // Attached panel windows are grouped into a single overview item per
       // grid.
       if (!panels_item) {
-        panels_item = new WindowSelectorPanels();
+        panels_item = new WindowSelectorPanels(root_window_);
         window_list_.push_back(panels_item);
       }
       panels_item->AddWindow(*iter);
@@ -358,6 +358,10 @@ void WindowGrid::InitSelectionWidget(WindowSelector::Direction direction) {
   // Disable the "bounce in" animation when showing the window.
   ::wm::SetWindowVisibilityAnimationTransition(
       selection_widget_->GetNativeWindow(), ::wm::ANIMATE_NONE);
+  // The selection widget should not activate the shelf when passing under it.
+  ash::wm::GetWindowState(selection_widget_->GetNativeWindow())->
+      set_ignored_by_shelf(true);
+
   views::View* content_view = new views::View;
   content_view->set_background(
       views::Background::CreateSolidBackground(kWindowOverviewSelectionColor));

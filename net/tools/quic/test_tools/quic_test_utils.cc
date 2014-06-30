@@ -4,14 +4,12 @@
 
 #include "net/tools/quic/test_tools/quic_test_utils.h"
 
-#include "base/sha1.h"
 #include "net/quic/quic_connection.h"
 #include "net/quic/test_tools/quic_connection_peer.h"
 #include "net/quic/test_tools/quic_test_utils.h"
 #include "net/tools/quic/quic_epoll_connection_helper.h"
 
 using base::StringPiece;
-using net::test::kInitialFlowControlWindowForTest;
 using net::test::MakeAckFrame;
 using net::test::MockHelper;
 using net::test::QuicConnectionPeer;
@@ -80,18 +78,10 @@ QuicAckFrame MakeAckFrameWithNackRanges(
   return ack;
 }
 
-uint64 SimpleRandom::RandUint64() {
-  unsigned char hash[base::kSHA1Length];
-  base::SHA1HashBytes(reinterpret_cast<unsigned char*>(&seed_), sizeof(seed_),
-                      hash);
-  memcpy(&seed_, hash, sizeof(seed_));
-  return seed_;
-}
-
 TestSession::TestSession(QuicConnection* connection,
                          const QuicConfig& config)
-  : QuicSession(connection, kInitialFlowControlWindowForTest, config),
-      crypto_stream_(NULL) {
+  : QuicSession(connection, config),
+    crypto_stream_(NULL) {
 }
 
 TestSession::~TestSession() {}

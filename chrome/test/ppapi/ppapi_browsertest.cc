@@ -62,10 +62,21 @@ using content::RenderViewHost;
 #if defined(DISABLE_NACL)
 
 #define TEST_PPAPI_NACL(test_name)
+#define TEST_PPAPI_NACL_NO_PNACL(test_name)
 #define TEST_PPAPI_NACL_DISALLOWED_SOCKETS(test_name)
 #define TEST_PPAPI_NACL_WITH_SSL_SERVER(test_name)
+#define TEST_PPAPI_NACL_SUBTESTS(test_name, run_statement)
 
 #else
+
+// TODO(dmichael): Remove this macro, crbug.com/384539
+#define TEST_PPAPI_NACL_NO_PNACL(test_name) \
+    IN_PROC_BROWSER_TEST_F(PPAPINaClNewlibTest, test_name) { \
+      RunTestViaHTTP(STRIP_PREFIXES(test_name)); \
+    } \
+    IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, MAYBE_GLIBC(test_name)) { \
+      RunTestViaHTTP(STRIP_PREFIXES(test_name)); \
+    } \
 
 // NaCl based PPAPI tests
 #define TEST_PPAPI_NACL(test_name) \
@@ -81,6 +92,22 @@ using content::RenderViewHost;
     IN_PROC_BROWSER_TEST_F(PPAPINaClPNaClNonSfiTest, \
                            MAYBE_PNACL_NONSFI(test_name)) { \
       RunTestViaHTTP(STRIP_PREFIXES(test_name)); \
+    }
+
+// NaCl based PPAPI tests
+#define TEST_PPAPI_NACL_SUBTESTS(test_name, run_statement) \
+    IN_PROC_BROWSER_TEST_F(PPAPINaClNewlibTest, test_name) { \
+      run_statement; \
+    } \
+    IN_PROC_BROWSER_TEST_F(PPAPINaClGLibcTest, MAYBE_GLIBC(test_name)) { \
+      run_statement; \
+    } \
+    IN_PROC_BROWSER_TEST_F(PPAPINaClPNaClTest, test_name) { \
+      run_statement; \
+    } \
+    IN_PROC_BROWSER_TEST_F(PPAPINaClPNaClNonSfiTest, \
+                           MAYBE_PNACL_NONSFI(test_name)) { \
+      run_statement; \
     }
 
 // NaCl based PPAPI tests with disallowed socket API
@@ -967,11 +994,17 @@ IN_PROC_BROWSER_TEST_F(OutOfProcessPPAPITest, Flash) {
       LIST_TEST(WebSocket_UtilityBufferedAmount) \
   )
 
-
 IN_PROC_BROWSER_TEST_F(PPAPITest, WebSocket1) {
   RUN_WEBSOCKET_SUBTESTS_1;
 }
-IN_PROC_BROWSER_TEST_F(PPAPITest, WebSocket2) {
+
+// Repeatedly flaky on Win7 Tests(1): http://crbug.com/389084
+#if defined(OS_WIN)
+#define MAYBE_WebSocket2 DISABLED_WebSocket2
+#else
+#define MAYBE_WebSocket2 WebSocket2
+#endif
+IN_PROC_BROWSER_TEST_F(PPAPITest, MAYBE_WebSocket2) {
   RUN_WEBSOCKET_SUBTESTS_2;
 }
 IN_PROC_BROWSER_TEST_F(OutOfProcessPPAPITest, WebSocket1) {
@@ -1156,6 +1189,7 @@ IN_PROC_BROWSER_TEST_F(PPAPITest, InputEvent_AcceptTouchEvent) {
   RunTestViaHTTP( \
       LIST_TEST(View_SizeChange) \
       LIST_TEST(View_ClipChange) \
+      LIST_TEST(View_ScrollOffsetChange) \
   )
 
 IN_PROC_BROWSER_TEST_F(PPAPITest, View) {
@@ -1196,6 +1230,43 @@ IN_PROC_BROWSER_TEST_F(OutOfProcessPPAPITest, MAYBE_FlashMessageLoop) {
   RUN_FLASH_MESSAGE_LOOP_SUBTESTS;
 }
 
+// The compositor test timeouts sometimes, so we have to split it to two
+// subtests.
+#define RUN_COMPOSITOR_SUBTESTS_0 \
+  RunTestViaHTTP( \
+      LIST_TEST(Compositor_BindUnbind) \
+      LIST_TEST(Compositor_Release) \
+      LIST_TEST(Compositor_ReleaseUnbound) \
+      LIST_TEST(Compositor_ReleaseWithoutCommit) \
+      LIST_TEST(Compositor_ReleaseWithoutCommitUnbound) \
+  )
+
+#define RUN_COMPOSITOR_SUBTESTS_1 \
+  RunTestViaHTTP( \
+      LIST_TEST(Compositor_CommitTwoTimesWithoutChange) \
+      LIST_TEST(Compositor_CommitTwoTimesWithoutChangeUnbound) \
+      LIST_TEST(Compositor_General) \
+      LIST_TEST(Compositor_GeneralUnbound) \
+  )
+
+#if defined(OS_WIN)
+// This test fails with the test compositor which is what's used by default for
+// browser tests on Windows. Renable when the software compositor is available.
+#define MAYBE_Compositor0 DISABLED_Compositor0
+#define MAYBE_Compositor1 DISABLED_Compositor1
+#elif defined(OS_MACOSX)
+// This test fails when using the legacy software mode. Reenable when the
+// software compositor is enabled crbug.com/286038
+#define MAYBE_Compositor0 DISABLED_Compositor0
+#define MAYBE_Compositor1 DISABLED_Compositor1
+#else
+#define MAYBE_Compositor0 Compositor0
+#define MAYBE_Compositor1 Compositor1
+#endif
+
+TEST_PPAPI_NACL_SUBTESTS(MAYBE_Compositor0, RUN_COMPOSITOR_SUBTESTS_0)
+TEST_PPAPI_NACL_SUBTESTS(MAYBE_Compositor1, RUN_COMPOSITOR_SUBTESTS_1)
+
 TEST_PPAPI_NACL(MediaStreamAudioTrack)
 
 TEST_PPAPI_NACL(MediaStreamVideoTrack)
@@ -1204,11 +1275,9 @@ TEST_PPAPI_NACL(MouseCursor)
 
 TEST_PPAPI_NACL(NetworkProxy)
 
-// TODO(scottmg): Disabled with DirectWrite investigating, probably sandbox-
-// related. http://crbug.com/382729
-#if !defined(OS_WIN)
 TEST_PPAPI_NACL(TrueTypeFont)
-#endif
+
+TEST_PPAPI_NACL(VideoDecoder)
 
 // VideoDestination doesn't work in content_browsertests.
 TEST_PPAPI_OUT_OF_PROCESS(VideoDestination)
@@ -1220,6 +1289,10 @@ TEST_PPAPI_NACL(VideoSource)
 
 // Printing doesn't work in content_browsertests.
 TEST_PPAPI_OUT_OF_PROCESS(Printing)
+
+// TODO(dmichael): Make this work on PNaCl and remove the macro.
+//                 crbug.com/384539
+TEST_PPAPI_NACL_NO_PNACL(MessageHandler)
 
 TEST_PPAPI_NACL(MessageLoop_Basics)
 TEST_PPAPI_NACL(MessageLoop_Post)

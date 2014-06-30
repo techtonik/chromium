@@ -23,6 +23,7 @@
 #include "third_party/WebKit/public/web/WebDragOperation.h"
 #include "third_party/WebKit/public/web/WebDragStatus.h"
 #include "third_party/skia/include/core/SkBitmap.h"
+#include "ui/gfx/ipc/gfx_param_traits.h"
 #include "ui/gfx/point.h"
 #include "ui/gfx/rect.h"
 #include "ui/gfx/size.h"
@@ -45,8 +46,8 @@ IPC_STRUCT_END()
 IPC_STRUCT_BEGIN(BrowserPluginHostMsg_ResizeGuest_Params)
   // Indicates whether the parameters have been populated or not.
   IPC_STRUCT_MEMBER(bool, size_changed)
-  // The new rect of the guest view area.
-  IPC_STRUCT_MEMBER(gfx::Rect, view_rect)
+  // The new size of guest view.
+  IPC_STRUCT_MEMBER(gfx::Size, view_size)
   // Indicates the scale factor of the embedder WebView.
   IPC_STRUCT_MEMBER(float, scale_factor)
   // Indicates a request for a full repaint of the page.
@@ -63,6 +64,7 @@ IPC_STRUCT_BEGIN(BrowserPluginHostMsg_Attach_Params)
   IPC_STRUCT_MEMBER(BrowserPluginHostMsg_AutoSize_Params, auto_size_params)
   IPC_STRUCT_MEMBER(BrowserPluginHostMsg_ResizeGuest_Params,
                     resize_guest_params)
+  IPC_STRUCT_MEMBER(gfx::Point, origin)
 IPC_STRUCT_END()
 
 IPC_STRUCT_BEGIN(BrowserPluginMsg_UpdateRect_Params)
@@ -153,7 +155,7 @@ IPC_MESSAGE_ROUTED3(BrowserPluginHostMsg_HandleInputEvent,
 IPC_MESSAGE_ROUTED3(BrowserPluginHostMsg_CopyFromCompositingSurfaceAck,
                     int /* instance_id */,
                     int /* request_id */,
-                    SkBitmap);
+                    SkBitmap)
 
 // Notify the guest renderer that some resources given to the embededer
 // are not used any more.
@@ -212,7 +214,7 @@ IPC_MESSAGE_ROUTED2(BrowserPluginHostMsg_ResizeGuest,
 
 // This message is sent in response to a completed attachment of a guest
 // to a BrowserPlugin.
-IPC_MESSAGE_CONTROL1(BrowserPluginMsg_Attach_ACK, int /* instance_id */);
+IPC_MESSAGE_CONTROL1(BrowserPluginMsg_Attach_ACK, int /* instance_id */)
 
 // Once the swapped out guest RenderView has been created in the embedder render
 // process, the browser process informs the embedder of its routing ID.

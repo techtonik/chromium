@@ -25,7 +25,6 @@ const int kTileHorizontalPadding = 10;
 const int kTileImageSize = 48;
 
 const SkColor kTileBackgroundColor = SK_ColorWHITE;
-const SkColor kTileBorderColor = SkColorSetARGB(0x30, 0xD0, 0xD0, 0xD0);
 const int kTileColorStripHeight = 2;
 const SkAlpha kTileColorStripOpacity = 0X5F;
 const int kTileCornerRadius = 2;
@@ -49,7 +48,7 @@ class TileItemView::TileItemBackground : public views::Background {
     paint.setFlags(SkPaint::kAntiAlias_Flag);
 
     // Paint the border.
-    paint.setColor(kTileBorderColor);
+    paint.setColor(kStartPageBorderColor);
     canvas->DrawRoundRect(view->GetContentsBounds(), kTileCornerRadius, paint);
 
     // Paint a rectangle for the color strip.
@@ -94,6 +93,10 @@ TileItemView::TileItemView()
   title_->SetFontList(rb.GetFontList(kItemTextFontStyle));
   title_->SetHorizontalAlignment(gfx::ALIGN_CENTER);
 
+  // When |item_| is NULL, the tile is invisible. Calling SetAppListItem with a
+  // non-NULL item makes the tile visible.
+  SetVisible(false);
+
   AddChildView(icon_);
   AddChildView(title_);
 }
@@ -102,6 +105,12 @@ TileItemView::~TileItemView() {
 }
 
 void TileItemView::SetAppListItem(AppListItem* item) {
+  // TODO(calamity): This will not update if the contents of |item_| have
+  // changed since it was last assigned. Add an observer to refresh when the
+  // item changes.
+  if (item == item_)
+    return;
+
   item_ = item;
   if (!item) {
     SetVisible(false);

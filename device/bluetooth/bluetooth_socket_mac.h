@@ -19,8 +19,8 @@
 #include "device/bluetooth/bluetooth_socket.h"
 #include "device/bluetooth/bluetooth_uuid.h"
 
-@class BluetoothRfcommChannelDelegate;
 @class BluetoothRfcommConnectionListener;
+@class BluetoothL2capConnectionListener;
 
 namespace net {
 class IOBuffer;
@@ -29,7 +29,8 @@ class IOBufferWithSize;
 
 namespace device {
 
-class BluetoothAdapter;
+class BluetoothAdapterMac;
+class BluetoothChannelMac;
 
 // Implements the BluetoothSocket class for the Mac OS X platform.
 class BluetoothSocketMac : public BluetoothSocket {
@@ -51,7 +52,7 @@ class BluetoothSocketMac : public BluetoothSocket {
   // |success_callback| will be called if the service is successfully
   // registered, |error_callback| on failure with a message explaining the
   // cause.
-  void ListenUsingRfcomm(scoped_refptr<BluetoothAdapter> adapter,
+  void ListenUsingRfcomm(scoped_refptr<BluetoothAdapterMac> adapter,
                          const BluetoothUUID& uuid,
                          int channel_id,
                          const base::Closure& success_callback,
@@ -62,7 +63,7 @@ class BluetoothSocketMac : public BluetoothSocket {
   // |success_callback| will be called if the service is successfully
   // registered, |error_callback| on failure with a message explaining the
   // cause.
-  void ListenUsingL2cap(scoped_refptr<BluetoothAdapter> adapter,
+  void ListenUsingL2cap(scoped_refptr<BluetoothAdapterMac> adapter,
                         const BluetoothUUID& uuid,
                         int psm,
                         const base::Closure& success_callback,
@@ -92,19 +93,17 @@ class BluetoothSocketMac : public BluetoothSocket {
       const base::Closure& success_callback,
       const ErrorCompletionCallback& error_callback);
 
-  // Called by BluetoothRfcommConnectionListener.
-  void OnRfcommChannelOpened(IOBluetoothRFCOMMChannel* rfcomm_channel);
+  // Called by BluetoothRfcommConnectionListener and
+  // BluetoothL2capConnectionListener.
+  void OnChannelOpened(scoped_ptr<BluetoothChannelMac> channel);
 
-  // Called by BluetoothRfcommChannelDelegate.
-  void OnRfcommChannelOpenComplete(IOBluetoothRFCOMMChannel* rfcomm_channel,
-                                   IOReturn status);
-  void OnRfcommChannelClosed(IOBluetoothRFCOMMChannel* rfcomm_channel);
-  void OnRfcommChannelDataReceived(IOBluetoothRFCOMMChannel* rfcomm_channel,
-                                   void* data,
-                                   size_t length);
-  void OnRfcommChannelWriteComplete(IOBluetoothRFCOMMChannel* rfcomm_channel,
-                                    void* refcon,
-                                    IOReturn status);
+  // Called by |channel_|.
+  // Note: OnChannelOpenComplete might be called before the |channel_| is set.
+  void OnChannelOpenComplete(const std::string& device_address,
+                             IOReturn status);
+  void OnChannelClosed();
+  void OnChannelDataReceived(void* data, size_t length);
+  void OnChannelWriteComplete(void* refcon, IOReturn status);
 
  private:
   struct AcceptRequest {
@@ -156,26 +155,24 @@ class BluetoothSocketMac : public BluetoothSocket {
 
   // Adapter the socket is registered against. This is only present when the
   // socket is listening.
-  scoped_refptr<BluetoothAdapter> adapter_;
+  scoped_refptr<BluetoothAdapterMac> adapter_;
 
   // UUID of the profile being connected to, or that the socket is listening on.
   device::BluetoothUUID uuid_;
 
-  // A simple helper that registers for OS notifications and forwards them to
+  // Simple helpers that register for OS notifications and forward them to
   // |this| profile.
   base::scoped_nsobject<BluetoothRfcommConnectionListener>
       rfcomm_connection_listener_;
-
-  // A simple delegate that forwards RFCOMM channel methods to |this| socket.
-  base::scoped_nsobject<BluetoothRfcommChannelDelegate>
-      rfcomm_channel_delegate_;
+  base::scoped_nsobject<BluetoothL2capConnectionListener>
+      l2cap_connection_listener_;
 
   // A handle to the service record registered in the system SDP server.
   // Used to eventually unregister the service.
   BluetoothSDPServiceRecordHandle service_record_handle_;
 
-  // The IOBluetooth RFCOMM channel used to issue commands.
-  base::scoped_nsobject<IOBluetoothRFCOMMChannel> rfcomm_channel_;
+  // The channel used to issue commands.
+  scoped_ptr<BluetoothChannelMac> channel_;
 
   // Connection callbacks -- when a pending async connection is active.
   scoped_ptr<ConnectCallbacks> connect_callbacks_;
@@ -193,8 +190,8 @@ class BluetoothSocketMac : public BluetoothSocket {
   // request.
   scoped_ptr<AcceptRequest> accept_request_;
 
-  // Queue of incoming RFCOMM connections.
-  std::queue<base::scoped_nsobject<IOBluetoothRFCOMMChannel>> accept_queue_;
+  // Queue of incoming connections.
+  std::queue<linked_ptr<BluetoothChannelMac>> accept_queue_;
 
   DISALLOW_COPY_AND_ASSIGN(BluetoothSocketMac);
 };

@@ -209,7 +209,6 @@ class CONTENT_EXPORT RenderViewHostImpl
       const WebPreferences& prefs) OVERRIDE;
   virtual void GetAudioOutputControllers(
       const GetAudioOutputControllersCallback& callback) const OVERRIDE;
-  virtual void SetWebUIHandle(mojo::ScopedMessagePipeHandle handle) OVERRIDE;
   virtual void SelectWordAroundCaret() OVERRIDE;
 
 #if defined(OS_ANDROID)
@@ -439,6 +438,10 @@ class CONTENT_EXPORT RenderViewHostImpl
 
   // Whether the RVH is waiting for the unload ack from the renderer.
   bool IsWaitingForUnloadACK() const;
+
+  void OnTextSurroundingSelectionResponse(const base::string16& content,
+                                          size_t start_offset,
+                                          size_t end_offset);
 
   // Update the FrameTree to use this RenderViewHost's main frame
   // RenderFrameHost. Called when the RenderViewHost is committed.

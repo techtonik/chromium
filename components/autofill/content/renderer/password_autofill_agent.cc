@@ -232,7 +232,9 @@ PasswordAutofillAgent::PasswordAutofillAgent(content::RenderView* render_view)
       was_username_autofilled_(false),
       was_password_autofilled_(false),
       username_selection_start_(0),
+      did_stop_loading_(false),
       weak_ptr_factory_(this) {
+  Send(new AutofillHostMsg_PasswordAutofillAgentConstructed(routing_id()));
 }
 
 PasswordAutofillAgent::~PasswordAutofillAgent() {
@@ -467,14 +469,10 @@ void PasswordAutofillAgent::FirstUserGestureObserved() {
 void PasswordAutofillAgent::SendPasswordForms(blink::WebFrame* frame,
                                               bool only_visible) {
   scoped_ptr<RendererSavePasswordProgressLogger> logger;
-  // From the perspective of saving passwords, only calls with |only_visible|
-  // being true are important -- the decision whether to save the password is
-  // only made after visible forms are known, for failed login detection. Calls
-  // with |only_visible| false are important for password form autofill, which
-  // is currently not part of the logging.
-  if (only_visible && logging_state_active_) {
+  if (logging_state_active_) {
     logger.reset(new RendererSavePasswordProgressLogger(this, routing_id()));
     logger->LogMessage(Logger::STRING_SEND_PASSWORD_FORMS_METHOD);
+    logger->LogBoolean(Logger::STRING_ONLY_VISIBLE, only_visible);
   }
 
   // Make sure that this security origin is allowed to use password manager.
@@ -538,7 +536,8 @@ void PasswordAutofillAgent::SendPasswordForms(blink::WebFrame* frame,
 
   if (only_visible) {
     Send(new AutofillHostMsg_PasswordFormsRendered(routing_id(),
-                                                   password_forms));
+                                                   password_forms,
+                                                   did_stop_loading_));
   } else {
     Send(new AutofillHostMsg_PasswordFormsParsed(routing_id(), password_forms));
   }
@@ -548,13 +547,14 @@ bool PasswordAutofillAgent::OnMessageReceived(const IPC::Message& message) {
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(PasswordAutofillAgent, message)
     IPC_MESSAGE_HANDLER(AutofillMsg_FillPasswordForm, OnFillPasswordForm)
-    IPC_MESSAGE_HANDLER(AutofillMsg_ChangeLoggingState, OnChangeLoggingState)
+    IPC_MESSAGE_HANDLER(AutofillMsg_SetLoggingState, OnSetLoggingState)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   return handled;
 }
 
 void PasswordAutofillAgent::DidStartLoading() {
+  did_stop_loading_ = false;
   if (usernames_usage_ != NOTHING_TO_AUTOFILL) {
     UMA_HISTOGRAM_ENUMERATION("PasswordManager.OtherPossibleUsernamesUsage",
                               usernames_usage_,
@@ -576,6 +576,10 @@ void PasswordAutofillAgent::DidFinishLoad(blink::WebLocalFrame* frame) {
   // triggers the "Save password?" infobar if the user just submitted a password
   // form.
   SendPasswordForms(frame, true);
+}
+
+void PasswordAutofillAgent::DidStopLoading() {
+  did_stop_loading_ = true;
 }
 
 void PasswordAutofillAgent::FrameDetached(blink::WebFrame* frame) {
@@ -796,7 +800,7 @@ void PasswordAutofillAgent::OnFillPasswordForm(
   }
 }
 
-void PasswordAutofillAgent::OnChangeLoggingState(bool active) {
+void PasswordAutofillAgent::OnSetLoggingState(bool active) {
   logging_state_active_ = active;
 }
 

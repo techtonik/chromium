@@ -38,7 +38,6 @@
 #include "content/renderer/mouse_lock_dispatcher.h"
 #include "content/renderer/render_frame_impl.h"
 #include "content/renderer/render_widget.h"
-#include "content/renderer/renderer_date_time_picker.h"
 #include "content/renderer/stats_collection_observer.h"
 #include "ipc/ipc_platform_file.h"
 #include "third_party/WebKit/public/platform/WebGraphicsContext3D.h"
@@ -61,6 +60,7 @@
 
 #if defined(OS_ANDROID)
 #include "content/renderer/android/content_detector.h"
+#include "content/renderer/android/renderer_date_time_picker.h"
 #include "third_party/WebKit/public/web/WebContentDetectionResult.h"
 #endif
 
@@ -81,10 +81,6 @@ struct ViewMsg_StopFinding_Params;
 namespace base {
 class CommandLine;
 }
-
-namespace ui {
-struct SelectedFileInfo;
-}  // namespace ui
 
 namespace blink {
 class WebApplicationCacheHost;
@@ -118,6 +114,10 @@ struct WebWindowFeatures;
 #if defined(OS_ANDROID)
 class WebHitTestResult;
 #endif
+}  // namespace blink
+
+namespace ui {
+struct SelectedFileInfo;
 }
 
 namespace webkit_glue {
@@ -133,7 +133,6 @@ class FaviconHelper;
 class HistoryController;
 class HistoryEntry;
 class ImageResourceFetcher;
-class MidiDispatcher;
 class MediaStreamDispatcher;
 class MouseLockDispatcher;
 class NavigationState;
@@ -200,6 +199,8 @@ class CONTENT_EXPORT RenderViewImpl
 
   // Returns the RenderViewImpl for the given routing ID.
   static RenderViewImpl* FromRoutingID(int routing_id);
+
+  static size_t GetRenderViewCount();
 
   // May return NULL when the view is closing.
   blink::WebView* webview() const;
@@ -274,9 +275,6 @@ class CONTENT_EXPORT RenderViewImpl
 
   void FrameDidStartLoading(blink::WebFrame* frame);
   void FrameDidStopLoading(blink::WebFrame* frame);
-
-  void FrameDidCommitProvisionalLoad(blink::WebLocalFrame* frame,
-                                     bool is_new_navigation);
 
   // Plugin-related functions --------------------------------------------------
 
@@ -355,10 +353,6 @@ class CONTENT_EXPORT RenderViewImpl
 
   // Change the device scale factor and force the compositor to resize.
   void SetDeviceScaleFactorForTesting(float factor);
-
-  // Change screen orientation and force the compositor to resize.
-  void SetScreenOrientationForTesting(
-      const blink::WebScreenOrientationType& orientation);
 
   // Change the device ICC color profile while running a layout test.
   void SetDeviceColorProfileForTesting(const std::vector<char>& color_profile);
@@ -458,7 +452,6 @@ class CONTENT_EXPORT RenderViewImpl
                                        const blink::WebURL& url,
                                        const blink::WebString& title);
   virtual blink::WebPageVisibilityState visibilityState() const;
-  virtual blink::WebMIDIClient* webMIDIClient();
   virtual blink::WebPushClient* webPushClient();
   virtual void draggableRegionsChanged();
 
@@ -511,6 +504,7 @@ class CONTENT_EXPORT RenderViewImpl
                                       TopControlsState current,
                                       bool animate) OVERRIDE;
 #endif
+  bool uses_temporary_zoom_level() const { return uses_temporary_zoom_level_; }
 
   // Please do not add your stuff randomly to the end here. If there is an
   // appropriate section, add it there. If not, there are some random functions
@@ -743,6 +737,7 @@ class CONTENT_EXPORT RenderViewImpl
   void OnSetRendererPrefs(const RendererPreferences& renderer_prefs);
   void OnSetWebUIProperty(const std::string& name, const std::string& value);
   void OnSetZoomLevelForLoadingURL(const GURL& url, double zoom_level);
+  void OnSetZoomLevelForView(bool uses_temporary_zoom_level, double level);
   void OnStop();
   void OnStopFinding(StopFindAction action);
   void OnSuppressDialogsUntilSwapOut();
@@ -754,6 +749,7 @@ class CONTENT_EXPORT RenderViewImpl
   void OnDisownOpener();
   void OnWindowSnapshotCompleted(const int snapshot_id,
       const gfx::Size& size, const std::vector<unsigned char>& png);
+  void OnForceRedraw(int request_id);
   void OnSelectWordAroundCaret();
 #if defined(OS_ANDROID)
   void OnActivateNearestFindResult(int request_id, float x, float y);
@@ -796,9 +792,6 @@ class CONTENT_EXPORT RenderViewImpl
   // doesn't have a frame at the specified size, the first is returned.
   bool DownloadFavicon(int id, const GURL& image_url, int image_size);
 
-  // Returns the URL being loaded by the given frame's request.
-  GURL GetLoadingUrl(blink::WebFrame* frame) const;
-
   // Called to get the WebPlugin to handle find requests in the document.
   // Returns NULL if there is no such WebPlugin.
   blink::WebPlugin* GetWebPluginForFind();
@@ -807,10 +800,6 @@ class CONTENT_EXPORT RenderViewImpl
   // cropped due to a recent navigation the browser did not know about.
   bool IsBackForwardToStaleEntry(const FrameMsg_Navigate_Params& params,
                                  bool is_reload);
-
-  // TODO(nasko): Remove this method when code is migrated to use
-  // RenderFrameObserver.
-  void OnNavigate(const FrameMsg_Navigate_Params& params);
 
   // Make the given |frame| show an empty, unscriptable page.
   // TODO(creis): Move this to RenderFrame.
@@ -1018,6 +1007,9 @@ class CONTENT_EXPORT RenderViewImpl
   // The next target URL we want to send to the browser.
   GURL pending_target_url_;
 
+  // Indicates whether this view overrides url-based zoom settings.
+  bool uses_temporary_zoom_level_;
+
 #if defined(OS_ANDROID)
   // Cache the old top controls state constraints. Used when updating
   // current value only without altering the constraints.
@@ -1059,9 +1051,6 @@ class CONTENT_EXPORT RenderViewImpl
 
   // BrowserPluginManager attached to this view; lazily initialized.
   scoped_refptr<BrowserPluginManager> browser_plugin_manager_;
-
-  // MidiClient attached to this view; lazily initialized.
-  MidiDispatcher* midi_dispatcher_;
 
   DevToolsAgent* devtools_agent_;
 

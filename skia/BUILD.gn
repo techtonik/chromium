@@ -260,6 +260,8 @@ component("skia") {
     "ext/convolver.h",
     "ext/event_tracer_impl.cc",
     "ext/event_tracer_impl.h",
+    "ext/fontmgr_default_win.cc",
+    "ext/fontmgr_default_win.h",
     "ext/google_logging.cc",
     "ext/image_operations.cc",
     "ext/image_operations.h",
@@ -317,11 +319,9 @@ component("skia") {
   # Remove unused util files include in utils.gypi
   sources -= [
   "//third_party/skia/include/utils/SkCondVar.h",
-  "//third_party/skia/include/utils/SkCountdown.h",
   "//third_party/skia/include/utils/SkRunnable.h",
   "//third_party/skia/include/utils/SkThreadPool.h",
   "//third_party/skia/src/utils/SkCondVar.cpp",
-  "//third_party/skia/src/utils/SkCountdown.cpp",
 
   "//third_party/skia/include/utils/SkBoundaryPatch.h",
   "//third_party/skia/include/utils/SkFrontBufferedStream.h",
@@ -425,7 +425,6 @@ component("skia") {
   } else {
     sources -= [
       "//third_party/skia/src/ports/SkFontHost_win.cpp",
-      "//third_party/skia/src/ports/SkFontMgr_default_gdi.cpp",
       "//third_party/skia/src/ports/SkFontMgr_win_dw.cpp",
       "//third_party/skia/src/ports/SkOSFile_win.cpp",
       "//third_party/skia/src/ports/SkRemotableFontMgr_win_dw.cpp",
@@ -630,9 +629,19 @@ source_set("skia_opts") {
       ]
     }
 
-
+  } else if (cpu_arch == "mipsel") {
+    cflags += [ "-fomit-frame-pointer" ]
+    sources = [
+      "//third_party/skia/src/opts/SkBitmapProcState_opts_none.cpp",
+      "//third_party/skia/src/opts/SkBlitMask_opts_none.cpp",
+      "//third_party/skia/src/opts/SkBlitRow_opts_none.cpp",
+      "//third_party/skia/src/opts/SkUtils_opts_none.cpp",
+      "//third_party/skia/src/opts/SkXfermode_opts_none.cpp",
+      "//third_party/skia/src/opts/SkMorphology_opts_none.cpp",
+      "//third_party/skia/src/opts/SkBlurImage_opts_none.cpp",
+    ]
   } else {
-    assert(false, "Need to port MIPS stuff from skia_library_opts.gyp")
+    assert(false, "Need to port cpu specific stuff from skia_library_opts.gyp")
   }
 
   configs -= [ "//build/config/compiler:chromium_code" ]

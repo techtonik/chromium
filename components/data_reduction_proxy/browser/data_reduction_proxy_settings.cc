@@ -15,17 +15,15 @@
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "components/data_reduction_proxy/browser/data_reduction_proxy_auth_request_handler.h"
 #include "components/data_reduction_proxy/browser/data_reduction_proxy_configurator.h"
 #include "components/data_reduction_proxy/browser/data_reduction_proxy_params.h"
+#include "components/data_reduction_proxy/browser/data_reduction_proxy_usage_stats.h"
 #include "components/data_reduction_proxy/common/data_reduction_proxy_pref_names.h"
 #include "components/data_reduction_proxy/common/data_reduction_proxy_switches.h"
-#include "crypto/random.h"
-#include "net/base/auth.h"
 #include "net/base/host_port_pair.h"
 #include "net/base/load_flags.h"
 #include "net/base/net_errors.h"
-#include "net/http/http_auth.h"
-#include "net/http/http_auth_cache.h"
 #include "net/http/http_network_session.h"
 #include "net/http/http_response_headers.h"
 #include "net/url_request/url_fetcher.h"
@@ -46,10 +44,6 @@ const char kUMAProxyStartupStateHistogram[] =
 // Key of the UMA DataReductionProxy.ProbeURL histogram.
 const char kUMAProxyProbeURL[] = "DataReductionProxy.ProbeURL";
 
-// TODO(marq): Factor this string out into a constant here and in
-//             http_auth_handler_spdyproxy.
-const char kAuthenticationRealmName[] = "SpdyProxy";
-
 int64 GetInt64PrefValue(const base::ListValue& list_value, size_t index) {
   int64 val = 0;
   std::string pref_value;
@@ -60,6 +54,12 @@ int64 GetInt64PrefValue(const base::ListValue& list_value, size_t index) {
     DCHECK(rv);
   }
   return val;
+}
+
+bool IsEnabledOnCommandLine() {
+  const CommandLine& command_line = *CommandLine::ForCurrentProcess();
+  return command_line.HasSwitch(
+      data_reduction_proxy::switches::kEnableDataReductionProxy);
 }
 
 }  // namespace
@@ -139,115 +139,12 @@ void DataReductionProxySettings::SetProxyConfigurator(
   configurator_ = configurator.Pass();
 }
 
-// static
-void DataReductionProxySettings::InitDataReductionProxySession(
-    net::HttpNetworkSession* session,
-    const DataReductionProxyParams* params) {
-// This is a no-op unless the authentication parameters are compiled in.
-// (even though values for them may be specified on the command line).
-// Authentication will still work if the command line parameters are used,
-// however there will be a round-trip overhead for each challenge/response
-// (typically once per session).
-// TODO(bengr):Pass a configuration struct into DataReductionProxyConfigurator's
-// constructor. The struct would carry everything in the preprocessor flags.
-  DCHECK(session);
-  net::HttpAuthCache* auth_cache = session->http_auth_cache();
-  DCHECK(auth_cache);
-  InitDataReductionAuthentication(auth_cache, params);
-}
-
-// static
-void DataReductionProxySettings::InitDataReductionAuthentication(
-    net::HttpAuthCache* auth_cache,
-    const DataReductionProxyParams* params) {
-  DCHECK(auth_cache);
-  DCHECK(params);
-  int64 timestamp =
-      (base::Time::Now() - base::Time::UnixEpoch()).InMilliseconds() / 1000;
-
-  DataReductionProxyParams::DataReductionProxyList proxies =
-      params->GetAllowedProxies();
-  for (DataReductionProxyParams::DataReductionProxyList::iterator it =
-           proxies.begin();
-       it != proxies.end(); ++it) {
-    GURL auth_origin = (*it).GetOrigin();
-
-    int32 rand[3];
-    crypto::RandBytes(rand, 3 * sizeof(rand[0]));
-
-    std::string realm =
-        base::StringPrintf("%s%lld", kAuthenticationRealmName,
-                           static_cast<long long>(timestamp));
-    std::string challenge = base::StringPrintf(
-        "%s realm=\"%s\", ps=\"%lld-%u-%u-%u\"",
-        kAuthenticationRealmName,
-        realm.data(),
-        static_cast<long long>(timestamp),
-        rand[0],
-        rand[1],
-        rand[2]);
-    base::string16 password = AuthHashForSalt(timestamp, params->key());
-
-    DVLOG(1) << "origin: [" << auth_origin << "] realm: [" << realm
-        << "] challenge: [" << challenge << "] password: [" << password << "]";
-
-    net::AuthCredentials credentials(base::string16(), password);
-    // |HttpAuthController| searches this cache by origin and path, the latter
-    // being '/' in the case of the data reduction proxy.
-    auth_cache->Add(auth_origin,
-                    realm,
-                    net::HttpAuth::AUTH_SCHEME_SPDYPROXY,
-                    challenge,
-                    credentials,
-                    std::string("/"));
-  }
-}
-
-bool DataReductionProxySettings::IsAcceptableAuthChallenge(
-    net::AuthChallengeInfo* auth_info) {
-  // Challenge realm must start with the authentication realm name.
-  std::string realm_prefix =
-      auth_info->realm.substr(0, strlen(kAuthenticationRealmName));
-  if (realm_prefix != kAuthenticationRealmName)
-    return false;
-
-  // The challenger must be one of the configured proxies.
-  DataReductionProxyParams::DataReductionProxyList proxies =
-      params_->GetAllowedProxies();
-  for (DataReductionProxyParams::DataReductionProxyList::iterator it =
-       proxies.begin();
-       it != proxies.end(); ++it) {
-    net::HostPortPair origin_host = net::HostPortPair::FromURL(*it);
-    if (origin_host.Equals(auth_info->challenger))
-      return true;
-  }
-  return false;
-}
-
-base::string16 DataReductionProxySettings::GetTokenForAuthChallenge(
-    net::AuthChallengeInfo* auth_info) {
-  if (auth_info->realm.length() > strlen(kAuthenticationRealmName)) {
-    int64 salt;
-    std::string realm_suffix =
-        auth_info->realm.substr(strlen(kAuthenticationRealmName));
-    if (base::StringToInt64(realm_suffix, &salt)) {
-      return AuthHashForSalt(salt, params_->key());
-    } else {
-      DVLOG(1) << "Unable to parse realm name " << auth_info->realm
-               << "into an int for salting.";
-      return base::string16();
-    }
-  } else {
-    return base::string16();
-  }
-}
-
 bool DataReductionProxySettings::IsDataReductionProxyEnabled() {
-  return spdy_proxy_auth_enabled_.GetValue() ||
-      DataReductionProxyParams::IsKeySetOnCommandLine();
+  return spdy_proxy_auth_enabled_.GetValue() || IsEnabledOnCommandLine();
 }
 
-bool DataReductionProxySettings::IsDataReductionProxyAlternativeEnabled() {
+bool
+DataReductionProxySettings::IsDataReductionProxyAlternativeEnabled() const {
   return data_reduction_proxy_alternative_enabled_.GetValue();
 }
 
@@ -294,6 +191,16 @@ DataReductionProxySettings::GetDailyOriginalContentLengths() {
   return GetDailyContentLengths(prefs::kDailyHttpOriginalContentLength);
 }
 
+bool DataReductionProxySettings::IsDataReductionProxyUnreachable() {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  return usage_stats_->isDataReductionProxyUnreachable();
+}
+
+void DataReductionProxySettings::SetDataReductionProxyUsageStats(
+    DataReductionProxyUsageStats* usage_stats) {
+  usage_stats_ = usage_stats;
+}
+
 DataReductionProxySettings::ContentLengthList
 DataReductionProxySettings::GetDailyReceivedContentLengths() {
   DCHECK(thread_checker_.CalledOnValidThread());
@@ -303,6 +210,13 @@ DataReductionProxySettings::GetDailyReceivedContentLengths() {
 void DataReductionProxySettings::OnURLFetchComplete(
     const net::URLFetcher* source) {
   DCHECK(thread_checker_.CalledOnValidThread());
+
+  // The purpose of sending a request for the warmup URL is to warm the
+  // connection to the data_reduction_proxy. The result is ignored.
+  if (source == warmup_fetcher_.get())
+    return;
+
+  DCHECK(source == fetcher_.get());
   net::URLRequestStatus status = source->GetStatus();
   if (status.status() == net::URLRequestStatus::FAILED &&
       status.error() == net::ERR_INTERNET_DISCONNECTED) {
@@ -398,6 +312,7 @@ void DataReductionProxySettings::OnIPAddressChanged() {
   if (enabled_by_user_) {
     DCHECK(params_->allowed());
     ProbeWhetherDataReductionProxyIsAvailable();
+    WarmProxyConnection();
   }
 }
 
@@ -450,8 +365,10 @@ void DataReductionProxySettings::MaybeActivateDataReductionProxy(
                   at_startup);
 
   // Check if the proxy has been restricted explicitly by the carrier.
-  if (enabled_by_user_)
+  if (enabled_by_user_) {
     ProbeWhetherDataReductionProxyIsAvailable();
+    WarmProxyConnection();
+  }
 }
 
 void DataReductionProxySettings::SetProxyConfigs(bool enabled,
@@ -580,25 +497,49 @@ base::string16 DataReductionProxySettings::AuthHashForSalt(
   return base::UTF8ToUTF16(base::MD5String(salted_key));
 }
 
-net::URLFetcher* DataReductionProxySettings::GetURLFetcher() {
-  DCHECK(url_request_context_getter_);
-  net::URLFetcher* fetcher = net::URLFetcher::Create(params_->probe_url(),
+net::URLFetcher* DataReductionProxySettings::GetBaseURLFetcher(
+    const GURL& gurl,
+    int load_flags) {
+
+  net::URLFetcher* fetcher = net::URLFetcher::Create(gurl,
                                                      net::URLFetcher::GET,
                                                      this);
-  fetcher->SetLoadFlags(net::LOAD_DISABLE_CACHE | net::LOAD_BYPASS_PROXY);
+  fetcher->SetLoadFlags(load_flags);
+  DCHECK(url_request_context_getter_);
   fetcher->SetRequestContext(url_request_context_getter_);
   // Configure max retries to be at most kMaxRetries times for 5xx errors.
   static const int kMaxRetries = 5;
   fetcher->SetMaxRetriesOn5xx(kMaxRetries);
+  fetcher->SetAutomaticallyRetryOnNetworkChanges(kMaxRetries);
   return fetcher;
 }
 
+
+net::URLFetcher*
+DataReductionProxySettings::GetURLFetcherForAvailabilityCheck() {
+  return GetBaseURLFetcher(params_->probe_url(),
+                           net::LOAD_DISABLE_CACHE | net::LOAD_BYPASS_PROXY);
+}
+
+
 void DataReductionProxySettings::ProbeWhetherDataReductionProxyIsAvailable() {
-  net::URLFetcher* fetcher = GetURLFetcher();
+  net::URLFetcher* fetcher = GetURLFetcherForAvailabilityCheck();
   if (!fetcher)
     return;
   fetcher_.reset(fetcher);
   fetcher_->Start();
+}
+
+net::URLFetcher* DataReductionProxySettings::GetURLFetcherForWarmup() {
+  return GetBaseURLFetcher(params_->warmup_url(), net::LOAD_DISABLE_CACHE);
+}
+
+void DataReductionProxySettings::WarmProxyConnection() {
+  net::URLFetcher* fetcher = GetURLFetcherForWarmup();
+  if (!fetcher)
+    return;
+  warmup_fetcher_.reset(fetcher);
+  warmup_fetcher_->Start();
 }
 
 }  // namespace data_reduction_proxy

@@ -16,13 +16,13 @@
 #include "chrome/renderer/extensions/app_window_custom_bindings.h"
 #include "chrome/renderer/extensions/automation_internal_custom_bindings.h"
 #include "chrome/renderer/extensions/chrome_v8_context.h"
+#include "chrome/renderer/extensions/enterprise_platform_keys_natives.h"
 #include "chrome/renderer/extensions/file_browser_handler_custom_bindings.h"
 #include "chrome/renderer/extensions/file_browser_private_custom_bindings.h"
 #include "chrome/renderer/extensions/media_galleries_custom_bindings.h"
 #include "chrome/renderer/extensions/notifications_native_handler.h"
 #include "chrome/renderer/extensions/page_actions_custom_bindings.h"
 #include "chrome/renderer/extensions/page_capture_custom_bindings.h"
-#include "chrome/renderer/extensions/pepper_request_natives.h"
 #include "chrome/renderer/extensions/sync_file_system_custom_bindings.h"
 #include "chrome/renderer/extensions/tab_finder.h"
 #include "chrome/renderer/extensions/tabs_custom_bindings.h"
@@ -50,9 +50,7 @@
 using extensions::NativeHandler;
 
 ChromeExtensionsDispatcherDelegate::ChromeExtensionsDispatcherDelegate()
-    : webrequest_adblock_(false),
-      webrequest_adblock_plus_(false),
-      webrequest_other_(false) {
+    : webrequest_used_(false) {
 }
 
 ChromeExtensionsDispatcherDelegate::~ChromeExtensionsDispatcherDelegate() {
@@ -105,6 +103,10 @@ void ChromeExtensionsDispatcherDelegate::RegisterNativeHandlers(
       scoped_ptr<NativeHandler>(
           new extensions::SyncFileSystemCustomBindings(context)));
   module_system->RegisterNativeHandler(
+      "enterprise_platform_keys_natives",
+      scoped_ptr<NativeHandler>(
+          new extensions::EnterprisePlatformKeysNatives(context)));
+  module_system->RegisterNativeHandler(
       "file_browser_handler",
       scoped_ptr<NativeHandler>(
           new extensions::FileBrowserHandlerCustomBindings(context)));
@@ -129,9 +131,6 @@ void ChromeExtensionsDispatcherDelegate::RegisterNativeHandlers(
       scoped_ptr<NativeHandler>(
           new extensions::PageCaptureCustomBindings(context)));
   module_system->RegisterNativeHandler(
-      "pepper_request_natives",
-      scoped_ptr<NativeHandler>(new extensions::PepperRequestNatives(context)));
-  module_system->RegisterNativeHandler(
       "tabs",
       scoped_ptr<NativeHandler>(new extensions::TabsCustomBindings(context)));
   module_system->RegisterNativeHandler(
@@ -151,9 +150,6 @@ void ChromeExtensionsDispatcherDelegate::RegisterNativeHandlers(
 
 void ChromeExtensionsDispatcherDelegate::PopulateSourceMap(
     extensions::ResourceBundleSourceMap* source_map) {
-  // Libraries.
-  source_map->RegisterSource("pepper_request", IDR_PEPPER_REQUEST_JS);
-
   // Custom bindings.
   source_map->RegisterSource("app", IDR_APP_CUSTOM_BINDINGS_JS);
   source_map->RegisterSource("app.window", IDR_APP_WINDOW_CUSTOM_BINDINGS_JS);
@@ -240,17 +236,17 @@ void ChromeExtensionsDispatcherDelegate::PopulateSourceMap(
 
   // Platform app sources that are not API-specific..
   source_map->RegisterSource("tagWatcher", IDR_TAG_WATCHER_JS);
-  source_map->RegisterSource("webview", IDR_WEBVIEW_CUSTOM_BINDINGS_JS);
+  source_map->RegisterSource("webViewInternal",
+                             IDR_WEB_VIEW_INTERNAL_CUSTOM_BINDINGS_JS);
   // Note: webView not webview so that this doesn't interfere with the
   // chrome.webview API bindings.
   source_map->RegisterSource("webView", IDR_WEB_VIEW_JS);
+  source_map->RegisterSource("webViewEvents", IDR_WEB_VIEW_EVENTS_JS);
   source_map->RegisterSource("webViewExperimental",
                              IDR_WEB_VIEW_EXPERIMENTAL_JS);
   source_map->RegisterSource("webViewRequest",
                              IDR_WEB_VIEW_REQUEST_CUSTOM_BINDINGS_JS);
   source_map->RegisterSource("denyWebView", IDR_WEB_VIEW_DENY_JS);
-  source_map->RegisterSource("adView", IDR_AD_VIEW_JS);
-  source_map->RegisterSource("denyAdView", IDR_AD_VIEW_DENY_JS);
   source_map->RegisterSource("injectAppTitlebar", IDR_INJECT_APP_TITLEBAR_JS);
 }
 
@@ -296,20 +292,6 @@ void ChromeExtensionsDispatcherDelegate::RequireAdditionalModules(
       }
     } else {
       module_system->Require("denyWebView");
-    }
-  }
-
-  // Same comment as above for <adview> tag.
-  if (context_type == extensions::Feature::BLESSED_EXTENSION_CONTEXT &&
-      is_within_platform_app) {
-    if (CommandLine::ForCurrentProcess()->HasSwitch(
-            ::switches::kEnableAdview)) {
-      if (extension->permissions_data()->HasAPIPermission(
-              extensions::APIPermission::kAdView)) {
-        module_system->Require("adView");
-      } else {
-        module_system->Require("denyAdView");
-      }
     }
   }
 }
@@ -370,10 +352,6 @@ void ChromeExtensionsDispatcherDelegate::UpdateTabSpecificPermissions(
 }
 
 void ChromeExtensionsDispatcherDelegate::HandleWebRequestAPIUsage(
-    bool adblock,
-    bool adblock_plus,
-    bool other) {
-  webrequest_adblock_ = adblock;
-  webrequest_adblock_plus_ = adblock_plus;
-  webrequest_other_ = other;
+    bool webrequest_used) {
+  webrequest_used_ = webrequest_used;
 }

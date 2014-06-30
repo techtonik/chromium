@@ -4,7 +4,6 @@
 
 #include "android_webview/browser/aw_browser_context.h"
 
-#include "android_webview/browser/aw_browser_permission_request_delegate.h"
 #include "android_webview/browser/aw_form_database_service.h"
 #include "android_webview/browser/aw_pref_store.h"
 #include "android_webview/browser/aw_quota_manager_bridge.h"
@@ -16,6 +15,7 @@
 #include "base/prefs/pref_service.h"
 #include "base/prefs/pref_service_factory.h"
 #include "components/autofill/core/common/autofill_pref_names.h"
+#include "components/data_reduction_proxy/browser/data_reduction_proxy_auth_request_handler.h"
 #include "components/data_reduction_proxy/browser/data_reduction_proxy_config_service.h"
 #include "components/data_reduction_proxy/browser/data_reduction_proxy_params.h"
 #include "components/data_reduction_proxy/browser/data_reduction_proxy_prefs.h"
@@ -29,6 +29,7 @@
 
 using base::FilePath;
 using content::BrowserThread;
+using data_reduction_proxy::DataReductionProxyAuthRequestHandler;
 using data_reduction_proxy::DataReductionProxySettings;
 
 namespace android_webview {
@@ -101,6 +102,9 @@ void AwBrowserContext::PreMainMessageLoopRun() {
       new DataReductionProxySettings(
           new data_reduction_proxy::DataReductionProxyParams(
               data_reduction_proxy::DataReductionProxyParams::kAllowed)));
+  data_reduction_proxy_auth_request_handler_.reset(
+      new DataReductionProxyAuthRequestHandler(
+          data_reduction_proxy_settings_->params()));
 #endif
 
   url_request_context_getter_ =
@@ -165,6 +169,11 @@ DataReductionProxySettings* AwBrowserContext::GetDataReductionProxySettings() {
   return data_reduction_proxy_settings_.get();
 }
 
+DataReductionProxyAuthRequestHandler*
+AwBrowserContext::GetDataReductionProxyAuthRequestHandler() {
+  return data_reduction_proxy_auth_request_handler_.get();
+}
+
 // Create user pref service for autofill functionality.
 void AwBrowserContext::CreateUserPrefServiceIfNecessary() {
   if (user_pref_service_)
@@ -224,55 +233,6 @@ net::URLRequestContextGetter* AwBrowserContext::GetMediaRequestContext() {
   return GetRequestContext();
 }
 
-void AwBrowserContext::RequestMidiSysExPermission(
-      int render_process_id,
-      int render_view_id,
-      int bridge_id,
-      const GURL& requesting_frame,
-      bool user_gesture,
-      const MidiSysExPermissionCallback& callback) {
-  // TODO(toyoshim): Android WebView is not supported yet.
-  // See http://crbug.com/339767.
-  callback.Run(false);
-}
-
-void AwBrowserContext::CancelMidiSysExPermissionRequest(
-    int render_process_id,
-    int render_view_id,
-    int bridge_id,
-    const GURL& requesting_frame) {
-}
-
-void AwBrowserContext::RequestProtectedMediaIdentifierPermission(
-    int render_process_id,
-    int render_view_id,
-    const GURL& origin,
-    const ProtectedMediaIdentifierPermissionCallback& callback) {
-  AwBrowserPermissionRequestDelegate* delegate =
-      AwBrowserPermissionRequestDelegate::FromID(render_process_id,
-                                                 render_view_id);
-  if (delegate == NULL) {
-    DVLOG(0) << "Dropping ProtectedMediaIdentifierPermission request";
-    callback.Run(false);
-    return;
-  }
-  delegate->RequestProtectedMediaIdentifierPermission(origin, callback);
-}
-
-void AwBrowserContext::CancelProtectedMediaIdentifierPermissionRequests(
-    int render_process_id,
-    int render_view_id,
-    const GURL& origin) {
-  AwBrowserPermissionRequestDelegate* delegate =
-      AwBrowserPermissionRequestDelegate::FromID(render_process_id,
-                                                 render_view_id);
-  if (delegate == NULL) {
-    DVLOG(0) << "Dropping ProtectedMediaIdentifierPermission cancel";
-    return;
-  }
-  delegate->CancelProtectedMediaIdentifierPermissionRequests(origin);
-}
-
 net::URLRequestContextGetter*
 AwBrowserContext::GetMediaRequestContextForRenderProcess(
     int renderer_child_id) {
@@ -300,21 +260,17 @@ AwBrowserContext::GetDownloadManagerDelegate() {
   return &download_manager_delegate_;
 }
 
-content::GeolocationPermissionContext*
-AwBrowserContext::GetGeolocationPermissionContext() {
-  if (!geolocation_permission_context_.get()) {
-    geolocation_permission_context_ =
-        native_factory_->CreateGeolocationPermission(this);
-  }
-  return geolocation_permission_context_.get();
-}
-
 content::BrowserPluginGuestManager* AwBrowserContext::GetGuestManager() {
   return NULL;
 }
 
 quota::SpecialStoragePolicy* AwBrowserContext::GetSpecialStoragePolicy() {
   // Intentionally returning NULL as 'Extensions' and 'Apps' not supported.
+  return NULL;
+}
+
+content::PushMessagingService* AwBrowserContext::GetPushMessagingService() {
+  // TODO(johnme): Support push messaging in WebView.
   return NULL;
 }
 

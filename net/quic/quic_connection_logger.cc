@@ -102,10 +102,6 @@ base::Value* NetLogQuicStreamFrameCallback(const QuicStreamFrame* frame,
 base::Value* NetLogQuicAckFrameCallback(const QuicAckFrame* frame,
                                         NetLog::LogLevel /* log_level */) {
   base::DictionaryValue* dict = new base::DictionaryValue();
-  base::DictionaryValue* sent_info = new base::DictionaryValue();
-  dict->Set("sent_info", sent_info);
-  sent_info->SetString("least_unacked",
-                       base::Uint64ToString(frame->sent_info.least_unacked));
   base::DictionaryValue* received_info = new base::DictionaryValue();
   dict->Set("received_info", received_info);
   received_info->SetString(
@@ -192,6 +188,16 @@ base::Value* NetLogQuicBlockedFrameCallback(
     NetLog::LogLevel /* log_level */) {
   base::DictionaryValue* dict = new base::DictionaryValue();
   dict->SetInteger("stream_id", frame->stream_id);
+  return dict;
+}
+
+base::Value* NetLogQuicGoAwayFrameCallback(
+    const QuicGoAwayFrame* frame,
+    NetLog::LogLevel /* log_level */) {
+  base::DictionaryValue* dict = new base::DictionaryValue();
+  dict->SetInteger("quic_error", frame->error_code);
+  dict->SetInteger("last_good_stream_id", frame->last_good_stream_id);
+  dict->SetString("reason_phrase", frame->reason_phrase);
   return dict;
 }
 
@@ -386,6 +392,10 @@ void QuicConnectionLogger::OnFrameAddedToPacket(const QuicFrame& frame) {
                      frame.connection_close_frame));
       break;
     case GOAWAY_FRAME:
+      net_log_.AddEvent(
+          NetLog::TYPE_QUIC_SESSION_GOAWAY_FRAME_SENT,
+          base::Bind(&NetLogQuicGoAwayFrameCallback,
+                     frame.goaway_frame));
       break;
     case WINDOW_UPDATE_FRAME:
       net_log_.AddEvent(
@@ -404,6 +414,10 @@ void QuicConnectionLogger::OnFrameAddedToPacket(const QuicFrame& frame) {
           NetLog::TYPE_QUIC_SESSION_STOP_WAITING_FRAME_SENT,
           base::Bind(&NetLogQuicStopWaitingFrameCallback,
                      frame.stop_waiting_frame));
+      break;
+    case PING_FRAME:
+      // PingFrame has no contents to log, so just record that it was sent.
+      net_log_.AddEvent(NetLog::TYPE_QUIC_SESSION_PING_FRAME_SENT);
       break;
     default:
       DCHECK(false) << "Illegal frame type: " << frame.type;
@@ -563,6 +577,30 @@ void QuicConnectionLogger::OnConnectionCloseFrame(
   net_log_.AddEvent(
       NetLog::TYPE_QUIC_SESSION_CONNECTION_CLOSE_FRAME_RECEIVED,
       base::Bind(&NetLogQuicConnectionCloseFrameCallback, &frame));
+}
+
+void QuicConnectionLogger::OnWindowUpdateFrame(
+    const QuicWindowUpdateFrame& frame) {
+  net_log_.AddEvent(
+      NetLog::TYPE_QUIC_SESSION_WINDOW_UPDATE_FRAME_RECEIVED,
+      base::Bind(&NetLogQuicWindowUpdateFrameCallback, &frame));
+}
+
+void QuicConnectionLogger::OnBlockedFrame(const QuicBlockedFrame& frame) {
+  net_log_.AddEvent(
+      NetLog::TYPE_QUIC_SESSION_BLOCKED_FRAME_RECEIVED,
+      base::Bind(&NetLogQuicBlockedFrameCallback, &frame));
+}
+
+void QuicConnectionLogger::OnGoAwayFrame(const QuicGoAwayFrame& frame) {
+  net_log_.AddEvent(
+      NetLog::TYPE_QUIC_SESSION_GOAWAY_FRAME_RECEIVED,
+      base::Bind(&NetLogQuicGoAwayFrameCallback, &frame));
+}
+
+void QuicConnectionLogger::OnPingFrame(const QuicPingFrame& frame) {
+  // PingFrame has no contents to log, so just record that it was received.
+  net_log_.AddEvent(NetLog::TYPE_QUIC_SESSION_PING_FRAME_RECEIVED);
 }
 
 void QuicConnectionLogger::OnPublicResetPacket(

@@ -8,7 +8,7 @@
 #include "base/basictypes.h"
 #include "ui/app_list/app_list_model_observer.h"
 #include "ui/app_list/app_list_view_delegate_observer.h"
-#include "ui/views/controls/button/button.h"
+#include "ui/app_list/views/search_box_view_delegate.h"
 #include "ui/views/view.h"
 
 namespace app_list {
@@ -16,11 +16,12 @@ namespace app_list {
 class AppListMainView;
 class AppListModel;
 class AppListViewDelegate;
+class SearchResultListView;
 class TileItemView;
 
 // The start page for the experimental app list.
 class StartPageView : public views::View,
-                      public views::ButtonListener,
+                      public SearchBoxViewDelegate,
                       public AppListViewDelegateObserver,
                       public AppListModelObserver {
  public:
@@ -29,15 +30,31 @@ class StartPageView : public views::View,
   virtual ~StartPageView();
 
   void Reset();
+  void ShowSearchResults();
+
+  bool IsShowingSearchResults() const;
 
   const std::vector<TileItemView*>& tile_views() const { return tile_views_; }
+  SearchBoxView* dummy_search_box_view() { return search_box_view_; }
+
+  // Overridden from views::View:
+  virtual bool OnKeyPressed(const ui::KeyEvent& event) OVERRIDE;
+  virtual void Layout() OVERRIDE;
 
  private:
+  enum ShowState {
+    SHOW_START_PAGE,
+    SHOW_SEARCH_RESULTS,
+  };
+
+  void InitInstantContainer();
+  void InitTilesContainer();
+
+  void SetShowState(ShowState show_state);
   void SetModel(AppListModel* model);
 
-  // Overridden from views::ButtonListener:
-  virtual void ButtonPressed(views::Button* sender,
-                             const ui::Event& event) OVERRIDE;
+  // Overridden from SearchBoxViewDelegate:
+  virtual void QueryChanged(SearchBoxView* sender) OVERRIDE;
 
   // Overridden from AppListViewDelegateObserver:
   virtual void OnProfilesChanged() OVERRIDE;
@@ -55,10 +72,14 @@ class StartPageView : public views::View,
 
   AppListViewDelegate* view_delegate_;  // Owned by AppListView.
 
+  SearchBoxView* search_box_view_;      // Owned by views hierarchy.
+  SearchResultListView* results_view_;  // Owned by views hierarchy.
   views::View* instant_container_;  // Owned by views hierarchy.
   views::View* tiles_container_;    // Owned by views hierarchy.
 
   std::vector<TileItemView*> tile_views_;
+
+  ShowState show_state_;
 
   DISALLOW_COPY_AND_ASSIGN(StartPageView);
 };

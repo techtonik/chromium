@@ -5,8 +5,8 @@
 #ifndef MOJO_SERVICES_VIEW_MANAGER_IDS_H_
 #define MOJO_SERVICES_VIEW_MANAGER_IDS_H_
 
+#include "mojo/services/public/cpp/view_manager/types.h"
 #include "mojo/services/public/cpp/view_manager/util.h"
-#include "mojo/services/public/cpp/view_manager/view_manager_types.h"
 #include "mojo/services/view_manager/view_manager_export.h"
 
 namespace mojo {
@@ -15,6 +15,10 @@ namespace service {
 
 // Connection id reserved for the root.
 const ConnectionSpecificId kRootConnection = 0;
+
+// TODO(sky): remove this, temporary while window manager API is in existing
+// api.
+const ConnectionSpecificId kWindowManagerConnection = 1;
 
 // Adds a bit of type safety to node ids.
 struct MOJO_VIEW_MANAGER_EXPORT NodeId {
