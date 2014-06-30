@@ -47,6 +47,23 @@ function waitForElement(appWindow, query) {
 }
 
 /**
+ * Waits until an element disappears.
+ *
+ * @param {AppWindow} appWindow Application window.
+ * @param {string} query Query for the element.
+ * @return {Promise} Promise to be fulfilled with the element.
+ */
+function waitForElementLost(appWindow, query) {
+  return repeatUntil(function() {
+    var element = appWindow.contentWindow.document.querySelector(query);
+    if (element)
+      return pending('The element %s does not disappear.', query);
+    else
+      return true;
+  });
+}
+
+/**
  * Launches the Gallery app with the test entries.
  *
  * @param {string} testVolumeName Test volume name passed to the addEntries
@@ -66,8 +83,65 @@ function launchWithTestEntries(
         selectedEntries.map(function(entry) { return entry.nameText; }));
   });
   return launch(entriesPromise).then(function() {
-    return appWindowPromise.then(function(appWindow) {
-      return {appWindow: appWindow, entries: entries};
+    var launchedPromise = Promise.all([appWindowPromise, entriesPromise]);
+    return launchedPromise.then(function(results) {
+      return {appWindow: results[0], entries: results[1]};
     });
   });
+}
+
+/**
+ * Waits until the expected image is shown.
+ *
+ * @param {document} document Document.
+ * @param {number} width Expected width of the image.
+ * @param {number} height Expected height of the image.
+ * @param {string} name Expected name of the image.
+ * @return {Promise} Promsie to be fulfilled when the check is passed.
+ */
+function waitForSlideImage(document, width, height, name) {
+  var expected = {width: width, height: height, name: name};
+  return repeatUntil(function() {
+    var fullResCanvas = document.querySelector(
+        '.gallery[mode="slide"] .content canvas.fullres');
+    var nameBox = document.querySelector('.namebox');
+    var actual = {
+      width: fullResCanvas && fullResCanvas.width,
+      height: fullResCanvas && fullResCanvas.height,
+      name: nameBox && nameBox.value
+    };
+    if (!chrome.test.checkDeepEq(expected, actual)) {
+      return pending('Slide mode state, expected is %j, actual is %j.',
+                     expected, actual);
+    }
+    return actual;
+  });
+}
+
+/**
+ * Shorthand for clicking an element.
+ * @param {AppWindow} appWindow Application window.
+ * @param {string} query Query for the element.
+ * @param {Promise} Promise to be fulfilled with the clicked element.
+ */
+function waitAndClickElement(appWindow, query) {
+  return waitForElement(appWindow, query).then(function(element) {
+    element.click();
+    return element;
+  });
+}
+
+/**
+ * Sends a fake key down event.
+ *
+ * @param {AppWindow} appWindow Application window.
+ * @param {string} query Query for the element to be dispatched an event to.
+ * @param {string} keyIdentifier Key identifier.
+ * @return {boolean} True on success.
+ */
+function sendKeyDown(appWindow, query, keyIdentifier) {
+  return appWindow.contentWindow.document.querySelector(query).dispatchEvent(
+      new KeyboardEvent(
+          'keydown',
+          {bubbles: true, keyIdentifier: keyIdentifier}));
 }

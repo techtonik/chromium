@@ -373,7 +373,7 @@ class BrowserWindow : public ui::BaseWindow {
     AVATAR_BUBBLE_MODE_REAUTH,
   };
   virtual void ShowAvatarBubbleFromAvatarButton(AvatarBubbleMode mode,
-      signin::GAIAServiceType service_type) = 0;
+      const signin::ManageAccountsParams& manage_accounts_params) = 0;
 
   // Show bubble for password generation positioned relative to |rect|. The
   // subclasses implementing this interface do not own the |password_generator|

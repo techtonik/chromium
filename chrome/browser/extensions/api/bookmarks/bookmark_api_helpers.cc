@@ -106,11 +106,11 @@ void AddNodeFoldersOnly(ChromeBookmarkClient* client,
   return AddNodeHelper(client, node, nodes, recurse, true);
 }
 
-bool RemoveNode(ChromeBookmarkClient* client,
+bool RemoveNode(BookmarkModel* model,
+                ChromeBookmarkClient* client,
                 int64 id,
                 bool recursive,
                 std::string* error) {
-  BookmarkModel* model = client->model();
   const BookmarkNode* node = GetBookmarkNodeByID(model, id);
   if (!node) {
     *error = keys::kNoNodeError;
@@ -132,6 +132,28 @@ bool RemoveNode(ChromeBookmarkClient* client,
   const BookmarkNode* parent = node->parent();
   model->Remove(parent, parent->GetIndexOf(node));
   return true;
+}
+
+void GetMetaInfo(const BookmarkNode& node,
+                 base::DictionaryValue* id_to_meta_info_map) {
+  if (!node.IsVisible())
+    return;
+
+  const BookmarkNode::MetaInfoMap* meta_info = node.GetMetaInfoMap();
+  base::DictionaryValue* value = new base::DictionaryValue();
+  if (meta_info) {
+    BookmarkNode::MetaInfoMap::const_iterator itr;
+    for (itr = meta_info->begin(); itr != meta_info->end(); ++itr) {
+      value->SetStringWithoutPathExpansion(itr->first, itr->second);
+    }
+  }
+  id_to_meta_info_map->Set(base::Int64ToString(node.id()), value);
+
+  if (node.is_folder()) {
+    for (int i = 0; i < node.child_count(); ++i) {
+      GetMetaInfo(*(node.GetChild(i)), id_to_meta_info_map);
+    }
+  }
 }
 
 }  // namespace bookmark_api_helpers

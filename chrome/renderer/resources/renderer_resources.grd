@@ -30,8 +30,6 @@
       <!-- Extension libraries. -->
       <if expr="enable_extensions">
         <!-- Custom bindings for extension APIs. -->
-        <include name="IDR_AD_VIEW_DENY_JS" file="extensions\ad_view_deny.js" type="BINDATA" />
-        <include name="IDR_AD_VIEW_JS" file="extensions\ad_view.js" type="BINDATA" />
         <include name="IDR_APP_CUSTOM_BINDINGS_JS" file="extensions\app_custom_bindings.js" type="BINDATA" />
         <include name="IDR_APP_WINDOW_CUSTOM_BINDINGS_JS" file="extensions\app_window_custom_bindings.js" type="BINDATA" />
         <include name="IDR_AUTOMATION_CUSTOM_BINDINGS_JS" file="extensions\automation_custom_bindings.js" type="BINDATA" />
@@ -72,7 +70,6 @@
         <include name="IDR_PAGE_ACTIONS_CUSTOM_BINDINGS_JS" file="extensions\page_actions_custom_bindings.js" type="BINDATA" />
         <include name="IDR_PAGE_ACTION_CUSTOM_BINDINGS_JS" file="extensions\page_action_custom_bindings.js" type="BINDATA" />
         <include name="IDR_PAGE_CAPTURE_CUSTOM_BINDINGS_JS" file="extensions\page_capture_custom_bindings.js" type="BINDATA" />
-        <include name="IDR_PEPPER_REQUEST_JS" file="extensions\pepper_request.js" type="BINDATA" />
         <include name="IDR_SYNC_FILE_SYSTEM_CUSTOM_BINDINGS_JS" file="extensions\sync_file_system_custom_bindings.js" type="BINDATA" />
         <include name="IDR_SYSTEM_INDICATOR_CUSTOM_BINDINGS_JS" file="extensions\system_indicator_custom_bindings.js" type="BINDATA" />
         <include name="IDR_TAB_CAPTURE_CUSTOM_BINDINGS_JS" file="extensions\tab_capture_custom_bindings.js" type="BINDATA" />
@@ -86,10 +83,11 @@
         <include name="IDR_WEB_REQUEST_INTERNAL_CUSTOM_BINDINGS_JS" file="extensions\web_request_internal_custom_bindings.js" type="BINDATA" />
         <include name="IDR_WEBSTORE_CUSTOM_BINDINGS_JS" file="extensions\webstore_custom_bindings.js" type="BINDATA" />
         <include name="IDR_WEB_VIEW_DENY_JS" file="extensions\web_view_deny.js" type="BINDATA" />
+        <include name="IDR_WEB_VIEW_EVENTS_JS" file="extensions\web_view_events.js" type="BINDATA" />
         <include name="IDR_WEB_VIEW_EXPERIMENTAL_JS" file="extensions\web_view_experimental.js" type="BINDATA" />
+        <include name="IDR_WEB_VIEW_INTERNAL_CUSTOM_BINDINGS_JS" file="extensions\web_view_internal_custom_bindings.js" type="BINDATA" />
         <include name="IDR_WEB_VIEW_JS" file="extensions\web_view.js" type="BINDATA" />
-        <include name="IDR_WEBVIEW_CUSTOM_BINDINGS_JS" file="extensions\webview_custom_bindings.js" type="BINDATA" />
-        <include name="IDR_WEB_VIEW_REQUEST_CUSTOM_BINDINGS_JS" file="extensions\webview_request_custom_bindings.js" type="BINDATA" />
+        <include name="IDR_WEB_VIEW_REQUEST_CUSTOM_BINDINGS_JS" file="extensions\web_view_request_custom_bindings.js" type="BINDATA" />
 
         <!-- Platform app support. -->
         <include name="IDR_INJECT_APP_TITLEBAR_JS" file="extensions\inject_app_titlebar.js" type="BINDATA" />

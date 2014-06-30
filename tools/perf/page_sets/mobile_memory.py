@@ -32,7 +32,7 @@ class GmailPage(MobileMemoryPage):
   def ReloadAndGc(self, action_runner):
     action_runner.RunAction(ReloadAction())
     action_runner.Wait(15)
-    action_runner.RunAction(JsCollectGarbageAction())
+    action_runner.ForceGarbageCollection()
 
   def RunStressMemory(self, action_runner):
     for _ in xrange(3):
@@ -49,13 +49,25 @@ class GoogleSearchPage(MobileMemoryPage):
         page_set=page_set)
 
   def RunStressMemory(self, action_runner):
-    action_runner.RunAction(ScrollAction())
+    interaction = action_runner.BeginGestureInteraction(
+        'ScrollAction', is_smooth=True)
+    action_runner.ScrollPage()
+    interaction.End()
     action_runner.Wait(3)
-    action_runner.RunAction(ScrollAction())
+    interaction = action_runner.BeginGestureInteraction(
+        'ScrollAction', is_smooth=True)
+    action_runner.ScrollPage()
+    interaction.End()
     action_runner.Wait(3)
-    action_runner.RunAction(ScrollAction())
+    interaction = action_runner.BeginGestureInteraction(
+        'ScrollAction', is_smooth=True)
+    action_runner.ScrollPage()
+    interaction.End()
     action_runner.Wait(3)
-    action_runner.RunAction(ScrollAction())
+    interaction = action_runner.BeginGestureInteraction(
+        'ScrollAction', is_smooth=True)
+    action_runner.ScrollPage()
+    interaction.End()
     action_runner.WaitForJavaScriptCondition(
         'document.getElementById("rg_s").childElementCount > 300')
 
@@ -66,7 +78,10 @@ class ScrollPage(MobileMemoryPage):
     super(ScrollPage, self).__init__(url=url, page_set=page_set)
 
   def RunStressMemory(self, action_runner):
-    action_runner.RunAction(ScrollAction())
+    interaction = action_runner.BeginGestureInteraction(
+        'ScrollAction', is_smooth=True)
+    action_runner.ScrollPage()
+    interaction.End()
 
 
 class MobileMemoryPageSet(page_set_module.PageSet):
@@ -77,7 +92,8 @@ class MobileMemoryPageSet(page_set_module.PageSet):
     super(MobileMemoryPageSet, self).__init__(
         credentials_path='data/credentials.json',
         user_agent_type='mobile',
-        archive_data_file='data/mobile_memory.json')
+        archive_data_file='data/mobile_memory.json',
+        bucket=page_set_module.PARTNER_BUCKET)
 
     self.AddPage(GmailPage(self))
     self.AddPage(GoogleSearchPage(self))

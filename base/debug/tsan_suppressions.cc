@@ -251,12 +251,10 @@ char kTSanDefaultSuppressions[] =
 
 // http://crbug.com/348984
 "race:sctp_express_handle_sack\n"
+"race:system_base_info\n"
 
 // http://crbug.com/350982
 "race:libvpx/vp9/decoder/vp9_thread.c\n"
-
-// http://crbug.com/361790
-"race:workerGlobalScopeDestroyed\n"
 
 // http://crbug.com/363999
 "race:v8::internal::EnterDebugger::*EnterDebugger\n"
@@ -284,14 +282,24 @@ char kTSanDefaultSuppressions[] =
 
 // http://crbug.com/374135
 "race:media::AlsaWrapper::PcmWritei\n"
-"deadlock:media::AudioOutputDispatcherImpl::StopStream\n"
-"deadlock:media::AudioStreamHandler::AudioStreamContainer::OnMoreData\n"
 
 // False positive in libc's tzset_internal, http://crbug.com/379738.
 "race:tzset_internal\n"
 
 // http://crbug.com/380554
 "deadlock:g_type_add_interface_static\n"
+
+// http:://crbug.com/386385
+"race:content::AppCacheStorageImpl::DatabaseTask::CallRunCompleted\n"
+
+// http://crbug.com/388730
+"race:g_next_user_script_id\n"
+
+// http://crbug.com/389098
+"race:webrtc::RtpToNtpMs\n"
+"race:webrtc::UpdateRtcpList\n"
+"race:webrtc::RemoteNtpTimeEstimator::Estimate\n"
+"race:webrtc::voe::TransmitMixer::EnableStereoChannelSwapping\n"
 
 // End of suppressions.
 ;  // Please keep this semicolon.

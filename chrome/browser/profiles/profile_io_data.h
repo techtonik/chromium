@@ -5,6 +5,7 @@
 #ifndef CHROME_BROWSER_PROFILES_PROFILE_IO_DATA_H_
 #define CHROME_BROWSER_PROFILES_PROFILE_IO_DATA_H_
 
+#include <map>
 #include <string>
 
 #include "base/basictypes.h"
@@ -21,6 +22,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/storage_partition_descriptor.h"
 #include "chrome/common/content_settings_types.h"
+#include "components/data_reduction_proxy/browser/data_reduction_proxy_usage_stats.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/resource_context.h"
 #include "net/cookies/cookie_monster.h"
@@ -33,10 +35,10 @@ class ChromeNetworkDelegate;
 class CookieSettings;
 class DevToolsNetworkController;
 class HostContentSettingsMap;
-class ManagedModeURLFilter;
 class MediaDeviceIDSalt;
 class ProtocolHandlerRegistry;
 class SigninNamesOnIOThread;
+class SupervisedUserURLFilter;
 
 namespace extensions {
 class InfoMap;
@@ -168,6 +170,10 @@ class ProfileIOData {
     return &safe_browsing_enabled_;
   }
 
+  BooleanPrefMember* data_reduction_proxy_enabled() const {
+    return &data_reduction_proxy_enabled_;
+  }
+
   BooleanPrefMember* printing_enabled() const {
     return &printing_enabled_;
   }
@@ -180,8 +186,13 @@ class ProfileIOData {
     return &signin_allowed_;
   }
 
+  // TODO(bnc): remove per https://crbug.com/334602.
   BooleanPrefMember* network_prediction_enabled() const {
     return &network_prediction_enabled_;
+  }
+
+  IntegerPrefMember* network_prediction_options() const {
+    return &network_prediction_options_;
   }
 
   content::ResourceContext::SaltCallback GetMediaDeviceIDSalt() const;
@@ -217,8 +228,8 @@ class ProfileIOData {
 #endif
 
 #if defined(ENABLE_MANAGED_USERS)
-  const ManagedModeURLFilter* managed_mode_url_filter() const {
-    return managed_mode_url_filter_.get();
+  const SupervisedUserURLFilter* supervised_user_url_filter() const {
+    return supervised_user_url_filter_.get();
   }
 #endif
 
@@ -298,7 +309,7 @@ class ProfileIOData {
     scoped_ptr<net::ProxyConfigService> proxy_config_service;
 
 #if defined(ENABLE_MANAGED_USERS)
-    scoped_refptr<const ManagedModeURLFilter> managed_mode_url_filter;
+    scoped_refptr<const SupervisedUserURLFilter> supervised_user_url_filter;
 #endif
 
 #if defined(OS_CHROMEOS)
@@ -319,6 +330,15 @@ class ProfileIOData {
 
   void InitializeOnUIThread(Profile* profile);
   void ApplyProfileParamsToContext(ChromeURLRequestContext* context) const;
+
+#if defined(OS_ANDROID)
+#if defined(SPDY_PROXY_AUTH_ORIGIN)
+  void SetDataReductionProxyUsageStatsOnIOThread(IOThread* io_thread,
+                                                 Profile* profile);
+  void SetDataReductionProxyUsageStatsOnUIThread(Profile* profile,
+      data_reduction_proxy::DataReductionProxyUsageStats* usage_stats);
+#endif
+#endif
 
   scoped_ptr<net::URLRequestJobFactory> SetUpJobFactoryDefaults(
       scoped_ptr<net::URLRequestJobFactoryImpl> job_factory,
@@ -514,10 +534,12 @@ class ProfileIOData {
   mutable BooleanPrefMember enable_do_not_track_;
   mutable BooleanPrefMember force_safesearch_;
   mutable BooleanPrefMember safe_browsing_enabled_;
+  mutable BooleanPrefMember data_reduction_proxy_enabled_;
   mutable BooleanPrefMember printing_enabled_;
   mutable BooleanPrefMember sync_disabled_;
   mutable BooleanPrefMember signin_allowed_;
   mutable BooleanPrefMember network_prediction_enabled_;
+  mutable IntegerPrefMember network_prediction_options_;
   // TODO(marja): Remove session_startup_pref_ if no longer needed.
   mutable IntegerPrefMember session_startup_pref_;
   mutable BooleanPrefMember quick_check_enabled_;
@@ -574,7 +596,8 @@ class ProfileIOData {
       chrome_http_user_agent_settings_;
 
 #if defined(ENABLE_MANAGED_USERS)
-  mutable scoped_refptr<const ManagedModeURLFilter> managed_mode_url_filter_;
+  mutable scoped_refptr<const SupervisedUserURLFilter>
+      supervised_user_url_filter_;
 #endif
 
   mutable scoped_ptr<DevToolsNetworkController> network_controller_;

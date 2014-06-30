@@ -15,6 +15,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/scoped_vector.h"
 #include "base/memory/weak_ptr.h"
+#include "base/task/cancelable_task_tracker.h"
 #include "base/threading/non_thread_safe.h"
 #include "base/time/time.h"
 #include "base/timer/timer.h"
@@ -319,10 +320,9 @@ class PrerenderManager : public base::SupportsWeakPtr<PrerenderManager>,
 
   void OnHistoryServiceDidQueryURL(Origin origin,
                                    uint8 experiment_id,
-                                   CancelableRequestProvider::Handle handle,
                                    bool success,
-                                   const history::URLRow* url_row,
-                                   history::VisitVector* visits);
+                                   const history::URLRow& url_row,
+                                   const history::VisitVector& visits);
 
   Profile* profile() const { return profile_; }
 
@@ -359,6 +359,9 @@ class PrerenderManager : public base::SupportsWeakPtr<PrerenderManager>,
   // Notification that a prerender has completed and its bytes should be
   // recorded.
   void RecordNetworkBytes(Origin origin, bool used, int64 prerender_bytes);
+
+  // Returns whether prerendering is currently enabled for this manager.
+  bool IsEnabled() const;
 
   // Add to the running tally of bytes transferred over the network for this
   // profile if prerendering is currently enabled.
@@ -660,9 +663,6 @@ class PrerenderManager : public base::SupportsWeakPtr<PrerenderManager>,
       const GURL& url, Origin origin, uint8 experiment_id,
       FinalStatus final_status) const;
 
-  // Returns whether prerendering is currently enabled for this manager.
-  // Must be called on the UI thread.
-  bool IsEnabled() const;
 
   void CookieChanged(ChromeCookieDetails* details);
   void CookieChangedAnyCookiesLeftLookupResult(const std::string& domain_key,
@@ -742,7 +742,7 @@ class PrerenderManager : public base::SupportsWeakPtr<PrerenderManager>,
 
   content::NotificationRegistrar notification_registrar_;
 
-  CancelableRequestConsumer query_url_consumer_;
+  base::CancelableTaskTracker query_url_tracker_;
 
   // The number of bytes transferred over the network for the profile this
   // PrerenderManager is attached to.

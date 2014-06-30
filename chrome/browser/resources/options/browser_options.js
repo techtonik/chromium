@@ -86,6 +86,12 @@ cr.define('options', function() {
 
       if (loadTimeData.getBoolean('allowAdvancedSettings')) {
         $('advanced-settings-expander').onclick = function() {
+          var showAdvanced =
+              BrowserOptions.shouldShowSection_($('advanced-settings'));
+          if (showAdvanced) {
+            chrome.send('coreOptionsUserMetricsAction',
+                        ['Options_ShowAdvancedSettings']);
+          }
           self.toggleSectionWithAnimation_(
               $('advanced-settings'),
               $('advanced-settings-container'));
@@ -94,7 +100,7 @@ cr.define('options', function() {
           // and it was used to show the section (rather than hiding it), focus
           // the first element in the container.
           if (document.activeElement === $('advanced-settings-expander') &&
-                  $('advanced-settings').style.height === '') {
+              showAdvanced) {
             var focusElement = $('advanced-settings-container').querySelector(
                 'button, input, list, select, a[href]');
             if (focusElement)
@@ -123,7 +129,7 @@ cr.define('options', function() {
           if (self.signoutAllowed_)
             SyncSetupOverlay.showStopSyncingUI();
           else
-            ManageProfileOverlay.showDisconnectManagedProfileDialog();
+            chrome.send('showDisconnectManagedProfileDialog');
         } else if (cr.isChromeOS) {
           SyncSetupOverlay.showSetupUI();
         } else {
@@ -177,10 +183,10 @@ cr.define('options', function() {
                     ['Options_Homepage_ShowSettings']);
       };
 
-      chrome.send('requestHotwordAvailable');
       var hotwordIndicator = $('hotword-search-setting-indicator');
       HotwordSearchSettingIndicator.decorate(hotwordIndicator);
       hotwordIndicator.disabledOnErrorSection = $('hotword-search-enable');
+      chrome.send('requestHotwordAvailable');
 
       if ($('set-wallpaper')) {
         $('set-wallpaper').onclick = function(event) {
@@ -410,12 +416,15 @@ cr.define('options', function() {
         };
       }
 
-      // Security section.
+      // Device control section.
       if (cr.isChromeOS &&
           loadTimeData.getBoolean('consumerManagementEnabled')) {
-        $('security-section').hidden = false;
-        $('consumer-management-enroll-button').onclick = function(event) {
-          chrome.send('enrollConsumerManagement');
+        $('device-control-section').hidden = false;
+
+        $('consumer-management-section').onclick = function(event) {
+          // If either button is clicked.
+          if (event.target.tagName == 'BUTTON')
+            OptionsPage.navigateToPage('consumer-management-overlay');
         };
       }
 
@@ -496,17 +505,24 @@ cr.define('options', function() {
         Preferences.getInstance().addEventListener(
             'settings.accessibility',
             updateAccessibilitySettingsButton);
-        $('accessibility-settings-button').onclick = function(event) {
+        $('accessibility-learn-more').onclick = function(unused_event) {
+          window.open(loadTimeData.getString('accessibilityLearnMoreURL'));
+          chrome.send('coreOptionsUserMetricsAction',
+                      ['Options_AccessibilityLearnMore']);
+        };
+        $('accessibility-settings-button').onclick = function(unused_event) {
           window.open(loadTimeData.getString('accessibilitySettingsURL'));
         };
-        $('accessibility-spoken-feedback-check').onchange = function(event) {
+        $('accessibility-spoken-feedback-check').onchange = function(
+            unused_event) {
           chrome.send('spokenFeedbackChange',
                       [$('accessibility-spoken-feedback-check').checked]);
           updateAccessibilitySettingsButton();
         };
         updateAccessibilitySettingsButton();
 
-        $('accessibility-high-contrast-check').onchange = function(event) {
+        $('accessibility-high-contrast-check').onchange = function(
+            unused_event) {
           chrome.send('highContrastChange',
                       [$('accessibility-high-contrast-check').checked]);
         };
@@ -898,8 +914,10 @@ cr.define('options', function() {
       else
         $('start-stop-sync-indicator').removeAttribute('controlled-by');
 
-      // Hide the "sign in" button on Chrome OS, and show it on desktop Chrome.
-      signInButton.hidden = cr.isChromeOS;
+      // Hide the "sign in" button on Chrome OS, and show it on desktop Chrome
+      // (except for supervised users, which can't change their signed-in
+      // status).
+      signInButton.hidden = cr.isChromeOS || syncData.supervisedUser;
 
       signInButton.textContent =
           this.signedIn_ ?
@@ -996,14 +1014,15 @@ cr.define('options', function() {
 
     /**
      * Activates the Hotword section from the System settings page.
+     * @param {boolean} opt_enabled Current preference state for hotwording.
      * @param {string} opt_error The error message to display.
-     * @param {string} opt_help_link The link to a troubleshooting page.
      * @private
      */
-    showHotwordSection_: function(opt_error, opt_help_link) {
+    showHotwordSection_: function(opt_enabled, opt_error) {
       $('hotword-search').hidden = false;
-      $('hotword-search-setting-indicator').errorText = opt_error;
-      $('hotword-search-setting-indicator').helpLink = opt_help_link;
+      $('hotword-search-setting-indicator').setError(opt_error);
+      if (opt_enabled && opt_error)
+        $('hotword-search-setting-indicator').updateBasedOnError();
     },
 
     /**
@@ -1800,6 +1819,7 @@ cr.define('options', function() {
     'setAutoOpenFileTypesDisplayed',
     'setBluetoothState',
     'setCanSetTime',
+    'setConsumerManagementEnrollmentStatus',
     'setFontSize',
     'setNativeThemeButtonEnabled',
     'setHighContrastCheckboxState',
@@ -1844,6 +1864,17 @@ cr.define('options', function() {
     // TODO(jhawkins): Investigate the use case for this method.
     BrowserOptions.getLoggedInUsername = function() {
       return BrowserOptions.getInstance().username_;
+    };
+
+    /**
+     * Shows enroll or unenroll button based on the enrollment status.
+     * @param {boolean} isEnrolled Whether the device is enrolled.
+     */
+    BrowserOptions.setConsumerManagementEnrollmentStatus =
+        function(isEnrolled) {
+      $('consumer-management-enroll').hidden = isEnrolled;
+      $('consumer-management-unenroll').hidden = !isEnrolled;
+      ConsumerManagementOverlay.setEnrollmentStatus(isEnrolled);
     };
   }
 

@@ -10,20 +10,22 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
 #include "chrome/browser/invalidation/fake_invalidation_service.h"
-#include "chrome/browser/invalidation/invalidation_service_factory.h"
+#include "chrome/browser/invalidation/profile_invalidation_provider_factory.h"
 #include "chrome/browser/signin/fake_profile_oauth2_token_service.h"
 #include "chrome/browser/signin/fake_profile_oauth2_token_service_builder.h"
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/sync/glue/sync_backend_host_mock.h"
-#include "chrome/browser/sync/managed_user_signin_manager_wrapper.h"
 #include "chrome/browser/sync/profile_sync_components_factory_mock.h"
+#include "chrome/browser/sync/supervised_user_signin_manager_wrapper.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/test/base/testing_browser_process.h"
 #include "chrome/test/base/testing_pref_service_syncable.h"
 #include "chrome/test/base/testing_profile.h"
 #include "chrome/test/base/testing_profile_manager.h"
+#include "components/invalidation/invalidation_service.h"
+#include "components/invalidation/profile_invalidation_provider.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/sync_driver/data_type_manager_impl.h"
 #include "components/sync_driver/pref_names.h"
@@ -32,6 +34,10 @@
 #include "google_apis/gaia/gaia_constants.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+
+namespace content {
+class BrowserContext;
+}
 
 namespace browser_sync {
 
@@ -127,6 +133,13 @@ ACTION_P(ReturnNewMockHostCollectDeleteDirParam, delete_dir_param) {
       delete_dir_param);
 }
 
+KeyedService* BuildFakeProfileInvalidationProvider(
+    content::BrowserContext* context) {
+  return new invalidation::ProfileInvalidationProvider(
+      scoped_ptr<invalidation::InvalidationService>(
+          new invalidation::FakeInvalidationService));
+}
+
 // A test harness that uses a real ProfileSyncService and in most cases a
 // MockSyncBackendHost.
 //
@@ -151,8 +164,8 @@ class ProfileSyncServiceTest : public ::testing::Test {
                            BuildAutoIssuingFakeProfileOAuth2TokenService));
     testing_facotries.push_back(
             std::make_pair(
-                invalidation::InvalidationServiceFactory::GetInstance(),
-                invalidation::FakeInvalidationService::Build));
+                invalidation::ProfileInvalidationProviderFactory::GetInstance(),
+                BuildFakeProfileInvalidationProvider));
 
     profile_ = profile_manager_.CreateTestingProfile(
         "sync-service-test", scoped_ptr<PrefServiceSyncable>(),
@@ -183,7 +196,8 @@ class ProfileSyncServiceTest : public ::testing::Test {
     service_.reset(new ProfileSyncService(
         components_factory_,
         profile_,
-        new ManagedUserSigninManagerWrapper(profile_, signin),
+        make_scoped_ptr(new SupervisedUserSigninManagerWrapper(profile_,
+                                                               signin)),
         oauth2_token_service,
         behavior));
     service_->SetClearingBrowseringDataForTesting(
@@ -194,7 +208,8 @@ class ProfileSyncServiceTest : public ::testing::Test {
 #if defined(OS_WIN) || defined(OS_MACOSX) || (defined(OS_LINUX) && !defined(OS_CHROMEOS))
   void CreateServiceWithoutSignIn() {
     CreateService(browser_sync::MANUAL_START);
-    SigninManagerFactory::GetForProfile(profile())->SignOut();
+    SigninManagerFactory::GetForProfile(profile())->SignOut(
+        signin_metrics::SIGNOUT_TEST);
     service()->SetBackupStartDelayForTest(
         base::TimeDelta::FromMilliseconds(100));
   }
@@ -416,7 +431,8 @@ TEST_F(ProfileSyncServiceTest, EnableSyncAndSignOutDesktop) {
       sync_driver::prefs::kSyncSuppressStart));
   EXPECT_EQ(ProfileSyncService::SYNC, service()->backend_mode());
 
-  SigninManagerFactory::GetForProfile(profile())->SignOut();
+  SigninManagerFactory::GetForProfile(profile())->SignOut(
+      signin_metrics::SIGNOUT_TEST);
   EXPECT_TRUE(service()->sync_initialized());
   EXPECT_EQ(ProfileSyncService::BACKUP, service()->backend_mode());
 }
@@ -432,7 +448,8 @@ TEST_F(ProfileSyncServiceTest, EnableSyncAndSignOut) {
   EXPECT_FALSE(profile()->GetPrefs()->GetBoolean(
       sync_driver::prefs::kSyncSuppressStart));
 
-  SigninManagerFactory::GetForProfile(profile())->SignOut();
+  SigninManagerFactory::GetForProfile(profile())->SignOut(
+      signin_metrics::SIGNOUT_TEST);
   EXPECT_FALSE(service()->sync_initialized());
 }
 #endif  // !defined(OS_CHROMEOS)
@@ -474,7 +491,7 @@ TEST_F(ProfileSyncServiceTest, GetSyncTokenStatus) {
   EXPECT_EQ(syncer::CONNECTION_OK, token_status.connection_status);
 }
 
-#if defined(OS_WIN) || defined(OS_MACOSX) || (defined(OS_LINUX) && !defined(OS_CHROMEOS))
+#if defined(ENABLE_PRE_SYNC_BACKUP)
 void QuitLoop() {
   base::MessageLoop::current()->Quit();
 }
@@ -571,6 +588,15 @@ TEST_F(ProfileSyncServiceTest, RollbackThenBackup) {
   EXPECT_TRUE(delete_dir_param[2]);
 }
 #endif
+
+TEST_F(ProfileSyncServiceTest, GetSyncServiceURL) {
+  // See that we can override the URL with a flag.
+  CommandLine command_line(
+      base::FilePath(base::FilePath(FILE_PATH_LITERAL("chrome.exe"))));
+  command_line.AppendSwitchASCII(switches::kSyncServiceURL, "https://foo/bar");
+  EXPECT_EQ("https://foo/bar",
+            ProfileSyncService::GetSyncServiceURL(command_line).spec());
+}
 
 }  // namespace
 }  // namespace browser_sync

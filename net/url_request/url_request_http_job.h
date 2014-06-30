@@ -27,6 +27,7 @@ class HttpResponseHeaders;
 class HttpResponseInfo;
 class HttpTransaction;
 class HttpUserAgentSettings;
+class ProxyInfo;
 class UploadDataStream;
 class URLRequestContext;
 
@@ -90,6 +91,7 @@ class NET_EXPORT_PRIVATE URLRequestHttpJob : public URLRequestJob {
   void OnStartCompleted(int result);
   void OnReadCompleted(int result);
   void NotifyBeforeSendHeadersCallback(int result);
+  void NotifyBeforeSendProxyHeadersCallback(const ProxyInfo& proxy_info);
 
   void RestartTransactionWithAuth(const AuthCredentials& credentials);
 
@@ -189,9 +191,6 @@ class NET_EXPORT_PRIVATE URLRequestHttpJob : public URLRequestJob {
   CompletionCallback notify_before_headers_sent_callback_;
 
   bool read_in_progress_;
-
-  // An URL for an SDCH dictionary as suggested in a Get-Dictionary HTTP header.
-  GURL sdch_dictionary_url_;
 
   scoped_ptr<HttpTransaction> transaction_;
 

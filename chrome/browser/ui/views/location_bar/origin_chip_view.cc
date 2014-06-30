@@ -9,7 +9,6 @@
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/extensions/extension_icon_image.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/favicon/favicon_tab_helper.h"
@@ -28,6 +27,7 @@
 #include "content/public/browser/user_metrics.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
+#include "extensions/browser/extension_icon_image.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/manifest_handlers/icons_handler.h"
@@ -144,12 +144,14 @@ OriginChipView::OriginChipView(LocationBarView* location_bar_view,
       location_bar_view_(location_bar_view),
       profile_(profile),
       showing_16x16_icon_(false),
-      fade_in_animation_(this) {
+      fade_in_animation_(this),
+      security_level_(ToolbarModel::NONE),
+      url_malware_(false) {
   EnableCanvasFlippingForRTLUI(true);
 
   scoped_refptr<SafeBrowsingService> sb_service =
       g_browser_process->safe_browsing_service();
-  // May not be set for unit tests.
+  // |sb_service| may be NULL in tests.
   if (sb_service && sb_service->ui_manager())
     sb_service->ui_manager()->AddObserver(this);
 
@@ -174,6 +176,9 @@ OriginChipView::OriginChipView(LocationBarView* location_bar_view,
 
   fade_in_animation_.SetTweenType(gfx::Tween::LINEAR_OUT_SLOW_IN);
   fade_in_animation_.SetSlideDuration(175);
+
+  // Ensure |pressed_text_color_| and |background_colors_| are initialized.
+  SetBorderImages(kNormalImages);
 }
 
 OriginChipView::~OriginChipView() {
@@ -327,8 +332,12 @@ void OriginChipView::SetBorderImages(const int images[3][9]) {
     // of the background, which we treat as the representative color of the
     // entire background (reasonable, given the current appearance of these
     // images).
+    //
+    // NOTE: Because this is called from the constructor, when we're not in a
+    // Widget yet, GetThemeProvider() may return NULL, so use the location bar's
+    // theme provider instead to be safe.
     const SkBitmap& bitmap(
-        GetThemeProvider()->GetImageSkiaNamed(
+        location_bar_view_->GetThemeProvider()->GetImageSkiaNamed(
             images[i][4])->GetRepresentation(1.0f).sk_bitmap());
     SkAutoLockPixels pixel_lock(bitmap);
     background_colors_[i] =

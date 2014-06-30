@@ -161,6 +161,23 @@
       ],
       'sources': [
         'public/cpp/environment/tests/async_waiter_unittest.cc',
+        'public/cpp/environment/tests/logger_unittest.cc',
+        'public/cpp/environment/tests/logging_unittest.cc',
+      ],
+    },
+    {
+      'target_name': 'mojo_public_application_unittests',
+      'type': 'executable',
+      'dependencies': [
+        '../base/base.gyp:base',
+        '../testing/gtest.gyp:gtest',
+        'mojo_application',
+        'mojo_run_all_unittests',
+        'mojo_environment_standalone',
+        'mojo_utility',
+      ],
+      'sources': [
+        'public/cpp/application/tests/service_registry_unittest.cc',
       ],
     },
     {
@@ -303,6 +320,7 @@
         'public/interfaces/bindings/tests/sample_interfaces.mojom',
         'public/interfaces/bindings/tests/sample_service.mojom',
         'public/interfaces/bindings/tests/test_structs.mojom',
+        'public/interfaces/bindings/tests/validation_test_interfaces.mojom',
       ],
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
@@ -316,10 +334,16 @@
       'target_name': 'mojo_environment_standalone',
       'type': 'static_library',
       'sources': [
-        'public/cpp/environment/default_async_waiter.h',
+        'public/c/environment/async_waiter.h',
+        'public/c/environment/logger.h',
+        'public/c/environment/logging.h',
         'public/cpp/environment/environment.h',
         'public/cpp/environment/lib/default_async_waiter.cc',
+        'public/cpp/environment/lib/default_async_waiter.h',
+        'public/cpp/environment/lib/default_logger.cc',
+        'public/cpp/environment/lib/default_logger.h',
         'public/cpp/environment/lib/environment.cc',
+        'public/cpp/environment/lib/logging.cc',
       ],
       'include_dirs': [
         '..',
@@ -389,11 +413,15 @@
       'target_name': 'mojo_application',
       'type': 'static_library',
       'sources': [
-        'public/cpp/application/application.h',
+        'public/cpp/application/application_impl.h',
         'public/cpp/application/connect.h',
-        'public/cpp/application/lib/application.cc',
+        'public/cpp/application/lib/application_impl.cc',
         'public/cpp/application/lib/service_connector.cc',
         'public/cpp/application/lib/service_connector.h',
+        'public/cpp/application/lib/application_connection.cc',
+        'public/cpp/application/lib/application_delegate.cc',
+        'public/cpp/application/lib/service_registry.cc',
+        'public/cpp/application/lib/service_registry.h',
       ],
       'dependencies': [
         'mojo_service_provider_bindings',

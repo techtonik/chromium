@@ -18,7 +18,6 @@
 #include "chrome/browser/chromeos/file_manager/open_util.h"
 #include "chrome/browser/chromeos/fileapi/file_system_backend.h"
 #include "chrome/browser/drive/drive_app_registry.h"
-#include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/extensions/extension_util.h"
 #include "chrome/browser/profiles/profile.h"
@@ -28,6 +27,7 @@
 #include "chrome/common/pref_names.h"
 #include "chromeos/chromeos_switches.h"
 #include "extensions/browser/extension_host.h"
+#include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension_set.h"
@@ -46,10 +46,6 @@ namespace {
 
 // The values "file" and "app" are confusing, but cannot be changed easily as
 // these are used in default task IDs stored in preferences.
-//
-// TODO(satorux): We should rename them to "file_browser_handler" and
-// "file_handler" respectively when switching from preferences to
-// chrome.storage crbug.com/267359
 const char kFileBrowserHandlerTaskType[] = "file";
 const char kFileHandlerTaskType[] = "app";
 const char kDriveAppTaskType[] = "drive";
@@ -112,25 +108,6 @@ void KeepOnlyFileManagerInternalTasks(std::vector<FullTaskDescriptor>* tasks) {
   tasks->swap(filtered);
 }
 
-// Finds a task that matches |app_id| and |action_id| from |task_list|.
-// Returns a mutable iterator to the handler if found. Returns task_list->end()
-// if not found.
-std::vector<FullTaskDescriptor>::iterator
-FindTaskForAppIdAndActionId(
-    std::vector<FullTaskDescriptor>* task_list,
-    const std::string& app_id,
-    const std::string& action_id) {
-  DCHECK(task_list);
-
-  std::vector<FullTaskDescriptor>::iterator iter = task_list->begin();
-  while (iter != task_list->end() &&
-         !(iter->task_descriptor().app_id == app_id &&
-           iter->task_descriptor().action_id == action_id)) {
-    ++iter;
-  }
-  return iter;
-}
-
 void ChooseSuitableGalleryHandler(std::vector<FullTaskDescriptor>* task_list) {
   const bool disable_new_gallery =
       base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
@@ -144,42 +121,12 @@ void ChooseSuitableGalleryHandler(std::vector<FullTaskDescriptor>* task_list) {
         ++it;
     } else {
       if (it->task_descriptor().app_id == kFileManagerAppId &&
-          (it->task_descriptor().action_id == "gallery" ||
-           it->task_descriptor().action_id == "gallery-video")) {
+          it->task_descriptor().action_id == "gallery") {
         it = task_list->erase(it);
       } else {
         ++it;
       }
     }
-  }
-}
-
-// Chooses a suitable video handeler and removes other internal video hander.
-// Both "watch" and "gallery-video" actions are applicable which means that the
-// selection is all videos. Showing them both is confusing, so we only keep
-// the one that makes more sense ("watch" for single selection, "gallery"
-// for multiple selection).
-void ChooseSuitableVideoHandler(
-    const std::vector<GURL>& file_urls,
-    std::vector<FullTaskDescriptor>* task_list) {
-  std::vector<FullTaskDescriptor>::iterator video_player_iter =
-      FindTaskForAppIdAndActionId(task_list, kVideoPlayerAppId, "video");
-  std::vector<FullTaskDescriptor>::iterator gallery_video_iter;
-  if (base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
-          chromeos::switches::kFileManagerEnableNewGallery) == "false") {
-    gallery_video_iter = FindTaskForAppIdAndActionId(
-        task_list, kFileManagerAppId, "gallery-video");
-  } else {
-    gallery_video_iter =
-        FindTaskForAppIdAndActionId(task_list, kGalleryAppId, "open");
-  }
-
-  if (video_player_iter != task_list->end() &&
-      gallery_video_iter != task_list->end()) {
-    if (file_urls.size() == 1)
-      task_list->erase(gallery_video_iter);
-    else
-      task_list->erase(video_player_iter);
   }
 }
 
@@ -193,7 +140,7 @@ FullTaskDescriptor::FullTaskDescriptor(
     : task_descriptor_(task_descriptor),
       task_title_(task_title),
       icon_url_(icon_url),
-      is_default_(is_default){
+      is_default_(is_default) {
 }
 
 void UpdateDefaultTask(PrefService* pref_service,
@@ -283,7 +230,6 @@ bool ParseTaskID(const std::string& task_id, TaskDescriptor* task) {
   // Parse a legacy task ID that only contain two parts. Drive tasks are
   // identified by a prefix "drive-app:" on the extension ID. The legacy task
   // IDs can be stored in preferences.
-  // TODO(satorux): We should get rid of this code: crbug.com/267359.
   if (count == 2) {
     if (StartsWithASCII(result[0], kDriveTaskExtensionPrefix, true)) {
       task->task_type = TASK_TYPE_DRIVE_APP;
@@ -327,10 +273,8 @@ bool ExecuteFileTask(Profile* profile,
   }
 
   // Get the extension.
-  ExtensionService* service =
-      extensions::ExtensionSystem::Get(profile)->extension_service();
-  const Extension* extension = service ?
-      service->GetExtensionById(task.app_id, false) : NULL;
+  const Extension* extension = extensions::ExtensionRegistry::Get(
+      profile)->enabled_extensions().GetByID(task.app_id);
   if (!extension)
     return false;
 
@@ -428,13 +372,11 @@ void FindFileHandlerTasks(
   DCHECK(!path_mime_set.empty());
   DCHECK(result_list);
 
-  ExtensionService* service = profile->GetExtensionService();
-  if (!service)
-    return;
-
+  const extensions::ExtensionSet& enabled_extensions =
+      extensions::ExtensionRegistry::Get(profile)->enabled_extensions();
   for (extensions::ExtensionSet::const_iterator iter =
-           service->extensions()->begin();
-       iter != service->extensions()->end();
+           enabled_extensions.begin();
+       iter != enabled_extensions.end();
        ++iter) {
     const Extension* extension = iter->get();
 
@@ -465,10 +407,9 @@ void FindFileHandlerTasks(
           NULL);  // exists
 
       result_list->push_back(FullTaskDescriptor(
-          TaskDescriptor(extension->id(),
-                         file_tasks::TASK_TYPE_FILE_HANDLER,
-                         (*i)->id),
-          (*i)->title,
+          TaskDescriptor(
+              extension->id(), file_tasks::TASK_TYPE_FILE_HANDLER, (*i)->id),
+          extension->name(),
           best_icon,
           false /* is_default */));
     }
@@ -487,15 +428,15 @@ void FindFileBrowserHandlerTasks(
   if (common_tasks.empty())
     return;
 
-  ExtensionService* service =
-      extensions::ExtensionSystem::Get(profile)->extension_service();
+  const extensions::ExtensionSet& enabled_extensions =
+      extensions::ExtensionRegistry::Get(profile)->enabled_extensions();
   for (file_browser_handlers::FileBrowserHandlerList::const_iterator iter =
            common_tasks.begin();
        iter != common_tasks.end();
        ++iter) {
     const FileBrowserHandler* handler = *iter;
     const std::string extension_id = handler->extension_id();
-    const Extension* extension = service->GetExtensionById(extension_id, false);
+    const Extension* extension = enabled_extensions.GetByID(extension_id);
     DCHECK(extension);
 
     // TODO(zelidrag): Figure out how to expose icon URL that task defined in
@@ -545,8 +486,6 @@ void FindAllTypesOfTasks(
     KeepOnlyFileManagerInternalTasks(result_list);
 
   ChooseSuitableGalleryHandler(result_list);
-  ChooseSuitableVideoHandler(file_urls, result_list);
-
   ChooseAndSetDefaultTask(*profile->GetPrefs(), path_mime_set, result_list);
 }
 

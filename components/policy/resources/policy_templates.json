@@ -26,6 +26,8 @@
 #     items
 #   'string-enum' - the user can select a string value from a collection of
 #     items
+#   'string-enum-list' - the user can select a set of string values from a
+#     collection of items
 #   'main' - a boolean value
 #   'list' - a list of string values
 #   'dict' - a dictionary value, containing other values indexed by strings
@@ -118,7 +120,7 @@
 #   persistent IDs for all fields (but not for groups!) are needed. These are
 #   specified by the 'id' keys of each policy. NEVER CHANGE EXISTING IDs,
 #   because doing so would break the deployed wire format!
-#   For your editing convenience: highest ID currently used: 267
+#   For your editing convenience: highest ID currently used: 270
 #
 # Placeholders:
 #   The following placeholder strings are automatically substituted:
@@ -1610,11 +1612,11 @@
           'caption': '''Configure the list of force-installed extensions''',
           'desc': '''Allows you to specify a list of extensions that will be installed silently, without user interaction.
 
-          Each item of the list is a string that contains an extension ID and an update URL delimited by a semicolon (<ph name="SEMICOLON">;</ph>). The extension ID is the 32-letter string found e.g. on <ph name="CHROME_EXTENSIONS_LINK">chrome://extensions</ph> when in developer mode. The update URL should point to an Update Manifest XML document as described at <ph name="LINK_TO_EXTENSION_DOC1">http://code.google.com/chrome/extensions/autoupdate.html</ph>. Note that the update URL set in this policy is only used for the initial installation; subsequent updates of the extension will use the update URL indicated in the extension's manifest.
+          Each item of the list is a string that contains an extension ID and an update URL delimited by a semicolon (<ph name="SEMICOLON">;</ph>). The extension ID is the 32-letter string found e.g. on <ph name="CHROME_EXTENSIONS_LINK">chrome://extensions</ph> when in developer mode. The update URL should point to an Update Manifest XML document as described at <ph name="LINK_TO_EXTENSION_DOC1">https://developer.chrome.com/extensions/autoupdate</ph>. Note that the update URL set in this policy is only used for the initial installation; subsequent updates of the extension will use the update URL indicated in the extension's manifest.
 
           For each item, <ph name="PRODUCT_NAME">$1<ex>Google Chrome</ex></ph> will retrieve the extension specified by the extension ID from the update service at the specified update URL and silently install it.
 
-          For example, <ph name="EXTENSION_POLICY_EXAMPLE">lcncmkcnkcdbbanbjakcencbaoegdjlp;https://clients2.google.com/service/update2/crx</ph> installs the <ph name="EXTENSION_POLICY_EXAMPLE_EXTENSION_NAME">Google SSL Web Search</ph> extension from the standard Chrome Web Store update URL. For more information about hosting extensions, see: <ph name="LINK_TO_EXTENSION_DOC2">http://code.google.com/chrome/extensions/hosting.html</ph>.
+          For example, <ph name="EXTENSION_POLICY_EXAMPLE">lcncmkcnkcdbbanbjakcencbaoegdjlp;https://clients2.google.com/service/update2/crx</ph> installs the <ph name="EXTENSION_POLICY_EXAMPLE_EXTENSION_NAME">Google SSL Web Search</ph> extension from the standard Chrome Web Store update URL. For more information about hosting extensions, see: <ph name="LINK_TO_EXTENSION_DOC2">https://developer.chrome.com/extensions/hosting</ph>.
 
           Users will be unable to uninstall extensions that are specified by this policy. If you remove an extension from this list, then it will be automatically uninstalled by <ph name="PRODUCT_NAME">$1<ex>Google Chrome</ex></ph>. Extensions specified in this list are also automatically whitelisted for installation; the ExtensionsInstallBlacklist does not affect them.
 
@@ -1640,7 +1642,7 @@
 
           Starting in Chrome 21, it is more difficult to install extensions, apps, and user scripts from outside the Chrome Web Store. Previously, users could click on a link to a *.crx file, and Chrome would offer to install the file after a few warnings. After Chrome 21, such files must be downloaded and dragged onto the Chrome settings page. This setting allows specific URLs to have the old, easier installation flow.
 
-          Each item in this list is an extension-style match pattern (see http://code.google.com/chrome/extensions/match_patterns.html). Users will be able to easily install items from any URL that matches an item in this list. Both the location of the *.crx file and the page where the download is started from (i.e. the referrer) must be allowed by these patterns.
+          Each item in this list is an extension-style match pattern (see https://developer.chrome.com/extensions/match_patterns). Users will be able to easily install items from any URL that matches an item in this list. Both the location of the *.crx file and the page where the download is started from (i.e. the referrer) must be allowed by these patterns.
 
           ExtensionInstallBlacklist takes precedence over this policy. That is, an extension on the blacklist won't be installed, even if it happens from a site on this list.''',
           'label': '''URL patterns to allow extension, app, and user script installs from''',
@@ -2666,6 +2668,42 @@
           'desc': '''Allows you to set a list of url patterns that specify sites which are allowed to open popups.
 
           If this policy is left not set the global default value will be used for all sites either from the 'DefaultPopupsSetting' policy if it is set, or the user's personal configuration otherwise.''',
+        },
+        {
+          'name': 'RegisteredProtocolHandlers',
+          'type': 'dict',
+          'schema': {
+            'type': 'array',
+            'items': {
+              'type': 'object',
+              'properties': {
+                'default': {
+                  'description': 'A boolean flag indicating if the protocol handler should be set as the default.',
+                  'type': 'boolean'
+                },
+                'protocol': {
+                  'description': 'The protocol for the protocol handler.',
+                  'type': 'string'
+                },
+                'url': {
+                  'description': 'The URL of the protocol handler.',
+                  'type': 'string'
+                }
+              },
+              'required': ['protocol', 'url']
+            }
+          },
+          'supported_on': ['chrome.*:37-', 'chrome_os:37-'],
+          'features': {
+            'dynamic_refresh': False,
+            'per_profile': True,
+          },
+          'example_value': [{'protocol': 'mailto', 'url': 'https://mail.google.com/mail/?extsrc=mailto&url=%s', 'default': 'true'}],
+          'id': 268,
+          'caption': '''Register protocol handlers''',
+          'desc': '''Allows you to register a list of protocol handlers. This can only be a recommended policy. The property |protocol| should be set to the scheme such as 'mailto' and the property |url| should be set to the URL pattern of the application that handles the scheme. The pattern can include a '%s', which if present will be replaced by the handled URL.
+
+          The protocol handlers registered by policy are merged with the ones registered by the user and both are available for use. The user can override the protocol handlers installed by policy by installing a new default handler, but cannot remove a protocol handler registered by policy.''',
         },
         {
           'name': 'PopupsBlockedForUrls',
@@ -4655,9 +4693,31 @@
 
       This policy configures the clock format to use on the login screen and as a default for user sessions. Users can still override the clock format for their account.
 
-      If the policy is not set to true, the device will use a 24 hour clock format. If the policy is set to false, the device will use 12 hour clock format.
+      If the policy is set to true, the device will use a 24 hour clock format. If the policy is set to false, the device will use 12 hour clock format.
 
       If this policy is not set, the device will default to a 24 hour clock format.''',
+    },
+    {
+      'name': 'TouchVirtualKeyboardEnabled',
+      'type': 'main',
+      'schema': { 'type': 'boolean' },
+      'supported_on': ['chrome_os:37-' ],
+      'features': {
+        'dynamic_refresh': True,
+        'per_profile': True
+      },
+      'example_value': False,
+      'id': 269,
+      'caption': '''Enable virtual keyboard''',
+      'desc': '''This policy configures enabling the virtual keyboard as an input device on ChromeOS. Users cannot override this policy.
+
+      If the policy is set to true, the on-screen virtual keyboard will always be enabled.
+
+      If set to false, the on-screen virtual keyboard will always be disabled.
+
+      If you set this policy, users cannot change or override it. However, users will still be able to enable/disable an accessibility on-screen keyboard which takes precedence over the virtual keyboard controlled by this policy. See the |VirtualKeyboardEnabled| policy for controlling the accessibility on-screen keyboard.
+
+      If this policy is left unset, the on-screen keyboard is disabled initially but can be enabled by the user anytime. Heuristic rules may also be used to decide when to display the keyboard.''',
     },
     {
       'name': 'ShowLogoutButtonInTray',
@@ -6431,6 +6491,42 @@
       If you set this policy, users cannot change or override it.
 
       If the policy is left not set, the user can choose an image to be shown on the desktop and on the login screen background.''',
+    },
+    {
+      'name': 'EnableDeprecatedWebPlatformFeatures',
+      'type': 'string-enum-list',
+      'schema': {
+        'type': 'array',
+        'items': {
+          'type': 'string',
+          'enum': [
+            'ShowModalDialog_EffectiveUntil20150430'
+          ],
+        },
+      },
+      'items': [
+        {
+          'name': 'ShowModalDialog',
+          'value': 'ShowModalDialog_EffectiveUntil20150430',
+          'caption': '''Enable ShowModalDialog API through 2015.04.30''',
+        }
+      ],
+      'supported_on': ['chrome.*:37-', 'chrome_os:37-', 'android:37-'],
+      'features': {
+        'dynamic_refresh': True,
+        'per_profile': True,
+      },
+      'example_value': ['ShowModalDialog_EffectiveUntil20150430'],
+      'id': 270,
+      'caption': '''Enable deprecated web platform features for a limited time''',
+      'desc': '''Specify a list of deprecated web platform features to re-enable temporarily.
+
+      This policy gives administrators the ability to re-enable deprecated web platform features for a limited time. Features are identified by a string tag and the features corresponding to the tags included in the list specified by this policy will get re-enabled.
+
+      If this policy is left not set, or the list is empty or does not match one of the supported string tags, all deprecated web platform features will remain disabled.
+
+      While the policy itself is supported on the above platforms, the feature it is enabling may be available on fewer platforms. Not all deprecated Web Platform features can be re-enabled. Only the ones explicitly listed below can be for a limited period of time, which is different per feature. The general format of the string tag will be [DeprecatedFeatureName]_EffectiveUntil[yyyymmdd]. As reference, you can find the intent behind the Web Platform feature changes at http://bit.ly/blinkintents.
+      ''',
     },
   ],
   'messages': {

@@ -48,7 +48,7 @@
 #elif defined(USE_OZONE)
 #include "content/browser/compositor/overlay_candidate_validator_ozone.h"
 #include "content/browser/compositor/software_output_device_ozone.h"
-#include "ui/gfx/ozone/surface_factory_ozone.h"
+#include "ui/ozone/public/surface_factory_ozone.h"
 #elif defined(USE_X11)
 #include "content/browser/compositor/software_output_device_x11.h"
 #elif defined(OS_MACOSX)
@@ -121,8 +121,8 @@ scoped_ptr<cc::SoftwareOutputDevice> CreateSoftwareOutputDevice(
 scoped_ptr<cc::OverlayCandidateValidator> CreateOverlayCandidateValidator(
     gfx::AcceleratedWidget widget) {
 #if defined(USE_OZONE)
-  gfx::OverlayCandidatesOzone* overlay_candidates =
-      gfx::SurfaceFactoryOzone::GetInstance()->GetOverlayCandidates(widget);
+  ui::OverlayCandidatesOzone* overlay_candidates =
+      ui::SurfaceFactoryOzone::GetInstance()->GetOverlayCandidates(widget);
   if (overlay_candidates && CommandLine::ForCurrentProcess()->HasSwitch(
                                 switches::kEnableHardwareOverlays)) {
     return scoped_ptr<cc::OverlayCandidateValidator>(
@@ -188,8 +188,9 @@ scoped_ptr<cc::OutputSurface> GpuProcessTransportFactory::CreateOutputSurface(
           "Offscreen-Compositor");
     }
     scoped_ptr<SurfaceDisplayOutputSurface> output_surface(
-        new SurfaceDisplayOutputSurface(
-            display_client->display(), manager, offscreen_context_provider));
+        new SurfaceDisplayOutputSurface(manager, offscreen_context_provider));
+    display_client->CreateDisplay(output_surface->factory());
+    output_surface->set_display(display_client->display());
     data->display_client = display_client.Pass();
     return output_surface.PassAs<cc::OutputSurface>();
   }
@@ -274,6 +275,12 @@ void GpuProcessTransportFactory::RemoveCompositor(ui::Compositor* compositor) {
     // on the |gl_helper_| variable directly. So instead we call reset() on a
     // local scoped_ptr.
     scoped_ptr<GLHelper> helper = gl_helper_.Pass();
+
+    // If there are any observer left at this point, make sure they clean up
+    // before we destroy the GLHelper.
+    FOR_EACH_OBSERVER(
+        ImageTransportFactoryObserver, observer_list_, OnLostResources());
+
     helper.reset();
     DCHECK(!gl_helper_) << "Destroying the GLHelper should not cause a new "
                            "GLHelper to be created.";
@@ -324,6 +331,15 @@ void GpuProcessTransportFactory::RemoveObserver(
     ImageTransportFactoryObserver* observer) {
   observer_list_.RemoveObserver(observer);
 }
+
+#if defined(OS_MACOSX)
+void GpuProcessTransportFactory::OnSurfaceDisplayed(int surface_id) {
+  BrowserCompositorOutputSurface* surface = output_surface_map_.Lookup(
+      surface_id);
+  if (surface)
+    surface->OnSurfaceDisplayed();
+}
+#endif
 
 scoped_refptr<cc::ContextProvider>
 GpuProcessTransportFactory::SharedMainThreadContextProvider() {

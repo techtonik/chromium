@@ -14,11 +14,12 @@
 #include "base/strings/string16.h"
 #include "components/query_parser/query_parser.h"
 
-class BookmarkClient;
 class BookmarkNode;
-struct BookmarkMatch;
 
 namespace bookmarks {
+
+class BookmarkClient;
+struct BookmarkMatch;
 
 // BookmarkIndex maintains an index of the titles and URLs of bookmarks for
 // quick look up. BookmarkIndex is owned and maintained by BookmarkModel, you

@@ -92,8 +92,7 @@ namespace activitylog = activity_log_web_request_constants;
 
 namespace {
 
-const char kWebRequest[] = "webRequest";
-const char kWebView[] = "webview";
+const char kWebRequestEventPrefix[] = "webRequest.";
 
 // List of all the webRequest events.
 const char* const kWebRequestEvents[] = {
@@ -140,8 +139,11 @@ const char* GetRequestStageAsString(
 
 bool IsWebRequestEvent(const std::string& event_name) {
   std::string web_request_event_name(event_name);
-  if (web_request_event_name.find(kWebView) != std::string::npos)
-    web_request_event_name.replace(0, sizeof(kWebView) - 1, kWebRequest);
+  if (StartsWithASCII(
+          web_request_event_name, webview::kWebViewEventPrefix, true)) {
+    web_request_event_name.replace(
+        0, strlen(webview::kWebViewEventPrefix), kWebRequestEventPrefix);
+  }
   return std::find(kWebRequestEvents, ARRAYEND(kWebRequestEvents),
                    web_request_event_name) != ARRAYEND(kWebRequestEvents);
 }
@@ -415,7 +417,6 @@ void SendOnMessageEventOnUI(
   extensions::EventFilteringInfo event_filtering_info;
 
   std::string event_name;
-#if defined(ENABLE_EXTENSIONS)
   // The instance ID uniquely identifies a <webview> instance within an embedder
   // process. We use a filter here so that only event listeners for a particular
   // <webview> will fire.
@@ -425,11 +426,6 @@ void SendOnMessageEventOnUI(
   } else {
     event_name = declarative_keys::kOnMessage;
   }
-#else
-  // TODO(thestig) Remove this once the WebRequestAPI code is disabled.
-  // http://crbug.com/305852
-  NOTREACHED();
-#endif
 
   scoped_ptr<extensions::Event> event(new extensions::Event(
       event_name,
@@ -460,7 +456,8 @@ WebRequestAPI::WebRequestAPI(content::BrowserContext* context)
     event_router->RegisterObserver(this, event_name);
 
     // Also observe the corresponding webview event.
-    event_name.replace(0, sizeof(kWebRequest) - 1, kWebView);
+    event_name.replace(
+        0, sizeof(kWebRequestEventPrefix) - 1, webview::kWebViewEventPrefix);
     event_router->RegisterObserver(this, event_name);
   }
 }
@@ -1472,8 +1469,10 @@ void ExtensionWebRequestEventRouter::GetMatchingListenersImpl(
   ExtensionRendererState::WebViewInfo web_view_info;
   bool is_web_view_guest = ExtensionRendererState::GetInstance()->
       GetWebViewInfo(render_process_host_id, routing_id, &web_view_info);
-  if (is_web_view_guest)
-    web_request_event_name.replace(0, sizeof(kWebRequest) - 1, kWebView);
+  if (is_web_view_guest) {
+    web_request_event_name.replace(
+        0, sizeof(kWebRequestEventPrefix) - 1, webview::kWebViewEventPrefix);
+  }
 
   std::set<EventListener>& listeners =
       listeners_[profile][web_request_event_name];
@@ -2470,25 +2469,16 @@ void SendExtensionWebRequestStatusToHost(content::RenderProcessHost* host) {
   if (!profile)
     return;
 
-  bool adblock = false;
-  bool adblock_plus = false;
-  bool other = false;
+  bool webrequest_used = false;
   const extensions::ExtensionSet& extensions =
       extensions::ExtensionRegistry::Get(profile)->enabled_extensions();
   extensions::RuntimeData* runtime_data =
       extensions::ExtensionSystem::Get(profile)->runtime_data();
   for (extensions::ExtensionSet::const_iterator it = extensions.begin();
-       it != extensions.end(); ++it) {
-    if (runtime_data->HasUsedWebRequest(it->get())) {
-      if ((*it)->name().find("Adblock Plus") != std::string::npos) {
-        adblock_plus = true;
-      } else if ((*it)->name().find("AdBlock") != std::string::npos) {
-        adblock = true;
-      } else {
-        other = true;
-      }
-    }
+       !webrequest_used && it != extensions.end();
+       ++it) {
+    webrequest_used |= runtime_data->HasUsedWebRequest(it->get());
   }
 
-  host->Send(new ExtensionMsg_UsingWebRequestAPI(adblock, adblock_plus, other));
+  host->Send(new ExtensionMsg_UsingWebRequestAPI(webrequest_used));
 }

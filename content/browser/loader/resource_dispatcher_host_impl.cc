@@ -54,6 +54,7 @@
 #include "content/browser/streams/stream_registry.h"
 #include "content/browser/worker_host/worker_service_impl.h"
 #include "content/browser/web_contents/web_contents_impl.h"
+#include "content/common/appcache_interfaces.h"
 #include "content/common/resource_messages.h"
 #include "content/common/resource_request_body.h"
 #include "content/common/ssl_status_serialization.h"
@@ -94,7 +95,6 @@
 #include "webkit/browser/blob/blob_url_request_job_factory.h"
 #include "webkit/browser/fileapi/file_permission_policy.h"
 #include "webkit/browser/fileapi/file_system_context.h"
-#include "webkit/common/appcache/appcache_interfaces.h"
 #include "webkit/common/blob/shareable_file_reference.h"
 
 using base::Time;
@@ -387,6 +387,17 @@ void ResourceDispatcherHostImpl::RemoveResourceContext(
   active_resource_contexts_.erase(context);
 }
 
+void ResourceDispatcherHostImpl::ResumeResponseDeferredAtStart(
+    const GlobalRequestID& id) {
+  ResourceLoader* loader = GetLoader(id);
+  if (loader) {
+    // The response we were meant to resume could have already been canceled.
+    ResourceRequestInfoImpl* info = loader->GetRequestInfo();
+    if (info->cross_site_handler())
+      info->cross_site_handler()->ResumeResponseDeferredAtStart(id.request_id);
+  }
+}
+
 void ResourceDispatcherHostImpl::CancelRequestsForContext(
     ResourceContext* context) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
@@ -608,18 +619,17 @@ ResourceDispatcherHostImpl::CreateResourceHandlerForDownload(
 
 scoped_ptr<ResourceHandler>
 ResourceDispatcherHostImpl::MaybeInterceptAsStream(net::URLRequest* request,
-                                                   ResourceResponse* response) {
+                                                   ResourceResponse* response,
+                                                   std::string* payload) {
   ResourceRequestInfoImpl* info = ResourceRequestInfoImpl::ForRequest(request);
   const std::string& mime_type = response->head.mime_type;
 
   GURL origin;
-  std::string target_id;
   if (!delegate_ ||
-      !delegate_->ShouldInterceptResourceAsStream(info->GetContext(),
-                                                  request->url(),
+      !delegate_->ShouldInterceptResourceAsStream(request,
                                                   mime_type,
                                                   &origin,
-                                                  &target_id)) {
+                                                  payload)) {
     return scoped_ptr<ResourceHandler>();
   }
 
@@ -633,15 +643,11 @@ ResourceDispatcherHostImpl::MaybeInterceptAsStream(net::URLRequest* request,
 
   info->set_is_stream(true);
   delegate_->OnStreamCreated(
-      info->GetContext(),
-      info->GetChildID(),
-      info->GetRouteID(),
-      target_id,
+      request,
       handler->stream()->CreateHandle(
           request->url(),
           mime_type,
-          response->head.headers),
-      request->GetExpectedContentSize());
+          response->head.headers));
   return handler.PassAs<ResourceHandler>();
 }
 

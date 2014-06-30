@@ -68,9 +68,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
     INSTALLED,   // Install event is finished and is ready to be activated.
     ACTIVATING,  // Activate event is dispatched and being handled.
     ACTIVE,      // Activation is finished and can run as active.
-    DEACTIVATED, // The version is no longer running as active, due to
-                 // unregistration or replace. (TODO(kinuko): we may need
-                 // different states for different termination sequences)
+    REDUNDANT,   // The version is no longer running as active, due to
+                 // unregistration or replace.
   };
 
   class Listener {
@@ -125,11 +124,22 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // This returns OK (success) if the worker is already running.
   void StartWorkerWithCandidateProcesses(
       const std::vector<int>& potential_process_ids,
+      bool pause_after_download,
       const StatusCallback& callback);
 
-  // Starts an embedded worker for this version.
+  // Stops an embedded worker for this version.
   // This returns OK (success) if the worker is already stopped.
   void StopWorker(const StatusCallback& callback);
+
+  // Schedules an update to be run 'soon'.
+  void ScheduleUpdate();
+
+  // If an update is scheduled but not yet started, this resets the timer
+  // delaying the start time by a 'small' amount.
+  void DeferScheduledUpdate();
+
+  // Starts an update now.
+  void StartUpdate();
 
   // Sends an IPC message to the worker.
   // If the worker is not running this first tries to start it by
@@ -277,6 +287,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
   ObserverList<Listener> listeners_;
   ServiceWorkerScriptCacheMap script_cache_map_;
   base::OneShotTimer<ServiceWorkerVersion> stop_worker_timer_;
+  base::OneShotTimer<ServiceWorkerVersion> update_timer_;
 
   base::WeakPtrFactory<ServiceWorkerVersion> weak_factory_;
 

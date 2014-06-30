@@ -15,8 +15,10 @@
 #include "base/timer/timer.h"
 #include "content/browser/child_process_launcher.h"
 #include "content/browser/dom_storage/session_storage_namespace_impl.h"
+#include "content/browser/mojo/mojo_application_host.h"
 #include "content/browser/power_monitor_message_broadcaster.h"
 #include "content/common/content_export.h"
+#include "content/common/mojo/service_registry_impl.h"
 #include "content/public/browser/gpu_data_manager_observer.h"
 #include "content/public/browser/render_process_host.h"
 #include "ipc/ipc_channel_proxy.h"
@@ -45,18 +47,15 @@ class AudioRendererHost;
 class BrowserDemuxerAndroid;
 class GpuMessageFilter;
 class MessagePortMessageFilter;
-class MojoApplicationHost;
 #if defined(ENABLE_WEBRTC)
 class P2PSocketDispatcherHost;
 #endif
 class PeerConnectionTrackerHost;
 class RendererMainThread;
-class RenderProcessHostMojoImpl;
 class RenderWidgetHelper;
 class RenderWidgetHost;
 class RenderWidgetHostImpl;
 class RenderWidgetHostViewFrameSubscriber;
-class ScreenOrientationDispatcherHost;
 class StoragePartition;
 class StoragePartitionImpl;
 
@@ -144,6 +143,7 @@ class CONTENT_EXPORT RenderProcessHostImpl
   virtual void ResumeDeferredNavigation(const GlobalRequestID& request_id)
       OVERRIDE;
   virtual void NotifyTimezoneChange() OVERRIDE;
+  virtual ServiceRegistry* GetServiceRegistry() OVERRIDE;
 
   // IPC::Sender via RenderProcessHost.
   virtual bool Send(IPC::Message* msg) OVERRIDE;
@@ -180,9 +180,6 @@ class CONTENT_EXPORT RenderProcessHostImpl
   // Fires the webrtc log message callback with |message|, if callback is set.
   void WebRtcLogMessage(const std::string& message);
 #endif
-
-  scoped_refptr<ScreenOrientationDispatcherHost>
-      screen_orientation_dispatcher_host() const;
 
   // Used to extend the lifetime of the sessions until the render view
   // in the renderer is fully closed. This is static because its also called
@@ -254,18 +251,12 @@ class CONTENT_EXPORT RenderProcessHostImpl
   void IncrementWorkerRefCount();
   void DecrementWorkerRefCount();
 
-  // Establish a connection to a renderer-provided service. See
-  // content/common/mojo/mojo_service_names.h for a list of services.
-  void ConnectTo(const base::StringPiece& service_name,
-                 mojo::ScopedMessagePipeHandle handle);
+  // Call this function to resume the navigation when it was deferred
+  // immediately after receiving response headers.
+  void ResumeResponseDeferredAtStart(const GlobalRequestID& request_id);
 
-  template <typename Interface>
-  void ConnectTo(const base::StringPiece& service_name,
-                 mojo::InterfacePtr<Interface>* ptr) {
-    mojo::MessagePipe pipe;
-    ptr->Bind(pipe.handle0.Pass());
-    ConnectTo(service_name, pipe.handle1.Pass());
-  }
+  // Activates Mojo for this process. Does nothing if Mojo is already activated.
+  void EnsureMojoActivated();
 
  protected:
   // A proxy for our IPC::Channel that lives on the IO thread (see
@@ -328,8 +319,14 @@ class CONTENT_EXPORT RenderProcessHostImpl
   virtual void OnGpuSwitching() OVERRIDE;
 
 #if defined(ENABLE_WEBRTC)
+  void OnRegisterAecDumpConsumer(int id);
+  void OnUnregisterAecDumpConsumer(int id);
+  void RegisterAecDumpConsumerOnUIThread(int id);
+  void UnregisterAecDumpConsumerOnUIThread(int id);
+  void EnableAecDumpForId(const base::FilePath& file, int id);
   // Sends |file_for_transit| to the render process.
-  void SendAecDumpFileToRenderer(IPC::PlatformFileForTransit file_for_transit);
+  void SendAecDumpFileToRenderer(int id,
+                                 IPC::PlatformFileForTransit file_for_transit);
   void SendDisableAecDumpToRenderer();
 #endif
 
@@ -448,11 +445,11 @@ class CONTENT_EXPORT RenderProcessHostImpl
 
   scoped_refptr<P2PSocketDispatcherHost> p2p_socket_dispatcher_host_;
 
+  // Must be accessed on UI thread.
+  std::vector<int> aec_dump_consumers_;
+
   WebRtcStopRtpDumpCallback stop_rtp_dump_callback_;
 #endif
-
-  // Message filter and dispatcher for screen orientation.
-  ScreenOrientationDispatcherHost* screen_orientation_dispatcher_host_;
 
   int worker_ref_count_;
 

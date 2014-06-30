@@ -68,7 +68,8 @@ class BrowserPluginGuest::EmbedderWebContentsObserver
 BrowserPluginGuest::BrowserPluginGuest(
     int instance_id,
     bool has_render_view,
-    WebContentsImpl* web_contents)
+    WebContentsImpl* web_contents,
+    BrowserPluginGuestDelegate* delegate)
     : WebContentsObserver(web_contents),
       embedder_web_contents_(NULL),
       instance_id_(instance_id),
@@ -87,15 +88,19 @@ BrowserPluginGuest::BrowserPluginGuest(
       last_text_input_type_(ui::TEXT_INPUT_TYPE_NONE),
       last_input_mode_(ui::TEXT_INPUT_MODE_DEFAULT),
       last_can_compose_inline_(true),
-      delegate_(NULL),
+      delegate_(delegate),
       weak_ptr_factory_(this) {
   DCHECK(web_contents);
+  DCHECK(delegate);
+  RecordAction(base::UserMetricsAction("BrowserPlugin.Guest.Create"));
+  web_contents->SetBrowserPluginGuest(this);
+  delegate->RegisterDestructionCallback(
+      base::Bind(&BrowserPluginGuest::WillDestroy, AsWeakPtr()));
 }
 
 void BrowserPluginGuest::WillDestroy() {
   is_in_destruction_ = true;
   embedder_web_contents_ = NULL;
-  delegate_ = NULL;
 }
 
 base::WeakPtr<BrowserPluginGuest> BrowserPluginGuest::AsWeakPtr() {
@@ -110,9 +115,15 @@ bool BrowserPluginGuest::LockMouse(bool allowed) {
 }
 
 void BrowserPluginGuest::Destroy() {
-  if (!delegate_)
-    return;
   delegate_->Destroy();
+}
+
+WebContentsImpl* BrowserPluginGuest::CreateNewGuestWindow(
+    const WebContents::CreateParams& params) {
+  WebContentsImpl* new_contents =
+      static_cast<WebContentsImpl*>(delegate_->CreateNewGuestWindow(params));
+  DCHECK(new_contents);
+  return new_contents;
 }
 
 bool BrowserPluginGuest::OnMessageReceivedFromEmbedder(
@@ -140,7 +151,7 @@ bool BrowserPluginGuest::OnMessageReceivedFromEmbedder(
     IPC_MESSAGE_HANDLER(BrowserPluginHostMsg_ReclaimCompositorResources,
                         OnReclaimCompositorResources)
     IPC_MESSAGE_HANDLER(BrowserPluginHostMsg_ResizeGuest, OnResizeGuest)
-    IPC_MESSAGE_HANDLER(BrowserPluginHostMsg_SetAutoSize, OnSetSize)
+    IPC_MESSAGE_HANDLER(BrowserPluginHostMsg_SetAutoSize, OnSetAutoSize)
     IPC_MESSAGE_HANDLER(BrowserPluginHostMsg_SetEditCommandsForNextKeyEvent,
                         OnSetEditCommandsForNextKeyEvent)
     IPC_MESSAGE_HANDLER(BrowserPluginHostMsg_SetFocus, OnSetFocus)
@@ -161,7 +172,8 @@ void BrowserPluginGuest::Initialize(
   focused_ = params.focused;
   guest_visible_ = params.visible;
   guest_opaque_ = params.opaque;
-  guest_window_rect_ = params.resize_guest_params.view_rect;
+  guest_window_rect_ = gfx::Rect(params.origin,
+                                 params.resize_guest_params.view_size);
 
   auto_size_enabled_ = params.auto_size_params.enable;
   max_auto_size_ = params.auto_size_params.max_size;
@@ -199,7 +211,8 @@ void BrowserPluginGuest::Initialize(
 
   embedder_web_contents_observer_.reset(new EmbedderWebContentsObserver(this));
 
-  OnSetSize(instance_id_, params.auto_size_params, params.resize_guest_params);
+  OnSetAutoSize(
+      instance_id_, params.auto_size_params, params.resize_guest_params);
 
   // Create a swapped out RenderView for the guest in the embedder render
   // process, so that the embedder can access the guest's window object.
@@ -224,11 +237,6 @@ void BrowserPluginGuest::Initialize(
 
   // Inform the embedder of the guest's attachment.
   SendMessageToEmbedder(new BrowserPluginMsg_Attach_ACK(instance_id_));
-
-  if (delegate_) {
-    delegate_->DidAttach(extra_params);
-    has_render_view_ = true;
-  }
 }
 
 BrowserPluginGuest::~BrowserPluginGuest() {
@@ -237,34 +245,10 @@ BrowserPluginGuest::~BrowserPluginGuest() {
 // static
 BrowserPluginGuest* BrowserPluginGuest::Create(
     int instance_id,
-    SiteInstance* guest_site_instance,
     WebContentsImpl* web_contents,
-    scoped_ptr<base::DictionaryValue> extra_params,
-    BrowserPluginGuest* opener) {
-  RecordAction(base::UserMetricsAction("BrowserPlugin.Guest.Create"));
-  BrowserPluginGuest* guest = new BrowserPluginGuest(
-      instance_id, web_contents->opener() != NULL, web_contents);
-  web_contents->SetBrowserPluginGuest(guest);
-  WebContents* opener_web_contents = NULL;
-  if (opener) {
-    opener_web_contents = opener->GetWebContents();
-    guest_site_instance = opener_web_contents->GetSiteInstance();
-  }
-  BrowserPluginGuestDelegate* delegate = NULL;
-  GetContentClient()->browser()->GuestWebContentsCreated(
-      instance_id,
-      guest_site_instance,
-      web_contents,
-      opener_web_contents,
-      &delegate,
-      extra_params.Pass());
-  if (delegate) {
-    delegate->RegisterDestructionCallback(
-        base::Bind(&BrowserPluginGuest::WillDestroy,
-                   base::Unretained(guest)));
-    guest->set_delegate(delegate);
-  }
-  return guest;
+    BrowserPluginGuestDelegate* delegate) {
+  return new BrowserPluginGuest(
+      instance_id, web_contents->opener() != NULL, web_contents, delegate);
 }
 
 // static
@@ -451,6 +435,12 @@ bool BrowserPluginGuest::ShouldForwardToBrowserPluginGuest(
 bool BrowserPluginGuest::OnMessageReceived(const IPC::Message& message) {
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(BrowserPluginGuest, message)
+    IPC_MESSAGE_HANDLER(InputHostMsg_ImeCancelComposition,
+                        OnImeCancelComposition)
+#if defined(OS_MACOSX) || defined(USE_AURA)
+    IPC_MESSAGE_HANDLER(InputHostMsg_ImeCompositionRangeChanged,
+                        OnImeCompositionRangeChanged)
+#endif
     IPC_MESSAGE_HANDLER(ViewHostMsg_HasTouchEventHandlers,
                         OnHasTouchEventHandlers)
     IPC_MESSAGE_HANDLER(ViewHostMsg_LockMouse, OnLockMouse)
@@ -463,14 +453,8 @@ bool BrowserPluginGuest::OnMessageReceived(const IPC::Message& message) {
  #endif
     IPC_MESSAGE_HANDLER(ViewHostMsg_ShowWidget, OnShowWidget)
     IPC_MESSAGE_HANDLER(ViewHostMsg_TakeFocus, OnTakeFocus)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_TextInputTypeChanged,
-                        OnTextInputTypeChanged)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_ImeCancelComposition,
-                        OnImeCancelComposition)
-#if defined(OS_MACOSX) || defined(USE_AURA)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_ImeCompositionRangeChanged,
-                        OnImeCompositionRangeChanged)
-#endif
+    IPC_MESSAGE_HANDLER(ViewHostMsg_TextInputStateChanged,
+                        OnTextInputStateChanged)
     IPC_MESSAGE_HANDLER(ViewHostMsg_UnlockMouse, OnUnlockMouse)
     IPC_MESSAGE_HANDLER(ViewHostMsg_UpdateRect, OnUpdateRect)
     IPC_MESSAGE_UNHANDLED(handled = false)
@@ -484,6 +468,9 @@ void BrowserPluginGuest::Attach(
     const base::DictionaryValue& extra_params) {
   if (attached())
     return;
+
+  if (delegate_)
+    delegate_->WillAttach(embedder_web_contents, extra_params);
 
   // If a RenderView has already been created for this new window, then we need
   // to initialize the browser-side state now so that the RenderFrameHostManager
@@ -499,6 +486,9 @@ void BrowserPluginGuest::Attach(
   Initialize(params, embedder_web_contents, extra_params);
 
   SendQueuedMessages();
+
+  if (delegate_)
+    delegate_->DidAttach();
 
   RecordAction(base::UserMetricsAction("BrowserPlugin.Guest.Attached"));
 }
@@ -551,19 +541,19 @@ void BrowserPluginGuest::OnImeSetComposition(
     const std::vector<blink::WebCompositionUnderline>& underlines,
     int selection_start,
     int selection_end) {
-  Send(new ViewMsg_ImeSetComposition(routing_id(),
-                                     base::UTF8ToUTF16(text), underlines,
-                                     selection_start, selection_end));
+  Send(new InputMsg_ImeSetComposition(routing_id(),
+                                      base::UTF8ToUTF16(text), underlines,
+                                      selection_start, selection_end));
 }
 
 void BrowserPluginGuest::OnImeConfirmComposition(
     int instance_id,
     const std::string& text,
     bool keep_selection) {
-  Send(new ViewMsg_ImeConfirmComposition(routing_id(),
-                                         base::UTF8ToUTF16(text),
-                                         gfx::Range::InvalidRange(),
-                                         keep_selection));
+  Send(new InputMsg_ImeConfirmComposition(routing_id(),
+                                          base::UTF8ToUTF16(text),
+                                          gfx::Range::InvalidRange(),
+                                          keep_selection));
 }
 
 void BrowserPluginGuest::OnExtendSelectionAndDelete(
@@ -650,9 +640,6 @@ void BrowserPluginGuest::OnLockMouse(bool user_gesture,
     return;
   }
 
-  if (!delegate_)
-    return;
-
   pending_lock_request_ = true;
 
   delegate_->RequestPointerLockPermission(
@@ -695,16 +682,16 @@ void BrowserPluginGuest::OnResizeGuest(
   // When autosize is turned off and as a result there is a layout change, we
   // send a sizechanged event.
   if (!auto_size_enabled_ && last_seen_auto_size_enabled_ &&
-      !params.view_rect.size().IsEmpty() && delegate_) {
-    delegate_->SizeChanged(last_seen_view_size_, params.view_rect.size());
+      !params.view_size.IsEmpty()) {
+    delegate_->SizeChanged(last_seen_view_size_, params.view_size);
     last_seen_auto_size_enabled_ = false;
   }
   // Just resize the WebContents and repaint if needed.
-  full_size_ = params.view_rect.size();
-  if (!params.view_rect.size().IsEmpty())
-    GetWebContents()->GetView()->SizeContents(params.view_rect.size());
+  full_size_ = params.view_size;
+  if (!params.view_size.IsEmpty())
+    GetWebContents()->GetView()->SizeContents(params.view_size);
   if (params.repaint)
-    Send(new ViewMsg_Repaint(routing_id(), params.view_rect.size()));
+    Send(new ViewMsg_Repaint(routing_id(), params.view_size));
 }
 
 void BrowserPluginGuest::OnSetFocus(int instance_id, bool focused) {
@@ -717,12 +704,15 @@ void BrowserPluginGuest::OnSetFocus(int instance_id, bool focused) {
   RenderWidgetHostViewBase* rwhv = static_cast<RenderWidgetHostViewBase*>(
       web_contents()->GetRenderWidgetHostView());
   if (rwhv) {
-    rwhv->TextInputTypeChanged(last_text_input_type_, last_input_mode_,
-                               last_can_compose_inline_);
+    ViewHostMsg_TextInputState_Params params;
+    params.type = last_text_input_type_;
+    params.mode = last_input_mode_;
+    params.can_compose_inline = last_can_compose_inline_;
+    rwhv->TextInputStateChanged(params);
   }
 }
 
-void BrowserPluginGuest::OnSetSize(
+void BrowserPluginGuest::OnSetAutoSize(
     int instance_id,
     const BrowserPluginHostMsg_AutoSize_Params& auto_size_params,
     const BrowserPluginHostMsg_ResizeGuest_Params& resize_guest_params) {
@@ -748,7 +738,7 @@ void BrowserPluginGuest::OnSetSize(
     Send(new ViewMsg_Repaint(routing_id(), max_auto_size_));
   } else if (!auto_size_enabled_ && old_auto_size_enabled) {
     GetWebContents()->GetRenderViewHost()->DisableAutoResize(
-        resize_guest_params.view_rect.size());
+        resize_guest_params.view_size);
   }
   OnResizeGuest(instance_id_, resize_guest_params);
 }
@@ -860,7 +850,7 @@ void BrowserPluginGuest::OnUpdateRect(
   last_seen_view_size_ = params.view_size;
 
   if ((auto_size_enabled_ || last_seen_auto_size_enabled_) &&
-      size_changed && delegate_) {
+      size_changed) {
     delegate_->SizeChanged(old_size, last_seen_view_size_);
   }
   last_seen_auto_size_enabled_ = auto_size_enabled_;
@@ -869,17 +859,15 @@ void BrowserPluginGuest::OnUpdateRect(
       new BrowserPluginMsg_UpdateRect(instance_id(), relay_params));
 }
 
-void BrowserPluginGuest::OnTextInputTypeChanged(ui::TextInputType type,
-                                                ui::TextInputMode input_mode,
-                                                bool can_compose_inline) {
+void BrowserPluginGuest::OnTextInputStateChanged(
+    const ViewHostMsg_TextInputState_Params& params) {
   // Save the state of text input so we can restore it on focus.
-  last_text_input_type_ = type;
-  last_input_mode_ = input_mode;
-  last_can_compose_inline_ = can_compose_inline;
+  last_text_input_type_ = params.type;
+  last_input_mode_ = params.mode;
+  last_can_compose_inline_ = params.can_compose_inline;
 
   static_cast<RenderWidgetHostViewBase*>(
-      web_contents()->GetRenderWidgetHostView())->TextInputTypeChanged(
-          type, input_mode, can_compose_inline);
+      web_contents()->GetRenderWidgetHostView())->TextInputStateChanged(params);
 }
 
 void BrowserPluginGuest::OnImeCancelComposition() {

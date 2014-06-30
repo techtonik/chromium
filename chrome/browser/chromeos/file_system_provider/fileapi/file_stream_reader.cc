@@ -4,6 +4,7 @@
 
 #include "chrome/browser/chromeos/file_system_provider/fileapi/file_stream_reader.h"
 
+#include "base/debug/trace_event.h"
 #include "base/files/file.h"
 #include "base/memory/ref_counted.h"
 #include "chrome/browser/chromeos/file_system_provider/fileapi/provider_async_file_util.h"
@@ -118,12 +119,12 @@ void OnReadChunkReceivedOnUIThread(
 void GetMetadataOnUIThread(
     base::WeakPtr<ProvidedFileSystemInterface> file_system,
     const base::FilePath& file_path,
-    const fileapi::AsyncFileUtil::GetFileInfoCallback& callback) {
+    const ProvidedFileSystemInterface::GetMetadataCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
 
   // If the file system got unmounted, then abort the get length operation.
   if (!file_system.get()) {
-    callback.Run(base::File::FILE_ERROR_ABORT, base::File::Info());
+    callback.Run(EntryMetadata(), base::File::FILE_ERROR_ABORT);
     return;
   }
 
@@ -132,12 +133,12 @@ void GetMetadataOnUIThread(
 
 // Forward the completion callback to IO thread.
 void OnGetMetadataReceivedOnUIThread(
-    const fileapi::AsyncFileUtil::GetFileInfoCallback& callback,
-    base::File::Error result,
-    const base::File::Info& file_info) {
+    const ProvidedFileSystemInterface::GetMetadataCallback& callback,
+    const EntryMetadata& metadata,
+    base::File::Error result) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   BrowserThread::PostTask(
-      BrowserThread::IO, FROM_HERE, base::Bind(callback, result, file_info));
+      BrowserThread::IO, FROM_HERE, base::Bind(callback, metadata, result));
 }
 
 }  // namespace
@@ -204,19 +205,42 @@ void FileStreamReader::OnInitializeCompleted(
 int FileStreamReader::Read(net::IOBuffer* buffer,
                            int buffer_length,
                            const net::CompletionCallback& callback) {
+  TRACE_EVENT_ASYNC_BEGIN1("file_system_provider",
+                           "FileStreamReader::Read",
+                           this,
+                           "buffer_length",
+                           buffer_length);
+
   // Lazily initialize with the first call to Read().
   if (!file_handle_) {
     Initialize(base::Bind(&FileStreamReader::ReadAfterInitialized,
                           weak_ptr_factory_.GetWeakPtr(),
                           make_scoped_refptr(buffer),
                           buffer_length,
-                          callback),
-               base::Bind(&Int64ToIntCompletionCallback, callback));
+                          base::Bind(&FileStreamReader::OnReadCompleted,
+                                     weak_ptr_factory_.GetWeakPtr(),
+                                     callback)),
+               base::Bind(&Int64ToIntCompletionCallback,
+                          base::Bind(&FileStreamReader::OnReadCompleted,
+                                     weak_ptr_factory_.GetWeakPtr(),
+                                     callback)));
+
     return net::ERR_IO_PENDING;
   }
 
-  ReadAfterInitialized(buffer, buffer_length, callback);
+  ReadAfterInitialized(buffer,
+                       buffer_length,
+                       base::Bind(&FileStreamReader::OnReadCompleted,
+                                  weak_ptr_factory_.GetWeakPtr(),
+                                  callback));
   return net::ERR_IO_PENDING;
+}
+
+void FileStreamReader::OnReadCompleted(net::CompletionCallback callback,
+                                       int result) {
+  callback.Run(static_cast<int>(result));
+  TRACE_EVENT_ASYNC_END0(
+      "file_system_provider", "FileStreamReader::Read", this);
 }
 
 int64 FileStreamReader::GetLength(
@@ -314,8 +338,8 @@ void FileStreamReader::OnReadChunkReceived(
 
 void FileStreamReader::OnGetMetadataForGetLengthReceived(
     const net::Int64CompletionCallback& callback,
-    base::File::Error result,
-    const base::File::Info& file_info) {
+    const EntryMetadata& metadata,
+    base::File::Error result) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
 
   // In case of an error, abort.
@@ -325,7 +349,7 @@ void FileStreamReader::OnGetMetadataForGetLengthReceived(
   }
 
   DCHECK_EQ(result, base::File::FILE_OK);
-  callback.Run(file_info.size);
+  callback.Run(metadata.size);
 }
 
 }  // namespace file_system_provider

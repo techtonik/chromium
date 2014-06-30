@@ -2,13 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifndef __STDC_LIMIT_MACROS
+#define __STDC_LIMIT_MACROS
+#endif
+
 #include "nacl_io/host_resolver.h"
 
 #include <assert.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "nacl_io/kernel_proxy.h"
+#include "nacl_io/log.h"
 #include "nacl_io/ossocket.h"
 #include "nacl_io/pepper_interface.h"
 
@@ -222,8 +228,10 @@ int HostResolver::getaddrinfo(const char* node,
   *result = NULL;
   struct addrinfo* end = NULL;
 
-  if (node == NULL && service == NULL)
+  if (node == NULL && service == NULL) {
+    LOG_TRACE("node and service are NULL.");
     return EAI_NONAME;
+  }
 
   // Check the service name (port).  Currently we only handle numeric
   // services.
@@ -231,9 +239,10 @@ int HostResolver::getaddrinfo(const char* node,
   if (service != NULL) {
     char* cp;
     port = strtol(service, &cp, 10);
-    if (port > 0 && port <= 65535 && *cp == '\0') {
+    if (port >= 0 && port <= UINT16_MAX && *cp == '\0') {
       port = htons(port);
     } else {
+      LOG_TRACE("Service \"%s\" not supported.", service);
       return EAI_SERVICE;
     }
   }
@@ -249,6 +258,7 @@ int HostResolver::getaddrinfo(const char* node,
     case AF_UNSPEC:
       break;
     default:
+      LOG_TRACE("Unknown family: %d.", hints->ai_family);
       return EAI_FAMILY;
   }
 
@@ -298,16 +308,23 @@ int HostResolver::getaddrinfo(const char* node,
     return 0;
   }
 
-  if (NULL == ppapi_)
+  if (NULL == ppapi_) {
+    LOG_ERROR("ppapi_ is NULL.");
     return EAI_SYSTEM;
+  }
 
   // Use PPAPI interface to resolve nodename
   HostResolverInterface* resolver_iface = ppapi_->GetHostResolverInterface();
-  VarInterface* var_interface = ppapi_->GetVarInterface();
+  VarInterface* var_iface = ppapi_->GetVarInterface();
   NetAddressInterface* netaddr_iface = ppapi_->GetNetAddressInterface();
 
-  if (NULL == resolver_iface || NULL == var_interface || NULL == netaddr_iface)
+  if (!(resolver_iface && var_iface && netaddr_iface)) {
+    LOG_ERROR("Got NULL interface(s): %s%s%s",
+              resolver_iface ? "" : "HostResolver ",
+              var_iface ? "" : "Var ",
+              netaddr_iface ? "" : "NetAddress");
     return EAI_SYSTEM;
+  }
 
   ScopedResource scoped_resolver(ppapi_,
                                  resolver_iface->Create(ppapi_->GetInstance()));
@@ -337,7 +354,7 @@ int HostResolver::getaddrinfo(const char* node,
     PP_Var name_var = resolver_iface->GetCanonicalName(resolver);
     if (PP_VARTYPE_STRING == name_var.type) {
       uint32_t len = 0;
-      const char* tmp = var_interface->VarToUtf8(name_var, &len);
+      const char* tmp = var_iface->VarToUtf8(name_var, &len);
       // For some reason GetCanonicalName alway returns an empty
       // string so this condition is never true.
       // TODO(sbc): investigate this issue with PPAPI team.
@@ -350,7 +367,7 @@ int HostResolver::getaddrinfo(const char* node,
     }
     if (!canon_name)
       canon_name = strdup(node);
-    var_interface->Release(name_var);
+    var_iface->Release(name_var);
   }
 
   int num_addresses = resolver_iface->GetNetAddressCount(resolver);

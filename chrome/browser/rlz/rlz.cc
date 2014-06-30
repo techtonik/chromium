@@ -20,15 +20,15 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/google/google_brand.h"
-#include "chrome/browser/google/google_util.h"
 #include "chrome/browser/omnibox/omnibox_log.h"
 #include "chrome/browser/prefs/session_startup_pref.h"
-#include "chrome/browser/search_engines/template_url.h"
 #include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
+#include "components/google/core/browser/google_util.h"
+#include "components/search_engines/template_url.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/notification_service.h"
@@ -237,7 +237,8 @@ bool RLZTracker::InitRlzFromProfileDelayed(Profile* profile,
     const TemplateURL* url_template =
         template_url_service->GetDefaultSearchProvider();
     is_google_default_search =
-        url_template && url_template->url_ref().HasGoogleBaseURLs();
+        url_template && url_template->url_ref().HasGoogleBaseURLs(
+            template_url_service->search_terms_data());
   }
 
   PrefService* pref_service = profile->GetPrefs();

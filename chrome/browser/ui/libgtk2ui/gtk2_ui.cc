@@ -45,6 +45,7 @@
 #include "ui/gfx/skbitmap_operations.h"
 #include "ui/gfx/skia_util.h"
 #include "ui/views/controls/button/label_button.h"
+#include "ui/views/controls/button/label_button_border.h"
 #include "ui/views/linux_ui/window_button_order_observer.h"
 
 #if defined(USE_GCONF)
@@ -58,6 +59,8 @@
 //
 // - Render and inject the omnibox background.
 // - Make sure to test with a light on dark theme, too.
+
+namespace libgtk2ui {
 
 namespace {
 
@@ -237,16 +240,16 @@ void PickButtonTintFromColors(const GdkColor& accent_gdk_color,
                               const GdkColor& text_color,
                               const GdkColor& background_color,
                               color_utils::HSL* tint) {
-  SkColor accent_color = libgtk2ui::GdkColorToSkColor(accent_gdk_color);
+  SkColor accent_color = GdkColorToSkColor(accent_gdk_color);
   color_utils::HSL accent_tint;
   color_utils::SkColorToHSL(accent_color, &accent_tint);
 
   color_utils::HSL text_tint;
-  color_utils::SkColorToHSL(libgtk2ui::GdkColorToSkColor(text_color),
+  color_utils::SkColorToHSL(GdkColorToSkColor(text_color),
                             &text_tint);
 
   color_utils::HSL background_tint;
-  color_utils::SkColorToHSL(libgtk2ui::GdkColorToSkColor(background_color),
+  color_utils::SkColorToHSL(GdkColorToSkColor(background_color),
                             &background_tint);
 
   // If the accent color is gray, then our normal HSL tomfoolery will bring out
@@ -297,7 +300,7 @@ void PickButtonTintFromColors(const GdkColor& accent_gdk_color,
 // Applies an HSL shift to a GdkColor (instead of an SkColor)
 void GdkColorHSLShift(const color_utils::HSL& shift, GdkColor* frame_color) {
   SkColor shifted = color_utils::HSLShift(
-      libgtk2ui::GdkColorToSkColor(*frame_color), shift);
+      GdkColorToSkColor(*frame_color), shift);
 
   frame_color->pixel = 0;
   frame_color->red = SkColorGetR(shifted) * kSkiaToGDKMultiplier;
@@ -327,8 +330,6 @@ color_utils::HSL GetDefaultTint(int id) {
 }
 
 }  // namespace
-
-namespace libgtk2ui {
 
 Gtk2UI::Gtk2UI() : middle_click_action_(MIDDLE_CLICK_ACTION_LOWER) {
   GtkInitFromCommandLine(*CommandLine::ForCurrentProcess());
@@ -557,9 +558,9 @@ gfx::Image Gtk2UI::GetIconForContentType(
 
 scoped_ptr<views::Border> Gtk2UI::CreateNativeBorder(
     views::LabelButton* owning_button,
-    scoped_ptr<views::Border> border) {
+    scoped_ptr<views::LabelButtonBorder> border) {
   if (owning_button->GetNativeTheme() != NativeThemeGtk2::instance())
-    return border.Pass();
+    return border.PassAs<views::Border>();
 
   return scoped_ptr<views::Border>(
       new Gtk2Border(this, owning_button, border.Pass()));
@@ -751,7 +752,7 @@ void Gtk2UI::GetScrollbarColors(GdkColor* thumb_active_color,
   // Draw scrollbar thumb part and track into offscreen image
   const int kWidth  = 100;
   const int kHeight = 20;
-  GtkStyle*  style  = gtk_rc_get_style(scrollbar);
+  GtkStyle* style   = gtk_rc_get_style(scrollbar);
   GdkWindow* gdk_window = gtk_widget_get_window(window);
   GdkPixmap* pm     = gdk_pixmap_new(gdk_window, kWidth, kHeight, -1);
   GdkRectangle rect = { 0, 0, kWidth, kHeight };
@@ -1242,6 +1243,7 @@ SkBitmap Gtk2UI::GenerateGTKIcon(int base_id) const {
   if (gtk_state == GTK_STATE_ACTIVE || gtk_state == GTK_STATE_PRELIGHT) {
     SkBitmap border = DrawGtkButtonBorder(gtk_state,
                                           false,
+                                          false,
                                           default_bitmap.width(),
                                           default_bitmap.height());
     canvas.drawBitmap(border, 0, 0);
@@ -1269,6 +1271,7 @@ SkBitmap Gtk2UI::GenerateToolbarBezel(int gtk_state, int sizing_idr) const {
   SkCanvas canvas(retval);
   SkBitmap border = DrawGtkButtonBorder(
       gtk_state,
+      false,
       false,
       default_bitmap.width(),
       default_bitmap.height());
@@ -1310,6 +1313,7 @@ void Gtk2UI::GetSelectedEntryForegroundHSL(color_utils::HSL* tint) const {
 
 SkBitmap Gtk2UI::DrawGtkButtonBorder(int gtk_state,
                                      bool focused,
+                                     bool call_to_action,
                                      int width,
                                      int height) const {
   // Create a temporary GTK button to snapshot
@@ -1321,6 +1325,9 @@ SkBitmap Gtk2UI::DrawGtkButtonBorder(int gtk_state,
   gtk_widget_realize(button);
   gtk_widget_show(button);
   gtk_widget_show(window);
+
+  if (call_to_action)
+    GTK_WIDGET_SET_FLAGS(button, GTK_HAS_DEFAULT);
 
   if (focused) {
     // We can't just use gtk_widget_grab_focus() here because that sets

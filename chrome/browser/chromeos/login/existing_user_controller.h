@@ -81,15 +81,10 @@ class ExistingUserController : public LoginDisplay::Delegate,
   virtual void CompleteLogin(const UserContext& user_context) OVERRIDE;
   virtual base::string16 GetConnectedNetworkName() OVERRIDE;
   virtual bool IsSigninInProgress() const OVERRIDE;
-  virtual void Login(const UserContext& user_context) OVERRIDE;
+  virtual void Login(const UserContext& user_context,
+                     const SigninSpecifics& specifics) OVERRIDE;
   virtual void MigrateUserData(const std::string& old_password) OVERRIDE;
-  virtual void LoginAsRetailModeUser() OVERRIDE;
-  virtual void LoginAsGuest() OVERRIDE;
-  virtual void LoginAsPublicAccount(const std::string& username) OVERRIDE;
-  virtual void LoginAsKioskApp(const std::string& app_id,
-                               bool diagnostic_mode) OVERRIDE;
   virtual void OnSigninScreenReady() OVERRIDE;
-  virtual void OnUserSelected(const std::string& username) OVERRIDE;
   virtual void OnStartEnterpriseEnrollment() OVERRIDE;
   virtual void OnStartKioskEnableScreen() OVERRIDE;
   virtual void OnStartKioskAutolaunchScreen() OVERRIDE;
@@ -98,6 +93,11 @@ class ExistingUserController : public LoginDisplay::Delegate,
   virtual void SetDisplayEmail(const std::string& email) OVERRIDE;
   virtual void ShowWrongHWIDScreen() OVERRIDE;
   virtual void Signout() OVERRIDE;
+
+  virtual void LoginAsRetailModeUser();
+  virtual void LoginAsGuest();
+  virtual void LoginAsPublicAccount(const std::string& username);
+  virtual void LoginAsKioskApp(const std::string& app_id, bool diagnostic_mode);
 
   // content::NotificationObserver implementation.
   virtual void Observe(int type,
@@ -120,6 +120,14 @@ class ExistingUserController : public LoginDisplay::Delegate,
   LoginDisplayHost* login_display_host() {
     return host_;
   }
+
+  // Returns value of LoginPerformer::auth_mode() (cached if performer is
+  // destroyed).
+  LoginPerformer::AuthorizationMode auth_mode() const;
+
+  // Returns value of LoginPerformer::password_changed() (cached if performer is
+  // destroyed).
+  bool password_changed() const;
 
  private:
   friend class ExistingUserControllerTest;
@@ -280,6 +288,10 @@ class ExistingUserController : public LoginDisplay::Delegate,
   // True if password has been changed for user who is completing sign in.
   // Set in OnLoginSuccess. Before that use LoginPerformer::password_changed().
   bool password_changed_;
+
+  // Set in OnLoginSuccess. Before that use LoginPerformer::auth_mode().
+  // Initialized with AUTH_MODE_EXTENSION as more restricted mode.
+  LoginPerformer::AuthorizationMode auth_mode_;
 
   // True if auto-enrollment should be performed before starting the user's
   // session.

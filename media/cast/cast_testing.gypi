@@ -14,10 +14,13 @@
         'cast_receiver',
         'cast_transport',
         '<(DEPTH)/testing/gtest.gyp:gtest',
+        '<(DEPTH)/third_party/ffmpeg/ffmpeg.gyp:ffmpeg',
         '<(DEPTH)/third_party/libyuv/libyuv.gyp:libyuv',
         '<(DEPTH)/ui/gfx/gfx.gyp:gfx_geometry',
       ],
       'sources': [
+        'test/fake_media_source.cc',
+        'test/fake_media_source.h',
         'test/fake_single_thread_task_runner.cc',
         'test/fake_single_thread_task_runner.h',
         'test/skewed_single_thread_task_runner.cc',
@@ -124,6 +127,42 @@
       ], # source
     },
     {
+      'target_name': 'cast_benchmarks',
+      'type': '<(gtest_target_type)',
+      'include_dirs': [
+        '<(DEPTH)/',
+      ],
+      'dependencies': [
+        'cast_base',
+        'cast_receiver',
+        'cast_rtcp',
+        'cast_sender',
+        'cast_test_utility',
+        'cast_transport',
+        '<(DEPTH)/base/base.gyp:test_support_base',
+        '<(DEPTH)/net/net.gyp:net',
+        '<(DEPTH)/testing/gtest.gyp:gtest',
+      ],
+      'sources': [
+        'test/cast_benchmarks.cc',
+        'test/fake_single_thread_task_runner.cc',
+        'test/fake_single_thread_task_runner.h',
+        'test/fake_video_encode_accelerator.cc',
+        'test/fake_video_encode_accelerator.h',
+        'test/utility/test_util.cc',
+        'test/utility/test_util.h',
+      ], # source
+      'conditions': [
+        ['os_posix==1 and OS!="mac" and OS!="ios" and use_allocator!="none"',
+          {
+            'dependencies': [
+              '<(DEPTH)/base/allocator/allocator.gyp:allocator',
+            ],
+          }
+        ],
+      ],
+    },
+    {
       # This is a target for the collection of cast development tools.
       # They are built on bots but not shipped.
       'target_name': 'cast_tools',
@@ -187,6 +226,28 @@
       ],
       'sources': [
         '<(DEPTH)/media/cast/test/sender.cc',
+      ],
+    },
+    {
+      'target_name': 'cast_simulator',
+      'type': 'executable',
+      'include_dirs': [
+        '<(DEPTH)/',
+      ],
+      'dependencies': [
+        'cast_base',
+        'cast_sender',
+        'cast_test_utility',
+        'cast_transport',
+        '<(DEPTH)/net/net.gyp:net_test_support',
+        '<(DEPTH)/media/media.gyp:media',
+        '<(DEPTH)/testing/gtest.gyp:gtest',
+        '<(DEPTH)/third_party/ffmpeg/ffmpeg.gyp:ffmpeg',
+        '<(DEPTH)/third_party/opus/opus.gyp:opus',
+        '<(DEPTH)/ui/gfx/gfx.gyp:gfx_geometry',
+      ],
+      'sources': [
+        '<(DEPTH)/media/cast/test/simulator.cc',
       ],
     },
     {

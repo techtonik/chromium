@@ -2168,3 +2168,28 @@ name=bug_377728
 *!HunspellEngine::FillSuggestionList
 *!SpellcheckLanguage::SpellCheckWord
 *!SpellCheck::SpellCheckWord
+
+UNINITIALIZED READ
+name=bug_387373
+*!blink::WebEmbeddedWorkerImpl::startWorkerContext
+*!content::EmbeddedWorkerDispatcher::OnStartWorker
+*!EmbeddedWorkerMsg_StartWorker::Dispatch<>
+
+UNINITIALIZED READ
+name=bug_389263
+*!BrowserView::ShowAvatarBubbleFromAvatarButton
+*!OpaqueBrowserFrameView::ButtonPressed
+*!views::Button::NotifyClick
+*!ProfileChooserViewBrowserTest::OpenProfileChooserView
+
+UNADDRESSABLE ACCESS
+name=bug_389132
+content.dll!crypto_kernel_do_load_cipher_type
+content.dll!crypto_kernel_load_cipher_type
+content.dll!crypto_kernel_init
+content.dll!cricket::SrtpSession::SetKey
+content.dll!cricket::SrtpSession::SetSend
+content.dll!cricket::SrtpFilter::SetRtpParams
+content.dll!cricket::BaseChannel::SetupDtlsSrtp
+content.dll!cricket::BaseChannel::ChannelWritable_w
+content.dll!cricket::BaseChannel::OnWritableState

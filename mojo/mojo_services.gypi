@@ -124,7 +124,7 @@
       'target_name': 'mojo_native_viewport_bindings',
       'type': 'static_library',
       'sources': [
-        'services/native_viewport/native_viewport.mojom',
+        'services/public/interfaces/native_viewport/native_viewport.mojom',
       ],
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
@@ -163,6 +163,7 @@
         'services/native_viewport/native_viewport.h',
         'services/native_viewport/native_viewport_android.cc',
         'services/native_viewport/native_viewport_mac.mm',
+        'services/native_viewport/native_viewport_ozone.cc',
         'services/native_viewport/native_viewport_service.cc',
         'services/native_viewport/native_viewport_service.h',
         'services/native_viewport/native_viewport_stub.cc',
@@ -180,6 +181,21 @@
             'mojo_jni_headers',
           ],
         }],
+      ],
+    },
+    {
+      'target_name': 'mojo_navigation_bindings',
+      'type': 'static_library',
+      'sources': [
+        'services/public/interfaces/navigation/navigation.mojom',
+      ],
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'export_dependent_settings': [
+        'mojo_cpp_bindings',
+      ],
+      'dependencies': [
+        'mojo_cpp_bindings',
+        'mojo_network_bindings',
       ],
     },
     {
@@ -209,6 +225,7 @@
         'mojo_common_lib',
         'mojo_environment_chromium',
         'mojo_network_bindings',
+        'mojo_profile_service_bindings',
         'mojo_system_impl',
       ],
       'export_dependent_settings': [
@@ -228,7 +245,41 @@
       'target_name': 'mojo_view_manager_common',
       'type': 'static_library',
       'sources': [
-        'services/public/cpp/view_manager/view_manager_types.h',
+        'services/public/cpp/view_manager/types.h',
+      ],
+    },
+    {
+      'target_name': 'mojo_launcher_bindings',
+      'type': 'static_library',
+      'sources': [
+        'services/public/interfaces/launcher/launcher.mojom',
+      ],
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'export_dependent_settings': [
+        'mojo_cpp_bindings',
+      ],
+      'dependencies': [
+        'mojo_cpp_bindings',
+        'mojo_navigation_bindings',
+      ],
+    },
+    {
+      'target_name': 'mojo_launcher',
+      'type': 'shared_library',
+      'dependencies': [
+        '../base/base.gyp:base',
+        '../url/url.gyp:url_lib',
+        'mojo_application',
+        'mojo_cpp_bindings',
+        'mojo_environment_chromium',
+        'mojo_launcher_bindings',
+        'mojo_network_bindings',
+        'mojo_system_impl',
+        'mojo_utility',
+      ],
+      'sources': [
+        'services/launcher/launcher.cc',
+        'public/cpp/application/lib/mojo_main_chromium.cc',
       ],
     },
     {
@@ -236,6 +287,7 @@
       'type': 'static_library',
       'sources': [
         'services/public/interfaces/view_manager/view_manager.mojom',
+        'services/public/interfaces/view_manager/view_manager_constants.mojom',
       ],
       'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
       'export_dependent_settings': [
@@ -253,6 +305,7 @@
       'dependencies': [
         '../base/base.gyp:base',
         '../skia/skia.gyp:skia',
+        '../ui/events/events.gyp:events',
         '../ui/gfx/gfx.gyp:gfx',
         '../ui/gfx/gfx.gyp:gfx_geometry',
         'mojo_application',
@@ -263,24 +316,25 @@
         'mojo_view_manager_common',
       ],
       'sources': [
+        'services/public/cpp/view_manager/lib/node.cc',
+        'services/public/cpp/view_manager/lib/node_observer.cc',
+        'services/public/cpp/view_manager/lib/node_private.cc',
+        'services/public/cpp/view_manager/lib/node_private.h',
         'services/public/cpp/view_manager/lib/view.cc',
         'services/public/cpp/view_manager/lib/view_private.cc',
         'services/public/cpp/view_manager/lib/view_private.h',
-        'services/public/cpp/view_manager/lib/view_manager_synchronizer.cc',
-        'services/public/cpp/view_manager/lib/view_manager_synchronizer.h',
-        'services/public/cpp/view_manager/lib/view_tree_host.cc',
-        'services/public/cpp/view_manager/lib/view_tree_node.cc',
-        'services/public/cpp/view_manager/lib/view_tree_node_observer.cc',
-        'services/public/cpp/view_manager/lib/view_tree_node_private.cc',
-        'services/public/cpp/view_manager/lib/view_tree_node_private.h',
+        'services/public/cpp/view_manager/lib/view_manager_client_impl.cc',
+        'services/public/cpp/view_manager/lib/view_manager_client_impl.h',
+        'services/public/cpp/view_manager/node.h',
+        'services/public/cpp/view_manager/node_observer.h',
         'services/public/cpp/view_manager/view.h',
+        'services/public/cpp/view_manager/view_event_dispatcher.h',
         'services/public/cpp/view_manager/view_manager.h',
         'services/public/cpp/view_manager/view_manager_delegate.h',
-        'services/public/cpp/view_manager/view_manager_types.h',
         'services/public/cpp/view_manager/view_observer.h',
-        'services/public/cpp/view_manager/view_tree_host.h',
-        'services/public/cpp/view_manager/view_tree_node.h',
-        'services/public/cpp/view_manager/view_tree_node_observer.h',
+      ],
+      'export_dependent_settings': [
+        'mojo_view_manager_bindings',
       ],
     },
     {
@@ -298,10 +352,9 @@
         'mojo_view_manager_lib',
       ],
       'sources': [
+        'services/public/cpp/view_manager/tests/node_unittest.cc',
         'services/public/cpp/view_manager/tests/view_unittest.cc',
         'services/public/cpp/view_manager/tests/view_manager_unittest.cc',
-        'services/public/cpp/view_manager/tests/view_tree_host_unittest.cc',
-        'services/public/cpp/view_manager/tests/view_tree_node_unittest.cc',
       ],
       'conditions': [
         ['use_aura==1', {
@@ -312,7 +365,24 @@
           'dependencies': [
             'mojo_run_all_unittests',
           ],
-        }]
+        }],
+      ],
+    },
+    {
+      'target_name': 'mojo_surfaces_bindings',
+      'type': 'static_library',
+      'sources': [
+        'services/public/interfaces/surfaces/surfaces.mojom',
+        'services/public/interfaces/surfaces/surface_id.mojom',
+        'services/public/interfaces/surfaces/quads.mojom',
+      ],
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'export_dependent_settings': [
+        'mojo_cpp_bindings',
+      ],
+      'dependencies': [
+        'mojo_cpp_bindings',
+        'mojo_geometry_bindings',
       ],
     },
     {
@@ -331,7 +401,7 @@
     },
     {
       'target_name': 'mojo_test_service',
-      'type': 'shared_library',
+      'type': 'loadable_module',
       'dependencies': [
         '../base/base.gyp:base',
         'mojo_application',
@@ -343,8 +413,35 @@
       'sources': [
         'public/cpp/application/lib/mojo_main_standalone.cc',
         'services/test_service/test_service_application.cc',
+        'services/test_service/test_service_application.h',
         'services/test_service/test_service_impl.cc',
         'services/test_service/test_service_impl.h',
+      ],
+    },
+    {
+      'target_name': 'mojo_profile_service_bindings',
+      'type': 'static_library',
+      'sources': [
+        'services/public/interfaces/profile/profile_service.mojom',
+      ],
+      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
+      'export_dependent_settings': [
+        'mojo_cpp_bindings',
+      ],
+      'dependencies': [
+        'mojo_cpp_bindings',
+      ],
+    },
+    {
+      'target_name': 'mojo_profile_service',
+      'type': 'static_library',
+      'sources': [
+        'services/profile/profile_service_impl.cc',
+        'services/profile/profile_service_impl.h',
+      ],
+      'dependencies': [
+        '../base/base.gyp:base',
+        'mojo_profile_service_bindings',
       ],
     },
   ],
@@ -368,7 +465,7 @@
             '../ui/gl/gl.gyp:gl',
             '../webkit/common/gpu/webkit_gpu.gyp:webkit_gpu',
             'mojo_application',
-            'mojo_aura_support',
+            'mojo_cc_support',
             'mojo_common_lib',
             'mojo_environment_chromium',
             'mojo_geometry_bindings',
@@ -393,13 +490,15 @@
             'services/view_manager/root_view_manager.cc',
             'services/view_manager/root_view_manager.h',
             'services/view_manager/root_view_manager_delegate.h',
+            'services/view_manager/screen_impl.cc',
+            'services/view_manager/screen_impl.h',
             'services/view_manager/view.cc',
             'services/view_manager/view.h',
-            'services/view_manager/view_manager_connection.cc',
-            'services/view_manager/view_manager_connection.h',
-            'services/view_manager/view_manager_init_connection.cc',
-            'services/view_manager/view_manager_init_connection.h',
             'services/view_manager/view_manager_export.h',
+            'services/view_manager/view_manager_init_service_impl.cc',
+            'services/view_manager/view_manager_init_service_impl.h',
+            'services/view_manager/view_manager_service_impl.cc',
+            'services/view_manager/view_manager_service_impl.h',
             'services/view_manager/context_factory_impl.cc',
             'services/view_manager/context_factory_impl.h',
             'services/view_manager/window_tree_host_impl.cc',
@@ -421,6 +520,19 @@
             'services/public/cpp/view_manager/lib/view_manager_test_suite.cc',
             'services/public/cpp/view_manager/lib/view_manager_test_suite.h',
             'services/public/cpp/view_manager/lib/view_manager_unittests.cc',
+          ],
+          'conditions': [
+            ['OS=="linux"', {
+              'dependencies': [
+                '../third_party/mesa/mesa.gyp:osmesa',
+                'mojo_native_viewport_service',
+              ],
+            }],
+            ['use_x11==1', {
+              'dependencies': [
+                '../ui/gfx/x/gfx_x11.gyp:gfx_x11',
+              ],
+            }],
           ],
         },
         {
@@ -450,7 +562,7 @@
           'sources': [
             'services/view_manager/test_change_tracker.cc',
             'services/view_manager/test_change_tracker.h',
-            'services/view_manager/view_manager_connection_unittest.cc',
+            'services/view_manager/view_manager_unittest.cc',
           ],
         },
         {

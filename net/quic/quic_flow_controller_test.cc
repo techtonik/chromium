@@ -5,7 +5,6 @@
 #include "net/quic/quic_flow_controller.h"
 
 #include "base/strings/stringprintf.h"
-#include "net/quic/quic_flags.h"
 #include "net/quic/quic_utils.h"
 #include "net/quic/test_tools/quic_connection_peer.h"
 #include "net/quic/test_tools/quic_flow_controller_peer.h"
@@ -24,11 +23,10 @@ class QuicFlowControllerTest : public ::testing::Test {
  public:
   QuicFlowControllerTest()
       : stream_id_(1234),
-        send_window_(kInitialFlowControlWindowForTest),
-        receive_window_(kInitialFlowControlWindowForTest),
-        max_receive_window_(kInitialFlowControlWindowForTest),
-        connection_(false),
-        old_flag_(&FLAGS_enable_quic_stream_flow_control_2, true) {
+        send_window_(kInitialSessionFlowControlWindowForTest),
+        receive_window_(kInitialSessionFlowControlWindowForTest),
+        max_receive_window_(kInitialSessionFlowControlWindowForTest),
+        connection_(false) {
   }
 
   void Initialize() {
@@ -44,7 +42,6 @@ class QuicFlowControllerTest : public ::testing::Test {
   uint64 max_receive_window_;
   scoped_ptr<QuicFlowController> flow_controller_;
   MockConnection connection_;
-  ValueRestore<bool> old_flag_;
 };
 
 TEST_F(QuicFlowControllerTest, SendingBytes) {
@@ -95,7 +92,7 @@ TEST_F(QuicFlowControllerTest, ReceivingBytes) {
   EXPECT_TRUE(flow_controller_->IsEnabled());
   EXPECT_FALSE(flow_controller_->IsBlocked());
   EXPECT_FALSE(flow_controller_->FlowControlViolation());
-  EXPECT_EQ(kInitialFlowControlWindowForTest,
+  EXPECT_EQ(kInitialSessionFlowControlWindowForTest,
             QuicFlowControllerPeer::ReceiveWindowSize(flow_controller_.get()));
 
   // Receive some bytes, updating highest received offset, but not enough to
@@ -113,16 +110,15 @@ TEST_F(QuicFlowControllerTest, ReceivingBytes) {
 
   // Result is that once again we have a fully open receive window.
   EXPECT_FALSE(flow_controller_->FlowControlViolation());
-  EXPECT_EQ(kInitialFlowControlWindowForTest,
+  EXPECT_EQ(kInitialSessionFlowControlWindowForTest,
             QuicFlowControllerPeer::ReceiveWindowSize(flow_controller_.get()));
 }
 
 TEST_F(QuicFlowControllerTest,
        DisabledWhenQuicVersionDoesNotSupportFlowControl) {
   // Only support version 16: no flow control.
-  QuicVersionVector supported_versions;
-  supported_versions.push_back(QUIC_VERSION_16);
-  QuicConnectionPeer::SetSupportedVersions(&connection_, supported_versions);
+  QuicConnectionPeer::SetSupportedVersions(&connection_,
+                                           SupportedVersions(QUIC_VERSION_16));
 
   Initialize();
 

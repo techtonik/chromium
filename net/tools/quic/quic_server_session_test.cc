@@ -52,11 +52,16 @@ class QuicServerSessionTest : public ::testing::TestWithParam<QuicVersion> {
                        QuicRandom::GetInstance()) {
     config_.SetDefaults();
     config_.set_max_streams_per_connection(3, 3);
+    config_.SetInitialFlowControlWindowToSend(
+        kInitialSessionFlowControlWindowForTest);
+    config_.SetInitialStreamFlowControlWindowToSend(
+        kInitialStreamFlowControlWindowForTest);
+    config_.SetInitialSessionFlowControlWindowToSend(
+        kInitialSessionFlowControlWindowForTest);
 
     connection_ =
         new StrictMock<MockConnection>(true, SupportedVersions(GetParam()));
-    session_.reset(new QuicServerSession(
-        config_, connection_, kInitialFlowControlWindowForTest, &owner_));
+    session_.reset(new QuicServerSession(config_, connection_, &owner_));
     session_->InitializeSession(crypto_config_);
     visitor_ = QuicConnectionPeer::GetVisitor(connection_);
   }

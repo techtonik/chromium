@@ -17,11 +17,13 @@
 #include "chrome/browser/autocomplete/autocomplete_controller.h"
 #include "chrome/browser/autocomplete/autocomplete_match.h"
 #include "chrome/browser/autocomplete/autocomplete_provider.h"
+#include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/history/history_service.h"
 #include "chrome/browser/history/history_service_factory.h"
-#include "chrome/browser/history/url_database.h"
 #include "chrome/browser/search/search.h"
-#include "chrome/browser/search_engines/template_url.h"
+#include "components/history/core/browser/url_database.h"
+#include "components/metrics/proto/omnibox_event.pb.h"
+#include "components/search_engines/template_url.h"
 #include "content/public/browser/web_ui.h"
 #include "mojo/common/common_type_converters.h"
 
@@ -168,17 +170,13 @@ void OmniboxUIHandler::StartOmniboxQuery(const mojo::String& input_string,
   ResetController();
   time_omnibox_started_ = base::Time::Now();
   input_ = AutocompleteInput(
-      input_string.To<base::string16>(),
-      cursor_position,
-      base::string16(),  // user's desired tld (top-level domain)
+      input_string.To<base::string16>(), cursor_position, base::string16(),
       GURL(),
-      static_cast<AutocompleteInput::PageClassification>(
+      static_cast<metrics::OmniboxEventProto::PageClassification>(
           page_classification),
-      prevent_inline_autocomplete,
-      prefer_keyword,
-      true,  // allow exact keyword matches
-      true);
-  controller_->Start(input_);  // want all matches
+      prevent_inline_autocomplete, prefer_keyword, true, true,
+      ChromeAutocompleteSchemeClassifier(profile_));
+  controller_->Start(input_);
 }
 
 void OmniboxUIHandler::ResetController() {

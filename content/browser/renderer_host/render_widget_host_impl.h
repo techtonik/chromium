@@ -192,6 +192,11 @@ class CONTENT_EXPORT RenderWidgetHostImpl
   virtual void AccessibilityHitTest(const gfx::Point& point) OVERRIDE;
   virtual void AccessibilityFatalError() OVERRIDE;
 
+  // Forces redraw in the renderer and when the update reaches the browser
+  // grabs snapshot from the compositor. Returns PNG-encoded snapshot.
+  void GetSnapshotFromBrowser(
+      const base::Callback<void(const unsigned char*,size_t)> callback);
+
   const NativeWebKeyboardEvent* GetLastKeyboardEvent() const;
 
   // Notification that the screen info has changed.
@@ -255,6 +260,8 @@ class CONTENT_EXPORT RenderWidgetHostImpl
 
   // Whether pausing may be useful.
   bool CanPauseForPendingResizeOrRepaints();
+
+  bool resize_ack_pending_for_testing() { return resize_ack_pending_; }
 
   // Wait for a surface matching the size of the widget's view, possibly
   // blocking until the renderer sends a new frame.
@@ -627,9 +634,9 @@ class CONTENT_EXPORT RenderWidgetHostImpl
   virtual void OnBlur();
   void OnSetCursor(const WebCursor& cursor);
   void OnSetTouchEventEmulationEnabled(bool enabled, bool allow_pinch);
-  void OnTextInputTypeChanged(ui::TextInputType type,
-                              ui::TextInputMode input_mode,
-                              bool can_compose_inline);
+  void OnTextInputStateChanged(
+      const ViewHostMsg_TextInputState_Params& params);
+
 #if defined(OS_MACOSX) || defined(USE_AURA)
   void OnImeCompositionRangeChanged(
       const gfx::Range& range,
@@ -693,7 +700,17 @@ class CONTENT_EXPORT RenderWidgetHostImpl
   // which may get in recursive loops).
   void DelayedAutoResized();
 
+  void WindowOldSnapshotReachedScreen(int snapshot_id);
+
   void WindowSnapshotReachedScreen(int snapshot_id);
+
+  void OnSnapshotDataReceived(int snapshot_id,
+                              const unsigned char* png,
+                              size_t size);
+
+  void OnSnapshotDataReceivedAsync(
+      int snapshot_id,
+      scoped_refptr<base::RefCountedBytes> png_data);
 
   // Send a message to the renderer process to change the accessibility mode.
   void SetAccessibilityMode(AccessibilityMode AccessibilityMode);
@@ -861,6 +878,11 @@ class CONTENT_EXPORT RenderWidgetHostImpl
 #endif
 
   int64 last_input_number_;
+
+  int next_browser_snapshot_id_;
+  typedef std::map<int,
+      base::Callback<void(const unsigned char*, size_t)> > PendingSnapshotMap;
+  PendingSnapshotMap pending_browser_snapshots_;
 
   DISALLOW_COPY_AND_ASSIGN(RenderWidgetHostImpl);
 };

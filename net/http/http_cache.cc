@@ -290,6 +290,7 @@ HttpCache::HttpCache(const net::HttpNetworkSession::Params& params,
     : net_log_(params.net_log),
       backend_factory_(backend_factory),
       building_backend_(false),
+      bypass_lock_for_test_(false),
       mode_(NORMAL),
       network_layer_(new HttpNetworkLayer(new HttpNetworkSession(params))),
       weak_factory_(this) {
@@ -304,6 +305,7 @@ HttpCache::HttpCache(HttpNetworkSession* session,
     : net_log_(session->net_log()),
       backend_factory_(backend_factory),
       building_backend_(false),
+      bypass_lock_for_test_(false),
       mode_(NORMAL),
       network_layer_(new HttpNetworkLayer(session)),
       weak_factory_(this) {
@@ -315,6 +317,7 @@ HttpCache::HttpCache(HttpTransactionFactory* network_layer,
     : net_log_(net_log),
       backend_factory_(backend_factory),
       building_backend_(false),
+      bypass_lock_for_test_(false),
       mode_(NORMAL),
       network_layer_(network_layer),
       weak_factory_(this) {
@@ -416,17 +419,13 @@ void HttpCache::WriteMetadata(const GURL& url,
 }
 
 void HttpCache::CloseAllConnections() {
-  net::HttpNetworkLayer* network =
-      static_cast<net::HttpNetworkLayer*>(network_layer_.get());
-  HttpNetworkSession* session = network->GetSession();
+  HttpNetworkSession* session = GetSession();
   if (session)
     session->CloseAllConnections();
 }
 
 void HttpCache::CloseIdleConnections() {
-  net::HttpNetworkLayer* network =
-      static_cast<net::HttpNetworkLayer*>(network_layer_.get());
-  HttpNetworkSession* session = network->GetSession();
+  HttpNetworkSession* session = GetSession();
   if (session)
     session->CloseIdleConnections();
 }
@@ -457,7 +456,12 @@ int HttpCache::CreateTransaction(RequestPriority priority,
     CreateBackend(NULL, net::CompletionCallback());
   }
 
-  trans->reset(new HttpCache::Transaction(priority, this));
+   HttpCache::Transaction* transaction =
+      new HttpCache::Transaction(priority, this);
+   if (bypass_lock_for_test_)
+    transaction->BypassLockForTest();
+
+  trans->reset(transaction);
   return OK;
 }
 
@@ -466,9 +470,7 @@ HttpCache* HttpCache::GetCache() {
 }
 
 HttpNetworkSession* HttpCache::GetSession() {
-  net::HttpNetworkLayer* network =
-      static_cast<net::HttpNetworkLayer*>(network_layer_.get());
-  return network->GetSession();
+  return network_layer_->GetSession();
 }
 
 scoped_ptr<HttpTransactionFactory>

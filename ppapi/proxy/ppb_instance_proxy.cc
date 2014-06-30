@@ -18,7 +18,6 @@
 #include "ppapi/proxy/browser_font_singleton_resource.h"
 #include "ppapi/proxy/content_decryptor_private_serializer.h"
 #include "ppapi/proxy/enter_proxy.h"
-#include "ppapi/proxy/extensions_common_resource.h"
 #include "ppapi/proxy/file_mapping_resource.h"
 #include "ppapi/proxy/flash_clipboard_resource.h"
 #include "ppapi/proxy/flash_file_resource.h"
@@ -27,6 +26,7 @@
 #include "ppapi/proxy/gamepad_resource.h"
 #include "ppapi/proxy/host_dispatcher.h"
 #include "ppapi/proxy/isolated_file_system_private_resource.h"
+#include "ppapi/proxy/message_handler.h"
 #include "ppapi/proxy/network_proxy_resource.h"
 #include "ppapi/proxy/pdf_resource.h"
 #include "ppapi/proxy/plugin_dispatcher.h"
@@ -39,6 +39,7 @@
 #include "ppapi/shared_impl/ppb_view_shared.h"
 #include "ppapi/shared_impl/var.h"
 #include "ppapi/thunk/enter.h"
+#include "ppapi/thunk/ppb_compositor_api.h"
 #include "ppapi/thunk/ppb_graphics_2d_api.h"
 #include "ppapi/thunk/ppb_graphics_3d_api.h"
 #include "ppapi/thunk/thunk.h"
@@ -50,6 +51,7 @@
 
 using ppapi::thunk::EnterInstanceNoLock;
 using ppapi::thunk::EnterResourceNoLock;
+using ppapi::thunk::PPB_Compositor_API;
 using ppapi::thunk::PPB_Graphics2D_API;
 using ppapi::thunk::PPB_Graphics3D_API;
 using ppapi::thunk::PPB_Instance_API;
@@ -214,36 +216,28 @@ PP_Bool PPB_Instance_Proxy::BindGraphics(PP_Instance instance,
                                          PP_Resource device) {
   // If device is 0, pass a null HostResource. This signals the host to unbind
   // all devices.
-  HostResource host_resource;
   PP_Resource pp_resource = 0;
   if (device) {
     Resource* resource =
         PpapiGlobals::Get()->GetResourceTracker()->GetResource(device);
     if (!resource || resource->pp_instance() != instance)
       return PP_FALSE;
-    host_resource = resource->host_resource();
-    pp_resource = resource->pp_resource();
-  } else {
-    // Passing 0 means unbinding all devices.
-    dispatcher()->Send(new PpapiHostMsg_PPBInstance_BindGraphics(
-        API_ID_PPB_INSTANCE, instance, 0));
-    return PP_TRUE;
+    // We need to pass different resource to Graphics 2D, 3D and Compositor
+    // right now.  Once 3D is migrated to the new design, we should be able to
+    // unify this.
+    if (resource->AsPPB_Graphics3D_API()) {
+      pp_resource = resource->host_resource().host_resource();
+    } else if (resource->AsPPB_Graphics2D_API() ||
+               resource->AsPPB_Compositor_API()) {
+      pp_resource = resource->pp_resource();
+    } else {
+      // A bad resource.
+      return PP_FALSE;
+    }
   }
-
-  // We need to pass different resource to Graphics 2D and 3D right now.  Once
-  // 3D is migrated to the new design, we should be able to unify this.
-  EnterResourceNoLock<PPB_Graphics2D_API> enter_2d(device, false);
-  EnterResourceNoLock<PPB_Graphics3D_API> enter_3d(device, false);
-  if (enter_2d.succeeded()) {
-    dispatcher()->Send(new PpapiHostMsg_PPBInstance_BindGraphics(
+  dispatcher()->Send(new PpapiHostMsg_PPBInstance_BindGraphics(
         API_ID_PPB_INSTANCE, instance, pp_resource));
-    return PP_TRUE;
-  } else if (enter_3d.succeeded()) {
-    dispatcher()->Send(new PpapiHostMsg_PPBInstance_BindGraphics(
-        API_ID_PPB_INSTANCE, instance, host_resource.host_resource()));
-    return PP_TRUE;
-  }
-  return PP_FALSE;
+  return PP_TRUE;
 }
 
 PP_Bool PPB_Instance_Proxy::IsFullFrame(PP_Instance instance) {
@@ -391,9 +385,6 @@ Resource* PPB_Instance_Proxy::GetSingletonResource(PP_Instance instance,
   switch (id) {
     case BROKER_SINGLETON_ID:
       new_singleton = new BrokerResource(connection, instance);
-      break;
-    case EXTENSIONS_COMMON_SINGLETON_ID:
-      new_singleton = new ExtensionsCommonResource(connection, instance);
       break;
     case FILE_MAPPING_SINGLETON_ID:
       new_singleton = new FileMappingResource(connection, instance);
@@ -774,17 +765,31 @@ void PPB_Instance_Proxy::PostMessage(PP_Instance instance,
       instance, SerializedVarSendInputShmem(dispatcher(), message,
                                             instance)));
 }
+
 int32_t PPB_Instance_Proxy::RegisterMessageHandler(
     PP_Instance instance,
     void* user_data,
     const PPP_MessageHandler_0_1* handler,
     PP_Resource message_loop) {
-  // Not yet implemented. See crbug.com/367896
-  return PP_ERROR_NOTSUPPORTED;
+  InstanceData* data =
+      static_cast<PluginDispatcher*>(dispatcher())->GetInstanceData(instance);
+  if (!data)
+    return PP_ERROR_BADARGUMENT;
+
+  int32_t result = PP_ERROR_FAILED;
+  scoped_ptr<MessageHandler> message_handler = MessageHandler::Create(
+      instance, handler, user_data, message_loop, &result);
+  if (message_handler)
+    data->message_handler = message_handler.Pass();
+  return result;
 }
 
 void PPB_Instance_Proxy::UnregisterMessageHandler(PP_Instance instance) {
-  // Not yet implemented. See crbug.com/367896
+  InstanceData* data =
+      static_cast<PluginDispatcher*>(dispatcher())->GetInstanceData(instance);
+  if (!data)
+    return;
+  data->message_handler.reset();
 }
 
 PP_Bool PPB_Instance_Proxy::SetCursor(PP_Instance instance,

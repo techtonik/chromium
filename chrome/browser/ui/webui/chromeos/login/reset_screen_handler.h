@@ -14,6 +14,8 @@
 #include "chromeos/dbus/update_engine_client.h"
 #include "content/public/browser/web_ui.h"
 
+class PrefRegistrySimple;
+
 namespace chromeos {
 
 // WebUI implementation of ResetScreenActor.
@@ -43,6 +45,9 @@ class ResetScreenHandler : public ResetScreenActor,
 
   void OnRollbackCheck(bool can_rollback);
 
+  // Registers Local State preferences.
+  static void RegisterPrefs(PrefRegistrySimple* registry);
+
  private:
   // JS messages handlers.
   void HandleOnCancel();
@@ -51,7 +56,6 @@ class ResetScreenHandler : public ResetScreenActor,
   void HandleOnLearnMore();
 
   void ChooseAndApplyShowScenario();
-  void OnRollbackFlagFileCheckDone(scoped_ptr<bool> file_exists);
   void ShowWithParams();
 
   Delegate* delegate_;

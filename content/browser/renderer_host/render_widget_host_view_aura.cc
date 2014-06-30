@@ -306,7 +306,19 @@ void GetScreenInfoForWindow(WebScreenInfo* results, aura::Window* window) {
   results->depth = 24;
   results->depthPerComponent = 8;
   results->deviceScaleFactor = display.device_scale_factor();
+
+  // The Display rotation and the WebScreenInfo orientation are not the same
+  // angle. The former is the physical display rotation while the later is the
+  // rotation required by the content to be shown properly on the screen, in
+  // other words, relative to the physical display.
   results->orientationAngle = display.RotationAsDegree();
+  if (results->orientationAngle == 90)
+    results->orientationAngle = 270;
+  else if (results->orientationAngle == 270)
+    results->orientationAngle = 90;
+
+  results->orientationType =
+      RenderWidgetHostViewBase::GetOrientationTypeFromDisplay(display);
 }
 
 bool PointerEventActivates(const ui::Event& event) {
@@ -430,6 +442,10 @@ RenderWidgetHostViewAura::RenderWidgetHostViewAura(RenderWidgetHost* host)
       paint_canvas_(NULL),
       synthetic_move_sent_(false),
       cursor_visibility_state_in_renderer_(UNKNOWN),
+#if defined(OS_WIN)
+      legacy_render_widget_host_HWND_(NULL),
+      legacy_window_destroyed_(false),
+#endif
       touch_editing_client_(NULL),
       weak_ptr_factory_(this) {
   host_->SetView(this);
@@ -448,20 +464,6 @@ RenderWidgetHostViewAura::RenderWidgetHostViewAura(RenderWidgetHost* host)
 
 ////////////////////////////////////////////////////////////////////////////////
 // RenderWidgetHostViewAura, RenderWidgetHostView implementation:
-
-bool RenderWidgetHostViewAura::OnMessageReceived(
-    const IPC::Message& message) {
-  bool handled = true;
-  IPC_BEGIN_MESSAGE_MAP(RenderWidgetHostViewAura, message)
-    // TODO(kevers): Move to RenderWidgetHostViewImpl and consolidate IPC
-    // messages for TextInput<State|Type>Changed. Corresponding code in
-    // RenderWidgetHostViewAndroid should also be moved at the same time.
-    IPC_MESSAGE_HANDLER(ViewHostMsg_TextInputStateChanged,
-                        OnTextInputStateChanged)
-    IPC_MESSAGE_UNHANDLED(handled = false)
-  IPC_END_MESSAGE_MAP()
-  return handled;
-}
 
 void RenderWidgetHostViewAura::InitAsChild(
     gfx::NativeView parent_view) {
@@ -813,25 +815,19 @@ void RenderWidgetHostViewAura::SetIsLoading(bool is_loading) {
   UpdateCursorIfOverSelf();
 }
 
-void RenderWidgetHostViewAura::TextInputTypeChanged(
-    ui::TextInputType type,
-    ui::TextInputMode input_mode,
-    bool can_compose_inline) {
-  if (text_input_type_ != type ||
-      text_input_mode_ != input_mode ||
-      can_compose_inline_ != can_compose_inline) {
-    text_input_type_ = type;
-    text_input_mode_ = input_mode;
-    can_compose_inline_ = can_compose_inline;
+void RenderWidgetHostViewAura::TextInputStateChanged(
+    const ViewHostMsg_TextInputState_Params& params) {
+  if (text_input_type_ != params.type ||
+      text_input_mode_ != params.mode ||
+      can_compose_inline_ != params.can_compose_inline) {
+    text_input_type_ = params.type;
+    text_input_mode_ = params.mode;
+    can_compose_inline_ = params.can_compose_inline;
     if (GetInputMethod())
       GetInputMethod()->OnTextInputTypeChanged(this);
     if (touch_editing_client_)
       touch_editing_client_->OnTextInputTypeChanged(text_input_type_);
   }
-}
-
-void RenderWidgetHostViewAura::OnTextInputStateChanged(
-    const ViewHostMsg_TextInputState_Params& params) {
   if (params.show_ime_if_needed && params.type != ui::TEXT_INPUT_TYPE_NONE) {
     if (GetInputMethod())
       GetInputMethod()->ShowImeIfNeeded();
@@ -1015,14 +1011,27 @@ void RenderWidgetHostViewAura::InternalSetBounds(const gfx::Rect& rect) {
   // coordinate translations done by these plugins to break.
   // Additonally the legacy dummy window is needed for accessibility and for
   // scrolling to work in legacy drivers for trackpoints/trackpads, etc.
-  if (GetNativeViewId()) {
+  if (!legacy_window_destroyed_ && GetNativeViewId()) {
     if (!legacy_render_widget_host_HWND_) {
       legacy_render_widget_host_HWND_ = LegacyRenderWidgetHostHWND::Create(
           reinterpret_cast<HWND>(GetNativeViewId()));
     }
     if (legacy_render_widget_host_HWND_) {
+      legacy_render_widget_host_HWND_->set_host(this);
       legacy_render_widget_host_HWND_->SetBounds(
           window_->GetBoundsInRootWindow());
+      // There are cases where the parent window is created, made visible and
+      // the associated RenderWidget is also visible before the
+      // LegacyRenderWidgetHostHWND instace is created. Ensure that it is shown
+      // here.
+      if (!host_->is_hidden())
+        legacy_render_widget_host_HWND_->Show();
+
+      BrowserAccessibilityManagerWin* manager =
+          static_cast<BrowserAccessibilityManagerWin*>(
+              GetBrowserAccessibilityManager());
+      if (manager)
+        manager->SetAccessibleHWND(legacy_render_widget_host_HWND_);
     }
   }
 
@@ -1063,6 +1072,11 @@ void RenderWidgetHostViewAura::UpdateMouseLockRegion() {
     RECT window_rect = window_->GetBoundsInScreen().ToRECT();
     ::ClipCursor(&window_rect);
   }
+}
+
+void RenderWidgetHostViewAura::OnLegacyWindowDestroyed() {
+  legacy_render_widget_host_HWND_ = NULL;
+  legacy_window_destroyed_ = true;
 }
 #endif
 
@@ -1246,33 +1260,21 @@ InputEventAckState RenderWidgetHostViewAura::FilterInputEvent(
 }
 
 void RenderWidgetHostViewAura::CreateBrowserAccessibilityManagerIfNeeded() {
-  if (GetBrowserAccessibilityManager())
-    return;
-
-  BrowserAccessibilityManager* manager = NULL;
 #if defined(OS_WIN)
-  aura::WindowTreeHost* host = window_->GetHost();
-  if (!host)
-    return;
-  HWND hwnd = host->GetAcceleratedWidget();
-
-  // The accessible_parent may be NULL at this point. The WebContents will pass
-  // it down to this instance (by way of the RenderViewHost and
-  // RenderWidgetHost) when it is known. This instance will then set it on its
-  // BrowserAccessibilityManager.
-  gfx::NativeViewAccessible accessible_parent =
-      host_->GetParentNativeViewAccessible();
-
-  if (legacy_render_widget_host_HWND_) {
-    manager = new BrowserAccessibilityManagerWin(
-        legacy_render_widget_host_HWND_.get(), accessible_parent,
-        BrowserAccessibilityManagerWin::GetEmptyDocument(), host_);
+  if (!GetBrowserAccessibilityManager()) {
+    gfx::NativeViewAccessible accessible_parent =
+        host_->GetParentNativeViewAccessible();
+    SetBrowserAccessibilityManager(new BrowserAccessibilityManagerWin(
+        legacy_render_widget_host_HWND_, accessible_parent,
+        BrowserAccessibilityManagerWin::GetEmptyDocument(), host_));
   }
 #else
-  manager = BrowserAccessibilityManager::Create(
-      BrowserAccessibilityManager::GetEmptyDocument(), host_);
+  if (!GetBrowserAccessibilityManager()) {
+    SetBrowserAccessibilityManager(
+        BrowserAccessibilityManager::Create(
+            BrowserAccessibilityManager::GetEmptyDocument(), host_));
+  }
 #endif
-  SetBrowserAccessibilityManager(manager);
 }
 
 gfx::GLSurfaceHandle RenderWidgetHostViewAura::GetCompositingSurface() {
@@ -1347,10 +1349,12 @@ void RenderWidgetHostViewAura::SetCompositionText(
   for (std::vector<ui::CompositionUnderline>::const_iterator it =
            composition.underlines.begin();
        it != composition.underlines.end(); ++it) {
-    underlines.push_back(blink::WebCompositionUnderline(it->start_offset,
-                                                        it->end_offset,
-                                                        it->color,
-                                                        it->thick));
+    underlines.push_back(
+        blink::WebCompositionUnderline(static_cast<unsigned>(it->start_offset),
+                                       static_cast<unsigned>(it->end_offset),
+                                       it->color,
+                                       it->thick,
+                                       it->background_color));
   }
 
   // TODO(suzhe): due to a bug of webkit, we can't use selection range with
@@ -1697,6 +1701,19 @@ void RenderWidgetHostViewAura::OnWindowDestroying(aura::Window* window) {
   }
   LPARAM lparam = reinterpret_cast<LPARAM>(this);
   EnumChildWindows(parent, WindowDestroyingCallback, lparam);
+
+  // The LegacyRenderWidgetHostHWND instance is destroyed when its window is
+  // destroyed. Normally we control when that happens via the Destroy call
+  // in the dtor. However there may be cases where the window is destroyed
+  // by Windows, i.e. the parent window is destroyed before the
+  // RenderWidgetHostViewAura instance goes away etc. To avoid that we
+  // destroy the LegacyRenderWidgetHostHWND instance here.
+  if (legacy_render_widget_host_HWND_) {
+    legacy_render_widget_host_HWND_->Destroy();
+    // The Destroy call above will delete the LegacyRenderWidgetHostHWND
+    // instance.
+    legacy_render_widget_host_HWND_ = NULL;
+  }
 #endif
 
   // Make sure that the input method no longer references to this object before
@@ -2186,7 +2203,10 @@ RenderWidgetHostViewAura::~RenderWidgetHostViewAura() {
   DetachFromInputMethod();
 
 #if defined(OS_WIN)
-  legacy_render_widget_host_HWND_.reset(NULL);
+  // The LegacyRenderWidgetHostHWND window should have been destroyed in
+  // RenderWidgetHostViewAura::OnWindowDestroying and the pointer should
+  // be set to NULL.
+  DCHECK(!legacy_render_widget_host_HWND_);
 #endif
 }
 

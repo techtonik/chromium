@@ -45,6 +45,8 @@ class ShellExtensionSystem : public ExtensionSystem {
   // KeyedService implementation:
   virtual void Shutdown() OVERRIDE;
 
+  scoped_refptr<Extension> extension() { return extension_; }
+
   // ExtensionSystem implementation:
   virtual void InitForRegularProfile(bool extensions_enabled) OVERRIDE;
   virtual ExtensionService* extension_service() OVERRIDE;
@@ -70,6 +72,8 @@ class ShellExtensionSystem : public ExtensionSystem {
       const UnloadedExtensionInfo::Reason reason) OVERRIDE;
   virtual const OneShotEvent& ready() const OVERRIDE;
   virtual ContentVerifier* content_verifier() OVERRIDE;
+  virtual scoped_ptr<ExtensionSet> GetDependentExtensions(
+      const Extension* extension) OVERRIDE;
 
  private:
   content::BrowserContext* browser_context_;  // Not owned.

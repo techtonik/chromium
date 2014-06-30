@@ -42,7 +42,6 @@
 #include "chrome/browser/browser_process_platform_part.h"
 #include "chrome/browser/browser_shutdown.h"
 #include "chrome/browser/chrome_browser_main_extra_parts.h"
-#include "chrome/browser/component_updater/cld_component_installer.h"
 #include "chrome/browser/component_updater/component_updater_service.h"
 #include "chrome/browser/component_updater/flash_component_installer.h"
 #include "chrome/browser/component_updater/pnacl/pnacl_component_installer.h"
@@ -55,7 +54,6 @@
 #include "chrome/browser/first_run/first_run.h"
 #include "chrome/browser/first_run/upgrade_util.h"
 #include "chrome/browser/google/google_search_counter.h"
-#include "chrome/browser/google/google_util.h"
 #include "chrome/browser/gpu/gl_string_manager.h"
 #include "chrome/browser/gpu/three_d_api_observer.h"
 #include "chrome/browser/jankometer.h"
@@ -105,6 +103,7 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/common/profiling.h"
 #include "chrome/installer/util/google_update_settings.h"
+#include "components/google/core/browser/google_util.h"
 #include "components/language_usage_metrics/language_usage_metrics.h"
 #include "components/metrics/metrics_service.h"
 #include "components/nacl/browser/nacl_browser.h"
@@ -165,10 +164,10 @@
 #include "base/win/windows_version.h"
 #include "chrome/browser/browser_util_win.h"
 #include "chrome/browser/chrome_browser_main_win.h"
+#include "chrome/browser/component_updater/sw_reporter_installer_win.h"
 #include "chrome/browser/first_run/try_chrome_dialog_view.h"
 #include "chrome/browser/first_run/upgrade_util_win.h"
 #include "chrome/browser/ui/network_profile_bubble.h"
-#include "chrome/common/net/url_fixer_upper.h"
 #include "chrome/installer/util/helper.h"
 #include "chrome/installer/util/install_util.h"
 #include "chrome/installer/util/shell_util.h"
@@ -182,6 +181,10 @@
 
 #include "base/mac/scoped_nsautorelease_pool.h"
 #include "chrome/browser/mac/keystone_glue.h"
+#endif
+
+#if defined(CLD_DATA_FROM_COMPONENT)
+#include "chrome/browser/component_updater/cld_component_installer.h"
 #endif
 
 #if defined(ENABLE_FULL_PRINTING) && !defined(OFFICIAL_BUILD)
@@ -388,26 +391,27 @@ void RegisterComponentsForUpdate(const CommandLine& command_line) {
   RegisterRecoveryComponent(cus, g_browser_process->local_state());
   RegisterPepperFlashComponent(cus);
   RegisterSwiftShaderComponent(cus);
-#endif
-
-#if !defined(OS_ANDROID)
   g_browser_process->pnacl_component_installer()->RegisterPnaclComponent(
       cus, command_line);
-#endif
-
-#if !defined(OS_CHROMEOS) && !defined(OS_ANDROID)
   RegisterWidevineCdmComponent(cus);
 #endif
 
-#if !defined(OS_CHROMEOS)
-  // CRLSetFetcher attempts to load a CRL set from either the local disk or
-  // network.
-  if (!command_line.HasSwitch(switches::kDisableCRLSets))
-    g_browser_process->crl_set_fetcher()->StartInitialLoad(cus);
+#if defined(CLD_DATA_FROM_COMPONENT)
+  RegisterCldComponent(cus);
 #endif
 
-#if defined(CLD2_DYNAMIC_MODE) && defined(CLD2_IS_COMPONENT)
-  RegisterCldComponent(cus);
+#if !defined(OS_CHROMEOS) && !defined(OS_ANDROID)
+  // CRLSetFetcher attempts to load a CRL set from either the local disk or
+  // network.
+  g_browser_process->crl_set_fetcher()->StartInitialLoad(cus);
+#elif defined(OS_ANDROID)
+  // The CRLSet component was enabled for some releases. This code attempts to
+  // delete it from the local disk of those how may have downloaded it.
+  g_browser_process->crl_set_fetcher()->DeleteFromDisk();
+#endif
+
+#if defined(OS_WIN)
+  ExecutePendingSwReporter(cus, g_browser_process->local_state());
 #endif
 
   cus->Start();
@@ -1535,8 +1539,6 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
   performance_monitor::PerformanceMonitor::GetInstance()->Initialize();
 
   PostBrowserStart();
-
-  chrome_prefs::SchedulePrefHashStoresUpdateCheck(profile_->GetPath());
 
   if (parameters().ui_task) {
     // We end the startup timer here if we have parameters to run, because we

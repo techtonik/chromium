@@ -248,12 +248,15 @@ class EVENTS_EXPORT LocatedEvent : public Event {
   // TODO(tdresser): Always return floating point location. See
   // crbug.com/337824.
   gfx::Point location() const { return gfx::ToFlooredPoint(location_); }
-  gfx::PointF location_f() const { return location_; }
+  const gfx::PointF& location_f() const { return location_; }
   void set_root_location(const gfx::PointF& root_location) {
     root_location_ = root_location;
   }
   gfx::Point root_location() const {
     return gfx::ToFlooredPoint(root_location_);
+  }
+  const gfx::PointF& root_location_f() const {
+    return root_location_;
   }
 
   // Transform the locations using |inverted_root_transform|.
@@ -417,6 +420,13 @@ class EVENTS_EXPORT MouseWheelEvent : public MouseEvent {
         offset_(model.x_offset(), model.y_offset()) {
   }
 
+  // Used for synthetic events in testing and by the gesture recognizer.
+  MouseWheelEvent(const gfx::Vector2d& offset,
+                  const gfx::PointF& location,
+                  const gfx::PointF& root_location,
+                  int flags,
+                  int changed_button_flags);
+
   // The amount to scroll. This is in multiples of kWheelDelta.
   // Note: x_offset() > 0/y_offset() > 0 means scroll left/up.
   int x_offset() const { return offset_.x(); }
@@ -538,6 +548,8 @@ class EVENTS_EXPORT KeyEvent : public Event {
   // BMP characters.
   uint16 GetCharacter() const;
 
+  // Gets the platform key code. For XKB, this is the xksym value.
+  uint32 platform_keycode() const { return platform_keycode_; }
   KeyboardCode key_code() const { return key_code_; }
   bool is_char() const { return is_char_; }
 
@@ -581,6 +593,16 @@ class EVENTS_EXPORT KeyEvent : public Event {
   // share the same type: ET_KEY_PRESSED.
   bool is_char_;
 
+  // The platform related keycode value. For XKB, it's keysym value.
+  // For now, this is used for CharacterComposer in ChromeOS.
+  uint32 platform_keycode_;
+
+  // String of 'key' defined in DOM KeyboardEvent (e.g. 'a', 'â')
+  // http://www.w3.org/TR/uievents/#keyboard-key-codes.
+  //
+  // This value represents the text that the key event will insert to input
+  // field. For key with modifier key, it may have specifial text.
+  // e.g. CTRL+A has '\x01'.
   uint16 character_;
 
   static bool IsRepeated(const KeyEvent& event);

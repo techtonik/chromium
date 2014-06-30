@@ -77,6 +77,10 @@ class ChromePasswordManagerClient
   // Observer for PasswordGenerationPopup events. Used for testing.
   void SetTestObserver(autofill::PasswordGenerationPopupObserver* observer);
 
+  // Returns true if the bubble UI is enabled, and false if we're still using
+  // the sad old Infobar UI.
+  static bool IsTheHotNewBubbleUIEnabled();
+
  private:
   ChromePasswordManagerClient(content::WebContents* web_contents,
                               autofill::AutofillClient* autofill_client);
@@ -104,6 +108,10 @@ class ChromePasswordManagerClient
   // Causes the password editing UI to be shown anchored at |element_bounds|.
   void ShowPasswordEditingPopup(
       const gfx::RectF& bounds, const autofill::PasswordForm& form);
+
+  // Sends a message to the renderer with the current value of
+  // |can_use_log_router_|.
+  void NotifyRendererOfLoggingAvailability();
 
   Profile* const profile_;
 

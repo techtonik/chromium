@@ -7,6 +7,7 @@
 #include "base/single_thread_task_runner.h"
 #include "media/cast/transport/cast_transport_config.h"
 #include "media/cast/transport/cast_transport_defines.h"
+#include "net/base/net_util.h"
 
 namespace media {
 namespace cast {
@@ -66,6 +67,11 @@ CastTransportSenderImpl::CastTransportSenderImpl(
                             this,
                             &CastTransportSenderImpl::SendRawEvents);
   }
+  if (transport_) {
+    // The default DSCP value for cast is AF41. Which gives it a higher
+    // priority over other traffic.
+    transport_->SetDscp(net::DSCP_AF41);
+  }
 }
 
 CastTransportSenderImpl::~CastTransportSenderImpl() {
@@ -74,18 +80,16 @@ CastTransportSenderImpl::~CastTransportSenderImpl() {
 }
 
 void CastTransportSenderImpl::InitializeAudio(
-    const CastTransportAudioConfig& config) {
-  LOG_IF(WARNING, config.rtp.config.aes_key.empty() ||
-                  config.rtp.config.aes_iv_mask.empty())
+    const CastTransportRtpConfig& config) {
+  LOG_IF(WARNING, config.aes_key.empty() || config.aes_iv_mask.empty())
       << "Unsafe to send audio with encryption DISABLED.";
-  if (!audio_encryptor_.Initialize(config.rtp.config.aes_key,
-                                   config.rtp.config.aes_iv_mask)) {
+  if (!audio_encryptor_.Initialize(config.aes_key, config.aes_iv_mask)) {
     status_callback_.Run(TRANSPORT_AUDIO_UNINITIALIZED);
     return;
   }
   audio_sender_.reset(new RtpSender(clock_, transport_task_runner_, &pacer_));
-  if (audio_sender_->InitializeAudio(config)) {
-    pacer_.RegisterAudioSsrc(config.rtp.config.ssrc);
+  if (audio_sender_->Initialize(config)) {
+    pacer_.RegisterAudioSsrc(config.ssrc);
     status_callback_.Run(TRANSPORT_AUDIO_INITIALIZED);
   } else {
     audio_sender_.reset();
@@ -94,18 +98,16 @@ void CastTransportSenderImpl::InitializeAudio(
 }
 
 void CastTransportSenderImpl::InitializeVideo(
-    const CastTransportVideoConfig& config) {
-  LOG_IF(WARNING, config.rtp.config.aes_key.empty() ||
-                  config.rtp.config.aes_iv_mask.empty())
+    const CastTransportRtpConfig& config) {
+  LOG_IF(WARNING, config.aes_key.empty() || config.aes_iv_mask.empty())
       << "Unsafe to send video with encryption DISABLED.";
-  if (!video_encryptor_.Initialize(config.rtp.config.aes_key,
-                                   config.rtp.config.aes_iv_mask)) {
+  if (!video_encryptor_.Initialize(config.aes_key, config.aes_iv_mask)) {
     status_callback_.Run(TRANSPORT_VIDEO_UNINITIALIZED);
     return;
   }
   video_sender_.reset(new RtpSender(clock_, transport_task_runner_, &pacer_));
-  if (video_sender_->InitializeVideo(config)) {
-    pacer_.RegisterVideoSsrc(config.rtp.config.ssrc);
+  if (video_sender_->Initialize(config)) {
+    pacer_.RegisterVideoSsrc(config.ssrc);
     status_callback_.Run(TRANSPORT_VIDEO_INITIALIZED);
   } else {
     video_sender_.reset();
@@ -122,7 +124,7 @@ namespace {
 void EncryptAndSendFrame(const EncodedFrame& frame,
                          TransportEncryptionHandler* encryptor,
                          RtpSender* sender) {
-  if (encryptor->initialized()) {
+  if (encryptor->is_activated()) {
     EncodedFrame encrypted_frame;
     frame.CopyMetadataTo(&encrypted_frame);
     if (encryptor->Encrypt(frame.frame_id, frame.data, &encrypted_frame.data)) {
@@ -177,13 +179,19 @@ void CastTransportSenderImpl::SendRtcpFromRtpSender(
 
 void CastTransportSenderImpl::ResendPackets(
     bool is_audio,
-    const MissingFramesAndPacketsMap& missing_packets) {
+    const MissingFramesAndPacketsMap& missing_packets,
+    bool cancel_rtx_if_not_in_list,
+    base::TimeDelta dedupe_window) {
   if (is_audio) {
     DCHECK(audio_sender_) << "Audio sender uninitialized";
-    audio_sender_->ResendPackets(missing_packets);
+    audio_sender_->ResendPackets(missing_packets,
+                                 cancel_rtx_if_not_in_list,
+                                 dedupe_window);
   } else {
     DCHECK(video_sender_) << "Video sender uninitialized";
-    video_sender_->ResendPackets(missing_packets);
+    video_sender_->ResendPackets(missing_packets,
+                                 cancel_rtx_if_not_in_list,
+                                 dedupe_window);
   }
 }
 

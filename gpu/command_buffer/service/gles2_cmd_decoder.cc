@@ -590,7 +590,7 @@ class GLES2DecoderImpl : public GLES2Decoder,
   virtual gfx::GLContext* GetGLContext() OVERRIDE { return context_.get(); }
   virtual ContextGroup* GetContextGroup() OVERRIDE { return group_.get(); }
   virtual Capabilities GetCapabilities() OVERRIDE;
-  virtual void RestoreState(const ContextState* prev_state) const OVERRIDE;
+  virtual void RestoreState(const ContextState* prev_state) OVERRIDE;
 
   virtual void RestoreActiveTexture() const OVERRIDE {
     state_.RestoreActiveTexture();
@@ -616,6 +616,7 @@ class GLES2DecoderImpl : public GLES2Decoder,
     state_.RestoreTextureUnitBindings(unit, NULL);
   }
   virtual void RestoreFramebufferBindings() const OVERRIDE;
+  virtual void RestoreRenderbufferBindings() OVERRIDE;
   virtual void RestoreTextureState(unsigned service_id) const OVERRIDE;
 
   virtual void ClearAllAttributes() const OVERRIDE;
@@ -687,6 +688,9 @@ class GLES2DecoderImpl : public GLES2Decoder,
 
   // Overriden from ErrorStateClient.
   virtual void OnOutOfMemoryError() OVERRIDE;
+
+  // Ensure Renderbuffer corresponding to last DoBindRenderbuffer() is bound.
+  void EnsureRenderbufferBound();
 
   // Helpers to facilitate calling into compatible extensions.
   static void RenderbufferStorageMultisampleHelper(
@@ -3896,7 +3900,7 @@ GLuint GLES2DecoderImpl::GetBackbufferServiceId() const {
              : (surface_.get() ? surface_->GetBackingFrameBufferObject() : 0);
 }
 
-void GLES2DecoderImpl::RestoreState(const ContextState* prev_state) const {
+void GLES2DecoderImpl::RestoreState(const ContextState* prev_state) {
   TRACE_EVENT1("gpu", "GLES2DecoderImpl::RestoreState",
                "context", logger_.GetLogPrefix());
   // Restore the Framebuffer first because of bugs in Intel drivers.
@@ -3921,6 +3925,10 @@ void GLES2DecoderImpl::RestoreFramebufferBindings() const {
     glBindFramebufferEXT(GL_READ_FRAMEBUFFER, service_id);
   }
   OnFboChanged();
+}
+
+void GLES2DecoderImpl::RestoreRenderbufferBindings() {
+  state_.RestoreRenderbufferBindings();
 }
 
 void GLES2DecoderImpl::RestoreTextureState(unsigned service_id) const {
@@ -4044,7 +4052,7 @@ void GLES2DecoderImpl::DoBindRenderbuffer(GLenum target, GLuint client_id) {
         return;
       }
 
-      // It's a new id so make a renderbuffer renderbuffer for it.
+      // It's a new id so make a renderbuffer for it.
       glGenRenderbuffersEXT(1, &service_id);
       CreateRenderbuffer(client_id, service_id);
       renderbuffer = GetRenderbuffer(client_id);
@@ -4058,7 +4066,8 @@ void GLES2DecoderImpl::DoBindRenderbuffer(GLenum target, GLuint client_id) {
   }
   LogClientServiceForInfo(renderbuffer, client_id, "glBindRenderbuffer");
   state_.bound_renderbuffer = renderbuffer;
-  glBindRenderbufferEXT(target, service_id);
+  state_.bound_renderbuffer_valid = true;
+  glBindRenderbufferEXT(GL_RENDERBUFFER, service_id);
 }
 
 void GLES2DecoderImpl::DoBindTexture(GLenum target, GLuint client_id) {
@@ -4728,21 +4737,6 @@ void GLES2DecoderImpl::DoBindAttribLocation(
   glBindAttribLocation(program->service_id(), index, name);
 }
 
-error::Error GLES2DecoderImpl::HandleBindAttribLocation(
-    uint32 immediate_data_size, const cmds::BindAttribLocation& c) {
-  GLuint program = static_cast<GLuint>(c.program);
-  GLuint index = static_cast<GLuint>(c.index);
-  uint32 name_size = c.data_size;
-  const char* name = GetSharedMemoryAs<const char*>(
-      c.name_shm_id, c.name_shm_offset, name_size);
-  if (name == NULL) {
-    return error::kOutOfBounds;
-  }
-  std::string name_str(name, name_size);
-  DoBindAttribLocation(program, index, name_str.c_str());
-  return error::kNoError;
-}
-
 error::Error GLES2DecoderImpl::HandleBindAttribLocationBucket(
     uint32 immediate_data_size, const cmds::BindAttribLocationBucket& c) {
   GLuint program = static_cast<GLuint>(c.program);
@@ -4791,21 +4785,6 @@ void GLES2DecoderImpl::DoBindUniformLocationCHROMIUM(
         GL_INVALID_VALUE,
         "glBindUniformLocationCHROMIUM", "location out of range");
   }
-}
-
-error::Error GLES2DecoderImpl::HandleBindUniformLocationCHROMIUM(
-    uint32 immediate_data_size, const cmds::BindUniformLocationCHROMIUM& c) {
-  GLuint program = static_cast<GLuint>(c.program);
-  GLint location = static_cast<GLint>(c.location);
-  uint32 name_size = c.data_size;
-  const char* name = GetSharedMemoryAs<const char*>(
-      c.name_shm_id, c.name_shm_offset, name_size);
-  if (name == NULL) {
-    return error::kOutOfBounds;
-  }
-  std::string name_str(name, name_size);
-  DoBindUniformLocationCHROMIUM(program, location, name_str.c_str());
-  return error::kNoError;
 }
 
 error::Error GLES2DecoderImpl::HandleBindUniformLocationCHROMIUMBucket(
@@ -5228,6 +5207,8 @@ void GLES2DecoderImpl::DoGetRenderbufferParameteriv(
         "glGetRenderbufferParameteriv", "no renderbuffer bound");
     return;
   }
+
+  EnsureRenderbufferBound();
   switch (pname) {
     case GL_RENDERBUFFER_INTERNAL_FORMAT:
       *params = renderbuffer->internal_format();
@@ -5267,6 +5248,16 @@ void GLES2DecoderImpl::DoBlitFramebufferCHROMIUM(
       srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter);
   state_.SetDeviceCapabilityState(GL_SCISSOR_TEST,
                                   state_.enable_flags.scissor_test);
+}
+
+void GLES2DecoderImpl::EnsureRenderbufferBound() {
+  if (!state_.bound_renderbuffer_valid) {
+    state_.bound_renderbuffer_valid = true;
+    glBindRenderbufferEXT(GL_RENDERBUFFER,
+                          state_.bound_renderbuffer.get()
+                              ? state_.bound_renderbuffer->service_id()
+                              : 0);
+  }
 }
 
 void GLES2DecoderImpl::RenderbufferStorageMultisampleHelper(
@@ -5369,6 +5360,7 @@ void GLES2DecoderImpl::DoRenderbufferStorageMultisampleCHROMIUM(
     return;
   }
 
+  EnsureRenderbufferBound();
   GLenum impl_format =
       renderbuffer_manager()->InternalRenderbufferFormatToImplFormat(
           internalformat);
@@ -5415,6 +5407,7 @@ void GLES2DecoderImpl::DoRenderbufferStorageMultisampleEXT(
     return;
   }
 
+  EnsureRenderbufferBound();
   GLenum impl_format =
       renderbuffer_manager()->InternalRenderbufferFormatToImplFormat(
           internalformat);
@@ -5570,6 +5563,7 @@ void GLES2DecoderImpl::DoRenderbufferStorage(
     return;
   }
 
+  EnsureRenderbufferBound();
   LOCAL_COPY_REAL_GL_ERRORS_TO_WRAPPER("glRenderbufferStorage");
   glRenderbufferStorageEXT(
       target,
@@ -6477,7 +6471,6 @@ error::Error GLES2DecoderImpl::DoDrawArrays(
       } else {
         glDrawArraysInstancedANGLE(mode, first, count, primcount);
       }
-      ProcessPendingQueries();
       if (textures_set) {
         RestoreStateForTextures();
       }
@@ -6617,7 +6610,6 @@ error::Error GLES2DecoderImpl::DoDrawElements(
                      element_array_buffer->service_id());
       }
 
-      ProcessPendingQueries();
       if (textures_set) {
         RestoreStateForTextures();
       }
@@ -6699,17 +6691,6 @@ error::Error GLES2DecoderImpl::ShaderSourceHelper(
   // the call to glCompileShader.
   shader->UpdateSource(str.c_str());
   return error::kNoError;
-}
-
-error::Error GLES2DecoderImpl::HandleShaderSource(
-    uint32 immediate_data_size, const cmds::ShaderSource& c) {
-  uint32 data_size = c.data_size;
-  const char* data = GetSharedMemoryAs<const char*>(
-      c.data_shm_id, c.data_shm_offset, data_size);
-  if (!data) {
-    return error::kOutOfBounds;
-  }
-  return ShaderSourceHelper(c.shader, data, data_size);
 }
 
 error::Error GLES2DecoderImpl::HandleShaderSourceBucket(
@@ -7637,19 +7618,6 @@ error::Error GLES2DecoderImpl::GetAttribLocationHelper(
 
 error::Error GLES2DecoderImpl::HandleGetAttribLocation(
     uint32 immediate_data_size, const cmds::GetAttribLocation& c) {
-  uint32 name_size = c.data_size;
-  const char* name = GetSharedMemoryAs<const char*>(
-      c.name_shm_id, c.name_shm_offset, name_size);
-  if (!name) {
-    return error::kOutOfBounds;
-  }
-  std::string name_str(name, name_size);
-  return GetAttribLocationHelper(
-    c.program, c.location_shm_id, c.location_shm_offset, name_str);
-}
-
-error::Error GLES2DecoderImpl::HandleGetAttribLocationBucket(
-    uint32 immediate_data_size, const cmds::GetAttribLocationBucket& c) {
   Bucket* bucket = GetBucket(c.name_bucket_id);
   if (!bucket) {
     return error::kInvalidArguments;
@@ -7696,19 +7664,6 @@ error::Error GLES2DecoderImpl::GetUniformLocationHelper(
 
 error::Error GLES2DecoderImpl::HandleGetUniformLocation(
     uint32 immediate_data_size, const cmds::GetUniformLocation& c) {
-  uint32 name_size = c.data_size;
-  const char* name = GetSharedMemoryAs<const char*>(
-      c.name_shm_id, c.name_shm_offset, name_size);
-  if (!name) {
-    return error::kOutOfBounds;
-  }
-  std::string name_str(name, name_size);
-  return GetUniformLocationHelper(
-    c.program, c.location_shm_id, c.location_shm_offset, name_str);
-}
-
-error::Error GLES2DecoderImpl::HandleGetUniformLocationBucket(
-    uint32 immediate_data_size, const cmds::GetUniformLocationBucket& c) {
   Bucket* bucket = GetBucket(c.name_bucket_id);
   if (!bucket) {
     return error::kInvalidArguments;
@@ -10625,8 +10580,6 @@ error::Error GLES2DecoderImpl::HandleAsyncTexImage2DCHROMIUM(
   TRACE_EVENT0("gpu", "GLES2DecoderImpl::HandleAsyncTexImage2DCHROMIUM");
   GLenum target = static_cast<GLenum>(c.target);
   GLint level = static_cast<GLint>(c.level);
-  // TODO(kloveless): Change HandleAsyncTexImage2DCHROMIUM command to use
-  // unsigned integer for internalformat.
   GLenum internal_format = static_cast<GLenum>(c.internalformat);
   GLsizei width = static_cast<GLsizei>(c.width);
   GLsizei height = static_cast<GLsizei>(c.height);

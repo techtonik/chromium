@@ -4,6 +4,7 @@
 
 #include "media/cast/transport/rtp_sender/rtp_sender.h"
 
+#include "base/big_endian.h"
 #include "base/logging.h"
 #include "base/rand_util.h"
 #include "media/cast/transport/cast_transport_defines.h"
@@ -40,30 +41,13 @@ RtpSender::RtpSender(
 
 RtpSender::~RtpSender() {}
 
-bool RtpSender::InitializeAudio(const CastTransportAudioConfig& config) {
-  storage_.reset(new PacketStorage(config.rtp.max_outstanding_frames));
+bool RtpSender::Initialize(const CastTransportRtpConfig& config) {
+  storage_.reset(new PacketStorage(config.stored_frames));
   if (!storage_->IsValid()) {
     return false;
   }
-  config_.audio = true;
-  config_.ssrc = config.rtp.config.ssrc;
-  config_.payload_type = config.rtp.config.payload_type;
-  config_.frequency = config.frequency;
-  config_.audio_codec = config.codec;
-  packetizer_.reset(new RtpPacketizer(transport_, storage_.get(), config_));
-  return true;
-}
-
-bool RtpSender::InitializeVideo(const CastTransportVideoConfig& config) {
-  storage_.reset(new PacketStorage(config.rtp.max_outstanding_frames));
-  if (!storage_->IsValid()) {
-    return false;
-  }
-  config_.audio = false;
-  config_.ssrc = config.rtp.config.ssrc;
-  config_.payload_type = config.rtp.config.payload_type;
-  config_.frequency = kVideoFrequency;
-  config_.video_codec = config.codec;
+  config_.ssrc = config.ssrc;
+  config_.payload_type = config.rtp_payload_type;
   packetizer_.reset(new RtpPacketizer(transport_, storage_.get(), config_));
   return true;
 }
@@ -74,7 +58,9 @@ void RtpSender::SendFrame(const EncodedFrame& frame) {
 }
 
 void RtpSender::ResendPackets(
-    const MissingFramesAndPacketsMap& missing_frames_and_packets) {
+    const MissingFramesAndPacketsMap& missing_frames_and_packets,
+    bool cancel_rtx_if_not_in_list,
+    base::TimeDelta dedupe_window) {
   DCHECK(storage_);
   // Iterate over all frames in the list.
   for (MissingFramesAndPacketsMap::const_iterator it =
@@ -87,6 +73,11 @@ void RtpSender::ResendPackets(
     // If empty, we need to re-send all packets for this frame.
     const PacketIdSet& missing_packet_set = it->second;
 
+    bool resend_all = missing_packet_set.find(kRtcpCastAllPacketsLost) !=
+        missing_packet_set.end();
+    bool resend_last = missing_packet_set.find(kRtcpCastLastPacket) !=
+        missing_packet_set.end();
+
     const SendPacketVector* stored_packets = storage_->GetFrame8(frame_id);
     if (!stored_packets)
       continue;
@@ -96,12 +87,22 @@ void RtpSender::ResendPackets(
       const PacketKey& packet_key = it->first;
       const uint16 packet_id = packet_key.second.second;
 
-      // If the resend request doesn't include this packet then cancel
-      // re-transmission already in queue.
-      if (!missing_packet_set.empty() &&
-          missing_packet_set.find(packet_id) == missing_packet_set.end()) {
-        transport_->CancelSendingPacket(it->first);
-      } else {
+      // Should we resend the packet?
+      bool resend = resend_all;
+
+      // Should we resend it because it's in the missing_packet_set?
+      if (!resend &&
+          missing_packet_set.find(packet_id) != missing_packet_set.end()) {
+        resend = true;
+      }
+
+      // If we were asked to resend the last packet, check if it's the
+      // last packet.
+      if (!resend && resend_last && (it + 1) == stored_packets->end()) {
+        resend = true;
+      }
+
+      if (resend) {
         // Resend packet to the network.
         VLOG(3) << "Resend " << static_cast<int>(frame_id) << ":"
                 << packet_id;
@@ -109,17 +110,22 @@ void RtpSender::ResendPackets(
         PacketRef packet_copy = FastCopyPacket(it->second);
         UpdateSequenceNumber(&packet_copy->data);
         packets_to_resend.push_back(std::make_pair(packet_key, packet_copy));
+      } else if (cancel_rtx_if_not_in_list) {
+        transport_->CancelSendingPacket(it->first);
       }
     }
-    transport_->ResendPackets(packets_to_resend);
+    transport_->ResendPackets(packets_to_resend, dedupe_window);
   }
 }
 
 void RtpSender::UpdateSequenceNumber(Packet* packet) {
-  uint16 new_sequence_number = packetizer_->NextSequenceNumber();
-  int index = 2;
-  (*packet)[index] = (static_cast<uint8>(new_sequence_number));
-  (*packet)[index + 1] = (static_cast<uint8>(new_sequence_number >> 8));
+  // TODO(miu): This is an abstraction violation.  This needs to be a part of
+  // the overall packet (de)serialization consolidation.
+  static const int kByteOffsetToSequenceNumber = 2;
+  base::BigEndianWriter big_endian_writer(
+      reinterpret_cast<char*>((&packet->front()) + kByteOffsetToSequenceNumber),
+      sizeof(uint16));
+  big_endian_writer.WriteU16(packetizer_->NextSequenceNumber());
 }
 
 }  // namespace transport

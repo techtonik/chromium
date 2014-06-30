@@ -6,7 +6,6 @@
 
 #include "base/json/json_writer.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/chromeos/net/network_portal_detector.h"
 #include "chrome/browser/extensions/api/networking_private/networking_private_api.h"
 #include "chrome/browser/extensions/event_router_forwarder.h"
 #include "chrome/browser/profiles/profile.h"
@@ -17,6 +16,7 @@
 #include "chromeos/network/network_state_handler_observer.h"
 #include "chromeos/network/onc/onc_signature.h"
 #include "chromeos/network/onc/onc_translator.h"
+#include "chromeos/network/portal_detector/network_portal_detector.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/onc/onc_constants.h"
 #include "extensions/browser/extension_system.h"
@@ -143,7 +143,8 @@ void NetworkingPrivateEventRouterImpl::StartOrStopListeningForNetworkChanges() {
 void NetworkingPrivateEventRouterImpl::NetworkListChanged() {
   EventRouter* event_router = EventRouter::Get(profile_);
   NetworkStateHandler::NetworkStateList networks;
-  NetworkHandler::Get()->network_state_handler()->GetNetworkList(&networks);
+  NetworkHandler::Get()->network_state_handler()->GetVisibleNetworkList(
+      &networks);
   if (!event_router->HasEventListener(
            api::networking_private::OnNetworkListChanged::kEventName)) {
     // TODO(stevenjb): Remove logging once crbug.com/256881 is fixed

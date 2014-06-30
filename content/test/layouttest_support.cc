@@ -9,6 +9,7 @@
 #include "content/browser/renderer_host/render_widget_host_impl.h"
 #include "content/common/gpu/image_transport_surface.h"
 #include "content/public/common/page_state.h"
+#include "content/renderer/compositor_bindings/web_layer_impl.h"
 #include "content/renderer/history_entry.h"
 #include "content/renderer/history_serialization.h"
 #include "content/renderer/render_frame_impl.h"
@@ -80,16 +81,9 @@ void EnableWebTestProxyCreation(
   RenderFrameImpl::InstallCreateHook(CreateWebFrameTestProxy);
 }
 
-void SetMockGamepads(const WebGamepads& pads) {
-  RendererWebKitPlatformSupportImpl::SetMockGamepadsForTesting(pads);
-}
-
-void MockGamepadConnected(int index, const WebGamepad& pad) {
-  RendererWebKitPlatformSupportImpl::MockGamepadConnected(index, pad);
-}
-
-void MockGamepadDisconnected(int index, const WebGamepad& pad) {
-  RendererWebKitPlatformSupportImpl::MockGamepadDisconnected(index, pad);
+void SetMockGamepadProvider(RendererGamepadProvider* provider) {
+  RenderThreadImpl::current()->webkit_platform_support()->
+      set_gamepad_provider(provider);
 }
 
 void SetMockDeviceMotionData(const WebDeviceMotionData& data) {
@@ -99,21 +93,6 @@ void SetMockDeviceMotionData(const WebDeviceMotionData& data) {
 void SetMockDeviceOrientationData(const WebDeviceOrientationData& data) {
   RendererWebKitPlatformSupportImpl::
       SetMockDeviceOrientationDataForTesting(data);
-}
-
-void SetMockScreenOrientation(
-    RenderView* render_view,
-    const blink::WebScreenOrientationType& orientation) {
-  static_cast<RenderViewImpl*>(render_view)
-      ->SetScreenOrientationForTesting(orientation);
-  // FIXME(ostap): Remove this when blink side gets updated.
-  RendererWebKitPlatformSupportImpl::
-      SetMockScreenOrientationForTesting(orientation);
-}
-
-void ResetMockScreenOrientation()
-{
-  RendererWebKitPlatformSupportImpl::ResetMockScreenOrientationForTesting();
 }
 
 void MockBatteryStatusChanged(const WebBatteryStatus& status) {
@@ -303,6 +282,10 @@ std::string DumpBackForwardList(std::vector<PageState>& page_state,
   }
   result.append("===============================================\n");
   return result;
+}
+
+blink::WebLayer* InstantiateWebLayer(scoped_refptr<cc::TextureLayer> layer) {
+  return new WebLayerImpl(layer);
 }
 
 }  // namespace content

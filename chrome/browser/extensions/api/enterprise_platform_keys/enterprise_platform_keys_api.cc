@@ -7,6 +7,8 @@
 #include "base/bind.h"
 #include "base/values.h"
 #include "chrome/browser/chromeos/platform_keys/platform_keys.h"
+#include "chrome/browser/chromeos/platform_keys/platform_keys_service.h"
+#include "chrome/browser/chromeos/platform_keys/platform_keys_service_factory.h"
 #include "chrome/common/extensions/api/enterprise_platform_keys.h"
 #include "chrome/common/extensions/api/enterprise_platform_keys_internal.h"
 #include "content/public/browser/browser_thread.h"
@@ -23,6 +25,7 @@ namespace api_epki = api::enterprise_platform_keys_internal;
 // extension. Keep this in sync with the custom binding in Javascript.
 const char kErrorInvalidToken[] = "The token is not valid.";
 
+const char kErrorAlgorithmNotSupported[] = "Algorithm not supported.";
 const char kErrorInvalidX509Cert[] =
     "Certificate is not a valid X.509 certificate.";
 const char kTokenIdUser[] = "user";
@@ -48,13 +51,18 @@ EnterprisePlatformKeysInternalGenerateKeyFunction::Run() {
   if (!ValidateToken(params->token_id))
     return RespondNow(Error(kErrorInvalidToken));
 
-  chromeos::platform_keys::GenerateRSAKey(
+  chromeos::PlatformKeysService* service =
+      chromeos::PlatformKeysServiceFactory::GetForBrowserContext(
+          browser_context());
+  DCHECK(service);
+
+  service->GenerateRSAKey(
       params->token_id,
       params->modulus_length,
+      extension_id(),
       base::Bind(
           &EnterprisePlatformKeysInternalGenerateKeyFunction::OnGeneratedKey,
-          this),
-      GetProfile());
+          this));
   return RespondLater();
 }
 
@@ -82,12 +90,30 @@ EnterprisePlatformKeysInternalSignFunction::Run() {
   if (!ValidateToken(params->token_id))
     return RespondNow(Error(kErrorInvalidToken));
 
-  chromeos::platform_keys::Sign(
+  chromeos::platform_keys::HashAlgorithm hash_algorithm;
+  if (params->hash_algorithm_name == "SHA-1")
+    hash_algorithm = chromeos::platform_keys::HASH_ALGORITHM_SHA1;
+  else if (params->hash_algorithm_name == "SHA-256")
+    hash_algorithm = chromeos::platform_keys::HASH_ALGORITHM_SHA256;
+  else if (params->hash_algorithm_name == "SHA-384")
+    hash_algorithm = chromeos::platform_keys::HASH_ALGORITHM_SHA384;
+  else if (params->hash_algorithm_name == "SHA-512")
+    hash_algorithm = chromeos::platform_keys::HASH_ALGORITHM_SHA512;
+  else
+    return RespondNow(Error(kErrorAlgorithmNotSupported));
+
+  chromeos::PlatformKeysService* service =
+      chromeos::PlatformKeysServiceFactory::GetForBrowserContext(
+          browser_context());
+  DCHECK(service);
+
+  service->Sign(
       params->token_id,
       params->public_key,
+      hash_algorithm,
       params->data,
-      base::Bind(&EnterprisePlatformKeysInternalSignFunction::OnSigned, this),
-      GetProfile());
+      extension_id(),
+      base::Bind(&EnterprisePlatformKeysInternalSignFunction::OnSigned, this));
   return RespondLater();
 }
 
@@ -118,7 +144,7 @@ EnterprisePlatformKeysGetCertificatesFunction::Run() {
       base::Bind(
           &EnterprisePlatformKeysGetCertificatesFunction::OnGotCertificates,
           this),
-      GetProfile());
+      browser_context());
   return RespondLater();
 }
 
@@ -170,7 +196,7 @@ EnterprisePlatformKeysImportCertificateFunction::Run() {
       base::Bind(&EnterprisePlatformKeysImportCertificateFunction::
                      OnImportedCertificate,
                  this),
-      GetProfile());
+      browser_context());
   return RespondLater();
 }
 
@@ -207,7 +233,7 @@ EnterprisePlatformKeysRemoveCertificateFunction::Run() {
       base::Bind(&EnterprisePlatformKeysRemoveCertificateFunction::
                      OnRemovedCertificate,
                  this),
-      GetProfile());
+      browser_context());
   return RespondLater();
 }
 

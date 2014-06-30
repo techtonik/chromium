@@ -38,13 +38,13 @@ void BlueButton::ResetColorsFromNativeTheme() {
     SetTextColor(STATE_HOVERED, GetNativeTheme()->
         GetSystemColor(ui::NativeTheme::kColorId_BlueButtonHoverColor));
     SetTextColor(STATE_PRESSED, GetNativeTheme()->
-        GetSystemColor(ui::NativeTheme::kColorId_BlueButtonHighlightColor));
+        GetSystemColor(ui::NativeTheme::kColorId_BlueButtonPressedColor));
     SetTextColor(STATE_DISABLED, GetNativeTheme()->
         GetSystemColor(ui::NativeTheme::kColorId_BlueButtonDisabledColor));
 
     // TODO(estade): this is not great on system themes.
-    label()->SetShadowColors(kBlueButtonShadowColor, kBlueButtonShadowColor);
-    label()->SetShadowOffset(0, 1);
+    label()->set_shadows(gfx::ShadowValues(1,
+        gfx::ShadowValue(gfx::Point(0, 1), 0, kBlueButtonShadowColor)));
   }
 }
 

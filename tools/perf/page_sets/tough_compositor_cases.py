@@ -27,10 +27,10 @@ class ToughCompositorScrollPage(ToughCompositorPage):
 
   def RunSmoothness(self, action_runner):
     # Make the scroll longer to reduce noise.
-    scroll_down = ScrollAction()
-    scroll_down.direction = "down"
-    scroll_down.speed = 300
-    action_runner.RunAction(scroll_down)
+    interaction = action_runner.BeginGestureInteraction(
+        'ScrollAction', is_smooth=True)
+    action_runner.ScrollPage(direction='down', speed_in_pixels_per_second=300)
+    interaction.End()
 
 class ToughCompositorWaitPage(ToughCompositorPage):
 
@@ -50,7 +50,8 @@ class ToughCompositorCasesPageSet(page_set_module.PageSet):
     super(ToughCompositorCasesPageSet, self).__init__(
       credentials_path='data/credentials.json',
       user_agent_type='mobile',
-      archive_data_file='data/tough_compositor_cases.json')
+      archive_data_file='data/tough_compositor_cases.json',
+      bucket=page_set_module.PUBLIC_BUCKET)
 
     scroll_urls_list = [
       # Why: Baseline CC scrolling page. A long page with only text. """

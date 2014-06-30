@@ -346,7 +346,6 @@ QuicErrorCode QuicCryptoClientConfig::FillClientHello(
     const QuicServerId& server_id,
     QuicConnectionId connection_id,
     const QuicVersion preferred_version,
-    uint32 initial_flow_control_window_bytes,
     const CachedState* cached,
     QuicWallTime now,
     QuicRandom* rand,
@@ -358,9 +357,6 @@ QuicErrorCode QuicCryptoClientConfig::FillClientHello(
 
   FillInchoateClientHello(server_id, preferred_version, cached,
                           out_params, out);
-
-  // Set initial receive window for flow control.
-  out->SetValue(kIFCW, initial_flow_control_window_bytes);
 
   const CryptoHandshakeMessage* scfg = cached->GetServerConfig();
   if (!scfg) {
@@ -589,6 +585,18 @@ QuicErrorCode QuicCryptoClientConfig::ProcessRejection(
       *error_details = "Proof missing";
       return QUIC_INVALID_CRYPTO_MESSAGE_PARAMETER;
     }
+  }
+
+  const uint32* reject_reasons;
+  size_t num_reject_reasons;
+  COMPILE_ASSERT(sizeof(QuicTag) == sizeof(uint32), header_out_of_sync);
+  if (rej.GetTaglist(kRREJ, &reject_reasons,
+                     &num_reject_reasons) == QUIC_NO_ERROR) {
+#if defined(DEBUG)
+    for (size_t i = 0; i < num_reject_reasons; ++i) {
+      DVLOG(1) << "Reasons for rejection: " << reject_reasons[i];
+    }
+#endif
   }
 
   return QUIC_NO_ERROR;

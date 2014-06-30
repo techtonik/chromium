@@ -13,7 +13,7 @@ import os
 import cloud_storage_test_base
 import maps_expectations
 
-from telemetry import test
+from telemetry import benchmark
 from telemetry.core import bitmap
 from telemetry.core import util
 from telemetry.page import page
@@ -84,7 +84,8 @@ class MapsPage(page.Page):
 
   def RunNavigateSteps(self, action_runner):
     action_runner.NavigateToPage(self)
-    action_runner.WaitForJavaScriptCondition('window.testDone', timeout=180)
+    action_runner.WaitForJavaScriptCondition(
+        'window.testDone', timeout_in_seconds=180)
 
 
 class Maps(cloud_storage_test_base.TestBase):

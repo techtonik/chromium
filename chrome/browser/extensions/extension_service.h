@@ -22,6 +22,7 @@
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
 #include "extensions/browser/external_provider_interface.h"
+#include "extensions/browser/install_flag.h"
 #include "extensions/browser/management_policy.h"
 #include "extensions/browser/process_manager.h"
 #include "extensions/common/extension.h"
@@ -52,6 +53,7 @@ class ExtensionRegistry;
 class ExtensionSystem;
 class ExtensionUpdater;
 class OneShotEvent;
+class ExternalInstallManager;
 class SharedModuleService;
 class UpdateObserver;
 }  // namespace extensions
@@ -281,17 +283,18 @@ class ExtensionService
 
   // Informs the service that an extension's files are in place for loading.
   //
-  // |page_ordinal| is the location of the extension in the app launcher.
-  // |has_requirement_errors| is true if requirements of the extension weren't
-  // met (for example graphics capabilities).
-  // |blacklist_state| will be BLACKLISTED if the extension is blacklisted.
-  // |wait_for_idle| may be false to install the extension immediately.
+  // |extension|     the extension
+  // |page_ordinal|  the location of the extension in the app launcher
+  // |install_flags| a bitmask of extensions::InstallFlags
   void OnExtensionInstalled(const extensions::Extension* extension,
                             const syncer::StringOrdinal& page_ordinal,
-                            bool has_requirement_errors,
-                            extensions::BlacklistState blacklist_state,
-                            bool is_ephemeral,
-                            bool wait_for_idle);
+                            int install_flags);
+  void OnExtensionInstalled(const extensions::Extension* extension,
+                            const syncer::StringOrdinal& page_ordinal) {
+    OnExtensionInstalled(extension,
+                         page_ordinal,
+                         static_cast<int>(extensions::kInstallFlagNone));
+  }
 
   // Checks for delayed installation for all pending installs.
   void MaybeFinishDelayedInstallations();
@@ -316,9 +319,6 @@ class ExtensionService
   // Given a (presumably just-installed) extension id, mark that extension as
   // acknowledged.
   void AcknowledgeExternalExtension(const std::string& id);
-
-  // Disable extensions that are known to be disabled yet are currently enabled.
-  void ReconcileKnownDisabled();
 
   // Postpone installations so that we don't have to worry about race
   // conditions.
@@ -375,7 +375,11 @@ class ExtensionService
   }
 
   // Note that this may return NULL if autoupdate is not turned on.
+#if defined(ENABLE_EXTENSIONS)
   extensions::ExtensionUpdater* updater() { return updater_.get(); }
+#else
+  extensions::ExtensionUpdater* updater() { return NULL; }
+#endif
 
   extensions::ComponentLoader* component_loader() {
     return component_loader_.get();
@@ -385,6 +389,10 @@ class ExtensionService
 
   extensions::SharedModuleService* shared_module_service() {
     return shared_module_service_.get();
+  }
+
+  extensions::ExternalInstallManager* external_install_manager() {
+    return external_install_manager_.get();
   }
 
   //////////////////////////////////////////////////////////////////////////////
@@ -483,10 +491,10 @@ class ExtensionService
   // the extension is installed, e.g., to update event handlers on background
   // pages; and perform other extension install tasks before calling
   // AddExtension.
+  // |install_flags| is a bitmask of extensions::InstallFlags.
   void AddNewOrUpdatedExtension(const extensions::Extension* extension,
                                 extensions::Extension::State initial_state,
-                                extensions::BlacklistState blacklist_state,
-                                bool is_ephemeral,
+                                int install_flags,
                                 const syncer::StringOrdinal& page_ordinal,
                                 const std::string& install_parameter);
 
@@ -503,11 +511,6 @@ class ExtensionService
   void FinishInstallation(const extensions::Extension* extension,
                           bool was_ephemeral);
 
-  // Updates the |extension|'s active permission set to include only permissions
-  // currently requested by the extension and all the permissions required by
-  // the extension.
-  void UpdateActivePermissions(const extensions::Extension* extension);
-
   // Disables the extension if the privilege level has increased
   // (e.g., due to an upgrade).
   void CheckPermissionsIncrease(const extensions::Extension* extension,
@@ -523,7 +526,7 @@ class ExtensionService
   // Helper to determine if updating an extensions should proceed immediately,
   // or if we should delay the update until further notice.
   bool ShouldDelayExtensionUpdate(const std::string& extension_id,
-                                  bool wait_for_idle) const;
+                                  bool install_immediately) const;
 
   // Manages the blacklisted extensions, intended as callback from
   // Blacklist::GetBlacklistedIDs.
@@ -605,8 +608,10 @@ class ExtensionService
   // Signaled when all extensions are loaded.
   extensions::OneShotEvent* const ready_;
 
+#if defined(ENABLE_EXTENSIONS)
   // Our extension updater, if updates are turned on.
   scoped_ptr<extensions::ExtensionUpdater> updater_;
+#endif
 
   // Map unloaded extensions' ids to their paths. When a temporarily loaded
   // extension is unloaded, we lose the information about it and don't have
@@ -675,6 +680,10 @@ class ExtensionService
   // The controller for the UI that alerts the user about any blacklisted
   // extensions.
   scoped_ptr<extensions::ExtensionErrorController> error_controller_;
+
+  // The manager for extensions that were externally installed that is
+  // responsible for prompting the user about suspicious extensions.
+  scoped_ptr<extensions::ExternalInstallManager> external_install_manager_;
 
   // Sequenced task runner for extension related file operations.
   scoped_refptr<base::SequencedTaskRunner> file_task_runner_;

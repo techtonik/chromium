@@ -13,7 +13,6 @@
 #include "base/process/process.h"
 #include "base/strings/string16.h"
 #include "base/sync_socket.h"
-#include "base/values.h"
 #include "gpu/command_buffer/common/command_buffer.h"
 #include "gpu/command_buffer/common/mailbox.h"
 #include "gpu/ipc/gpu_command_buffer_traits.h"
@@ -37,6 +36,7 @@
 #include "ppapi/c/pp_size.h"
 #include "ppapi/c/pp_time.h"
 #include "ppapi/c/ppb_audio_config.h"
+#include "ppapi/c/ppb_compositor_layer.h"
 #include "ppapi/c/ppb_image_data.h"
 #include "ppapi/c/ppb_tcp_socket.h"
 #include "ppapi/c/ppb_text_input_controller.h"
@@ -59,6 +59,7 @@
 #include "ppapi/proxy/serialized_handle.h"
 #include "ppapi/proxy/serialized_structs.h"
 #include "ppapi/proxy/serialized_var.h"
+#include "ppapi/shared_impl/compositor_layer_data.h"
 #include "ppapi/shared_impl/dir_contents.h"
 #include "ppapi/shared_impl/file_growth.h"
 #include "ppapi/shared_impl/file_path.h"
@@ -86,6 +87,7 @@
 IPC_ENUM_TRAITS_MAX_VALUE(ppapi::TCPSocketVersion,
                           ppapi::TCP_SOCKET_VERSION_1_1_OR_ABOVE)
 IPC_ENUM_TRAITS(PP_AudioSampleRate)
+IPC_ENUM_TRAITS_MAX_VALUE(PP_BlendMode, PP_BLENDMODE_LAST)
 IPC_ENUM_TRAITS(PP_DeviceType_Dev)
 IPC_ENUM_TRAITS(PP_DecryptorStreamType)
 IPC_ENUM_TRAITS(PP_SessionType)
@@ -143,7 +145,17 @@ IPC_STRUCT_TRAITS_BEGIN(PP_Size)
   IPC_STRUCT_TRAITS_MEMBER(width)
 IPC_STRUCT_TRAITS_END()
 
+IPC_STRUCT_TRAITS_BEGIN(PP_FloatSize)
+  IPC_STRUCT_TRAITS_MEMBER(height)
+  IPC_STRUCT_TRAITS_MEMBER(width)
+IPC_STRUCT_TRAITS_END()
+
 IPC_STRUCT_TRAITS_BEGIN(PP_Rect)
+  IPC_STRUCT_TRAITS_MEMBER(point)
+  IPC_STRUCT_TRAITS_MEMBER(size)
+IPC_STRUCT_TRAITS_END()
+
+IPC_STRUCT_TRAITS_BEGIN(PP_FloatRect)
   IPC_STRUCT_TRAITS_MEMBER(point)
   IPC_STRUCT_TRAITS_MEMBER(size)
 IPC_STRUCT_TRAITS_END()
@@ -222,6 +234,41 @@ IPC_STRUCT_TRAITS_BEGIN(ppapi::FileGrowth)
   IPC_STRUCT_TRAITS_MEMBER(append_mode_write_amount)
 IPC_STRUCT_TRAITS_END()
 
+IPC_STRUCT_TRAITS_BEGIN(ppapi::CompositorLayerData)
+  IPC_STRUCT_TRAITS_MEMBER(common)
+  IPC_STRUCT_TRAITS_MEMBER(color)
+  IPC_STRUCT_TRAITS_MEMBER(texture)
+  IPC_STRUCT_TRAITS_MEMBER(image)
+IPC_STRUCT_TRAITS_END()
+
+IPC_STRUCT_TRAITS_BEGIN(ppapi::CompositorLayerData::LayerCommon)
+  IPC_STRUCT_TRAITS_MEMBER(size)
+  IPC_STRUCT_TRAITS_MEMBER(clip_rect)
+  IPC_STRUCT_TRAITS_MEMBER(transform)
+  IPC_STRUCT_TRAITS_MEMBER(blend_mode)
+  IPC_STRUCT_TRAITS_MEMBER(opacity)
+  IPC_STRUCT_TRAITS_MEMBER(resource_id)
+IPC_STRUCT_TRAITS_END()
+
+IPC_STRUCT_TRAITS_BEGIN(ppapi::CompositorLayerData::ColorLayer)
+  IPC_STRUCT_TRAITS_MEMBER(red)
+  IPC_STRUCT_TRAITS_MEMBER(green)
+  IPC_STRUCT_TRAITS_MEMBER(blue)
+  IPC_STRUCT_TRAITS_MEMBER(alpha)
+IPC_STRUCT_TRAITS_END()
+
+IPC_STRUCT_TRAITS_BEGIN(ppapi::CompositorLayerData::ImageLayer)
+  IPC_STRUCT_TRAITS_MEMBER(resource)
+  IPC_STRUCT_TRAITS_MEMBER(source_rect)
+IPC_STRUCT_TRAITS_END()
+
+IPC_STRUCT_TRAITS_BEGIN(ppapi::CompositorLayerData::TextureLayer)
+  IPC_STRUCT_TRAITS_MEMBER(mailbox)
+  IPC_STRUCT_TRAITS_MEMBER(sync_point)
+  IPC_STRUCT_TRAITS_MEMBER(source_rect)
+  IPC_STRUCT_TRAITS_MEMBER(premult_alpha)
+IPC_STRUCT_TRAITS_END()
+
 IPC_STRUCT_TRAITS_BEGIN(ppapi::DeviceRefData)
   IPC_STRUCT_TRAITS_MEMBER(type)
   IPC_STRUCT_TRAITS_MEMBER(name)
@@ -265,6 +312,7 @@ IPC_STRUCT_TRAITS_BEGIN(ppapi::ViewData)
   IPC_STRUCT_TRAITS_MEMBER(clip_rect)
   IPC_STRUCT_TRAITS_MEMBER(device_scale)
   IPC_STRUCT_TRAITS_MEMBER(css_scale)
+  IPC_STRUCT_TRAITS_MEMBER(scroll_offset)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(PP_TouchPoint)
@@ -629,10 +677,15 @@ IPC_MESSAGE_ROUTED3(PpapiMsg_PPPInstance_HandleDocumentLoad,
     int /* pending_loader_host_id */,
     ppapi::URLResponseInfoData /* response */)
 
-// PPP_Messaging.
+// PPP_Messaging and PPP_MessageHandler.
 IPC_MESSAGE_ROUTED2(PpapiMsg_PPPMessaging_HandleMessage,
                     PP_Instance /* instance */,
                     ppapi::proxy::SerializedVar /* message */)
+IPC_SYNC_MESSAGE_ROUTED2_2(PpapiMsg_PPPMessageHandler_HandleBlockingMessage,
+                           PP_Instance /* instance */,
+                           ppapi::proxy::SerializedVar /* message */,
+                           ppapi::proxy::SerializedVar /* result */,
+                           bool /* was_handled */)
 
 // PPP_MouseLock.
 IPC_MESSAGE_ROUTED1(PpapiMsg_PPPMouseLock_MouseLockLost,
@@ -769,7 +822,7 @@ IPC_MESSAGE_CONTROL1(PpapiHostMsg_ChannelCreated,
                      IPC::ChannelHandle /* handle */)
 
 // Notify the renderer that the PPAPI channel gets ready in the plugin.
-IPC_MESSAGE_CONTROL0(PpapiHostMsg_StartupInitializationComplete);
+IPC_MESSAGE_CONTROL0(PpapiHostMsg_StartupInitializationComplete)
 
 // Calls renderer to open a resource file for nacl_irt_open_resource().
 IPC_SYNC_MESSAGE_CONTROL1_1(PpapiHostMsg_OpenResource,
@@ -1259,25 +1312,6 @@ IPC_MESSAGE_CONTROL0(PpapiHostMsg_Broker_Create)
 // ResourceMessageReplyParams in the reply message.
 IPC_MESSAGE_CONTROL0(PpapiHostMsg_Broker_IsAllowed)
 
-// Extensions common -----------------------------------------------------------
-IPC_MESSAGE_CONTROL0(PpapiHostMsg_ExtensionsCommon_Create)
-
-// Starts an extension API request which doesn't expect a response.
-// |request_name| is an API function name. |args| is a list of input arguments.
-IPC_MESSAGE_CONTROL2(PpapiHostMsg_ExtensionsCommon_Post,
-                     std::string /* request_name */,
-                     base::ListValue /* args */)
-
-// Starts an extension API request which expects a response sent back using a
-// PpapiPluginMsg_ExtensionsCommon_CallReply message.
-// |request_name| is an API function name. |args| is a list of input arguments.
-// |output| is a list of output results.
-IPC_MESSAGE_CONTROL2(PpapiHostMsg_ExtensionsCommon_Call,
-                     std::string /* request_name */,
-                     base::ListValue /* args */)
-IPC_MESSAGE_CONTROL1(PpapiPluginMsg_ExtensionsCommon_CallReply,
-                     base::ListValue /* output */)
-
 // UMA
 IPC_MESSAGE_CONTROL0(PpapiHostMsg_UMA_Create)
 IPC_MESSAGE_CONTROL5(PpapiHostMsg_UMA_HistogramCustomTimes,
@@ -1296,8 +1330,19 @@ IPC_MESSAGE_CONTROL3(PpapiHostMsg_UMA_HistogramEnumeration,
                      std::string /* name */,
                      int32_t /* sample */,
                      int32_t /* boundary_value */)
-IPC_MESSAGE_CONTROL0(PpapiHostMsg_UMA_IsCrashReportingEnabled);
-IPC_MESSAGE_CONTROL0(PpapiPluginMsg_UMA_IsCrashReportingEnabledReply);
+IPC_MESSAGE_CONTROL0(PpapiHostMsg_UMA_IsCrashReportingEnabled)
+IPC_MESSAGE_CONTROL0(PpapiPluginMsg_UMA_IsCrashReportingEnabledReply)
+
+// Compositor
+IPC_MESSAGE_CONTROL0(PpapiHostMsg_Compositor_Create)
+IPC_MESSAGE_CONTROL2(PpapiHostMsg_Compositor_CommitLayers,
+                     std::vector<ppapi::CompositorLayerData> /* layers */,
+                     bool /* reset */)
+IPC_MESSAGE_CONTROL0(PpapiPluginMsg_Compositor_CommitLayersReply)
+IPC_MESSAGE_CONTROL3(PpapiPluginMsg_Compositor_ReleaseResource,
+                     int32_t /* id */,
+                     uint32_t /* sync_point */,
+                     bool /* is_lost */)
 
 // File chooser.
 IPC_MESSAGE_CONTROL0(PpapiHostMsg_FileChooser_Create)
@@ -1484,11 +1529,11 @@ IPC_MESSAGE_CONTROL3(PpapiPluginMsg_MediaStreamTrack_InitBuffers,
                      int32_t /* buffer_size */,
                      bool /* readonly */)
 IPC_MESSAGE_CONTROL1(PpapiPluginMsg_MediaStreamTrack_EnqueueBuffer,
-                     int32_t /* index */);
+                     int32_t /* index */)
 IPC_MESSAGE_CONTROL1(PpapiHostMsg_MediaStreamTrack_EnqueueBuffer,
-                     int32_t /* index */);
+                     int32_t /* index */)
 IPC_MESSAGE_CONTROL1(PpapiPluginMsg_MediaStreamTrack_EnqueueBuffers,
-                     std::vector<int32_t> /* indices */);
+                     std::vector<int32_t> /* indices */)
 IPC_MESSAGE_CONTROL0(PpapiHostMsg_MediaStreamTrack_Close)
 
 // NetworkMonitor.
@@ -1520,9 +1565,10 @@ IPC_MESSAGE_CONTROL1(PpapiPluginMsg_TrueTypeFontSingleton_GetFontsInFamilyReply,
                          /* fonts */)
 IPC_MESSAGE_CONTROL1(PpapiHostMsg_TrueTypeFont_Create,
                      ppapi::proxy::SerializedTrueTypeFontDesc /* desc */)
-IPC_MESSAGE_CONTROL0(PpapiHostMsg_TrueTypeFont_Describe)
-IPC_MESSAGE_CONTROL1(PpapiPluginMsg_TrueTypeFont_DescribeReply,
-                     ppapi::proxy::SerializedTrueTypeFontDesc /* desc */)
+// Unsolicited reply to return the actual font's desc to the plugin.
+IPC_MESSAGE_CONTROL2(PpapiPluginMsg_TrueTypeFont_CreateReply,
+                     ppapi::proxy::SerializedTrueTypeFontDesc /* desc */,
+                     int32_t /* result */)
 IPC_MESSAGE_CONTROL0(PpapiHostMsg_TrueTypeFont_GetTableTags)
 IPC_MESSAGE_CONTROL1(PpapiPluginMsg_TrueTypeFont_GetTableTagsReply,
                      std::vector<uint32_t> /* tags */)
@@ -1861,10 +1907,11 @@ IPC_MESSAGE_CONTROL3(PpapiHostMsg_VideoDecoder_Decode,
                      int32_t /* decode_id */)
 IPC_MESSAGE_CONTROL1(PpapiPluginMsg_VideoDecoder_DecodeReply,
                      uint32_t /* shm_id */)
-IPC_MESSAGE_CONTROL3(PpapiPluginMsg_VideoDecoder_RequestTextures,
+IPC_MESSAGE_CONTROL4(PpapiPluginMsg_VideoDecoder_RequestTextures,
                      uint32_t /* num_textures */,
                      PP_Size /* size */,
-                     uint32_t /* texture_target */)
+                     uint32_t /* texture_target */,
+                     std::vector<gpu::Mailbox> /* mailboxes*/)
 IPC_MESSAGE_CONTROL2(PpapiHostMsg_VideoDecoder_AssignTextures,
                      PP_Size /* size */,
                      std::vector<uint32_t> /* texture_ids */)

@@ -250,6 +250,20 @@ media::VideoCaptureFormats FilterFormats(
   if (min_width > max_width || min_height > max_height)
     return media::VideoCaptureFormats();
 
+  double min_frame_rate = 0.0f;
+  double max_frame_rate = 0.0f;
+  if (GetConstraintValueAsDouble(constraints,
+                                 MediaStreamVideoSource::kMaxFrameRate,
+                                 &max_frame_rate) &&
+      GetConstraintValueAsDouble(constraints,
+                                 MediaStreamVideoSource::kMinFrameRate,
+                                 &min_frame_rate)) {
+    if (min_frame_rate > max_frame_rate) {
+      DLOG(WARNING) << "Wrong requested frame rate.";
+      return media::VideoCaptureFormats();
+    }
+  }
+
   blink::WebVector<blink::WebMediaConstraint> mandatory;
   blink::WebVector<blink::WebMediaConstraint> optional;
   constraints.getMandatoryConstraints(mandatory);
@@ -342,7 +356,6 @@ MediaStreamVideoSource::MediaStreamVideoSource()
 }
 
 MediaStreamVideoSource::~MediaStreamVideoSource() {
-  DVLOG(3) << "~MediaStreamVideoSource()";
 }
 
 void MediaStreamVideoSource::AddTrack(
@@ -501,9 +514,7 @@ void MediaStreamVideoSource::OnStartDone(bool success) {
     state_ = STARTED;
     SetReadyState(blink::WebMediaStreamSource::ReadyStateLive);
   } else {
-    state_ = ENDED;
-    SetReadyState(blink::WebMediaStreamSource::ReadyStateEnded);
-    StopSourceImpl();
+    StopSource();
   }
 
   // This object can be deleted after calling FinalizeAddTrack. See comment in
@@ -538,9 +549,13 @@ void MediaStreamVideoSource::FinalizeAddTrack() {
       GetDesiredMinAndMaxAspectRatio(it->constraints,
                                      &min_aspect_ratio,
                                      &max_aspect_ratio);
-      track_adapter_->AddTrack(it->track,it->frame_callback,
+      double max_frame_rate = 0.0f;
+      GetConstraintValueAsDouble(it->constraints,
+                                 kMaxFrameRate, &max_frame_rate);
+      track_adapter_->AddTrack(it->track, it->frame_callback,
                                max_width, max_height,
-                               min_aspect_ratio, max_aspect_ratio);
+                               min_aspect_ratio, max_aspect_ratio,
+                               max_frame_rate);
     }
 
     DVLOG(3) << "FinalizeAddTrack() success " << success;
@@ -552,6 +567,7 @@ void MediaStreamVideoSource::FinalizeAddTrack() {
 
 void MediaStreamVideoSource::SetReadyState(
     blink::WebMediaStreamSource::ReadyState state) {
+  DVLOG(3) << "MediaStreamVideoSource::SetReadyState state " << state;
   if (!owner().isNull()) {
     owner().setReadyState(state);
   }

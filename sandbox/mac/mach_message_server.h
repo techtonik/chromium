@@ -33,7 +33,14 @@ class MessageDemuxer {
 // different port, or reply to the message with a MIG error.
 class MachMessageServer {
  public:
-  MachMessageServer(MessageDemuxer* demuxer, mach_msg_size_t buffer_size);
+  // Creates a new Mach message server that will send messages to |demuxer|
+  // for handling. If the |server_receive_right| is non-NULL, this class will
+  // take ownership of the port and it will be used to receive messages.
+  // Otherwise the server will create a new receive right.
+  // The maximum size of messages is specified by |buffer_size|.
+  MachMessageServer(MessageDemuxer* demuxer,
+                    mach_port_t server_receive_right,
+                    mach_msg_size_t buffer_size);
   ~MachMessageServer();
 
   // Initializes the class and starts running the message server. If this
@@ -71,6 +78,10 @@ class MachMessageServer {
 
   // A MACH_RECV dispatch source for the server_port_.
   dispatch_source_t server_source_;
+
+  // Semaphore used to wait on the |server_source_|'s cancellation in the
+  // destructor.
+  dispatch_semaphore_t source_canceled_;
 
   // The size of the two message buffers below.
   const mach_msg_size_t buffer_size_;

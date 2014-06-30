@@ -6,7 +6,6 @@
 
 #include <android/bitmap.h>
 
-#include "base/android/sys_utils.h"
 #include "base/basictypes.h"
 #include "base/bind.h"
 #include "base/callback_helpers.h"
@@ -15,6 +14,7 @@
 #include "base/message_loop/message_loop.h"
 #include "base/metrics/histogram.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/sys_info.h"
 #include "base/threading/worker_pool.h"
 #include "cc/base/latency_info_swap_promise.h"
 #include "cc/layers/delegated_frame_provider.h"
@@ -40,6 +40,7 @@
 #include "content/browser/renderer_host/dip_util.h"
 #include "content/browser/renderer_host/image_transport_factory_android.h"
 #include "content/browser/renderer_host/input/synthetic_gesture_target_android.h"
+#include "content/browser/renderer_host/input/web_input_event_builders_android.h"
 #include "content/browser/renderer_host/input/web_input_event_util.h"
 #include "content/browser/renderer_host/render_process_host_impl.h"
 #include "content/browser/renderer_host/render_view_host_impl.h"
@@ -187,6 +188,7 @@ RenderWidgetHostViewAndroid::RenderWidgetHostViewAndroid(
           switches::kDisableOverscrollEdgeEffect)),
       overscroll_effect_(OverscrollGlow::Create(overscroll_effect_enabled_)),
       gesture_provider_(CreateGestureProviderConfig(), this),
+      gesture_text_selector_(this),
       flush_input_requested_(false),
       accelerated_surface_route_id_(0),
       using_synchronous_compositor_(SynchronousCompositorImpl::FromID(
@@ -218,8 +220,6 @@ bool RenderWidgetHostViewAndroid::OnMessageReceived(
                         OnDidChangeBodyBackgroundColor)
     IPC_MESSAGE_HANDLER(ViewHostMsg_SetNeedsBeginFrame,
                         OnSetNeedsBeginFrame)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_TextInputStateChanged,
-                        OnTextInputStateChanged)
     IPC_MESSAGE_HANDLER(ViewHostMsg_SmartClipDataExtracted,
                         OnSmartClipDataExtracted)
     IPC_MESSAGE_UNHANDLED(handled = false)
@@ -435,6 +435,23 @@ void RenderWidgetHostViewAndroid::UnlockCompositingSurface() {
   }
 }
 
+void RenderWidgetHostViewAndroid::SetTextSurroundingSelectionCallback(
+    const TextSurroundingSelectionCallback& callback) {
+  // Only one outstanding request is allowed at any given time.
+  DCHECK(!callback.is_null());
+  text_surrounding_selection_callback_ = callback;
+}
+
+void RenderWidgetHostViewAndroid::OnTextSurroundingSelectionResponse(
+    const base::string16& content,
+    size_t start_offset,
+    size_t end_offset) {
+  if (text_surrounding_selection_callback_.is_null())
+    return;
+  text_surrounding_selection_callback_.Run(content, start_offset, end_offset);
+  text_surrounding_selection_callback_.Reset();
+}
+
 void RenderWidgetHostViewAndroid::ReleaseLocksOnSurface() {
   if (!frame_evictor_->HasFrame()) {
     DCHECK_EQ(locks_on_frame_count_, 0u);
@@ -476,18 +493,11 @@ void RenderWidgetHostViewAndroid::SetIsLoading(bool is_loading) {
   // is TabContentsDelegate.
 }
 
-void RenderWidgetHostViewAndroid::TextInputTypeChanged(
-    ui::TextInputType type,
-    ui::TextInputMode input_mode,
-    bool can_compose_inline) {
-  // Unused on Android, which uses OnTextInputChanged instead.
-}
-
 long RenderWidgetHostViewAndroid::GetNativeImeAdapter() {
   return reinterpret_cast<intptr_t>(&ime_adapter_android_);
 }
 
-void RenderWidgetHostViewAndroid::OnTextInputStateChanged(
+void RenderWidgetHostViewAndroid::TextInputStateChanged(
     const ViewHostMsg_TextInputState_Params& params) {
   // If the change is not originated from IME (e.g. Javascript, autofill),
   // send back the renderer an acknowledgement, regardless of how we exit from
@@ -536,13 +546,10 @@ void RenderWidgetHostViewAndroid::OnStartContentIntent(
 }
 
 void RenderWidgetHostViewAndroid::OnSmartClipDataExtracted(
-    const base::string16& result) {
-  // Custom serialization over IPC isn't allowed normally for security reasons.
-  // Since this feature is only used in (single-process) WebView, there are no
-  // security issues. Enforce that it's only called in single process mode.
-  CHECK(RenderProcessHost::run_renderer_in_process());
+    const base::string16& result,
+    const gfx::Rect rect) {
   if (content_view_core_)
-    content_view_core_->OnSmartClipDataExtracted(result);
+    content_view_core_->OnSmartClipDataExtracted(rect, result);
 }
 
 bool RenderWidgetHostViewAndroid::OnTouchEvent(
@@ -552,6 +559,11 @@ bool RenderWidgetHostViewAndroid::OnTouchEvent(
 
   if (!gesture_provider_.OnTouchEvent(event))
     return false;
+
+  if (gesture_text_selector_.OnTouchEvent(event)) {
+    gesture_provider_.OnTouchEventAck(false);
+    return true;
+  }
 
   // Short-circuit touch forwarding if no touch handlers exist.
   if (!host_->ShouldForwardTouchEvent()) {
@@ -692,9 +704,6 @@ void RenderWidgetHostViewAndroid::CopyFromCompositingSurface(
   delegated_layer->SetHideLayerAndSubtree(true);
   delegated_layer->SetIsDrawable(true);
   delegated_layer->SetContentsOpaque(true);
-  gfx::Transform layer_scale(
-      device_scale_factor, 0.f, 0.f, device_scale_factor, 0.f, 0.f);
-  delegated_layer->SetTransform(layer_scale);
   compositor->AttachLayerForReadback(delegated_layer);
 
   readback_layer = delegated_layer;
@@ -794,6 +803,14 @@ void RenderWidgetHostViewAndroid::SwapDelegatedFrame(
     last_output_surface_id_ = output_surface_id;
   }
 
+  // DelegatedRendererLayerImpl applies the inverse device_scale_factor of the
+  // renderer frame, assuming that the browser compositor will scale
+  // it back up to device scale.  But on Android we put our browser layers in
+  // physical pixels and set our browser CC device_scale_factor to 1, so this
+  // suppresses the transform.  This line may need to be removed when fixing
+  // http://crbug.com/384134 or http://crbug.com/310763
+  frame_data->device_scale_factor = 1.0f;
+
   if (!has_content) {
     DestroyDelegatedContent();
   } else {
@@ -818,19 +835,6 @@ void RenderWidgetHostViewAndroid::SwapDelegatedFrame(
     layer_->SetContentsOpaque(true);
     layer_->SetBounds(content_size_in_layer_);
     layer_->SetNeedsDisplay();
-    // DelegatedRendererLayer scales the frame data from physical space to DIPs
-    // by inverting the frame's device scale factor, assuming that the browser
-    // compositor will map from DIPs back to physical pixels using its own
-    // device scale factor. However, the Android browser compositor always uses
-    // a device scale factor of 1.0, so we have to transform the delegated
-    // layer by the device scale to get it into the same physical pixel space as
-    // the rest of the UI.
-    const gfx::Display& display =
-        gfx::Screen::GetNativeScreen()->GetPrimaryDisplay();
-    float device_scale_factor = display.device_scale_factor();
-    gfx::Transform layer_scale(
-        device_scale_factor, 0.f, 0.f, device_scale_factor, 0.f, 0.f);
-    layer_->SetTransform(layer_scale);
   }
 
   base::Closure ack_callback =
@@ -873,10 +877,6 @@ void RenderWidgetHostViewAndroid::InternalSwapCompositorFrame(
     return;
   }
 
-  // Always let ContentViewCore know about the new frame first, so it can decide
-  // to schedule a Draw immediately when it sees the texture layer invalidation.
-  OnFrameMetadataUpdated(frame->metadata);
-
   if (layer_ && layer_->layer_tree_host()) {
     for (size_t i = 0; i < frame->metadata.latency_info.size(); i++) {
       scoped_ptr<cc::SwapPromise> swap_promise(
@@ -894,6 +894,8 @@ void RenderWidgetHostViewAndroid::InternalSwapCompositorFrame(
 
   SwapDelegatedFrame(output_surface_id, frame->delegated_frame_data.Pass());
   frame_evictor_->SwappedFrame(!host_->is_hidden());
+
+  OnFrameMetadataUpdated(frame->metadata);
 }
 
 void RenderWidgetHostViewAndroid::OnSwapCompositorFrame(
@@ -1292,6 +1294,9 @@ void RenderWidgetHostViewAndroid::RunAckCallbacks() {
 
 void RenderWidgetHostViewAndroid::OnGestureEvent(
     const ui::GestureEventData& gesture) {
+  if (gesture_text_selector_.OnGestureEvent(gesture))
+    return;
+
   SendGestureEvent(CreateWebGestureEventFromGestureEventData(gesture));
 }
 
@@ -1432,11 +1437,36 @@ SkBitmap::Config RenderWidgetHostViewAndroid::PreferredReadbackFormat() {
   // Define the criteria here. If say the 16 texture readback is
   // supported we should go with that (this degrades quality)
   // or stick back to the default format.
-  if (base::android::SysUtils::IsLowEndDevice()) {
+  if (base::SysInfo::IsLowEndDevice()) {
     if (IsReadbackConfigSupported(SkBitmap::kRGB_565_Config))
       return SkBitmap::kRGB_565_Config;
   }
   return SkBitmap::kARGB_8888_Config;
+}
+
+void RenderWidgetHostViewAndroid::ShowSelectionHandlesAutomatically() {
+  if (content_view_core_)
+    content_view_core_->ShowSelectionHandlesAutomatically();
+}
+
+void RenderWidgetHostViewAndroid::SelectRange(
+    float x1, float y1, float x2, float y2) {
+  if (content_view_core_)
+    static_cast<WebContentsImpl*>(content_view_core_->GetWebContents())->
+        SelectRange(gfx::Point(x1, y1), gfx::Point(x2, y2));
+}
+
+void RenderWidgetHostViewAndroid::Unselect() {
+  if (content_view_core_)
+    content_view_core_->GetWebContents()->Unselect();
+}
+
+void RenderWidgetHostViewAndroid::LongPress(
+    base::TimeTicks time, float x, float y) {
+  blink::WebGestureEvent long_press = WebGestureEventBuilder::Build(
+      blink::WebInputEvent::GestureLongPress,
+      (time - base::TimeTicks()).InSecondsF(), x, y);
+  SendGestureEvent(long_press);
 }
 
 // static
@@ -1449,6 +1479,8 @@ void RenderWidgetHostViewBase::GetDefaultScreenInfo(
   results->availableRect = display.work_area();
   results->deviceScaleFactor = display.device_scale_factor();
   results->orientationAngle = display.RotationAsDegree();
+  results->orientationType =
+      RenderWidgetHostViewBase::GetOrientationTypeFromDisplay(display);
   gfx::DeviceDisplayInfo info;
   results->depth = info.GetBitsPerPixel();
   results->depthPerComponent = info.GetBitsPerComponent();

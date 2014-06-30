@@ -29,13 +29,13 @@
 #include "chrome/browser/extensions/install_tracker_factory.h"
 #include "chrome/browser/extensions/install_verifier.h"
 #include "chrome/browser/extensions/shared_module_service.h"
-#include "chrome/browser/omaha_query_params/omaha_query_params.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/extensions/extension_constants.h"
+#include "components/omaha_query_params/omaha_query_params.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/download_manager.h"
 #include "content/public/browser/download_save_info.h"
@@ -60,7 +60,6 @@
 #include "chrome/browser/chromeos/drive/file_system_util.h"
 #endif
 
-using chrome::OmahaQueryParams;
 using content::BrowserContext;
 using content::BrowserThread;
 using content::DownloadItem;
@@ -202,8 +201,9 @@ GURL WebstoreInstaller::GetWebstoreInstallURL(
   std::string url_string = extension_urls::GetWebstoreUpdateUrl().spec();
 
   GURL url(url_string + "?response=redirect&" +
-           OmahaQueryParams::Get(OmahaQueryParams::CRX) + "&x=" +
-           net::EscapeQueryParamValue(JoinString(params, '&'), true));
+           omaha_query_params::OmahaQueryParams::Get(
+               omaha_query_params::OmahaQueryParams::CRX) +
+           "&x=" + net::EscapeQueryParamValue(JoinString(params, '&'), true));
   DCHECK(url.is_valid());
 
   return url;
@@ -399,12 +399,9 @@ void WebstoreInstaller::Observe(int type,
   }
 }
 
-void WebstoreInstaller::OnExtensionWillBeInstalled(
+void WebstoreInstaller::OnExtensionInstalled(
     content::BrowserContext* browser_context,
-    const Extension* extension,
-    bool is_update,
-    bool from_ephemeral,
-    const std::string& old_name) {
+    const Extension* extension) {
   CHECK(profile_->IsSameProfile(Profile::FromBrowserContext(browser_context)));
   if (pending_modules_.empty())
     return;
@@ -492,7 +489,9 @@ void WebstoreInstaller::OnDownloadStarted(
 }
 
 void WebstoreInstaller::OnDownloadUpdated(DownloadItem* download) {
-  CHECK_EQ(download_item_, download);
+  // DownloadItemImpl calls the observer for a completed item, ignore it.
+  if (download_item_ != download)
+    return;
 
   switch (download->GetState()) {
     case DownloadItem::CANCELLED:

@@ -108,6 +108,7 @@
         'autofill_regexes',
         'components_resources.gyp:components_resources',
         'components_strings.gyp:components_strings',
+        'keyed_service_core',
         'os_crypt',
         'pref_registry',
         'webdata_common',
@@ -184,6 +185,7 @@
         'autofill/core/browser/phone_number.h',
         'autofill/core/browser/phone_number_i18n.cc',
         'autofill/core/browser/phone_number_i18n.h',
+        'autofill/core/browser/popup_item_ids.h',
         'autofill/core/browser/state_names.cc',
         'autofill/core/browser/state_names.h',
         'autofill/core/browser/validation.cc',
@@ -282,6 +284,7 @@
             '../ipc/ipc.gyp:ipc',
             '../third_party/WebKit/public/blink.gyp:blink_minimal',
             '../ui/gfx/gfx.gyp:gfx',
+            '../ui/gfx/ipc/gfx_ipc.gyp:gfx_ipc',
           ],
           'include_dirs': [
             '..',

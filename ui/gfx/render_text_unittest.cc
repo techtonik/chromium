@@ -1903,7 +1903,6 @@ TEST_F(RenderTextTest, Multiline_Newline) {
   }
 }
 
-
 TEST_F(RenderTextTest, Win_BreakRunsByUnicodeBlocks) {
   scoped_ptr<RenderTextWin> render_text(
       static_cast<RenderTextWin*>(RenderText::CreateInstance()));
@@ -1974,7 +1973,71 @@ TEST_F(RenderTextTest, HarfBuzz_CharToGlyph) {
                 run.CharRangeToGlyphRange(Range(j, j + 1)));
     }
   }
+}
 
+TEST_F(RenderTextTest, HarfBuzz_RunDirection) {
+  RenderTextHarfBuzz render_text;
+  const base::string16 mixed =
+      WideToUTF16(L"\x05D0\x05D1" L"1234" L"\x05D2\x05D3");
+  render_text.SetText(mixed);
+  render_text.EnsureLayout();
+  ASSERT_EQ(3U, render_text.runs_.size());
+  EXPECT_TRUE(render_text.runs_[0]->is_rtl);
+  EXPECT_FALSE(render_text.runs_[1]->is_rtl);
+  EXPECT_TRUE(render_text.runs_[2]->is_rtl);
+}
+
+TEST_F(RenderTextTest, HarfBuzz_BreakRunsByUnicodeBlocks) {
+  RenderTextHarfBuzz render_text;
+
+  // The '\x25B6' "play character" should break runs. http://crbug.com/278913
+  render_text.SetText(WideToUTF16(L"x\x25B6y"));
+  render_text.EnsureLayout();
+  ASSERT_EQ(3U, render_text.runs_.size());
+  EXPECT_EQ(Range(0, 1), render_text.runs_[0]->range);
+  EXPECT_EQ(Range(1, 2), render_text.runs_[1]->range);
+  EXPECT_EQ(Range(2, 3), render_text.runs_[2]->range);
+
+  render_text.SetText(WideToUTF16(L"x \x25B6 y"));
+  render_text.EnsureLayout();
+  ASSERT_EQ(3U, render_text.runs_.size());
+  EXPECT_EQ(Range(0, 2), render_text.runs_[0]->range);
+  EXPECT_EQ(Range(2, 3), render_text.runs_[1]->range);
+  EXPECT_EQ(Range(3, 5), render_text.runs_[2]->range);
+}
+
+// Disabled on Mac because RenderTextMac doesn't implement GetGlyphBounds.
+#if !defined(OS_MACOSX)
+TEST_F(RenderTextTest, GlyphBounds) {
+  const wchar_t* kTestStrings[] = {
+      L"asdf 1234 qwer", L"\x0647\x0654", L"\x0645\x0631\x062D\x0628\x0627"
+  };
+  scoped_ptr<RenderText> render_text(RenderText::CreateInstance());
+
+  for (size_t i = 0; i < arraysize(kTestStrings); ++i) {
+    render_text->SetText(WideToUTF16(kTestStrings[i]));
+    render_text->EnsureLayout();
+
+    for (size_t j = 0; j < render_text->text().length(); ++j)
+      EXPECT_FALSE(render_text->GetGlyphBounds(j).is_empty());
+  }
+}
+#endif
+
+// Remove this after making RTHB default in favor of RenderTextTest.GlyphBounds.
+TEST_F(RenderTextTest, HarfBuzz_GlyphBounds) {
+  const wchar_t* kTestStrings[] = {
+      L"asdf 1234 qwer", L"\x0647\x0654", L"\x0645\x0631\x062D\x0628\x0627"
+  };
+  scoped_ptr<RenderText> render_text(new RenderTextHarfBuzz);
+
+  for (size_t i = 0; i < arraysize(kTestStrings); ++i) {
+    render_text->SetText(WideToUTF16(kTestStrings[i]));
+    render_text->EnsureLayout();
+
+    for (size_t j = 0; j < render_text->text().length(); ++j)
+      EXPECT_FALSE(render_text->GetGlyphBounds(j).is_empty());
+  }
 }
 
 }  // namespace gfx

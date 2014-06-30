@@ -24,6 +24,7 @@
 #include "extensions/common/url_pattern_set.h"
 #include "extensions/common/view_type.h"
 #include "ipc/ipc_message_macros.h"
+#include "ui/gfx/ipc/gfx_param_traits.h"
 #include "url/gurl.h"
 
 #define IPC_MESSAGE_START ExtensionMsgStart
@@ -394,10 +395,8 @@ IPC_MESSAGE_ROUTED1(ExtensionMsg_NotifyRenderViewType,
                     extensions::ViewType /* view_type */)
 
 // Deliver a message sent with ExtensionHostMsg_PostMessage.
-IPC_MESSAGE_CONTROL3(ExtensionMsg_UsingWebRequestAPI,
-                     bool /* adblock */,
-                     bool /* adblock_plus */,
-                     bool /* other_webrequest */)
+IPC_MESSAGE_CONTROL1(ExtensionMsg_UsingWebRequestAPI,
+                     bool /* webrequest_used */)
 
 // Ask the lazy background page if it is ready to be suspended. This is sent
 // when the page is considered idle. The renderer will reply with the same
@@ -583,21 +582,20 @@ IPC_MESSAGE_ROUTED3(ExtensionHostMsg_ContentScriptsExecuting,
                     int32 /* page_id of the _topmost_ frame */,
                     GURL /* url of the _topmost_ frame */)
 
-// Sent from the renderer to the browser to request permission for a content
-// script to execute on a given page.
+// Sent from the renderer to the browser to request permission for a script
+// injection.
 // If request id is -1, this signals that the request has already ran, and this
 // merely serves as a notification. This happens when the feature to disable
 // scripts running without user consent is not enabled.
-IPC_MESSAGE_ROUTED3(ExtensionHostMsg_RequestContentScriptPermission,
+IPC_MESSAGE_ROUTED3(ExtensionHostMsg_RequestScriptInjectionPermission,
                     std::string /* extension id */,
                     int /* page id */,
                     int /* request id */)
 
 // Sent from the browser to the renderer in reply to a
-// RequestContentScriptPermission message, granting permission for a content
+// RequestScriptInjectionPermission message, granting permission for a script
 // script to run.
-IPC_MESSAGE_ROUTED1(ExtensionMsg_GrantContentScriptPermission,
-                    int /* request id */)
+IPC_MESSAGE_ROUTED1(ExtensionMsg_PermitScriptInjection, int /* request id */)
 
 // Sent by the renderer when a web page is checking if its app is installed.
 IPC_MESSAGE_ROUTED3(ExtensionHostMsg_GetAppInstallState,

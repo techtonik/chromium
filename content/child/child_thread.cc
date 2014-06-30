@@ -19,6 +19,7 @@
 #include "base/message_loop/timer_slack.h"
 #include "base/process/kill.h"
 #include "base/process/process_handle.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/synchronization/condition_variable.h"
 #include "base/synchronization/lock.h"
@@ -120,7 +121,7 @@ class SuicideOnChannelErrorFilter : public IPC::MessageFilter {
     // forever and leave behind a renderer process which eats 100% CPU forever.
     //
     // This is because the terminate signals (ViewMsg_ShouldClose and the error
-    // from the IPC channel) are routed to the main message loop but never
+    // from the IPC sender) are routed to the main message loop but never
     // processed (because that message loop is stuck in V8).
     //
     // One could make the browser SIGKILL the renderers, but that leaves open a
@@ -128,7 +129,7 @@ class SuicideOnChannelErrorFilter : public IPC::MessageFilter {
     // the browser because "it's stuck") will leave behind a process eating all
     // the CPU.
     //
-    // So, we install a filter on the channel so that we can process this event
+    // So, we install a filter on the sender so that we can process this event
     // here and kill the process.
     // TODO(earthdok): Re-enable on CrOS http://crbug.com/360622
 #if (defined(ADDRESS_SANITIZER) || defined(LEAK_SANITIZER) || \
@@ -238,7 +239,7 @@ void ChildThread::Init() {
     IPC::Logging::GetInstance()->SetIPCSender(this);
 #endif
 
-  mojo_application_.reset(new MojoApplication(this));
+  mojo_application_.reset(new MojoApplication);
 
   sync_message_filter_ =
       new IPC::SyncMessageFilter(ChildProcess::current()->GetShutDownEvent());
@@ -266,11 +267,16 @@ void ChildThread::Init() {
 
   channel_->AddFilter(histogram_message_filter_.get());
   channel_->AddFilter(sync_message_filter_.get());
-  channel_->AddFilter(new tracing::ChildTraceMessageFilter(
-      ChildProcess::current()->io_message_loop_proxy()));
   channel_->AddFilter(resource_message_filter_.get());
   channel_->AddFilter(quota_message_filter_->GetFilter());
   channel_->AddFilter(service_worker_message_filter_->GetFilter());
+
+  if (!CommandLine::ForCurrentProcess()->HasSwitch(switches::kSingleProcess)) {
+    // In single process mode, browser-side tracing will cover the whole
+    // process including renderers.
+    channel_->AddFilter(new tracing::ChildTraceMessageFilter(
+        ChildProcess::current()->io_message_loop_proxy()));
+  }
 
   // In single process mode we may already have a power monitor
   if (!base::PowerMonitor::Get()) {
@@ -289,11 +295,21 @@ void ChildThread::Init() {
     channel_->AddFilter(new SuicideOnChannelErrorFilter());
 #endif
 
+  int connection_timeout = kConnectionTimeoutS;
+  std::string connection_override =
+      CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          switches::kIPCConnectionTimeout);
+  if (!connection_override.empty()) {
+    int temp;
+    if (base::StringToInt(connection_override, &temp))
+      connection_timeout = temp;
+  }
+
   base::MessageLoop::current()->PostDelayedTask(
       FROM_HERE,
       base::Bind(&ChildThread::EnsureConnected,
                  channel_connected_factory_.GetWeakPtr()),
-      base::TimeDelta::FromSeconds(kConnectionTimeoutS));
+      base::TimeDelta::FromSeconds(connection_timeout));
 
 #if defined(OS_ANDROID)
   {
@@ -352,15 +368,6 @@ void ChildThread::OnChannelConnected(int32 peer_pid) {
 void ChildThread::OnChannelError() {
   set_on_channel_error_called(true);
   base::MessageLoop::current()->Quit();
-}
-
-void ChildThread::ConnectToService(
-    const mojo::String& service_url,
-    const mojo::String& service_name,
-    mojo::ScopedMessagePipeHandle message_pipe,
-    const mojo::String& requestor_url) {
-  // By default, we don't expect incoming connections.
-  NOTREACHED();
 }
 
 bool ChildThread::Send(IPC::Message* msg) {

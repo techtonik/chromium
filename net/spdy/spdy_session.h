@@ -131,6 +131,14 @@ COMPILE_ASSERT(12 == SpdyFramer::LAST_ERROR,
 COMPILE_ASSERT(15 == RST_STREAM_NUM_STATUS_CODES,
                SpdyProtocolErrorDetails_RstStreamStatus_mismatch);
 
+// Splits pushed |headers| into request and response parts. Request headers are
+// the headers specifying resource URL.
+void NET_EXPORT_PRIVATE
+    SplitPushedHeadersToRequestAndResponse(const SpdyHeaderBlock& headers,
+                                           SpdyMajorVersion protocol_version,
+                                           SpdyHeaderBlock* request_headers,
+                                           SpdyHeaderBlock* response_headers);
+
 // A helper class used to manage a request to create a stream.
 class NET_EXPORT_PRIVATE SpdyStreamRequest {
  public:
@@ -602,6 +610,11 @@ class NET_EXPORT SpdySession : public BufferedSpdyFramerVisitorInterface,
   // was closed). Processes as many pending stream requests as
   // possible.
   void ProcessPendingStreamRequests();
+
+  bool TryCreatePushStream(SpdyStreamId stream_id,
+                           SpdyStreamId associated_stream_id,
+                           SpdyPriority priority,
+                           const SpdyHeaderBlock& headers);
 
   // Close the stream pointed to by the given iterator. Note that that
   // stream may hold the last reference to the session.

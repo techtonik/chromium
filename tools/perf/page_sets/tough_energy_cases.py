@@ -38,13 +38,16 @@ class ToughEnergyCasesPageSet(page_set_module.PageSet):
 
   def __init__(self):
     super(ToughEnergyCasesPageSet, self).__init__(
+      archive_data_file='data/tough_energy_cases.json',
+      bucket=page_set_module.PUBLIC_BUCKET,
       credentials_path='data/credentials.json')
 
     # Why: Above the fold animated gif running in the background
     self.AddPage(ToughEnergyCasesPage(
       'file://tough_energy_cases/above-fold-animated-gif.html',
       self))
-    self.AddPage(GmailPage(self))
+    # TODO(dominikg): fix crbug.com/386152
+    #self.AddPage(GmailPage(self))
     # Why: Below the fold animated gif
     self.AddPage(ToughEnergyCasesPage(
       'file://tough_energy_cases/below-fold-animated-gif.html',

@@ -22,6 +22,12 @@ void FakeGCMDriver::AddAppHandler(
 void FakeGCMDriver::RemoveAppHandler(const std::string& app_id) {
 }
 
+void FakeGCMDriver::OnSignedIn() {
+}
+
+void FakeGCMDriver::Purge() {
+}
+
 void FakeGCMDriver::Enable() {
 }
 
@@ -36,7 +42,7 @@ bool FakeGCMDriver::IsStarted() const {
   return true;
 }
 
-bool FakeGCMDriver::IsGCMClientReady() const {
+bool FakeGCMDriver::IsConnected() const {
   return true;
 }
 
@@ -46,10 +52,6 @@ void FakeGCMDriver::GetGCMStatistics(const GetGCMStatisticsCallback& callback,
 
 void FakeGCMDriver::SetGCMRecording(const GetGCMStatisticsCallback& callback,
                                     bool recording) {
-}
-
-std::string FakeGCMDriver::SignedInUserName() const {
-  return std::string();
 }
 
 GCMClient::Result FakeGCMDriver::EnsureStarted() {

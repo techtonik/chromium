@@ -14,9 +14,9 @@
 #import <AppKit/AppKit.h>
 #import <CoreWLAN/CoreWLAN.h>
 #import <ImageCaptureCore/ImageCaptureCore.h>
-#import <IOBluetooth/objc/IOBluetoothDevice.h>
-#import <IOBluetooth/objc/IOBluetoothDeviceInquiry.h>
-#import <IOBluetooth/objc/IOBluetoothHostController.h>
+#import <IOBluetooth/IOBluetooth.h>
+
+#include "base/base_export.h"
 
 #if !defined(MAC_OS_X_VERSION_10_7) || \
     MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_7
@@ -113,6 +113,7 @@ typedef NSUInteger NSWindowButton;
 @interface NSAnimationContext (LionSDK)
 + (void)runAnimationGroup:(void (^)(NSAnimationContext *context))changes
         completionHandler:(void (^)(void))completionHandler;
+@property(copy) void(^completionHandler)(void);
 @end
 
 @interface NSView (LionSDK)
@@ -168,6 +169,10 @@ enum CWChannelBand {
                       aborted:(BOOL)aborted;
 @end
 
+@interface IOBluetoothL2CAPChannel (LionSDK)
+@property(readonly) BluetoothL2CAPMTU outgoingMTU;
+@end
+
 @interface IOBluetoothDevice (LionSDK)
 - (NSString*)addressString;
 - (unsigned int)classOfDevice;
@@ -177,8 +182,9 @@ enum CWChannelBand {
 - (IOReturn)performSDPQuery:(id)target uuids:(NSArray*)uuids;
 @end
 
-#endif  // MAC_OS_X_VERSION_10_7
+BASE_EXPORT extern "C" NSString* const NSWindowWillEnterFullScreenNotification;
 
+#endif  // MAC_OS_X_VERSION_10_7
 
 #if !defined(MAC_OS_X_VERSION_10_8) || \
     MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_8
@@ -239,5 +245,24 @@ typedef NSUInteger NSWindowOcclusionState;
 @end
 
 #endif  // MAC_OS_X_VERSION_10_9
+
+
+#if !defined(MAC_OS_X_VERSION_10_10) || \
+    MAC_OS_X_VERSION_MAX_ALLOWED < MAC_OS_X_VERSION_10_10
+
+enum {
+  NSWindowTitleVisible  = 0,
+  NSWindowTitleHidden = 1,
+  NSWindowTitleHiddenWhenActive = 2,
+};
+typedef NSInteger NSWindowTitleVisibility;
+
+@interface NSWindow (YosemiteSDK)
+
+@property NSWindowTitleVisibility titleVisibility;
+
+@end
+
+#endif  // MAC_OS_X_VERSION_10_10
 
 #endif  // BASE_MAC_SDK_FORWARD_DECLARATIONS_H_

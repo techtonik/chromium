@@ -5,6 +5,7 @@
 #include "mojo/services/native_viewport/native_viewport.h"
 
 #include "ui/events/event.h"
+#include "ui/events/event_utils.h"
 #include "ui/gfx/win/msg_util.h"
 #include "ui/gfx/win/window_impl.h"
 
@@ -111,6 +112,8 @@ class NativeViewportWin : public gfx::WindowImpl,
     MSG msg = { hwnd(), message, w_param, l_param, 0,
                 { CR_GET_X_LPARAM(l_param), CR_GET_Y_LPARAM(l_param) } };
     ui::MouseEvent event(msg);
+    if (ui::IsMouseEventFromTouch(message))
+      event.set_flags(event.flags() | ui::EF_FROM_TOUCH);
     SetMsgHandled(delegate_->OnEvent(&event));
     return 0;
   }
@@ -143,8 +146,11 @@ class NativeViewportWin : public gfx::WindowImpl,
   void OnWindowPosChanged(WINDOWPOS* window_pos) {
     if (!(window_pos->flags & SWP_NOSIZE) ||
         !(window_pos->flags & SWP_NOMOVE)) {
-      delegate_->OnBoundsChanged(gfx::Rect(window_pos->x, window_pos->y,
-                                           window_pos->cx, window_pos->cy));
+      RECT cr;
+      GetClientRect(hwnd(), &cr);
+      delegate_->OnBoundsChanged(
+          gfx::Rect(window_pos->x, window_pos->y,
+                    cr.right - cr.left, cr.bottom - cr.top));
     }
   }
 
