@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "apps/browser/api/app_runtime/app_runtime_api.h"
 #include "base/bind_helpers.h"
 #include "base/callback_helpers.h"
 #include "chrome/browser/extensions/extension_browsertest.h"
@@ -14,6 +13,7 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/test_utils.h"
+#include "extensions/browser/api/app_runtime/app_runtime_api.h"
 #include "extensions/browser/service_worker_manager.h"
 
 namespace extensions {
