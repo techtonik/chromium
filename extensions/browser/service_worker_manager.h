@@ -8,6 +8,7 @@
 #include "base/memory/linked_ptr.h"
 #include "components/keyed_service/content/browser_context_keyed_service_factory.h"
 #include "components/keyed_service/core/keyed_service.h"
+#include "content/public/browser/service_worker_host_client.h"
 #include "extensions/common/extension.h"
 
 namespace content {
@@ -91,6 +92,7 @@ class ServiceWorkerManager : public KeyedService {
       const ExtensionId& extension_id,
       scoped_ptr<content::ServiceWorkerHost> service_worker_host);
   void FinishUnregistration(const ExtensionId& extension_id, bool success);
+  void ServiceWorkerHasActiveVersion(const ExtensionId& extension_id);
 
   content::BrowserContext* const context_;
 
@@ -106,6 +108,20 @@ class ServiceWorkerManager : public KeyedService {
     // ServiceWorkerContext.
     UNREGISTERING,
   };
+
+  class ServiceWorkerHostClient : public content::ServiceWorkerHostClient {
+   public:
+    ServiceWorkerHostClient(ServiceWorkerManager* manager,
+                            ExtensionId extension_id);
+    virtual ~ServiceWorkerHostClient();
+
+    // content::ServiceWorkerHostClient interface:
+    virtual void OnVersionChanged() OVERRIDE;
+
+    ServiceWorkerManager* manager_;
+    ExtensionId extension_id_;
+  };
+
   struct SuccessFailureClosurePair {
     SuccessFailureClosurePair(base::Closure success, base::Closure failure);
     ~SuccessFailureClosurePair();
@@ -123,6 +139,7 @@ class ServiceWorkerManager : public KeyedService {
     RegistrationState registration;
     int outstanding_state_changes;
     linked_ptr<content::ServiceWorkerHost> service_worker_host;
+    linked_ptr<ServiceWorkerHostClient> service_worker_host_client;
     // Can be non-empty during REGISTERING.
     VectorOfClosurePairs registration_callbacks;
     // Can be non-empty during UNREGISTERING.

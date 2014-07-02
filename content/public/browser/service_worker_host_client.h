@@ -20,9 +20,13 @@ namespace content {
 // A ServiceWorkerHostClient object is disconnected by deleting the associated
 // ServiceWorkerHost.
 class ServiceWorkerHostClient : public IPC::Listener {
+ public:
   // When the service worker being listened to changes version (to a new one,
   // or to an unregistered state).
   virtual void OnVersionChanged() {}
+
+ protected:
+  virtual ~ServiceWorkerHostClient() {}
 };
 
 }  // namespace content

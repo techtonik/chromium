@@ -153,6 +153,18 @@ void ServiceWorkerManager::FinishUnregistration(const ExtensionId& extension_id,
   }
 }
 
+void ServiceWorkerManager::ServiceWorkerHasActiveVersion(
+    const ExtensionId& extension_id) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  State& ext_state = states_[extension_id];
+  DCHECK(ext_state.service_worker_host.get());
+  if (ext_state.service_worker_host->HasActiveVersion()) {
+    ext_state.activation_callbacks.RunSuccessCallbacksAndClear();
+  } else {
+    ext_state.activation_callbacks.RunFailureCallbacksAndClear();
+  }
+}
+
 void ServiceWorkerManager::WhenRegistered(
     const Extension* extension,
     const tracked_objects::Location& from_here,
@@ -253,6 +265,23 @@ content::ServiceWorkerHost* ServiceWorkerManager::GetServiceWorkerHost(
 WeakPtr<ServiceWorkerManager> ServiceWorkerManager::WeakThis() {
   return weak_this_factory_.GetWeakPtr();
 }
+
+// ServiceWorkerManager::ServiceWorkerHostClient
+
+ServiceWorkerManager::ServiceWorkerHostClient::ServiceWorkerHostClient(
+    ServiceWorkerManager* manager,
+    ExtensionId extension_id)
+    : manager_(manager), extension_id_(extension_id) {
+}
+
+ServiceWorkerManager::ServiceWorkerHostClient::~ServiceWorkerHostClient() {
+}
+
+void ServiceWorkerManager::ServiceWorkerHostClient::OnVersionChanged() {
+  manager_->ServiceWorkerHasActiveVersion(extension_id_);
+}
+
+// ServiceWorkerManager::SuccessFailureClosurePair
 
 ServiceWorkerManager::SuccessFailureClosurePair::SuccessFailureClosurePair(
     base::Closure success,
