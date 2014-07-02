@@ -205,7 +205,8 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
       LoadExtension(ext_dir_.unpacked_path());
 
   fprintf(stderr, "\n\n\n%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
-  apps::AppEventRouter::DispatchOnLaunchedEvent(profile(), extension);
+  extensions::AppRuntimeEventRouter::DispatchOnLaunchedEvent(profile(),
+                                                             extension);
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
@@ -220,7 +221,8 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
   WaitUntilRegistered(extension.get());
 
   fprintf(stderr, "\n\n\n%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
-  apps::AppEventRouter::DispatchOnLaunchedEvent(profile(), extension);
+  extensions::AppRuntimeEventRouter::DispatchOnLaunchedEvent(profile(),
+                                                             extension);
 }
 
 }  // namespace
