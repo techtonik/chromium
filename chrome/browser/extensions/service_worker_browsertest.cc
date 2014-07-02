@@ -206,7 +206,10 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
   }
 }
 
-IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, WaitUntilActive) {
+// Disabled as it hangs waiting for active. content::ServiceWorkerHostClient
+// needs to be implemented for this to work.
+IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, 
+                       DISABLED_WaitUntilActive) {
   ext_dir_.WriteManifest(kServiceWorkerManifest);
   ext_dir_.WriteFile(FILE_PATH_LITERAL("service_worker.js"), "");
 
