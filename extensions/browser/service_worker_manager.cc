@@ -231,11 +231,13 @@ void ServiceWorkerManager::WhenActive(
       if (state.service_worker_host->HasActiveVersion()) {
         base::MessageLoop::current()->PostTask(from_here, success);
       } else {
-        state.activation_callbacks.push_back(std::make_pair(success, failure));
+        state.activation_callbacks.push_back(
+            SuccessFailureClosurePair(success, failure));
       }
       break;
     case REGISTERING:
-      state.activation_callbacks.push_back(std::make_pair(success, failure));
+      state.activation_callbacks.push_back(
+          SuccessFailureClosurePair(success, failure));
       break;
   }
 }
