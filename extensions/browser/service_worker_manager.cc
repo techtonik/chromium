@@ -175,7 +175,8 @@ void ServiceWorkerManager::WhenRegistered(
       base::MessageLoop::current()->PostTask(from_here, success);
       break;
     case REGISTERING:
-      state.registration_callbacks.push_back(std::make_pair(success, failure));
+      state.registration_callbacks.push_back(
+          SuccessFailureClosurePair(success, failure));
       break;
   }
 }
@@ -203,7 +204,7 @@ void ServiceWorkerManager::WhenUnregistered(
       break;
     case UNREGISTERING:
       state.unregistration_callbacks.push_back(
-          std::make_pair(success, failure));
+          SuccessFailureClosurePair(success, failure));
       break;
   }
 }
@@ -251,18 +252,29 @@ WeakPtr<ServiceWorkerManager> ServiceWorkerManager::WeakThis() {
   return weak_this_factory_.GetWeakPtr();
 }
 
+ServiceWorkerManager::SuccessFailureClosurePair::SuccessFailureClosurePair(
+    base::Closure success,
+    base::Closure failure)
+    : success(success), failure(failure) {
+}
+
+ServiceWorkerManager::SuccessFailureClosurePair::~SuccessFailureClosurePair() {
+}
+
 void ServiceWorkerManager::VectorOfClosurePairs::RunSuccessCallbacksAndClear() {
-  for (size_t i = 0; i < size(); ++i) {
-    at(i).first.Run();
+  std::vector<SuccessFailureClosurePair> swapped_callbacks;
+  swap(swapped_callbacks);
+  for (size_t i = 0; i < swapped_callbacks.size(); ++i) {
+    swapped_callbacks[i].success.Run();
   }
-  clear();
 }
 
 void ServiceWorkerManager::VectorOfClosurePairs::RunFailureCallbacksAndClear() {
-  for (size_t i = 0; i < size(); ++i) {
-    at(i).second.Run();
+  std::vector<SuccessFailureClosurePair> swapped_callbacks;
+  swap(swapped_callbacks);
+  for (size_t i = 0; i < swapped_callbacks.size(); ++i) {
+    swapped_callbacks[i].failure.Run();
   }
-  clear();
 }
 
 // ServiceWorkerManagerFactory

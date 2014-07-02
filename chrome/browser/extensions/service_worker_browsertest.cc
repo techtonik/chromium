@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "apps/browser/api/app_runtime/app_runtime_api.h"
 #include "base/bind_helpers.h"
 #include "base/callback_helpers.h"
 #include "chrome/browser/extensions/extension_browsertest.h"
@@ -14,6 +13,7 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/test_utils.h"
+#include "extensions/browser/api/app_runtime/app_runtime_api.h"
 #include "extensions/browser/service_worker_manager.h"
 
 namespace extensions {
@@ -36,7 +36,8 @@ class ExtensionServiceWorkerBrowserTest : public ExtensionBrowserTest {
 
   virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
     ExtensionBrowserTest::SetUpCommandLine(command_line);
-    command_line->AppendSwitch(switches::kEnableServiceWorker);
+    command_line->AppendSwitch(
+        switches::kEnableExperimentalWebPlatformFeatures);
   }
 
   void WaitUntilRegistered(const Extension* extension) {
@@ -226,7 +227,8 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
       LoadExtension(ext_dir_.unpacked_path());
 
   fprintf(stderr, "\n\n\n%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
-  apps::AppEventRouter::DispatchOnLaunchedEvent(profile(), extension);
+  extensions::AppRuntimeEventRouter::DispatchOnLaunchedEvent(profile(),
+                                                             extension);
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
@@ -241,7 +243,8 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
   WaitUntilRegistered(extension.get());
 
   fprintf(stderr, "\n\n\n%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
-  apps::AppEventRouter::DispatchOnLaunchedEvent(profile(), extension);
+  extensions::AppRuntimeEventRouter::DispatchOnLaunchedEvent(profile(),
+                                                             extension);
 }
 
 }  // namespace
