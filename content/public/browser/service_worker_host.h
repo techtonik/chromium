@@ -17,9 +17,8 @@ class ServiceWorkerHostImpl;
 // Interface to communicate with service workers from any thread. Abstracts the
 // lifetime and active version for calling code.
 //
-// A ServiceWorkerHost object is paired with a ServiceWorkerHostClient object,
-// when the client is no longer interested the ServiceWorkerHost object must
-// be deleted.
+// A ServiceWorkerHost object is paired with a ServiceWorkerHostClient object.
+// Disconnect the client by deleting the ServiceWorkerHost object.
 class ServiceWorkerHost : public IPC::Sender {
  public:
   virtual ~ServiceWorkerHost() {};
