@@ -118,6 +118,9 @@ class ServiceWorkerManager : public KeyedService {
     // content::ServiceWorkerHostClient interface:
     virtual void OnVersionChanged() OVERRIDE;
 
+    // IPC::Listener interface:
+    virtual bool OnMessageReceived(const IPC::Message& message) OVERRIDE;
+
     ServiceWorkerManager* manager_;
     ExtensionId extension_id_;
   };

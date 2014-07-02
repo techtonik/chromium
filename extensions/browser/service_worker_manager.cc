@@ -68,18 +68,15 @@ void ServiceWorkerManager::RegisterExtension(const Extension* extension) {
     return;
   ext_state.registration = REGISTERING;
   ++ext_state.outstanding_state_changes;
+  ext_state.service_worker_host_client.reset(
+      new ServiceWorkerHostClient(this, extension->id()));
   const GURL service_worker_script = extension->GetResourceURL(
       BackgroundInfo::GetServiceWorkerScript(extension));
 
   GetSWContext(extension->id())->RegisterServiceWorker(
       extension->GetResourceURL("/*"),
       service_worker_script,
-      //
-      //
-      // TODO Register a client
-      //
-      //
-      NULL,
+      ext_state.service_worker_host_client.get(),
       base::Bind(&ServiceWorkerManager::FinishRegistration,
                  WeakThis(),
                  extension->id()));
@@ -279,6 +276,17 @@ ServiceWorkerManager::ServiceWorkerHostClient::~ServiceWorkerHostClient() {
 
 void ServiceWorkerManager::ServiceWorkerHostClient::OnVersionChanged() {
   manager_->ServiceWorkerHasActiveVersion(extension_id_);
+}
+
+bool ServiceWorkerManager::ServiceWorkerHostClient::OnMessageReceived(
+    const IPC::Message& message) {
+  //
+  //
+  // TODO: Implement this.
+  //
+  //
+  NOTIMPLEMENTED();
+  return false;
 }
 
 // ServiceWorkerManager::SuccessFailureClosurePair
