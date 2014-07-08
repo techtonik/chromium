@@ -22,6 +22,7 @@
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/render_process_host.h"
+#include "content/public/browser/service_worker_host.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_switches.h"
@@ -120,6 +121,13 @@ void ExpectResultAndRun(bool expected,
                         const base::Closure& continuation,
                         bool actual) {
   EXPECT_EQ(expected, actual);
+  continuation.Run();
+}
+
+void ExpectServiceWorkerHostAndRun(bool expected,
+                                   const base::Closure& continuation,
+                                   scoped_ptr<ServiceWorkerHost> actual_host) {
+  EXPECT_EQ(expected, !!actual_host.get());
   continuation.Run();
 }
 
@@ -679,7 +687,10 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBrowserTest, Reload) {
     public_context()->RegisterServiceWorker(
         embedded_test_server()->GetURL(kPageUrl),
         embedded_test_server()->GetURL(kWorkerUrl),
-        base::Bind(&ExpectResultAndRun, true, base::Bind(&base::DoNothing)));
+        NULL,
+        base::Bind(&ExpectServiceWorkerHostAndRun,
+                   true,
+                   base::Bind(&base::DoNothing)));
     observer->Wait();
   }
   NavigateToURL(shell(), embedded_test_server()->GetURL(kPageUrl));
@@ -769,7 +780,9 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, MAYBE_Registration) {
     public_context()->RegisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL("/does/not/exist"),
-        base::Bind(&ExpectResultAndRun, false, run_loop.QuitClosure()));
+        NULL,
+        base::Bind(
+            &ExpectServiceWorkerHostAndRun, false, run_loop.QuitClosure()));
     run_loop.Run();
   }
   EXPECT_EQ(0, CountRenderProcessHosts());
@@ -780,7 +793,9 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, MAYBE_Registration) {
     public_context()->RegisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL(kWorkerUrl),
-        base::Bind(&ExpectResultAndRun, true, run_loop.QuitClosure()));
+        NULL,
+        base::Bind(
+            &ExpectServiceWorkerHostAndRun, true, run_loop.QuitClosure()));
     run_loop.Run();
   }
   EXPECT_EQ(1, CountRenderProcessHosts());
@@ -792,7 +807,9 @@ IN_PROC_BROWSER_TEST_F(ServiceWorkerBlackBoxBrowserTest, MAYBE_Registration) {
     public_context()->RegisterServiceWorker(
         embedded_test_server()->GetURL("/*"),
         embedded_test_server()->GetURL(kWorkerUrl),
-        base::Bind(&ExpectResultAndRun, true, run_loop.QuitClosure()));
+        NULL,
+        base::Bind(
+            &ExpectServiceWorkerHostAndRun, true, run_loop.QuitClosure()));
     run_loop.Run();
   }
 

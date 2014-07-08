@@ -5,12 +5,15 @@
 #include "base/callback_forward.h"
 #include "base/memory/singleton.h"
 #include "base/memory/weak_ptr.h"
+#include "base/memory/linked_ptr.h"
 #include "components/keyed_service/content/browser_context_keyed_service_factory.h"
 #include "components/keyed_service/core/keyed_service.h"
+#include "content/public/browser/service_worker_host_client.h"
 #include "extensions/common/extension.h"
 
 namespace content {
 class ServiceWorkerContext;
+class ServiceWorkerHost;
 class ServiceWorkerRegistration;
 class StoragePartition;
 }
@@ -57,6 +60,22 @@ class ServiceWorkerManager : public KeyedService {
                         const base::Closure& success,
                         const base::Closure& failure);
 
+  // Calls |success| when |extension| has an active service worker.  If
+  // |extension| does not have a pending active version or starts being
+  // unregistered completes, calls |failure| instead.
+  void WhenActive(const Extension* extension,
+                  const tracked_objects::Location& from_here,
+                  const base::Closure& success,
+                  const base::Closure& failure);
+
+  // Returns the ServiceWorkerHost for an extension, or NULL if none registered.
+  //
+  //
+  // TODO: Needs lifetime control, event listeners are holding onto this.
+  //
+  //
+  content::ServiceWorkerHost* GetServiceWorkerHost(ExtensionId extension_id);
+
  private:
   friend class ServiceWorkerManagerFactory;
 
@@ -69,8 +88,11 @@ class ServiceWorkerManager : public KeyedService {
       const ExtensionId& ext_id) const;
   inline base::WeakPtr<ServiceWorkerManager> WeakThis();
 
-  void FinishRegistration(const ExtensionId& extension_id, bool success);
+  void FinishRegistration(
+      const ExtensionId& extension_id,
+      scoped_ptr<content::ServiceWorkerHost> service_worker_host);
   void FinishUnregistration(const ExtensionId& extension_id, bool success);
+  void ServiceWorkerHasActiveVersion(const ExtensionId& extension_id);
 
   content::BrowserContext* const context_;
 
@@ -86,6 +108,23 @@ class ServiceWorkerManager : public KeyedService {
     // ServiceWorkerContext.
     UNREGISTERING,
   };
+
+  class ServiceWorkerHostClient : public content::ServiceWorkerHostClient {
+   public:
+    ServiceWorkerHostClient(ServiceWorkerManager* manager,
+                            ExtensionId extension_id);
+    virtual ~ServiceWorkerHostClient();
+
+    // content::ServiceWorkerHostClient interface:
+    virtual void OnVersionChanged() OVERRIDE;
+
+    // IPC::Listener interface:
+    virtual bool OnMessageReceived(const IPC::Message& message) OVERRIDE;
+
+    ServiceWorkerManager* manager_;
+    ExtensionId extension_id_;
+  };
+
   struct SuccessFailureClosurePair {
     SuccessFailureClosurePair(base::Closure success, base::Closure failure);
     ~SuccessFailureClosurePair();
@@ -102,10 +141,14 @@ class ServiceWorkerManager : public KeyedService {
   struct State {
     RegistrationState registration;
     int outstanding_state_changes;
+    linked_ptr<content::ServiceWorkerHost> service_worker_host;
+    linked_ptr<ServiceWorkerHostClient> service_worker_host_client;
     // Can be non-empty during REGISTERING.
     VectorOfClosurePairs registration_callbacks;
     // Can be non-empty during UNREGISTERING.
     VectorOfClosurePairs unregistration_callbacks;
+    // Can be non-empty any time.
+    VectorOfClosurePairs activation_callbacks;
     State();
     ~State();
   };

@@ -13,6 +13,7 @@
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/info_map.h"
 #include "extensions/browser/process_manager.h"
+#include "extensions/browser/service_worker_manager.h"
 #include "extensions/common/extension_messages.h"
 #include "ipc/ipc_message_macros.h"
 
@@ -102,7 +103,10 @@ void ExtensionMessageFilter::OnExtensionAddListener(
   EventRouter* router = EventRouter::Get(browser_context_);
   if (!router)
     return;
-  router->AddEventListener(event_name, process, extension_id);
+  content::ServiceWorkerHost* service_worker =
+      ServiceWorkerManager::Get(browser_context_)
+          ->GetServiceWorkerHost(extension_id);
+  router->AddEventListener(event_name, process, service_worker, extension_id);
 }
 
 void ExtensionMessageFilter::OnExtensionRemoveListener(

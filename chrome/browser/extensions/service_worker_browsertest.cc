@@ -13,6 +13,7 @@
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/test_utils.h"
+#include "extensions/browser/api/app_runtime/app_runtime_api.h"
 #include "extensions/browser/service_worker_manager.h"
 
 namespace extensions {
@@ -20,6 +21,11 @@ namespace {
 
 using content::BrowserThread;
 using content::ServiceWorkerContextWrapper;
+
+void FailTest(const std::string& message, const base::Closure& continuation) {
+  ADD_FAILURE() << message;
+  continuation.Run();
+}
 
 // Exists as a browser test because ExtensionHosts are hard to create without
 // a real browser.
@@ -33,6 +39,31 @@ class ExtensionServiceWorkerBrowserTest : public ExtensionBrowserTest {
     command_line->AppendSwitch(
         switches::kEnableExperimentalWebPlatformFeatures);
   }
+
+  void WaitUntilRegistered(const Extension* extension) {
+    base::RunLoop run_loop;
+    ServiceWorkerManager::Get(profile())
+        ->WhenRegistered(extension,
+                         FROM_HERE,
+                         run_loop.QuitClosure(),
+                         base::Bind(FailTest,
+                                    "Extension wasn't being registered",
+                                    run_loop.QuitClosure()));
+    run_loop.Run();
+  }
+
+  void WaitUntilActive(const Extension* extension) {
+    base::RunLoop run_loop;
+    ServiceWorkerManager::Get(profile())
+        ->WhenActive(extension,
+                     FROM_HERE,
+                     run_loop.QuitClosure(),
+                     base::Bind(FailTest,
+                                "Extension failed to become active.",
+                                run_loop.QuitClosure()));
+    run_loop.Run();
+  }
+
   extensions::ScopedCurrentChannel trunk_channel_;
   TestExtensionDir ext_dir_;
 };
@@ -56,12 +87,27 @@ const char kServiceWorkerManifest[] =
     "  }"
     "}";
 
+const char kEventPageManifest[] =
+    "{"
+    "  \"name\": \"\","
+    "  \"manifest_version\": 2,"
+    "  \"version\": \"1\","
+    "  \"app\": {"
+    "    \"background\": {"
+    "      \"scripts\": [\"background.js\"]"
+    "    }"
+    "  }"
+    "}";
+
 class IOThreadInstallUninstallTest {
  public:
   IOThreadInstallUninstallTest(
+      Profile* profile,
       const scoped_refptr<ServiceWorkerContextWrapper>& service_worker_context,
       const ExtensionId& ext_id)
-      : service_worker_context_(service_worker_context), ext_id_(ext_id) {}
+      : profile_(profile),
+        service_worker_context_(service_worker_context),
+        ext_id_(ext_id) {}
 
   void TestInstall(const base::Closure& continuation) {
     content::ServiceWorkerStorage* sw_storage =
@@ -90,17 +136,14 @@ class IOThreadInstallUninstallTest {
               registration->pattern());
     EXPECT_TRUE(registration->waiting_version() ||
                 registration->active_version());
+    EXPECT_TRUE(
+        ServiceWorkerManager::Get(profile_)->GetServiceWorkerHost(ext_id_));
   }
 
+  Profile* profile_;
   const scoped_refptr<ServiceWorkerContextWrapper> service_worker_context_;
   const ExtensionId ext_id_;
 };
-
-static void FailTest(const std::string& message,
-                     const base::Closure& continuation) {
-  ADD_FAILURE() << message;
-  continuation.Run();
-}
 
 static void ShutdownWorkers(
     const scoped_refptr<ServiceWorkerContextWrapper>& wrapper) {
@@ -115,21 +158,10 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
 
   scoped_refptr<const Extension> extension =
       LoadExtension(ext_dir_.unpacked_path());
-  ASSERT_TRUE(extension.get());
-
-  {
-    base::RunLoop run_loop;
-    ServiceWorkerManager::Get(profile())
-        ->WhenRegistered(extension.get(),
-                         FROM_HERE,
-                         run_loop.QuitClosure(),
-                         base::Bind(FailTest,
-                                    "Extension wasn't being registered",
-                                    run_loop.QuitClosure()));
-    run_loop.Run();
-  }
+  WaitUntilRegistered(extension.get());
 
   IOThreadInstallUninstallTest test_obj(
+      profile(),
       static_cast<ServiceWorkerContextWrapper*>(
           GetSWContext(profile(), extension->id())),
       extension->id());
@@ -172,6 +204,50 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
                                       run_loop.QuitClosure()));
     run_loop.Run();
   }
+}
+
+// Disabled as it hangs waiting for active. content::ServiceWorkerHostClient
+// needs to be implemented for this to work.
+IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, 
+                       DISABLED_WaitUntilActive) {
+  ext_dir_.WriteManifest(kServiceWorkerManifest);
+  ext_dir_.WriteFile(FILE_PATH_LITERAL("service_worker.js"), "");
+
+  scoped_refptr<const Extension> extension =
+      LoadExtension(ext_dir_.unpacked_path());
+  WaitUntilRegistered(extension.get());
+  WaitUntilActive(extension.get());
+}
+
+IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
+                       DISABLED_SendOnLaunched_BackgroundPageForTesting) {
+  ext_dir_.WriteManifest(kEventPageManifest);
+  ext_dir_.WriteFile(
+      FILE_PATH_LITERAL("background.js"),
+      "chrome.app.runtime.onLaunched.addListener(function() {});");
+
+  scoped_refptr<const Extension> extension =
+      LoadExtension(ext_dir_.unpacked_path());
+
+  fprintf(stderr, "\n\n\n%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
+  extensions::AppRuntimeEventRouter::DispatchOnLaunchedEvent(profile(),
+                                                             extension);
+}
+
+IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
+                       DISABLED_SendOnLaunched) {
+  ext_dir_.WriteManifest(kServiceWorkerManifest);
+  ext_dir_.WriteFile(
+      FILE_PATH_LITERAL("service_worker.js"),
+      "chrome.app.runtime.onLaunched.addListener(function() {});");
+
+  scoped_refptr<const Extension> extension =
+      LoadExtension(ext_dir_.unpacked_path());
+  WaitUntilRegistered(extension.get());
+
+  fprintf(stderr, "\n\n\n%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
+  extensions::AppRuntimeEventRouter::DispatchOnLaunchedEvent(profile(),
+                                                             extension);
 }
 
 }  // namespace

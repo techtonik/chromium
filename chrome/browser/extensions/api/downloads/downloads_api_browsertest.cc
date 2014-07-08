@@ -278,14 +278,17 @@ class DownloadExtensionTest : public ExtensionApiTest {
     EventRouter::Get(current_browser()->profile())
         ->AddEventListener(downloads::OnCreated::kEventName,
                            tab->GetRenderProcessHost(),
+                           NULL,
                            GetExtensionId());
     EventRouter::Get(current_browser()->profile())
         ->AddEventListener(downloads::OnChanged::kEventName,
                            tab->GetRenderProcessHost(),
+                           NULL,
                            GetExtensionId());
     EventRouter::Get(current_browser()->profile())
         ->AddEventListener(downloads::OnErased::kEventName,
                            tab->GetRenderProcessHost(),
+                           NULL,
                            GetExtensionId());
   }
 
@@ -299,6 +302,7 @@ class DownloadExtensionTest : public ExtensionApiTest {
     EventRouter::Get(current_browser()->profile())
         ->AddEventListener(downloads::OnDeterminingFilename::kEventName,
                            tab->GetRenderProcessHost(),
+                           NULL,
                            GetExtensionId());
     return tab->GetRenderProcessHost();
   }

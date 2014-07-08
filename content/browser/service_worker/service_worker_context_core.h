@@ -147,7 +147,7 @@ class CONTENT_EXPORT ServiceWorkerContextCore
                                const UnregistrationCallback& callback);
 
   // This class maintains collections of live instances, this class
-  // does not own these object or influence their lifetime.
+  // does not own these objects or influence their lifetime.
   ServiceWorkerRegistration* GetLiveRegistration(int64 registration_id);
   void AddLiveRegistration(ServiceWorkerRegistration* registration);
   void RemoveLiveRegistration(int64 registration_id);

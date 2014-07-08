@@ -14,6 +14,7 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/render_process_host.h"
+#include "content/public/browser/service_worker_host.h"
 #include "extensions/browser/api_activity_monitor.h"
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_prefs.h"
@@ -24,6 +25,7 @@
 #include "extensions/browser/lazy_background_task_queue.h"
 #include "extensions/browser/process_manager.h"
 #include "extensions/browser/process_map.h"
+#include "extensions/browser/service_worker_manager.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_api.h"
 #include "extensions/common/extension_messages.h"
@@ -114,6 +116,7 @@ void EventRouter::DispatchExtensionMessage(IPC::Sender* ipc_sender,
   args.Set(0, new base::StringValue(event_name));
   args.Set(1, event_args);
   args.Set(2, info.AsValue().release());
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
   ipc_sender->Send(new ExtensionMsg_MessageInvoke(
       MSG_ROUTING_CONTROL,
       extension_id,
@@ -186,16 +189,26 @@ EventRouter::~EventRouter() {}
 
 void EventRouter::AddEventListener(const std::string& event_name,
                                    content::RenderProcessHost* process,
+                                   content::ServiceWorkerHost* service_worker,
                                    const std::string& extension_id) {
-  listeners_.AddListener(scoped_ptr<EventListener>(new EventListener(
-      event_name, extension_id, process, scoped_ptr<DictionaryValue>())));
+  listeners_.AddListener(scoped_ptr<EventListener>(
+      new EventListener(event_name,
+                        extension_id,
+                        process,
+                        service_worker,
+                        scoped_ptr<DictionaryValue>())));
 }
 
 void EventRouter::RemoveEventListener(const std::string& event_name,
                                       content::RenderProcessHost* process,
                                       const std::string& extension_id) {
-  EventListener listener(event_name, extension_id, process,
-                         scoped_ptr<DictionaryValue>());
+  //
+  //
+  // TODO Enable service worker listeners.
+  //
+  //
+  EventListener listener(
+      event_name, extension_id, process, NULL, scoped_ptr<DictionaryValue>());
   listeners_.RemoveListener(&listener);
 }
 
@@ -239,8 +252,15 @@ void EventRouter::OnListenerRemoved(const EventListener* listener) {
 
 void EventRouter::AddLazyEventListener(const std::string& event_name,
                                        const std::string& extension_id) {
-  scoped_ptr<EventListener> listener(new EventListener(
-      event_name, extension_id, NULL, scoped_ptr<DictionaryValue>()));
+  content::ServiceWorkerHost* service_worker =
+      ServiceWorkerManager::Get(browser_context_)
+          ->GetServiceWorkerHost(extension_id);
+  scoped_ptr<EventListener> listener(
+      new EventListener(event_name,
+                        extension_id,
+                        NULL,
+                        service_worker,
+                        scoped_ptr<DictionaryValue>()));
   bool is_new = listeners_.AddListener(listener.Pass());
 
   if (is_new) {
@@ -253,7 +273,11 @@ void EventRouter::AddLazyEventListener(const std::string& event_name,
 
 void EventRouter::RemoveLazyEventListener(const std::string& event_name,
                                           const std::string& extension_id) {
-  EventListener listener(event_name, extension_id, NULL,
+  EventListener listener(event_name,
+                         extension_id,
+                         NULL,
+                         ServiceWorkerManager::Get(browser_context_)
+                             ->GetServiceWorkerHost(extension_id),
                          scoped_ptr<DictionaryValue>());
   bool did_exist = listeners_.RemoveListener(&listener);
 
@@ -270,14 +294,25 @@ void EventRouter::AddFilteredEventListener(const std::string& event_name,
                                            const std::string& extension_id,
                                            const base::DictionaryValue& filter,
                                            bool add_lazy_listener) {
-  listeners_.AddListener(scoped_ptr<EventListener>(new EventListener(
-      event_name, extension_id, process,
-      scoped_ptr<DictionaryValue>(filter.DeepCopy()))));
+  //
+  //
+  // TODO Enable creating service worker listeners.
+  //
+  //
+  listeners_.AddListener(scoped_ptr<EventListener>(
+      new EventListener(event_name,
+                        extension_id,
+                        process,
+                        NULL,
+                        scoped_ptr<DictionaryValue>(filter.DeepCopy()))));
 
   if (add_lazy_listener) {
     bool added = listeners_.AddListener(scoped_ptr<EventListener>(
-        new EventListener(event_name, extension_id, NULL,
-        scoped_ptr<DictionaryValue>(filter.DeepCopy()))));
+        new EventListener(event_name,
+                          extension_id,
+                          NULL,
+                          NULL,
+                          scoped_ptr<DictionaryValue>(filter.DeepCopy()))));
 
     if (added)
       AddFilterToEvent(event_name, extension_id, &filter);
@@ -290,7 +325,15 @@ void EventRouter::RemoveFilteredEventListener(
     const std::string& extension_id,
     const base::DictionaryValue& filter,
     bool remove_lazy_listener) {
-  EventListener listener(event_name, extension_id, process,
+  //
+  //
+  // TODO Enable service worker listeners by taking service worker input param.
+  //
+  //
+  EventListener listener(event_name,
+                         extension_id,
+                         process,
+                         NULL,
                          scoped_ptr<DictionaryValue>(filter.DeepCopy()));
 
   listeners_.RemoveListener(&listener);
@@ -432,6 +475,15 @@ void EventRouter::DispatchEventWithLazyListener(const std::string& extension_id,
     RemoveLazyEventListener(event_name, extension_id);
 }
 
+// static
+bool EventRouter::ContainsKey(
+    const std::set<EventRouter::EventDispatchIdentifier> set_of_ids,
+    const EventListener* listener) {
+  EventDispatchIdentifier dispatch_id(listener->GetBrowserContext(),
+                                      listener->extension_id());
+  return ::ContainsKey(set_of_ids, dispatch_id);
+}
+
 void EventRouter::DispatchEventImpl(const std::string& restrict_to_extension_id,
                                     const linked_ptr<Event>& event) {
   // We don't expect to get events from a completely different browser context.
@@ -466,13 +518,12 @@ void EventRouter::DispatchEventImpl(const std::string& restrict_to_extension_id,
     const EventListener* listener = *it;
     if (restrict_to_extension_id.empty() ||
         restrict_to_extension_id == listener->extension_id()) {
-      if (listener->process()) {
-        EventDispatchIdentifier dispatch_id(listener->GetBrowserContext(),
-                                            listener->extension_id());
-        if (!ContainsKey(already_dispatched, dispatch_id)) {
-          DispatchEventToProcess(
-              listener->extension_id(), listener->process(), event);
-        }
+      if ((listener->process() || listener->service_worker()) &&
+          !ContainsKey(already_dispatched, listener)) {
+        DispatchEventToProcess(listener->extension_id(),
+                               listener->process(),
+                               listener->service_worker(),
+                               event);
       }
     }
   }
@@ -509,9 +560,11 @@ void EventRouter::DispatchLazyEvent(
   }
 }
 
-void EventRouter::DispatchEventToProcess(const std::string& extension_id,
-                                         content::RenderProcessHost* process,
-                                         const linked_ptr<Event>& event) {
+void EventRouter::DispatchEventToProcess(
+    const std::string& extension_id,
+    content::RenderProcessHost* process,
+    content::ServiceWorkerHost* service_worker_host,
+    const linked_ptr<Event>& event) {
   const Extension* extension =
       ExtensionRegistry::Get(browser_context_)->enabled_extensions().GetByID(
           extension_id);
@@ -521,13 +574,22 @@ void EventRouter::DispatchEventToProcess(const std::string& extension_id,
   if (!extension)
     return;
 
-  BrowserContext* listener_context = process->GetBrowserContext();
-  ProcessMap* process_map = ProcessMap::Get(listener_context);
-  // If the event is privileged, only send to extension processes. Otherwise,
-  // it's OK to send to normal renderers (e.g., for content scripts).
-  if (ExtensionAPI::GetSharedInstance()->IsPrivileged(event->event_name) &&
-      !process_map->Contains(extension->id(), process->GetID())) {
-    return;
+  BrowserContext* listener_context =
+      process ? process->GetBrowserContext() : NULL;
+
+  // If the event is privileged, only send to extension processes / service
+  // workers. Otherwise, it's OK to send to normal renderers (e.g., for content
+  // scripts).
+  if (ExtensionAPI::GetSharedInstance()->IsPrivileged(event->event_name)) {
+    if (listener_context) {
+      if (!ProcessMap::Get(listener_context)
+               ->Contains(extension->id(), process->GetID())) {
+        return;
+      }
+    } else if (!ServiceWorkerManager::Get(browser_context_)
+                    ->GetServiceWorkerHost(extension_id)) {
+      return;
+    }
   }
 
   // If the event is restricted to a URL, only dispatch if the extension has
@@ -540,7 +602,14 @@ void EventRouter::DispatchEventToProcess(const std::string& extension_id,
     return;
   }
 
-  if (!CanDispatchEventToBrowserContext(listener_context, extension, event))
+  //
+  //
+  // TODO: In the service worker case process will be NULL and thus
+  // listener_context NULL. We won't be able to evaluate this correctly.
+  //
+  //
+  if (listener_context &&
+      !CanDispatchEventToBrowserContext(listener_context, extension, event))
     return;
 
   if (!event->will_dispatch_callback.is_null()) {
@@ -548,9 +617,16 @@ void EventRouter::DispatchEventToProcess(const std::string& extension_id,
                                       event->event_args.get());
   }
 
-  DispatchExtensionMessage(process, listener_context, extension->id(),
-                           event->event_name, event->event_args.get(),
-                           event->user_gesture, event->filter_info);
+  IPC::Sender* ipc_sender =
+      service_worker_host ? implicit_cast<IPC::Sender*>(service_worker_host)
+                          : implicit_cast<IPC::Sender*>(process);
+  DispatchExtensionMessage(ipc_sender,
+                           listener_context,
+                           extension->id(),
+                           event->event_name,
+                           event->event_args.get(),
+                           event->user_gesture,
+                           event->filter_info);
   IncrementInFlightEvents(listener_context, extension);
 }
 
@@ -662,8 +738,8 @@ void EventRouter::DispatchPendingEvent(const linked_ptr<Event>& event,
 
   if (listeners_.HasProcessListener(host->render_process_host(),
                                     host->extension()->id())) {
-    DispatchEventToProcess(host->extension()->id(),
-                           host->render_process_host(), event);
+    DispatchEventToProcess(
+        host->extension()->id(), host->render_process_host(), NULL, event);
   }
 }
 

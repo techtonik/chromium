@@ -221,6 +221,7 @@ void ServiceWorkerVersion::StartUpdate() {
 
 void ServiceWorkerVersion::SendMessage(
     const IPC::Message& message, const StatusCallback& callback) {
+  fprintf(stderr, "%s:%s:%d \n", __FILE__, __FUNCTION__, __LINE__);
   if (running_status() != RUNNING) {
     // Schedule calling this method after starting the worker.
     StartWorker(base::Bind(&RunTaskAfterStartWorker,

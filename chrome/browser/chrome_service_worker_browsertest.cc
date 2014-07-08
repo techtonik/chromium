@@ -15,6 +15,7 @@
 #include "chrome/test/base/in_process_browser_test.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/service_worker_context.h"
+#include "content/public/browser/service_worker_host.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
@@ -40,8 +41,8 @@ class ChromeServiceWorkerTest : public InProcessBrowserTest {
 
 static void ExpectResultAndRun(bool expected,
                                const base::Closure& continuation,
-                               bool actual) {
-  EXPECT_EQ(expected, actual);
+                               scoped_ptr<content::ServiceWorkerHost> actual) {
+  EXPECT_EQ(expected, !!actual.get());
   continuation.Run();
 }
 
@@ -61,6 +62,7 @@ IN_PROC_BROWSER_TEST_F(ChromeServiceWorkerTest,
   sw_context->RegisterServiceWorker(
       embedded_test_server()->GetURL("/*"),
       embedded_test_server()->GetURL("/service_worker.js"),
+      NULL,
       base::Bind(&ExpectResultAndRun, true, run_loop.QuitClosure()));
   run_loop.Run();
 

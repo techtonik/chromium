@@ -29,6 +29,7 @@ class PrefService;
 namespace content {
 class BrowserContext;
 class RenderProcessHost;
+class ServiceWorkerHost;
 }
 
 namespace extensions {
@@ -99,6 +100,7 @@ class EventRouter : public content::NotificationObserver,
   // mode extension.
   void AddEventListener(const std::string& event_name,
                         content::RenderProcessHost* process,
+                        content::ServiceWorkerHost* service_worker,
                         const std::string& extension_id);
   void RemoveEventListener(const std::string& event_name,
                            content::RenderProcessHost* process,
@@ -207,6 +209,12 @@ class EventRouter : public content::NotificationObserver,
                             const std::string& extension_id,
                             const std::string& event_name);
 
+  // Returns tru if the |set_of_ids| contains the EventDispatchIdentifier for
+  // the |listener|.
+  static bool ContainsKey(
+      const std::set<EventRouter::EventDispatchIdentifier> set_of_ids,
+      const EventListener* listener);
+
   // Shared by DispatchEvent*. If |restrict_to_extension_id| is empty, the
   // event is broadcast.
   // An event that just came off the pending list may not be delayed again.
@@ -221,9 +229,11 @@ class EventRouter : public content::NotificationObserver,
                          const linked_ptr<Event>& event,
                          std::set<EventDispatchIdentifier>* already_dispatched);
 
-  // Dispatches the event to the specified extension running in |process|.
+  // Dispatches the event to the specified extension running in |process|,
+  // and specifically to the |service_worker_host| if non-NULL.
   void DispatchEventToProcess(const std::string& extension_id,
                               content::RenderProcessHost* process,
+                              content::ServiceWorkerHost* service_worker_host,
                               const linked_ptr<Event>& event);
 
   // Returns false when the event is scoped to a context and the listening
