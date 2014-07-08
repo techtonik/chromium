@@ -5952,6 +5952,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_FLAGS_ASH_ENABLE_TOUCH_VIEW_TESTING_DESCRIPTION" desc="Description for the flag to enable the TouchView testing mode.">
           Enable Ctrl+Alt+Shift+8 to toggle the TouchView maximizing mode.
         </message>
+        <message name="IDS_FLAGS_ASH_DISABLE_TEXT_FILTERING_IN_OVERVIEW_MODE_NAME" desc="Title for the flag to disable window filtering in overview mode by inputing text">
+          Disable text filtering in Overview Mode.
+        </message>
+        <message name="IDS_FLAGS_ASH_DISABLE_TEXT_FILTERING_IN_OVERVIEW_MODE_DESCRIPTION" desc="Description for the flag to disable window filtering in overview mode by inputing text">
+          Disables filtering the windows shown in overview mode by entering text.
+        </message>
       </if>
 
       <message name="IDS_GENERIC_EXPERIMENT_CHOICE_AUTOMATIC" desc="Generic 'Automatic' experiment choice option name.">
@@ -6304,12 +6310,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_NUM_RASTER_THREADS_FOUR" desc="">
         4
       </message>
-      <message name="IDS_FLAGS_ENABLE_SYNC_DIRECTORY_OPERATION_NAME" desc="Name of the flag to enable syncfs direcory support.">
-        Enable Syncfs directory operation.
-      </message>
-      <message name="IDS_FLAGS_ENABLE_SYNC_DIRECTORY_OPERATION_DESCRIPTION" desc="Description of the flag to enable syncfs directory support.">
-        Enables directory support for sync filesystem.
-      </message>
       <if expr="is_macosx">
         <message name="IDS_FLAGS_APPS_KEEP_CHROME_ALIVE_NAME" desc="Title for the flag to prevent Chrome from quitting when Chrome Apps are open.">
           Apps keep Chrome alive.
@@ -6329,6 +6329,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_RESET_APP_LIST_INSTALL_STATE_DESCRIPTION" desc="Description of the flag to reset the app launcher install state.">
         Reset the App Launcher install state on every restart. While this flag is set, Chrome will forget the launcher has been installed each time it starts. This is used for testing the App Launcher install flow.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_APP_VIEW_NAME" desc="Name of the flag to enable the &lt;appview&gt; element.">
+        Enable the &lt;appview&gt; element in Chrome Apps.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_APP_VIEW_DESCRIPTION" desc="Description of the flag to enable the &lt;appview&gt; element.">
+        This will allow the use of the experimental &lt;appview&gt; element in Chrome Apps.
       </message>
       <if expr="enable_app_list">
         <message name="IDS_FLAGS_ENABLE_APP_LIST_NAME" desc="Name of the flag to enable the app launcher.">
@@ -6399,12 +6405,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_ENABLE_LINKABLE_EPHEMERAL_APPS_DESCRIPTION" desc="Description for the flag to enable linkable ephemeral apps.">
         Enables experimentation with launching ephemeral apps from hyperlinks. For example, links to Chrome Web Store app detail pages in Google search results will launch the app rather than navigate to the detail page.
-      </message>
-      <message name="IDS_FLAGS_ENABLE_SERVICE_WORKER_NAME" desc="Name of the flag to enable streamlined ServiceWorker.">
-        Enable support for ServiceWorker.
-      </message>
-      <message name="IDS_FLAGS_ENABLE_SERVICE_WORKER_DESCRIPTION" desc="Description for the flag to enable ServiceWorker.">
-        ServiceWorker is a new kind of web worker that can intercept resource requests. See https://github.com/slightlyoff/ServiceWorker for more information.
       </message>
       <message name="IDS_FLAGS_ENABLE_SERVICE_WORKER_SYNC_NAME" desc="Name of the flag to enable ServiceWorker background synchronization.">
         Enable support for ServiceWorker background sync event.
@@ -6992,6 +6992,14 @@ Keep your key file in a safe place. You will need it to create new versions of y
         </message>
       </if>
 
+      <!-- chrome://voicesearch strings -->
+      <message name="IDS_VOICESEARCH_LOADING_MESSAGE" desc="Shown while loading until full list of modules is retrieved">
+        Loading...
+      </message>
+      <message name="IDS_VOICESEARCH_TITLE_MESSAGE" desc="Shown while loading until full list of modules is retrieved">
+        About Voice Search
+      </message>
+
       <!-- JavaScript Dialog Box strings -->
       <message name="IDS_JAVASCRIPT_ALERT_DEFAULT_TITLE" desc="Title for JavaScript alert originating from a webpage if there is no hostname to display">
         JavaScript Alert
@@ -7133,8 +7141,11 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_TOOLTIP_TRANSLATE" desc="The tooltip for translate">
         Translate this page
       </message>
-      <message name="IDS_TOOLTIP_ZOOM" desc="The tooltip for zoom icon">
+      <message name="IDS_TOOLTIP_ZOOM" desc="The tooltip for the zoom bubble">
         Zoom: <ph name="VALUE">$1<ex>100</ex></ph>%
+      </message>
+      <message name="IDS_TOOLTIP_ZOOM_EXTENSION_ICON" desc="The tooltip for the extension icon in the zoom bubble">
+        This page was zoomed by the "<ph name="NAME">$1<ex>Google Cast</ex></ph>" extension
       </message>
       <if expr="not use_titlecase">
         <message name="IDS_ZOOM_SET_DEFAULT" desc="The text label of a button which, when clicked, returns the page to default zoom">
@@ -14129,25 +14140,11 @@ Do you accept?
     <message name="IDS_CHROME_SHORTCUT_DESCRIPTION" desc="Description for the Chrome app shortcut in the app launcher.">
       A fast, simple, and secure web browser, built for the modern web.
     </message>
-    <message name="IDS_WEBSTORE_APP_DESCRIPTION" desc="Description for the WebStore app.">
-      Discover great apps, games, extensions and themes for Google Chrome.
-    </message>
-
-    <!-- WebStore name experiment names -->
     <message name="IDS_WEBSTORE_NAME_STORE" desc="Name for the WebStore app in the app launcher.">
       Web Store
     </message>
-    <message name="IDS_WEBSTORE_NAME_WEBSTORE" desc="Name for the WebStore app in the app launcher.">
-      WebStore
-    </message>
-    <message name="IDS_WEBSTORE_NAME_GET_APPS" desc="Name for the WebStore app in the app launcher.">
-      Get Apps
-    </message>
-    <message name="IDS_WEBSTORE_NAME_ADD_APPS" desc="Name for the WebStore app in the app launcher.">
-      Add Apps
-    </message>
-    <message name="IDS_WEBSTORE_NAME_MORE_APPS" desc="Name for the WebStore app in the app launcher.">
-      More Apps
+    <message name="IDS_WEBSTORE_APP_DESCRIPTION" desc="Description for the WebStore app.">
+      Discover great apps, games, extensions and themes for Google Chrome.
     </message>
 
     <!-- WebStore search results -->
@@ -14530,6 +14527,12 @@ Do you accept?
     </message>
     <message name="IDS_PUSH_MESSSAGING_BLOCK_RADIO" desc="A radio button in Content Settings dialog to deny a site to send push messages.">
       Do not allow any sites to send push messages
+    </message>
+    <message name="IDS_PUSH_MESSAGES_BUBBLE_TEXT" desc="Question asked on the info bar whenever a domain wants to send push messages">
+        notification tray.
+    </message>
+    <message name="IDS_PUSH_MESSAGES_BUBBLE_FRAGMENT" desc="Question asked on the info bar whenever a domain wants to send push messages">
+        notifications
     </message>
   </messages>
   </release>

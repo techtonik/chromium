@@ -25,9 +25,22 @@ class SyncFileSystemService;
 // with each other.
 class SyncProcessRunner {
  public:
-  typedef base::Callback<void(const SyncStatusCallback&)> Task;
+  class TimerHelper {
+   public:
+    virtual ~TimerHelper() {}
+    virtual bool IsRunning() = 0;
+    virtual void Start(const tracked_objects::Location& from_here,
+                       const base::TimeDelta& delay,
+                       const base::Closure& closure) = 0;
+
+   protected:
+    TimerHelper() {}
+  };
+
   SyncProcessRunner(const std::string& name,
-                    SyncFileSystemService* sync_service);
+                    SyncFileSystemService* sync_service,
+                    scoped_ptr<TimerHelper> timer_helper,
+                    int max_parallel_task);
   virtual ~SyncProcessRunner();
 
   // Subclass must implement this.
@@ -48,18 +61,19 @@ class SyncProcessRunner {
   virtual SyncServiceState GetServiceState();
 
  private:
-  void Finished(SyncStatusCode status);
+  void Finished(const base::TimeTicks& start_time, SyncStatusCode status);
   void Run();
   void ScheduleInternal(int64 delay);
 
   std::string name_;
   SyncFileSystemService* sync_service_;
-  base::OneShotTimer<SyncProcessRunner> timer_;
-  base::Time last_scheduled_;
+  int max_parallel_task_;
+  int running_tasks_;
+  scoped_ptr<TimerHelper> timer_helper_;
+  base::TimeTicks last_scheduled_;
   int64 current_delay_;
   int64 last_delay_;
   int64 pending_changes_;
-  bool running_;
   base::WeakPtrFactory<SyncProcessRunner> factory_;
 
   DISALLOW_COPY_AND_ASSIGN(SyncProcessRunner);

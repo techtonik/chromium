@@ -92,7 +92,7 @@ source_set("browser") {
       "//cc",
       "//cc:cc_surfaces",
       "//mojo/public/cpp/bindings",
-      "//mojo/public/interfaces/interface_provider",
+      "//mojo/public/interfaces/service_provider",
       "//mojo/public/js/bindings",
       "//net:http_server",
       "//third_party/icu",
@@ -100,7 +100,6 @@ source_set("browser") {
       "//third_party/libyuv",
       "//ui/resources",
       "//ui/surface",
-      "//ui/webui/resources",
       "//webkit:resources",
       "//webkit:strings",
       "//webkit/browser:storage",
@@ -378,7 +377,7 @@ source_set("browser") {
     deps += [ "//ui/compositor" ]
   }
 
-  if (enable_speech_input) {
+  if (enable_web_speech) {
     deps += [
       "//third_party/flac",
       "//third_party/speex",

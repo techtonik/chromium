@@ -47,6 +47,7 @@ class CC_EXPORT SingleThreadProxy : public Proxy,
   virtual void Stop() OVERRIDE;
   virtual size_t MaxPartialTextureUpdates() const OVERRIDE;
   virtual void ForceSerializeOnSwapBuffers() OVERRIDE;
+  virtual bool SupportsImplScrolling() const OVERRIDE;
   virtual scoped_ptr<base::Value> AsValue() const OVERRIDE;
   virtual bool CommitPendingForTesting() OVERRIDE;
 
@@ -79,7 +80,7 @@ class CC_EXPORT SingleThreadProxy : public Proxy,
   virtual void PostDelayedScrollbarFadeOnImplThread(
       const base::Closure& start_fade,
       base::TimeDelta delay) OVERRIDE {}
-  virtual void DidActivatePendingTree() OVERRIDE {}
+  virtual void DidActivateSyncTree() OVERRIDE {}
   virtual void DidManageTiles() OVERRIDE {}
   virtual void SetDebugState(const LayerTreeDebugState& debug_state) OVERRIDE {}
 

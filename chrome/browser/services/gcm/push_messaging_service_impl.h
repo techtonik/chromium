@@ -49,7 +49,8 @@ class PushMessagingServiceImpl : public content::PushMessagingService,
       const std::string& app_id,
       const std::string& sender_id,
       int renderer_id,
-      int router_id,
+      int render_frame_id,
+      bool user_gesture,
       const content::PushMessagingService::RegisterCallback& callback) OVERRIDE;
 
  private:

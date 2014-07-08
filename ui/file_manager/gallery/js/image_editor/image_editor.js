@@ -105,15 +105,14 @@ ImageEditor.prototype.onContentUpdate_ = function() {
 /**
  * Open the editing session for a new image.
  *
- * @param {string} url Image url.
- * @param {Object} metadata Metadata.
+ * @param {Gallery.Item} item Gallery item.
  * @param {Object} effect Transition effect object.
  * @param {function(function)} saveFunction Image save function.
  * @param {function} displayCallback Display callback.
  * @param {function} loadCallback Load callback.
  */
 ImageEditor.prototype.openSession = function(
-    url, metadata, effect, saveFunction, displayCallback, loadCallback) {
+    item, effect, saveFunction, displayCallback, loadCallback) {
   if (this.commandQueue_)
     throw new Error('Session not closed');
 
@@ -121,7 +120,7 @@ ImageEditor.prototype.openSession = function(
 
   var self = this;
   this.imageView_.load(
-      url, metadata, effect, displayCallback, function(loadType, delay, error) {
+      item, effect, displayCallback, function(loadType, delay, error) {
     self.lockUI(false);
     self.commandQueue_ = new CommandQueue(
         self.container_.ownerDocument,
@@ -902,6 +901,13 @@ ImageEditor.Toolbar = function(parent, displayStringFunction, updateCallback) {
   this.wrapper_ = parent;
   this.displayStringFunction_ = displayStringFunction;
   this.updateCallback_ = updateCallback;
+  Object.seal(this);
+};
+
+ImageEditor.Toolbar.prototype = {
+  get element() {
+    return this.wrapper_;
+  }
 };
 
 /**
@@ -954,11 +960,13 @@ ImageEditor.Toolbar.prototype.addLabel = function(name) {
 ImageEditor.Toolbar.prototype.addButton = function(
     name, title, handler, opt_class) {
   var button = this.create_('button');
-  if (opt_class) button.classList.add(opt_class);
+  if (opt_class)
+    button.classList.add(opt_class);
   var label = this.create_('span');
   label.textContent = this.displayStringFunction_(title);
   button.appendChild(label);
   button.label = this.displayStringFunction_(title);
+  button.title = this.displayStringFunction_(title);
   button.addEventListener('click', handler, false);
   return this.add(button);
 };
@@ -1121,23 +1129,42 @@ ImageEditor.Prompt.prototype.setTimer = function(callback, timeout) {
  *
  * @param {string} text The prompt text.
  * @param {number} timeout Timeout in ms.
- * @param {Object} formatArgs varArgs for the formatting function.
+ * @param {...Object} var_formatArgs varArgs for the formatting function.
  */
-ImageEditor.Prompt.prototype.show = function(text, timeout, formatArgs) {
-  this.showAt.apply(this,
-      ['center'].concat(Array.prototype.slice.call(arguments)));
+ImageEditor.Prompt.prototype.show = function(text, timeout, var_formatArgs) {
+  var args = [text].concat(Array.prototype.slice.call(arguments, 2));
+  var message = this.displayStringFunction_.apply(
+      null, [text].concat(args));
+  this.showStringAt('center', message, timeout);
 };
 
 /**
+ * Show the position at the specific position.
  *
  * @param {string} pos The 'pos' attribute value.
  * @param {string} text The prompt text.
  * @param {number} timeout Timeout in ms.
- * @param {Object} formatArgs varArgs for the formatting function.
+ * @param {...Object} var_formatArgs varArgs for the formatting function.
  */
-ImageEditor.Prompt.prototype.showAt = function(pos, text, timeout, formatArgs) {
+ImageEditor.Prompt.prototype.showAt = function(
+    pos, text, timeout, var_formatArgs) {
+  var args = [text].concat(Array.prototype.slice.call(arguments, 3));
+  var message = this.displayStringFunction_.apply(
+      null, [text].concat(args));
+  this.showStringAt(pos, message, timeout);
+};
+
+/**
+ * Show the string in the prompt
+ *
+ * @param {string} pos The 'pos' attribute value.
+ * @param {string} text The prompt text.
+ * @param {number} timeout Timeout in ms.
+ */
+ImageEditor.Prompt.prototype.showStringAt = function(pos, text, timeout) {
   this.reset();
-  if (!text) return;
+  if (!text)
+    return;
 
   var document = this.container_.ownerDocument;
   this.wrapper_ = document.createElement('div');
@@ -1154,8 +1181,7 @@ ImageEditor.Prompt.prototype.showAt = function(pos, text, timeout, formatArgs) {
   this.wrapper_.appendChild(tool);
   tool.appendChild(this.prompt_);
 
-  var args = [text].concat(Array.prototype.slice.call(arguments, 3));
-  this.prompt_.textContent = this.displayStringFunction_.apply(null, args);
+  this.prompt_.textContent = text;
 
   var close = document.createElement('div');
   close.className = 'close';

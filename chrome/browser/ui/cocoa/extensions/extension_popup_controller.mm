@@ -12,6 +12,7 @@
 #include "chrome/browser/extensions/extension_view_host.h"
 #include "chrome/browser/extensions/extension_view_host_factory.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/common/url_constants.h"
 #include "chrome/browser/ui/browser.h"
 #import "chrome/browser/ui/cocoa/browser_window_cocoa.h"
 #import "chrome/browser/ui/cocoa/extensions/extension_view_mac.h"
@@ -214,20 +215,17 @@ class DevtoolsNotificationBridge : public content::NotificationObserver {
         modalDialogManager->IsDialogActive()) {
       return;
     }
-    // We must shutdown host_ immediately, and it will notify RendererProcess
-    // right away. We can't wait to do it in
-    // -[ExtensionPopController windowWillClose:...]
-    if (host_->view())
-      host_->view()->set_container(NULL);
-    host_.reset();
   }
   [super close];
 }
 
-- (void)windowWillClose:(NSNotification*)notification {
+- (void)windowWillClose:(NSNotification *)notification {
   [super windowWillClose:notification];
   if (gPopup == self)
     gPopup = nil;
+  if (host_->view())
+    host_->view()->set_container(NULL);
+  host_.reset();
 }
 
 - (void)windowDidResignKey:(NSNotification*)notification {
@@ -277,17 +275,26 @@ class DevtoolsNotificationBridge : public content::NotificationObserver {
   if (!browser)
     return nil;
 
+  // If we click the browser/page action again, we should close the popup.
+  // Make Mac behavior the same with Windows and others.
+  if (gPopup) {
+    std::string extension_id = url.host();
+    if (url.SchemeIs(content::kChromeUIScheme) &&
+        url.host() == chrome::kChromeUIExtensionInfoHost)
+      extension_id = url.path().substr(1);
+    extensions::ExtensionViewHost* host = [gPopup extensionViewHost];
+    if (extension_id == host->extension_id()) {
+      [gPopup close];
+      return nil;
+    }
+  }
+
   extensions::ExtensionViewHost* host =
       extensions::ExtensionViewHostFactory::CreatePopupHost(url, browser);
   DCHECK(host);
   if (!host)
     return nil;
 
-  // Since we only close without releasing(see bug:351278), we need to shutdown
-  // host_ in -[ExtensionPopupController close] immediately. If not, host_ might
-  // not be released even when new ExtensionPopupController is ready. And
-  // this causes bug:376511.
-  // See above -[ExtensionPopupController close].
   [gPopup close];
 
   // Takes ownership of |host|. Also will autorelease itself when the popup is
@@ -392,13 +399,13 @@ class DevtoolsNotificationBridge : public content::NotificationObserver {
 
 - (void)windowDidResize:(NSNotification*)notification {
   // Let the extension view know, so that it can tell plugins.
-  if (host_ && host_->view())
+  if (host_->view())
     host_->view()->WindowFrameChanged();
 }
 
 - (void)windowDidMove:(NSNotification*)notification {
   // Let the extension view know, so that it can tell plugins.
-  if (host_ && host_->view())
+  if (host_->view())
     host_->view()->WindowFrameChanged();
 }
 

@@ -50,7 +50,7 @@ class ServiceWorkerStorage;
 // is the root of the containment hierarchy for service worker data
 // associated with a particular partition.
 class CONTENT_EXPORT ServiceWorkerContextCore
-    : public ServiceWorkerVersion::Listener {
+    : NON_EXPORTED_BASE(public ServiceWorkerVersion::Listener) {
  public:
   typedef base::Callback<void(ServiceWorkerStatusCode status)> StatusCallback;
   typedef base::Callback<void(ServiceWorkerStatusCode status,
@@ -75,7 +75,7 @@ class CONTENT_EXPORT ServiceWorkerContextCore
     void Initialize();
 
     ProcessToProviderMap* map_;
-    scoped_ptr<ProcessToProviderMap::iterator> provider_iterator_;
+    scoped_ptr<ProcessToProviderMap::iterator> process_iterator_;
     scoped_ptr<ProviderMap::iterator> provider_host_iterator_;
 
     DISALLOW_COPY_AND_ASSIGN(ProviderHostIterator);

@@ -13,7 +13,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/message_loop/message_loop.h"
 #include "base/strings/string16.h"
-#include "chrome/browser/search_engines/template_url_service_observer.h"
+#include "components/search_engines/template_url_service_observer.h"
 #include "content/public/test/test_browser_thread_bundle.h"
 
 class GURL;
@@ -21,7 +21,6 @@ class TemplateURLService;
 class TestingProfile;
 class TestingTemplateURLService;
 class TestingProfile;
-class WebDataService;
 
 // TemplateURLServiceTestUtilBase contains basic API to ease testing of
 // TemplateURLService. User should take care of the infrastructure separately.

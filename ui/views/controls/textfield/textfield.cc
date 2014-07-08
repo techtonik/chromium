@@ -409,6 +409,11 @@ void Textfield::UseDefaultSelectionTextColor() {
   SchedulePaint();
 }
 
+void Textfield::SetShadows(const gfx::ShadowValues& shadows) {
+  GetRenderText()->set_shadows(shadows);
+  SchedulePaint();
+}
+
 SkColor Textfield::GetSelectionBackgroundColor() const {
   return use_default_selection_background_color_ ?
       GetNativeTheme()->GetSystemColor(
@@ -601,7 +606,7 @@ bool Textfield::OnMousePressed(const ui::MouseEvent& event) {
             ui::Clipboard::GetForCurrentThread(),
             ui::CLIPBOARD_TYPE_SELECTION).WriteText(base::string16());
         OnAfterUserAction();
-      } else if(!read_only()) {
+      } else if (!read_only()) {
         PasteSelectionClipboard(event);
       }
     }
@@ -647,7 +652,14 @@ void Textfield::OnMouseReleased(const ui::MouseEvent& event) {
 }
 
 bool Textfield::OnKeyPressed(const ui::KeyEvent& event) {
+  // Since HandleKeyEvent() might destroy |this|, get a weak pointer and verify
+  // it isn't null before proceeding.
+  base::WeakPtr<Textfield> textfield(weak_ptr_factory_.GetWeakPtr());
+
   bool handled = controller_ && controller_->HandleKeyEvent(this, event);
+
+  if (!textfield)
+    return handled;
 
 #if defined(OS_LINUX) && !defined(OS_CHROMEOS)
   ui::TextEditKeyBindingsDelegateAuraLinux* delegate =
@@ -1314,12 +1326,17 @@ void Textfield::InsertText(const base::string16& new_text) {
 }
 
 void Textfield::InsertChar(base::char16 ch, int flags) {
+  const int kControlModifierMask = ui::EF_CONTROL_DOWN | ui::EF_ALT_DOWN |
+                                   ui::EF_COMMAND_DOWN | ui::EF_ALTGR_DOWN |
+                                   ui::EF_MOD3_DOWN;
+
   // Filter out all control characters, including tab and new line characters,
   // and all characters with Alt modifier. But allow characters with the AltGr
   // modifier. On Windows AltGr is represented by Alt+Ctrl, and on Linux it's a
   // different flag that we don't care about.
-  const bool should_insert_char = ((ch >= 0x20 && ch < 0x7F) || ch > 0x9F) &&
-      (flags & ~(ui::EF_SHIFT_DOWN | ui::EF_CAPS_LOCK_DOWN)) != ui::EF_ALT_DOWN;
+  const bool should_insert_char =
+      ((ch >= 0x20 && ch < 0x7F) || ch > 0x9F) &&
+      (flags & kControlModifierMask) != ui::EF_ALT_DOWN;
   if (GetTextInputType() == ui::TEXT_INPUT_TYPE_NONE || !should_insert_char)
     return;
 

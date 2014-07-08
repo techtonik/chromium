@@ -70,7 +70,7 @@
 #import "chrome/browser/ui/cocoa/translate/translate_bubble_controller.h"
 #include "chrome/browser/ui/cocoa/website_settings/permission_bubble_cocoa.h"
 #include "chrome/browser/ui/fullscreen/fullscreen_controller.h"
-#include "chrome/browser/ui/omnibox/location_bar.h"
+#include "chrome/browser/ui/location_bar/location_bar.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/tabs/tab_strip_model_delegate.h"
 #include "chrome/browser/ui/toolbar/encoding_menu_controller.h"
@@ -1381,7 +1381,6 @@ using web_modal::WebContentsModalDialogManager;
 
 // Make the location bar the first responder, if possible.
 - (void)focusLocationBar:(BOOL)selectAll {
-  [[self window] makeKeyWindow];
   [toolbarController_ focusLocationBar:selectAll];
 }
 
@@ -1668,8 +1667,7 @@ using web_modal::WebContentsModalDialogManager;
 }
 
 - (void)userChangedTheme {
-  NSView* contentView = [[self window] contentView];
-  [[contentView superview] cr_recursivelySetNeedsDisplay:YES];
+  [[[[self window] contentView] superview] cr_recursivelySetNeedsDisplay:YES];
 }
 
 - (ui::ThemeProvider*)themeProvider {
@@ -1830,7 +1828,7 @@ using web_modal::WebContentsModalDialogManager;
   [view setHidden:![self shouldShowAvatar]];
 
   // Install the view.
-  [[[[self window] contentView] superview] addSubview:view];
+  [[[self window] cr_windowView] addSubview:view];
 }
 
 // Called when we get a three-finger swipe.

@@ -22,13 +22,12 @@ class SmoothnessToughCanvasCases(benchmark.Benchmark):
   page_set = page_sets.ToughCanvasCasesPageSet
 
 
-@benchmark.Disabled  # crbug.com/373812
+@benchmark.Disabled('android')  # crbug.com/373812
 class SmoothnessToughWebGLCases(benchmark.Benchmark):
   test = smoothness.Smoothness
   page_set = page_sets.ToughWebglCasesPageSet
 
 
-@benchmark.Disabled
 class SmoothnessMaps(benchmark.Benchmark):
   test = smoothness.Smoothness
   page_set = page_sets.MapsPageSet
@@ -78,7 +77,7 @@ class SmoothnessGpuRasterizationTop25(benchmark.Benchmark):
     silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
 
 
-@benchmark.Disabled('android')  # crbug.com/363783
+@benchmark.Disabled('j')  # crbug.com/363783
 class SmoothnessGpuRasterizationKeyMobileSites(benchmark.Benchmark):
   """Measures rendering statistics for the key mobile sites with GPU
   rasterization

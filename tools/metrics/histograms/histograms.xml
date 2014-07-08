@@ -2937,8 +2937,31 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="DataReductionProxy.BlockTypeFallback"
+    enum="DataReductionProxyBypassType">
+  <owner>bengr@chromium.org</owner>
+  <owner>marq@chromium.org</owner>
+  <summary>
+    Counts various events that trigger Chrome to block the fallback
+    configuration of the data reduction proxy.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.BlockTypePrimary"
+    enum="DataReductionProxyBypassType">
+  <owner>bengr@chromium.org</owner>
+  <owner>marq@chromium.org</owner>
+  <summary>
+    Counts various events that trigger Chrome to block the primary configuration
+    of the data reduction proxy.
+  </summary>
+</histogram>
+
 <histogram name="DataReductionProxy.BypassInfoFallback"
-    enum="DataReductionProxyBypassEventType">
+    enum="DataReductionProxyBypassEventType_Deprecated">
+  <obsolete>
+    Deprecated as of 6/2014, replaced by DataReductionProxy.BypassTypeFallback.
+  </obsolete>
   <owner>bengr@chromium.org</owner>
   <owner>marq@chromium.org</owner>
   <summary>
@@ -2948,7 +2971,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="DataReductionProxy.BypassInfoPrimary"
-    enum="DataReductionProxyBypassEventType">
+    enum="DataReductionProxyBypassEventType_Deprecated">
+  <obsolete>
+    Deprecated as of 6/2014, replaced by DataReductionProxy.BypassTypePrimary.
+  </obsolete>
   <owner>bengr@chromium.org</owner>
   <owner>marq@chromium.org</owner>
   <summary>
@@ -2974,6 +3000,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Positive net error code that caused the primary data reduction proxy to be
     bypassed and put on the proxy retry list. Called after a failure to connect
     or resolve a host name.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.BypassTypeFallback"
+    enum="DataReductionProxyBypassType">
+  <owner>bengr@chromium.org</owner>
+  <owner>marq@chromium.org</owner>
+  <summary>
+    Counts various events that trigger Chrome to bypass the fallback
+    configuration of the data reduction proxy.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.BypassTypePrimary"
+    enum="DataReductionProxyBypassType">
+  <owner>bengr@chromium.org</owner>
+  <owner>marq@chromium.org</owner>
+  <summary>
+    Counts various events that trigger Chrome to bypass the primary
+    configuration of the data reduction proxy.
   </summary>
 </histogram>
 
@@ -10676,11 +10722,43 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Memory.RendererGrowthIn30Min" units="KB">
+  <owner>dmikurube@chromium.org</owner>
+  <owner>kenjibaheux@google.com</owner>
+  <summary>
+    Growth speed of the private working set used by each renderer process per 30
+    minutes.  The usage and growth speed is recorded at most every 30 minutes,
+    not every exact 30 minutes.  If the interval is longer than 30 minutes, it
+    is normalized to a speed KB per 30 minutes.  Each renderer process provides
+    one sample.  Recorded once per UMA log unless this is the first time the UMA
+    log is recorded after startup of the renderer, 30 minutes have not passed
+    from the last recording of the renderer or the usage goes down. If the usage
+    goes down, the amount of the shrink will be recorded in the
+    Memory.RendererShrinkIn30Min histogram.
+  </summary>
+</histogram>
+
 <histogram name="Memory.RendererProcessCount">
   <owner>dmikurube@chromium.org</owner>
   <owner>kenjibaheux@google.com</owner>
   <summary>
     The count of active renderer processes.  Recorded once per UMA ping.
+  </summary>
+</histogram>
+
+<histogram name="Memory.RendererShrinkIn30Min" units="KB">
+  <owner>dmikurube@chromium.org</owner>
+  <owner>kenjibaheux@google.com</owner>
+  <summary>
+    Shrink speed of the private working set used by each renderer process per 30
+    minutes.  The usage and shrink speed is recorded at most every 30 minutes,
+    not every exact 30 minutes.  If the interval is longer than 30 minutes, it
+    is normalized to a speed KB per 30 minutes.  Each renderer process provides
+    one sample.  Recorded once per UMA log unless this is the first time the UMA
+    log is recorded after startup of the renderer, 30 minutes have not passed
+    from the last recording of the renderer or the usage goes up. If the usage
+    goes up, the amount of the growth will be recorded in the
+    Memory.RendererGrowthIn30Min histogram.
   </summary>
 </histogram>
 
@@ -11528,6 +11606,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="NaCl.Perf.ShutdownTime.Total" units="milliseconds">
+  <owner>jvoung@chromium.org</owner>
+  <owner>mackinlay@google.com</owner>
+  <owner>ncbray@chromium.org</owner>
+  <summary>The time it took the NaCl module to shut down.</summary>
+</histogram>
+
 <histogram name="NaCl.Perf.Size.Manifest" units="KB">
   <owner>jvoung@chromium.org</owner>
   <owner>mackinlay@google.com</owner>
@@ -11664,13 +11749,6 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     the NaCl module is ready to be used.  Normalized by the size of the .nexe,
     in megabytes.
   </summary>
-</histogram>
-
-<histogram name="NaCl.ShutdownTime.Total" units="milliseconds">
-  <owner>jvoung@chromium.org</owner>
-  <owner>mackinlay@google.com</owner>
-  <owner>ncbray@chromium.org</owner>
-  <summary>The time it took the NaCl module to shut down.</summary>
 </histogram>
 
 <histogram name="NaCl.Startups" enum="NaClStartupEnum">
@@ -18753,6 +18831,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="OOBE.BootToSignInCompleted" units="milliseconds">
+  <owner>merkulova@chromium.org</owner>
+  <summary>Time from boot to sign-in completed.</summary>
+</histogram>
+
+<histogram name="OOBE.StepCompletionTime" units="milliseconds">
+  <owner>merkulova@chromium.org</owner>
+  <summary>Time spent on specific OOBE screen.</summary>
+</histogram>
+
 <histogram name="OriginChip.Pressed">
   <owner>gbillock@chromium.org</owner>
   <summary>The number of clicks on the origin chip.</summary>
@@ -20637,6 +20725,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="PLT.Abandoned" enum="Abandoned">
+  <obsolete>
+    Deprecated as of 2014-06.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     Distribution of actual finished pages, vs abandoned pages, where we needed
@@ -20646,21 +20737,33 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="PLT.Abandoned.NoProxy.http" enum="Abandoned">
+  <obsolete>
+    Deprecated as of 2014-06.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary/>
 </histogram>
 
 <histogram name="PLT.Abandoned.NoProxy.https" enum="Abandoned">
+  <obsolete>
+    Deprecated as of 2014-06.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary/>
 </histogram>
 
 <histogram name="PLT.Abandoned.Proxy.http" enum="Abandoned">
+  <obsolete>
+    Deprecated as of 2014-06.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary/>
 </histogram>
 
 <histogram name="PLT.Abandoned.Proxy.https" enum="Abandoned">
+  <obsolete>
+    Deprecated as of 2014-06.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary/>
 </histogram>
@@ -20682,6 +20785,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="PLT.Abandoned_ExtensionWebRequest" enum="Abandoned">
+  <obsolete>
+    Deprecated as of 2014-06.
+  </obsolete>
   <owner>vabr@chromium.org</owner>
   <summary>
     The PLT.Abandoned histogram for pages loaded after WebRequest API was used.
@@ -20713,11 +20819,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="PLT.Abandoned_SpdyProxy" enum="Abandoned">
+  <obsolete>
+    Deprecated as of 2014-06.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary/>
 </histogram>
 
 <histogram name="PLT.AbandonType" enum="AbandonType">
+  <obsolete>
+    Deprecated as of 2014-06.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>Diagnose why a page load was considered abandoned.</summary>
 </histogram>
@@ -21128,6 +21240,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="PLT.MissingStart" enum="MissingStartType">
+  <obsolete>
+    Deprecated as of 2014-06.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     Diagnose error conditions in PLT reporting. A start time should always be
@@ -26007,6 +26122,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="SBIRS.FindDownloadedBinaryTime" units="milliseconds">
+  <owner>grt@google.com</owner>
+  <summary>
+    The elapsed time to find the most recent binary download from all loaded
+    profiles when creating a safe browsing incident report.
+  </summary>
+</histogram>
+
 <histogram name="SBIRS.Incident" enum="IncidentType">
   <owner>grt@google.com</owner>
   <summary>
@@ -26048,11 +26171,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>The elapsed time to upload a safe browsing incident report.</summary>
 </histogram>
 
-<histogram name="SBIRS.UploadResult" enum="UploadResult">
+<histogram name="SBIRS.UploadResult" enum="ReportProcessingResult">
   <owner>grt@google.com</owner>
   <summary>
-    The result of a report upload by the safe browsing incident reporting
-    service.
+    The result of an attempted report upload by the safe browsing incident
+    reporting service.
   </summary>
 </histogram>
 
@@ -35917,7 +36040,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="4" label="Channel is negotiated."/>
 </enum>
 
-<enum name="DataReductionProxyBypassEventType" type="int">
+<enum name="DataReductionProxyBypassEventType_Deprecated" type="int">
   <int value="0" label="Short bypass"/>
   <int value="1" label="Long bypass"/>
   <int value="2" label="Bypass due to internal server error"/>
@@ -35926,6 +36049,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="5" label="Bypass due to 4xx response"/>
   <int value="6"
       label="Bypass due to 407 response from proxy without a challenge"/>
+</enum>
+
+<enum name="DataReductionProxyBypassType" type="int">
+  <int value="0"
+      label="Bypass due to explicit instruction for the current request"/>
+  <int value="1"
+      label="Short bypass: Bypass the proxy for less than one minute"/>
+  <int value="2"
+      label="Medium bypass: Bypass the proxy for one to five minutes"/>
+  <int value="3"
+      label="Long bypass: Bypass the proxy for more than five minutes"/>
+  <int value="4" label="Bypass due to a 4xx missing via header"/>
+  <int value="5"
+      label="Bypass due to other missing via header, excluding 4xx errors"/>
+  <int value="6"
+      label="Bypass due to 407 response from proxy without a challenge"/>
+  <int value="7" label="Bypass due to a 500 internal server error"/>
+  <int value="8" label="Bypass because the request URI was too long"/>
+  <int value="9" label="Bypass due to a 503 response"/>
+  <int value="10" label="Bypass due to any network error"/>
 </enum>
 
 <enum name="DataReductionProxyProbeURLFetchResult" type="int">
@@ -36047,6 +36190,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1270622879" label="hk.dll"/>
   <int value="1409376135" label="windowsapihookdll32.dll"/>
   <int value="1736709911" label="bitguard.dll"/>
+  <int value="1996673448" label="scdetour.dll"/>
   <int value="2117903235" label="cplushook.dll"/>
   <int value="2132270559" label="libsvn_tsvn32.dll"/>
 </enum>
@@ -38134,6 +38278,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="820" label="WEBVIEWINTERNAL_TERMINATE"/>
   <int value="821" label="BLUETOOTHLOWENERGY_STARTCHARACTERISTICNOTIFICATIONS"/>
   <int value="822" label="BLUETOOTHLOWENERGY_STOPCHARACTERISTICNOTIFICATIONS"/>
+  <int value="823" label="GCDPRIVATE_GETCLOUDDEVICELIST"/>
+  <int value="824" label="GCDPRIVATE_QUERYFORNEWLOCALDEVICES"/>
+  <int value="825" label="GCDPRIVATE_STARTSETUP"/>
+  <int value="826" label="GCDPRIVATE_SETWIFINETWORKS"/>
+  <int value="827" label="GCDPRIVATE_SETWIFICREDENTIALS"/>
+  <int value="828" label="GCDPRIVATE_CONFIRMCODE"/>
+  <int value="829" label="GCDPRIVATE_STOPSETUP"/>
+  <int value="830" label="TABS_SETZOOM"/>
+  <int value="831" label="TABS_GETZOOM"/>
+  <int value="832" label="TABS_SETZOOMSETTINGS"/>
+  <int value="833" label="TABS_GETZOOMSETTINGS"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -38912,6 +39067,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="469" label="CSSSelectorPseudoHost"/>
   <int value="470" label="CSSSelectorPseudoHostContext"/>
   <int value="471" label="CSSDeepCombinator"/>
+  <int value="472" label="SyncXHRWithCredentials"/>
+  <int value="473" label="UseAsm"/>
+  <int value="474" label="KeyEventNotAllowedInFullScreen"/>
+  <int value="475" label="DOMWindowOpen"/>
+  <int value="476" label="DOMWindowOpenFeatures"/>
 </enum>
 
 <enum name="FFmpegCodecs" type="int">
@@ -44457,6 +44617,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="Webdata autofill DB error"/>
   <int value="3" label="Webdata token DB error"/>
   <int value="4" label="Webdata DB error"/>
+  <int value="5" label="Webdata keyword DB error"/>
 </enum>
 
 <enum name="ProfileGaiaPhotoOptions" type="int">
@@ -44900,6 +45061,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="56" label="IDC_SPELLCHECK_LANGUAGES_FIRST"/>
   <int value="57" label="IDC_CONTENT_CONTEXT_SEARCHWEBFORIMAGE"/>
   <int value="58" label="IDC_SPELLCHECK_SUGGESTION"/>
+</enum>
+
+<enum name="ReportProcessingResult" type="int">
+  <int value="0" label="Success">A report was created and uploaded</int>
+  <int value="1" label="Suppressed">
+    A report was not uploaded because the CSD Whitelist killswitch was present
+  </int>
+  <int value="2" label="InvalidRequest">
+    A report was not uploaded because it could not be serialized
+  </int>
+  <int value="3" label="Cancelled">
+    A report upload was cancelled due to service shutdown
+  </int>
+  <int value="4" label="RequestFailed">A report upload failed</int>
+  <int value="5" label="InvalidResponse">
+    The response from a report upload was invalid
+  </int>
+  <int value="6" label="NoDownload">
+    A report was not uploaded because no binary download was found to report
+  </int>
 </enum>
 
 <enum name="ResolutionCategory" type="int">
@@ -47170,15 +47351,6 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="AUTOMATIC_UPDATES"/>
   <int value="2" label="MANUAL_UPDATES_ONLY"/>
   <int value="3" label="AUTO_UPDATES_ONLY"/>
-</enum>
-
-<enum name="UploadResult" type="int">
-  <int value="0" label="Success"/>
-  <int value="1" label="Suppressed">CSD Whitelist killswitch present</int>
-  <int value="2" label="InvalidRequest"/>
-  <int value="3" label="Cancelled"/>
-  <int value="4" label="RequestFailed"/>
-  <int value="5" label="InvalidResponse"/>
 </enum>
 
 <enum name="UrlResolutionResult" type="int">
@@ -49896,6 +50068,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <suffix name="Shortcuts"/>
   <suffix name="ZeroSuggest"/>
   <affected-histogram name="Omnibox.ProviderTime"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="OobeScreenName" separator=".">
+  <suffix name="Eula"/>
+  <suffix name="Hid-detection"/>
+  <suffix name="Image"/>
+  <suffix name="Network"/>
+  <suffix name="Update"/>
+  <suffix name="Wrong-hwid"/>
+  <affected-histogram name="OOBE.StepCompletionTime"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="OverlappedReadImpact">

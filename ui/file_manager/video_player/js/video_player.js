@@ -280,26 +280,22 @@ VideoPlayer.prototype.unloadVideo = function() {
  * @private
  */
 VideoPlayer.prototype.onFirstVideoReady_ = function() {
-  // TODO: chrome.app.window soon will be able to resize the content area.
-  // Until then use approximate title bar height.
-  var TITLE_HEIGHT = 33;
-
   var videoWidth = this.videoElement_.videoWidth;
   var videoHeight = this.videoElement_.videoHeight;
 
   var aspect = videoWidth / videoHeight;
   var newWidth = videoWidth;
-  var newHeight = videoHeight + TITLE_HEIGHT;
+  var newHeight = videoHeight;
 
   var shrinkX = newWidth / window.screen.availWidth;
   var shrinkY = newHeight / window.screen.availHeight;
   if (shrinkX > 1 || shrinkY > 1) {
     if (shrinkY > shrinkX) {
       newHeight = newHeight / shrinkY;
-      newWidth = (newHeight - TITLE_HEIGHT) * aspect;
+      newWidth = newHeight * aspect;
     } else {
       newWidth = newWidth / shrinkX;
-      newHeight = newWidth / aspect + TITLE_HEIGHT;
+      newHeight = newWidth / aspect;
     }
   }
 

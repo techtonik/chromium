@@ -7,6 +7,7 @@
 #include "base/json/json_reader.h"
 #include "base/strings/stringprintf.h"
 #include "base/test/trace_event_analyzer.h"
+#include "base/timer/elapsed_timer.h"
 #include "base/values.h"
 #include "content/browser/media/webrtc_internals.h"
 #include "content/browser/web_contents/web_contents_impl.h"
@@ -80,6 +81,14 @@ class WebRtcGetUserMediaBrowserTest: public WebRtcContentBrowserTest,
  public:
   WebRtcGetUserMediaBrowserTest() : trace_log_(NULL) {}
   virtual ~WebRtcGetUserMediaBrowserTest() {}
+
+  virtual void TearDown() OVERRIDE {
+    LOG(INFO) << "Entering teardown; " << timer_.Elapsed().InSeconds()
+              << " seconds elapsed.";
+    WebRtcContentBrowserTest::TearDown();
+    LOG(INFO) << "Exiting teardown; " << timer_.Elapsed().InSeconds()
+              << " seconds elapsed.";
+  }
 
   virtual void SetUpCommandLine(CommandLine* command_line) OVERRIDE {
     WebRtcContentBrowserTest::SetUpCommandLine(command_line);
@@ -199,7 +208,7 @@ class WebRtcGetUserMediaBrowserTest: public WebRtcContentBrowserTest,
     NavigateToURL(shell(), url);
 
     std::string devices_as_json = ExecuteJavascriptAndReturnResult(
-        "getMediaDevices()");
+        "getSources()");
     EXPECT_FALSE(devices_as_json.empty());
 
     int error_code;
@@ -223,20 +232,22 @@ class WebRtcGetUserMediaBrowserTest: public WebRtcContentBrowserTest,
       std::string device_id;
       ASSERT_TRUE((*it)->GetAsDictionary(&dict));
       ASSERT_TRUE(dict->GetString("kind", &kind));
-      ASSERT_TRUE(dict->GetString("deviceId", &device_id));
+      ASSERT_TRUE(dict->GetString("id", &device_id));
       ASSERT_FALSE(device_id.empty());
-      EXPECT_TRUE(kind == "audioinput" || kind == "videoinput" ||
-                  kind == "audiooutput");
-      if (kind == "audioinput") {
+      EXPECT_TRUE(kind == "audio" || kind == "video");
+      if (kind == "audio") {
         audio_ids->push_back(device_id);
-      } else if (kind == "videoinput") {
+      } else if (kind == "video") {
         video_ids->push_back(device_id);
       }
-      // We ignore audio output.
     }
     ASSERT_FALSE(audio_ids->empty());
     ASSERT_FALSE(video_ids->empty());
   }
+
+ protected:
+  // TODO(phoglund): Remove when done debugging https://crbug.com/387895.
+  base::ElapsedTimer timer_;
 
  private:
   base::debug::TraceLog* trace_log_;
@@ -311,15 +322,8 @@ IN_PROC_BROWSER_TEST_P(WebRtcGetUserMediaBrowserTest,
                           kRenderDuplicatedMediastreamAndStop));
 }
 
-// Flaky on Android.  http://crbug.com/387895
-#if defined(OS_ANDROID)
-#define MAYBE_GetAudioAndVideoStreamAndStop DISABLED_GetAudioAndVideoStreamAndStop
-#else
-#define MAYBE_GetAudioAndVideoStreamAndStop GetAudioAndVideoStreamAndStop
-#endif
-
 IN_PROC_BROWSER_TEST_P(WebRtcGetUserMediaBrowserTest,
-                       MAYBE_GetAudioAndVideoStreamAndStop) {
+                       GetAudioAndVideoStreamAndStop) {
   ASSERT_TRUE(embedded_test_server()->InitializeAndWaitUntilReady());
 
   GURL url(embedded_test_server()->GetURL("/media/getusermedia.html"));
@@ -355,6 +359,9 @@ IN_PROC_BROWSER_TEST_P(WebRtcGetUserMediaBrowserTest,
                        GetUserMediaWithMandatorySourceID) {
   ASSERT_TRUE(embedded_test_server()->InitializeAndWaitUntilReady());
 
+  LOG(INFO) << "HTTP server ready; " << timer_.Elapsed().InSeconds()
+            << " seconds elapsed.";
+
   std::vector<std::string> audio_ids;
   std::vector<std::string> video_ids;
   GetInputDevices(&audio_ids, &video_ids);
@@ -373,7 +380,12 @@ IN_PROC_BROWSER_TEST_P(WebRtcGetUserMediaBrowserTest,
               *audio_it,
               *video_it)));
     }
+    LOG(INFO) << "Tested one combination; " << timer_.Elapsed().InSeconds()
+              << " seconds elapsed.";
   }
+
+  LOG(INFO) << "End test body; " << timer_.Elapsed().InSeconds()
+            << " seconds elapsed.";
 }
 
 IN_PROC_BROWSER_TEST_P(WebRtcGetUserMediaBrowserTest,
@@ -629,7 +641,7 @@ static const UserMediaSizes kAllUserMediaSizes[] = {
     {960, 960, 720, 720, 10, 30},
     {1280, 1280, 720, 720, 10, 30}};
 
-INSTANTIATE_TEST_CASE_P(UserMedia,
+INSTANTIATE_TEST_CASE_P(WebRtcConstraintsBrowserTests,
                         WebRtcConstraintsBrowserTest,
                         testing::ValuesIn(kAllUserMediaSizes));
 

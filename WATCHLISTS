@@ -524,6 +524,9 @@
     'predictors': {
       'filepath': 'predictors',
     },
+    'prepopulated_engines': {
+      'filepath': 'components/search_engines/prepopulated_engines.json',
+    },
     'prerender': {
       'filepath': 'prerender'
     },
@@ -686,6 +689,7 @@
     'webrtc_media': {
       'filepath': 'chrome/browser/media/|'\
                   'content/browser/renderer_host/media/|'\
+                  'content/common/gpu/media/|'\
                   'content/renderer/media/|'\
                   'media/video/|'\
                   'video.*_accelerat',
@@ -891,6 +895,7 @@
                'stuartmorgan+watch@chromium.org'],
     'policy_templates': ['joaodasilva+watch@chromium.org'],
     'predictors': ['dominich+watch@chromium.org', 'shishir+watch@chromium.org'],
+    'prepopulated_engines': ['vasilii+watch@chromium.org'],
     'prerender': ['cbentzel+watch@chromium.org', 'tburkard+watch@chromium.org',
                   'dominich+watch@chromium.org', 'gavinp+prer@chromium.org',
                   'davidben+watch@chromium.org',],
@@ -952,7 +957,8 @@
                          'groby+virtualkb@chromium.org'],
     'webkit': ['darin-cc@chromium.org'],
     'webrtc_media': ['wjia+watch@chromium.org',
-                     'mcasas+watch@chromium.org'],
+                     'mcasas+watch@chromium.org',
+                     'posciak+watch@chromium.org'],
     'website_settings': ['markusheintz@chromium.org'],
     'worker': ['jam@chromium.org'],
     'x11': ['derat+watch@chromium.org',

@@ -336,7 +336,6 @@
       'sources': [
         'public/c/environment/async_waiter.h',
         'public/c/environment/logger.h',
-        'public/c/environment/logging.h',
         'public/cpp/environment/environment.h',
         'public/cpp/environment/lib/default_async_waiter.cc',
         'public/cpp/environment/lib/default_async_waiter.h',
@@ -344,6 +343,7 @@
         'public/cpp/environment/lib/default_logger.h',
         'public/cpp/environment/lib/environment.cc',
         'public/cpp/environment/lib/logging.cc',
+        'public/cpp/environment/logging.h',
       ],
       'include_dirs': [
         '..',
@@ -377,21 +377,6 @@
       ],
       'include_dirs': [
         '..',
-      ],
-    },
-    {
-      # GN version: //mojo/public/interfaces/interface_provider:interface_provider
-      'target_name': 'mojo_interface_provider_bindings',
-      'type': 'static_library',
-      'sources': [
-        'public/interfaces/interface_provider/interface_provider.mojom',
-      ],
-      'includes': [ 'public/tools/bindings/mojom_bindings_generator.gypi' ],
-      'dependencies': [
-        'mojo_cpp_bindings',
-      ],
-      'export_dependent_settings': [
-        'mojo_cpp_bindings',
       ],
     },
     {
@@ -441,6 +426,13 @@
             'java_in_dir': 'public/java',
           },
           'includes': [ '../build/java.gypi' ],
+          'conditions': [
+            ['android_webview_build==0', {
+              'dependencies': [
+                '../third_party/jsr-305/jsr-305.gyp:jsr_305_javalib',
+              ],
+            }]
+          ],
         },
         {
           'target_name': 'mojo_bindings_java',

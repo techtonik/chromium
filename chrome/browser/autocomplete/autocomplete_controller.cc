@@ -16,7 +16,6 @@
 #include "chrome/browser/autocomplete/autocomplete_controller_delegate.h"
 #include "chrome/browser/autocomplete/bookmark_provider.h"
 #include "chrome/browser/autocomplete/builtin_provider.h"
-#include "chrome/browser/autocomplete/extension_app_provider.h"
 #include "chrome/browser/autocomplete/history_quick_provider.h"
 #include "chrome/browser/autocomplete/history_url_provider.h"
 #include "chrome/browser/autocomplete/keyword_provider.h"
@@ -25,10 +24,8 @@
 #include "chrome/browser/autocomplete/zero_suggest_provider.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/omnibox/omnibox_field_trial.h"
-#include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/search/search.h"
-#include "chrome/browser/search_engines/ui_thread_search_terms_data.h"
 #include "components/search_engines/template_url.h"
+#include "components/search_engines/template_url_service.h"
 #include "content/public/browser/notification_service.h"
 #include "grit/generated_resources.h"
 #include "grit/theme_resources.h"
@@ -172,6 +169,7 @@ bool AutocompleteMatchHasCustomDescription(const AutocompleteMatch& match) {
 
 AutocompleteController::AutocompleteController(
     Profile* profile,
+    TemplateURLService* template_url_service,
     AutocompleteControllerDelegate* delegate,
     int provider_types)
     : delegate_(delegate),
@@ -182,14 +180,12 @@ AutocompleteController::AutocompleteController(
       stop_timer_duration_(OmniboxFieldTrial::StopTimerFieldTrialDuration()),
       done_(true),
       in_start_(false),
-      profile_(profile) {
+      template_url_service_(template_url_service) {
   provider_types &= ~OmniboxFieldTrial::GetDisabledProviderTypes();
   if (provider_types & AutocompleteProvider::TYPE_BOOKMARK)
     providers_.push_back(new BookmarkProvider(this, profile));
   if (provider_types & AutocompleteProvider::TYPE_BUILTIN)
     providers_.push_back(new BuiltinProvider(this, profile));
-  if (provider_types & AutocompleteProvider::TYPE_EXTENSION_APP)
-    providers_.push_back(new ExtensionAppProvider(this, profile));
   if (provider_types & AutocompleteProvider::TYPE_HISTORY_QUICK)
     providers_.push_back(new HistoryQuickProvider(this, profile));
   if (provider_types & AutocompleteProvider::TYPE_HISTORY_URL) {
@@ -406,7 +402,8 @@ void AutocompleteController::ResetSession() {
 void AutocompleteController::UpdateMatchDestinationURL(
     base::TimeDelta query_formulation_time,
     AutocompleteMatch* match) const {
-  TemplateURL* template_url = match->GetTemplateURL(profile_, false);
+  TemplateURL* template_url = match->GetTemplateURL(
+      template_url_service_, false);
   if (!template_url || !match->search_terms_args.get() ||
       match->search_terms_args->assisted_query_stats.empty())
     return;
@@ -424,7 +421,7 @@ void AutocompleteController::UpdateMatchDestinationURL(
        zero_suggest_provider_->field_trial_triggered_in_session()),
       input_.current_page_classification());
   match->destination_url = GURL(template_url->url_ref().ReplaceSearchTerms(
-      search_terms_args, UIThreadSearchTermsData(profile_)));
+      search_terms_args, template_url_service_->search_terms_data()));
 }
 
 void AutocompleteController::UpdateResult(
@@ -454,7 +451,7 @@ void AutocompleteController::UpdateResult(
     result_.AppendMatches((*i)->matches());
 
   // Sort the matches and trim to a small number of "best" matches.
-  result_.SortAndCull(input_, profile_);
+  result_.SortAndCull(input_, template_url_service_);
 
   // Need to validate before invoking CopyOldMatches as the old matches are not
   // valid against the current input.
@@ -465,7 +462,7 @@ void AutocompleteController::UpdateResult(
   if (!done_) {
     // This conditional needs to match the conditional in Start that invokes
     // StartExpireTimer.
-    result_.CopyOldMatches(input_, last_result, profile_);
+    result_.CopyOldMatches(input_, last_result, template_url_service_);
   }
 
   UpdateKeywordDescriptions(&result_);
@@ -510,7 +507,7 @@ void AutocompleteController::UpdateAssociatedKeywords(
   for (ACMatches::iterator match(result->begin()); match != result->end();
        ++match) {
     base::string16 keyword(
-        match->GetSubstitutingExplicitlyInvokedKeyword(profile_));
+        match->GetSubstitutingExplicitlyInvokedKeyword(template_url_service_));
     if (!keyword.empty()) {
       keywords.insert(keyword);
       continue;
@@ -546,7 +543,8 @@ void AutocompleteController::UpdateKeywordDescriptions(
       i->description_class.clear();
       DCHECK(!i->keyword.empty());
       if (i->keyword != last_keyword) {
-        const TemplateURL* template_url = i->GetTemplateURL(profile_, false);
+        const TemplateURL* template_url =
+            i->GetTemplateURL(template_url_service_, false);
         if (template_url) {
           // For extension keywords, just make the description the extension
           // name -- don't assume that the normal search keyword description is
@@ -599,7 +597,8 @@ void AutocompleteController::UpdateAssistedQueryStats(
   // Go over all matches and set AQS if the match supports it.
   for (size_t index = 0; index < result->size(); ++index) {
     AutocompleteMatch* match = result->match_at(index);
-    const TemplateURL* template_url = match->GetTemplateURL(profile_, false);
+    const TemplateURL* template_url =
+        match->GetTemplateURL(template_url_service_, false);
     if (!template_url || !match->search_terms_args.get())
       continue;
     std::string selected_index;
@@ -611,7 +610,7 @@ void AutocompleteController::UpdateAssistedQueryStats(
                            selected_index.c_str(),
                            autocompletions.c_str());
     match->destination_url = GURL(template_url->url_ref().ReplaceSearchTerms(
-        *match->search_terms_args, UIThreadSearchTermsData(profile_)));
+        *match->search_terms_args, template_url_service_->search_terms_data()));
   }
 }
 

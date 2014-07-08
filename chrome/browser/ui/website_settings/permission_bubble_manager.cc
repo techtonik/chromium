@@ -236,17 +236,20 @@ void PermissionBubbleManager::NavigationEntryCommitted(
     return;
 
   // If we have navigated to a new url or reloaded the page...
-  if (request_url_ != web_contents()->GetLastCommittedURL() ||
+  // GetAsReferrer strips fragment and username/password, meaning
+  // the navigation is really to the same page.
+  if ((request_url_.GetAsReferrer() !=
+       web_contents()->GetLastCommittedURL().GetAsReferrer()) ||
       details.type == content::NAVIGATION_TYPE_EXISTING_PAGE) {
     // Kill off existing bubble and cancel any pending requests.
-    CancelPendingQueue();
+    CancelPendingQueues();
     FinalizeBubble();
   }
 }
 
 void PermissionBubbleManager::WebContentsDestroyed() {
   // If the web contents has been destroyed, treat the bubble as cancelled.
-  CancelPendingQueue();
+  CancelPendingQueues();
   FinalizeBubble();
 
   // The WebContents is going away; be aggressively paranoid and delete
@@ -318,8 +321,9 @@ void PermissionBubbleManager::TriggerShowBubble() {
   if (!request_url_has_loaded_)
     return;
   if (requests_.empty() && queued_requests_.empty() &&
-      queued_frame_requests_.empty())
+      queued_frame_requests_.empty()) {
     return;
+  }
 
   if (requests_.empty()) {
     // Queues containing a user-gesture-generated request have priority.
@@ -358,20 +362,26 @@ void PermissionBubbleManager::FinalizeBubble() {
   }
   requests_.clear();
   accept_states_.clear();
-  if (queued_requests_.size() || queued_frame_requests_.size()) {
+  if (queued_requests_.size() || queued_frame_requests_.size())
     TriggerShowBubble();
-  } else {
+  else
     request_url_ = GURL();
-  }
 }
 
-void PermissionBubbleManager::CancelPendingQueue() {
+void PermissionBubbleManager::CancelPendingQueues() {
   std::vector<PermissionBubbleRequest*>::iterator requests_iter;
   for (requests_iter = queued_requests_.begin();
        requests_iter != queued_requests_.end();
        requests_iter++) {
     (*requests_iter)->RequestFinished();
   }
+  for (requests_iter = queued_frame_requests_.begin();
+       requests_iter != queued_frame_requests_.end();
+       requests_iter++) {
+    (*requests_iter)->RequestFinished();
+  }
+  queued_requests_.clear();
+  queued_frame_requests_.clear();
 }
 
 bool PermissionBubbleManager::ExistingRequest(
@@ -404,3 +414,4 @@ bool PermissionBubbleManager::HasUserGestureRequest(
   }
   return false;
 }
+

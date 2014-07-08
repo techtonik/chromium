@@ -18,7 +18,6 @@
 #include "chrome/browser/download/download_request_limiter.h"
 #include "chrome/browser/download/download_resource_throttle.h"
 #include "chrome/browser/extensions/api/streams_private/streams_private_api.h"
-#include "chrome/browser/extensions/extension_renderer_state.h"
 #include "chrome/browser/extensions/user_script_listener.h"
 #include "chrome/browser/metrics/variations/variations_http_header_provider.h"
 #include "chrome/browser/prefetch/prefetch.h"
@@ -60,6 +59,10 @@
 #include "net/http/http_response_headers.h"
 #include "net/url_request/url_request.h"
 
+#if defined(ENABLE_EXTENSIONS)
+#include "chrome/browser/guest_view/web_view/web_view_renderer_state.h"
+#endif
+
 #if defined(ENABLE_CONFIGURATION_POLICY)
 #include "components/policy/core/common/cloud/policy_header_io_helper.h"
 #endif
@@ -93,6 +96,7 @@ using content::BrowserThread;
 using content::RenderViewHost;
 using content::ResourceDispatcherHostLoginDelegate;
 using content::ResourceRequestInfo;
+using content::ResourceType;
 using extensions::Extension;
 using extensions::StreamsPrivateAPI;
 
@@ -453,12 +457,11 @@ bool ChromeResourceDispatcherHostDelegate::HandleExternalProtocol(
   return false;
 #else
 
-  ExtensionRendererState::WebViewInfo info;
-  if (ExtensionRendererState::GetInstance()->GetWebViewInfo(child_id,
-                                                            route_id,
-                                                            &info)) {
+#if defined(ENABLE_EXTENSIONS)
+  if (WebViewRendererState::GetInstance()->IsGuest(child_id))
     return false;
-  }
+
+#endif  // defined(ENABLE_EXTENSIONS)
 
   BrowserThread::PostTask(
       BrowserThread::UI, FROM_HERE,

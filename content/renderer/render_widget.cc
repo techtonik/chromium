@@ -185,6 +185,7 @@ class RenderWidget::ScreenMetricsEmulator {
   void OnUpdateScreenRectsMessage(const gfx::Rect& view_screen_rect,
                                   const gfx::Rect& window_screen_rect);
   void OnShowContextMenu(ContextMenuParams* params);
+  gfx::Rect AdjustValidationMessageAnchor(const gfx::Rect& anchor);
 
  private:
   void Reapply();
@@ -351,6 +352,14 @@ void RenderWidget::ScreenMetricsEmulator::OnShowContextMenu(
   params->y += offset_.y();
 }
 
+gfx::Rect RenderWidget::ScreenMetricsEmulator::AdjustValidationMessageAnchor(
+    const gfx::Rect& anchor) {
+  gfx::Rect scaled = gfx::ToEnclosedRect(gfx::ScaleRect(anchor, scale_));
+  scaled.set_x(scaled.x() + offset_.x());
+  scaled.set_y(scaled.y() + offset_.y());
+  return scaled;
+}
+
 // RenderWidget ---------------------------------------------------------------
 
 RenderWidget::RenderWidget(blink::WebPopupType popup_type,
@@ -505,14 +514,6 @@ void RenderWidget::SetSwappedOut(bool is_swapped_out) {
     RenderProcess::current()->AddRefProcess();
 }
 
-bool RenderWidget::UsingSynchronousRendererCompositor() const {
-#if defined(OS_ANDROID)
-  return SynchronousCompositorFactory::GetInstance() != NULL;
-#else
-  return false;
-#endif
-}
-
 void RenderWidget::EnableScreenMetricsEmulation(
     const WebDeviceEmulationParams& params) {
   if (!screen_metrics_emulator_)
@@ -534,6 +535,12 @@ void RenderWidget::SetPopupOriginAdjustmentsForEmulation(
       emulator->original_screen_rect().origin().y() + emulator->offset().y());
   screen_info_ = emulator->original_screen_info();
   device_scale_factor_ = screen_info_.deviceScaleFactor;
+}
+
+gfx::Rect RenderWidget::AdjustValidationMessageAnchor(const gfx::Rect& anchor) {
+  if (screen_metrics_emulator_)
+    return screen_metrics_emulator_->AdjustValidationMessageAnchor(anchor);
+  return anchor;
 }
 
 void RenderWidget::SetScreenMetricsEmulationParameters(
@@ -1327,6 +1334,7 @@ void RenderWidget::QueueSyntheticGesture(
 }
 
 void RenderWidget::Close() {
+  screen_metrics_emulator_.reset();
   if (webwidget_) {
     webwidget_->willCloseLayerTreeView();
     compositor_.reset();

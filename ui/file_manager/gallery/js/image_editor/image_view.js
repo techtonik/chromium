@@ -9,10 +9,9 @@
  *
  * @param {HTMLElement} container The container element.
  * @param {Viewport} viewport The viewport.
- * @param {MetadataCache} metadataCache The metadataCache.
  * @constructor
  */
-function ImageView(container, viewport, metadataCache) {
+function ImageView(container, viewport) {
   this.container_ = container;
   this.viewport_ = viewport;
   this.document_ = container.ownerDocument;
@@ -20,11 +19,10 @@ function ImageView(container, viewport, metadataCache) {
   this.displayedContentGeneration_ = 0;
   this.displayedViewportGeneration_ = 0;
 
-  this.imageLoader_ = new ImageUtil.ImageLoader(this.document_, metadataCache);
+  this.imageLoader_ = new ImageUtil.ImageLoader(this.document_);
   // We have a separate image loader for prefetch which does not get cancelled
   // when the selection changes.
-  this.prefetchLoader_ = new ImageUtil.ImageLoader(
-      this.document_, metadataCache);
+  this.prefetchLoader_ = new ImageUtil.ImageLoader(this.document_);
 
   // The content cache is used for prefetching the next image when going
   // through the images sequentially. The real life photos can be large
@@ -45,12 +43,6 @@ function ImageView(container, viewport, metadataCache) {
    * @private
    */
   this.screenImage_ = null;
-
-  this.localImageTransformFetcher_ = function(entry, callback) {
-    metadataCache.getOne(entry, 'fetchedMedia', function(fetchedMedia) {
-      callback(fetchedMedia.imageTransform);
-    });
-  };
 }
 
 /**
@@ -100,7 +92,7 @@ ImageView.prototype = {__proto__: ImageBuffer.Overlay.prototype};
  * Draws below overlays with the default zIndex.
  * @return {number} Z-index.
  */
-ImageView.prototype.getZIndex = function() { return -1 };
+ImageView.prototype.getZIndex = function() { return -1; };
 
 /**
  * Draws the image on screen.
@@ -286,16 +278,18 @@ ImageView.prototype.cancelLoad = function() {
  * Loads the thumbnail first, then replaces it with the main image.
  * Takes into account the image orientation encoded in the metadata.
  *
- * @param {FileEntry} entry Image entry.
- * @param {Object} metadata Metadata.
+ * @param {Gallery.Item} item Gallery item to be loaded.
  * @param {Object} effect Transition effect object.
  * @param {function(number} displayCallback Called when the image is displayed
  *   (possibly as a prevew).
  * @param {function(number} loadCallback Called when the image is fully loaded.
  *   The parameter is the load type.
  */
-ImageView.prototype.load = function(entry, metadata, effect,
-                                    displayCallback, loadCallback) {
+ImageView.prototype.load =
+    function(item, effect, displayCallback, loadCallback) {
+  var entry = item.getEntry();
+  var metadata = item.getMetadata() || {};
+
   if (effect) {
     // Skip effects when reloading repeatedly very quickly.
     var time = Date.now();
@@ -305,8 +299,6 @@ ImageView.prototype.load = function(entry, metadata, effect,
     }
     this.lastLoadTime_ = time;
   }
-
-  metadata = metadata || {};
 
   ImageUtil.metrics.startInterval(ImageUtil.getMetricName('DisplayTime'));
 
@@ -396,8 +388,7 @@ ImageView.prototype.load = function(entry, metadata, effect,
     self.prefetchLoader_.cancel();  // The prefetch was doing something useless.
 
     self.imageLoader_.load(
-        contentEntry,
-        self.localImageTransformFetcher_,
+        item,
         displayMainImage.bind(null, loadType, previewShown),
         delay);
   }
@@ -434,11 +425,12 @@ ImageView.prototype.load = function(entry, metadata, effect,
 
 /**
  * Prefetches an image.
- * @param {FileEntry} entry The image entry.
+ * @param {Gallery.Item} item The image item.
  * @param {number} delay Image load delay in ms.
  */
-ImageView.prototype.prefetch = function(entry, delay) {
+ImageView.prototype.prefetch = function(item, delay) {
   var self = this;
+  var entry = item.getEntry();
   function prefetchDone(canvas) {
     if (canvas.width)
       self.contentCache_.putItem(entry, canvas);
@@ -452,11 +444,7 @@ ImageView.prototype.prefetch = function(entry, delay) {
     // strain on memory.
     this.contentCache_.evictLRU();
 
-    this.prefetchLoader_.load(
-        entry,
-        this.localImageTransformFetcher_,
-        prefetchDone,
-        delay);
+    this.prefetchLoader_.load(item, prefetchDone, delay);
   }
 };
 

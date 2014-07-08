@@ -18,11 +18,121 @@ function unload(opt_exiting) { Gallery.instance.onUnload(opt_exiting); }
 ContentProvider.WORKER_SCRIPT = '/js/metadata_worker.js';
 
 /**
+ * Data model for gallery.
+ *
+ * @constructor
+ * @extends {cr.ui.ArrayDataModel}
+ */
+function GalleryDataModel() {
+  cr.ui.ArrayDataModel.call(this, []);
+  this.metadataCache_ = null;
+}
+
+GalleryDataModel.prototype = {
+  __proto__: cr.ui.ArrayDataModel.prototype
+};
+
+/**
+ * Initializes the data model.
+ *
+ * @param {MetadataCache} metadataCache Metadata cache.
+ * @param {Array.<FileEntry>} entries Image entries.
+ * @return {Promise} Promise to be fulfilled with after initialization.
+ */
+GalleryDataModel.prototype.initialize = function(metadataCache, entries) {
+  // Store metadata cache.
+  this.metadataCache_ = metadataCache;
+
+  // Obtain metadata.
+  var metadataPromise = new Promise(function(fulfill) {
+    this.metadataCache_.get(entries, Gallery.METADATA_TYPE, fulfill);
+  }.bind(this));
+
+  // Initialize the gallery by using the metadata.
+  return metadataPromise.then(function(metadata) {
+    // Check the length of metadata.
+    if (entries.length !== metadata.length)
+      return Promise.reject('Failed to obtain metadata for the entries.');
+
+    // Obtains items.
+    var items = entries.map(function(entry, i) {
+      return new Gallery.Item(
+          entry, MetadataCache.cloneMetadata(metadata[i]), metadataCache);
+    });
+
+    // Update the models.
+    this.push.apply(this, items);
+  }.bind(this));
+};
+
+/**
+ * Saves new image.
+ *
+ * @param {Gallery.Item} item Original gallery item.
+ * @param {Canvas} canvas Canvas containing new image.
+ * @param {boolean} overwrite Whether to overwrite the image to the item or not.
+ * @return {Promise} Promise to be fulfilled with when the operation completes.
+ */
+GalleryDataModel.prototype.saveItem = function(item, canvas, overwrite) {
+  var oldEntry = item.getEntry();
+  var oldMetadata = item.getMetadata();
+  var metadataEncoder = ImageEncoder.encodeMetadata(
+      item.getMetadata(), canvas, 1 /* quality */);
+  var newMetadata = ContentProvider.ConvertContentMetadata(
+      metadataEncoder.getMetadata(),
+      MetadataCache.cloneMetadata(item.getMetadata()));
+  if (newMetadata.filesystem)
+    newMetadata.filesystem.modificationTime = new Date();
+  if (newMetadata.drive)
+    newMetadata.drive.present = true;
+
+  return new Promise(function(fulfill, reject) {
+    item.saveToFile(
+        null,
+        overwrite,
+        canvas,
+        metadataEncoder,
+        function(success) {
+          if (!success) {
+            reject('Failed to save the image.');
+            return;
+          }
+
+          // The item's entry is updated to the latest entry. Update metadata.
+          item.setMetadata(newMetadata);
+
+          if (util.isSameEntry(oldEntry, item.getEntry())) {
+            // Current entry is updated.
+            // Dispatch an event.
+            var event = new Event('content');
+            event.item = item;
+            event.oldEntry = item.getEntry();
+            event.metadata = newMetadata;
+            this.dispatchEvent(event);
+
+            // Need an update of metdataCache.
+            this.metadataCache_.set(
+                item.getEntry(),
+                Gallery.METADATA_TYPE,
+                newMetadata);
+          } else {
+            // New entry is added and the item now tracks it.
+            // Add another item for the old entry.
+            var anotherItem = new Gallery.Item(
+                oldEntry, oldMetadata, this.metadataCache_);
+            this.splice(this.indexOf(item), 0, anotherItem);
+          }
+
+          fulfill();
+        }.bind(this));
+  }.bind(this));
+};
+
+/**
  * Gallery for viewing and editing image files.
  *
  * @param {!VolumeManager} volumeManager The VolumeManager instance of the
  *     system.
- * @class
  * @constructor
  */
 function Gallery(volumeManager) {
@@ -41,7 +151,6 @@ function Gallery(volumeManager) {
     metadataCache: MetadataCache.createFull(volumeManager),
     shareActions: [],
     readonlyDirName: '',
-    saveDirEntry: null,
     displayStringFunction: function() { return ''; },
     loadTimeData: {}
   };
@@ -53,7 +162,7 @@ function Gallery(volumeManager) {
   this.metadataCacheObserverId_ = null;
   this.onExternallyUnmountedBound_ = this.onExternallyUnmounted_.bind(this);
 
-  this.dataModel_ = new cr.ui.ArrayDataModel([]);
+  this.dataModel_ = new GalleryDataModel();
   this.selectionModel_ = new cr.ui.ListSelectionModel();
 
   this.initDom_();
@@ -208,7 +317,6 @@ Gallery.prototype.initDom_ = function() {
   this.mosaicMode_ = new MosaicMode(content,
                                     this.dataModel_,
                                     this.selectionModel_,
-                                    this.metadataCache_,
                                     this.volumeManager_,
                                     this.toggleMode_.bind(this, null));
 
@@ -268,27 +376,9 @@ Gallery.prototype.createToolbarButton_ = function(className, title) {
  * @param {!Array.<Entry>} selectedEntries Array of selected entries.
  */
 Gallery.prototype.load = function(entries, selectedEntries) {
-  // Obtain metadata.
-  var metadataPromise = new Promise(function(fulfill) {
-    this.metadataCache_.get(entries, Gallery.METADATA_TYPE, fulfill);
-  }.bind(this));
-
-  // Initialize the gallery by uisng the metadata.
-  metadataPromise.then(function(metadata) {
-    // Check the length of metadata.
-    if (entries.length !== metadata.length)
-      return Promise.reject('Failed to obtain metadata for the entries.');
-
-    // Obtains items.
-    var items = entries.map(function(entry, i) {
-      return new Gallery.Item(entry, MetadataCache.cloneMetadata(metadata[i]));
-    });
-
-    // Update the models.
-    this.dataModel_.push.apply(this.dataModel_, items);
-    this.selectionModel_.adjustLength(this.dataModel_.length);
-
+  this.dataModel_.initialize(this.metadataCache_, entries).then(function() {
     // Apply selection.
+    this.selectionModel_.adjustLength(this.dataModel_.length);
     var entryIndexesByURLs = {};
     for (var index = 0; index < entries.length; index++) {
       entryIndexesByURLs[entries[index].toURL()] = index;
@@ -315,6 +405,7 @@ Gallery.prototype.load = function(entries, selectedEntries) {
 
     // Do the initialization for each mode.
     if (shouldShowMosaic) {
+      mosaic.show();
       this.inactivityWatcher_.check();  // Show the toolbar.
       cr.dispatchSimpleEvent(this, 'loaded');
     } else {
@@ -376,7 +467,7 @@ Gallery.getFileBrowserPrivate = function() {
  * @return {boolean} True if some tool is currently active.
  */
 Gallery.prototype.hasActiveTool = function() {
-  return this.currentMode_.hasActiveTool() ||
+  return (this.currentMode_ && this.currentMode_.hasActiveTool()) ||
       this.isSharing_() || this.isRenaming_();
 };
 
@@ -668,36 +759,27 @@ Gallery.prototype.onFilenameFocus_ = function() {
  * @private
  */
 Gallery.prototype.onFilenameEditBlur_ = function(event) {
-  if (this.filenameEdit_.value && this.filenameEdit_.value[0] === '.') {
-    this.prompt_.show('GALLERY_FILE_HIDDEN_NAME', 5000);
-    this.filenameEdit_.focus();
-    event.stopPropagation();
-    event.preventDefault();
-    return false;
-  }
-
   var item = this.getSingleSelectedItem();
   if (item) {
     var oldEntry = item.getEntry();
 
-    var onFileExists = function() {
-      this.prompt_.show('GALLERY_FILE_EXISTS', 3000);
-      this.filenameEdit_.value = name;
-      this.filenameEdit_.focus();
-    }.bind(this);
-
-    var onSuccess = function() {
+    item.rename(this.filenameEdit_.value).then(function() {
       var event = new Event('content');
       event.item = item;
       event.oldEntry = oldEntry;
       event.metadata = null;  // Metadata unchanged.
       this.dataModel_.dispatchEvent(event);
-    }.bind(this);
-
-    if (this.filenameEdit_.value) {
-      item.rename(
-          this.filenameEdit_.value, onSuccess, onFileExists);
-    }
+    }.bind(this), function(error) {
+      this.filenameEdit_.value =
+          ImageUtil.getDisplayNameFromName(item.getEntry().name);
+      this.filenameEdit_.focus();
+      if (typeof error === 'string')
+        this.prompt_.showStringAt('center', error, 5000);
+      else
+        return Promise.reject(error);
+    }.bind(this)).catch(function(error) {
+      console.error(error.stack || error);
+    });
   }
 
   ImageUtil.setAttribute(this.filenameSpacer_, 'renaming', false);
@@ -781,7 +863,6 @@ Gallery.prototype.updateShareMenu_ = function() {
   }
 
   var api = Gallery.getFileBrowserPrivate();
-  var mimeTypes = [];  // TODO(kaznacheev) Collect mime types properly.
 
   var createShareMenu = function(tasks) {
     var wasHidden = this.shareMenu_.hidden;
@@ -834,7 +915,7 @@ Gallery.prototype.updateShareMenu_ = function() {
   if (!entries.length)
     createShareMenu([]);  // Empty list of tasks, since there is no selection.
   else
-    api.getFileTasks(util.entriesToURLs(entries), mimeTypes, createShareMenu);
+    api.getFileTasks(util.entriesToURLs(entries), createShareMenu);
 };
 
 /**

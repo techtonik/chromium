@@ -39,14 +39,14 @@ static_library("common") {
     "//chrome:strings",
     "//chrome/app/theme:theme_resources",
     "//chrome/common:constants",
-    "//chrome/common/metrics/proto",
     "//chrome/common/net",
+    "//chrome/common/safe_browsing:proto",
     #"//components/cloud_devices:common",  TODO(GYP)
     #"//components/json_schema",  TODO(GYP)
     "//components/metrics",  
     #"//components/components.gyp:policy_component_common",  TODO(GYP)
     "//components/translate:translate_core_common",
-    #"//components/variations",  TODO(GYP)
+    "//components/variations",
     "//content/public/common",
     "//crypto",
     "//extensions:extensions_resources",

@@ -51,6 +51,7 @@ group("root") {
     "//third_party/WebKit/public:all_blink",
     "//third_party/angle:translator",
     "//third_party/brotli",
+    "//third_party/cacheinvalidation",
     "//third_party/ffmpeg",
     "//third_party/flac",
     "//third_party/harfbuzz-ng",
@@ -58,7 +59,10 @@ group("root") {
     "//third_party/iccjpeg",
     "//third_party/icu",
     "//third_party/leveldatabase",
+    "//third_party/libaddressinput",
+    "//third_party/libphonenumber",
     "//third_party/libpng",
+    "//third_party/libsrtp",
     "//third_party/libusb",
     "//third_party/libwebm",
     "//third_party/libwebp",
@@ -66,6 +70,7 @@ group("root") {
     "//third_party/libyuv",
     "//third_party/lzma_sdk",
     "//third_party/mesa",
+    "//third_party/opus",
     "//third_party/ots",
     "//third_party/protobuf:protobuf_lite",
     "//third_party/qcms",
@@ -85,11 +90,14 @@ group("root") {
     "//ui/events",
     "//ui/gfx",
     "//ui/gl",
+    "//ui/keyboard",
     "//ui/native_theme",
     "//ui/resources",
     "//ui/snapshot",
     "//ui/strings",
     "//ui/surface",
+    "//ui/web_dialogs",
+    "//ui/wm",
     "//url",
     "//v8:v8",
     "//webkit/browser:storage",
@@ -141,6 +149,7 @@ group("root") {
       "//ppapi:ppapi_c",
       "//sandbox",
       "//third_party/libusb",
+      "//ui/keyboard",  # Blocked on content.
 
       # Seems to not be compiled on Android. Otherwise it will need a config.h.
       "//third_party/libxslt",
@@ -156,7 +165,10 @@ group("root") {
       "//third_party/WebKit/public:all_blink",
 
       # Not tested on Android yet:
+      "//third_party/libaddressinput",
       "//third_party/ffmpeg",
+      "//ui/web_dialogs",
+      "//ui/wm",
       "//webkit/browser:storage",
       "//webkit/child",
     ]

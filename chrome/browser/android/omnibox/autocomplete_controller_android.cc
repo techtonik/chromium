@@ -26,7 +26,6 @@
 #include "chrome/browser/profiles/profile_android.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/search/search.h"
-#include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/sessions/session_id.h"
 #include "chrome/browser/ui/search/instant_search_prerenderer.h"
@@ -38,6 +37,7 @@
 #include "components/autocomplete/autocomplete_input.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/metrics/proto/omnibox_event.pb.h"
+#include "components/search_engines/template_url_service.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/notification_source.h"
@@ -82,7 +82,8 @@ class ZeroSuggestPrefetcher : public AutocompleteControllerDelegate {
 
 ZeroSuggestPrefetcher::ZeroSuggestPrefetcher(Profile* profile)
     : controller_(new AutocompleteController(
-          profile, this, AutocompleteProvider::TYPE_ZERO_SUGGEST)) {
+          profile, TemplateURLServiceFactory::GetForProfile(profile), this,
+          AutocompleteProvider::TYPE_ZERO_SUGGEST)) {
   // Creating an arbitrary fake_request_source to avoid passing in an invalid
   // AutocompleteInput object.
   base::string16 fake_request_source(base::ASCIIToUTF16(
@@ -115,7 +116,8 @@ void ZeroSuggestPrefetcher::OnResultChanged(bool default_match_changed) {
 
 AutocompleteControllerAndroid::AutocompleteControllerAndroid(Profile* profile)
     : autocomplete_controller_(new AutocompleteController(
-          profile, this, kAndroidAutocompleteProviders)),
+          profile, TemplateURLServiceFactory::GetForProfile(profile), this,
+          kAndroidAutocompleteProviders)),
       inside_synchronous_start_(false),
       profile_(profile) {
 }

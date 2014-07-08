@@ -223,7 +223,7 @@
             'test/ppapi_unittest.cc',
           ],
         }],
-        ['input_speech==0', {
+        ['enable_web_speech==0', {
           'sources!': [
             'test/mock_google_streaming_server.cc',
           ],
@@ -471,6 +471,7 @@
         'browser/frame_host/render_widget_host_view_child_frame_unittest.cc',
         'browser/frame_host/render_widget_host_view_guest_unittest.cc',
         'browser/gamepad/gamepad_provider_unittest.cc',
+        'browser/gamepad/gamepad_service_unittest.cc',
         'browser/gamepad/gamepad_test_helpers.cc',
         'browser/gamepad/gamepad_test_helpers.h',
         'browser/geolocation/geolocation_provider_unittest.cc',
@@ -824,7 +825,7 @@
             ['exclude', '^renderer/media/media_stream_'],
           ],
         }],
-        ['input_speech==0', {
+        ['enable_web_speech==0', {
           'sources/': [
             ['exclude', '^browser/speech/'],
           ]
@@ -881,8 +882,8 @@
         }],
         ['OS == "android"', {
           'sources': [
-            'browser/renderer_host/java/gin_java_method_invocation_helper_unittest.cc',
-            'browser/renderer_host/java/jni_helper_unittest.cc',
+            'browser/android/java/gin_java_method_invocation_helper_unittest.cc',
+            'browser/android/java/jni_helper_unittest.cc',
             'renderer/java/gin_java_bridge_value_converter_unittest.cc',
           ],
           'sources!': [
@@ -1296,7 +1297,7 @@
                 '../ppapi/ppapi_internal.gyp:ppapi_tests',
               ]
             }],
-            ['input_speech==0', {
+            ['enable_web_speech==0', {
               'sources/': [
                 ['exclude', '^browser/speech/'],
               ]

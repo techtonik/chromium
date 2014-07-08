@@ -95,6 +95,7 @@ HardwareRenderer::HardwareRenderer(SharedRendererState* state)
       cc::LayerTreeHost::CreateSingleThreaded(this, this, NULL, settings);
   layer_tree_host_->SetRootLayer(root_layer_);
   layer_tree_host_->SetLayerTreeHostClientReady();
+  layer_tree_host_->set_has_transparent_background(true);
 }
 
 HardwareRenderer::~HardwareRenderer() {

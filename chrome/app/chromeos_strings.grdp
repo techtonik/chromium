@@ -126,12 +126,6 @@ Press any key to continue exploring.
   <message name="IDS_FLAGS_ENABLE_FILE_MANAGER_MTP_DESCRIPTION" desc="Description of the about:flag option to the enable MTP support in file manager.">
     Show MTP devices as a file storage in the file manager.
   </message>
-  <message name="IDS_FLAGS_FILE_MANAGER_ENABLE_NEW_AUDIO_PLAYER_NAME" desc="Name of the about:flag option to enable the new audio player app.">
-    Enable the new audio player
-  </message>
-  <message name="IDS_FLAGS_FILE_MANAGER_ENABLE_NEW_AUDIO_PLAYER_DESCRIPTION" desc="Description of the about:flag option to the enable new audio player app.">
-    Use the experimental new audio player instead of the stable one.
-  </message>
   <message name="IDS_FLAGS_FILE_MANAGER_ENABLE_NEW_GALLERY_NAME" desc="Name of the about:flag option to enable the new gallery app.">
     Enable the new gallery
   </message>
@@ -344,6 +338,27 @@ Press any key to continue exploring.
   </message>
   <message name="IDS_FILE_BROWSER_GALLERY_CROP" desc="In the Gallery, the title on the button that cuts out a rectangular fragment from a photo">
     Crop
+  </message>
+  <message name="IDS_FILE_BROWSER_GALLERY_ASPECT_RATIO_1_1" desc="Button label to fix aspect to 1:1 ratio when cropping.">
+    1x1
+  </message>
+  <message name="IDS_FILE_BROWSER_GALLERY_ASPECT_RATIO_4_6" desc="Button label to fix aspect to 4:6 ratio when cropping.">
+    4x6
+  </message>
+  <message name="IDS_FILE_BROWSER_GALLERY_ASPECT_RATIO_6_4" desc="Button label to fix aspect to 6:4 ratio when cropping.">
+    6x4
+  </message>
+  <message name="IDS_FILE_BROWSER_GALLERY_ASPECT_RATIO_5_7" desc="Button label to fix aspect to 5:7 ratio when cropping.">
+    5x7
+  </message>
+  <message name="IDS_FILE_BROWSER_GALLERY_ASPECT_RATIO_7_5" desc="Button label to fix aspect to 7:5 ratio when cropping.">
+    7x5
+  </message>
+  <message name="IDS_FILE_BROWSER_GALLERY_ASPECT_RATIO_16_9" desc="Button label to fix aspect to 16:9 ratio when cropping.">
+    16x9
+  </message>
+  <message name="IDS_FILE_BROWSER_GALLERY_ASPECT_RATIO_9_16" desc="Button label to fix aspect to 9:16 ratio when cropping.">
+    9x16
   </message>
   <message name="IDS_FILE_BROWSER_GALLERY_EXPOSURE" desc="In the Gallery, the title on the button that applies the Brightness/Contrast filter to a photo.">
     Brightness
@@ -3740,6 +3755,12 @@ Battery full
   <message name="IDS_REMOVABLE_DEVICE_SCANNING_MESSAGE" desc="Text of notification message which is shown when user inserts removable device (SD card, USB key...)">
     Scanning content...
   </message>
+  <message name="IDS_REMOVABLE_DEVICE_NAVIGATION_MESSAGE" desc="Text of notification message to navigate users to Files.app. If user clicks a button in the notification, Files.app opens.">
+    Explore the device's content in the Files app.
+  </message>
+  <message name="IDS_REMOVABLE_DEVICE_NAVIGATION_BUTTON_LABEL" desc="Text of a button label in a notification to navigate users to FIles.app. If user clicks the button, Files.app opens.">
+    Open Files app
+  </message>
   <message name="IDS_REMOVABLE_DEVICE_HARD_UNPLUG_TITLE" desc="Text of notification message which is shown when user removes removable device (SD card, USB key...) without clicking the eject icon">
     You removed your device too soon!
   </message>
@@ -5527,5 +5548,13 @@ All users must sign out to continue.
   </message>
   <message name="IDS_SET_TIME_TIME_LABEL" desc="Label for the time input element.">
     System time
+  </message>
+
+  <!-- 'OK Google' voice search activation display strings -->
+  <message name="IDS_FLAGS_OK_GOOGLE_NAME" desc="Name of about:flags option for Ok Google.">
+    Enable 'Ok Google' to activate voice search.
+  </message>
+  <message name="IDS_FLAGS_OK_GOOGLE_DESCRIPTION" desc="Description of about:flags option Ok Google.">
+    If enabled, there will be an option in chrome:settings to enable saying 'Ok Google' to activate voice search.
   </message>
 </grit-part>

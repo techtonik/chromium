@@ -12,7 +12,6 @@
 #include "chrome/browser/extensions/api/web_request/web_request_api.h"
 #include "chrome/browser/extensions/api/web_view/web_view_internal_api.h"
 #include "chrome/browser/extensions/chrome_extension_web_contents_observer.h"
-#include "chrome/browser/extensions/extension_renderer_state.h"
 #include "chrome/browser/extensions/menu_manager.h"
 #include "chrome/browser/extensions/script_executor.h"
 #include "chrome/browser/favicon/favicon_tab_helper.h"
@@ -22,14 +21,15 @@
 #include "chrome/browser/guest_view/guest_view_manager.h"
 #include "chrome/browser/guest_view/web_view/web_view_constants.h"
 #include "chrome/browser/guest_view/web_view/web_view_permission_types.h"
+#include "chrome/browser/guest_view/web_view/web_view_renderer_state.h"
 #include "chrome/browser/renderer_context_menu/context_menu_delegate.h"
 #include "chrome/browser/renderer_context_menu/render_view_context_menu.h"
 #include "chrome/browser/ui/pdf/pdf_tab_helper.h"
+#include "chrome/browser/ui/zoom/zoom_controller.h"
 #include "chrome/common/chrome_version_info.h"
 #include "chrome/common/render_messages.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/child_process_security_policy.h"
-#include "content/public/browser/host_zoom_map.h"
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/notification_details.h"
@@ -65,7 +65,7 @@
 #endif  // defined(ENABLE_FULL_PRINTING)
 #endif  // defined(ENABLE_PRINTING)
 
-#if defined(ENABLE_PLUGINS)
+#if defined(ENABLE_PLUGINS) && !defined(OS_ANDROID)
 #include "chrome/browser/guest_view/web_view/plugin_permission_helper.h"
 #endif
 
@@ -75,6 +75,7 @@
 
 using base::UserMetricsAction;
 using content::RenderFrameHost;
+using content::ResourceType;
 using content::WebContents;
 
 namespace {
@@ -164,10 +165,18 @@ void RemoveWebViewEventListenersOnIOThread(
 }
 
 void AttachWebViewHelpers(WebContents* contents) {
+  // Create a zoom controller for the guest contents give it access to
+  // GetZoomLevel() and and SetZoomLevel() in WebViewGuest.
+  // TODO(wjmaclean) This currently uses the same HostZoomMap as the browser
+  // context, but we eventually want to isolate the guest contents from zoom
+  // changes outside the guest (e.g. in the main browser), so we should
+  // create a separate HostZoomMap for the guest.
+  ZoomController::CreateForWebContents(contents);
+
   FaviconTabHelper::CreateForWebContents(contents);
   extensions::ChromeExtensionWebContentsObserver::CreateForWebContents(
       contents);
-#if defined(ENABLE_PLUGINS)
+#if defined(ENABLE_PLUGINS) && !defined(OS_ANDROID)
   PluginPermissionHelper::CreateForWebContents(contents);
 #endif
 #if defined(ENABLE_PRINTING)
@@ -514,7 +523,7 @@ void WebViewGuest::GuestDestroyed() {
   menu_manager->RemoveAllContextItems(extensions::MenuItem::ExtensionKey(
       embedder_extension_id(), view_instance_id()));
 
-  RemoveWebViewFromExtensionRendererState(web_contents());
+  RemoveWebViewStateFromIOThread(web_contents());
 }
 
 bool WebViewGuest::IsDragAndDropEnabled() const {
@@ -1010,17 +1019,14 @@ WebViewGuest::~WebViewGuest() {
 }
 
 void WebViewGuest::DidCommitProvisionalLoadForFrame(
-    int64 frame_id,
-    const base::string16& frame_unique_name,
-    bool is_main_frame,
+    content::RenderFrameHost* render_frame_host,
     const GURL& url,
-    content::PageTransition transition_type,
-    content::RenderViewHost* render_view_host) {
+    content::PageTransition transition_type) {
   find_helper_.CancelAllFindSessions();
 
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   args->SetString(guestview::kUrl, url.spec());
-  args->SetBoolean(guestview::kIsTopLevel, is_main_frame);
+  args->SetBoolean(guestview::kIsTopLevel, !render_frame_host->GetParent());
   args->SetInteger(webview::kInternalCurrentEntryIndex,
       guest_web_contents()->GetController().GetCurrentEntryIndex());
   args->SetInteger(webview::kInternalEntryCount,
@@ -1031,41 +1037,37 @@ void WebViewGuest::DidCommitProvisionalLoadForFrame(
       new GuestViewBase::Event(webview::kEventLoadCommit, args.Pass()));
 
   // Update the current zoom factor for the new page.
-  current_zoom_factor_ = content::ZoomLevelToZoomFactor(
-      content::HostZoomMap::GetZoomLevel(guest_web_contents()));
+  ZoomController* zoom_controller =
+      ZoomController::FromWebContents(guest_web_contents());
+  DCHECK(zoom_controller);
+  current_zoom_factor_ = zoom_controller->GetZoomLevel();
 
-  if (is_main_frame) {
+  if (!render_frame_host->GetParent()) {
     chromevox_injected_ = false;
-    main_frame_id_ = frame_id;
+    main_frame_id_ = render_frame_host->GetRoutingID();
   }
 }
 
 void WebViewGuest::DidFailProvisionalLoad(
-    int64 frame_id,
-    const base::string16& frame_unique_name,
-    bool is_main_frame,
+    content::RenderFrameHost* render_frame_host,
     const GURL& validated_url,
     int error_code,
-    const base::string16& error_description,
-    content::RenderViewHost* render_view_host) {
+    const base::string16& error_description) {
   // Translate the |error_code| into an error string.
   std::string error_type(net::ErrorToString(error_code));
   DCHECK(StartsWithASCII(error_type, "net::", true));
   error_type.erase(0, 5);
-  LoadAbort(is_main_frame, validated_url, error_type);
+  LoadAbort(!render_frame_host->GetParent(), validated_url, error_type);
 }
 
 void WebViewGuest::DidStartProvisionalLoadForFrame(
-    int64 frame_id,
-    int64 parent_frame_id,
-    bool is_main_frame,
+    content::RenderFrameHost* render_frame_host,
     const GURL& validated_url,
     bool is_error_page,
-    bool is_iframe_srcdoc,
-    content::RenderViewHost* render_view_host) {
+    bool is_iframe_srcdoc) {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   args->SetString(guestview::kUrl, validated_url.spec());
-  args->SetBoolean(guestview::kIsTopLevel, is_main_frame);
+  args->SetBoolean(guestview::kIsTopLevel, !render_frame_host->GetParent());
   DispatchEvent(
       new GuestViewBase::Event(webview::kEventLoadStart, args.Pass()));
 }
@@ -1141,7 +1143,7 @@ void WebViewGuest::LoadRedirect(const GURL& old_url,
       new GuestViewBase::Event(webview::kEventLoadRedirect, args.Pass()));
 }
 
-void WebViewGuest::AddWebViewToExtensionRendererState() {
+void WebViewGuest::PushWebViewStateToIOThread() {
   const GURL& site_url = guest_web_contents()->GetSiteInstance()->GetSiteURL();
   std::string partition_domain;
   std::string partition_id;
@@ -1153,7 +1155,7 @@ void WebViewGuest::AddWebViewToExtensionRendererState() {
   }
   DCHECK(embedder_extension_id() == partition_domain);
 
-  ExtensionRendererState::WebViewInfo web_view_info;
+  WebViewRendererState::WebViewInfo web_view_info;
   web_view_info.embedder_process_id = embedder_render_process_id();
   web_view_info.instance_id = view_instance_id();
   web_view_info.partition_id = partition_id;
@@ -1162,21 +1164,21 @@ void WebViewGuest::AddWebViewToExtensionRendererState() {
   content::BrowserThread::PostTask(
       content::BrowserThread::IO,
       FROM_HERE,
-      base::Bind(&ExtensionRendererState::AddWebView,
-                 base::Unretained(ExtensionRendererState::GetInstance()),
+      base::Bind(&WebViewRendererState::AddGuest,
+                 base::Unretained(WebViewRendererState::GetInstance()),
                  guest_web_contents()->GetRenderProcessHost()->GetID(),
                  guest_web_contents()->GetRoutingID(),
                  web_view_info));
 }
 
 // static
-void WebViewGuest::RemoveWebViewFromExtensionRendererState(
+void WebViewGuest::RemoveWebViewStateFromIOThread(
     WebContents* web_contents) {
   content::BrowserThread::PostTask(
       content::BrowserThread::IO, FROM_HERE,
       base::Bind(
-          &ExtensionRendererState::RemoveWebView,
-          base::Unretained(ExtensionRendererState::GetInstance()),
+          &WebViewRendererState::RemoveGuest,
+          base::Unretained(WebViewRendererState::GetInstance()),
           web_contents->GetRenderProcessHost()->GetID(),
           web_contents->GetRoutingID()));
 }
@@ -1264,7 +1266,7 @@ void WebViewGuest::WillAttachToEmbedder() {
   // We must install the mapping from guests to WebViews prior to resuming
   // suspended resource loads so that the WebRequest API will catch resource
   // requests.
-  AddWebViewToExtensionRendererState();
+  PushWebViewStateToIOThread();
 }
 
 content::JavaScriptDialogManager*
@@ -1493,8 +1495,11 @@ void WebViewGuest::SetName(const std::string& name) {
 }
 
 void WebViewGuest::SetZoom(double zoom_factor) {
+  ZoomController* zoom_controller =
+      ZoomController::FromWebContents(guest_web_contents());
+  DCHECK(zoom_controller);
   double zoom_level = content::ZoomFactorToZoomLevel(zoom_factor);
-  content::HostZoomMap::SetZoomLevel(guest_web_contents(), zoom_level);
+  zoom_controller->SetZoomLevel(zoom_level);
 
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   args->SetDouble(webview::kOldZoomFactor, current_zoom_factor_);

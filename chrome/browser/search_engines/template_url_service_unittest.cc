@@ -15,17 +15,17 @@
 #include "base/test/mock_time_provider.h"
 #include "base/threading/thread.h"
 #include "base/time/time.h"
-#include "chrome/browser/history/history_notifications.h"
 #include "chrome/browser/history/history_service.h"
 #include "chrome/browser/history/history_service_factory.h"
-#include "chrome/browser/search_engines/search_host_to_urls_map.h"
-#include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_test_util.h"
 #include "chrome/browser/webdata/web_data_service_factory.h"
 #include "chrome/test/base/testing_profile.h"
+#include "components/search_engines/keyword_web_data_service.h"
+#include "components/search_engines/search_host_to_urls_map.h"
 #include "components/search_engines/search_terms_data.h"
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_prepopulate_data.h"
+#include "components/search_engines/template_url_service.h"
 #include "components/webdata/common/web_database.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -894,9 +894,9 @@ TEST_F(TemplateURLServiceTest, UpdateKeywordSearchTermsForURL) {
                      "http://icon1", false, "UTF-8;UTF-16", Time(), Time());
 
   for (size_t i = 0; i < ARRAYSIZE_UNSAFE(data); ++i) {
-    history::URLVisitedDetails details;
-    details.row = history::URLRow(GURL(data[i].url));
-    details.transition = content::PageTransitionFromInt(0);
+    TemplateURLService::URLVisitedDetails details = {
+      GURL(data[i].url), false
+    };
     model()->UpdateKeywordSearchTermsForURL(details);
     EXPECT_EQ(data[i].term, test_util_.GetAndClearSearchTerm());
   }
@@ -916,9 +916,9 @@ TEST_F(TemplateURLServiceTest, DontUpdateKeywordSearchForNonReplaceable) {
                      "http://icon1", false, "UTF-8;UTF-16", Time(), Time());
 
   for (size_t i = 0; i < ARRAYSIZE_UNSAFE(data); ++i) {
-    history::URLVisitedDetails details;
-    details.row = history::URLRow(GURL(data[i].url));
-    details.transition = content::PageTransitionFromInt(0);
+    TemplateURLService::URLVisitedDetails details = {
+      GURL(data[i].url), false
+    };
     model()->UpdateKeywordSearchTermsForURL(details);
     ASSERT_EQ(base::string16(), test_util_.GetAndClearSearchTerm());
   }
@@ -1181,9 +1181,8 @@ TEST_F(TemplateURLServiceTest, FailedInit) {
   test_util_.VerifyLoad();
 
   test_util_.ClearModel();
-  scoped_refptr<WebDataService> web_service =
-      WebDataService::FromBrowserContext(test_util_.profile());
-  web_service->ShutdownDatabase();
+  WebDataServiceFactory::GetKeywordWebDataForProfile(
+      test_util_.profile(), Profile::EXPLICIT_ACCESS)->ShutdownDatabase();
 
   test_util_.ResetModel(false);
   model()->Load();

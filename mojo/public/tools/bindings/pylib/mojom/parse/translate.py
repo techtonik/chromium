@@ -35,8 +35,8 @@ def _MapKind(kind):
                   'handle<message_pipe>': 'h:m',
                   'handle<shared_buffer>': 'h:s'}
   if kind.endswith('[]'):
-    typename = kind[0:len(kind)-2]
-    if _FIXED_ARRAY_REGEXP.search(typename) != None:
+    typename = kind[0:-2]
+    if _FIXED_ARRAY_REGEXP.search(typename):
       raise Exception("Arrays of fixed sized arrays not supported")
     return 'a:' + _MapKind(typename)
   if kind.endswith(']'):
@@ -44,9 +44,9 @@ def _MapKind(kind):
     typename = kind[0:lbracket]
     if typename.find('[') != -1:
       raise Exception("Fixed sized arrays of arrays not supported")
-    return 'a' + kind[lbracket+1:len(kind)-1] + ':' + _MapKind(typename)
+    return 'a' + kind[lbracket+1:-1] + ':' + _MapKind(typename)
   if kind.endswith('&'):
-    return 'r:' + _MapKind(kind[0:len(kind)-1])
+    return 'r:' + _MapKind(kind[0:-1])
   if kind in map_to_kind:
     return map_to_kind[kind]
   return 'x:' + kind
@@ -66,25 +66,28 @@ def _GetAttribute(attributes, name):
   return out
 
 def _MapField(tree):
-  assert type(tree[3]) is ast.Ordinal
+  assert isinstance(tree[3], ast.Ordinal)
   return {'name': tree[2],
           'kind': _MapKind(tree[1]),
           'ordinal': tree[3].value,
           'default': tree[4]}
 
-def _MapParameter(tree):
-  assert type(tree[3]) is ast.Ordinal
-  return {'name': tree[2],
-          'kind': _MapKind(tree[1]),
-          'ordinal': tree[3].value}
-
 def _MapMethod(tree):
-  assert type(tree[3]) is ast.Ordinal
+  assert isinstance(tree[2], ast.ParameterList)
+  assert isinstance(tree[3], ast.Ordinal)
+  assert tree[4] is None or isinstance(tree[2], ast.ParameterList)
+
+  def ParameterToDict(param):
+    assert isinstance(param, ast.Parameter)
+    return {'name': param.name,
+            'kind': _MapKind(param.typename),
+            'ordinal': param.ordinal.value}
+
   method = {'name': tree[1],
-            'parameters': _MapTree(_MapParameter, tree[2], 'PARAM'),
+            'parameters': map(ParameterToDict, tree[2]),
             'ordinal': tree[3].value}
-  if tree[4] != None:
-    method['response_parameters'] = _MapTree(_MapParameter, tree[4], 'PARAM')
+  if tree[4]:
+    method['response_parameters'] = map(ParameterToDict, tree[4])
   return method
 
 def _MapEnumField(tree):

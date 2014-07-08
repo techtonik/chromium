@@ -29,6 +29,7 @@ extern const char kChromeUICloudPrintResourcesURL[];
 extern const char kChromeUIComponentsURL[];
 extern const char kChromeUIConflictsURL[];
 extern const char kChromeUIConstrainedHTMLTestURL[];
+extern const char kChromeUIContextualSearchPromoURL[];
 extern const char kChromeUICrashesURL[];
 extern const char kChromeUICreditsURL[];
 extern const char kChromeUIDevicesURL[];
@@ -84,6 +85,7 @@ extern const char kChromeUIUberURL[];
 extern const char kChromeUIUberFrameURL[];
 extern const char kChromeUIUserActionsURL[];
 extern const char kChromeUIVersionURL[];
+extern const char kChromeUIVoiceSearchURL[];
 
 #if defined(OS_ANDROID)
 extern const char kChromeUINativeNewTabURL[];
@@ -152,6 +154,7 @@ extern const char kChromeUICloudPrintResourcesHost[];
 extern const char kChromeUICloudPrintSetupHost[];
 extern const char kChromeUIConflictsHost[];
 extern const char kChromeUIConstrainedHTMLTestHost[];
+extern const char kChromeUIContextualSearchPromoHost[];
 extern const char kChromeUICrashesHost[];
 extern const char kChromeUICrashHost[];
 extern const char kChromeUICreditsHost[];
@@ -233,6 +236,7 @@ extern const char kChromeUIUberFrameHost[];
 extern const char kChromeUIUberHost[];
 extern const char kChromeUIUserActionsHost[];
 extern const char kChromeUIVersionHost[];
+extern const char kChromeUIVoiceSearchHost[];
 extern const char kChromeUIWorkersHost[];
 
 extern const char kChromeUIScreenshotPath[];

@@ -9,6 +9,7 @@ generated_extensions_api("extensions_api") {
     "app_runtime.idl",
     "dns.idl",
     "extensions_manifest_types.json",
+    "power.idl",
     "socket.idl",
     "sockets_tcp.idl",
     "sockets_tcp_server.idl",
@@ -18,5 +19,6 @@ generated_extensions_api("extensions_api") {
   ]
   root_namespace = "extensions::core_api"
   impl_dir = "//extensions/browser/api"
+  bundle = true
   deps = [ "//skia" ]
 }

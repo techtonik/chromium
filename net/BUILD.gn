@@ -752,6 +752,8 @@ if (use_v8_in_net) {
       "//url",
       "//v8",
     ]
+
+    forward_dependent_configs_from = [ ":net" ]
   }
 }
 
@@ -1041,7 +1043,6 @@ source_set("quic_tools") {
     "quic/quic_time_wait_list_manager.h",
   ]
   deps = [
-    ":balsa",
     ":net",
     "//base",
     "//base/third_party/dynamic_annotations",

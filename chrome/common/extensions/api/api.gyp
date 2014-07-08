@@ -15,15 +15,9 @@
     # These duplicate other lists and are the only ones used on Android. They
     # should be eliminated. See crbug.com/305852.
     'android_schema_files': [
-      'activity_log_private.json',
       'file_system.idl',
       'manifest_types.json',
       'sync_file_system.idl',
-      'tab_capture.idl',
-      'tabs.json',
-      'types.json',
-      'web_navigation.json',
-      'windows.json',
     ],
 
     # These are used everywhere except Android.
@@ -93,7 +87,6 @@
       'omnibox.json',
       'page_capture.json',
       'permissions.json',
-      'power.idl',
       'preferences_private.json',
       'push_messaging.idl',
       'reading_list_private.json',

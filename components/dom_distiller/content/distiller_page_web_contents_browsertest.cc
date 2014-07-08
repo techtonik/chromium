@@ -138,15 +138,12 @@ class WebContentsMainFrameHelper : public content::WebContentsObserver {
   }
 
   virtual void DidCommitProvisionalLoadForFrame(
-      int64 frame_id,
-      const base::string16& frame_unique_name,
-      bool is_main_frame,
+      content::RenderFrameHost* render_frame_host,
       const GURL& url,
-      content::PageTransition transition_type,
-      content::RenderViewHost* render_view_host) OVERRIDE {
+      content::PageTransition transition_type) OVERRIDE {
     if (wait_for_document_loaded_)
       return;
-    if (is_main_frame)
+    if (!render_frame_host->GetParent())
       callback_.Run();
   }
 

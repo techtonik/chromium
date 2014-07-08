@@ -23,7 +23,6 @@
 #include "chrome/browser/search/instant_service.h"
 #include "chrome/browser/search/instant_service_factory.h"
 #include "chrome/browser/search/search.h"
-#include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/search_engines/ui_thread_search_terms_data.h"
 #include "chrome/browser/sync/profile_sync_service.h"
@@ -34,6 +33,7 @@
 #include "components/metrics/proto/omnibox_input_type.pb.h"
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_prepopulate_data.h"
+#include "components/search_engines/template_url_service.h"
 #include "components/sync_driver/sync_prefs.h"
 #include "components/url_fixer/url_fixer.h"
 #include "content/public/common/url_constants.h"
@@ -177,7 +177,9 @@ void BaseSearchProvider::DeleteMatch(const AutocompleteMatch& match) {
 
   HistoryService* const history_service =
       HistoryServiceFactory::GetForProfile(profile_, Profile::EXPLICIT_ACCESS);
-  TemplateURL* template_url = match.GetTemplateURL(profile_, false);
+  TemplateURLService* template_url_service =
+      TemplateURLServiceFactory::GetForProfile(profile_);
+  TemplateURL* template_url = match.GetTemplateURL(template_url_service, false);
   // This may be NULL if the template corresponding to the keyword has been
   // deleted or there is no keyword set.
   if (template_url != NULL) {

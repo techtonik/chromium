@@ -423,7 +423,9 @@
       "nckgahadagoaajjgafhacjanaoiihapd",
       "ljclpkphhpbpinifbeabbhlfddcpfdde",
       "ppleadejekpmccmnpjdimmlfljlkdfej",
-      "eggnbpckecmjlblplehfpjjdhhidfdoj"
+      "eggnbpckecmjlblplehfpjjdhhidfdoj",
+      "jfjjdfefebklmdbmenmlehlopoocnoeh",
+      "knipolnnllmklapflnccelgolnpehhpl"
     ]
   },
   "hid": {
@@ -567,10 +569,6 @@
     "extension_types": ["extension", "legacy_packaged_app", "platform_app"],
     "contexts": ["blessed_extension"]
   },
-  "power": {
-    "dependencies": ["permission:power"],
-    "contexts": ["blessed_extension"]
-  },
   "preferencesPrivate": {
     "dependencies": ["permission:preferencesPrivate"],
     "contexts": ["blessed_extension"]
@@ -675,6 +673,18 @@
     "channel": "stable",
     "extension_types": ["extension", "legacy_packaged_app"],
     "contexts": ["blessed_extension"]
+  },
+  "tabs.setZoom": {
+    "channel": "dev"
+  },
+  "tabs.getZoom": {
+    "channel": "dev"
+  },
+  "tabs.setZoomSettings": {
+    "channel": "dev"
+  },
+  "tabs.getZoomSettings": {
+    "channel": "dev"
   },
   "terminalPrivate": {
     "dependencies": ["permission:terminalPrivate"],

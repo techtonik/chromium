@@ -65,7 +65,9 @@ bool FixRateSender::OnPacketSent(
   return true;
 }
 
-void FixRateSender::OnRetransmissionTimeout(bool packets_retransmitted) { }
+void FixRateSender::OnRetransmissionTimeout(bool packets_retransmitted) {}
+
+void FixRateSender::RevertRetransmissionTimeout() {}
 
 QuicTime::Delta FixRateSender::TimeUntilSend(
     QuicTime now,
@@ -85,6 +87,9 @@ QuicBandwidth FixRateSender::BandwidthEstimate() const {
   return bitrate_;
 }
 
+bool FixRateSender::HasReliableBandwidthEstimate() const {
+  return true;
+}
 
 QuicTime::Delta FixRateSender::RetransmissionDelay() const {
   // TODO(pwestin): Calculate and return retransmission delay.

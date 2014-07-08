@@ -310,6 +310,8 @@
         'linux_ui/status_icon_linux.cc',
         'linux_ui/window_button_order_observer.h',
         'linux_ui/window_button_order_provider.cc',
+        'masked_targeter_delegate.cc',
+        'masked_targeter_delegate.h',
         'metrics.cc',
         'metrics.h',
         'metrics_aura.cc',
@@ -349,6 +351,8 @@
         'view_model_utils.h',
         'view_targeter.cc',
         'view_targeter.h',
+        'view_targeter_delegate.cc',
+        'view_targeter_delegate.h',
         'views_switches.cc',
         'views_switches.h',
         'views_delegate.cc',
@@ -821,5 +825,31 @@
         }],
       ],
     },  # target_name: views_unittests
-  ],
+  ],  # targets
+  'conditions': [
+    ['OS=="mac"', {
+      'targets': [
+        {
+          'target_name': 'macviews_interactive_ui_tests',
+          'type': 'executable',
+          'dependencies': [
+            '../../base/base.gyp:base',
+            '../../base/base.gyp:test_support_base',
+            '../../skia/skia.gyp:skia',
+            '../../testing/gtest.gyp:gtest',
+            '../compositor/compositor.gyp:compositor_test_support',
+            '../resources/ui_resources.gyp:ui_resources',
+            '../resources/ui_resources.gyp:ui_test_pak',
+            '../strings/ui_strings.gyp:ui_strings',
+            'views',
+            'views_test_support',
+          ],
+          'sources': [
+            'run_all_unittests.cc',
+            'widget/native_widget_mac_interactive_uitest.mm',
+          ],
+        },  # target_name: macviews_interactive_ui_tests
+      ],  # targets
+    }],
+  ],  # conditions
 }

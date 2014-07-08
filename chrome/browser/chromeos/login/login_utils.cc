@@ -43,7 +43,7 @@
 #include "chrome/browser/chromeos/login/profile_auth_data.h"
 #include "chrome/browser/chromeos/login/saml/saml_offline_signin_limiter.h"
 #include "chrome/browser/chromeos/login/saml/saml_offline_signin_limiter_factory.h"
-#include "chrome/browser/chromeos/login/session/session_manager.h"
+#include "chrome/browser/chromeos/login/session/user_session_manager.h"
 #include "chrome/browser/chromeos/login/signin/oauth2_login_manager.h"
 #include "chrome/browser/chromeos/login/signin/oauth2_login_manager_factory.h"
 #include "chrome/browser/chromeos/login/startup_utils.h"
@@ -52,6 +52,7 @@
 #include "chrome/browser/chromeos/login/users/supervised_user_manager.h"
 #include "chrome/browser/chromeos/login/users/user.h"
 #include "chrome/browser/chromeos/login/users/user_manager.h"
+#include "chrome/browser/chromeos/profiles/profile_helper.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/first_run/first_run.h"
@@ -119,6 +120,10 @@ bool NeedRestartToApplyPerSessionFlags(const CommandLine& user_flags) {
 }
 
 bool CanPerformEarlyRestart() {
+  // TODO(alemate): crbug/391357 - temporary disabling early restart before
+  // crbug.com/391793 is fixed.
+  return false;
+
   const ExistingUserController* controller =
       ExistingUserController::current_controller();
   if (!controller)
@@ -142,7 +147,7 @@ struct DoBrowserLaunchOnLocaleLoadedData;
 class LoginUtilsImpl
     : public LoginUtils,
       public base::SupportsWeakPtr<LoginUtilsImpl>,
-      public SessionManager::Delegate {
+      public UserSessionManager::Delegate {
  public:
   LoginUtilsImpl()
       : delegate_(NULL) {
@@ -166,7 +171,7 @@ class LoginUtilsImpl
   virtual bool RestartToApplyPerSessionFlagsIfNeed(Profile* profile,
                                                    bool early_restart) OVERRIDE;
 
-  // SessionManager::Delegate implementation:
+  // UserSessionManager::Delegate implementation:
    virtual void OnProfilePrepared(Profile* profile) OVERRIDE;
  #if defined(ENABLE_RLZ)
    virtual void OnRlzInitialized() OVERRIDE;
@@ -305,7 +310,7 @@ void LoginUtilsImpl::DoBrowserLaunch(Profile* profile,
   if (browser_shutdown::IsTryingToQuit())
     return;
 
-  User* const user = UserManager::Get()->GetUserByProfile(profile);
+  User* const user = ProfileHelper::Get()->GetUserByProfile(profile);
   scoped_ptr<DoBrowserLaunchOnLocaleLoadedData> data(
       new DoBrowserLaunchOnLocaleLoadedData(this, profile, login_host));
 
@@ -313,7 +318,7 @@ void LoginUtilsImpl::DoBrowserLaunch(Profile* profile,
       new locale_util::SwitchLanguageCallback(
           base::Bind(&LoginUtilsImpl::DoBrowserLaunchOnLocaleLoaded,
                      base::Passed(data.Pass()))));
-  if (!SessionManager::GetInstance()->
+  if (!UserSessionManager::GetInstance()->
           RespectLocalePreference(profile, user, callback.Pass())) {
     DoBrowserLaunchOnLocaleLoadedImpl(profile, login_host);
   }
@@ -332,7 +337,7 @@ void LoginUtilsImpl::PrepareProfile(
   // creation and initialization to SessionManager. Later LoginUtils will be
   // removed and all LoginUtils clients will just work with SessionManager
   // directly.
-  SessionManager::GetInstance()->StartSession(user_context,
+  UserSessionManager::GetInstance()->StartSession(user_context,
                                               authenticator_,
                                               has_auth_cookies,
                                               has_active_session,
@@ -410,7 +415,7 @@ void LoginUtilsImpl::OnRlzInitialized() {
 #endif
 
 void LoginUtilsImpl::AttemptRestart(Profile* profile) {
-  if (SessionManager::GetInstance()->GetSigninSessionRestoreStrategy() !=
+  if (UserSessionManager::GetInstance()->GetSigninSessionRestoreStrategy() !=
       OAuth2LoginManager::RESTORE_FROM_COOKIE_JAR) {
     chrome::AttemptRestart();
     return;
@@ -429,7 +434,7 @@ void LoginUtilsImpl::AttemptRestart(Profile* profile) {
   }
 
   LOG(WARNING) << "Attempting browser restart during session restore.";
-  SessionManager::GetInstance()->set_exit_after_session_restore(true);
+  UserSessionManager::GetInstance()->set_exit_after_session_restore(true);
 }
 
 // static

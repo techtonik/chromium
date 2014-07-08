@@ -68,6 +68,8 @@ class WebsiteTest:
     self.environment = None
     # The webdriver.
     self.driver = None
+    # Whether or not the test was run.
+    self.was_run = False
 
   # Mouse/Keyboard actions.
 

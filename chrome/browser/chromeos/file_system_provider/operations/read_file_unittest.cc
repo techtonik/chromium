@@ -11,6 +11,7 @@
 #include "base/memory/scoped_vector.h"
 #include "base/values.h"
 #include "chrome/browser/chromeos/file_system_provider/operations/read_file.h"
+#include "chrome/browser/chromeos/file_system_provider/operations/test_util.h"
 #include "chrome/common/extensions/api/file_system_provider.h"
 #include "chrome/common/extensions/api/file_system_provider_internal.h"
 #include "extensions/browser/event_router.h"
@@ -29,28 +30,6 @@ const int kRequestId = 2;
 const int kFileHandle = 3;
 const int kOffset = 10;
 const int kLength = 5;
-
-// Fake event dispatcher implementation with extra logging capability. Acts as
-// a providing extension end-point.
-class LoggingDispatchEventImpl {
- public:
-  explicit LoggingDispatchEventImpl(bool dispatch_reply)
-      : dispatch_reply_(dispatch_reply) {}
-  virtual ~LoggingDispatchEventImpl() {}
-
-  bool OnDispatchEventImpl(scoped_ptr<extensions::Event> event) {
-    events_.push_back(event->DeepCopy());
-    return dispatch_reply_;
-  }
-
-  ScopedVector<extensions::Event>& events() { return events_; }
-
- private:
-  ScopedVector<extensions::Event> events_;
-  bool dispatch_reply_;
-
-  DISALLOW_COPY_AND_ASSIGN(LoggingDispatchEventImpl);
-};
 
 // Callback invocation logger. Acts as a fileapi end-point.
 class CallbackLogger {
@@ -73,7 +52,7 @@ class CallbackLogger {
     DISALLOW_COPY_AND_ASSIGN(Event);
   };
 
-  CallbackLogger() : weak_ptr_factory_(this) {}
+  CallbackLogger() {}
   virtual ~CallbackLogger() {}
 
   void OnReadFile(int chunk_length, bool has_more, base::File::Error result) {
@@ -82,14 +61,9 @@ class CallbackLogger {
 
   ScopedVector<Event>& events() { return events_; }
 
-  base::WeakPtr<CallbackLogger> GetWeakPtr() {
-    return weak_ptr_factory_.GetWeakPtr();
-  }
-
  private:
   ScopedVector<Event> events_;
   bool dispatch_reply_;
-  base::WeakPtrFactory<CallbackLogger> weak_ptr_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(CallbackLogger);
 };
@@ -115,19 +89,19 @@ class FileSystemProviderOperationsReadFileTest : public testing::Test {
 };
 
 TEST_F(FileSystemProviderOperationsReadFileTest, Execute) {
-  LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
+  util::LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
   CallbackLogger callback_logger;
 
-  ReadFile read_file(
-      NULL,
-      file_system_info_,
-      kFileHandle,
-      io_buffer_.get(),
-      kOffset,
-      kLength,
-      base::Bind(&CallbackLogger::OnReadFile, callback_logger.GetWeakPtr()));
+  ReadFile read_file(NULL,
+                     file_system_info_,
+                     kFileHandle,
+                     io_buffer_.get(),
+                     kOffset,
+                     kLength,
+                     base::Bind(&CallbackLogger::OnReadFile,
+                                base::Unretained(&callback_logger)));
   read_file.SetDispatchEventImplForTesting(
-      base::Bind(&LoggingDispatchEventImpl::OnDispatchEventImpl,
+      base::Bind(&util::LoggingDispatchEventImpl::OnDispatchEventImpl,
                  base::Unretained(&dispatcher)));
 
   EXPECT_TRUE(read_file.Execute(kRequestId));
@@ -165,19 +139,19 @@ TEST_F(FileSystemProviderOperationsReadFileTest, Execute) {
 }
 
 TEST_F(FileSystemProviderOperationsReadFileTest, Execute_NoListener) {
-  LoggingDispatchEventImpl dispatcher(false /* dispatch_reply */);
+  util::LoggingDispatchEventImpl dispatcher(false /* dispatch_reply */);
   CallbackLogger callback_logger;
 
-  ReadFile read_file(
-      NULL,
-      file_system_info_,
-      kFileHandle,
-      io_buffer_.get(),
-      kOffset,
-      kLength,
-      base::Bind(&CallbackLogger::OnReadFile, callback_logger.GetWeakPtr()));
+  ReadFile read_file(NULL,
+                     file_system_info_,
+                     kFileHandle,
+                     io_buffer_.get(),
+                     kOffset,
+                     kLength,
+                     base::Bind(&CallbackLogger::OnReadFile,
+                                base::Unretained(&callback_logger)));
   read_file.SetDispatchEventImplForTesting(
-      base::Bind(&LoggingDispatchEventImpl::OnDispatchEventImpl,
+      base::Bind(&util::LoggingDispatchEventImpl::OnDispatchEventImpl,
                  base::Unretained(&dispatcher)));
 
   EXPECT_FALSE(read_file.Execute(kRequestId));
@@ -187,19 +161,19 @@ TEST_F(FileSystemProviderOperationsReadFileTest, OnSuccess) {
   using extensions::api::file_system_provider_internal::
       ReadFileRequestedSuccess::Params;
 
-  LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
+  util::LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
   CallbackLogger callback_logger;
 
-  ReadFile read_file(
-      NULL,
-      file_system_info_,
-      kFileHandle,
-      io_buffer_.get(),
-      kOffset,
-      kLength,
-      base::Bind(&CallbackLogger::OnReadFile, callback_logger.GetWeakPtr()));
+  ReadFile read_file(NULL,
+                     file_system_info_,
+                     kFileHandle,
+                     io_buffer_.get(),
+                     kOffset,
+                     kLength,
+                     base::Bind(&CallbackLogger::OnReadFile,
+                                base::Unretained(&callback_logger)));
   read_file.SetDispatchEventImplForTesting(
-      base::Bind(&LoggingDispatchEventImpl::OnDispatchEventImpl,
+      base::Bind(&util::LoggingDispatchEventImpl::OnDispatchEventImpl,
                  base::Unretained(&dispatcher)));
 
   EXPECT_TRUE(read_file.Execute(kRequestId));
@@ -233,19 +207,19 @@ TEST_F(FileSystemProviderOperationsReadFileTest, OnSuccess) {
 }
 
 TEST_F(FileSystemProviderOperationsReadFileTest, OnError) {
-  LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
+  util::LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
   CallbackLogger callback_logger;
 
-  ReadFile read_file(
-      NULL,
-      file_system_info_,
-      kFileHandle,
-      io_buffer_.get(),
-      kOffset,
-      kLength,
-      base::Bind(&CallbackLogger::OnReadFile, callback_logger.GetWeakPtr()));
+  ReadFile read_file(NULL,
+                     file_system_info_,
+                     kFileHandle,
+                     io_buffer_.get(),
+                     kOffset,
+                     kLength,
+                     base::Bind(&CallbackLogger::OnReadFile,
+                                base::Unretained(&callback_logger)));
   read_file.SetDispatchEventImplForTesting(
-      base::Bind(&LoggingDispatchEventImpl::OnDispatchEventImpl,
+      base::Bind(&util::LoggingDispatchEventImpl::OnDispatchEventImpl,
                  base::Unretained(&dispatcher)));
 
   EXPECT_TRUE(read_file.Execute(kRequestId));

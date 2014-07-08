@@ -53,7 +53,6 @@
 #include "chrome/browser/search/instant_service.h"
 #include "chrome/browser/search/instant_service_factory.h"
 #include "chrome/browser/search/search.h"
-#include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/translate/chrome_translate_client.h"
 #include "chrome/browser/translate/cld_data_harness.h"
@@ -65,7 +64,7 @@
 #include "chrome/browser/ui/browser_tabstrip.h"
 #include "chrome/browser/ui/browser_window.h"
 #include "chrome/browser/ui/host_desktop.h"
-#include "chrome/browser/ui/omnibox/location_bar.h"
+#include "chrome/browser/ui/location_bar/location_bar.h"
 #include "chrome/browser/ui/omnibox/omnibox_edit_model.h"
 #include "chrome/browser/ui/omnibox/omnibox_view.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -88,6 +87,7 @@
 #include "components/policy/core/common/policy_service.h"
 #include "components/policy/core/common/policy_service_impl.h"
 #include "components/search_engines/template_url.h"
+#include "components/search_engines/template_url_service.h"
 #include "components/translate/core/browser/language_state.h"
 #include "components/translate/core/browser/translate_infobar_delegate.h"
 #include "content/public/browser/browser_child_process_host_iterator.h"
@@ -1362,8 +1362,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, DeveloperToolsDisabled) {
   content::WebContents* contents =
       browser()->tab_strip_model()->GetActiveWebContents();
   DevToolsWindow *devtools_window =
-      DevToolsWindow::GetInstanceForInspectedRenderViewHost(
-          contents->GetRenderViewHost());
+      DevToolsWindow::GetInstanceForInspectedWebContents(contents);
   EXPECT_TRUE(devtools_window);
 
   // Disable devtools via policy.
@@ -1378,12 +1377,10 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, DeveloperToolsDisabled) {
   // wait for devtools close
   close_observer.Wait();
   // The existing devtools window should have closed.
-  EXPECT_FALSE(DevToolsWindow::GetInstanceForInspectedRenderViewHost(
-      contents->GetRenderViewHost()));
+  EXPECT_FALSE(DevToolsWindow::GetInstanceForInspectedWebContents(contents));
   // And it's not possible to open it again.
   EXPECT_FALSE(chrome::ExecuteCommand(browser(), IDC_DEV_TOOLS));
-  EXPECT_FALSE(DevToolsWindow::GetInstanceForInspectedRenderViewHost(
-      contents->GetRenderViewHost()));
+  EXPECT_FALSE(DevToolsWindow::GetInstanceForInspectedWebContents(contents));
 }
 
 // TODO(samarth): remove along with rest of NTP4 code.
@@ -1557,7 +1554,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, ExtensionInstallForcelist) {
   policies.Set(key::kExtensionInstallForcelist, POLICY_LEVEL_MANDATORY,
                POLICY_SCOPE_USER, forcelist.DeepCopy(), NULL);
   content::WindowedNotificationObserver observer(
-      chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
+      chrome::NOTIFICATION_EXTENSION_WILL_BE_INSTALLED_DEPRECATED,
       content::NotificationService::AllSources());
   UpdateProviderPolicy(policies);
   observer.Wait();
@@ -1595,7 +1592,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, ExtensionInstallForcelist) {
   extensions::ExtensionUpdater::CheckParams params;
   params.install_immediately = true;
   content::WindowedNotificationObserver update_observer(
-      chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
+      chrome::NOTIFICATION_EXTENSION_WILL_BE_INSTALLED_DEPRECATED,
       content::NotificationService::AllSources());
   updater->CheckNow(params);
   update_observer.Wait();
@@ -1725,7 +1722,7 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, MAYBE_ExtensionInstallSources) {
   UpdateProviderPolicy(policies);
 
   content::WindowedNotificationObserver observer(
-      chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
+      chrome::NOTIFICATION_EXTENSION_WILL_BE_INSTALLED_DEPRECATED,
       content::NotificationService::AllSources());
   PerformClick(1, 0);
   observer.Wait();

@@ -167,8 +167,8 @@ RenderFrameHostImpl::RenderFrameHostImpl(
 
   if (GetProcess()->GetServiceRegistry()) {
     RenderFrameSetupPtr setup;
-    GetProcess()->GetServiceRegistry()->GetRemoteInterface(&setup);
-    mojo::IInterfaceProviderPtr service_provider;
+    GetProcess()->GetServiceRegistry()->ConnectToRemoteService(&setup);
+    mojo::ServiceProviderPtr service_provider;
     setup->GetServiceProviderForFrame(routing_id_,
                                       mojo::Get(&service_provider));
     service_registry_.BindRemoteServiceProvider(
@@ -403,10 +403,8 @@ void RenderFrameHostImpl::OnDocumentOnLoadCompleted() {
 }
 
 void RenderFrameHostImpl::OnDidStartProvisionalLoadForFrame(
-    int parent_routing_id,
     const GURL& url) {
-  frame_tree_node_->navigator()->DidStartProvisionalLoad(
-      this, parent_routing_id, url);
+  frame_tree_node_->navigator()->DidStartProvisionalLoad(this, url);
 }
 
 void RenderFrameHostImpl::OnDidFailProvisionalLoadWithError(

@@ -448,6 +448,14 @@
    fun:_ZN3gfx18RenderTextHarfBuzz12EnsureLayoutEv
 }
 
+{
+  bug_391510
+  Memcheck:Leak
+  fun:_Znw*
+  fun:_ZN4base21CancelableTaskTracker16NewTrackedTaskId*
+  fun:_ZN14HistoryService14ScheduleDBTask*
+  fun:_ZN7history19URLIndexPrivateData26ScheduleUpdateRecentVisits*
+}
 
 #-----------------------------------------------------------------------
 # 3. Suppressions for real chromium bugs that are not yet fixed.
@@ -5583,14 +5591,6 @@
    fun:_ZN11webkit_glue16WebURLLoaderImpl7Context18OnCompletedRequestEibRKSsRKN4base9TimeTicksE
 }
 {
-   bug_328092
-   Memcheck:Leak
-   fun:_Znw*
-   fun:_ZN7content16WebURLLoaderImplC1Ev
-   fun:_ZN7content17BlinkPlatformImpl15createURLLoaderEv
-   fun:_ZN7WebCore14ResourceLoader5startEv
-}
-{
    bug_329960
    Memcheck:Leak
    fun:_Znw*
@@ -5694,13 +5694,7 @@
    fun:_ZN7WebCore15DOMWrapperWorldC1Eii
    fun:_ZN7WebCore15DOMWrapperWorld6createEii
    fun:_ZN7WebCore15DOMWrapperWorld9mainWorldEv
-   fun:_ZN7WebCore16ScriptControllerC2EPNS_10LocalFrameE
-   fun:_ZN7WebCore16ScriptControllerC1EPNS_10LocalFrameE
-   fun:_ZN7WebCore10LocalFrame*
-   fun:_ZN7WebCore10LocalFrame*
-   fun:_ZN7WebCore10LocalFrame6create*
-   fun:_ZN5blink17WebLocalFrameImpl21initializeAsMainFrameEPN7WebCore4PageE
-   fun:_ZN5blink11WebViewImpl12setMainFrameEPNS_8WebFrameE
+   ...
    fun:_ZN7content22BufferedDataSourceTestC2Ev
 }
 {
@@ -6236,4 +6230,11 @@
    Memcheck:Leak
    fun:_Znw*
    fun:_ZN20data_reduction_proxy69DataReductionProxyUsageStatsTest_isDataReductionProxyUnreachable_Test8TestBodyEv
+}
+{
+   bug_390108
+   Memcheck:Leak
+   fun:_Zna*
+   fun:_ZN3url17AddStandardSchemeEPKc
+   fun:_ZN36AutocompleteInputTest_InputType_Test8TestBodyEv
 }

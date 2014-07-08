@@ -72,6 +72,7 @@
 #include "content/renderer/media/webmediaplayer_params.h"
 #include "content/renderer/notification_provider.h"
 #include "content/renderer/npapi/plugin_channel_host.h"
+#include "content/renderer/push_messaging_dispatcher.h"
 #include "content/renderer/render_process.h"
 #include "content/renderer/render_thread_impl.h"
 #include "content/renderer/render_view_impl.h"
@@ -406,6 +407,7 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
       cdm_manager_(NULL),
 #endif
       geolocation_dispatcher_(NULL),
+      push_messaging_dispatcher_(NULL),
       screen_orientation_dispatcher_(NULL),
       weak_factory_(this) {
   std::pair<RoutingIDFrameMap::iterator, bool> result =
@@ -1762,10 +1764,8 @@ void RenderFrameImpl::didStartProvisionalLoad(blink::WebLocalFrame* frame) {
                     DidStartProvisionalLoad(frame));
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, DidStartProvisionalLoad());
 
-  int parent_routing_id = frame->parent() ?
-      FromWebFrame(frame->parent())->GetRoutingID() : -1;
-  Send(new FrameHostMsg_DidStartProvisionalLoadForFrame(
-       routing_id_, parent_routing_id, ds->request().url()));
+  Send(new FrameHostMsg_DidStartProvisionalLoadForFrame(routing_id_,
+                                                        ds->request().url()));
 }
 
 void RenderFrameImpl::didReceiveServerRedirectForProvisionalLoad(
@@ -1816,7 +1816,6 @@ void RenderFrameImpl::didFailProvisionalLoad(blink::WebLocalFrame* frame,
        EqualsASCII(failed_request.httpMethod(), "POST"));
 
   FrameHostMsg_DidFailProvisionalLoadWithError_Params params;
-  params.frame_unique_name = frame->uniqueName();
   params.error_code = error.reason;
   GetContentClient()->renderer()->GetNavigationErrorStrings(
       render_view_.get(),
@@ -2418,6 +2417,10 @@ void RenderFrameImpl::willSendRequest(
                                WebString::fromUTF8(kDefaultAcceptHeader));
   }
 
+  // Add an empty HTTP origin header for non GET methods if none is currently
+  // present.
+  request.addHTTPOriginIfNeeded(WebString());
+
   // Attach |should_replace_current_entry| state to requests so that, should
   // this navigation later require a request transfer, all state is preserved
   // when it is re-created in the new process.
@@ -2745,6 +2748,12 @@ blink::WebGeolocationClient* RenderFrameImpl::geolocationClient() {
   return geolocation_dispatcher_;
 }
 
+blink::WebPushClient* RenderFrameImpl::pushClient() {
+  if (!push_messaging_dispatcher_)
+    push_messaging_dispatcher_ = new PushMessagingDispatcher(this);
+  return push_messaging_dispatcher_;
+}
+
 void RenderFrameImpl::willStartUsingPeerConnectionHandler(
     blink::WebLocalFrame* frame,
     blink::WebRTCPeerConnectionHandler* handler) {
@@ -2945,7 +2954,6 @@ void RenderFrameImpl::UpdateURL(blink::WebFrame* frame) {
   params.is_post = false;
   params.post_id = -1;
   params.page_id = render_view_->page_id_;
-  params.frame_unique_name = frame->uniqueName();
   params.socket_address.set_host(response.remoteIPAddress().utf8());
   params.socket_address.set_port(response.remotePort());
   WebURLResponseExtraDataImpl* extra_data = GetExtraDataFromResponse(response);
@@ -3522,9 +3530,8 @@ WebMediaPlayer* RenderFrameImpl::CreateAndroidWebMediaPlayer(
   }
 
   scoped_refptr<StreamTextureFactory> stream_texture_factory;
-  if (GetRenderWidget()->UsingSynchronousRendererCompositor()) {
-    SynchronousCompositorFactory* factory =
-        SynchronousCompositorFactory::GetInstance();
+  if (SynchronousCompositorFactory* factory =
+          SynchronousCompositorFactory::GetInstance()) {
     stream_texture_factory = factory->CreateStreamTextureFactory(routing_id_);
   } else {
     scoped_refptr<webkit::gpu::ContextProviderWebContext> context_provider =

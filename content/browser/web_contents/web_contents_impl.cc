@@ -2208,18 +2208,6 @@ bool WebContentsImpl::GetClosedByUserGesture() const {
   return closed_by_user_gesture_;
 }
 
-int WebContentsImpl::GetZoomPercent(bool* enable_increment,
-                                    bool* enable_decrement) const {
-  *enable_decrement = *enable_increment = false;
-  // Calculate the zoom percent from the factor. Round up to the nearest whole
-  // number.
-  int percent = static_cast<int>(
-      ZoomLevelToZoomFactor(HostZoomMap::GetZoomLevel(this)) * 100 + 0.5);
-  *enable_decrement = percent > minimum_zoom_percent_;
-  *enable_increment = percent < maximum_zoom_percent_;
-  return percent;
-}
-
 void WebContentsImpl::ViewSource() {
   if (!delegate_)
     return;
@@ -2332,22 +2320,17 @@ void WebContentsImpl::SetFocusToLocationBar(bool select_all) {
 
 void WebContentsImpl::DidStartProvisionalLoad(
     RenderFrameHostImpl* render_frame_host,
-    int parent_routing_id,
     const GURL& validated_url,
     bool is_error_page,
     bool is_iframe_srcdoc) {
-  bool is_main_frame = render_frame_host->frame_tree_node()->IsMainFrame();
-
   // Notify observers about the start of the provisional load.
-  int render_frame_id = render_frame_host->GetRoutingID();
-  RenderViewHost* render_view_host = render_frame_host->render_view_host();
-  FOR_EACH_OBSERVER(WebContentsObserver, observers_,
-                    DidStartProvisionalLoadForFrame(
-                        render_frame_id, parent_routing_id, is_main_frame,
-                        validated_url, is_error_page, is_iframe_srcdoc,
-                        render_view_host));
+  FOR_EACH_OBSERVER(
+      WebContentsObserver,
+      observers_,
+      DidStartProvisionalLoadForFrame(
+          render_frame_host, validated_url, is_error_page, is_iframe_srcdoc));
 
-  if (is_main_frame) {
+  if (!render_frame_host->GetParent()) {
     FOR_EACH_OBSERVER(
         WebContentsObserver,
         observers_,
@@ -2360,19 +2343,12 @@ void WebContentsImpl::DidFailProvisionalLoadWithError(
     RenderFrameHostImpl* render_frame_host,
     const FrameHostMsg_DidFailProvisionalLoadWithError_Params& params) {
   GURL validated_url(params.url);
-  int render_frame_id = render_frame_host->GetRoutingID();
-  bool is_main_frame = render_frame_host->frame_tree_node()->IsMainFrame();
-  RenderViewHost* render_view_host = render_frame_host->render_view_host();
-  FOR_EACH_OBSERVER(
-      WebContentsObserver,
-      observers_,
-      DidFailProvisionalLoad(render_frame_id,
-                             params.frame_unique_name,
-                             is_main_frame,
-                             validated_url,
-                             params.error_code,
-                             params.error_description,
-                             render_view_host));
+  FOR_EACH_OBSERVER(WebContentsObserver,
+                    observers_,
+                    DidFailProvisionalLoad(render_frame_host,
+                                           validated_url,
+                                           params.error_code,
+                                           params.error_description));
 }
 
 void WebContentsImpl::DidFailLoadWithError(
@@ -2450,22 +2426,13 @@ void WebContentsImpl::DidRedirectProvisionalLoad(
 
 void WebContentsImpl::DidCommitProvisionalLoad(
     RenderFrameHostImpl* render_frame_host,
-    const base::string16& frame_unique_name,
-    bool is_main_frame,
     const GURL& url,
     PageTransition transition_type) {
-  int render_frame_id = render_frame_host->GetRoutingID();
-  RenderViewHost* render_view_host = render_frame_host->render_view_host();
   // Notify observers about the commit of the provisional load.
-  FOR_EACH_OBSERVER(
-      WebContentsObserver,
-      observers_,
-      DidCommitProvisionalLoadForFrame(render_frame_id,
-                                       frame_unique_name,
-                                       is_main_frame,
-                                       url,
-                                       transition_type,
-                                       render_view_host));
+  FOR_EACH_OBSERVER(WebContentsObserver,
+                    observers_,
+                    DidCommitProvisionalLoadForFrame(
+                        render_frame_host, url, transition_type));
 }
 
 void WebContentsImpl::DidNavigateMainFramePreCommit(
@@ -4128,11 +4095,9 @@ gfx::Size WebContentsImpl::GetSizeForNewRenderView() {
   return size;
 }
 
-void WebContentsImpl::OnFrameRemoved(
-    RenderViewHostImpl* render_view_host,
-    int frame_routing_id) {
-   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
-                     FrameDetached(render_view_host, frame_routing_id));
+void WebContentsImpl::OnFrameRemoved(RenderFrameHost* render_frame_host) {
+  FOR_EACH_OBSERVER(
+      WebContentsObserver, observers_, FrameDetached(render_frame_host));
 }
 
 void WebContentsImpl::OnPreferredSizeChanged(const gfx::Size& old_size) {

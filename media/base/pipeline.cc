@@ -353,8 +353,7 @@ void Pipeline::StateTransitionTask(PipelineStatus status) {
 
   // Guard against accidentally clearing |pending_callbacks_| for states that
   // use it as well as states that should not be using it.
-  DCHECK_EQ(pending_callbacks_.get() != NULL,
-            (state_ == kInitPrerolling || state_ == kSeeking));
+  DCHECK_EQ(pending_callbacks_.get() != NULL, state_ == kSeeking);
 
   pending_callbacks_.reset();
 
@@ -397,29 +396,21 @@ void Pipeline::StateTransitionTask(PipelineStatus status) {
         metadata_cb_.Run(metadata);
       }
 
-      return DoInitialPreroll(done_cb);
+      // TODO(scherkus): Fold kInitPrerolling state into kPlaying.
+      return done_cb.Run(PIPELINE_OK);
 
     case kPlaying:
       base::ResetAndReturn(&seek_cb_).Run(PIPELINE_OK);
 
       if (audio_renderer_)
         audio_renderer_->StartPlayingFrom(start_timestamp_);
+      if (video_renderer_)
+        video_renderer_->StartPlayingFrom(start_timestamp_);
+      if (text_renderer_)
+        text_renderer_->StartPlaying();
 
       PlaybackRateChangedTask(GetPlaybackRate());
       VolumeChangedTask(GetVolume());
-
-      // We enter this state from either kInitPrerolling or kSeeking. As of now
-      // both those states call Preroll(), which means by time we enter this
-      // state we've already buffered enough data. Forcefully update the
-      // buffering state, which start the clock and renderers and transition
-      // into kPlaying state.
-      //
-      // TODO(scherkus): Remove after renderers are taught to fire buffering
-      // state callbacks http://crbug.com/144683
-      if (video_renderer_) {
-        DCHECK(WaitingForEnoughData());
-        BufferingStateChanged(&video_buffering_state_, BUFFERING_HAVE_ENOUGH);
-      }
       return;
 
     case kStopping:
@@ -437,32 +428,6 @@ void Pipeline::StateTransitionTask(PipelineStatus status) {
 //
 // That being said, deleting the renderers while keeping |pending_callbacks_|
 // running on the media thread would result in crashes.
-void Pipeline::DoInitialPreroll(const PipelineStatusCB& done_cb) {
-  DCHECK(task_runner_->BelongsToCurrentThread());
-  DCHECK(!pending_callbacks_.get());
-  SerialRunner::Queue bound_fns;
-
-  const base::TimeDelta seek_timestamp = base::TimeDelta();
-
-  // Preroll renderers.
-  if (video_renderer_) {
-    bound_fns.Push(base::Bind(
-        &VideoRenderer::Preroll, base::Unretained(video_renderer_.get()),
-        seek_timestamp));
-
-    // TODO(scherkus): Remove after VideoRenderer is taught to fire buffering
-    // state callbacks http://crbug.com/144683
-    bound_fns.Push(base::Bind(&VideoRenderer::Play,
-                              base::Unretained(video_renderer_.get())));
-  }
-
-  if (text_renderer_) {
-    bound_fns.Push(base::Bind(
-        &TextRenderer::Play, base::Unretained(text_renderer_.get())));
-  }
-
-  pending_callbacks_ = SerialRunner::Run(bound_fns, done_cb);
-}
 
 #if DCHECK_IS_ON
 static void VerifyBufferingStates(BufferingState* audio_buffering_state,
@@ -494,13 +459,6 @@ void Pipeline::DoSeek(
   if (video_renderer_) {
     bound_fns.Push(base::Bind(
         &VideoRenderer::Flush, base::Unretained(video_renderer_.get())));
-
-    // TODO(scherkus): Remove after VideoRenderer is taught to fire buffering
-    // state callbacks http://crbug.com/144683
-    bound_fns.Push(base::Bind(&Pipeline::BufferingStateChanged,
-                              base::Unretained(this),
-                              &video_buffering_state_,
-                              BUFFERING_HAVE_NOTHING));
   }
 
 #if DCHECK_IS_ON
@@ -518,23 +476,6 @@ void Pipeline::DoSeek(
   // Seek demuxer.
   bound_fns.Push(base::Bind(
       &Demuxer::Seek, base::Unretained(demuxer_), seek_timestamp));
-
-  // Preroll renderers.
-  if (video_renderer_) {
-    bound_fns.Push(base::Bind(
-        &VideoRenderer::Preroll, base::Unretained(video_renderer_.get()),
-        seek_timestamp));
-
-    // TODO(scherkus): Remove after renderers are taught to fire buffering
-    // state callbacks http://crbug.com/144683
-    bound_fns.Push(base::Bind(&VideoRenderer::Play,
-                              base::Unretained(video_renderer_.get())));
-  }
-
-  if (text_renderer_) {
-    bound_fns.Push(base::Bind(
-        &TextRenderer::Play, base::Unretained(text_renderer_.get())));
-  }
 
   pending_callbacks_ = SerialRunner::Run(bound_fns, done_cb);
 }
@@ -864,6 +805,8 @@ void Pipeline::InitializeVideoRenderer(const PipelineStatusCB& done_cb) {
       done_cb,
       base::Bind(&Pipeline::OnUpdateStatistics, base::Unretained(this)),
       base::Bind(&Pipeline::OnVideoTimeUpdate, base::Unretained(this)),
+      base::Bind(&Pipeline::BufferingStateChanged, base::Unretained(this),
+                 &video_buffering_state_),
       base::Bind(&Pipeline::OnVideoRendererEnded, base::Unretained(this)),
       base::Bind(&Pipeline::SetError, base::Unretained(this)),
       base::Bind(&Pipeline::GetMediaTime, base::Unretained(this)),

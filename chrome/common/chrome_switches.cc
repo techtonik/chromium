@@ -425,6 +425,9 @@ const char kEnableAnswersInSuggest[]        = "enable-answers-in-suggest";
 // If set, the app list will be enabled as if enabled from CWS.
 const char kEnableAppList[]                 = "enable-app-list";
 
+// Enables the <appview> tag in platform apps.
+const char kEnableAppView[]                 = "enable-app-view";
+
 // Enables the <window-controls> tag in platform apps.
 const char kEnableAppWindowControls[]       = "enable-app-window-controls";
 
@@ -537,6 +540,10 @@ const char kEnableOriginChipOnSrp[]         = "enable-origin-chip-on-srp";
 
 // Enables panels (always on-top docked pop-up windows).
 const char kEnablePanels[]                  = "enable-panels";
+
+// Enables presenting plugin placeholder content as shadow DOM.
+const char kEnablePluginPlaceholderShadowDom[] =
+    "enable-plugin-placeholder-shadow-dom";
 
 // Enables showing unregistered printers in print preview
 const char kEnablePrintPreviewRegisterPromos[] =
@@ -1126,7 +1133,7 @@ const char kSimulateOutdatedNoAU[]           = "simulate-outdated-no-au";
 const char kSpellingServiceFeedbackUrl[] = "spelling-service-feedback-url";
 
 // Specifies the number of seconds between sending batches of feedback to
-// spelling service. The default is 30 minutes. The mininum is 5 seconds. This
+// spelling service. The default is 30 minutes. The minimum is 5 seconds. This
 // switch is for temporary testing only.
 // TODO(rouslan): Remove this flag when feedback testing is complete. Revisit by
 // August 2013.
@@ -1191,10 +1198,6 @@ const char kSyncDeferredStartupTimeoutSeconds[] =
 // Enables feature to avoid unnecessary GetUpdate requests.
 const char kSyncEnableGetUpdateAvoidance[]   =
     "sync-enable-get-update-avoidance";
-
-// Enables directory support for sync filesystem
-const char kSyncfsEnableDirectoryOperation[] =
-    "enable-syncfs-directory-operation";
 
 // Disable data backup when user's not signed in.
 const char kSyncDisableBackup[] = "disable-sync-backup";

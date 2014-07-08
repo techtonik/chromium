@@ -439,9 +439,14 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   scoped_ptr<DelegatedFrameHost> delegated_frame_host_;
   scoped_ptr<ui::Layer> root_layer_;
 
-  // Container for the NSView drawn by the browser compositor. This will never
-  // be NULL, but may be invalid (see its IsValid method).
+  // Container for the NSView drawn by the browser compositor.
   scoped_ptr<BrowserCompositorViewMac> browser_compositor_view_;
+
+  // Placeholder that is allocated while browser_compositor_view_ is NULL,
+  // indicating that a BrowserCompositorViewMac may be allocated. This is to
+  // help in recycling the internals of BrowserCompositorViewMac.
+  scoped_ptr<BrowserCompositorViewPlaceholderMac>
+      browser_compositor_view_placeholder_;
 
   // This holds the current software compositing framebuffer, if any.
   scoped_ptr<SoftwareFrameManager> software_frame_manager_;
@@ -449,13 +454,6 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   // Latency info to send back when the next frame appears on the
   // screen.
   std::vector<ui::LatencyInfo> pending_latency_info_;
-
-  // When taking a screenshot when using CoreAnimation, add a delay of
-  // a few frames to ensure that the contents have reached the screen
-  // before reporting latency info.
-  uint32 pending_latency_info_delay_;
-  base::WeakPtrFactory<RenderWidgetHostViewMac>
-      pending_latency_info_delay_weak_ptr_factory_;
 
   NSWindow* pepper_fullscreen_window() const {
     return pepper_fullscreen_window_;
@@ -489,7 +487,6 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   void AddPendingLatencyInfo(
       const std::vector<ui::LatencyInfo>& latency_info);
   void SendPendingLatencyInfoToHost();
-  void TickPendingLatencyInfoDelay();
 
   void SendPendingSwapAck();
 

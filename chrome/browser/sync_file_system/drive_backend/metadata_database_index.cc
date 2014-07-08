@@ -15,6 +15,32 @@
 #include "third_party/leveldatabase/src/include/leveldb/db.h"
 #include "third_party/leveldatabase/src/include/leveldb/write_batch.h"
 
+// LevelDB database schema
+// =======================
+//
+// NOTE
+// - Entries are sorted by keys.
+// - int64 value is serialized as a string by base::Int64ToString().
+// - ServiceMetadata, FileMetadata, and FileTracker values are serialized
+//   as a string by SerializeToString() of protocol buffers.
+//
+// Version 3
+//   # Version of this schema
+//   key: "VERSION"
+//   value: "3"
+//
+//   # Metadata of the SyncFS service
+//   key: "SERVICE"
+//   value: <ServiceMetadata 'service_metadata'>
+//
+//   # Metadata of remote files
+//   key: "FILE: " + <string 'file_id'>
+//   value: <FileMetadata 'metadata'>
+//
+//   # Trackers of local file updates
+//   key: "TRACKER: " + <int64 'tracker_id'>
+//   value: <FileTracker 'tracker'>
+
 namespace sync_file_system {
 namespace drive_backend {
 
@@ -47,17 +73,6 @@ typename Container::mapped_type FindItem(
   if (found == container.end())
     return typename Container::mapped_type();
   return found->second;
-}
-
-bool IsAppRoot(const FileTracker& tracker) {
-  return tracker.tracker_kind() == TRACKER_KIND_APP_ROOT ||
-      tracker.tracker_kind() == TRACKER_KIND_DISABLED_APP_ROOT;
-}
-
-std::string GetTrackerTitle(const FileTracker& tracker) {
-  if (tracker.has_synced_details())
-    return tracker.synced_details().title();
-  return std::string();
 }
 
 void ReadDatabaseContents(leveldb::DB* db,
@@ -223,14 +238,24 @@ void MetadataDatabaseIndex::Initialize(DatabaseContents* contents) {
 MetadataDatabaseIndex::MetadataDatabaseIndex() {}
 MetadataDatabaseIndex::~MetadataDatabaseIndex() {}
 
-const FileTracker* MetadataDatabaseIndex::GetFileTracker(
-    int64 tracker_id) const {
-  return tracker_by_id_.get(tracker_id);
+bool MetadataDatabaseIndex::GetFileMetadata(
+    const std::string& file_id, FileMetadata* metadata) const {
+  FileMetadata* identified = metadata_by_id_.get(file_id);
+  if (!identified)
+    return false;
+  if (metadata)
+    metadata->CopyFrom(*identified);
+  return true;
 }
 
-const FileMetadata* MetadataDatabaseIndex::GetFileMetadata(
-    const std::string& file_id) const {
-  return metadata_by_id_.get(file_id);
+bool MetadataDatabaseIndex::GetFileTracker(
+    int64 tracker_id, FileTracker* tracker) const {
+  FileTracker* identified = tracker_by_id_.get(tracker_id);
+  if (!identified)
+    return false;
+  if (tracker)
+    tracker->CopyFrom(*identified);
+  return true;
 }
 
 void MetadataDatabaseIndex::StoreFileMetadata(

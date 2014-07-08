@@ -10,6 +10,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/scoped_vector.h"
 #include "chrome/browser/chromeos/file_system_provider/operations/open_file.h"
+#include "chrome/browser/chromeos/file_system_provider/operations/test_util.h"
 #include "chrome/browser/chromeos/file_system_provider/provided_file_system_interface.h"
 #include "chrome/common/extensions/api/file_system_provider.h"
 #include "chrome/common/extensions/api/file_system_provider_internal.h"
@@ -26,28 +27,6 @@ const char kExtensionId[] = "mbflcebpggnecokmikipoihdbecnjfoj";
 const char kFileSystemId[] = "testing-file-system";
 const int kRequestId = 2;
 const base::FilePath::CharType kFilePath[] = "/directory/blueberries.txt";
-
-// Fake event dispatcher implementation with extra logging capability. Acts as
-// a providing extension end-point.
-class LoggingDispatchEventImpl {
- public:
-  explicit LoggingDispatchEventImpl(bool dispatch_reply)
-      : dispatch_reply_(dispatch_reply) {}
-  virtual ~LoggingDispatchEventImpl() {}
-
-  bool OnDispatchEventImpl(scoped_ptr<extensions::Event> event) {
-    events_.push_back(event->DeepCopy());
-    return dispatch_reply_;
-  }
-
-  ScopedVector<extensions::Event>& events() { return events_; }
-
- private:
-  ScopedVector<extensions::Event> events_;
-  bool dispatch_reply_;
-
-  DISALLOW_COPY_AND_ASSIGN(LoggingDispatchEventImpl);
-};
 
 // Callback invocation logger. Acts as a fileapi end-point.
 class CallbackLogger {
@@ -68,7 +47,7 @@ class CallbackLogger {
     DISALLOW_COPY_AND_ASSIGN(Event);
   };
 
-  CallbackLogger() : weak_ptr_factory_(this) {}
+  CallbackLogger() {}
   virtual ~CallbackLogger() {}
 
   void OnOpenFile(int file_handle, base::File::Error result) {
@@ -77,14 +56,9 @@ class CallbackLogger {
 
   ScopedVector<Event>& events() { return events_; }
 
-  base::WeakPtr<CallbackLogger> GetWeakPtr() {
-    return weak_ptr_factory_.GetWeakPtr();
-  }
-
  private:
   ScopedVector<Event> events_;
   bool dispatch_reply_;
-  base::WeakPtrFactory<CallbackLogger> weak_ptr_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(CallbackLogger);
 };
@@ -108,18 +82,18 @@ class FileSystemProviderOperationsOpenFileTest : public testing::Test {
 };
 
 TEST_F(FileSystemProviderOperationsOpenFileTest, Execute) {
-  LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
+  util::LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
   CallbackLogger callback_logger;
 
-  OpenFile open_file(
-      NULL,
-      file_system_info_,
-      base::FilePath::FromUTF8Unsafe(kFilePath),
-      ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
-      false /* create */,
-      base::Bind(&CallbackLogger::OnOpenFile, callback_logger.GetWeakPtr()));
+  OpenFile open_file(NULL,
+                     file_system_info_,
+                     base::FilePath::FromUTF8Unsafe(kFilePath),
+                     ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
+                     false /* create */,
+                     base::Bind(&CallbackLogger::OnOpenFile,
+                                base::Unretained(&callback_logger)));
   open_file.SetDispatchEventImplForTesting(
-      base::Bind(&LoggingDispatchEventImpl::OnDispatchEventImpl,
+      base::Bind(&util::LoggingDispatchEventImpl::OnDispatchEventImpl,
                  base::Unretained(&dispatcher)));
 
   EXPECT_TRUE(open_file.Execute(kRequestId));
@@ -160,36 +134,36 @@ TEST_F(FileSystemProviderOperationsOpenFileTest, Execute) {
 }
 
 TEST_F(FileSystemProviderOperationsOpenFileTest, Execute_NoListener) {
-  LoggingDispatchEventImpl dispatcher(false /* dispatch_reply */);
+  util::LoggingDispatchEventImpl dispatcher(false /* dispatch_reply */);
   CallbackLogger callback_logger;
 
-  OpenFile open_file(
-      NULL,
-      file_system_info_,
-      base::FilePath::FromUTF8Unsafe(kFilePath),
-      ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
-      false /* create */,
-      base::Bind(&CallbackLogger::OnOpenFile, callback_logger.GetWeakPtr()));
+  OpenFile open_file(NULL,
+                     file_system_info_,
+                     base::FilePath::FromUTF8Unsafe(kFilePath),
+                     ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
+                     false /* create */,
+                     base::Bind(&CallbackLogger::OnOpenFile,
+                                base::Unretained(&callback_logger)));
   open_file.SetDispatchEventImplForTesting(
-      base::Bind(&LoggingDispatchEventImpl::OnDispatchEventImpl,
+      base::Bind(&util::LoggingDispatchEventImpl::OnDispatchEventImpl,
                  base::Unretained(&dispatcher)));
 
   EXPECT_FALSE(open_file.Execute(kRequestId));
 }
 
 TEST_F(FileSystemProviderOperationsOpenFileTest, OnSuccess) {
-  LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
+  util::LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
   CallbackLogger callback_logger;
 
-  OpenFile open_file(
-      NULL,
-      file_system_info_,
-      base::FilePath::FromUTF8Unsafe(kFilePath),
-      ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
-      false /* create */,
-      base::Bind(&CallbackLogger::OnOpenFile, callback_logger.GetWeakPtr()));
+  OpenFile open_file(NULL,
+                     file_system_info_,
+                     base::FilePath::FromUTF8Unsafe(kFilePath),
+                     ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
+                     false /* create */,
+                     base::Bind(&CallbackLogger::OnOpenFile,
+                                base::Unretained(&callback_logger)));
   open_file.SetDispatchEventImplForTesting(
-      base::Bind(&LoggingDispatchEventImpl::OnDispatchEventImpl,
+      base::Bind(&util::LoggingDispatchEventImpl::OnDispatchEventImpl,
                  base::Unretained(&dispatcher)));
 
   EXPECT_TRUE(open_file.Execute(kRequestId));
@@ -204,18 +178,18 @@ TEST_F(FileSystemProviderOperationsOpenFileTest, OnSuccess) {
 }
 
 TEST_F(FileSystemProviderOperationsOpenFileTest, OnError) {
-  LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
+  util::LoggingDispatchEventImpl dispatcher(true /* dispatch_reply */);
   CallbackLogger callback_logger;
 
-  OpenFile open_file(
-      NULL,
-      file_system_info_,
-      base::FilePath::FromUTF8Unsafe(kFilePath),
-      ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
-      false /* create */,
-      base::Bind(&CallbackLogger::OnOpenFile, callback_logger.GetWeakPtr()));
+  OpenFile open_file(NULL,
+                     file_system_info_,
+                     base::FilePath::FromUTF8Unsafe(kFilePath),
+                     ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
+                     false /* create */,
+                     base::Bind(&CallbackLogger::OnOpenFile,
+                                base::Unretained(&callback_logger)));
   open_file.SetDispatchEventImplForTesting(
-      base::Bind(&LoggingDispatchEventImpl::OnDispatchEventImpl,
+      base::Bind(&util::LoggingDispatchEventImpl::OnDispatchEventImpl,
                  base::Unretained(&dispatcher)));
 
   EXPECT_TRUE(open_file.Execute(kRequestId));

@@ -338,10 +338,6 @@ GLRenderer::GLRenderer(RendererClient* client,
   // The updater can access textures while the GLRenderer is using them.
   capabilities_.allow_partial_texture_updates = true;
 
-  // Check for texture fast paths. Currently we always use MO8 textures,
-  // so we only need to avoid POT textures if we have an NPOT fast-path.
-  capabilities_.avoid_pow2_textures = context_caps.gpu.fast_npot_mo8_textures;
-
   capabilities_.using_map_image = context_caps.gpu.map_image;
 
   capabilities_.using_discard_framebuffer =
@@ -629,12 +625,9 @@ static SkBitmap ApplyImageFilter(
       skia::AdoptRef(use_gr_context->context()->wrapBackendTexture(
           backend_texture_description));
 
-  SkImageInfo info = {
-    source_texture_resource->size().width(),
-    source_texture_resource->size().height(),
-    kPMColor_SkColorType,
-    kPremul_SkAlphaType
-  };
+  SkImageInfo info =
+      SkImageInfo::MakeN32Premul(source_texture_resource->size().width(),
+                                 source_texture_resource->size().height());
   // Place the platform texture inside an SkBitmap.
   SkBitmap source;
   source.setInfo(info);
@@ -741,12 +734,8 @@ static SkBitmap ApplyBlendModeWithBackdrop(
       skia::AdoptRef(use_gr_context->context()->wrapBackendTexture(
           backend_texture_description));
 
-  SkImageInfo source_info = {
-    source_size.width(),
-    source_size.height(),
-    kPMColor_SkColorType,
-    kPremul_SkAlphaType
-  };
+  SkImageInfo source_info =
+      SkImageInfo::MakeN32Premul(source_size.width(), source_size.height());
   // Place the platform texture inside an SkBitmap.
   SkBitmap source;
   source.setInfo(source_info);
@@ -754,12 +743,8 @@ static SkBitmap ApplyBlendModeWithBackdrop(
       skia::AdoptRef(new SkGrPixelRef(source_info, source_texture.get()));
   source.setPixelRef(source_pixel_ref.get());
 
-  SkImageInfo background_info = {
-    background_size.width(),
-    background_size.height(),
-    kPMColor_SkColorType,
-    kPremul_SkAlphaType
-  };
+  SkImageInfo background_info = SkImageInfo::MakeN32Premul(
+      background_size.width(), background_size.height());
 
   SkBitmap background;
   background.setInfo(background_info);

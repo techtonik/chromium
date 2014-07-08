@@ -278,7 +278,7 @@ void ServiceWorkerVersion::DispatchActivateEvent(
 void ServiceWorkerVersion::DispatchFetchEvent(
     const ServiceWorkerFetchRequest& request,
     const FetchCallback& callback) {
-  DCHECK_EQ(ACTIVE, status()) << status();
+  DCHECK_EQ(ACTIVATED, status()) << status();
 
   if (running_status() != RUNNING) {
     // Schedule calling this method after starting the worker.
@@ -303,7 +303,7 @@ void ServiceWorkerVersion::DispatchFetchEvent(
 }
 
 void ServiceWorkerVersion::DispatchSyncEvent(const StatusCallback& callback) {
-  DCHECK_EQ(ACTIVE, status()) << status();
+  DCHECK_EQ(ACTIVATED, status()) << status();
 
   if (!CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableServiceWorkerSync)) {
@@ -332,7 +332,7 @@ void ServiceWorkerVersion::DispatchSyncEvent(const StatusCallback& callback) {
 
 void ServiceWorkerVersion::DispatchPushEvent(const StatusCallback& callback,
                                              const std::string& data) {
-  DCHECK_EQ(ACTIVE, status()) << status();
+  DCHECK_EQ(ACTIVATED, status()) << status();
 
   if (!CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableExperimentalWebPlatformFeatures)) {
@@ -388,22 +388,18 @@ void ServiceWorkerVersion::RemoveControllee(
   controllee_by_id_.Remove(found->second);
   controllee_map_.erase(found);
   RemoveProcessFromWorker(provider_host->process_id());
-  if (!HasControllee())
+  if (!HasControllee()) {
     ScheduleStopWorker();
-  // TODO(kinuko): Fire NoControllees notification when the # of controllees
-  // reaches 0, so that a new pending version can be activated (which will
-  // deactivate this version).
-  // TODO(michaeln): On no controllees call storage DeleteVersionResources
-  // if this version has been deactivated. Probably storage can listen for
-  // NoControllees for versions that have been deleted.
+    FOR_EACH_OBSERVER(Listener, listeners_, OnNoControllees(this));
+  }
 }
 
-void ServiceWorkerVersion::AddWaitingControllee(
+void ServiceWorkerVersion::AddPotentialControllee(
     ServiceWorkerProviderHost* provider_host) {
   AddProcessToWorker(provider_host->process_id());
 }
 
-void ServiceWorkerVersion::RemoveWaitingControllee(
+void ServiceWorkerVersion::RemovePotentialControllee(
     ServiceWorkerProviderHost* provider_host) {
   RemoveProcessFromWorker(provider_host->process_id());
 }
@@ -566,10 +562,12 @@ void ServiceWorkerVersion::OnActivateEventFinished(
     return;
   }
   ServiceWorkerStatusCode status = SERVICE_WORKER_OK;
-  if (result == blink::WebServiceWorkerEventResultRejected)
+  if (result == blink::WebServiceWorkerEventResultRejected) {
     status = SERVICE_WORKER_ERROR_ACTIVATE_WORKER_FAILED;
-  else
-    SetStatus(ACTIVE);
+    SetStatus(REDUNDANT);
+  } else {
+    SetStatus(ACTIVATED);
+  }
 
   scoped_refptr<ServiceWorkerVersion> protect(this);
   callback->Run(status);
@@ -585,10 +583,12 @@ void ServiceWorkerVersion::OnInstallEventFinished(
     return;
   }
   ServiceWorkerStatusCode status = SERVICE_WORKER_OK;
-  if (result == blink::WebServiceWorkerEventResultRejected)
+  if (result == blink::WebServiceWorkerEventResultRejected) {
     status = SERVICE_WORKER_ERROR_INSTALL_WORKER_FAILED;
-  else
+    SetStatus(REDUNDANT);
+  } else {
     SetStatus(INSTALLED);
+  }
 
   scoped_refptr<ServiceWorkerVersion> protect(this);
   callback->Run(status);

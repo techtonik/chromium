@@ -1032,13 +1032,6 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(chromeos::switches::kDisableBootAnimation),
   },
   {
-    "enable-new-audio-player",
-    IDS_FLAGS_FILE_MANAGER_ENABLE_NEW_AUDIO_PLAYER_NAME,
-    IDS_FLAGS_FILE_MANAGER_ENABLE_NEW_AUDIO_PLAYER_DESCRIPTION,
-    kOsCrOS,
-    SINGLE_VALUE_TYPE(chromeos::switches::kFileManagerEnableNewAudioPlayer)
-  },
-  {
     "enable-new-gallery",
     IDS_FLAGS_FILE_MANAGER_ENABLE_NEW_GALLERY_NAME,
     IDS_FLAGS_FILE_MANAGER_ENABLE_NEW_GALLERY_DESCRIPTION,
@@ -1086,6 +1079,12 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ASH_ENABLE_TOUCH_VIEW_TESTING_DESCRIPTION,
     kOsCrOS,
     SINGLE_VALUE_TYPE(ash::switches::kAshEnableTouchViewTesting),
+  },
+  { "ash-disable-text-filtering-in-overview-mode",
+    IDS_FLAGS_ASH_DISABLE_TEXT_FILTERING_IN_OVERVIEW_MODE_NAME,
+    IDS_FLAGS_ASH_DISABLE_TEXT_FILTERING_IN_OVERVIEW_MODE_DESCRIPTION,
+    kOsCrOS,
+    SINGLE_VALUE_TYPE(ash::switches::kAshDisableTextFilteringInOverviewMode),
   },
 #endif
 #if defined(OS_CHROMEOS)
@@ -1356,13 +1355,6 @@ const Experiment kExperiments[] = {
     kOsLinux | kOsCrOS | kOsAndroid,
     SINGLE_VALUE_TYPE(switches::kEnableTcpFastOpen)
   },
-  {
-    "enable-syncfs-directory-operation",
-    IDS_FLAGS_ENABLE_SYNC_DIRECTORY_OPERATION_NAME,
-    IDS_FLAGS_ENABLE_SYNC_DIRECTORY_OPERATION_DESCRIPTION,
-    kOsAll,
-    SINGLE_VALUE_TYPE(switches::kSyncfsEnableDirectoryOperation),
-  },
 #if defined(ENABLE_SERVICE_DISCOVERY)
   {
     "disable-device-discovery",
@@ -1513,6 +1505,13 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnableAppList)
   },
 #endif
+  {
+    "enable-app-view",
+    IDS_FLAGS_ENABLE_APP_VIEW_NAME,
+    IDS_FLAGS_ENABLE_APP_VIEW_DESCRIPTION,
+    kOsAll,
+    SINGLE_VALUE_TYPE(switches::kEnableAppView)
+  },
   {
     "disable-app-list-app-info",
     IDS_FLAGS_DISABLE_APP_INFO_IN_APP_LIST,
@@ -1951,6 +1950,15 @@ const Experiment kExperiments[] = {
     ENABLE_DISABLE_VALUE_TYPE(
         data_reduction_proxy::switches::kEnableDataReductionProxyDev,
         data_reduction_proxy::switches::kDisableDataReductionProxyDev)
+  },
+#endif
+#if defined(OS_CHROMEOS)
+  {
+    "enable-ok-google-voice-search",
+    IDS_FLAGS_OK_GOOGLE_NAME,
+    IDS_FLAGS_OK_GOOGLE_DESCRIPTION,
+    kOsCrOS,
+    SINGLE_VALUE_TYPE(chromeos::switches::kEnableOkGoogleVoiceSearch)
   },
 #endif
 };

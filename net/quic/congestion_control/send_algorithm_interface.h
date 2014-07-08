@@ -67,6 +67,9 @@ class NET_EXPORT_PRIVATE SendAlgorithmInterface {
   // nor OnPacketLost will be called for these packets.
   virtual void OnRetransmissionTimeout(bool packets_retransmitted) = 0;
 
+  // Called when the last retransmission timeout was spurious.
+  virtual void RevertRetransmissionTimeout() = 0;
+
   // Calculate the time until we can send the next packet.
   virtual QuicTime::Delta TimeUntilSend(
       QuicTime now,
@@ -76,6 +79,9 @@ class NET_EXPORT_PRIVATE SendAlgorithmInterface {
   // What's the current estimated bandwidth in bytes per second.
   // Returns 0 when it does not have an estimate.
   virtual QuicBandwidth BandwidthEstimate() const = 0;
+
+  // Returns true if the current bandwidth estimate is reliable.
+  virtual bool HasReliableBandwidthEstimate() const = 0;
 
   // Get the send algorithm specific retransmission delay, called RTO in TCP,
   // Note 1: the caller is responsible for sanity checking this value.

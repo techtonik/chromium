@@ -33,9 +33,11 @@
 #include "chrome/browser/chromeos/login/hwid_checker.h"
 #include "chrome/browser/chromeos/login/login_utils.h"
 #include "chrome/browser/chromeos/login/managed/locally_managed_user_creation_screen.h"
+#include "chrome/browser/chromeos/login/screens/controller_pairing_screen.h"
 #include "chrome/browser/chromeos/login/screens/error_screen.h"
 #include "chrome/browser/chromeos/login/screens/eula_screen.h"
 #include "chrome/browser/chromeos/login/screens/hid_detection_screen.h"
+#include "chrome/browser/chromeos/login/screens/host_pairing_screen.h"
 #include "chrome/browser/chromeos/login/screens/kiosk_autolaunch_screen.h"
 #include "chrome/browser/chromeos/login/screens/kiosk_enable_screen.h"
 #include "chrome/browser/chromeos/login/screens/network_screen.h"
@@ -103,12 +105,38 @@ bool CanShowHIDDetectionScreen() {
         chromeos::switches::kDisableHIDDetectionOnOOBE);
 }
 
+bool ShouldShowControllerPairingScreen() {
+  return CommandLine::ForCurrentProcess()->HasSwitch(
+      chromeos::switches::kShowControllerPairingDemo);
+}
+
+bool ShouldShowHostPairingScreen() {
+  return CommandLine::ForCurrentProcess()->HasSwitch(
+      chromeos::switches::kShowHostPairingDemo);
+}
+
 bool IsResumableScreen(const std::string& screen) {
   for (size_t i = 0; i < ARRAYSIZE_UNSAFE(kResumableScreens); ++i) {
     if (screen == kResumableScreens[i])
       return true;
   }
   return false;
+}
+
+void RecordUMAHistogramForOOBEStepCompletionTime(std::string screen_name,
+                                                 base::TimeDelta step_time) {
+  screen_name[0] = std::toupper(screen_name[0]);
+  std::string histogram_name = "OOBE.StepCompletionTime." + screen_name;
+  // Equivalent to using UMA_HISTOGRAM_MEDIUM_TIMES. UMA_HISTOGRAM_MEDIUM_TIMES
+  // can not be used here, because |histogram_name| is calculated dynamically
+  // and changes from call to call.
+  base::HistogramBase* histogram = base::Histogram::FactoryTimeGet(
+      histogram_name,
+      base::TimeDelta::FromMilliseconds(10),
+      base::TimeDelta::FromMinutes(3),
+      50,
+      base::HistogramBase::kUmaTargetedHistogramFlag);
+  histogram->AddTime(step_time);
 }
 
 }  // namespace
@@ -134,6 +162,9 @@ const char WizardController::kLocallyManagedUserCreationScreenName[] =
 const char WizardController::kAppLaunchSplashScreenName[] =
   "app-launch-splash";
 const char WizardController::kHIDDetectionScreenName[] = "hid-detection";
+const char WizardController::kControllerPairingScreenName[] =
+    "controller-pairing";
+const char WizardController::kHostPairingScreenName[] = "host-pairing";
 
 // static
 const int WizardController::kMinAudibleOutputVolumePercent = 10;
@@ -360,6 +391,22 @@ chromeos::HIDDetectionScreen* WizardController::GetHIDDetectionScreen() {
   return hid_detection_screen_.get();
 }
 
+ControllerPairingScreen* WizardController::GetControllerPairingScreen() {
+  if (!controller_pairing_screen_) {
+    controller_pairing_screen_.reset(new ControllerPairingScreen(
+        this, oobe_display_->GetControllerPairingScreenActor()));
+  }
+  return controller_pairing_screen_.get();
+}
+
+HostPairingScreen* WizardController::GetHostPairingScreen() {
+  if (!host_pairing_screen_) {
+    host_pairing_screen_.reset(new HostPairingScreen(
+        this, oobe_display_->GetHostPairingScreenActor()));
+  }
+  return host_pairing_screen_.get();
+}
+
 void WizardController::ShowNetworkScreen() {
   VLOG(1) << "Showing network screen.";
   // Hide the status area initially; it only appears after OOBE first animates
@@ -518,6 +565,18 @@ void WizardController::ShowHIDDetectionScreen() {
   SetCurrentScreen(GetHIDDetectionScreen());
 }
 
+void WizardController::ShowControllerPairingScreen() {
+  VLOG(1) << "Showing controller pairing screen.";
+  SetStatusAreaVisible(false);
+  SetCurrentScreen(GetControllerPairingScreen());
+}
+
+void WizardController::ShowHostPairingScreen() {
+  VLOG(1) << "Showing host pairing screen.";
+  SetStatusAreaVisible(false);
+  SetCurrentScreen(GetHostPairingScreen());
+}
+
 void WizardController::SkipToLoginForTesting(
     const LoginScreenContext& context) {
   VLOG(1) << "SkipToLoginForTesting.";
@@ -578,7 +637,14 @@ void WizardController::OnConnectionFailed() {
 }
 
 void WizardController::OnUpdateCompleted() {
-  ShowAutoEnrollmentCheckScreen();
+  // TODO(dzhioev): place checks related to pairing in a proper place.
+  if (ShouldShowControllerPairingScreen()) {
+    ShowControllerPairingScreen();
+  } else if (ShouldShowHostPairingScreen()) {
+    ShowHostPairingScreen();
+  } else {
+    ShowAutoEnrollmentCheckScreen();
+  }
 }
 
 void WizardController::OnEulaAccepted() {
@@ -635,6 +701,17 @@ void WizardController::OnUserImageSelected() {
       return;
     }
   }
+  if (!time_oobe_started_.is_null()) {
+    base::TimeDelta delta = base::Time::Now() - time_oobe_started_;
+    UMA_HISTOGRAM_CUSTOM_TIMES(
+        "OOBE.BootToSignInCompleted",
+        delta,
+        base::TimeDelta::FromMilliseconds(10),
+        base::TimeDelta::FromMinutes(30),
+        100);
+    time_oobe_started_ = base::Time();
+  }
+
   // Launch browser and delete login host controller.
   BrowserThread::PostTask(
       BrowserThread::UI,
@@ -716,6 +793,14 @@ void WizardController::OnTermsOfServiceAccepted() {
   ShowUserImageScreen();
 }
 
+void WizardController::OnControllerPairingFinished() {
+  ShowAutoEnrollmentCheckScreen();
+}
+
+void WizardController::OnHostPairingFinished() {
+  ShowAutoEnrollmentCheckScreen();
+}
+
 void WizardController::InitiateOOBEUpdate() {
   PerformPostEulaActions();
   SetCurrentScreenSmooth(GetUpdateScreen(), true);
@@ -752,11 +837,11 @@ void WizardController::PerformPostEulaActions() {
 }
 
 void WizardController::PerformOOBECompletedActions() {
-  StartupUtils::MarkOobeCompleted();
   UMA_HISTOGRAM_COUNTS_100(
       "HIDDetection.TimesDialogShownPerOOBECompleted",
       GetLocalState()->GetInteger(prefs::kTimesHIDDialogShown));
   GetLocalState()->ClearPref(prefs::kTimesHIDDialogShown);
+  StartupUtils::MarkOobeCompleted();
 }
 
 void WizardController::SetCurrentScreen(WizardScreen* new_current) {
@@ -777,7 +862,7 @@ void WizardController::ShowCurrentScreen() {
 
   FOR_EACH_OBSERVER(Observer, observer_list_, OnScreenChanged(current_screen_));
 
-  oobe_display_->ShowScreen(current_screen_);
+  current_screen_->Show();
 }
 
 void WizardController::SetCurrentScreenSmooth(WizardScreen* new_current,
@@ -791,7 +876,11 @@ void WizardController::SetCurrentScreenSmooth(WizardScreen* new_current,
   smooth_show_timer_.Stop();
 
   if (current_screen_)
-    oobe_display_->HideScreen(current_screen_);
+    current_screen_->Hide();
+
+  std::string screen_id = new_current->GetName();
+  if (IsOOBEStepToTrack(screen_id))
+    screen_show_times_[screen_id] = base::Time::Now();
 
   previous_screen_ = current_screen_;
   current_screen_ = new_current;
@@ -842,8 +931,13 @@ void WizardController::AdvanceToScreen(const std::string& screen_name) {
     AutoLaunchKioskApp();
   } else if (screen_name == kHIDDetectionScreenName) {
     ShowHIDDetectionScreen();
+  } else if (screen_name == kControllerPairingScreenName) {
+    ShowControllerPairingScreen();
+  } else if (screen_name == kHostPairingScreenName) {
+    ShowHostPairingScreen();
   } else if (screen_name != kTestNoScreenName) {
     if (is_out_of_box_) {
+      time_oobe_started_ = base::Time::Now();
       if (CanShowHIDDetectionScreen())
         ShowHIDDetectionScreen();
       else
@@ -858,6 +952,12 @@ void WizardController::AdvanceToScreen(const std::string& screen_name) {
 // WizardController, chromeos::ScreenObserver overrides:
 void WizardController::OnExit(ExitCodes exit_code) {
   VLOG(1) << "Wizard screen exit code: " << exit_code;
+  std::string previous_screen_id = current_screen_->GetName();
+  if (IsOOBEStepToTrack(previous_screen_id)) {
+    RecordUMAHistogramForOOBEStepCompletionTime(
+        previous_screen_id,
+        base::Time::Now() - screen_show_times_[previous_screen_id]);
+  }
   switch (exit_code) {
     case HID_DETECTION_COMPLETED:
       OnHIDDetectionCompleted();
@@ -922,6 +1022,12 @@ void WizardController::OnExit(ExitCodes exit_code) {
       break;
     case WRONG_HWID_WARNING_SKIPPED:
       OnWrongHWIDWarningSkipped();
+      break;
+    case CONTROLLER_PAIRING_FINISHED:
+      OnControllerPairingFinished();
+      break;
+    case HOST_PAIRING_FINISHED:
+      OnHostPairingFinished();
       break;
     default:
       NOTREACHED();
@@ -997,6 +1103,17 @@ void WizardController::SetZeroDelays() {
 // static
 bool WizardController::IsZeroDelayEnabled() {
   return zero_delay_enabled_;
+}
+
+// static
+bool WizardController::IsOOBEStepToTrack(const std::string& screen_id) {
+  return (screen_id == kHIDDetectionScreenName ||
+          screen_id == kNetworkScreenName ||
+          screen_id == kUpdateScreenName ||
+          screen_id == kUserImageScreenName ||
+          screen_id == kEulaScreenName ||
+          screen_id == kLoginScreenName ||
+          screen_id == kWrongHWIDScreenName);
 }
 
 // static

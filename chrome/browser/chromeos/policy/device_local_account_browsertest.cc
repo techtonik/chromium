@@ -90,6 +90,7 @@
 #include "components/policy/core/common/policy_service.h"
 #include "components/policy/core/common/policy_switches.h"
 #include "components/signin/core/common/signin_pref_names.h"
+#include "components/user_manager/user_type.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/notification_source.h"
@@ -418,7 +419,7 @@ class DeviceLocalAccountTest : public DevicePolicyCrosBrowserTest,
     const chromeos::User* user = chromeos::UserManager::Get()->FindUser(id);
     ASSERT_TRUE(user);
     EXPECT_EQ(id, user->email());
-    EXPECT_EQ(chromeos::User::USER_TYPE_PUBLIC_ACCOUNT, user->GetType());
+    EXPECT_EQ(user_manager::USER_TYPE_PUBLIC_ACCOUNT, user->GetType());
   }
 
   base::FilePath GetExtensionCacheDirectoryForAccountID(
@@ -720,7 +721,7 @@ IN_PROC_BROWSER_TEST_F(DeviceLocalAccountTest, ExtensionsUncached) {
 
   // Start listening for app/extension installation results.
   content::WindowedNotificationObserver hosted_app_observer(
-      chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
+      chrome::NOTIFICATION_EXTENSION_WILL_BE_INSTALLED_DEPRECATED,
       base::Bind(DoesInstallSuccessReferToId, kHostedAppID));
   content::WindowedNotificationObserver extension_observer(
       chrome::NOTIFICATION_EXTENSION_INSTALL_ERROR,
@@ -815,7 +816,7 @@ IN_PROC_BROWSER_TEST_F(DeviceLocalAccountTest, ExtensionsCached) {
 
   // Start listening for app/extension installation results.
   content::WindowedNotificationObserver hosted_app_observer(
-      chrome::NOTIFICATION_EXTENSION_INSTALLED_DEPRECATED,
+      chrome::NOTIFICATION_EXTENSION_WILL_BE_INSTALLED_DEPRECATED,
       base::Bind(DoesInstallSuccessReferToId, kHostedAppID));
   content::WindowedNotificationObserver extension_observer(
       chrome::NOTIFICATION_EXTENSION_INSTALL_ERROR,

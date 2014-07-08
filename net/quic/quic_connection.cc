@@ -1482,8 +1482,8 @@ bool QuicConnection::OnPacketSent(WriteResult result) {
   pending_write_.reset();
 
   if (result.status == WRITE_STATUS_ERROR) {
-    DVLOG(1) << "Write failed with error: " << result.error_code << " ("
-             << ErrorToString(result.error_code) << ")";
+    DVLOG(1) << ENDPOINT << "Write failed with error: " << result.error_code
+             << " (" << ErrorToString(result.error_code) << ")";
     // We can't send an error as the socket is presumably borked.
     CloseConnection(QUIC_PACKET_WRITE_ERROR, false);
     return false;
@@ -1573,8 +1573,8 @@ void QuicConnection::SendPing() {
   if (retransmission_alarm_->IsSet()) {
     return;
   }
-  if (version() <= QUIC_VERSION_17) {
-    // TODO(rch): remove this when we remove version 17.
+  if (version() <= QUIC_VERSION_16) {
+    // TODO(rch): remove this when we remove version 15 and 16.
     // This is a horrible hideous hack which we should not support.
     IOVector data;
     char c_data[] = "C";

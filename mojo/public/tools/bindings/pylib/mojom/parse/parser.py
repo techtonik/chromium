@@ -70,10 +70,26 @@ class Parser(object):
     self.source = source
     self.filename = filename
 
+  # Names of functions
+  #
+  # In general, we name functions after the left-hand-side of the rule(s) that
+  # they handle. E.g., |p_foo_bar| for a rule |foo_bar : ...|.
+  #
+  # There may be multiple functions handling rules for the same left-hand-side;
+  # then we name the functions |p_foo_bar_N| (for left-hand-side |foo_bar|),
+  # where N is a number (numbered starting from 1). Note that using multiple
+  # functions is actually more efficient than having single functions handle
+  # multiple rules (and, e.g., distinguishing them by examining |len(p)|).
+  #
+  # It's also possible to have a function handling multiple rules with different
+  # left-hand-sides. We do not do this.
+  #
+  # See http://www.dabeaz.com/ply/ply.html#ply_nn25 for more details.
+
   def p_root(self, p):
     """root : import root
             | module
-            | definitions"""
+            | definition_list"""
     if len(p) > 2:
       p[0] = _ListFromConcat(p[1], p[2])
     else:
@@ -90,12 +106,13 @@ class Parser(object):
     p[0] = ('IMPORT', eval(p[2]))
 
   def p_module(self, p):
-    """module : attribute_section MODULE identifier LBRACE definitions RBRACE"""
+    """module : attribute_section MODULE identifier LBRACE definition_list \
+                    RBRACE"""
     p[0] = ('MODULE', p[3], p[1], p[5])
 
-  def p_definitions(self, p):
-    """definitions : definition definitions
-                   | """
+  def p_definition_list(self, p):
+    """definition_list : definition definition_list
+                       | """
     if len(p) > 1:
       p[0] = _ListFromConcat(p[1], p[2])
 
@@ -107,15 +124,15 @@ class Parser(object):
     p[0] = p[1]
 
   def p_attribute_section(self, p):
-    """attribute_section : LBRACKET attributes RBRACKET
+    """attribute_section : LBRACKET attribute_list RBRACKET
                          | """
     if len(p) > 3:
       p[0] = p[2]
 
-  def p_attributes(self, p):
-    """attributes : attribute
-                  | attribute COMMA attributes
-                  | """
+  def p_attribute_list(self, p):
+    """attribute_list : attribute
+                      | attribute COMMA attribute_list
+                      | """
     if len(p) == 2:
       p[0] = _ListFromConcat(p[1])
     elif len(p) > 3:
@@ -167,29 +184,36 @@ class Parser(object):
       p[0] = _ListFromConcat(p[1], p[2])
 
   def p_response(self, p):
-    """response : RESPONSE LPAREN parameters RPAREN
+    """response : RESPONSE LPAREN parameter_list RPAREN
                 | """
     if len(p) > 3:
       p[0] = p[3]
 
   def p_method(self, p):
-    """method : NAME ordinal LPAREN parameters RPAREN response SEMI"""
+    """method : NAME ordinal LPAREN parameter_list RPAREN response SEMI"""
     p[0] = ('METHOD', p[1], p[4], p[2], p[6])
 
-  def p_parameters(self, p):
-    """parameters : parameter
-                  | parameter COMMA parameters
-                  | """
-    if len(p) == 1:
-      p[0] = []
-    elif len(p) == 2:
-      p[0] = _ListFromConcat(p[1])
-    elif len(p) > 3:
-      p[0] = _ListFromConcat(p[1], p[3])
+  def p_parameter_list_1(self, p):
+    """parameter_list : """
+    p[0] = ast.ParameterList()
+
+  def p_parameter_list_2(self, p):
+    """parameter_list : nonempty_parameter_list"""
+    p[0] = p[1]
+
+  def p_nonempty_parameter_list_1(self, p):
+    """nonempty_parameter_list : parameter"""
+    p[0] = ast.ParameterList(p[1])
+
+  def p_nonempty_parameter_list_2(self, p):
+    """nonempty_parameter_list : nonempty_parameter_list COMMA parameter"""
+    p[0] = p[1]
+    p[0].Append(p[3])
 
   def p_parameter(self, p):
     """parameter : typename NAME ordinal"""
-    p[0] = ('PARAM', p[1], p[2], p[3])
+    p[0] = ast.Parameter(p[1], p[2], p[3],
+                         filename=self.filename, lineno=p.lineno(1))
 
   def p_typename(self, p):
     """typename : basictypename
@@ -229,8 +253,8 @@ class Parser(object):
     value = int(p[3])
     if value == 0 or value > _MAX_ARRAY_SIZE:
       raise ParseError(self.filename, "Fixed array size %d invalid" % value,
-                       lineno=p.lineno(1),
-                       snippet=self._GetSnippet(p.lineno(1)))
+                       lineno=p.lineno(3),
+                       snippet=self._GetSnippet(p.lineno(3)))
     p[0] = p[1] + "[" + p[3] + "]"
 
   def p_interfacerequest(self, p):
@@ -251,13 +275,13 @@ class Parser(object):
       p[0] = ast.Ordinal(None)
 
   def p_enum(self, p):
-    """enum : ENUM NAME LBRACE enum_fields RBRACE SEMI"""
+    """enum : ENUM NAME LBRACE enum_field_list RBRACE SEMI"""
     p[0] = ('ENUM', p[2], p[4])
 
-  def p_enum_fields(self, p):
-    """enum_fields : enum_field
-                   | enum_field COMMA enum_fields
-                   | """
+  def p_enum_field_list(self, p):
+    """enum_field_list : enum_field
+                       | enum_field COMMA enum_field_list
+                       | """
     if len(p) == 2:
       p[0] = _ListFromConcat(p[1])
     elif len(p) > 3:
@@ -291,7 +315,6 @@ class Parser(object):
 
   def p_literal(self, p):
     """literal : number
-               | CHAR_CONST
                | TRUE
                | FALSE
                | DEFAULT

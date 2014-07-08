@@ -106,7 +106,7 @@
         # This condition is for Windows 8 Metro mode support.  We need to
         # specify a particular desktop during widget creation in that case.
         # This is done using the desktop aura native widget framework.
-        ['use_ash==1 and OS=="win"', {
+        ['OS=="win"', {
           'dependencies': [
             '../aura/aura.gyp:aura',
           ],
@@ -140,6 +140,7 @@
             ['exclude', '\\.(cc|mm)$'],
             ['include', '^dummy_message_center\\.cc$'],
             ['include', '^message_center_switches\\.cc$'],
+            ['include', '^notification_delegate\\.cc$'],
           ],
         }, {  # notifications==1
           'sources!': [ 'dummy_message_center.cc' ],
@@ -148,7 +149,6 @@
         ['OS=="android"', {
           'sources/': [
             ['include', '^notification\\.cc$'],
-            ['include', '^notification_delegate\\.cc$'],
             ['include', '^notifier_settings\\.cc$'],
           ],
         }],

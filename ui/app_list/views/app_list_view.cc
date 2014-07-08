@@ -11,6 +11,7 @@
 #include "base/win/windows_version.h"
 #include "ui/app_list/app_list_constants.h"
 #include "ui/app_list/app_list_model.h"
+#include "ui/app_list/app_list_switches.h"
 #include "ui/app_list/app_list_view_delegate.h"
 #include "ui/app_list/speech_ui_model.h"
 #include "ui/app_list/views/app_list_background.h"
@@ -21,10 +22,12 @@
 #include "ui/app_list/views/contents_view.h"
 #include "ui/app_list/views/search_box_view.h"
 #include "ui/app_list/views/speech_view.h"
+#include "ui/app_list/views/start_page_view.h"
 #include "ui/base/ui_base_switches.h"
 #include "ui/compositor/layer.h"
 #include "ui/compositor/layer_animation_observer.h"
 #include "ui/compositor/scoped_layer_animation_settings.h"
+#include "ui/gfx/canvas.h"
 #include "ui/gfx/image/image_skia.h"
 #include "ui/gfx/insets.h"
 #include "ui/gfx/path.h"
@@ -65,7 +68,7 @@ bool SupportsShadow() {
   // Shadows are not supported on Windows without Aero Glass.
   if (!ui::win::IsAeroGlassEnabled() ||
       CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kDisableDwmComposition)) {
+          ::switches::kDisableDwmComposition)) {
     return false;
   }
 #elif defined(OS_LINUX) && !defined(OS_CHROMEOS)
@@ -74,6 +77,28 @@ bool SupportsShadow() {
 #endif
   return true;
 }
+
+// The background for the App List overlay, which appears as a white rounded
+// rectangle with the given radius and the same size as the target view.
+class AppListOverlayBackground : public views::Background {
+ public:
+  AppListOverlayBackground(int corner_radius)
+      : corner_radius_(corner_radius) {};
+  virtual ~AppListOverlayBackground() {};
+
+  // Overridden from views::Background:
+  virtual void Paint(gfx::Canvas* canvas, views::View* view) const OVERRIDE {
+    SkPaint paint;
+    paint.setStyle(SkPaint::kFill_Style);
+    paint.setColor(SK_ColorWHITE);
+    canvas->DrawRoundRect(view->GetContentsBounds(), corner_radius_, paint);
+  }
+
+ private:
+  const int corner_radius_;
+
+  DISALLOW_COPY_AND_ASSIGN(AppListOverlayBackground);
+};
 
 }  // namespace
 
@@ -123,6 +148,7 @@ AppListView::AppListView(AppListViewDelegate* delegate)
     : delegate_(delegate),
       app_list_main_view_(NULL),
       speech_view_(NULL),
+      overlay_view_(NULL),
       animation_observer_(new HideViewAnimationObserver()) {
   CHECK(delegate);
 
@@ -188,6 +214,11 @@ void AppListView::Close() {
 
 void AppListView::UpdateBounds() {
   SizeToContents();
+}
+
+void AppListView::SetAppListOverlayVisible(bool visible) {
+  DCHECK(overlay_view_);
+  overlay_view_->SetVisible(visible);
 }
 
 bool AppListView::ShouldCenterWindow() const {
@@ -317,6 +348,26 @@ void AppListView::InitAsBubbleInternal(gfx::NativeView parent,
   GetWidget()->Hide();
 #endif
 
+  // To make the overlay view, construct a view with a white background, rather
+  // than a white rectangle in it. This is because we need overlay_view_ to be
+  // drawn to its own layer (so it appears correctly in the foreground).
+  const float kOverlayOpacity = 0.75f;
+  overlay_view_ = new views::View();
+  overlay_view_->SetPaintToLayer(true);
+  overlay_view_->layer()->SetOpacity(kOverlayOpacity);
+  overlay_view_->SetBoundsRect(GetContentsBounds());
+  overlay_view_->SetVisible(false);
+  // On platforms that don't support a shadow, the rounded border of the app
+  // list is constructed _inside_ the view, so a rectangular background goes
+  // over the border in the rounded corners. To fix this, give the background a
+  // corner radius 1px smaller than the outer border, so it just reaches but
+  // doesn't cover it.
+  const int kOverlayCornerRadius =
+      GetBubbleFrameView()->bubble_border()->GetBorderCornerRadius();
+  overlay_view_->set_background(new AppListOverlayBackground(
+      kOverlayCornerRadius - (SupportsShadow() ? 0 : 1)));
+  AddChildView(overlay_view_);
+
   if (delegate_)
     delegate_->ViewInitialized();
 }
@@ -345,7 +396,12 @@ void AppListView::OnBeforeBubbleWidgetInit(
 }
 
 views::View* AppListView::GetInitiallyFocusedView() {
-  return app_list_main_view_->search_box_view()->search_box();
+  return app_list::switches::IsExperimentalAppListEnabled()
+             ? app_list_main_view_->contents_view()
+                   ->start_page_view()
+                   ->dummy_search_box_view()
+                   ->search_box()
+             : app_list_main_view_->search_box_view()->search_box();
 }
 
 gfx::ImageSkia AppListView::GetWindowIcon() {

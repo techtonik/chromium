@@ -37,14 +37,14 @@ const char kDisableDemoMode[] = "disable-demo-mode";
 const char kDisableGeniusApp[] = "disable-genius-app";
 
 // Disable HID-detection OOBE screen.
-const char kDisableHIDDetectionOnOOBE[]      = "disable-hid-detection-on-oobe";
+const char kDisableHIDDetectionOnOOBE[] = "disable-hid-detection-on-oobe";
 
 // Avoid doing expensive animations upon login.
 const char kDisableLoginAnimations[] = "disable-login-animations";
 
 // Disable login/lock UI (user pods) scrolling into view on JS side when virtual
 // keyboard is shown.
-const char kDisableLoginScrollIntoView[]    = "disable-login-scroll-into-view";
+const char kDisableLoginScrollIntoView[] = "disable-login-scroll-into-view";
 
 // Disable new channel switcher UI.
 const char kDisableNewChannelSwitcherUI[] = "disable-new-channel-switcher-ui";
@@ -92,6 +92,9 @@ const char kEnableFileManagerMTP[] = "enable-filemanager-mtp";
 const char kEnableNetworkPortalNotification[] =
     "enable-network-portal-notification";
 
+// Enables activation of voice search by saying 'Ok Google'.
+const char kEnableOkGoogleVoiceSearch[] = "enable-ok-google-voice-search";
+
 // Enables touchpad three-finger-click as middle button.
 const char kEnableTouchpadThreeFingerClick[]
     = "enable-touchpad-three-finger-click";
@@ -125,10 +128,6 @@ const char kEnterpriseEnrollmentSkipRobotAuth[] =
 // Enables the new gallery in the Files.app.
 const char kFileManagerEnableNewGallery[] =
     "file-manager-enable-new-gallery";
-
-// Enables the new audio player in the Files.app.
-const char kFileManagerEnableNewAudioPlayer[] =
-    "file-manager-enable-new-audio-player";
 
 // Passed to Chrome the first time that it's run after the system boots.
 // Not passed on restart after sign out.
@@ -165,11 +164,11 @@ const char kKioskModeScreensaverPath[] = "kiosk-mode-screensaver-path";
 // Enables Chrome-as-a-login-manager behavior.
 const char kLoginManager[] = "login-manager";
 
-// Specifies a password to be used to login (along with login-user).
-const char kLoginPassword[] = "login-password";
-
-// Specifies the profile to use once a chromeos user is logged in. This is
-// required unless --multi-profile is set.
+// Specifies the profile to use once a chromeos user is logged in.
+// This parameter is ignored if user goes through login screen since user_id
+// hash defines which profile directory to use.
+// In case of browser restart within active session this parameter is used
+// to pass user_id hash for primary user.
 const char kLoginProfile[] = "login-profile";
 
 // Specifies the user which is already logged in.
@@ -205,6 +204,14 @@ const char kPowerStub[] = "power-stub";
 //  'cellular=1' - Cellular is initially connected
 //  'interactive=3' - Interactive mode, connect/scan/etc requests take 3 secs
 const char kShillStub[] = "shill-stub";
+
+// If this switch is set, controller pairing process is displayed after update
+// stage of OOBE.
+const char kShowControllerPairingDemo[] = "show-controller-pairing-demo";
+
+// If this switch is set, controller pairing process is displayed after update
+// stage of OOBE.
+const char kShowHostPairingDemo[] = "show-host-pairing-demo";
 
 // Sends test messages on first call to RequestUpdate (stub only).
 const char kSmsTestMessages[] = "sms-test-messages";

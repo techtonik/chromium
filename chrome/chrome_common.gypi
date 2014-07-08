@@ -107,6 +107,8 @@
       'common/extensions/manifest_handlers/nacl_modules_handler.h',
       'common/extensions/manifest_handlers/settings_overrides_handler.cc',
       'common/extensions/manifest_handlers/settings_overrides_handler.h',
+      'common/extensions/manifest_handlers/synthesize_browser_action_handler.cc',
+      'common/extensions/manifest_handlers/synthesize_browser_action_handler.h',
       'common/extensions/manifest_handlers/theme_handler.cc',
       'common/extensions/manifest_handlers/theme_handler.h',
       'common/extensions/manifest_handlers/ui_overrides_handler.cc',
@@ -288,7 +290,7 @@
         'common_net',
         'common_version',
         'installer_util',
-        'metrics_proto',
+        'safe_browsing_proto',
         '<(DEPTH)/base/base.gyp:base',
         '<(DEPTH)/base/base.gyp:base_i18n',
         '<(DEPTH)/base/base.gyp:base_prefs',
@@ -435,8 +437,6 @@
           'sources/': [
             ['exclude', '^common/chrome_version_info_posix.cc'],
             ['exclude', '^common/importer/'],
-            ['include', '^common/importer/imported_favicon_usage.cc$'],
-            ['include', '^common/importer/imported_favicon_usage.h$'],
             ['exclude', '^common/media_galleries/'],
             ['exclude', '^common/service_'],
           ],
@@ -513,7 +513,6 @@
       ],
       'export_dependent_settings': [
         '../base/base.gyp:base',
-        'metrics_proto',
       ],
     },
     {
@@ -671,21 +670,6 @@
       'variables': {
         'proto_in_dir': 'common/safe_browsing',
         'proto_out_dir': 'chrome/common/safe_browsing',
-      },
-      'includes': [ '../build/protoc.gypi' ],
-    },
-    {
-      # Protobuf compiler / generator for UMA (User Metrics Analysis).
-
-      # GN version: //chrome/common/metrics/proto:proto
-      'target_name': 'metrics_proto',
-      'type': 'static_library',
-      'sources': [
-        'common/metrics/proto/chrome_experiments.proto',
-      ],
-      'variables': {
-        'proto_in_dir': 'common/metrics/proto',
-        'proto_out_dir': 'chrome/common/metrics/proto',
       },
       'includes': [ '../build/protoc.gypi' ],
     },

@@ -8,7 +8,6 @@
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
-#include "chrome/browser/search_engines/template_url_service.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/search_engines/template_url_service_test_util.h"
 #include "chrome/browser/search_engines/ui_thread_search_terms_data.h"
@@ -17,6 +16,8 @@
 #include "components/search_engines/search_engines_pref_names.h"
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_prepopulate_data.h"
+#include "components/search_engines/template_url_service.h"
+#include "components/search_engines/template_url_service_client.h"
 #include "net/base/net_util.h"
 #include "sync/api/sync_change_processor_wrapper_for_test.h"
 #include "sync/api/sync_error_factory.h"
@@ -235,7 +236,10 @@ void TemplateURLServiceSyncTest::SetUp() {
   profile_b_.reset(new TestingProfile);
   TemplateURLServiceFactory::GetInstance()->
       RegisterUserPrefsOnBrowserContextForTest(profile_b_.get());
-  model_b_.reset(new TemplateURLService(profile_b_.get(), NULL));
+  model_b_.reset(new TemplateURLService(
+      profile_b_->GetPrefs(), scoped_ptr<SearchTermsData>(
+          new UIThreadSearchTermsData(profile_b_.get())), NULL,
+      scoped_ptr<TemplateURLServiceClient>(), NULL, NULL, base::Closure()));
   model_b_->Load();
 }
 

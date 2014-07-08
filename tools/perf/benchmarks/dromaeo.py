@@ -14,17 +14,22 @@ from telemetry.page import page_set
 class _DromaeoMeasurement(page_measurement.PageMeasurement):
   def __init__(self):
     super(_DromaeoMeasurement, self).__init__()
-    self._power_metric = power.PowerMetric()
+    self._power_metric = None
 
   def CustomizeBrowserOptions(self, options):
     power.PowerMetric.CustomizeBrowserOptions(options)
+
+  def WillStartBrowser(self, browser):
+    self._power_metric = power.PowerMetric(browser)
 
   def DidNavigateToPage(self, page, tab):
     self._power_metric.Start(page, tab)
 
   def MeasurePage(self, page, tab, results):
     tab.WaitForJavaScriptExpression(
-        'window.document.getElementById("pause").value == "Run"', 60)
+        'window.document.getElementById("pause") &&' +
+        'window.document.getElementById("pause").value == "Run"',
+        120)
 
     # Start spying on POST request that will report benchmark results, and
     # intercept result data.
@@ -77,11 +82,11 @@ class _DromaeoMeasurement(page_measurement.PageMeasurement):
       AddResult('%s/%s' % (data['collection'], data['name']),
                 data['mean'])
 
-      escaped_top_name = data['collection'].split('-', 1)[0]
-      AggregateData(aggregated, escaped_top_name, data['mean'])
+      top_name = data['collection'].split('-', 1)[0]
+      AggregateData(aggregated, top_name, data['mean'])
 
-      escaped_collection = data['collection']
-      AggregateData(aggregated, escaped_collection, data['mean'])
+      collection_name = data['collection']
+      AggregateData(aggregated, collection_name, data['mean'])
 
     for key, value in aggregated.iteritems():
       AddResult(key, math.exp(value['sum'] / value['count']))

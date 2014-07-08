@@ -57,28 +57,19 @@ class WebNavigationTabObserver
   virtual void AboutToNavigateRenderView(
       content::RenderViewHost* render_view_host) OVERRIDE;
   virtual void DidStartProvisionalLoadForFrame(
-      int64 frame_num,
-      int64 parent_frame_num,
-      bool is_main_frame,
+      content::RenderFrameHost* render_frame_host,
       const GURL& validated_url,
       bool is_error_page,
-      bool is_iframe_srcdoc,
-      content::RenderViewHost* render_view_host) OVERRIDE;
+      bool is_iframe_srcdoc) OVERRIDE;
   virtual void DidCommitProvisionalLoadForFrame(
-      int64 frame_num,
-      const base::string16& frame_unique_name,
-      bool is_main_frame,
+      content::RenderFrameHost* render_frame_host,
       const GURL& url,
-      content::PageTransition transition_type,
-      content::RenderViewHost* render_view_host) OVERRIDE;
+      content::PageTransition transition_type) OVERRIDE;
   virtual void DidFailProvisionalLoad(
-      int64 frame_num,
-      const base::string16& frame_unique_name,
-      bool is_main_frame,
+      content::RenderFrameHost* render_frame_host,
       const GURL& validated_url,
       int error_code,
-      const base::string16& error_description,
-      content::RenderViewHost* render_view_host) OVERRIDE;
+      const base::string16& error_description) OVERRIDE;
   virtual void DocumentLoadedInFrame(
       int64 frame_num,
       content::RenderViewHost* render_view_host) OVERRIDE;
@@ -103,8 +94,8 @@ class WebNavigationTabObserver
                                    WindowOpenDisposition disposition,
                                    content::PageTransition transition,
                                    int64 source_frame_num) OVERRIDE;
-  virtual void FrameDetached(content::RenderViewHost* render_view_host,
-                             int64 frame_num) OVERRIDE;
+  virtual void FrameDetached(
+      content::RenderFrameHost* render_view_host) OVERRIDE;
   virtual void WebContentsDestroyed() OVERRIDE;
 
  private:

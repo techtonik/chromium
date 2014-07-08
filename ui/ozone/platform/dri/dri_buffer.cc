@@ -31,7 +31,7 @@ uint8_t GetColorDepth(SkColorType type) {
       return 16;
     case kARGB_4444_SkColorType:
       return 12;
-    case kPMColor_SkColorType:
+    case kN32_SkColorType:
       return 24;
     default:
       NOTREACHED();
@@ -41,6 +41,7 @@ uint8_t GetColorDepth(SkColorType type) {
 
 void DestroyDumbBuffer(int fd, uint32_t handle) {
   struct drm_mode_destroy_dumb destroy_request;
+  memset(&destroy_request, 0, sizeof(destroy_request));
   destroy_request.handle = handle;
   drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy_request);
 }
@@ -50,14 +51,15 @@ bool CreateDumbBuffer(int fd,
                       uint32_t* handle,
                       uint32_t* stride) {
   struct drm_mode_create_dumb request;
+  memset(&request, 0, sizeof(request));
   request.width = info.width();
   request.height = info.height();
   request.bpp = info.bytesPerPixel() << 3;
   request.flags = 0;
 
   if (drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &request) < 0) {
-    DLOG(ERROR) << "Cannot create dumb buffer (" << errno << ") "
-                << strerror(errno);
+    VLOG(2) << "Cannot create dumb buffer (" << errno << ") "
+            << strerror(errno);
     return false;
   }
 
@@ -95,7 +97,7 @@ DriBuffer::~DriBuffer() {
 bool DriBuffer::Initialize(const SkImageInfo& info) {
   void* pixels = NULL;
   if (!CreateDumbBuffer(dri_->get_fd(), info, &handle_, &stride_)) {
-    DLOG(ERROR) << "Cannot allocate drm dumb buffer";
+    VLOG(2) << "Cannot allocate drm dumb buffer";
     return false;
   }
 
@@ -103,7 +105,7 @@ bool DriBuffer::Initialize(const SkImageInfo& info) {
                      handle_,
                      info.getSafeSize(stride_),
                      &pixels)) {
-    DLOG(ERROR) << "Cannot map drm dumb buffer";
+    VLOG(2) << "Cannot map drm dumb buffer";
     DestroyDumbBuffer(dri_->get_fd(), handle_);
     return false;
   }
@@ -115,13 +117,13 @@ bool DriBuffer::Initialize(const SkImageInfo& info) {
                             stride_,
                             handle_,
                             &framebuffer_)) {
-    DLOG(ERROR) << "Failed to register framebuffer: " << strerror(errno);
+    VLOG(2) << "Failed to register framebuffer: " << strerror(errno);
     return false;
   }
 
   surface_ = skia::AdoptRef(SkSurface::NewRasterDirect(info, pixels, stride_));
   if (!surface_) {
-    DLOG(ERROR) << "Cannot install Skia pixels for drm buffer";
+    VLOG(2) << "Cannot install Skia pixels for drm buffer";
     return false;
   }
 

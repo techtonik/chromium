@@ -49,11 +49,11 @@ struct {
 } const kDefaultAudioConstraints[] = {
   { MediaAudioConstraints::kEchoCancellation, true },
   { MediaAudioConstraints::kGoogEchoCancellation, true },
-#if defined(OS_CHROMEOS) || defined(OS_MACOSX)
-  // Enable the extended filter mode AEC on platforms with known echo issues.
-  { MediaAudioConstraints::kGoogExperimentalEchoCancellation, true },
-#else
+#if defined(OS_ANDROID) || defined(OS_IOS)
   { MediaAudioConstraints::kGoogExperimentalEchoCancellation, false },
+#else
+  // Enable the extended filter mode AEC on all non-mobile platforms.
+  { MediaAudioConstraints::kGoogExperimentalEchoCancellation, true },
 #endif
   { MediaAudioConstraints::kGoogAutoGainControl, true },
   { MediaAudioConstraints::kGoogExperimentalAutoGainControl, true },
@@ -62,7 +62,10 @@ struct {
   { MediaAudioConstraints::kGoogTypingNoiseDetection, true },
   { MediaAudioConstraints::kGoogExperimentalNoiseSuppression, false },
 #if defined(OS_WIN)
-  { kMediaStreamAudioDucking, true },
+  // TODO(tommi): Turn this back to |true| on Windows when ducking issues
+  // have been resolved.
+  // Bugs: crbug/391414, crbug/391247.
+  { kMediaStreamAudioDucking, false },
 #else
   { kMediaStreamAudioDucking, false },
 #endif
@@ -234,7 +237,9 @@ void EnableNoiseSuppression(AudioProcessing* audio_processing) {
 }
 
 void EnableExperimentalNoiseSuppression(AudioProcessing* audio_processing) {
-  CHECK_EQ(audio_processing->EnableExperimentalNs(true), 0);
+  webrtc::Config config;
+  config.Set<webrtc::ExperimentalNs>(new webrtc::ExperimentalNs(true));
+  audio_processing->SetExtraOptions(config);
 }
 
 void EnableHighPassFilter(AudioProcessing* audio_processing) {

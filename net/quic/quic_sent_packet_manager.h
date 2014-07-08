@@ -165,6 +165,9 @@ class NET_EXPORT_PRIVATE QuicSentPacketManager {
   // Returns the estimated bandwidth calculated by the congestion algorithm.
   QuicBandwidth BandwidthEstimate() const;
 
+  // Returns true if the current bandwidth estimate is reliable.
+  bool HasReliableBandwidthEstimate() const;
+
   // Returns the size of the current congestion window in bytes.  Note, this is
   // not the *available* window.  Some send algorithms may not use a congestion
   // window and will return 0.
@@ -178,6 +181,10 @@ class NET_EXPORT_PRIVATE QuicSentPacketManager {
 
   void set_debug_delegate(DebugDelegate* debug_delegate) {
     debug_delegate_ = debug_delegate;
+  }
+
+  QuicPacketSequenceNumber largest_observed() const {
+    return largest_observed_;
   }
 
  private:
@@ -290,7 +297,13 @@ class NET_EXPORT_PRIVATE QuicSentPacketManager {
   scoped_ptr<SendAlgorithmInterface> send_algorithm_;
   scoped_ptr<LossDetectionInterface> loss_algorithm_;
 
-  QuicPacketSequenceNumber largest_observed_;  // From the most recent ACK.
+  // The largest sequence number which we have sent and received an ACK for
+  // from the peer.
+  QuicPacketSequenceNumber largest_observed_;
+
+  // Tracks the first RTO packet.  If any packet before that packet gets acked,
+  // it indicates the RTO was spurious and should be reversed(F-RTO).
+  QuicPacketSequenceNumber first_rto_transmission_;
   // Number of times the RTO timer has fired in a row without receiving an ack.
   size_t consecutive_rto_count_;
   // Number of times the tail loss probe has been sent.

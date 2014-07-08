@@ -875,7 +875,8 @@ void WebMediaPlayerAndroid::ReleaseMediaResources() {
       break;
   }
   player_manager_->ReleaseResources(player_id_);
-  OnPlayerReleased();
+  if (!needs_external_surface_)
+    SetNeedsEstablishPeer(true);
 }
 
 void WebMediaPlayerAndroid::OnDestruct() {
@@ -908,9 +909,7 @@ void WebMediaPlayerAndroid::DrawRemotePlaybackText(
       static_cast<int>(video_size_css_px.height() * device_scale_factor));
 
   SkBitmap bitmap;
-  bitmap.setConfig(
-      SkBitmap::kARGB_8888_Config, canvas_size.width(), canvas_size.height());
-  bitmap.allocPixels();
+  bitmap.allocN32Pixels(canvas_size.width(), canvas_size.height());
 
   // Create the canvas and draw the "Casting to <Chromecast>" text on it.
   SkCanvas canvas(bitmap);

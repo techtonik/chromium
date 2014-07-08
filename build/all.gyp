@@ -54,6 +54,7 @@
             '../chrome/chrome.gyp:chrome_shell_apk',
             '../remoting/remoting.gyp:remoting_apk',
             '../tools/telemetry/telemetry.gyp:*#host',
+            '../tools/relocation_packer/relocation_packer.gyp:relocation_packer_unittests#host',
             # TODO(nyquist) This should instead by a target for sync when all of
             # the sync-related code for Android has been upstreamed.
             # See http://crbug.com/159203
@@ -149,6 +150,11 @@
                 '../tools/ipc_fuzzer/ipc_fuzzer.gyp:*',
               ],
             }],
+          ],
+        }],
+        ['chromecast==1', {
+          'dependencies': [
+            '../chromecast/chromecast.gyp:*',
           ],
         }],
         ['use_x11==1', {
@@ -1178,6 +1184,7 @@
             ['use_ozone==1', {
               'dependencies': [
                 '../ui/ozone/ozone.gyp:*',
+                '../ui/ozone/demo/ozone_demos.gyp:*',
               ],
               'dependencies!': [
                 '../chrome/chrome.gyp:interactive_ui_tests',  # crbug.com/362166

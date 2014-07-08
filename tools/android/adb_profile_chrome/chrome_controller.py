@@ -37,7 +37,7 @@ class ChromeTracingController(controllers.BaseController):
   @staticmethod
   def GetCategories(device, package_info):
     device.BroadcastIntent(intent.Intent(
-        action='%s.GPU_PROFILER_LIST_CATEGORIES' % self._package_info.package))
+        action='%s.GPU_PROFILER_LIST_CATEGORIES' % package_info.package))
     try:
       json_category_list = device.old_interface.WaitForLogMatch(
           re.compile(r'{"traceCategoriesList(.*)'), None, timeout=5).group(0)
@@ -100,5 +100,5 @@ class ChromeTracingController(controllers.BaseController):
 
     trace_file = self._trace_file.replace('/storage/emulated/0/', '/sdcard/')
     host_file = os.path.join(os.path.curdir, os.path.basename(trace_file))
-    self._device.old_interface.PullFileFromDevice(trace_file, host_file)
+    self._device.PullFile(trace_file, host_file)
     return host_file

@@ -21,6 +21,9 @@
             # Whether we're building a ChromeOS build.
             'chromeos%': 0,
 
+            # Whether we're building the cast (chromecast) shell
+            'chromecast%': 0,
+
             # Whether or not we are using the Aura windowing framework.
             'use_aura%': 0,
 
@@ -47,6 +50,7 @@
           },
           # Copy conditionally-set variables out one scope.
           'chromeos%': '<(chromeos)',
+          'chromecast%': '<(chromecast)',
           'use_aura%': '<(use_aura)',
           'use_ash%': '<(use_ash)',
           'use_cras%': '<(use_cras)',
@@ -92,6 +96,11 @@
               'use_aura%': 1,
             }],
 
+            ['chromecast==1', {
+              'embedded%': 1,
+              'use_ozone%': 1,
+            }],
+
             # Ozone uses Aura.
             ['use_ozone==1', {
               'use_aura%': 1,
@@ -109,12 +118,6 @@
               'use_ozone%': 1,
             }],
 
-            ['embedded==1', {
-              'use_system_fontconfig%': 0,
-            }, {
-              'use_system_fontconfig%': 1,
-            }],
-
             ['OS=="android"', {
               'target_arch%': 'arm',
             }, {
@@ -126,6 +129,7 @@
         },
         # Copy conditionally-set variables out one scope.
         'chromeos%': '<(chromeos)',
+        'chromecast%': '<(chromecast)',
         'desktop_linux%': '<(desktop_linux)',
         'use_aura%': '<(use_aura)',
         'use_ash%': '<(use_ash)',
@@ -134,7 +138,6 @@
         'embedded%': '<(embedded)',
         'use_openssl%': '<(use_openssl)',
         'use_openssl_certs%': '<(use_openssl_certs)',
-        'use_system_fontconfig%': '<(use_system_fontconfig)',
         'enable_viewport%': '<(enable_viewport)',
         'enable_hidpi%': '<(enable_hidpi)',
         'buildtype%': '<(buildtype)',
@@ -236,6 +239,7 @@
 
       # Copy conditionally-set variables out one scope.
       'chromeos%': '<(chromeos)',
+      'chromecast%': '<(chromecast)',
       'host_arch%': '<(host_arch)',
       'target_arch%': '<(target_arch)',
       'target_subarch%': '<(target_subarch)',
@@ -250,7 +254,6 @@
       'embedded%': '<(embedded)',
       'use_openssl%': '<(use_openssl)',
       'use_openssl_certs%': '<(use_openssl_certs)',
-      'use_system_fontconfig%': '<(use_system_fontconfig)',
       'enable_viewport%': '<(enable_viewport)',
       'enable_hidpi%': '<(enable_hidpi)',
       'android_webview_build%': '<(android_webview_build)',
@@ -329,10 +332,8 @@
       # existing safe browsing logic.
       'safe_browsing%': 1,
 
-      # Speech input is compiled in by default. Set to 0 to disable.
-      # TODO(tommyw): Speech Input doesn't exist anymore. Clarify the scope
-      # of this flag (and probably rename it).
-      'input_speech%': 1,
+      # Web speech is enabled by default. Set to 0 to disable.
+      'enable_web_speech%': 1,
 
       # Notifications are compiled in by default. Set to 0 to disable.
       'notifications%' : 1,
@@ -711,9 +712,9 @@
         }],
 
         # Android OS includes support for proprietary codecs regardless of
-        # building Chromium or Google Chrome. We also ship Google Chrome with
-        # proprietary codecs.
-        ['OS=="android" or branding=="Chrome"', {
+        # building Chromium or Google Chrome. We also ship Google Chrome and
+        # Chromecast with proprietary codecs.
+        ['OS=="android" or branding=="Chrome" or chromecast==1', {
           'proprietary_codecs%': 1,
         }, {
           'proprietary_codecs%': 0,
@@ -926,10 +927,10 @@
         }],
 
         # By default, use ICU data file (icudtl.dat) on all platforms
-        # except when building Android WebView.
+        # except when building Android WebView or Chromecast.
         # TODO(jshin): Handle 'use_system_icu' on Linux (Chromium).
         # Set the data reduction proxy origin for Android Webview.
-        ['android_webview_build==0', {
+        ['android_webview_build==0 and chromecast==0', {
           'icu_use_data_file_flag%' : 1,
           'spdy_proxy_auth_origin%': '',
           'data_reduction_proxy_probe_url%': '',
@@ -1025,12 +1026,12 @@
     'use_ozone%': '<(use_ozone)',
     'use_ozone_evdev%': '<(use_ozone_evdev)',
     'use_clipboard_aurax11%': '<(use_clipboard_aurax11)',
-    'use_system_fontconfig%': '<(use_system_fontconfig)',
     'desktop_linux%': '<(desktop_linux)',
     'use_x11%': '<(use_x11)',
     'use_gnome_keyring%': '<(use_gnome_keyring)',
     'linux_fpic%': '<(linux_fpic)',
     'chromeos%': '<(chromeos)',
+    'chromecast%': '<(chromecast)',
     'enable_viewport%': '<(enable_viewport)',
     'enable_hidpi%': '<(enable_hidpi)',
     'use_xi2_mt%':'<(use_xi2_mt)',
@@ -1057,7 +1058,7 @@
     'chromium_win_pch%': '<(chromium_win_pch)',
     'configuration_policy%': '<(configuration_policy)',
     'safe_browsing%': '<(safe_browsing)',
-    'input_speech%': '<(input_speech)',
+    'enable_web_speech%': '<(enable_web_speech)',
     'notifications%': '<(notifications)',
     'clang_use_chrome_plugins%': '<(clang_use_chrome_plugins)',
     'mac_want_real_dsym%': '<(mac_want_real_dsym)',
@@ -1567,7 +1568,7 @@
         'disable_nacl%': 1,
         'enable_background%': 0,
         'icu_use_data_file_flag%': 1,
-        'input_speech%': 0,
+        'enable_web_speech%': 0,
         'use_system_libxml%': 1,
         'use_system_sqlite%': 1,
         'locales==': [
@@ -1702,6 +1703,9 @@
         'android_stlport_libs_dir': '<(android_stlport_root)/libs/<(android_app_abi)',
         'host_os%': '<(host_os)',
 
+        # Location of the "objcopy" binary, used by both gyp and scripts.
+        'android_objcopy%' : '<!(/bin/echo -n <(android_toolchain)/*-objcopy)',
+
         # Location of the "strip" binary, used by both gyp and scripts.
         'android_strip%' : '<!(/bin/echo -n <(android_toolchain)/*-strip)',
 
@@ -1720,7 +1724,7 @@
 
         'proprietary_codecs%': '<(proprietary_codecs)',
         'safe_browsing%': 2,
-        'input_speech%': 0,
+        'enable_web_speech%': 0,
         'java_bridge%': 1,
         'build_ffmpegsumo%': 0,
         'use_allocator%': 'none',
@@ -1752,6 +1756,24 @@
         # Copy it out one scope.
         'android_webview_build%': '<(android_webview_build)',
       }],  # OS=="android"
+      ['embedded==1', {
+        'use_system_fontconfig%': 0,
+      }, {
+        'use_system_fontconfig%': 1,
+      }],
+      ['chromecast==1', {
+        'ffmpeg_branding%': 'Chrome',
+        'ozone_platform_ozonex%': 1,
+        'conditions': [
+          ['target_arch=="arm"', {
+            'arm_arch%': '',
+            'arm_tune%': 'cortex-a9',
+            'arm_thumb%': 1,
+            'enable_mpeg2ts_stream_parser%': 1,
+            'video_hole%': 1,
+          }],
+        ],
+      }],
       ['android_webview_build==1', {
         # When building the WebView in the Android tree, jarjar will remap all
         # the class names, so the JNI generator needs to know this.
@@ -1879,7 +1901,7 @@
         ],
       }],
 
-      ['os_posix==1 and chromeos==0 and OS!="android" and OS!="ios"', {
+      ['os_posix==1 and chromeos==0 and OS!="android" and OS!="ios" and embedded==0', {
         'use_cups%': 1,
       }, {
         'use_cups%': 0,
@@ -2213,11 +2235,6 @@
         'ozone_platform_egltest%': 1,
       }],
 
-      ['use_ozone==1 and ozone_auto_platforms==1 and chromeos==1', {
-        # Use dri as the default platform.
-        'ozone_platform%': 'dri',
-      }],
-
       ['desktop_linux==1 and use_aura==1 and use_x11==1', {
         'use_clipboard_aurax11%': 1,
       }],
@@ -2289,6 +2306,8 @@
       'chromium_code%': '<(chromium_code)',
 
       'component%': '<(component)',
+
+      'chromecast%': '<(chromecast)',
 
       # See http://msdn.microsoft.com/en-us/library/aa652360(VS.71).aspx
       'win_release_Optimization%': '2', # 2 = /Os
@@ -2625,6 +2644,7 @@
         'defines': [
           'ADDRESS_SANITIZER',
           'MEMORY_TOOL_REPLACES_ALLOCATOR',
+          'MEMORY_SANITIZER_INITIAL_SIZE',
         ],
       }],
       ['syzyasan==1', {
@@ -2637,6 +2657,7 @@
         'defines': [
             'SYZYASAN',
             'MEMORY_TOOL_REPLACES_ALLOCATOR',
+            'MEMORY_SANITIZER_INITIAL_SIZE',
         ],
       }],
       ['OS=="win"', {
@@ -2668,6 +2689,22 @@
           }],
         ],  # win_z7!=0
       }],  # OS==win
+      ['chromecast==1', {
+        'defines': [
+          'LOG_DISABLED=0',
+        ],
+        'conditions': [
+          ['target_arch=="arm"', {
+            'defines': [
+              # TODO(lcwu): Work around an error when building Chromium
+              # with gcc-4.5.3 (e.g. v8/src/platform-linux.cc). Remove
+              # this define once the toolchain is updated.
+              # See crbug.com/388933.
+              '__SOFTFP',
+            ],
+          }],
+        ],
+      }],
       ['enable_task_manager==1', {
         'defines': [
           'ENABLE_TASK_MANAGER=1',
@@ -3212,6 +3249,7 @@
           }, {
             'defines': [
               'MEMORY_TOOL_REPLACES_ALLOCATOR',
+              'MEMORY_SANITIZER_INITIAL_SIZE',
               'DYNAMIC_ANNOTATIONS_ENABLED=1',
               'WTF_USE_DYNAMIC_ANNOTATIONS=1',
             ],
@@ -3716,6 +3754,33 @@
                       }],
                     ],
                   }],
+                  ['chromecast==1', {
+                    'cflags': [
+                      # We set arm_arch to "" so that -march compiler option
+                      # is not set.  Otherwise a gcc bug that would complain
+                      # about it conflicting with '-mcpu=cortex-a9'. The flag
+                      # '-march=armv7-a' is actually redundant anyway because
+                      # it is enabled by default when we built the toolchain.
+                      # And using '-mcpu=cortex-a9' should be sufficient.
+                      '-mcpu=cortex-a9',
+                      '-funwind-tables',
+                      # Breakpad requires symbols with debugging information
+                      '-g',
+                    ],
+                    'ldflags': [
+                      # We want to statically link libstdc++/libgcc_s.
+                      '-static-libstdc++',
+                      '-static-libgcc',
+                    ],
+                    'cflags!': [
+                      # Some components in Chromium (e.g. v8, skia, ffmpeg)
+                      # define their own cflags for arm builds that could
+                      # conflict with the flags we set here (e.g.
+                      # '-mcpu=cortex-a9'). Remove these flags explicitly.
+                      '-march=armv7-a',
+                      '-mtune=cortex-a8',
+                    ],
+                  }],
                 ],
               }],
             ],
@@ -3823,6 +3888,16 @@
               '-std=gnu++11',
             ],
           }],
+          ['clang==1 and OS=="android"', {
+            # Android uses stlport, whose include/new defines
+            # `void  operator delete[](void* ptr) throw();`, which
+            # clang's -Wimplicit-exception-spec-mismatch warns about for some
+            # reason -- http://llvm.org/PR16638. TODO(thakis): Include stlport
+            # via -isystem instead.
+            'cflags_cc': [
+              '-Wno-implicit-exception-spec-mismatch',
+            ],
+          }],
           ['clang==1 and clang_use_chrome_plugins==1', {
             'cflags': [
               '<@(clang_chrome_plugins_flags)',
@@ -3877,6 +3952,7 @@
                 ],
                 'defines': [
                   'MEMORY_TOOL_REPLACES_ALLOCATOR',
+                  'MEMORY_SANITIZER_INITIAL_SIZE',
                 ],
               }],
             ],
@@ -4052,7 +4128,7 @@
                 'cflags': [
                   # Avoids errors with current NDK:
                   # "third_party/android_tools/ndk/toolchains/arm-linux-androideabi-4.6/prebuilt/linux-x86_64/bin/../lib/gcc/arm-linux-androideabi/4.6/include/arm_neon.h:3426:3: error: argument must be a constant"
-                  '-finstrument-functions-exclude-file-list=arm_neon.h',
+                  '-finstrument-functions-exclude-file-list=arm_neon.h,SaturatedArithmeticARM.h',
                 ],
               }],
             ],
@@ -4451,7 +4527,7 @@
                 ],
               }, { # else: use_system_stlport!=1
                 'cflags': [
-                  '-isystem<(android_stlport_include)',
+                  '-I<(android_stlport_include)',
                 ],
                 'ldflags': [
                   '-L<(android_stlport_libs_dir)',

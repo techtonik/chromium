@@ -22,7 +22,6 @@
 #include "base/values.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/chrome_notification_types.h"
-#include "chrome/browser/extensions/activity_log/activity_log.h"
 #include "chrome/browser/history/history_notifications.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/history/history_types.h"
@@ -56,6 +55,10 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/l10n/time_format.h"
 #include "ui/base/resource/resource_bundle.h"
+
+#if defined(ENABLE_EXTENSIONS)
+#include "chrome/browser/extensions/activity_log/activity_log.h"
+#endif
 
 #if defined(ENABLE_MANAGED_USERS)
 #include "chrome/browser/supervised_user/supervised_user_navigation_observer.h"
@@ -670,8 +673,7 @@ void BrowsingHistoryHandler::MergeDuplicateResults(
   // pointers to invalid locations.
   new_results.reserve(results->size());
   // Maps a URL to the most recent entry on a particular day.
-  std::map<GURL,BrowsingHistoryHandler::HistoryEntry*>
-      current_day_entries;
+  std::map<GURL, BrowsingHistoryHandler::HistoryEntry*> current_day_entries;
 
   // Keeps track of the day that |current_day_urls| is holding the URLs for,
   // in order to handle removing per-day duplicates.
@@ -849,17 +851,17 @@ void BrowsingHistoryHandler::WebHistoryQueryComplete(
       for (int j = 0; j < static_cast<int>(ids->GetSize()); ++j) {
         const base::DictionaryValue* id = NULL;
         std::string timestamp_string;
-        int64 timestamp_usec;
+        int64 timestamp_usec = 0;
 
-        if (!(ids->GetDictionary(j, &id) &&
-            id->GetString("timestamp_usec", &timestamp_string) &&
-              base::StringToInt64(timestamp_string, &timestamp_usec))) {
+        if (!ids->GetDictionary(j, &id) ||
+            !id->GetString("timestamp_usec", &timestamp_string) ||
+            !base::StringToInt64(timestamp_string, &timestamp_usec)) {
           NOTREACHED() << "Unable to extract timestamp.";
           continue;
         }
         // The timestamp on the server is a Unix time.
         base::Time time = base::Time::UnixEpoch() +
-                          base::TimeDelta::FromMicroseconds(timestamp_usec);
+            base::TimeDelta::FromMicroseconds(timestamp_usec);
 
         // Get the ID of the client that this visit came from.
         std::string client_id;

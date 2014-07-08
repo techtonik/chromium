@@ -143,13 +143,10 @@ class WebUILoginView : public views::View,
 
   // Overridden from content::WebContentsObserver.
   virtual void DidFailProvisionalLoad(
-      int64 frame_id,
-      const base::string16& frame_unique_name,
-      bool is_main_frame,
+      content::RenderFrameHost* render_frame_host,
       const GURL& validated_url,
       int error_code,
-      const base::string16& error_description,
-      content::RenderViewHost* render_view_host) OVERRIDE;
+      const base::string16& error_description) OVERRIDE;
 
   // Performs series of actions when login prompt is considered
   // to be ready and visible.

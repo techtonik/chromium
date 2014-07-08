@@ -318,7 +318,7 @@ void GetScreenInfoForWindow(WebScreenInfo* results, aura::Window* window) {
     results->orientationAngle = 90;
 
   results->orientationType =
-      RenderWidgetHostViewBase::GetOrientationTypeFromDisplay(display);
+      RenderWidgetHostViewBase::GetOrientationTypeForDesktop(display);
 }
 
 bool PointerEventActivates(const ui::Event& event) {
@@ -1709,6 +1709,7 @@ void RenderWidgetHostViewAura::OnWindowDestroying(aura::Window* window) {
   // RenderWidgetHostViewAura instance goes away etc. To avoid that we
   // destroy the LegacyRenderWidgetHostHWND instance here.
   if (legacy_render_widget_host_HWND_) {
+    legacy_render_widget_host_HWND_->set_host(NULL);
     legacy_render_widget_host_HWND_->Destroy();
     // The Destroy call above will delete the LegacyRenderWidgetHostHWND
     // instance.

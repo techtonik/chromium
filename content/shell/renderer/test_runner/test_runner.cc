@@ -193,6 +193,8 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
                             int max_width,
                             int max_height);
   bool DisableAutoResizeMode(int new_width, int new_height);
+  void SetMockDeviceLight(double value);
+  void ResetDeviceLight();
   void SetMockDeviceMotion(gin::Arguments* args);
   void SetMockDeviceOrientation(gin::Arguments* args);
   void SetMockScreenOrientation(const std::string& orientation);
@@ -281,9 +283,9 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
   void CapturePixelsAsyncThen(v8::Handle<v8::Function> callback);
   void SetCustomTextOutput(std::string output);
   void SetViewSourceForFrame(const std::string& name, bool enabled);
-  void setMockPushClientSuccess(const std::string& end_point,
+  void SetMockPushClientSuccess(const std::string& endpoint,
                                 const std::string& registration_id);
-  void setMockPushClientError(const std::string& message);
+  void SetMockPushClientError(const std::string& message);
 
   bool GlobalFlag();
   void SetGlobalFlag(bool value);
@@ -395,6 +397,8 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::EnableAutoResizeMode)
       .SetMethod("disableAutoResizeMode",
                  &TestRunnerBindings::DisableAutoResizeMode)
+      .SetMethod("setMockDeviceLight", &TestRunnerBindings::SetMockDeviceLight)
+      .SetMethod("resetDeviceLight", &TestRunnerBindings::ResetDeviceLight)
       .SetMethod("setMockDeviceMotion",
                  &TestRunnerBindings::SetMockDeviceMotion)
       .SetMethod("setMockDeviceOrientation",
@@ -403,8 +407,7 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::SetMockScreenOrientation)
       .SetMethod("didChangeBatteryStatus",
                  &TestRunnerBindings::DidChangeBatteryStatus)
-      .SetMethod("resetBatteryStatus",
-                 &TestRunnerBindings::ResetBatteryStatus)
+      .SetMethod("resetBatteryStatus", &TestRunnerBindings::ResetBatteryStatus)
       .SetMethod("didAcquirePointerLock",
                  &TestRunnerBindings::DidAcquirePointerLock)
       .SetMethod("didNotAcquirePointerLock",
@@ -502,8 +505,7 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::PathToLocalResource)
       .SetMethod("setBackingScaleFactor",
                  &TestRunnerBindings::SetBackingScaleFactor)
-      .SetMethod("setColorProfile",
-                 &TestRunnerBindings::SetColorProfile)
+      .SetMethod("setColorProfile", &TestRunnerBindings::SetColorProfile)
       .SetMethod("setPOSIXLocale", &TestRunnerBindings::SetPOSIXLocale)
       .SetMethod("setMIDIAccessorResult",
                  &TestRunnerBindings::SetMIDIAccessorResult)
@@ -524,15 +526,16 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::RemoveWebPageOverlay)
       .SetMethod("displayAsync", &TestRunnerBindings::DisplayAsync)
       .SetMethod("displayAsyncThen", &TestRunnerBindings::DisplayAsyncThen)
-      .SetMethod("capturePixelsAsyncThen", &TestRunnerBindings::CapturePixelsAsyncThen)
+      .SetMethod("capturePixelsAsyncThen",
+                 &TestRunnerBindings::CapturePixelsAsyncThen)
       .SetMethod("setCustomTextOutput",
                  &TestRunnerBindings::SetCustomTextOutput)
       .SetMethod("setViewSourceForFrame",
                  &TestRunnerBindings::SetViewSourceForFrame)
       .SetMethod("setMockPushClientSuccess",
-                 &TestRunnerBindings::setMockPushClientSuccess)
+                 &TestRunnerBindings::SetMockPushClientSuccess)
       .SetMethod("setMockPushClientError",
-                 &TestRunnerBindings::setMockPushClientError)
+                 &TestRunnerBindings::SetMockPushClientError)
 
       // Properties.
       .SetProperty("globalFlag",
@@ -820,6 +823,17 @@ bool TestRunnerBindings::DisableAutoResizeMode(int new_width, int new_height) {
   if (runner_)
     return runner_->DisableAutoResizeMode(new_width, new_height);
   return false;
+}
+
+void TestRunnerBindings::SetMockDeviceLight(double value) {
+  if (!runner_)
+    return;
+  runner_->SetMockDeviceLight(value);
+}
+
+void TestRunnerBindings::ResetDeviceLight() {
+  if (runner_)
+    runner_->ResetDeviceLight();
 }
 
 void TestRunnerBindings::SetMockDeviceMotion(gin::Arguments* args) {
@@ -1350,14 +1364,15 @@ void TestRunnerBindings::SetViewSourceForFrame(const std::string& name,
   }
 }
 
-void TestRunnerBindings::setMockPushClientSuccess(
-  const std::string& end_point, const std::string& registration_id) {
+void TestRunnerBindings::SetMockPushClientSuccess(
+    const std::string& endpoint,
+    const std::string& registration_id) {
   if (!runner_)
     return;
-  runner_->SetMockPushClientSuccess(end_point, registration_id);
+  runner_->SetMockPushClientSuccess(endpoint, registration_id);
 }
 
-void TestRunnerBindings::setMockPushClientError(const std::string& message) {
+void TestRunnerBindings::SetMockPushClientError(const std::string& message) {
   if (!runner_)
     return;
   runner_->SetMockPushClientError(message);
@@ -1565,6 +1580,7 @@ void TestRunner::Reset() {
     delegate_->deleteAllCookies();
     delegate_->resetScreenOrientation();
     ResetBatteryStatus();
+    ResetDeviceLight();
   }
 
   dump_editting_callbacks_ = false;
@@ -2270,6 +2286,14 @@ bool TestRunner::DisableAutoResizeMode(int new_width, int new_height) {
   return true;
 }
 
+void TestRunner::SetMockDeviceLight(double value) {
+  delegate_->setDeviceLightData(value);
+}
+
+void TestRunner::ResetDeviceLight() {
+  delegate_->setDeviceLightData(-1);
+}
+
 void TestRunner::SetMockDeviceMotion(
     bool has_acceleration_x, double acceleration_x,
     bool has_acceleration_y, double acceleration_y,
@@ -2809,9 +2833,9 @@ void TestRunner::CapturePixelsCallback(scoped_ptr<InvokeCallbackTask> task,
   InvokeCallback(task.Pass());
 }
 
-void TestRunner::SetMockPushClientSuccess(
-  const std::string& end_point, const std::string& registration_id) {
-  proxy_->GetPushClientMock()->SetMockSuccessValues(end_point, registration_id);
+void TestRunner::SetMockPushClientSuccess(const std::string& endpoint,
+                                          const std::string& registration_id) {
+  proxy_->GetPushClientMock()->SetMockSuccessValues(endpoint, registration_id);
 }
 
 void TestRunner::SetMockPushClientError(const std::string& message) {

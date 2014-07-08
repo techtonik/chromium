@@ -122,7 +122,7 @@ class LayerTreeHostImplTest : public testing::Test,
   }
   virtual void NotifyReadyToActivate() OVERRIDE {
     did_notify_ready_to_activate_ = true;
-    host_impl_->ActivatePendingTree();
+    host_impl_->ActivateSyncTree();
   }
   virtual void SetNeedsRedrawOnImplThread() OVERRIDE {
     did_request_redraw_ = true;
@@ -159,7 +159,7 @@ class LayerTreeHostImplTest : public testing::Test,
     scrollbar_fade_start_ = start_fade;
     requested_scrollbar_animation_delay_ = delay;
   }
-  virtual void DidActivatePendingTree() OVERRIDE {}
+  virtual void DidActivateSyncTree() OVERRIDE {}
   virtual void DidManageTiles() OVERRIDE {}
 
   void set_reduce_memory_result(bool reduce_memory_result) {
@@ -3160,7 +3160,7 @@ TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
   gfx::Size new_size(42, 24);
   host_impl_->CreatePendingTree();
   CreateScrollAndContentsLayers(host_impl_->pending_tree(), new_size);
-  host_impl_->ActivatePendingTree();
+  host_impl_->ActivateSyncTree();
   EXPECT_EQ(new_size, scroll_delegate.scrollable_size());
 
   // Un-setting the delegate should propagate the delegate's current offset to
@@ -3497,7 +3497,8 @@ class BlendStateCheckLayer : public LayerImpl {
         render_pass->CreateAndAppendSharedQuadState();
     PopulateSharedQuadState(shared_quad_state);
 
-    scoped_ptr<TileDrawQuad> test_blending_draw_quad = TileDrawQuad::Create();
+    TileDrawQuad* test_blending_draw_quad =
+        render_pass->CreateAndAppendDrawQuad<TileDrawQuad>();
     test_blending_draw_quad->SetNew(shared_quad_state,
                                     quad_rect_,
                                     opaque_rect,
@@ -3509,7 +3510,6 @@ class BlendStateCheckLayer : public LayerImpl {
     test_blending_draw_quad->visible_rect = quad_visible_rect_;
     EXPECT_EQ(blend_, test_blending_draw_quad->ShouldDrawWithBlending());
     EXPECT_EQ(has_render_surface_, !!render_surface());
-    render_pass->AppendDrawQuad(test_blending_draw_quad.PassAs<DrawQuad>());
   }
 
   void SetExpectation(bool blend, bool has_render_surface) {
@@ -3892,7 +3892,7 @@ class LayerTreeHostImplViewportCoveredTest : public LayerTreeHostImplTest {
     host_impl_->DidDrawAllLayers(frame);
   }
 
-  virtual void DidActivatePendingTree() OVERRIDE {
+  virtual void DidActivateSyncTree() OVERRIDE {
     did_activate_pending_tree_ = true;
   }
 
@@ -4050,7 +4050,7 @@ TEST_F(LayerTreeHostImplViewportCoveredTest, ActiveTreeShrinkViewportInvalid) {
                             viewport_size_.height() + 100);
   host_impl_->SetViewportSize(DipSizeToPixelSize(larger_viewport));
   EXPECT_TRUE(host_impl_->active_tree()->ViewportSizeInvalid());
-  host_impl_->ActivatePendingTree();
+  host_impl_->ActivateSyncTree();
   EXPECT_TRUE(did_activate_pending_tree_);
   EXPECT_FALSE(host_impl_->active_tree()->ViewportSizeInvalid());
 
@@ -4251,10 +4251,10 @@ class FakeLayerWithQuads : public LayerImpl {
     SkColor gray = SkColorSetRGB(100, 100, 100);
     gfx::Rect quad_rect(content_bounds());
     gfx::Rect visible_quad_rect(quad_rect);
-    scoped_ptr<SolidColorDrawQuad> my_quad = SolidColorDrawQuad::Create();
+    SolidColorDrawQuad* my_quad =
+        render_pass->CreateAndAppendDrawQuad<SolidColorDrawQuad>();
     my_quad->SetNew(
         shared_quad_state, quad_rect, visible_quad_rect, gray, false);
-    render_pass->AppendDrawQuad(my_quad.PassAs<DrawQuad>());
   }
 
  private:
@@ -5487,7 +5487,7 @@ TEST_F(LayerTreeHostImplTest, FarAwayQuadsDontNeedAA) {
   scrolling_layer->SetScrollClipLayer(root->id());
   scrolling_layer->SetScrollOffset(scroll_offset);
 
-  host_impl_->ActivatePendingTree();
+  host_impl_->ActivateSyncTree();
 
   host_impl_->active_tree()->UpdateDrawProperties();
   ASSERT_EQ(1u, host_impl_->active_tree()->RenderSurfaceLayerList().size());
@@ -5777,7 +5777,7 @@ TEST_F(LayerTreeHostImplTest, RequireHighResWhenVisible) {
   EXPECT_TRUE(host_impl_->active_tree()->RequiresHighResToDraw());
 
   host_impl_->CreatePendingTree();
-  host_impl_->ActivatePendingTree();
+  host_impl_->ActivateSyncTree();
 
   EXPECT_FALSE(host_impl_->active_tree()->RequiresHighResToDraw());
   host_impl_->SetVisible(true);
@@ -5797,7 +5797,7 @@ TEST_F(LayerTreeHostImplTest, RequireHighResAfterGpuRasterizationToggles) {
   EXPECT_TRUE(host_impl_->active_tree()->RequiresHighResToDraw());
 
   host_impl_->CreatePendingTree();
-  host_impl_->ActivatePendingTree();
+  host_impl_->ActivateSyncTree();
 
   EXPECT_FALSE(host_impl_->active_tree()->RequiresHighResToDraw());
   host_impl_->SetUseGpuRasterization(true);
@@ -6289,6 +6289,59 @@ TEST_F(LayerTreeHostImplTest, LatencyInfoPassedToCompositorFrameMetadata) {
   EXPECT_EQ(1u, metadata_latency_after.size());
   EXPECT_TRUE(metadata_latency_after[0].FindLatency(
       ui::INPUT_EVENT_LATENCY_BEGIN_RWH_COMPONENT, 0, NULL));
+}
+
+TEST_F(LayerTreeHostImplTest, SelectionBoundsPassedToCompositorFrameMetadata) {
+  int root_layer_id = 1;
+  scoped_ptr<SolidColorLayerImpl> root =
+      SolidColorLayerImpl::Create(host_impl_->active_tree(), root_layer_id);
+  root->SetPosition(gfx::PointF());
+  root->SetBounds(gfx::Size(10, 10));
+  root->SetContentBounds(gfx::Size(10, 10));
+  root->SetDrawsContent(true);
+
+  host_impl_->active_tree()->SetRootLayer(root.PassAs<LayerImpl>());
+
+  // Ensure the default frame selection bounds are empty.
+  FakeOutputSurface* fake_output_surface =
+      static_cast<FakeOutputSurface*>(host_impl_->output_surface());
+  const ViewportSelectionBound& selection_anchor_before =
+      fake_output_surface->last_sent_frame().metadata.selection_anchor;
+  const ViewportSelectionBound& selection_focus_before =
+      fake_output_surface->last_sent_frame().metadata.selection_focus;
+  EXPECT_EQ(ViewportSelectionBound(), selection_anchor_before);
+  EXPECT_EQ(ViewportSelectionBound(), selection_focus_before);
+
+  // Plumb the layer-local selection bounds.
+  gfx::Rect selection_rect(5, 0, 0, 5);
+  LayerSelectionBound anchor, focus;
+  anchor.type = SELECTION_BOUND_CENTER;
+  anchor.layer_id = root_layer_id;
+  anchor.layer_rect = selection_rect;
+  focus = anchor;
+  host_impl_->active_tree()->RegisterSelection(anchor, focus);
+
+  // Trigger a draw-swap sequence.
+  host_impl_->SetNeedsRedraw();
+
+  gfx::Rect full_frame_damage(host_impl_->DrawViewportSize());
+  LayerTreeHostImpl::FrameData frame;
+  EXPECT_EQ(DRAW_SUCCESS, host_impl_->PrepareToDraw(&frame));
+  host_impl_->DrawLayers(&frame, gfx::FrameTime::Now());
+  host_impl_->DidDrawAllLayers(frame);
+  EXPECT_TRUE(host_impl_->SwapBuffers(frame));
+
+  // Ensure the selection bounds have propagated to the frame metadata.
+  const ViewportSelectionBound& selection_anchor_after =
+      fake_output_surface->last_sent_frame().metadata.selection_anchor;
+  const ViewportSelectionBound& selection_focus_after =
+      fake_output_surface->last_sent_frame().metadata.selection_focus;
+  EXPECT_EQ(anchor.type, selection_anchor_after.type);
+  EXPECT_EQ(focus.type, selection_focus_after.type);
+  EXPECT_EQ(selection_rect, selection_anchor_after.viewport_rect);
+  EXPECT_EQ(selection_rect, selection_anchor_after.viewport_rect);
+  EXPECT_TRUE(selection_anchor_after.visible);
+  EXPECT_TRUE(selection_anchor_after.visible);
 }
 
 class SimpleSwapPromiseMonitor : public SwapPromiseMonitor {
