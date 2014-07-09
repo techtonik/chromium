@@ -55,6 +55,7 @@ Pipeline::Pipeline(
   media_log_->AddEvent(media_log_->CreatePipelineStateChangedEvent(kCreated));
   media_log_->AddEvent(
       media_log_->CreateEvent(MediaLogEvent::PIPELINE_CREATED));
+  clock_->SetTime(base::TimeDelta(), base::TimeDelta());
 }
 
 Pipeline::~Pipeline() {
@@ -156,7 +157,7 @@ void Pipeline::SetVolume(float volume) {
 
 TimeDelta Pipeline::GetMediaTime() const {
   base::AutoLock auto_lock(lock_);
-  return clock_->Elapsed();
+  return std::min(clock_->Elapsed(), duration_);
 }
 
 Ranges<TimeDelta> Pipeline::GetBufferedTimeRanges() const {
@@ -166,7 +167,7 @@ Ranges<TimeDelta> Pipeline::GetBufferedTimeRanges() const {
 
 TimeDelta Pipeline::GetMediaDuration() const {
   base::AutoLock auto_lock(lock_);
-  return clock_->Duration();
+  return duration_;
 }
 
 bool Pipeline::DidLoadingProgress() {
@@ -204,7 +205,6 @@ const char* Pipeline::GetStateString(State state) {
     RETURN_STRING(kInitDemuxer);
     RETURN_STRING(kInitAudioRenderer);
     RETURN_STRING(kInitVideoRenderer);
-    RETURN_STRING(kInitPrerolling);
     RETURN_STRING(kSeeking);
     RETURN_STRING(kPlaying);
     RETURN_STRING(kStopping);
@@ -232,17 +232,14 @@ Pipeline::State Pipeline::GetNextState() const {
         return kInitAudioRenderer;
       if (demuxer_->GetStream(DemuxerStream::VIDEO))
         return kInitVideoRenderer;
-      return kInitPrerolling;
+      return kPlaying;
 
     case kInitAudioRenderer:
       if (demuxer_->GetStream(DemuxerStream::VIDEO))
         return kInitVideoRenderer;
-      return kInitPrerolling;
+      return kPlaying;
 
     case kInitVideoRenderer:
-      return kInitPrerolling;
-
-    case kInitPrerolling:
       return kPlaying;
 
     case kSeeking:
@@ -324,7 +321,7 @@ void Pipeline::SetDuration(TimeDelta duration) {
   UMA_HISTOGRAM_LONG_TIMES("Media.Duration", duration);
 
   base::AutoLock auto_lock(lock_);
-  clock_->SetDuration(duration);
+  duration_ = duration;
   if (!duration_change_cb_.is_null())
     duration_change_cb_.Run();
 }
@@ -372,35 +369,36 @@ void Pipeline::StateTransitionTask(PipelineStatus status) {
     case kInitVideoRenderer:
       return InitializeVideoRenderer(done_cb);
 
-    case kInitPrerolling:
-      filter_collection_.reset();
-      {
-        base::AutoLock l(lock_);
-        // We do not want to start the clock running. We only want to set the
-        // base media time so our timestamp calculations will be correct.
-        clock_->SetTime(base::TimeDelta(), base::TimeDelta());
-      }
-      if (!audio_renderer_ && !video_renderer_) {
-        done_cb.Run(PIPELINE_ERROR_COULD_NOT_RENDER);
-        return;
-      }
-
-      {
-        PipelineMetadata metadata;
-        metadata.has_audio = audio_renderer_;
-        metadata.has_video = video_renderer_;
-        metadata.timeline_offset = demuxer_->GetTimelineOffset();
-        DemuxerStream* stream = demuxer_->GetStream(DemuxerStream::VIDEO);
-        if (stream)
-          metadata.natural_size = stream->video_decoder_config().natural_size();
-        metadata_cb_.Run(metadata);
-      }
-
-      // TODO(scherkus): Fold kInitPrerolling state into kPlaying.
-      return done_cb.Run(PIPELINE_OK);
-
     case kPlaying:
+      // Finish initial start sequence the first time we enter the playing
+      // state.
+      if (filter_collection_) {
+        filter_collection_.reset();
+        if (!audio_renderer_ && !video_renderer_) {
+          ErrorChangedTask(PIPELINE_ERROR_COULD_NOT_RENDER);
+          return;
+        }
+
+        {
+          PipelineMetadata metadata;
+          metadata.has_audio = audio_renderer_;
+          metadata.has_video = video_renderer_;
+          metadata.timeline_offset = demuxer_->GetTimelineOffset();
+          DemuxerStream* stream = demuxer_->GetStream(DemuxerStream::VIDEO);
+          if (stream) {
+            metadata.natural_size =
+                stream->video_decoder_config().natural_size();
+          }
+          metadata_cb_.Run(metadata);
+        }
+      }
+
       base::ResetAndReturn(&seek_cb_).Run(PIPELINE_OK);
+
+      {
+        base::AutoLock auto_lock(lock_);
+        clock_->SetTime(start_timestamp_, start_timestamp_);
+      }
 
       if (audio_renderer_)
         audio_renderer_->StartPlayingFrom(start_timestamp_);
@@ -443,6 +441,10 @@ void Pipeline::DoSeek(
   DCHECK(task_runner_->BelongsToCurrentThread());
   DCHECK(!pending_callbacks_.get());
   SerialRunner::Queue bound_fns;
+  {
+    base::AutoLock auto_lock(lock_);
+    PauseClockAndStopRendering_Locked();
+  }
 
   // Pause.
   if (text_renderer_) {
@@ -685,12 +687,6 @@ void Pipeline::SeekTask(TimeDelta time, const PipelineStatusCB& seek_cb) {
   text_ended_ = false;
   start_timestamp_ = time;
 
-  // Kick off seeking!
-  {
-    base::AutoLock auto_lock(lock_);
-    PauseClockAndStopRendering_Locked();
-    clock_->SetTime(time, time);
-  }
   DoSeek(time, base::Bind(
       &Pipeline::OnStateTransition, base::Unretained(this)));
 }
@@ -707,7 +703,7 @@ void Pipeline::DoAudioRendererEnded() {
   // Start clock since there is no more audio to trigger clock updates.
   {
     base::AutoLock auto_lock(lock_);
-    clock_->SetMaxTime(clock_->Duration());
+    clock_->SetMaxTime(duration_);
     StartClockIfWaitingForTimeUpdate_Locked();
   }
 
@@ -753,7 +749,7 @@ void Pipeline::RunEndedCallbackIfNeeded() {
   {
     base::AutoLock auto_lock(lock_);
     PauseClockAndStopRendering_Locked();
-    clock_->SetTime(clock_->Duration(), clock_->Duration());
+    clock_->SetTime(duration_, duration_);
   }
 
   DCHECK_EQ(status_, PIPELINE_OK);
@@ -821,13 +817,14 @@ void Pipeline::BufferingStateChanged(BufferingState* buffering_state,
   DCHECK(task_runner_->BelongsToCurrentThread());
   bool was_waiting_for_enough_data = WaitingForEnoughData();
 
-  // Disable underflow by ignoring updates that renderers have ran out of data.
-  if (state_ == kPlaying && new_buffering_state == BUFFERING_HAVE_NOTHING &&
-      underflow_disabled_for_testing_) {
+  *buffering_state = new_buffering_state;
+
+  // Disable underflow by ignoring updates that renderers have ran out of data
+  // after we have started the clock.
+  if (state_ == kPlaying && underflow_disabled_for_testing_ &&
+      clock_state_ != CLOCK_PAUSED) {
     return;
   }
-
-  *buffering_state = new_buffering_state;
 
   // Renderer underflowed.
   if (!was_waiting_for_enough_data && WaitingForEnoughData()) {
@@ -883,7 +880,7 @@ void Pipeline::StartPlayback() {
   } else {
     base::AutoLock auto_lock(lock_);
     clock_state_ = CLOCK_PLAYING;
-    clock_->SetMaxTime(clock_->Duration());
+    clock_->SetMaxTime(duration_);
     clock_->Play();
   }
 }

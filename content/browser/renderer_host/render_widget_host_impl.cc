@@ -59,6 +59,7 @@
 #include "content/public/common/content_constants.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/result_codes.h"
+#include "content/public/common/web_preferences.h"
 #include "skia/ext/image_operations.h"
 #include "skia/ext/platform_canvas.h"
 #include "third_party/WebKit/public/web/WebCompositionUnderline.h"
@@ -68,7 +69,6 @@
 #include "ui/gfx/skbitmap_operations.h"
 #include "ui/gfx/vector2d_conversions.h"
 #include "ui/snapshot/snapshot.h"
-#include "webkit/common/webpreferences.h"
 
 #if defined(OS_WIN)
 #include "content/common/plugin_constants_win.h"
@@ -108,8 +108,8 @@ int GetInputRouterViewFlagsFromCompositorFrameMetadata(
   if (metadata.min_page_scale_factor == metadata.max_page_scale_factor)
     view_flags |= InputRouter::FIXED_PAGE_SCALE;
 
-  const float window_width_dip =
-      std::ceil(metadata.page_scale_factor * metadata.viewport_size.width());
+  const float window_width_dip = std::ceil(
+      metadata.page_scale_factor * metadata.scrollable_viewport_size.width());
   const float content_width_css = metadata.root_layer_size.width();
   if (content_width_css <= window_width_dip)
     view_flags |= InputRouter::MOBILE_VIEWPORT;
@@ -678,14 +678,14 @@ void RenderWidgetHostImpl::CopyFromBackingStore(
     const gfx::Rect& src_subrect,
     const gfx::Size& accelerated_dst_size,
     const base::Callback<void(bool, const SkBitmap&)>& callback,
-    const SkBitmap::Config& bitmap_config) {
+    const SkColorType color_type) {
   if (view_) {
     TRACE_EVENT0("browser",
         "RenderWidgetHostImpl::CopyFromBackingStore::FromCompositingSurface");
     gfx::Rect accelerated_copy_rect = src_subrect.IsEmpty() ?
         gfx::Rect(view_->GetViewBounds().size()) : src_subrect;
     view_->CopyFromCompositingSurface(
-        accelerated_copy_rect, accelerated_dst_size, callback, bitmap_config);
+        accelerated_copy_rect, accelerated_dst_size, callback, color_type);
     return;
   }
 
@@ -1427,6 +1427,12 @@ void RenderWidgetHostImpl::OnCompositorSurfaceBuffersSwapped(
   if (!ui::LatencyInfo::Verify(params.latency_info,
                                "ViewHostMsg_CompositorSurfaceBuffersSwapped"))
     return;
+
+  if (params.use_native_widget) {
+    RenderWidgetHelper::OnNativeSurfaceBuffersSwappedOnUIThread(params);
+    return;
+  }
+
   if (!view_) {
     AcceleratedSurfaceMsg_BufferPresented_Params ack_params;
     ack_params.sync_point = 0;
@@ -2381,10 +2387,10 @@ void RenderWidgetHostImpl::AddLatencyInfoComponentIds(
   }
 }
 
-SkBitmap::Config RenderWidgetHostImpl::PreferredReadbackFormat() {
+SkColorType RenderWidgetHostImpl::PreferredReadbackFormat() {
   if (view_)
     return view_->PreferredReadbackFormat();
-  return SkBitmap::kARGB_8888_Config;
+  return kN32_SkColorType;
 }
 
 }  // namespace content

@@ -29,6 +29,7 @@ import android.text.Editable;
 import android.text.Selection;
 import android.text.TextUtils;
 import android.util.Log;
+import android.util.Pair;
 import android.view.ActionMode;
 import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
@@ -118,9 +119,12 @@ public class ContentViewCore
     // native side. However we still need a strong reference on the Java side to
     // prevent garbage collection if the embedder doesn't maintain their own ref to the
     // interface object - the Java side ref won't create a new GC root.
-    // This map stores those refernces. We put into the map on addJavaScriptInterface()
-    // and remove from it in removeJavaScriptInterface().
-    private final Map<String, Object> mJavaScriptInterfaces = new HashMap<String, Object>();
+    // This map stores those references. We put into the map on addJavaScriptInterface()
+    // and remove from it in removeJavaScriptInterface(). The annotation class is stored for
+    // the purpose of migrating injected objects from one instance of CVC to another, which
+    // is used by Android WebView to support WebChromeClient.onCreateWindow scenario.
+    private final Map<String, Pair<Object, Class>> mJavaScriptInterfaces =
+            new HashMap<String, Pair<Object, Class>>();
 
     // Additionally, we keep track of all Java bound JS objects that are in use on the
     // current page to ensure that they are not garbage collected until the page is
@@ -287,7 +291,7 @@ public class ContentViewCore
     // whether the last selected text is still highlighted.
     private boolean mHasSelection;
     private String mLastSelectedText;
-    private boolean mSelectionEditable;
+    private boolean mFocusedNodeEditable;
     private ActionMode mActionMode;
     private boolean mUnselectAllOnActionModeDismiss;
 
@@ -1048,14 +1052,14 @@ public class ContentViewCore
      * Loads the current navigation if there is a pending lazy load (after tab restore).
      */
     public void loadIfNecessary() {
-        if (mNativeContentViewCore != 0) nativeLoadIfNecessary(mNativeContentViewCore);
+        if (mWebContents != null) mWebContents.getNavigationController().loadIfNecessary();
     }
 
     /**
      * Requests the current navigation to be loaded upon the next call to loadIfNecessary().
      */
     public void requestRestoreLoad() {
-        if (mNativeContentViewCore != 0) nativeRequestRestoreLoad(mNativeContentViewCore);
+        if (mWebContents != null) mWebContents.getNavigationController().requestRestoreLoad();
     }
 
     /**
@@ -1063,9 +1067,7 @@ public class ContentViewCore
      */
     public void reload(boolean checkForRepost) {
         mAccessibilityInjector.addOrRemoveAccessibilityApisIfNecessary();
-        if (mNativeContentViewCore != 0) {
-            nativeReload(mNativeContentViewCore, checkForRepost);
-        }
+        if (mWebContents != null) mWebContents.getNavigationController().reload(checkForRepost);
     }
 
     /**
@@ -1073,23 +1075,22 @@ public class ContentViewCore
      */
     public void reloadIgnoringCache(boolean checkForRepost) {
         mAccessibilityInjector.addOrRemoveAccessibilityApisIfNecessary();
-        if (mNativeContentViewCore != 0) {
-            nativeReloadIgnoringCache(mNativeContentViewCore, checkForRepost);
-        }
+        if (mWebContents != null) mWebContents.getNavigationController().reloadIgnoringCache(
+                checkForRepost);
     }
 
     /**
      * Cancel the pending reload.
      */
     public void cancelPendingReload() {
-        if (mNativeContentViewCore != 0) nativeCancelPendingReload(mNativeContentViewCore);
+        if (mWebContents != null) mWebContents.getNavigationController().cancelPendingReload();
     }
 
     /**
      * Continue the pending reload.
      */
     public void continuePendingReload() {
-        if (mNativeContentViewCore != 0) nativeContinuePendingReload(mNativeContentViewCore);
+        if (mWebContents != null) mWebContents.getNavigationController().continuePendingReload();
     }
 
     /**
@@ -1111,7 +1112,14 @@ public class ContentViewCore
      * @return Whether the current selection is editable (false if no text selected).
      */
     public boolean isSelectionEditable() {
-        return mHasSelection ? mSelectionEditable : false;
+        return mHasSelection ? mFocusedNodeEditable : false;
+    }
+
+    /**
+     * @return Whether the current focused node is editable.
+     */
+    public boolean isFocusedNodeEditable() {
+        return mFocusedNodeEditable;
     }
 
     // End FrameLayout overrides.
@@ -1887,7 +1895,7 @@ public class ContentViewCore
             getInsertionHandleController().allowAutomaticShowing();
             getSelectionHandleController().allowAutomaticShowing();
         } else {
-            if (mSelectionEditable) getInsertionHandleController().allowAutomaticShowing();
+            if (mFocusedNodeEditable) getInsertionHandleController().allowAutomaticShowing();
         }
     }
 
@@ -2130,7 +2138,7 @@ public class ContentViewCore
 
             @Override
             public boolean isSelectionEditable() {
-                return mSelectionEditable;
+                return mFocusedNodeEditable;
             }
 
             @Override
@@ -2367,7 +2375,7 @@ public class ContentViewCore
             int compositionStart, int compositionEnd, boolean showImeIfNeeded,
             boolean isNonImeChange) {
         TraceEvent.begin();
-        mSelectionEditable = (textInputType != ImeAdapter.getTextInputTypeNone());
+        mFocusedNodeEditable = (textInputType != ImeAdapter.getTextInputTypeNone());
 
         mImeAdapter.updateKeyboardVisibility(
                 nativeImeAdapterAndroid, textInputType, showImeIfNeeded);
@@ -2497,7 +2505,7 @@ public class ContentViewCore
         } else {
             mUnselectAllOnActionModeDismiss = false;
             hideSelectActionBar();
-            if (x1 != 0 && y1 != 0 && mSelectionEditable) {
+            if (x1 != 0 && y1 != 0 && mFocusedNodeEditable) {
                 // Selection is a caret, and a text field is focused.
                 if (mSelectionHandleController != null) {
                     mSelectionHandleController.hide();
@@ -2680,6 +2688,16 @@ public class ContentViewCore
     }
 
     /**
+     * Returns JavaScript interface objects previously injected via
+     * {@link #addJavascriptInterface(Object, String)}.
+     *
+     * @return the mapping of names to interface objects and corresponding annotation classes
+     */
+    public Map<String, Pair<Object, Class>> getJavascriptInterfaces() {
+        return mJavaScriptInterfaces;
+    }
+
+    /**
      * This will mimic {@link #addPossiblyUnsafeJavascriptInterface(Object, String, Class)}
      * and automatically pass in {@link JavascriptInterface} as the required annotation.
      *
@@ -2736,7 +2754,7 @@ public class ContentViewCore
     public void addPossiblyUnsafeJavascriptInterface(Object object, String name,
             Class<? extends Annotation> requiredAnnotation) {
         if (mNativeContentViewCore != 0 && object != null) {
-            mJavaScriptInterfaces.put(name, object);
+            mJavaScriptInterfaces.put(name, new Pair<Object, Class>(object, requiredAnnotation));
             nativeAddJavascriptInterface(mNativeContentViewCore, object, name, requiredAnnotation);
         }
     }
@@ -3270,17 +3288,6 @@ public class ContentViewCore
             long nativeContentViewCoreImpl, boolean enabled);
     private native void nativeSetMultiTouchZoomSupportEnabled(
             long nativeContentViewCoreImpl, boolean enabled);
-
-    private native void nativeLoadIfNecessary(long nativeContentViewCoreImpl);
-    private native void nativeRequestRestoreLoad(long nativeContentViewCoreImpl);
-
-    private native void nativeReload(long nativeContentViewCoreImpl, boolean checkForRepost);
-    private native void nativeReloadIgnoringCache(
-            long nativeContentViewCoreImpl, boolean checkForRepost);
-
-    private native void nativeCancelPendingReload(long nativeContentViewCoreImpl);
-
-    private native void nativeContinuePendingReload(long nativeContentViewCoreImpl);
 
     private native void nativeSelectPopupMenuItems(long nativeContentViewCoreImpl, int[] indices);
 

@@ -266,7 +266,7 @@ class TestSpdyVisitor : public SpdyFramerVisitorInterface,
         header_buffer_(new char[kDefaultHeaderBufferSize]),
         header_buffer_length_(0),
         header_buffer_size_(kDefaultHeaderBufferSize),
-        header_stream_id_(-1),
+        header_stream_id_(static_cast<SpdyStreamId>(-1)),
         header_control_type_(DATA),
         header_buffer_valid_(false) {}
 
@@ -3197,7 +3197,7 @@ TEST_P(SpdyFramerTest, TooLargeHeadersFrameUsesContinuation) {
   EXPECT_TRUE(visitor.header_buffer_valid_);
   EXPECT_EQ(0, visitor.error_count_);
   EXPECT_EQ(1, visitor.headers_frame_count_);
-  EXPECT_EQ(1, visitor.continuation_count_);
+  EXPECT_EQ(16, visitor.continuation_count_);
   EXPECT_EQ(1, visitor.zero_length_control_frame_header_data_count_);
 }
 
@@ -3226,7 +3226,7 @@ TEST_P(SpdyFramerTest, TooLargePushPromiseFrameUsesContinuation) {
   EXPECT_TRUE(visitor.header_buffer_valid_);
   EXPECT_EQ(0, visitor.error_count_);
   EXPECT_EQ(1, visitor.push_promise_frame_count_);
-  EXPECT_EQ(1, visitor.continuation_count_);
+  EXPECT_EQ(16, visitor.continuation_count_);
   EXPECT_EQ(1, visitor.zero_length_control_frame_header_data_count_);
 }
 

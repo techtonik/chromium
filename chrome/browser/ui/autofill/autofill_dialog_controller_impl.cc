@@ -64,6 +64,7 @@
 #include "components/autofill/core/browser/validation.h"
 #include "components/autofill/core/common/autofill_pref_names.h"
 #include "components/autofill/core/common/form_data.h"
+#include "components/metrics/metrics_service.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/geolocation_provider.h"
@@ -390,11 +391,6 @@ scoped_ptr<DialogNotification> GetWalletError(
       break;
 
     case wallet::WalletClient::INVALID_PARAMS:
-      // TODO(estade): re-enable this code when we can distinguish between
-      // Chrome-triggered errors and merchant-triggered ones. See
-      // http://crbug.com/354897
-      // error_ids = IDS_AUTOFILL_WALLET_UPGRADE_CHROME_ERROR;
-      // error_code = 42;
       error_ids = IDS_AUTOFILL_WALLET_BAD_TRANSACTION_AMOUNT;
       error_code = 76;
       break;
@@ -415,7 +411,7 @@ scoped_ptr<DialogNotification> GetWalletError(
       break;
 
     case wallet::WalletClient::INTERNAL_ERROR:
-      error_ids = IDS_AUTOFILL_WALLET_UNKNOWN_ERROR;
+      error_ids = IDS_AUTOFILL_WALLET_UPGRADE_CHROME_ERROR;
       error_code = 62;
       break;
 
@@ -2173,6 +2169,7 @@ void AutofillDialogControllerImpl::UserEditedOrActivatedInput(
 
   // |popup_input_type_| must be set before calling |Show()|.
   popup_input_type_ = type;
+  popup_section_ = section;
 
   // TODO(estade): do we need separators and control rows like 'Clear
   // Form'?
@@ -2444,7 +2441,8 @@ void AutofillDialogControllerImpl::DidAcceptSuggestion(
 
   base::string16 billing_country =
       wrapper->GetInfo(AutofillType(ADDRESS_BILLING_COUNTRY));
-  if (!snapshot.count(ADDRESS_BILLING_COUNTRY) &&
+  if (popup_section_ == ActiveBillingSection() &&
+      !snapshot.count(ADDRESS_BILLING_COUNTRY) &&
       !billing_country.empty()) {
     billing_rebuilt = RebuildInputsForCountry(
         ActiveBillingSection(), billing_country, false);
@@ -2452,7 +2450,8 @@ void AutofillDialogControllerImpl::DidAcceptSuggestion(
 
   base::string16 shipping_country =
       wrapper->GetInfo(AutofillType(ADDRESS_HOME_COUNTRY));
-  if (!snapshot.count(ADDRESS_HOME_COUNTRY) &&
+  if (popup_section_ == SECTION_SHIPPING &&
+      !snapshot.count(ADDRESS_HOME_COUNTRY) &&
       !shipping_country.empty()) {
     shipping_rebuilt = RebuildInputsForCountry(
         SECTION_SHIPPING, shipping_country, false);
@@ -2466,14 +2465,9 @@ void AutofillDialogControllerImpl::DidAcceptSuggestion(
       UpdateSection(SECTION_SHIPPING);
   }
 
-  for (size_t i = SECTION_MIN; i <= SECTION_MAX; ++i) {
-    DialogSection section = static_cast<DialogSection>(i);
-    if (!SectionIsActive(section))
-      continue;
-
-    wrapper->FillInputs(MutableRequestedFieldsForSection(section));
-    view_->FillSection(section, popup_input_type);
-  }
+  DCHECK(SectionIsActive(popup_section_));
+  wrapper->FillInputs(MutableRequestedFieldsForSection(popup_section_));
+  view_->FillSection(popup_section_, popup_input_type);
 
   GetMetricLogger().LogDialogPopupEvent(
       AutofillMetrics::DIALOG_POPUP_FORM_FILLED);
@@ -2844,6 +2838,7 @@ AutofillDialogControllerImpl::AutofillDialogControllerImpl(
       suggested_shipping_(this),
       cares_about_shipping_(true),
       popup_input_type_(UNKNOWN_TYPE),
+      popup_section_(SECTION_MIN),
       waiting_for_explicit_sign_in_response_(false),
       has_accepted_legal_documents_(false),
       is_submitting_(false),
@@ -2898,7 +2893,7 @@ void AutofillDialogControllerImpl::LoadRiskFingerprintData() {
   std::string accept_languages =
       user_prefs->GetString(::prefs::kAcceptLanguages);
   base::Time install_time = base::Time::FromTimeT(
-      g_browser_process->local_state()->GetInt64(::prefs::kInstallDate));
+      g_browser_process->metrics_service()->GetInstallDate());
 
   risk::GetFingerprint(
       obfuscated_gaia_id, window_bounds, web_contents(),
@@ -3619,7 +3614,7 @@ bool AutofillDialogControllerImpl::SectionIsValid(
 
 bool AutofillDialogControllerImpl::RulesAreLoaded(DialogSection section) {
   AddressData address_data;
-  address_data.country_code = CountryCodeForSection(section);
+  address_data.region_code = CountryCodeForSection(section);
   AddressValidator::Status status = GetValidator()->ValidateAddress(
       address_data, AddressProblemFilter(), NULL);
   return status == AddressValidator::SUCCESS;

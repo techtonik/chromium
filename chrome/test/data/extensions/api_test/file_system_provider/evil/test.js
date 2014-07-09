@@ -17,17 +17,6 @@ var fileSystem = null;
 var openedFiles = {};
 
 /**
- * @type {Object}
- * @const
- */
-var TESTING_ROOT = Object.freeze({
-  isDirectory: true,
-  name: '',
-  size: 0,
-  modificationTime: new Date(2014, 4, 28, 10, 39, 15)
-});
-
-/**
  * Metadata for a testing file.
  * @type {Object}
  * @const
@@ -76,51 +65,6 @@ var TESTING_RELATIVE_NAME_FILE = Object.freeze({
 });
 
 /**
- * Returns metadata for the requested entry.
- *
- * To successfully acquire a DirectoryEntry, or even a DOMFileSystem, this event
- * must be implemented and return correct values.
- *
- * @param {GetMetadataRequestedOptions} options Options.
- * @param {function(Object)} onSuccess Success callback with metadata passed
- *     an argument.
- * @param {function(string)} onError Error callback with an error code.
- */
-function onGetMetadataRequested(options, onSuccess, onError) {
-  if (options.fileSystemId != test_util.FILE_SYSTEM_ID) {
-    onError('INVALID_OPERATION');  // enum ProviderError.
-    return;
-  }
-
-  if (options.entryPath == '/') {
-    onSuccess(TESTING_ROOT);
-    return;
-  }
-
-  if (options.entryPath == '/' + TESTING_TOO_LARGE_CHUNK_FILE.name) {
-    onSuccess(TESTING_TOO_LARGE_CHUNK_FILE);
-    return;
-  }
-
-  if (options.entryPath == '/' + TESTING_INVALID_CALLBACK_FILE.name) {
-    onSuccess(TESTING_INVALID_CALLBACK_FILE);
-    return;
-  }
-
-  if (options.entryPath == '/' + TESTING_NEGATIVE_SIZE_FILE.name) {
-    onSuccess(TESTING_NEGATIVE_SIZE_FILE);
-    return;
-  }
-
-  if (options.entryPath == '/' + TESTING_RELATIVE_NAME_FILE.name) {
-    onSuccess(TESTING_RELATIVE_NAME_FILE);
-    return;
-  }
-
-  onError('NOT_FOUND');  // enum ProviderError.
-}
-
-/**
  * Requests opening a file at <code>filePath</code>. Further file operations
  * will be associated with the <code>requestId</code>
  *
@@ -134,7 +78,7 @@ function onOpenFileRequested(options, onSuccess, onError) {
     return;
   }
 
-  if (options.mode != 'READ' || options.create) {
+  if (options.mode != 'READ') {
     onError('ACCESS_DENIED');  // enum ProviderError.
     return;
   }
@@ -231,13 +175,24 @@ function onReadFileRequested(options, onSuccess, onError) {
  */
 function setUp(callback) {
   chrome.fileSystemProvider.onGetMetadataRequested.addListener(
-      onGetMetadataRequested);
+      test_util.onGetMetadataRequestedDefault);
+
+  test_util.defaultMetadata['/' + TESTING_TOO_LARGE_CHUNK_FILE.name] =
+    TESTING_TOO_LARGE_CHUNK_FILE;
+  test_util.defaultMetadata['/' + TESTING_INVALID_CALLBACK_FILE.name] =
+    TESTING_INVALID_CALLBACK_FILE;
+  test_util.defaultMetadata['/' + TESTING_NEGATIVE_SIZE_FILE.name] =
+    TESTING_NEGATIVE_SIZE_FILE;
+  test_util.defaultMetadata['/' + TESTING_RELATIVE_NAME_FILE.name] =
+    TESTING_RELATIVE_NAME_FILE;
+
   chrome.fileSystemProvider.onOpenFileRequested.addListener(
       onOpenFileRequested);
   chrome.fileSystemProvider.onReadFileRequested.addListener(
       onReadFileRequested);
   chrome.fileSystemProvider.onCloseFileRequested.addListener(
       onCloseFileRequested);
+
   test_util.mountFileSystem(callback);
 }
 

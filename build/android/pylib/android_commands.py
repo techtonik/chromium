@@ -394,7 +394,7 @@ class AndroidCommands(object):
             'Unable to find $EXTERNAL_STORAGE')
     return self._external_storage
 
-  def WaitForDevicePm(self):
+  def WaitForDevicePm(self, timeout=120):
     """Blocks until the device's package manager is available.
 
     To workaround http://b/5201039, we restart the shell and retry if the
@@ -407,7 +407,7 @@ class AndroidCommands(object):
     retries = 3
     while retries:
       try:
-        self._adb.WaitForDevicePm()
+        self._adb.WaitForDevicePm(wait_time=timeout)
         return  # Success
       except errors.WaitForResponseTimedOutError as e:
         last_err = e
@@ -446,7 +446,7 @@ class AndroidCommands(object):
       timeout = 120
     # To run tests we need at least the package manager and the sd card (or
     # other external storage) to be ready.
-    self.WaitForDevicePm()
+    self.WaitForDevicePm(timeout)
     self.WaitForSdCardReady(timeout)
 
   def Shutdown(self):
@@ -1230,7 +1230,7 @@ class AndroidCommands(object):
     """
     # Example output:
     # /foo/bar:
-    # -rw-r----- 1 user group   102 2011-05-12 12:29:54.131623387 +0100 baz.txt
+    # -rw-r----- user group   102 2011-05-12 12:29:54.131623387 +0100 baz.txt
     re_file = re.compile('^-(?P<perms>[^\s]+)\s+'
                          '(?P<user>[^\s]+)\s+'
                          '(?P<group>[^\s]+)\s+'
@@ -1260,7 +1260,8 @@ class AndroidCommands(object):
     temp_props_file = tempfile.NamedTemporaryFile()
     properties = ''
     if self._adb.Pull(LOCAL_PROPERTIES_PATH, temp_props_file.name):
-      properties = file(temp_props_file.name).read()
+      with open(temp_props_file.name) as f:
+        properties = f.read()
     re_search = re.compile(r'^\s*' + re.escape(JAVA_ASSERT_PROPERTY) +
                            r'\s*=\s*all\s*$', re.MULTILINE)
     if enable != bool(re.search(re_search, properties)):

@@ -269,9 +269,7 @@ base::DictionaryValue* ExtensionSettingsHandler::CreateExtensionDetailValue(
   // - The extension has access to enough urls that we can't just let it run
   //   on those specified in the permissions.
   bool wants_all_urls =
-      FeatureSwitch::scripts_require_action()->IsEnabled() &&
-      extension->permissions_data()->RequiresActionForScriptExecution(
-          extension);
+      extension->permissions_data()->HasWithheldImpliedAllHosts();
   extension_data->SetBoolean("wantsAllUrls", wants_all_urls);
   extension_data->SetBoolean(
       "allowAllUrls",
@@ -361,7 +359,7 @@ base::DictionaryValue* ExtensionSettingsHandler::CreateExtensionDetailValue(
       base::ListValue* warnings_list = new base::ListValue;
       for (std::vector<std::string>::const_iterator iter = warnings.begin();
            iter != warnings.end(); ++iter) {
-        warnings_list->Append(base::Value::CreateStringValue(*iter));
+        warnings_list->Append(new base::StringValue(*iter));
       }
       extension_data->Set("warnings", warnings_list);
     }
@@ -735,9 +733,10 @@ void ExtensionSettingsHandler::ExtensionUninstallAccepted() {
   if (!extension)
     return;
 
-  extension_service_->UninstallExtension(extension_id_prompting_,
-                                         false,  // External uninstall.
-                                         NULL);  // Error.
+  extension_service_->UninstallExtension(
+      extension_id_prompting_,
+      ExtensionService::UNINSTALL_REASON_USER_INITIATED,
+      NULL);  // Error.
   extension_id_prompting_ = "";
 
   // There will be no EXTENSION_UNLOADED notification for terminated
@@ -1163,7 +1162,7 @@ void ExtensionSettingsHandler::HandleShowPath(const base::ListValue* args) {
 
 void ExtensionSettingsHandler::ShowAlert(const std::string& message) {
   base::ListValue arguments;
-  arguments.Append(base::Value::CreateStringValue(message));
+  arguments.Append(new base::StringValue(message));
   web_ui()->CallJavascriptFunction("alert", arguments);
 }
 

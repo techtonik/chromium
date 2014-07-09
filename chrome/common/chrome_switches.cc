@@ -52,6 +52,12 @@ const char kAllowOutdatedPlugins[]          = "allow-outdated-plugins";
 // URLs. This provides an override to get the old insecure behavior.
 const char kAllowRunningInsecureContent[]   = "allow-running-insecure-content";
 
+// Specifies the threshold to be used when determining of an Alternate-Protocol
+// advertisement will be honored. If the advertised probability is larger
+// than the threshold, then it will be honored.
+const char kAlternateProtocolProbabilityThreshold[] =
+    "alternate-protocol-probability-threshold";
+
 // Prevents Chrome from requiring authorization to run certain widely installed
 // but less commonly used plug-ins.
 const char kAlwaysAuthorizePlugins[]        = "always-authorize-plugins";
@@ -166,10 +172,6 @@ const char kCloudPrintJobTitle[]            = "cloud-print-job-title";
 // Setup cloud print proxy for provided printers. This does not start
 // service or register proxy for autostart.
 const char kCloudPrintSetupProxy[]          = "cloud-print-setup-proxy";
-
-// Comma-separated options to troubleshoot the component updater. Only valid
-// for the browser process.
-const char kComponentUpdater[]              = "component-updater";
 
 // Comma-separated list of BrowserThreads that cause browser process to crash
 // if the given browser thread is not responsive. UI,IO,DB,FILE,CACHE are the
@@ -1157,18 +1159,6 @@ const char kSSLVersionMin[]                 = "ssl-version-min";
 
 // Starts the browser maximized, regardless of any previous settings.
 const char kStartMaximized[]                = "start-maximized";
-
-// Controls the width of time-of-day filters on the 'suggested' ntp page, in
-// minutes.
-const char kSuggestionNtpFilterWidth[]      = "suggestion-ntp-filter-width";
-
-// Enables a normal distribution dropoff to the relevancy of visits with respect
-// to the time of day.
-const char kSuggestionNtpGaussianFilter[]   = "suggestion-ntp-gaussian-filter";
-
-// Enables a linear dropoff to the relevancy of visits with respect to the time
-// of day.
-const char kSuggestionNtpLinearFilter[]     = "suggestion-ntp-linear-filter";
 
 // Sets the supervised user ID for any loaded or newly created profile to the
 // given value. Pass an empty string to mark the profile as non-supervised.

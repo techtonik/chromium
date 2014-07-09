@@ -411,6 +411,9 @@ LoginDisplayHostImpl::~LoginDisplayHostImpl() {
       RemoveVirtualKeyboardStateObserver(this);
   ash::Shell::GetScreen()->RemoveObserver(this);
 
+  if (login_view_ && login_window_)
+    login_window_->RemoveRemovalsObserver(this);
+
   if (login::LoginScrollIntoViewEnabled())
     ResetKeyboardOverscrollOverride();
 
@@ -905,6 +908,16 @@ void LoginDisplayHostImpl::OnDisplayMetricsChanged(const gfx::Display& display,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// LoginDisplayHostImpl, views::WidgetRemovalsObserver implementation:
+void LoginDisplayHostImpl::OnWillRemoveView(views::Widget* widget,
+                                            views::View* view) {
+  if (view != static_cast<views::View*>(login_view_))
+    return;
+  login_view_ = NULL;
+  widget->RemoveRemovalsObserver(this);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // LoginDisplayHostImpl, private
 
 void LoginDisplayHostImpl::ShutdownDisplayHost(bool post_quit_task) {
@@ -1062,6 +1075,7 @@ void LoginDisplayHostImpl::InitLoginWindowAndView() {
       login_window_->GetNativeView(),
       wm::ANIMATE_HIDE);
 
+  login_window_->AddRemovalsObserver(this);
   login_window_->SetContentsView(login_view_);
 
   // If WebUI is initialized in hidden state, show it only if we're no
@@ -1192,11 +1206,12 @@ void ShowLoginWizard(const std::string& first_screen_name) {
 
   policy::BrowserPolicyConnectorChromeOS* connector =
       g_browser_process->platform_part()->browser_policy_connector_chromeos();
-  bool should_show_enrollment_screen =
-      first_screen_name.empty() && oobe_complete &&
-      chromeos::WizardController::ShouldAutoStartEnrollment() &&
-      !connector->IsEnterpriseManaged();
-  if (should_show_enrollment_screen) {
+  bool enrollment_screen_wanted =
+      chromeos::WizardController::ShouldRecoverEnrollment() ||
+      (chromeos::WizardController::ShouldAutoStartEnrollment() &&
+       oobe_complete &&
+       !connector->IsEnterpriseManaged());
+  if (enrollment_screen_wanted && first_screen_name.empty()) {
     // Shows networks screen instead of enrollment screen to resume the
     // interrupted auto start enrollment flow because enrollment screen does
     // not handle flaky network. See http://crbug.com/332572

@@ -18,16 +18,14 @@ class ScopedDestructionNotifier {
  public:
   explicit ScopedDestructionNotifier(View* view)
       : view_(view) {
-    FOR_EACH_OBSERVER(
-        ViewObserver,
-        *ViewPrivate(view_).observers(),
-        OnViewDestroy(view_, ViewObserver::DISPOSITION_CHANGING));
+    FOR_EACH_OBSERVER(ViewObserver,
+                      *ViewPrivate(view_).observers(),
+                      OnViewDestroying(view_));
   }
   ~ScopedDestructionNotifier() {
-    FOR_EACH_OBSERVER(
-        ViewObserver,
-        *ViewPrivate(view_).observers(),
-        OnViewDestroy(view_, ViewObserver::DISPOSITION_CHANGED));
+    FOR_EACH_OBSERVER(ViewObserver,
+                      *ViewPrivate(view_).observers(),
+                      OnViewDestroyed(view_));
   }
 
  private:
@@ -77,7 +75,7 @@ View::View(ViewManager* manager)
       manager_(manager) {}
 
 View::View()
-    : id_(-1),
+    : id_(static_cast<Id>(-1)),
       node_(NULL),
       manager_(NULL) {}
 

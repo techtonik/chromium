@@ -22,6 +22,7 @@
 #include "content/renderer/pepper/pepper_hung_plugin_filter.h"
 #include "content/renderer/pepper/pepper_plugin_instance_impl.h"
 #include "content/renderer/pepper/pepper_plugin_registry.h"
+#include "content/renderer/pepper/ppapi_preferences_builder.h"
 #include "content/renderer/pepper/ppb_image_data_impl.h"
 #include "content/renderer/pepper/ppb_proxy_impl.h"
 #include "content/renderer/pepper/ppb_scrollbar_impl.h"
@@ -620,11 +621,11 @@ RendererPpapiHostImpl* PluginModule::CreateOutOfProcessModule(
       path, render_frame->GetRoutingID(), plugin_child_id));
   scoped_ptr<HostDispatcherWrapper> dispatcher(new HostDispatcherWrapper(
       this, peer_pid, plugin_child_id, permissions, is_external));
-  if (!dispatcher->Init(
-          channel_handle,
-          &GetInterface,
-          ppapi::Preferences(render_frame->render_view()->webkit_preferences()),
-          hung_filter.get()))
+  if (!dispatcher->Init(channel_handle,
+                        &GetInterface,
+                        ppapi::Preferences(PpapiPreferencesBuilder::Build(
+                            render_frame->render_view()->webkit_preferences())),
+                        hung_filter.get()))
     return NULL;
 
   RendererPpapiHostImpl* host_impl =
@@ -691,7 +692,7 @@ scoped_refptr<PluginModule> PluginModule::Create(
 
   // Out of process: have the browser start the plugin process for us.
   IPC::ChannelHandle channel_handle;
-  base::ProcessId peer_pid;
+  base::ProcessId peer_pid = 0;
   int plugin_child_id = 0;
   render_frame->Send(new ViewHostMsg_OpenChannelToPepperPlugin(
       path, &channel_handle, &peer_pid, &plugin_child_id));

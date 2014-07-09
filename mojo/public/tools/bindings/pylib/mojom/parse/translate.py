@@ -51,19 +51,13 @@ def _MapKind(kind):
     return map_to_kind[kind]
   return 'x:' + kind
 
-def _MapAttributes(attributes):
-  if not attributes:
+def _AttributeListToDict(attribute_list):
+  if attribute_list is None:
     return {}
-  return dict([(attribute[1], attribute[2])
-               for attribute in attributes if attribute[0] == 'ATTRIBUTE'])
-
-def _GetAttribute(attributes, name):
-  out = None
-  if attributes:
-    for attribute in attributes:
-      if attribute[0] == 'ATTRIBUTE' and attribute[1] == name:
-        out = attribute[2]
-  return out
+  assert isinstance(attribute_list, ast.AttributeList)
+  # TODO(vtl): Check for duplicate keys here.
+  return dict([(attribute.key, attribute.value)
+                   for attribute in attribute_list])
 
 def _MapField(tree):
   assert isinstance(tree[3], ast.Ordinal)
@@ -90,14 +84,10 @@ def _MapMethod(tree):
     method['response_parameters'] = map(ParameterToDict, tree[4])
   return method
 
-def _MapEnumField(tree):
-  return {'name': tree[1],
-          'value': tree[2]}
-
 def _MapStruct(tree):
   struct = {}
   struct['name'] = tree[1]
-  struct['attributes'] = _MapAttributes(tree[2])
+  struct['attributes'] = _AttributeListToDict(tree[2])
   struct['fields'] = _MapTree(_MapField, tree[3], 'FIELD')
   struct['enums'] = _MapTree(_MapEnum, tree[3], 'ENUM')
   struct['constants'] = _MapTree(_MapConstant, tree[3], 'CONST')
@@ -106,16 +96,21 @@ def _MapStruct(tree):
 def _MapInterface(tree):
   interface = {}
   interface['name'] = tree[1]
-  interface['client'] = _GetAttribute(tree[2], 'Client')
+  interface['attributes'] = _AttributeListToDict(tree[2])
+  interface['client'] = interface['attributes'].get('Client')
   interface['methods'] = _MapTree(_MapMethod, tree[3], 'METHOD')
   interface['enums'] = _MapTree(_MapEnum, tree[3], 'ENUM')
   interface['constants'] = _MapTree(_MapConstant, tree[3], 'CONST')
   return interface
 
 def _MapEnum(tree):
+  def MapEnumField(tree):
+    return {'name': tree[1],
+            'value': tree[2]}
+
   enum = {}
   enum['name'] = tree[1]
-  enum['fields'] = _MapTree(_MapEnumField, tree[2], 'ENUM_FIELD')
+  enum['fields'] = _MapTree(MapEnumField, tree[2], 'ENUM_VALUE')
   return enum
 
 def _MapConstant(tree):
@@ -124,17 +119,6 @@ def _MapConstant(tree):
   constant['kind'] = _MapKind(tree[1])
   constant['value'] = tree[3]
   return constant
-
-def _MapModule(tree, name):
-  mojom = {}
-  mojom['name'] = name
-  mojom['namespace'] = tree[1]
-  mojom['attributes'] = _MapAttributes(tree[2])
-  mojom['structs'] = _MapTree(_MapStruct, tree[3], 'STRUCT')
-  mojom['interfaces'] = _MapTree(_MapInterface, tree[3], 'INTERFACE')
-  mojom['enums'] = _MapTree(_MapEnum, tree[3], 'ENUM')
-  mojom['constants'] = _MapTree(_MapConstant, tree[3], 'CONST')
-  return mojom
 
 def _MapImport(tree):
   import_item = {}
@@ -147,7 +131,19 @@ class _MojomBuilder(object):
     self.mojom = {}
 
   def Build(self, tree, name):
-    modules = [_MapModule(item, name) for item in tree if item[0] == 'MODULE']
+    def MapModule(tree, name):
+      assert tree[1] is None or tree[1][0] == 'IDENTIFIER'
+      mojom = {}
+      mojom['name'] = name
+      mojom['namespace'] = '' if not tree[1] else tree[1][1]
+      mojom['attributes'] = _AttributeListToDict(tree[2])
+      mojom['structs'] = _MapTree(_MapStruct, tree[3], 'STRUCT')
+      mojom['interfaces'] = _MapTree(_MapInterface, tree[3], 'INTERFACE')
+      mojom['enums'] = _MapTree(_MapEnum, tree[3], 'ENUM')
+      mojom['constants'] = _MapTree(_MapConstant, tree[3], 'CONST')
+      return mojom
+
+    modules = [MapModule(item, name) for item in tree if item[0] == 'MODULE']
     if len(modules) != 1:
       raise Exception('A mojom file must contain exactly 1 module.')
     self.mojom = modules[0]

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "chrome/browser/chromeos/file_system_provider/operations/open_file.h"
+
 #include <string>
 #include <vector>
 
@@ -9,7 +11,6 @@
 #include "base/files/file_path.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/scoped_vector.h"
-#include "chrome/browser/chromeos/file_system_provider/operations/open_file.h"
 #include "chrome/browser/chromeos/file_system_provider/operations/test_util.h"
 #include "chrome/browser/chromeos/file_system_provider/provided_file_system_interface.h"
 #include "chrome/common/extensions/api/file_system_provider.h"
@@ -74,7 +75,7 @@ class FileSystemProviderOperationsOpenFileTest : public testing::Test {
     file_system_info_ =
         ProvidedFileSystemInfo(kExtensionId,
                                kFileSystemId,
-                               "" /* file_system_name */,
+                               "" /* display_name */,
                                base::FilePath() /* mount_path */);
   }
 
@@ -89,7 +90,6 @@ TEST_F(FileSystemProviderOperationsOpenFileTest, Execute) {
                      file_system_info_,
                      base::FilePath::FromUTF8Unsafe(kFilePath),
                      ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
-                     false /* create */,
                      base::Bind(&CallbackLogger::OnOpenFile,
                                 base::Unretained(&callback_logger)));
   open_file.SetDispatchEventImplForTesting(
@@ -127,10 +127,6 @@ TEST_F(FileSystemProviderOperationsOpenFileTest, Execute) {
       extensions::api::file_system_provider::ToString(
           extensions::api::file_system_provider::OPEN_FILE_MODE_READ);
   EXPECT_EQ(expected_file_open_mode, event_file_open_mode);
-
-  bool event_create;
-  EXPECT_TRUE(options->GetBoolean("create", &event_create));
-  EXPECT_FALSE(event_create);
 }
 
 TEST_F(FileSystemProviderOperationsOpenFileTest, Execute_NoListener) {
@@ -141,7 +137,6 @@ TEST_F(FileSystemProviderOperationsOpenFileTest, Execute_NoListener) {
                      file_system_info_,
                      base::FilePath::FromUTF8Unsafe(kFilePath),
                      ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
-                     false /* create */,
                      base::Bind(&CallbackLogger::OnOpenFile,
                                 base::Unretained(&callback_logger)));
   open_file.SetDispatchEventImplForTesting(
@@ -159,7 +154,6 @@ TEST_F(FileSystemProviderOperationsOpenFileTest, OnSuccess) {
                      file_system_info_,
                      base::FilePath::FromUTF8Unsafe(kFilePath),
                      ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
-                     false /* create */,
                      base::Bind(&CallbackLogger::OnOpenFile,
                                 base::Unretained(&callback_logger)));
   open_file.SetDispatchEventImplForTesting(
@@ -185,7 +179,6 @@ TEST_F(FileSystemProviderOperationsOpenFileTest, OnError) {
                      file_system_info_,
                      base::FilePath::FromUTF8Unsafe(kFilePath),
                      ProvidedFileSystemInterface::OPEN_FILE_MODE_READ,
-                     false /* create */,
                      base::Bind(&CallbackLogger::OnOpenFile,
                                 base::Unretained(&callback_logger)));
   open_file.SetDispatchEventImplForTesting(

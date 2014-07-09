@@ -6,30 +6,21 @@
 
 #include "base/format_macros.h"
 #include "chrome/browser/sync_file_system/logger.h"
-#include "chrome/browser/sync_file_system/sync_file_system_service.h"
 
 namespace sync_file_system {
 
-namespace {
-
-// Default delay when more changes are available.
-const int64 kSyncDelayInMilliseconds = 1 * base::Time::kMillisecondsPerSecond;
-
-// Default delay when the previous change has had an error (but remote service
-// is running).
-const int64 kSyncDelayWithSyncError = 3 * base::Time::kMillisecondsPerSecond;
-
-// Default delay when there're more than 10 pending changes.
-const int64 kSyncDelayFastInMilliseconds = 100;
-const int kPendingChangeThresholdForFastSync = 10;
-
-// Default delay when remote service is temporarily unavailable.
-const int64 kSyncDelaySlowInMilliseconds =
-    30 * base::Time::kMillisecondsPerSecond;  // Start with 30 sec + exp backoff
-
-// Default delay when there're no changes.
-const int64 kSyncDelayMaxInMilliseconds =
+const int64 SyncProcessRunner::kSyncDelayInMilliseconds =
+    1 * base::Time::kMillisecondsPerSecond; // 1 sec
+const int64 SyncProcessRunner::kSyncDelayWithSyncError =
+    3 * base::Time::kMillisecondsPerSecond; // 3 sec
+const int64 SyncProcessRunner::kSyncDelayFastInMilliseconds = 100;  // 100 ms
+const int SyncProcessRunner::kPendingChangeThresholdForFastSync = 10;
+const int64 SyncProcessRunner::kSyncDelaySlowInMilliseconds =
+    30 * base::Time::kMillisecondsPerSecond;  // 30 sec
+const int64 SyncProcessRunner::kSyncDelayMaxInMilliseconds =
     30 * 60 * base::Time::kMillisecondsPerSecond;  // 30 min
+
+namespace {
 
 class BaseTimerHelper : public SyncProcessRunner::TimerHelper {
  public:
@@ -43,6 +34,10 @@ class BaseTimerHelper : public SyncProcessRunner::TimerHelper {
                      const base::TimeDelta& delay,
                      const base::Closure& closure) OVERRIDE {
     timer_.Start(from_here, delay, closure);
+  }
+
+  virtual base::TimeTicks Now() const OVERRIDE {
+    return base::TimeTicks::Now();
   }
 
   virtual ~BaseTimerHelper() {}
@@ -66,11 +61,11 @@ bool WasSuccessfulSync(SyncStatusCode status) {
 
 SyncProcessRunner::SyncProcessRunner(
     const std::string& name,
-    SyncFileSystemService* sync_service,
+    Client* client,
     scoped_ptr<TimerHelper> timer_helper,
     int max_parallel_task)
     : name_(name),
-      sync_service_(sync_service),
+      client_(client),
       max_parallel_task_(max_parallel_task),
       running_tasks_(0),
       timer_helper_(timer_helper.Pass()),
@@ -130,7 +125,7 @@ void SyncProcessRunner::OnChangesUpdated(
   pending_changes_ = pending_changes;
   if (old_pending_changes != pending_changes) {
     if (pending_changes == 0)
-      sync_service()->OnSyncIdle();
+      client_->OnSyncIdle();
     util::Log(logging::LOG_VERBOSE, FROM_HERE,
               "[%s] pending_changes updated: %" PRId64,
               name_.c_str(), pending_changes);
@@ -138,8 +133,12 @@ void SyncProcessRunner::OnChangesUpdated(
   Schedule();
 }
 
+SyncFileSystemService* SyncProcessRunner::GetSyncService() {
+  return client_->GetSyncService();
+}
+
 SyncServiceState SyncProcessRunner::GetServiceState() {
-  return sync_service()->GetSyncServiceState();
+  return client_->GetSyncServiceState();
 }
 
 void SyncProcessRunner::Finished(const base::TimeTicks& start_time,
@@ -150,7 +149,7 @@ void SyncProcessRunner::Finished(const base::TimeTicks& start_time,
   util::Log(logging::LOG_VERBOSE, FROM_HERE,
             "[%s] * Finished (elapsed: %" PRId64 " sec)",
             name_.c_str(),
-            (base::TimeTicks::Now() - start_time).InSeconds());
+            (timer_helper_->Now() - start_time).InSeconds());
   if (status == SYNC_STATUS_NO_CHANGE_TO_SYNC ||
       status == SYNC_STATUS_FILE_BUSY)
     ScheduleInternal(kSyncDelayMaxInMilliseconds);
@@ -165,7 +164,7 @@ void SyncProcessRunner::Run() {
   if (running_tasks_ >= max_parallel_task_)
     return;
   ++running_tasks_;
-  last_scheduled_ = base::TimeTicks::Now();
+  last_scheduled_ = timer_helper_->Now();
   last_delay_ = current_delay_;
 
   util::Log(logging::LOG_VERBOSE, FROM_HERE,
@@ -182,7 +181,7 @@ void SyncProcessRunner::ScheduleInternal(int64 delay) {
     if (current_delay_ == delay)
       return;
 
-    base::TimeDelta elapsed = base::TimeTicks::Now() - last_scheduled_;
+    base::TimeDelta elapsed = timer_helper_->Now() - last_scheduled_;
     if (elapsed < time_to_next) {
       time_to_next = time_to_next - elapsed;
     } else {

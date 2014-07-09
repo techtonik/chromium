@@ -37,8 +37,6 @@
       'renderer/extensions/renderer_permissions_policy_delegate.h',
       'renderer/extensions/resource_request_policy.cc',
       'renderer/extensions/resource_request_policy.h',
-      'renderer/extensions/sync_file_system_custom_bindings.cc',
-      'renderer/extensions/sync_file_system_custom_bindings.h',
       'renderer/extensions/tab_finder.cc',
       'renderer/extensions/tab_finder.h',
       'renderer/extensions/webstore_bindings.cc',
@@ -172,20 +170,22 @@
       'renderer/extensions/cast_streaming_native_handler.h',
     ],
     'chrome_renderer_extensions_sources': [
-      'renderer/extensions/chrome_extensions_render_frame_observer.cc',
-      'renderer/extensions/chrome_extensions_render_frame_observer.h',
-    ],
-    'chrome_renderer_non_android_sources': [
       'renderer/extensions/app_window_custom_bindings.cc',
       'renderer/extensions/app_window_custom_bindings.h',
+      'renderer/extensions/chrome_extensions_render_frame_observer.cc',
+      'renderer/extensions/chrome_extensions_render_frame_observer.h',
       'renderer/extensions/chrome_v8_extension_handler.cc',
       'renderer/extensions/chrome_v8_extension_handler.h',
       'renderer/extensions/file_browser_handler_custom_bindings.cc',
       'renderer/extensions/file_browser_handler_custom_bindings.h',
       'renderer/extensions/page_actions_custom_bindings.cc',
       'renderer/extensions/page_actions_custom_bindings.h',
+      'renderer/extensions/sync_file_system_custom_bindings.cc',
+      'renderer/extensions/sync_file_system_custom_bindings.h',
       'renderer/extensions/tabs_custom_bindings.cc',
       'renderer/extensions/tabs_custom_bindings.h',
+    ],
+    'chrome_renderer_non_android_sources': [
       'renderer/prerender/prerender_media_load_deferrer.cc',
       'renderer/prerender/prerender_media_load_deferrer.h',
     ],
@@ -213,13 +213,17 @@
       'renderer/pepper/ppb_pdf_impl.cc',
       'renderer/pepper/ppb_pdf_impl.h',
     ],
+    # For safe_browsing==1 or safe_browsing==2.
+    'chrome_renderer_basic_safe_browsing_sources': [
+      'renderer/safe_browsing/malware_dom_details.cc',
+      'renderer/safe_browsing/malware_dom_details.h',
+    ],
+    # For safe_browsing==1 only.
     'chrome_renderer_safe_browsing_sources': [
       'renderer/safe_browsing/feature_extractor_clock.cc',
       'renderer/safe_browsing/feature_extractor_clock.h',
       'renderer/safe_browsing/features.cc',
       'renderer/safe_browsing/features.h',
-      'renderer/safe_browsing/malware_dom_details.cc',
-      'renderer/safe_browsing/malware_dom_details.h',
       'renderer/safe_browsing/murmurhash3_util.cc',
       'renderer/safe_browsing/murmurhash3_util.h',
       'renderer/safe_browsing/phishing_classifier.cc',
@@ -324,6 +328,11 @@
             '../ppapi/ppapi_internal.gyp:ppapi_shared',
           ],
         }],
+        ['safe_browsing==1 or safe_browsing==2', {
+          'sources': [
+            '<@(chrome_renderer_basic_safe_browsing_sources)',
+          ],
+        }],
         ['safe_browsing==1', {
           'sources': [
             '<@(chrome_renderer_safe_browsing_sources)',
@@ -334,6 +343,11 @@
           'dependencies': [
             'safe_browsing_proto',
             '../third_party/smhasher/smhasher.gyp:murmurhash3',
+          ],
+        }],
+        ['safe_browsing==2', {
+          'defines': [
+            'MOBILE_SAFE_BROWSING',
           ],
         }],
         ['enable_extensions==1', {

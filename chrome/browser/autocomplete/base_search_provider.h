@@ -248,9 +248,7 @@ class BaseSearchProvider : public AutocompleteProvider,
 
   class NavigationResult : public Result {
    public:
-    // |provider| and |profile| are both used to compute |formatted_url_|.
-    NavigationResult(const AutocompleteProvider& provider,
-                     Profile* profile,
+    NavigationResult(const AutocompleteSchemeClassifier& scheme_classifier,
                      const GURL& url,
                      AutocompleteMatchType::Type type,
                      const base::string16& description,
@@ -491,6 +489,8 @@ class BaseSearchProvider : public AutocompleteProvider,
   // Updates |matches_| from the latest results; applies calculated relevances
   // if suggested relevances cause undesriable behavior. Updates |done_|.
   virtual void UpdateMatches() = 0;
+
+  Profile* profile_;
 
   // Whether a field trial, if any, has triggered in the most recent
   // autocomplete query. This field is set to true only if the suggestion

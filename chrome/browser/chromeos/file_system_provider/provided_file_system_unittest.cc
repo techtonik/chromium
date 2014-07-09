@@ -4,6 +4,8 @@
 
 // TODO(mtomasz): Move these test cases to operations/unmount_unittest.cc.
 
+#include "chrome/browser/chromeos/file_system_provider/provided_file_system.h"
+
 #include <string>
 #include <vector>
 
@@ -12,7 +14,6 @@
 #include "base/run_loop.h"
 #include "base/values.h"
 #include "chrome/browser/chromeos/file_system_provider/mount_path_util.h"
-#include "chrome/browser/chromeos/file_system_provider/provided_file_system.h"
 #include "chrome/browser/chromeos/file_system_provider/provided_file_system_info.h"
 #include "chrome/browser/chromeos/file_system_provider/provided_file_system_interface.h"
 #include "chrome/browser/chromeos/file_system_provider/request_manager.h"
@@ -30,7 +31,7 @@ namespace {
 const char kExtensionId[] = "mbflcebpggnecokmikipoihdbecnjfoj";
 const int kExpectedRequestId = 1;
 const char kFileSystemId[] = "camera-pictures";
-const char kFileSystemName[] = "Camera Pictures";
+const char kDisplayName[] = "Camera Pictures";
 
 class FakeEventRouter : public extensions::EventRouter {
  public:
@@ -89,7 +90,7 @@ class FileSystemProviderProvidedFileSystemTest : public testing::Test {
     const base::FilePath mount_path =
         util::GetMountPath(profile_.get(), kExtensionId, kFileSystemId);
     file_system_info_.reset(new ProvidedFileSystemInfo(
-        kExtensionId, kFileSystemId, kFileSystemName, mount_path));
+        kExtensionId, kFileSystemId, kDisplayName, mount_path));
     provided_file_system_.reset(
         new ProvidedFileSystem(event_router_.get(), *file_system_info_.get()));
   }

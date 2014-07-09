@@ -1364,7 +1364,7 @@ CompositorFrameMetadata LayerTreeHostImpl::MakeCompositorFrameMetadata() const {
   CompositorFrameMetadata metadata;
   metadata.device_scale_factor = device_scale_factor_;
   metadata.page_scale_factor = active_tree_->total_page_scale_factor();
-  metadata.viewport_size = active_tree_->ScrollableViewportSize();
+  metadata.scrollable_viewport_size = active_tree_->ScrollableViewportSize();
   metadata.root_layer_size = active_tree_->ScrollableSize();
   metadata.min_page_scale_factor = active_tree_->min_page_scale_factor();
   metadata.max_page_scale_factor = active_tree_->max_page_scale_factor();
@@ -1498,7 +1498,7 @@ void LayerTreeHostImpl::DrawLayers(FrameData* frame,
   active_tree_->root_layer()->ResetAllChangeTrackingForSubtree();
 
   devtools_instrumentation::DidDrawFrame(id_);
-  BenchmarkInstrumentation::IssueImplThreadRenderingStatsEvent(
+  benchmark_instrumentation::IssueImplThreadRenderingStatsEvent(
       rendering_stats_instrumentation_->impl_thread_rendering_stats());
   rendering_stats_instrumentation_->AccumulateAndClearImplThreadStats();
 }

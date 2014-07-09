@@ -8,33 +8,26 @@
 
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
-#include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/search_engines/template_url_fetcher_callbacks.h"
 #include "chrome/browser/search_engines/template_url_parser.h"
-#include "chrome/browser/search_engines/template_url_service_factory.h"
-#include "chrome/browser/search_engines/ui_thread_search_terms_data.h"
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_service.h"
-#include "content/public/browser/render_frame_host.h"
-#include "content/public/browser/render_process_host.h"
-#include "content/public/browser/web_contents.h"
-#include "content/public/common/url_fetcher.h"
 #include "net/base/load_flags.h"
 #include "net/url_request/url_fetcher.h"
 #include "net/url_request/url_fetcher_delegate.h"
+#include "net/url_request/url_request_context_getter.h"
 #include "net/url_request/url_request_status.h"
 
 // RequestDelegate ------------------------------------------------------------
 class TemplateURLFetcher::RequestDelegate : public net::URLFetcherDelegate {
  public:
-  // Takes ownership of |callbacks|.
-  RequestDelegate(TemplateURLFetcher* fetcher,
-                  const base::string16& keyword,
-                  const GURL& osdd_url,
-                  const GURL& favicon_url,
-                  content::WebContents* web_contents,
-                  TemplateURLFetcherCallbacks* callbacks,
-                  ProviderType provider_type);
+  RequestDelegate(
+      TemplateURLFetcher* fetcher,
+      const base::string16& keyword,
+      const GURL& osdd_url,
+      const GURL& favicon_url,
+      const URLFetcherCustomizeCallback& url_fetcher_customize_callback,
+      const ConfirmAddSearchProviderCallback& confirm_add_callback,
+      ProviderType provider_type);
 
   // net::URLFetcherDelegate:
   // If data contains a valid OSDD, a TemplateURL is created and added to
@@ -61,7 +54,7 @@ class TemplateURLFetcher::RequestDelegate : public net::URLFetcherDelegate {
   const GURL osdd_url_;
   const GURL favicon_url_;
   const ProviderType provider_type_;
-  scoped_ptr<TemplateURLFetcherCallbacks> callbacks_;
+  ConfirmAddSearchProviderCallback confirm_add_callback_;
 
   scoped_ptr<TemplateURLService::Subscription> template_url_subscription_;
 
@@ -73,8 +66,8 @@ TemplateURLFetcher::RequestDelegate::RequestDelegate(
     const base::string16& keyword,
     const GURL& osdd_url,
     const GURL& favicon_url,
-    content::WebContents* web_contents,
-    TemplateURLFetcherCallbacks* callbacks,
+    const URLFetcherCustomizeCallback& url_fetcher_customize_callback,
+    const ConfirmAddSearchProviderCallback& confirm_add_callback,
     ProviderType provider_type)
     : url_fetcher_(net::URLFetcher::Create(
           osdd_url, net::URLFetcher::GET, this)),
@@ -83,9 +76,8 @@ TemplateURLFetcher::RequestDelegate::RequestDelegate(
       osdd_url_(osdd_url),
       favicon_url_(favicon_url),
       provider_type_(provider_type),
-      callbacks_(callbacks) {
-  TemplateURLService* model = TemplateURLServiceFactory::GetForProfile(
-      fetcher_->profile());
+      confirm_add_callback_(confirm_add_callback) {
+  TemplateURLService* model = fetcher_->template_url_service_;
   DCHECK(model);  // TemplateURLFetcher::ScheduleDownload verifies this.
 
   if (!model->loaded()) {
@@ -96,16 +88,10 @@ TemplateURLFetcher::RequestDelegate::RequestDelegate(
     model->Load();
   }
 
-  url_fetcher_->SetRequestContext(fetcher->profile()->GetRequestContext());
-  // Can be NULL during tests.
-  if (web_contents) {
-    content::AssociateURLFetcherWithRenderFrame(
-        url_fetcher_.get(),
-        web_contents->GetURL(),
-        web_contents->GetRenderProcessHost()->GetID(),
-        web_contents->GetMainFrame()->GetRoutingID());
-  }
+  if (!url_fetcher_customize_callback.is_null())
+    url_fetcher_customize_callback.Run(url_fetcher_.get());
 
+  url_fetcher_->SetRequestContext(fetcher->request_context_.get());
   url_fetcher_->Start();
 }
 
@@ -135,11 +121,12 @@ void TemplateURLFetcher::RequestDelegate::OnURLFetchComplete(
     return;
   }
 
-  template_url_.reset(TemplateURLParser::Parse(fetcher_->profile(), false,
+  template_url_.reset(TemplateURLParser::Parse(
+      fetcher_->template_url_service_->search_terms_data(), false,
       data.data(), data.length(), NULL));
   if (!template_url_.get() ||
       !template_url_->url_ref().SupportsReplacement(
-          UIThreadSearchTermsData(fetcher_->profile()))) {
+          fetcher_->template_url_service_->search_terms_data())) {
     fetcher_->RequestCompleted(this);
     // WARNING: RequestCompleted deletes us.
     return;
@@ -156,9 +143,7 @@ void TemplateURLFetcher::RequestDelegate::OnURLFetchComplete(
   }
 
   // Wait for the model to be loaded before adding the provider.
-  TemplateURLService* model = TemplateURLServiceFactory::GetForProfile(
-      fetcher_->profile());
-  if (!model->loaded())
+  if (!fetcher_->template_url_service_->loaded())
     return;
   AddSearchProvider();
   // WARNING: AddSearchProvider deletes us.
@@ -167,8 +152,7 @@ void TemplateURLFetcher::RequestDelegate::OnURLFetchComplete(
 void TemplateURLFetcher::RequestDelegate::AddSearchProvider() {
   DCHECK(template_url_.get());
   DCHECK(!keyword_.empty());
-  Profile* profile = fetcher_->profile();
-  TemplateURLService* model = TemplateURLServiceFactory::GetForProfile(profile);
+  TemplateURLService* model = fetcher_->template_url_service_;
   DCHECK(model);
   DCHECK(model->loaded());
 
@@ -206,7 +190,7 @@ void TemplateURLFetcher::RequestDelegate::AddSearchProvider() {
       // The source WebContents' delegate takes care of adding the URL to the
       // model, which takes ownership, or of deleting it if the add is
       // cancelled.
-      callbacks_->ConfirmAddSearchProvider(new TemplateURL(data), profile);
+      confirm_add_callback_.Run(make_scoped_ptr(new TemplateURL(data)));
       break;
 
     default:
@@ -220,8 +204,11 @@ void TemplateURLFetcher::RequestDelegate::AddSearchProvider() {
 
 // TemplateURLFetcher ---------------------------------------------------------
 
-TemplateURLFetcher::TemplateURLFetcher(Profile* profile) : profile_(profile) {
-  DCHECK(profile_);
+TemplateURLFetcher::TemplateURLFetcher(
+    TemplateURLService* template_url_service,
+    net::URLRequestContextGetter* request_context)
+    : template_url_service_(template_url_service),
+      request_context_(request_context) {
 }
 
 TemplateURLFetcher::~TemplateURLFetcher() {
@@ -231,16 +218,10 @@ void TemplateURLFetcher::ScheduleDownload(
     const base::string16& keyword,
     const GURL& osdd_url,
     const GURL& favicon_url,
-    content::WebContents* web_contents,
-    TemplateURLFetcherCallbacks* callbacks,
+    const URLFetcherCustomizeCallback& url_fetcher_customize_callback,
+    const ConfirmAddSearchProviderCallback& confirm_add_callback,
     ProviderType provider_type) {
   DCHECK(osdd_url.is_valid());
-  scoped_ptr<TemplateURLFetcherCallbacks> owned_callbacks(callbacks);
-
-  TemplateURLService* url_model =
-      TemplateURLServiceFactory::GetForProfile(profile());
-  if (!url_model)
-    return;
 
   // For a JS-added OSDD, the provided keyword is irrelevant because we will
   // generate a keyword later from the OSDD content.  For the autodetected case,
@@ -248,15 +229,15 @@ void TemplateURLFetcher::ScheduleDownload(
   if (provider_type == TemplateURLFetcher::AUTODETECTED_PROVIDER) {
     DCHECK(!keyword.empty());
 
-    if (!url_model->loaded()) {
+    if (!template_url_service_->loaded()) {
       // We could try to set up a callback to this function again once the model
       // is loaded but since this is an auto-add case anyway, meh.
-      url_model->Load();
+      template_url_service_->Load();
       return;
     }
 
     const TemplateURL* template_url =
-        url_model->GetTemplateURLForKeyword(keyword);
+        template_url_service_->GetTemplateURLForKeyword(keyword);
     if (template_url && (!template_url->safe_for_autoreplace() ||
                          template_url->originating_url() == osdd_url))
       return;
@@ -270,9 +251,9 @@ void TemplateURLFetcher::ScheduleDownload(
       return;
   }
 
-  requests_.push_back(
-      new RequestDelegate(this, keyword, osdd_url, favicon_url, web_contents,
-                          owned_callbacks.release(), provider_type));
+  requests_.push_back(new RequestDelegate(
+      this, keyword, osdd_url, favicon_url, url_fetcher_customize_callback,
+      confirm_add_callback, provider_type));
 }
 
 void TemplateURLFetcher::RequestCompleted(RequestDelegate* request) {

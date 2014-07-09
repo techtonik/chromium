@@ -178,7 +178,7 @@ class Dispatcher : public content::RenderProcessObserver,
   void OnTransferBlobs(const std::vector<std::string>& blob_uuids);
   void OnUnloaded(const std::string& id);
   void OnUpdatePermissions(const ExtensionMsg_UpdatePermissions_Params& params);
-  void OnUpdateTabSpecificPermissions(int page_id,
+  void OnUpdateTabSpecificPermissions(const GURL& url,
                                       int tab_id,
                                       const std::string& extension_id,
                                       const URLPatternSet& origin_set);
@@ -192,10 +192,7 @@ class Dispatcher : public content::RenderProcessObserver,
   void UpdateActiveExtensions();
 
   // Sets up the host permissions for |extension|.
-  void InitOriginPermissions(const Extension* extension);
-  void UpdateOriginPermissions(UpdatedExtensionPermissionsInfo::Reason reason,
-                               const Extension* extension,
-                               const URLPatternSet& origins);
+  void UpdateOriginPermissions(const Extension* extension);
 
   // Enable custom element whitelist in Apps.
   void EnableCustomElementWhiteList();

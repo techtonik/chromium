@@ -41,15 +41,15 @@ class ParserTest(unittest.TestCase):
         module my_module {
         }
         """
-    self.assertEquals(parser.Parse(source, "my_file.mojom"),
-                      [("MODULE", "my_module", None, None)])
+    expected = [('MODULE', ('IDENTIFIER', 'my_module'), None, None)]
+    self.assertEquals(parser.Parse(source, "my_file.mojom"), expected)
 
   def testSourceWithCrLfs(self):
     """Tests a .mojom source with CR-LFs instead of LFs."""
 
     source = "// This is a comment.\r\n\r\nmodule my_module {\r\n}\r\n"
-    self.assertEquals(parser.Parse(source, "my_file.mojom"),
-                      [("MODULE", "my_module", None, None)])
+    expected = [('MODULE', ('IDENTIFIER', 'my_module'), None, None)]
+    self.assertEquals(parser.Parse(source, "my_file.mojom"), expected)
 
   def testUnexpectedEOF(self):
     """Tests a "truncated" .mojom source."""
@@ -141,7 +141,7 @@ class ParserTest(unittest.TestCase):
         """
     expected = \
         [('MODULE',
-          'my_module',
+          ('IDENTIFIER', 'my_module'),
           None,
           [('STRUCT',
             'MyStruct',
@@ -161,7 +161,7 @@ class ParserTest(unittest.TestCase):
         """
     expected = \
         [('MODULE',
-          '',
+          None,
           None,
           [('STRUCT',
             'MyStruct',
@@ -200,35 +200,74 @@ class ParserTest(unittest.TestCase):
         r"^my_file\.mojom:4: Error: Unexpected '{':\n *{$"):
       parser.Parse(source2, "my_file.mojom")
 
-  def testEnumInitializers(self):
-    """Tests an enum with simple initialized values."""
+  def testEnums(self):
+    """Tests that enum statements are correctly parsed."""
 
     source = """\
         module my_module {
-
-        enum MyEnum {
-          MY_ENUM_NEG1 = -1,
-          MY_ENUM_ZERO = 0,
-          MY_ENUM_1 = +1,
-          MY_ENUM_2,
+        enum MyEnum1 { VALUE1, VALUE2 };  // No trailing comma.
+        enum MyEnum2 {
+          VALUE1 = -1,
+          VALUE2 = 0,
+          VALUE3 = + 987,  // Check that space is allowed.
+          VALUE4 = 0xAF12,
+          VALUE5 = -0x09bcd,
+          VALUE6 = VALUE5,
+          VALUE7,  // Leave trailing comma.
         };
-
         }  // my_module
         """
     expected = \
         [('MODULE',
-          'my_module',
+          ('IDENTIFIER', 'my_module'),
           None,
           [('ENUM',
-            'MyEnum',
-            [('ENUM_FIELD', 'MY_ENUM_NEG1', '-1'),
-             ('ENUM_FIELD', 'MY_ENUM_ZERO', '0'),
-             ('ENUM_FIELD', 'MY_ENUM_1', '+1'),
-             ('ENUM_FIELD', 'MY_ENUM_2', None)])])]
+            'MyEnum1',
+            [('ENUM_VALUE', 'VALUE1', None),
+             ('ENUM_VALUE', 'VALUE2', None)]),
+           ('ENUM',
+            'MyEnum2',
+            [('ENUM_VALUE', 'VALUE1', '-1'),
+             ('ENUM_VALUE', 'VALUE2', '0'),
+             ('ENUM_VALUE', 'VALUE3', '+987'),
+             ('ENUM_VALUE', 'VALUE4', '0xAF12'),
+             ('ENUM_VALUE', 'VALUE5', '-0x09bcd'),
+             ('ENUM_VALUE', 'VALUE6', ('IDENTIFIER', 'VALUE5')),
+             ('ENUM_VALUE', 'VALUE7', None)])])]
     self.assertEquals(parser.Parse(source, "my_file.mojom"), expected)
 
-  def testConst(self):
-    """Tests some constants and struct memebers initialized with them."""
+  def testInvalidEnumInitializers(self):
+    """Tests that invalid enum initializers are correctly detected."""
+
+    # No values.
+    source1 = """\
+        enum MyEnum {
+        };
+        """
+    with self.assertRaisesRegexp(
+        parser.ParseError,
+        r"^my_file\.mojom:2: Error: Unexpected '}':\n"
+            r" *};$"):
+      parser.Parse(source1, "my_file.mojom")
+
+    # Floating point value.
+    source2 = "enum MyEnum { VALUE = 0.123 };"
+    with self.assertRaisesRegexp(
+        parser.ParseError,
+        r"^my_file\.mojom:1: Error: Unexpected '0\.123':\n"
+            r"enum MyEnum { VALUE = 0\.123 };$"):
+      parser.Parse(source2, "my_file.mojom")
+
+    # Boolean value.
+    source2 = "enum MyEnum { VALUE = true };"
+    with self.assertRaisesRegexp(
+        parser.ParseError,
+        r"^my_file\.mojom:1: Error: Unexpected 'true':\n"
+            r"enum MyEnum { VALUE = true };$"):
+      parser.Parse(source2, "my_file.mojom")
+
+  def testConsts(self):
+    """Tests some constants and struct members initialized with them."""
 
     source = """\
         module my_module {
@@ -242,13 +281,13 @@ class ParserTest(unittest.TestCase):
         """
     expected = \
         [('MODULE',
-          'my_module',
+          ('IDENTIFIER', 'my_module'),
           None,
           [('STRUCT',
             'MyStruct', None,
             [('CONST', 'int8', 'kNumber', '-1'),
              ('FIELD', 'int8', 'number',
-                ast.Ordinal(0), ('IDENTIFIER', 'kNumber'))])])]
+              ast.Ordinal(0), ('IDENTIFIER', 'kNumber'))])])]
     self.assertEquals(parser.Parse(source, "my_file.mojom"), expected)
 
   def testNoConditionals(self):
@@ -291,7 +330,7 @@ class ParserTest(unittest.TestCase):
         """
     expected = \
         [('MODULE',
-          'my_module',
+          ('IDENTIFIER', 'my_module'),
           None,
           [('STRUCT',
             'MyStruct',
@@ -388,7 +427,7 @@ class ParserTest(unittest.TestCase):
         """
     expected = \
         [('MODULE',
-          'my.mod',
+          ('IDENTIFIER', 'my.mod'),
           None,
           [('STRUCT',
             'MyStruct',
@@ -412,7 +451,7 @@ class ParserTest(unittest.TestCase):
         """
     expected = \
         [('MODULE',
-          '',
+          None,
           None,
           [('STRUCT',
             'MyStruct',
@@ -474,7 +513,7 @@ class ParserTest(unittest.TestCase):
         """
     expected = \
         [('MODULE',
-          '',
+          None,
           None,
           [('STRUCT',
             'MyStruct',
@@ -516,7 +555,7 @@ class ParserTest(unittest.TestCase):
         """
     expected = \
         [('MODULE',
-          '',
+          None,
           None,
           [('STRUCT',
             'MyStruct',
@@ -534,7 +573,7 @@ class ParserTest(unittest.TestCase):
     source = "struct MyStruct { int32[][] nested_array; };"
     expected = \
         [('MODULE',
-          '',
+          None,
           None,
           [('STRUCT',
             'MyStruct',
@@ -585,7 +624,7 @@ class ParserTest(unittest.TestCase):
     source1 = "interface MyInterface { MyMethod(int32 a); };"
     expected1 = \
         [('MODULE',
-          '',
+          None,
           None,
           [('INTERFACE',
             'MyInterface',
@@ -605,7 +644,7 @@ class ParserTest(unittest.TestCase):
         """
     expected2 = \
         [('MODULE',
-          '',
+          None,
           None,
           [('INTERFACE',
             'MyInterface',
@@ -630,7 +669,7 @@ class ParserTest(unittest.TestCase):
         """
     expected3 = \
         [('MODULE',
-          '',
+          None,
           None,
           [('INTERFACE',
             'MyInterface',
@@ -671,6 +710,79 @@ class ParserTest(unittest.TestCase):
         r"^my_file\.mojom:2: Error: Unexpected ',':\n"
             r" *MyMethod\(, string a\);$"):
       parser.Parse(source2, "my_file.mojom")
+
+  def testValidAttributes(self):
+    """Tests parsing attributes (and attribute lists)."""
+
+    # Note: We use structs because they have (optional) attribute lists.
+
+    # Empty attribute list.
+    source1 = "[] struct MyStruct {};"
+    expected1 = \
+        [('MODULE',
+          None,
+          None,
+          [('STRUCT',
+            'MyStruct',
+            ast.AttributeList(),
+            None)])]
+    self.assertEquals(parser.Parse(source1, "my_file.mojom"), expected1)
+
+    # One-element attribute list, with name value.
+    source2 = "[MyAttribute=MyName] struct MyStruct {};"
+    expected2 = \
+        [('MODULE',
+          None,
+          None,
+          [('STRUCT',
+            'MyStruct',
+            ast.AttributeList(ast.Attribute("MyAttribute", "MyName")),
+            None)])]
+    self.assertEquals(parser.Parse(source2, "my_file.mojom"), expected2)
+
+    # Two-element attribute list, with one string value and one integer value.
+    source3 = "[MyAttribute1 = \"hello\", MyAttribute2 = 5] struct MyStruct {};"
+    expected3 = \
+        [('MODULE',
+          None,
+          None,
+          [('STRUCT',
+            'MyStruct',
+            ast.AttributeList([ast.Attribute("MyAttribute1", "hello"),
+                               ast.Attribute("MyAttribute2", 5)]),
+            None)])]
+    self.assertEquals(parser.Parse(source3, "my_file.mojom"), expected3)
+
+    # TODO(vtl): Boolean attributes don't work yet. (In fact, we just |eval()|
+    # literal (non-name) values, which is extremely dubious.)
+
+  def testInvalidAttributes(self):
+    """Tests that invalid attributes and attribute lists are correctly
+    detected."""
+
+    # Trailing commas not allowed.
+    source1 = "[MyAttribute=MyName,] struct MyStruct {};"
+    with self.assertRaisesRegexp(
+        parser.ParseError,
+        r"^my_file\.mojom:1: Error: Unexpected '\]':\n"
+            r"\[MyAttribute=MyName,\] struct MyStruct {};$"):
+      parser.Parse(source1, "my_file.mojom")
+
+    # Missing value.
+    source2 = "[MyAttribute=] struct MyStruct {};"
+    with self.assertRaisesRegexp(
+        parser.ParseError,
+        r"^my_file\.mojom:1: Error: Unexpected '\]':\n"
+            r"\[MyAttribute=\] struct MyStruct {};$"):
+      parser.Parse(source2, "my_file.mojom")
+
+    # Missing key.
+    source3 = "[=MyName] struct MyStruct {};"
+    with self.assertRaisesRegexp(
+        parser.ParseError,
+        r"^my_file\.mojom:1: Error: Unexpected '=':\n"
+            r"\[=MyName\] struct MyStruct {};$"):
+      parser.Parse(source3, "my_file.mojom")
 
 if __name__ == "__main__":
   unittest.main()

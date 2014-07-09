@@ -10,6 +10,8 @@ from metrics import power
 from telemetry import benchmark
 from telemetry.page import page_measurement
 from telemetry.page import page_set
+from telemetry.value import list_of_scalar_values
+from telemetry.value import scalar
 
 
 def _Mean(l):
@@ -47,9 +49,14 @@ decodeURIComponent(formElement.value.split("?")[1]);
     for key in result_dict:
       if key == 'v':
         continue
-      results.Add(key, 'ms', result_dict[key], data_type='unimportant')
+      results.AddValue(list_of_scalar_values.ListOfScalarValues(
+          results.current_page, key, 'ms', result_dict[key], important=False))
       total += _Mean(result_dict[key])
-    results.Add('Total', 'ms', total)
+
+    # TODO(tonyg/nednguyen): This measurement shouldn't calculate Total. The
+    # results system should do that for us.
+    results.AddValue(scalar.ScalarValue(
+        results.current_page, 'Total', 'ms', total))
 
 
 class Kraken(benchmark.Benchmark):

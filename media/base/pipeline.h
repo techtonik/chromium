@@ -59,10 +59,7 @@ typedef base::Callback<void(PipelineMetadata)> PipelineMetadataCB;
 //   [ InitXXX (for each filter) ]      [ Stopping ]
 //         |                                 |
 //         V                                 V
-//   [ InitPrerolling ]                 [ Stopped ]
-//         |
-//         V
-//   [ Playing ] <-- [ Seeking ]
+//   [ Playing ] <-- [ Seeking ]        [ Stopped ]
 //         |               ^
 //         `---------------'
 //              Seek()
@@ -194,7 +191,6 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
     kInitDemuxer,
     kInitAudioRenderer,
     kInitVideoRenderer,
-    kInitPrerolling,
     kSeeking,
     kPlaying,
     kStopping,
@@ -296,10 +292,6 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
 
   // Initiates an asynchronous pause-flush-seek-preroll call sequence
   // executing |done_cb| with the final status when completed.
-  //
-  // TODO(scherkus): Prerolling should be separate from seeking so we can report
-  // finer grained ready states (HAVE_CURRENT_DATA vs. HAVE_FUTURE_DATA)
-  // indepentent from seeking.
   void DoSeek(base::TimeDelta seek_timestamp, const PipelineStatusCB& done_cb);
 
   // Initiates an asynchronous pause-flush-stop call sequence executing
@@ -353,6 +345,9 @@ class MEDIA_EXPORT Pipeline : public DemuxerHost {
   // SetPlaybackRate() and a task is dispatched on the task runner to notify
   // the filters.
   float playback_rate_;
+
+  // Current duration as reported by |demuxer_|.
+  base::TimeDelta duration_;
 
   // base::TickClock used by |clock_|.
   base::DefaultTickClock default_tick_clock_;

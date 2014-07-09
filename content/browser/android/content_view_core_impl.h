@@ -28,7 +28,7 @@ class WindowAndroid;
 }
 
 namespace content {
-class JavaBridgeDispatcherHostManager;
+class GinJavaBridgeDispatcherHost;
 class RenderWidgetHostViewAndroid;
 struct MenuItem;
 
@@ -158,12 +158,6 @@ class ContentViewCoreImpl : public ContentViewCore,
                                        jobject obj,
                                        jboolean enabled);
 
-  void LoadIfNecessary(JNIEnv* env, jobject obj);
-  void RequestRestoreLoad(JNIEnv* env, jobject obj);
-  void Reload(JNIEnv* env, jobject obj, jboolean check_for_repost);
-  void ReloadIgnoringCache(JNIEnv* env, jobject obj, jboolean check_for_repost);
-  void CancelPendingReload(JNIEnv* env, jobject obj);
-  void ContinuePendingReload(JNIEnv* env, jobject obj);
   void AddStyleSheetByURL(JNIEnv* env, jobject obj, jstring url);
   void ClearHistory(JNIEnv* env, jobject obj);
   void EvaluateJavaScript(JNIEnv* env,
@@ -402,8 +396,8 @@ class ContentViewCoreImpl : public ContentViewCore,
   bool accessibility_enabled_;
 
   // Manages injecting Java objects.
-  scoped_ptr<JavaBridgeDispatcherHostManager>
-      java_bridge_dispatcher_host_manager_;
+  scoped_ptr<GinJavaBridgeDispatcherHost>
+      java_bridge_dispatcher_host_;
 
   DISALLOW_COPY_AND_ASSIGN(ContentViewCoreImpl);
 };

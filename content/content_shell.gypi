@@ -412,6 +412,8 @@
             'files': [
               'shell/renderer/test_runner/resources/fonts/AHEM____.TTF',
               'shell/renderer/test_runner/resources/fonts/fonts.conf',
+              '../third_party/gardiner_mod/GardinerModBug.ttf',
+              '../third_party/gardiner_mod/GardinerModCat.ttf',
             ]
           }],
         }],
@@ -1030,11 +1032,6 @@
                 'additional_input_paths': [
                   '<(PRODUCT_DIR)/icudtl.dat',
                 ],
-              }],
-              ['component != "shared_library" and target_arch != "arm64" and target_arch != "x64" and profiling_full_stack_frames != 1', {
-                # Only enable the chromium linker on regular builds, since the
-                # component build crashes on Android 4.4. See b/11379966
-                'use_chromium_linker': '1',
               }],
             ],
           },
