@@ -135,7 +135,8 @@ class IOThreadInstallUninstallTest {
     EXPECT_EQ(GURL("chrome-extension://" + ext_id_ + "/*"),
               registration->pattern());
     EXPECT_TRUE(registration->waiting_version() ||
-                registration->active_version());
+                registration->active_version() ||
+                registration->installing_version());
     EXPECT_TRUE(
         ServiceWorkerManager::Get(profile_)->GetServiceWorkerHost(ext_id_));
   }
