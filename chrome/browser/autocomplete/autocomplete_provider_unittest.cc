@@ -49,7 +49,8 @@ class TestProvider : public AutocompleteProvider {
   TestProvider(int relevance, const base::string16& prefix,
                Profile* profile,
                const base::string16 match_keyword)
-      : AutocompleteProvider(NULL, profile, AutocompleteProvider::TYPE_SEARCH),
+      : AutocompleteProvider(NULL, AutocompleteProvider::TYPE_SEARCH),
+        profile_(profile),
         relevance_(relevance),
         prefix_(prefix),
         match_keyword_(match_keyword) {
@@ -74,6 +75,7 @@ class TestProvider : public AutocompleteProvider {
       AutocompleteMatch::Type type,
       const TemplateURLRef::SearchTermsArgs& search_terms_args);
 
+  Profile* profile_;
   int relevance_;
   const base::string16 prefix_;
   const base::string16 match_keyword_;
@@ -251,7 +253,7 @@ void AutocompleteProviderTest::ResetControllerWithTestProviders(
   RegisterTemplateURL(base::ASCIIToUTF16(kTestTemplateURLKeyword),
                       "http://aqs/{searchTerms}/{google:assistedQueryStats}");
 
-  ACProviders providers;
+  AutocompleteController::Providers providers;
 
   // Construct two new providers, with either the same or different prefixes.
   TestProvider* provider1 = new TestProvider(
@@ -259,7 +261,6 @@ void AutocompleteProviderTest::ResetControllerWithTestProviders(
       base::ASCIIToUTF16("http://a"),
       &profile_,
       base::ASCIIToUTF16(kTestTemplateURLKeyword));
-  provider1->AddRef();
   providers.push_back(provider1);
 
   TestProvider* provider2 = new TestProvider(
@@ -268,7 +269,6 @@ void AutocompleteProviderTest::ResetControllerWithTestProviders(
                         : base::ASCIIToUTF16("http://b"),
       &profile_,
       base::string16());
-  provider2->AddRef();
   providers.push_back(provider2);
 
   // Reset the controller to contain our new providers.

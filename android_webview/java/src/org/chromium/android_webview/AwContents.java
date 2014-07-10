@@ -23,6 +23,7 @@ import android.os.Bundle;
 import android.os.Message;
 import android.text.TextUtils;
 import android.util.Log;
+import android.util.Pair;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -804,6 +805,13 @@ public class AwContents {
         if (wasAttached) onDetachedFromWindow();
         if (!wasPaused) onPause();
 
+        // Save injected JavaScript interfaces.
+        Map<String, Pair<Object, Class>> javascriptInterfaces =
+                new HashMap<String, Pair<Object, Class>>();
+        if (mContentViewCore != null) {
+            javascriptInterfaces.putAll(mContentViewCore.getJavascriptInterfaces());
+        }
+
         setNewAwContents(popupNativeAwContents);
 
         // Finally refresh all view state for mContentViewCore and mNativeAwContents.
@@ -817,6 +825,14 @@ public class AwContents {
         if (wasViewVisible) setViewVisibilityInternal(true);
         if (wasWindowFocused) onWindowFocusChanged(wasWindowFocused);
         if (wasFocused) onFocusChanged(true, 0, null);
+
+        // Restore injected JavaScript interfaces.
+        for (Map.Entry<String, Pair<Object, Class>> entry : javascriptInterfaces.entrySet()) {
+            mContentViewCore.addPossiblyUnsafeJavascriptInterface(
+                    entry.getValue().first,
+                    entry.getKey(),
+                    entry.getValue().second);
+        }
     }
 
     /**
@@ -1027,6 +1043,8 @@ public class AwContents {
      * @param params Parameters for this load.
      */
     public void loadUrl(LoadUrlParams params) {
+        if (mNativeAwContents == 0) return;
+
         if (params.getLoadUrlType() == LoadUrlParams.LOAD_TYPE_DATA &&
                 !params.isBaseUrlDataScheme()) {
             // This allows data URLs with a non-data base URL access to file:///android_asset/ and
@@ -1065,12 +1083,11 @@ public class AwContents {
             }
         }
 
-        if (mNativeAwContents != 0) {
-            nativeSetExtraHeadersForUrl(
-                    mNativeAwContents, params.getUrl(), params.getExtraHttpRequestHeadersString());
-        }
+        nativeSetExtraHeadersForUrl(
+                mNativeAwContents, params.getUrl(), params.getExtraHttpRequestHeadersString());
         params.setExtraHeaders(new HashMap<String, String>());
 
+        nativeSendCheckRenderThreadResponsiveness(mNativeAwContents);
         mContentViewCore.loadUrl(params);
 
         // The behavior of WebViewClassic uses the populateVisitedLinks callback in WebKit.
@@ -2458,6 +2475,7 @@ public class AwContents {
     private native void nativeClearView(long nativeAwContents);
     private native void nativeSetExtraHeadersForUrl(long nativeAwContents,
             String url, String extraHeaders);
+    private native void nativeSendCheckRenderThreadResponsiveness(long nativeAwContents);
 
     private native void nativeInvokeGeolocationCallback(
             long nativeAwContents, boolean value, String requestingFrame);

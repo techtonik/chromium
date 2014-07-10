@@ -5,18 +5,20 @@
 #ifndef CHROME_BROWSER_SEARCH_ENGINES_TEMPLATE_URL_FETCHER_H_
 #define CHROME_BROWSER_SEARCH_ENGINES_TEMPLATE_URL_FETCHER_H_
 
+#include "base/callback_forward.h"
+#include "base/memory/ref_counted.h"
+#include "base/memory/scoped_ptr.h"
 #include "base/memory/scoped_vector.h"
 #include "base/strings/string16.h"
 #include "components/keyed_service/core/keyed_service.h"
-#include "ui/gfx/native_widget_types.h"
 
 class GURL;
-class Profile;
 class TemplateURL;
-class TemplateURLFetcherCallbacks;
+class TemplateURLService;
 
-namespace content {
-class WebContents;
+namespace net {
+class URLFetcher;
+class URLRequestContextGetter;
 }
 
 // TemplateURLFetcher is responsible for downloading OpenSearch description
@@ -25,18 +27,24 @@ class WebContents;
 //
 class TemplateURLFetcher : public KeyedService {
  public:
+  typedef base::Callback<void(
+      net::URLFetcher* url_fetcher)> URLFetcherCustomizeCallback;
+  typedef base::Callback<void(
+      scoped_ptr<TemplateURL> template_url)> ConfirmAddSearchProviderCallback;
+
   enum ProviderType {
     AUTODETECTED_PROVIDER,
     EXPLICIT_PROVIDER  // Supplied by Javascript.
   };
 
-  // Creates a TemplateURLFetcher with the specified Profile.
-  explicit TemplateURLFetcher(Profile* profile);
+  // Creates a TemplateURLFetcher.
+  TemplateURLFetcher(TemplateURLService* template_url_service,
+                     net::URLRequestContextGetter* request_context);
   virtual ~TemplateURLFetcher();
 
   // If TemplateURLFetcher is not already downloading the OSDD for osdd_url,
   // it is downloaded. If successful and the result can be parsed, a TemplateURL
-  // is added to the TemplateURLService. Takes ownership of |callbacks|.
+  // is added to the TemplateURLService.
   //
   // If |provider_type| is AUTODETECTED_PROVIDER, |keyword| must be non-empty,
   // and if there's already a non-replaceable TemplateURL in the model for
@@ -44,14 +52,16 @@ class TemplateURLFetcher : public KeyedService {
   // download is started.  If |provider_type| is EXPLICIT_PROVIDER, |keyword| is
   // ignored.
   //
-  // |web_contents| specifies which WebContents displays the page the OSDD is
-  // downloaded for. |web_contents| must not be NULL, except during tests.
-  void ScheduleDownload(const base::string16& keyword,
-                        const GURL& osdd_url,
-                        const GURL& favicon_url,
-                        content::WebContents* web_contents,
-                        TemplateURLFetcherCallbacks* callbacks,
-                        ProviderType provider_type);
+  // If |url_fetcher_customize_callback| is not null, it's run after a
+  // URLFetcher is created. This callback can be used to set additional
+  // parameters on the URLFetcher.
+  void ScheduleDownload(
+      const base::string16& keyword,
+      const GURL& osdd_url,
+      const GURL& favicon_url,
+      const URLFetcherCustomizeCallback& url_fetcher_customize_callback,
+      const ConfirmAddSearchProviderCallback& confirm_add_callback,
+      ProviderType provider_type);
 
   // The current number of outstanding requests.
   int requests_count() const { return requests_.size(); }
@@ -64,12 +74,11 @@ class TemplateURLFetcher : public KeyedService {
 
   typedef ScopedVector<RequestDelegate> Requests;
 
-  Profile* profile() const { return profile_; }
-
   // Invoked from the RequestDelegate when done downloading.
   void RequestCompleted(RequestDelegate* request);
 
-  Profile* profile_;
+  TemplateURLService* template_url_service_;
+  scoped_refptr<net::URLRequestContextGetter> request_context_;
 
   // In progress requests.
   Requests requests_;

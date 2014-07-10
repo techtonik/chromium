@@ -85,9 +85,8 @@ void ReadDatabaseContents(leveldb::DB* db,
     std::string key = itr->key().ToString();
     std::string value = itr->value().ToString();
 
-    if (StartsWithASCII(key, kFileMetadataKeyPrefix, true)) {
-      std::string file_id = RemovePrefix(key, kFileMetadataKeyPrefix);
-
+    std::string file_id;
+    if (RemovePrefix(key, kFileMetadataKeyPrefix, &file_id)) {
       scoped_ptr<FileMetadata> metadata(new FileMetadata);
       if (!metadata->ParseFromString(itr->value().ToString())) {
         util::Log(logging::LOG_WARNING, FROM_HERE,
@@ -99,10 +98,10 @@ void ReadDatabaseContents(leveldb::DB* db,
       continue;
     }
 
-    if (StartsWithASCII(key, kFileTrackerKeyPrefix, true)) {
+    std::string tracker_id_str;
+    if (RemovePrefix(key, kFileTrackerKeyPrefix, &tracker_id_str)) {
       int64 tracker_id = 0;
-      if (!base::StringToInt64(RemovePrefix(key, kFileTrackerKeyPrefix),
-                               &tracker_id)) {
+      if (!base::StringToInt64(tracker_id_str, &tracker_id)) {
         util::Log(logging::LOG_WARNING, FROM_HERE,
                   "Failed to parse TrackerID");
         continue;
@@ -383,7 +382,8 @@ int64 MetadataDatabaseIndex::PickDirtyTracker() const {
   return *dirty_trackers_.begin();
 }
 
-void MetadataDatabaseIndex::DemoteDirtyTracker(int64 tracker_id) {
+void MetadataDatabaseIndex::DemoteDirtyTracker(
+    int64 tracker_id, leveldb::WriteBatch* /* unused_batch */) {
   if (dirty_trackers_.erase(tracker_id))
     demoted_dirty_trackers_.insert(tracker_id);
 }
@@ -392,7 +392,8 @@ bool MetadataDatabaseIndex::HasDemotedDirtyTracker() const {
   return !demoted_dirty_trackers_.empty();
 }
 
-void MetadataDatabaseIndex::PromoteDemotedDirtyTrackers() {
+void MetadataDatabaseIndex::PromoteDemotedDirtyTrackers(
+    leveldb::WriteBatch* /* unused_batch */) {
   dirty_trackers_.insert(demoted_dirty_trackers_.begin(),
                          demoted_dirty_trackers_.end());
   demoted_dirty_trackers_.clear();

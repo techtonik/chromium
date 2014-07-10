@@ -454,7 +454,6 @@ extern const char kStabilityPluginInstances[];
 extern const char kStabilityPluginCrashes[];
 extern const char kStabilityPluginLoadingErrors[];
 
-extern const char kInstallDate[];
 extern const char kUninstallMetricsPageLoadCount[];
 extern const char kUninstallLastLaunchTimeSec[];
 extern const char kUninstallLastObservedRunTimeSec[];
@@ -669,6 +668,7 @@ extern const char kInitialLocale[];
 extern const char kOobeComplete[];
 extern const char kOobeScreenPending[];
 extern const char kDeviceRegistered[];
+extern const char kEnrollmentRecoveryRequired[];
 extern const char kUsedPolicyCertificates[];
 extern const char kServerBackedDeviceState[];
 extern const char kCustomizationDefaultWallpaperURL[];
@@ -727,8 +727,6 @@ extern const char kMessageCenterShowedFirstRunBalloon[];
 extern const char kMessageCenterShowIcon[];
 extern const char kMessageCenterForcedOnTaskbar[];
 
-extern const char kRecoveryComponentVersion[];
-extern const char kComponentUpdaterState[];
 extern const char kAttemptedToEnableAutoupdate[];
 
 #if defined(OS_WIN)

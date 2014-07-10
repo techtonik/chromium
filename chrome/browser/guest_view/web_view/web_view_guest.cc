@@ -229,6 +229,7 @@ WebViewGuest::WebViewGuest(content::BrowserContext* browser_context,
       is_overriding_user_agent_(false),
       main_frame_id_(0),
       chromevox_injected_(false),
+      current_zoom_factor_(1.0),
       find_helper_(this),
       javascript_dialog_helper_(this) {
 }
@@ -754,7 +755,7 @@ void WebViewGuest::RequestFileSystemPermission(
     bool allowed_by_default,
     const base::Callback<void(bool)>& callback) {
   base::DictionaryValue request_info;
-  request_info.Set(guestview::kUrl, base::Value::CreateStringValue(url.spec()));
+  request_info.Set(guestview::kUrl, new base::StringValue(url.spec()));
   RequestPermission(
       WEB_VIEW_PERMISSION_TYPE_FILESYSTEM,
       request_info,
@@ -778,7 +779,7 @@ void WebViewGuest::RequestGeolocationPermission(
     const base::Callback<void(bool)>& callback) {
   base::DictionaryValue request_info;
   request_info.Set(guestview::kUrl,
-                   base::Value::CreateStringValue(requesting_frame.spec()));
+                   new base::StringValue(requesting_frame.spec()));
   request_info.Set(guestview::kUserGesture,
                    base::Value::CreateBooleanValue(user_gesture));
 
@@ -1210,9 +1211,8 @@ void WebViewGuest::RequestMediaAccessPermission(
     const content::MediaStreamRequest& request,
     const content::MediaResponseCallback& callback) {
   base::DictionaryValue request_info;
-  request_info.Set(
-      guestview::kUrl,
-      base::Value::CreateStringValue(request.security_origin.spec()));
+  request_info.Set(guestview::kUrl,
+                   new base::StringValue(request.security_origin.spec()));
   RequestPermission(WEB_VIEW_PERMISSION_TYPE_MEDIA,
                     request_info,
                     base::Bind(&WebViewGuest::OnWebViewMediaPermissionResponse,
@@ -1228,9 +1228,7 @@ void WebViewGuest::CanDownload(
     const std::string& request_method,
     const base::Callback<void(bool)>& callback) {
   base::DictionaryValue request_info;
-  request_info.Set(
-      guestview::kUrl,
-      base::Value::CreateStringValue(url.spec()));
+  request_info.Set(guestview::kUrl, new base::StringValue(url.spec()));
   RequestPermission(
       WEB_VIEW_PERMISSION_TYPE_DOWNLOAD,
       request_info,
@@ -1250,7 +1248,7 @@ void WebViewGuest::RequestPointerLockPermission(
   request_info.Set(webview::kLastUnlockedBySelf,
                    base::Value::CreateBooleanValue(last_unlocked_by_target));
   request_info.Set(guestview::kUrl,
-                   base::Value::CreateStringValue(
+                   new base::StringValue(
                        guest_web_contents()->GetLastCommittedURL().spec()));
 
   RequestPermission(
@@ -1606,19 +1604,18 @@ void WebViewGuest::RequestNewWindowPermission(
   request_info.Set(webview::kInitialWidth,
                    base::Value::CreateIntegerValue(initial_bounds.width()));
   request_info.Set(webview::kTargetURL,
-                   base::Value::CreateStringValue(new_window_info.url.spec()));
-  request_info.Set(webview::kName,
-                   base::Value::CreateStringValue(new_window_info.name));
+                   new base::StringValue(new_window_info.url.spec()));
+  request_info.Set(webview::kName, new base::StringValue(new_window_info.name));
   request_info.Set(webview::kWindowID,
                    base::Value::CreateIntegerValue(
                       guest->GetGuestInstanceID()));
   // We pass in partition info so that window-s created through newwindow
   // API can use it to set their partition attribute.
   request_info.Set(webview::kStoragePartitionId,
-                   base::Value::CreateStringValue(storage_partition_id));
-  request_info.Set(webview::kWindowOpenDisposition,
-                   base::Value::CreateStringValue(
-                       WindowOpenDispositionToString(disposition)));
+                   new base::StringValue(storage_partition_id));
+  request_info.Set(
+      webview::kWindowOpenDisposition,
+      new base::StringValue(WindowOpenDispositionToString(disposition)));
 
   RequestPermission(WEB_VIEW_PERMISSION_TYPE_NEW_WINDOW,
                     request_info,

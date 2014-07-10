@@ -476,6 +476,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Apps.AppShimErrorVersion">
+  <owner>jackhou@chromium.org</owner>
+  <summary>
+    Counts which major milestone versions of app_mode_loader are sending
+    --app-shim-error. --app-shim-error is sent as a command line argument to
+    Chrome when app_mode_loader was unable to dyload the Chrome Framework and
+    call ChromeAppModeMain. For example, when Chrome updates from 32-bit to
+    64-bit, an older shim will find the new framework version but fail to dyload
+    it.
+  </summary>
+</histogram>
+
 <histogram name="Ash.ActiveTouchPoints">
   <owner>kuscher@google.com</owner>
   <owner>rbyers@chromium.org</owner>
@@ -2784,6 +2796,71 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Connectivity Diagnostics App: Amount of time taken to run each of the
     connectivity tests.
   </summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultCookiesSetting" enum="ContentSetting">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>The default cookies setting at profile open.</summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultHandlersSetting" enum="ContentSetting">
+  <obsolete>
+    Deprecated 07/2014 since it is not referenced anywhere in the code.
+  </obsolete>
+  <owner>toyoshim@chromium.org</owner>
+  <summary>The default handler setting at profile open.</summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultImagesSetting" enum="ContentSetting">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>The default image setting at profile open.</summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultJavaScriptSetting"
+    enum="ContentSetting">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>The default JavaScript setting at profile open.</summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultLocationSetting" enum="ContentSetting">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>The default location setting at profile open.</summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultMediaStreamSetting"
+    enum="ContentSetting">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>The default MediaStream setting at profile open.</summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultMIDISysExSetting" enum="ContentSetting">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>
+    The default MIDI permission setting on sysex (system exclusive) messages at
+    profile open.
+  </summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultMouseCursorSetting"
+    enum="ContentSetting">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>The default mouse cursor setting at profile open.</summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultNotificationsSetting"
+    enum="ContentSetting">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>The default notification setting at profile open.</summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultPluginsSetting" enum="ContentSetting">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>The default plugins setting at profile open.</summary>
+</histogram>
+
+<histogram name="ContentSettings.DefaultPopupsSetting" enum="ContentSetting">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>The default popups setting at profile open.</summary>
 </histogram>
 
 <histogram name="Cookie.ParsedCookieStatus" enum="ParsedCookieStatus">
@@ -21704,21 +21781,33 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="PLT.StartToFinish.NoProxy.http">
+  <obsolete>
+    Deprecated as of 07/2014.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>StartToFinish times when using http and no proxy.</summary>
 </histogram>
 
 <histogram name="PLT.StartToFinish.NoProxy.https">
+  <obsolete>
+    Deprecated as of 07/2014.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>StartToFinish times when using https and no proxy.</summary>
 </histogram>
 
 <histogram name="PLT.StartToFinish.Proxy.http">
+  <obsolete>
+    Deprecated as of 07/2014.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>StartToFinish times when using http over a proxy.</summary>
 </histogram>
 
 <histogram name="PLT.StartToFinish.Proxy.https">
+  <obsolete>
+    Deprecated as of 07/2014.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>StartToFinish times when using https over a proxy.</summary>
 </histogram>
@@ -24755,6 +24844,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB.BloomFilter" units="milliseconds">
+  <obsolete>
+    Has not been generated for years (7/8/14).
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The first stage check that measures the time that Chrome took to check if a
@@ -24771,6 +24863,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB.Database" units="milliseconds">
+  <obsolete>
+    Has not been generated for years (7/8/14).
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The second stage check that measures the time that Chrome took to check if a
@@ -24779,6 +24874,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB.DBCheck" units="milliseconds">
+  <obsolete>
+    Has not been generated for years (7/8/14).
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The second stage check that mesures the time that Chrome took to check if a
@@ -24788,6 +24886,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB.Delay" units="milliseconds">
+  <obsolete>
+    Has not been generated for years (7/8/14).
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     This measures the time that SafeBrowsing actually delayed the browsing
@@ -24798,6 +24899,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB.FilterCheck" units="milliseconds">
+  <obsolete>
+    Has not been generated for years (7/8/14).
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The first stage check that measures the time that Chrome took to check if a
@@ -24806,6 +24910,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB.Network" units="milliseconds">
+  <obsolete>
+    Has not been generated for years (7/8/14).
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The third and final stage check that mesures the time that Chrome took to
@@ -24814,6 +24921,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB.NetworkCheck" units="milliseconds">
+  <obsolete>
+    Has not been generated for years (7/8/14).
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     The third and final stage check that mesures the time that Chrome took to
@@ -24823,6 +24933,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB.PauseSafe" units="milliseconds">
+  <obsolete>
+    Has not been generated for years (7/8/14).
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     This measures the time that SafeBrowsing actually delayed the browsing
@@ -24833,18 +24946,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB.Update">
+  <obsolete>
+    Has not been generated for years (7/8/14).
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>TBD.</summary>
 </histogram>
 
 <histogram name="SB2.AddPrefixes">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The number of add prefixes stored in the database after the last update.
   </summary>
 </histogram>
 
 <histogram name="SB2.BloomFailure" enum="SB2BloomFailure">
+  <obsolete>
+    Bloom filter support deleted in October 2012.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     Track failures when in processing the safe-browsing database bloom filter.
@@ -24865,12 +24984,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.BloomFilterLoad" units="ms">
+  <obsolete>
+    Bloom filter support deleted in October 2012.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>Time to load the BloomFilter file.</summary>
 </histogram>
 
 <histogram name="SB2.BrowseDatabaseKilobytes" units="KB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The size of the browsing SafeBrowsing database file on disk in kilobytes,
     after an update has occurred.
@@ -24878,7 +25000,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.BuildFilter" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The time that it took to regenerate the filter after we have received all
     the update chunks.
@@ -24898,7 +25020,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.BuildReadKilobytes" units="KB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The number of kilobytes read by the browser process during the filter
     generation phase.
@@ -24906,7 +25028,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.BuildReadOperations">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The number of read operations issued by the browser process during the
     filter generation phase.
@@ -24926,7 +25048,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.BuildWriteKilobytes" units="KB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The number of kilobytes written by the browser process during the filter
     generation phase.
@@ -24934,7 +25056,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.BuildWriteOperations">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The number of write operations issued by the browser process during the
     filter generation phase.
@@ -24942,7 +25064,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.ChunkInsert" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The time that it takes to write one redirect URL (which can contain multiple
     chunks) to the database.
@@ -24950,14 +25072,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.ChunkRequest" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The network time between the request and response for a chunk.
   </summary>
 </histogram>
 
 <histogram name="SB2.ChunkSize" units="bytes">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>The size of one chunk URL.</summary>
 </histogram>
 
@@ -24971,7 +25093,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.DatabaseFailure" enum="SB2DatabaseFailure">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>Track failures when updating the safe-browsing database.</summary>
 </histogram>
 
@@ -24986,7 +25108,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.DatabaseOpen" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The time it takes to initialize the SafeBrowsing storage backend, in
     milliseconds.
@@ -25002,7 +25124,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.Delay" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The time that SafeBrowsing actually delayed the browsing experience. It
     records the difference between the time when Chrome would have started
@@ -25028,7 +25150,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.DownloadChecks" enum="SB2DownloadChecks">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     Records results of SafeBrowsing download check, including both url check and
     downloaded file hash check.
@@ -25036,7 +25158,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.DownloadDatabaseKilobytes" units="KB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The size of the downloads SafeBrowsing database file on disk in kilobytes,
     after an update has occurred.
@@ -25044,19 +25166,19 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.DownloadDuration" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>The time it takes for a download to finish.</summary>
 </histogram>
 
 <histogram name="SB2.DownloadHashCheckDuration" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The time it takes for SafeBrowsing to check hash of a download file.
   </summary>
 </histogram>
 
 <histogram name="SB2.DownloadUrlCheckDuration" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>The time it takes for SafeBrowsing to check a download url.</summary>
 </histogram>
 
@@ -25089,7 +25211,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.FilterCheck" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The time that it took to check a URL against our in-memory filter.
   </summary>
@@ -25104,7 +25226,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.FilterLoad" enum="SB2FilterLoad">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>Which filter file the database loaded from disk.</summary>
 </histogram>
 
@@ -25313,7 +25435,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.OldDatabaseKilobytes" units="KB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>Size of v1 database deleted from client profile.</summary>
 </histogram>
 
@@ -25377,7 +25499,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.PrefixSetBitsPerPrefix" units="bits">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The size of the PrefixSet storage in bits, divided by the number of prefixes
     represented.  Should almost always be 16.
@@ -25396,12 +25518,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.PrefixSetKilobytes" units="KB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>The size of the PrefixSet file in kilobytes.</summary>
 </histogram>
 
 <histogram name="SB2.PrefixSetLoad" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>Time to load the PrefixSet file.</summary>
 </histogram>
 
@@ -25474,7 +25596,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.PrefixSetWrite" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>Time to store the PrefixSet file.</summary>
 </histogram>
 
@@ -25510,7 +25632,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.SideEffectFreeWhitelistDatabaseKilobytes" units="KB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The size of the Side Effect Free Whitelist SaafeBrowsing database file on
     disk in kilobytes, after an update has occurred.
@@ -25518,7 +25640,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.SideEffectFreeWhitelistPrefixSetKilobytes" units="KB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The size of the Side Effect Free Whitelist PrefixSet file in kilobytes,
     after an udpate has occurred.
@@ -25526,12 +25648,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.SideEffectFreeWhitelistPrefixSetLoad" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>Time to load the Side Effect Free Whitelist PrefixSet file.</summary>
 </histogram>
 
 <histogram name="SB2.SideEffectFreeWhitelistPrefixSetWrite" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     Time to store the Side Effect Free Whitelist PrefixSet file.
   </summary>
@@ -25539,7 +25661,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="SB2.SideEffectFreeWhitelistStatus"
     enum="SB2SideEffectFreeWhitelistStatus">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>The instantiation status of the SideEffectFreeWhitelist.</summary>
 </histogram>
 
@@ -25549,14 +25671,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.SubPrefixes">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The number of sub prefixes stored in the database after the last update.
   </summary>
 </histogram>
 
 <histogram name="SB2.Update" units="milliseconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>
     The time from the receipt of the update request to the receipt of the final
     update chunk.
@@ -25564,17 +25686,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.UpdateRequestSize" units="bytes">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>The payload size of update requests to the server.</summary>
 </histogram>
 
 <histogram name="SB2.UpdateResult" enum="SB2UpdateResult">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>Result from trying to update the SafeBrowsing data.</summary>
 </histogram>
 
 <histogram name="SB2.UpdateSize" units="bytes">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>The size of all the chunk URLs in an update response.</summary>
 </histogram>
 
@@ -25595,7 +25717,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="SB2.UpdateUrls">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>shess@chromium.org</owner>
   <summary>The number of chunk URLs in an update response.</summary>
 </histogram>
 
@@ -34002,7 +34124,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="WebCore.XHR.send.ArrayBufferOrView"
     enum="XMLHttpRequestSendArrayBufferOrView">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <obsolete>
+    Deprecated as of 7/2014. This histogram was used to determine when it would
+    be ok to remove the deprecated XMLHttpRequest.send(ArrayBuffer) overload.
+    The support for ArrayBuffer was un-deprecated in the WHATWG spec for XHR,
+    and subsequently un-deprecated in Blink.
+  </obsolete>
+  <owner>tyoshino@chromium.org</owner>
+  <owner>costan@gmail.com</owner>
   <summary>
     Count the number of XHR.send() calls for each argument type to see when we
     can deprecate the ArrayBuffer type support.
@@ -35887,6 +36016,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="PROBLEM"/>
   <int value="3" label="TEST_FAILURE_OCCURRED"/>
   <int value="4" label="TEST_NOT_RUN"/>
+</enum>
+
+<enum name="ContentSetting" type="int">
+  <int value="1" label="ALLOW"/>
+  <int value="2" label="BLOCK"/>
+  <int value="3" label="ASK"/>
+  <int value="4" label="SESSION_ONLY"/>
 </enum>
 
 <enum name="ContextualSearchOptCardAction" type="int">
@@ -45142,6 +45278,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="SB2BloomFailure" type="int">
+  <obsolete>
+    Bloom filter support deleted in October 2012.
+  </obsolete>
   <int value="0" label="READ_OPEN"/>
   <int value="1" label="READ_VERSION"/>
   <int value="2" label="READ_NUM_KEYS"/>
@@ -45153,6 +45292,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="SB2BloomFilterFalsePositives" type="int">
+  <obsolete>
+    Bloom filter support deleted in October 2012.
+  </obsolete>
   <int value="0" label="ALL_MISSES"/>
   <int value="1" label="FALSE_POSITIVE_MISSES"/>
 </enum>
@@ -50853,6 +50995,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram_suffixes>
 
 <histogram_suffixes name="SpdyCwnd">
+  <obsolete>
+    Deprecated as of 07/2014.
+  </obsolete>
+  <owner>willchan@chromium.org</owner>
   <suffix name="cwnd32" label="using cwnd policy static 32"/>
   <suffix name="cwnd10" label="using cwnd policy static 10"/>
   <suffix name="cwnd16" label="using cwnd policy static 16"/>

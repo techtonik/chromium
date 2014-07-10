@@ -663,49 +663,6 @@ void DumpDeprecatedHistograms(const WebPerformance& performance,
         break;
     }
   }
-
-  // Record SpdyCwnd results.
-  if (document_state->was_fetched_via_spdy()) {
-    switch (load_type) {
-      case DocumentState::LINK_LOAD_NORMAL:
-        PLT_HISTOGRAM("PLT.BeginToFinish_LinkLoadNormal_cwndDynamic",
-                      begin_to_finish_all_loads);
-        PLT_HISTOGRAM("PLT.StartToFinish_LinkLoadNormal_cwndDynamic",
-                      start_to_finish_all_loads);
-        PLT_HISTOGRAM("PLT.StartToCommit_LinkLoadNormal_cwndDynamic",
-                      start_to_commit);
-        break;
-      case DocumentState::NORMAL_LOAD:
-        PLT_HISTOGRAM("PLT.BeginToFinish_NormalLoad_cwndDynamic",
-                      begin_to_finish_all_loads);
-        PLT_HISTOGRAM("PLT.StartToFinish_NormalLoad_cwndDynamic",
-                      start_to_finish_all_loads);
-        PLT_HISTOGRAM("PLT.StartToCommit_NormalLoad_cwndDynamic",
-                      start_to_commit);
-        break;
-      default:
-        break;
-    }
-  }
-
-  // Record page load time and abandonment rates for proxy cases.
-  if (document_state->was_fetched_via_proxy()) {
-    if (scheme_type == URLPattern::SCHEME_HTTPS) {
-      PLT_HISTOGRAM("PLT.StartToFinish.Proxy.https", start_to_finish_all_loads);
-    } else {
-      DCHECK(scheme_type == URLPattern::SCHEME_HTTP);
-      PLT_HISTOGRAM("PLT.StartToFinish.Proxy.http", start_to_finish_all_loads);
-    }
-  } else {
-    if (scheme_type == URLPattern::SCHEME_HTTPS) {
-      PLT_HISTOGRAM("PLT.StartToFinish.NoProxy.https",
-                    start_to_finish_all_loads);
-    } else {
-      DCHECK(scheme_type == URLPattern::SCHEME_HTTP);
-      PLT_HISTOGRAM("PLT.StartToFinish.NoProxy.http",
-                    start_to_finish_all_loads);
-    }
-  }
 }
 
 }  // namespace

@@ -28,6 +28,7 @@
 #include "chrome/browser/content_settings/content_settings_utils.h"
 #include "chrome/browser/content_settings/cookie_settings.h"
 #include "chrome/browser/content_settings/host_content_settings_map.h"
+#include "chrome/browser/content_settings/permission_request_id.h"
 #include "chrome/browser/content_settings/tab_specific_content_settings.h"
 #include "chrome/browser/defaults.h"
 #include "chrome/browser/devtools/chrome_devtools_manager_delegate.h"
@@ -74,7 +75,6 @@
 #include "chrome/browser/ssl/ssl_add_certificate.h"
 #include "chrome/browser/ssl/ssl_blocking_page.h"
 #include "chrome/browser/ssl/ssl_client_certificate_selector.h"
-#include "chrome/browser/sync_file_system/local/sync_file_system_backend.h"
 #include "chrome/browser/tab_contents/tab_util.h"
 #include "chrome/browser/ui/blocked_content/blocked_window_params.h"
 #include "chrome/browser/ui/blocked_content/popup_blocker_tab_helper.h"
@@ -123,6 +123,7 @@
 #include "content/public/common/child_process_host.h"
 #include "content/public/common/content_descriptors.h"
 #include "content/public/common/url_utils.h"
+#include "content/public/common/web_preferences.h"
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_message_filter.h"
 #include "extensions/browser/extension_registry.h"
@@ -151,7 +152,6 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "webkit/browser/fileapi/external_mount_points.h"
-#include "webkit/common/webpreferences.h"
 
 #if defined(OS_WIN)
 #include "base/win/windows_version.h"
@@ -164,6 +164,7 @@
 #elif defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/chrome_browser_main_chromeos.h"
 #include "chrome/browser/chromeos/drive/fileapi/file_system_backend_delegate.h"
+#include "chrome/browser/chromeos/file_manager/app_id.h"
 #include "chrome/browser/chromeos/file_system_provider/fileapi/backend_delegate.h"
 #include "chrome/browser/chromeos/fileapi/file_system_backend.h"
 #include "chrome/browser/chromeos/fileapi/mtp_file_system_backend_delegate.h"
@@ -205,10 +206,6 @@
 #include "components/signin/core/browser/signin_manager.h"
 #endif
 
-#if defined(OS_CHROMEOS)
-#include "chrome/browser/chromeos/file_manager/app_id.h"
-#endif
-
 #if defined(TOOLKIT_VIEWS)
 #include "chrome/browser/ui/views/chrome_browser_main_extra_parts_views.h"
 #endif
@@ -237,6 +234,7 @@
 #include "chrome/browser/guest_view/web_view/web_view_guest.h"
 #include "chrome/browser/guest_view/web_view/web_view_renderer_state.h"
 #include "chrome/browser/renderer_host/chrome_extension_message_filter.h"
+#include "chrome/browser/sync_file_system/local/sync_file_system_backend.h"
 #endif
 
 #if defined(ENABLE_SPELLCHECK)
@@ -264,6 +262,7 @@ using content::RenderViewHost;
 using content::ResourceType;
 using content::SiteInstance;
 using content::WebContents;
+using content::WebPreferences;
 using extensions::APIPermission;
 using extensions::Extension;
 using extensions::InfoMap;
@@ -498,7 +497,7 @@ bool CertMatchesFilter(const net::X509Certificate& cert,
 // Fills |map| with the per-script font prefs under path |map_name|.
 void FillFontFamilyMap(const PrefService* prefs,
                        const char* map_name,
-                       webkit_glue::ScriptFontFamilyMap* map) {
+                       content::ScriptFontFamilyMap* map) {
   // TODO(falken): Get rid of the brute-force scan over possible
   // (font family / script) combinations - see http://crbug.com/308095.
   for (size_t i = 0; i < prefs::kWebKitScriptsForFontFamilyMapsLength; ++i) {
@@ -1603,14 +1602,14 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
         chrome::VersionInfo::Channel channel =
             chrome::VersionInfo::GetChannel();
 #if defined(OS_ANDROID) || defined(OS_IOS)
-        chrome::VersionInfo::Channel forceChannel =
+        chrome::VersionInfo::Channel force_channel =
             chrome::VersionInfo::CHANNEL_DEV;
 #else
-        chrome::VersionInfo::Channel forceChannel =
+        chrome::VersionInfo::Channel force_channel =
             chrome::VersionInfo::CHANNEL_CANARY;
 #endif
 
-        if (channel <= forceChannel || group == "Enabled")
+        if (channel <= force_channel || group == "Enabled")
           command_line->AppendSwitch(switches::kEnableOfflineLoadStaleCache);
       }
     }
@@ -1623,6 +1622,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
       autofill::switches::kLocalHeuristicsOnlyForPasswordGeneration,
       extensions::switches::kAllowHTTPBackgroundPage,
       extensions::switches::kAllowLegacyExtensionManifests,
+      extensions::switches::kEnableEmbeddedExtensionOptions,
       extensions::switches::kEnableExperimentalExtensionApis,
       extensions::switches::kEnableScriptsRequireAction,
       extensions::switches::kExtensionsOnChromeURLs,
@@ -2129,9 +2129,12 @@ void ChromeContentBrowserClient::RequestMidiSysExPermission(
   MidiPermissionContext* context =
       MidiPermissionContextFactory::GetForProfile(
           Profile::FromBrowserContext(web_contents->GetBrowserContext()));
-  context->RequestMidiSysExPermission(web_contents, bridge_id, requesting_frame,
-                                      user_gesture, result_callback,
-                                      cancel_callback);
+  int renderer_id = web_contents->GetRenderProcessHost()->GetID();
+  int render_view_id = web_contents->GetRenderViewHost()->GetRoutingID();
+  const PermissionRequestID id(renderer_id, render_view_id, bridge_id, GURL());
+
+  context->RequestPermission(web_contents, id, requesting_frame,
+                             user_gesture, result_callback);
 }
 
 void ChromeContentBrowserClient::RequestProtectedMediaIdentifierPermission(
@@ -2415,8 +2418,8 @@ void ChromeContentBrowserClient::UpdateInspectorSetting(
       Profile::FromBrowserContext(browser_context)->GetPrefs(),
       prefs::kWebKitInspectorSettings);
   base::DictionaryValue* inspector_settings = update.Get();
-  inspector_settings->SetWithoutPathExpansion(
-      key, base::Value::CreateStringValue(value));
+  inspector_settings->SetWithoutPathExpansion(key,
+                                              new base::StringValue(value));
 }
 
 void ChromeContentBrowserClient::BrowserURLHandlerCreated(
@@ -2567,17 +2570,17 @@ void ChromeContentBrowserClient::GetAdditionalAllowedSchemesForFileSystem(
 
 void ChromeContentBrowserClient::GetURLRequestAutoMountHandlers(
     std::vector<fileapi::URLRequestAutoMountHandler>* handlers) {
-#if !defined(OS_ANDROID)
+#if defined(ENABLE_EXTENSIONS)
   handlers->push_back(
       base::Bind(MediaFileSystemBackend::AttemptAutoMountForURLRequest));
-#endif  // OS_ANDROID
+#endif
 }
 
 void ChromeContentBrowserClient::GetAdditionalFileSystemBackends(
     content::BrowserContext* browser_context,
     const base::FilePath& storage_partition_path,
     ScopedVector<fileapi::FileSystemBackend>* additional_backends) {
-#if !defined(OS_ANDROID)
+#if defined(ENABLE_EXTENSIONS)
   base::SequencedWorkerPool* pool = content::BrowserThread::GetBlockingPool();
   additional_backends->push_back(new MediaFileSystemBackend(
       storage_partition_path,
@@ -2600,9 +2603,11 @@ void ChromeContentBrowserClient::GetAdditionalFileSystemBackends(
   additional_backends->push_back(backend);
 #endif
 
+#if defined(ENABLE_EXTENSIONS)
   additional_backends->push_back(
       new sync_file_system::SyncFileSystemBackend(
           Profile::FromBrowserContext(browser_context)));
+#endif
 
 #if defined(ENABLE_SERVICE_DISCOVERY)
   if (CommandLine::ForCurrentProcess()->HasSwitch(

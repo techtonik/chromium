@@ -1369,9 +1369,7 @@ const char kStabilityPluginLoadingErrors[] = "loading_errors";
 
 // The keys below are strictly increasing counters over the lifetime of
 // a chrome installation. They are (optionally) sent up to the uninstall
-// survey in the event of uninstallation. The installation date is used by some
-// opt-in services such as Wallet and UMA.
-const char kInstallDate[] = "uninstall_metrics.installation_date2";
+// survey in the event of uninstallation.
 const char kUninstallMetricsPageLoadCount[] =
     "uninstall_metrics.page_load_count";
 const char kUninstallLastLaunchTimeSec[] =
@@ -1873,6 +1871,10 @@ const char kOobeScreenPending[] = "OobeScreenPending";
 // A boolean pref of the device registered flag (second part after first login).
 const char kDeviceRegistered[] = "DeviceRegistered";
 
+// Boolean pref to signal corrupted enrollment to force the device through
+// enrollment recovery flow upon next boot.
+const char kEnrollmentRecoveryRequired[] = "EnrollmentRecoveryRequired";
+
 // List of usernames that used certificates pushed by policy before.
 // This is used to prevent these users from joining multiprofile sessions.
 const char kUsedPolicyCertificates[] = "policy.used_policy_certificates";
@@ -2089,14 +2091,6 @@ const char kCustomHandlersEnabled[] = "custom_handlers.enabled";
 // milliseconds. Not all values are meaningful, so it is clamped to a sane range
 // by the cloud policy subsystem.
 const char kDevicePolicyRefreshRate[] = "policy.device_refresh_rate";
-
-// String that represents the recovery component last downloaded version. This
-// takes the usual 'a.b.c.d' notation.
-const char kRecoveryComponentVersion[] = "recovery_component.version";
-
-// String that stores the component updater last known state. This is used for
-// troubleshooting.
-const char kComponentUpdaterState[] = "component_updater.state";
 
 // A boolean where true means that the browser has previously attempted to
 // enable autoupdate and failed, so the next out-of-date browser start should

@@ -96,7 +96,7 @@ class Parser(object):
       # Generator expects a module. If one wasn't specified insert one with an
       # empty name.
       if p[1][0] != 'MODULE':
-        p[0] = [('MODULE', '', None, p[1])]
+        p[0] = [('MODULE', None, None, p[1])]
       else:
         p[0] = [p[1]]
 
@@ -106,8 +106,8 @@ class Parser(object):
     p[0] = ('IMPORT', eval(p[2]))
 
   def p_module(self, p):
-    """module : attribute_section MODULE identifier LBRACE definition_list \
-                    RBRACE"""
+    """module : attribute_section MODULE identifier_wrapped LBRACE \
+                    definition_list RBRACE"""
     p[0] = ('MODULE', p[3], p[1], p[5])
 
   def p_definition_list(self, p):
@@ -129,19 +129,27 @@ class Parser(object):
     if len(p) > 3:
       p[0] = p[2]
 
-  def p_attribute_list(self, p):
-    """attribute_list : attribute
-                      | attribute COMMA attribute_list
-                      | """
-    if len(p) == 2:
-      p[0] = _ListFromConcat(p[1])
-    elif len(p) > 3:
-      p[0] = _ListFromConcat(p[1], p[3])
+  def p_attribute_list_1(self, p):
+    """attribute_list : """
+    p[0] = ast.AttributeList()
+
+  def p_attribute_list_2(self, p):
+    """attribute_list : nonempty_attribute_list"""
+    p[0] = p[1]
+
+  def p_nonempty_attribute_list_1(self, p):
+    """nonempty_attribute_list : attribute"""
+    p[0] = ast.AttributeList(p[1])
+
+  def p_nonempty_attribute_list_2(self, p):
+    """nonempty_attribute_list : nonempty_attribute_list COMMA attribute"""
+    p[0] = p[1]
+    p[0].Append(p[3])
 
   def p_attribute(self, p):
     """attribute : NAME EQUALS evaled_literal
                  | NAME EQUALS NAME"""
-    p[0] = ('ATTRIBUTE', p[1], p[3])
+    p[0] = ast.Attribute(p[1], p[3], filename=self.filename, lineno=p.lineno(1))
 
   def p_evaled_literal(self, p):
     """evaled_literal : literal"""
@@ -213,7 +221,7 @@ class Parser(object):
   def p_parameter(self, p):
     """parameter : typename NAME ordinal"""
     p[0] = ast.Parameter(p[1], p[2], p[3],
-                         filename=self.filename, lineno=p.lineno(1))
+                         filename=self.filename, lineno=p.lineno(2))
 
   def p_typename(self, p):
     """typename : basictypename
@@ -275,25 +283,24 @@ class Parser(object):
       p[0] = ast.Ordinal(None)
 
   def p_enum(self, p):
-    """enum : ENUM NAME LBRACE enum_field_list RBRACE SEMI"""
+    """enum : ENUM NAME LBRACE nonempty_enum_value_list RBRACE SEMI
+            | ENUM NAME LBRACE nonempty_enum_value_list COMMA RBRACE SEMI"""
     p[0] = ('ENUM', p[2], p[4])
 
-  def p_enum_field_list(self, p):
-    """enum_field_list : enum_field
-                       | enum_field COMMA enum_field_list
-                       | """
-    if len(p) == 2:
-      p[0] = _ListFromConcat(p[1])
-    elif len(p) > 3:
-      p[0] = _ListFromConcat(p[1], p[3])
+  def p_nonempty_enum_value_list_1(self, p):
+    """nonempty_enum_value_list : enum_value"""
+    p[0] = [p[1]]
 
-  def p_enum_field(self, p):
-    """enum_field : NAME
-                  | NAME EQUALS constant"""
-    if len(p) == 2:
-      p[0] = ('ENUM_FIELD', p[1], None)
-    else:
-      p[0] = ('ENUM_FIELD', p[1], p[3])
+  def p_nonempty_enum_value_list_2(self, p):
+    """nonempty_enum_value_list : nonempty_enum_value_list COMMA enum_value"""
+    p[0] = p[1]
+    p[0].append(p[3])
+
+  def p_enum_value(self, p):
+    """enum_value : NAME
+                  | NAME EQUALS int
+                  | NAME EQUALS identifier_wrapped"""
+    p[0] = ('ENUM_VALUE', p[1], p[3] if len(p) == 4 else None)
 
   def p_const(self, p):
     """const : CONST typename NAME EQUALS constant SEMI"""
@@ -308,30 +315,38 @@ class Parser(object):
     """identifier_wrapped : identifier"""
     p[0] = ('IDENTIFIER', p[1])
 
+  # TODO(vtl): Make this produce a "wrapped" identifier (probably as an
+  # |ast.Identifier|, to be added) and get rid of identifier_wrapped.
   def p_identifier(self, p):
     """identifier : NAME
                   | NAME DOT identifier"""
     p[0] = ''.join(p[1:])
 
   def p_literal(self, p):
-    """literal : number
+    """literal : int
+               | float
                | TRUE
                | FALSE
                | DEFAULT
                | STRING_LITERAL"""
     p[0] = p[1]
 
-  def p_number(self, p):
-    """number : digits
-              | PLUS digits
-              | MINUS digits"""
+  def p_int(self, p):
+    """int : int_const
+           | PLUS int_const
+           | MINUS int_const"""
     p[0] = ''.join(p[1:])
 
-  def p_digits(self, p):
-    """digits : INT_CONST_DEC
-              | INT_CONST_HEX
-              | FLOAT_CONST"""
+  def p_int_const(self, p):
+    """int_const : INT_CONST_DEC
+                 | INT_CONST_HEX"""
     p[0] = p[1]
+
+  def p_float(self, p):
+    """float : FLOAT_CONST
+             | PLUS FLOAT_CONST
+             | MINUS FLOAT_CONST"""
+    p[0] = ''.join(p[1:])
 
   def p_error(self, e):
     if e is None:

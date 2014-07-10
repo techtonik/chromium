@@ -423,20 +423,6 @@
                 '../breakpad/breakpad.gyp:dump_syms',
               ],
             }],
-            ['linux_strip_reliability_tests==1', {
-              'actions': [
-                {
-                  'action_name': 'strip_reliability_tests',
-                  'outputs': [
-                    '<(PRODUCT_DIR)/strip_reliability_tests.stamp',
-                  ],
-                  'action': ['strip',
-                             '-g',
-                             '<@(_inputs)'],
-                  'message': 'Stripping reliability tests',
-                },
-              ],
-            }],
           ],
         },
       ],
@@ -746,8 +732,8 @@
             'service/cloud_print/printer_job_handler.h',
             'service/cloud_print/printer_job_queue_handler.cc',
             'service/cloud_print/printer_job_queue_handler.h',
-            'service/net/service_url_request_context.cc',
-            'service/net/service_url_request_context.h',
+            'service/net/service_url_request_context_getter.cc',
+            'service/net/service_url_request_context_getter.h',
             'service/service_ipc_server.cc',
             'service/service_ipc_server.h',
             'service/service_main.cc',

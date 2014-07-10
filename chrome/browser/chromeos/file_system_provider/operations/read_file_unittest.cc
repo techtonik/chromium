@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "chrome/browser/chromeos/file_system_provider/operations/read_file.h"
+
 #include <string>
 
 #include "base/files/file.h"
@@ -10,7 +12,6 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/scoped_vector.h"
 #include "base/values.h"
-#include "chrome/browser/chromeos/file_system_provider/operations/read_file.h"
 #include "chrome/browser/chromeos/file_system_provider/operations/test_util.h"
 #include "chrome/common/extensions/api/file_system_provider.h"
 #include "chrome/common/extensions/api/file_system_provider_internal.h"
@@ -79,7 +80,7 @@ class FileSystemProviderOperationsReadFileTest : public testing::Test {
     file_system_info_ =
         ProvidedFileSystemInfo(kExtensionId,
                                kFileSystemId,
-                               "" /* file_system_name */,
+                               "" /* display_name */,
                                base::FilePath() /* mount_path */);
     io_buffer_ = make_scoped_refptr(new net::IOBuffer(kOffset + kLength));
   }

@@ -15,9 +15,7 @@
     # These duplicate other lists and are the only ones used on Android. They
     # should be eliminated. See crbug.com/305852.
     'android_schema_files': [
-      'file_system.idl',
       'manifest_types.json',
-      'sync_file_system.idl',
     ],
 
     # These are used everywhere except Android.
