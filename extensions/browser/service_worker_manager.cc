@@ -27,12 +27,6 @@ using base::WeakPtr;
 using content::BrowserContext;
 using content::BrowserThread;
 
-ServiceWorkerManager::State::State()
-    : registration(UNREGISTERED), outstanding_state_changes(0) {
-}
-ServiceWorkerManager::State::~State() {
-}
-
 ServiceWorkerManager::ServiceWorkerManager(BrowserContext* context)
     : context_(context), weak_this_factory_(this) {
 }
@@ -62,21 +56,20 @@ content::ServiceWorkerContext* ServiceWorkerManager::GetSWContext(
 void ServiceWorkerManager::RegisterExtension(const Extension* extension) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   CHECK(BackgroundInfo::HasServiceWorker(extension));
-  State& ext_state = states_[extension->id()];
-  if (ext_state.registration == REGISTERING ||
-      ext_state.registration == REGISTERED)
+  Registration* registration = registrations_[extension->id()].get();
+  if (!registration)
+    registrations_[extension->id()].reset(registration = new Registration());
+  if (registration->state == REGISTERING || registration->state == REGISTERED)
     return;
-  ext_state.registration = REGISTERING;
-  ++ext_state.outstanding_state_changes;
-  ext_state.service_worker_host_client.reset(
-      new ServiceWorkerHostClient(this, extension->id()));
+  registration->state = REGISTERING;
+  ++registration->outstanding_state_changes;
   const GURL service_worker_script = extension->GetResourceURL(
       BackgroundInfo::GetServiceWorkerScript(extension));
 
   GetSWContext(extension->id())->RegisterServiceWorker(
       extension->GetResourceURL("/*"),
       service_worker_script,
-      ext_state.service_worker_host_client.get(),
+      registration,
       base::Bind(&ServiceWorkerManager::FinishRegistration,
                  WeakThis(),
                  extension->id()));
@@ -86,22 +79,22 @@ void ServiceWorkerManager::FinishRegistration(
     const ExtensionId& extension_id,
     scoped_ptr<content::ServiceWorkerHost> service_worker_host) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  State& ext_state = states_[extension_id];
-  --ext_state.outstanding_state_changes;
-  DCHECK_GE(ext_state.outstanding_state_changes, 0);
-  if (ext_state.outstanding_state_changes > 0)
+  Registration* registration = registrations_[extension_id].get();
+  --registration->outstanding_state_changes;
+  DCHECK_GE(registration->outstanding_state_changes, 0);
+  if (registration->outstanding_state_changes > 0)
     return;
 
-  DCHECK_EQ(ext_state.registration, REGISTERING);
+  DCHECK_EQ(registration->state, REGISTERING);
   if (service_worker_host) {
-    ext_state.registration = REGISTERED;
-    ext_state.service_worker_host.reset(service_worker_host.release());
-    ext_state.registration_callbacks.RunSuccessCallbacksAndClear();
+    registration->state = REGISTERED;
+    registration->service_worker_host.reset(service_worker_host.release());
+    registration->registration_callbacks.RunSuccessCallbacksAndClear();
   } else {
     LOG(ERROR) << "Service Worker Registration failed for extension "
                << extension_id;
-    ext_state.registration_callbacks.RunFailureCallbacksAndClear();
-    states_.erase(extension_id);
+    registration->registration_callbacks.RunFailureCallbacksAndClear();
+    registrations_.erase(extension_id);
   }
 }
 
@@ -109,18 +102,17 @@ void ServiceWorkerManager::UnregisterExtension(const Extension* extension) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   CHECK(BackgroundInfo::HasServiceWorker(extension));
 
-  base::hash_map<ExtensionId, State>::iterator it =
-      states_.find(extension->id());
-  if (it == states_.end()) {
+  RegistrationMap::iterator it = registrations_.find(extension->id());
+  if (it == registrations_.end()) {
     // Extension isn't registered.
     return;
   }
-  State& ext_state = it->second;
-  if (ext_state.registration == UNREGISTERING)
+  Registration* registration = it->second.get();
+  if (registration->state == UNREGISTERING)
     return;
 
-  ext_state.registration = UNREGISTERING;
-  ++ext_state.outstanding_state_changes;
+  registration->state = UNREGISTERING;
+  ++registration->outstanding_state_changes;
 
   GetSWContext(extension->id())->UnregisterServiceWorker(
       extension->GetResourceURL("/*"),
@@ -132,33 +124,21 @@ void ServiceWorkerManager::UnregisterExtension(const Extension* extension) {
 void ServiceWorkerManager::FinishUnregistration(const ExtensionId& extension_id,
                                                 bool success) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  State& ext_state = states_[extension_id];
-  --ext_state.outstanding_state_changes;
-  DCHECK_GE(ext_state.outstanding_state_changes, 0);
-  if (ext_state.outstanding_state_changes > 0)
+  Registration* registration = registrations_[extension_id].get();
+  --registration->outstanding_state_changes;
+  DCHECK_GE(registration->outstanding_state_changes, 0);
+  if (registration->outstanding_state_changes > 0)
     return;
 
-  DCHECK_EQ(ext_state.registration, UNREGISTERING);
+  DCHECK_EQ(registration->state, UNREGISTERING);
   if (success) {
-    ext_state.unregistration_callbacks.RunSuccessCallbacksAndClear();
-    states_.erase(extension_id);
+    registration->unregistration_callbacks.RunSuccessCallbacksAndClear();
+    registrations_.erase(extension_id);
   } else {
     LOG(ERROR) << "Service Worker Unregistration failed for extension "
                << extension_id;
-    ext_state.registration = REGISTERED;
-    ext_state.unregistration_callbacks.RunFailureCallbacksAndClear();
-  }
-}
-
-void ServiceWorkerManager::ServiceWorkerHasActiveVersion(
-    const ExtensionId& extension_id) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  State& ext_state = states_[extension_id];
-  DCHECK(ext_state.service_worker_host.get());
-  if (ext_state.service_worker_host->HasActiveVersion()) {
-    ext_state.activation_callbacks.RunSuccessCallbacksAndClear();
-  } else {
-    ext_state.activation_callbacks.RunFailureCallbacksAndClear();
+    registration->state = REGISTERED;
+    registration->unregistration_callbacks.RunFailureCallbacksAndClear();
   }
 }
 
@@ -167,15 +147,14 @@ void ServiceWorkerManager::WhenRegistered(
     const tracked_objects::Location& from_here,
     const base::Closure& success,
     const base::Closure& failure) {
-  base::hash_map<ExtensionId, State>::iterator it =
-      states_.find(extension->id());
-  if (it == states_.end()) {
+  RegistrationMap::iterator it = registrations_.find(extension->id());
+  if (it == registrations_.end()) {
     base::MessageLoop::current()->PostTask(from_here, failure);
     return;
   }
 
-  State& state = it->second;
-  switch (state.registration) {
+  Registration* registration = it->second.get();
+  switch (registration->state) {
     case UNREGISTERED:
     case UNREGISTERING:
       base::MessageLoop::current()->PostTask(from_here, failure);
@@ -184,7 +163,7 @@ void ServiceWorkerManager::WhenRegistered(
       base::MessageLoop::current()->PostTask(from_here, success);
       break;
     case REGISTERING:
-      state.registration_callbacks.push_back(
+      registration->registration_callbacks.push_back(
           SuccessFailureClosurePair(success, failure));
       break;
   }
@@ -195,15 +174,14 @@ void ServiceWorkerManager::WhenUnregistered(
     const tracked_objects::Location& from_here,
     const base::Closure& success,
     const base::Closure& failure) {
-  base::hash_map<ExtensionId, State>::iterator it =
-      states_.find(extension->id());
-  if (it == states_.end()) {
+  RegistrationMap::iterator it = registrations_.find(extension->id());
+  if (it == registrations_.end()) {
     base::MessageLoop::current()->PostTask(from_here, success);
     return;
   }
 
-  State& state = it->second;
-  switch (state.registration) {
+  Registration* registration = it->second.get();
+  switch (registration->state) {
     case REGISTERED:
     case REGISTERING:
       base::MessageLoop::current()->PostTask(from_here, failure);
@@ -212,7 +190,7 @@ void ServiceWorkerManager::WhenUnregistered(
       base::MessageLoop::current()->PostTask(from_here, success);
       break;
     case UNREGISTERING:
-      state.unregistration_callbacks.push_back(
+      registration->unregistration_callbacks.push_back(
           SuccessFailureClosurePair(success, failure));
       break;
   }
@@ -223,29 +201,28 @@ void ServiceWorkerManager::WhenActive(
     const tracked_objects::Location& from_here,
     const base::Closure& success,
     const base::Closure& failure) {
-  base::hash_map<ExtensionId, State>::iterator it =
-      states_.find(extension->id());
-  if (it == states_.end()) {
+  RegistrationMap::iterator it = registrations_.find(extension->id());
+  if (it == registrations_.end()) {
     base::MessageLoop::current()->PostTask(from_here, failure);
     return;
   }
 
-  State& state = it->second;
-  switch (state.registration) {
+  Registration* registration = it->second.get();
+  switch (registration->state) {
     case UNREGISTERED:
     case UNREGISTERING:
       base::MessageLoop::current()->PostTask(from_here, failure);
       break;
     case REGISTERED:
-      if (state.service_worker_host->HasActiveVersion()) {
+      if (registration->service_worker_host->HasActiveVersion()) {
         base::MessageLoop::current()->PostTask(from_here, success);
       } else {
-        state.activation_callbacks.push_back(
+        registration->activation_callbacks.push_back(
             SuccessFailureClosurePair(success, failure));
       }
       break;
     case REGISTERING:
-      state.activation_callbacks.push_back(
+      registration->activation_callbacks.push_back(
           SuccessFailureClosurePair(success, failure));
       break;
   }
@@ -253,40 +230,14 @@ void ServiceWorkerManager::WhenActive(
 
 content::ServiceWorkerHost* ServiceWorkerManager::GetServiceWorkerHost(
     ExtensionId extension_id) {
-  base::hash_map<ExtensionId, State>::iterator it = states_.find(extension_id);
-  if (it == states_.end())
+  RegistrationMap::iterator it = registrations_.find(extension_id);
+  if (it == registrations_.end())
     return NULL;
-  return it->second.service_worker_host.get();
+  return it->second->service_worker_host.get();
 }
 
 WeakPtr<ServiceWorkerManager> ServiceWorkerManager::WeakThis() {
   return weak_this_factory_.GetWeakPtr();
-}
-
-// ServiceWorkerManager::ServiceWorkerHostClient
-
-ServiceWorkerManager::ServiceWorkerHostClient::ServiceWorkerHostClient(
-    ServiceWorkerManager* manager,
-    ExtensionId extension_id)
-    : manager_(manager), extension_id_(extension_id) {
-}
-
-ServiceWorkerManager::ServiceWorkerHostClient::~ServiceWorkerHostClient() {
-}
-
-void ServiceWorkerManager::ServiceWorkerHostClient::OnVersionChanged() {
-  manager_->ServiceWorkerHasActiveVersion(extension_id_);
-}
-
-bool ServiceWorkerManager::ServiceWorkerHostClient::OnMessageReceived(
-    const IPC::Message& message) {
-  //
-  //
-  // TODO: Implement this.
-  //
-  //
-  NOTIMPLEMENTED();
-  return false;
 }
 
 // ServiceWorkerManager::SuccessFailureClosurePair
@@ -314,6 +265,36 @@ void ServiceWorkerManager::VectorOfClosurePairs::RunFailureCallbacksAndClear() {
   for (size_t i = 0; i < swapped_callbacks.size(); ++i) {
     swapped_callbacks[i].failure.Run();
   }
+}
+
+// ServiceWorkerManager::Registration
+
+ServiceWorkerManager::Registration::Registration()
+    : state(UNREGISTERED), outstanding_state_changes(0) {
+}
+
+ServiceWorkerManager::Registration::~Registration() {
+}
+
+void ServiceWorkerManager::Registration::OnVersionChanged() {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  DCHECK(service_worker_host.get());
+  if (service_worker_host->HasActiveVersion()) {
+    activation_callbacks.RunSuccessCallbacksAndClear();
+  } else {
+    activation_callbacks.RunFailureCallbacksAndClear();
+  }
+}
+
+bool ServiceWorkerManager::Registration::OnMessageReceived(
+    const IPC::Message& message) {
+  //
+  //
+  // TODO: Implement this.
+  //
+  //
+  NOTIMPLEMENTED();
+  return false;
 }
 
 // ServiceWorkerManagerFactory

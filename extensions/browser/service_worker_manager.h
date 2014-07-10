@@ -109,22 +109,6 @@ class ServiceWorkerManager : public KeyedService {
     UNREGISTERING,
   };
 
-  class ServiceWorkerHostClient : public content::ServiceWorkerHostClient {
-   public:
-    ServiceWorkerHostClient(ServiceWorkerManager* manager,
-                            ExtensionId extension_id);
-    virtual ~ServiceWorkerHostClient();
-
-    // content::ServiceWorkerHostClient interface:
-    virtual void OnVersionChanged() OVERRIDE;
-
-    // IPC::Listener interface:
-    virtual bool OnMessageReceived(const IPC::Message& message) OVERRIDE;
-
-    ServiceWorkerManager* manager_;
-    ExtensionId extension_id_;
-  };
-
   struct SuccessFailureClosurePair {
     SuccessFailureClosurePair(base::Closure success, base::Closure failure);
     ~SuccessFailureClosurePair();
@@ -138,21 +122,28 @@ class ServiceWorkerManager : public KeyedService {
     void RunSuccessCallbacksAndClear();
     void RunFailureCallbacksAndClear();
   };
-  struct State {
-    RegistrationState registration;
+  struct Registration : public content::ServiceWorkerHostClient {
+    RegistrationState state;
     int outstanding_state_changes;
-    linked_ptr<content::ServiceWorkerHost> service_worker_host;
-    linked_ptr<ServiceWorkerHostClient> service_worker_host_client;
+    scoped_ptr<content::ServiceWorkerHost> service_worker_host;
     // Can be non-empty during REGISTERING.
     VectorOfClosurePairs registration_callbacks;
     // Can be non-empty during UNREGISTERING.
     VectorOfClosurePairs unregistration_callbacks;
     // Can be non-empty any time.
     VectorOfClosurePairs activation_callbacks;
-    State();
-    ~State();
+    Registration();
+    virtual ~Registration();
+
+    // content::ServiceWorkerHostClient interface:
+    virtual void OnVersionChanged() OVERRIDE;
+
+    // IPC::Listener interface:
+    virtual bool OnMessageReceived(const IPC::Message& message) OVERRIDE;
   };
-  base::hash_map<ExtensionId, State> states_;
+  typedef base::hash_map<ExtensionId, linked_ptr<Registration> >
+      RegistrationMap;
+  RegistrationMap registrations_;
 
   base::WeakPtrFactory<ServiceWorkerManager> weak_this_factory_;
 };
