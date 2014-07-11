@@ -90,7 +90,7 @@ class ServiceWorkerManager : public KeyedService {
 
   void FinishRegistration(
       const ExtensionId& extension_id,
-      scoped_ptr<content::ServiceWorkerHost> service_worker_host);
+      scoped_refptr<content::ServiceWorkerHost> service_worker_host);
   void FinishUnregistration(const ExtensionId& extension_id, bool success);
   void ServiceWorkerHasActiveVersion(const ExtensionId& extension_id);
 
@@ -125,7 +125,6 @@ class ServiceWorkerManager : public KeyedService {
   struct Registration : public content::ServiceWorkerHostClient {
     RegistrationState state;
     int outstanding_state_changes;
-    scoped_ptr<content::ServiceWorkerHost> service_worker_host;
     // Can be non-empty during REGISTERING.
     VectorOfClosurePairs registration_callbacks;
     // Can be non-empty during UNREGISTERING.

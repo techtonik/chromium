@@ -23,7 +23,7 @@ class ServiceWorkerContext {
   // roughly, must be of the form "<origin>/<path>/*".
   typedef GURL Scope;
 
-  typedef base::Callback<void(scoped_ptr<ServiceWorkerHost>)>
+  typedef base::Callback<void(scoped_refptr<ServiceWorkerHost>)>
       ServiceWorkerHostCallback;
   typedef base::Callback<void(bool)> ResultCallback;
 
