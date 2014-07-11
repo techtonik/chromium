@@ -76,20 +76,16 @@ ServiceWorkerHostImpl::ServiceWorkerHostImpl(
     const GURL& scope,
     scoped_refptr<ServiceWorkerContextWrapper> context_wrapper,
     ServiceWorkerHostClient* client)
-    : scope_(scope), context_wrapper_(context_wrapper), client_(client) {
-  //
-  //
-  // TODO: Register the client and implement interface.
-  //
-  //
+    : scope_(scope), context_wrapper_(context_wrapper), ui_thread_(client) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  BrowserThread::PostTask(
+      BrowserThread::IO,
+      FROM_HERE,
+      base::Bind(&ServiceWorkerHostImpl::FindRegistrationOnIO, this));
 }
 
-ServiceWorkerHostImpl::~ServiceWorkerHostImpl() {
-  //
-  //
-  // TODO: Disconnect client from wherever we've registered it
-  //
-  //
+void ServiceWorkerHostImpl::DisconnectServiceWorkerHostClient() {
+  ui_thread_.client = NULL;
 }
 
 const GURL& ServiceWorkerHostImpl::scope() {
@@ -117,6 +113,63 @@ bool ServiceWorkerHostImpl::Send(IPC::Message* message) {
       FROM_HERE,
       base::Bind(SendOnIO, context_wrapper_, scope_, message));
   return true;
+}
+
+ServiceWorkerHostImpl::~ServiceWorkerHostImpl() {
+  //
+  //
+  // TODO: Disconnect client from wherever we've registered it
+  //
+  //
+}
+
+void ServiceWorkerHostImpl::FindRegistrationOnIO() {
+  context_wrapper_->context()->storage()->FindRegistrationForPattern(
+      scope_,
+      base::Bind(&ServiceWorkerHostImpl::OnRegistrationFoundOnIO, this));
+}
+
+void ServiceWorkerHostImpl::OnRegistrationFoundOnIO(
+    ServiceWorkerStatusCode status,
+    const scoped_refptr<ServiceWorkerRegistration>& registration) {
+  if (status != SERVICE_WORKER_OK) {  // || !registration->active_version()) {
+    //
+    //
+    // TODO(scheib) Failed to find registration?
+    //
+    //
+    fprintf(stderr,
+            "%s:%s:%d NOT OK: status: %d\n",
+            __FILE__,
+            __FUNCTION__,
+            __LINE__,
+            status);
+    return;
+  }
+  io_thread_.registration = registration;
+  //
+  //
+  //  TODO CONTINUE TO INSTALL
+  //
+  //
+}
+
+// ServiceWorkerHostImpl::UIThreadMembers
+
+ServiceWorkerHostImpl::UIThreadMembers::UIThreadMembers(
+    ServiceWorkerHostClient* client)
+    : client(client) {
+}
+
+ServiceWorkerHostImpl::UIThreadMembers::~UIThreadMembers() {
+}
+
+// ServiceWorkerHostImpl::IOThreadMembers
+
+ServiceWorkerHostImpl::IOThreadMembers::IOThreadMembers() {
+}
+
+ServiceWorkerHostImpl::IOThreadMembers::~IOThreadMembers() {
 }
 
 }  // namespace content

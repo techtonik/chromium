@@ -141,9 +141,14 @@ void ServiceWorkerContextWrapper::GetServiceWorkerHost(
   if (scope.is_empty()) {
     // FinishRegistrationOnIO calls this function with empty scope to create a
     // NULL response.
-    callback.Run(scoped_ptr<ServiceWorkerHost>());
+    callback.Run(scoped_refptr<ServiceWorkerHost>());
   } else {
-    callback.Run(scoped_ptr<ServiceWorkerHost>(
+    //
+    //
+    // TODO look up registration, and create a Host only if one found.
+    //
+    //
+    callback.Run(scoped_refptr<ServiceWorkerHost>(
         new ServiceWorkerHostImpl(scope, this, client)));
   }
 }

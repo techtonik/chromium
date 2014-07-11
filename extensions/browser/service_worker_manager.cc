@@ -77,7 +77,7 @@ void ServiceWorkerManager::RegisterExtension(const Extension* extension) {
 
 void ServiceWorkerManager::FinishRegistration(
     const ExtensionId& extension_id,
-    scoped_ptr<content::ServiceWorkerHost> service_worker_host) {
+    scoped_refptr<content::ServiceWorkerHost> service_worker_host) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   Registration* registration = registrations_[extension_id].get();
   --registration->outstanding_state_changes;
@@ -88,7 +88,7 @@ void ServiceWorkerManager::FinishRegistration(
   DCHECK_EQ(registration->state, REGISTERING);
   if (service_worker_host) {
     registration->state = REGISTERED;
-    registration->service_worker_host.reset(service_worker_host.release());
+    registration->set_service_worker_host(service_worker_host);
     registration->registration_callbacks.RunSuccessCallbacksAndClear();
   } else {
     LOG(ERROR) << "Service Worker Registration failed for extension "
@@ -214,7 +214,7 @@ void ServiceWorkerManager::WhenActive(
       base::MessageLoop::current()->PostTask(from_here, failure);
       break;
     case REGISTERED:
-      if (registration->service_worker_host->HasActiveVersion()) {
+      if (registration->service_worker_host()->HasActiveVersion()) {
         base::MessageLoop::current()->PostTask(from_here, success);
       } else {
         registration->activation_callbacks.push_back(
@@ -233,7 +233,7 @@ content::ServiceWorkerHost* ServiceWorkerManager::GetServiceWorkerHost(
   RegistrationMap::iterator it = registrations_.find(extension_id);
   if (it == registrations_.end())
     return NULL;
-  return it->second->service_worker_host.get();
+  return it->second->service_worker_host();
 }
 
 WeakPtr<ServiceWorkerManager> ServiceWorkerManager::WeakThis() {
@@ -278,8 +278,8 @@ ServiceWorkerManager::Registration::~Registration() {
 
 void ServiceWorkerManager::Registration::OnVersionChanged() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  DCHECK(service_worker_host.get());
-  if (service_worker_host->HasActiveVersion()) {
+  DCHECK(service_worker_host());
+  if (service_worker_host()->HasActiveVersion()) {
     activation_callbacks.RunSuccessCallbacksAndClear();
   } else {
     activation_callbacks.RunFailureCallbacksAndClear();

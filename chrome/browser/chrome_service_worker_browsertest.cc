@@ -39,9 +39,10 @@ class ChromeServiceWorkerTest : public InProcessBrowserTest {
   base::ScopedTempDir service_worker_dir_;
 };
 
-static void ExpectResultAndRun(bool expected,
-                               const base::Closure& continuation,
-                               scoped_ptr<content::ServiceWorkerHost> actual) {
+static void ExpectResultAndRun(
+    bool expected,
+    const base::Closure& continuation,
+    scoped_refptr<content::ServiceWorkerHost> actual) {
   EXPECT_EQ(expected, !!actual.get());
   continuation.Run();
 }

@@ -14,14 +14,13 @@ namespace content {
 class ServiceWorkerHostClient;
 class ServiceWorkerHostImpl;
 
-// Interface to communicate with service workers from any thread. Abstracts the
-// lifetime and active version for calling code.
-//
-// A ServiceWorkerHost object is paired with a ServiceWorkerHostClient object.
-// Disconnect the client by deleting the ServiceWorkerHost object.
-class ServiceWorkerHost : public IPC::Sender {
+// Interface to communicate with service workers from the UI thread. Abstracts
+// the lifetime and active version for calling code.
+class ServiceWorkerHost : public IPC::Sender,
+                          public base::RefCountedThreadSafe<ServiceWorkerHost> {
  public:
-  virtual ~ServiceWorkerHost() {};
+  // Disconnects a ServiceWorkerHostClient, releasing references to it.
+  virtual void DisconnectServiceWorkerHostClient();
 
   // Identifying attributes.
   virtual const GURL& scope() = 0;
@@ -42,9 +41,12 @@ class ServiceWorkerHost : public IPC::Sender {
   // (registered, installing, installed but not active, active)
   virtual bool Send(IPC::Message* msg) OVERRIDE = 0;
 
+ protected:
+  ServiceWorkerHost() {}
+  virtual ~ServiceWorkerHost() {}
+
  private:
-  friend ServiceWorkerHostImpl;
-  ServiceWorkerHost() {};
+  friend class base::RefCountedThreadSafe<ServiceWorkerHost>;
   DISALLOW_COPY_AND_ASSIGN(ServiceWorkerHost);
 };
 
