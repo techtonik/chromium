@@ -124,9 +124,10 @@ void ExpectResultAndRun(bool expected,
   continuation.Run();
 }
 
-void ExpectServiceWorkerHostAndRun(bool expected,
-                                   const base::Closure& continuation,
-                                   scoped_ptr<ServiceWorkerHost> actual_host) {
+void ExpectServiceWorkerHostAndRun(
+    bool expected,
+    const base::Closure& continuation,
+    scoped_refptr<ServiceWorkerHost> actual_host) {
   EXPECT_EQ(expected, !!actual_host.get());
   continuation.Run();
 }
