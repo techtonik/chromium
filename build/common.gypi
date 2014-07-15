@@ -1618,7 +1618,7 @@
             'android_host_arch%': '<!(uname -m)',
             # Android API-level of the SDK used for compilation.
             'android_sdk_version%': '19',
-            'android_sdk_build_tools_version%': '19.0.0',
+            'android_sdk_build_tools_version%': '20.0.0',
             'host_os%': "<!(uname -s | sed -e 's/Linux/linux/;s/Darwin/mac/')",
           },
           # Copy conditionally-set variables out one scope.
@@ -1777,6 +1777,10 @@
         # the class names, so the JNI generator needs to know this.
         'jni_generator_jarjar_file': '../android_webview/build/jarjar-rules.txt',
       }],
+      ['OS=="linux"', {
+        # TODO(thakis): This is here to measure perf for a while.
+        'clang%': 1,
+      }],  # OS=="mac"
       ['OS=="mac"', {
         'conditions': [
           # All Chrome builds have breakpad symbols, but only process the
@@ -3257,9 +3261,9 @@
           }],
           # _FORTIFY_SOURCE isn't really supported by Clang now, see
           # http://llvm.org/bugs/show_bug.cgi?id=16821.
-          # TODO(glider): once the bug is fixed, disable source fortification
-          # under the sanitizer tools only.
-          ['os_posix==1 and (OS!="linux" or clang!=1)', {
+          # It seems to work fine with Ubuntu 12 headers though, so use it
+          # in official builds.
+          ['os_posix==1 and (asan!=1 and msan!=1 and tsan!=1 and lsan!=1 and ubsan!=1) and (OS!="linux" or clang!=1 or buildtype=="Official")', {
             'target_conditions': [
               ['chromium_code==1', {
                 # Non-chromium code is not guaranteed to compile cleanly
@@ -3435,13 +3439,20 @@
                   'debug_optimize%': 's',
                 },
                 'cflags': [
-                  '-fomit-frame-pointer',
                   '-fdata-sections',
                   '-ffunction-sections',
                 ],
                 'ldflags': [
                   '-Wl,-O1',
                   '-Wl,--as-needed',
+                ],
+              }],
+              ['OS=="android" and android_full_debug==0 and target_arch!="arm64"', {
+                # We don't omit frame pointers on arm64 since they are required
+                # to correctly unwind stackframes which contain system library
+                # function frames (crbug.com/391706).
+                'cflags': [
+                  '-fomit-frame-pointer',
                 ],
               }],
               ['OS=="linux" and target_arch=="ia32"', {
@@ -3499,13 +3510,18 @@
                   '-Wl,--gc-sections',
                 ],
               }],
+              ['OS=="android" and target_arch!="arm64"', {
+                # We don't omit frame pointers on arm64 since they are required
+                # to correctly unwind stackframes which contain system library
+                # function frames (crbug.com/391706).
+                'cflags': [
+                  '-fomit-frame-pointer',
+                ]
+              }],
               ['OS=="android"', {
                 'variables': {
                   'release_optimize%': 's',
                 },
-                'cflags': [
-                  '-fomit-frame-pointer',
-                ],
                 'ldflags': [
                   # Warn in case of text relocations.
                   '-Wl,--warn-shared-textrel',
@@ -3886,16 +3902,6 @@
               '-std=gnu++11',
             ],
           }],
-          ['clang==1 and OS=="android"', {
-            # Android uses stlport, whose include/new defines
-            # `void  operator delete[](void* ptr) throw();`, which
-            # clang's -Wimplicit-exception-spec-mismatch warns about for some
-            # reason -- http://llvm.org/PR16638. TODO(thakis): Include stlport
-            # via -isystem instead.
-            'cflags_cc': [
-              '-Wno-implicit-exception-spec-mismatch',
-            ],
-          }],
           ['clang==1 and clang_use_chrome_plugins==1', {
             'cflags': [
               '<@(clang_chrome_plugins_flags)',
@@ -4187,7 +4193,7 @@
               # gcc -- http://gcc.gnu.org/onlinedocs/gcc-4.8.0/gcc/Optimize-Options.html
               # TODO(mithro): Watch for clang support at following thread:
               # http://clang-developers.42468.n3.nabble.com/Adding-fuse-ld-support-to-clang-td4032180.html
-              ['gcc_version>=48', {
+              ['gcc_version>=48 and clang==0', {
                 'target_conditions': [
                   ['_toolset=="target"', {
                     'ldflags': [
@@ -4196,7 +4202,7 @@
                   }],
                 ],
               }],
-              ['host_gcc_version>=48', {
+              ['host_gcc_version>=48 and clang==0', {
                 'target_conditions': [
                   ['_toolset=="host"', {
                     'ldflags': [
@@ -4234,7 +4240,7 @@
               '-Wl,--disable-new-dtags',
             ],
           }],
-          ['gcc_version>=48', {
+          ['gcc_version>=48 and clang==0', {
             'target_conditions': [
               ['_toolset=="target"', {
                 'cflags_cc': [
@@ -4247,7 +4253,7 @@
               }],
             ],
           }],
-          ['host_gcc_version>=48', {
+          ['host_gcc_version>=48 and clang==0', {
             'target_conditions': [
               ['_toolset=="host"', {
                 'cflags_cc': [
@@ -4525,7 +4531,7 @@
                 ],
               }, { # else: use_system_stlport!=1
                 'cflags': [
-                  '-I<(android_stlport_include)',
+                  '-isystem<(android_stlport_include)',
                 ],
                 'ldflags': [
                   '-L<(android_stlport_libs_dir)',
@@ -5481,7 +5487,7 @@
     # Don't warn about the "typedef 'foo' locally defined but not used"
     # for gcc 4.8.
     # TODO: remove this flag once all builds work. See crbug.com/227506
-    ['gcc_version>=48', {
+    ['gcc_version>=48 and clang==0', {
       'target_defaults': {
         'cflags': [
           '-Wno-unused-local-typedefs',

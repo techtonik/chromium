@@ -1442,7 +1442,6 @@ IPC_MESSAGE_CONTROL1(ViewHostMsg_SuddenTerminationChanged,
                      bool /* enabled */)
 
 IPC_STRUCT_BEGIN(ViewHostMsg_CompositorSurfaceBuffersSwapped_Params)
-  IPC_STRUCT_MEMBER(bool, use_native_widget)
   IPC_STRUCT_MEMBER(int32, surface_id)
   IPC_STRUCT_MEMBER(uint64, surface_handle)
   IPC_STRUCT_MEMBER(int32, route_id)
@@ -1492,6 +1491,12 @@ IPC_MESSAGE_ROUTED4(ViewHostMsg_RegisterProtocolHandler,
                     std::string /* scheme */,
                     GURL /* url */,
                     base::string16 /* title */,
+                    bool /* user_gesture */)
+
+// Unregister the registered handler for URL requests with the given scheme.
+IPC_MESSAGE_ROUTED3(ViewHostMsg_UnregisterProtocolHandler,
+                    std::string /* scheme */,
+                    GURL /* url */,
                     bool /* user_gesture */)
 
 // Stores new inspector setting in the profile.
@@ -1652,8 +1657,9 @@ IPC_MESSAGE_ROUTED1(ViewHostMsg_SetNeedsBeginFrame,
                     bool /* enabled */)
 
 // Reply to the ViewMsg_ExtractSmartClipData message.
-IPC_MESSAGE_ROUTED2(ViewHostMsg_SmartClipDataExtracted,
-                    base::string16 /* result */,
+IPC_MESSAGE_ROUTED3(ViewHostMsg_SmartClipDataExtracted,
+                    base::string16 /* text */,
+                    base::string16 /* html */,
                     gfx::Rect /* rect */)
 
 #elif defined(OS_MACOSX)

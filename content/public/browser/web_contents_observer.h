@@ -178,8 +178,7 @@ class CONTENT_EXPORT WebContentsObserver : public IPC::Listener,
   // This method is invoked when the document in the given frame finished
   // loading. At this point, scripts marked as defer were executed, and
   // content scripts marked "document_end" get injected into the frame.
-  virtual void DocumentLoadedInFrame(int64 frame_id,
-                                     RenderViewHost* render_view_host) {}
+  virtual void DocumentLoadedInFrame(RenderFrameHost* render_frame_host) {}
 
   // This method is invoked when the navigation is done, i.e. the spinner of
   // the tab will stop spinning, and the onload event was dispatched.
@@ -187,19 +186,15 @@ class CONTENT_EXPORT WebContentsObserver : public IPC::Listener,
   // If the WebContents is displaying replacement content, e.g. network error
   // pages, DidFinishLoad is invoked for frames that were not sending
   // navigational events before. It is safe to ignore these events.
-  virtual void DidFinishLoad(int64 frame_id,
-                             const GURL& validated_url,
-                             bool is_main_frame,
-                             RenderViewHost* render_view_host) {}
+  virtual void DidFinishLoad(RenderFrameHost* render_frame_host,
+                             const GURL& validated_url) {}
 
   // This method is like DidFinishLoad, but when the load failed or was
   // cancelled, e.g. window.stop() is invoked.
-  virtual void DidFailLoad(int64 frame_id,
+  virtual void DidFailLoad(RenderFrameHost* render_frame_host,
                            const GURL& validated_url,
-                           bool is_main_frame,
                            int error_code,
-                           const base::string16& error_description,
-                           RenderViewHost* render_view_host) {}
+                           const base::string16& error_description) {}
 
   // This method is invoked when content was loaded from an in-memory cache.
   virtual void DidLoadResourceFromMemoryCache(
@@ -327,8 +322,8 @@ class CONTENT_EXPORT WebContentsObserver : public IPC::Listener,
   virtual void AccessibilityEventReceived(
       const std::vector<AXEventNotificationDetails>& details) {}
 
-  // Invoked when brand color is changed to |brand_color|.
-  virtual void DidChangeBrandColor(SkColor brand_color) {}
+  // Invoked when theme color is changed to |theme_color|.
+  virtual void DidChangeThemeColor(SkColor theme_color) {}
 
   // Invoked if an IPC message is coming from a specific RenderFrameHost.
   virtual bool OnMessageReceived(const IPC::Message& message,

@@ -14,11 +14,11 @@ from telemetry.core import browser_finder
 from telemetry.core import command_line
 from telemetry.core import util
 from telemetry.page import page_runner
-from telemetry.page import cloud_storage
 from telemetry.page import page_set
 from telemetry.page import page_test
 from telemetry.page import test_expectations
 from telemetry.results import page_test_results
+from telemetry.util import cloud_storage
 
 
 Disabled = decorators.Disabled
@@ -127,7 +127,7 @@ class Benchmark(command_line.Command):
                       'If you believe you have credentials, follow the '
                       'instructions below.',
                       generated_profile_archive_path)
-        logging.error(e)
+        logging.error(str(e))
         sys.exit(-1)
 
     # Unzip profile directory.
@@ -191,10 +191,7 @@ class Benchmark(command_line.Command):
     By default, it will create an empty expectations set. Override to generate
     custom expectations.
     """
-    if hasattr(cls, 'expectations'):
-      return cls.expectations
-    else:
-      return test_expectations.TestExpectations()
+    return test_expectations.TestExpectations()
 
 
 def AddCommandLineArgs(parser):

@@ -28,30 +28,30 @@ vars = {
   "libcxxabi_revision": "206024",
   "webkit_trunk": "http://src.chromium.org/blink/trunk",
   "nacl_trunk": "http://src.chromium.org/native_client/trunk",
-  "webkit_revision": "177730",
+  "webkit_revision": "178084",
   "chromium_git": "https://chromium.googlesource.com",
   "chromiumos_git": "https://chromium.googlesource.com/chromiumos",
   "pdfium_git": "https://pdfium.googlesource.com",
   "skia_git": "https://skia.googlesource.com",
   "boringssl_git": "https://boringssl.googlesource.com",
   "swig_revision": "230490",
-  "nacl_revision": "13452",
+  "nacl_revision": "13456",
   # After changing nacl_revision, run 'glient sync' and check native_client/DEPS
   # to update other nacl_*_revision's.
   "nacl_tools_revision": "13077",  # native_client/DEPS: tools_rev
   "google_toolbox_for_mac_revision": "662",
-  "libaddressinput_revision": "300",
+  "libaddressinput_revision": "305",
   "libphonenumber_revision": "621",
-  "libvpx_revision": "280676",
+  "libvpx_revision": "282874",
   "lss_revision": "26",
   "sfntly_revision": "239",
   "lighttpd_revision": "33737",
-  "skia_revision": "6815011292f0a130db2b35ca0f862b246769f3b8",
+  "skia_revision": "bf0b9ced0b93d9684b044e0880691768f9aa4394",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   "v8_branch": "trunk",
-  "v8_revision": "22291",
+  "v8_revision": "22400",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
@@ -61,7 +61,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
-  "swarming_revision": "f37f5121888fbfdb494650daa14ee872a0261c51",
+  "swarming_revision": "c8437bfa40aa3428ee7655585b6203f2cac67693",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openssl
   # and whatever else without interference from each other.
@@ -73,11 +73,11 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling build tools
   # and whatever else without interference from each other.
-  "buildtools_revision": "916ba1fc49098855f8ddd08edd41484d36d84e08",
+  "buildtools_revision": "59b93247766e1cdac6e482637ad493df38f7aeb7",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFIum
   # and whatever else without interference from each other.
-  "pdfium_revision": "cb46ea1bca55b448a7a54db2086c6f736f05c35f",
+  "pdfium_revision": "532a6a7ece21ca4ea253a196bb5c61a1861d12a0",
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openmax_dl
   # and whatever else without interference from each other.
@@ -85,7 +85,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling BoringSSL
   # and whatever else without interference from each other.
-  "boringssl_revision": "8af663956519f7302284c0c36b413c0495986e14",
+  "boringssl_revision": "09020c2f08df11179b93e6548117806a4c0d0d45",
 }
 
 deps = {
@@ -160,7 +160,7 @@ deps = {
     (Var("googlecode_url") % "grit-i18n") + "/trunk@170",
 
   "src/tools/gyp":
-    (Var("googlecode_url") % "gyp") + "/trunk@1944",
+    (Var("googlecode_url") % "gyp") + "/trunk@1950",
 
   "src/tools/swarming_client":
     Var("chromium_git") + "/external/swarming.client.git@" +
@@ -228,7 +228,7 @@ deps = {
 
   "src/third_party/usrsctp/usrsctplib":
     (Var("googlecode_url") % "sctp-refimpl") +
-    "/trunk/KERN/usrsctp/usrsctplib@8875",
+    "/trunk/KERN/usrsctp/usrsctplib@8912",
 
   "src/third_party/libsrtp":
     "/trunk/deps/third_party/libsrtp@261337",
@@ -267,7 +267,7 @@ deps = {
         "/trunk/jsoncpp/src/lib_json@" + Var("jsoncpp_revision"),
 
   "src/third_party/libyuv":
-    (Var("googlecode_url") % "libyuv") + "/trunk@1028",
+    (Var("googlecode_url") % "libyuv") + "/trunk@1035",
 
   "src/third_party/smhasher/src":
     (Var("googlecode_url") % "smhasher") + "/trunk@152",
@@ -480,7 +480,7 @@ deps_os = {
     # For Linux and Chromium OS.
     "src/third_party/cros_system_api":
       Var("chromiumos_git") + "/platform/system_api.git" +
-      "@520b666e3e1690993de0e86d02d47fe90ea48bbc",
+      "@5e0746db937822e77288800bd8d0ca5702dcff85",
 
     # Note that this is different from Android's freetype repo.
     "src/third_party/freetype2/src":
@@ -490,7 +490,7 @@ deps_os = {
     # Build tools for targeting ChromeOS.
     "src/third_party/chromite":
       Var("chromiumos_git") + "/chromite.git" +
-      "@df22fd72b22d1905af6e69d23ec373b69c9c75f6",
+      "@371a0a5adec10a47f6040241b574b96b9bc00fbc",
 
     # Dependency of chromite.git.
     "src/third_party/pyelftools":
@@ -512,7 +512,7 @@ deps_os = {
   "android": {
     "src/third_party/android_tools":
       Var("chromium_git") + "/android_tools.git" +
-      "@7e1a9d2fadc6d5aba62b235ffa9a15f3b4be06cb",
+      "@18728e9dd5dd66d4f5edf1b792e77e2b544a1cb0",
 
     "src/third_party/aosp":
       "/trunk/deps/third_party/aosp@148330",
@@ -799,7 +799,7 @@ hooks = [
     "action": ["python",
                "src/build/get_syzygy_binaries.py",
                "--output-dir=src/third_party/syzygy/binaries",
-               "--revision=8f3646e5c1d3141a93a14fed6a92f916c20fe135",
+               "--revision=363bc02a09c380b6f5f397606cc0744d85d54a51",
                "--overwrite",
     ],
   },

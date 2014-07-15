@@ -82,8 +82,8 @@ class MyTestURLRequestContext : public net::TestURLRequestContext {
 class MyTestURLRequestContextGetter : public net::TestURLRequestContextGetter {
  public:
   explicit MyTestURLRequestContextGetter(
-      const scoped_refptr<base::MessageLoopProxy>& io_message_loop_proxy)
-      : TestURLRequestContextGetter(io_message_loop_proxy) {}
+      const scoped_refptr<base::SingleThreadTaskRunner>& io_task_runner)
+      : TestURLRequestContextGetter(io_task_runner) {}
 
   virtual net::TestURLRequestContext* GetURLRequestContext() OVERRIDE {
     // Construct |context_| lazily so it gets constructed on the right
@@ -221,7 +221,7 @@ class InvalidatorShim : public InvalidationHandler {
       : sync_manager_(sync_manager) {}
 
   virtual void OnInvalidatorStateChange(InvalidatorState state) OVERRIDE {
-    sync_manager_->OnInvalidatorStateChange(state);
+    sync_manager_->SetInvalidatorEnabled(state == INVALIDATIONS_ENABLED);
   }
 
   virtual void OnIncomingInvalidation(

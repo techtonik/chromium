@@ -82,7 +82,7 @@ SlideMode.prototype.getTitle = function() { return 'GALLERY_SLIDE'; };
  * @private
  */
 SlideMode.prototype.initListeners_ = function() {
-  window.addEventListener('resize', this.onResize_.bind(this), false);
+  window.addEventListener('resize', this.onResize_.bind(this));
 };
 
 /**
@@ -334,6 +334,7 @@ SlideMode.prototype.leave = function(zoomToRect, callback) {
       callback();
     }.bind(this);
 
+  this.viewport_.setZoomIndex(0);
   if (this.getItemCount_() === 0) {
     this.showErrorBanner_(false);
     commitDone();
@@ -607,7 +608,10 @@ SlideMode.prototype.getNextSelectedIndex_ = function(direction) {
  * @param {string} keyID Key identifier.
  */
 SlideMode.prototype.advanceWithKeyboard = function(keyID) {
-  this.advanceManually(keyID === 'Up' || keyID === 'Left' ? -1 : 1);
+  var prev = (keyID === 'Up' ||
+              keyID === 'Left' ||
+              keyID === 'MediaPreviousTrack');
+  this.advanceManually(prev ? -1 : 1);
 };
 
 /**
@@ -806,10 +810,12 @@ SlideMode.prototype.onKeyDown = function(event) {
   if (this.isSlideshowOn_()) {
     switch (keyID) {
       case 'U+001B':  // Escape exits the slideshow.
+      case 'MediaStop':
         this.stopSlideshow_(event);
         break;
 
       case 'U+0020':  // Space pauses/resumes the slideshow.
+      case 'MediaPlayPause':
         this.toggleSlideshowPause_();
         break;
 
@@ -817,6 +823,8 @@ SlideMode.prototype.onKeyDown = function(event) {
       case 'Down':
       case 'Left':
       case 'Right':
+      case 'MediaNextTrack':
+      case 'MediaPreviousTrack':
         this.advanceWithKeyboard(keyID);
         break;
     }
@@ -853,10 +861,24 @@ SlideMode.prototype.onKeyDown = function(event) {
     case 'Down':
     case 'Left':
     case 'Right':
+    case 'MediaNextTrack':
+    case 'MediaPreviousTrack':
       this.advanceWithKeyboard(keyID);
       break;
 
-    default: return false;
+    case 'Ctrl-U+00BB':  // Ctrl+'=' zoom in.
+      if (!this.isEditing()) {
+        this.viewport_.setZoomIndex(this.viewport_.getZoomIndex() + 1);
+        this.imageView_.draw();
+      }
+      break;
+
+    case 'Ctrl-U+00BD':  // Ctrl+'-' zoom out.
+      if (!this.isEditing()) {
+        this.viewport_.setZoomIndex(this.viewport_.getZoomIndex() - 1);
+        this.imageView_.draw();
+      }
+      break;
   }
 
   return true;
@@ -868,7 +890,8 @@ SlideMode.prototype.onKeyDown = function(event) {
  */
 SlideMode.prototype.onResize_ = function() {
   this.viewport_.sizeByFrameAndFit(this.container_);
-  this.viewport_.repaint();
+  this.viewport_.update();
+  this.editor_.getBuffer().draw();
 };
 
 /**
@@ -929,7 +952,7 @@ SlideMode.prototype.saveCurrentImage_ = function(callback) {
  */
 SlideMode.prototype.onContentChange_ = function(event) {
   var newEntry = event.item.getEntry();
-  if (util.isSameEntry(newEntry, event.oldEntry))
+  if (!util.isSameEntry(newEntry, event.oldEntry))
     this.imageView_.changeEntry(newEntry);
 };
 
@@ -1022,6 +1045,10 @@ SlideMode.prototype.isSlideshowOn_ = function() {
  * @param {Event=} opt_event Event.
  */
 SlideMode.prototype.startSlideshow = function(opt_interval, opt_event) {
+  // Reset zoom.
+  this.viewport_.setZoomIndex(0);
+  this.imageView_.draw();
+
   // Set the attribute early to prevent the toolbar from flashing when
   // the slideshow is being started from the mosaic view.
   this.container_.setAttribute('slideshow', 'playing');
@@ -1173,6 +1200,9 @@ SlideMode.prototype.toggleEditor = function(opt_event) {
   ImageUtil.setAttribute(this.container_, 'editing', !this.isEditing());
 
   if (this.isEditing()) { // isEditing has just been flipped to a new value.
+    // Reset zoom.
+    this.viewport_.setZoomIndex(0);
+    this.imageView_.draw();
     if (this.context_.readonlyDirName) {
       this.editor_.getPrompt().showAt(
           'top', 'GALLERY_READONLY_WARNING', 0, this.context_.readonlyDirName);

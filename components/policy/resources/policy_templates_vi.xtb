@@ -178,15 +178,15 @@
 
           Nếu chính sách này không được đặt, trang sẽ được quét tìm thẻ meta.</translation>
 <translation id="3478024346823118645">Xóa dữ liệu người dùng khi đăng xuất</translation>
-<translation id="8668394701842594241">Chỉ định danh sách các trình cắm được bật trong <ph name="PRODUCT_NAME"/> và ngăn người dùng thay đổi cài đặt này.
+<translation id="8668394701842594241">Chỉ định danh sách các plugin được bật trong <ph name="PRODUCT_NAME"/> và ngăn người dùng thay đổi cài đặt này.
 
       Các ký tự đại diện '*' và '?' có thể được sử dụng để khớp với chuỗi các ký tự ngẫu nhiên. '*' khớp với một số ngẫu nhiên các ký tự còn '?' chỉ định ký tự đơn tùy chọn, tức là khớp với 0 hoặc 1 ký tự. Ký tự thoát là '\', vì vậy để khớp với các ký tự '*', '?' hoặc '\' thực, bạn có thể đặt '\' trước các ký tự này.
 
-      Danh sách trình cắm được chỉ định luôn được sử dụng trong <ph name="PRODUCT_NAME"/> nếu chúng được cài đặt. Các trình cắm này được đánh dấu là được bật trong  'about:plugins' và người dùng không thể tắt các trình cắm này. 
+      Danh sách plugin được chỉ định luôn được sử dụng trong <ph name="PRODUCT_NAME"/> nếu chúng được cài đặt. Các plugin này được đánh dấu là được bật trong  'about:plugins' và người dùng không thể tắt các plugin này. 
 
       Xin lưu ý rằng chính sách này ghi đè cả DisabledPlugins và DisabledPluginsExceptions.
 
-      Nếu không thiết lập chính sách này, người dùng có thể tắt bất kỳ trình cắm nào được cài đặt trên hệ thống.</translation>
+      Nếu không thiết lập chính sách này, người dùng có thể tắt bất kỳ plugin nào được cài đặt trên hệ thống.</translation>
 <translation id="653608967792832033">Chỉ định khoảng thời gian không có thao tác nhập của người dùng mà sau khoảng thời gian đó màn hình bị khóa khi chạy trên nguồn pin.
 
           Khi được đặt thành một giá trị lớn hơn không, chính sách này chỉ định khoảng thời gian mà người dùng phải duy trì chế độ không sử dụng trước khi <ph name="PRODUCT_OS_NAME"/> khóa màn hình.
@@ -239,11 +239,11 @@
 <translation id="7271085005502526897">Nhập trang chủ từ trình duyệt mặc định trong lần chạy đầu tiên</translation>
 <translation id="6036523166753287175">Bật tính năng chặn tường lửa từ máy chủ truy cập từ xa</translation>
 <translation id="1096105751829466145">Nhà cung cấp dịch vụ tìm kiếm mặc định</translation>
-<translation id="7567380065339179813">Cho phép trình cắm trên các trang web này</translation>
+<translation id="7567380065339179813">Cho phép plugin trên các trang web này</translation>
 <translation id="4555850956567117258">Cho phép chứng thực từ xa cho người dùng</translation>
 <translation id="5966615072639944554">Tiện ích mở rộng được phép sử dụng API chứng thực từ xa</translation>
 <translation id="1617235075406854669">Bật xóa lịch sử trình duyệt và lịch sử tải xuống</translation>
-<translation id="5290940294294002042">Chỉ định danh sách trình cắm mà người dùng có thể bật hoặc tắt</translation>
+<translation id="5290940294294002042">Chỉ định danh sách plugin mà người dùng có thể bật hoặc tắt</translation>
 <translation id="3153348162326497318">Cho phép bạn chỉ định những tiện ích mở rộng mà người dùng KHÔNG thể cài đặt. Các tiện ích mở rộng đã được cài đặt sẽ bị xóa nếu nằm trong danh sách đen.
 
           Giá trị danh sách đen của '*' có nghĩa là tất cả tiện ích mở rộng đều nằm trong danh sách đen trừ khi chúng được liệt kê rõ ràng trong danh sách trắng.
@@ -255,7 +255,7 @@
 <translation id="5809728392451418079">Đặt tên hiển thị cho tài khoản trong thiết bị</translation>
 <translation id="1427655258943162134">Địa chỉ hoặc URL của máy chủ proxy</translation>
 <translation id="1827523283178827583">Sử dụng máy chủ proxy cố định</translation>
-<translation id="3021409116652377124">Vô hiệu hóa trình tìm kiếm trình cắm</translation>
+<translation id="3021409116652377124">Vô hiệu hóa trình tìm kiếm plugin</translation>
 <translation id="7236775576470542603">Đặt loại kính lúp màn hình mặc định được bật trên màn hình đăng nhập.
           Nếu đặt chính sách này, chính sách sẽ kiểm soát loại kính lúp màn hình được bật khi màn hình đăng nhập hiển thị. Đặt chính sách thành ''None'' sẽ tắt kính lúp màn hình.
 
@@ -310,7 +310,7 @@
 <translation id="5630352020869108293">Khôi phục phiên trước đó</translation>
 <translation id="2067011586099792101">Chặn truy cập vào các trang web nằm ngoài gói nội dung</translation>
 <translation id="4980635395568992380">Loại dữ liệu:</translation>
-<translation id="3096595567015595053">Danh sách trình cắm được kích hoạt</translation>
+<translation id="3096595567015595053">Danh sách plugin được kích hoạt</translation>
 <translation id="3048744057455266684">Nếu chính sách này được đặt và URL tìm kiếm được đề xuất từ thanh địa chỉ có chứa tham số này trong chuỗi truy vấn hoặc trong số nhận dạng phân đoạn, thì đề xuất sẽ hiển thị cụm từ tìm kiếm và nhà cung cấp dịch vụ tìm kiếm thay vì URL tìm kiếm thô.
           Chính sách này là tùy chọn. Nếu không được đặt, sẽ không có thay thế cụm từ tìm kiếm nào được thực hiện.
 
@@ -348,7 +348,7 @@
 <translation id="8614804915612153606">Tắt cập nhật tự động</translation>
 <translation id="4834526953114077364">Người dùng gần đây ít sử dụng nhất đã không đăng nhập trong 3 tháng qua và sẽ bị xóa cho tới khi đủ dung lượng trống</translation>
 <translation id="382476126209906314">Định cấu hình tiền tố TalkGadget cho máy chủ truy cập từ xa</translation>
-<translation id="6561396069801924653">Hiển thị tùy chọn trợ năng trong trình đơn của khay hệ thống</translation>
+<translation id="6561396069801924653">Hiển thị tùy chọn trợ năng trong menu của khay hệ thống</translation>
 <translation id="8104962233214241919">Tự động chọn chứng chỉ ứng dụng khách cho các trang web này</translation>
 <translation id="2906874737073861391">Danh sách tiện ích mở rộng trong AppPack</translation>
 <translation id="4386578721025870401">Hạn chế thời gian mà người dùng được xác thực qua SAML có thể đăng nhập ngoại tuyến.
@@ -408,7 +408,7 @@
 
       Chính sách này được chỉ định theo mili giây.</translation>
 <translation id="7275334191706090484">Dấu trang được quản lý</translation>
-<translation id="3570008976476035109">Chặn trình cắm trên các trang web này</translation>
+<translation id="3570008976476035109">Chặn plugin trên các trang web này</translation>
 <translation id="8749370016497832113">Bật xóa lịch sử trình duyệt và lịch sử tải xuống trong <ph name="PRODUCT_NAME"/> và ngăn người dùng thay đổi cài đặt này.
 
       Xin lưu ý rằng ngay cả khi chính sách này bị tắt, lịch sử duyệt web và lịch sử tải xuống vẫn không được đảm bảo là sẽ được lưu lại: người dùng có thể trực tiếp chỉnh sửa hoặc xóa các tệp cơ sở dữ liệu lịch sử và trình duyệt có thể tự hết hạn hoặc lưu trữ tất cả hoặc bất kỳ mục lịch sử nào vào thời điểm bất kỳ.
@@ -444,7 +444,7 @@
 
       Nếu cài đặt này được bật hoặc không được định cấu hình, người dùng có thể in.
 
-      Nếu cài đặt này bị tắt, người dùng không thể in từ <ph name="PRODUCT_NAME"/>. In bị tắt trong menu cờ lê, tiện ích mở rộng, ứng dụng JavaScript, v.v.  <ph name="PRODUCT_NAME"/> trong khi in. Để biết ví dụ, ứng dụng Flash nhất định có tùy chọn in trong trình đơn ngữ cảnh, không chịu sự điều chỉnh của chính sách này.</translation>
+      Nếu cài đặt này bị tắt, người dùng không thể in từ <ph name="PRODUCT_NAME"/>. In bị tắt trong menu cờ lê, tiện ích mở rộng, ứng dụng JavaScript, v.v.  <ph name="PRODUCT_NAME"/> trong khi in. Để biết ví dụ, ứng dụng Flash nhất định có tùy chọn in trong menu ngữ cảnh, không chịu sự điều chỉnh của chính sách này.</translation>
 <translation id="9135033364005346124">Bật proxy <ph name="CLOUD_PRINT_NAME"/></translation>
 <translation id="4519046672992331730">Bật đề xuất tìm kiếm trong thanh địa chỉ của <ph name="PRODUCT_NAME"/> và không cho phép người dùng thay đổi cài đặt này.
 
@@ -698,7 +698,7 @@
 <translation id="262740370354162807">Cho phép gửi tài liệu tới <ph name="CLOUD_PRINT_NAME"/></translation>
 <translation id="7717938661004793600">Định cấu hình tính năng trợ năng của <ph name="PRODUCT_OS_NAME"/>.</translation>
 <translation id="5182055907976889880">Định cấu hình Google Drive trong <ph name="PRODUCT_OS_NAME"/>.</translation>
-<translation id="8704831857353097849">Danh sách trình cắm bị tắt</translation>
+<translation id="8704831857353097849">Danh sách plugin bị tắt</translation>
 <translation id="467449052039111439">Mở một danh sách URL</translation>
 <translation id="1988371335297483117">Có thể tải xuống các phần tải dữ liệu tự động cập nhật trên <ph name="PRODUCT_OS_NAME"/> qua HTTP thay vì HTTPS. Điều này cho phép lưu vào cache qua HTTP thông suốt các tài nguyên đã tải xuống qua HTTP.
 
@@ -728,7 +728,7 @@
 <translation id="5316405756476735914">Cho phép bạn đặt liệu các trang web có được phép đặt dữ liệu cục bộ hay không. Bạn có thể cho phép hoặc từ chối đặt dữ liệu cục bộ đối với tất cả các trang web. Nếu không thiết lập chính sách này, 'AllowCookies' sẽ được sử dụng và người dùng có thể thay đổi cài đặt này.</translation>
 <translation id="4250680216510889253">Không</translation>
 <translation id="1522425503138261032">Cho phép các trang web theo dõi vị trí thực của người dùng</translation>
-<translation id="6467433935902485842">Cho phép bạn thiết lập danh sách các mẫu url chỉ định những trang web được phép chạy trình cắm. Nếu không thiết lập chính sách này, giá trị mặc định chung từ chính sách 'DefaultPluginsSetting' nếu chính sách này được thiết lập hoặc từ cấu hình cá nhân của người dùng sẽ được sử dụng cho tất cả các trang web.</translation>
+<translation id="6467433935902485842">Cho phép bạn thiết lập danh sách các mẫu url chỉ định những trang web được phép chạy plugin. Nếu không thiết lập chính sách này, giá trị mặc định chung từ chính sách 'DefaultPluginsSetting' nếu chính sách này được thiết lập hoặc từ cấu hình cá nhân của người dùng sẽ được sử dụng cho tất cả các trang web.</translation>
 <translation id="4423597592074154136">Chỉ định cài đặt proxy theo cách thủ công</translation>
 <translation id="209586405398070749">Kênh ổn định</translation>
 <translation id="8170878842291747619">Cho phép dịch vụ Google Dịch tích hợp trên <ph name="PRODUCT_NAME"/>.
@@ -781,7 +781,7 @@
 <translation id="8971221018777092728">Bộ tính giờ tự động đăng nhập vào phiên công khai</translation>
 <translation id="8285435910062771358">Đã bật kính lúp toàn màn hình</translation>
 <translation id="5141670636904227950">Đặt loại kính lúp màn hình mặc định được bật trên màn hình đăng nhập</translation>
-<translation id="3864818549971490907">Cài đặt trình cắm mặc định</translation>
+<translation id="3864818549971490907">Cài đặt plugin mặc định</translation>
 <translation id="7151201297958662315">Xác định liệu quá trình <ph name="PRODUCT_NAME"/> có bắt đầu khi đăng nhập vào OS và tiếp tục chạy khi cửa sổ trình duyệt cuối cùng đóng, cho phép các ứng dụng dưới nền vẫn hoạt động. Quá trình chạy dưới nền hiển thị biểu tượng trong khay hệ thống và luôn có thể được đóng từ đó.
 
       Nếu chính sách này được đặt thành đúng, chế độ chạy dưới nền sẽ được bật và người dùng sẽ không thể điều khiển được chế độ này trong cài đặt trình duyệt.
@@ -944,9 +944,9 @@
           Chính sách này là tùy chọn. Nếu không thiết lập, sẽ không có kết quả tìm kiếm tức thì nào được cung cấp.
 
           Chính sách này chỉ được áp dụng nếu chính sách  'DefaultSearchProviderEnabled' được bật.</translation>
-<translation id="6693751878507293182">Nếu bạn đặt cài đặt này thành bật, tìm kiếm tự động và cài đặt trình cắm bị thiếu sẽ bị tắt trong <ph name="PRODUCT_NAME"/>.
+<translation id="6693751878507293182">Nếu bạn đặt cài đặt này thành bật, tìm kiếm tự động và cài đặt plugin bị thiếu sẽ bị tắt trong <ph name="PRODUCT_NAME"/>.
 
-      Đặt thành tắt hoặc không đặt tùy chọn này, trình tìm kiếm trình cắm sẽ hoạt động.</translation>
+      Đặt thành tắt hoặc không đặt tùy chọn này, trình tìm kiếm plugin sẽ hoạt động.</translation>
 <translation id="2650049181907741121">Hành động sẽ thực hiện khi người dùng đóng nắp</translation>
 <translation id="7880891067740158163">Cho phép bạn chỉ định danh sách các mẫu url chỉ định những trang web mà <ph name="PRODUCT_NAME"/> sẽ chọn tự động một chứng chỉ ứng dụng khách, nếu trang web yêu cầu chứng chỉ.
 
@@ -1192,7 +1192,7 @@
 <translation id="2872961005593481000">Tắt</translation>
 <translation id="4445684791305970001">Tắt các Công cụ dành cho nhà phát triển và bảng điều khiển JavaScript.
 
-      Nếu bạn bật cài đặt này, sẽ không thể truy cập các Công cụ dành cho nhà phát triển cũng như không thể kiểm tra các phần tử của trang web được nữa. Mọi phím tắt và mọi trình đơn hoặc các mục nhập trình đơn ngữ cảnh để mở các Công cụ dành cho nhà phát triển hoặc Bảng điều khiển JavaScript sẽ bị tắt.
+      Nếu bạn bật cài đặt này, sẽ không thể truy cập các Công cụ dành cho nhà phát triển cũng như không thể kiểm tra các phần tử của trang web được nữa. Mọi phím tắt và mọi menu hoặc các mục nhập menu ngữ cảnh để mở các Công cụ dành cho nhà phát triển hoặc Bảng điều khiển JavaScript sẽ bị tắt.
 
       Đặt thành tắt hoặc không đặt tùy chọn này sẽ cho phép người dùng sử dụng các Công cụ dành cho nhà phát triển và bảng điều khiển JavaScript.</translation>
 <translation id="9203071022800375458">Tắt tính năng chụp ảnh chụp màn hình.
@@ -1291,7 +1291,7 @@
 <translation id="7079519252486108041">Chặn cửa sổ bật lên trên các trang web này</translation>
 <translation id="1859633270756049523">Giới hạn độ dài phiên</translation>
 <translation id="7433714841194914373">Bật chế độ Instant</translation>
-<translation id="4983201894483989687">Cho phép chạy các trình cắm đã lỗi thời</translation>
+<translation id="4983201894483989687">Cho phép chạy các plugin đã lỗi thời</translation>
 <translation id="443665821428652897">Xóa dữ liệu trang web khi đóng trình duyệt (không dùng nữa)</translation>
 <translation id="3823029528410252878">Tắt lưu lịch sử trình duyệt trong <ph name="PRODUCT_NAME"/> và ngăn người dùng thay đổi cài đặt này. Nếu cài đặt này được bật, lịch sử duyệt web sẽ không được lưu. Nếu tắt hoặc không thiết lập cài đặt này, lịch sử duyệt web sẽ được lưu.</translation>
 <translation id="7295019613773647480">Bật người dùng được giám sát</translation>
@@ -1458,13 +1458,13 @@
           Nếu bạn đặt chính sách này, người dùng không thể thay đổi hoặc ghi đè chính sách.
 
           Nếu không đặt chính sách này, phản hồi bằng giọng nói bị tắt ngay từ đầu nhưng người dùng có thể bật tính năng này bất cứ lúc nào.</translation>
-<translation id="7796141075993499320">Cho phép bạn thiết lập danh sách các mẫu url chỉ định những trang web được phép chạy trình cắm.
+<translation id="7796141075993499320">Cho phép bạn thiết lập danh sách các mẫu url chỉ định những trang web được phép chạy plugin.
 
           Nếu không thiết lập chính sách này, giá trị mặc định chung từ chính sách 'DefaultPopupsSetting' nếu chính sách này được thiết lập hoặc từ cấu hình cá nhân của người dùng sẽ được sử dụng cho tất cả các trang web.</translation>
 <translation id="3809527282695568696">Nếu 'Mở danh sách URL' được chọn là tác vụ khởi động, điều này sẽ cho phép bạn chỉ định danh sách URL được mở. Nếu không được đặt, sẽ không có URL nào được mở khi khởi động.
 
           Chính sách này chỉ có hiệu lực nếu chính sách 'RestoreOnStartup' được đặt thành 'RestoreOnStartupIsURLs'.</translation>
-<translation id="649418342108050703">Tắt hỗ trợ dành cho API đồ họa 3D. Bật cài đặt này sẽ ngăn các trang web truy cập bộ xử lý đồ họa (GPU). Cụ thể, các trang web không thể truy cập API WebGL và các trình cắm không thể sử dụng API Pepper 3D. Tắt hoặc không thiết lập cài đặt này có thể cho phép các trang web sử dụng API WebGL và các trình cắm sử dụng API Pepper 3D. Cài đặt mặc định của trình duyệt có thể vẫn yêu cầu phải thông qua đối số dòng lệnh để sử dụng các API này.</translation>
+<translation id="649418342108050703">Tắt hỗ trợ dành cho API đồ họa 3D. Bật cài đặt này sẽ ngăn các trang web truy cập bộ xử lý đồ họa (GPU). Cụ thể, các trang web không thể truy cập API WebGL và các plugin không thể sử dụng API Pepper 3D. Tắt hoặc không thiết lập cài đặt này có thể cho phép các trang web sử dụng API WebGL và các plugin sử dụng API Pepper 3D. Cài đặt mặc định của trình duyệt có thể vẫn yêu cầu phải thông qua đối số dòng lệnh để sử dụng các API này.</translation>
 <translation id="2077273864382355561">Độ trễ tắt màn hình khi chạy trên nguồn pin</translation>
 <translation id="9112897538922695510">Cho phép bạn đăng ký danh sách trình xử lý giao thức. Đây có thể chỉ là một chính sách được đề xuất. Thuộc tính |protocol| của sản phẩm nên được đặt thành lược đồ chẳng hạn như 'mailto' và thuộc tính |url| nên được đặt thành mẫu URL của ứng dụng xử lý lược đồ. Mẫu có thể bao gồm '%s' mà nếu có mặt sẽ được thay thế bằng URL đã xử lý.
 
@@ -1507,14 +1507,14 @@
 
       Nếu chính sách này không được đặt, sẽ có tính năng proxy nén dữ liệu để người dùng chọn có sử dụng hay không.</translation>
 <translation id="2170233653554726857">Bật tối ưu hóa WPAD</translation>
-<translation id="7424751532654212117">Danh sách các trường hợp ngoại lệ của danh sách trình cắm bị vô hiệu hóa</translation>
+<translation id="7424751532654212117">Danh sách các trường hợp ngoại lệ của danh sách plugin bị vô hiệu hóa</translation>
 <translation id="6233173491898450179">Đặt thư mục tải xuống</translation>
 <translation id="8908294717014659003">Cho phép bạn đặt liệu trang web có được phép truy cập vào thiết bị thu dữ liệu truyền thông hay không. Quyền truy cập vào thiết bị thu dữ liệu truyền thông có thể được phép theo mặc định hoặc người dùng có thể được hỏi mỗi lần trang web muốn có quyền truy cập vào thiết bị thu dữ liệu truyền thông.
 
           Nếu chính sách này không được đặt, 'PromptOnAccess' sẽ được sử dụng và người dùng có thể thay đổi cài đặt này.</translation>
 <translation id="4429220551923452215">Bật hoặc tắt lối tắt ứng dụng trong thanh dấu trang.
 
-      Nếu chính sách này không được đặt thì người dùng có thể chọn hiển thị hoặc ẩn lối tắt ứng dụng từ trình đơn ngữ cảnh của thanh dấu trang.
+      Nếu chính sách này không được đặt thì người dùng có thể chọn hiển thị hoặc ẩn lối tắt ứng dụng từ menu ngữ cảnh của thanh dấu trang.
 
       Nếu chính sách này được định cấu hình thì người dùng không thể thay đổi và lối tắt ứng dụng sẽ luôn được hiển thị hoặc không bao giờ được hiển thị.</translation>
 <translation id="2299220924812062390">Chỉ định danh sách plugin được phép</translation>
@@ -1575,7 +1575,7 @@
 <translation id="6774533686631353488">Cho phép các máy chủ Nhắn tin gốc ở mức người dùng (được cài đặt mà không cần có quyền quản trị).</translation>
 <translation id="868187325500643455">Cho phép tất cả các trang web tự động chạy plugin</translation>
 <translation id="7421483919690710988">Đặt kích thước bộ nhớ cache của đĩa phương tiện theo byte</translation>
-<translation id="5226033722357981948">Chỉ định có nên vô hiệu hóa trình tìm kiếm trình cắm hay không</translation>
+<translation id="5226033722357981948">Chỉ định có nên vô hiệu hóa trình tìm kiếm plugin hay không</translation>
 <translation id="7234280155140786597">Tên của các máy chủ nhắn tin gốc bị cấm (hoặc * cho tất cả)</translation>
 <translation id="4890209226533226410">Đặt loại kính lúp màn hình được bật.
 
@@ -1622,7 +1622,7 @@
           Chính sách này chỉ được tuân theo nếu kích hoạt chính sách 'DefaultSearchProviderEnabled'.</translation>
 <translation id="5307432759655324440">Tính khả dụng của chế độ ẩn danh</translation>
 <translation id="4056910949759281379">Vô hiệu hóa giao thức SPDY</translation>
-<translation id="3808945828600697669">Chỉ định danh sách các trình cắm bị vô hiệu hóa</translation>
+<translation id="3808945828600697669">Chỉ định danh sách các plugin bị vô hiệu hóa</translation>
 <translation id="4525521128313814366">Cho phép bạn thiết lập danh sách các mẫu url chỉ định những trang web không được phép hiển thị hình ảnh.
 
           Nếu không thiết lập chính sách này, giá trị mặc định chung từ chính sách 'DefaultImagesSetting' nếu chính sách này được thiết lập hoặc từ cấu hình cá nhân của người dùng sẽ được sử dụng cho tất cả các trang web.</translation>
@@ -1723,7 +1723,7 @@
 <translation id="1734716591049455502">Định cấu hình tùy chọn truy cập từ xa</translation>
 <translation id="7336878834592315572">Lưu giữ cookie trong thời hạn phiên</translation>
 <translation id="7715711044277116530">Tỷ lệ phần trăm theo đó xác định độ trễ mờ màn hình ở chế độ bản trình bày</translation>
-<translation id="8777120694819070607">Cho phép <ph name="PRODUCT_NAME"/> chạy các trình cắm lỗi thời. Nếu bạn bật cài đặt này, các trình cắm lỗi thời sẽ được sử dụng như những trình cắm bình thường. Nếu bạn tắt cài đặt này, các trình cắm lỗi thời sẽ không được sử dụng và người dùng sẽ không được yêu cầu cấp phép chạy các trình cắm đó. Nếu bạn không đặt cài đặt này, người dùng sẽ được yêu cầu cấp phép để chạy các trình cắm lỗi thời.</translation>
+<translation id="8777120694819070607">Cho phép <ph name="PRODUCT_NAME"/> chạy các plugin lỗi thời. Nếu bạn bật cài đặt này, các plugin lỗi thời sẽ được sử dụng như những plugin bình thường. Nếu bạn tắt cài đặt này, các plugin lỗi thời sẽ không được sử dụng và người dùng sẽ không được yêu cầu cấp phép chạy các plugin đó. Nếu bạn không đặt cài đặt này, người dùng sẽ được yêu cầu cấp phép để chạy các plugin lỗi thời.</translation>
 <translation id="2629448496147630947">Định cấu hình tùy chọn truy cập từ xa trong <ph name="PRODUCT_NAME"/>.
 
       Các tính năng này bị bỏ qua trừ khi ứng dụng web Truy cập từ xa được cài đặt.</translation>
@@ -1860,15 +1860,15 @@
       Khi đặt chính sách này, dấu trang được quản lý sẽ là thư mục mặc định được mở khi mở chế độ xem dấu trong trong Chrome.
 
       Dấu trang được quản lý không được đồng bộ hóa với tài khoản người dùng.</translation>
-<translation id="6757375960964186754">Hiển thị tùy chọn trợ năng của <ph name="PRODUCT_OS_NAME"/> trong trình đơn hệ thống.
+<translation id="6757375960964186754">Hiển thị tùy chọn trợ năng của <ph name="PRODUCT_OS_NAME"/> trong menu hệ thống.
 
-          Nếu chính sách này được đặt thành true, tùy chọn Trợ năng luôn xuất hiện trong trình đơn khay hệ thống.
+          Nếu chính sách này được đặt thành true, tùy chọn Trợ năng luôn xuất hiện trong menu khay hệ thống.
 
-          Nếu chính sách này được đặt thành false, tùy chọn Trợ năng không bao giờ xuất hiện trong trình đơn khay hệ thống.
+          Nếu chính sách này được đặt thành false, tùy chọn Trợ năng không bao giờ xuất hiện trong menu khay hệ thống.
 
           Nếu bạn đặt chính sách này, người dùng không thể thay đổi hoặc ghi đè chính sách đó.
 
-          Nếu chính sách này không được đặt, tùy chọn Trợ năng sẽ không xuất hiện trong trình đơn khay hệ thống nhưng người dùng có thể làm cho tùy chọn Trợ năng hiển thị qua trang Cài đặt.</translation>
+          Nếu chính sách này không được đặt, tùy chọn Trợ năng sẽ không xuất hiện trong menu khay hệ thống nhưng người dùng có thể làm cho tùy chọn Trợ năng hiển thị qua trang Cài đặt.</translation>
 <translation id="8303314579975657113">Chỉ định thư viện GSSAPI nào được sử dụng để Xác thực HTTP. Bạn có thể chỉ đặt tên thư viện hoặc đường dẫn đầy đủ. Nếu không có cài đặt nào được cung cấp, <ph name="PRODUCT_NAME"/> sẽ quay trở lại sử dụng tên thư viện mặc định.</translation>
 <translation id="8549772397068118889">Cảnh báo khi truy cập vào các trang web nằm ngoài gói nội dung</translation>
 <translation id="7749402620209366169">Bật xác thực hai bước cho máy chủ truy cập từ xa thay vì mã PIN do người dùng chỉ định.

@@ -30,6 +30,8 @@ enum RequestType {
   OPEN_FILE,
   CLOSE_FILE,
   READ_FILE,
+  CREATE_DIRECTORY,
+  DELETE_ENTRY,
   TESTING
 };
 

@@ -26,10 +26,13 @@ class OSExchangeDataTest : public PlatformTest {
 TEST_F(OSExchangeDataTest, StringDataGetAndSet) {
   OSExchangeData data;
   base::string16 input = base::ASCIIToUTF16("I can has cheezburger?");
+  EXPECT_FALSE(data.HasString());
   data.SetString(input);
+  EXPECT_TRUE(data.HasString());
 
   OSExchangeData data2(data.provider().Clone());
   base::string16 output;
+  EXPECT_TRUE(data2.HasString());
   EXPECT_TRUE(data2.GetString(&output));
   EXPECT_EQ(input, output);
   std::string url_spec = "http://www.goats.com/";
@@ -46,16 +49,18 @@ TEST_F(OSExchangeDataTest, TestURLExchangeFormats) {
   std::string url_spec = "http://www.google.com/";
   GURL url(url_spec);
   base::string16 url_title = base::ASCIIToUTF16("www.google.com");
+  EXPECT_FALSE(data.HasURL(OSExchangeData::DO_NOT_CONVERT_FILENAMES));
   data.SetURL(url, url_title);
-  base::string16 output;
+  EXPECT_TRUE(data.HasURL(OSExchangeData::DO_NOT_CONVERT_FILENAMES));
 
   OSExchangeData data2(data.provider().Clone());
 
   // URL spec and title should match
   GURL output_url;
   base::string16 output_title;
+  EXPECT_TRUE(data2.HasURL(OSExchangeData::DO_NOT_CONVERT_FILENAMES));
   EXPECT_TRUE(data2.GetURLAndTitle(
-      OSExchangeData::CONVERT_FILENAMES, &output_url, &output_title));
+      OSExchangeData::DO_NOT_CONVERT_FILENAMES, &output_url, &output_title));
   EXPECT_EQ(url_spec, output_url.spec());
   EXPECT_EQ(url_title, output_title);
   base::string16 output_string;
@@ -63,6 +68,28 @@ TEST_F(OSExchangeDataTest, TestURLExchangeFormats) {
   // URL should be the raw text response
   EXPECT_TRUE(data2.GetString(&output_string));
   EXPECT_EQ(url_spec, base::UTF16ToUTF8(output_string));
+}
+
+// Test that setting the URL does not overwrite a previously set custom string.
+TEST_F(OSExchangeDataTest, URLAndString) {
+  OSExchangeData data;
+  base::string16 string = base::ASCIIToUTF16("I can has cheezburger?");
+  data.SetString(string);
+  std::string url_spec = "http://www.google.com/";
+  GURL url(url_spec);
+  base::string16 url_title = base::ASCIIToUTF16("www.google.com");
+  data.SetURL(url, url_title);
+
+  base::string16 output_string;
+  EXPECT_TRUE(data.GetString(&output_string));
+  EXPECT_EQ(string, output_string);
+
+  GURL output_url;
+  base::string16 output_title;
+  EXPECT_TRUE(data.GetURLAndTitle(
+      OSExchangeData::CONVERT_FILENAMES, &output_url, &output_title));
+  EXPECT_EQ(url_spec, output_url.spec());
+  EXPECT_EQ(url_title, output_title);
 }
 
 TEST_F(OSExchangeDataTest, TestPickledData) {

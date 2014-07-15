@@ -506,8 +506,8 @@ bool WebContentsImpl::OnMessageReceived(RenderViewHost* render_view_host,
     IPC_MESSAGE_HANDLER(FrameHostMsg_PluginCrashed, OnPluginCrashed)
     IPC_MESSAGE_HANDLER(FrameHostMsg_DomOperationResponse,
                         OnDomOperationResponse)
-    IPC_MESSAGE_HANDLER(FrameHostMsg_DidChangeBrandColor,
-                        OnBrandColorChanged)
+    IPC_MESSAGE_HANDLER(FrameHostMsg_DidChangeThemeColor,
+                        OnThemeColorChanged)
     IPC_MESSAGE_HANDLER(FrameHostMsg_DidFinishDocumentLoad,
                         OnDocumentLoadedInFrame)
     IPC_MESSAGE_HANDLER(FrameHostMsg_DidFinishLoad, OnDidFinishLoad)
@@ -534,6 +534,8 @@ bool WebContentsImpl::OnMessageReceived(RenderViewHost* render_view_host,
     IPC_MESSAGE_HANDLER(ViewHostMsg_EnumerateDirectory, OnEnumerateDirectory)
     IPC_MESSAGE_HANDLER(ViewHostMsg_RegisterProtocolHandler,
                         OnRegisterProtocolHandler)
+    IPC_MESSAGE_HANDLER(ViewHostMsg_UnregisterProtocolHandler,
+                        OnUnregisterProtocolHandler)
     IPC_MESSAGE_HANDLER(ViewHostMsg_Find_Reply, OnFindReply)
     IPC_MESSAGE_HANDLER(ViewHostMsg_AppCacheAccessed, OnAppCacheAccessed)
     IPC_MESSAGE_HANDLER(ViewHostMsg_WebUISend, OnWebUISend)
@@ -2356,12 +2358,10 @@ void WebContentsImpl::DidFailLoadWithError(
     const GURL& url,
     int error_code,
     const base::string16& error_description) {
-  int render_frame_id = render_frame_host->GetRoutingID();
-  bool is_main_frame = render_frame_host->frame_tree_node()->IsMainFrame();
-  RenderViewHost* render_view_host = render_frame_host->render_view_host();
-  FOR_EACH_OBSERVER(WebContentsObserver, observers_,
-                    DidFailLoad(render_frame_id, url, is_main_frame, error_code,
-                                error_description, render_view_host));
+  FOR_EACH_OBSERVER(
+      WebContentsObserver,
+      observers_,
+      DidFailLoad(render_frame_host, url, error_code, error_description));
 }
 
 void WebContentsImpl::NotifyChangedNavigationState(
@@ -2511,9 +2511,9 @@ bool WebContentsImpl::CanOverscrollContent() const {
   return false;
 }
 
-void WebContentsImpl::OnBrandColorChanged(SkColor brand_color) {
+void WebContentsImpl::OnThemeColorChanged(SkColor theme_color) {
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
-                    DidChangeBrandColor(brand_color));
+                    DidChangeThemeColor(theme_color));
 }
 
 void WebContentsImpl::OnDidLoadResourceFromMemoryCache(
@@ -2583,12 +2583,8 @@ void WebContentsImpl::OnDocumentLoadedInFrame() {
   CHECK(!render_view_message_source_);
   RenderFrameHostImpl* rfh =
       static_cast<RenderFrameHostImpl*>(render_frame_message_source_);
-
-  int render_frame_id = rfh->GetRoutingID();
-  RenderViewHost* render_view_host = rfh->render_view_host();
-  FOR_EACH_OBSERVER(WebContentsObserver,
-                    observers_,
-                    DocumentLoadedInFrame(render_frame_id, render_view_host));
+  FOR_EACH_OBSERVER(
+      WebContentsObserver, observers_, DocumentLoadedInFrame(rfh));
 }
 
 void WebContentsImpl::OnDidFinishLoad(
@@ -2606,12 +2602,8 @@ void WebContentsImpl::OnDidFinishLoad(
 
   RenderFrameHostImpl* rfh =
       static_cast<RenderFrameHostImpl*>(render_frame_message_source_);
-  int render_frame_id = rfh->GetRoutingID();
-  RenderViewHost* render_view_host = rfh->render_view_host();
-  bool is_main_frame = rfh->frame_tree_node()->IsMainFrame();
-  FOR_EACH_OBSERVER(WebContentsObserver, observers_,
-                    DidFinishLoad(render_frame_id, validated_url,
-                                  is_main_frame, render_view_host));
+  FOR_EACH_OBSERVER(
+      WebContentsObserver, observers_, DidFinishLoad(rfh, validated_url));
 }
 
 void WebContentsImpl::OnDidStartLoading(bool to_different_document) {
@@ -2734,6 +2726,20 @@ void WebContentsImpl::OnRegisterProtocolHandler(const std::string& protocol,
     return;
 
   delegate_->RegisterProtocolHandler(this, protocol, url, user_gesture);
+}
+
+void WebContentsImpl::OnUnregisterProtocolHandler(const std::string& protocol,
+                                                  const GURL& url,
+                                                  bool user_gesture) {
+  if (!delegate_)
+    return;
+
+  ChildProcessSecurityPolicyImpl* policy =
+      ChildProcessSecurityPolicyImpl::GetInstance();
+  if (policy->IsPseudoScheme(protocol))
+    return;
+
+  delegate_->UnregisterProtocolHandler(this, protocol, url, user_gesture);
 }
 
 void WebContentsImpl::OnFindReply(int request_id,
@@ -3403,6 +3409,9 @@ void WebContentsImpl::RenderViewTerminated(RenderViewHost* rvh,
   // Cancel any visible dialogs so they are not left dangling over the sad tab.
   if (dialog_manager_)
     dialog_manager_->CancelActiveAndPendingDialogs(this);
+
+  if (delegate_)
+    delegate_->HideValidationMessage(this);
 
   SetIsLoading(rvh, false, true, NULL);
   NotifyDisconnected();

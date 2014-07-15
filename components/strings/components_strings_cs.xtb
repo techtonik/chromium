@@ -90,7 +90,7 @@
 <translation id="6445051938772793705">Země</translation>
 <translation id="5031870354684148875">O Překladači Google</translation>
 <translation id="6891596781022320156">Úroveň zásady není podporována.</translation>
-<translation id="2025186561304664664">Server proxy je nastaven na automatickou konfiguraci.</translation>
+<translation id="2025186561304664664">Proxy server je nastaven na automatickou konfiguraci.</translation>
 <translation id="1853748787962613237">Zobrazení článku se nezdařilo.</translation>
 <translation id="5455374756549232013">Chybné časové razítko zásady</translation>
 <translation id="1962204205936693436">Záložky domény <ph name="DOMAIN"/></translation>
@@ -109,7 +109,7 @@
 <translation id="4117700440116928470">Rozsah zásady není podporován.</translation>
 <translation id="2114841414352855701">Zásada ignorována, protože bylo přepsána zásadou <ph name="POLICY_NAME"/>.</translation>
 <translation id="3228969707346345236">Překlad se nezdařil. Stránka je již v jazyce <ph name="LANGUAGE"/>.</translation>
-<translation id="8891727572606052622">Neplatný režim serveru proxy.</translation>
+<translation id="8891727572606052622">Neplatný režim proxy serveru.</translation>
 <translation id="6008256403891681546">JCB</translation>
 <translation id="7752995774971033316">Nespravováno</translation>
 <translation id="3712624925041724820">Byly vyčerpány licence</translation>
@@ -135,7 +135,7 @@
 <translation id="8249320324621329438">Naposledy načteno:</translation>
 <translation id="1285320974508926690">Tento web nikdy nepřekládat</translation>
 <translation id="6282194474023008486">PSČ</translation>
-<translation id="443673843213245140">Využití serveru proxy je zakázáno, je však určena explicitní konfigurace serveru proxy.</translation>
+<translation id="443673843213245140">Využití proxy serveru je zakázáno, je však určena explicitní konfigurace proxy serveru.</translation>
 <translation id="3623476034248543066">Zobrazit hodnotu</translation>
 <translation id="9020542370529661692">Stránka byla přeložena do jazyka <ph name="TARGET_LANGUAGE"/></translation>
 <translation id="5631439013527180824">Neplatný token správy zařízení</translation>
@@ -169,7 +169,7 @@
 <translation id="5019198164206649151">Záložní úložiště je ve špatném stavu</translation>
 <translation id="8364627913115013041">Nenastaveno.</translation>
 <translation id="8713130696108419660">Nesprávný počáteční podpis</translation>
-<translation id="20817612488360358">Jako aktivní jsou nakonfigurována systémová nastavení serveru proxy, je však určena i explicitní konfigurace serveru proxy.</translation>
+<translation id="20817612488360358">Jako aktivní jsou nakonfigurována systémová nastavení proxy serveru, je však určena i explicitní konfigurace proxy serveru.</translation>
 <translation id="2639739919103226564">Stav:</translation>
 <translation id="1832546148887467272">Přepnout na doménu <ph name="NEW_GOOGLE_HOST"/></translation>
 <translation id="5095208057601539847">Provincie</translation>

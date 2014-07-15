@@ -18,6 +18,7 @@
 #include "base/synchronization/lock.h"
 #include "crypto/ec_private_key.h"
 #include "crypto/openssl_util.h"
+#include "crypto/scoped_openssl_types.h"
 #include "net/base/net_errors.h"
 #include "net/cert/cert_verifier.h"
 #include "net/cert/single_request_cert_verifier.h"
@@ -50,6 +51,8 @@ const int kNoPendingReadResult = 1;
 // If a client doesn't have a list of protocols that it supports, but
 // the server supports NPN, choosing "http/1.1" is the best answer.
 const char kDefaultSupportedNPNProtocol[] = "http/1.1";
+
+typedef crypto::ScopedOpenSSL<X509, X509_free>::Type ScopedX509;
 
 #if OPENSSL_VERSION_NUMBER < 0x1000103fL
 // This method doesn't seem to have made it into the OpenSSL headers.
@@ -94,6 +97,23 @@ std::string GetSocketSessionCacheKey(const SSLClientSocketOpenSSL& socket) {
   result.append("/");
   result.append(socket.ssl_session_cache_shard());
   return result;
+}
+
+void FreeX509Stack(STACK_OF(X509) * ptr) {
+  sk_X509_pop_free(ptr, X509_free);
+}
+
+ScopedX509 OSCertHandleToOpenSSL(
+    X509Certificate::OSCertHandle os_handle) {
+#if defined(USE_OPENSSL_CERTS)
+  return ScopedX509(X509Certificate::DupOSCertHandle(os_handle));
+#else  // !defined(USE_OPENSSL_CERTS)
+  std::string der_encoded;
+  if (!X509Certificate::GetDEREncoded(os_handle, &der_encoded))
+    return ScopedX509();
+  const uint8_t* bytes = reinterpret_cast<const uint8_t*>(der_encoded.data());
+  return ScopedX509(d2i_X509(NULL, &bytes, der_encoded.size()));
+#endif  // defined(USE_OPENSSL_CERTS)
 }
 
 }  // namespace
@@ -170,7 +190,7 @@ class SSLClientSocketOpenSSL::SSLContext {
   // SSLClientSocketOpenSSL object from an SSL instance.
   int ssl_socket_data_index_;
 
-  crypto::ScopedOpenSSL<SSL_CTX, SSL_CTX_free> ssl_ctx_;
+  crypto::ScopedOpenSSL<SSL_CTX, SSL_CTX_free>::Type ssl_ctx_;
   // |session_cache_| must be destroyed before |ssl_ctx_|.
   SSLSessionCacheOpenSSL session_cache_;
 };
@@ -209,13 +229,10 @@ class SSLClientSocketOpenSSL::PeerCertificateChain {
   bool IsValid() { return os_chain_.get() && openssl_chain_.get(); }
 
  private:
-  static void FreeX509Stack(STACK_OF(X509)* cert_chain) {
-    sk_X509_pop_free(cert_chain, X509_free);
-  }
+  typedef crypto::ScopedOpenSSL<STACK_OF(X509), FreeX509Stack>::Type
+      ScopedX509Stack;
 
-  friend class crypto::ScopedOpenSSL<STACK_OF(X509), FreeX509Stack>;
-
-  crypto::ScopedOpenSSL<STACK_OF(X509), FreeX509Stack> openssl_chain_;
+  ScopedX509Stack openssl_chain_;
 
   scoped_refptr<X509Certificate> os_chain_;
 };
@@ -329,9 +346,9 @@ SSLClientSocketOpenSSL::SSLClientSocketOpenSSL(
     const SSLClientSocketContext& context)
     : transport_send_busy_(false),
       transport_recv_busy_(false),
-      transport_recv_eof_(false),
       weak_factory_(this),
       pending_read_error_(kNoPendingReadResult),
+      transport_read_error_(OK),
       transport_write_error_(OK),
       server_cert_chain_(new PeerCertificateChain(NULL)),
       completed_handshake_(false),
@@ -445,7 +462,6 @@ void SSLClientSocketOpenSSL::Disconnect() {
   transport_send_busy_ = false;
   send_buffer_ = NULL;
   transport_recv_busy_ = false;
-  transport_recv_eof_ = false;
   recv_buffer_ = NULL;
 
   user_connect_callback_.Reset();
@@ -457,6 +473,7 @@ void SSLClientSocketOpenSSL::Disconnect() {
   user_write_buf_len_    = 0;
 
   pending_read_error_ = kNoPendingReadResult;
+  transport_read_error_ = OK;
   transport_write_error_ = OK;
 
   server_cert_verify_result_.Reset();
@@ -659,6 +676,10 @@ int SSLClientSocketOpenSSL::Init() {
   DCHECK(ssl_bio);
   DCHECK(transport_bio_);
 
+  // Install a callback on OpenSSL's end to plumb transport errors through.
+  BIO_set_callback(ssl_bio, &SSLClientSocketOpenSSL::BIOCallback);
+  BIO_set_callback_arg(ssl_bio, reinterpret_cast<char*>(this));
+
   SSL_set_bio(ssl_, ssl_bio, ssl_bio);
 
   // OpenSSL defaults some options to on, others to off. To avoid ambiguity,
@@ -777,7 +798,7 @@ bool SSLClientSocketOpenSSL::DoTransportIO() {
     if (rv != ERR_IO_PENDING && rv != 0)
       network_moved = true;
   } while (rv > 0);
-  if (!transport_recv_eof_ && BufferRecv() != ERR_IO_PENDING)
+  if (transport_read_error_ == OK && BufferRecv() != ERR_IO_PENDING)
     network_moved = true;
   return network_moved;
 }
@@ -1261,20 +1282,9 @@ void SSLClientSocketOpenSSL::BufferRecvComplete(int result) {
 void SSLClientSocketOpenSSL::TransportWriteComplete(int result) {
   DCHECK(ERR_IO_PENDING != result);
   if (result < 0) {
-    // Got a socket write error; close the BIO to indicate this upward.
-    //
-    // TODO(davidben): The value of |result| gets lost. Feed the error back into
-    // the BIO so it gets (re-)detected in OnSendComplete. Perhaps with
-    // BIO_set_callback.
-    DVLOG(1) << "TransportWriteComplete error " << result;
-    (void)BIO_shutdown_wr(SSL_get_wbio(ssl_));
-
-    // Match the fix for http://crbug.com/249848 in NSS by erroring future reads
-    // from the socket after a write error.
-    //
-    // TODO(davidben): Avoid having read and write ends interact this way.
+    // Record the error. Save it to be reported in a future read or write on
+    // transport_bio_'s peer.
     transport_write_error_ = result;
-    (void)BIO_shutdown_wr(transport_bio_);
     send_buffer_ = NULL;
   } else {
     DCHECK(send_buffer_.get());
@@ -1287,19 +1297,15 @@ void SSLClientSocketOpenSSL::TransportWriteComplete(int result) {
 
 int SSLClientSocketOpenSSL::TransportReadComplete(int result) {
   DCHECK(ERR_IO_PENDING != result);
-  if (result <= 0) {
+  // If an EOF, canonicalize to ERR_CONNECTION_CLOSED here so MapOpenSSLError
+  // does not report success.
+  if (result == 0)
+    result = ERR_CONNECTION_CLOSED;
+  if (result < 0) {
     DVLOG(1) << "TransportReadComplete result " << result;
-    // Received 0 (end of file) or an error. Either way, bubble it up to the
-    // SSL layer via the BIO. TODO(joth): consider stashing the error code, to
-    // relay up to the SSL socket client (i.e. via DoReadCallback).
-    if (result == 0)
-      transport_recv_eof_ = true;
-    (void)BIO_shutdown_wr(transport_bio_);
-  } else if (transport_write_error_ < 0) {
-    // Mirror transport write errors as read failures; transport_bio_ has been
-    // shut down by TransportWriteComplete, so the BIO_write will fail, failing
-    // the CHECK. http://crbug.com/335557.
-    result = transport_write_error_;
+    // Received an error. Save it to be reported in a future read on
+    // transport_bio_'s peer.
+    transport_read_error_ = result;
   } else {
     DCHECK(recv_buffer_.get());
     int ret = BIO_write(transport_bio_, recv_buffer_->data(), result);
@@ -1347,31 +1353,40 @@ int SSLClientSocketOpenSSL::ClientCertRequestCallback(SSL* ssl,
 
   // Second pass: a client certificate should have been selected.
   if (ssl_config_.client_cert.get()) {
+    // TODO(davidben): Configure OpenSSL to also send the intermediates.
+    ScopedX509 leaf_x509 =
+        OSCertHandleToOpenSSL(ssl_config_.client_cert->os_cert_handle());
+    if (!leaf_x509) {
+      LOG(WARNING) << "Failed to import certificate";
+      OpenSSLPutNetError(FROM_HERE, ERR_SSL_CLIENT_AUTH_CERT_BAD_FORMAT);
+      return -1;
+    }
+
+    crypto::ScopedEVP_PKEY privkey;
 #if defined(USE_OPENSSL_CERTS)
     // A note about ownership: FetchClientCertPrivateKey() increments
     // the reference count of the EVP_PKEY. Ownership of this reference
     // is passed directly to OpenSSL, which will release the reference
     // using EVP_PKEY_free() when the SSL object is destroyed.
-    OpenSSLClientKeyStore::ScopedEVP_PKEY privkey;
-    if (OpenSSLClientKeyStore::GetInstance()->FetchClientCertPrivateKey(
+    if (!OpenSSLClientKeyStore::GetInstance()->FetchClientCertPrivateKey(
             ssl_config_.client_cert.get(), &privkey)) {
-      // TODO(joth): (copied from NSS) We should wait for server certificate
-      // verification before sending our credentials. See http://crbug.com/13934
-      *x509 = X509Certificate::DupOSCertHandle(
-          ssl_config_.client_cert->os_cert_handle());
-      *pkey = privkey.release();
-      return 1;
+      // Could not find the private key. Fail the handshake and surface an
+      // appropriate error to the caller.
+      LOG(WARNING) << "Client cert found without private key";
+      OpenSSLPutNetError(FROM_HERE, ERR_SSL_CLIENT_AUTH_CERT_NO_PRIVATE_KEY);
+      return -1;
     }
-
-    // Could not find the private key. Fail the handshake and surface an
-    // appropriate error to the caller.
-    LOG(WARNING) << "Client cert found without private key";
-    OpenSSLPutNetError(FROM_HERE, ERR_SSL_CLIENT_AUTH_CERT_NO_PRIVATE_KEY);
-    return -1;
 #else  // !defined(USE_OPENSSL_CERTS)
-    // OS handling of client certificates is not yet implemented.
+    // OS handling of private keys is not yet implemented.
     NOTIMPLEMENTED();
+    return 0;
 #endif  // defined(USE_OPENSSL_CERTS)
+
+    // TODO(joth): (copied from NSS) We should wait for server certificate
+    // verification before sending our credentials. See http://crbug.com/13934
+    *x509 = leaf_x509.release();
+    *pkey = privkey.release();
+    return 1;
   }
 
   // Send no client certificate.
@@ -1446,6 +1461,51 @@ int SSLClientSocketOpenSSL::SelectNextProtoCallback(unsigned char** out,
   server_protos_.assign(reinterpret_cast<const char*>(in), inlen);
   DVLOG(2) << "next protocol: '" << npn_proto_ << "' status: " << npn_status_;
   return SSL_TLSEXT_ERR_OK;
+}
+
+long SSLClientSocketOpenSSL::MaybeReplayTransportError(
+    BIO *bio,
+    int cmd,
+    const char *argp, int argi, long argl,
+    long retvalue) {
+  if (cmd == (BIO_CB_READ|BIO_CB_RETURN) && retvalue <= 0) {
+    // If there is no more data in the buffer, report any pending errors that
+    // were observed. Note that both the readbuf and the writebuf are checked
+    // for errors, since the application may have encountered a socket error
+    // while writing that would otherwise not be reported until the application
+    // attempted to write again - which it may never do. See
+    // https://crbug.com/249848.
+    if (transport_read_error_ != OK) {
+      OpenSSLPutNetError(FROM_HERE, transport_read_error_);
+      return -1;
+    }
+    if (transport_write_error_ != OK) {
+      OpenSSLPutNetError(FROM_HERE, transport_write_error_);
+      return -1;
+    }
+  } else if (cmd == BIO_CB_WRITE) {
+    // Because of the write buffer, this reports a failure from the previous
+    // write payload. If the current payload fails to write, the error will be
+    // reported in a future write or read to |bio|.
+    if (transport_write_error_ != OK) {
+      OpenSSLPutNetError(FROM_HERE, transport_write_error_);
+      return -1;
+    }
+  }
+  return retvalue;
+}
+
+// static
+long SSLClientSocketOpenSSL::BIOCallback(
+    BIO *bio,
+    int cmd,
+    const char *argp, int argi, long argl,
+    long retvalue) {
+  SSLClientSocketOpenSSL* socket = reinterpret_cast<SSLClientSocketOpenSSL*>(
+      BIO_get_callback_arg(bio));
+  CHECK(socket);
+  return socket->MaybeReplayTransportError(
+      bio, cmd, argp, argi, argl, retvalue);
 }
 
 scoped_refptr<X509Certificate>

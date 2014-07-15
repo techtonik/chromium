@@ -85,6 +85,7 @@ component("net") {
    ":net_resources",
     "//base",
     "//base:i18n",
+    "//base:prefs",
     "//base/third_party/dynamic_annotations",
     "//crypto",
     "//crypto:platform",
@@ -435,6 +436,8 @@ component("net") {
   if (is_win) {
     sources -= [
       "http/http_auth_handler_ntlm_portable.cc",
+      "socket/socket_libevent.cc",
+      "socket/socket_libevent.h",
       "socket/tcp_socket_libevent.cc",
       "socket/tcp_socket_libevent.h",
       "udp/udp_socket_libevent.cc",
@@ -520,7 +523,7 @@ component("net") {
       include_dirs = [ "//third_party/openssl" ]
     }
   }
-  
+
   if (use_icu_alternatives_on_android) {
     deps -= [
       "//base:i18n",
@@ -1063,6 +1066,7 @@ test("net_unittests") {
     ":test_support",
     "//base",
     "//base:i18n",
+    "//base:prefs_test_support",
     "//base/allocator",
     "//base/third_party/dynamic_annotations",
     "//crypto",

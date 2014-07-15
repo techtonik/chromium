@@ -20,7 +20,7 @@ action("regexes") {
   visibility = "//components/autofill/*"
   script = "//build/escape_unicode.py"
 
-  source_prereqs = [
+  inputs = [
     "autofill_regex_constants.cc.utf8",
   ]
   outputs = [
@@ -28,7 +28,7 @@ action("regexes") {
   ]
 
   args = [ "-o", rebase_path(target_gen_dir, root_build_dir) ]
-  args += rebase_path(source_prereqs, root_build_dir)
+  args += rebase_path(inputs, root_build_dir)
 }
 
 # GYP version: components/autofill.gyp:autofill_core_browser
@@ -140,11 +140,12 @@ static_library("browser") {
     "//components/os_crypt",
     "//components/resources",
     "//components/strings",
+    "//components/webdata/common",
     "//google_apis",
     "//skia",
     "//sql",
     "//third_party/icu",
-    "//third_party/libaddressinput",
+    "//third_party/libaddressinput:util",
     "//third_party/libphonenumber",
     "//ui/base",
     "//ui/gfx",
@@ -154,7 +155,6 @@ static_library("browser") {
     # TODO(GYP) also remove libjingle_stub_config below when this is added:
     #'../third_party/libjingle/libjingle.gyp:libjingle',  TODO(GYP)
     #'pref_registry',  TODO(GYP)
-    #'webdata_common',  TODO(GYP)
   ]
 
   configs += [ "//content:libjingle_stub_config" ]

@@ -4508,16 +4508,6 @@
    fun:_ZN*OneClickSigninHelperTest*
 }
 {
-   bug_175815
-   Memcheck:Leak
-   fun:_Znw*
-   fun:_ZN4base5Value18CreateIntegerValueEi
-   fun:_ZNK4base16FundamentalValue8DeepCopyEv
-   fun:_ZN4base8internal12_GLOBAL__N_125DictionaryHiddenRootValue26RemoveWithoutPathExpansionERKSsPPNS_5ValueE
-   fun:_ZN4base15DictionaryValue6RemoveERKSsPPNS_5ValueE
-   fun:_ZN32PluginFinderTest_JsonSyntax_Test8TestBodyEv
-}
-{
    bug_175823
    Memcheck:Leak
    ...
@@ -6230,4 +6220,27 @@
    Memcheck:Leak
    fun:_Znw*
    fun:_ZN20data_reduction_proxy69DataReductionProxyUsageStatsTest_isDataReductionProxyUnreachable_Test8TestBodyEv
+}
+{
+   bug_392912
+   Memcheck:Uninitialized
+   fun:_ZNK8SkStroke10strokePathERK6SkPathPS0_
+   fun:_ZNK11SkStrokeRec11applyToPathEP6SkPathRKS0_
+   fun:_ZNK7SkPaint11getFillPathERK6SkPathPS0_PK6SkRect
+   fun:_ZNK6SkDraw8drawPathERK6SkPathRK7SkPaintPK8SkMatrixbb
+   fun:_ZNK6SkDraw8drawPathERK6SkPathRK7SkPaintPK8SkMatrixb
+   fun:_ZN14SkBitmapDevice8drawPathERK6SkDrawRK6SkPathRK7SkPaintPK8SkMatrixb
+   fun:_ZN8SkCanvas8drawPathERK6SkPathRK7SkPaint
+}
+{
+   bug_392936
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN4base8internal20PostTaskAndReplyImpl16PostTaskAndReplyERKN15tracked_objects8LocationERKNS_8CallbackIFvvEEESA_
+   fun:_ZN4base10WorkerPool16PostTaskAndReplyERKN15tracked_objects8LocationERKNS_8CallbackIFvvEEES9_b
+   fun:_ZN3net16HostResolverImpl16LoopbackProbeJobC2ERKN4base7WeakPtrIS0_EE
+   fun:_ZN3net16HostResolverImplC1ERKNS_12HostResolver7OptionsEPNS_6NetLogE
+   fun:_ZN8chromeos24HostResolverImplChromeOSC1E13scoped_refptrIN4base16MessageLoopProxyEEPNS_19NetworkStateHandlerERKN3net12HostResolver7OptionsEPNS7_6NetLogE
+   fun:_ZN8chromeos24HostResolverImplChromeOS25CreateHostResolverForTestE13scoped_refptrIN4base16MessageLoopProxyEEPNS_19NetworkStateHandlerE
+   fun:_ZN28HostResolverImplChromeOSTest22InitializeHostResolverEv
 }

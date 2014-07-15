@@ -227,6 +227,23 @@ void FakeProvidedFileSystem::ReadFile(
   }
 }
 
+void FakeProvidedFileSystem::CreateDirectory(
+    const base::FilePath& directory_path,
+    bool exclusive,
+    bool recursive,
+    const fileapi::AsyncFileUtil::StatusCallback& callback) {
+  base::MessageLoopProxy::current()->PostTask(
+      FROM_HERE, base::Bind(callback, base::File::FILE_OK));
+}
+
+void FakeProvidedFileSystem::DeleteEntry(
+    const base::FilePath& entry_path,
+    bool recursive,
+    const fileapi::AsyncFileUtil::StatusCallback& callback) {
+  base::MessageLoopProxy::current()->PostTask(
+      FROM_HERE, base::Bind(callback, base::File::FILE_OK));
+}
+
 const ProvidedFileSystemInfo& FakeProvidedFileSystem::GetFileSystemInfo()
     const {
   return file_system_info_;

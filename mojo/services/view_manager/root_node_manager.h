@@ -82,7 +82,8 @@ class MOJO_VIEW_MANAGER_EXPORT RootNodeManager
   };
 
   RootNodeManager(ApplicationConnection* app_connection,
-                  RootViewManagerDelegate* view_manager_delegate);
+                  RootViewManagerDelegate* view_manager_delegate,
+                  const Callback<void()>& native_viewport_closed_callback);
   virtual ~RootNodeManager();
 
   // Returns the id for the next ViewManagerServiceImpl.
@@ -114,7 +115,7 @@ class MOJO_VIEW_MANAGER_EXPORT RootNodeManager
   // Returns the View identified by |id|.
   View* GetView(const ViewId& id);
 
-  Node* root() { return &root_; }
+  Node* root() { return root_.get(); }
 
   bool IsProcessingChange() const { return current_change_ != NULL; }
 
@@ -137,6 +138,7 @@ class MOJO_VIEW_MANAGER_EXPORT RootNodeManager
 
   // These functions trivially delegate to all ViewManagerServiceImpls, which in
   // term notify their clients.
+  void ProcessNodeDestroyed(Node* node);
   void ProcessNodeBoundsChanged(const Node* node,
                                 const gfx::Rect& old_bounds,
                                 const gfx::Rect& new_bounds);
@@ -187,9 +189,13 @@ class MOJO_VIEW_MANAGER_EXPORT RootNodeManager
                                    const Array<Id>& node_ids);
 
   // Overridden from NodeDelegate:
+  virtual void OnNodeDestroyed(const Node* node) OVERRIDE;
   virtual void OnNodeHierarchyChanged(const Node* node,
                                       const Node* new_parent,
                                       const Node* old_parent) OVERRIDE;
+  virtual void OnNodeBoundsChanged(const Node* node,
+                                   const gfx::Rect& old_bounds,
+                                   const gfx::Rect& new_bounds) OVERRIDE;
   virtual void OnNodeViewReplaced(const Node* node,
                                   const View* new_view,
                                   const View* old_view) OVERRIDE;
@@ -211,7 +217,7 @@ class MOJO_VIEW_MANAGER_EXPORT RootNodeManager
   RootViewManager root_view_manager_;
 
   // Root node.
-  Node root_;
+  scoped_ptr<Node> root_;
 
   // Set of ViewManagerServiceImpls created by way of Connect(). These have to
   // be explicitly destroyed.

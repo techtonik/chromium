@@ -499,7 +499,7 @@ Mfumo wa kipimo  lazima uwe 100% au zaidi. Thamani zitakazofupisha kuchelewa kwa
 
       Sera hii inawapa wasimamizi uwezo wa kuwasha tena vipengele visivyotumika vya mbinu ya wavuti kwa muda mfupi. Vipengele vinatambuliwa kwa lebo ya mfuatano na vipengele vinavyolingana na lebo vilivyojumuishwa katika orodha iliyobainishwa na sera hii vitawashwa tena.
 
-      Lebo zinazofuata zimefafanuliwa kwa sasa:
+      Lebo zinazofuata zimetambuliwa kwa sasa:
       - ShowModalDialog_EffectiveUntil20150430
 
       Ikiwa sera hii itaachwa bila kuwekwa au orodha ni tupu, vipengele vyote visivyotumika vya mbinu ya wavuti vitasalia vikiwa vimezimwa.</translation>
@@ -922,7 +922,7 @@ Sera hii huathiri aina zote za vifaa vya kuingiza video na si tu kamera iliyojen
           Sera hii ikiwekwa kwenye Sivyo, shughuli za video hazizuii mtumiaji kusemekana kutokuwa na shughuli.</translation>
 <translation id="3965339130942650562">Muda umekwisha mpaka uondokaji wa kuingia kusikotumika kutekelezwe</translation>
 <translation id="5814301096961727113">Weka hali chaguo-msingi ya maoni yanayotamkwa kwenye skrini ya kuingia katika akaunti</translation>
-<translation id="1950814444940346204">Washa vipengele visivyotumika vya mbinu ya wavuti</translation>
+<translation id="1950814444940346204">Washa vipengele visivyotumika vya wavuti</translation>
 <translation id="9084985621503260744">Bainisha iwapo shughuli za video zinaathiri udhibiti wa nishati</translation>
 <translation id="7091198954851103976">Kila wakati inaendesha programu jalizi ambazo zinahitaji uidhinishaji.</translation>
 <translation id="1708496595873025510">Weka kizuizi kwenye uletaji wa mbegu Tofauti</translation>
@@ -1257,11 +1257,11 @@ Thamani ya sera inapaswa kubainishwa katika milisekunde. Thamani huwekwa pamoja 
           Sera hii ni ya matumizi ya ndani na Chrome yenyewe.</translation>
 <translation id="913195841488580904">Zuia ufikivu kwenye orodha za URL</translation>
 <translation id="5461308170340925511">Husanidi sera zinazohusiana na kiendelezi. Mtumiaji haruhusiwi kuvisakinisha viendelezi visivyoidhinishwa isipokuwa viidhinishwe. Pia unaweza kulazimisha <ph name="PRODUCT_NAME"/> kuvisakinisha viendelezi kiotomatiki kwa kuvibainisha katika <ph name="EXTENSIONINSTALLFORCELIST_POLICY_NAME"/>. Viendelezi vilivyosakinishwa kwa lazima husakinishwa bila kujali iwapo vimo katika orodha ya visivyoidhinishwa.</translation>
-<translation id="3292147213643666827">Huwasha <ph name="PRODUCT_NAME"/> kufanya kama proksi kati ya <ph name="CLOUD_PRINT_NAME"/> na vichapishaji vilivyotangulia vilivyounganishwa kwenye mashine.
+<translation id="3292147213643666827">Huwezesha <ph name="PRODUCT_NAME"/> kufanya kazi kama proksi kati ya <ph name="CLOUD_PRINT_NAME"/> na printa zilizotangulia zilizounganishwa kwenye mashine.
 
-      Iwapo mpangilio huu utawashwa au hutasanidiwa, watumiaji wanaweza kutumia proksi ya kuchipisha la wingu kwa uthibitishaji kwa akaunti ya Google.
+      Iwapo mpangilio huu utawashwa au hutasanidiwa, watumiaji wanaweza kutumia proksi ya kuchipisha ya wingu ili kuthibitisha akaunti ya Google.
 
-      Iwapo mpangilio huu utafungwa, watumiaji hawawezi kuwasha proksi, na mashine haitaruhusiwa kushiriki vichapishaji vyake na <ph name="CLOUD_PRINT_NAME"/>.</translation>
+      Iwapo mpangilio huu utafungwa, watumiaji hawawezi kuwasha proksi, na mashine haitaruhusiwa kushiriki printa zake na <ph name="CLOUD_PRINT_NAME"/>.</translation>
 <translation id="6373222873250380826">Inalemaza visasisho otomatiki inapowekwa kwenye Ndivyo.
 
       Vifaa <ph name="PRODUCT_OS_NAME"/> vinakagua visasisho kiotomatiki wakati mpangilio huu haujasanidiwa au umewekwa kuwa Sivyo.</translation>
@@ -1583,9 +1583,9 @@ Iwapo sera hii haijawekwa, maoni yanayotamkwaa yatazimwa mwanzoni lakini yanawez
 <translation id="3891357445869647828">Wezesha JavaScript</translation>
 <translation id="2274864612594831715">Sera hii inasanidi kuwasha kibodi pepe kama kifaa cha kuingiza data kwenye ChromeOS. Watumiaji hawawezi kuibatilisha sera hii.
 
-      Ikiwa sera hii itawekwa kuwa kweli,  kibodi pepe ya skrini itawashwa wakati wowote.
+      Ikiwa sera hii itawekwa kuwa ndivyo,  kibodi pepe ya skrini itawashwa wakati wowote.
 
-      Ikiwekwa kuwa uongo, kibodi pepe ya skrini itazimwa wakati wowote.
+      Ikiwekwa kuwa sivyo, kibodi pepe ya skrini itazimwa wakati wowote.
 
       Ukiweka sera hii, watumiaji hawawezi kuibadilisha au kuibatilisha. Hata hivyo, watumiaji bado wataweza kuwasha/kuzima kibodi pepe ya skrini ya ufikiaji inayopewa kipaumbele dhidi ya kibodi pepe inayodhibitiwa na sera hii. Angalia sera ya |VirtualKeyboardEnabled| kwa kudhibiti kibodi pepe ya skrini ya ufikiaji.
 

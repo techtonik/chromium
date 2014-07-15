@@ -42,24 +42,30 @@ RootNodeManager::Context::~Context() {
   aura::Env::DeleteInstance();
 }
 
-RootNodeManager::RootNodeManager(ApplicationConnection* app_connection,
-                                 RootViewManagerDelegate* view_manager_delegate)
+RootNodeManager::RootNodeManager(
+    ApplicationConnection* app_connection,
+    RootViewManagerDelegate* view_manager_delegate,
+    const Callback<void()>& native_viewport_closed_callback)
     : app_connection_(app_connection),
       next_connection_id_(1),
       next_server_change_id_(1),
-      root_view_manager_(app_connection, this, view_manager_delegate),
-      root_(this, RootNodeId()),
+      root_view_manager_(app_connection,
+                         this,
+                         view_manager_delegate,
+                         native_viewport_closed_callback),
+      root_(new Node(this, RootNodeId())),
       current_change_(NULL) {
 }
 
 RootNodeManager::~RootNodeManager() {
   aura::client::FocusClient* focus_client =
-      aura::client::GetFocusClient(root_.window());
+      aura::client::GetFocusClient(root_->window());
   focus_client->RemoveObserver(this);
   while (!connections_created_by_connect_.empty())
     delete *(connections_created_by_connect_.begin());
   // All the connections should have been destroyed.
   DCHECK(connection_map_.empty());
+  root_.reset();
 }
 
 ConnectionSpecificId RootNodeManager::GetAndAdvanceNextConnectionId() {
@@ -104,8 +110,8 @@ ViewManagerServiceImpl* RootNodeManager::GetConnection(
 }
 
 Node* RootNodeManager::GetNode(const NodeId& id) {
-  if (id == root_.id())
-    return &root_;
+  if (id == root_->id())
+    return root_.get();
   ConnectionMap::iterator i = connection_map_.find(id.connection_id);
   return i == connection_map_.end() ? NULL : i->second->GetNode(id);
 }
@@ -195,7 +201,7 @@ void RootNodeManager::ProcessNodeDeleted(const NodeId& node) {
   for (ConnectionMap::iterator i = connection_map_.begin();
        i != connection_map_.end(); ++i) {
     i->second->ProcessNodeDeleted(node, next_server_change_id_,
-                                 IsChangeSource(i->first));
+                                  IsChangeSource(i->first));
   }
 }
 
@@ -250,13 +256,17 @@ ViewManagerServiceImpl* RootNodeManager::EmbedImpl(
 
   ViewManagerServiceImpl* connection =
       new ViewManagerServiceImpl(this,
-                                creator_id,
-                                creator_url,
-                                url.To<std::string>());
+                                 creator_id,
+                                 creator_url,
+                                 url.To<std::string>());
   connection->SetRoots(node_ids);
   BindToPipe(connection, pipe.handle0.Pass());
   connections_created_by_connect_.insert(connection);
   return connection;
+}
+
+void RootNodeManager::OnNodeDestroyed(const Node* node) {
+  ProcessNodeDeleted(node->id());
 }
 
 void RootNodeManager::OnNodeHierarchyChanged(const Node* node,
@@ -264,6 +274,12 @@ void RootNodeManager::OnNodeHierarchyChanged(const Node* node,
                                              const Node* old_parent) {
   if (!root_view_manager_.in_setup())
     ProcessNodeHierarchyChanged(node, new_parent, old_parent);
+}
+
+void RootNodeManager::OnNodeBoundsChanged(const Node* node,
+                                          const gfx::Rect& old_bounds,
+                                          const gfx::Rect& new_bounds) {
+  ProcessNodeBoundsChanged(node, old_bounds, new_bounds);
 }
 
 void RootNodeManager::OnNodeViewReplaced(const Node* node,

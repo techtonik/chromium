@@ -74,7 +74,7 @@ class CC_EXPORT LayerTreeImpl {
   FrameRateCounter* frame_rate_counter() const;
   PaintTimeCounter* paint_time_counter() const;
   MemoryHistory* memory_history() const;
-  bool device_viewport_valid_for_tile_management() const;
+  bool resourceless_software_draw() const;
   gfx::Size device_viewport_size() const;
   bool IsActiveTree() const;
   bool IsPendingTree() const;
@@ -90,6 +90,7 @@ class CC_EXPORT LayerTreeImpl {
   scoped_ptr<ScrollbarAnimationController> CreateScrollbarAnimationController(
       LayerImpl* scrolling_layer);
   void DidAnimateScrollOffset();
+  void InputScrollAnimationFinished();
   bool use_gpu_rasterization() const;
   bool create_low_res_tiling() const;
 
@@ -203,6 +204,8 @@ class CC_EXPORT LayerTreeImpl {
   // These should be called by LayerImpl's ctor/dtor.
   void RegisterLayer(LayerImpl* layer);
   void UnregisterLayer(LayerImpl* layer);
+
+  size_t NumLayers();
 
   AnimationRegistrar* animationRegistrar() const;
 

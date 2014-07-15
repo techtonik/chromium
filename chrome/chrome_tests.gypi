@@ -50,6 +50,7 @@
         '../ui/base/clipboard/clipboard_unittest.cc',
         '../ui/views/controls/webview/webview_interactive_uitest.cc',
         '../ui/views/corewm/desktop_capture_controller_unittest.cc',
+        '../ui/views/widget/desktop_aura/x11_topmost_window_finder_interactive_uitest.cc',
         '../ui/views/widget/widget_interactive_uitest.cc',
         'browser/apps/app_browsertest_util.cc',
         'browser/apps/app_browsertest_util.h',
@@ -296,6 +297,8 @@
             'test/data/chromeos/service_login.html',
           ],
           'sources!': [
+            '../ui/views/widget/desktop_aura/x11_topmost_window_finder_interactive_uitest.cc', 
+
             # chromeos does not use cross-platform panels
             'browser/notifications/notification_browsertest.cc',
             'browser/ui/panels/detached_panel_browsertest.cc',
@@ -337,7 +340,7 @@
             # but that causes errors in other targets when
             # resulting .res files get referenced multiple times.
             '<(SHARED_INTERMEDIATE_DIR)/chrome_version/other_version.rc',
-            '<(SHARED_INTERMEDIATE_DIR)/ui/ui_resources/ui_unscaled_resources.rc',
+            '<(SHARED_INTERMEDIATE_DIR)/ui/resources/ui_unscaled_resources.rc',
 
             'browser/ui/views/accessibility/browser_views_accessibility_browsertest.cc',
           ],
@@ -565,7 +568,7 @@
           'inputs': [
             'test/chromedriver/cpp_source.py',
             'test/chromedriver/embed_mobile_devices_in_cpp.py',
-            '../third_party/WebKit/Source/devtools/front_end/sdk/OverridesSupport.js',
+            '../third_party/WebKit/Source/devtools/front_end/toolbox/OverridesUI.js',
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome/mobile_device_list.cc',
@@ -575,7 +578,7 @@
                       'test/chromedriver/embed_mobile_devices_in_cpp.py',
                       '--directory',
                       '<(SHARED_INTERMEDIATE_DIR)/chrome/test/chromedriver/chrome',
-                      '../third_party/WebKit/Source/devtools/front_end/sdk/OverridesSupport.js',
+                      '../third_party/WebKit/Source/devtools/front_end/toolbox/OverridesUI.js',
           ],
           'message': 'Generating sources for embedding mobile devices in chromedriver',
         },
@@ -855,6 +858,7 @@
         '../apps/app_shim/test/app_shim_host_manager_test_api_mac.cc',
         '../apps/app_shim/test/app_shim_host_manager_test_api_mac.h',
         '../apps/load_and_launch_browsertest.cc',
+        '../extensions/browser/api/serial/serial_apitest.cc',
         '../extensions/browser/api/usb/usb_apitest.cc',
         '../extensions/browser/api/usb/usb_manual_apitest.cc',
         '../extensions/browser/test_extension_registry_observer.h',
@@ -880,6 +884,7 @@
         'browser/apps/app_browsertest_util.cc',
         'browser/apps/app_browsertest_util.h',
         'browser/apps/app_crash_browsertest.cc',
+        'browser/apps/app_view_browsertest.cc',
         'browser/apps/app_window_browsertest.cc',
         'browser/apps/app_url_redirector_browsertest.cc',
         'browser/apps/drive/drive_app_converter_browsertest.cc',
@@ -1105,6 +1110,7 @@
         'browser/extensions/api/idle/idle_apitest.cc',
         'browser/extensions/api/idltest/idltest_apitest.cc',
         'browser/extensions/api/image_writer_private/image_writer_private_apitest.cc',
+        'browser/extensions/api/image_writer_private/test_utils.cc',
         'browser/extensions/api/input_ime/input_ime_apitest_chromeos.cc',
         'browser/extensions/api/management/management_api_browsertest.cc',
         'browser/extensions/api/management/management_apitest.cc',
@@ -1129,7 +1135,6 @@
         'browser/extensions/api/push_messaging/sync_setup_helper.cc',
         'browser/extensions/api/reading_list_private/reading_list_private_apitest.cc',
         'browser/extensions/api/screenlock_private/screenlock_private_apitest.cc',
-        'browser/extensions/api/serial/serial_apitest.cc',
         'browser/extensions/api/sessions/sessions_apitest.cc',
         'browser/extensions/api/settings_overrides/settings_overrides_browsertest.cc',
         'browser/extensions/api/socket/socket_apitest.cc',
@@ -1849,7 +1854,7 @@
         ['OS=="win"', {
           'sources': [
             '<(SHARED_INTERMEDIATE_DIR)/chrome_version/other_version.rc',
-            '<(SHARED_INTERMEDIATE_DIR)/ui/ui_resources/ui_unscaled_resources.rc',
+            '<(SHARED_INTERMEDIATE_DIR)/ui/resources/ui_unscaled_resources.rc',
           ],
           'include_dirs': [
             '<(DEPTH)/third_party/wtl/include',
@@ -2171,7 +2176,7 @@
         ['OS=="win"', {
           'sources': [
             '<(SHARED_INTERMEDIATE_DIR)/chrome_version/other_version.rc',
-            '<(SHARED_INTERMEDIATE_DIR)/ui/ui_resources/ui_unscaled_resources.rc',
+            '<(SHARED_INTERMEDIATE_DIR)/ui/resources/ui_unscaled_resources.rc',
           ],
           'include_dirs': [
             '<(DEPTH)/third_party/wtl/include',
@@ -2414,11 +2419,11 @@
         'browser/sync/test/integration/single_client_bookmarks_sync_test.cc',
         'browser/sync/test/integration/single_client_dictionary_sync_test.cc',
         'browser/sync/test/integration/single_client_extensions_sync_test.cc',
-        'browser/sync/test/integration/single_client_managed_user_settings_sync_test.cc',
         'browser/sync/test/integration/single_client_passwords_sync_test.cc',
         'browser/sync/test/integration/single_client_preferences_sync_test.cc',
         'browser/sync/test/integration/single_client_search_engines_sync_test.cc',
         'browser/sync/test/integration/single_client_sessions_sync_test.cc',
+        'browser/sync/test/integration/single_client_supervised_user_settings_sync_test.cc',
         'browser/sync/test/integration/single_client_themes_sync_test.cc',
         'browser/sync/test/integration/single_client_typed_urls_sync_test.cc',
         'browser/sync/test/integration/sync_auth_test.cc',
@@ -2458,7 +2463,7 @@
         ['OS=="win"', {
           'sources': [
             '<(SHARED_INTERMEDIATE_DIR)/chrome_version/other_version.rc',
-            '<(SHARED_INTERMEDIATE_DIR)/ui/ui_resources/ui_unscaled_resources.rc',
+            '<(SHARED_INTERMEDIATE_DIR)/ui/resources/ui_unscaled_resources.rc',
           ],
           'include_dirs': [
             '<(DEPTH)/third_party/wtl/include',
@@ -2839,6 +2844,13 @@
           ],
           'sources': [
             'browser_tests.isolate',
+          ],
+          'conditions': [
+            ['use_x11==1', {
+              'dependencies': [
+                '../tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',
+              ],
+            }],
           ],
         },
         {

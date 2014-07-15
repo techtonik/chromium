@@ -62,6 +62,7 @@ class SessionCrashedBubbleView
   virtual base::string16 GetWindowTitle() const OVERRIDE;
   virtual bool ShouldShowWindowTitle() const OVERRIDE;
   virtual bool ShouldShowCloseButton() const OVERRIDE;
+  virtual void OnWidgetDestroying(views::Widget* widget) OVERRIDE;
 
   // views::BubbleDelegateView methods.
   virtual void Init() OVERRIDE;
@@ -78,11 +79,8 @@ class SessionCrashedBubbleView
   virtual void DidStartNavigationToPendingEntry(
       const GURL& url,
       content::NavigationController::ReloadType reload_type) OVERRIDE;
-  virtual void DidFinishLoad(
-      int64 frame_id,
-      const GURL& validated_url,
-      bool is_main_frame,
-      content::RenderViewHost* render_view_host) OVERRIDE;
+  virtual void DidFinishLoad(content::RenderFrameHost* render_frame_host,
+                             const GURL& validated_url) OVERRIDE;
   virtual void WasShown() OVERRIDE;
   virtual void WasHidden() OVERRIDE;
 
@@ -128,6 +126,10 @@ class SessionCrashedBubbleView
 
   // Whether or not a navigation has started on current tab.
   bool started_navigation_;
+
+  // Whether or not the user chose to restore previous session. It is used to
+  // collect bubble usage stats.
+  bool restored_;
 
   DISALLOW_COPY_AND_ASSIGN(SessionCrashedBubbleView);
 };

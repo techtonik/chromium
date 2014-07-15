@@ -21,6 +21,12 @@ const char kFileMetadataKeyPrefix[] = "FILE: ";
 const char kFileTrackerKeyPrefix[] = "TRACKER: ";
 
 const char kAppRootIDByAppIDKeyPrefix[] = "APP_ROOT: ";
+const char kActiveTrackerIDByFileIDKeyPrefix[] = "ACTIVE_FILE: ";
+const char kTrackerIDByFileIDKeyPrefix[] = "TRACKER_FILE: ";
+const char kMultiTrackerByFileIDKeyPrefix[] = "MULTI_FILE: ";
+const char kActiveTrackerIDByParentAndTitleKeyPrefix[] = "ACTIVE_PATH: ";
+const char kTrackerIDByParentAndTitleKeyPrefix[] = "TRACKER_PATH: ";
+const char kMultiBackingParentAndTitleKeyPrefix[] = "MULTI_PATH: ";
 const char kDirtyIDKeyPrefix[] = "DIRTY: ";
 const char kDemotedDirtyIDKeyPrefix[] = "DEMOTED_DIRTY: ";
 

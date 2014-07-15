@@ -156,6 +156,12 @@
             'rappor/log_uploader_unittest.cc',
             'rappor/rappor_metric_unittest.cc',
             'rappor/rappor_service_unittest.cc',
+            'search_engines/default_search_manager_unittest.cc',
+            'search_engines/default_search_policy_handler_unittest.cc',
+            'search_engines/search_host_to_urls_map_unittest.cc',
+            'search_engines/template_url_prepopulate_data_unittest.cc',
+            'search_engines/template_url_service_util_unittest.cc',
+            'search_engines/template_url_unittest.cc',
             'search_provider_logos/logo_cache_unittest.cc',
             'search_provider_logos/logo_tracker_unittest.cc',
             'sessions/serialized_navigation_entry_unittest.cc',
@@ -201,6 +207,7 @@
             'variations/metrics_util_unittest.cc',
             'variations/study_filtering_unittest.cc',
             'variations/variations_associated_data_unittest.cc',
+            'variations/variations_http_header_provider_unittest.cc',
             'variations/variations_seed_processor_unittest.cc',
             'variations/variations_seed_simulator_unittest.cc',
             'visitedlink/test/visitedlink_unittest.cc',
@@ -224,6 +231,7 @@
             '../testing/gtest.gyp:gtest',
             '../ui/base/ui_base.gyp:ui_base',
             '../ui/gfx/gfx.gyp:gfx',
+            '../ui/gfx/gfx.gyp:gfx_test_support',
 
             'components_resources.gyp:components_resources',
 
@@ -283,6 +291,9 @@
             'components.gyp:history_core_browser',
             'components.gyp:history_core_common',
 
+            # Dependencies of infobar
+            'components.gyp:infobars_test_support',
+
             # Dependencies of invalidation
             'components.gyp:invalidation',
             'components.gyp:invalidation_test_support',
@@ -331,6 +342,9 @@
 
             # Dependencies of rappor
             'components.gyp:rappor',
+
+            # Dependencies of search_engines
+            'components.gyp:search_engines',
 
             # Dependencies of search_provider_logos
             'components.gyp:search_provider_logos',
@@ -435,6 +449,7 @@
                 ['include', '^network_time/'],
                 ['include', '^password_manager/'],
                 ['include', '^precache/core/'],
+                ['include', '^search_engines/'],
                 ['include', '^search_provider_logos/'],
                 ['include', '^signin/'],
                 ['include', '^sync_driver/'],
@@ -606,7 +621,6 @@
                 'policy/core/common/cloud/external_policy_data_updater_unittest.cc',
                 'policy/core/common/cloud/policy_header_io_helper_unittest.cc',
                 'policy/core/common/cloud/policy_header_service_unittest.cc',
-                'policy/core/common/cloud/rate_limiter_unittest.cc',
                 'policy/core/common/cloud/resource_cache_unittest.cc',
                 'policy/core/common/cloud/user_cloud_policy_manager_unittest.cc',
                 'policy/core/common/cloud/user_cloud_policy_store_unittest.cc',
@@ -627,6 +641,7 @@
                 'policy/core/common/schema_map_unittest.cc',
                 'policy/core/common/schema_registry_unittest.cc',
                 'policy/core/common/schema_unittest.cc',
+                'search_engines/default_search_policy_handler_unittest.cc',
               ],
               'conditions': [
                 ['OS=="android"', {

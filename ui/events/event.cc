@@ -147,7 +147,8 @@ Event::Event(EventType type, base::TimeDelta time_stamp, int flags)
       cancelable_(true),
       target_(NULL),
       phase_(EP_PREDISPATCH),
-      result_(ER_UNHANDLED) {
+      result_(ER_UNHANDLED),
+      source_device_id_(ED_UNKNOWN_DEVICE) {
   if (type_ < ET_LAST)
     name_ = EventTypeName(type_);
 }
@@ -163,7 +164,8 @@ Event::Event(const base::NativeEvent& native_event,
       cancelable_(true),
       target_(NULL),
       phase_(EP_PREDISPATCH),
-      result_(ER_UNHANDLED) {
+      result_(ER_UNHANDLED),
+      source_device_id_(ED_UNKNOWN_DEVICE) {
   base::TimeDelta delta = EventTimeForNow() - time_stamp_;
   if (type_ < ET_LAST)
     name_ = EventTypeName(type_);
@@ -179,6 +181,14 @@ Event::Event(const base::NativeEvent& native_event,
           100,
           base::HistogramBase::kUmaTargetedHistogramFlag);
   counter_for_type->Add(delta.InMicroseconds());
+
+#if defined(USE_X11)
+  if (native_event->type == GenericEvent) {
+    XIDeviceEvent* xiev =
+        static_cast<XIDeviceEvent*>(native_event->xcookie.data);
+    source_device_id_ = xiev->deviceid;
+  }
+#endif
 }
 
 Event::Event(const Event& copy)
@@ -191,7 +201,8 @@ Event::Event(const Event& copy)
       cancelable_(true),
       target_(NULL),
       phase_(EP_PREDISPATCH),
-      result_(ER_UNHANDLED) {
+      result_(ER_UNHANDLED),
+      source_device_id_(copy.source_device_id_) {
   if (type_ < ET_LAST)
     name_ = EventTypeName(type_);
 }
@@ -428,19 +439,13 @@ TouchEvent::TouchEvent(const base::NativeEvent& native_event)
       radius_x_(GetTouchRadiusX(native_event)),
       radius_y_(GetTouchRadiusY(native_event)),
       rotation_angle_(GetTouchAngle(native_event)),
-      force_(GetTouchForce(native_event)),
-      source_device_id_(-1) {
+      force_(GetTouchForce(native_event)) {
   latency()->AddLatencyNumberWithTimestamp(
       INPUT_EVENT_LATENCY_ORIGINAL_COMPONENT,
       0,
       0,
       base::TimeTicks::FromInternalValue(time_stamp().ToInternalValue()),
       1);
-
-#if defined(USE_X11)
-  XIDeviceEvent* xiev = static_cast<XIDeviceEvent*>(native_event->xcookie.data);
-  source_device_id_ = xiev->deviceid;
-#endif
 
   latency()->AddLatencyNumber(INPUT_EVENT_LATENCY_UI_COMPONENT, 0, 0);
 }
@@ -454,8 +459,7 @@ TouchEvent::TouchEvent(EventType type,
       radius_x_(0.0f),
       radius_y_(0.0f),
       rotation_angle_(0.0f),
-      force_(0.0f),
-      source_device_id_(-1) {
+      force_(0.0f) {
   latency()->AddLatencyNumber(INPUT_EVENT_LATENCY_UI_COMPONENT, 0, 0);
 }
 
@@ -473,8 +477,7 @@ TouchEvent::TouchEvent(EventType type,
       radius_x_(radius_x),
       radius_y_(radius_y),
       rotation_angle_(angle),
-      force_(force),
-      source_device_id_(-1) {
+      force_(force) {
   latency()->AddLatencyNumber(INPUT_EVENT_LATENCY_UI_COMPONENT, 0, 0);
 }
 
@@ -590,7 +593,10 @@ uint16 KeyEvent::GetCharacter() const {
     return GetCharacterFromKeyCode(key_code_, flags());
 
   DCHECK(native_event()->type == KeyPress ||
-         native_event()->type == KeyRelease);
+         native_event()->type == KeyRelease ||
+         (native_event()->type == GenericEvent &&
+          (native_event()->xgeneric.evtype == XI_KeyPress ||
+           native_event()->xgeneric.evtype == XI_KeyRelease)));
 
   // When a control key is held, prefer ASCII characters to non ASCII
   // characters in order to use it for shortcut keys.  GetCharacterFromKeyCode
@@ -733,32 +739,20 @@ void ScrollEvent::Scale(const float factor) {
 ////////////////////////////////////////////////////////////////////////////////
 // GestureEvent
 
-GestureEvent::GestureEvent(EventType type,
-                           float x,
+GestureEvent::GestureEvent(float x,
                            float y,
                            int flags,
                            base::TimeDelta time_stamp,
-                           const GestureEventDetails& details,
-                           unsigned int touch_ids_bitfield)
-    : LocatedEvent(type,
+                           const GestureEventDetails& details)
+    : LocatedEvent(details.type(),
                    gfx::PointF(x, y),
                    gfx::PointF(x, y),
                    time_stamp,
                    flags | EF_FROM_TOUCH),
-      details_(details),
-      touch_ids_bitfield_(touch_ids_bitfield) {
+      details_(details) {
 }
 
 GestureEvent::~GestureEvent() {
-}
-
-int GestureEvent::GetLowestTouchId() const {
-  if (touch_ids_bitfield_ == 0)
-    return -1;
-  int i = -1;
-  // Find the index of the least significant 1 bit
-  while (!(1 << ++i & touch_ids_bitfield_));
-  return i;
 }
 
 }  // namespace ui

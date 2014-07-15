@@ -12,8 +12,8 @@
 #include "base/memory/scoped_ptr.h"
 #include "chrome/browser/chromeos/login/auth/auth_attempt_state.h"
 #include "chrome/browser/chromeos/login/auth/auth_attempt_state_resolver.h"
-#include "chrome/browser/chromeos/login/auth/key.h"
-#include "chrome/browser/chromeos/login/auth/user_context.h"
+#include "chromeos/login/auth/key.h"
+#include "chromeos/login/auth/user_context.h"
 #include "components/user_manager/user_type.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
@@ -76,7 +76,7 @@ void OnlineAttempt::OnClientLoginSuccess(
     TryClientLogin();
     return;
   }
-  TriggerResolve(LoginFailure::LoginFailureNone());
+  TriggerResolve(AuthFailure::AuthFailureNone());
 }
 
 void OnlineAttempt::OnClientLoginFailure(
@@ -103,20 +103,19 @@ void OnlineAttempt::OnClientLoginFailure(
     // and succeeded.  That we've failed with INVALID_GAIA_CREDENTIALS now
     // indicates that the account is HOSTED.
     LOG(WARNING) << "Rejecting valid HOSTED account.";
-    TriggerResolve(LoginFailure::FromNetworkAuthFailure(
-                       GoogleServiceAuthError(
-                           GoogleServiceAuthError::HOSTED_NOT_ALLOWED)));
+    TriggerResolve(AuthFailure::FromNetworkAuthFailure(
+        GoogleServiceAuthError(GoogleServiceAuthError::HOSTED_NOT_ALLOWED)));
     return;
   }
 
   if (error.state() == GoogleServiceAuthError::TWO_FACTOR) {
     LOG(WARNING) << "Two factor authenticated. Sync will not work.";
-    TriggerResolve(LoginFailure::LoginFailureNone());
+    TriggerResolve(AuthFailure::AuthFailureNone());
 
     return;
   }
   VLOG(2) << "ClientLogin attempt failed with " << error.state();
-  TriggerResolve(LoginFailure::FromNetworkAuthFailure(error));
+  TriggerResolve(AuthFailure::FromNetworkAuthFailure(error));
 }
 
 void OnlineAttempt::TryClientLogin() {
@@ -150,12 +149,11 @@ void OnlineAttempt::CancelClientLogin() {
     LOG(WARNING) << "Canceling ClientLogin attempt.";
     CancelRequest();
 
-    TriggerResolve(LoginFailure(LoginFailure::LOGIN_TIMED_OUT));
+    TriggerResolve(AuthFailure(AuthFailure::LOGIN_TIMED_OUT));
   }
 }
 
-void OnlineAttempt::TriggerResolve(
-    const LoginFailure& outcome) {
+void OnlineAttempt::TriggerResolve(const AuthFailure& outcome) {
   attempt_->RecordOnlineLoginStatus(outcome);
   client_fetcher_.reset(NULL);
   resolver_->Resolve();

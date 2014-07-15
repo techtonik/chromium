@@ -61,6 +61,8 @@ class MockDemuxerStream : public DemuxerStream {
   void set_audio_decoder_config(const AudioDecoderConfig& config);
   void set_video_decoder_config(const VideoDecoderConfig& config);
 
+  virtual VideoRotation video_rotation() OVERRIDE;
+
  private:
   DemuxerStream::Type type_;
   AudioDecoderConfig audio_decoder_config_;
@@ -128,7 +130,6 @@ class MockVideoRenderer : public VideoRenderer {
   MOCK_METHOD1(Flush, void(const base::Closure& callback));
   MOCK_METHOD1(StartPlayingFrom, void(base::TimeDelta timestamp));
   MOCK_METHOD1(Stop, void(const base::Closure& callback));
-  MOCK_METHOD1(SetPlaybackRate, void(float playback_rate));
 
  private:
   DISALLOW_COPY_AND_ASSIGN(MockVideoRenderer);

@@ -1,8 +1,6 @@
 # Copyright 2014 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-# pylint: disable=W0401,W0614
-from telemetry.page.actions.all_page_actions import *
 from telemetry.page import page as page_module
 from telemetry.page import page_set as page_set_module
 
@@ -589,6 +587,33 @@ class SVGIconRaster(KeySilkCasesPage):
       action_runner.Wait(1)
       interaction.End()
 
+
+class UpdateHistoryState(KeySilkCasesPage):
+
+  """ Why: Modern apps often update history state, which currently is janky."""
+
+  def __init__(self, page_set):
+    super(UpdateHistoryState, self).__init__(
+      url='file://key_silk_cases/pushState.html',
+      page_set=page_set)
+
+  def RunNavigateSteps(self, action_runner):
+    action_runner.NavigateToPage(self)
+    action_runner.ExecuteJavaScript('''
+        window.requestAnimationFrame(function() {
+            window.__history_state_loaded = true;
+          });
+        ''')
+    action_runner.WaitForJavaScriptCondition(
+        'window.__history_state_loaded == true;')
+
+  def RunSmoothness(self, action_runner):
+    interaction = action_runner.BeginInteraction('animation_interaction',
+        is_smooth=True)
+    action_runner.Wait(5) # JS runs the animation continuously on the page
+    interaction.End()
+
+
 class KeySilkCasesPageSet(page_set_module.PageSet):
 
   """ Pages hand-picked for project Silk. """
@@ -627,3 +652,4 @@ class KeySilkCasesPageSet(page_set_module.PageSet):
     self.AddPage(Page25(self))
     self.AddPage(Page26(self))
     self.AddPage(SVGIconRaster(self))
+    self.AddPage(UpdateHistoryState(self))

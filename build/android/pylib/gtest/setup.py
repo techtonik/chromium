@@ -39,6 +39,7 @@ _ISOLATE_FILE_PATHS = {
     'media_perftests': 'media/media_perftests.isolate',
     'media_unittests': 'media/media_unittests.isolate',
     'net_unittests': 'net/net_unittests.isolate',
+    'sql_unittests': 'sql/sql_unittests.isolate',
     'ui_unittests': 'ui/ui_unittests.isolate',
     'unit_tests': 'chrome/unit_tests.isolate',
     'webkit_unit_tests':
@@ -138,6 +139,8 @@ def _GenerateDepsDirUsingIsolate(suite_name, isolate_file_path=None):
       '--config-variable', 'chromeos', '0',
       '--config-variable', 'component', 'static_library',
       '--config-variable', 'icu_use_data_file_flag', '1',
+      # TODO(maruel): This may not be always true.
+      '--config-variable', 'target_arch', 'arm',
       '--config-variable', 'use_openssl', '0',
   ]
   assert not cmd_helper.RunCmd(isolate_cmd)

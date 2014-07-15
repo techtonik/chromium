@@ -297,12 +297,16 @@ TEST_F(WidgetTestInteractive, ResetCaptureOnGestureEnd) {
   toplevel->Show();
 
   // Start a gesture on |gesture|.
-  ui::GestureEvent begin(ui::ET_GESTURE_BEGIN,
-      15, 15, 0, base::TimeDelta(),
-      ui::GestureEventDetails(ui::ET_GESTURE_BEGIN, 0, 0), 1);
-  ui::GestureEvent end(ui::ET_GESTURE_END,
-      15, 15, 0, base::TimeDelta(),
-      ui::GestureEventDetails(ui::ET_GESTURE_END, 0, 0), 1);
+  ui::GestureEvent begin(15,
+                         15,
+                         0,
+                         base::TimeDelta(),
+                         ui::GestureEventDetails(ui::ET_GESTURE_BEGIN, 0, 0));
+  ui::GestureEvent end(15,
+                       15,
+                       0,
+                       base::TimeDelta(),
+                       ui::GestureEventDetails(ui::ET_GESTURE_END, 0, 0));
   toplevel->OnGestureEvent(&begin);
 
   // Now try to click on |mouse|. Since |gesture| will have capture, |mouse|
@@ -882,7 +886,7 @@ TEST_F(WidgetCaptureTest, Capture) {
   TestCapture(false);
 }
 
-#if !defined(OS_LINUX)
+#if !defined(OS_CHROMEOS)
 // See description in TestCapture(). Creates DesktopNativeWidget.
 TEST_F(WidgetCaptureTest, CaptureDesktopNativeWidget) {
   TestCapture(true);
@@ -930,10 +934,58 @@ TEST_F(WidgetCaptureTest, MouseExitOnCaptureGrab) {
 }
 #endif
 
-#if !defined(OS_CHROMEOS)
 namespace {
 
-// Used to veirfy OnMouseEvent() has been invoked.
+// Widget observer which grabs capture when the widget is activated.
+class CaptureOnActivationObserver : public WidgetObserver {
+ public:
+  CaptureOnActivationObserver() {
+  }
+  virtual ~CaptureOnActivationObserver() {
+  }
+
+  // WidgetObserver:
+  virtual void OnWidgetActivationChanged(Widget* widget, bool active) OVERRIDE {
+    if (active)
+      widget->SetCapture(NULL);
+  }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(CaptureOnActivationObserver);
+};
+
+}  // namespace
+
+// Test that setting capture on widget activation of a non-toplevel widget
+// (e.g. a bubble on Linux) succeeds.
+TEST_F(WidgetCaptureTest, SetCaptureToNonToplevel) {
+  Widget toplevel;
+  Widget::InitParams toplevel_params =
+      CreateParams(Widget::InitParams::TYPE_WINDOW_FRAMELESS);
+  toplevel_params.native_widget = CreateNativeWidget(true, &toplevel);
+  toplevel_params.ownership = Widget::InitParams::WIDGET_OWNS_NATIVE_WIDGET;
+  toplevel.Init(toplevel_params);
+  toplevel.Show();
+
+  Widget* child = new Widget;
+  Widget::InitParams child_params =
+      CreateParams(Widget::InitParams::TYPE_WINDOW_FRAMELESS);
+  child_params.parent = toplevel.GetNativeView();
+  child_params.context = toplevel.GetNativeView();
+  child->Init(child_params);
+
+  CaptureOnActivationObserver observer;
+  child->AddObserver(&observer);
+  child->Show();
+
+  EXPECT_TRUE(child->HasCapture());
+}
+
+
+#if defined(OS_WIN)
+namespace {
+
+// Used to verify OnMouseEvent() has been invoked.
 class MouseEventTrackingWidget : public Widget {
  public:
   MouseEventTrackingWidget() : got_mouse_event_(false) {}
@@ -959,18 +1011,10 @@ class MouseEventTrackingWidget : public Widget {
 
 }  // namespace
 
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS)
-// TODO(erg): linux_aura bringup: http://crbug.com/163931
-#define MAYBE_MouseEventDispatchedToRightWindow \
-  DISABLED_MouseEventDispatchedToRightWindow
-#else
-#define MAYBE_MouseEventDispatchedToRightWindow \
-  MouseEventDispatchedToRightWindow
-#endif
-
 // Verifies if a mouse event is received on a widget that doesn't have capture
-// it is correctly processed by the widget that doesn't have capture.
-TEST_F(WidgetCaptureTest, MAYBE_MouseEventDispatchedToRightWindow) {
+// on Windows that it is correctly processed by the widget that doesn't have
+// capture. This behavior is not desired on OSes other than Windows.
+TEST_F(WidgetCaptureTest, MouseEventDispatchedToRightWindow) {
   MouseEventTrackingWidget widget1;
   Widget::InitParams params1 =
       CreateParams(views::Widget::InitParams::TYPE_WINDOW);

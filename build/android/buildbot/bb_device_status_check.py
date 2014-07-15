@@ -5,6 +5,7 @@
 # found in the LICENSE file.
 
 """A class to keep track of devices across builds and report state."""
+import json
 import logging
 import optparse
 import os
@@ -246,7 +247,7 @@ def KillAllAdb():
       try:
         if 'adb' in p.name:
           yield p
-      except psutil.error.NoSuchProcess:
+      except (psutil.error.NoSuchProcess, psutil.error.AccessDenied):
         pass
 
   for sig in [signal.SIGTERM, signal.SIGQUIT, signal.SIGKILL]:
@@ -255,12 +256,12 @@ def KillAllAdb():
         print 'kill %d %d (%s [%s])' % (sig, p.pid, p.name,
             ' '.join(p.cmdline))
         p.send_signal(sig)
-      except psutil.error.NoSuchProcess:
+      except (psutil.error.NoSuchProcess, psutil.error.AccessDenied):
         pass
   for p in GetAllAdb():
     try:
       print 'Unable to kill %d (%s [%s])' % (p.pid, p.name, ' '.join(p.cmdline))
-    except psutil.error.NoSuchProcess:
+    except (psutil.error.NoSuchProcess, psutil.error.AccessDenied):
       pass
 
 
@@ -275,6 +276,8 @@ def main():
                     help='Output device status data for dashboard.')
   parser.add_option('--restart-usb', action='store_true',
                     help='Restart USB ports before running device check.')
+  parser.add_option('--json-output',
+                    help='Output JSON information into a specified file.')
 
   options, args = parser.parse_args()
   if args:
@@ -358,6 +361,16 @@ def main():
       perf_tests_results_helper.PrintPerfResult('DeviceBattery', serial,
                                                 [battery], '%',
                                                 'unimportant')
+
+  if options.json_output:
+    with open(options.json_output, 'wb') as f:
+      f.write(json.dumps({
+        'online_devices': devices,
+        'offline_devices': offline_devices,
+        'expected_devices': expected_devices,
+        'unique_types': unique_types,
+        'unique_builds': unique_builds,
+      }))
 
   if False in fail_step_lst:
     # TODO(navabi): Build fails on device status check step if there exists any

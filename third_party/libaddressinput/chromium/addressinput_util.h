@@ -7,8 +7,8 @@
 
 #include <map>
 
-#include "third_party/libaddressinput/chromium/cpp/include/libaddressinput/address_field.h"
-#include "third_party/libaddressinput/chromium/cpp/include/libaddressinput/address_problem.h"
+#include "third_party/libaddressinput/src/cpp/include/libaddressinput/address_field.h"
+#include "third_party/libaddressinput/src/cpp/include/libaddressinput/address_problem.h"
 
 namespace i18n {
 namespace addressinput {
@@ -32,9 +32,9 @@ bool HasAllRequiredFields(
 void ValidateRequiredFields(
     const ::i18n::addressinput::AddressData& address_to_check,
     const std::multimap< ::i18n::addressinput::AddressField,
-                         ::i18n::addressinput::AddressProblem::Type>* filter,
+                         ::i18n::addressinput::AddressProblem>* filter,
     std::multimap< ::i18n::addressinput::AddressField,
-                   ::i18n::addressinput::AddressProblem::Type>* problems);
+                   ::i18n::addressinput::AddressProblem>* problems);
 
 }  // namespace addressinput
 }  // namespace autofill

@@ -2577,10 +2577,6 @@ int RenderViewImpl::GetRoutingID() const {
   return routing_id_;
 }
 
-int RenderViewImpl::GetPageId() const {
-  return page_id_;
-}
-
 gfx::Size RenderViewImpl::GetSize() const {
   return size();
 }
@@ -3943,8 +3939,6 @@ void RenderViewImpl::zoomLimitsChanged(double minimum_level,
 void RenderViewImpl::zoomLevelChanged() {
   double zoom_level = webview()->zoomLevel();
 
-  FOR_EACH_OBSERVER(RenderViewObserver, observers_, ZoomLevelChanged());
-
   // Do not send empty URLs to the browser when we are just setting the default
   // zoom level (from RendererPreferences) before the first navigation.
   if (!webview()->mainFrame()->document().url().isEmpty()) {
@@ -3979,6 +3973,20 @@ void RenderViewImpl::registerProtocolHandler(const WebString& scheme,
                                                absolute_url,
                                                title,
                                                user_gesture));
+}
+
+void RenderViewImpl::unregisterProtocolHandler(const WebString& scheme,
+                                               const WebURL& base_url,
+                                               const WebURL& url) {
+  bool user_gesture = WebUserGestureIndicator::isProcessingUserGesture();
+  GURL base(base_url);
+  GURL absolute_url = base.Resolve(base::UTF16ToUTF8(url.string()));
+  if (base.GetOrigin() != absolute_url.GetOrigin())
+    return;
+  Send(new ViewHostMsg_UnregisterProtocolHandler(routing_id_,
+                                                 base::UTF16ToUTF8(scheme),
+                                                 absolute_url,
+                                                 user_gesture));
 }
 
 blink::WebPageVisibilityState RenderViewImpl::visibilityState() const {

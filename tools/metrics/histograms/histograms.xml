@@ -2743,6 +2743,35 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Compositing.NumActiveLayers">
+  <owner>dneto@chromium.org</owner>
+  <summary>
+    The number of layers in the active tree for each compositor frame. This is
+    logged once per frame, before the frame is drawn.
+  </summary>
+</histogram>
+
+<histogram name="Compositing.RenderPass.AppendQuadData.NumIncompleteTiles">
+  <owner>weiliangc@chromium.org.</owner>
+  <summary>
+    Keeps track of number of incomplete tiles in a drawn compositor frame while
+    scrolling. This is a rough measurement of ugliness during user interaction.
+    Incomplete tiles are non ideal scaled. A sample is recorded everytime a
+    frame is drawn while a scroll is in progress. Tracking bug 381695.
+  </summary>
+</histogram>
+
+<histogram name="Compositing.RenderPass.AppendQuadData.NumMissingTiles">
+  <owner>weiliangc@chromium.org.</owner>
+  <summary>
+    Keeps track of number of missing tiles in a drawn compositor frame while
+    scrolling. This is a rough measurement of ugliness during user interaction.
+    Incomplete tiles are checkerboard or solid color. A sample is recorded
+    everytime a frame is drawn while a scroll is in progress. Tracking bug
+    381695.
+  </summary>
+</histogram>
+
 <histogram name="ConnectivityDiagnostics.ChromeOsSignalStrength"
     units="percent">
   <owner>ebeach@google.com</owner>
@@ -3619,6 +3648,59 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The user selection in the Sideload Wipeout bubble, grouped by the
     UmaWipeoutHistogramOptions enum.
+  </summary>
+</histogram>
+
+<histogram name="DiskBasedCertCache.CertIo" enum="CertificateChainPosition">
+  <owner>brandonsalmon@chromium.org</owner>
+  <summary>
+    Records information about DiskBasedCertCache operations with respect to
+    certificate chain positions. Zero indicates that a certificate is root, one
+    indicates that it is the first intermediate certificate, etc.
+  </summary>
+</histogram>
+
+<histogram name="DiskBasedCertCache.CertIoCacheResult" enum="CacheResult">
+  <owner>brandonsalmon@chromium.org</owner>
+  <summary>
+    Records the outcome of requests to retrieve certificates from the disk
+    cache.
+  </summary>
+</histogram>
+
+<histogram name="DiskBasedCertCache.CertIoReadSuccessLeaf"
+    enum="BooleanSuccess">
+  <owner>brandonsalmon@chromium.org</owner>
+  <summary>
+    Whether or not the leaf certificate of a certificate chain was successfuly
+    read from the disk cache.
+  </summary>
+</histogram>
+
+<histogram name="DiskBasedCertCache.CertIoWriteSuccessLeaf"
+    enum="BooleanSuccess">
+  <owner>brandonsalmon@chromium.org</owner>
+  <summary>
+    Whether or not the leaf certificate of a certificate chain was successfully
+    written to the disk cache.
+  </summary>
+</histogram>
+
+<histogram name="DiskBasedCertCache.ChainReadTime" units="milliseconds">
+  <owner>brandonsalmon@chromium.org</owner>
+  <summary>
+    Measures the wall clock time spent reading a certificate chain. The starting
+    time is when the read command is issued, and the ending time is when all of
+    the  certificates in the chain have been read into memory.
+  </summary>
+</histogram>
+
+<histogram name="DiskBasedCertCache.ChainWriteTime" units="milliseconds">
+  <owner>brandonsalmon@chromium.org</owner>
+  <summary>
+    Measures the wall clock time spent writing a certificate chain to disk. The
+    starting time is when the write command is issued, and the ending time is
+    when all the certificates in the chain have been written to disk.
   </summary>
 </histogram>
 
@@ -18923,6 +19005,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>The number of clicks on the origin chip.</summary>
 </histogram>
 
+<histogram name="OSX.BluetoothAvailability" enum="BluetoothAvailability">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    The availability and capabilities of the Bluetooth driver on OSX devices.
+    This metric is logged on startup.
+  </summary>
+</histogram>
+
 <histogram name="OSX.CatSixtyFour" enum="CatSixtyFour">
   <owner>mark@chromium.org</owner>
   <summary>The cat's flavor and how many bits there are in it.</summary>
@@ -19333,6 +19423,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>vabr@chromium.org</owner>
   <summary>
     Breakdown of which response the user selected from the save password prompt.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.SyncingAccountState"
+    enum="PasswordManagerSyncingAccountState">
+  <owner>gcasto@chromium.org</owner>
+  <owner>vabr@chromium.org</owner>
+  <summary>
+    Information about the user's current sync status crossed with whether their
+    synced password is saved.
   </summary>
 </histogram>
 
@@ -26840,6 +26940,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="SessionCrashed.Bubble" enum="SessionCrashedBubbleUserAction">
+  <owner>yiyaoliu@chromium.org</owner>
+  <summary>How did the user interact with the SessionCrashed Bubble?</summary>
+</histogram>
+
 <histogram name="Settings.DefaultSearchProvider" enum="OmniboxSearchEngine">
   <obsolete>
     Deprecated in Chrome 30.  Use Search.DefaultSearchProviderType instead.
@@ -32119,6 +32224,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="TileManager.ExceededMemoryBudget" enum="TileMemoryBudget">
+  <owner>reveman@chromium.org</owner>
+  <owner>vmpstr@chromium.org</owner>
+  <summary>
+    Measures whether the tile manager exceeded the hard GPU memory budget
+    (OOMed). Recorded each time the tile manager assigns GPU memory to tiles.
+  </summary>
+</histogram>
+
 <histogram name="TimeZone.TimeZoneRequest.Event" enum="TimeZoneRequestEvent">
   <summary>Events in TimeZoneRequest.</summary>
 </histogram>
@@ -35472,6 +35586,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="5" label="Blacklist disabled."/>
 </enum>
 
+<enum name="BluetoothAvailability" type="int">
+  <int value="0" label="Unexpected error"/>
+  <int value="1" label="Not available"/>
+  <int value="2" label="Available without LE"/>
+  <int value="3" label="Available with LE"/>
+  <int value="4" label="Available unknown LE"/>
+</enum>
+
 <enum name="BluetoothPairingMethod" type="int">
   <int value="0" label="No user interaction required"/>
   <int value="1" label="PIN Code requested from user"/>
@@ -35695,6 +35817,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="3" label="HTTP_STREAM_FACTORY_IMPL_JOB_MAIN"/>
 </enum>
 
+<enum name="CacheResult" type="int">
+  <int value="0" label="MEMORY_CACHE_HIT"/>
+  <int value="1" label="DISK_CACHE_HIT"/>
+  <int value="2" label="DISK_CACHE_ENTRY_CORRUPT"/>
+  <int value="3" label="DISK_CACHE_ERROR"/>
+  <int value="4" label="CACHE_MISS"/>
+</enum>
+
 <enum name="CanvasContextType" type="int">
   <int value="0" label="2d"/>
   <int value="1" label="webkit-3d"/>
@@ -35777,6 +35907,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="18" label="FutureCat (&gt;10.10), 32-bit (?)"/>
   <int value="19" label="FutureCat (&gt;10.10), 64-bit"/>
   <int value="20" label="FutureCat (&gt;10.10), 8-bit (?)"/>
+</enum>
+
+<enum name="CertificateChainPosition" type="int">
+  <int value="0" label="Root Certificate"/>
 </enum>
 
 <enum name="ChannelLayout" type="int">
@@ -38376,7 +38510,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="783" label="STREAMSPRIVATE_ABORT"/>
   <int value="784" label="MANAGEMENT_SETLAUNCHTYPE"/>
   <int value="785" label="MANAGEMENT_GENERATEAPPFORLINK"/>
-  <int value="786" label="GUESTVIEWINTERNAL_ALLOCATEINSTANCEID"/>
+  <int value="786" label="DELETED_GUESTVIEWINTERNAL_ALLOCATEINSTANCEID"/>
   <int value="787" label="DELETED_WEBVIEW_NAVIGATE"/>
   <int value="788" label="INPUTMETHODPRIVATE_GETCURRENTINPUTMETHOD"/>
   <int value="789" label="INPUTMETHODPRIVATE_SETCURRENTINPUTMETHOD"/>
@@ -38425,6 +38559,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="831" label="TABS_GETZOOM"/>
   <int value="832" label="TABS_SETZOOMSETTINGS"/>
   <int value="833" label="TABS_GETZOOMSETTINGS"/>
+  <int value="834" label="GCDPRIVATE_GETCOMMANDDEFS"/>
+  <int value="835" label="GCDPRIVATE_INSERTCOMMAND"/>
+  <int value="836" label="GCDPRIVATE_GETCOMMAND"/>
+  <int value="837" label="GCDPRIVATE_CANCELCOMMAND"/>
+  <int value="838" label="GCDPRIVATE_GETCOMMANDSLIST"/>
+  <int value="839" label="APPVIEWINTERNAL_ATTACHFRAME"/>
+  <int value="840" label="APPVIEWINTERNAL_DENYREQUEST"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -42441,6 +42582,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="161" label="SOCKET_SET_SEND_BUFFER_SIZE_ERROR"/>
   <int value="162" label="SOCKET_RECEIVE_BUFFER_SIZE_UNCHANGEABLE"/>
   <int value="163" label="SOCKET_SEND_BUFFER_SIZE_UNCHANGEABLE"/>
+  <int value="164" label="SSL_CLIENT_AUTH_CERT_BAD_FORMAT"/>
   <int value="200" label="CERT_COMMON_NAME_INVALID"/>
   <int value="201" label="CERT_DATE_INVALID"/>
   <int value="202" label="CERT_AUTHORITY_INVALID"/>
@@ -42515,6 +42657,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="406" label="CACHE_RACE"/>
   <int value="407" label="CACHE_CHECKSUM_READ_FAILURE"/>
   <int value="408" label="CACHE_CHECKSUM_MISMATCH"/>
+  <int value="409" label="CACHE_LOCK_TIMEOUT"/>
   <int value="501" label="INSECURE_RESPONSE"/>
   <int value="502" label="NO_PRIVATE_KEY_FOR_CERT"/>
   <int value="503" label="ADD_USER_CERT_FAILED"/>
@@ -43828,6 +43971,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="Match"/>
 </enum>
 
+<enum name="PasswordManagerSyncingAccountState" type="int">
+  <summary>
+    The value is a combination of the current sync state and if the user has
+    their sync password saved.
+  </summary>
+  <int value="0" label="Syncing/Sync password not saved"/>
+  <int value="1" label="Syncing/Sync password saved"/>
+  <int value="2" label="Not Syncing/Sync password not saved"/>
+  <int value="3"
+      label="Not Syncing/Sync pasword saved. This value should not happen."/>
+</enum>
+
 <enum name="PasswordManagerUIDismissalReason" type="int">
   <int value="0" label="Bubble lost focus / No infobar interaction"/>
   <int value="1" label="Clicked 'Save'"/>
@@ -44592,6 +44747,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="8" label="HEADERS_AND_FOOTERS"/>
   <int value="9" label="CSS_BACKGROUND"/>
   <int value="10" label="SELECTION_ONLY"/>
+  <int value="11" label="EXTERNAL_PDF_PREVIEW"/>
 </enum>
 
 <enum name="PrivetNotificationsEvent" type="int">
@@ -45754,6 +45910,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="0" label="OK"/>
   <int value="1" label="Write headers error"/>
   <int value="2" label="Write data error"/>
+</enum>
+
+<enum name="SessionCrashedBubbleUserAction" type="int">
+  <int value="0" label="The bubble was shown"/>
+  <int value="1" label="There was an error when showing the bubble."/>
+  <int value="2" label="The Restore button was clicked"/>
+  <int value="3" label="User was already opted in to UMA"/>
+  <int value="4" label="User chose to opt in to UMA"/>
+  <int value="5" label="User clicked on the help button"/>
+  <int value="6" label="User ignored or closed the bubble"/>
 </enum>
 
 <enum name="SessionStartupPref" type="int">
@@ -47152,6 +47318,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="9" label="No syn data + probe failed"/>
 </enum>
 
+<enum name="TileMemoryBudget" type="int">
+  <int value="0" label="Within memory budget"/>
+  <int value="1" label="Exceeded memory budget"/>
+</enum>
+
 <enum name="TimeZoneRequestEvent" type="int">
   <int value="0" label="Request start"/>
   <int value="1" label="Response success"/>
@@ -48143,6 +48314,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <affected-histogram name="CertificateType.NonBR"/>
   <affected-histogram name="CertificateType2.BR"/>
   <affected-histogram name="CertificateType2.NonBR"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="CertIo" separator="">
+  <suffix name="ReadSuccess"
+      label="success rate of reading a certificate from the disk cache"/>
+  <suffix name="ReadFailure"
+      label="failure rate of reading a certificate from the disk cache"/>
+  <suffix name="WriteSuccess"
+      label="success rate of writing a certificate to the disk cache"/>
+  <suffix name="WriteFailure"
+      label="failure rate of writing a certificate to the disk cache"/>
+  <affected-histogram name="DiskBasedCertCache.CertIo"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="CloudPrintRequests" separator=".">

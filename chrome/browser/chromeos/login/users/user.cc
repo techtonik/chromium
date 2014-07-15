@@ -10,6 +10,7 @@
 #include "base/threading/thread_restrictions.h"
 #include "chrome/browser/chromeos/login/users/avatar/default_user_images.h"
 #include "chrome/browser/chromeos/login/users/user_manager.h"
+#include "chromeos/login/user_names.h"
 #include "google_apis/gaia/gaia_auth_util.h"
 #include "grit/theme_resources.h"
 #include "ui/base/resource/resource_bundle.h"
@@ -208,7 +209,8 @@ void User::SetAccountLocale(const std::string& resolved_account_locale) {
   account_locale_.reset(new std::string(resolved_account_locale));
 }
 
-void User::SetImage(const UserImage& user_image, int image_index) {
+void User::SetImage(const user_manager::UserImage& user_image,
+                    int image_index) {
   user_image_ = user_image;
   image_index_ = image_index;
   image_is_stub_ = false;
@@ -221,9 +223,9 @@ void User::SetImageURL(const GURL& image_url) {
 }
 
 void User::SetStubImage(int image_index, bool is_loading) {
-  user_image_ = UserImage(
-      *ResourceBundle::GetSharedInstance().
-          GetImageSkiaNamed(IDR_PROFILE_PICTURE_LOADING));
+  user_image_ = user_manager::UserImage(
+      *ResourceBundle::GetSharedInstance().GetImageSkiaNamed(
+          IDR_PROFILE_PICTURE_LOADING));
   image_index_ = image_index;
   image_is_stub_ = true;
   image_is_loading_ = is_loading;
@@ -244,7 +246,7 @@ bool RegularUser::CanSyncImage() const {
   return true;
 }
 
-GuestUser::GuestUser() : User(UserManager::kGuestUserName) {
+GuestUser::GuestUser() : User(chromeos::login::kGuestUserName) {
   set_display_email(std::string());
 }
 
@@ -280,7 +282,7 @@ std::string LocallyManagedUser::display_email() const {
   return base::UTF16ToUTF8(display_name());
 }
 
-RetailModeUser::RetailModeUser() : User(UserManager::kRetailModeUserName) {
+RetailModeUser::RetailModeUser() : User(chromeos::login::kRetailModeUserName) {
   set_display_email(std::string());
 }
 

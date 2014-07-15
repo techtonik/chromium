@@ -19,13 +19,13 @@ from telemetry.core import exceptions
 from telemetry.core import util
 from telemetry.core import wpr_modes
 from telemetry.core.platform.profiler import profiler_finder
-from telemetry.page import cloud_storage
 from telemetry.page import page_filter
 from telemetry.page import page_runner_repeat
 from telemetry.page import page_test
 from telemetry.page.actions import navigate
 from telemetry.page.actions import page_action
 from telemetry.results import results_options
+from telemetry.util import cloud_storage
 from telemetry.util import exception_formatter
 
 
@@ -277,7 +277,7 @@ def _PrepareAndRunPage(test, page_set, expectations, finder_options,
           logging.error('Aborting multi-tab test after tab %s crashed',
                         page.url)
           raise
-        logging.warning(e)
+        logging.warning(str(e))
         state.StopBrowser()
 
       if finder_options.profiler:
@@ -301,7 +301,7 @@ def _PrepareAndRunPage(test, page_set, expectations, finder_options,
       if test.is_multi_tab_test:
         logging.error('Aborting multi-tab test after browser crashed')
         raise
-      logging.warning(e)
+      logging.warning(str(e))
 
 
 def _UpdatePageSetArchivesIfChanged(page_set):

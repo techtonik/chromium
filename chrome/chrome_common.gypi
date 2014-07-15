@@ -11,8 +11,6 @@
       'common/attrition_experiments.h',
       'common/auto_start_linux.cc',
       'common/auto_start_linux.h',
-      'common/autocomplete_match_type.cc',
-      'common/autocomplete_match_type.h',
       'common/badge_util.cc',
       'common/badge_util.h',
       'common/child_process_logging.h',
@@ -91,6 +89,8 @@
       'common/extensions/features/chrome_channel_feature_filter.h',
       'common/extensions/features/feature_channel.cc',
       'common/extensions/features/feature_channel.h',
+      'common/extensions/image_writer/image_writer_util_mac.cc',
+      'common/extensions/image_writer/image_writer_util_mac.h',
       'common/extensions/manifest_handlers/app_isolation_info.cc',
       'common/extensions/manifest_handlers/app_isolation_info.h',
       'common/extensions/manifest_handlers/app_launch_info.cc',
@@ -312,7 +312,7 @@
         '<(DEPTH)/crypto/crypto.gyp:crypto',
         '<(DEPTH)/extensions/extensions_resources.gyp:extensions_resources',
         '<(DEPTH)/extensions/extensions_strings.gyp:extensions_strings',
-        '<(DEPTH)/media/cast/cast.gyp:cast_transport',
+        '<(DEPTH)/media/cast/cast.gyp:cast_net',
         '<(DEPTH)/net/net.gyp:net',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/icu/icu.gyp:icui18n',
@@ -339,7 +339,8 @@
         }],
         ['OS=="win" or OS=="mac"', {
           'sources': [
-            'common/extensions/api/networking_private/networking_private_crypto.cc',
+            'common/extensions/api/networking_private/networking_private_crypto_nss.cc',
+            'common/extensions/api/networking_private/networking_private_crypto_openssl.cc',
             'common/extensions/api/networking_private/networking_private_crypto.h',
             'common/media_galleries/itunes_library.cc',
             'common/media_galleries/itunes_library.h',
@@ -511,6 +512,17 @@
         ['safe_browsing==2', {
           'defines': [ 'MOBILE_SAFE_BROWSING' ],
         }],
+        ['use_openssl==1', {
+           'sources!': [
+             'common/extensions/api/networking_private/networking_private_crypto_nss.cc',
+           ],
+         },
+         {  # else !use_openssl
+           'sources!': [
+             'common/extensions/api/networking_private/networking_private_crypto_openssl.cc',
+           ],
+         },
+        ],
       ],
       'target_conditions': [
         ['OS == "ios"', {
@@ -646,8 +658,6 @@
         }],
         ['use_openssl==1', {
             'sources!': [
-              # networking_private_crypto.cc uses NSS functions.
-              'common/extensions/api/networking_private/networking_private_crypto.cc',
               'common/net/x509_certificate_model_nss.cc',
             ],
           },

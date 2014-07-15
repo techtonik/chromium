@@ -10,9 +10,9 @@
 
 #include "base/memory/scoped_ptr.h"
 #include "chrome/browser/chromeos/login/user_flow.h"
-#include "chrome/browser/chromeos/login/users/avatar/user_image.h"
 #include "chrome/browser/chromeos/login/users/user.h"
 #include "chrome/browser/chromeos/login/users/user_manager.h"
+#include "components/user_manager/user_image/user_image.h"
 
 namespace chromeos {
 
@@ -63,7 +63,6 @@ class FakeUserManager : public UserManager {
   virtual UserList GetUnlockUsers() const OVERRIDE;
   virtual const std::string& GetOwnerEmail() OVERRIDE;
   virtual void SessionStarted() OVERRIDE {}
-  virtual void RestoreActiveSessions() OVERRIDE {}
   virtual void RemoveUser(const std::string& email,
       RemoveUserDelegate* delegate) OVERRIDE {}
   virtual void RemoveUserFromList(const std::string& email) OVERRIDE {}
@@ -97,7 +96,6 @@ class FakeUserManager : public UserManager {
   virtual bool IsLoggedInAsKioskApp() const OVERRIDE;
   virtual bool IsLoggedInAsStub() const OVERRIDE;
   virtual bool IsSessionStarted() const OVERRIDE;
-  virtual bool UserSessionsRestored() const OVERRIDE;
   virtual bool IsUserNonCryptohomeDataEphemeral(
       const std::string& email) const OVERRIDE;
   virtual void SetUserFlow(const std::string& email, UserFlow* flow) OVERRIDE {}

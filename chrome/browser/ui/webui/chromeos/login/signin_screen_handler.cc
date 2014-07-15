@@ -8,7 +8,6 @@
 
 #include "base/bind.h"
 #include "base/bind_helpers.h"
-#include "base/command_line.h"
 #include "base/debug/trace_event.h"
 #include "base/location.h"
 #include "base/logging.h"
@@ -29,8 +28,6 @@
 #include "chrome/browser/chromeos/boot_times_loader.h"
 #include "chrome/browser/chromeos/input_method/input_method_util.h"
 #include "chrome/browser/chromeos/kiosk_mode/kiosk_mode_settings.h"
-#include "chrome/browser/chromeos/login/auth/key.h"
-#include "chrome/browser/chromeos/login/auth/user_context.h"
 #include "chrome/browser/chromeos/login/hwid_checker.h"
 #include "chrome/browser/chromeos/login/lock/screen_locker.h"
 #include "chrome/browser/chromeos/login/screens/core_oobe_actor.h"
@@ -52,14 +49,14 @@
 #include "chrome/browser/ui/webui/chromeos/login/native_window_delegate.h"
 #include "chrome/browser/ui/webui/chromeos/login/network_state_informer.h"
 #include "chrome/browser/ui/webui/chromeos/login/oobe_ui.h"
-#include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
-#include "chromeos/chromeos_switches.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/dbus/power_manager_client.h"
 #include "chromeos/ime/ime_keyboard.h"
 #include "chromeos/ime/input_method_manager.h"
+#include "chromeos/login/auth/key.h"
+#include "chromeos/login/auth/user_context.h"
 #include "chromeos/network/network_state.h"
 #include "chromeos/network/network_state_handler.h"
 #include "chromeos/network/portal_detector/network_portal_detector.h"
@@ -390,10 +387,6 @@ void SigninScreenHandler::DeclareLocalizedValues(
 
   if (chromeos::KioskModeSettings::Get()->IsKioskModeEnabled())
     builder->Add("demoLoginMessage", IDS_KIOSK_MODE_LOGIN_MESSAGE);
-
-  builder->Add("runType", CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kFirstExecAfterBoot) ?  "firstExecAfterBoot" :
-                                        "notFirstExecAfterBoot");
 }
 
 void SigninScreenHandler::Show(const LoginScreenContext& context) {
@@ -1105,11 +1098,9 @@ void SigninScreenHandler::HandleToggleKioskAutolaunchScreen() {
 }
 
 void SigninScreenHandler::LoadUsers(const base::ListValue& users_list,
-                                    bool animated,
                                     bool showGuest) {
   CallJS("login.AccountPickerScreen.loadUsers",
          users_list,
-         animated,
          delegate_->IsShowGuest());
 }
 

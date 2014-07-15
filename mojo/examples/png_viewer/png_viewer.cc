@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "base/message_loop/message_loop.h"
 #include "base/strings/string_tokenizer.h"
 #include "mojo/examples/media_viewer/media_viewer.mojom.h"
 #include "mojo/public/cpp/application/application_connection.h"
@@ -63,12 +64,12 @@ class NavigatorImpl : public InterfaceImpl<navigation::Navigator> {
     uint32_t num_bytes = bytes_remaining;
     while (bytes_remaining > 0) {
       MojoResult result = ReadDataRaw(
-          response_details->response_body_stream.get(),
+          response_details->response->body.get(),
           buf,
           &num_bytes,
           MOJO_READ_DATA_FLAG_NONE);
       if (result == MOJO_RESULT_SHOULD_WAIT) {
-        Wait(response_details->response_body_stream.get(),
+        Wait(response_details->response->body.get(),
              MOJO_HANDLE_SIGNAL_READABLE,
              MOJO_DEADLINE_INDEFINITE);
       } else if (result == MOJO_RESULT_OK) {
@@ -165,6 +166,10 @@ class PNGViewer : public ApplicationDelegate,
     content_view_->SetColor(SK_ColorGRAY);
     if (!bitmap_.isNull())
       DrawBitmap();
+  }
+  virtual void OnViewManagerDisconnected(
+      view_manager::ViewManager* view_manager) OVERRIDE {
+    base::MessageLoop::current()->Quit();
   }
 
   void DrawBitmap() {

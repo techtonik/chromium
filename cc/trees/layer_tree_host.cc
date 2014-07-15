@@ -288,9 +288,11 @@ void LayerTreeHost::FinishCommitOnImplThread(LayerTreeHostImpl* host_impl) {
 
   sync_tree->set_source_frame_number(source_frame_number());
 
-  if (needs_full_tree_sync_)
+  if (needs_full_tree_sync_) {
     sync_tree->SetRootLayer(TreeSynchronizer::SynchronizeTrees(
         root_layer(), sync_tree->DetachLayerTree(), sync_tree));
+  }
+
   {
     TRACE_EVENT0("cc", "LayerTreeHost::PushProperties");
     TreeSynchronizer::PushProperties(root_layer(), sync_tree->root_layer());
@@ -1017,31 +1019,40 @@ void LayerTreeHost::PaintLayerContents(
   in_paint_layer_contents_ = false;
 }
 
-void LayerTreeHost::ApplyScrollAndScale(const ScrollAndScaleSet& info) {
+void LayerTreeHost::ApplyScrollAndScale(ScrollAndScaleSet* info) {
   if (!root_layer_.get())
     return;
+
+  ScopedPtrVector<SwapPromise>::iterator it = info->swap_promises.begin();
+  for (; it != info->swap_promises.end(); ++it) {
+    scoped_ptr<SwapPromise> swap_promise(info->swap_promises.take(it));
+    TRACE_EVENT_FLOW_STEP0("input",
+                           "LatencyInfo.Flow",
+                           TRACE_ID_DONT_MANGLE(swap_promise->TraceId()),
+                           "Main thread scroll update");
+    QueueSwapPromise(swap_promise.Pass());
+  }
 
   gfx::Vector2d inner_viewport_scroll_delta;
   gfx::Vector2d outer_viewport_scroll_delta;
 
-  for (size_t i = 0; i < info.scrolls.size(); ++i) {
-    Layer* layer =
-        LayerTreeHostCommon::FindLayerInSubtree(root_layer_.get(),
-                                                info.scrolls[i].layer_id);
+  for (size_t i = 0; i < info->scrolls.size(); ++i) {
+    Layer* layer = LayerTreeHostCommon::FindLayerInSubtree(
+        root_layer_.get(), info->scrolls[i].layer_id);
     if (!layer)
       continue;
     if (layer == outer_viewport_scroll_layer_.get()) {
-      outer_viewport_scroll_delta += info.scrolls[i].scroll_delta;
+      outer_viewport_scroll_delta += info->scrolls[i].scroll_delta;
     } else if (layer == inner_viewport_scroll_layer_.get()) {
-      inner_viewport_scroll_delta += info.scrolls[i].scroll_delta;
+      inner_viewport_scroll_delta += info->scrolls[i].scroll_delta;
     } else {
       layer->SetScrollOffsetFromImplSide(layer->scroll_offset() +
-                                         info.scrolls[i].scroll_delta);
+                                         info->scrolls[i].scroll_delta);
     }
   }
 
   if (!inner_viewport_scroll_delta.IsZero() ||
-      !outer_viewport_scroll_delta.IsZero() || info.page_scale_delta != 1.f) {
+      !outer_viewport_scroll_delta.IsZero() || info->page_scale_delta != 1.f) {
     // SetScrollOffsetFromImplSide above could have destroyed the tree,
     // so re-get this layer before doing anything to it.
 
@@ -1058,11 +1069,11 @@ void LayerTreeHost::ApplyScrollAndScale(const ScrollAndScaleSet& info) {
           outer_viewport_scroll_layer_->scroll_offset() +
           outer_viewport_scroll_delta);
     }
-    ApplyPageScaleDeltaFromImplSide(info.page_scale_delta);
+    ApplyPageScaleDeltaFromImplSide(info->page_scale_delta);
 
     client_->ApplyScrollAndScale(
         inner_viewport_scroll_delta + outer_viewport_scroll_delta,
-        info.page_scale_delta);
+        info->page_scale_delta);
   }
 }
 

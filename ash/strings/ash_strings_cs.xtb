@@ -23,7 +23,7 @@
 <translation id="8054466585765276473">Výpočet doby výdrže baterie.</translation>
 <translation id="7982789257301363584">Síť</translation>
 <translation id="2303600792989757991">Přepnutí přehledu okna</translation>
-<translation id="5565793151875479467">Server proxy...</translation>
+<translation id="5565793151875479467">Proxy server...</translation>
 <translation id="938582441709398163">Překryvná klávesnice</translation>
 <translation id="4387004326333427325">Ověřovací certifikát byl vzdáleně odmítnut</translation>
 <translation id="6979158407327259162">Disk Google</translation>
@@ -246,7 +246,6 @@ Vypnete jej stisknutím kombinace kláves Alt + Vyhledávání nebo Shift.</tran
 <translation id="520760366042891468">Sdílíte ovládání obrazovky (prostřednictvím služby Hangouts).</translation>
 <translation id="8000066093800657092">Žádná síť</translation>
 <translation id="4015692727874266537">Přihlásit jiný účet...</translation>
-<translation id="1044925987639358253">Mikrofon je používán.</translation>
 <translation id="6911468394164995108">Připojit k jiné...</translation>
 <translation id="3678715477168044796"><ph name="DISPLAY_NAME"/>: <ph name="ANNOTATION"/></translation>
 <translation id="2563856802393254086">Blahopřejeme! Datová služba <ph name="NAME"/> byla aktivována a je připravena k použití.</translation>

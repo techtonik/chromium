@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "base/message_loop/message_loop.h"
 #include "mojo/examples/html_viewer/blink_platform_impl.h"
 #include "mojo/examples/html_viewer/html_document_view.h"
 #include "mojo/public/cpp/application/application_connection.h"
@@ -47,11 +48,9 @@ class HTMLViewer : public ApplicationDelegate,
     blink::shutdown();
   }
 
-  void Load(URLResponsePtr response,
-            ScopedDataPipeConsumerHandle response_body_stream) {
+  void Load(URLResponsePtr response) {
     // Need to wait for OnRootAdded.
     response_ = response.Pass();
-    response_body_stream_ = response_body_stream.Pass();
     MaybeLoad();
   }
 
@@ -79,10 +78,14 @@ class HTMLViewer : public ApplicationDelegate,
     document_view_->AttachToNode(root);
     MaybeLoad();
   }
+  virtual void OnViewManagerDisconnected(
+      view_manager::ViewManager* view_manager) OVERRIDE {
+    base::MessageLoop::current()->Quit();
+  }
 
   void MaybeLoad() {
     if (document_view_ && response_.get())
-      document_view_->Load(response_.Pass(), response_body_stream_.Pass());
+      document_view_->Load(response_.Pass());
   }
 
   scoped_ptr<BlinkPlatformImpl> blink_platform_impl_;
@@ -91,7 +94,6 @@ class HTMLViewer : public ApplicationDelegate,
   // TODO(darin): Figure out proper ownership of this instance.
   HTMLDocumentView* document_view_;
   URLResponsePtr response_;
-  ScopedDataPipeConsumerHandle response_body_stream_;
 
   DISALLOW_COPY_AND_ASSIGN(HTMLViewer);
 };
@@ -102,8 +104,7 @@ void NavigatorImpl::Navigate(
     navigation::ResponseDetailsPtr response_details) {
   printf("In HTMLViewer, rendering url: %s\n",
       response_details->response->url.data());
-  viewer_->Load(response_details->response.Pass(),
-                response_details->response_body_stream.Pass());
+  viewer_->Load(response_details->response.Pass());
 }
 
 }

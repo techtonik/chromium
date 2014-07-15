@@ -55,6 +55,7 @@
         'base/typed_buffer_unittest.cc',
         'base/util_unittest.cc',
         'client/audio_player_unittest.cc',
+	'client/client_status_logger_unittest.cc',
         'client/key_event_mapper_unittest.cc',
         'client/plugin/normalizing_input_filter_cros_unittest.cc',
         'client/plugin/normalizing_input_filter_mac_unittest.cc',
@@ -80,6 +81,7 @@
         'host/heartbeat_sender_unittest.cc',
         'host/host_change_notification_listener_unittest.cc',
         'host/host_mock_objects.cc',
+        'host/host_status_logger_unittest.cc',
         'host/host_status_monitor_fake.h',
         'host/host_status_sender_unittest.cc',
         'host/ipc_desktop_environment_unittest.cc',
@@ -89,7 +91,6 @@
         'host/linux/unicode_to_keysym_unittest.cc',
         'host/linux/x_server_clipboard_unittest.cc',
         'host/local_input_monitor_unittest.cc',
-        'host/log_to_server_unittest.cc',
         'host/native_messaging/native_messaging_reader_unittest.cc',
         'host/native_messaging/native_messaging_writer_unittest.cc',
         'host/pairing_registry_delegate_linux_unittest.cc',
@@ -124,6 +125,7 @@
         'jingle_glue/fake_signal_strategy.cc',
         'jingle_glue/fake_signal_strategy.h',
         'jingle_glue/iq_sender_unittest.cc',
+	'jingle_glue/log_to_server_unittest.cc',
         'jingle_glue/mock_objects.cc',
         'jingle_glue/mock_objects.h',
         'jingle_glue/network_settings_unittest.cc',
@@ -290,6 +292,9 @@
     {
       'target_name': 'remoting_browser_test_resources',
       'type': 'none',
+      'variables': {
+        'zip_script': '../build/android/gyp/zip.py',
+      },
       'copies': [
         {
           'destination': '<(PRODUCT_DIR)',
@@ -298,6 +303,27 @@
             ],
         },
       ], #end of copies
+      'actions': [
+        {
+          # Store the browser test resources into a zip file so there is a
+          # consistent filename to reference for build archiving (i.e. in
+          # FILES.cfg).
+          'action_name': 'zip browser test resources',
+          'inputs': [
+            '<(zip_script)',
+            '<@(remoting_webapp_js_browser_test_files)'
+          ],
+          'outputs': [
+            '<(PRODUCT_DIR)/remoting-browser-tests.zip',
+          ],
+          'action': [
+            'python',
+            '<(zip_script)',
+            '--input-dir', 'webapp/browser_test',
+            '--output', '<@(_outputs)',
+           ],
+        },
+      ], # end of actions
     },  # end of target 'remoting_browser_test_resources'
     {
       'target_name': 'remoting_webapp_unittest',
@@ -343,20 +369,19 @@
       ],
       'actions': [
         {
-          'action_name': 'Build Remoting Webapp ut.html',
+          'action_name': 'Build Remoting Webapp unittest.html',
           'inputs': [
             'webapp/build-html.py',
             '<(remoting_webapp_unittest_template_main)',
             '<@(remoting_webapp_main_html_js_files)',
-            '<@(remoting_webapp_unittest_exclude_files)',
             '<@(remoting_webapp_unittest_cases)'
           ],
           'outputs': [
-            '<(PRODUCT_DIR)/unittest.html',
+            '<(output_dir)/unittest.html',
           ],
           'action': [
             'python', 'webapp/build-html.py',
-            '<(output_dir)/unittest.html',
+            '<@(_outputs)',
             '<(remoting_webapp_unittest_template_main)',
             # GYP automatically removes subsequent duplicated command line
             # arguments.  Therefore, the excludejs flag must be set before the

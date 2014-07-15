@@ -40,7 +40,7 @@
 <translation id="8032142183999901390">Sau khi xóa tài khoản khỏi Chrome, bạn có thể cần phải tải lại các tab đang mở của mình để tác vụ có hiệu lực.</translation>
 <translation id="5775197990071433230">Máy tính này đã có phiên bản mới hơn của các cấu phần Google Chrome. Vui lòng sử dụng một trình cài đặt mới hơn.</translation>
 <translation id="4987308747895123092">Hãy đóng tất cả cửa sổ Google Chrome (bao gồm cả những cửa sổ trong chế độ Windows 8) và thử lại.</translation>
-<translation id="568643307450491754">Tìm dấu trang của bạn trong trình đơn Chrome hoặc trên thanh dấu trang.</translation>
+<translation id="568643307450491754">Tìm dấu trang của bạn trong menu Chrome hoặc trên thanh dấu trang.</translation>
 <translation id="8556340503434111824">Hiện đã có phiên bản mới của Google Chrome và phiên bản này nhanh hơn bao giờ hết.</translation>
 <translation id="4728575227883772061">Không cài đặt được do lỗi chưa xác định. Nếu Google Chrome hiện đang chạy, vui lòng đóng Google Chrome và thử lại.</translation>
 <translation id="3080151273017101988">Tiếp tục chạy các ứng dụng nền khi Google Chrome đóng</translation>
@@ -100,7 +100,7 @@
 Một số tính năng có thể không khả dụng. Vui lòng chỉ định thư mục tiểu sử khác hoặc sử dụng phiên bản Chrome mới hơn.</translation>
 <translation id="7282192067747128786">Chrome - Thông báo (<ph name="QUANTITY"/> thông báo chưa đọc)</translation>
 <translation id="6011049234605203654">Đi tới
-          trình đơn Chrome &gt;
+          menu Chrome &gt;
           <ph name="SETTINGS_TITLE"/>
           &gt;
           <ph name="ADVANCED_TITLE"/>
@@ -155,7 +155,7 @@ Một số tính năng có thể không khả dụng. Vui lòng chỉ định th
 <translation id="4864451188650489141">Bạn có thể thêm tài khoản Google khác và khóa Chromium của bạn bên dưới.</translation>
 <translation id="2669824781555328029"><ph name="FILE_NAME"/> có thể gây hại cho trải nghiệm duyệt web của bạn, vì vậy Chrome đã chặn tệp đó.</translation>
 <translation id="5875635642195358109">Đi tới
-        trình đơn Chrome &gt;
+        menu Chrome &gt;
         <ph name="SETTINGS_TITLE"/>
         &gt;
         <ph name="ADVANCED_TITLE"/>
@@ -183,7 +183,7 @@ Một số tính năng có thể không khả dụng. Vui lòng chỉ định th
 <translation id="163860049029591106">Bắt đầu với Chrome OS</translation>
 <translation id="1587223624401073077">Google Chrome đang sử dụng máy ảnh của bạn.</translation>
 <translation id="1399397803214730675">Máy tính này đã có phiên bản Google Chrome mới hơn. Nếu phần mềm hiện không hoạt động, vui lòng gỡ cài đặt Google Chrome và thử lại.</translation>
-<translation id="576822117893741893">Hiển thị trình đơn Chrome</translation>
+<translation id="576822117893741893">Hiển thị menu Chrome</translation>
 <translation id="3444832043240812445">Trang này chỉ hiển thị thông tin về các sự cố gần đây của bạn nếu bạn <ph name="BEGIN_LINK"/>bật báo cáo sự cố<ph name="END_LINK"/>.</translation>
 <translation id="8614913330719544658">Google Chrome không hồi đáp. Chạy lại ngay bây giờ?</translation>
 <translation id="2681064822612051220">Đã phát hiện cài đặt Google Chrome xung đột trên hệ thống. Vui lòng gỡ cài đặt và thử lại.</translation>
@@ -211,7 +211,7 @@ Một số tính năng có thể không khả dụng. Vui lòng chỉ định th
 <translation id="2769762047821873045">Google Chrome không phải là trình duyệt mặc định của bạn.</translation>
 <translation id="4567424176335768812">Bạn đã đăng nhập với tên <ph name="USER_EMAIL_ADDRESS"/>. Bây giờ, bạn có thể truy cập dấu trang, lịch sử và các cài đặt khác trên tất cả những thiết bị đã đăng nhập của bạn.</translation>
 <translation id="6855094794438142393">Đi tới
-          trình đơn Chrome &gt;
+          menu Chrome &gt;
           <ph name="SETTINGS_TITLE"/>
           &gt;
           <ph name="ADVANCED_TITLE"/>

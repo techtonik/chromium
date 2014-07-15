@@ -258,7 +258,6 @@ NOINLINE static void MaybeTriggerAsanError(const GURL& url) {
   const char kCorruptHeapBlock[] = "/corrupt-heap-block";
   const char kCorruptHeap[] = "/corrupt-heap";
 #endif
-  const int kArraySize = 5;
 
   if (!url.DomainIs(kCrashDomain, sizeof(kCrashDomain) - 1))
     return;
@@ -406,6 +405,9 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
 #if defined(ENABLE_BROWSER_CDMS)
       cdm_manager_(NULL),
 #endif
+#if defined(VIDEO_HOLE)
+      contains_media_player_(false),
+#endif
       geolocation_dispatcher_(NULL),
       push_messaging_dispatcher_(NULL),
       screen_orientation_dispatcher_(NULL),
@@ -431,8 +433,8 @@ RenderFrameImpl::~RenderFrameImpl() {
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, RenderFrameGone());
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, OnDestruct());
 
-#if defined(OS_ANDROID) && defined(VIDEO_HOLE)
-  if (media_player_manager_)
+#if defined(VIDEO_HOLE)
+  if (contains_media_player_)
     render_view_->UnregisterVideoHoleFrame(this);
 #endif
 
@@ -886,10 +888,12 @@ void RenderFrameImpl::OnNavigate(const FrameMsg_Navigate_Params& params) {
 
     frame->loadRequest(request);
 
-    // If this is a cross-process navigation, the browser process will send
-    // along the proper navigation start value.
-    if (!params.browser_navigation_start.is_null() &&
-        frame->provisionalDataSource()) {
+    // The browser provides the navigation_start time to bootstrap the
+    // Navigation Timing information for the browser-initiated navigations. In
+    // case of cross-process navigations, this carries over the time of
+    // finishing the onbeforeunload handler of the previous page.
+    DCHECK(!params.browser_navigation_start.is_null());
+    if (frame->provisionalDataSource()) {
       // browser_navigation_start is likely before this process existed, so we
       // can't use InterProcessTimeTicksConverter. Instead, the best we can do
       // is just ensure we don't report a bogus value in the future.
@@ -1372,6 +1376,13 @@ blink::WebMediaPlayer* RenderFrameImpl::createMediaPlayer(
     blink::WebLocalFrame* frame,
     const blink::WebURL& url,
     blink::WebMediaPlayerClient* client) {
+#if defined(VIDEO_HOLE)
+  if (!contains_media_player_) {
+    render_view_->RegisterVideoHoleFrame(this);
+    contains_media_player_ = true;
+  }
+#endif  // defined(VIDEO_HOLE)
+
   blink::WebMediaStream web_stream(
       blink::WebMediaStreamRegistry::lookupMediaStreamDescriptor(url));
   if (!web_stream.isNull())
@@ -2169,12 +2180,12 @@ void RenderFrameImpl::didUpdateCurrentHistoryItem(blink::WebLocalFrame* frame) {
   render_view_->didUpdateCurrentHistoryItem(frame);
 }
 
-void RenderFrameImpl::didChangeBrandColor() {
+void RenderFrameImpl::didChangeThemeColor() {
   if (frame_->parent())
     return;
 
-  Send(new FrameHostMsg_DidChangeBrandColor(
-      routing_id_, frame_->document().brandColor()));
+  Send(new FrameHostMsg_DidChangeThemeColor(
+      routing_id_, frame_->document().themeColor()));
 }
 
 blink::WebNotificationPresenter* RenderFrameImpl::notificationPresenter() {
@@ -3558,12 +3569,8 @@ WebMediaPlayer* RenderFrameImpl::CreateAndroidWebMediaPlayer(
 }
 
 RendererMediaPlayerManager* RenderFrameImpl::GetMediaPlayerManager() {
-  if (!media_player_manager_) {
+  if (!media_player_manager_)
     media_player_manager_ = new RendererMediaPlayerManager(this);
-#if defined(VIDEO_HOLE)
-    render_view_->RegisterVideoHoleFrame(this);
-#endif  // defined(VIDEO_HOLE)
-  }
   return media_player_manager_;
 }
 

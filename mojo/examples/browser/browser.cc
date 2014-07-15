@@ -5,6 +5,7 @@
 #include "base/basictypes.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "mojo/common/common_type_converters.h"
 #include "mojo/examples/window_manager/window_manager.mojom.h"
 #include "mojo/public/cpp/application/application_connection.h"
 #include "mojo/public/cpp/application/application_delegate.h"
@@ -205,6 +206,12 @@ class Browser : public ApplicationDelegate,
     root_->SetFocus();
     CreateWidget(root_);
   }
+  virtual void OnViewManagerDisconnected(
+      view_manager::ViewManager* view_manager) OVERRIDE {
+    DCHECK_EQ(view_manager_, view_manager);
+    view_manager_ = NULL;
+    base::MessageLoop::current()->Quit();
+  }
 
   // views::TextfieldController:
   virtual bool HandleKeyEvent(views::Textfield* sender,
@@ -214,7 +221,7 @@ class Browser : public ApplicationDelegate,
       printf("User entered this URL: %s\n", url.spec().c_str());
       navigation::NavigationDetailsPtr nav_details(
           navigation::NavigationDetails::New());
-      nav_details->url = url.spec();
+      nav_details->url = String::From(url);
       navigator_host_->RequestNavigate(view_manager_->GetRoots().front()->id(),
                                        navigation::NEW_NODE,
                                        nav_details.Pass());
@@ -231,6 +238,10 @@ class Browser : public ApplicationDelegate,
       focus_client->FocusWindow(NULL);
     else if (gained_focus == root_)
       focus_client->FocusWindow(widget_->GetNativeView());
+  }
+  virtual void OnNodeDestroyed(view_manager::Node* node) OVERRIDE {
+    DCHECK_EQ(root_, node);
+    node->RemoveObserver(this);
   }
 
   scoped_ptr<ViewsInit> views_init_;

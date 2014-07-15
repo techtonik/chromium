@@ -987,13 +987,11 @@ void Textfield::ShowContextMenuForView(View* source,
                                        const gfx::Point& point,
                                        ui::MenuSourceType source_type) {
   UpdateContextMenu();
-  ignore_result(context_menu_runner_->RunMenuAt(
-      GetWidget(),
-      NULL,
-      gfx::Rect(point, gfx::Size()),
-      MENU_ANCHOR_TOPLEFT,
-      source_type,
-      MenuRunner::HAS_MNEMONICS | MenuRunner::CONTEXT_MENU));
+  ignore_result(context_menu_runner_->RunMenuAt(GetWidget(),
+                                                NULL,
+                                                gfx::Rect(point, gfx::Size()),
+                                                MENU_ANCHOR_TOPLEFT,
+                                                source_type));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1568,9 +1566,9 @@ void Textfield::UpdateAfterChange(bool text_changed, bool cursor_changed) {
     if (cursor_repaint_timer_.IsRunning())
       cursor_repaint_timer_.Reset();
     if (!text_changed) {
-      // TEXT_CHANGED implies SELECTION_CHANGED, so we only need to fire
+      // TEXT_CHANGED implies TEXT_SELECTION_CHANGED, so we only need to fire
       // this if only the selection changed.
-      NotifyAccessibilityEvent(ui::AX_EVENT_SELECTION_CHANGED, true);
+      NotifyAccessibilityEvent(ui::AX_EVENT_TEXT_SELECTION_CHANGED, true);
     }
   }
   if (text_changed || cursor_changed) {
@@ -1703,7 +1701,9 @@ void Textfield::UpdateContextMenu() {
     if (controller_)
       controller_->UpdateContextMenu(context_menu_contents_.get());
   }
-  context_menu_runner_.reset(new MenuRunner(context_menu_contents_.get()));
+  context_menu_runner_.reset(
+      new MenuRunner(context_menu_contents_.get(),
+                     MenuRunner::HAS_MNEMONICS | MenuRunner::CONTEXT_MENU));
 }
 
 void Textfield::TrackMouseClicks(const ui::MouseEvent& event) {

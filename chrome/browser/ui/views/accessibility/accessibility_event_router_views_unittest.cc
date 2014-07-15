@@ -140,7 +140,7 @@ class AccessibilityEventRouterViewsTest
   }
 
   views::Widget* CreateWindowWithContents(views::View* contents) {
-    gfx::NativeView context = NULL;
+    gfx::NativeWindow context = NULL;
 #if defined(USE_AURA)
     context = aura_test_helper_->root_window();
 #endif
@@ -446,7 +446,7 @@ class SimpleMenuDelegate : public ui::SimpleMenuModel::Delegate {
     menu_model_->AddSeparator(ui::NORMAL_SEPARATOR);
     menu_model_->AddItem(IDC_MENU_ITEM_3, ASCIIToUTF16("Item 3"));
 
-    menu_runner_.reset(new views::MenuRunner(menu_model_.get()));
+    menu_runner_.reset(new views::MenuRunner(menu_model_.get(), 0));
     return menu_runner_->GetMenu();
   }
 

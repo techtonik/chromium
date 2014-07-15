@@ -463,9 +463,9 @@ Hvis du aktiverer denne innstillingen, sendes anonym rapportering av bruk og pro
 
       Denne innstillingen konfigurerer klokkeformatet som brukes på påloggingskjermen og som standard for brukerøkter. Brukerne kan fremdeles overstyre klokkeformatet for kontoene sine.
 
-      Hvis innstillingen er angitt som true, bruker enheten et 24-timers klokkeformat. Hvis innstillingen er angitt som false, bruker enheten et 12-timers klokkeformat.
+      Hvis innstillingen er «true», bruker enheten 24-timers klokkeformat. Hvis innstillingen er «false», bruker enheten 12-timers klokkeformat.
 
-      Hvis innstillingen ikke angis, bruker enheten et 24-timers klokkeformat som standard.</translation>
+      Hvis innstillingen ikke er angitt, bruker enheten 24-timers klokkeformat som standard.</translation>
 <translation id="8764119899999036911">Angir om generert Kerberos-SPN er basert på det kanoniske DNS-navnet eller på det angitte originalnavnet. Hvis du aktiverer denne innstillingen, droppes CNAME-oppslag, og tjenernavnet brukes som angitt. Hvis du deaktiverer denne innstillingen eller ikke angir den, bestemmes tjenerens kanoniske navn ved hjelp av CNAME-oppslag.</translation>
 <translation id="5056708224511062314">Skjermforstørrelse deaktivert</translation>
 <translation id="4377599627073874279">La alle nettsteder vise alle bilder</translation>
@@ -1426,9 +1426,9 @@ skjermtastaturet når som helst og statusen den har på påloggingsskjermen er v
 
       Hvis denne innstillingen deaktiveres eller ikke angis, er det mulig å tillate nettsider bruk av programmeringsgrensesnittet WebGL, og programtillegg bruk av programmeringsgrensesnittet Pepper 3D. Standardinnstillingene til nettleseren kan likevel kreve at kommandolinjeargumenter skal bestås for at disse programmeringsgrensesnittene skal brukes.</translation>
 <translation id="2077273864382355561">Forsinkelse for avslått skjerm når enheten kjører på batteristrøm</translation>
-<translation id="9112897538922695510">Med denne innstillingen kan du registrere en liste over protokollbehandlere. Dette er bare en anbefalt innstilling. Område|protokollen| bør angis i skjemaet som «mailto» og |nettadressen| til området bør angis til nettadressemønsteret til appen som behandler skjemaet. Mønsteret kan inkludere et «%s» som erstattes av den behandlede nettadressen, hvis det er til stede.
+<translation id="9112897538922695510">Med denne innstillingen kan du registrere en liste over protokollbehandlere. Dette er bare en anbefalt innstilling. Egenskapen |protocol| bør settes til det aktuelle skjemaet, for eksempel «mailto», og egenskapen |url| bør settes til nettadressemønsteret for appen som behandler skjemaet. Mønsteret kan inkludere en «%s» som, hvis den brukes, erstattes av nettadressen som behandles.
 
-          Protokollbehandlere som registreres av denne innstillingen slås sammen med de som er registrert av brukeren, og begge er tilgjengelige for bruk. Brukeren kan overstyre protokollbehandlerne som innstillingen har installert ved å installere en ny standardbehandler, men kan ikke fjerne en protokollbehandler som innstillingen har registrert.</translation>
+          Protokollbehandlere som registreres via denne innstillingen, slås sammen med de som er registrert av brukeren, og begge er tilgjengelige for bruk. Brukeren kan overstyre protokollbehandlerne som innstillingen har installert, ved å installere en ny standardbehandler, men kan ikke fjerne en protokollbehandler som er registrert via en innstilling.</translation>
 <translation id="3417418267404583991">Hvis denne retningslinjen er angitt som Sann eller ikke er konfigurert, aktiverer <ph name="PRODUCT_OS_NAME"/> gjestepålogging. Gjestepålogginger er anonyme brukerøkter og krever ikke passord.
 
       Hvis denne retningslinjen er angitt som Usann, tillater ikke <ph name="PRODUCT_OS_NAME"/> at gjesteøkter startes.</translation>
@@ -1527,11 +1527,11 @@ skjermtastaturet når som helst og statusen den har på påloggingsskjermen er v
 <translation id="3891357445869647828">Aktiver JavaScript</translation>
 <translation id="2274864612594831715">Denne innstillingen konfigurerer aktiveringen av det virtuelle tastaturet som en inndataenhet på Chrome OS. Brukerne kan ikke overstyre denne innstillingen.
 
-      Hvis denne innstillingen angis som true, aktiveres det virtuelle skjermtastaturet alltid.
+      Hvis denne innstillingen er «true», aktiveres det virtuelle skjermtastaturet alltid.
 
-      Hvis den angis som false, deaktiveres alltid det virtuelle skjermtastaturet.
+      Hvis den er «false», deaktiveres alltid det virtuelle skjermtastaturet.
 
-      Hvis du angir denne innstillingen, kan ikke brukerne endre eller overstyre den. Brukerne kan imidlertid aktivere og deaktivere et eventuelt skjermtastatur som er levert via tilgjengelighetsfunksjonene og har forrang over det virtuelle tastaturet som kontrolleres av denne innstillingen. Se |VirtualKeyboardEnabled|-innstillingen for å kontrollere skjermtastaturet som leveres av tilgjengelighetsfunksjonene.
+      Hvis du angir denne innstillingen, kan ikke brukerne endre eller overstyre den. Brukerne kan imidlertid aktivere og deaktivere et eventuelt skjermtastatur som er levert via tilgjengelighetsfunksjonene og har forrang over det virtuelle tastaturet som kontrolleres av denne innstillingen. Se innstillingen |VirtualKeyboardEnabled| for å kontrollere skjermtastaturet som leveres av tilgjengelighetsfunksjonene.
 
       Hvis denne innstillingen ikke angis, blir skjermtastaturet i utgangspunktet deaktivert, men det kan aktiveres av brukeren når som helst. Heuristiske regler kan også brukes til å bestemme når tastaturet skal vises.</translation>
 <translation id="6774533686631353488">Tillat bruk av integrerte meldingsverter på brukernivå (installert uten administratorrettigheter).</translation>

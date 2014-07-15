@@ -16,6 +16,7 @@
         '../base/base.gyp:base_i18n',
         '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
         '../cc/cc.gyp:cc',
+        '../components/components.gyp:user_manager',
         '../content/content.gyp:content_browser',
         '../media/media.gyp:media',
         '../net/net.gyp:net',
@@ -229,7 +230,6 @@
         'session/session_state_delegate.h',
         'session/session_state_observer.cc',
         'session/session_state_observer.h',
-        'session/user_info.h',
         'shelf/app_list_button.cc',
         'shelf/app_list_button.h',
         'shelf/app_list_shelf_item_delegate.cc',
@@ -331,11 +331,6 @@
         'system/chromeos/network/network_connect.cc',
         'system/chromeos/network/network_connect.h',
         'system/chromeos/network/network_detailed_view.h',
-        'system/chromeos/network/network_icon.cc',
-        'system/chromeos/network/network_icon.h',
-        'system/chromeos/network/network_icon_animation.cc',
-        'system/chromeos/network/network_icon_animation.h',
-        'system/chromeos/network/network_icon_animation_observer.h',
         'system/chromeos/network/network_observer.h',
         'system/chromeos/network/network_portal_detector_observer.h',
         'system/chromeos/network/network_state_list_detailed_view.cc',
@@ -504,6 +499,8 @@
         'system/user/user_card_view.h',
         'system/user/user_view.cc',
         'system/user/user_view.h',
+        'system/web_notification/ash_popup_alignment_delegate.cc',
+        'system/web_notification/ash_popup_alignment_delegate.h',
         'system/web_notification/web_notification_tray.cc',
         'system/web_notification/web_notification_tray.h',
         'system/win/audio/tray_audio_delegate_win.cc',
@@ -724,6 +721,8 @@
             # Ash #includes power_supply_properties.pb.h directly.
             '../chromeos/chromeos.gyp:power_manager_proto',
             '../device/bluetooth/bluetooth.gyp:device_bluetooth',
+            '../ui/chromeos/ui_chromeos.gyp:ui_chromeos_resources',
+            '../ui/chromeos/ui_chromeos.gyp:ui_chromeos_strings',
             '../ui/chromeos/ui_chromeos.gyp:ui_chromeos',
             '../ui/display/display.gyp:display',
             '../ui/display/display.gyp:display_util',
@@ -880,6 +879,7 @@
         '../base/base.gyp:base',
         '../base/base.gyp:test_support_base',
         '../chrome/chrome_resources.gyp:packed_resources',
+        '../components/components.gyp:user_manager',
         '../content/content.gyp:content_browser',
         '../content/content_shell_and_tests.gyp:test_support_content',
         '../skia/skia.gyp:skia',
@@ -987,6 +987,7 @@
         'system/tray/system_tray_unittest.cc',
         'system/tray/tray_details_view_unittest.cc',
         'system/user/tray_user_unittest.cc',
+        'system/web_notification/ash_popup_alignment_delegate_unittest.cc',
         'system/web_notification/web_notification_tray_unittest.cc',
         'test/ash_test_helper_unittest.cc',
         'test/ash_unittests.cc',
@@ -1055,7 +1056,7 @@
             ['exclude', 'autoclick/autoclick_unittest.cc'],
           ],
           'sources': [
-            '<(SHARED_INTERMEDIATE_DIR)/ui/ui_resources/ui_unscaled_resources.rc',
+            '<(SHARED_INTERMEDIATE_DIR)/ui/resources/ui_unscaled_resources.rc',
           ],
           # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
           'msvs_disabled_warnings': [ 4267, ],
@@ -1178,6 +1179,7 @@
       'type': 'executable',
       'dependencies': [
         'ash_shell_lib',
+        '../components/components.gyp:user_manager',
       ],
       'sources': [
         'shell/shell_main.cc',
@@ -1195,7 +1197,7 @@
         }],
         ['chromeos==1', {
           'dependencies': [
-	    '../device/bluetooth/bluetooth.gyp:device_bluetooth',
+            '../device/bluetooth/bluetooth.gyp:device_bluetooth',
           ],
         }],
       ],
@@ -1205,6 +1207,7 @@
       'type': 'executable',
       'dependencies': [
         '../base/base.gyp:test_support_base',
+        '../components/components.gyp:user_manager',
         '../content/content_shell_and_tests.gyp:test_support_content',
         '../skia/skia.gyp:skia',
         '../testing/gtest.gyp:gtest',

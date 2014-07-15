@@ -68,6 +68,8 @@ class EVENTS_EXPORT Event {
   const LatencyInfo* latency() const { return &latency_; }
   void set_latency(const LatencyInfo& latency) { latency_ = latency; }
 
+  int source_device_id() const { return source_device_id_; }
+
   // By default, events are "cancelable", this means any default processing that
   // the containing abstraction layer may perform can be prevented by calling
   // SetHandled(). SetHandled() or StopPropagation() must not be called for
@@ -230,6 +232,10 @@ class EVENTS_EXPORT Event {
   EventTarget* target_;
   EventPhase phase_;
   EventResult result_;
+
+  // The device id the event came from, or ED_UNKNOWN_DEVICE if the information
+  // is not available.
+  int source_device_id_;
 };
 
 class EVENTS_EXPORT CancelModeEvent : public Event {
@@ -388,6 +394,7 @@ class EVENTS_EXPORT MouseEvent : public LocatedEvent {
   // NOTE: during a press and release flags() contains the complete set of
   // flags. Use this to determine the button that was pressed or released.
   int changed_button_flags() const { return changed_button_flags_; }
+  void set_changed_button_flags(int flags) { changed_button_flags_ = flags; }
 
  private:
   // Returns the repeat count based on the previous mouse click, if it is
@@ -455,8 +462,7 @@ class EVENTS_EXPORT TouchEvent : public LocatedEvent {
         radius_x_(model.radius_x_),
         radius_y_(model.radius_y_),
         rotation_angle_(model.rotation_angle_),
-        force_(model.force_),
-        source_device_id_(model.source_device_id_) {
+        force_(model.force_) {
   }
 
   TouchEvent(EventType type,
@@ -481,14 +487,10 @@ class EVENTS_EXPORT TouchEvent : public LocatedEvent {
   float radius_y() const { return radius_y_; }
   float rotation_angle() const { return rotation_angle_; }
   float force() const { return force_; }
-  int source_device_id() const { return source_device_id_; }
 
   // Used for unit tests.
   void set_radius_x(const float r) { radius_x_ = r; }
   void set_radius_y(const float r) { radius_y_ = r; }
-  void set_source_device_id(int source_device_id) {
-    source_device_id_ = source_device_id;
-  }
 
   // Overridden from LocatedEvent.
   virtual void UpdateForRootTransform(
@@ -522,9 +524,6 @@ class EVENTS_EXPORT TouchEvent : public LocatedEvent {
 
   // Force (pressure) of the touch. Normalized to be [0, 1]. Default to be 0.0.
   float force_;
-
-  // The device id of the screen the event came from. Default to be -1.
-  int source_device_id_;
 };
 
 class EVENTS_EXPORT KeyEvent : public Event {
@@ -660,13 +659,11 @@ class EVENTS_EXPORT ScrollEvent : public MouseEvent {
 
 class EVENTS_EXPORT GestureEvent : public LocatedEvent {
  public:
-  GestureEvent(EventType type,
-               float x,
+  GestureEvent(float x,
                float y,
                int flags,
                base::TimeDelta time_stamp,
-               const GestureEventDetails& details,
-               unsigned int touch_ids_bitfield);
+               const GestureEventDetails& details);
 
   // Create a new GestureEvent which is identical to the provided model.
   // If source / target windows are provided, the model location will be
@@ -674,26 +671,15 @@ class EVENTS_EXPORT GestureEvent : public LocatedEvent {
   template <typename T>
   GestureEvent(const GestureEvent& model, T* source, T* target)
       : LocatedEvent(model, source, target),
-        details_(model.details_),
-        touch_ids_bitfield_(model.touch_ids_bitfield_) {
+        details_(model.details_) {
   }
 
   virtual ~GestureEvent();
 
   const GestureEventDetails& details() const { return details_; }
 
-  // Returns the lowest touch-id of any of the touches which make up this
-  // gesture. If there are no touches associated with this gesture, returns -1.
-  int GetLowestTouchId() const;
-
  private:
   GestureEventDetails details_;
-
-  // The set of indices of ones in the binary representation of
-  // touch_ids_bitfield_ is the set of touch_ids associate with this gesture.
-  // This value is stored as a bitfield because the number of touch ids varies,
-  // but we currently don't need more than 32 touches at a time.
-  const unsigned int touch_ids_bitfield_;
 };
 
 }  // namespace ui

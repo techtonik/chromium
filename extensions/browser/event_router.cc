@@ -580,7 +580,8 @@ void EventRouter::DispatchEventToProcess(
   // If the event is privileged, only send to extension processes / service
   // workers. Otherwise, it's OK to send to normal renderers (e.g., for content
   // scripts).
-  if (ExtensionAPI::GetSharedInstance()->IsPrivileged(event->event_name)) {
+  if (!ExtensionAPI::GetSharedInstance()->IsAvailableInUntrustedContext(
+          event->event_name, extension)) {
     if (listener_context) {
       if (!ProcessMap::Get(listener_context)
                ->Contains(extension->id(), process->GetID())) {

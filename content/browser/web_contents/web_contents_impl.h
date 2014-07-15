@@ -703,7 +703,7 @@ class CONTENT_EXPORT WebContentsImpl
                          const IPC::Message& message);
 
   // IPC message handlers.
-  void OnBrandColorChanged(SkColor brand_color);
+  void OnThemeColorChanged(SkColor theme_color);
   void OnDidLoadResourceFromMemoryCache(const GURL& url,
                                         const std::string& security_info,
                                         const std::string& http_request,
@@ -726,6 +726,9 @@ class CONTENT_EXPORT WebContentsImpl
                                  const GURL& url,
                                  const base::string16& title,
                                  bool user_gesture);
+  void OnUnregisterProtocolHandler(const std::string& protocol,
+                                   const GURL& url,
+                                   bool user_gesture);
   void OnFindReply(int request_id,
                    int number_of_matches,
                    const gfx::Rect& selection_rect,

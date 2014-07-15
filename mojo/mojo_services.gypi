@@ -132,6 +132,8 @@
         '../testing/gtest.gyp:gtest',
         '../ui/gfx/gfx.gyp:gfx',
         '../ui/gfx/gfx.gyp:gfx_geometry',
+        '../ui/gfx/gfx.gyp:gfx_test_support',
+        'mojo_environment_chromium',
         'mojo_geometry_lib',
         'mojo_run_all_unittests',
         'mojo_surfaces_bindings',
@@ -139,6 +141,42 @@
       ],
       'sources': [
         'services/public/cpp/surfaces/tests/surface_unittest.cc',
+      ],
+    },
+    {
+      'target_name': 'mojo_gles2',
+      'type': 'shared_library',
+      'defines': [
+        'MOJO_GLES2_IMPLEMENTATION',
+        'GLES2_USE_MOJO',
+      ],
+      'include_dirs': [
+        '..',
+      ],
+      'dependencies': [
+        '../third_party/khronos/khronos.gyp:khronos_headers'
+      ],
+      'direct_dependent_settings': {
+        'include_dirs': [
+          '..',
+        ],
+        'defines': [
+          'GLES2_USE_MOJO',
+        ],
+      },
+      'sources': [
+        'public/c/gles2/gles2.h',
+        'public/c/gles2/gles2_export.h',
+        'public/gles2/gles2_private.cc',
+        'public/gles2/gles2_private.h',
+      ],
+      'conditions': [
+        ['OS=="mac"', {
+          'xcode_settings': {
+            # Make it a run-path dependent library.
+            'DYLIB_INSTALL_NAME_BASE': '@loader_path',
+          },
+        }],
       ],
     },
     {
@@ -301,6 +339,32 @@
       ],
     },
     {
+      'target_name': 'mojo_surfaces_service',
+      'type': 'shared_library',
+      'dependencies': [
+        '../base/base.gyp:base',
+        '../cc/cc.gyp:cc',
+        '../cc/cc.gyp:cc_surfaces',
+        '../ui/gfx/gfx.gyp:gfx_geometry',
+        'mojo_application',
+        'mojo_cc_support',
+        'mojo_environment_chromium',
+        'mojo_geometry_bindings',
+        'mojo_geometry_lib',
+        'mojo_gles2',
+        'mojo_surfaces_bindings',
+        'mojo_surfaces_lib',
+        'mojo_system_impl',
+      ],
+      'sources': [
+        'services/surfaces/surfaces_impl.cc',
+        'services/surfaces/surfaces_impl.h',
+        'services/surfaces/surfaces_service_application.cc',
+        'services/surfaces/surfaces_service_application.h',
+        'public/cpp/application/lib/mojo_main_chromium.cc',
+      ],
+    },
+    {
       'target_name': 'mojo_view_manager_common',
       'type': 'static_library',
       'sources': [
@@ -402,6 +466,8 @@
         '../base/base.gyp:base',
         '../base/base.gyp:test_support_base',
         '../testing/gtest.gyp:gtest',
+        '../ui/gfx/gfx.gyp:gfx',
+        '../ui/gfx/gfx.gyp:gfx_test_support',
         'mojo_environment_chromium',
         'mojo_geometry_bindings',
         'mojo_geometry_lib',
@@ -441,6 +507,7 @@
       'dependencies': [
         'mojo_cpp_bindings',
         'mojo_geometry_bindings',
+        'mojo_native_viewport_bindings',
       ],
     },
     {

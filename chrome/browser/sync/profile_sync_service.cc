@@ -32,6 +32,7 @@
 #include "chrome/browser/defaults.h"
 #include "chrome/browser/invalidation/profile_invalidation_provider_factory.h"
 #include "chrome/browser/net/chrome_cookie_notification_details.h"
+#include "chrome/browser/prefs/chrome_pref_service_factory.h"
 #include "chrome/browser/prefs/pref_service_syncable.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/services/gcm/gcm_profile_service.h"
@@ -75,6 +76,7 @@
 #include "components/sync_driver/pref_names.h"
 #include "components/sync_driver/system_encryptor.h"
 #include "components/sync_driver/user_selectable_sync_type.h"
+#include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/notification_source.h"
@@ -89,6 +91,7 @@
 #include "sync/internal_api/public/sync_context_proxy.h"
 #include "sync/internal_api/public/sync_encryption_handler.h"
 #include "sync/internal_api/public/util/experiments.h"
+#include "sync/internal_api/public/util/sync_db_util.h"
 #include "sync/internal_api/public/util/sync_string_conversions.h"
 #include "sync/js/js_event_details.h"
 #include "sync/util/cryptographer.h"
@@ -521,11 +524,20 @@ bool ProfileSyncService::ShouldDeleteSyncFolder() {
   if (backend_mode_ == SYNC)
     return !HasSyncSetupCompleted();
 
-  // Start fresh if it's the first time backup after user stopped syncing.
-  // This is needed because backup DB may contain items deleted by user during
-  // sync period and can cause back-from-dead issues.
-  if (backend_mode_ == BACKUP && !sync_prefs_.GetFirstSyncTime().is_null())
-    return true;
+  if (backend_mode_ == BACKUP) {
+    base::Time reset_time = chrome_prefs::GetResetTime(profile_);
+
+    // Start fresh if:
+    // * It's the first time backup after user stopped syncing because backup
+    //   DB may contain items deleted by user during sync period and can cause
+    //   back-from-dead issues if user didn't choose rollback.
+    // * Settings are reset during startup because of tampering to avoid
+    //   restoring settings from backup.
+    if (!sync_prefs_.GetFirstSyncTime().is_null() ||
+        (!reset_time.is_null() && profile_->GetStartTime() <= reset_time)) {
+      return true;
+    }
+  }
 
   return false;
 }
@@ -648,6 +660,8 @@ void ProfileSyncService::StartUpSlowBackendComponents(
 
   if (backend_mode_ == ROLLBACK)
     ClearBrowsingDataSinceFirstSync();
+  else if (backend_mode_ == SYNC)
+    CheckSyncBackupIfNeeded();
 
   base::FilePath sync_folder = backend_mode_ == SYNC ?
       base::FilePath(kSyncDataFolderName) :
@@ -1011,6 +1025,13 @@ void ProfileSyncService::UpdateBackendInitUMA(bool success) {
 void ProfileSyncService::PostBackendInitialization() {
   // Never get here for backup / restore.
   DCHECK_EQ(backend_mode_, SYNC);
+
+  if (last_backup_time_) {
+    browser_sync::SyncedDeviceTracker* device_tracker =
+        backend_->GetSyncedDeviceTracker();
+    if (device_tracker)
+      device_tracker->UpdateLocalDeviceBackupTime(*last_backup_time_);
+  }
 
   if (protocol_event_observers_.might_have_observers()) {
     backend_->RequestBufferedProtocolEventsAndEnableForwarding();
@@ -2586,4 +2607,51 @@ void ProfileSyncService::StartStopBackupForTesting() {
     ShutdownImpl(browser_sync::SyncBackendHost::STOP_AND_CLAIM_THREAD);
   else
     backup_rollback_controller_.Start(base::TimeDelta());
+}
+
+void ProfileSyncService::CheckSyncBackupIfNeeded() {
+  DCHECK_EQ(backend_mode_, SYNC);
+
+#if defined(ENABLE_PRE_SYNC_BACKUP)
+  // Check backup once a day.
+  if (!last_backup_time_ &&
+      (last_synced_time_.is_null() ||
+          base::Time::Now() - last_synced_time_ >=
+              base::TimeDelta::FromDays(1))) {
+    // If sync thread is set, need to serialize check on sync thread after
+    // closing backup DB.
+    if (sync_thread_) {
+      sync_thread_->message_loop_proxy()->PostTask(
+          FROM_HERE,
+          base::Bind(syncer::CheckSyncDbLastModifiedTime,
+                     profile_->GetPath().Append(kSyncBackupDataFolderName),
+                     base::MessageLoopProxy::current(),
+                     base::Bind(&ProfileSyncService::CheckSyncBackupCallback,
+                                weak_factory_.GetWeakPtr())));
+    } else {
+      content::BrowserThread::PostTask(
+          content::BrowserThread::FILE, FROM_HERE,
+          base::Bind(syncer::CheckSyncDbLastModifiedTime,
+                     profile_->GetPath().Append(kSyncBackupDataFolderName),
+                     base::MessageLoopProxy::current(),
+                     base::Bind(&ProfileSyncService::CheckSyncBackupCallback,
+                                weak_factory_.GetWeakPtr())));
+    }
+  }
+#endif
+}
+
+void ProfileSyncService::CheckSyncBackupCallback(base::Time backup_time) {
+  last_backup_time_.reset(new base::Time(backup_time));
+
+  if (HasSyncingBackend() && backend_initialized_) {
+    browser_sync::SyncedDeviceTracker* device_tracker =
+        backend_->GetSyncedDeviceTracker();
+    if (device_tracker)
+      device_tracker->UpdateLocalDeviceBackupTime(*last_backup_time_);
+  }
+}
+
+base::Time ProfileSyncService::GetDeviceBackupTimeForTesting() const {
+  return backend_->GetSyncedDeviceTracker()->GetLocalDeviceBackupTime();
 }

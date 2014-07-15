@@ -6,6 +6,7 @@
 
 #include "android_webview/browser/browser_view_renderer_client.h"
 #include "android_webview/browser/shared_renderer_state.h"
+#include "android_webview/common/aw_switches.h"
 #include "android_webview/public/browser/draw_gl.h"
 #include "base/android/jni_android.h"
 #include "base/auto_reset.h"
@@ -216,18 +217,20 @@ size_t BrowserViewRenderer::GetNumTiles() const {
 bool BrowserViewRenderer::OnDraw(jobject java_canvas,
                                  bool is_hardware_canvas,
                                  const gfx::Vector2d& scroll,
-                                 const gfx::Rect& global_visible_rect,
-                                 const gfx::Rect& clip) {
+                                 const gfx::Rect& global_visible_rect) {
   last_on_draw_scroll_offset_ = scroll;
   last_on_draw_global_visible_rect_ = global_visible_rect;
 
   if (clear_view_)
     return false;
 
-  if (is_hardware_canvas && attached_to_window_)
+  if (is_hardware_canvas && attached_to_window_ &&
+      !switches::ForceAuxiliaryBitmap()) {
     return OnDrawHardware(java_canvas);
+  }
+
   // Perform a software draw
-  return DrawSWInternal(java_canvas, clip);
+  return OnDrawSoftware(java_canvas);
 }
 
 bool BrowserViewRenderer::OnDrawHardware(jobject java_canvas) {
@@ -295,14 +298,7 @@ void BrowserViewRenderer::ReturnResourceFromParent() {
   }
 }
 
-bool BrowserViewRenderer::DrawSWInternal(jobject java_canvas,
-                                         const gfx::Rect& clip) {
-  if (clip.IsEmpty()) {
-    TRACE_EVENT_INSTANT0(
-        "android_webview", "EarlyOut_EmptyClip", TRACE_EVENT_SCOPE_THREAD);
-    return true;
-  }
-
+bool BrowserViewRenderer::OnDrawSoftware(jobject java_canvas) {
   if (!compositor_) {
     TRACE_EVENT_INSTANT0(
         "android_webview", "EarlyOut_NoCompositor", TRACE_EVENT_SCOPE_THREAD);
@@ -313,7 +309,7 @@ bool BrowserViewRenderer::DrawSWInternal(jobject java_canvas,
       ->RenderViaAuxilaryBitmapIfNeeded(
             java_canvas,
             last_on_draw_scroll_offset_,
-            clip,
+            gfx::Rect(width_, height_),
             base::Bind(&BrowserViewRenderer::CompositeSW,
                        base::Unretained(this)));
 }
@@ -324,7 +320,9 @@ skia::RefPtr<SkPicture> BrowserViewRenderer::CapturePicture(int width,
 
   // Return empty Picture objects for empty SkPictures.
   if (width <= 0 || height <= 0) {
-    return skia::AdoptRef(new SkPicture);
+    SkPictureRecorder emptyRecorder;
+    emptyRecorder.beginRecording(0, 0);
+    return skia::AdoptRef(emptyRecorder.endRecording());
   }
 
   // Reset scroll back to the origin, will go back to the old

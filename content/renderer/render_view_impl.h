@@ -451,6 +451,9 @@ class CONTENT_EXPORT RenderViewImpl
                                        const blink::WebURL& base_url,
                                        const blink::WebURL& url,
                                        const blink::WebString& title);
+  virtual void unregisterProtocolHandler(const blink::WebString& scheme,
+                                         const blink::WebURL& base_url,
+                                         const blink::WebURL& url);
   virtual blink::WebPageVisibilityState visibilityState() const;
   virtual blink::WebPushClient* webPushClient();
   virtual void draggableRegionsChanged();
@@ -480,7 +483,6 @@ class CONTENT_EXPORT RenderViewImpl
   virtual bool Send(IPC::Message* message) OVERRIDE;
   virtual RenderFrame* GetMainRenderFrame() OVERRIDE;
   virtual int GetRoutingID() const OVERRIDE;
-  virtual int GetPageId() const OVERRIDE;
   virtual gfx::Size GetSize() const OVERRIDE;
   virtual WebPreferences& GetWebkitPreferences() OVERRIDE;
   virtual void SetWebkitPreferences(const WebPreferences& preferences) OVERRIDE;

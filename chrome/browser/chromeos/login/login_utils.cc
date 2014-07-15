@@ -35,7 +35,6 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/chromeos/boot_times_loader.h"
 #include "chrome/browser/chromeos/login/auth/parallel_authenticator.h"
-#include "chrome/browser/chromeos/login/auth/user_context.h"
 #include "chrome/browser/chromeos/login/chrome_restart_request.h"
 #include "chrome/browser/chromeos/login/demo_mode/demo_app_launcher.h"
 #include "chrome/browser/chromeos/login/existing_user_controller.h"
@@ -76,6 +75,7 @@
 #include "chromeos/dbus/dbus_method_call_status.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/dbus/session_manager_client.h"
+#include "chromeos/login/auth/user_context.h"
 #include "chromeos/settings/cros_settings_names.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "content/public/browser/browser_thread.h"
@@ -144,10 +144,9 @@ bool CanPerformEarlyRestart() {
 
 struct DoBrowserLaunchOnLocaleLoadedData;
 
-class LoginUtilsImpl
-    : public LoginUtils,
-      public base::SupportsWeakPtr<LoginUtilsImpl>,
-      public UserSessionManager::Delegate {
+class LoginUtilsImpl : public LoginUtils,
+                       public base::SupportsWeakPtr<LoginUtilsImpl>,
+                       public UserSessionManagerDelegate {
  public:
   LoginUtilsImpl()
       : delegate_(NULL) {
@@ -167,7 +166,7 @@ class LoginUtilsImpl
   virtual void DelegateDeleted(LoginUtils::Delegate* delegate) OVERRIDE;
   virtual void CompleteOffTheRecordLogin(const GURL& start_url) OVERRIDE;
   virtual scoped_refptr<Authenticator> CreateAuthenticator(
-      LoginStatusConsumer* consumer) OVERRIDE;
+      AuthStatusConsumer* consumer) OVERRIDE;
   virtual bool RestartToApplyPerSessionFlagsIfNeed(Profile* profile,
                                                    bool early_restart) OVERRIDE;
 
@@ -337,11 +336,8 @@ void LoginUtilsImpl::PrepareProfile(
   // creation and initialization to SessionManager. Later LoginUtils will be
   // removed and all LoginUtils clients will just work with SessionManager
   // directly.
-  UserSessionManager::GetInstance()->StartSession(user_context,
-                                              authenticator_,
-                                              has_auth_cookies,
-                                              has_active_session,
-                                              this);
+  UserSessionManager::GetInstance()->StartSession(
+      user_context, authenticator_, has_auth_cookies, has_active_session, this);
 }
 
 void LoginUtilsImpl::DelegateDeleted(LoginUtils::Delegate* delegate) {
@@ -388,7 +384,7 @@ void LoginUtilsImpl::CompleteOffTheRecordLogin(const GURL& start_url) {
 }
 
 scoped_refptr<Authenticator> LoginUtilsImpl::CreateAuthenticator(
-    LoginStatusConsumer* consumer) {
+    AuthStatusConsumer* consumer) {
   // Screen locker needs new Authenticator instance each time.
   if (ScreenLocker::default_screen_locker()) {
     if (authenticator_.get())

@@ -71,6 +71,8 @@
 #include "chrome/browser/search_engines/search_provider_install_state_message_filter.h"
 #include "chrome/browser/signin/principals_message_filter.h"
 #include "chrome/browser/speech/chrome_speech_recognition_manager_delegate.h"
+#include "chrome/browser/speech/extension_api/tts_engine_extension_api.h"
+#include "chrome/browser/speech/tts_controller.h"
 #include "chrome/browser/speech/tts_message_filter.h"
 #include "chrome/browser/ssl/ssl_add_certificate.h"
 #include "chrome/browser/ssl/ssl_blocking_page.h"
@@ -232,6 +234,7 @@
 #include "chrome/browser/guest_view/guest_view_constants.h"
 #include "chrome/browser/guest_view/guest_view_manager.h"
 #include "chrome/browser/guest_view/web_view/web_view_guest.h"
+#include "chrome/browser/guest_view/web_view/web_view_permission_helper.h"
 #include "chrome/browser/guest_view/web_view/web_view_renderer_state.h"
 #include "chrome/browser/renderer_host/chrome_extension_message_filter.h"
 #include "chrome/browser/sync_file_system/local/sync_file_system_backend.h"
@@ -648,7 +651,8 @@ float GetDeviceScaleAdjustment() {
 namespace chrome {
 
 ChromeContentBrowserClient::ChromeContentBrowserClient()
-    : prerender_tracker_(NULL) {
+    : prerender_tracker_(NULL),
+      weak_factory_(this) {
 #if defined(ENABLE_PLUGINS)
   for (size_t i = 0; i < arraysize(kPredefinedAllowedDevChannelOrigins); ++i)
     allowed_dev_channel_origins_.insert(kPredefinedAllowedDevChannelOrigins[i]);
@@ -660,6 +664,11 @@ ChromeContentBrowserClient::ChromeContentBrowserClient()
 
   permissions_policy_delegate_.reset(
       new extensions::BrowserPermissionsPolicyDelegate());
+
+#if !defined(OS_ANDROID)
+  TtsExtensionEngine* tts_extension_engine = TtsExtensionEngine::GetInstance();
+  TtsController::GetInstance()->SetTtsEngineDelegate(tts_extension_engine);
+#endif
 }
 
 ChromeContentBrowserClient::~ChromeContentBrowserClient() {
@@ -1470,7 +1479,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
 #if defined(OS_POSIX)
   if (breakpad::IsCrashReporterEnabled()) {
     std::string enable_crash_reporter;
-    GoogleUpdateSettings::GetMetricsId(&enable_crash_reporter);
+    GoogleUpdateSettings::LoadMetricsClientId(&enable_crash_reporter);
     command_line->AppendSwitchASCII(switches::kEnableCrashReporter,
                                     enable_crash_reporter);
   }
@@ -1819,25 +1828,97 @@ bool ChromeContentBrowserClient::AllowWorkerDatabase(
   return allow;
 }
 
-bool ChromeContentBrowserClient::AllowWorkerFileSystem(
+void ChromeContentBrowserClient::AllowWorkerFileSystem(
     const GURL& url,
     content::ResourceContext* context,
-    const std::vector<std::pair<int, int> >& render_frames) {
+    const std::vector<std::pair<int, int> >& render_frames,
+    base::Callback<void(bool)> callback) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
   ProfileIOData* io_data = ProfileIOData::FromResourceContext(context);
   CookieSettings* cookie_settings = io_data->GetCookieSettings();
   bool allow = cookie_settings->IsSettingCookieAllowed(url, url);
 
+#if defined(ENABLE_EXTENSIONS)
+  GuestPermissionRequestHelper(url, render_frames, callback, allow);
+#else
+  FileSystemAccessed(url, render_frames, callback, allow);
+#endif
+}
+
+#if defined(ENABLE_EXTENSIONS)
+void ChromeContentBrowserClient::GuestPermissionRequestHelper(
+    const GURL& url,
+    const std::vector<std::pair<int, int> >& render_frames,
+    base::Callback<void(bool)> callback,
+    bool allow) {
+  DCHECK(BrowserThread:: CurrentlyOn(BrowserThread::IO));
+  std::vector<std::pair<int, int> >::const_iterator i;
+  std::map<int, int> process_map;
+  std::map<int, int>::const_iterator it;
+  bool has_web_view_guest = false;
+  // Record access to file system for potential display in UI.
+  for (i = render_frames.begin(); i != render_frames.end(); ++i) {
+    if (process_map.find(i->first) != process_map.end())
+      continue;
+
+    process_map.insert(std::pair<int, int>(i->first, i->second));
+
+    if (WebViewRendererState::GetInstance()->IsGuest(i->first))
+      has_web_view_guest = true;
+  }
+  if (!has_web_view_guest) {
+    FileSystemAccessed(url, render_frames, callback, allow);
+    return;
+  }
+  DCHECK(process_map.size() == 1);
+  it = process_map.begin();
+  BrowserThread::PostTask(
+      BrowserThread::UI,
+      FROM_HERE,
+      base::Bind(&ChromeContentBrowserClient::
+                  RequestFileSystemPermissionOnUIThread,
+                  it->first,
+                  it->second,
+                  url,
+                  allow,
+                  base::Bind(&ChromeContentBrowserClient::FileSystemAccessed,
+                            weak_factory_.GetWeakPtr(),
+                            url,
+                            render_frames,
+                            callback)));
+}
+
+void ChromeContentBrowserClient::RequestFileSystemPermissionOnUIThread(
+    int render_process_id,
+    int render_frame_id,
+    const GURL& url,
+    bool allowed_by_default,
+    const base::Callback<void(bool)>& callback) {
+  DCHECK(BrowserThread:: CurrentlyOn(BrowserThread::UI));
+  WebViewPermissionHelper* web_view_permission_helper =
+      WebViewPermissionHelper::FromFrameID(render_process_id,
+                                           render_frame_id);
+  web_view_permission_helper->RequestFileSystemPermission(url,
+                                                          allowed_by_default,
+                                                          callback);
+}
+#endif
+
+void ChromeContentBrowserClient::FileSystemAccessed(
+    const GURL& url,
+    const std::vector<std::pair<int, int> >& render_frames,
+    base::Callback<void(bool)> callback,
+    bool allow) {
   // Record access to file system for potential display in UI.
   std::vector<std::pair<int, int> >::const_iterator i;
   for (i = render_frames.begin(); i != render_frames.end(); ++i) {
     BrowserThread::PostTask(
-        BrowserThread::UI, FROM_HERE,
+        BrowserThread::UI,
+        FROM_HERE,
         base::Bind(&TabSpecificContentSettings::FileSystemAccessed,
                    i->first, i->second, url, !allow));
   }
-
-  return allow;
+  callback.Run(allow);
 }
 
 bool ChromeContentBrowserClient::AllowWorkerIndexedDB(
@@ -2513,8 +2594,11 @@ bool ChromeContentBrowserClient::AllowPepperSocketAPI(
   Profile* profile = Profile::FromBrowserContext(browser_context);
   const extensions::ExtensionSet* extension_set = NULL;
   if (profile) {
-    extension_set = extensions::ExtensionSystem::Get(profile)->
-        extension_service()->extensions();
+    const ExtensionService* ext_service =
+        extensions::ExtensionSystem::Get(profile)->extension_service();
+    if (ext_service) {
+      extension_set = ext_service->extensions();
+    }
   }
 
   if (private_api) {
@@ -2733,8 +2817,11 @@ bool ChromeContentBrowserClient::IsPluginAllowedToCallRequestOSFileHandle(
   Profile* profile = Profile::FromBrowserContext(browser_context);
   const extensions::ExtensionSet* extension_set = NULL;
   if (profile) {
-    extension_set = extensions::ExtensionSystem::Get(profile)->
-        extension_service()->extensions();
+    const ExtensionService* ext_service =
+        extensions::ExtensionSystem::Get(profile)->extension_service();
+    if (ext_service) {
+      extension_set = ext_service->extensions();
+    }
   }
   return IsExtensionOrSharedModuleWhitelisted(url, extension_set,
                                               allowed_file_handle_origins_) ||
@@ -2758,8 +2845,11 @@ bool ChromeContentBrowserClient::IsPluginAllowedToUseDevChannelAPIs(
   Profile* profile = Profile::FromBrowserContext(browser_context);
   const extensions::ExtensionSet* extension_set = NULL;
   if (profile) {
-    extension_set = extensions::ExtensionSystem::Get(profile)->
-        extension_service()->extensions();
+    const ExtensionService* ext_service =
+        extensions::ExtensionSystem::Get(profile)->extension_service();
+    if (ext_service) {
+      extension_set = ext_service->extensions();
+    }
   }
 
   // Allow access for whitelisted applications.

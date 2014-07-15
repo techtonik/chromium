@@ -87,6 +87,7 @@
       'dependencies': [
         '../base/base.gyp:base',
         '../base/base.gyp:base_i18n',
+        '../base/base.gyp:base_prefs',
         '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
         '../crypto/crypto.gyp:crypto',
         '../sdch/sdch.gyp:sdch',
@@ -265,6 +266,7 @@
               'cert/jwk_serializer_openssl.cc',
               'cert/x509_util_openssl.cc',
               'cert/x509_util_openssl.h',
+              'crypto/scoped_openssl_types.h',
               'quic/crypto/aead_base_decrypter_openssl.cc',
               'quic/crypto/aead_base_encrypter_openssl.cc',
               'quic/crypto/aes_128_gcm_12_decrypter_openssl.cc',
@@ -392,6 +394,8 @@
         [ 'OS == "win"', {
             'sources!': [
               'http/http_auth_handler_ntlm_portable.cc',
+              'socket/socket_libevent.cc',
+              'socket/socket_libevent.h',
               'socket/tcp_socket_libevent.cc',
               'socket/tcp_socket_libevent.h',
               'udp/udp_socket_libevent.cc',
@@ -535,6 +539,7 @@
       'dependencies': [
         '../base/base.gyp:base',
         '../base/base.gyp:base_i18n',
+        '../base/base.gyp:base_prefs_test_support',
         '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',
         '../crypto/crypto.gyp:crypto',
         '../testing/gmock.gyp:gmock',
@@ -546,7 +551,7 @@
         'net',
         'net_derived_sources',
         'net_test_support',
-        'quic_ported_server',
+        'quic_tools',
       ],
       'sources': [
         '<@(net_test_sources)',
@@ -1118,7 +1123,7 @@
     {
       # This is a temporary target which will be merged into 'net' once the
       # dependency on balsa is eliminated and the classes are actually used.
-      'target_name': 'quic_ported_server',
+      'target_name': 'quic_tools',
       'type': 'static_library',
       'dependencies': [
 	'../base/base.gyp:base',
@@ -1506,7 +1511,7 @@
           'dependencies': [
             '../base/base.gyp:base',
             'net',
-            'quic_ported_server',
+            'quic_tools',
           ],
           'sources': [
             'quic/quic_server_bin.cc',

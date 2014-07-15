@@ -80,8 +80,7 @@ void GetDataListSuggestions(const WebInputElement& element,
   base::string16 prefix;
   if (!ignore_current_value) {
     prefix = element.editingValue();
-    if (element.isMultiple() &&
-        element.formControlType() == WebString::fromUTF8("email")) {
+    if (element.isMultiple() && element.isEmailField()) {
       std::vector<base::string16> parts;
       base::SplitStringDontTrim(prefix, ',', &parts);
       if (parts.size() > 0) {
@@ -181,6 +180,11 @@ void AutofillAgent::DidFinishDocumentLoad(WebLocalFrame* frame) {
   ProcessForms(*frame);
 }
 
+void AutofillAgent::DidCommitProvisionalLoad(WebLocalFrame* frame,
+                                             bool is_new_navigation) {
+  form_cache_.ResetFrame(*frame);
+}
+
 void AutofillAgent::FrameDetached(WebFrame* frame) {
   form_cache_.ResetFrame(*frame);
 }
@@ -211,13 +215,6 @@ void AutofillAgent::WillSubmitForm(WebLocalFrame* frame,
     Send(new AutofillHostMsg_FormSubmitted(routing_id(), form_data,
                                            base::TimeTicks::Now()));
   }
-}
-
-void AutofillAgent::ZoomLevelChanged() {
-  // Any time the zoom level changes, the page's content moves, so any Autofill
-  // popups should be hidden. This is only needed for the new Autofill UI
-  // because WebKit already knows to hide the old UI when this occurs.
-  HidePopup();
 }
 
 void AutofillAgent::FocusedNodeChanged(const WebNode& node) {
@@ -418,8 +415,7 @@ void AutofillAgent::AcceptDataListSuggestion(
   base::string16 new_value = suggested_value;
   // If this element takes multiple values then replace the last part with
   // the suggestion.
-  if (input_element->isMultiple() &&
-      input_element->formControlType() == WebString::fromUTF8("email")) {
+  if (input_element->isMultiple() && input_element->isEmailField()) {
     std::vector<base::string16> parts;
 
     base::SplitStringDontTrim(input_element->editingValue(), ',', &parts);

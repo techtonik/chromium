@@ -437,7 +437,7 @@
 <translation id="1022361784792428773">ID de extensiones que el usuario no debe poder instalar (o * para incluirlas todas).</translation>
 <translation id="6064943054844745819">Especifica una lista de funciones de plataforma web en desuso para volver a habilitarlas.
 
-      Esta política ofrece a los administradores la posibilidad de volver a habilitar durante un tiempo limitado funciones de plataforma web en desuso. Las funciones se identifican con una etiqueta de cadena; se volverán a habilitar las funciones correspondientes a las etiquetas incluidas en la lista que indica esta política.
+      Esta política ofrece a los administradores la posibilidad de volver a habilitar, durante un tiempo limitado, funciones de plataforma web en desuso. Las funciones se identifican con una etiqueta de cadena; se volverán a habilitar las funciones correspondientes a las etiquetas incluidas en la lista que indica esta política.
 
       Actualmente, las siguientes etiquetas están definidas:
       - ShowModalDialog_EffectiveUntil20150430
@@ -1251,9 +1251,9 @@ El formato del valor sigue los nombres de las zonas horarias de la &quot;Base de
 <translation id="3809527282695568696">Si se selecciona &quot;Abrir una lista de URL&quot; como acción de inicio, esto te permitirá especificar la lista de URL que se abren. Si esto no se configura, no se abrirá ninguna URL al inicio. Esta política solo funciona si la política &quot;RestoreOnStartup&quot; se configura como &quot;RestoreOnStartupIsURLs&quot;.</translation>
 <translation id="649418342108050703">Inhabilita la compatibilidad para API gráfica de 3D. Al habilitar esta configuración, las páginas web no pueden acceder a la unidad de procesamiento gráfico (GPU). Las páginas web no pueden acceder específicamente a la API WebGL y los complementos no pueden usar la API Pepper 3D. Si se inhabilita esta configuración o si no se la configura, se permite que las páginas web usen la API WebGL y que los complementos utilicen la API Pepper 3D. Es posible que las configuraciones predeterminadas del navegador aún necesiten que se pasen argumentos de línea de comandos para poder usar estas API.</translation>
 <translation id="2077273864382355561">Demora de pantalla apagada con batería</translation>
-<translation id="9112897538922695510">Te permite registrar una lista de controladores de protocolo. Esto solo puede ser una política recomendada. La propiedad |protocolo| se debe establecer para el esquema (por ejemplo, &quot;mailto&quot;) de la URL y la propiedad |url| se debe establecer para el patrón de la URL de la aplicación que controla el esquema. El patrón puede incluir una especificación &quot;%s&quot; que, si está presente, se reemplazará por la URL controlada.
+<translation id="9112897538922695510">Te permite registrar una lista de controladores de protocolo. Esto solo puede ser una política recomendada. La propiedad |protocol| se debe establecer para el esquema (por ejemplo, &quot;mailto&quot;) de la URL, y la propiedad |url| se debe establecer para el patrón de la URL de la aplicación que controla el esquema. El patrón puede incluir una especificación &quot;%s&quot; que, si está presente, se reemplazará por la URL controlada.
 
-          Los controladores de protocolo registrados por la política se fusionan con los registrados por el usuario y todos están disponibles para utilizarse. El usuario puede anular los controladores de protocolos instalados por la política si instala un nuevo controlador predeterminado, pero no puede eliminar un controlador de protocolo registrado por la política.</translation>
+          Los controladores de protocolo registrados por la política se fusionan con los registrados por el usuario, y todos están disponibles para utilizarse. El usuario puede anular los controladores de protocolos instalados por la política si instala un nuevo controlador predeterminado, pero no puede eliminar un controlador de protocolo registrado por la política.</translation>
 <translation id="3417418267404583991">Si esta política no se configura o se establece en &quot;true&quot;, <ph name="PRODUCT_OS_NAME"/> permitirá iniciar sesión como invitado. Los inicios de sesión como invitado son sesiones de usuario anónimas y no requieren contraseña.
 
       Si esta política se establece en &quot;false&quot;, <ph name="PRODUCT_OS_NAME"/> no permitirá el inicio de sesiones de invitados.</translation>
@@ -1350,7 +1350,7 @@ El formato del valor sigue los nombres de las zonas horarias de la &quot;Base de
 
       Si se establece esta política, los usuarios no pueden cambiarla ni anularla, pero pueden habilitar/inhabilitar un teclado en pantalla de accesibilidad que tiene su precedente en el teclado virtual que controla esta política. Consulta la política |VirtualKeyboardEnabled| para controlar la accesibilidad del teclado en pantalla.
 
-      Si esta política no se establece, el teclado virtual en pantalla está inhabilitado inicialmente, pero el usuario puede habilitarlo en cualquier momento. Las reglas heurísticas también se pueden utilizar para decidir si mostrar o no el teclado.</translation>
+      Si esta política no se establece, el teclado virtual en pantalla está inhabilitado inicialmente, pero el usuario puede habilitarlo en cualquier momento. Las reglas heurísticas también se pueden utilizar para decidir si mostrar el teclado o no.</translation>
 <translation id="6774533686631353488">Permite el uso de hosts de mensajería nativa en el nivel de usuario (instalados sin permisos de administrador).</translation>
 <translation id="868187325500643455">Permitir a todos los sitios que ejecuten automáticamente complementos</translation>
 <translation id="7421483919690710988">Establecer tamaño de caché de disco de medios en bytes</translation>

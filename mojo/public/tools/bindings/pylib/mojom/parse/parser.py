@@ -86,35 +86,44 @@ class Parser(object):
   #
   # See http://www.dabeaz.com/ply/ply.html#ply_nn25 for more details.
 
-  def p_root(self, p):
-    """root : import root
-            | module
-            | definition_list"""
-    if len(p) > 2:
-      p[0] = _ListFromConcat(p[1], p[2])
-    else:
-      # Generator expects a module. If one wasn't specified insert one with an
-      # empty name.
-      if p[1][0] != 'MODULE':
-        p[0] = [('MODULE', None, None, p[1])]
-      else:
-        p[0] = [p[1]]
+  # TODO(vtl): Get rid of the braces in the module "statement". (Consider
+  # renaming "module" -> "package".) Then we'll be able to have a single rule
+  # for root (by making module "optional").
+  def p_root_1(self, p):
+    """root : import_list module LBRACE definition_list RBRACE"""
+    p[0] = ast.Mojom(p[2], p[1], p[4])
+
+  def p_root_2(self, p):
+    """root : import_list definition_list"""
+    p[0] = ast.Mojom(None, p[1], p[2])
+
+  def p_import_list_1(self, p):
+    """import_list : """
+    p[0] = ast.ImportList()
+
+  def p_import_list_2(self, p):
+    """import_list : import_list import"""
+    p[0] = p[1]
+    p[0].Append(p[2])
 
   def p_import(self, p):
     """import : IMPORT STRING_LITERAL"""
     # 'eval' the literal to strip the quotes.
-    p[0] = ('IMPORT', eval(p[2]))
+    # TODO(vtl): This eval is dubious. We should unquote/unescape ourselves.
+    p[0] = ast.Import(eval(p[2]))
 
   def p_module(self, p):
-    """module : attribute_section MODULE identifier_wrapped LBRACE \
-                    definition_list RBRACE"""
-    p[0] = ('MODULE', p[3], p[1], p[5])
+    """module : attribute_section MODULE identifier_wrapped """
+    p[0] = ast.Module(p[3], p[1], filename=self.filename, lineno=p.lineno(2))
 
   def p_definition_list(self, p):
     """definition_list : definition definition_list
                        | """
     if len(p) > 1:
-      p[0] = _ListFromConcat(p[1], p[2])
+      p[0] = p[2]
+      p[0].insert(0, p[1])
+    else:
+      p[0] = []
 
   def p_definition(self, p):
     """definition : struct
@@ -123,11 +132,13 @@ class Parser(object):
                   | const"""
     p[0] = p[1]
 
-  def p_attribute_section(self, p):
-    """attribute_section : LBRACKET attribute_list RBRACKET
-                         | """
-    if len(p) > 3:
-      p[0] = p[2]
+  def p_attribute_section_1(self, p):
+    """attribute_section : """
+    p[0] = None
+
+  def p_attribute_section_2(self, p):
+    """attribute_section : LBRACKET attribute_list RBRACKET"""
+    p[0] = p[2]
 
   def p_attribute_list_1(self, p):
     """attribute_list : """

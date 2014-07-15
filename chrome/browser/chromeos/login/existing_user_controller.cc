@@ -28,7 +28,6 @@
 #include "chrome/browser/chromeos/customization_document.h"
 #include "chrome/browser/chromeos/first_run/first_run.h"
 #include "chrome/browser/chromeos/kiosk_mode/kiosk_mode_settings.h"
-#include "chrome/browser/chromeos/login/auth/user_context.h"
 #include "chrome/browser/chromeos/login/helper.h"
 #include "chrome/browser/chromeos/login/login_utils.h"
 #include "chrome/browser/chromeos/login/startup_utils.h"
@@ -48,6 +47,8 @@
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/dbus/power_manager_client.h"
 #include "chromeos/dbus/session_manager_client.h"
+#include "chromeos/login/auth/user_context.h"
+#include "chromeos/login/user_names.h"
 #include "chromeos/settings/cros_settings_names.h"
 #include "components/google/core/browser/google_util.h"
 #include "components/policy/core/common/policy_service.h"
@@ -123,7 +124,7 @@ ExistingUserController* ExistingUserController::current_controller_ = NULL;
 // ExistingUserController, public:
 
 ExistingUserController::ExistingUserController(LoginDisplayHost* host)
-    : login_status_consumer_(NULL),
+    : auth_status_consumer_(NULL),
       host_(host),
       login_display_(host_->CreateLoginDisplay(this)),
       num_login_attempts_(0),
@@ -452,7 +453,7 @@ void ExistingUserController::PerformLogin(
 
   is_login_in_progress_ = true;
   if (gaia::ExtractDomainName(user_context.GetUserID()) ==
-          UserManager::kLocallyManagedUserDomain) {
+      chromeos::login::kLocallyManagedUserDomain) {
     login_performer_->LoginAsLocallyManagedUser(user_context);
   } else {
     login_performer_->PerformLogin(user_context, auth_mode);
@@ -705,7 +706,7 @@ void ExistingUserController::ShowTPMError() {
 // ExistingUserController, LoginPerformer::Delegate implementation:
 //
 
-void ExistingUserController::OnLoginFailure(const LoginFailure& failure) {
+void ExistingUserController::OnAuthFailure(const AuthFailure& failure) {
   is_login_in_progress_ = false;
   offline_failed_ = true;
 
@@ -718,7 +719,7 @@ void ExistingUserController::OnLoginFailure(const LoginFailure& failure) {
     return;
   }
 
-  if (failure.reason() == LoginFailure::OWNER_REQUIRED) {
+  if (failure.reason() == AuthFailure::OWNER_REQUIRED) {
     ShowError(IDS_LOGIN_ERROR_OWNER_REQUIRED, error);
     content::BrowserThread::PostDelayedTask(
         content::BrowserThread::UI, FROM_HERE,
@@ -726,7 +727,7 @@ void ExistingUserController::OnLoginFailure(const LoginFailure& failure) {
                    base::Unretained(DBusThreadManager::Get()->
                                     GetSessionManagerClient())),
         base::TimeDelta::FromMilliseconds(kSafeModeRestartUiDelayMs));
-  } else if (failure.reason() == LoginFailure::TPM_ERROR) {
+  } else if (failure.reason() == AuthFailure::TPM_ERROR) {
     ShowTPMError();
   } else if (!online_succeeded_for_.empty()) {
     ShowGaiaPasswordChanged(online_succeeded_for_);
@@ -742,7 +743,7 @@ void ExistingUserController::OnLoginFailure(const LoginFailure& failure) {
         ShowError(IDS_LOGIN_ERROR_OFFLINE_FAILED_NETWORK_NOT_CONNECTED, error);
     } else {
       // TODO(nkostylev): Cleanup rest of ClientLogin related code.
-      if (failure.reason() == LoginFailure::NETWORK_AUTH_FAILED &&
+      if (failure.reason() == AuthFailure::NETWORK_AUTH_FAILED &&
           failure.error().state() ==
               GoogleServiceAuthError::HOSTED_NOT_ALLOWED) {
         ShowError(IDS_LOGIN_ERROR_AUTHENTICATING_HOSTED, error);
@@ -763,14 +764,14 @@ void ExistingUserController::OnLoginFailure(const LoginFailure& failure) {
   // attempt.
   UserManager::Get()->ResetUserFlow(last_login_attempt_username_);
 
-  if (login_status_consumer_)
-    login_status_consumer_->OnLoginFailure(failure);
+  if (auth_status_consumer_)
+    auth_status_consumer_->OnAuthFailure(failure);
 
   // Clear the recorded displayed email so it won't affect any future attempts.
   display_email_.clear();
 }
 
-void ExistingUserController::OnLoginSuccess(const UserContext& user_context) {
+void ExistingUserController::OnAuthSuccess(const UserContext& user_context) {
   is_login_in_progress_ = false;
   offline_failed_ = false;
   login_display_->set_signin_completed(true);
@@ -846,12 +847,12 @@ void ExistingUserController::OnProfilePrepared(Profile* profile) {
     LoginUtils::Get()->DoBrowserLaunch(profile, host_);
     host_ = NULL;
   }
-  // Inform |login_status_consumer_| about successful login.
-  if (login_status_consumer_)
-    login_status_consumer_->OnLoginSuccess(UserContext());
+  // Inform |auth_status_consumer_| about successful login.
+  if (auth_status_consumer_)
+    auth_status_consumer_->OnAuthSuccess(UserContext());
 }
 
-void ExistingUserController::OnOffTheRecordLoginSuccess() {
+void ExistingUserController::OnOffTheRecordAuthSuccess() {
   is_login_in_progress_ = false;
   offline_failed_ = false;
 
@@ -861,8 +862,8 @@ void ExistingUserController::OnOffTheRecordLoginSuccess() {
 
   LoginUtils::Get()->CompleteOffTheRecordLogin(guest_mode_url_);
 
-  if (login_status_consumer_)
-    login_status_consumer_->OnOffTheRecordLoginSuccess();
+  if (auth_status_consumer_)
+    auth_status_consumer_->OnOffTheRecordAuthSuccess();
 }
 
 void ExistingUserController::OnPasswordChangeDetected() {
@@ -894,8 +895,8 @@ void ExistingUserController::OnPasswordChangeDetected() {
   // doing this.  See http://crosbug.com/9115 http://crosbug.com/7792
   login_display_->ShowPasswordChangedDialog(show_invalid_old_password_error);
 
-  if (login_status_consumer_)
-    login_status_consumer_->OnPasswordChangeDetected();
+  if (auth_status_consumer_)
+    auth_status_consumer_->OnPasswordChangeDetected();
 
   display_email_.clear();
 }
@@ -910,9 +911,9 @@ void ExistingUserController::WhiteListCheckFailed(const std::string& email) {
   login_display_->SetUIEnabled(true);
   login_display_->ShowSigninUI(email);
 
-  if (login_status_consumer_) {
-    login_status_consumer_->OnLoginFailure(LoginFailure(
-          LoginFailure::WHITELIST_CHECK_FAILED));
+  if (auth_status_consumer_) {
+    auth_status_consumer_->OnAuthFailure(
+        AuthFailure(AuthFailure::WHITELIST_CHECK_FAILED));
   }
 
   display_email_.clear();

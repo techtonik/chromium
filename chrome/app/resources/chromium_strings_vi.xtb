@@ -34,7 +34,7 @@
 <translation id="1396446129537741364">Chromium đang cố gắng hiển thị mật khẩu.</translation>
 <translation id="2886012850691518054">Tùy chọn: giúp cải thiện Chromium bằng cách tự động gửi thống kê sử dụng và báo cáo sự cố cho Google.</translation>
 <translation id="580822234363523061">Đi tới
-          trình đơn Chromium &gt;
+          menu Chromium &gt;
           <ph name="SETTINGS_TITLE"/>
           &gt;
           <ph name="ADVANCED_TITLE"/>
@@ -71,7 +71,7 @@
 <translation id="8353224596138547809">Bạn có muốn Chromium lưu mật khẩu của bạn cho trang web này không?</translation>
 <translation id="7339898014177206373">Cửa sổ mới</translation>
 <translation id="3733625138702910745">Đi tới
-        trình đơn Chromium &gt;
+        menu Chromium &gt;
         <ph name="SETTINGS_TITLE"/>
         &gt;
         <ph name="ADVANCED_TITLE"/>
@@ -145,7 +145,7 @@
 <translation id="3582788516608077514">Đang cập nhật Chromium...</translation>
 <translation id="7223968959479464213">Trình quản lý tác vụ - Chromium</translation>
 <translation id="1779356040007214683">Để làm cho Chromium an toàn hơn, chúng tôi đã vô hiệu hóa một số tiện ích mở rộng không được liệt kê trong <ph name="IDS_EXTENSION_WEB_STORE_TITLE"/> và có thể đã được thêm mà bạn không biết.</translation>
-<translation id="6638567566961868659">Tìm dấu trang của bạn trong trình đơn Chromium hoặc trên thanh dấu trang.</translation>
+<translation id="6638567566961868659">Tìm dấu trang của bạn trong menu Chromium hoặc trên thanh dấu trang.</translation>
 <translation id="2673087257647337101">Gần được cập nhật! Hãy chạy lại Chromium để hoàn tất cập nhật.</translation>
 <translation id="4864451188650489141">Bạn có thể thêm tài khoản Google khác và khóa Chromium của bạn bên dưới.</translation>
 <translation id="1293235220023151515">Đã tìm thấy bản cài đặt Chromium xung đột trên hệ thống. Vui lòng gỡ cài đặt và thử lại.</translation>
@@ -153,7 +153,7 @@
 <translation id="2648074677641340862">Đã xảy ra lỗi hệ điều hành khi cài đặt. Hãy tải xuống Chromium lại lần nữa.</translation>
 <translation id="5942520288919337908">Đã thêm <ph name="EXTENSION_NAME"/> vào  Chromium.</translation>
 <translation id="4559775032954821361">Đi tới
-          trình đơn Chromium &gt;
+          menu Chromium &gt;
           <ph name="SETTINGS_TITLE"/>
           &gt;
           <ph name="ADVANCED_TITLE"/>
@@ -187,7 +187,7 @@ Một số tính năng có thể không khả dụng. Hãy chỉ định thư m�
 <translation id="2158734852934720349">Giấy phép nguồn mở Chromium OS</translation>
 <translation id="2966088006374919794">Chromium cần chạy ứng dụng bên ngoài để xử lý các liên kết <ph name="SCHEME"/>. Liên kết được yêu cầu là <ph name="PROTOLINK"/>.</translation>
 <translation id="2558235863893655150">Bạn có muốn Chromium lưu mật khẩu của bạn không?</translation>
-<translation id="1231416733874080281">Hiển thị trình đơn Chromium</translation>
+<translation id="1231416733874080281">Hiển thị menu Chromium</translation>
 <translation id="6485906693002546646">Bạn đang sử dụng <ph name="PROFILE_EMAIL"/> để đồng bộ hóa nội dung Chromium của mình. Để cập nhật tùy chọn đồng bộ hóa hoặc sử dụng Chromium mà không cần tài khoản Google, hãy truy cập <ph name="SETTINGS_LINK"/>.</translation>
 <translation id="5772805321386874569">(yêu cầu Chromium <ph name="BEGIN_BUTTON"/>khởi động lại<ph name="END_BUTTON"/>)</translation>
 <translation id="1688750314291223739">Thiết lập đồng bộ hóa để lưu các tính năng trình duyệt được cá nhân hóa của bạn vào web và truy cập chúng từ Chromium trên bất kỳ máy tính nào.</translation>

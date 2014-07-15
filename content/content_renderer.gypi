@@ -246,10 +246,6 @@
       'renderer/java/gin_java_bridge_object.h',
       'renderer/java/gin_java_bridge_value_converter.cc',
       'renderer/java/gin_java_bridge_value_converter.h',
-      'renderer/java/java_bridge_channel.cc',
-      'renderer/java/java_bridge_channel.h',
-      'renderer/java/java_bridge_dispatcher.cc',
-      'renderer/java/java_bridge_dispatcher.h',
       'renderer/media/active_loader.cc',
       'renderer/media/active_loader.h',
       'renderer/media/aec_dump_message_filter.cc',
@@ -839,6 +835,15 @@
     ['enable_plugins==1', {
       'sources': [
         '<@(private_renderer_plugin_sources)',
+      ],
+      'conditions': [
+        ['OS=="android"', {
+          'sources!': [
+            # Android does not build FFmpeg, which these depend on.
+            'renderer/pepper/video_decoder_shim.cc',
+            'renderer/pepper/video_decoder_shim.h',
+          ],
+        }],
       ],
       'dependencies': [
         '../ppapi/ppapi_internal.gyp:ppapi_host',

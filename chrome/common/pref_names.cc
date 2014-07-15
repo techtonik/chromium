@@ -325,10 +325,10 @@ const char kIncognitoModeAvailability[] = "incognito.mode_availability";
 const char kSearchSuggestEnabled[] = "search.suggest_enabled";
 
 #if defined(OS_ANDROID)
-// Integer indicating the Contextual Search enabled state.
-// -1 - opt-out (disabled)
-//  0 - undecided
-//  1 - opt-in (enabled)
+// String indicating the Contextual Search enabled state.
+// "false" - opt-out (disabled)
+// "" (empty string) - undecided
+// "true" - opt-in (enabled)
 const char kContextualSearchEnabled[] = "search.contextual_search_enabled";
 #endif
 
@@ -2098,13 +2098,6 @@ const char kDevicePolicyRefreshRate[] = "policy.device_refresh_rate";
 // instead.
 const char kAttemptedToEnableAutoupdate[] =
     "browser.attempted_to_enable_autoupdate";
-
-#if defined(OS_WIN)
-// The number of attempts left to execute the SwReporter. This starts at the max
-// number of retries allowed, and goes down as attempts are made and is cleared
-// back to 0 when it successfully completes.
-const char kSwReporterExecuteTryCount[] = "software_reporter.execute_try_count";
-#endif
 
 // The next media gallery ID to assign.
 const char kMediaGalleriesUniqueId[] = "media_galleries.gallery_id";

@@ -13,8 +13,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/threading/sequenced_worker_pool.h"
 #include "chrome/browser/chrome_notification_types.h"
-#include "chrome/browser/chromeos/login/auth/key.h"
-#include "chrome/browser/chromeos/login/auth/user_context.h"
 #include "chrome/browser/chromeos/login/login_manager_test.h"
 #include "chrome/browser/chromeos/login/managed/supervised_user_authentication.h"
 #include "chrome/browser/chromeos/login/startup_utils.h"
@@ -34,6 +32,8 @@
 #include "chrome/browser/supervised_user/supervised_user_sync_service_factory.h"
 #include "chromeos/cryptohome/mock_async_method_caller.h"
 #include "chromeos/cryptohome/mock_homedir_methods.h"
+#include "chromeos/login/auth/key.h"
+#include "chromeos/login/auth/user_context.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/test_utils.h"
@@ -51,6 +51,9 @@ namespace chromeos {
 namespace {
 
 const char kCurrentPage[] = "$('managed-user-creation').currentPage_";
+
+const char kStubEthernetGuid[] = "eth0";
+
 }
 
 ManagedUsersSyncTestAdapter::ManagedUsersSyncTestAdapter(Profile* profile)
@@ -195,11 +198,9 @@ void ManagedUserTestBase::SetUpInProcessBrowserTestFixture() {
   NetworkPortalDetector::CaptivePortalState online_state;
   online_state.status = NetworkPortalDetector::CAPTIVE_PORTAL_STATUS_ONLINE;
   online_state.response_code = 204;
-  network_portal_detector_->SetDefaultNetworkPathForTesting(
-      kStubEthernetServicePath,
-      kStubEthernetServicePath /* guid */);
-  network_portal_detector_->SetDetectionResultsForTesting(
-      kStubEthernetServicePath, online_state);
+  network_portal_detector_->SetDefaultNetworkForTesting(kStubEthernetGuid);
+  network_portal_detector_->SetDetectionResultsForTesting(kStubEthernetGuid,
+                                                          online_state);
 }
 
 void ManagedUserTestBase::CleanUpOnMainThread() {

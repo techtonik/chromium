@@ -32,6 +32,7 @@
 #include "content/child/appcache/appcache_dispatcher.h"
 #include "content/child/appcache/appcache_frontend_impl.h"
 #include "content/child/child_histogram_message_filter.h"
+#include "content/child/content_child_helpers.h"
 #include "content/child/db_message_filter.h"
 #include "content/child/indexed_db/indexed_db_dispatcher.h"
 #include "content/child/indexed_db/indexed_db_message_filter.h"
@@ -292,6 +293,23 @@ void CreateRenderFrameSetup(mojo::InterfaceRequest<RenderFrameSetup> request) {
 
 }  // namespace
 
+// For measuring memory usage after each task. Behind a command line flag.
+class MemoryObserver : public base::MessageLoop::TaskObserver {
+ public:
+  MemoryObserver() {}
+  virtual ~MemoryObserver() {}
+
+  virtual void WillProcessTask(const base::PendingTask& pending_task) OVERRIDE {
+  }
+
+  virtual void DidProcessTask(const base::PendingTask& pending_task) OVERRIDE {
+    HISTOGRAM_MEMORY_KB("Memory.RendererUsed", GetMemoryUsageKB());
+  }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(MemoryObserver);
+};
+
 RenderThreadImpl::HistogramCustomizer::HistogramCustomizer() {
   custom_histograms_.insert("V8.MemoryExternalFragmentationTotal");
   custom_histograms_.insert("V8.MemoryHeapSampleTotalCommitted");
@@ -548,6 +566,11 @@ void RenderThreadImpl::Shutdown() {
       RenderProcessObserver, observers_, OnRenderProcessShutdown());
 
   ChildThread::Shutdown();
+
+  if (memory_observer_) {
+    message_loop()->RemoveTaskObserver(memory_observer_.get());
+    memory_observer_.reset();
+  }
 
   // Wait for all databases to be closed.
   if (webkit_platform_support_) {
@@ -876,6 +899,11 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
   if (!command_line.HasSwitch(switches::kEnableDeferredImageDecoding) &&
       !is_impl_side_painting_enabled_)
     SkGraphics::SetImageCacheByteLimit(0u);
+
+  if (command_line.HasSwitch(switches::kMemoryMetrics)) {
+    memory_observer_.reset(new MemoryObserver());
+    message_loop()->AddTaskObserver(memory_observer_.get());
+  }
 }
 
 void RenderThreadImpl::RegisterSchemes() {
@@ -1187,7 +1215,7 @@ scoped_ptr<base::SharedMemory> RenderThreadImpl::AllocateSharedMemory(
       HostAllocateSharedMemoryBuffer(size));
 }
 
-bool RenderThreadImpl::CreateViewCommandBuffer(
+CreateCommandBufferResult RenderThreadImpl::CreateViewCommandBuffer(
       int32 surface_id,
       const GPUCreateCommandBufferConfig& init_params,
       int32 route_id) {
@@ -1196,17 +1224,17 @@ bool RenderThreadImpl::CreateViewCommandBuffer(
                "surface_id",
                surface_id);
 
-  bool succeeded = false;
+  CreateCommandBufferResult result;
   IPC::Message* message = new GpuHostMsg_CreateViewCommandBuffer(
       surface_id,
       init_params,
       route_id,
-      &succeeded);
+      &result);
 
   // Allow calling this from the compositor thread.
   thread_safe_sender()->Send(message);
 
-  return succeeded;
+  return result;
 }
 
 void RenderThreadImpl::CreateImage(

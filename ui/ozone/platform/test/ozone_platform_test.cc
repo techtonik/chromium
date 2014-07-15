@@ -8,12 +8,12 @@
 #include "base/files/file_path.h"
 #include "ui/events/ozone/device/device_manager.h"
 #include "ui/events/ozone/evdev/event_factory_evdev.h"
-#include "ui/ozone/ozone_platform.h"
-#include "ui/ozone/ozone_switches.h"
 #include "ui/ozone/platform/test/file_surface_factory.h"
-#include "ui/ozone/public/cursor_factory_ozone.h"
+#include "ui/ozone/platform/test/test_cursor_factory.h"
 #include "ui/ozone/public/gpu_platform_support.h"
 #include "ui/ozone/public/gpu_platform_support_host.h"
+#include "ui/ozone/public/ozone_platform.h"
+#include "ui/ozone/public/ozone_switches.h"
 
 #if defined(OS_CHROMEOS)
 #include "ui/ozone/common/chromeos/native_display_delegate_ozone.h"
@@ -66,7 +66,7 @@ class OzonePlatformTest : public OzonePlatform {
     surface_factory_ozone_.reset(new FileSurfaceFactory(file_path_));
     event_factory_ozone_.reset(
         new EventFactoryEvdev(NULL, device_manager_.get()));
-    cursor_factory_ozone_.reset(new CursorFactoryOzone());
+    cursor_factory_ozone_.reset(new TestCursorFactory());
     gpu_platform_support_host_.reset(CreateStubGpuPlatformSupportHost());
   }
 

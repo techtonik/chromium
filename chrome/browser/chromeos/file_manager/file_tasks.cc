@@ -17,6 +17,7 @@
 #include "chrome/browser/chromeos/file_manager/fileapi_util.h"
 #include "chrome/browser/chromeos/file_manager/open_util.h"
 #include "chrome/browser/chromeos/fileapi/file_system_backend.h"
+#include "chrome/browser/drive/drive_api_util.h"
 #include "chrome/browser/drive/drive_app_registry.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/extensions/extension_util.h"
@@ -29,9 +30,9 @@
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
+#include "extensions/browser/extension_util.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension_set.h"
-#include "google_apis/drive/gdata_wapi_parser.h"
 #include "webkit/browser/fileapi/file_system_context.h"
 #include "webkit/browser/fileapi/file_system_url.h"
 
@@ -89,11 +90,10 @@ const size_t kDriveTaskExtensionPrefixLength =
 bool ContainsGoogleDocument(const PathAndMimeTypeSet& path_mime_set) {
   for (PathAndMimeTypeSet::const_iterator iter = path_mime_set.begin();
        iter != path_mime_set.end(); ++iter) {
-    if (google_apis::ResourceEntry::ClassifyEntryKindByFileExtension(
-            iter->first) &
-        google_apis::ResourceEntry::KIND_OF_GOOGLE_DOCUMENT) {
+    std::string extension =
+        base::FilePath(iter->first.Extension()).AsUTF8Unsafe();
+    if (drive::util::IsHostedDocumentByExtension(extension))
       return true;
-    }
   }
   return false;
 }
@@ -382,6 +382,10 @@ void FindFileHandlerTasks(
 
     // We don't support using hosted apps to open files.
     if (!extension->is_platform_app())
+      continue;
+
+    // Ephemeral apps cannot be file handlers.
+    if (extensions::util::IsEphemeralApp(extension->id(), profile))
       continue;
 
     if (profile->IsOffTheRecord() &&

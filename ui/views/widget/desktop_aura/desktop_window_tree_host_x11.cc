@@ -203,6 +203,8 @@ void DesktopWindowTreeHostX11::HandleNativeWidgetActivationChanged(
     OnHostActivated();
     open_windows().remove(xwindow_);
     open_windows().insert(open_windows().begin(), xwindow_);
+  } else {
+    ReleaseCapture();
   }
 
   desktop_native_widget_aura_->HandleActivationChanged(active);
@@ -294,6 +296,7 @@ DesktopWindowTreeHostX11::CreateDragDropClient(
 
 void DesktopWindowTreeHostX11::Close() {
   // TODO(erg): Might need to do additional hiding tasks here.
+  delayed_resize_task_.Cancel();
 
   if (!close_widget_factory_.HasWeakPtrs()) {
     // And we delay the close so that if we are called from an ATL callback,
@@ -311,7 +314,7 @@ void DesktopWindowTreeHostX11::CloseNow() {
   if (xwindow_ == None)
     return;
 
-  x11_capture_.reset();
+  ReleaseCapture();
   native_widget_delegate_->OnNativeWidgetDestroying();
 
   // If we have children, close them. Use a copy for iteration because they'll
@@ -508,7 +511,7 @@ void DesktopWindowTreeHostX11::Deactivate() {
   if (!IsActive())
     return;
 
-  x11_capture_.reset();
+  ReleaseCapture();
   X11DesktopHandler::get()->DeactivateWindow(xwindow_);
 }
 
@@ -530,7 +533,7 @@ void DesktopWindowTreeHostX11::Maximize() {
 }
 
 void DesktopWindowTreeHostX11::Minimize() {
-  x11_capture_.reset();
+  ReleaseCapture();
   XIconifyWindow(xdisplay_, xwindow_, 0);
 }
 
@@ -819,10 +822,8 @@ void DesktopWindowTreeHostX11::OnNativeWidgetFocus() {
 }
 
 void DesktopWindowTreeHostX11::OnNativeWidgetBlur() {
-  if (xwindow_) {
-    x11_capture_.reset();
+  if (xwindow_)
     native_widget_delegate_->AsWidget()->GetInputMethod()->OnBlur();
-  }
 }
 
 bool DesktopWindowTreeHostX11::IsAnimatingClosed() const {
@@ -966,10 +967,6 @@ void DesktopWindowTreeHostX11::PostNativeEvent(
       break;
   }
   XSendEvent(xdisplay_, xwindow_, False, 0, &xevent);
-}
-
-void DesktopWindowTreeHostX11::OnDeviceScaleFactorChanged(
-    float device_scale_factor) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1629,12 +1626,18 @@ uint32_t DesktopWindowTreeHostX11::DispatchEvent(
       bool origin_changed = bounds_.origin() != bounds.origin();
       previous_bounds_ = bounds_;
       bounds_ = bounds;
-      if (size_changed)
-        OnHostResized(bounds.size());
+
       if (origin_changed)
         OnHostMoved(bounds_.origin());
-      if (size_changed)
-        ResetWindowRegion();
+
+      if (size_changed) {
+        delayed_resize_task_.Reset(base::Bind(
+            &DesktopWindowTreeHostX11::DelayedResize,
+            close_widget_factory_.GetWeakPtr(),
+            bounds.size()));
+        base::MessageLoop::current()->PostTask(
+            FROM_HERE, delayed_resize_task_.callback());
+      }
       break;
     }
     case GenericEvent: {
@@ -1793,6 +1796,12 @@ uint32_t DesktopWindowTreeHostX11::DispatchEvent(
     }
   }
   return ui::POST_DISPATCH_STOP_PROPAGATION;
+}
+
+void DesktopWindowTreeHostX11::DelayedResize(const gfx::Size& size) {
+  OnHostResized(size);
+  ResetWindowRegion();
+  delayed_resize_task_.Cancel();
 }
 
 ////////////////////////////////////////////////////////////////////////////////

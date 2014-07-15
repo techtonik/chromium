@@ -226,6 +226,8 @@ ContentViewCoreImpl::ContentViewCoreImpl(
       accessibility_enabled_(false) {
   CHECK(web_contents) <<
       "A ContentViewCoreImpl should be created with a valid WebContents.";
+  DCHECK(view_android_);
+  DCHECK(window_android_);
 
   root_layer_->SetBackgroundColor(GetBackgroundColor(env, obj));
   gfx::Size physical_size(
@@ -270,6 +272,15 @@ void ContentViewCoreImpl::OnJavaContentViewCoreDestroyed(JNIEnv* env,
                                                          jobject obj) {
   DCHECK(env->IsSameObject(java_ref_.get(env).obj(), obj));
   java_ref_.reset();
+  // Java peer has gone, ContentViewCore is not functional and waits to
+  // be destroyed with WebContents.
+  // We need to reset WebContentsViewAndroid's reference, otherwise, there
+  // could have call in when swapping the WebContents,
+  // see http://crbug.com/383939 .
+  DCHECK(web_contents_);
+  static_cast<WebContentsViewAndroid*>(
+      static_cast<WebContentsImpl*>(web_contents_)->GetView())->
+          SetContentViewCore(NULL);
 }
 
 void ContentViewCoreImpl::InitWebContents() {
@@ -393,10 +404,8 @@ void ContentViewCoreImpl::UpdateFrameInfo(
   if (obj.is_null())
     return;
 
-  if (window_android_) {
-    window_android_->set_content_offset(
-        gfx::ScaleVector2d(content_offset, dpi_scale_));
-  }
+  window_android_->set_content_offset(
+      gfx::ScaleVector2d(content_offset, dpi_scale_));
 
   Java_ContentViewCore_updateFrameInfo(
       env, obj.obj(),
@@ -796,14 +805,10 @@ void ContentViewCoreImpl::LoadUrl(
 }
 
 ui::ViewAndroid* ContentViewCoreImpl::GetViewAndroid() const {
-  // view_android_ should never be null for Chrome.
-  DCHECK(view_android_);
   return view_android_;
 }
 
 ui::WindowAndroid* ContentViewCoreImpl::GetWindowAndroid() const {
-  // This should never be NULL for Chrome, but will be NULL for WebView.
-  DCHECK(window_android_);
   return window_android_;
 }
 
@@ -1624,16 +1629,18 @@ bool ContentViewCoreImpl::WillHandleDeferAfterResponseStarted() {
 }
 
 void ContentViewCoreImpl::OnSmartClipDataExtracted(
-    const gfx::Rect& clip_rect,
-    const base::string16& result) {
+    const base::string16& text,
+    const base::string16& html,
+    const gfx::Rect& clip_rect) {
   JNIEnv* env = AttachCurrentThread();
   ScopedJavaLocalRef<jobject> obj = java_ref_.get(env);
   if (obj.is_null())
     return;
+  ScopedJavaLocalRef<jstring> jtext = ConvertUTF16ToJavaString(env, text);
+  ScopedJavaLocalRef<jstring> jhtml = ConvertUTF16ToJavaString(env, html);
   ScopedJavaLocalRef<jobject> clip_rect_object(CreateJavaRect(env, clip_rect));
-  ScopedJavaLocalRef<jstring> jresult = ConvertUTF16ToJavaString(env, result);
   Java_ContentViewCore_onSmartClipDataExtracted(
-      env, obj.obj(), jresult.obj(), clip_rect_object.obj());
+      env, obj.obj(), jtext.obj(), jhtml.obj(), clip_rect_object.obj());
 }
 
 void ContentViewCoreImpl::WebContentsDestroyed() {

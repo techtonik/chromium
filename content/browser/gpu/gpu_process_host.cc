@@ -51,7 +51,7 @@
 #endif
 
 #if defined(USE_OZONE)
-#include "ui/ozone/ozone_switches.h"
+#include "ui/ozone/public/ozone_switches.h"
 #endif
 
 #if defined(USE_X11) && !defined(OS_CHROMEOS)
@@ -646,7 +646,9 @@ void GpuProcessHost::CreateViewCommandBuffer(
     surface_refs_.insert(std::make_pair(surface_id,
         GpuSurfaceTracker::GetInstance()->GetSurfaceRefForSurface(surface_id)));
   } else {
-    callback.Run(false);
+    // Could distinguish here between compositing_surface being NULL
+    // and Send failing, if desired.
+    callback.Run(CREATE_COMMAND_BUFFER_FAILED_AND_CHANNEL_LOST);
   }
 }
 
@@ -745,7 +747,7 @@ void GpuProcessHost::OnChannelEstablished(
                GpuDataManagerImpl::GetInstance()->GetGPUInfo());
 }
 
-void GpuProcessHost::OnCommandBufferCreated(bool succeeded) {
+void GpuProcessHost::OnCommandBufferCreated(CreateCommandBufferResult result) {
   TRACE_EVENT0("gpu", "GpuProcessHost::OnCommandBufferCreated");
 
   if (create_command_buffer_requests_.empty())
@@ -754,7 +756,7 @@ void GpuProcessHost::OnCommandBufferCreated(bool succeeded) {
   CreateCommandBufferCallback callback =
       create_command_buffer_requests_.front();
   create_command_buffer_requests_.pop();
-  callback.Run(succeeded);
+  callback.Run(result);
 }
 
 void GpuProcessHost::OnDestroyCommandBuffer(int32 surface_id) {
@@ -852,49 +854,39 @@ void GpuProcessHost::OnAcceleratedSurfaceBuffersSwapped(
 
   gfx::AcceleratedWidget native_widget =
       GpuSurfaceTracker::Get()->AcquireNativeWidget(params.surface_id);
-
-  // Retrieve the render widget helper to forward this message to on the UI
-  // thread.
-  RenderWidgetHelper* helper = NULL;
-  int render_widget_id = 0;
   if (native_widget) {
-    int render_process_id = 0;
-    // TODO(ccameron): The render process and widget IDs have a race between
-    // the UI and the IO threads, and may potentially be wrong. Move the
-    // functionality in RenderProcessHost::WaitForBackingStoreMsg to a place
-    // where it can accept IPCs from all renderers (rather than this hack where
-    // we fake the render process and widget ID of a renderer for the browser).
-    // http://crbug.com/392031
-    if (RenderWidgetHelper::GetRenderWidgetIDForWidget(
-            native_widget, &render_process_id, &render_widget_id)) {
-      helper = RenderWidgetHelper::FromProcessHostID(render_process_id);
-    }
-  } else {
-    int render_process_id = 0;
-    if (GpuSurfaceTracker::Get()->GetRenderWidgetIDForSurface(
-        params.surface_id, &render_process_id, &render_widget_id)) {
-      helper = RenderWidgetHelper::FromProcessHostID(render_process_id);
-    }
+    RenderWidgetHelper::OnNativeSurfaceBuffersSwappedOnIOThread(this, params);
+    return;
   }
 
-  // If this is not targetting a native widget and we don't find a helper, then
-  // ack immediately and ignore the message.
-  if (!helper && !native_widget) {
-    AcceleratedSurfaceMsg_BufferPresented_Params ack_params;
-    ack_params.sync_point = 0;
+  gfx::GLSurfaceHandle surface_handle =
+      GpuSurfaceTracker::Get()->GetSurfaceHandle(params.surface_id);
+  // Compositor window is always gfx::kNullPluginWindow.
+  // TODO(jbates) http://crbug.com/105344 This will be removed when there are no
+  // plugin windows.
+  if (surface_handle.handle != gfx::kNullPluginWindow ||
+      surface_handle.transport_type == gfx::TEXTURE_TRANSPORT) {
+    RouteOnUIThread(GpuHostMsg_AcceleratedSurfaceBuffersSwapped(params));
+    return;
+  }
+
+  AcceleratedSurfaceMsg_BufferPresented_Params ack_params;
+  ack_params.sync_point = 0;
+
+  int render_process_id = 0;
+  int render_widget_id = 0;
+  if (!GpuSurfaceTracker::Get()->GetRenderWidgetIDForSurface(
+      params.surface_id, &render_process_id, &render_widget_id)) {
     Send(new AcceleratedSurfaceMsg_BufferPresented(params.route_id,
                                                    ack_params));
     return;
   }
-
-  // If this is targetting a native widget, then ack the swap immediately to
-  // avoid introducing a deadlock between the browser and GPU processes (rate
-  // limiting is done through the compositor).
-  if (native_widget) {
-    AcceleratedSurfaceMsg_BufferPresented_Params ack_params;
-    ack_params.sync_point = 0;
+  RenderWidgetHelper* helper =
+      RenderWidgetHelper::FromProcessHostID(render_process_id);
+  if (!helper) {
     Send(new AcceleratedSurfaceMsg_BufferPresented(params.route_id,
                                                    ack_params));
+    return;
   }
 
   // Pass the SwapBuffers on to the RenderWidgetHelper to wake up the UI thread
@@ -902,7 +894,6 @@ void GpuProcessHost::OnAcceleratedSurfaceBuffersSwapped(
   // will forward to the RenderWidgetHostView via RenderProcessHostImpl and
   // RenderWidgetHostImpl.
   ViewHostMsg_CompositorSurfaceBuffersSwapped_Params view_params;
-  view_params.use_native_widget = native_widget;
   view_params.surface_id = params.surface_id;
   view_params.surface_handle = params.surface_handle;
   view_params.route_id = params.route_id;
@@ -910,18 +901,9 @@ void GpuProcessHost::OnAcceleratedSurfaceBuffersSwapped(
   view_params.scale_factor = params.scale_factor;
   view_params.gpu_process_host_id = host_id_;
   view_params.latency_info = params.latency_info;
-  if (helper) {
-    helper->DidReceiveBackingStoreMsg(
-        ViewHostMsg_CompositorSurfaceBuffersSwapped(
-            render_widget_id,
-            view_params));
-  } else if (native_widget) {
-    BrowserThread::PostTask(
-        BrowserThread::UI,
-        FROM_HERE,
-        base::Bind(&RenderWidgetHelper::OnNativeSurfaceBuffersSwappedOnUIThread,
-                       view_params));
-  }
+  helper->DidReceiveBackingStoreMsg(ViewHostMsg_CompositorSurfaceBuffersSwapped(
+      render_widget_id,
+      view_params));
 }
 #endif  // OS_MACOSX
 
@@ -1081,7 +1063,7 @@ void GpuProcessHost::SendOutstandingReplies() {
     CreateCommandBufferCallback callback =
         create_command_buffer_requests_.front();
     create_command_buffer_requests_.pop();
-    callback.Run(false);
+    callback.Run(CREATE_COMMAND_BUFFER_FAILED_AND_CHANNEL_LOST);
   }
 }
 

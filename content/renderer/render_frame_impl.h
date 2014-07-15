@@ -311,7 +311,7 @@ class CONTENT_EXPORT RenderFrameImpl
                                      const blink::WebHistoryItem& item,
                                      blink::WebHistoryCommitType commit_type);
   virtual void didUpdateCurrentHistoryItem(blink::WebLocalFrame* frame);
-  virtual void didChangeBrandColor();
+  virtual void didChangeThemeColor();
   virtual blink::WebNotificationPresenter* notificationPresenter();
   virtual void didChangeSelection(bool is_empty_selection);
   virtual blink::WebColorChooser* createColorChooser(
@@ -636,6 +636,12 @@ class CONTENT_EXPORT RenderFrameImpl
   // the browser process. It's okay to use a raw pointer since it's a
   // RenderFrameObserver.
   RendererCdmManager* cdm_manager_;
+#endif
+
+#if defined(VIDEO_HOLE)
+  // Whether or not this RenderFrameImpl contains a media player. Used to
+  // register as an observer for video-hole-specific events.
+  bool contains_media_player_;
 #endif
 
   // The geolocation dispatcher attached to this frame, lazily initialized.

@@ -108,10 +108,6 @@ void PictureLayerImpl::PushPropertiesTo(LayerImpl* base_layer) {
   // Tilings would be expensive to push, so we swap.
   layer_impl->tilings_.swap(tilings_);
 
-  // Ensure that we don't have any tiles that are out of date.
-  if (tilings_)
-    tilings_->RemoveTilesInRegion(invalidation_);
-
   layer_impl->tilings_->SetClient(layer_impl);
   if (tilings_)
     tilings_->SetClient(this);
@@ -154,7 +150,6 @@ void PictureLayerImpl::AppendQuads(
 
   SharedQuadState* shared_quad_state =
       render_pass->CreateAndAppendSharedQuadState();
-  PopulateSharedQuadState(shared_quad_state);
   shared_quad_state->SetAll(scaled_draw_transform,
                             scaled_content_bounds,
                             scaled_visible_content_rect,
@@ -163,8 +158,6 @@ void PictureLayerImpl::AppendQuads(
                             draw_properties().opacity,
                             blend_mode(),
                             sorting_context_id_);
-
-  gfx::Rect rect = scaled_visible_content_rect;
 
   if (current_draw_mode_ == DRAW_MODE_RESOURCELESS_SOFTWARE) {
     AppendDebugBorderQuad(
@@ -175,16 +168,16 @@ void PictureLayerImpl::AppendQuads(
         DebugColors::DirectPictureBorderColor(),
         DebugColors::DirectPictureBorderWidth(layer_tree_impl()));
 
-    gfx::Rect geometry_rect = rect;
+    gfx::Rect geometry_rect = scaled_visible_content_rect;
     gfx::Rect opaque_rect = contents_opaque() ? geometry_rect : gfx::Rect();
     gfx::Rect visible_geometry_rect = occlusion_tracker.UnoccludedContentRect(
         geometry_rect, scaled_draw_transform);
     if (visible_geometry_rect.IsEmpty())
       return;
 
-    gfx::Size texture_size = rect.size();
+    gfx::Size texture_size = scaled_visible_content_rect.size();
     gfx::RectF texture_rect = gfx::RectF(texture_size);
-    gfx::Rect quad_content_rect = rect;
+    gfx::Rect quad_content_rect = scaled_visible_content_rect;
 
     PictureDrawQuad* quad =
         render_pass->CreateAndAppendDrawQuad<PictureDrawQuad>();
@@ -198,7 +191,6 @@ void PictureLayerImpl::AppendQuads(
                  quad_content_rect,
                  max_contents_scale,
                  pile_);
-    append_quads_data->num_missing_tiles++;
     return;
   }
 
@@ -207,7 +199,10 @@ void PictureLayerImpl::AppendQuads(
 
   if (ShowDebugBorders()) {
     for (PictureLayerTilingSet::CoverageIterator iter(
-             tilings_.get(), max_contents_scale, rect, ideal_contents_scale_);
+             tilings_.get(),
+             max_contents_scale,
+             scaled_visible_content_rect,
+             ideal_contents_scale_);
          iter;
          ++iter) {
       SkColor color;
@@ -257,8 +252,10 @@ void PictureLayerImpl::AppendQuads(
 
   size_t missing_tile_count = 0u;
   size_t on_demand_missing_tile_count = 0u;
-  for (PictureLayerTilingSet::CoverageIterator iter(
-           tilings_.get(), max_contents_scale, rect, ideal_contents_scale_);
+  for (PictureLayerTilingSet::CoverageIterator iter(tilings_.get(),
+                                                    max_contents_scale,
+                                                    scaled_visible_content_rect,
+                                                    ideal_contents_scale_);
        iter;
        ++iter) {
     gfx::Rect geometry_rect = iter.geometry_rect();
@@ -280,7 +277,7 @@ void PictureLayerImpl::AppendQuads(
           opaque_rect.Intersect(geometry_rect);
 
           if (iter->contents_scale() != ideal_contents_scale_)
-            append_quads_data->had_incomplete_tile = true;
+            append_quads_data->num_incomplete_tiles++;
 
           TileDrawQuad* quad =
               render_pass->CreateAndAppendDrawQuad<TileDrawQuad>();
@@ -354,7 +351,6 @@ void PictureLayerImpl::AppendQuads(
       }
 
       append_quads_data->num_missing_tiles++;
-      append_quads_data->had_incomplete_tile = true;
       append_quads_data->approximated_visible_content_area +=
           visible_geometry_rect.width() * visible_geometry_rect.height();
       ++missing_tile_count;
@@ -399,7 +395,9 @@ void PictureLayerImpl::UpdateTiles(
   DCHECK(!occlusion_tracker ||
          layer_tree_impl()->settings().use_occlusion_for_tile_prioritization);
 
-  if (layer_tree_impl()->device_viewport_valid_for_tile_management()) {
+  // Transforms and viewport are invalid for tile management inside a
+  // resourceless software draw, so don't update them.
+  if (!layer_tree_impl()->resourceless_software_draw()) {
     visible_rect_for_tile_priority_ = visible_content_rect();
     viewport_size_for_tile_priority_ = layer_tree_impl()->DrawViewportSize();
     screen_space_transform_for_tile_priority_ = screen_space_transform();
@@ -672,15 +670,20 @@ void PictureLayerImpl::SyncFromActiveLayer(const PictureLayerImpl* other) {
   raster_contents_scale_ = other->raster_contents_scale_;
   low_res_raster_contents_scale_ = other->low_res_raster_contents_scale_;
 
-  // Union in the other newly exposed regions as invalid.
-  Region difference_region = Region(gfx::Rect(bounds()));
-  difference_region.Subtract(gfx::Rect(other->bounds()));
-  invalidation_.Union(difference_region);
+  // The tilings on this layer were swapped here from the active layer on
+  // activation, so they have not seen the invalidation that was given to
+  // the active layer. So union that invalidation in here, but don't save
+  // it and pass it back to the active layer again.
+  Region invalidation_from_pending_and_active =
+      UnionRegions(invalidation_, other->invalidation_);
 
   bool synced_high_res_tiling = false;
   if (CanHaveTilings()) {
-    synced_high_res_tiling = tilings_->SyncTilings(
-        *other->tilings_, bounds(), invalidation_, MinimumContentsScale());
+    synced_high_res_tiling =
+        tilings_->SyncTilings(*other->tilings_,
+                              bounds(),
+                              invalidation_from_pending_and_active,
+                              MinimumContentsScale());
   } else {
     RemoveAllTilings();
   }

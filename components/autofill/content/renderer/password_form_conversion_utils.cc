@@ -22,50 +22,78 @@ using blink::WebVector;
 namespace autofill {
 namespace {
 
-// Maximum number of password fields we will observe before throwing our
-// hands in the air and giving up with a given form.
-static const size_t kMaxPasswords = 3;
-
 // Checks in a case-insensitive way if the autocomplete attribute for the given
 // |element| is present and has the specified |value_in_lowercase|.
-bool HasAutocompleteAttributeValue(const WebInputElement* element,
+bool HasAutocompleteAttributeValue(const WebInputElement& element,
                                    const char* value_in_lowercase) {
-  return LowerCaseEqualsASCII(element->getAttribute("autocomplete"),
+  return LowerCaseEqualsASCII(element.getAttribute("autocomplete"),
                               value_in_lowercase);
 }
 
-// Helper to determine which password is the main one, and which is
-// an old password (e.g on a "make new password" form), if any.
+// Helper to determine which password is the main (current) one, and which is
+// the new password (e.g., on a sign-up or change password form), if any.
 bool LocateSpecificPasswords(std::vector<WebInputElement> passwords,
-                             WebInputElement* password,
-                             WebInputElement* old_password) {
+                             WebInputElement* current_password,
+                             WebInputElement* new_password) {
+  DCHECK(current_password && current_password->isNull());
+  DCHECK(new_password && new_password->isNull());
+
+  // First, look for elements marked with either autocomplete='current-password'
+  // or 'new-password' -- if we find any, take the hint, and treat the first of
+  // each kind as the element we are looking for.
+  for (std::vector<WebInputElement>::const_iterator it = passwords.begin();
+       it != passwords.end(); it++) {
+    if (HasAutocompleteAttributeValue(*it, "current-password") &&
+        current_password->isNull()) {
+      *current_password = *it;
+    } else if (HasAutocompleteAttributeValue(*it, "new-password") &&
+        new_password->isNull()) {
+      *new_password = *it;
+    }
+  }
+
+  // If we have seen an element with either of autocomplete attributes above,
+  // take that as a signal that the page author must have intentionally left the
+  // rest of the password fields unmarked. Perhaps they are used for other
+  // purposes, e.g., PINs, OTPs, and the like. So we skip all the heuristics we
+  // normally do, and ignore the rest of the password fields.
+  if (!current_password->isNull() || !new_password->isNull())
+    return true;
+
   switch (passwords.size()) {
     case 1:
       // Single password, easy.
-      *password = passwords[0];
+      *current_password = passwords[0];
       break;
     case 2:
       if (passwords[0].value() == passwords[1].value()) {
-        // Treat two identical passwords as a single password.
-        *password = passwords[0];
+        // Two identical passwords: assume we are seeing a new password with a
+        // confirmation. This can be either a sign-up form or a password change
+        // form that does not ask for the old password.
+        *new_password = passwords[0];
       } else {
         // Assume first is old password, second is new (no choice but to guess).
-        *old_password = passwords[0];
-        *password = passwords[1];
+        *current_password = passwords[0];
+        *new_password = passwords[1];
       }
       break;
     case 3:
-      if (passwords[0].value() == passwords[1].value() &&
+      if (!passwords[0].value().isEmpty() &&
+          passwords[0].value() == passwords[1].value() &&
           passwords[0].value() == passwords[2].value()) {
-        // All three passwords the same? Just treat as one and hope.
-        *password = passwords[0];
-      } else if (passwords[0].value() == passwords[1].value()) {
-        // Two the same and one different -> old password is duplicated one.
-        *old_password = passwords[0];
-        *password = passwords[2];
+        // All three passwords are the same and non-empty? This does not make
+        // any sense, give up.
+        return false;
       } else if (passwords[1].value() == passwords[2].value()) {
-        *old_password = passwords[0];
-        *password = passwords[1];
+        // New password is the duplicated one, and comes second; or empty form
+        // with 3 password fields, in which case we will assume this layout.
+        *current_password = passwords[0];
+        *new_password = passwords[1];
+      } else if (passwords[0].value() == passwords[1].value()) {
+        // It is strange that the new password comes first, but trust more which
+        // fields are duplicated than the ordering of fields.
+        *current_password = passwords[2];
+        *new_password = passwords[0];
       } else {
         // Three different passwords, or first and last match with middle
         // different. No idea which is which, so no luck.
@@ -78,8 +106,7 @@ bool LocateSpecificPasswords(std::vector<WebInputElement> passwords,
   return true;
 }
 
-// Get information about a login form that encapsulated in the
-// PasswordForm struct.
+// Get information about a login form encapsulated in a PasswordForm struct.
 void GetPasswordForm(const WebFormElement& form, PasswordForm* password_form) {
   WebInputElement latest_input_element;
   WebInputElement username_element;
@@ -101,8 +128,7 @@ void GetPasswordForm(const WebFormElement& form, PasswordForm* password_form) {
     if (!input_element || !input_element->isEnabled())
       continue;
 
-    if ((passwords.size() < kMaxPasswords) &&
-        input_element->isPasswordField()) {
+    if (input_element->isPasswordField()) {
       passwords.push_back(*input_element);
       // If we have not yet considered any element to be the username so far,
       // provisionally select the input element just before the first password
@@ -122,7 +148,7 @@ void GetPasswordForm(const WebFormElement& form, PasswordForm* password_form) {
 
     // Various input types such as text, url, email can be a username field.
     if (input_element->isTextField() && !input_element->isPasswordField()) {
-      if (HasAutocompleteAttributeValue(input_element, "username")) {
+      if (HasAutocompleteAttributeValue(*input_element, "username")) {
         if (has_seen_element_with_autocomplete_username_before) {
           // A second or subsequent element marked with autocomplete='username'.
           // This makes us less confident that we have understood the form. We
@@ -180,8 +206,8 @@ void GetPasswordForm(const WebFormElement& form, PasswordForm* password_form) {
     return;
 
   WebInputElement password;
-  WebInputElement old_password;
-  if (!LocateSpecificPasswords(passwords, &password, &old_password))
+  WebInputElement new_password;
+  if (!LocateSpecificPasswords(passwords, &password, &new_password))
     return;
 
   // We want to keep the path but strip any authentication data, as well as
@@ -204,9 +230,9 @@ void GetPasswordForm(const WebFormElement& form, PasswordForm* password_form) {
     password_form->password_value = password.value();
     password_form->password_autocomplete_set = password.autoComplete();
   }
-  if (!old_password.isNull()) {
-    password_form->old_password_element = old_password.nameForAutofill();
-    password_form->old_password_value = old_password.value();
+  if (!new_password.isNull()) {
+    password_form->new_password_element = new_password.nameForAutofill();
+    password_form->new_password_value = new_password.value();
   }
 
   password_form->scheme = PasswordForm::SCHEME_HTML;

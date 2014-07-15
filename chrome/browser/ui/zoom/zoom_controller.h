@@ -83,6 +83,13 @@ class ZoomController : public content::WebContentsObserver,
   void AddObserver(ZoomObserver* observer);
   void RemoveObserver(ZoomObserver* observer);
 
+  // Used to set whether the zoom notification bubble can be shown when the
+  // zoom level is changed for this controller. Default behavior is to show
+  // the bubble.
+  void SetShowsNotificationBubble(bool can_show_bubble) {
+    can_show_bubble_ = can_show_bubble;
+  }
+
   // Gets the current zoom level by querying HostZoomMap (if not in manual zoom
   // mode) or from the ZoomController local value otherwise.
   double GetZoomLevel() const;
@@ -107,6 +114,7 @@ class ZoomController : public content::WebContentsObserver,
   virtual void DidNavigateMainFrame(
       const content::LoadCommittedDetails& details,
       const content::FrameNavigateParams& params) OVERRIDE;
+  virtual void WebContentsDestroyed() OVERRIDE;
 
  private:
   explicit ZoomController(content::WebContents* web_contents);
@@ -120,11 +128,9 @@ class ZoomController : public content::WebContentsObserver,
   // meaning the change should apply to ~all sites. If it is not empty, the
   // change only affects sites with the given host.
   void UpdateState(const std::string& host);
-  // Same as UpdateState, but takes into account whether a temporary zoom level
-  // has been set on |host| when deciding whether to show the zoom notification
-  // bubble.
-  void UpdateStateIncludingTemporary(const std::string& host,
-                                     bool is_temporary_zoom);
+
+  // True if changes to zoom level can trigger the zoom notification bubble.
+  bool can_show_bubble_;
 
   // The current zoom mode.
   ZoomMode zoom_mode_;

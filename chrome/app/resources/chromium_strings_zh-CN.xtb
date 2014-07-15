@@ -93,7 +93,7 @@
 <translation id="3258596308407688501">Chromium 无法读写其数据目录：
 
 <ph name="USER_DATA_DIRECTORY"/></translation>
-<translation id="1869480248812203386">您可以自动向Google报告可能出现的安全事件详情，协助我们提高Chromium的安全性和易用性。</translation>
+<translation id="1869480248812203386">您可以选择自动向Google报告可能出现的安全事件详情，以帮助我们提高Chromium的安全性和易用性。</translation>
 <translation id="6970811910055250180">正在更新设备...</translation>
 <translation id="2485422356828889247">卸载</translation>
 <translation id="85843667276690461">获取 Chromium 使用帮助</translation>

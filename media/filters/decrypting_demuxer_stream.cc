@@ -110,7 +110,7 @@ void DecryptingDemuxerStream::Reset(const base::Closure& closure) {
   DoReset();
 }
 
-void DecryptingDemuxerStream::Stop(const base::Closure& closure) {
+void DecryptingDemuxerStream::Stop() {
   DVLOG(2) << __FUNCTION__ << " - state: " << state_;
   DCHECK(task_runner_->BelongsToCurrentThread());
   DCHECK(state_ != kUninitialized) << state_;
@@ -137,7 +137,6 @@ void DecryptingDemuxerStream::Stop(const base::Closure& closure) {
   pending_buffer_to_decrypt_ = NULL;
 
   state_ = kStopped;
-  BindToCurrentLoop(closure).Run();
 }
 
 AudioDecoderConfig DecryptingDemuxerStream::audio_decoder_config() {
@@ -163,6 +162,10 @@ void DecryptingDemuxerStream::EnableBitstreamConverter() {
 
 bool DecryptingDemuxerStream::SupportsConfigChanges() {
   return demuxer_stream_->SupportsConfigChanges();
+}
+
+VideoRotation DecryptingDemuxerStream::video_rotation() {
+  return VIDEO_ROTATION_0;
 }
 
 DecryptingDemuxerStream::~DecryptingDemuxerStream() {

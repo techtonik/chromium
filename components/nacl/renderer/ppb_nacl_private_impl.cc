@@ -587,6 +587,19 @@ PP_Bool PPIsNonSFIModeEnabled() {
   return PP_FromBool(IsNonSFIModeEnabled());
 }
 
+void GetNexeFdContinuation(scoped_refptr<ppapi::TrackedCallback> callback,
+                           PP_Bool* out_is_hit,
+                           PP_FileHandle* out_handle,
+                           int32_t pp_error,
+                           bool is_hit,
+                           PP_FileHandle handle) {
+  if (pp_error == PP_OK) {
+    *out_is_hit = PP_FromBool(is_hit);
+    *out_handle = handle;
+  }
+  callback->PostRun(pp_error);
+}
+
 int32_t GetNexeFd(PP_Instance instance,
                   const char* pexe_url,
                   uint32_t abi_version,
@@ -645,9 +658,7 @@ int32_t GetNexeFd(PP_Instance instance,
       GetRoutingID(instance),
       instance,
       cache_info,
-      is_hit,
-      handle,
-      enter.callback());
+      base::Bind(&GetNexeFdContinuation, enter.callback(), is_hit, handle));
 
   return enter.SetResult(PP_OK_COMPLETIONPENDING);
 }
@@ -1115,9 +1126,9 @@ bool ManifestResolveKey(PP_Instance instance,
 }
 
 PP_Bool GetPNaClResourceInfo(PP_Instance instance,
-                             const char* filename,
                              PP_Var* llc_tool_name,
                              PP_Var* ld_tool_name) {
+  static const char kFilename[] = "chrome://pnacl-translator/pnacl.json";
   NexeLoadManager* load_manager = GetNexeLoadManager(instance);
   DCHECK(load_manager);
   if (!load_manager)
@@ -1125,7 +1136,7 @@ PP_Bool GetPNaClResourceInfo(PP_Instance instance,
 
   uint64_t nonce_lo = 0;
   uint64_t nonce_hi = 0;
-  base::File file(GetReadonlyPnaclFd(filename, false /* is_executable */,
+  base::File file(GetReadonlyPnaclFd(kFilename, false /* is_executable */,
                                      &nonce_lo, &nonce_hi));
   if (!file.IsValid()) {
     load_manager->ReportLoadError(
@@ -1141,14 +1152,14 @@ PP_Bool GetPNaClResourceInfo(PP_Instance instance,
     load_manager->ReportLoadError(
         PP_NACL_ERROR_PNACL_RESOURCE_FETCH,
         std::string("GetPNaClResourceInfo, GetFileInfo failed for: ") +
-            filename);
+            kFilename);
     return PP_FALSE;
   }
 
   if (file_info.size > 1 << 20) {
     load_manager->ReportLoadError(
         PP_NACL_ERROR_PNACL_RESOURCE_FETCH,
-        std::string("GetPNaClResourceInfo, file too large: ") + filename);
+        std::string("GetPNaClResourceInfo, file too large: ") + kFilename);
     return PP_FALSE;
   }
 
@@ -1157,7 +1168,7 @@ PP_Bool GetPNaClResourceInfo(PP_Instance instance,
     load_manager->ReportLoadError(
         PP_NACL_ERROR_PNACL_RESOURCE_FETCH,
         std::string("GetPNaClResourceInfo, couldn't allocate for: ") +
-            filename);
+            kFilename);
     return PP_FALSE;
   }
 
@@ -1165,7 +1176,7 @@ PP_Bool GetPNaClResourceInfo(PP_Instance instance,
   if (rc < 0) {
     load_manager->ReportLoadError(
         PP_NACL_ERROR_PNACL_RESOURCE_FETCH,
-        std::string("GetPNaClResourceInfo, reading failed for: ") + filename);
+        std::string("GetPNaClResourceInfo, reading failed for: ") + kFilename);
     return PP_FALSE;
   }
 

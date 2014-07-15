@@ -71,8 +71,8 @@ std::string GetStringFromID(SavePasswordProgressLogger::StringID id) {
       return "Password element";
     case SavePasswordProgressLogger::STRING_PASSWORD_AUTOCOMPLETE_SET:
       return "Password autocomplete set";
-    case SavePasswordProgressLogger::STRING_OLD_PASSWORD_ELEMENT:
-      return "Old password element";
+    case SavePasswordProgressLogger::STRING_NEW_PASSWORD_ELEMENT:
+      return "New password element";
     case SavePasswordProgressLogger::STRING_SSL_VALID:
       return "SSL valid";
     case SavePasswordProgressLogger::STRING_PASSWORD_GENERATED:
@@ -137,14 +137,16 @@ std::string GetStringFromID(SavePasswordProgressLogger::StringID id) {
       return "Form manager found, exact match.";
     case SavePasswordProgressLogger::STRING_MATCH_WITHOUT_ACTION:
       return "Form manager found, match except for action.";
-    case SavePasswordProgressLogger::STRING_NO_FORM_MANAGER:
-      return "No form manager found.";
+    case SavePasswordProgressLogger::STRING_MATCHING_NOT_COMPLETE:
+      return "No form manager has completed matching.";
     case SavePasswordProgressLogger::STRING_FORM_BLACKLISTED:
       return "Form blacklisted.";
     case SavePasswordProgressLogger::STRING_INVALID_FORM:
       return "Invalid form.";
     case SavePasswordProgressLogger::STRING_AUTOCOMPLETE_OFF:
       return "Autocomplete=off.";
+    case SavePasswordProgressLogger::STRING_SYNC_CREDENTIAL:
+      return "Credential is used for syncing passwords.";
     case SavePasswordProgressLogger::STRING_PROVISIONALLY_SAVED_FORM:
       return "provisionally_saved_form";
     case SavePasswordProgressLogger::STRING_IGNORE_POSSIBLE_USERNAMES:
@@ -264,8 +266,8 @@ void SavePasswordProgressLogger::LogPasswordForm(
                 ScrubElementID(form.password_element));
   log.SetBoolean(GetStringFromID(STRING_PASSWORD_AUTOCOMPLETE_SET),
                  form.password_autocomplete_set);
-  log.SetString(GetStringFromID(STRING_OLD_PASSWORD_ELEMENT),
-                ScrubElementID(form.old_password_element));
+  log.SetString(GetStringFromID(STRING_NEW_PASSWORD_ELEMENT),
+                ScrubElementID(form.new_password_element));
   log.SetBoolean(GetStringFromID(STRING_SSL_VALID), form.ssl_valid);
   log.SetBoolean(GetStringFromID(STRING_PASSWORD_GENERATED),
                  form.type == PasswordForm::TYPE_GENERATED);

@@ -126,6 +126,9 @@ class CC_EXPORT LayerTreeHostImpl
   virtual InputHandler::ScrollStatus ScrollBegin(
       const gfx::Point& viewport_point,
       InputHandler::ScrollInputType type) OVERRIDE;
+  virtual InputHandler::ScrollStatus ScrollAnimated(
+      const gfx::Point& viewport_point,
+      const gfx::Vector2dF& scroll_delta) OVERRIDE;
   virtual bool ScrollBy(const gfx::Point& viewport_point,
                         const gfx::Vector2dF& scroll_delta) OVERRIDE;
   virtual bool ScrollVerticallyByPage(const gfx::Point& viewport_point,
@@ -193,7 +196,7 @@ class CC_EXPORT LayerTreeHostImpl
   // DidDrawAllLayers must also be called, regardless of whether DrawLayers is
   // called between the two.
   virtual DrawResult PrepareToDraw(FrameData* frame);
-  virtual void DrawLayers(FrameData* frame, base::TimeTicks frame_begin_time);
+  virtual void DrawLayers(FrameData* frame);
   // Must be called if and only if PrepareToDraw was called.
   void DidDrawAllLayers(const FrameData& frame);
 
@@ -213,9 +216,7 @@ class CC_EXPORT LayerTreeHostImpl
   // Resets all of the trees to an empty state.
   void ResetTreesForTesting();
 
-  bool device_viewport_valid_for_tile_management() const {
-    return device_viewport_valid_for_tile_management_;
-  }
+  DrawMode GetDrawMode() const;
 
   // Viewport size in draw space: this size is in physical pixels and is used
   // for draw properties, tilings, quads and render passes.
@@ -252,7 +253,7 @@ class CC_EXPORT LayerTreeHostImpl
       const gfx::Transform& transform,
       const gfx::Rect& viewport,
       const gfx::Rect& clip,
-      bool valid_for_tile_management) OVERRIDE;
+      bool resourceless_software_draw) OVERRIDE;
   virtual void DidLoseOutputSurface() OVERRIDE;
   virtual void DidSwapBuffers() OVERRIDE;
   virtual void DidSwapBuffersComplete() OVERRIDE;
@@ -316,6 +317,8 @@ class CC_EXPORT LayerTreeHostImpl
   bool scroll_affects_scroll_handler() const {
     return scroll_affects_scroll_handler_;
   }
+  void QueueSwapPromiseForMainThreadScrollUpdate(
+      scoped_ptr<SwapPromise> swap_promise);
 
   bool IsCurrentlyScrolling() const;
 
@@ -549,6 +552,9 @@ class CC_EXPORT LayerTreeHostImpl
   void MarkUIResourceNotEvicted(UIResourceId uid);
 
   void NotifySwapPromiseMonitorsOfSetNeedsRedraw();
+  void NotifySwapPromiseMonitorsOfForwardingToMainThread();
+  void BreakSwapPromisesForMainThreadScrollUpdate(
+      SwapPromise::DidNotSwapReason reason);
 
   typedef base::hash_map<UIResourceId, UIResourceData>
       UIResourceMap;
@@ -595,6 +601,7 @@ class CC_EXPORT LayerTreeHostImpl
   bool wheel_scrolling_;
   bool scroll_affects_scroll_handler_;
   int scroll_layer_id_when_mouse_over_scrollbar_;
+  ScopedPtrVector<SwapPromise> swap_promises_for_main_thread_scroll_update_;
 
   bool tile_priorities_dirty_;
 
@@ -659,7 +666,7 @@ class CC_EXPORT LayerTreeHostImpl
   gfx::Transform external_transform_;
   gfx::Rect external_viewport_;
   gfx::Rect external_clip_;
-  bool device_viewport_valid_for_tile_management_;
+  bool resourceless_software_draw_;
 
   gfx::Rect viewport_damage_rect_;
 

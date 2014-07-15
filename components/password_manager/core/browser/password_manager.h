@@ -113,6 +113,7 @@ class PasswordManager : public LoginModel {
     FORM_BLACKLISTED,
     INVALID_FORM,
     AUTOCOMPLETE_OFF,
+    SYNC_CREDENTIAL,
     MAX_FAILURE_VALUE
   };
 
@@ -183,9 +184,9 @@ class PasswordManager : public LoginModel {
   // The platform-level driver. Must outlive this class.
   PasswordManagerDriver* const driver_;
 
-  // Set to false to disable the password manager (will no longer ask if you
+  // Set to false to disable password saving (will no longer ask if you
   // want to save passwords but will continue to fill passwords).
-  BooleanPrefMember password_manager_enabled_;
+  BooleanPrefMember saving_passwords_enabled_;
 
   // Observers to be notified of LoginModel events.  This is mutable to allow
   // notification in const member functions.

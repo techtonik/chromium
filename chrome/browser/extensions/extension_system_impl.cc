@@ -30,7 +30,6 @@
 #include "chrome/browser/extensions/user_script_master.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
-#include "chrome/browser/ui/webui/extensions/extension_icon_source.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/chrome_version_info.h"
 #include "chrome/common/extensions/extension_constants.h"
@@ -61,6 +60,7 @@
 
 #if defined(ENABLE_EXTENSIONS)
 #include "chrome/browser/extensions/unpacked_installer.h"
+#include "chrome/browser/ui/webui/extensions/extension_icon_source.h"
 #endif
 
 #if defined(ENABLE_NOTIFICATIONS)
@@ -291,7 +291,7 @@ void ExtensionSystemImpl::Shared::Init(bool extensions_enabled) {
   bool allow_noisy_errors = !command_line->HasSwitch(switches::kNoErrorDialogs);
   ExtensionErrorReporter::Init(allow_noisy_errors);
 
-  user_script_master_ = new UserScriptMaster(profile_);
+  user_script_master_.reset(new UserScriptMaster(profile_));
 
   // ExtensionService depends on RuntimeData.
   runtime_data_.reset(new RuntimeData(ExtensionRegistry::Get(profile_)));
@@ -364,8 +364,10 @@ void ExtensionSystemImpl::Shared::Init(bool extensions_enabled) {
   }
   extension_service_->Init();
 
+#if defined(ENABLE_EXTENSIONS)
   // Make the chrome://extension-icon/ resource available.
   content::URLDataSource::Add(profile_, new ExtensionIconSource(profile_));
+#endif
 
   extension_warning_service_.reset(new ExtensionWarningService(profile_));
   extension_warning_badge_service_.reset(

@@ -1605,7 +1605,7 @@ Als het beleid niet wordt ingesteld, of op 'False' wordt ingesteld, wordt het sp
 
       Als je dit beleid instelt, kunnen gebruikers dit niet wijzigen of overschrijven. Gebruikers kunnen echter nog wel een schermtoetsenbord voor toegankelijkheid in-/uitschakelen dat voorrang heeft op het virtuele toetsenbord dat met dit beleid wordt beheerd. Bekijk het beleid |VirtualKeyboardEnabled| voor het beheren van het schermtoetsenbord voor toegankelijkheid.
 
-      Als dit beleid niet wordt ingesteld, wordt het schermtoetsenbord aanvankelijk uitgeschakeld, maar kan dit op elk gewenst moment door de gebruiker worden ingeschakeld. Er kunnen ook heuristische regels worden gebruikt om te bepalen wanneer het toetsenbord weergegeven.</translation>
+      Als dit beleid niet wordt ingesteld, wordt het schermtoetsenbord aanvankelijk uitgeschakeld, maar kan dit op elk gewenst moment door de gebruiker worden ingeschakeld. Er kunnen ook heuristische regels worden gebruikt om te bepalen wanneer het toetsenbord wordt weergegeven.</translation>
 <translation id="6774533686631353488">Hosts voor systeemeigen berichten op gebruikersniveau toestaan (geïnstalleerd zonder beheerdersrechten).</translation>
 <translation id="868187325500643455">Alle sites toestaan automatisch plug-ins uit te voeren</translation>
 <translation id="7421483919690710988">Grootte van mediaschijfcache in bytes instellen</translation>

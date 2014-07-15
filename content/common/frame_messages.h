@@ -209,7 +209,9 @@ IPC_STRUCT_BEGIN(FrameMsg_Navigate_Params)
   // Type of navigation.
   IPC_STRUCT_MEMBER(FrameMsg_Navigate_Type::Value, navigation_type)
 
-  // The time the request was created
+  // The time the request was created. This is used by the old performance
+  // infrastructure to set up DocumentState associated with the RenderView.
+  // TODO(ppi): make it go away.
   IPC_STRUCT_MEMBER(base::Time, request_time)
 
   // Extra headers (separated by \n) to send during the request.
@@ -242,7 +244,7 @@ IPC_STRUCT_BEGIN(FrameMsg_Navigate_Params)
   // If not empty, which frame to navigate.
   IPC_STRUCT_MEMBER(std::string, frame_to_navigate)
 
-  // The navigationStart time to expose to JS for this navigation.
+  // The navigationStart time to expose through the Navigation Timing API to JS.
   IPC_STRUCT_MEMBER(base::TimeTicks, browser_navigation_start)
 IPC_STRUCT_END()
 
@@ -601,9 +603,9 @@ IPC_MESSAGE_ROUTED3(FrameHostMsg_MediaPlayingNotification,
 IPC_MESSAGE_ROUTED1(FrameHostMsg_MediaPausedNotification,
                     int64 /* player_cookie, distinguishes instances */)
 
-// Notify browser the brand color has been changed.
-IPC_MESSAGE_ROUTED1(FrameHostMsg_DidChangeBrandColor,
-                    SkColor /* brand_color */)
+// Notify browser the theme color has been changed.
+IPC_MESSAGE_ROUTED1(FrameHostMsg_DidChangeThemeColor,
+                    SkColor /* theme_color */)
 
 // Response for FrameMsg_TextSurroundingSelectionRequest, |startOffset| and
 // |endOffset| are the offsets of the selection in the returned |content|.

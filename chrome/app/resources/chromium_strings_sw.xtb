@@ -108,7 +108,7 @@ Baadhi ya vipengele huenda visipatikane na mabadiliko katika mapendeleo hayatahi
 <translation id="3258596308407688501">Chromium haiwezi kusoma na kuandika kwenye saraka yake ya data:
 
 <ph name="USER_DATA_DIRECTORY"/></translation>
-<translation id="1869480248812203386">Unaweza kusaidia kuifanya Chromium salama na rahisi zaidi kutumia kwa kuripoti maelezo ya uwezekano wa matukio ya usalama kwenye Google kiotomatiki.</translation>
+<translation id="1869480248812203386">Unaweza kusaidia kuifanya Chromium salama na rahisi zaidi kutumia kwa kuripoti maelezo ya uwezekano wa matukio yasiyo salama kwa Google kiotomatiki.</translation>
 <translation id="6970811910055250180">Inasasisha kifaa chako...</translation>
 <translation id="2485422356828889247">Ondoa</translation>
 <translation id="85843667276690461">Pata msaada kwa kutumia Chromium</translation>
@@ -223,7 +223,7 @@ Kuingia bila kujali kutaunganisha maelezo ya Chromium kama vile alamisho, histor
 <translation id="9013262824292842194">Chromium inahitaji Windows Vista au Windows XP iliyo na SP2 au zaidi.</translation>
 <translation id="1967743265616885482">Kijenzi kilicho na jina sawa kimejulikana kuwa na ukinzani na Chromium.</translation>
 <translation id="8704119203788522458">Hii ni Chromium yako</translation>
-<translation id="8269379391216269538">Saidia ili kuiboresha Chromium zaidi</translation>
+<translation id="8269379391216269538">Saidia ili kuiboresha Chromium</translation>
 <translation id="4224199872375172890">Chromium imesasishwa.</translation>
 <translation id="374481098568514319">Kompyuta hii tayari ina toleo jipya la hivi karibuni zaidi la vijenzi vya Chromium. Tafadhali tumia kisakinishi cha hivi karibuni zaidi.</translation>
 <translation id="6240281849816458190">Ulijaribu kufikia &lt;strong&gt; <ph name="DOMAIN"/> &lt;/ strong&gt;, lakini seva iliwasilisha cheti ambacho bado si halali. Hakuna maelezo ya kuashiria ikiwa cheti hicho kinaweza kuaminika. Chromium haiwezi kutoa hakikisho kwamba unawasiliana na &lt;strong&gt; <ph name="DOMAIN2"/> &lt;/ strong&gt; wala sio mshambulizi. Saa ya kompyuta yako ya kwa sasa imewekwa <ph name="CURRENT_TIME"/> . Je, hilo ni sahihi? Ikiwa sivyo, unapaswa kusahihisha mfumo wako wa saa na kisha uonyeshe upya ukurasa huu.</translation>

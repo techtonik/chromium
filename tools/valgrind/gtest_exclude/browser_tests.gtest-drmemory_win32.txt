@@ -54,6 +54,7 @@ DoNot*
 Down*Ext*
 Down*UI*
 Do*adTest.*
+Do*tTest.*All
 Drive*
 # E*
 ECK*
@@ -81,6 +82,7 @@ Font*gs
 Ftp*
 # G*
 GcdPri*.*Remove
+GcdPri*.*Query
 Gcm*.R*
 GetA*
 Ge*Br*
@@ -138,6 +140,7 @@ PPA*ib*
 PPA*lT*.*
 PPAPIT*.F*
 PPAPIT*.W*
+PPAPIT*.U*3
 # Q*
 # R*
 Red*
