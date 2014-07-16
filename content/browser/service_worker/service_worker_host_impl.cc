@@ -75,17 +75,18 @@ namespace content {
 ServiceWorkerHostImpl::ServiceWorkerHostImpl(
     const GURL& scope,
     scoped_refptr<ServiceWorkerContextWrapper> context_wrapper,
+    const scoped_refptr<ServiceWorkerRegistration>& registration,
     ServiceWorkerHostClient* client)
-    : scope_(scope), context_wrapper_(context_wrapper), ui_thread_(client) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  BrowserThread::PostTask(
-      BrowserThread::IO,
-      FROM_HERE,
-      base::Bind(&ServiceWorkerHostImpl::FindRegistrationOnIO, this));
-}
-
-void ServiceWorkerHostImpl::DisconnectServiceWorkerHostClient() {
-  ui_thread_.client = NULL;
+    : scope_(scope),
+      context_wrapper_(context_wrapper),
+      ui_thread_(client),
+      io_thread_(registration) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  //
+  //
+  //  TODO CONTINUE TO INSTALL
+  //
+  //
 }
 
 const GURL& ServiceWorkerHostImpl::scope() {
@@ -115,41 +116,14 @@ bool ServiceWorkerHostImpl::Send(IPC::Message* message) {
   return true;
 }
 
+void ServiceWorkerHostImpl::DisconnectServiceWorkerHostClient() {
+  ui_thread_.client = NULL;
+}
+
 ServiceWorkerHostImpl::~ServiceWorkerHostImpl() {
   //
   //
   // TODO: Disconnect client from wherever we've registered it
-  //
-  //
-}
-
-void ServiceWorkerHostImpl::FindRegistrationOnIO() {
-  context_wrapper_->context()->storage()->FindRegistrationForPattern(
-      scope_,
-      base::Bind(&ServiceWorkerHostImpl::OnRegistrationFoundOnIO, this));
-}
-
-void ServiceWorkerHostImpl::OnRegistrationFoundOnIO(
-    ServiceWorkerStatusCode status,
-    const scoped_refptr<ServiceWorkerRegistration>& registration) {
-  if (status != SERVICE_WORKER_OK) {  // || !registration->active_version()) {
-    //
-    //
-    // TODO(scheib) Failed to find registration?
-    //
-    //
-    fprintf(stderr,
-            "%s:%s:%d NOT OK: status: %d\n",
-            __FILE__,
-            __FUNCTION__,
-            __LINE__,
-            status);
-    return;
-  }
-  io_thread_.registration = registration;
-  //
-  //
-  //  TODO CONTINUE TO INSTALL
   //
   //
 }
@@ -166,7 +140,9 @@ ServiceWorkerHostImpl::UIThreadMembers::~UIThreadMembers() {
 
 // ServiceWorkerHostImpl::IOThreadMembers
 
-ServiceWorkerHostImpl::IOThreadMembers::IOThreadMembers() {
+ServiceWorkerHostImpl::IOThreadMembers::IOThreadMembers(
+    const scoped_refptr<ServiceWorkerRegistration>& registration)
+    : registration(registration) {
 }
 
 ServiceWorkerHostImpl::IOThreadMembers::~IOThreadMembers() {

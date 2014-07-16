@@ -7,6 +7,7 @@
 
 #include "content/public/browser/service_worker_host.h"
 
+#include "base/memory/ref_counted.h"
 #include "content/common/content_export.h"
 #include "content/common/service_worker/service_worker_status_code.h"
 
@@ -18,15 +19,17 @@ class ServiceWorkerRegistration;
 // Interface to communicate with service workers from any thread. Abstracts the
 // lifetime and active version for calling code; call Send and the messages
 // will be queued as needed and sent to the active service worker.
-class ServiceWorkerHostImpl : public ServiceWorkerHost {
+class ServiceWorkerHostImpl
+    : public ServiceWorkerHost,
+      public base::RefCountedThreadSafe<ServiceWorkerHostImpl> {
  public:
   ServiceWorkerHostImpl(
       const GURL& scope,
       scoped_refptr<ServiceWorkerContextWrapper> context_wrapper,
+      const scoped_refptr<ServiceWorkerRegistration>& registration,
       ServiceWorkerHostClient* client);
 
   // ServiceWorkerHost implementation:
-  virtual void DisconnectServiceWorkerHostClient() OVERRIDE;
   virtual const GURL& scope() OVERRIDE;
   virtual const GURL& script() OVERRIDE;
   virtual bool HasActiveVersion() OVERRIDE;
@@ -34,14 +37,12 @@ class ServiceWorkerHostImpl : public ServiceWorkerHost {
   // IPC::Sender implementation.
   virtual bool Send(IPC::Message* msg) OVERRIDE;
 
+  // Disconnects a ServiceWorkerHostClient, releasing references to it.
+  void DisconnectServiceWorkerHostClient();
+
  private:
   friend class base::RefCountedThreadSafe<ServiceWorkerHostImpl>;
   virtual ~ServiceWorkerHostImpl();
-
-  void FindRegistrationOnIO();
-  void OnRegistrationFoundOnIO(
-      ServiceWorkerStatusCode status,
-      const scoped_refptr<ServiceWorkerRegistration>& registration);
 
   const GURL scope_;
   const GURL script_;  // TODO: implement this existing.
@@ -54,7 +55,8 @@ class ServiceWorkerHostImpl : public ServiceWorkerHost {
   } ui_thread_;
 
   struct IOThreadMembers {
-    IOThreadMembers();
+    IOThreadMembers(
+        const scoped_refptr<ServiceWorkerRegistration>& registration);
     ~IOThreadMembers();
     scoped_refptr<ServiceWorkerRegistration> registration;
   } io_thread_;
