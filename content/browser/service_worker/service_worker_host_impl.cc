@@ -82,11 +82,12 @@ ServiceWorkerHostImpl::ServiceWorkerHostImpl(
       ui_thread_(client),
       io_thread_(registration) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  //
-  //
-  //  TODO CONTINUE TO INSTALL
-  //
-  //
+
+  // Take a reference to to the object instance now. It is released in
+  // DisconnectAndDeleteOnIO(). See class comments Note on Lifetime.
+  AddRef();
+
+  io_thread_.registration->AddListener(this);
 }
 
 const GURL& ServiceWorkerHostImpl::scope() {
@@ -116,8 +117,25 @@ bool ServiceWorkerHostImpl::Send(IPC::Message* message) {
   return true;
 }
 
-void ServiceWorkerHostImpl::DisconnectServiceWorkerHostClient() {
+void ServiceWorkerHostImpl::OnVersionAttributesChanged(
+    ServiceWorkerRegistration* registration,
+    ChangedVersionAttributesMask changed_mask,
+    const ServiceWorkerRegistrationInfo& info) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  //
+  //
+  // TODO cache information to UI thread and inform the client.
+  //
+  //
+}
+
+void ServiceWorkerHostImpl::DisconnectClientAndDeleteOnUI() {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   ui_thread_.client = NULL;
+  BrowserThread::PostTask(
+      BrowserThread::IO,
+      FROM_HERE,
+      base::Bind(&ServiceWorkerHostImpl::DisconnectAndDeleteOnIO, this));
 }
 
 ServiceWorkerHostImpl::~ServiceWorkerHostImpl() {
@@ -126,6 +144,16 @@ ServiceWorkerHostImpl::~ServiceWorkerHostImpl() {
   // TODO: Disconnect client from wherever we've registered it
   //
   //
+}
+
+void ServiceWorkerHostImpl::DisconnectAndDeleteOnIO() {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  io_thread_.registration->RemoveListener(this);
+
+  // Release reference from constructor. See class comments Note on Lifetime.
+  Release();
+  // We are likely be destroyed here! Callbacks in message queues may still
+  // hold references.
 }
 
 // ServiceWorkerHostImpl::UIThreadMembers
