@@ -57,8 +57,14 @@ void ServiceWorkerManager::RegisterExtension(const Extension* extension) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   CHECK(BackgroundInfo::HasServiceWorker(extension));
   Registration* registration = registrations_[extension->id()].get();
-  if (!registration)
-    registrations_[extension->id()].reset(registration = new Registration());
+  //
+  //
+  // TODO Handle a registration object already existing?
+  //
+  //
+  DCHECK(!registration);
+  registrations_[extension->id()].reset(registration = new Registration());
+
   if (registration->state == REGISTERING || registration->state == REGISTERED)
     return;
   registration->state = REGISTERING;
