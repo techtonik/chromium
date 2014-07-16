@@ -5,23 +5,17 @@
 #ifndef CONTENT_PUBLIC_BROWSER_SERVICE_WORKER_HOST_H_
 #define CONTENT_PUBLIC_BROWSER_SERVICE_WORKER_HOST_H_
 
-#include "base/memory/ref_counted.h"
 #include "ipc/ipc_sender.h"
 #include "url/gurl.h"
 
 namespace content {
 
 class ServiceWorkerHostClient;
-class ServiceWorkerHostImpl;
 
 // Interface to communicate with service workers from the UI thread. Abstracts
 // the lifetime and active version for calling code.
-class ServiceWorkerHost : public IPC::Sender,
-                          public base::RefCountedThreadSafe<ServiceWorkerHost> {
+class ServiceWorkerHost : public IPC::Sender {
  public:
-  // Disconnects a ServiceWorkerHostClient, releasing references to it.
-  virtual void DisconnectServiceWorkerHostClient();
-
   // Identifying attributes.
   virtual const GURL& scope() = 0;
   virtual const GURL& script() = 0;
@@ -46,7 +40,6 @@ class ServiceWorkerHost : public IPC::Sender,
   virtual ~ServiceWorkerHost() {}
 
  private:
-  friend class base::RefCountedThreadSafe<ServiceWorkerHost>;
   DISALLOW_COPY_AND_ASSIGN(ServiceWorkerHost);
 };
 

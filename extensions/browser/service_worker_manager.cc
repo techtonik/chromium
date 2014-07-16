@@ -75,9 +75,8 @@ void ServiceWorkerManager::RegisterExtension(const Extension* extension) {
                  extension->id()));
 }
 
-void ServiceWorkerManager::FinishRegistration(
-    const ExtensionId& extension_id,
-    scoped_refptr<content::ServiceWorkerHost> service_worker_host) {
+void ServiceWorkerManager::FinishRegistration(const ExtensionId& extension_id,
+                                              bool success) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   Registration* registration = registrations_[extension_id].get();
   --registration->outstanding_state_changes;
@@ -86,9 +85,8 @@ void ServiceWorkerManager::FinishRegistration(
     return;
 
   DCHECK_EQ(registration->state, REGISTERING);
-  if (service_worker_host) {
+  if (success) {
     registration->state = REGISTERED;
-    registration->set_service_worker_host(service_worker_host);
     registration->registration_callbacks.RunSuccessCallbacksAndClear();
   } else {
     LOG(ERROR) << "Service Worker Registration failed for extension "

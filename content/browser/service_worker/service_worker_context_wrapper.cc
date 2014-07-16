@@ -13,7 +13,6 @@
 #include "content/browser/service_worker/service_worker_process_manager.h"
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/public/browser/browser_thread.h"
-#include "content/public/browser/service_worker_host.h"
 #include "content/public/browser/service_worker_host_client.h"
 #include "ipc/ipc_message.h"
 #include "webkit/browser/quota/quota_manager_proxy.h"
@@ -91,7 +90,7 @@ void ServiceWorkerContextWrapper::RegisterServiceWorker(
     const Scope& scope,
     const GURL& script_url,
     ServiceWorkerHostClient* client,
-    const ServiceWorkerHostCallback& callback) {
+    const ResultCallback& callback) {
   if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
     BrowserThread::PostTask(
         BrowserThread::IO,
@@ -138,21 +137,25 @@ void ServiceWorkerContextWrapper::UnregisterServiceWorker(
 void ServiceWorkerContextWrapper::GetServiceWorkerHost(
     const Scope& scope,
     ServiceWorkerHostClient* client,
-    const ServiceWorkerHostCallback& callback) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  if (scope.is_empty()) {
-    // FinishRegistrationOnIO calls this function with empty scope to create a
-    // NULL response.
-    callback.Run(scoped_refptr<ServiceWorkerHost>());
-  } else {
-    //
-    //
-    // TODO look up registration, and create a Host only if one found.
-    //
-    //
-    callback.Run(scoped_refptr<ServiceWorkerHost>(
-        new ServiceWorkerHostImpl(scope, this, client)));
+    const ResultCallback& callback) {
+  if (!BrowserThread::CurrentlyOn(BrowserThread::IO)) {
+    BrowserThread::PostTask(
+        BrowserThread::IO,
+        FROM_HERE,
+        base::Bind(&ServiceWorkerContextWrapper::UnregisterServiceWorker,
+                   this,
+                   scope,
+                   callback));
+    return;
   }
+
+  context()->storage()->FindRegistrationForPattern(
+      scope,
+      base::Bind(&ServiceWorkerContextWrapper::FinishGetServiceWorkerHostOnIO,
+                 this,
+                 scope,
+                 client,
+                 callback));
 }
 
 void ServiceWorkerContextWrapper::Terminate() {
@@ -215,21 +218,30 @@ void ServiceWorkerContextWrapper::DidDeleteAndStartOver(
 void ServiceWorkerContextWrapper::FinishRegistrationOnIO(
     const Scope& scope,
     ServiceWorkerHostClient* client,
-    const ServiceWorkerHostCallback& callback,
+    const ResultCallback& callback,
     ServiceWorkerStatusCode status,
     int64 registration_id,
     int64 version_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  Scope scope_if_status_ok = (status == SERVICE_WORKER_OK) ? scope : GURL();
+  if (status == SERVICE_WORKER_OK) {
+    GetServiceWorkerHost(scope, client, callback);
+  } else {
+    PostResultToUIFromStatusOnIO(callback, status);
+  }
+}
 
-  BrowserThread::PostTask(
-      BrowserThread::UI,
-      FROM_HERE,
-      base::Bind(&ServiceWorkerContextWrapper::GetServiceWorkerHost,
-                 this,
-                 scope_if_status_ok,
-                 client,
-                 callback));
+void ServiceWorkerContextWrapper::FinishGetServiceWorkerHostOnIO(
+    const Scope& scope,
+    ServiceWorkerHostClient* client,
+    const ServiceWorkerContext::ResultCallback& callback,
+    ServiceWorkerStatusCode status,
+    const scoped_refptr<ServiceWorkerRegistration>& registration) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  if (status == SERVICE_WORKER_OK && client) {
+    client->set_service_worker_host(
+        new ServiceWorkerHostImpl(scope, this, registration, client));
+  }
+  PostResultToUIFromStatusOnIO(callback, status);
 }
 
 }  // namespace content

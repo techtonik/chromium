@@ -60,18 +60,16 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
   }
 
   // ServiceWorkerContext implementation:
-  virtual void RegisterServiceWorker(
-      const Scope& scope,
-      const GURL& script_url,
-      ServiceWorkerHostClient* client,
-      const ServiceWorkerHostCallback& callback) OVERRIDE;
+  virtual void RegisterServiceWorker(const Scope& scope,
+                                     const GURL& script_url,
+                                     ServiceWorkerHostClient* client,
+                                     const ResultCallback& callback) OVERRIDE;
   virtual void UnregisterServiceWorker(const GURL& pattern,
                                        const ResultCallback& callback) OVERRIDE;
   virtual void Terminate() OVERRIDE;
-  virtual void GetServiceWorkerHost(
-      const Scope& scope,
-      ServiceWorkerHostClient* client,
-      const ServiceWorkerHostCallback& callback) OVERRIDE;
+  virtual void GetServiceWorkerHost(const Scope& scope,
+                                    ServiceWorkerHostClient* client,
+                                    const ResultCallback& callback) OVERRIDE;
 
   void AddObserver(ServiceWorkerContextObserver* observer);
   void RemoveObserver(ServiceWorkerContextObserver* observer);
@@ -95,10 +93,18 @@ class CONTENT_EXPORT ServiceWorkerContextWrapper
   // Completes the registration process on IO thread.
   void FinishRegistrationOnIO(const Scope& scope,
                               ServiceWorkerHostClient* client,
-                              const ServiceWorkerHostCallback& callback,
+                              const ResultCallback& callback,
                               ServiceWorkerStatusCode status,
                               int64 registration_id,
                               int64 version_id);
+
+  // Completes registration & construction of a ServiceWorkerHost on IO thread.
+  void FinishGetServiceWorkerHostOnIO(
+      const Scope& scope,
+      ServiceWorkerHostClient* client,
+      const ServiceWorkerContext::ResultCallback& callback,
+      ServiceWorkerStatusCode status,
+      const scoped_refptr<ServiceWorkerRegistration>& registration);
 
   const scoped_refptr<ObserverListThreadSafe<ServiceWorkerContextObserver> >
       observer_list_;

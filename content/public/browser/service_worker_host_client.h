@@ -12,6 +12,7 @@
 namespace content {
 
 class ServiceWorkerHost;
+class ServiceWorkerHostImpl;
 
 // Interface for clients of ServiceWorkerHost listening to messages from service
 // worker version farthest along the install flow, typically the current active
@@ -28,11 +29,9 @@ class CONTENT_EXPORT ServiceWorkerHostClient : public IPC::Listener {
  public:
   ServiceWorkerHostClient();
 
-  ServiceWorkerHost* service_worker_host() {
-    return service_worker_host_.get();
-  }
+  ServiceWorkerHost* service_worker_host();
   void set_service_worker_host(
-      const scoped_refptr<ServiceWorkerHost>& service_worker_host);
+      const scoped_refptr<ServiceWorkerHostImpl>& service_worker_host);
 
   // When the service worker being listened to changes version (to a new one,
   // or to an unregistered state).
@@ -41,7 +40,7 @@ class CONTENT_EXPORT ServiceWorkerHostClient : public IPC::Listener {
  protected:
   virtual ~ServiceWorkerHostClient();
 
-  scoped_refptr<ServiceWorkerHost> service_worker_host_;
+  scoped_refptr<ServiceWorkerHostImpl> service_worker_host_;
 };
 
 }  // namespace content

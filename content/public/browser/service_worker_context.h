@@ -23,8 +23,6 @@ class ServiceWorkerContext {
   // roughly, must be of the form "<origin>/<path>/*".
   typedef GURL Scope;
 
-  typedef base::Callback<void(scoped_refptr<ServiceWorkerHost>)>
-      ServiceWorkerHostCallback;
   typedef base::Callback<void(bool)> ResultCallback;
 
   // Equivalent to calling navigator.serviceWorker.register(script_url, {scope:
@@ -42,11 +40,10 @@ class ServiceWorkerContext {
   //  * |script_url| fails to parse or its top-level execution fails.
   //    TODO: The error message for this needs to be available to developers.
   //  * Something unexpected goes wrong, like a renderer crash or a full disk.
-  virtual void RegisterServiceWorker(
-      const Scope& scope,
-      const GURL& script_url,
-      ServiceWorkerHostClient* client,
-      const ServiceWorkerHostCallback& callback) = 0;
+  virtual void RegisterServiceWorker(const Scope& scope,
+                                     const GURL& script_url,
+                                     ServiceWorkerHostClient* client,
+                                     const ResultCallback& callback) = 0;
 
   // Equivalent to calling navigator.serviceWorker.unregister(pattern) from a
   // renderer, except that |pattern| is an absolute URL instead of relative to
@@ -70,10 +67,9 @@ class ServiceWorkerContext {
   // Optionally provide a |client| for communication from the service worker.
   //
   // |callback| is run on UI thread.
-  virtual void GetServiceWorkerHost(
-      const Scope& scope,
-      ServiceWorkerHostClient* client,
-      const ServiceWorkerHostCallback& callback) = 0;
+  virtual void GetServiceWorkerHost(const Scope& scope,
+                                    ServiceWorkerHostClient* client,
+                                    const ResultCallback& callback) = 0;
 
   // Synchronously releases all of the RenderProcessHosts that have Service
   // Workers running inside them, and prevents any new Service Worker instances
