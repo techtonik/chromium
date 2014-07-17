@@ -60,13 +60,21 @@ class ServiceWorkerManager : public KeyedService {
                         const base::Closure& success,
                         const base::Closure& failure);
 
-  // Calls |success| when |extension| has an active service worker.  If
-  // |extension| does not have a pending active version or starts being
-  // unregistered completes, calls |failure| instead.
-  void WhenActive(const Extension* extension,
-                  const tracked_objects::Location& from_here,
-                  const base::Closure& success,
-                  const base::Closure& failure);
+  // Calls |success| when |extension| has an installed service worker.  Calls
+  // |falure| if |extension| has not started the registration process or has
+  // been unregistered.
+  void WhenInstalled(const Extension* extension,
+                     const tracked_objects::Location& from_here,
+                     const base::Closure& success,
+                     const base::Closure& failure);
+
+  // Calls |success| when |extension| has an actived service worker.  Calls
+  // |falure| if |extension| has not started the registration process or has
+  // been unregistered.
+  void WhenActivated(const Extension* extension,
+                     const tracked_objects::Location& from_here,
+                     const base::Closure& success,
+                     const base::Closure& failure);
 
   // Returns the ServiceWorkerHost for an extension, or NULL if none registered.
   //
@@ -127,12 +135,13 @@ class ServiceWorkerManager : public KeyedService {
     VectorOfClosurePairs registration_callbacks;
     // Can be non-empty during UNREGISTERING.
     VectorOfClosurePairs unregistration_callbacks;
-    // Can be non-empty any time.
-    VectorOfClosurePairs activation_callbacks;
+    VectorOfClosurePairs installed_callbacks;
+    VectorOfClosurePairs activated_callbacks;
     Registration();
     virtual ~Registration();
 
     // content::ServiceWorkerHostClient interface:
+    virtual void OnInstalled() OVERRIDE;
     virtual void OnActivated() OVERRIDE;
 
     // IPC::Listener interface:
@@ -140,6 +149,13 @@ class ServiceWorkerManager : public KeyedService {
   };
   typedef base::hash_map<ExtensionId, linked_ptr<Registration> >
       RegistrationMap;
+
+  // Returns the registration for an id from registrations_, or returns NULL.
+  Registration* FindRegistration(ExtensionId id);
+  Registration* FindRegistration(const Extension* extension) {
+    return FindRegistration(extension->id());
+  }
+
   RegistrationMap registrations_;
 
   base::WeakPtrFactory<ServiceWorkerManager> weak_this_factory_;

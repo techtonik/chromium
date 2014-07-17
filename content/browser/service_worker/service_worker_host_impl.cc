@@ -99,7 +99,12 @@ const GURL& ServiceWorkerHostImpl::script() {
   return script_;
 }
 
-bool ServiceWorkerHostImpl::HasHadActiveVersion() {
+bool ServiceWorkerHostImpl::HasInstalled() {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  return ui_thread_.has_installed;
+}
+
+bool ServiceWorkerHostImpl::HasActivated() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   return ui_thread_.has_activated;
 }
@@ -162,6 +167,12 @@ void ServiceWorkerHostImpl::OnVersionAttributesChangedOnUI(
   if (!ui_thread_.client)
     return;
 
+  if (!ui_thread_.has_installed &&
+      info.active_version.status == ServiceWorkerVersion::INSTALLED) {
+    ui_thread_.has_installed = true;
+    ui_thread_.client->OnInstalled();
+  }
+
   if (!ui_thread_.has_activated &&
       info.active_version.status == ServiceWorkerVersion::ACTIVATED) {
     ui_thread_.has_activated = true;
@@ -173,7 +184,7 @@ void ServiceWorkerHostImpl::OnVersionAttributesChangedOnUI(
 
 ServiceWorkerHostImpl::UIThreadMembers::UIThreadMembers(
     ServiceWorkerHostClient* client)
-    : client(client), has_activated(false) {
+    : client(client), has_installed(false), has_activated(false) {
 }
 
 ServiceWorkerHostImpl::UIThreadMembers::~UIThreadMembers() {

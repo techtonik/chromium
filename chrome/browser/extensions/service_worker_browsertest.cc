@@ -52,15 +52,27 @@ class ExtensionServiceWorkerBrowserTest : public ExtensionBrowserTest {
     run_loop.Run();
   }
 
-  void WaitUntilActive(const Extension* extension) {
+  void WaitUntilInstalled(const Extension* extension) {
     base::RunLoop run_loop;
     ServiceWorkerManager::Get(profile())
-        ->WhenActive(extension,
-                     FROM_HERE,
-                     run_loop.QuitClosure(),
-                     base::Bind(FailTest,
-                                "Extension failed to become active.",
-                                run_loop.QuitClosure()));
+        ->WhenInstalled(extension,
+                        FROM_HERE,
+                        run_loop.QuitClosure(),
+                        base::Bind(FailTest,
+                                   "Extension failed to become installed.",
+                                   run_loop.QuitClosure()));
+    run_loop.Run();
+  }
+
+  void WaitUntilActivated(const Extension* extension) {
+    base::RunLoop run_loop;
+    ServiceWorkerManager::Get(profile())
+        ->WhenActivated(extension,
+                        FROM_HERE,
+                        run_loop.QuitClosure(),
+                        base::Bind(FailTest,
+                                   "Extension failed to become activated.",
+                                   run_loop.QuitClosure()));
     run_loop.Run();
   }
 
@@ -209,15 +221,14 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
 
 // Disabled as it hangs waiting for active. content::ServiceWorkerHostClient
 // needs to be implemented for this to work.
-IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
-                       DISABLED_WaitUntilActive) {
+IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, WaitUntilInstalled) {
   ext_dir_.WriteManifest(kServiceWorkerManifest);
   ext_dir_.WriteFile(FILE_PATH_LITERAL("service_worker.js"), "");
 
   scoped_refptr<const Extension> extension =
       LoadExtension(ext_dir_.unpacked_path());
   WaitUntilRegistered(extension.get());
-  WaitUntilActive(extension.get());
+  WaitUntilInstalled(extension.get());
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,

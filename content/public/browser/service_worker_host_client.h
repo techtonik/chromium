@@ -32,7 +32,8 @@ class CONTENT_EXPORT ServiceWorkerHostClient : public IPC::Listener {
     service_worker_host_ = service_worker_host;
   }
 
-  // Called when a service worker has been installed and activated.
+  // Called when a service worker has been installed, activated:
+  virtual void OnInstalled() {}
   virtual void OnActivated() {}
 
  protected:
