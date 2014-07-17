@@ -27,26 +27,9 @@ using base::WeakPtr;
 using content::BrowserContext;
 using content::BrowserThread;
 
-ServiceWorkerManager::ServiceWorkerManager(BrowserContext* context)
-    : context_(context), weak_this_factory_(this) {
-}
-ServiceWorkerManager::~ServiceWorkerManager() {
-}
-
 ServiceWorkerManager* ServiceWorkerManager::Get(
     content::BrowserContext* context) {
   return ServiceWorkerManagerFactory::GetForBrowserContext(context);
-}
-
-content::StoragePartition* ServiceWorkerManager::GetStoragePartition(
-    const ExtensionId& ext_id) const {
-  return content::BrowserContext::GetStoragePartitionForSite(
-      context_, Extension::GetBaseURLFromExtensionId(ext_id));
-}
-
-content::ServiceWorkerContext* ServiceWorkerManager::GetSWContext(
-    const ExtensionId& ext_id) const {
-  return GetStoragePartition(ext_id)->GetServiceWorkerContext();
 }
 
 // alecflett says that if we send a series of RegisterServiceWorker and
@@ -81,27 +64,6 @@ void ServiceWorkerManager::RegisterExtension(const Extension* extension) {
                  extension->id()));
 }
 
-void ServiceWorkerManager::FinishRegistration(const ExtensionId& extension_id,
-                                              bool success) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  Registration* registration = registrations_[extension_id].get();
-  --registration->outstanding_state_changes;
-  DCHECK_GE(registration->outstanding_state_changes, 0);
-  if (registration->outstanding_state_changes > 0)
-    return;
-
-  DCHECK_EQ(registration->state, REGISTERING);
-  if (success) {
-    registration->state = REGISTERED;
-    registration->registration_callbacks.RunSuccessCallbacksAndClear();
-  } else {
-    LOG(ERROR) << "Service Worker Registration failed for extension "
-               << extension_id;
-    registration->registration_callbacks.RunFailureCallbacksAndClear();
-    registrations_.erase(extension_id);
-  }
-}
-
 void ServiceWorkerManager::UnregisterExtension(const Extension* extension) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   CHECK(BackgroundInfo::HasServiceWorker(extension));
@@ -118,29 +80,6 @@ void ServiceWorkerManager::UnregisterExtension(const Extension* extension) {
       base::Bind(&ServiceWorkerManager::FinishUnregistration,
                  WeakThis(),
                  extension->id()));
-}
-
-void ServiceWorkerManager::FinishUnregistration(const ExtensionId& extension_id,
-                                                bool success) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  Registration* registration = registrations_[extension_id].get();
-  --registration->outstanding_state_changes;
-  DCHECK_GE(registration->outstanding_state_changes, 0);
-  if (registration->outstanding_state_changes > 0)
-    return;
-
-  DCHECK_EQ(registration->state, UNREGISTERING);
-  if (success) {
-    registration->unregistration_callbacks.RunSuccessCallbacksAndClear();
-    registration->installed_callbacks.RunFailureCallbacksAndClear();
-    registration->activated_callbacks.RunFailureCallbacksAndClear();
-    registrations_.erase(extension_id);
-  } else {
-    LOG(ERROR) << "Service Worker Unregistration failed for extension "
-               << extension_id;
-    registration->state = REGISTERED;
-    registration->unregistration_callbacks.RunFailureCallbacksAndClear();
-  }
 }
 
 void ServiceWorkerManager::WhenRegistered(
@@ -241,10 +180,6 @@ content::ServiceWorkerHost* ServiceWorkerManager::GetServiceWorkerHost(
   return registration->service_worker_host();
 }
 
-WeakPtr<ServiceWorkerManager> ServiceWorkerManager::WeakThis() {
-  return weak_this_factory_.GetWeakPtr();
-}
-
 // ServiceWorkerManager::SuccessFailureClosurePair
 
 ServiceWorkerManager::SuccessFailureClosurePair::SuccessFailureClosurePair(
@@ -298,6 +233,74 @@ bool ServiceWorkerManager::Registration::OnMessageReceived(
   //
   NOTIMPLEMENTED();
   return false;
+}
+
+// ServiceWorkerManager private:
+
+ServiceWorkerManager::ServiceWorkerManager(BrowserContext* context)
+    : context_(context), weak_this_factory_(this) {
+}
+
+ServiceWorkerManager::~ServiceWorkerManager() {
+}
+
+void ServiceWorkerManager::FinishRegistration(const ExtensionId& extension_id,
+                                              bool success) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  Registration* registration = registrations_[extension_id].get();
+  --registration->outstanding_state_changes;
+  DCHECK_GE(registration->outstanding_state_changes, 0);
+  if (registration->outstanding_state_changes > 0)
+    return;
+
+  DCHECK_EQ(registration->state, REGISTERING);
+  if (success) {
+    registration->state = REGISTERED;
+    registration->registration_callbacks.RunSuccessCallbacksAndClear();
+  } else {
+    LOG(ERROR) << "Service Worker Registration failed for extension "
+               << extension_id;
+    registration->registration_callbacks.RunFailureCallbacksAndClear();
+    registrations_.erase(extension_id);
+  }
+}
+
+void ServiceWorkerManager::FinishUnregistration(const ExtensionId& extension_id,
+                                                bool success) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  Registration* registration = registrations_[extension_id].get();
+  --registration->outstanding_state_changes;
+  DCHECK_GE(registration->outstanding_state_changes, 0);
+  if (registration->outstanding_state_changes > 0)
+    return;
+
+  DCHECK_EQ(registration->state, UNREGISTERING);
+  if (success) {
+    registration->unregistration_callbacks.RunSuccessCallbacksAndClear();
+    registration->installed_callbacks.RunFailureCallbacksAndClear();
+    registration->activated_callbacks.RunFailureCallbacksAndClear();
+    registrations_.erase(extension_id);
+  } else {
+    LOG(ERROR) << "Service Worker Unregistration failed for extension "
+               << extension_id;
+    registration->state = REGISTERED;
+    registration->unregistration_callbacks.RunFailureCallbacksAndClear();
+  }
+}
+
+content::StoragePartition* ServiceWorkerManager::GetStoragePartition(
+    const ExtensionId& ext_id) const {
+  return content::BrowserContext::GetStoragePartitionForSite(
+      context_, Extension::GetBaseURLFromExtensionId(ext_id));
+}
+
+content::ServiceWorkerContext* ServiceWorkerManager::GetSWContext(
+    const ExtensionId& ext_id) const {
+  return GetStoragePartition(ext_id)->GetServiceWorkerContext();
+}
+
+WeakPtr<ServiceWorkerManager> ServiceWorkerManager::WeakThis() {
+  return weak_this_factory_.GetWeakPtr();
 }
 
 ServiceWorkerManager::Registration* ServiceWorkerManager::FindRegistration(

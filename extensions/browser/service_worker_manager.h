@@ -87,21 +87,6 @@ class ServiceWorkerManager : public KeyedService {
  private:
   friend class ServiceWorkerManagerFactory;
 
-  ServiceWorkerManager(content::BrowserContext* context);
-  virtual ~ServiceWorkerManager();
-
-  inline content::StoragePartition* GetStoragePartition(
-      const ExtensionId& ext_id) const;
-  inline content::ServiceWorkerContext* GetSWContext(
-      const ExtensionId& ext_id) const;
-  inline base::WeakPtr<ServiceWorkerManager> WeakThis();
-
-  void FinishRegistration(const ExtensionId& extension_id, bool success);
-  void FinishUnregistration(const ExtensionId& extension_id, bool success);
-  void ServiceWorkerHasActiveVersion(const ExtensionId& extension_id);
-
-  content::BrowserContext* const context_;
-
   enum RegistrationState {
     // Represented by not being in the map.
     UNREGISTERED,
@@ -121,6 +106,7 @@ class ServiceWorkerManager : public KeyedService {
     base::Closure success;
     base::Closure failure;
   };
+
   // Stores vector of <success, failure> pairs of callbacks.
   class VectorOfClosurePairs : public std::vector<SuccessFailureClosurePair> {
    public:
@@ -128,6 +114,7 @@ class ServiceWorkerManager : public KeyedService {
     void RunSuccessCallbacksAndClear();
     void RunFailureCallbacksAndClear();
   };
+
   struct Registration : public content::ServiceWorkerHostClient {
     RegistrationState state;
     int outstanding_state_changes;
@@ -147,8 +134,21 @@ class ServiceWorkerManager : public KeyedService {
     // IPC::Listener interface:
     virtual bool OnMessageReceived(const IPC::Message& message) OVERRIDE;
   };
+
   typedef base::hash_map<ExtensionId, linked_ptr<Registration> >
       RegistrationMap;
+
+  ServiceWorkerManager(content::BrowserContext* context);
+  virtual ~ServiceWorkerManager();
+
+  void FinishRegistration(const ExtensionId& extension_id, bool success);
+  void FinishUnregistration(const ExtensionId& extension_id, bool success);
+
+  inline content::StoragePartition* GetStoragePartition(
+      const ExtensionId& ext_id) const;
+  inline content::ServiceWorkerContext* GetSWContext(
+      const ExtensionId& ext_id) const;
+  inline base::WeakPtr<ServiceWorkerManager> WeakThis();
 
   // Returns the registration for an id from registrations_, or returns NULL.
   Registration* FindRegistration(ExtensionId id);
@@ -156,8 +156,9 @@ class ServiceWorkerManager : public KeyedService {
     return FindRegistration(extension->id());
   }
 
+  content::BrowserContext* const context_;
   RegistrationMap registrations_;
-
+  // WeakPtrFactory Should be last member, see WeakPtrFactory doc.
   base::WeakPtrFactory<ServiceWorkerManager> weak_this_factory_;
 };
 
