@@ -133,7 +133,7 @@ class ServiceWorkerManager : public KeyedService {
     virtual ~Registration();
 
     // content::ServiceWorkerHostClient interface:
-    virtual void OnVersionChanged() OVERRIDE;
+    virtual void OnActivated() OVERRIDE;
 
     // IPC::Listener interface:
     virtual bool OnMessageReceived(const IPC::Message& message) OVERRIDE;

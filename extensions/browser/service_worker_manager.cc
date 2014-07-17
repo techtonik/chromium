@@ -218,7 +218,7 @@ void ServiceWorkerManager::WhenActive(
       base::MessageLoop::current()->PostTask(from_here, failure);
       break;
     case REGISTERED:
-      if (registration->service_worker_host()->HasActiveVersion()) {
+      if (registration->service_worker_host()->HasHadActiveVersion()) {
         base::MessageLoop::current()->PostTask(from_here, success);
       } else {
         registration->activation_callbacks.push_back(
@@ -280,14 +280,10 @@ ServiceWorkerManager::Registration::Registration()
 ServiceWorkerManager::Registration::~Registration() {
 }
 
-void ServiceWorkerManager::Registration::OnVersionChanged() {
+void ServiceWorkerManager::Registration::OnActivated() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   DCHECK(service_worker_host());
-  if (service_worker_host()->HasActiveVersion()) {
-    activation_callbacks.RunSuccessCallbacksAndClear();
-  } else {
-    activation_callbacks.RunFailureCallbacksAndClear();
-  }
+  activation_callbacks.RunSuccessCallbacksAndClear();
 }
 
 bool ServiceWorkerManager::Registration::OnMessageReceived(

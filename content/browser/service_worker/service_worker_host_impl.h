@@ -39,7 +39,7 @@ class ServiceWorkerHostImpl
   // ServiceWorkerHost implementation:
   virtual const GURL& scope() OVERRIDE;
   virtual const GURL& script() OVERRIDE;
-  virtual bool HasActiveVersion() OVERRIDE;
+  virtual bool HasHadActiveVersion() OVERRIDE;
 
   // IPC::Sender implementation:
   virtual bool Send(IPC::Message* msg) OVERRIDE;
@@ -61,6 +61,12 @@ class ServiceWorkerHostImpl
   // Completes destruction of this object on the IO thread.
   void DisconnectAndDeleteOnIO();
 
+  // Completes handling of OnVersionAttributesChanged on UI thread by calling
+  // ServiceWorkerHostClient handlers.
+  void OnVersionAttributesChangedOnUI(
+      ChangedVersionAttributesMask changed_mask,
+      const ServiceWorkerRegistrationInfo& info);
+
   const GURL scope_;
   const GURL script_;  // TODO: implement this existing.
   scoped_refptr<ServiceWorkerContextWrapper> context_wrapper_;
@@ -69,6 +75,7 @@ class ServiceWorkerHostImpl
     UIThreadMembers(ServiceWorkerHostClient* client);
     ~UIThreadMembers();
     ServiceWorkerHostClient* client;  // Can be NULL when disconnecting.
+    bool has_activated;
   } ui_thread_;
 
   struct IOThreadMembers {
