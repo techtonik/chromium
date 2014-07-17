@@ -39,7 +39,8 @@ class ServiceWorkerHostImpl
   // ServiceWorkerHost implementation:
   virtual const GURL& scope() OVERRIDE;
   virtual const GURL& script() OVERRIDE;
-  virtual bool HasHadActiveVersion() OVERRIDE;
+  virtual bool HasInstalled() OVERRIDE;
+  virtual bool HasActivated() OVERRIDE;
 
   // IPC::Sender implementation:
   virtual bool Send(IPC::Message* msg) OVERRIDE;
@@ -75,6 +76,7 @@ class ServiceWorkerHostImpl
     UIThreadMembers(ServiceWorkerHostClient* client);
     ~UIThreadMembers();
     ServiceWorkerHostClient* client;  // Can be NULL when disconnecting.
+    bool has_installed;
     bool has_activated;
   } ui_thread_;
 
