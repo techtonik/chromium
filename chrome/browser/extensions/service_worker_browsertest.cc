@@ -219,16 +219,25 @@ IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, InstallAndUninstall) {
   }
 }
 
-// Disabled as it hangs waiting for active. content::ServiceWorkerHostClient
-// needs to be implemented for this to work.
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest, WaitUntilInstalled) {
   ext_dir_.WriteManifest(kServiceWorkerManifest);
   ext_dir_.WriteFile(FILE_PATH_LITERAL("service_worker.js"), "");
-
   scoped_refptr<const Extension> extension =
       LoadExtension(ext_dir_.unpacked_path());
-  WaitUntilRegistered(extension.get());
   WaitUntilInstalled(extension.get());
+}
+
+// Disabled due to hanging. Activation is not completing.
+IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,
+                       DISABLED_WaitUntilActivated) {
+  ext_dir_.WriteManifest(kServiceWorkerManifest);
+  ext_dir_.WriteFile(FILE_PATH_LITERAL("service_worker.js"),
+                     "this.onactivate = function(event) {"
+                     "  console.log('ok');"
+                     "};");
+  scoped_refptr<const Extension> extension =
+      LoadExtension(ext_dir_.unpacked_path());
+  WaitUntilActivated(extension.get());
 }
 
 IN_PROC_BROWSER_TEST_F(ExtensionServiceWorkerBrowserTest,

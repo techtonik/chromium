@@ -145,7 +145,8 @@ void ServiceWorkerManager::WhenInstalled(
     return;
   }
 
-  if (registration->service_worker_host()->HasInstalled()) {
+  if (registration->service_worker_host() &&
+      registration->service_worker_host()->HasInstalled()) {
     base::MessageLoop::current()->PostTask(from_here, success);
   } else {
     registration->installed_callbacks.push_back(
@@ -164,7 +165,8 @@ void ServiceWorkerManager::WhenActivated(
     return;
   }
 
-  if (registration->service_worker_host()->HasActivated()) {
+  if (registration->service_worker_host() &&
+      registration->service_worker_host()->HasActivated()) {
     base::MessageLoop::current()->PostTask(from_here, success);
   } else {
     registration->activated_callbacks.push_back(
