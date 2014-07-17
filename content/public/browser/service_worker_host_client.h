@@ -32,9 +32,8 @@ class CONTENT_EXPORT ServiceWorkerHostClient : public IPC::Listener {
     service_worker_host_ = service_worker_host;
   }
 
-  // When the service worker being listened to changes version (to a new one,
-  // or to an unregistered state).
-  virtual void OnVersionChanged() {}
+  // Called when a service worker has been installed and activated.
+  virtual void OnActivated() {}
 
  protected:
   virtual ~ServiceWorkerHostClient();

@@ -8,6 +8,7 @@
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/browser/service_worker/service_worker_version.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/service_worker_host_client.h"
 #include "ipc/ipc_message.h"
 
 namespace {
@@ -98,13 +99,9 @@ const GURL& ServiceWorkerHostImpl::script() {
   return script_;
 }
 
-bool ServiceWorkerHostImpl::HasActiveVersion() {
-  //
-  //
-  // TODO
-  //
-  //
-  return false;
+bool ServiceWorkerHostImpl::HasHadActiveVersion() {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  return ui_thread_.has_activated;
 }
 
 bool ServiceWorkerHostImpl::Send(IPC::Message* message) {
@@ -122,11 +119,13 @@ void ServiceWorkerHostImpl::OnVersionAttributesChanged(
     ChangedVersionAttributesMask changed_mask,
     const ServiceWorkerRegistrationInfo& info) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  //
-  //
-  // TODO cache information to UI thread and inform the client.
-  //
-  //
+  BrowserThread::PostTask(
+      BrowserThread::UI,
+      FROM_HERE,
+      base::Bind(&ServiceWorkerHostImpl::OnVersionAttributesChangedOnUI,
+                 this,
+                 changed_mask,
+                 info));
 }
 
 void ServiceWorkerHostImpl::DisconnectClientAndDeleteOnUI() {
@@ -156,11 +155,25 @@ void ServiceWorkerHostImpl::DisconnectAndDeleteOnIO() {
   // hold references.
 }
 
+void ServiceWorkerHostImpl::OnVersionAttributesChangedOnUI(
+    ChangedVersionAttributesMask changed_mask,
+    const ServiceWorkerRegistrationInfo& info) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  if (!ui_thread_.client)
+    return;
+
+  if (!ui_thread_.has_activated &&
+      info.active_version.status == ServiceWorkerVersion::ACTIVATED) {
+    ui_thread_.has_activated = true;
+    ui_thread_.client->OnActivated();
+  }
+}
+
 // ServiceWorkerHostImpl::UIThreadMembers
 
 ServiceWorkerHostImpl::UIThreadMembers::UIThreadMembers(
     ServiceWorkerHostClient* client)
-    : client(client) {
+    : client(client), has_activated(false) {
 }
 
 ServiceWorkerHostImpl::UIThreadMembers::~UIThreadMembers() {

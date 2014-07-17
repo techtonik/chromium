@@ -20,8 +20,8 @@ class ServiceWorkerHost : public IPC::Sender {
   virtual const GURL& scope() = 0;
   virtual const GURL& script() = 0;
 
-  // True when a version is installed and activated.
-  virtual bool HasActiveVersion() = 0;
+  // True when a version has been installed and activated.
+  virtual bool HasHadActiveVersion() = 0;
 
   // IPC::Sender interface:
   // Sends a message to the version farthest along in in the install flow,
