@@ -8,6 +8,7 @@
 #include "content/public/browser/service_worker_host.h"
 
 #include "base/memory/ref_counted.h"
+#include "content/browser/service_worker/service_worker_registration.h"
 #include "content/common/content_export.h"
 #include "content/common/service_worker/service_worker_status_code.h"
 
@@ -16,11 +17,17 @@ namespace content {
 class ServiceWorkerContextWrapper;
 class ServiceWorkerRegistration;
 
-// Interface to communicate with service workers from any thread. Abstracts the
-// lifetime and active version for calling code; call Send and the messages
-// will be queued as needed and sent to the active service worker.
+// Implements ServiceWorkerHost.
+//
+// Note on Lifetime:
+// Instances of this object are created and AddRef() is called in the
+// constructor. Destruction is initiated by DisconnectClientAndDeleteOnUI,
+// continues on the IO thread in DisconnectAndDeleteOnIO which calls Release().
+// Callbacks may be outstanding that will eventually run and drop references
+// to zero.
 class ServiceWorkerHostImpl
     : public ServiceWorkerHost,
+      public ServiceWorkerRegistration::Listener,
       public base::RefCountedThreadSafe<ServiceWorkerHostImpl> {
  public:
   ServiceWorkerHostImpl(
@@ -34,15 +41,25 @@ class ServiceWorkerHostImpl
   virtual const GURL& script() OVERRIDE;
   virtual bool HasActiveVersion() OVERRIDE;
 
-  // IPC::Sender implementation.
+  // IPC::Sender implementation:
   virtual bool Send(IPC::Message* msg) OVERRIDE;
 
-  // Disconnects a ServiceWorkerHostClient, releasing references to it.
-  void DisconnectServiceWorkerHostClient();
+  // ServiceWorkerRegistration::Listener implementation:
+  virtual void OnVersionAttributesChanged(
+      ServiceWorkerRegistration* registration,
+      ChangedVersionAttributesMask changed_mask,
+      const ServiceWorkerRegistrationInfo& info) OVERRIDE;
+
+  // Disconnects a ServiceWorkerHostClient, releasing references to it, and
+  // initiates destruction of this ServiceWorkerHostImpl object.
+  void DisconnectClientAndDeleteOnUI();
 
  private:
   friend class base::RefCountedThreadSafe<ServiceWorkerHostImpl>;
   virtual ~ServiceWorkerHostImpl();
+
+  // Completes destruction of this object on the IO thread.
+  void DisconnectAndDeleteOnIO();
 
   const GURL scope_;
   const GURL script_;  // TODO: implement this existing.

@@ -8,21 +8,11 @@
 
 namespace content {
 
-ServiceWorkerHostClient::ServiceWorkerHostClient() {
-}
-
-ServiceWorkerHost* ServiceWorkerHostClient::service_worker_host() {
-  return service_worker_host_.get();
-}
-
-void ServiceWorkerHostClient::set_service_worker_host(
-    const scoped_refptr<ServiceWorkerHostImpl>& service_worker_host) {
-  service_worker_host_ = service_worker_host;
-}
-
 ServiceWorkerHostClient::~ServiceWorkerHostClient() {
-  if (service_worker_host_.get())
-    service_worker_host_->DisconnectServiceWorkerHostClient();
+  ServiceWorkerHostImpl* swh_impl =
+      static_cast<ServiceWorkerHostImpl*>(service_worker_host_);
+  if (swh_impl)
+    swh_impl->DisconnectClientAndDeleteOnUI();
 }
 
 }  // namespace content

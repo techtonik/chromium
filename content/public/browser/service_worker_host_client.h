@@ -5,14 +5,12 @@
 #ifndef CONTENT_PUBLIC_BROWSER_SERVICE_WORKER_HOST_CLIENT_H_
 #define CONTENT_PUBLIC_BROWSER_SERVICE_WORKER_HOST_CLIENT_H_
 
-#include "base/memory/ref_counted.h"
 #include "content/common/content_export.h"
 #include "ipc/ipc_listener.h"
 
 namespace content {
 
 class ServiceWorkerHost;
-class ServiceWorkerHostImpl;
 
 // Interface for clients of ServiceWorkerHost listening to messages from service
 // worker version farthest along the install flow, typically the current active
@@ -27,11 +25,12 @@ class ServiceWorkerHostImpl;
 // ServiceWorkerHost::DisconnectServiceWorkerHostClient.
 class CONTENT_EXPORT ServiceWorkerHostClient : public IPC::Listener {
  public:
-  ServiceWorkerHostClient();
+  ServiceWorkerHostClient() : service_worker_host_(NULL) {}
 
-  ServiceWorkerHost* service_worker_host();
-  void set_service_worker_host(
-      const scoped_refptr<ServiceWorkerHostImpl>& service_worker_host);
+  ServiceWorkerHost* service_worker_host() { return service_worker_host_; }
+  void set_service_worker_host(ServiceWorkerHost* service_worker_host) {
+    service_worker_host_ = service_worker_host;
+  }
 
   // When the service worker being listened to changes version (to a new one,
   // or to an unregistered state).
@@ -40,7 +39,7 @@ class CONTENT_EXPORT ServiceWorkerHostClient : public IPC::Listener {
  protected:
   virtual ~ServiceWorkerHostClient();
 
-  scoped_refptr<ServiceWorkerHostImpl> service_worker_host_;
+  ServiceWorkerHost* service_worker_host_;
 };
 
 }  // namespace content
