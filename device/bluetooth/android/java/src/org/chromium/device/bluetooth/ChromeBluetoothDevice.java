@@ -89,6 +89,16 @@ final class ChromeBluetoothDevice {
         return string_array;
     }
 
+    // Implements BluetoothDeviceAndroid::CreateGattConnection.
+    @CalledByNative
+    private ChromeBluetoothDevice // TODO change this to ChromeBluetoothGattConnection.
+            createGattConnection() {
+        // BluetoothGatt mBluetoothGatt;
+        // mBluetoothGatt = mDevice.connectGatt(Context context, boolean autoConnect,
+        // BluetoothGattCallback callback)
+        return null;
+    }
+
     // Implements BluetoothDeviceAndroid::GetDeviceName.
     @CalledByNative
     private String getDeviceName() {

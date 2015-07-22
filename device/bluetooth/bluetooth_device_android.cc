@@ -186,7 +186,20 @@ void BluetoothDeviceAndroid::ConnectToServiceInsecurely(
 void BluetoothDeviceAndroid::CreateGattConnection(
     const GattConnectionCallback& callback,
     const ConnectErrorCallback& error_callback) {
-  NOTIMPLEMENTED();
+  base::android::ScopedJavaLocalRef<jobject> bluetooth_gatt_wrapper =
+      Java_ChromeBluetoothDevice_createGattConnection(AttachCurrentThread(),
+                                                      j_device_.obj());
+  if (bluetooth_gatt_wrapper.obj()) {
+    NOTIMPLEMENTED();
+    //   scoped_ptr<BluetoothGattConnection> gatt_connection =
+    //     BluetoothGattConnectionAndroid::Create(bluetooth_gatt_wrapper);
+    //   callback.Run();
+    LOG(WARNING) << "true????????????????????????????????????????????";
+    error_callback.Run(ERROR_UNKNOWN);
+  } else {
+    LOG(WARNING) << "false               .........................";
+    error_callback.Run(ERROR_UNKNOWN);
+  }
 }
 
 BluetoothDeviceAndroid::BluetoothDeviceAndroid() {

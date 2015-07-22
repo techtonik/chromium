@@ -27,8 +27,20 @@ void BluetoothTestBase::DiscoverySessionCallback(
   discovery_sessions_.push_back(discovery_session.release());
 }
 
+void BluetoothTestBase::GattConnectionCallback(
+    scoped_ptr<BluetoothGattConnection> connection) {
+  ++callback_count_;
+  gatt_connections_.push_back(connection.release());
+}
+
 void BluetoothTestBase::ErrorCallback() {
   ++error_callback_count_;
+}
+
+void BluetoothTestBase::ConnectErrorCallback(
+    enum BluetoothDevice::ConnectErrorCode error_code) {
+  ++error_callback_count_;
+  last_connect_error_code_ = error_code;
 }
 
 base::Closure BluetoothTestBase::GetCallback() {
@@ -41,8 +53,20 @@ BluetoothTestBase::GetDiscoverySessionCallback() {
                     base::Unretained(this));
 }
 
+BluetoothDevice::GattConnectionCallback
+BluetoothTestBase::GetGattConnectionCallback() {
+  return base::Bind(&BluetoothTestBase::GattConnectionCallback,
+                    base::Unretained(this));
+}
+
 BluetoothAdapter::ErrorCallback BluetoothTestBase::GetErrorCallback() {
   return base::Bind(&BluetoothTestBase::ErrorCallback, base::Unretained(this));
+}
+
+BluetoothDevice::ConnectErrorCallback
+BluetoothTestBase::GetConnectErrorCallback() {
+  return base::Bind(&BluetoothTestBase::ConnectErrorCallback,
+                    base::Unretained(this));
 }
 
 }  // namespace device

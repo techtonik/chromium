@@ -9,6 +9,7 @@
 #include "base/message_loop/message_loop.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_discovery_session.h"
+#include "device/bluetooth/bluetooth_gatt_connection.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace device {
@@ -48,12 +49,16 @@ class BluetoothTestBase : public testing::Test {
   // Callbacks that increment |callback_count_|, |error_callback_count_|:
   void Callback();
   void DiscoverySessionCallback(scoped_ptr<BluetoothDiscoverySession>);
+  void GattConnectionCallback(scoped_ptr<BluetoothGattConnection>);
   void ErrorCallback();
+  void ConnectErrorCallback(enum BluetoothDevice::ConnectErrorCode);
 
   // Accessors to get callbacks bound to this fixture:
   base::Closure GetCallback();
   BluetoothAdapter::DiscoverySessionCallback GetDiscoverySessionCallback();
+  BluetoothDevice::GattConnectionCallback GetGattConnectionCallback();
   BluetoothAdapter::ErrorCallback GetErrorCallback();
+  BluetoothDevice::ConnectErrorCallback GetConnectErrorCallback();
 
   // A Message loop is required by some implementations that will PostTasks and
   // by base::RunLoop().RunUntilIdle() use in this fixuture.
@@ -61,9 +66,11 @@ class BluetoothTestBase : public testing::Test {
 
   scoped_refptr<BluetoothAdapter> adapter_;
   ScopedVector<BluetoothDiscoverySession> discovery_sessions_;
+  ScopedVector<BluetoothGattConnection> gatt_connections_;
+  enum BluetoothDevice::ConnectErrorCode last_connect_error_code_ =
+      BluetoothDevice::ERROR_UNKNOWN;
   int callback_count_ = 0;
   int error_callback_count_ = 0;
-  bool run_message_loop_to_wait_for_callbacks_ = true;
 };
 
 }  // namespace device
