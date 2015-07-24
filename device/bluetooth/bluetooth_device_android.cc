@@ -186,9 +186,16 @@ void BluetoothDeviceAndroid::ConnectToServiceInsecurely(
 void BluetoothDeviceAndroid::CreateGattConnection(
     const GattConnectionCallback& callback,
     const ConnectErrorCallback& error_callback) {
+  // TODO
+  //
+  //
+  // CHANGE TO TRACK REQUEST CALLBACKS;
+  // HAVE A CALL BACK THAT PASSES THROUGH TO THEM.
+  //
   base::android::ScopedJavaLocalRef<jobject> bluetooth_gatt_wrapper =
-      Java_ChromeBluetoothDevice_createGattConnection(AttachCurrentThread(),
-                                                      j_device_.obj());
+      Java_ChromeBluetoothDevice_createGattConnection(
+          AttachCurrentThread(), j_device_.obj(),
+          base::android::GetApplicationContext());
   if (bluetooth_gatt_wrapper.obj()) {
     NOTIMPLEMENTED();
     //   scoped_ptr<BluetoothGattConnection> gatt_connection =

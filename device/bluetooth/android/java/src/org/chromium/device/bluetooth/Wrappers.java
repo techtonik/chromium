@@ -8,6 +8,8 @@ import android.Manifest;
 import android.annotation.TargetApi;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
@@ -225,6 +227,12 @@ class Wrappers {
             mDevice = device;
         }
 
+        public BluetoothGattWrapper connectGatt(
+                Context context, boolean autoConnect, BluetoothGattCallbackWrapper callback) {
+            return new BluetoothGattWrapper(mDevice.connectGatt(
+                    context, autoConnect, new BluetoothGattCallbackWrapperCaller(callback)));
+        }
+
         public String getAddress() {
             return mDevice.getAddress();
         }
@@ -240,5 +248,50 @@ class Wrappers {
         public String getName() {
             return mDevice.getName();
         }
+    }
+
+    /**
+     * Wraps android.bluetooth.BluetoothGatt.
+     */
+    static class BluetoothGattWrapper {
+        private final BluetoothGatt mGatt;
+
+        BluetoothGattWrapper(BluetoothGatt gatt) {
+            mGatt = gatt;
+        }
+    }
+
+    /**
+     * Implements android.bluetooth.BluetoothGattCallback and passes calls through
+     * to a provided BluetoothGattCallback instance.
+     *
+     * This class is required so that Fakes can use BluetoothGattCallbackWrapper
+     * without it extending from BluetoothGattCallback. Fakes must function even on
+     * Android versions where BluetoothGattCallback class is not defined.
+     */
+    static class BluetoothGattCallbackWrapperCaller extends BluetoothGattCallback {
+        final BluetoothGattCallbackWrapper mWrapperCallback;
+
+        BluetoothGattCallbackWrapperCaller(BluetoothGattCallbackWrapper wrapperCallback) {
+            mWrapperCallback = wrapperCallback;
+        }
+
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+            mWrapperCallback.onConnectionStateChange(status, newState);
+        }
+    }
+
+    /**
+     * Wraps android.bluetooth.BluetoothGattCallback, being called by
+     * BluetoothGattCallbackWrapperCaller.
+     *
+     * BluetoothGatt gatt parameters are omitted from methods as each call would
+     * need to wrapp them in a BluetoothGattWrapper. That would be superfluous given
+     * that the required initial call to connectGatt will return a
+     * BluetoothGattWrapper.
+     */
+    abstract static class BluetoothGattCallbackWrapper {
+        public abstract void onConnectionStateChange(int status, int newState);
     }
 }

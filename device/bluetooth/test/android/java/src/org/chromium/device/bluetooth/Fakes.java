@@ -8,6 +8,7 @@ import android.annotation.TargetApi;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
+import android.content.Context;
 import android.os.Build;
 import android.os.ParcelUuid;
 
@@ -179,11 +180,23 @@ class Fakes {
     static class FakeBluetoothDevice extends Wrappers.BluetoothDeviceWrapper {
         private String mAddress;
         private String mName;
+        private Wrappers.BluetoothGattCallbackWrapper mGattCallback;
 
         public FakeBluetoothDevice(String address, String name) {
             super(null);
             mAddress = address;
             mName = name;
+        }
+
+        @Override
+        public Wrappers.BluetoothGattWrapper connectGatt(Context context, boolean autoConnect,
+                Wrappers.BluetoothGattCallbackWrapper callback) {
+            if (mGattCallback != null) {
+                throw new IllegalArgumentException(
+                        "FakeBluetoothDevice does not support multiple calls to connectGatt.");
+            }
+            mGattCallback = callback;
+            return new FakeBluetoothGatt();
         }
 
         @Override
@@ -204,6 +217,15 @@ class Fakes {
         @Override
         public String getName() {
             return mName;
+        }
+    }
+
+    /**
+     * Fakes android.bluetooth.BluetoothDevice.
+     */
+    static class FakeBluetoothGatt extends Wrappers.BluetoothGattWrapper {
+        public FakeBluetoothGatt() {
+            super(null);
         }
     }
 }

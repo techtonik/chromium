@@ -6,6 +6,7 @@ package org.chromium.device.bluetooth;
 
 import android.annotation.TargetApi;
 import android.bluetooth.BluetoothDevice;
+import android.content.Context;
 import android.os.Build;
 import android.os.ParcelUuid;
 
@@ -28,6 +29,7 @@ final class ChromeBluetoothDevice {
 
     private final Wrappers.BluetoothDeviceWrapper mDevice;
     private List<ParcelUuid> mUuidsFromScan;
+    Wrappers.BluetoothGattWrapper mBluetoothGatt;
 
     private ChromeBluetoothDevice(Wrappers.BluetoothDeviceWrapper deviceWrapper) {
         mDevice = deviceWrapper;
@@ -92,10 +94,15 @@ final class ChromeBluetoothDevice {
     // Implements BluetoothDeviceAndroid::CreateGattConnection.
     @CalledByNative
     private ChromeBluetoothDevice // TODO change this to ChromeBluetoothGattConnection.
-            createGattConnection() {
-        // BluetoothGatt mBluetoothGatt;
-        // mBluetoothGatt = mDevice.connectGatt(Context context, boolean autoConnect,
-        // BluetoothGattCallback callback)
+            createGattConnection(Context context) {
+        if (mBluetoothGatt == null) {
+            mBluetoothGatt = mDevice.connectGatt(
+                    context, false /* autoConnect */, new BluetoothGattCallbackImpl());
+        }
+
+        // TODO
+        // CALL CONNECT AND CREATE A TIMEOUT TO CALL ERROR IF CONNECT NOT DETECTED.
+        // TODO
         return null;
     }
 
@@ -103,5 +110,13 @@ final class ChromeBluetoothDevice {
     @CalledByNative
     private String getDeviceName() {
         return mDevice.getName();
+    }
+
+    // Implements callbacks related to a GATT connection.
+    private class BluetoothGattCallbackImpl extends Wrappers.BluetoothGattCallbackWrapper {
+        @Override
+        public void onConnectionStateChange(int status, int newState) {
+            // TODO
+        }
     }
 }
