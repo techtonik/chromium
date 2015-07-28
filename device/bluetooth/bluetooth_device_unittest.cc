@@ -133,7 +133,7 @@ TEST_F(BluetoothTest, CreateGattConnection) {
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
   CompleteGattConnection(device);
-
+  EXPECT_EQ();
   // be not connected; connect.
   // be connected; try to connect.
 }

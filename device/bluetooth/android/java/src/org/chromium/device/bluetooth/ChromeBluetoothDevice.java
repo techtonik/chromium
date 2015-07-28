@@ -93,17 +93,14 @@ final class ChromeBluetoothDevice {
 
     // Implements BluetoothDeviceAndroid::CreateGattConnection.
     @CalledByNative
-    private ChromeBluetoothDevice // TODO change this to ChromeBluetoothGattConnection.
-            createGattConnection(Context context) {
+    private boolean createGattConnection(Context context) {
         if (mBluetoothGatt == null) {
+            Log.i(TAG, "connectGatt");
             mBluetoothGatt = mDevice.connectGatt(
                     context, false /* autoConnect */, new BluetoothGattCallbackImpl());
         }
-
-        // TODO
-        // CALL CONNECT AND CREATE A TIMEOUT TO CALL ERROR IF CONNECT NOT DETECTED.
-        // TODO
-        return null;
+        Log.i(TAG, "BluetoothGatt.connect");
+        return mBluetoothGatt.connect();
     }
 
     // Implements BluetoothDeviceAndroid::GetFakeBluetoothDeviceForTesting.
@@ -125,7 +122,13 @@ final class ChromeBluetoothDevice {
     private class BluetoothGattCallbackImpl extends Wrappers.BluetoothGattCallbackWrapper {
         @Override
         public void onConnectionStateChange(int status, int newState) {
-            // TODO
+            nativeOnConnectionStateChange(status == android.bluetooth.BluetoothGatt.GATT_SUCCESS, newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED);
         }
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // BluetoothAdapterDevice C++ methods declared for access from java:
+
+    // Binds to BluetoothDeviceAndroid::OnConnectionStateChange.
+    void nativeOnConnectionStateChange(boolean success, boolean connected);
 }

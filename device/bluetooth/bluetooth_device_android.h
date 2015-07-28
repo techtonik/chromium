@@ -78,6 +78,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
       const GattConnectionCallback& callback,
       const ConnectErrorCallback& error_callback) override;
 
+  // Callback indicating when GATT client has connected/disconnected.
+  // See android.bluetooth.BluetoothGattCallback.onConnectionStateChange.
+  void OnConnectionStateChange(bool success, bool connected);
+
   // Returns BluetoothDeviceWrapper from the associated ChromeBluetoothDevice.
   base::android::ScopedJavaLocalRef<jobject>
   GetBluetoothDeviceWrapperForTesting();
@@ -87,9 +91,13 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
 
   // BluetoothDevice:
   std::string GetDeviceName() const override;
-
+  
   // Java object org.chromium.device.bluetooth.ChromeBluetoothDevice.
   base::android::ScopedJavaGlobalRef<jobject> j_device_;
+
+  // Callbacks for pending results of CreateGattConnection calls.
+  std::vector<GattConnectionCallback> create_gatt_connection_success_callbacks_;
+  std::vector<ConnectErrorCallback> create_gatt_connection_error_callbacks_;
 
   DISALLOW_COPY_AND_ASSIGN(BluetoothDeviceAndroid);
 };

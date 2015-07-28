@@ -186,26 +186,37 @@ void BluetoothDeviceAndroid::ConnectToServiceInsecurely(
 void BluetoothDeviceAndroid::CreateGattConnection(
     const GattConnectionCallback& callback,
     const ConnectErrorCallback& error_callback) {
-  // TODO
-  //
-  //
-  // CHANGE TO TRACK REQUEST CALLBACKS;
-  // HAVE A CALL BACK THAT PASSES THROUGH TO THEM.
-  //
-  base::android::ScopedJavaLocalRef<jobject> bluetooth_gatt_wrapper =
-      Java_ChromeBluetoothDevice_createGattConnection(
+  create_gatt_connection_success_callbacks_.push_back(callback);
+  create_gatt_connection_error_callbacks_.push_back(error_callback);
+
+//// If previous call to CreateGattConnection is already underway, wait for
+//// that response.
+//if (create_gatt_connection_error_callbacks_.size() > 1)
+//  return;
+
+  if (!Java_ChromeBluetoothDevice_createGattConnection(
           AttachCurrentThread(), j_device_.obj(),
-          base::android::GetApplicationContext());
-  if (bluetooth_gatt_wrapper.obj()) {
-    NOTIMPLEMENTED();
-    //   scoped_ptr<BluetoothGattConnection> gatt_connection =
-    //     BluetoothGattConnectionAndroid::Create(bluetooth_gatt_wrapper);
-    //   callback.Run();
-    LOG(WARNING) << "true????????????????????????????????????????????";
-    error_callback.Run(ERROR_UNKNOWN);
+          base::android::GetApplicationContext()))
+  {
+    for (const auto& error_callback : create_gatt_connection_error_callbacks_)
+      error_callback.Run(ERROR_FAILED);
+    create_gatt_connection_success_callbacks_.clear(); 
+    create_gatt_connection_error_callbacks_.clear();
+    return;
+  }
+}
+
+void BluetoothDeviceAndroid::OnConnectionStateChange(bool success, bool connected){
+  if (success && connected) {
+    for (const auto& callback : create_gatt_connection_success_callbacks_)
+      callback.Run(new BluetoothGattConnectionAndroid());
+    create_gatt_connection_success_callbacks_.clear(); 
+    create_gatt_connection_error_callbacks_.clear();
   } else {
-    LOG(WARNING) << "false               .........................";
-    error_callback.Run(ERROR_UNKNOWN);
+    for (const auto& error_callback : create_gatt_connection_error_callbacks_)
+      error_callback.Run(ERROR_FAILED);
+    create_gatt_connection_success_callbacks_.clear(); 
+    create_gatt_connection_error_callbacks_.clear();
   }
 }
 

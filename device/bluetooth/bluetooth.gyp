@@ -74,6 +74,8 @@
         'bluetooth_gatt_characteristic.h',
         'bluetooth_gatt_connection.cc',
         'bluetooth_gatt_connection.h',
+        'bluetooth_gatt_connection_android.cc',
+        'bluetooth_gatt_connection_android.h',
         'bluetooth_gatt_connection_chromeos.cc',
         'bluetooth_gatt_connection_chromeos.h',
         'bluetooth_gatt_descriptor.cc',
