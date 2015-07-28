@@ -78,6 +78,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
       const GattConnectionCallback& callback,
       const ConnectErrorCallback& error_callback) override;
 
+  // Returns BluetoothDeviceWrapper from the associated ChromeBluetoothDevice.
+  base::android::ScopedJavaLocalRef<jobject>
+  GetBluetoothDeviceWrapperForTesting();
+
  protected:
   BluetoothDeviceAndroid();
 

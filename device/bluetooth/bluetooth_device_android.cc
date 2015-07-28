@@ -209,6 +209,12 @@ void BluetoothDeviceAndroid::CreateGattConnection(
   }
 }
 
+base::android::ScopedJavaLocalRef<jobject>
+BluetoothDeviceAndroid::GetBluetoothDeviceWrapperForTesting() {
+  return Java_ChromeBluetoothDevice_getBluetoothDeviceWrapperForTesting(
+      AttachCurrentThread(), j_device_.obj());
+}
+
 BluetoothDeviceAndroid::BluetoothDeviceAndroid() {
 }
 

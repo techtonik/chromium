@@ -26,6 +26,7 @@ class BluetoothTestAndroid : public BluetoothTestBase {
   void InitWithoutDefaultAdapter() override;
   void InitWithFakeAdapter() override;
   void DiscoverLowEnergyDevice(int device_ordinal) override;
+  void CompleteGattConnection(BluetoothDevice* device) override;
 
   base::android::ScopedJavaGlobalRef<jobject> j_fake_bluetooth_adapter_;
 };

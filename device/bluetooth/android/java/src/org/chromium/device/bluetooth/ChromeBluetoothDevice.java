@@ -106,6 +106,15 @@ final class ChromeBluetoothDevice {
         return null;
     }
 
+    // Implements BluetoothDeviceAndroid::GetFakeBluetoothDeviceForTesting.
+    @CalledByNative
+    // 'Object' type must be used for return type because inner class
+    // Wrappers.BluetoothDeviceWrapper reference is not handled by jni_generator.py JavaToJni.
+    // http://crbug.com/505554
+    private Object getBluetoothDeviceWrapperForTesting() {
+        return mDevice;
+    }
+
     // Implements BluetoothDeviceAndroid::GetDeviceName.
     @CalledByNative
     private String getDeviceName() {

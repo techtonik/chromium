@@ -46,6 +46,9 @@ class BluetoothTestBase : public testing::Test {
   //   4: BB:00:00:00:00:02 with empty name, empty UUIDs.
   virtual void DiscoverLowEnergyDevice(int device_ordinal){};
 
+  // Simulate success of implementation details of CreateGattConnection.
+  virtual void CompleteGattConnection(BluetoothDevice* device){};
+
   // Callbacks that increment |callback_count_|, |error_callback_count_|:
   void Callback();
   void DiscoverySessionCallback(scoped_ptr<BluetoothDiscoverySession>);

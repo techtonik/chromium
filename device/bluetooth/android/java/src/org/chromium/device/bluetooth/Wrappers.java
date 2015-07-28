@@ -288,8 +288,8 @@ class Wrappers {
      *
      * BluetoothGatt gatt parameters are omitted from methods as each call would
      * need to wrapp them in a BluetoothGattWrapper. That would be superfluous given
-     * that the required initial call to connectGatt will return a
-     * BluetoothGattWrapper.
+     * that the required initial call to BluetoothDeviceWrapper.connectGatt will
+     * return a BluetoothGattWrapper.
      */
     abstract static class BluetoothGattCallbackWrapper {
         public abstract void onConnectionStateChange(int status, int newState);

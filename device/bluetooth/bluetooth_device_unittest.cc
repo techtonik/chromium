@@ -132,6 +132,10 @@ TEST_F(BluetoothTest, CreateGattConnection) {
 
   device->CreateGattConnection(GetGattConnectionCallback(),
                                GetConnectErrorCallback());
+  CompleteGattConnection(device);
+
+  // be not connected; connect.
+  // be connected; try to connect.
 }
 #endif  // defined(OS_ANDROID)
 

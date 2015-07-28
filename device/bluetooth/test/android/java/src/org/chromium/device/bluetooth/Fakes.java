@@ -188,6 +188,15 @@ class Fakes {
             mName = name;
         }
 
+        @CalledByNative("FakeBluetoothDevice")
+        private void completeGattConnection() {
+            mGattCallback.onConnectionStateChange(android.bluetooth.BluetoothGatt.GATT_SUCCESS,
+                    android.bluetooth.BluetoothProfile.STATE_CONNECTED);
+        }
+
+        // -----------------------------------------------------------------------------------------
+        // Wrappers.BluetoothDeviceWrapper overrides:
+
         @Override
         public Wrappers.BluetoothGattWrapper connectGatt(Context context, boolean autoConnect,
                 Wrappers.BluetoothGattCallbackWrapper callback) {

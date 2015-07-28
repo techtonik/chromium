@@ -7,6 +7,7 @@
 #include "base/logging.h"
 #include "device/bluetooth/android/wrappers.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
+#include "device/bluetooth/bluetooth_device_android.h"
 #include "jni/Fakes_jni.h"
 
 using base::android::AttachCurrentThread;
@@ -46,6 +47,15 @@ void BluetoothTestAndroid::InitWithFakeAdapter() {
 void BluetoothTestAndroid::DiscoverLowEnergyDevice(int device_ordinal) {
   Java_FakeBluetoothAdapter_discoverLowEnergyDevice(
       AttachCurrentThread(), j_fake_bluetooth_adapter_.obj(), device_ordinal);
+}
+
+void BluetoothTestAndroid::CompleteGattConnection(BluetoothDevice* device) {
+  BluetoothDeviceAndroid* device_android =
+      static_cast<BluetoothDeviceAndroid*>(device);
+  base::android::ScopedJavaLocalRef<jobject> j_fake_bluetooth_device =
+      device_android->GetBluetoothDeviceWrapperForTesting();
+  Java_FakeBluetoothDevice_completeGattConnection(
+      AttachCurrentThread(), j_fake_bluetooth_device.obj());
 }
 
 }  // namespace device
