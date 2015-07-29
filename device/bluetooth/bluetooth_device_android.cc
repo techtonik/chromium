@@ -7,6 +7,8 @@
 #include "base/android/jni_android.h"
 #include "base/android/jni_array.h"
 #include "base/android/jni_string.h"
+#include "device/bluetooth/bluetooth_adapter_android.h"
+#include "device/bluetooth/bluetooth_gatt_connection_android.h"
 #include "jni/ChromeBluetoothDevice_jni.h"
 
 using base::android::AttachCurrentThread;
@@ -15,11 +17,13 @@ using base::android::AppendJavaStringArrayToStringVector;
 namespace device {
 
 BluetoothDeviceAndroid* BluetoothDeviceAndroid::Create(
+    BluetoothAdapterAndroid* adapter,
     jobject bluetooth_device_wrapper) {  // Java Type: bluetoothDeviceWrapper
-  BluetoothDeviceAndroid* device = new BluetoothDeviceAndroid();
+  BluetoothDeviceAndroid* device = new BluetoothDeviceAndroid(adapter);
 
   device->j_device_.Reset(Java_ChromeBluetoothDevice_create(
-      AttachCurrentThread(), bluetooth_device_wrapper));
+      AttachCurrentThread(), reinterpret_cast<intptr_t>(device),
+      bluetooth_device_wrapper));
 
   return device;
 }
@@ -189,33 +193,36 @@ void BluetoothDeviceAndroid::CreateGattConnection(
   create_gatt_connection_success_callbacks_.push_back(callback);
   create_gatt_connection_error_callbacks_.push_back(error_callback);
 
-//// If previous call to CreateGattConnection is already underway, wait for
-//// that response.
-//if (create_gatt_connection_error_callbacks_.size() > 1)
-//  return;
+  //// If previous call to CreateGattConnection is already underway, wait for
+  //// that response.
+  // if (create_gatt_connection_error_callbacks_.size() > 1)
+  //  return;
 
   if (!Java_ChromeBluetoothDevice_createGattConnection(
           AttachCurrentThread(), j_device_.obj(),
-          base::android::GetApplicationContext()))
-  {
+          base::android::GetApplicationContext())) {
     for (const auto& error_callback : create_gatt_connection_error_callbacks_)
       error_callback.Run(ERROR_FAILED);
-    create_gatt_connection_success_callbacks_.clear(); 
+    create_gatt_connection_success_callbacks_.clear();
     create_gatt_connection_error_callbacks_.clear();
     return;
   }
 }
 
-void BluetoothDeviceAndroid::OnConnectionStateChange(bool success, bool connected){
+void BluetoothDeviceAndroid::OnConnectionStateChange(JNIEnv* env,
+                                                     jobject jcaller,
+                                                     bool success,
+                                                     bool connected) {
   if (success && connected) {
     for (const auto& callback : create_gatt_connection_success_callbacks_)
-      callback.Run(new BluetoothGattConnectionAndroid());
-    create_gatt_connection_success_callbacks_.clear(); 
+      callback.Run(make_scoped_ptr(
+          new BluetoothGattConnectionAndroid(adapter_, GetAddress())));
+    create_gatt_connection_success_callbacks_.clear();
     create_gatt_connection_error_callbacks_.clear();
   } else {
     for (const auto& error_callback : create_gatt_connection_error_callbacks_)
       error_callback.Run(ERROR_FAILED);
-    create_gatt_connection_success_callbacks_.clear(); 
+    create_gatt_connection_success_callbacks_.clear();
     create_gatt_connection_error_callbacks_.clear();
   }
 }
@@ -226,8 +233,8 @@ BluetoothDeviceAndroid::GetBluetoothDeviceWrapperForTesting() {
       AttachCurrentThread(), j_device_.obj());
 }
 
-BluetoothDeviceAndroid::BluetoothDeviceAndroid() {
-}
+BluetoothDeviceAndroid::BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter)
+    : adapter_(adapter) {}
 
 std::string BluetoothDeviceAndroid::GetDeviceName() const {
   return ConvertJavaStringToUTF8(Java_ChromeBluetoothDevice_getDeviceName(

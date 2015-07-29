@@ -11,6 +11,8 @@
 
 namespace device {
 
+class BluetoothAdapterAndroid;
+
 // BluetoothDeviceAndroid along with the Java class
 // org.chromium.device.bluetooth.BluetoothDevice implement BluetoothDevice.
 class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
@@ -25,6 +27,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
   // TODO(scheib): Return a scoped_ptr<>, but then adapter will need to handle
   // this correctly. http://crbug.com/506416
   static BluetoothDeviceAndroid* Create(
+      BluetoothAdapterAndroid* adapter,
       jobject bluetooth_device_wrapper);  // Java Type: bluetoothDeviceWrapper
 
   ~BluetoothDeviceAndroid() override;
@@ -80,18 +83,23 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
 
   // Callback indicating when GATT client has connected/disconnected.
   // See android.bluetooth.BluetoothGattCallback.onConnectionStateChange.
-  void OnConnectionStateChange(bool success, bool connected);
+  void OnConnectionStateChange(JNIEnv* env,
+                               jobject jcaller,
+                               bool success,
+                               bool connected);
 
   // Returns BluetoothDeviceWrapper from the associated ChromeBluetoothDevice.
   base::android::ScopedJavaLocalRef<jobject>
   GetBluetoothDeviceWrapperForTesting();
 
  protected:
-  BluetoothDeviceAndroid();
+  BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter);
 
   // BluetoothDevice:
   std::string GetDeviceName() const override;
-  
+
+  BluetoothAdapterAndroid* adapter_;
+
   // Java object org.chromium.device.bluetooth.ChromeBluetoothDevice.
   base::android::ScopedJavaGlobalRef<jobject> j_device_;
 

@@ -259,6 +259,10 @@ class Wrappers {
         BluetoothGattWrapper(BluetoothGatt gatt) {
             mGatt = gatt;
         }
+
+        public boolean connect() {
+            return mGatt.connect();
+        }
     }
 
     /**

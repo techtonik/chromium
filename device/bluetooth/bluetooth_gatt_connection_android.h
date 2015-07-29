@@ -9,28 +9,19 @@
 
 #include "base/callback.h"
 #include "base/memory/weak_ptr.h"
-#include "android/dbus/bluetooth_device_client.h"
-#include "dbus/object_path.h"
 #include "device/bluetooth/bluetooth_gatt_connection.h"
 
 namespace device {
 
-class BluetoothAdapter;
-
-}  // namespace device
-
-namespace android {
+class BluetoothAdapterAndroid;
 
 // BluetoothGattConnectionAndroid implements BluetoothGattConnection for the
-// Chrome OS platform.
-class BluetoothGattConnectionAndroid
-    : public device::BluetoothGattConnection,
-      public BluetoothDeviceClient::Observer {
+// Android platform.
+class BluetoothGattConnectionAndroid : public device::BluetoothGattConnection {
  public:
   explicit BluetoothGattConnectionAndroid(
-      scoped_refptr<device::BluetoothAdapter> adapter,
-      const std::string& device_address,
-      const dbus::ObjectPath& object_path);
+      scoped_refptr<device::BluetoothAdapterAndroid> adapter,
+      const std::string& device_address);
   ~BluetoothGattConnectionAndroid() override;
 
   // BluetoothGattConnection overrides.
@@ -39,28 +30,18 @@ class BluetoothGattConnectionAndroid
   void Disconnect(const base::Closure& callback) override;
 
  private:
-
-  // android::BluetoothDeviceClient::Observer overrides.
-  void DeviceRemoved(const dbus::ObjectPath& object_path) override;
-  void DevicePropertyChanged(const dbus::ObjectPath& object_path,
-                             const std::string& property_name) override;
-
   // True, if the connection is currently active.
   bool connected_;
 
   // The Bluetooth adapter that this connection is associated with.
-  scoped_refptr<device::BluetoothAdapter> adapter_;
+  scoped_refptr<BluetoothAdapterAndroid> adapter_;
 
   // Bluetooth address of the underlying device.
   std::string device_address_;
 
-  // D-Bus object path of the underlying device. This is used to filter observer
-  // events.
-  dbus::ObjectPath object_path_;
-
   DISALLOW_COPY_AND_ASSIGN(BluetoothGattConnectionAndroid);
 };
 
-}  // namespace android
+}  // namespace device
 
 #endif  // DEVICE_BLUETOOTH_BLUETOOTH_GATT_CONNECTION_ANDROID_H_

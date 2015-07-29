@@ -27,11 +27,14 @@ import java.util.List;
 final class ChromeBluetoothDevice {
     private static final String TAG = "cr.Bluetooth";
 
+    private long mNativeBluetoothDeviceAndroid;
     private final Wrappers.BluetoothDeviceWrapper mDevice;
     private List<ParcelUuid> mUuidsFromScan;
     Wrappers.BluetoothGattWrapper mBluetoothGatt;
 
-    private ChromeBluetoothDevice(Wrappers.BluetoothDeviceWrapper deviceWrapper) {
+    private ChromeBluetoothDevice(
+            long nativeBluetoothDeviceAndroid, Wrappers.BluetoothDeviceWrapper deviceWrapper) {
+        mNativeBluetoothDeviceAndroid = nativeBluetoothDeviceAndroid;
         mDevice = deviceWrapper;
         Log.v(TAG, "ChromeBluetoothDevice created.");
     }
@@ -43,8 +46,10 @@ final class ChromeBluetoothDevice {
     // 'Object' type must be used because inner class Wrappers.BluetoothDeviceWrapper reference is
     // not handled by jni_generator.py JavaToJni. http://crbug.com/505554
     @CalledByNative
-    private static ChromeBluetoothDevice create(Object deviceWrapper) {
-        return new ChromeBluetoothDevice((Wrappers.BluetoothDeviceWrapper) deviceWrapper);
+    private static ChromeBluetoothDevice create(
+            long nativeBluetoothDeviceAndroid, Object deviceWrapper) {
+        return new ChromeBluetoothDevice(
+                nativeBluetoothDeviceAndroid, (Wrappers.BluetoothDeviceWrapper) deviceWrapper);
     }
 
     // Implements BluetoothDeviceAndroid::UpdateAdvertisedUUIDs.
@@ -122,7 +127,9 @@ final class ChromeBluetoothDevice {
     private class BluetoothGattCallbackImpl extends Wrappers.BluetoothGattCallbackWrapper {
         @Override
         public void onConnectionStateChange(int status, int newState) {
-            nativeOnConnectionStateChange(status == android.bluetooth.BluetoothGatt.GATT_SUCCESS, newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED);
+            nativeOnConnectionStateChange(mNativeBluetoothDeviceAndroid,
+                    status == android.bluetooth.BluetoothGatt.GATT_SUCCESS,
+                    newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED);
         }
     }
 
@@ -130,5 +137,6 @@ final class ChromeBluetoothDevice {
     // BluetoothAdapterDevice C++ methods declared for access from java:
 
     // Binds to BluetoothDeviceAndroid::OnConnectionStateChange.
-    void nativeOnConnectionStateChange(boolean success, boolean connected);
+    private native void nativeOnConnectionStateChange(
+            long nativeBluetoothDeviceAndroid, boolean success, boolean connected);
 }

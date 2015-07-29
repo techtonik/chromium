@@ -236,5 +236,13 @@ class Fakes {
         public FakeBluetoothGatt() {
             super(null);
         }
+
+        @Override
+        public boolean connect() {
+            // TODO test
+            // TODO test
+            // TODO test
+            return true;
+        }
     }
 }
