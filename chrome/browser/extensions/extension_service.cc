@@ -278,7 +278,6 @@ ExtensionService::ExtensionService(Profile* profile,
       system_(extensions::ExtensionSystem::Get(profile)),
       extension_prefs_(extension_prefs),
       blacklist_(blacklist),
-      extension_sync_service_(NULL),
       registry_(extensions::ExtensionRegistry::Get(profile)),
       pending_extension_manager_(profile),
       install_directory_(install_directory),
@@ -776,9 +775,8 @@ bool ExtensionService::UninstallExtension(
 
   // Don't sync the uninstall if we're going to reinstall the extension
   // momentarily.
-  if (extension_sync_service_ &&
-      reason != extensions::UNINSTALL_REASON_REINSTALL) {
-    extension_sync_service_->SyncUninstallExtension(*extension);
+  if (reason != extensions::UNINSTALL_REASON_REINSTALL) {
+    ExtensionSyncService::Get(profile_)->SyncUninstallExtension(*extension);
   }
 
   delayed_installs_.Remove(extension->id());
@@ -866,8 +864,7 @@ void ExtensionService::EnableExtension(const std::string& extension_id) {
       content::Source<Profile>(profile_),
       content::Details<const Extension>(extension));
 
-  if (extension_sync_service_)
-    extension_sync_service_->SyncEnableExtension(*extension);
+  ExtensionSyncService::Get(profile_)->SyncExtensionChangeIfNeeded(*extension);
 }
 
 void ExtensionService::DisableExtension(const std::string& extension_id,
@@ -917,8 +914,7 @@ void ExtensionService::DisableExtension(const std::string& extension_id,
     registry_->RemoveTerminated(extension->id());
   }
 
-  if (extension_sync_service_)
-    extension_sync_service_->SyncDisableExtension(*extension);
+  ExtensionSyncService::Get(profile_)->SyncExtensionChangeIfNeeded(*extension);
 }
 
 void ExtensionService::DisableUserExtensions(
@@ -1038,7 +1034,10 @@ void ExtensionService::NotifyExtensionLoaded(const Extension* extension) {
   // that the request context doesn't yet know about. The profile is responsible
   // for ensuring its URLRequestContexts appropriately discover the loaded
   // extension.
-  system_->RegisterExtensionWithRequestContexts(extension);
+  system_->RegisterExtensionWithRequestContexts(
+      extension,
+      base::Bind(&ExtensionService::OnExtensionRegisteredWithRequestContexts,
+                 AsWeakPtr(), make_scoped_refptr(extension)));
 
   // Tell renderers about the new extension, unless it's a theme (renderers
   // don't need to know about themes).
@@ -1111,6 +1110,13 @@ void ExtensionService::NotifyExtensionLoaded(const Extension* extension) {
     ThumbnailSource* thumbnail_source = new ThumbnailSource(profile_, false);
     content::URLDataSource::Add(profile_, thumbnail_source);
   }
+}
+
+void ExtensionService::OnExtensionRegisteredWithRequestContexts(
+    scoped_refptr<const extensions::Extension> extension) {
+  registry_->AddReady(extension);
+  if (registry_->enabled_extensions().Contains(extension->id()))
+    registry_->TriggerOnReady(extension.get());
 }
 
 void ExtensionService::NotifyExtensionUnloaded(
@@ -1510,8 +1516,8 @@ void ExtensionService::AddExtension(const Extension* extension) {
   } else if (!reloading &&
              extension_prefs_->IsExtensionDisabled(extension->id())) {
     registry_->AddDisabled(extension);
-    if (extension_sync_service_)
-      extension_sync_service_->SyncExtensionChangeIfNeeded(*extension);
+    ExtensionSyncService::Get(profile_)->SyncExtensionChangeIfNeeded(
+        *extension);
     content::NotificationService::current()->Notify(
         extensions::NOTIFICATION_EXTENSION_UPDATE_DISABLED,
         content::Source<Profile>(profile_),
@@ -1548,8 +1554,8 @@ void ExtensionService::AddExtension(const Extension* extension) {
     }
 
     registry_->AddEnabled(extension);
-    if (extension_sync_service_)
-      extension_sync_service_->SyncExtensionChangeIfNeeded(*extension);
+    ExtensionSyncService::Get(profile_)->SyncExtensionChangeIfNeeded(
+        *extension);
     NotifyExtensionLoaded(extension);
   }
   system_->runtime_data()->SetBeingUpgraded(extension->id(), false);
@@ -2062,8 +2068,10 @@ void ExtensionService::PromoteEphemeralApp(
 
   registry_->TriggerOnInstalled(extension, true);
 
-  if (!is_from_sync && extension_sync_service_)
-    extension_sync_service_->SyncExtensionChangeIfNeeded(*extension);
+  if (!is_from_sync) {
+    ExtensionSyncService::Get(profile_)->SyncExtensionChangeIfNeeded(
+        *extension);
+  }
 }
 
 const Extension* ExtensionService::GetPendingExtensionUpdate(

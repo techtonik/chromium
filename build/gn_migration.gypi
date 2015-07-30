@@ -327,7 +327,6 @@
             #"//third_party/mesa",
             #"//third_party/mockito:mockito_java",
             #"//third_party/openmax_dl/dl",
-            #"//third_party/speex",
             #"//ui/android:ui_java",
 
             # TODO(GYP): Are these needed?
@@ -444,7 +443,6 @@
             #"//third_party/ots",
             #"//third_party/qcms",
             #"//third_party/smhasher:murmurhash3",
-            #"//third_party/speex",
             #"//third_party/webrtc/system_wrappers",
             #"//ui/native_theme",
             #"//ui/snapshot",
@@ -532,6 +530,7 @@
             '../courgette/courgette.gyp:courgette_unittests_run',
             '../crypto/crypto.gyp:crypto_unittests_run',
             '../google_apis/gcm/gcm.gyp:gcm_unit_tests_run',
+            '../google_apis/google_apis.gyp:google_apis_unittests_run',
             '../gpu/gpu.gyp:gpu_unittests_run',
             '../ipc/ipc.gyp:ipc_tests_run',
             '../media/cast/cast.gyp:cast_unittests_run',

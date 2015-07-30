@@ -2,35 +2,44 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import atexit
+
 import telemetry.internal.platform.power_monitor as power_monitor
 
+
+def _ReenableChargingIfNeeded(battery):
+  if not battery.GetCharging():
+    battery.TieredSetCharging(True)
 
 class PowerMonitorController(power_monitor.PowerMonitor):
   """
   PowerMonitor that acts as facade for a list of PowerMonitor objects and uses
   the first available one.
   """
-  def __init__(self, power_monitors):
+  def __init__(self, power_monitors, battery):
     super(PowerMonitorController, self).__init__()
-    self._cascading_power_monitors = power_monitors
-    self._active_monitor = None
-
-  def _AsyncPowerMonitor(self):
-    return next(
-        (x for x in self._cascading_power_monitors if x.CanMonitorPower()),
-        None)
+    self._candidate_power_monitors = power_monitors
+    self._active_monitors = []
+    self._battery = battery
+    atexit.register(_ReenableChargingIfNeeded, self._battery)
 
   def CanMonitorPower(self):
-    return bool(self._AsyncPowerMonitor())
+    return any(m.CanMonitorPower() for m in self._candidate_power_monitors)
 
   def StartMonitoringPower(self, browser):
-    self._active_monitor = self._AsyncPowerMonitor()
-    assert self._active_monitor, 'No available monitor.'
-    self._active_monitor.StartMonitoringPower(browser)
+    assert not self._active_monitors, 'Must call StopMonitoringPower().'
+    self._active_monitors = (
+        [m for m in self._candidate_power_monitors if m.CanMonitorPower()])
+    assert self._active_monitors, 'No available monitor.'
+    for monitor in self._active_monitors:
+      monitor.StartMonitoringPower(browser)
 
   def StopMonitoringPower(self):
-    assert self._active_monitor, 'StartMonitoringPower() not called.'
+    assert self._active_monitors, 'StartMonitoringPower() not called.'
     try:
-      return self._active_monitor.StopMonitoringPower()
+      results = {}
+      for monitor in self._active_monitors:
+        results.update(monitor.StopMonitoringPower())
+      return results
     finally:
-      self._active_monitor = None
+      self._active_monitors = []

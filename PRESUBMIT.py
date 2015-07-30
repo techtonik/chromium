@@ -302,7 +302,7 @@ def _CheckNoProductionCodeUsingTestOnlyFunctions(input_api, output_api):
   # calls to such functions without a proper C++ parser.
   file_inclusion_pattern = r'.+%s' % _IMPLEMENTATION_EXTENSIONS
 
-  base_function_pattern = r'[ :]test::[^\s]+|ForTest(ing)?|for_test(ing)?'
+  base_function_pattern = r'[ :]test::[^\s]+|ForTest(s|ing)?|for_test(s|ing)?'
   inclusion_pattern = input_api.re.compile(r'(%s)\s*\(' % base_function_pattern)
   comment_pattern = input_api.re.compile(r'//.*(%s)' % base_function_pattern)
   exclusion_pattern = input_api.re.compile(
@@ -1198,15 +1198,16 @@ def _GetJSONParseError(input_api, filename, eat_comments=True):
   try:
     contents = input_api.ReadFile(filename)
     if eat_comments:
-      json_comment_eater = input_api.os_path.join(
-          input_api.PresubmitLocalPath(),
-          'tools', 'json_comment_eater', 'json_comment_eater.py')
-      process = input_api.subprocess.Popen(
-          [input_api.python_executable, json_comment_eater],
-          stdin=input_api.subprocess.PIPE,
-          stdout=input_api.subprocess.PIPE,
-          universal_newlines=True)
-      (contents, _) = process.communicate(input=contents)
+      import sys
+      original_sys_path = sys.path
+      try:
+        sys.path = sys.path + [input_api.os_path.join(
+            input_api.PresubmitLocalPath(),
+            'tools', 'json_comment_eater')]
+        import json_comment_eater
+      finally:
+        sys.path = original_sys_path
+      contents = json_comment_eater.Nom(contents)
 
     input_api.json.loads(contents)
   except ValueError as e:

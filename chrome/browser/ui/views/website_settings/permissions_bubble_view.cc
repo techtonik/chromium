@@ -23,7 +23,10 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/models/combobox_model.h"
 #include "ui/base/resource/resource_bundle.h"
+#include "ui/gfx/paint_vector_icon.h"
 #include "ui/gfx/text_constants.h"
+#include "ui/native_theme/common_theme.h"
+#include "ui/native_theme/native_theme.h"
 #include "ui/views/bubble/bubble_delegate.h"
 #include "ui/views/bubble/bubble_frame_view.h"
 #include "ui/views/controls/button/checkbox.h"
@@ -243,11 +246,10 @@ PermissionsBubbleDelegateView::PermissionsBubbleDelegateView(
     views::ImageView* icon = new views::ImageView();
     gfx::VectorIconId vector_id = requests[index]->GetVectorIconId();
     if (vector_id != gfx::VectorIconId::VECTOR_ICON_NONE) {
-      // TODO(estade): move this color to a shared location?
-      icon->SetVectorIcon(vector_id,
-                          SkColorSetRGB(0x5A, 0x5A, 0x5A),
-                          gfx::Size(kIconSize - 2, kIconSize - 2));
-      icon->SetBorder(views::Border::CreateEmptyBorder(1, 1, 1, 1));
+      SkColor grey;
+      ui::CommonThemeGetSystemColor(ui::NativeTheme::kColorId_ChromeIconGrey,
+                                    &grey);
+      icon->SetImage(gfx::CreateVectorIcon(vector_id, kIconSize, grey));
     } else {
       icon->SetImage(bundle.GetImageSkiaNamed(requests.at(index)->GetIconID()));
       icon->SetImageSize(gfx::Size(kIconSize, kIconSize));

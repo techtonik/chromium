@@ -4,9 +4,9 @@
 
 #include "components/html_viewer/document_resource_waiter.h"
 
-#include "components/html_viewer/frame_tree_manager.h"
 #include "components/html_viewer/global_state.h"
 #include "components/html_viewer/html_document_oopif.h"
+#include "components/html_viewer/html_frame_tree_manager.h"
 #include "components/view_manager/public/cpp/view.h"
 
 namespace html_viewer {
@@ -28,13 +28,15 @@ void DocumentResourceWaiter::Release(
     mojo::InterfaceRequest<mandoline::FrameTreeClient>*
         frame_tree_client_request,
     mandoline::FrameTreeServerPtr* frame_tree_server,
-    mojo::Array<mandoline::FrameDataPtr>* frame_data,
-    mojo::URLResponsePtr* response) {
+    mojo::Array<mandoline::FrameDataPtr>* frame_data) {
   DCHECK(IsReady());
   *frame_tree_client_request = frame_tree_client_request_.Pass();
   *frame_tree_server = server_.Pass();
   *frame_data = frame_data_.Pass();
-  *response = response_.Pass();
+}
+
+mojo::URLResponsePtr DocumentResourceWaiter::ReleaseURLResponse() {
+  return response_.Pass();
 }
 
 bool DocumentResourceWaiter::IsReady() const {
@@ -69,6 +71,12 @@ void DocumentResourceWaiter::OnFrameAdded(mandoline::FrameDataPtr frame_data) {
 }
 
 void DocumentResourceWaiter::OnFrameRemoved(uint32_t frame_id) {
+  // It is assumed we receive OnConnect() (which unbinds) before anything else.
+  NOTREACHED();
+}
+
+void DocumentResourceWaiter::OnFrameNameChanged(uint32_t frame_id,
+                                                const mojo::String& name) {
   // It is assumed we receive OnConnect() (which unbinds) before anything else.
   NOTREACHED();
 }

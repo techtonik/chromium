@@ -1783,50 +1783,36 @@ void LayerTreeHostImpl::UpdateViewportContainerSizes() {
   if (!inner_container)
     return;
 
-  // TODO(bokan): This code is currently specific to top controls. It should be
-  // made general. crbug.com/464814.
-  if (!TopControlsHeight()) {
-    if (outer_container)
-      outer_container->SetBoundsDelta(gfx::Vector2dF());
-
-    inner_container->SetBoundsDelta(gfx::Vector2dF());
-    active_tree_->InnerViewportScrollLayer()->SetBoundsDelta(gfx::Vector2dF());
-
-    return;
-  }
-
   ViewportAnchor anchor(InnerViewportScrollLayer(),
                         OuterViewportScrollLayer());
 
-  // Adjust the inner viewport by shrinking/expanding the container to account
-  // for the change in top controls height since the last Resize from Blink.
   float top_controls_layout_height =
       active_tree_->top_controls_shrink_blink_size()
           ? active_tree_->top_controls_height()
           : 0.f;
-  inner_container->SetBoundsDelta(gfx::Vector2dF(
-      0,
-      top_controls_layout_height - top_controls_manager_->ContentTopOffset()));
+  float delta_from_top_controls =
+      top_controls_layout_height - top_controls_manager_->ContentTopOffset();
 
-  if (!outer_container || outer_container->BoundsForScrolling().IsEmpty())
-    return;
+  // Adjust the viewport layers by shrinking/expanding the container to account
+  // for changes in the size (e.g. top controls) since the last resize from
+  // Blink.
+  gfx::Vector2dF amount_to_expand(
+      0.f,
+      delta_from_top_controls);
+  inner_container->SetBoundsDelta(amount_to_expand);
 
-  // Adjust the outer viewport container as well, since adjusting only the
-  // inner may cause its bounds to exceed those of the outer, causing scroll
-  // clamping. We adjust it so it maintains the same aspect ratio as the
-  // inner viewport.
-  float aspect_ratio = inner_container->BoundsForScrolling().width() /
-      inner_container->BoundsForScrolling().height();
-  float target_height = outer_container->BoundsForScrolling().width() /
-      aspect_ratio;
-  float current_outer_height = outer_container->BoundsForScrolling().height() -
-      outer_container->bounds_delta().y();
-  gfx::Vector2dF delta(0, target_height - current_outer_height);
+  if (outer_container && !outer_container->BoundsForScrolling().IsEmpty()) {
+    // Adjust the outer viewport container as well, since adjusting only the
+    // inner may cause its bounds to exceed those of the outer, causing scroll
+    // clamping.
+    gfx::Vector2dF amount_to_expand_scaled = gfx::ScaleVector2d(
+        amount_to_expand, 1.f / active_tree_->min_page_scale_factor());
+    outer_container->SetBoundsDelta(amount_to_expand_scaled);
+    active_tree_->InnerViewportScrollLayer()->SetBoundsDelta(
+        amount_to_expand_scaled);
 
-  outer_container->SetBoundsDelta(delta);
-  active_tree_->InnerViewportScrollLayer()->SetBoundsDelta(delta);
-
-  anchor.ResetViewportToAnchoredPosition();
+    anchor.ResetViewportToAnchoredPosition();
+  }
 }
 
 void LayerTreeHostImpl::SynchronouslyInitializeAllTiles() {
@@ -1927,10 +1913,10 @@ void LayerTreeHostImpl::ActivateSyncTree() {
     DCHECK(!recycle_tree_);
     pending_tree_.swap(recycle_tree_);
 
+    UpdateViewportContainerSizes();
+
     active_tree_->SetRootLayerScrollOffsetDelegate(
         root_layer_scroll_offset_delegate_);
-
-    UpdateViewportContainerSizes();
   } else {
     active_tree_->ProcessUIResourceRequestQueue();
   }
@@ -1988,11 +1974,9 @@ void LayerTreeHostImpl::SetVisible(bool visible) {
   else
     EvictAllUIResources();
 
-  // Call PrepareTiles unconditionally on visibility change since this tab may
-  // never get another draw or timer tick. When becoming visible we care about
-  // unblocking the scheduler which might be waiting for activation / ready to
-  // draw. When becoming invisible we care about evicting tiles immediately.
-  PrepareTiles();
+  // Call PrepareTiles to evict tiles when we become invisible.
+  if (!visible)
+    PrepareTiles();
 
   if (!renderer_)
     return;
@@ -2093,6 +2077,9 @@ void LayerTreeHostImpl::CreateResourceAndTileTaskWorkerPool(
     scoped_ptr<ResourcePool>* resource_pool,
     scoped_ptr<ResourcePool>* staging_resource_pool) {
   DCHECK(GetTaskRunner());
+  // TODO(vmpstr): Make this a DCHECK (or remove) when crbug.com/419086 is
+  // resolved.
+  CHECK(resource_provider_);
 
   // Pass the single-threaded synchronous task graph runner to the worker pool
   // if we're in synchronous single-threaded mode.

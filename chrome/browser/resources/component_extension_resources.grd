@@ -39,7 +39,6 @@
       <include name="IDR_BOOKMARK_MANAGER_BOOKMARK_BMM_TREE_JS" file="bookmark_manager/js/bmm/bookmark_tree.js" type="BINDATA" />
       <include name="IDR_BOOKMARK_MANAGER_BOOKMARK_DND_JS" file="bookmark_manager/js/dnd.js" type="BINDATA" />
       <include name="IDR_BOOKMARK_MANAGER_BOOKMARK_BMM_JS" file="bookmark_manager/js/bmm.js" type="BINDATA" />
-      <include name="IDR_BOOKMARK_MANAGER_BOOKMARK_CSS_JS" file="bookmark_manager/css/bmm.css.js" type="BINDATA" />
       <!-- Gaia auth extension -->
       <include name="IDR_GAIA_AUTH_MAIN" file="gaia_auth/main.html" allowexternalscript="true" type="BINDATA" />
       <include name="IDR_GAIA_AUTH_MAIN_JS" file="gaia_auth/main.js" type="BINDATA" />
@@ -166,7 +165,7 @@
         <include name="IDR_PDF_INDEX_MATERIAL_HTML" file="pdf/index-material.html" allowexternalscript="true" type="BINDATA" />
         <include name="IDR_PDF_MAIN_JS" file="pdf/main.js" type="BINDATA" />
         <include name="IDR_PDF_PDF_JS" file="pdf/pdf.js" type="BINDATA" />
-        <include name="IDR_PDF_UI_MANAGER_JS" file="pdf/ui_manager.js" type="BINDATA" />
+        <include name="IDR_PDF_UI_MANAGER_JS" file="pdf/toolbar_manager.js" type="BINDATA" />
         <include name="IDR_PDF_VIEWPORT_JS" file="pdf/viewport.js" type="BINDATA" />
         <include name="IDR_PDF_OPEN_PDF_PARAMS_PARSER_JS" file="pdf/open_pdf_params_parser.js" type="BINDATA" />
         <include name="IDR_PDF_NAVIGATOR_JS" file="pdf/navigator.js" type="BINDATA" />

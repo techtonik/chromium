@@ -126,10 +126,11 @@ android_library("chrome_java") {
     "//components/gcm_driver/android:gcm_driver_java",
     "//components/invalidation/impl:java",
     "//components/navigation_interception/android:navigation_interception_java",
-    "//components/safe_json/android:safe_json_java",
-    "//components/service_tab_launcher:service_tab_launcher_java",
     "//components/policy/android:policy_java",
     "//components/precache/android:precache_java",
+    "//components/safe_json/android:safe_json_java",
+    "//components/service_tab_launcher:service_tab_launcher_java",
+    "//components/signin/core/browser/android:java",
     "//components/variations/android:variations_java",
     "//components/web_contents_delegate_android:web_contents_delegate_android_java",
     "//content/public/android:content_java",
@@ -157,6 +158,10 @@ android_library("chrome_java") {
     google_play_services_library,
   ]
 
+  if (android_sdk_version != "M") {
+    deps += [ "//third_party/android_tools:preview_java_sources" ]
+  }
+
   srcjar_deps = [
     ":chrome_android_java_enums_srcjar",
     ":chrome_version_srcjar",
@@ -166,6 +171,7 @@ android_library("chrome_java") {
     "//chrome:content_setting_javagen",
     "//chrome:content_settings_type_javagen",
     "//components/enhanced_bookmarks:enhanced_bookmarks_java_enums_srcjar",
+    "//components/offline_pages:offline_pages_enums_java",
   ]
 
   DEPRECATED_java_in_dir = "java/src"
@@ -612,6 +618,8 @@ android_library("chrome_shared_test_java") {
     "//components/dom_distiller/android:dom_distiller_core_java",
     "//components/invalidation/impl:java",
     "//components/invalidation/impl:javatests",
+    "//components/navigation_interception/android:navigation_interception_java",
+    "//components/policy/android:policy_java",
     "//components/precache/android:precache_java",
     "//components/precache/android:precache_javatests",
     "//components/web_contents_delegate_android:web_contents_delegate_android_java",

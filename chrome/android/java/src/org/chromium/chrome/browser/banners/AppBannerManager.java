@@ -8,13 +8,13 @@ import android.content.Context;
 import android.text.TextUtils;
 
 import org.chromium.base.ApplicationStatus;
-import org.chromium.base.CalledByNative;
-import org.chromium.base.JNINamespace;
 import org.chromium.base.VisibleForTesting;
+import org.chromium.base.annotations.CalledByNative;
+import org.chromium.base.annotations.JNINamespace;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.BookmarkUtils;
-import org.chromium.chrome.browser.EmptyTabObserver;
-import org.chromium.chrome.browser.Tab;
+import org.chromium.chrome.browser.tab.EmptyTabObserver;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.content_public.browser.WebContents;
 
 /**
@@ -70,8 +70,11 @@ public class AppBannerManager extends EmptyTabObserver {
      * @param tab Tab that the AppBannerManager will be attached to.
      */
     public AppBannerManager(Tab tab, Context context) {
-        int iconSize = context.getResources().getDimensionPixelSize(R.dimen.app_banner_icon_size);
-        mNativePointer = nativeInit(iconSize);
+        int iconSizePx = context.getResources().getDimensionPixelSize(R.dimen.app_banner_icon_size);
+        float density = context.getResources().getDisplayMetrics().density;
+        int iconSizeDp = (int) (iconSizePx / density);
+
+        mNativePointer = nativeInit(iconSizeDp);
         mTab = tab;
         updatePointers();
     }

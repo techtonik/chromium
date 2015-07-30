@@ -7,8 +7,8 @@
 #include <algorithm>
 
 #include "base/atomic_sequence_num.h"
+#include "base/command_line.h"
 #include "base/compiler_specific.h"
-#include "base/hash.h"
 #include "base/thread_task_runner_handle.h"
 #include "base/trace_event/memory_dump_provider.h"
 #include "base/trace_event/memory_dump_session_state.h"
@@ -70,10 +70,10 @@ void RequestPeriodicGlobalDump() {
 const char* const MemoryDumpManager::kTraceCategoryForTesting = kTraceCategory;
 
 // static
-const uint64 MemoryDumpManager::kInvalidTracingProcessId = 0;
+const int MemoryDumpManager::kMaxConsecutiveFailuresCount = 3;
 
 // static
-const int MemoryDumpManager::kMaxConsecutiveFailuresCount = 3;
+const uint64 MemoryDumpManager::kInvalidTracingProcessId = 0;
 
 // static
 MemoryDumpManager* MemoryDumpManager::GetInstance() {
@@ -96,6 +96,7 @@ MemoryDumpManager::MemoryDumpManager()
       delegate_(nullptr),
       memory_tracing_enabled_(0),
       tracing_process_id_(kInvalidTracingProcessId),
+      system_allocator_pool_name_(nullptr),
       skip_core_dumpers_auto_registration_for_testing_(false) {
   g_next_guid.GetNext();  // Make sure that first guid is not zero.
 }
@@ -120,6 +121,7 @@ void MemoryDumpManager::Initialize() {
   g_mmaps_dump_provider = ProcessMemoryMapsDumpProvider::GetInstance();
   RegisterDumpProvider(g_mmaps_dump_provider);
   RegisterDumpProvider(MallocDumpProvider::GetInstance());
+  system_allocator_pool_name_ = MallocDumpProvider::kAllocatedObjects;
 #endif
 
 #if defined(OS_ANDROID)
@@ -128,6 +130,7 @@ void MemoryDumpManager::Initialize() {
 
 #if defined(OS_WIN)
   RegisterDumpProvider(WinHeapDumpProvider::GetInstance());
+  system_allocator_pool_name_ = WinHeapDumpProvider::kAllocatedObjects;
 #endif
 }
 
@@ -272,7 +275,9 @@ void MemoryDumpManager::ContinueAsyncProcessDump(
       skip_dump = true;
     } else if (mdp == g_mmaps_dump_provider &&
                pmd_async_state->req_args.dump_type !=
-                   MemoryDumpType::PERIODIC_INTERVAL_WITH_MMAPS) {
+                   MemoryDumpType::PERIODIC_INTERVAL_WITH_MMAPS &&
+               pmd_async_state->req_args.dump_type !=
+                   MemoryDumpType::EXPLICITLY_TRIGGERED) {
       // Mmaps dumping is very heavyweight and cannot be performed at the same
       // rate of other dumps. TODO(primiano): this is a hack and should be
       // cleaned up as part of crbug.com/499731.
@@ -417,7 +422,12 @@ void MemoryDumpManager::OnTraceLogEnabled() {
 
   subtle::NoBarrier_Store(&memory_tracing_enabled_, 1);
 
-  if (delegate_->IsCoordinatorProcess()) {
+  // TODO(primiano): This is a temporary hack to disable periodic memory dumps
+  // when running memory benchmarks until they can be enabled/disabled in
+  // base::trace_event::TraceConfig. See https://goo.gl/5Hj3o0.
+  if (delegate_->IsCoordinatorProcess() &&
+      !CommandLine::ForCurrentProcess()->HasSwitch(
+          "enable-memory-benchmarking")) {
     g_periodic_dumps_count = 0;
     periodic_dump_timer_.Start(FROM_HERE,
                                TimeDelta::FromMilliseconds(kDumpIntervalMs),
@@ -432,13 +442,8 @@ void MemoryDumpManager::OnTraceLogDisabled() {
   session_state_ = nullptr;
 }
 
-// static
-uint64 MemoryDumpManager::ChildProcessIdToTracingProcessId(
-    int child_process_id) {
-  return static_cast<uint64>(
-             Hash(reinterpret_cast<const char*>(&child_process_id),
-                  sizeof(child_process_id))) +
-         1;
+uint64 MemoryDumpManager::GetTracingProcessId() const {
+  return delegate_->GetTracingProcessId();
 }
 
 MemoryDumpManager::MemoryDumpProviderInfo::MemoryDumpProviderInfo(

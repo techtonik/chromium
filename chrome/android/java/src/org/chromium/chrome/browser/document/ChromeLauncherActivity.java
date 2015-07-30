@@ -35,7 +35,6 @@ import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.IntentHandler.TabOpenType;
 import org.chromium.chrome.browser.ShortcutHelper;
 import org.chromium.chrome.browser.ShortcutSource;
-import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.UrlConstants;
 import org.chromium.chrome.browser.WarmupManager;
 import org.chromium.chrome.browser.WebappAuthenticator;
@@ -49,6 +48,7 @@ import org.chromium.chrome.browser.partnercustomizations.HomepageManager;
 import org.chromium.chrome.browser.partnercustomizations.PartnerBrowserCustomizations;
 import org.chromium.chrome.browser.preferences.ChromePreferenceManager;
 import org.chromium.chrome.browser.preferences.DocumentModeManager;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabIdManager;
 import org.chromium.chrome.browser.tabmodel.document.ActivityDelegate;
 import org.chromium.chrome.browser.tabmodel.document.AsyncTabCreationParams;
@@ -58,6 +58,7 @@ import org.chromium.chrome.browser.tabmodel.document.DocumentTabModelSelector;
 import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.chrome.browser.util.IntentUtils;
 import org.chromium.chrome.browser.webapps.WebappActivity;
+import org.chromium.chrome.browser.webapps.WebappInfo;
 import org.chromium.content.browser.crypto.CipherFactory;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.common.ScreenOrientationValues;
@@ -332,7 +333,7 @@ public class ChromeLauncherActivity extends Activity
             int shortcutSource = getIntent().getIntExtra(
                         ShortcutHelper.EXTRA_SOURCE, ShortcutSource.UNKNOWN);
             LaunchMetrics.recordHomeScreenLaunchIntoTab(url, shortcutSource);
-            if (relaunchTask(incognito, url)) return;
+            if (relaunchTask(incognito, url) != Tab.INVALID_TAB_ID) return;
         }
 
         // Create and fire a launch Intent to start a new Task.  The old Intent is copied using
@@ -449,9 +450,10 @@ public class ChromeLauncherActivity extends Activity
      * @param incognito Whether the created document should be incognito.
      * @param asyncParams AsyncTabCreationParams to store internally and use later once an intent is
      *                    received to launch the URL.
+     * @return ID of the Tab that was launched.
      */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    public static void launchDocumentInstance(
+    public static int launchDocumentInstance(
             Activity activity, boolean incognito, AsyncTabCreationParams asyncParams) {
         assert asyncParams != null;
 
@@ -470,7 +472,8 @@ public class ChromeLauncherActivity extends Activity
         if (launchMode == LAUNCH_MODE_RETARGET) {
             assert asyncParams.getWebContents() == null;
             assert loadUrlParams.getPostData() == null;
-            if (relaunchTask(incognito, loadUrlParams.getUrl())) return;
+            int relaunchedId = relaunchTask(incognito, loadUrlParams.getUrl());
+            if (relaunchedId != Tab.INVALID_TAB_ID) return relaunchedId;
         }
 
         // If the new tab is spawned by another tab, record the parent.
@@ -503,6 +506,8 @@ public class ChromeLauncherActivity extends Activity
         } else {
             fireDocumentIntent(activity, intent, incognito, affiliated, asyncParams);
         }
+
+        return ActivityDelegate.getTabIdFromIntent(intent);
     }
 
     /**
@@ -656,11 +661,11 @@ public class ChromeLauncherActivity extends Activity
      * Bring the task matching the given URL to the front if the task is retargetable.
      * @param incognito Whether or not the tab is incognito.
      * @param url URL that the tab would have been created for. If null, this param is ignored.
-     * @return Whether the task was successfully brought back.
+     * @return ID of the Tab if it was successfully relaunched, otherwise Tab.INVALID_TAB_ID.
      */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    private static boolean relaunchTask(boolean incognito, String url) {
-        if (TextUtils.isEmpty(url)) return false;
+    private static int relaunchTask(boolean incognito, String url) {
+        if (TextUtils.isEmpty(url)) return Tab.INVALID_TAB_ID;
 
         Context context = ApplicationStatus.getApplicationContext();
         ActivityManager manager =
@@ -680,10 +685,10 @@ public class ChromeLauncherActivity extends Activity
             }
 
             if (!moveToFront(task)) continue;
-            return true;
+            return id;
         }
 
-        return false;
+        return Tab.INVALID_TAB_ID;
     }
 
     /**
@@ -767,12 +772,14 @@ public class ChromeLauncherActivity extends Activity
     private Intent launchWebapp(Intent intent) {
         String webappId = IntentUtils.safeGetStringExtra(intent, ShortcutHelper.EXTRA_ID);
         String webappUrl = IntentUtils.safeGetStringExtra(intent, ShortcutHelper.EXTRA_URL);
-        String webappTitle = IntentUtils.safeGetStringExtra(intent, ShortcutHelper.EXTRA_TITLE);
         String webappIcon = IntentUtils.safeGetStringExtra(intent, ShortcutHelper.EXTRA_ICON);
         int webappOrientation = IntentUtils.safeGetIntExtra(intent,
                 ShortcutHelper.EXTRA_ORIENTATION, ScreenOrientationValues.DEFAULT);
         int webappSource = IntentUtils.safeGetIntExtra(intent,
                 ShortcutHelper.EXTRA_SOURCE, ShortcutSource.UNKNOWN);
+
+        String webappName = WebappInfo.nameFromIntent(intent);
+        String webappShortName = WebappInfo.shortNameFromIntent(intent);
 
         if (webappId != null && webappUrl != null) {
             String webappMacString = IntentUtils.safeGetStringExtra(
@@ -786,8 +793,8 @@ public class ChromeLauncherActivity extends Activity
                             webappUrl, webappSource);
                 }
 
-                WebappActivity.launchInstance(this, webappId,
-                        webappUrl, webappIcon, webappTitle, webappOrientation, webappSource);
+                WebappActivity.launchInstance(this, webappId, webappUrl,
+                        webappIcon, webappName, webappShortName, webappOrientation, webappSource);
             } else {
                 Log.e(TAG, "Shortcut (" + webappUrl + ") opened in Chrome.");
 

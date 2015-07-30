@@ -11,9 +11,9 @@ import android.util.Log;
 import org.chromium.base.ActivityState;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.ApplicationStatus.ActivityStateListener;
-import org.chromium.base.CalledByNative;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.VisibleForTesting;
+import org.chromium.base.annotations.CalledByNative;
 import org.chromium.base.annotations.SuppressFBWarnings;
 import org.chromium.chrome.browser.identity.UniqueIdentificationGenerator;
 import org.chromium.sync.internal_api.pub.PassphraseType;
@@ -179,10 +179,7 @@ public class ProfileSyncService {
             return;
         }
         String sessionTag = SESSION_TAG_PREFIX + uniqueTag;
-        if (!nativeSetSyncSessionsId(mNativeProfileSyncServiceAndroid, sessionTag)) {
-            Log.e(TAG, "Unable to write session sync tag. "
-                    + "This may lead to unexpected tab sync behavior.");
-        }
+        nativeSetSyncSessionsId(mNativeProfileSyncServiceAndroid, sessionTag);
     }
 
     /**
@@ -321,9 +318,9 @@ public class ProfileSyncService {
         nativeEnableEncryptEverything(mNativeProfileSyncServiceAndroid);
     }
 
-    public void setEncryptionPassphrase(String passphrase, boolean isGaia) {
+    public void setEncryptionPassphrase(String passphrase) {
         assert isSyncInitialized();
-        nativeSetEncryptionPassphrase(mNativeProfileSyncServiceAndroid, passphrase, isGaia);
+        nativeSetEncryptionPassphrase(mNativeProfileSyncServiceAndroid, passphrase);
     }
 
     public boolean isCryptographerReady() {
@@ -647,8 +644,7 @@ public class ProfileSyncService {
     private native void nativeRequestStop(long nativeProfileSyncServiceAndroid);
     private native void nativeFlushDirectory(long nativeProfileSyncServiceAndroid);
     private native void nativeSignOutSync(long nativeProfileSyncServiceAndroid);
-    private native boolean nativeSetSyncSessionsId(
-            long nativeProfileSyncServiceAndroid, String tag);
+    private native void nativeSetSyncSessionsId(long nativeProfileSyncServiceAndroid, String tag);
     private native String nativeQuerySyncStatusSummary(long nativeProfileSyncServiceAndroid);
     private native int nativeGetAuthError(long nativeProfileSyncServiceAndroid);
     private native boolean nativeIsSyncInitialized(long nativeProfileSyncServiceAndroid);
@@ -664,7 +660,7 @@ public class ProfileSyncService {
     private native boolean nativeSetDecryptionPassphrase(
             long nativeProfileSyncServiceAndroid, String passphrase);
     private native void nativeSetEncryptionPassphrase(
-            long nativeProfileSyncServiceAndroid, String passphrase, boolean isGaia);
+            long nativeProfileSyncServiceAndroid, String passphrase);
     private native boolean nativeIsCryptographerReady(long nativeProfileSyncServiceAndroid);
     private native int nativeGetPassphraseType(long nativeProfileSyncServiceAndroid);
     private native boolean nativeHasExplicitPassphraseTime(long nativeProfileSyncServiceAndroid);

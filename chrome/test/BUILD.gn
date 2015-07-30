@@ -84,6 +84,8 @@ source_set("test_support") {
     "logging/win/test_log_collector.h",
   ]
 
+  configs += [ "//build/config:precompiled_headers" ]
+
   # New deps should go in the non-iOS section below.
   public_deps = [
     "//content/test:test_support",
@@ -182,6 +184,13 @@ source_set("test_support") {
     deps += [ "//components/ownership" ]
   }
 
+  if (use_aura) {
+    sources += [
+      "base/test_browser_window_aura.cc",
+      "base/test_browser_window_aura.h",
+    ]
+  }
+
   if (enable_plugins) {
     sources += [
       "ppapi/ppapi_test.cc",
@@ -221,6 +230,7 @@ if (!is_android) {
                     ".",
                     "//chrome")
 
+    configs += [ "//build/config:precompiled_headers" ]
     defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
     ldflags = []
 
@@ -540,6 +550,8 @@ if (!is_android) {
             ".",
             "//chrome")
 
+    configs += [ "//build/config:precompiled_headers" ]
+
     deps = [
       ":browser_tests_js_webui",
       ":sync_integration_test_support",
@@ -561,7 +573,7 @@ if (!is_android) {
       "//components/autofill/content/browser/wallet:test_support",
       "//components/autofill/content/renderer:test_support",
       "//components/captive_portal:test_support",
-      "//components/dom_distiller/content",
+      "//components/dom_distiller/content:content_browser",
       "//components/dom_distiller/core:test_support",
       "//components/guest_view/browser:test_support",
       "//components/resources",
@@ -610,9 +622,8 @@ if (!is_android) {
     # Runtime dependencies
     data_deps = [
       "//ppapi:ppapi_tests",
-
-      #'../remoting/remoting.gyp:remoting_browser_test_resources',  TODO(GYP)
-      #'../remoting/remoting.gyp:remoting_webapp_unittests',  TODO(GYP)
+      "//remoting/webapp:browser_test_resources",
+      "//remoting/webapp:unit_tests",
       "//third_party/mesa:osmesa",
       "//third_party/widevine/cdm:widevine_test_license_server",
     ]
@@ -655,18 +666,18 @@ if (!is_android) {
         # to know all of the different toolchain options.
         assert(current_cpu == "x64")
         data_deps += [
-          # "test/data/nacl:shared_test_files",  # TODO(GYP)
+          # "test/data/nacl:shared_test_files",  # TODO(GYP) bug 512902
           "//ppapi/native_client:nacl_irt(//native_client/build/toolchain/nacl:irt_x64)",
-          # "../ppapi/ppapi_nacl.gyp:ppapi_nacl_tests",  # TODO(GYP)
-          # "../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_background_keepalive",  # TODO(GYP)
-          # "../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_media_galleries",  # TODO(GYP)
-          # "../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_packaged_app",  # TODO(GYP)
+          # "../ppapi/ppapi_nacl.gyp:ppapi_nacl_tests",  # TODO(GYP) bug 512901
+          # "../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_background_keepalive",  # TODO(GYP) bug 512900
+          # "../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_media_galleries",  # TODO(GYP) bug 512900
+          # "../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_packaged_app",  # TODO(GYP) bug 512900
         ]
         if (is_chromeos) {
           sources += [ "//third_party/liblouis/nacl_wrapper/liblouis_wrapper_browsertest.cc" ]
           deps += [
-            #'browser_chromeos',  TODO(GYP)
-            #'../third_party/liblouis/liblouis_nacl.gyp:liblouis_test_data',  TODO(GYP)
+            "//chrome/browser/chromeos",
+            #'../third_party/liblouis/liblouis_nacl.gyp:liblouis_test_data',  TODO(GYP) bug 512906
           ]
         }
       }
@@ -679,7 +690,7 @@ if (!is_android) {
         # browser process as needed by this test. See http://crbug.com/157312.
         sources -= [ "../browser/nacl_host/test/gdb_debug_stub_browsertest.cc" ]
         deps += [
-          #'chrome.gyp:chrome_nacl_win64',  TODO(GYP)
+          #'chrome.gyp:chrome_nacl_win64',  TODO(GYP) bug 512869
         ]
         configs -= [ "//build/config/win:default_incremental_linking" ]
         configs +=
@@ -690,7 +701,7 @@ if (!is_android) {
           "//native_client/src/trusted/service_runtime/linux:munge_nacl_helper_bootstrap",
           "//components/nacl:nacl_helper",
 
-          # "//components/nacl_nonsfi.gyp:nacl_helper_nonsfi",  # TODO(GYP)
+          # "//components/nacl_nonsfi.gyp:nacl_helper_nonsfi",  # TODO(GYP) bug 512912.
         ]
       }
     }
@@ -739,8 +750,7 @@ if (!is_android) {
       deps += [
         "//dbus",
         "//dbus:test_support",
-
-        #"//ui/login:resources",  TODO(GYP)
+        "//ui/login:resources",
       ]
     } else {
       sources -= [
@@ -888,6 +898,7 @@ if (!is_android) {
         "../browser/policy/cloud/component_cloud_policy_browsertest.cc",
         "../browser/prefs/pref_hash_browsertest.cc",
         "../renderer/spellchecker/spellcheck_provider_hunspell_unittest.cc",
+        "../renderer/spellchecker/spellcheck_unittest.cc",
       ]
     }
     if (is_chromeos) {
@@ -1147,6 +1158,7 @@ if (!is_android) {
                     ".",
                     "//chrome")
 
+    configs += [ "//build/config:precompiled_headers" ]
     defines = []
 
     deps = [
@@ -1198,7 +1210,7 @@ if (!is_android) {
     if (!is_ios) {
       deps += [
         ":unit_tests_js",
-        "//components/audio_modem:audio_modem_test_support",
+        "//components/audio_modem:test_support",
         "//components/autofill/content/browser/wallet:test_support",
         "//components/autofill/content/renderer:test_support",
         "//components/metrics/proto",
@@ -1456,6 +1468,12 @@ if (!is_android) {
               ".",
               "//chrome")
       deps += [ "//chrome/browser/media/router:test_support" ]
+      if (!is_android) {
+        sources += rebase_path(
+                chrome_tests_unit_gypi_values.chrome_unit_tests_media_router_non_android_sources,
+                ".",
+                "//chrome")
+      }
       if (!toolkit_views) {
         sources -= [ "../browser/ui/views/media_router/media_router_ui_browsertest.cc" ]
       }
@@ -1560,19 +1578,17 @@ if (!is_android) {
       ]
     }
     if (is_win) {
-      if (!is_component_build) {
-        # Unit_tests pdb files can get too big when incremental linking is
-        # on, disabling for this target.
-        #'LinkIncremental': '<(msvs_debug_link_nonincremental)',  TODO(GYP)
-      }
+      # The PDB gets too large for incremental linking.
+      configs -= [ "//build/config/win:default_incremental_linking" ]
+      configs += [ "//build/config/win:no_incremental_linking" ]
 
       sources += rebase_path(
               chrome_tests_unit_gypi_values.chrome_unit_tests_win_sources,
               ".",
               "//chrome")
       deps += [
-        #'browser/safe_browsing/incident_reporting/verifier_test/verifier_unittest.gyp:verifier_test_dll_1',  TODO(GYP)
-        #'browser/safe_browsing/incident_reporting/verifier_test/verifier_unittest.gyp:verifier_test_dll_2',  TODO(GYP)
+        #'browser/safe_browsing/incident_reporting/verifier_test/verifier_unittest.gyp:verifier_test_dll_1',  TODO(GYP) bug 512919
+        #'browser/safe_browsing/incident_reporting/verifier_test/verifier_unittest.gyp:verifier_test_dll_2',  TODO(GYP) bug 512919
         "//chrome:other_version",
         "//chrome_elf:blacklist_test_dll_1",
         "//chrome/installer/util:strings",
@@ -1581,10 +1597,6 @@ if (!is_android) {
         "//third_party/wtl",
         "//ui/resources",
       ]
-
-      configs -= [ "//build/config/win:default_incremental_linking" ]
-      configs +=
-          [ "//build/config/win:default_large_module_incremental_linking" ]
 
       libs = [
         "comsupp.lib",
@@ -1657,7 +1669,7 @@ if (!is_android) {
               ".",
               "//chrome")
     }
-    if (!enable_plugin_installation) {
+    if (enable_plugins && !enable_plugin_installation) {
       sources -= [ "../browser/plugins/plugin_installer_unittest.cc" ]
     }
   }

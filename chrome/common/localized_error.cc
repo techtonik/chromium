@@ -321,6 +321,13 @@ const LocalizedErrorMap net_error_options[] = {
    IDS_ERRORPAGES_DETAILS_SSL_VERSION_OR_CIPHER_MISMATCH,
    SUGGEST_NONE,
   },
+  {net::ERR_TEMPORARY_BACKOFF,
+   IDS_ERRORPAGES_TITLE_ACCESS_DENIED,
+   IDS_ERRORPAGES_HEADING_ACCESS_DENIED,
+   IDS_ERRORPAGES_SUMMARY_TEMPORARY_BACKOFF,
+   IDS_ERRORPAGES_DETAILS_TEMPORARY_BACKOFF,
+   SUGGEST_NONE,
+  },
 };
 
 // Special error page to be used in the case of navigating back to a page
@@ -898,15 +905,18 @@ void LocalizedError::EnableGoogleCachedCopyButtonExperiment(
 
       scoped_ptr<base::DictionaryValue> cache_button(new base::DictionaryValue);
 
+      // Google cache copy button label experiment.
       if (field_trial_exp_type_ == kCachedCopyButtonExpTypeCopy) {
         cache_button->SetString(
             "msg",
             l10n_util::GetStringUTF16(IDS_ERRORPAGES_BUTTON_SHOW_CACHED_COPY));
+        cache_button->SetBoolean("defaultLabel", false);
       } else {
         // Default to "Show cached page" button label.
         cache_button->SetString(
             "msg",
             l10n_util::GetStringUTF16(IDS_ERRORPAGES_BUTTON_SHOW_CACHED_PAGE));
+        cache_button->SetBoolean("defaultLabel", true);
       }
       cache_button->SetString("cacheUrl", cache_url);
       cache_button->SetInteger("trackingId", cache_tracking_id);

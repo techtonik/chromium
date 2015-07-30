@@ -21,6 +21,7 @@
 #include "base/timer/timer.h"
 #include "content/browser/service_worker/embedded_worker_instance.h"
 #include "content/browser/service_worker/service_worker_script_cache_map.h"
+#include "content/common/background_sync_service.mojom.h"
 #include "content/common/content_export.h"
 #include "content/common/service_port_service.mojom.h"
 #include "content/common/service_worker/service_worker_status_code.h"
@@ -75,8 +76,6 @@ class CONTENT_EXPORT ServiceWorkerVersion
                               const base::string16& /* name */,
                               const base::string16& /* data */)>
       ServicePortConnectCallback;
-  typedef base::Callback<void(ServiceWorkerStatusCode, const std::vector<int>&)>
-      SendStashedPortsCallback;
 
   enum RunningStatus {
     STOPPED = EmbeddedWorkerInstance::STOPPED,
@@ -210,7 +209,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // notify completion.
   //
   // This must be called when the status() is ACTIVATED.
-  void DispatchSyncEvent(const StatusCallback& callback);
+  void DispatchSyncEvent(SyncRegistrationPtr registration,
+                         const StatusCallback& callback);
 
   // Sends notificationclick event to the associated embedded worker and
   // asynchronously calls |callback| when it errors out or it gets a response
@@ -265,16 +265,6 @@ class CONTENT_EXPORT ServiceWorkerVersion
       const std::vector<TransferredMessagePort>& sent_message_ports,
       const StatusCallback& callback);
 
-  // Transfers one or more stashed message ports to the associated embedded
-  // worker, and asynchronously calls |callback| with the new route ids for the
-  // transferred ports as soon as the ports are sent to the renderer.
-  // Once the ports are received by the renderer, the ports themselves will
-  // inform MessagePortService, which will enable actual messages to be sent.
-  void SendStashedMessagePorts(
-      const std::vector<TransferredMessagePort>& stashed_message_ports,
-      const std::vector<base::string16>& port_names,
-      const SendStashedPortsCallback& callback);
-
   // Adds and removes |provider_host| as a controllee of this ServiceWorker.
   // A potential controllee is a host having the version as its .installing
   // or .waiting version.
@@ -283,6 +273,10 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   // Returns if it has controllee.
   bool HasControllee() const { return !controllee_map_.empty(); }
+
+  // Returns whether the service worker has active window clients under its
+  // control.
+  bool HasWindowClients();
 
   // Adds and removes |request_job| as a dependent job not to stop the
   // ServiceWorker while |request_job| is reading the stream of the fetch event
@@ -438,8 +432,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
   void OnFetchEventFinished(int request_id,
                             ServiceWorkerFetchEventResult result,
                             const ServiceWorkerResponse& response);
-  void OnSyncEventFinished(int request_id,
-                           blink::WebServiceWorkerEventResult result);
+  void OnSyncEventFinished(int request_id, ServiceWorkerEventStatus status);
   void OnNotificationClickEventFinished(int request_id);
   void OnPushEventFinished(int request_id,
                            blink::WebServiceWorkerEventResult result);
@@ -466,10 +459,18 @@ class CONTENT_EXPORT ServiceWorkerVersion
       const base::string16& message,
       const std::vector<TransferredMessagePort>& sent_message_ports);
   void OnFocusClient(int request_id, const std::string& client_uuid);
+  void OnNavigateClient(int request_id,
+                        const std::string& client_uuid,
+                        const GURL& url);
+  void DidNavigateClient(int request_id,
+                         int render_process_id,
+                         int render_frame_id);
+  void OnNavigateClientFinished(int request_id,
+                                const std::string& client_uuid,
+                                const ServiceWorkerClientInfo& client);
   void OnSkipWaiting(int request_id);
   void OnClaimClients(int request_id);
   void OnPongFromWorker();
-  void OnStashMessagePort(int message_port_id, const base::string16& name);
 
   void OnFocusClientFinished(int request_id,
                              const std::string& client_uuid,
@@ -485,6 +486,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   void GetWindowClients(int request_id,
                         const ServiceWorkerClientQueryOptions& options);
+  const std::vector<base::Tuple<int, int, std::string>>
+  GetWindowClientsInternal(bool include_uncontolled);
   void DidGetWindowClients(int request_id,
                            const ServiceWorkerClientQueryOptions& options,
                            scoped_ptr<ServiceWorkerClients> clients);
@@ -541,10 +544,11 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   void OnStoppedInternal(EmbeddedWorkerInstance::Status old_status);
 
-  // Called when the connection to a ServicePortDispatcher drops or fails.
+  // Called when a connection to a mojo event Dispatcher drops or fails.
   // Calls callbacks for any outstanding requests to the dispatcher as well
   // as cleans up the dispatcher.
   void OnServicePortDispatcherConnectionError();
+  void OnBackgroundSyncDispatcherConnectionError();
 
   const int64 version_id_;
   const int64 registration_id_;
@@ -571,6 +575,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
       service_port_connect_requests_;
 
   ServicePortDispatcherPtr service_port_dispatcher_;
+  BackgroundSyncServiceClientPtr background_sync_dispatcher_;
 
   std::set<const ServiceWorkerURLRequestJob*> streaming_url_request_jobs_;
 

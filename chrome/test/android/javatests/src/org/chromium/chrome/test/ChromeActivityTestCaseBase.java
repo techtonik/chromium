@@ -31,7 +31,6 @@ import org.chromium.chrome.browser.ChromeApplication;
 import org.chromium.chrome.browser.ChromeSwitches;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.DeferredStartupHandler;
-import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.document.ChromeLauncherActivity;
 import org.chromium.chrome.browser.document.DocumentActivity;
 import org.chromium.chrome.browser.document.IncognitoDocumentActivity;
@@ -46,6 +45,7 @@ import org.chromium.chrome.browser.preferences.NetworkPredictionOptions;
 import org.chromium.chrome.browser.preferences.PrefServiceBridge;
 import org.chromium.chrome.browser.preferences.Preferences;
 import org.chromium.chrome.browser.preferences.PreferencesLauncher;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.EmptyTabModelObserver;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
@@ -107,8 +107,6 @@ public abstract class ChromeActivityTestCaseBase<T extends ChromeActivity>
     private static final String PERF_OUTPUT_FILE = "PerfTestData.txt";
 
     private static final long OMNIBOX_FIND_SUGGESTION_TIMEOUT_MS = 10 * 1000;
-
-    private static final float FLOAT_EPSILON = 0.001f;
 
     public ChromeActivityTestCaseBase(Class<T> activityClass) {
         super(activityClass);
@@ -178,7 +176,7 @@ public abstract class ChromeActivityTestCaseBase<T extends ChromeActivity>
 
     /** Convenience function for {@link ApplicationTestUtils#clearAppData(Context)}. */
     protected void clearAppData() throws Exception {
-        ApplicationTestUtils.clearAppData(getInstrumentation().getContext());
+        ApplicationTestUtils.clearAppData(getInstrumentation().getTargetContext());
     }
 
     /**
@@ -830,17 +828,8 @@ public abstract class ChromeActivityTestCaseBase<T extends ChromeActivity>
 
     @Override
     protected void runTest() throws Throwable {
-        boolean shouldRun = true;
-        String perfTagAnalysisString = "";
-        try {
-            shouldRun = RestrictedInstrumentationTestCase.shouldRunTest(this);
-            perfTagAnalysisString = setupPotentialPerfTest(shouldRun);
-        } catch (Exception e) {
-            // eat the exception here; super.runTest() will catch it again and handle it properly
-        }
-
-        if (shouldRun) super.runTest();
-
+        String perfTagAnalysisString = setupPotentialPerfTest();
+        super.runTest();
         endPerfTest(perfTagAnalysisString);
     }
 
@@ -871,7 +860,7 @@ public abstract class ChromeActivityTestCaseBase<T extends ChromeActivity>
             "REC_CATCH_EXCEPTION",
             "RV_RETURN_VALUE_IGNORED_BAD_PRACTICE",
             })
-    private String setupPotentialPerfTest(boolean willTestRun) {
+    private String setupPotentialPerfTest() {
         File perfFile = getInstrumentation().getTargetContext().getFileStreamPath(
                 PERF_OUTPUT_FILE);
         perfFile.delete();
@@ -886,53 +875,49 @@ public abstract class ChromeActivityTestCaseBase<T extends ChromeActivity>
                 StringBuilder annotationData = new StringBuilder();
                 annotationData.append(String.format(PERF_ANNOTATION_FORMAT, method.getName()));
 
-                if (!willTestRun) {
-                    annotationData.append(PERF_NORUN_TAG);
-                } else {
-                    // Grab the minimum number of trace calls we will track (if names(),
-                    // graphNames(), and graphValues() do not have the same number of elements, we
-                    // will track as many as we can given the data available.
-                    final int maxIndex = Math.min(annotation.traceNames().length, Math.min(
-                            annotation.graphNames().length, annotation.seriesNames().length));
+                // Grab the minimum number of trace calls we will track (if names(),
+                // graphNames(), and graphValues() do not have the same number of elements, we
+                // will track as many as we can given the data available.
+                final int maxIndex = Math.min(annotation.traceNames().length, Math.min(
+                        annotation.graphNames().length, annotation.seriesNames().length));
 
-                    List<String> allNames = new LinkedList<String>();
-                    for (int i = 0; i < maxIndex; ++i) {
-                        // Prune out all of ',' and ';' from the strings.  Replace them with '-'.
-                        String name = annotation.traceNames()[i].replaceAll("[,;]", "-");
-                        allNames.add(name);
-                        String graphName = annotation.graphNames()[i].replaceAll("[,;]", "-");
-                        String seriesName = annotation.seriesNames()[i].replaceAll("[,;]", "-");
-                        if (annotation.traceTiming()) {
-                            annotationData.append(name).append(",")
-                                    .append(graphName).append(",")
-                                    .append(seriesName).append(';');
-                        }
-
-                        // If memory tracing is enabled, add an additional graph for each one
-                        // defined to track timing perf that will track the corresponding memory
-                        // usage.
-                        // Keep the series name the same, but just append a memory identifying
-                        // prefix to the graph.
-                        if (annotation.traceMemory()) {
-                            String memName = PerfTraceEvent.makeMemoryTraceNameFromTimingName(name);
-                            String memGraphName = PerfTraceEvent.makeSafeTraceName(
-                                    graphName, MEMORY_TRACE_GRAPH_SUFFIX);
-                            annotationData.append(memName).append(",")
-                                    .append(memGraphName).append(",")
-                                    .append(seriesName).append(';');
-                            allNames.add(memName);
-                        }
+                List<String> allNames = new LinkedList<String>();
+                for (int i = 0; i < maxIndex; ++i) {
+                    // Prune out all of ',' and ';' from the strings.  Replace them with '-'.
+                    String name = annotation.traceNames()[i].replaceAll("[,;]", "-");
+                    allNames.add(name);
+                    String graphName = annotation.graphNames()[i].replaceAll("[,;]", "-");
+                    String seriesName = annotation.seriesNames()[i].replaceAll("[,;]", "-");
+                    if (annotation.traceTiming()) {
+                        annotationData.append(name).append(",")
+                                .append(graphName).append(",")
+                                .append(seriesName).append(';');
                     }
-                    // We only record perf trace events for the names explicitly listed.
-                    PerfTraceEvent.setFilter(allNames);
 
-                    // Figure out if we should automatically start or stop the trace.
-                    if (annotation.autoTrace()) {
-                        PerfTraceEvent.setEnabled(true);
+                    // If memory tracing is enabled, add an additional graph for each one
+                    // defined to track timing perf that will track the corresponding memory
+                    // usage.
+                    // Keep the series name the same, but just append a memory identifying
+                    // prefix to the graph.
+                    if (annotation.traceMemory()) {
+                        String memName = PerfTraceEvent.makeMemoryTraceNameFromTimingName(name);
+                        String memGraphName = PerfTraceEvent.makeSafeTraceName(
+                                graphName, MEMORY_TRACE_GRAPH_SUFFIX);
+                        annotationData.append(memName).append(",")
+                                .append(memGraphName).append(",")
+                                .append(seriesName).append(';');
+                        allNames.add(memName);
                     }
-                    PerfTraceEvent.setTimingTrackingEnabled(annotation.traceTiming());
-                    PerfTraceEvent.setMemoryTrackingEnabled(annotation.traceMemory());
                 }
+                // We only record perf trace events for the names explicitly listed.
+                PerfTraceEvent.setFilter(allNames);
+
+                // Figure out if we should automatically start or stop the trace.
+                if (annotation.autoTrace()) {
+                    PerfTraceEvent.setEnabled(true);
+                }
+                PerfTraceEvent.setTimingTrackingEnabled(annotation.traceTiming());
+                PerfTraceEvent.setMemoryTrackingEnabled(annotation.traceMemory());
 
                 perfAnnotationString = annotationData.toString();
             }

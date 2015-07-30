@@ -5,7 +5,6 @@
 package org.chromium.chrome.browser.sync;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.FragmentTransaction;
 import android.os.Bundle;
@@ -13,6 +12,7 @@ import android.preference.CheckBoxPreference;
 import android.preference.Preference;
 import android.preference.SwitchPreference;
 import android.preference.TwoStatePreference;
+import android.support.v7.app.AlertDialog;
 import android.test.suitebuilder.annotation.SmallTest;
 import android.view.View;
 import android.widget.Button;
@@ -273,7 +273,7 @@ public class SyncCustomizationFragmentTest extends SyncTestBase {
         ThreadUtils.runOnUiThreadBlocking(new Runnable() {
             @Override
             public void run() {
-                fragment.onPassphraseEntered("passphrase", false, false);
+                fragment.onPassphraseEntered("passphrase");
             }
         });
         // No crash means we passed.
@@ -390,12 +390,12 @@ public class SyncCustomizationFragmentTest extends SyncTestBase {
 
     private PassphraseTypeDialogFragment getPassphraseTypeDialogFragment() {
         return (PassphraseTypeDialogFragment) mActivity.getFragmentManager()
-                .findFragmentByTag(SyncCustomizationFragment.FRAGMENT_PASSWORD_TYPE);
+                .findFragmentByTag(SyncCustomizationFragment.FRAGMENT_PASSPHRASE_TYPE);
     }
 
     private PassphraseCreationDialogFragment getPassphraseCreationDialogFragment() {
         return (PassphraseCreationDialogFragment) mActivity.getFragmentManager()
-                .findFragmentByTag(SyncCustomizationFragment.FRAGMENT_CUSTOM_PASSWORD);
+                .findFragmentByTag(SyncCustomizationFragment.FRAGMENT_CUSTOM_PASSPHRASE);
     }
 
     private void assertDefaultSyncOnState(SyncCustomizationFragment fragment) {

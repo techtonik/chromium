@@ -274,20 +274,34 @@ AlternativeServiceVector HttpServerPropertiesImpl::GetAlternativeServices(
   // Copy alternative services with probability greater than or equal to the
   // threshold into |alternative_services_above_threshold|.
   AlternativeServiceVector alternative_services_above_threshold;
-  AlternativeServiceMap::const_iterator it =
-      alternative_service_map_.Get(origin);
-  if (it != alternative_service_map_.end()) {
-    for (const AlternativeServiceInfo& alternative_service_info : it->second) {
-      if (alternative_service_info.probability <
-          alternative_service_probability_threshold_) {
+  const base::Time now = base::Time::Now();
+  AlternativeServiceMap::iterator map_it = alternative_service_map_.Get(origin);
+  if (map_it != alternative_service_map_.end()) {
+    for (AlternativeServiceInfoVector::iterator it = map_it->second.begin();
+         it != map_it->second.end();) {
+      if (it->expiration < now) {
+        it = map_it->second.erase(it);
         continue;
       }
-      AlternativeService alternative_service(
-          alternative_service_info.alternative_service);
+      if (it->probability < alternative_service_probability_threshold_) {
+        ++it;
+        continue;
+      }
+      AlternativeService alternative_service(it->alternative_service);
       if (alternative_service.host.empty()) {
         alternative_service.host = origin.host();
       }
+      // If the alternative service is equivalent to the origin (same host, same
+      // port, and both TCP), then there is already a Job for it, so do not
+      // return it here.
+      if (origin.Equals(alternative_service.host_port_pair()) &&
+          NPN_SPDY_MINIMUM_VERSION <= alternative_service.protocol &&
+          alternative_service.protocol <= NPN_SPDY_MAXIMUM_VERSION) {
+        ++it;
+        continue;
+      }
       alternative_services_above_threshold.push_back(alternative_service);
+      ++it;
     }
     return alternative_services_above_threshold;
   }
@@ -296,27 +310,34 @@ AlternativeServiceVector HttpServerPropertiesImpl::GetAlternativeServices(
   if (canonical == canonical_host_to_origin_map_.end()) {
     return AlternativeServiceVector();
   }
-  it = alternative_service_map_.Get(canonical->second);
-  if (it == alternative_service_map_.end()) {
+  map_it = alternative_service_map_.Get(canonical->second);
+  if (map_it == alternative_service_map_.end()) {
     return AlternativeServiceVector();
   }
-  for (const AlternativeServiceInfo& alternative_service_info : it->second) {
-    if (alternative_service_info.probability <
-        alternative_service_probability_threshold_) {
+  for (AlternativeServiceInfoVector::iterator it = map_it->second.begin();
+       it != map_it->second.end();) {
+    if (it->expiration < now) {
+      it = map_it->second.erase(it);
       continue;
     }
-    AlternativeService alternative_service(
-        alternative_service_info.alternative_service);
+    if (it->probability < alternative_service_probability_threshold_) {
+      ++it;
+      continue;
+    }
+    AlternativeService alternative_service(it->alternative_service);
     if (alternative_service.host.empty()) {
       alternative_service.host = canonical->second.host();
       if (IsAlternativeServiceBroken(alternative_service)) {
+        ++it;
         continue;
       }
       alternative_service.host = origin.host();
     } else if (IsAlternativeServiceBroken(alternative_service)) {
+      ++it;
       continue;
     }
     alternative_services_above_threshold.push_back(alternative_service);
+    ++it;
   }
   return alternative_services_above_threshold;
 }
@@ -324,11 +345,13 @@ AlternativeServiceVector HttpServerPropertiesImpl::GetAlternativeServices(
 bool HttpServerPropertiesImpl::SetAlternativeService(
     const HostPortPair& origin,
     const AlternativeService& alternative_service,
-    double alternative_probability) {
+    double alternative_probability,
+    base::Time expiration) {
   return SetAlternativeServices(
       origin, AlternativeServiceInfoVector(
-                  /*size=*/1, AlternativeServiceInfo(alternative_service,
-                                                     alternative_probability)));
+                  /*size=*/1,
+                  AlternativeServiceInfo(alternative_service,
+                                         alternative_probability, expiration)));
 }
 
 bool HttpServerPropertiesImpl::SetAlternativeServices(
@@ -645,11 +668,38 @@ void HttpServerPropertiesImpl::ExpireBrokenAlternateProtocolMappings() {
       break;
     }
 
-    const AlternativeService alternative_service = it->first;
+    const AlternativeService expired_alternative_service = it->first;
     broken_alternative_services_.erase(it);
-    // TODO(bnc): Make sure broken alternative services are not in the mapping.
-    ClearAlternativeServices(
-        HostPortPair(alternative_service.host, alternative_service.port));
+
+    // Remove every occurrence of |expired_alternative_service| from
+    // |alternative_service_map_|.
+    for (AlternativeServiceMap::iterator map_it =
+             alternative_service_map_.begin();
+         map_it != alternative_service_map_.end();) {
+      for (AlternativeServiceInfoVector::iterator it = map_it->second.begin();
+           it != map_it->second.end();) {
+        AlternativeService alternative_service(it->alternative_service);
+        // Empty hostname in map means hostname of key: substitute before
+        // comparing to |expired_alternative_service|.
+        if (alternative_service.host.empty()) {
+          alternative_service.host = map_it->first.host();
+        }
+        if (alternative_service == expired_alternative_service) {
+          it = map_it->second.erase(it);
+          continue;
+        }
+        ++it;
+      }
+      // If an origin has an empty list of alternative services, then remove it
+      // from both |canonical_host_to_origin_map_| and
+      // |alternative_service_map_|.
+      if (map_it->second.empty()) {
+        RemoveCanonicalHost(map_it->first);
+        map_it = alternative_service_map_.Erase(map_it);
+        continue;
+      }
+      ++map_it;
+    }
   }
   ScheduleBrokenAlternateProtocolMappingsExpiration();
 }

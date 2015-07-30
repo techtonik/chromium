@@ -353,6 +353,11 @@ void FeatureInfo::InitializeFeatures() {
         GL_COMPRESSED_RGB_S3TC_DXT1_EXT);
     validators_.compressed_texture_format.AddValue(
         GL_COMPRESSED_RGBA_S3TC_DXT1_EXT);
+
+    validators_.texture_internal_format_storage.AddValue(
+        GL_COMPRESSED_RGB_S3TC_DXT1_EXT);
+    validators_.texture_internal_format_storage.AddValue(
+        GL_COMPRESSED_RGBA_S3TC_DXT1_EXT);
   }
 
   if (enable_dxt3) {
@@ -361,6 +366,8 @@ void FeatureInfo::InitializeFeatures() {
     // requires on the fly compression. The latter does not.
     AddExtensionString("GL_CHROMIUM_texture_compression_dxt3");
     validators_.compressed_texture_format.AddValue(
+        GL_COMPRESSED_RGBA_S3TC_DXT3_EXT);
+    validators_.texture_internal_format_storage.AddValue(
         GL_COMPRESSED_RGBA_S3TC_DXT3_EXT);
   }
 
@@ -373,6 +380,8 @@ void FeatureInfo::InitializeFeatures() {
     AddExtensionString("GL_CHROMIUM_texture_compression_dxt5");
     validators_.compressed_texture_format.AddValue(
         GL_COMPRESSED_RGBA_S3TC_DXT5_EXT);
+    validators_.texture_internal_format_storage.AddValue(
+        GL_COMPRESSED_RGBA_S3TC_DXT5_EXT);
   }
 
   bool have_atc = extensions.Contains("GL_AMD_compressed_ATC_texture") ||
@@ -383,6 +392,10 @@ void FeatureInfo::InitializeFeatures() {
     AddExtensionString("GL_AMD_compressed_ATC_texture");
     validators_.compressed_texture_format.AddValue(GL_ATC_RGB_AMD);
     validators_.compressed_texture_format.AddValue(
+        GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD);
+
+    validators_.texture_internal_format_storage.AddValue(GL_ATC_RGB_AMD);
+    validators_.texture_internal_format_storage.AddValue(
         GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD);
   }
 
@@ -728,6 +741,7 @@ void FeatureInfo::InitializeFeatures() {
     AddExtensionString("GL_OES_compressed_ETC1_RGB8_texture");
     feature_flags_.oes_compressed_etc1_rgb8_texture = true;
     validators_.compressed_texture_format.AddValue(GL_ETC1_RGB8_OES);
+    validators_.texture_internal_format_storage.AddValue(GL_ETC1_RGB8_OES);
   }
 
   if (extensions.Contains("GL_AMD_compressed_ATC_texture")) {
@@ -737,6 +751,13 @@ void FeatureInfo::InitializeFeatures() {
     validators_.compressed_texture_format.AddValue(
         GL_ATC_RGBA_EXPLICIT_ALPHA_AMD);
     validators_.compressed_texture_format.AddValue(
+        GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD);
+
+    validators_.texture_internal_format_storage.AddValue(
+        GL_ATC_RGB_AMD);
+    validators_.texture_internal_format_storage.AddValue(
+        GL_ATC_RGBA_EXPLICIT_ALPHA_AMD);
+    validators_.texture_internal_format_storage.AddValue(
         GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD);
   }
 
@@ -750,6 +771,15 @@ void FeatureInfo::InitializeFeatures() {
         GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG);
     validators_.compressed_texture_format.AddValue(
         GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG);
+
+    validators_.texture_internal_format_storage.AddValue(
+        GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG);
+    validators_.texture_internal_format_storage.AddValue(
+        GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG);
+    validators_.texture_internal_format_storage.AddValue(
+        GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG);
+    validators_.texture_internal_format_storage.AddValue(
+        GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG);
   }
 
   // Ideally we would only expose this extension on Mac OS X, to
@@ -761,12 +791,11 @@ void FeatureInfo::InitializeFeatures() {
       gl_version_info_->is_desktop_core_profile) {
     AddExtensionString("GL_ARB_texture_rectangle");
     feature_flags_.arb_texture_rectangle = true;
+    // Rectangle textures are used as samplers via glBindTexture, framebuffer
+    // textures via glFramebufferTexture2D, and copy destinations via
+    // glCopyPixels.
     validators_.texture_bind_target.AddValue(GL_TEXTURE_RECTANGLE_ARB);
-    // For the moment we don't add this enum to the texture_target
-    // validator. This implies that the only way to get image data into a
-    // rectangular texture is via glTexImageIOSurface2DCHROMIUM, which is
-    // just fine since again we don't want applications depending on this
-    // extension.
+    validators_.texture_target.AddValue(GL_TEXTURE_RECTANGLE_ARB);
     validators_.get_tex_param_target.AddValue(GL_TEXTURE_RECTANGLE_ARB);
     validators_.g_l_state.AddValue(GL_TEXTURE_BINDING_RECTANGLE_ARB);
   }

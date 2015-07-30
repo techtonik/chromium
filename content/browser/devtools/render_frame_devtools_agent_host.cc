@@ -265,7 +265,7 @@ bool DevToolsAgentHost::IsDebuggerAttached(WebContents* web_contents) {
   return agent_host && agent_host->IsAttached();
 }
 
-//static
+// static
 void RenderFrameDevToolsAgentHost::AddAllAgentHosts(
     DevToolsAgentHost::List* result) {
   base::Callback<void(RenderFrameHost*)> callback = base::Bind(
@@ -509,6 +509,7 @@ void RenderFrameDevToolsAgentHost::RenderFrameDeleted(RenderFrameHost* rfh) {
 void RenderFrameDevToolsAgentHost::DestroyOnRenderFrameGone() {
   DCHECK(current_);
   scoped_refptr<RenderFrameDevToolsAgentHost> protect(this);
+  UpdateProtocolHandlers(nullptr);
   if (IsAttached())
     OnClientDetached();
   HostClosed();

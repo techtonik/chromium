@@ -10,8 +10,8 @@ import android.net.Uri;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
-import org.chromium.base.CalledByNative;
 import org.chromium.base.ThreadUtils;
+import org.chromium.base.annotations.CalledByNative;
 import org.chromium.chrome.browser.ContentSettingsType;
 import org.chromium.chrome.browser.UrlUtilities;
 import org.chromium.chrome.browser.preferences.website.ContentSetting;
@@ -42,7 +42,7 @@ public final class PrefServiceBridge {
     public static final int SUPERVISED_USER_FILTERING_BLOCK = 2;
 
     private static final String MIGRATION_PREF_KEY = "PrefMigrationVersion";
-    private static final int MIGRATION_CURRENT_VERSION = 3;
+    private static final int MIGRATION_CURRENT_VERSION = 4;
 
     private static final String HTTPS_SCHEME = "https";
 
@@ -128,6 +128,12 @@ public final class PrefServiceBridge {
             nativeMigrateLocationPreference();
             nativeMigrateProtectedMediaPreference();
         }
+        if (currentVersion < 4) {
+            // For a brief period (M44 Beta), it was possible for users to disable images via Site
+            // Settings. Now that this option has been removed, ensure that users are not stuck with
+            // images disabled.
+            setContentSettingEnabled(ContentSettingsType.CONTENT_SETTINGS_TYPE_IMAGES, true);
+        }
         preferences.edit().putInt(MIGRATION_PREF_KEY, MIGRATION_CURRENT_VERSION).commit();
     }
 
@@ -142,12 +148,11 @@ public final class PrefServiceBridge {
         String url = templateUrlService.getSearchEngineUrlFromTemplateUrl(
                 templateUrlService.getDefaultSearchEngineIndex());
         if (allowed && !url.startsWith("https:")) return;
-        GeolocationInfo locationSettings = new GeolocationInfo(url, null);
+        GeolocationInfo locationSettings = new GeolocationInfo(url, null, false);
         ContentSetting locationPermission = locationSettings.getContentSetting();
         if (locationPermission == null || locationPermission == ContentSetting.ASK) {
-            WebsitePreferenceBridge.nativeSetGeolocationSettingForOrigin(
-                    url, url, allowed
-                            ? ContentSetting.ALLOW.toInt() : ContentSetting.BLOCK.toInt());
+            WebsitePreferenceBridge.nativeSetGeolocationSettingForOrigin(url, url,
+                    allowed ? ContentSetting.ALLOW.toInt() : ContentSetting.BLOCK.toInt(), false);
             SharedPreferences sharedPreferences =
                     PreferenceManager.getDefaultSharedPreferences(context);
             sharedPreferences.edit().putBoolean(LOCATION_AUTO_ALLOWED, true).apply();
@@ -185,7 +190,7 @@ public final class PrefServiceBridge {
      */
     public static boolean isLocationDisabledForUrl(Uri uri) {
         // TODO(finnur): Delete this method once GeolocationHeader has been upstreamed.
-        GeolocationInfo locationSettings = new GeolocationInfo(uri.toString(), null);
+        GeolocationInfo locationSettings = new GeolocationInfo(uri.toString(), null, false);
         ContentSetting locationPermission = locationSettings.getContentSetting();
 
         // If no preference has been chosen and the scheme is https, fall back to the preference for
@@ -195,7 +200,7 @@ public final class PrefServiceBridge {
             if (scheme != null && scheme.toLowerCase(Locale.US).equals("https")
                     && uri.getAuthority() != null && uri.getUserInfo() == null) {
                 String urlWithHttp = "http://" + uri.getHost();
-                locationSettings = new GeolocationInfo(urlWithHttp, null);
+                locationSettings = new GeolocationInfo(urlWithHttp, null, false);
                 locationPermission = locationSettings.getContentSetting();
             }
         }
@@ -393,6 +398,13 @@ public final class PrefServiceBridge {
      */
     public void setTranslateEnabled(boolean enabled) {
         nativeSetTranslateEnabled(enabled);
+    }
+
+    /**
+     * Sets the preference that controls automatic detection of character encoding.
+     */
+    public void setAutoDetectEncodingEnabled(boolean enabled) {
+        nativeSetAutoDetectEncodingEnabled(enabled);
     }
 
     /**
@@ -614,6 +626,13 @@ public final class PrefServiceBridge {
      */
     public boolean isTranslateManaged() {
         return nativeGetTranslateManaged();
+    }
+
+    /**
+     * @return true if automatic detection of character encoding is enabled, false otherwise.
+     */
+    public boolean isAutoDetectEncodingEnabled() {
+        return nativeGetAutoDetectEncodingEnabled();
     }
 
     /**
@@ -934,6 +953,7 @@ public final class PrefServiceBridge {
     private native boolean nativeGetFullscreenManaged();
     private native boolean nativeGetTranslateEnabled();
     private native boolean nativeGetTranslateManaged();
+    private native boolean nativeGetAutoDetectEncodingEnabled();
     private native boolean nativeGetResolveNavigationErrorEnabled();
     private native boolean nativeGetResolveNavigationErrorManaged();
     private native boolean nativeGetProtectedMediaIdentifierEnabled();
@@ -944,6 +964,7 @@ public final class PrefServiceBridge {
     private native boolean nativeGetPrintingManaged();
     private native boolean nativeGetForceGoogleSafeSearch();
     private native void nativeSetTranslateEnabled(boolean enabled);
+    private native void nativeSetAutoDetectEncodingEnabled(boolean enabled);
     private native void nativeResetTranslateDefaults();
     private native void nativeMigrateJavascriptPreference();
     private native void nativeMigrateLocationPreference();

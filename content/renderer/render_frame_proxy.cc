@@ -11,9 +11,9 @@
 #include "content/child/webmessageportchannel_impl.h"
 #include "content/common/frame_messages.h"
 #include "content/common/frame_replication_state.h"
+#include "content/common/site_isolation_policy.h"
 #include "content/common/swapped_out_messages.h"
 #include "content/common/view_messages.h"
-#include "content/public/common/content_switches.h"
 #include "content/renderer/child_frame_compositing_helper.h"
 #include "content/renderer/render_frame_impl.h"
 #include "content/renderer/render_thread_impl.h"
@@ -119,8 +119,7 @@ RenderFrameProxy* RenderFrameProxy::FromWebFrame(blink::WebFrame* web_frame) {
 
 // static
 bool RenderFrameProxy::IsSwappedOutStateForbidden() {
-  return base::CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kSitePerProcess);
+  return SiteIsolationPolicy::AreCrossProcessFramesPossible();
 }
 
 RenderFrameProxy::RenderFrameProxy(int routing_id, int frame_routing_id)
@@ -179,8 +178,7 @@ void RenderFrameProxy::DidCommitCompositorFrame() {
 
 void RenderFrameProxy::SetReplicatedState(const FrameReplicationState& state) {
   DCHECK(web_frame_);
-  web_frame_->setReplicatedOrigin(blink::WebSecurityOrigin::createFromString(
-      blink::WebString::fromUTF8(state.origin.string())));
+  web_frame_->setReplicatedOrigin(state.origin);
   web_frame_->setReplicatedSandboxFlags(state.sandbox_flags);
   web_frame_->setReplicatedName(blink::WebString::fromUTF8(state.name));
 }
@@ -336,10 +334,8 @@ void RenderFrameProxy::OnDidUpdateName(const std::string& name) {
   web_frame_->setReplicatedName(blink::WebString::fromUTF8(name));
 }
 
-void RenderFrameProxy::OnDidUpdateOrigin(
-    const url::DeprecatedSerializedOrigin& origin) {
-  web_frame_->setReplicatedOrigin(blink::WebSecurityOrigin::createFromString(
-      blink::WebString::fromUTF8(origin.string())));
+void RenderFrameProxy::OnDidUpdateOrigin(const url::Origin& origin) {
+  web_frame_->setReplicatedOrigin(origin);
 }
 
 void RenderFrameProxy::frameDetached(DetachType type) {

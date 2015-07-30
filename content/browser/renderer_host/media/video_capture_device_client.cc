@@ -230,22 +230,13 @@ void VideoCaptureDeviceClient::OnIncomingCapturedData(
     last_captured_pixel_format_ = frame_format.pixel_format;
 
     if (frame_format.pixel_format == media::VIDEO_CAPTURE_PIXEL_FORMAT_MJPEG &&
-        VideoCaptureGpuJpegDecoder::Supported()) {
-      if (!external_jpeg_decoder_initialized_) {
-        external_jpeg_decoder_initialized_ = true;
-        // base::Unretained is safe because |this| outlives
-        // |external_jpeg_decoder_| and the callbacks are never called after
-        // |external_jpeg_decoder_| is destroyed.
-        external_jpeg_decoder_.reset(new VideoCaptureGpuJpegDecoder(
-            base::Bind(
-                &VideoCaptureController::DoIncomingCapturedVideoFrameOnIOThread,
-                controller_),
-            // TODO(kcwu): fallback to software decode if error.
-            // https://crbug.com/503532
-            base::Bind(&VideoCaptureDeviceClient::OnError,
-                       base::Unretained(this))));
-        external_jpeg_decoder_->Initialize();
-      }
+        !external_jpeg_decoder_initialized_) {
+      external_jpeg_decoder_initialized_ = true;
+      external_jpeg_decoder_.reset(new VideoCaptureGpuJpegDecoder(
+          base::Bind(
+              &VideoCaptureController::DoIncomingCapturedVideoFrameOnIOThread,
+              controller_)));
+      external_jpeg_decoder_->Initialize();
     }
   }
 
@@ -332,7 +323,17 @@ void VideoCaptureDeviceClient::OnIncomingCapturedData(
       origin_colorspace = libyuv::FOURCC_UYVY;
       break;
     case media::VIDEO_CAPTURE_PIXEL_FORMAT_RGB24:
+      // Linux RGB24 defines red at lowest byte address,
+      // see http://linuxtv.org/downloads/v4l-dvb-apis/packed-rgb.html.
+      // Windows RGB24 defines blue at lowest byte,
+      // see https://msdn.microsoft.com/en-us/library/windows/desktop/dd407253
+#if defined(OS_LINUX)
+      origin_colorspace = libyuv::FOURCC_RAW;
+#elif defined(OS_WIN)
       origin_colorspace = libyuv::FOURCC_24BG;
+#else
+      NOTREACHED() << "RGB24 is only available in Linux and Windows platforms";
+#endif
 #if defined(OS_WIN)
       // TODO(wjia): Currently, for RGB24 on WIN, capture device always
       // passes in positive src_width and src_height. Remove this hardcoded
@@ -361,12 +362,18 @@ void VideoCaptureDeviceClient::OnIncomingCapturedData(
   // paddings and/or alignments, but it cannot be smaller.
   DCHECK_GE(static_cast<size_t>(length), frame_format.ImageAllocationSize());
 
-  if (external_jpeg_decoder_ &&
-      frame_format.pixel_format == media::VIDEO_CAPTURE_PIXEL_FORMAT_MJPEG &&
-      rotation == 0 && !flip && external_jpeg_decoder_->ReadyToDecode()) {
-    external_jpeg_decoder_->DecodeCapturedData(data, length, frame_format,
-                                               timestamp, buffer.Pass());
-    return;
+  if (external_jpeg_decoder_) {
+    const VideoCaptureGpuJpegDecoder::STATUS status =
+        external_jpeg_decoder_->GetStatus();
+    if (status == VideoCaptureGpuJpegDecoder::FAILED) {
+      external_jpeg_decoder_.reset();
+    } else if (status == VideoCaptureGpuJpegDecoder::INIT_PASSED &&
+        frame_format.pixel_format == media::VIDEO_CAPTURE_PIXEL_FORMAT_MJPEG &&
+        rotation == 0 && !flip) {
+      external_jpeg_decoder_->DecodeCapturedData(data, length, frame_format,
+                                                 timestamp, buffer.Pass());
+      return;
+    }
   }
 
   if (libyuv::ConvertToI420(data,

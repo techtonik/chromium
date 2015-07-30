@@ -29,6 +29,7 @@
 #include "base/threading/simple_thread.h"
 #include "base/threading/thread_local.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/trace_event/memory_dump_manager.h"
 #include "base/trace_event/trace_event.h"
 #include "base/values.h"
 #include "cc/base/switches.h"
@@ -79,6 +80,7 @@
 #include "content/public/renderer/content_renderer_client.h"
 #include "content/public/renderer/render_process_observer.h"
 #include "content/public/renderer/render_view_visitor.h"
+#include "content/renderer/bluetooth/bluetooth_message_filter.h"
 #include "content/renderer/browser_plugin/browser_plugin_manager.h"
 #include "content/renderer/cache_storage/cache_storage_dispatcher.h"
 #include "content/renderer/cache_storage/cache_storage_message_filter.h"
@@ -125,8 +127,9 @@
 #include "media/renderers/gpu_video_accelerator_factories.h"
 #include "mojo/common/common_type_converters.h"
 #include "net/base/net_errors.h"
-#include "net/base/net_util.h"
+#include "net/base/port_util.h"
 #include "skia/ext/event_tracer_impl.h"
+#include "skia/ext/skia_memory_dump_provider.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebThread.h"
 #include "third_party/WebKit/public/web/WebCache.h"
@@ -623,7 +626,6 @@ RenderThreadImpl::RenderThreadImpl(
     : ChildThreadImpl(Options::Builder()
                           .InBrowserProcess(params)
                           .UseMojoChannel(ShouldUseMojoChannel())
-                          .ListenerTaskRunner(scheduler->DefaultTaskRunner())
                           .Build()),
       renderer_scheduler_(scheduler.Pass()),
       raster_worker_pool_(new RasterWorkerPool()) {
@@ -637,7 +639,6 @@ RenderThreadImpl::RenderThreadImpl(
     scoped_ptr<scheduler::RendererScheduler> scheduler)
     : ChildThreadImpl(Options::Builder()
                           .UseMojoChannel(ShouldUseMojoChannel())
-                          .ListenerTaskRunner(scheduler->DefaultTaskRunner())
                           .Build()),
       renderer_scheduler_(scheduler.Pass()),
       main_message_loop_(main_message_loop.Pass()),
@@ -727,6 +728,9 @@ void RenderThreadImpl::Init() {
   midi_message_filter_ = new MidiMessageFilter(GetIOMessageLoopProxy());
   AddFilter(midi_message_filter_.get());
 
+  bluetooth_message_filter_ = new BluetoothMessageFilter(thread_safe_sender());
+  AddFilter(bluetooth_message_filter_->GetFilter());
+
   AddFilter((new IndexedDBMessageFilter(thread_safe_sender()))->GetFilter());
 
   AddFilter((new CacheStorageMessageFilter(thread_safe_sender()))->GetFilter());
@@ -736,6 +740,8 @@ void RenderThreadImpl::Init() {
   GetContentClient()->renderer()->RenderThreadStarted();
 
   InitSkiaEventTracer();
+  base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
+      skia::SkiaMemoryDumpProvider::GetInstance());
 
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();
@@ -1449,6 +1455,8 @@ RenderThreadImpl::GetGpuFactories() {
     bool parsed_image_texture_target =
         base::StringToUint(image_texture_target_string, &image_texture_target);
     DCHECK(parsed_image_texture_target);
+    CHECK(gpu_channel_host.get()) << "Have gpu_va_context_provider but no "
+                                     "gpu_channel_host. See crbug.com/495185.";
     gpu_factories = RendererGpuVideoAcceleratorFactories::Create(
         gpu_channel_host.get(), media_task_runner, gpu_va_context_provider_,
         image_texture_target, enable_video_accelerator);
@@ -1480,8 +1488,9 @@ RenderThreadImpl::SharedMainThreadContextProvider() {
       shared_main_thread_contexts_->DestroyedOnMainThread()) {
     shared_main_thread_contexts_ = NULL;
 #if defined(OS_ANDROID)
-    if (SynchronousCompositorFactory* factory =
-            SynchronousCompositorFactory::GetInstance()) {
+    SynchronousCompositorFactory* factory =
+        SynchronousCompositorFactory::GetInstance();
+    if (factory && factory->OverrideWithFactory()) {
       shared_main_thread_contexts_ = factory->CreateOffscreenContextProvider(
           GetOffscreenAttribs(), "Offscreen-MainThread");
     }
@@ -1725,7 +1734,7 @@ void RenderThreadImpl::OnCreateNewView(const ViewMsg_New_Params& params) {
   EnsureWebKitInitialized();
   CompositorDependencies* compositor_deps = this;
   // When bringing in render_view, also bring in webkit's glue and jsbindings.
-  RenderViewImpl::Create(params, compositor_deps, false);
+  RenderViewImpl::Create(compositor_deps, params, false);
 }
 
 GpuChannelHost* RenderThreadImpl::EstablishGpuChannelSync(

@@ -32,11 +32,13 @@
         '../google_apis/google_apis.gyp:google_apis',
         '../net/net.gyp:net',
         '../sql/sql.gyp:sql',
+        '../third_party/cacheinvalidation/cacheinvalidation.gyp:cacheinvalidation_proto_cpp',
         '../third_party/icu/icu.gyp:icui18n',
         '../third_party/icu/icu.gyp:icuuc',
         'content_settings_core_browser',
         'content_settings_core_common',
         'google_core_browser',
+        'invalidation_public',
         'keyed_service_core',
         'os_crypt',
         'signin_core_common',
@@ -57,6 +59,14 @@
         'signin/core/browser/account_reconcilor.h',
         'signin/core/browser/account_tracker_service.cc',
         'signin/core/browser/account_tracker_service.h',
+        'signin/core/browser/android/component_jni_registrar.cc',
+        'signin/core/browser/android/component_jni_registrar.h',
+        'signin/core/browser/child_account_info_fetcher.cc',
+        'signin/core/browser/child_account_info_fetcher.h',
+        'signin/core/browser/child_account_info_fetcher_android.cc',
+        'signin/core/browser/child_account_info_fetcher_android.h',
+        'signin/core/browser/child_account_info_fetcher_impl.cc',
+        'signin/core/browser/child_account_info_fetcher_impl.h',
         'signin/core/browser/device_activity_fetcher.cc',
         'signin/core/browser/device_activity_fetcher.h',
         'signin/core/browser/gaia_cookie_manager_service.cc',
@@ -67,6 +77,7 @@
         'signin/core/browser/profile_oauth2_token_service.h',
         'signin/core/browser/refresh_token_annotation_request.cc',
         'signin/core/browser/refresh_token_annotation_request.h',
+        'signin/core/browser/signin_client.cc',
         'signin/core/browser/signin_client.h',
         'signin/core/browser/signin_cookie_changed_subscription.cc',
         'signin/core/browser/signin_cookie_changed_subscription.h',
@@ -92,6 +103,15 @@
         'signin/core/browser/webdata/token_web_data.h',
       ],
       'conditions': [
+        ['OS=="android"', {
+          'dependencies': [
+            'signin_core_browser_jni_headers',
+          ],
+          'sources!': [
+            'signin/core/browser/child_account_info_fetcher_impl.cc',
+            'signin/core/browser/child_account_info_fetcher_impl.h',
+          ],
+        }],
         ['chromeos==1', {
           'sources!': [
             'signin/core/browser/signin_manager.cc',
@@ -114,14 +134,49 @@
       ],
       'sources': [
         # Note: file list duplicated in GN build.
+        'signin/core/browser/fake_account_fetcher_service.cc',
+        'signin/core/browser/fake_account_fetcher_service.h',
         'signin/core/browser/fake_auth_status_provider.cc',
         'signin/core/browser/fake_auth_status_provider.h',
+        'signin/core/browser/fake_profile_oauth2_token_service.cc',
+        'signin/core/browser/fake_profile_oauth2_token_service.h',
+        'signin/core/browser/fake_signin_manager.cc',
+        'signin/core/browser/fake_signin_manager.h',
         'signin/core/browser/test_signin_client.cc',
         'signin/core/browser/test_signin_client.h',
       ],
     },
   ],
   'conditions': [
+    ['OS == "android"', {
+      'targets': [
+        {
+          # GN version: //components/signin/core/browser/android:java
+          'target_name': 'signin_core_browser_java',
+          'type': 'none',
+          'dependencies': [
+            '../base/base.gyp:base',
+            '../sync/sync.gyp:sync_java',
+          ],
+          'variables': {
+            'java_in_dir': 'signin/core/browser/android/java',
+          },
+          'includes': [ '../build/java.gypi' ],
+        },
+        {
+          # GN version: //components/signin/core/browser/android:jni_headers
+          'target_name': 'signin_core_browser_jni_headers',
+          'type': 'none',
+          'sources': [
+            'signin/core/browser/android/java/src/org/chromium/components/signin/ChildAccountInfoFetcher.java',
+          ],
+          'variables': {
+            'jni_gen_package': 'components/signin',
+          },
+          'includes': [ '../build/jni_generator.gypi' ],
+        },
+      ],
+    }],
     ['OS == "ios"', {
       # GN version: //components/signin/core/browser:ios
       'targets': [

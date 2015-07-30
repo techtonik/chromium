@@ -11,7 +11,6 @@ import page_sets.key_silk_cases
 from telemetry import benchmark
 
 
-@benchmark.Disabled('win', 'mac', 'linux')  # crbug.com/510818
 class SmoothnessTop25(perf_benchmark.PerfBenchmark):
   """Measures rendering statistics while scrolling down the top 25 web pages.
 
@@ -310,7 +309,7 @@ class SmoothnessToughScrollingCases(perf_benchmark.PerfBenchmark):
   def Name(cls):
     return 'smoothness.tough_scrolling_cases'
 
-
+@benchmark.Disabled('android')  # http://crbug.com/513699
 class SmoothnessImageDecodingCases(perf_benchmark.PerfBenchmark):
   """Measures decoding statistics for jpeg images.
   """
@@ -326,6 +325,7 @@ class SmoothnessImageDecodingCases(perf_benchmark.PerfBenchmark):
     return 'smoothness.image_decoding_cases'
 
 
+@benchmark.Disabled('android')  # http://crbug.com/513699
 class SmoothnessGpuImageDecodingCases(perf_benchmark.PerfBenchmark):
   """Measures decoding statistics for jpeg images with GPU rasterization.
   """

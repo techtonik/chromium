@@ -55,10 +55,9 @@ class ProfileSyncServiceAndroid : public sync_driver::SyncServiceObserver {
   void GetAllNodes(JNIEnv* env, jobject obj, jobject callback);
 
   // Called from Java early during startup to ensure we use the correct
-  // unique machine tag in session sync. Returns true if the machine tag was
-  // succesfully set.
+  // unique machine tag in session sync.
   // This must be called before the |SessionModelAssociator| is initialized.
-  jboolean SetSyncSessionsId(JNIEnv* env, jobject obj, jstring tag);
+  void SetSyncSessionsId(JNIEnv* env, jobject obj, jstring tag);
 
   // Returns true if the sync backend is initialized.
   jboolean IsSyncInitialized(JNIEnv* env, jobject obj);
@@ -96,13 +95,10 @@ class ProfileSyncServiceAndroid : public sync_driver::SyncServiceObserver {
                                    jobject obj,
                                    jstring passphrase);
 
-  // Encrypts the user's data with the passed passphrase. If |is_gaia| == true
-  // then the passphrase is treated as a google (GAIA) passphrase, otherwise
-  // it's treated like an explicit/custom passphrase.
+  // Encrypts the user's data with the passed custom passphrase.
   void SetEncryptionPassphrase(JNIEnv* env,
                                jobject obj,
-                               jstring passphrase,
-                               jboolean is_gaia);
+                               jstring passphrase);
 
   // Returns whether the cryptographer is ready (i.e. encrypted types can be
   // handled).

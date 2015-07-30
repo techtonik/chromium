@@ -60,6 +60,11 @@
     Enable on-screen keyboard
   </message>
 
+  <!-- Advanced Page -->
+  <message name="IDS_SETTINGS_ADVANCED_PAGE_TITLE" desc="Name of the settings page which displays advanced preferences.">
+    Advanced
+  </message>
+
   <!-- Appearance Page -->
   <message name="IDS_SETTINGS_APPEARANCE_PAGE_TITLE" desc="Name of the settings page which displays appearance preferences.">
     Appearance
@@ -84,6 +89,11 @@
   </message>
   <message name="IDS_SETTINGS_CHANGE_HOME_PAGE" desc="Label of the control to change the home page.">
     Change
+  </message>
+
+  <!-- Basic Page -->
+  <message name="IDS_SETTINGS_BASIC_PAGE_TITLE" desc="Name of the settings page which displays advanced preferences.">
+    Basic
   </message>
 
   <!-- Downloads Page -->
@@ -155,6 +165,9 @@
   </message>
   <message name="IDS_SETTINGS_WAKE_ON_WIFI_DESCRIPTION" desc="In the settings tab, the text next to the checkbox for enabling quickly reconnecting to known Wi-Fi SSIDs.">
     Keep Wi-Fi on during sleep
+  </message>
+  <message name="IDS_SETTINGS_MANAGE_CERTIFICATES" desc="Text for manage certificates button in Privacy options">
+    Manage Certificates
   </message>
   <message name="IDS_SETTINGS_SITE_SETTINGS" desc="Text for site settings button in Privacy options">
     Site settings

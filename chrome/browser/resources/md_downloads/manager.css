@@ -4,9 +4,8 @@
 
 :host {
   @apply(--downloads-shared-style);
-}
-
-#downloads-list {
-  margin: 0 auto;
-  width: var(--downloads-item-width);
+  display: flex;
+  flex: 1 0 1024px;
+  flex-direction: column;
+  height: 100%;
 }

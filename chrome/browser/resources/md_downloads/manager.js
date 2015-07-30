@@ -18,6 +18,12 @@ cr.define('downloads', function() {
       },
     },
 
+    ready: function() {
+      window.addEventListener('resize', this.onResize_.bind(this));
+      // onResize_() doesn't need to be called immediately here because it's
+      // guaranteed to be called again shortly when items are received.
+    },
+
     /**
      * @return {number} A guess at how many items could be visible at once.
      * @private
@@ -38,7 +44,7 @@ cr.define('downloads', function() {
           e.canExecute = this.$.toolbar.canUndo();
           break;
         case 'clear-all-command':
-          e.canExecute = true;
+          e.canExecute = this.$.toolbar.canClearAll();
           break;
       }
     },
@@ -66,6 +72,16 @@ cr.define('downloads', function() {
       this.actionService_.search('');
     },
 
+    /** @private */
+    onResize_: function() {
+      // TODO(dbeam): expose <paper-header-panel>'s #mainContainer in Polymer.
+      var container = this.$.panel.$.mainContainer;
+      var scrollbarWidth = container.offsetWidth - container.clientWidth;
+      this.items_.forEach(function(item) {
+        item.scrollbarWidth = scrollbarWidth;
+      });
+    },
+
     /**
      * @return {number} The number of downloads shown on the page.
      * @private
@@ -82,10 +98,10 @@ cr.define('downloads', function() {
     updateAll_: function(list) {
       var oldIdMap = this.idMap_ || {};
 
-      /** @private {!Object<!downloads.ItemView>} */
+      /** @private {!Object<!downloads.Item>} */
       this.idMap_ = {};
 
-      /** @private {!Array<!downloads.ItemView>} */
+      /** @private {!Array<!downloads.Item>} */
       this.items_ = [];
 
       if (!this.iconLoader_) {
@@ -100,7 +116,7 @@ cr.define('downloads', function() {
 
         // Re-use old items when possible (saves work, preserves focus).
         var item = oldIdMap[id] ||
-            new downloads.ItemView(this.iconLoader_, this.actionService_);
+            new downloads.Item(this.iconLoader_, this.actionService_);
 
         this.idMap_[id] = item;  // Associated by ID for fast lookup.
         this.items_.push(item);  // Add to sorted list for order.
@@ -141,7 +157,9 @@ cr.define('downloads', function() {
       this.hasDownloads_ = this.size_() > 0;
 
       if (loadTimeData.getBoolean('allowDeletingHistory'))
-        this.$.toolbar.canClearAll = this.hasDownloads_;
+        this.$.toolbar.downloadsShowing = this.hasDownloads_;
+
+      this.onResize_();
     },
 
     /**
@@ -150,6 +168,7 @@ cr.define('downloads', function() {
      */
     updateItem_: function(data) {
       this.idMap_[data.id].update(data);
+      this.onResize_();
     },
   });
 

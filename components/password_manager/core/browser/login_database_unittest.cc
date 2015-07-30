@@ -59,7 +59,7 @@ void GenerateExamplePasswordForm(PasswordForm* form) {
   form->form_data.name = ASCIIToUTF16("form_name");
   form->date_synced = base::Time::Now();
   form->display_name = ASCIIToUTF16("Mr. Smith");
-  form->avatar_url = GURL("https://accounts.google.com/Avatar");
+  form->icon_url = GURL("https://accounts.google.com/Icon");
   form->federation_url = GURL("https://accounts.google.com/federation");
   form->skip_zero_click = true;
 }
@@ -609,7 +609,7 @@ static bool AddTimestampedLogin(LoginDatabase* db,
   form.submit_element = ASCIIToUTF16("signIn");
   form.signon_realm = url;
   form.display_name = ASCIIToUTF16(unique_string);
-  form.avatar_url = GURL("https://accounts.google.com/Avatar");
+  form.icon_url = GURL("https://accounts.google.com/Icon");
   form.federation_url = GURL("https://accounts.google.com/federation");
   form.skip_zero_click = true;
 
@@ -733,7 +733,7 @@ TEST_F(LoginDatabaseTest, BlacklistedLogins) {
   form.scheme = PasswordForm::SCHEME_HTML;
   form.date_synced = base::Time::Now();
   form.display_name = ASCIIToUTF16("Mr. Smith");
-  form.avatar_url = GURL("https://accounts.google.com/Avatar");
+  form.icon_url = GURL("https://accounts.google.com/Icon");
   form.federation_url = GURL("https://accounts.google.com/federation");
   form.skip_zero_click = true;
   EXPECT_EQ(AddChangeForForm(form), db().AddLogin(form));
@@ -957,7 +957,7 @@ TEST_F(LoginDatabaseTest, UpdateLogin) {
   form.scheme = PasswordForm::SCHEME_BASIC;
   form.type = PasswordForm::TYPE_GENERATED;
   form.display_name = ASCIIToUTF16("Mr. Smith");
-  form.avatar_url = GURL("https://accounts.google.com/Avatar");
+  form.icon_url = GURL("https://accounts.google.com/Icon");
   form.federation_url = GURL("https://accounts.google.com/federation");
   form.skip_zero_click = true;
   EXPECT_EQ(UpdateChangeForForm(form), db().UpdateLogin(form));
@@ -1122,9 +1122,7 @@ TEST_F(LoginDatabaseTest, ClearPasswordValues) {
 
   // Encrypting/decrypting shouldn't happen. Thus there should be no keychain
   // access on Mac.
-  scoped_ptr<base::HistogramSamples> samples =
-      histogram_tester.GetHistogramSamplesSinceCreation("OSX.Keychain.Access");
-  EXPECT_TRUE(!samples || samples->TotalCount() == 0);
+  histogram_tester.ExpectTotalCount("OSX.Keychain.Access", 0);
 }
 
 #if defined(OS_POSIX)

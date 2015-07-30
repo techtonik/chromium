@@ -20,11 +20,12 @@ from telemetry.internal.forwarders import android_forwarder
 from telemetry.internal.image_processing import video
 from telemetry.internal.platform import android_device
 from telemetry.internal.platform import linux_based_platform_backend
-from telemetry.internal.platform.power_monitor import android_ds2784_power_monitor
 from telemetry.internal.platform.power_monitor import android_dumpsys_power_monitor
+from telemetry.internal.platform.power_monitor import android_fuelgauge_power_monitor
 from telemetry.internal.platform.power_monitor import android_temperature_monitor
 from telemetry.internal.platform.power_monitor import monsoon_power_monitor
 from telemetry.internal.platform.power_monitor import power_monitor_controller
+from telemetry.internal.platform.power_monitor import sysfs_power_monitor
 from telemetry.internal.platform.profiler import android_prebuilt_profiler_helper
 from telemetry.internal.util import exception_formatter
 from telemetry.internal.util import external_modules
@@ -165,9 +166,11 @@ class AndroidPlatformBackend(
     self._device_copy_script = None
     power_controller = power_monitor_controller.PowerMonitorController([
         monsoon_power_monitor.MonsoonPowerMonitor(self._device, self),
-        android_ds2784_power_monitor.DS2784PowerMonitor(self._device, self),
         android_dumpsys_power_monitor.DumpsysPowerMonitor(self._battery, self),
-    ])
+        sysfs_power_monitor.SysfsPowerMonitor(self, standalone=True),
+        android_fuelgauge_power_monitor.FuelGaugePowerMonitor(
+            self._battery, self),
+    ], self._battery)
     self._power_monitor = android_temperature_monitor.AndroidTemperatureMonitor(
         power_controller, self._device)
     self._video_recorder = None
@@ -449,6 +452,14 @@ class AndroidPlatformBackend(
   def GetNetworkData(self, browser):
     return self._battery.GetNetworkData(browser._browser_backend.package)
 
+  def PathExists(self, device_path, timeout=None, retries=None):
+    """ Return whether the given path exists on the device.
+    This method is the same as
+    android.pylib.device.device_utils.DeviceUtils.PathExists.
+    """
+    return self._device.PathExists(
+        device_path, timeout=timeout, retries=retries)
+
   def GetFileContents(self, fname):
     if not self._can_access_protected_file_contents:
       logging.warning('%s cannot be retrieved on non-rooted device.' % fname)
@@ -513,7 +524,7 @@ class AndroidPlatformBackend(
     Limit the number in case we have an error loop or we are failing to dismiss.
     """
     for _ in xrange(10):
-      if not self._device.old_interface.DismissCrashDialogIfNeeded():
+      if not self._device.DismissCrashDialogIfNeeded():
         break
 
   def IsAppRunning(self, process_name):

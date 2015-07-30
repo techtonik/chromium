@@ -242,7 +242,8 @@ class DownloadNotificationTestBase : public InProcessBrowserTest {
 
   void SetUpCommandLine(base::CommandLine* command_line) override {
     // TODO(yoshiki): Remove this after the download notification launches.
-    command_line->AppendSwitch(switches::kEnableDownloadNotification);
+    command_line->AppendSwitchASCII(switches::kEnableDownloadNotification,
+                                    "enabled");
   }
 
   void SetUp() override {
@@ -927,7 +928,7 @@ IN_PROC_BROWSER_TEST_F(DownloadNotificationTest,
   EXPECT_EQ(download_incognito, downloads[0]);
 
   // Confirms the types of download notifications are correct.
-  EXPECT_EQ(message_center::NOTIFICATION_TYPE_PROGRESS,
+  EXPECT_EQ(message_center::NOTIFICATION_TYPE_BASE_FORMAT,
             GetNotification(notification_id1)->type());
   EXPECT_EQ(message_center::NOTIFICATION_TYPE_PROGRESS,
             GetNotification(notification_id2)->type());
@@ -1095,7 +1096,7 @@ IN_PROC_BROWSER_TEST_F(MultiProfileDownloadNotificationTest,
 
   // Confirms the types of download notifications are correct.
   // Normal notification for user1.
-  EXPECT_EQ(message_center::NOTIFICATION_TYPE_PROGRESS,
+  EXPECT_EQ(message_center::NOTIFICATION_TYPE_BASE_FORMAT,
             GetNotification(notification_id_user1)->type());
   // Group notification for user2.
   EXPECT_EQ(message_center::NOTIFICATION_TYPE_MULTIPLE,
@@ -1103,9 +1104,9 @@ IN_PROC_BROWSER_TEST_F(MultiProfileDownloadNotificationTest,
   EXPECT_EQ(2u,
             GetNotification(notification_id_user2_group)->items().size());
   // Normal notification for user2.
-  EXPECT_EQ(message_center::NOTIFICATION_TYPE_PROGRESS,
+  EXPECT_EQ(message_center::NOTIFICATION_TYPE_BASE_FORMAT,
             GetNotification(notification_id_user2_1)->type());
-  EXPECT_EQ(message_center::NOTIFICATION_TYPE_PROGRESS,
+  EXPECT_EQ(message_center::NOTIFICATION_TYPE_BASE_FORMAT,
             GetNotification(notification_id_user2_2)->type());
 
   // Requests to complete the downloads.

@@ -90,14 +90,15 @@ _REVISION_NEGATIVE_FILTER['HEAD'] = [
     'PageLoadingTest.testShouldBeAbleToNavigateBackInTheBrowserHistory',
     # https://code.google.com/p/chromedriver/issues/detail?id=1117
     'PageLoadingTest.testShouldBeAbleToAccessPagesWithAnInsecureSslCertificate',
-    # https://code.google.com/p/chromedriver/issues/detail?id=1138
-    'XPathElementFindingTest.*',
     # Flaky: https://code.google.com/p/chromedriver/issues/detail?id=1113
     'FrameSwitchingTest.testShouldNotSwitchMagicallyToTheTopWindow',
     # Flaky: https://code.google.com/p/chromedriver/issues/detail?id=1151
     'DragAndDropTest.testDragAndDrop',
     'DragAndDropTest.testShouldAllowUsersToDragAndDropToElementsOffTheCurrentViewPort',
     'DragAndDropTest.testElementInDiv',
+    # https://code.google.com/p/chromedriver/issues/detail?id=1167
+    'MiscTest.testStimulatesStrangeOnloadInteractionInFirefox',
+    'PageLoadingTest.testShouldNotHangIfDocumentOpenCallIsNeverFollowedByDocumentCloseCall',
 ]
 
 
@@ -212,11 +213,18 @@ _OS_NEGATIVE_FILTER['android:chrome'] = [
     # https://code.google.com/p/chromedriver/issues/detail?id=998
     'ImplicitWaitTest.testShouldImplicitlyWaitForASingleElement',
     'ImplicitWaitTest.testShouldReturnAfterFirstAttemptToFindManyAfterDisablingImplicitWaits',
+
+    # https://code.google.com/p/chromedriver/issues/detail?id=1176
+    'ChromeDriverTests.clientLogShouldBeEnabledByDefault',
 ]
 _OS_NEGATIVE_FILTER['android:chrome_stable'] = (
     _OS_NEGATIVE_FILTER['android:chrome'])
 _OS_NEGATIVE_FILTER['android:chrome_beta'] = (
-    _OS_NEGATIVE_FILTER['android:chrome']
+    _OS_NEGATIVE_FILTER['android:chrome'] + [
+        'ClickTest.testShouldClickOnFirstBoundingClientRectWithNonZeroSize',
+        'CombinedInputActionsTest.testCanClickOnLinksWithAnOffset',
+        'CombinedInputActionsTest.testMouseMovementWorksWhenNavigatingToAnotherPage',
+    ]
 )
 _OS_NEGATIVE_FILTER['android:chrome_shell'] = (
     _OS_NEGATIVE_FILTER['android:chrome'] + [
@@ -224,6 +232,8 @@ _OS_NEGATIVE_FILTER['android:chrome_shell'] = (
         'ClickTest.testShouldClickOnFirstBoundingClientRectWithNonZeroSize',
         'CombinedInputActionsTest.testCanClickOnLinksWithAnOffset',
         'CombinedInputActionsTest.testMouseMovementWorksWhenNavigatingToAnotherPage',
+        # https://code.google.com/p/chromedriver/issues/detail?id=1171
+        'ChromeDriverTests.testOptionsForUninitializedWebDriver',
     ]
 )
 _OS_NEGATIVE_FILTER['android:chromedriver_webview_shell'] = (

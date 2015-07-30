@@ -5,7 +5,7 @@
 * {
   --downloads-item-width: 606px;
   --downloads-shared-style: {
-    font-family: Roboto;
-    font-weight: 500;
   };
+  /* (1024 total width - 606 item width) / 2 = 209 room to play. */
+  --downloads-side-column-basis: 209px;
 }

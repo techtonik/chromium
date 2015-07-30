@@ -121,8 +121,8 @@ void LoadDisplayLayouts() {
     }
 
     if (it.key().find(",") != std::string::npos) {
-      std::vector<std::string> ids;
-      base::SplitString(it.key(), ',', &ids);
+      std::vector<std::string> ids = base::SplitString(
+          it.key(), ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
       int64 id1 = gfx::Display::kInvalidDisplayID;
       int64 id2 = gfx::Display::kInvalidDisplayID;
       if (!base::StringToInt64(ids[0], &id1) ||
@@ -253,15 +253,15 @@ void StoreCurrentDisplayProperties() {
 
     scoped_ptr<base::DictionaryValue> property_value(
         new base::DictionaryValue());
+    // Don't save the display preference in unified mode because its
+    // size and modes can change depending on the combination of displays.
+    if (display_manager->IsInUnifiedMode())
+      continue;
     property_value->SetInteger(
         "rotation",
         static_cast<int>(info.GetRotation(gfx::Display::ROTATION_SOURCE_USER)));
-    // Don't save the ui scale in unified mode because UI scale range
-    // changes depending on the display combinations.
-    if (!display_manager->IsInUnifiedMode()) {
-      property_value->SetInteger(
-          "ui-scale", static_cast<int>(info.configured_ui_scale() * 1000));
-    }
+    property_value->SetInteger(
+        "ui-scale", static_cast<int>(info.configured_ui_scale() * 1000));
 
     ash::DisplayMode mode;
     if (!display.IsInternal() &&

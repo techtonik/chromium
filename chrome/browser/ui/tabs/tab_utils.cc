@@ -182,8 +182,8 @@ const gfx::Image& GetTabMediaIndicatorAffordanceImage(
   ui::ResourceBundle& rb = ui::ResourceBundle::GetSharedInstance();
   switch (media_state) {
     case TAB_MEDIA_STATE_AUDIO_PLAYING:
+      return rb.GetNativeImageNamed(IDR_TAB_AUDIO_MUTING_INDICATOR);
     case TAB_MEDIA_STATE_AUDIO_MUTING:
-      return rb.GetNativeImageNamed(IDR_TAB_AUDIO_MUTING_AFFORDANCE);
     case TAB_MEDIA_STATE_NONE:
     case TAB_MEDIA_STATE_RECORDING:
     case TAB_MEDIA_STATE_CAPTURING:
@@ -276,16 +276,23 @@ const std::string& GetTabAudioMutedCause(content::WebContents* contents) {
   return LastMuteMetadata::FromWebContents(contents)->cause;
 }
 
-void SetTabAudioMuted(content::WebContents* contents,
-                      bool mute,
-                      const std::string& cause) {
-  if (!contents || !chrome::CanToggleAudioMute(contents))
-    return;
+TabMutedResult SetTabAudioMuted(content::WebContents* contents,
+                                bool mute,
+                                const std::string& cause) {
+  DCHECK(contents);
+
+  if (!IsTabAudioMutingFeatureEnabled())
+    return TAB_MUTED_RESULT_FAIL_NOT_ENABLED;
+
+  if (!chrome::CanToggleAudioMute(contents))
+    return TAB_MUTED_RESULT_FAIL_TABCAPTURE;
 
   LastMuteMetadata::CreateForWebContents(contents);  // Create if not exists.
-  LastMuteMetadata::FromWebContents(contents)->cause = cause;
 
   contents->SetAudioMuted(mute);
+  LastMuteMetadata::FromWebContents(contents)->cause = cause;
+
+  return TAB_MUTED_RESULT_SUCCESS;
 }
 
 bool IsTabAudioMuted(content::WebContents* contents) {

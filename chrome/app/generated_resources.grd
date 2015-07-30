@@ -499,6 +499,13 @@ are declared in build/common.gypi.
         Customize
       </message>
 
+      <!-- Runtime permission infobar strings -->
+      <if expr="is_android">
+        <message name="IDS_INFOBAR_UPDATE_PERMISSIONS_BUTTON_TEXT" desc="Button text shown when Chrome does not have the necessary permission required to complete the requested tasks (e.g. a website has request location information, but Chrome is missing that Android permission)." formatter_data="android_java">
+          Update permissions
+        </message>
+      </if>
+
       <message name="IDS_SHOWFULLHISTORY_LINK" desc="The label of the Show Full History link at the bottom of the back/forward menu.">
         Show Full History
       </message>
@@ -724,8 +731,8 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
       <!-- content area context menus. Android does not use it -->
       <if expr="not is_android">
         <if expr="is_macosx">
-            <message name="IDS_CONTENT_CONTEXT_LOOK_UP_IN_DICTIONARY" desc="The name of the 'Look Up in Dictionary' item in the content area context menu.  To translate, launch /Applications/TextEdit.app in an appropriately localized version of OS X, right-click on the text entry area and use the translation from there.">
-              Look Up in Dictionary
+            <message name="IDS_CONTENT_CONTEXT_LOOK_UP" desc="The name of the 'Look Up “string”' item in the content area context menu. To translate, launch /Applications/TextEdit.app in an appropriately localized version of OS X, right-click on the text entry area and use the translation from there.">
+              Look Up “<ph name="LOOKUP_STRING">$1<ex>orthogonal</ex></ph>”
             </message>
         </if>
         <if expr="not use_titlecase">
@@ -921,8 +928,8 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
           <message name="IDS_CONTENT_CONTEXT_SELECTALL" desc="The name of the Select All command in the content area context menu">
             Select &amp;all
           </message>
-          <message name="IDS_CONTENT_CONTEXT_SEARCHWEBFOR" desc="The name of the Search the Web for 'string' command in the content area context menu">
-            &amp;Search <ph name="SEARCH_ENGINE">$1<ex>Google</ex></ph> for '<ph name="SEARCH_TERMS">$2<ex>flowers</ex></ph>'
+          <message name="IDS_CONTENT_CONTEXT_SEARCHWEBFOR" desc="The name of the Search the Web for “string” command in the content area context menu">
+            &amp;Search <ph name="SEARCH_ENGINE">$1<ex>Google</ex></ph> for “<ph name="SEARCH_TERMS">$2<ex>flowers</ex></ph>”
           </message>
           <message name="IDS_CONTENT_CONTEXT_SEARCHWEBFORIMAGE" desc="The name of the Search For Image command in the content area context menu">
             &amp;Search <ph name="SEARCH_ENGINE">$1<ex>Google</ex></ph> for this image
@@ -1141,8 +1148,8 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
           <message name="IDS_CONTENT_CONTEXT_SELECTALL" desc="In Title Case: The name of the Select All command in the content area context menu">
             Select &amp;All
           </message>
-          <message name="IDS_CONTENT_CONTEXT_SEARCHWEBFOR" desc="In Title Case: The name of the Search the Web for 'string' command in the content area context menu">
-            &amp;Search <ph name="SEARCH_ENGINE">$1<ex>Google</ex></ph> for '<ph name="SEARCH_TERMS">$2<ex>flowers</ex></ph>'
+          <message name="IDS_CONTENT_CONTEXT_SEARCHWEBFOR" desc="In Title Case: The name of the Search the Web for “string” command in the content area context menu">
+            &amp;Search <ph name="SEARCH_ENGINE">$1<ex>Google</ex></ph> for “<ph name="SEARCH_TERMS">$2<ex>flowers</ex></ph>”
           </message>
           <message name="IDS_CONTENT_CONTEXT_SEARCHWEBFORIMAGE" desc="In Title Case: The name of the Search For Image command in the content area context menu">
             &amp;Search <ph name="SEARCH_ENGINE">$1<ex>Google</ex></ph> for this Image
@@ -1988,6 +1995,10 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
          desc="Message shown to the user to validate the download when the download content is classified as uncommon by safebrowsing.">
         <ph name="FILE_NAME">$1<ex>bla.exe</ex></ph> is not commonly downloaded and could be dangerous.
       </message>
+      <message name="IDS_PROMPT_BLOCKED_MALICIOUS_DOWNLOAD_TITLE"
+               desc="In the download notification, a title of message shown for blocked download">
+        Malicious download blocked
+      </message>
       <message name="IDS_CONFIRM_KEEP_DANGEROUS_DOWNLOAD_TITLE"
                desc="Title for the confirmation dialog asking whether the user really meant to keep a dangerous download">
         Confirm Download
@@ -2049,6 +2060,9 @@ Even if you have downloaded files from this website before, the website might ha
       <message name="IDS_DOWNLOAD_SEARCH_BUTTON" desc="Title of the button in the download page that triggers a search">
         Search downloads
       </message>
+      <message name="IDS_MD_DOWNLOAD_SEARCH" desc="Placeholder text/label for the search input in the download page">
+        Search
+      </message>
       <message name="IDS_DOWNLOAD_SEARCHRESULTSFOR" desc="Format string for search results">
         Search results for '<ph name="SEARCH_STRING">$1</ph>'
       </message>
@@ -2074,6 +2088,10 @@ Even if you have downloaded files from this website before, the website might ha
                desc="In the download view, 'Retry download' link text">
         Retry download
       </message>
+      <message name="IDS_MD_DOWNLOAD_LINK_RETRY"
+               desc="In the download view, 'Retry' button text to retry downloading a file.">
+        Retry
+      </message>
       <if expr="not is_macosx">
         <message name="IDS_DOWNLOAD_LINK_SHOW"
                  desc="In the download view, 'Show in folder' link text">
@@ -2089,6 +2107,10 @@ Even if you have downloaded files from this website before, the website might ha
       <message name="IDS_DOWNLOAD_LINK_SHOW_ALL_DOWNLOADS"
                desc="In the download notification, 'Show all downloads' button text.">
         Show all downloads
+      </message>
+      <message name="IDS_DOWNLOAD_LINK_LEARN_MORE_SCANNING"
+               desc="In the download notification, a label of the button to show information about download scanning">
+        Learn more
       </message>
       <message name="IDS_DOWNLOAD_TAB_CANCELLED"
                desc="Text that appears next to the downloaded files that have been canceled">
@@ -4251,10 +4273,10 @@ Even if you have downloaded files from this website before, the website might ha
       <!-- Extension toolbar bubble -->
       <if expr="enable_extensions">
         <message name="IDS_EXTENSION_TOOLBAR_BUBBLE_HEADING" desc="Heading of the bubble to tell users that all extensions are now visible in the toolbar (the extension toolbar info bubble).">
-          Your extensions can now be found here.
+          All your extensions are here
         </message>
         <message name="IDS_EXTENSION_TOOLBAR_BUBBLE_CONTENT" desc="Content of the extension toolbar info bubble.">
-          Right click to remove the extensions you don't want or hide them in the menu.
+          Use the context (right-click) menu to remove the extensions you don't need.
         </message>
         <message name="IDS_EXTENSION_TOOLBAR_BUBBLE_OK" desc="Button label for the extension toolbar info bubble.">
           Got it
@@ -6531,17 +6553,17 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_V8_PAC_MOJO_OUT_OF_PROCESS_DESCRIPTION" desc="Description for the flag to enable out-of-process V8 proxy resolver.">
         Enable Out-of-process V8 Proxy Resolver. Runs the V8 proxy resolver in a utility process instead of inside the browser process.
       </message>
-      <message name="IDS_FLAGS_V8_CACHE_OPTIONS_NAME" desc="Name of V8 cache options flag">
-        V8 caching mode.
+      <message name="IDS_FLAGS_V8_CACHE_OPTIONS_NAME" desc="Name of the about::flags setting for JavaScript cache options.">
+        JavaScript caching mode.
       </message>
-      <message name="IDS_FLAGS_V8_CACHE_OPTIONS_DESCRIPTION" desc="Description of V8 cache options flag">
+      <message name="IDS_FLAGS_V8_CACHE_OPTIONS_DESCRIPTION" desc="Description of the about::flags setting for JavaScript cache options.">
         Caching mode for the V8 JavaScript engine.
       </message>
-      <message name="IDS_FLAGS_V8_CACHE_OPTIONS_PARSE" desc="Name of V8 cache option 'parser'">
-        Cache parsing data.
+      <message name="IDS_FLAGS_V8_CACHE_OPTIONS_PARSE" desc="The JavaScript engine supports three 'caching' modes: disabled; caching data generated by the JavaScript parser; or caching data generated by the JavaScript compiler. This option describes the 2nd of these, caching data generated by the parser.">
+        Cache JavaScript parser data.
       </message>
-      <message name="IDS_FLAGS_V8_CACHE_OPTIONS_CODE" desc="Name of V8 cache option 'code'">
-        Cache generated machine code.
+      <message name="IDS_FLAGS_V8_CACHE_OPTIONS_CODE" desc="The JavaScript engine supports three 'caching' modes: disabled; caching data generated by the JavaScript parser; or caching data generated by the JavaScript compiler. This option describes the 3rd of these, caching data generated by the compiler.">
+        Cache JavaScript compiler data.
       </message>
 
       <!-- Data Reduction Proxy -->
@@ -6623,24 +6645,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_ZERO_COPY_DESCRIPTION" desc="Description of about:flags option for zero-copy rasterizer.">
         If enabled, raster threads write directly to GPU memory associated with tiles.
-      </message>
-      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_NAME" desc="Name of about:flags option for maximum tiles for interest area.">
-        Maximum tiles for interest area
-      </message>
-      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_DESCRIPTION" desc="Description of about:flags option for maximum tiles for interest area.">
-        Specify the maximum tiles for interest area.
-      </message>
-      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_SHORT" desc="">
-        64
-      </message>
-      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_TALL" desc="">
-        128
-      </message>
-      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_GRANDE" desc="">
-        256
-      </message>
-      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_VENTI" desc="">
-        512
       </message>
       <message name="IDS_FLAGS_TAB_CAPTURE_UPSCALE_QUALITY_NAME" desc="">
         Tab capture upscaling quality.
@@ -7021,11 +7025,11 @@ Keep your key file in a safe place. You will need it to create new versions of y
         </message>
       </if>
       <if expr="chromeos">
-        <message name="IDS_FLAGS_ENABLE_ACCELERATED_MJPEG_DECODE_NAME" desc="Name of the flag to enable accelerated mjpeg decode for captured frame where available.">
-          Enable hardware-accelerated mjpeg decode for captured frame.
+        <message name="IDS_FLAGS_DISABLE_ACCELERATED_MJPEG_DECODE_NAME" desc="Name of the flag to disable accelerated mjpeg decode for captured frame where available.">
+          Disable hardware-accelerated mjpeg decode for captured frame.
         </message>
-        <message name="IDS_FLAGS_ENABLE_ACCELERATED_MJPEG_DECODE_DESCRIPTION" desc="Description for the flag to enable accelerated mjpeg decode for captured frame where available.">
-          Enable hardware-accelerated mjpeg decode for captured frame where available.
+        <message name="IDS_FLAGS_DISABLE_ACCELERATED_MJPEG_DECODE_DESCRIPTION" desc="Description for the flag to disable accelerated mjpeg decode for captured frame where available.">
+          Disable hardware-accelerated mjpeg decode for captured frame where available.
         </message>
       </if>
       <message name="IDS_FLAGS_RESTRICT_IFRAME_PERMISSIONS_NAME" desc="Name of the flag to enable the restricted iframe permissions model.">
@@ -7034,6 +7038,14 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_RESTRICT_IFRAME_PERMISSIONS_DESCRIPTION" desc="Description of the flag to enable the restricted iframe permissions model.">
         Causes all iframes to be denied all permissions by default. Allowing particular permissions for an iframe may involve listing the names of these permissions as values of new iframe attributes.
       </message>
+      <if expr="enable_task_manager">
+        <message name="IDS_FLAGS_ENABLE_NEW_TASK_MANAGER_NAME" desc="Name of the flag to enable the new implementation of the task manager.">
+          Enable the new task manager.
+        </message>
+        <message name="IDS_FLAGS_ENABLE_NEW_TASK_MANAGER_DESCRIPTION" desc="Description of the flag to enable the new implementation of the task manager.">
+          Enables the use of the new and optimized implementation of the chrome task manager.
+        </message>
+      </if>
 
       <!-- Crashes -->
       <message name="IDS_CRASHES_TITLE" desc="Title for the chrome://crashes page.">
@@ -7098,7 +7110,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
 
       <!-- Custom dictionary page -->
       <message name="IDS_LANGUAGE_DICTIONARY_OVERLAY_TITLE" desc="Title for the chrome://settings/editDictionary page, where a user can add and remove words in the dictionary used for spelling">
-        Custom spelling dictionary
+        Edit custom dictionary
       </message>
       <message name="IDS_LANGUAGE_DICTIONARY_OVERLAY_ADD_WORD_LABEL" desc="Label for adding a new word to the dictionary on the chrome://settings/editDictionary page">
         Add a new word
@@ -7477,9 +7489,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_ABOUT_VERSION_OFFICIAL" desc="official build on the about:version page">
         Official Build
-      </message>
-      <message name="IDS_ABOUT_VERSION_UNOFFICIAL" desc="unofficial build on the about:version page">
-        Developer Build
       </message>
       <message name="IDS_ABOUT_VERSION_32BIT" desc="32-bit on the chrome://version page">
         (32-bit)
@@ -8223,11 +8232,17 @@ I don't think this site should be blocked!
       <message name="IDS_COOKIES_BLOCK_3RDPARTY_CHKBOX" desc="A checkbox in the Content Settings dialog for blocking all 3rd party cookies.">
         Block third-party cookies and site data
       </message>
-      <message name="IDS_MEDIA_STREAM_TAB_LABEL" desc="Label for media device tab on Content Settings dialog">
-        Media
+      <message name="IDS_MEDIA_STREAM_MIC_TAB_LABEL" desc="Label for the microphone tab on Content Settings dialog">
+        Microphone
       </message>
-      <message name="IDS_MEDIA_STREAM_HEADER" desc="Header for media device exception management page on Content Settings dialog">
-        Media exceptions
+      <message name="IDS_MEDIA_STREAM_CAMERA_TAB_LABEL" desc="Label for the camera tab on Content Settings dialog">
+        Camera
+      </message>
+      <message name="IDS_MEDIA_STREAM_MIC_HEADER" desc="Header for microphone exception management page on Content Settings dialog">
+        Microphone exceptions
+      </message>
+      <message name="IDS_MEDIA_STREAM_CAMERA_HEADER" desc="Header for camera exception management page on Content Settings dialog">
+        Camera exceptions
       </message>
       <message name="IDS_MEDIA_STREAM_BLOCK_RADIO" desc="A radio button in Content Settings dialog to deny all sites to access any capture device.">
         Do not allow sites to access your camera and microphone
@@ -8262,20 +8277,20 @@ I don't think this site should be blocked!
       <message name="IDS_MEDIA_MENU_NO_DEVICE_TITLE" desc="The title of the media select menu if there is no microphone or camera available on the machine">
         None available
       </message>
-      <message name="IDS_MEDIA_PEPPER_FLASH_DEFAULT_DIVERGED_LABEL" desc="The label in Content Settings dialog informing that Pepper Flash uses different default permission for camera and microphone than the default media permission.">
-        Adobe Flash Player camera and microphone settings are different.
+      <message name="IDS_MEDIA_PEPPER_FLASH_MIC_DEFAULT_DIVERGED_LABEL" desc="The label in Content Settings dialog informing that Pepper Flash uses different default permission for microphone than the default media permission.">
+        Adobe Flash Player microphone settings are different.
       </message>
-      <message name="IDS_MEDIA_PEPPER_FLASH_EXCEPTIONS_DIVERGED_LABEL" desc="The label in the media device exception management page informing that Pepper Flash uses different exceptions than the ones listed on the page.">
-        Adobe Flash Player camera and microphone exceptions are different.
+      <message name="IDS_MEDIA_PEPPER_FLASH_CAMERA_DEFAULT_DIVERGED_LABEL" desc="The label in Content Settings dialog informing that Pepper Flash uses different default permission for camera than the default media permission.">
+        Adobe Flash Player camera settings are different.
+      </message>
+      <message name="IDS_MEDIA_PEPPER_FLASH_MIC_EXCEPTIONS_DIVERGED_LABEL" desc="The label in the media device exception management page informing that Pepper Flash uses different exceptions for microphone than the ones listed on the page.">
+        Adobe Flash Player microphone exceptions are different.
+      </message>
+      <message name="IDS_MEDIA_PEPPER_FLASH_CAMERA_EXCEPTIONS_DIVERGED_LABEL" desc="The label in the media device exception management page informing that Pepper Flash uses different exceptions for camera than the ones listed on the page.">
+        Adobe Flash Player camera exceptions are different.
       </message>
       <message name="IDS_MEDIA_PEPPER_FLASH_CHANGE_LINK" desc="The link to change Pepper Flash camera and microphone settings.">
         Change
-      </message>
-      <message name="IDS_MEDIA_AUDIO_EXCEPTION_HEADER" desc="A column header for the action column of the media audio exceptions dialog">
-        Audio
-      </message>
-      <message name="IDS_MEDIA_VIDEO_EXCEPTION_HEADER" desc="A column header for the action column of the media video exceptions dialog">
-        Video
       </message>
       <message name="IDS_CONTENT_SETTING_CHANGED_INFOBAR_BUTTON" desc="The string used in the infobar button allowing the user to reload the page directly from the infobar.">
         Reload
@@ -9765,6 +9780,15 @@ I don't think this site should be blocked!
       </message>
       <message name="IDS_ERRORPAGES_DETAILS_TEMPORARILY_THROTTLED" desc="The error message displayed when we temporarily stop sending requests to a server in order to avoid DDoS.">
         Extension requests to this URL have been temporarily throttled.
+      </message>
+
+      <message name="IDS_ERRORPAGES_SUMMARY_TEMPORARY_BACKOFF" desc="Summary in the error page when we temporarily stop sending requests to a server because of a Backoff header received earlier.">
+        The server hosting the webpage might be overloaded or under maintainance.
+        In order to avoid generating too much traffic and making the situation worse,
+        requests to this URL has been temporarily disallowed.
+      </message>
+      <message name="IDS_ERRORPAGES_DETAILS_TEMPORARY_BACKOFF" desc="The error message displayed when we temporarily stop sending requests to a server in order to avoid overloading it.">
+        Requests to this URL have been temporarily throttled.
       </message>
 
       <message name="IDS_ERRORPAGES_SUMMARY_BLOCKED" desc="Summary in the error page when an extension blocks a request.">
@@ -11339,6 +11363,9 @@ I don't think this site should be blocked!
       <message name="IDS_AUTOFILL_CARD_UNMASK_PROMPT_STORAGE_TOOLTIP" desc="Text that provides further explanation for checkbox in card unmasking dialog that allows user to store a Wallet card on their local device." formatter_data="android_java">
         If checked, Chrome will store a copy of your card on this device for faster form filling.
       </message>
+      <message name="IDS_AUTOFILL_CARD_UNMASK_PROMPT_STORAGE_TOOLTIP_IOS" desc="Text that provides further explanation on iOS for the option in the card unmasking dialog that allows user to store a Wallet card on their local device." formatter_data="android_java">
+        If enabled, Chrome will store a copy of your card on this device for faster form filling.
+      </message>
       <message name="IDS_AUTOFILL_CARD_UNMASK_CONFIRM_BUTTON" desc="Text for button that confirms the credit card CVC entry dialog." formatter_data="android_java">
         Verify
       </message>
@@ -12265,9 +12292,6 @@ I don't think this site should be blocked!
       </message>
       <message name="IDS_PLUGIN_INITIALIZATION_ERROR_PROMPT" desc="Info Bar message to notify that we couldn't load a plugin">
         Could not load <ph name="PLUGIN_NAME">$1<ex>Shockwave</ex>.</ph>
-      </message>
-      <message name="IDS_WEBWORKER_CRASHED_PROMPT" desc="Info Bar message to notify about a crashed WebWorker">
-        A part of this page (HTML WebWorker) has crashed, so it might not function correctly.
       </message>
 
       <!-- External Protocol Dialog -->
@@ -14489,13 +14513,6 @@ After you create a new supervised user, you can manage their settings at any tim
           Enable IME extensions to supply custom views for user input such as  virtual keyboards.
         </message>
 
-        <message name="IDS_FLAGS_DISABLE_NEW_MD_INPUT_VIEW_NAME" desc="Name of about::flags option to disable material style of input view virtual keyboard.">
-          Disable input view keyboard in material design.
-        </message>
-        <message name="IDS_FLAGS_DISABLE_NEW_MD_INPUT_VIEW_DESCRIPTION" desc="Description of about::flags option to disable the material style of input view virtual keyboard.">
-          Disable input view keyboards in material design.
-        </message>
-
         <message name="IDS_FLAGS_DISABLE_NEW_KOREAN_IME_NAME" desc="Name of about::flags option to disable the new Korean IME">
           Disable new Korean IME.
         </message>
@@ -15804,7 +15821,7 @@ After you create a new supervised user, you can manage their settings at any tim
         Do you want <ph name="PASSWORD_MANAGER_BRAND">$1<ex>Google Chrome</ex></ph> to save your password for <ph name="ORIGIN">$2<ex>example.com</ex></ph>?
       </message>
 
-    <if expr="is_win">
+    <if expr="is_win or is_macosx">
       <!-- Tab discarding -->
       <message name="IDS_FLAGS_ENABLE_TAB_DISCARDING_NAME" desc="Name for the flag to enable tab discarding.">
         Enable tab discarding

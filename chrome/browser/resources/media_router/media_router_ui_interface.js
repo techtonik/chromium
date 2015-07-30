@@ -41,20 +41,25 @@ cr.define('media_router.ui', function() {
    * Populates the WebUI with data obtained from Media Router.
    *
    * @param {headerText: string,
+   *         headerTextTooltip: string,
    *         sinks: !Array<!media_router.Sink>,
    *         routes: !Array<!media_router.Route>,
    *         castModes: !Array<!media_router.CastMode>} data
    * Parameters in data:
    *   headerText - text to be displayed in the header of the WebUI.
+   *   headerTextTooltip - tooltip to be displayed for the header of the WebUI.
    *   sinks - list of sinks to be displayed.
    *   routes - list of routes that are associated with the sinks.
    *   castModes - list of available cast modes.
+   *   routeProviderExtensionId - the ID of the media route provider extension.
    */
   function setInitialData(data) {
     container.headerText = data['headerText'];
+    container.headerTextTooltip = data['headerTextTooltip'];
     container.sinkList = data['sinks'];
     container.routeList = data['routes'];
     container.castModeList = data['castModes'];
+    container.routeProviderExtensionId = data['routeProviderExtensionId'];
   }
 
   /**

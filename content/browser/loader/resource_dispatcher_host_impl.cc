@@ -61,6 +61,7 @@
 #include "content/common/appcache_interfaces.h"
 #include "content/common/navigation_params.h"
 #include "content/common/resource_messages.h"
+#include "content/common/site_isolation_policy.h"
 #include "content/common/ssl_status_serialization.h"
 #include "content/common/view_messages.h"
 #include "content/public/browser/browser_thread.h"
@@ -718,19 +719,19 @@ ResourceDispatcherHostImpl::CreateResourceHandlerForDownload(
   return handler.Pass();
 }
 
-scoped_ptr<ResourceHandler>
-ResourceDispatcherHostImpl::MaybeInterceptAsStream(net::URLRequest* request,
-                                                   ResourceResponse* response,
-                                                   std::string* payload) {
+scoped_ptr<ResourceHandler> ResourceDispatcherHostImpl::MaybeInterceptAsStream(
+    const base::FilePath& plugin_path,
+    net::URLRequest* request,
+    ResourceResponse* response,
+    std::string* payload) {
+  payload->clear();
   ResourceRequestInfoImpl* info = ResourceRequestInfoImpl::ForRequest(request);
   const std::string& mime_type = response->head.mime_type;
 
   GURL origin;
   if (!delegate_ ||
-      !delegate_->ShouldInterceptResourceAsStream(request,
-                                                  mime_type,
-                                                  &origin,
-                                                  payload)) {
+      !delegate_->ShouldInterceptResourceAsStream(
+          request, plugin_path, mime_type, &origin, payload)) {
     return scoped_ptr<ResourceHandler>();
   }
 
@@ -1386,10 +1387,11 @@ scoped_ptr<ResourceHandler> ResourceDispatcherHostImpl::CreateResourceHandler(
     // to drive the transfer.
     bool is_swappable_navigation =
         request_data.resource_type == RESOURCE_TYPE_MAIN_FRAME;
-    // If we are using --site-per-process, install it for subframes as well.
+    // If out-of-process iframes are possible, then all subframe requests need
+    // to go through the CrossSiteResourceHandler to enforce the site isolation
+    // policy.
     if (!is_swappable_navigation &&
-        base::CommandLine::ForCurrentProcess()->HasSwitch(
-            switches::kSitePerProcess)) {
+        SiteIsolationPolicy::AreCrossProcessFramesPossible()) {
       is_swappable_navigation =
           request_data.resource_type == RESOURCE_TYPE_SUB_FRAME;
     }

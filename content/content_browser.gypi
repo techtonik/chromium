@@ -1208,6 +1208,8 @@
       'browser/renderer_host/input/touch_emulator_client.h',
       'browser/renderer_host/input/touch_event_queue.cc',
       'browser/renderer_host/input/touch_event_queue.h',
+      'browser/renderer_host/input/touch_selection_controller_client_aura.cc',
+      'browser/renderer_host/input/touch_selection_controller_client_aura.h',
       'browser/renderer_host/input/touchpad_tap_suppression_controller.cc',
       'browser/renderer_host/input/touchpad_tap_suppression_controller.h',
       'browser/renderer_host/input/touchscreen_tap_suppression_controller.cc',
@@ -1402,8 +1404,6 @@
       'browser/service_worker/service_worker_version.h',
       'browser/service_worker/service_worker_write_to_cache_job.cc',
       'browser/service_worker/service_worker_write_to_cache_job.h',
-      'browser/service_worker/stashed_port_manager.cc',
-      'browser/service_worker/stashed_port_manager.h',
       'browser/shared_worker/shared_worker_host.cc',
       'browser/shared_worker/shared_worker_host.h',
       'browser/shared_worker/shared_worker_instance.cc',
@@ -1523,8 +1523,6 @@
       'browser/web_contents/aura/overscroll_window_delegate.h',
       'browser/web_contents/aura/shadow_layer_delegate.cc',
       'browser/web_contents/aura/shadow_layer_delegate.h',
-      'browser/web_contents/touch_editable_impl_aura.cc',
-      'browser/web_contents/touch_editable_impl_aura.h',
       'browser/web_contents/web_contents_android.cc',
       'browser/web_contents/web_contents_android.h',
       'browser/web_contents/web_contents_impl.cc',
@@ -2065,10 +2063,10 @@
       ],
     }, {
       'sources/': [
+        ['exclude', '^browser/renderer_host/input/touch_selection_controller_client_aura.cc'],
+        ['exclude', '^browser/renderer_host/input/touch_selection_controller_client_aura.h'],
         ['exclude', '^browser/renderer_host/render_widget_host_view_aura.cc'],
         ['exclude', '^browser/renderer_host/render_widget_host_view_aura.h'],
-        ['exclude', '^browser/web_contents/touch_editable_impl_aura.cc'],
-        ['exclude', '^browser/web_contents/touch_editable_impl_aura.h'],
         ['exclude', '^browser/renderer_host/ui_events_helper.cc'],
         ['exclude', '^browser/renderer_host/ui_events_helper.h'],
       ],
@@ -2085,7 +2083,6 @@
     ['enable_web_speech==1', {
       'dependencies': [
         '../third_party/flac/flac.gyp:libflac',
-        '../third_party/speex/speex.gyp:libspeex',
       ],
     }],
     ['enable_web_speech==0 and OS=="android"', {

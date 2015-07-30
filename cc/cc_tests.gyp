@@ -94,6 +94,7 @@
       'raster/texture_compressor_etc1_unittest.cc',
       'raster/tile_task_worker_pool_unittest.cc',
       'resources/platform_color_unittest.cc',
+      'resources/resource_pool_unittest.cc',
       'resources/resource_provider_unittest.cc',
       'resources/scoped_resource_unittest.cc',
       'resources/video_resource_updater_unittest.cc',
@@ -467,7 +468,7 @@
           'conditions': [
             # crbug.com/464062 xdisplaycheck is used to run cc_unittests_run on
             # the linux try bots when using X11.
-            ['OS=="linux" and use_ozone==0',
+            ['use_x11==1',
               {
                 'dependencies': [
                   '../tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',

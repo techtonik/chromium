@@ -33,7 +33,6 @@ class CC_EXPORT LayerTreeSettings {
   bool use_external_begin_frame_source;
   bool main_frame_before_activation_enabled;
   bool using_synchronous_renderer_compositor;
-  bool report_overscroll_only_for_scrollable_axes;
   bool accelerated_animation_enabled;
   bool can_use_lcd_text;
   bool use_distance_field_text;
@@ -67,7 +66,7 @@ class CC_EXPORT LayerTreeSettings {
   gfx::Size max_untiled_layer_size;
   gfx::Size default_tile_grid_size;
   gfx::Size minimum_occlusion_tracking_size;
-  size_t max_tiles_for_interest_area;
+  size_t tiling_interest_area_padding;
   float skewport_target_time_in_seconds;
   int skewport_extrapolation_limit_in_content_pixels;
   size_t max_unused_resource_memory_percentage;

@@ -287,24 +287,6 @@ class TitleWatcher : public WebContentsObserver {
   DISALLOW_COPY_AND_ASSIGN(TitleWatcher);
 };
 
-// Watches a WebContents and blocks until it is destroyed.
-class WebContentsDestroyedWatcher : public WebContentsObserver {
- public:
-  explicit WebContentsDestroyedWatcher(WebContents* web_contents);
-  ~WebContentsDestroyedWatcher() override;
-
-  // Waits until the WebContents is destroyed.
-  void Wait();
-
- private:
-  // Overridden WebContentsObserver methods.
-  void WebContentsDestroyed() override;
-
-  scoped_refptr<MessageLoopRunner> message_loop_runner_;
-
-  DISALLOW_COPY_AND_ASSIGN(WebContentsDestroyedWatcher);
-};
-
 // Watches a RenderProcessHost and waits for specified destruction events.
 class RenderProcessHostWatcher : public RenderProcessHostObserver {
  public:
@@ -430,28 +412,6 @@ class FrameWatcher : public BrowserMessageFilter {
   base::Closure quit_;
 
   DISALLOW_COPY_AND_ASSIGN(FrameWatcher);
-};
-
-// This observer keeps track of the last deleted RenderFrame to avoid
-// accessing it and causing use-after-free condition.
-class RenderFrameDeletedObserver : public WebContentsObserver {
- public:
-  RenderFrameDeletedObserver(RenderFrameHost* rfh);
-  ~RenderFrameDeletedObserver() override;
-
-  // Overridden WebContentsObserver methods.
-  void RenderFrameDeleted(RenderFrameHost* render_frame_host) override;
-
-  void WaitUntilDeleted();
-  bool deleted();
-
- private:
-  int process_id_;
-  int routing_id_;
-  bool deleted_;
-  scoped_ptr<base::RunLoop> runner_;
-
-  DISALLOW_COPY_AND_ASSIGN(RenderFrameDeletedObserver);
 };
 
 }  // namespace content

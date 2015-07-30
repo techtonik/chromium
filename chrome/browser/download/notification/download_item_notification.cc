@@ -97,12 +97,7 @@ void DownloadItemNotification::OnNotificationClose() {
 
 void DownloadItemNotification::OnNotificationClick() {
   if (item_->IsDangerous()) {
-#if defined(FULL_SAFE_BROWSING)
-    DownloadCommands(item_).ExecuteCommand(
-        DownloadCommands::LEARN_MORE_SCANNING);
-#else
-    CloseNotificationByUser();
-#endif
+    // Do nothing.
     return;
   }
 
@@ -236,7 +231,10 @@ void DownloadItemNotification::UpdateNotificationData(
     notification_->set_message(GetWarningText());
 
     // Show icon.
-    SetNotificationIcon(IDR_DOWNLOAD_NOTIFICATION_MALICIOUS);
+    if (model.MightBeMalicious())
+      SetNotificationIcon(IDR_DOWNLOAD_NOTIFICATION_WARNING_BAD);
+    else
+      SetNotificationIcon(IDR_DOWNLOAD_NOTIFICATION_WARNING_UNWANTED);
   } else {
     notification_->set_title(GetTitle());
     notification_->set_message(model.GetStatusText());
@@ -245,16 +243,23 @@ void DownloadItemNotification::UpdateNotificationData(
                              item_->GetBrowserContext()->IsOffTheRecord();
 
     switch (item_->GetState()) {
-      case content::DownloadItem::IN_PROGRESS:
-        notification_->set_type(message_center::NOTIFICATION_TYPE_PROGRESS);
-        notification_->set_progress(item_->PercentComplete());
+      case content::DownloadItem::IN_PROGRESS: {
+        int percent_complete = item_->PercentComplete();
+        if (percent_complete >= 0) {
+          notification_->set_type(message_center::NOTIFICATION_TYPE_PROGRESS);
+          notification_->set_progress(percent_complete);
+        } else {
+          notification_->set_type(
+              message_center::NOTIFICATION_TYPE_BASE_FORMAT);
+          notification_->set_progress(0);
+        }
         if (is_off_the_record) {
-          // TODO(yoshiki): Replace the tentative image.
           SetNotificationIcon(IDR_DOWNLOAD_NOTIFICATION_INCOGNITO);
         } else {
           SetNotificationIcon(IDR_DOWNLOAD_NOTIFICATION_DOWNLOADING);
         }
         break;
+      }
       case content::DownloadItem::COMPLETE:
         DCHECK(item_->IsDone());
 
@@ -272,7 +277,6 @@ void DownloadItemNotification::UpdateNotificationData(
         notification_->set_progress(100);
 
         if (is_off_the_record) {
-          // TODO(yoshiki): Replace the tentative image.
           SetNotificationIcon(IDR_DOWNLOAD_NOTIFICATION_INCOGNITO);
         } else {
           SetNotificationIcon(IDR_DOWNLOAD_NOTIFICATION_DOWNLOADING);
@@ -298,7 +302,7 @@ void DownloadItemNotification::UpdateNotificationData(
         }
 
         notification_->set_progress(0);
-        SetNotificationIcon(IDR_DOWNLOAD_NOTIFICATION_WARNING);
+        SetNotificationIcon(IDR_DOWNLOAD_NOTIFICATION_WARNING_UNWANTED);
         break;
       case content::DownloadItem::MAX_DOWNLOAD_STATE:  // sentinel
         NOTREACHED();
@@ -422,8 +426,13 @@ DownloadItemNotification::GetExtraActions() const {
       new std::vector<DownloadCommands::Command>());
 
   if (item_->IsDangerous()) {
-    actions->push_back(DownloadCommands::DISCARD);
-    actions->push_back(DownloadCommands::KEEP);
+    DownloadItemModel model(item_);
+    if (model.MightBeMalicious()) {
+      actions->push_back(DownloadCommands::LEARN_MORE_SCANNING);
+    } else {
+      actions->push_back(DownloadCommands::DISCARD);
+      actions->push_back(DownloadCommands::KEEP);
+    }
     return actions.Pass();
   }
 
@@ -451,6 +460,18 @@ DownloadItemNotification::GetExtraActions() const {
 
 base::string16 DownloadItemNotification::GetTitle() const {
   base::string16 title_text;
+  DownloadItemModel model(item_);
+
+  if (item_->IsDangerous()) {
+    if (model.MightBeMalicious()) {
+      return l10n_util::GetStringUTF16(
+          IDS_PROMPT_BLOCKED_MALICIOUS_DOWNLOAD_TITLE);
+    } else {
+      return l10n_util::GetStringUTF16(
+          IDS_CONFIRM_KEEP_DANGEROUS_DOWNLOAD_TITLE);
+    }
+  }
+
   base::string16 file_name =
       item_->GetFileNameToReportUser().LossyDisplayName();
   switch (item_->GetState()) {
@@ -506,9 +527,11 @@ base::string16 DownloadItemNotification::GetCommandLabel(
     case DownloadCommands::CANCEL:
       id = IDS_DOWNLOAD_LINK_CANCEL;
       break;
+    case DownloadCommands::LEARN_MORE_SCANNING:
+      id = IDS_DOWNLOAD_LINK_LEARN_MORE_SCANNING;
+      break;
     case DownloadCommands::ALWAYS_OPEN_TYPE:
     case DownloadCommands::PLATFORM_OPEN:
-    case DownloadCommands::LEARN_MORE_SCANNING:
     case DownloadCommands::LEARN_MORE_INTERRUPTED:
       // Only for menu.
       NOTREACHED();

@@ -139,6 +139,10 @@ class CONTENT_EXPORT RenderFrameHostImpl
   void ExecuteJavaScript(const base::string16& javascript) override;
   void ExecuteJavaScript(const base::string16& javascript,
                          const JavaScriptResultCallback& callback) override;
+  void ExecuteJavaScriptForTests(const base::string16& javascript) override;
+  void ExecuteJavaScriptForTests(
+      const base::string16& javascript,
+      const JavaScriptResultCallback& callback) override;
   void ExecuteJavaScriptWithUserGestureForTests(
       const base::string16& javascript) override;
   void ExecuteJavaScriptInIsolatedWorld(
@@ -376,6 +380,9 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // the accessibility mode.
   void RequestAXTreeSnapshot(AXTreeSnapshotCallback callback);
 
+  // Resets the accessibility serializer in the renderer.
+  void AccessibilityReset();
+
   // Turn on accessibility testing. The given callback will be run
   // every time an accessibility notification is received from the
   // renderer process, and the accessibility tree it sent can be
@@ -581,6 +588,9 @@ class CONTENT_EXPORT RenderFrameHostImpl
       const CommonNavigationParams& common_params,
       const RequestNavigationParams& request_params);
 
+  // Returns true if the ExecuteJavaScript() API can be used on this host.
+  bool CanExecuteJavaScript();
+
   // For now, RenderFrameHosts indirectly keep RenderViewHosts alive via a
   // refcount that calls Shutdown when it reaches zero.  This allows each
   // RenderFrameHostManager to just care about RenderFrameHosts, while ensuring
@@ -668,7 +678,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // When the last BeforeUnload message was sent.
   base::TimeTicks send_before_unload_start_time_;
 
-  // Set to true when there is a pending FrameMsg_ShouldClose message.  This
+  // Set to true when there is a pending FrameMsg_BeforeUnload message.  This
   // ensures we don't spam the renderer with multiple beforeunload requests.
   // When either this value or IsWaitingForUnloadACK is true, the value of
   // unload_ack_is_for_cross_site_transition_ indicates whether this is for a

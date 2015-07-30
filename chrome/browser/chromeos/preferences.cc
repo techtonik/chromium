@@ -319,6 +319,7 @@ void Preferences::InitUserPrefs(PrefServiceSyncable* prefs) {
 
   pref_change_registrar_.Init(prefs);
   pref_change_registrar_.Add(prefs::kResolveTimezoneByGeolocation, callback);
+  pref_change_registrar_.Add(prefs::kUse24HourClock, callback);
 }
 
 void Preferences::Init(Profile* profile, const user_manager::User* user) {
@@ -553,9 +554,10 @@ void Preferences::ApplyPreferences(ApplyReason reason,
     std::string value(enabled_extension_imes_.GetValue());
 
     std::vector<std::string> split_values;
-    if (!value.empty())
-      base::SplitString(value, ',', &split_values);
-
+    if (!value.empty()) {
+      split_values = base::SplitString(value, ",", base::TRIM_WHITESPACE,
+                                       base::SPLIT_WANT_ALL);
+    }
     ime_state_->SetEnabledExtensionImes(&split_values);
   }
 
@@ -598,6 +600,13 @@ void Preferences::ApplyPreferences(ApplyReason reason,
       }
     }
   }
+
+  if (pref_name == prefs::kUse24HourClock ||
+      reason != REASON_ACTIVE_USER_CHANGED) {
+    const bool value = prefs_->GetBoolean(prefs::kUse24HourClock);
+    user_manager::UserManager::Get()->SetKnownUserBooleanPref(
+        user_->GetUserID(), prefs::kUse24HourClock, value);
+  }
 }
 
 void Preferences::OnIsSyncingChanged() {
@@ -622,8 +631,10 @@ void Preferences::SetLanguageConfigStringListAsCSV(const char* section,
   VLOG(1) << "Setting " << name << " to '" << value << "'";
 
   std::vector<std::string> split_values;
-  if (!value.empty())
-    base::SplitString(value, ',', &split_values);
+  if (!value.empty()) {
+    split_values = base::SplitString(value, ",", base::TRIM_WHITESPACE,
+                                     base::SPLIT_WANT_ALL);
+  }
 
   // Transfers the xkb id to extension-xkb id.
   if (input_method_manager_->MigrateInputMethods(&split_values))

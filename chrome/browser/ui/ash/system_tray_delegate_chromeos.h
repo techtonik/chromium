@@ -147,6 +147,8 @@ class SystemTrayDelegateChromeOS
   void ShouldRebootOnShutdown(
       const ash::RebootOnShutdownCallback& callback) override;
   ash::VPNDelegate* GetVPNDelegate() const override;
+  void SetLastFocusedPodHourClockType(
+      base::HourClockType hour_clock_type) override;
 
   // Overridden from user_manager::UserManager::UserSessionStateObserver:
   void UserAddedToSession(const user_manager::User* active_user) override;
@@ -222,7 +224,7 @@ class SystemTrayDelegateChromeOS
 
   // Overridden from CrasAudioHandler::AudioObserver.
   void OnOutputNodeVolumeChanged(uint64_t node_id, int volume) override;
-  void OnOutputMuteChanged(bool mute_on) override;
+  void OnOutputMuteChanged(bool mute_on, bool system_adjust) override;
   void OnInputNodeGainChanged(uint64_t node_id, int gain) override;
   void OnInputMuteChanged(bool mute_on) override;
   void OnAudioNodesChanged() override;
@@ -307,6 +309,9 @@ class SystemTrayDelegateChromeOS
       custodian_info_changed_observers_;
 
   base::ObserverList<ash::ShutdownPolicyObserver> shutdown_policy_observers_;
+
+  bool user_pod_was_focused_;
+  base::HourClockType last_focused_pod_hour_clock_type_;
 
   base::WeakPtrFactory<SystemTrayDelegateChromeOS> weak_ptr_factory_;
 

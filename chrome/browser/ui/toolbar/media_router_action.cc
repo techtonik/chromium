@@ -5,9 +5,9 @@
 #include "chrome/browser/ui/toolbar/media_router_action.h"
 
 #include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/media/router/media_router_dialog_controller.h"
 #include "chrome/browser/ui/toolbar/media_router_action_platform_delegate.h"
 #include "chrome/browser/ui/toolbar/toolbar_action_view_delegate.h"
-#include "chrome/browser/ui/webui/media_router/media_router_dialog_controller.h"
 #include "chrome/grit/generated_resources.h"
 #include "grit/theme_resources.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -22,7 +22,8 @@ MediaRouterAction::MediaRouterAction(Browser* browser)
       media_router_idle_icon_(ui::ResourceBundle::GetSharedInstance().
           GetImageNamed(IDR_MEDIA_ROUTER_IDLE_ICON)),
       delegate_(nullptr),
-      platform_delegate_(MediaRouterActionPlatformDelegate::Create(browser)) {
+      platform_delegate_(MediaRouterActionPlatformDelegate::Create(browser)),
+      contextual_menu_(browser) {
 }
 
 MediaRouterAction::~MediaRouterAction() {
@@ -72,7 +73,7 @@ bool MediaRouterAction::HasPopup(
 }
 
 void MediaRouterAction::HidePopup() {
-  GetMediaRouterDialogController()->CloseMediaRouterDialog();
+  GetMediaRouterDialogController()->HideMediaRouterDialog();
 }
 
 gfx::NativeView MediaRouterAction::GetPopupNativeView() {
@@ -80,7 +81,7 @@ gfx::NativeView MediaRouterAction::GetPopupNativeView() {
 }
 
 ui::MenuModel* MediaRouterAction::GetContextMenu() {
-  return nullptr;
+  return contextual_menu_.menu_model();
 }
 
 bool MediaRouterAction::CanDrag() const {

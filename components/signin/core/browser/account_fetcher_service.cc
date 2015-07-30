@@ -11,6 +11,7 @@
 #include "base/trace_event/trace_event.h"
 #include "components/signin/core/browser/account_info_fetcher.h"
 #include "components/signin/core/browser/account_tracker_service.h"
+#include "components/signin/core/browser/child_account_info_fetcher.h"
 #include "components/signin/core/browser/refresh_token_annotation_request.h"
 #include "components/signin/core/browser/signin_client.h"
 #include "components/signin/core/common/signin_switches.h"
@@ -20,6 +21,14 @@ namespace {
 
 const base::TimeDelta kRefreshFromTokenServiceDelay =
     base::TimeDelta::FromHours(24);
+
+bool AccountSupportsUserInfo(const std::string& account_id) {
+  // Supervised users use a specially scoped token which when used for general
+  // purposes causes the token service to raise spurious auth errors.
+  // TODO(treib): this string is also used in supervised_user_constants.cc.
+  // Should put in a common place.
+  return account_id != "managed_user@localhost";
+}
 
 #if !defined(OS_ANDROID) && !defined(OS_IOS)
 // IsRefreshTokenDeviceIdExperimentEnabled is called from
@@ -42,8 +51,10 @@ AccountFetcherService::AccountFetcherService()
     : account_tracker_service_(nullptr),
       token_service_(nullptr),
       signin_client_(nullptr),
+      invalidation_service_(nullptr),
       network_fetches_enabled_(false),
-      shutdown_called_(false) {}
+      shutdown_called_(false),
+      child_info_request_(nullptr) {}
 
 AccountFetcherService::~AccountFetcherService() {
   DCHECK(shutdown_called_);
@@ -52,10 +63,12 @@ AccountFetcherService::~AccountFetcherService() {
 void AccountFetcherService::Initialize(
     SigninClient* signin_client,
     OAuth2TokenService* token_service,
-    AccountTrackerService* account_tracker_service) {
+    AccountTrackerService* account_tracker_service,
+    invalidation::InvalidationService* invalidation_service) {
   DCHECK(signin_client);
   DCHECK(!signin_client_);
   signin_client_ = signin_client;
+  invalidation_service_ = invalidation_service;
   DCHECK(account_tracker_service);
   DCHECK(!account_tracker_service_);
   account_tracker_service_ = account_tracker_service;
@@ -72,6 +85,9 @@ void AccountFetcherService::Initialize(
 
 void AccountFetcherService::Shutdown() {
   token_service_->RemoveObserver(this);
+  // child_info_request_ is an invalidation handler and needs to be
+  // unregistered during the lifetime of the invalidation service.
+  child_info_request_.reset();
   shutdown_called_ = true;
 }
 
@@ -102,6 +118,29 @@ void AccountFetcherService::RefreshAllAccountInfo(bool only_fetch_if_invalid) {
   }
 }
 
+// Child account status is refreshed through invalidations which are only
+// available for the primary account. Finding the primary account requires a
+// dependency on signin_manager which we get around by only allowing a single
+// account. This is possible since we only support a single account to be a
+// child anyway.
+void AccountFetcherService::UpdateChildInfo() {
+  DCHECK(CalledOnValidThread());
+  std::vector<std::string> accounts = token_service_->GetAccounts();
+  if (accounts.size() == 1) {
+    const std::string& candidate = accounts[0];
+    if (candidate == child_request_account_id_)
+      return;
+    if (!child_request_account_id_.empty())
+      ResetChildInfo();
+    if (!AccountSupportsUserInfo(candidate))
+      return;
+    child_request_account_id_ = candidate;
+    StartFetchingChildInfo(candidate);
+  } else {
+    ResetChildInfo();
+  }
+}
+
 void AccountFetcherService::RefreshAllAccountsAndScheduleNext() {
   DCHECK(network_fetches_enabled_);
   RefreshAllAccountInfo(false);
@@ -125,6 +164,7 @@ void AccountFetcherService::ScheduleNextRefresh() {
   }
 }
 
+// Starts fetching user information. This is called periodically to refresh.
 void AccountFetcherService::StartFetchingUserInfo(
     const std::string& account_id) {
   DCHECK(CalledOnValidThread());
@@ -141,6 +181,21 @@ void AccountFetcherService::StartFetchingUserInfo(
     user_info_requests_.set(account_id, fetcher.Pass());
     user_info_requests_.get(account_id)->Start();
   }
+}
+
+// Starts fetching whether this is a child account. Handles refresh internally.
+void AccountFetcherService::StartFetchingChildInfo(
+    const std::string& account_id) {
+  child_info_request_.reset(ChildAccountInfoFetcher::CreateFrom(
+      child_request_account_id_, this, token_service_,
+      signin_client_->GetURLRequestContext(), invalidation_service_));
+}
+
+void AccountFetcherService::ResetChildInfo() {
+  if (!child_request_account_id_.empty())
+    SetIsChildAccount(child_request_account_id_, false);
+  child_request_account_id_.clear();
+  child_info_request_.reset();
 }
 
 void AccountFetcherService::RefreshAccountInfo(const std::string& account_id,
@@ -160,12 +215,7 @@ void AccountFetcherService::RefreshAccountInfo(const std::string& account_id,
   account_tracker_service_->StartTrackingAccount(account_id);
   const AccountTrackerService::AccountInfo& info =
       account_tracker_service_->GetAccountInfo(account_id);
-
-  // Don't bother fetching for supervised users since this causes the token
-  // service to raise spurious auth errors.
-  // TODO(treib): this string is also used in supervised_user_constants.cc.
-  // Should put in a common place.
-  if (account_id == "managed_user@localhost")
+  if (!AccountSupportsUserInfo(account_id))
     return;
 
 // |only_fetch_if_invalid| is false when the service is due for a timed update.
@@ -210,11 +260,16 @@ void AccountFetcherService::RefreshTokenAnnotationRequestDone(
 
 void AccountFetcherService::OnUserInfoFetchSuccess(
     const std::string& account_id,
-    const base::DictionaryValue* user_info,
-    const std::vector<std::string>* service_flags) {
-  account_tracker_service_->SetAccountStateFromUserInfo(
-      account_id, user_info, service_flags);
+    scoped_ptr<base::DictionaryValue> user_info) {
+  account_tracker_service_->SetAccountStateFromUserInfo(account_id,
+                                                        user_info.get());
   user_info_requests_.erase(account_id);
+}
+
+void AccountFetcherService::SetIsChildAccount(const std::string& account_id,
+                                              bool is_child_account) {
+  if (child_request_account_id_ == account_id)
+    account_tracker_service_->SetIsChildAccount(account_id, is_child_account);
 }
 
 void AccountFetcherService::OnUserInfoFetchFailure(
@@ -230,8 +285,8 @@ void AccountFetcherService::OnRefreshTokenAvailable(
   // (such as fetching the signin token "handle" in order to look for password
   // changes) once everything is initialized and the refresh token is present.
   signin_client_->DoFinalInit();
-
   RefreshAccountInfo(account_id, true);
+  UpdateChildInfo();
 }
 
 void AccountFetcherService::OnRefreshTokenRevoked(
@@ -243,6 +298,7 @@ void AccountFetcherService::OnRefreshTokenRevoked(
 
   DVLOG(1) << "REVOKED " << account_id;
   user_info_requests_.erase(account_id);
+  UpdateChildInfo();
   account_tracker_service_->StopTrackingAccount(account_id);
 }
 
@@ -250,4 +306,5 @@ void AccountFetcherService::OnRefreshTokensLoaded() {
   // OnRefreshTokenAvailable has been called for all accounts by this point.
   // Maybe remove this after further investigation.
   RefreshAllAccountInfo(true);
+  UpdateChildInfo();
 }

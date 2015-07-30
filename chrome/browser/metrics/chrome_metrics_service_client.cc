@@ -20,18 +20,18 @@
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/google/google_brand.h"
 #include "chrome/browser/metrics/chrome_stability_metrics_provider.h"
-#include "chrome/browser/metrics/drive_metrics_provider.h"
 #include "chrome/browser/metrics/omnibox_metrics_provider.h"
 #include "chrome/browser/metrics/time_ticks_experiment_win.h"
 #include "chrome/browser/process_resource_usage.h"
 #include "chrome/browser/ui/browser_otr_state.h"
 #include "chrome/common/chrome_constants.h"
+#include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/crash_keys.h"
 #include "chrome/common/metrics/version_utils.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/common/render_messages.h"
 #include "components/metrics/call_stack_profile_metrics_provider.h"
+#include "components/metrics/drive_metrics_provider.h"
 #include "components/metrics/gpu/gpu_metrics_provider.h"
 #include "components/metrics/metrics_service.h"
 #include "components/metrics/net/net_metrics_log_uploader.h"
@@ -73,9 +73,9 @@
 #include "components/browser_watcher/watcher_metrics_provider_win.h"
 #endif
 
-#if !defined(OS_CHROMEOS) && !defined(OS_IOS)
+#if !defined(OS_CHROMEOS)
 #include "chrome/browser/metrics/signin_status_metrics_provider.h"
-#endif  // !defined(OS_CHROMEOS) && !defined(OS_IOS)
+#endif  // !defined(OS_CHROMEOS)
 
 namespace {
 
@@ -351,7 +351,10 @@ void ChromeMetricsServiceClient::Initialize() {
   metrics_service_->RegisterMetricsProvider(
       scoped_ptr<metrics::MetricsProvider>(new metrics::GPUMetricsProvider));
 
-  drive_metrics_provider_ = new DriveMetricsProvider;
+  drive_metrics_provider_ = new metrics::DriveMetricsProvider(
+      content::BrowserThread::GetMessageLoopProxyForThread(
+          content::BrowserThread::FILE),
+      chrome::FILE_LOCAL_STATE);
   metrics_service_->RegisterMetricsProvider(
       scoped_ptr<metrics::MetricsProvider>(drive_metrics_provider_));
 
@@ -378,8 +381,8 @@ void ChromeMetricsServiceClient::Initialize() {
   // Report exit funnels for canary and dev only.
   bool report_exit_funnels = false;
   switch (chrome::VersionInfo::GetChannel()) {
-    case chrome::VersionInfo::CHANNEL_CANARY:
-    case chrome::VersionInfo::CHANNEL_DEV:
+    case version_info::Channel::CANARY:
+    case version_info::Channel::DEV:
       report_exit_funnels = true;
       break;
   }
@@ -410,11 +413,11 @@ void ChromeMetricsServiceClient::Initialize() {
       scoped_ptr<metrics::MetricsProvider>(signin_metrics_provider_cros));
 #endif  // defined(OS_CHROMEOS)
 
-#if !defined(OS_CHROMEOS) && !defined(OS_IOS)
+#if !defined(OS_CHROMEOS)
   metrics_service_->RegisterMetricsProvider(
       scoped_ptr<metrics::MetricsProvider>(
           SigninStatusMetricsProvider::CreateInstance()));
-#endif  // !defined(OS_CHROMEOS) && !defined(OS_IOS)
+#endif  // !defined(OS_CHROMEOS)
 
   // Clear stability metrics if it is the first time cellular upload logic
   // should apply to avoid sudden bulk uploads. It needs to be done after all

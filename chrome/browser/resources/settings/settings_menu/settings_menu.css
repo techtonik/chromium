@@ -3,12 +3,16 @@
  * found in the LICENSE file. */
 
 :host {
-  display: block;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
 }
 
 paper-menu {
+  background-color: transparent;
   margin: 0;
-  padding-top: 20px;
+  padding: 0;
 }
 
 paper-menu > * {

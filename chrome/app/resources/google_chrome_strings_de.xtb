@@ -45,6 +45,7 @@
 <translation id="4050175100176540509">Wichtige Sicherheitsverbesserungen und neue Funktionen sind in der aktuellen Version verfügbar.</translation>
 <translation id="8437332772351535342">Bei einem Neustart im Desktopmodus werden Ihre Chrome-Apps geschlossen und neu gestartet.</translation>
 <translation id="4728575227883772061">Installation aufgrund von unbekanntem Fehler fehlgeschlagen. Falls Google Chrome bereits ausgeführt wird, schließen Sie es und versuchen Sie es erneut.</translation>
+<translation id="7788788617745289808">Chrome benötigt Zugriff auf die Kamera, um sie für diese Website freizugeben.</translation>
 <translation id="3080151273017101988">Apps im Hintergrund ausführen, wenn Google Chrome geschlossen ist</translation>
 <translation id="4149882025268051530">Das Installationsprogramm konnte das Archiv nicht dekomprimieren. Laden Sie Google Chrome erneut herunter.</translation>
 <translation id="7054640471403081847">Für diesen Computer werden in Kürze keine weiteren Google Chrome-Updates mehr bereitgestellt, da die Hardware des Geräts nicht mehr unterstützt wird.</translation>
@@ -59,6 +60,7 @@
 <translation id="5204098752394657250"><ph name="TERMS_OF_SERVICE_LINK"/>Google Chrome-Nutzungsbedingungen<ph name="END_TERMS_OF_SERVICE_LINK"/></translation>
 <translation id="4743926867934016338">Akzeptieren und suchen</translation>
 <translation id="1393853151966637042">Hilfe für Chrome aufrufen</translation>
+<translation id="1061441684050139317">Chrome benötigt Zugriff auf das Mikrofon, um es für diese Website freizugeben.</translation>
 <translation id="7398801000654795464">Sie waren in Chrome als <ph name="USER_EMAIL_ADDRESS"/> angemeldet. Melden Sie sich bitte wieder mit demselben Konto an.</translation>
 <translation id="4513711165509885787">Ihre Zahlungsangaben wurden in Chrome gespeichert.</translation>
 <translation id="5253588388888612165">Wenn Sie diesen Computer gemeinsam mit <ph name="PROFILE_NAME"/> nutzen, fügen Sie Ihr eigenes Profil zu Chrome hinzu, um separat zu surfen. Trennen Sie andernfalls die Verbindung zu dem Google-Konto der Person.</translation>
@@ -80,6 +82,7 @@
 <translation id="5037239767309817516">Schließen Sie alle Google Chrome-Fenster und starten Sie die App neu, damit diese Änderung wirksam wird.</translation>
 <translation id="1619887657840448962">Um Chrome sicherer zu machen, haben wir die folgende Erweiterung deaktiviert. Sie ist nicht im <ph name="IDS_EXTENSION_WEB_STORE_TITLE"/> aufgeführt und wurde möglicherweise ohne Ihr Wissen hinzugefügt.</translation>
 <translation id="225614027745146050">Willkommen</translation>
+<translation id="8811903091068364646">Chrome auf dem Desktop neu sta&amp;rten</translation>
 <translation id="3398288718845740432">Im Chrome-Menü ausblenden</translation>
 <translation id="7473891865547856676">Nein danke</translation>
 <translation id="3149510190863420837">Chrome-Apps</translation>
@@ -89,6 +92,7 @@
 <translation id="6368958679917195344">Chrome OS wird durch zusätzliche <ph name="BEGIN_LINK_CROS_OSS"/>Open-Source-Software<ph name="END_LINK_CROS_OSS"/> möglich gemacht.</translation>
 <translation id="5799551393681493217">Aktiviert Iframe-basierte Anmeldevorgänge für Chrome. Dieses Flag überschreibt das Flag &quot;enable-web-based-signin&quot;.</translation>
 <translation id="7459554271817304652">Richten Sie die Synchronisierung ein, um Ihre personalisierten Browserfunktionen online zu speichern und über Google Chrome auf jedem Computer darauf zuzugreifen.</translation>
+<translation id="6012342843556706400">Chrome benötigt Zugriff auf den Standort, um ihn für diese Website freizugeben.</translation>
 <translation id="4331809312908958774">Chrome OS</translation>
 <translation id="8823341990149967727">Chrome ist veraltet.</translation>
 <translation id="4424024547088906515">Dieser Server konnte nicht beweisen, dass er <ph name="DOMAIN"/> ist. Sein Sicherheitszertifikat wird von Chrome als nicht vertrauenswürdig eingestuft. Mögliche Gründe sind eine fehlerhafte Konfiguration oder ein Angreifer, der Ihre Verbindung abfängt.</translation>
@@ -96,6 +100,7 @@
 <translation id="5618769508111928343"><ph name="SITE"/> schützt Ihre Daten in der Regel durch Verschlüsselung. Als Chrome dieses Mal versuchte, eine Verbindung zu <ph name="SITE"/> herzustellen, gab die Website ungewöhnliche und falsche Anmeldedaten zurück. Entweder versucht ein Angreifer, sich als <ph name="SITE"/> auszugeben, oder die Verbindung wurde durch eine WLAN-Anmeldeseite unterbrochen. Da Chrome die Verbindung vor dem Austausch von Daten unterbrochen hat, sind Ihre Daten weiterhin sicher.</translation>
 <translation id="6600954340915313787">In Chrome kopiert</translation>
 <translation id="2576431527583832481">Chrome ist jetzt noch besser! Es ist eine neue Version verfügbar.</translation>
+<translation id="423410644998903704">Chrome benötigt Zugriff auf die Berechtigungen, um sie für diese Website freizugeben.</translation>
 <translation id="4633000520311261472">Um Chrome sicherer zu machen, haben wir einige Erweiterungen deaktiviert, die nicht im <ph name="IDS_EXTENSION_WEB_STORE_TITLE"/> aufgeführt sind und möglicherweise ohne Ihr Wissen hinzugefügt wurden.</translation>
 <translation id="3656661827369545115">Chromium beim Starten des Computers automatisch ausführen</translation>
 <translation id="1763864636252898013">Dieser Server konnte nicht beweisen, dass er <ph name="DOMAIN"/> ist. Sein Sicherheitszertifikat wird vom Betriebssystem Ihres Geräts als nicht vertrauenswürdig eingestuft. Mögliche Gründe sind eine fehlerhafte Konfiguration oder ein Angreifer, der Ihre Verbindung abfängt.</translation>
@@ -229,6 +234,7 @@ Sollten Sie sich trotzdem anmelden, werden die Chrome-Daten wie Lesezeichen, Ver
 <translation id="3037838751736561277">Google Chrome wird im Hintergrundmodus ausgeführt.</translation>
 <translation id="2084710999043359739">Zu Chrome hinzufügen</translation>
 <translation id="4692614041509923516">Auf Ihrem Computer wird eine alte Version von Microsoft Windows ausgeführt, die das Sicherheitszertifikat dieser Website nicht verarbeiten kann. Google Chrome kann daher nicht feststellen, ob das Zertifikat von <ph name="SITE"/> oder von jemandem aus Ihrem Netzwerk stammt, der sich als <ph name="SITE"/> ausgibt. Bitte installieren Sie eine neuere Version von Windows auf Ihrem Computer.</translation>
+<translation id="5931853610562009806">Auf einem Mac können Passwörter in Ihrem Schlüsselbund gespeichert und von anderen Chrome-Nutzern über dieses OS X-Konto abgerufen oder synchronisiert werden.</translation>
 <translation id="3360895254066713204">Chrome Helper</translation>
 <translation id="1877026089748256423">Chrome ist veraltet.</translation>
 <translation id="7592736734348559088">Google Chrome konnte Ihre Daten nicht synchronisieren, da die Anmeldedaten Ihres Kontos nicht mehr aktuell sind.</translation>
@@ -240,6 +246,7 @@ Sollten Sie sich trotzdem anmelden, werden die Chrome-Daten wie Lesezeichen, Ver
 <translation id="1001534784610492198">Das Installationsarchiv ist beschädigt oder ungültig. Laden Sie Google Chrome erneut herunter.</translation>
 <translation id="2246246234298806438">Google Chrome kann ohne den integrierten PDF-Viewer keine Druckvorschau anzeigen.</translation>
 <translation id="5132929315877954718">Entdecken Sie tolle Apps, Spiele, Erweiterungen und Designs für Google Chrome.</translation>
+<translation id="7784335114585804598">Chrome im Windows 8-Modus neu sta&amp;rten</translation>
 <translation id="6626317981028933585">Leider sind Ihre Mozilla Firefox-Einstellungen nicht verfügbar, wenn dieser Browser ausgeführt wird. Um diese Einstellungen in Google Chrome zu importieren, speichern Sie Ihre Arbeit und schließen Sie alle Firefox-Fenster. Klicken Sie anschließend auf &quot;Weiter&quot;.</translation>
 <translation id="8274359292107649245">Chrome auf dem Desktop öffnen</translation>
 <translation id="7242029209006116544">Sie melden sich mit einem verwalteten Konto an und ermöglichen dessen Administrator Zugriff auf Ihr Google Chrome-Profil. Ihre Chrome-Daten, wie Apps, Lesezeichen, Verlauf, Passwörter und andere Einstellungen, werden dauerhaft mit <ph name="USER_NAME"/> verknüpft. Sie können diese Daten über das Google Konten-Dashboard löschen, aber nicht mit einem anderen Konto verknüpfen. Wenn Sie Ihre bestehenden Chrome-Daten getrennt verwenden möchten, können Sie ein neues Profil erstellen. <ph name="LEARN_MORE"/></translation>

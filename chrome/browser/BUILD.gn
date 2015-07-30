@@ -60,6 +60,7 @@ if (is_desktop_linux) {
 source_set("browser") {
   configs += [
     "//build/config/compiler:wexit_time_destructors",
+    "//build/config:precompiled_headers",
     "//third_party/WebKit/public:debug_devtools",
   ]
   defines = []
@@ -85,7 +86,6 @@ source_set("browser") {
     "//chrome/app/theme:theme_resources",
     "//chrome/browser/net:encrypted_cert_logger_proto",
     "//chrome/browser/net:probe_message_proto",
-    "//chrome/browser/offline_pages:offline_pages_proto",
     "//chrome/browser/ssl:cert_logger_proto",
     "//chrome/browser/ui",
     "//chrome/common",
@@ -137,6 +137,7 @@ source_set("browser") {
     "//components/search",
     "//components/search_engines",
     "//components/search_provider_logos",
+    "//components/security_interstitials",
     "//components/signin/core/browser",
     "//components/startup_metric_utils",
     "//components/strings",
@@ -258,7 +259,7 @@ source_set("browser") {
       "//components/data_reduction_proxy/content/browser",
       "//components/devtools_discovery",
       "//components/devtools_http_handler",
-      "//components/dom_distiller/content",
+      "//components/dom_distiller/content:content_browser",
       "//components/favicon/content",
       "//components/history/content/browser",
       "//components/keyed_service/content",
@@ -343,8 +344,8 @@ source_set("browser") {
     sources +=
         rebase_path(gypi_values.chrome_browser_mac_sources, ".", "//chrome")
     deps += [
-      #"app_shim"  TODO(GYP)
-      #"browser_app_shim"  TODO(GYP)
+      #"app_shim"  TODO(GYP) bug 512600
+      #"browser_app_shim"  TODO(GYP) bug 512600
     ]
   }
   if (enable_extensions) {
@@ -380,7 +381,9 @@ source_set("browser") {
     sources += rebase_path(gypi_values.chrome_browser_spellchecker_sources,
                            ".",
                            "//chrome")
-    deps += [ "//third_party/hunspell" ]
+    if (!is_android) {
+      deps += [ "//third_party/hunspell" ]
+    }
   }
   if (enable_nacl) {
     sources +=
@@ -1016,16 +1019,14 @@ source_set("test_support") {
     "sessions/session_restore_test_helper.h",
     "sessions/session_service_test_helper.cc",
     "sessions/session_service_test_helper.h",
-    "signin/fake_account_fetcher_service.cc",
-    "signin/fake_account_fetcher_service.h",
+    "signin/fake_account_fetcher_service_builder.cc",
+    "signin/fake_account_fetcher_service_builder.h",
     "signin/fake_gaia_cookie_manager_service.cc",
     "signin/fake_gaia_cookie_manager_service.h",
-    "signin/fake_profile_oauth2_token_service.cc",
-    "signin/fake_profile_oauth2_token_service.h",
     "signin/fake_profile_oauth2_token_service_builder.cc",
     "signin/fake_profile_oauth2_token_service_builder.h",
-    "signin/fake_signin_manager.cc",
-    "signin/fake_signin_manager.h",
+    "signin/fake_signin_manager_builder.cc",
+    "signin/fake_signin_manager_builder.h",
     "ssl/ssl_client_auth_requestor_mock.cc",
     "ssl/ssl_client_auth_requestor_mock.h",
     "sync/profile_sync_components_factory_mock.cc",
@@ -1035,6 +1036,8 @@ source_set("test_support") {
     "ui/webui/signin/login_ui_test_utils.cc",
     "ui/webui/signin/login_ui_test_utils.h",
   ]
+
+  configs += [ "//build/config:precompiled_headers" ]
 
   public_deps = [
     ":browser",

@@ -10,6 +10,7 @@ import android.content.pm.ResolveInfo;
 import android.os.IBinder;
 import android.os.SystemClock;
 import android.os.TransactionTooLargeException;
+import android.support.customtabs.CustomTabsCallback;
 import android.text.TextUtils;
 import android.view.ContextMenu;
 import android.view.Menu;
@@ -19,8 +20,6 @@ import org.chromium.base.VisibleForTesting;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeActivity;
-import org.chromium.chrome.browser.EmptyTabObserver;
-import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.UrlUtilities;
 import org.chromium.chrome.browser.WebContentsFactory;
 import org.chromium.chrome.browser.banners.AppBannerManager;
@@ -30,6 +29,8 @@ import org.chromium.chrome.browser.contextmenu.ContextMenuPopulator;
 import org.chromium.chrome.browser.externalnav.ExternalNavigationDelegateImpl;
 import org.chromium.chrome.browser.externalnav.ExternalNavigationHandler;
 import org.chromium.chrome.browser.tab.ChromeTab;
+import org.chromium.chrome.browser.tab.EmptyTabObserver;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabIdManager;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.content_public.browser.LoadUrlParams;
@@ -78,13 +79,15 @@ public class CustomTab extends ChromeTab {
                 mPageLoadStartedTimestamp = SystemClock.elapsedRealtime();
                 mCurrentState = STATE_WAITING_LOAD_FINISH;
             }
-            mCustomTabsConnection.notifyPageLoadStarted(mSession, url);
+            mCustomTabsConnection.notifyNavigationEvent(
+                    mSession, CustomTabsCallback.NAVIGATION_STARTED);
         }
 
         @Override
         public void onPageLoadFinished(Tab tab) {
             long pageLoadFinishedTimestamp = SystemClock.elapsedRealtime();
-            mCustomTabsConnection.notifyPageLoadFinished(mSession, tab.getUrl());
+            mCustomTabsConnection.notifyNavigationEvent(
+                    mSession, CustomTabsCallback.NAVIGATION_FINISHED);
             // Both histograms (commit and PLT) are reported here, to make sure
             // that they are always recorded together, and that we only record
             // commits for successful navigations.

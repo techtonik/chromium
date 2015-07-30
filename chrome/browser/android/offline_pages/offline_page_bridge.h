@@ -8,6 +8,10 @@
 #include "base/android/jni_android.h"
 #include "base/android/jni_weak_ref.h"
 
+namespace base {
+class FilePath;
+}
+
 namespace content {
 class BrowserContext;
 }
@@ -29,7 +33,18 @@ class OfflinePageBridge {
                     content::BrowserContext* browser_context);
   void Destroy(JNIEnv*, jobject);
 
+  void LoadAllPages(JNIEnv* env,
+                    jobject obj,
+                    jobject j_callback_obj,
+                    jobject j_result_obj);
+
+  void SavePage(JNIEnv* env,
+                jobject obj,
+                jobject j_callback_obj,
+                jobject j_web_contents);
+
  private:
+  base::FilePath GetDownloadsPath() const;
 
   JavaObjectWeakGlobalRef weak_java_ref_;
   // Not owned.

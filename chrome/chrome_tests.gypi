@@ -294,6 +294,7 @@
       'browser/first_run/try_chrome_dialog_view_browsertest.cc',
       'browser/geolocation/access_token_store_browsertest.cc',
       'browser/geolocation/geolocation_browsertest.cc',
+      'browser/global_keyboard_shortcuts_mac_browsertest.mm',
       'browser/history/history_browsertest.cc',
       'browser/history/redirect_browsertest.cc',
       'browser/iframe_browsertest.cc',
@@ -355,6 +356,8 @@
       'browser/net/websocket_browsertest.cc',
       'browser/password_manager/password_manager_browsertest.cc',
       'browser/pdf/pdf_extension_test.cc',
+      'browser/pdf/pdf_extension_test_util.cc',
+      'browser/pdf/pdf_extension_test_util.h',
       'browser/plugins/plugin_power_saver_browsertest.cc',
       'browser/prefetch/prefetch_browsertest.cc',
       'browser/prefs/pref_functional_browsertest.cc',
@@ -869,7 +872,7 @@
       'browser/ui/app_list/speech_recognizer_browsertest.cc',
     ],
     'chrome_browser_tests_media_router_sources': [
-      'browser/ui/webui/media_router/media_router_dialog_controller_browsertest.cc',
+      'browser/ui/webui/media_router/media_router_dialog_controller_impl_browsertest.cc',
       'test/data/webui/media_router/media_router_elements_browsertest.js',
       'test/media_router/media_router_base_browsertest.cc',
       'test/media_router/media_router_base_browsertest.h',
@@ -902,6 +905,7 @@
       'browser/ui/webui/options/chromeos/accounts_options_browsertest.js',
       'browser/ui/webui/options/chromeos/bluetooth_options_browsertest.js',
       'browser/ui/webui/options/chromeos/date_time_options_browsertest.js',
+      'browser/ui/webui/options/chromeos/power_overlay_browsertest.js',
       'browser/ui/webui/options/content_options_browsertest.js',
       'browser/ui/webui/options/content_settings_exception_area_browsertest.js',
       'browser/ui/webui/options/cookies_view_browsertest.js',
@@ -2031,7 +2035,7 @@
         '../components/components.gyp:autofill_content_risk_proto',
         '../components/components.gyp:autofill_content_test_support',
         '../components/components.gyp:captive_portal_test_support',
-        '../components/components.gyp:dom_distiller_content',
+        '../components/components.gyp:dom_distiller_content_browser',
         '../components/components.gyp:dom_distiller_test_support',
         '../components/components.gyp:guest_view_test_support',
         '../components/components.gyp:translate_core_common',
@@ -3330,14 +3334,25 @@
             ['OS=="win"', {
               'targets': [
                 {
-                  'target_name': 'angle_deqp_tests_run',
+                  'target_name': 'angle_deqp_gles2_tests_run',
                   'type': 'none',
                   'dependencies': [
-                    '../gpu/gpu.gyp:angle_deqp_tests',
+                    '../gpu/gpu.gyp:angle_deqp_gles2_tests',
                     'gpu_tests_base',
                   ],
                   'sources': [
-                    'angle_deqp_tests.isolate',
+                    'angle_deqp_gles2_tests.isolate',
+                  ],
+                },
+                {
+                  'target_name': 'angle_deqp_gles3_tests_run',
+                  'type': 'none',
+                  'dependencies': [
+                    '../gpu/gpu.gyp:angle_deqp_gles3_tests',
+                    'gpu_tests_base',
+                  ],
+                  'sources': [
+                    'angle_deqp_gles3_tests.isolate',
                   ],
                 },
               ],

@@ -310,6 +310,10 @@ Background.prototype = {
           return;
         }
         break;
+      case 'showOptionsPage':
+        var optionsPage = {url: 'chromevox/background/options.html'};
+        chrome.tabs.create(optionsPage);
+        break;
     }
 
     if (pred) {
@@ -583,6 +587,8 @@ Background.prototype = {
   isWhitelistedForCompat_: function(url) {
     return url.indexOf('chrome://md-settings') != -1 ||
           url.indexOf('chrome://oobe/login') != -1 ||
+          url.indexOf(
+              'https://accounts.google.com/embedded/setup/chromeos') === 0 ||
           url === '';
   },
 

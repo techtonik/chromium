@@ -23,8 +23,8 @@ namespace {
 scoped_ptr<views::Border> CreateBorder(const int normal_image_set[],
                                        const int hot_image_set[],
                                        const int pushed_image_set[]) {
-  scoped_ptr<views::LabelButtonBorder> border(
-      new views::LabelButtonBorder(views::Button::STYLE_TEXTBUTTON));
+  scoped_ptr<views::LabelButtonAssetBorder> border(
+      new views::LabelButtonAssetBorder(views::Button::STYLE_TEXTBUTTON));
   border->SetPainter(false, views::Button::STATE_NORMAL,
       views::Painter::CreateImageGridPainter(normal_image_set));
   border->SetPainter(false, views::Button::STATE_HOVERED,
@@ -130,6 +130,17 @@ void NewAvatarButton::OnMouseReleased(const ui::MouseEvent& event) {
     suppress_mouse_released_action_ = false;
   else
     LabelButton::OnMouseReleased(event);
+}
+
+void NewAvatarButton::OnGestureEvent(ui::GestureEvent* event) {
+  // TODO(wjmaclean): The check for ET_GESTURE_LONG_PRESS is done here since
+  // no other UI button based on CustomButton appears to handle mouse
+  // right-click. If other cases are identified, it may make sense to move this
+  // check to CustomButton.
+  if (event->type() == ui::ET_GESTURE_LONG_PRESS)
+    NotifyClick(*event);
+  else
+    LabelButton::OnGestureEvent(event);
 }
 
 void NewAvatarButton::OnProfileAdded(const base::FilePath& profile_path) {

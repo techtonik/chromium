@@ -322,6 +322,7 @@ interface CSSViewportRule
     method constructor
 interface Cache
     method add
+    method addAll
     method constructor
     method delete
     method keys
@@ -1240,7 +1241,29 @@ interface HTMLAnchorElement
     setter type
     setter username
 interface HTMLAppletElement
+    getter align
+    getter alt
+    getter archive
+    getter code
+    getter codeBase
+    getter height
+    getter hspace
+    getter name
+    getter object
+    getter vspace
+    getter width
     method constructor
+    setter align
+    setter alt
+    setter archive
+    setter code
+    setter codeBase
+    setter height
+    setter hspace
+    setter name
+    setter object
+    setter vspace
+    setter width
 interface HTMLAreaElement
     getter alt
     getter coords
@@ -1606,8 +1629,20 @@ interface HTMLElement
     setter translate
     setter webkitdropzone
 interface HTMLEmbedElement
+    getter align
+    getter height
+    getter name
+    getter src
+    getter type
+    getter width
     method constructor
     method getSVGDocument
+    setter align
+    setter height
+    setter name
+    setter src
+    setter type
+    setter width
 interface HTMLFieldSetElement
     getter disabled
     getter elements
@@ -1635,11 +1670,31 @@ interface HTMLFormControlsCollection
     method constructor
     method namedItem
 interface HTMLFormElement
+    getter acceptCharset
+    getter action
+    getter autocomplete
+    getter elements
+    getter encoding
+    getter enctype
+    getter length
+    getter method
+    getter name
+    getter noValidate
+    getter target
     method checkValidity
     method constructor
     method reportValidity
     method reset
     method submit
+    setter acceptCharset
+    setter action
+    setter autocomplete
+    setter encoding
+    setter enctype
+    setter method
+    setter name
+    setter noValidate
+    setter target
 interface HTMLFrameElement
     getter contentDocument
     getter contentWindow
@@ -1662,7 +1717,47 @@ interface HTMLFrameElement
     setter scrolling
     setter src
 interface HTMLFrameSetElement
+    getter cols
+    getter onbeforeunload
+    getter onblur
+    getter onerror
+    getter onfocus
+    getter onhashchange
+    getter onlanguagechange
+    getter onload
+    getter onmessage
+    getter onoffline
+    getter ononline
+    getter onorientationchange
+    getter onpagehide
+    getter onpageshow
+    getter onpopstate
+    getter onresize
+    getter onscroll
+    getter onstorage
+    getter onunload
+    getter rows
     method constructor
+    setter cols
+    setter onbeforeunload
+    setter onblur
+    setter onerror
+    setter onfocus
+    setter onhashchange
+    setter onlanguagechange
+    setter onload
+    setter onmessage
+    setter onoffline
+    setter ononline
+    setter onorientationchange
+    setter onpagehide
+    setter onpageshow
+    setter onpopstate
+    setter onresize
+    setter onscroll
+    setter onstorage
+    setter onunload
+    setter rows
 interface HTMLHRElement
     getter align
     getter color
@@ -2072,11 +2167,48 @@ interface HTMLOListElement
     setter start
     setter type
 interface HTMLObjectElement
+    getter align
+    getter archive
+    getter border
+    getter code
+    getter codeBase
+    getter codeType
+    getter contentDocument
+    getter data
+    getter declare
+    getter form
+    getter height
+    getter hspace
+    getter name
+    getter standby
+    getter type
+    getter useMap
+    getter validationMessage
+    getter validity
+    getter vspace
+    getter width
+    getter willValidate
     method checkValidity
     method constructor
     method getSVGDocument
     method reportValidity
     method setCustomValidity
+    setter align
+    setter archive
+    setter border
+    setter code
+    setter codeBase
+    setter codeType
+    setter data
+    setter declare
+    setter height
+    setter hspace
+    setter name
+    setter standby
+    setter type
+    setter useMap
+    setter vspace
+    setter width
 interface HTMLOptGroupElement
     getter disabled
     getter label
@@ -2676,10 +2808,6 @@ interface MIDIPort
     method constructor
     method open
     setter onstatechange
-interface MediaDevices
-    method constructor
-    method enumerateDevices
-    method getUserMedia
 interface MediaElementAudioSourceNode
     getter mediaElement
     method constructor
@@ -2911,7 +3039,6 @@ interface Navigator
     getter language
     getter languages
     getter maxTouchPoints
-    getter mediaDevices
     getter mimeTypes
     getter onLine
     getter platform
@@ -2962,8 +3089,6 @@ interface Node
     getter childNodes
     getter firstChild
     getter lastChild
-    getter localName
-    getter namespaceURI
     getter nextSibling
     getter nodeName
     getter nodeType
@@ -3107,7 +3232,6 @@ interface PerformanceResourceTiming
     getter responseEnd
     getter responseStart
     getter secureConnectionStart
-    getter workerStart
     method constructor
 interface PerformanceTiming
     getter connectEnd
@@ -3395,6 +3519,11 @@ interface SVGDiscardElement
     method constructor
 interface SVGElement
     getter className
+    getter offsetHeight
+    getter offsetLeft
+    getter offsetParent
+    getter offsetTop
+    getter offsetWidth
     getter onabort
     getter onblur
     getter oncancel
@@ -4751,9 +4880,7 @@ interface TreeWalker
     method previousSibling
     setter currentNode
 interface UIEvent
-    getter charCode
     getter detail
-    getter keyCode
     getter view
     getter which
     method constructor

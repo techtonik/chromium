@@ -11,7 +11,8 @@ from telemetry import decorators
 from telemetry.internal.backends.chrome_inspector import devtools_http
 from telemetry.internal.backends.chrome_inspector import inspector_backend
 from telemetry.internal.backends.chrome_inspector import tracing_backend
-from telemetry.internal.platform.tracing_agent import chrome_tracing_agent
+from telemetry.internal.platform.tracing_agent import (
+    chrome_devtools_tracing_agent)
 from telemetry.timeline import trace_data as trace_data_module
 
 
@@ -66,8 +67,8 @@ class DevToolsClientBackend(object):
     self._devtools_context_map_backend = _DevToolsContextMapBackend(
         self._app_backend, self)
 
-    chrome_tracing_agent.ChromeTracingAgent.RegisterDevToolsClient(
-      self, self._app_backend.platform_backend)
+    (chrome_devtools_tracing_agent.ChromeDevtoolsTracingAgent
+        .RegisterDevToolsClient(self, self._app_backend.platform_backend))
 
   @property
   def remote_port(self):
@@ -213,6 +214,22 @@ class DevToolsClientBackend(object):
 
     assert self._tracing_backend
     return self._tracing_backend.StopTracing(trace_data_builder, timeout)
+
+  def DumpMemory(self, timeout=30):
+    """Dumps memory.
+
+    Returns:
+      GUID of the generated dump if successful, None otherwise.
+
+    Raises:
+      TracingTimeoutException: If more than |timeout| seconds has passed
+      since the last time any data is received.
+      TracingUnrecoverableException: If there is a websocket error.
+      TracingUnexpectedResponseException: If the response contains an error
+      or does not contain the expected result.
+    """
+    self._CreateTracingBackendIfNeeded()
+    return self._tracing_backend.DumpMemory(timeout)
 
 
 class _DevToolsContextMapBackend(object):

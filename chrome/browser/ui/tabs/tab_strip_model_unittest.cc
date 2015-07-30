@@ -26,7 +26,6 @@
 #include "chrome/common/url_constants.h"
 #include "chrome/test/base/chrome_render_view_host_test_harness.h"
 #include "chrome/test/base/testing_profile.h"
-#include "components/web_modal/popup_manager.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
@@ -246,11 +245,11 @@ class TabStripModelTest : public ChromeRenderViewHostTestHarness {
       model->SetTabPinned(i, true);
 
     ui::ListSelectionModel selection_model;
-    std::vector<std::string> selection;
-    base::SplitStringAlongWhitespace(selected_tabs, &selection);
-    for (size_t i = 0; i < selection.size(); ++i) {
+    for (const base::StringPiece& sel : base::SplitStringPiece(
+             selected_tabs, base::kWhitespaceASCII,
+             base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
       int value;
-      ASSERT_TRUE(base::StringToInt(selection[i], &value));
+      ASSERT_TRUE(base::StringToInt(sel, &value));
       selection_model.AddIndexToSelection(value);
     }
     selection_model.set_active(selection_model.selected_indices()[0]);
@@ -2527,8 +2526,6 @@ TEST_F(TabStripModelTest, TabBlockedState) {
   // Setup a SingleWebContentsDialogManager for tab |contents2|.
   web_modal::WebContentsModalDialogManager* modal_dialog_manager =
       web_modal::WebContentsModalDialogManager::FromWebContents(contents2);
-  web_modal::PopupManager popup_manager(NULL);
-  popup_manager.RegisterWith(contents2);
 
   // Show a dialog that blocks tab |contents2|.
   // DummySingleWebContentsDialogManager doesn't care about the

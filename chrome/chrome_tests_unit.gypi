@@ -37,7 +37,7 @@
       'browser/banners/app_banner_data_fetcher_unittest.cc',
       'browser/banners/app_banner_settings_helper_unittest.cc',
       'browser/bitmap_fetcher/bitmap_fetcher_service_unittest.cc',
-      'browser/bookmarks/chrome_bookmark_client_unittest.cc',
+      'browser/bookmarks/managed_bookmark_service_unittest.cc',
       'browser/browser_about_handler_unittest.cc',
       'browser/browser_process_impl_unittest.cc',
       'browser/browsing_data/browsing_data_appcache_helper_unittest.cc',
@@ -86,6 +86,7 @@
       'browser/download/download_query_unittest.cc',
       'browser/download/download_request_infobar_delegate_unittest.cc',
       'browser/download/download_request_limiter_unittest.cc',
+      'browser/download/download_resource_throttle_unittest.cc',
       'browser/download/download_status_updater_unittest.cc',
       'browser/download/download_target_determiner_unittest.cc',
       'browser/download/download_ui_controller_unittest.cc',
@@ -130,7 +131,6 @@
       'browser/metrics/chrome_browser_main_extra_parts_metrics_unittest.cc',
       'browser/metrics/chrome_metrics_service_accessor_unittest.cc',
       'browser/metrics/cloned_install_detector_unittest.cc',
-      'browser/metrics/drive_metrics_provider_unittest.cc',
       'browser/metrics/perf_provider_chromeos_unittest.cc',
       'browser/metrics/signin_status_metrics_provider_chromeos_unittest.cc',
       'browser/metrics/signin_status_metrics_provider_unittest.cc',
@@ -159,10 +159,8 @@
       'browser/net/spdyproxy/data_reduction_proxy_settings_unittest_android.cc',
       'browser/net/ssl_config_service_manager_pref_unittest.cc',
       'browser/net/url_info_unittest.cc',
-      'browser/offline_pages/offline_page_metadata_store_impl_unittest.cc',
       'browser/password_manager/chrome_password_manager_client_unittest.cc',
       'browser/password_manager/password_manager_internals_service_unittest.cc',
-      'browser/password_manager/password_manager_metrics_util_unittest.cc',
       'browser/password_manager/password_store_mac_unittest.cc',
       'browser/password_manager/password_store_proxy_mac_unittest.cc',
       'browser/password_manager/password_store_win_unittest.cc',
@@ -203,12 +201,12 @@
       'browser/process_singleton_win_unittest.cc',
       'browser/profiles/file_path_verifier_win_unittest.cc',
       'browser/profiles/gaia_info_update_service_unittest.cc',
+      'browser/profiles/profile_attributes_storage_unittest.cc',
       'browser/profiles/profile_avatar_icon_util_unittest.cc',
       'browser/profiles/profile_downloader_unittest.cc',
       'browser/profiles/profile_info_cache_unittest.cc',
       'browser/profiles/profile_info_cache_unittest.h',
       'browser/profiles/profile_manager_unittest.cc',
-      'browser/profiles/profile_attributes_storage_unittest.cc',
       'browser/profiles/profile_shortcut_manager_unittest_win.cc',
       'browser/push_messaging/push_messaging_app_identifier_unittest.cc',
       'browser/push_messaging/push_messaging_permission_context_unittest.cc',
@@ -368,7 +366,6 @@
       'browser/ui/cocoa/browser_window_layout_unittest.mm',
       'browser/ui/cocoa/bubble_view_unittest.mm',
       'browser/ui/cocoa/chrome_browser_window_unittest.mm',
-      'browser/ui/cocoa/chrome_event_processing_window_unittest.mm',
       'browser/ui/cocoa/clickhold_button_cell_unittest.mm',
       'browser/ui/cocoa/cocoa_profile_test.h',
       'browser/ui/cocoa/cocoa_profile_test.mm',
@@ -1023,6 +1020,7 @@
       'browser/safe_browsing/incident_reporting/off_domain_inclusion_detector_unittest.cc',
       'browser/safe_browsing/incident_reporting/preference_validation_delegate_unittest.cc',
       'browser/safe_browsing/incident_reporting/resource_request_detector_unittest.cc',
+      'browser/safe_browsing/incident_reporting/state_store_unittest.cc',
       'browser/safe_browsing/incident_reporting/tracked_preference_incident_unittest.cc',
       'browser/safe_browsing/incident_reporting/variations_seed_signature_incident_unittest.cc',
       'browser/safe_browsing/local_database_manager_unittest.cc',
@@ -1093,8 +1091,8 @@
       'service/cloud_print/connector_settings_unittest.cc',
       'service/cloud_print/printer_job_handler_unittest.cc',
       'service/cloud_print/printer_job_queue_handler_unittest.cc',
+      'service/service_ipc_server_unittest.cc',
       'service/service_process_prefs_unittest.cc',
-      'service/service_process_unittest.cc',
     ],
     'chrome_unit_tests_captive_portal_sources': [
       'browser/captive_portal/captive_portal_service_unittest.cc',
@@ -1150,6 +1148,8 @@
       'browser/chromeos/drive/download_handler_unittest.cc',
       'browser/chromeos/drive/drive_file_stream_reader_unittest.cc',
       'browser/chromeos/drive/drive_integration_service_unittest.cc',
+      'browser/chromeos/drive/drive_test_util.cc',
+      'browser/chromeos/drive/drive_test_util.h',
       'browser/chromeos/drive/dummy_file_system.cc',
       'browser/chromeos/drive/dummy_file_system.h',
       'browser/chromeos/drive/fake_file_system.cc',
@@ -1192,8 +1192,6 @@
       'browser/chromeos/drive/sync/entry_update_performer_unittest.cc',
       'browser/chromeos/drive/sync/remove_performer_unittest.cc',
       'browser/chromeos/drive/sync_client_unittest.cc',
-      'browser/chromeos/drive/drive_test_util.cc',
-      'browser/chromeos/drive/drive_test_util.h',
       'browser/chromeos/drive/write_on_cache_file_unittest.cc',
       'browser/chromeos/events/event_rewriter_unittest.cc',
       'browser/chromeos/events/keyboard_driven_event_rewriter_unittest.cc',
@@ -1338,6 +1336,7 @@
       'browser/extensions/updater/local_extension_cache_unittest.cc',
       'browser/metrics/chromeos_metrics_provider_unittest.cc',
       'browser/notifications/login_state_notification_blocker_chromeos_unittest.cc',
+      'browser/ui/browser_finder_chromeos_unittest.cc',
       # TODO(zturner): Enable this on Windows. See
       # BrowserWithTestWindowTest::SetUp() for a comment explaining why this is
       # broken.
@@ -1462,16 +1461,18 @@
       'browser/media/router/issue_manager_unittest.cc',
       'browser/media/router/issue_unittest.cc',
       'browser/media/router/media_route_unittest.cc',
-      'browser/media/router/media_router_mojo_impl_unittest.cc',
-      'browser/media/router/media_router_type_converters_unittest.cc',
       'browser/media/router/media_sink_unittest.cc',
       'browser/media/router/media_source_helper_unittest.cc',
       'browser/media/router/media_source_unittest.cc',
       'browser/media/router/presentation_media_sinks_observer_unittest.cc',
       'browser/media/router/presentation_service_delegate_impl_unittest.cc',
       'browser/media/router/presentation_session_state_observer_unittest.cc',
+    ],
+    'chrome_unit_tests_media_router_non_android_sources': [
+      'browser/media/router/media_router_mojo_impl_unittest.cc',
+      'browser/media/router/media_router_type_converters_unittest.cc',
       'browser/ui/webui/media_router/media_cast_mode_unittest.cc',
-      'browser/ui/webui/media_router/media_router_dialog_controller_unittest.cc',
+      'browser/ui/webui/media_router/media_router_dialog_controller_impl_unittest.cc',
       'browser/ui/webui/media_router/media_router_test.cc',
       'browser/ui/webui/media_router/media_router_test.h',
       'browser/ui/webui/media_router/media_router_webui_message_handler_unittest.cc',
@@ -1544,9 +1545,8 @@
       'browser/ui/cocoa/autofill/new_credit_card_bubble_cocoa_unittest.mm',
       'browser/ui/content_settings/content_setting_bubble_model_unittest.cc',
       'browser/ui/content_settings/content_setting_image_model_unittest.cc',
-      'browser/ui/elide_url_unittest.cc',  # URL elider not used on Android.
-      'browser/ui/extensions/extension_action_view_controller_unittest.cc',
       'browser/ui/exclusive_access/fullscreen_controller_state_unittest.cc',
+      'browser/ui/extensions/extension_action_view_controller_unittest.cc',
       'browser/ui/omnibox/omnibox_controller_unittest.cc',
       'browser/ui/omnibox/omnibox_edit_unittest.cc',
       'browser/ui/omnibox/omnibox_popup_model_unittest.cc',
@@ -1642,6 +1642,7 @@
     # Sources for Offline pages. For now only for Android.
     'chrome_unit_tests_offline_pages_sources': [
       'browser/android/offline_pages/offline_page_mhtml_archiver_unittest.cc',
+      'browser/android/offline_pages/offline_page_web_contents_observer_unittest.cc',
     ],
   },
   'targets': [
@@ -1758,16 +1759,14 @@
         'browser/sessions/session_restore_test_helper.h',
         'browser/sessions/session_service_test_helper.cc',
         'browser/sessions/session_service_test_helper.h',
-        'browser/signin/fake_account_fetcher_service.cc',
-        'browser/signin/fake_account_fetcher_service.h',
+        'browser/signin/fake_account_fetcher_service_builder.cc',
+        'browser/signin/fake_account_fetcher_service_builder.h',
         'browser/signin/fake_gaia_cookie_manager_service.cc',
         'browser/signin/fake_gaia_cookie_manager_service.h',
-        'browser/signin/fake_profile_oauth2_token_service.cc',
-        'browser/signin/fake_profile_oauth2_token_service.h',
         'browser/signin/fake_profile_oauth2_token_service_builder.cc',
         'browser/signin/fake_profile_oauth2_token_service_builder.h',
-        'browser/signin/fake_signin_manager.cc',
-        'browser/signin/fake_signin_manager.h',
+        'browser/signin/fake_signin_manager_builder.cc',
+        'browser/signin/fake_signin_manager_builder.h',
         'browser/ssl/ssl_client_auth_requestor_mock.cc',
         'browser/ssl/ssl_client_auth_requestor_mock.h',
         'browser/sync/profile_sync_components_factory_mock.cc',
@@ -1961,6 +1960,12 @@
             'browser/chromeos/settings/device_settings_test_helper.h',
             'browser/chromeos/system/fake_input_device_settings.cc',
             'browser/chromeos/system/fake_input_device_settings.h',
+          ],
+        }],
+        ['use_aura==1', {
+          'sources': [
+            'test/base/test_browser_window_aura.cc',
+            'test/base/test_browser_window_aura.h',
           ],
         }],
         ['configuration_policy==1', {
@@ -2265,7 +2270,7 @@
           'includes': ['chrome_ios_bundle_resources.gypi'],
           'xcode_settings': {'OTHER_LDFLAGS': ['-ObjC']},
         }],
-        ['OS=="ios" or chromeos==1', {
+        ['chromeos==1', {
           'sources!': [
             'browser/metrics/signin_status_metrics_provider_unittest.cc',
           ],
@@ -2434,6 +2439,11 @@
         ['enable_media_router==1', {
           'sources': [ '<@(chrome_unit_tests_media_router_sources)' ],
           'dependencies': [ 'browser/media/router/media_router.gyp:media_router_test_support' ],
+          'conditions': [
+            ['OS!="android"', {
+              'sources': [ '<@(chrome_unit_tests_media_router_non_android_sources)' ],
+            }],
+          ],
         }],
         ['enable_captive_portal_detection==1', {
           'sources': [ '<@(chrome_unit_tests_captive_portal_sources)' ],
@@ -2652,6 +2662,7 @@
           ],
           'sources!': [
             'renderer/spellchecker/spellcheck_provider_hunspell_unittest.cc',
+            'renderer/spellchecker/spellcheck_unittest.cc',
           ],
           'ldflags': [
             # Some android targets still depend on --gc-sections to link.

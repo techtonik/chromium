@@ -23,7 +23,7 @@
 #include "ui/keyboard/keyboard_switches.h"
 #include "ui/keyboard/keyboard_util.h"
 
-namespace keyboard_api = extensions::core_api::virtual_keyboard_private;
+namespace keyboard_api = extensions::api::virtual_keyboard_private;
 
 namespace {
 
@@ -65,8 +65,6 @@ bool ChromeVirtualKeyboardDelegate::GetKeyboardConfig(
       GenerateFeatureFlag("gesturetyping", keyboard::IsGestureTypingEnabled()));
   features->AppendString(GenerateFeatureFlag(
       "gestureediting", keyboard::IsGestureEditingEnabled()));
-  features->AppendString(GenerateFeatureFlag(
-      "materialdesign", keyboard::IsMaterialDesignEnabled()));
   features->AppendString(
       GenerateFeatureFlag("voiceinput", keyboard::IsVoiceInputEnabled()));
   features->AppendString(GenerateFeatureFlag("experimental",

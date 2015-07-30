@@ -71,7 +71,7 @@
 #include "ui/gl/gpu_timing.h"
 
 #if defined(OS_MACOSX)
-#include <IOSurface/IOSurfaceAPI.h>
+#include <IOSurface/IOSurface.h>
 // Note that this must be included after gl_bindings.h to avoid conflicts.
 #include <OpenGL/CGLIOSurface.h>
 #endif
@@ -1474,9 +1474,6 @@ class GLES2DecoderImpl : public GLES2Decoder,
   // Wrapper for glEnableVertexAttribArray.
   void DoEnableVertexAttribArray(GLuint index);
 
-  // Wrapper for glFinish.
-  void DoFinish();
-
   // Wrapper for glFlush.
   void DoFlush();
 
@@ -1867,7 +1864,7 @@ class GLES2DecoderImpl : public GLES2Decoder,
   // and allow context preemption and GPU watchdog checks in GpuScheduler().
   void ExitCommandProcessingEarly() { commands_to_process_ = 0; }
 
-  void ProcessPendingReadPixels();
+  void ProcessPendingReadPixels(bool did_finish);
   void FinishReadPixels(const cmds::ReadPixels& c, GLuint buffer);
 
   // Generate a member function prototype for each command in an automated and
@@ -3145,6 +3142,7 @@ Capabilities GLES2DecoderImpl::GetCapabilities() {
 
   caps.post_sub_buffer = supports_post_sub_buffer_;
   caps.image = true;
+  caps.surfaceless = surfaceless_;
 
   caps.blend_equation_advanced =
       feature_info_->feature_flags().blend_equation_advanced;
@@ -3565,7 +3563,7 @@ bool GLES2DecoderImpl::MakeCurrent() {
 }
 
 void GLES2DecoderImpl::ProcessFinishedAsyncTransfers() {
-  ProcessPendingReadPixels();
+  ProcessPendingReadPixels(false);
   if (engine() && query_manager_.get())
     query_manager_->ProcessPendingTransferQueries();
 
@@ -3844,6 +3842,7 @@ void GLES2DecoderImpl::BeginDecoding() {
   gpu_trace_commands_ = gpu_tracer_->IsTracing() && *gpu_decoder_category_;
   gpu_debug_commands_ = log_commands() || debug() || gpu_trace_commands_ ||
                         (*cb_command_trace_category_ != 0);
+  query_manager_->ProcessFrameBeginUpdates();
 }
 
 void GLES2DecoderImpl::EndDecoding() {
@@ -3923,7 +3922,6 @@ void GLES2DecoderImpl::Destroy(bool have_context) {
   state_.bound_pixel_unpack_buffer = NULL;
   state_.bound_transform_feedback_buffer = NULL;
   state_.bound_uniform_buffer = NULL;
-  state_.current_queries.clear();
   framebuffer_state_.bound_read_framebuffer = NULL;
   framebuffer_state_.bound_draw_framebuffer = NULL;
   state_.bound_renderbuffer = NULL;
@@ -4405,10 +4403,28 @@ void GLES2DecoderImpl::RemoveBuffer(GLuint client_id) {
   buffer_manager()->RemoveBuffer(client_id);
 }
 
-void GLES2DecoderImpl::DoFinish() {
+// TODO(dyen): Temporary shared memory to sanity check finish calls.
+error::Error GLES2DecoderImpl::HandleFinish(uint32 immediate_data_size,
+                                const void* cmd_data) {
+  const gles2::cmds::Finish& c =
+      *static_cast<const gles2::cmds::Finish*>(cmd_data);
+  int32 sync_shm_id = static_cast<int32>(c.sync_count_shm_id);
+  uint32 sync_shm_offset = static_cast<uint32>(c.sync_count_shm_offset);
+  uint32 finish_count = static_cast<GLuint>(c.finish_count);
+
   glFinish();
-  ProcessPendingReadPixels();
+  ProcessPendingReadPixels(true);
   ProcessPendingQueries(true);
+
+  base::subtle::Atomic32* sync_counter =
+      GetSharedMemoryAs<base::subtle::Atomic32*>(sync_shm_id,
+                                                 sync_shm_offset,
+                                                 sizeof(*sync_counter)) ;
+  if (sync_counter) {
+    base::subtle::Release_Store(sync_counter, finish_count);
+  }
+
+  return error::kNoError;
 }
 
 void GLES2DecoderImpl::DoFlush() {
@@ -11051,7 +11067,7 @@ void GLES2DecoderImpl::DoSwapBuffers() {
   }
 
   ScopedGPUTrace scoped_gpu_trace(gpu_tracer_.get(), kTraceDecoder,
-                                  "gpu_toplevel", "SwapBuffer");
+                                  "GLES2Decoder", "SwapBuffer");
 
   bool is_tracing;
   TRACE_EVENT_CATEGORY_GROUP_ENABLED(TRACE_DISABLED_BY_DEFAULT("gpu.debug"),
@@ -11529,15 +11545,6 @@ bool GLES2DecoderImpl::GenQueriesEXTHelper(
 void GLES2DecoderImpl::DeleteQueriesEXTHelper(
     GLsizei n, const GLuint* client_ids) {
   for (GLsizei ii = 0; ii < n; ++ii) {
-    QueryManager::Query* query = query_manager_->GetQuery(client_ids[ii]);
-    if (query && !query->IsDeleted()) {
-      ContextState::QueryMap::iterator it =
-          state_.current_queries.find(query->target());
-      if (it != state_.current_queries.end())
-        state_.current_queries.erase(it);
-
-      query->Destroy(true);
-    }
     query_manager_->RemoveQuery(client_ids[ii]);
   }
 }
@@ -11562,9 +11569,13 @@ void GLES2DecoderImpl::WaitForReadPixels(base::Closure callback) {
   }
 }
 
-void GLES2DecoderImpl::ProcessPendingReadPixels() {
+void GLES2DecoderImpl::ProcessPendingReadPixels(bool did_finish) {
+  // Note: |did_finish| guarantees that the GPU has passed the fence but
+  // we cannot assume that GLFence::HasCompleted() will return true yet as
+  // that's not guaranteed by all GLFence implementations.
   while (!pending_readpixel_fences_.empty() &&
-         pending_readpixel_fences_.front()->fence->HasCompleted()) {
+         (did_finish ||
+          pending_readpixel_fences_.front()->fence->HasCompleted())) {
     std::vector<base::Closure> callbacks =
         pending_readpixel_fences_.front()->callbacks;
     pending_readpixel_fences_.pop();
@@ -11580,7 +11591,7 @@ bool GLES2DecoderImpl::HasMoreIdleWork() {
 }
 
 void GLES2DecoderImpl::PerformIdleWork() {
-  ProcessPendingReadPixels();
+  ProcessPendingReadPixels(false);
   if (!async_pixel_transfer_manager_->NeedsProcessMorePendingTransfers())
     return;
   async_pixel_transfer_manager_->ProcessMorePendingTransfers();
@@ -11605,6 +11616,26 @@ error::Error GLES2DecoderImpl::HandleBeginQueryEXT(uint32 immediate_data_size,
       break;
     case GL_COMMANDS_COMPLETED_CHROMIUM:
       if (!features().chromium_sync_query) {
+#if defined(OS_MACOSX)
+        // TODO(dyen): Remove once we know what is failing.
+        uint32_t boolean_flags = 0;
+        if (gfx::g_driver_gl.ext.b_GL_ARB_sync)
+          boolean_flags |= 1;
+        if (gfx::g_driver_gl.ext.b_GL_APPLE_fence)
+          boolean_flags |= 2;
+        if (gfx::g_driver_gl.ext.b_GL_NV_fence)
+          boolean_flags |= 4;
+
+        CHECK(boolean_flags != 0) << "Nothing supported";
+        CHECK(boolean_flags != 1) << "ARB";
+        CHECK(boolean_flags != 2) << "APPLE";
+        CHECK(boolean_flags != 3) << "ARB APPLE";
+        CHECK(boolean_flags != 4) << "NV";
+        CHECK(boolean_flags != 5) << "NV ARB";
+        CHECK(boolean_flags != 6) << "NV APPLE";
+        CHECK(boolean_flags != 7) << "NV ARB APPLE";
+        CHECK(false) << "Unknown error.";
+#endif
         LOCAL_SET_GL_ERROR(
             GL_INVALID_OPERATION, "glBeginQueryEXT",
             "not enabled for commands completed queries");
@@ -11636,13 +11667,22 @@ error::Error GLES2DecoderImpl::HandleBeginQueryEXT(uint32 immediate_data_size,
       return error::kNoError;
   }
 
-  if (state_.current_queries.find(target) != state_.current_queries.end()) {
+  if (query_manager_->GetActiveQuery(target)) {
+#if defined(OS_MACOSX)
+    // TODO(dyen): Remove once we know what is failing.
+    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM)
+        << "Query already in progress";
+#endif
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION, "glBeginQueryEXT", "query already in progress");
     return error::kNoError;
   }
 
   if (client_id == 0) {
+#if defined(OS_MACOSX)
+    // TODO(dyen): Remove once we know what is failing.
+    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Id is 0";
+#endif
     LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glBeginQueryEXT", "id is 0");
     return error::kNoError;
   }
@@ -11650,6 +11690,10 @@ error::Error GLES2DecoderImpl::HandleBeginQueryEXT(uint32 immediate_data_size,
   QueryManager::Query* query = query_manager_->GetQuery(client_id);
   if (!query) {
     if (!query_manager_->IsValidQuery(client_id)) {
+#if defined(OS_MACOSX)
+      // TODO(dyen): Remove once we know what is failing.
+      CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Invalid ID";
+#endif
       LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
                          "glBeginQueryEXT",
                          "id not made by glGenQueriesEXT");
@@ -11660,6 +11704,10 @@ error::Error GLES2DecoderImpl::HandleBeginQueryEXT(uint32 immediate_data_size,
   }
 
   if (query->target() != target) {
+#if defined(OS_MACOSX)
+    // TODO(dyen): Remove once we know what is failing.
+    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Non-Matching Target";
+#endif
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION, "glBeginQueryEXT", "target does not match");
     return error::kNoError;
@@ -11670,10 +11718,13 @@ error::Error GLES2DecoderImpl::HandleBeginQueryEXT(uint32 immediate_data_size,
   }
 
   if (!query_manager_->BeginQuery(query)) {
+#if defined(OS_MACOSX)
+    // TODO(dyen): Remove once we know what is failing.
+    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Out of bounds";
+#endif
     return error::kOutOfBounds;
   }
 
-  state_.current_queries[target] = query;
   return error::kNoError;
 }
 
@@ -11683,22 +11734,28 @@ error::Error GLES2DecoderImpl::HandleEndQueryEXT(uint32 immediate_data_size,
       *static_cast<const gles2::cmds::EndQueryEXT*>(cmd_data);
   GLenum target = static_cast<GLenum>(c.target);
   uint32 submit_count = static_cast<GLuint>(c.submit_count);
-  ContextState::QueryMap::iterator it = state_.current_queries.find(target);
 
-  if (it == state_.current_queries.end()) {
+  QueryManager::Query* query = query_manager_->GetActiveQuery(target);
+  if (!query) {
+#if defined(OS_MACOSX)
+    // TODO(dyen): Remove once we know what is failing.
+    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Target not active";
+#endif
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION, "glEndQueryEXT", "No active query");
     return error::kNoError;
   }
 
-  QueryManager::Query* query = it->second.get();
   if (!query_manager_->EndQuery(query, submit_count)) {
+#if defined(OS_MACOSX)
+    // TODO(dyen): Remove once we know what is failing.
+    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Out of bounds";
+#endif
     return error::kOutOfBounds;
   }
 
   query_manager_->ProcessPendingTransferQueries();
 
-  state_.current_queries.erase(it);
   return error::kNoError;
 }
 
@@ -11965,6 +12022,11 @@ static GLenum ExtractFormatFromStorageFormat(GLenum internalformat) {
     case GL_RG32UI:
     case GL_RG32I:
       return GL_RG_INTEGER;
+    case GL_ATC_RGB_AMD:
+    case GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG:
+    case GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG:
+    case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
+    case GL_ETC1_RGB8_OES:
     case GL_RGB8:
     case GL_R11F_G11F_B10F:
     case GL_RGB565:
@@ -11980,6 +12042,13 @@ static GLenum ExtractFormatFromStorageFormat(GLenum internalformat) {
     case GL_RGB32UI:
     case GL_RGB32I:
       return GL_RGB_INTEGER;
+    case GL_ATC_RGBA_EXPLICIT_ALPHA_AMD:
+    case GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD:
+    case GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG:
+    case GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG:
+    case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
+    case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
+    case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
     case GL_RGBA8:
     case GL_SRGB8_ALPHA8:
     case GL_RGBA8_SNORM:
@@ -12837,12 +12906,22 @@ void GLES2DecoderImpl::DoTexStorage2DEXT(
   if (error == GL_NO_ERROR) {
     GLsizei level_width = width;
     GLsizei level_height = height;
+
+    GLenum cur_format = feature_info_->IsES3Enabled() ?
+                        internal_format : format;
     for (int ii = 0; ii < levels; ++ii) {
-      GLenum cur_format = feature_info_->IsES3Enabled() ?
-          internal_format : format;
-      texture_manager()->SetLevelInfo(texture_ref, target, ii, cur_format,
-                                      level_width, level_height, 1, 0, format,
-                                      type, gfx::Rect());
+      if (target == GL_TEXTURE_CUBE_MAP) {
+        for (int jj = 0; jj < 6; ++jj) {
+          GLenum face = GL_TEXTURE_CUBE_MAP_POSITIVE_X + jj;
+          texture_manager()->SetLevelInfo(texture_ref, face, ii, cur_format,
+                                          level_width, level_height, 1, 0,
+                                          format, type, gfx::Rect());
+        }
+      } else {
+        texture_manager()->SetLevelInfo(texture_ref, target, ii, cur_format,
+                                        level_width, level_height, 1, 0,
+                                        format, type, gfx::Rect());
+      }
       level_width = std::max(1, level_width >> 1);
       level_height = std::max(1, level_height >> 1);
     }
@@ -13134,19 +13213,10 @@ void GLES2DecoderImpl::DoInsertEventMarkerEXT(
 }
 
 void GLES2DecoderImpl::DoPushGroupMarkerEXT(
-    GLsizei length, const GLchar* marker) {
-  if (!marker) {
-    marker = "";
-  }
-  std::string name = length ? std::string(marker, length) : std::string(marker);
-  debug_marker_manager_.PushGroup(name);
-  gpu_tracer_->Begin(TRACE_DISABLED_BY_DEFAULT("gpu_group_marker"), name,
-                     kTraceGroupMarker);
+    GLsizei /*length*/, const GLchar* /*marker*/) {
 }
 
 void GLES2DecoderImpl::DoPopGroupMarkerEXT(void) {
-  debug_marker_manager_.PopGroup();
-  gpu_tracer_->End(kTraceGroupMarker);
 }
 
 void GLES2DecoderImpl::DoBindTexImage2DCHROMIUM(
@@ -13255,6 +13325,7 @@ error::Error GLES2DecoderImpl::HandleTraceBeginCHROMIUM(
     return error::kInvalidArguments;
   }
 
+  debug_marker_manager_.PushGroup(trace_name);
   if (!gpu_tracer_->Begin(category_name, trace_name, kTraceCHROMIUM)) {
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION,
@@ -13265,6 +13336,7 @@ error::Error GLES2DecoderImpl::HandleTraceBeginCHROMIUM(
 }
 
 void GLES2DecoderImpl::DoTraceEndCHROMIUM() {
+  debug_marker_manager_.PopGroup();
   if (!gpu_tracer_->End(kTraceCHROMIUM)) {
     LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
                        "glTraceEndCHROMIUM", "no trace begin found");

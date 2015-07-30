@@ -50,11 +50,13 @@ enum {
   DIR_USER_APPLICATIONS,        // ~/Applications
   DIR_USER_LIBRARY,             // ~/Library
 #endif
-#if defined(OS_CHROMEOS) || (defined(OS_MACOSX) && !defined(OS_IOS))
+#if defined(OS_CHROMEOS) || (defined(OS_LINUX) && defined(CHROMIUM_BUILD)) || \
+    (defined(OS_MACOSX) && !defined(OS_IOS))
   DIR_USER_EXTERNAL_EXTENSIONS,  // Directory for per-user external extensions
-                                 // on Chrome Mac.  On Chrome OS, this path is
-                                 // used for OEM customization.
-                                 // Getting this path does not create it.
+                                 // on Chrome Mac and Chromium Linux.
+                                 // On Chrome OS, this path is used for OEM
+                                 // customization. Getting this path does not
+                                 // create it.
 #endif
 
 #if defined(OS_LINUX)
@@ -72,9 +74,6 @@ enum {
   DIR_COMPONENT_UPDATED_PEPPER_FLASH_PLUGIN,  // Base directory of the Pepper
                                               // Flash plugins downloaded by the
                                               // component updater.
-  DIR_PEPPER_FLASH_SYSTEM_PLUGIN,  // Base directory of the system version of
-                                   // the Pepper Flash plugin, downloadable
-                                   // from Adobe website.
   FILE_RESOURCE_MODULE,         // Full path and filename of the module that
                                 // contains embedded resources (version,
                                 // strings, images, etc.).
@@ -83,12 +82,16 @@ enum {
   FILE_RECORDED_SCRIPT,         // Full path to the script.log file that
                                 // contains recorded browser events for
                                 // playback.
-  FILE_FLASH_PLUGIN,            // Full path to the internal NPAPI Flash plugin
-                                // file. Querying this path will succeed no
-                                // matter the file exists or not.
   FILE_PEPPER_FLASH_PLUGIN,     // Full path to the bundled Pepper Flash plugin
                                 // file.
-
+  FILE_PEPPER_FLASH_SYSTEM_PLUGIN,  // Full path to the system version of the
+                                    // Pepper Flash plugin, downloadable from
+                                    // Adobe website. Querying this path might
+                                    // succeed no matter the file exists or not.
+  FILE_FLASH_SYSTEM_PLUGIN,     // Full path to the system version of NPAPI
+                                // Flash plugin, downloadable from Adobe
+                                // website. Querying this path might succeed no
+                                // matter the file exists or not.
   FILE_NACL_PLUGIN,             // Full path to the internal NaCl plugin file.
   DIR_PNACL_BASE,               // Full path to the base dir for PNaCl.
   DIR_PNACL_COMPONENT,          // Full path to the latest PNaCl version

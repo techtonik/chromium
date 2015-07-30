@@ -9,6 +9,7 @@
 
 #include <pango/pango.h>
 #include <X11/Xlib.h>
+#include <gio/gio.h>
 
 #include "base/command_line.h"
 #include "base/debug/leak_annotations.h"
@@ -45,12 +46,14 @@
 #include "third_party/skia/include/core/SkShader.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/gfx/canvas.h"
+#include "ui/gfx/display.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/image/image.h"
 #include "ui/gfx/skbitmap_operations.h"
 #include "ui/gfx/skia_util.h"
 #include "ui/gfx/x/x11_types.h"
+#include "ui/native_theme/native_theme.h"
 #include "ui/resources/grit/ui_resources.h"
 #include "ui/views/controls/button/label_button.h"
 #include "ui/views/controls/button/label_button_border.h"
@@ -423,6 +426,21 @@ views::LinuxUI::NonClientMiddleClickAction GetDefaultMiddleClickAction() {
     default:
       return views::LinuxUI::MIDDLE_CLICK_ACTION_LOWER;
   }
+}
+
+double GetGnomeTextScalingFactor() {
+  const char kDesktopInterfaceSchema[] = "org.gnome.desktop.interface";
+  for (const gchar* const* schemas = g_settings_list_schemas(); *schemas;
+       schemas++) {
+    if (!strcmp(kDesktopInterfaceSchema, static_cast<const char*>(*schemas))) {
+      GSettings* settings = g_settings_new(kDesktopInterfaceSchema);
+      double scale = g_settings_get_double(settings, "text-scaling-factor");
+      g_object_unref(settings);
+      return scale;
+    }
+  }
+  // Fallback if the schema does not exist.
+  return GetFontDPI() / GetBaseDPI();
 }
 
 }  // namespace
@@ -979,6 +997,13 @@ void Gtk2UI::LoadGtkValues() {
       GdkColorToSkColor(entry_style->base[GTK_STATE_ACTIVE]);
   inactive_selection_fg_color_ =
       GdkColorToSkColor(entry_style->text[GTK_STATE_ACTIVE]);
+
+  colors_[ThemeProperties::COLOR_THROBBER_SPINNING] =
+      NativeThemeGtk2::instance()->GetSystemColor(
+          ui::NativeTheme::kColorId_ThrobberSpinningColor);
+  colors_[ThemeProperties::COLOR_THROBBER_WAITING] =
+      NativeThemeGtk2::instance()->GetSystemColor(
+          ui::NativeTheme::kColorId_ThrobberWaitingColor);
 }
 
 GdkColor Gtk2UI::BuildFrameColors(GtkStyle* frame_style) {
@@ -1389,8 +1414,9 @@ void Gtk2UI::UpdateDefaultFont(const PangoFontDescription* desc) {
   // Use gfx::FontRenderParams to select a family and determine the rendering
   // settings.
   gfx::FontRenderParamsQuery query;
-  base::SplitString(pango_font_description_get_family(desc), ',',
-                    &query.families);
+  query.families = base::SplitString(pango_font_description_get_family(desc),
+                                     ",", base::TRIM_WHITESPACE,
+                                     base::SPLIT_WANT_ALL);
 
   if (pango_font_description_get_size_is_absolute(desc)) {
     // If the size is absolute, it's specified in Pango units. There are
@@ -1434,9 +1460,14 @@ void Gtk2UI::UpdateDeviceScaleFactor(float device_scale_factor) {
 }
 
 float Gtk2UI::GetDeviceScaleFactor() const {
-  float scale = GetFontDPI() / GetBaseDPI();
-  // Round to 1 decimal, e.g. to 1.4.
-  return roundf(scale * 10) / 10;
+  if (gfx::Display::HasForceDeviceScaleFactor())
+    return gfx::Display::GetForcedDeviceScaleFactor();
+  // Linux chrome does not support dynamnic scale factor change. Use the
+  // value obtanied during startup. The value is rounded to 1 decimal, e.g.
+  // to 1.4, for safety.
+  static float device_scale_factor =
+      roundf(GetGnomeTextScalingFactor() * 10) / 10;
+  return device_scale_factor;
 }
 
 }  // namespace libgtk2ui

@@ -4,7 +4,6 @@
 
 #include "components/guest_view/browser/guest_view_base.h"
 
-#include "base/command_line.h"
 #include "base/lazy_instance.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/guest_view/browser/guest_view_event.h"
@@ -19,7 +18,7 @@
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
-#include "content/public/common/content_switches.h"
+#include "content/public/common/browser_plugin_guest_mode.h"
 #include "content/public/common/page_zoom.h"
 #include "content/public/common/url_constants.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
@@ -76,11 +75,6 @@ class GuestViewBase::OwnerContentsObserver : public WebContentsObserver {
   void RenderProcessGone(base::TerminationStatus status) override {
     if (destroyed_)
       return;
-
-    GuestViewManager::FromBrowserContext(web_contents()->GetBrowserContext())
-        ->EmbedderWillBeDestroyed(
-            web_contents()->GetRenderProcessHost()->GetID());
-
     // If the embedder process is destroyed, then destroy the guest.
     Destroy();
   }
@@ -322,7 +316,9 @@ void GuestViewBase::SetSize(const SetSizeParams& params) {
 }
 
 // static
-void GuestViewBase::CleanUp(int embedder_process_id, int view_instance_id) {
+void GuestViewBase::CleanUp(content::BrowserContext* browser_context,
+                            int embedder_process_id,
+                            int view_instance_id) {
   // TODO(paulmeyer): Add in any general GuestView cleanup work here.
 }
 
@@ -560,8 +556,7 @@ void GuestViewBase::DidNavigateMainFrame(
   // TODO(lazyboy): This breaks guest visibility in --site-per-process because
   // we do not take the widget's visibility into account.  We need to also
   // stay hidden during "visibility:none" state.
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess)) {
+  if (content::BrowserPluginGuestMode::UseCrossProcessFramesForGuests()) {
     web_contents()->WasShown();
   }
 }

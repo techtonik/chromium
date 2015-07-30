@@ -198,20 +198,11 @@ static base::LazyInstance<WebViewKeyToIDMap> web_view_key_to_id_map =
 }  // namespace
 
 // static
-void WebViewGuest::CleanUp(int embedder_process_id, int view_instance_id) {
-  GuestViewBase::CleanUp(embedder_process_id, view_instance_id);
-
-  auto rph = content::RenderProcessHost::FromID(embedder_process_id);
-  // TODO(paulmeyer): It should be impossible for rph to be nullptr here, but
-  // this check is needed here for now as there seems to be occasional crashes
-  // because of this (http//crbug.com/499438). This should be removed once the
-  // cause is discovered and fixed.
-  DCHECK(rph != nullptr)
-      << "Cannot find RenderProcessHost for embedder process ID# "
-      << embedder_process_id;
-  if (rph == nullptr)
-    return;
-  auto browser_context = rph->GetBrowserContext();
+void WebViewGuest::CleanUp(content::BrowserContext* browser_context,
+                           int embedder_process_id,
+                           int view_instance_id) {
+  GuestViewBase::CleanUp(browser_context, embedder_process_id,
+                         view_instance_id);
 
   // Clean up rules registries for the WebView.
   WebViewKey key(embedder_process_id, view_instance_id);
@@ -219,8 +210,10 @@ void WebViewGuest::CleanUp(int embedder_process_id, int view_instance_id) {
   if (it != web_view_key_to_id_map.Get().end()) {
     auto rules_registry_id = it->second;
     web_view_key_to_id_map.Get().erase(it);
-    RulesRegistryService::Get(browser_context)
-        ->RemoveRulesRegistriesByID(rules_registry_id);
+    RulesRegistryService* rrs =
+        RulesRegistryService::GetIfExists(browser_context);
+    if (rrs)
+      rrs->RemoveRulesRegistriesByID(rules_registry_id);
   }
 
   // Clean up web request event listeners for the WebView.
@@ -804,6 +797,10 @@ void WebViewGuest::DidFailProvisionalLoad(
     int error_code,
     const base::string16& error_description,
     bool was_ignored_by_handler) {
+  // Suppress loadabort for "mailto" URLs.
+  if (validated_url.SchemeIs(url::kMailToScheme))
+    return;
+
   LoadAbort(!render_frame_host->GetParent(), validated_url, error_code,
             net::ErrorToShortString(error_code));
 }
@@ -1232,21 +1229,24 @@ content::WebContents* WebViewGuest::OpenURLFromTab(
         owner_web_contents(), params);
   }
 
-  // If the guest wishes to navigate away prior to attachment then we save the
-  // navigation to perform upon attachment. Navigation initializes a lot of
-  // state that assumes an embedder exists, such as RenderWidgetHostViewGuest.
-  // Navigation also resumes resource loading which we don't want to allow
-  // until attachment.
   if (!attached()) {
     WebViewGuest* opener = GetOpener();
-    auto it = opener->pending_new_windows_.find(this);
-    if (it == opener->pending_new_windows_.end())
+    // If the guest wishes to navigate away prior to attachment then we save the
+    // navigation to perform upon attachment. Navigation initializes a lot of
+    // state that assumes an embedder exists, such as RenderWidgetHostViewGuest.
+    // Navigation also resumes resource loading. If we were created using
+    // newwindow (i.e. we have an opener), we don't allow navigation until
+    // attachment.
+    if (opener) {
+      auto it = opener->pending_new_windows_.find(this);
+      if (it == opener->pending_new_windows_.end())
+        return nullptr;
+      const NewWindowInfo& info = it->second;
+      NewWindowInfo new_window_info(params.url, info.name);
+      new_window_info.changed = new_window_info.url != info.url;
+      it->second = new_window_info;
       return nullptr;
-    const NewWindowInfo& info = it->second;
-    NewWindowInfo new_window_info(params.url, info.name);
-    new_window_info.changed = new_window_info.url != info.url;
-    it->second = new_window_info;
-    return nullptr;
+    }
   }
 
   // This code path is taken if RenderFrameImpl::DecidePolicyForNavigation

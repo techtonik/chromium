@@ -1,0 +1,148 @@
+/* Copyright 2015 The Chromium Authors. All rights reserved.
+ * Use of this source code is governed by a BSD-style license that can be
+ * found in the LICENSE file. */
+
+:host {
+  @apply(--downloads-shared-style);
+  display: flex;
+  margin: 32px 0;
+}
+
+:host([hide-date]) {
+  margin-top: -16px;
+}
+
+/* Day separators. */
+:host(:not(:first-of-type):not([hide-date])) :-webkit-any(#content-wrapper,
+                                                          #since) {
+  border-top: 1px solid rgba(0, 0, 0, .2);  /* TODO(dbeam): real color. */
+  padding-top: 32px;
+}
+
+#date-container,
+#end-cap {
+  flex: 1 0 var(--downloads-side-column-basis);
+}
+
+#date-container > * {
+  -webkit-margin-start: 24px;
+  color: #616161;
+  font-size: 107.69%;
+  font-weight: bold;
+}
+
+:host([hide-date]) #date-container {
+  visibility: hidden;
+}
+
+#content {
+  background: white;
+  border-radius: 2px;  /* TODO(dbeam): why does this differ from Polymer? */
+  display: flex;
+  flex: none;
+  width: var(--downloads-item-width);
+}
+
+#content.no-file {
+  background: rgba(255, 255, 255, .5);
+}
+
+.no-file .icon-wrapper:not(#remove-wrapper),
+.no-file #details {
+  opacity: .5;
+}
+
+#details {
+  -webkit-border-start: 1px #d8d8d8 solid;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 16px 16px 12px 16px;
+}
+
+.icon-wrapper {
+  align-self: center;
+  flex: none;
+  justify-content: center;
+  margin: 0 32px;
+}
+
+#icon {
+  height: 32px;
+  width: 32px;
+}
+
+#name,
+#file-link,
+#url {
+  max-width: 100%;
+}
+
+#name,
+#file-link {
+  word-break: break-all;
+}
+
+#name {
+  -webkit-margin-end: 12px;  /* Only really affects #tag. */
+  color: #212121;
+  font-weight: bold;
+}
+
+.dangerous #name {
+  color: rgb(35, 114, 236);
+}
+
+#tag {
+  color: #6f6f6f;
+  font-size: 92.307%;
+  font-weight: bold;
+}
+
+#url {
+  color: rgb(88, 152, 251);
+  margin-top: 6px;
+  overflow: hidden;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#progress,
+#description:not(:empty),
+.controls {
+  margin-top: 16px;
+}
+
+#description {
+  color: #616161;
+}
+
+.dangerous #description {
+  color: rgb(217, 84, 61);
+}
+
+#progress {
+  --paper-progress-active-color: rgb(54, 126, 237);
+  --paper-progress-container-color: rgb(223, 222, 223);
+  width: auto;
+}
+
+/* TODO(dbeam): open up a CSS mixin instead in Polymer. */
+#progress /deep/ #progressContainer {
+  border-radius: 2px;
+}
+
+#remove-wrapper {
+  align-self: flex-start;
+  margin: 0;
+}
+
+#remove {
+  --paper-icon-button: {
+    height: 16px;
+    width: 16px;
+  };
+  --iron-icon-height: 16px;
+  --iron-icon-width: 16px;
+}

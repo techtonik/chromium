@@ -236,28 +236,11 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
   this.savedLabel_ = queryRequiredElement(this.options_, '.saved');
 
   /**
-   * @type {!HTMLElement}
-   * @private
+   * @private {!FilesToast}
    * @const
    */
-  this.overwriteOriginalBox_ = queryRequiredElement(
-      this.options_, '.overwrite-original');
-
-  /**
-   * @type {!HTMLElement}
-   * @private
-   * @const
-   */
-  this.overwriteOriginal_ = queryRequiredElement(
-      this.overwriteOriginalBox_, '#overwrite-checkbox')
-  chrome.storage.local.get(SlideMode.OVERWRITE_KEY, function(values) {
-    var value = values[SlideMode.OVERWRITE_KEY];
-    // Out-of-the box default is 'true'
-    this.overwriteOriginal_.checked =
-        (value === 'false' || value === false) ? false : true;
-  }.bind(this));
-  this.overwriteOriginal_.addEventListener('click',
-      this.onOverwriteOriginalClick_.bind(this));
+  this.filesToast_ = /** @type {!FilesToast} */
+      (queryRequiredElement(document, 'files-toast'));
 
   /**
    * @type {!HTMLElement}
@@ -303,8 +286,6 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
       this.advanceManually.bind(this, -1));
   util.createChild(this.arrowLeft_);
 
-  util.createChild(this.arrowBox_, 'arrow-spacer');
-
   /**
    * @type {!HTMLElement}
    * @private
@@ -329,8 +310,8 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @private
    * @const
    */
-  this.ribbon_ = new Ribbon(
-      this.document_, this.dataModel_, this.selectionModel_, thumbnailModel);
+  this.ribbon_ = new Ribbon(this.document_, window, this.dataModel_,
+      this.selectionModel_, thumbnailModel);
   this.ribbonSpacer_.appendChild(this.ribbon_);
 
   util.createChild(this.container_, 'spinner');
@@ -340,7 +321,7 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @const
    */
   var slideShowButton = queryRequiredElement(this.topToolbar_,
-      '.button.slideshow');
+      'paper-button.slideshow');
   slideShowButton.addEventListener('click',
       this.startSlideshow.bind(this, SlideMode.SLIDESHOW_INTERVAL_FIRST));
 
@@ -361,15 +342,23 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @private
    * @const
    */
-  this.editButton_ = queryRequiredElement(this.topToolbar_, '.button.edit');
+  this.editButton_ = queryRequiredElement(this.topToolbar_, 'button.edit');
   this.editButton_.addEventListener('click', this.toggleEditor.bind(this));
+
+  /**
+   * @private {!FilesToggleRipple}
+   * @const
+   */
+  this.editButtonToggleRipple_ = /** @type {!FilesToggleRipple} */
+      (assert(this.editButton_.querySelector('files-toggle-ripple')));
 
   /**
    * @type {!HTMLElement}
    * @private
    * @const
    */
-  this.printButton_ = queryRequiredElement(this.topToolbar_, '.button.print');
+  this.printButton_ = queryRequiredElement(
+      this.topToolbar_, 'paper-button.print');
   this.printButton_.addEventListener('click', this.print_.bind(this));
 
   /**
@@ -410,6 +399,7 @@ function SlideMode(container, content, topToolbar, bottomToolbar, prompt,
    * @const
    */
   this.viewport_ = new Viewport(window);
+  this.viewport_.addEventListener('resize', this.onViewportResize_.bind(this));
 
   /**
    * @type {!ImageView}
@@ -996,15 +986,8 @@ SlideMode.prototype.itemLoaded_ = function(
     this.printButton_.disabled = false;
   }
 
-  // For once edited image, disallow the 'overwrite' setting change.
-  ImageUtil.setAttribute(this.overwriteOriginalBox_, 'disabled',
-      !this.getSelectedItem().isOriginal() ||
-      FileType.isRaw(item.getEntry()) ||
-      GalleryUtil.isOnMTPVolume(item.getEntry(), this.volumeManager_));
-
   var keys = {};
   keys[SlideMode.OVERWRITE_BUBBLE_KEY] = 0;
-  keys[SlideMode.OVERWRITE_KEY] = true;
   chrome.storage.local.get(keys,
       function(values) {
         var times = values[SlideMode.OVERWRITE_BUBBLE_KEY];
@@ -1016,10 +999,6 @@ SlideMode.prototype.itemLoaded_ = function(
             chrome.storage.local.set(items);
           }
         }
-        if (FileType.isRaw(item.getEntry()))
-          this.overwriteOriginal_.checked = false;
-        else
-          this.overwriteOriginal_.checked = values[SlideMode.OVERWRITE_KEY];
       }.bind(this));
 
   loadCallback(loadType, delay);
@@ -1124,12 +1103,12 @@ SlideMode.prototype.onKeyDown = function(event) {
     case 'Ctrl-U+0050':  // Ctrl+'p' prints the current image.
       if (!this.printButton_.disabled)
         this.print_();
-      break;
+      return true;
 
     case 'U+0045':  // 'e' toggles the editor.
       if (!this.editButton_.disabled)
         this.toggleEditor(event);
-      break;
+      return true;
 
     case 'U+001B':  // Escape
       if (this.isEditing()) {
@@ -1141,14 +1120,14 @@ SlideMode.prototype.onKeyDown = function(event) {
       } else {
         return false;  // Not handled.
       }
-      break;
+      return true;
 
     case 'Home':
       this.selectFirst();
-      break;
+      return true;
     case 'End':
       this.selectLast();
-      break;
+      return true;
     case 'Up':
     case 'Down':
     case 'Left':
@@ -1165,11 +1144,11 @@ SlideMode.prototype.onKeyDown = function(event) {
       } else {
         this.advanceWithKeyboard(keyID);
       }
-      break;
+      return true;
     case 'MediaNextTrack':
     case 'MediaPreviousTrack':
       this.advanceWithKeyboard(keyID);
-      break;
+      return true;
 
     case 'Ctrl-U+00BB':  // Ctrl+'=' zoom in.
       if (!this.isEditing()) {
@@ -1177,7 +1156,7 @@ SlideMode.prototype.onKeyDown = function(event) {
         this.touchHandlers_.stopOperation();
         this.imageView_.applyViewportChange();
       }
-      break;
+      return true;
 
     case 'Ctrl-U+00BD':  // Ctrl+'-' zoom out.
       if (!this.isEditing()) {
@@ -1185,7 +1164,7 @@ SlideMode.prototype.onKeyDown = function(event) {
         this.touchHandlers_.stopOperation();
         this.imageView_.applyViewportChange();
       }
-      break;
+      return true;
 
     case 'Ctrl-U+0030': // Ctrl+'0' zoom reset.
       if (!this.isEditing()) {
@@ -1193,10 +1172,10 @@ SlideMode.prototype.onKeyDown = function(event) {
         this.touchHandlers_.stopOperation();
         this.imageView_.applyViewportChange();
       }
-      break;
+      return true;
   }
 
-  return true;
+  return false;
 };
 
 /**
@@ -1205,6 +1184,14 @@ SlideMode.prototype.onKeyDown = function(event) {
  */
 SlideMode.prototype.onResize_ = function() {
   this.touchHandlers_.stopOperation();
+};
+
+/**
+ * Handles resize event of viewport.
+ * @private
+ */
+SlideMode.prototype.onViewportResize_ = function() {
+  // This method must be called after the resize of viewport.
   this.editor_.getBuffer().draw();
 };
 
@@ -1232,20 +1219,11 @@ SlideMode.prototype.saveCurrentImage_ = function(item, callback) {
   var savedPromise = this.dataModel_.saveItem(
       this.volumeManager_,
       item,
-      this.imageView_.getCanvas(),
-      this.shouldOverwriteOriginal_());
+      this.imageView_.getCanvas());
 
   savedPromise.then(function() {
     this.showSpinner_(false);
     this.flashSavedLabel_();
-
-    // Allow changing the 'Overwrite original' setting only if the user
-    // used Undo to restore the original image AND it is not a copy.
-    // Otherwise lock the setting in its current state.
-    var mayChangeOverwrite = !this.editor_.canUndo() && item.isOriginal() &&
-        !FileType.isRaw(item.getEntry());
-    ImageUtil.setAttribute(
-        this.overwriteOriginalBox_, 'disabled', !mayChangeOverwrite);
 
     // Record UMA for the first edit.
     if (this.imageView_.getContentRevision() === 1)
@@ -1274,12 +1252,6 @@ SlideMode.prototype.flashSavedLabel_ = function() {
 };
 
 /**
- * Local storage key for the 'Overwrite original' setting.
- * @type {string}
- */
-SlideMode.OVERWRITE_KEY = 'gallery-overwrite-original';
-
-/**
  * Local storage key for the number of times that
  * the overwrite info bubble has been displayed.
  * @type {string}
@@ -1291,25 +1263,6 @@ SlideMode.OVERWRITE_BUBBLE_KEY = 'gallery-overwrite-bubble';
  * @type {number}
  */
 SlideMode.OVERWRITE_BUBBLE_MAX_TIMES = 5;
-
-/**
- * @return {boolean} True if 'Overwrite original' is set.
- * @private
- */
-SlideMode.prototype.shouldOverwriteOriginal_ = function() {
-  return this.overwriteOriginal_.checked;
-};
-
-/**
- * 'Overwrite original' checkbox handler.
- * @param {!Event} event Event.
- * @private
- */
-SlideMode.prototype.onOverwriteOriginalClick_ = function(event) {
-  var items = {};
-  items[SlideMode.OVERWRITE_KEY] = event.target.checked;
-  chrome.storage.local.set(items);
-};
 
 /**
  * Overwrite info bubble close handler.
@@ -1517,15 +1470,30 @@ SlideMode.prototype.toggleEditor = function(opt_event) {
   this.stopSlideshow_();
 
   ImageUtil.setAttribute(this.container_, 'editing', !this.isEditing());
+  this.editButtonToggleRipple_.activated = this.isEditing();
 
   if (this.isEditing()) { // isEditing has just been flipped to a new value.
     // Reset zoom.
     this.viewport_.resetView();
     this.imageView_.applyViewportChange();
+
+    // TODO(yawano): Integarate this warning message to the non writable format
+    //     warning message.
     if (this.context_.readonlyDirName) {
       this.editor_.getPrompt().showAt(
           'top', 'GALLERY_READONLY_WARNING', 0, this.context_.readonlyDirName);
+    } else {
+      // If image format is not writable format, show toast to let user know
+      // that edits will be saved to a copy.
+      var item = this.getItem(this.getSelectedIndex());
+      if (!item.isWritableFormat()) {
+        item.getCopyName().then(function(copyName) {
+          this.filesToast_.show(
+              strf('GALLERY_NON_WRITABLE_FORMAT_WARNING', copyName));
+        }.bind(this));
+      }
     }
+
     this.touchHandlers_.enabled = false;
   } else {
     this.editor_.getPrompt().hide();

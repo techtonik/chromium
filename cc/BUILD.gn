@@ -509,6 +509,8 @@ component("cc") {
     ]
   }
 
+  configs += [ "//build/config:precompiled_headers" ]
+
   public_deps = [
     "//cc/base",
     "//skia",
@@ -662,6 +664,7 @@ source_set("test_support") {
     "test/test_web_graphics_context_3d.h",
   ]
 
+  configs += [ "//build/config:precompiled_headers" ]
   include_dirs = [
     ".",
     "test",
@@ -694,6 +697,15 @@ source_set("test_support") {
   if (!is_android) {  # TODO(GYP) Enable on Android when osmesa links.
     deps += [ "//third_party/mesa:osmesa" ]
   }
+}
+
+# TODO(GYP): Delete this after we've converted everything to GN.
+# The _run targets exist only for compatibility w/ GYP.
+group("cc_unittests_run") {
+  testonly = true
+  deps = [
+    ":cc_unittests",
+  ]
 }
 
 test("cc_unittests") {
@@ -781,6 +793,7 @@ test("cc_unittests") {
     "raster/texture_compressor_etc1_unittest.cc",
     "raster/tile_task_worker_pool_unittest.cc",
     "resources/platform_color_unittest.cc",
+    "resources/resource_pool_unittest.cc",
     "resources/resource_provider_unittest.cc",
     "resources/scoped_resource_unittest.cc",
     "resources/video_resource_updater_unittest.cc",
@@ -835,6 +848,11 @@ test("cc_unittests") {
     "test/run_all_unittests.cc",
   ]
 
+  configs += [ "//build/config:precompiled_headers" ]
+  data = [
+    "test/data/",
+  ]
+
   deps = [
     ":cc",
     ":test_support",
@@ -855,6 +873,8 @@ test("cc_unittests") {
     "//ui/gl",
     "//ui/gl:test_support",
   ]
+
+  data_deps = [ "//third_party/mesa:osmesa" ]
 }
 
 test("cc_perftests") {

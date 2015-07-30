@@ -15,8 +15,8 @@
 #include "content/browser/frame_host/render_frame_host_manager.h"
 #include "content/common/content_export.h"
 #include "content/common/frame_replication_state.h"
-#include "url/deprecated_serialized_origin.h"
 #include "url/gurl.h"
+#include "url/origin.h"
 
 namespace content {
 
@@ -111,12 +111,17 @@ class CONTENT_EXPORT FrameTreeNode {
     return current_url_;
   }
 
-  void set_current_url(const GURL& url) {
-    current_url_ = url;
+  // Sets the last committed URL for this frame and updates
+  // has_committed_real_load accordingly.
+  void SetCurrentURL(const GURL& url);
+
+  // Returns true iff SetCurrentURL has been called with a non-blank URL.
+  bool has_committed_real_load() const {
+    return has_committed_real_load_;
   }
 
   // Set the current origin and notify proxies about the update.
-  void SetCurrentOrigin(const url::DeprecatedSerializedOrigin& origin);
+  void SetCurrentOrigin(const url::Origin& origin);
 
   // Set the current name and notify proxies about the update.
   void SetFrameName(const std::string& name);
@@ -134,7 +139,8 @@ class CONTENT_EXPORT FrameTreeNode {
   bool CommitPendingSandboxFlags();
 
   bool HasSameOrigin(const FrameTreeNode& node) const {
-    return replication_state_.origin.IsSameAs(node.replication_state_.origin);
+    return replication_state_.origin.IsSameOriginWith(
+        node.replication_state_.origin);
   }
 
   const FrameReplicationState& current_replication_state() const {
@@ -241,11 +247,14 @@ class CONTENT_EXPORT FrameTreeNode {
   // The immediate children of this specific frame.
   ScopedVector<FrameTreeNode> children_;
 
-  // Track the current frame's last committed URL, so we can estimate the
-  // process impact of out-of-process iframes.
-  // TODO(creis): Remove this when we can store subframe URLs in the
-  // NavigationController.
+  // Track the current frame's last committed URL.
+  // TODO(creis): Consider storing a reference to the last committed
+  // FrameNavigationEntry here once those are created in all modes.
   GURL current_url_;
+
+  // Whether this frame has committed any real load, replacing its initial
+  // about:blank page.
+  bool has_committed_real_load_;
 
   // Track information that needs to be replicated to processes that have
   // proxies for this frame.

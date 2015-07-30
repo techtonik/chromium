@@ -31,9 +31,9 @@ class OmniboxEditController {
                             WindowOpenDisposition disposition,
                             ui::PageTransition transition);
 
-  // Updates the controller, and, if |contents| is non-NULL, restores saved
-  // state that the tab holds.
-  virtual void Update(const content::WebContents* contents) = 0;
+  // Called when the the controller should update itself without restoring any
+  // tab state.
+  virtual void UpdateWithoutTabRestore() = 0;
 
   // Called when anything has changed that might affect the layout or contents
   // of the views around the edit, including the text of the edit and the
@@ -52,11 +52,13 @@ class OmniboxEditController {
   virtual ToolbarModel* GetToolbarModel() = 0;
   virtual const ToolbarModel* GetToolbarModel() const = 0;
 
+  CommandUpdater* command_updater() { return command_updater_; }
+  const CommandUpdater* command_updater() const { return command_updater_; }
+
  protected:
   explicit OmniboxEditController(CommandUpdater* command_updater);
   virtual ~OmniboxEditController();
 
-  CommandUpdater* command_updater() { return command_updater_; }
   GURL destination_url() const { return destination_url_; }
   WindowOpenDisposition disposition() const { return disposition_; }
   ui::PageTransition transition() const { return transition_; }

@@ -21,6 +21,7 @@
 #include "chrome/installer/setup/install_worker.h"
 #include "chrome/installer/setup/setup_constants.h"
 #include "chrome/installer/util/browser_distribution.h"
+#include "chrome/installer/util/install_util.h"
 #include "chrome/installer/util/installer_state.h"
 #include "chrome/installer/util/master_preferences.h"
 #include "chrome/installer/util/master_preferences_constants.h"
@@ -87,7 +88,8 @@ class InstallShortcutTest : public testing::Test {
     expected_properties_.set_description(chrome_properties.description);
     expected_properties_.set_dual_mode(false);
     expected_start_menu_properties_ = expected_properties_;
-    expected_start_menu_properties_.set_dual_mode(true);
+    expected_start_menu_properties_.set_dual_mode(
+        InstallUtil::ShouldInstallMetroProperties());
 
     prefs_.reset(GetFakeMasterPrefs(false, false, false));
 
@@ -142,8 +144,10 @@ class InstallShortcutTest : public testing::Test {
   void TearDown() override {
     // Try to unpin potentially pinned shortcuts (although pinning isn't tested,
     // the call itself might still have pinned the Start Menu shortcuts).
-    base::win::TaskbarUnpinShortcutLink(user_start_menu_shortcut_);
-    base::win::TaskbarUnpinShortcutLink(system_start_menu_shortcut_);
+    base::win::UnpinShortcutFromTaskbar(user_start_menu_shortcut_);
+    base::win::UnpinShortcutFromTaskbar(system_start_menu_shortcut_);
+    base::win::UnpinShortcutFromStart(user_start_menu_shortcut_);
+    base::win::UnpinShortcutFromStart(system_start_menu_shortcut_);
     CoUninitialize();
   }
 

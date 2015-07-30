@@ -19,6 +19,7 @@ source_set("ui") {
   libs = []
 
   configs += [
+    "//build/config:precompiled_headers",
     "//build/config/compiler:wexit_time_destructors",
     "//third_party/WebKit/public:debug_devtools",
   ]
@@ -61,7 +62,6 @@ source_set("ui") {
     "//skia",
     "//third_party/cacheinvalidation",
     "//third_party/icu",
-    "//third_party/libxml",
     "//third_party/zlib",
     "//ui/accessibility",
     "//ui/base",
@@ -91,6 +91,7 @@ source_set("ui") {
       "//chrome/installer/util",
       "//components/autofill/content/browser:risk_proto",
       "//components/power",
+      "//components/secure_display",
       "//components/suggestions/proto",
       "//device/nfc",
       "//media",
@@ -444,7 +445,7 @@ source_set("ui") {
             ".",
             "//chrome")
   }
-  if (enable_media_router) {
+  if (enable_media_router && !is_android && !is_ios) {
     sources += rebase_path(gypi_values.chrome_browser_ui_media_router_sources,
                            ".",
                            "//chrome")

@@ -18,11 +18,14 @@ class SysfsPowerMonitor(power_monitor.PowerMonitor):
   """PowerMonitor that relies on sysfs to monitor CPU statistics on several
   different platforms.
   """
-  def __init__(self, linux_based_platform_backend):
+  # TODO(rnephew): crbug.com/513453
+  # Convert all platforms to use standalone power monitors.
+  def __init__(self, linux_based_platform_backend, standalone=False):
     """Constructor.
 
     Args:
         linux_based_platform_backend: A LinuxBasedPlatformBackend object.
+        standalone: If it is not wrapping another monitor, set to True.
 
     Attributes:
         _cpus: A list of the CPUs on the target device.
@@ -42,6 +45,8 @@ class SysfsPowerMonitor(power_monitor.PowerMonitor):
     self._initial_cstate = None
     self._initial_freq = None
     self._platform = linux_based_platform_backend
+    self._standalone = standalone
+    self._is_monitoring_power = False
 
   @decorators.Cache
   def CanMonitorPower(self):
@@ -50,16 +55,17 @@ class SysfsPowerMonitor(power_monitor.PowerMonitor):
 
   def StartMonitoringPower(self, _browser):
     # |_browser| is unused, can be None.
-    assert not self._initial_cstate, 'Must call StopMonitoringPower().'
+    assert not self._is_monitoring_power, 'Must call StopMonitoringPower().'
     if self.CanMonitorPower():
       self._cpus = filter(  # pylint: disable=deprecated-lambda
           lambda x: re.match(r'^cpu[0-9]+', x),
           self._platform.RunCommand('ls %s' % CPU_PATH).split())
       self._initial_freq = self.GetCpuFreq()
       self._initial_cstate = self.GetCpuState()
+      self._is_monitoring_power = True
 
   def StopMonitoringPower(self):
-    assert self._initial_cstate, 'StartMonitoringPower() not called.'
+    assert self._is_monitoring_power, 'StartMonitoringPower() not called.'
     try:
       out = {}
       if SysfsPowerMonitor.CanMonitorPower(self):
@@ -72,10 +78,13 @@ class SysfsPowerMonitor(power_monitor.PowerMonitor):
             self._platform.ParseCStateSample(self._initial_cstate),
             self._platform.ParseCStateSample(self._final_cstate))
         for cpu in frequencies:
-          out[cpu] = {'frequency_percent': frequencies[cpu]}
-          out[cpu]['cstate_residency_percent'] = cstates[cpu]
+          out[cpu] = {'frequency_percent': frequencies.get(cpu)}
+          out[cpu] = {'cstate_residency_percent': cstates.get(cpu)}
+      if self._standalone:
+        return self.CombineResults(out, {})
       return out
     finally:
+      self._is_monitoring_power = False
       self._initial_cstate = None
       self._initial_freq = None
 
@@ -87,7 +96,13 @@ class SysfsPowerMonitor(power_monitor.PowerMonitor):
     """
     stats = {}
     for cpu in self._cpus:
-      cpu_state_path = os.path.join(CPU_PATH, cpu, 'cpuidle/state*')
+      cpu_idle_path = os.path.join(CPU_PATH, cpu, 'cpuidle')
+      if not self._platform.PathExists(cpu_idle_path):
+        logging.warning(
+            'Cannot read cpu c-state residency times for %s due to %s not exist'
+            % (cpu, cpu_idle_path))
+        continue
+      cpu_state_path = os.path.join(cpu_idle_path, 'state*')
       output = self._platform.RunCommand(
           'cat %s %s %s; date +%%s' % (
               os.path.join(cpu_state_path, 'name'),

@@ -18,13 +18,11 @@
 #include "chrome/common/chrome_isolated_world_ids.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/crash_keys.h"
-#include "chrome/common/prerender_messages.h"
 #include "chrome/common/render_messages.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/renderer/prerender/prerender_helper.h"
 #include "chrome/renderer/safe_browsing/phishing_classifier_delegate.h"
 #include "chrome/renderer/web_apps.h"
-#include "chrome/renderer/webview_color_overlay.h"
 #include "components/translate/content/renderer/translate_helper.h"
 #include "components/web_cache/renderer/web_cache_render_process_observer.h"
 #include "content/public/common/bindings_policy.h"
@@ -168,6 +166,7 @@ ChromeRenderViewObserver::ChromeRenderViewObserver(
           0,
           extensions::kExtensionScheme)),
       phishing_classifier_(NULL),
+      webview_visually_deemphasized_(false),
       capture_timer_(false, false) {
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();
@@ -309,17 +308,17 @@ void ChromeRenderViewObserver::OnSetClientSidePhishingDetection(
 
 #if defined(ENABLE_EXTENSIONS)
 void ChromeRenderViewObserver::OnSetVisuallyDeemphasized(bool deemphasized) {
-  bool already_deemphasized = !!dimmed_color_overlay_.get();
-  if (already_deemphasized == deemphasized)
+  if (webview_visually_deemphasized_ == deemphasized)
     return;
+
+  webview_visually_deemphasized_ = deemphasized;
 
   if (deemphasized) {
     // 70% opaque grey.
     SkColor greyish = SkColorSetARGB(178, 0, 0, 0);
-    dimmed_color_overlay_.reset(
-        new WebViewColorOverlay(render_view(), greyish));
+    render_view()->GetWebView()->setPageOverlayColor(greyish);
   } else {
-    dimmed_color_overlay_.reset();
+    render_view()->GetWebView()->setPageOverlayColor(SK_ColorTRANSPARENT);
   }
 }
 #endif
@@ -485,7 +484,8 @@ bool ChromeRenderViewObserver::HasRefreshMetaTag(WebFrame* frame) {
     if (!element.hasHTMLTagName(tag_name))
       continue;
     WebString value = element.getAttribute(attribute_name);
-    if (value.isNull() || !base::LowerCaseEqualsASCII(value, "refresh"))
+    if (value.isNull() ||
+        !base::LowerCaseEqualsASCII(base::StringPiece16(value), "refresh"))
       continue;
     return true;
   }

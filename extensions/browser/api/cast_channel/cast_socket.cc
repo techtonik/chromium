@@ -60,18 +60,18 @@ std::string FormatTimeForLogging(base::Time time) {
 
 namespace extensions {
 static base::LazyInstance<BrowserContextKeyedAPIFactory<
-    ApiResourceManager<core_api::cast_channel::CastSocket> > > g_factory =
+    ApiResourceManager<api::cast_channel::CastSocket>>> g_factory =
     LAZY_INSTANCE_INITIALIZER;
 
 // static
 template <>
 BrowserContextKeyedAPIFactory<
-    ApiResourceManager<core_api::cast_channel::CastSocket> >*
-ApiResourceManager<core_api::cast_channel::CastSocket>::GetFactoryInstance() {
+    ApiResourceManager<api::cast_channel::CastSocket>>*
+ApiResourceManager<api::cast_channel::CastSocket>::GetFactoryInstance() {
   return g_factory.Pointer();
 }
 
-namespace core_api {
+namespace api {
 namespace cast_channel {
 CastSocket::CastSocket(const std::string& owner_extension_id)
     : ApiResource(owner_extension_id) {
@@ -279,7 +279,6 @@ void CastSocketImpl::Connect(scoped_ptr<CastTransport::Delegate> delegate,
 }
 
 CastTransport* CastSocketImpl::transport() const {
-  DCHECK_EQ(ready_state_, READY_STATE_OPEN);
   return transport_.get();
 }
 
@@ -528,7 +527,6 @@ void CastSocketImpl::DoConnectCallback() {
     SetReadyState(READY_STATE_OPEN);
     transport_->SetReadDelegate(delegate_.Pass());
   } else {
-    SetReadyState(READY_STATE_CLOSED);
     CloseInternal();
   }
   base::ResetAndReturn(&connect_callback_).Run(error_state_);
@@ -597,6 +595,6 @@ void CastSocketImpl::SetErrorState(ChannelError error_state) {
   delegate_->OnError(error_state_);
 }
 }  // namespace cast_channel
-}  // namespace core_api
+}  // namespace api
 }  // namespace extensions
 #undef VLOG_WITH_CONNECTION

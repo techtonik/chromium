@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "base/memory/scoped_ptr.h"
+#include "extensions/browser/extension_event_histogram_value.h"
 #include "extensions/browser/extension_prefs_observer.h"
 
 class ExtensionFunctionRegistry;
@@ -161,7 +162,8 @@ class ExtensionsBrowserClient {
   virtual void PermitExternalProtocolHandler() = 0;
 
   // Creates a new AppSorting instance.
-  virtual scoped_ptr<AppSorting> CreateAppSorting() = 0;
+  virtual scoped_ptr<AppSorting> CreateAppSorting(
+      content::BrowserContext* context) = 0;
 
   // Return true if the system is run in forced app mode.
   virtual bool IsRunningInForcedAppMode() = 0;
@@ -196,7 +198,8 @@ class ExtensionsBrowserClient {
 
   // Propagate a event to all the renderers in every browser context. The
   // implementation must be safe to call from any thread.
-  virtual void BroadcastEventToRenderers(const std::string& event_name,
+  virtual void BroadcastEventToRenderers(events::HistogramValue histogram_value,
+                                         const std::string& event_name,
                                          scoped_ptr<base::ListValue> args) = 0;
 
   // Returns the embedder's net::NetLog.

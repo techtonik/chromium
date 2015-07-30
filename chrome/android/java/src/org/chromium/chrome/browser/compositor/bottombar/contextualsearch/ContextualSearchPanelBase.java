@@ -28,12 +28,6 @@ import org.chromium.ui.resources.dynamics.DynamicResourceLoader;
  */
 abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandler
         implements ContextualSearchPromoHost {
-
-    /**
-     * The margin top of the Contextual Search Bar in dps.
-     */
-    private static final float SEARCH_BAR_MARGIN_TOP_DP = 16.f;
-
     /**
      * The side padding of Search Bar icons in dps.
      */
@@ -48,6 +42,18 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
      * The height of the expanded Search Panel relative to the height of the screen.
      */
     private static final float EXPANDED_PANEL_HEIGHT_PERCENTAGE = .7f;
+
+    /**
+     * The height of the expanded Search Panel relative to the height of the screen when
+     * the panel is in the narrow width mode.
+     */
+    private static final float NARROW_EXPANDED_PANEL_HEIGHT_PERCENTAGE = .3f;
+
+    /**
+     * The height of the maximized Search Panel relative to the height of the screen when
+     * the panel is in the narrow width mode.
+     */
+    private static final float NARROW_MAXIMIZED_PANEL_HEIGHT_PERCENTAGE = .75f;
 
     /**
      * The width of the small version of the Search Panel in dps.
@@ -237,8 +243,8 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
         mSearchBarPaddingTop = PANEL_SHADOW_HEIGHT_DP;
 
         mSearchBarHeightPeeking = context.getResources().getDimension(
-                R.dimen.contextual_search_bar_height) * mPxToDp + mSearchBarPaddingTop;
-        mSearchBarHeightMaximized = mToolbarHeight + mSearchBarPaddingTop;
+                R.dimen.contextual_search_bar_height) * mPxToDp;
+        mSearchBarHeightMaximized = mToolbarHeight;
         mSearchBarHeightExpanded =
                 Math.round((mSearchBarHeightPeeking + mSearchBarHeightMaximized) / 2.f);
 
@@ -436,7 +442,9 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
      * @return The height of the Search Content View in pixels.
      */
     public int getSearchContentViewHeightPx() {
-        return Math.round((mMaximumHeight - getToolbarHeight()) / mPxToDp);
+        float searchBarExpandedHeight = isFullscreenSizePanel()
+                ? getToolbarHeight() : mSearchBarHeightPeeking;
+        return Math.round((mMaximumHeight - searchBarExpandedHeight) / mPxToDp);
     }
 
     // ============================================================================================
@@ -537,8 +545,6 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
     // --------------------------------------------------------------------------------------------
     // Contextual Search Bar states
     // --------------------------------------------------------------------------------------------
-
-    private float mSearchBarMarginTop;
     private float mSearchBarMarginSide;
     private float mSearchBarHeight;
     private float mSearchBarTextOpacity;
@@ -558,13 +564,6 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
 
     private float mCloseIconOpacity;
     private float mCloseIconWidth;
-
-    /**
-     * @return The top margin of the Contextual Search Bar.
-     */
-    public float getSearchBarMarginTop() {
-        return mSearchBarMarginTop;
-    }
 
     /**
      * @return The side margin of the Contextual Search Bar.
@@ -849,7 +848,6 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
         mIsShowing = false;
 
         // Static values.
-        mSearchBarMarginTop = SEARCH_BAR_MARGIN_TOP_DP;
         mSearchBarMarginSide = SEARCH_BAR_ICON_SIDE_PADDING_DP;
         mProgressBarHeight = PROGRESS_BAR_HEIGHT_DP;
         mSearchBarBorderHeight = SEARCH_BAR_BORDER_HEIGHT_DP;
@@ -877,10 +875,17 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
         } else if (state == PanelState.PEEKED) {
             panelHeight = mSearchBarHeightPeeking;
         } else if (state == PanelState.EXPANDED) {
-            panelHeight = fullscreenHeight * EXPANDED_PANEL_HEIGHT_PERCENTAGE
-                    + mSearchBarPaddingTop;
+            if (isFullscreenSizePanel()) {
+                panelHeight = fullscreenHeight * EXPANDED_PANEL_HEIGHT_PERCENTAGE;
+            } else {
+                panelHeight = fullscreenHeight * NARROW_EXPANDED_PANEL_HEIGHT_PERCENTAGE;
+            }
         } else if (state == PanelState.MAXIMIZED) {
-            panelHeight = fullscreenHeight + mSearchBarPaddingTop;
+            if (isFullscreenSizePanel()) {
+                panelHeight = fullscreenHeight;
+            } else {
+                panelHeight = fullscreenHeight * NARROW_MAXIMIZED_PANEL_HEIGHT_PERCENTAGE;
+            }
         }
 
         return panelHeight;
@@ -901,6 +906,9 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
         // height.
         for (PanelState state : PanelState.values()) {
             if (!isValidState(state)) {
+                continue;
+            }
+            if (!isFullscreenSizePanel() && state == PanelState.EXPANDED) {
                 continue;
             }
 
@@ -936,7 +944,8 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
             destroyPromoView();
             destroyContextualSearchControl();
             onClose(reason);
-        } else if (state == PanelState.EXPANDED) {
+        } else if (state == PanelState.EXPANDED && isFullscreenSizePanel()
+                || (state == PanelState.MAXIMIZED && !isFullscreenSizePanel())) {
             showPromoViewAtYPosition(getPromoYPx());
         }
     }
@@ -1123,7 +1132,7 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
         // Search Bar height.
         float searchBarHeight = Math.round(MathUtils.interpolate(
                 mSearchBarHeightPeeking,
-                mSearchBarHeightExpanded,
+                getSearchBarHeightExpanded(),
                 percentage));
         mSearchBarHeight = searchBarHeight;
 
@@ -1172,7 +1181,8 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
      */
     private void updatePanelForMaximization(float percentage) {
         // Update the opt out promo.
-        updatePromoVisibility(1.f - percentage);
+        float promoVisibilityPercentage = isFullscreenSizePanel() ? 1.f - percentage : 1.f;
+        updatePromoVisibility(promoVisibilityPercentage);
 
         // Base page offset.
         mBasePageY = getBasePageTargetY();
@@ -1186,8 +1196,8 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
 
         // Search Bar height.
         float searchBarHeight = Math.round(MathUtils.interpolate(
-                mSearchBarHeightExpanded,
-                mSearchBarHeightMaximized,
+                getSearchBarHeightExpanded(),
+                getSearchBarHeightMaximized(),
                 percentage));
         mSearchBarHeight = searchBarHeight;
 
@@ -1247,6 +1257,22 @@ abstract class ContextualSearchPanelBase extends ContextualSearchPanelStateHandl
 
         // Update the Search Bar Shadow.
         updateSearchBarShadow();
+    }
+
+    private float getSearchBarHeightExpanded() {
+        if (isFullscreenSizePanel()) {
+            return mSearchBarHeightExpanded;
+        } else {
+            return mSearchBarHeightPeeking;
+        }
+    }
+
+    private float getSearchBarHeightMaximized() {
+        if (isFullscreenSizePanel()) {
+            return mSearchBarHeightMaximized;
+        } else {
+            return mSearchBarHeightPeeking;
+        }
     }
 
     /**

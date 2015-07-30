@@ -73,6 +73,7 @@
 #include "net/proxy/proxy_service.h"
 #include "net/ssl/channel_id_service.h"
 #include "net/ssl/client_cert_store.h"
+#include "net/url_request/certificate_report_sender.h"
 #include "net/url_request/data_protocol_handler.h"
 #include "net/url_request/file_protocol_handler.h"
 #include "net/url_request/ftp_protocol_handler.h"
@@ -93,6 +94,7 @@
 #endif
 
 #if defined(ENABLE_EXTENSIONS)
+#include "chrome/browser/extensions/extension_cookie_monster_delegate.h"
 #include "chrome/browser/extensions/extension_resource_protocols.h"
 #include "extensions/browser/extension_protocols.h"
 #include "extensions/browser/extension_system.h"
@@ -377,12 +379,15 @@ void ProfileIOData::InitializeOnUIThread(Profile* profile) {
   params->cookie_settings = CookieSettingsFactory::GetForProfile(profile);
   params->host_content_settings_map = profile->GetHostContentSettingsMap();
   params->ssl_config_service = profile->GetSSLConfigService();
-  params->cookie_monster_delegate =
-      chrome_browser_net::CreateCookieDelegate(profile);
+
+  scoped_refptr<net::CookieMonsterDelegate> next_cookie_monster_delegate;
 #if defined(ENABLE_EXTENSIONS)
   params->extension_info_map =
       extensions::ExtensionSystem::Get(profile)->info_map();
+  next_cookie_monster_delegate = new ExtensionCookieMonsterDelegate(profile);
 #endif
+  params->cookie_monster_delegate =
+      chrome_browser_net::CreateCookieDelegate(next_cookie_monster_delegate);
 
   if (predictors::ResourcePrefetchPredictor* predictor =
           predictors::ResourcePrefetchPredictorFactory::GetForProfile(
@@ -639,6 +644,11 @@ ProfileIOData::~ProfileIOData() {
     memcpy(&media_context_vtable_cache[current_context],
            static_cast<void*>(it->second), sizeof(void*));
   }
+
+  // Destroy certificate_report_sender_ before main_request_context_,
+  // since the former has a reference to the latter.
+  transport_security_state_->SetReportSender(nullptr);
+  certificate_report_sender_.reset();
 
   // TODO(ajwong): These AssertNoURLRequests() calls are unnecessary since they
   // are already done in the URLRequestContext destructor.
@@ -1058,6 +1068,11 @@ void ProfileIOData::Init(
               pool->GetSequenceToken(),
               base::SequencedWorkerPool::BLOCK_SHUTDOWN),
           IsOffTheRecord()));
+
+  certificate_report_sender_.reset(new net::CertificateReportSender(
+      main_request_context_.get(),
+      net::CertificateReportSender::DO_NOT_SEND_COOKIES));
+  transport_security_state_->SetReportSender(certificate_report_sender_.get());
 
   // Take ownership over these parameters.
   cookie_settings_ = profile_params_->cookie_settings;

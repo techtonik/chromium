@@ -33,6 +33,7 @@ class TestNativeRunner : public shell::NativeRunner {
     base::MessageLoop::current()->Quit();
   }
   void Start(const base::FilePath& app_path,
+             bool start_sandboxed,
              shell::NativeApplicationCleanup cleanup,
              InterfaceRequest<Application> application_request,
              const base::Closure& app_completed_callback) override {
@@ -97,8 +98,9 @@ TEST_F(NativeApplicationLoaderTest, DoesNotExist) {
   mojo::URLRequestPtr request(mojo::URLRequest::New());
   request->url = mojo::String::From(url.spec());
   application_manager_.ConnectToApplication(
-      request.Pass(), std::string(), GURL(), services.Pass(),
-      service_provider.Pass(), base::Closure());
+      nullptr, request.Pass(), std::string(), GURL(), services.Pass(),
+      service_provider.Pass(), shell::GetPermissiveCapabilityFilter(),
+      base::Closure());
   EXPECT_FALSE(state_.runner_was_created);
   EXPECT_FALSE(state_.runner_was_started);
   EXPECT_FALSE(state_.runner_was_destroyed);

@@ -11,7 +11,6 @@
 #include "chrome/browser/android/banners/app_banner_data_fetcher_android.h"
 #include "chrome/browser/banners/app_banner_metrics.h"
 #include "chrome/common/chrome_constants.h"
-#include "chrome/common/render_messages.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/frame_navigate_params.h"
 #include "jni/AppBannerManager_jni.h"
@@ -55,7 +54,7 @@ bool AppBannerManagerAndroid::HandleNonWebApp(const std::string& platform,
   if (!CheckPlatformAndId(platform, id))
     return false;
 
-  banners::TrackDisplayEvent(DISPLAY_EVENT_BANNER_REQUESTED);
+  banners::TrackDisplayEvent(DISPLAY_EVENT_NATIVE_APP_BANNER_REQUESTED);
 
   // Send the info to the Java side to get info about the app.
   JNIEnv* env = base::android::AttachCurrentThread();

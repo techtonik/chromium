@@ -11,14 +11,13 @@ import android.net.Uri;
 import android.text.TextUtils;
 
 import org.chromium.base.ApplicationStatus;
-import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.IntentHandler;
-import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.TabState;
 import org.chromium.chrome.browser.UrlConstants;
 import org.chromium.chrome.browser.document.ChromeLauncherActivity;
 import org.chromium.chrome.browser.document.DocumentMetricIds;
 import org.chromium.chrome.browser.tab.ChromeTab;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabIdManager;
 import org.chromium.chrome.browser.tabmodel.TabCreatorManager.TabCreator;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
@@ -28,13 +27,11 @@ import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.ui.base.PageTransition;
 
-import java.lang.ref.WeakReference;
-
 /**
  * Asynchronously creates Tabs by creating/starting up Activities.
  */
 public class TabDelegate extends TabCreator {
-    private boolean mIsIncognito;
+    private final boolean mIsIncognito;
 
     /**
      * Creates a TabDelegate.
@@ -143,11 +140,10 @@ public class TabDelegate extends TabCreator {
                 && asyncParams.getWebContents() != null);
 
         Context context = ApplicationStatus.getApplicationContext();
-        Activity parentActivity = getActivityForTabId(parentId);
+        Activity parentActivity = ActivityDelegate.getActivityForTabId(parentId);
 
         if (FeatureUtilities.isDocumentMode(context)) {
-            ChromeLauncherActivity.launchDocumentInstance(
-                    parentActivity, mIsIncognito, asyncParams);
+            AsyncDocumentLauncher.getInstance().enqueueLaunch(mIsIncognito, parentId, asyncParams);
         } else {
             // TODO(dfalcantara): Is it possible to get rid of this conditional?
             int assignedTabId = TabIdManager.getInstance().generateValidId(Tab.INVALID_TAB_ID);
@@ -172,20 +168,5 @@ public class TabDelegate extends TabCreator {
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             IntentHandler.startActivityForTrustedIntent(intent, context);
         }
-    }
-
-    /** @return Running Activity that owns the given Tab, null if the Activity couldn't be found. */
-    private Activity getActivityForTabId(int id) {
-        if (id == Tab.INVALID_TAB_ID) return null;
-
-        for (WeakReference<Activity> ref : ApplicationStatus.getRunningActivities()) {
-            if (!(ref.get() instanceof ChromeActivity)) continue;
-
-            ChromeActivity activity = (ChromeActivity) ref.get();
-            if (activity == null) continue;
-
-            if (activity.getTabModelSelector().getModelForTabId(id) != null) return activity;
-        }
-        return null;
     }
 }

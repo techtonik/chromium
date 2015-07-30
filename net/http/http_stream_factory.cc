@@ -8,8 +8,10 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
+#include "base/time/time.h"
 #include "net/base/host_mapping_rules.h"
 #include "net/base/host_port_pair.h"
+#include "net/base/port_util.h"
 #include "net/http/http_network_session.h"
 #include "url/gurl.h"
 
@@ -97,7 +99,7 @@ void HttpStreamFactory::ProcessAlternateProtocol(
 
   http_server_properties->SetAlternativeService(
       host_port, AlternativeService(protocol, "", static_cast<uint16>(port)),
-      probability);
+      probability, base::Time::Now() + base::TimeDelta::FromDays(1));
 }
 
 GURL HttpStreamFactory::ApplyHostMappingRules(const GURL& url,

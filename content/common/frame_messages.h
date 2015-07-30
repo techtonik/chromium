@@ -28,8 +28,8 @@
 #include "ipc/ipc_message_macros.h"
 #include "third_party/WebKit/public/web/WebTreeScopeType.h"
 #include "ui/gfx/ipc/gfx_param_traits.h"
-#include "url/deprecated_serialized_origin.h"
 #include "url/gurl.h"
+#include "url/origin.h"
 
 #undef IPC_MESSAGE_EXPORT
 #define IPC_MESSAGE_EXPORT CONTENT_EXPORT
@@ -215,7 +215,7 @@ IPC_STRUCT_BEGIN_WITH_PARENT(FrameHostMsg_DidCommitProvisionalLoad_Params,
 
   // Origin of the frame.  This will be replicated to any associated
   // RenderFrameProxies.
-  IPC_STRUCT_MEMBER(url::DeprecatedSerializedOrigin, origin)
+  IPC_STRUCT_MEMBER(url::Origin, origin)
 
   // How navigation metrics starting on UI action for this load should be
   // reported.
@@ -262,6 +262,7 @@ IPC_STRUCT_TRAITS_BEGIN(content::CommonNavigationParams)
   IPC_STRUCT_TRAITS_MEMBER(transition)
   IPC_STRUCT_TRAITS_MEMBER(navigation_type)
   IPC_STRUCT_TRAITS_MEMBER(allow_download)
+  IPC_STRUCT_TRAITS_MEMBER(should_replace_current_entry)
   IPC_STRUCT_TRAITS_MEMBER(ui_timestamp)
   IPC_STRUCT_TRAITS_MEMBER(report_type)
   IPC_STRUCT_TRAITS_MEMBER(base_url_for_data_url)
@@ -279,7 +280,6 @@ IPC_STRUCT_TRAITS_BEGIN(content::StartNavigationParams)
   IPC_STRUCT_TRAITS_MEMBER(is_post)
   IPC_STRUCT_TRAITS_MEMBER(extra_headers)
   IPC_STRUCT_TRAITS_MEMBER(browser_initiated_post_data)
-  IPC_STRUCT_TRAITS_MEMBER(should_replace_current_entry)
   IPC_STRUCT_TRAITS_MEMBER(transferred_request_child_id)
   IPC_STRUCT_TRAITS_MEMBER(transferred_request_request_id)
 IPC_STRUCT_TRAITS_END()
@@ -600,8 +600,7 @@ IPC_MESSAGE_ROUTED1(FrameMsg_DidUpdateName, std::string /* name */)
 
 // Update a proxy's replicated origin.  Used when the frame is navigated to a
 // new origin.
-IPC_MESSAGE_ROUTED1(FrameMsg_DidUpdateOrigin,
-                    url::DeprecatedSerializedOrigin /* origin */)
+IPC_MESSAGE_ROUTED1(FrameMsg_DidUpdateOrigin, url::Origin /* origin */)
 
 // Send to the RenderFrame to set text tracks state and style settings.
 // Sent for top-level frames.

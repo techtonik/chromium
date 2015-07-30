@@ -82,7 +82,7 @@ class GpuChannelMessageFilter : public IPC::MessageFilter {
  public:
   GpuChannelMessageFilter(
       base::WeakPtr<GpuChannel> gpu_channel,
-      scoped_refptr<gpu::SyncPointManager> sync_point_manager,
+      gpu::SyncPointManager* sync_point_manager,
       scoped_refptr<base::SingleThreadTaskRunner> task_runner,
       bool future_sync_points)
       : preemption_state_(IDLE),
@@ -139,6 +139,17 @@ class GpuChannelMessageFilter : public IPC::MessageFilter {
                      gpu_channel_, sync_point_manager_, message.routing_id(),
                      base::get<0>(retire), sync_point));
       handled = true;
+    }
+
+    // These are handled by GpuJpegDecodeAccelerator and
+    // GpuVideoDecodeAccelerator.
+    // TODO(kcwu) Modify GpuChannel::AddFilter to handle additional filters by
+    // GpuChannelMessageFilter instead of by IPC::SyncChannel directly. Then we
+    // don't need to exclude them one by one here.
+    if (message.type() == AcceleratedJpegDecoderMsg_Decode::ID ||
+        message.type() == AcceleratedJpegDecoderMsg_Destroy::ID ||
+        message.type() == AcceleratedVideoDecoderMsg_Decode::ID) {
+      return false;
     }
 
     // All other messages get processed by the GpuChannel.
@@ -356,7 +367,7 @@ class GpuChannelMessageFilter : public IPC::MessageFilter {
 
   static void InsertSyncPointOnMainThread(
       base::WeakPtr<GpuChannel> gpu_channel,
-      scoped_refptr<gpu::SyncPointManager> manager,
+      gpu::SyncPointManager* manager,
       int32 routing_id,
       bool retire,
       uint32 sync_point) {
@@ -385,7 +396,7 @@ class GpuChannelMessageFilter : public IPC::MessageFilter {
   // passed through - therefore the WeakPtr assumptions are respected.
   base::WeakPtr<GpuChannel> gpu_channel_;
   IPC::Sender* sender_;
-  scoped_refptr<gpu::SyncPointManager> sync_point_manager_;
+  gpu::SyncPointManager* sync_point_manager_;
   scoped_refptr<base::SingleThreadTaskRunner> task_runner_;
   scoped_refptr<gpu::PreemptionFlag> preempting_flag_;
 
@@ -407,11 +418,13 @@ GpuChannel::GpuChannel(GpuChannelManager* gpu_channel_manager,
                        gfx::GLShareGroup* share_group,
                        gpu::gles2::MailboxManager* mailbox,
                        int client_id,
+                       uint64_t client_tracing_id,
                        bool software,
                        bool allow_future_sync_points)
     : gpu_channel_manager_(gpu_channel_manager),
       messages_processed_(0),
       client_id_(client_id),
+      client_tracing_id_(client_tracing_id),
       share_group_(share_group ? share_group : new gfx::GLShareGroup),
       mailbox_manager_(mailbox
                            ? scoped_refptr<gpu::gles2::MailboxManager>(mailbox)
@@ -833,11 +846,20 @@ void GpuChannel::RemoveFilter(IPC::MessageFilter* filter) {
 }
 
 uint64 GpuChannel::GetMemoryUsage() {
-  uint64 size = 0;
+  // Collect the unique memory trackers in use by the |stubs_|.
+  std::set<gpu::gles2::MemoryTracker*> unique_memory_trackers;
   for (StubMap::Iterator<GpuCommandBufferStub> it(&stubs_);
        !it.IsAtEnd(); it.Advance()) {
-    size += it.GetCurrentValue()->GetMemoryUsage();
+    unique_memory_trackers.insert(it.GetCurrentValue()->GetMemoryTracker());
   }
+
+  // Sum the memory usage for all unique memory trackers.
+  uint64 size = 0;
+  for (auto* tracker : unique_memory_trackers) {
+    size += gpu_channel_manager()->gpu_memory_manager()->GetTrackerMemoryUsage(
+        tracker);
+  }
+
   return size;
 }
 

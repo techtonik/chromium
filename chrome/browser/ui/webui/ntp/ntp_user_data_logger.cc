@@ -60,7 +60,7 @@ DEFINE_WEB_CONTENTS_USER_DATA_KEY(NTPUserDataLogger);
 // routine exists because regular histogram macros are cached thus can't be used
 // if the name of the histogram will change at a given call site.
 void logLoadTimeHistogram(const std::string& histogram, base::TimeDelta value) {
-  base::HistogramBase* counter = base::LinearHistogram::FactoryTimeGet(
+  base::HistogramBase* counter = base::Histogram::FactoryTimeGet(
       histogram,
       base::TimeDelta::FromMilliseconds(1),
       base::TimeDelta::FromSeconds(60), 100,
@@ -127,7 +127,7 @@ void NTPUserDataLogger::EmitNtpStatistics() {
     logLoadTimeHistogram("NewTabPage.LoadTime." + source, load_time_);
 
     // Split between Startup and non-startup.
-    std::string status = during_startup_ ? "Startup" : "Newtab";
+    std::string status = during_startup_ ? "Startup" : "NewTab";
     logLoadTimeHistogram("NewTabPage.LoadTime." + status, load_time_);
 
     load_time_ = base::TimeDelta::FromMilliseconds(0);

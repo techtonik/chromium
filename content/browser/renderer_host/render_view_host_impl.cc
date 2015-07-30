@@ -214,6 +214,7 @@ RenderViewHostImpl::RenderViewHostImpl(
       waiting_for_drag_context_response_(false),
       enabled_bindings_(0),
       page_id_(-1),
+      nav_entry_id_(0),
       is_active_(!swapped_out),
       is_swapped_out_(swapped_out),
       main_frame_routing_id_(main_frame_routing_id),
@@ -521,6 +522,11 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
 
   prefs.strict_powerful_feature_restrictions = command_line.HasSwitch(
       switches::kEnableStrictPowerfulFeatureRestrictions);
+
+  const std::string blockable_mixed_content_group =
+      base::FieldTrialList::FindFullName("BlockableMixedContent");
+  prefs.strictly_block_blockable_mixed_content =
+      blockable_mixed_content_group == "StrictlyBlockBlockableMixedContent";
 
   prefs.v8_cache_options = GetV8CacheOptions();
 
@@ -912,7 +918,6 @@ bool RenderViewHostImpl::OnMessageReceived(const IPC::Message& msg) {
                         OnRouteCloseEvent)
     IPC_MESSAGE_HANDLER(DragHostMsg_StartDragging, OnStartDragging)
     IPC_MESSAGE_HANDLER(DragHostMsg_UpdateDragCursor, OnUpdateDragCursor)
-    IPC_MESSAGE_HANDLER(DragHostMsg_TargetDrop_ACK, OnTargetDropACK)
     IPC_MESSAGE_HANDLER(ViewHostMsg_TakeFocus, OnTakeFocus)
     IPC_MESSAGE_HANDLER(ViewHostMsg_FocusedNodeChanged, OnFocusedNodeChanged)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ClosePage_ACK, OnClosePageACK)
@@ -1158,13 +1163,6 @@ void RenderViewHostImpl::OnUpdateDragCursor(WebDragOperation current_op) {
   RenderViewHostDelegateView* view = delegate_->GetDelegateView();
   if (view)
     view->UpdateDragCursor(current_op);
-}
-
-void RenderViewHostImpl::OnTargetDropACK() {
-  NotificationService::current()->Notify(
-      NOTIFICATION_RENDER_VIEW_HOST_DID_RECEIVE_DRAG_TARGET_DROP_ACK,
-      Source<RenderViewHost>(this),
-      NotificationService::NoDetails());
 }
 
 void RenderViewHostImpl::OnTakeFocus(bool reverse) {

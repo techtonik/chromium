@@ -203,6 +203,8 @@ without changes to the corresponding grd file. -->
       <part file="cr_elements_images.grdp" />
     </includes>
     <structures>
+      <structure name="IDR_WEBUI_CSS_ACTION_LINK"
+                 file="css/action_link.css" type="chrome_html" />
       <structure name="IDR_WEBUI_CSS_ALERT_OVERLAY"
                  file="css/alert_overlay.css" type="chrome_html" />
       <structure name="IDR_WEBUI_CSS_APPS_COMMON"
@@ -241,7 +243,8 @@ without changes to the corresponding grd file. -->
       <structure name="IDR_WEBUI_CSS_ROBOTO"
                  file="css/roboto.css" type="chrome_html" />
       <structure name="IDR_WEBUI_CSS_SPINNER"
-                 file="css/spinner.css" type="chrome_html" />
+                 file="css/spinner.css" type="chrome_html"
+                 flattenhtml="true" />
       <structure name="IDR_WEBUI_CSS_TABLE"
                  file="css/table.css" type="chrome_html" />
       <structure name="IDR_WEBUI_CSS_TABS"
@@ -253,8 +256,6 @@ without changes to the corresponding grd file. -->
       <structure name="IDR_WEBUI_CSS_TREE"
                  file="css/tree.css" type="chrome_html"
                  flattenhtml="true" />
-      <structure name="IDR_WEBUI_CSS_TREE_JS"
-                 file="css/tree.css.js" type="chrome_html" />
       <structure name="IDR_WEBUI_CSS_WIDGETS"
                  file="css/widgets.css" type="chrome_html"
                  flattenhtml="true" />

@@ -62,11 +62,9 @@ bool ConfigureURLMappings(const base::CommandLine& command_line,
 
   // Configure the resolution of unknown mojo: URLs.
   GURL base_url;
-  if (command_line.HasSwitch(switches::kOrigin)) {
-    base_url = GURL(command_line.GetSwitchValueASCII(switches::kOrigin));
-  } else if (!command_line.HasSwitch(switches::kUseUpdater)) {
+  if (!command_line.HasSwitch(switches::kUseUpdater)) {
     // Use the shell's file root if the base was not specified.
-    base_url = context->ResolveShellFileURL("");
+    base_url = context->ResolveShellFileURL(std::string());
   }
 
   if (base_url.is_valid())
@@ -194,8 +192,9 @@ void InitDevToolsServiceIfNeeded(shell::ApplicationManager* manager,
   URLRequestPtr request(URLRequest::New());
   request->url = "mojo:devtools_service";
   manager->ConnectToApplication(
-      request.Pass(), std::string(), GURL("mojo:shell"),
-      GetProxy(&devtools_service_provider), nullptr, base::Closure());
+      nullptr, request.Pass(), std::string(), GURL("mojo:shell"),
+      GetProxy(&devtools_service_provider), nullptr,
+      shell::GetPermissiveCapabilityFilter(), base::Closure());
 
   devtools_service::DevToolsCoordinatorPtr devtools_coordinator;
   devtools_service_provider->ConnectToService(
@@ -309,8 +308,9 @@ bool Context::Init() {
   mojo::URLRequestPtr request(mojo::URLRequest::New());
   request->url = mojo::String::From("mojo:tracing");
   application_manager_.ConnectToApplication(
-      request.Pass(), std::string(), GURL(""), nullptr,
-      tracing_service_provider_ptr.Pass(), base::Closure());
+      nullptr, request.Pass(), std::string(), GURL(""), nullptr,
+      tracing_service_provider_ptr.Pass(),
+      shell::GetPermissiveCapabilityFilter(), base::Closure());
 
   InitDevToolsServiceIfNeeded(&application_manager_, command_line);
 
@@ -355,8 +355,8 @@ void Context::Run(const GURL& url) {
   mojo::URLRequestPtr request(mojo::URLRequest::New());
   request->url = mojo::String::From(url.spec());
   application_manager_.ConnectToApplication(
-      request.Pass(), std::string(), GURL(), GetProxy(&services),
-      exposed_services.Pass(),
+      nullptr, request.Pass(), std::string(), GURL(), GetProxy(&services),
+      exposed_services.Pass(), shell::GetPermissiveCapabilityFilter(),
       base::Bind(&Context::OnApplicationEnd, base::Unretained(this), url));
 }
 

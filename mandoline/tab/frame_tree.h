@@ -14,7 +14,7 @@ class FrameTreeDelegate;
 class FrameUserData;
 
 // FrameTree manages the set of Frames that comprise a single url. FrameTree
-// owns the root Frame and each Frames owns its children. Frames are
+// owns the root Frame and each Frame owns its children. Frames are
 // automatically deleted and removed from the tree if the corresponding view is
 // deleted. This happens if the creator of the view deletes it (say an iframe is
 // destroyed).
@@ -35,20 +35,33 @@ class FrameTree {
                            FrameTreeClient* client,
                            scoped_ptr<FrameUserData> user_data);
 
-  // If frame->view() == |view|, then |frame| is deleted and a new Frame created
-  // to replace it. Otherwise a new Frame is created as a child of |frame|.
-  // It is expected this is called from
-  //  ViewManagerDelegate::OnEmbedForDescendant().
+  // If frame->view() == |view|, then all of |frame|'s children are destroyed
+  // and |frame| is reused. Otherwise a new Frame is created as a child of
+  // |frame|. It is expected this is called from
+  // ViewManagerDelegate::OnEmbedForDescendant().
   Frame* CreateOrReplaceFrame(Frame* frame,
                               mojo::View* view,
                               FrameTreeClient* frame_tree_client,
                               scoped_ptr<FrameUserData> user_data);
 
+  // Creates a new Frame parented to |parent|. The Frame is considered shared in
+  // that it is sharing the FrameTreeClient/FrameTreeServer of |parent|. There
+  // may or may not be a View identified by |frame_id| yet. See Frame for
+  // details.
+  void CreateSharedFrame(Frame* parent, uint32_t frame_id);
+
  private:
   friend class Frame;
 
+  Frame* CreateAndAddFrameImpl(mojo::View* view,
+                               uint32_t frame_id,
+                               Frame* parent,
+                               FrameTreeClient* client,
+                               scoped_ptr<FrameUserData> user_data);
+
   void LoadingStateChanged();
   void ProgressChanged();
+  void FrameNameChanged(Frame* frame);
 
   mojo::View* view_;
 

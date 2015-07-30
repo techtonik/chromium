@@ -43,7 +43,7 @@ using ::testing::Return;
 using ::testing::SaveArg;
 
 namespace extensions {
-namespace core_api {
+namespace api {
 namespace cast_channel {
 const char kAuthNamespace[] = "urn:x-cast:com.google.cast.tp.deviceauth";
 
@@ -578,6 +578,10 @@ TEST_F(CastSocketTest, TestConnectAuthMessageCorrupted) {
   EXPECT_EQ(cast_channel::READY_STATE_CLOSED, socket_->ready_state());
   EXPECT_EQ(cast_channel::CHANNEL_ERROR_TRANSPORT_ERROR,
             socket_->error_state());
+
+  // Verifies that the CastSocket's resources were torn down during channel
+  // close. (see http://crbug.com/504078)
+  EXPECT_EQ(nullptr, socket_->transport());
 }
 
 // Test connection error - TCP connect fails (async)
@@ -946,5 +950,5 @@ TEST_F(CastSocketTest, TestChannelPolicyVerificationCapabilitiesVideoOut) {
   EXPECT_FALSE(socket_->TestVerifyChannelPolicyAudioOnly());
 }
 }  // namespace cast_channel
-}  // namespace core_api
+}  // namespace api
 }  // namespace extensions

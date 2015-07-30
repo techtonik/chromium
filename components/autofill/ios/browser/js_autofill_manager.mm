@@ -13,31 +13,10 @@
 - (void)fetchFormsWithMinimumRequiredFieldsCount:(NSUInteger)requiredFieldsCount
                                completionHandler:
                                    (void (^)(NSString*))completionHandler {
-  [self fetchFormsWithRequirements:autofill::REQUIRE_NONE
-        minimumRequiredFieldsCount:requiredFieldsCount
-                 completionHandler:completionHandler];
-}
-
-- (void)fetchFormsWithRequirements:(autofill::RequirementsMask)requirements
-        minimumRequiredFieldsCount:(NSUInteger)requiredFieldsCount
-                 completionHandler:(void (^)(NSString*))completionHandler {
   DCHECK(completionHandler);
-  // Convert from C++ enum to JS enum.
-  NSString* requirementsJS = nil;
-  switch (requirements) {
-    case autofill::REQUIRE_NONE:
-      requirementsJS = @"__gCrWeb.autofill.REQUIREMENTS_MASK_NONE";
-      break;
-    case autofill::REQUIRE_AUTOCOMPLETE:
-      requirementsJS =
-          @"__gCrWeb.autofill.REQUIREMENTS_MASK_REQUIRE_AUTOCOMPLETE";
-      break;
-  }
-  DCHECK(requirementsJS);
-
   NSString* extractFormsJS = [NSString
-      stringWithFormat:@"__gCrWeb.autofill.extractForms(%" PRIuNS ", %@);",
-                       requiredFieldsCount, requirementsJS];
+      stringWithFormat:@"__gCrWeb.autofill.extractForms(%" PRIuNS ");",
+                       requiredFieldsCount];
   [self evaluate:extractFormsJS
       stringResultHandler:^(NSString* result, NSError*) {
         completionHandler(result);
@@ -78,16 +57,46 @@
 }
 
 - (void)fillForm:(NSString*)dataString
-        styleElements:(BOOL)styleElements
-    completionHandler:(ProceduralBlock)completionHandler {
+    forceFillFieldName:(NSString*)forceFillFieldName
+     completionHandler:(ProceduralBlock)completionHandler {
   DCHECK(completionHandler);
+  std::string fieldName =
+      forceFillFieldName
+          ? base::GetQuotedJSONString([forceFillFieldName UTF8String])
+          : "null";
   NSString* fillFormJS =
       [NSString stringWithFormat:@"__gCrWeb.autofill.fillForm(%@, %s);",
-                                 dataString, styleElements ? "true" : "false"];
+                                 dataString, fieldName.c_str()];
   id stringResultHandler = ^(NSString*, NSError*) {
     completionHandler();
   };
   return [self evaluate:fillFormJS stringResultHandler:stringResultHandler];
+}
+
+- (void)fillFormForInstantBuy:(NSString*)dataString
+            completionHandler:(ProceduralBlock)completionHandler {
+  DCHECK(completionHandler);
+  NSString* fillFormJS = [NSString
+      stringWithFormat:@"__gCrWeb.autofill.fillFormForInstantBuy(%@);",
+                       dataString];
+  id stringResultHandler = ^(NSString*, NSError*) {
+    completionHandler();
+  };
+  return [self evaluate:fillFormJS stringResultHandler:stringResultHandler];
+}
+
+- (void)clearAutofilledFieldsForFormNamed:(NSString*)formName
+                        completionHandler:(ProceduralBlock)completionHandler {
+  DCHECK(completionHandler);
+  web::JavaScriptCompletion resultHandler = ^void(NSString*, NSError*) {
+    completionHandler();
+  };
+
+  NSString* js =
+      [NSString stringWithFormat:
+                    @"__gCrWeb.autofill.clearAutofilledFields(%s);",
+                    base::GetQuotedJSONString([formName UTF8String]).c_str()];
+  [self evaluate:js stringResultHandler:resultHandler];
 }
 
 - (void)dispatchAutocompleteEvent:(NSString*)formName {

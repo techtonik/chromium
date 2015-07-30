@@ -610,7 +610,8 @@ SkBitmap* ChromeContentRendererClient::GetSadWebViewBitmap() {
 #if defined(ENABLE_EXTENSIONS)
 const Extension* ChromeContentRendererClient::GetExtensionByOrigin(
     const WebSecurityOrigin& origin) const {
-  if (!base::EqualsASCII(origin.protocol(), extensions::kExtensionScheme))
+  if (!base::EqualsASCII(base::StringPiece16(origin.protocol()),
+                         extensions::kExtensionScheme))
     return NULL;
 
   const std::string extension_id = origin.host().utf8().data();
@@ -1141,7 +1142,8 @@ void ChromeContentRendererClient::GetNavigationErrorStrings(
     base::string16* error_description) {
   const GURL failed_url = error.unreachableURL;
 
-  bool is_post = base::EqualsASCII(failed_request.httpMethod(), "POST");
+  bool is_post = base::EqualsASCII(
+      base::StringPiece16(failed_request.httpMethod()), "POST");
 
   if (error_html) {
     // TODO(ellyjones): change GetNavigationErrorStrings to take a RenderFrame
@@ -1395,6 +1397,8 @@ bool ChromeContentRendererClient::CrossesExtensionExtents(
     // the type of process.  In default Chrome, that's the URL of the opener's
     // top frame and not the opener frame itself.  In --site-per-process, we
     // can use the opener frame itself.
+    // TODO(nick): Either wire this up to SiteIsolationPolicy, or to state on
+    // |opener_frame|/its ancestors.
     if (base::CommandLine::ForCurrentProcess()->HasSwitch(
             switches::kSitePerProcess))
       old_url = opener_frame->document().url();
@@ -1538,11 +1542,11 @@ bool ChromeContentRendererClient::IsPluginAllowedToUseDevChannelAPIs() {
     return true;
   }
 
-  chrome::VersionInfo::Channel channel = chrome::VersionInfo::GetChannel();
+  version_info::Channel channel = chrome::VersionInfo::GetChannel();
   // Allow dev channel APIs to be used on "Canary", "Dev", and "Unknown"
   // releases of Chrome. Permitting "Unknown" allows these APIs to be used on
   // Chromium builds as well.
-  return channel <= chrome::VersionInfo::CHANNEL_DEV;
+  return channel <= version_info::Channel::DEV;
 #else
   return false;
 #endif
@@ -1571,8 +1575,8 @@ bool ChromeContentRendererClient::IsPluginAllowedToUseCompositorAPI(
   if (IsExtensionOrSharedModuleWhitelisted(url, allowed_compositor_origins_))
     return true;
 
-  chrome::VersionInfo::Channel channel = chrome::VersionInfo::GetChannel();
-  return channel <= chrome::VersionInfo::CHANNEL_DEV;
+  version_info::Channel channel = chrome::VersionInfo::GetChannel();
+  return channel <= version_info::Channel::DEV;
 #else
   return false;
 #endif

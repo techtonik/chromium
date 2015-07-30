@@ -24,6 +24,7 @@
 #include "base/time/time.h"
 #include "device/bluetooth/bluetooth_classic_device_mac.h"
 #include "device/bluetooth/bluetooth_discovery_session.h"
+#include "device/bluetooth/bluetooth_low_energy_central_manager_delegate.h"
 #include "device/bluetooth/bluetooth_socket_mac.h"
 #include "device/bluetooth/bluetooth_uuid.h"
 
@@ -47,22 +48,45 @@ base::WeakPtr<BluetoothAdapter> BluetoothAdapter::CreateAdapter(
 }
 
 // static
-base::WeakPtr<BluetoothAdapter> BluetoothAdapterMac::CreateAdapter() {
+base::WeakPtr<BluetoothAdapterMac> BluetoothAdapterMac::CreateAdapter() {
   BluetoothAdapterMac* adapter = new BluetoothAdapterMac();
   adapter->Init();
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }
 
+// static
+base::WeakPtr<BluetoothAdapterMac> BluetoothAdapterMac::CreateAdapterForTest(
+    std::string name,
+    std::string address,
+    scoped_refptr<base::SequencedTaskRunner> ui_task_runner) {
+  BluetoothAdapterMac* adapter = new BluetoothAdapterMac();
+  adapter->InitForTest(ui_task_runner);
+  adapter->name_ = name;
+  adapter->address_ = address;
+  return adapter->weak_ptr_factory_.GetWeakPtr();
+}
+
 BluetoothAdapterMac::BluetoothAdapterMac()
     : BluetoothAdapter(),
-      powered_(false),
+      classic_powered_(false),
       num_discovery_sessions_(0),
       classic_discovery_manager_(
           BluetoothDiscoveryManagerMac::CreateClassic(this)),
       weak_ptr_factory_(this) {
-  if (IsLowEnergyAvailable())
+  if (IsLowEnergyAvailable()) {
     low_energy_discovery_manager_.reset(
         BluetoothLowEnergyDiscoveryManagerMac::Create(this));
+    low_energy_central_manager_delegate_.reset(
+        [[BluetoothLowEnergyCentralManagerDelegate alloc]
+            initWithDiscoveryManager:low_energy_discovery_manager_.get()
+                          andAdapter:this]);
+    Class aClass = NSClassFromString(@"CBCentralManager");
+    low_energy_central_manager_.reset([[aClass alloc]
+        initWithDelegate:low_energy_central_manager_delegate_.get()
+                   queue:dispatch_get_main_queue()]);
+    low_energy_discovery_manager_->SetCentralManager(
+        low_energy_central_manager_.get());
+  }
   DCHECK(classic_discovery_manager_.get());
 }
 
@@ -88,11 +112,21 @@ bool BluetoothAdapterMac::IsInitialized() const {
 }
 
 bool BluetoothAdapterMac::IsPresent() const {
-  return !address_.empty();
+  bool is_present = !address_.empty();
+  if (IsLowEnergyAvailable()) {
+    is_present = is_present || ([low_energy_central_manager_ state] ==
+                                CBCentralManagerStatePoweredOn);
+  }
+  return is_present;
 }
 
 bool BluetoothAdapterMac::IsPowered() const {
-  return powered_;
+  bool is_powered = classic_powered_;
+  if (IsLowEnergyAvailable()) {
+    is_powered = is_powered || ([low_energy_central_manager_ state] ==
+                                CBCentralManagerStatePoweredOn);
+  }
+  return is_powered;
 }
 
 void BluetoothAdapterMac::SetPowered(bool powered,
@@ -101,8 +135,9 @@ void BluetoothAdapterMac::SetPowered(bool powered,
   NOTIMPLEMENTED();
 }
 
+// TODO(krstnmnlsn): If this information is retrievable form IOBluetooth we
+// should return the discoverable status.
 bool BluetoothAdapterMac::IsDiscoverable() const {
-  NOTIMPLEMENTED();
   return false;
 }
 
@@ -183,6 +218,16 @@ void BluetoothAdapterMac::DeviceConnected(IOBluetoothDevice* device) {
 // static
 bool BluetoothAdapterMac::IsLowEnergyAvailable() {
   return base::mac::IsOSYosemiteOrLater();
+}
+
+void BluetoothAdapterMac::SetCentralManagerForTesting(
+    CBCentralManager* central_manager) {
+  CHECK(BluetoothAdapterMac::IsLowEnergyAvailable());
+  [central_manager performSelector:@selector(setDelegate:)
+                        withObject:low_energy_central_manager_delegate_];
+  low_energy_central_manager_.reset(central_manager);
+  low_energy_discovery_manager_->SetCentralManager(
+      low_energy_central_manager_.get());
 }
 
 void BluetoothAdapterMac::RemovePairingDelegateInternal(
@@ -319,7 +364,7 @@ void BluetoothAdapterMac::PollAdapter() {
           "461181 BluetoothAdapterMac::PollAdapter::Start"));
   bool was_present = IsPresent();
   std::string address;
-  bool powered = false;
+  bool classic_powered = false;
   IOBluetoothHostController* controller =
       [IOBluetoothHostController defaultController];
 
@@ -331,7 +376,7 @@ void BluetoothAdapterMac::PollAdapter() {
   if (controller != nil) {
     address = BluetoothDevice::CanonicalizeAddress(
         base::SysNSStringToUTF8([controller addressAsString]));
-    powered = ([controller powerState] == kBluetoothHCIPowerStateON);
+    classic_powered = ([controller powerState] == kBluetoothHCIPowerStateON);
 
     // For performance reasons, cache the adapter's name. It's not uncommon for
     // a call to [controller nameAsString] to take tens of milliseconds. Note
@@ -361,10 +406,10 @@ void BluetoothAdapterMac::PollAdapter() {
   tracked_objects::ScopedTracker tracking_profile4(
       FROM_HERE_WITH_EXPLICIT_FUNCTION(
           "461181 BluetoothAdapterMac::PollAdapter::AdapterPowerChanged"));
-  if (powered_ != powered) {
-    powered_ = powered;
+  if (classic_powered_ != classic_powered) {
+    classic_powered_ = classic_powered;
     FOR_EACH_OBSERVER(BluetoothAdapter::Observer, observers_,
-                      AdapterPoweredChanged(this, powered_));
+                      AdapterPoweredChanged(this, classic_powered_));
   }
 
   // TODO(erikchen): Remove ScopedTracker below once http://crbug.com/461181
@@ -438,6 +483,9 @@ void BluetoothAdapterMac::LowEnergyDeviceUpdated(
   FOR_EACH_OBSERVER(BluetoothAdapter::Observer, observers_,
                     DeviceChanged(this, device_reference));
 }
+
+// TODO(krstnmnlsn): Implement. crbug.com/511025
+void BluetoothAdapterMac::LowEnergyCentralManagerUpdatedState() {}
 
 void BluetoothAdapterMac::RemoveTimedOutDevices() {
   // Notify observers if any previously seen devices are no longer available,

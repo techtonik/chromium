@@ -77,6 +77,10 @@ _CONTROL_CHARGING_COMMANDS = [
 ]
 
 
+_CURRENT_FOCUS_CRASH_RE = re.compile(
+    r'\s*mCurrentFocus.*Application (Error|Not Responding): (\S+)}')
+
+
 @decorators.WithExplicitTimeoutAndRetries(
     _DEFAULT_TIMEOUT, _DEFAULT_RETRIES)
 def GetAVDs():
@@ -736,7 +740,8 @@ class DeviceUtils(object):
       CommandTimeoutError on timeout.
       DeviceUnreachableError on missing device.
     """
-    pids = self.GetPids(process_name)
+    procs_pids = self.GetPids(process_name)
+    pids = list(itertools.chain(*procs_pids.values()))
     if not pids:
       if quiet:
         return 0
@@ -744,7 +749,13 @@ class DeviceUtils(object):
         raise device_errors.CommandFailedError(
             'No process "%s"' % process_name, str(self))
 
-    cmd = ['kill', '-%d' % signum] + pids.values()
+    logging.info(
+        'KillAll(%s, ...) attempting to kill the following:', process_name)
+    for name, ids  in procs_pids.iteritems():
+      for i in ids:
+        logging.info('  %05s %s', str(i), name)
+
+    cmd = ['kill', '-%d' % signum] + pids
     self.RunShellCommand(cmd, as_root=as_root, check_return=True)
 
     if blocking:
@@ -1126,9 +1137,17 @@ class DeviceUtils(object):
       for host_path, device_path in host_device_tuples:
         zip_utils.WriteToZipFile(zip_file, host_path, device_path)
 
-  @decorators.WithTimeoutAndRetriesFromInstance()
+  # TODO(nednguyen): remove this and migrate the callsite to PathExists().
   def FileExists(self, device_path, timeout=None, retries=None):
     """Checks whether the given file exists on the device.
+
+    Arguments are the same as PathExists.
+    """
+    return self.PathExists(device_path, timeout=timeout, retries=retries)
+
+  @decorators.WithTimeoutAndRetriesFromInstance()
+  def PathExists(self, device_path, timeout=None, retries=None):
+    """Checks whether the given path exists on the device.
 
     Args:
       device_path: A string containing the absolute path to the file on the
@@ -1576,14 +1595,14 @@ class DeviceUtils(object):
       retries: number of retries
 
     Returns:
-      A dict mapping process name to PID for each process that contained the
-      provided |process_name|.
+      A dict mapping process name to a list of PIDs for each process that
+      contained the provided |process_name|.
 
     Raises:
       CommandTimeoutError on timeout.
       DeviceUnreachableError on missing device.
     """
-    procs_pids = {}
+    procs_pids = collections.defaultdict(list)
     try:
       ps_output = self._RunPipedShellCommand(
           'ps | grep -F %s' % cmd_helper.SingleQuote(process_name))
@@ -1599,7 +1618,8 @@ class DeviceUtils(object):
       try:
         ps_data = line.split()
         if process_name in ps_data[-1]:
-          procs_pids[ps_data[-1]] = ps_data[1]
+          pid, process = ps_data[1], ps_data[-1]
+          procs_pids[process].append(pid)
       except IndexError:
         pass
     return procs_pids
@@ -1661,6 +1681,38 @@ class DeviceUtils(object):
       logging.exception('Error getting memory usage from status')
 
     return result
+
+  @decorators.WithTimeoutAndRetriesFromInstance()
+  def DismissCrashDialogIfNeeded(self, timeout=None, retries=None):
+    """Dismiss the error/ANR dialog if present.
+
+    Returns: Name of the crashed package if a dialog is focused,
+             None otherwise.
+    """
+    def _FindFocusedWindow():
+      match = None
+      # TODO(jbudorick): Try to grep the output on the device instead of using
+      # large_output if/when DeviceUtils exposes a public interface for piped
+      # shell command handling.
+      for line in self.RunShellCommand(['dumpsys', 'window', 'windows'],
+                                       check_return=True, large_output=True):
+        match = re.match(_CURRENT_FOCUS_CRASH_RE, line)
+        if match:
+          break
+      return match
+
+    match = _FindFocusedWindow()
+    if not match:
+      return None
+    package = match.group(2)
+    logging.warning('Trying to dismiss %s dialog for %s' % match.groups())
+    self.SendKeyEvent(keyevent.KEYCODE_DPAD_RIGHT)
+    self.SendKeyEvent(keyevent.KEYCODE_DPAD_RIGHT)
+    self.SendKeyEvent(keyevent.KEYCODE_ENTER)
+    match = _FindFocusedWindow()
+    if match:
+      logging.error('Still showing a %s dialog for %s' % match.groups())
+    return package
 
   def _GetMemoryUsageForPidFromSmaps(self, pid):
     SMAPS_COLUMNS = (

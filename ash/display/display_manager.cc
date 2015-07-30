@@ -8,6 +8,7 @@
 #include <cmath>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "ash/ash_switches.h"
@@ -78,18 +79,19 @@ struct DisplayInfoSortFunctor {
   }
 };
 
-struct DisplayModeMatcher {
-  DisplayModeMatcher(const DisplayMode& target_mode)
-      : target_mode(target_mode) {}
-  bool operator()(const DisplayMode& mode) {
-    return target_mode.IsEquivalent(mode);
-  }
-  DisplayMode target_mode;
-};
-
 gfx::Display& GetInvalidDisplay() {
   static gfx::Display* invalid_display = new gfx::Display();
   return *invalid_display;
+}
+
+std::vector<DisplayMode>::const_iterator FindDisplayMode(
+    const DisplayInfo& info,
+    const DisplayMode& target_mode) {
+  const std::vector<DisplayMode>& modes = info.display_modes();
+  return std::find_if(modes.begin(), modes.end(),
+                      [target_mode](const DisplayMode& mode) {
+                        return target_mode.IsEquivalent(mode);
+                      });
 }
 
 void SetInternalDisplayModeList(DisplayInfo* info) {
@@ -109,8 +111,13 @@ void MaybeInitInternalDisplay(DisplayInfo* info) {
   }
 }
 
-bool IsInternalDisplayId(int64 id) {
-  return gfx::Display::InternalDisplayId() == id;
+gfx::Size GetMaxNativeSize(const DisplayInfo& info) {
+  gfx::Size size;
+  for (auto& mode : info.display_modes()) {
+    if (mode.size.GetArea() > size.GetArea())
+      size = mode.size;
+  }
+  return size;
 }
 
 }  // namespace
@@ -136,10 +143,6 @@ DisplayManager::DisplayManager()
       registered_internal_display_rotation_(gfx::Display::ROTATE_0),
       weak_ptr_factory_(this) {
 #if defined(OS_CHROMEOS)
-  // Enable only on the device so that DisplayManagerFontTest passes.
-  if (base::SysInfo::IsRunningOnChromeOS())
-    DisplayInfo::SetUse125DSFForUIScaling(true);
-
   change_display_upon_host_resize_ = !base::SysInfo::IsRunningOnChromeOS();
 #endif
   gfx::Screen::SetScreenInstance(gfx::SCREEN_TYPE_ALTERNATE, screen_.get());
@@ -240,7 +243,7 @@ DisplayIdPair DisplayManager::GetCurrentDisplayIdPair() const {
   } else {
     CHECK_LE(2u, active_display_list_.size());
     int64 id_at_zero = active_display_list_[0].id();
-    if (id_at_zero == gfx::Display::InternalDisplayId() ||
+    if (gfx::Display::IsInternalDisplayId(id_at_zero) ||
         id_at_zero == first_display_id()) {
       return std::make_pair(id_at_zero, active_display_list_[1].id());
     } else {
@@ -362,64 +365,9 @@ void DisplayManager::SetDisplayRotation(int64 display_id,
   }
 }
 
-bool DisplayManager::SetDisplayUIScale(int64 display_id,
-                                       float ui_scale) {
-  if (GetDisplayIdForUIScaling() != display_id)
-    return false;
-
-  bool found = false;
-  // TODO(mukai): merge this implementation into SetDisplayMode().
-  DisplayInfoList display_info_list;
-  for (const auto& display : active_display_list_) {
-    DisplayInfo info = GetDisplayInfo(display.id());
-    if (info.id() == display_id) {
-      found = true;
-      if (info.configured_ui_scale() == ui_scale)
-        return true;
-      if (!HasDisplayModeForUIScale(info, ui_scale))
-        return false;
-      info.set_configured_ui_scale(ui_scale);
-    }
-    display_info_list.push_back(info);
-  }
-  if (found) {
-    AddMirrorDisplayInfoIfAny(&display_info_list);
-    UpdateDisplays(display_info_list);
-    return true;
-  }
-  return false;
-}
-
-void DisplayManager::SetDisplayResolution(int64 display_id,
-                                          const gfx::Size& resolution) {
-  DCHECK_NE(gfx::Display::InternalDisplayId(), display_id);
-  if (gfx::Display::InternalDisplayId() == display_id)
-    return;
-  const DisplayInfo& display_info = GetDisplayInfo(display_id);
-  const std::vector<DisplayMode>& modes = display_info.display_modes();
-  DCHECK_NE(0u, modes.size());
-  DisplayMode target_mode;
-  target_mode.size = resolution;
-  std::vector<DisplayMode>::const_iterator iter =
-      std::find_if(modes.begin(), modes.end(), DisplayModeMatcher(target_mode));
-  if (iter == modes.end()) {
-    LOG(WARNING) << "Unsupported resolution was requested:"
-                 << resolution.ToString();
-    return;
-  }
-  display_modes_[display_id] = *iter;
-#if defined(OS_CHROMEOS)
-  if (base::SysInfo::IsRunningOnChromeOS())
-    Shell::GetInstance()->display_configurator()->OnConfigurationChanged();
-#endif
-}
-
 bool DisplayManager::SetDisplayMode(int64 display_id,
                                     const DisplayMode& display_mode) {
-  if (GetDisplayIdForUIScaling() == display_id) {
-    SetDisplayUIScale(display_id, display_mode.ui_scale);
-    return false;
-  }
+  bool change_ui_scale = GetDisplayIdForUIScaling() == display_id;
 
   DisplayInfoList display_info_list;
   bool display_property_changed = false;
@@ -427,22 +375,28 @@ bool DisplayManager::SetDisplayMode(int64 display_id,
   for (const auto& display : active_display_list_) {
     DisplayInfo info = GetDisplayInfo(display.id());
     if (info.id() == display_id) {
-      const std::vector<DisplayMode>& modes = info.display_modes();
-      std::vector<DisplayMode>::const_iterator iter =
-          std::find_if(modes.begin(),
-                       modes.end(),
-                       DisplayModeMatcher(display_mode));
-      if (iter == modes.end()) {
-        LOG(WARNING) << "Unsupported resolution was requested:"
-                     << display_mode.size.ToString();
+      auto iter = FindDisplayMode(info, display_mode);
+      if (iter == info.display_modes().end()) {
+        LOG(WARNING) << "Unsupported display mode was requested:"
+                     << "size=" << display_mode.size.ToString()
+                     << ", ui scale=" << display_mode.ui_scale
+                     << ", scale fator=" << display_mode.device_scale_factor;
         return false;
       }
-      display_modes_[display_id] = *iter;
-      if (info.bounds_in_native().size() != display_mode.size)
-        resolution_changed = true;
-      if (info.device_scale_factor() != display_mode.device_scale_factor) {
-        info.set_device_scale_factor(display_mode.device_scale_factor);
+
+      if (change_ui_scale) {
+        if (info.configured_ui_scale() == display_mode.ui_scale)
+          return true;
+        info.set_configured_ui_scale(display_mode.ui_scale);
         display_property_changed = true;
+      } else {
+        display_modes_[display_id] = *iter;
+        if (info.bounds_in_native().size() != display_mode.size)
+          resolution_changed = true;
+        if (info.device_scale_factor() != display_mode.device_scale_factor) {
+          info.set_device_scale_factor(display_mode.device_scale_factor);
+          display_property_changed = true;
+        }
       }
     }
     display_info_list.push_back(info);
@@ -451,11 +405,14 @@ bool DisplayManager::SetDisplayMode(int64 display_id,
     AddMirrorDisplayInfoIfAny(&display_info_list);
     UpdateDisplays(display_info_list);
   }
+  if (resolution_changed && IsInUnifiedMode()) {
+    ReconfigureDisplays();
 #if defined(OS_CHROMEOS)
-  if (resolution_changed && base::SysInfo::IsRunningOnChromeOS())
+  } else if (resolution_changed && base::SysInfo::IsRunningOnChromeOS()) {
     Shell::GetInstance()->display_configurator()->OnConfigurationChanged();
 #endif
-  return resolution_changed;
+  }
+  return resolution_changed || display_property_changed;
 }
 
 void DisplayManager::RegisterDisplayProperty(
@@ -486,7 +443,7 @@ void DisplayManager::RegisterDisplayProperty(
   if (overscan_insets)
     display_info_[display_id].SetOverscanInsets(*overscan_insets);
   if (!resolution_in_pixels.IsEmpty()) {
-    DCHECK(!IsInternalDisplayId(display_id));
+    DCHECK(!gfx::Display::IsInternalDisplayId(display_id));
     // Default refresh rate, until OnNativeDisplaysChanged() updates us with the
     // actual display info, is 60 Hz.
     DisplayMode mode(resolution_in_pixels, 60.0f, false, false);
@@ -506,17 +463,13 @@ DisplayMode DisplayManager::GetActiveModeForDisplayId(int64 display_id) const {
   // restored mode to |display_mode_|, so it needs to look up the mode whose
   // UI-scale value matches. See the TODO in RegisterDisplayProperty().
   const DisplayInfo& info = GetDisplayInfo(display_id);
-  const std::vector<DisplayMode>& display_modes = info.display_modes();
 
-  if (GetDisplayIdForUIScaling() == display_id) {
-    for (size_t i = 0; i < display_modes.size(); ++i) {
-      if (info.configured_ui_scale() == display_modes[i].ui_scale)
-        return display_modes[i];
-    }
-  } else {
-    for (size_t i = 0; i < display_modes.size(); ++i) {
-      if (display_modes[i].native)
-        return display_modes[i];
+  for (auto& mode : info.display_modes()) {
+    if (GetDisplayIdForUIScaling() == display_id) {
+      if (info.configured_ui_scale() == mode.ui_scale)
+        return mode;
+    } else if (mode.native) {
+      return mode;
     }
   }
   return selected_mode;
@@ -621,7 +574,8 @@ void DisplayManager::OnNativeDisplaysChanged(
        iter != updated_displays.end();
        ++iter) {
     if (!internal_display_connected)
-      internal_display_connected = IsInternalDisplayId(iter->id());
+      internal_display_connected =
+          gfx::Display::IsInternalDisplayId(iter->id());
     // Mirrored monitors have the same origins.
     gfx::Point origin = iter->bounds_in_native().origin();
     if (origins.find(origin) != origins.end()) {
@@ -640,10 +594,7 @@ void DisplayManager::OnNativeDisplaysChanged(
     // This is empty the displays are initialized from InitFromCommandLine.
     if (!display_modes.size())
       continue;
-    std::vector<DisplayMode>::const_iterator display_modes_iter =
-        std::find_if(display_modes.begin(),
-                     display_modes.end(),
-                     DisplayModeMatcher(new_mode));
+    auto display_modes_iter = FindDisplayMode(*iter, new_mode);
     // Update the actual resolution selected as the resolution request may fail.
     if (display_modes_iter == display_modes.end())
       display_modes_.erase(iter->id());
@@ -961,9 +912,9 @@ std::string DisplayManager::GetDisplayNameForId(int64 id) {
 }
 
 int64 DisplayManager::GetDisplayIdForUIScaling() const {
-  // UI Scaling is effective on internal display or on unified desktop.
-  return IsInUnifiedMode() ? kUnifiedDisplayId
-                           : gfx::Display::InternalDisplayId();
+  // UI Scaling is effective on internal display.
+  return gfx::Display::HasInternalDisplay() ? gfx::Display::InternalDisplayId()
+                                            : gfx::Display::kInvalidDisplayID;
 }
 
 void DisplayManager::SetMirrorMode(bool mirror) {
@@ -1120,7 +1071,8 @@ void DisplayManager::CreateScreenForShutdown() const {
 }
 
 void DisplayManager::UpdateInternalDisplayModeListForTest() {
-  if (display_info_.count(gfx::Display::InternalDisplayId()) == 0)
+  if (!gfx::Display::HasInternalDisplay() ||
+      display_info_.count(gfx::Display::InternalDisplayId()) == 0)
     return;
   DisplayInfo* info = &display_info_[gfx::Display::InternalDisplayId()];
   SetInternalDisplayModeList(info);
@@ -1137,7 +1089,7 @@ void DisplayManager::CreateSoftwareMirroringDisplayInfo(
       case MIRRORING: {
         bool zero_is_source =
             first_display_id_ == (*display_info_list)[0].id() ||
-            gfx::Display::InternalDisplayId() == (*display_info_list)[0].id();
+            gfx::Display::IsInternalDisplayId((*display_info_list)[0].id());
         DCHECK_EQ(MIRRORING, multi_display_mode_);
         mirroring_display_id_ =
             (*display_info_list)[zero_is_source ? 1 : 0].id();
@@ -1166,34 +1118,86 @@ void DisplayManager::CreateSoftwareMirroringDisplayInfo(
         gfx::Rect unified_bounds;
         software_mirroring_display_list_.clear();
 
+        // 1st Pass. Find the max size.
         int max_height = std::numeric_limits<int>::min();
-        for (auto& info : *display_info_list)
+
+        int default_height = 0;
+        float default_device_scale_factor = 1.0f;
+        for (auto& info : *display_info_list) {
           max_height = std::max(max_height, info.size_in_pixel().height());
+          if (!default_height || gfx::Display::IsInternalDisplayId(info.id())) {
+            default_height = info.size_in_pixel().height();
+            default_device_scale_factor = info.device_scale_factor();
+          }
+        }
 
         std::vector<DisplayMode> display_mode_list;
-        std::set<float> ui_scales;
+        std::set<std::pair<float, float>> dsf_scale_list;
 
+        // 2nd Pass. Compute the unified display size.
         for (auto& info : *display_info_list) {
           InsertAndUpdateDisplayInfo(info);
           gfx::Point origin(unified_bounds.right(), 0);
-          float ui_scale =
+          float scale =
               info.size_in_pixel().height() / static_cast<float>(max_height);
           // The display is scaled to fit the unified desktop size.
           gfx::Display display = CreateMirroringDisplayFromDisplayInfoById(
-              info.id(), origin, 1.0f / ui_scale);
-          display.UpdateWorkAreaFromInsets(gfx::Insets());
+              info.id(), origin, 1.0f / scale);
           unified_bounds.Union(display.bounds());
 
-          ui_scales.insert(ui_scale);
-
-          software_mirroring_display_list_.push_back(display);
+          dsf_scale_list.insert(
+              std::make_pair(info.device_scale_factor(), scale));
         }
+
         DisplayInfo info(kUnifiedDisplayId, "Unified Desktop", false);
-        info.SetBounds(unified_bounds);
 
         DisplayMode native_mode(unified_bounds.size(), 60.0f, false, true);
-        info.SetDisplayModes(
-            CreateUnifiedDisplayModeList(native_mode, ui_scales));
+        std::vector<DisplayMode> modes =
+            CreateUnifiedDisplayModeList(native_mode, dsf_scale_list);
+
+        // Find the default mode.
+        auto iter = std::find_if(
+            modes.begin(), modes.end(),
+            [default_height,
+             default_device_scale_factor](const DisplayMode& mode) {
+              return mode.size.height() == default_height &&
+                     mode.device_scale_factor == default_device_scale_factor;
+            });
+        iter->native = true;
+        info.SetDisplayModes(modes);
+        info.set_device_scale_factor(iter->device_scale_factor);
+        info.SetBounds(gfx::Rect(iter->size));
+
+        // Forget the configured resolution if the original unified
+        // desktop resolution has changed.
+        if (display_info_.count(kUnifiedDisplayId) != 0 &&
+            GetMaxNativeSize(display_info_[kUnifiedDisplayId]) !=
+                unified_bounds.size()) {
+          display_modes_.erase(kUnifiedDisplayId);
+        }
+
+        // 3rd Pass. Set the selected mode, then recompute the mirroring
+        // display size.
+        DisplayMode mode;
+        if (GetSelectedModeForDisplayId(kUnifiedDisplayId, &mode) &&
+            FindDisplayMode(info, mode) != info.display_modes().end()) {
+          info.set_device_scale_factor(mode.device_scale_factor);
+          info.SetBounds(gfx::Rect(mode.size));
+        } else {
+          display_modes_.erase(kUnifiedDisplayId);
+        }
+
+        int unified_display_height = info.size_in_pixel().height();
+        gfx::Point origin;
+        for (auto& info : *display_info_list) {
+          float display_scale = info.size_in_pixel().height() /
+                                static_cast<float>(unified_display_height);
+          gfx::Display display = CreateMirroringDisplayFromDisplayInfoById(
+              info.id(), origin, 1.0f / display_scale);
+          origin.Offset(display.size().width(), 0);
+          display.UpdateWorkAreaFromInsets(gfx::Insets());
+          software_mirroring_display_list_.push_back(display);
+        }
 
         display_info_list->clear();
         display_info_list->push_back(info);
@@ -1305,11 +1309,10 @@ bool DisplayManager::UpdateNonPrimaryDisplayBoundsForLayout(
   }
 
   int64 id_at_zero = displays->at(0).id();
-  DisplayIdPair pair =
-      (id_at_zero == first_display_id_ ||
-       id_at_zero == gfx::Display::InternalDisplayId()) ?
-      std::make_pair(id_at_zero, displays->at(1).id()) :
-      std::make_pair(displays->at(1).id(), id_at_zero);
+  DisplayIdPair pair = (id_at_zero == first_display_id_ ||
+                        gfx::Display::IsInternalDisplayId(id_at_zero))
+                           ? std::make_pair(id_at_zero, displays->at(1).id())
+                           : std::make_pair(displays->at(1).id(), id_at_zero);
   DisplayLayout layout =
       layout_store_->ComputeDisplayLayoutForDisplayIdPair(pair);
 

@@ -1125,7 +1125,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
   ASSERT_TRUE(content::ExecuteScript(RenderViewHost(), fill_and_submit));
   observer.Wait();
   if (chrome::VersionInfo::GetChannel() ==
-      chrome::VersionInfo::CHANNEL_UNKNOWN) {
+      version_info::Channel::UNKNOWN) {
     // Passwords getting auto-saved, no prompt.
     EXPECT_FALSE(prompt_observer->IsShowingPrompt());
     EXPECT_FALSE(password_store->IsEmpty());
@@ -1970,8 +1970,7 @@ IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
 IN_PROC_BROWSER_TEST_F(PasswordManagerBrowserTestBase,
                        CrossSitePasswordEnforcement) {
   // The code under test is only active under site isolation.
-  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
-          ::switches::kSitePerProcess)) {
+  if (!content::AreAllSitesIsolatedForTesting()) {
     return;
   }
 

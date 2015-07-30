@@ -14,6 +14,7 @@
 #include "content/browser/tracing/tracing_ui.h"
 #include "content/common/child_process_messages.h"
 #include "content/public/browser/browser_message_filter.h"
+#include "content/public/common/child_process_host.h"
 #include "content/public/common/content_switches.h"
 
 #if defined(OS_CHROMEOS)
@@ -484,6 +485,8 @@ void TracingControllerImpl::AddTraceMessageFilter(
     trace_message_filter->SendEnableMonitoring(
         TraceLog::GetInstance()->GetCurrentTraceConfig());
   }
+  if (!trace_message_filter_added_callback_.is_null())
+    trace_message_filter_added_callback_.Run(trace_message_filter);
 }
 
 void TracingControllerImpl::RemoveTraceMessageFilter(
@@ -823,6 +826,22 @@ void TracingControllerImpl::RequestGlobalMemoryDump(
 
 bool TracingControllerImpl::IsCoordinatorProcess() const {
   return true;
+}
+
+uint64 TracingControllerImpl::GetTracingProcessId() const {
+  return ChildProcessHost::kBrowserTracingProcessId;
+}
+
+void TracingControllerImpl::SetTraceMessageFilterAddedCallback(
+    const TraceMessageFilterAddedCallback& callback) {
+  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  trace_message_filter_added_callback_ = callback;
+}
+
+void TracingControllerImpl::GetTraceMessageFilters(
+    TraceMessageFilterSet* filters) {
+  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  filters->insert(trace_message_filters_.begin(), trace_message_filters_.end());
 }
 
 void TracingControllerImpl::OnProcessMemoryDumpResponse(

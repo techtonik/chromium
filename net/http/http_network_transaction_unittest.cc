@@ -494,6 +494,7 @@ void FillLargeHeadersString(std::string* str, int size) {
     str->append(row, sizeof_row);
 }
 
+#if defined(NTLM_PORTABLE)
 // Alternative functions that eliminate randomness and dependency on the local
 // host name so that the generated NTLM messages are reproducible.
 void MockGenerateRandom1(uint8* output, size_t n) {
@@ -522,6 +523,7 @@ void MockGenerateRandom2(uint8* output, size_t n) {
 std::string MockGetHostName() {
   return "WTC-WIN7";
 }
+#endif  // defined(NTLM_PORTABLE)
 
 template<typename ParentPool>
 class CaptureGroupNameSocketPool : public ParentPool {
@@ -641,6 +643,7 @@ bool CheckDigestServerAuth(const AuthChallengeInfo* auth_challenge) {
   return true;
 }
 
+#if defined(NTLM_PORTABLE)
 bool CheckNTLMServerAuth(const AuthChallengeInfo* auth_challenge) {
   if (!auth_challenge)
     return false;
@@ -650,6 +653,7 @@ bool CheckNTLMServerAuth(const AuthChallengeInfo* auth_challenge) {
   EXPECT_EQ("ntlm", auth_challenge->scheme);
   return true;
 }
+#endif  // defined(NTLM_PORTABLE)
 
 }  // namespace
 
@@ -3840,8 +3844,12 @@ TEST_P(HttpNetworkTransactionTest,
   // CONNECT to mail.example.org:443 via SPDY.
   SpdyHeaderBlock connect2_block;
   connect2_block[spdy_util_.GetMethodKey()] = "CONNECT";
-  connect2_block[spdy_util_.GetPathKey()] = "mail.example.org:443";
-  connect2_block[spdy_util_.GetHostKey()] = "mail.example.org";
+  if (GetParam() >= kProtoHTTP2MinimumVersion) {
+    connect2_block[spdy_util_.GetHostKey()] = "mail.example.org:443";
+  } else {
+    connect2_block[spdy_util_.GetPathKey()] = "mail.example.org:443";
+    connect2_block[spdy_util_.GetHostKey()] = "mail.example.org";
+  }
   spdy_util_.MaybeAddVersionHeader(&connect2_block);
   scoped_ptr<SpdyFrame> connect2(
       spdy_util_.ConstructSpdySyn(3, connect2_block, LOWEST, false, false));
@@ -7864,8 +7872,10 @@ scoped_refptr<HttpNetworkSession> SetupSessionForGroupNameTests(
       session->http_server_properties();
   AlternativeService alternative_service(
       AlternateProtocolFromNextProto(next_proto), "", 443);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
   http_server_properties->SetAlternativeService(
-      HostPortPair("host.with.alternate", 80), alternative_service, 1.0);
+      HostPortPair("host.with.alternate", 80), alternative_service, 1.0,
+      expiration);
 
   return session;
 }
@@ -8799,8 +8809,9 @@ TEST_P(HttpNetworkTransactionTest, EmptyAlternateProtocolHeader) {
   HttpServerProperties& http_server_properties =
       *session->http_server_properties();
   AlternativeService alternative_service(QUIC, "", 80);
-  http_server_properties.SetAlternativeService(http_host_port_pair,
-                                               alternative_service, 1.0);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
+  http_server_properties.SetAlternativeService(
+      http_host_port_pair, alternative_service, 1.0, expiration);
 
   AlternativeServiceVector alternative_service_vector =
       http_server_properties.GetAlternativeServices(http_host_port_pair);
@@ -8864,8 +8875,9 @@ TEST_P(HttpNetworkTransactionTest,
   const AlternativeService alternative_service(
       AlternateProtocolFromNextProto(GetParam()), "www.example.org",
       666);  // Port is ignored by MockConnect anyway.
-  http_server_properties->SetAlternativeService(host_port_pair,
-                                                alternative_service, 1.0);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
+  http_server_properties->SetAlternativeService(
+      host_port_pair, alternative_service, 1.0, expiration);
 
   scoped_ptr<HttpTransaction> trans(
       new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
@@ -8927,9 +8939,10 @@ TEST_P(HttpNetworkTransactionTest,
   AlternativeService alternative_service(
       AlternateProtocolFromNextProto(GetParam()), "www.example.org",
       kUnrestrictedAlternatePort);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
   http_server_properties->SetAlternativeService(
       HostPortPair::FromURL(restricted_port_request.url), alternative_service,
-      1.0);
+      1.0, expiration);
 
   scoped_ptr<HttpTransaction> trans(
       new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
@@ -8980,9 +8993,10 @@ TEST_P(HttpNetworkTransactionTest,
   AlternativeService alternative_service(
       AlternateProtocolFromNextProto(GetParam()), "www.example.org",
       kUnrestrictedAlternatePort);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
   http_server_properties->SetAlternativeService(
       HostPortPair::FromURL(restricted_port_request.url), alternative_service,
-      1.0);
+      1.0, expiration);
 
   scoped_ptr<HttpTransaction> trans(
       new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
@@ -9030,9 +9044,10 @@ TEST_P(HttpNetworkTransactionTest,
   AlternativeService alternative_service(
       AlternateProtocolFromNextProto(GetParam()), "www.example.org",
       kRestrictedAlternatePort);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
   http_server_properties->SetAlternativeService(
       HostPortPair::FromURL(restricted_port_request.url), alternative_service,
-      1.0);
+      1.0, expiration);
 
   scoped_ptr<HttpTransaction> trans(
       new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
@@ -9081,9 +9096,10 @@ TEST_P(HttpNetworkTransactionTest,
   AlternativeService alternative_service(
       AlternateProtocolFromNextProto(GetParam()), "www.example.org",
       kRestrictedAlternatePort);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
   http_server_properties->SetAlternativeService(
       HostPortPair::FromURL(unrestricted_port_request.url), alternative_service,
-      1.0);
+      1.0, expiration);
 
   scoped_ptr<HttpTransaction> trans(
       new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
@@ -9127,13 +9143,14 @@ TEST_P(HttpNetworkTransactionTest,
 
   base::WeakPtr<HttpServerProperties> http_server_properties =
       session->http_server_properties();
-  const int kUnrestrictedAlternatePort = 1024;
+  const int kUnrestrictedAlternatePort = 1025;
   AlternativeService alternative_service(
       AlternateProtocolFromNextProto(GetParam()), "www.example.org",
       kUnrestrictedAlternatePort);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
   http_server_properties->SetAlternativeService(
       HostPortPair::FromURL(unrestricted_port_request.url), alternative_service,
-      1.0);
+      1.0, expiration);
 
   scoped_ptr<HttpTransaction> trans(
       new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
@@ -9176,8 +9193,9 @@ TEST_P(HttpNetworkTransactionTest, AlternateProtocolUnsafeBlocked) {
   AlternativeService alternative_service(
       AlternateProtocolFromNextProto(GetParam()), "www.example.org",
       kUnsafePort);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
   http_server_properties->SetAlternativeService(
-      HostPortPair::FromURL(request.url), alternative_service, 1.0);
+      HostPortPair::FromURL(request.url), alternative_service, 1.0, expiration);
 
   scoped_ptr<HttpTransaction> trans(
       new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
@@ -11827,8 +11845,9 @@ class AltSvcCertificateVerificationTest : public HttpNetworkTransactionTest {
         session->http_server_properties();
     AlternativeService alternative_service(
         AlternateProtocolFromNextProto(GetParam()), alternative);
+    base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
     http_server_properties->SetAlternativeService(origin, alternative_service,
-                                                  1.0);
+                                                  1.0, expiration);
 
     // First request to alternative.
     if (pooling) {
@@ -11931,8 +11950,9 @@ TEST_P(HttpNetworkTransactionTest, AlternativeServiceNotOnHttp11) {
       session->http_server_properties();
   AlternativeService alternative_service(
       AlternateProtocolFromNextProto(GetParam()), alternative);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
   http_server_properties->SetAlternativeService(origin, alternative_service,
-                                                1.0);
+                                                1.0, expiration);
 
   scoped_ptr<HttpTransaction> trans(
       new HttpNetworkTransaction(DEFAULT_PRIORITY, session.get()));
@@ -12003,8 +12023,9 @@ TEST_P(HttpNetworkTransactionTest, FailedAlternativeServiceIsNotUserVisible) {
       session->http_server_properties();
   AlternativeService alternative_service(
       AlternateProtocolFromNextProto(GetParam()), alternative);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
   http_server_properties->SetAlternativeService(origin, alternative_service,
-                                                1.0);
+                                                1.0, expiration);
 
   HttpNetworkTransaction trans1(DEFAULT_PRIORITY, session.get());
   HttpRequestInfo request1;
@@ -12111,8 +12132,9 @@ TEST_P(HttpNetworkTransactionTest, AlternativeServiceShouldNotPoolToHttp11) {
       session->http_server_properties();
   AlternativeService alternative_service(
       AlternateProtocolFromNextProto(GetParam()), alternative);
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
   http_server_properties->SetAlternativeService(origin, alternative_service,
-                                                1.0);
+                                                1.0, expiration);
 
   // First transaction to alternative to open an HTTP/1.1 socket.
   scoped_ptr<HttpTransaction> trans1(

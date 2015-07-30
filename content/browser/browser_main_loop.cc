@@ -67,6 +67,7 @@
 #include "net/base/network_change_notifier.h"
 #include "net/socket/client_socket_factory.h"
 #include "net/ssl/ssl_config_service.h"
+#include "skia/ext/skia_memory_dump_provider.h"
 #include "ui/base/clipboard/clipboard.h"
 
 #if defined(USE_AURA) || (defined(OS_MACOSX) && !defined(OS_IOS))
@@ -631,6 +632,8 @@ void BrowserMainLoop::PostMainMessageLoopStart() {
   // Enable the dump providers.
   base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
       HostSharedBitmapManager::current());
+  base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
+      skia::SkiaMemoryDumpProvider::GetInstance());
 
 #if defined(TCMALLOC_TRACE_MEMORY_SUPPORTED)
   trace_memory_controller_.reset(new base::trace_event::TraceMemoryController(
@@ -1201,8 +1204,8 @@ int BrowserMainLoop::BrowserThreadsStarted() {
   allowed_clipboard_threads.push_back(base::PlatformThread::CurrentId());
 #if defined(OS_WIN)
   // On Windows, clipboards are also used on the FILE or IO threads.
-  allowed_clipboard_threads.push_back(file_thread_->thread_id());
-  allowed_clipboard_threads.push_back(io_thread_->thread_id());
+  allowed_clipboard_threads.push_back(file_thread_->GetThreadId());
+  allowed_clipboard_threads.push_back(io_thread_->GetThreadId());
 #endif
   ui::Clipboard::SetAllowedThreads(allowed_clipboard_threads);
 

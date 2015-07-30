@@ -6,7 +6,7 @@ package org.chromium.chrome.browser.compositor.scene_layer;
 
 import android.content.Context;
 
-import org.chromium.base.JNINamespace;
+import org.chromium.base.annotations.JNINamespace;
 import org.chromium.chrome.browser.compositor.LayerTitleCache;
 import org.chromium.chrome.browser.compositor.layouts.components.CompositorButton;
 import org.chromium.chrome.browser.compositor.overlays.strip.StripLayoutHelperManager;
@@ -58,9 +58,14 @@ public class TabStripSceneLayer extends SceneOverlayLayer {
             StripLayoutTab[] stripLayoutTabsToRender, float yOffset) {
         if (mNativePtr == 0) return;
 
-        nativeBeginBuildingFrame(mNativePtr);
-        pushButtonsAndBackground(layoutHelper, resourceManager, yOffset);
-        pushStripTabs(layoutHelper, layerTitleCache, resourceManager, stripLayoutTabsToRender);
+        final boolean visible = yOffset > -layoutHelper.getHeight();
+        // This will hide the tab strips if necessary.
+        nativeBeginBuildingFrame(mNativePtr, visible);
+        // When strip tabs are completely off screen, we don't need to update it.
+        if (visible) {
+            pushButtonsAndBackground(layoutHelper, resourceManager, yOffset);
+            pushStripTabs(layoutHelper, layerTitleCache, resourceManager, stripLayoutTabsToRender);
+        }
         nativeFinishBuildingFrame(mNativePtr);
     }
 
@@ -110,7 +115,7 @@ public class TabStripSceneLayer extends SceneOverlayLayer {
     }
 
     private native long nativeInit();
-    private native void nativeBeginBuildingFrame(long nativeTabStripSceneLayer);
+    private native void nativeBeginBuildingFrame(long nativeTabStripSceneLayer, boolean visible);
     private native void nativeFinishBuildingFrame(long nativeTabStripSceneLayer);
     private native void nativeUpdateTabStripLayer(long nativeTabStripSceneLayer, float width,
             float height, float yOffset, float stripBrightness);

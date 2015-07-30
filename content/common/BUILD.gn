@@ -132,6 +132,7 @@ source_set("common") {
 
   configs += [
     "//content:content_implementation",
+    "//build/config:precompiled_headers",
     "//build/config/compiler:no_size_t_to_int_warning",
   ]
 
@@ -164,6 +165,7 @@ source_set("common") {
   if (!is_ios) {
     deps += [
       "//cc",
+      "//device/bluetooth",
       "//ipc",
       "//ipc/mojo",
 
@@ -187,6 +189,7 @@ source_set("common") {
       "//third_party/WebKit/public:blink",
       "//third_party/mojo/src/mojo/edk/system",
       "//ui/gl",
+      ":mojo_bindings",
     ]
   }
 
@@ -264,16 +267,15 @@ source_set("common") {
     deps += [
       "//ui/ozone:ozone",
       "//ui/ozone:ozone_base",
-      "//ui/ozone/gpu",
     ]
   } else {
     sources -= [
       "cursors/webcursor_ozone.cc",
       "font_list_ozone.cc",
-      "gpu/client/gpu_memory_buffer_impl_ozone_native_buffer.cc",
-      "gpu/client/gpu_memory_buffer_impl_ozone_native_buffer.h",
-      "gpu/gpu_memory_buffer_factory_ozone_native_buffer.cc",
-      "gpu/gpu_memory_buffer_factory_ozone_native_buffer.h",
+      "gpu/client/gpu_memory_buffer_impl_ozone_native_pixmap.cc",
+      "gpu/client/gpu_memory_buffer_impl_ozone_native_pixmap.h",
+      "gpu/gpu_memory_buffer_factory_ozone_native_pixmap.cc",
+      "gpu/gpu_memory_buffer_factory_ozone_native_pixmap.h",
     ]
   }
 

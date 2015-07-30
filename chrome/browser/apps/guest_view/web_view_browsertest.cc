@@ -15,6 +15,7 @@
 #include "chrome/browser/apps/app_browsertest_util.h"
 #include "chrome/browser/chrome_content_browser_client.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
+#include "chrome/browser/pdf/pdf_extension_test_util.h"
 #include "chrome/browser/prerender/prerender_link_manager.h"
 #include "chrome/browser/prerender/prerender_link_manager_factory.h"
 #include "chrome/browser/profiles/profile.h"
@@ -2458,6 +2459,41 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestCloseNewWindowCleanup) {
 // guest content.
 IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestFocusWhileFocused) {
   TestHelper("testFocusWhileFocused", "web_view/shim", NO_TEST_SERVER);
+}
+
+IN_PROC_BROWSER_TEST_F(WebViewTest, NestedGuestContainerBounds) {
+  TestHelper("testPDFInWebview", "web_view/shim", NO_TEST_SERVER);
+
+  std::vector<content::WebContents*> guest_web_contents_list;
+  GetGuestViewManager()->WaitForNumGuestsCreated(2u);
+  GetGuestViewManager()->GetGuestWebContentsList(&guest_web_contents_list);
+  ASSERT_EQ(2u, guest_web_contents_list.size());
+
+  content::WebContents* web_view_contents = guest_web_contents_list[0];
+  content::WebContents* mime_handler_view_contents = guest_web_contents_list[1];
+
+  // Make sure we've completed loading |mime_handler_view_guest|.
+  bool load_success = pdf_extension_test_util::EnsurePDFHasLoaded(
+      web_view_contents);
+  EXPECT_TRUE(load_success);
+
+  gfx::Rect web_view_container_bounds = web_view_contents->GetContainerBounds();
+  gfx::Rect mime_handler_view_container_bounds =
+      mime_handler_view_contents->GetContainerBounds();
+  EXPECT_EQ(web_view_container_bounds.origin(),
+            mime_handler_view_container_bounds.origin());
+}
+
+IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestMailtoLink) {
+  TestHelper("testMailtoLink", "web_view/shim", NEEDS_TEST_SERVER);
+}
+
+// Tests that a renderer navigation from an unattached guest that results in a
+// server redirect works properly.
+IN_PROC_BROWSER_TEST_F(WebViewTest,
+                       Shim_TestRendererNavigationRedirectWhileUnattached) {
+  TestHelper("testRendererNavigationRedirectWhileUnattached",
+             "web_view/shim", NEEDS_TEST_SERVER);
 }
 
 #if defined(USE_AURA)

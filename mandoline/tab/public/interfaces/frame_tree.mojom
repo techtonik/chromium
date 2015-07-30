@@ -4,6 +4,8 @@
 
 module mandoline;
 
+import "network/public/interfaces/url_loader.mojom";
+
 // This files defines the interfaces and structures used for frames.
 //
 // When a client in the frame tree is connected to by way of the ViewManager a
@@ -18,11 +20,29 @@ module mandoline;
 // TODO(sky): there are likely timing issues here, figure out how to resolve
 // that.
 
+// Expresses a preference for where a navigation will be performed.
+enum NavigationTarget {
+  // No preference
+  DEFAULT,
+
+  // In the same ViewManager node that the navigation was initiated
+  SOURCE_NODE,
+
+  // In a new ViewManager node
+  NEW_NODE
+};
+
 // Provides information about a frame.
 struct FrameData {
   // 0 if the frame has no parent (its the root).
   uint32 parent_id;
   uint32 frame_id;
+
+  string? name;
+  // TODO(sky): this is not being propagated correctly. It needs to be updated
+  // along with deciding if we want to keep NavigatorHost.
+  string origin;
+  uint32 sandbox_flags;
 };
 
 struct MessageEvent {
@@ -32,18 +52,32 @@ struct MessageEvent {
 interface FrameTreeServer {
   // TODO(sky): make these real.
   PostMessageEventToFrame(uint32 frame_id, MessageEvent event);
-  NavigateFrame(uint32 frame_id);
-  ReloadFrame(uint32 frame_id);
 
   // Notifies the server that a load has started or stopped in this frame.
   // When loading is started, progress is reset to 0, but when loading is
   // stopped progress may not have reached 1.0.
-  LoadingStarted();
-  LoadingStopped();
+  LoadingStarted(uint32 frame_id);
+  LoadingStopped(uint32 frame_id);
 
   // Called when the progress for this frame changes. Will only be called while
   // a load is in progress.
-  ProgressChanged(double progress);
+  ProgressChanged(uint32 frame_id, double progress);
+
+  SetFrameName(uint32 frame_id, string? name);
+
+  // Called when the client creates a new frame. |frame_id| corresponds to
+  // the id of the view hosting the frame, and |parent_id| the id of the
+  // parent.
+  OnCreatedFrame(uint32 parent_id, uint32 frame_id);
+
+  // The specified frame is requesting a navigation.
+  RequestNavigate(uint32 frame_id,
+                  NavigationTarget target,
+                  mojo.URLRequest request);
+
+  // The frame navigated locally, for example, pushState() navigations in an
+  // HTML application.
+  DidNavigateLocally(uint32 frame_id, string url);
 };
 
 interface FrameTreeClient {
@@ -57,4 +91,8 @@ interface FrameTreeClient {
   // Called when a frame is removed from the tree. This is not called on the
   // originator of the change.
   OnFrameRemoved(uint32 frame_id);
+
+  // Called when the name of a frame changes. This is not called on the
+  // originator of the change.
+  OnFrameNameChanged(uint32 frame_id, string name);
 };

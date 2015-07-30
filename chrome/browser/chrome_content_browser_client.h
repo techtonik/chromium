@@ -154,6 +154,13 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       const base::string16& name,
       content::ResourceContext* context,
       const std::vector<std::pair<int, int>>& render_frames) override;
+
+#if defined(ENABLE_WEBRTC)
+  bool AllowWebRTCIdentityCache(const GURL& url,
+                                const GURL& first_party_url,
+                                content::ResourceContext* context) override;
+#endif  // defined(ENABLE_WEBRTC)
+
   net::URLRequestContext* OverrideRequestContextForURL(
       const GURL& url,
       content::ResourceContext* context) override;
@@ -280,7 +287,7 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   static void MaybeCopyDisableWebRtcEncryptionSwitch(
       base::CommandLine* to_command_line,
       const base::CommandLine& from_command_line,
-      VersionInfo::Channel channel);
+      version_info::Channel channel);
 #endif
 
   void FileSystemAccessed(

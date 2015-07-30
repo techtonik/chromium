@@ -26,7 +26,6 @@
 #include "chrome/browser/chromeos/profiles/profile_helper.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
 #include "chrome/browser/io_thread.h"
-#include "chrome/browser/lifetime/application_lifetime.h"
 #include "chrome/browser/ui/webui/chromeos/login/signin_screen_handler.h"
 #include "chrome/browser/ui/webui/signin/inline_login_ui.h"
 #include "chrome/common/chrome_version_info.h"
@@ -87,6 +86,10 @@ void UpdateAuthParams(base::DictionaryValue* params,
   // Account creation depends on Guest sign-in (http://crosbug.com/24570).
   params->SetBoolean("createAccount", allow_new_user && allow_guest);
   params->SetBoolean("guestSignin", allow_guest);
+
+  // nosignup flow if new users are not allowed.
+  if (!allow_new_user && StartupUtils::IsWebviewSigninEnabled())
+    params->SetString("flow", "nosignup");
 
   // Allow supervised user creation only if:
   // 1. Enterprise managed device > is allowed by policy.
@@ -448,8 +451,6 @@ void GaiaScreenHandler::RegisterMessages() {
   AddCallback("scrapedPasswordVerificationFailed",
               &GaiaScreenHandler::HandleScrapedPasswordVerificationFailed);
   AddCallback("loginWebuiReady", &GaiaScreenHandler::HandleGaiaUIReady);
-  AddCallback("toggleWebviewSignin",
-              &GaiaScreenHandler::HandleToggleWebviewSignin);
   AddCallback("toggleEasyBootstrap",
               &GaiaScreenHandler::HandleToggleEasyBootstrap);
   AddCallback("identifierEntered", &GaiaScreenHandler::HandleIdentifierEntered);
@@ -606,13 +607,6 @@ void GaiaScreenHandler::HandleScrapedPasswordVerificationFailed() {
   RecordSAMLScrapingVerificationResultInHistogram(false);
 }
 
-void GaiaScreenHandler::HandleToggleWebviewSignin() {
-  if (StartupUtils::EnableWebviewSignin(
-        !StartupUtils::IsWebviewSigninEnabled())) {
-    chrome::AttemptRestart();
-  }
-}
-
 void GaiaScreenHandler::HandleToggleEasyBootstrap() {
   use_easy_bootstrap_ = !use_easy_bootstrap_;
   const bool kForceReload = true;
@@ -765,20 +759,20 @@ void GaiaScreenHandler::SubmitLoginFormForTest() {
     code += "document.getElementById('Passwd').value = '" + test_pass_ + "';";
     code += "document.getElementById('signIn').click();";
 
-    frame->ExecuteJavaScript(base::ASCIIToUTF16(code));
+    frame->ExecuteJavaScriptForTests(base::ASCIIToUTF16(code));
   } else {
     std::string code;
 
     code =
         "document.getElementById('identifier').value = '" + test_user_ + "';";
     code += "document.getElementById('nextButton').click();";
-    frame->ExecuteJavaScript(base::ASCIIToUTF16(code));
+    frame->ExecuteJavaScriptForTests(base::ASCIIToUTF16(code));
 
     if (!test_pass_.empty()) {
       code =
           "document.getElementById('password').value = '" + test_pass_ + "';";
       code += "document.getElementById('nextButton').click();";
-      frame->ExecuteJavaScript(base::ASCIIToUTF16(code));
+      frame->ExecuteJavaScriptForTests(base::ASCIIToUTF16(code));
     }
   }
 

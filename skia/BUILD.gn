@@ -291,6 +291,7 @@ component("skia") {
     "ext/platform_device_mac.cc",
     "ext/platform_device_win.cc",
     "ext/recursive_gaussian_convolution.cc",
+    "ext/skia_memory_dump_provider.cc",
     "ext/skia_utils_base.cc",
     "ext/skia_utils_ios.mm",
     "ext/skia_utils_mac.mm",
@@ -441,6 +442,7 @@ component("skia") {
   configs -= [ "//build/config/compiler:chromium_code" ]
   configs += [
     ":skia_library_config",
+    "//build/config:precompiled_headers",
     "//build/config/compiler:no_chromium_code",
   ]
   public_configs = [ ":skia_config" ]
@@ -581,6 +583,15 @@ source_set("skia_opts") {
   visibility = [ ":skia" ]
 }
 
+# TODO(GYP): Delete this after we've converted everything to GN.
+# The _run targets exist only for compatibility w/ GYP.
+group("skia_unittests_run") {
+  testonly = true
+  deps = [
+    ":skia_unittests",
+  ]
+}
+
 test("skia_unittests") {
   sources = [
     "ext/analysis_canvas_unittest.cc",
@@ -591,6 +602,7 @@ test("skia_unittests") {
     "ext/platform_canvas_unittest.cc",
     "ext/recursive_gaussian_convolution_unittest.cc",
     "ext/refptr_unittest.cc",
+    "ext/skia_memory_dump_provider_unittest.cc",
     "ext/skia_utils_ios_unittest.mm",
     "ext/skia_utils_mac_unittest.mm",
   ]

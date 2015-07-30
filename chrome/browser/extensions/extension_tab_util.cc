@@ -106,6 +106,16 @@ Browser* CreateBrowser(ChromeUIThreadExtensionFunction* function,
   return browser;
 }
 
+// Use this function for reporting a tab id to an extension. It will
+// take care of setting the id to TAB_ID_NONE if necessary (for
+// example with devtools).
+int GetTabIdForExtensions(const WebContents* web_contents) {
+  Browser* browser = chrome::FindBrowserWithWebContents(web_contents);
+  if (browser && !ExtensionTabUtil::BrowserSupportsTabs(browser))
+    return -1;
+  return SessionTabHelper::IdForTab(web_contents);
+}
+
 }  // namespace
 
 ExtensionTabUtil::OpenTabParams::OpenTabParams()
@@ -374,7 +384,7 @@ base::DictionaryValue* ExtensionTabUtil::CreateTabValue(
 
   base::DictionaryValue* result = new base::DictionaryValue();
   bool is_loading = contents->IsLoading();
-  result->SetInteger(keys::kIdKey, GetTabId(contents));
+  result->SetInteger(keys::kIdKey, GetTabIdForExtensions(contents));
   result->SetInteger(keys::kIndexKey, tab_index);
   result->SetInteger(keys::kWindowIdKey, GetWindowIdOfTab(contents));
   result->SetString(keys::kStatusKey, GetTabStatusText(is_loading));
@@ -412,7 +422,7 @@ base::DictionaryValue* ExtensionTabUtil::CreateTabValue(
   if (tab_strip) {
     WebContents* opener = tab_strip->GetOpenerOfWebContentsAt(tab_index);
     if (opener)
-      result->SetInteger(keys::kOpenerTabIdKey, GetTabId(opener));
+      result->SetInteger(keys::kOpenerTabIdKey, GetTabIdForExtensions(opener));
   }
 
   return result;
@@ -489,6 +499,8 @@ bool ExtensionTabUtil::GetTabById(int tab_id,
                                   TabStripModel** tab_strip,
                                   WebContents** contents,
                                   int* tab_index) {
+  if (tab_id == api::tabs::TAB_ID_NONE)
+    return false;
   Profile* profile = Profile::FromBrowserContext(browser_context);
   Profile* incognito_profile =
       include_incognito && profile->HasOffTheRecordProfile() ?
@@ -636,6 +648,11 @@ bool ExtensionTabUtil::OpenOptionsPage(const Extension* extension,
   params.url = url_to_navigate;
   chrome::ShowSingletonTabOverwritingNTP(browser, params);
   return true;
+}
+
+// static
+bool ExtensionTabUtil::BrowserSupportsTabs(Browser* browser) {
+  return browser && browser->tab_strip_model() && !browser->is_devtools();
 }
 
 }  // namespace extensions

@@ -23,7 +23,6 @@
 #include "chrome/common/chrome_version_info.h"
 #include "chrome/common/crash_keys.h"
 #include "chrome/common/pepper_flash.h"
-#include "chrome/common/render_messages.h"
 #include "chrome/common/secure_origin_whitelist.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/grit/common_resources.h"
@@ -53,7 +52,6 @@
 #endif
 
 #if defined(ENABLE_PLUGINS)
-#include "chrome/common/pepper_flash.h"
 #include "content/public/common/pepper_plugin_info.h"
 #include "flapper_version.h"  // In SHARED_INTERMEDIATE_DIR.
 #include "ppapi/shared_impl/ppapi_permissions.h"
@@ -239,13 +237,10 @@ content::PepperPluginInfo CreatePepperFlashInfo(const base::FilePath& path,
   plugin.path = path;
   plugin.permissions = chrome::kPepperFlashPermissions;
 
-  std::vector<std::string> flash_version_numbers;
-  base::SplitString(version, '.', &flash_version_numbers);
+  std::vector<std::string> flash_version_numbers = base::SplitString(
+      version, ".", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY);
   if (flash_version_numbers.size() < 1)
     flash_version_numbers.push_back("11");
-  // |SplitString()| puts in an empty string given an empty string. :(
-  else if (flash_version_numbers[0].empty())
-    flash_version_numbers[0] = "11";
   if (flash_version_numbers.size() < 2)
     flash_version_numbers.push_back("2");
   if (flash_version_numbers.size() < 3)
@@ -311,17 +306,6 @@ bool GetBundledPepperFlash(content::PepperPluginInfo* plugin) {
 #endif  // FLAPPER_AVAILABLE
 }
 
-#if defined(OS_WIN)
-const char kPepperFlashDLLBaseName[] =
-#if defined(ARCH_CPU_X86)
-    "pepflashplayer32_";
-#elif defined(ARCH_CPU_X86_64)
-    "pepflashplayer64_";
-#else
-#error Unsupported Windows CPU architecture.
-#endif  // defined(ARCH_CPU_X86)
-#endif  // defined(OS_WIN)
-
 #if defined(FLAPPER_AVAILABLE)
 bool IsSystemFlashScriptDebuggerPresent() {
 #if defined(OS_WIN)
@@ -359,14 +343,16 @@ bool GetSystemPepperFlash(content::PepperPluginInfo* plugin) {
   if (command_line->HasSwitch(switches::kPpapiFlashPath))
     return false;
 
-  base::FilePath flash_path;
-  if (!PathService::Get(chrome::DIR_PEPPER_FLASH_SYSTEM_PLUGIN, &flash_path))
+  base::FilePath flash_filename;
+  if (!PathService::Get(chrome::FILE_PEPPER_FLASH_SYSTEM_PLUGIN,
+                        &flash_filename))
     return false;
 
-  if (!base::PathExists(flash_path))
+  if (!base::PathExists(flash_filename))
     return false;
 
-  base::FilePath manifest_path(flash_path.AppendASCII("manifest.json"));
+  base::FilePath manifest_path(
+      flash_filename.DirName().AppendASCII("manifest.json"));
 
   std::string manifest_data;
   if (!base::ReadFileToString(manifest_path, &manifest_data))
@@ -383,23 +369,7 @@ bool GetSystemPepperFlash(content::PepperPluginInfo* plugin) {
   if (!chrome::CheckPepperFlashManifest(*manifest, &version))
     return false;
 
-#if defined(OS_WIN)
-  // PepperFlash DLLs on Windows look like basename_v_x_y_z.dll.
-  std::string filename(kPepperFlashDLLBaseName);
-  filename.append(version.GetString());
-  base::ReplaceChars(filename, ".", "_", &filename);
-  filename.append(".dll");
-
-  base::FilePath path(flash_path.Append(base::ASCIIToUTF16(filename)));
-#else
-  // PepperFlash on OS X is called PepperFlashPlayer.plugin
-  base::FilePath path(flash_path.Append(chrome::kPepperFlashPluginFilename));
-#endif
-
-  if (!base::PathExists(path))
-    return false;
-
-  *plugin = CreatePepperFlashInfo(path, version.GetString());
+  *plugin = CreatePepperFlashInfo(flash_filename, version.GetString());
   return true;
 }
 #endif  //  defined(ENABLE_PLUGINS)
@@ -584,4 +554,9 @@ void ChromeContentClient::AddSecureSchemesAndOrigins(
   schemes->insert(extensions::kExtensionScheme);
   schemes->insert(extensions::kExtensionResourceScheme);
   GetSecureOriginWhitelist(origins);
+}
+
+void ChromeContentClient::AddServiceWorkerSchemes(
+    std::set<std::string>* schemes) {
+  schemes->insert(extensions::kExtensionScheme);
 }

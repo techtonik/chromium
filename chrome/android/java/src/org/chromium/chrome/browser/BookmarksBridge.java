@@ -4,9 +4,9 @@
 
 package org.chromium.chrome.browser;
 
-import org.chromium.base.CalledByNative;
 import org.chromium.base.ObserverList;
 import org.chromium.base.VisibleForTesting;
+import org.chromium.base.annotations.CalledByNative;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.components.bookmarks.BookmarkId;
 import org.chromium.components.bookmarks.BookmarkType;
@@ -488,7 +488,6 @@ public class BookmarksBridge {
      * @return Id of the added node. If adding failed (index is invalid, string is null, parent is
      *         not editable), returns null.
      */
-    @VisibleForTesting
     public BookmarkId addFolder(BookmarkId parent, int index, String title) {
         assert parent.getType() == BookmarkType.NORMAL;
         assert index >= 0;
@@ -509,7 +508,6 @@ public class BookmarksBridge {
      * @return Id of the added node. If adding failed (index is invalid, string is null, parent is
      *         not editable), returns null.
      */
-    @VisibleForTesting
     public BookmarkId addBookmark(BookmarkId parent, int index, String title, String url) {
         assert parent.getType() == BookmarkType.NORMAL;
         assert index >= 0;
@@ -542,8 +540,8 @@ public class BookmarksBridge {
         nativeEndGroupingUndos(mNativeBookmarksBridge);
     }
 
-    public static boolean isEditBookmarksEnabled(Profile profile) {
-        return nativeIsEditBookmarksEnabled(profile);
+    public boolean isEditBookmarksEnabled() {
+        return nativeIsEditBookmarksEnabled(mNativeBookmarksBridge);
     }
 
     public static boolean isEnhancedBookmarksEnabled(Profile profile) {
@@ -716,7 +714,7 @@ public class BookmarksBridge {
     private native long nativeInit(Profile profile);
     private native boolean nativeIsDoingExtensiveChanges(long nativeBookmarksBridge);
     private native void nativeDestroy(long nativeBookmarksBridge);
-    private static native boolean nativeIsEditBookmarksEnabled(Profile profile);
+    private static native boolean nativeIsEditBookmarksEnabled(long nativeBookmarksBridge);
 
     /**
      * Simple object representing the bookmark item.

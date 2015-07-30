@@ -194,17 +194,8 @@ bool GURL::operator>(const GURL& other) const {
   return spec_ > other.spec_;
 }
 
-GURL GURL::Resolve(const std::string& relative) const {
-  return ResolveWithCharsetConverter(relative, NULL);
-}
-GURL GURL::Resolve(const base::string16& relative) const {
-  return ResolveWithCharsetConverter(relative, NULL);
-}
-
 // Note: code duplicated below (it's inconvenient to use a template here).
-GURL GURL::ResolveWithCharsetConverter(
-    const std::string& relative,
-    url::CharsetConverter* charset_converter) const {
+GURL GURL::Resolve(const std::string& relative) const {
   // Not allowed for invalid URLs.
   if (!is_valid_)
     return GURL();
@@ -219,7 +210,7 @@ GURL GURL::ResolveWithCharsetConverter(
   if (!url::ResolveRelative(spec_.data(), static_cast<int>(spec_.length()),
                             parsed_, relative.data(),
                             static_cast<int>(relative.length()),
-                            charset_converter, &output, &result.parsed_)) {
+                            nullptr, &output, &result.parsed_)) {
     // Error resolving, return an empty URL.
     return GURL();
   }
@@ -235,9 +226,7 @@ GURL GURL::ResolveWithCharsetConverter(
 }
 
 // Note: code duplicated above (it's inconvenient to use a template here).
-GURL GURL::ResolveWithCharsetConverter(
-    const base::string16& relative,
-    url::CharsetConverter* charset_converter) const {
+GURL GURL::Resolve(const base::string16& relative) const {
   // Not allowed for invalid URLs.
   if (!is_valid_)
     return GURL();
@@ -252,7 +241,7 @@ GURL GURL::ResolveWithCharsetConverter(
   if (!url::ResolveRelative(spec_.data(), static_cast<int>(spec_.length()),
                             parsed_, relative.data(),
                             static_cast<int>(relative.length()),
-                            charset_converter, &output, &result.parsed_)) {
+                            nullptr, &output, &result.parsed_)) {
     // Error resolving, return an empty URL.
     return GURL();
   }
@@ -383,9 +372,10 @@ bool GURL::IsStandard() const {
 bool GURL::SchemeIs(const char* lower_ascii_scheme) const {
   if (parsed_.scheme.len <= 0)
     return lower_ascii_scheme == NULL;
-  return base::LowerCaseEqualsASCII(spec_.data() + parsed_.scheme.begin,
-                                    spec_.data() + parsed_.scheme.end(),
-                                    lower_ascii_scheme);
+  return base::LowerCaseEqualsASCII(
+      base::StringPiece(spec_.data() + parsed_.scheme.begin,
+                        parsed_.scheme.len),
+      lower_ascii_scheme);
 }
 
 bool GURL::SchemeIsHTTPOrHTTPS() const {
@@ -522,10 +512,9 @@ bool GURL::DomainIs(const char* lower_ascii_domain,
   const char* start_pos = spec_.data() + parsed_.host.begin +
                           host_len - domain_len;
 
-  if (!base::LowerCaseEqualsASCII(start_pos,
-                                  last_pos + 1,
-                                  lower_ascii_domain,
-                                  lower_ascii_domain + domain_len))
+  if (!base::LowerCaseEqualsASCII(
+           base::StringPiece(start_pos, last_pos - start_pos + 1),
+           base::StringPiece(lower_ascii_domain, domain_len)))
     return false;
 
   // Check whether host has right domain start with dot, make sure we got

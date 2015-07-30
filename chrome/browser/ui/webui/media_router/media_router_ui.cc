@@ -12,8 +12,8 @@
 #include "chrome/browser/media/router/issues_observer.h"
 #include "chrome/browser/media/router/media_route.h"
 #include "chrome/browser/media/router/media_router.h"
+#include "chrome/browser/media/router/media_router_factory.h"
 #include "chrome/browser/media/router/media_router_mojo_impl.h"
-#include "chrome/browser/media/router/media_router_mojo_impl_factory.h"
 #include "chrome/browser/media/router/media_routes_observer.h"
 #include "chrome/browser/media/router/media_sink.h"
 #include "chrome/browser/media/router/media_sinks_observer.h"
@@ -22,7 +22,6 @@
 #include "chrome/browser/media/router/presentation_service_delegate_impl.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/sessions/session_tab_helper.h"
-#include "chrome/browser/ui/webui/media_router/media_router_dialog_controller.h"
 #include "chrome/browser/ui/webui/media_router/media_router_localized_strings_provider.h"
 #include "chrome/browser/ui/webui/media_router/media_router_resources_provider.h"
 #include "chrome/browser/ui/webui/media_router/media_router_webui_message_handler.h"
@@ -116,9 +115,14 @@ MediaRouterUI::MediaRouterUI(content::WebUI* web_ui)
   content::WebContents* wc = web_ui->GetWebContents();
   DCHECK(wc);
 
-  router_ = MediaRouterMojoImplFactory::GetApiForBrowserContext(
-      wc->GetBrowserContext());
+  router_ = static_cast<MediaRouterMojoImpl*>(
+      MediaRouterFactory::GetApiForBrowserContext(wc->GetBrowserContext()));
   DCHECK(router_);
+
+  // Allows UI to load extensionview.
+  // TODO(haibinlu): limit object-src to current extension once crbug/514866
+  // is fixed.
+  html_source->OverrideContentSecurityPolicyObjectSrc("object-src *;");
 
   AddLocalizedStrings(html_source.get());
   AddMediaRouterUIResources(html_source.get());
@@ -252,6 +256,13 @@ std::string MediaRouterUI::GetInitialHeaderText() const {
                                     GetHostFromURL(frame_url_));
 }
 
+std::string MediaRouterUI::GetInitialHeaderTextTooltip() const {
+  if (cast_modes_.empty())
+    return std::string();
+
+  return GetHostFromURL(frame_url_);
+}
+
 void MediaRouterUI::OnResultsUpdated(
     const std::vector<MediaSinkWithCastModes>& sinks) {
   sinks_ = sinks;
@@ -348,6 +359,10 @@ bool MediaRouterUI::DoCreateRoute(const MediaSink::Id& sink_id,
 
 std::string MediaRouterUI::GetFrameURLHost() const {
   return GetHostFromURL(frame_url_);
+}
+
+const std::string& MediaRouterUI::GetRouteProviderExtensionId() const {
+  return router_->media_route_provider_extension_id();
 }
 
 }  // namespace media_router

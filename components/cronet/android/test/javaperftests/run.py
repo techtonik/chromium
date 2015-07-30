@@ -47,7 +47,6 @@ sys.path.append(os.path.join(REPOSITORY_ROOT, 'tools/telemetry'))
 sys.path.append(os.path.join(REPOSITORY_ROOT, 'build/android'))
 
 import lighttpd_server
-from pylib import android_commands
 from pylib import pexpect
 from pylib.device import device_utils
 from pylib.device import intent
@@ -101,9 +100,9 @@ globals().update(BENCHMARK_CONFIG)
 
 
 def GetDevice():
-  devices = android_commands.GetAttachedDevices()
+  devices = device_utils.DeviceUtils.HealthyDevices()
   assert len(devices) == 1
-  return device_utils.DeviceUtils(devices[0])
+  return devices[0]
 
 
 def GetForwarderFactory(device):
@@ -174,7 +173,7 @@ class CronetPerfTestMeasurement(
     # it is not a browser with a timeline interface.
     pass
 
-  def MeasureForPageTest(self, tracing_controller, results):
+  def Measure(self, tracing_controller, results):
     # Reads results from |RESULTS_FILE| on target and adds to |results|.
     jsonResults = json.loads(self._device.ReadFile(RESULTS_FILE))
     for test in jsonResults:

@@ -45,6 +45,7 @@
 <translation id="4050175100176540509">最新版本不仅在安全性方面做出了重要改进，还提供了多项新功能。</translation>
 <translation id="8437332772351535342">若以桌面模式重新启动，将会关闭并重新启动您的Chrome应用。</translation>
 <translation id="4728575227883772061">未知错误导致安装失败。如果 Google Chrome 浏览器正在运行，请将其关闭，然后重试。</translation>
+<translation id="7788788617745289808">Chrome 需要具有摄像头使用权限，才能批准此网站的分享请求。</translation>
 <translation id="3080151273017101988">关闭 Google Chrome 后继续运行后台应用</translation>
 <translation id="4149882025268051530">安装程序无法解压缩存档文件。请重新下载 Google Chrome。</translation>
 <translation id="7054640471403081847">此计算机很快将停止接收Google Chrome更新，因为其硬件不再受支持。</translation>
@@ -59,6 +60,7 @@
 <translation id="5204098752394657250">Google Chrome　<ph name="TERMS_OF_SERVICE_LINK"/>服务条款<ph name="END_TERMS_OF_SERVICE_LINK"/></translation>
 <translation id="4743926867934016338">接受并搜索</translation>
 <translation id="1393853151966637042">获取 Chrome 浏览器使用帮助</translation>
+<translation id="1061441684050139317">Chrome 需要具有麦克风使用权限，才能批准此网站的分享请求。</translation>
 <translation id="7398801000654795464">您之前登录 Chrome 时使用的帐户为 <ph name="USER_EMAIL_ADDRESS"/>，请使用同一帐户再次登录。</translation>
 <translation id="4513711165509885787">您的帐单明细已保存在 Chrome 中。</translation>
 <translation id="5253588388888612165">如果您与<ph name="PROFILE_NAME"/>共用这台计算机，将您的帐户添加到Chrome，即可在单独的环境中浏览。或者，您也可以取消与其Google帐户的关联。</translation>
@@ -80,6 +82,7 @@
 <translation id="5037239767309817516">请关闭所有 Google Chrome 窗口，然后重新启动，以使此更改生效。</translation>
 <translation id="1619887657840448962">为了提高 Chrome 的安全性，我们停用了以下扩展程序（该扩展程序未列在<ph name="IDS_EXTENSION_WEB_STORE_TITLE"/>中，并且可能是在您不知情的情况下添加的）。</translation>
 <translation id="225614027745146050">欢迎</translation>
+<translation id="8811903091068364646">以桌面模式重新启动 Chrome(&amp;R)</translation>
 <translation id="3398288718845740432">在 Chrome 菜单中隐藏</translation>
 <translation id="7473891865547856676">不，谢谢</translation>
 <translation id="3149510190863420837">Chrome 应用</translation>
@@ -89,6 +92,7 @@
 <translation id="6368958679917195344">Chrome 操作系统的问世还有其他<ph name="BEGIN_LINK_CROS_OSS"/>开放源代码软件<ph name="END_LINK_CROS_OSS"/>的一份功劳。</translation>
 <translation id="5799551393681493217">启用基于 iframe 的 Chrome 登录流程。此项会覆盖 --enable-web-based-signin。</translation>
 <translation id="7459554271817304652">您可以设置同步以将个性化浏览器功能保存到网上，以便在任意计算机上的 Google Chrome 浏览器中使用这些功能。</translation>
+<translation id="6012342843556706400">Chrome 需要具有位置信息使用权，才能批准此网站的分享请求。</translation>
 <translation id="4331809312908958774">Chrome OS
 </translation>
 <translation id="8823341990149967727">Chrome版本太旧</translation>
@@ -97,6 +101,7 @@
 <translation id="5618769508111928343"><ph name="SITE"/> 通常使用加密技术来保护您的信息。Chrome 此次尝试连接到 <ph name="SITE"/> 时，此网站返回了异常的错误凭据。这可能是因为有攻击程序在试图冒充 <ph name="SITE"/>，或 Wi-Fi 登录屏幕中断了此次连接。请放心，您的信息仍然是安全的，因为 Chrome 尚未进行任何数据交换便停止了连接。</translation>
 <translation id="6600954340915313787">已复制到 Chrome</translation>
 <translation id="2576431527583832481">Chrome 浏览器刚刚经过了改进！新版本已推出。</translation>
+<translation id="423410644998903704">Chrome 需要具有这些功能的使用权限，才能批准此网站的分享请求。</translation>
 <translation id="4633000520311261472">为了提高 Chrome 的安全性，系统停用了一些未列在 <ph name="IDS_EXTENSION_WEB_STORE_TITLE"/>中、可能是在您不知情的情况下添加的扩展程序。</translation>
 <translation id="3656661827369545115">启动计算机时自动启动Chromium</translation>
 <translation id="1763864636252898013">此服务器无法证明它是<ph name="DOMAIN"/>；您设备的操作系统不信任其安全证书。出现此问题的原因可能是配置有误或您的连接被拦截了。</translation>
@@ -221,6 +226,7 @@
 <translation id="3037838751736561277">Google Chrome处于后台运行模式。</translation>
 <translation id="2084710999043359739">添加到 Chrome 浏览器</translation>
 <translation id="4692614041509923516">您的计算机运行的是旧版Microsoft Windows，无法处理此网站的安全证书。因此，Google Chrome无法确定该证书是来自<ph name="SITE"/>，还是来自您所在的网络中假冒<ph name="SITE"/>的用户。请将您的计算机更新到更高版本的Windows。</translation>
+<translation id="5931853610562009806">在 Mac 上，密码可能会保存到您的钥匙串 (Keychain) 中，这将导致共用此 OS X 帐户的其他 Chrome 用户都能够访问或同步处理这些密码。</translation>
 <translation id="3360895254066713204">Chrome 浏览器帮助应用</translation>
 <translation id="1877026089748256423">Chrome版本太旧</translation>
 <translation id="7592736734348559088">由于您的帐户登录详细信息已过期，Google Chrome无法同步您的数据。</translation>
@@ -232,6 +238,7 @@
 <translation id="1001534784610492198">安装程序存档文件损坏或无效。请重新下载 Google Chrome。</translation>
 <translation id="2246246234298806438">在缺少内置 PDF 查看器的情况下，Google Chrome 浏览器无法显示打印预览。</translation>
 <translation id="5132929315877954718">查找适用于Google Chrome的精彩应用、游戏、扩展程序和主题背景。</translation>
+<translation id="7784335114585804598">以 Windows 8 模式重新启动 Chrome(&amp;R)</translation>
 <translation id="6626317981028933585">抱歉，无法在 Mozilla Firefox 浏览器运行时获取其设置。要将其设置导入 Google Chrome 浏览器，请保存您手头的工作并关闭所有 Firefox 窗口，然后点击“继续”。</translation>
 <translation id="8274359292107649245">打开桌面版 Chrome</translation>
 <translation id="7242029209006116544">您目前登录的帐户是一个托管帐户，该帐户的管理员将能够控制您的 Google Chrome 个人资料。您的 Chrome 数据（例如您的应用、书签、历史记录、密码和其他设置）将永远与 <ph name="USER_NAME"/> 相关联。您可以通过 Google 帐户信息中心删除这些数据，但无法将这些数据与其他帐户相关联。您可以选择创建新的个人资料来单独存储现有的 Chrome 数据。<ph name="LEARN_MORE"/></translation>

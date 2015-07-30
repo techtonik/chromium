@@ -31,13 +31,13 @@ namespace extensions {
 
 struct Event;
 
-namespace core_api {
+namespace api {
 namespace cast_channel {
 class Logger;
 }  // namespace cast_channel
-}  // namespace core_api
+}  // namespace api
 
-namespace cast_channel = core_api::cast_channel;
+namespace cast_channel = api::cast_channel;
 
 class CastChannelAPI : public BrowserContextKeyedAPI,
                        public base::SupportsWeakPtr<CastChannelAPI> {
@@ -100,6 +100,9 @@ class CastChannelAsyncApiFunction : public AsyncApiFunction {
   CastChannelAsyncApiFunction();
 
  protected:
+  typedef ApiResourceManager<cast_channel::CastSocket>::ApiResourceData
+      SocketData;
+
   ~CastChannelAsyncApiFunction() override;
 
   // AsyncApiFunction:
@@ -135,8 +138,8 @@ class CastChannelAsyncApiFunction : public AsyncApiFunction {
   // Sets the function result from |channel_info|.
   void SetResultFromChannelInfo(const cast_channel::ChannelInfo& channel_info);
 
-  // The API resource manager for CastSockets.
-  ApiResourceManager<cast_channel::CastSocket>* manager_;
+  // The collection of CastSocket API resources.
+  scoped_refptr<SocketData> sockets_;
 };
 
 class CastChannelOpenFunction : public CastChannelAsyncApiFunction {
@@ -167,7 +170,7 @@ class CastChannelOpenFunction : public CastChannelAsyncApiFunction {
    public:
     CastMessageHandler(const EventDispatchCallback& ui_dispatch_cb,
                        cast_channel::CastSocket* socket,
-                       scoped_refptr<core_api::cast_channel::Logger> logger);
+                       scoped_refptr<api::cast_channel::Logger> logger);
     ~CastMessageHandler() override;
 
     // CastTransport::Delegate implementation.
@@ -182,7 +185,7 @@ class CastChannelOpenFunction : public CastChannelAsyncApiFunction {
     EventDispatchCallback const ui_dispatch_cb_;
     cast_channel::CastSocket* const socket_;
     // Logger object for reporting error details.
-    scoped_refptr<core_api::cast_channel::Logger> logger_;
+    scoped_refptr<api::cast_channel::Logger> logger_;
 
     DISALLOW_COPY_AND_ASSIGN(CastMessageHandler);
   };

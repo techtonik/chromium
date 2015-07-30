@@ -32,6 +32,7 @@ class IssuesObserver;
 class MediaRoute;
 class MediaRouter;
 class MediaRouterDialogCallbacks;
+class MediaRouterMojoImpl;
 class MediaRouterWebUIMessageHandler;
 class MediaRoutesObserver;
 class MediaSink;
@@ -107,6 +108,11 @@ class MediaRouterUI
   // initially loaded. The header text is determined by the preferred cast mode.
   std::string GetInitialHeaderText() const;
 
+  // Returns the tooltip text for the header that should be displayed
+  // in the UI when it is initially loaded. At present, this text is
+  // just the full hostname of the current site.
+  std::string GetInitialHeaderTextTooltip() const;
+
   // Returns the hostname of the default source's parent frame URL.
   std::string GetFrameURLHost() const;
   bool has_pending_route_request() const { return has_pending_route_request_; }
@@ -115,6 +121,8 @@ class MediaRouterUI
   const std::vector<MediaRoute>& routes() const { return routes_; }
   const std::set<MediaCastMode>& cast_modes() const { return cast_modes_; }
   const content::WebContents* initiator() const { return initiator_; }
+
+  const std::string& GetRouteProviderExtensionId() const;
 
  private:
   class UIIssuesObserver;
@@ -193,8 +201,8 @@ class MediaRouterUI
 
   content::WebContents* initiator_;
 
-  // Cached pointer to the MediaRouter for this instance's BrowserContext.
-  MediaRouter* router_;
+  // Pointer to the MediaRouter for this instance's BrowserContext.
+  MediaRouterMojoImpl* router_;
 
   // NOTE: Weak pointers must be invalidated before all other member variables.
   // Therefore |weak_factory_| must be placed at the end.

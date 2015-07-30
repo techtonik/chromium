@@ -275,6 +275,7 @@ component("media") {
   configs += [
     ":media_config",
     ":media_implementation",
+    "//build/config:precompiled_headers",
 
     # TODO(wolenetz): Fix size_t to int trunctaion in win64.
     # See http://crbug.com/171009
@@ -330,6 +331,14 @@ component("media") {
       "filters/vpx_video_decoder.h",
     ]
     deps += [ "//third_party/libvpx" ]
+  }
+
+  if (media_use_libwebm) {
+    sources += [
+      "capture/webm_muxer.cc",
+      "capture/webm_muxer.h",
+    ]
+    deps += [ "//third_party/libwebm" ]
   }
 
   if (is_android) {

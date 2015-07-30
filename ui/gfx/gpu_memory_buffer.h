@@ -6,6 +6,7 @@
 #define UI_GFX_GPU_MEMORY_BUFFER_H_
 
 #include "base/memory/shared_memory.h"
+#include "base/trace_event/memory_dump_manager.h"
 #include "build/build_config.h"
 #include "ui/gfx/gfx_export.h"
 
@@ -18,8 +19,8 @@ enum GpuMemoryBufferType {
   SHARED_MEMORY_BUFFER,
   IO_SURFACE_BUFFER,
   SURFACE_TEXTURE_BUFFER,
-  OZONE_NATIVE_BUFFER,
-  GPU_MEMORY_BUFFER_TYPE_LAST = OZONE_NATIVE_BUFFER
+  OZONE_NATIVE_PIXMAP,
+  GPU_MEMORY_BUFFER_TYPE_LAST = OZONE_NATIVE_PIXMAP
 };
 
 using GpuMemoryBufferId = int32;
@@ -31,6 +32,10 @@ struct GFX_EXPORT GpuMemoryBufferHandle {
   GpuMemoryBufferId id;
   base::SharedMemoryHandle handle;
 };
+
+base::trace_event::MemoryAllocatorDumpGuid GFX_EXPORT
+GetGpuMemoryBufferGUIDForTracing(uint64 tracing_process_id,
+                                 GpuMemoryBufferId buffer_id);
 
 // This interface typically correspond to a type of shared memory that is also
 // shared with the GPU. A GPU memory buffer can be written to directly by
@@ -84,6 +89,9 @@ class GFX_EXPORT GpuMemoryBuffer {
   // Fills the stride in bytes for each plane of the buffer. The stride of
   // plane K is stored at index K-1 of the |stride| array.
   virtual void GetStride(int* stride) const = 0;
+
+  // Returns a unique identifier associated with buffer.
+  virtual GpuMemoryBufferId GetId() const = 0;
 
   // Returns a platform specific handle for this buffer.
   virtual GpuMemoryBufferHandle GetHandle() const = 0;

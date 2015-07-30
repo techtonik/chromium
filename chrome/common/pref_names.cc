@@ -905,17 +905,9 @@ const char kPluginsEnabledPlugins[] = "plugins.plugins_enabled";
 
 // When bundled NPAPI Flash is removed, if at that point it is enabled while
 // Pepper Flash is disabled, we would like to turn on Pepper Flash. And we will
-// want to do so only once.
-const char kPluginsMigratedToPepperFlash[] = "plugins.migrated_to_pepper_flash";
-
-// In the early stage of component-updated PPAPI Flash, we did field trials in
-// which it was set to disabled by default. The corresponding settings item may
-// remain in some users' profiles. Currently it affects both the bundled and
-// component-updated PPAPI Flash (since the two share the same enable/disable
-// state). We want to remove this item to get those users to use PPAPI Flash.
-// We will want to do so only once.
-const char kPluginsRemovedOldComponentPepperFlashSettings[] =
-    "plugins.removed_old_component_pepper_flash_settings";
+// want to do so in M45, once, for realz.
+const char kNpapiFlashMigratedToPepperFlash[] =
+    "plugins.npapi_flash_migrated_to_pepper_flash";
 
 #if !defined(OS_ANDROID)
 // Whether about:plugins is shown in the details mode or not.
@@ -1881,14 +1873,6 @@ const char kLogoutStartedLast[] = "chromeos.logout-started";
 // value is defined in:
 //   chrome/browser/chromeos/policy/consumer_management_stage.h
 const char kConsumerManagementStage[] = "consumer_management.stage";
-
-// A boolean pref. If set to true, experimental webview based signin flow
-// is deactivated.
-const char kWebviewSigninDisabled[] = "webview_signin_disabled";
-
-// A boolean pref. If set to true, then on the network screen we should display
-// whether the WebView-based sign-in flow is active.
-const char kNewLoginUIPopup[] = "new_login_ui_popup";
 #endif  // defined(OS_CHROMEOS)
 
 // Whether there is a Flash version installed that supports clearing LSO data.

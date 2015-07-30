@@ -56,18 +56,24 @@
         'test/app_remoting_report_issue_request.h',
         'test/app_remoting_service_urls.cc',
         'test/app_remoting_service_urls.h',
+        'test/chromoting_test_driver_environment.cc',
+        'test/chromoting_test_driver_environment.h',
         'test/connection_setup_info.cc',
         'test/connection_setup_info.h',
         'test/fake_access_token_fetcher.cc',
         'test/fake_access_token_fetcher.h',
         'test/fake_app_remoting_report_issue_request.cc',
         'test/fake_app_remoting_report_issue_request.h',
+        'test/fake_host_list_fetcher.cc',
+        'test/fake_host_list_fetcher.h',
         'test/fake_network_dispatcher.cc',
         'test/fake_network_dispatcher.h',
         'test/fake_network_manager.cc',
         'test/fake_network_manager.h',
         'test/fake_port_allocator.cc',
         'test/fake_port_allocator.h',
+        'test/fake_refresh_token_store.cc',
+        'test/fake_refresh_token_store.h',
         'test/fake_remote_host_info_fetcher.cc',
         'test/fake_remote_host_info_fetcher.h',
         'test/fake_socket_factory.cc',
@@ -88,6 +94,8 @@
         'test/remote_host_info.h',
         'test/remote_host_info_fetcher.cc',
         'test/remote_host_info_fetcher.h',
+        'test/rgb_value.cc',
+        'test/rgb_value.h',
         'test/test_chromoting_client.cc',
         'test/test_chromoting_client.h',
         'test/test_video_renderer.cc',
@@ -321,6 +329,7 @@
         'signaling/xmpp_signal_strategy_unittest.cc',
         'test/access_token_fetcher_unittest.cc',
         'test/app_remoting_report_issue_request_unittest.cc',
+        'test/chromoting_test_driver_environment_unittest.cc',
         'test/host_list_fetcher_unittest.cc',
         'test/remote_host_info_fetcher_unittest.cc',
         'test/test_chromoting_client_unittest.cc',
@@ -400,6 +409,7 @@
       ],  # end of 'conditions'
     },  # end of target 'remoting_unittests'
     {
+      # GN version: //remoting/webapp:browser_test_resources
       'target_name': 'remoting_browser_test_resources',
       'type': 'none',
       'copies': [
@@ -441,6 +451,7 @@
       ],  # end of actions
     },  # end of target 'remoting_webapp_browser_test_html'
     {
+      # GN version: //remoting/webapp:unit_tests
       'target_name': 'remoting_webapp_unittests',
       'type': 'none',
       'variables': {
@@ -453,6 +464,7 @@
       },
       'copies': [
         {
+          # GN version: //remoting/webapp:qunit
           'destination': '<(output_dir)/qunit',
           'files': [
             '../third_party/qunit/src/browser_test_harness.js',
@@ -461,6 +473,7 @@
           ],
         },
         {
+          # GN version: //remoting/webapp:blanketjs
           'destination': '<(output_dir)/blanketjs',
           'files': [
             '../third_party/blanketjs/src/blanket.js',
@@ -468,6 +481,7 @@
           ],
         },
         {
+          # GN version: //remoting/webapp:sinonjs
           'destination': '<(output_dir)/sinonjs',
           'files': [
             '../third_party/sinonjs/src/sinon.js',
@@ -475,6 +489,7 @@
           ],
         },
         {
+          # GN version: //remoting/webapp:js_files
           'destination': '<(output_dir)',
           'files': [
             '<@(webapp_js_files)',

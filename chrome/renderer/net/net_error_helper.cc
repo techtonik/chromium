@@ -167,6 +167,8 @@ void NetErrorHelper::GenerateLocalizedErrorPage(
     scoped_ptr<ErrorPageParams> params,
     bool* reload_button_shown,
     bool* show_saved_copy_button_shown,
+    bool* show_cached_copy_button_shown,
+    bool* show_cached_page_button_shown,
     std::string* error_html) const {
   error_html->clear();
 
@@ -188,6 +190,19 @@ void NetErrorHelper::GenerateLocalizedErrorPage(
     *show_saved_copy_button_shown =
         error_strings.Get("showSavedCopyButton", NULL);
 
+    bool show_cache_copy_button_default_label;
+    bool showing_cache_copy_experiment =
+        error_strings.GetBoolean("cacheButton.defaultLabel",
+        &show_cache_copy_button_default_label);
+    if (showing_cache_copy_experiment) {
+      if (show_cache_copy_button_default_label) {
+        *show_cached_copy_button_shown = false;
+        *show_cached_page_button_shown = true;
+      } else {
+        *show_cached_page_button_shown = false;
+        *show_cached_copy_button_shown = true;
+      }
+    }
     // "t" is the id of the template's root node.
     *error_html = webui::GetTemplatesHtml(template_html, &error_strings, "t");
   }
@@ -295,8 +310,9 @@ void NetErrorHelper::ReloadPage() {
 
 void NetErrorHelper::LoadPageFromCache(const GURL& page_url) {
   blink::WebFrame* web_frame = render_frame()->GetWebFrame();
-  DCHECK(!base::EqualsASCII(web_frame->dataSource()->request().httpMethod(),
-                            "POST"));
+  DCHECK(!base::EqualsASCII(
+      base::StringPiece16(web_frame->dataSource()->request().httpMethod()),
+      "POST"));
 
   blink::WebURLRequest request(page_url);
   request.setCachePolicy(blink::WebURLRequest::ReturnCacheDataDontLoad);

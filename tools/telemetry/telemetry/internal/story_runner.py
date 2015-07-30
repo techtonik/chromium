@@ -97,13 +97,15 @@ def _RunStoryAndProcessErrorIfNeeded(story, results, state, test):
             story, sys.exc_info(), 'Unhandlable exception raised.'))
     raise
   finally:
-    has_existing_exception = sys.exc_info() is not None
+    has_existing_exception = (sys.exc_info() != (None, None, None))
     try:
       state.DidRunStory(results)
       # if state.DidRunStory raises exception, things are messed up badly and we
       # do not need to run test.DidRunStory at that point.
       if isinstance(test, story_test.StoryTest):
         test.DidRunStory(state.platform)
+      else:
+        test.DidRunPage(state.platform)
     except Exception:
       if not has_existing_exception:
         raise

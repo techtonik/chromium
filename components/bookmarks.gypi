@@ -112,8 +112,13 @@
       'dependencies': [
         'bookmarks_browser',
         'components_strings.gyp:components_strings',
+        'keyed_service_core',
       ],
       'sources': [
+        'bookmarks/managed/managed_bookmark_service.cc',
+        'bookmarks/managed/managed_bookmark_service.h',
+        'bookmarks/managed/managed_bookmark_util.cc',
+        'bookmarks/managed/managed_bookmark_util.h',
         'bookmarks/managed/managed_bookmarks_tracker.cc',
         'bookmarks/managed/managed_bookmarks_tracker.h',
       ],

@@ -13,6 +13,7 @@
 #include "base/trace_event/process_memory_dump.h"
 #include "base/trace_event/trace_event.h"
 #include "content/browser/gpu/gpu_process_host.h"
+#include "content/common/child_process_host_impl.h"
 #include "content/common/gpu/client/gpu_memory_buffer_impl.h"
 #include "content/common/gpu/client/gpu_memory_buffer_impl_shared_memory.h"
 #include "content/common/gpu/gpu_memory_buffer_factory_shared_memory.h"
@@ -29,7 +30,7 @@
 #endif
 
 #if defined(USE_OZONE)
-#include "content/common/gpu/gpu_memory_buffer_factory_ozone_native_buffer.h"
+#include "content/common/gpu/gpu_memory_buffer_factory_ozone_native_pixmap.h"
 #endif
 
 namespace content {
@@ -64,8 +65,8 @@ bool IsGpuMemoryBufferFactoryConfigurationSupported(
                                                   configuration.usage);
 #endif
 #if defined(USE_OZONE)
-    case gfx::OZONE_NATIVE_BUFFER:
-      return GpuMemoryBufferFactoryOzoneNativeBuffer::
+    case gfx::OZONE_NATIVE_PIXMAP:
+      return GpuMemoryBufferFactoryOzoneNativePixmap::
           IsGpuMemoryBufferConfigurationSupported(configuration.format,
                                                   configuration.usage);
 #endif
@@ -105,7 +106,7 @@ GetSupportedGpuMemoryBufferConfigurations(gfx::GpuMemoryBufferType type) {
     }
   }
 
-#if defined(USE_OZONE)
+#if defined(USE_OZONE) || defined(OS_MACOSX)
   const GpuMemoryBufferFactory::Configuration kScanoutConfigurations[] = {
       {gfx::GpuMemoryBuffer::BGRA_8888, gfx::GpuMemoryBuffer::SCANOUT},
       {gfx::GpuMemoryBuffer::RGBX_8888, gfx::GpuMemoryBuffer::SCANOUT}};
@@ -122,8 +123,6 @@ BrowserGpuMemoryBufferManager* g_gpu_memory_buffer_manager = nullptr;
 
 // Global atomic to generate gpu memory buffer unique IDs.
 base::StaticAtomicSequenceNumber g_next_gpu_memory_buffer_id;
-
-const char kMemoryAllocatorName[] = "gpumemorybuffer";
 
 }  // namespace
 
@@ -154,8 +153,7 @@ BrowserGpuMemoryBufferManager::BrowserGpuMemoryBufferManager(int gpu_client_id)
       supported_configurations_(
           GetSupportedGpuMemoryBufferConfigurations(factory_type_)),
       gpu_client_id_(gpu_client_id),
-      gpu_host_id_(0),
-      weak_ptr_factory_(this) {
+      gpu_host_id_(0) {
   DCHECK(!g_gpu_memory_buffer_manager);
   g_gpu_memory_buffer_manager = this;
 }
@@ -180,7 +178,7 @@ uint32 BrowserGpuMemoryBufferManager::GetImageTextureTarget(
 
     switch (type) {
       case gfx::SURFACE_TEXTURE_BUFFER:
-      case gfx::OZONE_NATIVE_BUFFER:
+      case gfx::OZONE_NATIVE_PIXMAP:
         // GPU memory buffers that are shared with the GL using EGLImages
         // require TEXTURE_EXTERNAL_OES.
         return GL_TEXTURE_EXTERNAL_OES;
@@ -267,12 +265,16 @@ bool BrowserGpuMemoryBufferManager::OnMemoryDump(
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
 
   for (const auto& client : clients_) {
+    int client_id = client.first;
+
     for (const auto& buffer : client.second) {
       if (buffer.second.type == gfx::EMPTY_BUFFER)
         continue;
 
-      base::trace_event::MemoryAllocatorDump* dump = pmd->CreateAllocatorDump(
-          base::StringPrintf("%s/%d", kMemoryAllocatorName, buffer.first));
+      gfx::GpuMemoryBufferId buffer_id = buffer.first;
+      base::trace_event::MemoryAllocatorDump* dump =
+          pmd->CreateAllocatorDump(base::StringPrintf(
+              "gpumemorybuffer/client_%d/buffer_%d", client_id, buffer_id));
       if (!dump)
         return false;
 
@@ -287,6 +289,19 @@ bool BrowserGpuMemoryBufferManager::OnMemoryDump(
       dump->AddScalar(base::trace_event::MemoryAllocatorDump::kNameSize,
                       base::trace_event::MemoryAllocatorDump::kUnitsBytes,
                       buffer_size_in_bytes);
+
+      // Create the cross-process ownership edge. If the client creates a
+      // corresponding dump for the same buffer, this will avoid to
+      // double-count them in tracing. If, instead, no other process will emit a
+      // dump with the same guid, the segment will be accounted to the browser.
+      const uint64 client_tracing_process_id =
+          ChildProcessHostImpl::ChildProcessUniqueIdToTracingProcessId(
+              client_id);
+      base::trace_event::MemoryAllocatorDumpGuid shared_buffer_guid =
+          gfx::GetGpuMemoryBufferGUIDForTracing(client_tracing_process_id,
+                                                buffer_id);
+      pmd->CreateSharedGlobalAllocatorDump(shared_buffer_guid);
+      pmd->AddOwnershipEdge(dump->guid(), shared_buffer_guid);
     }
   }
 
@@ -394,8 +409,15 @@ void BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferForSurfaceOnIO(
   // Allocate shared memory buffer as fallback.
   buffers[new_id] = BufferInfo(request->size, gfx::SHARED_MEMORY_BUFFER,
                                request->format, request->usage, 0);
+  // Note: Unretained is safe as IO thread is stopped before manager is
+  // destroyed.
   request->result = GpuMemoryBufferImplSharedMemory::Create(
-      new_id, request->size, request->format);
+      new_id, request->size, request->format,
+      base::Bind(
+          &GpuMemoryBufferDeleted,
+          BrowserThread::GetMessageLoopProxyForThread(BrowserThread::IO),
+          base::Bind(&BrowserGpuMemoryBufferManager::DestroyGpuMemoryBufferOnIO,
+                     base::Unretained(this), new_id, request->client_id)));
   request->event.Signal();
 }
 
@@ -410,14 +432,15 @@ void BrowserGpuMemoryBufferManager::GpuMemoryBufferAllocatedForSurfaceOnIO(
     return;
   }
 
+  // Note: Unretained is safe as IO thread is stopped before manager is
+  // destroyed.
   request->result = GpuMemoryBufferImpl::CreateFromHandle(
       handle, request->size, request->format, request->usage,
       base::Bind(
           &GpuMemoryBufferDeleted,
           BrowserThread::GetMessageLoopProxyForThread(BrowserThread::IO),
           base::Bind(&BrowserGpuMemoryBufferManager::DestroyGpuMemoryBufferOnIO,
-                     weak_ptr_factory_.GetWeakPtr(), handle.id,
-                     request->client_id)));
+                     base::Unretained(this), handle.id, request->client_id)));
   request->event.Signal();
 }
 
@@ -464,10 +487,12 @@ void BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferOnIO(
   // and verify that this has not changed when allocation completes.
   buffers[id] = BufferInfo(size, gfx::EMPTY_BUFFER, format, usage, 0);
 
+  // Note: Unretained is safe as IO thread is stopped before manager is
+  // destroyed.
   host->CreateGpuMemoryBuffer(
       id, size, format, usage, client_id, surface_id,
       base::Bind(&BrowserGpuMemoryBufferManager::GpuMemoryBufferAllocatedOnIO,
-                 weak_ptr_factory_.GetWeakPtr(), id, client_id, surface_id,
+                 base::Unretained(this), id, client_id, surface_id,
                  gpu_host_id_, reused_gpu_process, callback));
 }
 

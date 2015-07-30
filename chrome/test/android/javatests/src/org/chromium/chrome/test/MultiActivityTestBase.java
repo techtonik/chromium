@@ -5,13 +5,14 @@
 package org.chromium.chrome.test;
 
 import android.content.Context;
+import android.test.InstrumentationTestCase;
 import android.text.TextUtils;
 
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.UrlUtils;
 import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.ChromeSwitches;
-import org.chromium.chrome.browser.Tab;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.document.DocumentTabModelSelector;
 import org.chromium.chrome.test.util.ApplicationTestUtils;
 import org.chromium.chrome.test.util.browser.tabmodel.document.MockStorageDelegate;
@@ -24,7 +25,7 @@ import org.chromium.content.browser.test.util.CriteriaHelper;
 @CommandLineFlags.Add({
         ChromeSwitches.DISABLE_FIRST_RUN_EXPERIENCE
         })
-public abstract class MultiActivityTestBase extends RestrictedInstrumentationTestCase {
+public abstract class MultiActivityTestBase extends InstrumentationTestCase {
     protected static final String URL_1 = createTestUrl(1);
     protected static final String URL_2 = createTestUrl(2);
     protected static final String URL_3 = createTestUrl(3);
@@ -75,12 +76,42 @@ public abstract class MultiActivityTestBase extends RestrictedInstrumentationTes
             + "    </style>"
             + "    <script>"
             + "      function openNewWindow() {"
-            + "        if (window.open('" + URL_4 + "')) location.href = '" + SUCCESS_URL + "';"
+            + "        var site = window.open('" + URL_4 + "');"
+            + "        if (site) location.href = '" + SUCCESS_URL + "';"
             + "      }"
             + "    </script>"
             + "  </head>"
             + "  <body id='body'>"
-            + "    <div onclick='openNewWindow()'></div></a>"
+            + "    <div onclick='openNewWindow()'></div>"
+            + "  </body>"
+            + "</html>");
+
+    /** Opens a new page via window.open(), but get rid of the opener. */
+    protected static final String ONCLICK_NO_REFERRER_LINK = UrlUtils.encodeHtmlDataUri(
+            "<html>"
+            + "  <head>"
+            + "    <title>window.open page, opener set to null</title>"
+            + "    <meta name='viewport'"
+            + "        content='width=device-width initial-scale=0.5, maximum-scale=0.5'>"
+            + "    <style>"
+            + "      body {margin: 0em;} div {width: 100%; height: 100%; background: #011684;}"
+            + "    </style>"
+            + "    <script>"
+            + "      function openWithoutReferrer() {"
+            + "        var site = window.open();"
+            + "        site.opener = null;"
+            + "        site.document.open();"
+            + "        site.document.write("
+            + "          '<meta http-equiv=\"refresh\" content=\"0;url=" + URL_4 + "\">');"
+            + "        site.document.close();"
+            + "        if (site) location.href = '" + SUCCESS_URL + "';"
+            + "      }"
+            + "    </script>"
+            + "  </head>"
+            + "  <body>"
+            + "    <a onclick='openWithoutReferrer()'>"
+            + "      <div>The bug that just keeps on coming back.</div>"
+            + "    </a>"
             + "  </body>"
             + "</html>");
 

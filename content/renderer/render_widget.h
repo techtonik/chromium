@@ -8,7 +8,6 @@
 #include <deque>
 #include <map>
 
-#include "base/auto_reset.h"
 #include "base/basictypes.h"
 #include "base/callback.h"
 #include "base/compiler_specific.h"
@@ -92,6 +91,12 @@ struct WebPluginGeometry;
 
 // RenderWidget provides a communication bridge between a WebWidget and
 // a RenderWidgetHost, the latter of which lives in a different process.
+//
+// RenderWidget is used to implement:
+// - RenderViewImpl (deprecated)
+// - Fullscreen mode (RenderWidgetFullScreen)
+// - Popup "menus" (like the color chooser and date picker)
+// - Widgets for frames (for out-of-process iframe support)
 class CONTENT_EXPORT RenderWidget
     : public IPC::Listener,
       public IPC::Sender,
@@ -216,10 +221,6 @@ class CONTENT_EXPORT RenderWidget
   void CleanupWindowInPluginMoves(gfx::PluginWindowHandle window);
 
   RenderWidgetCompositor* compositor() const;
-
-  const ui::LatencyInfo* current_event_latency_info() const {
-    return current_event_latency_info_;
-  }
 
   virtual scoped_ptr<cc::OutputSurface> CreateOutputSurface(bool fallback);
 
@@ -357,7 +358,8 @@ class CONTENT_EXPORT RenderWidget
     NO_RESIZE_ACK,
   };
 
-  RenderWidget(blink::WebPopupType popup_type,
+  RenderWidget(CompositorDependencies* compositor_deps,
+               blink::WebPopupType popup_type,
                const blink::WebScreenInfo& screen_info,
                bool swapped_out,
                bool hidden,
@@ -373,11 +375,10 @@ class CONTENT_EXPORT RenderWidget
 
   // Initializes this view with the given opener.  CompleteInit must be called
   // later.
-  bool Init(int32 opener_id, CompositorDependencies* compositor_deps);
+  bool Init(int32 opener_id);
 
   // Called by Init and subclasses to perform initialization.
   bool DoInit(int32 opener_id,
-              CompositorDependencies* compositor_deps,
               blink::WebWidget* web_widget,
               IPC::SyncMessage* create_widget_message);
 
@@ -397,7 +398,6 @@ class CONTENT_EXPORT RenderWidget
   void FlushPendingInputEventAck();
   void DoDeferredClose();
   void NotifyOnClose();
-  void CloseInternal(bool close_synchronously);
 
   // Close the underlying WebWidget.
   virtual void Close();
@@ -501,7 +501,6 @@ class CONTENT_EXPORT RenderWidget
   // state.
   void SetHidden(bool hidden);
 
-  void WillToggleFullscreen();
   void DidToggleFullscreen();
 
   bool next_paint_is_resize_ack() const;
@@ -603,7 +602,7 @@ class CONTENT_EXPORT RenderWidget
 
   // Dependencies for initializing a compositor, including flags for optional
   // features.
-  CompositorDependencies* compositor_deps_;
+  CompositorDependencies* const compositor_deps_;
 
   // We are responsible for destroying this object via its Close method.
   // May be NULL when the window is closing.
@@ -778,8 +777,6 @@ class CONTENT_EXPORT RenderWidget
   // completed gesture.
   std::queue<SyntheticGestureCompletionCallback>
       pending_synthetic_gesture_callbacks_;
-
-  const ui::LatencyInfo* current_event_latency_info_;
 
   uint32 next_output_surface_id_;
 

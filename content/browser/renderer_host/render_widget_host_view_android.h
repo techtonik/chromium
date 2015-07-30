@@ -182,8 +182,8 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
   void OnVSync(base::TimeTicks frame_time,
                base::TimeDelta vsync_period) override;
   void OnAnimate(base::TimeTicks begin_frame_time) override;
-  void OnActivityPaused() override;
-  void OnActivityResumed() override;
+  void OnActivityStopped() override;
+  void OnActivityStarted() override;
 
   // DelegatedFrameEvictor implementation
   void EvictDelegatedFrame() override;
@@ -263,9 +263,9 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
 
   void DestroyDelegatedContent();
   void CheckOutputSurfaceChanged(uint32 output_surface_id);
-  void SubmitFrame(scoped_ptr<cc::DelegatedFrameData> frame_data);
+  void SubmitFrame(scoped_ptr<cc::CompositorFrame> frame_data);
   void SwapDelegatedFrame(uint32 output_surface_id,
-                          scoped_ptr<cc::DelegatedFrameData> frame_data);
+                          scoped_ptr<cc::CompositorFrame> frame_data);
   void SendDelegatedFrameAck(uint32 output_surface_id);
   void SendReturnedDelegatedResources(uint32 output_surface_id);
 

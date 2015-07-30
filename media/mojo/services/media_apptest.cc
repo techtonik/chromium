@@ -12,7 +12,8 @@
 #include "media/base/test_helpers.h"
 #include "media/cdm/key_system_names.h"
 #include "media/mojo/interfaces/content_decryption_module.mojom.h"
-#include "media/mojo/interfaces/media_renderer.mojom.h"
+#include "media/mojo/interfaces/renderer.mojom.h"
+#include "media/mojo/interfaces/service_factory.mojom.h"
 #include "media/mojo/services/media_type_converters.h"
 #include "media/mojo/services/mojo_demuxer_stream_impl.h"
 #include "mojo/application/public/cpp/application_connection.h"
@@ -31,25 +32,25 @@ namespace {
 const char kInvalidKeySystem[] = "invalid.key.system";
 const char kSecurityOrigin[] = "http://foo.com";
 
-class MockMediaRendererClient : public interfaces::MediaRendererClient {
+class MockRendererClient : public interfaces::RendererClient {
  public:
-  MockMediaRendererClient(){};
-  ~MockMediaRendererClient() override{};
+  MockRendererClient(){};
+  ~MockRendererClient() override{};
 
-  // interfaces::MediaRendererClient implementation.
+  // interfaces::RendererClient implementation.
   MOCK_METHOD2(OnTimeUpdate, void(int64_t time_usec, int64_t max_time_usec));
   MOCK_METHOD1(OnBufferingStateChange, void(interfaces::BufferingState state));
   MOCK_METHOD0(OnEnded, void());
   MOCK_METHOD0(OnError, void());
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(MockMediaRendererClient);
+  DISALLOW_COPY_AND_ASSIGN(MockRendererClient);
 };
 
 class MediaAppTest : public mojo::test::ApplicationTestBase {
  public:
   MediaAppTest()
-      : media_renderer_client_binding_(&media_renderer_client_),
+      : renderer_client_binding_(&renderer_client_),
         video_demuxer_stream_(DemuxerStream::VIDEO) {}
   ~MediaAppTest() override {}
 
@@ -60,9 +61,12 @@ class MediaAppTest : public mojo::test::ApplicationTestBase {
     request->url = "mojo:media";
     mojo::ApplicationConnection* connection =
         application_impl()->ConnectToApplication(request.Pass());
+    connection->SetRemoteServiceProviderConnectionErrorHandler(
+        base::Bind(&MediaAppTest::ConnectionClosed, base::Unretained(this)));
 
-    connection->ConnectToService(&cdm_);
-    connection->ConnectToService(&media_renderer_);
+    connection->ConnectToService(&service_factory_);
+    service_factory_->CreateCdm(mojo::GetProxy(&cdm_));
+    service_factory_->CreateRenderer(mojo::GetProxy(&renderer_));
 
     run_loop_.reset(new base::RunLoop());
   }
@@ -92,25 +96,28 @@ class MediaAppTest : public mojo::test::ApplicationTestBase {
     interfaces::DemuxerStreamPtr video_stream;
     new MojoDemuxerStreamImpl(&video_demuxer_stream_, GetProxy(&video_stream));
 
-    interfaces::MediaRendererClientPtr client_ptr;
-    media_renderer_client_binding_.Bind(GetProxy(&client_ptr));
+    interfaces::RendererClientPtr client_ptr;
+    renderer_client_binding_.Bind(GetProxy(&client_ptr));
 
     EXPECT_CALL(*this, OnRendererInitialized(expected_result))
         .Times(Exactly(1))
         .WillOnce(InvokeWithoutArgs(run_loop_.get(), &base::RunLoop::Quit));
-    media_renderer_->Initialize(client_ptr.Pass(), nullptr, video_stream.Pass(),
-                                base::Bind(&MediaAppTest::OnRendererInitialized,
-                                           base::Unretained(this)));
+    renderer_->Initialize(client_ptr.Pass(), nullptr, video_stream.Pass(),
+                          base::Bind(&MediaAppTest::OnRendererInitialized,
+                                     base::Unretained(this)));
   }
+
+  MOCK_METHOD0(ConnectionClosed, void());
 
  protected:
   scoped_ptr<base::RunLoop> run_loop_;
 
+  interfaces::ServiceFactoryPtr service_factory_;
   interfaces::ContentDecryptionModulePtr cdm_;
-  interfaces::MediaRendererPtr media_renderer_;
+  interfaces::RendererPtr renderer_;
 
-  StrictMock<MockMediaRendererClient> media_renderer_client_;
-  mojo::Binding<interfaces::MediaRendererClient> media_renderer_client_binding_;
+  StrictMock<MockRendererClient> renderer_client_;
+  mojo::Binding<interfaces::RendererClient> renderer_client_binding_;
 
   StrictMock<MockDemuxerStream> video_demuxer_stream_;
 
@@ -140,6 +147,21 @@ TEST_F(MediaAppTest, InitializeRenderer_Success) {
 
 TEST_F(MediaAppTest, InitializeRenderer_InvalidConfig) {
   InitializeRenderer(TestVideoConfig::Invalid(), false);
+  run_loop_->Run();
+}
+
+TEST_F(MediaAppTest, Lifetime) {
+  // Disconnecting CDM and Renderer services doesn't terminate the app.
+  cdm_.reset();
+  renderer_.reset();
+
+  // Disconnecting ServiceFactory service should terminate the app, which will
+  // close the connection.
+  EXPECT_CALL(*this, ConnectionClosed())
+      .Times(Exactly(1))
+      .WillOnce(Invoke(run_loop_.get(), &base::RunLoop::Quit));
+  service_factory_.reset();
+
   run_loop_->Run();
 }
 

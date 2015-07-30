@@ -140,7 +140,7 @@ bool ChromePasswordManagerClient::IsAutomaticPasswordSavingEnabled() const {
   return base::CommandLine::ForCurrentProcess()->HasSwitch(
              password_manager::switches::kEnableAutomaticPasswordSaving) &&
          chrome::VersionInfo::GetChannel() ==
-             chrome::VersionInfo::CHANNEL_UNKNOWN;
+             version_info::Channel::UNKNOWN;
 }
 
 bool ChromePasswordManagerClient::IsPasswordManagementEnabledForCurrentPage()
@@ -203,9 +203,10 @@ std::string ChromePasswordManagerClient::GetSyncUsername() const {
 }
 
 bool ChromePasswordManagerClient::IsSyncAccountCredential(
-    const std::string& username, const std::string& origin) const {
+    const std::string& username,
+    const std::string& realm) const {
   return password_manager_sync_metrics::IsSyncAccountCredential(
-      profile_, username, origin);
+      profile_, username, realm);
 }
 
 void ChromePasswordManagerClient::AutofillResultsComputed() {

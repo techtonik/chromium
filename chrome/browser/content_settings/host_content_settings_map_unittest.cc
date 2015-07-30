@@ -325,11 +325,6 @@ TEST_F(HostContentSettingsMapTest, ObserveDefaultPref) {
       profile.GetHostContentSettingsMap();
 
   PrefService* prefs = profile.GetPrefs();
-
-  // Make a copy of the default pref value so we can reset it later.
-  scoped_ptr<base::Value> default_value(prefs->FindPreference(
-      prefs::kDefaultContentSettings)->GetValue()->DeepCopy());
-
   GURL host("http://example.com");
 
   host_content_settings_map->SetDefaultContentSetting(
@@ -338,18 +333,14 @@ TEST_F(HostContentSettingsMapTest, ObserveDefaultPref) {
             host_content_settings_map->GetContentSetting(
                 host, host, CONTENT_SETTINGS_TYPE_IMAGES, std::string()));
 
-  // Make a copy of the pref's new value so we can reset it later.
-  scoped_ptr<base::Value> new_value(prefs->FindPreference(
-      prefs::kDefaultContentSettings)->GetValue()->DeepCopy());
-
   // Clearing the backing pref should also clear the internal cache.
-  prefs->Set(prefs::kDefaultContentSettings, *default_value);
+  prefs->ClearPref(prefs::kDefaultImagesSetting);
   EXPECT_EQ(CONTENT_SETTING_ALLOW,
             host_content_settings_map->GetContentSetting(
                 host, host, CONTENT_SETTINGS_TYPE_IMAGES, std::string()));
 
   // Reseting the pref to its previous value should update the cache.
-  prefs->Set(prefs::kDefaultContentSettings, *new_value);
+  prefs->SetInteger(prefs::kDefaultImagesSetting, CONTENT_SETTING_BLOCK);
   EXPECT_EQ(CONTENT_SETTING_BLOCK,
             host_content_settings_map->GetContentSetting(
                 host, host, CONTENT_SETTINGS_TYPE_IMAGES, std::string()));
@@ -1022,71 +1013,4 @@ TEST_F(HostContentSettingsMapTest, AddContentSettingsObserver) {
       CONTENT_SETTINGS_TYPE_IMAGES,
       std::string(),
       CONTENT_SETTING_DEFAULT);
-}
-
-TEST_F(HostContentSettingsMapTest, OverrideAllowedWebsiteSetting) {
-  TestingProfile profile;
-  HostContentSettingsMap* host_content_settings_map =
-      profile.GetHostContentSettingsMap();
-  GURL host("http://example.com/");
-  ContentSettingsPattern pattern =
-      ContentSettingsPattern::FromString("[*.]example.com");
-  host_content_settings_map->SetContentSetting(
-      pattern,
-      ContentSettingsPattern::Wildcard(),
-      CONTENT_SETTINGS_TYPE_GEOLOCATION,
-      std::string(),
-      CONTENT_SETTING_ALLOW);
-
-  EXPECT_EQ(CONTENT_SETTING_ALLOW,
-            host_content_settings_map->GetContentSetting(
-                host, host, CONTENT_SETTINGS_TYPE_GEOLOCATION, std::string()));
-
-  // Disabling should override an allowed exception.
-  host_content_settings_map->SetContentSettingOverride(
-      CONTENT_SETTINGS_TYPE_GEOLOCATION, false);
-  EXPECT_EQ(CONTENT_SETTING_BLOCK,
-            host_content_settings_map->GetContentSetting(
-                host, host, CONTENT_SETTINGS_TYPE_GEOLOCATION, std::string()));
-
-  host_content_settings_map->SetContentSettingOverride(
-      CONTENT_SETTINGS_TYPE_GEOLOCATION, true);
-  EXPECT_EQ(CONTENT_SETTING_ALLOW,
-            host_content_settings_map->GetContentSetting(
-                host, host, CONTENT_SETTINGS_TYPE_GEOLOCATION, std::string()));
-}
-
-TEST_F(HostContentSettingsMapTest, OverrideAllowedDefaultSetting) {
-  TestingProfile profile;
-  HostContentSettingsMap* host_content_settings_map =
-      profile.GetHostContentSettingsMap();
-
-  // Check setting defaults.
-  EXPECT_EQ(CONTENT_SETTING_ALLOW,
-            host_content_settings_map->GetDefaultContentSetting(
-                CONTENT_SETTINGS_TYPE_IMAGES, NULL));
-
-  GURL host("http://example.com/");
-  EXPECT_EQ(CONTENT_SETTING_ALLOW,
-            host_content_settings_map->GetContentSetting(
-                host, host, CONTENT_SETTINGS_TYPE_IMAGES, std::string()));
-
-  // Disabling should override an allowed default setting.
-  host_content_settings_map->SetContentSettingOverride(
-      CONTENT_SETTINGS_TYPE_IMAGES, false);
-  EXPECT_EQ(CONTENT_SETTING_BLOCK,
-            host_content_settings_map->GetContentSetting(
-                host, host, CONTENT_SETTINGS_TYPE_IMAGES, std::string()));
-
-  // Enabling shouldn't override positively.
-  host_content_settings_map->SetContentSettingOverride(
-      CONTENT_SETTINGS_TYPE_IMAGES, true);
-  EXPECT_EQ(CONTENT_SETTING_ALLOW,
-            host_content_settings_map->GetContentSetting(
-                host, host, CONTENT_SETTINGS_TYPE_IMAGES, std::string()));
-  host_content_settings_map->SetDefaultContentSetting(
-      CONTENT_SETTINGS_TYPE_IMAGES, CONTENT_SETTING_BLOCK);
-  EXPECT_EQ(CONTENT_SETTING_BLOCK,
-            host_content_settings_map->GetContentSetting(
-                host, host, CONTENT_SETTINGS_TYPE_IMAGES, std::string()));
 }

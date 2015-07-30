@@ -106,6 +106,16 @@ def processJinjaTemplate(input_file, include_paths, output_file, context):
   rendered = template.render(context)
   io.open(output_file, 'w', encoding='utf-8').write(rendered)
 
+
+def getClientPluginType(webapp_type):
+  if webapp_type in ['v1', 'v2']:
+    return 'native'
+  elif webapp_type in ['v2_pnacl', 'shared_module']:
+    return 'pnacl'
+  elif webapp_type is 'app_remoting':
+    return ''
+
+
 def buildWebApp(buildtype, version, destination, zip_path,
                 manifest_template, webapp_type, appid, app_client_id, app_name,
                 app_description, app_capabilities, manifest_key, files,
@@ -223,11 +233,10 @@ def buildWebApp(buildtype, version, destination, zip_path,
   is_desktop_remoting = not is_app_remoting
 
   # Set client plugin type.
-  # TODO(wez): Use 'native' in app_remoting until b/17441659 is resolved.
   if not is_app_remoting_webapp:
-    client_plugin = 'pnacl' if webapp_type == 'v2_pnacl' else 'native'
+    client_plugin = getClientPluginType(webapp_type)
     findAndReplace(os.path.join(destination, 'plugin_settings.js'),
-                   "'CLIENT_PLUGIN_TYPE'", "'" + client_plugin + "'")
+                 "'CLIENT_PLUGIN_TYPE'", "'" + client_plugin + "'")
 
   # Allow host names for google services/apis to be overriden via env vars.
   oauth2AccountsHost = os.environ.get(
@@ -407,29 +416,22 @@ def buildWebApp(buildtype, version, destination, zip_path,
     findAndReplace(os.path.join(destination, 'arv_main.js'),
                    "'APPLICATION_CAPABILITIES'", appCapabilities)
 
-  # Use a consistent extension id for dev builds.
-  # AppRemoting builds always use the dev app id - the correct app id gets
-  # written into the manifest later.
-  if is_app_remoting_webapp:
-    if buildtype != 'Dev':
-      if not manifest_key:
-        raise Exception('Invalid manifest_key passed in: "' +
-            manifest_key + '"')
-      manifestKey = '"key": "' + manifest_key + '",'
-    else:
-      manifestKey = '"key": "remotingdevbuild",'
-  elif buildtype != 'Official':
-    # TODO(joedow): Update the chromoting webapp GYP entries to include keys.
-    manifestKey = '"key": "remotingdevbuild",'
+  # Official AppRemoting builds get the key from the gyp/gn build file. All
+  # other builds use a fixed key. For dev builds, this ensures that the app
+  # can be run directly from the output directory. For official CRD builds,
+  # it allows QA to test the app without uploading it to Chrome Web Store.
+  if is_app_remoting_webapp and buildtype != 'Dev':
+    if not manifest_key:
+      raise Exception('No manifest_key passed in')
   else:
-    manifestKey = ''
+      manifest_key = 'remotingdevbuild'
 
   # Generate manifest.
   if manifest_template:
     context = {
         'webapp_type': webapp_type,
         'FULL_APP_VERSION': version,
-        'MANIFEST_KEY_FOR_UNOFFICIAL_BUILD': manifestKey,
+        'MANIFEST_KEY': manifest_key,
         'OAUTH2_REDIRECT_URL': oauth2RedirectUrlJson,
         'TALK_GADGET_HOST': talkGadgetHostJson,
         'THIRD_PARTY_AUTH_REDIRECT_URL': thirdPartyAuthUrlJson,

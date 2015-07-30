@@ -59,6 +59,7 @@
 #include "content/browser/renderer_host/render_view_host_impl.h"  // Temporary
 #include "content/browser/site_instance_impl.h"
 #include "content/common/frame_messages.h"
+#include "content/common/site_isolation_policy.h"
 #include "content/common/ssl_status_serialization.h"
 #include "content/common/view_messages.h"
 #include "content/public/browser/browser_context.h"
@@ -73,7 +74,6 @@
 #include "content/public/browser/user_metrics.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_constants.h"
-#include "content/public/common/content_switches.h"
 #include "media/base/mime_util.h"
 #include "net/base/escape.h"
 #include "net/base/net_util.h"
@@ -414,12 +414,6 @@ NavigationControllerImpl::GetEntryWithUniqueID(int nav_entry_id) const {
   return (index != -1) ? entries_[index] : nullptr;
 }
 
-bool NavigationControllerImpl::HasCommittedRealLoad(
-    FrameTreeNode* frame_tree_node) const {
-  NavigationEntryImpl* last_committed = GetLastCommittedEntry();
-  return last_committed && last_committed->GetFrameEntry(frame_tree_node);
-}
-
 void NavigationControllerImpl::LoadEntry(
     scoped_ptr<NavigationEntryImpl> entry) {
   // When navigating to a new page, we don't know for sure if we will actually
@@ -535,9 +529,11 @@ void NavigationControllerImpl::TakeScreenshot() {
 }
 
 void NavigationControllerImpl::SetScreenshotManager(
-    NavigationEntryScreenshotManager* manager) {
-  screenshot_manager_.reset(manager ? manager :
-                            new NavigationEntryScreenshotManager(this));
+    scoped_ptr<NavigationEntryScreenshotManager> manager) {
+  if (manager.get())
+    screenshot_manager_ = manager.Pass();
+  else
+    screenshot_manager_.reset(new NavigationEntryScreenshotManager(this));
 }
 
 bool NavigationControllerImpl::CanGoBack() const {
@@ -743,8 +739,7 @@ void NavigationControllerImpl::LoadURLWithParams(const LoadURLParams& params) {
 
       // In --site-per-process, create an identical NavigationEntry with a
       // new FrameNavigationEntry for the target subframe.
-      if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-              switches::kSitePerProcess)) {
+      if (SiteIsolationPolicy::UseSubframeNavigationEntries()) {
         entry = GetLastCommittedEntry()->Clone();
         entry->SetPageID(-1);
         entry->AddOrUpdateFrameEntry(node, -1, -1, nullptr, params.url,
@@ -897,8 +892,7 @@ bool NavigationControllerImpl::RendererDidNavigate(
   NavigationEntryImpl* active_entry = GetLastCommittedEntry();
   active_entry->SetTimestamp(timestamp);
   active_entry->SetHttpStatusCode(params.http_status_code);
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess)) {
+  if (SiteIsolationPolicy::UseSubframeNavigationEntries()) {
     // Update the frame-specific PageState.
     FrameNavigationEntry* frame_entry =
         active_entry->GetFrameEntry(rfh->frame_tree_node());
@@ -945,6 +939,13 @@ bool NavigationControllerImpl::RendererDidNavigate(
   }
 
   NotifyNavigationEntryCommitted(details);
+
+  // Update the RenderViewHost of the top-level RenderFrameHost's notion of what
+  // entry it's showing for use later.
+  RenderFrameHostImpl* main_frame =
+      rfh->frame_tree_node()->frame_tree()->root()->current_frame_host();
+  static_cast<RenderViewHostImpl*>(main_frame->GetRenderViewHost())->
+      set_nav_entry_id(active_entry->GetUniqueID());
 
   return true;
 }
@@ -1229,8 +1230,7 @@ void NavigationControllerImpl::RendererDidNavigateNewSubframe(
                                   << "that a last committed entry exists.";
 
   scoped_ptr<NavigationEntryImpl> new_entry;
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess)) {
+  if (SiteIsolationPolicy::UseSubframeNavigationEntries()) {
     // Make sure new_entry takes ownership of frame_entry in a scoped_refptr.
     FrameNavigationEntry* frame_entry = new FrameNavigationEntry(
         rfh->frame_tree_node()->frame_tree_node_id(),
@@ -1285,8 +1285,7 @@ bool NavigationControllerImpl::RendererDidNavigateAutoSubframe(
     }
   }
 
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess)) {
+  if (SiteIsolationPolicy::UseSubframeNavigationEntries()) {
     // This may be a "new auto" case where we add a new FrameNavigationEntry, or
     // it may be a "history auto" case where we update an existing one.
     NavigationEntryImpl* last_committed = GetLastCommittedEntry();
@@ -1750,8 +1749,7 @@ bool NavigationControllerImpl::NavigateToPendingEntryInternal(
   // In default Chrome, there are no subframe FrameNavigationEntries.  Either
   // navigate the main frame or use the main frame's FrameNavigationEntry to
   // tell the indicated frame where to go.
-  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess)) {
+  if (!SiteIsolationPolicy::UseSubframeNavigationEntries()) {
     FrameNavigationEntry* frame_entry = GetPendingEntry()->GetFrameEntry(root);
     FrameTreeNode* frame = root;
     int ftn_id = GetPendingEntry()->frame_tree_node_id();

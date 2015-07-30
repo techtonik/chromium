@@ -1281,7 +1281,9 @@ TemplateURLService::CreateTemplateURLFromTemplateURLAndSyncData(
   data.favicon_url = GURL(specifics.favicon_url());
   data.show_in_default_list = specifics.show_in_default_list();
   data.safe_for_autoreplace = specifics.safe_for_autoreplace();
-  base::SplitString(specifics.input_encodings(), ';', &data.input_encodings);
+  data.input_encodings = base::SplitString(
+      specifics.input_encodings(), ";",
+      base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
   // If the server data has duplicate encodings, we'll want to push an update
   // below to correct it.  Note that we also fix this in
   // GetSearchProvidersUsingKeywordResult(), since otherwise we'd never correct
@@ -2107,7 +2109,8 @@ base::string16 TemplateURLService::UniquifyKeyword(const TemplateURL& turl,
     GURL gurl(turl.url());
     if (gurl.is_valid() &&
         (turl.GetType() != TemplateURL::OMNIBOX_API_EXTENSION)) {
-      base::string16 keyword_candidate = TemplateURL::GenerateKeyword(gurl);
+      base::string16 keyword_candidate = TemplateURL::GenerateKeyword(
+          gurl, search_terms_data().GetAcceptLanguages());
       if (!GetTemplateURLForKeyword(keyword_candidate))
         return keyword_candidate;
     }

@@ -19,6 +19,10 @@
 
 namespace IPC {
 
+namespace internal {
+class ChannelReader;
+}  // namespace internal
+
 //------------------------------------------------------------------------------
 
 struct LogData;
@@ -180,6 +184,9 @@ class IPC_EXPORT Message : public base::Pickle {
   // Whether the message has any brokerable attachments.
   bool HasBrokerableAttachments() const;
 
+  void set_sender_pid(base::ProcessId id) { sender_pid_ = id; }
+  base::ProcessId get_sender_pid() const { return sender_pid_; }
+
 #ifdef IPC_MESSAGE_LOG_ENABLED
   // Adds the outgoing time from Time::Now() at the end of the message and sets
   // a bit to indicate that it's been added.
@@ -217,6 +224,7 @@ class IPC_EXPORT Message : public base::Pickle {
   friend class ChannelNacl;
   friend class ChannelPosix;
   friend class ChannelWin;
+  friend class internal::ChannelReader;
   friend class MessageReplyDeserializer;
   friend class SyncMessage;
 
@@ -257,6 +265,10 @@ class IPC_EXPORT Message : public base::Pickle {
   const MessageAttachmentSet* attachment_set() const {
     return attachment_set_.get();
   }
+
+  // The process id of the sender of the message. This member is populated with
+  // a valid value for every message dispatched to listeners.
+  base::ProcessId sender_pid_;
 
 #ifdef IPC_MESSAGE_LOG_ENABLED
   // Used for logging.

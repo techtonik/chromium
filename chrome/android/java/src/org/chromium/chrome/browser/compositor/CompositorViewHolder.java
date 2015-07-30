@@ -29,9 +29,6 @@ import org.chromium.base.SysUtils;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.annotations.SuppressFBWarnings;
 import org.chromium.chrome.R;
-import org.chromium.chrome.browser.EmptyTabObserver;
-import org.chromium.chrome.browser.Tab;
-import org.chromium.chrome.browser.TabObserver;
 import org.chromium.chrome.browser.compositor.Invalidator.Client;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManager;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManagerHost;
@@ -43,9 +40,13 @@ import org.chromium.chrome.browser.contextualsearch.ContextualSearchManagementDe
 import org.chromium.chrome.browser.device.DeviceClassManager;
 import org.chromium.chrome.browser.fullscreen.ChromeFullscreenManager;
 import org.chromium.chrome.browser.fullscreen.ChromeFullscreenManager.FullscreenListener;
+import org.chromium.chrome.browser.tab.EmptyTabObserver;
+import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.tab.TabObserver;
 import org.chromium.chrome.browser.tabmodel.EmptyTabModelSelectorObserver;
 import org.chromium.chrome.browser.tabmodel.TabCreatorManager;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
+import org.chromium.chrome.browser.widget.ClipDrawableProgressBar.DrawingInfo;
 import org.chromium.chrome.browser.widget.ControlContainer;
 import org.chromium.content.browser.ContentReadbackHandler;
 import org.chromium.content.browser.ContentViewClient;
@@ -56,7 +57,6 @@ import org.chromium.ui.base.DeviceFormFactor;
 import org.chromium.ui.base.WindowAndroid;
 import org.chromium.ui.resources.ResourceManager;
 import org.chromium.ui.resources.dynamics.DynamicResourceLoader;
-import org.chromium.ui.resources.dynamics.ViewResourceAdapter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -118,6 +118,7 @@ public class CompositorViewHolder extends FrameLayout
     // Cache objects that should not be created frequently.
     private final Rect mCacheViewport = new Rect();
     private final Rect mCacheVisibleViewport = new Rect();
+    private DrawingInfo mProgressBarDrawingInfo;
 
     // If we've drawn at least one frame.
     private boolean mHasDrawnOnce = false;
@@ -222,6 +223,7 @@ public class CompositorViewHolder extends FrameLayout
             }
         });
 
+        if (!DeviceFormFactor.isTablet(getContext())) mProgressBarDrawingInfo = new DrawingInfo();
         mCompositorView = new CompositorView(getContext(), this);
         addView(mCompositorView,
                 new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -252,17 +254,11 @@ public class CompositorViewHolder extends FrameLayout
                 : null;
         if (loader != null && mControlContainer != null) {
             loader.unregisterResource(R.id.control_container);
-            loader.unregisterResource(R.id.progress);
         }
         mControlContainer = controlContainer;
         if (loader != null && mControlContainer != null) {
             loader.registerResource(
                     R.id.control_container, mControlContainer.getToolbarResourceAdapter());
-
-            ViewResourceAdapter progressAdapter = mControlContainer.getProgressResourceAdapter();
-            if (progressAdapter != null) {
-                loader.registerResource(R.id.progress, progressAdapter);
-            }
         }
     }
 
@@ -311,12 +307,6 @@ public class CompositorViewHolder extends FrameLayout
         if (mControlContainer != null) {
             mCompositorView.getResourceManager().getDynamicResourceLoader().registerResource(
                     R.id.control_container, mControlContainer.getToolbarResourceAdapter());
-
-            ViewResourceAdapter progressAdapter = mControlContainer.getProgressResourceAdapter();
-            if (progressAdapter != null) {
-                mCompositorView.getResourceManager().getDynamicResourceLoader().registerResource(
-                        R.id.progress, progressAdapter);
-            }
         }
     }
 
@@ -551,7 +541,12 @@ public class CompositorViewHolder extends FrameLayout
         TraceEvent.begin("CompositorViewHolder:layout");
         if (mLayoutManager != null) {
             mLayoutManager.onUpdate();
-            mCompositorView.finalizeLayers(mLayoutManager, mSkipNextToolbarTextureUpdate);
+            if (mProgressBarDrawingInfo != null) {
+                mControlContainer.getProgressBarDrawingInfo(mProgressBarDrawingInfo);
+            }
+            mCompositorView.finalizeLayers(mLayoutManager, mSkipNextToolbarTextureUpdate,
+                    mProgressBarDrawingInfo);
+
             // TODO(changwan): Check if this hack can be removed.
             // This is a hack to draw one more frame if the screen just rotated for Nexus 10 + L.
             // See http://crbug/440469 for more.

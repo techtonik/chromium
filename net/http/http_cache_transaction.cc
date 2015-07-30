@@ -237,8 +237,8 @@ static bool HeaderMatches(const HttpRequestHeaders& headers,
 
     HttpUtil::ValuesIterator v(header_value.begin(), header_value.end(), ',');
     while (v.GetNext()) {
-      if (base::LowerCaseEqualsASCII(v.value_begin(), v.value_end(),
-                                     search->value))
+      if (base::LowerCaseEqualsASCII(
+              base::StringPiece(v.value_begin(), v.value_end()), search->value))
         return true;
     }
   }
@@ -327,7 +327,7 @@ bool HttpCache::Transaction::AddTruncatedFlag() {
   DCHECK(mode_ & WRITE || mode_ == NONE);
 
   // Don't set the flag for sparse entries.
-  if (is_sparse_)
+  if (partial_ && !truncated_)
     return true;
 
   if (!CanResume(true))

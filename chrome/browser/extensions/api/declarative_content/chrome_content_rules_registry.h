@@ -50,7 +50,7 @@ namespace extensions {
 //
 // Here is the high level overview of this functionality:
 //
-// core_api::events::Rule consists of conditions and actions, these are
+// api::events::Rule consists of conditions and actions, these are
 // represented as a ContentRule with ContentConditions and ContentRuleActions.
 //
 // The evaluation of URL related condition attributes (host_suffix, path_prefix)
@@ -84,7 +84,7 @@ class ChromeContentRulesRegistry
   // RulesRegistry:
   std::string AddRulesImpl(
       const std::string& extension_id,
-      const std::vector<linked_ptr<core_api::events::Rule>>& rules) override;
+      const std::vector<linked_ptr<api::events::Rule>>& rules) override;
   std::string RemoveRulesImpl(
       const std::string& extension_id,
       const std::vector<std::string>& rule_identifiers) override;
@@ -156,10 +156,9 @@ class ChromeContentRulesRegistry
   // and ContentAction.  |extension| may be NULL in tests.  If |error| is empty,
   // the translation was successful and the returned rule is internally
   // consistent.
-  scoped_ptr<const ContentRule> CreateRule(
-      const Extension* extension,
-      const core_api::events::Rule& api_rule,
-      std::string* error);
+  scoped_ptr<const ContentRule> CreateRule(const Extension* extension,
+                                           const api::events::Rule& api_rule,
+                                           std::string* error);
 
   // True if this object is managing the rules for |context|.
   bool ManagingRulesForBrowserContext(content::BrowserContext* context);
@@ -175,8 +174,10 @@ class ChromeContentRulesRegistry
   // selectors.
   void EvaluateConditionsForTab(content::WebContents* tab);
 
-  // Evaluates the conditions for tabs in each browser window.
-  void EvaluateConditionsForAllTabs();
+  // Returns true if a rule created by |extension| should be evaluated for an
+  // incognito renderer.
+  bool ShouldEvaluateExtensionRulesForIncognitoRenderer(
+      const Extension* extension) const;
 
   using ExtensionRuleIdPair = std::pair<const Extension*, std::string>;
   using RuleAndConditionForURLMatcherId =
@@ -187,6 +188,10 @@ class ChromeContentRulesRegistry
   // Map that tells us which ContentRules and ContentConditions may
   // match for a URLMatcherConditionSet::ID returned by the |url_matcher_|.
   RuleAndConditionForURLMatcherId rule_and_conditions_for_match_id_;
+
+  // Set of conditions that participate in URL matching. Supports early-out
+  // during evaluation of conditions that have failing URL matches.
+  std::set<const ContentCondition*> url_matcher_conditions_;
 
   RulesMap content_rules_;
 

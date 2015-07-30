@@ -49,10 +49,6 @@ class SpdyFramerPeer;
 
 }  // namespace test
 
-// A datastructure for holding a set of headers from a HEADERS, PUSH_PROMISE,
-// SYN_STREAM, or SYN_REPLY frame.
-typedef std::map<std::string, std::string> SpdyHeaderBlock;
-
 // A datastructure for holding the ID and flag fields for SETTINGS.
 // Conveniently handles converstion to/from wire format.
 class NET_EXPORT_PRIVATE SettingsFlagsAndId {
@@ -335,8 +331,8 @@ class NET_EXPORT_PRIVATE SpdyFramer {
   //                and avoid exposing through the header.  (Needed for test)
   enum SpdyState {
     SPDY_ERROR,
-    SPDY_RESET,
-    SPDY_AUTO_RESET,
+    SPDY_READY_FOR_FRAME,  // Framer is ready for reading the next frame.
+    SPDY_FRAME_COMPLETE,  // Framer has finished reading a frame, need to reset.
     SPDY_READING_COMMON_HEADER,
     SPDY_CONTROL_FRAME_PAYLOAD,
     SPDY_READ_DATA_FRAME_PADDING_LENGTH,
@@ -676,14 +672,13 @@ class NET_EXPORT_PRIVATE SpdyFramer {
   void WriteHeaderBlockToZ(const SpdyHeaderBlock* headers,
                            z_stream* out) const;
 
-  void SerializeNameValueBlockWithoutCompression(
+  void SerializeHeaderBlockWithoutCompression(
       SpdyFrameBuilder* builder,
-      const SpdyNameValueBlock& name_value_block) const;
+      const SpdyHeaderBlock& header_block) const;
 
   // Compresses automatically according to enable_compression_.
-  void SerializeNameValueBlock(
-      SpdyFrameBuilder* builder,
-      const SpdyFrameWithNameValueBlockIR& frame);
+  void SerializeHeaderBlock(SpdyFrameBuilder* builder,
+                            const SpdyFrameWithHeaderBlockIR& frame);
 
   // Set the error code and moves the framer into the error state.
   void set_error(SpdyError error);

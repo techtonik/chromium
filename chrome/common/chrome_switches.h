@@ -120,15 +120,14 @@ extern const char kEnableClearBrowsingDataCounters[];
 extern const char kEnableCloudPrintProxy[];
 extern const char kEnableDevToolsExperiments[];
 extern const char kEnableDeviceDiscoveryNotifications[];
-extern const char kEnableDomDistiller[];
-extern const char kEnhancedBookmarksExperiment[];
-extern const char kEnableDomainReliability[];
 extern const char kEnableDownloadNotification[];
+extern const char kEnableDomainReliability[];
 extern const char kEnableEphemeralAppsInWebstore[];
 extern const char kEnableExperimentalHotwordHardware[];
 extern const char kEnableExtensionActivityLogging[];
 extern const char kEnableExtensionActivityLogTesting[];
 extern const char kEnableFastUnload[];
+extern const char kEnableInsecureQuic[];
 extern const char kEnableLinkableEphemeralApps[];
 extern const char kEnableMaterialDesignDownloads[];
 extern const char kEnableMaterialDesignSettings[];
@@ -158,13 +157,11 @@ extern const char kDisableSettingsWindow[];
 extern const char kEnableSiteEngagementService[];
 extern const char kEnableSuggestionsService[];
 extern const char kEnableSupervisedUserManagedBookmarksFolder[];
-extern const char kEnableSyncArticles[];
 extern const char kEnableTabAudioMuting[];
 extern const char kEnableThumbnailRetargeting[];
 extern const char kEnableUserAlternateProtocolPorts[];
 extern const char kEnableWebAppFrame[];
 extern const char kEnableWifiCredentialSync[];
-extern const char kEnhancedBookmarksExperiment[];
 extern const char kExtensionContentVerificationBootstrap[];
 extern const char kExtensionContentVerificationEnforceStrict[];
 extern const char kExtensionContentVerificationEnforce[];
@@ -371,7 +368,6 @@ extern const char kRelauncherProcess[];
 #if defined(OS_WIN)
 extern const char kEnableCloudPrintXps[];
 extern const char kEnableProfileShortcutManager[];
-extern const char kEnableTabDiscarding[];
 extern const char kForceDesktop[];
 extern const char kForceImmersive[];
 extern const char kHideIcons[];
@@ -383,6 +379,10 @@ extern const char kViewerLaunchViaAppId[];
 extern const char kWaitForMutex[];
 extern const char kWindows8Search[];
 #endif  // defined(OS_WIN)
+
+#if defined(OS_WIN) || defined(OS_MACOSX)
+extern const char kEnableTabDiscarding[];
+#endif  // defined(OS_WIN) || defined(OS_MACOSX)
 
 #if defined(ENABLE_IPC_FUZZER)
 extern const char kIpcFuzzerTestcase[];
@@ -400,6 +400,10 @@ extern const char kDisablePluginPowerSaver[];
 extern const char kEnablePluginPowerSaver[];
 #endif
 
+#if defined(ENABLE_TASK_MANAGER)
+extern const char kEnableNewTaskManager[];
+#endif  // defined(ENABLE_TASK_MANAGER)
+
 bool AboutInSettingsEnabled();
 bool MdDownloadsEnabled();
 bool MdSettingsEnabled();
@@ -410,6 +414,10 @@ bool SettingsWindowEnabled();
 #if defined(OS_CHROMEOS)
 bool PowerOverlayEnabled();
 #endif
+
+#if defined(ENABLE_TASK_MANAGER)
+bool NewTaskManagerEnabled();
+#endif  // defined(ENABLE_TASK_MANAGER)
 
 // DON'T ADD RANDOM STUFF HERE. Put it in the main section above in
 // alphabetical order, or in one of the ifdefs (also in order in each section).

@@ -49,7 +49,8 @@ class CONTENT_EXPORT BackgroundSyncManager
     ERROR_TYPE_STORAGE,
     ERROR_TYPE_NOT_FOUND,
     ERROR_TYPE_NO_SERVICE_WORKER,
-    ERROR_TYPE_MAX = ERROR_TYPE_NO_SERVICE_WORKER
+    ERROR_TYPE_NOT_ALLOWED,
+    ERROR_TYPE_MAX = ERROR_TYPE_NOT_ALLOWED
   };
 
   using StatusCallback = base::Callback<void(ErrorType)>;
@@ -121,6 +122,7 @@ class CONTENT_EXPORT BackgroundSyncManager
       const ServiceWorkerStorage::GetUserDataForAllRegistrationsCallback&
           callback);
   virtual void FireOneShotSync(
+      const BackgroundSyncRegistration& registration,
       const scoped_refptr<ServiceWorkerVersion>& active_version,
       const ServiceWorkerVersion::StatusCallback& callback);
 
@@ -267,7 +269,8 @@ class CONTENT_EXPORT BackgroundSyncManager
                              ServiceWorkerStatusCode status_code);
 
   // Called when all sync events have completed.
-  static void OnAllSyncEventsCompleted(const base::TimeTicks& start_time);
+  static void OnAllSyncEventsCompleted(const base::TimeTicks& start_time,
+                                       int number_of_batched_sync_events);
 
   // OnRegistrationDeleted callbacks
   void OnRegistrationDeletedImpl(int64 registration_id,

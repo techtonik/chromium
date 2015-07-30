@@ -11,8 +11,10 @@
 #include "base/memory/scoped_vector.h"
 #include "base/test/scoped_path_override.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/values.h"
 #include "chromecast/app/linux/cast_crash_reporter_client.h"
 #include "chromecast/crash/app_state_tracker.h"
+#include "chromecast/crash/linux/crash_testing_utils.h"
 #include "chromecast/crash/linux/crash_util.h"
 #include "chromecast/crash/linux/dump_info.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -30,19 +32,6 @@ int WriteFakeDumpStateFile(const std::string& path) {
   dumpstate.Write(
       0, kFakeDumpstateContents, sizeof(kFakeDumpstateContents) - 1);
   return 0;
-}
-
-ScopedVector<DumpInfo> GetCurrentDumps(const std::string& logfile_path) {
-  ScopedVector<DumpInfo> dumps;
-  std::string entry;
-
-  std::ifstream in(logfile_path);
-  DCHECK(in.is_open());
-  while (std::getline(in, entry)) {
-    scoped_ptr<DumpInfo> info(new DumpInfo(entry));
-    dumps.push_back(info.Pass());
-  }
-  return dumps.Pass();
 }
 
 }  // namespace
@@ -111,7 +100,8 @@ class CastCrashReporterClientTest : public testing::Test {
     base::FilePath lockfile =
         fake_home_dir_.Append("minidumps").Append("lockfile");
     ASSERT_TRUE(base::PathExists(lockfile));
-    ScopedVector<DumpInfo> dumps = GetCurrentDumps(lockfile.value());
+    ScopedVector<DumpInfo> dumps;
+    ASSERT_TRUE(FetchDumps(lockfile.value(), &dumps));
     ASSERT_EQ(1u, dumps.size());
 
     const DumpInfo& dump_info = *(dumps[0]);

@@ -9,6 +9,7 @@
 #include "base/metrics/field_trial.h"
 #include "base/prefs/pref_service.h"
 #include "base/run_loop.h"
+#include "base/strings/string_number_conversions.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/safe_browsing/ping_manager.h"
@@ -20,6 +21,7 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/common/pref_names.h"
 #include "components/variations/variations_associated_data.h"
+#include "net/url_request/certificate_report_sender.h"
 #include "net/url_request/url_request_context.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "url/gurl.h"
@@ -44,9 +46,10 @@ namespace CertificateReportingTestUtils {
 // network.
 class MockReporter : public chrome_browser_net::CertificateErrorReporter {
  public:
-  MockReporter(net::URLRequestContext* request_context,
-               const GURL& upload_url,
-               CookiesPreference cookies_preference);
+  MockReporter(
+      net::URLRequestContext* request_context,
+      const GURL& upload_url,
+      net::CertificateReportSender::CookiesPreference cookies_preference);
 
   // CertificateErrorReporter implementation
   void SendReport(CertificateErrorReporter::ReportType type,
@@ -64,13 +67,13 @@ class MockReporter : public chrome_browser_net::CertificateErrorReporter {
   DISALLOW_COPY_AND_ASSIGN(MockReporter);
 };
 
-MockReporter::MockReporter(net::URLRequestContext* request_context,
-                           const GURL& upload_url,
-                           CookiesPreference cookies_preference)
+MockReporter::MockReporter(
+    net::URLRequestContext* request_context,
+    const GURL& upload_url,
+    net::CertificateReportSender::CookiesPreference cookies_preference)
     : CertificateErrorReporter(request_context,
                                upload_url,
-                               cookies_preference) {
-}
+                               cookies_preference) {}
 
 void MockReporter::SendReport(CertificateErrorReporter::ReportType type,
                               const std::string& serialized_report) {
@@ -86,8 +89,9 @@ void CertificateReportingTest::SetUpMockReporter() {
   // because the MockReporter doesn't actually use a
   // request_context. (In order to pass a real request_context, the
   // reporter would have to be constructed on the IO thread.)
-  reporter_ = new MockReporter(nullptr, GURL("http://example.test"),
-                               MockReporter::DO_NOT_SEND_COOKIES);
+  reporter_ =
+      new MockReporter(nullptr, GURL("http://example.test"),
+                       net::CertificateReportSender::DO_NOT_SEND_COOKIES);
 
   scoped_refptr<SafeBrowsingService> safe_browsing_service =
       g_browser_process->safe_browsing_service();
@@ -100,7 +104,7 @@ void CertificateReportingTest::SetUpMockReporter() {
           base::Passed(scoped_ptr<CertificateErrorReporter>(reporter_))));
 }
 
-const std::string& CertificateReportingTest::GetLatestHostnameReported() {
+const std::string& CertificateReportingTest::GetLatestHostnameReported() const {
   return reporter_->latest_hostname_reported();
 }
 
@@ -163,22 +167,22 @@ scoped_ptr<SSLCertReporter> SetUpMockSSLCertReporter(
   return ssl_cert_reporter.Pass();
 }
 
-// Helper function to set the Finch options.
-void SetCertReportingFinchConfig(const std::string& group_name,
-                                 const std::string& param_value) {
-  base::FieldTrialList::CreateFieldTrial(CertReportHelper::kFinchExperimentName,
-                                         group_name);
-  if (!param_value.empty()) {
-    std::map<std::string, std::string> params;
-    params[CertReportHelper::kFinchParamName] = param_value;
-    variations::AssociateVariationParams(CertReportHelper::kFinchExperimentName,
-                                         group_name, params);
-  }
-}
+ExpectReport GetReportExpectedFromFinch() {
+  const std::string group_name = base::FieldTrialList::FindFullName(
+      CertReportHelper::kFinchExperimentName);
 
-// Helper function to set the Finch options in case we have no parameter.
-void SetCertReportingFinchConfig(const std::string& group_name) {
-  SetCertReportingFinchConfig(group_name, std::string());
+  if (group_name == CertReportHelper::kFinchGroupShowPossiblySend) {
+    const std::string param = variations::GetVariationParamValue(
+        CertReportHelper::kFinchExperimentName,
+        CertReportHelper::kFinchParamName);
+    double sendingThreshold;
+    if (!base::StringToDouble(param, &sendingThreshold))
+      return CERT_REPORT_NOT_EXPECTED;
+
+    if (sendingThreshold == 1.0)
+      return CertificateReportingTestUtils::CERT_REPORT_EXPECTED;
+  }
+  return CertificateReportingTestUtils::CERT_REPORT_NOT_EXPECTED;
 }
 
 }  // namespace CertificateReportingTestUtils

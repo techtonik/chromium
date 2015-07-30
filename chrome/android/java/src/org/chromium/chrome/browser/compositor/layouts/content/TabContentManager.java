@@ -10,14 +10,14 @@ import android.graphics.Canvas;
 import android.util.SparseArray;
 import android.view.View;
 
-import org.chromium.base.CalledByNative;
 import org.chromium.base.CommandLine;
-import org.chromium.base.JNINamespace;
 import org.chromium.base.PathUtils;
+import org.chromium.base.annotations.CalledByNative;
+import org.chromium.base.annotations.JNINamespace;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeSwitches;
 import org.chromium.chrome.browser.NativePage;
-import org.chromium.chrome.browser.Tab;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
 import org.chromium.ui.base.DeviceFormFactor;

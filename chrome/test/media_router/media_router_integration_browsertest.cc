@@ -13,7 +13,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
-#include "chrome/browser/ui/webui/media_router/media_router_dialog_controller.h"
+#include "chrome/browser/ui/webui/media_router/media_router_dialog_controller_impl.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/test_navigation_observer.h"
@@ -70,11 +70,19 @@ void MediaRouterIntegrationBrowserTest::OpenTestPage(
   ui_test_utils::NavigateToURL(browser(), net::FilePathToFileURL(full_path));
 }
 
+void MediaRouterIntegrationBrowserTest::OpenTestPageInNewTab(
+    base::FilePath::StringPieceType file_name) {
+  base::FilePath full_path = GetResourceFile(file_name);
+  ui_test_utils::NavigateToURLWithDisposition(
+      browser(), net::FilePathToFileURL(full_path), NEW_FOREGROUND_TAB,
+      ui_test_utils::BROWSER_TEST_WAIT_FOR_NAVIGATION);
+}
+
 void MediaRouterIntegrationBrowserTest::ChooseSink(
     content::WebContents* web_contents,
     const std::string& sink_id) {
-  MediaRouterDialogController* controller =
-      MediaRouterDialogController::GetOrCreateForWebContents(web_contents);
+  MediaRouterDialogControllerImpl* controller =
+      MediaRouterDialogControllerImpl::GetOrCreateForWebContents(web_contents);
   content::WebContents* dialog_contents = controller->GetMediaRouterDialog();
   ASSERT_TRUE(dialog_contents);
   std::string script = base::StringPrintf(
@@ -159,6 +167,38 @@ IN_PROC_BROWSER_TEST_F(MediaRouterIntegrationBrowserTest,
   test_navigation_observer.Wait();
   ChooseSink(web_contents, "id1");
   ExecuteJavaScriptAPI(web_contents, "checkSessionFailedToStart();");
+}
+
+IN_PROC_BROWSER_TEST_F(MediaRouterIntegrationBrowserTest, MANUAL_JoinSession) {
+  OpenTestPage(FILE_PATH_LITERAL("basic_test.html"));
+  content::WebContents* web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(web_contents);
+  ExecuteJavaScriptAPI(web_contents, "waitUntilDeviceAvailable();");
+  content::TestNavigationObserver test_navigation_observer(web_contents, 1);
+  test_navigation_observer.StartWatchingNewWebContents();
+  ExecuteJavaScriptAPI(web_contents, "startSession();");
+  test_navigation_observer.Wait();
+  ChooseSink(web_contents, "id1");
+  ExecuteJavaScriptAPI(web_contents, "checkSession();");
+  std::string session_id;
+  ASSERT_TRUE(content::ExecuteScriptAndExtractString(
+      web_contents, "window.domAutomationController.send(startedSession.id)",
+      &session_id));
+
+  OpenTestPageInNewTab(FILE_PATH_LITERAL("basic_test.html"));
+  content::WebContents* new_web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  ASSERT_TRUE(new_web_contents);
+  ASSERT_NE(web_contents, new_web_contents);
+  ExecuteJavaScriptAPI(
+      new_web_contents,
+      base::StringPrintf("joinSession('%s');", session_id.c_str()));
+  std::string joined_session_id;
+  ASSERT_TRUE(content::ExecuteScriptAndExtractString(
+      new_web_contents, "window.domAutomationController.send(joinedSession.id)",
+      &joined_session_id));
+  ASSERT_EQ(session_id, joined_session_id);
 }
 
 }  // namespace media_router

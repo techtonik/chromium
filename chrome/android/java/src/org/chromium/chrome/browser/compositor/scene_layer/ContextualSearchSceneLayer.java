@@ -4,7 +4,7 @@
 
 package org.chromium.chrome.browser.compositor.scene_layer;
 
-import org.chromium.base.JNINamespace;
+import org.chromium.base.annotations.JNINamespace;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanelFeatures;
@@ -46,7 +46,6 @@ public class ContextualSearchSceneLayer extends SceneLayer {
         float searchPanelWidth = mSearchPanel.getWidth();
         float searchPanelHeight = mSearchPanel.getHeight();
 
-        float searchBarMarginTop = mSearchPanel.getSearchBarMarginTop();
         float searchBarMarginSide = mSearchPanel.getSearchBarMarginSide();
         float searchBarHeight = mSearchPanel.getSearchBarHeight();
         float searchBarTextOpacity = mSearchPanel.getSearchBarTextOpacity();
@@ -96,7 +95,6 @@ public class ContextualSearchSceneLayer extends SceneLayer {
                 searchPanelY * mDpToPx,
                 searchPanelWidth * mDpToPx,
                 searchPanelHeight * mDpToPx,
-                searchBarMarginTop * mDpToPx,
                 searchBarMarginSide * mDpToPx,
                 searchBarHeight * mDpToPx,
                 searchBarTextOpacity,
@@ -160,7 +158,6 @@ public class ContextualSearchSceneLayer extends SceneLayer {
             float searchPanelY,
             float searchPanelWidth,
             float searchPanelHeight,
-            float searchBarMarginTop,
             float searchBarMarginSide,
             float searchBarHeight,
             float searchBarTextOpacity,

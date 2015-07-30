@@ -227,46 +227,43 @@ files-toggle-ripple::shadow .ripple.activated {
 }
 
 .gallery .arrow-box {
-  -webkit-box-align: center;
-  -webkit-box-orient: horizontal;
-  -webkit-box-pack: center;
-  display: -webkit-box;
-  height: 100%;
   pointer-events: none;
-  position: absolute;
-  width: 100%;
-  z-index: 100;
 }
 
 .gallery .arrow-box .arrow {
+  align-items: center;
+  display: flex;
+  height: 100%;
   opacity: 0;
-  pointer-events: none;
+  position: absolute;
+  z-index: 100;
 }
 
-.gallery .arrow-box .arrow-spacer {
-  -webkit-box-flex: 1;
-  pointer-events: none;
+.gallery .arrow-box .arrow.left {
+  left: 16px;
+}
+
+.gallery .arrow-box .arrow.right {
+  right: 16px;
 }
 
 .gallery[tools] .arrow-box[active] .arrow {
-  cursor: pointer;
   opacity: 1;
-  pointer-events: auto;
 }
 
 /* The arrow icons are in nested divs so that their opacity can be manipulated
  * independently from their parent (which can be dimmed when the crop frame
  * overlaps it) */
 .gallery .arrow div {
-  background-position: center center;
-  background-repeat: no-repeat;
-  height: 193px;
+  cursor: pointer;
+  height: 48px;
   opacity: 0;
-  width: 105px;
+  width: 48px;
+  pointer-events: auto;
 }
 
 .gallery[tools] .arrow-box[active] .arrow div {
-  opacity: 0.25;
+  opacity: 0.4;
 }
 
 .gallery[tools] .arrow-box[active] .arrow div:hover {
@@ -275,14 +272,14 @@ files-toggle-ripple::shadow .ripple.activated {
 
 .gallery .arrow.left div {
   background-image: -webkit-image-set(
-      url(../images/100/arrow_left.png) 1x,
-      url(../images/200/arrow_left.png) 2x);
+      url(../images/100/slideshow_previous.png) 1x,
+      url(../images/200/slideshow_previous.png) 2x);
 }
 
 .gallery .arrow.right div {
   background-image: -webkit-image-set(
-      url(../images/100/arrow_right.png) 1x,
-      url(../images/200/arrow_right.png) 2x);
+      url(../images/100/slideshow_next.png) 1x,
+      url(../images/200/slideshow_next.png) 2x);
 }
 
 /* Special behavior on mouse drag.
@@ -401,14 +398,20 @@ files-toggle-ripple::shadow .ripple.activated {
 
 .gallery .ribbon-spacer {
   height: 55px;
+  position: relative;
 }
 
 .gallery .toolbar .ribbon {
+  display: flex;
   height: 100%;
+  justify-content: center;
   margin: 0 auto;
   overflow: hidden;
+  position: absolute;
+  top: 4px;
   transition: opacity 180ms linear, visibility 0ms linear;
   white-space: nowrap;
+  width: 100%;
   z-index: 0;
 }
 
@@ -419,14 +422,16 @@ files-toggle-ripple::shadow .ripple.activated {
 }
 
 .gallery .ribbon-image {
-  border: 2px solid rgba(255, 255, 255, 0);  /* transparent white */
+  background-color: black;
   cursor: pointer;
-  display: inline-block;
-  height: 47px;
-  margin: 2px 2px 2px 0;
+  display: block;
+  flex: none;
+  height: 40px;
+  margin: 0 2px;
   overflow: hidden;
+  position: relative;
   transition: all 180ms linear;
-  width: 47px;
+  width: 71px;
 }
 
 .ribbon-image[vanishing='smooth'] {
@@ -437,34 +442,19 @@ files-toggle-ripple::shadow .ripple.activated {
   width: 0;
 }
 
-.gallery .ribbon-image[selected] {
-  border: 2px solid rgb(77, 144, 254);
-}
-
 .gallery .toolbar .ribbon.fade-left {
-  -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0,
-                                                rgba(0, 0, 0, 1) 40px);
+  justify-content: flex-end;
 }
 
 .gallery .toolbar .ribbon.fade-right {
-  -webkit-mask-image: linear-gradient(to left, rgba(0, 0, 0, 0) 0,
-                                               rgba(0, 0, 0, 1) 40px);
-}
-
-.gallery .toolbar .ribbon.fade-left.fade-right {
-  -webkit-mask-image: linear-gradient(to right, rgba(0, 0, 0, 0) 0,
-                                                rgba(0, 0, 0, 1) 40px,
-                                                rgba(0, 0, 0, 1) 230px,
-                                                rgba(0, 0, 0, 0) 100%);
+  justify-content: flex-start;
 }
 
 .gallery .image-wrapper {
-  background-size: 45px 45px;
-  border: 1px solid rgba(0, 0, 0, 0);  /* transparent black */
-  height: 45px;
+  height: 100%;
   overflow: hidden;
   position: relative;
-  width: 45px;
+  width: 100%;
 }
 
 .gallery .image-wrapper > img {
@@ -473,6 +463,15 @@ files-toggle-ripple::shadow .ripple.activated {
 
 .gallery .image-wrapper > img:not(.cached) {
   -webkit-animation: fadeIn 500ms ease-in;
+}
+
+.gallery .ribbon-image[selected] > .selection-frame {
+  border: 2px solid rgb(27, 168, 243);
+  box-sizing: border-box;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  width: 100%;
 }
 
 /* Editor toolbar. */
@@ -575,7 +574,8 @@ files-toggle-ripple::shadow .ripple.activated {
   visibility: visible;
 }
 
-.gallery > .toolbar paper-button {
+.gallery > .toolbar paper-button,
+.gallery > .toolbar button {
   background-position: center;
   background-repeat: no-repeat;
   height: 32px;
@@ -584,11 +584,33 @@ files-toggle-ripple::shadow .ripple.activated {
   width: 32px;
 }
 
+.gallery > .toolbar button {
+  background-color: transparent;
+  border: 0;
+  padding: 0;
+  position: relative;
+}
+
+.gallery > .toolbar button > .icon {
+  background-position: center;
+  background-repeat: no-repeat;
+  height: 100%;
+  position: relative;
+  width: 100%;
+  z-index: 2;
+}
+
+.gallery > .toolbar button > files-toggle-ripple {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+}
+
 .gallery > .toolbar paper-button:focus {
   background-color: rgba(0, 0, 0, 0.3);
 }
 
-.gallery > .toolbar paper-button.edit {
+.gallery > .toolbar button.edit > .icon {
   background-image: -webkit-image-set(
       url(../images/100/edit.png) 1x,
       url(../images/200/edit.png) 2x);
@@ -606,13 +628,13 @@ files-toggle-ripple::shadow .ripple.activated {
       url(../images/200/delete.png) 2x);
 }
 
-.gallery > .toolbar paper-button.slide-mode {
+.gallery > .toolbar .icon.slide-mode {
   background-image: -webkit-image-set(
       url(../images/100/slide_view.png) 1x,
       url(../images/200/slide_view.png) 2x);
 }
 
-.gallery > .toolbar paper-button.mosaic-mode {
+.gallery > .toolbar .icon.thumbnail-mode {
   background-image: -webkit-image-set(
       url(../images/100/mosaic_view.png) 1x,
       url(../images/200/mosaic_view.png) 2x);
@@ -635,10 +657,10 @@ files-toggle-ripple::shadow .ripple.activated {
   pointer-events: none;
 }
 
-.gallery:not([editing])[mode='slide'] > .toolbar paper-button.slide-mode,
-.gallery:not([editing])[mode='mosaic'] > .toolbar paper-button.mosaic-mode,
-.gallery[editing][mode='slide'] > .toolbar paper-button.mosaic-mode,
-.gallery > .toolbar paper-button[disabled] {
+.gallery[mode='slide'] .icon.slide-mode,
+.gallery[mode='thumbnail'] .icon.thumbnail-mode,
+paper-button[disabled],
+button[disabled] {
   display: none;
 }
 
@@ -722,6 +744,10 @@ button.edit-toolbar > .button-content > .icon {
   background-repeat: no-repeat;
   height: 24px;
   width: 24px;
+}
+
+button.edit-toolbar > .button-content > .label {
+  -webkit-margin-end: 6px;
 }
 
 button.edit-toolbar > .ripples {
@@ -825,7 +851,7 @@ button.edit-toolbar > .ripples {
   border: 0 none;
   border-image: none;
   box-sizing: border-box;
-  color: #fff;
+  color: white;
   min-width: 0;
   padding: 0;
   position: relative;
@@ -1150,6 +1176,24 @@ paper-slider::shadow paper-progress::shadow #progressContainer {
   display: none;
 }
 
+.toast-stage {
+  bottom: 0;
+  left: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.gallery[tools] .toast-stage {
+  bottom: 48px;
+  top: 48px;
+}
+
+files-toast {
+  pointer-events: auto;
+}
+
 /* Mosaic view. */
 .mosaic {
   bottom: 0;
@@ -1269,11 +1313,9 @@ paper-slider::shadow paper-progress::shadow #progressContainer {
 /* Slideshow controls */
 
 .slideshow-toolbar {
-  -webkit-box-align: center;
-  -webkit-box-orient: horizontal;
-  -webkit-box-pack: center;
-  bottom: 0;
+  bottom: 16px;
   display: none;
+  justify-content: center;
   left: 0;
   padding-bottom: 6px;
   pointer-events: none;
@@ -1282,16 +1324,16 @@ paper-slider::shadow paper-progress::shadow #progressContainer {
 }
 
 .gallery[tools][slideshow] .slideshow-toolbar {
-  display: -webkit-box;
+  display: flex;
 }
 
 .slideshow-toolbar > div {
   background-position: center;
   background-repeat: no-repeat;
-  height: 68px;
-  opacity: 0.5;
+  height: 48px;
+  opacity: 0.8;
   pointer-events: auto;
-  width: 68px;
+  width: 48px;
 }
 
 .slideshow-toolbar > div:hover {
@@ -1300,22 +1342,21 @@ paper-slider::shadow paper-progress::shadow #progressContainer {
 
 .slideshow-toolbar > .slideshow-play {
   background-image: -webkit-image-set(
-      url(../images/100/slideshow-play.png) 1x,
-      url(../images/200/slideshow-play.png) 2x);
-  margin-right: -2px;
+      url(../images/100/slideshow_play.png) 1x,
+      url(../images/200/slideshow_play.png) 2x);
 }
 
 .gallery[slideshow='playing'] .slideshow-toolbar > .slideshow-play {
   background-image: -webkit-image-set(
-      url(../images/100/slideshow-pause.png) 1x,
-      url(../images/200/slideshow-pause.png) 2x);
+      url(../images/100/slideshow_pause.png) 1x,
+      url(../images/200/slideshow_pause.png) 2x);
 }
 
 .slideshow-toolbar > .slideshow-end {
+  -webkit-margin-start: 4px;
   background-image: -webkit-image-set(
-      url(../images/100/slideshow-end.png) 1x,
-      url(../images/200/slideshow-end.png) 2x);
-  margin-left: -2px;
+      url(../images/100/slideshow_close.png) 1x,
+      url(../images/200/slideshow_close.png) 2x);
 }
 
 .debug-me .load-target-content-metadata::before,
@@ -1341,4 +1382,102 @@ paper-slider::shadow paper-progress::shadow #progressContainer {
 
 .debug-me .load-target-file-entry::before {
   background-color: rgba(0, 0, 255, 0.3);
+}
+
+/**
+ * Thumbnail view.
+ */
+.thumbnail-view {
+  display: block;
+  height: 100%;
+  overflow-y: scroll;
+}
+
+.thumbnail-view ul {
+  -webkit-padding-end: 4px;
+  -webkit-padding-start: 0;
+  margin: 0;
+  padding-top: 52px; /* Toolbar height (48px) + Margin (4px) */
+  padding-bottom: 0;
+}
+
+.thumbnail-view .thumbnail {
+  -webkit-margin-start: 4px;
+  display: block;
+  margin-bottom: 4px;
+  position: relative;
+}
+
+html[dir='ltr'] .thumbnail-view .thumbnail {
+  float: left;
+}
+
+html[dir='rtl'] .thumbnail-view .thumbnail {
+  float: right;
+}
+
+.thumbnail-view::-webkit-scrollbar {
+  width: 0;
+}
+
+.thumbnail-view .scrollbar {
+  bottom: 4px;
+  opacity: 1;
+  position: absolute;
+  top: 52px; /* Toolbar height (48px) + Margin (4px) */
+  transition: opacity 1s;
+  width: 8px;
+}
+
+.thumbnail-view .scrollbar.transparent {
+  opacity: 0;
+  pointer-events: none;
+}
+
+html[dir='ltr'] .thumbnail-view .scrollbar {
+  right: 0;
+}
+
+html[dir='rtl'] .thumbnail-view .scrollbar {
+  left: 0;
+}
+
+.thumbnail-view .scrollbar .thumb {
+  -webkit-margin-end: 4px;
+  background-color: white;
+  border-radius: 2px;
+  opacity: 0.4;
+  width: 4px;
+}
+
+.thumbnail-view .thumbnail > .frame {
+  bottom: 0;
+  left: 0;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.thumbnail-view .thumbnail > .frame.image {
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.thumbnail-view .thumbnail.selected > .frame.selection {
+  border: solid 2px rgb(27, 168, 243);
+}
+
+.thumbnail-view .thumbnail.transparent {
+  opacity: 0;
+}
+
+.thumbnail-view .animation-thumbnail {
+  background-repeat: no-repeat;
+  background-size: cover;
+  display: none;
+  position: absolute;
+}
+
+.thumbnail-view .animation-thumbnail.animating {
+  display: block;
 }

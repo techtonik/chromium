@@ -709,8 +709,9 @@ TEST_P(GLES2DecoderTest1, DeleteTexturesImmediateInvalidArgs) {
 }
 
 TEST_P(GLES2DecoderTest1, DeleteTransformFeedbacksImmediateValidArgs) {
-  EXPECT_CALL(*gl_, DeleteTransformFeedbacks(
-                        1, Pointee(kServiceTransformFeedbackId))).Times(1);
+  EXPECT_CALL(*gl_,
+              DeleteTransformFeedbacks(1, Pointee(kServiceTransformFeedbackId)))
+      .Times(1);
   cmds::DeleteTransformFeedbacksImmediate& cmd =
       *GetImmediateAs<cmds::DeleteTransformFeedbacksImmediate>();
   SpecializedSetup<cmds::DeleteTransformFeedbacksImmediate, 0>(true);
@@ -864,15 +865,7 @@ TEST_P(GLES2DecoderTest1, FenceSyncValidArgs) {
   decoder_->set_unsafe_es3_apis_enabled(false);
   EXPECT_EQ(error::kUnknownCommand, ExecuteCmd(cmd));
 }
-
-TEST_P(GLES2DecoderTest1, FinishValidArgs) {
-  EXPECT_CALL(*gl_, Finish());
-  SpecializedSetup<cmds::Finish, 0>(true);
-  cmds::Finish cmd;
-  cmd.Init();
-  EXPECT_EQ(error::kNoError, ExecuteCmd(cmd));
-  EXPECT_EQ(GL_NO_ERROR, GetGLError());
-}
+// TODO(gman): Finish
 
 TEST_P(GLES2DecoderTest1, FlushValidArgs) {
   EXPECT_CALL(*gl_, Flush());

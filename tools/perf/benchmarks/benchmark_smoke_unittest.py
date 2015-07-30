@@ -22,12 +22,14 @@ from benchmarks import image_decoding
 from benchmarks import indexeddb_perf
 from benchmarks import jetstream
 from benchmarks import kraken
+from benchmarks import memory
 from benchmarks import octane
 from benchmarks import rasterize_and_record_micro
 from benchmarks import repaint
 from benchmarks import spaceport
 from benchmarks import speedometer
 from benchmarks import sunspider
+from benchmarks import text_selection
 
 
 def SmokeTestGenerator(benchmark):
@@ -83,13 +85,15 @@ _BLACK_LIST_TEST_MODULES = {
     spaceport,  # Takes 451 seconds.
     speedometer,  # Takes 101 seconds.
     jetstream,  # Take 206 seconds.
+    text_selection, # Always fails on cq bot.
 }
 
 # Some smoke benchmark tests that run quickly on desktop platform can be very
 # slow on Android. So we create a separate set of black list only for Android.
 _ANDROID_BLACK_LIST_MODULES = {
     kraken,  # Takes 275 seconds on Android.
-    sunspider  # Takes 163 seconds on Android.
+    sunspider,  # Takes 163 seconds on Android.
+    memory  # Often times out on bots, crbug.com/513767
 }
 
 
@@ -100,11 +104,11 @@ def load_tests(loader, standard_tests, pattern):
   benchmarks_dir = os.path.dirname(__file__)
   top_level_dir = os.path.dirname(benchmarks_dir)
 
-  # Using the default of |index_by_class_name=False| means that if a module
-  # has multiple benchmarks, only the last one is returned.
+  # Using the default of |one_class_per_module=True| means that if a module
+  # has multiple benchmarks, only the first one is returned.
   all_benchmarks = discover.DiscoverClasses(
       benchmarks_dir, top_level_dir, benchmark_module.Benchmark,
-      index_by_class_name=False).values()
+      one_class_per_module=True)
   for benchmark in all_benchmarks:
     if sys.modules[benchmark.__module__] in _BLACK_LIST_TEST_MODULES:
       continue

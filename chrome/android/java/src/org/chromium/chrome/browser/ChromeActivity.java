@@ -7,6 +7,7 @@ package org.chromium.chrome.browser;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.SearchManager;
+import android.app.assist.AssistContent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -14,6 +15,7 @@ import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.Rect;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
@@ -72,8 +74,8 @@ import org.chromium.chrome.browser.device.DeviceClassManager;
 import org.chromium.chrome.browser.dom_distiller.DistilledPagePrefsView;
 import org.chromium.chrome.browser.dom_distiller.ReaderModeActivityDelegate;
 import org.chromium.chrome.browser.dom_distiller.ReaderModeManager;
-import org.chromium.chrome.browser.enhanced_bookmarks.EnhancedBookmarksModel;
 import org.chromium.chrome.browser.enhancedbookmarks.EnhancedBookmarkUtils;
+import org.chromium.chrome.browser.enhancedbookmarks.EnhancedBookmarksModel;
 import org.chromium.chrome.browser.fullscreen.ChromeFullscreenManager;
 import org.chromium.chrome.browser.gsa.ContextReporter;
 import org.chromium.chrome.browser.gsa.GSAServiceClient;
@@ -88,7 +90,6 @@ import org.chromium.chrome.browser.nfc.BeamController;
 import org.chromium.chrome.browser.nfc.BeamProvider;
 import org.chromium.chrome.browser.omaha.OmahaClient;
 import org.chromium.chrome.browser.partnercustomizations.PartnerBrowserCustomizations;
-import org.chromium.chrome.browser.policy.PolicyManager.PolicyChangeListener;
 import org.chromium.chrome.browser.preferences.ChromePreferenceManager;
 import org.chromium.chrome.browser.preferences.PrefServiceBridge;
 import org.chromium.chrome.browser.preferences.PreferencesLauncher;
@@ -98,6 +99,9 @@ import org.chromium.chrome.browser.snackbar.LoFiBarPopupController;
 import org.chromium.chrome.browser.snackbar.SnackbarManager;
 import org.chromium.chrome.browser.snackbar.SnackbarManager.SnackbarManageable;
 import org.chromium.chrome.browser.sync.ProfileSyncService;
+import org.chromium.chrome.browser.tab.EmptyTabObserver;
+import org.chromium.chrome.browser.tab.Tab;
+import org.chromium.chrome.browser.tab.TabObserver;
 import org.chromium.chrome.browser.tabmodel.ChromeTabCreator;
 import org.chromium.chrome.browser.tabmodel.EmptyTabModel;
 import org.chromium.chrome.browser.tabmodel.TabCreatorManager;
@@ -121,6 +125,7 @@ import org.chromium.content.browser.ContentViewCore;
 import org.chromium.content.common.ContentSwitches;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.readback_types.ReadbackResponse;
+import org.chromium.policy.CombinedPolicyProvider.PolicyChangeListener;
 import org.chromium.printing.PrintManagerDelegateImpl;
 import org.chromium.printing.PrintingController;
 import org.chromium.ui.base.ActivityWindowAndroid;
@@ -137,6 +142,17 @@ import java.util.concurrent.TimeUnit;
 public abstract class ChromeActivity extends AsyncInitializationActivity
         implements TabCreatorManager, AccessibilityStateChangeListener, PolicyChangeListener,
         ContextualSearchTabPromotionDelegate, SnackbarManageable, SceneChangeObserver {
+    /**
+     * Factory which creates the AppMenuHandler.
+     */
+    public interface AppMenuHandlerFactory {
+        /**
+         * @return AppMenuHandler for the given activity and menu resource id.
+         */
+        public AppMenuHandler get(Activity activity,
+                AppMenuPropertiesDelegate delegate, int menuResourceId);
+    }
+
     /**
      * No control container to inflate during initialization.
      */
@@ -199,6 +215,24 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
 
     private final Locale mCurrentLocale = Locale.getDefault();
 
+    private AssistStatusHandler mAssistStatusHandler;
+
+    private static AppMenuHandlerFactory sAppMenuHandlerFactory = new AppMenuHandlerFactory() {
+        @Override
+        public AppMenuHandler get(
+                Activity activity, AppMenuPropertiesDelegate delegate, int menuResourceId) {
+            return new AppMenuHandler(activity, delegate, menuResourceId);
+        }
+    };
+
+    /**
+     * @param The {@link AppMenuHandlerFactory} for creating {@link mAppMenuHandler}
+     */
+    @VisibleForTesting
+    public static void setAppMenuHandlerFactoryForTesting(AppMenuHandlerFactory factory) {
+        sAppMenuHandlerFactory = factory;
+    }
+
     @Override
     public void preInflationStartup() {
         super.preInflationStartup();
@@ -217,6 +251,14 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
         mWindowAndroid.restoreInstanceState(getSavedInstanceState());
         mSnackbarManager = new SnackbarManager(getWindow());
         mLoFiBarPopupController = new LoFiBarPopupController(this, getSnackbarManager());
+
+        mAssistStatusHandler = createAssistStatusHandler();
+        if (mAssistStatusHandler != null) {
+            if (mTabModelSelector != null) {
+                mAssistStatusHandler.setTabModelSelector(mTabModelSelector);
+            }
+            mAssistStatusHandler.updateAssistState();
+        }
 
         // Low end device UI should be allowed only after a fresh install or when the data has
         // been cleared. This must happen before anyone calls SysUtils.isLowEndDevice() or
@@ -320,8 +362,8 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
         assert controlContainer != null;
         ToolbarControlContainer toolbarContainer = (ToolbarControlContainer) controlContainer;
         mAppMenuPropertiesDelegate = createAppMenuPropertiesDelegate();
-        mAppMenuHandler = new AppMenuHandler(this,
-                mAppMenuPropertiesDelegate, getAppMenuLayoutId());
+        mAppMenuHandler = sAppMenuHandlerFactory.get(this, mAppMenuPropertiesDelegate,
+                getAppMenuLayoutId());
         mToolbarManager = new ToolbarManager(this, toolbarContainer, mAppMenuHandler,
                 mAppMenuPropertiesDelegate, getCompositorViewHolder().getInvalidator());
         mAppMenuHandler.addObserver(new AppMenuObserver() {
@@ -357,6 +399,20 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
     }
 
     /**
+     * @return The assist handler for this activity.
+     */
+    protected AssistStatusHandler getAssistStatusHandler() {
+        return mAssistStatusHandler;
+    }
+
+    /**
+     * @return A newly constructed assist handler for this given activity type.
+     */
+    protected AssistStatusHandler createAssistStatusHandler() {
+        return new AssistStatusHandler(this);
+    }
+
+    /**
      * @return The resource id for the layout to use for {@link ControlContainer}. 0 by default.
      */
     protected int getControlContainerLayoutId() {
@@ -387,7 +443,7 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
                 DeviceClassManager.enableSnapshots()));
         mCompositorViewHolder.onNativeLibraryReady(mWindowAndroid, getTabContentManager());
 
-        if (isContextualSearchAllowed() && ContextualSearchFieldTrial.isEnabled(this)) {
+        if (isContextualSearchAllowed() && ContextualSearchFieldTrial.isEnabled()) {
             mContextualSearchManager = new ContextualSearchManager(this, mWindowAndroid, this);
         }
 
@@ -455,6 +511,10 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
                 postDeferredStartupIfNeeded();
             }
         };
+
+        if (mAssistStatusHandler != null) {
+            mAssistStatusHandler.setTabModelSelector(tabModelSelector);
+        }
     }
 
     @Override
@@ -623,6 +683,20 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
     public void onPause() {
         super.onPause();
         if (mSnackbarManager != null) mSnackbarManager.dismissSnackbar(false);
+    }
+
+    // @TargetApi(Build.VERSION_CODES.M) TODO(sgurun) add method document once API is public
+    // crbug/512264
+    // @Override
+    public void onProvideAssistContent(AssistContent outContent) {
+        if (getAssistStatusHandler() == null || !getAssistStatusHandler().isAssistSupported()) {
+            // No information is provided in incognito mode.
+            return;
+        }
+        Tab tab = getActivityTab();
+        if (tab != null && !isInOverviewMode()) {
+            outContent.setWebUri(Uri.parse(tab.getUrl()));
+        }
     }
 
     @Override
@@ -863,10 +937,13 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
         if (tabToBookmark == null || tabToBookmark.isFrozen()) {
             return;
         }
-        assert BookmarksBridge.isEditBookmarksEnabled(tabToBookmark.getProfile());
 
-        // Managed bookmarks can't be edited. If the current URL is only bookmarked by managed
-        // bookmarks then fall back on adding a new bookmark instead.
+        assert mToolbarManager.getBookmarksBridge().isEditBookmarksEnabled();
+
+        // Note the use of getUserBookmarkId() over getBookmarkId() here: Managed bookmarks can't be
+        // edited. If the current URL is only bookmarked by managed bookmarks, this will return
+        // INVALID_BOOKMARK_ID, so the code below will fall back on adding a new bookmark instead.
+        // TODO(bauerb): This does not take partner bookmarks into account.
         final long bookmarkId = tabToBookmark.getUserBookmarkId();
 
         if (EnhancedBookmarkUtils.isEnhancedBookmarkEnabled(tabToBookmark.getProfile())) {
@@ -885,20 +962,17 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
                         EnhancedBookmarkUtils.startEditActivity(ChromeActivity.this,
                                 new BookmarkId(bookmarkId, BookmarkType.NORMAL));
                     }
-                    bookmarkModel.removeModelObserver(this);
+                    bookmarkModel.removeObserver(this);
                 }
             };
 
             if (bookmarkModel.isBookmarkModelLoaded()) {
                 modelObserver.bookmarkModelLoaded();
             } else {
-                bookmarkModel.addModelObserver(modelObserver);
+                bookmarkModel.addObserver(modelObserver);
             }
         } else {
             Intent intent = new Intent(this, ManageBookmarkActivity.class);
-            // Managed bookmarks can't be edited. Fallback on adding a new bookmark if the current
-            // URL is bookmarked by a managed bookmark.
-
             if (bookmarkId == ChromeBrowserProviderClient.INVALID_BOOKMARK_ID) {
                 intent.putExtra(ManageBookmarkActivity.BOOKMARK_INTENT_IS_FOLDER, false);
                 intent.putExtra(ManageBookmarkActivity.BOOKMARK_INTENT_TITLE,

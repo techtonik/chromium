@@ -31,57 +31,71 @@ NavigationTracker::~NavigationTracker() {}
 
 Status NavigationTracker::IsPendingNavigation(const std::string& frame_id,
                                               bool* is_pending) {
-  if (loading_state_ == kUnknown) {
-    scoped_ptr<base::DictionaryValue> result;
-
-    // In the case that a http request is sent to server to fetch the page
-    // content and the server hasn't responded at all, a dummy page is created
-    // for the new window. In such case, the baseURL will be empty.
-    base::DictionaryValue empty_params;
-    Status status = client_->SendCommandAndGetResult(
-        "DOM.getDocument", empty_params, &result);
-    std::string base_url;
-    if (status.IsError() || !result->GetString("root.baseURL", &base_url))
-      return Status(kUnknownError, "cannot determine loading status", status);
-    if (base_url.empty()) {
-      *is_pending = true;
-      loading_state_ = kLoading;
-      return Status(kOk);
+  if (!IsExpectingFrameLoadingEvents()) {
+    if (loading_state_ != kLoading) {
+      base::DictionaryValue params;
+      params.SetString("expression", "document.readyState");
+      scoped_ptr<base::DictionaryValue> result;
+      Status status =
+          client_->SendCommandAndGetResult("Runtime.evaluate", params, &result);
+      std::string ready_state;
+      if (status.IsError() || !result->GetString("result.value", &ready_state))
+        return status;
+      loading_state_ = ready_state == "complete" ? kNotLoading : kLoading;
     }
+  } else {
+    if (loading_state_ == kUnknown) {
+      scoped_ptr<base::DictionaryValue> result;
 
-    // If the loading state is unknown (which happens after first connecting),
-    // force loading to start and set the state to loading. This will
-    // cause a frame start event to be received, and the frame stop event
-    // will not be received until all frames are loaded.
-    // Loading is forced to start by attaching a temporary iframe.
-    // Forcing loading to start is not necessary if the main frame is not yet
-    // loaded.
-    const char kStartLoadingIfMainFrameNotLoading[] =
-       "var isLoaded = document.readyState == 'complete' ||"
-       "    document.readyState == 'interactive';"
-       "if (isLoaded) {"
-       "  var frame = document.createElement('iframe');"
-       "  frame.src = 'about:blank';"
-       "  document.body.appendChild(frame);"
-       "  window.setTimeout(function() {"
-       "    document.body.removeChild(frame);"
-       "  }, 0);"
-       "}";
-    base::DictionaryValue params;
-    params.SetString("expression", kStartLoadingIfMainFrameNotLoading);
-    status = client_->SendCommandAndGetResult(
-        "Runtime.evaluate", params, &result);
-    if (status.IsError())
-      return Status(kUnknownError, "cannot determine loading status", status);
+      // In the case that a http request is sent to server to fetch the page
+      // content and the server hasn't responded at all, a dummy page is created
+      // for the new window. In such case, the baseURL will be empty.
+      base::DictionaryValue empty_params;
+      Status status = client_->SendCommandAndGetResult(
+          "DOM.getDocument", empty_params, &result);
+      std::string base_url;
+      if (status.IsError() || !result->GetString("root.baseURL", &base_url))
+        return Status(kUnknownError, "cannot determine loading status", status);
+      if (base_url.empty()) {
+        *is_pending = true;
+        loading_state_ = kLoading;
+        return Status(kOk);
+      }
 
-    // Between the time the JavaScript is evaluated and SendCommandAndGetResult
-    // returns, OnEvent may have received info about the loading state.
-    // This is only possible during a nested command. Only set the loading state
-    // if the loading state is still unknown.
-    if (loading_state_ == kUnknown)
-      loading_state_ = kLoading;
+      // If the loading state is unknown (which happens after first connecting),
+      // force loading to start and set the state to loading. This will cause a
+      // frame start event to be received, and the frame stop event will not be
+      // received until all frames are loaded.  Loading is forced to start by
+      // attaching a temporary iframe.  Forcing loading to start is not
+      // necessary if the main frame is not yet loaded.
+      const char kStartLoadingIfMainFrameNotLoading[] =
+         "var isLoaded = document.readyState == 'complete' ||"
+         "    document.readyState == 'interactive';"
+         "if (isLoaded) {"
+         "  var frame = document.createElement('iframe');"
+         "  frame.src = 'about:blank';"
+         "  document.body.appendChild(frame);"
+         "  window.setTimeout(function() {"
+         "    document.body.removeChild(frame);"
+         "  }, 0);"
+         "}";
+      base::DictionaryValue params;
+      params.SetString("expression", kStartLoadingIfMainFrameNotLoading);
+      status = client_->SendCommandAndGetResult(
+          "Runtime.evaluate", params, &result);
+      if (status.IsError())
+        return Status(kUnknownError, "cannot determine loading status", status);
+
+      // Between the time the JavaScript is evaluated and
+      // SendCommandAndGetResult returns, OnEvent may have received info about
+      // the loading state.  This is only possible during a nested command. Only
+      // set the loading state if the loading state is still unknown.
+      if (loading_state_ == kUnknown)
+        loading_state_ = kLoading;
+    }
   }
   *is_pending = loading_state_ == kLoading;
+
   if (frame_id.empty()) {
     *is_pending |= scheduled_frame_set_.size() > 0;
     *is_pending |= pending_frame_set_.size() > 0;
@@ -173,14 +187,38 @@ Status NavigationTracker::OnEvent(DevToolsClient* client,
       pending_frame_set_.clear();
       scheduled_frame_set_.clear();
     }
+  } else if (method == "Runtime.executionContextsCleared" ||
+             method == "Runtime.executionContextDestroyed") {
+    if (!IsExpectingFrameLoadingEvents())
+      ResetLoadingState(kLoading);
+  } else if (method == "Page.loadEventFired") {
+    if (!IsExpectingFrameLoadingEvents())
+      ResetLoadingState(kNotLoading);
   } else if (method == "Inspector.targetCrashed") {
     ResetLoadingState(kNotLoading);
   }
   return Status(kOk);
 }
 
-Status NavigationTracker::OnCommandSuccess(DevToolsClient* client,
-                                           const std::string& method) {
+Status NavigationTracker::OnCommandSuccess(
+    DevToolsClient* client,
+    const std::string& method,
+    const base::DictionaryValue& result) {
+  if (!IsExpectingFrameLoadingEvents()) {
+    if (method == "Page.navigate" && loading_state_ == kLoading) {
+      // In all versions of Chrome that are supported by ChromeDriver, except
+      // for old versions of Android WebView, Page.navigate will return a
+      // frameId in the command response. We'll get a notification that the
+      // frame has loaded when we get the Page.frameStoppedLoading event, so
+      // keep track of the pending frame id here.
+      std::string pending_frame_id;
+      if (result.GetString("frameId", &pending_frame_id)) {
+        pending_frame_set_.insert(pending_frame_id);
+        return Status(kOk);
+      }
+    }
+  }
+
   if ((method == "Page.navigate" || method == "Page.navigateToHistoryEntry") &&
       loading_state_ != kLoading) {
     // At this point the browser has initiated the navigation, but besides that,
@@ -227,4 +265,18 @@ void NavigationTracker::ResetLoadingState(LoadingState loading_state) {
   loading_state_ = loading_state;
   pending_frame_set_.clear();
   scheduled_frame_set_.clear();
+}
+
+bool NavigationTracker::IsExpectingFrameLoadingEvents() {
+  // As of crrev.com/323900 (Chrome 44+) we no longer receive
+  // Page.frameStartedLoading and Page.frameStoppedLoading events immediately
+  // after clicking on an element. This can cause tests to fail if the click
+  // command results in a page navigation, such as in the case of
+  // PageLoadingTest.testShouldTimeoutIfAPageTakesTooLongToLoadAfterClick from
+  // the Selenium test suite.
+  // TODO(samuong): Remove this once we stop supporting M43.
+  if (browser_info_->browser_name == "chrome")
+    return browser_info_->build_no < 2358;
+  else
+    return browser_info_->major_version < 44;
 }

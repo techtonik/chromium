@@ -26,6 +26,8 @@
 #include "url/gurl.h"
 
 #if defined(MOJO_RENDERER)
+#include "media/mojo/interfaces/renderer.mojom.h"
+#include "media/mojo/interfaces/service_factory.mojom.h"
 #include "media/mojo/services/mojo_renderer_impl.h"
 #include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/application/public/cpp/application_test_base.h"
@@ -619,11 +621,17 @@ class PipelineIntegrationTestHost : public mojo::test::ApplicationTestBase,
             ->ConnectToApplication(request.Pass())
             ->GetServiceProvider();
 
-    interfaces::MediaRendererPtr mojo_media_renderer;
-    mojo::ConnectToService(service_provider, &mojo_media_renderer);
+    mojo::ConnectToService(service_provider, &media_service_factory_);
+
+    interfaces::RendererPtr mojo_renderer;
+    media_service_factory_->CreateRenderer(mojo::GetProxy(&mojo_renderer));
+
     return make_scoped_ptr(new MojoRendererImpl(message_loop_.task_runner(),
-                                                mojo_media_renderer.Pass()));
+                                                mojo_renderer.Pass()));
   }
+
+ private:
+  interfaces::ServiceFactoryPtr media_service_factory_;
 };
 #else
 class PipelineIntegrationTestHost : public testing::Test,

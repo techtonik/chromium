@@ -78,8 +78,12 @@ component("net") {
     "NET_IMPLEMENTATION",
   ]
 
-  # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
-  configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
+  configs += [
+    "//build/config:precompiled_headers",
+
+    # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
+    "//build/config/compiler:no_size_t_to_int_warning",
+  ]
   public_configs = [ ":net_config" ]
   include_dirs = []
 
@@ -688,8 +692,12 @@ source_set("test_support") {
     "url_request/url_request_test_util.h",
   ]
 
-  # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
-  configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
+  configs += [
+    "//build/config:precompiled_headers",
+
+    # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
+    "//build/config/compiler:no_size_t_to_int_warning",
+  ]
 
   public_deps = [
     "//base",
@@ -1015,9 +1023,6 @@ if (!is_ios && !is_android) {
       "tools/testserver/run_testserver.cc",
     ]
     deps = [
-      ":net",  # TODO(brettw) bug 363749: this shouldn't be necessary. It's not
-               # in the GYP build, and can be removed when the bug is fixed.
-
       ":test_support",
       "//base",
       "//base/test:test_support",
@@ -1227,7 +1232,7 @@ if (is_android) {
       "android/javatests/src/org/chromium/net/AndroidKeyStoreTestUtil.java",
       "test/android/javatests/src/org/chromium/net/test/DummySpnegoAuthenticator.java",
     ]
-    jni_package = "net"
+    jni_package = "net/test"
   }
 }
 
@@ -1306,59 +1311,17 @@ executable("quic_server") {
   ]
 }
 
-# TODO(GYP) make this compile on Android, we need some native test deps done.
-# TODO(GYP) Also doesn't work on Mac, need to figure out why not.
-if (!is_android && !is_mac) {
-  if (is_linux) {
-    # There are quic-related files with the same file name in different
-    # directories. With our current object file mapping, these produce the
-    # same .o files. Split these out into a second target to avoid the
-    # collision.
-    # TODO(rch) bug 505930: de-duplicate these names.
-    quic_dupe_files = [
-      "tools/quic/quic_client_session_test.cc",
-      "tools/quic/test_tools/mock_quic_dispatcher.cc",
-      "tools/quic/test_tools/mock_quic_dispatcher.h",
-      "tools/quic/test_tools/quic_test_utils.cc",
-      "tools/quic/test_tools/quic_test_utils.h",
-    ]
-    source_set("quic_de_dupe") {
-      testonly = true
-      if (is_linux) {
-        sources = quic_dupe_files
-
-        deps = [
-          ":balsa",
-          ":extras",
-          ":http_server",
-          ":net",
-          ":simple_quic_tools",
-          ":test_support",
-          "//base",
-          "//base:i18n",
-          "//base:prefs_test_support",
-          "//base/allocator",
-          "//base/third_party/dynamic_annotations",
-          "//crypto",
-          "//crypto:platform",
-          "//crypto:test_support",
-          "//gin",
-          "//net/base/registry_controlled_domains",
-          "//sql",
-          "//testing/gmock",
-          "//testing/gtest",
-          "//third_party/zlib",
-          "//url",
-        ]
-      }
-    }
-  }
-
+# TODO(GYP) bug 513775: Make this work on Mac.
+if (!is_mac) {
   test("net_unittests") {
     sources = gypi_values.net_test_sources
 
-    # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
-    configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
+    configs += [
+      "//build/config:precompiled_headers",
+
+      # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
+      "//build/config/compiler:no_size_t_to_int_warning",
+    ]
     defines = []
 
     deps = [
@@ -1402,13 +1365,11 @@ if (!is_android && !is_mac) {
     }
     if (is_linux) {
       sources += gypi_values.net_linux_test_sources
-      sources -= quic_dupe_files
       deps += [
         ":balsa",
         ":epoll_quic_tools",
         ":epoll_server",
         ":flip_in_mem_edsm_server_base",
-        ":quic_de_dupe",
       ]
     }
 
@@ -1418,19 +1379,6 @@ if (!is_android && !is_mac) {
 
     if (is_chromeos) {
       sources -= [ "proxy/proxy_config_service_linux_unittest.cc" ]
-    }
-
-    if (is_android) {
-      sources -= [
-        # See bug http://crbug.com/344533.
-        "disk_cache/blockfile/index_table_v3_unittest.cc",
-
-        # No res_ninit() et al on Android, so this doesn't make a lot of
-        # sense.
-        "dns/dns_config_service_posix_unittest.cc",
-      ]
-      deps += [ ":net_test_jni_headers" ]
-      isolate_file = "net_unittests.isolate"
     }
 
     if (v8_use_external_startup_data) {
@@ -1634,7 +1582,6 @@ if (!is_android && !is_mac) {
         # iOS.
         # OS is not "linux" or "freebsd" or "openbsd".
         "socket/unix_domain_client_socket_posix_unittest.cc",
-        "socket/unix_domain_listen_socket_posix_unittest.cc",
         "socket/unix_domain_server_socket_posix_unittest.cc",
 
         # See bug http://crbug.com/344533.
@@ -1643,18 +1590,22 @@ if (!is_android && !is_mac) {
     }
 
     if (is_android) {
-      sources -= [ "dns/dns_config_service_posix_unittest.cc" ]
+      sources -= [
+        # See bug http://crbug.com/344533.
+        "disk_cache/blockfile/index_table_v3_unittest.cc",
+        "dns/dns_config_service_posix_unittest.cc",
+      ]
+      deps += [
+        ":net_test_jni_headers",
 
-      # TODO(GYP)
-      # # TODO(mmenke):  This depends on test_support_base, which depends on
-      # #                icu.  Figure out a way to remove that dependency.
-      # 'dependencies': [
-      #   '../testing/android/native_test.gyp:native_test_native_code',
-      # ]
-
+        # TODO(mmenke):  This depends on test_support_base, which depends on
+        #                icu.  Figure out a way to remove that dependency.
+        "//testing/android/native_test:native_test_native_code",
+      ]
       set_sources_assignment_filter([])
       sources += [ "base/address_tracker_linux_unittest.cc" ]
       set_sources_assignment_filter(sources_assignment_filter)
+      isolate_file = "net_unittests.isolate"
     }
 
     if (use_icu_alternatives_on_android) {
@@ -1690,14 +1641,14 @@ executable("net_perftests") {
   # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
   configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
   deps = [
+    ":extras",
+    ":net",
+    ":test_support",
     "//base",
     "//base:i18n",
     "//base/test:test_support_perf",
     "//testing/gtest",
     "//url",
-    ":extras",
-    ":net",
-    ":test_support",
   ]
 
   if (enable_websockets) {
@@ -1708,11 +1659,5 @@ executable("net_perftests") {
     deps += [ ":net_with_v8" ]
   } else {
     sources -= [ "proxy/proxy_resolver_perftest.cc" ]
-  }
-
-  if (is_win && icu_use_data_file) {
-    # This is needed to trigger the dll copy step on windows.
-    # TODO(mark): Specifying this here shouldn't be necessary.
-    deps += [ "//third_party/icu:icudata" ]
   }
 }

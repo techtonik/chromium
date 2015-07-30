@@ -10,6 +10,8 @@
 #include "base/files/file_util.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/test/scoped_path_override.h"
+#include "chromecast/crash/linux/crash_testing_utils.h"
+#include "chromecast/crash/linux/dump_info.h"
 #include "chromecast/crash/linux/minidump_generator.h"
 #include "chromecast/crash/linux/minidump_writer.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -20,14 +22,6 @@ namespace {
 const char kDumplogFile[] = "dumplog";
 const char kLockfileName[] = "lockfile";
 const char kMinidumpSubdir[] = "minidumps";
-
-std::string GetCurrentTimeASCII() {
-  char cur_time[20];
-  time_t now = time(NULL);
-  struct tm* tm = gmtime(&now);
-  strftime(cur_time, 20, "%Y-%m-%d %H:%M:%S", tm);
-  return std::string(cur_time);
-}
 
 class FakeMinidumpGenerator : public MinidumpGenerator {
  public:
@@ -56,18 +50,24 @@ class MinidumpWriterTest : public testing::Test {
     home_.reset(new base::ScopedPathOverride(base::DIR_HOME, fake_home_dir));
     minidump_dir_ = fake_home_dir.Append(kMinidumpSubdir);
     dumplog_file_ = minidump_dir_.Append(kDumplogFile);
+    lockfile_path_ = minidump_dir_.Append(kLockfileName);
 
     // Create the minidump directory and lockfile.
     ASSERT_TRUE(base::CreateDirectory(minidump_dir_));
     base::File lockfile(
-        minidump_dir_.Append(kLockfileName),
+        lockfile_path_,
         base::File::FLAG_CREATE_ALWAYS | base::File::FLAG_WRITE);
     ASSERT_TRUE(lockfile.IsValid());
+  }
+
+  bool AppendLockFile(const DumpInfo& dump) {
+    return chromecast::AppendLockFile(lockfile_path_.value(), dump);
   }
 
   FakeMinidumpGenerator fake_generator_;
   base::FilePath minidump_dir_;
   base::FilePath dumplog_file_;
+  base::FilePath lockfile_path_;
 
  private:
   scoped_ptr<base::ScopedPathOverride> home_;
@@ -126,13 +126,19 @@ TEST_F(MinidumpWriterTest, Write_FailsWhenTooManyDumpsPresent) {
                         base::Bind(&FakeDumpState));
 
   // Write dump logs to the lockfile.
-  std::ofstream lockfile(minidump_dir_.Append(kLockfileName).value());
-  ASSERT_TRUE(lockfile.is_open());
   size_t too_many_dumps = writer.max_dumps() + 1;
   for (size_t i = 0; i < too_many_dumps; ++i) {
-    lockfile << "p|2012-01-01 01:02:03|/dump/path||" << std::endl;
+    scoped_ptr<DumpInfo> info(CreateDumpInfo(
+        "{"
+        "\"name\": \"p\","
+        "\"dump_time\" : \"2012-01-01 01:02:03\","
+        "\"dump\": \"dump_string\","
+        "\"uptime\": \"123456789\","
+        "\"logfile\": \"logfile.log\""
+        "}"));
+    ASSERT_TRUE(info->valid());
+    ASSERT_TRUE(AppendLockFile(*info));
   }
-  lockfile.close();
 
   ASSERT_EQ(-1, writer.Write());
 }
@@ -144,11 +150,11 @@ TEST_F(MinidumpWriterTest, Write_FailsWhenTooManyRecentDumpsPresent) {
                         base::Bind(&FakeDumpState));
 
   // Write dump logs to the lockfile.
-  std::ofstream lockfile(minidump_dir_.Append(kLockfileName).value());
-  ASSERT_TRUE(lockfile.is_open());
   size_t too_many_recent_dumps = writer.max_recent_dumps() + 1;
   for (size_t i = 0; i < too_many_recent_dumps; ++i) {
-    lockfile << "|" << GetCurrentTimeASCII() << "|/dump/path||" << std::endl;
+    MinidumpParams params;
+    DumpInfo info("dump", "/dump/path", time(nullptr), params);
+    ASSERT_TRUE(AppendLockFile(info));
   }
 
   ASSERT_EQ(-1, writer.Write());
@@ -164,9 +170,17 @@ TEST_F(MinidumpWriterTest, Write_SucceedsWhenDumpLimitsNotExceeded) {
   ASSERT_GT(writer.max_recent_dumps(), 0);
 
   // Write an old dump logs to the lockfile.
-  std::ofstream lockfile(minidump_dir_.Append(kLockfileName).value());
-  ASSERT_TRUE(lockfile.is_open());
-  lockfile << "p|2012-01-01 01:02:03|/dump/path||" << std::endl;
+  scoped_ptr<DumpInfo> info(CreateDumpInfo(
+      "{"
+      "\"name\": \"p\","
+      "\"dump_time\" : \"2012-01-01 01:02:03\","
+      "\"dump\": \"dump_string\","
+      "\"uptime\": \"123456789\","
+      "\"logfile\": \"logfile.log\""
+      "}"));
+  ASSERT_TRUE(info->valid());
+  ASSERT_TRUE(AppendLockFile(*info));
+  ASSERT_EQ(0, writer.Write());
 }
 
 }  // namespace chromecast

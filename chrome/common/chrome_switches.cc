@@ -412,17 +412,11 @@ const char kEnableDevToolsExperiments[]     = "enable-devtools-experiments";
 const char kEnableDeviceDiscoveryNotifications[] =
     "enable-device-discovery-notifications";
 
-// Enables the DOM distiller.
-const char kEnableDomDistiller[] = "enable-dom-distiller";
-
 // Enables Domain Reliability Monitoring.
 const char kEnableDomainReliability[] = "enable-domain-reliability";
 
-// Enables Download Notification.
+// Download Notification. (value is "", "enabled" or "disabled")
 const char kEnableDownloadNotification[] = "enable-download-notification";
-
-// Enable Enhanced Bookmarks.
-const char kEnhancedBookmarksExperiment[] = "enhanced-bookmarks-experiment";
 
 // Enables experimentation with ephemeral apps to be launched from the webstore.
 const char kEnableEphemeralAppsInWebstore[] =
@@ -442,6 +436,10 @@ const char kEnableExtensionActivityLogTesting[] =
 // running a tab's onunload js handler independently of the GUI -
 // crbug.com/142458 .
 const char kEnableFastUnload[]         = "enable-fast-unload";
+
+// Enables support for the QUIC protocol for insecure schemes (http://).
+// This is a temporary testing flag.
+const char kEnableInsecureQuic[] = "enable-insecure-quic";
 
 // Enables experimentation with launching ephemeral apps via hyperlinks.
 const char kEnableLinkableEphemeralApps[]   = "enable-linkable-ephemeral-apps";
@@ -542,9 +540,6 @@ const char kEnableSuggestionsService[]      = "enable-suggestions-service";
 // Enables the supervised user managed bookmarks folder.
 const char kEnableSupervisedUserManagedBookmarksFolder[] =
     "enable-supervised-user-managed-bookmarks-folder";
-
-// Enables synced articles.
-const char kEnableSyncArticles[]            = "enable-sync-articles";
 
 // Enables user control over muting tab audio from the tab strip.
 const char kEnableTabAudioMuting[]  = "enable-tab-audio-muting";
@@ -1294,9 +1289,6 @@ const char kEnableCloudPrintXps[]           = "enable-cloud-print-xps";
 // they use a custom-user-data-dir which disables this.
 const char kEnableProfileShortcutManager[]  = "enable-profile-shortcut-manager";
 
-// Enable tab discarding when system is under memory pressure.
-const char kEnableTabDiscarding[] = "enable-tab-discarding";
-
 // For the DelegateExecute verb handler to launch Chrome in metro mode on
 // Windows 8 and higher.  Used when relaunching metro Chrome.
 const char kForceImmersive[]                = "force-immersive";
@@ -1337,6 +1329,11 @@ const char kWaitForMutex[]                  = "wait-for-mutex";
 const char kWindows8Search[]                = "windows8-search";
 #endif  // defined(OS_WIN)
 
+#if defined(OS_WIN) || defined(OS_MACOSX)
+// Enable tab discarding when system is under memory pressure.
+const char kEnableTabDiscarding[] = "enable-tab-discarding";
+#endif  // defined(OS_WIN) || defined(OS_MACOSX)
+
 #if defined(ENABLE_IPC_FUZZER)
 // Specifies the testcase used by the IPC fuzzer.
 const char kIpcFuzzerTestcase[]             = "ipc-fuzzer-testcase";
@@ -1346,6 +1343,11 @@ const char kIpcFuzzerTestcase[]             = "ipc-fuzzer-testcase";
 // Enables support to debug printing subsystem.
 const char kDebugPrint[] = "debug-print";
 #endif
+
+#if defined(ENABLE_TASK_MANAGER)
+// Enables the new implementation of the task manager.
+const char kEnableNewTaskManager[]   = "enable-new-task-manager";
+#endif  // defined(ENABLE_TASK_MANAGER)
 
 bool AboutInSettingsEnabled() {
   return SettingsWindowEnabled() &&
@@ -1395,6 +1397,13 @@ bool PowerOverlayEnabled() {
       ::switches::kEnablePowerOverlay);
 }
 #endif
+
+#if defined(ENABLE_TASK_MANAGER)
+bool NewTaskManagerEnabled() {
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
+      kEnableNewTaskManager);
+}
+#endif  // defined(ENABLE_TASK_MANAGER)
 
 // -----------------------------------------------------------------------------
 // DO NOT ADD YOUR CRAP TO THE BOTTOM OF THIS FILE.

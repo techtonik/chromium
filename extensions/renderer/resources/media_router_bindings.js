@@ -50,7 +50,8 @@ define('media_router_bindings', [
       }),
       'description': route.description,
       'icon_url': route.iconUrl,
-      'is_local': route.isLocal
+      'is_local': route.isLocal,
+      'custom_controller_path': route.customControllerPath,
     });
   }
 
@@ -472,9 +473,9 @@ define('media_router_bindings', [
       routeId, message) {
     return this.handlers_.sendRouteMessage(routeId, message)
         .then(function() {
-          return true;
+          return {'sent': true};
         }, function() {
-          return false;
+          return {'sent': false};
         });
   };
 

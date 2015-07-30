@@ -833,23 +833,23 @@ class DeviceUtilsKillAllTest(DeviceUtilsTest):
 
   def testKillAll_nonblocking(self):
     with self.assertCalls(
-        (self.call.device.GetPids('some.process'), {'some.process': '1234'}),
+        (self.call.device.GetPids('some.process'), {'some.process': ['1234']}),
         (self.call.adb.Shell('kill -9 1234'), '')):
       self.assertEquals(
           1, self.device.KillAll('some.process', blocking=False))
 
   def testKillAll_blocking(self):
     with self.assertCalls(
-        (self.call.device.GetPids('some.process'), {'some.process': '1234'}),
+        (self.call.device.GetPids('some.process'), {'some.process': ['1234']}),
         (self.call.adb.Shell('kill -9 1234'), ''),
-        (self.call.device.GetPids('some.process'), {'some.process': '1234'}),
+        (self.call.device.GetPids('some.process'), {'some.process': ['1234']}),
         (self.call.device.GetPids('some.process'), [])):
       self.assertEquals(
           1, self.device.KillAll('some.process', blocking=True))
 
   def testKillAll_root(self):
     with self.assertCalls(
-        (self.call.device.GetPids('some.process'), {'some.process': '1234'}),
+        (self.call.device.GetPids('some.process'), {'some.process': ['1234']}),
         (self.call.device.NeedsSU(), True),
         (self.call.adb.Shell("su -c sh -c 'kill -9 1234'"), '')):
       self.assertEquals(
@@ -857,10 +857,19 @@ class DeviceUtilsKillAllTest(DeviceUtilsTest):
 
   def testKillAll_sigterm(self):
     with self.assertCalls(
-        (self.call.device.GetPids('some.process'), {'some.process': '1234'}),
+        (self.call.device.GetPids('some.process'),
+            {'some.process': ['1234']}),
         (self.call.adb.Shell('kill -15 1234'), '')):
       self.assertEquals(
           1, self.device.KillAll('some.process', signum=device_signal.SIGTERM))
+
+  def testKillAll_multipleInstances(self):
+    with self.assertCalls(
+        (self.call.device.GetPids('some.process'),
+            {'some.process': ['1234', '4567']}),
+        (self.call.adb.Shell('kill -15 1234 4567'), '')):
+      self.assertEquals(
+          2, self.device.KillAll('some.process', signum=device_signal.SIGTERM))
 
 
 class DeviceUtilsStartActivityTest(DeviceUtilsTest):
@@ -1292,20 +1301,27 @@ class DeviceUtilsPushChangedFilesZippedTest(DeviceUtilsTest):
          ('/test/host/path/file2', '/test/device/path/file2')])
 
 
-class DeviceUtilsFileExistsTest(DeviceUtilsTest):
+class DeviceUtilsPathExistsTest(DeviceUtilsTest):
 
-  def testFileExists_usingTest_fileExists(self):
+  def testPathExists_usingTest_pathExists(self):
     with self.assertCall(
         self.call.device.RunShellCommand(
             ['test', '-e', '/path/file.exists'], check_return=True), ''):
-      self.assertTrue(self.device.FileExists('/path/file.exists'))
+      self.assertTrue(self.device.PathExists('/path/file.exists'))
 
-  def testFileExists_usingTest_fileDoesntExist(self):
+  def testPathExists_usingTest_pathDoesntExist(self):
     with self.assertCall(
         self.call.device.RunShellCommand(
-            ['test', '-e', '/does/not/exist'], check_return=True),
+            ['test', '-e', '/path/does/not/exist'], check_return=True),
         self.ShellError('', 1)):
-      self.assertFalse(self.device.FileExists('/does/not/exist'))
+      self.assertFalse(self.device.PathExists('/path/does/not/exist'))
+
+  def testFileExists_usingTest_pathDoesntExist(self):
+    with self.assertCall(
+        self.call.device.RunShellCommand(
+            ['test', '-e', '/does/not/exist.html'], check_return=True),
+        self.ShellError('', 1)):
+      self.assertFalse(self.device.FileExists('/does/not/exist.html'))
 
 
 class DeviceUtilsPullFileTest(DeviceUtilsTest):
@@ -1665,16 +1681,20 @@ class DeviceUtilsGetPidsTest(DeviceUtilsTest):
     with self.assertCall(
         self.call.device._RunPipedShellCommand('ps | grep -F one.match'),
         ['user  1001    100   1024 1024   ffffffff 00000000 one.match']):
-      self.assertEqual({'one.match': '1001'}, self.device.GetPids('one.match'))
+      self.assertEqual(
+          {'one.match': ['1001']},
+          self.device.GetPids('one.match'))
 
-  def testGetPids_mutlipleMatches(self):
+  def testGetPids_multipleMatches(self):
     with self.assertCall(
         self.call.device._RunPipedShellCommand('ps | grep -F match'),
         ['user  1001    100   1024 1024   ffffffff 00000000 one.match',
          'user  1002    100   1024 1024   ffffffff 00000000 two.match',
          'user  1003    100   1024 1024   ffffffff 00000000 three.match']):
       self.assertEqual(
-          {'one.match': '1001', 'two.match': '1002', 'three.match': '1003'},
+          {'one.match': ['1001'],
+           'two.match': ['1002'],
+           'three.match': ['1003']},
           self.device.GetPids('match'))
 
   def testGetPids_exactMatch(self):
@@ -1683,7 +1703,7 @@ class DeviceUtilsGetPidsTest(DeviceUtilsTest):
         ['user  1000    100   1024 1024   ffffffff 00000000 not.exact.match',
          'user  1234    100   1024 1024   ffffffff 00000000 exact.match']):
       self.assertEqual(
-          {'not.exact.match': '1000', 'exact.match': '1234'},
+          {'not.exact.match': ['1000'], 'exact.match': ['1234']},
           self.device.GetPids('exact.match'))
 
   def testGetPids_quotable(self):
@@ -1691,7 +1711,16 @@ class DeviceUtilsGetPidsTest(DeviceUtilsTest):
         self.call.device._RunPipedShellCommand("ps | grep -F 'my$process'"),
         ['user  1234    100   1024 1024   ffffffff 00000000 my$process']):
       self.assertEqual(
-          {'my$process': '1234'}, self.device.GetPids('my$process'))
+          {'my$process': ['1234']}, self.device.GetPids('my$process'))
+
+  def testGetPids_multipleInstances(self):
+    with self.assertCall(
+        self.call.device._RunPipedShellCommand('ps | grep -F foo'),
+        ['user  1000    100   1024 1024   ffffffff 00000000 foo',
+         'user  1234    100   1024 1024   ffffffff 00000000 foo']):
+      self.assertEqual(
+          {'foo': ['1000', '1234']},
+          self.device.GetPids('foo'))
 
 
 class DeviceUtilsTakeScreenshotTest(DeviceUtilsTest):
@@ -1760,6 +1789,55 @@ class DeviceUtilsGetMemoryUsageForPidTest(DeviceUtilsTest):
             'Private_Dirty': 106,
           },
           self.device.GetMemoryUsageForPid(4321))
+
+
+class DeviceUtilsDismissCrashDialogIfNeededTest(DeviceUtilsTest):
+
+  def testDismissCrashDialogIfNeeded_crashedPageckageNotFound(self):
+    sample_dumpsys_output = '''
+WINDOW MANAGER WINDOWS (dumpsys window windows)
+  Window #11 Window{f8b647a u0 SearchPanel}:
+    mDisplayId=0 mSession=Session{8 94:122} mClient=android.os.BinderProxy@1ba5
+    mOwnerUid=100 mShowToOwnerOnly=false package=com.android.systemui appop=NONE
+    mAttrs=WM.LayoutParams{(0,0)(fillxfill) gr=#53 sim=#31 ty=2024 fl=100
+    Requested w=1080 h=1920 mLayoutSeq=426
+    mBaseLayer=211000 mSubLayer=0 mAnimLayer=211000+0=211000 mLastLayer=211000
+'''
+    with self.assertCalls(
+        (self.call.device.RunShellCommand(
+            ['dumpsys', 'window', 'windows'], check_return=True,
+            large_output=True), sample_dumpsys_output.split('\n'))):
+      package_name = self.device.DismissCrashDialogIfNeeded()
+      self.assertIsNone(package_name)
+
+  def testDismissCrashDialogIfNeeded_crashedPageckageFound(self):
+    sample_dumpsys_output = '''
+WINDOW MANAGER WINDOWS (dumpsys window windows)
+  Window #11 Window{f8b647a u0 SearchPanel}:
+    mDisplayId=0 mSession=Session{8 94:122} mClient=android.os.BinderProxy@1ba5
+    mOwnerUid=102 mShowToOwnerOnly=false package=com.android.systemui appop=NONE
+    mAttrs=WM.LayoutParams{(0,0)(fillxfill) gr=#53 sim=#31 ty=2024 fl=100
+    Requested w=1080 h=1920 mLayoutSeq=426
+    mBaseLayer=211000 mSubLayer=0 mAnimLayer=211000+0=211000 mLastLayer=211000
+  mHasPermanentDpad=false
+  mCurrentFocus=Window{3a27740f u0 Application Error: com.android.chrome}
+  mFocusedApp=AppWindowToken{470af6f token=Token{272ec24e ActivityRecord{t894}}}
+'''
+    with self.assertCalls(
+        (self.call.device.RunShellCommand(
+            ['dumpsys', 'window', 'windows'], check_return=True,
+            large_output=True), sample_dumpsys_output.split('\n')),
+        (self.call.device.RunShellCommand(
+            ['input', 'keyevent', '22'], check_return=True)),
+        (self.call.device.RunShellCommand(
+            ['input', 'keyevent', '22'], check_return=True)),
+        (self.call.device.RunShellCommand(
+            ['input', 'keyevent', '66'], check_return=True)),
+        (self.call.device.RunShellCommand(
+            ['dumpsys', 'window', 'windows'], check_return=True,
+            large_output=True), [])):
+      package_name = self.device.DismissCrashDialogIfNeeded()
+      self.assertEqual(package_name, 'com.android.chrome')
 
 
 class DeviceUtilsClientCache(DeviceUtilsTest):

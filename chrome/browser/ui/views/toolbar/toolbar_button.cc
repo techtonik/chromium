@@ -18,6 +18,7 @@
 #include "ui/gfx/display.h"
 #include "ui/gfx/screen.h"
 #include "ui/strings/grit/ui_strings.h"
+#include "ui/views/animation/ink_drop_animation_controller.h"
 #include "ui/views/controls/button/label_button_border.h"
 #include "ui/views/controls/menu/menu_item_view.h"
 #include "ui/views/controls/menu/menu_model_adapter.h"
@@ -31,6 +32,18 @@ ToolbarButton::ToolbarButton(views::ButtonListener* listener,
       menu_showing_(false),
       y_position_on_lbuttondown_(0),
       show_menu_factory_(this) {
+#if defined(OS_CHROMEOS)
+  // The ink drop animation is only targeted at ChromeOS because there is
+  // concern it will conflict with OS level touch feedback in a bad way.
+  if (ui::MaterialDesignController::IsModeMaterial()) {
+    ink_drop_animation_controller_.reset(
+        new views::InkDropAnimationController(this));
+    layer()->SetFillsBoundsOpaquely(false);
+    image()->SetPaintToLayer(true);
+    image()->SetFillsBoundsOpaquely(false);
+  }
+#endif  // defined(OS_CHROMEOS)
+
   set_context_menu_controller(this);
 }
 
@@ -54,8 +67,11 @@ bool ToolbarButton::IsMenuShowing() const {
 gfx::Size ToolbarButton::GetPreferredSize() const {
   gfx::Size size(image()->GetPreferredSize());
   gfx::Size label_size = label()->GetPreferredSize();
-  if (label_size.width() > 0)
-    size.Enlarge(label_size.width() + LocationBarView::kItemPadding, 0);
+  if (label_size.width() > 0) {
+    const int horizontal_item_padding = GetThemeProvider()->GetDisplayProperty(
+        ThemeProperties::PROPERTY_LOCATION_BAR_HORIZONTAL_PADDING);
+    size.Enlarge(label_size.width() + horizontal_item_padding, 0);
+  }
   // For non-material assets the entire size of the button is captured in the
   // image resource. For Material Design the excess whitespace is being removed
   // from the image assets. Enlarge the button by the theme provided insets.
@@ -145,8 +161,24 @@ void ToolbarButton::GetAccessibleState(ui::AXViewState* state) {
 
 scoped_ptr<views::LabelButtonBorder>
 ToolbarButton::CreateDefaultBorder() const {
-  scoped_ptr<views::LabelButtonBorder> border =
-      LabelButton::CreateDefaultBorder();
+  scoped_ptr<views::LabelButtonBorder> border;
+  if (ui::MaterialDesignController::IsModeMaterial()) {
+#if defined(OS_CHROMEOS)
+    border.reset(new views::LabelButtonBorder());
+    border->set_insets(views::LabelButtonAssetBorder::GetDefaultInsetsForStyle(
+        Button::STYLE_TEXTBUTTON));
+#else
+    scoped_ptr<views::LabelButtonAssetBorder> asset_border(
+        new views::LabelButtonAssetBorder(Button::STYLE_TEXTBUTTON));
+    // The material design spec does not include a visual effect for the
+    // STATE_HOVERED button state so we have to remove the default one added by
+    // LabelButtonAssetBorder.
+    asset_border->SetPainter(false, Button::STATE_HOVERED, nullptr);
+    border = asset_border.Pass();
+#endif
+  } else {
+    border.reset(new views::LabelButtonAssetBorder(Button::STYLE_TEXTBUTTON));
+  }
 
   ui::ThemeProvider* provider = GetThemeProvider();
   if (provider && provider->UsingSystemTheme()) {

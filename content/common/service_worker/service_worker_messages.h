@@ -228,9 +228,6 @@ IPC_MESSAGE_ROUTED3(ServiceWorkerHostMsg_FetchEventFinished,
                     int /* request_id */,
                     content::ServiceWorkerFetchEventResult,
                     content::ServiceWorkerResponse)
-IPC_MESSAGE_ROUTED2(ServiceWorkerHostMsg_SyncEventFinished,
-                    int /* request_id */,
-                    blink::WebServiceWorkerEventResult)
 IPC_MESSAGE_ROUTED1(ServiceWorkerHostMsg_NotificationClickEventFinished,
                     int /* request_id */)
 IPC_MESSAGE_ROUTED2(ServiceWorkerHostMsg_PushEventFinished,
@@ -275,6 +272,12 @@ IPC_MESSAGE_ROUTED2(ServiceWorkerHostMsg_FocusClient,
                     int /* request_id */,
                     std::string /* uuid */)
 
+// Ask the browser to navigate a client (renderer->browser).
+IPC_MESSAGE_ROUTED3(ServiceWorkerHostMsg_NavigateClient,
+                    int /* request_id */,
+                    std::string /* uuid */,
+                    GURL /* url */)
+
 // Asks the browser to force this worker to become activated.
 IPC_MESSAGE_ROUTED1(ServiceWorkerHostMsg_SkipWaiting,
                     int /* request_id */)
@@ -283,11 +286,6 @@ IPC_MESSAGE_ROUTED1(ServiceWorkerHostMsg_SkipWaiting,
 // its scope.
 IPC_MESSAGE_ROUTED1(ServiceWorkerHostMsg_ClaimClients,
                     int /* request_id */)
-
-// Asks the browser to stash a message port, giving it a name.
-IPC_MESSAGE_ROUTED2(ServiceWorkerHostMsg_StashMessagePort,
-                    int /* message_port_id */,
-                    base::string16 /* name */)
 
 //---------------------------------------------------------------------------
 // Messages sent from the browser to the child process.
@@ -422,8 +420,6 @@ IPC_MESSAGE_CONTROL1(ServiceWorkerMsg_ActivateEvent,
 IPC_MESSAGE_CONTROL2(ServiceWorkerMsg_FetchEvent,
                      int /* request_id */,
                      content::ServiceWorkerFetchRequest)
-IPC_MESSAGE_CONTROL1(ServiceWorkerMsg_SyncEvent,
-                     int /* request_id */)
 IPC_MESSAGE_CONTROL3(ServiceWorkerMsg_NotificationClickEvent,
                      int /* request_id */,
                      int64_t /* persistent_notification_id */,
@@ -479,9 +475,12 @@ IPC_MESSAGE_CONTROL2(ServiceWorkerMsg_FocusClientResponse,
                      int /* request_id */,
                      content::ServiceWorkerClientInfo /* client */)
 
-// Sent via EmbeddedWorker to transfer a stashed message port to the worker.
-IPC_MESSAGE_CONTROL3(
-    ServiceWorkerMsg_SendStashedMessagePorts,
-    std::vector<content::TransferredMessagePort> /* stashed_message_ports */,
-    std::vector<int> /* new_routing_ids */,
-    std::vector<base::string16> /* port_names */)
+// Sent via EmbeddedWorker as a response of NavigateClient.
+IPC_MESSAGE_CONTROL2(ServiceWorkerMsg_NavigateClientResponse,
+                     int /* request_id */,
+                     content::ServiceWorkerClientInfo /* client */)
+
+// Sent via EmbeddedWorker as an error response of NavigateClient.
+IPC_MESSAGE_CONTROL2(ServiceWorkerMsg_NavigateClientError,
+                     int /* request_id */,
+                     GURL /* url */)

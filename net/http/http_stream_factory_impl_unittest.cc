@@ -9,6 +9,7 @@
 
 #include "base/basictypes.h"
 #include "base/compiler_specific.h"
+#include "net/base/port_util.h"
 #include "net/base/test_completion_callback.h"
 #include "net/cert/mock_cert_verifier.h"
 #include "net/dns/mock_host_resolver.h"
@@ -1374,9 +1375,10 @@ TEST_P(HttpStreamFactoryTest, DISABLED_OrphanedWebSocketStream) {
   request_info.url = GURL("ws://www.google.com:8888");
   request_info.load_flags = 0;
 
+  base::Time expiration = base::Time::Now() + base::TimeDelta::FromDays(1);
   session->http_server_properties()->SetAlternativeService(
       HostPortPair("www.google.com", 8888),
-      AlternativeService(NPN_HTTP_2, "www.google.com", 9999), 1.0);
+      AlternativeService(NPN_HTTP_2, "www.google.com", 9999), 1.0, expiration);
 
   SSLConfig ssl_config;
   StreamRequestWaiter waiter;

@@ -55,6 +55,7 @@ enum SSLInterstitialCause {
   AUTHORITY_ERROR_CAPTIVE_PORTAL,
   SELF_SIGNED,
   EXPIRED_RECENTLY,
+  LIKELY_SAME_DOMAIN,
   UNUSED_INTERSTITIAL_CAUSE_ENTRY,
 };
 
@@ -208,6 +209,8 @@ void SSLErrorClassification::RecordUMAStatistics(
           RecordSSLInterstitialCause(overridable, SUBDOMAIN_INVERSE_MATCH);
         if (IsCertLikelyFromMultiTenantHosting())
           RecordSSLInterstitialCause(overridable, LIKELY_MULTI_TENANT_HOSTING);
+        if (IsCertLikelyFromSameDomain())
+          RecordSSLInterstitialCause(overridable, LIKELY_SAME_DOMAIN);
       } else {
          RecordSSLInterstitialCause(overridable, HOST_NAME_NOT_KNOWN_TLD);
       }
@@ -316,9 +319,8 @@ size_t SSLErrorClassification::FindSubDomainDifference(
 
 SSLErrorClassification::Tokens SSLErrorClassification::
 Tokenize(const std::string& name) {
-  Tokens name_tokens;
-  base::SplitStringDontTrim(name, '.', &name_tokens);
-  return name_tokens;
+  return base::SplitString(
+      name, ".", base::KEEP_WHITESPACE, base::SPLIT_WANT_ALL);
 }
 
 // We accept the inverse case for www for historical reasons.
@@ -461,6 +463,29 @@ bool SSLErrorClassification::IsCertLikelyFromMultiTenantHosting() const {
     }
   }
   return true;
+}
+
+bool SSLErrorClassification::IsCertLikelyFromSameDomain() const {
+  std::string host_name = request_url_.host();
+  std::vector<std::string> dns_names;
+  cert_.GetDNSNames(&dns_names);
+
+  dns_names.push_back(host_name);
+  std::vector<std::string> dns_names_domain;
+
+  for (const std::string& dns_name : dns_names) {
+    dns_names_domain.push_back(
+        net::registry_controlled_domains::GetDomainAndRegistry(
+            dns_name,
+            net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES));
+  }
+
+  DCHECK(!dns_names_domain.empty());
+  const std::string& host_name_domain = dns_names_domain.back();
+
+  // Last element is the original domain. So, excluding it.
+  return std::find(dns_names_domain.begin(), dns_names_domain.end() - 1,
+                   host_name_domain) != dns_names_domain.end() - 1;
 }
 
 // static

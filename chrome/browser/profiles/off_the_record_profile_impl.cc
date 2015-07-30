@@ -39,7 +39,6 @@
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/common/render_messages.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/ui/zoom/zoom_event_manager.h"
@@ -97,14 +96,14 @@ namespace {
 
 void NotifyOTRProfileCreatedOnIOThread(void* original_profile,
                                        void* otr_profile) {
-  ExtensionWebRequestEventRouter::GetInstance()->OnOTRBrowserContextCreated(
-      original_profile, otr_profile);
+  extensions::ExtensionWebRequestEventRouter::GetInstance()
+      ->OnOTRBrowserContextCreated(original_profile, otr_profile);
 }
 
 void NotifyOTRProfileDestroyedOnIOThread(void* original_profile,
                                          void* otr_profile) {
-  ExtensionWebRequestEventRouter::GetInstance()->OnOTRBrowserContextDestroyed(
-      original_profile, otr_profile);
+  extensions::ExtensionWebRequestEventRouter::GetInstance()
+      ->OnOTRBrowserContextDestroyed(original_profile, otr_profile);
 }
 
 }  // namespace

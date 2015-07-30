@@ -33,8 +33,9 @@ class DocumentResourceWaiter : public mandoline::FrameTreeClient {
   void Release(mojo::InterfaceRequest<mandoline::FrameTreeClient>*
                    frame_tree_client_request,
                mandoline::FrameTreeServerPtr* frame_tree_server,
-               mojo::Array<mandoline::FrameDataPtr>* frame_data,
-               mojo::URLResponsePtr* response);
+               mojo::Array<mandoline::FrameDataPtr>* frame_data);
+
+  mojo::URLResponsePtr ReleaseURLResponse();
 
   // See class description.
   bool IsReady() const;
@@ -50,6 +51,7 @@ class DocumentResourceWaiter : public mandoline::FrameTreeClient {
                  mojo::Array<mandoline::FrameDataPtr> frame_data) override;
   void OnFrameAdded(mandoline::FrameDataPtr frame_data) override;
   void OnFrameRemoved(uint32_t frame_id) override;
+  void OnFrameNameChanged(uint32_t frame_id, const mojo::String& name) override;
 
   GlobalState* global_state_;
   HTMLDocumentOOPIF* document_;

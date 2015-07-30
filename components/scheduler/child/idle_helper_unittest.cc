@@ -144,7 +144,6 @@ class IdleHelperForTest : public IdleHelper, public IdleHelper::Delegate {
       base::TimeDelta required_quiescence_duration_before_long_idle_period)
       : IdleHelper(scheduler_helper,
                    this,
-                   SchedulerHelper::TASK_QUEUE_COUNT,
                    "test.idle",
                    TRACE_DISABLED_BY_DEFAULT("test.idle"),
                    "TestSchedulerIdlePeriod",
@@ -179,8 +178,7 @@ class BaseIdleHelperTest : public testing::Test {
             new SchedulerHelper(main_task_runner_,
                                 "test.idle",
                                 TRACE_DISABLED_BY_DEFAULT("test.idle"),
-                                TRACE_DISABLED_BY_DEFAULT("test.idle.debug"),
-                                SchedulerHelper::TASK_QUEUE_COUNT + 1)),
+                                TRACE_DISABLED_BY_DEFAULT("test.idle.debug"))),
         idle_helper_(new IdleHelperForTest(
             scheduler_helper_.get(),
             required_quiescence_duration_before_long_idle_period)),
@@ -826,7 +824,7 @@ TEST_F(IdleHelperTest, TestLongIdlePeriodRestartWaitsIfNotMaxDeadline) {
 
   // Once the pending task is run the new idle period should start.
   clock_->Advance(pending_task_delay - idle_task_duration);
-  RunUntilIdle();
+
   // Since the idle period tried to start before the pending task ran we have to
   // wait for the idle helper to retry starting the long idle period.
   clock_->Advance(retry_enable_long_idle_period_delay());

@@ -31,7 +31,6 @@
 #include "base/trace_event/memory_dump_manager.h"
 #include "base/tracked_objects.h"
 #include "components/tracing/child_trace_message_filter.h"
-#include "content/child/bluetooth/bluetooth_message_filter.h"
 #include "content/child/child_discardable_shared_memory_manager.h"
 #include "content/child/child_gpu_memory_buffer_manager.h"
 #include "content/child/child_histogram_message_filter.h"
@@ -61,10 +60,6 @@
 #include "ipc/ipc_sync_message_filter.h"
 #include "ipc/mojo/ipc_channel_mojo.h"
 
-#if defined(OS_ANDROID)
-#include "base/thread_task_runner_handle.h"
-#endif
-
 #if defined(TCMALLOC_TRACE_MEMORY_SUPPORTED)
 #include "third_party/tcmalloc/chromium/src/gperftools/heap-profiler.h"
 #endif
@@ -74,7 +69,7 @@
 #endif
 
 #if defined(OS_WIN)
-#include "ipc/attachment_broker_win.h"
+#include "ipc/attachment_broker_unprivileged_win.h"
 #endif
 
 using tracked_objects::ThreadData;
@@ -139,8 +134,8 @@ class SuicideOnChannelErrorFilter : public IPC::MessageFilter {
     // On POSIX, at least, one can install an unload handler which loops
     // forever and leave behind a renderer process which eats 100% CPU forever.
     //
-    // This is because the terminate signals (ViewMsg_ShouldClose and the error
-    // from the IPC sender) are routed to the main message loop but never
+    // This is because the terminate signals (FrameMsg_BeforeUnload and the
+    // error from the IPC sender) are routed to the main message loop but never
     // processed (because that message loop is stuck in V8).
     //
     // One could make the browser SIGKILL the renderers, but that leaves open a
@@ -297,13 +292,6 @@ ChildThreadImpl::Options::Builder::AddStartupFilter(
   return *this;
 }
 
-ChildThreadImpl::Options::Builder&
-ChildThreadImpl::Options::Builder::ListenerTaskRunner(
-    scoped_refptr<base::SingleThreadTaskRunner> task_runner) {
-  options_.listener_task_runner = task_runner;
-  return *this;
-}
-
 ChildThreadImpl::Options ChildThreadImpl::Options::Builder::Build() {
   return options_;
 }
@@ -373,7 +361,7 @@ void ChildThreadImpl::Init(const Options& options) {
 #endif
 
 #if defined(OS_WIN)
-  attachment_broker_.reset(new IPC::AttachmentBrokerWin());
+  attachment_broker_.reset(new IPC::AttachmentBrokerUnprivilegedWin());
 #endif
 
   mojo_application_.reset(new MojoApplication(GetIOTaskRunner()));
@@ -401,8 +389,6 @@ void ChildThreadImpl::Init(const Options& options) {
                                               quota_message_filter_.get()));
   geofencing_message_filter_ =
       new GeofencingMessageFilter(thread_safe_sender_.get());
-  bluetooth_message_filter_ =
-      new BluetoothMessageFilter(thread_safe_sender_.get());
   notification_dispatcher_ =
       new NotificationDispatcher(thread_safe_sender_.get());
   push_dispatcher_ = new PushDispatcher(thread_safe_sender_.get());
@@ -415,7 +401,6 @@ void ChildThreadImpl::Init(const Options& options) {
   channel_->AddFilter(push_dispatcher_->GetFilter());
   channel_->AddFilter(service_worker_message_filter_->GetFilter());
   channel_->AddFilter(geofencing_message_filter_->GetFilter());
-  channel_->AddFilter(bluetooth_message_filter_->GetFilter());
 
   if (!IsInBrowserProcess()) {
     // In single process mode, browser-side tracing will cover the whole
@@ -450,10 +435,6 @@ void ChildThreadImpl::Init(const Options& options) {
     channel_->AddFilter(startup_filter);
   }
 
-  // Set listener task runner before connect channel to avoid data race.
-  if (options.listener_task_runner) {
-    channel_->SetListenerTaskRunner(options.listener_task_runner);
-  }
   ConnectChannel(options.use_mojo_channel);
 
   int connection_timeout = kConnectionTimeoutS;

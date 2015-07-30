@@ -72,6 +72,7 @@ std::string DeriveCommandLine(const GURL& start_url,
     ::switches::kBlinkSettings,
     ::switches::kDisableAccelerated2dCanvas,
     ::switches::kDisableAcceleratedJpegDecoding,
+    ::switches::kDisableAcceleratedMjpegDecode,
     ::switches::kDisableAcceleratedVideoDecode,
     ::switches::kDisableBlinkFeatures,
     ::switches::kDisableCastStreamingHWEncoding,
@@ -96,7 +97,6 @@ std::string DeriveCommandLine(const GURL& start_url,
     ::switches::kDisableThreadedScrolling,
     ::switches::kDisableTouchDragDrop,
     ::switches::kDisableTouchEditing,
-    ::switches::kEnableAcceleratedMjpegDecode,
     ::switches::kEnableBlinkFeatures,
     ::switches::kEnableCompositorAnimationTimelines,
     ::switches::kEnableDelegatedRenderer,
@@ -199,7 +199,6 @@ std::string DeriveCommandLine(const GURL& start_url,
     cc::switches::kEnableGpuBenchmarking,
     cc::switches::kEnablePropertyTreeVerification,
     cc::switches::kEnableMainFrameBeforeActivation,
-    cc::switches::kMaxTilesForInterestArea,
     cc::switches::kMaxUnusedResourceMemoryUsagePercentage,
     cc::switches::kShowCompositedLayerBorders,
     cc::switches::kShowFPSCounter,
@@ -257,10 +256,9 @@ std::string DeriveCommandLine(const GURL& start_url,
 // Simulates a session manager restart by launching give command line
 // and exit current process.
 void ReLaunch(const std::string& command_line) {
-  std::vector<std::string> argv;
-
   // This is not a proper way to get |argv| but it's good enough for debugging.
-  base::SplitString(command_line, ' ', &argv);
+  std::vector<std::string> argv = base::SplitString(
+      command_line, " ", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
 
   base::LaunchProcess(argv, base::LaunchOptions());
   chrome::AttemptUserExit();

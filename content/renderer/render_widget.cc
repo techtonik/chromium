@@ -468,14 +468,15 @@ gfx::Rect RenderWidget::ScreenMetricsEmulator::AdjustValidationMessageAnchor(
 
 // RenderWidget ---------------------------------------------------------------
 
-RenderWidget::RenderWidget(blink::WebPopupType popup_type,
+RenderWidget::RenderWidget(CompositorDependencies* compositor_deps,
+                           blink::WebPopupType popup_type,
                            const blink::WebScreenInfo& screen_info,
                            bool swapped_out,
                            bool hidden,
                            bool never_visible)
     : routing_id_(MSG_ROUTING_NONE),
       surface_id_(0),
-      compositor_deps_(nullptr),
+      compositor_deps_(compositor_deps),
       webwidget_(nullptr),
       opener_id_(MSG_ROUTING_NONE),
       init_complete_(false),
@@ -508,7 +509,6 @@ RenderWidget::RenderWidget(blink::WebPopupType popup_type,
       suppress_next_char_events_(false),
       screen_info_(screen_info),
       device_scale_factor_(screen_info_.deviceScaleFactor),
-      current_event_latency_info_(NULL),
       next_output_surface_id_(0),
 #if defined(OS_ANDROID)
       text_field_is_dirty_(false),
@@ -540,9 +540,9 @@ RenderWidget* RenderWidget::Create(int32 opener_id,
                                    blink::WebPopupType popup_type,
                                    const blink::WebScreenInfo& screen_info) {
   DCHECK(opener_id != MSG_ROUTING_NONE);
-  scoped_refptr<RenderWidget> widget(
-      new RenderWidget(popup_type, screen_info, false, false, false));
-  if (widget->Init(opener_id, compositor_deps)) {  // adds reference on success.
+  scoped_refptr<RenderWidget> widget(new RenderWidget(
+      compositor_deps, popup_type, screen_info, false, false, false));
+  if (widget->Init(opener_id)) {  // adds reference on success.
     return widget.get();
   }
   return NULL;
@@ -557,15 +557,15 @@ RenderWidget* RenderWidget::CreateForFrame(
     CompositorDependencies* compositor_deps,
     blink::WebLocalFrame* frame) {
   CHECK_NE(routing_id, MSG_ROUTING_NONE);
-  scoped_refptr<RenderWidget> widget(new RenderWidget(
-      blink::WebPopupTypeNone, screen_info, false, hidden, false));
+  scoped_refptr<RenderWidget> widget(
+      new RenderWidget(compositor_deps, blink::WebPopupTypeNone, screen_info,
+                       false, hidden, false));
   widget->routing_id_ = routing_id;
   widget->surface_id_ = surface_id;
-  widget->compositor_deps_ = compositor_deps;
   widget->for_oopif_ = true;
   // DoInit increments the reference count on |widget|, keeping it alive after
   // this function returns.
-  if (widget->DoInit(MSG_ROUTING_NONE, compositor_deps,
+  if (widget->DoInit(MSG_ROUTING_NONE,
                      RenderWidget::CreateWebFrameWidget(widget.get(), frame),
                      nullptr)) {
     widget->CompleteInit();
@@ -595,22 +595,16 @@ blink::WebWidget* RenderWidget::CreateWebWidget(RenderWidget* render_widget) {
 }
 
 void RenderWidget::CloseForFrame() {
-  // Close() must be called synchronously, since Blink objects are already in
-  // the process of being torn down. Deferring Close() to the message loop like
-  // the normal case means that Close() will end up getting called when various
-  // pointers, etc. are already nulled out or freed.
-  CloseInternal(true);
+  OnClose();
 }
 
-bool RenderWidget::Init(int32 opener_id,
-                        CompositorDependencies* compositor_deps) {
-  return DoInit(opener_id, compositor_deps, RenderWidget::CreateWebWidget(this),
+bool RenderWidget::Init(int32 opener_id) {
+  return DoInit(opener_id, RenderWidget::CreateWebWidget(this),
                 new ViewHostMsg_CreateWidget(opener_id, popup_type_,
                                              &routing_id_, &surface_id_));
 }
 
 bool RenderWidget::DoInit(int32 opener_id,
-                          CompositorDependencies* compositor_deps,
                           WebWidget* web_widget,
                           IPC::SyncMessage* create_widget_message) {
   DCHECK(!webwidget_);
@@ -618,7 +612,6 @@ bool RenderWidget::DoInit(int32 opener_id,
   if (opener_id != MSG_ROUTING_NONE)
     opener_id_ = opener_id;
 
-  compositor_deps_ = compositor_deps;
   webwidget_ = web_widget;
 
   bool result = true;
@@ -798,8 +791,6 @@ void RenderWidget::Resize(const gfx::Size& new_size,
 
   // NOTE: We may have entered fullscreen mode without changing our size.
   bool fullscreen_change = is_fullscreen_granted_ != is_fullscreen_granted;
-  if (fullscreen_change)
-    WillToggleFullscreen();
   is_fullscreen_granted_ = is_fullscreen_granted;
   display_mode_ = display_mode;
 
@@ -856,7 +847,37 @@ void RenderWidget::SetWindowRectSynchronously(
 }
 
 void RenderWidget::OnClose() {
-  CloseInternal(false);
+  DCHECK(content::RenderThread::Get());
+  if (closing_)
+    return;
+  NotifyOnClose();
+  closing_ = true;
+
+  // Browser correspondence is no longer needed at this point.
+  if (routing_id_ != MSG_ROUTING_NONE) {
+    RenderThread::Get()->RemoveRoute(routing_id_);
+    SetHidden(false);
+    if (RenderThreadImpl::current())
+      RenderThreadImpl::current()->WidgetDestroyed();
+  }
+
+  if (for_oopif_) {
+    // Widgets for frames may be created and closed at any time while the frame
+    // is alive. However, the closing process must happen synchronously. Frame
+    // widget and frames hold pointers to each other. If Close() is deferred to
+    // the message loop like in the non-frame widget case, WebWidget::close()
+    // can end up accessing members of an already-deleted frame.
+    Close();
+  } else {
+    // If there is a Send call on the stack, then it could be dangerous to close
+    // now.  Post a task that only gets invoked when there are no nested message
+    // loops.
+    base::ThreadTaskRunnerHandle::Get()->PostNonNestableTask(
+        FROM_HERE, base::Bind(&RenderWidget::Close, this));
+  }
+
+  // Balances the AddRef taken when we called AddRoute.
+  Release();
 }
 
 // Got a response from the browser after the renderer decided to create a new
@@ -969,7 +990,7 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
 #if defined(OS_ANDROID)
   if (SynchronousCompositorFactory* factory =
       SynchronousCompositorFactory::GetInstance()) {
-    return factory->CreateOutputSurface(routing_id(),
+    return factory->CreateOutputSurface(routing_id(), surface_id(),
                                         frame_swap_message_queue_);
   }
 #endif
@@ -1089,9 +1110,6 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
       ime_event_guard_maybe.reset(new ImeEventGuard(this));
   }
 #endif
-
-  base::AutoReset<const ui::LatencyInfo*> resetter(&current_event_latency_info_,
-                                                   &latency_info);
 
   base::TimeTicks start_time;
   if (base::TimeTicks::IsHighResolution())
@@ -1548,35 +1566,6 @@ void RenderWidget::NotifyOnClose() {
   FOR_EACH_OBSERVER(RenderFrameImpl, render_frames_, WidgetWillClose());
 }
 
-void RenderWidget::CloseInternal(bool close_synchronously) {
-  DCHECK(content::RenderThread::Get());
-  if (closing_)
-    return;
-  NotifyOnClose();
-  closing_ = true;
-
-  // Browser correspondence is no longer needed at this point.
-  if (routing_id_ != MSG_ROUTING_NONE) {
-    RenderThread::Get()->RemoveRoute(routing_id_);
-    SetHidden(false);
-    if (RenderThreadImpl::current())
-      RenderThreadImpl::current()->WidgetDestroyed();
-  }
-
-  if (close_synchronously) {
-    Close();
-  } else {
-    // If there is a Send call on the stack, then it could be dangerous to close
-    // now.  Post a task that only gets invoked when there are no nested message
-    // loops.
-    base::ThreadTaskRunnerHandle::Get()->PostNonNestableTask(
-        FROM_HERE, base::Bind(&RenderWidget::Close, this));
-  }
-
-  // Balances the AddRef taken when we called AddRoute.
-  Release();
-}
-
 void RenderWidget::closeWidgetSoon() {
   DCHECK(content::RenderThread::Get());
   if (is_swapped_out_) {
@@ -1685,6 +1674,8 @@ void RenderWidget::OnImeSetComposition(
   if (!ShouldHandleImeEvent())
     return;
   ImeEventGuard guard(this);
+  base::AutoReset<bool> handling_input_event_resetter(&handling_input_event_,
+                                                      true);
   if (!webwidget_->setComposition(
       text, WebVector<WebCompositionUnderline>(underlines),
       selection_start, selection_end)) {
@@ -1857,17 +1848,6 @@ void RenderWidget::SetHidden(bool hidden) {
     RenderThreadImpl::current()->WidgetRestored();
 }
 
-void RenderWidget::WillToggleFullscreen() {
-  if (!webwidget_)
-    return;
-
-  if (is_fullscreen_granted_) {
-    webwidget_->willExitFullScreen();
-  } else {
-    webwidget_->willEnterFullScreen();
-  }
-}
-
 void RenderWidget::DidToggleFullscreen() {
   if (!webwidget_)
     return;
@@ -1919,6 +1899,7 @@ void RenderWidget::FinishHandlingImeEvent() {
 }
 
 void RenderWidget::UpdateTextInputType() {
+  TRACE_EVENT0("renderer", "RenderWidget::UpdateTextInputType");
   ui::TextInputType new_type = GetTextInputType();
   if (IsDateTimeInput(new_type))
     return;  // Not considered as a text input field in WebKit/Chromium.
@@ -1950,6 +1931,7 @@ void RenderWidget::UpdateTextInputType() {
 #if defined(OS_ANDROID) || defined(USE_AURA)
 void RenderWidget::UpdateTextInputState(ShowIme show_ime,
                                         ChangeSource change_source) {
+  TRACE_EVENT0("renderer", "RenderWidget::UpdateTextInputState");
   if (handling_ime_event_)
     return;
   ui::TextInputType new_type = GetTextInputType();
@@ -2018,15 +2000,26 @@ void RenderWidget::GetSelectionBounds(gfx::Rect* focus, gfx::Rect* anchor) {
 }
 
 void RenderWidget::UpdateSelectionBounds() {
+  TRACE_EVENT0("renderer", "RenderWidget::UpdateSelectionBounds");
   if (!webwidget_)
     return;
   if (handling_ime_event_)
     return;
 
+#if defined(USE_AURA)
+  // TODO(mohsen): For now, always send explicit selection IPC notifications for
+  // Aura beucause composited selection updates are not working for webview tags
+  // which regresses IME inside webview. Remove this when composited selection
+  // updates are fixed for webviews. See, http://crbug.com/510568.
+  bool send_ipc = true;
+#else
   // With composited selection updates, the selection bounds will be reported
   // directly by the compositor, in which case explicit IPC selection
   // notifications should be suppressed.
-  if (!blink::WebRuntimeFeatures::isCompositedSelectionUpdateEnabled()) {
+  bool send_ipc =
+      !blink::WebRuntimeFeatures::isCompositedSelectionUpdateEnabled();
+#endif
+  if (send_ipc) {
     ViewHostMsg_SelectionBounds_Params params;
     GetSelectionBounds(&params.anchor_rect, &params.focus_rect);
     if (selection_anchor_rect_ != params.anchor_rect ||
@@ -2085,6 +2078,7 @@ void RenderWidget::UpdateCompositionInfo(bool should_update_range) {
   // TODO(yukawa): Start sending character bounds when the browser side
   // implementation becomes ready (crbug.com/424866).
 #else
+  TRACE_EVENT0("renderer", "RenderWidget::UpdateCompositionInfo");
   gfx::Range range = gfx::Range();
   if (should_update_range) {
     GetCompositionRange(&range);

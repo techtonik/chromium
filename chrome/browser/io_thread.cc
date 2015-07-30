@@ -84,6 +84,7 @@
 #include "net/url_request/ftp_protocol_handler.h"
 #include "net/url_request/static_http_user_agent_settings.h"
 #include "net/url_request/url_fetcher.h"
+#include "net/url_request/url_request_backoff_manager.h"
 #include "net/url_request/url_request_context.h"
 #include "net/url_request/url_request_context_getter.h"
 #include "net/url_request/url_request_job_factory_impl.h"
@@ -270,6 +271,7 @@ ConstructSystemRequestContext(IOThread::Globals* globals,
       globals->http_user_agent_settings.get());
   context->set_network_quality_estimator(
       globals->network_quality_estimator.get());
+  context->set_backoff_manager(globals->url_request_backoff_manager.get());
   return context;
 }
 
@@ -314,16 +316,14 @@ void ConfigureSpdyGlobalsFromUseSpdyArgument(const std::string& mode,
   static const char kDisableAltProtocols[] = "no-alt-protocols";
   static const char kInitialMaxConcurrentStreams[] = "init-max-streams";
 
-  std::vector<std::string> spdy_options;
-  base::SplitString(mode, ',', &spdy_options);
-
-  for (const std::string& element : spdy_options) {
-    std::vector<std::string> name_value;
-    base::SplitString(element, '=', &name_value);
-    const std::string& option =
-        name_value.size() > 0 ? name_value[0] : std::string();
-    const std::string value =
-        name_value.size() > 1 ? name_value[1] : std::string();
+  for (const base::StringPiece& element : base::SplitStringPiece(
+           mode, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL)) {
+    std::vector<base::StringPiece> name_value = base::SplitStringPiece(
+        element, "=", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
+    const base::StringPiece option =
+        name_value.size() > 0 ? name_value[0] : base::StringPiece();
+    const base::StringPiece value =
+        name_value.size() > 1 ? name_value[1] : base::StringPiece();
 
     if (option == kOff) {
       net::HttpStreamFactory::set_spdy_enabled(false);
@@ -335,7 +335,7 @@ void ConfigureSpdyGlobalsFromUseSpdyArgument(const std::string& mode,
     }
     if (option == kExclude) {
       globals->forced_spdy_exclusions.insert(
-          net::HostPortPair::FromURL(GURL(value)));
+          net::HostPortPair::FromURL(GURL(value.as_string())));
       continue;
     }
     if (option == kDisableCompression) {
@@ -353,7 +353,7 @@ void ConfigureSpdyGlobalsFromUseSpdyArgument(const std::string& mode,
         continue;
       }
     }
-    LOG(DFATAL) << "Unrecognized spdy option: " << option;
+    LOG(DFATAL) << "Unrecognized spdy option: " << option.as_string();
   }
 }
 
@@ -688,13 +688,10 @@ void IOThread::Init() {
   if (command_line.HasSwitch(switches::kCertificateTransparencyLog)) {
     std::string switch_value = command_line.GetSwitchValueASCII(
         switches::kCertificateTransparencyLog);
-    std::vector<std::string> logs;
-    base::SplitString(switch_value, ',', &logs);
-    for (std::vector<std::string>::iterator it = logs.begin(); it != logs.end();
-         ++it) {
-      const std::string& curr_log = *it;
-      std::vector<std::string> log_metadata;
-      base::SplitString(curr_log, ':', &log_metadata);
+    for (const base::StringPiece& curr_log : base::SplitStringPiece(
+             switch_value, ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL)) {
+      std::vector<std::string> log_metadata = base::SplitString(
+          curr_log, ":", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
       CHECK_GE(log_metadata.size(), 3u)
           << "CT log metadata missing: Switch format is "
           << "'description:base64_key:url_without_schema'.";
@@ -868,6 +865,14 @@ void IOThread::Init() {
 
   globals_->proxy_script_fetcher_context.reset(
       ConstructProxyScriptFetcherContext(globals_, net_log_));
+
+  const version_info::Channel channel = chrome::VersionInfo::GetChannel();
+  if (channel == version_info::Channel::UNKNOWN ||
+      channel == version_info::Channel::CANARY ||
+      channel == version_info::Channel::DEV) {
+    globals_->url_request_backoff_manager.reset(
+        new net::URLRequestBackoffManager());
+  }
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
   // Start observing Keychain events. This needs to be done on the UI thread,
@@ -1128,7 +1133,7 @@ void IOThread::InitializeNetworkSessionParamsFromGlobals(
       &params->alternative_service_probability_threshold);
 
   globals.enable_quic.CopyToIfSet(&params->enable_quic);
-  globals.disable_insecure_quic.CopyToIfSet(&params->disable_insecure_quic);
+  globals.enable_insecure_quic.CopyToIfSet(&params->enable_insecure_quic);
   globals.enable_quic_for_proxies.CopyToIfSet(&params->enable_quic_for_proxies);
   globals.quic_always_require_handshake_confirmation.CopyToIfSet(
       &params->quic_always_require_handshake_confirmation);
@@ -1266,8 +1271,8 @@ void IOThread::ConfigureQuicGlobals(
       command_line, quic_trial_group, quic_allowed_by_policy);
   globals->enable_quic_for_proxies.set(enable_quic_for_proxies);
   if (enable_quic) {
-    globals->disable_insecure_quic.set(
-        ShouldDisableInsecureQuic(quic_trial_params));
+    globals->enable_insecure_quic.set(
+        ShouldEnableInsecureQuic(command_line, quic_trial_params));
     globals->quic_always_require_handshake_confirmation.set(
         ShouldQuicAlwaysRequireHandshakeConfirmation(quic_trial_params));
     globals->quic_disable_connection_pooling.set(
@@ -1380,10 +1385,14 @@ bool IOThread::ShouldEnableQuicForDataReductionProxy() {
 }
 
 // static
-bool IOThread::ShouldDisableInsecureQuic(
+bool IOThread::ShouldEnableInsecureQuic(
+    const base::CommandLine& command_line,
     const VariationParameters& quic_trial_params) {
+  if (command_line.HasSwitch(switches::kEnableInsecureQuic))
+    return true;
+
   return base::LowerCaseEqualsASCII(
-      GetVariationParam(quic_trial_params, "disable_insecure_quic"),
+      GetVariationParam(quic_trial_params, "enable_insecure_quic"),
       "true");
 }
 

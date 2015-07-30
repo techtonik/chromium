@@ -108,6 +108,12 @@ config("compiler") {
       "/FS",  # Preserve previous PDB behavior.
     ]
 
+    # Force C/C++ mode for the given GN detected file type. This is necessary
+    # for precompiled headers where the same source file is compiled in both
+    # modes.
+    cflags_c += [ "/TC" ]
+    cflags_cc += [ "/TP" ]
+
     # Building with Clang on Windows is a work in progress and very
     # experimental. See crbug.com/82385.
     # Keep this in sync with the similar block in build/common.gypi
@@ -130,10 +136,6 @@ config("compiler") {
         cflags += [ "-m64" ]
       }
 
-      # TODO(thakis): Remove this once llvm.org/PR24167 is fixed.
-      if (is_asan) {
-        cflags += [ "/fallback" ]
-      }
       if (exec_script("//build/win/use_ansi_codes.py", [], "trim string") ==
           "True") {
         cflags += [
@@ -142,6 +144,12 @@ config("compiler") {
           "-fansi-escape-codes",
         ]
       }
+    }
+
+    if (is_syzyasan) {
+      # SyzyAsan needs /PROFILE turned on to produce appropriate pdbs.
+      assert(!is_win_fastlink, "/PROFILE and /DEBUG:FASTLINK are incompatible")
+      ldflags += [ "/PROFILE" ]
     }
   } else {
     # Common GCC compiler flags setup.
@@ -614,8 +622,15 @@ config("runtime_library") {
       }
     }
   } else {
-    # Static CRT.
-    if (is_win) {
+    if (is_win && current_os != "win") {
+      # WindowsRT: use the dynamic CRT.
+      if (is_debug) {
+        cflags += [ "/MDd" ]
+      } else {
+        cflags += [ "/MD" ]
+      }
+    } else if (is_win) {
+      # Desktop Windows: static CRT.
       if (is_debug) {
         cflags += [ "/MTd" ]
       } else {
@@ -710,18 +725,11 @@ config("runtime_library") {
 default_warning_flags = []
 default_warning_flags_cc = []
 if (is_win) {
-  # TODO(thakis): Make this unconditional once llvm.org/PR24167 is fixed.
-  if (!is_clang || !is_asan) {
-    default_warning_flags += [ "/WX" ]  # Treat warnings as errors.
-  }
-
   default_warning_flags += [
-    # Warnings permanently disabled:
+    # Treat warnings as errors.
+    "/WX",
 
-    # TODO(GYP) The GYP build doesn't have this globally enabled but disabled
-    # for a bunch of individual targets. Re-enable this globally when those
-    # targets are fixed.
-    "/wd4018",  # Comparing signed and unsigned values.
+    # Warnings permanently disabled:
 
     # C4127: conditional expression is constant
     # This warning can in theory catch dead code and other problems, but
@@ -787,6 +795,7 @@ if (is_win) {
     "/wd4510",  # Default constructor could not be generated.
     "/wd4512",  # Assignment operator could not be generated.
     "/wd4610",  # Class can never be instantiated, constructor required.
+    "/wd4995",  # 'X': name was marked as #pragma deprecated
     "/wd4996",  # Deprecated function warning.
   ]
 
@@ -1239,7 +1248,14 @@ config("symbols") {
     } else {
       cflags = [ "/Zi" ]  # Produce PDB file, no edit and continue.
     }
-    ldflags = [ "/DEBUG" ]
+    if (is_win_fastlink) {
+      # Tell VS 2015+ to create a PDB that references debug
+      # information in .obj and .lib files instead of copying
+      # it all. This flag is incompatible with /PROFILE
+      ldflags = [ "/DEBUG:FASTLINK" ]
+    } else {
+      ldflags = [ "/DEBUG" ]
+    }
   } else {
     cflags = [ "-g2" ]
     if (use_debug_fission) {
@@ -1251,7 +1267,14 @@ config("symbols") {
 config("minimal_symbols") {
   if (is_win) {
     # Linker symbols for backtraces only.
-    ldflags = [ "/DEBUG" ]
+    if (is_win_fastlink) {
+      # Tell VS 2015+ to create a PDB that references debug
+      # information in .obj and .lib files instead of copying
+      # it all. This flag is incompatible with /PROFILE
+      ldflags = [ "/DEBUG:FASTLINK" ]
+    } else {
+      ldflags = [ "/DEBUG" ]
+    }
   } else {
     cflags = [ "-g1" ]
     if (use_debug_fission) {

@@ -55,6 +55,7 @@ Polymer({
 
     /**
      * Array of properties to pass to the property list.
+     * @type {!Array<string>}
      */
     ipConfigFields_: {
       type: Array,
@@ -109,9 +110,11 @@ Polymer({
     if (this.automatic || !this.savedStaticIp_) {
       // Save the static IP configuration when switching to automatic.
       this.savedStaticIp_ = this.ipConfig.ipv4;
+      var configType =
+          this.automatic ? CrOnc.IPConfigType.DHCP : CrOnc.IPConfigType.STATIC;
       this.fire('ip-change', {
         field: 'IPAddressConfigType',
-        value: this.automatic ? 'DHCP' : 'Static'
+        value: configType
       });
     } else {
       // Restore the saved static IP configuration.
@@ -191,8 +194,6 @@ Polymer({
    * @private
    */
   onIPChange_: function(event) {
-    event.stopPropagation();
-
     var field = event.detail.field;
     var value = event.detail.value;
     // Note: |field| includes the 'ipv4.' prefix.

@@ -12,7 +12,7 @@
 #include "extensions/common/permissions/permissions_data.h"
 #include "extensions/common/permissions/usb_device_permission.h"
 
-namespace usb = extensions::core_api::usb;
+namespace usb = extensions::api::usb;
 
 using content::BrowserThread;
 using device::UsbDevice;
@@ -27,7 +27,8 @@ namespace {
 bool WillDispatchDeviceEvent(scoped_refptr<UsbDevice> device,
                              content::BrowserContext* browser_context,
                              const Extension* extension,
-                             base::ListValue* event_args) {
+                             base::ListValue* event_args,
+                             const base::DictionaryValue* listener_filter) {
   // Check install-time and optional permissions.
   UsbDevicePermission::CheckParam param(
       device->vendor_id(), device->product_id(),

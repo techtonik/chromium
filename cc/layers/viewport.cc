@@ -43,11 +43,9 @@ Viewport::ScrollResult Viewport::ScrollBy(const gfx::Vector2dF& delta,
 
   gfx::Vector2dF pending_content_delta = content_delta;
 
-  if (OuterScrollLayer()) {
-    pending_content_delta -=
-        host_impl_->ScrollLayer(OuterScrollLayer(), pending_content_delta,
-                                viewport_point, is_direct_manipulation);
-  }
+  pending_content_delta -=
+      host_impl_->ScrollLayer(OuterScrollLayer(), pending_content_delta,
+                              viewport_point, is_direct_manipulation);
 
   ScrollResult result;
 
@@ -157,16 +155,6 @@ gfx::Vector2dF Viewport::AdjustOverscroll(const gfx::Vector2dF& delta) const {
     adjusted.set_x(0.0f);
   if (std::abs(adjusted.y()) < kEpsilon)
     adjusted.set_y(0.0f);
-
-  // Disable overscroll on axes which are impossible to scroll.
-  if (host_impl_->settings().report_overscroll_only_for_scrollable_axes) {
-    if (std::abs(MaxTotalScrollOffset().x()) <= kEpsilon ||
-        !InnerScrollLayer()->user_scrollable_horizontal())
-      adjusted.set_x(0.0f);
-    if (std::abs(MaxTotalScrollOffset().y()) <= kEpsilon ||
-        !InnerScrollLayer()->user_scrollable_vertical())
-      adjusted.set_y(0.0f);
-  }
 
   return adjusted;
 }

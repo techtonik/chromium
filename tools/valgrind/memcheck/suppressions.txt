@@ -192,6 +192,13 @@
    fun:_mesa_CompileShaderARB
    fun:shared_dispatch_stub_529
 }
+{
+   bug_515618
+   Memcheck:Unaddressable
+   fun:do_lookup_x
+   obj:*
+   fun:_dl_lookup_symbol_x
+}
 
 #-----------------------------------------------------------------------
 # 2. intentional unit test errors, or stuff that is somehow a false positive
@@ -3139,10 +3146,10 @@
    fun:_ZN8app_list4test12_GLOBAL__N_122AppListViewTestContext16RunStartPageTestEv
 }
 {
-   bug_415092
+   bug_512466
    Memcheck:Leak
    fun:_Znw*
-   fun:_ZN4base22PosixDynamicThreadPool7AddTaskEPNS_11PendingTaskE
+   fun:_ZN4base22PosixDynamicThreadPool13AddTaskNoLockEPNS_11PendingTaskE
    fun:_ZN4base22PosixDynamicThreadPool8PostTaskERKN15tracked_objects8LocationERKNS_8CallbackIFvvEEE
    fun:_ZN4base12_GLOBAL__N_114WorkerPoolImpl8PostTaskERKN15tracked_objects8LocationERKNS_8CallbackIFvvEEEb
    fun:_ZN4base10WorkerPool8PostTaskERKN15tracked_objects8LocationERKNS_8CallbackIFvvEEEb
@@ -3502,17 +3509,6 @@
    fun:_ZN7content26ResourceDispatcherHostImpl23OnRenderViewHostCreatedEiibb
 }
 {
-   bug_484882
-   Memcheck:Uninitialized
-   fun:_ZNK8SkStroke10strokePathERK6SkPathPS0_
-   fun:_ZNK11SkStrokeRec11applyToPathEP6SkPathRKS0_
-   fun:_ZNK7SkPaint11getFillPathERK6SkPathPS0_PK6SkRectf
-   fun:_ZNK7SkPaint11getFillPathERK6SkPathPS0_
-   fun:_ZNK5blink4Path18strokeBoundingRectERKNS_10StrokeDataE
-   fun:_ZNK5blink14LayoutSVGShape26calculateStrokeBoundingBoxEv
-   fun:_ZN5blink14LayoutSVGShape22updateShapeFromElementEv
-}
-{
    bug_487706
    Memcheck:Leak
    fun:calloc
@@ -3530,15 +3526,68 @@
    Memcheck:Uninitialized
    fun:_ZN5blink17CSSPropertyParser9validUnitEPNS_14CSSParserValueENS0_5UnitsENS_13CSSParserModeENS0_31ReleaseParsedCalcValueConditionE
    fun:_ZN5blink17CSSPropertyParser9validUnitEPNS_14CSSParserValueENS0_5UnitsENS0_31ReleaseParsedCalcValueConditionE
-   fun:_ZN5blink17CSSPropertyParser18validWidthOrHeightEPNS_14CSSParserValueENS0_5UnitsE
+   ...
    fun:_ZN5blink17CSSPropertyParser10parseValueENS_13CSSPropertyIDEb
    fun:_ZN5blink17CSSPropertyParser10parseValueENS_13CSSPropertyIDEbPNS_18CSSParserValueListERKNS_16CSSParserContextERN3WTF6VectorINS_11CSSPropertyELm256ENS7_16DefaultAllocatorEEENS_13StyleRuleBase4TypeE
    fun:_ZN5blink13CSSParserImpl23consumeDeclarationValueENS_19CSSParserTokenRangeENS_13CSSPropertyIDEbNS_13StyleRuleBase4TypeE
-   fun:_ZN5blink13CSSParserImpl18consumeDeclarationENS_19CSSParserTokenRangeENS_13StyleRuleBase4TypeE
 }
 {
-   bug_509513
+   bug_514434
+   Memcheck:Leak
+   fun:malloc
+   fun:__netlink_request
+   fun:getifaddrs_internal
+   fun:getifaddrs
+   fun:_ZN3net25HaveOnlyLoopbackAddressesEv
+   fun:_ZN3net16HostResolverImpl16LoopbackProbeJob7DoProbeEv
+}
+{
+   bug_514439
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN8IOThread34InitSystemRequestContextOnIOThreadEv
+}
+{
+   bug_514443
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZNSs4_Rep9_S_createEmmRKSaIcE
+   fun:_ZNSs9_M_mutateEmmm
+   fun:_ZNSs15_M_replace_safeEmmPKcm
+   fun:_ZN4base8internal13CopyToStringTISsEEvRKNS_16BasicStringPieceIT_EEPS3_
+   fun:_ZN4base8internal12CopyToStringERKNS_16BasicStringPieceISsEEPSs
+   fun:_ZNK4base16BasicStringPieceISsE12CopyToStringEPSs
+   fun:_ZN4base8FilePathC1ENS_16BasicStringPieceISsEE
+}
+{
+   bug_514868
+   Memcheck:Leak
+   fun:_Znw*
+   fun:_ZN4base12_GLOBAL__N_112CreateThreadEmbPNS_14PlatformThread8DelegateEPNS_20PlatformThreadHandleENS_14ThreadPriorityE
+   fun:_ZN4base14PlatformThread18CreateWithPriorityEmPNS0_8DelegateEPNS_20PlatformThreadHandleENS_14ThreadPriorityE
+   fun:_ZN4base6Thread16StartWithOptionsERKNS0_7OptionsE
+   fun:_ZN7content17BrowserThreadImpl16StartWithOptionsERKN4base6Thread7OptionsE
+   fun:_ZN7content17TestBrowserThread13StartIOThreadEv
+   fun:_ZN22BrowserProcessImplTest21StartSecondaryThreadsEv
+   fun:_ZN37BrowserProcessImplTest_LifeCycle_Test8TestBodyEv
+}
+{
+   bug_515263
    Memcheck:Uninitialized
-   fun:_ZNK5blink9FillLayer31computeCachedPropertiesIfNeededEv
-   fun:_ZNK5blink9FillLayer29thisOrNextLayersUseContentBoxEv
+   fun:_ZNK5blink6MemberINS_15ResourceFetcherEE3getEv
+   fun:_ZN5blink13VisitorHelperINS_27InlinedGlobalMarkingVisitorEE5traceINS_15ResourceFetcherEEEvRKNS_6MemberIT_EE
+   fun:_ZN5blink14ResourceLoader9traceImplINS_27InlinedGlobalMarkingVisitorEEEvT_
+   fun:_ZN5blink14ResourceLoader5traceENS_27InlinedGlobalMarkingVisitorE
+   fun:_ZN5blink10TraceTraitINS_14ResourceLoaderEE5traceEPNS_7VisitorEPv
+   fun:_ZN5blink13CallbackStack4Item4callEPNS_7VisitorE
+}
+{
+   bug_515266
+   Memcheck:Uninitialized
+   fun:_ZN3WTF16VectorBufferBaseIN5blink6MemberINS1_11MessagePortEEELb1ENS1_13HeapAllocatorEE6bufferEv
+   fun:_ZN3WTF6VectorIN5blink6MemberINS1_11MessagePortEEELm1ENS1_13HeapAllocatorEE5traceINS1_27InlinedGlobalMarkingVisitorEEEvT_
+   fun:_ZN5blink10TraceTraitIN3WTF6VectorINS_6MemberINS_11MessagePortEEELm1ENS_13HeapAllocatorEEEE5traceEPNS_7VisitorEPv
+   fun:_ZN5blink13CallbackStack4Item4callEPNS_7VisitorE
+   fun:_ZN5blink4Heap25popAndInvokeTraceCallbackEPNS_7VisitorE
+   fun:_ZN5blink4Heap19processMarkingStackEPNS_7VisitorE
 }

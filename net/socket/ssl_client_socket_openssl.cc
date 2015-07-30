@@ -954,11 +954,6 @@ int SSLClientSocketOpenSSL::Init() {
   if (cert_verifier_->SupportsOCSPStapling())
     SSL_enable_ocsp_stapling(ssl_);
 
-  // Enable fastradio padding.
-  SSL_enable_fastradio_padding(ssl_,
-                               ssl_config_.fastradio_padding_enabled &&
-                                   ssl_config_.fastradio_padding_eligible);
-
   // By default, renegotiations are rejected. After the initial handshake
   // completes, some application protocols may re-enable it.
   SSL_set_reject_peer_renegotiations(ssl_, 1);
@@ -1261,10 +1256,10 @@ int SSLClientSocketOpenSSL::DoVerifyCertComplete(int result) {
       (result == OK ||
        (IsCertificateError(result) && IsCertStatusMinorError(cert_status))) &&
       !transport_security_state_->CheckPublicKeyPins(
-          host_and_port_.host(),
-          server_cert_verify_result_.is_issued_by_known_root,
-          server_cert_verify_result_.public_key_hashes,
-          &pinning_failure_log_)) {
+          host_and_port_, server_cert_verify_result_.is_issued_by_known_root,
+          server_cert_verify_result_.public_key_hashes, server_cert_.get(),
+          server_cert_verify_result_.verified_cert.get(),
+          TransportSecurityState::ENABLE_PIN_REPORTS, &pinning_failure_log_)) {
     result = ERR_SSL_PINNED_KEY_NOT_IN_CERT_CHAIN;
   }
 

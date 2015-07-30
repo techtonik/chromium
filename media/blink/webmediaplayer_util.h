@@ -46,7 +46,7 @@ ConvertToEmeInitDataType(blink::WebEncryptedMediaInitDataType init_data_type);
 blink::WebEncryptedMediaInitDataType MEDIA_EXPORT
 ConvertToWebInitDataType(EmeInitDataType init_data_type);
 
-typedef blink::WebCallbacks<void, blink::WebSetSinkIdError> WebSetSinkIdCB;
+typedef blink::WebCallbacks<void, blink::WebSetSinkIdError*> WebSetSinkIdCB;
 
 // Wraps a WebSetSinkIdCB into a media::SwitchOutputDeviceCB
 // and binds it to the current thread

@@ -7,8 +7,8 @@
 #include <vector>
 
 #include "ash/content/display/screen_orientation_controller_chromeos.h"
-#include "ash/display/display_controller.h"
 #include "ash/display/display_manager.h"
+#include "ash/display/window_tree_host_manager.h"
 #include "ash/shell.h"
 #include "ash/system/chromeos/devicetype_utils.h"
 #include "ash/system/system_notifier.h"
@@ -94,9 +94,7 @@ base::string16 GetAllDisplayInfo() {
   int64 internal_id = gfx::Display::kInvalidDisplayID;
   // Make sure to show the internal display first.
   if (!display_manager->IsInUnifiedMode() &&
-      gfx::Display::HasInternalDisplay() &&
-      gfx::Display::InternalDisplayId() ==
-          display_manager->first_display_id()) {
+      gfx::Display::IsInternalDisplayId(display_manager->first_display_id())) {
     internal_id = display_manager->first_display_id();
     lines.push_back(GetDisplayInfoLine(internal_id));
   }
@@ -193,7 +191,7 @@ class DisplayView : public ActionableView {
     int64 external_id = gfx::Display::kInvalidDisplayID;
     for (size_t i = 0; i < display_manager->GetNumDisplays(); ++i) {
       int64 id = display_manager->GetDisplayAt(i).id();
-      if (id != gfx::Display::InternalDisplayId()) {
+      if (!gfx::Display::IsInternalDisplayId(id)) {
         external_id = id;
         break;
       }
@@ -253,7 +251,7 @@ class DisplayView : public ActionableView {
 
     int64 primary_id = Shell::GetScreen()->GetPrimaryDisplay().id();
     if (gfx::Display::HasInternalDisplay() &&
-        !(gfx::Display::InternalDisplayId() == primary_id)) {
+        !(gfx::Display::IsInternalDisplayId(primary_id))) {
       if (additional_message_out) {
         *additional_message_out = ash::SubstituteChromeOSDeviceType(
             IDS_ASH_STATUS_TRAY_DISPLAY_DOCKED_DESCRIPTION);
@@ -295,12 +293,12 @@ class DisplayView : public ActionableView {
 TrayDisplay::TrayDisplay(SystemTray* system_tray)
     : SystemTrayItem(system_tray),
       default_(NULL) {
-  Shell::GetInstance()->display_controller()->AddObserver(this);
+  Shell::GetInstance()->window_tree_host_manager()->AddObserver(this);
   UpdateDisplayInfo(NULL);
 }
 
 TrayDisplay::~TrayDisplay() {
-  Shell::GetInstance()->display_controller()->RemoveObserver(this);
+  Shell::GetInstance()->window_tree_host_manager()->RemoveObserver(this);
 }
 
 void TrayDisplay::UpdateDisplayInfo(TrayDisplay::DisplayInfoMap* old_info) {

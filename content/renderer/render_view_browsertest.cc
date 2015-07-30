@@ -427,7 +427,8 @@ TEST_F(RenderViewImplTest, DISABLED_OnNavStateChanged) {
 
   // Change the value of the input. We should have gotten an update state
   // notification. We need to spin the message loop to catch this update.
-  ExecuteJavaScript("document.getElementById('elt_text').value = 'foo';");
+  ExecuteJavaScriptForTests(
+      "document.getElementById('elt_text').value = 'foo';");
   ProcessPendingMessages();
   EXPECT_TRUE(render_thread_->sink().GetUniqueMessageMatching(
       ViewHostMsg_UpdateState::ID));
@@ -764,8 +765,7 @@ TEST_F(RenderViewImplTest, ReloadWhileSwappedOut) {
 TEST_F(RenderViewImplTest, OriginReplicationForSwapOut) {
   // This test should only run with --site-per-process, since origin
   // replication only happens in that mode.
-  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess))
+  if (!AreAllSitesIsolatedForTesting())
     return;
 
   LoadHTML(
@@ -775,10 +775,10 @@ TEST_F(RenderViewImplTest, OriginReplicationForSwapOut) {
   TestRenderFrame* child_frame = static_cast<TestRenderFrame*>(
       RenderFrame::FromWebFrame(web_frame->firstChild()));
 
-  // Swap the child frame out and pass a serialized origin to be set for
+  // Swap the child frame out and pass a replicated origin to be set for
   // WebRemoteFrame.
   content::FrameReplicationState replication_state;
-  replication_state.origin = url::DeprecatedSerializedOrigin("http://foo.com");
+  replication_state.origin = url::Origin(GURL("http://foo.com"));
   child_frame->SwapOut(kProxyRoutingId, true, replication_state);
 
   // The child frame should now be a WebRemoteFrame.
@@ -787,16 +787,40 @@ TEST_F(RenderViewImplTest, OriginReplicationForSwapOut) {
   // Expect the origin to be updated properly.
   blink::WebSecurityOrigin origin = web_frame->firstChild()->securityOrigin();
   EXPECT_EQ(origin.toString(),
-            WebString::fromUTF8(replication_state.origin.string()));
+            WebString::fromUTF8(replication_state.origin.Serialize()));
 
   // Now, swap out the second frame using a unique origin and verify that it is
   // replicated correctly.
-  replication_state.origin = url::DeprecatedSerializedOrigin();
+  replication_state.origin = url::Origin();
   TestRenderFrame* child_frame2 = static_cast<TestRenderFrame*>(
       RenderFrame::FromWebFrame(web_frame->lastChild()));
   child_frame2->SwapOut(kProxyRoutingId + 1, true, replication_state);
   EXPECT_TRUE(web_frame->lastChild()->isWebRemoteFrame());
   EXPECT_TRUE(web_frame->lastChild()->securityOrigin().isUnique());
+}
+
+// Verify that DidFlushPaint doesn't crash if called after a RenderView is
+// swapped out. See https://crbug.com/513552.
+TEST_F(RenderViewImplTest, PaintAfterSwapOut) {
+  // Create a new main frame RenderFrame so that we don't interfere with the
+  // shutdown of frame() in RenderViewTest.TearDown.
+  blink::WebURLRequest popup_request(GURL("http://foo.com"));
+  blink::WebView* new_web_view = view()->createView(
+      GetMainFrame(), popup_request, blink::WebWindowFeatures(), "foo",
+      blink::WebNavigationPolicyNewForegroundTab, false);
+  RenderViewImpl* new_view = RenderViewImpl::FromWebView(new_web_view);
+
+  // Respond to a swap out request.
+  TestRenderFrame* new_main_frame =
+      static_cast<TestRenderFrame*>(new_view->GetMainRenderFrame());
+  new_main_frame->SwapOut(kProxyRoutingId, true,
+                          content::FrameReplicationState());
+
+  // Simulate getting painted after swapping out.
+  new_view->DidFlushPaint();
+
+  new_view->Close();
+  new_view->Release();
 }
 
 // Test that we get the correct UpdateState message when we go back twice
@@ -963,7 +987,7 @@ TEST_F(RenderViewImplTest, OnImeTypeChanged) {
   for (int i = 0; i < kRepeatCount; i++) {
     // Move the input focus to the first <input> element, where we should
     // activate IMEs.
-    ExecuteJavaScript("document.getElementById('test1').focus();");
+    ExecuteJavaScriptForTests("document.getElementById('test1').focus();");
     ProcessPendingMessages();
     render_thread_->sink().ClearMessages();
 
@@ -983,7 +1007,7 @@ TEST_F(RenderViewImplTest, OnImeTypeChanged) {
 
     // Move the input focus to the second <input> element, where we should
     // de-activate IMEs.
-    ExecuteJavaScript("document.getElementById('test2').focus();");
+    ExecuteJavaScriptForTests("document.getElementById('test2').focus();");
     ProcessPendingMessages();
     render_thread_->sink().ClearMessages();
 
@@ -1033,7 +1057,7 @@ TEST_F(RenderViewImplTest, OnImeTypeChanged) {
 // the window focus while composing a CJK text. To handle such complicated
 // cases, this test should not only call IME-related functions in the
 // RenderWidget class, but also call some RenderWidget members, e.g.
-// ExecuteJavaScript(), RenderWidget::OnSetFocus(), etc.
+// ExecuteJavaScriptForTests(), RenderWidget::OnSetFocus(), etc.
 TEST_F(RenderViewImplTest, ImeComposition) {
   enum ImeCommand {
     IME_INITIALIZE,
@@ -1108,7 +1132,7 @@ TEST_F(RenderViewImplTest, ImeComposition) {
                 "<div id=\"test1\" contenteditable=\"true\"></div>"
                 "</body>"
                 "</html>");
-        ExecuteJavaScript("document.getElementById('test1').focus();");
+        ExecuteJavaScriptForTests("document.getElementById('test1').focus();");
         break;
 
       case IME_SETINPUTMODE:
@@ -1186,17 +1210,18 @@ TEST_F(RenderViewImplTest, OnSetTextDirection) {
   };
   for (size_t i = 0; i < arraysize(kTextDirection); ++i) {
     // Set the text direction of the <textarea> element.
-    ExecuteJavaScript("document.getElementById('test').focus();");
+    ExecuteJavaScriptForTests("document.getElementById('test').focus();");
     view()->OnSetTextDirection(kTextDirection[i].direction);
 
     // Write the values of its DOM 'dir' attribute and its CSS 'direction'
     // property to the <div> element.
-    ExecuteJavaScript("var result = document.getElementById('result');"
-                      "var node = document.getElementById('test');"
-                      "var style = getComputedStyle(node, null);"
-                      "result.innerText ="
-                      "    node.getAttribute('dir') + ',' +"
-                      "    style.getPropertyValue('direction');");
+    ExecuteJavaScriptForTests(
+        "var result = document.getElementById('result');"
+        "var node = document.getElementById('test');"
+        "var style = getComputedStyle(node, null);"
+        "result.innerText ="
+        "    node.getAttribute('dir') + ',' +"
+        "    style.getPropertyValue('direction');");
 
     // Copy the document content to std::wstring and compare with the
     // expected result.
@@ -1248,7 +1273,7 @@ TEST_F(RenderViewImplTest, OnHandleKeyboardEvent) {
            "</div>"
            "</body>"
            "</html>");
-  ExecuteJavaScript("document.getElementById('test').focus();");
+  ExecuteJavaScriptForTests("document.getElementById('test').focus();");
   render_thread_->sink().ClearMessages();
 
   static const MockKeyboard::Layout kLayouts[] = {
@@ -1341,8 +1366,8 @@ TEST_F(RenderViewImplTest, OnHandleKeyboardEvent) {
         // text created from a virtual-key code, a character code, and the
         // modifier-key status.
         const int kMaxOutputCharacters = 1024;
-        std::string output = base::UTF16ToUTF8(
-            GetMainFrame()->contentAsText(kMaxOutputCharacters));
+        std::string output = base::UTF16ToUTF8(base::StringPiece16(
+            GetMainFrame()->contentAsText(kMaxOutputCharacters)));
         EXPECT_EQ(expected_result, output);
       }
     }
@@ -1515,7 +1540,7 @@ TEST_F(RenderViewImplTest, MAYBE_InsertCharacters) {
              "</div>"
              "</body>"
              "</html>");
-    ExecuteJavaScript("document.getElementById('test').focus();");
+    ExecuteJavaScriptForTests("document.getElementById('test').focus();");
     render_thread_->sink().ClearMessages();
 
     // For each key code, we send three keyboard events.
@@ -1735,10 +1760,13 @@ TEST_F(RenderViewImplTest, GetCompositionCharacterBoundsTest) {
   // http://crbug.com/304193
   if (base::win::GetVersion() < base::win::VERSION_VISTA)
     return;
+  // http://crbug.com/508747
+  if (base::win::GetVersion() >= base::win::VERSION_WIN10)
+    return;
 #endif
 
   LoadHTML("<textarea id=\"test\"></textarea>");
-  ExecuteJavaScript("document.getElementById('test').focus();");
+  ExecuteJavaScriptForTests("document.getElementById('test').focus();");
 
   const base::string16 empty_string;
   const std::vector<blink::WebCompositionUnderline> empty_underline;
@@ -1840,7 +1868,7 @@ TEST_F(RenderViewImplTest, SetEditableSelectionAndComposition) {
            "<input id=\"test1\" value=\"some test text hello\"></input>"
            "</body>"
            "</html>");
-  ExecuteJavaScript("document.getElementById('test1').focus();");
+  ExecuteJavaScriptForTests("document.getElementById('test1').focus();");
   frame()->SetEditableSelectionOffsets(4, 8);
   const std::vector<blink::WebCompositionUnderline> empty_underline;
   frame()->SetCompositionFromExistingText(7, 10, empty_underline);
@@ -1865,7 +1893,7 @@ TEST_F(RenderViewImplTest, OnExtendSelectionAndDelete) {
            "<input id=\"test1\" value=\"abcdefghijklmnopqrstuvwxyz\"></input>"
            "</body>"
            "</html>");
-  ExecuteJavaScript("document.getElementById('test1').focus();");
+  ExecuteJavaScriptForTests("document.getElementById('test1').focus();");
   frame()->SetEditableSelectionOffsets(10, 10);
   frame()->ExtendSelectionAndDelete(3, 4);
   blink::WebTextInputInfo info = view()->webview()->textInputInfo();
@@ -1907,8 +1935,8 @@ TEST_F(RenderViewImplTest, NavigateSubframe) {
   // Copy the document content to std::wstring and compare with the
   // expected result.
   const int kMaxOutputCharacters = 256;
-  std::string output = base::UTF16ToUTF8(
-      GetMainFrame()->contentAsText(kMaxOutputCharacters));
+  std::string output = base::UTF16ToUTF8(base::StringPiece16(
+      GetMainFrame()->contentAsText(kMaxOutputCharacters)));
   EXPECT_EQ(output, "hello \n\nworld");
 }
 
@@ -1938,7 +1966,7 @@ TEST_F(RenderViewImplTest, MessageOrderInDidChangeSelection) {
   LoadHTML("<textarea id=\"test\"></textarea>");
 
   view()->handling_input_event_ = true;
-  ExecuteJavaScript("document.getElementById('test').focus();");
+  ExecuteJavaScriptForTests("document.getElementById('test').focus();");
 
   bool is_input_type_called = false;
   bool is_selection_called = false;
@@ -2029,8 +2057,8 @@ TEST_F(RendererErrorPageTest, MAYBE_Suppresses) {
   main_frame->didFailProvisionalLoad(web_frame, error,
                                      blink::WebStandardCommit);
   const int kMaxOutputCharacters = 22;
-  EXPECT_EQ("",
-            base::UTF16ToASCII(web_frame->contentAsText(kMaxOutputCharacters)));
+  EXPECT_EQ("", base::UTF16ToASCII(
+      base::StringPiece16(web_frame->contentAsText(kMaxOutputCharacters))));
 }
 
 #if defined(OS_ANDROID)
@@ -2064,7 +2092,8 @@ TEST_F(RendererErrorPageTest, MAYBE_DoesNotSuppress) {
   FrameLoadWaiter(main_frame).Wait();
   const int kMaxOutputCharacters = 22;
   EXPECT_EQ("A suffusion of yellow.",
-            base::UTF16ToASCII(web_frame->contentAsText(kMaxOutputCharacters)));
+            base::UTF16ToASCII(base::StringPiece16(
+                web_frame->contentAsText(kMaxOutputCharacters))));
 }
 
 #if defined(OS_ANDROID)
@@ -2097,7 +2126,8 @@ TEST_F(RendererErrorPageTest, MAYBE_HttpStatusCodeErrorWithEmptyBody) {
   FrameLoadWaiter(main_frame).Wait();
   const int kMaxOutputCharacters = 22;
   EXPECT_EQ("A suffusion of yellow.",
-            base::UTF16ToASCII(web_frame->contentAsText(kMaxOutputCharacters)));
+            base::UTF16ToASCII(base::StringPiece16(
+                web_frame->contentAsText(kMaxOutputCharacters))));
 }
 
 // Ensure the render view sends favicon url update events correctly.
@@ -2126,7 +2156,7 @@ TEST_F(RenderViewImplTest, FocusElementCallsFocusedNodeChanged) {
   LoadHTML("<input id='test1' value='hello1'></input>"
            "<input id='test2' value='hello2'></input>");
 
-  ExecuteJavaScript("document.getElementById('test1').focus();");
+  ExecuteJavaScriptForTests("document.getElementById('test1').focus();");
   const IPC::Message* msg1 = render_thread_->sink().GetFirstMessageMatching(
       ViewHostMsg_FocusedNodeChanged::ID);
   EXPECT_TRUE(msg1);
@@ -2136,7 +2166,7 @@ TEST_F(RenderViewImplTest, FocusElementCallsFocusedNodeChanged) {
   EXPECT_TRUE(base::get<0>(params));
   render_thread_->sink().ClearMessages();
 
-  ExecuteJavaScript("document.getElementById('test2').focus();");
+  ExecuteJavaScriptForTests("document.getElementById('test2').focus();");
   const IPC::Message* msg2 = render_thread_->sink().GetFirstMessageMatching(
         ViewHostMsg_FocusedNodeChanged::ID);
   EXPECT_TRUE(msg2);
@@ -2351,7 +2381,7 @@ TEST_F(DevToolsAgentTest, DevToolsResumeOnClose) {
   base::ThreadTaskRunnerHandle::Get()->PostTask(
       FROM_HERE,
       base::Bind(&DevToolsAgentTest::CloseWhilePaused, base::Unretained(this)));
-  ExecuteJavaScript("debugger;");
+  ExecuteJavaScriptForTests("debugger;");
 
   // CloseWhilePaused should resume execution and continue here.
   EXPECT_FALSE(IsPaused());

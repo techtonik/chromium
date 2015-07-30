@@ -101,8 +101,9 @@ PasswordForm::Layout SequenceToLayout(base::StringPiece layout_sequence) {
 // |element| is present and has the specified |value_in_lowercase|.
 bool HasAutocompleteAttributeValue(const WebInputElement& element,
                                    const char* value_in_lowercase) {
-  return base::LowerCaseEqualsASCII(element.getAttribute("autocomplete"),
-                                    value_in_lowercase);
+  return base::LowerCaseEqualsASCII(
+      base::StringPiece16(element.getAttribute("autocomplete")),
+      value_in_lowercase);
 }
 
 // Helper to determine which password is the main (current) one, and which is
@@ -288,7 +289,7 @@ void GetPasswordForm(
          (nonscript_modified_values &&
           nonscript_modified_values->find(*input_element) !=
               nonscript_modified_values->end()) ||
-         HasAutocompleteAttributeValue(*input_element, "current_password") ||
+         HasAutocompleteAttributeValue(*input_element, "current-password") ||
          HasAutocompleteAttributeValue(*input_element, "new-password"))) {
       passwords.push_back(*input_element);
       // If we have not yet considered any element to be the username so far,

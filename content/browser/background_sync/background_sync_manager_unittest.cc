@@ -183,10 +183,12 @@ class TestBackgroundSyncManager : public BackgroundSyncManager {
   }
 
   void FireOneShotSync(
+      const BackgroundSyncRegistration& registration,
       const scoped_refptr<ServiceWorkerVersion>& active_version,
       const ServiceWorkerVersion::StatusCallback& callback) override {
     if (one_shot_callback_.is_null()) {
-      BackgroundSyncManager::FireOneShotSync(active_version, callback);
+      BackgroundSyncManager::FireOneShotSync(registration, active_version,
+                                             callback);
     } else {
       one_shot_callback_.Run(active_version, callback);
     }
@@ -254,6 +256,18 @@ class BackgroundSyncManagerTest : public testing::Test {
     EXPECT_TRUE(called_1);
     EXPECT_TRUE(called_2);
 
+    // Register window clients for the service workers
+    host_1_.reset(new ServiceWorkerProviderHost(
+        34 /* dummy render proces id */, MSG_ROUTING_NONE /* render_frame_id */,
+        1 /* dummy provider id */, SERVICE_WORKER_PROVIDER_FOR_WINDOW,
+        helper_->context()->AsWeakPtr(), nullptr));
+    host_1_->SetDocumentUrl(GURL(kPattern1));
+    host_2_.reset(new ServiceWorkerProviderHost(
+        34 /* dummy render proces id */, MSG_ROUTING_NONE /* render_frame_id */,
+        1 /* dummy provider id */, SERVICE_WORKER_PROVIDER_FOR_WINDOW,
+        helper_->context()->AsWeakPtr(), nullptr));
+    host_2_->SetDocumentUrl(GURL(kPattern2));
+
     // Hang onto the registrations as they need to be "live" when
     // calling BackgroundSyncManager::Register.
     helper_->context_wrapper()->FindRegistrationForId(
@@ -266,6 +280,14 @@ class BackgroundSyncManagerTest : public testing::Test {
     base::RunLoop().RunUntilIdle();
     EXPECT_TRUE(sw_registration_1_);
     EXPECT_TRUE(sw_registration_2_);
+
+    sw_registration_1_->active_version()->AddControllee(host_1_.get());
+    sw_registration_2_->active_version()->AddControllee(host_2_.get());
+  }
+
+  void RemoveWindowClients() {
+    sw_registration_1_->active_version()->RemoveControllee(host_1_.get());
+    sw_registration_2_->active_version()->RemoveControllee(host_2_.get());
   }
 
   void SetNetwork(net::NetworkChangeNotifier::ConnectionType connection_type) {
@@ -480,6 +502,8 @@ class BackgroundSyncManagerTest : public testing::Test {
   scoped_ptr<BackgroundSyncManager> background_sync_manager_;
   TestBackgroundSyncManager* test_background_sync_manager_;
 
+  scoped_ptr<ServiceWorkerProviderHost> host_1_;
+  scoped_ptr<ServiceWorkerProviderHost> host_2_;
   int64 sw_registration_id_1_;
   int64 sw_registration_id_2_;
   scoped_refptr<ServiceWorkerRegistration> sw_registration_1_;
@@ -1234,6 +1258,24 @@ TEST_F(BackgroundSyncManagerTest, KillManagerMidSync) {
   InitSyncEventTest();
   EXPECT_FALSE(GetRegistration(sync_options_1_));
   EXPECT_EQ(2, sync_events_called_);
+}
+
+TEST_F(BackgroundSyncManagerTest, RegisterFailsWithoutWindow) {
+  RemoveWindowClients();
+  EXPECT_FALSE(Register(sync_options_1_));
+}
+
+TEST_F(BackgroundSyncManagerTest, RegisterExistingFailsWithoutWindow) {
+  EXPECT_TRUE(Register(sync_options_1_));
+  RemoveWindowClients();
+  EXPECT_FALSE(Register(sync_options_1_));
+}
+
+TEST_F(BackgroundSyncManagerTest, UnregisterSucceedsWithoutWindow) {
+  EXPECT_TRUE(Register(sync_options_1_));
+  RemoveWindowClients();
+  EXPECT_TRUE(Unregister(callback_registration_));
+  EXPECT_FALSE(GetRegistration(sync_options_1_));
 }
 
 }  // namespace content

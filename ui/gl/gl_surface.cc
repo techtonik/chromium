@@ -17,10 +17,6 @@
 #include "ui/gl/gl_implementation.h"
 #include "ui/gl/gl_switches.h"
 
-#if defined(USE_X11)
-#include <X11/Xlib.h>
-#endif
-
 namespace gfx {
 
 namespace {
@@ -101,10 +97,6 @@ GLSurface::GLSurface() {}
 
 bool GLSurface::Initialize() {
   return true;
-}
-
-void GLSurface::DestroyAndTerminateDisplay() {
-  Destroy();
 }
 
 bool GLSurface::Resize(const gfx::Size& size) {

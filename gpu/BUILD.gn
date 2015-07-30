@@ -231,7 +231,12 @@ test("gpu_unittests") {
     "config/gpu_util_unittest.cc",
   ]
 
-  configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
+  configs += [
+    "//build/config:precompiled_headers",
+
+    # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
+    "//build/config/compiler:no_size_t_to_int_warning",
+  ]
 
   deps = [
     ":gpu",
@@ -270,6 +275,15 @@ test("gpu_perftests") {
     "//testing/perf",
     "//ui/gfx/geometry",
     "//ui/gl",
+  ]
+}
+
+# TODO(GYP): Delete this after we've converted everything to GN.
+# The _run targets exist only for compatibility w/ GYP.
+group("angle_unittests_run") {
+  testonly = true
+  deps = [
+    ":angle_unittests",
   ]
 }
 

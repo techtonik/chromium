@@ -10,9 +10,9 @@ import android.os.Parcel;
 import android.os.ParcelUuid;
 import android.os.Parcelable;
 
-import org.chromium.base.CalledByNative;
-import org.chromium.base.JNINamespace;
 import org.chromium.base.VisibleForTesting;
+import org.chromium.base.annotations.CalledByNative;
+import org.chromium.base.annotations.JNINamespace;
 import org.chromium.content_public.browser.AccessibilitySnapshotCallback;
 import org.chromium.content_public.browser.AccessibilitySnapshotNode;
 import org.chromium.content_public.browser.JavaScriptCallback;
@@ -293,14 +293,24 @@ import java.util.UUID;
     }
 
     @Override
-    @VisibleForTesting
     public void evaluateJavaScript(String script, JavaScriptCallback callback) {
         nativeEvaluateJavaScript(mNativeWebContentsAndroid, script, callback);
     }
 
     @Override
+    @VisibleForTesting
+    public void evaluateJavaScriptForTests(String script, JavaScriptCallback callback) {
+        nativeEvaluateJavaScriptForTests(mNativeWebContentsAndroid, script, callback);
+    }
+
+    @Override
     public void addMessageToDevToolsConsole(int level, String message) {
         nativeAddMessageToDevToolsConsole(mNativeWebContentsAndroid, level, message);
+    }
+
+    @Override
+    public void sendMessageToFrame(String frameName, String message, String targetOrigin) {
+        nativeSendMessageToFrame(mNativeWebContentsAndroid, frameName, message, targetOrigin);
     }
 
     @Override
@@ -323,8 +333,10 @@ import java.util.UUID;
     }
 
     @Override
-    public void requestAccessibilitySnapshot(AccessibilitySnapshotCallback callback) {
-        nativeRequestAccessibilitySnapshot(mNativeWebContentsAndroid, callback);
+    public void requestAccessibilitySnapshot(AccessibilitySnapshotCallback callback,
+            float offsetY, float scrollX) {
+        nativeRequestAccessibilitySnapshot(mNativeWebContentsAndroid, callback,
+                offsetY, scrollX);
     }
 
     @Override
@@ -335,6 +347,11 @@ import java.util.UUID;
     @Override
     public void suspendMediaSession() {
         nativeSuspendMediaSession(mNativeWebContentsAndroid);
+    }
+
+    @Override
+    public String getEncoding() {
+        return nativeGetEncoding(mNativeWebContentsAndroid);
     }
 
     // root node can be null if parsing fails.
@@ -419,13 +436,18 @@ import java.util.UUID;
     private native void nativeResumeLoadingCreatedWebContents(long nativeWebContentsAndroid);
     private native void nativeEvaluateJavaScript(long nativeWebContentsAndroid,
             String script, JavaScriptCallback callback);
+    private native void nativeEvaluateJavaScriptForTests(long nativeWebContentsAndroid,
+            String script, JavaScriptCallback callback);
     private native void nativeAddMessageToDevToolsConsole(
             long nativeWebContentsAndroid, int level, String message);
+    private native void nativeSendMessageToFrame(long nativeWebContentsAndroid,
+            String frameName, String message, String targetOrigin);
     private native boolean nativeHasAccessedInitialDocument(
             long nativeWebContentsAndroid);
     private native int nativeGetThemeColor(long nativeWebContentsAndroid);
     private native void nativeRequestAccessibilitySnapshot(long nativeWebContentsAndroid,
-            AccessibilitySnapshotCallback callback);
+            AccessibilitySnapshotCallback callback, float offsetY, float scrollX);
     private native void nativeResumeMediaSession(long nativeWebContentsAndroid);
     private native void nativeSuspendMediaSession(long nativeWebContentsAndroid);
+    private native String nativeGetEncoding(long nativeWebContentsAndroid);
 }

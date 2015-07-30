@@ -42,6 +42,7 @@ class CookieStore;
 class FtpTransactionFactory;
 class HostMappingRules;
 class HttpAuthHandlerFactory;
+class HttpServerProperties;
 class ProxyConfigService;
 class URLRequestContext;
 class URLRequestInterceptor;
@@ -181,6 +182,10 @@ class NET_EXPORT URLRequestContextBuilder {
     throttling_enabled_ = throttling_enabled;
   }
 
+  void set_backoff_enabled(bool backoff_enabled) {
+    backoff_enabled_ = backoff_enabled;
+  }
+
   void SetInterceptors(
       ScopedVector<URLRequestInterceptor> url_request_interceptors);
 
@@ -207,6 +212,11 @@ class NET_EXPORT URLRequestContextBuilder {
   // SdchOwner in net/sdch/sdch_owner.h is a simple policy object.
   void set_sdch_enabled(bool enable) { sdch_enabled_ = enable; }
 
+  // Sets a specific HttpServerProperties for use in the
+  // URLRequestContext rather than creating a default HttpServerPropertiesImpl.
+  void SetHttpServerProperties(
+      scoped_ptr<HttpServerProperties> http_server_properties);
+
   URLRequestContext* Build();
 
  private:
@@ -232,6 +242,7 @@ class NET_EXPORT URLRequestContextBuilder {
 #endif
   bool http_cache_enabled_;
   bool throttling_enabled_;
+  bool backoff_enabled_;
   bool sdch_enabled_;
 
   scoped_refptr<base::SingleThreadTaskRunner> file_task_runner_;
@@ -248,6 +259,7 @@ class NET_EXPORT URLRequestContextBuilder {
   scoped_ptr<FtpTransactionFactory> ftp_transaction_factory_;
   std::vector<SchemeFactory> extra_http_auth_handlers_;
   ScopedVector<URLRequestInterceptor> url_request_interceptors_;
+  scoped_ptr<HttpServerProperties> http_server_properties_;
 
   DISALLOW_COPY_AND_ASSIGN(URLRequestContextBuilder);
 };

@@ -46,6 +46,7 @@
 #include "content/common/inter_process_time_ticks_converter.h"
 #include "content/common/navigation_params.h"
 #include "content/common/render_frame_setup.mojom.h"
+#include "content/common/site_isolation_policy.h"
 #include "content/common/swapped_out_messages.h"
 #include "content/public/browser/ax_event_notification_details.h"
 #include "content/public/browser/browser_accessibility_state.h"
@@ -92,6 +93,10 @@ int g_next_accessibility_reset_token = 1;
 // The next value to use for the javascript callback id.
 int g_next_javascript_callback_id = 1;
 
+// Whether to allow injecting javascript into any kind of frame (for Android
+// WebView).
+bool g_allow_injecting_javascript = false;
+
 // The (process id, routing id) pair that identifies one RenderFrame.
 typedef std::pair<int32, int32> RenderFrameHostID;
 typedef base::hash_map<RenderFrameHostID, RenderFrameHostImpl*>
@@ -124,6 +129,11 @@ bool RenderFrameHostImpl::IsRFHStateActive(RenderFrameHostImplState rfh_state) {
 RenderFrameHost* RenderFrameHost::FromID(int render_process_id,
                                          int render_frame_id) {
   return RenderFrameHostImpl::FromID(render_process_id, render_frame_id);
+}
+
+// static
+void RenderFrameHost::AllowInjectingJavaScriptForAndroidWebView() {
+  g_allow_injecting_javascript = true;
 }
 
 // static
@@ -272,6 +282,7 @@ void RenderFrameHostImpl::AddMessageToConsole(ConsoleMessageLevel level,
 
 void RenderFrameHostImpl::ExecuteJavaScript(
     const base::string16& javascript) {
+  CHECK(CanExecuteJavaScript());
   Send(new FrameMsg_JavaScriptExecuteRequest(routing_id_,
                                              javascript,
                                              0, false));
@@ -280,12 +291,30 @@ void RenderFrameHostImpl::ExecuteJavaScript(
 void RenderFrameHostImpl::ExecuteJavaScript(
      const base::string16& javascript,
      const JavaScriptResultCallback& callback) {
+  CHECK(CanExecuteJavaScript());
   int key = g_next_javascript_callback_id++;
   Send(new FrameMsg_JavaScriptExecuteRequest(routing_id_,
                                              javascript,
                                              key, true));
   javascript_callbacks_.insert(std::make_pair(key, callback));
 }
+
+void RenderFrameHostImpl::ExecuteJavaScriptForTests(
+    const base::string16& javascript) {
+  Send(new FrameMsg_JavaScriptExecuteRequestForTests(routing_id_,
+                                                     javascript,
+                                                     0, false, false));
+}
+
+void RenderFrameHostImpl::ExecuteJavaScriptForTests(
+     const base::string16& javascript,
+     const JavaScriptResultCallback& callback) {
+  int key = g_next_javascript_callback_id++;
+  Send(new FrameMsg_JavaScriptExecuteRequestForTests(routing_id_, javascript,
+                                                     key, true, false));
+  javascript_callbacks_.insert(std::make_pair(key, callback));
+}
+
 
 void RenderFrameHostImpl::ExecuteJavaScriptWithUserGestureForTests(
     const base::string16& javascript) {
@@ -510,6 +539,11 @@ void RenderFrameHostImpl::AccessibilityHitTest(const gfx::Point& point) {
 
 void RenderFrameHostImpl::AccessibilitySetAccessibilityFocus(int acc_obj_id) {
   Send(new AccessibilityMsg_SetAccessibilityFocus(routing_id_, acc_obj_id));
+}
+
+void RenderFrameHostImpl::AccessibilityReset() {
+  accessibility_reset_token_ = g_next_accessibility_reset_token++;
+  Send(new AccessibilityMsg_Reset(routing_id_, accessibility_reset_token_));
 }
 
 void RenderFrameHostImpl::AccessibilityFatalError() {
@@ -1243,7 +1277,10 @@ void RenderFrameHostImpl::OnDidDisownOpener() {
 }
 
 void RenderFrameHostImpl::OnDidChangeName(const std::string& name) {
+  std::string old_name = frame_tree_node()->frame_name();
   frame_tree_node()->SetFrameName(name);
+  if (old_name.empty() && !name.empty())
+    frame_tree_node_->render_manager()->CreateProxiesForNewNamedFrame();
   delegate_->DidChangeName(this, name);
 }
 
@@ -1317,8 +1354,7 @@ void RenderFrameHostImpl::OnBeginNavigation(
 }
 
 void RenderFrameHostImpl::OnDispatchLoad() {
-  CHECK(base::CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kSitePerProcess));
+  CHECK(SiteIsolationPolicy::AreCrossProcessFramesPossible());
   // Only frames with an out-of-process parent frame should be sending this
   // message.
   RenderFrameProxyHost* proxy =
@@ -1374,12 +1410,14 @@ void RenderFrameHostImpl::OnAccessibilityEvents(
     details.reserve(params.size());
     for (size_t i = 0; i < params.size(); ++i) {
       const AccessibilityHostMsg_EventParams& param = params[i];
-      AXEventNotificationDetails detail(param.update.node_id_to_clear,
-                                        param.update.nodes,
-                                        param.event_type,
-                                        param.id,
-                                        GetProcess()->GetID(),
-                                        routing_id_);
+      AXEventNotificationDetails detail(
+          param.update.node_id_to_clear,
+          param.update.nodes,
+          param.event_type,
+          param.id,
+          param.node_to_browser_plugin_instance_id_map,
+          GetProcess()->GetID(),
+          routing_id_);
       details.push_back(detail);
     }
 
@@ -1671,8 +1709,8 @@ void RenderFrameHostImpl::Navigate(
 void RenderFrameHostImpl::NavigateToURL(const GURL& url) {
   CommonNavigationParams common_params(
       url, Referrer(), ui::PAGE_TRANSITION_LINK, FrameMsg_Navigate_Type::NORMAL,
-      true, base::TimeTicks::Now(), FrameMsg_UILoadMetricsReportType::NO_REPORT,
-      GURL(), GURL());
+      true, false, base::TimeTicks::Now(),
+      FrameMsg_UILoadMetricsReportType::NO_REPORT, GURL(), GURL());
   Navigate(common_params, StartNavigationParams(), RequestNavigationParams());
 }
 
@@ -1887,7 +1925,7 @@ bool RenderFrameHostImpl::IsFocused() {
 
 const image_downloader::ImageDownloaderPtr&
 RenderFrameHostImpl::GetMojoImageDownloader() {
-  if (!mojo_image_downloader_.get()) {
+  if (!mojo_image_downloader_.get() && GetServiceRegistry()) {
     GetServiceRegistry()->ConnectToRemoteService(
         mojo::GetProxy(&mojo_image_downloader_));
   }
@@ -2123,6 +2161,19 @@ void RenderFrameHostImpl::UpdatePermissionsForNavigation(
   if (request_params.page_state.IsValid()) {
     render_view_host_->GrantFileAccessFromPageState(request_params.page_state);
   }
+}
+
+bool RenderFrameHostImpl::CanExecuteJavaScript() {
+  return g_allow_injecting_javascript ||
+         !frame_tree_node_->current_url().is_valid() ||
+         frame_tree_node_->current_url().SchemeIs(kChromeDevToolsScheme) ||
+         ChildProcessSecurityPolicyImpl::GetInstance()->HasWebUIBindings(
+             GetProcess()->GetID()) ||
+         // It's possible to load about:blank in a Web UI renderer.
+         // See http://crbug.com/42547
+         (frame_tree_node_->current_url().spec() == url::kAboutBlankURL) ||
+         // InterstitialPageImpl should be the only case matching this.
+         (delegate_->GetAsWebContents() == nullptr);
 }
 
 }  // namespace content

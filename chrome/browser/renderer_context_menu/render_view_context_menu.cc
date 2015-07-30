@@ -59,7 +59,7 @@
 #include "chrome/common/net/url_util.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/render_messages.h"
-#include "chrome/common/spellcheck_messages.h"
+#include "chrome/common/spellcheck_common.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_headers.h"
@@ -279,12 +279,6 @@ WindowOpenDisposition ForceNewTabDispositionFromEventFlags(
   WindowOpenDisposition disposition =
       ui::DispositionFromEventFlags(event_flags);
   return disposition == CURRENT_TAB ? NEW_FOREGROUND_TAB : disposition;
-}
-
-// Helper function to escape "&" as "&&".
-void EscapeAmpersands(base::string16* text) {
-  base::ReplaceChars(*text, base::ASCIIToUTF16("&"), base::ASCIIToUTF16("&&"),
-                     text);
 }
 
 // Returns the preference of the profile represented by the |context|.
@@ -1006,8 +1000,18 @@ void RenderViewContextMenu::AppendEditableItems() {
     menu_model_.AddSeparator(ui::NORMAL_SEPARATOR);
   }
 
+#if defined(OS_MACOSX)
   if (use_spellcheck_and_search)
     AppendSpellcheckOptionsSubMenu();
+#else
+  if (chrome::spellcheck_common::IsMultilingualSpellcheckEnabled()) {
+    menu_model_.AddItemWithStringId(IDC_CONTENT_CONTEXT_LANGUAGE_SETTINGS,
+                                    IDS_CONTENT_CONTEXT_LANGUAGE_SETTINGS);
+  } else if (use_spellcheck_and_search) {
+    AppendSpellcheckOptionsSubMenu();
+  }
+#endif  // defined(OS_MACOSX)
+
   AppendPlatformEditableItems();
 
   menu_model_.AddSeparator(ui::NORMAL_SEPARATOR);
@@ -1794,7 +1798,9 @@ void RenderViewContextMenu::ExecuteCommand(int id, int event_flags) {
           SearchEngineTabHelper::FromWebContents(source_web_contents_);
       if (search_engine_tab_helper &&
           search_engine_tab_helper->delegate()) {
-        base::string16 keyword(TemplateURL::GenerateKeyword(params_.page_url));
+        base::string16 keyword(TemplateURL::GenerateKeyword(
+            params_.page_url,
+            GetProfile()->GetPrefs()->GetString(prefs::kAcceptLanguages)));
         TemplateURLData data;
         data.SetShortName(keyword);
         data.SetKeyword(keyword);
@@ -1871,6 +1877,11 @@ base::string16 RenderViewContextMenu::PrintableSelectionText() {
   return gfx::TruncateString(params_.selection_text,
                              kMaxSelectionTextLength,
                              gfx::WORD_BREAK);
+}
+
+void RenderViewContextMenu::EscapeAmpersands(base::string16* text) {
+  base::ReplaceChars(*text, base::ASCIIToUTF16("&"), base::ASCIIToUTF16("&&"),
+                     text);
 }
 
 // Controller functions --------------------------------------------------------

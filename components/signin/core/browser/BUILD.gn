@@ -14,6 +14,14 @@ static_library("browser") {
     "account_reconcilor.h",
     "account_tracker_service.cc",
     "account_tracker_service.h",
+    "android/component_jni_registrar.cc",
+    "android/component_jni_registrar.h",
+    "child_account_info_fetcher.cc",
+    "child_account_info_fetcher.h",
+    "child_account_info_fetcher_android.cc",
+    "child_account_info_fetcher_android.h",
+    "child_account_info_fetcher_impl.cc",
+    "child_account_info_fetcher_impl.h",
     "device_activity_fetcher.cc",
     "device_activity_fetcher.h",
     "gaia_cookie_manager_service.cc",
@@ -24,6 +32,7 @@ static_library("browser") {
     "profile_oauth2_token_service.h",
     "refresh_token_annotation_request.cc",
     "refresh_token_annotation_request.h",
+    "signin_client.cc",
     "signin_client.h",
     "signin_cookie_changed_subscription.cc",
     "signin_cookie_changed_subscription.h",
@@ -61,6 +70,7 @@ static_library("browser") {
     "//components/content_settings/core/browser",
     "//components/content_settings/core/common",
     "//components/google/core/browser",
+    "//components/invalidation/public",
     "//components/keyed_service/core",
     "//components/os_crypt",
     "//components/webdata/common",
@@ -69,13 +79,27 @@ static_library("browser") {
   if (is_chromeos) {
     sources -= [ "signin_manager.cc" ]
   }
+
+  if (is_android) {
+    sources -= [
+      "child_account_info_fetcher_impl.cc",
+      "child_account_info_fetcher_impl.h",
+    ]
+    deps += [ "android:jni_headers" ]
+  }
 }
 
 static_library("test_support") {
   testonly = true
   sources = [
+    "fake_account_fetcher_service.cc",
+    "fake_account_fetcher_service.h",
     "fake_auth_status_provider.cc",
     "fake_auth_status_provider.h",
+    "fake_profile_oauth2_token_service.cc",
+    "fake_profile_oauth2_token_service.h",
+    "fake_signin_manager.cc",
+    "fake_signin_manager.h",
     "test_signin_client.cc",
     "test_signin_client.h",
   ]

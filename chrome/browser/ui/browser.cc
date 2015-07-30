@@ -158,13 +158,11 @@
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/favicon/content/content_favicon_driver.h"
 #include "components/history/core/browser/top_sites.h"
-#include "components/infobars/core/simple_alert_infobar_delegate.h"
 #include "components/search/search.h"
 #include "components/sessions/session_types.h"
 #include "components/startup_metric_utils/startup_metric_utils.h"
 #include "components/translate/core/browser/language_state.h"
 #include "components/ui/zoom/zoom_controller.h"
-#include "components/web_modal/popup_manager.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
 #include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/interstitial_page.h"
@@ -452,12 +450,6 @@ Browser::Browser(const CreateParams& params)
 
   exclusive_access_manager_.reset(
       new ExclusiveAccessManager(window_->GetExclusiveAccessContext()));
-
-  // Must be initialized after window_.
-  // Also: surprise! a modal dialog host is not necessary to host modal dialogs
-  // without a modal dialog host, so that value may be null.
-  popup_manager_.reset(new web_modal::PopupManager(
-      GetWebContentsModalDialogHost()));
 
   // TODO(beng): Move BrowserList::AddBrowser() to the end of this function and
   //             replace uses of this with BL's notifications.
@@ -938,9 +930,6 @@ void Browser::TabInsertedAt(WebContents* contents,
                             bool foreground) {
   SetAsDelegate(contents, true);
 
-  if (popup_manager_)
-    popup_manager_->RegisterWith(contents);
-
   SessionTabHelper* session_tab_helper =
       SessionTabHelper::FromWebContents(contents);
   session_tab_helper->SetWindowID(session_id());
@@ -982,9 +971,6 @@ void Browser::TabClosingAt(TabStripModel* tab_strip_model,
       content::Source<NavigationController>(&contents->GetController()),
       content::NotificationService::NoDetails());
 
-  if (popup_manager_)
-    popup_manager_->UnregisterWith(contents);
-
   // Sever the WebContents' connection back to us.
   SetAsDelegate(contents, false);
 }
@@ -1000,9 +986,6 @@ void Browser::TabDetachedAt(WebContents* contents, int index) {
       session_service->SetSelectedTabInWindow(session_id(),
                                               old_active_index - 1);
   }
-
-  if (popup_manager_)
-    popup_manager_->UnregisterWith(contents);
 
   TabDetachedAtImpl(contents, index, DETACH_TYPE_DETACH);
 }
@@ -1690,13 +1673,6 @@ void Browser::RendererUnresponsive(WebContents* source) {
 
 void Browser::RendererResponsive(WebContents* source) {
   TabDialogs::FromWebContents(source)->HideHungRendererDialog();
-}
-
-void Browser::WorkerCrashed(WebContents* source) {
-  SimpleAlertInfoBarDelegate::Create(
-      InfoBarService::FromWebContents(source),
-      infobars::InfoBarDelegate::kNoIconID,
-      l10n_util::GetStringUTF16(IDS_WEBWORKER_CRASHED_PROMPT), true);
 }
 
 void Browser::DidNavigateMainFramePostCommit(WebContents* web_contents) {

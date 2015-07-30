@@ -113,14 +113,14 @@ void TrayAudio::OnOutputNodeVolumeChanged(uint64_t /* node_id */,
   PopupDetailedView(kTrayPopupAutoCloseDelayInSeconds, false);
 }
 
-void TrayAudio::OnOutputMuteChanged(bool /* mute_on */) {
+void TrayAudio::OnOutputMuteChanged(bool /* mute_on */, bool system_adjust) {
   if (tray_view())
       tray_view()->SetVisible(GetInitialVisibility());
 
   if (volume_view_) {
     volume_view_->Update();
     SetDetailedViewCloseDelay(kTrayPopupAutoCloseDelayInSeconds);
-  } else {
+  } else if (!system_adjust) {
     pop_up_volume_view_ = true;
     PopupDetailedView(kTrayPopupAutoCloseDelayInSeconds, false);
   }
@@ -142,7 +142,7 @@ void TrayAudio::ChangeInternalSpeakerChannelMode() {
   // Swap left/right channel only if it is in Yoga mode.
   system::TrayAudioDelegate::AudioChannelMode channel_mode =
       system::TrayAudioDelegate::NORMAL;
-  if (gfx::Display::InternalDisplayId() != gfx::Display::kInvalidDisplayID) {
+  if (gfx::Display::HasInternalDisplay()) {
     const DisplayInfo& display_info =
         Shell::GetInstance()->display_manager()->GetDisplayInfo(
             gfx::Display::InternalDisplayId());
@@ -154,20 +154,20 @@ void TrayAudio::ChangeInternalSpeakerChannelMode() {
 }
 
 void TrayAudio::OnDisplayAdded(const gfx::Display& new_display) {
-  if (new_display.id() != gfx::Display::InternalDisplayId())
+  if (!new_display.IsInternal())
     return;
   ChangeInternalSpeakerChannelMode();
 }
 
 void TrayAudio::OnDisplayRemoved(const gfx::Display& old_display) {
-  if (old_display.id() != gfx::Display::InternalDisplayId())
+  if (!old_display.IsInternal())
     return;
   ChangeInternalSpeakerChannelMode();
 }
 
 void TrayAudio::OnDisplayMetricsChanged(const gfx::Display& display,
                                         uint32_t changed_metrics) {
-  if (display.id() != gfx::Display::InternalDisplayId())
+  if (!display.IsInternal())
     return;
 
   if (changed_metrics & gfx::DisplayObserver::DISPLAY_METRIC_ROTATION)

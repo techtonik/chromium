@@ -15,17 +15,17 @@ import android.view.ViewTreeObserver.OnGlobalFocusChangeListener;
 import org.chromium.base.ActivityState;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.ApplicationStatus.ActivityStateListener;
-import org.chromium.base.CalledByNative;
 import org.chromium.base.SysUtils;
 import org.chromium.base.VisibleForTesting;
+import org.chromium.base.annotations.CalledByNative;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeActivity;
-import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.WebContentsFactory;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchControl;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel.PanelState;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel.StateChangeReason;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanelDelegate;
+import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanelFeatures;
 import org.chromium.chrome.browser.contextualsearch.ContextualSearchSelectionController.SelectionType;
 import org.chromium.chrome.browser.device.DeviceClassManager;
 import org.chromium.chrome.browser.externalnav.ExternalNavigationHandler;
@@ -34,6 +34,7 @@ import org.chromium.chrome.browser.externalnav.ExternalNavigationParams;
 import org.chromium.chrome.browser.gsa.GSAContextDisplaySelection;
 import org.chromium.chrome.browser.infobar.InfoBarContainer;
 import org.chromium.chrome.browser.preferences.PrefServiceBridge;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tab.TabRedirectHandler;
 import org.chromium.chrome.browser.tabmodel.EmptyTabModelObserver;
 import org.chromium.chrome.browser.tabmodel.TabModel;
@@ -1064,7 +1065,11 @@ public class ContextualSearchManager extends ContextualSearchObservable
 
             // NOTE(pedrosimonetti): The Panel should be closed after being promoted to a Tab
             // to prevent Chrome-Android from animating the creation of the new Tab.
-            mSearchPanelDelegate.closePanel(StateChangeReason.TAB_PROMOTION, false);
+            if (ContextualSearchPanelFeatures.shouldAnimatePanelCloseOnPromoteToTab()) {
+                mSearchPanelDelegate.closePanel(StateChangeReason.TAB_PROMOTION, true);
+            } else {
+                mSearchPanelDelegate.closePanel(StateChangeReason.TAB_PROMOTION, false);
+            }
 
             // Focus the Omnibox.
             if (shouldFocusOmnibox) {
@@ -1248,8 +1253,10 @@ public class ContextualSearchManager extends ContextualSearchObservable
             StateChangeReason stateChangeReason = type == SelectionType.TAP
                     ? StateChangeReason.TEXT_SELECT_TAP : StateChangeReason.TEXT_SELECT_LONG_PRESS;
             ContextualSearchUma.logSelectionIsValid(isSelectionValid);
-
-            if (isSelectionValid) {
+            // Workaround to disable Contextual Search in HTML fullscreen mode. crbug.com/511977
+            boolean isInFullscreenMode =
+                    mActivity.getFullscreenManager().getPersistentFullscreenMode();
+            if (isSelectionValid && !isInFullscreenMode) {
                 mSearchPanelDelegate.updateBasePageSelectionYPx(y);
                 showContextualSearch(stateChangeReason);
             } else {

@@ -19,7 +19,7 @@
 #include "net/quic/crypto/quic_decrypter.h"
 #include "net/quic/crypto/quic_encrypter.h"
 #include "net/quic/crypto/quic_server_info.h"
-#include "net/quic/quic_client_session.h"
+#include "net/quic/quic_chromium_client_session.h"
 #include "net/quic/quic_connection.h"
 #include "net/quic/quic_connection_helper.h"
 #include "net/quic/quic_default_packet_writer.h"
@@ -80,16 +80,15 @@ class TestQuicConnection : public QuicConnection {
 // is received.
 class AutoClosingStream : public QuicHttpStream {
  public:
-  explicit AutoClosingStream(const base::WeakPtr<QuicClientSession>& session)
-      : QuicHttpStream(session) {
-  }
+  explicit AutoClosingStream(
+      const base::WeakPtr<QuicChromiumClientSession>& session)
+      : QuicHttpStream(session) {}
 
-  void OnHeadersAvailable(StringPiece headers) override { Close(false); }
-
-  int OnDataReceived(const char* data, int length) override {
+  void OnHeadersAvailable(const SpdyHeaderBlock& headers) override {
     Close(false);
-    return OK;
   }
+
+  void OnDataAvailable() override { Close(false); }
 };
 
 class TestPacketWriterFactory : public QuicConnection::PacketWriterFactory {
@@ -212,7 +211,7 @@ class QuicHttpStreamTest : public ::testing::TestWithParam<QuicVersion> {
                                          helper_.get(), writer_factory);
     connection_->set_visitor(&visitor_);
     connection_->SetSendAlgorithm(send_algorithm_);
-    session_.reset(new QuicClientSession(
+    session_.reset(new QuicChromiumClientSession(
         connection_, scoped_ptr<DatagramClientSocket>(socket),
         /*stream_factory=*/nullptr, &crypto_client_stream_factory_,
         &transport_security_state_, make_scoped_ptr((QuicServerInfo*)nullptr),
@@ -307,7 +306,7 @@ class QuicHttpStreamTest : public ::testing::TestWithParam<QuicVersion> {
   testing::StrictMock<MockConnectionVisitor> visitor_;
   scoped_ptr<QuicHttpStream> stream_;
   TransportSecurityState transport_security_state_;
-  scoped_ptr<QuicClientSession> session_;
+  scoped_ptr<QuicChromiumClientSession> session_;
   QuicCryptoClientConfig crypto_config_;
   TestCompletionCallback callback_;
   HttpRequestInfo request_;
@@ -497,8 +496,9 @@ TEST_P(QuicHttpStreamTest, SendPostRequest) {
   SetResponse("200 OK", std::string());
   ProcessPacket(ConstructResponseHeadersPacket(2, !kFin));
 
-  // Since the headers have already arrived, this should return immediately.
-  EXPECT_EQ(OK, stream_->ReadResponseHeaders(callback_.callback()));
+  // The headers have arrived, but they are delivered asynchronously.
+  EXPECT_EQ(ERR_IO_PENDING, stream_->ReadResponseHeaders(callback_.callback()));
+  EXPECT_EQ(OK, callback_.WaitForResult());
   ASSERT_TRUE(response_.headers.get());
   EXPECT_EQ(200, response_.headers->response_code());
   EXPECT_TRUE(response_.headers->HasHeaderValue("Content-Type", "text/plain"));
@@ -540,6 +540,7 @@ TEST_P(QuicHttpStreamTest, SendChunkedPostRequest) {
                                                  callback_.callback()));
 
   upload_data_stream.AppendData(kUploadData, chunk_size, true);
+  EXPECT_EQ(OK, callback_.WaitForResult());
 
   // Ack both packets in the request.
   ProcessPacket(ConstructAckPacket(1, 0, 0));
@@ -548,8 +549,9 @@ TEST_P(QuicHttpStreamTest, SendChunkedPostRequest) {
   SetResponse("200 OK", std::string());
   ProcessPacket(ConstructResponseHeadersPacket(2, !kFin));
 
-  // Since the headers have already arrived, this should return immediately.
-  ASSERT_EQ(OK, stream_->ReadResponseHeaders(callback_.callback()));
+  // The headers have arrived, but they are delivered asynchronously
+  EXPECT_EQ(ERR_IO_PENDING, stream_->ReadResponseHeaders(callback_.callback()));
+  EXPECT_EQ(OK, callback_.WaitForResult());
   ASSERT_TRUE(response_.headers.get());
   EXPECT_EQ(200, response_.headers->response_code());
   EXPECT_TRUE(response_.headers->HasHeaderValue("Content-Type", "text/plain"));
@@ -592,6 +594,7 @@ TEST_P(QuicHttpStreamTest, SendChunkedPostRequestWithFinalEmptyDataPacket) {
                                                  callback_.callback()));
 
   upload_data_stream.AppendData(nullptr, 0, true);
+  EXPECT_EQ(OK, callback_.WaitForResult());
 
   ProcessPacket(ConstructAckPacket(1, 0, 0));
 
@@ -599,8 +602,9 @@ TEST_P(QuicHttpStreamTest, SendChunkedPostRequestWithFinalEmptyDataPacket) {
   SetResponse("200 OK", std::string());
   ProcessPacket(ConstructResponseHeadersPacket(2, !kFin));
 
-  // Since the headers have already arrived, this should return immediately.
-  ASSERT_EQ(OK, stream_->ReadResponseHeaders(callback_.callback()));
+  // The headers have arrived, but they are delivered asynchronously
+  EXPECT_EQ(ERR_IO_PENDING, stream_->ReadResponseHeaders(callback_.callback()));
+  EXPECT_EQ(OK, callback_.WaitForResult());
   ASSERT_TRUE(response_.headers.get());
   EXPECT_EQ(200, response_.headers->response_code());
   EXPECT_TRUE(response_.headers->HasHeaderValue("Content-Type", "text/plain"));
@@ -610,11 +614,10 @@ TEST_P(QuicHttpStreamTest, SendChunkedPostRequestWithFinalEmptyDataPacket) {
   ProcessPacket(ConstructDataPacket(3, false, kFin, response_data_.length(),
                                     kResponseBody));
 
-  // Since the body has already arrived, this should return immediately.
+  // The body has arrived, but it is delivered asynchronously
   ASSERT_EQ(static_cast<int>(strlen(kResponseBody)),
             stream_->ReadResponseBody(read_buffer_.get(), read_buffer_->size(),
                                       callback_.callback()));
-
   EXPECT_TRUE(stream_->IsResponseBodyComplete());
   EXPECT_TRUE(AtEof());
 }
@@ -640,6 +643,7 @@ TEST_P(QuicHttpStreamTest, SendChunkedPostRequestWithOneEmptyDataPacket) {
                                                  callback_.callback()));
 
   upload_data_stream.AppendData(nullptr, 0, true);
+  EXPECT_EQ(OK, callback_.WaitForResult());
 
   ProcessPacket(ConstructAckPacket(1, 0, 0));
 
@@ -647,8 +651,9 @@ TEST_P(QuicHttpStreamTest, SendChunkedPostRequestWithOneEmptyDataPacket) {
   SetResponse("200 OK", std::string());
   ProcessPacket(ConstructResponseHeadersPacket(2, !kFin));
 
-  // Since the headers have already arrived, this should return immediately.
-  ASSERT_EQ(OK, stream_->ReadResponseHeaders(callback_.callback()));
+  // The headers have arrived, but they are delivered asynchronously
+  EXPECT_EQ(ERR_IO_PENDING, stream_->ReadResponseHeaders(callback_.callback()));
+  EXPECT_EQ(OK, callback_.WaitForResult());
   ASSERT_TRUE(response_.headers.get());
   EXPECT_EQ(200, response_.headers->response_code());
   EXPECT_TRUE(response_.headers->HasHeaderValue("Content-Type", "text/plain"));
@@ -658,7 +663,7 @@ TEST_P(QuicHttpStreamTest, SendChunkedPostRequestWithOneEmptyDataPacket) {
   ProcessPacket(ConstructDataPacket(3, false, kFin, response_data_.length(),
                                     kResponseBody));
 
-  // Since the body has already arrived, this should return immediately.
+  // The body has arrived, but it is delivered asynchronously
   ASSERT_EQ(static_cast<int>(strlen(kResponseBody)),
             stream_->ReadResponseBody(read_buffer_.get(), read_buffer_->size(),
                                       callback_.callback()));
@@ -670,7 +675,7 @@ TEST_P(QuicHttpStreamTest, SendChunkedPostRequestWithOneEmptyDataPacket) {
 TEST_P(QuicHttpStreamTest, DestroyedEarly) {
   SetRequest("GET", "/", DEFAULT_PRIORITY);
   AddWrite(ConstructRequestHeadersPacket(1, kFin, DEFAULT_PRIORITY));
-  if (FLAGS_quic_process_frames_inline) {
+  if (!FLAGS_quic_process_frames_inline) {
     AddWrite(ConstructRstStreamCancelledPacket(2));
   } else {
     AddWrite(ConstructAckAndRstStreamPacket(2));
@@ -696,13 +701,15 @@ TEST_P(QuicHttpStreamTest, DestroyedEarly) {
   // In the course of processing this packet, the QuicHttpStream close itself.
   ProcessPacket(ConstructResponseHeadersPacket(2, kFin));
 
+  base::MessageLoop::current()->RunUntilIdle();
+
   EXPECT_TRUE(AtEof());
 }
 
 TEST_P(QuicHttpStreamTest, Priority) {
   SetRequest("GET", "/", MEDIUM);
   AddWrite(ConstructRequestHeadersPacket(1, kFin, MEDIUM));
-  if (FLAGS_quic_process_frames_inline) {
+  if (!FLAGS_quic_process_frames_inline) {
     AddWrite(ConstructRstStreamCancelledPacket(2));
   } else {
     AddWrite(ConstructAckAndRstStreamPacket(2));
@@ -739,6 +746,8 @@ TEST_P(QuicHttpStreamTest, Priority) {
   SetResponse("404 OK", "hello world!");
   // In the course of processing this packet, the QuicHttpStream close itself.
   ProcessPacket(ConstructResponseHeadersPacket(2, kFin));
+
+  base::MessageLoop::current()->RunUntilIdle();
 
   EXPECT_TRUE(AtEof());
 }

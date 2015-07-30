@@ -99,17 +99,14 @@ ErrorCode JingleSession::error() {
   return error_;
 }
 
-void JingleSession::StartConnection(
-    const std::string& peer_jid,
-    scoped_ptr<Authenticator> authenticator,
-    scoped_ptr<CandidateSessionConfig> config) {
+void JingleSession::StartConnection(const std::string& peer_jid,
+                                    scoped_ptr<Authenticator> authenticator) {
   DCHECK(CalledOnValidThread());
   DCHECK(authenticator.get());
   DCHECK_EQ(authenticator->state(), Authenticator::MESSAGE_READY);
 
   peer_jid_ = peer_jid;
   authenticator_ = authenticator.Pass();
-  candidate_config_ = config.Pass();
 
   // Generate random session ID. There are usually not more than 1
   // concurrent session per host, so a random 64-bit integer provides
@@ -122,7 +119,7 @@ void JingleSession::StartConnection(
                         session_id_);
   message.initiator = session_manager_->signal_strategy_->GetLocalJid();
   message.description.reset(
-      new ContentDescription(candidate_config_->Clone(),
+      new ContentDescription(session_manager_->protocol_config_->Clone(),
                              authenticator_->GetNextMessage()));
   SendMessage(message);
 
@@ -140,9 +137,17 @@ void JingleSession::InitializeIncomingConnection(
   peer_jid_ = initiate_message.from;
   authenticator_ = authenticator.Pass();
   session_id_ = initiate_message.sid;
-  candidate_config_ = initiate_message.description->config()->Clone();
 
   SetState(ACCEPTING);
+
+  config_ =
+      SessionConfig::SelectCommon(initiate_message.description->config(),
+                                  session_manager_->protocol_config_.get());
+  if (!config_) {
+    LOG(WARNING) << "Rejecting connection from " << peer_jid_
+                 << " because no compatible configuration has been found.";
+    CloseInternal(INCOMPATIBLE_PROTOCOL);
+  }
 }
 
 void JingleSession::AcceptIncomingConnection(
@@ -204,20 +209,9 @@ const std::string& JingleSession::jid() {
   return peer_jid_;
 }
 
-const CandidateSessionConfig* JingleSession::candidate_config() {
-  DCHECK(CalledOnValidThread());
-  return candidate_config_.get();
-}
-
 const SessionConfig& JingleSession::config() {
   DCHECK(CalledOnValidThread());
   return *config_;
-}
-
-void JingleSession::set_config(scoped_ptr<SessionConfig> config) {
-  DCHECK(CalledOnValidThread());
-  DCHECK(!config_);
-  config_ = config.Pass();
 }
 
 StreamChannelFactory* JingleSession::GetTransportChannelFactory() {
@@ -270,7 +264,6 @@ void JingleSession::CreateChannel(const std::string& name,
 
   scoped_ptr<Transport> channel =
       session_manager_->transport_factory_->CreateTransport();
-  channel->SetUseStandardIce(config_->standard_ice());
   channel->Connect(name, this, callback);
   AddPendingRemoteTransportInfo(channel.get());
   channels_[name] = channel.release();
@@ -380,8 +373,6 @@ void JingleSession::EnsurePendingTransportInfoMessage() {
   if (!pending_transport_info_message_) {
     pending_transport_info_message_.reset(new JingleMessage(
         peer_jid_, JingleMessage::TRANSPORT_INFO, session_id_));
-    pending_transport_info_message_->standard_ice = config_->standard_ice();
-
     // Delay sending the new candidates in case we get more candidates
     // that we can send in one message.
     transport_info_timer_.Start(
@@ -522,14 +513,6 @@ void JingleSession::OnSessionInfo(const JingleMessage& message,
 }
 
 void JingleSession::ProcessTransportInfo(const JingleMessage& message) {
-  // Check if the transport information version matches what was negotiated.
-  if (message.standard_ice != config_->standard_ice()) {
-    LOG(ERROR) << "Received transport-info message in format different from "
-                  "negotiated.";
-    CloseInternal(INCOMPATIBLE_PROTOCOL);
-    return;
-  }
-
   for (std::list<JingleMessage::IceCredentials>::const_iterator it =
            message.ice_credentials.begin();
        it != message.ice_credentials.end(); ++it) {
@@ -606,7 +589,7 @@ bool JingleSession::InitializeConfigFromDescription(
     LOG(ERROR) << "session-accept does not specify configuration";
     return false;
   }
-  if (!candidate_config()->IsSupported(*config_)) {
+  if (!session_manager_->protocol_config_->IsSupported(*config_)) {
     LOG(ERROR) << "session-accept specifies an invalid configuration";
     return false;
   }

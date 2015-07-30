@@ -162,8 +162,8 @@ void Scheduler::SetThrottleFrameProduction(bool throttle) {
   ProcessScheduledActions();
 }
 
-void Scheduler::SetNeedsCommit() {
-  state_machine_.SetNeedsCommit();
+void Scheduler::SetNeedsBeginMainFrame() {
+  state_machine_.SetNeedsBeginMainFrame();
   ProcessScheduledActions();
 }
 
@@ -180,11 +180,6 @@ void Scheduler::SetNeedsAnimate() {
 void Scheduler::SetNeedsPrepareTiles() {
   DCHECK(!IsInsideAction(SchedulerStateMachine::ACTION_PREPARE_TILES));
   state_machine_.SetNeedsPrepareTiles();
-  ProcessScheduledActions();
-}
-
-void Scheduler::SetWaitForReadyToDraw() {
-  state_machine_.SetWaitForReadyToDraw();
   ProcessScheduledActions();
 }
 
@@ -276,6 +271,7 @@ void Scheduler::SetupNextBeginFrameIfNeeded() {
       frame_source_->SetNeedsBeginFrames(true);
       devtools_instrumentation::NeedsBeginFrameChanged(layer_tree_host_id_,
                                                        true);
+      UpdateCompositorTimingHistoryRecordingEnabled();
     } else if (state_machine_.begin_impl_frame_state() ==
                SchedulerStateMachine::BEGIN_IMPL_FRAME_STATE_IDLE) {
       // Call SetNeedsBeginFrames(false) in between frames only.
@@ -283,6 +279,7 @@ void Scheduler::SetupNextBeginFrameIfNeeded() {
       client_->SendBeginMainFrameNotExpectedSoon();
       devtools_instrumentation::NeedsBeginFrameChanged(layer_tree_host_id_,
                                                        false);
+      UpdateCompositorTimingHistoryRecordingEnabled();
     }
   }
 
@@ -450,9 +447,9 @@ void Scheduler::PostBeginRetroFrameIfNeeded() {
 
 void Scheduler::BeginImplFrameWithDeadline(const BeginFrameArgs& args) {
   bool main_thread_is_in_high_latency_mode =
-      state_machine_.MainThreadIsInHighLatencyMode();
+      state_machine_.main_thread_missed_last_deadline();
   TRACE_EVENT2("cc,benchmark", "Scheduler::BeginImplFrame", "args",
-               args.AsValue(), "main_thread_is_high_latency",
+               args.AsValue(), "main_thread_missed_last_deadline",
                main_thread_is_in_high_latency_mode);
   TRACE_COUNTER1(TRACE_DISABLED_BY_DEFAULT("cc.debug.scheduler"),
                  "MainThreadLatency", main_thread_is_in_high_latency_mode);
@@ -721,8 +718,6 @@ void Scheduler::AsValueInto(base::trace_event::TracedValue* state) const {
   state->BeginDictionary("scheduler_state");
   state->SetDouble("estimated_parent_draw_time_ms",
                    estimated_parent_draw_time_.InMillisecondsF());
-  state->SetBoolean("last_set_needs_begin_frame_",
-                    frame_source_->NeedsBeginFrames());
   state->SetInteger("begin_retro_frame_args",
                     static_cast<int>(begin_retro_frame_args_.size()));
   state->SetBoolean("begin_retro_frame_task",
@@ -748,13 +743,14 @@ void Scheduler::AsValueInto(base::trace_event::TracedValue* state) const {
 
 void Scheduler::UpdateCompositorTimingHistoryRecordingEnabled() {
   compositor_timing_history_->SetRecordingEnabled(
-      state_machine_.HasInitializedOutputSurface() && state_machine_.visible());
+      state_machine_.HasInitializedOutputSurface() &&
+      state_machine_.visible() && frame_source_->NeedsBeginFrames());
 }
 
 bool Scheduler::ShouldRecoverMainLatency(const BeginFrameArgs& args) const {
   DCHECK(!settings_.using_synchronous_renderer_compositor);
 
-  if (!state_machine_.MainThreadIsInHighLatencyMode())
+  if (!state_machine_.main_thread_missed_last_deadline())
     return false;
 
   // When prioritizing impl thread latency, we currently put the
@@ -814,10 +810,10 @@ bool Scheduler::CanCommitAndActivateBeforeDeadline(
 }
 
 bool Scheduler::IsBeginMainFrameSentOrStarted() const {
-  return (state_machine_.commit_state() ==
-              SchedulerStateMachine::COMMIT_STATE_BEGIN_MAIN_FRAME_SENT ||
-          state_machine_.commit_state() ==
-              SchedulerStateMachine::COMMIT_STATE_BEGIN_MAIN_FRAME_STARTED);
+  return (state_machine_.begin_main_frame_state() ==
+              SchedulerStateMachine::BEGIN_MAIN_FRAME_STATE_SENT ||
+          state_machine_.begin_main_frame_state() ==
+              SchedulerStateMachine::BEGIN_MAIN_FRAME_STATE_STARTED);
 }
 
 }  // namespace cc

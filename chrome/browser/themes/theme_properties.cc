@@ -102,10 +102,27 @@ const SkColor kDefaultColorToolbarStrokeInactive = SkColorSetRGB(163, 163, 163);
 // ui::MaterialDesignController::Mode, see
 // ui/base/resource/material_design/material_design_controller.h
 
+// Additional horizontal padding applied on the trailing edge of icon-label
+// views.
+const int kIconLabelViewTrailingPadding[] = {2, 8, 8};
+
+// The horizontal space between the edge and a bubble
+const int kLocationBarBubbleHorizontalPadding[] = {1, 5, 5};
+
+// The additional vertical padding of a bubble.
+const int kLocationBarBubbleVerticalPadding[] = {1, 3, 3};
+
 // The height to be occupied by the LocationBar. For
 // MaterialDesignController::NON_MATERIAL the height is determined from image
 // assets.
 const int kLocationBarHeight[] = {0, 28, 32};
+
+// Space between items in the location bar, as well as between items and the
+// edges.
+const int kLocationBarHorizontalPadding[] = {3, 6, 6};
+
+// The Vertical padding of items in the location bar.
+const int kLocationBarVerticalPadding[] = {2, 6, 6};
 
 // The spacing between a ToolbarButton's image and its border.
 const int kToolbarButtonBorderInset[] = {2, 6, 6};
@@ -177,19 +194,17 @@ SkColor TintForUnderline(SkColor input) {
 
 // static
 int ThemeProperties::StringToAlignment(const std::string& alignment) {
-  std::vector<std::string> split;
-  base::SplitStringAlongWhitespace(alignment, &split);
-
   int alignment_mask = 0;
-  for (std::vector<std::string>::iterator component(split.begin());
-       component != split.end(); ++component) {
-    if (base::LowerCaseEqualsASCII(*component, kAlignmentTop))
+  for (const std::string& component : base::SplitString(
+           alignment, base::kWhitespaceASCII,
+           base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
+    if (base::LowerCaseEqualsASCII(component, kAlignmentTop))
       alignment_mask |= ALIGN_TOP;
-    else if (base::LowerCaseEqualsASCII(*component, kAlignmentBottom))
+    else if (base::LowerCaseEqualsASCII(component, kAlignmentBottom))
       alignment_mask |= ALIGN_BOTTOM;
-    else if (base::LowerCaseEqualsASCII(*component, kAlignmentLeft))
+    else if (base::LowerCaseEqualsASCII(component, kAlignmentLeft))
       alignment_mask |= ALIGN_LEFT;
-    else if (base::LowerCaseEqualsASCII(*component, kAlignmentRight))
+    else if (base::LowerCaseEqualsASCII(component, kAlignmentRight))
       alignment_mask |= ALIGN_RIGHT;
   }
   return alignment_mask;
@@ -345,8 +360,18 @@ int ThemeProperties::GetDefaultDisplayProperty(int id) {
       return kDefaultDisplayPropertyNTPTiling;
     case ThemeProperties::NTP_LOGO_ALTERNATE:
       return kDefaultDisplayPropertyNTPAlternateLogo;
+    case ThemeProperties::PROPERTY_ICON_LABEL_VIEW_TRAILING_PADDING:
+      return kIconLabelViewTrailingPadding[mode];
+    case ThemeProperties::PROPERTY_LOCATION_BAR_BUBBLE_HORIZONTAL_PADDING:
+      return kLocationBarBubbleHorizontalPadding[mode];
+    case ThemeProperties::PROPERTY_LOCATION_BAR_BUBBLE_VERTICAL_PADDING:
+      return kLocationBarBubbleVerticalPadding[mode];
     case ThemeProperties::PROPERTY_LOCATION_BAR_HEIGHT:
       return kLocationBarHeight[mode];
+    case ThemeProperties::PROPERTY_LOCATION_BAR_HORIZONTAL_PADDING:
+      return kLocationBarHorizontalPadding[mode];
+    case ThemeProperties::PROPERTY_LOCATION_BAR_VERTICAL_PADDING:
+      return kLocationBarVerticalPadding[mode];
     case ThemeProperties::PROPERTY_TOOLBAR_BUTTON_BORDER_INSET:
       return kToolbarButtonBorderInset[mode];
     case ThemeProperties::PROPERTY_TOOLBAR_VIEW_CONTENT_SHADOW_HEIGHT:

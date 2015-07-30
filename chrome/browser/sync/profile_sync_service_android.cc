@@ -192,13 +192,12 @@ void ProfileSyncServiceAndroid::GetAllNodes(JNIEnv* env,
   sync_service_->GetAllNodes(native_callback);
 }
 
-jboolean ProfileSyncServiceAndroid::SetSyncSessionsId(
+void ProfileSyncServiceAndroid::SetSyncSessionsId(
     JNIEnv* env, jobject obj, jstring tag) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   DCHECK(profile_);
   std::string machine_tag = ConvertJavaStringToUTF8(env, tag);
   sync_prefs_->SetSyncSessionsGUID(machine_tag);
-  return true;
 }
 
 jint ProfileSyncServiceAndroid::GetAuthError(JNIEnv* env, jobject) {
@@ -276,12 +275,10 @@ jboolean ProfileSyncServiceAndroid::SetDecryptionPassphrase(
 }
 
 void ProfileSyncServiceAndroid::SetEncryptionPassphrase(
-    JNIEnv* env, jobject obj, jstring passphrase, jboolean is_gaia) {
+    JNIEnv* env, jobject obj, jstring passphrase) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   std::string key = ConvertJavaStringToUTF8(env, passphrase);
-  sync_service_->SetEncryptionPassphrase(
-      key,
-      is_gaia ? ProfileSyncService::IMPLICIT : ProfileSyncService::EXPLICIT);
+  sync_service_->SetEncryptionPassphrase(key, ProfileSyncService::EXPLICIT);
 }
 
 jboolean ProfileSyncServiceAndroid::IsCryptographerReady(JNIEnv* env, jobject) {

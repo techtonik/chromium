@@ -8,6 +8,7 @@
 #include <string>
 
 #include "base/command_line.h"
+#include "base/guid.h"
 #include "base/location.h"
 #include "base/memory/ref_counted.h"
 #include "base/metrics/histogram_macros.h"
@@ -28,9 +29,9 @@
 #include "content/browser/service_worker/service_worker_metrics.h"
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/browser/service_worker/service_worker_utils.h"
-#include "content/browser/service_worker/stashed_port_manager.h"
 #include "content/browser/storage_partition_impl.h"
 #include "content/common/service_worker/service_worker_messages.h"
+#include "content/common/service_worker/service_worker_type_converters.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/page_navigator.h"
@@ -38,10 +39,12 @@
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "content/public/common/background_sync.mojom.h"
 #include "content/public/common/child_process_host.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/result_codes.h"
+#include "content/public/common/service_registry.h"
 #include "mojo/common/common_type_converters.h"
 #include "mojo/common/url_type_converters.h"
 #include "net/http/http_response_headers.h"
@@ -174,27 +177,18 @@ void RunErrorServicePortConnectCallback(
                base::string16());
 }
 
-void RunErrorSendStashedPortsCallback(
-    const ServiceWorkerVersion::SendStashedPortsCallback& callback,
-    ServiceWorkerStatusCode status) {
-  callback.Run(status, std::vector<int>());
-}
+using OpenURLCallback = base::Callback<void(int, int)>;
 
-using WindowOpenedCallback = base::Callback<void(int, int)>;
-
-// The WindowOpenedObserver class is a WebContentsObserver that will wait for a
-// new Window's WebContents to be initialized, run the |callback| passed to its
-// constructor then self destroy.
+// The OpenURLObserver class is a WebContentsObserver that will wait for a
+// WebContents to be initialized, run the |callback| passed to its constructor
+// then self destroy.
 // The callback will receive the process and frame ids. If something went wrong
 // those will be (kInvalidUniqueID, MSG_ROUTING_NONE).
 // The callback will be called in the IO thread.
-class WindowOpenedObserver : public WebContentsObserver {
+class OpenURLObserver : public WebContentsObserver {
  public:
-  WindowOpenedObserver(WebContents* web_contents,
-                       const WindowOpenedCallback& callback)
-    : WebContentsObserver(web_contents),
-      callback_(callback)
-  {}
+  OpenURLObserver(WebContents* web_contents, const OpenURLCallback& callback)
+      : WebContentsObserver(web_contents), callback_(callback) {}
 
   void DidCommitProvisionalLoadForFrame(
       RenderFrameHost* render_frame_host,
@@ -232,16 +226,44 @@ class WindowOpenedObserver : public WebContentsObserver {
     base::MessageLoop::current()->DeleteSoon(FROM_HERE, this);
   }
 
-  const WindowOpenedCallback callback_;
+  const OpenURLCallback callback_;
 
-  DISALLOW_COPY_AND_ASSIGN(WindowOpenedObserver);
+  DISALLOW_COPY_AND_ASSIGN(OpenURLObserver);
 };
 
-void DidOpenURL(const WindowOpenedCallback& callback,
-                WebContents* web_contents) {
+void DidOpenURL(const OpenURLCallback& callback, WebContents* web_contents) {
   DCHECK(web_contents);
 
-  new WindowOpenedObserver(web_contents, callback);
+  new OpenURLObserver(web_contents, callback);
+}
+
+void NavigateClientOnUI(const GURL& url,
+                        const GURL& script_url,
+                        int process_id,
+                        int frame_id,
+                        const OpenURLCallback& callback) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+
+  RenderFrameHost* render_frame_host =
+      RenderFrameHost::FromID(process_id, frame_id);
+  WebContents* web_contents =
+      WebContents::FromRenderFrameHost(render_frame_host);
+
+  if (!render_frame_host || !web_contents) {
+    BrowserThread::PostTask(
+        BrowserThread::IO, FROM_HERE,
+        base::Bind(callback, ChildProcessHost::kInvalidUniqueID,
+                   MSG_ROUTING_NONE));
+    return;
+  }
+
+  OpenURLParams params(
+      url, Referrer::SanitizeForRequest(
+               url, Referrer(script_url, blink::WebReferrerPolicyDefault)),
+      CURRENT_TAB, ui::PAGE_TRANSITION_AUTO_TOPLEVEL,
+      true /* is_renderer_initiated */);
+  web_contents->OpenURL(params);
+  DidOpenURL(callback, web_contents);
 }
 
 void OpenWindowOnUI(
@@ -249,7 +271,7 @@ void OpenWindowOnUI(
     const GURL& script_url,
     int process_id,
     const scoped_refptr<ServiceWorkerContextWrapper>& context_wrapper,
-    const WindowOpenedCallback& callback) {
+    const OpenURLCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
 
   BrowserContext* browser_context = context_wrapper->storage_partition()
@@ -377,21 +399,6 @@ bool IsInstalled(ServiceWorkerVersion::Status status) {
   }
   NOTREACHED() << "Unexpected status: " << status;
   return false;
-}
-
-scoped_refptr<StashedPortManager> GetStashedPortManagerOnUIThread(
-    const scoped_refptr<ServiceWorkerContextWrapper>& context_wrapper) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  return context_wrapper->storage_partition()->GetStashedPortManager();
-}
-
-void StashPortImpl(
-    const scoped_refptr<ServiceWorkerVersion>& service_worker,
-    int message_port_id,
-    const base::string16& name,
-    const scoped_refptr<StashedPortManager>& stashed_port_manager) {
-  DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  stashed_port_manager->AddPort(service_worker.get(), message_port_id, name);
 }
 
 }  // namespace
@@ -790,25 +797,30 @@ void ServiceWorkerVersion::DispatchFetchEvent(
   }
 }
 
-void ServiceWorkerVersion::DispatchSyncEvent(const StatusCallback& callback) {
+void ServiceWorkerVersion::DispatchSyncEvent(SyncRegistrationPtr registration,
+                                             const StatusCallback& callback) {
   DCHECK_EQ(ACTIVATED, status()) << status();
   if (running_status() != RUNNING) {
     // Schedule calling this method after starting the worker.
-    StartWorker(base::Bind(&RunTaskAfterStartWorker,
-                           weak_factory_.GetWeakPtr(), callback,
-                           base::Bind(&self::DispatchSyncEvent,
-                                      weak_factory_.GetWeakPtr(),
-                                      callback)));
+    StartWorker(base::Bind(
+        &RunTaskAfterStartWorker, weak_factory_.GetWeakPtr(), callback,
+        base::Bind(&self::DispatchSyncEvent, weak_factory_.GetWeakPtr(),
+                   base::Passed(registration.Pass()), callback)));
     return;
   }
 
   int request_id = AddRequest(callback, &sync_requests_, REQUEST_SYNC);
-  ServiceWorkerStatusCode status = embedded_worker_->SendMessage(
-      ServiceWorkerMsg_SyncEvent(request_id));
-  if (status != SERVICE_WORKER_OK) {
-    sync_requests_.Remove(request_id);
-    RunSoon(base::Bind(callback, status));
+  if (!background_sync_dispatcher_) {
+    embedded_worker_->GetServiceRegistry()->ConnectToRemoteService(
+        mojo::GetProxy(&background_sync_dispatcher_));
+    background_sync_dispatcher_.set_connection_error_handler(base::Bind(
+        &ServiceWorkerVersion::OnBackgroundSyncDispatcherConnectionError,
+        weak_factory_.GetWeakPtr()));
   }
+
+  background_sync_dispatcher_->Sync(
+      registration.Pass(), base::Bind(&self::OnSyncEventFinished,
+                                      weak_factory_.GetWeakPtr(), request_id));
 }
 
 void ServiceWorkerVersion::DispatchNotificationClickEvent(
@@ -967,32 +979,6 @@ void ServiceWorkerVersion::DispatchCrossOriginMessageEvent(
   RunSoon(base::Bind(callback, status));
 }
 
-void ServiceWorkerVersion::SendStashedMessagePorts(
-    const std::vector<TransferredMessagePort>& stashed_message_ports,
-    const std::vector<base::string16>& port_names,
-    const SendStashedPortsCallback& callback) {
-  if (running_status() != RUNNING) {
-    // Schedule calling this method after starting the worker.
-    StartWorker(base::Bind(
-        &RunTaskAfterStartWorker, weak_factory_.GetWeakPtr(),
-        base::Bind(&RunErrorSendStashedPortsCallback, callback),
-        base::Bind(&self::SendStashedMessagePorts, weak_factory_.GetWeakPtr(),
-                   stashed_message_ports, port_names, callback)));
-    return;
-  }
-
-  MessagePortMessageFilter* filter =
-      embedded_worker_->message_port_message_filter();
-  std::vector<int> new_routing_ids(stashed_message_ports.size());
-  for (size_t i = 0; i < stashed_message_ports.size(); ++i)
-    new_routing_ids[i] = filter->GetNextRoutingID();
-
-  ServiceWorkerStatusCode status =
-      embedded_worker_->SendMessage(ServiceWorkerMsg_SendStashedMessagePorts(
-          stashed_message_ports, new_routing_ids, port_names));
-  RunSoon(base::Bind(callback, status, new_routing_ids));
-}
-
 void ServiceWorkerVersion::AddControllee(
     ServiceWorkerProviderHost* provider_host) {
   const std::string& uuid = provider_host->client_uuid();
@@ -1015,6 +1001,10 @@ void ServiceWorkerVersion::RemoveControllee(
   if (HasControllee())
     return;
   FOR_EACH_OBSERVER(Listener, listeners_, OnNoControllees(this));
+}
+
+bool ServiceWorkerVersion::HasWindowClients() {
+  return !GetWindowClientsInternal(false /* include_uncontrolled */).empty();
 }
 
 void ServiceWorkerVersion::AddStreamingURLRequestJob(
@@ -1207,8 +1197,6 @@ bool ServiceWorkerVersion::OnMessageReceived(const IPC::Message& message) {
                         OnInstallEventFinished)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_FetchEventFinished,
                         OnFetchEventFinished)
-    IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_SyncEventFinished,
-                        OnSyncEventFinished)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_NotificationClickEventFinished,
                         OnNotificationClickEventFinished)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_PushEventFinished,
@@ -1225,13 +1213,12 @@ bool ServiceWorkerVersion::OnMessageReceived(const IPC::Message& message) {
                         OnPostMessageToClient)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_FocusClient,
                         OnFocusClient)
+    IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_NavigateClient, OnNavigateClient)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_SkipWaiting,
                         OnSkipWaiting)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_ClaimClients,
                         OnClaimClients)
     IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_Pong, OnPongFromWorker)
-    IPC_MESSAGE_HANDLER(ServiceWorkerHostMsg_StashMessagePort,
-                        OnStashMessagePort)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   return handled;
@@ -1392,7 +1379,7 @@ void ServiceWorkerVersion::OnFetchEventFinished(
 
 void ServiceWorkerVersion::OnSyncEventFinished(
     int request_id,
-    blink::WebServiceWorkerEventResult result) {
+    ServiceWorkerEventStatus status) {
   TRACE_EVENT1("ServiceWorker",
                "ServiceWorkerVersion::OnSyncEventFinished",
                "Request id", request_id);
@@ -1402,13 +1389,8 @@ void ServiceWorkerVersion::OnSyncEventFinished(
     return;
   }
 
-  ServiceWorkerStatusCode status = SERVICE_WORKER_OK;
-  if (result == blink::WebServiceWorkerEventResultRejected) {
-    status = SERVICE_WORKER_ERROR_EVENT_WAITUNTIL_REJECTED;
-  }
-
   scoped_refptr<ServiceWorkerVersion> protect(this);
-  request->callback.Run(status);
+  request->callback.Run(mojo::ConvertTo<ServiceWorkerStatusCode>(status));
   RemoveCallbackAndStopIfRedundant(&sync_requests_, request_id);
 }
 
@@ -1691,6 +1673,105 @@ void ServiceWorkerVersion::OnFocusClientFinished(
       request_id, client_info));
 }
 
+void ServiceWorkerVersion::OnNavigateClient(int request_id,
+                                            const std::string& client_uuid,
+                                            const GURL& url) {
+  if (!context_)
+    return;
+
+  TRACE_EVENT2("ServiceWorker", "ServiceWorkerVersion::OnNavigateClient",
+               "Request id", request_id, "Client id", client_uuid);
+
+  if (!url.is_valid() || !base::IsValidGUID(client_uuid)) {
+    DVLOG(1) << "Received unexpected invalid URL/UUID from renderer process.";
+    BrowserThread::PostTask(
+        BrowserThread::UI, FROM_HERE,
+        base::Bind(&KillEmbeddedWorkerProcess, embedded_worker_->process_id(),
+                   RESULT_CODE_KILLED_BAD_MESSAGE));
+    return;
+  }
+
+  // Reject requests for URLs that the process is not allowed to access. It's
+  // possible to receive such requests since the renderer-side checks are
+  // slightly different. For example, the view-source scheme will not be
+  // filtered out by Blink.
+  if (!ChildProcessSecurityPolicyImpl::GetInstance()->CanRequestURL(
+          embedded_worker_->process_id(), url)) {
+    embedded_worker_->SendMessage(
+        ServiceWorkerMsg_NavigateClientError(request_id, url));
+    return;
+  }
+
+  ServiceWorkerProviderHost* provider_host =
+      context_->GetProviderHostByClientID(client_uuid);
+  if (!provider_host || provider_host->active_version() != this) {
+    embedded_worker_->SendMessage(
+        ServiceWorkerMsg_NavigateClientError(request_id, url));
+    return;
+  }
+
+  BrowserThread::PostTask(
+      BrowserThread::UI, FROM_HERE,
+      base::Bind(&NavigateClientOnUI, url, script_url_,
+                 provider_host->process_id(), provider_host->frame_id(),
+                 base::Bind(&ServiceWorkerVersion::DidNavigateClient,
+                            weak_factory_.GetWeakPtr(), request_id)));
+}
+
+void ServiceWorkerVersion::DidNavigateClient(int request_id,
+                                             int render_process_id,
+                                             int render_frame_id) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+
+  if (running_status() != RUNNING)
+    return;
+
+  if (render_process_id == ChildProcessHost::kInvalidUniqueID &&
+      render_frame_id == MSG_ROUTING_NONE) {
+    embedded_worker_->SendMessage(
+        ServiceWorkerMsg_NavigateClientError(request_id, GURL()));
+    return;
+  }
+
+  for (auto it =
+           context_->GetClientProviderHostIterator(script_url_.GetOrigin());
+       !it->IsAtEnd(); it->Advance()) {
+    ServiceWorkerProviderHost* provider_host = it->GetProviderHost();
+    if (provider_host->process_id() != render_process_id ||
+        provider_host->frame_id() != render_frame_id) {
+      continue;
+    }
+    provider_host->GetWindowClientInfo(base::Bind(
+        &ServiceWorkerVersion::OnNavigateClientFinished,
+        weak_factory_.GetWeakPtr(), request_id, provider_host->client_uuid()));
+    return;
+  }
+
+  OnNavigateClientFinished(request_id, std::string(),
+                           ServiceWorkerClientInfo());
+}
+
+void ServiceWorkerVersion::OnNavigateClientFinished(
+    int request_id,
+    const std::string& client_uuid,
+    const ServiceWorkerClientInfo& client_info) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+
+  if (running_status() != RUNNING)
+    return;
+
+  ServiceWorkerClientInfo client(client_info);
+
+  // If the |client_info| is empty, it means that the navigated client wasn't
+  // controlled but the action still succeeded. The renderer process is
+  // expecting an empty client in such case.
+  if (!client.IsEmpty())
+    client.client_uuid = client_uuid;
+
+  embedded_worker_->SendMessage(
+      ServiceWorkerMsg_NavigateClientResponse(request_id, client));
+}
+
 void ServiceWorkerVersion::OnSkipWaiting(int request_id) {
   skip_waiting_ = true;
   if (status_ != INSTALLED)
@@ -1736,26 +1817,6 @@ void ServiceWorkerVersion::OnClaimClients(int request_id) {
 
 void ServiceWorkerVersion::OnPongFromWorker() {
   ping_controller_->OnPongReceived();
-}
-
-void ServiceWorkerVersion::OnStashMessagePort(int message_port_id,
-                                              const base::string16& name) {
-  // Just abort if we are shutting down.
-  if (!context_)
-    return;
-
-  ServiceWorkerRegistration* registration =
-      context_->GetLiveRegistration(registration_id_);
-  if (!registration)
-    return;
-
-  // TODO(mek): Figure out a way to avoid this round-trip through the UI thread.
-  BrowserThread::PostTaskAndReplyWithResult(
-      BrowserThread::UI, FROM_HERE,
-      base::Bind(&GetStashedPortManagerOnUIThread,
-                 make_scoped_refptr(context_->wrapper())),
-      base::Bind(&StashPortImpl, make_scoped_refptr(this), message_port_id,
-                 name));
 }
 
 void ServiceWorkerVersion::DidEnsureLiveRegistrationForStartWorker(
@@ -1814,17 +1875,8 @@ void ServiceWorkerVersion::GetWindowClients(
     const ServiceWorkerClientQueryOptions& options) {
   DCHECK(options.client_type == blink::WebServiceWorkerClientTypeWindow ||
          options.client_type == blink::WebServiceWorkerClientTypeAll);
-  std::vector<base::Tuple<int, int, std::string>> clients_info;
-  if (!options.include_uncontrolled) {
-    for (auto& controllee : controllee_map_)
-      AddWindowClient(controllee.second, &clients_info);
-  } else {
-    for (auto it =
-             context_->GetClientProviderHostIterator(script_url_.GetOrigin());
-         !it->IsAtEnd(); it->Advance()) {
-      AddWindowClient(it->GetProviderHost(), &clients_info);
-    }
-  }
+  const std::vector<base::Tuple<int, int, std::string>>& clients_info =
+      GetWindowClientsInternal(options.include_uncontrolled);
 
   if (clients_info.empty()) {
     DidGetWindowClients(request_id, options,
@@ -1837,6 +1889,22 @@ void ServiceWorkerVersion::GetWindowClients(
       base::Bind(&OnGetWindowClientsFromUI, clients_info, script_url_,
                  base::Bind(&ServiceWorkerVersion::DidGetWindowClients,
                             weak_factory_.GetWeakPtr(), request_id, options)));
+}
+
+const std::vector<base::Tuple<int, int, std::string>>
+ServiceWorkerVersion::GetWindowClientsInternal(bool include_uncontrolled) {
+  std::vector<base::Tuple<int, int, std::string>> clients_info;
+  if (!include_uncontrolled) {
+    for (auto& controllee : controllee_map_)
+      AddWindowClient(controllee.second, &clients_info);
+  } else {
+    for (auto it =
+             context_->GetClientProviderHostIterator(script_url_.GetOrigin());
+         !it->IsAtEnd(); it->Advance()) {
+      AddWindowClient(it->GetProviderHost(), &clients_info);
+    }
+  }
+  return clients_info;
 }
 
 void ServiceWorkerVersion::DidGetWindowClients(
@@ -2211,6 +2279,8 @@ void ServiceWorkerVersion::OnStoppedInternal(
   // for messages that are still outstanding for those services.
   OnServicePortDispatcherConnectionError();
 
+  OnBackgroundSyncDispatcherConnectionError();
+
   streaming_url_request_jobs_.clear();
 
   FOR_EACH_OBSERVER(Listener, listeners_, OnRunningStateChanged(this));
@@ -2224,6 +2294,11 @@ void ServiceWorkerVersion::OnServicePortDispatcherConnectionError() {
                     SERVICE_WORKER_ERROR_FAILED, false, base::string16(),
                     base::string16());
   service_port_dispatcher_.reset();
+}
+
+void ServiceWorkerVersion::OnBackgroundSyncDispatcherConnectionError() {
+  RunIDMapCallbacks(&sync_requests_, SERVICE_WORKER_ERROR_FAILED);
+  background_sync_dispatcher_.reset();
 }
 
 }  // namespace content

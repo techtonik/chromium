@@ -35,6 +35,7 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewStructure;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityManager.AccessibilityStateChangeListener;
 import android.view.accessibility.AccessibilityNodeProvider;
@@ -44,14 +45,14 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.FrameLayout;
 
 import org.chromium.base.ApiCompatibilityUtils;
-import org.chromium.base.CalledByNative;
 import org.chromium.base.CommandLine;
-import org.chromium.base.JNINamespace;
 import org.chromium.base.Log;
 import org.chromium.base.ObserverList;
 import org.chromium.base.ObserverList.RewindableIterator;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.VisibleForTesting;
+import org.chromium.base.annotations.CalledByNative;
+import org.chromium.base.annotations.JNINamespace;
 import org.chromium.content.R;
 import org.chromium.content.browser.ScreenOrientationListener.ScreenOrientationObserver;
 import org.chromium.content.browser.accessibility.BrowserAccessibilityManager;
@@ -63,6 +64,7 @@ import org.chromium.content.browser.input.GamepadList;
 import org.chromium.content.browser.input.ImeAdapter;
 import org.chromium.content.browser.input.ImeAdapter.AdapterInputConnectionFactory;
 import org.chromium.content.browser.input.InputMethodManagerWrapper;
+import org.chromium.content.browser.input.JoystickScrollProvider;
 import org.chromium.content.browser.input.PastePopupMenu;
 import org.chromium.content.browser.input.PastePopupMenu.PastePopupMenuDelegate;
 import org.chromium.content.browser.input.PopupTouchHandleDrawable;
@@ -72,6 +74,8 @@ import org.chromium.content.browser.input.SelectPopupDialog;
 import org.chromium.content.browser.input.SelectPopupDropdown;
 import org.chromium.content.browser.input.SelectPopupItem;
 import org.chromium.content.common.ContentSwitches;
+import org.chromium.content_public.browser.AccessibilitySnapshotCallback;
+import org.chromium.content_public.browser.AccessibilitySnapshotNode;
 import org.chromium.content_public.browser.GestureStateListener;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
@@ -111,6 +115,14 @@ public class ContentViewCore implements
     // Used to represent gestures for long press and long tap.
     private static final int IS_LONG_PRESS = 1;
     private static final int IS_LONG_TAP = 2;
+
+    /**
+     * TODO(sgurun) remove these and use public API. crbug/512264
+     */
+    private static final int TEXT_STYLE_BOLD = 1 << 0;
+    private static final int TEXT_STYLE_ITALIC = 1 << 1;
+    private static final int TEXT_STYLE_UNDERLINE = 1 << 2;
+    private static final int TEXT_STYLE_STRIKE_THRU = 1 << 3;
 
     private static final ZoomControlsDelegate NO_OP_ZOOM_CONTROLS_DELEGATE =
             new ZoomControlsDelegate() {
@@ -502,6 +514,9 @@ public class ContentViewCore implements
     // Cached copy of all positions and scales as reported by the renderer.
     private final RenderCoordinates mRenderCoordinates;
 
+    // Provides smooth gamepad joystick-driven scrolling.
+    private final JoystickScrollProvider mJoystickScrollProvider;
+
     private boolean mIsMobileOptimizedHint;
 
     // Tracks whether a selection is currently active.  When applied to selected text, indicates
@@ -552,9 +567,9 @@ public class ContentViewCore implements
     // because the OSK was just brought up.
     private final Rect mFocusPreOSKViewportRect = new Rect();
 
-    // On tap this will store the x, y coordinates of the touch.
-    private int mLastTapX;
-    private int mLastTapY;
+    // Store the x, y coordinates of the last touch or mouse event.
+    private float mLastFocalEventX;
+    private float mLastFocalEventY;
 
     // Whether a touch scroll sequence is active, used to hide text selection
     // handles. Note that a scroll sequence will *always* bound a pinch
@@ -628,6 +643,7 @@ public class ContentViewCore implements
         mInputMethodManagerWrapper = new InputMethodManagerWrapper(mContext);
 
         mRenderCoordinates = new RenderCoordinates();
+        mJoystickScrollProvider = new JoystickScrollProvider(this);
         float deviceScaleFactor = getContext().getResources().getDisplayMetrics().density;
         String forceScaleFactor = CommandLine.getInstance().getSwitchValue(
                 ContentSwitches.FORCE_DEVICE_SCALE_FACTOR);
@@ -1139,6 +1155,7 @@ public class ContentViewCore implements
     /**
      * @return The selected text (empty if no text selected).
      */
+    @VisibleForTesting
     public String getSelectedText() {
         return mHasSelection ? mLastSelectedText : "";
     }
@@ -1401,17 +1418,6 @@ public class ContentViewCore implements
                     break;
             }
         }
-    }
-
-    /**
-     * Sets whether or not this {@link ContentViewCore} will visibly display it's content. By
-     * default this is set to {@code true} so there is no need to call this to start showing content
-     * when initially creating a {@link ContentViewCore}.
-     * @param draws Whether or not this {@link ContentViewCore} should draw.
-     */
-    public void setDrawsContent(boolean draws) {
-        if (mNativeContentViewCore == 0) return;
-        nativeSetDrawsContent(mNativeContentViewCore, draws);
     }
 
     /**
@@ -1765,6 +1771,8 @@ public class ContentViewCore implements
     public boolean onGenericMotionEvent(MotionEvent event) {
         if (GamepadList.onGenericMotionEvent(event)) return true;
         if ((event.getSource() & InputDevice.SOURCE_CLASS_POINTER) != 0) {
+            mLastFocalEventX = event.getX();
+            mLastFocalEventY = event.getY();
             switch (event.getAction()) {
                 case MotionEvent.ACTION_SCROLL:
                     if (mNativeContentViewCore == 0) return false;
@@ -1789,6 +1797,8 @@ public class ContentViewCore implements
                     mContainerView.postDelayed(mFakeMouseMoveRunnable, 250);
                     return true;
             }
+        } else if ((event.getSource() & InputDevice.SOURCE_CLASS_JOYSTICK) != 0) {
+            if (mJoystickScrollProvider.onMotion(event)) return true;
         }
         return mContainerViewInternals.super_onGenericMotionEvent(event);
     }
@@ -1817,7 +1827,7 @@ public class ContentViewCore implements
      * are overridden, so that View's mScrollX and mScrollY will be unchanged at
      * (0, 0). This is critical for drawing ContentView correctly.
      */
-    public void scrollBy(float dxPix, float dyPix) {
+    public void scrollBy(float dxPix, float dyPix, boolean useLastFocalEventLocation) {
         if (mNativeContentViewCore == 0) return;
         if (dxPix == 0 && dyPix == 0) return;
         long time = SystemClock.uptimeMillis();
@@ -1825,8 +1835,12 @@ public class ContentViewCore implements
         // be active when programatically scrolling. Cancelling the fling in
         // such cases ensures a consistent gesture event stream.
         if (mPotentiallyActiveFlingCount > 0) nativeFlingCancel(mNativeContentViewCore, time);
-        nativeScrollBegin(mNativeContentViewCore, time, 0, 0, -dxPix, -dyPix, false);
-        nativeScrollBy(mNativeContentViewCore, time, 0, 0, dxPix, dyPix);
+        // x/y represents starting location of scroll.
+        final float x = useLastFocalEventLocation ? mLastFocalEventX : 0f;
+        final float y = useLastFocalEventLocation ? mLastFocalEventY : 0f;
+        nativeScrollBegin(
+                mNativeContentViewCore, time, x, y, -dxPix, -dyPix, !useLastFocalEventLocation);
+        nativeScrollBy(mNativeContentViewCore, time, x, y, dxPix, dyPix);
         nativeScrollEnd(mNativeContentViewCore, time);
     }
 
@@ -1839,7 +1853,7 @@ public class ContentViewCore implements
         final float yCurrentPix = mRenderCoordinates.getScrollYPix();
         final float dxPix = xPix - xCurrentPix;
         final float dyPix = yPix - yCurrentPix;
-        scrollBy(dxPix, dyPix);
+        scrollBy(dxPix, dyPix, false);
     }
 
     // NOTE: this can go away once ContentView.getScrollX() reports correct values.
@@ -1933,23 +1947,8 @@ public class ContentViewCore implements
         }
 
         if (!mPopupZoomer.isShowing()) mPopupZoomer.setLastTouch(xPix, yPix);
-
-        mLastTapX = (int) xPix;
-        mLastTapY = (int) yPix;
-    }
-
-    /**
-     * @return The x coordinate for the last point that a tap or press gesture was initiated from.
-     */
-    public int getLastTapX()  {
-        return mLastTapX;
-    }
-
-    /**
-     * @return The y coordinate for the last point that a tap or press gesture was initiated from.
-     */
-    public int getLastTapY()  {
-        return mLastTapY;
+        mLastFocalEventX = xPix;
+        mLastFocalEventY = yPix;
     }
 
     public void setZoomControlsDelegate(ZoomControlsDelegate zoomControlsDelegate) {
@@ -2402,6 +2401,7 @@ public class ContentViewCore implements
 
             if (focusedNodeEditable != mFocusedNodeEditable) {
                 mFocusedNodeEditable = focusedNodeEditable;
+                mJoystickScrollProvider.setEnabled(!mFocusedNodeEditable);
                 getContentViewClient().onFocusedNodeEditabilityChanged(mFocusedNodeEditable);
             }
         } finally {
@@ -2466,6 +2466,7 @@ public class ContentViewCore implements
     /**
      * @return The visible select popup being shown.
      */
+    @VisibleForTesting
     public SelectPopup getSelectPopupForTest() {
         return mSelectPopup;
     }
@@ -2941,6 +2942,57 @@ public class ContentViewCore implements
         return null;
     }
 
+    // @TargetApi(Build.VERSION_CODES.M) TODO(sgurun) add method document once API is public
+    // crbug/512264
+    public void onProvideVirtualStructure(final ViewStructure structure) {
+        // Do not collect accessibility tree in incognito mode
+        if (getWebContents().isIncognito()) {
+            structure.setChildCount(0);
+            return;
+        }
+
+        structure.setChildCount(1);
+        final ViewStructure viewRoot = structure.asyncNewChild(0);
+        getWebContents().requestAccessibilitySnapshot(
+                new AccessibilitySnapshotCallback() {
+                    @Override
+                    public void onAccessibilitySnapshot(AccessibilitySnapshotNode root) {
+                        viewRoot.setClassName("");
+                        if (root == null) {
+                            viewRoot.asyncCommit();
+                            return;
+                        }
+                        createVirtualStructure(viewRoot, root, 0, 0);
+                    }
+                },
+                mRenderCoordinates.getContentOffsetYPix(),
+                mRenderCoordinates.getScrollXPix());
+    }
+
+    // When creating the View structure, the left and top are relative to the parent node.
+    // The X scroll is not used, rather compensated through X-position, while the Y scroll
+    // is provided.
+    private void createVirtualStructure(ViewStructure viewNode, AccessibilitySnapshotNode node,
+            int parentX, int parentY) {
+        viewNode.setClassName(node.className);
+        viewNode.setText(node.text);
+        viewNode.setDimens(node.x - parentX - node.scrollX, node.y - parentY, 0, node.scrollY,
+                node.width, node.height);
+        viewNode.setChildCount(node.children.size());
+        if (node.hasStyle) {
+            int style = (node.bold ? TEXT_STYLE_BOLD : 0)
+                    | (node.italic ? TEXT_STYLE_ITALIC : 0)
+                    | (node.underline ? TEXT_STYLE_UNDERLINE : 0)
+                    | (node.lineThrough ? TEXT_STYLE_STRIKE_THRU : 0);
+            viewNode.setTextStyle(node.textSize, node.color, node.bgcolor, style);
+        }
+        for (int i = 0; i < node.children.size(); i++) {
+            createVirtualStructure(viewNode.asyncNewChild(i), node.children.get(i), node.x,
+                    node.y);
+        }
+        viewNode.asyncCommit();
+    }
+
     @TargetApi(Build.VERSION_CODES.KITKAT)
     @Override
     public void onSystemCaptioningChanged(TextTrackSettings settings) {
@@ -3267,6 +3319,4 @@ public class ContentViewCore implements
             int x, int y, int w, int h);
 
     private native void nativeSetBackgroundOpaque(long nativeContentViewCoreImpl, boolean opaque);
-
-    private native void nativeSetDrawsContent(long nativeContentViewCoreImpl, boolean draws);
 }

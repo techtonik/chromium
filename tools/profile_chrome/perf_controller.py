@@ -12,7 +12,6 @@ import tempfile
 from profile_chrome import controllers
 from profile_chrome import ui
 
-from pylib import android_commands
 from pylib import constants
 from pylib.perf import perf_control
 from pylib.utils import device_temp_file
@@ -22,7 +21,7 @@ sys.path.append(os.path.join(constants.DIR_SOURCE_ROOT,
                              'telemetry'))
 try:
   # pylint: disable=F0401
-  from telemetry.core.platform.profiler import android_profiling_helper
+  from telemetry.internal.platform.profiler import android_profiling_helper
   from catapult_base import binary_manager
 except ImportError:
   android_profiling_helper = None

@@ -101,9 +101,9 @@
           './gallery_data_model.js',
           './gallery_item.js',
           './gallery_util.js',
-          './mosaic_mode.js',
           './ribbon.js',
           './slide_mode.js',
+          './thumbnail_mode.js',
         ],
         'externs': [
           '<(EXTERNS_DIR)/chrome_send.js',
@@ -113,6 +113,7 @@
           '../../../../third_party/analytics/externs.js',
           '../../externs/chrome_test.js',
           '../../externs/exif_entry.js',
+          '../../externs/files_elements.js',
           '../../externs/gallery_foreground.js',
           '../../externs/paper_elements.js',
           '../../externs/platform.js',

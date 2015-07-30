@@ -67,7 +67,6 @@ import org.chromium.chrome.browser.ChromeSwitches;
 import org.chromium.chrome.browser.ContextualMenuBar;
 import org.chromium.chrome.browser.ContextualMenuBar.ActionBarDelegate;
 import org.chromium.chrome.browser.CustomSelectionActionModeCallback;
-import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.WebsiteSettingsPopup;
 import org.chromium.chrome.browser.WindowDelegate;
 import org.chromium.chrome.browser.appmenu.AppMenuButtonHelper;
@@ -90,6 +89,7 @@ import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.search_engines.TemplateUrlService;
 import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
 import org.chromium.chrome.browser.tab.ChromeTab;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.toolbar.ToolbarDataProvider;
 import org.chromium.chrome.browser.toolbar.ToolbarPhone;
 import org.chromium.chrome.browser.util.FeatureUtilities;
@@ -818,7 +818,6 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
                 });
 
         mWindowAndroid = windowAndroid;
-        mMicButton.setOnClickListener(this);
     }
 
     /**
@@ -840,6 +839,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
         mNavigationButton.setOnClickListener(this);
         updateMicButtonState();
         mDeleteButton.setOnClickListener(this);
+        mMicButton.setOnClickListener(this);
 
         mAutocomplete = new AutocompleteController(this);
 

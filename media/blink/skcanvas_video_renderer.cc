@@ -153,11 +153,11 @@ scoped_ptr<SkImage> CreateSkImageFromVideoFrameYUVTextures(
       {uv_tex_size.width(), uv_tex_size.height()},
   };
 
-  // TODO(dcastagna): Skia currently doesn't support Rec709 YUV conversion.
-  DCHECK(!CheckColorSpace(video_frame, media::COLOR_SPACE_HD_REC709));
   SkYUVColorSpace color_space = kRec601_SkYUVColorSpace;
   if (CheckColorSpace(video_frame, media::COLOR_SPACE_JPEG))
     color_space = kJPEG_SkYUVColorSpace;
+  else if (CheckColorSpace(video_frame, media::COLOR_SPACE_HD_REC709))
+    color_space = kRec709_SkYUVColorSpace;
 
   SkImage* img = SkImage::NewFromYUVTexturesCopy(context_3d.gr_context,
                                                  color_space, handles, yuvSizes,
@@ -213,18 +213,17 @@ class VideoImageGenerator : public SkImageGenerator {
   void set_frame(const scoped_refptr<VideoFrame>& frame) { frame_ = frame; }
 
  protected:
-  Result onGetPixels(const SkImageInfo& info,
-                     void* pixels,
-                     size_t row_bytes,
-                     const Options&,
-                     SkPMColor ctable[],
-                     int* ctable_count) override {
+  bool onGetPixels(const SkImageInfo& info,
+                   void* pixels,
+                   size_t row_bytes,
+                   SkPMColor ctable[],
+                   int* ctable_count) override {
     if (!frame_.get())
-      return kInvalidInput;
+      return false;
     // If skia couldn't do the YUV conversion on GPU, we will on CPU.
     SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
         frame_, pixels, row_bytes);
-    return kSuccess;
+    return true;
   }
 
   bool onGetYUV8Planes(SkISize sizes[3],
@@ -232,10 +231,9 @@ class VideoImageGenerator : public SkImageGenerator {
                        size_t row_bytes[3],
                        SkYUVColorSpace* color_space) override {
     if (!frame_.get() || !media::IsYuvPlanar(frame_->format()) ||
-        // TODO(rileya): Skia currently doesn't support Rec709 YUV conversion,
-        // or YUVA conversion. Remove this case once it does. As-is we will
-        // fall back on the pure-software path in this case.
-        CheckColorSpace(frame_, COLOR_SPACE_HD_REC709) ||
+        // TODO(rileya): Skia currently doesn't support YUVA conversion. Remove
+        // this case once it does. As-is we will fall back on the pure-software
+        // path in this case.
         frame_->format() == PIXEL_FORMAT_YV12A) {
       return false;
     }
@@ -243,6 +241,8 @@ class VideoImageGenerator : public SkImageGenerator {
     if (color_space) {
       if (CheckColorSpace(frame_, COLOR_SPACE_JPEG))
         *color_space = kJPEG_SkYUVColorSpace;
+      else if (CheckColorSpace(frame_, COLOR_SPACE_HD_REC709))
+        *color_space = kRec709_SkYUVColorSpace;
       else
         *color_space = kRec601_SkYUVColorSpace;
     }

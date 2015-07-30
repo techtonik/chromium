@@ -216,7 +216,7 @@ void CreateAppListShortcuts(
     base::FilePath shortcut_to_pin =
         user_data_dir.Append(app_list_shortcut_name).
             AddExtension(installer::kLnkExt);
-    success = base::win::TaskbarPinShortcutLink(shortcut_to_pin) && success;
+    success = base::win::PinShortcutToTaskbar(shortcut_to_pin) && success;
   }
 }
 
@@ -330,14 +330,14 @@ void AppListServiceWin::ScheduleWarmup() {
   // to the server-side analysis tool, reducing this period to 10 sec in Dev
   // builds and Canary, where profiler instrumentations are enabled.
   switch (chrome::VersionInfo::GetChannel()) {
-    case chrome::VersionInfo::CHANNEL_UNKNOWN:
-    case chrome::VersionInfo::CHANNEL_CANARY:
+    case version_info::Channel::UNKNOWN:
+    case version_info::Channel::CANARY:
       kInitWindowDelay = 10;
       break;
 
-    case chrome::VersionInfo::CHANNEL_DEV:
-    case chrome::VersionInfo::CHANNEL_BETA:
-    case chrome::VersionInfo::CHANNEL_STABLE:
+    case version_info::Channel::DEV:
+    case version_info::Channel::BETA:
+    case version_info::Channel::STABLE:
       // Except on Canary, don't bother scheduling an app launcher warmup when
       // it's not already enabled. Always schedule on Canary while collecting
       // profiler data (see comment above).

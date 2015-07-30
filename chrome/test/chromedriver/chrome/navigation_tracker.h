@@ -49,7 +49,8 @@ class NavigationTracker : public DevToolsEventListener {
                  const std::string& method,
                  const base::DictionaryValue& params) override;
   Status OnCommandSuccess(DevToolsClient* client,
-                          const std::string& method) override;
+                          const std::string& method,
+                          const base::DictionaryValue& result) override;
 
  private:
   DevToolsClient* client_;
@@ -59,6 +60,7 @@ class NavigationTracker : public DevToolsEventListener {
   std::set<std::string> scheduled_frame_set_;
 
   void ResetLoadingState(LoadingState loading_state);
+  bool IsExpectingFrameLoadingEvents();
 
   DISALLOW_COPY_AND_ASSIGN(NavigationTracker);
 };

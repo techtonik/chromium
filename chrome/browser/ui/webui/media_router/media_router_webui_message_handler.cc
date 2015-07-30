@@ -62,6 +62,7 @@ scoped_ptr<base::DictionaryValue> RouteToValue(const MediaRoute& route) {
   dictionary->SetString("sinkId", route.media_sink().id());
   dictionary->SetString("title", route.description());
   dictionary->SetBoolean("isLocal", route.is_local());
+  dictionary->SetString("customControllerPath", route.custom_controller_path());
 
   return dictionary.Pass();
 }
@@ -87,6 +88,7 @@ scoped_ptr<base::ListValue> CastModesToValue(const CastModeSet& cast_modes,
     cast_mode_val->SetInteger("type", cast_mode);
     cast_mode_val->SetString("title",
                              MediaCastModeToTitle(cast_mode, source_host));
+    cast_mode_val->SetString("host", source_host);
     cast_mode_val->SetString(
         "description", MediaCastModeToDescription(cast_mode, source_host));
     value->Append(cast_mode_val.release());
@@ -217,6 +219,8 @@ void MediaRouterWebUIMessageHandler::OnRequestInitialData(
   base::DictionaryValue initial_data;
 
   initial_data.SetString("headerText", media_router_ui->GetInitialHeaderText());
+  initial_data.SetString("headerTextTooltip",
+      media_router_ui->GetInitialHeaderTextTooltip());
 
   scoped_ptr<base::ListValue> sinks(SinksToValue(media_router_ui->sinks()));
   initial_data.Set("sinks", sinks.release());
@@ -230,6 +234,9 @@ void MediaRouterWebUIMessageHandler::OnRequestInitialData(
       // is upstreamed.
       std::string()));
   initial_data.Set("castModes", cast_modes.release());
+
+  initial_data.SetString("routeProviderExtensionId",
+                         GetMediaRouterUI()->GetRouteProviderExtensionId());
 
   web_ui()->CallJavascriptFunction(kSetInitialData, initial_data);
   media_router_ui->UIInitialized();
@@ -351,4 +358,3 @@ MediaRouterUI* MediaRouterWebUIMessageHandler::GetMediaRouterUI() {
 }
 
 }  // namespace media_router
-

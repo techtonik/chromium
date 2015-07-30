@@ -56,7 +56,6 @@
 #include "chrome/browser/android/omnibox/autocomplete_controller_android.h"
 #include "chrome/browser/android/omnibox/omnibox_prerender.h"
 #include "chrome/browser/android/password_ui_view_android.h"
-#include "chrome/browser/android/policy/policy_manager.h"
 #include "chrome/browser/android/precache/precache_launcher.h"
 #include "chrome/browser/android/preferences/autofill/autofill_profile_bridge.h"
 #include "chrome/browser/android/preferences/pref_service_bridge.h"
@@ -78,7 +77,6 @@
 #include "chrome/browser/autofill/android/personal_data_manager_android.h"
 #include "chrome/browser/dom_distiller/dom_distiller_service_factory_android.h"
 #include "chrome/browser/dom_distiller/tab_utils_android.h"
-#include "chrome/browser/enhanced_bookmarks/android/enhanced_bookmarks_bridge.h"
 #include "chrome/browser/history/android/sqlite_cursor.h"
 #include "chrome/browser/invalidation/invalidation_service_factory_android.h"
 #include "chrome/browser/lifetime/application_lifetime_android.h"
@@ -87,6 +85,7 @@
 #include "chrome/browser/net/spdyproxy/data_reduction_proxy_settings_android.h"
 #include "chrome/browser/notifications/notification_ui_manager_android.h"
 #include "chrome/browser/password_manager/credential_android.h"
+#include "chrome/browser/permissions/permission_update_infobar_delegate_android.h"
 #include "chrome/browser/prerender/external_prerender_handler_android.h"
 #include "chrome/browser/profiles/profile_android.h"
 #include "chrome/browser/search_engines/template_url_service_android.h"
@@ -135,6 +134,7 @@
 #include "components/policy/core/browser/android/component_jni_registrar.h"
 #include "components/safe_json/android/component_jni_registrar.h"
 #include "components/service_tab_launcher/component_jni_registrar.h"
+#include "components/signin/core/browser/android/component_jni_registrar.h"
 #include "components/variations/android/component_jni_registrar.h"
 #include "components/web_contents_delegate_android/component_jni_registrar.h"
 
@@ -157,6 +157,7 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
      navigation_interception::RegisterNavigationInterceptionJni},
     {"Policy", policy::android::RegisterPolicy},
     {"SafeJson", safe_json::android::RegisterSafeJsonJni},
+    {"Signin", signin::android::RegisterSigninJni},
     {"WebContentsDelegateAndroid",
      web_contents_delegate_android::RegisterWebContentsDelegateAndroidJni},
     // Register JNI for chrome classes.
@@ -175,9 +176,8 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
          RegisterAutofillDialogControllerAndroid},
     {"AutofillDialogResult",
      autofill::AutofillDialogResult::RegisterAutofillDialogResult},
-    {"AutofillKeyboardAccessory",
-     autofill::AutofillKeyboardAccessoryView::
-         RegisterAutofillKeyboardAccessoryView},
+    {"AutofillKeyboardAccessory", autofill::AutofillKeyboardAccessoryView::
+                                      RegisterAutofillKeyboardAccessoryView},
     {"AutofillLoggerAndroid", autofill::AutofillLoggerAndroid::Register},
     {"AutofillPopup",
      autofill::AutofillPopupViewAndroid::RegisterAutofillPopupViewAndroid},
@@ -217,8 +217,6 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
     {"DownloadOverwriteInfoBarDelegate",
      RegisterDownloadOverwriteInfoBarDelegate},
     {"EditBookmarkHelper", RegisterEditBookmarkHelper},
-    {"EnhancedBookmarksBridge",
-     enhanced_bookmarks::android::RegisterEnhancedBookmarksBridge},
     {"ExternalPrerenderRequestHandler",
      prerender::ExternalPrerenderHandlerAndroid::
          RegisterExternalPrerenderHandlerAndroid},
@@ -255,8 +253,7 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
      NotificationUIManagerAndroid::RegisterNotificationUIManager},
     {"OAuth2TokenServiceDelegateAndroid",
      OAuth2TokenServiceDelegateAndroid::Register},
-    {"OfflinePageBridge",
-     offline_pages::android::RegisterOfflinePageBridge},
+    {"OfflinePageBridge", offline_pages::android::RegisterOfflinePageBridge},
     {"OmniboxPrerender", RegisterOmniboxPrerender},
     {"OmniboxUrlEmphasizer",
      OmniboxUrlEmphasizer::RegisterOmniboxUrlEmphasizer},
@@ -267,9 +264,10 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
      autofill::PasswordGenerationPopupViewAndroid::Register},
     {"PasswordUIViewAndroid",
      PasswordUIViewAndroid::RegisterPasswordUIViewAndroid},
+    {"PermissionUpdateInfoBarDelegate",
+     PermissionUpdateInfoBarDelegate::RegisterPermissionUpdateInfoBarDelegate},
     {"PersonalDataManagerAndroid",
      autofill::PersonalDataManagerAndroid::Register},
-    {"PolicyManager", RegisterPolicyManager},
     {"PrecacheLauncher", RegisterPrecacheLauncher},
     {"PrefServiceBridge", PrefServiceBridge::RegisterPrefServiceBridge},
     {"ProfileAndroid", ProfileAndroid::RegisterProfileAndroid},

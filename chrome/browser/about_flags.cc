@@ -28,6 +28,7 @@
 #include "components/autofill/core/common/autofill_switches.h"
 #include "components/cloud_devices/common/cloud_devices_switches.h"
 #include "components/dom_distiller/core/dom_distiller_switches.h"
+#include "components/enhanced_bookmarks/enhanced_bookmark_switches.h"
 #include "components/metrics/metrics_hashes.h"
 #include "components/nacl/common/nacl_switches.h"
 #include "components/omnibox/browser/omnibox_switches.h"
@@ -232,18 +233,6 @@ const Experiment::Choice kDataReductionProxyLoFiChoices[] = {
     { IDS_FLAGS_DATA_REDUCTION_PROXY_LO_FI_DISABLED,
         data_reduction_proxy::switches::kDataReductionProxyLoFi,
         data_reduction_proxy::switches::kDataReductionProxyLoFiValueDisabled}
-};
-
-const Experiment::Choice kMaxTilesForInterestAreaChoices[] = {
-  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
-  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_SHORT,
-    cc::switches::kMaxTilesForInterestArea, "64"},
-  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_TALL,
-    cc::switches::kMaxTilesForInterestArea, "128"},
-  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_GRANDE,
-    cc::switches::kMaxTilesForInterestArea, "256"},
-  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_VENTI,
-    cc::switches::kMaxTilesForInterestArea, "512"}
 };
 
 const Experiment::Choice kShowSavedCopyChoices[] = {
@@ -519,6 +508,16 @@ const Experiment::Choice kGestureEditingChoices[] = {
     keyboard::switches::kGestureEditingEnabled},
 };
 #endif
+
+const Experiment::Choice kDownloadNotificationChoices[] = {
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
+  { IDS_GENERIC_EXPERIMENT_CHOICE_ENABLED,
+    switches::kEnableDownloadNotification,
+    "enabled" },
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
+    switches::kEnableDownloadNotification,
+    "disabled" }
+};
 
 const Experiment::Choice kSupervisedUserSafeSitesChoices[] = {
   { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
@@ -890,7 +889,7 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_ENABLE_DOWNLOAD_NOTIFICATION_NAME,
      IDS_FLAGS_ENABLE_DOWNLOAD_NOTIFICATION_DESCRIPTION,
      kOsDesktop,
-     SINGLE_VALUE_TYPE(switches::kEnableDownloadNotification)},
+     MULTI_VALUE_TYPE(kDownloadNotificationChoices)},
 #if defined(ENABLE_PLUGINS)
     {"allow-nacl-socket-api",
      IDS_FLAGS_ALLOW_NACL_SOCKET_API_NAME,
@@ -1207,11 +1206,6 @@ const Experiment kExperiments[] = {
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableDelegatedRenderer,
                                switches::kDisableDelegatedRenderer)},
 #endif
-    {"max-tiles-for-interest-area",
-     IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_NAME,
-     IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_DESCRIPTION,
-     kOsAll,
-     MULTI_VALUE_TYPE(kMaxTilesForInterestAreaChoices)},
     {"enable-offer-store-unmasked-wallet-cards",
      IDS_FLAGS_ENABLE_OFFER_STORE_UNMASKED_WALLET_CARDS,
      IDS_FLAGS_ENABLE_OFFER_STORE_UNMASKED_WALLET_CARDS_DESCRIPTION,
@@ -1277,11 +1271,6 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_DISABLE_NEW_KOREAN_IME_DESCRIPTION,
      kOsCrOS,
      SINGLE_VALUE_TYPE(chromeos::switches::kDisableNewKoreanIme)},
-    {"disable-new-md-input-view",
-     IDS_FLAGS_DISABLE_NEW_MD_INPUT_VIEW_NAME,
-     IDS_FLAGS_DISABLE_NEW_MD_INPUT_VIEW_DESCRIPTION,
-     kOsCrOS,
-     SINGLE_VALUE_TYPE(keyboard::switches::kDisableNewMDInputView)},
     {"enable-physical-keyboard-autocorrect",
      IDS_FLAGS_ENABLE_PHYSICAL_KEYBOARD_AUTOCORRECT_NAME,
      IDS_FLAGS_ENABLE_PHYSICAL_KEYBOARD_AUTOCORRECT_DESCRIPTION,
@@ -1866,11 +1855,6 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_DISABLE_RESOLVE_TIMEZONE_BY_GEOLOCATION_DESCRIPTION,
      kOsCrOS,
      SINGLE_VALUE_TYPE(chromeos::switches::kDisableTimeZoneTrackingOption)},
-    {"disable-webview-signin-flow",
-     IDS_FLAGS_DISABLE_WEBVIEW_SIGNIN_FLOW_NAME,
-     IDS_FLAGS_DISABLE_WEBVIEW_SIGNIN_FLOW_DESCRIPTION,
-     kOsCrOS,
-     SINGLE_VALUE_TYPE(chromeos::switches::kDisableWebviewSigninFlow)},
 #endif  // defined(OS_CHROMEOS)
     {"data-reduction-proxy-lo-fi",
      IDS_FLAGS_DATA_REDUCTION_PROXY_LO_FI_NAME,
@@ -2045,11 +2029,11 @@ const Experiment kExperiments[] = {
      SINGLE_VALUE_TYPE(switches::kEnableWebVR)},
 #endif
 #if defined(OS_CHROMEOS)
-    {"enable-accelerated-mjpeg-decode",
-     IDS_FLAGS_ENABLE_ACCELERATED_MJPEG_DECODE_NAME,
-     IDS_FLAGS_ENABLE_ACCELERATED_MJPEG_DECODE_DESCRIPTION,
+    {"disable-accelerated-mjpeg-decode",
+     IDS_FLAGS_DISABLE_ACCELERATED_MJPEG_DECODE_NAME,
+     IDS_FLAGS_DISABLE_ACCELERATED_MJPEG_DECODE_DESCRIPTION,
      kOsCrOS,
-     SINGLE_VALUE_TYPE(switches::kEnableAcceleratedMjpegDecode)},
+     SINGLE_VALUE_TYPE(switches::kDisableAcceleratedMjpegDecode)},
 #endif  // OS_CHROMEOS
     {"v8-cache-options",
      IDS_FLAGS_V8_CACHE_OPTIONS_NAME,
@@ -2063,11 +2047,11 @@ const Experiment kExperiments[] = {
      kOsDesktop,
      SINGLE_VALUE_TYPE(switches::kEnableMaterialDesignDownloads)},
 #endif
-#if defined(OS_WIN)
+#if defined(OS_WIN) || defined(OS_MACOSX)
     {"enable-tab-discarding",
      IDS_FLAGS_ENABLE_TAB_DISCARDING_NAME,
      IDS_FLAGS_ENABLE_TAB_DISCARDING_DESCRIPTION,
-     kOsWin,
+     kOsWin | kOsMac,
      SINGLE_VALUE_TYPE(switches::kEnableTabDiscarding)},
 #endif
     {"enable-clear-browsing-data-counters",
@@ -2076,6 +2060,14 @@ const Experiment kExperiments[] = {
      kOsAll,
      SINGLE_VALUE_TYPE(switches::kEnableClearBrowsingDataCounters)
     },
+#if defined(ENABLE_TASK_MANAGER)
+    {"enable-new-task-manager",
+     IDS_FLAGS_ENABLE_NEW_TASK_MANAGER_NAME,
+     IDS_FLAGS_ENABLE_NEW_TASK_MANAGER_DESCRIPTION,
+     kOsDesktop,
+     SINGLE_VALUE_TYPE(switches::kEnableNewTaskManager)
+    },
+#endif  // defined(ENABLE_TASK_MANAGER)
     // NOTE: Adding new command-line switches requires adding corresponding
     // entries to enum "LoginCustomFlags" in histograms.xml. See note in
     // histograms.xml and don't forget to run AboutFlagsHistogramTest unit test.
@@ -2182,27 +2174,27 @@ void GetSanitizedEnabledFlags(
 }
 
 bool SkipConditionalExperiment(const Experiment& experiment) {
-  chrome::VersionInfo::Channel channel = chrome::VersionInfo::GetChannel();
+  version_info::Channel channel = chrome::VersionInfo::GetChannel();
 
 #if defined(OS_ANDROID)
   // enable-data-reduction-proxy-dev is only available for the Dev/Beta channel.
   if (!strcmp("enable-data-reduction-proxy-dev", experiment.internal_name) &&
-      channel != chrome::VersionInfo::CHANNEL_BETA &&
-      channel != chrome::VersionInfo::CHANNEL_DEV) {
+      channel != version_info::Channel::BETA &&
+      channel != version_info::Channel::DEV) {
     return true;
   }
   // enable-data-reduction-proxy-alt is only available for the Dev channel.
   if (!strcmp("enable-data-reduction-proxy-alt", experiment.internal_name) &&
-      channel != chrome::VersionInfo::CHANNEL_DEV) {
+      channel != version_info::Channel::DEV) {
     return true;
   }
   // enable-data-reduction-proxy-carrier-test is only available for Chromium
   // builds and the Canary/Dev channel.
   if (!strcmp("enable-data-reduction-proxy-carrier-test",
               experiment.internal_name) &&
-      channel != chrome::VersionInfo::CHANNEL_DEV &&
-      channel != chrome::VersionInfo::CHANNEL_CANARY &&
-      channel != chrome::VersionInfo::CHANNEL_UNKNOWN) {
+      channel != version_info::Channel::DEV &&
+      channel != version_info::Channel::CANARY &&
+      channel != version_info::Channel::UNKNOWN) {
     return true;
   }
 #endif
@@ -2210,10 +2202,10 @@ bool SkipConditionalExperiment(const Experiment& experiment) {
   // data-reduction-proxy-lo-fi is only available for Chromium builds and
   // the Canary/Dev/Beta channels.
   if (!strcmp("data-reduction-proxy-lo-fi", experiment.internal_name) &&
-      channel != chrome::VersionInfo::CHANNEL_BETA &&
-      channel != chrome::VersionInfo::CHANNEL_DEV &&
-      channel != chrome::VersionInfo::CHANNEL_CANARY &&
-      channel != chrome::VersionInfo::CHANNEL_UNKNOWN) {
+      channel != version_info::Channel::BETA &&
+      channel != version_info::Channel::DEV &&
+      channel != version_info::Channel::CANARY &&
+      channel != version_info::Channel::UNKNOWN) {
     return true;
   }
 
@@ -2221,9 +2213,9 @@ bool SkipConditionalExperiment(const Experiment& experiment) {
   // builds and the Canary/Dev channels.
   if (!strcmp("enable-data-reduction-proxy-config-client",
               experiment.internal_name) &&
-      channel != chrome::VersionInfo::CHANNEL_DEV &&
-      channel != chrome::VersionInfo::CHANNEL_CANARY &&
-      channel != chrome::VersionInfo::CHANNEL_UNKNOWN) {
+      channel != version_info::Channel::DEV &&
+      channel != version_info::Channel::CANARY &&
+      channel != version_info::Channel::UNKNOWN) {
     return true;
   }
 
@@ -2232,9 +2224,9 @@ bool SkipConditionalExperiment(const Experiment& experiment) {
   // builds and Canary/Dev channel.
   if (!strcmp("enable-data-reduction-proxy-bypass-warnings",
               experiment.internal_name) &&
-      channel != chrome::VersionInfo::CHANNEL_UNKNOWN &&
-      channel != chrome::VersionInfo::CHANNEL_CANARY &&
-      channel != chrome::VersionInfo::CHANNEL_DEV) {
+      channel != version_info::Channel::UNKNOWN &&
+      channel != version_info::Channel::CANARY &&
+      channel != version_info::Channel::DEV) {
     return true;
   }
 #endif

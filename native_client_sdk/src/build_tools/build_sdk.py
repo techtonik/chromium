@@ -127,7 +127,10 @@ def GetGypBuiltLib(tcname, arch):
   else:
     lib_suffix = ''
 
-  tcdir = 'tc_' + GetToolchainLibc(tcname)
+  if tcname == 'arm_bionic':
+    tcdir = 'tc_newlib'
+  else:
+    tcdir = 'tc_' + GetToolchainLibc(tcname)
 
   if tcname == 'pnacl':
     if arch is None:
@@ -273,6 +276,7 @@ NACL_HEADER_MAP = {
       ('native_client/src/include/nacl/nacl_minidump.h', 'nacl/'),
       ('native_client/src/untrusted/irt/irt.h', ''),
       ('native_client/src/untrusted/irt/irt_dev.h', ''),
+      ('native_client/src/untrusted/irt/irt_extension.h', ''),
       ('native_client/src/untrusted/nacl/nacl_dyncode.h', 'nacl/'),
       ('native_client/src/untrusted/nacl/nacl_startup.h', 'nacl/'),
       ('native_client/src/untrusted/pthread/pthread.h', ''),
@@ -285,6 +289,7 @@ NACL_HEADER_MAP = {
       ('native_client/src/include/nacl/nacl_minidump.h', 'nacl/'),
       ('native_client/src/untrusted/irt/irt.h', ''),
       ('native_client/src/untrusted/irt/irt_dev.h', ''),
+      ('native_client/src/untrusted/irt/irt_extension.h', ''),
       ('native_client/src/untrusted/nacl/nacl_dyncode.h', 'nacl/'),
       ('native_client/src/untrusted/nacl/nacl_startup.h', 'nacl/'),
       ('native_client/src/untrusted/valgrind/dynamic_annotations.h', 'nacl/'),
@@ -442,9 +447,6 @@ def GypNinjaInstall(pepperdir, toolchains):
 
   for tc in toolchains:
     if tc in ('host', 'clang-newlib'):
-      continue
-    # TODO(sbc): remove this once untrusted.gypi can build arm glibc targets
-    elif tc == 'arm_glibc':
       continue
     elif tc == 'pnacl':
       xarches = (None, 'ia32', 'x64', 'arm')

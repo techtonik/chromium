@@ -74,6 +74,16 @@ Polymer({
     },
 
     /**
+     * The header text tooltip. This would be descriptive of the
+     * source origin, whether a host name, tab URL, etc.
+     * @type {string}
+     */
+    headerTextTooltip: {
+      type: String,
+      value: '',
+    },
+
+    /**
      * The issue to show.
      * @type {?media_router.Issue}
      */
@@ -93,6 +103,15 @@ Polymer({
     },
 
     /**
+     * The number of current local routes.
+     * @private {number}
+     */
+    localRouteCount_: {
+      type: Number,
+      value: 0,
+    },
+
+    /**
      * The list of current routes.
      * @type {!Array<!media_router.Route>}
      */
@@ -109,6 +128,16 @@ Polymer({
     routeMap_: {
       type: Object,
       value: {},
+    },
+
+    /**
+     * The ID of the media route provider extension.
+     * @type {string}
+     */
+    routeProviderExtensionId: {
+      type: String,
+      value: '',
+      observer: 'propogateExtensionId_',
     },
 
     /**
@@ -187,6 +216,16 @@ Polymer({
     // |sinkToRouteMap_| entry will be overwritten with that of the new route,
     // which results in the correct sink to route mapping.
     this.routeList.push(route);
+  },
+
+  /**
+   * Propagates extension ID to the child elements that need it.
+   *
+   * @private
+   */
+  propogateExtensionId_: function() {
+    this.$['route-details'].routeProviderExtensionId =
+        this.routeProviderExtensionId;
   },
 
   /**
@@ -311,6 +350,20 @@ Polymer({
   },
 
   /**
+   * Updates |currentView_| if the dialog had just opened and there's
+   * only one local route.
+   *
+   * @param {?media_router.Route} route A local route.
+   * @private
+   */
+  maybeShowRouteDetailsOnOpen_: function(route) {
+    if (this.localRouteCount_ == 1 && this.justOpened_ && route) {
+      this.currentRoute_ = route;
+      this.currentView_ = this.CONTAINER_VIEW_.ROUTE_DETAILS;
+    }
+  },
+
+  /**
    * Creates a new route if |route| is null. Otherwise, shows the route
    * details.
    *
@@ -330,8 +383,8 @@ Polymer({
   },
 
   /**
-   * Handles a cast mode selection. Updates |headerText| and
-   * |selectedCastModeValue_|.
+   * Handles a cast mode selection. Updates |headerText|, |headerTextTooltip|,
+   * and |selectedCastModeValue_|.
    *
    * @param {!Event} event The event object.
    * @private
@@ -339,6 +392,7 @@ Polymer({
   onCastModeClick_: function(event) {
     var clickedMode = this.$.castModeList.itemForElement(event.target);
     this.headerText = clickedMode.description;
+    this.headerTextTooltip = clickedMode.host;
     this.selectedCastModeValue_ = clickedMode.type;
   },
 
@@ -371,6 +425,13 @@ Polymer({
    */
   rebuildRouteMaps_: function() {
     this.routeMap_ = {};
+    this.localRouteCount_ = 0;
+
+    // Keeps track of the last local route we find in |routeList|. If
+    // |localRouteCount_| is eventually equal to one, |localRoute| would be the
+    // only current local route.
+    var localRoute = null;
+
     // Rebuild |sinkToRouteMap_| with a temporary map to avoid firing the
     // computed functions prematurely.
     var tempSinkToRouteMap = {};
@@ -378,9 +439,17 @@ Polymer({
     this.routeList.forEach(function(route) {
       this.routeMap_[route.id] = route;
       tempSinkToRouteMap[route.sinkId] = route;
+
+      if (route.isLocal) {
+        this.localRouteCount_++;
+        // It's OK if localRoute is updated multiple times; it is only used if
+        // |localRouteCount_| == 1, which implies it was only set once.
+        localRoute = route;
+      }
     }, this);
 
     this.sinkToRouteMap_ = tempSinkToRouteMap;
+    this.maybeShowRouteDetailsOnOpen_(localRoute);
   },
 
   /**

@@ -123,7 +123,9 @@ void SingleThreadProxy::SetLayerTreeHostClientReady() {
 void SingleThreadProxy::SetVisible(bool visible) {
   TRACE_EVENT1("cc", "SingleThreadProxy::SetVisible", "visible", visible);
   DebugScopedSetImplThread impl(this);
+
   layer_tree_host_impl_->SetVisible(visible);
+
   if (scheduler_on_impl_thread_)
     scheduler_on_impl_thread_->SetVisible(layer_tree_host_impl_->visible());
   // Changing visibility could change ShouldComposite().
@@ -190,7 +192,7 @@ void SingleThreadProxy::SetNeedsAnimate() {
   animate_requested_ = true;
   DebugScopedSetImplThread impl(this);
   if (scheduler_on_impl_thread_)
-    scheduler_on_impl_thread_->SetNeedsCommit();
+    scheduler_on_impl_thread_->SetNeedsBeginMainFrame();
 }
 
 void SingleThreadProxy::SetNeedsUpdateLayers() {
@@ -314,7 +316,7 @@ void SingleThreadProxy::SetNeedsCommit() {
   commit_requested_ = true;
   DebugScopedSetImplThread impl(this);
   if (scheduler_on_impl_thread_)
-    scheduler_on_impl_thread_->SetNeedsCommit();
+    scheduler_on_impl_thread_->SetNeedsBeginMainFrame();
 }
 
 void SingleThreadProxy::SetNeedsRedraw(const gfx::Rect& damage_rect) {
@@ -425,7 +427,7 @@ void SingleThreadProxy::SetNeedsRedrawRectOnImplThread(
 void SingleThreadProxy::SetNeedsCommitOnImplThread() {
   client_->ScheduleComposite();
   if (scheduler_on_impl_thread_)
-    scheduler_on_impl_thread_->SetNeedsCommit();
+    scheduler_on_impl_thread_->SetNeedsBeginMainFrame();
 }
 
 void SingleThreadProxy::SetVideoNeedsBeginFrames(bool needs_begin_frames) {
@@ -448,11 +450,6 @@ void SingleThreadProxy::PostAnimationEventsToMainThreadOnImplThread(
 bool SingleThreadProxy::IsInsideDraw() { return inside_draw_; }
 
 void SingleThreadProxy::DidActivateSyncTree() {
-  // This is required because NotifyReadyToActivate gets called immediately
-  // after commit since single thread commits directly to the active tree.
-  if (scheduler_on_impl_thread_)
-    scheduler_on_impl_thread_->SetWaitForReadyToDraw();
-
   // Synchronously call to CommitComplete. Resetting
   // |commit_blocking_task_runner| would make sure all tasks posted during
   // commit/activation before CommitComplete.

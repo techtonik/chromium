@@ -26,6 +26,7 @@
 #include "net/http/http_network_layer.h"
 #include "net/http/http_network_session.h"
 #include "net/http/http_server_properties_impl.h"
+#include "net/http/http_server_properties_manager.h"
 #include "net/http/transport_security_persister.h"
 #include "net/http/transport_security_state.h"
 #include "net/ssl/channel_id_service.h"
@@ -33,6 +34,7 @@
 #include "net/ssl/ssl_config_service_defaults.h"
 #include "net/url_request/data_protocol_handler.h"
 #include "net/url_request/static_http_user_agent_settings.h"
+#include "net/url_request/url_request_backoff_manager.h"
 #include "net/url_request/url_request_context.h"
 #include "net/url_request/url_request_context_storage.h"
 #include "net/url_request/url_request_intercepting_job_factory.h"
@@ -203,6 +205,7 @@ URLRequestContextBuilder::URLRequestContextBuilder()
 #endif
       http_cache_enabled_(true),
       throttling_enabled_(false),
+      backoff_enabled_(false),
       sdch_enabled_(false) {
 }
 
@@ -241,6 +244,11 @@ void URLRequestContextBuilder::SetCookieAndChannelIdStores(
 void URLRequestContextBuilder::SetFileTaskRunner(
     const scoped_refptr<base::SingleThreadTaskRunner>& task_runner) {
   file_task_runner_ = task_runner;
+}
+
+void URLRequestContextBuilder::SetHttpServerProperties(
+    scoped_ptr<HttpServerProperties> http_server_properties) {
+  http_server_properties_ = http_server_properties.Pass();
 }
 
 URLRequestContext* URLRequestContextBuilder::Build() {
@@ -326,12 +334,20 @@ URLRequestContext* URLRequestContextBuilder::Build() {
                                            false)));
   }
 
-  storage->set_http_server_properties(
-      scoped_ptr<HttpServerProperties>(new HttpServerPropertiesImpl()));
+  if (http_server_properties_) {
+    storage->set_http_server_properties(http_server_properties_.Pass());
+  } else {
+    storage->set_http_server_properties(
+        scoped_ptr<HttpServerProperties>(new HttpServerPropertiesImpl()));
+  }
+
   storage->set_cert_verifier(CertVerifier::CreateDefault());
 
   if (throttling_enabled_)
     storage->set_throttler_manager(new URLRequestThrottlerManager());
+
+  if (backoff_enabled_)
+    storage->set_backoff_manager(new URLRequestBackoffManager());
 
   HttpNetworkSession::Params network_session_params;
   network_session_params.host_resolver = context->host_resolver();

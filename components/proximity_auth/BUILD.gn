@@ -6,6 +6,7 @@ import("//testing/test.gni")
 
 source_set("proximity_auth") {
   sources = [
+    "authenticator.h",
     "bluetooth_connection.cc",
     "bluetooth_connection.h",
     "bluetooth_connection_finder.cc",
@@ -24,6 +25,12 @@ source_set("proximity_auth") {
     "connection.h",
     "connection_finder.h",
     "connection_observer.h",
+    "device_to_device_authenticator.cc",
+    "device_to_device_authenticator.h",
+    "device_to_device_initiator_operations.cc",
+    "device_to_device_initiator_operations.h",
+    "device_to_device_secure_context.cc",
+    "device_to_device_secure_context.h",
     "metrics.cc",
     "metrics.h",
     "proximity_auth_client.h",
@@ -33,6 +40,7 @@ source_set("proximity_auth") {
     "proximity_monitor_impl.cc",
     "proximity_monitor_impl.h",
     "proximity_monitor_observer.h",
+    "remote_device.cc",
     "remote_device.h",
     "remote_status_update.cc",
     "remote_status_update.h",
@@ -49,10 +57,25 @@ source_set("proximity_auth") {
   ]
 
   deps = [
+    "cryptauth/proto",
     "logging",
     "//base",
     "//device/bluetooth",
     "//net",
+  ]
+}
+
+source_set("test_support") {
+  testonly = true
+
+  sources = [
+    "device_to_device_responder_operations.cc",
+    "device_to_device_responder_operations.h",
+  ]
+
+  deps = [
+    "cryptauth:test_support",
+    "//base",
   ]
 }
 
@@ -64,6 +87,9 @@ source_set("unit_tests") {
     "bluetooth_throttler_impl_unittest.cc",
     "client_impl_unittest.cc",
     "connection_unittest.cc",
+    "device_to_device_authenticator_unittest.cc",
+    "device_to_device_operations_unittest.cc",
+    "device_to_device_secure_context_unittest.cc",
     "proximity_auth_system_unittest.cc",
     "proximity_monitor_impl_unittest.cc",
     "remote_status_update_unittest.cc",
@@ -75,7 +101,9 @@ source_set("unit_tests") {
 
   deps = [
     ":proximity_auth",
+    ":test_support",
     "ble:unit_tests",
+    "cryptauth:test_support",
     "cryptauth:unit_tests",
     "logging:unit_tests",
     "//base/test:test_support",

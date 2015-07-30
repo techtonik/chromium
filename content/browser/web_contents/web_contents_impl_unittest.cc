@@ -2886,8 +2886,7 @@ TEST_F(WebContentsImplTest, StartStopEventsBalance) {
   // The bug manifests itself in regular mode as well, but browser-initiated
   // navigation of subframes is only possible in --site-per-process mode within
   // unit tests.
-  base::CommandLine::ForCurrentProcess()->AppendSwitch(
-      switches::kSitePerProcess);
+  IsolateAllSitesForTesting(base::CommandLine::ForCurrentProcess());
   const GURL initial_url("about:blank");
   const GURL main_url("http://www.chromium.org");
   const GURL foo_url("http://foo.chromium.org");

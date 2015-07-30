@@ -38,7 +38,6 @@ class Screen;
 
 namespace ash {
 class AcceleratorControllerTest;
-class DisplayController;
 class DisplayLayoutStore;
 class MouseWarpController;
 class ScreenAsh;
@@ -162,15 +161,6 @@ class ASH_EXPORT DisplayManager
   void SetDisplayRotation(int64 display_id,
                           gfx::Display::Rotation rotation,
                           gfx::Display::RotationSource source);
-
-  // Sets the display's ui scale. Returns true if it's successful, or
-  // false otherwise.  TODO(mukai): remove this and merge into
-  // SetDisplayMode.
-  bool SetDisplayUIScale(int64 display_id, float ui_scale);
-
-  // Sets the display's resolution.
-  // TODO(mukai): remove this and merge into SetDisplayMode.
-  void SetDisplayResolution(int64 display_id, const gfx::Size& resolution);
 
   // Sets the external display's configuration, including resolution change,
   // ui-scale change, and device scale factor change. Returns true if it changes

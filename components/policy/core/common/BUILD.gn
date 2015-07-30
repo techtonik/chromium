@@ -92,9 +92,6 @@ source_set("common") {
       "policy_namespace.h",
       "policy_pref_names.cc",
       "policy_pref_names.h",
-      "policy_provider_android.cc",
-      "policy_provider_android.h",
-      "policy_provider_android_delegate.h",
       "policy_service.cc",
       "policy_service.h",
       "policy_service_impl.cc",
@@ -128,6 +125,8 @@ source_set("common") {
       "schema_registry_tracking_policy_provider.cc",
       "schema_registry_tracking_policy_provider.h",
     ]
+
+    configs += [ "//build/config:precompiled_headers" ]
 
     deps = [
       "//base:prefs",

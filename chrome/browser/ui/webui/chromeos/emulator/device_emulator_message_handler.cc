@@ -8,117 +8,150 @@
 
 #include "base/bind.h"
 #include "base/values.h"
+#include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/dbus/fake_power_manager_client.h"
 #include "content/public/browser/web_ui.h"
 
 namespace {
 
 // Define the name of the callback functions that will be used by JavaScript.
-const char kBatteryPercentFunction[] = "requestBatteryInfo";
-const char kPowerSourceOptionsFunction[] = "requestExternalPowerOptions";
-const char kUpdateBatteryPercentFunction[] = "updateBatteryPercent";
-const char kUpdatePowerModeFunction[] = "updateExternalPower";
-const char kBatteryPercentFunctionJSCallback[] =
-    "device_emulator.batterySettings.setBatteryPercent";
-const char kSetPowerSourceOptionsJSCallback[] =
-    "device_emulator.batterySettings.setExternalPowerOptions";
+const char kBluetoothDiscoverFunction[] = "requestBluetoothDiscover";
+const char kBluetoothPairFunction[] = "requestBluetoothPair";
+const char kRequestPowerInfo[] = "requestPowerInfo";
 
-const char kExternalPowerNameAc[] = "AC Power";
-const char kExternalPowerNameUsb[] = "USB Power (Low energy)";
-const char kExternalPowerNameDisconnected[] = "Disconnected";
+// Define update functions that will update the power properties to the
+// variables defined in the web UI.
+const char kUpdateBatteryPercent[] = "updateBatteryPercent";
+const char kUpdateExternalPower[] = "updateExternalPower";
+const char kUpdateTimeToEmpty[] = "updateTimeToEmpty";
+const char kUpdateTimeToFull[] = "updateTimeToFull";
+
+// Define callback functions that will update the JavaScript variable
+// and the web UI.
+const char kUpdatePowerPropertiesJSCallback[] =
+    "device_emulator.batterySettings.updatePowerProperties";
 
 }  // namespace
 
-DeviceEmulatorMessageHandler::DeviceEmulatorMessageHandler() {
-}
+DeviceEmulatorMessageHandler::DeviceEmulatorMessageHandler()
+    : fake_power_manager_client_(static_cast<chromeos::FakePowerManagerClient*>(
+          chromeos::DBusThreadManager::Get()
+              ->GetPowerManagerClient())) {}
 
 DeviceEmulatorMessageHandler::~DeviceEmulatorMessageHandler() {
-  chromeos::FakePowerManagerClient* client =
-      static_cast<chromeos::FakePowerManagerClient*>(
-          chromeos::DBusThreadManager::Get()->GetPowerManagerClient());
-  client->RemoveObserver(this);
+  fake_power_manager_client_->RemoveObserver(this);
 }
 
 void DeviceEmulatorMessageHandler::Init() {
-  chromeos::FakePowerManagerClient* client =
-      static_cast<chromeos::FakePowerManagerClient*>(
-          chromeos::DBusThreadManager::Get()->GetPowerManagerClient());
-  client->AddObserver(this);
+  fake_power_manager_client_->AddObserver(this);
 }
 
-void DeviceEmulatorMessageHandler::HandleRequestBatteryInfo(
+void DeviceEmulatorMessageHandler::RequestPowerInfo(
     const base::ListValue* args) {
-  CallBatteryPercentCallback(rand() % 101);
+  fake_power_manager_client_->RequestStatusUpdate();
 }
 
-void DeviceEmulatorMessageHandler::HandleRequestExternalPowerOptions(
+void DeviceEmulatorMessageHandler::HandleRequestBluetoothDiscover(
     const base::ListValue* args) {
-  base::ListValue options;
-  scoped_ptr<base::DictionaryValue> option1(new base::DictionaryValue());
-  option1->SetString("text", kExternalPowerNameAc);
-  option1->SetInteger("value",
-                      power_manager::PowerSupplyProperties_ExternalPower_AC);
-
-  options.Append(option1.Pass());
-
-  scoped_ptr<base::DictionaryValue> option2(new base::DictionaryValue());
-  option2->SetString("text", kExternalPowerNameUsb);
-  option2->SetInteger("value",
-                      power_manager::PowerSupplyProperties_ExternalPower_USB);
-
-  options.Append(option2.Pass());
-
-  scoped_ptr<base::DictionaryValue> option3(new base::DictionaryValue());
-  option3->SetString("text", kExternalPowerNameDisconnected);
-  option3->SetInteger(
-      "value", power_manager::PowerSupplyProperties_ExternalPower_DISCONNECTED);
-
-  options.Append(option3.Pass());
-
-  web_ui()->CallJavascriptFunction(kSetPowerSourceOptionsJSCallback, options);
+  const base::DictionaryValue* device = NULL;
+  args->GetDictionary(0, &device);
+  // TODO(rfrapp): Create device if it doesn't exist and discover it.
 }
 
-void DeviceEmulatorMessageHandler::HandleUpdateBatteryPercent(
+void DeviceEmulatorMessageHandler::HandleRequestBluetoothPair(
     const base::ListValue* args) {
-  int new_percent = -1;
-  args->GetInteger(0, &new_percent);
-
-  // TODO(mozartalouis): Add call to FakePowerManagerClient
-  // to update the battery percentage.
+  const base::DictionaryValue* device = NULL;
+  args->GetDictionary(0, &device);
+  // TODO(rfrapp): Create device if it doesn't exist and pair it to the main
+  // adapter.
 }
 
-void DeviceEmulatorMessageHandler::HandleUpdateExternalPower(
+void DeviceEmulatorMessageHandler::UpdateBatteryPercent(
+    const base::ListValue* args) {
+  power_manager::PowerSupplyProperties props =
+      fake_power_manager_client_->props();
+
+  int new_percent;
+  if (args->GetInteger(0, &new_percent))
+    props.set_battery_percent(new_percent);
+
+  fake_power_manager_client_->UpdatePowerProperties(props);
+}
+
+void DeviceEmulatorMessageHandler::UpdateExternalPower(
     const base::ListValue* args) {
   int power_source;
   args->GetInteger(0, &power_source);
+
+  power_manager::PowerSupplyProperties props =
+      fake_power_manager_client_->props();
+  props.set_external_power(
+      static_cast<power_manager::PowerSupplyProperties_ExternalPower>(
+          power_source));
+  fake_power_manager_client_->UpdatePowerProperties(props);
+}
+
+void DeviceEmulatorMessageHandler::UpdateTimeToEmpty(
+    const base::ListValue* args) {
+  power_manager::PowerSupplyProperties props =
+      fake_power_manager_client_->props();
+
+  int new_time;
+  if (args->GetInteger(0, &new_time))
+    props.set_battery_time_to_empty_sec(new_time);
+
+  fake_power_manager_client_->UpdatePowerProperties(props);
+}
+
+void DeviceEmulatorMessageHandler::UpdateTimeToFull(
+    const base::ListValue* args) {
+  power_manager::PowerSupplyProperties props =
+      fake_power_manager_client_->props();
+  int new_time;
+  if (args->GetInteger(0, &new_time))
+    props.set_battery_time_to_full_sec(new_time);
+  fake_power_manager_client_->UpdatePowerProperties(props);
 }
 
 void DeviceEmulatorMessageHandler::PowerChanged(
     const power_manager::PowerSupplyProperties& proto) {
-  CallBatteryPercentCallback(static_cast<int>(proto.battery_percent()));
+  web_ui()->CallJavascriptFunction(
+      kUpdatePowerPropertiesJSCallback,
+      base::FundamentalValue(proto.battery_percent()),
+      base::FundamentalValue(proto.external_power()),
+      base::FundamentalValue(
+          static_cast<int>(proto.battery_time_to_empty_sec())),
+      base::FundamentalValue(
+          static_cast<int>(proto.battery_time_to_full_sec())));
 }
 
 void DeviceEmulatorMessageHandler::RegisterMessages() {
   web_ui()->RegisterMessageCallback(
-      kBatteryPercentFunction,
-      base::Bind(&DeviceEmulatorMessageHandler::HandleRequestBatteryInfo,
+      kRequestPowerInfo,
+      base::Bind(&DeviceEmulatorMessageHandler::RequestPowerInfo,
                  base::Unretained(this)));
   web_ui()->RegisterMessageCallback(
-      kPowerSourceOptionsFunction,
-      base::Bind(
-          &DeviceEmulatorMessageHandler::HandleRequestExternalPowerOptions,
-          base::Unretained(this)));
-  web_ui()->RegisterMessageCallback(
-      kUpdateBatteryPercentFunction,
-      base::Bind(&DeviceEmulatorMessageHandler::HandleUpdateBatteryPercent,
+      kUpdateBatteryPercent,
+      base::Bind(&DeviceEmulatorMessageHandler::UpdateBatteryPercent,
                  base::Unretained(this)));
   web_ui()->RegisterMessageCallback(
-      kUpdatePowerModeFunction,
-      base::Bind(&DeviceEmulatorMessageHandler::HandleUpdateExternalPower,
+      kUpdateExternalPower,
+      base::Bind(&DeviceEmulatorMessageHandler::UpdateExternalPower,
                  base::Unretained(this)));
-}
-
-void DeviceEmulatorMessageHandler::CallBatteryPercentCallback(int percent) {
-  web_ui()->CallJavascriptFunction(kBatteryPercentFunctionJSCallback,
-                                   base::FundamentalValue(percent));
+  web_ui()->RegisterMessageCallback(
+      kUpdateTimeToEmpty,
+      base::Bind(&DeviceEmulatorMessageHandler::UpdateTimeToEmpty,
+                 base::Unretained(this)));
+  web_ui()->RegisterMessageCallback(
+      kUpdateTimeToFull,
+      base::Bind(&DeviceEmulatorMessageHandler::UpdateTimeToFull,
+                 base::Unretained(this)));
+  web_ui()->RegisterMessageCallback(
+      kBluetoothDiscoverFunction,
+      base::Bind(&DeviceEmulatorMessageHandler::HandleRequestBluetoothDiscover,
+                 base::Unretained(this)));
+  web_ui()->RegisterMessageCallback(
+      kBluetoothPairFunction,
+      base::Bind(&DeviceEmulatorMessageHandler::HandleRequestBluetoothPair,
+                 base::Unretained(this)));
 }

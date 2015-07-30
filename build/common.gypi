@@ -305,7 +305,7 @@
           }], # OS=="linux" and branding=="Chrome" and buildtype=="Official" and chromeos==0
 
           ['OS=="linux" and target_arch=="mipsel"', {
-            'sysroot%': '<!(cd <(DEPTH) && pwd -P)/mipsel-sysroot/sysroot',
+            'sysroot%': '<!(cd <(DEPTH) && pwd -P)/build/linux/debian_wheezy_mips-sysroot',
           }],
         ],
       },
@@ -391,6 +391,11 @@
       # /analyze is off by default on Windows because it is very slow and noisy.
       # Enable with GYP_DEFINES=win_analyze=1
       'win_analyze%': 0,
+
+      # /debug:fastlink is off by default on Windows because it generates PDBs
+      # that are machine-local. But, great for local builds.
+      # Enable with GYP_DEFINES=win_fastlink=1
+      'win_fastlink%': 0,
 
       # Set to select the Title Case versions of strings in GRD files.
       'use_titlecase_in_grd%': 0,
@@ -702,6 +707,7 @@
       # Control Flow Integrity for virtual calls and casts.
       # See http://clang.llvm.org/docs/ControlFlowIntegrity.html
       'cfi_vptr%': 0,
+      'cfi_diag%': 0,
 
       'cfi_blacklist%': '<(PRODUCT_DIR)/../../tools/cfi/blacklist.txt',
 
@@ -875,6 +881,7 @@
           'enable_supervised_users%': 0,
           'enable_task_manager%': 0,
           'use_system_libcxx%': 1,
+          'enable_media_router%': 0,
         }],
 
         # Use GPU accelerated cross process image transport by default
@@ -946,10 +953,8 @@
 
         ['OS=="android" or OS=="ios"', {
           'enable_captive_portal_detection%': 0,
-          'enable_media_router%': 0,
         }, {
           'enable_captive_portal_detection%': 1,
-          'enable_media_router%': 1,
         }],
 
         # Enable Skia UI text drawing incrementally on different platforms.
@@ -1084,6 +1089,10 @@
       # Native Client is enabled by default.
       'disable_nacl%': '0',
 
+      # Native Client toolchains, enabled by default.
+      'disable_pnacl%': 0,
+      'disable_newlib%': 0,
+
       # Sets the default version name and code for Android app, by default we
       # do a developer build.
       'android_app_version_name%': 'Developer Build',
@@ -1143,6 +1152,7 @@
     'system_libdir%': '<(system_libdir)',
     'component%': '<(component)',
     'win_analyze%': '<(win_analyze)',
+    'win_fastlink%': '<(win_fastlink)',
     'enable_resource_whitelist_generation%': '<(enable_resource_whitelist_generation)',
     'use_titlecase_in_grd%': '<(use_titlecase_in_grd)',
     'use_third_party_translations%': '<(use_third_party_translations)',
@@ -1240,6 +1250,7 @@
     'video_hole%': '<(video_hole)',
     'v8_use_external_startup_data%': '<(v8_use_external_startup_data)',
     'cfi_vptr%': '<(cfi_vptr)',
+    'cfi_diag%': '<(cfi_diag)',
     'cfi_blacklist%': '<(cfi_blacklist)',
     'mac_views_browser%': '<(mac_views_browser)',
     'android_app_version_name%': '<(android_app_version_name)',
@@ -1473,8 +1484,9 @@
     # Copy out the setting of disable_nacl.
     'disable_nacl%': '<(disable_nacl)',
 
-    # Portable Native Client is enabled by default.
-    'disable_pnacl%': 0,
+    # Native Client toolchains, enabled by default.
+    'disable_pnacl%': '<(disable_pnacl)',
+    'disable_newlib%': '<(disable_newlib)',
 
     # Whether to build full debug version for Debug configuration on Android.
     # Compared to full debug version, the default Debug configuration on Android
@@ -1848,7 +1860,7 @@
       ['chromecast==1 and OS!="android"', {
         'ozone_platform_cast%': 1
       }],
-      ['OS=="linux" and target_arch!="mipsel"', {
+      ['OS=="linux"', {
         'clang%': 1,
       }],  # OS=="mac"
       ['OS=="mac"', {
@@ -2111,11 +2123,7 @@
           # TODO(eugenebut): Remove enable_coverage check once
           # libclang_rt.profile_ios.a is bundled with Chromium's clang.
           # http://crbug.com/450379
-          #
-          # TODO(sdefresne): Remove xcodebuild version check onces clang ToT
-          # supports "nullable" and related. https://crbug.com/499448
-          ['buildtype=="Official" or enable_coverage or '
-            '<!(xcodebuild -version|awk \'/Xcode/{print ($2 >= 7.0)}\')==1', {
+          ['buildtype=="Official" or enable_coverage', {
             'clang_xcode%': 1,
           }],
         ],
@@ -2360,10 +2368,12 @@
       }],
       ['target_arch=="mipsel" and mips_arch_variant=="r2"', {
         'mips_fpu_mode%': 'fp32',
+      }, {
+        'mips_fpu_mode%': '',
       }],
 
       # Enable brlapi by default for chromeos.
-      [ 'chromeos==1', {
+      ['chromeos==1', {
         'use_brlapi%': 1,
       }],
 
@@ -3535,6 +3545,34 @@
           }],
           ['OS=="win"', {
             'defines': ['NO_TCMALLOC'],
+            'conditions': [
+              ['win_fastlink==1', {
+                'msvs_settings': {
+                  'VCLinkerTool': {
+                    # /PROFILE is incompatible with /debug:fastlink
+                    'Profile': 'false',
+                    'AdditionalOptions': [
+                      # Tell VS 2015+ to create a PDB that references debug
+                      # information in .obj and .lib files instead of copying
+                      # it all.
+                      '/DEBUG:FASTLINK',
+                    ],
+                  },
+                },
+              }, {
+                # win_fastlink==0
+                'msvs_settings': {
+                  'VCLinkerTool': {
+                    # This corresponds to the /PROFILE flag which ensures the PDB
+                    # file contains FIXUP information (growing the PDB file by about
+                    # 5%) but does not otherwise alter the output binary. This
+                    # information is used by the Syzygy optimization tool when
+                    # decomposing the release image.
+                    'Profile': 'true',
+                  },
+                },
+              }],
+            ],
           }],
           # _FORTIFY_SOURCE isn't really supported by Clang now, see
           # http://llvm.org/bugs/show_bug.cgi?id=16821.
@@ -5430,6 +5468,12 @@
                 'xcode_settings': {
                   'DEPLOYMENT_POSTPROCESSING': 'YES',
                   'STRIP_INSTALLED_PRODUCT': 'YES',
+                  'conditions': [
+                    ['buildtype!="Official"', {
+                      # Remove dSYM to reduce build time.
+                      'DEBUG_INFORMATION_FORMAT': 'dwarf',
+                    }],
+                  ],
                 },
               },
               'Debug_Base': {
@@ -5640,6 +5684,7 @@
           4512, # Assignment operator could not be generated
           4610, # Object can never be instantiated
           4838, # Narrowing conversion. Doesn't seem to be very useful.
+          4995, # 'X': name was marked as #pragma deprecated
           4996, # 'X': was declared deprecated (for GetVersionEx).
 
           # These are variable shadowing warnings that are new in VS2015. We
@@ -5742,15 +5787,6 @@
                   '-Wno-unknown-pragmas',  # http://crbug.com/505314
                   '-Wno-unused-function',  # http://crbug.com/505316
                   '-Wno-unused-value',  # http://crbug.com/505318
-                ],
-              },
-            }],
-            ['clang==1 and target_arch=="ia32" and asan==1', {
-              # TODO(thakis): Remove this block once llvm.org/PR24167 is fixed.
-              'VCCLCompilerTool': {
-                'WarnAsError': 'false',
-                'AdditionalOptions': [
-                  '/fallback',
                 ],
               },
             }],
@@ -5970,17 +6006,19 @@
         ['CXX.host', '<(host_cxx)'],
       ],
     }],
-    ['OS=="linux" and target_arch=="mipsel" and clang==0', {
+    ['OS=="linux" and target_arch=="mipsel" and host_arch!="mipsel" and chromeos==0 and clang==0', {
+      # Set default mips cross tools on linux.  These can be overridden
+      # using CC,CXX,CC.host and CXX.host environment variables.
       'make_global_settings': [
-        ['CC', '<(sysroot)/../bin/mipsel-linux-gnu-gcc'],
-        ['CXX', '<(sysroot)/../bin/mipsel-linux-gnu-g++'],
+        ['CC', '<!(which mipsel-linux-gnu-gcc)'],
+        ['CXX', '<!(which mipsel-linux-gnu-g++)'],
         ['CC.host', '<(host_cc)'],
         ['CXX.host', '<(host_cxx)'],
       ],
     }],
     ['OS=="linux" and target_arch=="arm" and host_arch!="arm" and chromeos==0 and clang==0', {
-      # Set default ARM cross compiling on linux.  These can be overridden
-      # using CC/CXX/etc environment variables.
+      # Set default ARM cross tools on linux.  These can be overridden
+      # using CC,CXX,CC.host and CXX.host environment variables.
       'make_global_settings': [
         ['CC', '<!(which arm-linux-gnueabihf-gcc)'],
         ['CXX', '<!(which arm-linux-gnueabihf-g++)'],
@@ -5988,7 +6026,6 @@
         ['CXX.host', '<(host_cxx)'],
       ],
     }],
-
     # TODO(yyanagisawa): supports GENERATOR==make
     #  make generator doesn't support CC_wrapper without CC
     #  in make_global_settings yet.
@@ -6095,6 +6132,44 @@
             'ldflags': [
               '-flto',
             ],
+          }],
+        ],
+      },
+    }],
+    ['cfi_diag==1', {
+      'target_defaults': {
+        'target_conditions': [
+          ['_toolset=="target"', {
+            'cflags': [
+              '-fno-sanitize-trap=cfi',
+              '-fsanitize-recover=cfi',
+            ],
+            'ldflags': [
+              '-fno-sanitize-trap=cfi',
+              '-fsanitize-recover=cfi',
+            ],
+            'xcode_settings': {
+              'OTHER_CFLAGS': [
+                '-fno-sanitize-trap=cfi',
+                '-fsanitize-recover=cfi',
+              ],
+            },
+            'msvs_settings': {
+              'VCCLCompilerTool': {
+                'AdditionalOptions': [
+                  '-fno-sanitize-trap=cfi',
+                  '-fsanitize-recover=cfi',
+                ],
+              },
+            },
+          }],
+          ['_toolset=="target" and _type!="static_library"', {
+            'xcode_settings':  {
+              'OTHER_LDFLAGS': [
+                '-fno-sanitize-trap=cfi',
+                '-fsanitize-recover=cfi',
+              ],
+            },
           }],
         ],
       },

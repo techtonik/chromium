@@ -28,7 +28,7 @@ import zipfile
 # Note: this revision is only used for Windows. Other platforms use update.sh.
 # TODO(thakis): Use the same revision on Windows and non-Windows.
 # TODO(thakis): Remove update.sh, use update.py everywhere.
-LLVM_WIN_REVISION = '242415'
+LLVM_WIN_REVISION = '243039'
 
 use_head_revision = 'LLVM_FORCE_HEAD_REVISION' in os.environ
 if use_head_revision:
@@ -309,6 +309,8 @@ def ApplyLocalPatches():
 
 
 def DeleteChromeToolsShim():
+  OLD_SHIM_DIR = os.path.join(LLVM_DIR, 'tools', 'zzz-chrometools')
+  shutil.rmtree(OLD_SHIM_DIR, ignore_errors=True)
   shutil.rmtree(CHROME_TOOLS_SHIM_DIR, ignore_errors=True)
 
 
@@ -404,6 +406,7 @@ def UpdateClang(args):
       try:
         DownloadUrl(cds_full_url, f)
         f.seek(0)
+        # TODO(thakis): Delete LLVM_BUILD_DIR before extracting.
         tarfile.open(mode='r:gz', fileobj=f).extractall(path=LLVM_BUILD_DIR)
         print 'clang %s unpacked' % PACKAGE_VERSION
         # Download the gold plugin if requested to by an environment variable.

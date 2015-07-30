@@ -46,7 +46,8 @@ bool WillDispatchTabUpdatedEvent(
     const base::DictionaryValue* changed_properties,
     content::BrowserContext* context,
     const Extension* extension,
-    base::ListValue* event_args) {
+    base::ListValue* event_args,
+    const base::DictionaryValue* listener_filter) {
   // Overwrite the second argument with the appropriate properties dictionary,
   // depending on extension permissions.
   base::DictionaryValue* properties_value = changed_properties->DeepCopy();
@@ -129,7 +130,7 @@ TabsEventRouter::TabsEventRouter(Profile* profile)
 
     // Also catch up our internal bookkeeping of tab entries.
     Browser* browser = *it;
-    if (browser->tab_strip_model()) {
+    if (ExtensionTabUtil::BrowserSupportsTabs(browser)) {
       for (int i = 0; i < browser->tab_strip_model()->count(); ++i) {
         WebContents* contents = browser->tab_strip_model()->GetWebContentsAt(i);
         int tab_id = ExtensionTabUtil::GetTabId(contents);
@@ -148,7 +149,8 @@ void TabsEventRouter::OnBrowserAdded(Browser* browser) {
 }
 
 void TabsEventRouter::RegisterForBrowserNotifications(Browser* browser) {
-  if (!profile_->IsSameProfile(browser->profile()))
+  if (!profile_->IsSameProfile(browser->profile()) ||
+      !ExtensionTabUtil::BrowserSupportsTabs(browser))
     return;
   // Start listening to TabStripModel events for this browser.
   TabStripModel* tab_strip = browser->tab_strip_model();
@@ -204,11 +206,13 @@ void TabsEventRouter::OnBrowserSetLastActive(Browser* browser) {
   }
 }
 
-static bool WillDispatchTabCreatedEvent(WebContents* contents,
-                                        bool active,
-                                        content::BrowserContext* context,
-                                        const Extension* extension,
-                                        base::ListValue* event_args) {
+static bool WillDispatchTabCreatedEvent(
+    WebContents* contents,
+    bool active,
+    content::BrowserContext* context,
+    const Extension* extension,
+    base::ListValue* event_args,
+    const base::DictionaryValue* listener_filter) {
   base::DictionaryValue* tab_value = ExtensionTabUtil::CreateTabValue(
       contents, extension);
   event_args->Clear();

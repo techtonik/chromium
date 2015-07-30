@@ -16,6 +16,7 @@
 #include "base/time/time.h"
 #include "content/child/webmessageportchannel_impl.h"
 #include "content/common/service_worker/service_worker_types.h"
+#include "content/public/common/service_worker_event_status.mojom.h"
 #include "ipc/ipc_listener.h"
 #include "mojo/application/public/interfaces/service_provider.mojom.h"
 #include "third_party/WebKit/public/platform/WebGeofencingEventType.h"
@@ -35,6 +36,7 @@ class WebDataSource;
 struct WebServiceWorkerClientQueryOptions;
 class WebServiceWorkerContextProxy;
 class WebServiceWorkerProvider;
+struct WebSyncRegistration;
 }
 
 namespace IPC {
@@ -56,6 +58,8 @@ class WebServiceWorkerRegistrationImpl;
 class ServiceWorkerContextClient
     : public blink::WebServiceWorkerContextClient {
  public:
+  using SyncCallback = mojo::Callback<void(ServiceWorkerEventStatus)>;
+
   // Returns a thread-specific client instance.  This does NOT create a
   // new instance.
   static ServiceWorkerContextClient* ThreadSpecificInstance();
@@ -141,11 +145,15 @@ class ServiceWorkerContextClient
       blink::WebMessagePortChannelArray* channels);
   virtual void focus(const blink::WebString& uuid,
                      blink::WebServiceWorkerClientCallbacks*);
+  virtual void navigate(const blink::WebString& uuid,
+                        const blink::WebURL&,
+                        blink::WebServiceWorkerClientCallbacks*);
   virtual void skipWaiting(
       blink::WebServiceWorkerSkipWaitingCallbacks* callbacks);
   virtual void claim(blink::WebServiceWorkerClientsClaimCallbacks* callbacks);
-  virtual void stashMessagePort(blink::WebMessagePortChannel* channel,
-                                const blink::WebString& name);
+
+  virtual void DispatchSyncEvent(const blink::WebSyncRegistration& registration,
+                                 const SyncCallback& callback);
 
  private:
   struct WorkerContextData;
@@ -161,7 +169,6 @@ class ServiceWorkerContextClient
   void OnActivateEvent(int request_id);
   void OnInstallEvent(int request_id);
   void OnFetchEvent(int request_id, const ServiceWorkerFetchRequest& request);
-  void OnSyncEvent(int request_id);
   void OnNotificationClickEvent(
       int request_id,
       int64_t persistent_notification_id,
@@ -180,10 +187,6 @@ class ServiceWorkerContextClient
       const base::string16& message,
       const std::vector<TransferredMessagePort>& sent_message_ports,
       const std::vector<int>& new_routing_ids);
-  void OnSendStashedMessagePorts(
-      const std::vector<TransferredMessagePort>& stashed_message_ports,
-      const std::vector<int>& new_routing_ids,
-      const std::vector<base::string16>& port_names);
   void OnDidGetClients(
       int request_id, const std::vector<ServiceWorkerClientInfo>& clients);
   void OnOpenWindowResponse(int request_id,
@@ -191,6 +194,9 @@ class ServiceWorkerContextClient
   void OnOpenWindowError(int request_id, const std::string& message);
   void OnFocusClientResponse(int request_id,
                              const ServiceWorkerClientInfo& client);
+  void OnNavigateClientResponse(int request_id,
+                                const ServiceWorkerClientInfo& client);
+  void OnNavigateClientError(int request_id, const GURL& url);
   void OnDidSkipWaiting(int request_id);
   void OnDidClaimClients(int request_id);
   void OnClaimClientsError(int request_id,

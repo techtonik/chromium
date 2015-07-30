@@ -311,8 +311,7 @@ extern const char kPluginsPluginsList[];
 extern const char kPluginsDisabledPlugins[];
 extern const char kPluginsDisabledPluginsExceptions[];
 extern const char kPluginsEnabledPlugins[];
-extern const char kPluginsMigratedToPepperFlash[];
-extern const char kPluginsRemovedOldComponentPepperFlashSettings[];
+extern const char kNpapiFlashMigratedToPepperFlash[];
 #if !defined(OS_ANDROID)
 extern const char kPluginsShowDetails[];
 #endif
@@ -665,8 +664,6 @@ extern const char kServerBackedDeviceState[];
 extern const char kCustomizationDefaultWallpaperURL[];
 extern const char kLogoutStartedLast[];
 extern const char kConsumerManagementStage[];
-extern const char kWebviewSigninDisabled[];
-extern const char kNewLoginUIPopup[];
 #endif  // defined(OS_CHROMEOS)
 
 extern const char kClearPluginLSODataEnabled[];

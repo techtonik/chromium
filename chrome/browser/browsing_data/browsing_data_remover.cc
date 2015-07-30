@@ -12,6 +12,7 @@
 #include "base/bind_helpers.h"
 #include "base/callback.h"
 #include "base/logging.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/prefs/pref_service.h"
 #include "chrome/browser/autofill/personal_data_manager_factory.h"
 #include "chrome/browser/browser_process.h"
@@ -68,6 +69,11 @@
 #include "net/url_request/url_request_context_getter.h"
 #include "storage/browser/quota/special_storage_policy.h"
 
+#if defined(OS_ANDROID)
+#include "chrome/browser/precache/precache_manager_factory.h"
+#include "components/precache/content/precache_manager.h"
+#endif
+
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/profiles/profile_helper.h"
 #include "chromeos/attestation/attestation_constants.h"
@@ -109,6 +115,16 @@ CallbackList* GetOnBrowsingDataRemovedCallbacks() {
     g_on_browsing_data_removed_callbacks = new CallbackList();
   return g_on_browsing_data_removed_callbacks;
 }
+
+// A helper enum to report the deletion of cookies and/or cache. Do not reorder
+// the entries, as this enum is passed to UMA.
+enum CookieOrCacheDeletionChoice {
+  NEITHER_COOKIES_NOR_CACHE,
+  ONLY_COOKIES,
+  ONLY_CACHE,
+  BOTH_COOKIES_AND_CACHE,
+  MAX_CHOICE_VALUE
+};
 
 }  // namespace
 
@@ -219,6 +235,9 @@ BrowsingDataRemover::BrowsingDataRemover(Profile* profile,
       waiting_for_clear_platform_keys_(false),
       waiting_for_clear_plugin_data_(false),
       waiting_for_clear_pnacl_cache_(false),
+#if defined(OS_ANDROID)
+      waiting_for_clear_precache_history_(false),
+#endif
       waiting_for_clear_storage_partition_data_(false),
 #if defined(ENABLE_WEBRTC)
       waiting_for_clear_webrtc_logs_(false),
@@ -437,6 +456,23 @@ void BrowsingDataRemover::RemoveImpl(int remove_mask,
     // include origins that the user has visited, so it must be cleared.
     if (profile_->GetSSLHostStateDelegate())
       profile_->GetSSLHostStateDelegate()->Clear();
+
+#if defined(OS_ANDROID)
+    precache::PrecacheManager* precache_manager =
+        precache::PrecacheManagerFactory::GetForBrowserContext(profile_);
+    // |precache_manager| could be NULL if the profile is off the record.
+    if (!precache_manager) {
+      waiting_for_clear_precache_history_ = true;
+      precache_manager->ClearHistory();
+      // The above calls are done on the UI thread but do their work on the DB
+      // thread. So wait for it.
+      BrowserThread::PostTaskAndReply(
+          BrowserThread::DB, FROM_HERE,
+          base::Bind(&base::DoNothing),
+          base::Bind(&BrowsingDataRemover::OnClearedPrecacheHistory,
+                     base::Unretained(this)));
+    }
+#endif
   }
 
   if ((remove_mask & REMOVE_DOWNLOADS) && may_delete_history) {
@@ -755,6 +791,19 @@ void BrowsingDataRemover::RemoveImpl(int remove_mask,
                      base::Unretained(this)));
     }
   }
+
+  // Record the combined deletion of cookies and cache.
+  CookieOrCacheDeletionChoice choice = NEITHER_COOKIES_NOR_CACHE;
+  if (remove_mask & REMOVE_COOKIES &&
+      origin_type_mask_ & BrowsingDataHelper::UNPROTECTED_WEB) {
+    choice = remove_mask & REMOVE_CACHE ? BOTH_COOKIES_AND_CACHE
+                                        : ONLY_COOKIES;
+  } else if (remove_mask & REMOVE_CACHE) {
+    choice = ONLY_CACHE;
+  }
+
+  UMA_HISTOGRAM_ENUMERATION(
+      "ClearBrowsingData.UserDeletedCookieOrCache", choice, MAX_CHOICE_VALUE);
 }
 
 void BrowsingDataRemover::AddObserver(Observer* observer) {
@@ -820,6 +869,9 @@ bool BrowsingDataRemover::AllDone() {
          !waiting_for_clear_platform_keys_ &&
          !waiting_for_clear_plugin_data_ &&
          !waiting_for_clear_pnacl_cache_ &&
+#if defined(OS_ANDROID)
+         !waiting_for_clear_precache_history_ &&
+#endif
 #if defined(ENABLE_WEBRTC)
          !waiting_for_clear_webrtc_logs_ &&
 #endif
@@ -1101,6 +1153,14 @@ void BrowsingDataRemover::OnClearedStoragePartitionData() {
 void BrowsingDataRemover::OnClearedWebRtcLogs() {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   waiting_for_clear_webrtc_logs_ = false;
+  NotifyAndDeleteIfDone();
+}
+#endif
+
+#if defined(OS_ANDROID)
+void BrowsingDataRemover::OnClearedPrecacheHistory() {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  waiting_for_clear_precache_history_ = false;
   NotifyAndDeleteIfDone();
 }
 #endif

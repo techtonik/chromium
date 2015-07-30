@@ -38,7 +38,6 @@
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/page_navigator.h"
 #include "content/public/browser/render_frame_host.h"
-#include "content/public/common/content_switches.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/content_browser_test_utils.h"
 #include "extensions/browser/extension_system.h"
@@ -159,12 +158,11 @@ class TaskManagerOOPIFBrowserTest : public TaskManagerBrowserTest,
   void SetUpCommandLine(base::CommandLine* command_line) override {
     TaskManagerBrowserTest::SetUpCommandLine(command_line);
     if (GetParam())
-      command_line->AppendSwitch(switches::kSitePerProcess);
+      content::IsolateAllSitesForTesting(command_line);
   }
 
   bool ShouldExpectSubframes() {
-    return base::CommandLine::ForCurrentProcess()->HasSwitch(
-        switches::kSitePerProcess);
+    return content::AreAllSitesIsolatedForTesting();
   }
 
  private:
@@ -257,7 +255,8 @@ IN_PROC_BROWSER_TEST_F(TaskManagerBrowserTest,
   tab1->GetMainFrame()->ExecuteJavaScriptWithUserGestureForTests(
       base::ASCIIToUTF16("window.open('title3.html', '_blank');"));
   // ... then immediately hang the renderer so that title3.html can't load.
-  tab1->GetMainFrame()->ExecuteJavaScript(base::ASCIIToUTF16("while(1);"));
+  tab1->GetMainFrame()->ExecuteJavaScriptForTests(
+      base::ASCIIToUTF16("while(1);"));
 
   // Blocks until a new WebContents appears.
   WebContents* tab2 = web_contents_added_observer.GetWebContents();

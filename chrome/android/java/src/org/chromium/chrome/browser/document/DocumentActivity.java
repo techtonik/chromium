@@ -27,7 +27,6 @@ import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.ChromeApplication;
 import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.KeyboardShortcuts;
-import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.TabState;
 import org.chromium.chrome.browser.UrlUtilities;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel.StateChangeReason;
@@ -44,6 +43,7 @@ import org.chromium.chrome.browser.preferences.datareduction.DataReductionPrefer
 import org.chromium.chrome.browser.preferences.datareduction.DataReductionPromoScreen;
 import org.chromium.chrome.browser.signin.SigninPromoScreen;
 import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.SingleTabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabSelectionType;
@@ -410,8 +410,9 @@ public class DocumentActivity extends ChromeActivity {
         String url = (asyncParams != null && asyncParams.getLoadUrlParams().getUrl() != null)
                 ? asyncParams.getLoadUrlParams().getUrl() : determineLastKnownUrl();
 
-        LoadUrlParams loadUrlParams = asyncParams == null
-                ? new LoadUrlParams(url, transitionType) : asyncParams.getLoadUrlParams();
+        LoadUrlParams loadUrlParams =
+                asyncParams == null ? new LoadUrlParams(url) : asyncParams.getLoadUrlParams();
+        loadUrlParams.setTransitionType(transitionType);
         if (getIntent() != null) {
             loadUrlParams.setIntentReceivedTimestamp(getOnCreateTimestampUptimeMs());
         }
@@ -420,7 +421,7 @@ public class DocumentActivity extends ChromeActivity {
             IntentHandler.addReferrerAndHeaders(loadUrlParams, intent, this);
         }
 
-        if (asyncParams != null) {
+        if (asyncParams != null && asyncParams.getOriginalIntent() != null) {
             mDocumentTab.getTabRedirectHandler().updateIntent(asyncParams.getOriginalIntent());
         } else {
             if (getIntent() != null) {

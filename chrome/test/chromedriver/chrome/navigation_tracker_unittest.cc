@@ -279,6 +279,20 @@ class DeterminingLoadStateDevToolsClient : public StubDevToolsClient {
         result_dict.SetString("root.baseURL", "http://test");
       result->reset(result_dict.DeepCopy());
       return Status(kOk);
+    } else if (method == "Runtime.evaluate") {
+      std::string expression;
+      params.GetString("expression", &expression);
+      if (expression == "document.readyState") {
+        base::DictionaryValue result_dict;
+        if (is_loading_) {
+          result_dict.SetString("result.value", "loading");
+          is_loading_ = false;
+        } else {
+          result_dict.SetString("result.value", "complete");
+        }
+        result->reset(result_dict.DeepCopy());
+        return Status(kOk);
+      }
     }
 
     if (send_event_first_.length()) {
@@ -333,24 +347,18 @@ TEST(NavigationTracker, UnknownStateForcesStartReceivesStop) {
 
 TEST(NavigationTracker, OnSuccessfulNavigate) {
   base::DictionaryValue params;
-  params.SetString("frameId", "f");
-  DeterminingLoadStateDevToolsClient client(
-      false, true, "Page.frameStoppedLoading", &params);
-  BrowserInfo browser_info;
-  NavigationTracker tracker(
-      &client, NavigationTracker::kNotLoading, &browser_info);
-  tracker.OnCommandSuccess(&client, "Page.navigate");
-  ASSERT_NO_FATAL_FAILURE(AssertPendingState(&tracker, "f", false));
-}
-
-TEST(NavigationTracker, OnSuccessfulNavigateStillWaiting) {
-  base::DictionaryValue params;
-  params.SetString("frameId", "f");
   DeterminingLoadStateDevToolsClient client(
       false, true, std::string(), &params);
   BrowserInfo browser_info;
+  std::string version_string = "{\"Browser\": \"Chrome/44.0.2403.125\","
+                               " \"WebKit-Version\": \"537.36 (@199461)\"}";
+  ASSERT_TRUE(ParseBrowserInfo(version_string, &browser_info).IsOk());
   NavigationTracker tracker(
       &client, NavigationTracker::kNotLoading, &browser_info);
-  tracker.OnCommandSuccess(&client, "Page.navigate");
+  base::DictionaryValue result;
+  result.SetString("frameId", "f");
+  tracker.OnCommandSuccess(&client, "Page.navigate", result);
   ASSERT_NO_FATAL_FAILURE(AssertPendingState(&tracker, "f", true));
+  tracker.OnEvent(&client, "Page.loadEventFired", params);
+  ASSERT_NO_FATAL_FAILURE(AssertPendingState(&tracker, "f", false));
 }

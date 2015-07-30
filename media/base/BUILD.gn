@@ -80,7 +80,6 @@ source_set("base") {
     "channel_mixer.h",
     "channel_mixing_matrix.cc",
     "channel_mixing_matrix.h",
-    "clock.h",
     "data_buffer.cc",
     "data_buffer.h",
     "data_source.cc",
@@ -209,6 +208,9 @@ source_set("base") {
   ]
   libs = []
   configs += [
+    # This target uses the ALLOCATOR_SHIM define.
+    "//base/allocator:allocator_shim_define",
+    "//build/config:precompiled_headers",
     "//media:media_config",
     "//media:media_implementation",
   ]

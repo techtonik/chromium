@@ -42,6 +42,10 @@
 #include "content/renderer/media/android/renderer_media_player_manager.h"
 #endif
 
+#if defined(ENABLE_MOJO_MEDIA)
+#include "media/mojo/interfaces/service_factory.mojom.h"
+#endif
+
 class GURL;
 class TransportDIB;
 struct FrameMsg_NewFrame_WidgetParams;
@@ -531,7 +535,6 @@ class CONTENT_EXPORT RenderFrameImpl
         const blink::WebAXObject& end_object,
         int end_offset);
   virtual void didChangeManifest(blink::WebLocalFrame*);
-  virtual void didChangeDefaultPresentation(blink::WebLocalFrame*);
   virtual bool enterFullscreen();
   virtual bool exitFullscreen();
   virtual blink::WebPermissionClient* permissionClient();
@@ -541,6 +544,7 @@ class CONTENT_EXPORT RenderFrameImpl
                                        const blink::WebString& title);
   virtual void unregisterProtocolHandler(const blink::WebString& scheme,
                                          const blink::WebURL& url);
+  virtual blink::WebBluetooth* bluetooth();
 
 #if defined(ENABLE_WEBVR)
   blink::WebVRClient* webVRClient() override;
@@ -816,10 +820,10 @@ class CONTENT_EXPORT RenderFrameImpl
   media::MediaPermission* GetMediaPermission();
 
 #if defined(ENABLE_MOJO_MEDIA)
-  mojo::ServiceProvider* GetMediaServiceProvider();
+  media::interfaces::ServiceFactory* GetMediaServiceFactory();
 
-  // Called when a connection error happened on |media_service_provider_|.
-  void OnMediaServiceProviderConnectionError();
+  // Called when a connection error happened on |media_service_factory_|.
+  void OnMediaServiceFactoryConnectionError();
 #endif
 
   media::CdmFactory* GetCdmFactory();
@@ -932,8 +936,8 @@ class CONTENT_EXPORT RenderFrameImpl
   MediaPermissionDispatcher* media_permission_dispatcher_;
 
 #if defined(ENABLE_MOJO_MEDIA)
-  // The media service provider attached to this frame, lazily initialized.
-  mojo::ServiceProviderPtr media_service_provider_;
+  // The media factory attached to this frame, lazily initialized.
+  media::interfaces::ServiceFactoryPtr media_service_factory_;
 #endif
 
   // MidiClient attached to this frame; lazily initialized.
@@ -996,6 +1000,8 @@ class CONTENT_EXPORT RenderFrameImpl
   scoped_ptr<PermissionDispatcher> permission_client_;
 
   scoped_ptr<blink::WebAppBannerClient> app_banner_client_;
+
+  scoped_ptr<blink::WebBluetooth> bluetooth_;
 
 #if defined(ENABLE_WEBVR)
   // The VR dispatcher attached to the frame, lazily initialized.

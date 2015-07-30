@@ -63,6 +63,7 @@
 #include "content/common/browser_plugin/browser_plugin_messages.h"
 #include "content/common/frame_messages.h"
 #include "content/common/input_messages.h"
+#include "content/common/site_isolation_policy.h"
 #include "content/common/ssl_status_serialization.h"
 #include "content/common/view_messages.h"
 #include "content/public/browser/ax_event_notification_details.h"
@@ -88,6 +89,7 @@
 #include "content/public/browser/web_contents_delegate.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/common/bindings_policy.h"
+#include "content/public/common/browser_plugin_guest_mode.h"
 #include "content/public/common/content_constants.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/page_zoom.h"
@@ -217,6 +219,10 @@ void AddRenderWidgetHostViewToSet(std::set<RenderWidgetHostView*>* set,
 void SetAccessibilityModeOnFrame(AccessibilityMode mode,
                                  RenderFrameHost* frame_host) {
   static_cast<RenderFrameHostImpl*>(frame_host)->SetAccessibilityMode(mode);
+}
+
+void ResetAccessibility(RenderFrameHost* rfh) {
+  static_cast<RenderFrameHostImpl*>(rfh)->AccessibilityReset();
 }
 
 }  // namespace
@@ -863,7 +869,10 @@ const std::string& WebContentsImpl::GetUserAgentOverride() const {
 }
 
 void WebContentsImpl::EnableTreeOnlyAccessibilityMode() {
-  AddAccessibilityMode(AccessibilityModeTreeOnly);
+  if (GetAccessibilityMode() == AccessibilityModeTreeOnly)
+    ForEachFrame(base::Bind(&ResetAccessibility));
+  else
+    AddAccessibilityMode(AccessibilityModeTreeOnly);
 }
 
 bool WebContentsImpl::IsTreeOnlyAccessibilityModeForTesting() const {
@@ -1231,8 +1240,7 @@ void WebContentsImpl::DispatchBeforeUnload(bool for_cross_site_transition) {
 void WebContentsImpl::AttachToOuterWebContentsFrame(
     WebContents* outer_web_contents,
     RenderFrameHost* outer_contents_frame) {
-  CHECK(base::CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kSitePerProcess));
+  CHECK(BrowserPluginGuestMode::UseCrossProcessFramesForGuests());
   // Create a link to our outer WebContents.
   node_.reset(new WebContentsTreeNode());
   node_->ConnectToOuterWebContents(
@@ -1326,8 +1334,7 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params) {
       GetContentClient()->browser()->GetWebContentsViewDelegate(this);
 
   if (browser_plugin_guest_ &&
-      !base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess)) {
+      !BrowserPluginGuestMode::UseCrossProcessFramesForGuests()) {
     scoped_ptr<WebContentsView> platform_view(CreateWebContentsView(
         this, delegate, &render_view_host_delegate_view_));
 
@@ -1628,9 +1635,7 @@ void WebContentsImpl::CreateNewWindow(
   // SiteInstance in its own BrowsingInstance.
   bool is_guest = BrowserPluginGuest::IsGuest(this);
 
-  if (is_guest &&
-      base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess)) {
+  if (is_guest && BrowserPluginGuestMode::UseCrossProcessFramesForGuests()) {
     // TODO(lazyboy): CreateNewWindow doesn't work for OOPIF-based <webview>
     // yet.
     NOTREACHED();
@@ -1727,6 +1732,13 @@ void WebContentsImpl::CreateNewWindow(
       partition_id,
       session_storage_namespace);
 
+  // If the new frame has a name, make sure any SiteInstances that can find
+  // this named frame have proxies for it.  Must be called after
+  // SetSessionStorageNamespace, since this calls CreateRenderView, which uses
+  // GetSessionStorageNamespace.
+  if (!params.frame_name.empty())
+    new_contents->GetRenderManager()->CreateProxiesForNewNamedFrame();
+
   // Save the window for later if we're not suppressing the opener (since it
   // will be shown immediately).
   if (!params.opener_suppressed) {
@@ -1767,7 +1779,15 @@ void WebContentsImpl::CreateNewWindow(
                                 ui::PAGE_TRANSITION_LINK,
                                 true /* is_renderer_initiated */);
       open_params.user_gesture = params.user_gesture;
-      new_contents->OpenURL(open_params);
+
+      if (delegate_ && !is_guest &&
+          !delegate_->ShouldResumeRequestsForCreatedWindow()) {
+        // We are in asynchronous add new contents path, delay opening url
+        new_contents->delayed_open_url_params_.reset(
+            new OpenURLParams(open_params));
+      } else {
+        new_contents->OpenURL(open_params);
+      }
     }
   }
 }
@@ -2494,12 +2514,6 @@ void WebContentsImpl::DidGetResourceResponseStart(
 
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
                     DidGetResourceResponseStart(details));
-
-  // TODO(avi): Remove. http://crbug.com/170921
-  NotificationService::current()->Notify(
-      NOTIFICATION_RESOURCE_RESPONSE_STARTED,
-      Source<WebContents>(this),
-      Details<const ResourceRequestDetails>(&details));
 }
 
 void WebContentsImpl::DidGetRedirectForResourceRequest(
@@ -2628,9 +2642,25 @@ int WebContentsImpl::DownloadImage(
     uint32_t max_bitmap_size,
     bool bypass_cache,
     const WebContents::ImageDownloadCallback& callback) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   static int next_image_download_id = 0;
   const image_downloader::ImageDownloaderPtr& mojo_image_downloader =
       GetMainFrame()->GetMojoImageDownloader();
+  const int download_id = ++next_image_download_id;
+  if (!mojo_image_downloader) {
+    // If the renderer process is dead (i.e. crash, or memory pressure on
+    // Android), the downloader service will be invalid. Pre-Mojo, this would
+    // hang the callback indefinetly since the IPC would be dropped. Now,
+    // respond with a 400 HTTP error code to indicate that something went wrong.
+    BrowserThread::PostTask(
+        BrowserThread::UI, FROM_HERE,
+        base::Bind(&WebContents::ImageDownloadCallback::Run,
+                   base::Owned(new ImageDownloadCallback(callback)),
+                   download_id, 400, url, std::vector<SkBitmap>(),
+                   std::vector<gfx::Size>()));
+    return download_id;
+  }
+
   image_downloader::DownloadRequestPtr req =
       image_downloader::DownloadRequest::New();
 
@@ -2641,8 +2671,8 @@ int WebContentsImpl::DownloadImage(
 
   mojo_image_downloader->DownloadImage(
       req.Pass(),
-      base::Bind(&DidDownloadImage, callback, ++next_image_download_id, url));
-  return next_image_download_id;
+      base::Bind(&DidDownloadImage, callback, download_id, url));
+  return download_id;
 }
 
 bool WebContentsImpl::IsSubframe() const {
@@ -2691,6 +2721,12 @@ void WebContentsImpl::ExitFullscreen() {
 }
 
 void WebContentsImpl::ResumeLoadingCreatedWebContents() {
+  if (delayed_open_url_params_.get()) {
+    OpenURL(*delayed_open_url_params_.get());
+    delayed_open_url_params_.reset(nullptr);
+    return;
+  }
+
   // Resume blocked requests for both the RenderViewHost and RenderFrameHost.
   // TODO(brettw): It seems bogus to reach into here and initialize the host.
   if (is_resume_pending_) {
@@ -3463,14 +3499,6 @@ bool WebContentsImpl::UpdateTitleForEntry(NavigationEntryImpl* entry,
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
                     TitleWasSet(entry, explicit_set));
 
-  // TODO(avi): Remove. http://crbug.com/170921
-  std::pair<NavigationEntry*, bool> details =
-      std::make_pair(entry, explicit_set);
-  NotificationService::current()->Notify(
-      NOTIFICATION_WEB_CONTENTS_TITLE_UPDATED,
-      Source<WebContents>(this),
-      Details<std::pair<NavigationEntry*, bool> >(&details));
-
   return true;
 }
 
@@ -3550,11 +3578,6 @@ void WebContentsImpl::RenderFrameDeleted(RenderFrameHost* render_frame_host) {
   FOR_EACH_OBSERVER(WebContentsObserver,
                     observers_,
                     RenderFrameDeleted(render_frame_host));
-}
-
-void WebContentsImpl::WorkerCrashed(RenderFrameHost* render_frame_host) {
-  if (delegate_)
-    delegate_->WorkerCrashed(this);
 }
 
 void WebContentsImpl::ShowContextMenu(RenderFrameHost* render_frame_host,
@@ -3793,21 +3816,31 @@ void WebContentsImpl::UpdateState(RenderViewHost* rvh,
   // Ensure that this state update comes from a RenderViewHost that belongs to
   // this WebContents.
   // TODO(nasko): This should go through RenderFrameHost.
-  // TODO(creis): We can't update state for cross-process subframes until we
-  // have FrameNavigationEntries.  Once we do, this should be a DCHECK.
   if (rvh->GetDelegate()->GetAsWebContents() != this)
     return;
 
-  // We must be prepared to handle state updates for any page, these occur
+  // We must be prepared to handle state updates for any page. They occur
   // when the user is scrolling and entering form data, as well as when we're
   // leaving a page, in which case our state may have already been moved to
   // the next page. The navigation controller will look up the appropriate
   // NavigationEntry and update it when it is notified via the delegate.
+  RenderViewHostImpl* rvhi = static_cast<RenderViewHostImpl*>(rvh);
   NavigationEntryImpl* entry = controller_.GetEntryWithPageID(
-      rvh->GetSiteInstance(), page_id);
-
+      rvhi->GetSiteInstance(), page_id);
   if (!entry)
     return;
+
+  NavigationEntryImpl* new_entry = controller_.GetEntryWithUniqueID(
+      rvhi->nav_entry_id());
+
+  if (SiteIsolationPolicy::UseSubframeNavigationEntries()) {
+    // TODO(creis): We can't properly update state for cross-process subframes
+    // until PageState is decomposed into FrameStates. Until then, use the new
+    // method.
+    entry = new_entry;
+  } else {
+    CHECK_EQ(entry, new_entry);
+  }
 
   if (page_state == entry->GetPageState())
     return;  // Nothing to update.
@@ -3973,21 +4006,25 @@ void WebContentsImpl::UpdateTitle(RenderFrameHost* render_frame_host,
                                   int32 page_id,
                                   const base::string16& title,
                                   base::i18n::TextDirection title_direction) {
-  RenderViewHost* rvh = render_frame_host->GetRenderViewHost();
-
   // If we have a title, that's a pretty good indication that we've started
   // getting useful data.
   SetNotWaitingForResponse();
 
   // Try to find the navigation entry, which might not be the current one.
-  // For example, it might be from a pending RVH for the pending entry.
+  // For example, it might be from a recently swapped out RFH.
   NavigationEntryImpl* entry = controller_.GetEntryWithPageID(
-      rvh->GetSiteInstance(), page_id);
+      render_frame_host->GetSiteInstance(), page_id);
+
+  RenderViewHostImpl* rvhi =
+      static_cast<RenderViewHostImpl*>(render_frame_host->GetRenderViewHost());
+  NavigationEntryImpl* new_entry = controller_.GetEntryWithUniqueID(
+      rvhi->nav_entry_id());
+  CHECK_EQ(entry, new_entry);
 
   // We can handle title updates when we don't have an entry in
   // UpdateTitleForEntry, but only if the update is from the current RVH.
   // TODO(avi): Change to make decisions based on the RenderFrameHost.
-  if (!entry && rvh != GetRenderViewHost())
+  if (!entry && render_frame_host != GetMainFrame())
     return;
 
   // TODO(evan): make use of title_direction.
@@ -4042,8 +4079,7 @@ void WebContentsImpl::EnsureOpenerProxiesExist(RenderFrameHost* source_rfh) {
     // then we should not create a RenderView. AttachToOuterWebContentsFrame()
     // already created a RenderFrameProxyHost for that purpose.
     if (GetBrowserPluginEmbedder() &&
-        base::CommandLine::ForCurrentProcess()->HasSwitch(
-            switches::kSitePerProcess)) {
+        BrowserPluginGuestMode::UseCrossProcessFramesForGuests()) {
       return;
     }
 
@@ -4268,8 +4304,7 @@ bool WebContentsImpl::CreateRenderViewForRenderManager(
   // frame RWHVs are unique in that they do not have their own WebContents.
   bool is_guest_in_site_per_process =
       !!browser_plugin_guest_.get() &&
-      base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess);
+      BrowserPluginGuestMode::UseCrossProcessFramesForGuests();
   if (!for_main_frame_navigation || is_guest_in_site_per_process) {
     RenderWidgetHostViewChildFrame* rwh_view_child =
         new RenderWidgetHostViewChildFrame(render_view_host);

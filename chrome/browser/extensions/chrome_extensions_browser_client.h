@@ -29,7 +29,7 @@ class ChromeExtensionsAPIClient;
 class ChromeProcessManagerDelegate;
 class ContentSettingsPrefsObserver;
 
-// Implementation of extensions::BrowserClient for Chrome, which includes
+// Implementation of BrowserClient for Chrome, which includes
 // knowledge of Profiles, BrowserContexts and incognito.
 //
 // NOTE: Methods that do not require knowledge of browser concepts should be
@@ -61,7 +61,7 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
       const std::string& extension_id,
       content::BrowserContext* context) const override;
   bool CanExtensionCrossIncognito(
-      const extensions::Extension* extension,
+      const Extension* extension,
       content::BrowserContext* context) const override;
   net::URLRequestJob* MaybeCreateResourceBundleRequestJob(
       net::URLRequest* request,
@@ -82,7 +82,8 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
   scoped_ptr<ExtensionHostDelegate> CreateExtensionHostDelegate() override;
   bool DidVersionUpdate(content::BrowserContext* context) override;
   void PermitExternalProtocolHandler() override;
-  scoped_ptr<AppSorting> CreateAppSorting() override;
+  scoped_ptr<AppSorting> CreateAppSorting(
+      content::BrowserContext* context) override;
   bool IsRunningInForcedAppMode() override;
   ApiActivityMonitor* GetApiActivityMonitor(
       content::BrowserContext* context) override;
@@ -91,11 +92,12 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
       ExtensionFunctionRegistry* registry) const override;
   void RegisterMojoServices(content::RenderFrameHost* render_frame_host,
                             const Extension* extension) const override;
-  scoped_ptr<extensions::RuntimeAPIDelegate> CreateRuntimeAPIDelegate(
+  scoped_ptr<RuntimeAPIDelegate> CreateRuntimeAPIDelegate(
       content::BrowserContext* context) const override;
   const ComponentExtensionResourceManager*
   GetComponentExtensionResourceManager() override;
-  void BroadcastEventToRenderers(const std::string& event_name,
+  void BroadcastEventToRenderers(events::HistogramValue histogram_value,
+                                 const std::string& event_name,
                                  scoped_ptr<base::ListValue> args) override;
   net::NetLog* GetNetLog() override;
   ExtensionCache* GetExtensionCache() override;

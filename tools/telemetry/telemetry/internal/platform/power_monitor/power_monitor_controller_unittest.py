@@ -4,12 +4,18 @@
 
 import unittest
 
+from telemetry.core import util
 from telemetry.internal.platform import power_monitor as power_monitor
 from telemetry.internal.platform.power_monitor import power_monitor_controller
 
+util.AddDirToPythonPath(util.GetTelemetryDir(), 'third_party', 'mock')
+import mock  # pylint: disable=import-error
+util.AddDirToPythonPath(util.GetChromiumSrcDir(), 'build', 'android')
+from pylib.device import battery_utils  # pylint: disable=import-error
 
 class PowerMonitorControllerTest(unittest.TestCase):
-  def testComposition(self):
+  @mock.patch.object(battery_utils, 'BatteryUtils')
+  def testComposition(self, _):
 
     class P1(power_monitor.PowerMonitor):
       def StartMonitoringPower(self, browser):
@@ -19,7 +25,7 @@ class PowerMonitorControllerTest(unittest.TestCase):
 
     class P2(power_monitor.PowerMonitor):
       def __init__(self, value):
-        self._value = value
+        self._value = {'P2': value}
       def CanMonitorPower(self):
         return True
       def StartMonitoringPower(self, browser):
@@ -27,8 +33,27 @@ class PowerMonitorControllerTest(unittest.TestCase):
       def StopMonitoringPower(self):
         return self._value
 
+    class P3(power_monitor.PowerMonitor):
+      def __init__(self, value):
+        self._value = {'P3': value}
+      def CanMonitorPower(self):
+        return True
+      def StartMonitoringPower(self, browser):
+        pass
+      def StopMonitoringPower(self):
+        return self._value
+
+    battery = battery_utils.BatteryUtils(None)
     controller = power_monitor_controller.PowerMonitorController(
-        [P1(), P2(1), P2(2)])
+        [P1(), P2(1), P3(2)], battery)
     self.assertEqual(controller.CanMonitorPower(), True)
     controller.StartMonitoringPower(None)
-    self.assertEqual(controller.StopMonitoringPower(), 1)
+    controller_returns = controller.StopMonitoringPower()
+    self.assertEqual(controller_returns['P2'], 1)
+    self.assertEqual(controller_returns['P3'], 2)
+
+  @mock.patch.object(battery_utils, 'BatteryUtils')
+  def testReenableCharingIfNeeded(self, mock_battery):
+    battery = battery_utils.BatteryUtils(None)
+    battery.GetCharging.return_value = False
+    power_monitor_controller._ReenableChargingIfNeeded(battery)

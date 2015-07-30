@@ -264,7 +264,9 @@ ASSERT_CDM_INIT_DATA_TYPE(KEYIDS);
 ASSERT_CDM_KEY_STATUS(USABLE);
 ASSERT_CDM_KEY_STATUS(INTERNAL_ERROR);
 ASSERT_CDM_KEY_STATUS(EXPIRED);
-ASSERT_CDM_KEY_STATUS(OUTPUT_NOT_ALLOWED);
+ASSERT_CDM_KEY_STATUS(OUTPUT_RESTRICTED);
+ASSERT_CDM_KEY_STATUS(OUTPUT_DOWNSCALED);
+ASSERT_CDM_KEY_STATUS(KEY_STATUS_PENDING);
 
 // CDM Message Type
 #define ASSERT_CDM_MESSAGE_TYPE(value)                                \
@@ -318,14 +320,14 @@ TypeConverter<scoped_ptr<media::DecryptConfig>,
 }
 
 // static
-media::interfaces::MediaDecoderBufferPtr
-TypeConverter<media::interfaces::MediaDecoderBufferPtr,
+media::interfaces::DecoderBufferPtr
+TypeConverter<media::interfaces::DecoderBufferPtr,
               scoped_refptr<media::DecoderBuffer>>::
     Convert(const scoped_refptr<media::DecoderBuffer>& input) {
   DCHECK(input);
 
-  media::interfaces::MediaDecoderBufferPtr mojo_buffer(
-      media::interfaces::MediaDecoderBuffer::New());
+  media::interfaces::DecoderBufferPtr mojo_buffer(
+      media::interfaces::DecoderBuffer::New());
   if (input->end_of_stream())
     return mojo_buffer.Pass();
 
@@ -361,8 +363,8 @@ TypeConverter<media::interfaces::MediaDecoderBufferPtr,
 // static
 scoped_refptr<media::DecoderBuffer>
 TypeConverter<scoped_refptr<media::DecoderBuffer>,
-              media::interfaces::MediaDecoderBufferPtr>::
-    Convert(const media::interfaces::MediaDecoderBufferPtr& input) {
+              media::interfaces::DecoderBufferPtr>::
+    Convert(const media::interfaces::DecoderBufferPtr& input) {
   if (!input->data_size)
     return media::DecoderBuffer::CreateEOSBuffer();
 

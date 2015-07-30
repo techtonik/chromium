@@ -164,7 +164,7 @@ class SourceState {
   // Sets the memory limit on each stream of a specific type.
   // |memory_limit| is the maximum number of bytes each stream of type |type|
   // is allowed to hold in its buffer.
-  void SetMemoryLimits(DemuxerStream::Type type, int memory_limit);
+  void SetMemoryLimits(DemuxerStream::Type type, size_t memory_limit);
   bool IsSeekWaitingForData() const;
 
  private:
@@ -509,20 +509,21 @@ void SourceState::Shutdown() {
   }
 }
 
-void SourceState::SetMemoryLimits(DemuxerStream::Type type, int memory_limit) {
+void SourceState::SetMemoryLimits(DemuxerStream::Type type,
+                                  size_t memory_limit) {
   switch (type) {
     case DemuxerStream::AUDIO:
       if (audio_)
-        audio_->set_memory_limit(memory_limit);
+        audio_->SetStreamMemoryLimit(memory_limit);
       break;
     case DemuxerStream::VIDEO:
       if (video_)
-        video_->set_memory_limit(memory_limit);
+        video_->SetStreamMemoryLimit(memory_limit);
       break;
     case DemuxerStream::TEXT:
       for (TextStreamMap::iterator itr = text_stream_map_.begin();
            itr != text_stream_map_.end(); ++itr) {
-        itr->second->set_memory_limit(memory_limit);
+        itr->second->SetStreamMemoryLimit(memory_limit);
       }
       break;
     case DemuxerStream::UNKNOWN:
@@ -1026,6 +1027,10 @@ TextTrackConfig ChunkDemuxerStream::text_track_config() {
   return stream_->GetCurrentTextTrackConfig();
 }
 
+void ChunkDemuxerStream::SetStreamMemoryLimit(size_t memory_limit) {
+  stream_->set_memory_limit(memory_limit);
+}
+
 void ChunkDemuxerStream::SetLiveness(Liveness liveness) {
   base::AutoLock auto_lock(lock_);
   liveness_ = liveness;
@@ -1269,7 +1274,8 @@ ChunkDemuxer::Status ChunkDemuxer::AddId(const std::string& id,
 
   scoped_ptr<FrameProcessor> frame_processor(
       new FrameProcessor(base::Bind(&ChunkDemuxer::IncreaseDurationIfNecessary,
-                         base::Unretained(this))));
+                                    base::Unretained(this)),
+                         media_log_));
 
   scoped_ptr<SourceState> source_state(new SourceState(
       stream_parser.Pass(), frame_processor.Pass(),
@@ -1583,7 +1589,8 @@ void ChunkDemuxer::Shutdown() {
     base::ResetAndReturn(&seek_cb_).Run(PIPELINE_ERROR_ABORT);
 }
 
-void ChunkDemuxer::SetMemoryLimits(DemuxerStream::Type type, int memory_limit) {
+void ChunkDemuxer::SetMemoryLimits(DemuxerStream::Type type,
+                                   size_t memory_limit) {
   for (SourceStateMap::iterator itr = source_state_map_.begin();
        itr != source_state_map_.end(); ++itr) {
     itr->second->SetMemoryLimits(type, memory_limit);

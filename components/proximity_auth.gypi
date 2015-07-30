@@ -21,6 +21,7 @@
         '../net/net.gyp:net',
       ],
       'sources': [
+        "proximity_auth/authenticator.h",
         "proximity_auth/ble/bluetooth_low_energy_characteristics_finder.cc",
         "proximity_auth/ble/bluetooth_low_energy_characteristics_finder.h",
         "proximity_auth/ble/bluetooth_low_energy_connection.cc",
@@ -54,6 +55,12 @@
         "proximity_auth/connection.h",
         "proximity_auth/connection_finder.h",
         "proximity_auth/connection_observer.h",
+        "proximity_auth/device_to_device_authenticator.cc",
+        "proximity_auth/device_to_device_authenticator.h",
+        "proximity_auth/device_to_device_initiator_operations.cc",
+        "proximity_auth/device_to_device_initiator_operations.h",
+        "proximity_auth/device_to_device_secure_context.cc",
+        "proximity_auth/device_to_device_secure_context.h",
         "proximity_auth/metrics.cc",
         "proximity_auth/metrics.h",
         "proximity_auth/proximity_auth_client.h",
@@ -63,6 +70,7 @@
         "proximity_auth/proximity_monitor_impl.cc",
         "proximity_auth/proximity_monitor_impl.h",
         "proximity_auth/proximity_monitor_observer.h",
+        "proximity_auth/remote_device.cc",
         "proximity_auth/remote_device.h",
         "proximity_auth/remote_status_update.cc",
         "proximity_auth/remote_status_update.h",
@@ -76,6 +84,21 @@
         "proximity_auth/throttled_bluetooth_connection_finder.h",
         "proximity_auth/wire_message.cc",
         "proximity_auth/wire_message.h",
+      ],
+    },
+    {
+      'target_name': 'proximity_auth_test_support',
+      'type': 'static_library',
+      'include_dirs': [
+        '..',
+      ],
+      'dependencies': [
+        ':cryptauth_test_support',
+        '../base/base.gyp:base',
+      ],
+      'sources': [
+        "proximity_auth/device_to_device_responder_operations.cc",
+        "proximity_auth/device_to_device_responder_operations.h",
       ],
     },
     {
@@ -171,6 +194,8 @@
         '../testing/gmock.gyp:gmock',
       ],
       'sources': [
+        "proximity_auth/cryptauth/fake_cryptauth_gcm_manager.cc",
+        "proximity_auth/cryptauth/fake_cryptauth_gcm_manager.h",
         "proximity_auth/cryptauth/fake_secure_message_delegate.cc",
         "proximity_auth/cryptauth/fake_secure_message_delegate.h",
         "proximity_auth/cryptauth/mock_cryptauth_client.cc",

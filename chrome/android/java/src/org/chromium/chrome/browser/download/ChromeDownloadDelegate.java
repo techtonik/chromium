@@ -15,13 +15,13 @@ import android.webkit.MimeTypeMap;
 import android.webkit.URLUtil;
 import android.widget.Toast;
 
-import org.chromium.base.CalledByNative;
 import org.chromium.base.VisibleForTesting;
+import org.chromium.base.annotations.CalledByNative;
 import org.chromium.chrome.R;
-import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.infobar.ConfirmInfoBar;
 import org.chromium.chrome.browser.infobar.InfoBar;
 import org.chromium.chrome.browser.infobar.InfoBarListeners;
+import org.chromium.chrome.browser.tab.Tab;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.content.browser.ContentViewDownloadDelegate;
 import org.chromium.content.browser.DownloadInfo;

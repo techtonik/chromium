@@ -710,7 +710,9 @@ static Layer* FindFirstScrollableLayer(Layer* layer) {
 }
 
 void LayerTreeHost::RecordGpuRasterizationHistogram() {
-  if (gpu_rasterization_histogram_recorded_)
+  // Gpu rasterization is only supported for Renderer compositors.
+  // Checking for proxy_->HasImplThread() to exclude Browser compositors.
+  if (gpu_rasterization_histogram_recorded_ || !proxy_->HasImplThread())
     return;
 
   // Record how widely gpu rasterization is enabled.
@@ -1150,19 +1152,30 @@ bool LayerTreeHost::ScrollOffsetAnimationWasInterrupted(
 
 bool LayerTreeHost::IsAnimatingFilterProperty(const Layer* layer) const {
   return animation_host_
-             ? animation_host_->IsAnimatingFilterProperty(layer->id())
+             ? animation_host_->IsAnimatingFilterProperty(layer->id(),
+                                                          LayerTreeType::ACTIVE)
              : false;
 }
 
 bool LayerTreeHost::IsAnimatingOpacityProperty(const Layer* layer) const {
   return animation_host_
-             ? animation_host_->IsAnimatingOpacityProperty(layer->id())
+             ? animation_host_->IsAnimatingOpacityProperty(
+                   layer->id(), LayerTreeType::ACTIVE)
              : false;
 }
 
 bool LayerTreeHost::IsAnimatingTransformProperty(const Layer* layer) const {
   return animation_host_
-             ? animation_host_->IsAnimatingTransformProperty(layer->id())
+             ? animation_host_->IsAnimatingTransformProperty(
+                   layer->id(), LayerTreeType::ACTIVE)
+             : false;
+}
+
+bool LayerTreeHost::HasPotentiallyRunningFilterAnimation(
+    const Layer* layer) const {
+  return animation_host_
+             ? animation_host_->HasPotentiallyRunningFilterAnimation(
+                   layer->id(), LayerTreeType::ACTIVE)
              : false;
 }
 
@@ -1170,7 +1183,7 @@ bool LayerTreeHost::HasPotentiallyRunningOpacityAnimation(
     const Layer* layer) const {
   return animation_host_
              ? animation_host_->HasPotentiallyRunningOpacityAnimation(
-                   layer->id())
+                   layer->id(), LayerTreeType::ACTIVE)
              : false;
 }
 
@@ -1178,7 +1191,7 @@ bool LayerTreeHost::HasPotentiallyRunningTransformAnimation(
     const Layer* layer) const {
   return animation_host_
              ? animation_host_->HasPotentiallyRunningTransformAnimation(
-                   layer->id())
+                   layer->id(), LayerTreeType::ACTIVE)
              : false;
 }
 

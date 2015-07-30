@@ -139,6 +139,9 @@ class TestFrameTreeDelegate : public FrameTreeDelegate {
   }
   void LoadingStateChanged(bool loading) override {}
   void ProgressChanged(double progress) override {}
+  void RequestNavigate(Frame* source,
+                       NavigationTarget target,
+                       mojo::URLRequestPtr request) override {}
 
  private:
   DISALLOW_COPY_AND_ASSIGN(TestFrameTreeDelegate);
@@ -166,6 +169,8 @@ class TestFrameTreeClient : public FrameTreeClient {
     adds_.push_back(frame.Pass());
   }
   void OnFrameRemoved(uint32_t frame_id) override {}
+  void OnFrameNameChanged(uint32_t frame_id,
+                          const mojo::String& name) override {}
 
  private:
   int connect_count_;

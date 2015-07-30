@@ -86,8 +86,10 @@
       'webapp/base/js/base_unittest.js',
       'webapp/base/js/base_event_hook_unittest.js',
       'webapp/base/js/base_inherits_unittest.js',
+      'webapp/base/js/callstack_unittest.js',
       'webapp/base/js/client_session_unittest.js',
       'webapp/base/js/client_session_factory_unittest.js',
+      'webapp/base/js/console_wrapper_unittest.js',
       'webapp/base/js/dns_blackhole_checker_unittest.js',
       'webapp/base/js/error_unittest.js',
       'webapp/base/js/fallback_signal_strategy_unittest.js',
@@ -108,6 +110,7 @@
       'webapp/base/js/xmpp_login_handler_unittest.js',
       'webapp/base/js/xmpp_stream_parser_unittest.js',
       'webapp/crd/js/apps_v2_migration_unittest.js',
+      'webapp/crd/js/combined_host_list_api_unittest.js',
       'webapp/crd/js/gcd_client_unittest.js',
       'webapp/crd/js/gcd_client_with_mock_xhr_unittest.js',
       'webapp/crd/js/host_controller_unittest.js',
@@ -180,6 +183,8 @@
     'remoting_webapp_shared_js_core_files': [
       'webapp/base/js/application.js',
       'webapp/base/js/base.js',
+      'webapp/base/js/callstack.js',
+      'webapp/base/js/console_wrapper.js',
       'webapp/base/js/ipc.js',
       'webapp/base/js/modal_dialogs.js',
       'webapp/base/js/platform.js',
@@ -286,6 +291,7 @@
       # JSCompiler.  If an implementation of an interface occurs in a
       # file processed before the interface itself, the @override tag
       # doesn't always work correctly.
+      'webapp/crd/js/combined_host_list_api.js',
       'webapp/crd/js/gcd_host_list_api.js',
       'webapp/crd/js/legacy_host_list_api.js',
     ],

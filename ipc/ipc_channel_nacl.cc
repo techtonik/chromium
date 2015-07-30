@@ -350,7 +350,11 @@ ChannelNacl::ReadState ChannelNacl::ReadData(
   return READ_SUCCEEDED;
 }
 
-bool ChannelNacl::WillDispatchInputMessage(Message* msg) {
+bool ChannelNacl::ShouldDispatchInputMessage(Message* msg) {
+  return true;
+}
+
+bool ChannelNacl::GetNonBrokeredAttachments(Message* msg) {
   uint16 header_fds = msg->header()->num_fds;
   CHECK(header_fds == input_fds_.size());
   if (header_fds == 0)
@@ -373,6 +377,12 @@ void ChannelNacl::HandleInternalMessage(const Message& msg) {
   // The trusted side IPC::Channel should handle the "hello" handshake; we
   // should not receive the "Hello" message.
   NOTREACHED();
+}
+
+base::ProcessId ChannelNacl::GetSenderPID() {
+  // The untrusted side of the IPC::Channel should never have to worry about
+  // sender's process id.
+  return base::kNullProcessId;
 }
 
 // Channel's methods

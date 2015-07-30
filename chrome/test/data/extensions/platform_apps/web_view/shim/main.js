@@ -18,6 +18,8 @@ var request_to_comm_channel_2 = 'connect_request';
 var response_from_comm_channel_1 = 'connected';
 var response_from_comm_channel_2 = 'connected_response';
 
+var GUEST_REDIRECT_FILE_NAME = 'guest_redirect.html';
+
 embedder.setUp_ = function(config) {
   if (!config || !config.testServer) {
     return;
@@ -34,13 +36,15 @@ embedder.setUp_ = function(config) {
   embedder.detectUserAgentURL = embedder.baseGuestURL + '/detect-user-agent';
   embedder.redirectGuestURL = embedder.baseGuestURL + '/server-redirect';
   embedder.redirectGuestURLDest = embedder.baseGuestURL +
-      '/extensions/platform_apps/web_view/shim/guest_redirect.html';
+      '/extensions/platform_apps/web_view/shim/' + GUEST_REDIRECT_FILE_NAME;
   embedder.closeSocketURL = embedder.baseGuestURL + '/close-socket';
   embedder.testImageBaseURL = embedder.baseGuestURL +
       '/extensions/platform_apps/web_view/shim/';
   embedder.virtualURL = 'http://virtualurl/';
   embedder.pluginURL = embedder.baseGuestURL +
       '/extensions/platform_apps/web_view/shim/embed.html';
+  embedder.mailtoTestURL = embedder.baseGuestURL +
+      '/extensions/platform_apps/web_view/shim/mailto.html';
 };
 
 window.runTest = function(testName) {
@@ -2722,6 +2726,85 @@ function testFocusWhileFocused() {
   document.body.appendChild(webview);
 }
 
+function testPDFInWebview() {
+  var webview = document.createElement('webview');
+  var pdfUrl = 'test.pdf';
+  // partition 'foobar' has access to local resource |pdfUrl|.
+  webview.partition = 'foobar';
+  webview.onloadstop = embedder.test.succeed;
+  webview.onloadabort = embedder.test.fail;
+  webview.setAttribute('src', pdfUrl);
+  document.body.appendChild(webview);
+}
+
+// This test verifies that mailto links are enabled.
+function testMailtoLink() {
+  var webview = new WebView();
+  webview.src = embedder.mailtoTestURL;
+
+  webview.onloadstop = function() {
+    webview.onloadabort = function(e) {
+      // The mailto link should not trigger a loadabort.
+      if (e.url.substring(0, 7) == 'mailto:') {
+        embedder.test.fail();
+      }
+    };
+    webview.onloadstop = function() {
+      // If mailto links are disabled, then |webview.src| will now be
+      // 'about:blank'.
+      embedder.test.assertFalse(webview.src == 'about:blank');
+      embedder.test.succeed();
+    };
+    webview.executeScript({code:'document.getElementById("mailto").click()'});
+  };
+
+  document.body.appendChild(webview);
+}
+
+// This test navigates an unattached guest to 'about:blank', then it makes a
+// renderer/ navigation to a URL that results in a server side redirect. In the
+// end we verify that the redirected URL loads in the guest properly.
+function testRendererNavigationRedirectWhileUnattached() {
+  var webview = document.createElement('webview');
+  // So that |webview| is unattached, but can navigate.
+  webview.style.display = 'none';
+
+  var seenRedirectURLCommit = false;
+  var seenRedirectLoadStop = false;
+
+  var checkTest = function() {
+    if (seenRedirectLoadStop && seenRedirectURLCommit) {
+      embedder.test.succeed();
+    }
+  };
+
+  webview.onloadstop = function(e) {
+
+    webview.onloadstop = function() {
+      webview.onloadstop = null;
+      seenRedirectLoadStop = true;
+      checkTest();
+    };
+    webview.executeScript({
+      code: 'window.location.href="' + embedder.redirectGuestURL + '"',
+    }, function(res) {
+      if (!res || !res.length) {
+        embedder.test.fail();
+        return;
+      }
+    });
+  };
+
+  webview.onloadcommit = function(e) {
+    if (e.url.indexOf(GUEST_REDIRECT_FILE_NAME) != -1) {
+      seenRedirectURLCommit = true;
+      checkTest();
+    }
+  };
+  document.body.appendChild(webview);
+  webview.src = 'about:blank';
+};
+
 embedder.test.testList = {
   'testAllowTransparencyAttribute': testAllowTransparencyAttribute,
   'testAutosizeHeight': testAutosizeHeight,
@@ -2822,7 +2905,11 @@ embedder.test.testList = {
   'testPlugin': testPlugin,
   'testGarbageCollect': testGarbageCollect,
   'testCloseNewWindowCleanup': testCloseNewWindowCleanup,
-  'testFocusWhileFocused': testFocusWhileFocused
+  'testFocusWhileFocused': testFocusWhileFocused,
+  'testPDFInWebview': testPDFInWebview,
+  'testMailtoLink': testMailtoLink,
+  'testRendererNavigationRedirectWhileUnattached':
+       testRendererNavigationRedirectWhileUnattached
 };
 
 onload = function() {
