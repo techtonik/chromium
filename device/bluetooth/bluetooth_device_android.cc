@@ -193,10 +193,7 @@ void BluetoothDeviceAndroid::CreateGattConnection(
   create_gatt_connection_success_callbacks_.push_back(callback);
   create_gatt_connection_error_callbacks_.push_back(error_callback);
 
-  //// If previous call to CreateGattConnection is already underway, wait for
-  //// that response.
-  // if (create_gatt_connection_error_callbacks_.size() > 1)
-  //  return;
+  // TODO call success immediately if already IsConnected.
 
   if (!Java_ChromeBluetoothDevice_createGattConnection(
           AttachCurrentThread(), j_device_.obj(),
