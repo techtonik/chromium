@@ -13,32 +13,19 @@
 
 namespace device {
 
-class BluetoothAdapterAndroid;
-
 // BluetoothGattConnectionAndroid implements BluetoothGattConnection for the
 // Android platform.
 class BluetoothGattConnectionAndroid : public device::BluetoothGattConnection {
  public:
   explicit BluetoothGattConnectionAndroid(
-      scoped_refptr<device::BluetoothAdapterAndroid> adapter,
+      scoped_refptr<device::BluetoothAdapter> adapter,
       const std::string& device_address);
   ~BluetoothGattConnectionAndroid() override;
 
   // BluetoothGattConnection overrides.
-  std::string GetDeviceAddress() const override;
-  bool IsConnected() override;
   void Disconnect(const base::Closure& callback) override;
 
  private:
-  // True, if the connection is currently active.
-  bool connected_;
-
-  // The Bluetooth adapter that this connection is associated with.
-  scoped_refptr<BluetoothAdapterAndroid> adapter_;
-
-  // Bluetooth address of the underlying device.
-  std::string device_address_;
-
   DISALLOW_COPY_AND_ASSIGN(BluetoothGattConnectionAndroid);
 };
 

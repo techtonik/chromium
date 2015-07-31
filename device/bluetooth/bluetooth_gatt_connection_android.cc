@@ -6,29 +6,18 @@
 
 #include "base/bind.h"
 #include "base/logging.h"
-#include "device/bluetooth/bluetooth_adapter_android.h"
+#include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_device.h"
 
 namespace device {
 
 BluetoothGattConnectionAndroid::BluetoothGattConnectionAndroid(
-    scoped_refptr<device::BluetoothAdapterAndroid> adapter,
+    scoped_refptr<device::BluetoothAdapter> adapter,
     const std::string& device_address)
-    : adapter_(adapter), device_address_(device_address) {
-  DCHECK(adapter_.get());
-  DCHECK(!device_address_.empty());
-}
+    : BluetoothGattConnection(adapter, device_address) {}
 
 BluetoothGattConnectionAndroid::~BluetoothGattConnectionAndroid() {
   Disconnect(base::Bind(&base::DoNothing));
-}
-
-std::string BluetoothGattConnectionAndroid::GetDeviceAddress() const {
-  return device_address_;
-}
-
-bool BluetoothGattConnectionAndroid::IsConnected() {
-  return adapter_->GetDevice(device_address_)->IsConnected();
 }
 
 void BluetoothGattConnectionAndroid::Disconnect(const base::Closure& callback) {
