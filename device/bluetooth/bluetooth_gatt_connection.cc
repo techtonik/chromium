@@ -8,7 +8,21 @@
 
 namespace device {
 
-BluetoothGattConnection::~BluetoothGattConnection() {}
+BluetoothGattConnection::BluetoothGattConnection(
+    BluetoothAdapter* adapter,
+    const std::string& device_address)
+    : adapter_(adapter), device_address_(device_address) {
+  DCHECK(adapter_.get());
+  DCHECK(!device_address_.empty());
+
+  BluetoothDevice* device = adapter_->GetDevice(device_address_);
+  if (device)
+    device->IncrementGattConnectionReferenceCount();
+}
+
+BluetoothGattConnection::~BluetoothGattConnection() {
+  Disconnect();
+}
 
 std::string BluetoothGattConnection::GetDeviceAddress() const {
   return device_address_;
@@ -18,26 +32,14 @@ bool BluetoothGattConnection::IsConnected() {
   return adapter_->GetDevice(device_address_)->IsConnected();
 }
 
-BluetoothGattConnection::BluetoothGattConnection(
-    scoped_refptr<device::BluetoothAdapter> adapter,
-    const std::string& device_address)
-    : adapter_(adapter), device_address_(device_address) {
-  DCHECK(adapter_.get());
-  DCHECK(!device_address_.empty());
-}
-
-void BluetoothGattConnection::IncrementConnectionReferenceCount() {
-  BluetoothDevice* device = adapter_->GetDevice(device_address_);
-  if (!device)
+void BluetoothGattConnection::Disconnect() {
+  if (already_decremented_connection_reference_on_device_)
     return;
-  // TODO
-}
 
-void BluetoothGattConnection::DecrementConnectionReferenceCount() {
+  already_decremented_connection_reference_on_device_ = true;
   BluetoothDevice* device = adapter_->GetDevice(device_address_);
-  if (!device)
-    return;
-  // TODO
+  if (device)
+    device->DecrementGattConnectionReferenceCount();
 }
 
 }  // namespace device

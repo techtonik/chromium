@@ -16,7 +16,7 @@ BluetoothGattConnectionChromeOS::BluetoothGattConnectionChromeOS(
     scoped_refptr<device::BluetoothAdapter> adapter,
     const std::string& device_address,
     const dbus::ObjectPath& object_path)
-    : BluetoothGattConnection(adapter, device_address),
+    : BluetoothGattConnection(adapter.get(), device_address),
       connected_(true),
       object_path_(object_path) {
   DCHECK(adapter_.get());
@@ -28,7 +28,7 @@ BluetoothGattConnectionChromeOS::BluetoothGattConnectionChromeOS(
 
 BluetoothGattConnectionChromeOS::~BluetoothGattConnectionChromeOS() {
   DBusThreadManager::Get()->GetBluetoothDeviceClient()->RemoveObserver(this);
-  Disconnect(base::Bind(&base::DoNothing));
+  Disconnect();
 }
 
 bool BluetoothGattConnectionChromeOS::IsConnected() {
@@ -49,11 +49,9 @@ bool BluetoothGattConnectionChromeOS::IsConnected() {
   return connected_;
 }
 
-void BluetoothGattConnectionChromeOS::Disconnect(
-    const base::Closure& callback) {
+void BluetoothGattConnectionChromeOS::Disconnect() {
   if (!connected_) {
     VLOG(1) << "Connection already inactive.";
-    callback.Run();
     return;
   }
 
@@ -65,7 +63,6 @@ void BluetoothGattConnectionChromeOS::Disconnect(
   // even though the underlying connection won't actually be disconnected. This
   // technically doesn't violate the contract put forth by this API.
   connected_ = false;
-  callback.Run();
 }
 
 void BluetoothGattConnectionChromeOS::DeviceRemoved(

@@ -35,7 +35,7 @@ class BluetoothGattConnectionChromeOS
 
   // BluetoothGattConnection overrides.
   bool IsConnected() override;
-  void Disconnect(const base::Closure& callback) override;
+  void Disconnect() override;
 
  private:
 

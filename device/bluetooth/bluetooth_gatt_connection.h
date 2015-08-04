@@ -22,6 +22,9 @@ class BluetoothAdapter;
 // operating system (e.g. due to user action).
 class DEVICE_BLUETOOTH_EXPORT BluetoothGattConnection {
  public:
+  BluetoothGattConnection(BluetoothAdapter* adapter,
+                          const std::string& device_address);
+
   // Destructor automatically closes this GATT connection. If this is the last
   // remaining GATT connection and this results in a call to the OS, that call
   // may not always succeed. Users can make an explicit call to
@@ -36,26 +39,21 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothGattConnection {
   // Returns true if this connection is open.
   virtual bool IsConnected();
 
-  // Disconnects this GATT connection and calls |callback| upon completion.
-  // After a successful invocation, the device may still remain connected due to
-  // other GATT connections.
-  virtual void Disconnect(const base::Closure& callback) = 0;
+  // Disconnects this GATT connection. The device may still remain connected due
+  // to other GATT connections.
+  virtual void Disconnect();
 
  protected:
-  BluetoothGattConnection(scoped_refptr<device::BluetoothAdapter> adapter,
-                          const std::string& device_address);
-
-  // Increments/Decrements a reference count for the associated device.
-  void IncrementConnectionReferenceCount();
-  void DecrementConnectionReferenceCount();
-
-  // The Bluetooth adapter that this connection is associated with.
+  // The Bluetooth adapter that this connection is associated with. A reference
+  // is held because BluetoothGattConnection keeps the connection alive.
   scoped_refptr<BluetoothAdapter> adapter_;
 
   // Bluetooth address of the underlying device.
   std::string device_address_;
 
  private:
+  bool already_decremented_connection_reference_on_device_ = false;
+
   DISALLOW_COPY_AND_ASSIGN(BluetoothGattConnection);
 };
 
