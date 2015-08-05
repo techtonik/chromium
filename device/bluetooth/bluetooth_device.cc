@@ -317,8 +317,8 @@ void BluetoothDevice::IncrementGattConnectionReferenceCount() {
 void BluetoothDevice::DecrementGattConnectionReferenceCount() {
   CHECK(gatt_connection_reference_count_ > 0);
   gatt_connection_reference_count_--;
-  if (gatt_connection_reference_count_)
-    Disconnect(base::Closure(), ErrorCallback());
+  if (gatt_connection_reference_count_ == 0)
+    DisconnectGatt();
 }
 
 void BluetoothDevice::ClearServiceData() { services_data_->Clear(); }

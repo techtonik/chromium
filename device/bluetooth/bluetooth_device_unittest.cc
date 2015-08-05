@@ -137,6 +137,8 @@ TEST_F(BluetoothTest, CreateGattConnection) {
   EXPECT_EQ(1, callback_count_--);
   EXPECT_EQ(0, error_callback_count_);
 
+  ASSERT_EQ(1, gatt_connections_.size());
+
   // be not connected; connect.
   // be connected; try to connect.
 }

@@ -185,6 +185,12 @@ void BluetoothDeviceChromeOS::CreateGattConnectionImpl() {
   NOTIMPLEMENTED();
 }
 
+void BluetoothDeviceChromeOS::DisconnectGatt() {
+  // ChromeOS implementation does not use the default CreateGattConnection
+  // implementation.
+  NOTIMPLEMENTED();
+}
+
 std::string BluetoothDeviceChromeOS::GetAddress() const {
   BluetoothDeviceClient::Properties* properties =
       DBusThreadManager::Get()->GetBluetoothDeviceClient()->

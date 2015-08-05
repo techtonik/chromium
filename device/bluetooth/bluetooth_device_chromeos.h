@@ -103,6 +103,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceChromeOS
   // BluetoothDevice override
   std::string GetDeviceName() const override;
   void CreateGattConnectionImpl() override;
+  void DisconnectGatt() override;
 
  private:
   friend class BluetoothAdapterChromeOS;

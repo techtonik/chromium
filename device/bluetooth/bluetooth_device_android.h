@@ -96,6 +96,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
   // BluetoothDevice:
   std::string GetDeviceName() const override;
   void CreateGattConnectionImpl() override;
+  void DisconnectGatt() override;
 
   // Java object org.chromium.device.bluetooth.ChromeBluetoothDevice.
   base::android::ScopedJavaGlobalRef<jobject> j_device_;

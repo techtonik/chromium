@@ -230,4 +230,9 @@ void BluetoothDeviceAndroid::CreateGattConnectionImpl() {
     DidFailToConnectGatt(ERROR_UNKNOWN);
 }
 
+void BluetoothDeviceAndroid::DisconnectGatt() {
+  // TODO BEFORE LANDING
+  NOTIMPLEMENTED();
+}
+
 }  // namespace device

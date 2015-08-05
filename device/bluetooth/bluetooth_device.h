@@ -448,6 +448,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDevice {
   // changes.
   virtual void CreateGattConnectionImpl() = 0;
 
+  // Disconnects GATT connection on platforms that maintain a specific GATT
+  // connection.
+  virtual void DisconnectGatt() = 0;
+
   // Calls pending callbacks for CreateGattConnection based on result of
   // subclasses actions initiated in CreateGattConnectionImpl or related
   // disconnection event.
