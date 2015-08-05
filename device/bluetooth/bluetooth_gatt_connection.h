@@ -36,7 +36,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothGattConnection {
   // to.
   std::string GetDeviceAddress() const;
 
-  // Returns true if this connection is open.
+  // Returns true if this GATT connection is open.
   virtual bool IsConnected();
 
   // Disconnects this GATT connection. The device may still remain connected due

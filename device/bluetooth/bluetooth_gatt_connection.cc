@@ -29,7 +29,8 @@ std::string BluetoothGattConnection::GetDeviceAddress() const {
 }
 
 bool BluetoothGattConnection::IsConnected() {
-  return adapter_->GetDevice(device_address_)->IsConnected();
+  return !already_decremented_connection_reference_on_device_ &&
+    adapter_->GetDevice(device_address_)->IsGattConnected();
 }
 
 void BluetoothGattConnection::Disconnect() {
