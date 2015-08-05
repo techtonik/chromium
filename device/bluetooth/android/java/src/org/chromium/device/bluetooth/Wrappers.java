@@ -263,6 +263,10 @@ class Wrappers {
         public boolean connect() {
             return mGatt.connect();
         }
+
+        public void disconnect() {
+            mGatt.disconnect();
+        }
     }
 
     /**

@@ -109,6 +109,13 @@ final class ChromeBluetoothDevice {
         return connectResult;
     }
 
+    // Implements BluetoothDeviceAndroid::DisconnectGatt.
+    @CalledByNative
+    private void disconnectGatt() {
+        Log.i(TAG, "BluetoothGatt.disconnect");
+        mBluetoothGatt.disconnect();
+    }
+
     // Implements BluetoothDeviceAndroid::GetDeviceName.
     @CalledByNative
     private String getDeviceName() {

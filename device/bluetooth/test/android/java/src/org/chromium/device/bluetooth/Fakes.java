@@ -251,5 +251,9 @@ class Fakes {
             // TODO test
             return true;
         }
+
+        @Override
+        public void disconnect() {
+        }
     }
 }

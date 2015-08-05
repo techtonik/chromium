@@ -128,7 +128,6 @@ TEST_F(BluetoothTest, CreateGattConnection) {
   DiscoverLowEnergyDevice(3);
   base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = observer.last_device();
-  ASSERT_TRUE(device);
 
   callback_count_ = error_callback_count_ = 0;
   device->CreateGattConnection(GetGattConnectionCallback(),
@@ -137,11 +136,12 @@ TEST_F(BluetoothTest, CreateGattConnection) {
   EXPECT_EQ(1, callback_count_--);
   EXPECT_EQ(0, error_callback_count_);
 
-  ASSERT_EQ(1, gatt_connections_.size());
+  ASSERT_EQ(1u, gatt_connections_.size());
 
   // be not connected; connect.
   // be connected; try to connect.
 }
 #endif  // defined(OS_ANDROID)
+
 
 }  // namespace device

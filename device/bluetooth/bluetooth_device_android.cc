@@ -231,8 +231,8 @@ void BluetoothDeviceAndroid::CreateGattConnectionImpl() {
 }
 
 void BluetoothDeviceAndroid::DisconnectGatt() {
-  // TODO BEFORE LANDING
-  NOTIMPLEMENTED();
+  Java_ChromeBluetoothDevice_disconnectGatt(
+      AttachCurrentThread(), j_device_.obj());
 }
 
 }  // namespace device
