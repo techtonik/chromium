@@ -105,7 +105,7 @@ final class ChromeBluetoothDevice {
                     context, false /* autoConnect */, new BluetoothGattCallbackImpl());
         }
         boolean connectResult = mBluetoothGatt.connect();
-        Log.i(TAG, "BluetoothGatt.connect returned %d", connectResult);
+        Log.i(TAG, "BluetoothGatt.connect returned %b", connectResult);
         return connectResult;
     }
 
@@ -128,7 +128,7 @@ final class ChromeBluetoothDevice {
     private class BluetoothGattCallbackImpl extends Wrappers.BluetoothGattCallbackWrapper {
         @Override
         public void onConnectionStateChange(int status, int newState) {
-            Log.i(TAG, "onConnectionStateChange %d %d", status, newState);
+            Log.i(TAG, "onConnectionStateChange status:%b newState:%b", status, newState);
             nativeOnConnectionStateChange(mNativeBluetoothDeviceAndroid,
                     status == android.bluetooth.BluetoothGatt.GATT_SUCCESS,
                     newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED);

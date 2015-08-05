@@ -240,6 +240,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDevice {
   // they could be connected to the adapter but not to an application.
   virtual bool IsConnected() const = 0;
 
+  // Indicates whether an active GATT connection exists to the device.
+  virtual bool IsGattConnected() const = 0;
+
   // Indicates whether the paired device accepts connections initiated from the
   // adapter. This value is undefined for unpaired devices.
   virtual bool IsConnectable() const = 0;

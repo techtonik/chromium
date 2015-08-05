@@ -207,7 +207,7 @@ void BluetoothDevice::CreateGattConnection(
   create_gatt_connection_success_callbacks_.push_back(callback);
   create_gatt_connection_error_callbacks_.push_back(error_callback);
 
-  if (IsConnected())
+  if (IsGattConnected())
     DidConnectGatt();
 
   CreateGattConnectionImpl();

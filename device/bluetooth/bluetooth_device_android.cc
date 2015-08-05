@@ -77,8 +77,11 @@ bool BluetoothDeviceAndroid::IsPaired() const {
 }
 
 bool BluetoothDeviceAndroid::IsConnected() const {
-  NOTIMPLEMENTED();
-  return false;
+  return IsGattConnected();
+}
+
+bool BluetoothDeviceAndroid::IsGattConnected() const {
+  return gatt_connected_;
 }
 
 bool BluetoothDeviceAndroid::IsConnectable() const {
@@ -190,7 +193,8 @@ void BluetoothDeviceAndroid::OnConnectionStateChange(JNIEnv* env,
                                                      jobject jcaller,
                                                      bool success,
                                                      bool connected) {
-  if (success && connected)
+  gatt_connected_ = connected;
+  if (gatt_connected_)
     DidConnectGatt();
   else
     DidFailToConnectGatt();

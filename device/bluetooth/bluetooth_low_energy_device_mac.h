@@ -40,6 +40,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothLowEnergyDeviceMac
   uint16 GetDeviceID() const override;
   bool IsPaired() const override;
   bool IsConnected() const override;
+  bool IsGattConnected() const override;
   bool IsConnectable() const override;
   bool IsConnecting() const override;
   BluetoothDevice::UUIDList GetUUIDs() const override;

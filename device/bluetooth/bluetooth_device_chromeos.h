@@ -46,6 +46,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceChromeOS
   uint16 GetDeviceID() const override;
   bool IsPaired() const override;
   bool IsConnected() const override;
+  bool IsGattConnected() const override;
   bool IsConnectable() const override;
   bool IsConnecting() const override;
   UUIDList GetUUIDs() const override;

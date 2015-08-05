@@ -49,6 +49,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
   uint16 GetDeviceID() const override;
   bool IsPaired() const override;
   bool IsConnected() const override;
+  bool IsGattConnected() const override;
   bool IsConnectable() const override;
   bool IsConnecting() const override;
   UUIDList GetUUIDs() const override;
@@ -99,9 +100,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
   // Java object org.chromium.device.bluetooth.ChromeBluetoothDevice.
   base::android::ScopedJavaGlobalRef<jobject> j_device_;
 
-  // Callbacks for pending results of CreateGattConnection calls.
-  std::vector<GattConnectionCallback> create_gatt_connection_success_callbacks_;
-  std::vector<ConnectErrorCallback> create_gatt_connection_error_callbacks_;
+  bool gatt_connected_ = false;
 
   DISALLOW_COPY_AND_ASSIGN(BluetoothDeviceAndroid);
 };

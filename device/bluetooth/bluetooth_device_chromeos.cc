@@ -240,6 +240,11 @@ bool BluetoothDeviceChromeOS::IsConnected() const {
   return properties->connected.value();
 }
 
+bool BluetoothDeviceChromeOS::IsGattConnected() const {
+  NOTIMPLEMENTED();
+  return false;
+}
+
 bool BluetoothDeviceChromeOS::IsConnectable() const {
   BluetoothInputClient::Properties* input_properties =
       DBusThreadManager::Get()->GetBluetoothInputClient()->
