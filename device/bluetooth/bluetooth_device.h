@@ -449,7 +449,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDevice {
   // Calls pending callbacks for CreateGattConnection based on result of
   // subclasses actions initiated in CreateGattConnectionImpl.
   void DidConnectGatt();
-  void DidFailToConnectGatt();
+  void DidFailToConnectGatt(ConnectErrorCode);
 
   // Maintains GattConnection reference count. Called by friend class
   // BluetoothGattConnection.

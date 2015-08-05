@@ -295,9 +295,9 @@ void BluetoothDevice::DidConnectGatt() {
   create_gatt_connection_error_callbacks_.clear();
 }
 
-void BluetoothDevice::DidFailToConnectGatt() {
+void BluetoothDevice::DidFailToConnectGatt(ConnectErrorCode error) {
   for (const auto& error_callback : create_gatt_connection_error_callbacks_)
-    error_callback.Run(ERROR_FAILED);
+    error_callback.Run(error);
   create_gatt_connection_success_callbacks_.clear();
   create_gatt_connection_error_callbacks_.clear();
 }

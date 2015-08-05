@@ -194,7 +194,7 @@ class Fakes {
         private static void connectionStateChange(
                 ChromeBluetoothDevice chromeDevice, boolean success, boolean connected) {
             FakeBluetoothDevice fakeDevice = (FakeBluetoothDevice) chromeDevice.mDevice;
-            fake_device.mGattCallback.onConnectionStateChange(success
+            fakeDevice.mGattCallback.onConnectionStateChange(success
                             ? android.bluetooth.BluetoothGatt.GATT_SUCCESS
                             : android.bluetooth.BluetoothGatt.GATT_FAILURE,
                     connected ? android.bluetooth.BluetoothProfile.STATE_CONNECTED

@@ -119,7 +119,10 @@ final class ChromeBluetoothDevice {
     private class BluetoothGattCallbackImpl extends Wrappers.BluetoothGattCallbackWrapper {
         @Override
         public void onConnectionStateChange(int status, int newState) {
-            Log.i(TAG, "onConnectionStateChange status:%b newState:%b", status, newState);
+            Log.i(TAG, "onConnectionStateChange status:%d newState:%s", status,
+                    (newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED)
+                            ? "Connected"
+                            : "Dissconnected");
             nativeOnConnectionStateChange(mNativeBluetoothDeviceAndroid,
                     status == android.bluetooth.BluetoothGatt.GATT_SUCCESS,
                     newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED);

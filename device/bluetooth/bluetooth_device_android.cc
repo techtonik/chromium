@@ -203,7 +203,7 @@ void BluetoothDeviceAndroid::OnConnectionStateChange(JNIEnv* env,
   if (gatt_connected_)
     DidConnectGatt();
   else
-    DidFailToConnectGatt();
+    DidFailToConnectGatt(ERROR_FAILED);
 }
 
 BluetoothDeviceAndroid::BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter)
@@ -218,7 +218,7 @@ void BluetoothDeviceAndroid::CreateGattConnectionImpl() {
   if (!Java_ChromeBluetoothDevice_createGattConnection(
           AttachCurrentThread(), j_device_.obj(),
           base::android::GetApplicationContext()))
-    DidFailToConnectGatt();
+    DidFailToConnectGatt(ERROR_UNKNOWN);
 }
 
 }  // namespace device
