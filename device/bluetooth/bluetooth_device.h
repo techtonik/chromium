@@ -443,13 +443,17 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDevice {
   virtual std::string GetDeviceName() const = 0;
 
   // Implements platform specific operations to initiate a GATT connection.
-  // Calls DidConnectGatt or DidFailToConnectGatt immediately or asynchronously.
+  // Subclasses must also call DidConnectGatt, DidFailToConnectGatt, or
+  // DidDisconnectGatt immediately or asynchronously as the connection state
+  // changes.
   virtual void CreateGattConnectionImpl() = 0;
 
   // Calls pending callbacks for CreateGattConnection based on result of
-  // subclasses actions initiated in CreateGattConnectionImpl.
+  // subclasses actions initiated in CreateGattConnectionImpl or related
+  // disconnection event.
   void DidConnectGatt();
   void DidFailToConnectGatt(ConnectErrorCode);
+  void DidDisconnectGatt();
 
   // Maintains GattConnection reference count. Called by friend class
   // BluetoothGattConnection.

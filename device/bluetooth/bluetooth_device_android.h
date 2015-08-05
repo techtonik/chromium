@@ -87,7 +87,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
   // See android.bluetooth.BluetoothGattCallback.onConnectionStateChange.
   void OnConnectionStateChange(JNIEnv* env,
                                jobject jcaller,
-                               bool success,
+                               int32_t status,
                                bool connected);
 
  protected:

@@ -123,8 +123,7 @@ final class ChromeBluetoothDevice {
                     (newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED)
                             ? "Connected"
                             : "Dissconnected");
-            nativeOnConnectionStateChange(mNativeBluetoothDeviceAndroid,
-                    status == android.bluetooth.BluetoothGatt.GATT_SUCCESS,
+            nativeOnConnectionStateChange(mNativeBluetoothDeviceAndroid, status,
                     newState == android.bluetooth.BluetoothProfile.STATE_CONNECTED);
         }
     }
@@ -134,5 +133,5 @@ final class ChromeBluetoothDevice {
 
     // Binds to BluetoothDeviceAndroid::OnConnectionStateChange.
     private native void nativeOnConnectionStateChange(
-            long nativeBluetoothDeviceAndroid, boolean success, boolean connected);
+            long nativeBluetoothDeviceAndroid, int success, boolean connected);
 }

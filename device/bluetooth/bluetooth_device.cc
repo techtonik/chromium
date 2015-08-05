@@ -302,6 +302,12 @@ void BluetoothDevice::DidFailToConnectGatt(ConnectErrorCode error) {
   create_gatt_connection_error_callbacks_.clear();
 }
 
+void BluetoothDevice::DidDisconnectGatt() {
+  // If pending calls to connect GATT existed, flush them to ensure a consistent
+  // state.
+  DidFailToConnectGatt(ERROR_UNKNOWN);
+}
+
 void BluetoothDevice::IncrementGattConnectionReferenceCount() {
   CHECK(gatt_connection_reference_count_ <
         std::numeric_limits<typeof(gatt_connection_reference_count_)>::max());

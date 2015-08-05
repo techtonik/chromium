@@ -194,16 +194,25 @@ void BluetoothDeviceAndroid::ConnectToServiceInsecurely(
   NOTIMPLEMENTED();
 }
 
-// TODO(scheib): Report error code to DidFailToConnectGatt.
 void BluetoothDeviceAndroid::OnConnectionStateChange(JNIEnv* env,
                                                      jobject jcaller,
-                                                     bool success,
+                                                     int32_t status,
                                                      bool connected) {
   gatt_connected_ = connected;
-  if (gatt_connected_)
+  if (gatt_connected_) {
     DidConnectGatt();
-  else
-    DidFailToConnectGatt(ERROR_FAILED);
+  } else {
+    switch (status) {   // Constants are from android.bluetooth.BluetoothGatt.
+      case 0x00000101:  // GATT_FAILURE
+        return DidFailToConnectGatt(ERROR_FAILED);
+      case 0x00000005:  // GATT_INSUFFICIENT_AUTHENTICATION
+        return DidFailToConnectGatt(ERROR_AUTH_FAILED);
+      case 0x00000000:  // GATT_SUCCESS
+        return DidDisconnectGatt();
+      default:
+        return DidFailToConnectGatt(ERROR_UNKNOWN);
+    }
+  }
 }
 
 BluetoothDeviceAndroid::BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter)
