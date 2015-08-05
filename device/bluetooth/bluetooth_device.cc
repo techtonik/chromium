@@ -4,8 +4,8 @@
 
 #include "device/bluetooth/bluetooth_device.h"
 
-#include <string>
 #include <limits>
+#include <string>
 
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
