@@ -5,6 +5,9 @@
 #include "net/quic/quic_http_stream.h"
 
 #include "base/callback_helpers.h"
+#ifdef TEMP_INSTRUMENTATION_468529
+#include "base/debug/alias.h"
+#endif
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/stringprintf.h"
 #include "net/base/io_buffer.h"
@@ -45,6 +48,16 @@ QuicHttpStream::QuicHttpStream(
 }
 
 QuicHttpStream::~QuicHttpStream() {
+#ifdef TEMP_INSTRUMENTATION_468529
+  liveness_ = DEAD;
+  stack_trace_ = base::debug::StackTrace();
+
+  // Probably not necessary, but just in case compiler tries to optimize out the
+  // writes to liveness_ and stack_trace_.
+  base::debug::Alias(&liveness_);
+  base::debug::Alias(&stack_trace_);
+#endif
+
   Close(false);
   if (session_)
     session_->RemoveObserver(this);
@@ -297,6 +310,10 @@ void QuicHttpStream::OnDataAvailable() {
   CHECK(user_buffer_.get());
   CHECK_NE(0, user_buffer_len_);
   int rv = ReadAvailableData(user_buffer_.get(), user_buffer_len_);
+  if (rv == ERR_IO_PENDING) {
+    // This was a spurrious notification. Wait for the next one.
+    return;
+  }
 
   CHECK(!callback_.is_null());
   user_buffer_ = nullptr;
@@ -359,6 +376,8 @@ void QuicHttpStream::DoCallback(int rv) {
 
 int QuicHttpStream::DoLoop(int rv) {
   do {
+    CrashIfInvalid();
+
     State state = next_state_;
     next_state_ = STATE_NONE;
     switch (state) {
@@ -526,6 +545,24 @@ int QuicHttpStream::ReadAvailableData(IOBuffer* buf, int buf_len) {
 
 SpdyMajorVersion QuicHttpStream::GetSpdyVersion() {
   return SpdyUtils::GetSpdyVersionForQuicVersion(stream_->version());
+}
+
+void QuicHttpStream::CrashIfInvalid() const {
+#ifdef TEMP_INSTRUMENTATION_468529
+  Liveness liveness = liveness_;
+
+  if (liveness == ALIVE)
+    return;
+
+  // Copy relevant variables onto the stack to guarantee they will be available
+  // in minidumps, and then crash.
+  base::debug::StackTrace stack_trace = stack_trace_;
+
+  base::debug::Alias(&liveness);
+  base::debug::Alias(&stack_trace);
+
+  CHECK_EQ(ALIVE, liveness);
+#endif
 }
 
 }  // namespace net

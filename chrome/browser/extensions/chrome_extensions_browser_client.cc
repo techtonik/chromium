@@ -31,11 +31,12 @@
 #include "chrome/browser/net/chrome_net_log.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/common/channel_info.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
-#include "chrome/common/chrome_version_info.h"
 #include "chrome/common/extensions/features/feature_channel.h"
 #include "chrome/common/pref_names.h"
+#include "components/version_info/version_info.h"
 #include "content/public/browser/render_process_host.h"
 #include "extensions/browser/api/generated_api_registration.h"
 #include "extensions/browser/extension_function_registry.h"
@@ -60,7 +61,7 @@ ChromeExtensionsBrowserClient::ChromeExtensionsBrowserClient() {
   api_client_.reset(new ChromeExtensionsAPIClient);
   // Only set if it hasn't already been set (e.g. by a test).
   if (GetCurrentChannel() == GetDefaultChannel())
-    SetCurrentChannel(chrome::VersionInfo::GetChannel());
+    SetCurrentChannel(chrome::GetChannel());
   resource_manager_.reset(new ChromeComponentExtensionResourceManager());
 }
 
@@ -205,8 +206,7 @@ bool ChromeExtensionsBrowserClient::DidVersionUpdate(
     last_version = base::Version(last_version_str);
   }
 
-  chrome::VersionInfo current_version_info;
-  std::string current_version = current_version_info.Version();
+  std::string current_version = version_info::GetVersionNumber();
   pref_service->SetString(pref_names::kLastChromeVersion,
                           current_version);
 
@@ -310,8 +310,8 @@ bool ChromeExtensionsBrowserClient::IsBackgroundUpdateAllowed() {
 
 bool ChromeExtensionsBrowserClient::IsMinBrowserVersionSupported(
     const std::string& min_version) {
-  chrome::VersionInfo version_info;
-  base::Version browser_version = base::Version(version_info.Version());
+  base::Version browser_version =
+      base::Version(version_info::GetVersionNumber());
   Version browser_min_version(min_version);
   if (browser_version.IsValid() && browser_min_version.IsValid() &&
       browser_min_version.CompareTo(browser_version) > 0) {
@@ -332,12 +332,10 @@ void ChromeExtensionsBrowserClient::ReportError(
   ErrorConsole::Get(context)->ReportError(error.Pass());
 }
 
-void ChromeExtensionsBrowserClient::CleanUpWebView(int embedder_process_id,
-                                                   int view_instance_id) {
-  content::BrowserContext* browser_context =
-      content::RenderProcessHost::FromID(embedder_process_id)
-      ->GetBrowserContext();
-
+void ChromeExtensionsBrowserClient::CleanUpWebView(
+    content::BrowserContext* browser_context,
+    int embedder_process_id,
+    int view_instance_id) {
   // Clean up context menus for the WebView.
   auto menu_manager =
       MenuManager::Get(Profile::FromBrowserContext(browser_context));

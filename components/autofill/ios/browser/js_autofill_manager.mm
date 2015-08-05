@@ -73,18 +73,6 @@
   return [self evaluate:fillFormJS stringResultHandler:stringResultHandler];
 }
 
-- (void)fillFormForInstantBuy:(NSString*)dataString
-            completionHandler:(ProceduralBlock)completionHandler {
-  DCHECK(completionHandler);
-  NSString* fillFormJS = [NSString
-      stringWithFormat:@"__gCrWeb.autofill.fillFormForInstantBuy(%@);",
-                       dataString];
-  id stringResultHandler = ^(NSString*, NSError*) {
-    completionHandler();
-  };
-  return [self evaluate:fillFormJS stringResultHandler:stringResultHandler];
-}
-
 - (void)clearAutofilledFieldsForFormNamed:(NSString*)formName
                         completionHandler:(ProceduralBlock)completionHandler {
   DCHECK(completionHandler);
@@ -97,24 +85,6 @@
                     @"__gCrWeb.autofill.clearAutofilledFields(%s);",
                     base::GetQuotedJSONString([formName UTF8String]).c_str()];
   [self evaluate:js stringResultHandler:resultHandler];
-}
-
-- (void)dispatchAutocompleteEvent:(NSString*)formName {
-  NSString* dispatchAutocompleteEventJS = [NSString
-      stringWithFormat:@"__gCrWeb.autofill.dispatchAutocompleteEvent(%s);",
-                       base::GetQuotedJSONString([formName UTF8String])
-                           .c_str()];
-  [self evaluate:dispatchAutocompleteEventJS stringResultHandler:nil];
-}
-
-- (void)dispatchAutocompleteErrorEvent:(NSString*)formName
-                            withReason:(NSString*)reason {
-  NSString* autocompleteErrorJS = [NSString
-      stringWithFormat:
-          @"__gCrWeb.autofill.dispatchAutocompleteErrorEvent(%s, %s);",
-          base::GetQuotedJSONString([formName UTF8String]).c_str(),
-          base::GetQuotedJSONString([reason UTF8String]).c_str()];
-  [self evaluate:autocompleteErrorJS stringResultHandler:nil];
 }
 
 - (void)fillPredictionData:(NSString*)dataString {

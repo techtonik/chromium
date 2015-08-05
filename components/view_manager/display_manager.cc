@@ -23,6 +23,7 @@
 #include "mojo/converters/transform/transform_type_converters.h"
 #include "ui/events/event.h"
 #include "ui/events/event_utils.h"
+#include "ui/platform_window/platform_ime_controller.h"
 #include "ui/platform_window/platform_window.h"
 #include "ui/platform_window/stub/stub_window.h"
 
@@ -195,7 +196,22 @@ const mojo::ViewportMetrics& DefaultDisplayManager::GetViewportMetrics() {
   return metrics_;
 }
 
+void DefaultDisplayManager::UpdateTextInputState(
+    const ui::TextInputState& state) {
+  ui::PlatformImeController* ime = platform_window_->GetPlatformImeController();
+  if (ime)
+    ime->UpdateTextInputState(state);
+}
+
+void DefaultDisplayManager::SetImeVisibility(bool visible) {
+  ui::PlatformImeController* ime = platform_window_->GetPlatformImeController();
+  if (ime)
+    ime->SetImeVisibility(visible);
+}
+
 void DefaultDisplayManager::Draw() {
+  if (!delegate_->GetRootView()->visible())
+    return;
   gfx::Rect rect(metrics_.size_in_pixels.To<gfx::Size>());
   auto pass = mojo::CreateDefaultPass(1, rect);
   pass->damage_rect = Rect::From(dirty_rect_);
@@ -207,9 +223,9 @@ void DefaultDisplayManager::Draw() {
   frame->resources.resize(0u);
   frame_pending_ = true;
   if (display_) {
-    display_->SubmitFrame(
-        frame.Pass(),
-        base::Bind(&DefaultDisplayManager::DidDraw, base::Unretained(this)));
+    display_->SubmitFrame(frame.Pass(),
+                          base::Bind(&DefaultDisplayManager::DidDraw,
+                                     weak_factory_.GetWeakPtr()));
   }
   dirty_rect_ = gfx::Rect();
 }

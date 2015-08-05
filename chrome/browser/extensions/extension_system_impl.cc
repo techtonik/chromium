@@ -29,7 +29,6 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/ui/webui/extensions/extension_icon_source.h"
 #include "chrome/common/chrome_switches.h"
-#include "chrome/common/chrome_version_info.h"
 #include "chrome/common/extensions/features/feature_channel.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/url_data_source.h"
@@ -46,8 +45,8 @@
 #include "extensions/common/constants.h"
 
 #if defined(ENABLE_NOTIFICATIONS)
-#include "chrome/browser/notifications/desktop_notification_service.h"
-#include "chrome/browser/notifications/desktop_notification_service_factory.h"
+#include "chrome/browser/notifications/notifier_state_tracker.h"
+#include "chrome/browser/notifications/notifier_state_tracker_factory.h"
 #include "ui/message_center/notifier_settings.h"
 #endif
 
@@ -135,6 +134,9 @@ void ExtensionSystemImpl::Shared::Init(bool extensions_enabled) {
   bool allow_noisy_errors = !command_line->HasSwitch(switches::kNoErrorDialogs);
   ExtensionErrorReporter::Init(allow_noisy_errors);
 
+  content_verifier_ = new ContentVerifier(
+      profile_, new ChromeContentVerifierDelegate(profile_));
+
   shared_user_script_master_.reset(new SharedUserScriptMaster(profile_));
 
   // ExtensionService depends on RuntimeData.
@@ -156,8 +158,6 @@ void ExtensionSystemImpl::Shared::Init(bool extensions_enabled) {
   // load any extensions.
   {
     InstallVerifier::Get(profile_)->Init();
-    content_verifier_ = new ContentVerifier(
-        profile_, new ChromeContentVerifierDelegate(profile_));
     ContentVerifierDelegate::Mode mode =
         ChromeContentVerifierDelegate::GetDefaultMode();
 #if defined(OS_CHROMEOS)
@@ -363,10 +363,10 @@ void ExtensionSystemImpl::RegisterExtensionWithRequestContexts(
       message_center::NotifierId::APPLICATION,
       extension->id());
 
-  DesktopNotificationService* notification_service =
-      DesktopNotificationServiceFactory::GetForProfile(profile_);
+  NotifierStateTracker* notifier_state_tracker =
+      NotifierStateTrackerFactory::GetForProfile(profile_);
   notifications_disabled =
-      !notification_service->IsNotifierEnabled(notifier_id);
+      !notifier_state_tracker->IsNotifierEnabled(notifier_id);
 #endif
 
   BrowserThread::PostTaskAndReply(

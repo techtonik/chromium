@@ -63,6 +63,12 @@
         "swarming": {
           "can_use_on_swarming_builders": true
         },
+        "test": "app_shell_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "aura_unittests"
       },
       {
@@ -87,7 +93,25 @@
         "swarming": {
           "can_use_on_swarming_builders": true
         },
+        "test": "cc_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "chromedriver_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "components_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "compositor_unittests"
       },
       {
         "swarming": {
@@ -115,6 +139,18 @@
           "can_use_on_swarming_builders": true
         },
         "test": "events_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "extensions_browsertests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "extensions_unittests"
       },
       {
         "swarming": {
@@ -169,6 +205,24 @@
           "can_use_on_swarming_builders": true
         },
         "test": "midi_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "mojo_common_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "mojo_public_environment_unittests"
+      },
+      {
+        "test": "mojo_public_system_unittests"
+      },
+      {
+        "test": "mojo_public_utility_unittests"
       },
       {
         "test": "mojo_system_unittests"
@@ -4405,7 +4459,7 @@
       {
         "args": [
           "--site-per-process",
-          "--gtest_filter=-BrowserTest.ClearPendingOnFailUnlessNTP:BrowserTest.OtherRedirectsDontForkProcess:BrowserTest.WindowOpenClose:ChromeRenderProcessHostTest.*:ChromeRenderProcessHostTestWithCommandLine.*:DevToolsExperimentalExtensionTest.*:DevToolsExtensionTest.*:DnsProbeBrowserTest.*:ErrorPageTest.*:ExtensionApiTest.ContentScriptOtherExtensions:ExtensionApiTest.ContentScriptExtensionProcess:ExtensionApiTest.Tabs2:ExtensionApiTest.TabsOnUpdated:ExtensionApiTest.WindowOpenPopupIframe:ExtensionOptionsApiTest.ExtensionCanEmbedOwnOptions:ExtensionViewTest.*:InlineLoginUISafeIframeBrowserTest.*:IsolatedAppTest.*:LaunchWebAuthFlowFunctionTest.*:MimeHandlerViewTest.*:*.NewAvatarMenuEnabledInGuestMode:OptionsUIBrowserTest.*:*PDFExtensionTest.*:PhishingClassifierTest.*:PhishingDOMFeatureExtractorTest.*:PopupBlockerBrowserTest.*:PrerenderBrowserTest.*:ProcessManagementTest.*:RedirectTest.*:ReferrerPolicyTest.*:*.RestoreCrossSiteWithExistingSiteInstance:*.RestoreTabWithSpecialURLOnBack:SSLUITest.*:WebNavigationApiTest.CrossProcessFragment:WebNavigationApiTest.ServerRedirectSingleProcess:WebNavigationApiTest.CrossProcessHistory:WebViewDPITest.*:WebViewPluginTest.*:WebViewTest.AcceptTouchEvents:WebViewTest.ExecuteScript:WebViewTest.GeolocationAPICancelGeolocation:WebViewTest.GeolocationAPIEmbedderHasAccessMultipleBridgeIdAllow:WebViewTest.IndexedDBIsolation:WebViewTest.ScreenCoordinates:WebViewTest.ContextMenusAPI_PreventDefault:WebViewTest.TestContextMenu:WebViewTest.NestedGuestContainerBounds:WebViewFocusTest.*:WebViewNewWindowTest.*:WebViewSizeTest.*:WebViewSpeechAPITest.*:WebViewVisibilityTest.*:ZoomControllerBrowserTest.*:*.NavigateFromNTPToOptionsInSameTab:*.ProfilesWithoutPagesNotLaunched:*.TabMove:*.WhitelistedExtension:*.NewTabPageURL:*.HomepageLocation:RestoreOnStartupPolicyTest*:PhishingClassifierDelegateTest.*:WebUIWebViewBrowserTest*:WebRtcBrowserTest.RunsAudioVideoWebRTCCallInTwoTabs"
+          "--gtest_filter=-BrowserTest.ClearPendingOnFailUnlessNTP:BrowserTest.OtherRedirectsDontForkProcess:BrowserTest.WindowOpenClose:ChromeRenderProcessHostTest.*:ChromeRenderProcessHostTestWithCommandLine.*:DevToolsExperimentalExtensionTest.*:DevToolsExtensionTest.*:DnsProbeBrowserTest.*:ErrorPageTest.*:ExtensionApiTest.ContentScriptOtherExtensions:ExtensionApiTest.ContentScriptExtensionProcess:ExtensionApiTest.Tabs2:ExtensionApiTest.TabsOnUpdated:ExtensionApiTest.WindowOpenPopupIframe:ExtensionOptionsApiTest.ExtensionCanEmbedOwnOptions:ExtensionViewTest.*:InlineLoginUISafeIframeBrowserTest.*:IsolatedAppTest.*:LaunchWebAuthFlowFunctionTest.*:MimeHandlerViewTest.*:*.NewAvatarMenuEnabledInGuestMode:OptionsUIBrowserTest.*:*PDFExtensionTest.*:PhishingClassifierTest.*:PhishingDOMFeatureExtractorTest.*:PopupBlockerBrowserTest.*:PrerenderBrowserTest.*:ProcessManagementTest.*:RedirectTest.*:ReferrerPolicyTest.*:*.RestoreCrossSiteWithExistingSiteInstance:*.RestoreTabWithSpecialURLOnBack:SSLUITest.*:WebNavigationApiTest.CrossProcessFragment:WebNavigationApiTest.ServerRedirectSingleProcess:WebNavigationApiTest.CrossProcessHistory:WebViewDPITest.*:WebViewPluginTest.*:WebViewTest.AcceptTouchEvents:WebViewTest.IndexedDBIsolation:WebViewTest.ScreenCoordinates:WebViewTest.ContextMenusAPI_PreventDefault:WebViewTest.TestContextMenu:WebViewTest.NestedGuestContainerBounds:WebViewFocusTest.*:WebViewNewWindowTest.*:WebViewSizeTest.*:WebViewSpeechAPITest.*:WebViewVisibilityTest.*:ZoomControllerBrowserTest.*:*.NavigateFromNTPToOptionsInSameTab:*.ProfilesWithoutPagesNotLaunched:*.TabMove:*.WhitelistedExtension:*.NewTabPageURL:*.HomepageLocation:RestoreOnStartupPolicyTest*:PhishingClassifierDelegateTest.*:WebUIWebViewBrowserTest*:WebRtcBrowserTest.RunsAudioVideoWebRTCCallInTwoTabs"
         ],
         "test": "browser_tests"
       },
@@ -4424,7 +4478,8 @@
       },
       {
         "args": [
-          "--site-per-process"
+          "--site-per-process",
+          "--gtest_filter=-CaptivePortalTabHelperTest.HttpsSubframe*"
         ],
         "test": "unit_tests"
       }
@@ -4435,7 +4490,7 @@
       {
         "args": [
           "--site-per-process",
-          "--gtest_filter=-BrowserTest.ClearPendingOnFailUnlessNTP:BrowserTest.OtherRedirectsDontForkProcess:BrowserTest.WindowOpenClose:ChromeRenderProcessHostTest.*:ChromeRenderProcessHostTestWithCommandLine.*:DevToolsExperimentalExtensionTest.*:DevToolsExtensionTest.*:DnsProbeBrowserTest.*:ErrorPageTest.*:ExtensionApiTest.ContentScriptOtherExtensions:ExtensionApiTest.ContentScriptExtensionProcess:ExtensionApiTest.Tabs2:ExtensionApiTest.TabsOnUpdated:ExtensionApiTest.WindowOpenPopupIframe:ExtensionOptionsApiTest.ExtensionCanEmbedOwnOptions:ExtensionViewTest.*:InlineLoginUISafeIframeBrowserTest.*:IsolatedAppTest.*:LaunchWebAuthFlowFunctionTest.*:MimeHandlerViewTest.*:*.NewAvatarMenuEnabledInGuestMode:OptionsUIBrowserTest.*:*PDFExtensionTest.*:PhishingClassifierTest.*:PhishingDOMFeatureExtractorTest.*:PopupBlockerBrowserTest.*:PrerenderBrowserTest.*:ProcessManagementTest.*:RedirectTest.*:ReferrerPolicyTest.*:*.RestoreCrossSiteWithExistingSiteInstance:*.RestoreTabWithSpecialURLOnBack:SSLUITest.*:WebNavigationApiTest.CrossProcessFragment:WebNavigationApiTest.ServerRedirectSingleProcess:WebNavigationApiTest.CrossProcessHistory:WebViewDPITest.*:WebViewPluginTest.*:WebViewTest.AcceptTouchEvents:WebViewTest.ExecuteScript:WebViewTest.GeolocationAPICancelGeolocation:WebViewTest.GeolocationAPIEmbedderHasAccessMultipleBridgeIdAllow:WebViewTest.IndexedDBIsolation:WebViewTest.ScreenCoordinates:WebViewTest.ContextMenusAPI_PreventDefault:WebViewTest.TestContextMenu:WebViewTest.NestedGuestContainerBounds:WebViewFocusTest.*:WebViewNewWindowTest.*:WebViewSizeTest.*:WebViewSpeechAPITest.*:WebViewVisibilityTest.*:ZoomControllerBrowserTest.*:*.NavigateFromNTPToOptionsInSameTab:*.ProfilesWithoutPagesNotLaunched:*.TabMove:*.WhitelistedExtension:*.NewTabPageURL:*.HomepageLocation:RestoreOnStartupPolicyTest*:PhishingClassifierDelegateTest.*:WebUIWebViewBrowserTest*:WebRtcBrowserTest.RunsAudioVideoWebRTCCallInTwoTabs"
+          "--gtest_filter=-BrowserTest.ClearPendingOnFailUnlessNTP:BrowserTest.OtherRedirectsDontForkProcess:BrowserTest.WindowOpenClose:ChromeRenderProcessHostTest.*:ChromeRenderProcessHostTestWithCommandLine.*:DevToolsExperimentalExtensionTest.*:DevToolsExtensionTest.*:DnsProbeBrowserTest.*:ErrorPageTest.*:ExtensionApiTest.ContentScriptOtherExtensions:ExtensionApiTest.ContentScriptExtensionProcess:ExtensionApiTest.Tabs2:ExtensionApiTest.TabsOnUpdated:ExtensionApiTest.WindowOpenPopupIframe:ExtensionOptionsApiTest.ExtensionCanEmbedOwnOptions:ExtensionViewTest.*:InlineLoginUISafeIframeBrowserTest.*:IsolatedAppTest.*:LaunchWebAuthFlowFunctionTest.*:MimeHandlerViewTest.*:*.NewAvatarMenuEnabledInGuestMode:OptionsUIBrowserTest.*:*PDFExtensionTest.*:PhishingClassifierTest.*:PhishingDOMFeatureExtractorTest.*:PopupBlockerBrowserTest.*:PrerenderBrowserTest.*:ProcessManagementTest.*:RedirectTest.*:ReferrerPolicyTest.*:*.RestoreCrossSiteWithExistingSiteInstance:*.RestoreTabWithSpecialURLOnBack:SSLUITest.*:WebNavigationApiTest.CrossProcessFragment:WebNavigationApiTest.ServerRedirectSingleProcess:WebNavigationApiTest.CrossProcessHistory:WebViewDPITest.*:WebViewPluginTest.*:WebViewTest.AcceptTouchEvents:WebViewTest.IndexedDBIsolation:WebViewTest.ScreenCoordinates:WebViewTest.ContextMenusAPI_PreventDefault:WebViewTest.TestContextMenu:WebViewTest.NestedGuestContainerBounds:WebViewFocusTest.*:WebViewNewWindowTest.*:WebViewSizeTest.*:WebViewSpeechAPITest.*:WebViewVisibilityTest.*:ZoomControllerBrowserTest.*:*.NavigateFromNTPToOptionsInSameTab:*.ProfilesWithoutPagesNotLaunched:*.TabMove:*.WhitelistedExtension:*.NewTabPageURL:*.HomepageLocation:RestoreOnStartupPolicyTest*:PhishingClassifierDelegateTest.*:WebUIWebViewBrowserTest*:WebRtcBrowserTest.RunsAudioVideoWebRTCCallInTwoTabs"
         ],
         "test": "browser_tests"
       },
@@ -4454,7 +4509,8 @@
       },
       {
         "args": [
-          "--site-per-process"
+          "--site-per-process",
+          "--gtest_filter=-CaptivePortalTabHelperTest.HttpsSubframe*"
         ],
         "test": "unit_tests"
       }

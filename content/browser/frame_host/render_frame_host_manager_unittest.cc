@@ -251,11 +251,13 @@ class RenderFrameHostManagerTest : public RenderViewHostImplTestHarness {
   }
 
   void TearDown() override {
-#if !defined(OS_ANDROID)
-    ImageTransportFactory::Terminate();
-#endif
     RenderViewHostImplTestHarness::TearDown();
     WebUIControllerFactory::UnregisterFactoryForTesting(&factory_);
+#if !defined(OS_ANDROID)
+    // RenderWidgetHostView holds on to a reference to SurfaceManager, so it
+    // must be shut down before the ImageTransportFactory.
+    ImageTransportFactory::Terminate();
+#endif
   }
 
   void set_should_create_webui(bool should_create_webui) {
@@ -303,7 +305,7 @@ class RenderFrameHostManagerTest : public RenderViewHostImplTestHarness {
       EXPECT_EQ(RenderFrameHostImpl::STATE_PENDING_SWAP_OUT,
                 old_rfh->rfh_state());
       if (!old_rfh->GetSiteInstance()->active_frame_count() ||
-          RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+          SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
         expecting_rfh_shutdown = true;
         EXPECT_TRUE(
             old_rfh->frame_tree_node()->render_manager()->IsPendingDeletion(
@@ -317,7 +319,7 @@ class RenderFrameHostManagerTest : public RenderViewHostImplTestHarness {
       old_rfh->OnSwappedOut();
       if (expecting_rfh_shutdown) {
         EXPECT_TRUE(rfh_observer.deleted());
-        if (!RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+        if (!SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
           EXPECT_TRUE(rvh_observer.deleted());
         }
       } else {
@@ -550,7 +552,7 @@ TEST_F(RenderFrameHostManagerTest, FilterMessagesWhileSwappedOut) {
 
   // In --site-per-process, the RenderFrameHost is deleted on cross-process
   // navigation, so the rest of the test case doesn't apply.
-  if (RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     return;
   }
 
@@ -660,7 +662,7 @@ TEST_F(RenderFrameHostManagerTest, DropCreateChildFrameWhileSwappedOut) {
 
   // This test is invalid in --site-per-process mode, as swapped-out is no
   // longer used.
-  if (RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     return;
   }
 
@@ -704,7 +706,7 @@ TEST_F(RenderFrameHostManagerTest, DropCreateChildFrameWhileSwappedOut) {
 TEST_F(RenderFrameHostManagerTest, WhiteListSwapCompositorFrame) {
   // TODO(nasko): Check with kenrb whether this test can be rewritten and
   // whether it makes sense when swapped out is replaced with proxies.
-  if (RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     return;
   }
   TestRenderFrameHost* swapped_out_rfh = CreateSwappedOutRenderFrameHost();
@@ -729,7 +731,7 @@ TEST_F(RenderFrameHostManagerTest, WhiteListSwapCompositorFrame) {
 TEST_F(RenderFrameHostManagerTest, GetRenderWidgetHostsReturnsActiveViews) {
   // This test is invalid in --site-per-process mode, as swapped-out is no
   // longer used.
-  if (RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     return;
   }
 
@@ -756,7 +758,7 @@ TEST_F(RenderFrameHostManagerTest,
        GetRenderWidgetHostsWithinGetAllRenderWidgetHosts) {
   // This test is invalid in --site-per-process mode, as swapped-out is no
   // longer used.
-  if (RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     return;
   }
 
@@ -1216,6 +1218,21 @@ TEST_F(RenderFrameHostManagerTest, WebUIWasCleared) {
 // Also tests that only user-gesture navigations can interrupt cross-process
 // navigations. http://crbug.com/75195
 TEST_F(RenderFrameHostManagerTest, PageDoesBackAndReload) {
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableBrowserSideNavigation)) {
+    // PlzNavigate uses a significantly different logic for renderer initiated
+    // navigations and navigation cancellation. Adapting this test would make it
+    // full of special cases and almost unreadable.
+    // There are tests that exercise these concerns for PlzNavigate, all from
+    // NavigatorTestWithBrowserSideNavigation:
+    // - BrowserInitiatedNavigationCancel
+    // - RendererUserInitiatedNavigationCancel
+    // - RendererNonUserInitiatedNavigationDoesntCancelRendererUserInitiated
+    // - RendererNonUserInitiatedNavigationDoesntCancelBrowserInitiated
+    // - RendererNonUserInitiatedNavigationCancelSimilarNavigation
+    SUCCEED() << "Test is not applicable with browser side navigation enabled";
+    return;
+  }
   const GURL kUrl1("http://www.google.com/");
   const GURL kUrl2("http://www.evil-site.com/");
 
@@ -1250,8 +1267,9 @@ TEST_F(RenderFrameHostManagerTest, PageDoesBackAndReload) {
   params.is_post = false;
   params.page_state = PageState::CreateFromURL(kUrl2);
 
-  contents()->GetFrameTree()->root()->navigator()->DidNavigate(evil_rfh,
-                                                               params);
+  evil_rfh->SimulateNavigationStart(kUrl2);
+  evil_rfh->SendNavigateWithParams(&params);
+  evil_rfh->SimulateNavigationStop();
 
   // That should NOT have cancelled the pending RFH, because the reload did
   // not have a user gesture. Thus, the pending back navigation will still
@@ -1273,8 +1291,9 @@ TEST_F(RenderFrameHostManagerTest, PageDoesBackAndReload) {
 
   // Now do the same but as a user gesture.
   params.gesture = NavigationGestureUser;
-  contents()->GetFrameTree()->root()->navigator()->DidNavigate(evil_rfh,
-                                                               params);
+  evil_rfh->SimulateNavigationStart(kUrl2);
+  evil_rfh->SendNavigateWithParams(&params);
+  evil_rfh->SimulateNavigationStop();
 
   // User navigation should have cancelled the pending RFH.
   EXPECT_TRUE(contents()->GetRenderManagerForTesting()->
@@ -1333,7 +1352,7 @@ TEST_F(RenderFrameHostManagerTest, NavigateAfterMissingSwapOutACK) {
   contents()->GetPendingMainFrame()->SendNavigate(
       entry2->GetPageID(), entry2->GetUniqueID(), false, entry2->GetURL());
   EXPECT_EQ(RenderFrameHostImpl::STATE_DEFAULT, main_test_rfh()->rfh_state());
-  if (!RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (!SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     EXPECT_EQ(rfh2, main_test_rfh());
     EXPECT_EQ(RenderFrameHostImpl::STATE_PENDING_SWAP_OUT, rfh1->rfh_state());
     rfh1->OnSwappedOut();
@@ -1381,7 +1400,7 @@ TEST_F(RenderFrameHostManagerTest, CreateSwappedOutOpenerRFHs) {
   EXPECT_TRUE(site_instance1->IsRelatedSiteInstance(rfh2->GetSiteInstance()));
 
   // Ensure rvh1 is placed on swapped out list of the current tab.
-  if (!RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (!SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     EXPECT_TRUE(manager->IsRVHOnSwappedOutList(rvh1));
     EXPECT_FALSE(rfh1_deleted_observer.deleted());
     EXPECT_TRUE(manager->IsOnSwappedOutList(rfh1));
@@ -1401,7 +1420,7 @@ TEST_F(RenderFrameHostManagerTest, CreateSwappedOutOpenerRFHs) {
   RenderFrameHostImpl* opener1_rfh = opener1_proxy->render_frame_host();
   TestRenderViewHost* opener1_rvh = static_cast<TestRenderViewHost*>(
       opener1_manager->GetSwappedOutRenderViewHost(rvh2->GetSiteInstance()));
-  if (!RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (!SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     EXPECT_TRUE(opener1_manager->IsOnSwappedOutList(opener1_rfh));
     EXPECT_TRUE(opener1_manager->IsRVHOnSwappedOutList(opener1_rvh));
     EXPECT_TRUE(opener1_rfh->is_swapped_out());
@@ -1416,7 +1435,7 @@ TEST_F(RenderFrameHostManagerTest, CreateSwappedOutOpenerRFHs) {
   RenderFrameHostImpl* opener2_rfh = opener2_proxy->render_frame_host();
   TestRenderViewHost* opener2_rvh = static_cast<TestRenderViewHost*>(
       opener2_manager->GetSwappedOutRenderViewHost(rvh2->GetSiteInstance()));
-  if (!RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (!SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     EXPECT_TRUE(opener2_manager->IsOnSwappedOutList(opener2_rfh));
     EXPECT_TRUE(opener2_manager->IsRVHOnSwappedOutList(opener2_rvh));
     EXPECT_TRUE(opener2_rfh->is_swapped_out());
@@ -1669,7 +1688,7 @@ TEST_F(RenderFrameHostManagerTest, EnableWebUIWithSwappedOutOpener) {
   RenderFrameHostImpl* opener1_rfh = opener1_proxy->render_frame_host();
   TestRenderViewHost* opener1_rvh = static_cast<TestRenderViewHost*>(
       opener1_manager->GetSwappedOutRenderViewHost(rvh2->GetSiteInstance()));
-  if (!RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (!SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     EXPECT_TRUE(opener1_manager->IsOnSwappedOutList(opener1_rfh));
     EXPECT_TRUE(opener1_manager->IsRVHOnSwappedOutList(opener1_rvh));
     EXPECT_TRUE(opener1_rfh->is_swapped_out());
@@ -1914,7 +1933,7 @@ TEST_F(RenderFrameHostManagerTest, SwapOutFrameAfterSwapOutACK) {
   rfh1->OnSwappedOut();
 
   // rfh1 should be swapped out or deleted in --site-per-process.
-  if (!RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (!SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     EXPECT_FALSE(rfh_deleted_observer.deleted());
     EXPECT_TRUE(rfh1->is_swapped_out());
   } else {
@@ -1963,7 +1982,7 @@ TEST_F(RenderFrameHostManagerTest,
   rfh1->OnSwappedOut();
 
   // rfh1 should be swapped out.
-  if (RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+  if (SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
     EXPECT_TRUE(rfh_deleted_observer.deleted());
     EXPECT_TRUE(contents()->GetFrameTree()->root()->render_manager()
                 ->GetRenderFrameProxyHost(site_instance.get()));
@@ -2022,7 +2041,7 @@ TEST_F(RenderFrameHostManagerTest,
         FrameHostMsg_BeforeUnload_ACK(0, false, now, now));
     EXPECT_FALSE(contents()->CrossProcessNavigationPending());
 
-    if (RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+    if (SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
       EXPECT_TRUE(rfh_deleted_observer.deleted());
       EXPECT_TRUE(contents()->GetFrameTree()->root()->render_manager()
                   ->GetRenderFrameProxyHost(site_instance.get()));

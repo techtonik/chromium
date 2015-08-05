@@ -12,7 +12,7 @@ import tempfile
 
 from pylib.device import device_errors  # pylint: disable=F0401
 
-from catapult_base import binary_manager
+from telemetry.internal.util import binary_manager
 from telemetry.core import platform
 from telemetry.core import util
 from telemetry.internal.platform import profiler
@@ -23,9 +23,14 @@ from pylib.perf import perf_control  # pylint: disable=F0401
 
 
 _PERF_OPTIONS = [
+    # Sample across all processes and CPUs to so that the current CPU gets
+    # recorded to each sample.
+    '--all-cpus',
     # In perf 3.13 --call-graph requires an argument, so use the -g short-hand
     # which does not.
     '-g',
+    # Record raw samples to get CPU information.
+    '--raw-samples',
     # Increase sampling frequency for better coverage.
     '--freq', '2000',
 ]

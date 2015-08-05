@@ -198,6 +198,10 @@ class CC_EXPORT LayerTreeImpl {
   SyncedProperty<ScaleGroup>* page_scale_factor();
   const SyncedProperty<ScaleGroup>* page_scale_factor() const;
 
+  void set_hide_pinch_scrollbars_near_min_scale(bool hide) {
+    hide_pinch_scrollbars_near_min_scale_ = hide;
+  }
+
   SyncedElasticOverscroll* elastic_overscroll() {
     return elastic_overscroll_.get();
   }
@@ -274,6 +278,10 @@ class CC_EXPORT LayerTreeImpl {
   // Distribute the rool scroll between outer and inner viewport scroll layer.
   // The outer viewport scroll layer scrolls first.
   void DistributeRootScrollOffset();
+
+  void ApplyScroll(LayerImpl* layer, ScrollState* scroll_state) {
+    layer_tree_host_impl_->ApplyScroll(layer, scroll_state);
+  }
 
   // Call this function when you expect there to be a swap buffer.
   // See swap_promise.h for how to use SwapPromise.
@@ -388,7 +396,7 @@ class CC_EXPORT LayerTreeImpl {
   bool SetPageScaleFactorLimits(float min_page_scale_factor,
                                 float max_page_scale_factor);
   void DidUpdatePageScale();
-  void HideInnerViewportScrollbarsIfNearMinimumScale();
+  void HideInnerViewportScrollbarsIfNeeded();
   void PushTopControls(const float* top_controls_shown_ratio);
   LayerTreeHostImpl* layer_tree_host_impl_;
   int source_frame_number_;
@@ -410,6 +418,7 @@ class CC_EXPORT LayerTreeImpl {
   scoped_refptr<SyncedProperty<ScaleGroup>> page_scale_factor_;
   float min_page_scale_factor_;
   float max_page_scale_factor_;
+  bool hide_pinch_scrollbars_near_min_scale_;
 
   scoped_refptr<SyncedElasticOverscroll> elastic_overscroll_;
 

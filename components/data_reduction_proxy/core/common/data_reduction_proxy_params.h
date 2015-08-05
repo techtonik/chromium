@@ -51,6 +51,10 @@ bool IsLoFiAlwaysOnViaFlags();
 // mode only on cellular connections.
 bool IsLoFiCellularOnlyViaFlags();
 
+// Returns true if this client has the command line switch to enable Lo-Fi
+// mode only on slow connections.
+bool IsLoFiSlowConnectionsOnlyViaFlags();
+
 // Returns true if this client has the command line switch to disable Lo-Fi
 // mode.
 bool IsLoFiDisabledViaFlags();
@@ -65,6 +69,10 @@ bool IsIncludedInQuicFieldTrial();
 
 // Returns the name of the Lo-Fi field trial.
 std::string GetLoFiFieldTrialName();
+
+// Returns the name of the Lo-Fi field trial that configures LoFi flags when it
+// is force enabled through flags.
+std::string GetLoFiFlagFieldTrialName();
 
 std::string GetQuicFieldTrialName();
 

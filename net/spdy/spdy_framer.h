@@ -5,21 +5,18 @@
 #ifndef NET_SPDY_SPDY_FRAMER_H_
 #define NET_SPDY_SPDY_FRAMER_H_
 
-#include <list>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
-#include "base/basictypes.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/strings/string_piece.h"
 #include "base/sys_byteorder.h"
 #include "net/base/net_export.h"
-#include "net/spdy/hpack_decoder.h"
-#include "net/spdy/hpack_encoder.h"
+#include "net/spdy/hpack/hpack_decoder.h"
+#include "net/spdy/hpack/hpack_encoder.h"
 #include "net/spdy/spdy_alt_svc_wire_format.h"
 #include "net/spdy/spdy_header_block.h"
 #include "net/spdy/spdy_protocol.h"
@@ -403,6 +400,15 @@ class NET_EXPORT_PRIVATE SpdyFramer {
     debug_visitor_ = debug_visitor;
   }
 
+  // Sets whether or not ProcessInput returns after finishing a frame, or
+  // continues processing additional frames. Normally ProcessInput processes
+  // all input, but this method enables the caller (and visitor) to work with
+  // a single frame at a time (or that portion of the frame which is provided
+  // as input). Reset() does not change the value of this flag.
+  void set_process_single_input_frame(bool v) {
+    process_single_input_frame_ = v;
+  }
+
   // Pass data into the framer for parsing.
   // Returns the number of bytes consumed. It is safe to pass more bytes in
   // than may be consumed.
@@ -622,11 +628,12 @@ class NET_EXPORT_PRIVATE SpdyFramer {
   size_t ProcessIgnoredControlFramePayload(/*const char* data,*/ size_t len);
 
   // TODO(jgraettinger): To be removed with migration to
-  // SpdyHeadersHandlerInterface.
-  // Serializes the last-processed header block of |hpack_decoder_| as
-  // a SPDY3 format block, and delivers it to the visitor via reentrant
-  // call to ProcessControlFrameHeaderBlock().
-  void DeliverHpackBlockAsSpdy3Block();
+  // SpdyHeadersHandlerInterface.  Serializes the last-processed
+  // header block of |hpack_decoder_| as a SPDY3 format block, and
+  // delivers it to the visitor via reentrant call to
+  // ProcessControlFrameHeaderBlock().  |compressed_len| is used for
+  // logging compression percentage.
+  void DeliverHpackBlockAsSpdy3Block(size_t compressed_len);
 
   // Helpers for above internal breakouts from ProcessInput.
   void ProcessControlFrameHeader(int control_frame_type_field);
@@ -779,6 +786,10 @@ class NET_EXPORT_PRIVATE SpdyFramer {
   // we know to terminate the stream when the entire header block has been
   // processed.
   bool end_stream_when_done_;
+
+  // If true, then ProcessInput returns after processing a full frame,
+  // rather than reading all available input.
+  bool process_single_input_frame_ = false;
 
   // Last acknowledged value for SETTINGS_HEADER_TABLE_SIZE.
   size_t header_table_size_bound_;

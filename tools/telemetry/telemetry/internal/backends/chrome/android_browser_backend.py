@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import logging
-import sys
 
 from telemetry.core import exceptions
 from telemetry.internal.platform import android_platform_backend as \
@@ -15,10 +14,6 @@ from telemetry.internal.backends.chrome import chrome_browser_backend
 from telemetry.internal import forwarders
 
 util.AddDirToPythonPath(util.GetChromiumSrcDir(), 'build', 'android')
-try:
-  from pylib import ports
-except ImportError:
-  ports = None
 from pylib.device import intent
 
 
@@ -46,7 +41,7 @@ class AndroidBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
 
     # TODO(tonyg): This is flaky because it doesn't reserve the port that it
     # allocates. Need to fix this.
-    self._port = ports.AllocateTestServerPort()
+    self._port = util.GetUnreservedAvailableLocalPort()
 
     # TODO(wuhu): Move to network controller backend.
     self.platform_backend.InstallTestCa()
@@ -122,10 +117,9 @@ class AndroidBrowserBackend(chrome_browser_backend.ChromeBrowserBackend):
             '(1) Flashing to a userdebug build OR '
             '(2) Manually enabling web debugging in Chrome at '
             'Settings > Developer tools > Enable USB Web debugging.')
-        sys.exit(1)
+        self.Close()
+        raise
       except:
-        import traceback
-        traceback.print_exc()
         self.Close()
         raise
 

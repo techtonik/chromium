@@ -197,6 +197,9 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   void SetTransformOrigin(const gfx::Point3F&);
   gfx::Point3F transform_origin() const { return transform_origin_; }
 
+  bool HasAnyAnimationTargetingProperty(
+      Animation::TargetProperty property) const;
+
   bool ScrollOffsetAnimationWasInterrupted() const;
 
   void SetScrollParent(Layer* parent);
@@ -241,9 +244,6 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
     return draw_properties_.screen_space_transform;
   }
   float draw_opacity() const { return draw_properties_.opacity; }
-  bool draw_transform_is_animating() const {
-    return draw_properties_.target_space_transform_is_animating;
-  }
   bool screen_space_transform_is_animating() const {
     return draw_properties_.screen_space_transform_is_animating;
   }
@@ -314,11 +314,6 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
 
   void set_did_scroll_callback(const base::Closure& callback) {
     did_scroll_callback_ = callback;
-  }
-
-  void SetDrawCheckerboardForMissingTiles(bool checkerboard);
-  bool draw_checkerboard_for_missing_tiles() const {
-    return draw_checkerboard_for_missing_tiles_;
   }
 
   void SetForceRenderSurface(bool force_render_surface);
@@ -654,6 +649,7 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   void OnTransformAnimated(const gfx::Transform& transform) override;
   void OnScrollOffsetAnimated(const gfx::ScrollOffset& scroll_offset) override;
   void OnAnimationWaitingForDeletion() override;
+  void OnTransformIsPotentiallyAnimatingChanged(bool is_animating) override;
   bool IsActive() const override;
 
   // If this layer has a scroll parent, it removes |this| from its list of
@@ -716,7 +712,6 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   bool double_sided_ : 1;
   bool should_flatten_transform_ : 1;
   bool use_parent_backface_visibility_ : 1;
-  bool draw_checkerboard_for_missing_tiles_ : 1;
   bool force_render_surface_ : 1;
   bool transform_is_invertible_ : 1;
   bool has_render_surface_ : 1;

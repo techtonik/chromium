@@ -254,8 +254,14 @@ TEST(LayerAnimationControllerTest, SyncPause) {
 
   EXPECT_FALSE(controller_impl->GetAnimation(Animation::OPACITY));
 
-  int animation_id =
-      AddOpacityTransitionToController(controller.get(), 1, 0, 1, false);
+  // Two steps, three ranges: [0-1) -> 0.2, [1-2) -> 0.3, [2-3] -> 0.4.
+  const double duration = 3.0;
+  const int animation_id =
+      AddOpacityStepsToController(controller.get(), duration, 0.2f, 0.4f, 2);
+
+  // Set start offset to be at the beginning of the second range.
+  controller->GetAnimationById(animation_id)
+      ->set_time_offset(TimeDelta::FromSecondsD(1.01));
 
   controller->PushAnimationUpdatesTo(controller_impl.get());
   controller_impl->ActivateAnimations();
@@ -264,29 +270,52 @@ TEST(LayerAnimationControllerTest, SyncPause) {
   EXPECT_EQ(Animation::WAITING_FOR_TARGET_AVAILABILITY,
             controller_impl->GetAnimationById(animation_id)->run_state());
 
+  TimeTicks time = kInitialTickTime;
+
   // Start the animations on each controller.
   AnimationEventsVector events;
-  controller_impl->Animate(kInitialTickTime);
+  controller_impl->Animate(time);
   controller_impl->UpdateState(true, &events);
-  controller->Animate(kInitialTickTime);
+  EXPECT_EQ(1u, events.size());
+
+  controller->Animate(time);
   controller->UpdateState(true, nullptr);
+  controller->NotifyAnimationStarted(events[0]);
+
   EXPECT_EQ(Animation::RUNNING,
             controller_impl->GetAnimationById(animation_id)->run_state());
   EXPECT_EQ(Animation::RUNNING,
             controller->GetAnimationById(animation_id)->run_state());
 
-  // Pause the main-thread animation.
-  controller->PauseAnimation(
-      animation_id,
-      TimeDelta::FromMilliseconds(1000) + TimeDelta::FromMilliseconds(1000));
+  EXPECT_EQ(0.3f, dummy.opacity());
+  EXPECT_EQ(0.3f, dummy_impl.opacity());
+
+  EXPECT_EQ(kInitialTickTime,
+            controller->GetAnimationById(animation_id)->start_time());
+  EXPECT_EQ(kInitialTickTime,
+            controller_impl->GetAnimationById(animation_id)->start_time());
+
+  // Pause the animation at the middle of the second range so the offset
+  // delays animation until the middle of the third range.
+  controller->PauseAnimation(animation_id, TimeDelta::FromSecondsD(1.5));
   EXPECT_EQ(Animation::PAUSED,
             controller->GetAnimationById(animation_id)->run_state());
 
   // The pause run state change should make it to the impl thread controller.
   controller->PushAnimationUpdatesTo(controller_impl.get());
   controller_impl->ActivateAnimations();
+
+  // Advance time so it stays within the first range.
+  time += TimeDelta::FromMilliseconds(10);
+  controller->Animate(time);
+  controller_impl->Animate(time);
+
   EXPECT_EQ(Animation::PAUSED,
             controller_impl->GetAnimationById(animation_id)->run_state());
+
+  // Opacity value doesn't depend on time if paused at specified time offset.
+  EXPECT_EQ(0.4f, dummy.opacity());
+  EXPECT_EQ(0.4f, dummy_impl.opacity());
 }
 
 TEST(LayerAnimationControllerTest, DoNotSyncFinishedAnimation) {
@@ -2353,6 +2382,124 @@ TEST(LayerAnimationControllerTest, ActivationBetweenAnimateAndUpdateState) {
   // Both observers should have been ticked.
   EXPECT_EQ(0.75f, pending_dummy_impl.opacity());
   EXPECT_EQ(0.75f, dummy_impl.opacity());
+}
+
+TEST(LayerAnimationControllerTest,
+     ObserverNotifiedWhenTransformIsPotentiallyAnimatingChanges) {
+  AnimationEventsVector events;
+  FakeLayerAnimationValueObserver active_dummy_impl;
+  FakeInactiveLayerAnimationValueObserver pending_dummy_impl;
+  scoped_refptr<LayerAnimationController> controller_impl(
+      LayerAnimationController::Create(0));
+  controller_impl->AddValueObserver(&active_dummy_impl);
+  controller_impl->AddValueObserver(&pending_dummy_impl);
+  FakeLayerAnimationValueObserver dummy;
+  scoped_refptr<LayerAnimationController> controller(
+      LayerAnimationController::Create(0));
+  controller->AddValueObserver(&dummy);
+
+  EXPECT_FALSE(dummy.transform_is_animating());
+  EXPECT_FALSE(pending_dummy_impl.transform_is_animating());
+  EXPECT_FALSE(active_dummy_impl.transform_is_animating());
+
+  // Case 1: An animation that's allowed to run until its finish point.
+  AddAnimatedTransformToController(controller.get(), 1.0, 1, 1);
+  EXPECT_TRUE(dummy.transform_is_animating());
+
+  controller->PushAnimationUpdatesTo(controller_impl.get());
+  EXPECT_TRUE(pending_dummy_impl.transform_is_animating());
+  EXPECT_FALSE(active_dummy_impl.transform_is_animating());
+
+  controller_impl->ActivateAnimations();
+  EXPECT_TRUE(pending_dummy_impl.transform_is_animating());
+  EXPECT_TRUE(active_dummy_impl.transform_is_animating());
+
+  controller_impl->Animate(kInitialTickTime);
+  controller_impl->UpdateState(true, &events);
+
+  controller->NotifyAnimationStarted(events[0]);
+  events.clear();
+
+  // Finish the animation.
+  controller->Animate(kInitialTickTime + TimeDelta::FromMilliseconds(1000));
+  controller->UpdateState(true, nullptr);
+  EXPECT_FALSE(dummy.transform_is_animating());
+
+  controller->PushAnimationUpdatesTo(controller_impl.get());
+
+  // controller_impl hasn't yet ticked at/past the end of the animation.
+  EXPECT_TRUE(pending_dummy_impl.transform_is_animating());
+  EXPECT_TRUE(active_dummy_impl.transform_is_animating());
+
+  controller_impl->Animate(kInitialTickTime +
+                           TimeDelta::FromMilliseconds(1000));
+  controller_impl->UpdateState(true, &events);
+  EXPECT_FALSE(pending_dummy_impl.transform_is_animating());
+  EXPECT_FALSE(active_dummy_impl.transform_is_animating());
+
+  controller->NotifyAnimationFinished(events[0]);
+  events.clear();
+
+  // Case 2: An animation that's removed before it finishes.
+  int animation_id =
+      AddAnimatedTransformToController(controller.get(), 10.0, 2, 2);
+  EXPECT_TRUE(dummy.transform_is_animating());
+
+  controller->PushAnimationUpdatesTo(controller_impl.get());
+  EXPECT_TRUE(pending_dummy_impl.transform_is_animating());
+  EXPECT_FALSE(active_dummy_impl.transform_is_animating());
+
+  controller_impl->ActivateAnimations();
+  EXPECT_TRUE(pending_dummy_impl.transform_is_animating());
+  EXPECT_TRUE(active_dummy_impl.transform_is_animating());
+
+  controller_impl->Animate(kInitialTickTime +
+                           TimeDelta::FromMilliseconds(2000));
+  controller_impl->UpdateState(true, &events);
+
+  controller->NotifyAnimationStarted(events[0]);
+  events.clear();
+
+  controller->RemoveAnimation(animation_id);
+  EXPECT_FALSE(dummy.transform_is_animating());
+
+  controller->PushAnimationUpdatesTo(controller_impl.get());
+  EXPECT_FALSE(pending_dummy_impl.transform_is_animating());
+  EXPECT_TRUE(active_dummy_impl.transform_is_animating());
+
+  controller_impl->ActivateAnimations();
+  EXPECT_FALSE(pending_dummy_impl.transform_is_animating());
+  EXPECT_FALSE(active_dummy_impl.transform_is_animating());
+
+  // Case 3: An animation that's aborted before it finishes.
+  animation_id = AddAnimatedTransformToController(controller.get(), 10.0, 3, 3);
+  EXPECT_TRUE(dummy.transform_is_animating());
+
+  controller->PushAnimationUpdatesTo(controller_impl.get());
+  EXPECT_TRUE(pending_dummy_impl.transform_is_animating());
+  EXPECT_FALSE(active_dummy_impl.transform_is_animating());
+
+  controller_impl->ActivateAnimations();
+  EXPECT_TRUE(pending_dummy_impl.transform_is_animating());
+  EXPECT_TRUE(active_dummy_impl.transform_is_animating());
+
+  controller_impl->Animate(kInitialTickTime +
+                           TimeDelta::FromMilliseconds(3000));
+  controller_impl->UpdateState(true, &events);
+
+  controller->NotifyAnimationStarted(events[0]);
+  events.clear();
+
+  controller_impl->AbortAnimations(Animation::TRANSFORM);
+  EXPECT_FALSE(pending_dummy_impl.transform_is_animating());
+  EXPECT_FALSE(active_dummy_impl.transform_is_animating());
+
+  controller_impl->Animate(kInitialTickTime +
+                           TimeDelta::FromMilliseconds(4000));
+  controller_impl->UpdateState(true, &events);
+
+  controller->NotifyAnimationAborted(events[0]);
+  EXPECT_FALSE(dummy.transform_is_animating());
 }
 
 TEST(LayerAnimationControllerTest, ClippedOpacityValues) {

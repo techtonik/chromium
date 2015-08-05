@@ -190,6 +190,7 @@
       'browser/accessibility/dump_accessibility_tree_browsertest.cc',
       'browser/accessibility/site_per_process_accessibility_browsertest.cc',
       'browser/accessibility/snapshot_ax_tree_browsertest.cc',
+      'browser/background_sync/background_sync_browsertest.cc',
       'browser/battery_status/battery_monitor_impl_browsertest.cc',
       'browser/battery_status/battery_monitor_integration_browsertest.cc',
       'browser/bookmarklet_browsertest.cc',
@@ -232,7 +233,6 @@
       'browser/net_info_browsertest.cc',
       'browser/renderer_host/input/touch_action_browsertest.cc',
       'browser/renderer_host/input/touch_input_browsertest.cc',
-      'browser/renderer_host/input/touch_selection_controller_client_aura_browsertest.cc',
       'browser/renderer_host/render_message_filter_browsertest.cc',
       'browser/renderer_host/render_process_host_browsertest.cc',
       'browser/renderer_host/render_view_host_browsertest.cc',
@@ -247,6 +247,7 @@
       'browser/tracing/background_tracing_manager_browsertest.cc',
       'browser/tracing/tracing_controller_browsertest.cc',
       'browser/web_contents/opened_by_dom_browsertest.cc',
+      'browser/web_contents/touch_editable_impl_aura_browsertest.cc',
       'browser/web_contents/web_contents_impl_browsertest.cc',
       'browser/web_contents/web_contents_view_aura_browsertest.cc',
       'browser/webkit_browsertest.cc',
@@ -673,6 +674,7 @@
       'renderer/media/video_capture_impl_manager_unittest.cc',
       'renderer/media/video_capture_impl_unittest.cc',
       'renderer/media/video_capture_message_filter_unittest.cc',
+      'renderer/raster_worker_pool_unittest.cc',
       'renderer/render_thread_impl_unittest.cc',
       'renderer/render_widget_unittest.cc',
       'renderer/scheduler/resource_dispatch_throttler_unittest.cc',
@@ -1380,6 +1382,7 @@
           'target_name': 'content_browsertests',
           'type': '<(gtest_target_type)',
           'dependencies': [
+            'browser/background_sync/background_sync_proto.gyp:background_sync_proto',
             'content.gyp:content_common',
             'content.gyp:content_gpu',
             'content.gyp:content_plugin',
@@ -1441,6 +1444,11 @@
           ],
           'sources': [ '<@(content_browsertests_sources)' ],
           'conditions': [
+            ['chromeos==0', {
+              'sources!': [
+                'browser/web_contents/touch_editable_impl_aura_browsertest.cc',
+              ],
+            }],
             ['OS=="win"', {
               'resource_include_dirs': [
                 '<(SHARED_INTERMEDIATE_DIR)/webkit',
@@ -1514,15 +1522,6 @@
             ['use_aura!=1 and OS!="mac"', {
               'sources!' :[
                 'browser/compositor/image_transport_factory_browsertest.cc',
-              ],
-            }],
-            ['use_aura==1', {
-              'dependencies': [
-                '../ui/touch_selection/ui_touch_selection.gyp:ui_touch_selection',
-                '../ui/touch_selection/ui_touch_selection.gyp:ui_touch_selection_test_support',
-              ]}, {
-              'sources!': [
-                'browser/renderer_host/input/touch_selection_controller_client_aura_browsertest.cc',
               ],
             }],
             ['enable_webrtc==1', {

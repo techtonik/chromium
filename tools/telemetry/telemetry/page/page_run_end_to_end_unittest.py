@@ -409,7 +409,8 @@ class PageRunEndToEndTests(unittest.TestCase):
       def ValidateAndMeasurePage(self, *_):
         raise page_test.Failure
 
-      def CleanUpAfterPage(self, page, tab):
+      def DidRunPage(self, platform):
+        del platform  # unused
         self.did_call_clean_up = True
 
 
@@ -536,6 +537,7 @@ class PageRunEndToEndTests(unittest.TestCase):
       self._RunPageTestThatRaisesAppCrashException(test, max_failures=1)
     self.assertFormattedExceptionOnlyHas('AppCrashException')
 
+  @decorators.Disabled('chromeos')  # crbug.com/516738
   def testWebPageReplay(self):
     story_set = example_domain.ExampleDomainPageSet()
     body = []

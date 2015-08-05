@@ -12,20 +12,12 @@
   margin-top: -16px;
 }
 
-/* Day separators. */
-:host(:not(:first-of-type):not([hide-date])) :-webkit-any(#content-wrapper,
-                                                          #since) {
-  border-top: 1px solid rgba(0, 0, 0, .2);  /* TODO(dbeam): real color. */
-  padding-top: 32px;
-}
-
 #date-container,
 #end-cap {
   flex: 1 0 var(--downloads-side-column-basis);
 }
 
 #date-container > * {
-  -webkit-margin-start: 24px;
   color: #616161;
   font-size: 107.69%;
   font-weight: bold;
@@ -67,9 +59,16 @@
   margin: 0 32px;
 }
 
-#icon {
+.icon {
   height: 32px;
   width: 32px;
+}
+
+#warning {
+  -webkit-mask-image: url(../../../../ui/webui/resources/images/warning.svg);
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: 100%;
+  background: rgb(217, 84, 61);
 }
 
 #name,
@@ -100,7 +99,7 @@
 }
 
 #url {
-  color: rgb(88, 152, 251);
+  color: rgb(51, 103, 214);
   margin-top: 6px;
   overflow: hidden;
   text-decoration: none;
@@ -133,6 +132,14 @@
   border-radius: 2px;
 }
 
+#incognito {
+  -webkit-margin-end: 0;
+  -webkit-margin-start: 16px;
+  /* This image is 128x128 so it'll work fine in 2x. */
+  content: url(../../../../ui/webui/resources/images/incognito_icon.png);
+  width: 48px;
+}
+
 #remove-wrapper {
   align-self: flex-start;
   margin: 0;
@@ -145,4 +152,39 @@
   };
   --iron-icon-height: 16px;
   --iron-icon-width: 16px;
+}
+
+@media not all and (max-width: 1024px) {
+  /* Only show date separators in wide mode. */
+  :host(:not(:first-of-type):not([hide-date])) :-webkit-any(#content-wrapper,
+                                                            #since) {
+    border-top: 1px solid rgba(0, 0, 0, .2);  /* TODO(dbeam): real color. */
+    padding-top: 32px;
+  }
+
+  #date-container > * {
+    -webkit-margin-start: 24px;
+  }
+}
+
+@media all and (max-width: 1024px) {
+  /* In narrow windows, put the dates on top instead of on the side. */
+  :host {
+    flex-direction: column;
+  }
+
+  :host([hide-date]) #date-container,
+  #end-cap {
+    display: none;
+  }
+
+  #content {
+    margin: 0 auto;
+  }
+
+  #date-container {
+    flex: none !important;
+    margin: 0 auto 32px;
+    width: var(--downloads-item-width);
+  }
 }

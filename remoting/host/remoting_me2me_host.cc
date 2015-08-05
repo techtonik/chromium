@@ -55,7 +55,6 @@
 #include "remoting/host/host_main.h"
 #include "remoting/host/host_status_logger.h"
 #include "remoting/host/input_injector.h"
-#include "remoting/host/ipc_constants.h"
 #include "remoting/host/ipc_desktop_environment.h"
 #include "remoting/host/ipc_host_event_logger.h"
 #include "remoting/host/logging.h"
@@ -67,6 +66,7 @@
 #include "remoting/host/shutdown_watchdog.h"
 #include "remoting/host/signaling_connector.h"
 #include "remoting/host/single_window_desktop_environment.h"
+#include "remoting/host/switches.h"
 #include "remoting/host/third_party_auth_config.h"
 #include "remoting/host/token_validator_factory_impl.h"
 #include "remoting/host/usage_stats_consent.h"
@@ -469,7 +469,8 @@ bool HostProcess::InitWithCommandLine(const base::CommandLine* cmd_line) {
   daemon_channel_ = IPC::ChannelProxy::Create(channel_handle,
                                               IPC::Channel::MODE_CLIENT,
                                               this,
-                                              context_->network_task_runner());
+                                              context_->network_task_runner(),
+                                              nullptr);
 #else  // !defined(REMOTING_MULTI_PROCESS)
   // Connect to the daemon process.
   std::string channel_name =
@@ -479,7 +480,8 @@ bool HostProcess::InitWithCommandLine(const base::CommandLine* cmd_line) {
         IPC::ChannelProxy::Create(channel_name,
                                   IPC::Channel::MODE_CLIENT,
                                   this,
-                                  context_->network_task_runner().get());
+                                  context_->network_task_runner().get(),
+                                  nullptr);
   }
 
   if (cmd_line->HasSwitch(kHostConfigSwitchName)) {

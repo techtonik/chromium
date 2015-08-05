@@ -9,6 +9,7 @@
 #include "android_webview/browser/aw_contents_client_bridge_base.h"
 #include "android_webview/browser/aw_contents_io_thread_client.h"
 #include "android_webview/browser/aw_cookie_access_policy.h"
+#include "android_webview/browser/aw_locale_manager.h"
 #include "android_webview/browser/aw_printing_message_filter.h"
 #include "android_webview/browser/aw_quota_permission_context.h"
 #include "android_webview/browser/aw_web_preferences_populater.h"
@@ -106,11 +107,14 @@ class AwAccessTokenStore : public content::AccessTokenStore {
   DISALLOW_COPY_AND_ASSIGN(AwAccessTokenStore);
 };
 
+AwLocaleManager* g_locale_manager = NULL;
+
 }  // anonymous namespace
 
+// static
 std::string AwContentBrowserClient::GetAcceptLangsImpl() {
-  // Start with the currnet locale.
-  std::string langs = base::android::GetDefaultLocale();
+  // Start with the current locale.
+  std::string langs = g_locale_manager->GetLocale();
 
   // If we're not en-US, add in en-US which will be
   // used with a lower q-value.
@@ -120,6 +124,7 @@ std::string AwContentBrowserClient::GetAcceptLangsImpl() {
   return langs;
 }
 
+// static
 AwBrowserContext* AwContentBrowserClient::GetAwBrowserContext() {
   return AwBrowserContext::GetDefault();
 }
@@ -133,9 +138,12 @@ AwContentBrowserClient::AwContentBrowserClient(
   }
   browser_context_.reset(
       new AwBrowserContext(user_data_dir, native_factory_));
+  g_locale_manager = native_factory->CreateAwLocaleManager();
 }
 
 AwContentBrowserClient::~AwContentBrowserClient() {
+  delete g_locale_manager;
+  g_locale_manager = NULL;
 }
 
 void AwContentBrowserClient::AddCertificate(net::CertificateMimeType cert_type,
@@ -160,20 +168,6 @@ AwContentBrowserClient::GetWebContentsViewDelegate(
 
 void AwContentBrowserClient::RenderProcessWillLaunch(
     content::RenderProcessHost* host) {
-  // If WebView becomes multi-process capable, this may be insecure.
-  // More benefit can be derived from the ChildProcessSecurotyPolicy by
-  // deferring the GrantScheme calls until we know that a given child process
-  // really does need that priviledge. Check here to ensure we rethink this
-  // when the time comes. See crbug.com/156062.
-  CHECK(content::RenderProcessHost::run_renderer_in_process());
-
-  // Grant content: and file: scheme to the whole process, since we impose
-  // per-view access checks.
-  content::ChildProcessSecurityPolicy::GetInstance()->GrantScheme(
-      host->GetID(), android_webview::kContentScheme);
-  content::ChildProcessSecurityPolicy::GetInstance()->GrantScheme(
-      host->GetID(), url::kFileScheme);
-
   host->AddFilter(new AwContentsMessageFilter(host->GetID()));
   host->AddFilter(new cdm::CdmMessageFilterAndroid());
   host->AddFilter(new AwPrintingMessageFilter(host->GetID()));

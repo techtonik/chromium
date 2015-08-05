@@ -39,6 +39,7 @@ import org.chromium.chrome.browser.tab.TabRedirectHandler;
 import org.chromium.chrome.browser.tabmodel.EmptyTabModelObserver;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
+import org.chromium.chrome.browser.tabmodel.TabModel.TabSelectionType;
 import org.chromium.chrome.browser.tabmodel.TabModelObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorTabObserver;
@@ -216,6 +217,13 @@ public class ContextualSearchManager extends ContextualSearchObservable
 
         mTabModelObserver = new EmptyTabModelObserver() {
             @Override
+            public void didSelectTab(Tab tab, TabSelectionType type, int lastId) {
+                if (!mIsPromotingToTab && tab.getId() != lastId) {
+                    hideContextualSearch(StateChangeReason.UNKNOWN);
+                }
+            }
+
+            @Override
             public void didAddTab(Tab tab, TabLaunchType type) {
                 // If we're in the process of promoting this tab, just return and don't mess with
                 // this state.
@@ -314,6 +322,11 @@ public class ContextualSearchManager extends ContextualSearchObservable
     @Override
     public boolean isPromoAvailable() {
         return mPolicy.isPromoAvailable();
+    }
+
+    @Override
+    public int getControlContainerHeightResource() {
+        return mActivity.getControlContainerHeightResource();
     }
 
     /**
@@ -1267,7 +1280,14 @@ public class ContextualSearchManager extends ContextualSearchObservable
 
     @Override
     public void handleSelectionDismissal() {
-        if (mSearchPanelDelegate.isShowing() && !mIsPromotingToTab) {
+        if (mSearchPanelDelegate.isShowing()
+                && !mIsPromotingToTab
+                // If the selection is dismissed when the Panel is not peeking anymore,
+                // which means the Panel is at least partially expanded, then it means
+                // the selection was cleared by an external source (like JavaScript),
+                // so we should not dismiss the UI in here.
+                // See crbug.com/516665
+                && mSearchPanelDelegate.isPeeking()) {
             hideContextualSearch(StateChangeReason.CLEARED_SELECTION);
         }
     }

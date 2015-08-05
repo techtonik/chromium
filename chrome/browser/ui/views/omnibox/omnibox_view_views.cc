@@ -16,9 +16,6 @@
 #include "chrome/browser/command_updater.h"
 #include "chrome/browser/search/search.h"
 #include "chrome/browser/ui/omnibox/chrome_omnibox_client.h"
-#include "chrome/browser/ui/omnibox/omnibox_edit_controller.h"
-#include "chrome/browser/ui/omnibox/omnibox_edit_model.h"
-#include "chrome/browser/ui/omnibox/omnibox_popup_model.h"
 #include "chrome/browser/ui/view_ids.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_popup_contents_view.h"
@@ -27,7 +24,11 @@
 #include "components/bookmarks/browser/bookmark_node_data.h"
 #include "components/omnibox/browser/autocomplete_input.h"
 #include "components/omnibox/browser/autocomplete_match.h"
+#include "components/omnibox/browser/omnibox_edit_controller.h"
+#include "components/omnibox/browser/omnibox_edit_model.h"
 #include "components/omnibox/browser/omnibox_field_trial.h"
+#include "components/omnibox/browser/omnibox_popup_model.h"
+#include "components/search/search.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/common/constants.h"
 #include "net/base/escape.h"
@@ -136,7 +137,6 @@ OmniboxViewViews::OmniboxViewViews(OmniboxEditController* controller,
                                    LocationBarView* location_bar,
                                    const gfx::FontList& font_list)
     : OmniboxView(
-          profile,
           controller,
           make_scoped_ptr(new ChromeOmniboxClient(controller, profile))),
       profile_(profile),
@@ -204,8 +204,7 @@ void OmniboxViewViews::SaveStateToTab(content::WebContents* tab) {
 }
 
 void OmniboxViewViews::OnTabChanged(const content::WebContents* web_contents) {
-  security_level_ = controller()->GetToolbarModel()->GetSecurityLevel(false);
-
+  UpdateSecurityLevel();
   const OmniboxState* state = static_cast<OmniboxState*>(
       web_contents->GetUserData(&OmniboxState::kKey));
   model()->RestoreState(state ? &state->model_state : NULL);
@@ -228,7 +227,7 @@ void OmniboxViewViews::ResetTabState(content::WebContents* web_contents) {
 
 void OmniboxViewViews::Update() {
   const connection_security::SecurityLevel old_security_level = security_level_;
-  security_level_ = controller()->GetToolbarModel()->GetSecurityLevel(false);
+  UpdateSecurityLevel();
   if (model()->UpdatePermanentText()) {
     // Something visibly changed.  Re-enable URL replacement.
     controller()->GetToolbarModel()->set_url_replacement_enabled(true);
@@ -431,6 +430,12 @@ bool OmniboxViewViews::HandleEarlyTabActions(const ui::KeyEvent& event) {
 
 void OmniboxViewViews::AccessibilitySetValue(const base::string16& new_value) {
   SetUserText(new_value, new_value, true);
+}
+
+void OmniboxViewViews::UpdateSecurityLevel() {
+  ChromeToolbarModel* chrome_toolbar_model =
+      static_cast<ChromeToolbarModel*>(controller()->GetToolbarModel());
+  security_level_ = chrome_toolbar_model->GetSecurityLevel(false);
 }
 
 void OmniboxViewViews::SetWindowTextAndCaretPos(const base::string16& text,
@@ -1058,7 +1063,7 @@ void OmniboxViewViews::UpdateContextMenu(ui::SimpleMenuModel* menu_contents) {
 
   menu_contents->AddSeparator(ui::NORMAL_SEPARATOR);
 
-  if (chrome::IsQueryExtractionEnabled()) {
+  if (search::IsQueryExtractionEnabled()) {
     int select_all_position = menu_contents->GetIndexOfCommandId(
         IDS_APP_SELECT_ALL);
     DCHECK_GE(select_all_position, 0);

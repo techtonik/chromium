@@ -24,8 +24,16 @@
             'arch_suffix':'64'
           }],
         ],
+        'grit_out_dir': '<(SHARED_INTERMEDIATE_DIR)/android_webview',
       },
       'actions': [
+        {
+          'action_name': 'generate_aw_renderer_resources',
+          'variables': {
+            'grit_grd_file': 'renderer/aw_renderer_resources.grd',
+          },
+          'includes': [ '../build/grit_action.gypi' ],
+        },
         {
           'action_name': 'repack_android_webview_pack',
           'variables': {
@@ -36,6 +44,7 @@
               '<(SHARED_INTERMEDIATE_DIR)/content/content_resources.pak',
               '<(SHARED_INTERMEDIATE_DIR)/net/net_resources.pak',
               '<(SHARED_INTERMEDIATE_DIR)/ui/resources/ui_resources_100_percent.pak',
+              '<(grit_out_dir)/aw_renderer_resources.pak',
             ],
             'pak_output': '<(PRODUCT_DIR)/android_webview_assets/webviewchromium.pak',
           },
@@ -228,6 +237,7 @@
         'browser/aw_http_auth_handler_base.h',
         'browser/aw_javascript_dialog_manager.cc',
         'browser/aw_javascript_dialog_manager.h',
+        'browser/aw_locale_manager.h',
         'browser/aw_login_delegate.cc',
         'browser/aw_login_delegate.h',
         'browser/aw_media_client_android.cc',
@@ -279,6 +289,8 @@
         'browser/gl_view_renderer_manager.h',
         'browser/net/android_stream_reader_url_request_job.cc',
         'browser/net/android_stream_reader_url_request_job.h',
+        'browser/net/aw_http_user_agent_settings.h',
+        'browser/net/aw_http_user_agent_settings.cc',
         'browser/net/aw_network_delegate.cc',
         'browser/net/aw_network_delegate.h',
         'browser/net/aw_url_request_context_getter.cc',

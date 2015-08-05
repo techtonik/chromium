@@ -69,8 +69,6 @@
 #include "chrome/browser/nacl_host/nacl_browser_delegate_impl.h"
 #include "chrome/browser/net/chrome_net_log.h"
 #include "chrome/browser/net/crl_set_fetcher.h"
-#include "chrome/browser/notifications/desktop_notification_service.h"
-#include "chrome/browser/notifications/desktop_notification_service_factory.h"
 #include "chrome/browser/performance_monitor/performance_monitor.h"
 #include "chrome/browser/plugins/plugin_prefs.h"
 #include "chrome/browser/power/process_power_collector.h"
@@ -97,11 +95,11 @@
 #include "chrome/browser/ui/startup/startup_browser_creator.h"
 #include "chrome/browser/ui/uma_browsing_activity_observer.h"
 #include "chrome/browser/ui/webui/chrome_web_ui_controller_factory.h"
+#include "chrome/common/channel_info.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_result_codes.h"
 #include "chrome/common/chrome_switches.h"
-#include "chrome/common/chrome_version_info.h"
 #include "chrome/common/crash_keys.h"
 #include "chrome/common/env_vars.h"
 #include "chrome/common/logging_chrome.h"
@@ -127,6 +125,7 @@
 #include "components/translate/core/browser/translate_download_manager.h"
 #include "components/variations/net/variations_http_header_provider.h"
 #include "components/variations/variations_associated_data.h"
+#include "components/version_info/version_info.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
@@ -635,12 +634,12 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
                   << " list specified.";
   }
 
-#if !defined(GOOGLE_CHROME_BUILD)
+#if defined(FIELDTRIAL_TESTING_ENABLED)
   if (!command_line->HasSwitch(switches::kDisableFieldTrialTestingConfig) &&
       !command_line->HasSwitch(switches::kForceFieldTrials) &&
       !command_line->HasSwitch(switches::kVariationsServerURL))
     chrome_variations::AssociateDefaultFieldTrialConfig();
-#endif  // !defined(GOOGLE_CHROME_BUILD)
+#endif  // defined(FIELDTRIAL_TESTING_ENABLED)
 
   if (command_line->HasSwitch(switches::kForceVariationIds)) {
     // Create default variation ids which will always be included in the
@@ -676,8 +675,7 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
   // Now that field trials have been created, initializes metrics recording.
   metrics->InitializeMetricsRecordingState();
 
-  const version_info::Channel channel =
-      chrome::VersionInfo::GetChannel();
+  const version_info::Channel channel = chrome::GetChannel();
 
   // TODO(dalecurtis): Remove these checks and enable for all channels once we
   // track down the root causes of crbug.com/422522 and crbug.com/478932.
@@ -1015,7 +1013,7 @@ int ChromeBrowserMainParts::PreCreateThreadsImpl() {
 #if defined(OS_LINUX) || defined(OS_OPENBSD) || defined(OS_MACOSX)
   // Set the product channel for crash reports.
   base::debug::SetCrashKeyValue(crash_keys::kChannel,
-      chrome::VersionInfo::GetVersionStringModifier());
+                                chrome::GetChannelString());
 #endif  // defined(OS_LINUX) || defined(OS_OPENBSD) || defined(OS_MACOSX)
 
   // Initialize tracking synchronizer system.
@@ -1125,8 +1123,12 @@ void ChromeBrowserMainParts::PreBrowserStart() {
 #if defined(OS_CHROMEOS)
   g_browser_process->GetOomPriorityManager()->Start();
 #elif defined(OS_WIN) || defined(OS_MACOSX)
-  if (parsed_command_line().HasSwitch(switches::kEnableTabDiscarding))
+  const std::string group_name =
+      base::FieldTrialList::FindFullName("AutomaticTabDiscarding");
+  if (parsed_command_line().HasSwitch(switches::kEnableTabDiscarding) ||
+      base::StartsWith(group_name, "Enabled", base::CompareCase::SENSITIVE)) {
     g_browser_process->GetOomPriorityManager()->Start();
+  }
 #endif
 }
 

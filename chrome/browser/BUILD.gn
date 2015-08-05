@@ -129,7 +129,6 @@ source_set("browser") {
     "//components/password_manager/core/browser",
     "//components/password_manager/core/common",
     "//components/policy:policy_component",
-    "//components/printing/browser:printing_browser",
     "//components/proxy_config",
     "//components/query_parser",
     "//components/rappor",
@@ -137,7 +136,7 @@ source_set("browser") {
     "//components/search",
     "//components/search_engines",
     "//components/search_provider_logos",
-    "//components/security_interstitials",
+    "//components/security_interstitials/core",
     "//components/signin/core/browser",
     "//components/startup_metric_utils",
     "//components/strings",
@@ -583,7 +582,11 @@ source_set("browser") {
     sources += rebase_path(gypi_values.chrome_browser_printing_basic_sources,
                            ".",
                            "//chrome")
-    deps += [ "//printing" ]
+    deps += [
+      "//printing",
+      "//components/printing/browser:printing_browser",
+    ]
+
     if (is_win) {
       sources += rebase_path(gypi_values.chrome_browser_printing_emf_sources,
                              ".",
@@ -659,6 +662,7 @@ source_set("browser") {
       "//components/precache/core",
       "//components/resources:components_resources",
       "//components/service_tab_launcher",
+      "//components/toolbar",
       "//components/web_contents_delegate_android",
       "//third_party/android_opengl/etc1",
       "//third_party/android_tools:cpu_features",

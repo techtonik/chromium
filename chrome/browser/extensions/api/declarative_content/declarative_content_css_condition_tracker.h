@@ -13,10 +13,14 @@
 #include "base/callback.h"
 #include "base/containers/hash_tables.h"
 #include "base/memory/linked_ptr.h"
+#include "base/memory/scoped_ptr.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
 #include "content/public/browser/web_contents_observer.h"
 
+namespace base {
+class Value;
+}
 
 namespace content {
 class BrowserContext;
@@ -27,6 +31,33 @@ class WebContents;
 }
 
 namespace extensions {
+
+class Extension;
+
+// Tests whether all the specified CSS selectors match on the page.
+class DeclarativeContentCssPredicate {
+ public:
+  ~DeclarativeContentCssPredicate();
+
+  const std::vector<std::string>& css_selectors() const {
+    return css_selectors_;
+  }
+
+  // Evaluate for all watched CSS selectors that match on frames with the same
+  // origin as the page's main frame.
+  bool Evaluate(const base::hash_set<std::string>& matched_css_selectors) const;
+
+  static scoped_ptr<DeclarativeContentCssPredicate> Create(
+      const base::Value& value,
+      std::string* error);
+
+ private:
+  explicit DeclarativeContentCssPredicate(
+      const std::vector<std::string>& css_selectors);
+  std::vector<std::string> css_selectors_;
+
+  DISALLOW_COPY_AND_ASSIGN(DeclarativeContentCssPredicate);
+};
 
 class DeclarativeContentConditionTrackerDelegate;
 
@@ -39,6 +70,13 @@ class DeclarativeContentCssConditionTracker
       content::BrowserContext* context,
       DeclarativeContentConditionTrackerDelegate* delegate);
   ~DeclarativeContentCssConditionTracker() override;
+
+  // Creates a new DeclarativeContentCssPredicate from |value|. Sets
+  // *|error| and returns null if creation failed for any reason.
+  scoped_ptr<DeclarativeContentCssPredicate> CreatePredicate(
+      const Extension* extension,
+      const base::Value& value,
+      std::string* error);
 
   // Sets the set of CSS selectors to watch for CSS condition evaluation.
   void SetWatchedCssSelectors(

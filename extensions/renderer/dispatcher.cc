@@ -46,7 +46,6 @@
 #include "extensions/common/view_type.h"
 #include "extensions/renderer/api_activity_logger.h"
 #include "extensions/renderer/api_definitions_natives.h"
-#include "extensions/renderer/app_runtime_custom_bindings.h"
 #include "extensions/renderer/app_window_custom_bindings.h"
 #include "extensions/renderer/binding_generating_native_handler.h"
 #include "extensions/renderer/blob_native_handler.h"
@@ -73,7 +72,6 @@
 #include "extensions/renderer/render_frame_observer_natives.h"
 #include "extensions/renderer/request_sender.h"
 #include "extensions/renderer/runtime_custom_bindings.h"
-#include "extensions/renderer/safe_builtins.h"
 #include "extensions/renderer/script_context.h"
 #include "extensions/renderer/script_context_set.h"
 #include "extensions/renderer/script_injection.h"
@@ -670,9 +668,6 @@ void Dispatcher::RegisterNativeHandlers(ModuleSystem* module_system,
       scoped_ptr<NativeHandler>(new FileSystemNatives(context)));
 
   // Custom bindings.
-  module_system->RegisterNativeHandler(
-      "app_runtime",
-      scoped_ptr<NativeHandler>(new AppRuntimeCustomBindings(context)));
   // |dispatcher| is null in unit tests.
   const ScriptContextSet* script_context_set = dispatcher ?
       &dispatcher->script_context_set() : nullptr;
@@ -743,8 +738,6 @@ bool Dispatcher::OnControlMessageReceived(const IPC::Message& message) {
 }
 
 void Dispatcher::WebKitInitialized() {
-  RenderThread::Get()->RegisterExtension(SafeBuiltins::CreateV8Extension());
-
   // For extensions, we want to ensure we call the IdleHandler every so often,
   // even if the extension keeps up activity.
   if (set_idle_notifications_) {
@@ -1155,12 +1148,15 @@ void Dispatcher::UpdateBindingsForContext(ScriptContext* context) {
     case Feature::UNSPECIFIED_CONTEXT:
     case Feature::WEB_PAGE_CONTEXT:
     case Feature::BLESSED_WEB_PAGE_CONTEXT:
-      // Web page context; it's too expensive to run the full bindings code.
-      // Hard-code that the app and webstore APIs are available...
+      // Hard-code registration of any APIs that are exposed to webpage-like
+      // contexts, because it's too expensive to run the full bindings code.
+      // All of the same permission checks will still apply.
       if (context->GetAvailability("app").is_available())
         RegisterBinding("app", context);
       if (context->GetAvailability("webstore").is_available())
         RegisterBinding("webstore", context);
+      if (context->GetAvailability("dashboardPrivate").is_available())
+        RegisterBinding("dashboardPrivate", context);
       if (IsRuntimeAvailableToContext(context))
         RegisterBinding("runtime", context);
       UpdateContentCapabilities(context);
@@ -1176,10 +1172,7 @@ void Dispatcher::UpdateBindingsForContext(ScriptContext* context) {
           FeatureProvider::GetAPIFeatures();
       const std::vector<std::string>& apis =
           api_feature_provider->GetAllFeatureNames();
-      for (std::vector<std::string>::const_iterator it = apis.begin();
-           it != apis.end();
-           ++it) {
-        const std::string& api_name = *it;
+      for (const std::string& api_name : apis) {
         Feature* feature = api_feature_provider->GetFeature(api_name);
         DCHECK(feature);
 

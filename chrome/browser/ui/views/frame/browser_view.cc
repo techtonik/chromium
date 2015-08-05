@@ -51,8 +51,6 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_list.h"
 #include "chrome/browser/ui/browser_window_state.h"
-#include "chrome/browser/ui/omnibox/omnibox_popup_model.h"
-#include "chrome/browser/ui/omnibox/omnibox_view.h"
 #include "chrome/browser/ui/search/search_delegate.h"
 #include "chrome/browser/ui/search/search_model.h"
 #include "chrome/browser/ui/search/search_ui.h"
@@ -107,7 +105,9 @@
 #include "components/app_modal/app_modal_dialog.h"
 #include "components/app_modal/app_modal_dialog_queue.h"
 #include "components/app_modal/native_app_modal_dialog.h"
+#include "components/omnibox/browser/omnibox_popup_model.h"
 #include "components/omnibox/browser/omnibox_popup_view.h"
+#include "components/omnibox/browser/omnibox_view.h"
 #include "components/signin/core/common/profile_management_switches.h"
 #include "components/translate/core/browser/language_state.h"
 #include "content/app/resources/grit/content_resources.h"
@@ -448,8 +448,8 @@ const char BrowserView::kViewClassName[] = "BrowserView";
 
 BrowserView::BrowserView()
     : views::ClientView(nullptr, nullptr),
-      last_focused_view_storage_id_(
-          views::ViewStorage::GetInstance()->CreateStorageID()),
+      last_focused_view_storage_id_(views::ViewStorage::GetInstance()
+                                        ->CreateStorageID()),
       frame_(nullptr),
       top_container_(nullptr),
       tabstrip_(nullptr),
@@ -457,6 +457,7 @@ BrowserView::BrowserView()
       find_bar_host_view_(nullptr),
       infobar_container_(nullptr),
       contents_web_view_(nullptr),
+      devtools_web_view_(nullptr),
       contents_container_(nullptr),
       initialized_(false),
       in_process_fullscreen_(false),

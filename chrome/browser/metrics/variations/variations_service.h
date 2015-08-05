@@ -13,10 +13,10 @@
 #include "base/memory/weak_ptr.h"
 #include "base/metrics/field_trial.h"
 #include "base/observer_list.h"
+#include "base/threading/thread_checker.h"
 #include "base/time/time.h"
 #include "chrome/browser/metrics/variations/variations_request_scheduler.h"
 #include "chrome/browser/metrics/variations/variations_seed_store.h"
-#include "chrome/common/chrome_version_info.h"
 #include "components/variations/variations_seed_simulator.h"
 #include "components/web_resource/resource_request_allowed_notifier.h"
 #include "net/url_request/url_fetcher_delegate.h"
@@ -219,7 +219,7 @@ class VariationsService
   // to experiment churn while traveling.
   std::string LoadPermanentConsistencyCountry(
       const base::Version& version,
-      const variations::VariationsSeed& seed);
+      const std::string& latest_country);
 
   // The pref service used to store persist the variations seed.
   PrefService* local_state_;
@@ -277,6 +277,8 @@ class VariationsService
   // Helper that handles synchronizing Variations with the Registry.
   VariationsRegistrySyncer registry_syncer_;
 #endif
+
+  base::ThreadChecker thread_checker_;
 
   base::WeakPtrFactory<VariationsService> weak_ptr_factory_;
 

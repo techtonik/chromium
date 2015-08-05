@@ -567,6 +567,8 @@ class GLES2_IMPL_EXPORT GLES2Implementation
   bool GetHelper(GLenum pname, GLint* params);
   GLuint GetBoundBufferHelper(GLenum target);
   bool GetBooleanvHelper(GLenum pname, GLboolean* params);
+  bool GetBufferParameteri64vHelper(
+      GLenum target, GLenum pname, GLint64* params);
   bool GetBufferParameterivHelper(GLenum target, GLenum pname, GLint* params);
   bool GetFloatvHelper(GLenum pname, GLfloat* params);
   bool GetFramebufferAttachmentParameterivHelper(
@@ -816,16 +818,15 @@ class GLES2_IMPL_EXPORT GLES2Implementation
   // whether it should aggressively free them.
   bool aggressively_free_resources_;
 
-  // TODO(dyen): Temporary shared memory to sanity check finish calls.
-  uint32_t local_finish_counter_;
-  base::subtle::Atomic32* shared_finish_counter_;
-  int32_t shared_finish_counter_shm_id_;
-  uint32_t shared_finish_counter_shm_offset_;
-
   base::WeakPtrFactory<GLES2Implementation> weak_ptr_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(GLES2Implementation);
 };
+
+inline bool GLES2Implementation::GetBufferParameteri64vHelper(
+    GLenum /* target */, GLenum /* pname */, GLint64* /* params */) {
+  return false;
+}
 
 inline bool GLES2Implementation::GetBufferParameterivHelper(
     GLenum /* target */, GLenum /* pname */, GLint* /* params */) {

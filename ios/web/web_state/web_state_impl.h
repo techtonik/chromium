@@ -109,11 +109,6 @@ class WebStateImpl : public WebState, public NavigationManagerDelegate {
                                 int key_code,
                                 bool input_missing);
 
-  // Called when autocomplete is requested.
-  void OnAutocompleteRequested(const GURL& source_url,
-                               const std::string& form_name,
-                               bool user_initiated);
-
   // Called when new FaviconURL candidates are received.
   void OnFaviconUrlUpdated(const std::vector<FaviconURL>& candidates);
 
@@ -261,17 +256,10 @@ class WebStateImpl : public WebState, public NavigationManagerDelegate {
  protected:
   void AddObserver(WebStateObserver* observer) override;
   void RemoveObserver(WebStateObserver* observer) override;
+  void AddPolicyDecider(WebStatePolicyDecider* decider) override;
+  void RemovePolicyDecider(WebStatePolicyDecider* decider) override;
 
  private:
-  friend class WebStatePolicyDecider;
-
-  // Adds and removes policy deciders for navigation actions. The order in which
-  // deciders are called is undefined, and will stop on the first decider that
-  // refuses a navigation. Clients must be sure to remove the deciders before
-  // they go away.
-  void AddPolicyDecider(WebStatePolicyDecider* decider);
-  void RemovePolicyDecider(WebStatePolicyDecider* decider);
-
   // Creates a WebUIIOS object for |url| that is owned by the caller. Returns
   // nullptr if |url| does not correspond to a WebUI page.
   WebUIIOS* CreateWebUIIOS(const GURL& url);

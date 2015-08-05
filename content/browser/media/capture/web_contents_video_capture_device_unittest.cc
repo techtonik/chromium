@@ -24,6 +24,7 @@
 #include "content/public/test/test_browser_context.h"
 #include "content/public/test/test_browser_thread_bundle.h"
 #include "content/public/test/test_utils.h"
+#include "content/test/test_render_frame_host_factory.h"
 #include "content/test/test_render_view_host.h"
 #include "content/test/test_web_contents.h"
 #include "media/base/video_capture_types.h"
@@ -37,6 +38,7 @@
 #include "ui/base/layout.h"
 #include "ui/gfx/display.h"
 #include "ui/gfx/geometry/dip_util.h"
+#include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/screen.h"
 #include "ui/gfx/test/test_screen.h"
 
@@ -572,6 +574,7 @@ class WebContentsVideoCaptureDeviceTest : public testing::Test {
     // WebContents, it in turn creates CaptureTestRenderViewHosts.
     render_view_host_factory_.reset(
         new CaptureTestRenderViewHostFactory(&controller_));
+    render_frame_host_factory_.reset(new TestRenderFrameHostFactory());
 
     browser_context_.reset(new TestBrowserContext());
 
@@ -610,6 +613,7 @@ class WebContentsVideoCaptureDeviceTest : public testing::Test {
     base::RunLoop().RunUntilIdle();
 
     SiteInstanceImpl::set_render_process_host_factory(NULL);
+    render_frame_host_factory_.reset();
     render_view_host_factory_.reset();
     render_process_host_factory_.reset();
 
@@ -683,6 +687,9 @@ class WebContentsVideoCaptureDeviceTest : public testing::Test {
   // Creates capture-capable RenderViewHosts whose pixel content production is
   // under the control of |controller_|.
   scoped_ptr<CaptureTestRenderViewHostFactory> render_view_host_factory_;
+
+  // Self-registering RenderFrameHostFactory.
+  scoped_ptr<TestRenderFrameHostFactory> render_frame_host_factory_;
 
   // A mocked-out browser and tab.
   scoped_ptr<TestBrowserContext> browser_context_;
@@ -1024,6 +1031,101 @@ TEST_F(WebContentsVideoCaptureDeviceTest, VariableResolution_AnyWithinLimits) {
                                    arbitrary_source_size.width())));
 
   device()->StopAndDeAllocate();
+}
+
+TEST_F(WebContentsVideoCaptureDeviceTest,
+       ComputesStandardResolutionsForPreferredSize) {
+  // Helper function to run the same testing procedure for multiple combinations
+  // of |policy|, |standard_size| and |oddball_size|.
+  const auto RunTestForPreferredSize =
+      [=](media::ResolutionChangePolicy policy,
+          const gfx::Size& oddball_size,
+          const gfx::Size& standard_size) {
+    SCOPED_TRACE(::testing::Message()
+                 << "policy=" << policy
+                 << ", oddball_size=" << oddball_size.ToString()
+                 << ", standard_size=" << standard_size.ToString());
+
+    // Compute the expected preferred size.  For the fixed-resolution use case,
+    // the |oddball_size| is always the expected size; whereas for the
+    // variable-resolution cases, the |standard_size| is the expected size.
+    // Also, adjust to account for the device scale factor.
+    gfx::Size capture_preferred_size = gfx::ToFlooredSize(gfx::ScaleSize(
+        policy == media::RESOLUTION_POLICY_FIXED_RESOLUTION ?
+            oddball_size : standard_size,
+        1.0f / GetDeviceScaleFactor()));
+    ASSERT_NE(capture_preferred_size, web_contents()->GetPreferredSize());
+
+    // Start the WebContentsVideoCaptureDevice.
+    media::VideoCaptureParams capture_params;
+    capture_params.requested_format.frame_size = oddball_size;
+    capture_params.requested_format.frame_rate = kTestFramesPerSecond;
+    capture_params.requested_format.pixel_format =
+        media::VIDEO_CAPTURE_PIXEL_FORMAT_I420;
+    capture_params.resolution_change_policy = policy;
+    StubClientObserver unused_observer;
+    device()->AllocateAndStart(capture_params, unused_observer.PassClient());
+    base::RunLoop().RunUntilIdle();
+
+    // Check that the preferred size of the WebContents matches the one provided
+    // by WebContentsVideoCaptureDevice.
+    EXPECT_EQ(capture_preferred_size, web_contents()->GetPreferredSize());
+
+    // Stop the WebContentsVideoCaptureDevice.
+    device()->StopAndDeAllocate();
+    base::RunLoop().RunUntilIdle();
+  };
+
+  const media::ResolutionChangePolicy policies[3] = {
+    media::RESOLUTION_POLICY_FIXED_RESOLUTION,
+    media::RESOLUTION_POLICY_FIXED_ASPECT_RATIO,
+    media::RESOLUTION_POLICY_ANY_WITHIN_LIMIT,
+  };
+
+  for (size_t i = 0; i < arraysize(policies); ++i) {
+    // A 16:9 standard resolution should be set as the preferred size when the
+    // source size is almost or exactly 16:9.
+    for (int delta_w = 0; delta_w <= +5; ++delta_w) {
+      for (int delta_h = 0; delta_h <= +5; ++delta_h) {
+        RunTestForPreferredSize(policies[i],
+                                gfx::Size(1280 + delta_w, 720 + delta_h),
+                                gfx::Size(1280, 720));
+      }
+    }
+    for (int delta_w = -5; delta_w <= +5; ++delta_w) {
+      for (int delta_h = -5; delta_h <= +5; ++delta_h) {
+        RunTestForPreferredSize(policies[i],
+                                gfx::Size(1365 + delta_w, 768 + delta_h),
+                                gfx::Size(1280, 720));
+      }
+    }
+
+    // A 4:3 standard resolution should be set as the preferred size when the
+    // source size is almost or exactly 4:3.
+    for (int delta_w = 0; delta_w <= +5; ++delta_w) {
+      for (int delta_h = 0; delta_h <= +5; ++delta_h) {
+        RunTestForPreferredSize(policies[i],
+                                gfx::Size(640 + delta_w, 480 + delta_h),
+                                gfx::Size(640, 480));
+      }
+    }
+    for (int delta_w = -5; delta_w <= +5; ++delta_w) {
+      for (int delta_h = -5; delta_h <= +5; ++delta_h) {
+        RunTestForPreferredSize(policies[i],
+                                gfx::Size(800 + delta_w, 600 + delta_h),
+                                gfx::Size(768, 576));
+      }
+    }
+
+    // When the source size is not a common video aspect ratio, there is no
+    // adjustment made.
+    RunTestForPreferredSize(
+        policies[i], gfx::Size(1000, 1000), gfx::Size(1000, 1000));
+    RunTestForPreferredSize(
+        policies[i], gfx::Size(1600, 1000), gfx::Size(1600, 1000));
+    RunTestForPreferredSize(
+        policies[i], gfx::Size(837, 999), gfx::Size(837, 999));
+  }
 }
 
 }  // namespace

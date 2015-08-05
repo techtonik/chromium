@@ -81,10 +81,10 @@
 #include "chrome/browser/ui/sync/sync_promo_ui.h"
 #include "chrome/browser/ui/tab_contents/chrome_web_contents_view_delegate.h"
 #include "chrome/browser/ui/webui/chrome_web_ui_controller_factory.h"
+#include "chrome/common/channel_info.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
-#include "chrome/common/chrome_version_info.h"
 #include "chrome/common/env_vars.h"
 #include "chrome/common/logging_chrome.h"
 #include "chrome/common/pepper_permission_util.h"
@@ -110,6 +110,7 @@
 #include "components/translate/core/common/translate_switches.h"
 #include "components/url_fixer/url_fixer.h"
 #include "components/variations/variations_associated_data.h"
+#include "components/version_info/version_info.h"
 #include "content/public/browser/browser_child_process_host.h"
 #include "content/public/browser/browser_main_parts.h"
 #include "content/public/browser/browser_ppapi_host.h"
@@ -246,7 +247,7 @@
 #include "chrome/browser/spellchecker/spellcheck_message_filter.h"
 #endif
 
-#if defined(USE_PLATFORM_SPELLCHECKER)
+#if defined(USE_BROWSER_SPELLCHECKER)
 #include "chrome/browser/spellchecker/spellcheck_message_filter_platform.h"
 #endif
 
@@ -844,7 +845,7 @@ void ChromeContentBrowserClient::RenderProcessWillLaunch(
 #if defined(ENABLE_SPELLCHECK)
   host->AddFilter(new SpellCheckMessageFilter(id));
 #endif
-#if defined(USE_PLATFORM_SPELLCHECKER)
+#if defined(USE_BROWSER_SPELLCHECKER)
   host->AddFilter(new SpellCheckMessageFilterPlatform(id));
 #endif
   host->AddFilter(new ChromeNetBenchmarkingMessageFilter(profile, context));
@@ -901,8 +902,8 @@ GURL ChromeContentBrowserClient::GetEffectiveURL(
 
   // If the input |url| should be assigned to the Instant renderer, make its
   // effective URL distinct from other URLs on the search provider's domain.
-  if (chrome::ShouldAssignURLToInstantRenderer(url, profile))
-    return chrome::GetEffectiveURLForInstant(url, profile);
+  if (search::ShouldAssignURLToInstantRenderer(url, profile))
+    return search::GetEffectiveURLForInstant(url, profile);
 
 #if defined(ENABLE_EXTENSIONS)
   return ChromeContentBrowserClientExtensionsPart::GetEffectiveURL(
@@ -923,7 +924,7 @@ bool ChromeContentBrowserClient::ShouldUseProcessPerSite(
   if (!profile)
     return false;
 
-  if (chrome::ShouldUseProcessPerSiteForInstantURL(effective_url, profile))
+  if (search::ShouldUseProcessPerSiteForInstantURL(effective_url, profile))
     return true;
 
 #if defined(ENABLE_EXTENSIONS)
@@ -1034,7 +1035,7 @@ bool ChromeContentBrowserClient::IsSuitableHost(
     bool is_instant_process = instant_service->IsInstantProcess(
         process_host->GetID());
     bool should_be_in_instant_process =
-        chrome::ShouldAssignURLToInstantRenderer(site_url, profile);
+        search::ShouldAssignURLToInstantRenderer(site_url, profile);
     if (is_instant_process || should_be_in_instant_process)
       return is_instant_process && should_be_in_instant_process;
   }
@@ -1091,8 +1092,8 @@ void ChromeContentBrowserClient::SiteInstanceGotProcess(
 
   // Remember the ID of the Instant process to signal the renderer process
   // on startup in |AppendExtraCommandLineSwitches| below.
-  if (chrome::ShouldAssignURLToInstantRenderer(
-          site_instance->GetSiteURL(), profile)) {
+  if (search::ShouldAssignURLToInstantRenderer(site_instance->GetSiteURL(),
+                                               profile)) {
     InstantService* instant_service =
         InstantServiceFactory::GetForProfile(profile);
     if (instant_service)
@@ -1320,7 +1321,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
 #if defined(ENABLE_WEBRTC)
     MaybeCopyDisableWebRtcEncryptionSwitch(command_line,
                                            browser_command_line,
-                                           VersionInfo::GetChannel());
+                                           chrome::GetChannel());
 #endif
 
     if (process) {
@@ -2179,8 +2180,8 @@ void ChromeContentBrowserClient::BrowserURLHandlerCreated(
                           BrowserURLHandler::null_handler());
 #else
   // Handler to rewrite chrome://newtab for InstantExtended.
-  handler->AddHandlerPair(&chrome::HandleNewTabURLRewrite,
-                          &chrome::HandleNewTabURLReverseRewrite);
+  handler->AddHandlerPair(&search::HandleNewTabURLRewrite,
+                          &search::HandleNewTabURLReverseRewrite);
 #endif
 
   // chrome: & friends.
@@ -2358,8 +2359,7 @@ base::string16 ChromeContentBrowserClient::GetAppContainerSidForSandboxType(
   base::string16 sid;
 
 #if defined(GOOGLE_CHROME_BUILD)
-  const version_info::Channel channel =
-      chrome::VersionInfo::GetChannel();
+  const version_info::Channel channel = chrome::GetChannel();
 
   // It's possible to have a SxS installation running at the same time as a
   // non-SxS so isolate them from each other.

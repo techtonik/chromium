@@ -117,6 +117,10 @@ IPC_ENUM_TRAITS_MAX_VALUE(ui::TextInputMode, ui::TEXT_INPUT_MODE_MAX)
 IPC_ENUM_TRAITS_MAX_VALUE(ui::TextInputType, ui::TEXT_INPUT_TYPE_MAX)
 
 #if defined(OS_MACOSX)
+IPC_ENUM_TRAITS_MAX_VALUE(
+    blink::ScrollbarButtonsPlacement,
+    blink::ScrollbarButtonsPlacement::ScrollbarButtonsPlacementLast)
+
 IPC_ENUM_TRAITS_MAX_VALUE(blink::ScrollerStyle, blink::ScrollerStyleOverlay)
 
 IPC_STRUCT_TRAITS_BEGIN(FontDescriptor)
@@ -395,6 +399,9 @@ IPC_STRUCT_BEGIN(ViewHostMsg_TextInputState_Params)
   // The type of input field
   IPC_STRUCT_MEMBER(ui::TextInputType, type)
 
+  // The mode of input field
+  IPC_STRUCT_MEMBER(ui::TextInputMode, mode)
+
   // The flags of the input field (autocorrect, autocomplete, etc.)
   IPC_STRUCT_MEMBER(int, flags)
 
@@ -552,6 +559,8 @@ IPC_STRUCT_BEGIN(ViewMsg_UpdateScrollbarTheme_Params)
   IPC_STRUCT_MEMBER(bool, jump_on_track_click)
   IPC_STRUCT_MEMBER(blink::ScrollerStyle, preferred_scroller_style)
   IPC_STRUCT_MEMBER(bool, redraw)
+  IPC_STRUCT_MEMBER(bool, scroll_animation_enabled)
+  IPC_STRUCT_MEMBER(blink::ScrollbarButtonsPlacement, button_placement)
 IPC_STRUCT_END()
 #endif
 
@@ -1357,12 +1366,6 @@ IPC_MESSAGE_ROUTED1(ViewHostMsg_TakeFocus,
 // Required for opening a date/time dialog
 IPC_MESSAGE_ROUTED1(ViewHostMsg_OpenDateTimeDialog,
                     ViewHostMsg_DateTimeDialogValue_Params /* value */)
-
-IPC_MESSAGE_ROUTED4(ViewHostMsg_TextInputTypeChanged,
-                    ui::TextInputType /* TextInputType of the focused node */,
-                    ui::TextInputMode /* TextInputMode of the focused node */,
-                    bool /* can_compose_inline in the focused node */,
-                    int /* flags in the focused node */)
 
 // Required for updating text input state.
 IPC_MESSAGE_ROUTED1(ViewHostMsg_TextInputStateChanged,

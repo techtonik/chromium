@@ -2,23 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "base/prefs/pref_service.h"
+#include "base/strings/string_util.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_provider_client.h"
-#include "chrome/browser/ui/omnibox/omnibox_client.h"
-#include "chrome/browser/ui/omnibox/omnibox_controller.h"
-#include "chrome/test/base/chrome_render_view_host_test_harness.h"
+#include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/test/base/testing_profile.h"
 #include "components/omnibox/browser/autocomplete_controller.h"
 #include "components/omnibox/browser/autocomplete_provider.h"
+#include "components/omnibox/browser/omnibox_client.h"
+#include "components/omnibox/browser/omnibox_controller.h"
 #include "components/sessions/session_id.h"
-#include "content/public/browser/web_contents.h"
+#include "content/public/test/test_browser_thread_bundle.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace {
 class TestOmniboxClient : public OmniboxClient {
  public:
-  TestOmniboxClient(content::WebContents* web_contents, Profile* profile)
-      : web_contents_(web_contents), profile_(profile) {}
+  explicit TestOmniboxClient(Profile* profile)
+      : profile_(profile),
+        scheme_classifier_(profile) {}
   ~TestOmniboxClient() override {}
 
   // OmniboxClient:
@@ -26,19 +27,41 @@ class TestOmniboxClient : public OmniboxClient {
       override {
     return make_scoped_ptr(new ChromeAutocompleteProviderClient(profile_));
   }
+  scoped_ptr<OmniboxNavigationObserver> CreateOmniboxNavigationObserver(
+      const base::string16& text,
+      const AutocompleteMatch& match,
+      const AutocompleteMatch& alternate_nav_match) override {
+    return nullptr;
+  }
   bool CurrentPageExists() const override { return true; }
-  const GURL& GetURL() const override { return web_contents_->GetURL(); }
+  const GURL& GetURL() const override { return GURL::EmptyGURL(); }
+  const base::string16& GetTitle() const override {
+    return base::EmptyString16();
+  }
+  gfx::Image GetFavicon() const override { return gfx::Image(); }
   bool IsInstantNTP() const override { return false; }
   bool IsSearchResultsPage() const override { return false; }
   bool IsLoading() const override { return false; }
   bool IsPasteAndGoEnabled() const override { return false; }
-  content::NavigationController& GetNavigationController() const override {
-    return web_contents_->GetController();
-  }
+  bool IsNewTabPage(const std::string& url) const override { return false; }
+  bool IsHomePage(const std::string& url) const override { return false; }
   const SessionID& GetSessionID() const override { return session_id_; }
+  bookmarks::BookmarkModel* GetBookmarkModel() override { return nullptr; }
+  TemplateURLService* GetTemplateURLService() override { return nullptr; }
+  const AutocompleteSchemeClassifier& GetSchemeClassifier() const override {
+    return scheme_classifier_;
+  }
+  AutocompleteClassifier* GetAutocompleteClassifier() override {
+    return nullptr;
+  }
+  gfx::Image GetIconIfExtensionMatch(
+      const AutocompleteMatch& match) const override {
+    return gfx::Image();
+  }
   bool ProcessExtensionKeyword(TemplateURL* template_url,
                                const AutocompleteMatch& match,
-                               WindowOpenDisposition disposition) override {
+                               WindowOpenDisposition disposition,
+                               OmniboxNavigationObserver* observer) override {
     return false;
   }
   void OnInputStateChanged() override {}
@@ -49,13 +72,21 @@ class TestOmniboxClient : public OmniboxClient {
                        const base::Callback<void(const SkBitmap& bitmap)>&
                            on_bitmap_fetched) override {}
   void OnCurrentMatchChanged(const AutocompleteMatch& match) override {}
+  void OnTextChanged(const AutocompleteMatch& current_match,
+                     bool user_input_in_progress,
+                     base::string16& user_text,
+                     const AutocompleteResult& result,
+                     bool is_popup_open,
+                     bool has_focus) override {}
+  void OnInputAccepted(const AutocompleteMatch& match) override {}
+  void OnRevert() override {}
   void OnURLOpenedFromOmnibox(OmniboxLog* log) override {}
-  void DoPrerender(const AutocompleteMatch& match) override {}
-  void DoPreconnect(const AutocompleteMatch& match) override {}
+  void OnBookmarkLaunched() override {}
+  void DiscardNonCommittedNavigations() override {}
 
  private:
-  content::WebContents* web_contents_;
   Profile* profile_;
+  ChromeAutocompleteSchemeClassifier scheme_classifier_;
   SessionID session_id_;
 
   DISALLOW_COPY_AND_ASSIGN(TestOmniboxClient);
@@ -63,7 +94,7 @@ class TestOmniboxClient : public OmniboxClient {
 
 }  // namespace
 
-class OmniboxControllerTest : public ChromeRenderViewHostTestHarness {
+class OmniboxControllerTest : public testing::Test {
  protected:
   OmniboxControllerTest();
   ~OmniboxControllerTest() override;
@@ -71,16 +102,17 @@ class OmniboxControllerTest : public ChromeRenderViewHostTestHarness {
   void CreateController();
   void AssertProviders(int expected_providers);
 
-  PrefService* GetPrefs() { return profile()->GetPrefs(); }
   const AutocompleteController::Providers& GetAutocompleteProviders() const {
     return omnibox_controller_->autocomplete_controller()->providers();
   }
 
  private:
-  // ChromeRenderViewTestHarness:
+  // testing::Test:
   void SetUp() override;
   void TearDown() override;
 
+  content::TestBrowserThreadBundle thread_bundle_;
+  TestingProfile profile_;
   scoped_ptr<TestOmniboxClient> omnibox_client_;
   scoped_ptr<OmniboxController> omnibox_controller_;
 
@@ -118,16 +150,12 @@ void OmniboxControllerTest::AssertProviders(int expected_providers) {
 }
 
 void OmniboxControllerTest::SetUp() {
-  ChromeRenderViewHostTestHarness::SetUp();
-
-  omnibox_client_.reset(new TestOmniboxClient(web_contents(), profile()));
+  omnibox_client_.reset(new TestOmniboxClient(&profile_));
 }
 
 void OmniboxControllerTest::TearDown() {
   omnibox_controller_.reset();
   omnibox_client_.reset();
-
-  ChromeRenderViewHostTestHarness::TearDown();
 }
 
 TEST_F(OmniboxControllerTest, CheckDefaultAutocompleteProviders) {

@@ -211,8 +211,8 @@ class CONTENT_EXPORT WebContentsImpl
 
   // Request a one-time snapshot of the accessibility tree without changing
   // the accessibility mode.
-  typedef base::Callback<void(const ui::AXTreeUpdate&)>
-      AXTreeSnapshotCallback;
+  using AXTreeSnapshotCallback =
+      base::Callback<void(const ui::AXTreeUpdate<ui::AXNodeData>&)>;
   void RequestAXTreeSnapshot(AXTreeSnapshotCallback callback);
 
   // WebContents ------------------------------------------------------
@@ -508,6 +508,10 @@ class CONTENT_EXPORT WebContentsImpl
 
   // NavigatorDelegate ---------------------------------------------------------
 
+  void DidStartNavigation(NavigationHandle* navigation_handle) override;
+  void DidRedirectNavigation(NavigationHandle* navigation_handle) override;
+  void DidCommitNavigation(NavigationHandle* navigation_handle) override;
+  void DidFinishNavigation(NavigationHandle* navigation_handle) override;
   void DidStartProvisionalLoad(RenderFrameHostImpl* render_frame_host,
                                const GURL& validated_url,
                                bool is_error_page,

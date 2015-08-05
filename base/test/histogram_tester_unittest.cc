@@ -10,15 +10,19 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
-namespace base {
-
 using ::testing::ElementsAre;
 
-const std::string kHistogram1 = "Test1";
-const std::string kHistogram2 = "Test2";
-const std::string kHistogram3 = "Test3";
-const std::string kHistogram4 = "Test4";
-const std::string kHistogram5 = "Test5";
+namespace {
+
+const char kHistogram1[] = "Test1";
+const char kHistogram2[] = "Test2";
+const char kHistogram3[] = "Test3";
+const char kHistogram4[] = "Test4";
+const char kHistogram5[] = "Test5";
+
+}  // namespace
+
+namespace base {
 
 typedef testing::Test HistogramTesterTest;
 
@@ -29,17 +33,30 @@ TEST_F(HistogramTesterTest, Scope) {
   HistogramTester tester;
 
   // Verify that no histogram is recorded.
-  scoped_ptr<HistogramSamples> samples(
-      tester.GetHistogramSamplesSinceCreation(kHistogram1));
-  EXPECT_FALSE(samples);
+  tester.ExpectTotalCount(kHistogram1, 0);
 
   // Record a histogram after the creation of the recorder.
   UMA_HISTOGRAM_BOOLEAN(kHistogram1, true);
 
   // Verify that one histogram is recorded.
-  samples = tester.GetHistogramSamplesSinceCreation(kHistogram1);
+  scoped_ptr<HistogramSamples> samples(
+      tester.GetHistogramSamplesSinceCreation(kHistogram1));
   EXPECT_TRUE(samples);
   EXPECT_EQ(1, samples->TotalCount());
+}
+
+TEST_F(HistogramTesterTest, GetHistogramSamplesSinceCreationNotNull) {
+  // Chose the histogram name uniquely, to ensure nothing was recorded for it so
+  // far.
+  static const char kHistogram[] =
+      "GetHistogramSamplesSinceCreationNotNullHistogram";
+  HistogramTester tester;
+
+  // Verify that the returned samples are empty but not null.
+  scoped_ptr<HistogramSamples> samples(
+      tester.GetHistogramSamplesSinceCreation(kHistogram1));
+  EXPECT_TRUE(samples);
+  tester.ExpectTotalCount(kHistogram, 0);
 }
 
 TEST_F(HistogramTesterTest, TestUniqueSample) {

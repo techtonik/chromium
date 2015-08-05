@@ -478,13 +478,25 @@ bool DataReductionProxyConfig::ShouldUseLoFiHeaderForRequests() const {
 }
 
 void DataReductionProxyConfig::PopulateAutoLoFiParams() {
+  std::string field_trial = params::GetLoFiFieldTrialName();
+
+  if (params::IsLoFiSlowConnectionsOnlyViaFlags()) {
+    // Default parameters to use.
+    auto_lofi_minimum_rtt_ = base::TimeDelta::FromMilliseconds(2000);
+    auto_lofi_maximum_kbps_ = 0;
+    auto_lofi_hysteresis_ = base::TimeDelta::FromSeconds(60);
+    field_trial = params::GetLoFiFlagFieldTrialName();
+  }
+
   if (!IsIncludedInLoFiControlFieldTrial() &&
-      !IsIncludedInLoFiEnabledFieldTrial())
+      !IsIncludedInLoFiEnabledFieldTrial() &&
+      !params::IsLoFiSlowConnectionsOnlyViaFlags()) {
     return;
+  }
 
   uint64_t auto_lofi_minimum_rtt_msec;
-  std::string variation_value = variations::GetVariationParamValue(
-      params::GetLoFiFieldTrialName(), "rtt_msec");
+  std::string variation_value =
+      variations::GetVariationParamValue(field_trial, "rtt_msec");
   if (!variation_value.empty() &&
       base::StringToUint64(variation_value, &auto_lofi_minimum_rtt_msec)) {
     auto_lofi_minimum_rtt_ =
@@ -493,8 +505,7 @@ void DataReductionProxyConfig::PopulateAutoLoFiParams() {
   DCHECK_GE(auto_lofi_minimum_rtt_, base::TimeDelta());
 
   int32_t auto_lofi_maximum_kbps;
-  variation_value = variations::GetVariationParamValue(
-      params::GetLoFiFieldTrialName(), "kbps");
+  variation_value = variations::GetVariationParamValue(field_trial, "kbps");
   if (!variation_value.empty() &&
       base::StringToInt(variation_value, &auto_lofi_maximum_kbps)) {
     auto_lofi_maximum_kbps_ = auto_lofi_maximum_kbps;
@@ -503,7 +514,7 @@ void DataReductionProxyConfig::PopulateAutoLoFiParams() {
 
   uint32_t auto_lofi_hysteresis_period_seconds;
   variation_value = variations::GetVariationParamValue(
-      params::GetLoFiFieldTrialName(), "hysteresis_period_seconds");
+      field_trial, "hysteresis_period_seconds");
   if (!variation_value.empty() &&
       base::StringToUint(variation_value,
                          &auto_lofi_hysteresis_period_seconds)) {
@@ -787,20 +798,14 @@ void DataReductionProxyConfig::UpdateLoFiStatusOnMainFrameRequest(
     return;
   }
 
-  if (IsIncludedInLoFiControlFieldTrial()) {
-    lofi_status_ = IsNetworkQualityProhibitivelySlow(network_quality_estimator)
-                       ? LOFI_STATUS_ACTIVE_CONTROL
-                       : LOFI_STATUS_INACTIVE_CONTROL;
-    return;
-  }
-
   // Store the previous state of Lo-Fi, so that change in Lo-Fi status can be
   // recorded properly. This is not needed for the control group, because it
   // is only used to report changes in request headers, and the request headers
   // are never modified in the control group.
   LoFiStatus previous_lofi_status = lofi_status_;
 
-  if (IsIncludedInLoFiEnabledFieldTrial()) {
+  if (params::IsLoFiSlowConnectionsOnlyViaFlags() ||
+      IsIncludedInLoFiEnabledFieldTrial()) {
     lofi_status_ = IsNetworkQualityProhibitivelySlow(network_quality_estimator)
                        ? LOFI_STATUS_ACTIVE
                        : LOFI_STATUS_INACTIVE;
@@ -809,6 +814,14 @@ void DataReductionProxyConfig::UpdateLoFiStatusOnMainFrameRequest(
         ShouldUseLoFiHeaderForRequests(lofi_status_));
     return;
   }
+
+  if (IsIncludedInLoFiControlFieldTrial()) {
+    lofi_status_ = IsNetworkQualityProhibitivelySlow(network_quality_estimator)
+                       ? LOFI_STATUS_ACTIVE_CONTROL
+                       : LOFI_STATUS_INACTIVE_CONTROL;
+    return;
+  }
+
   // If Lo-Fi is not enabled through command line and the user is not in
   // Lo-Fi field trials, we set Lo-Fi to permanent off.
   lofi_status_ = LOFI_STATUS_OFF;

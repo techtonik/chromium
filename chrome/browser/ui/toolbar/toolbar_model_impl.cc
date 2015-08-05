@@ -134,7 +134,8 @@ int ToolbarModelImpl::GetIconForSecurityLevel(
     case connection_security::SECURE:
       return IDR_OMNIBOX_HTTPS_VALID;
     case connection_security::SECURITY_WARNING:
-      return IDR_OMNIBOX_HTTPS_WARNING;
+      // Surface Dubious as Neutral.
+      return IDR_LOCATION_BAR_HTTP;
     case connection_security::SECURITY_POLICY_WARNING:
       return IDR_OMNIBOX_HTTPS_POLICY_WARNING;
     case connection_security::SECURITY_ERROR:
@@ -190,7 +191,7 @@ bool ToolbarModelImpl::ShouldDisplayURL() const {
     }
   }
 
-  return !chrome::IsInstantNTP(delegate_->GetActiveWebContents());
+  return !search::IsInstantNTP(delegate_->GetActiveWebContents());
 }
 
 NavigationController* ToolbarModelImpl::GetNavigationController() const {
@@ -213,7 +214,7 @@ base::string16 ToolbarModelImpl::GetSearchTerms(bool ignore_editing) const {
     return base::string16();
 
   const WebContents* web_contents = delegate_->GetActiveWebContents();
-  base::string16 search_terms(chrome::GetSearchTerms(web_contents));
+  base::string16 search_terms(search::GetSearchTerms(web_contents));
   if (search_terms.empty()) {
     // We mainly do this to enforce the subsequent DCHECK.
     return base::string16();

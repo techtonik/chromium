@@ -74,7 +74,6 @@ Layer::Layer(const LayerSettings& settings)
       double_sided_(true),
       should_flatten_transform_(true),
       use_parent_backface_visibility_(false),
-      draw_checkerboard_for_missing_tiles_(false),
       force_render_surface_(false),
       transform_is_invertible_(true),
       has_render_surface_(false),
@@ -762,6 +761,14 @@ bool Layer::HasPotentiallyRunningTransformAnimation() const {
   return layer_tree_host_->HasPotentiallyRunningTransformAnimation(this);
 }
 
+bool Layer::HasAnyAnimationTargetingProperty(
+    Animation::TargetProperty property) const {
+  if (layer_animation_controller_)
+    return !!layer_animation_controller_->GetAnimation(property);
+
+  return layer_tree_host_->HasAnyAnimationTargetingProperty(this, property);
+}
+
 bool Layer::ScrollOffsetAnimationWasInterrupted() const {
   DCHECK(layer_tree_host_);
   return layer_animation_controller_
@@ -995,14 +1002,6 @@ void Layer::SetScrollBlocksOn(ScrollBlocksOn scroll_blocks_on) {
   SetNeedsCommit();
 }
 
-void Layer::SetDrawCheckerboardForMissingTiles(bool checkerboard) {
-  DCHECK(IsPropertyChangeAllowed());
-  if (draw_checkerboard_for_missing_tiles_ == checkerboard)
-    return;
-  draw_checkerboard_for_missing_tiles_ = checkerboard;
-  SetNeedsCommit();
-}
-
 void Layer::SetForceRenderSurface(bool force) {
   DCHECK(IsPropertyChangeAllowed());
   if (force_render_surface_ == force)
@@ -1188,8 +1187,6 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
   layer->SetClipTreeIndex(clip_tree_index());
   layer->set_offset_to_transform_parent(offset_to_transform_parent_);
   layer->SetDoubleSided(double_sided_);
-  layer->SetDrawCheckerboardForMissingTiles(
-      draw_checkerboard_for_missing_tiles_);
   layer->SetDrawsContent(DrawsContent());
   layer->SetHideLayerAndSubtree(hide_layer_and_subtree_);
   layer->SetHasRenderSurface(has_render_surface_);
@@ -1491,6 +1488,21 @@ void Layer::OnScrollOffsetAnimated(const gfx::ScrollOffset& scroll_offset) {
 void Layer::OnAnimationWaitingForDeletion() {
   // Animations are only deleted during PushProperties.
   SetNeedsPushProperties();
+}
+
+void Layer::OnTransformIsPotentiallyAnimatingChanged(bool is_animating) {
+  if (!layer_tree_host_)
+    return;
+  TransformTree& transform_tree =
+      layer_tree_host_->property_trees()->transform_tree;
+  TransformNode* node = transform_tree.Node(transform_tree_index());
+  if (!node)
+    return;
+
+  if (node->owner_id == id()) {
+    node->data.is_animated = is_animating;
+    transform_tree.set_needs_update(true);
+  }
 }
 
 bool Layer::IsActive() const {

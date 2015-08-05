@@ -62,6 +62,7 @@ class TestViewManagerClient : public mojo::ViewManagerClient {
   void OnEmbeddedAppDisconnected(uint32_t view) override {
     tracker_.OnEmbeddedAppDisconnected(view);
   }
+  void OnUnembed() override { tracker_.OnUnembed(); }
   void OnViewBoundsChanged(uint32_t view,
                            mojo::RectPtr old_bounds,
                            mojo::RectPtr new_bounds) override {
@@ -219,6 +220,8 @@ class TestDisplayManager : public DisplayManager {
   const mojo::ViewportMetrics& GetViewportMetrics() override {
     return display_metrices_;
   }
+  void UpdateTextInputState(const ui::TextInputState& state) override {}
+  void SetImeVisibility(bool visible) override {}
 
  private:
   mojo::ViewportMetrics display_metrices_;

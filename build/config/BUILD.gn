@@ -12,10 +12,16 @@ import("//build/module_args/v8.gni")
 import("//build/toolchain/goma.gni")
 
 declare_args() {
-  # When set, turns off the (normally-on) iterator debugging and related stuff
-  # that is normally turned on for Debug builds. These are generally useful for
-  # catching bugs but in some cases may cause conflicts or excessive slowness.
-  disable_iterator_debugging = false
+  # When set (the default) enables C++ iterator debugging in debug builds.
+  # Iterator debugging is always off in release builds (technically, this flag
+  # affects the "debug" config, which is always available but applied by
+  # default only in debug builds).
+  #
+  # Iterator debugging is generally useful for catching bugs. But it can
+  # introduce extra locking to check the state of an iterator against the state
+  # of the current object. For iterator- and thread-heavy code, this can
+  # significantly slow execution.
+  enable_iterator_debugging = true
 
   # Set to true to not store any build metadata, e.g. ifdef out all __DATE__
   # and __TIME__. Set to 0 to reenable the use of these macros in the code
@@ -44,11 +50,10 @@ declare_args() {
 # For now we define these globally to match the current GYP build.
 config("feature_flags") {
   # TODO(brettw) this probably needs to be parameterized.
-  defines = [ "V8_DEPRECATION_WARNINGS" ]  # Don't use deprecated V8 APIs anywhere.
-
-  if (cld_version > 0) {
-    defines += [ "CLD_VERSION=$cld_version" ]
-  }
+  defines = [
+    "V8_DEPRECATION_WARNINGS",  # Don't use deprecated V8 APIs anywhere.
+    "CLD_VERSION=$cld_version",
+  ]
   if (enable_mdns) {
     defines += [ "ENABLE_MDNS=1" ]
   }
@@ -82,8 +87,8 @@ config("feature_flags") {
   if (enable_spellcheck) {
     defines += [ "ENABLE_SPELLCHECK=1" ]
   }
-  if (use_platform_spellchecker) {
-    defines += [ "USE_PLATFORM_SPELLCHECKER=1" ]
+  if (use_browser_spellchecker) {
+    defines += [ "USE_BROWSER_SPELLCHECKER=1" ]
   }
   if (dont_embed_build_metadata) {
     defines += [ "DONT_EMBED_BUILD_METADATA" ]
@@ -217,9 +222,6 @@ config("feature_flags") {
   if (enable_image_loader_extension) {
     defines += [ "IMAGE_LOADER_EXTENSION=1" ]
   }
-  if (enable_remoting) {
-    defines += [ "ENABLE_REMOTING=1" ]
-  }
   if (enable_google_now) {
     defines += [ "ENABLE_GOOGLE_NOW=1" ]
   }
@@ -284,6 +286,9 @@ config("feature_flags") {
       "MEMORY_SANITIZER_INITIAL_SIZE",
     ]
   }
+  if (!fieldtrial_testing_like_official_build && !is_chrome_branded) {
+    defines += [ "FIELDTRIAL_TESTING_ENABLED" ]
+  }
 }
 
 # Debug/release ----------------------------------------------------------------
@@ -300,13 +305,12 @@ config("debug") {
   }
 
   if (is_win) {
-    if (disable_iterator_debugging) {
-      # Iterator debugging is enabled by the compiler on debug builds, and we
-      # have to tell it to turn it off.
+    if (!enable_iterator_debugging) {
+      # Iterator debugging is enabled by default by the compiler on debug
+      # builds, and we have to tell it to turn it off.
       defines += [ "_HAS_ITERATOR_DEBUGGING=0" ]
     }
-  } else if (is_linux && !is_android && current_cpu == "x64" &&
-             !disable_iterator_debugging) {
+  } else if (is_linux && current_cpu == "x64" && enable_iterator_debugging) {
     # Enable libstdc++ debugging facilities to help catch problems early, see
     # http://crbug.com/65151 .
     # TODO(phajdan.jr): Should we enable this for all of POSIX?

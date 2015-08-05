@@ -19,9 +19,9 @@
 #include "base/values.h"
 #include "cc/base/switches.h"
 #include "chrome/browser/flags_storage.h"
+#include "chrome/common/channel_info.h"
 #include "chrome/common/chrome_content_client.h"
 #include "chrome/common/chrome_switches.h"
-#include "chrome/common/chrome_version_info.h"
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/google_chrome_strings.h"
@@ -31,10 +31,12 @@
 #include "components/enhanced_bookmarks/enhanced_bookmark_switches.h"
 #include "components/metrics/metrics_hashes.h"
 #include "components/nacl/common/nacl_switches.h"
+#include "components/offline_pages/offline_page_switches.h"
 #include "components/omnibox/browser/omnibox_switches.h"
 #include "components/plugins/common/plugins_switches.h"
 #include "components/proximity_auth/switches.h"
 #include "components/search/search_switches.h"
+#include "components/version_info/version_info.h"
 #include "content/public/browser/user_metrics.h"
 #include "media/base/media_switches.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -232,7 +234,11 @@ const Experiment::Choice kDataReductionProxyLoFiChoices[] = {
             kDataReductionProxyLoFiValueCellularOnly},
     { IDS_FLAGS_DATA_REDUCTION_PROXY_LO_FI_DISABLED,
         data_reduction_proxy::switches::kDataReductionProxyLoFi,
-        data_reduction_proxy::switches::kDataReductionProxyLoFiValueDisabled}
+        data_reduction_proxy::switches::kDataReductionProxyLoFiValueDisabled},
+    { IDS_FLAGS_DATA_REDUCTION_PROXY_LO_FI_SLOW_CONNECTIONS_ONLY,
+        data_reduction_proxy::switches::kDataReductionProxyLoFi,
+        data_reduction_proxy::switches::
+            kDataReductionProxyLoFiValueSlowConnectionsOnly}
 };
 
 const Experiment::Choice kShowSavedCopyChoices[] = {
@@ -541,6 +547,18 @@ const Experiment::Choice kV8CacheOptionsChoices[] = {
   { IDS_FLAGS_V8_CACHE_OPTIONS_PARSE, switches::kV8CacheOptions, "parse" },
   { IDS_FLAGS_V8_CACHE_OPTIONS_CODE, switches::kV8CacheOptions, "code" },
 };
+
+#if defined(OS_ANDROID)
+const Experiment::Choice kProgressBarAnimationChoices[] = {
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
+      switches::kProgressBarAnimation, "disabled" },
+  { IDS_FLAGS_PROGRESS_BAR_ANIMATION_SMOOTH,
+      switches::kProgressBarAnimation, "smooth" },
+  { IDS_FLAGS_PROGRESS_BAR_ANIMATION_FAST_START,
+      switches::kProgressBarAnimation, "fast-start" },
+};
+#endif  // defined(OS_ANDROID)
 
 // RECORDING USER METRICS FOR FLAGS:
 // -----------------------------------------------------------------------------
@@ -2068,6 +2086,29 @@ const Experiment kExperiments[] = {
      SINGLE_VALUE_TYPE(switches::kEnableNewTaskManager)
     },
 #endif  // defined(ENABLE_TASK_MANAGER)
+    {"simplified-fullscreen-ui",
+     IDS_FLAGS_SIMPLIFIED_FULLSCREEN_UI_NAME,
+     IDS_FLAGS_SIMPLIFIED_FULLSCREEN_UI_DESCRIPTION,
+     kOsDesktop,
+     ENABLE_DISABLE_VALUE_TYPE(switches::kEnableSimplifiedFullscreenUI,
+                               switches::kDisableSimplifiedFullscreenUI)
+    },
+#if defined(OS_ANDROID)
+    {"progress-bar-animation",
+     IDS_FLAGS_PROGRESS_BAR_ANIMATION_NAME,
+     IDS_FLAGS_PROGRESS_BAR_ANIMATION_DESCRIPTION,
+     kOsAndroid,
+     MULTI_VALUE_TYPE(kProgressBarAnimationChoices)},
+#endif  // defined(OS_ANDROID)
+#if defined(OS_ANDROID)
+    {"offline-pages",
+     IDS_FLAGS_OFFLINE_PAGES_NAME,
+     IDS_FLAGS_OFFLINE_PAGES_DESCRIPTION,
+     kOsAndroid,
+     ENABLE_DISABLE_VALUE_TYPE(switches::kEnableOfflinePages,
+                               switches::kDisableOfflinePages)},
+#endif  // defined(OS_ANDROID)
+
     // NOTE: Adding new command-line switches requires adding corresponding
     // entries to enum "LoginCustomFlags" in histograms.xml. See note in
     // histograms.xml and don't forget to run AboutFlagsHistogramTest unit test.
@@ -2174,7 +2215,7 @@ void GetSanitizedEnabledFlags(
 }
 
 bool SkipConditionalExperiment(const Experiment& experiment) {
-  version_info::Channel channel = chrome::VersionInfo::GetChannel();
+  version_info::Channel channel = chrome::GetChannel();
 
 #if defined(OS_ANDROID)
   // enable-data-reduction-proxy-dev is only available for the Dev/Beta channel.

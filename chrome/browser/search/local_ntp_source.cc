@@ -57,8 +57,6 @@ const struct Resource{
   { "images/close_3_mask.png", IDR_CLOSE_3_MASK, "image/png" },
   { "images/close_4_button.png", IDR_CLOSE_4_BUTTON, "image/png" },
   { "images/google_logo.png", IDR_LOCAL_NTP_IMAGES_LOGO_PNG, "image/png" },
-  { "images/white_google_logo.png",
-    IDR_LOCAL_NTP_IMAGES_WHITE_LOGO_PNG, "image/png" },
   { "images/ntp_default_favicon.png", IDR_NTP_DEFAULT_FAVICON, "image/png" },
 };
 
@@ -141,7 +139,7 @@ scoped_ptr<base::DictionaryValue> GetTranslatedStrings(bool is_google) {
 std::string GetConfigData(Profile* profile) {
   base::DictionaryValue config_data;
   bool is_google = DefaultSearchProviderIsGoogle(profile) &&
-      chrome::ShouldShowGoogleLocalNTP();
+                   search::ShouldShowGoogleLocalNTP();
   config_data.Set("translatedStrings",
                   GetTranslatedStrings(is_google).release());
   config_data.SetBoolean("isGooglePage", is_google);

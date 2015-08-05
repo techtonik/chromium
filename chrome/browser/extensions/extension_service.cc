@@ -116,8 +116,6 @@ using extensions::ManagementPolicy;
 using extensions::Manifest;
 using extensions::PermissionID;
 using extensions::PermissionIDSet;
-using extensions::PermissionMessage;
-using extensions::PermissionMessageIDs;
 using extensions::PermissionSet;
 using extensions::SharedModuleInfo;
 using extensions::SharedModuleService;
@@ -1677,9 +1675,10 @@ void ExtensionService::CheckPermissionsIncrease(const Extension* extension,
 
 #if defined(ENABLE_SUPERVISED_USERS)
     // If a custodian-installed extension is disabled for a supervised user due
-    // to a permissions increase, send a request to the custodian, since the
+    // to a permissions increase, send a request to the custodian if the
     // supervised user themselves can't re-enable the extension.
-    if (extensions::util::IsExtensionSupervised(extension, profile_)) {
+    if (extensions::util::IsExtensionSupervised(extension, profile_) &&
+        extensions::util::NeedCustodianApprovalForPermissionIncrease()) {
       SupervisedUserService* supervised_user_service =
           SupervisedUserServiceFactory::GetForProfile(profile_);
       supervised_user_service->AddExtensionUpdateRequest(

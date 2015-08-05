@@ -22,7 +22,6 @@ import android.os.Bundle;
 import android.os.Looper;
 import android.os.MessageQueue;
 import android.os.Process;
-import android.os.StrictMode;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AlertDialog;
@@ -35,6 +34,7 @@ import android.view.ViewStub;
 import android.view.ViewTreeObserver;
 import android.view.ViewTreeObserver.OnPreDrawListener;
 import android.view.Window;
+import android.view.WindowManager;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityManager.AccessibilityStateChangeListener;
 import android.view.accessibility.AccessibilityManager.TouchExplorationStateChangeListener;
@@ -43,6 +43,7 @@ import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.BaseSwitches;
 import org.chromium.base.CommandLine;
 import org.chromium.base.Log;
+import org.chromium.base.SysUtils;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.VisibleForTesting;
@@ -88,7 +89,6 @@ import org.chromium.chrome.browser.metrics.UmaSessionStats;
 import org.chromium.chrome.browser.net.spdyproxy.DataReductionProxySettings;
 import org.chromium.chrome.browser.nfc.BeamController;
 import org.chromium.chrome.browser.nfc.BeamProvider;
-import org.chromium.chrome.browser.omaha.OmahaClient;
 import org.chromium.chrome.browser.partnercustomizations.PartnerBrowserCustomizations;
 import org.chromium.chrome.browser.preferences.ChromePreferenceManager;
 import org.chromium.chrome.browser.preferences.PrefServiceBridge;
@@ -117,8 +117,6 @@ import org.chromium.chrome.browser.toolbar.ToolbarManager;
 import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.chrome.browser.webapps.AddToHomescreenDialog;
 import org.chromium.chrome.browser.widget.ControlContainer;
-import org.chromium.components.bookmarks.BookmarkId;
-import org.chromium.components.bookmarks.BookmarkType;
 import org.chromium.content.browser.ContentReadbackHandler;
 import org.chromium.content.browser.ContentReadbackHandler.GetBitmapCallback;
 import org.chromium.content.browser.ContentViewCore;
@@ -207,6 +205,7 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
     private ChromeAppMenuPropertiesDelegate mAppMenuPropertiesDelegate;
     private AppMenuHandler mAppMenuHandler;
     private ToolbarManager mToolbarManager;
+    private BookmarkModelObserver mBookmarkObserver;
 
     // Time in ms that it took took us to inflate the initial layout
     private long mInflateInitialLayoutDurationMs;
@@ -260,19 +259,9 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
             mAssistStatusHandler.updateAssistState();
         }
 
-        // Low end device UI should be allowed only after a fresh install or when the data has
-        // been cleared. This must happen before anyone calls SysUtils.isLowEndDevice() or
-        // SysUtils.isLowEndDevice() will always return the wrong value.
-        // Temporarily allowing disk access. TODO: Fix. See http://crbug.com/473352
-        StrictMode.ThreadPolicy oldPolicy = StrictMode.allowThreadDiskReads();
-        try {
-            if (OmahaClient.isFreshInstallOrDataHasBeenCleared(this)) {
-                ChromePreferenceManager.getInstance(this).setAllowLowEndDeviceUi();
-            }
-        } finally {
-            StrictMode.setThreadPolicy(oldPolicy);
-        }
-
+        // If a user had ALLOW_LOW_END_DEVICE_UI explicitly set to false then we manually override
+        // SysUtils.isLowEndDevice() with a switch so that they continue to see the normal UI. This
+        // is only the case for grandfathered-in svelte users. We no longer do so for newer users.
         if (!ChromePreferenceManager.getInstance(this).getAllowLowEndDeviceUi()) {
             CommandLine.getInstance().appendSwitch(
                     BaseSwitches.DISABLE_LOW_END_DEVICE_MODE);
@@ -351,6 +340,8 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
 
         mCompositorViewHolder = (CompositorViewHolder) findViewById(R.id.compositor_view_holder);
         mCompositorViewHolder.setRootView(getWindow().getDecorView().getRootView());
+
+        enableHardwareAcceleration();
     }
 
     /**
@@ -509,6 +500,18 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
             @Override
             public void onCrash(Tab tab, boolean sadTabShown) {
                 postDeferredStartupIfNeeded();
+            }
+
+            @Override
+            public void onDidChangeThemeColor(Tab tab, int color) {
+                if (getToolbarManager() == null) return;
+                if (getActivityTab() != tab) return;
+
+                getToolbarManager().updatePrimaryColor(color);
+
+                ControlContainer controlContainer =
+                        (ControlContainer) findViewById(R.id.control_container);
+                controlContainer.getToolbarResourceAdapter().invalidate(null);
             }
         };
 
@@ -901,7 +904,7 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
     /**
      * @return The resource id that contains how large the top controls are.
      */
-    protected int getControlContainerHeightResource() {
+    public int getControlContainerHeightResource() {
         return R.dimen.control_container_height;
     }
 
@@ -948,28 +951,22 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
 
         if (EnhancedBookmarkUtils.isEnhancedBookmarkEnabled(tabToBookmark.getProfile())) {
             final EnhancedBookmarksModel bookmarkModel = new EnhancedBookmarksModel();
-
-            BookmarkModelObserver modelObserver = new BookmarkModelObserver() {
-                @Override
-                public void bookmarkModelChanged() {}
-
-                @Override
-                public void bookmarkModelLoaded() {
-                    if (bookmarkId == ChromeBrowserProviderClient.INVALID_BOOKMARK_ID) {
-                        EnhancedBookmarkUtils.addBookmarkAndShowSnackbar(bookmarkModel,
-                                tabToBookmark, getSnackbarManager(), ChromeActivity.this);
-                    } else {
-                        EnhancedBookmarkUtils.startEditActivity(ChromeActivity.this,
-                                new BookmarkId(bookmarkId, BookmarkType.NORMAL));
-                    }
-                    bookmarkModel.removeObserver(this);
-                }
-            };
-
             if (bookmarkModel.isBookmarkModelLoaded()) {
-                modelObserver.bookmarkModelLoaded();
-            } else {
-                bookmarkModel.addObserver(modelObserver);
+                EnhancedBookmarkUtils.addOrEditBookmark(bookmarkId, bookmarkModel,
+                        tabToBookmark, getSnackbarManager(), ChromeActivity.this);
+            } else if (mBookmarkObserver == null) {
+                mBookmarkObserver = new BookmarkModelObserver() {
+                    @Override
+                    public void bookmarkModelChanged() {}
+
+                    @Override
+                    public void bookmarkModelLoaded() {
+                        EnhancedBookmarkUtils.addOrEditBookmark(bookmarkId, bookmarkModel,
+                                tabToBookmark, getSnackbarManager(), ChromeActivity.this);
+                        bookmarkModel.removeObserver(this);
+                    }
+                };
+                bookmarkModel.addObserver(mBookmarkObserver);
             }
         } else {
             Intent intent = new Intent(this, ManageBookmarkActivity.class);
@@ -1462,4 +1459,11 @@ public abstract class ChromeActivity extends AsyncInitializationActivity
 
     @Override
     public void onSceneChange(Layout layout) { }
+
+    private void enableHardwareAcceleration() {
+        // HW acceleration is disabled in the manifest. Enable it only on high-end devices.
+        if (!SysUtils.isLowEndDevice()) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED);
+        }
+    }
 }

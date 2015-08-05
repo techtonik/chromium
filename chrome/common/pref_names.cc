@@ -109,6 +109,9 @@ const char kSupervisedUserManualHosts[] = "profile.managed.manual_hosts";
 // Maps URLs to whether the URL is manually allowed or blocked.
 const char kSupervisedUserManualURLs[] = "profile.managed.manual_urls";
 
+// Stores whether the SafeSites filter is enabled.
+const char kSupervisedUserSafeSites[] = "profile.managed.safe_sites";
+
 // Stores the email address associated with the google account of the secondary
 // custodian of the supervised user, set when the supervised user is created.
 const char kSupervisedUserSecondCustodianEmail[] =
@@ -1271,6 +1274,10 @@ const char kVariationsCompressedSeed[] = "variations_compressed_seed";
 // 64-bit integer serialization of the base::Time from the last successful seed
 // fetch (i.e. when the Variations server responds with 200 or 304).
 const char kVariationsLastFetchTime[] = "variations_last_fetch_time";
+
+// The latest country code received by the VariationsService for evaluating
+// studies.
+const char kVariationsCountry[] = "variations_country";
 
 // Pair of <Chrome version string, country code string> representing the country
 // used for filtering permanent consistency studies until the next time Chrome

@@ -22,6 +22,8 @@
       ],
       'sources': [
         'offline_pages/offline_page_archiver.h',
+        'offline_pages/offline_page_feature.cc',
+        'offline_pages/offline_page_feature.h',
         'offline_pages/offline_page_item.cc',
         'offline_pages/offline_page_item.h',
         'offline_pages/offline_page_model.cc',
@@ -30,6 +32,8 @@
         'offline_pages/offline_page_metadata_store.h',
         'offline_pages/offline_page_metadata_store_impl.cc',
         'offline_pages/offline_page_metadata_store_impl.h',
+        'offline_pages/offline_page_switches.cc',
+        'offline_pages/offline_page_switches.h',
       ],
     },
     {

@@ -87,6 +87,7 @@ GL_APICALL void         GL_APIENTRY glGetActiveUniformsiv (GLidProgram program, 
 GL_APICALL void         GL_APIENTRY glGetAttachedShaders (GLidProgram program, GLsizeiNotNegative maxcount, GLsizeiOptional* count, GLuint* shaders);
 GL_APICALL GLint        GL_APIENTRY glGetAttribLocation (GLidProgram program, const char* name);
 GL_APICALL void         GL_APIENTRY glGetBooleanv (GLenumGLState pname, GLboolean* params);
+GL_APICALL void         GL_APIENTRY glGetBufferParameteri64v (GLenumBufferTarget target, GLenumBufferParameter64 pname, GLint64* params);
 GL_APICALL void         GL_APIENTRY glGetBufferParameteriv (GLenumBufferTarget target, GLenumBufferParameter pname, GLint* params);
 GL_APICALL GLenum       GL_APIENTRY glGetError (void);
 GL_APICALL void         GL_APIENTRY glGetFloatv (GLenumGLState pname, GLfloat* params);
@@ -140,7 +141,7 @@ GL_APICALL void         GL_APIENTRY glLinkProgram (GLidProgram program);
 GL_APICALL void         GL_APIENTRY glPauseTransformFeedback (void);
 GL_APICALL void         GL_APIENTRY glPixelStorei (GLenumPixelStore pname, GLintPixelStoreAlignment param);
 GL_APICALL void         GL_APIENTRY glPolygonOffset (GLfloat factor, GLfloat units);
-GL_APICALL void         GL_APIENTRY glReadBuffer (GLenum src);
+GL_APICALL void         GL_APIENTRY glReadBuffer (GLenumReadBuffer src);
 GL_APICALL void         GL_APIENTRY glReadPixels (GLint x, GLint y, GLsizei width, GLsizei height, GLenumReadPixelFormat format, GLenumReadPixelType type, void* pixels);
 GL_APICALL void         GL_APIENTRY glReleaseShaderCompiler (void);
 GL_APICALL void         GL_APIENTRY glRenderbufferStorage (GLenumRenderBufferTarget target, GLenumRenderBufferFormat internalformat, GLsizei width, GLsizei height);

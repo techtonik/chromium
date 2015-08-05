@@ -641,12 +641,10 @@ void FenceSync(uint32_t client_id) {
   }
 }
 
-void Finish(uint32_t sync_count_shm_id,
-            uint32_t sync_count_shm_offset,
-            GLuint finish_count) {
+void Finish() {
   gles2::cmds::Finish* c = GetCmdSpace<gles2::cmds::Finish>();
   if (c) {
-    c->Init(sync_count_shm_id, sync_count_shm_offset, finish_count);
+    c->Init();
   }
 }
 
@@ -851,6 +849,17 @@ void GetBooleanv(GLenum pname,
   gles2::cmds::GetBooleanv* c = GetCmdSpace<gles2::cmds::GetBooleanv>();
   if (c) {
     c->Init(pname, params_shm_id, params_shm_offset);
+  }
+}
+
+void GetBufferParameteri64v(GLenum target,
+                            GLenum pname,
+                            uint32_t params_shm_id,
+                            uint32_t params_shm_offset) {
+  gles2::cmds::GetBufferParameteri64v* c =
+      GetCmdSpace<gles2::cmds::GetBufferParameteri64v>();
+  if (c) {
+    c->Init(target, pname, params_shm_id, params_shm_offset);
   }
 }
 

@@ -309,6 +309,14 @@ class SmoothnessToughScrollingCases(perf_benchmark.PerfBenchmark):
   def Name(cls):
     return 'smoothness.tough_scrolling_cases'
 
+class SmoothnessToughImageDecodeCases(perf_benchmark.PerfBenchmark):
+  test = smoothness.Smoothness
+  page_set = page_sets.ToughImageDecodeCasesPageSet
+
+  @classmethod
+  def Name(cls):
+    return 'smoothness.tough_image_decode_cases'
+
 @benchmark.Disabled('android')  # http://crbug.com/513699
 class SmoothnessImageDecodingCases(perf_benchmark.PerfBenchmark):
   """Measures decoding statistics for jpeg images.
@@ -353,22 +361,6 @@ class SmoothnessPathologicalMobileSites(perf_benchmark.PerfBenchmark):
   @classmethod
   def Name(cls):
     return 'smoothness.pathological_mobile_sites'
-
-
-@benchmark.Enabled('android')
-class SmoothnessSyncScrollPathologicalMobileSites(perf_benchmark.PerfBenchmark):
-  """Measures task execution statistics while sync-scrolling pathological sites.
-  """
-  tag = 'sync_scroll'
-  page_set = page_sets.PathologicalMobileSitesPageSet
-  test = smoothness.Smoothness
-
-  def SetExtraBrowserOptions(self, options):
-    silk_flags.CustomizeBrowserOptionsForSyncScrolling(options)
-
-  @classmethod
-  def Name(cls):
-    return 'smoothness.sync_scroll.pathological_mobile_sites'
 
 
 class SmoothnessToughAnimatedImageCases(perf_benchmark.PerfBenchmark):

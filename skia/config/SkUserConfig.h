@@ -222,10 +222,6 @@ SK_API void SkDebugf_FileLine(const char* file, int line, bool fatal,
 #   define SK_IGNORE_GPU_DITHER
 #endif
 
-#ifndef    SK_SUPPORT_LEGACY_UNBALANCED_PIXELREF_LOCKCOUNT
-#   define SK_SUPPORT_LEGACY_UNBALANCED_PIXELREF_LOCKCOUNT
-#endif
-
 ///////////////////////// Imported from BUILD.gn and skia_common.gypi
 
 /* In some places Skia can use static initializers for global initialization,
@@ -242,7 +238,6 @@ SK_API void SkDebugf_FileLine(const char* file, int line, bool fatal,
  */
 #define SK_GDI_ALWAYS_USE_TEXTMETRICS_FOR_FONT_METRICS
 
-#define IGNORE_ROT_AA_RECT_OPT
 #define SK_IGNORE_BLURRED_RRECT_OPT
 #define SK_USE_DISCARDABLE_SCALEDIMAGECACHE
 #define SK_WILL_NEVER_DRAW_PERSPECTIVE_TEXT

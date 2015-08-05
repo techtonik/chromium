@@ -107,12 +107,10 @@ RendererGpuVideoAcceleratorFactories::CreateVideoDecodeAccelerator() {
   DCHECK(task_runner_->BelongsToCurrentThread());
 
   WebGraphicsContext3DCommandBufferImpl* context = GetContext3d();
-  if (context && context->GetCommandBufferProxy()) {
-    return gpu_channel_host_->CreateVideoDecoder(
-        context->GetCommandBufferProxy()->GetRouteID());
-  }
+  if (context && context->GetCommandBufferProxy())
+    return context->GetCommandBufferProxy()->CreateVideoDecoder();
 
-  return scoped_ptr<media::VideoDecodeAccelerator>();
+  return nullptr;
 }
 
 scoped_ptr<media::VideoEncodeAccelerator>
@@ -121,12 +119,10 @@ RendererGpuVideoAcceleratorFactories::CreateVideoEncodeAccelerator() {
   DCHECK(task_runner_->BelongsToCurrentThread());
 
   WebGraphicsContext3DCommandBufferImpl* context = GetContext3d();
-  if (context && context->GetCommandBufferProxy()) {
-    return gpu_channel_host_->CreateVideoEncoder(
-        context->GetCommandBufferProxy()->GetRouteID());
-  }
+  if (context && context->GetCommandBufferProxy())
+    return context->GetCommandBufferProxy()->CreateVideoEncoder();
 
-  return scoped_ptr<media::VideoEncodeAccelerator>();
+  return nullptr;
 }
 
 bool RendererGpuVideoAcceleratorFactories::CreateTextures(
@@ -209,8 +205,8 @@ void RendererGpuVideoAcceleratorFactories::WaitSyncPoint(uint32 sync_point) {
 scoped_ptr<gfx::GpuMemoryBuffer>
 RendererGpuVideoAcceleratorFactories::AllocateGpuMemoryBuffer(
     const gfx::Size& size,
-    gfx::GpuMemoryBuffer::Format format,
-    gfx::GpuMemoryBuffer::Usage usage) {
+    gfx::BufferFormat format,
+    gfx::BufferUsage usage) {
   DCHECK(task_runner_->BelongsToCurrentThread());
   scoped_ptr<gfx::GpuMemoryBuffer> buffer =
       gpu_memory_buffer_manager_->AllocateGpuMemoryBuffer(size, format, usage);

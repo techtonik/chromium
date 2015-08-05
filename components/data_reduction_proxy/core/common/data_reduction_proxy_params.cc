@@ -42,6 +42,7 @@ const char kAndroidOneIdentifier[] = "sprout";
 const char kQuicFieldTrial[] = "DataReductionProxyUseQuic";
 
 const char kLoFiFieldTrial[] = "DataCompressionProxyLoFi";
+const char kLoFiFlagFieldTrial[] = "DataCompressionProxyLoFiFlag";
 
 const char kConfigServiceFieldTrial[] = "DataReductionProxyConfigService";
 const char kConfigServiceURLParam[] = "url";
@@ -74,6 +75,10 @@ std::string GetLoFiFieldTrialName() {
   return kLoFiFieldTrial;
 }
 
+std::string GetLoFiFlagFieldTrialName() {
+  return kLoFiFlagFieldTrial;
+}
+
 bool IsLoFiAlwaysOnViaFlags() {
   const std::string& lo_fi_value =
       base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
@@ -88,6 +93,14 @@ bool IsLoFiCellularOnlyViaFlags() {
           data_reduction_proxy::switches::kDataReductionProxyLoFi);
   return lo_fi_value == data_reduction_proxy::switches::
                             kDataReductionProxyLoFiValueCellularOnly;
+}
+
+bool IsLoFiSlowConnectionsOnlyViaFlags() {
+  const std::string& lo_fi_value =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          data_reduction_proxy::switches::kDataReductionProxyLoFi);
+  return lo_fi_value == data_reduction_proxy::switches::
+                            kDataReductionProxyLoFiValueSlowConnectionsOnly;
 }
 
 bool IsLoFiDisabledViaFlags() {

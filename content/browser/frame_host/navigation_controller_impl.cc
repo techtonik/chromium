@@ -813,10 +813,14 @@ bool NavigationControllerImpl::RendererDidNavigate(
     details->previous_entry_index = -1;
   }
 
-  // If we have a pending entry at this point, it should have a SiteInstance.
-  // Restored entries start out with a null SiteInstance, but we should have
-  // assigned one in NavigateToPendingEntry.
-  DCHECK(pending_entry_index_ == -1 || pending_entry_->site_instance());
+  // If there is a pending entry at this point, it should have a SiteInstance,
+  // except for restored entries.
+  DCHECK(pending_entry_index_ == -1 ||
+         pending_entry_->site_instance() ||
+         pending_entry_->restore_type() != NavigationEntryImpl::RESTORE_NONE);
+  if (pending_entry_ &&
+      pending_entry_->restore_type() != NavigationEntryImpl::RESTORE_NONE)
+    pending_entry_->set_restore_type(NavigationEntryImpl::RESTORE_NONE);
 
   // If we are doing a cross-site reload, we need to replace the existing
   // navigation entry, not add another entry to the history. This has the side
@@ -1164,7 +1168,7 @@ void NavigationControllerImpl::RendererDidNavigateToExistingPage(
 
   // The site instance will normally be the same except during session restore,
   // when no site instance will be assigned.
-  DCHECK(entry->site_instance() == NULL ||
+  DCHECK(entry->site_instance() == nullptr ||
          entry->site_instance() == rfh->GetSiteInstance());
   entry->set_site_instance(
       static_cast<SiteInstanceImpl*>(rfh->GetSiteInstance()));
@@ -1632,8 +1636,7 @@ void NavigationControllerImpl::InsertOrReplaceEntry(
   int current_size = static_cast<int>(entries_.size());
 
   // When replacing, don't prune the forward history.
-  if (replace) {
-    DCHECK_GT(current_size, 0);
+  if (replace && current_size > 0) {
     int32 page_id = entry->GetPageID();
 
     // ScopedVectors don't automatically delete the replaced value, so make sure
@@ -1646,6 +1649,9 @@ void NavigationControllerImpl::InsertOrReplaceEntry(
     delegate_->UpdateMaxPageID(page_id);
     return;
   }
+
+  // We shouldn't see replace == true when there's no committed entries.
+  DCHECK(!replace);
 
   if (current_size > 0) {
     // Prune any entries which are in front of the current entry.
@@ -1730,15 +1736,6 @@ void NavigationControllerImpl::NavigateToPendingEntry(ReloadType reload_type) {
 
   if (!success)
     DiscardNonCommittedEntries();
-
-  // If the entry is being restored and doesn't have a SiteInstance yet, fill
-  // it in now that we know. This allows us to find the entry when it commits.
-  if (pending_entry_ && !pending_entry_->site_instance() &&
-      pending_entry_->restore_type() != NavigationEntryImpl::RESTORE_NONE) {
-    pending_entry_->set_site_instance(static_cast<SiteInstanceImpl*>(
-        delegate_->GetPendingSiteInstance()));
-    pending_entry_->set_restore_type(NavigationEntryImpl::RESTORE_NONE);
-  }
 }
 
 bool NavigationControllerImpl::NavigateToPendingEntryInternal(

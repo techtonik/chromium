@@ -480,13 +480,15 @@ bool DrmDevice::SetCursor(uint32_t crtc_id,
                           uint32_t handle,
                           const gfx::Size& size) {
   DCHECK(file_.IsValid());
-  TRACE_EVENT1("drm", "DrmDevice::SetCursor", "handle", handle);
+  TRACE_EVENT2("drm", "DrmDevice::SetCursor", "crtc_id", crtc_id, "handle",
+               handle);
   return !drmModeSetCursor(file_.GetPlatformFile(), crtc_id, handle,
                            size.width(), size.height());
 }
 
 bool DrmDevice::MoveCursor(uint32_t crtc_id, const gfx::Point& point) {
   DCHECK(file_.IsValid());
+  TRACE_EVENT1("drm", "DrmDevice::MoveCursor", "crtc_id", crtc_id);
   return !drmModeMoveCursor(file_.GetPlatformFile(), crtc_id, point.x(),
                             point.y());
 }
@@ -544,10 +546,12 @@ bool DrmDevice::CommitProperties(drmModePropertySet* properties,
                                  bool test_only,
                                  const PageFlipCallback& callback) {
 #if defined(USE_DRM_ATOMIC)
-  if (test_only)
+  if (test_only) {
     flags |= DRM_MODE_ATOMIC_TEST_ONLY;
-  else
-    flags |= DRM_MODE_PAGE_FLIP_EVENT;
+  } else {
+    flags |= DRM_MODE_PAGE_FLIP_EVENT | DRM_MODE_ATOMIC_NONBLOCK;
+  }
+
   uint64_t id = page_flip_manager_->GetNextId();
   if (!drmModePropertySetCommit(file_.GetPlatformFile(), flags,
                                 reinterpret_cast<void*>(id), properties)) {

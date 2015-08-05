@@ -166,6 +166,13 @@ bool VariationsSeedStore::LoadSeed(variations::VariationsSeed* seed) {
     return false;
   }
 
+  // Migrate any existing country code from the seed to the pref, if the pref is
+  // empty. TODO(asvitkine): Clean up the code in M50+ when sufficient number
+  // of clients have migrated.
+  if (seed->has_country_code() &&
+      local_state_->GetString(prefs::kVariationsCountry).empty()) {
+    local_state_->SetString(prefs::kVariationsCountry, seed->country_code());
+  }
   variations_serial_number_ = seed->serial_number();
   RecordVariationSeedEmptyHistogram(VARIATIONS_SEED_NOT_EMPTY);
   return true;
@@ -214,6 +221,10 @@ bool VariationsSeedStore::StoreSeedData(
   // in M45+.
   local_state_->ClearPref(prefs::kVariationsSeed);
 
+  // Update the saved country code only if one was returned from the server.
+  if (seed.has_country_code())
+    local_state_->SetString(prefs::kVariationsCountry, seed.country_code());
+
   local_state_->SetString(prefs::kVariationsCompressedSeed, base64_seed_data);
   UpdateSeedDateAndLogDayChange(date_fetched);
   local_state_->SetString(prefs::kVariationsSeedSignature,
@@ -253,6 +264,7 @@ void VariationsSeedStore::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterInt64Pref(prefs::kVariationsSeedDate,
                               base::Time().ToInternalValue());
   registry->RegisterStringPref(prefs::kVariationsSeedSignature, std::string());
+  registry->RegisterStringPref(prefs::kVariationsCountry, std::string());
 }
 
 void VariationsSeedStore::ClearPrefs() {

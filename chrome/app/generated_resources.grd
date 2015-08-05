@@ -6270,12 +6270,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_WEB_BLUETOOTH_DESCRIPTION" desc="Description for the flag to enable Web Bluetooth.">
         Enables Web Bluetooth which could allow websites to connect to and control Bluetooth devices around you. Including keyboards, cameras, microphones, etc.
       </message>
-      <message name="IDS_FLAGS_NTP_OTHER_SESSIONS_MENU_NAME" desc="Name for the flag to disable the 'Other devices' menu on the NTP.">
-        Disable NTP 'Other devices' menu.
-      </message>
-      <message name="IDS_FLAGS_NTP_OTHER_SESSIONS_MENU_DESCRIPTION" desc="Description for the flag to disable the 'Other devices' menu on the NTP.">
-        Disable the new tab page menu for accessing tabs on other devices.
-      </message>
       <message name="IDS_FLAGS_ENABLE_DEVTOOLS_EXPERIMENTS_NAME" desc="Name for the flag to enable experiments in Developer Tools">
         Enable Developer Tools experiments.
       </message>
@@ -6595,6 +6589,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_DATA_REDUCTION_PROXY_LO_FI_DISABLED" desc="Option for IDS_FLAGS_ENABLE_DATA_REDUCTION_PROXY_LO_FI_NAME to disable Lo-Fi">
          Disable
+      </message>
+      <message name="IDS_FLAGS_DATA_REDUCTION_PROXY_LO_FI_SLOW_CONNECTIONS_ONLY" desc="Option for IDS_FLAGS_ENABLE_DATA_REDUCTION_PROXY_LO_FI_NAME to enable Lo-Fi only on slow connections">
+         Slow connections only
       </message>
       <message name="IDS_FLAGS_DATA_REDUCTION_PROXY_RESET_SAVINGS_NAME" desc="Title in about::flags to clear data savings obtained with data reduction proxy when Chrome restarts">
          Clear data savings on startup
@@ -7044,6 +7041,26 @@ Keep your key file in a safe place. You will need it to create new versions of y
         </message>
         <message name="IDS_FLAGS_ENABLE_NEW_TASK_MANAGER_DESCRIPTION" desc="Description of the flag to enable the new implementation of the task manager.">
           Enables the use of the new and optimized implementation of the chrome task manager.
+        </message>
+      </if>
+      <message name="IDS_FLAGS_SIMPLIFIED_FULLSCREEN_UI_NAME" desc="Name of the flag to enable the new simplified fullscreen and mouse lock UI.">
+        Simplified fullscreen / mouse lock UI.
+      </message>
+      <message name="IDS_FLAGS_SIMPLIFIED_FULLSCREEN_UI_DESCRIPTION" desc="Description of the flag to enable the new simplified fullscreen and mouse lock UI.">
+        An experimental new user experience when entering page-triggered fullscreen or mouse pointer lock states.
+      </message>
+      <if expr="is_android">
+        <message name="IDS_FLAGS_PROGRESS_BAR_ANIMATION_NAME" desc="Name of the flag to configure Android page loading progress bar animation.">
+          Android phone page loading progress bar animation
+        </message>
+        <message name="IDS_FLAGS_PROGRESS_BAR_ANIMATION_DESCRIPTION" desc="Description of the flag to configure Android page loading progress bar animation.">
+          Configures Android phone page loading progress bar animation.
+        </message>
+        <message name="IDS_FLAGS_PROGRESS_BAR_ANIMATION_SMOOTH" desc="Smooth progress bar animation style">
+          Smooth
+        </message>
+        <message name="IDS_FLAGS_PROGRESS_BAR_ANIMATION_FAST_START" desc="Fast start progress bar animation style">
+          Fast start
         </message>
       </if>
 
@@ -7604,13 +7621,13 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Click to go back, hold to see history
       </message>
       <message name="IDS_ACCNAME_TOOLTIP_BACK" desc="The tooltip for back button suited for non-mouse users">
-        Press enter to go back, context menu key to see history
+        Press to go back, context menu to see history
       </message>
       <message name="IDS_TOOLTIP_FORWARD" desc="The tooltip for forward button">
         Click to go forward, hold to see history
       </message>
       <message name="IDS_ACCNAME_TOOLTIP_FORWARD" desc="The tooltip for forward button  suited for non-mouse users">
-        Press enter to go forward, context menu key to see history
+        Press to go forward, context menu to see history
       </message>
       <message name="IDS_TOOLTIP_HOME" desc="The tooltip for the home button">
         Open the home page
@@ -8125,6 +8142,24 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_ENABLE_CLEAR_BROWSING_DATA_COUNTERS_DESCRIPTION" desc="Description of the flag that enables the data volume counters in the Clear browsing data dialog.">
         Shows data volume counters in the Clear browsing data dialog.
+      </message>
+      <message name="IDS_CLEAR_BROWSING_DATA_CALCULATING" desc="A text that is shown while the data volume is being counted.">
+        Calculating...
+      </message>
+      <message name="IDS_DEL_BROWSING_HISTORY_COUNTER" desc="A counter showing how many items of browsing history the user has.">
+        {COUNT, plural,
+         =1 {1 item}
+         other {# items}}
+      </message>
+      <message name="IDS_DEL_CACHE_COUNTER" desc="A counter showing how many kBs of cached data the user has.">
+        {COUNT, plural,
+         =1 {1 kB}
+         other {# kB}}
+      </message>
+      <message name="IDS_DEL_PASSWORDS_COUNTER" desc="A counter showing how many passwords the user has.">
+        {COUNT, plural,
+         =1 {1 password}
+         other {# passwords}}
       </message>
 
       <!-- Supervised User Avatar Menu -->
@@ -9218,11 +9253,9 @@ I don't think this site should be blocked!
       <message name="IDS_ERRORPAGE_FUN_DISABLED" desc="Explanation for when easter egg has been disabled by administrator">
         The owner of this device turned off the dinosaur game.
       </message>
-      <if expr="chromeos">
-        <message name="IDS_ERRORPAGES_BUTTON_DIAGNOSE" desc="Label for the button that invokes the connection diagnostic tool on the error page">
-          Diagnose errors...
-        </message>
-      </if>
+      <message name="IDS_ERRORPAGES_BUTTON_DIAGNOSE" desc="Label for the button that invokes the connection diagnostic tool on the error page">
+        Diagnose errors...
+      </message>
       <if expr="is_android">
         <message name="IDS_ERRORPAGES_BUTTON_SETTINGS" desc="Mobile: Label for the button on an error page to launch system settings menu">
           Settings
@@ -13637,6 +13670,12 @@ Some features may be unavailable.  Please check that the profile exists and you 
       <message name="IDS_MEDIASTREAM_BUBBLE_MANAGE_LINK" desc="Link on the media (camera and microphone) bubble that opens up the Content Settings management dialog for media settings.">
         Manage media settings...
       </message>
+      <message name="IDS_MEDIASTREAM_MICROPHONE_BUBBLE_MANAGE_LINK" desc="Link on the microphone bubble that opens up the Content Settings management dialog for microphone settings.">
+        Manage microphone settings...
+      </message>
+      <message name="IDS_MEDIASTREAM_CAMERA_BUBBLE_MANAGE_LINK" desc="Link on the camera bubble that opens up the Content Settings management dialog for camera settings.">
+        Manage camera settings...
+      </message>
       <message name="IDS_MICROPHONE_CAMERA_ALLOWED" desc="Status text that is used as location bar icon tooltip text and as media settings bubble status text when a page is allowed to use the camera and microphone.">
         This page is accessing your camera and microphone.
       </message>
@@ -15811,11 +15850,23 @@ After you create a new supervised user, you can manage their settings at any tim
       <message name="IDS_ACTIVE_MIXED_CONTENT_DESCRIPTION" desc="Description of a security problem where site ran active mixed content.">
         You have recently allowed insecure content (such as scripts or iframes) to run on this site.
       </message>
+      <message name="IDS_NO_MIXED_CONTENT" desc="Summary phrase for a site that does not have any mixed content.">
+        Secure Resources
+      </message>
+      <message name="IDS_NO_MIXED_CONTENT_DESCRIPTION" desc="Description of a site that does not have any mixed content.">
+        All resources on this page are served securely.
+      </message>
       <message name="IDS_CERTIFICATE_CHAIN_ERROR" desc="Summary phrase for a security problem with the site's certificate.">
         Certificate Error
       </message>
       <message name="IDS_CERTIFICATE_CHAIN_ERROR_DESCRIPTION_FORMAT" desc="Description of a security problem with the site's certificate.">
         There are issues with the site's certificate chain (<ph name="CERT_ERROR_DESCRIPTION">$1<ex>net::ERR_CERT_AUTHORITY_INVALID</ex></ph>).
+      </message>
+      <message name="IDS_VALID_SERVER_CERTIFICATE" desc="Summary phrase for a site that has a valid server certificate.">
+        Valid Certificate
+      </message>
+      <message name="IDS_VALID_SERVER_CERTIFICATE_DESCRIPTION" desc="Description of a site that has a valid server certificate.">
+        The connection to this site is using a valid, trusted server certificate.
       </message>
       <message name="IDS_SAVE_PASSWORD_TITLE" desc="The title of the save password bubble when a password can be saved.">
         Do you want <ph name="PASSWORD_MANAGER_BRAND">$1<ex>Google Chrome</ex></ph> to save your password for <ph name="ORIGIN">$2<ex>example.com</ex></ph>?
@@ -15828,6 +15879,15 @@ After you create a new supervised user, you can manage their settings at any tim
       </message>
       <message name="IDS_FLAGS_ENABLE_TAB_DISCARDING_DESCRIPTION" desc="Description for the flag to enable tab description.">
         If enabled, tabs get discarded from memory when the system memory is low. Discarded tabs are still visible on the tab strip and get reloaded when clicked on.
+      </message>
+    </if>
+
+    <if expr="is_android">
+      <message name="IDS_FLAGS_OFFLINE_PAGES_NAME" desc="Name for the flag to enable offline pages.">
+        Enable offline pages
+      </message>
+      <message name="IDS_FLAGS_OFFLINE_PAGES_DESCRIPTION" desc="Description for the flag to enable offline pages.">
+        Enable storing pages locally for offline use. Requires Enhanced Bookmarks to be enabled.
       </message>
     </if>
 

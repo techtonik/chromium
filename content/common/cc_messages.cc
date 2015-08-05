@@ -300,6 +300,7 @@ void ParamTraits<cc::RenderPass>::Write(
   WriteParam(m, p.damage_rect);
   WriteParam(m, p.transform_to_root_target);
   WriteParam(m, p.has_transparent_background);
+  WriteParam(m, p.referenced_surfaces);
   WriteParam(m, p.quad_list.size());
 
   cc::SharedQuadStateList::ConstIterator shared_quad_state_iter =
@@ -316,9 +317,6 @@ void ParamTraits<cc::RenderPass>::Write(
         << " opaque_rect: " << quad->opaque_rect.ToString();
 
     switch (quad->material) {
-      case cc::DrawQuad::CHECKERBOARD:
-        WriteParam(m, *cc::CheckerboardDrawQuad::MaterialCast(quad));
-        break;
       case cc::DrawQuad::DEBUG_BORDER:
         WriteParam(m, *cc::DebugBorderDrawQuad::MaterialCast(quad));
         break;
@@ -386,6 +384,9 @@ static size_t ReserveSizeForRenderPassWrite(const cc::RenderPass& p) {
 
   // The largest quad type, verified by a unit test.
   to_reserve += p.quad_list.size() * cc::LargestDrawQuadSize();
+
+  // The actual list of referenced surfaces.
+  to_reserve += p.referenced_surfaces.size() * sizeof(cc::SurfaceId);
   return to_reserve;
 }
 
@@ -407,13 +408,14 @@ bool ParamTraits<cc::RenderPass>::Read(const Message* m,
   gfx::Rect damage_rect;
   gfx::Transform transform_to_root_target;
   bool has_transparent_background;
+  std::vector<cc::SurfaceId> referenced_surfaces;
   size_t quad_list_size;
 
-  if (!ReadParam(m, iter, &id) ||
-      !ReadParam(m, iter, &output_rect) ||
+  if (!ReadParam(m, iter, &id) || !ReadParam(m, iter, &output_rect) ||
       !ReadParam(m, iter, &damage_rect) ||
       !ReadParam(m, iter, &transform_to_root_target) ||
       !ReadParam(m, iter, &has_transparent_background) ||
+      !ReadParam(m, iter, &referenced_surfaces) ||
       !ReadParam(m, iter, &quad_list_size))
     return false;
 
@@ -422,6 +424,7 @@ bool ParamTraits<cc::RenderPass>::Read(const Message* m,
             damage_rect,
             transform_to_root_target,
             has_transparent_background);
+  p->referenced_surfaces.swap(referenced_surfaces);
 
   for (size_t i = 0; i < quad_list_size; ++i) {
     cc::DrawQuad::Material material;
@@ -431,9 +434,6 @@ bool ParamTraits<cc::RenderPass>::Read(const Message* m,
 
     cc::DrawQuad* draw_quad = NULL;
     switch (material) {
-      case cc::DrawQuad::CHECKERBOARD:
-        draw_quad = ReadDrawQuad<cc::CheckerboardDrawQuad>(m, iter, p);
-        break;
       case cc::DrawQuad::DEBUG_BORDER:
         draw_quad = ReadDrawQuad<cc::DebugBorderDrawQuad>(m, iter, p);
         break;
@@ -513,6 +513,8 @@ void ParamTraits<cc::RenderPass>::Log(
   l->append(", ");
   LogParam(p.has_transparent_background, l);
   l->append(", ");
+  LogParam(p.referenced_surfaces, l);
+  l->append(", ");
 
   l->append("[");
   for (const auto& shared_quad_state : p.shared_quad_state_list) {
@@ -525,9 +527,6 @@ void ParamTraits<cc::RenderPass>::Log(
     if (quad != p.quad_list.front())
       l->append(", ");
     switch (quad->material) {
-      case cc::DrawQuad::CHECKERBOARD:
-        LogParam(*cc::CheckerboardDrawQuad::MaterialCast(quad), l);
-        break;
       case cc::DrawQuad::DEBUG_BORDER:
         LogParam(*cc::DebugBorderDrawQuad::MaterialCast(quad), l);
         break;

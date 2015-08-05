@@ -23,7 +23,8 @@ CrOnc.NetworkStateProperties;
 /** @typedef {string|number|boolean|Array<Object>} */
 CrOnc.NetworkStateProperty;
 
-/** @typedef {{
+/**
+ * @typedef {{
  *    Active: CrOnc.NetworkStateProperty,
  *    Effective: CrOnc.NetworkStateProperty,
  *    UserPolicy: CrOnc.NetworkStateProperty,
@@ -39,60 +40,11 @@ CrOnc.ManagedProperty;
 /** @typedef {CrOnc.NetworkStateProperty|!CrOnc.ManagedProperty} */
 CrOnc.ManagedNetworkStateProperty;
 
-// TODO(stevenjb): Update chrome_extensions.js to include IPConfigProperties
-// in chrome.networkingPrivate and use that.
-/** @typedef {{
- *    Gateway: (string|undefined),
- *    IPAddress: (string|undefined),
- *    NameServers: ?Array<string>,
- *    RoutingPrefix: (number|undefined),
- *    Type: (string|undefined),
- *    WebProxyAutoDiscoveryUrl: (string|undefined)
- * }}
- */
-CrOnc.IPConfigProperties;
+// TODO(stevenjb): Update chrome_extensions.js to include the following
+// in chrome.networkingPrivate and use those instead.
 
-/** @typedef {{
- *    Gateway: (string|undefined),
- *    IPAddress: (string|undefined),
- *    NameServers: ?Array<string>,
- *    RoutingPrefix: (string|undefined),
- *    Type: (string|undefined),
- *    WebProxyAutoDiscoveryUrl: (string|undefined)
- * }}
- */
-CrOnc.IPConfigUIProperties;
-
-// TODO(stevenjb): Update chrome_extensions.js to include ProxySettings
-// in chrome.networkingPrivate and use that.
-/** @typedef {{
- *    Host: string,
- *    Port: number
- * }}
- */
-CrOnc.ProxyLocation;
-
-/** @typedef {{
- *    HTTPProxy: ?CrOnc.ProxyLocation,
- *    SecureHTTPProxy: ?CrOnc.ProxyLocation,
- *    FTPProxy: ?CrOnc.ProxyLocation,
- *    SOCKS: ?CrOnc.ProxyLocation
- * }}
- */
-CrOnc.ManualProxySettings;
-
-/** @typedef {{
- *    Type: !CrOnc.ProxySettingsType,
- *    Manual: ?CrOnc.ManualProxySettings,
- *    ExcludeDomains: ?Array<string>,
- *    PAC: (string|undefined)
- * }}
- */
-CrOnc.ProxySettings;
-
-// TODO(stevenjb): Update chrome_extensions.js to include APNProperties
-// in chrome.networkingPrivate and use that.
-/** @typedef {{
+/**
+ * @typedef {{
  *    AccessPointName: string,
  *    Language: (string|undefined),
  *    LocalizedName: (string|undefined),
@@ -103,13 +55,84 @@ CrOnc.ProxySettings;
  */
 CrOnc.APNProperties;
 
+/**
+ * @typedef {{
+ *    requirePin: boolean,
+ *    currentPin: string,
+ *    newPin: (string|undefined)
+ * }}
+ */
+CrOnc.CellularSimState;
+
+/**
+ * @typedef {{
+ *    Gateway: (string|undefined),
+ *    IPAddress: (string|undefined),
+ *    NameServers: ?Array<string>,
+ *    RoutingPrefix: (number|undefined),
+ *    Type: (string|undefined),
+ *    WebProxyAutoDiscoveryUrl: (string|undefined)
+ * }}
+ */
+CrOnc.IPConfigProperties;
+
+/**
+ * @typedef {{
+ *    HTTPProxy: ?CrOnc.ProxyLocation,
+ *    SecureHTTPProxy: ?CrOnc.ProxyLocation,
+ *    FTPProxy: ?CrOnc.ProxyLocation,
+ *    SOCKS: ?CrOnc.ProxyLocation
+ * }}
+ */
+CrOnc.ManualProxySettings;
+
+/**
+ * @typedef {{
+ *    Host: string,
+ *    Port: number
+ * }}
+ */
+CrOnc.ProxyLocation;
+
+/**
+ * @typedef {{
+ *    Type: !CrOnc.ProxySettingsType,
+ *    Manual: ?CrOnc.ManualProxySettings,
+ *    ExcludeDomains: ?Array<string>,
+ *    PAC: (string|undefined)
+ * }}
+ */
+CrOnc.ProxySettings;
+
+/**
+ * @typedef {{
+ *    LockType: !CrOnc.LockType,
+ *    LockEnabled: boolean,
+ *    RetriesLeft: (number|undefined)
+ * }}
+ */
+CrOnc.SIMLockStatus;
+
+// Modified version of IPConfigProperties to store RoutingPrefix as a
+// human-readable string instead of as a number.
+/**
+ * @typedef {{
+ *    Gateway: (string|undefined),
+ *    IPAddress: (string|undefined),
+ *    NameServers: ?Array<string>,
+ *    RoutingPrefix: (string|undefined),
+ *    Type: (string|undefined),
+ *    WebProxyAutoDiscoveryUrl: (string|undefined)
+ * }}
+ */
+CrOnc.IPConfigUIProperties;
+
 /** @enum {string} */
-CrOnc.Type = {
-  CELLULAR: 'Cellular',
-  ETHERNET: 'Ethernet',
-  VPN: 'VPN',
-  WIFI: 'WiFi',
-  WIMAX: 'WiMAX',
+CrOnc.ActivationState = {
+  ACTIVATED: 'Activated',
+  ACTIVATING: 'Activating',
+  NOT_ACTIVATED: 'NotActivated',
+  PARTIALLY_ACTIVATED: 'PartiallyActivated',
 };
 
 /** @enum {string} */
@@ -129,6 +152,13 @@ CrOnc.IPConfigType = {
 CrOnc.IPType = {
   IPV4: 'IPv4',
   IPV6: 'IPv6',
+};
+
+/** @enum {string} */
+CrOnc.LockType = {
+  NONE: '',
+  PIN: 'sim-pin',
+  PUK: 'sim-puk',
 };
 
 /** @enum {string} */
@@ -169,6 +199,15 @@ CrOnc.Security = {
   WEP_PSK: 'WEP-PSK',
   WPA_EAP: 'WPA-EAP',
   WPA_PSK: 'WPA-PSK',
+};
+
+/** @enum {string} */
+CrOnc.Type = {
+  CELLULAR: 'Cellular',
+  ETHERNET: 'Ethernet',
+  VPN: 'VPN',
+  WIFI: 'WiFi',
+  WIMAX: 'WiMAX',
 };
 
 /**
@@ -308,6 +347,19 @@ CrOnc.getIPConfigForType = function(state, type) {
     result.NameServers = staticIpConfig.NameServers;
   }
   return result;
+};
+
+/**
+ * @param {!CrOnc.NetworkStateProperties} state The ONC network state.
+ * @return {boolean} True if |state| is a Cellular network with a locked SIM.
+ */
+CrOnc.isSimLocked = function(state) {
+  if (state.Type != CrOnc.Type.CELLULAR)
+    return false;
+  var property = /** @type {!CrOnc.SIMLockStatus} */(
+      CrOnc.getProperty(state, 'Cellular.SIMLockStatus'));
+  return property != undefined && (property.LockType == CrOnc.LockType.PIN ||
+                                   property.LockType == CrOnc.LockType.PUK);
 };
 
 /**

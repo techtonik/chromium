@@ -18,6 +18,7 @@
 #include "base/logging.h"
 #include "base/memory/linked_ptr.h"
 #include "base/memory/scoped_ptr.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/numerics/safe_math.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/trace_event/trace_event.h"
@@ -1474,6 +1475,9 @@ class GLES2DecoderImpl : public GLES2Decoder,
   // Wrapper for glEnableVertexAttribArray.
   void DoEnableVertexAttribArray(GLuint index);
 
+  // Wrapper for glFinish.
+  void DoFinish();
+
   // Wrapper for glFlush.
   void DoFlush();
 
@@ -1530,6 +1534,10 @@ class GLES2DecoderImpl : public GLES2Decoder,
   GLuint DoGetMaxValueInBufferCHROMIUM(
       GLuint buffer_id, GLsizei count, GLenum type, GLuint offset);
 
+  // Wrapper for glGetBufferParameteri64v.
+  void DoGetBufferParameteri64v(
+      GLenum target, GLenum pname, GLint64* params);
+
   // Wrapper for glGetBufferParameteriv.
   void DoGetBufferParameteriv(
       GLenum target, GLenum pname, GLint* params);
@@ -1571,6 +1579,9 @@ class GLES2DecoderImpl : public GLES2Decoder,
 
   // Wrapper for glLinkProgram
   void DoLinkProgram(GLuint program);
+
+  // Wrapper for glReadBuffer
+  void DoReadBuffer(GLenum src);
 
   // Wrapper for glRenderbufferStorage.
   void DoRenderbufferStorage(
@@ -1957,6 +1968,10 @@ class GLES2DecoderImpl : public GLES2Decoder,
   GLenum back_buffer_color_format_;
   bool back_buffer_has_depth_;
   bool back_buffer_has_stencil_;
+  // This tracks read buffer for both offscreen/onscreen backbuffer cases.
+  // TODO(zmo): when ES3 APIs are exposed to Nacl, make sure read_buffer_
+  // setting is set correctly when SwapBuffers().
+  GLenum back_buffer_read_buffer_;
 
   bool surfaceless_;
 
@@ -2521,6 +2536,7 @@ GLES2DecoderImpl::GLES2DecoderImpl(ContextGroup* group)
       back_buffer_color_format_(0),
       back_buffer_has_depth_(false),
       back_buffer_has_stencil_(false),
+      back_buffer_read_buffer_(GL_BACK),
       surfaceless_(false),
       backbuffer_needs_clear_bits_(0),
       current_decoder_error_(error::kNoError),
@@ -4403,28 +4419,10 @@ void GLES2DecoderImpl::RemoveBuffer(GLuint client_id) {
   buffer_manager()->RemoveBuffer(client_id);
 }
 
-// TODO(dyen): Temporary shared memory to sanity check finish calls.
-error::Error GLES2DecoderImpl::HandleFinish(uint32 immediate_data_size,
-                                const void* cmd_data) {
-  const gles2::cmds::Finish& c =
-      *static_cast<const gles2::cmds::Finish*>(cmd_data);
-  int32 sync_shm_id = static_cast<int32>(c.sync_count_shm_id);
-  uint32 sync_shm_offset = static_cast<uint32>(c.sync_count_shm_offset);
-  uint32 finish_count = static_cast<GLuint>(c.finish_count);
-
+void GLES2DecoderImpl::DoFinish() {
   glFinish();
   ProcessPendingReadPixels(true);
   ProcessPendingQueries(true);
-
-  base::subtle::Atomic32* sync_counter =
-      GetSharedMemoryAs<base::subtle::Atomic32*>(sync_shm_id,
-                                                 sync_shm_offset,
-                                                 sizeof(*sync_counter)) ;
-  if (sync_counter) {
-    base::subtle::Release_Store(sync_counter, finish_count);
-  }
-
-  return error::kNoError;
 }
 
 void GLES2DecoderImpl::DoFlush() {
@@ -5020,6 +5018,20 @@ bool GLES2DecoderImpl::GetHelper(
         }
         return true;
       }
+      case GL_READ_BUFFER:
+        *num_written = 1;
+        if (params) {
+          Framebuffer* framebuffer =
+              GetFramebufferInfoForTarget(GL_READ_FRAMEBUFFER);
+          GLenum read_buffer;
+          if (framebuffer) {
+            read_buffer = framebuffer->read_buffer();
+          } else {
+            read_buffer = back_buffer_read_buffer_;
+          }
+          *params = static_cast<GLint>(read_buffer);
+        }
+        return true;
     }
   }
   switch (pname) {
@@ -5466,6 +5478,13 @@ void GLES2DecoderImpl::DoGetProgramiv(
     return;
   }
   program->GetProgramiv(pname, params);
+}
+
+void GLES2DecoderImpl::DoGetBufferParameteri64v(
+    GLenum target, GLenum pname, GLint64* params) {
+  // Just delegate it. Some validation is actually done before this.
+  buffer_manager()->ValidateAndDoGetBufferParameteri64v(
+      &state_, target, pname, params);
 }
 
 void GLES2DecoderImpl::DoGetBufferParameteriv(
@@ -6299,6 +6318,7 @@ void GLES2DecoderImpl::DoRenderbufferStorage(
 
 void GLES2DecoderImpl::DoLinkProgram(GLuint program_id) {
   TRACE_EVENT0("gpu", "GLES2DecoderImpl::DoLinkProgram");
+  SCOPED_UMA_HISTOGRAM_TIMER("GPU.DoLinkProgramTime");
   Program* program = GetProgramInfoNotShader(
       program_id, "glLinkProgram");
   if (!program) {
@@ -6321,6 +6341,47 @@ void GLES2DecoderImpl::DoLinkProgram(GLuint program_id) {
   // LinkProgram can be very slow.  Exit command processing to allow for
   // context preemption and GPU watchdog checks.
   ExitCommandProcessingEarly();
+}
+
+void GLES2DecoderImpl::DoReadBuffer(GLenum src) {
+  switch (src) {
+    case GL_NONE:
+    case GL_BACK:
+      break;
+    default:
+      {
+        GLenum upper_limit = static_cast<GLenum>(
+            group_->max_color_attachments() + GL_COLOR_ATTACHMENT0);
+        if (src < GL_COLOR_ATTACHMENT0 || src >= upper_limit) {
+          LOCAL_SET_GL_ERROR(
+              GL_INVALID_ENUM, "glReadBuffer", "invalid enum for src");
+          return;
+        }
+      }
+      break;
+  }
+
+  Framebuffer* framebuffer = GetFramebufferInfoForTarget(GL_READ_FRAMEBUFFER);
+  if (framebuffer) {
+    if (src == GL_BACK) {
+      LOCAL_SET_GL_ERROR(
+          GL_INVALID_ENUM, "glReadBuffer",
+          "invalid src for a named framebuffer");
+      return;
+    }
+    framebuffer->set_read_buffer(src);
+  } else {
+    if (src != GL_NONE && src != GL_BACK) {
+      LOCAL_SET_GL_ERROR(
+          GL_INVALID_ENUM, "glReadBuffer",
+          "invalid src for the default framebuffer");
+      return;
+    }
+    back_buffer_read_buffer_ = src;
+    if (GetBackbufferServiceId() && src == GL_BACK)
+      src = GL_COLOR_ATTACHMENT0;
+  }
+  glReadBuffer(src);
 }
 
 void GLES2DecoderImpl::DoSamplerParameterfv(
@@ -11616,26 +11677,6 @@ error::Error GLES2DecoderImpl::HandleBeginQueryEXT(uint32 immediate_data_size,
       break;
     case GL_COMMANDS_COMPLETED_CHROMIUM:
       if (!features().chromium_sync_query) {
-#if defined(OS_MACOSX)
-        // TODO(dyen): Remove once we know what is failing.
-        uint32_t boolean_flags = 0;
-        if (gfx::g_driver_gl.ext.b_GL_ARB_sync)
-          boolean_flags |= 1;
-        if (gfx::g_driver_gl.ext.b_GL_APPLE_fence)
-          boolean_flags |= 2;
-        if (gfx::g_driver_gl.ext.b_GL_NV_fence)
-          boolean_flags |= 4;
-
-        CHECK(boolean_flags != 0) << "Nothing supported";
-        CHECK(boolean_flags != 1) << "ARB";
-        CHECK(boolean_flags != 2) << "APPLE";
-        CHECK(boolean_flags != 3) << "ARB APPLE";
-        CHECK(boolean_flags != 4) << "NV";
-        CHECK(boolean_flags != 5) << "NV ARB";
-        CHECK(boolean_flags != 6) << "NV APPLE";
-        CHECK(boolean_flags != 7) << "NV ARB APPLE";
-        CHECK(false) << "Unknown error.";
-#endif
         LOCAL_SET_GL_ERROR(
             GL_INVALID_OPERATION, "glBeginQueryEXT",
             "not enabled for commands completed queries");
@@ -11668,21 +11709,12 @@ error::Error GLES2DecoderImpl::HandleBeginQueryEXT(uint32 immediate_data_size,
   }
 
   if (query_manager_->GetActiveQuery(target)) {
-#if defined(OS_MACOSX)
-    // TODO(dyen): Remove once we know what is failing.
-    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM)
-        << "Query already in progress";
-#endif
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION, "glBeginQueryEXT", "query already in progress");
     return error::kNoError;
   }
 
   if (client_id == 0) {
-#if defined(OS_MACOSX)
-    // TODO(dyen): Remove once we know what is failing.
-    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Id is 0";
-#endif
     LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION, "glBeginQueryEXT", "id is 0");
     return error::kNoError;
   }
@@ -11690,10 +11722,6 @@ error::Error GLES2DecoderImpl::HandleBeginQueryEXT(uint32 immediate_data_size,
   QueryManager::Query* query = query_manager_->GetQuery(client_id);
   if (!query) {
     if (!query_manager_->IsValidQuery(client_id)) {
-#if defined(OS_MACOSX)
-      // TODO(dyen): Remove once we know what is failing.
-      CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Invalid ID";
-#endif
       LOCAL_SET_GL_ERROR(GL_INVALID_OPERATION,
                          "glBeginQueryEXT",
                          "id not made by glGenQueriesEXT");
@@ -11704,10 +11732,6 @@ error::Error GLES2DecoderImpl::HandleBeginQueryEXT(uint32 immediate_data_size,
   }
 
   if (query->target() != target) {
-#if defined(OS_MACOSX)
-    // TODO(dyen): Remove once we know what is failing.
-    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Non-Matching Target";
-#endif
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION, "glBeginQueryEXT", "target does not match");
     return error::kNoError;
@@ -11718,10 +11742,6 @@ error::Error GLES2DecoderImpl::HandleBeginQueryEXT(uint32 immediate_data_size,
   }
 
   if (!query_manager_->BeginQuery(query)) {
-#if defined(OS_MACOSX)
-    // TODO(dyen): Remove once we know what is failing.
-    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Out of bounds";
-#endif
     return error::kOutOfBounds;
   }
 
@@ -11737,20 +11757,12 @@ error::Error GLES2DecoderImpl::HandleEndQueryEXT(uint32 immediate_data_size,
 
   QueryManager::Query* query = query_manager_->GetActiveQuery(target);
   if (!query) {
-#if defined(OS_MACOSX)
-    // TODO(dyen): Remove once we know what is failing.
-    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Target not active";
-#endif
     LOCAL_SET_GL_ERROR(
         GL_INVALID_OPERATION, "glEndQueryEXT", "No active query");
     return error::kNoError;
   }
 
   if (!query_manager_->EndQuery(query, submit_count)) {
-#if defined(OS_MACOSX)
-    // TODO(dyen): Remove once we know what is failing.
-    CHECK(target != GL_COMMANDS_COMPLETED_CHROMIUM) << "Out of bounds";
-#endif
     return error::kOutOfBounds;
   }
 

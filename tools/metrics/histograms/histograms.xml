@@ -391,6 +391,13 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="appcache.MainPageLoad" enum="BooleanSecure">
+  <owner>michaeln@chromium.org</owner>
+  <summary>
+    Counts the number of appcached page loads for secure vs insecure origins.
+  </summary>
+</histogram>
+
 <histogram name="appcache.MainResourceResponseRetrieval" enum="BooleanSuccess">
   <owner>michaeln@chromium.org</owner>
   <summary>
@@ -2724,6 +2731,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Bluetooth.Web.FunctionCall.Count" enum="WebBluetoothFunction">
+  <owner>jyasskin@chromium.org</owner>
+  <owner>ortuno@chromium.org</owner>
+  <owner>scheib@chromium.org</owner>
+  <summary>
+    Counts the number of times each call to a WebBluetooth function is done.
+  </summary>
+</histogram>
+
 <histogram name="Bookmarks.LaunchDepth">
   <owner>yfriedman@chromium.org</owner>
   <summary>
@@ -4240,7 +4256,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Cookie.PriorityBlockingTime" units="ms">
-  <owner>erikwright@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
   <summary>
     This histogram records the total duration of time during which at least one
     web request was blocked waiting for the cookie store to load. If no requests
@@ -4251,7 +4267,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Cookie.PriorityLoadCount">
-  <owner>erikwright@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
   <summary>
     The number of distinct Effective Top-Level Domains Plus One (ETLD+1, i.e.,
     google.com, bbc.co.uk) for which a priority cookie load occurred.
@@ -4346,7 +4362,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Cookie.TimeBlockedOnLoad" units="ms">
-  <owner>erikwright@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
   <summary>
     The amount of time (ms) between the cookie store load starting and
     completing.
@@ -4357,7 +4373,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <obsolete>
     Deprecated as of 04/2015. The migration has finished for most users.
   </obsolete>
-  <owner>erikwright@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
   <summary>The amount of time (ms) to migrate a v4 database to v5.</summary>
 </histogram>
 
@@ -4365,7 +4381,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <obsolete>
     Deprecated as of 04/2015. The migration has finished for most users.
   </obsolete>
-  <owner>erikwright@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
   <summary>The amount of time (ms) to migrate a v5 database to v6.</summary>
 </histogram>
 
@@ -4373,7 +4389,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <obsolete>
     Deprecated as of 04/2015. The migration has finished for most users.
   </obsolete>
-  <owner>erikwright@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
   <summary>The amount of time (ms) to migrate a v6 database to v7.</summary>
 </histogram>
 
@@ -4381,7 +4397,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <obsolete>
     Deprecated as of 04/2015. The migration has finished for most users.
   </obsolete>
-  <owner>erikwright@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
   <summary>The amount of time (ms) to migrate a v7 database to v8.</summary>
 </histogram>
 
@@ -4414,7 +4430,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Cookie.TimeKeyLoadDBQueueWait" units="ms">
-  <owner>erikwright@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
   <summary>
     This histogram records the wall-clock delay between a priority load task
     being posted to the DB-thread and its execution.
@@ -4431,7 +4447,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Cookie.TimeLoad" units="ms">
-  <owner>erikwright@chromium.org</owner>
+  <owner>rdsmith@chromium.org</owner>
   <summary>
     This histogram records the sum of the durations of all initial tasks loading
     cookies from the database.
@@ -4487,7 +4503,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="CrashReport.BreakpadCrashDumpOutcome" enum="DumpOutcome">
-  <owner>erikwright@chromium.org</owner>
   <owner>siggi@chromium.org</owner>
   <summary>
     Reports the result of an attempt to report a crash dump via Breakpad.
@@ -4500,7 +4515,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="CrashReport.BreakpadDumpWithoutCrashOutcome"
     enum="DumpOutcome">
-  <owner>erikwright@chromium.org</owner>
   <owner>siggi@chromium.org</owner>
   <summary>
     Reports the result of an attempt to report a dump via Breakpad without
@@ -4530,7 +4544,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="CrashReport.PermanentUploadFailure" enum="BooleanHit">
-  <owner>erikwright@chromium.org</owner>
+  <owner>siggi@chromium.org</owner>
   <summary>
     Counts crash reports that the Kasko crash reporter fails to upload and hands
     off to Chrome. Kasko stores the failed reports in a location specified by
@@ -12968,6 +12982,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="GPU.ANGLE.D3DCompileMS" units="milliseconds">
+  <owner>jmadill@chromium.org</owner>
+  <summary>
+    The time ANGLE spends calling the D3D shader compiler. Tracks total time we
+    spend compiling shaders on startup and during Chrome's lifetime.
+  </summary>
+</histogram>
+
 <histogram name="GPU.ANGLE.DisplayInitializeMS" units="milliseconds">
   <owner>jmadill@chromium.org</owner>
   <summary>
@@ -13033,6 +13055,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     ANGLE's currently active D3D shader model version. Logged once every startup
     of the GPU process, on Windows only. Note that Shader Models 2 and 3 map to
     D3D9 with ANGLE, and 4+ map to D3D11 ANGLE.
+  </summary>
+</histogram>
+
+<histogram name="GPU.DoLinkProgramTime" units="milliseconds">
+  <owner>jmadill@chromium.org</owner>
+  <summary>
+    The time we spend in GLES2DecoderImpl::DoLinkProgram. Related to how much
+    time we spend compiling shaders during startup.
   </summary>
 </histogram>
 
@@ -16662,6 +16692,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Media.VideoCaptureGpuJpegDecoder.InitDecodeSuccess"
+    enum="BooleanSuccess">
+  <owner>henryhsu@chromium.org</owner>
+  <summary>
+    Indicates whether we were successful in initializing hardware jpeg decoder
+    for attempts to VideoCaptureGpuJpegDecoder::Initialize().
+  </summary>
+</histogram>
+
 <histogram name="Media.VideoCaptureManager" units="ms">
   <owner>mcasas@chromium.org</owner>
   <summary>Measures the time taken for VideoCaptureManager::</summary>
@@ -17509,8 +17548,20 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>kenjibaheux@google.com</owner>
   <owner>kouhei@chromium.org</owner>
   <summary>
-    The sum of all processes' swap.  Recorded once per UMA ping if the system
-    has swapped.
+    The sum of all processes' swap. Recorded once per UMA ping if the system has
+    swapped. See Memory.Swap.Total2 for the same metric with higher precision
+    bucketing.
+  </summary>
+</histogram>
+
+<histogram name="Memory.Swap.Total2" units="MiB">
+  <owner>hajimehoshi@chromium.org</owner>
+  <owner>kenjibaheux@google.com</owner>
+  <owner>kouhei@chromium.org</owner>
+  <owner>rkaplow@chromium.org</owner>
+  <summary>
+    The sum of all processes' swap. Recorded once per UMA ping if the system has
+    swapped.
   </summary>
 </histogram>
 
@@ -17538,7 +17589,22 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>hajimehoshi@chromium.org</owner>
   <owner>kenjibaheux@google.com</owner>
   <owner>kouhei@chromium.org</owner>
-  <summary>The sum of all processes.  Recorded once per UMA ping.</summary>
+  <summary>
+    The sum of all processes. This is not aware of shared memory so it is just a
+    rough estimate. Recorded once per UMA ping. See Memory.Total2 for the same
+    metric with higher precision bucketing.
+  </summary>
+</histogram>
+
+<histogram name="Memory.Total2" units="MiB">
+  <owner>hajimehoshi@chromium.org</owner>
+  <owner>kenjibaheux@google.com</owner>
+  <owner>kouhei@chromium.org</owner>
+  <owner>rkaplow@chromium.org</owner>
+  <summary>
+    The sum of all processes. This is not aware of shared memory so it is just a
+    rough estimate. Recorded once per UMA ping.
+  </summary>
 </histogram>
 
 <histogram name="Memory.Utility" units="KB">
@@ -23355,6 +23421,13 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Net.SpdyHpackDecompressionPercentage" units="%">
+  <owner>ckrasic@chromium.org</owner>
+  <summary>
+    The compression percentage in received HPACK compressed header frames.
+  </summary>
+</histogram>
+
 <histogram name="Net.SpdyHpackEncodedCharacterFrequency" units="ASCII codes">
   <obsolete>
     Obsolete as HTTP/2 standard is finalized.
@@ -28668,6 +28741,19 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="PasswordManager.TotalAccountsHighRes.WithScheme"
+    units="accounts">
+  <owner>engedy@chromium.org</owner>
+  <owner>vabr@chromium.org</owner>
+  <summary>
+    The number of accounts stored in the password manager (across all sites) for
+    origins with the scheme (e.g., HTTP, HTTPS, FTP) as given in the histogram
+    suffix. For each scheme, the count is recorded once per browser start-up.
+    (In case of multiple profiles, the counts are for the profile that first has
+    a WebContents created.)
+  </summary>
+</histogram>
+
 <histogram name="PasswordManager.UIDismissalReason"
     enum="PasswordManagerUIDismissalReason">
   <owner>mkwst@chromium.org</owner>
@@ -32190,10 +32276,32 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Precache.Fetch.ResponseBytes" units="bytes">
+  <obsolete>
+    Deprecated July 29 2015.
+  </obsolete>
   <owner>twifkak@chromium.org</owner>
   <owner>bengr@chromium.org</owner>
   <summary>
     The total number of response bytes received from all prefetch requests,
+    including config, manifests, and resources. Logged per prefetch run.
+  </summary>
+</histogram>
+
+<histogram name="Precache.Fetch.ResponseBytes.Network" units="bytes">
+  <owner>twifkak@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The total number of response bytes received over the network from all
+    prefetch requests, including config, manifests, and resources. Logged per
+    prefetch run.
+  </summary>
+</histogram>
+
+<histogram name="Precache.Fetch.ResponseBytes.Total" units="bytes">
+  <owner>twifkak@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The total number of response bytes contained in all prefetch requests,
     including config, manifests, and resources. Logged per prefetch run.
   </summary>
 </histogram>
@@ -36792,6 +36900,18 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="SBClientDownload.ArchivedArchiveExtensions"
+    enum="SBClientDownloadExtensions">
+  <owner>asanka@chromium.org</owner>
+  <summary>
+    Records a histogram of archive file types that were found while examining a
+    downloaded ZIP file. Each archive file type in a single ZIP file is recorded
+    at most once. The relative incidence rate of each filetype in this histogram
+    should indicate the probability of finding that file type in a ZIP file
+    given that that ZIP file contains an archive file.
+  </summary>
+</histogram>
+
 <histogram name="SBClientDownload.CheckDownloadStats"
     enum="SBClientDownloadCheckDownloadStats">
   <owner>mattm@chromium.org</owner>
@@ -38112,7 +38232,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Search.MigratedPrefToDictionaryValue" enum="BooleanHit">
-  <owner>erikwright@chromium.org</owner>
+  <owner>caitkp@chromium.org</owner>
   <summary>
     The number of times that a user-selected DSE was migrated from separate
     String/List/..Value preferences to the new single DictionaryValue used in
@@ -38525,6 +38645,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="ServiceWorker.URLRequestJob.FallbackedRequestMode"
+    enum="FetchRequestMode">
+  <owner>horo@chromium.org</owner>
+  <summary>
+    Records the the mode of request that was fallbacked to the network by the
+    Service Worker.
+  </summary>
+</histogram>
+
 <histogram name="ServiceWorker.URLRequestJob.MainResource.Result"
     enum="ServiceWorkerURLRequestJobResult">
   <owner>falken@chromium.org</owner>
@@ -38653,6 +38782,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="SessionRestore.ForegroundTabFirstPaint" units="milliseconds">
+  <obsolete>
+    Deprecated 2015-03-13 in favor of SessionRestore.ForegroundTabFirstPaint2
+    and ultimately SessionRestore.ForegroundTabFirstPaint3.
+  </obsolete>
   <owner>jeremy@chromium.org</owner>
   <owner>sky@chromium.org</owner>
   <summary>
@@ -39312,6 +39445,13 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>mlerman@chromium.org</owner>
   <summary>
     Track when chrome successfully adds an account. Failures are not tracked.
+  </summary>
+</histogram>
+
+<histogram name="Signin.AndroidGetAccountsTime" units="milliseconds">
+  <owner>nyquist@chromium.org</owner>
+  <summary>
+    The time it takes to retrieve the list of accounts from the system.
   </summary>
 </histogram>
 
@@ -42727,7 +42867,6 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 
 <histogram name="Stability.BrowserExitCodes" enum="WindowsExitCode">
   <owner>siggi@chromium.org</owner>
-  <owner>erikwright@chromium.org</owner>
   <summary>
     Records the exit code of the browser process (on Windows) from the previous
     launch. On crash, the exit code will indicate the exception code of the
@@ -45209,6 +45348,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Tab.Discarding" enum="TabBackgroundLoadStatus">
+  <owner>georgesak@chromium.org</owner>
+  <summary>
+    Metric to track counts of actions related to tab discarding. Namely, we get
+    an event for every tab switch, split into two groups, whether it was a
+    discarded tab not. We also get an event whenever a tab gets discarded.
+  </summary>
+</histogram>
+
 <histogram name="Tab.EvictedTabWasActive" enum="Boolean">
   <owner>lliabraa@chromium.org</owner>
   <summary>
@@ -46304,7 +46452,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="UMA.CleanExitBeaconConsistency" enum="UmaCleanExitConsistency">
-  <owner>erikwright@chromium.org</owner>
+  <owner>siggi@chromium.org</owner>
   <summary>
     Reports the combined state of distinct clean exit beacons stored in Local
     State and the Windows registry. They are normally expected to be identical.
@@ -46420,6 +46568,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="UMA.LoadLogsTime" units="milliseconds">
+  <obsolete>
+    Deprecated as of August 2015. The histograms showed no unexpected slowness,
+    and a profiler is a better tool for identifying any future issues.
+  </obsolete>
   <owner>asvitkine@chromium.org</owner>
   <summary>
     The time spent to load (de-serialize) unsent logs from local state, recorded
@@ -46535,6 +46687,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="UMA.StoreLogsTime" units="milliseconds">
+  <obsolete>
+    Deprecated as of August 2015. The histograms showed no unexpected slowness,
+    and a profiler is a better tool for identifying any future issues.
+  </obsolete>
   <owner>asvitkine@chromium.org</owner>
   <summary>
     The time spent to store unsent logs to local state, which is done
@@ -50281,6 +50437,13 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 <histogram name="websql.Async.OpenTime.Success" units="milliseconds">
   <owner>cmumford@chromium.org</owner>
   <summary>The time required to successfully open a Web SQL database.</summary>
+</histogram>
+
+<histogram name="websql.OpenDatabase" enum="BooleanSecure">
+  <owner>michaeln@chromium.org</owner>
+  <summary>
+    Counts the number of WebSQL databases opened for secure vs insecure origins.
+  </summary>
 </histogram>
 
 <histogram name="Webstore.ExtensionInstallResult" enum="BooleanSuccess">
@@ -54942,6 +55105,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="302" label="Key Permissions"/>
   <int value="303" label="Welcome page on OS upgrade enabled"/>
   <int value="304" label="Use hardware acceleration when available"/>
+  <int value="305" label="Android Negotiate authenticator account type"/>
 </enum>
 
 <enum name="EnterprisePolicyInvalidations" type="int">
@@ -56638,7 +56802,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="971" label="INPUTMETHODPRIVATE_FETCHALLDICTIONARYWORDS"/>
   <int value="972" label="INPUTMETHODPRIVATE_ADDWORDTODICTIONARY"/>
   <int value="973"
-      label="WEBSTOREPRIVATE_SHOWPERMISSIONPROMPTFORDELEGATEDINSTALL"/>
+      label="DASHBOARDPRIVATE_SHOWPERMISSIONPROMPTFORDELEGATEDINSTALL"/>
   <int value="974" label="PRINTERPROVIDERINTERNAL_GETPRINTDATA"/>
   <int value="975" label="VIRTUALKEYBOARDPRIVATE_SETMODE"/>
   <int value="976" label="NETWORKINGPRIVATE_STARTACTIVATE"/>
@@ -56727,7 +56891,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="1058"
       label="FILESYSTEMPROVIDERINTERNAL_GETACTIONSREQUESTEDSUCCESS"/>
   <int value="1059"
-      label="WEBSTOREPRIVATE_SHOWPERMISSIONPROMPTFORDELEGATEDBUNDLEINSTALL"/>
+      label="DASHBOARDPRIVATE_SHOWPERMISSIONPROMPTFORDELEGATEDBUNDLEINSTALL"/>
   <int value="1060" label="FILEMANAGERPRIVATEINTERNAL_GETENTRYACTIONS"/>
   <int value="1061" label="FILEMANAGERPRIVATEINTERNAL_EXECUTEENTRYACTION"/>
   <int value="1062" label="MDNS_FORCEDISCOVERY"/>
@@ -56741,6 +56905,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="1069" label="LANGUAGESETTINGSPRIVATE_ADDINPUTMETHOD"/>
   <int value="1070" label="LANGUAGESETTINGSPRIVATE_REMOVEINPUTMETHOD"/>
   <int value="1071" label="FILEMANAGERPRIVATE_CANCELALLFILETRANSFERS"/>
+  <int value="1072" label="NETWORKINGPRIVATE_UNLOCKCELLULARSIM"/>
+  <int value="1073" label="NETWORKINGPRIVATE_SETCELLULARSIMSTATE"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -58242,6 +58408,30 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="896" label="MixedContentBlockableAllowed"/>
   <int value="897" label="PseudoBeforeAfterForInputElement"/>
   <int value="898" label="V8Permissions_Revoke_Method"/>
+  <int value="899" label="LinkRelDnsPrefetch"/>
+  <int value="900" label="LinkRelPreconnect"/>
+  <int value="901" label="LinkRelPreload"/>
+  <int value="902" label="LinkHeaderDnsPrefetch"/>
+  <int value="903" label="LinkHeaderPreconnect"/>
+  <int value="904" label="ClientHintsMetaAcceptCH"/>
+  <int value="905" label="HTMLElementDeprecatedWidth"/>
+  <int value="906" label="ClientHintsContentDPR"/>
+  <int value="907" label="ElementCreateShadowRootOpen"/>
+  <int value="908" label="ElementCreateShadowRootClosed"/>
+  <int value="909" label="AudioParamSetValueAtTime"/>
+  <int value="910" label="AudioParamLinearRampToValueAtTime"/>
+  <int value="911" label="AudioParamExponentialRampToValueAtTime"/>
+  <int value="912" label="AudioParamSetTargetAtTime"/>
+  <int value="913" label="AudioParamSetValueCurveAtTime"/>
+  <int value="914" label="AudioParamCancelScheduledValues"/>
+  <int value="915" label="V8Permissions_Request_Method"/>
+</enum>
+
+<enum name="FetchRequestMode" type="int">
+  <int value="0" label="SameOrigin"/>
+  <int value="1" label="NoCORS"/>
+  <int value="2" label="CORS"/>
+  <int value="3" label="CORSWithForcedPreflight"/>
 </enum>
 
 <enum name="FFmpegCodecs" type="int">
@@ -61277,6 +61467,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1930720286" label="nacl-debug-mask"/>
   <int value="-1928198763" label="enable-async-dns"/>
   <int value="-1925117279" label="disable-quic-https"/>
+  <int value="-1915854488" label="enable-offline-pages"/>
   <int value="-1911153473" label="enable-easy-signin"/>
   <int value="-1888273969" label="tab-capture-upscale-quality"/>
   <int value="-1887053262"
@@ -61339,6 +61530,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1392562498" label="disable-origin-chip"/>
   <int value="-1386966873" label="disable-mac-views-native-app-windows"/>
   <int value="-1375111024" label="enable-fixed-position-compositing"/>
+  <int value="-1365503870" label="enable-simplified-fullscreen-ui"/>
   <int value="-1358669137" label="enable-supervised-user-blacklist"/>
   <int value="-1357655121" label="enable-iframe-based-signin"/>
   <int value="-1349872906"
@@ -61387,6 +61579,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-996673716" label="enable-web-app-frame"/>
   <int value="-979057409" label="enable-seccomp-filter-sandbox"/>
   <int value="-979034258" label="disable-ntp-other-sessions-menu"/>
+  <int value="-978700508" label="disable-simplified-fullscreen-ui"/>
   <int value="-972425050" label="gesture-editing"/>
   <int value="-964676765" label="enable-accelerated-mjpeg-decode"/>
   <int value="-951394314" label="top-chrome-md"/>
@@ -61579,6 +61772,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="880510010" label="enable-permissions-bubbles"/>
   <int value="884106779" label="supervised-user-safesites"/>
   <int value="887011602" label="enable-spelling-auto-correct"/>
+  <int value="903267263" label="disable-offline-pages"/>
   <int value="909439558" label="disable-device-discovery"/>
   <int value="916316159" label="disable-new-app-list-mixer"/>
   <int value="929462705" label="disable-link-disambiguation-popup"/>
@@ -61723,6 +61917,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2037756154" label="enable-impl-side-painting"/>
   <int value="2059322877" label="new-avatar-menu"/>
   <int value="2071461362" label="disable-credit-card-scan"/>
+  <int value="2076903744" label="progress-bar-animation"/>
   <int value="2077917024"
       label="enable-supervised-user-managed-bookmarks-folder"/>
   <int value="2093235103" label="default-tile-width"/>
@@ -67494,6 +67689,22 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="49" label="SCF"/>
   <int value="50" label="SCT"/>
   <int value="51" label="WSF"/>
+  <int value="52" label="7Z"/>
+  <int value="53" label="XZ"/>
+  <int value="54" label="GZ"/>
+  <int value="55" label="TGZ"/>
+  <int value="56" label="BZ2"/>
+  <int value="57" label="TAR"/>
+  <int value="58" label="ARJ"/>
+  <int value="59" label="LZH"/>
+  <int value="60" label="LHA"/>
+  <int value="61" label="WIM"/>
+  <int value="62" label="Z"/>
+  <int value="63" label="LZMA"/>
+  <int value="64" label="CPIO"/>
+  <int value="65" label="CMD"/>
+  <int value="66" label="APP"/>
+  <int value="67" label="OSX"/>
 </enum>
 
 <enum name="SBClientDownloadIsSignedBinary" type="int">
@@ -69937,6 +70148,12 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2" label="Not loaded on creation"/>
 </enum>
 
+<enum name="TabDiscardingEvents" type="int">
+  <int value="0" label="Switched to an active tab"/>
+  <int value="1" label="Switched to a discarded tab"/>
+  <int value="2" label="Discarded a tab"/>
+</enum>
+
 <enum name="TabRendererCrashStatus" type="int">
   <int value="0" label="Shown in foreground app"/>
   <int value="1" label="Hidden in foreground app"/>
@@ -71018,6 +71235,15 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="5" label="Policy"/>
 </enum>
 
+<enum name="WebBluetoothFunction" type="int">
+  <int value="0" label="requestDevice()"/>
+  <int value="1" label="connectGATT()"/>
+  <int value="2" label="getPrimaryService()"/>
+  <int value="3" label="getCharacteristic()"/>
+  <int value="4" label="Characteristic.readValue()"/>
+  <int value="5" label="Characteristic.writeValue()"/>
+</enum>
+
 <enum name="WebFontCacheHit" type="int">
   <int value="0" label="Miss"/>
   <int value="1" label="Hit"/>
@@ -71331,6 +71557,12 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="PLT.StartToCommit_NormalLoad"/>
   <affected-histogram name="PLT.StartToFinish_LinkLoadNormal"/>
   <affected-histogram name="PLT.StartToFinish_NormalLoad"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="AndroidGetAccountsTypes">
+  <suffix name="AccountManager" label="Using Android AccountManager API"/>
+  <suffix name="GoogleAuthUtil" label="Using GoogleAuthUtil API"/>
+  <affected-histogram name="Signin.AndroidGetAccountsTime"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="AppListFirstPaintWarmStartFast" separator="">
@@ -74607,6 +74839,15 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="PasswordManager.SavePasswordPromptResponse"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="PasswordScheme" separator=".">
+  <suffix name="Android" label="The password is for an Android app."/>
+  <suffix name="Ftp" label="The scheme of the origin is FTP."/>
+  <suffix name="Http" label="The scheme of the origin is HTTP."/>
+  <suffix name="Https" label="The scheme of the origin is HTTPS."/>
+  <suffix name="Other" label="The scheme of the origin is something else."/>
+  <affected-histogram name="PasswordManager.TotalAccountsHighRes.WithScheme"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="PerformanceMonitor" separator=".">
   <suffix name="BrowserProcess"/>
   <suffix name="GPUProcess"/>
@@ -75884,11 +76125,21 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="ThreadWatcher.UnresponsiveThreads"/>
 </histogram_suffixes>
 
-<histogram_suffixes name="TotalTimeToGoogle" separator=".">
-  <suffix name="Quic"
-      label="Recorded for Google servers only when QUIC is used."/>
-  <suffix name="NotQuic"
-      label="Recorded for Google servers only when QUIC is not used."/>
+<histogram_suffixes name="TotalTimeToHttpsGoogle" separator=".">
+  <suffix name="Quic">
+    <obsolete>
+      Deprecated as of 08/2015. Use Net.HttpJob.*Secure.Quic instead.
+    </obsolete>
+  </suffix>
+  <suffix name="NotQuic">
+    <obsolete>
+      Deprecated as of 08/2015. Use Net.HttpJob.*Secure.NotQuic instead.
+    </obsolete>
+  </suffix>
+  <suffix name="Secure.Quic"
+      label="Recorded for Google servers (https) only when QUIC is used."/>
+  <suffix name="Secure.NotQuic"
+      label="Recorded for Google servers (https) only when QUIC is not used."/>
   <affected-histogram name="Net.HttpJob.TotalTime"/>
   <affected-histogram name="Net.HttpJob.TotalTimeCached"/>
   <affected-histogram name="Net.HttpJob.TotalTimeNotCached"/>
@@ -75925,8 +76176,10 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="inbox" label="Custom histogram for Inbox"/>
   <suffix name="plus" label="Custom histogram for Google+"/>
   <affected-histogram name="V8.MemoryExternalFragmentationTotal"/>
+  <affected-histogram name="V8.MemoryHeapCommitted"/>
   <affected-histogram name="V8.MemoryHeapSampleTotalCommitted"/>
   <affected-histogram name="V8.MemoryHeapSampleTotalUsed"/>
+  <affected-histogram name="V8.MemoryHeapUsed"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="WebFontFamily">

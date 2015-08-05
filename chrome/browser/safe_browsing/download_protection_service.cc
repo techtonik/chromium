@@ -12,6 +12,7 @@
 #include "base/metrics/field_trial.h"
 #include "base/metrics/histogram.h"
 #include "base/metrics/sparse_histogram.h"
+#include "base/prefs/pref_service.h"
 #include "base/sequenced_task_runner_helpers.h"
 #include "base/stl_util.h"
 #include "base/strings/string_number_conversions.h"
@@ -23,11 +24,13 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/safe_browsing/download_feedback_service.h"
 #include "chrome/browser/safe_browsing/safe_browsing_service.h"
 #include "chrome/browser/safe_browsing/sandboxed_zip_analyzer.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_list.h"
+#include "chrome/common/pref_names.h"
 #include "chrome/common/safe_browsing/binary_feature_extractor.h"
 #include "chrome/common/safe_browsing/csd.pb.h"
 #include "chrome/common/safe_browsing/download_protection_util.h"
@@ -63,83 +66,20 @@ const char DownloadProtectionService::kDownloadRequestUrl[] =
     "https://sb-ssl.google.com/safebrowsing/clientreport/download";
 
 namespace {
-// List of extensions for which we track some UMA stats. The position of the
-// extension in kDangerousFileTypes is considered to be the UMA enumeration
-// value. Naturally, new values should only be added at the end.
-const base::FilePath::CharType* const kDangerousFileTypes[] = {
-    FILE_PATH_LITERAL(".exe"),
-    FILE_PATH_LITERAL(".msi"),
-    FILE_PATH_LITERAL(".cab"),
-    FILE_PATH_LITERAL(".sys"),
-    FILE_PATH_LITERAL(".scr"),
-    FILE_PATH_LITERAL(".drv"),
-    FILE_PATH_LITERAL(".bat"),
-    FILE_PATH_LITERAL(".zip"),
-    FILE_PATH_LITERAL(".rar"),
-    FILE_PATH_LITERAL(".dll"),
-    FILE_PATH_LITERAL(".pif"),
-    FILE_PATH_LITERAL(".com"),
-    FILE_PATH_LITERAL(".jar"),
-    FILE_PATH_LITERAL(".class"),
-    FILE_PATH_LITERAL(".pdf"),
-    FILE_PATH_LITERAL(".vb"),
-    FILE_PATH_LITERAL(".reg"),
-    FILE_PATH_LITERAL(".grp"),
-    nullptr,  // The "Other" bucket. This is in the middle of the array due to
-              // historical reasons.
-    FILE_PATH_LITERAL(".crx"),
-    FILE_PATH_LITERAL(".apk"),
-    FILE_PATH_LITERAL(".dmg"),
-    FILE_PATH_LITERAL(".pkg"),
-    FILE_PATH_LITERAL(".torrent"),
-    FILE_PATH_LITERAL(".website"),
-    FILE_PATH_LITERAL(".url"),
-    FILE_PATH_LITERAL(".vbe"),
-    FILE_PATH_LITERAL(".vbs"),
-    FILE_PATH_LITERAL(".js"),
-    FILE_PATH_LITERAL(".jse"),
-    FILE_PATH_LITERAL(".mht"),
-    FILE_PATH_LITERAL(".mhtml"),
-    FILE_PATH_LITERAL(".msc"),
-    FILE_PATH_LITERAL(".msp"),
-    FILE_PATH_LITERAL(".mst"),
-    FILE_PATH_LITERAL(".bas"),
-    FILE_PATH_LITERAL(".hta"),
-    FILE_PATH_LITERAL(".msh"),
-    FILE_PATH_LITERAL(".msh1"),
-    FILE_PATH_LITERAL(".msh1xml"),
-    FILE_PATH_LITERAL(".msh2"),
-    FILE_PATH_LITERAL(".msh2xml"),
-    FILE_PATH_LITERAL(".mshxml"),
-    FILE_PATH_LITERAL(".ps1"),
-    FILE_PATH_LITERAL(".ps1xml"),
-    FILE_PATH_LITERAL(".ps2"),
-    FILE_PATH_LITERAL(".ps2xml"),
-    FILE_PATH_LITERAL(".psc1"),
-    FILE_PATH_LITERAL(".psc2"),
-    FILE_PATH_LITERAL(".scf"),
-    FILE_PATH_LITERAL(".sct"),
-    FILE_PATH_LITERAL(".wsf"),
-};
-
-// UMA enumeration value for unrecognized file types. This is the array index of
-// the "Other" bucket in kDangerousFileTypes.
-const int EXTENSION_OTHER = 18;
-
 void RecordFileExtensionType(const base::FilePath& file) {
-  DCHECK_EQ(static_cast<base::FilePath::CharType*>(nullptr),
-            kDangerousFileTypes[EXTENSION_OTHER]);
+  UMA_HISTOGRAM_ENUMERATION(
+      "SBClientDownload.DownloadExtensions",
+      download_protection_util::GetSBClientDownloadExtensionValueForUMA(file),
+      download_protection_util::kSBClientDownloadExtensionsMax);
+}
 
-  int extension_type = EXTENSION_OTHER;
-  for (const auto& extension : kDangerousFileTypes) {
-    if (extension && file.MatchesExtension(extension)) {
-      extension_type = &extension - kDangerousFileTypes;
-      break;
-    }
-  }
-
-  UMA_HISTOGRAM_ENUMERATION("SBClientDownload.DownloadExtensions",
-                            extension_type, arraysize(kDangerousFileTypes));
+void RecordArchivedArchiveFileExtensionType(
+    const base::FilePath::StringType& extension) {
+  UMA_HISTOGRAM_ENUMERATION(
+      "SBClientDownload.ArchivedArchiveExtensions",
+      download_protection_util::GetSBClientDownloadExtensionValueForUMA(
+          base::FilePath(extension)),
+      download_protection_util::kSBClientDownloadExtensionsMax);
 }
 
 // Enumerate for histogramming purposes.
@@ -194,7 +134,12 @@ class DownloadSBClient
         ui_manager_(ui_manager),
         start_time_(base::TimeTicks::Now()),
         total_type_(total_type),
-        dangerous_type_(dangerous_type) {}
+        dangerous_type_(dangerous_type) {
+    Profile* profile = Profile::FromBrowserContext(item.GetBrowserContext());
+    is_extended_reporting_ = profile &&
+                             profile->GetPrefs()->GetBoolean(
+                                 prefs::kSafeBrowsingExtendedReportingEnabled);
+  }
 
   virtual void StartCheck() = 0;
   virtual bool IsDangerous(SBThreatType threat_type) const = 0;
@@ -230,13 +175,13 @@ class DownloadSBClient
     for (size_t i = 0; i < url_chain_.size(); ++i) {
       post_data += url_chain_[i].spec() + "\n";
     }
-    ui_manager_->ReportSafeBrowsingHit(
-        url_chain_.back(),  // malicious_url
-        url_chain_.front(), // page_url
-        referrer_url_,
-        true,  // is_subresource
-        threat_type,
-        post_data);
+    ui_manager_->ReportSafeBrowsingHit(url_chain_.back(),   // malicious_url
+                                       url_chain_.front(),  // page_url
+                                       referrer_url_,
+                                       true,  // is_subresource
+                                       threat_type,
+                                       post_data,
+                                       is_extended_reporting_);
   }
 
   void UpdateDownloadCheckStats(SBStatsType stat_type) {
@@ -255,6 +200,7 @@ class DownloadSBClient
  private:
   const SBStatsType total_type_;
   const SBStatsType dangerous_type_;
+  bool is_extended_reporting_;
 
   DISALLOW_COPY_AND_ASSIGN(DownloadSBClient);
 };
@@ -502,7 +448,7 @@ class DownloadProtectionService::CheckClientDownloadRequest
       *reason = REASON_INVALID_URL;
       return false;
     }
-    if (!download_protection_util::IsBinaryFile(target_path)) {
+    if (!download_protection_util::IsSupportedBinaryFile(target_path)) {
       *reason = REASON_NOT_BINARY_FILE;
       return false;
     }
@@ -601,6 +547,7 @@ class DownloadProtectionService::CheckClientDownloadRequest
 
   void OnZipAnalysisFinished(const zip_analyzer::Results& results) {
     DCHECK_CURRENTLY_ON(BrowserThread::UI);
+    DCHECK_EQ(ClientDownloadRequest::ZIPPED_EXECUTABLE, type_);
     if (!service_)
       return;
     if (results.success) {
@@ -618,11 +565,16 @@ class DownloadProtectionService::CheckClientDownloadRequest
                           results.has_archive && !zipped_executable_);
     UMA_HISTOGRAM_TIMES("SBClientDownload.ExtractZipFeaturesTime",
                         base::TimeTicks::Now() - zip_analysis_start_time_);
+    for (const auto& file_extension : results.archived_archive_filetypes)
+      RecordArchivedArchiveFileExtensionType(file_extension);
 
-    if (!zipped_executable_) {
+    if (!zipped_executable_ && !results.has_archive) {
       PostFinishTask(UNKNOWN, REASON_ARCHIVE_WITHOUT_BINARIES);
       return;
     }
+
+    if (!zipped_executable_ && results.has_archive)
+      type_ = ClientDownloadRequest::ZIPPED_ARCHIVE;
     OnFileFeatureExtractionDone();
   }
 
@@ -732,8 +684,23 @@ class DownloadProtectionService::CheckClientDownloadRequest
     // before sending it.
     if (!service_)
       return;
+    bool is_extended_reporting = false;
+    if (item_->GetBrowserContext()) {
+      Profile* profile =
+          Profile::FromBrowserContext(item_->GetBrowserContext());
+      is_extended_reporting = profile &&
+                              profile->GetPrefs()->GetBoolean(
+                                  prefs::kSafeBrowsingExtendedReportingEnabled);
+    }
 
     ClientDownloadRequest request;
+    if (is_extended_reporting) {
+      request.mutable_population()->set_user_population(
+          ChromeUserPopulation::EXTENDED_REPORTING);
+    } else {
+      request.mutable_population()->set_user_population(
+          ChromeUserPopulation::SAFE_BROWSING);
+    }
     request.set_url(SanitizeUrl(item_->GetUrlChain().back()));
     request.mutable_digests()->set_sha256(item_->GetHash());
     request.set_length(item_->GetReceivedBytes());

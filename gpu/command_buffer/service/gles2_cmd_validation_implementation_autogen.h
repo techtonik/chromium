@@ -36,8 +36,11 @@ static const GLenum valid_buffer_parameter_table[] = {
 };
 
 static const GLenum valid_buffer_parameter_table_es3[] = {
-    GL_BUFFER_ACCESS_FLAGS, GL_BUFFER_MAPPED, GL_BUFFER_MAP_LENGTH,
-    GL_BUFFER_MAP_OFFSET,
+    GL_BUFFER_ACCESS_FLAGS, GL_BUFFER_MAPPED,
+};
+
+static const GLenum valid_buffer_parameter_64_table[] = {
+    GL_BUFFER_SIZE, GL_BUFFER_MAP_LENGTH, GL_BUFFER_MAP_OFFSET,
 };
 
 static const GLenum valid_buffer_target_table[] = {
@@ -505,6 +508,27 @@ static const GLenum valid_query_target_table[] = {
     GL_COMMANDS_COMPLETED_CHROMIUM,
 };
 
+static const GLenum valid_read_buffer_table[] = {
+    GL_NONE,
+    GL_BACK,
+    GL_COLOR_ATTACHMENT0,
+    GL_COLOR_ATTACHMENT1,
+    GL_COLOR_ATTACHMENT2,
+    GL_COLOR_ATTACHMENT3,
+    GL_COLOR_ATTACHMENT4,
+    GL_COLOR_ATTACHMENT5,
+    GL_COLOR_ATTACHMENT6,
+    GL_COLOR_ATTACHMENT7,
+    GL_COLOR_ATTACHMENT8,
+    GL_COLOR_ATTACHMENT9,
+    GL_COLOR_ATTACHMENT10,
+    GL_COLOR_ATTACHMENT11,
+    GL_COLOR_ATTACHMENT12,
+    GL_COLOR_ATTACHMENT13,
+    GL_COLOR_ATTACHMENT14,
+    GL_COLOR_ATTACHMENT15,
+};
+
 static const GLenum valid_read_pixel_format_table[] = {
     GL_ALPHA, GL_RGB, GL_RGBA,
 };
@@ -942,6 +966,8 @@ Validators::Validators()
       buffer_mode(valid_buffer_mode_table, arraysize(valid_buffer_mode_table)),
       buffer_parameter(valid_buffer_parameter_table,
                        arraysize(valid_buffer_parameter_table)),
+      buffer_parameter_64(valid_buffer_parameter_64_table,
+                          arraysize(valid_buffer_parameter_64_table)),
       buffer_target(valid_buffer_target_table,
                     arraysize(valid_buffer_target_table)),
       buffer_usage(valid_buffer_usage_table,
@@ -1014,6 +1040,7 @@ Validators::Validators()
                       arraysize(valid_query_parameter_table)),
       query_target(valid_query_target_table,
                    arraysize(valid_query_target_table)),
+      read_buffer(valid_read_buffer_table, arraysize(valid_read_buffer_table)),
       read_pixel_format(valid_read_pixel_format_table,
                         arraysize(valid_read_pixel_format_table)),
       read_pixel_type(valid_read_pixel_type_table,

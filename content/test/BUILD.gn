@@ -320,6 +320,7 @@ if (!is_mac) {
       ":web_ui_test_mojo_bindings",
       "//base/allocator",
       "//base/test:test_support",
+      "//content/browser/background_sync:background_sync_proto",
       "//content/common:mojo_bindings",
       "//content/gpu",
       "//content/public/common",
@@ -373,6 +374,11 @@ if (!is_mac) {
       "//ppapi:ppapi_tests",
       "//third_party/mesa:osmesa",
     ]
+
+    if (!is_chromeos) {
+      sources -=
+          [ "../browser/web_contents/touch_editable_impl_aura_browsertest.cc" ]
+    }
 
     if (is_win) {
       sources += rebase_path(
@@ -459,16 +465,9 @@ if (!is_mac) {
               "//content")
     }
 
-    if (use_aura) {
-      deps += [
-        "//ui/touch_selection:test_support",
-        "//ui/touch_selection:touch_selection",
-      ]
-    } else {
-      sources -= [
-        "../browser/renderer_host/input/touch_selection_controller_client_aura_browsertest.cc",
-        "../browser/web_contents/web_contents_view_aura_browsertest.cc",
-      ]
+    if (!use_aura) {
+      sources -=
+          [ "../browser/web_contents/web_contents_view_aura_browsertest.cc" ]
     }
   }
 }
@@ -564,6 +563,7 @@ test("content_unittests") {
       "//third_party/icu",
       "//third_party/leveldatabase",
       "//third_party/libjingle",
+      "//ui/compositor:test_support",
       "//ui/gl",
       "//ui/gl:test_support",
     ]

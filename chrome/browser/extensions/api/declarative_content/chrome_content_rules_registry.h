@@ -11,11 +11,11 @@
 #include <utility>
 #include <vector>
 
+#include "base/callback.h"
 #include "base/memory/linked_ptr.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/scoped_vector.h"
 #include "chrome/browser/extensions/api/declarative_content/content_action.h"
-#include "chrome/browser/extensions/api/declarative_content/content_condition.h"
 #include "chrome/browser/extensions/api/declarative_content/declarative_content_condition_tracker_delegate.h"
 #include "chrome/browser/extensions/api/declarative_content/declarative_content_css_condition_tracker.h"
 #include "chrome/browser/extensions/api/declarative_content/declarative_content_is_bookmarked_condition_tracker.h"
@@ -44,6 +44,51 @@ class URLRequest;
 }
 
 namespace extensions {
+
+class Extension;
+
+// Representation of a condition in the Declarative Content API. A condition
+// consists of a set of predicates on the page state, all of which must be
+// satisified for the condition to be fulfilled.
+struct ContentCondition {
+ public:
+  ContentCondition(
+      scoped_ptr<DeclarativeContentPageUrlPredicate> page_url_predicate,
+      scoped_ptr<DeclarativeContentCssPredicate> css_predicate,
+      scoped_ptr<DeclarativeContentIsBookmarkedPredicate>
+          is_bookmarked_predicate);
+  ~ContentCondition();
+
+  scoped_ptr<DeclarativeContentPageUrlPredicate> page_url_predicate;
+  scoped_ptr<DeclarativeContentCssPredicate> css_predicate;
+  scoped_ptr<DeclarativeContentIsBookmarkedPredicate> is_bookmarked_predicate;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(ContentCondition);
+};
+
+// Defines the interface for a predicate factory. Temporary, until we can
+// introduce an interface to be implemented by the trackers that returns a
+// ContentPredicate.
+template <class T>
+using PredicateFactory =
+    base::Callback<scoped_ptr<T>(const Extension* extension,
+                                 const base::Value& value,
+                                 std::string* error)>;
+
+// Factory function that instantiates a ContentCondition according to the
+// description |condition| passed by the extension API.  |condition| should be
+// an instance of declarativeContent.PageStateMatcher.
+scoped_ptr<ContentCondition> CreateContentCondition(
+    const Extension* extension,
+    const PredicateFactory<DeclarativeContentCssPredicate>&
+        css_predicate_factory,
+    const PredicateFactory<DeclarativeContentIsBookmarkedPredicate>&
+        is_bookmarked_predicate_factory,
+    const PredicateFactory<DeclarativeContentPageUrlPredicate>&
+        page_url_predicate_factory,
+    const base::Value& condition,
+    std::string* error);
 
 // The ChromeContentRulesRegistry is responsible for managing
 // the internal representation of rules for the Declarative Content API.
@@ -150,15 +195,23 @@ class ChromeContentRulesRegistry
   };
 
   class EvaluationScope;
+  struct RendererContentMatchData;
 
   // Creates a ContentRule for |extension| given a json definition.  The format
   // of each condition and action's json is up to the specific ContentCondition
   // and ContentAction.  |extension| may be NULL in tests.  If |error| is empty,
   // the translation was successful and the returned rule is internally
   // consistent.
-  scoped_ptr<const ContentRule> CreateRule(const Extension* extension,
-                                           const api::events::Rule& api_rule,
-                                           std::string* error);
+  scoped_ptr<const ContentRule> CreateRule(
+      const Extension* extension,
+      const PredicateFactory<DeclarativeContentCssPredicate>&
+          css_predicate_factory,
+      const PredicateFactory<DeclarativeContentIsBookmarkedPredicate>&
+          is_bookmarked_predicate_factory,
+      const PredicateFactory<DeclarativeContentPageUrlPredicate>&
+          page_url_predicate_factory,
+      const api::events::Rule& api_rule,
+      std::string* error);
 
   // True if this object is managing the rules for |context|.
   bool ManagingRulesForBrowserContext(content::BrowserContext* context);
@@ -169,6 +222,11 @@ class ChromeContentRulesRegistry
 
   // Updates the condition evaluator with the current watched CSS selectors.
   void UpdateCssSelectorsFromRules();
+
+  // Returns true if all predicates in |condition| evaluate to true.
+  bool IsConditionFulfilled(
+      const ContentCondition& condition,
+      const RendererContentMatchData& renderer_data) const;
 
   // Evaluates the conditions for |tab| based on the tab state and matching CSS
   // selectors.

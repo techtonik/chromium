@@ -32,20 +32,12 @@ class ChromePermissionMessageProviderUnittest : public testing::Test {
   ~ChromePermissionMessageProviderUnittest() override {}
 
  protected:
-  std::vector<base::string16> GetMessages(const APIPermissionSet& permissions,
+  CoalescedPermissionMessages GetMessages(const APIPermissionSet& permissions,
                                           Manifest::Type type) {
     scoped_refptr<const PermissionSet> permission_set = new PermissionSet(
         permissions, ManifestPermissionSet(), URLPatternSet(), URLPatternSet());
-    return message_provider_->GetLegacyWarningMessages(permission_set.get(),
-                                                       type);
-  }
-
-  std::vector<base::string16> GetDetails(const APIPermissionSet& permissions,
-                                         Manifest::Type type) {
-    scoped_refptr<const PermissionSet> permission_set = new PermissionSet(
-        permissions, ManifestPermissionSet(), URLPatternSet(), URLPatternSet());
-    return message_provider_->GetLegacyWarningMessagesDetails(
-        permission_set.get(), type);
+    return message_provider_->GetPermissionMessages(
+        message_provider_->GetAllPermissionIDs(permission_set.get(), type));
   }
 
  private:
@@ -58,32 +50,36 @@ class ChromePermissionMessageProviderUnittest : public testing::Test {
 // superset permission message is displayed if they are both present.
 TEST_F(ChromePermissionMessageProviderUnittest,
        SupersetOverridesSubsetPermission) {
-  APIPermissionSet permissions;
-  std::vector<base::string16> messages;
-
-  permissions.clear();
-  permissions.insert(APIPermission::kTab);
-  messages = GetMessages(permissions, Manifest::TYPE_PLATFORM_APP);
-  ASSERT_EQ(1U, messages.size());
-  EXPECT_EQ(
-      l10n_util::GetStringUTF16(IDS_EXTENSION_PROMPT_WARNING_HISTORY_READ),
-      messages[0]);
-
-  permissions.clear();
-  permissions.insert(APIPermission::kTopSites);
-  messages = GetMessages(permissions, Manifest::TYPE_PLATFORM_APP);
-  ASSERT_EQ(1U, messages.size());
-  EXPECT_EQ(l10n_util::GetStringUTF16(IDS_EXTENSION_PROMPT_WARNING_TOPSITES),
-            messages[0]);
-
-  permissions.clear();
-  permissions.insert(APIPermission::kTab);
-  permissions.insert(APIPermission::kTopSites);
-  messages = GetMessages(permissions, Manifest::TYPE_PLATFORM_APP);
-  ASSERT_EQ(1U, messages.size());
-  EXPECT_EQ(
-      l10n_util::GetStringUTF16(IDS_EXTENSION_PROMPT_WARNING_HISTORY_READ),
-      messages[0]);
+  {
+    APIPermissionSet permissions;
+    permissions.insert(APIPermission::kTab);
+    CoalescedPermissionMessages messages =
+        GetMessages(permissions, Manifest::TYPE_PLATFORM_APP);
+    ASSERT_EQ(1U, messages.size());
+    EXPECT_EQ(
+        l10n_util::GetStringUTF16(IDS_EXTENSION_PROMPT_WARNING_HISTORY_READ),
+        messages.front().message());
+  }
+  {
+    APIPermissionSet permissions;
+    permissions.insert(APIPermission::kTopSites);
+    CoalescedPermissionMessages messages =
+        GetMessages(permissions, Manifest::TYPE_PLATFORM_APP);
+    ASSERT_EQ(1U, messages.size());
+    EXPECT_EQ(l10n_util::GetStringUTF16(IDS_EXTENSION_PROMPT_WARNING_TOPSITES),
+              messages.front().message());
+  }
+  {
+    APIPermissionSet permissions;
+    permissions.insert(APIPermission::kTab);
+    permissions.insert(APIPermission::kTopSites);
+    CoalescedPermissionMessages messages =
+        GetMessages(permissions, Manifest::TYPE_PLATFORM_APP);
+    ASSERT_EQ(1U, messages.size());
+    EXPECT_EQ(
+        l10n_util::GetStringUTF16(IDS_EXTENSION_PROMPT_WARNING_HISTORY_READ),
+        messages.front().message());
+  }
 }
 
 // Checks that when permissions are merged into a single message, their details
@@ -105,21 +101,21 @@ TEST_F(ChromePermissionMessageProviderUnittest,
   ASSERT_TRUE(usb->FromValue(devices_list.get(), nullptr, nullptr));
   permissions.insert(usb.release());
 
-  std::vector<base::string16> messages =
+  CoalescedPermissionMessages messages =
       GetMessages(permissions, Manifest::TYPE_EXTENSION);
-  std::vector<base::string16> details =
-      GetDetails(permissions, Manifest::TYPE_EXTENSION);
 
   ASSERT_EQ(2U, messages.size());
-  ASSERT_EQ(messages.size(), details.size());
-  EXPECT_EQ(
-      l10n_util::GetStringUTF16(IDS_EXTENSION_PROMPT_WARNING_HISTORY_READ),
-      messages[0]);
-  EXPECT_TRUE(details[0].empty());
+  auto it = messages.begin();
+  const CoalescedPermissionMessage& message0 = *it++;
   EXPECT_EQ(
       l10n_util::GetStringUTF16(IDS_EXTENSION_PROMPT_WARNING_USB_DEVICE_LIST),
-      messages[1]);
-  EXPECT_FALSE(details[1].empty());
+      message0.message());
+  EXPECT_FALSE(message0.submessages().empty());
+  const CoalescedPermissionMessage& message1 = *it++;
+  EXPECT_EQ(
+      l10n_util::GetStringUTF16(IDS_EXTENSION_PROMPT_WARNING_HISTORY_READ),
+      message1.message());
+  EXPECT_TRUE(message1.submessages().empty());
 }
 
 }  // namespace extensions

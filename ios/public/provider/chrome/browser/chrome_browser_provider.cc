@@ -58,6 +58,10 @@ InfoBarViewPlaceholder ChromeBrowserProvider::CreateInfoBarView(
   return nullptr;
 }
 
+ChromeIdentityService* ChromeBrowserProvider::GetChromeIdentityService() {
+  return nullptr;
+}
+
 StringProvider* ChromeBrowserProvider::GetStringProvider() {
   return nullptr;
 }
@@ -96,25 +100,7 @@ std::string ChromeBrowserProvider::GetRiskData() {
   return std::string();
 }
 
-std::string ChromeBrowserProvider::GetProductVersionWithPrefix(
-    const std::string& prefix) {
-  NOTREACHED();
-  return std::string();
-}
-
-std::string ChromeBrowserProvider::GetVersionString() {
-  return std::string();
-}
-
-std::string ChromeBrowserProvider::GetVersionNumber() {
-  return std::string();
-}
-
 rappor::RapporService* ChromeBrowserProvider::GetRapporService() {
-  return nullptr;
-}
-
-SearchProvider* ChromeBrowserProvider::GetSearchProvider() {
   return nullptr;
 }
 

@@ -789,12 +789,15 @@ void BridgedNativeWidget::CreateLayer(ui::LayerType layer_type,
 ////////////////////////////////////////////////////////////////////////////////
 // BridgedNativeWidget, internal::InputMethodDelegate:
 
-bool BridgedNativeWidget::DispatchKeyEventPostIME(const ui::KeyEvent& key) {
+ui::EventDispatchDetails BridgedNativeWidget::DispatchKeyEventPostIME(
+    ui::KeyEvent* key) {
   DCHECK(focus_manager_);
-  native_widget_mac_->GetWidget()->OnKeyEvent(const_cast<ui::KeyEvent*>(&key));
-  if (!key.handled())
-    return !focus_manager_->OnKeyEvent(key);
-  return key.handled();
+  native_widget_mac_->GetWidget()->OnKeyEvent(key);
+  if (!key->handled()) {
+    if (!focus_manager_->OnKeyEvent(*key))
+      key->StopPropagation();
+  }
+  return ui::EventDispatchDetails();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1002,8 +1005,15 @@ void BridgedNativeWidget::InitCompositor() {
 }
 
 void BridgedNativeWidget::DestroyCompositor() {
-  if (layer())
+  if (layer()) {
+    // LayerOwner supports a change in ownership, e.g., to animate a closing
+    // window, but that won't work as expected for the root layer in
+    // BridgedNativeWidget.
+    DCHECK_EQ(this, layer()->owner());
+    layer()->CompleteAllAnimations();
+    layer()->SuppressPaint();
     layer()->set_delegate(nullptr);
+  }
   DestroyLayer();
 
   if (!compositor_widget_) {

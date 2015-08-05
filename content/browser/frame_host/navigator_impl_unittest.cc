@@ -15,6 +15,7 @@
 #include "content/browser/streams/stream.h"
 #include "content/common/frame_messages.h"
 #include "content/common/navigation_params.h"
+#include "content/common/site_isolation_policy.h"
 #include "content/public/browser/stream_handle.h"
 #include "content/public/common/url_constants.h"
 #include "content/public/common/url_utils.h"
@@ -54,10 +55,10 @@ class NavigatorTestWithBrowserSideNavigation
   }
 
   void TearDown() override {
+    RenderViewHostImplTestHarness::TearDown();
 #if !defined(OS_ANDROID)
     ImageTransportFactory::Terminate();
 #endif
-    RenderViewHostImplTestHarness::TearDown();
   }
 
   TestNavigationURLLoader* GetLoaderForNavigationRequest(
@@ -100,12 +101,10 @@ class NavigatorTestWithBrowserSideNavigation
   // the tracked commit happens to clear up commit messages from previous
   // navigations.
   bool DidRenderFrameHostRequestCommit(TestRenderFrameHost* rfh) {
-    const FrameMsg_CommitNavigation* commit_message =
-        static_cast<const FrameMsg_CommitNavigation*>(
-            rfh->GetProcess()->sink().GetUniqueMessageMatching(
-                FrameMsg_CommitNavigation::ID));
-    return commit_message &&
-           rfh->GetRoutingID() == commit_message->routing_id();
+    const IPC::Message* message =
+        rfh->GetProcess()->sink().GetUniqueMessageMatching(
+            FrameMsg_CommitNavigation::ID);
+    return message && rfh->GetRoutingID() == message->routing_id();
   }
 
   SiteInstance* ConvertToSiteInstance(RenderFrameHostManager* rfhm,
@@ -934,7 +933,7 @@ TEST_F(NavigatorTestWithBrowserSideNavigation,
        SpeculativeRendererReuseSwappedOutRFH) {
   // This test doesn't make sense in --site-per-process where swapped out
   // RenderFrameHost is no longer used.
-  if (RenderFrameHostManager::IsSwappedOutStateForbidden())
+  if (SiteIsolationPolicy::IsSwappedOutStateForbidden())
     return;
 
   // Navigate to an initial site.

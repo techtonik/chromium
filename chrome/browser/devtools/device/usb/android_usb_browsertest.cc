@@ -166,6 +166,10 @@ class MockUsbDeviceHandle : public UsbDeviceHandle {
     NOTIMPLEMENTED();
   }
 
+  void ClearHalt(uint8 endpoint, const ResultCallback& callback) override {
+    NOTIMPLEMENTED();
+  }
+
   // Async IO. Can be called on any thread.
   void ControlTransfer(UsbEndpointDirection direction,
                        TransferRequestType request_type,
@@ -415,7 +419,7 @@ class MockUsbDevice : public UsbDevice {
                                             new MockUsbDeviceHandle<T>(this))));
   }
 
-  const UsbConfigDescriptor* GetConfiguration() override {
+  const UsbConfigDescriptor* GetActiveConfiguration() override {
     return T::kConfigured ? &config_desc_ : nullptr;
   }
 

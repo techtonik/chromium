@@ -2,17 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "net/spdy/spdy_framer.h"
+
+#include <stdlib.h>
+#include <string.h>
+
 #include <algorithm>
-#include <iostream>
 #include <limits>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "base/compiler_specific.h"
 #include "base/memory/scoped_ptr.h"
-#include "net/spdy/hpack_output_stream.h"
+#include "net/spdy/hpack/hpack_constants.h"
 #include "net/spdy/mock_spdy_framer_visitor.h"
 #include "net/spdy/spdy_frame_builder.h"
 #include "net/spdy/spdy_frame_reader.h"
-#include "net/spdy/spdy_framer.h"
 #include "net/spdy/spdy_protocol.h"
 #include "net/spdy/spdy_test_utils.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -484,7 +490,7 @@ class TestSpdyVisitor : public SpdyFramerVisitorInterface,
     const char* input_ptr = reinterpret_cast<const char*>(input);
     while (input_remaining > 0 &&
            framer_.error_code() == SpdyFramer::SPDY_NO_ERROR) {
-      // To make the tests more interesting, we feed random (amd small) chunks
+      // To make the tests more interesting, we feed random (and small) chunks
       // into the framer.  This simulates getting strange-sized reads from
       // the socket.
       const size_t kMaxReadSize = 32;
@@ -4372,27 +4378,27 @@ TEST_P(SpdyFramerTest, ReadHeadersWithContinuation) {
     0x00, 0x00, 0x14, 0x01, 0x08,  // HEADERS: PADDED
     0x00, 0x00, 0x00, 0x01,  // Stream 1
     0x03,                    // Padding of 3.
-    0x00, 0x06, 0x63, 0x6f,
-    0x6f, 0x6b, 0x69, 0x65,
-    0x07, 0x66, 0x6f, 0x6f,
-    0x3d, 0x62, 0x61, 0x72,
+    0x00, 0x06, 'c', 'o',
+    'o',  'k',  'i', 'e',
+    0x07, 'f',  'o', 'o',
+    '=',  'b',  'a', 'r',
     0x00, 0x00, 0x00,
 
     0x00, 0x00, 0x14, 0x09, 0x00,  // CONTINUATION
     0x00, 0x00, 0x00, 0x01,  // Stream 1
-    0x00, 0x06, 0x63, 0x6f,
-    0x6f, 0x6b, 0x69, 0x65,
-    0x08, 0x62, 0x61, 0x7a,
-    0x3d, 0x62, 0x69, 0x6e,
-    0x67, 0x00, 0x06, 0x63,
+    0x00, 0x06, 'c',  'o',
+    'o',  'k',  'i',  'e',
+    0x08, 'b',  'a',  'z',
+    '=',  'b',  'i',  'n',
+    'g',  0x00, 0x06, 'c',
 
     0x00, 0x00, 0x12, 0x09, 0x04,  // CONTINUATION: END_HEADERS
     0x00, 0x00, 0x00, 0x01,  // Stream 1
-    0x6f, 0x6f, 0x6b, 0x69,
-    0x65, 0x00, 0x00, 0x04,
-    0x6e, 0x61, 0x6d, 0x65,
-    0x05, 0x76, 0x61, 0x6c,
-    0x75, 0x65,
+    'o',  'o',  'k',  'i',
+    'e',  0x00, 0x00, 0x04,
+    'n',  'a',  'm',  'e',
+    0x05, 'v',  'a',  'l',
+    'u',  'e',
   };
 
   TestSpdyVisitor visitor(spdy_version_);
@@ -4418,26 +4424,26 @@ TEST_P(SpdyFramerTest, ReadHeadersWithContinuationAndFin) {
   const unsigned char kInput[] = {
     0x00, 0x00, 0x10, 0x01, 0x01,  // HEADERS: FIN
     0x00, 0x00, 0x00, 0x01,  // Stream 1
-    0x00, 0x06, 0x63, 0x6f,
-    0x6f, 0x6b, 0x69, 0x65,
-    0x07, 0x66, 0x6f, 0x6f,
-    0x3d, 0x62, 0x61, 0x72,
+    0x00, 0x06, 'c', 'o',
+    'o',  'k',  'i', 'e',
+    0x07, 'f',  'o', 'o',
+    '=',  'b',  'a', 'r',
 
     0x00, 0x00, 0x14, 0x09, 0x00,  // CONTINUATION
     0x00, 0x00, 0x00, 0x01,  // Stream 1
-    0x00, 0x06, 0x63, 0x6f,
-    0x6f, 0x6b, 0x69, 0x65,
-    0x08, 0x62, 0x61, 0x7a,
-    0x3d, 0x62, 0x69, 0x6e,
-    0x67, 0x00, 0x06, 0x63,
+    0x00, 0x06, 'c',  'o',
+    'o',  'k',  'i',  'e',
+    0x08, 'b',  'a',  'z',
+    '=',  'b',  'i',  'n',
+    'g',  0x00, 0x06, 'c',
 
     0x00, 0x00, 0x12, 0x09, 0x04,  // CONTINUATION: END_HEADERS
     0x00, 0x00, 0x00, 0x01,  // Stream 1
-    0x6f, 0x6f, 0x6b, 0x69,
-    0x65, 0x00, 0x00, 0x04,
-    0x6e, 0x61, 0x6d, 0x65,
-    0x05, 0x76, 0x61, 0x6c,
-    0x75, 0x65,
+    'o',  'o',  'k',  'i',
+    'e',  0x00, 0x00, 0x04,
+    'n',  'a',  'm',  'e',
+    0x05, 'v',  'a',  'l',
+    'u',  'e',
   };
 
   SpdyFramer framer(spdy_version_);
@@ -4467,27 +4473,27 @@ TEST_P(SpdyFramerTest, ReadPushPromiseWithContinuation) {
     0x08, 0x00, 0x00, 0x00,  // PADDED
     0x01, 0x02, 0x00, 0x00,  // Stream 1, Pad length field
     0x00, 0x2A, 0x00, 0x06,  // Promised stream 42
-    0x63, 0x6f, 0x6f, 0x6b,
-    0x69, 0x65, 0x07, 0x66,
-    0x6f, 0x6f, 0x3d, 0x62,
-    0x61, 0x72, 0x00, 0x00,
+    'c',  'o',  'o',  'k',
+    'i',  'e',  0x07, 'f',
+    'o',  'o',  '=',  'b',
+    'a',  'r',  0x00, 0x00,
 
     0x00, 0x00, 0x14, 0x09,  // CONTINUATION
     0x00, 0x00, 0x00, 0x00,
-    0x01, 0x00, 0x06, 0x63,  // Stream 1
-    0x6f, 0x6f, 0x6b, 0x69,
-    0x65, 0x08, 0x62, 0x61,
-    0x7a, 0x3d, 0x62, 0x69,
-    0x6e, 0x67, 0x00, 0x06,
-    0x63,
+    0x01, 0x00, 0x06, 'c',   // Stream 1
+    'o',  'o',  'k',  'i',
+    'e',  0x08, 'b',  'a',
+    'z',  '=',  'b',  'i',
+    'n',  'g',  0x00, 0x06,
+    'c',
 
     0x00, 0x00, 0x12, 0x09,  // CONTINUATION
     0x04, 0x00, 0x00, 0x00,  // END_HEADERS
-    0x01, 0x6f, 0x6f, 0x6b,  // Stream 1
-    0x69, 0x65, 0x00, 0x00,
-    0x04, 0x6e, 0x61, 0x6d,
-    0x65, 0x05, 0x76, 0x61,
-    0x6c, 0x75, 0x65,
+    0x01, 'o',  'o',  'k',   // Stream 1
+    'i',  'e',  0x00, 0x00,
+    0x04, 'n',  'a',  'm',
+    'e',  0x05, 'v',  'a',
+    'l',  'u',  'e',
   };
 
   SpdyFramer framer(spdy_version_);
@@ -6008,6 +6014,135 @@ TEST_P(SpdyFramerTest, ReadIncorrectlySizedPriority) {
   EXPECT_EQ(SpdyFramer::SPDY_INVALID_CONTROL_FRAME,
             visitor.framer_.error_code())
       << SpdyFramer::ErrorCodeToString(visitor.framer_.error_code());
+}
+
+// Test that SpdyFramer processes, by default, all passed input in one call
+// to ProcessInput (i.e. will not be calling set_process_single_input_frame()).
+TEST_P(SpdyFramerTest, ProcessAllInput) {
+  SpdyFramer framer(spdy_version_);
+  scoped_ptr<TestSpdyVisitor> visitor(new TestSpdyVisitor(spdy_version_));
+  framer.set_visitor(visitor.get());
+
+  // Create two input frames.
+  SpdyHeadersIR headers(1);
+  headers.set_priority(1);
+  headers.SetHeader("alpha", "beta");
+  headers.SetHeader("gamma", "charlie");
+  headers.SetHeader("cookie", "key1=value1; key2=value2");
+  scoped_ptr<SpdyFrame> headers_frame(framer.SerializeHeaders(headers));
+
+  const char four_score[] = "Four score and seven years ago";
+  SpdyDataIR four_score_ir(1, four_score);
+  scoped_ptr<SpdyFrame> four_score_frame(framer.SerializeData(four_score_ir));
+
+  // Put them in a single buffer (new variables here to make it easy to
+  // change the order and type of frames).
+  SpdyFrame* frame1 = headers_frame.get();
+  SpdyFrame* frame2 = four_score_frame.get();
+
+  const size_t frame1_size = frame1->size();
+  const size_t frame2_size = frame2->size();
+
+  LOG(INFO) << "frame1_size = " << frame1_size;
+  LOG(INFO) << "frame2_size = " << frame2_size;
+
+  string input_buffer;
+  input_buffer.append(frame1->data(), frame1_size);
+  input_buffer.append(frame2->data(), frame2_size);
+
+  const char* buf = input_buffer.data();
+  const size_t buf_size = input_buffer.size();
+
+  LOG(INFO) << "buf_size = " << buf_size;
+
+  size_t processed = framer.ProcessInput(buf, buf_size);
+  EXPECT_EQ(buf_size, processed);
+  EXPECT_EQ(SpdyFramer::SPDY_READY_FOR_FRAME, framer.state());
+  EXPECT_EQ(1, visitor->headers_frame_count_);
+  EXPECT_EQ(1, visitor->data_frame_count_);
+  EXPECT_EQ(strlen(four_score), static_cast<unsigned>(visitor->data_bytes_));
+}
+
+// Test that SpdyFramer stops after processing a full frame if
+// process_single_input_frame is set. Input to ProcessInput has two frames, but
+// only processes the first when we give it the first frame split at any point,
+// or give it more than one frame in the input buffer.
+TEST_P(SpdyFramerTest, ProcessAtMostOneFrame) {
+  SpdyFramer framer(spdy_version_);
+  framer.set_process_single_input_frame(true);
+  scoped_ptr<TestSpdyVisitor> visitor;
+
+  // Create two input frames.
+  const char four_score[] = "Four score and ...";
+  SpdyDataIR four_score_ir(1, four_score);
+  scoped_ptr<SpdyFrame> four_score_frame(framer.SerializeData(four_score_ir));
+
+  SpdyHeadersIR headers(2);
+  headers.SetHeader("alpha", "beta");
+  headers.SetHeader("gamma", "charlie");
+  headers.SetHeader("cookie", "key1=value1; key2=value2");
+  scoped_ptr<SpdyFrame> headers_frame(framer.SerializeHeaders(headers));
+
+  // Put them in a single buffer (new variables here to make it easy to
+  // change the order and type of frames).
+  SpdyFrame* frame1 = four_score_frame.get();
+  SpdyFrame* frame2 = headers_frame.get();
+
+  const size_t frame1_size = frame1->size();
+  const size_t frame2_size = frame2->size();
+
+  LOG(INFO) << "frame1_size = " << frame1_size;
+  LOG(INFO) << "frame2_size = " << frame2_size;
+
+  string input_buffer;
+  input_buffer.append(frame1->data(), frame1_size);
+  input_buffer.append(frame2->data(), frame2_size);
+
+  const char* buf = input_buffer.data();
+  const size_t buf_size = input_buffer.size();
+
+  LOG(INFO) << "buf_size = " << buf_size;
+
+  for (size_t first_size = 0; first_size <= buf_size; ++first_size) {
+    LOG(INFO) << "first_size = " << first_size;
+    visitor.reset(new TestSpdyVisitor(spdy_version_));
+    framer.set_visitor(visitor.get());
+
+    EXPECT_EQ(SpdyFramer::SPDY_READY_FOR_FRAME, framer.state());
+
+    size_t processed_first = framer.ProcessInput(buf, first_size);
+    if (first_size < frame1_size) {
+      EXPECT_EQ(first_size, processed_first);
+
+      if (first_size == 0) {
+        EXPECT_EQ(SpdyFramer::SPDY_READY_FOR_FRAME, framer.state());
+      } else {
+        EXPECT_NE(SpdyFramer::SPDY_READY_FOR_FRAME, framer.state());
+      }
+
+      const char* rest = buf + processed_first;
+      const size_t remaining = buf_size - processed_first;
+      LOG(INFO) << "remaining = " << remaining;
+
+      size_t processed_second = framer.ProcessInput(rest, remaining);
+
+      // Redundant tests just to make it easier to think about.
+      EXPECT_EQ(frame1_size - processed_first, processed_second);
+      size_t processed_total = processed_first + processed_second;
+      EXPECT_EQ(frame1_size, processed_total);
+    } else {
+      EXPECT_EQ(frame1_size, processed_first);
+    }
+
+    EXPECT_EQ(SpdyFramer::SPDY_READY_FOR_FRAME, framer.state());
+
+    // At this point should have processed the entirety of the first frame,
+    // and none of the second frame.
+
+    EXPECT_EQ(1, visitor->data_frame_count_);
+    EXPECT_EQ(strlen(four_score), static_cast<unsigned>(visitor->data_bytes_));
+    EXPECT_EQ(0, visitor->headers_frame_count_);
+  }
 }
 
 }  // namespace test

@@ -19,6 +19,9 @@
 #include "ios/chrome/browser/history/top_sites_factory.h"
 #include "ios/chrome/browser/history/web_history_service_factory.h"
 #include "ios/chrome/browser/search_engines/template_url_service_factory.h"
+#include "ios/chrome/browser/signin/about_signin_internals_factory.h"
+#include "ios/chrome/browser/signin/account_fetcher_service_factory.h"
+#include "ios/chrome/browser/signin/account_reconcilor_factory.h"
 #include "ios/chrome/browser/signin/account_tracker_service_factory.h"
 #include "ios/chrome/browser/signin/gaia_cookie_manager_service_factory.h"
 #include "ios/chrome/browser/signin/oauth2_token_service_factory.h"
@@ -47,6 +50,9 @@ void EnsureBrowserStateKeyedServiceFactoriesBuilt() {
   dom_distiller::DomDistillerServiceFactory::GetInstance();
   enhanced_bookmarks::BookmarkServerClusterServiceFactory::GetInstance();
   enhanced_bookmarks::EnhancedBookmarkModelFactory::GetInstance();
+  ios::AboutSigninInternalsFactory::GetInstance();
+  ios::AccountFetcherServiceFactory::GetInstance();
+  ios::AccountReconcilorFactory::GetInstance();
   ios::AccountTrackerServiceFactory::GetInstance();
   ios::BookmarkModelFactory::GetInstance();
   ios::BookmarkUndoServiceFactory::GetInstance();

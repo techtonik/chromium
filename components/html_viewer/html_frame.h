@@ -16,6 +16,7 @@
 #include "third_party/WebKit/public/web/WebFrameClient.h"
 #include "third_party/WebKit/public/web/WebRemoteFrameClient.h"
 #include "third_party/WebKit/public/web/WebSandboxFlags.h"
+#include "third_party/WebKit/public/web/WebTextInputInfo.h"
 #include "third_party/WebKit/public/web/WebViewClient.h"
 
 namespace blink {
@@ -70,8 +71,7 @@ class HTMLFrame : public blink::WebFrameClient,
   explicit HTMLFrame(const CreateParams& params);
 
   void Init(mojo::View* local_view,
-            const blink::WebString& remote_frame_name,
-            const blink::WebString& remote_origin);
+            const mojo::Map<mojo::String, mojo::Array<uint8_t>>& properties);
 
   // Closes and deletes this Frame.
   void Close();
@@ -120,8 +120,10 @@ class HTMLFrame : public blink::WebFrameClient,
             mojo::InterfaceRequest<mandoline::FrameTreeClient>
                 frame_tree_client_request);
 
-  // Sets the name of the remote frame. Does nothing if this is a local frame.
-  void SetRemoteFrameName(const mojo::String& name);
+  // Sets the appropriate value from the client property. |name| identifies
+  // the property and |new_data| the new value.
+  void SetValueFromClientProperty(const std::string& name,
+                                  mojo::Array<uint8_t> new_data);
 
   // Returns true if the Frame is local, false if remote.
   bool IsLocal() const;
@@ -136,7 +138,10 @@ class HTMLFrame : public blink::WebFrameClient,
   void SetView(mojo::View* view);
 
   // Creates the appropriate WebWidget implementation for the Frame.
-  void CreateWebWidget();
+  void CreateRootWebWidget();
+  void CreateLocalRootWebWidget(blink::WebLocalFrame* local_frame);
+
+  void InitializeWebWidget();
 
   void UpdateFocus();
 
@@ -152,7 +157,9 @@ class HTMLFrame : public blink::WebFrameClient,
   void FinishSwapToRemote();
 
   // Swaps this frame from a remote frame to a local frame.
-  void SwapToLocal(mojo::View* view, const blink::WebString& name);
+  void SwapToLocal(
+      mojo::View* view,
+      const mojo::Map<mojo::String, mojo::Array<uint8_t>>& properties);
 
   GlobalState* global_state() { return frame_tree_manager_->global_state(); }
 
@@ -161,6 +168,10 @@ class HTMLFrame : public blink::WebFrameClient,
 
   // The various frameDetached() implementations call into this.
   void FrameDetachedImpl(blink::WebFrame* web_frame);
+
+  // Update text input state from WebView to mojo::View. If the focused element
+  // is editable and |show_ime| is True, the software keyboard will be shown.
+  void UpdateTextInputState(bool show_ime);
 
   // mojo::ViewObserver methods:
   void OnViewBoundsChanged(mojo::View* view,
@@ -176,12 +187,23 @@ class HTMLFrame : public blink::WebFrameClient,
                  mojo::Array<mandoline::FrameDataPtr> frame_data) override;
   void OnFrameAdded(mandoline::FrameDataPtr frame_data) override;
   void OnFrameRemoved(uint32_t frame_id) override;
-  void OnFrameNameChanged(uint32_t frame_id, const mojo::String& name) override;
+  void OnFrameClientPropertyChanged(uint32_t frame_id,
+                                    const mojo::String& name,
+                                    mojo::Array<uint8_t> new_value) override;
 
   // WebViewClient methods:
-  virtual void initializeLayerTreeView() override;
-  virtual blink::WebLayerTreeView* layerTreeView() override;
   virtual blink::WebStorageNamespace* createSessionStorageNamespace();
+  virtual void didCancelCompositionOnSelectionChange();
+  virtual void didChangeContents();
+
+  // WebWidgetClient methods:
+  virtual void initializeLayerTreeView();
+  virtual blink::WebLayerTreeView* layerTreeView();
+  virtual void resetInputMethod();
+  virtual void didHandleGestureEvent(const blink::WebGestureEvent& event,
+                                     bool eventCancelled);
+  virtual void didUpdateTextOfFocusedElementByNonUserInput();
+  virtual void showImeIfNeeded();
 
   // WebFrameClient methods:
   virtual blink::WebMediaPlayer* createMediaPlayer(
@@ -215,6 +237,10 @@ class HTMLFrame : public blink::WebFrameClient,
   virtual void didChangeLoadProgress(double load_progress);
   virtual void didChangeName(blink::WebLocalFrame* frame,
                              const blink::WebString& name);
+  virtual void didCommitProvisionalLoad(
+      blink::WebLocalFrame* frame,
+      const blink::WebHistoryItem& item,
+      blink::WebHistoryCommitType commit_type);
 
   // blink::WebRemoteFrameClient:
   virtual void frameDetached(blink::WebRemoteFrameClient::DetachType type);
@@ -231,6 +257,8 @@ class HTMLFrame : public blink::WebFrameClient,
 
   HTMLFrameTreeManager* frame_tree_manager_;
   HTMLFrame* parent_;
+  // |view_| is non-null for local frames or remote frames that were once
+  // local.
   mojo::View* view_;
   // The id for this frame. If there is a view, this is the same id as the
   // view has.
@@ -242,7 +270,6 @@ class HTMLFrame : public blink::WebFrameClient,
   scoped_ptr<WebLayerTreeViewImpl> web_layer_tree_view_impl_;
   scoped_ptr<TouchHandler> touch_handler_;
 
-  // TODO(sky): better factor this, maybe push to View.
   blink::WebTreeScopeType scope_;
 
   scoped_ptr<WebLayerImpl> web_layer_;
@@ -251,6 +278,8 @@ class HTMLFrame : public blink::WebFrameClient,
   scoped_ptr<mojo::Binding<mandoline::FrameTreeClient>>
       frame_tree_client_binding_;
   mandoline::FrameTreeServerPtr server_;
+
+  blink::WebTextInputInfo text_input_info_;
 
   base::WeakPtrFactory<HTMLFrame> weak_factory_;
 

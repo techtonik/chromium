@@ -175,6 +175,7 @@
       'webapp/base/js/connected_view.js',
       'webapp/base/js/connection_info.js',
       'webapp/base/js/credentials_provider.js',
+      'webapp/base/js/experiments.js',
       'webapp/base/js/host_desktop.js',
       'webapp/base/js/smart_reconnector.js',
       'webapp/base/js/telemetry_event_writer.js',
@@ -194,8 +195,8 @@
       'webapp/base/js/plugin_settings.js',
       'webapp/base/js/suspend_detector.js',
       'webapp/base/js/typecheck.js',
-      'webapp/base/js/window_message_dispatcher.js',
       'webapp/base/js/xhr_event_writer.js',
+      'webapp/base/js/window_message_dispatcher.js',
       'webapp/base/js/xhr.js',
     ],
     # Host JavaScript files.

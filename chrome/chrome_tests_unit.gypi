@@ -219,7 +219,6 @@
       'browser/search/instant_unittest_base.cc',
       'browser/search/instant_unittest_base.h',
       'browser/search/most_visited_iframe_source_unittest.cc',
-      'browser/search/search_android_unittest.cc',
       'browser/search_engines/search_provider_install_data_unittest.cc',
       'browser/service_process/service_process_control_mac_unittest.mm',
       'browser/services/gcm/fake_gcm_profile_service.cc',
@@ -655,7 +654,6 @@
       'browser/extensions/api/declarative/rules_registry_with_cache_unittest.cc',
       'browser/extensions/api/declarative_content/chrome_content_rules_registry_unittest.cc',
       'browser/extensions/api/declarative_content/content_action_unittest.cc',
-      'browser/extensions/api/declarative_content/content_condition_unittest.cc',
       'browser/extensions/api/declarative_content/declarative_content_condition_tracker_test.cc',
       'browser/extensions/api/declarative_content/declarative_content_condition_tracker_test.h',
       'browser/extensions/api/declarative_content/declarative_content_css_condition_tracker_unittest.cc',
@@ -1043,6 +1041,7 @@
       'browser/safe_browsing/ui_manager_unittest.cc',
       'common/safe_browsing/binary_feature_extractor_unittest.cc',
       'common/safe_browsing/binary_feature_extractor_win_unittest.cc',
+      'common/safe_browsing/download_protection_util_unittest.cc',
       'common/safe_browsing/ipc_protobuf_message_test_messages.h',
       'common/safe_browsing/ipc_protobuf_message_unittest.cc',
       'common/safe_browsing/mach_o_image_reader_mac_unittest.cc',
@@ -1265,6 +1264,7 @@
       'browser/chromeos/login/saml/saml_offline_signin_limiter_unittest.cc',
       'browser/chromeos/login/signin/merge_session_load_page_unittest.cc',
       'browser/chromeos/login/supervised/supervised_user_authentication_unittest.cc',
+      'browser/chromeos/login/users/affiliation_unittest.cc',
       'browser/chromeos/login/users/multi_profile_user_controller_unittest.cc',
       'browser/chromeos/login/users/user_manager_unittest.cc',
       'browser/chromeos/login/users/wallpaper/wallpaper_manager_unittest.cc',
@@ -2115,11 +2115,6 @@
             '<(DEPTH)/components/nacl/renderer/plugin/plugin.gyp:nacl_trusted_plugin',
           ],
         }],
-        ['remoting==1', {
-          'dependencies': [
-            '../remoting/remoting.gyp:remoting_client_plugin',
-          ],
-        }],
         ['toolkit_views==1', {
           'dependencies': [
             '../ui/views/views.gyp:views',
@@ -2479,7 +2474,7 @@
             '../ui/events/devices/events_devices.gyp:events_devices',
           ],
         }],
-        [ 'cld_version==0 or cld_version==2', {
+        [ 'cld_version==2', {
           'dependencies': [
             # Unit tests should be independent of the CLD2 access mechanism,
             # just use static for simplicity.

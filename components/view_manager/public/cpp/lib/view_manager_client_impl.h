@@ -51,6 +51,8 @@ class ViewManagerClientImpl : public ViewManager,
   void SetProperty(Id view_id,
                    const std::string& name,
                    const std::vector<uint8_t>& data);
+  void SetViewTextInputState(Id view_id, TextInputStatePtr state);
+  void SetImeVisibility(Id view_id, bool visible, TextInputStatePtr state);
 
   void Embed(const String& url, Id view_id);
   void Embed(mojo::URLRequestPtr request,
@@ -99,6 +101,7 @@ class ViewManagerClientImpl : public ViewManager,
       mojo::URLRequestPtr request,
       const OnEmbedForDescendantCallback& callback) override;
   void OnEmbeddedAppDisconnected(Id view_id) override;
+  void OnUnembed() override;
   void OnViewBoundsChanged(Id view_id,
                            RectPtr old_bounds,
                            RectPtr new_bounds) override;

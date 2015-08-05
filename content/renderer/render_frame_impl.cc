@@ -312,6 +312,19 @@ NOINLINE void CrashIntentionally() {
   *zero = 0;
 }
 
+NOINLINE void BadCastCrashIntentionally() {
+  class A {
+    virtual void f() {}
+  };
+
+  class B {
+    virtual void f() {}
+  };
+
+  A a;
+  (void)(B*)&a;
+}
+
 #if defined(ADDRESS_SANITIZER) || defined(SYZYASAN)
 NOINLINE void MaybeTriggerAsanError(const GURL& url) {
   // NOTE(rogerm): We intentionally perform an invalid heap access here in
@@ -325,7 +338,7 @@ NOINLINE void MaybeTriggerAsanError(const GURL& url) {
   const char kCorruptHeap[] = "/corrupt-heap";
 #endif
 
-  if (!url.DomainIs(kCrashDomain, sizeof(kCrashDomain) - 1))
+  if (!url.DomainIs(kCrashDomain))
     return;
 
   if (!url.has_path())
@@ -351,7 +364,9 @@ NOINLINE void MaybeTriggerAsanError(const GURL& url) {
 void MaybeHandleDebugURL(const GURL& url) {
   if (!url.SchemeIs(kChromeUIScheme))
     return;
-  if (url == GURL(kChromeUICrashURL)) {
+  if (url == GURL(kChromeUIBadCastCrashURL)) {
+    BadCastCrashIntentionally();
+  } else if (url == GURL(kChromeUICrashURL)) {
     CrashIntentionally();
   } else if (url == GURL(kChromeUIDumpURL)) {
     // This URL will only correctly create a crash dump file if content is
@@ -706,7 +721,7 @@ RenderFrameImpl::~RenderFrameImpl() {
     // RenderFrameImpl in the case it is the main frame. Ensure it is deleted
     // along with this object.
     if (render_frame_proxy_ &&
-        !RenderFrameProxy::IsSwappedOutStateForbidden()) {
+        !SiteIsolationPolicy::IsSwappedOutStateForbidden()) {
       // The following method calls back into this object and clears
       // |render_frame_proxy_|.
       render_frame_proxy_->frameDetached(
@@ -793,7 +808,8 @@ void RenderFrameImpl::PepperTextInputTypeChanged(
   if (instance != render_view_->focused_pepper_plugin())
     return;
 
-  GetRenderWidget()->UpdateTextInputType();
+  GetRenderWidget()->UpdateTextInputState(
+      RenderWidget::NO_SHOW_IME, RenderWidget::FROM_NON_IME);
 
   FocusedNodeChangedForAccessibility(WebNode());
 }
@@ -1125,7 +1141,8 @@ void RenderFrameImpl::OnSwapOut(
     const FrameReplicationState& replicated_frame_state) {
   TRACE_EVENT1("navigation", "RenderFrameImpl::OnSwapOut", "id", routing_id_);
   RenderFrameProxy* proxy = NULL;
-  bool swapped_out_forbidden = RenderFrameProxy::IsSwappedOutStateForbidden();
+  bool swapped_out_forbidden =
+      SiteIsolationPolicy::IsSwappedOutStateForbidden();
   bool is_main_frame = !frame_->parent();
 
   // This codepath should only be hit for subframes when in --site-per-process.
@@ -1578,7 +1595,7 @@ void RenderFrameImpl::OnSetAccessibilityMode(AccessibilityMode new_mode) {
 }
 
 void RenderFrameImpl::OnSnapshotAccessibilityTree(int callback_id) {
-  ui::AXTreeUpdate response;
+  ui::AXTreeUpdate<ui::AXNodeData> response;
   RendererAccessibility::SnapshotAccessibilityTree(this, &response);
   Send(new AccessibilityHostMsg_SnapshotResponse(
       routing_id_, callback_id, response));
@@ -3012,17 +3029,14 @@ void RenderFrameImpl::didChangeSelection(bool is_empty_selection) {
   if (is_empty_selection)
     selection_text_.clear();
 
-  // UpdateTextInputType should be called before SyncSelectionIfRequired.
-  // UpdateTextInputType may send TextInputTypeChanged to notify the focus
+  // UpdateTextInputState should be called before SyncSelectionIfRequired.
+  // UpdateTextInputState may send TextInputStateChanged to notify the focus
   // was changed, and SyncSelectionIfRequired may send SelectionChanged
   // to notify the selection was changed.  Focus change should be notified
   // before selection change.
-  GetRenderWidget()->UpdateTextInputType();
+  GetRenderWidget()->UpdateTextInputState(
+      RenderWidget::NO_SHOW_IME, RenderWidget::FROM_NON_IME);
   SyncSelectionIfRequired();
-#if defined(OS_ANDROID)
-  GetRenderWidget()->UpdateTextInputState(RenderWidget::NO_SHOW_IME,
-                                          RenderWidget::FROM_NON_IME);
-#endif
 }
 
 blink::WebColorChooser* RenderFrameImpl::createColorChooser(
@@ -4184,7 +4198,7 @@ WebNavigationPolicy RenderFrameImpl::DecidePolicyForNavigation(
                                                            info.urlRequest));
 
   // TODO(nick): Is consulting |is_subframe_| here correct?
-  if (RenderFrameProxy::IsSwappedOutStateForbidden() && is_subframe_) {
+  if (SiteIsolationPolicy::IsSwappedOutStateForbidden() && is_subframe_) {
     // There's no reason to ignore navigations on subframes, since the swap out
     // logic no longer applies.
   } else {

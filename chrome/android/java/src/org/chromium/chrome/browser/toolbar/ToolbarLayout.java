@@ -79,6 +79,7 @@ abstract class ToolbarLayout extends FrameLayout implements Toolbar {
             removeView(mProgressBar);
             getFrameLayoutParams(mProgressBar).topMargin = mToolbarHeightWithoutShadow
                     - getFrameLayoutParams(mProgressBar).height;
+            if (isNativeLibraryReady()) mProgressBar.initializeAnimation();
         }
 
         mMenuButton = (TintedImageButton) findViewById(R.id.menu_button);
@@ -168,6 +169,7 @@ abstract class ToolbarLayout extends FrameLayout implements Toolbar {
      */
     public void onNativeLibraryReady() {
         mNativeLibraryReady = true;
+        if (mProgressBar != null) mProgressBar.initializeAnimation();
     }
 
     /**

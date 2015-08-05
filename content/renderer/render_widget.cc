@@ -1005,14 +1005,14 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
   scoped_refptr<ContextProviderCommandBuffer> worker_context_provider;
   if (!use_software) {
     context_provider = ContextProviderCommandBuffer::Create(
-        CreateGraphicsContext3D(), RENDER_COMPOSITOR_CONTEXT);
+        CreateGraphicsContext3D(true), RENDER_COMPOSITOR_CONTEXT);
     if (!context_provider.get()) {
       // Cause the compositor to wait and try again.
       return scoped_ptr<cc::OutputSurface>();
     }
 
     worker_context_provider = ContextProviderCommandBuffer::Create(
-        CreateGraphicsContext3D(), RENDER_WORKER_CONTEXT);
+        CreateGraphicsContext3D(false), RENDER_WORKER_CONTEXT);
     if (!worker_context_provider.get()) {
       // Cause the compositor to wait and try again.
       return scoped_ptr<cc::OutputSurface>();
@@ -1121,7 +1121,7 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
   TRACE_EVENT_FLOW_STEP0(
       "input,benchmark",
       "LatencyInfo.Flow",
-      TRACE_ID_DONT_MANGLE(latency_info.trace_id),
+      TRACE_ID_DONT_MANGLE(latency_info.trace_id()),
       "HanldeInputEventMain");
 
   // If we don't have a high res timer, these metrics won't be accurate enough
@@ -1400,13 +1400,10 @@ blink::WebLayerTreeView* RenderWidget::layerTreeView() {
 void RenderWidget::WillBeginCompositorFrame() {
   TRACE_EVENT0("gpu", "RenderWidget::willBeginCompositorFrame");
 
-  // The following two can result in further layout and possibly
+  // The UpdateTextInputState can result in further layout and possibly
   // enable GPU acceleration so they need to be called before any painting
   // is done.
-  UpdateTextInputType();
-#if defined(OS_ANDROID)
   UpdateTextInputState(NO_SHOW_IME, FROM_NON_IME);
-#endif
   UpdateSelectionBounds();
 }
 
@@ -1898,37 +1895,6 @@ void RenderWidget::FinishHandlingImeEvent() {
 #endif
 }
 
-void RenderWidget::UpdateTextInputType() {
-  TRACE_EVENT0("renderer", "RenderWidget::UpdateTextInputType");
-  ui::TextInputType new_type = GetTextInputType();
-  if (IsDateTimeInput(new_type))
-    return;  // Not considered as a text input field in WebKit/Chromium.
-
-  bool new_can_compose_inline = CanComposeInline();
-
-  blink::WebTextInputInfo new_info;
-  if (webwidget_)
-    new_info = webwidget_->textInputInfo();
-  const ui::TextInputMode new_mode = ConvertInputMode(new_info.inputMode);
-  int new_flags = new_info.flags;
-
-  if (text_input_type_ != new_type
-      || can_compose_inline_ != new_can_compose_inline
-      || text_input_mode_ != new_mode
-      || text_input_flags_ != new_flags) {
-    Send(new ViewHostMsg_TextInputTypeChanged(routing_id(),
-                                              new_type,
-                                              new_mode,
-                                              new_can_compose_inline,
-                                              new_flags));
-    text_input_type_ = new_type;
-    can_compose_inline_ = new_can_compose_inline;
-    text_input_mode_ = new_mode;
-    text_input_flags_ = new_flags;
-  }
-}
-
-#if defined(OS_ANDROID) || defined(USE_AURA)
 void RenderWidget::UpdateTextInputState(ShowIme show_ime,
                                         ChangeSource change_source) {
   TRACE_EVENT0("renderer", "RenderWidget::UpdateTextInputState");
@@ -1941,6 +1907,7 @@ void RenderWidget::UpdateTextInputState(ShowIme show_ime,
   blink::WebTextInputInfo new_info;
   if (webwidget_)
     new_info = webwidget_->textInputInfo();
+  const ui::TextInputMode new_mode = ConvertInputMode(new_info.inputMode);
 
   bool new_can_compose_inline = CanComposeInline();
 
@@ -1948,48 +1915,43 @@ void RenderWidget::UpdateTextInputState(ShowIme show_ime,
   // shown.
   if (show_ime == SHOW_IME_IF_NEEDED ||
       (text_input_type_ != new_type ||
+       text_input_mode_ != new_mode ||
        text_input_info_ != new_info ||
        can_compose_inline_ != new_can_compose_inline)
 #if defined(OS_ANDROID)
       || text_field_is_dirty_
 #endif
       ) {
-    ViewHostMsg_TextInputState_Params p;
-    p.type = new_type;
-    p.flags = new_info.flags;
-    p.value = new_info.value.utf8();
-    p.selection_start = new_info.selectionStart;
-    p.selection_end = new_info.selectionEnd;
-    p.composition_start = new_info.compositionStart;
-    p.composition_end = new_info.compositionEnd;
-    p.can_compose_inline = new_can_compose_inline;
-    p.show_ime_if_needed = (show_ime == SHOW_IME_IF_NEEDED);
+    ViewHostMsg_TextInputState_Params params;
+    params.type = new_type;
+    params.mode = new_mode;
+    params.flags = new_info.flags;
+    params.value = new_info.value.utf8();
+    params.selection_start = new_info.selectionStart;
+    params.selection_end = new_info.selectionEnd;
+    params.composition_start = new_info.compositionStart;
+    params.composition_end = new_info.compositionEnd;
+    params.can_compose_inline = new_can_compose_inline;
+    params.show_ime_if_needed = (show_ime == SHOW_IME_IF_NEEDED);
 #if defined(USE_AURA)
-    p.is_non_ime_change = true;
+    params.is_non_ime_change = true;
 #endif
 #if defined(OS_ANDROID)
-    p.is_non_ime_change = (change_source == FROM_NON_IME) ||
+    params.is_non_ime_change = (change_source == FROM_NON_IME) ||
                          text_field_is_dirty_;
-    if (p.is_non_ime_change)
+    if (params.is_non_ime_change)
       IncrementOutstandingImeEventAcks();
     text_field_is_dirty_ = false;
 #endif
-#if defined(USE_AURA)
-    Send(new ViewHostMsg_TextInputTypeChanged(routing_id(),
-                                              new_type,
-                                              text_input_mode_,
-                                              new_can_compose_inline,
-                                              new_info.flags));
-#endif
-    Send(new ViewHostMsg_TextInputStateChanged(routing_id(), p));
+    Send(new ViewHostMsg_TextInputStateChanged(routing_id(), params));
 
     text_input_info_ = new_info;
     text_input_type_ = new_type;
+    text_input_mode_ = new_mode;
     can_compose_inline_ = new_can_compose_inline;
     text_input_flags_ = new_info.flags;
   }
 }
-#endif
 
 void RenderWidget::GetSelectionBounds(gfx::Rect* focus, gfx::Rect* anchor) {
   WebRect focus_webrect;
@@ -2006,20 +1968,10 @@ void RenderWidget::UpdateSelectionBounds() {
   if (handling_ime_event_)
     return;
 
-#if defined(USE_AURA)
-  // TODO(mohsen): For now, always send explicit selection IPC notifications for
-  // Aura beucause composited selection updates are not working for webview tags
-  // which regresses IME inside webview. Remove this when composited selection
-  // updates are fixed for webviews. See, http://crbug.com/510568.
-  bool send_ipc = true;
-#else
   // With composited selection updates, the selection bounds will be reported
   // directly by the compositor, in which case explicit IPC selection
   // notifications should be suppressed.
-  bool send_ipc =
-      !blink::WebRuntimeFeatures::isCompositedSelectionUpdateEnabled();
-#endif
-  if (send_ipc) {
+  if (!blink::WebRuntimeFeatures::isCompositedSelectionUpdateEnabled()) {
     ViewHostMsg_SelectionBounds_Params params;
     GetSelectionBounds(&params.anchor_rect, &params.focus_rect);
     if (selection_anchor_rect_ != params.anchor_rect ||
@@ -2368,7 +2320,7 @@ bool RenderWidget::HasTouchEventHandlersAt(const gfx::Point& point) const {
 }
 
 scoped_ptr<WebGraphicsContext3DCommandBufferImpl>
-RenderWidget::CreateGraphicsContext3D() {
+RenderWidget::CreateGraphicsContext3D(bool compositor) {
   if (!webwidget_)
     return scoped_ptr<WebGraphicsContext3DCommandBufferImpl>();
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -2423,6 +2375,8 @@ RenderWidget::CreateGraphicsContext3D() {
   limits.mapped_memory_reclaim_limit =
       max_transfer_buffer_usage_mb * kBytesPerMegabyte;
 #endif
+  if (compositor)
+    limits.command_buffer_size = 64 * 1024;
 
   scoped_ptr<WebGraphicsContext3DCommandBufferImpl> context(
       new WebGraphicsContext3DCommandBufferImpl(surface_id(),

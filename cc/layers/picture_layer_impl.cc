@@ -18,7 +18,6 @@
 #include "cc/layers/append_quads_data.h"
 #include "cc/layers/solid_color_layer_impl.h"
 #include "cc/output/begin_frame_args.h"
-#include "cc/quads/checkerboard_draw_quad.h"
 #include "cc/quads/debug_border_draw_quad.h"
 #include "cc/quads/picture_draw_quad.h"
 #include "cc/quads/solid_color_draw_quad.h"
@@ -321,23 +320,14 @@ void PictureLayerImpl::AppendQuads(RenderPass* render_pass,
     }
 
     if (!has_draw_quad) {
-      if (draw_checkerboard_for_missing_tiles()) {
-        CheckerboardDrawQuad* quad =
-            render_pass->CreateAndAppendDrawQuad<CheckerboardDrawQuad>();
-        SkColor color = DebugColors::DefaultCheckerboardColor();
-        quad->SetNew(shared_quad_state, geometry_rect, visible_geometry_rect,
-                     color, ideal_device_scale_);
-      } else {
-        SkColor color = SafeOpaqueBackgroundColor();
-        SolidColorDrawQuad* quad =
-            render_pass->CreateAndAppendDrawQuad<SolidColorDrawQuad>();
-        quad->SetNew(shared_quad_state,
-                     geometry_rect,
-                     visible_geometry_rect,
-                     color,
-                     false);
-        ValidateQuadResources(quad);
-      }
+      // Checkerboard.
+      // TODO(danakj): Make this a different color when debugging.
+      SkColor color = SafeOpaqueBackgroundColor();
+      SolidColorDrawQuad* quad =
+          render_pass->CreateAndAppendDrawQuad<SolidColorDrawQuad>();
+      quad->SetNew(shared_quad_state, geometry_rect, visible_geometry_rect,
+                   color, false);
+      ValidateQuadResources(quad);
 
       if (geometry_rect.Intersects(scaled_viewport_for_tile_priority)) {
         append_quads_data->num_missing_tiles++;
@@ -421,7 +411,7 @@ bool PictureLayerImpl::UpdateTiles(bool resourceless_software_draw) {
   was_screen_space_transform_animating_ =
       draw_properties().screen_space_transform_is_animating;
 
-  if (draw_transform_is_animating())
+  if (screen_space_transform_is_animating())
     raster_source_->SetShouldAttemptToUseDistanceFieldText();
 
   double current_frame_time_in_seconds =

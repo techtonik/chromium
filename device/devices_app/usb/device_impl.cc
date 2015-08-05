@@ -123,7 +123,7 @@ void DeviceImpl::GetDeviceInfo(const GetDeviceInfoCallback& callback) {
   // but GetConfiguration() is non-const so we do it here for now.
   DeviceInfoPtr info = DeviceInfo::From(*device_handle_->GetDevice());
   const UsbConfigDescriptor* config =
-      device_handle_->GetDevice()->GetConfiguration();
+      device_handle_->GetDevice()->GetActiveConfiguration();
   info->configurations = mojo::Array<ConfigurationInfoPtr>::New(0);
   if (config)
     info->configurations.push_back(ConfigurationInfo::From(*config));
@@ -180,6 +180,16 @@ void DeviceImpl::Reset(const ResetCallback& callback) {
   }
 
   device_handle_->ResetDevice(WrapMojoCallback(callback));
+}
+
+void DeviceImpl::ClearHalt(uint8_t endpoint,
+                           const ClearHaltCallback& callback) {
+  if (!device_handle_) {
+    callback.Run(false);
+    return;
+  }
+
+  device_handle_->ClearHalt(endpoint, WrapMojoCallback(callback));
 }
 
 void DeviceImpl::ControlTransferIn(ControlTransferParamsPtr params,

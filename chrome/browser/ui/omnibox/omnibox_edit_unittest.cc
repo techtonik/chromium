@@ -6,11 +6,11 @@
 #include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/ui/omnibox/chrome_omnibox_client.h"
-#include "chrome/browser/ui/omnibox/omnibox_edit_controller.h"
-#include "chrome/browser/ui/omnibox/omnibox_edit_model.h"
-#include "chrome/browser/ui/omnibox/omnibox_view.h"
+#include "chrome/browser/ui/omnibox/chrome_omnibox_edit_controller.h"
 #include "chrome/browser/ui/toolbar/test_toolbar_model.h"
 #include "chrome/test/base/testing_profile.h"
+#include "components/omnibox/browser/omnibox_edit_model.h"
+#include "components/omnibox/browser/omnibox_view.h"
 #include "content/public/test/test_browser_thread_bundle.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -23,7 +23,7 @@ namespace {
 class TestingOmniboxView : public OmniboxView {
  public:
   explicit TestingOmniboxView(OmniboxEditController* controller)
-      : OmniboxView(nullptr, controller, nullptr) {}
+      : OmniboxView(controller, nullptr) {}
 
   // OmniboxView:
   void Update() override {}
@@ -94,24 +94,22 @@ class TestingOmniboxView : public OmniboxView {
   DISALLOW_COPY_AND_ASSIGN(TestingOmniboxView);
 };
 
-class TestingOmniboxEditController : public OmniboxEditController {
+class TestingOmniboxEditController : public ChromeOmniboxEditController {
  public:
   explicit TestingOmniboxEditController(ToolbarModel* toolbar_model)
-      : OmniboxEditController(NULL),
-        toolbar_model_(toolbar_model) {
-  }
+      : ChromeOmniboxEditController(NULL), toolbar_model_(toolbar_model) {}
 
  protected:
-  // OmniboxEditController:
+  // ChromeOmniboxEditController:
   void UpdateWithoutTabRestore() override {}
   void OnChanged() override {}
   void OnSetFocus() override {}
   void ShowURL() override {}
-  WebContents* GetWebContents() override { return NULL; }
   ToolbarModel* GetToolbarModel() override { return toolbar_model_; }
   const ToolbarModel* GetToolbarModel() const override {
     return toolbar_model_;
   }
+  WebContents* GetWebContents() override { return nullptr; }
 
  private:
   ToolbarModel* toolbar_model_;
@@ -196,8 +194,7 @@ TEST_F(AutocompleteEditTest, AdjustTextForCopy) {
       &profile, &AutocompleteClassifierFactory::BuildInstanceFor);
   OmniboxEditModel model(
       &view, &controller,
-      make_scoped_ptr(new ChromeOmniboxClient(&controller, &profile)),
-      &profile);
+      make_scoped_ptr(new ChromeOmniboxClient(&controller, &profile)));
 
   for (size_t i = 0; i < arraysize(input); ++i) {
     toolbar_model()->set_text(ASCIIToUTF16(input[i].perm_text));
@@ -231,8 +228,7 @@ TEST_F(AutocompleteEditTest, InlineAutocompleteText) {
       &profile, &AutocompleteClassifierFactory::BuildInstanceFor);
   OmniboxEditModel model(
       &view, &controller,
-      make_scoped_ptr(new ChromeOmniboxClient(&controller, &profile)),
-      &profile);
+      make_scoped_ptr(new ChromeOmniboxClient(&controller, &profile)));
 
   // Test if the model updates the inline autocomplete text in the view.
   EXPECT_EQ(base::string16(), view.inline_autocomplete_text());

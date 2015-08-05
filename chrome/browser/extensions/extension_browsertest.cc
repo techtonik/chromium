@@ -33,7 +33,7 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
-#include "chrome/common/chrome_version_info.h"
+#include "components/version_info/version_info.h"
 #include "content/public/browser/navigation_controller.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/notification_registrar.h"
@@ -401,15 +401,9 @@ const Extension* ExtensionBrowserTest::UpdateExtensionWaitForIdle(
 const Extension* ExtensionBrowserTest::InstallExtensionFromWebstore(
     const base::FilePath& path,
     int expected_change) {
-  return InstallOrUpdateExtension(std::string(),
-                                  path,
-                                  INSTALL_UI_TYPE_NONE,
-                                  expected_change,
-                                  Manifest::INTERNAL,
-                                  browser(),
-                                  Extension::FROM_WEBSTORE,
-                                  true,
-                                  false);
+  return InstallOrUpdateExtension(
+      std::string(), path, INSTALL_UI_TYPE_AUTO_CONFIRM, expected_change,
+      Manifest::INTERNAL, browser(), Extension::FROM_WEBSTORE, true, false);
 }
 
 const Extension* ExtensionBrowserTest::InstallOrUpdateExtension(

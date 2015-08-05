@@ -4,11 +4,11 @@
 import logging as real_logging
 import os
 
+from telemetry.core import discover
 from telemetry.core import network_controller
 from telemetry.core import tracing_controller
 from telemetry.core import util
 from telemetry.internal.platform import platform_backend as platform_backend_module
-from telemetry.util import classes_util
 
 
 _host_platform = None
@@ -39,9 +39,9 @@ def GetHostPlatform():
 def _IterAllPlatformBackendClasses():
   platform_dir = os.path.dirname(
       os.path.realpath(platform_backend_module.__file__))
-  return classes_util.DiscoverClasses(
+  return discover.DiscoverClasses(
       platform_dir, util.GetTelemetryDir(),
-      platform_backend_module.PlatformBackend)
+      platform_backend_module.PlatformBackend).itervalues()
 
 
 def GetPlatformForDevice(device, finder_options, logging=real_logging):
@@ -266,19 +266,18 @@ class Platform(object):
         # A platform-specific dictionary of additional details about the
         # utilization of individual hardware components.
         component_utilization: {
-
-          # Platform-specific data not attributed to any particular hardware
-          # component.
-          whole_package: {
-
-            # Device-specific onboard temperature sensor.
-            'average_temperature_c': c,
-
-            ...
-          }
-
           ...
         }
+        # Platform-specific data not attributed to any particular hardware
+        # component.
+        platform_info: {
+
+          # Device-specific onboard temperature sensor.
+          'average_temperature_c': c,
+
+           ...
+        }
+
       }
     """
     return self._platform_backend.StopMonitoringPower()

@@ -17,6 +17,7 @@
 #include "cc/debug/layer_tree_debug_state.h"
 #include "cc/debug/micro_benchmark_impl.h"
 #include "cc/debug/traced_value.h"
+#include "cc/input/scroll_state.h"
 #include "cc/layers/layer_utils.h"
 #include "cc/layers/painted_scrollbar_layer_impl.h"
 #include "cc/output/copy_output_request.h"
@@ -66,7 +67,6 @@ LayerImpl::LayerImpl(LayerTreeImpl* tree_impl,
       contents_opaque_(false),
       is_root_for_isolated_group_(false),
       use_parent_backface_visibility_(false),
-      draw_checkerboard_for_missing_tiles_(false),
       draws_content_(false),
       hide_layer_and_subtree_(false),
       transform_is_invertible_(true),
@@ -195,6 +195,30 @@ void LayerImpl::SetScrollChildren(std::set<LayerImpl*>* children) {
     return;
   scroll_children_.reset(children);
   SetNeedsPushProperties();
+}
+
+void LayerImpl::DistributeScroll(ScrollState* scroll_state) {
+  DCHECK(scroll_state);
+  if (scroll_state->FullyConsumed())
+    return;
+
+  scroll_state->DistributeToScrollChainDescendant();
+
+  // If the scroll doesn't propagate, and we're currently scrolling
+  // a layer other than this one, prevent the scroll from
+  // propagating to this layer.
+  if (!scroll_state->should_propagate() &&
+      scroll_state->delta_consumed_for_scroll_sequence() &&
+      scroll_state->current_native_scrolling_layer() != this) {
+    return;
+  }
+
+  ApplyScroll(scroll_state);
+}
+
+void LayerImpl::ApplyScroll(ScrollState* scroll_state) {
+  DCHECK(scroll_state);
+  layer_tree_impl()->ApplyScroll(this, scroll_state);
 }
 
 void LayerImpl::SetNumDescendantsThatDrawContent(int num_descendants) {
@@ -522,8 +546,6 @@ void LayerImpl::PushPropertiesTo(LayerImpl* layer) {
   layer->SetBackgroundColor(background_color_);
   layer->SetBounds(bounds_);
   layer->SetDoubleSided(double_sided_);
-  layer->SetDrawCheckerboardForMissingTiles(
-      draw_checkerboard_for_missing_tiles_);
   layer->SetDrawsContent(DrawsContent());
   layer->SetHideLayerAndSubtree(hide_layer_and_subtree_);
   layer->SetHasRenderSurface(!!render_surface());
@@ -802,6 +824,29 @@ void LayerImpl::UpdatePropertyTreeTransform() {
   }
 }
 
+void LayerImpl::UpdatePropertyTreeTransformIsAnimated(bool is_animated) {
+  if (transform_tree_index_ != -1) {
+    TransformTree& transform_tree =
+        layer_tree_impl()->property_trees()->transform_tree;
+    TransformNode* node = transform_tree.Node(transform_tree_index_);
+    // A LayerImpl's own current state is insufficient for determining whether
+    // it owns a TransformNode, since this depends on the state of the
+    // corresponding Layer at the time of the last commit. For example, if
+    // |is_animated| is false, this might mean a transform animation just ticked
+    // past its finish point (so the LayerImpl still owns a TransformNode) or it
+    // might mean that a transform animation was removed during commit or
+    // activation (and, in that case, the LayerImpl will no longer own a
+    // TransformNode, unless it has non-animation-related reasons for owning a
+    // node).
+    if (node->owner_id != id())
+      return;
+    if (node->data.is_animated != is_animated) {
+      node->data.is_animated = is_animated;
+      transform_tree.set_needs_update(true);
+    }
+  }
+}
+
 void LayerImpl::UpdatePropertyTreeOpacity() {
   if (opacity_tree_index_ != -1) {
     OpacityTree& opacity_tree =
@@ -826,8 +871,11 @@ void LayerImpl::UpdatePropertyTreeForScrollingAndAnimationIfNeeded() {
   if (HasAnyAnimationTargetingProperty(Animation::OPACITY))
     UpdatePropertyTreeOpacity();
 
-  if (HasAnyAnimationTargetingProperty(Animation::TRANSFORM))
+  if (HasAnyAnimationTargetingProperty(Animation::TRANSFORM)) {
     UpdatePropertyTreeTransform();
+    UpdatePropertyTreeTransformIsAnimated(
+        HasPotentiallyRunningTransformAnimation());
+  }
 }
 
 gfx::ScrollOffset LayerImpl::ScrollOffsetForAnimation() const {
@@ -861,6 +909,10 @@ void LayerImpl::OnScrollOffsetAnimated(const gfx::ScrollOffset& scroll_offset) {
 }
 
 void LayerImpl::OnAnimationWaitingForDeletion() {}
+
+void LayerImpl::OnTransformIsPotentiallyAnimatingChanged(bool is_animating) {
+  UpdatePropertyTreeTransformIsAnimated(is_animating);
+}
 
 bool LayerImpl::IsActive() const {
   return layer_tree_impl_->IsActiveTree();

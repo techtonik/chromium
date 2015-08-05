@@ -25,6 +25,7 @@
 #include "cc/test/fake_impl_proxy.h"
 #include "cc/test/fake_layer_tree_host.h"
 #include "cc/test/fake_layer_tree_host_impl.h"
+#include "cc/test/fake_output_surface.h"
 #include "cc/test/fake_picture_layer.h"
 #include "cc/test/fake_picture_layer_impl.h"
 #include "cc/test/geometry_test_utils.h"
@@ -1970,17 +1971,6 @@ TEST_F(LayerTreeHostCommonTest, AnimationsForRenderSurfaceHierarchy) {
   EXPECT_EQ(render_surface2, child_of_rs2->render_target());
   EXPECT_EQ(render_surface2, grand_child_of_rs2->render_target());
 
-  // Verify draw_transform_is_animating values
-  EXPECT_FALSE(parent->draw_transform_is_animating());
-  EXPECT_FALSE(child_of_root->draw_transform_is_animating());
-  EXPECT_TRUE(grand_child_of_root->draw_transform_is_animating());
-  EXPECT_FALSE(render_surface1->draw_transform_is_animating());
-  EXPECT_FALSE(child_of_rs1->draw_transform_is_animating());
-  EXPECT_FALSE(grand_child_of_rs1->draw_transform_is_animating());
-  EXPECT_FALSE(render_surface2->draw_transform_is_animating());
-  EXPECT_FALSE(child_of_rs2->draw_transform_is_animating());
-  EXPECT_TRUE(grand_child_of_rs2->draw_transform_is_animating());
-
   // Verify screen_space_transform_is_animating values
   EXPECT_FALSE(parent->screen_space_transform_is_animating());
   EXPECT_FALSE(child_of_root->screen_space_transform_is_animating());
@@ -2651,6 +2641,113 @@ TEST_F(LayerTreeHostCommonTest,
 
   EXPECT_TRUE(child->visible_layer_rect().IsEmpty());
   EXPECT_TRUE(child->drawable_content_rect().IsEmpty());
+}
+
+TEST_F(LayerTreeHostCommonTest,
+       VisibleContentRectForLayerWithUninvertibleDrawTransform) {
+  LayerImpl* root = root_layer();
+  LayerImpl* child = AddChildToRoot<LayerImpl>();
+  LayerImpl* grand_child = AddChild<LayerImpl>(child);
+  child->SetDrawsContent(true);
+  grand_child->SetDrawsContent(true);
+
+  gfx::Transform identity_matrix;
+
+  gfx::Transform perspective;
+  perspective.ApplyPerspectiveDepth(SkDoubleToMScalar(1e-12));
+
+  gfx::Transform rotation;
+  rotation.RotateAboutYAxis(45.0);
+
+  SetLayerPropertiesForTesting(root, identity_matrix, gfx::Point3F(),
+                               gfx::PointF(), gfx::Size(100, 100), true, false,
+                               true);
+  SetLayerPropertiesForTesting(child, perspective, gfx::Point3F(),
+                               gfx::PointF(10.f, 10.f), gfx::Size(100, 100),
+                               false, true, false);
+  SetLayerPropertiesForTesting(grand_child, rotation, gfx::Point3F(),
+                               gfx::PointF(), gfx::Size(100, 100), false, true,
+                               false);
+
+  ExecuteCalculateDrawProperties(root);
+
+  // Though all layers have invertible transforms, matrix multiplication using
+  // floating-point math makes the draw transform uninvertible.
+  EXPECT_FALSE(grand_child->draw_transform().IsInvertible());
+
+  // CalcDrawProps only skips a subtree when a layer's own transform is
+  // uninvertible, not when its draw transform is invertible, since CDP makes
+  // skipping decisions before computing a layer's draw transform. Property
+  // trees make skipping decisions after computing draw transforms, so could be
+  // made to skip layers with an uninvertible draw transform (once CDP is
+  // deleted).
+  EXPECT_EQ(gfx::Rect(grand_child->bounds()),
+            grand_child->visible_layer_rect());
+}
+
+TEST_F(LayerTreeHostCommonTest,
+       OcclusionForLayerWithUninvertibleDrawTransform) {
+  FakeImplProxy proxy;
+  TestSharedBitmapManager shared_bitmap_manager;
+  TestTaskGraphRunner task_graph_runner;
+  FakeLayerTreeHostImpl host_impl(&proxy, &shared_bitmap_manager,
+                                  &task_graph_runner);
+  scoped_ptr<LayerImpl> root = LayerImpl::Create(host_impl.active_tree(), 1);
+  scoped_ptr<LayerImpl> child = LayerImpl::Create(host_impl.active_tree(), 2);
+  scoped_ptr<LayerImpl> grand_child =
+      LayerImpl::Create(host_impl.active_tree(), 3);
+  scoped_ptr<LayerImpl> occluding_child =
+      LayerImpl::Create(host_impl.active_tree(), 4);
+  child->SetDrawsContent(true);
+  grand_child->SetDrawsContent(true);
+  occluding_child->SetDrawsContent(true);
+  occluding_child->SetContentsOpaque(true);
+
+  gfx::Transform identity_matrix;
+  gfx::Transform perspective;
+  perspective.ApplyPerspectiveDepth(SkDoubleToMScalar(1e-12));
+
+  gfx::Transform rotation;
+  rotation.RotateAboutYAxis(45.0);
+
+  SetLayerPropertiesForTesting(root.get(), identity_matrix, gfx::Point3F(),
+                               gfx::PointF(), gfx::Size(1000, 1000), true,
+                               false, true);
+  SetLayerPropertiesForTesting(child.get(), perspective, gfx::Point3F(),
+                               gfx::PointF(10.f, 10.f), gfx::Size(300, 300),
+                               false, true, false);
+  SetLayerPropertiesForTesting(grand_child.get(), rotation, gfx::Point3F(),
+                               gfx::PointF(), gfx::Size(200, 200), false, true,
+                               false);
+  SetLayerPropertiesForTesting(occluding_child.get(), identity_matrix,
+                               gfx::Point3F(), gfx::PointF(),
+                               gfx::Size(200, 200), false, false, false);
+
+  host_impl.SetViewportSize(root->bounds());
+
+  child->AddChild(grand_child.Pass());
+  root->AddChild(child.Pass());
+  root->AddChild(occluding_child.Pass());
+  host_impl.active_tree()->SetRootLayer(root.Pass());
+  host_impl.InitializeRenderer(FakeOutputSurface::Create3d());
+  bool update_lcd_text = false;
+  host_impl.active_tree()->UpdateDrawProperties(update_lcd_text);
+
+  LayerImpl* grand_child_ptr =
+      host_impl.active_tree()->root_layer()->children()[0]->children()[0];
+
+  // Though all layers have invertible transforms, matrix multiplication using
+  // floating-point math makes the draw transform uninvertible.
+  EXPECT_FALSE(grand_child_ptr->draw_transform().IsInvertible());
+
+  // Since |grand_child| has an uninvertible draw transform, it is treated as
+  // unoccluded (even though |occluding_child| comes later in draw order, and
+  // hence potentially occludes it).
+  gfx::Rect layer_bounds = gfx::Rect(grand_child_ptr->bounds());
+  EXPECT_EQ(
+      layer_bounds,
+      grand_child_ptr->draw_properties()
+          .occlusion_in_content_space.GetUnoccludedContentRect(layer_bounds));
 }
 
 TEST_F(LayerTreeHostCommonTest,
@@ -5880,6 +5977,63 @@ TEST_F(LayerTreeHostCommonTest,
       container_offset - rounded_effective_scroll_offset);
 }
 
+TEST_F(LayerTreeHostCommonTest,
+       ScrollSnappingWithAnimatedScreenSpaceTransform) {
+  // This test verifies that a scrolling layer whose screen space transform is
+  // animating doesn't get snapped to integer coordinates.
+  //
+  // + root
+  //   + animated layer
+  //     + surface
+  //       + container
+  //         + scroller
+  //
+  LayerImpl* root = root_layer();
+  LayerImpl* animated_layer = AddChildToRoot<FakePictureLayerImpl>();
+  LayerImpl* surface = AddChild<LayerImpl>(animated_layer);
+  LayerImpl* container = AddChild<LayerImpl>(surface);
+  LayerImpl* scroller = AddChild<LayerImpl>(container);
+  scroller->SetScrollClipLayer(container->id());
+  scroller->SetDrawsContent(true);
+
+  gfx::Transform identity_transform;
+  gfx::Transform start_scale;
+  start_scale.Scale(1.5f, 1.5f);
+  SetLayerPropertiesForTesting(root, identity_transform, gfx::Point3F(),
+                               gfx::PointF(), gfx::Size(50, 50), true, false,
+                               true);
+  SetLayerPropertiesForTesting(animated_layer, start_scale, gfx::Point3F(),
+                               gfx::PointF(), gfx::Size(50, 50), true, false,
+                               false);
+  SetLayerPropertiesForTesting(surface, identity_transform, gfx::Point3F(),
+                               gfx::PointF(), gfx::Size(50, 50), true, false,
+                               true);
+  SetLayerPropertiesForTesting(container, identity_transform, gfx::Point3F(),
+                               gfx::PointF(), gfx::Size(50, 50), true, false,
+                               false);
+  SetLayerPropertiesForTesting(scroller, identity_transform, gfx::Point3F(),
+                               gfx::PointF(), gfx::Size(100, 100), true, false,
+                               false);
+
+  gfx::Transform end_scale;
+  end_scale.Scale(2.f, 2.f);
+  TransformOperations start_operations;
+  start_operations.AppendMatrix(start_scale);
+  TransformOperations end_operations;
+  end_operations.AppendMatrix(end_scale);
+  AddAnimatedTransformToLayer(animated_layer, 1.0, start_operations,
+                              end_operations);
+
+  gfx::Vector2dF scroll_delta(5.f, 9.f);
+  scroller->SetScrollDelta(scroll_delta);
+
+  ExecuteCalculateDrawProperties(root);
+
+  gfx::Vector2dF expected_draw_transform_translation(-7.5f, -13.5f);
+  EXPECT_VECTOR2DF_EQ(expected_draw_transform_translation,
+                      scroller->draw_transform().To2dTranslation());
+}
+
 class AnimationScaleFactorTrackingLayerImpl : public LayerImpl {
  public:
   static scoped_ptr<AnimationScaleFactorTrackingLayerImpl> Create(
@@ -5967,6 +6121,7 @@ TEST_F(LayerTreeHostCommonTest, MaximumAnimationScaleFactor) {
   scale.AppendScale(5.f, 4.f, 3.f);
 
   AddAnimatedTransformToLayer(child_raw, 1.0, TransformOperations(), scale);
+  child_raw->layer_tree_impl()->property_trees()->needs_rebuild = true;
   ExecuteCalculateDrawProperties(grand_parent.get());
 
   // Only |child| has a scale-affecting animation.
@@ -5980,6 +6135,7 @@ TEST_F(LayerTreeHostCommonTest, MaximumAnimationScaleFactor) {
 
   AddAnimatedTransformToLayer(
       grand_parent.get(), 1.0, TransformOperations(), scale);
+  grand_parent->layer_tree_impl()->property_trees()->needs_rebuild = true;
   ExecuteCalculateDrawProperties(grand_parent.get());
 
   // |grand_parent| and |child| have scale-affecting animations.
@@ -5994,6 +6150,7 @@ TEST_F(LayerTreeHostCommonTest, MaximumAnimationScaleFactor) {
       0.f, grand_child_raw->draw_properties().maximum_animation_contents_scale);
 
   AddAnimatedTransformToLayer(parent_raw, 1.0, TransformOperations(), scale);
+  parent_raw->layer_tree_impl()->property_trees()->needs_rebuild = true;
   ExecuteCalculateDrawProperties(grand_parent.get());
 
   // |grand_parent|, |parent|, and |child| have scale-affecting animations.

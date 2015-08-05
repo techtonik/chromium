@@ -111,8 +111,6 @@ void CalculateVisibleRects(const std::vector<LayerType*>& visible_layer_list,
       }
 
       if (!success) {
-        DCHECK(transform_node->data.to_screen_is_animated);
-
         // An animated singular transform may become non-singular during the
         // animation, so we still need to compute a visible rect. In this
         // situation, we treat the entire layer as visible.
@@ -635,6 +633,25 @@ gfx::Transform ScreenSpaceTransformFromPropertyTrees(
     const LayerImpl* layer,
     const TransformTree& tree) {
   return ScreenSpaceTransformFromPropertyTreesInternal(layer, tree);
+}
+
+template <typename LayerType>
+bool ScreenSpaceTransformIsAnimatingFromPropertyTreesInternal(
+    LayerType* layer,
+    const TransformTree& tree) {
+  return tree.Node(layer->transform_tree_index())->data.to_screen_is_animated;
+}
+
+bool ScreenSpaceTransformIsAnimatingFromPropertyTrees(
+    const Layer* layer,
+    const TransformTree& tree) {
+  return ScreenSpaceTransformIsAnimatingFromPropertyTreesInternal(layer, tree);
+}
+
+bool ScreenSpaceTransformIsAnimatingFromPropertyTrees(
+    const LayerImpl* layer,
+    const TransformTree& tree) {
+  return ScreenSpaceTransformIsAnimatingFromPropertyTreesInternal(layer, tree);
 }
 
 template <typename LayerType>

@@ -368,6 +368,11 @@
       # Note: this setting is ignored if buildtype=="Official".
       'tracing_like_official_build%': 0,
 
+      # Set to 1 to make a build that disables activation of field trial tests
+      # specified in testing/variations/fieldtrial_testing_config_*.json.
+      # Note: this setting is ignored if branding=="Chrome".
+      'fieldtrial_testing_like_official_build%': 0,
+
       # Disable image loader component extension by default.
       'image_loader_extension%': 0,
 
@@ -556,7 +561,6 @@
       'enable_print_preview%': 1,
 
       # Set the version of CLD.
-      #   0: Don't specify the version. This option is for the Finch testing.
       #   1: Use only CLD1.
       #   2: Use only CLD2.
       'cld_version%': 2,
@@ -574,7 +578,7 @@
 
       # Use the operating system spellchecker, e.g. NSSpellChecker on Mac or
       # SpellCheckerSession on Android.
-      'use_platform_spellchecker%': 0,
+      'use_browser_spellchecker%': 0,
 
       # Webrtc compilation is enabled by default. Set to 0 to disable.
       'enable_webrtc%': 1,
@@ -830,7 +834,7 @@
 
         # Android and OSX have built-in spellcheckers that can be utilized.
         ['OS=="android" or OS=="mac"', {
-          'use_platform_spellchecker%': 1,
+          'use_browser_spellchecker%': 1,
         }],
 
         # Android OS includes support for proprietary codecs regardless of
@@ -1143,6 +1147,7 @@
     'win_z7%': '<(win_z7)',
     'dcheck_always_on%': '<(dcheck_always_on)',
     'tracing_like_official_build%': '<(tracing_like_official_build)',
+    'fieldtrial_testing_like_official_build%': '<(fieldtrial_testing_like_official_build)',
     'arm_version%': '<(arm_version)',
     'arm_neon%': '<(arm_neon)',
     'arm_neon_optional%': '<(arm_neon_optional)',
@@ -1212,7 +1217,7 @@
     'enable_basic_printing%': '<(enable_basic_printing)',
     'enable_print_preview%': '<(enable_print_preview)',
     'enable_spellcheck%': '<(enable_spellcheck)',
-    'use_platform_spellchecker%': '<(use_platform_spellchecker)',
+    'use_browser_spellchecker%': '<(use_browser_spellchecker)',
     'enable_google_now%': '<(enable_google_now)',
     'cld_version%': '<(cld_version)',
     'cld2_table_size%': '<(cld2_table_size)',
@@ -1712,6 +1717,21 @@
             'android_sdk_version%': '22',
             'android_sdk_build_tools_version%': '22.0.0',
             'host_os%': "<!(uname -s | sed -e 's/Linux/linux/;s/Darwin/mac/')",
+
+            'conditions': [
+              # Figure this out early since it needs symbols from libgcc.a, so it
+              # has to be before that in the set of libraries.
+              # ASan needs to dynamically link to libc++ even in static builds so
+              # that it can interpose operator new.
+              ['component=="shared_library" or asan==1', {
+                  'android_libcpp_library': 'c++_shared',
+                  'android_must_copy_system_libraries': 1,
+              }, {
+                  'android_libcpp_library': 'c++_static',
+                  'android_must_copy_system_libraries': 0,
+              }],
+            ],
+
           },
           # Copy conditionally-set variables out one scope.
           'android_ndk_root%': '<(android_ndk_root)',
@@ -1719,6 +1739,8 @@
           'android_sdk_root%': '<(android_sdk_root)',
           'android_sdk_version%': '<(android_sdk_version)',
           'android_libcpp_root': '<(android_ndk_root)/sources/cxx-stl/llvm-libc++',
+          'android_libcpp_library': '<(android_libcpp_library)',
+          'android_must_copy_system_libraries': '<(android_must_copy_system_libraries)',
           'host_os%': '<(host_os)',
 
           'android_sdk%': '<(android_sdk_root)/platforms/android-<(android_sdk_version)',
@@ -1796,8 +1818,10 @@
         'android_sdk_jar%': '<(android_sdk)/android.jar',
 
         'android_libcpp_root': '<(android_libcpp_root)',
+        'android_libcpp_library': '<(android_libcpp_library)',
         'android_libcpp_include': '<(android_libcpp_root)/libcxx/include',
         'android_libcpp_libs_dir%': '<(android_libcpp_root)/libs/<(android_app_abi)',
+        'android_must_copy_system_libraries': '<(android_must_copy_system_libraries)',
         'host_os%': '<(host_os)',
 
         # Location of the "objcopy" binary, used by both gyp and scripts.
@@ -2076,9 +2100,6 @@
       }],
       ['image_loader_extension==1', {
         'grit_defines': ['-D', 'image_loader_extension'],
-      }],
-      ['remoting==1', {
-        'grit_defines': ['-D', 'remoting'],
       }],
       ['use_titlecase_in_grd==1', {
         'grit_defines': ['-D', 'use_titlecase'],
@@ -2628,6 +2649,7 @@
     'defines': [
       # Don't use deprecated V8 APIs anywhere.
       'V8_DEPRECATION_WARNINGS',
+      'CLD_VERSION=<(cld_version)',
     ],
     'include_dirs': [
       '<(SHARED_INTERMEDIATE_DIR)',
@@ -2735,9 +2757,6 @@
       ['profiling==1', {
         'defines': ['ENABLE_PROFILING=1'],
       }],
-      ['remoting==1', {
-        'defines': ['ENABLE_REMOTING=1'],
-      }],
       ['enable_webrtc==1', {
         'defines': ['ENABLE_WEBRTC=1'],
       }],
@@ -2838,6 +2857,9 @@
       ['tracing_like_official_build!=0', {
         'defines': ['TRACING_IS_OFFICIAL_BUILD=1'],
       }],  # tracing_like_official_build!=0
+      ['fieldtrial_testing_like_official_build==0 and branding!="Chrome"', {
+        'defines': ['FIELDTRIAL_TESTING_ENABLED'],
+      }],  # fieldtrial_testing_like_official_build==0 and branding!="Chrome"
       ['OS=="win"', {
         'defines': ['NO_TCMALLOC'],
         'conditions': [
@@ -2994,9 +3016,6 @@
       ['enable_google_now==1', {
         'defines': ['ENABLE_GOOGLE_NOW=1'],
       }],
-      ['cld_version!=0', {
-        'defines': ['CLD_VERSION=<(cld_version)'],
-      }],
       ['enable_basic_printing==1 or enable_print_preview==1', {
         # Convenience define for ENABLE_BASIC_PRINTING || ENABLE_PRINT_PREVIEW.
         'defines': ['ENABLE_PRINTING=1'],
@@ -3013,8 +3032,8 @@
       ['enable_spellcheck==1', {
         'defines': ['ENABLE_SPELLCHECK=1'],
       }],
-      ['use_platform_spellchecker', {
-        'defines': ['USE_PLATFORM_SPELLCHECKER=1'],
+      ['use_browser_spellchecker', {
+        'defines': ['USE_BROWSER_SPELLCHECKER=1'],
       }],
       ['enable_captive_portal_detection==1', {
         'defines': ['ENABLE_CAPTIVE_PORTAL_DETECTION=1'],
@@ -4744,15 +4763,6 @@
         # identifying various build artifacts corresponding to a particular
         # build of chrome (e.g. where to find archived symbols).
         'chrome_build_id%': '',
-        'conditions': [
-          # Figure this out early since it needs symbols from libgcc.a, so it
-          # has to be before that in the set of libraries.
-          ['component=="shared_library"', {
-              'android_libcpp_library': 'c++_shared',
-          }, {
-              'android_libcpp_library': 'c++_static',
-          }],
-        ],
 
         # Placing this variable here prevents from forking libvpx, used
         # by remoting.  Remoting is off, so it needn't built,
@@ -4903,6 +4913,10 @@
                   '-D__compiler_offsetof=__builtin_offsetof',
                   '-Dnan=__builtin_nan',
                 ],
+                'cflags!': [
+                  # Clang does not support the following options.
+                  '-finline-limit=64',
+                ],
                 'conditions': [
                   ['target_arch=="arm"', {
                     'cflags': [
@@ -4914,10 +4928,10 @@
                   }],
                   ['target_arch=="ia32"', {
                     'cflags': [
-                      '-target x86-linux-androideabi',
+                      '-target i686-linux-androideabi',
                     ],
                     'ldflags': [
-                      '-target x86-linux-androideabi',
+                      '-target i686-linux-androideabi',
                     ],
                   }],
                   # Place holder for x64 support, not tested.
@@ -6170,6 +6184,17 @@
                 '-fsanitize-recover=cfi',
               ],
             },
+          }],
+        ],
+      },
+    }],
+    ['cfi_vptr==1 and cfi_diag==0', {
+      'target_defaults': {
+        'target_conditions': [
+          ['_toolset=="target"', {
+            'defines': [
+              'CFI_ENFORCEMENT',
+            ],
           }],
         ],
       },

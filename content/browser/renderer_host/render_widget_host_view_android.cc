@@ -373,8 +373,6 @@ bool RenderWidgetHostViewAndroid::OnMessageReceived(
                         OnDidChangeBodyBackgroundColor)
     IPC_MESSAGE_HANDLER(ViewHostMsg_SetNeedsBeginFrames,
                         OnSetNeedsBeginFrames)
-    IPC_MESSAGE_HANDLER(ViewHostMsg_TextInputStateChanged,
-                        OnTextInputStateChanged)
     IPC_MESSAGE_HANDLER(ViewHostMsg_SmartClipDataExtracted,
                         OnSmartClipDataExtracted)
     IPC_MESSAGE_HANDLER(ViewHostMsg_ShowUnhandledTapUIIfNeeded,
@@ -666,19 +664,11 @@ void RenderWidgetHostViewAndroid::SetIsLoading(bool is_loading) {
   // is TabContentsDelegate.
 }
 
-void RenderWidgetHostViewAndroid::TextInputTypeChanged(
-    ui::TextInputType type,
-    ui::TextInputMode input_mode,
-    bool can_compose_inline,
-    int flags) {
-  // Unused on Android, which uses OnTextInputChanged instead.
-}
-
 long RenderWidgetHostViewAndroid::GetNativeImeAdapter() {
   return reinterpret_cast<intptr_t>(&ime_adapter_android_);
 }
 
-void RenderWidgetHostViewAndroid::OnTextInputStateChanged(
+void RenderWidgetHostViewAndroid::TextInputStateChanged(
     const ViewHostMsg_TextInputState_Params& params) {
   // If the change is not originated from IME (e.g. Javascript, autofill),
   // send back the renderer an acknowledgement, regardless of how we exit from
@@ -1100,6 +1090,13 @@ void RenderWidgetHostViewAndroid::SwapDelegatedFrame(
   // http://crbug.com/384134 or http://crbug.com/310763
   frame->delegated_frame_data->device_scale_factor = 1.0f;
 
+  base::Closure ack_callback =
+      base::Bind(&RenderWidgetHostViewAndroid::SendDelegatedFrameAck,
+                 weak_ptr_factory_.GetWeakPtr(),
+                 output_surface_id);
+
+  ack_callbacks_.push(ack_callback);
+
   if (!has_content) {
     DestroyDelegatedContent();
   } else {
@@ -1112,12 +1109,6 @@ void RenderWidgetHostViewAndroid::SwapDelegatedFrame(
     layer_->SetBounds(content_size_in_layer_);
   }
 
-  base::Closure ack_callback =
-      base::Bind(&RenderWidgetHostViewAndroid::SendDelegatedFrameAck,
-                 weak_ptr_factory_.GetWeakPtr(),
-                 output_surface_id);
-
-  ack_callbacks_.push(ack_callback);
   if (host_->is_hidden())
     RunAckCallbacks(cc::SurfaceDrawStatus::DRAW_SKIPPED);
 }

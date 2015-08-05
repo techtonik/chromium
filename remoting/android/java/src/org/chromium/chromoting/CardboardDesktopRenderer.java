@@ -6,6 +6,7 @@ package org.chromium.chromoting;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.PointF;
 import android.opengl.GLES20;
 import android.opengl.Matrix;
 
@@ -36,18 +37,13 @@ public class CardboardDesktopRenderer implements CardboardView.StereoRenderer {
     private static final float DESKTOP_POSITION_X = 0.0f;
     private static final float DESKTOP_POSITION_Y = 0.0f;
     private static final float DESKTOP_POSITION_Z = -2.0f;
-    private static final float HALF_DESKTOP_LENGTH = 1.0f;
 
-    // TODO(shichengfeng): Get the height and width from real desktop image.
-    private static final FloatBuffer DESKTOP_COORDINATES = makeFloatBuffer(new float[] {
-            // Desktop model coordinates.
-            -HALF_DESKTOP_LENGTH, HALF_DESKTOP_LENGTH, 0.0f,
-            -HALF_DESKTOP_LENGTH, -HALF_DESKTOP_LENGTH, 0.0f,
-            HALF_DESKTOP_LENGTH, HALF_DESKTOP_LENGTH, 0.0f,
-            -HALF_DESKTOP_LENGTH, -HALF_DESKTOP_LENGTH, 0.0f,
-            HALF_DESKTOP_LENGTH, -HALF_DESKTOP_LENGTH, 0.0f,
-            HALF_DESKTOP_LENGTH, HALF_DESKTOP_LENGTH, 0.0f
-    });
+    // Allows user to click even when looking outside the desktop
+    // but within edge margin.
+    private static final float EDGE_MARGIN = 0.1f;
+
+    // Fix the desktop height and adjust width accordingly.
+    private static final float HALF_DESKTOP_HEIGHT = 1.0f;
 
     private static final FloatBuffer DESKTOP_TEXTURE_COORDINATES = makeFloatBuffer(new float[] {
             // Texture coordinate data.
@@ -93,6 +89,8 @@ public class CardboardDesktopRenderer implements CardboardView.StereoRenderer {
 
     private final Context mActivityContext;
 
+    private float mHalfDesktopWidth;
+
     // Flag to indicate whether reload the desktop texture or not.
     private boolean mReloadTexture;
 
@@ -129,6 +127,15 @@ public class CardboardDesktopRenderer implements CardboardView.StereoRenderer {
     /** Lock to allow multithreaded access to mReloadTexture. */
     private Object mReloadTextureLock = new Object();
 
+    // Lock for eye position related operations.
+    // This protects access to mEyePositionVector as well as mDesktop{Height/Width}Pixels.
+    private Object mEyePositionLock = new Object();
+
+    private int mDesktopHeightPixels;
+    private int mDesktopWidthPixels;
+
+    private FloatBuffer mDesktopCoordinates;
+
     public CardboardDesktopRenderer(Context context) {
         mActivityContext = context;
         mReloadTexture = false;
@@ -136,7 +143,6 @@ public class CardboardDesktopRenderer implements CardboardView.StereoRenderer {
         mCameraMatrix = new float[16];
         mViewMatrix = new float[16];
         mProjectionMatrix = new float[16];
-
         mDesktopModelMatrix = new float[16];
         mDesktopCombinedMatrix = new float[16];
         mEyePointModelMatrix = new float[16];
@@ -145,7 +151,11 @@ public class CardboardDesktopRenderer implements CardboardView.StereoRenderer {
         mForwardVector = new float[3];
         mEyePositionVector = new float[3];
 
-        // Provide the callback for JniInterface.
+        attachRedrawCallback();
+    }
+
+    // This can be called on any thread.
+    public void attachRedrawCallback() {
         JniInterface.provideRedrawCallback(new Runnable() {
             @Override
             public void run() {
@@ -263,25 +273,29 @@ public class CardboardDesktopRenderer implements CardboardView.StereoRenderer {
         Matrix.multiplyMM(mDesktopCombinedMatrix, 0, mProjectionMatrix,
                 0, mDesktopCombinedMatrix, 0);
 
-
         // Pass in model view project matrix.
         GLES20.glUniformMatrix4fv(mDesktopCombinedMatrixHandle, 1, false,
                 mDesktopCombinedMatrix, 0);
 
-        // Pass in texture data.
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
-        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mTextureDataHandle);
-        GLES20.glUniform1i(mTextureUniformHandle, 0);
-
+        if (mDesktopCoordinates == null) {
+            // This can happen if the client is connected, but a complete video frame has not yet
+            // been decoded.
+            return;
+        }
         // Pass in the desktop position.
         GLES20.glVertexAttribPointer(mPositionHandle, POSITION_DATA_SIZE, GLES20.GL_FLOAT, false,
-                0, DESKTOP_COORDINATES);
+                0, mDesktopCoordinates);
         GLES20.glEnableVertexAttribArray(mPositionHandle);
 
         // Pass in texture coordinate.
         GLES20.glVertexAttribPointer(mTextureCoordinateHandle, TEXTURE_COORDINATE_DATA_SIZE,
                 GLES20.GL_FLOAT, false, 0, DESKTOP_TEXTURE_COORDINATES);
         GLES20.glEnableVertexAttribArray(mTextureCoordinateHandle);
+
+        // Pass in texture data.
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, mTextureDataHandle);
+        GLES20.glUniform1i(mTextureUniformHandle, 0);
 
         // Draw the desktop.
         int totalPointNumber = 6;
@@ -298,8 +312,12 @@ public class CardboardDesktopRenderer implements CardboardView.StereoRenderer {
         // Set the eye point in front of desktop.
         GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT);
 
+        float eyePointX = clamp(mEyePositionVector[0], -mHalfDesktopWidth,
+                mHalfDesktopWidth);
+        float eyePointY = clamp(mEyePositionVector[1], -HALF_DESKTOP_HEIGHT,
+                HALF_DESKTOP_HEIGHT);
         Matrix.setIdentityM(mEyePointModelMatrix, 0);
-        Matrix.translateM(mEyePointModelMatrix, 0, -mEyePositionVector[0], -mEyePositionVector[1],
+        Matrix.translateM(mEyePointModelMatrix, 0, -eyePointX, -eyePointY,
                 DESKTOP_POSITION_Z);
         Matrix.multiplyMM(mEyePointCombinedMatrix, 0, mViewMatrix, 0, mEyePointModelMatrix, 0);
         Matrix.multiplyMM(mEyePointCombinedMatrix, 0, mProjectionMatrix,
@@ -319,25 +337,69 @@ public class CardboardDesktopRenderer implements CardboardView.StereoRenderer {
     }
 
     /**
-     * Check whether user is looking at desktop or not.
+     * Returns coordinates in units of pixels in the desktop bitmap.
+     * This can be called on any thread.
      */
-    private boolean isLookingAtDesktop() {
-        return Math.abs(mEyePositionVector[0]) <= HALF_DESKTOP_LENGTH
-                && Math.abs(mEyePositionVector[1]) <= HALF_DESKTOP_LENGTH;
+    public PointF getMouseCoordinates() {
+        PointF result = new PointF();
+        synchronized (mEyePositionLock) {
+            // Due to the coordinate direction, we only have to inverse x.
+            result.x = (-mEyePositionVector[0] + mHalfDesktopWidth)
+                    / (2 * mHalfDesktopWidth) * mDesktopWidthPixels;
+            result.y = (mEyePositionVector[1] + HALF_DESKTOP_HEIGHT)
+                    / (2 * HALF_DESKTOP_HEIGHT) * mDesktopHeightPixels;
+            result.x = clamp(result.x, 0, mDesktopWidthPixels);
+            result.y = clamp(result.y, 0, mDesktopHeightPixels);
+        }
+        return result;
+    }
+
+    /**
+     * Returns the passed in value if it resides within the specified range (inclusive).  If not,
+     * it will return the closest boundary from the range.  The ordering of the boundary values
+     * does not matter.
+     *
+     * @param value The value to be compared against the range.
+     * @param a First boundary range value.
+     * @param b Second boundary range value.
+     * @return The passed in value if it is within the range, otherwise the closest boundary value.
+     */
+    private static float clamp(float value, float a, float b) {
+        float min = (a > b) ? b : a;
+        float max = (a > b) ? a : b;
+        if (value < min) {
+            value = min;
+        } else if (value > max) {
+            value = max;
+        }
+        return value;
+    }
+
+    /**
+     * Check whether user is looking at desktop or not.
+     * This can be called on any thread.
+     */
+    public boolean isLookingAtDesktop() {
+        synchronized (mEyePositionLock) {
+            return Math.abs(mEyePositionVector[0]) <= (mHalfDesktopWidth + EDGE_MARGIN)
+                && Math.abs(mEyePositionVector[1]) <= (HALF_DESKTOP_HEIGHT + EDGE_MARGIN);
+        }
     }
 
     /**
      * Get position on desktop where user is looking at.
      */
     private void getLookingPosition() {
-        if (Math.abs(mForwardVector[2]) < 0.00001f) {
-            mEyePositionVector[0] = Math.signum(mForwardVector[0]) * Float.MAX_VALUE;
-            mEyePositionVector[1] = Math.signum(mForwardVector[1]) * Float.MAX_VALUE;
-        } else {
-            mEyePositionVector[0] = mForwardVector[0] * DESKTOP_POSITION_Z / mForwardVector[2];
-            mEyePositionVector[1] = mForwardVector[1] * DESKTOP_POSITION_Z / mForwardVector[2];
+        synchronized (mEyePositionLock) {
+            if (Math.abs(mForwardVector[2]) < 0.00001f) {
+                mEyePositionVector[0] = Math.signum(mForwardVector[0]) * Float.MAX_VALUE;
+                mEyePositionVector[1] = Math.signum(mForwardVector[1]) * Float.MAX_VALUE;
+            } else {
+                mEyePositionVector[0] = mForwardVector[0] * DESKTOP_POSITION_Z / mForwardVector[2];
+                mEyePositionVector[1] = mForwardVector[1] * DESKTOP_POSITION_Z / mForwardVector[2];
+            }
+            mEyePositionVector[2] = DESKTOP_POSITION_Z;
         }
-        mEyePositionVector[2] = DESKTOP_POSITION_Z;
     }
 
     /**
@@ -360,6 +422,12 @@ public class CardboardDesktopRenderer implements CardboardView.StereoRenderer {
             return;
         }
 
+        synchronized (mEyePositionLock) {
+            mDesktopHeightPixels = bitmap.getHeight();
+            mDesktopWidthPixels = bitmap.getWidth();
+        }
+
+        updateDesktopCoordinatesBuffer(bitmap);
         TextureHelper.linkTexture(textureDataHandle, bitmap);
 
         synchronized (mReloadTextureLock) {
@@ -376,5 +444,27 @@ public class CardboardDesktopRenderer implements CardboardView.StereoRenderer {
                 .order(ByteOrder.nativeOrder()).asFloatBuffer();
         result.put(data).position(0);
         return result;
+    }
+
+    /**
+     *  Update the desktop coordinates based on the new bitmap. Note here we fix the
+     *  height of the desktop and vary width accordingly.
+     */
+    private void updateDesktopCoordinatesBuffer(Bitmap bitmap) {
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
+        float newHalfDesktopWidth = width * HALF_DESKTOP_HEIGHT / height;
+        if (Math.abs(mHalfDesktopWidth - newHalfDesktopWidth) > 0.0001) {
+            mHalfDesktopWidth = newHalfDesktopWidth;
+            mDesktopCoordinates = makeFloatBuffer(new float[] {
+                // Desktop model coordinates.
+                -mHalfDesktopWidth, HALF_DESKTOP_HEIGHT, 0.0f,
+                -mHalfDesktopWidth, -HALF_DESKTOP_HEIGHT, 0.0f,
+                mHalfDesktopWidth, HALF_DESKTOP_HEIGHT, 0.0f,
+                -mHalfDesktopWidth, -HALF_DESKTOP_HEIGHT, 0.0f,
+                mHalfDesktopWidth, -HALF_DESKTOP_HEIGHT, 0.0f,
+                mHalfDesktopWidth, HALF_DESKTOP_HEIGHT, 0.0f
+            });
+        }
     }
 }

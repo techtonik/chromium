@@ -11,7 +11,6 @@
 namespace ios {
 
 class FakeProfileOAuth2TokenServiceIOSProvider;
-class FakeSearchProvider;
 class FakeStringProvider;
 
 class TestChromeBrowserProvider : public ChromeBrowserProvider {
@@ -23,13 +22,13 @@ class TestChromeBrowserProvider : public ChromeBrowserProvider {
   static TestChromeBrowserProvider* GetTestProvider();
 
   // ChromeBrowserProvider:
+  ChromeIdentityService* GetChromeIdentityService() override;
   StringProvider* GetStringProvider() override;
   const char* GetChromeUIScheme() override;
-  SearchProvider* GetSearchProvider() override;
 
  private:
+  scoped_ptr<ChromeIdentityService> chrome_identity_service_;
   scoped_ptr<FakeStringProvider> string_provider_;
-  scoped_ptr<FakeSearchProvider> search_provider_;
 
   DISALLOW_COPY_AND_ASSIGN(TestChromeBrowserProvider);
 };

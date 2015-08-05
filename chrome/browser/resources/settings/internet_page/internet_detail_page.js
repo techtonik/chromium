@@ -10,6 +10,9 @@
  * @group Chrome Settings Elements
  * @element cr-settings-internet-detail
  */
+(function() {
+
+/** @const */ var CARRIER_VERIZON = 'Verizon Wireless';
 
 Polymer({
   is: 'cr-settings-internet-detail-page',
@@ -235,7 +238,7 @@ Polymer({
   },
 
   /**
-   * Calls networkingPrivate.getState for this.guid.
+   * Calls networkingPrivate.getProperties for this.guid.
    * @private
    */
   getNetworkDetails_: function() {
@@ -252,6 +255,11 @@ Polymer({
    */
   getPropertiesCallback_: function(state) {
     this.networkState = state;
+    if (!state) {
+      // If state becomes null (i.e. the network is no longer visible), close
+      // the page.
+      MoreRouting.navigateTo('internet');
+    }
   },
 
   /**
@@ -310,20 +318,81 @@ Polymer({
 
   /**
    * @param {?CrOnc.NetworkStateProperties} state The network state properties.
-   * @return {boolean} Whether or not the network can be connected.
+   * @return {boolean} Whether or not to show the 'Connect' button.
    * @private
    */
-  canConnect_: function(state) {
+  showConnect_: function(state) {
     return state && state.Type != CrOnc.Type.ETHERNET &&
            state.ConnectionState == CrOnc.ConnectionState.NOT_CONNECTED;
   },
 
   /**
    * @param {?CrOnc.NetworkStateProperties} state The network state properties.
-   * @return {boolean} Whether or not the network can be disconnected.
+   * @return {boolean} Whether or not to show the 'Activate' buttonb.
    * @private
    */
-  canDisconnect_: function(state) {
+  showActivate_: function(state) {
+    if (!state || state.Type != CrOnc.Type.CELLULAR)
+      return false;
+    var activation = state.Cellular.ActivationState;
+    return activation == CrOnc.ActivationState.NOT_ACTIVATED ||
+           activation == CrOnc.ActivationState.PARTIALLY_ACTIVATED;
+  },
+
+  /**
+   * @param {?CrOnc.NetworkStateProperties} state The network state properties.
+   * @return {boolean} Whether or not to show the 'View Account' button.
+   * @private
+   */
+  showViewAccount_: function(state) {
+    // Show either the 'Activate' or the 'View Account' button.
+    if (this.showActivate_())
+      return false;
+
+    if (!state || state.Type != CrOnc.Type.CELLULAR || !state.Cellular)
+      return false;
+    var cellular = state.Cellular;
+
+    // Only show if online payment URL is provided or the carrier is Verizon.
+    if (cellular.Carrier != CARRIER_VERIZON) {
+      var paymentUrl = cellular.PaymentPortal && cellular.PaymentPortal.Url;
+      if (!paymentUrl)
+        return false;
+    }
+
+    // Only show for connected networks or LTE networks with a valid MDN.
+    if (!this.isConnectedState_(state)) {
+      var technology = cellular.NetworkTechnology;
+      if (technology != CrOnc.NetworkTechnology.LTE &&
+          technology != CrOnc.NetworkTechnology.LTEAdvanced) {
+        return false;
+      }
+      if (!cellular.MDN)
+        return false;
+    }
+
+    return true;
+  },
+
+  /**
+   * @return {boolean} Whether or not to enable the network connect button.
+   * @private
+   */
+  enableConnect_: function(state) {
+    if (!state || !this.showConnect_(state))
+      return false;
+    if (state.Type == CrOnc.Type.CELLULAR && CrOnc.isSimLocked(state))
+      return false;
+    // TODO(stevenjb): For VPN, check connected state of any network.
+    return true;
+  },
+
+  /**
+   * @param {?CrOnc.NetworkStateProperties} state The network state properties.
+   * @return {boolean} Whether or not to show the 'Disconnect' button.
+   * @private
+   */
+  showDisconnect_: function(state) {
     return state && state.Type != CrOnc.Type.ETHERNET &&
            state.ConnectionState != CrOnc.ConnectionState.NOT_CONNECTED;
   },
@@ -345,15 +414,38 @@ Polymer({
   },
 
   /**
-   * Event triggered when the apnlist element changes.
-   * @param {!{detail: { field: string, value: CrOnc.APNProperties}}} event
-   *     The network-apnlist change event.
+   * Callback when the Activate button is clicked.
    * @private
    */
-  onApnChange_: function(event) {
-    if (event.detail.field != 'APN')
+  onActivateClicked_: function() {
+    chrome.networkingPrivate.startActivate(this.guid);
+  },
+
+  /**
+   * Callback when the View Account button is clicked.
+   * @private
+   */
+  onViewAccountClicked_: function() {
+    // startActivate() will show the account page for activated networks.
+    chrome.networkingPrivate.startActivate(this.guid);
+  },
+
+  /**
+   * Event triggered for elements associated with network properties.
+   * @param {!{detail: { field: string, value: Object}}} event
+   * @private
+   */
+  onNetworkPropertyChange_: function(event) {
+    var field = event.detail.field;
+    var value = event.detail.value;
+    if (field == 'APN') {
+      this.setNetworkProperties_({Cellular: {APN: value}});
       return;
-    this.setNetworkProperties_({Cellular: {APN: event.detail.value}});
+    }
+    if (field == 'SIMLockStatus') {
+      this.setNetworkProperties_({Cellular: {SIMLockStatus: value}});
+      return;
+    }
   },
 
   /**
@@ -582,6 +674,17 @@ Polymer({
    * @private
    */
   isType_: function(state, type) {
-    return state && (state.Type == type);
+    return state && state.Type == type;
+  },
+
+  /**
+   * @param {?CrOnc.NetworkStateProperties} state The network state properties.
+   * @return {boolean} True if the Cellular SIM section should be shown.
+   * @private
+   */
+  showCellularSim_: function(state) {
+    return state && state.Type == 'Cellular' && state.Cellular &&
+        state.Cellular.Family == 'GSM';
   }
 });
+})();

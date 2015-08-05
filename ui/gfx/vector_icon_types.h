@@ -18,8 +18,13 @@ enum class VectorIconId;
 // are relative, in device independent pixels.
 const int kReferenceSizeDip = 48;
 
-// A path command; each correlates to an SVG path command.
+// A command to Skia.
 enum CommandType {
+  // A new <path> element. For the first path, this is assumed.
+  NEW_PATH,
+  // Sets the color for the current path.
+  PATH_COLOR_ARGB,
+  // These correspond to pathing commands.
   MOVE_TO,
   R_MOVE_TO,
   LINE_TO,
@@ -32,6 +37,9 @@ enum CommandType {
   R_CUBIC_TO,
   CIRCLE,
   CLOSE,
+  // Sets the dimensions of the canvas in dip. (Default is kReferenceSizeDip.)
+  CANVAS_DIMENSIONS,
+  // Marks the end of the list of commands.
   END
 };
 

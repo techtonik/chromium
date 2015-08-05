@@ -377,6 +377,18 @@ message PolicyData {
   // The unique directory api ID of the device which was generated on the
   // server-side.
   optional string directory_api_id = 22;
+  
+  // List of device affiliation IDs. If exists overlap between user
+  // affiliation IDs and device affiliation IDs, we consider that the user is
+  // affiliated on the device. Otherwise the user is not affiliated on the
+  // device. Should be fetched with device policy. Ignored if fetched with 
+  // other polices.
+  repeated string device_affiliation_ids = 23;
+  
+  // List of user affiliation IDs. The list is used to define if current user
+  // is affiliated on the device. See device_affiliation_ids for details. 
+  // Should be fetched with user policy. Ignored if fetched with other polices.
+  repeated string user_affiliation_ids = 24;
 }
 
 message PolicyFetchResponse {
@@ -674,6 +686,14 @@ message VolumeInfo {
   optional int64 storage_free = 3;
 }
 
+// Information about a single CPU temperature channel.
+message CPUTempInfo {
+  // Temperature channel label.
+  optional string cpu_label = 1;
+  // CPU temperature in Celsius.
+  optional int32 cpu_temp = 2;
+}
+
 // Report device level status.
 message DeviceStatusReportRequest {
   // The OS version reported by the device is a platform version
@@ -722,6 +742,9 @@ message DeviceStatusReportRequest {
 
   // Samples of free RAM [in bytes] (unreliable due to GC).
   repeated int64 system_ram_free = 15;
+
+  // CPU temp information.
+  repeated CPUTempInfo cpu_temp_info = 16;
 }
 
 // Provides status information for an installed app/extension.

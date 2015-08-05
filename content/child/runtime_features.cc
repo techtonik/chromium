@@ -59,16 +59,13 @@ static void SetRuntimeFeatureDefaultsForPlatform() {
   WebRuntimeFeatures::enableOrientationEvent(true);
   WebRuntimeFeatures::enableFastMobileScrolling(true);
   WebRuntimeFeatures::enableMediaCapture(true);
+  WebRuntimeFeatures::enableCompositedSelectionUpdate(true);
   // Android won't be able to reliably support non-persistent notifications, the
   // intended behavior for which is in flux by itself.
   WebRuntimeFeatures::enableNotificationConstructor(false);
 #else
   WebRuntimeFeatures::enableNavigatorContentUtils(true);
 #endif  // defined(OS_ANDROID)
-
-#if defined(OS_ANDROID) || defined(USE_AURA)
-  WebRuntimeFeatures::enableCompositedSelectionUpdate(true);
-#endif
 
 #if !(defined OS_ANDROID || defined OS_CHROMEOS || defined OS_IOS)
     // Only Android, ChromeOS, and IOS support NetInfo right now.
@@ -205,7 +202,8 @@ void SetRuntimeFeaturesDefaultsAndUpdateFromArgs(
 
   if (command_line.HasSwitch(switches::kEnableWebVR)) {
     WebRuntimeFeatures::enableWebVR(true);
-    WebRuntimeFeatures::enableFeatureFromString("GeometryInterfaces", true);
+    WebRuntimeFeatures::enableFeatureFromString(
+        std::string("GeometryInterfaces"), true);
   }
 
   // Enable explicitly enabled features, and then disable explicitly disabled
@@ -216,8 +214,7 @@ void SetRuntimeFeaturesDefaultsAndUpdateFromArgs(
         command_line.GetSwitchValueASCII(switches::kEnableBlinkFeatures), ',',
         &enabled_features);
     for (const std::string& feature : enabled_features) {
-      WebRuntimeFeatures::enableFeatureFromString(
-          blink::WebString::fromLatin1(feature), true);
+      WebRuntimeFeatures::enableFeatureFromString(feature, true);
     }
   }
   if (command_line.HasSwitch(switches::kDisableBlinkFeatures)) {
@@ -226,8 +223,7 @@ void SetRuntimeFeaturesDefaultsAndUpdateFromArgs(
         command_line.GetSwitchValueASCII(switches::kDisableBlinkFeatures), ',',
         &disabled_features);
     for (const std::string& feature : disabled_features) {
-      WebRuntimeFeatures::enableFeatureFromString(
-          blink::WebString::fromLatin1(feature), false);
+      WebRuntimeFeatures::enableFeatureFromString(feature, false);
     }
   }
 }

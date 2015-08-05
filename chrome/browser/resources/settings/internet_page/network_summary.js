@@ -154,7 +154,8 @@ Polymer({
    */
   onWiFiExpanded_: function(event) {
     this.getNetworkStates_();  // Get the latest network states (only).
-    chrome.networkingPrivate.requestNetworkScan();
+    if (event.detail.expanded)
+      chrome.networkingPrivate.requestNetworkScan();
   },
 
   /**
@@ -204,8 +205,18 @@ Polymer({
   onNetworksChangedEvent_: function(networkIds) {
     networkIds.forEach(function(id) {
       if (id in this.networkIds_) {
-        chrome.networkingPrivate.getState(id,
-                                          this.getStateCallback_.bind(this));
+        chrome.networkingPrivate.getState(
+            id,
+            function(state) {
+              // Async call, ensure id still exists.
+              if (!this.networkIds_[id])
+                return;
+              if (!state) {
+                this.networkIds_[id] = undefined;
+                return;
+              }
+              this.updateNetworkState_(state.Type, state);
+            }.bind(this));
       }
     }, this);
   },
@@ -273,8 +284,10 @@ Polymer({
     // Clear any current networks.
     this.networkIds_ = {};
 
-    // Get the first (active) state for each type.
+    // Track the first (active) state for each type.
     var foundTypes = {};
+
+    // Complete list of states by type.
     /** @type {!NetworkStateListObject} */ var networkStateLists = {
       Ethernet: [],
       WiFi: [],
@@ -282,6 +295,7 @@ Polymer({
       WiMAX: [],
       VPN: []
     };
+
     states.forEach(function(state) {
       var type = state.Type;
       if (!foundTypes[type]) {
@@ -291,7 +305,8 @@ Polymer({
       networkStateLists[type].push(state);
     }, this);
 
-    // Set any types not found to a default value or null.
+    // Set any types with a deviceState and no network to a default state,
+    // and any types not found to null.
     NETWORK_TYPES.forEach(function(type) {
       if (!foundTypes[type]) {
         /** @type {CrOnc.NetworkStateProperties} */ var defaultState = null;
@@ -308,18 +323,6 @@ Polymer({
       var vpn = { Type: CrOnc.Type.VPN, State: 'Enabled' };
       this.set('deviceStates.VPN', vpn);
     }
-  },
-
-  /**
-   * networkingPrivate.getState callback.
-   * @param {!CrOnc.NetworkStateProperties} state The network state properties.
-   * @private
-   */
-  getStateCallback_: function(state) {
-    var id = state.GUID;
-    if (!this.networkIds_[id])
-      return;
-    this.updateNetworkState_(state.Type, state);
   },
 
   /**

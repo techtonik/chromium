@@ -67,6 +67,7 @@ class ScrollbarLayerImplBase;
 class SimpleEnclosedRegion;
 class Tile;
 class TransformTree;
+class ScrollState;
 
 struct AppendQuadsData;
 
@@ -112,6 +113,7 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   void OnTransformAnimated(const gfx::Transform& transform) override;
   void OnScrollOffsetAnimated(const gfx::ScrollOffset& scroll_offset) override;
   void OnAnimationWaitingForDeletion() override;
+  void OnTransformIsPotentiallyAnimatingChanged(bool is_animating) override;
   bool IsActive() const override;
 
   // AnimationDelegate implementation.
@@ -148,6 +150,9 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   const std::set<LayerImpl*>* scroll_children() const {
     return scroll_children_.get();
   }
+
+  void DistributeScroll(ScrollState* scroll_state);
+  void ApplyScroll(ScrollState* scroll_state);
 
   void set_property_tree_sequence_number(int sequence_number) {}
 
@@ -190,6 +195,7 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   bool is_clipped() const { return is_clipped_; }
 
   void UpdatePropertyTreeTransform();
+  void UpdatePropertyTreeTransformIsAnimated(bool is_animated);
   void UpdatePropertyTreeOpacity();
   void UpdatePropertyTreeScrollOffset();
 
@@ -387,9 +393,6 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   SkXfermode::Mode draw_blend_mode() const {
     return draw_properties_.blend_mode;
   }
-  bool draw_transform_is_animating() const {
-    return draw_properties_.target_space_transform_is_animating;
-  }
   bool screen_space_transform_is_animating() const {
     return draw_properties_.screen_space_transform_is_animating;
   }
@@ -518,12 +521,6 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
     scroll_blocks_on_ = scroll_blocks_on;
   }
   ScrollBlocksOn scroll_blocks_on() const { return scroll_blocks_on_; }
-  void SetDrawCheckerboardForMissingTiles(bool checkerboard) {
-    draw_checkerboard_for_missing_tiles_ = checkerboard;
-  }
-  bool draw_checkerboard_for_missing_tiles() const {
-    return draw_checkerboard_for_missing_tiles_;
-  }
 
   InputHandler::ScrollStatus TryScroll(
       const gfx::PointF& screen_space_point,
@@ -780,7 +777,6 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   bool contents_opaque_ : 1;
   bool is_root_for_isolated_group_ : 1;
   bool use_parent_backface_visibility_ : 1;
-  bool draw_checkerboard_for_missing_tiles_ : 1;
   bool draws_content_ : 1;
   bool hide_layer_and_subtree_ : 1;
 

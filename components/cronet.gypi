@@ -149,6 +149,7 @@
           # cronet_static_small target has reduced binary size through using
           # ICU alternatives which requires file and ftp support be disabled.
           'target_name': 'cronet_static_small',
+          'type': 'static_library',
           'defines': [
             'USE_ICU_ALTERNATIVES_ON_ANDROID=1',
             'DISABLE_FILE_SUPPORT=1',
@@ -157,7 +158,6 @@
           'dependencies': [
             '../net/net.gyp:net_small',
           ],
-          'includes': [ 'cronet/cronet_static.gypi' ],
           'conditions': [
             ['enable_data_reduction_proxy_support==1',
               {
@@ -167,15 +167,16 @@
               },
             ],
           ],
+          'includes': [ 'cronet/cronet_static.gypi' ],
         },
         {
           # cronet_static target depends on ICU and includes file and ftp support.
           'target_name': 'cronet_static',
+          'type': 'static_library',
           'dependencies': [
             '../base/base.gyp:base_i18n',
             '../net/net.gyp:net',
           ],
-          'includes': [ 'cronet/cronet_static.gypi' ],
           'conditions': [
             ['enable_data_reduction_proxy_support==1',
               {
@@ -185,6 +186,7 @@
               },
             ],
           ],
+          'includes': [ 'cronet/cronet_static.gypi' ],
         },
         {
           'target_name': 'libcronet',
@@ -361,7 +363,6 @@
             'cronet/android/test/network_change_notifier_util.h',
           ],
           'dependencies': [
-            'cronet_static',
             'cronet_tests_jni_headers',
             '../base/base.gyp:base',
             '../net/net.gyp:net',
@@ -373,15 +374,19 @@
             '../third_party/icu/icu.gyp:icui18n',
             '../third_party/icu/icu.gyp:icuuc',
           ],
-          'conditions' : [
+          'defines': [
+            'CRONET_TEST=1',
+          ],
+          'conditions': [
             ['enable_data_reduction_proxy_support==1',
               {
-                'defines' : [
-                  'DATA_REDUCTION_PROXY_SUPPORT'
+                'dependencies': [
+                  '../components/components.gyp:data_reduction_proxy_core_browser',
                 ],
               },
             ],
           ],
+          'includes': [ 'cronet/cronet_static.gypi' ],
         },
         {
           'target_name': 'cronet_test_apk',

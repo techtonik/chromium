@@ -33,19 +33,79 @@
 }
 
 #search {
+  -webkit-margin-end: 10px;
   display: flex;
   justify-content: flex-end;
 }
 
+#search paper-input-container {
+  padding: 2px 0;
+}
+
 #search-term {
   --paper-input-container-color: rgba(255, 255, 255, .5);
+  --paper-input-container-focus-color: white;
   --paper-input-container-input: {
+    font-family: inherit;
     font-size: 14px;
   };
   --paper-input-container-input-color: white;
-  --paper-input-container-focus-color: white;
-  --paper-input-container-label: {
-    font-size: 14px;
+  z-index: 0;
+}
+
+#search-term input[type='search']::-webkit-search-cancel-button,
+#search-term input[type='search']::-webkit-search-results-button {
+  -webkit-appearance: none;
+}
+
+paper-icon-button {
+  --iron-icon-height: 16px;
+  --iron-icon-width: 16px;
+  --paper-icon-button: {
+    height: 16px;
+    padding: 6px;
+    width: 16px;
   };
-  -webkit-margin-end: 8px;
+}
+
+#search-term paper-icon-button {
+  position: absolute;
+  right: 0;
+  top: -2px;
+  z-index: 1;
+}
+
+:host-context([dir='rtl']) #search-term paper-icon-button {
+  left: 0;
+  right: auto;
+}
+
+paper-menu-button {
+  --paper-menu-button: {
+    padding: 0;
+  };
+}
+
+paper-item {
+  -webkit-user-select: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+paper-item:hover {
+  background: #eaeaea;  /* TODO(dbeam): real color? */
+}
+
+@media not all and (max-width: 1024px) {
+  /* Hide vertical dot menu when there's enough room for #actions. */
+  paper-menu-button {
+    display: none;
+  }
+}
+
+@media all and (max-width: 1024px) {
+  /* Hide #actions for narrow windows; they're shown in a vertical dot menu. */
+  #actions {
+    display: none;
+  }
 }

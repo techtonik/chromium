@@ -20,8 +20,8 @@
 #include "chrome/browser/extensions/test_extension_environment.h"
 #include "chrome/browser/local_discovery/pwg_raster_converter.h"
 #include "chrome/browser/ui/webui/print_preview/extension_printer_handler.h"
-#include "chrome/common/extensions/features/feature_channel.h"
 #include "chrome/test/base/testing_profile.h"
+#include "components/version_info/version_info.h"
 #include "device/core/device_client.h"
 #include "device/usb/mock_usb_device.h"
 #include "device/usb/mock_usb_service.h"
@@ -553,8 +553,6 @@ TEST_F(ExtensionPrinterHandlerTest, GetPrinters_Reset) {
 }
 
 TEST_F(ExtensionPrinterHandlerTest, GetUsbPrinters) {
-  extensions::ScopedCurrentChannel channel(version_info::Channel::DEV);
-
   scoped_refptr<MockUsbDevice> device0 =
       new MockUsbDevice(0, 0, "Google", "USB Printer", "");
   usb_service_.AddDevice(device0);

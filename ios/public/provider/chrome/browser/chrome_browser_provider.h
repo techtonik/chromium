@@ -46,8 +46,8 @@ namespace ios {
 
 class ChromeBrowserProvider;
 class ChromeBrowserStateManager;
+class ChromeIdentityService;
 class GeolocationUpdaterProvider;
-class SearchProvider;
 class StringProvider;
 class UpdatableResourceProvider;
 
@@ -79,6 +79,8 @@ class ChromeBrowserProvider {
   virtual InfoBarViewPlaceholder CreateInfoBarView(
       CGRect frame,
       InfoBarViewDelegate* delegate);
+  // Returns an instance of a Chrome identity service.
+  virtual ChromeIdentityService* GetChromeIdentityService();
   // Returns an instance of a string provider.
   virtual StringProvider* GetStringProvider();
   virtual GeolocationUpdaterProvider* GetGeolocationUpdaterProvider();
@@ -100,16 +102,8 @@ class ChromeBrowserProvider {
       autofill::CardUnmaskPromptController* controller);
   // Returns risk data used in Wallet requests.
   virtual std::string GetRiskData();
-  // Returns product version with prefix.
-  virtual std::string GetProductVersionWithPrefix(const std::string& prefix);
-  // Returns a version string to be displayed in "About Chromium" dialog.
-  virtual std::string GetVersionString();
-  // Version number, e.g. "6.0.490.1".
-  virtual std::string GetVersionNumber();
   // Returns the RapporService. May be null.
   virtual rappor::RapporService* GetRapporService();
-  // Returns the SearchProvider.
-  virtual SearchProvider* GetSearchProvider();
 };
 
 }  // namespace ios

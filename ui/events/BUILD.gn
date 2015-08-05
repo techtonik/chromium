@@ -296,6 +296,15 @@ source_set("test_support") {
   }
 }
 
+# TODO(GYP): Delete this after we've converted everything to GN.
+# The _run targets exist only for compatibility w/ GYP.
+group("events_unittests_run") {
+  testonly = true
+  deps = [
+    ":events_unittests",
+  ]
+}
+
 test("events_unittests") {
   sources = [
     "android/scroller_unittest.cc",
@@ -314,6 +323,7 @@ test("events_unittests") {
     "gesture_detection/touch_disposition_gesture_filter_unittest.cc",
     "gesture_detection/velocity_tracker_unittest.cc",
     "gestures/fling_curve_unittest.cc",
+    "ipc/latency_info_param_traits_unittest.cc",
     "keycodes/dom/keycode_converter_unittest.cc",
     "keycodes/keyboard_code_conversion_unittest.cc",
     "latency_info_unittest.cc",
@@ -328,9 +338,11 @@ test("events_unittests") {
     ":test_support",
     "//base",
     "//base/test:run_all_unittests",
+    "//ipc:test_support",
     "//skia",
     "//testing/gtest",
     "//ui/events/devices",
+    "//ui/events/ipc:events_ipc",
     "//ui/events/platform",
     "//ui/gfx:test_support",
   ]
@@ -342,6 +354,8 @@ test("events_unittests") {
       "//ui/events/gestures/blink",
     ]
   }
+
+  data_deps = [ "//third_party/mesa:osmesa" ]
 
   include_dirs = [ "//testing/gmock/include" ]
 

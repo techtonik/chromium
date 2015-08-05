@@ -883,15 +883,20 @@ void URLRequestHttpJob::ProcessPublicKeyPinsHeader() {
   if (request_info_.url.HostIsIPAddress())
     return;
 
-  // http://tools.ietf.org/html/draft-ietf-websec-key-pinning:
+  // http://tools.ietf.org/html/rfc7469:
   //
   //   If a UA receives more than one PKP header field in an HTTP
   //   response message over secure transport, then the UA MUST process
   //   only the first such header field.
   HttpResponseHeaders* headers = GetResponseHeaders();
   std::string value;
-  if (headers->EnumerateHeader(NULL, "Public-Key-Pins", &value))
+  if (headers->EnumerateHeader(nullptr, "Public-Key-Pins", &value))
     security_state->AddHPKPHeader(request_info_.url.host(), value, ssl_info);
+  if (headers->EnumerateHeader(nullptr, "Public-Key-Pins-Report-Only",
+                               &value)) {
+    security_state->ProcessHPKPReportOnlyHeader(
+        value, HostPortPair::FromURL(request_info_.url), ssl_info);
+  }
 }
 
 void URLRequestHttpJob::OnStartCompleted(int result) {
@@ -1495,35 +1500,40 @@ void URLRequestHttpJob::RecordPerfHistograms(CompletionCause reason) {
   }
 
   if (response_info_) {
-    bool is_google = request() && HasGoogleHost(request()->url());
+    // QUIC (by default) supports https scheme only, thus track https URLs only
+    // for QUIC.
+    bool is_https_google = request() && request()->url().SchemeIs("https") &&
+                           HasGoogleHost(request()->url());
     bool used_quic = response_info_->DidUseQuic();
-    if (is_google) {
+    if (is_https_google) {
       if (used_quic) {
-        UMA_HISTOGRAM_MEDIUM_TIMES("Net.HttpJob.TotalTime.Quic", total_time);
+        UMA_HISTOGRAM_MEDIUM_TIMES("Net.HttpJob.TotalTime.Secure.Quic",
+                                   total_time);
       } else {
-        UMA_HISTOGRAM_MEDIUM_TIMES("Net.HttpJob.TotalTime.NotQuic", total_time);
+        UMA_HISTOGRAM_MEDIUM_TIMES("Net.HttpJob.TotalTime.Secure.NotQuic",
+                                   total_time);
       }
     }
     if (response_info_->was_cached) {
       UMA_HISTOGRAM_TIMES("Net.HttpJob.TotalTimeCached", total_time);
-      if (is_google) {
+      if (is_https_google) {
         if (used_quic) {
-          UMA_HISTOGRAM_MEDIUM_TIMES("Net.HttpJob.TotalTimeCached.Quic",
+          UMA_HISTOGRAM_MEDIUM_TIMES("Net.HttpJob.TotalTimeCached.Secure.Quic",
                                      total_time);
         } else {
-          UMA_HISTOGRAM_MEDIUM_TIMES("Net.HttpJob.TotalTimeCached.NotQuic",
-                                     total_time);
+          UMA_HISTOGRAM_MEDIUM_TIMES(
+              "Net.HttpJob.TotalTimeCached.Secure.NotQuic", total_time);
         }
       }
     } else  {
       UMA_HISTOGRAM_TIMES("Net.HttpJob.TotalTimeNotCached", total_time);
-      if (is_google) {
+      if (is_https_google) {
         if (used_quic) {
-          UMA_HISTOGRAM_MEDIUM_TIMES("Net.HttpJob.TotalTimeNotCached.Quic",
-                                     total_time);
+          UMA_HISTOGRAM_MEDIUM_TIMES(
+              "Net.HttpJob.TotalTimeNotCached.Secure.Quic", total_time);
         } else {
-          UMA_HISTOGRAM_MEDIUM_TIMES("Net.HttpJob.TotalTimeNotCached.NotQuic",
-                                     total_time);
+          UMA_HISTOGRAM_MEDIUM_TIMES(
+              "Net.HttpJob.TotalTimeNotCached.Secure.NotQuic", total_time);
         }
       }
     }

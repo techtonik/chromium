@@ -147,10 +147,22 @@ class NativeWidgetMacTest : public WidgetTest {
 
 class WidgetChangeObserver : public TestWidgetObserver {
  public:
-  WidgetChangeObserver(Widget* widget)
-      : TestWidgetObserver(widget),
-        gained_visible_count_(0),
-        lost_visible_count_(0) {}
+  WidgetChangeObserver(Widget* widget) : TestWidgetObserver(widget) {}
+
+  void WaitForVisibleCounts(int gained, int lost) {
+    if (gained_visible_count_ >= gained && lost_visible_count_ >= lost)
+      return;
+
+    target_gained_visible_count_ = gained;
+    target_lost_visible_count_ = lost;
+
+    base::RunLoop run_loop;
+    run_loop_ = &run_loop;
+    base::MessageLoop::current()->task_runner()->PostDelayedTask(
+        FROM_HERE, run_loop.QuitClosure(), TestTimeouts::action_timeout());
+    run_loop.Run();
+    run_loop_ = nullptr;
+  }
 
   int gained_visible_count() const { return gained_visible_count_; }
   int lost_visible_count() const { return lost_visible_count_; }
@@ -160,10 +172,16 @@ class WidgetChangeObserver : public TestWidgetObserver {
   void OnWidgetVisibilityChanged(Widget* widget,
                                  bool visible) override {
     ++(visible ? gained_visible_count_ : lost_visible_count_);
+    if (run_loop_ && gained_visible_count_ >= target_gained_visible_count_ &&
+        lost_visible_count_ >= target_lost_visible_count_)
+      run_loop_->Quit();
   }
 
-  int gained_visible_count_;
-  int lost_visible_count_;
+  int gained_visible_count_ = 0;
+  int lost_visible_count_ = 0;
+  int target_gained_visible_count_ = 0;
+  int target_lost_visible_count_ = 0;
+  base::RunLoop* run_loop_ = nullptr;
 
   DISALLOW_COPY_AND_ASSIGN(WidgetChangeObserver);
 };
@@ -216,16 +234,16 @@ TEST_F(NativeWidgetMacTest, HideAndShowExternally) {
   [NSApp hide:nil];
   // When the activation policy is NSApplicationActivationPolicyRegular, the
   // calls via NSApp are asynchronous, and the run loop needs to be flushed.
-  // With NSApplicationActivationPolicyProhibited, the following RunUntilIdle
-  // calls are superfluous, but don't hurt.
-  base::RunLoop().RunUntilIdle();
+  // With NSApplicationActivationPolicyProhibited, the following
+  // WaitForVisibleCounts calls are superfluous, but don't hurt.
+  observer.WaitForVisibleCounts(3, 3);
   EXPECT_FALSE(widget->IsVisible());
   EXPECT_FALSE([ns_window isVisible]);
   EXPECT_EQ(3, observer.gained_visible_count());
   EXPECT_EQ(3, observer.lost_visible_count());
 
   [NSApp unhideWithoutActivation];
-  base::RunLoop().RunUntilIdle();
+  observer.WaitForVisibleCounts(4, 3);
   EXPECT_TRUE(widget->IsVisible());
   EXPECT_TRUE([ns_window isVisible]);
   EXPECT_EQ(4, observer.gained_visible_count());
@@ -233,10 +251,10 @@ TEST_F(NativeWidgetMacTest, HideAndShowExternally) {
 
   // Hide again to test unhiding with an activation.
   [NSApp hide:nil];
-  base::RunLoop().RunUntilIdle();
+  observer.WaitForVisibleCounts(4, 4);
   EXPECT_EQ(4, observer.lost_visible_count());
   [NSApp unhide:nil];
-  base::RunLoop().RunUntilIdle();
+  observer.WaitForVisibleCounts(5, 4);
   EXPECT_EQ(5, observer.gained_visible_count());
 
   // Hide again to test makeKeyAndOrderFront:.
@@ -284,9 +302,6 @@ class PaintCountView : public View {
 TEST_F(NativeWidgetMacTest, MiniaturizeExternally) {
   Widget* widget = new Widget;
   Widget::InitParams init_params(Widget::InitParams::TYPE_WINDOW);
-  // Make the layer not drawn, so that calls to paint can be observed
-  // synchronously.
-  init_params.layer_type = ui::LAYER_NOT_DRAWN;
   widget->Init(init_params);
 
   PaintCountView* view = new PaintCountView();
@@ -299,6 +314,7 @@ TEST_F(NativeWidgetMacTest, MiniaturizeExternally) {
   EXPECT_TRUE(view->IsDrawn());
   EXPECT_EQ(0, view->paint_count());
   widget->Show();
+  base::RunLoop().RunUntilIdle();
 
   EXPECT_EQ(1, observer.gained_visible_count());
   EXPECT_EQ(0, observer.lost_visible_count());
@@ -314,6 +330,7 @@ TEST_F(NativeWidgetMacTest, MiniaturizeExternally) {
   // Cocoa just blocks the UI thread during the animation, so no need to do
   // anything fancy to wait for it finish.
   [ns_window performMiniaturize:nil];
+  base::RunLoop().RunUntilIdle();
 
   EXPECT_TRUE(widget->IsMinimized());
   EXPECT_FALSE(widget->IsVisible());  // Minimizing also makes things invisible.
@@ -328,6 +345,7 @@ TEST_F(NativeWidgetMacTest, MiniaturizeExternally) {
   EXPECT_EQ(1, view->paint_count());
 
   [ns_window deminiaturize:nil];
+  base::RunLoop().RunUntilIdle();
 
   EXPECT_FALSE(widget->IsMinimized());
   EXPECT_TRUE(widget->IsVisible());
@@ -339,6 +357,7 @@ TEST_F(NativeWidgetMacTest, MiniaturizeExternally) {
   EXPECT_FALSE([ns_window isMiniaturized]);
 
   widget->Minimize();
+  base::RunLoop().RunUntilIdle();
 
   EXPECT_TRUE(widget->IsMinimized());
   EXPECT_TRUE([ns_window isMiniaturized]);
@@ -348,6 +367,7 @@ TEST_F(NativeWidgetMacTest, MiniaturizeExternally) {
   EXPECT_EQ(2, view->paint_count());  // No paint when miniaturizing.
 
   widget->Restore();  // If miniaturized, should deminiaturize.
+  base::RunLoop().RunUntilIdle();
 
   EXPECT_FALSE(widget->IsMinimized());
   EXPECT_FALSE([ns_window isMiniaturized]);
@@ -357,6 +377,7 @@ TEST_F(NativeWidgetMacTest, MiniaturizeExternally) {
   EXPECT_EQ(3, view->paint_count());
 
   widget->Restore();  // If not miniaturized, does nothing.
+  base::RunLoop().RunUntilIdle();
 
   EXPECT_FALSE(widget->IsMinimized());
   EXPECT_FALSE([ns_window isMiniaturized]);

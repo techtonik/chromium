@@ -18,10 +18,10 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "chrome/browser/themes/theme_properties.h"
-#include "chrome/browser/ui/omnibox/omnibox_popup_model.h"
 #include "chrome/browser/ui/views/location_bar/location_bar_view.h"
 #include "chrome/browser/ui/views/omnibox/omnibox_popup_contents_view.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/omnibox/browser/omnibox_popup_model.h"
 #include "grit/components_scaled_resources.h"
 #include "grit/theme_resources.h"
 #include "third_party/skia/include/core/SkColor.h"
@@ -355,8 +355,9 @@ void OmniboxResultView::PaintMatch(const AutocompleteMatch& match,
             answer_image_,
             0, 0, answer_image_.width(), answer_image_.height(),
             GetMirroredXInView(x), y, answer_icon_size, answer_icon_size, true);
+        // See TODO in Layout().
         x += answer_icon_size +
-             GetThemeProvider()->GetDisplayProperty(
+             location_bar_view_->GetThemeProvider()->GetDisplayProperty(
                  ThemeProperties::PROPERTY_ICON_LABEL_VIEW_TRAILING_PADDING);
       }
     } else {
@@ -608,7 +609,12 @@ void OmniboxResultView::InitContentsRenderTextIfNecessary() const {
 
 void OmniboxResultView::Layout() {
   const gfx::ImageSkia icon = GetIcon();
-  ui::ThemeProvider* theme_provider = GetThemeProvider();
+  // TODO(jonross): Currently |location_bar_view_| provides the correct
+  // ThemeProvider, as it is loaded on the BrowserFrame widget. The root widget
+  // for OmniboxResultView is AutocompletePopupWidget, which is not loading the
+  // theme. We should update the omnibox code to also track its own
+  // ThemeProvider in order to reduce dependancy on LocationBarView.
+  ui::ThemeProvider* theme_provider = location_bar_view_->GetThemeProvider();
   // |theme_provider| can be null when animations are running during shutdown,
   // after OmniboxResultView has been removed from the tree of Views.
   if (!theme_provider)

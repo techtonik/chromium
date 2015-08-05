@@ -15,7 +15,7 @@
     '../ui/accessibility/accessibility.gyp:ax_gen',
     '../ui/base/ime/ui_base_ime.gyp:ui_base_ime',
     '../ui/base/ui_base.gyp:ui_base',
-    '../ui/events/ipc/events_ipc.gyp:events_ipc',
+    '../ui/events/events.gyp:events_ipc',
     '../ui/gfx/gfx.gyp:gfx',
     '../ui/gfx/gfx.gyp:gfx_geometry',
     '../ui/gfx/ipc/gfx_ipc.gyp:gfx_ipc',
@@ -454,6 +454,7 @@
       'common/net/url_fetcher.cc',
       'common/net/url_request_user_data.cc',
       'common/net/url_request_user_data.h',
+      'common/notification_constants.h',
       'common/one_writer_seqlock.cc',
       'common/one_writer_seqlock.h',
       'common/origin_util.cc',
@@ -873,6 +874,7 @@
       ],
       'dependencies': [
         '../media/media.gyp:media',
+        '../third_party/libyuv/libyuv.gyp:libyuv',
       ],
       'sources': [
         'common/gpu/media/generic_v4l2_device.cc',

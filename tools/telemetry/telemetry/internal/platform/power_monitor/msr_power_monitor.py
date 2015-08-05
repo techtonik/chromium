@@ -63,10 +63,8 @@ class MsrPowerMonitor(power_monitor.PowerMonitor):
     return {
         'identifier': 'msr',
         'energy_consumption_mwh': _JoulesToMilliwattHours(energy_consumption_j),
-        'component_utilization': {
-            'whole_package': {
-                'average_temperature_c': average_temp_c,
-            },
+        'platform_info': {
+            'average_temperature_c': average_temp_c,
         },
     }
 
@@ -120,7 +118,11 @@ class MsrPowerMonitorLinux(MsrPowerMonitor):
       logging.info('Cannot monitor power: pre-Sandy Bridge CPU.')
       return False
 
-    return self._CheckMSRs()
+    if not self._CheckMSRs():
+      logging.info('Try running tools/telemetry/build/linux_setup_msr.py.')
+      return False
+
+    return True
 
 
 class MsrPowerMonitorWin(MsrPowerMonitor):

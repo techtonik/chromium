@@ -97,6 +97,15 @@ cr.define('route_details', function() {
         MockInteractions.tap(details.$['back-button']);
       });
 
+      // Tests for 'close-button-click' event firing when the close button
+      // is clicked.
+      test('close button click', function(done) {
+        details.addEventListener('close-button-click', function() {
+          done();
+        });
+        MockInteractions.tap(details.$['close-button']);
+      });
+
       // Tests for 'close-route-click' event firing when the
       // 'close-route-button' button is clicked.
       test('close route button click', function(done) {
@@ -111,8 +120,7 @@ cr.define('route_details', function() {
         // <paper-button> text is styled as upper case.
         checkSpanText(loadTimeData.getString('stopCastingButton')
             .toUpperCase(), 'close-route-button');
-        checkSpanText('', 'route-title');
-        checkSpanText('', 'route-status');
+        checkSpanText('', 'route-information');
         checkElementTextWithId('', 'sink-name');
       });
 
@@ -120,22 +128,21 @@ cr.define('route_details', function() {
       test('route is set', function() {
         // |route| is null.
         assertEquals(null, details.route);
-        checkSpanText('', 'route-title');
         checkDefaultViewIsShown();
 
-        // Set |route| to be non-null. 'route-title' text should be updated.
+        // Set |route| to be non-null.
         details.route = fakeRouteOne;
         assertEquals(fakeRouteOne, details.route);
-        checkSpanText(fakeRouteOne.title, 'route-title');
-        checkSpanText('', 'route-status');
+        checkSpanText(loadTimeData.getStringF('castingActivityStatus',
+            fakeRouteOne.title), 'route-information');
         assertEquals(null, details.sink);
         checkDefaultViewIsShown();
 
-        // Set |route| to a different route. 'route-title' text should
-        // be updated.
+        // Set |route| to a different route.
         details.route = fakeRouteTwo;
         assertEquals(fakeRouteTwo, details.route);
-        checkSpanText(fakeRouteTwo.title, 'route-title');
+        checkSpanText(loadTimeData.getStringF('castingActivityStatus',
+            fakeRouteTwo.title), 'route-information');
         checkDefaultViewIsShown();
       });
 
@@ -143,24 +150,21 @@ cr.define('route_details', function() {
       test('sink is set', function() {
         // |sink| is null.
         assertEquals(null, details.sink);
-        checkSpanText('', 'route-status');
+        checkSpanText('', 'route-information');
 
-        // Set |sink| to be non-null. 'route-status' should be updated.
+        // Set |sink| to be non-null. 'route-information' should be updated.
         details.sink = fakeSinkOne;
         assertEquals(fakeSinkOne, details.sink);
         assertEquals(null, details.route);
-        checkSpanText('', 'route-title');
         checkElementTextWithId(fakeSinkOne.name, 'sink-name');
-        checkSpanText(loadTimeData.getStringF('castingActivityStatus',
-            fakeSinkOne.name), 'route-status');
+        checkSpanText('', 'route-information');
 
-        // Set |sink| to be a different sink. 'route-status' text should
+        // Set |sink| to be a different sink. 'route-information' text should
         // be updated.
         details.sink = fakeSinkTwo;
         assertEquals(fakeSinkTwo, details.sink);
         checkElementTextWithId(fakeSinkTwo.name, 'sink-name');
-        checkSpanText(loadTimeData.getStringF('castingActivityStatus',
-            fakeSinkTwo.name), 'route-status');
+        checkSpanText('', 'route-information');
       });
 
       // Tests when |route| and |sink| both exist.
@@ -169,18 +173,16 @@ cr.define('route_details', function() {
         details.sink = fakeSinkOne;
         assertEquals(fakeSinkOne, details.sink);
         assertEquals(fakeRouteOne, details.route);
-        checkSpanText(fakeRouteOne.title, 'route-title');
         checkElementTextWithId(fakeSinkOne.name, 'sink-name');
         checkSpanText(loadTimeData.getStringF('castingActivityStatus',
-            fakeSinkOne.name), 'route-status');
+            fakeRouteOne.title), 'route-information');
       });
 
       // Tests when |route| and |sink| are both null.
       test('sink and route are null', function() {
         assertEquals(null, details.route);
         assertEquals(null, details.sink);
-        checkSpanText('', 'route-title');
-        checkSpanText('', 'route-status');
+        checkSpanText('', 'route-information');
       });
 
       // Tests when |route| and |sink| both exist and |route| has custom

@@ -32,7 +32,6 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/browser_instant_controller.h"
 #include "chrome/browser/ui/browser_window.h"
-#include "chrome/browser/ui/omnibox/omnibox_popup_model.h"
 #include "chrome/browser/ui/passwords/manage_passwords_icon.h"
 #include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
@@ -58,6 +57,7 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/favicon/content/content_favicon_driver.h"
+#include "components/omnibox/browser/omnibox_popup_model.h"
 #include "components/omnibox/browser/omnibox_popup_view.h"
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_service.h"
@@ -130,7 +130,7 @@ LocationBarView::LocationBarView(Browser* browser,
                                  Delegate* delegate,
                                  bool is_popup_mode)
     : LocationBar(profile),
-      OmniboxEditController(command_updater),
+      ChromeOmniboxEditController(command_updater),
       browser_(browser),
       omnibox_view_(NULL),
       delegate_(delegate),
@@ -357,13 +357,16 @@ SkColor LocationBarView::GetColor(
           color = SkColorSetRGB(7, 149, 0);
           break;
 
-        case connection_security::SECURITY_WARNING:
         case connection_security::SECURITY_POLICY_WARNING:
           return GetColor(security_level, DEEMPHASIZED_TEXT);
           break;
 
         case connection_security::SECURITY_ERROR:
           color = SkColorSetRGB(162, 0, 0);
+          break;
+
+        case connection_security::SECURITY_WARNING:
+          return GetColor(security_level, TEXT);
           break;
 
         default:
@@ -1063,7 +1066,9 @@ bool LocationBarView::ShouldShowKeywordBubble() const {
 }
 
 bool LocationBarView::ShouldShowEVBubble() const {
-  return (GetToolbarModel()->GetSecurityLevel(false) ==
+  const ChromeToolbarModel* chrome_toolbar_model =
+      static_cast<const ChromeToolbarModel*>(GetToolbarModel());
+  return (chrome_toolbar_model->GetSecurityLevel(false) ==
           connection_security::EV_SECURE);
 }
 

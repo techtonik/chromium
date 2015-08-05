@@ -146,7 +146,6 @@ extern const char kEnablePotentiallyAnnoyingSecurityFeatures[];
 extern const char kEnablePowerOverlay[];
 extern const char kEnablePrintPreviewRegisterPromos[];
 extern const char kEnableProfiling[];
-extern const char kEnableQueryExtraction[];
 extern const char kEnableQuic[];
 extern const char kEnableQuicPortSelection[];
 extern const char kEnableSavePasswordBubble[];
@@ -154,6 +153,8 @@ extern const char kEnableSdchPersistence[];
 extern const char kEnableSessionCrashedBubble[];
 extern const char kEnableSettingsWindow[];
 extern const char kDisableSettingsWindow[];
+extern const char kEnableSimplifiedFullscreenUI[];
+extern const char kDisableSimplifiedFullscreenUI[];
 extern const char kEnableSiteEngagementService[];
 extern const char kEnableSuggestionsService[];
 extern const char kEnableSupervisedUserManagedBookmarksFolder[];
@@ -177,6 +178,7 @@ extern const char kForceAppMode[];
 extern const char kForceFieldTrialParams[];
 extern const char kForceFirstRun[];
 extern const char kForceVariationIds[];
+extern const char kForceLocalNtp[];
 extern const char kHistoryEnableGroupByDomain[];
 extern const char kHomePage[];
 extern const char kHostRules[];
@@ -333,7 +335,7 @@ extern const char kEnableHostedMode[];
 extern const char kEnableReaderModeToolbarIcon[];
 extern const char kEnableZeroSuggestMostVisited[];
 extern const char kEnableZeroSuggestMostVisitedWithoutSerp[];
-extern const char kPrefetchSearchResults[];
+extern const char kProgressBarAnimation[];
 #endif  // defined(OS_ANDROID)
 
 #if defined(USE_ASH)

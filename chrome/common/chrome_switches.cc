@@ -506,9 +506,6 @@ const char kEnablePrintPreviewRegisterPromos[] =
 // during chrome_browser_main.
 const char kEnableProfiling[]               = "enable-profiling";
 
-// Enables query in the omnibox.
-const char kEnableQueryExtraction[]         = "enable-query-extraction";
-
 // Enables support for the QUIC protocol.  This is a temporary testing flag.
 const char kEnableQuic[]                    = "enable-quic";
 
@@ -529,6 +526,12 @@ const char kEnableSessionCrashedBubble[] = "enable-session-crashed-bubble";
 // (see SettingsWindowEnabled() below).
 const char kEnableSettingsWindow[]           = "enable-settings-window";
 const char kDisableSettingsWindow[]          = "disable-settings-window";
+
+// A new user experience for transitioning into fullscreen and mouse pointer
+// lock states.
+const char kEnableSimplifiedFullscreenUI[]  = "enable-simplified-fullscreen-ui";
+const char kDisableSimplifiedFullscreenUI[] =
+    "disable-simplified-fullscreen-ui";
 
 // Enable the Site Engagement service, which records interaction with sites and
 // allocates certain resources accordingly.
@@ -619,6 +622,9 @@ const char kForceFirstRun[]                 = "force-first-run";
 // header, specified as a 64-bit encoded list of numeric experiment ids. Ids
 // prefixed with the character "t" will be treated as Trigger Variation Ids.
 const char kForceVariationIds[]             = "force-variation-ids";
+
+// Forces Chrome to use localNTP instead of server (GWS) NTP.
+const char kForceLocalNtp[]                 = "force-local-ntp";
 
 // Enables grouping websites by domain and filtering them by period.
 const char kHistoryEnableGroupByDomain[]    = "enable-grouped-history";
@@ -1206,9 +1212,8 @@ const char kEnableZeroSuggestMostVisited[] =
 const char kEnableZeroSuggestMostVisitedWithoutSerp[] =
     "enable-zero-suggest-most-visited-without-serp";
 
-// Triggers prerendering of search base page to prefetch results for the typed
-// omnibox query. Only has an effect when prerender is enabled.
-const char kPrefetchSearchResults[]         = "prefetch-search-results";
+// Specifies Android phone page loading progress bar animation.
+const char kProgressBarAnimation[]          = "progress-bar-animation";
 #endif  // defined(OS_ANDROID)
 
 #if defined(USE_ASH)

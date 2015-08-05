@@ -10,7 +10,7 @@ import stat
 import subprocess
 import tempfile
 
-from catapult_base import binary_manager
+from telemetry.internal.util import binary_manager
 from telemetry.core import android_platform
 from telemetry.core import exceptions
 from telemetry.core import platform
@@ -164,15 +164,14 @@ class AndroidPlatformBackend(
       logging.exception('New exception caused by DeviceUtils conversion')
       raise
     self._device_copy_script = None
-    power_controller = power_monitor_controller.PowerMonitorController([
+    self._power_monitor = power_monitor_controller.PowerMonitorController([
+        android_temperature_monitor.AndroidTemperatureMonitor(self._device),
         monsoon_power_monitor.MonsoonPowerMonitor(self._device, self),
         android_dumpsys_power_monitor.DumpsysPowerMonitor(self._battery, self),
         sysfs_power_monitor.SysfsPowerMonitor(self, standalone=True),
         android_fuelgauge_power_monitor.FuelGaugePowerMonitor(
             self._battery, self),
     ], self._battery)
-    self._power_monitor = android_temperature_monitor.AndroidTemperatureMonitor(
-        power_controller, self._device)
     self._video_recorder = None
     self._installed_applications = None
 

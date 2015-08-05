@@ -13,7 +13,6 @@
 #include "cc/output/output_surface.h"
 #include "cc/output/render_surface_filters.h"
 #include "cc/output/software_output_device.h"
-#include "cc/quads/checkerboard_draw_quad.h"
 #include "cc/quads/debug_border_draw_quad.h"
 #include "cc/quads/picture_draw_quad.h"
 #include "cc/quads/render_pass_draw_quad.h"
@@ -25,6 +24,7 @@
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkImageFilter.h"
 #include "third_party/skia/include/core/SkMatrix.h"
+#include "third_party/skia/include/core/SkPath.h"
 #include "third_party/skia/include/core/SkPoint.h"
 #include "third_party/skia/include/core/SkShader.h"
 #include "third_party/skia/include/effects/SkLayerRasterizer.h"
@@ -143,6 +143,8 @@ void SoftwareRenderer::EnsureScissorTestDisabled() {
   // rendering, but the underlying effect we want is to clear any existing
   // clipRect on the current SkCanvas. This is done by setting clipRect to
   // the viewport's dimensions.
+  if (!current_canvas_)
+    return;
   is_scissor_enabled_ = false;
   SkISize size = current_canvas_->getDeviceSize();
   SetClipRect(gfx::Rect(size.width(), size.height()));
@@ -182,6 +184,8 @@ void SoftwareRenderer::SetScissorTestRect(const gfx::Rect& scissor_rect) {
 }
 
 void SoftwareRenderer::SetClipRect(const gfx::Rect& rect) {
+  if (!current_canvas_)
+    return;
   // Skia applies the current matrix to clip rects so we reset it temporary.
   SkMatrix current_matrix = current_canvas_->getTotalMatrix();
   current_canvas_->resetMatrix();
@@ -190,6 +194,8 @@ void SoftwareRenderer::SetClipRect(const gfx::Rect& rect) {
 }
 
 void SoftwareRenderer::ClearCanvas(SkColor color) {
+  if (!current_canvas_)
+    return;
   // SkCanvas::clear doesn't respect the current clipping region
   // so we SkCanvas::drawColor instead if scissoring is active.
   if (is_scissor_enabled_)
@@ -244,6 +250,8 @@ bool SoftwareRenderer::IsSoftwareResource(ResourceId resource_id) const {
 void SoftwareRenderer::DoDrawQuad(DrawingFrame* frame,
                                   const DrawQuad* quad,
                                   const gfx::QuadF* draw_region) {
+  if (!current_canvas_)
+    return;
   if (draw_region) {
     current_canvas_->save();
   }
@@ -302,14 +310,6 @@ void SoftwareRenderer::DoDrawQuad(DrawingFrame* frame,
   }
 
   switch (quad->material) {
-    case DrawQuad::CHECKERBOARD:
-      // TODO(enne) For now since checkerboards shouldn't be part of a 3D
-      // context, clipping regions aren't supported so we skip drawing them
-      // if this becomes the case.
-      if (!draw_region) {
-        DrawCheckerboardQuad(frame, CheckerboardDrawQuad::MaterialCast(quad));
-      }
-      break;
     case DrawQuad::DEBUG_BORDER:
       DrawDebugBorderQuad(frame, DebugBorderDrawQuad::MaterialCast(quad));
       break;
@@ -346,16 +346,6 @@ void SoftwareRenderer::DoDrawQuad(DrawingFrame* frame,
   if (draw_region) {
     current_canvas_->restore();
   }
-}
-
-void SoftwareRenderer::DrawCheckerboardQuad(const DrawingFrame* frame,
-                                            const CheckerboardDrawQuad* quad) {
-  gfx::RectF visible_quad_vertex_rect = MathUtil::ScaleRectProportional(
-      QuadVertexRect(), quad->rect, quad->visible_rect);
-  current_paint_.setColor(quad->color);
-  current_paint_.setAlpha(quad->shared_quad_state->opacity);
-  current_canvas_->drawRect(gfx::RectFToSkRect(visible_quad_vertex_rect),
-                            current_paint_);
 }
 
 void SoftwareRenderer::DrawDebugBorderQuad(const DrawingFrame* frame,

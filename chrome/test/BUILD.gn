@@ -224,6 +224,15 @@ if (!is_android) {
     ]
   }
 
+  # TODO(GYP): Delete this after we've converted everything to GN.
+  # The _run targets exist only for compatibility w/ GYP.
+  group("interactive_ui_tests_run") {
+    testonly = true
+    deps = [
+      ":interactive_ui_tests",
+    ]
+  }
+
   test("interactive_ui_tests") {
     sources =
         rebase_path(chrome_tests_gypi_values.chrome_interactive_ui_test_sources,
@@ -231,6 +240,40 @@ if (!is_android) {
                     "//chrome")
 
     configs += [ "//build/config:precompiled_headers" ]
+
+    data = [
+      "//net/data/ssl/certificates/",
+      "//net/tools/testserver/",
+      "//ppapi/tests/test_case.html",
+      "//ppapi/tests/test_case.html.mock-http-headers",
+      "//ppapi/tests/test_page.css",
+      "//ppapi/tests/test_page.css.mock-http-headers",
+      "//third_party/pyftpdlib/",
+      "//third_party/pywebsocket/",
+      "//third_party/tlslite/",
+      "//third_party/zlib/google/test/data/",
+      "//tools/metrics/histograms/histograms.xml",
+      "$root_out_dir/pyproto/google/",
+      "$root_out_dir/resources.pak",
+      "$root_out_dir/ui_test.pak",
+    ]
+    if (is_android || is_linux || is_win) {
+      data += [
+        "$root_out_dir/chrome_100_percent.pak",
+        "$root_out_dir/locales/en-US.pak",
+      ]
+    }
+    if (is_linux) {
+      data += [ "$root_out_dir/libppapi_tests.so" ]
+    }
+    if (is_linux || is_win) {
+      data += [
+        "$root_out_dir/chrome_100_percent.pak",
+        "$root_out_dir/locales/en-US.pak",
+        "$root_out_dir/locales/fr.pak",
+      ]
+    }
+
     defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
     ldflags = []
 
@@ -244,6 +287,7 @@ if (!is_android) {
       "//chrome:strings",
       "//chrome:packed_extra_resources",
       "//chrome:packed_resources",
+      "//components/resources",
       "//content/app/resources",
       "//crypto:platform",
       "//crypto:test_support",
@@ -270,7 +314,7 @@ if (!is_android) {
     deps += [ "//extensions:chrome_extensions_interactive_uitests" ]
 
     # Runtime dependencies
-    datadeps = [
+    data_deps = [
       "//ppapi:ppapi_tests",
       "//third_party/mesa:osmesa",
     ]
@@ -398,7 +442,7 @@ if (!is_android) {
     }
 
     if (is_mac) {
-      datadeps += [ "//chrome" ]
+      data_deps += [ "//chrome" ]
 
       # TODO(mark): We really want this for all non-static library targets, but
       # when we tried to pull it up to the common.gypi level, it broke other
@@ -406,7 +450,7 @@ if (!is_android) {
       ldflags += [ "-Wl,-ObjC" ]
     }
 
-    if (cld_version == 0 || cld_version == 2) {
+    if (cld_version == 2) {
       # Interactive tests should use whatever CLD2 data access mode that the
       # application embedder is using.
       deps += [ "//third_party/cld_2:cld2_platform_impl" ]
@@ -414,7 +458,7 @@ if (!is_android) {
 
     if (use_x11) {
       configs += [ "//build/config/linux:xtst" ]
-      datadeps += [ "//tools/xdisplaycheck" ]
+      data_deps += [ "//tools/xdisplaycheck" ]
     }
 
     if (enable_app_list) {
@@ -530,6 +574,9 @@ if (!is_android) {
       sources -=
           [ "../browser/ui/webui/downloads_ui_supervised_browsertest.js" ]
     }
+    if (!enable_print_preview) {
+      sources -= [ "data/webui/print_preview.js" ]
+    }
     deps = [
       "//chrome/browser/ui",
       "//skia",
@@ -635,7 +682,7 @@ if (!is_android) {
     #         'UseLibraryDependencyInputs': "true",
     # }
 
-    if (cld_version == 0 || cld_version == 2) {
+    if (cld_version == 2) {
       # Because the browser_tests use translate, they need CLD data.
       deps += [ "//third_party/cld_2:cld2_platform_impl" ]
     }
@@ -942,7 +989,6 @@ if (!is_android) {
         "../browser/ui/webui/print_preview/print_preview_ui_browsertest.cc",
         "data/webui/print_preview.cc",
         "data/webui/print_preview.h",
-        "data/webui/print_preview.js",
       ]
     }
     if (enable_mdns) {
@@ -977,11 +1023,38 @@ if (!is_android) {
     }
   }
 
+  # TODO(GYP): Delete this after we've converted everything to GN.
+  # The _run targets exist only for compatibility w/ GYP.
+  group("sync_integration_tests_run") {
+    testonly = true
+    deps = [
+      ":sync_integration_tests",
+    ]
+  }
+
   test("sync_integration_tests") {
     sources =
         rebase_path(chrome_tests_gypi_values.sync_integration_tests_sources,
                     ".",
                     "//chrome")
+
+    data = [
+      "//chrome/test/data/sync/",
+      "//net/tools/testserver/",
+      "//sync/tools/testserver/",
+      "//third_party/pyftpdlib/",
+      "//third_party/pywebsocket/",
+      "//third_party/tlslite/",
+      "$root_out_dir/pyproto/",
+      "$root_out_dir/resources.pak",
+    ]
+
+    if (is_linux || is_win) {
+      data += [
+        "$root_out_dir/chrome_100_percent.pak",
+        "$root_out_dir/locales/en-US.pak",
+      ]
+    }
 
     # TODO(phajdan.jr): Only temporary, to make transition easier.
     defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
@@ -1005,7 +1078,9 @@ if (!is_android) {
       "//third_party/WebKit/public:blink",
     ]
 
-    if (cld_version == 0 || cld_version == 2) {
+    data_deps = [ "//third_party/mesa:osmesa" ]
+
+    if (cld_version == 2) {
       # Language detection is irrelevant to sync, so it can depend on any
       # implementation for CLD2. Dynamic is smaller, so go with dynamic.
       deps += [ "//third_party/cld_2:cld2_dynamic" ]
@@ -1076,7 +1151,7 @@ if (!is_android) {
       "//testing/gtest",
     ]
 
-    if (cld_version == 0 || cld_version == 2) {
+    if (cld_version == 2) {
       # Language detection is irrelevant to sync, so it can depend on any
       # implementation for CLD2. Dynamic is smaller, so go with dynamic.
       deps += [ "//third_party/cld_2:cld2_dynamic" ]
@@ -1152,6 +1227,15 @@ if (!is_android) {
     }
   }
 
+  # TODO(GYP): Delete this after we've converted everything to GN.
+  # The _run targets exist only for compatibility w/ GYP.
+  group("unit_tests_run") {
+    testonly = true
+    deps = [
+      ":unit_tests",
+    ]
+  }
+
   test("unit_tests") {
     sources =
         rebase_path(chrome_tests_unit_gypi_values.chrome_unit_tests_sources,
@@ -1159,6 +1243,37 @@ if (!is_android) {
                     "//chrome")
 
     configs += [ "//build/config:precompiled_headers" ]
+
+    data = [
+      "data/",
+      "//base/test/data/",
+      "//chrome/third_party/mock4js/",
+      "//components/test/data/",
+      "//extensions/test/data/",
+      "//google_apis/test/data/",
+      "//net/data/",
+      "//net/tools/testserver/",
+      "//third_party/accessibility-audit/axs_testing.js",
+      "//third_party/hunspell_dictionaries/",
+      "//third_party/pyftpdlib/",
+      "//third_party/pywebsocket/",
+      "//third_party/tlslite/",
+      "//third_party/zlib/google/test/data/",
+      "//tools/metrics/histograms/histograms.xml",
+      "$root_out_dir/pyproto/google/",
+      "$root_out_dir/test_data/chrome/browser/resources/google_now/",
+      "$root_out_dir/test_data/chrome/browser/resources/print_preview/",
+      "$root_out_dir/test_data/chrome/renderer/resources/extensions/",
+      "$root_out_dir/test_data/ui/webui/",
+      "$root_out_dir/resources.pak",
+    ]
+    if (is_android || is_linux || is_win) {
+      data += [
+        "$root_out_dir/chrome_100_percent.pak",
+        "$root_out_dir/locales/en-US.pak",
+      ]
+    }
+
     defines = []
 
     deps = [
@@ -1500,7 +1615,7 @@ if (!is_android) {
     } else {
       sources -= [ "../browser/password_manager/password_store_x_unittest.cc" ]
     }
-    if (cld_version == 0 || cld_version == 2) {
+    if (cld_version == 2) {
       # Unit tests should be independent of the CLD2 access mechanism, just use
       # static for simplicity.
       deps += [ "//third_party/cld_2:cld2_static" ]
@@ -1701,7 +1816,7 @@ if (!is_android) {
         "//base/test:run_all_unittests",
         "//base/test:test_support",
       ]
-      if (cld_version == 0 || cld_version == 2) {
+      if (cld_version == 2) {
         # Use whatever CLD2 data access mode that the
         # application embedder is using.
         deps += [ "//third_party/cld_2:cld2_platform_impl" ]
@@ -1748,7 +1863,7 @@ if (!is_android) {
         sources -= [ "perf/mach_ports_performancetest.cc" ]
       }
 
-      if (cld_version == 0 || cld_version == 2) {
+      if (cld_version == 2) {
         # Use whatever CLD2 data access mode that the
         # application embedder is using.
         deps += [ "//third_party/cld_2:cld2_platform_impl" ]

@@ -107,16 +107,20 @@ GbmSurfaceFactory::CreateSurfacelessEGLSurfaceForWidget(
 scoped_refptr<ui::NativePixmap> GbmSurfaceFactory::CreateNativePixmap(
     gfx::AcceleratedWidget widget,
     gfx::Size size,
-    BufferFormat format,
-    BufferUsage usage) {
-  if (usage == MAP)
+    gfx::BufferFormat format,
+    gfx::BufferUsage usage) {
+#if !defined(OS_CHROMEOS)
+  // Support for memory mapping accelerated buffers requires some
+  // CrOS-specific patches (using vgem).
+  if (usage != SCANOUT)
     return nullptr;
+#endif
 
   scoped_refptr<GbmDevice> gbm = GetGbmDevice(widget);
   DCHECK(gbm);
 
   scoped_refptr<GbmBuffer> buffer =
-      GbmBuffer::CreateBuffer(gbm, format, size, true);
+      GbmBuffer::CreateBuffer(gbm, format, size, usage);
   if (!buffer.get())
     return nullptr;
 
@@ -132,14 +136,14 @@ bool GbmSurfaceFactory::CanShowPrimaryPlaneAsOverlay() {
   return allow_surfaceless_;
 }
 
-bool GbmSurfaceFactory::CanCreateNativePixmap(BufferUsage usage) {
+bool GbmSurfaceFactory::CanCreateNativePixmap(gfx::BufferUsage usage) {
   DCHECK(thread_checker_.CalledOnValidThread());
   switch (usage) {
-    case MAP:
+    case gfx::BufferUsage::MAP:
       return false;
-    case PERSISTENT_MAP:
+    case gfx::BufferUsage::PERSISTENT_MAP:
       return false;
-    case SCANOUT:
+    case gfx::BufferUsage::SCANOUT:
       return true;
   }
   NOTREACHED();

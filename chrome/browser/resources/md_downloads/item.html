@@ -19,7 +19,8 @@
     <div id="content-wrapper">
       <paper-material id="content" on-dragstart="onDragStart_">
         <div class="icon-wrapper">
-          <img id="icon" alt="">
+          <img class="icon" id="file-icon" alt="" hidden="[[isDangerous_]]">
+          <div class="icon" id="warning" hidden="[[!isDangerous_]]"></div>
         </div>
 
         <div id="details">
@@ -62,6 +63,9 @@
                 hidden$="[[isMalware_]]"></cr-button>
           </div>
         </div>
+
+        <div id="incognito" class="icon-wrapper"
+            hidden$="[[!isIncognito_]]"></div>
 
         <div id="remove-wrapper" class="icon-wrapper">
           <paper-icon-button id="remove" column-type="remove" icon="clear"

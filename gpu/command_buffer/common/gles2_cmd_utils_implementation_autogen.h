@@ -3450,6 +3450,14 @@ std::string GLES2Util::GetStringBufferParameter(uint32_t value) {
       {GL_BUFFER_USAGE, "GL_BUFFER_USAGE"},
       {GL_BUFFER_ACCESS_FLAGS, "GL_BUFFER_ACCESS_FLAGS"},
       {GL_BUFFER_MAPPED, "GL_BUFFER_MAPPED"},
+  };
+  return GLES2Util::GetQualifiedEnumString(string_table,
+                                           arraysize(string_table), value);
+}
+
+std::string GLES2Util::GetStringBufferParameter64(uint32_t value) {
+  static const EnumToString string_table[] = {
+      {GL_BUFFER_SIZE, "GL_BUFFER_SIZE"},
       {GL_BUFFER_MAP_LENGTH, "GL_BUFFER_MAP_LENGTH"},
       {GL_BUFFER_MAP_OFFSET, "GL_BUFFER_MAP_OFFSET"},
   };
@@ -4130,6 +4138,31 @@ std::string GLES2Util::GetStringQueryTarget(uint32_t value) {
       {GL_ASYNC_PIXEL_PACK_COMPLETED_CHROMIUM,
        "GL_ASYNC_PIXEL_PACK_COMPLETED_CHROMIUM"},
       {GL_COMMANDS_COMPLETED_CHROMIUM, "GL_COMMANDS_COMPLETED_CHROMIUM"},
+  };
+  return GLES2Util::GetQualifiedEnumString(string_table,
+                                           arraysize(string_table), value);
+}
+
+std::string GLES2Util::GetStringReadBuffer(uint32_t value) {
+  static const EnumToString string_table[] = {
+      {GL_NONE, "GL_NONE"},
+      {GL_BACK, "GL_BACK"},
+      {GL_COLOR_ATTACHMENT0, "GL_COLOR_ATTACHMENT0"},
+      {GL_COLOR_ATTACHMENT1, "GL_COLOR_ATTACHMENT1"},
+      {GL_COLOR_ATTACHMENT2, "GL_COLOR_ATTACHMENT2"},
+      {GL_COLOR_ATTACHMENT3, "GL_COLOR_ATTACHMENT3"},
+      {GL_COLOR_ATTACHMENT4, "GL_COLOR_ATTACHMENT4"},
+      {GL_COLOR_ATTACHMENT5, "GL_COLOR_ATTACHMENT5"},
+      {GL_COLOR_ATTACHMENT6, "GL_COLOR_ATTACHMENT6"},
+      {GL_COLOR_ATTACHMENT7, "GL_COLOR_ATTACHMENT7"},
+      {GL_COLOR_ATTACHMENT8, "GL_COLOR_ATTACHMENT8"},
+      {GL_COLOR_ATTACHMENT9, "GL_COLOR_ATTACHMENT9"},
+      {GL_COLOR_ATTACHMENT10, "GL_COLOR_ATTACHMENT10"},
+      {GL_COLOR_ATTACHMENT11, "GL_COLOR_ATTACHMENT11"},
+      {GL_COLOR_ATTACHMENT12, "GL_COLOR_ATTACHMENT12"},
+      {GL_COLOR_ATTACHMENT13, "GL_COLOR_ATTACHMENT13"},
+      {GL_COLOR_ATTACHMENT14, "GL_COLOR_ATTACHMENT14"},
+      {GL_COLOR_ATTACHMENT15, "GL_COLOR_ATTACHMENT15"},
   };
   return GLES2Util::GetQualifiedEnumString(string_table,
                                            arraysize(string_table), value);

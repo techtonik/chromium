@@ -83,9 +83,8 @@ CommandUtil.getCommandEntries = function(element) {
     // element is a normal List (eg. the file list on the right panel).
     var entries = element.selectedItems;
     // Check if it is Entry or not by checking for toURL().
-    return entries ||
-        entries.some(function(entry) { return !('toURL' in entry); }) ?
-        entries : [];
+    return entries.some(function(entry) { return !('toURL' in entry); }) ?
+        [] : entries;
   } else {
     return [];
   }
@@ -923,6 +922,21 @@ CommandHandler.COMMANDS_['drive-go-to-drive'] = /** @type {Command} */ ({
 });
 
 /**
+ * Opens a file with default action.
+ * @type {Command}
+ */
+CommandHandler.COMMANDS_['default-action'] = /** @type {Command} */ ({
+  execute: function(event, fileManager) {
+    fileManager.taskController.executeDefaultAction();
+  },
+  canExecute: function(event, fileManager) {
+    var canExecute = fileManager.taskController.canExecuteDefaultAction();
+    event.canExecute = canExecute;
+    event.command.setHidden(!canExecute);
+  }
+});
+
+/**
  * Displays open with dialog for current selection.
  * @type {Command}
  */
@@ -948,8 +962,9 @@ CommandHandler.COMMANDS_['open-with'] = /** @type {Command} */ ({
    * @param {!FileManager} fileManager FileManager to use.
    */
   canExecute: function(event, fileManager) {
-    var tasks = fileManager.getSelection().tasks;
-    event.canExecute = tasks && tasks.size() > 1;
+    var canExecute = fileManager.taskController.canExecuteOpenWith();
+    event.canExecute = canExecute;
+    event.command.setHidden(!canExecute);
   }
 });
 

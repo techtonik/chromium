@@ -30,6 +30,7 @@ class InterstitialPageImpl;
 class NavigationControllerImpl;
 class NavigationEntry;
 class NavigationEntryImpl;
+class NavigationHandleImpl;
 class NavigationRequest;
 class NavigatorTestWithBrowserSideNavigation;
 class RenderFrameHost;
@@ -185,18 +186,6 @@ class CONTENT_EXPORT RenderFrameHostManager {
   // WebContentsImpl.
   static bool ClearRFHsPendingShutdown(FrameTreeNode* node);
 
-  // Returns true if we are currently in a mode where the swapped out state
-  // should not be used. Currently (as an implementation strategy) swapped out
-  // is forbidden under --site-per-process, but our goal is to eliminate the
-  // mode entirely. In code that deals with the swapped out state, prefer calls
-  // to this function over consulting the switches directly. It will be easier
-  // to grep, and easier to rip out.
-  //
-  // TODO(nasko): When swappedout:// is eliminated entirely, this function (and
-  // its equivalent in RenderFrameProxy) should be removed and its callers
-  // cleaned up.
-  static bool IsSwappedOutStateForbidden();
-
   // All three delegate pointers must be non-NULL and are not owned by this
   // class. They must outlive this class. The RenderViewHostDelegate and
   // RenderWidgetHostDelegate are what will be installed into all
@@ -233,10 +222,8 @@ class CONTENT_EXPORT RenderFrameHostManager {
   // there is no current one.
   RenderWidgetHostView* GetRenderWidgetHostView() const;
 
-  // Returns whether this manager belongs to a FrameTreeNode that is a main
-  // frame in an inner WebContents.
-  // TODO(lazyboy): Make this work correctly for subframes inside inner
-  // WebContents too.
+  // Returns whether this manager belongs to a FrameTreeNode that belongs to an
+  // inner WebContents.
   bool ForInnerDelegate();
 
   // Returns the RenderWidgetHost of the outer WebContents (if any) that can be
@@ -758,6 +745,14 @@ class CONTENT_EXPORT RenderFrameHostManager {
   // owns the request until it's transferred to the new process, so it will be
   // cleaned up if the navigation is cancelled.  Otherwise, this is NULL.
   scoped_ptr<CrossSiteTransferringRequest> cross_site_transferring_request_;
+
+  // This is used to temporarily store the NavigationHandle during
+  // transferring navigations. The handle needs to be stored because the old
+  // RenderFrameHost may be discarded before a new RenderFrameHost is created
+  // for the navigation.
+  // PlzNavigate: this will never be set since there are no transferring
+  // navigations in PlzNavigate.
+  scoped_ptr<NavigationHandleImpl> transfer_navigation_handle_;
 
   // If either of these is non-NULL, the pending navigation is to a chrome:
   // page. The scoped_ptr is used if pending_web_ui_ != web_ui_, the WeakPtr is

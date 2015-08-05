@@ -60,6 +60,8 @@
         'test/chromoting_test_driver_environment.h',
         'test/connection_setup_info.cc',
         'test/connection_setup_info.h',
+        'test/connection_time_observer.cc',
+        'test/connection_time_observer.h',
         'test/fake_access_token_fetcher.cc',
         'test/fake_access_token_fetcher.h',
         'test/fake_app_remoting_report_issue_request.cc',
@@ -100,6 +102,8 @@
         'test/test_chromoting_client.h',
         'test/test_video_renderer.cc',
         'test/test_video_renderer.h',
+        'test/video_frame_writer.cc',
+        'test/video_frame_writer.h',
       ],
       'conditions': [
         ['enable_remoting_host == 0', {
@@ -184,7 +188,6 @@
         'remoting_base',
         'remoting_breakpad',
         'remoting_client',
-        'remoting_client_plugin',
         'remoting_host',
         'remoting_host_setup_base',
         'remoting_it2me_host_static',
@@ -330,6 +333,7 @@
         'test/access_token_fetcher_unittest.cc',
         'test/app_remoting_report_issue_request_unittest.cc',
         'test/chromoting_test_driver_environment_unittest.cc',
+        'test/connection_time_observer_unittest.cc',
         'test/host_list_fetcher_unittest.cc',
         'test/remote_host_info_fetcher_unittest.cc',
         'test/test_chromoting_client_unittest.cc',
@@ -361,11 +365,6 @@
               '-lwtsapi32.lib',
             ],
           },
-        }],
-        [ 'OS=="android"', {
-          'dependencies!': [
-            'remoting_client_plugin',
-          ],
         }],
         [ 'OS=="android"', {
           'dependencies': [
@@ -585,7 +584,7 @@
           'variables': {
             'output_dir': '<(PRODUCT_DIR)/remoting/remoting.webapp.browsertest.v2',
             'zip_path': '<(PRODUCT_DIR)/remoting-webapp.browsertest.v2.zip',
-            'webapp_type': 'v2_pnacl',
+            'webapp_type': 'v2',
             'main_html_file': '<(SHARED_INTERMEDIATE_DIR)/browser_test/main.html',
             'extra_files': [
               'webapp/crd/remoting_client_pnacl.nmf.jinja2',

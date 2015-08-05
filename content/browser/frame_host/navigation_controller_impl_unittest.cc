@@ -552,9 +552,13 @@ void CheckNavigationEntryMatchLoadParams(
 }
 
 TEST_F(NavigationControllerTest, LoadURLWithParams) {
+  // Start a navigation in order to have enough state to fake a transfer.
+  contents()->NavigateAndCommit(GURL("http://foo"));
+  contents()->StartNavigation(GURL("http://bar"));
+
   NavigationControllerImpl& controller = controller_impl();
 
-  NavigationController::LoadURLParams load_params(GURL("http://foo"));
+  NavigationController::LoadURLParams load_params(GURL("http://foo/2"));
   load_params.referrer =
       Referrer(GURL("http://referrer"), blink::WebReferrerPolicyDefault);
   load_params.transition_type = ui::PAGE_TRANSITION_GENERATED;
@@ -1104,21 +1108,19 @@ TEST_F(NavigationControllerTest, LoadURL_RedirectAbortDoesntShowPendingURL) {
 
   // Now make a pending new navigation, initiated by the renderer.
   const GURL kNewURL("http://foo/bee");
-  NavigationController::LoadURLParams load_url_params(kNewURL);
-  load_url_params.transition_type = ui::PAGE_TRANSITION_TYPED;
-  load_url_params.is_renderer_initiated = true;
-  controller.LoadURLWithParams(load_url_params);
+  main_test_rfh()->SimulateNavigationStart(kNewURL);
   EXPECT_EQ(0U, notifications.size());
   EXPECT_EQ(-1, controller.GetPendingEntryIndex());
   EXPECT_TRUE(controller.GetPendingEntry());
   EXPECT_EQ(0, controller.GetLastCommittedEntryIndex());
-  EXPECT_EQ(0, delegate->navigation_state_change_count());
+  EXPECT_EQ(1, delegate->navigation_state_change_count());
 
   // The visible entry should be the last committed URL, not the pending one.
   EXPECT_EQ(kExistingURL, controller.GetVisibleEntry()->GetURL());
 
-  // Now the navigation redirects. (There is no corresponding message here.)
+  // Now the navigation redirects.
   const GURL kRedirectURL("http://foo/see");
+  main_test_rfh()->SimulateRedirect(kRedirectURL);
 
   // We don't want to change the NavigationEntry's url, in case it cancels.
   // Prevents regression of http://crbug.com/77786.
@@ -1126,21 +1128,14 @@ TEST_F(NavigationControllerTest, LoadURL_RedirectAbortDoesntShowPendingURL) {
 
   // It may abort before committing, if it's a download or due to a stop or
   // a new navigation from the user.
-  FrameHostMsg_DidFailProvisionalLoadWithError_Params params;
-  params.error_code = net::ERR_ABORTED;
-  params.error_description = base::string16();
-  params.url = kRedirectURL;
-  params.showing_repost_interstitial = false;
-  main_test_rfh()->OnMessageReceived(
-      FrameHostMsg_DidFailProvisionalLoadWithError(0,  // routing_id
-                                                   params));
+  main_test_rfh()->SimulateNavigationError(kRedirectURL, net::ERR_ABORTED);
 
   // Because the pending entry is renderer initiated and not visible, we
   // clear it when it fails.
   EXPECT_EQ(-1, controller.GetPendingEntryIndex());
   EXPECT_FALSE(controller.GetPendingEntry());
   EXPECT_EQ(0, controller.GetLastCommittedEntryIndex());
-  EXPECT_EQ(1, delegate->navigation_state_change_count());
+  EXPECT_EQ(2, delegate->navigation_state_change_count());
 
   // The visible entry should be the last committed URL, not the pending one,
   // so that no spoof is possible.
@@ -2793,15 +2788,11 @@ TEST_F(NavigationControllerTest, RestoreNavigate) {
   EXPECT_FALSE(our_controller.GetEntryAtIndex(0)->site_instance());
 
   // After navigating, we should have one entry, and it should be "pending".
-  // It should now have a SiteInstance and no restore_type.
   our_controller.GoToIndex(0);
   EXPECT_EQ(1, our_controller.GetEntryCount());
   EXPECT_EQ(our_controller.GetEntryAtIndex(0),
             our_controller.GetPendingEntry());
   EXPECT_EQ(0, our_controller.GetEntryAtIndex(0)->GetPageID());
-  EXPECT_EQ(NavigationEntryImpl::RESTORE_NONE,
-            our_controller.GetEntryAtIndex(0)->restore_type());
-  EXPECT_TRUE(our_controller.GetEntryAtIndex(0)->site_instance());
 
   // Timestamp should remain the same before the navigation finishes.
   EXPECT_EQ(timestamp, our_controller.GetEntryAtIndex(0)->GetTimestamp());
@@ -2870,15 +2861,11 @@ TEST_F(NavigationControllerTest, RestoreNavigateAfterFailure) {
   EXPECT_FALSE(our_controller.GetEntryAtIndex(0)->site_instance());
 
   // After navigating, we should have one entry, and it should be "pending".
-  // It should now have a SiteInstance and no restore_type.
   our_controller.GoToIndex(0);
   EXPECT_EQ(1, our_controller.GetEntryCount());
   EXPECT_EQ(our_controller.GetEntryAtIndex(0),
             our_controller.GetPendingEntry());
   EXPECT_EQ(0, our_controller.GetEntryAtIndex(0)->GetPageID());
-  EXPECT_EQ(NavigationEntryImpl::RESTORE_NONE,
-            our_controller.GetEntryAtIndex(0)->restore_type());
-  EXPECT_TRUE(our_controller.GetEntryAtIndex(0)->site_instance());
 
   // This pending navigation may have caused a different navigation to fail,
   // which causes the pending entry to be cleared.

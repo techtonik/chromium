@@ -444,7 +444,7 @@ void NetworkQualityEstimator::OnConnectionTypeChanged(
     // Add the remaining percentile values.
     static const int kPercentiles[] = {0, 10, 90, 100};
     for (size_t i = 0; i < arraysize(kPercentiles); ++i) {
-      network_quality = GetEstimate(kPercentiles[i]);
+      network_quality = GetEstimateInternal(base::TimeTicks(), kPercentiles[i]);
 
       rtt_percentile = GetHistogram(
           "RTT.Percentile" + base::IntToString(kPercentiles[i]) + ".",
@@ -477,12 +477,38 @@ NetworkQuality NetworkQualityEstimator::GetPeakEstimate() const {
 }
 
 bool NetworkQualityEstimator::GetEstimate(NetworkQuality* median) const {
+  DCHECK(thread_checker_.CalledOnValidThread());
   if (kbps_observations_.Size() == 0 || rtt_msec_observations_.Size() == 0) {
     *median = NetworkQuality();
     return false;
   }
-  *median = GetEstimate(50);
+  *median = GetEstimateInternal(base::TimeTicks(), 50);
   return true;
+}
+
+bool NetworkQualityEstimator::GetRTTEstimate(base::TimeDelta* rtt) const {
+  if (rtt_msec_observations_.Size() == 0) {
+    *rtt = NetworkQuality::InvalidRTT();
+    return false;
+  }
+  *rtt = GetRTTEstimateInternal(base::TimeTicks(), 50);
+  return true;
+}
+
+bool NetworkQualityEstimator::GetDownlinkThroughputKbpsEstimate(
+    int32_t* kbps) const {
+  if (kbps_observations_.Size() == 0) {
+    *kbps = NetworkQuality::kInvalidThroughput;
+    return false;
+  }
+  *kbps = GetDownlinkThroughputKbpsEstimateInternal(base::TimeTicks(), 50);
+  return true;
+}
+
+base::TimeDelta NetworkQualityEstimator::GetMedianRTTSince(
+    const base::TimeTicks& begin_timestamp) const {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  return GetRTTEstimateInternal(begin_timestamp, 50);
 }
 
 NetworkQualityEstimator::Observation::Observation(int32_t value,
@@ -529,23 +555,52 @@ void NetworkQualityEstimator::ObservationBuffer::Clear() {
   DCHECK(observations_.empty());
 }
 
-NetworkQuality NetworkQualityEstimator::GetEstimate(int percentile) const {
+NetworkQuality NetworkQualityEstimator::GetEstimateInternal(
+    const base::TimeTicks& begin_timestamp,
+    int percentile) const {
   DCHECK(thread_checker_.CalledOnValidThread());
   DCHECK_GE(percentile, 0);
   DCHECK_LE(percentile, 100);
-  DCHECK_GT(kbps_observations_.Size(), 0U);
-  DCHECK_GT(rtt_msec_observations_.Size(), 0U);
+
+  return NetworkQuality(
+      GetRTTEstimateInternal(begin_timestamp, percentile),
+      GetDownlinkThroughputKbpsEstimateInternal(begin_timestamp, percentile));
+}
+
+base::TimeDelta NetworkQualityEstimator::GetRTTEstimateInternal(
+    const base::TimeTicks& begin_timestamp,
+    int percentile) const {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  DCHECK_GE(percentile, 0);
+  DCHECK_LE(percentile, 100);
 
   // RTT observations are sorted by duration from shortest to longest, thus
   // a higher percentile RTT will have a longer RTT than a lower percentile.
+  base::TimeDelta rtt = NetworkQuality::InvalidRTT();
+  int32_t rtt_result = -1;
+  if (rtt_msec_observations_.GetPercentile(begin_timestamp, &rtt_result,
+                                           percentile)) {
+    rtt = base::TimeDelta::FromMilliseconds(rtt_result);
+  }
+  return rtt;
+}
+
+int32_t NetworkQualityEstimator::GetDownlinkThroughputKbpsEstimateInternal(
+    const base::TimeTicks& begin_timestamp,
+    int percentile) const {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  DCHECK_GE(percentile, 0);
+  DCHECK_LE(percentile, 100);
+
   // Throughput observations are sorted by kbps from slowest to fastest,
   // thus a higher percentile throughput will be faster than a lower one.
-  return NetworkQuality(base::TimeDelta::FromMilliseconds(
-                            rtt_msec_observations_.GetPercentile(percentile)),
-                        kbps_observations_.GetPercentile(100 - percentile));
+  int32_t kbps = NetworkQuality::kInvalidThroughput;
+  kbps_observations_.GetPercentile(begin_timestamp, &kbps, 100 - percentile);
+  return kbps;
 }
 
 void NetworkQualityEstimator::ObservationBuffer::ComputeWeightedObservations(
+    const base::TimeTicks& begin_timestamp,
     std::vector<WeightedObservation>& weighted_observations,
     double* total_weight) const {
   weighted_observations.clear();
@@ -553,6 +608,8 @@ void NetworkQualityEstimator::ObservationBuffer::ComputeWeightedObservations(
   base::TimeTicks now = base::TimeTicks::Now();
 
   for (const auto& observation : observations_) {
+    if (observation.timestamp < begin_timestamp)
+      continue;
     base::TimeDelta time_since_sample_taken = now - observation.timestamp;
     double weight =
         pow(weight_multiplier_per_second_, time_since_sample_taken.InSeconds());
@@ -568,20 +625,28 @@ void NetworkQualityEstimator::ObservationBuffer::ComputeWeightedObservations(
   *total_weight = total_weight_observations;
 }
 
-int32_t NetworkQualityEstimator::ObservationBuffer::GetPercentile(
+bool NetworkQualityEstimator::ObservationBuffer::GetPercentile(
+    const base::TimeTicks& begin_timestamp,
+    int32_t* result,
     int percentile) const {
-  DCHECK(!observations_.empty());
-
+  DCHECK(result);
   // Stores WeightedObservation in increasing order of value.
   std::vector<WeightedObservation> weighted_observations;
 
   // Total weight of all observations in |weighted_observations|.
   double total_weight = 0.0;
 
-  ComputeWeightedObservations(weighted_observations, &total_weight);
+  ComputeWeightedObservations(begin_timestamp, weighted_observations,
+                              &total_weight);
+  if (weighted_observations.empty())
+    return false;
+
   DCHECK(!weighted_observations.empty());
   DCHECK_GT(total_weight, 0.0);
-  DCHECK_EQ(observations_.size(), weighted_observations.size());
+
+  // weighted_observations may have a smaller size than observations_ since the
+  // former contains only the observations later than begin_timestamp.
+  DCHECK_GE(observations_.size(), weighted_observations.size());
 
   double desired_weight = percentile / 100.0 * total_weight;
 
@@ -590,8 +655,10 @@ int32_t NetworkQualityEstimator::ObservationBuffer::GetPercentile(
     cumulative_weight_seen_so_far += weighted_observation.weight;
 
     // TODO(tbansal): Consider interpolating between observations.
-    if (cumulative_weight_seen_so_far >= desired_weight)
-      return weighted_observation.value;
+    if (cumulative_weight_seen_so_far >= desired_weight) {
+      *result = weighted_observation.value;
+      return true;
+    }
   }
 
   // Computation may reach here due to floating point errors. This may happen
@@ -599,7 +666,8 @@ int32_t NetworkQualityEstimator::ObservationBuffer::GetPercentile(
   // slightly larger than |total_weight| (due to floating point errors).
   // In this case, we return the highest |value| among all observations.
   // This is same as value of the last observation in the sorted vector.
-  return weighted_observations.at(weighted_observations.size() - 1).value;
+  *result = weighted_observations.at(weighted_observations.size() - 1).value;
+  return true;
 }
 
 NetworkQualityEstimator::NetworkID
@@ -626,7 +694,8 @@ NetworkQualityEstimator::GetCurrentNetworkID() const {
       case NetworkChangeNotifier::ConnectionType::CONNECTION_ETHERNET:
         break;
       case NetworkChangeNotifier::ConnectionType::CONNECTION_WIFI:
-#if defined(OS_ANDROID) || defined(OS_LINUX) || defined(OS_CHROMEOS)
+#if defined(OS_ANDROID) || defined(OS_LINUX) || defined(OS_CHROMEOS) || \
+    defined(OS_WIN)
         network_id.id = GetWifiSSID();
 #endif
         break;
