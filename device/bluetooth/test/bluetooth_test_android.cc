@@ -52,10 +52,10 @@ void BluetoothTestAndroid::DiscoverLowEnergyDevice(int device_ordinal) {
 void BluetoothTestAndroid::CompleteGattConnection(BluetoothDevice* device) {
   BluetoothDeviceAndroid* device_android =
       static_cast<BluetoothDeviceAndroid*>(device);
-  base::android::ScopedJavaLocalRef<jobject> j_fake_bluetooth_device =
-      device_android->GetBluetoothDeviceWrapperForTesting();
-  Java_FakeBluetoothDevice_completeGattConnection(
-      AttachCurrentThread(), j_fake_bluetooth_device.obj());
+
+  Java_FakeBluetoothDevice_connectionStateChange(
+      AttachCurrentThread(), device_android->GetJavaObject().obj(),
+      true /* success */, true /* connected */);
 }
 
 }  // namespace device

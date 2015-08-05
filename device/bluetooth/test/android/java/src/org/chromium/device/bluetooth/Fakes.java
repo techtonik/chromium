@@ -188,10 +188,17 @@ class Fakes {
             mName = name;
         }
 
+        // Create a call to onConnectionStateChange on the |chrome_device| using parameters
+        // |success| & |connected|.
         @CalledByNative("FakeBluetoothDevice")
-        private void completeGattConnection() {
-            mGattCallback.onConnectionStateChange(android.bluetooth.BluetoothGatt.GATT_SUCCESS,
-                    android.bluetooth.BluetoothProfile.STATE_CONNECTED);
+        private static void connectionStateChange(
+                ChromeBluetoothDevice chrome_device, boolean success, boolean connected) {
+            FakeBluetoothDevice fake_device = (FakeBluetoothDevice) chrome_device.mDevice;
+            fake_device.mGattCallback.onConnectionStateChange(success
+                            ? android.bluetooth.BluetoothGatt.GATT_SUCCESS
+                            : android.bluetooth.BluetoothGatt.GATT_FAILURE,
+                    connected ? android.bluetooth.BluetoothProfile.STATE_CONNECTED
+                              : android.bluetooth.BluetoothProfile.STATE_DISCONNECTED);
         }
 
         // -----------------------------------------------------------------------------------------

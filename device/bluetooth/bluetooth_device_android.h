@@ -14,7 +14,8 @@ namespace device {
 class BluetoothAdapterAndroid;
 
 // BluetoothDeviceAndroid along with the Java class
-// org.chromium.device.bluetooth.BluetoothDevice implement BluetoothDevice.
+// org.chromium.device.bluetooth.ChromeBluetoothDevice implement
+// BluetoothDevice.
 class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
     : public BluetoothDevice {
  public:
@@ -34,6 +35,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
 
   // Register C++ methods exposed to Java using JNI.
   static bool RegisterJNI(JNIEnv* env);
+
+  // Returns the associated ChromeBluetoothDevice Java object.
+  base::android::ScopedJavaLocalRef<jobject> GetJavaObject();
 
   // Updates cached copy of advertised UUIDs discovered during a scan.
   // Returns true if new UUIDs differed from cached values.
@@ -85,10 +89,6 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
                                jobject jcaller,
                                bool success,
                                bool connected);
-
-  // Returns BluetoothDeviceWrapper from the associated ChromeBluetoothDevice.
-  base::android::ScopedJavaLocalRef<jobject>
-  GetBluetoothDeviceWrapperForTesting();
 
  protected:
   BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter);

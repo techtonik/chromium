@@ -28,7 +28,7 @@ final class ChromeBluetoothDevice {
     private static final String TAG = "cr.Bluetooth";
 
     private long mNativeBluetoothDeviceAndroid;
-    private final Wrappers.BluetoothDeviceWrapper mDevice;
+    final Wrappers.BluetoothDeviceWrapper mDevice;
     private List<ParcelUuid> mUuidsFromScan;
     Wrappers.BluetoothGattWrapper mBluetoothGatt;
 
@@ -107,15 +107,6 @@ final class ChromeBluetoothDevice {
         boolean connectResult = mBluetoothGatt.connect();
         Log.i(TAG, "BluetoothGatt.connect returned %b", connectResult);
         return connectResult;
-    }
-
-    // Implements BluetoothDeviceAndroid::GetFakeBluetoothDeviceForTesting.
-    @CalledByNative
-    // 'Object' type must be used for return type because inner class
-    // Wrappers.BluetoothDeviceWrapper reference is not handled by jni_generator.py JavaToJni.
-    // http://crbug.com/505554
-    private Object getBluetoothDeviceWrapperForTesting() {
-        return mDevice;
     }
 
     // Implements BluetoothDeviceAndroid::GetDeviceName.

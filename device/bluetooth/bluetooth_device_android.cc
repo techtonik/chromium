@@ -40,6 +40,11 @@ bool BluetoothDeviceAndroid::RegisterJNI(JNIEnv* env) {
   return RegisterNativesImpl(env);  // Generated in ChromeBluetoothDevice_jni.h
 }
 
+base::android::ScopedJavaLocalRef<jobject>
+BluetoothDeviceAndroid::GetJavaObject() {
+  return base::android::ScopedJavaLocalRef<jobject>(j_device_);
+}
+
 uint32 BluetoothDeviceAndroid::GetBluetoothClass() const {
   return Java_ChromeBluetoothDevice_getBluetoothClass(AttachCurrentThread(),
                                                       j_device_.obj());
@@ -189,6 +194,7 @@ void BluetoothDeviceAndroid::ConnectToServiceInsecurely(
   NOTIMPLEMENTED();
 }
 
+// TODO(scheib): Report error code to DidFailToConnectGatt.
 void BluetoothDeviceAndroid::OnConnectionStateChange(JNIEnv* env,
                                                      jobject jcaller,
                                                      bool success,
@@ -198,12 +204,6 @@ void BluetoothDeviceAndroid::OnConnectionStateChange(JNIEnv* env,
     DidConnectGatt();
   else
     DidFailToConnectGatt();
-}
-
-base::android::ScopedJavaLocalRef<jobject>
-BluetoothDeviceAndroid::GetBluetoothDeviceWrapperForTesting() {
-  return Java_ChromeBluetoothDevice_getBluetoothDeviceWrapperForTesting(
-      AttachCurrentThread(), j_device_.obj());
 }
 
 BluetoothDeviceAndroid::BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter)
