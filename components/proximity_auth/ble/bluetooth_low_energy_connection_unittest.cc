@@ -711,7 +711,8 @@ TEST_F(ProximityAuthBluetoothLowEnergyConnectionTest,
           Return(new NiceMock<MockBluetoothLowEnergyCharacteristicsFinder>)));
 
   create_gatt_connection_success_callback_.Run(make_scoped_ptr(
-      new NiceMock<device::MockBluetoothGattConnection>(kBluetoothAddress)));
+      new NiceMock<device::MockBluetoothGattConnection>(adapter_,
+                                                        kBluetoothAddress)));
 
   CharacteristicsFound(connection.get());
   NotifySessionStarted(connection.get());
