@@ -338,6 +338,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="AppBanners.UserResponse" enum="AppBannersUserResponse">
+  <owner>dominickn@chromium.org</owner>
+  <summary>
+    App banners promote an application related to the current website, and are
+    requested specifically through the current page's HTML.  This stat
+    specifically tracks a user's response to a displayed banner.
+  </summary>
+</histogram>
+
 <histogram name="appcache.CheckResponseResult"
     enum="AppCacheCheckResponseResult">
   <owner>michaeln@chromium.org</owner>
@@ -2208,6 +2217,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Autofill.NumberOfEditedAutofilledFieldsAtSubmission"
+    units="fields">
+  <owner>mathp@chromium.org</owner>
+  <summary>
+    The number of autofilled fields that were subsequently edited prior to the
+    form being submitted.
+  </summary>
+</histogram>
+
 <histogram name="Autofill.PasswordFormQueryVolume"
     enum="PasswordFormQueryVolume">
   <owner>dvadym@chromium.org</owner>
@@ -2297,7 +2315,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>TBD.</summary>
 </histogram>
 
-<histogram name="Autofill.ScanCreditCard.Completed" units="BooleanCompleted">
+<histogram name="Autofill.ScanCreditCard.Completed" enum="BooleanCompleted">
   <owner>rouslan@chromium.org</owner>
   <summary>Whether a credit card scan was completed or cancelled.</summary>
 </histogram>
@@ -2493,7 +2511,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="BackgroundSync.Registration.OneShot"
-    enum="BackgroundSyncResult">
+    enum="BackgroundSyncStatus">
   <owner>iclelland@chromium.org</owner>
   <summary>
     Records the result of attempting to register a one-shot sync.
@@ -2519,7 +2537,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="BackgroundSync.Registration.Periodic"
-    enum="BackgroundSyncResult">
+    enum="BackgroundSyncStatus">
   <owner>iclelland@chromium.org</owner>
   <summary>
     Records the result of attempting to register a periodic sync.
@@ -2536,7 +2554,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="BackgroundSync.Unregistration.OneShot"
-    enum="BackgroundSyncResult">
+    enum="BackgroundSyncStatus">
   <owner>iclelland@chromium.org</owner>
   <summary>
     Records the result of attempting to unregister a one-shot sync.
@@ -2544,7 +2562,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="BackgroundSync.Unregistration.Periodic"
-    enum="BackgroundSyncResult">
+    enum="BackgroundSyncStatus">
   <owner>iclelland@chromium.org</owner>
   <summary>
     Records the result of attempting to unregister a periodic sync.
@@ -12938,6 +12956,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="GPU.ANGLE.Buffer11CPUMemoryMB" units="MB">
+  <owner>cwallez@chromium.org</owner>
+  <summary>
+     The sum of the size of the CPU-side memory allocations of Buffer11's copies
+    (vs. GPU memory allocations). These allocations are used when modifying the
+    buffer data on the CPU or when transfering to GPU memory via DMA.
+  </summary>
+</histogram>
+
 <histogram name="GPU.ANGLE.D3D11CreateDeviceError" enum="D3DHresult">
   <owner>jmadill@chromium.org</owner>
   <summary>
@@ -13309,6 +13336,33 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="History.DatabaseAdvancedMetricsTime" units="milliseconds">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Time spent on advanced History DB metrics calculation (weekly and monthly
+    URL, host, and category counts). Advanced metrics are logged on
+    initialization of the History DB on 0.3% of starts.
+  </summary>
+</histogram>
+
+<histogram name="History.DatabaseBasicMetricsTime" units="milliseconds">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Time spent on basic History DB metrics calculation (file size and table
+    counts). Basic metrics are logged on initialization of the History DB on 1%
+    of starts.
+  </summary>
+</histogram>
+
+<histogram name="History.DatabaseFileMB" units="MB">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Size of History DB file. Duplicate of Profile.HistorySize and
+    Sqlite.SizeKB.History. Logged on initialization of the History DB on 1% of
+    starts.
+  </summary>
+</histogram>
+
 <histogram name="History.DeleteFTSIndexDatabases">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -13395,6 +13449,32 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <owner>rkaplow@chromium.org</owner>
   <summary>
     The amount of time that elapsed during HistoryService::Init.
+  </summary>
+</histogram>
+
+<histogram name="History.MonthlyHostCount">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Unique hostnames in History database urls table with last-visit times in the
+    last 30 days. Metrics are logged on initialization of the History DB on 0.3%
+    of starts.
+  </summary>
+</histogram>
+
+<histogram name="History.MonthlyURLCount">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Unique URLs in History database urls table with last-visit times in the last
+    30 days. Metrics are logged on initialization of the History DB on 0.3% of
+    starts.
+  </summary>
+</histogram>
+
+<histogram name="History.MonthlyVisitCount">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Number of rows in History visits table with visit times in the last 30 days.
+    Metrics are logged on initialization of the History DB on 1% of starts.
   </summary>
 </histogram>
 
@@ -13511,6 +13591,48 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     history::TopSitesBackend::UpdateTopSitesOnDBThread to execute. Excludes the
     case where local TopSitesDatabase db_ is unavailable, i.e. where the update
     doesn't really happen.
+  </summary>
+</histogram>
+
+<histogram name="History.URLTableCount">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Number of rows in urls table in History DB. Metrics are logged on
+    initialization of the History DB on 1% of starts.
+  </summary>
+</histogram>
+
+<histogram name="History.VisitTableCount">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Number of rows in visits table in History DB. Metrics are logged on
+    initialization of the History DB on 1% of starts.
+  </summary>
+</histogram>
+
+<histogram name="History.WeeklyHostCount">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Unique hostnames in History database urls table with last-visit times in the
+    last 7 days. Metrics are logged on initialization of the History DB on 0.3%
+    of starts.
+  </summary>
+</histogram>
+
+<histogram name="History.WeeklyURLCount">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Unique URLs in History database urls table with last-visit times in the last
+    7 days. Metrics are logged on initialization of the History DB on 0.3% of
+    starts.
+  </summary>
+</histogram>
+
+<histogram name="History.WeeklyVisitCount">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Number of rows in History visits table with visit times in the last 7 days.
+    Metrics are logged on initialization of the History DB on 1% of starts.
   </summary>
 </histogram>
 
@@ -16350,6 +16472,13 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Media.LoadType" enum="MediaLoadType">
+  <owner>xhwang@chromium.org</owner>
+  <summary>
+    Load type of HTML5 media, such as URL, MediaSource and MediaStream.
+  </summary>
+</histogram>
+
 <histogram name="Media.LocalRendererSinkStates" enum="LocalRendererSinkStates">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -16374,9 +16503,24 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Media.Midi.InputPorts" units="devices">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>Connected input port numbers on the initialization.</summary>
+</histogram>
+
+<histogram name="Media.Midi.OutputPorts" units="devices">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>Connected output port numbers on the initialization.</summary>
+</histogram>
+
 <histogram name="Media.Midi.ResultOnShutdown" enum="MidiResult">
   <owner>toyoshim@chromium.org</owner>
   <summary>The final status of MidiManager on browser shutdown.</summary>
+</histogram>
+
+<histogram name="Media.Midi.Usage" enum="MidiUsage">
+  <owner>toyoshim@chromium.org</owner>
+  <summary>MidiManager usages to understand the API use case.</summary>
 </histogram>
 
 <histogram name="Media.MSE.AudioCodec" enum="MSECodec">
@@ -16396,6 +16540,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="Media.MSE.Playback" enum="BooleanSuccess">
+  <obsolete>
+    Renamed to Media.LoadType.
+  </obsolete>
   <owner>acolwell@chromium.org</owner>
   <summary>
     Whether Media Source Extensions is specified for playback of Media elements.
@@ -28239,6 +28386,28 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="PasswordManager.AccountsReusingPassword" units="accounts">
+  <owner>engedy@chromium.org</owner>
+  <owner>vabr@chromium.org</owner>
+  <summary>
+    Records, for each account, the number of other accounts (across all sites
+    and usernames) that reuse the same password. Only non-blacklisted,
+    HTML-form-based accounts are considered.
+
+    For each account, samples will only be recorded into the histograms that
+    have the first suffix corresponding to whether that account was saved on a
+    secure website or not. The second suffix is used to further categorize the
+    other accounts that reuse the same password based on how they relate to the
+    account in question, and whether they are secure. The number of other
+    accounts in each category will be reported into histogram with the
+    respective second suffixes.
+
+    Metrics are collected once per browser start-up. In case of multiple
+    profiles, the counts are for the profile for which a WebContents is first
+    created.
+  </summary>
+</histogram>
+
 <histogram name="PasswordManager.ActionsTaken"
     enum="PasswordManagerActionsTaken">
   <obsolete>
@@ -28741,7 +28910,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
-<histogram name="PasswordManager.TotalAccountsHighRes.WithScheme"
+<histogram name="PasswordManager.TotalAccountsHiRes.WithScheme"
     units="accounts">
   <owner>engedy@chromium.org</owner>
   <owner>vabr@chromium.org</owner>
@@ -38543,6 +38712,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="ServiceWorker.SendStopWorker.Status"
+    enum="ServiceWorkerStatusCode">
+  <owner>falken@chromium.org</owner>
+  <summary>
+    The result of trying to send the IPC message to a renderer process telling
+    it to stop an embedded worker. Recorded in EmbeddedWorkerInstance::Stop.
+  </summary>
+</histogram>
+
 <histogram name="ServiceWorker.StartNewWorker.Status"
     enum="ServiceWorkerStatusCode">
   <owner>falken@chromium.org</owner>
@@ -38631,6 +38809,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>
     Records successes and failures of purging a stale resource in
     ServiceWorkerStorage.
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorker.TerminateThread.Time" units="milliseconds">
+  <owner>falken@chromium.org</owner>
+  <summary>
+    The time taken in the renderer process between the main thread asking the
+    worker thread to terminate and getting ACK that it terminated.
   </summary>
 </histogram>
 
@@ -42692,6 +42878,13 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <summary>Error codes returned by sqlite for the history db.</summary>
 </histogram>
 
+<histogram name="Sqlite.Migration.History" units="milliseconds">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Time used to migrate History database schema to a new version.
+  </summary>
+</histogram>
+
 <histogram name="Sqlite.OpenFailure" enum="SqliteErrorCode">
   <owner>shess@chromium.org</owner>
   <summary>Error which prevented database open.</summary>
@@ -44821,10 +45014,42 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="Sync.RequestContentLength.Compressed" units="bytes">
+  <owner>gangwu@chromium.org</owner>
+  <summary>
+    The request content size for a single HTTP/HTTPS call from sync client to
+    server. The content is compressed by gzip.
+  </summary>
+</histogram>
+
+<histogram name="Sync.RequestContentLength.Original" units="bytes">
+  <owner>gangwu@chromium.org</owner>
+  <summary>
+    The original request content size for a single HTTP/HTTPS call from sync
+    client to server. It is the size before content got compressed.
+  </summary>
+</histogram>
+
 <histogram name="Sync.ResolveSimpleConflict"
     enum="SyncSimpleConflictResolutions">
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of simple conflict resolutions.</summary>
+</histogram>
+
+<histogram name="Sync.ResponseContentLength.Compressed" units="bytes">
+  <owner>gangwu@chromium.org</owner>
+  <summary>
+    The response content size for a single HTTP/HTTPS call from sync server to
+    client. The content is compressed by gzip.
+  </summary>
+</histogram>
+
+<histogram name="Sync.ResponseContentLength.Original" units="bytes">
+  <owner>gangwu@chromium.org</owner>
+  <summary>
+    The original response content size for a single HTTP/HTTPS call from sync
+    server and client. It is the size after content got uncompressed.
+  </summary>
 </histogram>
 
 <histogram name="Sync.RestoreBackendInitializeSucess" enum="BooleanSuccess">
@@ -45348,12 +45573,13 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
-<histogram name="Tab.Discarding" enum="TabBackgroundLoadStatus">
+<histogram name="Tab.Discarding" enum="TabDiscardingEvents">
   <owner>georgesak@chromium.org</owner>
   <summary>
     Metric to track counts of actions related to tab discarding. Namely, we get
     an event for every tab switch, split into two groups, whether it was a
-    discarded tab not. We also get an event whenever a tab gets discarded.
+    discarded tab not. We also get an event whenever a tab gets discarded as
+    well as when a tab that's playing audio gets discarded.
   </summary>
 </histogram>
 
@@ -46481,6 +46707,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="UMA.CollectExternalEventsTime" units="milliseconds">
+  <obsolete>
+    Deprecated as of August 2015. The histogram showed no unexpected slowness,
+    and a profiler is a better tool for identifying any future issues.
+  </obsolete>
   <owner>asvitkine@chromium.org</owner>
   <summary>
     The time to run the external metrics collection task (Chrome OS).
@@ -46533,7 +46763,10 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
-<histogram name="UMA.GeneratedLowEntropySource" enum="BooleanSuccess">
+<histogram name="UMA.GeneratedLowEntropySource" enum="Boolean">
+  <obsolete>
+    Deprecated as of August 2015. No longer tracked.
+  </obsolete>
   <owner>asvitkine@chromium.org</owner>
   <summary>
     For each attempt to generate the low entropy source, log whether or not the
@@ -46680,6 +46913,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="UMA.ProtoGzippedKBSaved" units="KB">
+  <obsolete>
+    Deprecated as of August 2015. See UMA.ProtoCompressionRatio instead.
+  </obsolete>
   <owner>asvitkine@chromium.org</owner>
   <summary>
     Kilobytes saved from gzipping the protobufs before uploading them.
@@ -46699,6 +46935,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="UMA.SyntheticTrials.Count">
+  <obsolete>
+    Deprecated as of August 2015.
+  </obsolete>
   <owner>asvitkine@chromium.org</owner>
   <summary>
     The number of synthetic field trials added to the UMA log when the system
@@ -46723,6 +46962,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 </histogram>
 
 <histogram name="UMA.UploadCreation" enum="BooleanSuccess">
+  <obsolete>
+    Deprecated as of August 2015.  This failure case no longer exists.
+  </obsolete>
   <owner>asvitkine@chromium.org</owner>
   <summary>
     For each attempted UMA upload, log whether the upload was successfully
@@ -48212,6 +48454,30 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
     change on a restart of the browser with the received seed.
 
     Recorded on every variation seed simulation, which follows a fetch.
+  </summary>
+</histogram>
+
+<histogram name="Variations.StoreSeed.DeltaSize" units="KiB">
+  <owner>asvitkine@chromium.org</owner>
+  <summary>
+    On successful save of a delta-compressed variations seed, records the size
+    of the delta in KiB.
+  </summary>
+</histogram>
+
+<histogram name="Variations.StoreSeed.DeltaSize.ReductionPercent" units="%">
+  <owner>asvitkine@chromium.org</owner>
+  <summary>
+    On successful save of a delta-compressed variations seed, records the size
+    of the delta as a percentage of the decoded seed size.
+  </summary>
+</histogram>
+
+<histogram name="Variations.StoreSeed.Size" units="KiB">
+  <owner>asvitkine@chromium.org</owner>
+  <summary>
+    On successful save of a non-delta-compressed variations seed, records the
+    size of the received seed in KiB.
   </summary>
 </histogram>
 
@@ -49946,6 +50212,14 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   </summary>
 </histogram>
 
+<histogram name="WebRTC.Video.AverageRoundTripTimeInMilliseconds" units="ms">
+  <owner>holmer@chromium.org</owner>
+  <summary>
+    The average round-trip time of a WebRTC call in milliseconds. Recorded when
+    a stream is removed.
+  </summary>
+</histogram>
+
 <histogram name="WebRTC.Video.BitrateReceivedInKbps" units="kbps">
   <owner>asapersson@chromium.org</owner>
   <summary>
@@ -50865,6 +51139,15 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="24" label="(Web app) User installed a web app"/>
 </enum>
 
+<enum name="AppBannersUserResponse" type="int">
+  <int value="1" label="Native app banner was accepted by the user"/>
+  <int value="2" label="Web app banner was accepted by the user"/>
+  <int value="3" label="Native app banner was dismissed by the user"/>
+  <int value="4" label="Web app banner was dismissed by the user"/>
+  <int value="5" label="Native app banner was ignored by the user"/>
+  <int value="6" label="Web app banner was ignored by the user"/>
+</enum>
+
 <enum name="AppCacheCheckResponseResult" type="int">
   <int value="0" label="OK"/>
   <int value="1" label="Manifest obsolete"/>
@@ -51516,11 +51799,12 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="3" label="AUTO_LAUNCH_FOREGROUND_USELESS"/>
 </enum>
 
-<enum name="BackgroundSyncResult" type="int">
+<enum name="BackgroundSyncStatus" type="int">
   <int value="0" label="Action completed successfully"/>
   <int value="1" label="Back-end error"/>
   <int value="2" label="Registration was not found"/>
   <int value="3" label="No active service worker"/>
+  <int value="4" label="Action not allowed"/>
 </enum>
 
 <enum name="BackgroundTracingState" type="int">
@@ -51644,6 +51928,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="91" label="WC_MEMORY_CACHE_RESOURCE_BAD_SECURITY_INFO"/>
   <int value="92" label="WC_RENDERER_DID_NAVIGATE_BAD_SECURITY_INFO"/>
   <int value="93" label="BDH_DUPLICATE_REQUEST_DEVICE_ID"/>
+  <int value="94" label="CSDH_INVALID_ORIGIN"/>
 </enum>
 
 <enum name="BadMessageReasonExtensions" type="int">
@@ -51774,6 +52059,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="3" label="Discovery start failed"/>
   <int value="4" label="Discovery stop failed"/>
   <int value="5" label="No matching devices found"/>
+  <int value="6" label="Bluetooth Adapter not present"/>
+  <int value="7" label="Bluetooth Adapter was off"/>
 </enum>
 
 <enum name="BookmarksExperimentState" type="int">
@@ -54706,8 +54993,8 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="50" label="Device attributes update failed">
     Failed to update device attributes.
   </int>
-  <int value="51" label="Lockbox device mode mismatch on re-enrollment">
-    Lockbox error on re-enrollment: mode does not match install attributes.
+  <int value="51" label="Lockbox device mode mismatch">
+    Enrollment mode does not match already locked install attributes.
   </int>
 </enum>
 
@@ -56907,6 +57194,7 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="1071" label="FILEMANAGERPRIVATE_CANCELALLFILETRANSFERS"/>
   <int value="1072" label="NETWORKINGPRIVATE_UNLOCKCELLULARSIM"/>
   <int value="1073" label="NETWORKINGPRIVATE_SETCELLULARSIMSTATE"/>
+  <int value="1074" label="ENTERPRISE_DEVICEATTRIBUTES_GETDIRECTORYDEVICEID"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -59594,6 +59882,9 @@ http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
   <int value="2" label="ALLOWED_TRUNCATED_HEADERS"/>
   <int value="3" label="SKIPPED_WS_PREFIX"/>
   <int value="4" label="SKIPPED_NON_WS_PREFIX"/>
+  <int value="5" label="HTTP_09_RESPONSE_OVER_HTTP"/>
+  <int value="6" label="HTTP_09_RESPONSE_OVER_SSL"/>
+  <int value="7" label="HEADER_HTTP_09_ON_REUSED_SOCKET"/>
 </enum>
 
 <enum name="HttpPipelineStatus" type="int">
@@ -61446,6 +61737,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-2083195884" label="enable-firewall-hole-punching"/>
   <int value="-2077268643" label="disable-device-enumeration"/>
   <int value="-2075725205" label="disable-new-zip-unpacker"/>
+  <int value="-2067166422" label="enable-slimming-paint-v2"/>
   <int value="-2063352474" label="enable-new-task-manager"/>
   <int value="-2063014275" label="enable-web-bluetooth"/>
   <int value="-2047822258" label="enable-avfoundation"/>
@@ -61573,6 +61865,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1052782474" label="enable-cloud-devices"/>
   <int value="-1052415111" label="malware-interstitial-v2"/>
   <int value="-1052219252" label="disable-captive-portal-bypass-proxy"/>
+  <int value="-1033738911" label="enable-mac-views-dialogs"/>
   <int value="-1022971520" label="enable-search-button-in-omnibox-for-str"/>
   <int value="-1020450980" label="gesture-deletion"/>
   <int value="-1016202433" label="disable-add-to-shelf"/>
@@ -61634,6 +61927,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-508143738" label="disable-accelerated-fixed-root-background"/>
   <int value="-506706655" label="respect-autocomplete-off-autofill"/>
   <int value="-495585885" label="enable-spdy-proxy-dev-auth-origin"/>
+  <int value="-488779992" label="blink-settings"/>
   <int value="-478462945" label="enable-ephemeral-apps"/>
   <int value="-462205750" label="enable-service-worker-sync"/>
   <int value="-430360431" label="disable-password-generation"/>
@@ -61704,6 +61998,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="203776499" label="enable-virtual-keyboard-overscroll"/>
   <int value="266702296" label="disable-plugin-power-saver"/>
   <int value="270267831" label="enable-scripts-require-action"/>
+  <int value="274103741" label="enable-ntp-popular-sites"/>
   <int value="278756320" label="disable-app-list-app-info"/>
   <int value="324631366" label="enable-drive-search-in-app-launcher"/>
   <int value="330138076" label="enable-clear-browsing-data-counters"/>
@@ -61720,6 +62015,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="412957264" label="tab-close-buttons-hidden-with-touch"/>
   <int value="413081240" label="enable-new-md-input-view"/>
   <int value="415154056" label="enable-physical-keyboard-autocorrect"/>
+  <int value="416887895" label="enable-password-change-support"/>
   <int value="423615350" label="enable-tab-audio-muting"/>
   <int value="446316019" label="enable-threaded-compositing"/>
   <int value="451196246" label="disable-impl-side-painting"/>
@@ -61755,6 +62051,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="779086132" label="enable-data-reduction-proxy-alt"/>
   <int value="782167080" label="enable-new-qp-input-view"/>
   <int value="811374216" label="disable-new-bookmark-apps"/>
+  <int value="820650704" label="disable-ntp-popular-sites"/>
   <int value="821192723" label="show-fps-counter"/>
   <int value="824961931" label="use-simple-cache-backend"/>
   <int value="834326277" label="enable-answers-in-suggest"/>
@@ -61907,6 +62204,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1930901873" label="disable-sync-app-list"/>
   <int value="1939413645" label="enable-invalid-cert-collection"/>
   <int value="1944156526" label="sync-url"/>
+  <int value="1955677113" label="trace-export-events-to-etw"/>
   <int value="1961425320" label="force-qtkit"/>
   <int value="1966730288" label="disable-threaded-compositing"/>
   <int value="1969604362" label="enable-pinch-virtual-viewport"/>
@@ -62874,6 +63172,12 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="3" label="Supported with type"/>
 </enum>
 
+<enum name="MediaLoadType" type="int">
+  <int value="0" label="URL"/>
+  <int value="1" label="MediaSource"/>
+  <int value="2" label="MediaStream"/>
+</enum>
+
 <enum name="MediaOutputProtectionStatus" type="int">
   <int value="0" label="Queried"/>
   <int value="1" label="No external link"/>
@@ -62958,6 +63262,16 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1" label="Successfully initialized"/>
   <int value="2" label="Not supported"/>
   <int value="3" label="Generic initialization error"/>
+</enum>
+
+<enum name="MidiUsage" type="int">
+  <int value="0" label="Instantiated"/>
+  <int value="1" label="Instantiated on unsupported platforms"/>
+  <int value="2" label="Session is started"/>
+  <int value="3" label="Session is ended"/>
+  <int value="4" label="Initialized"/>
+  <int value="5" label="Input port is added"/>
+  <int value="6" label="Output port is added"/>
 </enum>
 
 <enum name="MigrationNssToPemNetworkTypes" type="int">
@@ -68090,6 +68404,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="5" label="ErrorResponseTypeOpaque"/>
   <int value="6" label="ErrorResponseTypeNotBasicOrDefault"/>
   <int value="7" label="ErrorBodyUsed"/>
+  <int value="8" label="ErrorResponseTypeOpaqueForClientRequest"/>
 </enum>
 
 <enum name="ServiceWorkerStatusCode" type="int">
@@ -70152,6 +70467,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="0" label="Switched to an active tab"/>
   <int value="1" label="Switched to a discarded tab"/>
   <int value="2" label="Discarded a tab"/>
+  <int value="3"
+      label="Discarded a tab playing audio (included in the previous one)"/>
 </enum>
 
 <enum name="TabRendererCrashStatus" type="int">
@@ -70908,6 +71225,10 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2" label="Failed - Parse Error"/>
   <int value="3" label="Failed - Signature Mismatch"/>
   <int value="4" label="Failed - Gzip Compress Error"/>
+  <int value="5" label="Delta Count"/>
+  <int value="6" label="Failed - Delta: Read Seed"/>
+  <int value="7" label="Failed - Delta: Apply"/>
+  <int value="8" label="Failed - Delta: Store Seed"/>
 </enum>
 
 <enum name="VaryType" type="int">
@@ -74839,13 +75160,49 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="PasswordManager.SavePasswordPromptResponse"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="PasswordReuseSourceRealm" separator=".">
+  <suffix name="FromHttpRealm"
+      label="The account in question was saved on an HTTP site."/>
+  <suffix name="FromHttpsRealm"
+      label="The account in question was saved on a HTTPS site (including
+             those with certificate issues)."/>
+  <affected-histogram name="PasswordManager.AccountsReusingPassword"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="PasswordReuseTargetRealm" separator=".">
+  <suffix name="OnHttpRealmWithSameHost"
+      label="The number of other accounts whose realms have HTTP scheme and
+             the same host as the account in question."/>
+  <suffix name="OnHttpsRealmWithSameHost"
+      label="The number of other accounts whose realms have HTTPS scheme and
+             the same host as the account in question."/>
+  <suffix name="OnHttpRealmWithDifferentHost"
+      label="The number of other accounts whose realms have HTTP scheme and
+             different hosts than the account in question."/>
+  <suffix name="OnHttpsRealmWithDifferentHost"
+      label="The number of other accounts whose realms have HTTPS scheme and
+             different hosts than the account in question."/>
+  <suffix name="OnAnyRealmWithDifferentHost"
+      label="The number of other accounts whose realms have different hosts
+             than the account in question, and their scheme is either HTTP or
+             HTTPS."/>
+  <suffix name="OnPSLMatchingRealm"
+      label="The number of other accounts whose realms are public suffix
+             matches to that of the account in question (the scheme is always
+             the same in these cases)."/>
+  <affected-histogram
+      name="PasswordManager.AccountsReusingPassword.FromHttpRealm"/>
+  <affected-histogram
+      name="PasswordManager.AccountsReusingPassword.FromHttpsRealm"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="PasswordScheme" separator=".">
   <suffix name="Android" label="The password is for an Android app."/>
   <suffix name="Ftp" label="The scheme of the origin is FTP."/>
   <suffix name="Http" label="The scheme of the origin is HTTP."/>
   <suffix name="Https" label="The scheme of the origin is HTTPS."/>
   <suffix name="Other" label="The scheme of the origin is something else."/>
-  <affected-histogram name="PasswordManager.TotalAccountsHighRes.WithScheme"/>
+  <affected-histogram name="PasswordManager.TotalAccountsHiRes.WithScheme"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="PerformanceMonitor" separator=".">

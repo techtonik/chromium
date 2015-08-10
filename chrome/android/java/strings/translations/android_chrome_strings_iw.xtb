@@ -76,11 +76,13 @@
 <translation id="2842985007712546952">תיקיית אב</translation>
 <translation id="2354750644801399986">'אל תעקוב'</translation>
 <translation id="2351097562818989364">הגדרות התרגום שלך אופסו.</translation>
+<translation id="1557201757634521564">זיהוי אוטומטי של קידוד</translation>
 <translation id="4307992518367153382">היסודות</translation>
 <translation id="8007176423574883786">כבוי בשביל המכשיר הזה</translation>
 <translation id="119944043368869598">נקה הכל</translation>
 <translation id="7665369617277396874">הוסף חשבון</translation>
 <translation id="6458785801851713928">הסנכרון אינו זמין בדומיין שלך.</translation>
+<translation id="8275818695183729150">התר (בשביל חיפושים בסרגל הכתובות)</translation>
 <translation id="7788788617745289808">‏Chrome זקוק לגישה למצלמה כדי לשתף אותה עם האתר הזה.</translation>
 <translation id="7765158879357617694">העבר</translation>
 <translation id="2731700343119398978">המתן...</translation>
@@ -300,6 +302,7 @@
 <translation id="1197267115302279827">העבר סימניות</translation>
 <translation id="3190152372525844641">‏הפעל הרשאות בשביל Chrome ב<ph name="BEGIN_LINK"/>הגדרות Android<ph name="END_LINK"/>.</translation>
 <translation id="583891442612896534">‏ל-Chrome אין אפשרות לגשת אל שרתי Google לדחיסת נתונים. ייתכן שהחיסכון בנתונים יהיה מוגבל.</translation>
+<translation id="6324360525379265737">קביעה אוטומטית של קידוד תווים</translation>
 <translation id="4827948050554950725">הוסף כרטיס אשראי</translation>
 <translation id="2316129865977710310">לא, תודה</translation>
 <translation id="4278390842282768270">מותר</translation>
@@ -372,10 +375,13 @@
 <translation id="748127970106343339">אשר את מחיקת פרטי הכניסה של המכשיר</translation>
 <translation id="4351244548802238354">סגור את תיבת הדו-שיח</translation>
 <translation id="3089395242580810162">פתח בכרטיסיית גלישה בסתר</translation>
+<translation id="699220179437400583">‏דווח אוטומטית ל-Google על פרטים של בעיות אבטחה אפשריות</translation>
 <translation id="5899349522111170522">צור קובץ חדש</translation>
 <translation id="3158619413803296679">בחר סימניה</translation>
+<translation id="1832521218263067499">אירועי אבטחה</translation>
 <translation id="6138140242378429169">הפוך את הדף לידידותי לנייד</translation>
 <translation id="5345040418939504969"><ph name="BOOKMARK_TITLE"/> נמחק</translation>
+<translation id="1641113438599504367">גלישה בטוחה</translation>
 <translation id="2360035970720276770">‏ניתן להוריד רק כתובות אתרים המתחילות ב-&quot;http&quot; או &quot;https&quot;.</translation>
 <translation id="7926911226829060241">‏הסימניות הפתוחות, ההיסטוריה, הסיסמאות ונתונים נוספים מסתנכרנים עם חשבון Google שלך.</translation>
 <translation id="4871370605780490696">הוסף סימניה</translation>
@@ -439,6 +445,7 @@
 <translation id="1285320974508926690">לעולם אל תתרגם אתר זה</translation>
 <translation id="4165986682804962316">הגדרות אתרים</translation>
 <translation id="3672452749423051839">הצעות לשגיאת ניווט</translation>
+<translation id="307329814453917357">‏הצע לתרגם דפים באמצעות Google Translate</translation>
 <translation id="2956410042958133412">החשבון הזה מנוהל על ידי <ph name="PARENT_NAME_1"/> ו-<ph name="PARENT_NAME_2"/>.</translation>
 <translation id="780301667611848630">לא תודה</translation>
 <translation id="5164482624172255778">‏האם ברצונך ש-Google Chrome יציע בפעם הבאה לתרגם דפים בשפה <ph name="LANGUAGE"/> מאתר זה?</translation>
@@ -492,6 +499,7 @@
 <translation id="3988213473815854515">ניתנה הרשאת מיקום</translation>
 <translation id="1513352483775369820">סימניות והיסטוריית אתרים</translation>
 <translation id="8912362522468806198">‏חשבון Google</translation>
+<translation id="219985413780390209">הגן על עצמך ועל המכשיר מפני אתרים מסוכנים</translation>
 <translation id="6165508094623778733">למידע נוסף</translation>
 <translation id="3003595280608617736">‏אין כרטיס SD</translation>
 <translation id="6337234675334993532">הצפנה</translation>

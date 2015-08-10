@@ -108,6 +108,10 @@
 #include "content/browser/theme_helper_mac.h"
 #endif
 
+#if defined(USE_OZONE)
+#include "ui/ozone/public/client_native_pixmap_factory.h"
+#endif
+
 #if defined(OS_WIN)
 #include <windows.h>
 #include <commctrl.h>
@@ -319,12 +323,10 @@ MSVC_ENABLE_OPTIMIZE();
 // specified on the command-line. Ownership is passed to the caller.
 base::win::MemoryPressureMonitor* CreateWinMemoryPressureMonitor(
     const base::CommandLine& parsed_command_line) {
-  std::vector<std::string> thresholds;
-  base::SplitString(
+  std::vector<std::string> thresholds = base::SplitString(
       parsed_command_line.GetSwitchValueASCII(
           switches::kMemoryPressureThresholdsMb),
-      ',',
-      &thresholds);
+      ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
 
   int moderate_threshold_mb = 0;
   int critical_threshold_mb = 0;
@@ -612,6 +614,12 @@ void BrowserMainLoop::PostMainMessageLoopStart() {
       IOSurfaceManager::SetInstance(BrowserIOSurfaceManager::GetInstance());
     }
   }
+#endif
+
+#if defined(USE_OZONE)
+  client_native_pixmap_factory_ = ui::ClientNativePixmapFactory::Create();
+  ui::ClientNativePixmapFactory::SetInstance(
+      client_native_pixmap_factory_.get());
 #endif
 
   if (parsed_command_line_.HasSwitch(switches::kMemoryMetrics)) {
@@ -912,6 +920,10 @@ void BrowserMainLoop::ShutdownThreadsAndCleanUp() {
                  "BrowserMainLoop::Subsystem:PostMainMessageLoopRun");
     parts_->PostMainMessageLoopRun();
   }
+
+#if defined(USE_AURA)
+  aura::Env::DeleteInstance();
+#endif
 
   trace_memory_controller_.reset();
   system_stats_monitor_.reset();

@@ -25,6 +25,7 @@
 #include "components/omnibox/browser/keyword_provider.h"
 #include "components/omnibox/browser/omnibox_client.h"
 #include "components/omnibox/browser/omnibox_edit_controller.h"
+#include "components/omnibox/browser/omnibox_event_global_tracker.h"
 #include "components/omnibox/browser/omnibox_log.h"
 #include "components/omnibox/browser/omnibox_navigation_observer.h"
 #include "components/omnibox/browser/omnibox_popup_model.h"
@@ -35,7 +36,7 @@
 #include "components/search_engines/template_url_prepopulate_data.h"
 #include "components/search_engines/template_url_service.h"
 #include "components/toolbar/toolbar_model.h"
-#include "components/url_fixer/url_fixer.h"
+#include "components/url_formatter/url_fixer.h"
 #include "ui/gfx/image/image.h"
 #include "url/url_util.h"
 
@@ -298,7 +299,8 @@ bool OmniboxEditModel::UpdatePermanentText() {
 }
 
 GURL OmniboxEditModel::PermanentURL() {
-  return url_fixer::FixupURL(base::UTF16ToUTF8(permanent_text_), std::string());
+  return url_formatter::FixupURL(base::UTF16ToUTF8(permanent_text_),
+                                 std::string());
 }
 
 void OmniboxEditModel::SetUserText(const base::string16& text) {
@@ -708,6 +710,7 @@ void OmniboxEditModel::OpenMatch(AutocompleteMatch match,
   }
   autocomplete_controller()->AddProvidersInfo(&log.providers_info);
   client_->OnURLOpenedFromOmnibox(&log);
+  OmniboxEventGlobalTracker::GetInstance()->OnURLOpened(&log);
   LOCAL_HISTOGRAM_BOOLEAN("Omnibox.EventCount", true);
   DCHECK(!last_omnibox_focus_.is_null())
       << "An omnibox focus should have occurred before opening a match.";

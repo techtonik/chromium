@@ -3446,6 +3446,11 @@ class PrerenderBrowserTestWithExtensions : public PrerenderBrowserTest,
     ExtensionApiTest::TearDownInProcessBrowserTestFixture();
   }
 
+  void TearDownOnMainThread() override {
+    PrerenderBrowserTest::TearDownOnMainThread();
+    ExtensionApiTest::TearDownOnMainThread();
+  }
+
   void SetUpOnMainThread() override {
     PrerenderBrowserTest::SetUpOnMainThread();
   }
@@ -4046,7 +4051,7 @@ IN_PROC_BROWSER_TEST_F(PrerenderOmniboxBrowserTest,
 }
 
 // Can't run tests with NaCl plugins if built with DISABLE_NACL.
-#if !defined(DISABLE_NACL)
+#if !defined(DISABLE_NACL) && !defined(DISABLE_NACL_BROWSERTESTS)
 class PrerenderBrowserTestWithNaCl : public PrerenderBrowserTest {
  public:
   PrerenderBrowserTestWithNaCl() {}

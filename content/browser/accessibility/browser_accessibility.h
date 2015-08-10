@@ -67,7 +67,7 @@ class CONTENT_EXPORT BrowserAccessibility {
   virtual void OnLocationChanged() {}
 
   // Return true if this object is equal to or a descendant of |ancestor|.
-  bool IsDescendantOf(BrowserAccessibility* ancestor);
+  bool IsDescendantOf(const BrowserAccessibility* ancestor) const;
 
   // Returns true if this is a leaf node on this platform, meaning any
   // children should not be exposed to this platform's native accessibility
@@ -281,11 +281,6 @@ class CONTENT_EXPORT BrowserAccessibility {
   // Return the sum of the lengths of all static text descendants,
   // including this object if it's static text.
   int GetStaticTextLenRecursive() const;
-
-  // Similar to GetParent(), but includes nodes that are the host of a
-  // subtree rather than skipping over them - because they contain important
-  // bounds offsets.
-  BrowserAccessibility* GetParentForBoundsCalculation() const;
 
   // If a bounding rectangle is empty, compute it based on the union of its
   // children, since most accessibility APIs don't like elements with no

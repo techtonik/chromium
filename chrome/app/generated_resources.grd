@@ -2723,15 +2723,19 @@ Even if you have downloaded files from this website before, the website might ha
         Server's certificate does not match the URL.
       </message>
 
-      <message name="IDS_CERT_ERROR_EXPIRED_DETAILS" desc="Details for an expired X509 certificate">
-        This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate expired <ph name="DAYS">$2<ex>3</ex></ph> day(s) ago. This may be caused by a misconfiguration or an attacker intercepting your connection. Your computer's clock is currently set to <ph name="CURRENT_TIME">$3<ex>July 18, 2012</ex></ph>. Does that look right? If not, you should correct your system's clock and then refresh this page.
+      <message name="IDS_CERT_ERROR_EXPIRED_DETAILS" desc="Details for an expired X509 certificate [ICU Syntax]">
+        {1, plural,
+         =1 {This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;{0}<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate expired yesterday. This may be caused by a misconfiguration or an attacker intercepting your connection. Your computer's clock is currently set to <ph name="CURRENT_DATE">{2, date, full}<ex>Monday, July 16, 2012</ex></ph>. Does that look right? If not, you should correct your system's clock and then refresh this page.}
+         other {This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;{0}<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate expired # days ago. This may be caused by a misconfiguration or an attacker intercepting your connection. Your computer's clock is currently set to <ph name="CURRENT_DATE">{2, date, full}<ex>Monday, July 16, 2012</ex></ph>. Does that look right? If not, you should correct your system's clock and then refresh this page.}}
       </message>
       <message name="IDS_CERT_ERROR_EXPIRED_DESCRIPTION" desc="Description for an expired X509 certificate">
         Server's certificate has expired.
       </message>
 
-      <message name="IDS_CERT_ERROR_NOT_YET_VALID_DETAILS" desc="Details for an X509 certificate that is not yet valid">
-        This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;$1<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate is supposedly from <ph name="DAYS">$2<ex>3</ex></ph> day(s) in the future. This may be caused by a misconfiguration or an attacker intercepting your connection.
+      <message name="IDS_CERT_ERROR_NOT_YET_VALID_DETAILS" desc="Details for an X509 certificate that is not yet valid [ICU Syntax]">
+        {1, plural,
+         =1 {This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;{0}<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate is supposedly from tomorrow. This may be caused by a misconfiguration or an attacker intercepting your connection.}
+         other {This server could not prove that it is <ph name="DOMAIN">&lt;strong&gt;{0}<ex>paypal.com</ex>&lt;/strong&gt;</ph>; its security certificate is supposedly from # days in the future. This may be caused by a misconfiguration or an attacker intercepting your connection.}}
       </message>
       <message name="IDS_CERT_ERROR_NOT_YET_VALID_DESCRIPTION" desc="Description for an X509 certificate that is not yet valid">
         Server's certificate is not yet valid.
@@ -6252,6 +6256,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_DISABLE_SLIMMING_PAINT_DESCRIPTION" desc="Description for the flag to disable slimming paint.">
         Do not use the slimming paint display lists for drawing. Note the enable-slimming-paint flag takes precedence over this flag if both are present.
       </message>
+      <message name="IDS_FLAGS_ENABLE_SLIMMING_PAINT_V2_NAME" desc="Title for the flag to enable slimming paint phase 2.">
+        Enable slimming paint phase 2.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_SLIMMING_PAINT_V2_DESCRIPTION" desc="Description for the flag to enable slimming paint phase 2.">
+        Enable slimming paint phase 2 (display list based layerization, sub-tree painting optimization, etc.) Requires slimming paint enabled.
+      </message>
       <message name="IDS_FLAGS_EXPERIMENTAL_SECURITY_FEATURES_NAME" desc="Name for the flag to enable experimental security features.">
         Enable potentially annoying security features.
       </message>
@@ -6428,6 +6438,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_PASSWORD_MANAGER_REAUTHENTICATION_DESCRIPTION" desc="Description of the flag for the password manager reauthentication option.">
         Disable prompting the user for their OS password before revealing passwords on the passwords page.
       </message>
+      <message name="IDS_FLAGS_ENABLE_PASSWORD_CHANGE_SUPPORT_NAME" desc="Name of the flag for the password manager's password change support option.">
+        Enable change password support.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_PASSWORD_CHANGE_SUPPORT_DESCRIPTION" desc="Description of the flag for the password manager's change password support option.">
+        Enable updating a password in the password manager after submitting a "change password" form.
+      </message>
       <message name="IDS_FLAGS_ENABLE_PASSWORD_FORCE_SAVING_NAME" desc="Name of the flag for the password manager's force-saving option.">
         Enable force-saving of passwords
       </message>
@@ -6442,6 +6458,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_SAVE_PASSWORD" desc="The title of the save password bubble when a password can be saved.">
         Do you want <ph name="PASSWORD_MANAGER_BRAND">$1<ex>Google Chrome</ex></ph> to save your password for this site?
+      </message>
+      <message name="IDS_UPDATE_PASSWORD" desc="The title of the save password bubble when a password can be updated.">
+        Do you want <ph name="PASSWORD_MANAGER_BRAND">$1<ex>Google Chrome</ex></ph> to update your password for this site?
       </message>
       <message name="IDS_PASSWORD_MANAGER_SMART_LOCK" desc="The brand name of the password manager for the title of the save password bubble when a user is signed in.">
         Google Smart Lock
@@ -6800,12 +6819,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_EPHEMERAL_APPS_IN_WEBSTORE_DESCRIPTION" desc="Description for the flag to enable ephemeral apps.">
         Enables ephemeral apps, which are launched without installing in Chrome, to be launched from the Chrome WebStore. Requires the experimental App Launcher to be enabled.
       </message>
-      <message name="IDS_FLAGS_ENABLE_LINKABLE_EPHEMERAL_APPS_NAME" desc="Name of the flag to enable linkable ephemeral apps.">
-        Enable experimental linkable ephemeral apps.
-      </message>
-      <message name="IDS_FLAGS_ENABLE_LINKABLE_EPHEMERAL_APPS_DESCRIPTION" desc="Description for the flag to enable linkable ephemeral apps.">
-        Enables experimentation with launching ephemeral apps from hyperlinks. For example, links to Chrome Web Store app detail pages in Google search results will launch the app rather than navigate to the detail page.
-      </message>
       <if expr="is_android">
         <message name="IDS_FLAGS_DISABLE_CLICK_DELAY_NAME" desc="Name of the flag to disable the click delay.">
           Disable click delay.
@@ -7020,6 +7033,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_FLAGS_APP_WINDOW_CYCLING_DESCRIPTION" desc="Description of flag to enable or disable custom Cmd+` App window cycling on Mac.">
           Changes the behavior of Cmd+` when a Chrome App becomes active. When enabled, Chrome Apps will not be cycled when Cmd+` is pressed from a browser window, and browser windows will not be cycled when a Chrome App is active.
         </message>
+        <message name="IDS_FLAGS_MAC_VIEWS_DIALOGS_NAME" desc="Name of the flag to enable toolkit-views browser dialogs on Mac.">
+          Toolkit-Views Browser Dialogs.
+        </message>
+        <message name="IDS_FLAGS_MAC_VIEWS_DIALOGS_DESCRIPTION" desc="Description of the flag to enable toolkit-views browser dialogs on Mac.">
+          Causes Chrome on Mac to use a toolkit-views browser dialog when available, in place of the equivalent Cocoa dialog.
+        </message>
       </if>
       <if expr="chromeos">
         <message name="IDS_FLAGS_DISABLE_ACCELERATED_MJPEG_DECODE_NAME" desc="Name of the flag to disable accelerated mjpeg decode for captured frame where available.">
@@ -7056,6 +7075,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_FLAGS_PROGRESS_BAR_ANIMATION_DESCRIPTION" desc="Description of the flag to configure Android page loading progress bar animation.">
           Configures Android phone page loading progress bar animation.
         </message>
+        <message name="IDS_FLAGS_PROGRESS_BAR_ANIMATION_LINEAR" desc="Linear progress bar animation style">
+          Linear
+        </message>
         <message name="IDS_FLAGS_PROGRESS_BAR_ANIMATION_SMOOTH" desc="Smooth progress bar animation style">
           Smooth
         </message>
@@ -7063,6 +7085,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
           Fast start
         </message>
       </if>
+      <message name="IDS_FLAGS_LOW_PRIORITY_IFRAMES_UI_NAME" desc="Name of the flag to enable the low priority iframes experiment.">
+        Low priority iframes.
+      </message>
+      <message name="IDS_FLAGS_LOW_PRIORITY_IFRAMES_UI_DESCRIPTION" desc="Description of the flag to enable the low priority iframes experiment.">
+        Reduces the load priority of iframe resources.
+      </message>
 
       <!-- Crashes -->
       <message name="IDS_CRASHES_TITLE" desc="Title for the chrome://crashes page.">
@@ -7866,6 +7894,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_PASSWORD_MANAGER_SAVE_BUTTON" desc="Save button text for password manager">
           Save password
         </message>
+        <message name="IDS_PASSWORD_MANAGER_UPDATE_BUTTON" desc="Update button text for password manager">
+          Update password
+        </message>       
         <message name="IDS_PASSWORD_MANAGER_SAVE_ACCOUNT_BUTTON" desc="Save button text for password manager">
           Save
         </message>
@@ -13080,7 +13111,7 @@ Some features may be unavailable.  Please check that the profile exists and you 
       <!-- Translate Bubble -->
       <if expr="toolkit_views or is_macosx">
         <message name="IDS_TRANSLATE_BUBBLE_BEFORE_TRANSLATE" desc="Text to show for the translate bubble label when that page is in specified language and ask if should translate.">
-          Would you like to translate this page?
+          Do you want to translate this page?
         </message>
         <message name="IDS_TRANSLATE_BUBBLE_ADVANCED" desc="Text to show for the translate bubble link label to jump to the advanced panel.">
           Options
@@ -13773,7 +13804,7 @@ Some features may be unavailable.  Please check that the profile exists and you 
       <message name="IDS_MANAGE_PASSWORDS_DELETED" desc="The text that is used in the manage passwords bubble when a password is deleted.">
         Password deleted
       </message>
-      <message name="IDS_MANAGE_PASSWORDS_UNDO" desc="The text that is used in the manage passwords bubble when a password is de.">
+      <message name="IDS_MANAGE_PASSWORDS_UNDO" desc="The text that is used in the manage passwords bubble when a password is deleted.">
         Undo
       </message>
       <message name="IDS_MANAGE_PASSWORDS_CHOOSE_TITLE" desc="The title of the password bubble when a credential should be chosen.">
@@ -15888,6 +15919,22 @@ After you create a new supervised user, you can manage their settings at any tim
       </message>
       <message name="IDS_FLAGS_OFFLINE_PAGES_DESCRIPTION" desc="Description for the flag to enable offline pages.">
         Enable storing pages locally for offline use. Requires Enhanced Bookmarks to be enabled.
+      </message>
+      <message name="IDS_FLAGS_NTP_POPULAR_SITES_NAME" desc="Name for the flag to enable showing popular sites on the NTP">
+        Show popular sites on the NTP
+      </message>
+      <message name="IDS_FLAGS_NTP_POPULAR_SITES_DESCRIPTION" desc="Description for the flag to enable showing popular sites on the NTP">
+        Pre-populate the NTP with popular sites.
+      </message>
+    </if>
+
+    <if expr="is_win">
+      <!-- Exporting tracing events to ETW -->
+      <message name="IDS_FLAGS_TRACE_EXPORT_EVENTS_TO_ETW_NAME" desc="Name for the flag to enable exporting of tracing events to ETW.">
+        Enable exporting of tracing events to ETW.
+      </message>
+      <message name="IDS_FLAGS_TRACE_EXPORT_EVENTS_TO_ETW_DESRIPTION" desc="Description for the flag to enable exporting of tracing events to ETW.">
+        If enabled, trace events are exported to ETW and can be captured by either UIForETW or Xperf.
       </message>
     </if>
 

@@ -59,7 +59,7 @@ void ChannelProxy::Context::CreateChannel(scoped_ptr<ChannelFactory> factory) {
   channel_id_ = factory->GetName();
   channel_ = factory->BuildChannel(this);
   channel_send_thread_safe_ = channel_->IsSendThreadSafe();
-  channel_->set_attachment_broker_endpoint(attachment_broker_endpoint_);
+  channel_->SetAttachmentBrokerEndpoint(attachment_broker_endpoint_);
 }
 
 bool ChannelProxy::Context::TryFilters(const Message& message) {
@@ -341,6 +341,10 @@ void ChannelProxy::Context::Send(Message* message) {
                             base::Passed(scoped_ptr<Message>(message))));
 }
 
+bool ChannelProxy::Context::IsChannelSendThreadSafe() const {
+  return channel_send_thread_safe_;
+}
+
 //-----------------------------------------------------------------------------
 
 // static
@@ -426,6 +430,7 @@ void ChannelProxy::Init(scoped_ptr<ChannelFactory> factory,
       FROM_HERE, base::Bind(&Context::OnChannelOpened, context_.get()));
 
   did_init_ = true;
+  OnChannelInit();
 }
 
 void ChannelProxy::Close() {
@@ -484,6 +489,14 @@ void ChannelProxy::ClearIPCTaskRunner() {
   context()->ClearIPCTaskRunner();
 }
 
+base::ProcessId ChannelProxy::GetPeerPID() const {
+  return context_->peer_pid_;
+}
+
+void ChannelProxy::OnSetAttachmentBrokerEndpoint() {
+  context()->set_attachment_broker_endpoint(is_attachment_broker_endpoint());
+}
+
 #if defined(OS_POSIX) && !defined(OS_NACL_SFI)
 // See the TODO regarding lazy initialization of the channel in
 // ChannelProxy::Init().
@@ -506,8 +519,7 @@ base::ScopedFD ChannelProxy::TakeClientFileDescriptor() {
 }
 #endif
 
-void ChannelProxy::SetAttachmentBrokerEndpoint(bool is_endpoint) {
-  context()->set_attachment_broker_endpoint(is_endpoint);
+void ChannelProxy::OnChannelInit() {
 }
 
 //-----------------------------------------------------------------------------

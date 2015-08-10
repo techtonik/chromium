@@ -70,6 +70,7 @@ Chromoting</translation>
 <translation id="2813770873348017932">Conexiunile la computerul la distanță sunt blocate temporar, întrucât cineva a încercat să se conecteze la acesta utilizând un cod PIN greșit. Încercați din nou mai târziu.</translation>
 <translation id="6746493157771801606">Goliți istoricul</translation>
 <translation id="4430435636878359009">Dezactivați conexiunile la distanță la acest computer</translation>
+<translation id="3244258558056547981">Afișează vizualizarea Cardboard.</translation>
 <translation id="2314101195544969792">Sesiunea <ph name="APPLICATION_NAME"/> este inactivă de ceva timp și în curând va fi deconectată.</translation>
 <translation id="6001953797859482435">Preferințe privind gazda pentru Desktop la distanță Chrome</translation>
 <translation id="225614027745146050">Bun venit</translation>
@@ -112,6 +113,7 @@ Pentru informații privind confidențialitatea, accesați Politica de confidenț
 <translation id="8759753423332885148">Aflați mai multe.</translation>
 <translation id="4430915108080446161">Se generează codul de acces...</translation>
 <translation id="2013996867038862849">Toți clienții împerecheați au fost șterși.</translation>
+<translation id="5363265567587775042">Roagă utilizatorul al cărui computer dorești să îl accesezi să dea clic pe „<ph name="SHARE"/>” și să îți trimită codul de acces.</translation>
 <translation id="6985691951107243942">Sigur doriți să dezactivați conexiunile la distanță la <ph name="HOSTNAME"/>? Dacă vă răzgândiți, va trebui să accesați computerul respectiv pentru a reactiva conexiunile.</translation>
 <translation id="6944854424004126054">Restabiliți fereastra</translation>
 <translation id="9149992051684092333">Pentru a începe să permiteți accesul la desktopul dvs., trimiteți codul de acces de mai jos persoanei care vă va oferi asistență.</translation>

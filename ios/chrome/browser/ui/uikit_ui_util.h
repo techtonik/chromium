@@ -130,6 +130,13 @@ void ApplyVisualConstraints(NSArray* constraints,
                             NSDictionary* subviewsDictionary,
                             UIView* parentView);
 
+// Applies all |constraints| with |options| to all views in |subviewsDictionary|
+// in the superview |parentView|.
+void ApplyVisualConstraintsWithOptions(NSArray* constraints,
+                                       NSDictionary* subviewsDictionary,
+                                       NSLayoutFormatOptions options,
+                                       UIView* parentView);
+
 // Applies all |constraints| with |metrics| to all views in |subviewsDictionary|
 // in the superview |parentView|
 void ApplyVisualConstraintsWithMetrics(NSArray* constraints,
@@ -137,10 +144,33 @@ void ApplyVisualConstraintsWithMetrics(NSArray* constraints,
                                        NSDictionary* metrics,
                                        UIView* parentView);
 
+// Applies all |constraints| with |metrics| and |options| to all views in
+// |subviewsDictionary| in the superview |parentView|
+void ApplyVisualConstraintsWithMetricsAndOptions(
+    NSArray* constraints,
+    NSDictionary* subviewsDictionary,
+    NSDictionary* metrics,
+    NSLayoutFormatOptions options,
+    UIView* parentView);
+
+// Returns the correct NSLayoutFormatOption for the current OS and built. This
+// will return NSLayoutFormatDirectionLeadingToTrailing when a full RTL flip
+// is correct, and NSLayoutFormatDirectionLeftToRight when layout should not
+// change with text direction.
+// Generally speaking this option should be applied to any whole-page layouts;
+// smaller sections of views should be determined case by case.
+NSLayoutFormatOptions LayoutOptionForRTLSupport();
+
 // Adds a constraint that |subview| is center aligned horizontally in
 // |parentView|.
 // |subview| must be a subview of |parentView|.
 void AddSameCenterXConstraint(UIView* parentView, UIView* subview);
+
+// Adds a constraint that |subview1| and |subview2| are center aligned
+// horizontally on |parentView|.
+// |subview1| and |subview2| must be subview of |parentView|.
+void AddSameCenterXConstraint(UIView *parentView, UIView *subview1,
+                              UIView *subview2);
 
 // Adds a constraint that |subview| is center aligned vertically in
 // |parentView|.
@@ -153,6 +183,13 @@ void AddSameCenterYConstraint(UIView* parentView, UIView* subview);
 void AddSameCenterYConstraint(UIView* parentView,
                               UIView* subview1,
                               UIView* subview2);
+// Whether the UI is configured for right to left layout.
+// The implementation will use the local in order to get the UI layout direction
+// for version of iOS under 9.
+// TODO(jbbegue): Use base::i18n::IsRTL() instead when it will support RTL
+// pseudo language. Remove that method once base::i18n::IsRTL() is fixed.
+// crbug/514625.
+BOOL IsRTLUILayout();
 
 // Returns true if the main application window's rootViewController is a compact
 // iPad horizontal size class.

@@ -7,10 +7,8 @@
 #include <string>
 #include <vector>
 
-#if defined(OS_NACL)
 #include <nacl_io/nacl_io.h>
 #include <sys/mount.h>
-#endif
 
 #include "base/bind.h"
 #include "base/callback.h"
@@ -19,9 +17,11 @@
 #include "base/json/json_writer.h"
 #include "base/lazy_instance.h"
 #include "base/logging.h"
+#include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/stringprintf.h"
 #include "base/synchronization/lock.h"
+#include "base/threading/platform_thread.h"
 #include "base/threading/thread.h"
 #include "base/values.h"
 #include "crypto/random.h"
@@ -52,14 +52,7 @@
 #include "remoting/protocol/connection_to_host.h"
 #include "remoting/protocol/host_stub.h"
 #include "remoting/protocol/libjingle_transport_factory.h"
-#include "third_party/webrtc/base/helpers.h"
-#include "third_party/webrtc/base/ssladapter.h"
 #include "url/gurl.h"
-
-// Windows defines 'PostMessage', so we have to undef it.
-#if defined(PostMessage)
-#undef PostMessage
-#endif
 
 namespace remoting {
 
@@ -67,9 +60,6 @@ namespace {
 
 // Default DPI to assume for old clients that use notifyClientResolution.
 const int kDefaultDPI = 96;
-
-// URL scheme used by Chrome apps and extensions.
-const char kChromeExtensionUrlScheme[] = "chrome-extension";
 
 // The boundary value for the FPS histogram: we don't expect video frame-rate to
 // be greater than 40fps. Leaving some room for future improvements, we'll set
@@ -90,13 +80,11 @@ const int kBandwidthHistogramMinBps = 0;
 const int kBandwidthHistogramMaxBps = 10 * 1000 * 1000;
 const int kBandwidthHistogramBuckets = 100;
 
-#if defined(USE_OPENSSL)
-// Size of the random seed blob used to initialize RNG in libjingle. Libjingle
-// uses the seed only for OpenSSL builds. OpenSSL needs at least 32 bytes of
-// entropy (see http://wiki.openssl.org/index.php/Random_Numbers), but stores
-// 1039 bytes of state, so we initialize it with 1k or random data.
+// Size of the random seed blob used to initialize RNG in libjingle. OpenSSL
+// needs at least 32 bytes of entropy (see
+// http://wiki.openssl.org/index.php/Random_Numbers), but stores 1039 bytes of
+// state, so we initialize it with 1k or random data.
 const int kRandomSeedSize = 1024;
-#endif  // defined(USE_OPENSSL)
 
 // TODO(sergeyu): Ideally we should just pass ErrorCode to the webapp
 // and let it handle it, but it would be hard to fix it now because
@@ -132,18 +120,9 @@ std::string ConnectionErrorToString(protocol::ErrorCode error) {
   return std::string();
 }
 
-// This flag blocks LOGs to the UI if we're already in the middle of logging
-// to the UI. This prevents a potential infinite loop if we encounter an error
-// while sending the log message to the UI.
-bool g_logging_to_plugin = false;
-bool g_has_logging_instance = false;
-base::LazyInstance<scoped_refptr<base::SingleThreadTaskRunner> >::Leaky
-    g_logging_task_runner = LAZY_INSTANCE_INITIALIZER;
-base::LazyInstance<base::WeakPtr<ChromotingInstance> >::Leaky
-    g_logging_instance = LAZY_INSTANCE_INITIALIZER;
-base::LazyInstance<base::Lock>::Leaky
-    g_logging_lock = LAZY_INSTANCE_INITIALIZER;
-logging::LogMessageHandlerFunction g_logging_old_handler = nullptr;
+PP_Instance g_logging_instance = 0;
+base::LazyInstance<base::Lock>::Leaky g_logging_lock =
+    LAZY_INSTANCE_INITIALIZER;
 
 }  // namespace
 
@@ -161,7 +140,6 @@ ChromotingInstance::ChromotingInstance(PP_Instance pp_instance)
       text_input_controller_(this),
       use_async_pin_dialog_(false),
       weak_factory_(this) {
-#if defined(OS_NACL)
   // In NaCl global resources need to be initialized differently because they
   // are not shared with Chrome.
   thread_task_runner_handle_.reset(
@@ -172,15 +150,10 @@ ChromotingInstance::ChromotingInstance(PP_Instance pp_instance)
 
   // Register a global log handler.
   ChromotingInstance::RegisterLogMessageHandler();
-#else
-  jingle_glue::JingleThreadWrapper::EnsureForCurrentMessageLoop();
-#endif
 
-#if defined(OS_NACL)
   nacl_io_init_ppapi(pp_instance, pp::Module::Get()->get_browser_interface());
   mount("", "/etc", "memfs", 0, "");
   mount("", "/usr", "memfs", 0, "");
-#endif
 
   // Register for mouse, wheel and keyboard events.
   RequestInputEvents(PP_INPUTEVENT_CLASS_MOUSE | PP_INPUTEVENT_CLASS_WHEEL);
@@ -192,17 +165,10 @@ ChromotingInstance::ChromotingInstance(PP_Instance pp_instance)
   // Resister this instance to handle debug log messsages.
   RegisterLoggingInstance();
 
-#if defined(USE_OPENSSL)
   // Initialize random seed for libjingle. It's necessary only with OpenSSL.
   char random_seed[kRandomSeedSize];
   crypto::RandBytes(random_seed, sizeof(random_seed));
   rtc::InitRandom(random_seed, sizeof(random_seed));
-#else
-  // Libjingle's SSL implementation is not really used, but it has to be
-  // initialized for NSS builds to make sure that RNG is initialized in NSS,
-  // because libjingle uses it.
-  rtc::InitializeSSL();
-#endif  // !defined(USE_OPENSSL)
 
   // Send hello message.
   scoped_ptr<base::DictionaryValue> data(new base::DictionaryValue());
@@ -235,16 +201,6 @@ bool ChromotingInstance::Init(uint32_t argc,
   initialized_ = true;
 
   VLOG(1) << "Started ChromotingInstance::Init";
-
-  // Check that the calling content is part of an app or extension. This is only
-  // necessary for non-PNaCl version of the plugin. Also PPB_URLUtil_Dev doesn't
-  // work in NaCl at the moment so the check fails in NaCl builds.
-#if !defined(OS_NACL)
-  if (!IsCallerAppOrExtension()) {
-    LOG(ERROR) << "Not an app or extension";
-    return false;
-  }
-#endif
 
   // Start all the threads.
   context_.Start();
@@ -593,10 +549,15 @@ void ChromotingInstance::HandleConnect(const base::DictionaryValue& data) {
     }
   }
 
+  // Read and parse list of experiments.
+  std::string experiments;
+  std::vector<std::string> experiments_list;
+  if (data.GetString("experiments", &experiments))
+    base::SplitString(experiments, ' ', &experiments_list);
+
   VLOG(0) << "Connecting to " << host_jid
           << ". Local jid: " << local_jid << ".";
 
-#if defined(OS_NACL)
   std::string key_filter;
   if (!data.GetString("keyFilter", &key_filter)) {
     NOTREACHED();
@@ -611,13 +572,6 @@ void ChromotingInstance::HandleConnect(const base::DictionaryValue& data) {
     DCHECK(key_filter.empty());
     normalizing_input_filter_.reset(new protocol::InputFilter(&key_mapper_));
   }
-#elif defined(OS_MACOSX)
-  normalizing_input_filter_.reset(new NormalizingInputFilterMac(&key_mapper_));
-#elif defined(OS_CHROMEOS)
-  normalizing_input_filter_.reset(new NormalizingInputFilterCros(&key_mapper_));
-#else
-  normalizing_input_filter_.reset(new protocol::InputFilter(&key_mapper_));
-#endif
   input_handler_.set_input_stub(normalizing_input_filter_.get());
 
   // Try initializing 3D video renderer.
@@ -627,7 +581,8 @@ void ChromotingInstance::HandleConnect(const base::DictionaryValue& data) {
 
   // If we didn't initialize 3D renderer then use the 2D renderer.
   if (!video_renderer_) {
-    LogToWebapp("Initializing 2D renderer.");
+    LOG(WARNING)
+        << "Failed to initialize 3D renderer. Using 2D renderer instead.";
     video_renderer_.reset(new PepperVideoRenderer2D());
     if (!video_renderer_->Initialize(this, context_, this))
       video_renderer_.reset();
@@ -683,6 +638,14 @@ void ChromotingInstance::HandleConnect(const base::DictionaryValue& data) {
       new protocol::NegotiatingClientAuthenticator(
           client_pairing_id, client_paired_secret, authentication_tag,
           fetch_secret_callback, token_fetcher.Pass(), auth_methods));
+
+  scoped_ptr<protocol::CandidateSessionConfig> config =
+      protocol::CandidateSessionConfig::CreateDefault();
+  if (std::find(experiments_list.begin(), experiments_list.end(), "vp9") !=
+      experiments_list.end()) {
+    config->set_vp9_experiment_enabled(true);
+  }
+  client_->set_protocol_config(config.Pass());
 
   // Kick off the connection.
   client_->Start(signal_strategy_.get(), authenticator.Pass(),
@@ -1038,11 +1001,6 @@ void ChromotingInstance::SendPerfStats() {
 void ChromotingInstance::RegisterLogMessageHandler() {
   base::AutoLock lock(g_logging_lock.Get());
 
-  VLOG(1) << "Registering global log handler";
-
-  // Record previous handler so we can call it in a chain.
-  g_logging_old_handler = logging::GetLogMessageHandler();
-
   // Set up log message handler.
   // This is not thread-safe so we need it within our lock.
   logging::SetLogMessageHandler(&LogToUI);
@@ -1050,124 +1008,63 @@ void ChromotingInstance::RegisterLogMessageHandler() {
 
 void ChromotingInstance::RegisterLoggingInstance() {
   base::AutoLock lock(g_logging_lock.Get());
-
-  // Register this instance as the one that will handle all logging calls
-  // and display them to the user.
-  // If multiple plugins are run, then the last one registered will handle all
-  // logging for all instances.
-  g_logging_instance.Get() = weak_factory_.GetWeakPtr();
-  g_logging_task_runner.Get() = plugin_task_runner_;
-  g_has_logging_instance = true;
+  g_logging_instance = pp_instance();
 }
 
 void ChromotingInstance::UnregisterLoggingInstance() {
   base::AutoLock lock(g_logging_lock.Get());
 
   // Don't unregister unless we're the currently registered instance.
-  if (this != g_logging_instance.Get().get())
+  if (pp_instance() != g_logging_instance)
     return;
 
   // Unregister this instance for logging.
-  g_has_logging_instance = false;
-  g_logging_instance.Get().reset();
-  g_logging_task_runner.Get() = nullptr;
-
-  VLOG(1) << "Unregistering global log handler";
+  g_logging_instance = 0;
 }
 
 // static
 bool ChromotingInstance::LogToUI(int severity, const char* file, int line,
                                  size_t message_start,
                                  const std::string& str) {
-  // Note that we're reading |g_has_logging_instance| outside of a lock.
-  // This lockless read is done so that we don't needlessly slow down global
-  // logging with a lock for each log message.
-  //
-  // This lockless read is safe because:
-  //
-  // Misreading a false value (when it should be true) means that we'll simply
-  // skip processing a few log messages.
-  //
-  // Misreading a true value (when it should be false) means that we'll take
-  // the lock and check |g_logging_instance| unnecessarily. This is not
-  // problematic because we always set |g_logging_instance| inside a lock.
-  if (g_has_logging_instance) {
-    scoped_refptr<base::SingleThreadTaskRunner> logging_task_runner;
-    base::WeakPtr<ChromotingInstance> logging_instance;
-
-    {
-      base::AutoLock lock(g_logging_lock.Get());
-      // If we're on the logging thread and |g_logging_to_plugin| is set then
-      // this LOG message came from handling a previous LOG message and we
-      // should skip it to avoid an infinite loop of LOG messages.
-      if (!g_logging_task_runner.Get()->BelongsToCurrentThread() ||
-          !g_logging_to_plugin) {
-        logging_task_runner = g_logging_task_runner.Get();
-        logging_instance = g_logging_instance.Get();
-      }
-    }
-
-    if (logging_task_runner.get()) {
-      std::string message = remoting::GetTimestampString();
-      message += (str.c_str() + message_start);
-
-      logging_task_runner->PostTask(
-          FROM_HERE, base::Bind(&ChromotingInstance::ProcessLogToUI,
-                                logging_instance, message));
-    }
+  PP_LogLevel log_level = PP_LOGLEVEL_ERROR;
+  switch(severity) {
+    case logging::LOG_INFO:
+      log_level = PP_LOGLEVEL_TIP;
+      break;
+    case logging::LOG_WARNING:
+      log_level = PP_LOGLEVEL_WARNING;
+      break;
+    case logging::LOG_ERROR:
+    case logging::LOG_FATAL:
+      log_level = PP_LOGLEVEL_ERROR;
+      break;
   }
 
-  if (g_logging_old_handler)
-    return (g_logging_old_handler)(severity, file, line, message_start, str);
+  PP_Instance pp_instance = 0;
+  {
+    base::AutoLock lock(g_logging_lock.Get());
+    if (g_logging_instance)
+      pp_instance = g_logging_instance;
+  }
+  if (pp_instance) {
+    const PPB_Console* console = reinterpret_cast<const PPB_Console*>(
+        pp::Module::Get()->GetBrowserInterface(PPB_CONSOLE_INTERFACE));
+    if (console)
+      console->Log(pp_instance, log_level, pp::Var(str).pp_var());
+  }
+
+  // If this is a fatal message the log handler is going to crash after this
+  // function returns. In that case sleep for 1 second, Otherwise the plugin
+  // may crash before the message is delivered to the console.
+  if (severity == logging::LOG_FATAL)
+    base::PlatformThread::Sleep(base::TimeDelta::FromSeconds(1));
+
   return false;
-}
-
-void ChromotingInstance::ProcessLogToUI(const std::string& message) {
-  DCHECK(plugin_task_runner_->BelongsToCurrentThread());
-
-  // This flag (which is set only here) is used to prevent LogToUI from posting
-  // new tasks while we're in the middle of servicing a LOG call. This can
-  // happen if the call to LogDebugInfo tries to LOG anything.
-  // Since it is read on the plugin thread, we don't need to lock to set it.
-  g_logging_to_plugin = true;
-  scoped_ptr<base::DictionaryValue> data(new base::DictionaryValue());
-  data->SetString("message", message);
-  PostLegacyJsonMessage("logDebugMessage", data.Pass());
-  g_logging_to_plugin = false;
-}
-
-bool ChromotingInstance::IsCallerAppOrExtension() {
-  const pp::URLUtil_Dev* url_util = pp::URLUtil_Dev::Get();
-  if (!url_util)
-    return false;
-
-  PP_URLComponents_Dev url_components;
-  pp::Var url_var = url_util->GetDocumentURL(this, &url_components);
-  if (!url_var.is_string())
-    return false;
-
-  std::string url = url_var.AsString();
-  std::string url_scheme = url.substr(url_components.scheme.begin,
-                                      url_components.scheme.len);
-  return url_scheme == kChromeExtensionUrlScheme;
 }
 
 bool ChromotingInstance::IsConnected() {
   return client_ &&
          (client_->connection_state() == protocol::ConnectionToHost::CONNECTED);
-}
-
-void ChromotingInstance::LogToWebapp(const std::string& message) {
-  DCHECK(plugin_task_runner_->BelongsToCurrentThread());
-
-  LOG(ERROR) << message;
-
-#if !defined(OS_NACL)
-  // Log messages are forwarded to the webapp only in PNaCl version of the
-  // plugin, so ProcessLogToUI() needs to be called explicitly in the non-PNaCl
-  // version.
-  ProcessLogToUI(message);
-#endif  // !defined(OS_NACL)
 }
 
 }  // namespace remoting

@@ -4,7 +4,7 @@
 
 import("//testing/test.gni")
 
-source_set("message_pump") {
+component("message_pump") {
   sources = [
     "handle_watcher.cc",
     "handle_watcher.h",
@@ -15,9 +15,12 @@ source_set("message_pump") {
     "time_helper.h",
   ]
 
+  defines = [ "MOJO_MESSAGE_PUMP_IMPLEMENTATION" ]
+
   deps = [
     "//base",
     "//base/third_party/dynamic_annotations",
+    "//third_party/mojo/src/mojo/public/c/system:for_component",
     "//third_party/mojo/src/mojo/public/cpp/system",
   ]
 }

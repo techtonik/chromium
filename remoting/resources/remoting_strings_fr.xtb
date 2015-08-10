@@ -70,6 +70,7 @@ Chromoting</translation>
 <translation id="2813770873348017932">Les connexions à l'ordinateur à distance sont momentanément bloquées, car un utilisateur a tenté de s'y connecter en utilisant un code d'accès erroné. Veuillez réessayer ultérieurement.</translation>
 <translation id="6746493157771801606">Effacer l'historique</translation>
 <translation id="4430435636878359009">Désactiver les connexions à distance à cet ordinateur</translation>
+<translation id="3244258558056547981">Afficher la vue Cardboard</translation>
 <translation id="2314101195544969792">Votre session <ph name="APPLICATION_NAME"/> est inactive depuis un certain temps et risque de se fermer bientôt.</translation>
 <translation id="6001953797859482435">Préférences relatives à l'hôte Bureau à distance Google Chrome</translation>
 <translation id="225614027745146050">Bienvenue</translation>
@@ -112,6 +113,7 @@ Pour en savoir plus sur la confidentialité, veuillez consulter les règles de c
 <translation id="8759753423332885148">En savoir plus</translation>
 <translation id="4430915108080446161">Génération du code d'accès…</translation>
 <translation id="2013996867038862849">Tous les clients associés ont été supprimés.</translation>
+<translation id="5363265567587775042">Demandez à l'utilisateur de l'ordinateur auquel vous souhaitez accéder de cliquer sur &quot;<ph name="SHARE"/>&quot; et de vous donner le code d'accès.</translation>
 <translation id="6985691951107243942">Voulez-vous vraiment désactiver les connexions à distance à <ph name="HOSTNAME"/> ? Si vous changez d'avis, vous devrez réactiver les connexions depuis cet ordinateur.</translation>
 <translation id="6944854424004126054">Restaurer la fenêtre</translation>
 <translation id="9149992051684092333">Pour démarrer le partage de votre bureau, communiquez le code d'accès ci-dessous à la personne qui vous assistera.</translation>

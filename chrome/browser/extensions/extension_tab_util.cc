@@ -25,7 +25,7 @@
 #include "chrome/browser/ui/tabs/tab_utils.h"
 #include "chrome/common/extensions/api/tabs.h"
 #include "chrome/common/url_constants.h"
-#include "components/url_fixer/url_fixer.h"
+#include "components/url_formatter/url_fixer.h"
 #include "content/public/browser/favicon_status.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/web_contents.h"
@@ -432,9 +432,10 @@ void ExtensionTabUtil::ScrubTabValueForExtension(
     WebContents* contents,
     const Extension* extension,
     base::DictionaryValue* tab_info) {
-  bool has_permission = extension &&
+  int tab_id = GetTabId(contents);
+  bool has_permission = tab_id >= 0 && extension &&
                         extension->permissions_data()->HasAPIPermissionForTab(
-                            GetTabId(contents), APIPermission::kTab);
+                            tab_id, APIPermission::kTab);
 
   if (!has_permission) {
     tab_info->Remove(keys::kUrlKey, NULL);
@@ -550,7 +551,7 @@ bool ExtensionTabUtil::IsKillURL(const GURL& url) {
 
   // Check a fixed-up URL, to normalize the scheme and parse hosts correctly.
   GURL fixed_url =
-      url_fixer::FixupURL(url.possibly_invalid_spec(), std::string());
+      url_formatter::FixupURL(url.possibly_invalid_spec(), std::string());
   if (!fixed_url.SchemeIs(content::kChromeUIScheme))
     return false;
 

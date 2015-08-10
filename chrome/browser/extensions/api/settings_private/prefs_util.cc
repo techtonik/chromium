@@ -9,7 +9,7 @@
 #include "chrome/browser/extensions/chrome_extension_function.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/pref_names.h"
-#include "components/url_fixer/url_fixer.h"
+#include "components/url_formatter/url_fixer.h"
 
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/ownership/owner_settings_service_chromeos.h"
@@ -140,17 +140,16 @@ scoped_ptr<api::settings_private::PrefObject> PrefsUtil::GetCrosSettingsPref(
 
 scoped_ptr<api::settings_private::PrefObject> PrefsUtil::GetPref(
     const std::string& name) {
-  scoped_ptr<api::settings_private::PrefObject> pref_object(
-      new api::settings_private::PrefObject());
-
   if (IsCrosSetting(name))
     return GetCrosSettingsPref(name);
 
   PrefService* pref_service = FindServiceForPref(name);
   const PrefService::Preference* pref = pref_service->FindPreference(name);
   if (!pref)
-    return pref_object.Pass();
+    return nullptr;
 
+  scoped_ptr<api::settings_private::PrefObject> pref_object(
+      new api::settings_private::PrefObject());
   pref_object->key = pref->name();
   pref_object->type = GetType(name, pref->GetType());
   pref_object->value.reset(pref->GetValue()->DeepCopy());
@@ -215,7 +214,7 @@ bool PrefsUtil::SetPref(const std::string& pref_name,
         return false;
 
       if (IsPrefTypeURL(pref_name)) {
-        GURL fixed = url_fixer::FixupURL(original, std::string());
+        GURL fixed = url_formatter::FixupURL(original, std::string());
         temp_value.reset(new base::StringValue(fixed.spec()));
         value = temp_value.get();
       }

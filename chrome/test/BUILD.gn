@@ -10,6 +10,11 @@ import("//chrome/chrome_tests.gni")
 import("//chrome/test/base/js2gtest.gni")
 import("//testing/test.gni")
 
+declare_args() {
+  # TODO(GYP) http://crbug.com/462791
+  enable_nacl_browsertests = false
+}
+
 # This target exists to reference other test executables to bring these files
 # into the build.
 group("test") {
@@ -242,6 +247,7 @@ if (!is_android) {
     configs += [ "//build/config:precompiled_headers" ]
 
     data = [
+      "data/",
       "//net/data/ssl/certificates/",
       "//net/tools/testserver/",
       "//ppapi/tests/test_case.html",
@@ -257,21 +263,15 @@ if (!is_android) {
       "$root_out_dir/resources.pak",
       "$root_out_dir/ui_test.pak",
     ]
-    if (is_android || is_linux || is_win) {
-      data += [
-        "$root_out_dir/chrome_100_percent.pak",
-        "$root_out_dir/locales/en-US.pak",
-      ]
-    }
-    if (is_linux) {
-      data += [ "$root_out_dir/libppapi_tests.so" ]
-    }
     if (is_linux || is_win) {
       data += [
         "$root_out_dir/chrome_100_percent.pak",
         "$root_out_dir/locales/en-US.pak",
         "$root_out_dir/locales/fr.pak",
       ]
+    }
+    if (is_linux) {
+      data += [ "$root_out_dir/libppapi_tests.so" ]
     }
 
     defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
@@ -473,7 +473,7 @@ if (!is_android) {
               chrome_tests_gypi_values.chrome_interactive_ui_test_ash_sources,
               ".",
               "//chrome")
-      deps += [ "//ash:test_support" ]
+      deps += [ "//ash:interactive_ui_test_support" ]
     }
 
     if (enable_notifications) {
@@ -584,6 +584,15 @@ if (!is_android) {
     defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   }
 
+  # TODO(GYP): Delete this after we've converted everything to GN.
+  # The _run targets exist only for compatibility w/ GYP.
+  group("browser_tests_run") {
+    testonly = true
+    deps = [
+      ":browser_tests",
+    ]
+  }
+
   test("browser_tests") {
     sources = [
       "base/browser_tests_main.cc",
@@ -598,6 +607,45 @@ if (!is_android) {
             "//chrome")
 
     configs += [ "//build/config:precompiled_headers" ]
+
+    data = [
+      "data/",
+      "//chrome/browser/policy/test/asn1der.py",
+      "//chrome/browser/policy/test/policy_testserver.py",
+      "//chrome/common/extensions/docs/examples/apps/calculator/",
+      "//chrome/third_party/mock4js/",
+      "//content/test/data/",
+      "//google_apis/test/",
+      "//media/test/data/",
+      "//net/data/",
+      "//net/tools/testserver/",
+      "//ppapi/tests/test_case.html",
+      "//ppapi/tests/test_case.html.mock-http-headers",
+      "//ppapi/tests/test_page.css",
+      "//ppapi/tests/test_page.css.mock-http-headers",
+      "//testing/test_env.py",
+      "//third_party/accessibility-audit/axs_testing.js",
+      "//third_party/mocha/mocha.js",
+      "//third_party/pyftpdlib/",
+      "//third_party/pywebsocket/",
+      "//third_party/safe_browsing/",
+      "//third_party/simplejson/",
+      "//third_party/tlslite/",
+      "//ui/webui/resources/js/",
+      "$root_out_dir/pyproto/",
+      "$root_out_dir/browser_tests.pak",
+      "$root_out_dir/chrome_100_percent.pak",
+      "$root_out_dir/locales/",
+      "$root_out_dir/remoting/unittests/",
+      "$root_out_dir/resources.pak",
+      "$root_out_dir/resources/extension/",
+      "$root_out_dir/test_case.html",
+      "$root_out_dir/test_case.html.mock-http-headers",
+      "$root_out_dir/test_data/",
+      "$root_out_dir/test_page.css",
+      "$root_out_dir/test_page.css.mock-http-headers",
+      "$root_out_dir/test_url_loader_data/",
+    ]
 
     deps = [
       ":browser_tests_js_webui",
@@ -669,6 +717,7 @@ if (!is_android) {
     # Runtime dependencies
     data_deps = [
       "//ppapi:ppapi_tests",
+      "//ppapi:power_saver_test_plugin",
       "//remoting/webapp:browser_test_resources",
       "//remoting/webapp:unit_tests",
       "//third_party/mesa:osmesa",
@@ -676,6 +725,10 @@ if (!is_android) {
     ]
 
     defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+
+    if (!enable_nacl_browsertests) {
+      defines += [ "DISABLE_NACL_BROWSERTESTS" ]
+    }
 
     # TODO(GYP) if (is_win) {
     #       ['incremental_chrome_dll==1', {
@@ -690,7 +743,9 @@ if (!is_android) {
     if (!enable_one_click_signin) {
       sources -= [ "../browser/ui/sync/one_click_signin_bubble_links_delegate_browsertest.cc" ]
     }
-    if (enable_nacl) {
+    if (!enable_nacl_browsertests) {
+      sources -= [ "../browser/extensions/api/hotword_private/hotword_private_apitest.cc" ]
+    } else if (enable_nacl) {
       sources += [
         "../browser/extensions/extension_nacl_browsertest.cc",
         "../browser/nacl_host/test/gdb_debug_stub_browsertest.cc",
@@ -801,6 +856,7 @@ if (!is_android) {
       ]
     } else {
       sources -= [
+        "../browser/extensions/api/enterprise_device_attributes/enterprise_device_attributes_apitest.cc",
         "../browser/extensions/api/enterprise_platform_keys/enterprise_platform_keys_apitest_nss.cc",
         "../browser/extensions/api/platform_keys/platform_keys_apitest_nss.cc",
         "../browser/extensions/api/terminal/terminal_private_apitest.cc",
@@ -954,7 +1010,7 @@ if (!is_android) {
         "../browser/extensions/api/networking_private/networking_private_chromeos_apitest.cc",
       ]
     }
-    if (!is_android && !is_ios) {
+    if (!is_android && !is_ios && enable_nacl_browsertests) {
       sources +=
           [ "../browser/copresence/chrome_whispernet_client_browsertest.cc" ]
       deps += [ "//components/copresence" ]

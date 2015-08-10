@@ -110,5 +110,23 @@
         {
             "group_name": "Enabled"
         }
+    ],
+    "SyncHttpContentCompression": [
+        {
+            "group_name": "Enabled"
+        },
+        {
+            "group_name": "Disabled"
+        }
+    ],
+    "AutofillFieldMetadata": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
+    "UseDelayAgnosticAEC": [
+        {
+            "group_name": "DefaultEnabled"
+        }
     ]
 }

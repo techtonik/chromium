@@ -38,7 +38,10 @@
     {
       # GN version: //mojo/message_pump
       'target_name': 'mojo_message_pump_lib',
-      'type': 'static_library',
+      'type': '<(component)',
+      'defines': [
+        'MOJO_MESSAGE_PUMP_IMPLEMENTATION',
+      ],
       'dependencies': [
         '../base/base.gyp:base',
         '../base/third_party/dynamic_annotations/dynamic_annotations.gyp:dynamic_annotations',

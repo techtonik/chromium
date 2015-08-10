@@ -278,6 +278,11 @@ struct PasswordForm {
   // We use only client heuristics, so it could include signup forms.
   bool IsPossibleChangePasswordForm() const;
 
+  // Return true if we consider this form to be a change password form
+  // without username field. We use only client heuristics, so it could
+  // include signup forms.
+  bool IsPossibleChangePasswordFormWithoutUsername() const;
+
   // Equality operators for testing.
   bool operator==(const PasswordForm& form) const;
   bool operator!=(const PasswordForm& form) const;
@@ -285,6 +290,11 @@ struct PasswordForm {
   PasswordForm();
   ~PasswordForm();
 };
+
+// True if the unique keys for the forms are the same. The unique key is
+// (origin, username_element, username_value, password_element, signon_realm).
+bool ArePasswordFormUniqueKeyEqual(const autofill::PasswordForm& left,
+                                   const autofill::PasswordForm& right);
 
 // Map username to PasswordForm* for convenience. See password_form_manager.h.
 typedef base::ScopedPtrMap<base::string16, scoped_ptr<PasswordForm>>

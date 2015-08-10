@@ -52,7 +52,6 @@
 #include "chrome/browser/prefs/browser_prefs.h"
 #include "chrome/browser/prefs/chrome_pref_service_factory.h"
 #include "chrome/browser/prefs/pref_service_syncable.h"
-#include "chrome/browser/prefs/tracked/tracked_preference_validation_delegate.h"
 #include "chrome/browser/prerender/prerender_manager_factory.h"
 #include "chrome/browser/profiles/bookmark_model_loaded_observer.h"
 #include "chrome/browser/profiles/chrome_version_service.h"
@@ -90,7 +89,8 @@
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/ui/zoom/zoom_event_manager.h"
-#include "components/url_fixer/url_fixer.h"
+#include "components/url_formatter/url_fixer.h"
+#include "components/user_prefs/tracked/tracked_preference_validation_delegate.h"
 #include "components/user_prefs/user_prefs.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/dom_storage_context.h"
@@ -768,11 +768,11 @@ Profile* ProfileImpl::GetOriginalProfile() {
   return this;
 }
 
-bool ProfileImpl::IsSupervised() {
+bool ProfileImpl::IsSupervised() const {
   return !GetPrefs()->GetString(prefs::kSupervisedUserId).empty();
 }
 
-bool ProfileImpl::IsChild() {
+bool ProfileImpl::IsChild() const {
 #if defined(ENABLE_SUPERVISED_USERS)
   return GetPrefs()->GetString(prefs::kSupervisedUserId) ==
       supervised_users::kChildAccountSUID;
@@ -781,7 +781,7 @@ bool ProfileImpl::IsChild() {
 #endif
 }
 
-bool ProfileImpl::IsLegacySupervised() {
+bool ProfileImpl::IsLegacySupervised() const {
   return IsSupervised() && !IsChild();
 }
 
@@ -1185,8 +1185,9 @@ chrome_browser_net::Predictor* ProfileImpl::GetNetworkPredictor() {
   return predictor_;
 }
 
-DevToolsNetworkController* ProfileImpl::GetDevToolsNetworkController() {
-  return io_data_.GetDevToolsNetworkController();
+DevToolsNetworkControllerHandle*
+ProfileImpl::GetDevToolsNetworkControllerHandle() {
+  return io_data_.GetDevToolsNetworkControllerHandle();
 }
 
 void ProfileImpl::ClearNetworkingHistorySince(
@@ -1207,7 +1208,7 @@ GURL ProfileImpl::GetHomePage() {
 
     base::FilePath browser_directory;
     PathService::Get(base::DIR_CURRENT, &browser_directory);
-    GURL home_page(url_fixer::FixupRelativeFile(
+    GURL home_page(url_formatter::FixupRelativeFile(
         browser_directory,
         command_line.GetSwitchValuePath(switches::kHomePage)));
     if (home_page.is_valid())
@@ -1216,8 +1217,8 @@ GURL ProfileImpl::GetHomePage() {
 
   if (GetPrefs()->GetBoolean(prefs::kHomePageIsNewTabPage))
     return GURL(chrome::kChromeUINewTabURL);
-  GURL home_page(url_fixer::FixupURL(GetPrefs()->GetString(prefs::kHomePage),
-                                     std::string()));
+  GURL home_page(url_formatter::FixupURL(
+      GetPrefs()->GetString(prefs::kHomePage), std::string()));
   if (!home_page.is_valid())
     return GURL(chrome::kChromeUINewTabURL);
   return home_page;

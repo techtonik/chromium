@@ -124,6 +124,10 @@ void ProximityAuthWebUIHandler::RegisterMessages() {
                                    base::Unretained(this)));
 
   web_ui()->RegisterMessageCallback(
+      "toggleUnlockKey", base::Bind(&ProximityAuthWebUIHandler::ToggleUnlockKey,
+                                    base::Unretained(this)));
+
+  web_ui()->RegisterMessageCallback(
       "findEligibleUnlockDevices",
       base::Bind(&ProximityAuthWebUIHandler::FindEligibleUnlockDevices,
                  base::Unretained(this)));
@@ -153,6 +157,11 @@ void ProximityAuthWebUIHandler::RegisterMessages() {
   InitGCMManager();
   InitEnrollmentManager();
   InitDeviceManager();
+
+  // Note: We add the observer for the logs after initializing the managers
+  // because when this function is called, the WebUI's underlying WebContents
+  // has not been initialized, so calling any JavaScript function will crash
+  // Chrome.
   LogBuffer::GetInstance()->AddObserver(this);
 }
 
@@ -222,6 +231,32 @@ void ProximityAuthWebUIHandler::ClearLogBuffer(const base::ListValue* args) {
   // The OnLogBufferCleared() observer function will be called after the buffer
   // is cleared.
   LogBuffer::GetInstance()->Clear();
+}
+
+void ProximityAuthWebUIHandler::ToggleUnlockKey(const base::ListValue* args) {
+  std::string public_key_b64, public_key;
+  bool make_unlock_key;
+  if (args->GetSize() != 2 || !args->GetString(0, &public_key_b64) ||
+      !args->GetBoolean(1, &make_unlock_key) ||
+      !Base64UrlDecode(public_key_b64, &public_key)) {
+    PA_LOG(ERROR) << "Invalid arguments to toggleUnlockKey";
+    return;
+  }
+
+  cryptauth::ToggleEasyUnlockRequest request;
+  request.set_enable(make_unlock_key);
+  request.set_public_key(public_key);
+  *(request.mutable_device_classifier()) = delegate_->GetDeviceClassifier();
+
+  PA_LOG(INFO) << "Toggling unlock key:\n"
+               << "    public_key: " << public_key_b64 << "\n"
+               << "    make_unlock_key: " << make_unlock_key;
+  cryptauth_client_ = cryptauth_client_factory_->CreateInstance();
+  cryptauth_client_->ToggleEasyUnlock(
+      request, base::Bind(&ProximityAuthWebUIHandler::OnEasyUnlockToggled,
+                          weak_ptr_factory_.GetWeakPtr()),
+      base::Bind(&ProximityAuthWebUIHandler::OnCryptAuthClientError,
+                 weak_ptr_factory_.GetWeakPtr()));
 }
 
 void ProximityAuthWebUIHandler::FindEligibleUnlockDevices(
@@ -305,6 +340,7 @@ void ProximityAuthWebUIHandler::ToggleConnection(const base::ListValue* args) {
 void ProximityAuthWebUIHandler::InitGCMManager() {
   gcm_manager_.reset(new CryptAuthGCMManagerImpl(delegate_->GetGCMDriver(),
                                                  delegate_->GetPrefService()));
+  gcm_manager_->StartListening();
 }
 
 void ProximityAuthWebUIHandler::InitEnrollmentManager() {
@@ -382,6 +418,12 @@ void ProximityAuthWebUIHandler::OnCryptAuthClientError(
   PA_LOG(WARNING) << "CryptAuth request failed: " << error_message;
   base::StringValue error_string(error_message);
   web_ui()->CallJavascriptFunction("CryptAuthInterface.onError", error_string);
+}
+
+void ProximityAuthWebUIHandler::OnEasyUnlockToggled(
+    const cryptauth::ToggleEasyUnlockResponse& response) {
+  web_ui()->CallJavascriptFunction("CryptAuthInterface.onUnlockKeyToggled");
+  // TODO(tengs): Update the local state to reflect the toggle.
 }
 
 void ProximityAuthWebUIHandler::OnFoundEligibleUnlockDevices(

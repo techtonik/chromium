@@ -35,6 +35,8 @@
 #include "components/content_settings/core/browser/content_settings_utils.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/content_settings/core/browser/plugins_field_trial.h"
+#include "components/content_settings/core/browser/website_settings_info.h"
+#include "components/content_settings/core/browser/website_settings_registry.h"
 #include "components/content_settings/core/common/content_settings.h"
 #include "components/content_settings/core/common/content_settings_pattern.h"
 #include "components/google/core/browser/google_util.h"
@@ -432,8 +434,10 @@ void ContentSettingsHandler::GetLocalizedValues(
   RegisterStrings(localized_strings, resources, arraysize(resources));
 
   PrefService* prefs = Profile::FromWebUI(web_ui())->GetPrefs();
-  const base::Value* default_pref =
-      prefs->GetDefaultPrefValue(prefs::kDefaultPluginsSetting);
+  const base::Value* default_pref = prefs->GetDefaultPrefValue(
+      content_settings::WebsiteSettingsRegistry::GetInstance()
+          ->Get(CONTENT_SETTINGS_TYPE_PLUGINS)
+          ->default_value_pref_name());
 
   int default_value = CONTENT_SETTING_DEFAULT;
   bool success = default_pref->GetAsInteger(&default_value);
@@ -697,6 +701,7 @@ void ContentSettingsHandler::UpdateMediaSettingsFromPrefs(
   settings.default_setting_initialized = true;
 
   UpdateFlashMediaLinksVisibility(type);
+  UpdateMediaDeviceDropdownVisibility(type);
 }
 
 void ContentSettingsHandler::UpdateHandlersEnabledRadios() {
@@ -762,10 +767,6 @@ void ContentSettingsHandler::UpdateExceptionsViewFromModel(
       // supposed to be set by flags and field trials only, thus there is no
       // user facing UI for this content type and we skip it here.
       break;
-#if defined(OS_WIN)
-    case CONTENT_SETTINGS_TYPE_METRO_SWITCH_TO_DESKTOP:
-      break;
-#endif
     case CONTENT_SETTINGS_TYPE_APP_BANNER:
       // The content settings type CONTENT_SETTINGS_TYPE_APP_BANNER is used to
       // track whether app banners should be shown or not, and is not a user
@@ -793,9 +794,6 @@ void ContentSettingsHandler::UpdateOTRExceptionsViewFromModel(
     case CONTENT_SETTINGS_TYPE_NOTIFICATIONS:
     case CONTENT_SETTINGS_TYPE_AUTO_SELECT_CERTIFICATE:
     case CONTENT_SETTINGS_TYPE_MIXEDSCRIPT:
-#if defined(OS_WIN)
-    case CONTENT_SETTINGS_TYPE_METRO_SWITCH_TO_DESKTOP:
-#endif
     case CONTENT_SETTINGS_TYPE_MEDIASTREAM:
     case CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC:
     case CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA:
@@ -1609,6 +1607,16 @@ void ContentSettingsHandler::UpdateFlashMediaLinksVisibility(
           flash_settings.exceptions)) {
     ShowFlashMediaLink(EXCEPTIONS, type, true);
   }
+}
+
+void ContentSettingsHandler::UpdateMediaDeviceDropdownVisibility(
+    ContentSettingsType type) {
+  MediaSettingsInfo::ForOneType& settings = media_settings_->forType(type);
+
+  web_ui()->CallJavascriptFunction(
+      "ContentSettings.setDevicesMenuVisibility",
+      base::StringValue(ContentSettingsTypeToGroupName(type)),
+      base::FundamentalValue(!settings.policy_disable));
 }
 
 void ContentSettingsHandler::UpdateProtectedContentExceptionsButton() {

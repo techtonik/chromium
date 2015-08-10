@@ -426,9 +426,9 @@
       # Web speech is enabled by default. Set to 0 to disable.
       'enable_web_speech%': 1,
 
-      # 'Ok Google' hotwording is disabled by default in open source builds. Set
-      # to 1 to enable. (This will download a closed-source NaCl module at
-      # startup.) Chrome-branded builds have this enabled by default.
+      # 'Ok Google' hotwording is disabled by default. Set to 1 to enable. (This
+      # will download a closed-source NaCl module at startup.) Chrome-branded
+      # ChromeOS builds have this enabled by default.
       'enable_hotwording%': 0,
 
       # Notifications are compiled in by default. Set to 0 to disable.
@@ -859,7 +859,8 @@
           'enable_prod_wallet_service%': 1,
         }],
 
-        ['branding=="Chrome"', {
+        # Enable hotwording on Chrome-branded ChromeOS builds.
+        ['branding=="Chrome" and chromeos==1', {
           'enable_hotwording%': 1,
         }],
 
@@ -3142,6 +3143,9 @@
             # TODO(mgiuca): Move this suppression into individual third-party
             # libraries as required. http://crbug.com/505301.
             '-Wno-overloaded-virtual',
+            # TODO(thakis): Move this suppression into individual third-party
+            # libraries as required. http://crbug.com/505316.
+            '-Wno-unused-function',
             # Lots of third-party libraries have unused variables. Instead of
             # suppressing them individually, we just blanket suppress them here.
             '-Wno-unused-variable',
@@ -3576,18 +3580,6 @@
                       # it all.
                       '/DEBUG:FASTLINK',
                     ],
-                  },
-                },
-              }, {
-                # win_fastlink==0
-                'msvs_settings': {
-                  'VCLinkerTool': {
-                    # This corresponds to the /PROFILE flag which ensures the PDB
-                    # file contains FIXUP information (growing the PDB file by about
-                    # 5%) but does not otherwise alter the output binary. This
-                    # information is used by the Syzygy optimization tool when
-                    # decomposing the release image.
-                    'Profile': 'true',
                   },
                 },
               }],
@@ -4529,6 +4521,15 @@
               }],
             ],
           }],
+          ['(asan_coverage>1 or sanitizer_coverage>1) and target_arch=="arm"', {
+            'target_conditions': [
+              ['_toolset=="target"', {
+                'cflags': [
+                  '-mllvm -sanitizer-coverage-block-threshold=0',  # http://crbug.com/517105
+                ],
+              }],
+            ],
+          }],
           ['asan_field_padding!=0', {
             'target_conditions': [
               ['_toolset=="target"', {
@@ -5408,6 +5409,7 @@
       'target_defaults': {
         'xcode_settings' : {
           'CLANG_CXX_LANGUAGE_STANDARD': 'c++11',
+          'ENABLE_BITCODE': 'NO',
 
           'conditions': [
             # Older Xcodes do not support -Wno-deprecated-register, so pass an
@@ -5799,7 +5801,6 @@
                   '-Wno-microsoft',  # http://crbug.com/505296
                   '-Wno-switch',  # http://crbug.com/505308
                   '-Wno-unknown-pragmas',  # http://crbug.com/505314
-                  '-Wno-unused-function',  # http://crbug.com/505316
                   '-Wno-unused-value',  # http://crbug.com/505318
                 ],
               },
@@ -6005,9 +6006,9 @@
     }],
     ['use_lld==1 and OS=="win"', {
       'make_global_settings': [
-        # Limited to Windows because -flavor link2 is the driver that is
+        # Limited to Windows because lld-link is the driver that is
         # compatible with link.exe.
-        ['LD', '<(make_clang_dir)/bin/lld -flavor link2'],
+        ['LD', '<(make_clang_dir)/bin/lld-link'],
       ],
     }],
     ['OS=="android" and clang==0', {

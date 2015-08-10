@@ -7,7 +7,7 @@
 #include "content/browser/message_port_service.h"
 #include "content/browser/navigator_connect/service_port_service_impl.h"
 #include "content/browser/service_worker/service_worker_context_wrapper.h"
-#include "content/browser/service_worker/service_worker_utils.h"
+#include "content/common/service_worker/service_worker_utils.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/navigator_connect_service_factory.h"
 #include "content/public/common/navigator_connect_client.h"
@@ -26,7 +26,7 @@ struct NavigatorConnectContextImpl::Port {
   GURL client_origin;
 
   // Set to nullptr when the ServicePortService goes away.
-  ServicePortServiceImpl* service;
+  ServicePortServiceImpl* service = nullptr;
 
   // If this port is associated with a service worker, these fields store that
   // information.
@@ -115,6 +115,7 @@ void NavigatorConnectContextImpl::PostMessage(
         port.service_worker_registration_origin,
         base::Bind(&NavigatorConnectContextImpl::DeliverMessage, this, port.id,
                    message.message_as_string, sent_message_ports));
+    return;
   }
 
   if (!port.service) {

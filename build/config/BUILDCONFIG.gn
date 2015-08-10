@@ -574,7 +574,11 @@ if (is_win) {
   } else {
     assert(false, "Unknown host for android cross compile")
   }
-  set_default_toolchain("//build/toolchain/android:$current_cpu")
+  if (is_clang) {
+    set_default_toolchain("//build/toolchain/android:clang_$current_cpu")
+  } else {
+    set_default_toolchain("//build/toolchain/android:$current_cpu")
+  }
 } else if (is_linux) {
   if (is_clang) {
     host_toolchain = "//build/toolchain/linux:clang_$host_cpu"
@@ -591,7 +595,7 @@ if (is_win) {
   set_default_toolchain(host_toolchain)
 } else if (is_ios) {
   host_toolchain = "//build/toolchain/mac:clang_x64"
-  set_default_toolchain("//build/toolchain/mac:clang_$current_cpu")
+  set_default_toolchain("//build/toolchain/mac:ios_clang_arm")
 } else if (is_nacl) {
   # TODO(GYP): This will need to change when we get NaCl working
   # on multiple platforms, but this whole block of code (how we define
@@ -604,17 +608,13 @@ if (is_win) {
 # COMPONENT SETUP
 # ==============================================================================
 
-# TODO(brettw): Convert component_mode to being a non-exported variable
-# ("_component_mode" instead) once ICU's BUILD.gn file is updated to use
-# is_component_build instead.
 if (is_component_build) {
-  component_mode = "shared_library"
+  _component_mode = "shared_library"
 } else {
-  component_mode = "source_set"
+  _component_mode = "source_set"
 }
-
 template("component") {
-  target(component_mode, target_name) {
+  target(_component_mode, target_name) {
     forward_variables_from(invoker, "*")
 
     # All shared libraries must have the sanitizer deps to properly link in

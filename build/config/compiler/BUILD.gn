@@ -30,6 +30,8 @@ declare_args() {
   # only two architectures that are currently checked in). Turn this off when
   # you are using a custom toolchain and need to control -B in cflags.
   linux_use_bundled_binutils = is_linux && current_cpu == "x64"
+  binutils_path = rebase_path("//third_party/binutils/Linux_x64/Release/bin",
+                              root_build_dir)
 
   # Compile in such a way as to enable profiling of the generated code. For
   # example, don't omit the frame pointer and leave in symbols.
@@ -45,6 +47,14 @@ declare_args() {
   # Use gold for linking on 64-bit Linux only (on 32-bit it runs out of
   # address space, and it doesn't support cross-compiling).
   use_gold = is_linux && current_cpu == "x64"
+
+  # When we are going to use gold we need to find it.
+  if (use_gold) {
+    gold_path = rebase_path("//third_party/binutils/Linux_x64/Release/bin",
+                            root_build_dir)
+  } else {
+    gold_path = ""
+  }
 
   # use_debug_fission: whether to use split DWARF debug info
   # files. This can reduce link time significantly, but is incompatible
@@ -106,6 +116,7 @@ config("compiler") {
       "/Gy",  # Enable function-level linking.
       "/GS",  # Enable buffer security checking.
       "/FS",  # Preserve previous PDB behavior.
+      "/bigobj",  # Some of our files are bigger than the regular limits.
     ]
 
     # Force C/C++ mode for the given GN detected file type. This is necessary
@@ -167,11 +178,14 @@ config("compiler") {
     # Stack protection.
     if (is_mac) {
       cflags += [ "-fstack-protector-all" ]
-    } else if (is_linux) {
-      cflags += [
-        "-fstack-protector",
-        "--param=ssp-buffer-size=4",
-      ]
+    } else if (is_posix && !is_chromeos && !is_nacl) {
+      # TODO(phajdan.jr): Use -fstack-protector-strong when our gcc supports it.
+      cflags += [ "--param=ssp-buffer-size=4" ]
+      if (is_android && (current_cpu == "arm64" || current_cpu == "x86")) {
+        cflags += [ "-fno-stack-protector" ]
+      } else {
+        cflags += [ "-fstack-protector" ]
+      }
     }
 
     # Linker warnings.
@@ -270,9 +284,12 @@ config("compiler") {
         "i386",
       ]
     } else if (current_cpu == "arm") {
+      # TODO(GYP): we may need to distinguish between "arm64", "armv7",
+      # and "armv7s" for iOS, and hence need multiple current_cpu values
+      # rather than just "arm".
       common_mac_flags += [
         "-arch",
-        "armv7",
+        "arm64",
       ]
     }
 
@@ -456,8 +473,6 @@ config("compiler") {
     ldflags += [ "-pthread" ]
   }
   if (use_gold) {
-    gold_path = rebase_path("//third_party/binutils/Linux_x64/Release/bin",
-                            root_build_dir)
     ldflags += [
       "-B$gold_path",
 
@@ -491,8 +506,6 @@ config("compiler") {
   }
 
   if (linux_use_bundled_binutils) {
-    binutils_path = rebase_path("//third_party/binutils/Linux_x64/Release/bin",
-                                root_build_dir)
     cflags += [ "-B$binutils_path" ]
   }
 
@@ -522,7 +535,15 @@ config("compiler") {
       "-funwind-tables",
       "-fno-short-enums",
     ]
-    if (!is_clang) {
+    if (is_clang) {
+      rebased_android_toolchain_root =
+          rebase_path(android_toolchain_root, root_build_dir)
+      cflags += [
+        # TODO(hans) Enable integrated-as (crbug.com/124610).
+        "-no-integrated-as",
+        "-B${rebased_android_toolchain_root}/bin",  # Else /usr/bin/as gets picked up.
+      ]
+    } else {
       # Clang doesn't support these flags.
       cflags += [ "-finline-limit=64" ]
     }
@@ -545,8 +566,7 @@ config("compiler") {
       ldflags += [ "-fuse-ld=gold" ]
       if (is_clang) {
         # Let clang find the ld.gold in the NDK.
-        ldflags += [ "--gcc-toolchain=" +
-                     rebase_path(android_toolchain_root, root_build_dir) ]
+        ldflags += [ "--gcc-toolchain=$rebased_android_toolchain_root" ]
       }
     }
 
@@ -572,11 +592,23 @@ config("compiler") {
 
     if (is_clang) {
       if (current_cpu == "arm") {
-        cflags += [ "-target arm-linux-androideabi" ]
-        ldflags += [ "-target arm-linux-androideabi" ]
+        cflags += [
+          "-target",
+          "arm-linux-androideabi",
+        ]
+        ldflags += [
+          "-target",
+          "arm-linux-androideabi",
+        ]
       } else if (current_cpu == "x86") {
-        cflags += [ "-target i686-linux-androideabi" ]
-        ldflags += [ "-target i686-linux-androideabi" ]
+        cflags += [
+          "-target",
+          "i686-linux-androideabi",
+        ]
+        ldflags += [
+          "-target",
+          "i686-linux-androideabi",
+        ]
       }
     }
   }
@@ -817,7 +849,6 @@ if (is_win) {
       "-Wno-microsoft",  # http://crbug.com/505296
       "-Wno-switch",  # http://crbug.com/505308
       "-Wno-unknown-pragmas",  # http://crbug.com/505314
-      "-Wno-unused-function",  # http://crbug.com/505316
       "-Wno-unused-value",  # http://crbug.com/505318
     ]
   }
@@ -847,10 +878,13 @@ if (is_win) {
     default_warning_flags_cc += [
       # See comment for -Wno-c++11-narrowing.
       "-Wno-narrowing",
-
-      # TODO(thakis): Remove, http://crbug.com/263960
-      "-Wno-literal-suffix",
     ]
+    if (!is_clang) {
+      default_warning_flags_cc += [
+        # TODO(thakis): Remove, http://crbug.com/263960
+        "-Wno-literal-suffix",
+      ]
+    }
   }
 
   # Suppress warnings about ABI changes on ARM (Clang doesn't give this
@@ -1007,6 +1041,10 @@ config("no_chromium_code") {
       # libraries as required. http://crbug.com/505301.
       "-Wno-overloaded-virtual",
 
+      # TODO(thakis): Move this suppression into individual third-party
+      # libraries as required. http://crbug.com/505316.
+      "-Wno-unused-function",
+
       # Lots of third-party libraries have unused variables. Instead of
       # suppressing them individually, we just blanket suppress them here.
       "-Wno-unused-variable",
@@ -1147,7 +1185,7 @@ if (is_win) {
     }
   }
 
-  if (is_mac) {
+  if (is_mac || is_ios) {
     if (symbol_level == 2) {
       # Mac dead code stripping requires symbols.
       common_optimize_on_ldflags += [ "-Wl,-dead_strip" ]

@@ -190,6 +190,10 @@
 #include "content/browser/browser_io_surface_manager_mac.h"
 #endif
 
+#if defined(USE_OZONE)
+#include "ui/ozone/public/ozone_switches.h"
+#endif
+
 #if defined(ENABLE_BROWSER_CDMS)
 #include "content/browser/media/cdm/browser_cdm_manager.h"
 #endif
@@ -399,6 +403,16 @@ class SessionStorageHolder : public base::SupportsUserData::Data {
       session_storage_namespaces_awaiting_close_;
   DISALLOW_COPY_AND_ASSIGN(SessionStorageHolder);
 };
+
+std::string UintVectorToString(const std::vector<unsigned>& vector) {
+  std::string str;
+  for (auto it : vector) {
+    if (!str.empty())
+      str += ",";
+    str += base::UintToString(it);
+  }
+  return str;
+}
 
 }  // namespace
 
@@ -1138,21 +1152,19 @@ static void AppendCompositorCommandLineFlags(base::CommandLine* command_line) {
   if (IsForceGpuRasterizationEnabled())
     command_line->AppendSwitch(switches::kForceGpuRasterization);
 
-  command_line->AppendSwitchASCII(
-      switches::kContentImageTextureTarget,
-      base::UintToString(
-          // TODO(reveman): We currently assume that the compositor will use
-          // BGRA_8888 if it's able to, and RGBA_8888 otherwise. Since we don't
-          // know what it will use we hardcode BGRA_8888 here for now. We should
-          // instead move decisions about GpuMemoryBuffer format to the browser
-          // embedder so we know it here, and pass that decision to the
-          // compositor for each usage.
-          // crbug.com/490362
-          BrowserGpuMemoryBufferManager::GetImageTextureTarget(
-              gfx::BufferFormat::BGRA_8888,
-              // TODO(danakj): When one-copy supports partial update, change
-              // this usage to PERSISTENT_MAP for one-copy.
-              gfx::BufferUsage::MAP)));
+  std::vector<unsigned> image_targets(
+      static_cast<size_t>(gfx::BufferFormat::LAST) + 1, GL_TEXTURE_2D);
+  for (size_t format = 0;
+       format < static_cast<size_t>(gfx::BufferFormat::LAST) + 1; format++) {
+    image_targets[format] =
+        BrowserGpuMemoryBufferManager::GetImageTextureTarget(
+            static_cast<gfx::BufferFormat>(format),
+            // TODO(danakj): When one-copy supports partial update, change
+            // this usage to PERSISTENT_MAP for one-copy.
+            gfx::BufferUsage::MAP);
+  }
+  command_line->AppendSwitchASCII(switches::kContentImageTextureTarget,
+                                  UintVectorToString(image_targets));
 
   command_line->AppendSwitchASCII(
       switches::kVideoImageTextureTarget,
@@ -1291,6 +1303,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableSeccompFilterSandbox,
     switches::kEnableSkiaBenchmarking,
     switches::kEnableSlimmingPaint,
+    switches::kEnableSlimmingPaintV2,
     switches::kEnableSmoothScrolling,
     switches::kEnableStaleWhileRevalidate,
     switches::kEnableStatsTable,
@@ -1394,6 +1407,9 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableDirectWrite,
     switches::kDisableWin32kRendererLockDown,
     switches::kTraceExportEventsToETW,
+#endif
+#if defined(USE_OZONE)
+    switches::kOzonePlatform,
 #endif
 #if defined(OS_CHROMEOS)
     switches::kDisableVaapiAcceleratedVideoEncode,

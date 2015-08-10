@@ -17,6 +17,8 @@
 #include "base/memory/linked_ptr.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/threading/thread_checker.h"
+#include "base/trace_event/memory_allocator_dump.h"
+#include "base/trace_event/memory_dump_provider.h"
 #include "cc/base/cc_export.h"
 #include "cc/base/resource_id.h"
 #include "cc/output/context_provider.h"
@@ -57,7 +59,8 @@ class SharedBitmapManager;
 
 // This class is not thread-safe and can only be called from the thread it was
 // created on (in practice, the impl thread).
-class CC_EXPORT ResourceProvider {
+class CC_EXPORT ResourceProvider
+    : public base::trace_event::MemoryDumpProvider {
  private:
   struct Resource;
 
@@ -85,8 +88,9 @@ class CC_EXPORT ResourceProvider {
       int highp_threshold_min,
       bool use_rgba_4444_texture_format,
       size_t id_allocation_chunk_size,
-      bool use_persistent_map_for_gpu_memory_buffers);
-  virtual ~ResourceProvider();
+      bool use_persistent_map_for_gpu_memory_buffers,
+      const std::vector<unsigned>& use_image_texture_targets);
+  ~ResourceProvider() override;
 
   void DidLoseOutputSurface() { lost_output_surface_ = true; }
 
@@ -438,6 +442,14 @@ class CC_EXPORT ResourceProvider {
 
   void ValidateResource(ResourceId id) const;
 
+  GLenum GetImageTextureTarget(ResourceFormat format);
+
+  // base::trace_event::MemoryDumpProvider implementation.
+  bool OnMemoryDump(const base::trace_event::MemoryDumpArgs& args,
+                    base::trace_event::ProcessMemoryDump* pmd) override;
+
+  int tracing_id() const { return tracing_id_; }
+
  protected:
   ResourceProvider(OutputSurface* output_surface,
                    SharedBitmapManager* shared_bitmap_manager,
@@ -446,7 +458,8 @@ class CC_EXPORT ResourceProvider {
                    int highp_threshold_min,
                    bool use_rgba_4444_texture_format,
                    size_t id_allocation_chunk_size,
-                   bool use_persistent_map_for_gpu_memory_buffers);
+                   bool use_persistent_map_for_gpu_memory_buffers,
+                   const std::vector<unsigned>& use_image_texture_targets);
   void Initialize();
 
  private:
@@ -604,6 +617,11 @@ class CC_EXPORT ResourceProvider {
   bool use_persistent_map_for_gpu_memory_buffers_;
   // Fence used for CopyResource if CHROMIUM_sync_query is not supported.
   scoped_refptr<SynchronousFence> synchronous_fence_;
+  std::vector<unsigned> use_image_texture_targets_;
+
+  // A process-unique ID used for disambiguating memory dumps from different
+  // resource providers.
+  int tracing_id_;
 
   DISALLOW_COPY_AND_ASSIGN(ResourceProvider);
 };

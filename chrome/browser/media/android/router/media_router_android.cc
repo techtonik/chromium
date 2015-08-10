@@ -4,14 +4,29 @@
 
 #include "chrome/browser/media/android/router/media_router_android.h"
 
+#include "base/android/jni_android.h"
 #include "base/logging.h"
+#include "jni/ChromeMediaRouter_jni.h"
 
 namespace media_router {
 
 MediaRouterAndroid::MediaRouterAndroid(content::BrowserContext*) {
+  JNIEnv* env = base::android::AttachCurrentThread();
+  java_media_router_.Reset(Java_ChromeMediaRouter_create(
+      env,
+      reinterpret_cast<jlong>(this),
+      base::android::GetApplicationContext()));
 }
 
 MediaRouterAndroid::~MediaRouterAndroid() {
+}
+
+// static
+bool MediaRouterAndroid::Register(JNIEnv* env) {
+  bool ret = RegisterNativesImpl(env);
+  // No native calls to register just yet.
+  // DCHECK(g_ChromeMediaRouter_clazz);
+  return ret;
 }
 
 void MediaRouterAndroid::CreateRoute(
@@ -39,23 +54,15 @@ void MediaRouterAndroid::SendRouteMessage(
     const SendRouteMessageCallback& callback) {
   NOTIMPLEMENTED();
 }
-
 void MediaRouterAndroid::SendRouteBinaryMessage(
     const MediaRoute::Id& route_id,
     scoped_ptr<std::vector<uint8>> data,
     const SendRouteMessageCallback& callback) {
   NOTIMPLEMENTED();
 }
-
-void MediaRouterAndroid::ListenForRouteMessages(
-    const std::vector<MediaRoute::Id>& route_ids,
-    const PresentationSessionMessageCallback& message_cb) {
-  NOTIMPLEMENTED();
-}
 void MediaRouterAndroid::ClearIssue(const Issue::Id& issue_id) {
   NOTIMPLEMENTED();
 }
-
 void MediaRouterAndroid::RegisterMediaSinksObserver(
     MediaSinksObserver* observer) {
   NOTIMPLEMENTED();
@@ -76,6 +83,14 @@ void MediaRouterAndroid::RegisterIssuesObserver(IssuesObserver* observer) {
   NOTIMPLEMENTED();
 }
 void MediaRouterAndroid::UnregisterIssuesObserver(IssuesObserver* observer) {
+  NOTIMPLEMENTED();
+}
+void MediaRouterAndroid::RegisterPresentationSessionMessagesObserver(
+    PresentationSessionMessagesObserver* observer) {
+  NOTIMPLEMENTED();
+}
+void MediaRouterAndroid::UnregisterPresentationSessionMessagesObserver(
+    PresentationSessionMessagesObserver* observer) {
   NOTIMPLEMENTED();
 }
 

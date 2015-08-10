@@ -280,6 +280,30 @@ size_t ToolbarActionsBar::GetIconCount() const {
   return visible_icons;
 }
 
+gfx::Rect ToolbarActionsBar::GetFrameForIndex(size_t index) const {
+  size_t start_index = in_overflow_mode() ?
+      toolbar_actions_.size() - GetIconCount() : 0u;
+
+  // If the index is for an action that is before range we show (i.e., is for
+  // a button that's on the main bar, and this is the overflow), send back an
+  // empty rect.
+  if (index < start_index)
+    return gfx::Rect();
+
+  size_t relative_index = index - start_index;
+  int icons_per_overflow_row = platform_settings().icons_per_overflow_menu_row;
+  size_t row_index = in_overflow_mode() ?
+      relative_index / icons_per_overflow_row : 0;
+  size_t index_in_row = in_overflow_mode() ?
+      relative_index % icons_per_overflow_row : relative_index;
+
+  return gfx::Rect(platform_settings().left_padding +
+                       index_in_row * IconWidth(true),
+                   row_index * IconHeight(),
+                   IconWidth(false),
+                   IconHeight());
+}
+
 std::vector<ToolbarActionViewController*>
 ToolbarActionsBar::GetActions() const {
   std::vector<ToolbarActionViewController*> actions = toolbar_actions_.get();
@@ -379,7 +403,7 @@ void ToolbarActionsBar::CreateActions() {
     // CreateActions() can be called as part of the browser window set up, which
     // we need to let finish before showing the actions.
     scoped_ptr<extensions::ExtensionMessageBubbleController> controller =
-        ExtensionMessageBubbleFactory(browser_->profile()).GetController();
+        ExtensionMessageBubbleFactory(browser_).GetController();
     if (controller) {
       base::ThreadTaskRunnerHandle::Get()->PostTask(
           FROM_HERE, base::Bind(&ToolbarActionsBar::MaybeShowExtensionBubble,

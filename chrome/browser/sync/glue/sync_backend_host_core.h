@@ -9,6 +9,7 @@
 
 #include "base/timer/timer.h"
 #include "chrome/browser/sync/glue/sync_backend_host_impl.h"
+#include "components/invalidation/public/invalidation.h"
 #include "components/sync_driver/system_encryptor.h"
 #include "sync/internal_api/public/base/cancelation_signal.h"
 #include "sync/internal_api/public/sessions/type_debug_info_observer.h"
@@ -38,10 +39,12 @@ struct DoInitializeOptions {
       const std::string& restored_key_for_bootstrapping,
       const std::string& restored_keystore_key_for_bootstrapping,
       scoped_ptr<syncer::InternalComponentsFactory> internal_components_factory,
-      scoped_ptr<syncer::UnrecoverableErrorHandler> unrecoverable_error_handler,
+      const syncer::WeakHandle<syncer::UnrecoverableErrorHandler>&
+          unrecoverable_error_handler,
       const base::Closure& report_unrecoverable_error_function,
       scoped_ptr<syncer::SyncEncryptionHandler::NigoriState> saved_nigori_state,
-      syncer::PassphraseTransitionClearDataOption clear_data_option);
+      syncer::PassphraseTransitionClearDataOption clear_data_option,
+      const std::map<syncer::ModelType, int64>& invalidation_versions);
   ~DoInitializeOptions();
 
   base::MessageLoop* sync_loop;
@@ -61,10 +64,12 @@ struct DoInitializeOptions {
   std::string restored_key_for_bootstrapping;
   std::string restored_keystore_key_for_bootstrapping;
   scoped_ptr<syncer::InternalComponentsFactory> internal_components_factory;
-  scoped_ptr<syncer::UnrecoverableErrorHandler> unrecoverable_error_handler;
+  const syncer::WeakHandle<syncer::UnrecoverableErrorHandler>
+      unrecoverable_error_handler;
   base::Closure report_unrecoverable_error_function;
   scoped_ptr<syncer::SyncEncryptionHandler::NigoriState> saved_nigori_state;
   const syncer::PassphraseTransitionClearDataOption clear_data_option;
+  const std::map<syncer::ModelType, int64> invalidation_versions;
 };
 
 // Helper struct to handle currying params to
@@ -308,6 +313,12 @@ class SyncBackendHostCore
 
   // Set when the forwarding of per-type debug counters is enabled.
   bool forward_type_info_;
+
+  // A map of data type -> invalidation version to track the most recently
+  // received invalidation version for each type.
+  // This allows dropping any invalidations with versions older than those
+  // most recently received for that data type.
+  std::map<syncer::ModelType, int64> last_invalidation_versions_;
 
   base::WeakPtrFactory<SyncBackendHostCore> weak_ptr_factory_;
 

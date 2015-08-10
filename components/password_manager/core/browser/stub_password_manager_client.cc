@@ -4,10 +4,24 @@
 
 #include "components/password_manager/core/browser/stub_password_manager_client.h"
 
+#include "base/memory/scoped_ptr.h"
 #include "base/memory/scoped_vector.h"
 #include "components/password_manager/core/browser/password_form_manager.h"
+#include "components/password_manager/core/browser/store_result_filter.h"
 
 namespace password_manager {
+
+namespace {
+
+// This filter does not filter out anything, it is a dummy implementation of
+// the filter interface.
+class PassThroughStoreResultFilter : public StoreResultFilter {
+ public:
+  bool ShouldIgnore(const autofill::PasswordForm& form) override {
+    return false;
+  }
+};
+}
 
 StubPasswordManagerClient::StubPasswordManagerClient() {
 }
@@ -25,14 +39,10 @@ bool StubPasswordManagerClient::IsSyncAccountCredential(
   return false;
 }
 
-bool StubPasswordManagerClient::ShouldFilterAutofillResult(
-    const autofill::PasswordForm& form) {
-  return false;
-}
-
-bool StubPasswordManagerClient::PromptUserToSavePassword(
+bool StubPasswordManagerClient::PromptUserToSaveOrUpdatePassword(
     scoped_ptr<PasswordFormManager> form_to_save,
-    password_manager::CredentialSourceType type) {
+    password_manager::CredentialSourceType type,
+    bool update_password) {
   return false;
 }
 
@@ -58,6 +68,15 @@ PrefService* StubPasswordManagerClient::GetPrefs() {
 
 PasswordStore* StubPasswordManagerClient::GetPasswordStore() const {
   return nullptr;
+}
+
+const GURL& StubPasswordManagerClient::GetLastCommittedEntryURL() const {
+  return GURL::EmptyGURL();
+}
+
+scoped_ptr<StoreResultFilter>
+StubPasswordManagerClient::CreateStoreResultFilter() const {
+  return make_scoped_ptr(new PassThroughStoreResultFilter);
 }
 
 }  // namespace password_manager

@@ -8,7 +8,7 @@
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/password_manager/core/browser/affiliation_utils.h"
-#include "components/secure_display/elide_url.h"
+#include "components/url_formatter/elide_url.h"
 #include "net/base/net_util.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -39,11 +39,13 @@ void GetSavePasswordDialogTitleTextAndLinkRange(
     const GURL& user_visible_url,
     const GURL& form_origin_url,
     bool is_smartlock_branding_enabled,
+    bool is_update_password_bubble,
     base::string16* title,
     gfx::Range* title_link_range) {
   std::vector<size_t> offsets;
   std::vector<base::string16> replacements;
-  int title_id = IDS_SAVE_PASSWORD;
+  int title_id =
+      is_update_password_bubble ? IDS_UPDATE_PASSWORD : IDS_SAVE_PASSWORD;
 
   // Check whether the registry controlled domains for user-visible URL (i.e.
   // the one seen in the omnibox) and the password form post-submit navigation
@@ -54,7 +56,7 @@ void GetSavePasswordDialogTitleTextAndLinkRange(
           net::registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES);
   if (target_domain_differs) {
     title_id = IDS_SAVE_PASSWORD_TITLE;
-    replacements.push_back(secure_display::FormatUrlForSecurityDisplay(
+    replacements.push_back(url_formatter::FormatUrlForSecurityDisplay(
         form_origin_url, std::string()));
   }
 

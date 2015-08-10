@@ -70,6 +70,7 @@ isäntä</translation>
 <translation id="2813770873348017932">Yhteydet etätietokoneeseen on väliaikaisesti estetty, sillä siihen yritettiin ottaa yhteys virheellisellä PIN-koodilla. Yritä myöhemmin uudelleen.</translation>
 <translation id="6746493157771801606">Tyhjennä historia</translation>
 <translation id="4430435636878359009">Poista käytöstä etäyhteydet tähän tietokoneeseen</translation>
+<translation id="3244258558056547981">Näytä Cardboard-näkymä</translation>
 <translation id="2314101195544969792"><ph name="APPLICATION_NAME"/> -istuntosi on ollut epäaktiivinen jonkin aikaa, ja se katkaistaan pian.</translation>
 <translation id="6001953797859482435">Chrome-etäkäytön isäntäasetukset</translation>
 <translation id="225614027745146050">Tervetuloa</translation>
@@ -112,6 +113,7 @@ Lisätietoja tietosuojasta on Googlen tietosuojakäytännössä (http://goo.gl/S
 <translation id="8759753423332885148">Lisätietoja</translation>
 <translation id="4430915108080446161">Luodaan käyttökoodia...</translation>
 <translation id="2013996867038862849">Kaikki laitepareiksi yhdistetyt asiakkaat on poistettu.</translation>
+<translation id="5363265567587775042">Ota yhteyttä käyttäjään, jonka tietokonetta haluat käyttää. Pyydä häntä klikkaamaan <ph name="SHARE"/> ja antamaan käyttökoodi sinulle.</translation>
 <translation id="6985691951107243942">Haluatko varmasti poistaa käytöstä etäyhteydet kohteeseen <ph name="HOSTNAME"/>? Jos muutat mieltäsi, yhteydet täytyy palauttaa käyttöön kyseisellä tietokoneella.</translation>
 <translation id="6944854424004126054">Palauta ikkuna</translation>
 <translation id="9149992051684092333">Aloita työpöydän jakaminen antamalla käyttökoodi sinua avustavalle henkilölle.</translation>

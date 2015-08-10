@@ -5,17 +5,15 @@
 #ifndef GPU_COMMAND_BUFFER_SERVICE_CONTEXT_GROUP_H_
 #define GPU_COMMAND_BUFFER_SERVICE_CONTEXT_GROUP_H_
 
-#include <string>
 #include <vector>
 #include "base/basictypes.h"
 #include "base/containers/hash_tables.h"
-#include "base/memory/linked_ptr.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
+#include "gpu/command_buffer/common/constants.h"
 #include "gpu/command_buffer/common/gles2_cmd_format.h"
 #include "gpu/command_buffer/service/feature_info.h"
-#include "gpu/command_buffer/service/gles2_cmd_validation.h"
 #include "gpu/command_buffer/service/shader_translator_cache.h"
 #include "gpu/gpu_export.h"
 
@@ -181,14 +179,6 @@ class GPU_EXPORT ContextGroup : public base::RefCounted<ContextGroup> {
   // Loses all the context associated with this group.
   void LoseContexts(error::ContextLostReason reason);
 
-  // EXT_draw_buffer related states for backbuffer.
-  GLenum draw_buffer() const {
-    return draw_buffer_;
-  }
-  void set_draw_buffer(GLenum buf) {
-    draw_buffer_ = buf;
-  }
-
   bool GetBufferServiceId(GLuint client_id, GLuint* service_id) const;
 
   void AddSamplerId(GLuint client_id, GLuint service_id) {
@@ -310,8 +300,6 @@ class GPU_EXPORT ContextGroup : public base::RefCounted<ContextGroup> {
   base::hash_map<GLuint, GLuint> samplers_id_map_;
   base::hash_map<GLuint, GLuint> transformfeedbacks_id_map_;
   base::hash_map<GLuint, GLsync> syncs_id_map_;
-
-  GLenum draw_buffer_;
 
   DISALLOW_COPY_AND_ASSIGN(ContextGroup);
 };

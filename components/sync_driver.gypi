@@ -21,6 +21,8 @@
         # Note: file list duplicated in GN build.
         'sync_driver/backend_data_type_configurer.cc',
         'sync_driver/backend_data_type_configurer.h',
+        'sync_driver/backend_migrator.cc',
+        'sync_driver/backend_migrator.h',
         'sync_driver/change_processor.cc',
         'sync_driver/change_processor.h',
         'sync_driver/data_type_controller.cc',
@@ -66,11 +68,15 @@
         'sync_driver/profile_sync_auth_provider.h',
         'sync_driver/proxy_data_type_controller.cc',
         'sync_driver/proxy_data_type_controller.h',
+        'sync_driver/protocol_event_observer.cc',
+        'sync_driver/protocol_event_observer.h',
         'sync_driver/shared_change_processor.cc',
         'sync_driver/shared_change_processor.h',
         'sync_driver/shared_change_processor_ref.cc',
         'sync_driver/shared_change_processor_ref.h',
         'sync_driver/sync_api_component_factory.h',
+        'sync_driver/sync_error_controller.cc',
+        'sync_driver/sync_error_controller.h',
         'sync_driver/sync_frontend.cc',
         'sync_driver/sync_frontend.h',
         'sync_driver/sync_prefs.cc',
@@ -92,6 +98,15 @@
         }, {  # OS==ios
           'dependencies': [
             'sessions_ios',
+          ],
+        }],
+        ['configuration_policy==1', {
+          'dependencies': [
+            'policy',
+          ],
+          'sources': [
+            'sync_driver/sync_policy_handler.cc',
+            'sync_driver/sync_policy_handler.h',
           ],
         }],
       ],

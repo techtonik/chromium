@@ -553,6 +553,8 @@ const Experiment::Choice kProgressBarAnimationChoices[] = {
   { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
   { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
       switches::kProgressBarAnimation, "disabled" },
+  { IDS_FLAGS_PROGRESS_BAR_ANIMATION_LINEAR,
+        switches::kProgressBarAnimation, "linear" },
   { IDS_FLAGS_PROGRESS_BAR_ANIMATION_SMOOTH,
       switches::kProgressBarAnimation, "smooth" },
   { IDS_FLAGS_PROGRESS_BAR_ANIMATION_FAST_START,
@@ -825,6 +827,11 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_ENABLE_SLIMMING_PAINT_DESCRIPTION,
      kOsAll,
      SINGLE_VALUE_TYPE(switches::kEnableSlimmingPaint)},
+     {"enable-slimming-paint-v2",
+      IDS_FLAGS_ENABLE_SLIMMING_PAINT_V2_NAME,
+      IDS_FLAGS_ENABLE_SLIMMING_PAINT_V2_DESCRIPTION,
+      kOsAll,
+      SINGLE_VALUE_TYPE(switches::kEnableSlimmingPaintV2)},
     {"enable-experimental-web-platform-features",
      IDS_FLAGS_EXPERIMENTAL_WEB_PLATFORM_FEATURES_NAME,
      IDS_FLAGS_EXPERIMENTAL_WEB_PLATFORM_FEATURES_DESCRIPTION,
@@ -1106,6 +1113,12 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_PASSWORD_MANAGER_REAUTHENTICATION_DESCRIPTION,
      kOsMac | kOsWin,
      SINGLE_VALUE_TYPE(switches::kDisablePasswordManagerReauthentication)},
+    {"enable-password-change-support",
+     IDS_FLAGS_ENABLE_PASSWORD_CHANGE_SUPPORT_NAME,
+     IDS_FLAGS_ENABLE_PASSWORD_CHANGE_SUPPORT_DESCRIPTION,
+     kOsWin | kOsLinux | kOsCrOS,
+     SINGLE_VALUE_TYPE(
+         password_manager::switches::kEnablePasswordChangeSupport)},
     {"enable-password-force-saving",
      IDS_FLAGS_ENABLE_PASSWORD_FORCE_SAVING_NAME,
      IDS_FLAGS_ENABLE_PASSWORD_FORCE_SAVING_DESCRIPTION,
@@ -1490,11 +1503,6 @@ const Experiment kExperiments[] = {
      IDS_FLAGS_ENABLE_EPHEMERAL_APPS_IN_WEBSTORE_DESCRIPTION,
      kOsAll,
      SINGLE_VALUE_TYPE(switches::kEnableEphemeralAppsInWebstore)},
-    {"enable-linkable-ephemeral-apps",
-     IDS_FLAGS_ENABLE_LINKABLE_EPHEMERAL_APPS_NAME,
-     IDS_FLAGS_ENABLE_LINKABLE_EPHEMERAL_APPS_DESCRIPTION,
-     kOsAll,
-     SINGLE_VALUE_TYPE(switches::kEnableLinkableEphemeralApps)},
 #if defined(OS_ANDROID)
     {"disable-click-delay",
      IDS_FLAGS_DISABLE_CLICK_DELAY_NAME,
@@ -2038,6 +2046,11 @@ const Experiment kExperiments[] = {
      kOsMac,
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableAppWindowCycling,
                                switches::kDisableAppWindowCycling)},
+    {"mac-views-dialogs",
+     IDS_FLAGS_MAC_VIEWS_DIALOGS_NAME,
+     IDS_FLAGS_MAC_VIEWS_DIALOGS_DESCRIPTION,
+     kOsMac,
+     SINGLE_VALUE_TYPE(switches::kEnableMacViewsDialogs)},
 #endif
 #if defined(ENABLE_WEBVR)
     {"enable-webvr",
@@ -2108,7 +2121,30 @@ const Experiment kExperiments[] = {
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableOfflinePages,
                                switches::kDisableOfflinePages)},
 #endif  // defined(OS_ANDROID)
-
+    {"low-priority-iframes",
+     IDS_FLAGS_LOW_PRIORITY_IFRAMES_UI_NAME,
+     IDS_FLAGS_LOW_PRIORITY_IFRAMES_UI_DESCRIPTION,
+     kOsAll,
+     // NOTE: if we want to add additional experiment entries for other
+     // features controlled by kBlinkSettings, we'll need to add logic to
+     // merge the flag values.
+     SINGLE_VALUE_TYPE_AND_VALUE(
+         switches::kBlinkSettings, "lowPriorityIframes=true")},
+#if defined(OS_ANDROID)
+    {"enable-ntp-popular-sites",
+     IDS_FLAGS_NTP_POPULAR_SITES_NAME,
+     IDS_FLAGS_NTP_POPULAR_SITES_DESCRIPTION,
+     kOsAndroid,
+     ENABLE_DISABLE_VALUE_TYPE(switches::kEnableNTPPopularSites,
+                               switches::kDisableNTPPopularSites)},
+#endif  // defined(OS_ANDROID)
+#if defined(OS_WIN)
+     {"trace-export-events-to-etw",
+      IDS_FLAGS_TRACE_EXPORT_EVENTS_TO_ETW_NAME,
+      IDS_FLAGS_TRACE_EXPORT_EVENTS_TO_ETW_DESRIPTION,
+      kOsWin,
+      SINGLE_VALUE_TYPE(switches::kTraceExportEventsToETW)},
+#endif  // defined(OS_WIN)
     // NOTE: Adding new command-line switches requires adding corresponding
     // entries to enum "LoginCustomFlags" in histograms.xml. See note in
     // histograms.xml and don't forget to run AboutFlagsHistogramTest unit test.

@@ -70,6 +70,7 @@ Chromoting</translation>
 <translation id="2813770873348017932">Las conexiones con el ordenador remoto se han bloqueado temporalmente porque alguien ha intentado establecer conexión con él con un PIN que no es válido. Vuelve a intentarlo más tarde.</translation>
 <translation id="6746493157771801606">Borrar historial</translation>
 <translation id="4430435636878359009">Se inhabilitan las conexiones remotas con este ordenador</translation>
+<translation id="3244258558056547981">Mostrar vista de Cardboard.</translation>
 <translation id="2314101195544969792">La sesión de <ph name="APPLICATION_NAME"/> lleva un tiempo inactiva y se desconectará en breve.</translation>
 <translation id="6001953797859482435">Preferencias del host de Escritorio remoto de Chrome</translation>
 <translation id="225614027745146050">Te damos la bienvenida</translation>
@@ -112,6 +113,7 @@ Para obtener información sobre la privacidad, consulta la Política de privacid
 <translation id="8759753423332885148">Más información</translation>
 <translation id="4430915108080446161">Generando código de acceso...</translation>
 <translation id="2013996867038862849">Se han eliminado todos los clientes sincronizados.</translation>
+<translation id="5363265567587775042">Pregunta al usuario el ordenador al que se quiere acceder para hacer clic en <ph name="SHARE"/> y proporcionar el código de acceso.</translation>
 <translation id="6985691951107243942">¿Seguro que quieres inhabilitar las conexiones remotas con <ph name="HOSTNAME"/>? Si cambias de opinión, tendrás que volver a habilitar las conexiones desde ese ordenador.</translation>
 <translation id="6944854424004126054">Restaura la ventana</translation>
 <translation id="9149992051684092333">Para empezar a compartir tu escritorio, proporciona el código de acceso que se muestra a continuación a la persona que te vaya a ayudar.</translation>

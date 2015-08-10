@@ -9,6 +9,7 @@
 #include "base/memory/scoped_vector.h"
 #include "components/autofill/core/common/password_form.h"
 #include "components/password_manager/core/browser/password_store.h"
+#include "components/password_manager/core/browser/store_result_filter.h"
 
 class PrefService;
 
@@ -59,10 +60,6 @@ class PasswordManagerClient {
   // of SSL errors on a page.
   virtual bool IsSavingEnabledForCurrentPage() const;
 
-  // Return true if |form| should not be available for autofill.
-  virtual bool ShouldFilterAutofillResult(
-      const autofill::PasswordForm& form) = 0;
-
   // Return the username that the user is syncing with. Should return an empty
   // string if sync is not enabled for passwords.
   virtual std::string GetSyncUsername() const = 0;
@@ -72,17 +69,14 @@ class PasswordManagerClient {
   virtual bool IsSyncAccountCredential(const std::string& username,
                                        const std::string& realm) const = 0;
 
-  // Called when all autofill results have been computed. Client can use
-  // this signal to report statistics. Default implementation is a noop.
-  virtual void AutofillResultsComputed();
-
-  // Informs the embedder of a password form that can be saved if the user
-  // allows it. The embedder is not required to prompt the user if it decides
-  // that this form doesn't need to be saved.
-  // Returns true if the prompt was indeed displayed.
-  virtual bool PromptUserToSavePassword(
+  // Informs the embedder of a password form that can be saved or updated in
+  // password store if the user allows it. The embedder is not required to
+  // prompt the user if it decides that this form doesn't need to be saved or
+  // updated. Returns true if the prompt was indeed displayed.
+  virtual bool PromptUserToSaveOrUpdatePassword(
       scoped_ptr<PasswordFormManager> form_to_save,
-      CredentialSourceType type) = 0;
+      CredentialSourceType type,
+      bool update_password) = 0;
 
   // Informs the embedder of a password forms that the user should choose from.
   // Returns true if the prompt is indeed displayed. If the prompt is not
@@ -170,6 +164,17 @@ class PasswordManagerClient {
 
   // Returns the main frame URL.
   virtual const GURL& GetMainFrameURL() const;
+
+  // Returns true if the UI for confirmation of update password is enabled.
+  virtual bool IsUpdatePasswordUIEnabled() const;
+
+  virtual const GURL& GetLastCommittedEntryURL() const = 0;
+
+  // Creates a filter for PasswordFormManager to process password store
+  // response. One filter should be created for every batch of store results for
+  // a single observed form. The filter results should not be cached.
+  virtual scoped_ptr<password_manager::StoreResultFilter>
+  CreateStoreResultFilter() const = 0;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(PasswordManagerClient);

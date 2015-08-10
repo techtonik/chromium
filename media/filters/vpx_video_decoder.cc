@@ -102,7 +102,8 @@ class VpxVideoDecoder::MemoryPool
   // to this pool.
   base::Closure CreateFrameCallback(void* fb_priv_data);
 
-  bool OnMemoryDump(base::trace_event::ProcessMemoryDump* pmd) override;
+  bool OnMemoryDump(const base::trace_event::MemoryDumpArgs& args,
+                    base::trace_event::ProcessMemoryDump* pmd) override;
 
  private:
   friend class base::RefCountedThreadSafe<VpxVideoDecoder::MemoryPool>;
@@ -194,6 +195,7 @@ base::Closure VpxVideoDecoder::MemoryPool::CreateFrameCallback(
 }
 
 bool VpxVideoDecoder::MemoryPool::OnMemoryDump(
+    const base::trace_event::MemoryDumpArgs& args,
     base::trace_event::ProcessMemoryDump* pmd) {
   base::trace_event::MemoryAllocatorDump* memory_dump =
       pmd->CreateAllocatorDump("media/vpx/memory_pool");
@@ -292,10 +294,12 @@ bool VpxVideoDecoder::ConfigureDecoder(const VideoDecoderConfig& config) {
   if (config.codec() != kCodecVP8 && config.codec() != kCodecVP9)
     return false;
 
-  // In VP8 videos, only those with alpha are handled by VpxVideoDecoder. All
-  // other VP8 videos go to FFmpegVideoDecoder.
+#if !defined(DISABLE_FFMPEG_VIDEO_DECODERS)
+  // When FFmpegVideoDecoder is available it handles VP8 that doesn't have
+  // alpha, and VpxVideoDecoder will handle VP8 with alpha.
   if (config.codec() == kCodecVP8 && config.format() != PIXEL_FORMAT_YV12A)
     return false;
+#endif
 
   CloseDecoder();
 

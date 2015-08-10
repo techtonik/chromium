@@ -39,7 +39,6 @@
 #include "chrome/browser/signin/chrome_signin_client_factory.h"
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
-#include "chrome/browser/sync/backend_migrator.h"
 #include "chrome/browser/sync/glue/chrome_report_unrecoverable_error.h"
 #include "chrome/browser/sync/glue/favicon_cache.h"
 #include "chrome/browser/sync/glue/sync_backend_host.h"
@@ -49,7 +48,6 @@
 #include "chrome/browser/sync/profile_sync_components_factory_impl.h"
 #include "chrome/browser/sync/sessions/notification_service_sessions_router.h"
 #include "chrome/browser/sync/supervised_user_signin_manager_wrapper.h"
-#include "chrome/browser/sync/sync_error_controller.h"
 #include "chrome/browser/sync/sync_stopped_reporter.h"
 #include "chrome/browser/sync/sync_type_preference_provider.h"
 #include "chrome/browser/ui/browser.h"
@@ -71,10 +69,12 @@
 #include "components/signin/core/browser/profile_oauth2_token_service.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/signin/core/browser/signin_metrics.h"
+#include "components/sync_driver/backend_migrator.h"
 #include "components/sync_driver/change_processor.h"
 #include "components/sync_driver/data_type_controller.h"
 #include "components/sync_driver/device_info.h"
 #include "components/sync_driver/pref_names.h"
+#include "components/sync_driver/sync_error_controller.h"
 #include "components/sync_driver/system_encryptor.h"
 #include "components/sync_driver/user_selectable_sync_type.h"
 #include "content/public/browser/browser_thread.h"
@@ -525,17 +525,12 @@ void ProfileSyncService::InitializeBackend(bool delete_stale_data) {
   if (backend_mode_ == SYNC && delete_stale_data)
     ClearStaleErrors();
 
-  scoped_ptr<syncer::UnrecoverableErrorHandler>
-      backend_unrecoverable_error_handler(
-          new browser_sync::BackendUnrecoverableErrorHandler(
-              MakeWeakHandle(weak_factory_.GetWeakPtr())));
-
   backend_->Initialize(this, sync_thread_.Pass(), GetJsEventHandler(),
                        sync_service_url_, credentials, delete_stale_data,
                        scoped_ptr<syncer::SyncManagerFactory>(
                            new syncer::SyncManagerFactory(GetManagerType()))
                            .Pass(),
-                       backend_unrecoverable_error_handler.Pass(),
+                       MakeWeakHandle(weak_factory_.GetWeakPtr()),
                        base::Bind(browser_sync::ChromeReportUnrecoverableError),
                        network_resources_.get(), saved_nigori_state_.Pass());
 }

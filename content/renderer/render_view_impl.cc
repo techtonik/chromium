@@ -600,10 +600,9 @@ void ApplyBlinkSettings(const base::CommandLine& command_line,
   if (!command_line.HasSwitch(switches::kBlinkSettings))
     return;
 
-  std::vector<std::string> blink_settings;
-  base::SplitString(
-      command_line.GetSwitchValueASCII(switches::kBlinkSettings), ',',
-      &blink_settings);
+  std::vector<std::string> blink_settings = base::SplitString(
+      command_line.GetSwitchValueASCII(switches::kBlinkSettings),
+      ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
   for (const std::string& setting : blink_settings) {
     size_t pos = setting.find('=');
     settings->setFromStrings(
@@ -990,6 +989,7 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
       prefs.javascript_can_access_clipboard);
   WebRuntimeFeatures::enableXSLT(prefs.xslt_enabled);
   WebRuntimeFeatures::enableSlimmingPaint(prefs.slimming_paint_enabled);
+  WebRuntimeFeatures::enableSlimmingPaintV2(prefs.slimming_paint_v2_enabled);
   settings->setXSSAuditorEnabled(prefs.xss_auditor_enabled);
   settings->setDNSPrefetchingEnabled(prefs.dns_prefetching_enabled);
   settings->setLocalStorageEnabled(prefs.local_storage_enabled);
@@ -1068,6 +1068,9 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
 
   settings->setStrictlyBlockBlockableMixedContent(
       prefs.strictly_block_blockable_mixed_content);
+
+  settings->setStrictMixedContentCheckingForPlugin(
+      prefs.block_mixed_plugin_content);
 
   settings->setStrictPowerfulFeatureRestrictions(
       prefs.strict_powerful_feature_restrictions);
@@ -1161,6 +1164,7 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
       prefs.ignore_main_frame_overflow_hidden_quirk);
   settings->setReportScreenSizeInPhysicalPixelsQuirk(
       prefs.report_screen_size_in_physical_pixels_quirk);
+  settings->setPreferHiddenVolumeControls(true);
 
   bool record_full_layer =
       RenderViewImpl::FromWebView(web_view)
@@ -1996,7 +2000,8 @@ void RenderViewImpl::focusedNodeChanged(const WebNode& fromNode,
     new_frame->FocusedNodeChanged(toNode);
 
   // TODO(dmazzoni): remove once there's a separate a11y tree per frame.
-  GetMainRenderFrame()->FocusedNodeChangedForAccessibility(toNode);
+  if (main_render_frame_)
+    main_render_frame_->FocusedNodeChangedForAccessibility(toNode);
 }
 
 void RenderViewImpl::didUpdateLayout() {

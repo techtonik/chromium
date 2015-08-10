@@ -321,8 +321,11 @@ void PictureLayerImpl::AppendQuads(RenderPass* render_pass,
 
     if (!has_draw_quad) {
       // Checkerboard.
-      // TODO(danakj): Make this a different color when debugging.
       SkColor color = SafeOpaqueBackgroundColor();
+      if (ShowDebugBorders()) {
+        // Fill the whole tile with the missing tile color.
+        color = DebugColors::OOMTileBorderColor();
+      }
       SolidColorDrawQuad* quad =
           render_pass->CreateAndAppendDrawQuad<SolidColorDrawQuad>();
       quad->SetNew(shared_quad_state, geometry_rect, visible_geometry_rect,
@@ -692,7 +695,8 @@ gfx::Size PictureLayerImpl::CalculateTileSize(
       divisor = 2;
     if (content_bounds.width() <= viewport_width / 4)
       divisor = 1;
-    default_tile_height = MathUtil::RoundUp(viewport_height, divisor) / divisor;
+    default_tile_height =
+        MathUtil::UncheckedRoundUp(viewport_height, divisor) / divisor;
 
     // Grow default sizes to account for overlapping border texels.
     default_tile_width += 2 * PictureLayerTiling::kBorderTexels;
@@ -728,12 +732,12 @@ gfx::Size PictureLayerImpl::CalculateTileSize(
   // Clamp the tile width/height to the content width/height to save space.
   if (content_bounds.width() < default_tile_width) {
     tile_width = std::min(tile_width, content_bounds.width());
-    tile_width = MathUtil::RoundUp(tile_width, kTileRoundUp);
+    tile_width = MathUtil::UncheckedRoundUp(tile_width, kTileRoundUp);
     tile_width = std::min(tile_width, default_tile_width);
   }
   if (content_bounds.height() < default_tile_height) {
     tile_height = std::min(tile_height, content_bounds.height());
-    tile_height = MathUtil::RoundUp(tile_height, kTileRoundUp);
+    tile_height = MathUtil::UncheckedRoundUp(tile_height, kTileRoundUp);
     tile_height = std::min(tile_height, default_tile_height);
   }
 
@@ -806,9 +810,17 @@ void PictureLayerImpl::AddTilingsForRasterScale() {
 
   PictureLayerTiling* high_res =
       tilings_->FindTilingWithScale(raster_contents_scale_);
-  // We always need a high res tiling, so create one if it doesn't exist.
-  if (!high_res)
+  if (!high_res) {
+    // We always need a high res tiling, so create one if it doesn't exist.
     high_res = AddTiling(raster_contents_scale_);
+  } else if (high_res->may_contain_low_resolution_tiles()) {
+    // If the tiling we find here was LOW_RESOLUTION previously, it may not be
+    // fully rastered, so destroy the old tiles.
+    high_res->Reset();
+    // Reset the flag now that we'll make it high res, it will have fully
+    // rastered content.
+    high_res->reset_may_contain_low_resolution_tiles();
+  }
   high_res->set_resolution(HIGH_RESOLUTION);
 
   // If the low res scale is the same as the high res scale, that tiling

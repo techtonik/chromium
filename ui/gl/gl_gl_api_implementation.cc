@@ -475,13 +475,13 @@ void RealGLApi::glFinishFn() {
 void RealGLApi::InitializeFilteredExtensions() {
   if (disabled_exts_.size()) {
     filtered_exts_.clear();
-    if (gfx::GetGLImplementation() !=
-        gfx::kGLImplementationDesktopGLCoreProfile) {
+    if (gfx::WillUseGLGetStringForExtensions()) {
       filtered_exts_str_ =
           FilterGLExtensionList(reinterpret_cast<const char*>(
                                     GLApiBase::glGetStringFn(GL_EXTENSIONS)),
                                 disabled_exts_);
-      base::SplitString(filtered_exts_str_, ' ', &filtered_exts_);
+      filtered_exts_ = base::SplitString(
+          filtered_exts_str_, " ", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
     } else {
       GLint num_extensions = 0;
       GLApiBase::glGetIntegervFn(GL_NUM_EXTENSIONS, &num_extensions);
@@ -612,15 +612,6 @@ void VirtualGLApi::glFlushFn() {
 
 void VirtualGLApi::glFinishFn() {
   GLApiBase::glFinishFn();
-}
-
-ScopedSetGLToRealGLApi::ScopedSetGLToRealGLApi()
-    : old_gl_api_(GetCurrentGLApi()) {
-  SetGLToRealGLApi();
-}
-
-ScopedSetGLToRealGLApi::~ScopedSetGLToRealGLApi() {
-  SetGLApi(old_gl_api_);
 }
 
 }  // namespace gfx

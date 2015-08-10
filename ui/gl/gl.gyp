@@ -115,12 +115,16 @@
         'gpu_switching_observer.h',
         'gpu_timing.cc',
         'gpu_timing.h',
+        'scoped_api.cc',
+        'scoped_api.h',
         'scoped_binders.cc',
         'scoped_binders.h',
         'scoped_make_current.cc',
         'scoped_make_current.h',
         'sync_control_vsync_provider.cc',
         'sync_control_vsync_provider.h',
+        'trace_util.cc',
+        'trace_util.h',
       ],
       'conditions': [
         ['OS in ("win", "android", "linux")', {

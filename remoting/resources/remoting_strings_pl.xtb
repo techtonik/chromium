@@ -70,6 +70,7 @@ Chromoting</translation>
 <translation id="2813770873348017932">Połączenia z komputerem zdalnym są chwilowo zablokowane, bo ktoś próbował się z nim połączyć, podając nieprawidłowy PIN. Spróbuj ponownie później.</translation>
 <translation id="6746493157771801606">Wyczyść historię</translation>
 <translation id="4430435636878359009">Wyłącz połączenia zdalne z tym komputerem</translation>
+<translation id="3244258558056547981">Pokaż widok Cardboard.</translation>
 <translation id="2314101195544969792">Sesja aplikacji <ph name="APPLICATION_NAME"/> jest od jakiegoś czasu nieaktywna i zostanie wkrótce zakończona.</translation>
 <translation id="6001953797859482435">Ustawienia hosta Pulpitu zdalnego Chrome</translation>
 <translation id="225614027745146050">Witamy</translation>
@@ -112,6 +113,7 @@ Informacje na temat prywatności znajdziesz w Polityce prywatności Google (http
 <translation id="8759753423332885148">Więcej informacji.</translation>
 <translation id="4430915108080446161">Generuję kod dostępu…</translation>
 <translation id="2013996867038862849">Wszystkie sparowane klienty zostały usunięte.</translation>
+<translation id="5363265567587775042">Poproś użytkownika, z którego komputera chcesz korzystać, by kliknął „<ph name="SHARE"/>” i udostępnił Ci kod dostępu.</translation>
 <translation id="6985691951107243942">Na pewno chcesz wyłączyć połączenia zdalne z: <ph name="HOSTNAME"/>? Jeśli zmienisz zdanie, połączenia będzie trzeba włączyć na tamtym komputerze.</translation>
 <translation id="6944854424004126054">Przywróć okno</translation>
 <translation id="9149992051684092333">Aby udostępnić pulpit, podaj poniższy kod dostępu osobie, która będzie Ci pomagać.</translation>

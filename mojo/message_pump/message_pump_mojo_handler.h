@@ -5,6 +5,7 @@
 #ifndef MOJO_MESSAGE_PUMP_MESSAGE_PUMP_MOJO_HANDLER_H_
 #define MOJO_MESSAGE_PUMP_MESSAGE_PUMP_MOJO_HANDLER_H_
 
+#include "mojo/message_pump/mojo_message_pump_export.h"
 #include "third_party/mojo/src/mojo/public/cpp/system/core.h"
 
 namespace mojo {
@@ -12,7 +13,7 @@ namespace common {
 
 // Used by MessagePumpMojo to notify when a handle is either ready or has become
 // invalid. In case of error, the handler will be removed.
-class MessagePumpMojoHandler {
+class MOJO_MESSAGE_PUMP_EXPORT MessagePumpMojoHandler {
  public:
   virtual void OnHandleReady(const Handle& handle) = 0;
 

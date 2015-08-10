@@ -13,6 +13,7 @@
 #include "base/observer_list.h"
 #include "base/synchronization/lock.h"
 #include "base/time/time.h"
+#include "mojo/message_pump/mojo_message_pump_export.h"
 #include "third_party/mojo/src/mojo/public/cpp/system/core.h"
 
 namespace mojo {
@@ -21,9 +22,9 @@ namespace common {
 class MessagePumpMojoHandler;
 
 // Mojo implementation of MessagePump.
-class MessagePumpMojo : public base::MessagePump {
+class MOJO_MESSAGE_PUMP_EXPORT MessagePumpMojo : public base::MessagePump {
  public:
-  class Observer {
+  class MOJO_MESSAGE_PUMP_EXPORT Observer {
    public:
     Observer() {}
 

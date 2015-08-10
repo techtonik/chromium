@@ -71,6 +71,7 @@ Chromoting</translation>
 <translation id="2813770873348017932">Připojení ke vzdálenému počítači jsou dočasně zablokována, protože došlo k několika pokusům o připojení s nesprávným kódem PIN. Opakujte akci později.</translation>
 <translation id="6746493157771801606">Vymazat historii</translation>
 <translation id="4430435636878359009">Zakázat vzdálená připojení k tomuto počítači</translation>
+<translation id="3244258558056547981">Přepnout na zobrazení Cardboard</translation>
 <translation id="2314101195544969792">Relace aplikace <ph name="APPLICATION_NAME"/> je již nějakou dobu neaktivní a brzy bude odpojena.</translation>
 <translation id="6001953797859482435">Nastavení hostitele Vzdálené plochy Chrome</translation>
 <translation id="225614027745146050">Vítejte</translation>
@@ -113,6 +114,7 @@ Informace ohledně ochrany soukromí naleznete v zásadách ochrany soukromí sp
 <translation id="8759753423332885148">Další informace</translation>
 <translation id="4430915108080446161">Vytváření přístupového kódu...</translation>
 <translation id="2013996867038862849">Všichni spárovaní klienti byli smazáni.</translation>
+<translation id="5363265567587775042">Požádejte uživatele, k jehož počítači chcete získat přístup, aby kliknul na tlačítko <ph name="SHARE"/> a dal vám přístupový kód.</translation>
 <translation id="6985691951107243942">Opravdu chcete zakázat vzdálená připojení k počítači <ph name="HOSTNAME"/>? Pokud později své rozhodnutí změníte, bude nutné připojení povolit přímo z uvedeného počítače.</translation>
 <translation id="6944854424004126054">Obnovit okno</translation>
 <translation id="9149992051684092333">Chcete-li začít sdílet svoji plochu, poskytněte níže uvedený přístupový kód osobě, která vám bude pomáhat.</translation>

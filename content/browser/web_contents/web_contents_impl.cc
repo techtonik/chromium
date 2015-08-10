@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "base/command_line.h"
-#include "base/debug/crash_logging.h"
 #include "base/lazy_instance.h"
 #include "base/location.h"
 #include "base/logging.h"
@@ -23,6 +22,7 @@
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
 #include "components/mime_util/mime_util.h"
+#include "components/url_formatter/url_formatter.h"
 #include "content/browser/accessibility/accessibility_mode_helper.h"
 #include "content/browser/accessibility/browser_accessibility_state_impl.h"
 #include "content/browser/bad_message.h"
@@ -102,7 +102,6 @@
 #include "content/public/common/web_preferences.h"
 #include "mojo/common/url_type_converters.h"
 #include "mojo/converters/geometry/geometry_type_converters.h"
-#include "net/base/net_util.h"
 #include "net/http/http_cache.h"
 #include "net/http/http_transaction_factory.h"
 #include "net/url_request/url_request_context.h"
@@ -2476,11 +2475,11 @@ void WebContentsImpl::SaveFrameWithHeaders(const GURL& url,
   if (headers.empty()) {
     params->set_prefer_cache(true);
   } else {
-    std::vector<std::string> key_value_list;
-    base::SplitString(headers, '\n', &key_value_list);
-    for (const auto& key_value : key_value_list) {
-      std::vector<std::string> pair;
-      base::SplitString(key_value, ':', &pair);
+    for (const base::StringPiece& key_value :
+         base::SplitStringPiece(
+             headers, "\n", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL)) {
+      std::vector<std::string> pair = base::SplitString(
+          key_value, ":", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
       DCHECK_EQ(2ul, pair.size());
       params->add_request_header(pair[0], pair[1]);
     }
@@ -2713,20 +2712,18 @@ void WebContentsImpl::Find(int request_id,
                            const base::string16& search_text,
                            const blink::WebFindOptions& options) {
   // See if a top level browser plugin handles the find request first.
-  if (browser_plugin_embedder_) {
-    BrowserPluginGuest* guest = browser_plugin_embedder_->GetFullPageGuest();
-    if (guest && guest->Find(request_id, search_text, options))
-      return;
+  if (browser_plugin_embedder_ &&
+      browser_plugin_embedder_->Find(request_id, search_text, options)) {
+    return;
   }
   Send(new ViewMsg_Find(GetRoutingID(), request_id, search_text, options));
 }
 
 void WebContentsImpl::StopFinding(StopFindAction action) {
   // See if a top level browser plugin handles the stop finding request first.
-  if (browser_plugin_embedder_) {
-    BrowserPluginGuest* guest = browser_plugin_embedder_->GetFullPageGuest();
-    if (guest && guest->StopFinding(action))
-      return;
+  if (browser_plugin_embedder_ &&
+      browser_plugin_embedder_->StopFinding(action)) {
+    return;
   }
   Send(new ViewMsg_StopFinding(GetRoutingID(), action));
 }
@@ -3883,7 +3880,6 @@ void WebContentsImpl::UpdateState(RenderViewHost* rvh,
 
   NavigationEntryImpl* new_entry = controller_.GetEntryWithUniqueID(
       rvhi->nav_entry_id());
-  CHECK(new_entry);
 
   if (SiteIsolationPolicy::UseSubframeNavigationEntries()) {
     // TODO(creis): We can't properly update state for cross-process subframes
@@ -3891,23 +3887,7 @@ void WebContentsImpl::UpdateState(RenderViewHost* rvh,
     // method.
     entry = new_entry;
   } else {
-    base::debug::SetCrashKeyValue("pageid", base::IntToString(page_id));
-    base::debug::SetCrashKeyValue("navuniqueid",
-                                  base::IntToString(rvhi->nav_entry_id()));
-    base::debug::SetCrashKeyValue(
-        "oldindex", base::IntToString(controller_.GetIndexOfEntry(entry)));
-    base::debug::SetCrashKeyValue(
-        "newindex", base::IntToString(controller_.GetIndexOfEntry(new_entry)));
-    base::debug::SetCrashKeyValue(
-        "lastcommittedindex",
-        base::IntToString(controller_.GetLastCommittedEntryIndex()));
-    base::debug::SetCrashKeyValue("oldurl", entry->GetURL().spec());
-    base::debug::SetCrashKeyValue("newurl", new_entry->GetURL().spec());
-    base::debug::SetCrashKeyValue(
-        "updatedvalue", page_state.GetTopLevelUrlStringTemporaryForBug369661());
-    base::debug::SetCrashKeyValue("oldvalue", entry->GetURL().spec());
-    base::debug::SetCrashKeyValue("newvalue", new_entry->GetURL().spec());
-    CHECK_EQ(entry, new_entry);
+    DCHECK_EQ(entry, new_entry);
   }
 
   if (page_state == entry->GetPageState())
@@ -4268,9 +4248,9 @@ void WebContentsImpl::LoadStateChanged(
   load_state_ = load_state;
   upload_position_ = upload_position;
   upload_size_ = upload_size;
-  load_state_host_ = net::IDNToUnicode(url.host(),
-      GetContentClient()->browser()->GetAcceptLangs(
-          GetBrowserContext()));
+  load_state_host_ = url_formatter::IDNToUnicode(
+      url.host(),
+      GetContentClient()->browser()->GetAcceptLangs(GetBrowserContext()));
   if (load_state_.state == net::LOAD_STATE_READING_RESPONSE)
     SetNotWaitingForResponse();
   if (IsLoading()) {

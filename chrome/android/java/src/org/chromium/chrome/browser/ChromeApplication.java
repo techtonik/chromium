@@ -40,6 +40,7 @@ import org.chromium.chrome.R;
 import org.chromium.chrome.browser.accessibility.FontSizePrefs;
 import org.chromium.chrome.browser.banners.AppBannerManager;
 import org.chromium.chrome.browser.banners.AppDetailsDelegate;
+import org.chromium.chrome.browser.customtabs.CustomTabsConnection;
 import org.chromium.chrome.browser.document.DocumentActivity;
 import org.chromium.chrome.browser.document.IncognitoDocumentActivity;
 import org.chromium.chrome.browser.download.DownloadManagerService;
@@ -55,6 +56,7 @@ import org.chromium.chrome.browser.invalidation.UniqueIdInvalidationClientNameGe
 import org.chromium.chrome.browser.metrics.UmaUtils;
 import org.chromium.chrome.browser.metrics.VariationsSession;
 import org.chromium.chrome.browser.multiwindow.MultiWindowUtils;
+import org.chromium.chrome.browser.net.qualityprovider.NetworkQualityProvider;
 import org.chromium.chrome.browser.net.spdyproxy.DataReductionProxySettings;
 import org.chromium.chrome.browser.omaha.RequestGenerator;
 import org.chromium.chrome.browser.omaha.UpdateInfoBarHelper;
@@ -595,6 +597,13 @@ public class ChromeApplication extends ContentApplication {
     }
 
     /**
+     * @return A provider of network quality.
+     */
+    public NetworkQualityProvider createNetworkQualityProvider() {
+        return new NetworkQualityProvider();
+    }
+
+    /**
      * @return The user agent string of Chrome.
      */
     public static String getBrowserUserAgent() {
@@ -676,6 +685,15 @@ public class ChromeApplication extends ContentApplication {
         if (activity instanceof ChromeActivity) return new ChromeWindow((ChromeActivity) activity);
         return new ActivityWindowAndroid(activity);
     }
+
+    /**
+     * @return An instance of {@link CustomTabsConnection}. Should not be called
+     * outside of {@link CustomTabsConnection#getInstance()}.
+     */
+    public CustomTabsConnection createCustomTabsConnection() {
+        return new CustomTabsConnection(this);
+    }
+
     /**
      * @return Instance of printing controller that is shared among all chromium activities. May
      *         return null if printing is not supported on the platform.

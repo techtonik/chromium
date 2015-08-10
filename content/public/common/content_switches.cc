@@ -191,6 +191,10 @@ const char kDisableMediaSource[]            = "disable-media-source";
 // Disables usage of the namespace sandbox.
 const char kDisableNamespaceSandbox[]       = "disable-namespace-sandbox";
 
+// Disables native GPU memory buffer support.
+const char kDisableNativeGpuMemoryBuffers[] =
+    "disable-native-gpu-memory-buffers";
+
 // Disables the Web Notification and the Push APIs.
 const char kDisableNotifications[]          = "disable-notifications";
 
@@ -420,6 +424,9 @@ const char kEnableSkiaBenchmarking[]        = "enable-skia-benchmarking";
 // Enables slimming paint: http://www.chromium.org/blink/slimming-paint
 // Overrides kDisableSlimmingPaint if both are present.
 const char kEnableSlimmingPaint[]           = "enable-slimming-paint";
+
+// Enables slimming paint phase 2: http://www.chromium.org/blink/slimming-paint
+const char kEnableSlimmingPaintV2[]         = "enable-slimming-paint-v2";
 
 // On platforms that support it, enables smooth scroll animation.
 const char kEnableSmoothScrolling[]         = "enable-smooth-scrolling";

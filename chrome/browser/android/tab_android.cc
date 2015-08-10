@@ -56,7 +56,7 @@
 #include "components/infobars/core/infobar_container.h"
 #include "components/navigation_interception/intercept_navigation_delegate.h"
 #include "components/navigation_interception/navigation_params.h"
-#include "components/url_fixer/url_fixer.h"
+#include "components/url_formatter/url_fixer.h"
 #include "content/public/browser/android/compositor.h"
 #include "content/public/browser/android/content_view_core.h"
 #include "content/public/browser/browser_thread.h"
@@ -531,7 +531,8 @@ TabAndroid::TabLoadStatus TabAndroid::LoadUrl(JNIEnv* env,
                                               jstring j_referrer_url,
                                               jint referrer_policy,
                                               jboolean is_renderer_initiated,
-                                              jlong intent_received_timestamp) {
+                                              jlong intent_received_timestamp,
+                                              jboolean has_user_gesture) {
   if (!web_contents())
     return PAGE_LOAD_FAILED;
 
@@ -570,7 +571,7 @@ TabAndroid::TabLoadStatus TabAndroid::LoadUrl(JNIEnv* env,
   }
 
   GURL fixed_url(
-      url_fixer::FixupURL(gurl.possibly_invalid_spec(), std::string()));
+      url_formatter::FixupURL(gurl.possibly_invalid_spec(), std::string()));
   if (!fixed_url.is_valid())
     return PAGE_LOAD_FAILED;
 
@@ -614,6 +615,7 @@ TabAndroid::TabLoadStatus TabAndroid::LoadUrl(JNIEnv* env,
     }
     load_params.is_renderer_initiated = is_renderer_initiated;
     load_params.intent_received_timestamp = intent_received_timestamp;
+    load_params.has_user_gesture = has_user_gesture;
     web_contents()->GetController().LoadURLWithParams(load_params);
   }
   return DEFAULT_PAGE_LOAD;

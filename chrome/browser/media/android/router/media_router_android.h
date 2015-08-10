@@ -5,6 +5,9 @@
 #ifndef CHROME_BROWSER_MEDIA_ANDROID_ROUTER_MEDIA_ROUTER_ANDROID_H_
 #define CHROME_BROWSER_MEDIA_ANDROID_ROUTER_MEDIA_ROUTER_ANDROID_H_
 
+#include <jni.h>
+
+#include "base/android/scoped_java_ref.h"
 #include "base/memory/scoped_ptr.h"
 #include "chrome/browser/media/router/media_router.h"
 
@@ -18,6 +21,8 @@ namespace media_router {
 class MediaRouterAndroid : public MediaRouter {
  public:
   ~MediaRouterAndroid() override;
+
+  static bool Register(JNIEnv* env);
 
   // MediaRouter implementation.
   void CreateRoute(
@@ -40,9 +45,6 @@ class MediaRouterAndroid : public MediaRouter {
       const MediaRoute::Id& route_id,
       scoped_ptr<std::vector<uint8>> data,
       const SendRouteMessageCallback& callback) override;
-  void ListenForRouteMessages(
-      const std::vector<MediaRoute::Id>& route_ids,
-      const PresentationSessionMessageCallback& message_cb) override;
   void ClearIssue(const Issue::Id& issue_id) override;
 
  private:
@@ -57,6 +59,12 @@ class MediaRouterAndroid : public MediaRouter {
   void UnregisterMediaRoutesObserver(MediaRoutesObserver* observer) override;
   void RegisterIssuesObserver(IssuesObserver* observer) override;
   void UnregisterIssuesObserver(IssuesObserver* observer) override;
+  void RegisterPresentationSessionMessagesObserver(
+      PresentationSessionMessagesObserver* observer) override;
+  void UnregisterPresentationSessionMessagesObserver(
+      PresentationSessionMessagesObserver* observer) override;
+
+  base::android::ScopedJavaGlobalRef<jobject> java_media_router_;
 
   DISALLOW_COPY_AND_ASSIGN(MediaRouterAndroid);
 };

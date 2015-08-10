@@ -50,6 +50,7 @@
 #include "chrome/browser/android/metrics/uma_utils.h"
 #include "chrome/browser/android/metrics/variations_session.h"
 #include "chrome/browser/android/most_visited_sites.h"
+#include "chrome/browser/android/net/network_quality_provider.h"
 #include "chrome/browser/android/new_tab_page_prefs.h"
 #include "chrome/browser/android/offline_pages/offline_page_bridge.h"
 #include "chrome/browser/android/omnibox/answers_image_bridge.h"
@@ -82,6 +83,8 @@
 #include "chrome/browser/lifetime/application_lifetime_android.h"
 #include "chrome/browser/media/android/remote/record_cast_action.h"
 #include "chrome/browser/media/android/remote/remote_media_player_bridge.h"
+#include "chrome/browser/media/android/router/media_router_android.h"
+#include "chrome/browser/media/android/router/media_router_dialog_controller_android.h"
 #include "chrome/browser/net/spdyproxy/data_reduction_proxy_settings_android.h"
 #include "chrome/browser/notifications/notification_ui_manager_android.h"
 #include "chrome/browser/password_manager/credential_android.h"
@@ -137,6 +140,7 @@
 #include "components/signin/core/browser/android/component_jni_registrar.h"
 #include "components/variations/android/component_jni_registrar.h"
 #include "components/web_contents_delegate_android/component_jni_registrar.h"
+#include "sync/android/sync_jni_registrar.h"
 
 #if defined(ENABLE_PRINTING) && !defined(ENABLE_PRINT_PREVIEW)
 #include "printing/printing_context_android.h"
@@ -192,7 +196,12 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
      ChromeBrowserProvider::RegisterChromeBrowserProvider},
     {"ChromeHttpAuthHandler",
      ChromeHttpAuthHandler::RegisterChromeHttpAuthHandler},
-    {"ChromeWebContentsDelegateAndroid",
+#if defined(ENABLE_MEDIA_ROUTER)
+    {"ChromeMediaRouter", media_router::MediaRouterAndroid::Register},
+    {"ChromeMediaRouterDialogController",
+        media_router::MediaRouterDialogControllerAndroid::Register},
+#endif
+     {"ChromeWebContentsDelegateAndroid",
      RegisterChromeWebContentsDelegateAndroid},
     {"CompositorView", RegisterCompositorView},
     {"ConfirmInfoBarDelegate", RegisterConfirmInfoBarDelegate},
@@ -248,6 +257,7 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
     {"MostVisitedSites", MostVisitedSites::Register},
     {"NativeInfoBar", RegisterNativeInfoBar},
     {"NavigationPopup", NavigationPopup::RegisterNavigationPopup},
+    {"NetworkQualityProvider", RegisterNetworkQualityProvider},
     {"NewTabPagePrefs", NewTabPagePrefs::RegisterNewTabPagePrefs},
     {"NotificationUIManager",
      NotificationUIManagerAndroid::RegisterNotificationUIManager},
@@ -288,6 +298,7 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
     {"SSLClientCertificateRequest", RegisterSSLClientCertificateRequestAndroid},
     {"StartupMetricUtils", RegisterStartupMetricUtils},
     {"StaticTabSceneLayer", chrome::android::RegisterStaticTabSceneLayer},
+    {"Sync", syncer::RegisterSyncJni},
     {"TabAndroid", TabAndroid::RegisterTabAndroid},
     {"TabContentManager", chrome::android::RegisterTabContentManager},
     {"TabListSceneLayer", RegisterTabListSceneLayer},

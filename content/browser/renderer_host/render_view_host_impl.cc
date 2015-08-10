@@ -472,6 +472,10 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
       (command_line.HasSwitch(switches::kEnableSlimmingPaint) ||
       !command_line.HasSwitch(switches::kDisableSlimmingPaint)) &&
       (slimming_group != "DisableSlimmingPaint");
+  prefs.slimming_paint_v2_enabled =
+      prefs.slimming_paint_enabled &&
+      command_line.HasSwitch(switches::kEnableSlimmingPaintV2);
+
 #if defined(OS_MACOSX) || defined(OS_CHROMEOS)
   bool default_enable_scroll_animator = true;
 #else
@@ -527,6 +531,11 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
       base::FieldTrialList::FindFullName("BlockableMixedContent");
   prefs.strictly_block_blockable_mixed_content =
       blockable_mixed_content_group == "StrictlyBlockBlockableMixedContent";
+
+  const std::string plugin_mixed_content_status =
+      base::FieldTrialList::FindFullName("PluginMixedContentStatus");
+  prefs.block_mixed_plugin_content =
+      plugin_mixed_content_status == "BlockableMixedContent";
 
   prefs.v8_cache_options = GetV8CacheOptions();
 

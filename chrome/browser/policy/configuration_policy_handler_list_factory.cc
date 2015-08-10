@@ -39,15 +39,15 @@
 #include "chrome/browser/policy/javascript_policy_handler.h"
 #include "chrome/browser/policy/network_prediction_policy_handler.h"
 #include "chrome/browser/sessions/restore_on_startup_policy_handler.h"
-#include "chrome/browser/sync/sync_policy_handler.h"
+#include "components/sync_driver/sync_policy_handler.h"
 #endif
 
 #if defined(OS_CHROMEOS)
-#include "chrome/browser/chromeos/drive/drive_pref_names.h"
 #include "chrome/browser/chromeos/platform_keys/key_permissions_policy_handler.h"
 #include "chrome/browser/chromeos/policy/configuration_policy_handler_chromeos.h"
 #include "chromeos/chromeos_pref_names.h"
 #include "chromeos/dbus/power_policy_controller.h"
+#include "components/drive/drive_pref_names.h"
 #include "components/user_manager/user.h"
 #include "components/user_manager/user_manager.h"
 #include "ui/chromeos/accessibility_types.h"
@@ -610,7 +610,7 @@ scoped_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
   handlers->AddHandler(make_scoped_ptr(new JavascriptPolicyHandler()));
   handlers->AddHandler(make_scoped_ptr(new NetworkPredictionPolicyHandler()));
   handlers->AddHandler(make_scoped_ptr(new RestoreOnStartupPolicyHandler()));
-  handlers->AddHandler(make_scoped_ptr(new browser_sync::SyncPolicyHandler()));
+  handlers->AddHandler(make_scoped_ptr(new sync_driver::SyncPolicyHandler()));
 
   handlers->AddHandler(make_scoped_ptr(new StringMappingListPolicyHandler(
       key::kEnableDeprecatedWebPlatformFeatures,

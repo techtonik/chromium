@@ -82,10 +82,6 @@ const char kAppId[]                         = "app-id";
 // mode.
 const char kApp[]                           = "app";
 
-// Overrides the apps checkout URL, which is used to determine when to expose
-// some private APIs.
-const char kAppsCheckoutURL[]               = "apps-checkout-url";
-
 // The URL that the webstore APIs download extensions from.
 // Note: the URL must contain one '%s' for the extension ID.
 const char kAppsGalleryDownloadURL[]        = "apps-gallery-download-url";
@@ -281,6 +277,9 @@ const char kDisableMinimizeOnSecondLauncherItemClick[] =
 // Disables the new bookmark app system.
 const char kDisableNewBookmarkApps[]        = "disable-new-bookmark-apps";
 
+// Disables showing popular sites on the NTP.
+const char kDisableNTPPopularSites[]        = "disable-ntp-popular-sites";
+
 // Disable auto-reload of error pages if offline.
 const char kDisableOfflineAutoReload[]       = "disable-offline-auto-reload";
 
@@ -441,9 +440,6 @@ const char kEnableFastUnload[]         = "enable-fast-unload";
 // This is a temporary testing flag.
 const char kEnableInsecureQuic[] = "enable-insecure-quic";
 
-// Enables experimentation with launching ephemeral apps via hyperlinks.
-const char kEnableLinkableEphemeralApps[]   = "enable-linkable-ephemeral-apps";
-
 // Enables an experimental Material Design version of chrome://downloads.
 const char kEnableMaterialDesignDownloads[] = "enable-md-downloads";
 
@@ -469,6 +465,9 @@ const char kEnableNetBenchmarking[]         = "enable-net-benchmarking";
 
 // Enables the new bookmark app system.
 const char kEnableNewBookmarkApps[]         = "enable-new-bookmark-apps";
+
+// Enables showing popular sites on the NTP.
+const char kEnableNTPPopularSites[]         = "enable-ntp-popular-sites";
 
 // Enable auto-reload of error pages if offline.
 const char kEnableOfflineAutoReload[]       = "enable-offline-auto-reload";
@@ -1269,6 +1268,10 @@ const char kEnableAppWindowCycling[] = "enable-app-window-cycling";
 // Enables use of toolkit-views based native app windows.
 const char kEnableMacViewsNativeAppWindows[] =
     "enable-mac-views-native-app-windows";
+
+// Causes Chrome to use an equivalent toolkit-views version of a browser dialog
+// when available, rather than a Cocoa one.
+const char kEnableMacViewsDialogs[] = "enable-mac-views-dialogs";
 
 // Enables Translate experimental new UX which replaces the infobar.
 const char kEnableTranslateNewUX[]         = "enable-translate-new-ux";

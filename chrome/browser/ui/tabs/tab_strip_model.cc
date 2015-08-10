@@ -38,6 +38,7 @@ enum UMATabDiscarding {
   UMA_TAB_DISCARDING_SWITCH_TO_LOADED_TAB,
   UMA_TAB_DISCARDING_SWITCH_TO_DISCARDED_TAB,
   UMA_TAB_DISCARDING_DISCARD_TAB,
+  UMA_TAB_DISCARDING_DISCARD_TAB_AUDIO,
   UMA_TAB_DISCARDING_TAB_DISCARDING_MAX
 };
 
@@ -393,15 +394,22 @@ WebContents* TabStripModel::DiscardWebContentsAt(int index) {
   WebContents* null_contents =
       WebContents::Create(WebContents::CreateParams(profile()));
   WebContents* old_contents = GetWebContentsAtImpl(index);
+  bool is_playing_audio = chrome::IsPlayingAudio(old_contents);
   // Copy over the state from the navigation controller so we preserve the
   // back/forward history and continue to display the correct title/favicon.
   null_contents->GetController().CopyStateFrom(old_contents->GetController());
+
+  // Make sure we persist the last active time property.
+  null_contents->SetLastActiveTime(old_contents->GetLastActiveTime());
+
   // Replace the tab we're discarding with the null version.
   ReplaceWebContentsAt(index, null_contents);
   // Mark the tab so it will reload when we click.
   if (!contents_data_[index]->discarded()) {
     contents_data_[index]->set_discarded(true);
     RecordUMATabDiscarding(UMA_TAB_DISCARDING_DISCARD_TAB);
+    if (is_playing_audio)
+      RecordUMATabDiscarding(UMA_TAB_DISCARDING_DISCARD_TAB_AUDIO);
   }
   // Discard the old tab's renderer.
   // TODO(jamescook): This breaks script connections with other tabs.

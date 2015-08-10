@@ -23,6 +23,7 @@
 #include "components/password_manager/core/browser/password_manager.h"
 #include "components/password_manager/core/browser/password_manager_driver.h"
 #include "components/password_manager/core/browser/password_store.h"
+#include "components/password_manager/core/browser/store_result_filter.h"
 #include "components/password_manager/core/browser/stub_password_manager_client.h"
 #include "components/password_manager/core/browser/stub_password_manager_driver.h"
 #include "components/password_manager/core/browser/test_password_store.h"
@@ -51,6 +52,10 @@ ACTION_P4(InvokeConsumer, form1, form2, form3, form4) {
   result.push_back(make_scoped_ptr(new PasswordForm(form3)));
   result.push_back(make_scoped_ptr(new PasswordForm(form4)));
   arg0->OnGetPasswordStoreResults(result.Pass());
+}
+
+MATCHER_P(CheckUsername, username_value, "Username incorrect") {
+  return arg.username_value == username_value;
 }
 
 void RunAllPendingTasks() {
@@ -101,27 +106,30 @@ class MockPasswordManagerDriver : public StubPasswordManagerDriver {
   NiceMock<MockAutofillManager> mock_autofill_manager_;
 };
 
+class MockStoreResultFilter : public StoreResultFilter {
+ public:
+  MOCK_METHOD1(ShouldIgnore, bool(const autofill::PasswordForm& form));
+};
+
 class TestPasswordManagerClient : public StubPasswordManagerClient {
  public:
   explicit TestPasswordManagerClient(PasswordStore* password_store)
       : password_store_(password_store),
-        driver_(new NiceMock<MockPasswordManagerDriver>) {
+        driver_(new NiceMock<MockPasswordManagerDriver>),
+        is_update_password_ui_enabled_(false) {
     prefs_.registry()->RegisterBooleanPref(prefs::kPasswordManagerSavingEnabled,
                                            true);
   }
 
-  bool ShouldFilterAutofillResult(const autofill::PasswordForm& form) override {
-    if (form == form_to_filter_)
-      return true;
-    return false;
+  scoped_ptr<StoreResultFilter> CreateStoreResultFilter() const override {
+    scoped_ptr<NiceMock<MockStoreResultFilter>> stub_filter(
+        new NiceMock<MockStoreResultFilter>);
+    ON_CALL(*stub_filter, ShouldIgnore(_)).WillByDefault(Return(false));
+    return stub_filter.Pass();
   }
 
   PrefService* GetPrefs() override { return &prefs_; }
   PasswordStore* GetPasswordStore() const override { return password_store_; }
-
-  void SetFormToFilter(const autofill::PasswordForm& form) {
-    form_to_filter_ = form;
-  }
 
   MockPasswordManagerDriver* mock_driver() { return driver_.get(); }
 
@@ -133,12 +141,18 @@ class TestPasswordManagerClient : public StubPasswordManagerClient {
 
   void KillDriver() { driver_.reset(); }
 
- private:
-  autofill::PasswordForm form_to_filter_;
+  bool IsUpdatePasswordUIEnabled() const override {
+    return is_update_password_ui_enabled_;
+  }
+  void set_is_update_password_ui_enabled(bool value) {
+    is_update_password_ui_enabled_ = value;
+  }
 
+ private:
   TestingPrefServiceSimple prefs_;
   PasswordStore* password_store_;
   scoped_ptr<MockPasswordManagerDriver> driver_;
+  bool is_update_password_ui_enabled_;
 };
 
 class TestPasswordManager : public PasswordManager {
@@ -247,8 +261,10 @@ class PasswordFormManagerTest : public testing::Test {
     p->SanitizePossibleUsernames(form);
   }
 
-  bool IgnoredResult(PasswordFormManager* p, PasswordForm* form) {
-    return p->ShouldIgnoreResult(*form);
+  bool IgnoredResult(PasswordFormManager* p,
+                     PasswordForm* form,
+                     StoreResultFilter* filter) {
+    return p->ShouldIgnoreResult(*form, filter);
   }
 
   // Save saved_match() for observed_form() where |observed_form_data|,
@@ -490,12 +506,11 @@ TEST_F(PasswordFormManagerTest, TestNewLoginFromNewPasswordElement) {
 
   // By this point, the PasswordFormManager should have promoted the new
   // password value to be the current password, and should have wiped the
-  // password element names: they are likely going to be different on a login
+  // password element name: it is likely going to be different on a login
   // form, so it is not worth remembering them.
   EXPECT_EQ(credentials.new_password_value,
             GetPendingCredentials(&manager)->password_value);
   EXPECT_TRUE(GetPendingCredentials(&manager)->password_element.empty());
-  EXPECT_TRUE(GetPendingCredentials(&manager)->new_password_element.empty());
   EXPECT_TRUE(GetPendingCredentials(&manager)->new_password_value.empty());
 }
 
@@ -599,17 +614,19 @@ TEST_F(PasswordFormManagerTest, TestIgnoreResult) {
   // Make sure we don't match a PasswordForm if it was originally saved on
   // an SSL-valid page and we are now on a page with invalid certificate.
   saved_match()->ssl_valid = true;
-  EXPECT_TRUE(IgnoredResult(&manager, saved_match()));
+  scoped_ptr<MockStoreResultFilter> filter(new MockStoreResultFilter);
+  EXPECT_TRUE(IgnoredResult(&manager, saved_match(), filter.get()));
 
   saved_match()->ssl_valid = false;
   // Different paths for action / origin are okay.
   saved_match()->action = GURL("http://www.google.com/b/Login");
   saved_match()->origin = GURL("http://www.google.com/foo");
-  EXPECT_FALSE(IgnoredResult(&manager, saved_match()));
+  EXPECT_FALSE(IgnoredResult(&manager, saved_match(), filter.get()));
 
   // Results should be ignored if the client requests it.
-  client()->SetFormToFilter(*saved_match());
-  EXPECT_TRUE(IgnoredResult(&manager, saved_match()));
+  PasswordForm filtered_form(*saved_match());
+  EXPECT_CALL(*filter, ShouldIgnore(filtered_form)).WillOnce(Return(true));
+  EXPECT_TRUE(IgnoredResult(&manager, saved_match(), filter.get()));
 }
 
 TEST_F(PasswordFormManagerTest, TestEmptyAction) {
@@ -1582,6 +1599,63 @@ TEST_F(PasswordFormManagerTest, TestSuggestingPasswordChangeForms) {
   EXPECT_TRUE(password_manager.GetLatestWaitForUsername());
 }
 
+TEST_F(PasswordFormManagerTest, TestUpdateMethod) {
+  // Add a new password field to the test form. The PasswordFormManager should
+  // save the password from this field, instead of the current password field.
+  observed_form()->new_password_element = ASCIIToUTF16("NewPasswd");
+
+  // Given that |observed_form| was most likely a change password form, it
+  // should not serve as a source for updating meta-information stored with the
+  // old credentials, such as element names, as they are likely going to be
+  // different between change password and login forms. To test this in depth,
+  // forcibly wipe |submit_element|, which should normally trigger updating this
+  // field from |observed_form| in the UpdateLogin() step as a special case. We
+  // will verify in the end that this did not happen.
+  saved_match()->submit_element.clear();
+
+  TestPasswordManagerClient client_with_store(mock_store());
+  client_with_store.set_is_update_password_ui_enabled(true);
+  PasswordFormManager manager(nullptr, &client_with_store,
+                              client_with_store.driver(), *observed_form(),
+                              false);
+  SimulateMatchingPhase(&manager, RESULT_MATCH_FOUND);
+
+  // User submits current and new credentials to the observed form.
+  PasswordForm credentials(*observed_form());
+  credentials.username_element.clear();
+  credentials.password_value = saved_match()->password_value;
+  credentials.new_password_value = ASCIIToUTF16("test2");
+  credentials.preferred = true;
+  manager.ProvisionallySave(
+      credentials, PasswordFormManager::IGNORE_OTHER_POSSIBLE_USERNAMES);
+
+  // Successful login. The PasswordManager would instruct PasswordFormManager
+  // to save, and since this is an update, it should know not to save as a new
+  // login.
+  EXPECT_FALSE(manager.IsNewLogin());
+
+  // By now, the PasswordFormManager should have promoted the new password value
+  // already to be the current password, and should no longer maintain any info
+  // about the new password.
+  EXPECT_EQ(credentials.new_password_value,
+            GetPendingCredentials(&manager)->password_value);
+  EXPECT_TRUE(GetPendingCredentials(&manager)->new_password_element.empty());
+  EXPECT_TRUE(GetPendingCredentials(&manager)->new_password_value.empty());
+
+  // Trigger saving to exercise some special case handling in UpdateLogin().
+  PasswordForm new_credentials;
+  EXPECT_CALL(*mock_store(), UpdateLogin(_))
+      .WillOnce(testing::SaveArg<0>(&new_credentials));
+  manager.Update(*saved_match());
+  Mock::VerifyAndClearExpectations(mock_store());
+
+  // No meta-information should be updated, only the password.
+  EXPECT_EQ(credentials.new_password_value, new_credentials.password_value);
+  EXPECT_EQ(saved_match()->username_element, new_credentials.username_element);
+  EXPECT_EQ(saved_match()->password_element, new_credentials.password_element);
+  EXPECT_EQ(saved_match()->submit_element, new_credentials.submit_element);
+}
+
 TEST_F(PasswordFormManagerTest, WipeStoreCopyIfOutdated_BeforeStoreCallback) {
   PasswordForm form(*saved_match());
   ASSERT_FALSE(form.password_value.empty());
@@ -1678,6 +1752,177 @@ TEST_F(PasswordFormManagerTest, WipeStoreCopyIfOutdated_Outdated) {
   form_manager.WipeStoreCopyIfOutdated();
   histogram_tester.ExpectUniqueSample("PasswordManager.StoreReadyWhenWiping", 1,
                                       1);
+}
+
+TEST_F(PasswordFormManagerTest, RemoveNoUsernameAccounts) {
+  TestPasswordManagerClient client_with_store(mock_store());
+  TestPasswordManager password_manager(&client_with_store);
+  PasswordFormManager form_manager(&password_manager, &client_with_store,
+                                   client_with_store.driver(), *observed_form(),
+                                   false);
+
+  PasswordForm saved_form = *saved_match();
+  saved_form.username_value.clear();
+  ScopedVector<PasswordForm> result;
+  result.push_back(new PasswordForm(saved_form));
+  form_manager.SimulateFetchMatchingLoginsFromPasswordStore();
+  form_manager.OnGetPasswordStoreResults(result.Pass());
+
+  PasswordForm submitted_form(*observed_form());
+  submitted_form.preferred = true;
+  submitted_form.username_value = saved_match()->username_value;
+  submitted_form.password_value = saved_match()->password_value;
+
+  saved_form.preferred = false;
+  EXPECT_CALL(*mock_store(),
+              AddLogin(CheckUsername(saved_match()->username_value)));
+  EXPECT_CALL(*mock_store(), RemoveLogin(saved_form));
+
+  form_manager.ProvisionallySave(
+      submitted_form, PasswordFormManager::IGNORE_OTHER_POSSIBLE_USERNAMES);
+  form_manager.Save();
+}
+
+TEST_F(PasswordFormManagerTest, NotRemovePSLNoUsernameAccounts) {
+  TestPasswordManagerClient client_with_store(mock_store());
+  TestPasswordManager password_manager(&client_with_store);
+  PasswordFormManager form_manager(&password_manager, &client_with_store,
+                                   client_with_store.driver(), *observed_form(),
+                                   false);
+
+  PasswordForm saved_form = *saved_match();
+  saved_form.username_value.clear();
+  saved_form.original_signon_realm = "www.example.org";
+  ScopedVector<PasswordForm> result;
+  result.push_back(new PasswordForm(saved_form));
+  form_manager.SimulateFetchMatchingLoginsFromPasswordStore();
+  form_manager.OnGetPasswordStoreResults(result.Pass());
+
+  PasswordForm submitted_form(*observed_form());
+  submitted_form.preferred = true;
+  submitted_form.username_value = saved_match()->username_value;
+  submitted_form.password_value = saved_match()->password_value;
+
+  EXPECT_CALL(*mock_store(),
+              AddLogin(CheckUsername(saved_match()->username_value)));
+  EXPECT_CALL(*mock_store(), RemoveLogin(_)).Times(0);
+
+  form_manager.ProvisionallySave(
+      submitted_form, PasswordFormManager::IGNORE_OTHER_POSSIBLE_USERNAMES);
+  form_manager.Save();
+}
+
+TEST_F(PasswordFormManagerTest, NotRemoveCredentialsWithUsername) {
+  TestPasswordManagerClient client_with_store(mock_store());
+  TestPasswordManager password_manager(&client_with_store);
+  PasswordFormManager form_manager(&password_manager, &client_with_store,
+                                   client_with_store.driver(), *observed_form(),
+                                   false);
+
+  PasswordForm saved_form = *saved_match();
+  ASSERT_FALSE(saved_form.username_value.empty());
+  ScopedVector<PasswordForm> result;
+  result.push_back(new PasswordForm(saved_form));
+  form_manager.SimulateFetchMatchingLoginsFromPasswordStore();
+  form_manager.OnGetPasswordStoreResults(result.Pass());
+
+  PasswordForm submitted_form(*observed_form());
+  submitted_form.preferred = true;
+  base::string16 username = saved_form.username_value + ASCIIToUTF16("1");
+  submitted_form.username_value = username;
+  submitted_form.password_value = saved_match()->password_value;
+
+  EXPECT_CALL(*mock_store(), AddLogin(CheckUsername(username)));
+  EXPECT_CALL(*mock_store(), RemoveLogin(_)).Times(0);
+
+  form_manager.ProvisionallySave(
+      submitted_form, PasswordFormManager::IGNORE_OTHER_POSSIBLE_USERNAMES);
+  form_manager.Save();
+}
+
+TEST_F(PasswordFormManagerTest, NotRemoveCredentialsWithDiferrentPassword) {
+  TestPasswordManagerClient client_with_store(mock_store());
+  TestPasswordManager password_manager(&client_with_store);
+  PasswordFormManager form_manager(&password_manager, &client_with_store,
+                                   client_with_store.driver(), *observed_form(),
+                                   false);
+
+  PasswordForm saved_form = *saved_match();
+  saved_form.username_value.clear();
+  ScopedVector<PasswordForm> result;
+  result.push_back(new PasswordForm(saved_form));
+  form_manager.SimulateFetchMatchingLoginsFromPasswordStore();
+  form_manager.OnGetPasswordStoreResults(result.Pass());
+
+  PasswordForm submitted_form(*observed_form());
+  submitted_form.preferred = true;
+  submitted_form.username_value = saved_match()->username_value;
+  submitted_form.password_value = saved_form.password_value + ASCIIToUTF16("1");
+
+  EXPECT_CALL(*mock_store(),
+              AddLogin(CheckUsername(saved_match()->username_value)));
+  EXPECT_CALL(*mock_store(), RemoveLogin(_)).Times(0);
+
+  form_manager.ProvisionallySave(
+      submitted_form, PasswordFormManager::IGNORE_OTHER_POSSIBLE_USERNAMES);
+  form_manager.Save();
+}
+
+TEST_F(PasswordFormManagerTest, SaveNoUsernameEvenIfWithUsernamePresent) {
+  TestPasswordManagerClient client_with_store(mock_store());
+  TestPasswordManager password_manager(&client_with_store);
+  PasswordFormManager form_manager(&password_manager, &client_with_store,
+                                   client_with_store.driver(), *observed_form(),
+                                   false);
+
+  PasswordForm* saved_form = saved_match();
+  ASSERT_FALSE(saved_match()->username_value.empty());
+  ScopedVector<PasswordForm> result;
+  result.push_back(new PasswordForm(*saved_form));
+  form_manager.SimulateFetchMatchingLoginsFromPasswordStore();
+  form_manager.OnGetPasswordStoreResults(result.Pass());
+
+  PasswordForm submitted_form(*observed_form());
+  submitted_form.preferred = true;
+  submitted_form.username_value.clear();
+
+  EXPECT_CALL(*mock_store(), AddLogin(CheckUsername(base::string16())));
+  EXPECT_CALL(*mock_store(), RemoveLogin(_)).Times(0);
+
+  form_manager.ProvisionallySave(
+      submitted_form, PasswordFormManager::IGNORE_OTHER_POSSIBLE_USERNAMES);
+  form_manager.Save();
+}
+
+TEST_F(PasswordFormManagerTest, NotRemoveOnUpdate) {
+  TestPasswordManagerClient client_with_store(mock_store());
+  TestPasswordManager password_manager(&client_with_store);
+  PasswordFormManager form_manager(&password_manager, &client_with_store,
+                                   client_with_store.driver(), *observed_form(),
+                                   false);
+
+  ScopedVector<PasswordForm> result;
+  PasswordForm saved_form = *saved_match();
+  ASSERT_FALSE(saved_form.username_value.empty());
+  result.push_back(new PasswordForm(saved_form));
+  saved_form.username_value.clear();
+  saved_form.preferred = false;
+  result.push_back(new PasswordForm(saved_form));
+  form_manager.SimulateFetchMatchingLoginsFromPasswordStore();
+  form_manager.OnGetPasswordStoreResults(result.Pass());
+
+  PasswordForm submitted_form(*observed_form());
+  submitted_form.preferred = true;
+  submitted_form.username_value = saved_match()->username_value;
+  submitted_form.password_value = saved_form.password_value + ASCIIToUTF16("1");
+
+  EXPECT_CALL(*mock_store(),
+              UpdateLogin(CheckUsername(saved_match()->username_value)));
+  EXPECT_CALL(*mock_store(), RemoveLogin(_)).Times(0);
+
+  form_manager.ProvisionallySave(
+      submitted_form, PasswordFormManager::IGNORE_OTHER_POSSIBLE_USERNAMES);
+  form_manager.Save();
 }
 
 }  // namespace password_manager

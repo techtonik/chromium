@@ -59,13 +59,17 @@ static void SetRuntimeFeatureDefaultsForPlatform() {
   WebRuntimeFeatures::enableOrientationEvent(true);
   WebRuntimeFeatures::enableFastMobileScrolling(true);
   WebRuntimeFeatures::enableMediaCapture(true);
-  WebRuntimeFeatures::enableCompositedSelectionUpdate(true);
   // Android won't be able to reliably support non-persistent notifications, the
   // intended behavior for which is in flux by itself.
   WebRuntimeFeatures::enableNotificationConstructor(false);
+  WebRuntimeFeatures::enableNewMediaPlaybackUi(true);
 #else
   WebRuntimeFeatures::enableNavigatorContentUtils(true);
 #endif  // defined(OS_ANDROID)
+
+#if defined(OS_ANDROID) || defined(USE_AURA)
+  WebRuntimeFeatures::enableCompositedSelectionUpdate(true);
+#endif
 
 #if !(defined OS_ANDROID || defined OS_CHROMEOS || defined OS_IOS)
     // Only Android, ChromeOS, and IOS support NetInfo right now.
@@ -209,22 +213,18 @@ void SetRuntimeFeaturesDefaultsAndUpdateFromArgs(
   // Enable explicitly enabled features, and then disable explicitly disabled
   // ones.
   if (command_line.HasSwitch(switches::kEnableBlinkFeatures)) {
-    std::vector<std::string> enabled_features;
-    base::SplitString(
-        command_line.GetSwitchValueASCII(switches::kEnableBlinkFeatures), ',',
-        &enabled_features);
-    for (const std::string& feature : enabled_features) {
+    std::vector<std::string> enabled_features = base::SplitString(
+        command_line.GetSwitchValueASCII(switches::kEnableBlinkFeatures),
+        ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
+    for (const std::string& feature : enabled_features)
       WebRuntimeFeatures::enableFeatureFromString(feature, true);
-    }
   }
   if (command_line.HasSwitch(switches::kDisableBlinkFeatures)) {
-    std::vector<std::string> disabled_features;
-    base::SplitString(
-        command_line.GetSwitchValueASCII(switches::kDisableBlinkFeatures), ',',
-        &disabled_features);
-    for (const std::string& feature : disabled_features) {
+    std::vector<std::string> disabled_features = base::SplitString(
+        command_line.GetSwitchValueASCII(switches::kDisableBlinkFeatures),
+        ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
+    for (const std::string& feature : disabled_features)
       WebRuntimeFeatures::enableFeatureFromString(feature, false);
-    }
   }
 }
 

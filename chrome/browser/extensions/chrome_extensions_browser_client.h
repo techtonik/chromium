@@ -82,8 +82,6 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
   scoped_ptr<ExtensionHostDelegate> CreateExtensionHostDelegate() override;
   bool DidVersionUpdate(content::BrowserContext* context) override;
   void PermitExternalProtocolHandler() override;
-  scoped_ptr<AppSorting> CreateAppSorting(
-      content::BrowserContext* context) override;
   bool IsRunningInForcedAppMode() override;
   ApiActivityMonitor* GetApiActivityMonitor(
       content::BrowserContext* context) override;
@@ -110,6 +108,8 @@ class ChromeExtensionsBrowserClient : public ExtensionsBrowserClient {
   void CleanUpWebView(content::BrowserContext* browser_context,
                       int embedder_process_id,
                       int view_instance_id) override;
+  void AttachExtensionTaskManagerTag(content::WebContents* web_contents,
+                                     ViewType view_type) override;
 
  private:
   friend struct base::DefaultLazyInstanceTraits<ChromeExtensionsBrowserClient>;

@@ -58,12 +58,13 @@
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_io_data.h"
 #include "components/dom_distiller/core/url_constants.h"
 #include "components/sync_driver/pref_names.h"
-#include "components/url_fixer/url_fixer.h"
+#include "components/url_formatter/url_fixer.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/host_zoom_map.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/resource_context.h"
 #include "net/base/keygen_handler.h"
+#include "net/cert/cert_verifier.h"
 #include "net/cookies/canonical_cookie.h"
 #include "net/http/http_transaction_factory.h"
 #include "net/http/http_util.h"
@@ -155,6 +156,8 @@ using content::BrowserThread;
 using content::ResourceContext;
 
 namespace {
+
+net::CertVerifier* g_cert_verifier_for_testing = nullptr;
 
 #if defined(DEBUG_DEVTOOLS)
 bool IsSupportedDevToolsURL(const GURL& url, base::FilePath* path) {
@@ -508,7 +511,7 @@ void ProfileIOData::InitializeOnUIThread(Profile* profile) {
 #if defined(ENABLE_CONFIGURATION_POLICY)
   policy::URLBlacklist::SegmentURLCallback callback =
       static_cast<policy::URLBlacklist::SegmentURLCallback>(
-          url_fixer::SegmentURL);
+          url_formatter::SegmentURL);
   base::SequencedWorkerPool* pool = BrowserThread::GetBlockingPool();
   scoped_refptr<base::SequencedTaskRunner> background_task_runner =
       pool->GetSequencedTaskRunner(pool->GetSequenceToken());
@@ -694,7 +697,7 @@ ProfileIOData* ProfileIOData::FromResourceContext(
 
 // static
 bool ProfileIOData::IsHandledProtocol(const std::string& scheme) {
-  DCHECK_EQ(scheme, base::StringToLowerASCII(scheme));
+  DCHECK_EQ(scheme, base::ToLowerASCII(scheme));
   static const char* const kProtocolList[] = {
     url::kFileScheme,
     content::kChromeDevToolsScheme,
@@ -746,6 +749,12 @@ void ProfileIOData::InstallProtocolHandlers(
     DCHECK(set_protocol);
   }
   protocol_handlers->clear();
+}
+
+// static
+void ProfileIOData::SetCertVerifierForTesting(
+    net::CertVerifier* cert_verifier) {
+  g_cert_verifier_for_testing = cert_verifier;
 }
 
 content::ResourceContext* ProfileIOData::GetResourceContext() const {
@@ -1099,24 +1108,31 @@ void ProfileIOData::Init(
   use_system_key_slot_ = profile_params_->use_system_key_slot;
   if (use_system_key_slot_)
     EnableNSSSystemKeySlotForResourceContext(resource_context_.get());
-
-  crypto::ScopedPK11Slot public_slot =
-      crypto::GetPublicSlotForChromeOSUser(username_hash_);
-  // The private slot won't be ready by this point. It shouldn't be necessary
-  // for cert trust purposes anyway.
-  scoped_refptr<net::CertVerifyProc> verify_proc(
-      new chromeos::CertVerifyProcChromeOS(public_slot.Pass()));
-  if (policy_cert_verifier_) {
-    DCHECK_EQ(policy_cert_verifier_, cert_verifier_.get());
-    policy_cert_verifier_->InitializeOnIOThread(verify_proc);
-  } else {
-    cert_verifier_.reset(new net::MultiThreadedCertVerifier(verify_proc.get()));
-  }
-  main_request_context_->set_cert_verifier(cert_verifier_.get());
-#else
-  main_request_context_->set_cert_verifier(
-      io_thread_globals->cert_verifier.get());
 #endif
+
+  if (g_cert_verifier_for_testing) {
+    main_request_context_->set_cert_verifier(g_cert_verifier_for_testing);
+  } else {
+#if defined(OS_CHROMEOS)
+    crypto::ScopedPK11Slot public_slot =
+        crypto::GetPublicSlotForChromeOSUser(username_hash_);
+    // The private slot won't be ready by this point. It shouldn't be necessary
+    // for cert trust purposes anyway.
+    scoped_refptr<net::CertVerifyProc> verify_proc(
+        new chromeos::CertVerifyProcChromeOS(public_slot.Pass()));
+    if (policy_cert_verifier_) {
+      DCHECK_EQ(policy_cert_verifier_, cert_verifier_.get());
+      policy_cert_verifier_->InitializeOnIOThread(verify_proc);
+    } else {
+      cert_verifier_.reset(
+          new net::MultiThreadedCertVerifier(verify_proc.get()));
+    }
+    main_request_context_->set_cert_verifier(cert_verifier_.get());
+#else
+    main_request_context_->set_cert_verifier(
+        io_thread_globals->cert_verifier.get());
+#endif
+  }
 
   // Install the New Tab Page Interceptor.
   if (profile_params_->new_tab_page_interceptor.get()) {
@@ -1298,11 +1314,10 @@ scoped_ptr<net::HttpCache> ProfileIOData::CreateMainHttpFactory(
   if (data_reduction_proxy_io_data_.get())
     params.proxy_delegate = data_reduction_proxy_io_data_->proxy_delegate();
 
-  network_controller_.reset(new DevToolsNetworkController());
-
   net::HttpNetworkSession* session = new net::HttpNetworkSession(params);
   return scoped_ptr<net::HttpCache>(new net::HttpCache(
-      new DevToolsNetworkTransactionFactory(network_controller_.get(), session),
+      new DevToolsNetworkTransactionFactory(
+          network_controller_handle_.GetController(), session),
       context->net_log(), main_backend));
 }
 
@@ -1311,7 +1326,7 @@ scoped_ptr<net::HttpCache> ProfileIOData::CreateHttpFactory(
     net::HttpCache::BackendFactory* backend) const {
   return scoped_ptr<net::HttpCache>(new net::HttpCache(
       new DevToolsNetworkTransactionFactory(
-          network_controller_.get(), shared_session),
+          network_controller_handle_.GetController(), shared_session),
       shared_session->net_log(), backend));
 }
 

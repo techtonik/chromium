@@ -153,14 +153,14 @@ void EncodeFieldForUpload(const AutofillField& field,
     // We use the same field elements as the query and add a few more below.
     buzz::XmlElement* field_element = EncodeFieldForQuery(field, parent);
 
-    if (IsAutofillFieldMetadataEnabled()) {
-      if (!field.autocomplete_attribute.empty()) {
-        field_element->SetAttr(buzz::QName(kAttributeAutocomplete),
-                               field.autocomplete_attribute);
-      }
-      field_element->SetAttr(buzz::QName(kAttributeAutofillType),
-                             base::IntToString(*field_type));
+    if (IsAutofillFieldMetadataEnabled() &&
+        !field.autocomplete_attribute.empty()) {
+      field_element->SetAttr(buzz::QName(kAttributeAutocomplete),
+                             field.autocomplete_attribute);
     }
+
+    field_element->SetAttr(buzz::QName(kAttributeAutofillType),
+                           base::IntToString(*field_type));
   }
 }
 
@@ -789,10 +789,14 @@ void FormStructure::UpdateFromCache(const FormStructure& cached_form) {
         field->value = base::string16();
       }
 
+      // Transfer attributes of the cached AutofillField to the newly created
+      // AutofillField.
       field->set_heuristic_type(cached_field->second->heuristic_type());
       field->set_server_type(cached_field->second->server_type());
       field->SetHtmlType(cached_field->second->html_type(),
                          cached_field->second->html_mode());
+      field->set_previously_autofilled(
+          cached_field->second->previously_autofilled());
     }
   }
 
@@ -817,22 +821,28 @@ void FormStructure::LogQualityMetrics(
   size_t num_detected_field_types = 0;
   size_t num_server_mismatches = 0;
   size_t num_heuristic_mismatches = 0;
+  size_t num_edited_autofilled_fields = 0;
   bool did_autofill_all_possible_fields = true;
   bool did_autofill_some_possible_fields = false;
   for (size_t i = 0; i < field_count(); ++i) {
     const AutofillField* field = this->field(i);
+
+    // No further logging for password fields.  Those are primarily related to a
+    // different feature code path, and so make more sense to track outside of
+    // this metric.
+    if (field->form_control_type == "password")
+      continue;
+
+    // We count fields that were autofilled but later modified, regardless of
+    // whether the data now in the field is recognized.
+    if (field->previously_autofilled())
+      num_edited_autofilled_fields++;
 
     // No further logging for empty fields nor for fields where the entered data
     // does not appear to already exist in the user's stored Autofill data.
     const ServerFieldTypeSet& field_types = field->possible_types();
     DCHECK(!field_types.empty());
     if (field_types.count(EMPTY_TYPE) || field_types.count(UNKNOWN_TYPE))
-      continue;
-
-    // Similarly, no further logging for password fields.  Those are primarily
-    // related to a different feature code path, and so make more sense to track
-    // outside of this metric.
-    if (field->form_control_type == "password")
       continue;
 
     ++num_detected_field_types;
@@ -905,6 +915,9 @@ void FormStructure::LogQualityMetrics(
                                                 field_type);
     }
   }
+
+  AutofillMetrics::LogNumberOfEditedAutofilledFieldsAtSubmission(
+      num_edited_autofilled_fields);
 
   if (num_detected_field_types < kRequiredAutofillFields) {
     AutofillMetrics::LogUserHappinessMetric(
@@ -1092,7 +1105,7 @@ void FormStructure::ParseFieldTypesFromAutocompleteAttributes(
     // non-space characters (e.g. tab) to spaces, and converting to lowercase.
     std::string autocomplete_attribute =
         base::CollapseWhitespaceASCII(field->autocomplete_attribute, false);
-    autocomplete_attribute = base::StringToLowerASCII(autocomplete_attribute);
+    autocomplete_attribute = base::ToLowerASCII(autocomplete_attribute);
 
     // The autocomplete attribute is overloaded: it can specify either a field
     // type hint or whether autocomplete should be enabled at all.  Ignore the

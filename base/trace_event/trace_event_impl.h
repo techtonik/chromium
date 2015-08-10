@@ -66,8 +66,11 @@ const int kTraceMaxNumArgs = 2;
 
 struct TraceEventHandle {
   uint32 chunk_seq;
-  uint16 chunk_index;
-  uint16 event_index;
+  // These numbers of bits must be kept consistent with
+  // TraceBufferChunk::kMaxTrunkIndex and
+  // TraceBufferChunk::kTraceBufferChunkSize (in trace_buffer.h).
+  unsigned chunk_index : 26;
+  unsigned event_index : 6;
 };
 
 class BASE_EXPORT TraceEvent {
@@ -155,7 +158,6 @@ class BASE_EXPORT TraceEvent {
   TimeDelta thread_duration_;
   // id_ can be used to store phase-specific data.
   unsigned long long id_;
-  scoped_ptr<TraceEventMemoryOverhead> cached_memory_overhead_estimate_;
   // context_id_ is used to store context information.
   unsigned long long context_id_;
   TraceValue arg_values_[kTraceMaxNumArgs];

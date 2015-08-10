@@ -4,7 +4,10 @@
 
 #include "net/tools/quic/spdy_balsa_utils.h"
 
+#include "net/spdy/spdy_test_utils.h"
 #include "testing/gtest/include/gtest/gtest.h"
+
+using net::test::CompareSpdyHeaderBlocks;
 
 namespace net {
 namespace tools {
@@ -20,11 +23,11 @@ TEST(SpdyBalsaUtilsTest, RequestHeadersToSpdyHeaders) {
 
   SpdyHeaderBlock expected_headers;
   expected_headers[":authority"] = "www.google.com";
-  expected_headers[":method"] = "GET";
   expected_headers[":path"] = "/foo";
   expected_headers[":scheme"] = "https";
+  expected_headers[":method"] = "GET";
 
-  EXPECT_EQ(expected_headers, spdy_headers);
+  EXPECT_TRUE(CompareSpdyHeaderBlocks(expected_headers, spdy_headers));
 }
 
 TEST(SpdyBalsaUtilsTest, ResponseHeadersToSpdyHeaders) {
@@ -37,16 +40,16 @@ TEST(SpdyBalsaUtilsTest, ResponseHeadersToSpdyHeaders) {
   SpdyHeaderBlock expected_headers;
   expected_headers[":status"] = "200";
 
-  EXPECT_EQ(expected_headers, spdy_headers);
+  EXPECT_TRUE(CompareSpdyHeaderBlocks(expected_headers, spdy_headers));
 }
 
 TEST(SpdyBalsaUtilsTest, SpdyHeadersToRequestHeaders) {
   // Test :authority header.
   SpdyHeaderBlock spdy_headers;
   spdy_headers[":authority"] = "www.google.com";
-  spdy_headers[":method"] = "GET";
   spdy_headers[":path"] = "/foo";
   spdy_headers[":scheme"] = "https";
+  spdy_headers[":method"] = "GET";
 
   BalsaHeaders request_headers;
   SpdyBalsaUtils::SpdyHeadersToRequestHeaders(spdy_headers, &request_headers,

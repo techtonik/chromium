@@ -417,9 +417,13 @@ bool MimeUtil::AreSupportedMediaCodecs(
 void MimeUtil::ParseCodecString(const std::string& codecs,
                                 std::vector<std::string>* codecs_out,
                                 bool strip) {
-  std::string no_quote_codecs;
-  base::TrimString(codecs, "\"", &no_quote_codecs);
-  base::SplitString(no_quote_codecs, ',', codecs_out);
+  *codecs_out = base::SplitString(
+      base::TrimString(codecs, "\"", base::TRIM_ALL),
+      ",", base::TRIM_WHITESPACE, base::SPLIT_WANT_ALL);
+
+  // Convert empty or all-whitespace input to 0 results.
+  if (codecs_out->size() == 1 && (*codecs_out)[0].empty())
+    codecs_out->clear();
 
   if (!strip)
     return;
@@ -533,7 +537,7 @@ static bool ParseH264CodecID(const std::string& codec_id,
     return false;
   }
 
-  std::string profile = base::StringToUpperASCII(codec_id.substr(5, 4));
+  std::string profile = base::ToUpperASCII(codec_id.substr(5, 4));
   if (IsValidH264BaselineProfile(profile)) {
     *codec = MimeUtil::H264_BASELINE;
   } else if (profile == "4D40") {
@@ -546,8 +550,7 @@ static bool ParseH264CodecID(const std::string& codec_id,
     return true;
   }
 
-  *is_ambiguous =
-      !IsValidH264Level(base::StringToUpperASCII(codec_id.substr(9)));
+  *is_ambiguous = !IsValidH264Level(base::ToUpperASCII(codec_id.substr(9)));
   return true;
 }
 

@@ -143,14 +143,6 @@ void OffTheRecordProfileImpl::Init() {
          IncognitoModePrefs::GetAvailability(profile_->GetPrefs()) !=
              IncognitoModePrefs::DISABLED);
 
-  // TODO(oshima): Remove the need to eagerly initialize the request context
-  // getter. chromeos::OnlineAttempt is illegally trying to access this
-  // Profile member from a thread other than the UI thread, so we need to
-  // prevent a race.
-#if defined(OS_CHROMEOS)
-  GetRequestContext();
-#endif  // defined(OS_CHROMEOS)
-
   TrackZoomLevelsFromParent();
 
 #if defined(ENABLE_PLUGINS)
@@ -287,18 +279,18 @@ ExtensionSpecialStoragePolicy*
   return GetOriginalProfile()->GetExtensionSpecialStoragePolicy();
 }
 
-bool OffTheRecordProfileImpl::IsSupervised() {
-  return GetOriginalProfile()->IsSupervised();
+bool OffTheRecordProfileImpl::IsSupervised() const {
+  return profile_->IsSupervised();
 }
 
-bool OffTheRecordProfileImpl::IsChild() {
+bool OffTheRecordProfileImpl::IsChild() const {
   // TODO(treib): If we ever allow incognito for child accounts, evaluate
   // whether we want to just return false here.
-  return GetOriginalProfile()->IsChild();
+  return profile_->IsChild();
 }
 
-bool OffTheRecordProfileImpl::IsLegacySupervised() {
-  return GetOriginalProfile()->IsLegacySupervised();
+bool OffTheRecordProfileImpl::IsLegacySupervised() const {
+  return profile_->IsLegacySupervised();
 }
 
 PrefService* OffTheRecordProfileImpl::GetPrefs() {
@@ -505,9 +497,9 @@ chrome_browser_net::Predictor* OffTheRecordProfileImpl::GetNetworkPredictor() {
   return NULL;
 }
 
-DevToolsNetworkController*
-OffTheRecordProfileImpl::GetDevToolsNetworkController() {
-  return io_data_->GetDevToolsNetworkController();
+DevToolsNetworkControllerHandle*
+OffTheRecordProfileImpl::GetDevToolsNetworkControllerHandle() {
+  return io_data_->GetDevToolsNetworkControllerHandle();
 }
 
 void OffTheRecordProfileImpl::ClearNetworkingHistorySince(

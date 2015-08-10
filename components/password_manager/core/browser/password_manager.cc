@@ -90,26 +90,35 @@ bool IsSignupForm(const PasswordForm& form) {
   return !form.new_password_element.empty() && form.password_element.empty();
 }
 
+// Tries to convert the |server_field_type| to a PasswordFormFieldPredictionType
+// stored in |type|. Returns true if the conversion was made.
 bool ServerTypeToPrediction(autofill::ServerFieldType server_field_type,
                             autofill::PasswordFormFieldPredictionType* type) {
   switch (server_field_type) {
     case autofill::USERNAME:
     case autofill::USERNAME_AND_EMAIL_ADDRESS:
       *type = autofill::PREDICTION_USERNAME;
-      break;
+      return true;
 
     case autofill::PASSWORD:
       *type = autofill::PREDICTION_CURRENT_PASSWORD;
-      break;
+      return true;
 
     case autofill::ACCOUNT_CREATION_PASSWORD:
       *type = autofill::PREDICTION_NEW_PASSWORD;
-      break;
+      return true;
 
     default:
       return false;
   }
-  return true;
+}
+
+// Returns true if the |field_type| is known to be possibly
+// misinterpreted as a password by the Password Manager.
+bool IsPredictedTypeNotPasswordPrediction(
+    autofill::ServerFieldType field_type) {
+  return field_type == autofill::CREDIT_CARD_NUMBER ||
+         field_type == autofill::CREDIT_CARD_VERIFICATION_CODE;
 }
 
 bool PreferredRealmIsFromAndroid(
@@ -555,7 +564,9 @@ bool PasswordManager::CanProvisionalManagerSave() {
 
 bool PasswordManager::ShouldPromptUserToSavePassword() const {
   return !client_->IsAutomaticPasswordSavingEnabled() &&
-         provisional_save_manager_->IsNewLogin() &&
+         (provisional_save_manager_->IsNewLogin() ||
+          provisional_save_manager_->observed_form()
+              .IsPossibleChangePasswordFormWithoutUsername()) &&
          !provisional_save_manager_->has_generated_password() &&
          !provisional_save_manager_->IsPendingCredentialsPublicSuffixMatch();
 }
@@ -687,9 +698,13 @@ void PasswordManager::OnLoginSuccessful() {
                           empty_password);
     if (logger)
       logger->LogMessage(Logger::STRING_DECISION_ASK);
-    if (client_->PromptUserToSavePassword(
+    bool update_password = !provisional_save_manager_->best_matches().empty() &&
+                           provisional_save_manager_->observed_form()
+                               .IsPossibleChangePasswordFormWithoutUsername();
+    if (client_->PromptUserToSaveOrUpdatePassword(
             provisional_save_manager_.Pass(),
-            CredentialSourceType::CREDENTIAL_SOURCE_PASSWORD_MANAGER)) {
+            CredentialSourceType::CREDENTIAL_SOURCE_PASSWORD_MANAGER,
+            update_password)) {
       if (logger)
         logger->LogMessage(Logger::STRING_SHOW_PASSWORD_PROMPT);
     }
@@ -768,8 +783,17 @@ void PasswordManager::ProcessAutofillPredictions(
              form->begin();
          field != form->end(); ++field) {
       autofill::PasswordFormFieldPredictionType prediction_type;
-      if (ServerTypeToPrediction((*field)->server_type(), &prediction_type))
-        predictions[form->ToFormData()][prediction_type] = *(*field);
+      if (ServerTypeToPrediction((*field)->server_type(), &prediction_type)) {
+        predictions[form->ToFormData()][*(*field)] = prediction_type;
+      }
+      // Certain fields are annotated by the browsers as "not passwords" i.e.
+      // they should not be treated as passwords by the Password Manager.
+      if ((*field)->form_control_type == "password" &&
+          IsPredictedTypeNotPasswordPrediction(
+              (*field)->Type().GetStorableType())) {
+        predictions[form->ToFormData()][*(*field)] =
+            autofill::PREDICTION_NOT_PASSWORD;
+      }
     }
   }
   if (predictions.empty())

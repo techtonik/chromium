@@ -7,12 +7,16 @@
 #include <algorithm>
 #include <limits>
 
+#include "base/atomic_sequence_num.h"
 #include "base/containers/hash_tables.h"
 #include "base/metrics/histogram.h"
 #include "base/numerics/safe_math.h"
 #include "base/stl_util.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
+#include "base/strings/stringprintf.h"
+#include "base/thread_task_runner_handle.h"
+#include "base/trace_event/memory_dump_manager.h"
 #include "base/trace_event/trace_event.h"
 #include "cc/resources/platform_color.h"
 #include "cc/resources/resource_util.h"
@@ -30,6 +34,7 @@
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/gpu_memory_buffer.h"
+#include "ui/gl/trace_util.h"
 
 using gpu::gles2::GLES2Interface;
 
@@ -242,6 +247,10 @@ class CopyTextureFence : public ResourceProvider::Fence {
   DISALLOW_COPY_AND_ASSIGN(CopyTextureFence);
 };
 
+// Generates process-unique IDs to use for tracing a ResourceProvider's
+// resources.
+base::StaticAtomicSequenceNumber g_next_resource_provider_tracing_id;
+
 }  // namespace
 
 ResourceProvider::Resource::~Resource() {}
@@ -393,17 +402,21 @@ scoped_ptr<ResourceProvider> ResourceProvider::Create(
     int highp_threshold_min,
     bool use_rgba_4444_texture_format,
     size_t id_allocation_chunk_size,
-    bool use_persistent_map_for_gpu_memory_buffers) {
+    bool use_persistent_map_for_gpu_memory_buffers,
+    const std::vector<unsigned>& use_image_texture_targets) {
   scoped_ptr<ResourceProvider> resource_provider(new ResourceProvider(
       output_surface, shared_bitmap_manager, gpu_memory_buffer_manager,
       blocking_main_thread_task_runner, highp_threshold_min,
       use_rgba_4444_texture_format, id_allocation_chunk_size,
-      use_persistent_map_for_gpu_memory_buffers));
+      use_persistent_map_for_gpu_memory_buffers, use_image_texture_targets));
   resource_provider->Initialize();
   return resource_provider;
 }
 
 ResourceProvider::~ResourceProvider() {
+  base::trace_event::MemoryDumpManager::GetInstance()->UnregisterDumpProvider(
+      this);
+
   while (!children_.empty())
     DestroyChildInternal(children_.begin(), FOR_SHUTDOWN);
   while (!resources_.empty())
@@ -1084,7 +1097,8 @@ ResourceProvider::ResourceProvider(
     int highp_threshold_min,
     bool use_rgba_4444_texture_format,
     size_t id_allocation_chunk_size,
-    bool use_persistent_map_for_gpu_memory_buffers)
+    bool use_persistent_map_for_gpu_memory_buffers,
+    const std::vector<unsigned>& use_image_texture_targets)
     : output_surface_(output_surface),
       shared_bitmap_manager_(shared_bitmap_manager),
       gpu_memory_buffer_manager_(gpu_memory_buffer_manager),
@@ -1106,13 +1120,23 @@ ResourceProvider::ResourceProvider(
       id_allocation_chunk_size_(id_allocation_chunk_size),
       use_sync_query_(false),
       use_persistent_map_for_gpu_memory_buffers_(
-          use_persistent_map_for_gpu_memory_buffers) {
+          use_persistent_map_for_gpu_memory_buffers),
+      use_image_texture_targets_(use_image_texture_targets),
+      tracing_id_(g_next_resource_provider_tracing_id.GetNext()) {
   DCHECK(output_surface_->HasClient());
   DCHECK(id_allocation_chunk_size_);
 }
 
 void ResourceProvider::Initialize() {
   DCHECK(thread_checker_.CalledOnValidThread());
+
+  // In certain cases, ThreadTaskRunnerHandle isn't set (Android Webview).
+  // Don't register a dump provider in these cases.
+  // TODO(ericrk): Get this working in Android Webview. crbug.com/517156
+  if (base::ThreadTaskRunnerHandle::IsSet()) {
+    base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
+        this, base::ThreadTaskRunnerHandle::Get());
+  }
 
   GLES2Interface* gl = ContextGL();
   if (!gl) {
@@ -1935,6 +1959,13 @@ GLint ResourceProvider::GetActiveTextureUnit(GLES2Interface* gl) {
   return active_unit;
 }
 
+GLenum ResourceProvider::GetImageTextureTarget(ResourceFormat format) {
+  gfx::BufferFormat buffer_format = ToGpuMemoryBufferFormat(format);
+  DCHECK_GT(use_image_texture_targets_.size(),
+            static_cast<size_t>(buffer_format));
+  return use_image_texture_targets_[static_cast<size_t>(buffer_format)];
+}
+
 void ResourceProvider::ValidateResource(ResourceId id) const {
   DCHECK(thread_checker_.CalledOnValidThread());
   DCHECK(id);
@@ -1951,6 +1982,56 @@ class GrContext* ResourceProvider::GrContext(bool worker_context) const {
       worker_context ? output_surface_->worker_context_provider()
                      : output_surface_->context_provider();
   return context_provider ? context_provider->GrContext() : NULL;
+}
+
+bool ResourceProvider::OnMemoryDump(
+    const base::trace_event::MemoryDumpArgs& args,
+    base::trace_event::ProcessMemoryDump* pmd) {
+  DCHECK(thread_checker_.CalledOnValidThread());
+
+  const uint64 tracing_process_id =
+      base::trace_event::MemoryDumpManager::GetInstance()
+          ->GetTracingProcessId();
+
+  for (const auto& resource_entry : resources_) {
+    const auto& resource = resource_entry.second;
+
+    // Resource IDs are not process-unique, so log with the ResourceProvider's
+    // unique id.
+    std::string dump_name = base::StringPrintf(
+        "cc/resource_memory/resource_provider_%d/resource_%d", tracing_id_,
+        resource_entry.first);
+    base::trace_event::MemoryAllocatorDump* dump =
+        pmd->CreateAllocatorDump(dump_name);
+
+    uint64_t total_bytes = ResourceUtil::UncheckedSizeInBytesAligned<size_t>(
+        resource.size, resource.format);
+    dump->AddScalar(base::trace_event::MemoryAllocatorDump::kNameSize,
+                    base::trace_event::MemoryAllocatorDump::kUnitsBytes,
+                    static_cast<uint64_t>(total_bytes));
+
+    // Resources which are shared across processes require a shared GUID to
+    // prevent double counting the memory. We currently support shared GUIDs for
+    // GpuMemoryBuffer, SharedBitmap, and GL backed resources.
+    base::trace_event::MemoryAllocatorDumpGuid guid;
+    if (resource.gpu_memory_buffer) {
+      guid = gfx::GetGpuMemoryBufferGUIDForTracing(
+          tracing_process_id, resource.gpu_memory_buffer->GetHandle().id);
+    } else if (resource.shared_bitmap) {
+      guid = GetSharedBitmapGUIDForTracing(resource.shared_bitmap->id());
+    } else if (resource.gl_id && resource.allocated) {
+      guid =
+          gfx::GetGLTextureGUIDForTracing(tracing_process_id, resource.gl_id);
+    }
+
+    if (!guid.empty()) {
+      const int kImportance = 2;
+      pmd->CreateSharedGlobalAllocatorDump(guid);
+      pmd->AddOwnershipEdge(dump->guid(), guid, kImportance);
+    }
+  }
+
+  return true;
 }
 
 }  // namespace cc

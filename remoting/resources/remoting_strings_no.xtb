@@ -70,6 +70,7 @@ Vert</translation>
 <translation id="2813770873348017932">Tilkoblinger til den eksterne datamaskinen er midlertidig blokkert fordi noen prøvde å koble seg til med en ugyldig PIN-kode. Prøv på nytt senere.</translation>
 <translation id="6746493157771801606">Tøm logg</translation>
 <translation id="4430435636878359009">Deaktiver eksterne tilkoblinger til denne datamaskinen.</translation>
+<translation id="3244258558056547981">Se Cardboard-visning.</translation>
 <translation id="2314101195544969792"><ph name="APPLICATION_NAME"/>-økten din har vært inaktiv en stund og kommer snart til å bli koblet fra.</translation>
 <translation id="6001953797859482435">Alternativer for Chrome Eksternt skrivebord-vert</translation>
 <translation id="225614027745146050">Velkommen</translation>
@@ -112,6 +113,7 @@ Du kan finne informasjon om personvern i Googles personvernregler (http://goo.gl
 <translation id="8759753423332885148">Finn ut mer</translation>
 <translation id="4430915108080446161">Genererer tilgangskode …</translation>
 <translation id="2013996867038862849">Alle tilknyttede klienter har blitt slettet.</translation>
+<translation id="5363265567587775042">Be brukeren av datamaskinen du vil ha tilgang til, om å klikke på «<ph name="SHARE"/>» og gi deg tilgangskoden.</translation>
 <translation id="6985691951107243942">Er du sikker på at du vil deaktivere eksterne tilkoblinger til <ph name="HOSTNAME"/>? Hvis du ombestemmer deg, må du tilbake til datamaskinen for å gjenopprette tilkoblingene.</translation>
 <translation id="6944854424004126054">Gjenopprett vinduet</translation>
 <translation id="9149992051684092333">Kom i gang med deling av skrivebordet ved å gi adgangskoden nedenfor til personen som skal hjelpe deg.</translation>

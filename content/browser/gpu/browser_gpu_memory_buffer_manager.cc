@@ -20,6 +20,7 @@
 #include "content/public/browser/browser_thread.h"
 #include "content/public/common/content_switches.h"
 #include "gpu/GLES2/gl2extchromium.h"
+#include "ui/gl/gl_switches.h"
 
 #if defined(OS_MACOSX)
 #include "content/common/gpu/gpu_memory_buffer_factory_io_surface.h"
@@ -88,8 +89,23 @@ gfx::GpuMemoryBufferType GetGpuMemoryBufferFactoryType() {
 std::vector<GpuMemoryBufferFactory::Configuration>
 GetSupportedGpuMemoryBufferConfigurations(gfx::GpuMemoryBufferType type) {
   std::vector<GpuMemoryBufferFactory::Configuration> configurations;
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableNativeGpuMemoryBuffers)) {
+#if defined(OS_MACOSX)
+  bool enable_native_gpu_memory_buffers =
+      !base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kDisableNativeGpuMemoryBuffers);
+#else
+  bool enable_native_gpu_memory_buffers =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableNativeGpuMemoryBuffers);
+#endif
+
+  // Disable native buffers when using Mesa.
+  if (base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          switches::kUseGL) == gfx::kGLImplementationOSMesaName) {
+    enable_native_gpu_memory_buffers = false;
+  }
+
+  if (enable_native_gpu_memory_buffers) {
     const GpuMemoryBufferFactory::Configuration kNativeConfigurations[] = {
         {gfx::BufferFormat::R_8, gfx::BufferUsage::MAP},
         {gfx::BufferFormat::R_8, gfx::BufferUsage::PERSISTENT_MAP},
@@ -147,11 +163,14 @@ struct BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferRequest {
   scoped_ptr<gfx::GpuMemoryBuffer> result;
 };
 
-BrowserGpuMemoryBufferManager::BrowserGpuMemoryBufferManager(int gpu_client_id)
+BrowserGpuMemoryBufferManager::BrowserGpuMemoryBufferManager(
+    int gpu_client_id,
+    uint64_t gpu_client_tracing_id)
     : factory_type_(GetGpuMemoryBufferFactoryType()),
       supported_configurations_(
           GetSupportedGpuMemoryBufferConfigurations(factory_type_)),
       gpu_client_id_(gpu_client_id),
+      gpu_client_tracing_id_(gpu_client_tracing_id),
       gpu_host_id_(0) {
   DCHECK(!g_gpu_memory_buffer_manager);
   g_gpu_memory_buffer_manager = this;
@@ -259,6 +278,7 @@ void BrowserGpuMemoryBufferManager::SetDestructionSyncPoint(
 }
 
 bool BrowserGpuMemoryBufferManager::OnMemoryDump(
+    const base::trace_event::MemoryDumpArgs& args,
     base::trace_event::ProcessMemoryDump* pmd) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
 
@@ -292,9 +312,8 @@ bool BrowserGpuMemoryBufferManager::OnMemoryDump(
       // corresponding dump for the same buffer, this will avoid to
       // double-count them in tracing. If, instead, no other process will emit a
       // dump with the same guid, the segment will be accounted to the browser.
-      const uint64 client_tracing_process_id =
-          ChildProcessHostImpl::ChildProcessUniqueIdToTracingProcessId(
-              client_id);
+      uint64 client_tracing_process_id = ClientIdToTracingProcessId(client_id);
+
       base::trace_event::MemoryAllocatorDumpGuid shared_buffer_guid =
           gfx::GetGpuMemoryBufferGUIDForTracing(client_tracing_process_id,
                                                 buffer_id);
@@ -587,6 +606,19 @@ void BrowserGpuMemoryBufferManager::DestroyGpuMemoryBufferOnIO(
     host->DestroyGpuMemoryBuffer(id, client_id, sync_point);
 
   buffers.erase(buffer_it);
+}
+
+uint64_t BrowserGpuMemoryBufferManager::ClientIdToTracingProcessId(
+    int client_id) const {
+  if (client_id == gpu_client_id_) {
+    // The gpu_client uses a fixed tracing ID.
+    return gpu_client_tracing_id_;
+  }
+
+  // In normal cases, |client_id| is a child process id, so we can perform
+  // the standard conversion.
+  return ChildProcessHostImpl::ChildProcessUniqueIdToTracingProcessId(
+      client_id);
 }
 
 }  // namespace content

@@ -20,6 +20,7 @@
 #include "cc/surfaces/surface_aggregator.h"
 #include "cc/surfaces/surface_manager.h"
 #include "gpu/command_buffer/client/gles2_interface.h"
+#include "ui/gfx/buffer_types.h"
 
 namespace cc {
 
@@ -107,7 +108,9 @@ void Display::InitializeRenderer() {
       output_surface_.get(), bitmap_manager_, gpu_memory_buffer_manager_,
       nullptr, settings_.highp_threshold_min, settings_.use_rgba_4444_textures,
       settings_.texture_id_allocation_chunk_size,
-      use_persistent_map_for_gpu_memory_buffers);
+      use_persistent_map_for_gpu_memory_buffers,
+      std::vector<unsigned>(static_cast<size_t>(gfx::BufferFormat::LAST) + 1,
+                            GL_TEXTURE_2D));
   if (!resource_provider)
     return;
 
@@ -164,9 +167,6 @@ bool Display::DrawAndSwap() {
     return false;
   }
 
-  if (output_surface_->SurfaceIsSuspendForRecycle())
-    return false;
-
   scoped_ptr<CompositorFrame> frame =
       aggregator_->Aggregate(current_surface_id_);
   if (!frame) {
@@ -207,6 +207,14 @@ bool Display::DrawAndSwap() {
 
   bool should_draw = !frame->metadata.latency_info.empty() ||
                      have_copy_requests || (have_damage && size_matches);
+
+  // If the surface is suspended then the resources to be used by the draw are
+  // likely destroyed.
+  if (output_surface_->SurfaceIsSuspendForRecycle()) {
+    TRACE_EVENT_INSTANT0("cc", "Surface is suspended for recycle.",
+                         TRACE_EVENT_SCOPE_THREAD);
+    should_draw = false;
+  }
 
   if (should_draw) {
     gfx::Rect device_viewport_rect = gfx::Rect(current_surface_size_);

@@ -5,6 +5,8 @@
 {
   'variables': {
     'chrome_browser_extensions_chromeos_sources': [
+      'browser/extensions/api/enterprise_device_attributes/enterprise_device_attributes_api.cc',
+      'browser/extensions/api/enterprise_device_attributes/enterprise_device_attributes_api.h',
       'browser/extensions/api/enterprise_platform_keys/enterprise_platform_keys_api.cc',
       'browser/extensions/api/enterprise_platform_keys/enterprise_platform_keys_api.h',
       'browser/extensions/api/enterprise_platform_keys_private/enterprise_platform_keys_private_api.cc',
@@ -74,8 +76,6 @@
       'browser/apps/ephemeral_app_service.h',
       'browser/apps/ephemeral_app_service_factory.cc',
       'browser/apps/ephemeral_app_service_factory.h',
-      'browser/apps/ephemeral_app_throttle.cc',
-      'browser/apps/ephemeral_app_throttle.h',
       'browser/apps/install_chrome_app.cc',
       'browser/apps/install_chrome_app.h',
       'browser/apps/per_app_settings_service.cc',

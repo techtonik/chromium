@@ -65,6 +65,7 @@
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/storage_partition.h"
+#include "extensions/browser/app_sorting.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_prefs.h"
@@ -2115,7 +2116,7 @@ void ExtensionService::TerminateExtension(const std::string& extension_id) {
 }
 
 void ExtensionService::UntrackTerminatedExtension(const std::string& id) {
-  std::string lowercase_id = base::StringToLowerASCII(id);
+  std::string lowercase_id = base::ToLowerASCII(id);
   const Extension* extension =
       registry_->terminated_extensions().GetByID(lowercase_id);
   registry_->RemoveTerminated(lowercase_id);

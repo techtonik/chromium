@@ -83,12 +83,26 @@ function Gallery(volumeManager) {
   this.filenameSpacer_ = queryRequiredElement(this.topToolbar_,
       '.filename-spacer');
 
-  this.filenameEdit_ = queryRequiredElement(this.filenameSpacer_,
-      'paper-input');
+  /**
+   * @private {HTMLInputElement}
+   * @const
+   */
+  this.filenameEdit_ = /** @type {HTMLInputElement} */
+      (queryRequiredElement(this.filenameSpacer_, 'input'));
+
+  this.filenameCanvas_ = document.createElement('canvas');
+  this.filenameCanvasContext_ = this.filenameCanvas_.getContext('2d');
+
+  // Set font style of canvas context to same font style with rename field.
+  var filenameEditComputedStyle = window.getComputedStyle(this.filenameEdit_);
+  this.filenameCanvasContext_.font = filenameEditComputedStyle.font;
+
   this.filenameEdit_.addEventListener('blur',
       this.onFilenameEditBlur_.bind(this));
   this.filenameEdit_.addEventListener('focus',
       this.onFilenameFocus_.bind(this));
+  this.filenameEdit_.addEventListener('input',
+      this.resizeRenameField_.bind(this));
   this.filenameEdit_.addEventListener('keydown',
       this.onFilenameEditKeydown_.bind(this));
 
@@ -165,6 +179,8 @@ function Gallery(volumeManager) {
       'externally-unmounted', this.onExternallyUnmountedBound_);
   // The 'pagehide' event is called when the app window is closed.
   window.addEventListener('pagehide', this.onPageHide_.bind(this));
+
+  window.addEventListener('resize', this.resizeRenameField_.bind(this));
 }
 
 /**
@@ -630,6 +646,9 @@ Gallery.prototype.onKeyDown_ = function(event) {
   if (this.shareDialog_.isShowing())
     return;
 
+  // Show UIs when user types any key.
+  this.inactivityWatcher_.kick();
+
   // Handle mode specific shortcut keys.
   if (this.currentMode_.onKeyDown(event)) {
     event.preventDefault();
@@ -699,6 +718,7 @@ Gallery.prototype.updateSelectionAndState_ = function() {
       this.filenameEdit_.disabled = selectedItem.getLocationInfo().isReadOnly;
       this.filenameEdit_.value =
           ImageUtil.getDisplayNameFromName(this.selectedEntry_.name);
+      this.resizeRenameField_();
       this.shareButton_.hidden = !selectedItem.getLocationInfo().isDriveBased;
     } else {
       if (this.context_.curDirEntry) {
@@ -712,6 +732,7 @@ Gallery.prototype.updateSelectionAndState_ = function() {
       this.filenameEdit_.disabled = true;
       this.filenameEdit_.value =
           strf('GALLERY_ITEMS_SELECTED', numSelectedItems);
+      this.resizeRenameField_();
       this.shareButton_.hidden = true;
     }
   } else {
@@ -719,6 +740,7 @@ Gallery.prototype.updateSelectionAndState_ = function() {
     this.filenameEdit_.disabled = true;
     this.deleteButton_.disabled = true;
     this.filenameEdit_.value = '';
+    this.resizeRenameField_();
     this.shareButton_.hidden = true;
   }
 
@@ -738,8 +760,7 @@ Gallery.prototype.updateSelectionAndState_ = function() {
 Gallery.prototype.onFilenameFocus_ = function() {
   ImageUtil.setAttribute(this.filenameSpacer_, 'renaming', true);
   this.filenameEdit_.originalValue = this.filenameEdit_.value;
-  setTimeout(this.filenameEdit_.inputElement.select.bind(
-      this.filenameEdit_.inputElement), 0);
+  setTimeout(this.filenameEdit_.select.bind(this.filenameEdit_), 0);
   this.onUserAction_();
 };
 
@@ -765,6 +786,7 @@ Gallery.prototype.onFilenameEditBlur_ = function(event) {
         return Promise.resolve();
       this.filenameEdit_.value =
           ImageUtil.getDisplayNameFromName(item.getEntry().name);
+      this.resizeRenameField_();
       this.filenameEdit_.focus();
       if (typeof error === 'string')
         this.prompt_.showStringAt('center', error, 5000);
@@ -780,6 +802,32 @@ Gallery.prototype.onFilenameEditBlur_ = function(event) {
 };
 
 /**
+ * Minimum width of rename field.
+ * @const {number}
+ */
+Gallery.MIN_WIDTH_RENAME_FIELD = 160; // px
+
+/**
+ * End padding for rename field.
+ * @const {number}
+ */
+Gallery.END_PADDING_RENAME_FIELD = 20; // px
+
+/**
+ * Resize rename field depending on its content.
+ * @private
+ */
+Gallery.prototype.resizeRenameField_ = function() {
+  var size = this.filenameCanvasContext_.measureText(this.filenameEdit_.value);
+
+  var width = Math.min(Math.max(
+      size.width + Gallery.END_PADDING_RENAME_FIELD,
+      Gallery.MIN_WIDTH_RENAME_FIELD), window.innerWidth / 2);
+
+  this.filenameEdit_.style.width = width + 'px';
+};
+
+/**
  * Keydown event handler on filename edit box
  * @param {!Event} event A keyboard event.
  * @private
@@ -789,6 +837,7 @@ Gallery.prototype.onFilenameEditKeydown_ = function(event) {
   switch (event.keyCode) {
     case 27:  // Escape
       this.filenameEdit_.value = this.filenameEdit_.originalValue;
+      this.resizeRenameField_();
       this.filenameEdit_.blur();
       break;
 

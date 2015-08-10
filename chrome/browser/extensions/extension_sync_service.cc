@@ -22,6 +22,7 @@
 #include "extensions/browser/app_sorting.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
+#include "extensions/browser/extension_system.h"
 #include "extensions/browser/extension_util.h"
 #include "extensions/browser/uninstall_reason.h"
 #include "extensions/common/extension.h"
@@ -30,11 +31,13 @@
 #include "sync/api/sync_change.h"
 #include "sync/api/sync_error_factory.h"
 
+using extensions::AppSorting;
 using extensions::Extension;
 using extensions::ExtensionPrefs;
 using extensions::ExtensionRegistry;
 using extensions::ExtensionSet;
 using extensions::ExtensionSyncData;
+using extensions::ExtensionSystem;
 using extensions::SyncBundle;
 
 namespace {
@@ -89,14 +92,9 @@ syncer::SyncDataList ToSyncerSyncDataList(
 
 }  // namespace
 
-ExtensionSyncService::ExtensionSyncService(Profile* profile,
-                                           ExtensionPrefs* extension_prefs,
-                                           ExtensionService* extension_service)
+ExtensionSyncService::ExtensionSyncService(Profile* profile)
     : profile_(profile),
-      extension_prefs_(extension_prefs),
-      extension_service_(extension_service) {
-  SetSyncStartFlare(sync_start_util::GetFlareForSyncableService(
-      profile_->GetPath()));
+      flare_(sync_start_util::GetFlareForSyncableService(profile->GetPath())) {
 }
 
 ExtensionSyncService::~ExtensionSyncService() {}
@@ -108,7 +106,7 @@ ExtensionSyncService* ExtensionSyncService::Get(
 }
 
 void ExtensionSyncService::SyncUninstallExtension(
-    const extensions::Extension& extension) {
+    const Extension& extension) {
   if (!extensions::util::ShouldSync(&extension, profile_))
     return;
 
@@ -122,7 +120,7 @@ void ExtensionSyncService::SyncUninstallExtension(
   if (bundle->IsSyncing()) {
     bundle->PushSyncDeletion(extension.id(),
                              CreateSyncData(extension).GetSyncData());
-  } else if (extension_service_->is_ready() && !flare_.is_null()) {
+  } else if (extension_service()->is_ready() && !flare_.is_null()) {
     flare_.Run(type);  // Tell sync to start ASAP.
   }
 }
@@ -141,7 +139,7 @@ void ExtensionSyncService::SyncExtensionChangeIfNeeded(
     DCHECK(!ExtensionPrefs::Get(profile_)->NeedsSync(extension.id()));
   } else {
     ExtensionPrefs::Get(profile_)->SetNeedsSync(extension.id(), true);
-    if (extension_service_->is_ready() && !flare_.is_null())
+    if (extension_service()->is_ready() && !flare_.is_null())
       flare_.Run(type);  // Tell sync to start ASAP.
   }
 }
@@ -181,7 +179,7 @@ syncer::SyncMergeResult ExtensionSyncService::MergeDataAndStartSyncing(
     ExtensionPrefs::Get(profile_)->SetNeedsSync(data.id(), false);
 
   if (type == syncer::APPS)
-    extension_prefs_->app_sorting()->FixNTPOrdinalCollisions();
+    ExtensionSystem::Get(profile_)->app_sorting()->FixNTPOrdinalCollisions();
 
   return syncer::SyncMergeResult(type);
 }
@@ -196,7 +194,7 @@ syncer::SyncDataList ExtensionSyncService::GetAllSyncData(
   if (!bundle->IsSyncing())
     return syncer::SyncDataList();
 
-  std::vector<extensions::ExtensionSyncData> sync_data_list =
+  std::vector<ExtensionSyncData> sync_data_list =
       GetLocalSyncDataList(type, true);
 
   // Add pending data (where the local extension is either not installed yet or
@@ -219,29 +217,31 @@ syncer::SyncError ExtensionSyncService::ProcessSyncChanges(
       ApplySyncData(*extension_sync_data);
   }
 
-  extension_prefs_->app_sorting()->FixNTPOrdinalCollisions();
+  ExtensionSystem::Get(profile_)->app_sorting()->FixNTPOrdinalCollisions();
 
   return syncer::SyncError();
 }
 
 ExtensionSyncData ExtensionSyncService::CreateSyncData(
-    const extensions::Extension& extension) const {
-  bool enabled = extension_service_->IsExtensionEnabled(extension.id());
-  int disable_reasons = extension_prefs_->GetDisableReasons(extension.id());
+    const Extension& extension) const {
+  const ExtensionPrefs* extension_prefs = ExtensionPrefs::Get(profile_);
+  bool enabled = extension_service()->IsExtensionEnabled(extension.id());
+  int disable_reasons = extension_prefs->GetDisableReasons(extension.id());
   bool incognito_enabled = extensions::util::IsIncognitoEnabled(extension.id(),
                                                                 profile_);
   bool remote_install =
-      extension_prefs_->HasDisableReason(extension.id(),
-                                         Extension::DISABLE_REMOTE_INSTALL);
+      extension_prefs->HasDisableReason(extension.id(),
+                                        Extension::DISABLE_REMOTE_INSTALL);
   ExtensionSyncData::OptionalBoolean allowed_on_all_url =
       GetAllowedOnAllUrlsOptionalBoolean(extension.id(), profile_);
   if (extension.is_app()) {
+    AppSorting* app_sorting = ExtensionSystem::Get(profile_)->app_sorting();
     return ExtensionSyncData(
         extension, enabled, disable_reasons, incognito_enabled, remote_install,
         allowed_on_all_url,
-        extension_prefs_->app_sorting()->GetAppLaunchOrdinal(extension.id()),
-        extension_prefs_->app_sorting()->GetPageOrdinal(extension.id()),
-        extensions::GetLaunchTypePrefValue(extension_prefs_, extension.id()));
+        app_sorting->GetAppLaunchOrdinal(extension.id()),
+        app_sorting->GetPageOrdinal(extension.id()),
+        extensions::GetLaunchTypePrefValue(extension_prefs, extension.id()));
   }
   return ExtensionSyncData(
       extension, enabled, disable_reasons, incognito_enabled, remote_install,
@@ -260,12 +260,11 @@ bool ExtensionSyncService::ApplySyncData(
   if (extension_sync_data.is_app()) {
     if (extension_sync_data.app_launch_ordinal().IsValid() &&
         extension_sync_data.page_ordinal().IsValid()) {
-      extension_prefs_->app_sorting()->SetAppLaunchOrdinal(
+      AppSorting* app_sorting = ExtensionSystem::Get(profile_)->app_sorting();
+      app_sorting->SetAppLaunchOrdinal(
           id,
           extension_sync_data.app_launch_ordinal());
-      extension_prefs_->app_sorting()->SetPageOrdinal(
-          id,
-          extension_sync_data.page_ordinal());
+      app_sorting->SetPageOrdinal(id, extension_sync_data.page_ordinal());
     }
 
     // The corresponding validation of this value during ExtensionSyncData
@@ -282,7 +281,7 @@ bool ExtensionSyncService::ApplySyncData(
 
   if (!ApplyExtensionSyncDataHelper(extension_sync_data, type)) {
     bundle->AddPendingExtension(id, extension_sync_data);
-    extension_service_->CheckForUpdatesSoon();
+    extension_service()->CheckForUpdatesSoon();
     return false;
   }
 
@@ -290,7 +289,7 @@ bool ExtensionSyncService::ApplySyncData(
 }
 
 void ExtensionSyncService::ApplyBookmarkAppSyncData(
-    const extensions::ExtensionSyncData& extension_sync_data) {
+    const ExtensionSyncData& extension_sync_data) {
   DCHECK(extension_sync_data.is_app());
 
   // Process bookmark app sync if necessary.
@@ -301,7 +300,7 @@ void ExtensionSyncService::ApplyBookmarkAppSyncData(
   }
 
   const Extension* extension =
-      extension_service_->GetInstalledExtension(extension_sync_data.id());
+      extension_service()->GetInstalledExtension(extension_sync_data.id());
 
   // Return if there are no bookmark app details that need updating.
   if (extension &&
@@ -331,19 +330,23 @@ void ExtensionSyncService::ApplyBookmarkAppSyncData(
 
   // If the bookmark app already exists, keep the old icons.
   if (!extension) {
-    CreateOrUpdateBookmarkApp(extension_service_, &web_app_info);
+    CreateOrUpdateBookmarkApp(extension_service(), &web_app_info);
   } else {
     GetWebApplicationInfoFromApp(profile_,
                                  extension,
                                  base::Bind(&OnWebApplicationInfoLoaded,
                                             web_app_info,
-                                            extension_service_->AsWeakPtr()));
+                                            extension_service()->AsWeakPtr()));
   }
 }
 
-void ExtensionSyncService::SetSyncStartFlare(
+void ExtensionSyncService::SetSyncStartFlareForTesting(
     const syncer::SyncableService::StartSyncFlare& flare) {
   flare_ = flare;
+}
+
+ExtensionService* ExtensionSyncService::extension_service() const {
+  return ExtensionSystem::Get(profile_)->extension_service();
 }
 
 SyncBundle* ExtensionSyncService::GetSyncBundle(syncer::ModelType type) {
@@ -410,8 +413,8 @@ bool ExtensionSyncService::ApplyExtensionSyncDataHelper(
 
   // Handle uninstalls first.
   if (extension_sync_data.uninstalled()) {
-    if (!extension_service_->UninstallExtensionHelper(
-            extension_service_, id, extensions::UNINSTALL_REASON_SYNC)) {
+    if (!ExtensionService::UninstallExtensionHelper(
+            extension_service(), id, extensions::UNINSTALL_REASON_SYNC)) {
       LOG(WARNING) << "Could not uninstall extension " << id << " for sync";
     }
     return true;
@@ -442,9 +445,9 @@ bool ExtensionSyncService::ApplyExtensionSyncDataHelper(
         extension_sync_data.supports_disable_reasons() &&
         extension && (version_compare_result == 0);
     if (grant_permissions)
-      extension_service_->GrantPermissionsAndEnableExtension(extension);
+      extension_service()->GrantPermissionsAndEnableExtension(extension);
     else
-      extension_service_->EnableExtension(id);
+      extension_service()->EnableExtension(id);
   } else {
     int disable_reasons = extension_sync_data.disable_reasons();
     if (extension_sync_data.remote_install()) {
@@ -465,7 +468,7 @@ bool ExtensionSyncService::ApplyExtensionSyncDataHelper(
     if (extension_sync_data.supports_disable_reasons())
       ExtensionPrefs::Get(profile_)->ClearDisableReasons(id);
 
-    extension_service_->DisableExtension(id, disable_reasons);
+    extension_service()->DisableExtension(id, disable_reasons);
   }
 
   // We need to cache some information here because setting the incognito flag
@@ -476,7 +479,7 @@ bool ExtensionSyncService::ApplyExtensionSyncDataHelper(
   // be promoted to a regular installed extension and downloading from the Web
   // Store is not necessary.
   if (extension && extensions::util::IsEphemeralApp(id, profile_))
-    extension_service_->PromoteEphemeralApp(extension, true);
+    extension_service()->PromoteEphemeralApp(extension, true);
 
   // Update the incognito flag.
   extensions::util::SetIsIncognitoEnabled(
@@ -499,7 +502,7 @@ bool ExtensionSyncService::ApplyExtensionSyncDataHelper(
     }
   } else {
     CHECK(type == syncer::EXTENSIONS || type == syncer::APPS);
-    if (!extension_service_->pending_extension_manager()->AddFromSync(
+    if (!extension_service()->pending_extension_manager()->AddFromSync(
             id,
             extension_sync_data.update_url(),
             extensions::sync_helper::IsSyncable,

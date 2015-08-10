@@ -430,7 +430,15 @@ IN_PROC_BROWSER_TEST_F(InstantExtendedTest,
   ASSERT_THAT(active_tab->GetURL().spec(), HasSubstr("q=puppies"));
 }
 
-IN_PROC_BROWSER_TEST_F(InstantExtendedTest, OmniboxMarginSetForSearchURLs) {
+#if defined(OS_LINUX) && defined(ADDRESS_SANITIZER)
+// Flaky crashes at shutdown on Linux Asan; http://crbug.com/517886.
+#define MAYBE_OmniboxMarginSetForSearchURLs \
+  DISABLED_OmniboxMarginSetForSearchURLs
+#else
+#define MAYBE_OmniboxMarginSetForSearchURLs OmniboxMarginSetForSearchURLs
+#endif
+IN_PROC_BROWSER_TEST_F(InstantExtendedTest,
+                       MAYBE_OmniboxMarginSetForSearchURLs) {
   ASSERT_NO_FATAL_FAILURE(SetupInstant(browser()));
   FocusOmnibox();
 
@@ -799,7 +807,13 @@ IN_PROC_BROWSER_TEST_F(InstantExtendedTest,
   EXPECT_EQ(1, on_most_visited_change_calls_);
 }
 
-IN_PROC_BROWSER_TEST_F(InstantExtendedPrefetchTest, SetPrefetchQuery) {
+// http://crbug.com/518106
+#if defined(OS_WIN)
+#define MAYBE_SetPrefetchQuery DISABLED_SetPrefetchQuery
+#else
+#define MAYBE_SetPrefetchQuery SetPrefetchQuery
+#endif
+IN_PROC_BROWSER_TEST_F(InstantExtendedPrefetchTest, MAYBE_SetPrefetchQuery) {
   ASSERT_NO_FATAL_FAILURE(SetupInstant(browser()));
   FocusOmnibox();
 
@@ -861,7 +875,14 @@ IN_PROC_BROWSER_TEST_F(InstantExtendedPrefetchTest, SetPrefetchQuery) {
   ASSERT_EQ("puppy", prefetch_query_value_);
 }
 
-IN_PROC_BROWSER_TEST_F(InstantExtendedPrefetchTest, ClearPrefetchedResults) {
+// http://crbug.com/518106
+#if defined(OS_WIN)
+#define MAYBE_ClearPrefetchedResults DISABLED_ClearPrefetchedResults
+#else
+#define MAYBE_ClearPrefetchedResults ClearPrefetchedResults
+#endif
+IN_PROC_BROWSER_TEST_F(InstantExtendedPrefetchTest,
+                       MAYBE_ClearPrefetchedResults) {
   ASSERT_NO_FATAL_FAILURE(SetupInstant(browser()));
   FocusOmnibox();
 

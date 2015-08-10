@@ -70,6 +70,7 @@ Chromoting</translation>
 <translation id="2813770873348017932">Veze s udaljenim računalom privremeno su blokirane jer se na njih pokušava spojiti korisnik s PIN-om koji nije važeći. Pokušajte ponovo kasnije.</translation>
 <translation id="6746493157771801606">Izbriši povijest</translation>
 <translation id="4430435636878359009">Onemogući daljinske veze na ovom računalu</translation>
+<translation id="3244258558056547981">Prikaži prikaz Cardboarda.</translation>
 <translation id="2314101195544969792">Vaša sesija u aplikaciji <ph name="APPLICATION_NAME"/> nije aktivna već neko vrijeme, pa će se uskoro prekinuti veza.</translation>
 <translation id="6001953797859482435">Postavke hosta Udaljene radne površine Chrome</translation>
 <translation id="225614027745146050">Dobro došli</translation>
@@ -112,6 +113,7 @@ Informacije o privatnosti potražite u Googleovim pravilima o privatnosti (http:
 <translation id="8759753423332885148">Saznajte više.</translation>
 <translation id="4430915108080446161">Generiranje pristupnog koda...</translation>
 <translation id="2013996867038862849">Svi su upareni klijenti izbrisani.</translation>
+<translation id="5363265567587775042">Zamolite korisnika čijem računalu želite pristupiti da klikne &quot;<ph name="SHARE"/>&quot; i da vam pristupni kôd.</translation>
 <translation id="6985691951107243942">Jeste li sigurni da želite onemogućiti daljinske veze s hostom <ph name="HOSTNAME"/>? Ako se predomislite, morat ćete se spojiti na to računalo da biste ponovo omogućili veze.</translation>
 <translation id="6944854424004126054">Vraćanje prozora</translation>
 <translation id="9149992051684092333">Da biste započeli dijeliti radnu površinu, pošaljite pristupni kôd u nastavku osobi koja će vam pomagati.</translation>

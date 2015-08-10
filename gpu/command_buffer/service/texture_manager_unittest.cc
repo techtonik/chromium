@@ -1714,6 +1714,10 @@ class CountingMemoryTracker : public MemoryTracker {
     return current_size_[pool];
   }
 
+  uint64_t ClientTracingId() const override { return 0; }
+
+  int ClientId() const override { return 0; }
+
  private:
   ~CountingMemoryTracker() override {}
 
@@ -2056,12 +2060,6 @@ TEST_F(TextureFormatTypeValidationTest, ES2Basic) {
 
   // ES3
   ExpectInvalidEnum(GL_RGB, GL_UNSIGNED_BYTE, GL_RGB8);
-}
-
-TEST_F(TextureFormatTypeValidationTest, ES2WithExtBGRA) {
-  SetupFeatureInfo("GL_EXT_bgra", "OpenGL ES 2.0");
-
-  ExpectValid(GL_BGRA_EXT, GL_UNSIGNED_BYTE, GL_BGRA_EXT);
 }
 
 TEST_F(TextureFormatTypeValidationTest, ES2WithExtTextureFormatBGRA8888) {

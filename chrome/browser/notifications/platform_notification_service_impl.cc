@@ -17,13 +17,13 @@
 #include "chrome/common/pref_names.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/content_settings/core/common/content_settings.h"
+#include "components/url_formatter/url_formatter.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/desktop_notification_delegate.h"
 #include "content/public/browser/notification_event_dispatcher.h"
 #include "content/public/browser/platform_notification_context.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/common/platform_notification_data.h"
-#include "net/base/net_util.h"
 #include "ui/message_center/notifier_settings.h"
 #include "url/url_constants.h"
 
@@ -85,13 +85,15 @@ PlatformNotificationServiceImpl::~PlatformNotificationServiceImpl() {}
 void PlatformNotificationServiceImpl::OnPersistentNotificationClick(
     BrowserContext* browser_context,
     int64_t persistent_notification_id,
-    const GURL& origin) const {
+    const GURL& origin,
+    int action_index) const {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   content::NotificationEventDispatcher::GetInstance()
       ->DispatchNotificationClickEvent(
             browser_context,
             persistent_notification_id,
             origin,
+            action_index,
             base::Bind(&OnEventDispatchComplete));
 }
 
@@ -397,7 +399,8 @@ base::string16 PlatformNotificationServiceImpl::WebOriginDisplayName(
           spec.begin() +
               parsed.CountCharactersBefore(url::Parsed::USERNAME, true));
     }
-    formatted_origin.append(net::IDNToUnicode(origin.host(), languages));
+    formatted_origin.append(
+        url_formatter::IDNToUnicode(origin.host(), languages));
     if (origin.has_port()) {
       formatted_origin.push_back(':');
       formatted_origin.append(base::UTF8ToUTF16(origin.port()));
@@ -407,5 +410,5 @@ base::string16 PlatformNotificationServiceImpl::WebOriginDisplayName(
 
   // TODO(dewittj): Once file:// URLs are passed in to the origin
   // GURL here, begin returning the path as the display name.
-  return net::FormatUrl(origin, languages);
+  return url_formatter::FormatUrl(origin, languages);
 }

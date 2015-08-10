@@ -73,6 +73,12 @@ class ChromeBrowserBackend(browser_backend.BrowserBackend):
       return None
     return extension_backend.ExtensionBackendDict(self)
 
+  def _ArgsNeedProxyServer(self, args):
+    """Returns True if args for Chrome indicate the need for proxy server."""
+    if '--enable-spdy-proxy-auth' in args:
+      return True
+    return [arg for arg in args if arg.startswith('--proxy-server=')]
+
   def GetBrowserStartupArgs(self):
     args = []
     args.extend(self.browser_options.extra_browser_args)
@@ -90,8 +96,8 @@ class ChromeBrowserBackend(browser_backend.BrowserBackend):
 
     # Set --no-proxy-server to work around some XP issues unless
     # some other flag indicates a proxy is needed.
-    if not '--enable-spdy-proxy-auth' in args:
-      args.append('--no-proxy-server')
+    if not self._ArgsNeedProxyServer(args):
+      self.browser_options.no_proxy_server = True
 
     if self.browser_options.disable_background_networking:
       args.append('--disable-background-networking')
@@ -124,6 +130,9 @@ class ChromeBrowserBackend(browser_backend.BrowserBackend):
     if self.browser_options.disable_default_apps:
       args.append('--disable-default-apps')
 
+    if self.browser_options.enable_logging:
+      args.append('--enable-logging')
+      args.append('--v=1')
     return args
 
   def _UseHostResolverRules(self):
@@ -313,3 +322,15 @@ class ChromeBrowserBackend(browser_backend.BrowserBackend):
 
   def DumpMemory(self, timeout=web_contents.DEFAULT_WEB_CONTENTS_TIMEOUT):
     return self.devtools_client.DumpMemory(timeout)
+
+  @property
+  def supports_cpu_metrics(self):
+    return True
+
+  @property
+  def supports_memory_metrics(self):
+    return True
+
+  @property
+  def supports_power_metrics(self):
+    return True

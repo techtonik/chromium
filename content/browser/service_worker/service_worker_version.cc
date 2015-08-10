@@ -28,10 +28,10 @@
 #include "content/browser/service_worker/service_worker_context_wrapper.h"
 #include "content/browser/service_worker/service_worker_metrics.h"
 #include "content/browser/service_worker/service_worker_registration.h"
-#include "content/browser/service_worker/service_worker_utils.h"
 #include "content/browser/storage_partition_impl.h"
 #include "content/common/service_worker/service_worker_messages.h"
 #include "content/common/service_worker/service_worker_type_converters.h"
+#include "content/common/service_worker/service_worker_utils.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/page_navigator.h"
@@ -826,7 +826,8 @@ void ServiceWorkerVersion::DispatchSyncEvent(SyncRegistrationPtr registration,
 void ServiceWorkerVersion::DispatchNotificationClickEvent(
     const StatusCallback& callback,
     int64_t persistent_notification_id,
-    const PlatformNotificationData& notification_data) {
+    const PlatformNotificationData& notification_data,
+    int action_index) {
   DCHECK_EQ(ACTIVATED, status()) << status();
   if (running_status() != RUNNING) {
     // Schedule calling this method after starting the worker.
@@ -834,7 +835,8 @@ void ServiceWorkerVersion::DispatchNotificationClickEvent(
         &RunTaskAfterStartWorker, weak_factory_.GetWeakPtr(), callback,
         base::Bind(&self::DispatchNotificationClickEvent,
                    weak_factory_.GetWeakPtr(), callback,
-                   persistent_notification_id, notification_data)));
+                   persistent_notification_id, notification_data,
+                   action_index)));
     return;
   }
 
@@ -842,7 +844,8 @@ void ServiceWorkerVersion::DispatchNotificationClickEvent(
                               REQUEST_NOTIFICATION_CLICK);
   ServiceWorkerStatusCode status =
       embedded_worker_->SendMessage(ServiceWorkerMsg_NotificationClickEvent(
-          request_id, persistent_notification_id, notification_data));
+          request_id, persistent_notification_id, notification_data,
+          action_index));
   if (status != SERVICE_WORKER_OK) {
     notification_click_requests_.Remove(request_id);
     RunSoon(base::Bind(callback, status));

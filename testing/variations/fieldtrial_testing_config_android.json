@@ -196,6 +196,22 @@
     ],
     "IconNTP": [
         {
+            "group_name": "Enabled",
+            "params": {
+                "state": "enabled"
+            }
+        }
+    ],
+    "SyncHttpContentCompression": [
+        {
+            "group_name": "Enabled"
+        },
+        {
+            "group_name": "Disabled"
+        }
+    ],
+    "AutofillFieldMetadata": [
+        {
             "group_name": "Enabled"
         }
     ]

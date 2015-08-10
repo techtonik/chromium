@@ -72,11 +72,7 @@ class AndroidMandolineBackend(
     args = self.GetBrowserStartupArgs()
 
     if self.browser_options.startup_url:
-      # TODO(yzshen): For now "about:blank" is not supported yet.
-      if self.browser_options.startup_url != "about:blank":
-        args.append(self.browser_options.startup_url)
-      else:
-        logging.warning('Ignoring startup URL about:blank.')
+      args.append(self.browser_options.startup_url)
 
     logging.debug('Starting Mandoline %s', args)
 
@@ -154,8 +150,7 @@ class AndroidMandolineBackend(
     self._KillBrowser()
 
     if self._port:
-      # TODO(yzshen): Consider remove the port forwarding. Currently AdbWrapper
-      # doesn't expose necessary API.
+      self.platform_backend.StopForwardingHost(self._port)
       self._port = None
       self._device_port = None
 

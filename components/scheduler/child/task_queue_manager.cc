@@ -45,6 +45,8 @@ TaskQueueManager::TaskQueueManager(
       base::Bind(&TaskQueueManager::DoWork, weak_factory_.GetWeakPtr(), true);
   do_work_from_other_thread_closure_ =
       base::Bind(&TaskQueueManager::DoWork, weak_factory_.GetWeakPtr(), false);
+  delayed_queue_wakeup_closure_ =
+      base::Bind(&TaskQueueManager::DelayedDoWork, weak_factory_.GetWeakPtr());
 }
 
 TaskQueueManager::~TaskQueueManager() {
@@ -104,9 +106,12 @@ void TaskQueueManager::UnregisterAsUpdatableTaskQueue(
 
 void TaskQueueManager::UpdateWorkQueues(
     bool should_trigger_wakeup,
-    const base::PendingTask* previous_task) {
+    const internal::TaskQueueImpl::Task* previous_task) {
   DCHECK(main_thread_checker_.CalledOnValidThread());
   internal::LazyNow lazy_now(this);
+
+  // Move any ready delayed tasks into the incomming queues.
+  WakeupReadyDelayedQueues(&lazy_now);
 
   // Insert any newly updatable queues into the updatable_queue_set_.
   {
@@ -125,11 +130,74 @@ void TaskQueueManager::UpdateWorkQueues(
     // as the iterator isn't the element being delated.
     if (queue->work_queue().empty())
         queue->UpdateWorkQueue(&lazy_now, should_trigger_wakeup, previous_task);
-    if (!queue->work_queue().empty()) {
-      // Currently we should not be getting tasks with delayed run times in any
-      // of the work queues.
-      DCHECK(queue->work_queue().front().delayed_run_time.is_null());
+  }
+}
+
+void TaskQueueManager::ScheduleDelayedWorkTask(
+    scoped_refptr<internal::TaskQueueImpl> queue,
+    base::TimeTicks delayed_run_time) {
+  internal::LazyNow lazy_now(this);
+  ScheduleDelayedWork(queue.get(), delayed_run_time, &lazy_now);
+}
+
+void TaskQueueManager::ScheduleDelayedWork(internal::TaskQueueImpl* queue,
+                                           base::TimeTicks delayed_run_time,
+                                           internal::LazyNow* lazy_now) {
+  if (!main_task_runner_->BelongsToCurrentThread()) {
+    // NOTE posting a delayed task from a different thread is not expected to be
+    // common. This pathway is less optimal than perhaps it could be because
+    // it causes two main thread tasks to be run.  Should this assumption prove
+    // to be false in future, we may need to revisit this.
+    main_task_runner_->PostTask(
+        FROM_HERE, base::Bind(&TaskQueueManager::ScheduleDelayedWorkTask,
+                              weak_factory_.GetWeakPtr(),
+                              scoped_refptr<internal::TaskQueueImpl>(queue),
+                              delayed_run_time));
+    return;
+  }
+  if (delayed_run_time > lazy_now->Now()) {
+    // Make sure there's one (and only one) task posted to |main_task_runner_|
+    // to call |DelayedDoWork| at |delayed_run_time|.
+    if (delayed_wakeup_map_.find(delayed_run_time) ==
+        delayed_wakeup_map_.end()) {
+      base::TimeDelta delay = delayed_run_time - lazy_now->Now();
+      main_task_runner_->PostDelayedTask(FROM_HERE,
+                                         delayed_queue_wakeup_closure_, delay);
     }
+    delayed_wakeup_map_.insert(std::make_pair(delayed_run_time, queue));
+  } else {
+    WakeupReadyDelayedQueues(lazy_now);
+  }
+}
+
+void TaskQueueManager::DelayedDoWork() {
+  DCHECK(main_thread_checker_.CalledOnValidThread());
+
+  {
+    internal::LazyNow lazy_now(this);
+    WakeupReadyDelayedQueues(&lazy_now);
+  }
+
+  DoWork(false);
+}
+
+void TaskQueueManager::WakeupReadyDelayedQueues(internal::LazyNow* lazy_now) {
+  // Wake up any queues with pending delayed work.  Note std::multipmap stores
+  // the elements sorted by key, so the begin() iterator points to the earliest
+  // queue to wakeup.
+  std::set<internal::TaskQueueImpl*> dedup_set;
+  while (!delayed_wakeup_map_.empty()) {
+    DelayedWakeupMultimap::iterator next_wakeup = delayed_wakeup_map_.begin();
+    if (next_wakeup->first > lazy_now->Now())
+      break;
+    // A queue could have any number of delayed tasks pending so it's worthwhile
+    // deduping calls to MoveReadyDelayedTasksToIncomingQueue since it takes a
+    // lock.  NOTE the order in which these are called matters since the order
+    // in which EnqueueTaskLocks is called is respected when choosing which
+    // queue to execute a task from.
+    if (dedup_set.insert(next_wakeup->second).second)
+      next_wakeup->second->MoveReadyDelayedTasksToIncomingQueue(lazy_now);
+    delayed_wakeup_map_.erase(next_wakeup);
   }
 }
 
@@ -148,8 +216,8 @@ void TaskQueueManager::MaybePostDoWorkOnMainRunner() {
   }
 }
 
-void TaskQueueManager::DoWork(bool posted_from_main_thread) {
-  if (posted_from_main_thread) {
+void TaskQueueManager::DoWork(bool decrement_pending_dowork_count) {
+  if (decrement_pending_dowork_count) {
     pending_dowork_count_--;
     DCHECK_GE(pending_dowork_count_, 0);
   }
@@ -159,15 +227,11 @@ void TaskQueueManager::DoWork(bool posted_from_main_thread) {
   // pump-after-wakeup queue.
   UpdateWorkQueues(false, nullptr);
 
-  base::PendingTask previous_task((tracked_objects::Location()),
-                                  (base::Closure()));
+  internal::TaskQueueImpl::Task previous_task;
   for (int i = 0; i < work_batch_size_; i++) {
     internal::TaskQueueImpl* queue;
     if (!SelectQueueToService(&queue))
-      return;
-    // Note that this function won't post another call to DoWork if one is
-    // already pending, so it is safe to call it in a loop.
-    MaybePostDoWorkOnMainRunner();
+      break;
 
     if (ProcessTaskFromWorkQueue(queue, &previous_task))
       return;  // The TaskQueueManager got deleted, we must bail out.
@@ -181,6 +245,12 @@ void TaskQueueManager::DoWork(bool posted_from_main_thread) {
     if (main_task_runner_->IsNested())
       break;
   }
+
+  // TODO(alexclarke): Consider refactoring the above loop to terminate only
+  // when there's no more work left to be done, rather than posting a
+  // continuation task.
+  if (!selector_.EnabledWorkQueuesEmpty())
+    MaybePostDoWorkOnMainRunner();
 }
 
 bool TaskQueueManager::SelectQueueToService(
@@ -192,16 +262,18 @@ bool TaskQueueManager::SelectQueueToService(
   return should_run;
 }
 
-void TaskQueueManager::DidQueueTask(const base::PendingTask& pending_task) {
+void TaskQueueManager::DidQueueTask(
+    const internal::TaskQueueImpl::Task& pending_task) {
   task_annotator_.DidQueueTask("TaskQueueManager::PostTask", pending_task);
 }
 
 bool TaskQueueManager::ProcessTaskFromWorkQueue(
     internal::TaskQueueImpl* queue,
-    base::PendingTask* out_previous_task) {
+    internal::TaskQueueImpl::Task* out_previous_task) {
   DCHECK(main_thread_checker_.CalledOnValidThread());
   scoped_refptr<DeletionSentinel> protect(deletion_sentinel_);
-  base::PendingTask pending_task = queue->TakeTaskFromWorkQueue();
+  // TODO(alexclarke): consider std::move() when allowed.
+  internal::TaskQueueImpl::Task pending_task = queue->TakeTaskFromWorkQueue();
 
   if (queue->GetQuiescenceMonitored())
     task_was_run_on_quiescence_monitored_queue_ = true;
@@ -310,9 +382,11 @@ TaskQueueManager::AsValueWithSelectorResult(
   return state;
 }
 
-void TaskQueueManager::OnTaskQueueEnabled() {
+void TaskQueueManager::OnTaskQueueEnabled(internal::TaskQueueImpl* queue) {
   DCHECK(main_thread_checker_.CalledOnValidThread());
-  MaybePostDoWorkOnMainRunner();
+  // Only schedule DoWork if there's something to do.
+  if (!queue->work_queue().empty())
+    MaybePostDoWorkOnMainRunner();
 }
 
 }  // namespace scheduler

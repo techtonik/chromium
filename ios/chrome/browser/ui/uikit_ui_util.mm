@@ -426,23 +426,52 @@ UIColor* InterpolateFromColorToColor(UIColor* firstColor,
 void ApplyVisualConstraints(NSArray* constraints,
                             NSDictionary* subviewsDictionary,
                             UIView* parentView) {
-  ApplyVisualConstraintsWithMetrics(constraints, subviewsDictionary, nil,
-                                    parentView);
+  ApplyVisualConstraintsWithMetricsAndOptions(constraints, subviewsDictionary,
+                                              nil, 0, parentView);
+}
+
+void ApplyVisualConstraintsWithOptions(NSArray* constraints,
+                                       NSDictionary* subviewsDictionary,
+                                       NSLayoutFormatOptions options,
+                                       UIView* parentView) {
+  ApplyVisualConstraintsWithMetricsAndOptions(constraints, subviewsDictionary,
+                                              nil, options, parentView);
 }
 
 void ApplyVisualConstraintsWithMetrics(NSArray* constraints,
                                        NSDictionary* subviewsDictionary,
                                        NSDictionary* metrics,
                                        UIView* parentView) {
+  ApplyVisualConstraintsWithMetricsAndOptions(constraints, subviewsDictionary,
+                                              metrics, 0, parentView);
+}
+
+void ApplyVisualConstraintsWithMetricsAndOptions(
+    NSArray* constraints,
+    NSDictionary* subviewsDictionary,
+    NSDictionary* metrics,
+    NSLayoutFormatOptions options,
+    UIView* parentView) {
   for (NSString* constraint in constraints) {
     DCHECK([constraint isKindOfClass:[NSString class]]);
     [parentView
         addConstraints:[NSLayoutConstraint
                            constraintsWithVisualFormat:constraint
-                                               options:0
+                                               options:options
                                                metrics:metrics
                                                  views:subviewsDictionary]];
   }
+}
+
+NSLayoutFormatOptions LayoutOptionForRTLSupport() {
+// Under iOS9 when full RTL support is available return LeadingToTrailing.
+// Otherwise return LeftToRight
+#if __IPHONE_9_0
+  if (base::ios::IsRunningOnIOS9OrLater()) {
+    return NSLayoutFormatDirectionLeadingToTrailing;
+  }
+#endif
+  return NSLayoutFormatDirectionLeftToRight;
 }
 
 void AddSameCenterXConstraint(UIView* parentView, UIView* subview) {
@@ -452,6 +481,21 @@ void AddSameCenterXConstraint(UIView* parentView, UIView* subview) {
                                          attribute:NSLayoutAttributeCenterX
                                          relatedBy:NSLayoutRelationEqual
                                             toItem:parentView
+                                         attribute:NSLayoutAttributeCenterX
+                                        multiplier:1
+                                          constant:0]];
+}
+
+void AddSameCenterXConstraint(UIView *parentView, UIView *subview1,
+                              UIView *subview2) {
+  DCHECK_EQ(parentView, [subview1 superview]);
+  DCHECK_EQ(parentView, [subview2 superview]);
+  DCHECK_NE(subview1, subview2);
+  [parentView addConstraint:[NSLayoutConstraint
+                                constraintWithItem:subview1
+                                         attribute:NSLayoutAttributeCenterX
+                                         relatedBy:NSLayoutRelationEqual
+                                            toItem:subview2
                                          attribute:NSLayoutAttributeCenterX
                                         multiplier:1
                                           constant:0]];
@@ -498,4 +542,23 @@ bool IsCompactTablet() {
 
 bool IsCompactTabletSizeClass(UIUserInterfaceSizeClass sizeClass) {
   return IsIPadIdiom() && sizeClass == UIUserInterfaceSizeClassCompact;
+}
+
+BOOL IsRTLUILayout() {
+  if (base::ios::IsRunningOnIOS9OrLater()) {
+#if __IPHONE_9_0
+    // Calling this method is better than using the locale on iOS9 since it will
+    // work with the right to left pseudolanguage.
+    return [UIView userInterfaceLayoutDirectionForSemanticContentAttribute:
+                       UISemanticContentAttributeUnspecified] ==
+           UIUserInterfaceLayoutDirectionRightToLeft;
+#endif
+  }
+  // Using NSLocale instead of base::i18n::IsRTL() in order to take into account
+  // right to left pseudolanguage correctly (which base::i18n::IsRTL() doesn't).
+  return
+      [NSLocale
+          characterDirectionForLanguage:
+              [[NSLocale currentLocale] objectForKey:NSLocaleLanguageCode]] ==
+      NSLocaleLanguageDirectionRightToLeft;
 }

@@ -17,10 +17,10 @@
 #include "content/browser/service_worker/service_worker_handle.h"
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/browser/service_worker/service_worker_registration_handle.h"
-#include "content/browser/service_worker/service_worker_utils.h"
 #include "content/common/service_worker/embedded_worker_messages.h"
 #include "content/common/service_worker/service_worker_messages.h"
 #include "content/common/service_worker/service_worker_types.h"
+#include "content/common/service_worker/service_worker_utils.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/origin_util.h"
@@ -332,10 +332,7 @@ void ServiceWorkerDispatcherHost::OnRegisterServiceWorker(
   std::string error_message;
   if (ServiceWorkerUtils::ContainsDisallowedCharacter(pattern, script_url,
                                                       &error_message)) {
-    Send(new ServiceWorkerMsg_ServiceWorkerRegistrationError(
-        thread_id, request_id, WebServiceWorkerError::ErrorTypeSecurity,
-        base::ASCIIToUTF16(kServiceWorkerRegisterErrorPrefix) +
-            base::UTF8ToUTF16(error_message)));
+    bad_message::ReceivedBadMessage(this, bad_message::SWDH_REGISTER_CANNOT);
     return;
   }
 
@@ -888,7 +885,7 @@ void ServiceWorkerDispatcherHost::UpdateComplete(
     return;  // The provider has already been destroyed.
 
   if (status != SERVICE_WORKER_OK) {
-    SendRegistrationError(thread_id, request_id, status, status_message);
+    SendUpdateError(thread_id, request_id, status, status_message);
     return;
   }
 
@@ -1221,6 +1218,20 @@ void ServiceWorkerDispatcherHost::SendRegistrationError(
   Send(new ServiceWorkerMsg_ServiceWorkerRegistrationError(
       thread_id, request_id, error_type,
       base::ASCIIToUTF16(kServiceWorkerRegisterErrorPrefix) + error_message));
+}
+
+void ServiceWorkerDispatcherHost::SendUpdateError(
+    int thread_id,
+    int request_id,
+    ServiceWorkerStatusCode status,
+    const std::string& status_message) {
+  base::string16 error_message;
+  blink::WebServiceWorkerError::ErrorType error_type;
+  GetServiceWorkerRegistrationStatusResponse(status, status_message,
+                                             &error_type, &error_message);
+  Send(new ServiceWorkerMsg_ServiceWorkerUpdateError(
+      thread_id, request_id, error_type,
+      base::ASCIIToUTF16(kServiceWorkerUpdateErrorPrefix) + error_message));
 }
 
 void ServiceWorkerDispatcherHost::SendUnregistrationError(

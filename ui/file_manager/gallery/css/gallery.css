@@ -8,6 +8,10 @@ body {
   margin: 0;
 }
 
+button {
+  cursor: pointer;
+}
+
 input:focus, button:focus {
   outline: 1px solid rgb(77, 144, 254);
 }
@@ -38,6 +42,15 @@ paper-ripple {
 
 files-toggle-ripple::shadow .ripple.activated {
   opacity: 0.4;
+}
+
+/**
+ * Default size of slider knob is large for Gallery. Overwrite it to make it
+ * half of the original size.
+ */
+paper-slider::shadow .expand:not(.pin) > #sliderKnob > #sliderKnobInner {
+  height: 50%;
+  width: 50%;
 }
 
 .gallery,
@@ -307,14 +320,15 @@ files-toggle-ripple::shadow .ripple.activated {
   flex: 1 0 auto;
 }
 
-.filename-spacer paper-input {
+#rename-input {
   margin: 8px 0;
   min-width: 160px;
+  padding: 4px 0;
   width: -webkit-fit-content;
 }
 
-.filename-spacer paper-input::shadow paper-input-container {
-  padding: 4px 0;
+#rename-input > input {
+  color: white;
 }
 
 /* Bubble */
@@ -550,6 +564,15 @@ files-toggle-ripple::shadow .ripple.activated {
   position: relative;
 }
 
+.gallery > .toolbar paper-button:focus,
+.gallery > .toolbar button:focus {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.gallery > .toolbar button:focus {
+  outline: none;
+}
+
 .gallery > .toolbar button > .icon {
   background-position: center;
   background-repeat: no-repeat;
@@ -563,10 +586,6 @@ files-toggle-ripple::shadow .ripple.activated {
   position: absolute;
   top: 0;
   z-index: 1;
-}
-
-.gallery > .toolbar paper-button:focus {
-  background-color: rgba(0, 0, 0, 0.3);
 }
 
 .gallery > .toolbar button.edit > .icon {
@@ -644,9 +663,10 @@ button[disabled] {
   display: none;
 }
 
-.toolbar button.edit-toolbar:focus:not(.using-mouse) {
-  background-color: rgba(0, 0, 0, 0.3);
-  outline: none;
+/* Do not show focus state if it's made by mouse since it makes difficult to see
+ * the toggle animation. */
+.toolbar button.edit-toolbar:focus.using-mouse {
+  background-color: transparent;
 }
 
 /* Edit main toolbar. */
@@ -837,8 +857,10 @@ paper-slider::shadow paper-progress::shadow #progressContainer {
 .gallery .crop-overlay {
   -webkit-box-orient: vertical;
   display: -webkit-box;
+  height: 100%;
   pointer-events: none;
   position: absolute;
+  width: 100%;
 }
 
 .gallery .crop-overlay .shadow {

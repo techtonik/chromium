@@ -35,10 +35,29 @@ class AndroidForwarderFactory(forwarders.ForwarderFactory):
       self._rndis_configurator = AndroidRndisConfigurator(self._device)
 
   def Create(self, port_pairs):
-    if self._rndis_configurator:
-      return AndroidRndisForwarder(self._device, self._rndis_configurator,
-                                   port_pairs)
-    return AndroidForwarder(self._device, port_pairs)
+    try:
+      if self._rndis_configurator:
+        return AndroidRndisForwarder(self._device, self._rndis_configurator,
+                                     port_pairs)
+      return AndroidForwarder(self._device, port_pairs)
+    except Exception:
+      try:
+        logging.warning('Failed to create forwarder. '
+                        'Currently forwarded connections:')
+        for line in self._device.adb.ForwardList().splitlines():
+          logging.warning('  %s', line)
+      except Exception:
+        logging.warning('Exception raised while listing forwarded connections.')
+
+      logging.warning('Device tcp sockets in use:')
+      try:
+        for line in self._device.ReadFile('/proc/net/tcp', as_root=True,
+                                          force_pull=True).splitlines():
+          logging.warning('  %s', line)
+      except Exception:
+        logging.warning('Exception raised while listing tcp sockets.')
+
+      raise
 
   @property
   def host_ip(self):

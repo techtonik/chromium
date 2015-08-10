@@ -131,6 +131,7 @@
 #include "net/base/port_util.h"
 #include "skia/ext/event_tracer_impl.h"
 #include "skia/ext/skia_memory_dump_provider.h"
+#include "third_party/WebKit/public/platform/WebImageGenerator.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebThread.h"
 #include "third_party/WebKit/public/web/WebCache.h"
@@ -421,6 +422,19 @@ void CreateEmbeddedWorkerSetup(
   new EmbeddedWorkerSetupImpl(request.Pass());
 }
 
+void StringToUintVector(const std::string& str, std::vector<unsigned>* vector) {
+  DCHECK(vector->empty());
+  std::vector<std::string> pieces;
+  base::SplitString(str, ',', &pieces);
+  DCHECK_EQ(pieces.size(), static_cast<size_t>(gfx::BufferFormat::LAST) + 1);
+  for (size_t i = 0; i < pieces.size(); ++i) {
+    unsigned number = 0;
+    bool succeed = base::StringToUint(pieces[i], &number);
+    DCHECK(succeed);
+    vector->push_back(number);
+  }
+}
+
 }  // namespace
 
 // For measuring memory usage after each task. Behind a command line flag.
@@ -653,9 +667,7 @@ void RenderThreadImpl::Init() {
 
   std::string image_texture_target_string =
       command_line.GetSwitchValueASCII(switches::kContentImageTextureTarget);
-  bool parsed_image_texture_target = base::StringToUint(
-      image_texture_target_string, &use_image_texture_target_);
-  DCHECK(parsed_image_texture_target);
+  StringToUintVector(image_texture_target_string, &use_image_texture_targets_);
 
   if (command_line.HasSwitch(switches::kDisableLCDText)) {
     is_lcd_text_enabled_ = false;
@@ -1144,6 +1156,10 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
   SkGraphics::SetResourceCacheSingleAllocationByteLimit(
       kImageCacheSingleAllocationByteLimit);
 
+  // Hook up blink's codecs so skia can call them
+  SkGraphics::SetImageGeneratorFromEncodedFactory(
+      blink::WebImageGenerator::create);
+
   if (command_line.HasSwitch(switches::kMemoryMetrics)) {
     memory_observer_.reset(new MemoryObserver());
     message_loop()->AddTaskObserver(memory_observer_.get());
@@ -1332,13 +1348,15 @@ RenderThreadImpl::GetGpuFactories() {
     bool enable_video_accelerator =
         !cmd_line->HasSwitch(switches::kDisableAcceleratedVideoDecode);
     std::string image_texture_target_string =
-        cmd_line->GetSwitchValueASCII(switches::kContentImageTextureTarget);
+        cmd_line->GetSwitchValueASCII(switches::kVideoImageTextureTarget);
     unsigned image_texture_target = 0;
     bool parsed_image_texture_target =
         base::StringToUint(image_texture_target_string, &image_texture_target);
     DCHECK(parsed_image_texture_target);
-    CHECK(gpu_channel_host.get()) << "Have gpu_va_context_provider but no "
-                                     "gpu_channel_host. See crbug.com/495185.";
+    CHECK(gpu_channel_.get()) << "Have gpu_va_context_provider but no "
+                                 "gpu_channel_. See crbug.com/495185.";
+    CHECK(gpu_channel_host.get()) << "Have gpu_va_context_provider but lost "
+                                     "gpu_channel_. See crbug.com/495185.";
     gpu_factories = RendererGpuVideoAcceleratorFactories::Create(
         gpu_channel_host.get(), media_task_runner, gpu_va_context_provider_,
         image_texture_target, enable_video_accelerator);
@@ -1459,8 +1477,8 @@ bool RenderThreadImpl::IsElasticOverscrollEnabled() {
   return is_elastic_overscroll_enabled_;
 }
 
-uint32 RenderThreadImpl::GetImageTextureTarget() {
-  return use_image_texture_target_;
+std::vector<unsigned> RenderThreadImpl::GetImageTextureTargets() {
+  return use_image_texture_targets_;
 }
 
 scoped_refptr<base::SingleThreadTaskRunner>

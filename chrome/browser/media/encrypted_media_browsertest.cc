@@ -39,8 +39,6 @@ const char kClearKeyCdmPluginMimeType[] = "application/x-ppapi-clearkey-cdm";
 const char kClearKeyKeySystem[] = "org.w3.clearkey";
 const char kPrefixedClearKeyKeySystem[] = "webkit-org.w3.clearkey";
 const char kExternalClearKeyKeySystem[] = "org.chromium.externalclearkey";
-const char kExternalClearKeyDecryptOnlyKeySystem[] =
-    "org.chromium.externalclearkey.decryptonly";
 const char kExternalClearKeyFileIOTestKeySystem[] =
     "org.chromium.externalclearkey.fileiotest";
 const char kExternalClearKeyInitializeFailKeySystem[] =
@@ -534,7 +532,7 @@ INSTANTIATE_TEST_CASE_P(SRC_ClearKey,
                                 Values(UNPREFIXED)));
 #endif  // !defined(OS_ANDROID)
 
-#if !defined(OS_WIN) || defined(NDEBUG)
+#if !defined(OS_WIN)
 // Tests flaky on Win 7 dbg. http://crbug.com/517018
 INSTANTIATE_TEST_CASE_P(MSE_ClearKey_Prefixed,
                         EncryptedMediaTest,
@@ -546,7 +544,7 @@ INSTANTIATE_TEST_CASE_P(MSE_ClearKey,
                         Combine(Values(kClearKeyKeySystem),
                                 Values(MSE),
                                 Values(UNPREFIXED)));
-#endif  // !defined(OS_WIN) || defined(NDEBUG)
+#endif  // !defined(OS_WIN)
 
 // External Clear Key is currently only used on platforms that use Pepper CDMs.
 #if defined(ENABLE_PEPPER_CDMS)
@@ -560,7 +558,10 @@ INSTANTIATE_TEST_CASE_P(SRC_ExternalClearKey,
                         Combine(Values(kExternalClearKeyKeySystem),
                                 Values(SRC),
                                 Values(UNPREFIXED)));
-#if !defined(OS_WIN) || defined(NDEBUG)
+#if !defined(OS_WIN)
+const char kExternalClearKeyDecryptOnlyKeySystem[] =
+    "org.chromium.externalclearkey.decryptonly";
+
 // Tests flaky on Win 7 dbg. http://crbug.com/517018
 INSTANTIATE_TEST_CASE_P(MSE_ExternalClearKey_Prefixed,
                         EncryptedMediaTest,
@@ -583,7 +584,7 @@ INSTANTIATE_TEST_CASE_P(MSE_ExternalClearKeyDecryptOnly,
                         Combine(Values(kExternalClearKeyDecryptOnlyKeySystem),
                                 Values(MSE),
                                 Values(UNPREFIXED)));
-#endif  // !defined(OS_WIN) || defined(NDEBUG)
+#endif  // !defined(OS_WIN)
 #endif  // defined(ENABLE_PEPPER_CDMS)
 
 #if defined(WIDEVINE_CDM_AVAILABLE)

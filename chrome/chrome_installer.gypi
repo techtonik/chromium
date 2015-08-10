@@ -338,13 +338,9 @@
             'installer/mini_installer/decompress.cc',
             'installer/mini_installer/decompress.h',
             'installer/mini_installer/decompress_test.cc',
-            'installer/mini_installer/mini_installer_constants.cc',
-            'installer/mini_installer/mini_installer_constants.h',
             'installer/mini_installer/mini_string.cc',
             'installer/mini_installer/mini_string.h',
             'installer/mini_installer/mini_string_test.cc',
-	    'installer/mini_installer/regkey.cc',
-	    'installer/mini_installer/regkey.h',
             'installer/setup/app_launcher_installer.cc',  # Move to lib
             'installer/setup/app_launcher_installer.h',  # Move to lib
             'installer/setup/archive_patch_helper.cc',  # Move to lib
@@ -534,6 +530,7 @@
             {
               'destination': '<(PRODUCT_DIR)/installer/theme/',
               'files': [
+                '<(branding_dir)/linux/product_logo_32.xpm',
                 '<(branding_dir_100)/product_logo_16.png',
                 '<(branding_dir)/product_logo_22.png',
                 '<(branding_dir)/product_logo_24.png',
@@ -542,7 +539,6 @@
                 '<(branding_dir)/product_logo_64.png',
                 '<(branding_dir)/product_logo_128.png',
                 '<(branding_dir)/product_logo_256.png',
-                '<(branding_dir)/product_logo_32.xpm',
                 '<(branding_dir)/BRANDING',
               ],
             },

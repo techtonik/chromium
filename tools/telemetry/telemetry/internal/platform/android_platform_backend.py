@@ -186,6 +186,10 @@ class AndroidPlatformBackend(
 
     _FixPossibleAdbInstability()
 
+  @property
+  def log_file_path(self):
+    return None
+
   @classmethod
   def SupportsDevice(cls, device):
     return isinstance(device, android_device.AndroidDevice)
@@ -516,6 +520,9 @@ class AndroidPlatformBackend(
 
   def ForwardHostToDevice(self, host_port, device_port):
     self._device.adb.Forward('tcp:%d' % host_port, device_port)
+
+  def StopForwardingHost(self, host_port):
+    self._device.adb.ForwardRemove('tcp:%d' % host_port)
 
   def DismissCrashDialogIfNeeded(self):
     """Dismiss any error dialogs.

@@ -233,6 +233,7 @@
       'browser/net_info_browsertest.cc',
       'browser/renderer_host/input/touch_action_browsertest.cc',
       'browser/renderer_host/input/touch_input_browsertest.cc',
+      'browser/renderer_host/input/touch_selection_controller_client_aura_browsertest.cc',
       'browser/renderer_host/render_message_filter_browsertest.cc',
       'browser/renderer_host/render_process_host_browsertest.cc',
       'browser/renderer_host/render_view_host_browsertest.cc',
@@ -247,7 +248,6 @@
       'browser/tracing/background_tracing_manager_browsertest.cc',
       'browser/tracing/tracing_controller_browsertest.cc',
       'browser/web_contents/opened_by_dom_browsertest.cc',
-      'browser/web_contents/touch_editable_impl_aura_browsertest.cc',
       'browser/web_contents/web_contents_impl_browsertest.cc',
       'browser/web_contents/web_contents_view_aura_browsertest.cc',
       'browser/webkit_browsertest.cc',
@@ -561,7 +561,6 @@
       'browser/service_worker/service_worker_request_handler_unittest.cc',
       'browser/service_worker/service_worker_storage_unittest.cc',
       'browser/service_worker/service_worker_url_request_job_unittest.cc',
-      'browser/service_worker/service_worker_utils_unittest.cc',
       'browser/service_worker/service_worker_version_unittest.cc',
       'browser/service_worker/service_worker_write_to_cache_job_unittest.cc',
       'browser/shareable_file_reference_unittest.cc',
@@ -645,6 +644,7 @@
       'common/sandbox_mac_system_access_unittest.mm',
       'common/sandbox_mac_unittest_helper.h',
       'common/sandbox_mac_unittest_helper.mm',
+      'common/service_worker/service_worker_utils_unittest.cc',
       'common/ssl_status_serialization_unittest.cc',
       'common/webplugininfo_unittest.cc',
       'renderer/android/email_detector_unittest.cc',
@@ -1444,11 +1444,6 @@
           ],
           'sources': [ '<@(content_browsertests_sources)' ],
           'conditions': [
-            ['chromeos==0', {
-              'sources!': [
-                'browser/web_contents/touch_editable_impl_aura_browsertest.cc',
-              ],
-            }],
             ['OS=="win"', {
               'resource_include_dirs': [
                 '<(SHARED_INTERMEDIATE_DIR)/webkit',
@@ -1522,6 +1517,15 @@
             ['use_aura!=1 and OS!="mac"', {
               'sources!' :[
                 'browser/compositor/image_transport_factory_browsertest.cc',
+              ],
+            }],
+            ['use_aura==1', {
+              'dependencies': [
+                '../ui/touch_selection/ui_touch_selection.gyp:ui_touch_selection',
+                '../ui/touch_selection/ui_touch_selection.gyp:ui_touch_selection_test_support',
+              ]}, {
+              'sources!': [
+                'browser/renderer_host/input/touch_selection_controller_client_aura_browsertest.cc',
               ],
             }],
             ['enable_webrtc==1', {

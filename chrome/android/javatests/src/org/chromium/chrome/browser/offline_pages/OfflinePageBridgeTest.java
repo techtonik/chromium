@@ -4,6 +4,7 @@
 
 package org.chromium.chrome.browser.offline_pages;
 
+import android.test.FlakyTest;
 import android.test.suitebuilder.annotation.MediumTest;
 
 import org.chromium.base.ThreadUtils;
@@ -12,6 +13,8 @@ import org.chromium.chrome.browser.offline_pages.OfflinePageBridge.OfflinePageCa
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.test.ChromeActivityTestCaseBase;
 import org.chromium.chrome.test.util.TestHttpServerClient;
+import org.chromium.components.bookmarks.BookmarkId;
+import org.chromium.components.bookmarks.BookmarkType;
 import org.chromium.components.offline_pages.LoadResult;
 import org.chromium.components.offline_pages.SavePageResult;
 
@@ -26,6 +29,7 @@ public class OfflinePageBridgeTest extends ChromeActivityTestCaseBase<ChromeActi
     private static final String TEST_PAGE =
             TestHttpServerClient.getUrl("chrome/test/data/android/about.html");
     private static final int TIMEOUT_MS = 5000;
+    private static final BookmarkId BOOKMARK_ID = new BookmarkId(1234, BookmarkType.NORMAL);
 
     public OfflinePageBridgeTest() {
         super(ChromeActivity.class);
@@ -41,13 +45,18 @@ public class OfflinePageBridgeTest extends ChromeActivityTestCaseBase<ChromeActi
         loadAllPages(LoadResult.SUCCESS, /* expected count */ 0);
     }
 
+    /*
     @MediumTest
+    Bug 518758
+    */
+    @FlakyTest
     public void testAddOfflinePageAndLoad() throws Exception {
         loadUrl(TEST_PAGE);
         savePage(SavePageResult.SUCCESS, TEST_PAGE);
         List<OfflinePageItem> allPages = loadAllPages(0 /* LoadResult.SUCCESS */, 1);
         assertEquals("Offline page item url incorrect.", TEST_PAGE, allPages.get(0).getUrl());
-        assertEquals("Offline page item title incorrect.", "About", allPages.get(0).getTitle());
+        assertEquals("Offline page item bookmark ID incorrect.", BOOKMARK_ID,
+                allPages.get(0).getBookmarkId());
         assertTrue("Offline page item offline file url doesn't start properly.",
                 allPages.get(0).getOfflineUrl().startsWith("file:///"));
         assertTrue("Offline page item offline file doesn't have the right name.",
@@ -70,20 +79,22 @@ public class OfflinePageBridgeTest extends ChromeActivityTestCaseBase<ChromeActi
                 Profile profile = Profile.getLastUsedProfile();
                 final OfflinePageBridge offlinePageBridge = new OfflinePageBridge(profile);
                 offlinePageBridge.savePage(getActivity().getActivityTab().getWebContents(),
-                        new OfflinePageCallback() {
-                        @Override
-                        public void onLoadAllPagesDone(
-                                int loadResult, List<OfflinePageItem> offlinePages) {
-                            assertTrue("Should have received this callback", false);
-                        }
+                        BOOKMARK_ID, new OfflinePageCallback() {
+                            @Override
+                            public void onLoadAllPagesDone(
+                                    int loadResult, List<OfflinePageItem> offlinePages) {
+                                assertTrue("Should have received this callback", false);
+                            }
 
-                        @Override
-                        public void onSavePageDone(int savePageResult, String url) {
-                            assertEquals("Requested and returned URLs differ.", expectedUrl, url);
-                            assertEquals("Save result incorrect.", expectedResult, savePageResult);
-                            semaphore.release();
-                        }
-                    });
+                            @Override
+                            public void onSavePageDone(int savePageResult, String url) {
+                                assertEquals(
+                                        "Requested and returned URLs differ.", expectedUrl, url);
+                                assertEquals(
+                                        "Save result incorrect.", expectedResult, savePageResult);
+                                semaphore.release();
+                            }
+                        });
             }
         });
         assertTrue(semaphore.tryAcquire(TIMEOUT_MS, TimeUnit.MILLISECONDS));

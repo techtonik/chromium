@@ -35,6 +35,7 @@
 #include "content/child/webmessageportchannel_impl.h"
 #include "content/child/websocket_bridge.h"
 #include "content/child/weburlresponse_extradata_impl.h"
+#include "content/common/accessibility_messages.h"
 #include "content/common/clipboard_messages.h"
 #include "content/common/frame_messages.h"
 #include "content/common/frame_replication_state.h"
@@ -1595,7 +1596,7 @@ void RenderFrameImpl::OnSetAccessibilityMode(AccessibilityMode new_mode) {
 }
 
 void RenderFrameImpl::OnSnapshotAccessibilityTree(int callback_id) {
-  ui::AXTreeUpdate<ui::AXNodeData> response;
+  ui::AXTreeUpdate<AXContentNodeData> response;
   RendererAccessibility::SnapshotAccessibilityTree(this, &response);
   Send(new AccessibilityHostMsg_SnapshotResponse(
       routing_id_, callback_id, response));
@@ -4463,6 +4464,9 @@ void RenderFrameImpl::NavigateInternal(
   WebHistoryItem item_for_history_navigation;
   WebURLRequest request = CreateURLRequestForNavigation(
       common_params, stream_params.Pass(), frame_->isViewSourceModeEnabled());
+#if defined(OS_ANDROID)
+  request.setHasUserGesture(start_params.has_user_gesture);
+#endif
 
   // PlzNavigate: Make sure that Blink's loader will not try to use browser side
   // navigation for this request (since it already went to the browser).

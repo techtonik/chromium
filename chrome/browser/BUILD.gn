@@ -20,10 +20,10 @@ if (is_desktop_linux) {
 }
 
 declare_args() {
-  # 'Ok Google' hotwording is disabled by default in open source builds. Set to
-  # true to enable. (This will download a closed-source NaCl module at startup.)
-  # Chrome-branded builds have this enabled by default.
-  enable_hotwording = is_chrome_branded
+  # 'Ok Google' hotwording is disabled by default. Set to true to enable. (This
+  # will download a closed-source NaCl module at startup.) Chrome-branded
+  # ChromeOS builds have this enabled by default.
+  enable_hotwording = is_chrome_branded && is_chromeos
 }
 
 about_credits_file = "$target_gen_dir/about_credits.html"
@@ -147,8 +147,9 @@ source_set("browser") {
     "//components/ui/zoom:ui_zoom",
     "//components/undo",
     "//components/update_client",
-    "//components/url_fixer",
+    "//components/url_formatter",
     "//components/user_prefs",
+    "//components/user_prefs/tracked:user_prefs_tracked",
     "//components/variations",
     "//components/variations/net",
     "//components/webdata/common",
@@ -264,11 +265,13 @@ source_set("browser") {
       "//components/keyed_service/content",
       "//components/navigation_interception",
       "//components/password_manager/content/browser",
+      "//components/password_manager/sync/browser",
       "//components/plugins/common",
       "//components/safe_json",
       "//components/sessions",
       "//components/storage_monitor",
       "//components/translate/content/browser",
+      "//components/upload_list",
       "//components/url_matcher",
       "//components/visitedlink/browser",
       "//components/visitedlink/common",
@@ -1056,6 +1059,7 @@ source_set("test_support") {
     "//components/invalidation/impl:test_support",
     "//components/password_manager/core/browser:test_support",
     "//components/search_engines:test_support",
+    "//components/user_prefs/tracked:user_prefs_tracked_test_support",
     "//content/test:test_support",
     "//chrome/app/theme:theme_resources",
     "//net:test_support",
