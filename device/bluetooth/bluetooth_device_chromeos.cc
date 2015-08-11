@@ -125,8 +125,7 @@ BluetoothDeviceChromeOS::BluetoothDeviceChromeOS(
     const dbus::ObjectPath& object_path,
     scoped_refptr<base::SequencedTaskRunner> ui_task_runner,
     scoped_refptr<device::BluetoothSocketThread> socket_thread)
-    : BluetoothDevice(adapter),
-      adapter_(adapter),
+    : adapter_(adapter),
       object_path_(object_path),
       num_connecting_calls_(0),
       connection_monitor_started_(false),
@@ -177,18 +176,6 @@ std::string BluetoothDeviceChromeOS::GetDeviceName() const {
   DCHECK(properties);
 
   return properties->alias.value();
-}
-
-void BluetoothDeviceChromeOS::CreateGattConnectionImpl() {
-  // ChromeOS implementation does not use the default CreateGattConnection
-  // implementation.
-  NOTIMPLEMENTED();
-}
-
-void BluetoothDeviceChromeOS::DisconnectGatt() {
-  // ChromeOS implementation does not use the default CreateGattConnection
-  // implementation.
-  NOTIMPLEMENTED();
 }
 
 std::string BluetoothDeviceChromeOS::GetAddress() const {
@@ -244,11 +231,6 @@ bool BluetoothDeviceChromeOS::IsConnected() const {
   DCHECK(properties);
 
   return properties->connected.value();
-}
-
-bool BluetoothDeviceChromeOS::IsGattConnected() const {
-  NOTIMPLEMENTED();
-  return false;
 }
 
 bool BluetoothDeviceChromeOS::IsConnectable() const {

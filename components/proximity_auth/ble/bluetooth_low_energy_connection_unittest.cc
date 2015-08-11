@@ -139,7 +139,6 @@ class ProximityAuthBluetoothLowEnergyConnectionTest : public testing::Test {
         from_peripheral_char_uuid_(
             device::BluetoothUUID(kFromPeripheralCharUUID)),
         gatt_connection_(new NiceMock<device::MockBluetoothGattConnection>(
-            adapter_,
             kBluetoothAddress)),
         gatt_connection_alias_(gatt_connection_.get()),
         notify_session_alias_(NULL),
@@ -225,9 +224,8 @@ class ProximityAuthBluetoothLowEnergyConnectionTest : public testing::Test {
             SaveArg<1>(&characteristics_finder_error_callback_),
             Return(new NiceMock<MockBluetoothLowEnergyCharacteristicsFinder>)));
 
-    create_gatt_connection_success_callback_.Run(
-        make_scoped_ptr(new NiceMock<device::MockBluetoothGattConnection>(
-            adapter_, kBluetoothAddress)));
+    create_gatt_connection_success_callback_.Run(make_scoped_ptr(
+        new NiceMock<device::MockBluetoothGattConnection>(kBluetoothAddress)));
 
     EXPECT_EQ(connection->sub_status(),
               BluetoothLowEnergyConnection::SubStatus::WAITING_CHARACTERISTICS);
@@ -711,8 +709,7 @@ TEST_F(ProximityAuthBluetoothLowEnergyConnectionTest,
           Return(new NiceMock<MockBluetoothLowEnergyCharacteristicsFinder>)));
 
   create_gatt_connection_success_callback_.Run(make_scoped_ptr(
-      new NiceMock<device::MockBluetoothGattConnection>(adapter_,
-                                                        kBluetoothAddress)));
+      new NiceMock<device::MockBluetoothGattConnection>(kBluetoothAddress)));
 
   CharacteristicsFound(connection.get());
   NotifySessionStarted(connection.get());

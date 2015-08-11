@@ -174,11 +174,6 @@ bool BluetoothDeviceWin::IsConnected() const {
   return connected_;
 }
 
-bool BluetoothDeviceWin::IsGattConnected() const {
-  NOTIMPLEMENTED();
-  return false;
-}
-
 bool BluetoothDeviceWin::IsConnectable() const {
   return false;
 }
