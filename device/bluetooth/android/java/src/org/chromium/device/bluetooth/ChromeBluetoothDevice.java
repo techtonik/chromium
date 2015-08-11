@@ -96,9 +96,9 @@ final class ChromeBluetoothDevice {
         return string_array;
     }
 
-    // Implements BluetoothDeviceAndroid::CreateGattConnection.
+    // Implements BluetoothDeviceAndroid::CreateGattConnectionImpl.
     @CalledByNative
-    private boolean createGattConnection(Context context) {
+    private boolean createGattConnectionImpl(Context context) {
         if (mBluetoothGatt == null) {
             Log.i(TAG, "connectGatt");
             mBluetoothGatt = mDevice.connectGatt(

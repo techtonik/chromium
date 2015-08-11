@@ -224,7 +224,7 @@ std::string BluetoothDeviceAndroid::GetDeviceName() const {
 }
 
 void BluetoothDeviceAndroid::CreateGattConnectionImpl() {
-  if (!Java_ChromeBluetoothDevice_createGattConnection(
+  if (!Java_ChromeBluetoothDevice_createGattConnectionImpl(
           AttachCurrentThread(), j_device_.obj(),
           base::android::GetApplicationContext()))
     DidFailToConnectGatt(ERROR_UNKNOWN);
