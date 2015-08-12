@@ -21,8 +21,7 @@ BluetoothDeviceAndroid* BluetoothDeviceAndroid::Create(
   BluetoothDeviceAndroid* device = new BluetoothDeviceAndroid(adapter);
 
   device->j_device_.Reset(Java_ChromeBluetoothDevice_create(
-      AttachCurrentThread(), reinterpret_cast<intptr_t>(device),
-      bluetooth_device_wrapper));
+      AttachCurrentThread(), bluetooth_device_wrapper));
 
   return device;
 }
@@ -38,11 +37,6 @@ bool BluetoothDeviceAndroid::UpdateAdvertisedUUIDs(jobject advertised_uuids) {
 // static
 bool BluetoothDeviceAndroid::RegisterJNI(JNIEnv* env) {
   return RegisterNativesImpl(env);  // Generated in ChromeBluetoothDevice_jni.h
-}
-
-base::android::ScopedJavaLocalRef<jobject>
-BluetoothDeviceAndroid::GetJavaObject() {
-  return base::android::ScopedJavaLocalRef<jobject>(j_device_);
 }
 
 uint32 BluetoothDeviceAndroid::GetBluetoothClass() const {
@@ -82,11 +76,8 @@ bool BluetoothDeviceAndroid::IsPaired() const {
 }
 
 bool BluetoothDeviceAndroid::IsConnected() const {
-  return IsGattConnected();
-}
-
-bool BluetoothDeviceAndroid::IsGattConnected() const {
-  return gatt_connected_;
+  NOTIMPLEMENTED();
+  return false;
 }
 
 bool BluetoothDeviceAndroid::IsConnectable() const {
@@ -194,25 +185,10 @@ void BluetoothDeviceAndroid::ConnectToServiceInsecurely(
   NOTIMPLEMENTED();
 }
 
-void BluetoothDeviceAndroid::OnConnectionStateChange(JNIEnv* env,
-                                                     jobject jcaller,
-                                                     int32_t status,
-                                                     bool connected) {
-  gatt_connected_ = connected;
-  if (gatt_connected_) {
-    DidConnectGatt();
-  } else {
-    switch (status) {   // Constants are from android.bluetooth.BluetoothGatt.
-      case 0x00000101:  // GATT_FAILURE
-        return DidFailToConnectGatt(ERROR_FAILED);
-      case 0x00000005:  // GATT_INSUFFICIENT_AUTHENTICATION
-        return DidFailToConnectGatt(ERROR_AUTH_FAILED);
-      case 0x00000000:  // GATT_SUCCESS
-        return DidDisconnectGatt();
-      default:
-        return DidFailToConnectGatt(ERROR_UNKNOWN);
-    }
-  }
+void BluetoothDeviceAndroid::CreateGattConnection(
+    const GattConnectionCallback& callback,
+    const ConnectErrorCallback& error_callback) {
+  NOTIMPLEMENTED();
 }
 
 BluetoothDeviceAndroid::BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter)
@@ -221,18 +197,6 @@ BluetoothDeviceAndroid::BluetoothDeviceAndroid(BluetoothAdapterAndroid* adapter)
 std::string BluetoothDeviceAndroid::GetDeviceName() const {
   return ConvertJavaStringToUTF8(Java_ChromeBluetoothDevice_getDeviceName(
       AttachCurrentThread(), j_device_.obj()));
-}
-
-void BluetoothDeviceAndroid::CreateGattConnectionImpl() {
-  if (!Java_ChromeBluetoothDevice_createGattConnectionImpl(
-          AttachCurrentThread(), j_device_.obj(),
-          base::android::GetApplicationContext()))
-    DidFailToConnectGatt(ERROR_UNKNOWN);
-}
-
-void BluetoothDeviceAndroid::DisconnectGatt() {
-  Java_ChromeBluetoothDevice_disconnectGatt(
-      AttachCurrentThread(), j_device_.obj());
 }
 
 }  // namespace device
