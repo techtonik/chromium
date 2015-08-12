@@ -12,8 +12,6 @@
 
 namespace device {
 
-class BluetoothAdapter;
-
 // BluetoothGattConnection represents a GATT connection to a Bluetooth device
 // that has GATT services. Instances are obtained from a BluetoothDevice,
 // and the connection is kept alive as long as there is at least one
@@ -22,8 +20,6 @@ class BluetoothAdapter;
 // operating system (e.g. due to user action).
 class DEVICE_BLUETOOTH_EXPORT BluetoothGattConnection {
  public:
-  BluetoothGattConnection();
-
   // Destructor automatically closes this GATT connection. If this is the last
   // remaining GATT connection and this results in a call to the OS, that call
   // may not always succeed. Users can make an explicit call to
@@ -41,6 +37,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothGattConnection {
   // Disconnects this GATT connection. The device may still remain connected due
   // to other GATT connections.
   virtual void Disconnect() = 0;
+
+ protected:
+  BluetoothGattConnection();
 
  private:
   DISALLOW_COPY_AND_ASSIGN(BluetoothGattConnection);
