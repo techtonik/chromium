@@ -34,7 +34,7 @@ BluetoothLowEnergyDeviceMac::BluetoothLowEnergyDeviceMac(
     CBPeripheral* peripheral,
     NSDictionary* advertisement_data,
     int rssi)
-    : BluetoothDevice(adapter) {
+    : BluetoothDeviceMac(adapter) {
   DCHECK(BluetoothAdapterMac::IsLowEnergyAvailable());
   identifier_ = GetPeripheralIdentifier(peripheral);
   hash_address_ = GetPeripheralHashAddress(peripheral);

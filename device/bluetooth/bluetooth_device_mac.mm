@@ -6,8 +6,8 @@
 
 namespace device {
 
-BluetoothDeviceMac::BluetoothDeviceMac() {
-}
+BluetoothDeviceMac::BluetoothDeviceMac(BluetoothAdapterMac* adapter)
+    : BluetoothDevice(adapter) {}
 
 BluetoothDeviceMac::~BluetoothDeviceMac() {
 }

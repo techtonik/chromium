@@ -441,7 +441,7 @@ void BluetoothAdapterMac::ClassicDeviceAdded(IOBluetoothDevice* device) {
   if (devices_.count(device_address))
     return;
 
-  devices_[device_address] = new BluetoothClassicDeviceMac(device);
+  devices_[device_address] = new BluetoothClassicDeviceMac(this, device);
   FOR_EACH_OBSERVER(BluetoothAdapter::Observer,
                     observers_,
                     DeviceAdded(this, devices_[device_address]));
