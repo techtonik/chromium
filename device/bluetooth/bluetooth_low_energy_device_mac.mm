@@ -112,6 +112,10 @@ bool BluetoothLowEnergyDeviceMac::IsPaired() const {
 }
 
 bool BluetoothLowEnergyDeviceMac::IsConnected() const {
+  return IsGattConnected();
+}
+
+bool BluetoothLowEnergyDeviceMac::IsGattConnected() const {
   return (GetPeripheralState() == CBPeripheralStateConnected);
 }
 
