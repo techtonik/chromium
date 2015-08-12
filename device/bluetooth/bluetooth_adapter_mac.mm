@@ -441,7 +441,7 @@ void BluetoothAdapterMac::ClassicDeviceAdded(IOBluetoothDevice* device) {
   if (devices_.count(device_address))
     return;
 
-  devices_[device_address] = new BluetoothClassicDeviceMac(device);
+  devices_[device_address] = new BluetoothClassicDeviceMac(this, device);
   FOR_EACH_OBSERVER(BluetoothAdapter::Observer,
                     observers_,
                     DeviceAdded(this, devices_[device_address]));
@@ -459,8 +459,8 @@ void BluetoothAdapterMac::LowEnergyDeviceUpdated(
   BluetoothDevice*& device_reference = devices_[device_address];
   if (!device_reference) {
     // A new device has been found.
-    device_reference =
-        new BluetoothLowEnergyDeviceMac(peripheral, advertisement_data, rssi);
+    device_reference = new BluetoothLowEnergyDeviceMac(
+        this, peripheral, advertisement_data, rssi);
     FOR_EACH_OBSERVER(BluetoothAdapter::Observer, observers_,
                       DeviceAdded(this, device_reference));
     return;
