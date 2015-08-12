@@ -20,6 +20,7 @@
 
 namespace device {
 
+class BluetoothAdapterMac;
 class BluetoothLowEnergyDiscoverManagerMac;
 
 class DEVICE_BLUETOOTH_EXPORT BluetoothLowEnergyDeviceMac
