@@ -10,6 +10,8 @@
 
 namespace device {
 
+class BluetoothAdapter;
+
 class MockBluetoothGattConnection : public BluetoothGattConnection {
  public:
   MockBluetoothGattConnection(scoped_refptr<device::BluetoothAdapter> adapter,
