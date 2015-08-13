@@ -310,7 +310,7 @@ void BluetoothDevice::DidDisconnectGatt() {
 
 void BluetoothDevice::IncrementGattConnectionReferenceCount() {
   CHECK(gatt_connection_reference_count_ <
-        std::numeric_limits<typeof(gatt_connection_reference_count_)>::max());
+        std::numeric_limits<decltype(gatt_connection_reference_count_)>::max());
   gatt_connection_reference_count_++;
 }
 
