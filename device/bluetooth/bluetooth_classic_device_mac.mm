@@ -110,6 +110,10 @@ bool BluetoothClassicDeviceMac::IsConnected() const {
   return [device_ isConnected];
 }
 
+bool BluetoothClassicDeviceMac::IsGattConnected() const {
+  return false;  // Classic devices do not support GATT connection.
+}
+
 bool BluetoothClassicDeviceMac::IsConnectable() const {
   return false;
 }
