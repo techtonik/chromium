@@ -225,6 +225,18 @@ std::string BluetoothLowEnergyDeviceMac::GetDeviceName() const {
   return base::SysNSStringToUTF8([peripheral_ name]);
 }
 
+void BluetoothLowEnergyDeviceMac::CreateGattConnectionImpl() {
+  // Mac implementation does not yet use the default CreateGattConnection
+  // implementation. http://crbug.com/520774
+  NOTIMPLEMENTED();
+}
+
+void BluetoothLowEnergyDeviceMac::DisconnectGatt() {
+  // Mac implementation does not yet use the default CreateGattConnection
+  // implementation. http://crbug.com/520774
+  NOTIMPLEMENTED();
+}
+
 // static
 std::string BluetoothLowEnergyDeviceMac::GetPeripheralIdentifier(
     CBPeripheral* peripheral) {

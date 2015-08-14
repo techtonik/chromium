@@ -74,6 +74,13 @@ std::string BluetoothClassicDeviceMac::GetDeviceName() const {
   return base::SysNSStringToUTF8([device_ name]);
 }
 
+void BluetoothClassicDeviceMac::CreateGattConnectionImpl() {
+  // Classic devices do not support GATT connection.
+  DidFailToConnectGatt(ERROR_UNSUPPORTED_DEVICE);
+}
+
+void BluetoothClassicDeviceMac::DisconnectGatt() {}
+
 std::string BluetoothClassicDeviceMac::GetAddress() const {
   return GetDeviceAddress(device_);
 }
