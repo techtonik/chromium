@@ -4,11 +4,13 @@
 
 #include "device/bluetooth/bluetooth_device.h"
 
+#include <limits>
 #include <string>
 
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/values.h"
+#include "device/bluetooth/bluetooth_gatt_connection.h"
 #include "device/bluetooth/bluetooth_gatt_service.h"
 #include "grit/bluetooth_strings.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -199,6 +201,18 @@ bool BluetoothDevice::IsTrustable() const {
   return false;
 }
 
+void BluetoothDevice::CreateGattConnection(
+    const GattConnectionCallback& callback,
+    const ConnectErrorCallback& error_callback) {
+  create_gatt_connection_success_callbacks_.push_back(callback);
+  create_gatt_connection_error_callbacks_.push_back(error_callback);
+
+  if (IsGattConnected())
+    DidConnectGatt();
+
+  CreateGattConnectionImpl();
+}
+
 std::vector<BluetoothGattService*>
     BluetoothDevice::GetGattServices() const {
   std::vector<BluetoothGattService*> services;
@@ -270,6 +284,41 @@ BluetoothDevice::UUIDList BluetoothDevice::GetServiceDataUUIDs() const {
     iter.Advance();
   }
   return uuids;
+}
+
+void BluetoothDevice::DidConnectGatt() {
+  for (const auto& callback : create_gatt_connection_success_callbacks_) {
+    callback.Run(
+        make_scoped_ptr(new BluetoothGattConnection(adapter_, GetAddress())));
+  }
+  create_gatt_connection_success_callbacks_.clear();
+  create_gatt_connection_error_callbacks_.clear();
+}
+
+void BluetoothDevice::DidFailToConnectGatt(ConnectErrorCode error) {
+  for (const auto& error_callback : create_gatt_connection_error_callbacks_)
+    error_callback.Run(error);
+  create_gatt_connection_success_callbacks_.clear();
+  create_gatt_connection_error_callbacks_.clear();
+}
+
+void BluetoothDevice::DidDisconnectGatt() {
+  // If pending calls to connect GATT existed, flush them to ensure a consistent
+  // state.
+  DidFailToConnectGatt(ERROR_UNKNOWN);
+}
+
+void BluetoothDevice::IncrementGattConnectionReferenceCount() {
+  CHECK(gatt_connection_reference_count_ <
+        std::numeric_limits<decltype(gatt_connection_reference_count_)>::max());
+  gatt_connection_reference_count_++;
+}
+
+void BluetoothDevice::DecrementGattConnectionReferenceCount() {
+  CHECK(gatt_connection_reference_count_ > 0);
+  gatt_connection_reference_count_--;
+  if (gatt_connection_reference_count_ == 0)
+    DisconnectGatt();
 }
 
 void BluetoothDevice::ClearServiceData() { services_data_->Clear(); }
