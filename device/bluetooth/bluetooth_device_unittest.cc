@@ -125,4 +125,36 @@ TEST_F(BluetoothTest, LowEnergyDeviceNoUUIDs) {
 // also require build configuration to generate string resources into a .pak
 // file.
 
+#if defined(OS_ANDROID)
+// Basic CreateGattConnection test.
+TEST_F(BluetoothTest, CreateGattConnection) {
+  InitWithFakeAdapter();
+  TestBluetoothAdapterObserver observer(adapter_);
+
+  // Get a device.
+  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
+                                  GetErrorCallback());
+  base::RunLoop().RunUntilIdle();
+  DiscoverLowEnergyDevice(3);
+  base::RunLoop().RunUntilIdle();
+  BluetoothDevice* device = observer.last_device();
+
+  callback_count_ = error_callback_count_ = 0;
+  device->CreateGattConnection(GetGattConnectionCallback(),
+                               GetConnectErrorCallback());
+  CompleteGattConnection(device);
+  EXPECT_EQ(1, callback_count_--);
+  EXPECT_EQ(0, error_callback_count_);
+  ASSERT_EQ(1u, gatt_connections_.size());
+  EXPECT_TRUE(device->IsGattConnected());
+
+  // Connect again once already connected.
+  device->CreateGattConnection(GetGattConnectionCallback(),
+                               GetConnectErrorCallback());
+  EXPECT_EQ(1, callback_count_--);
+  EXPECT_EQ(0, error_callback_count_);
+  ASSERT_EQ(2u, gatt_connections_.size());
+}
+#endif  // defined(OS_ANDROID)
+
 }  // namespace device

@@ -8,6 +8,7 @@ import android.annotation.TargetApi;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
+import android.content.Context;
 import android.os.Build;
 import android.os.ParcelUuid;
 
@@ -179,11 +180,39 @@ class Fakes {
     static class FakeBluetoothDevice extends Wrappers.BluetoothDeviceWrapper {
         private String mAddress;
         private String mName;
+        private Wrappers.BluetoothGattCallbackWrapper mGattCallback;
 
         public FakeBluetoothDevice(String address, String name) {
             super(null);
             mAddress = address;
             mName = name;
+        }
+
+        // Create a call to onConnectionStateChange on the |chrome_device| using parameters
+        // |success| & |connected|.
+        @CalledByNative("FakeBluetoothDevice")
+        private static void connectionStateChange(
+                ChromeBluetoothDevice chromeDevice, boolean success, boolean connected) {
+            FakeBluetoothDevice fakeDevice = (FakeBluetoothDevice) chromeDevice.mDevice;
+            fakeDevice.mGattCallback.onConnectionStateChange(success
+                            ? android.bluetooth.BluetoothGatt.GATT_SUCCESS
+                            : android.bluetooth.BluetoothGatt.GATT_FAILURE,
+                    connected ? android.bluetooth.BluetoothProfile.STATE_CONNECTED
+                              : android.bluetooth.BluetoothProfile.STATE_DISCONNECTED);
+        }
+
+        // -----------------------------------------------------------------------------------------
+        // Wrappers.BluetoothDeviceWrapper overrides:
+
+        @Override
+        public Wrappers.BluetoothGattWrapper connectGatt(Context context, boolean autoConnect,
+                Wrappers.BluetoothGattCallbackWrapper callback) {
+            if (mGattCallback != null) {
+                throw new IllegalArgumentException(
+                        "FakeBluetoothDevice does not support multiple calls to connectGatt.");
+            }
+            mGattCallback = callback;
+            return new FakeBluetoothGatt();
         }
 
         @Override
@@ -205,5 +234,25 @@ class Fakes {
         public String getName() {
             return mName;
         }
+    }
+
+    /**
+     * Fakes android.bluetooth.BluetoothDevice.
+     */
+    static class FakeBluetoothGatt extends Wrappers.BluetoothGattWrapper {
+        public FakeBluetoothGatt() {
+            super(null);
+        }
+
+        @Override
+        public boolean connect() {
+            // TODO test
+            // TODO test
+            // TODO test
+            return true;
+        }
+
+        @Override
+        public void disconnect() {}
     }
 }
