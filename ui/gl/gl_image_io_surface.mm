@@ -25,6 +25,7 @@ bool ValidInternalFormat(unsigned internalformat) {
   switch (internalformat) {
     case GL_R8:
     case GL_BGRA_EXT:
+    case GL_RGB:
       return true;
     default:
       return false;
@@ -35,6 +36,7 @@ bool ValidFormat(BufferFormat format) {
   switch (format) {
     case BufferFormat::R_8:
     case BufferFormat::BGRA_8888:
+    case BufferFormat::UYVY_422:
       return true;
     case BufferFormat::ATC:
     case BufferFormat::ATCIA:
@@ -43,9 +45,8 @@ bool ValidFormat(BufferFormat format) {
     case BufferFormat::ETC1:
     case BufferFormat::RGBA_4444:
     case BufferFormat::RGBA_8888:
-    case BufferFormat::RGBX_8888:
+    case BufferFormat::BGRX_8888:
     case BufferFormat::YUV_420:
-    case BufferFormat::YUV_420_BIPLANAR:
       return false;
   }
 
@@ -59,6 +60,8 @@ GLenum TextureFormat(BufferFormat format) {
       return GL_RED;
     case BufferFormat::BGRA_8888:
       return GL_RGBA;
+    case BufferFormat::UYVY_422:
+      return GL_RGB;
     case BufferFormat::ATC:
     case BufferFormat::ATCIA:
     case BufferFormat::DXT1:
@@ -66,9 +69,8 @@ GLenum TextureFormat(BufferFormat format) {
     case BufferFormat::ETC1:
     case BufferFormat::RGBA_4444:
     case BufferFormat::RGBA_8888:
-    case BufferFormat::RGBX_8888:
+    case BufferFormat::BGRX_8888:
     case BufferFormat::YUV_420:
-    case BufferFormat::YUV_420_BIPLANAR:
       NOTREACHED();
       return 0;
   }
@@ -83,6 +85,9 @@ GLenum DataFormat(BufferFormat format) {
       return GL_RED;
     case BufferFormat::BGRA_8888:
       return GL_BGRA;
+    case BufferFormat::UYVY_422:
+      return GL_YCBCR_422_APPLE;
+      break;
     case BufferFormat::ATC:
     case BufferFormat::ATCIA:
     case BufferFormat::DXT1:
@@ -90,9 +95,8 @@ GLenum DataFormat(BufferFormat format) {
     case BufferFormat::ETC1:
     case BufferFormat::RGBA_4444:
     case BufferFormat::RGBA_8888:
-    case BufferFormat::RGBX_8888:
+    case BufferFormat::BGRX_8888:
     case BufferFormat::YUV_420:
-    case BufferFormat::YUV_420_BIPLANAR:
       NOTREACHED();
       return 0;
   }
@@ -107,6 +111,9 @@ GLenum DataType(BufferFormat format) {
       return GL_UNSIGNED_BYTE;
     case BufferFormat::BGRA_8888:
       return GL_UNSIGNED_INT_8_8_8_8_REV;
+    case BufferFormat::UYVY_422:
+      return GL_UNSIGNED_SHORT_8_8_APPLE;
+      break;
     case BufferFormat::ATC:
     case BufferFormat::ATCIA:
     case BufferFormat::DXT1:
@@ -114,9 +121,8 @@ GLenum DataType(BufferFormat format) {
     case BufferFormat::ETC1:
     case BufferFormat::RGBA_4444:
     case BufferFormat::RGBA_8888:
-    case BufferFormat::RGBX_8888:
+    case BufferFormat::BGRX_8888:
     case BufferFormat::YUV_420:
-    case BufferFormat::YUV_420_BIPLANAR:
       NOTREACHED();
       return 0;
   }
@@ -127,9 +133,11 @@ GLenum DataType(BufferFormat format) {
 
 }  // namespace
 
-GLImageIOSurface::GLImageIOSurface(const gfx::Size& size,
+GLImageIOSurface::GLImageIOSurface(gfx::GenericSharedMemoryId io_surface_id,
+                                   const gfx::Size& size,
                                    unsigned internalformat)
-    : size_(size),
+    : io_surface_id_(io_surface_id),
+      size_(size),
       internalformat_(internalformat),
       format_(BufferFormat::RGBA_8888) {}
 
@@ -205,6 +213,25 @@ bool GLImageIOSurface::ScheduleOverlayPlane(gfx::AcceleratedWidget widget,
                                             const RectF& crop_rect) {
   NOTREACHED();
   return false;
+}
+
+void GLImageIOSurface::OnMemoryDump(base::trace_event::ProcessMemoryDump* pmd,
+                                    uint64_t process_tracing_id,
+                                    const std::string& dump_name) {
+  // IOSurfaceGetAllocSize will return 0 if io_surface_ is invalid. In this case
+  // we log 0 for consistency with other GLImage memory dump functions.
+  size_t size_bytes = IOSurfaceGetAllocSize(io_surface_);
+
+  base::trace_event::MemoryAllocatorDump* dump =
+      pmd->CreateAllocatorDump(dump_name);
+  dump->AddScalar(base::trace_event::MemoryAllocatorDump::kNameSize,
+                  base::trace_event::MemoryAllocatorDump::kUnitsBytes,
+                  static_cast<uint64_t>(size_bytes));
+
+  auto guid = gfx::GetGenericSharedMemoryGUIDForTracing(process_tracing_id,
+                                                        io_surface_id_);
+  pmd->CreateSharedGlobalAllocatorDump(guid);
+  pmd->AddOwnershipEdge(dump->guid(), guid);
 }
 
 base::ScopedCFTypeRef<IOSurfaceRef> GLImageIOSurface::io_surface() {

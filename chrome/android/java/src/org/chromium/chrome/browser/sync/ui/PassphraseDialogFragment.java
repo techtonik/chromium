@@ -31,7 +31,7 @@ import android.widget.TextView.OnEditorActionListener;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.sync.ProfileSyncService;
-import org.chromium.sync.internal_api.pub.PassphraseType;
+import org.chromium.sync.PassphraseType;
 import org.chromium.ui.text.SpanApplier;
 import org.chromium.ui.text.SpanApplier.SpanInfo;
 
@@ -86,7 +86,7 @@ public class PassphraseDialogFragment extends DialogFragment implements OnClickL
         final EditText passphrase = (EditText) v.findViewById(R.id.passphrase);
         final Context context = passphrase.getContext();
         TextView resetText = (TextView) v.findViewById(R.id.reset_text);
-        ProfileSyncService profileSyncService = ProfileSyncService.get(context);
+        ProfileSyncService profileSyncService = ProfileSyncService.get();
         String accountName = profileSyncService.getCurrentSignedInAccountText() + "\n\n";
         resetText.setText(SpanApplier.applySpans(
                 context.getString(R.string.sync_passphrase_reset_instructions),

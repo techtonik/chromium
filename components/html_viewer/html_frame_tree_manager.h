@@ -18,7 +18,6 @@ class WebView;
 }
 
 namespace mojo {
-class ApplicationImpl;
 class View;
 }
 
@@ -36,11 +35,11 @@ class HTMLFrameDelegate;
 // that is backed by a mojo::View.
 class HTMLFrameTreeManager {
  public:
-  // Creates a new HTMLFrame. The caller owns the return value and must call
+  // Returns a new HTMLFrame or null if a HTMLFrame does not need to be created.
+  // If this returns non-null the caller owns the return value and must call
   // Close() when done.
   static HTMLFrame* CreateFrameAndAttachToTree(
       GlobalState* global_state,
-      mojo::ApplicationImpl* app,
       mojo::View* view,
       scoped_ptr<DocumentResourceWaiter> resource_waiter,
       HTMLFrameDelegate* delegate);

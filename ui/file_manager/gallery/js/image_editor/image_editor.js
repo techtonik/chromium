@@ -15,10 +15,15 @@
  * @param {function(string, ...string)} displayStringFunction String
  *     formatting function.
  * @constructor
+ * @extends {cr.EventTarget}
  * @struct
+ *
+ * TODO(yawano): Remove displayStringFunction from arguments.
  */
 function ImageEditor(
     viewport, imageView, prompt, DOMContainers, modes, displayStringFunction) {
+  cr.EventTarget.call(this);
+
   this.rootContainer_ = DOMContainers.root;
   this.container_ = DOMContainers.image;
   this.modes_ = modes;
@@ -58,6 +63,8 @@ function ImageEditor(
       this.onOptionsChange.bind(this), true /* done button */);
   this.modeToolbar_.addEventListener(
       'done-clicked', this.onDoneClicked_.bind(this));
+  this.modeToolbar_.addEventListener(
+      'cancel-clicked', this.onCancelClicked_.bind(this));
 
   this.prompt_ = prompt;
 
@@ -98,11 +105,30 @@ function ImageEditor(
   this.registerAction_('redo');
 
   /**
+   * @private {!HTMLElement}
+   * @const
+   */
+  this.exitButton_ = /** @type {!HTMLElement} */
+      (queryRequiredElement('.edit-mode-toolbar paper-button.exit'));
+  this.exitButton_.addEventListener('click', this.onExitClicked_.bind(this));
+
+  /**
    * @private {!FilesToast}
    */
   this.filesToast_ = /** @type {!FilesToast}*/
-      (queryRequiredElement(document, 'files-toast'));
+      (queryRequiredElement('files-toast'));
 }
+
+ImageEditor.prototype.__proto__ = cr.EventTarget.prototype;
+
+/**
+ * Handles click event of exit button.
+ * @private
+ */
+ImageEditor.prototype.onExitClicked_ = function() {
+  var event = new Event('exit-clicked');
+  this.dispatchEvent(event);
+};
 
 /**
  * Creates a toolbar button.
@@ -182,6 +208,10 @@ ImageEditor.prototype.openSession = function(
   this.imageView_.load(
       item, effect, displayCallback, function(loadType, delay, error) {
         self.lockUI(false);
+
+        // Always handle an item as original for new session.
+        item.setAsOriginal();
+
         self.commandQueue_ = new CommandQueue(
             self.container_.ownerDocument, assert(self.imageView_.getCanvas()),
             saveFunction);
@@ -565,6 +595,8 @@ ImageEditor.prototype.setUpMode_ = function(mode) {
     return;
   }
 
+  this.exitButton_.hidden = true;
+
   this.modeToolbar_.clear();
   this.currentMode_.createTools(this.modeToolbar_);
   this.modeToolbar_.show(true);
@@ -576,9 +608,16 @@ ImageEditor.prototype.setUpMode_ = function(mode) {
  * @private
  */
 ImageEditor.prototype.onDoneClicked_ = function(event) {
-  var button = event.target.getDoneButton();
-  button.querySelector('paper-ripple').simulatedRipple();
-  this.leaveMode(true);
+  this.leaveMode(true /* commit */);
+};
+
+/**
+ * Handles click event of Cancel button.
+ * @param {!Event} event An event.
+ * @private
+ */
+ImageEditor.prototype.onCancelClicked_ = function(event) {
+  this.leaveMode(false /* not commit */);
 };
 
 /**
@@ -604,6 +643,8 @@ ImageEditor.prototype.leaveMode = function(commit) {
     var paperRipple = this.currentTool_.querySelector('paper-ripple');
     paperRipple.upAction();
   }
+
+  this.exitButton_.hidden = false;
 
   this.currentMode_.cleanUpCaches();
   this.currentMode_ = null;
@@ -993,13 +1034,13 @@ ImageEditor.MouseControl.prototype.updateCursor_ = function(position) {
  * @param {function(string)} displayStringFunction A string formatting function.
  * @param {function(Object)=} opt_updateCallback The callback called when
  *     controls change.
- * @param {boolean=} opt_showDoneButton True to show done button.
+ * @param {boolean=} opt_showActionButtons True to show action buttons.
  * @constructor
  * @extends {cr.EventTarget}
  * @struct
  */
 ImageEditor.Toolbar = function(
-    parent, displayStringFunction, opt_updateCallback, opt_showDoneButton) {
+    parent, displayStringFunction, opt_updateCallback, opt_showActionButtons) {
   this.wrapper_ = parent;
   this.displayStringFunction_ = displayStringFunction;
 
@@ -1009,15 +1050,22 @@ ImageEditor.Toolbar = function(
    */
   this.updateCallback_ = opt_updateCallback || null;
 
-  // Create done button.
-  if (opt_showDoneButton) {
-    var doneButtonLayer = document.createElement('div');
-    doneButtonLayer.classList.add('done-button');
+  // Create action buttons.
+  if (opt_showActionButtons) {
+    var actionButtonsLayer = document.createElement('div');
+    actionButtonsLayer.classList.add('action-buttons');
+
+    this.cancelButton_ = ImageEditor.Toolbar.createButton_(
+        'GALLERY_CANCEL_LABEL', ImageEditor.Toolbar.ButtonType.LABEL_UPPER_CASE,
+        this.onCancelClicked_.bind(this), 'cancel');
+    actionButtonsLayer.appendChild(this.cancelButton_);
+
     this.doneButton_ = ImageEditor.Toolbar.createButton_(
-        'GALLERY_DONE', ImageEditor.Toolbar.ButtonType.LABEL,
+        'GALLERY_DONE', ImageEditor.Toolbar.ButtonType.LABEL_UPPER_CASE,
         this.onDoneClicked_.bind(this), 'done');
-    doneButtonLayer.appendChild(this.doneButton_);
-    this.wrapper_.appendChild(doneButtonLayer);
+    actionButtonsLayer.appendChild(this.doneButton_);
+
+    this.wrapper_.appendChild(actionButtonsLayer);
   }
 
   /**
@@ -1041,7 +1089,20 @@ ImageEditor.Toolbar.HEIGHT = 48; // px
  * @private
  */
 ImageEditor.Toolbar.prototype.onDoneClicked_ = function() {
+  this.doneButton_.querySelector('paper-ripple').simulatedRipple();
+
   var event = new Event('done-clicked');
+  this.dispatchEvent(event);
+};
+
+/**
+ * Handles click event of cancel button.
+ * @private
+ */
+ImageEditor.Toolbar.prototype.onCancelClicked_ = function() {
+  this.cancelButton_.querySelector('paper-ripple').simulatedRipple();
+
+  var event = new Event('cancel-clicked');
   this.dispatchEvent(event);
 };
 
@@ -1051,14 +1112,6 @@ ImageEditor.Toolbar.prototype.onDoneClicked_ = function() {
  */
 ImageEditor.Toolbar.prototype.getElement = function() {
   return this.container_;
-};
-
-/**
- * Returns the element of done button.
- * @return {!HTMLElement}
- */
-ImageEditor.Toolbar.prototype.getDoneButton = function() {
-  return this.doneButton_;
 };
 
 /**
@@ -1084,7 +1137,8 @@ ImageEditor.Toolbar.prototype.add = function(element) {
  */
 ImageEditor.Toolbar.ButtonType = {
   ICON: 'icon',
-  LABEL: 'label'
+  LABEL: 'label',
+  LABEL_UPPER_CASE: 'label_upper_case'
 };
 
 /**
@@ -1108,10 +1162,13 @@ ImageEditor.Toolbar.createButton_ = function(
     var icon = document.createElement('div');
     icon.classList.add('icon');
     button.appendChild(icon);
-  } else if (type === ImageEditor.Toolbar.ButtonType.LABEL) {
+  } else if (type === ImageEditor.Toolbar.ButtonType.LABEL ||
+      type === ImageEditor.Toolbar.ButtonType.LABEL_UPPER_CASE) {
     var label = document.createElement('span');
     label.classList.add('label');
-    label.textContent = strf(title);
+    label.textContent =
+        type === ImageEditor.Toolbar.ButtonType.LABEL_UPPER_CASE ?
+        strf(title).toLocaleUpperCase() : strf(title);
     button.appendChild(label);
   } else {
     assertNotReached();
@@ -1123,14 +1180,9 @@ ImageEditor.Toolbar.createButton_ = function(
   button.label = strf(title);
   button.title = strf(title);
 
-  // Click event is late for setting using-mouse class. i.e. if we set this
-  // class with click event, user can see a blink of :focus:not(.using-mouse)
-  // state.
-  button.addEventListener('mousedown',
-      button.classList.toggle.bind(button.classList, 'using-mouse', true));
+  GalleryUtil.decorateMouseFocusHandling(button);
+
   button.addEventListener('click', handler , false);
-  button.addEventListener('blur',
-      button.classList.toggle.bind(button.classList, 'using-mouse', false));
 
   return button;
 };

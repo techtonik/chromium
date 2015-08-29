@@ -83,7 +83,7 @@ class ChromePasswordManagerClient
   const GURL& GetMainFrameURL() const override;
   bool IsUpdatePasswordUIEnabled() const override;
   const GURL& GetLastCommittedEntryURL() const override;
-  scoped_ptr<password_manager::StoreResultFilter> CreateStoreResultFilter()
+  scoped_ptr<password_manager::CredentialsFilter> CreateStoreResultFilter()
       const override;
 
   // Hides any visible generation UI.
@@ -131,6 +131,10 @@ class ChromePasswordManagerClient
   void ShowPasswordEditingPopup(content::RenderFrameHost* render_frame_host,
                                 const gfx::RectF& bounds,
                                 const autofill::PasswordForm& form);
+
+  // Notify the PasswordManager that generation is available for |form|. Used
+  // for UMA stats.
+  void GenerationAvailableForForm(const autofill::PasswordForm& form);
 
   // Sends a message to the renderer with the current value of
   // |can_use_log_router_|.

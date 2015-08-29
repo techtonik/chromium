@@ -140,8 +140,7 @@ static jlong Init(JNIEnv* env, jobject obj, jobject j_profile) {
 }
 
 static jboolean IsEnhancedBookmarksFeatureEnabled(JNIEnv* env,
-                                                  jclass clazz,
-                                                  jobject j_profile) {
+                                                  jclass clazz) {
   return enhanced_bookmarks::IsEnhancedBookmarksEnabled();
 }
 
@@ -503,7 +502,18 @@ bool BookmarksBridge::DoesBookmarkExist(JNIEnv* env,
                                         jlong id,
                                         jint type) {
   DCHECK(IsLoaded());
-  return GetNodeByID(id, type);
+
+  const BookmarkNode* node = GetNodeByID(id, type);
+
+  if (!node)
+    return false;
+
+  if (type == BookmarkType::BOOKMARK_TYPE_NORMAL) {
+    return true;
+  } else {
+    DCHECK(type == BookmarkType::BOOKMARK_TYPE_PARTNER);
+    return partner_bookmarks_shim_->IsReachable(node);
+  }
 }
 
 void BookmarksBridge::GetBookmarksForFolder(JNIEnv* env,

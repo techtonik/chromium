@@ -6,6 +6,7 @@
 #define CHROME_BROWSER_IO_THREAD_H_
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -176,7 +177,7 @@ class IOThread : public content::BrowserThreadDelegate {
     net::NextProtoVector next_protos;
     Optional<std::string> trusted_spdy_proxy;
     std::set<net::HostPortPair> forced_spdy_exclusions;
-    Optional<bool> use_alternate_protocols;
+    Optional<bool> use_alternative_services;
     Optional<double> alternative_service_probability_threshold;
 
     Optional<bool> enable_quic;
@@ -377,6 +378,10 @@ class IOThread : public content::BrowserThreadDelegate {
   // Returns true if QUIC should prefer AES-GCN even without hardware support.
   static bool ShouldQuicPreferAes(const VariationParameters& quic_trial_params);
 
+  // Returns true if QUIC should enable alternative services.
+  static bool ShouldQuicEnableAlternativeServices(
+      const VariationParameters& quic_trial_params);
+
   // Returns the maximum number of QUIC connections with high packet loss in a
   // row after which QUIC should be disabled.  Returns 0 if the default value
   // should be used.
@@ -422,6 +427,17 @@ class IOThread : public content::BrowserThreadDelegate {
   static double GetAlternativeProtocolProbabilityThreshold(
       const base::CommandLine& command_line,
       const VariationParameters& quic_trial_params);
+
+  static net::URLRequestContext* ConstructSystemRequestContext(
+      IOThread::Globals* globals,
+      net::NetLog* net_log);
+
+  // TODO(willchan): Remove proxy script fetcher context since it's not
+  // necessary now that I got rid of refcounting URLRequestContexts.
+  // See IOThread::Globals for details.
+  static net::URLRequestContext* ConstructProxyScriptFetcherContext(
+      IOThread::Globals* globals,
+      net::NetLog* net_log);
 
   // The NetLog is owned by the browser process, to allow logging from other
   // threads during shutdown, but is used most frequently on the IOThread.

@@ -6,13 +6,15 @@
 #define CONTENT_COMMON_GPU_IMAGE_TRANSPORT_SURFACE_OVERLAY_MAC_H_
 
 #include <deque>
+#include <vector>
 
 #include "base/memory/linked_ptr.h"
 #import "base/mac/scoped_nsobject.h"
+#include "base/timer/timer.h"
 #include "content/common/gpu/gpu_command_buffer_stub.h"
 #include "content/common/gpu/image_transport_surface.h"
-#include "ui/accelerated_widget_mac/display_link_mac.h"
 #include "ui/gl/gl_surface.h"
+#include "ui/gl/gpu_switching_observer.h"
 
 @class CAContext;
 @class CALayer;
@@ -20,7 +22,8 @@
 namespace content {
 
 class ImageTransportSurfaceOverlayMac : public gfx::GLSurface,
-                                        public ImageTransportSurface {
+                                        public ImageTransportSurface,
+                                        public ui::GpuSwitchingObserver {
  public:
   ImageTransportSurfaceOverlayMac(GpuChannelManager* manager,
                                   GpuCommandBufferStub* stub,
@@ -35,7 +38,8 @@ class ImageTransportSurfaceOverlayMac : public gfx::GLSurface,
   bool SupportsPostSubBuffer() override;
   gfx::Size GetSize() override;
   void* GetHandle() override;
-
+  bool OnMakeCurrent(gfx::GLContext* context) override;
+  bool SetBackbufferAllocation(bool allocated) override;
   bool ScheduleOverlayPlane(int z_order,
                             gfx::OverlayTransform transform,
                             gfx::GLImage* image,
@@ -50,12 +54,18 @@ class ImageTransportSurfaceOverlayMac : public gfx::GLSurface,
   void SetLatencyInfo(const std::vector<ui::LatencyInfo>&) override;
   void WakeUpGpu() override;
 
+  // ui::GpuSwitchingObserver implementation.
+  void OnGpuSwitched() override;
+
  private:
   class PendingSwap;
+  class OverlayPlane;
 
   ~ImageTransportSurfaceOverlayMac() override;
 
-  gfx::SwapResult SwapBuffersInternal(const gfx::Rect& pixel_damage_rect);
+  void ScheduleOverlayPlaneForPartialDamage(const gfx::Rect& pixel_damage_rect);
+  gfx::SwapResult SwapBuffersInternal();
+  static void UpdateCALayerTree(CALayer* root_layer, PendingSwap* swap);
 
   // Returns true if the front of |pending_swaps_| has completed, or has timed
   // out by |now|.
@@ -66,7 +76,7 @@ class ImageTransportSurfaceOverlayMac : public gfx::GLSurface,
   void DisplayFirstPendingSwapImmediately();
   // Force that all of |pending_swaps_| displayed immediately, and the list be
   // cleared.
-  void FinishAllPendingSwaps();
+  void DisplayAndClearAllPendingSwaps();
   // Callback issued during the next vsync period ofter a SwapBuffers call,
   // to check if the swap is completed, and display the frame. Note that if
   // another SwapBuffers happens before this callback, the pending swap will
@@ -76,19 +86,28 @@ class ImageTransportSurfaceOverlayMac : public gfx::GLSurface,
   // argument to avoid redundant calls to base::TimeTicks::Now.
   void PostCheckPendingSwapsCallbackIfNeeded(const base::TimeTicks& now);
 
+  // Return the time of |interval_fraction| of the way through the next
+  // vsync period that starts after |from|. If the vsync parameters are not
+  // valid then return |from|.
+  base::TimeTicks GetNextVSyncTimeAfter(
+      const base::TimeTicks& from, double interval_fraction);
+
   scoped_ptr<ImageTransportHelper> helper_;
   base::scoped_nsobject<CAContext> ca_context_;
   base::scoped_nsobject<CALayer> layer_;
-  base::scoped_nsobject<CALayer> partial_damage_layer_;
 
   gfx::Size pixel_size_;
   float scale_factor_;
   std::vector<ui::LatencyInfo> latency_info_;
 
+  // The renderer ID that all contexts made current to this surface should be
+  // targeting.
+  GLint gl_renderer_id_;
+
   // Weak pointer to the image provided when ScheduleOverlayPlane is called. Is
   // consumed and reset when SwapBuffers is called. For now, only one overlay
   // plane is supported.
-  gfx::GLImage* pending_overlay_image_;
+  std::vector<linked_ptr<OverlayPlane>> pending_overlay_planes_;
 
   // A queue of all frames that have been created by SwapBuffersInternal but
   // have not yet been displayed. This queue is checked at the beginning of
@@ -97,14 +116,18 @@ class ImageTransportSurfaceOverlayMac : public gfx::GLSurface,
 
   // The union of the damage rects of SwapBuffersInternal since the last
   // non-partial swap.
-  gfx::Rect accumulated_partial_damage_pixel_rect_;
+  gfx::Rect accumulated_damage_dip_rect_;
 
-  // The display link used to compute the time for callbacks.
-  scoped_refptr<ui::DisplayLinkMac> display_link_mac_;
+  // The time of the last swap was issued. If this is more than two vsyncs, then
+  // use the simpler non-smooth animation path.
+  base::TimeTicks last_swap_time_;
 
-  // True if there is a pending call to CheckPendingSwapsCallback posted.
-  bool has_pending_callback_;
+  // The vsync information provided by the browser.
+  bool vsync_parameters_valid_;
+  base::TimeTicks vsync_timebase_;
+  base::TimeDelta vsync_interval_;
 
+  base::Timer display_pending_swap_timer_;
   base::WeakPtrFactory<ImageTransportSurfaceOverlayMac> weak_factory_;
 };
 

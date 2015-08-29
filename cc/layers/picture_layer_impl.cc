@@ -582,8 +582,8 @@ bool PictureLayerImpl::RasterSourceUsesLCDText() const {
 
 void PictureLayerImpl::NotifyTileStateChanged(const Tile* tile) {
   if (layer_tree_impl()->IsActiveTree()) {
-    gfx::RectF layer_damage_rect =
-        gfx::ScaleRect(tile->content_rect(), 1.f / tile->contents_scale());
+    gfx::Rect layer_damage_rect = gfx::ScaleToEnclosingRect(
+        tile->content_rect(), 1.f / tile->contents_scale());
     AddDamageRect(layer_damage_rect);
   }
   if (tile->draw_info().NeedsRaster()) {
@@ -902,11 +902,11 @@ void PictureLayerImpl::AddLowResolutionTilingIfNeeded() {
   // res tiling during a pinch or a CSS animation.
   bool is_pinching = layer_tree_impl()->PinchGestureActive();
   bool is_animating = draw_properties().screen_space_transform_is_animating;
-  if (!low_res && !is_pinching && !is_animating)
-    low_res = AddTiling(low_res_raster_contents_scale_);
-
-  if (low_res)
+  if (!is_pinching && !is_animating) {
+    if (!low_res)
+      low_res = AddTiling(low_res_raster_contents_scale_);
     low_res->set_resolution(LOW_RESOLUTION);
+  }
 }
 
 void PictureLayerImpl::RecalculateRasterScales() {
@@ -1054,9 +1054,9 @@ void PictureLayerImpl::CleanUpTilingsOnActiveLayer(
   }
 
   PictureLayerTilingSet* twin_set = twin ? twin->tilings_.get() : nullptr;
-  tilings_->CleanUpTilings(
-      min_acceptable_high_res_scale, max_acceptable_high_res_scale,
-      used_tilings, layer_tree_impl()->create_low_res_tiling(), twin_set);
+  tilings_->CleanUpTilings(min_acceptable_high_res_scale,
+                           max_acceptable_high_res_scale, used_tilings,
+                           twin_set);
   DCHECK_GT(tilings_->num_tilings(), 0u);
   SanityCheckTilingState();
 }

@@ -9,9 +9,9 @@
 #include "cc/resources/returned_resource.h"
 #include "cc/resources/transferable_resource.h"
 #include "cc/surfaces/surface_id.h"
+#include "components/view_manager/public/interfaces/compositor_frame.mojom.h"
 #include "components/view_manager/public/interfaces/quads.mojom.h"
 #include "components/view_manager/public/interfaces/surface_id.mojom.h"
-#include "components/view_manager/public/interfaces/surfaces.mojom.h"
 #include "gpu/command_buffer/common/mailbox.h"
 #include "gpu/command_buffer/common/mailbox_holder.h"
 #include "mojo/converters/surfaces/mojo_surfaces_export.h"
@@ -26,6 +26,8 @@ class SharedQuadState;
 }  // namespace cc
 
 namespace mojo {
+
+class CustomSurfaceConverter;
 
 // Types from surface_id.mojom
 template <>
@@ -68,6 +70,10 @@ TypeConverter<SharedQuadStatePtr, cc::SharedQuadState> {
   static SharedQuadStatePtr Convert(const cc::SharedQuadState& input);
 };
 
+scoped_ptr<cc::RenderPass> ConvertToRenderPass(
+    const mojo::PassPtr& input,
+    CustomSurfaceConverter* custom_converter);
+
 template <>
 struct MOJO_SURFACES_EXPORT TypeConverter<PassPtr, cc::RenderPass> {
   static PassPtr Convert(const cc::RenderPass& input);
@@ -78,7 +84,7 @@ struct MOJO_SURFACES_EXPORT TypeConverter<scoped_ptr<cc::RenderPass>, PassPtr> {
   static scoped_ptr<cc::RenderPass> Convert(const PassPtr& input);
 };
 
-// Types from surfaces.mojom
+// Types from compositor_frame.mojom
 template <>
 struct MOJO_SURFACES_EXPORT TypeConverter<MailboxPtr, gpu::Mailbox> {
   static MailboxPtr Convert(const gpu::Mailbox& input);
@@ -140,16 +146,28 @@ TypeConverter<Array<ReturnedResourcePtr>, cc::ReturnedResourceArray> {
   static Array<ReturnedResourcePtr> Convert(
       const cc::ReturnedResourceArray& input);
 };
+template <>
+struct MOJO_SURFACES_EXPORT
+    TypeConverter<cc::ReturnedResourceArray, Array<ReturnedResourcePtr>> {
+  static cc::ReturnedResourceArray Convert(
+      const Array<ReturnedResourcePtr>& input);
+};
+
+scoped_ptr<cc::CompositorFrame> ConvertToCompositorFrame(
+    const mojo::CompositorFramePtr& input,
+    CustomSurfaceConverter* custom_converter);
 
 template <>
-struct MOJO_SURFACES_EXPORT TypeConverter<FramePtr, cc::CompositorFrame> {
-  static FramePtr Convert(const cc::CompositorFrame& input);
+struct MOJO_SURFACES_EXPORT
+TypeConverter<CompositorFramePtr, cc::CompositorFrame> {
+  static CompositorFramePtr Convert(const cc::CompositorFrame& input);
 };
 
 template <>
 struct MOJO_SURFACES_EXPORT
-TypeConverter<scoped_ptr<cc::CompositorFrame>, FramePtr> {
-  static scoped_ptr<cc::CompositorFrame> Convert(const FramePtr& input);
+TypeConverter<scoped_ptr<cc::CompositorFrame>, CompositorFramePtr> {
+  static scoped_ptr<cc::CompositorFrame> Convert(
+      const CompositorFramePtr& input);
 };
 
 }  // namespace mojo

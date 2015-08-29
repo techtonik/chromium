@@ -9,9 +9,6 @@
 #include "gpu/command_buffer/common/gles2_cmd_format.h"
 #include "gpu/command_buffer/common/gles2_cmd_utils.h"
 #include "gpu/command_buffer/common/id_allocator.h"
-#include "gpu/command_buffer/service/async_pixel_transfer_delegate_mock.h"
-#include "gpu/command_buffer/service/async_pixel_transfer_manager.h"
-#include "gpu/command_buffer/service/async_pixel_transfer_manager_mock.h"
 #include "gpu/command_buffer/service/cmd_buffer_engine.h"
 #include "gpu/command_buffer/service/context_group.h"
 #include "gpu/command_buffer/service/context_state.h"
@@ -2775,6 +2772,10 @@ class MockGLImage : public gfx::GLImage {
                                           gfx::OverlayTransform,
                                           const gfx::Rect&,
                                           const gfx::RectF&));
+  MOCK_METHOD3(OnMemoryDump,
+               void(base::trace_event::ProcessMemoryDump*,
+                    uint64_t,
+                    const std::string&));
 
  protected:
   virtual ~MockGLImage() {}
@@ -3233,6 +3234,39 @@ TEST_P(GLES2DecoderCompressedFormatsTest, GetCompressedTextureFormatsPVRTC) {
 TEST_P(GLES2DecoderCompressedFormatsTest, GetCompressedTextureFormatsETC1) {
   const GLenum formats[] = {GL_ETC1_RGB8_OES};
   CheckFormats("GL_OES_compressed_ETC1_RGB8_texture", formats, 1);
+}
+
+TEST_P(GLES2DecoderCompressedFormatsTest, GetCompressedTextureFormatsASTC) {
+  const GLenum formats[] = {
+      GL_COMPRESSED_RGBA_ASTC_4x4_KHR,
+      GL_COMPRESSED_RGBA_ASTC_5x4_KHR,
+      GL_COMPRESSED_RGBA_ASTC_5x5_KHR,
+      GL_COMPRESSED_RGBA_ASTC_6x5_KHR,
+      GL_COMPRESSED_RGBA_ASTC_6x6_KHR,
+      GL_COMPRESSED_RGBA_ASTC_8x5_KHR,
+      GL_COMPRESSED_RGBA_ASTC_8x6_KHR,
+      GL_COMPRESSED_RGBA_ASTC_8x8_KHR,
+      GL_COMPRESSED_RGBA_ASTC_10x5_KHR,
+      GL_COMPRESSED_RGBA_ASTC_10x6_KHR,
+      GL_COMPRESSED_RGBA_ASTC_10x8_KHR,
+      GL_COMPRESSED_RGBA_ASTC_10x10_KHR,
+      GL_COMPRESSED_RGBA_ASTC_12x10_KHR,
+      GL_COMPRESSED_RGBA_ASTC_12x12_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x8_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR,
+      GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR};
+  CheckFormats("GL_KHR_texture_compression_astc_ldr", formats, 28);
 }
 
 TEST_P(GLES2DecoderManualInitTest, GetNoCompressedTextureFormats) {

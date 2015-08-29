@@ -31,12 +31,10 @@ class LayerTreeHostTilesPixelTest : public LayerTreePixelTest {
     settings->use_display_lists = true;
     switch (raster_mode_) {
       case PARTIAL_ONE_COPY:
-        settings->use_one_copy = true;
         settings->use_zero_copy = false;
         settings->use_persistent_map_for_gpu_memory_buffers = true;
         break;
       case FULL_ONE_COPY:
-        settings->use_one_copy = true;
         settings->use_zero_copy = false;
         settings->use_persistent_map_for_gpu_memory_buffers = false;
         break;
@@ -161,6 +159,7 @@ class LayerTreeHostTilesTestPartialInvalidation
         // only re-raster the stuff in the rect. If it doesn't do partial raster
         // it would re-raster the whole thing instead.
         client_.set_blue_top(false);
+        Finish();
         picture_layer_->SetNeedsDisplayRect(gfx::Rect(50, 50, 100, 100));
 
         // Add a copy request to see what happened!
@@ -186,6 +185,13 @@ TEST_F(LayerTreeHostTilesTestPartialInvalidation,
   RunRasterPixelTest(
       false, FULL_ONE_COPY, picture_layer_,
       base::FilePath(FILE_PATH_LITERAL("blue_yellow_flipped.png")));
+}
+
+TEST_F(LayerTreeHostTilesTestPartialInvalidation,
+       PartialRaster_MultiThread_OneCopy) {
+  RunRasterPixelTest(
+      true, PARTIAL_ONE_COPY, picture_layer_,
+      base::FilePath(FILE_PATH_LITERAL("blue_yellow_partial_flipped.png")));
 }
 
 TEST_F(LayerTreeHostTilesTestPartialInvalidation,

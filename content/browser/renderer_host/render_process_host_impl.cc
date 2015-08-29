@@ -37,7 +37,7 @@
 #include "base/trace_event/trace_event.h"
 #include "base/tracked_objects.h"
 #include "cc/base/switches.h"
-#include "components/scheduler/common/scheduler_switches.h"
+#include "components/tracing/tracing_switches.h"
 #include "content/browser/appcache/appcache_dispatcher_host.h"
 #include "content/browser/appcache/chrome_appcache_service.h"
 #include "content/browser/background_sync/background_sync_service_impl.h"
@@ -210,8 +210,6 @@
 #include "content/common/media/aec_dump_messages.h"
 #include "content/common/media/media_stream_messages.h"
 #endif
-
-extern bool g_exited_main_message_loop;
 
 namespace content {
 namespace {
@@ -517,7 +515,7 @@ RenderProcessHostImpl::RenderProcessHostImpl(
 
   ChildProcessSecurityPolicyImpl::GetInstance()->Add(GetID());
 
-  CHECK(!g_exited_main_message_loop);
+  CHECK(!BrowserMainRunner::ExitedMainMessageLoop());
   RegisterHost(GetID(), this);
   g_all_hosts.Get().set_check_on_null_data(true);
   // Initialize |child_process_activity_time_| to a reasonable value.
@@ -956,15 +954,17 @@ void RenderProcessHostImpl::RegisterMojoServices() {
   mojo_application_host_->service_registry()->AddService(
       base::Bind(&device::BatteryMonitorImpl::Create));
 
+#if !defined(OS_ANDROID)
   mojo_application_host_->service_registry()->AddService(
       base::Bind(&device::VibrationManagerImpl::Create));
+#endif
 
   mojo_application_host_->service_registry()->AddService(
       base::Bind(&PermissionServiceContext::CreateService,
                  base::Unretained(permission_service_context_.get())));
 
   mojo_application_host_->service_registry()->AddService(base::Bind(
-      &content::BackgroundSyncServiceImpl::Create,
+      &BackgroundSyncContextImpl::CreateService,
       base::Unretained(storage_partition_impl_->GetBackgroundSyncContext())));
 
   mojo_application_host_->service_registry()->AddService(base::Bind(
@@ -1136,32 +1136,30 @@ static void AppendCompositorCommandLineFlags(base::CommandLine* command_line) {
     command_line->AppendSwitch(switches::kEnableGpuRasterization);
 
   int msaa_sample_count = GpuRasterizationMSAASampleCount();
-  if (msaa_sample_count > 0) {
+  if (msaa_sample_count >= 0) {
     command_line->AppendSwitchASCII(
         switches::kGpuRasterizationMSAASampleCount,
         base::IntToString(msaa_sample_count));
   }
 
-  DCHECK_IMPLIES(IsZeroCopyUploadEnabled(), !IsOneCopyUploadEnabled());
-  DCHECK_IMPLIES(IsOneCopyUploadEnabled(), !IsZeroCopyUploadEnabled());
   if (IsZeroCopyUploadEnabled())
     command_line->AppendSwitch(switches::kEnableZeroCopy);
-  if (!IsOneCopyUploadEnabled())
-    command_line->AppendSwitch(switches::kDisableOneCopy);
+  if (IsPersistentGpuMemoryBufferEnabled())
+    command_line->AppendSwitch(switches::kEnablePersistentGpuMemoryBuffer);
 
   if (IsForceGpuRasterizationEnabled())
     command_line->AppendSwitch(switches::kForceGpuRasterization);
 
+  gfx::BufferUsage buffer_usage = IsPersistentGpuMemoryBufferEnabled()
+                                      ? gfx::BufferUsage::PERSISTENT_MAP
+                                      : gfx::BufferUsage::MAP;
   std::vector<unsigned> image_targets(
       static_cast<size_t>(gfx::BufferFormat::LAST) + 1, GL_TEXTURE_2D);
   for (size_t format = 0;
        format < static_cast<size_t>(gfx::BufferFormat::LAST) + 1; format++) {
     image_targets[format] =
         BrowserGpuMemoryBufferManager::GetImageTextureTarget(
-            static_cast<gfx::BufferFormat>(format),
-            // TODO(danakj): When one-copy supports partial update, change
-            // this usage to PERSISTENT_MAP for one-copy.
-            gfx::BufferUsage::MAP);
+            static_cast<gfx::BufferFormat>(format), buffer_usage);
   }
   command_line->AppendSwitchASCII(switches::kContentImageTextureTarget,
                                   UintVectorToString(image_targets));
@@ -1256,8 +1254,10 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableNotifications,
     switches::kDisableOverlayScrollbar,
     switches::kDisablePermissionsAPI,
+    switches::kDisablePresentationAPI,
     switches::kDisablePinch,
     switches::kDisablePrefixedEncryptedMedia,
+    switches::kDisableRGBA4444Textures,
     switches::kDisableSeccompFilterSandbox,
     switches::kDisableSharedWorkers,
     switches::kDisableSlimmingPaint,
@@ -1282,6 +1282,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableExperimentalWebPlatformFeatures,
     switches::kEnableGPUClientLogging,
     switches::kEnableGpuClientTracing,
+    switches::kEnableGpuMemoryBufferVideoFrames,
     switches::kEnableGPUServiceLogging,
     switches::kEnableIconNtp,
     switches::kEnableLinkDisambiguationPopup,
@@ -1298,6 +1299,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnablePreciseMemoryInfo,
     switches::kEnablePreferCompositingToLCDText,
     switches::kEnablePushMessagePayload,
+    switches::kEnableRGBA4444Textures,
     switches::kEnableRendererMojoChannel,
     switches::kEnableRTCSmoothnessAlgorithm,
     switches::kEnableSeccompFilterSandbox,
@@ -1305,14 +1307,12 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableSlimmingPaint,
     switches::kEnableSlimmingPaintV2,
     switches::kEnableSmoothScrolling,
-    switches::kEnableStaleWhileRevalidate,
     switches::kEnableStatsTable,
     switches::kEnableThreadedCompositing,
     switches::kEnableTouchDragDrop,
     switches::kEnableTouchEditing,
     switches::kEnableUnsafeES3APIs,
     switches::kEnableViewport,
-    switches::kEnableViewportMeta,
     switches::kInvertViewportScrollOrder,
     switches::kEnableVtune,
     switches::kEnableWebBluetooth,
@@ -1366,7 +1366,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     cc::switches::kEnableBeginFrameScheduling,
     cc::switches::kEnableGpuBenchmarking,
     cc::switches::kEnableMainFrameBeforeActivation,
-    cc::switches::kMaxUnusedResourceMemoryUsagePercentage,
     cc::switches::kShowCompositedLayerBorders,
     cc::switches::kShowFPSCounter,
     cc::switches::kShowLayerAnimationBounds,
@@ -1378,8 +1377,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     cc::switches::kStrictLayerPropertyChangeChecking,
     cc::switches::kTopControlsHideThreshold,
     cc::switches::kTopControlsShowThreshold,
-
-    scheduler::switches::kDisableBlinkScheduler,
 
 #if defined(ENABLE_PLUGINS)
     switches::kEnablePepperTesting,
@@ -1396,7 +1393,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableLowEndDeviceMode,
 #if defined(OS_ANDROID)
     switches::kDisableGestureRequirementForMediaPlayback,
-    switches::kDisableWebRTC,
     switches::kDisableWebAudio,
     switches::kRendererWaitForJavaDebugger,
 #endif
@@ -1722,7 +1718,6 @@ void RenderProcessHostImpl::Cleanup() {
       io_surface_manager_token_.SetZero();
     }
 #endif
-
   }
 }
 
@@ -1816,7 +1811,7 @@ void RenderProcessHostImpl::AddFilter(BrowserMessageFilter* filter) {
 }
 
 bool RenderProcessHostImpl::FastShutdownForPageCount(size_t count) {
-  if (static_cast<size_t>(GetActiveViewCount()) == count)
+  if (GetActiveViewCount() == count)
     return FastShutdownIfPossible();
   return false;
 }
@@ -2170,8 +2165,8 @@ void RenderProcessHostImpl::ProcessDied(bool already_dead,
   // TODO(darin): clean this up
 }
 
-int RenderProcessHost::GetActiveViewCount() {
-  int num_active_views = 0;
+size_t RenderProcessHost::GetActiveViewCount() {
+  size_t num_active_views = 0;
   scoped_ptr<RenderWidgetHostIterator> widgets(
       RenderWidgetHost::GetRenderWidgetHosts());
   while (RenderWidgetHost* widget = widgets->GetNextHost()) {
@@ -2234,8 +2229,7 @@ void RenderProcessHostImpl::OnShutdownRequest() {
   // Don't shut down if there are active RenderViews, or if there are pending
   // RenderViews being swapped back in.
   // In single process mode, we never shutdown the renderer.
-  int num_active_views = GetActiveViewCount();
-  if (pending_views_ || num_active_views > 0 || run_renderer_in_process())
+  if (pending_views_ || run_renderer_in_process() || GetActiveViewCount() > 0)
     return;
 
   // Notify any contents that might have swapped out renderers from this

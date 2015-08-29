@@ -71,10 +71,10 @@ cr.define('options.network', function() {
 
   /**
    * The state of the cellular device or undefined if not available.
-   * @type {string|undefined}
+   * @type {?chrome.networkingPrivate.DeviceStateProperties}
    * @private
    */
-  var cellularDeviceState_ = undefined;
+  var cellularDevice_ = null;
 
   /**
    * The active cellular network or null if none.
@@ -467,25 +467,20 @@ cr.define('options.network', function() {
 
   /**
    * Returns true if |cellular| is a GSM network with no sim present.
-   * @param {?NetworkProperties} cellular The network state properties.
+   * @param {?chrome.networkingPrivate.DeviceStateProperties} cellularDevice
    * @return {boolean} Whether |network| is missing a SIM card.
    */
-  function isCellularSimAbsent(cellular) {
-    if (!cellular || !cellular.Cellular)
-      return false;
-    return cellular.Cellular.Family == 'GSM' && !cellular.Cellular.SIMPresent;
+  function isCellularSimAbsent(cellularDevice) {
+    return !!cellularDevice && cellularDevice.SimPresent === false;
   }
 
   /**
    * Returns true if |cellular| has a locked SIM card.
-   * @param {?NetworkProperties} cellular The network state properties.
+   * @param {?chrome.networkingPrivate.DeviceStateProperties} cellularDevice
    * @return {boolean} Whether |network| has a locked SIM card.
    */
-  function isCellularSimLocked(cellular) {
-    if (!cellular || !cellular.Cellular)
-      return false;
-    var simLockStatus = cellular.Cellular.SIMLockStatus;
-    return !!(simLockStatus && simLockStatus.LockType);
+  function isCellularSimLocked(cellularDevice) {
+    return !!cellularDevice && !!cellularDevice.SimLockType;
   }
 
   NetworkSelectorItem.prototype = {
@@ -551,7 +546,7 @@ cr.define('options.network', function() {
           data: {}
         });
       } else if (this.data_.key == 'Cellular') {
-        if (cellularDeviceState_ == 'Enabled' &&
+        if (cellularDevice_.State == 'Enabled' &&
             cellularNetwork_ && cellularNetwork_.Cellular &&
             cellularNetwork_.Cellular.SupportNetworkScan) {
           addendum.push({
@@ -636,21 +631,24 @@ cr.define('options.network', function() {
             label: loadTimeData.getString('turnOffWifi'),
             command: function() {
               sendChromeMetricsAction('Options_NetworkWifiToggle');
-              chrome.networkingPrivate.disableNetworkType('WiFi');
+              chrome.networkingPrivate.disableNetworkType(
+                  chrome.networkingPrivate.NetworkType.WI_FI);
             },
             data: {}});
         } else if (this.data_.key == 'WiMAX') {
           addendum.push({
             label: loadTimeData.getString('turnOffWimax'),
             command: function() {
-              chrome.networkingPrivate.disableNetworkType('WiMAX');
+              chrome.networkingPrivate.disableNetworkType(
+                  chrome.networkingPrivate.NetworkType.WI_MAX);
             },
             data: {}});
         } else if (this.data_.key == 'Cellular') {
           addendum.push({
             label: loadTimeData.getString('turnOffCellular'),
             command: function() {
-              chrome.networkingPrivate.disableNetworkType('Cellular');
+              chrome.networkingPrivate.disableNetworkType(
+                  chrome.networkingPrivate.NetworkType.CELLULAR);
             },
             data: {}});
         }
@@ -912,7 +910,9 @@ cr.define('options.network', function() {
     onNetworkListChanged_: function() {
       var networkList = this;
       chrome.networkingPrivate.getDeviceStates(function(deviceStates) {
-        var filter = { networkType: 'All' };
+        var filter = {
+          networkType: chrome.networkingPrivate.NetworkType.ALL
+        };
         chrome.networkingPrivate.getNetworks(filter, function(networkStates) {
           networkList.updateNetworkStates(deviceStates, networkStates);
         });
@@ -1105,29 +1105,15 @@ cr.define('options.network', function() {
     },
 
     /**
-     * Updates the state of a toggle button.
-     * @param {string} key Unique identifier for the element.
-     * @param {boolean} active Whether the control is active.
-     */
-    updateToggleControl: function(key, active) {
-      var index = this.indexOf(key);
-      if (index != undefined) {
-        var entry = this.dataModel.item(index);
-        entry.iconType = active ? 'control-active' : 'control-inactive';
-        this.update(entry);
-      }
-    },
-
-    /**
      * Updates the state of network devices and services.
-     * @param {!Array<{State: string, Type: string}>} deviceStates The result
-     *     from networkingPrivate.getDeviceStates.
+     * @param {!Array<!chrome.networkingPrivate.DeviceStateProperties>}
+     *     deviceStates The result from networkingPrivate.getDeviceStates.
      * @param {!Array<!chrome.networkingPrivate.NetworkStateProperties>}
      *     networkStates The result from networkingPrivate.getNetworks.
      */
     updateNetworkStates: function(deviceStates, networkStates) {
       // Update device states.
-      cellularDeviceState_ = undefined;
+      cellularDevice_ = null;
       wifiDeviceState_ = undefined;
       wimaxDeviceState_ = undefined;
       for (var i = 0; i < deviceStates.length; ++i) {
@@ -1135,7 +1121,7 @@ cr.define('options.network', function() {
         var type = device.Type;
         var state = device.State;
         if (type == 'Cellular')
-          cellularDeviceState_ = cellularDeviceState_ || state;
+          cellularDevice_ = cellularDevice_ || device;
         else if (type == 'WiFi')
           wifiDeviceState_ = wifiDeviceState_ || state;
         else if (type == 'WiMAX')
@@ -1211,16 +1197,17 @@ cr.define('options.network', function() {
       if (wifiDeviceState_ == 'Enabled')
         loadData_('WiFi', networkStates);
       else
-        addEnableNetworkButton_('WiFi');
+        addEnableNetworkButton_(chrome.networkingPrivate.NetworkType.WI_FI);
 
       // Only show cellular control if available.
-      if (cellularDeviceState_) {
-        if (cellularDeviceState_ == 'Enabled' &&
-            !isCellularSimLocked(cellularNetwork_) &&
-            !isCellularSimAbsent(cellularNetwork_)) {
+      if (cellularDevice_) {
+        if (cellularDevice_.State == 'Enabled' &&
+            !isCellularSimAbsent(cellularDevice_) &&
+            !isCellularSimLocked(cellularDevice_)) {
           loadData_('Cellular', networkStates);
         } else {
-          addEnableNetworkButton_('Cellular');
+          addEnableNetworkButton_(
+              chrome.networkingPrivate.NetworkType.CELLULAR);
         }
       } else {
         this.deleteItem('Cellular');
@@ -1231,7 +1218,7 @@ cr.define('options.network', function() {
         if (wimaxDeviceState_ == 'Enabled')
           loadData_('WiMAX', networkStates);
         else
-          addEnableNetworkButton_('WiMAX');
+          addEnableNetworkButton_(chrome.networkingPrivate.NetworkType.WI_MAX);
       } else {
         this.deleteItem('WiMAX');
       }
@@ -1246,19 +1233,19 @@ cr.define('options.network', function() {
 
   /**
    * Replaces a network menu with a button for enabling the network type.
-   * @param {string} type The type of network (WiFi, Cellular or Wimax).
+   * @param {chrome.networkingPrivate.NetworkType} type
    * @private
    */
   function addEnableNetworkButton_(type) {
     var subtitle = loadTimeData.getString('networkDisabled');
     var enableNetwork = function() {
-      if (type == 'WiFi')
+      if (type == chrome.networkingPrivate.NetworkType.WI_FI)
         sendChromeMetricsAction('Options_NetworkWifiToggle');
-      if (type == 'Cellular') {
-        if (isCellularSimLocked(cellularNetwork_)) {
+      if (type == chrome.networkingPrivate.NetworkType.CELLULAR) {
+        if (isCellularSimLocked(cellularDevice_)) {
           chrome.send('simOperation', ['unlock']);
           return;
-        } else if (isCellularSimAbsent(cellularNetwork_)) {
+        } else if (isCellularSimAbsent(cellularDevice_)) {
           chrome.send('simOperation', ['configure']);
           return;
         }

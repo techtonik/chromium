@@ -7,31 +7,31 @@
 #include "base/bind.h"
 #include "base/files/file_util.h"
 #include "base/prefs/pref_service.h"
-#include "chrome/browser/chromeos/drive/change_list_loader.h"
 #include "chrome/browser/chromeos/drive/directory_loader.h"
-#include "chrome/browser/chromeos/drive/file_cache.h"
-#include "chrome/browser/chromeos/drive/file_system/copy_operation.h"
-#include "chrome/browser/chromeos/drive/file_system/create_directory_operation.h"
-#include "chrome/browser/chromeos/drive/file_system/create_file_operation.h"
-#include "chrome/browser/chromeos/drive/file_system/download_operation.h"
-#include "chrome/browser/chromeos/drive/file_system/get_file_for_saving_operation.h"
-#include "chrome/browser/chromeos/drive/file_system/move_operation.h"
-#include "chrome/browser/chromeos/drive/file_system/open_file_operation.h"
-#include "chrome/browser/chromeos/drive/file_system/remove_operation.h"
-#include "chrome/browser/chromeos/drive/file_system/search_operation.h"
-#include "chrome/browser/chromeos/drive/file_system/set_property_operation.h"
-#include "chrome/browser/chromeos/drive/file_system/touch_operation.h"
-#include "chrome/browser/chromeos/drive/file_system/truncate_operation.h"
-#include "chrome/browser/chromeos/drive/file_system_core_util.h"
 #include "chrome/browser/chromeos/drive/file_system_observer.h"
-#include "chrome/browser/chromeos/drive/job_scheduler.h"
 #include "chrome/browser/chromeos/drive/remove_stale_cache_files.h"
-#include "chrome/browser/chromeos/drive/resource_entry_conversion.h"
 #include "chrome/browser/chromeos/drive/search_metadata.h"
 #include "chrome/browser/chromeos/drive/sync_client.h"
+#include "components/drive/change_list_loader.h"
 #include "components/drive/drive.pb.h"
 #include "components/drive/drive_pref_names.h"
+#include "components/drive/file_cache.h"
 #include "components/drive/file_change.h"
+#include "components/drive/file_system/copy_operation.h"
+#include "components/drive/file_system/create_directory_operation.h"
+#include "components/drive/file_system/create_file_operation.h"
+#include "components/drive/file_system/download_operation.h"
+#include "components/drive/file_system/get_file_for_saving_operation.h"
+#include "components/drive/file_system/move_operation.h"
+#include "components/drive/file_system/open_file_operation.h"
+#include "components/drive/file_system/remove_operation.h"
+#include "components/drive/file_system/search_operation.h"
+#include "components/drive/file_system/set_property_operation.h"
+#include "components/drive/file_system/touch_operation.h"
+#include "components/drive/file_system/truncate_operation.h"
+#include "components/drive/file_system_core_util.h"
+#include "components/drive/job_scheduler.h"
+#include "components/drive/resource_entry_conversion.h"
 #include "google_apis/drive/drive_api_parser.h"
 
 namespace drive {
@@ -206,6 +206,10 @@ void GetPathFromResourceIdAfterGetPath(base::FilePath* file_path,
 bool FreeDiskSpaceIfNeededForOnBlockingPool(internal::FileCache* cache,
                                             int64 num_bytes) {
   return cache->FreeDiskSpaceIfNeededFor(num_bytes);
+}
+
+uint64_t CalculateEvictableCacheSizeOnBlockingPool(internal::FileCache* cache) {
+  return cache->CalculateEvictableCacheSize();
 }
 
 // Excludes hosted documents from the given entries.
@@ -1043,5 +1047,14 @@ void FileSystem::FreeDiskSpaceIfNeededFor(
       blocking_task_runner_.get(), FROM_HERE,
       base::Bind(&FreeDiskSpaceIfNeededForOnBlockingPool, cache_, num_bytes),
       callback);
+}
+
+void FileSystem::CalculateEvictableCacheSize(
+    const EvictableCacheSizeCallback& callback) {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  DCHECK(!callback.is_null());
+  base::PostTaskAndReplyWithResult(
+      blocking_task_runner_.get(), FROM_HERE,
+      base::Bind(&CalculateEvictableCacheSizeOnBlockingPool, cache_), callback);
 }
 }  // namespace drive

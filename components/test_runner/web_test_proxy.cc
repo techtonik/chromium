@@ -42,7 +42,6 @@
 #include "third_party/WebKit/public/platform/WebURLResponse.h"
 #include "third_party/WebKit/public/web/WebAXEnums.h"
 #include "third_party/WebKit/public/web/WebAXObject.h"
-#include "third_party/WebKit/public/web/WebCachedURLRequest.h"
 #include "third_party/WebKit/public/web/WebConsoleMessage.h"
 #include "third_party/WebKit/public/web/WebDataSource.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
@@ -393,6 +392,7 @@ WebTestProxyBase::WebTestProxyBase()
 
 WebTestProxyBase::~WebTestProxyBase() {
   test_interfaces_->WindowClosed(this);
+  delegate_->OnWebTestProxyBaseDestroy(this);
 }
 
 void WebTestProxyBase::SetInterfaces(WebTestInterfaces* interfaces) {
@@ -1170,19 +1170,6 @@ void WebTestProxyBase::DidDispatchPingLoader(blink::WebLocalFrame* frame,
   if (test_interfaces_->GetTestRunner()->shouldDumpPingLoaderCallbacks())
     delegate_->PrintMessage(std::string("PingLoader dispatched to '") +
                             URLDescription(url).c_str() + "'.\n");
-}
-
-void WebTestProxyBase::WillRequestResource(
-    blink::WebLocalFrame* frame,
-    const blink::WebCachedURLRequest& request) {
-  if (test_interfaces_->GetTestRunner()->shouldDumpResourceRequestCallbacks()) {
-    PrintFrameDescription(delegate_, frame);
-    delegate_->PrintMessage(std::string(" - ") +
-                            request.initiatorName().utf8().data());
-    delegate_->PrintMessage(std::string(" requested '") +
-                            URLDescription(request.urlRequest().url()).c_str() +
-                            "'\n");
-  }
 }
 
 void WebTestProxyBase::WillSendRequest(

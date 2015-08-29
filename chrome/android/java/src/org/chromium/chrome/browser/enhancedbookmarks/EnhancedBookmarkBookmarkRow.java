@@ -9,12 +9,17 @@ import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.support.v4.graphics.drawable.RoundedBitmapDrawable;
 import android.support.v4.graphics.drawable.RoundedBitmapDrawableFactory;
+import android.text.format.Formatter;
 import android.util.AttributeSet;
+import android.view.View;
+import android.widget.TextView;
 
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkItem;
 import org.chromium.chrome.browser.enhancedbookmarks.EnhancedBookmarkManager.UIState;
 import org.chromium.chrome.browser.favicon.LargeIconBridge.LargeIconCallback;
+import org.chromium.chrome.browser.offlinepages.OfflinePageBridge;
+import org.chromium.chrome.browser.offlinepages.OfflinePageItem;
 import org.chromium.chrome.browser.widget.RoundedIconGenerator;
 import org.chromium.components.bookmarks.BookmarkId;
 
@@ -76,8 +81,24 @@ public class EnhancedBookmarkBookmarkRow extends EnhancedBookmarkRow implements 
         mUrl = item.getUrl();
         mIconImageView.setImageDrawable(null);
         mTitleView.setText(item.getTitle());
-        mDelegate.getModel().getLargeIcon(mUrl, mMinIconSize, this);
+        mDelegate.getLargeIconBridge().getLargeIconForUrl(mUrl, mMinIconSize, this);
+        updateOfflinePageSize(bookmarkId);
         return item;
+    }
+
+    private void updateOfflinePageSize(BookmarkId bookmarkId) {
+        OfflinePageItem offlinePage = null;
+        OfflinePageBridge bridge = mDelegate.getModel().getOfflinePageBridge();
+        if (mDelegate.getCurrentState() == UIState.STATE_FILTER && bridge != null) {
+            offlinePage = bridge.getPageByBookmarkId(bookmarkId);
+        }
+        TextView textView = (TextView) findViewById(R.id.offline_page_size);
+        if (offlinePage != null) {
+            textView.setText(Formatter.formatFileSize(getContext(), offlinePage.getFileSize()));
+            textView.setVisibility(View.VISIBLE);
+        } else {
+            textView.setVisibility(View.GONE);
+        }
     }
 
     // LargeIconCallback implementation.
@@ -91,7 +112,7 @@ public class EnhancedBookmarkBookmarkRow extends EnhancedBookmarkRow implements 
         } else {
             RoundedBitmapDrawable roundedIcon = RoundedBitmapDrawableFactory.create(
                     getResources(),
-                    Bitmap.createScaledBitmap(icon, mDisplayedIconSize, mDisplayedIconSize, true));
+                    Bitmap.createScaledBitmap(icon, mDisplayedIconSize, mDisplayedIconSize, false));
             roundedIcon.setCornerRadius(mCornerRadius);
             mIconImageView.setImageDrawable(roundedIcon);
         }

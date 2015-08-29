@@ -11,7 +11,7 @@
 
     # Note: sources list duplicated in GN build. In the GN build,
     # each component has its own unit tests target defined in its
-    # directory that are then linked into the final content_unittests.
+    # directory that are then linked into the final components_unittests.
     'auto_login_parser_unittest_sources': [
       'auto_login_parser/auto_login_parser_unittest.cc',
     ],
@@ -19,13 +19,9 @@
       'autofill/content/browser/content_autofill_driver_unittest.cc',
       'autofill/content/browser/request_autocomplete_manager_unittest.cc',
       'autofill/content/browser/wallet/full_wallet_unittest.cc',
-      'autofill/content/browser/wallet/instrument_unittest.cc',
       'autofill/content/browser/wallet/real_pan_wallet_client_unittest.cc',
       'autofill/content/browser/wallet/wallet_address_unittest.cc',
-      'autofill/content/browser/wallet/wallet_client_unittest.cc',
-      'autofill/content/browser/wallet/wallet_items_unittest.cc',
       'autofill/content/browser/wallet/wallet_service_url_unittest.cc',
-      'autofill/content/browser/wallet/wallet_signin_helper_unittest.cc',
       'autofill/content/renderer/renderer_save_password_progress_logger_unittest.cc',
       'autofill/core/browser/address_field_unittest.cc',
       'autofill/core/browser/address_i18n_unittest.cc',
@@ -85,6 +81,9 @@
       'browser_watcher/watcher_metrics_provider_win_unittest.cc',
       'browser_watcher/window_hang_monitor_win_unittest.cc',
     ],
+    'bubble_unittest_sources': [
+      'bubble/bubble_manager_unittest.cc',
+    ],
     'captive_portal_unittest_sources': [
       'captive_portal/captive_portal_detector_unittest.cc',
     ],
@@ -95,6 +94,9 @@
     'component_updater_unittest_sources': [
       'component_updater/component_updater_service_unittest.cc',
       'component_updater/timer_unittest.cc',
+    ],
+    'compression_unittest_sources': [
+      'compression/compression_utils_unittest.cc',
     ],
     'content_settings_unittest_sources': [
       'content_settings/core/browser/content_settings_mock_provider.cc',
@@ -189,7 +191,6 @@
       'undo/undo_manager_test.cc',
     ],
 
-    # Note: GN tests converted to here, need to do the rest.
     'audio_modem_unittest_sources': [
       'audio_modem/audio_player_unittest.cc',
       'audio_modem/audio_recorder_unittest.cc',
@@ -224,6 +225,7 @@
       'feedback/feedback_uploader_unittest.cc',
     ],
     'gcm_driver_unittest_sources': [
+      'gcm_driver/gcm_account_tracker_unittest.cc',
       'gcm_driver/gcm_account_mapper_unittest.cc',
       'gcm_driver/gcm_channel_status_request_unittest.cc',
       'gcm_driver/gcm_client_impl_unittest.cc',
@@ -302,9 +304,14 @@
     'login_unittest_sources': [
       'login/screens/screen_context_unittest.cc',
     ],
+    'memory_pressure_unittest_sources': [
+      'memory_pressure/direct_memory_pressure_calculator_win_unittest.cc',
+      'memory_pressure/filtered_memory_pressure_calculator_unittest.cc',
+      'memory_pressure/test_memory_pressure_calculator.cc',
+      'memory_pressure/test_memory_pressure_calculator.h',
+    ],
     'metrics_unittest_sources': [
       'metrics/call_stack_profile_metrics_provider_unittest.cc',
-      'metrics/compression_utils_unittest.cc',
       'metrics/daily_event_unittest.cc',
       'metrics/drive_metrics_provider_unittest.cc',
       'metrics/gpu/gpu_metrics_provider_unittest.cc',
@@ -496,6 +503,7 @@
       'proximity_auth/proximity_monitor_impl_unittest.cc',
       'proximity_auth/remote_status_update_unittest.cc',
       'proximity_auth/throttled_bluetooth_connection_finder_unittest.cc',
+      'proximity_auth/unlock_manager_unittest.cc',
       'proximity_auth/wire_message_unittest.cc',
     ],
     'proxy_config_unittest_sources': [
@@ -539,6 +547,7 @@
       'scheduler/child/worker_scheduler_impl_unittest.cc',
       'scheduler/renderer/deadline_task_runner_unittest.cc',
       'scheduler/renderer/renderer_scheduler_impl_unittest.cc',
+      'scheduler/renderer/task_cost_estimator_unittest.cc',
       'scheduler/renderer/webthread_impl_for_renderer_scheduler_unittest.cc',
       'scheduler/test/test_always_fail_time_source.cc',
       'scheduler/test/test_always_fail_time_source.h',
@@ -576,6 +585,7 @@
       'signin/core/browser/refresh_token_annotation_request_unittest.cc',
       'signin/core/browser/signin_error_controller_unittest.cc',
       'signin/core/browser/webdata/token_service_table_unittest.cc',
+      'signin/ios/browser/account_consistency_service_unittest.mm',
       'signin/ios/browser/profile_oauth2_token_service_ios_delegate_unittest.mm',
     ],
     'storage_monitor_unittest_sources': [
@@ -599,6 +609,7 @@
       'sync_driver/data_type_manager_impl_unittest.cc',
       'sync_driver/device_info_data_type_controller_unittest.cc',
       'sync_driver/device_info_sync_service_unittest.cc',
+      'sync_driver/favicon_cache_unittest.cc',
       'sync_driver/generic_change_processor_unittest.cc',
       'sync_driver/model_association_manager_unittest.cc',
       'sync_driver/non_blocking_data_type_controller_unittest.cc',
@@ -606,6 +617,7 @@
       'sync_driver/shared_change_processor_unittest.cc',
       'sync_driver/sync_policy_handler_unittest.cc',
       'sync_driver/sync_prefs_unittest.cc',
+      'sync_driver/sync_stopped_reporter_unittest.cc',
       'sync_driver/system_encryptor_unittest.cc',
       'sync_driver/tab_node_pool_unittest.cc',
       'sync_driver/ui_data_type_controller_unittest.cc',
@@ -619,6 +631,7 @@
       'translate/core/common/translate_metrics_unittest.cc',
       'translate/core/common/translate_util_unittest.cc',
       'translate/core/language_detection/language_detection_util_unittest.cc',
+      # TODO(GYP) bug 523060: these translate tests on iOS.
       'translate/ios/browser/js_translate_manager_unittest.mm',
       'translate/ios/browser/language_detection_controller_unittest.mm',
       'translate/ios/browser/translate_controller_unittest.mm',
@@ -655,12 +668,16 @@
       'variations/active_field_trials_unittest.cc',
       'variations/caching_permuted_entropy_provider_unittest.cc',
       'variations/entropy_provider_unittest.cc',
+      'variations/experiment_labels_unittest.cc',
       'variations/metrics_util_unittest.cc',
       'variations/net/variations_http_header_provider_unittest.cc',
       'variations/study_filtering_unittest.cc',
       'variations/variations_associated_data_unittest.cc',
+      'variations/variations_request_scheduler_mobile_unittest.cc',
+      'variations/variations_request_scheduler_unittest.cc',
       'variations/variations_seed_processor_unittest.cc',
       'variations/variations_seed_simulator_unittest.cc',
+      'variations/variations_seed_store_unittest.cc',
     ],
     'visitedlink_unittest_sources': [
       'visitedlink/test/visitedlink_unittest.cc',
@@ -737,9 +754,11 @@
         '<@(autofill_unittest_sources)',
         '<@(bookmarks_unittest_sources)',
         '<@(browser_watcher_unittest_sources)',
+        '<@(bubble_unittest_sources)',
         '<@(captive_portal_unittest_sources)',
         '<@(cloud_devices_unittest_sources)',
         '<@(component_updater_unittest_sources)',
+        '<@(compression_unittest_sources)',
         '<@(content_settings_unittest_sources)',
         '<@(crash_unittest_sources)',
         '<@(crx_file_unittest_sources)',
@@ -760,6 +779,7 @@
         '<@(language_usage_metrics_unittest_sources)',
         '<@(leveldb_proto_unittest_sources)',
         '<@(login_unittest_sources)',
+        '<@(memory_pressure_unittest_sources)',
         '<@(metrics_unittest_sources)',
         '<@(mime_util_unittest_sources)',
         '<@(network_time_unittest_sources)',
@@ -830,13 +850,14 @@
         'components.gyp:bookmarks_browser',
         'components.gyp:bookmarks_managed',
         'components.gyp:bookmarks_test_support',
+        'components.gyp:bubble',
         'components.gyp:captive_portal_test_support',
         'components.gyp:cloud_devices_common',
         'components.gyp:component_updater',
+        'components.gyp:compression',
         'components.gyp:content_settings_core_browser',
         'components.gyp:content_settings_core_common',
         'components.gyp:content_settings_core_test_support',
-        'components.gyp:crash_test_support',
         'components.gyp:crx_file',
         'components.gyp:data_reduction_proxy_core_browser',
         'components.gyp:data_reduction_proxy_core_common',
@@ -865,6 +886,7 @@
         'components.gyp:leveldb_proto',
         'components.gyp:leveldb_proto_test_support',
         'components.gyp:login',
+        'components.gyp:memory_pressure',
         'components.gyp:metrics',
         'components.gyp:metrics_gpu',
         'components.gyp:metrics_net',
@@ -984,6 +1006,7 @@
             'components.gyp:autofill_content_browser',
             'components.gyp:autofill_content_renderer',
             'components.gyp:autofill_content_test_support',
+            'components.gyp:crash_test_support',
             'components.gyp:data_reduction_proxy_content_browser',
             'components.gyp:devtools_http_handler',
             'components.gyp:dom_distiller_content_browser',
@@ -1157,6 +1180,9 @@
             '<@(copresence_unittest_sources)',
             '<@(feedback_unittest_sources)',
             '<@(proximity_auth_unittest_sources)',
+          ],
+          'sources!': [
+            'variations/variations_request_scheduler_mobile_unittest.cc',
           ],
           'dependencies': [
             '../device/bluetooth/bluetooth.gyp:device_bluetooth_mocks',
@@ -1438,6 +1464,7 @@
             'HAS_OUT_OF_PROC_TEST_RUNNER',
           ],
           'sources': [
+            # Note: test list duplicated in GN build.
             'autofill/content/browser/risk/fingerprint_browsertest.cc',
             'autofill/content/renderer/password_form_conversion_utils_browsertest.cc',
             'dom_distiller/content/browser/distillable_page_utils_browsertest.cc',

@@ -12,7 +12,7 @@ import android.util.Log;
 import org.chromium.base.ActivityState;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.test.util.Feature;
-import org.chromium.chrome.shell.ChromeShellActivity;
+import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.test.util.browser.sync.SyncTestUtil;
 import org.chromium.content.browser.ContentViewCore;
 import org.chromium.content.browser.test.util.Criteria;
@@ -20,7 +20,6 @@ import org.chromium.content.browser.test.util.CriteriaHelper;
 import org.chromium.content.browser.test.util.JavaScriptUtils;
 import org.chromium.sync.AndroidSyncSettings;
 import org.chromium.sync.signin.AccountManagerHelper;
-import org.chromium.sync.signin.ChromeSigninController;
 
 import java.util.concurrent.TimeoutException;
 
@@ -29,16 +28,6 @@ import java.util.concurrent.TimeoutException;
  */
 public class SyncTest extends SyncTestBase {
     private static final String TAG = "SyncTest";
-
-    /**
-     * This is a regression test for http://crbug.com/475299.
-     */
-    @LargeTest
-    @Feature({"Sync"})
-    public void testGcmInitialized() throws Throwable {
-        setupTestAccountAndSignInToSync(CLIENT_ID);
-        assertTrue(ChromeSigninController.get(mContext).isGcmInitialized());
-    }
 
     @LargeTest
     @Feature({"Sync"})
@@ -80,7 +69,7 @@ public class SyncTest extends SyncTestBase {
     public void testAboutSyncPageDisplaysCurrentSyncStatus() throws InterruptedException {
         setupTestAccountAndSignInToSync(CLIENT_ID);
 
-        loadUrlWithSanitization("chrome://sync");
+        loadUrl("chrome://sync");
         SyncTestUtil.AboutSyncInfoGetter aboutInfoGetter =
                 new SyncTestUtil.AboutSyncInfoGetter(getActivity());
         try {
@@ -169,7 +158,7 @@ public class SyncTest extends SyncTestBase {
         SyncTestUtil.verifySyncIsActiveForAccount(mContext, account);
     }
 
-    private static ContentViewCore getContentViewCore(ChromeShellActivity activity) {
-        return activity.getActiveContentViewCore();
+    private static ContentViewCore getContentViewCore(ChromeActivity activity) {
+        return activity.getActivityTab().getContentViewCore();
     }
 }

@@ -97,36 +97,27 @@ TEST_F(IOThreadTest, SpdyFieldTrialHoldbackEnabled) {
 }
 
 TEST_F(IOThreadTest, SpdyFieldTrialSpdy31Enabled) {
-  bool use_alternate_protocols = false;
   field_trial_group_ = "Spdy31Enabled";
   ConfigureSpdyGlobals();
   EXPECT_THAT(globals_.next_protos,
               ElementsAre(net::kProtoHTTP11,
                           net::kProtoSPDY31));
-  globals_.use_alternate_protocols.CopyToIfSet(&use_alternate_protocols);
-  EXPECT_TRUE(use_alternate_protocols);
 }
 
 TEST_F(IOThreadTest, SpdyFieldTrialSpdy4Enabled) {
-  bool use_alternate_protocols = false;
   field_trial_group_ = "Spdy4Enabled";
   ConfigureSpdyGlobals();
-  EXPECT_THAT(globals_.next_protos,
-              ElementsAre(net::kProtoHTTP11, net::kProtoSPDY31,
-                          net::kProtoHTTP2_14, net::kProtoHTTP2));
-  globals_.use_alternate_protocols.CopyToIfSet(&use_alternate_protocols);
-  EXPECT_TRUE(use_alternate_protocols);
+  EXPECT_THAT(
+      globals_.next_protos,
+      ElementsAre(net::kProtoHTTP11, net::kProtoSPDY31, net::kProtoHTTP2));
 }
 
 TEST_F(IOThreadTest, SpdyFieldTrialDefault) {
   field_trial_group_ = "";
   ConfigureSpdyGlobals();
-  EXPECT_THAT(globals_.next_protos,
-              ElementsAre(net::kProtoHTTP11, net::kProtoSPDY31,
-                          net::kProtoHTTP2_14, net::kProtoHTTP2));
-  bool use_alternate_protocols = false;
-  globals_.use_alternate_protocols.CopyToIfSet(&use_alternate_protocols);
-  EXPECT_TRUE(use_alternate_protocols);
+  EXPECT_THAT(
+      globals_.next_protos,
+      ElementsAre(net::kProtoHTTP11, net::kProtoSPDY31, net::kProtoHTTP2));
 }
 
 TEST_F(IOThreadTest, SpdyFieldTrialParametrized) {
@@ -137,9 +128,6 @@ TEST_F(IOThreadTest, SpdyFieldTrialParametrized) {
   ConfigureSpdyGlobals();
   EXPECT_THAT(globals_.next_protos,
               ElementsAre(net::kProtoHTTP11, net::kProtoHTTP2));
-  bool use_alternate_protocols = false;
-  globals_.use_alternate_protocols.CopyToIfSet(&use_alternate_protocols);
-  EXPECT_TRUE(use_alternate_protocols);
 }
 
 TEST_F(IOThreadTest, SpdyCommandLineUseSpdyOff) {
@@ -148,14 +136,6 @@ TEST_F(IOThreadTest, SpdyCommandLineUseSpdyOff) {
   field_trial_group_ = "Spdy4Enabled";
   ConfigureSpdyGlobals();
   EXPECT_EQ(0u, globals_.next_protos.size());
-}
-
-TEST_F(IOThreadTest, SpdyCommandLineUseSpdyDisableAltProtocols) {
-  command_line_.AppendSwitchASCII("use-spdy", "no-alt-protocols");
-  ConfigureSpdyGlobals();
-  bool use_alternate_protocols = true;
-  globals_.use_alternate_protocols.CopyToIfSet(&use_alternate_protocols);
-  EXPECT_FALSE(use_alternate_protocols);
 }
 
 TEST_F(IOThreadTest, DisableQuicByDefault) {
@@ -189,6 +169,7 @@ TEST_F(IOThreadTest, EnableQuicFromFieldTrialGroup) {
   EXPECT_FALSE(params.quic_enable_non_blocking_io);
   EXPECT_FALSE(params.quic_disable_disk_cache);
   EXPECT_FALSE(params.quic_prefer_aes);
+  EXPECT_FALSE(params.use_alternative_services);
   EXPECT_EQ(0, params.quic_max_number_of_lossy_connections);
   EXPECT_EQ(1.0f, params.quic_packet_loss_threshold);
   EXPECT_FALSE(IOThread::ShouldEnableQuicForDataReductionProxy());
@@ -380,6 +361,16 @@ TEST_F(IOThreadTest, QuicPreferAes) {
   net::HttpNetworkSession::Params params;
   InitializeNetworkSessionParams(&params);
   EXPECT_TRUE(params.quic_prefer_aes);
+}
+
+TEST_F(IOThreadTest, QuicEnableAlternativeServicesFromFieldTrialParams) {
+  field_trial_group_ = "Enabled";
+  field_trial_params_["use_alternative_services"] = "true";
+
+  ConfigureQuicGlobals();
+  net::HttpNetworkSession::Params params;
+  InitializeNetworkSessionParams(&params);
+  EXPECT_TRUE(params.use_alternative_services);
 }
 
 TEST_F(IOThreadTest, QuicMaxNumberOfLossyConnectionsFieldTrialParams) {

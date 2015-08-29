@@ -28,10 +28,11 @@
 #include "ui/gfx/geometry/rect.h"
 
 @class AvatarBaseController;
+class BookmarkBubbleObserverCocoa;
 class Browser;
 class BrowserWindow;
 class BrowserWindowCocoa;
-@class BrowserWindowEnterFullscreenTransition;
+@class BrowserWindowFullscreenTransition;
 @class DevToolsController;
 @class DownloadShelfController;
 class ExtensionKeybindingRegistryCocoa;
@@ -82,8 +83,8 @@ class Command;
   base::scoped_nsobject<PresentationModeController> presentationModeController_;
   base::scoped_nsobject<ExclusiveAccessBubbleWindowController>
       exclusiveAccessBubbleWindowController_;
-  base::scoped_nsobject<BrowserWindowEnterFullscreenTransition>
-      enterFullscreenTransition_;
+  base::scoped_nsobject<BrowserWindowFullscreenTransition>
+      fullscreenTransition_;
 
   // Strong. StatusBubble is a special case of a strong reference that
   // we don't wrap in a scoped_ptr because it is acting the same
@@ -91,6 +92,7 @@ class Command;
   // be shut down before our destructors are called.
   StatusBubbleMac* statusBubble_;
 
+  scoped_ptr<BookmarkBubbleObserverCocoa> bookmarkBubbleObserver_;
   BookmarkBubbleController* bookmarkBubbleController_;  // Weak.
   BOOL initializing_;  // YES while we are currently in initWithBrowser:
   BOOL ownsBrowser_;  // Only ever NO when testing
@@ -131,6 +133,11 @@ class Command;
   // to indicate that the window is in the process of transitioning into
   // AppKit fullscreen mode.
   BOOL enteringAppKitFullscreen_;
+
+  // True between |-windowWillExitFullScreen:| and |-windowDidExitFullScreen:|
+  // to indicate that the window is in the process of transitioning out of
+  // AppKit fullscreen mode.
+  BOOL exitingAppKitFullscreen_;
 
   // True between |enterImmersiveFullscreen| and |-windowDidEnterFullScreen:|
   // to indicate that the window is in the process of transitioning into
@@ -175,9 +182,6 @@ class Command;
   // The Extension Command Registry used to determine which keyboard events to
   // handle.
   scoped_ptr<ExtensionKeybindingRegistryCocoa> extension_keybinding_registry_;
-
-  // Whether the root view of the window is layer backed.
-  BOOL windowViewWantsLayer_;
 }
 
 // A convenience class method which gets the |BrowserWindowController| for a
@@ -354,6 +358,9 @@ class Command;
 // Return the point to which a bubble window's arrow should point, in window
 // coordinates.
 - (NSPoint)bookmarkBubblePoint;
+
+// Called by BookmarkBubbleObserverCocoa when the bubble is closed.
+- (void)bookmarkBubbleClosed;
 
 // Called when the Add Search Engine dialog is closed.
 - (void)sheetDidEnd:(NSWindow*)sheet

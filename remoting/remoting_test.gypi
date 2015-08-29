@@ -161,7 +161,7 @@
       ],
       'sources': [
         'test/app_remoting_test_driver.cc',
-        'test/app_remoting_test_driver_environment_app_details.cc',
+        'test/app_remoting_sample_test_driver_environment.cc',
       ],
     },  # end of target 'ar_sample_test_driver'
 
@@ -214,7 +214,6 @@
         'base/capabilities_unittest.cc',
         'base/compound_buffer_unittest.cc',
         'base/rate_counter_unittest.cc',
-        'base/resources_unittest.cc',
         'base/rsa_key_pair_unittest.cc',
         'base/run_all_unittests.cc',
         'base/running_average_unittest.cc',
@@ -228,6 +227,7 @@
         'client/normalizing_input_filter_cros_unittest.cc',
         'client/normalizing_input_filter_mac_unittest.cc',
         'client/server_log_entry_client_unittest.cc',
+        'client/software_video_renderer_unittest.cc',
         'client/touch_input_scaler_unittest.cc',
         'codec/audio_encoder_opus_unittest.cc',
         'codec/codec_test.cc',
@@ -277,6 +277,7 @@
         'host/register_support_host_request_unittest.cc',
         'host/remote_input_filter_unittest.cc',
         'host/resizing_host_observer_unittest.cc',
+        'host/resources_unittest.cc',
         'host/screen_resolution_unittest.cc',
         'host/server_log_entry_host_unittest.cc',
         'host/setup/me2me_native_messaging_host.cc',
@@ -316,6 +317,7 @@
         'protocol/message_reader_unittest.cc',
         'protocol/monitored_video_stub_unittest.cc',
         'protocol/mouse_input_filter_unittest.cc',
+        'protocol/quic_channel_factory_unittest.cc',
         'protocol/negotiating_authenticator_unittest.cc',
         'protocol/pairing_registry_unittest.cc',
         'protocol/port_range_unittest.cc',
@@ -335,24 +337,13 @@
         'signaling/xmpp_signal_strategy_unittest.cc',
         'test/access_token_fetcher_unittest.cc',
         'test/app_remoting_report_issue_request_unittest.cc',
+        'test/app_remoting_test_driver_environment_unittest.cc',
         'test/chromoting_test_driver_environment_unittest.cc',
         'test/connection_time_observer_unittest.cc',
         'test/host_list_fetcher_unittest.cc',
         'test/remote_host_info_fetcher_unittest.cc',
         'test/test_chromoting_client_unittest.cc',
         'test/test_video_renderer_unittest.cc',
-
-        # TODO(sergeyu): app_remoting_test_driver_environment_unittest.cc
-        # depends on ar_test_driver_common target and that target implicitly
-        # depends on app_remoting_test_driver_environment_app_details.cc to
-        # allow some parameters to be overridden (i.e. *app_details.cc file can
-        # be replace with a different one). This means that app_deails.cc file
-        # has to be included here explicitly. Fix
-        # app_remoting_test_driver_environment.cc to avoid this implicit
-        # dependency on *app_details.cc .
-        # http://crbug.com/510887
-        'test/app_remoting_test_driver_environment_app_details.cc',
-        'test/app_remoting_test_driver_environment_unittest.cc',
       ],
       'conditions': [
         [ 'OS=="win"', {
@@ -400,7 +391,6 @@
           'sources/': [
             ['exclude', '^codec/'],
             ['exclude', '^host/'],
-            ['exclude', '^base/resources_unittest\\.cc$'],
           ]
         }],
         [ 'OS == "linux" and use_allocator!="none"', {

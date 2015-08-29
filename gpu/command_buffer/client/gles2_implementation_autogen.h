@@ -807,9 +807,15 @@ void EndTransformFeedback() override;
 
 void GetQueryivEXT(GLenum target, GLenum pname, GLint* params) override;
 
+void GetQueryObjectivEXT(GLuint id, GLenum pname, GLint* params) override;
+
 void GetQueryObjectuivEXT(GLuint id, GLenum pname, GLuint* params) override;
 
+void GetQueryObjecti64vEXT(GLuint id, GLenum pname, GLint64* params) override;
+
 void GetQueryObjectui64vEXT(GLuint id, GLenum pname, GLuint64* params) override;
+
+void SetDisjointValueSyncCHROMIUM() override;
 
 void InsertEventMarkerEXT(GLsizei length, const GLchar* marker) override;
 
@@ -948,6 +954,16 @@ void CompressedCopyTextureCHROMIUM(GLenum target,
                                    GLenum source_id,
                                    GLenum dest_id) override;
 
+void CompressedCopySubTextureCHROMIUM(GLenum target,
+                                      GLenum source_id,
+                                      GLenum dest_id,
+                                      GLint xoffset,
+                                      GLint yoffset,
+                                      GLint x,
+                                      GLint y,
+                                      GLsizei width,
+                                      GLsizei height) override;
+
 void DrawArraysInstancedANGLE(GLenum mode,
                               GLint first,
                               GLsizei count,
@@ -1002,30 +1018,6 @@ void TraceBeginCHROMIUM(const char* category_name,
                         const char* trace_name) override;
 
 void TraceEndCHROMIUM() override;
-
-void AsyncTexSubImage2DCHROMIUM(GLenum target,
-                                GLint level,
-                                GLint xoffset,
-                                GLint yoffset,
-                                GLsizei width,
-                                GLsizei height,
-                                GLenum format,
-                                GLenum type,
-                                const void* data) override;
-
-void AsyncTexImage2DCHROMIUM(GLenum target,
-                             GLint level,
-                             GLenum internalformat,
-                             GLsizei width,
-                             GLsizei height,
-                             GLint border,
-                             GLenum format,
-                             GLenum type,
-                             const void* pixels) override;
-
-void WaitAsyncTexImage2DCHROMIUM(GLenum target) override;
-
-void WaitAllAsyncTexImage2DCHROMIUM() override;
 
 void DiscardFramebufferEXT(GLenum target,
                            GLsizei count,

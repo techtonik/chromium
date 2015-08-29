@@ -39,6 +39,11 @@ bool ContentBrowserClient::ShouldUseProcessPerSite(
   return false;
 }
 
+bool ContentBrowserClient::ShouldLockToOrigin(BrowserContext* browser_context,
+                                              const GURL& effective_url) {
+  return true;
+}
+
 net::URLRequestContextGetter* ContentBrowserClient::CreateRequestContext(
     BrowserContext* browser_context,
     ProtocolHandlerMap* protocol_handlers,
@@ -63,6 +68,12 @@ bool ContentBrowserClient::IsHandledURL(const GURL& url) {
 bool ContentBrowserClient::CanCommitURL(RenderProcessHost* process_host,
                                         const GURL& site_url) {
   return true;
+}
+
+bool ContentBrowserClient::IsIllegalOrigin(ResourceContext* resource_context,
+                                           int child_process_id,
+                                           const GURL& origin) {
+  return false;
 }
 
 bool ContentBrowserClient::ShouldAllowOpenURL(SiteInstance* site_instance,
@@ -283,6 +294,10 @@ base::FilePath ContentBrowserClient::GetDefaultDownloadDirectory() {
 
 std::string ContentBrowserClient::GetDefaultDownloadName() {
   return std::string();
+}
+
+base::FilePath ContentBrowserClient::GetShaderDiskCacheDirectory() {
+  return base::FilePath();
 }
 
 BrowserPpapiHost*

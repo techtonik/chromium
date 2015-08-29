@@ -12,6 +12,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityEvent;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -25,41 +26,26 @@ import org.chromium.ui.gfx.DeviceDisplayInfo;
  * below the content area.
  */
 public class AutofillKeyboardAccessory extends LinearLayout
-        implements WindowAndroid.KeyboardVisibilityListener, View.OnClickListener {
+        implements WindowAndroid.KeyboardVisibilityListener, View.OnClickListener,
+        View.OnLongClickListener {
     private final WindowAndroid mWindowAndroid;
-    private final AutofillKeyboardAccessoryDelegate mAutofillCallback;
+    private final AutofillDelegate mAutofillDelegate;
     private final int mMaximumLabelWidthPx;
     private final int mMaximumSublabelWidthPx;
 
     /**
-     * An interface to handle the touch interaction with an AutofillKeyboardAccessory object.
-     */
-    public interface AutofillKeyboardAccessoryDelegate {
-        /**
-         * Informs the controller the AutofillKeyboardAccessory was hidden.
-         */
-        public void dismissed();
-
-        /**
-         * Handles the selection of an Autofill suggestion from an AutofillKeyboardAccessory.
-         * @param listIndex The index of the selected Autofill suggestion.
-         */
-        public void suggestionSelected(int listIndex);
-    }
-
-    /**
      * Creates an AutofillKeyboardAccessory with specified parameters.
      * @param windowAndroid The owning WindowAndroid.
-     * @param autofillCallback A object that handles the calls to the native
-     * AutofillKeyboardAccessoryView.
+     * @param autofillDelegate A object that handles the calls to the native
+     *                         AutofillKeyboardAccessoryView.
      */
     public AutofillKeyboardAccessory(
-            WindowAndroid windowAndroid, AutofillKeyboardAccessoryDelegate autofillCallback) {
+            WindowAndroid windowAndroid, AutofillDelegate autofillDelegate) {
         super(windowAndroid.getActivity().get());
-        assert autofillCallback != null;
+        assert autofillDelegate != null;
         assert windowAndroid.getActivity().get() != null;
         mWindowAndroid = windowAndroid;
-        mAutofillCallback = autofillCallback;
+        mAutofillDelegate = autofillDelegate;
 
         int deviceWidthPx = DeviceDisplayInfo.create(getContext()).getDisplayWidth();
         mMaximumLabelWidthPx = deviceWidthPx / 2;
@@ -81,23 +67,38 @@ public class AutofillKeyboardAccessory extends LinearLayout
     @SuppressLint("InlinedApi")
     public void showWithSuggestions(AutofillSuggestion[] suggestions, boolean isRtl) {
         removeAllViews();
-        for (AutofillSuggestion suggestion : suggestions) {
-            View touchTarget = LayoutInflater.from(getContext()).inflate(
-                    R.layout.autofill_keyboard_accessory_item, this, false);
-            touchTarget.setOnClickListener(this);
-            TextView label = (TextView) touchTarget.findViewById(
-                    R.id.autofill_keyboard_accessory_item_label);
-            label.setMaxWidth(mMaximumLabelWidthPx);
+        int separatorPosition = -1;
+        for (int i = 0; i < suggestions.length; i++) {
+            AutofillSuggestion suggestion = suggestions[i];
+            assert !TextUtils.isEmpty(suggestion.getLabel());
 
-            if (suggestion.getIconId() != 0) {
-                ApiCompatibilityUtils.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                        label, suggestion.getIconId(), 0, 0, 0);
-            }
+            // Negative suggestion ID indiciates a tool like "settings" or "scan credit card."
+            // Non-negative suggestion ID indicates suggestions that can be filled into the form.
+            View touchTarget;
+            if (suggestion.getSuggestionId() < 0 && suggestion.getIconId() != 0) {
+                touchTarget = LayoutInflater.from(getContext()).inflate(
+                        R.layout.autofill_keyboard_accessory_icon, this, false);
 
-            if (!TextUtils.isEmpty(suggestion.getLabel())) {
+                if (separatorPosition == -1) separatorPosition = i;
+
+                ImageView icon = (ImageView) touchTarget;
+                icon.setImageResource(suggestion.getIconId());
+                icon.setContentDescription(suggestion.getLabel());
+            } else {
+                touchTarget = LayoutInflater.from(getContext()).inflate(
+                        R.layout.autofill_keyboard_accessory_item, this, false);
+
+                TextView label = (TextView) touchTarget.findViewById(
+                        R.id.autofill_keyboard_accessory_item_label);
+                label.setMaxWidth(mMaximumLabelWidthPx);
                 label.setText(suggestion.getLabel());
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
                     label.setTypeface(Typeface.DEFAULT_BOLD);
+                }
+
+                if (suggestion.getIconId() != 0) {
+                    ApiCompatibilityUtils.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                            label, suggestion.getIconId(), 0, 0, 0);
                 }
 
                 if (!TextUtils.isEmpty(suggestion.getSublabel())) {
@@ -109,7 +110,19 @@ public class AutofillKeyboardAccessory extends LinearLayout
                 }
             }
 
+            touchTarget.setTag(i);
+            touchTarget.setOnClickListener(this);
+            if (suggestion.isDeletable()) {
+                touchTarget.setOnLongClickListener(this);
+            }
+
             addView(touchTarget);
+        }
+
+        if (separatorPosition != -1) {
+            View separator = new View(getContext());
+            separator.setLayoutParams(new LinearLayout.LayoutParams(0, 0, 1));
+            addView(separator, separatorPosition);
         }
 
         ApiCompatibilityUtils.setLayoutDirection(
@@ -138,20 +151,18 @@ public class AutofillKeyboardAccessory extends LinearLayout
     public void keyboardVisibilityChanged(boolean isShowing) {
         if (!isShowing) {
             dismiss();
-            mAutofillCallback.dismissed();
+            mAutofillDelegate.dismissed();
         }
     }
 
     @Override
     public void onClick(View v) {
-        int count = getChildCount();
-        for (int i = 0; i < count; i++) {
-            if (getChildAt(i) == v) {
-                mAutofillCallback.suggestionSelected(i);
-                return;
-            }
-        }
+        mAutofillDelegate.suggestionSelected((int) v.getTag());
+    }
 
-        assert false;
+    @Override
+    public boolean onLongClick(View v) {
+        mAutofillDelegate.deleteSuggestion((int) v.getTag());
+        return true;
     }
 }

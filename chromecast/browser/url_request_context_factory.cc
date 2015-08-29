@@ -238,22 +238,21 @@ void URLRequestContextFactory::InitializeMainContextDependencies(
        it != protocol_handlers->end();
        ++it) {
     set_protocol = job_factory->SetProtocolHandler(
-        it->first, it->second.release());
+        it->first, make_scoped_ptr(it->second.release()));
     DCHECK(set_protocol);
   }
   set_protocol = job_factory->SetProtocolHandler(
-      url::kDataScheme,
-      new net::DataProtocolHandler);
+      url::kDataScheme, make_scoped_ptr(new net::DataProtocolHandler));
   DCHECK(set_protocol);
 
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
       switches::kEnableLocalFileAccesses)) {
     set_protocol = job_factory->SetProtocolHandler(
         url::kFileScheme,
-        new net::FileProtocolHandler(
-            content::BrowserThread::GetBlockingPool()->
-                GetTaskRunnerWithShutdownBehavior(
-                    base::SequencedWorkerPool::SKIP_ON_SHUTDOWN)));
+        make_scoped_ptr(new net::FileProtocolHandler(
+            content::BrowserThread::GetBlockingPool()
+                ->GetTaskRunnerWithShutdownBehavior(
+                    base::SequencedWorkerPool::SKIP_ON_SHUTDOWN))));
     DCHECK(set_protocol);
   }
 
@@ -298,7 +297,7 @@ void URLRequestContextFactory::PopulateNetworkSessionParams(
   // TODO(lcwu): http://crbug.com/329681. Remove this once spdy is enabled
   // by default at the content level.
   params->next_protos = net::NextProtosSpdy31();
-  params->use_alternate_protocols = true;
+  params->use_alternative_services = true;
 }
 
 net::URLRequestContext* URLRequestContextFactory::CreateSystemRequestContext() {

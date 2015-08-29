@@ -178,9 +178,10 @@ class ANDROID_SDK_VERSION_CODES(object):
   KITKAT_WATCH = 20
   LOLLIPOP = 21
   LOLLIPOP_MR1 = 22
+  MARSHMALLOW = 23
 
-ANDROID_SDK_VERSION = ANDROID_SDK_VERSION_CODES.LOLLIPOP_MR1
-ANDROID_SDK_BUILD_TOOLS_VERSION = '22.0.0'
+ANDROID_SDK_VERSION = ANDROID_SDK_VERSION_CODES.MARSHMALLOW
+ANDROID_SDK_BUILD_TOOLS_VERSION = '23.0.0'
 ANDROID_SDK_ROOT = os.path.join(DIR_SOURCE_ROOT,
                                 'third_party/android_tools/sdk')
 ANDROID_SDK_TOOLS = os.path.join(ANDROID_SDK_ROOT,
@@ -188,9 +189,14 @@ ANDROID_SDK_TOOLS = os.path.join(ANDROID_SDK_ROOT,
 ANDROID_NDK_ROOT = os.path.join(DIR_SOURCE_ROOT,
                                 'third_party/android_tools/ndk')
 
+PROGUARD_SCRIPT_PATH = os.path.join(
+    ANDROID_SDK_ROOT, 'tools', 'proguard', 'bin', 'proguard.sh')
+
 EMULATOR_SDK_ROOT = os.environ.get('ANDROID_EMULATOR_SDK_ROOT',
                                    os.path.join(DIR_SOURCE_ROOT,
                                                 'android_emulator_sdk'))
+
+PROGUARD_ROOT = os.path.join(DIR_SOURCE_ROOT, 'third_party', 'proguard')
 
 BAD_DEVICES_JSON = os.path.join(DIR_SOURCE_ROOT,
                                 os.environ.get('CHROMIUM_OUT_DIR', 'out'),

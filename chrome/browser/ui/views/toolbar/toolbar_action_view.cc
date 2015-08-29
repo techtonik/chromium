@@ -63,8 +63,7 @@ ToolbarActionView::ToolbarActionView(
   set_id(VIEW_ID_BROWSER_ACTION);
   view_controller_->SetDelegate(this);
   SetHorizontalAlignment(gfx::ALIGN_CENTER);
-  if (view_controller_->CanDrag())
-    set_drag_controller(delegate_);
+  set_drag_controller(delegate_);
 
   set_context_menu_controller(this);
 
@@ -77,9 +76,12 @@ ToolbarActionView::ToolbarActionView(
           ThemeServiceFactory::GetForProfile(profile_)));
 
   // If the button is within a menu, we need to make it focusable in order to
-  // have it accessible via keyboard navigation.
-  if (delegate_->ShownInsideMenu())
+  // have it accessible via keyboard navigation, but it shouldn't request focus
+  // (because that would close the menu).
+  if (delegate_->ShownInsideMenu()) {
+    set_request_focus_on_press(false);
     SetFocusable(true);
+  }
 
   UpdateState();
 }

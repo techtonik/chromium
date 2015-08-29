@@ -476,17 +476,6 @@ void RenderMessageFilter::OnCreateWindow(
     int64* cloned_session_storage_namespace_id) {
   bool no_javascript_access;
 
-  // Merge the additional features into the WebWindowFeatures struct before we
-  // pass it on.
-  blink::WebVector<blink::WebString> additional_features(
-      params.additional_features.size());
-
-  for (size_t i = 0; i < params.additional_features.size(); ++i)
-    additional_features[i] = blink::WebString(params.additional_features[i]);
-
-  blink::WebWindowFeatures features = params.features;
-  features.additionalFeatures.swap(additional_features);
-
   bool can_create_window =
       GetContentClient()->browser()->CanCreateWindow(
           params.opener_url,
@@ -496,7 +485,7 @@ void RenderMessageFilter::OnCreateWindow(
           params.target_url,
           params.referrer,
           params.disposition,
-          features,
+          params.features,
           params.user_gesture,
           params.opener_suppressed,
           resource_context_,
@@ -826,6 +815,7 @@ void RenderMessageFilter::OnGetMonitorColorProfile(std::vector<char>* profile) {
 #endif
 
 void RenderMessageFilter::DownloadUrl(int render_view_id,
+                                      int render_frame_id,
                                       const GURL& url,
                                       const Referrer& referrer,
                                       const base::string16& suggested_name,
@@ -844,6 +834,7 @@ void RenderMessageFilter::DownloadUrl(int render_view_id,
       resource_context_,
       render_process_id_,
       render_view_id,
+      render_frame_id,
       false,
       false,
       save_info.Pass(),
@@ -852,13 +843,16 @@ void RenderMessageFilter::DownloadUrl(int render_view_id,
 }
 
 void RenderMessageFilter::OnDownloadUrl(int render_view_id,
+                                        int render_frame_id,
                                         const GURL& url,
                                         const Referrer& referrer,
                                         const base::string16& suggested_name) {
-  DownloadUrl(render_view_id, url, referrer, suggested_name, false);
+  DownloadUrl(render_view_id, render_frame_id, url, referrer, suggested_name,
+              false);
 }
 
 void RenderMessageFilter::OnSaveImageFromDataURL(int render_view_id,
+                                                 int render_frame_id,
                                                  const std::string& url_str) {
   // Please refer to RenderViewImpl::saveImageFromDataURL().
   if (url_str.length() >= kMaxLengthOfDataURLString)
@@ -868,7 +862,8 @@ void RenderMessageFilter::OnSaveImageFromDataURL(int render_view_id,
   if (!data_url.SchemeIs(url::kDataScheme))
     return;
 
-  DownloadUrl(render_view_id, data_url, Referrer(), base::string16(), true);
+  DownloadUrl(render_view_id, render_frame_id, data_url, Referrer(),
+              base::string16(), true);
 }
 
 void RenderMessageFilter::AllocateSharedMemoryOnFileThread(
@@ -995,7 +990,8 @@ void RenderMessageFilter::OnCacheableMetadataAvailable(
   // in weburlloader_impl.cc).
   const net::RequestPriority kPriority = net::LOW;
   scoped_refptr<net::IOBuffer> buf(new net::IOBuffer(data.size()));
-  memcpy(buf->data(), &data.front(), data.size());
+  if (!data.empty())
+    memcpy(buf->data(), &data.front(), data.size());
   cache->WriteMetadata(url, kPriority, expected_response_time, buf.get(),
                        data.size());
 }
@@ -1199,7 +1195,8 @@ void RenderMessageFilter::OnWebAudioMediaCodec(
 }
 #endif
 
-void RenderMessageFilter::OnAllocateGpuMemoryBuffer(uint32 width,
+void RenderMessageFilter::OnAllocateGpuMemoryBuffer(gfx::GpuMemoryBufferId id,
+                                                    uint32 width,
                                                     uint32 height,
                                                     gfx::BufferFormat format,
                                                     gfx::BufferUsage usage,
@@ -1215,13 +1212,10 @@ void RenderMessageFilter::OnAllocateGpuMemoryBuffer(uint32 width,
 
   BrowserGpuMemoryBufferManager::current()
       ->AllocateGpuMemoryBufferForChildProcess(
-          gfx::Size(width, height),
-          format,
-          usage,
-          PeerHandle(),
+          id, gfx::Size(width, height), format, usage, PeerHandle(),
           render_process_id_,
-          base::Bind(
-              &RenderMessageFilter::GpuMemoryBufferAllocated, this, reply));
+          base::Bind(&RenderMessageFilter::GpuMemoryBufferAllocated, this,
+                     reply));
 }
 
 void RenderMessageFilter::GpuMemoryBufferAllocated(

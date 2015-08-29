@@ -50,9 +50,7 @@ import java.util.concurrent.TimeoutException;
 /**
  * Tests the Contextual Search Manager using instrumentation tests.
  */
-@CommandLineFlags.Add({
-        ChromeSwitches.ENABLE_CONTEXTUAL_SEARCH_FOR_TESTING
-        })
+@CommandLineFlags.Add(ChromeSwitches.ENABLE_CONTEXTUAL_SEARCH_FOR_TESTING)
 public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<ChromeActivity> {
 
     private static final String TEST_PAGE =
@@ -307,7 +305,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      * @throws InterruptedException
      */
     private void waitForPanelToExpandAndAssert() throws InterruptedException {
-        assertTrue("Search Bar did not expand.", waitForPanelToEnterState(PanelState.EXPANDED));
+        assertTrue("Search Panel did not expand.", waitForPanelToEnterState(PanelState.EXPANDED));
     }
 
     /**
@@ -315,7 +313,8 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      * @throws InterruptedException
      */
     private void waitForPanelToMaximizeAndAssert() throws InterruptedException {
-        assertTrue("Search Bar did not maximize.", waitForPanelToEnterState(PanelState.MAXIMIZED));
+        assertTrue(
+                "Search Panel did not maximize.", waitForPanelToEnterState(PanelState.MAXIMIZED));
     }
 
     /**
@@ -323,14 +322,16 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      * @throws InterruptedException
      */
     private void waitForPanelToCloseAndAssert() throws InterruptedException {
-        // TODO(donnd): figure out why using waitForPanelToEnterState here doesn't work.
-        assertTrue("Search Bar did not close.",
-                CriteriaHelper.pollForCriteria(new Criteria() {
-                    @Override
-                    public boolean isSatisfied() {
-                        return !mManager.isSearchPanelShowing();
-                    }
-                }, TEST_TIMEOUT, DEFAULT_POLLING_INTERVAL));
+        assertTrue("Search Panel did not close.", waitForPanelToEnterState(PanelState.CLOSED));
+    }
+
+    /**
+     * Asserts that the panel was never opened.
+     * @throws InterruptedException
+     */
+    private void assertPanelNeverOpened() throws InterruptedException {
+        assertTrue(
+                "Search Panel actually did open.", waitForPanelToEnterState(PanelState.UNDEFINED));
     }
 
     /**
@@ -392,6 +393,8 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
     /**
      * Waits for the selection to be dissolved.
+     * Use this method any time a test repeatedly establishes and dissolves a selection to ensure
+     * that the selection has been completely dissolved before simulating the next selection event.
      * This is needed because the renderer's notification of a selection going away is async,
      * and a subsequent tap may think there's a current selection until it has been dissolved.
      */
@@ -402,6 +405,14 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
                 return !mSelectionController.isSelectionEstablished();
             }
         }, TEST_TIMEOUT, DEFAULT_POLLING_INTERVAL));
+    }
+
+    /**
+     * Waits for the panel to close and then waits for the selection to dissolve.
+     */
+    private void waitForPanelToCloseAndSelectionDissolved() throws InterruptedException {
+        waitForPanelToCloseAndAssert();
+        waitForSelectionDissolved();
     }
 
     /**
@@ -465,20 +476,20 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
     /**
      * Taps the base page near the top.
      */
-    private void tapBasePage() throws InterruptedException {
+    private void tapBasePageToClosePanel() throws InterruptedException {
         tapBasePage(0.1f, 0.1f);
+        waitForPanelToCloseAndAssert();
     }
 
     /**
      * Taps the base page at the given x, y position.
      */
-    private void tapBasePage(float x, float y) throws InterruptedException {
+    private void tapBasePage(float x, float y) {
         Point size = new Point();
         getActivity().getWindowManager().getDefaultDisplay().getSize(size);
         x *= size.x;
         y *= size.y;
         singleClick(x, y);
-        waitForPanelToCloseAndAssert();
     }
 
     /**
@@ -486,9 +497,16 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     private void clickToExpandAndClosePanel() throws InterruptedException, TimeoutException {
         clickWordNode("states");
+        tapBarToExpandAndClosePanel();
+        waitForSelectionDissolved();
+    }
+
+    /**
+     * Tap on the peeking Bar to expand the panel, then taps on the base page to close it.
+     */
+    private void tapBarToExpandAndClosePanel() throws InterruptedException {
         tapPeekingBarToExpandAndAssert();
-        tapBasePage();
-        waitForPanelToCloseAndAssert();
+        tapBasePageToClosePanel();
     }
 
     /**
@@ -526,7 +544,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
         mFakeServer.reset();
         clickWordNode("states");
         clickNode("states-far");
-        waitForPanelToCloseAndAssert();
+        waitForPanelToCloseAndSelectionDissolved();
     }
 
     /**
@@ -543,7 +561,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
         fakeResponse(false, 200, "States", "display-text", "alternate-term", false);
         waitForPanelToPeekAndAssert();
         clickNode("states-far");
-        waitForPanelToCloseAndAssert();
+        waitForPanelToCloseAndSelectionDissolved();
     }
 
     /**
@@ -589,7 +607,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testHidesWhenOmniboxFocused() throws InterruptedException, TimeoutException {
         clickWordNode("intelligence");
 
@@ -608,7 +626,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testDoesContainAWord() {
         assertTrue(mSelectionController.doesContainAWord("word"));
         assertTrue(mSelectionController.doesContainAWord("word "));
@@ -627,7 +645,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testIsValidSelection() {
         StubbedContentViewCore stubbedCvc = new StubbedContentViewCore(
                 getActivity().getBaseContext());
@@ -651,7 +669,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTap() throws InterruptedException, TimeoutException {
         clickWordNode("intelligence");
 
@@ -667,7 +685,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testLongPress() throws InterruptedException, TimeoutException {
         longPressNode("states");
 
@@ -728,8 +746,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
         assertEquals(1, mFakeServer.loadedUrlCount());
 
         // tap the base page to close.
-        tapBasePage();
-        waitForPanelToCloseAndAssert();
+        tapBasePageToClosePanel();
         assertEquals(1, mFakeServer.loadedUrlCount());
         assertNoContentViewCore();
     }
@@ -753,7 +770,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      * @SmallTest
      * @Feature({"ContextualSearch"})
      */
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     @FlakyTest
     public void testTapExpand() throws InterruptedException, TimeoutException {
         assertNoSearchesLoaded();
@@ -772,8 +789,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
         assertEquals(1, mFakeServer.loadedUrlCount());
 
         // tap the base page to close.
-        tapBasePage();
-        waitForPanelToCloseAndAssert();
+        tapBasePageToClosePanel();
         assertEquals(1, mFakeServer.loadedUrlCount());
         assertNoContentViewCore();
     }
@@ -841,7 +857,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTapDisablePreload() throws InterruptedException, TimeoutException {
         clickWordNode("intelligence");
 
@@ -854,13 +870,10 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
     /**
      * Tests that long-press selects text, and a subsequent tap will unselect text.
-     * @SmallTest
-     * @Feature({"ContextualSearch"})
-     * @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testLongPressGestureSelects() throws InterruptedException, TimeoutException {
         longPressNode("intelligence");
         assertEquals("Intelligence", getSelectedText());
@@ -880,7 +893,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTapGestureSelects() throws InterruptedException, TimeoutException {
         clickWordNode("intelligence");
         assertEquals("Intelligence", getSelectedText());
@@ -898,7 +911,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTapGestureOnSpecialCharacterDoesntSelect()
             throws InterruptedException, TimeoutException {
         clickNode("question-mark");
@@ -913,7 +926,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTapGestureFollowedByScrollClearsSelection()
             throws InterruptedException, TimeoutException {
         clickWordNode("intelligence");
@@ -931,7 +944,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTapGestureFollowedByInvalidTextTapCloses()
             throws InterruptedException, TimeoutException {
         clickWordNode("states-far");
@@ -947,7 +960,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTapGestureFollowedByNonTextTap()
             throws InterruptedException, TimeoutException {
         clickWordNode("states-far");
@@ -963,7 +976,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTapGestureFarAwayTogglesSelecting()
             throws InterruptedException, TimeoutException {
         clickWordNode("states");
@@ -984,7 +997,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTapGesturesNearbyKeepSelecting()
             throws InterruptedException, TimeoutException {
         clickWordNode("states");
@@ -1001,13 +1014,10 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
     /**
      * Tests that a long-press gesture followed by scrolling does not clear the selection.
-     * @SmallTest
-     * @Feature({"ContextualSearch"})
-     * @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testLongPressGestureFollowedByScrollMaintainsSelection()
             throws InterruptedException, TimeoutException {
         longPressNode("intelligence");
@@ -1020,13 +1030,10 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
     /**
      * Tests that a long-press gesture followed by a tap does not select.
-     * @SmallTest
-     * @Feature({"ContextualSearch"})
-     * @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testLongPressGestureFollowedByTapDoesntSelect()
             throws InterruptedException, TimeoutException {
         longPressNode("intelligence");
@@ -1041,7 +1048,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testContextualSearchDismissedOnForegroundTabCrash()
             throws InterruptedException, TimeoutException {
         clickWordNode("states");
@@ -1073,7 +1080,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
     @CommandLineFlags.Add(ChromeSwitches.DISABLE_DOCUMENT_MODE)
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testContextualSearchNotDismissedOnBackgroundTabCrash()
             throws InterruptedException, TimeoutException {
         ChromeTabUtils.newTabFromMenu(getInstrumentation(),
@@ -1118,7 +1125,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      * @SmallTest
      * @Feature({"ContextualSearch"})
      */
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     @CommandLineFlags.Add(ChromeSwitches.DISABLE_DOCUMENT_MODE)
     @FlakyTest
     public void testTapSearchBarPromotesToTab() throws InterruptedException, TimeoutException {
@@ -1175,10 +1182,10 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTapOnRoleIgnored() throws InterruptedException, TimeoutException {
         clickNode("role");
-        waitForGestureToClosePanelAndAssertNoSelection();
+        assertPanelNeverOpened();
     }
 
     /**
@@ -1186,10 +1193,10 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTapOnARIAIgnored() throws InterruptedException, TimeoutException {
         clickNode("aria");
-        waitForGestureToClosePanelAndAssertNoSelection();
+        assertPanelNeverOpened();
     }
 
     /**
@@ -1197,23 +1204,19 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testTapOnFocusableIgnored() throws InterruptedException, TimeoutException {
         clickNode("focusable");
-        waitForGestureToClosePanelAndAssertNoSelection();
+        assertPanelNeverOpened();
     }
 
     /**
      * Tests that taps can be resolve-limited for decided users.
-     *
-     * @SmallTest
-     * @Feature({"ContextualSearch"})
-     * crbug.com/487759
      */
+    @SmallTest
+    @Feature({"ContextualSearch"})
     @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
-    @CommandLineFlags.Add(
-            ContextualSearchFieldTrial.TAP_RESOLVE_LIMIT_FOR_DECIDED + "=2")
-    @FlakyTest
+    @CommandLineFlags.Add(ContextualSearchFieldTrial.TAP_RESOLVE_LIMIT_FOR_DECIDED + "=2")
     public void testTapResolveLimitForDecided() throws InterruptedException, TimeoutException {
         clickToTriggerSearchTermResolution();
         assertSearchTermRequested();
@@ -1233,15 +1236,11 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
     /**
      * Tests that taps can be resolve-limited for undecided users.
-     *
-     * @SmallTest
-     * @Feature({"ContextualSearch"})
-     * crbug.com/487759
      */
+    @SmallTest
+    @Feature({"ContextualSearch"})
     @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
-    @CommandLineFlags.Add({
-            ContextualSearchFieldTrial.TAP_RESOLVE_LIMIT_FOR_UNDECIDED + "=2"})
-    @FlakyTest
+    @CommandLineFlags.Add(ContextualSearchFieldTrial.TAP_RESOLVE_LIMIT_FOR_UNDECIDED + "=2")
     public void testTapResolveLimitForUndecided() throws InterruptedException, TimeoutException {
         mPolicy.overrideDecidedStateForTesting(false);
 
@@ -1263,15 +1262,11 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
     /**
      * Tests that taps can be preload-limited for decided users.
-     *
-     * @SmallTest
-     * @Feature({"ContextualSearch"})
-     * crbug.com/487759
      */
+    @SmallTest
+    @Feature({"ContextualSearch"})
     @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
-    @CommandLineFlags.Add(
-            ContextualSearchFieldTrial.TAP_PREFETCH_LIMIT_FOR_DECIDED + "=2")
-    @FlakyTest
+    @CommandLineFlags.Add(ContextualSearchFieldTrial.TAP_PREFETCH_LIMIT_FOR_DECIDED + "=2")
     public void testTapPrefetchLimitForDecided() throws InterruptedException, TimeoutException {
         clickToTriggerPrefetch();
         assertLoadedLowPriorityUrl();
@@ -1291,15 +1286,11 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
     /**
      * Tests that taps can be preload-limited for undecided users.
-     *
-     * @SmallTest
-     * @Feature({"ContextualSearch"})
-     * crbug.com/487759
      */
+    @SmallTest
+    @Feature({"ContextualSearch"})
     @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
-    @CommandLineFlags.Add(
-            ContextualSearchFieldTrial.TAP_PREFETCH_LIMIT_FOR_UNDECIDED + "=2")
-    @FlakyTest
+    @CommandLineFlags.Add(ContextualSearchFieldTrial.TAP_PREFETCH_LIMIT_FOR_UNDECIDED + "=2")
     public void testTapPrefetchLimitForUndecided() throws InterruptedException, TimeoutException {
         mPolicy.overrideDecidedStateForTesting(false);
 
@@ -1321,12 +1312,10 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
     /**
      * Tests the tap triggered promo limit for opt-out.
-     *
      * @SmallTest
      * @Feature({"ContextualSearch"})
-     * crbug.com/487759
      */
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     @CommandLineFlags.Add({
             ContextualSearchFieldTrial.PROMO_ON_LIMITED_TAPS + "=true",
             ContextualSearchFieldTrial.TAP_TRIGGERED_PROMO_LIMIT + "=2"})
@@ -1337,10 +1326,10 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
         clickWordNode("states");
         clickNode("states-far");
-        waitForPanelToCloseAndAssert();
+        waitForPanelToCloseAndSelectionDissolved();
         clickWordNode("states");
         clickNode("states-far");
-        waitForPanelToCloseAndAssert();
+        waitForPanelToCloseAndSelectionDissolved();
 
         // 3rd click won't peek the panel.
         clickNode("states");
@@ -1353,18 +1342,20 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
         waitForPanelToPeekAndAssert();
 
         // Expanding the panel should deactivate the limit.
-        clickToExpandAndClosePanel();
+        tapBarToExpandAndClosePanel();
+        // Clear the long-press selection.
+        clickNode("states-far");
 
         // Three taps should work now.
         clickWordNode("states");
         clickNode("states-far");
-        waitForPanelToCloseAndAssert();
+        waitForPanelToCloseAndSelectionDissolved();
         clickWordNode("states");
         clickNode("states-far");
-        waitForPanelToCloseAndAssert();
+        waitForPanelToCloseAndSelectionDissolved();
         clickWordNode("states");
         clickNode("states-far");
-        waitForPanelToCloseAndAssert();
+        waitForPanelToCloseAndSelectionDissolved();
     }
 
     /**
@@ -1373,9 +1364,8 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      * @SmallTest
      * @Feature({"ContextualSearch"})
      */
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
-    @CommandLineFlags.Add(
-            ContextualSearchFieldTrial.TAP_PREFETCH_LIMIT_FOR_DECIDED + "=2")
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
+    @CommandLineFlags.Add(ContextualSearchFieldTrial.TAP_PREFETCH_LIMIT_FOR_DECIDED + "=2")
     @FlakyTest
     public void testDisembodiedBar() throws InterruptedException, TimeoutException {
         clickToTriggerPrefetch();
@@ -1389,7 +1379,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
         // Expanding the panel should reset the limit.
         swipePanelUp();
         singleClick(0.5f, 0.5f);
-        waitForPanelToCloseAndAssert();
+        waitForPanelToCloseAndSelectionDissolved();
 
         // Click should preload again.
         clickToTriggerPrefetch();
@@ -1444,7 +1434,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testHttpsBeforeAcceptForOptOut() throws InterruptedException, TimeoutException {
         mPolicy.overrideDecidedStateForTesting(false);
         mFakeServer.setShouldUseHttps(true);
@@ -1459,7 +1449,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testHttpsAfterAcceptForOptOut() throws InterruptedException, TimeoutException {
         mPolicy.overrideDecidedStateForTesting(true);
         mFakeServer.setShouldUseHttps(true);
@@ -1472,7 +1462,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testHttpBeforeAcceptForOptOut() throws InterruptedException, TimeoutException {
         mPolicy.overrideDecidedStateForTesting(false);
 
@@ -1484,7 +1474,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testHttpAfterAcceptForOptOut() throws InterruptedException, TimeoutException {
         mPolicy.overrideDecidedStateForTesting(true);
 
@@ -1529,8 +1519,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
         pressAppMenuKey();
         assertAppMenuVisibility(false);
 
-        tapBasePage();
-        waitForPanelToCloseAndAssert();
+        tapBasePageToClosePanel();
 
         pressAppMenuKey();
         assertAppMenuVisibility(true);
@@ -1541,7 +1530,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testAppMenuSuppressedWhenMaximized() throws InterruptedException, TimeoutException {
         clickWordNode("states");
         swipePanelUpToTop();
@@ -1572,7 +1561,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      * @SmallTest
      * @Feature({"ContextualSearch"})
      */
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     @CommandLineFlags.Add({
             ContextualSearchFieldTrial.PROMO_ON_LIMITED_TAPS + "=true",
             ContextualSearchFieldTrial.TAP_TRIGGERED_PROMO_LIMIT + "=2"})
@@ -1594,14 +1583,13 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
         // Now we're at the limit, a tap should be ignored.
         clickNode("states");
-        waitForPanelToCloseAndAssert();
+        waitForPanelToCloseAndSelectionDissolved();
         assertTapPromoCounterEnabledAt(2);
 
         // An open should disable the counter, but we need to use long-press (tap is now disabled).
         longPressNode("states-far");
         tapPeekingBarToExpandAndAssert();
-        tapBasePage();
-        waitForPanelToCloseAndAssert();
+        tapBasePageToClosePanel();
         assertTapPromoCounterDisabledAt(2);
 
         // Even though we closed the panel, the long-press selection is still there.
@@ -1620,11 +1608,10 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
     /**
      * Tests the promo open counter.
-     * @SmallTest
-     * @Feature({"ContextualSearch"})
      */
+    @SmallTest
+    @Feature({"ContextualSearch"})
     @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
-    @FlakyTest
     public void testPromoOpenCountForUndecided() throws InterruptedException, TimeoutException {
         mPolicy.overrideDecidedStateForTesting(false);
 
@@ -1668,7 +1655,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      * @SmallTest
      * @Feature({"ContextualSearch"})
      */
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     @FlakyTest
     public void testTapCount() throws InterruptedException, TimeoutException {
         assertEquals(0, mPolicy.getTapCount());
@@ -1715,8 +1702,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
         longPressNode("states");
         assertEquals(0, observer.hideCount);
 
-        tapBasePage();
-        waitForPanelToCloseAndAssert();
+        tapBasePageToClosePanel();
         assertEquals(1, observer.hideCount);
     }
 
@@ -1733,8 +1719,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
         clickWordNode("states");
         assertEquals(0, observer.hideCount);
 
-        tapBasePage();
-        waitForPanelToCloseAndAssert();
+        tapBasePageToClosePanel();
         assertEquals(1, observer.hideCount);
     }
 
@@ -1755,7 +1740,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testNotifyObserverHideOnClearSelectionAfterTap()
             throws InterruptedException, TimeoutException {
         TestContextualSearchObserver observer = new TestContextualSearchObserver();
@@ -1785,7 +1770,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
      */
     @SmallTest
     @Feature({"ContextualSearch"})
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     public void testPreventHandlingCurrentSelectionModification()
             throws InterruptedException, TimeoutException {
         longPressNode("intelligence");
@@ -1808,10 +1793,10 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
 
     /**
      * Tests a bunch of taps in a row.
-     * We've had reliability problems with simple taps due to async clearing
+     * We've had reliability problems with a sequence of simple taps, due to async dissolving
      * of selection bounds, so this helps prevent a regression with that.
      */
-    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    @Restriction(RESTRICTION_TYPE_NON_LOW_END_DEVICE)
     @CommandLineFlags.Add({ContextualSearchFieldTrial.TAP_RESOLVE_LIMIT_FOR_DECIDED + "=200",
             ContextualSearchFieldTrial.TAP_RESOLVE_LIMIT_FOR_UNDECIDED + "=200",
             ContextualSearchFieldTrial.TAP_PREFETCH_LIMIT_FOR_DECIDED + "=200",

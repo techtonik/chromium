@@ -23,7 +23,6 @@
 #include "base/prefs/pref_service.h"
 #include "base/prefs/pref_value_store.h"
 #include "base/prefs/scoped_user_pref_update.h"
-#include "base/process/process_info.h"
 #include "base/profiler/scoped_profile.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/run_loop.h"
@@ -120,11 +119,14 @@
 #include "components/rappor/rappor_service.h"
 #include "components/signin/core/common/profile_management_switches.h"
 #include "components/startup_metric_utils/startup_metric_utils.h"
+#include "components/tracing/tracing_switches.h"
 #include "components/translate/content/browser/browser_cld_utils.h"
 #include "components/translate/content/common/cld_data_source.h"
 #include "components/translate/core/browser/translate_download_manager.h"
 #include "components/variations/net/variations_http_header_provider.h"
+#include "components/variations/pref_names.h"
 #include "components/variations/variations_associated_data.h"
+#include "components/variations/variations_switches.h"
 #include "components/version_info/version_info.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_observer.h"
@@ -175,6 +177,7 @@
 
 #if defined(OS_WIN)
 #include "base/environment.h"  // For PreRead experiment.
+#include "base/trace_event/trace_event_etw_export_win.h"
 #include "base/win/windows_version.h"
 #include "chrome/browser/browser_util_win.h"
 #include "chrome/browser/chrome_browser_main_win.h"
@@ -541,6 +544,16 @@ void LaunchDevToolsHandlerIfNeeded(const base::CommandLine& command_line) {
   }
 }
 
+base::StackSamplingProfiler::SamplingParams GetStartupSamplingParams() {
+  // Sample at 10Hz for 30 seconds.
+  base::StackSamplingProfiler::SamplingParams params;
+  params.initial_delay = base::TimeDelta::FromMilliseconds(0);
+  params.bursts = 1;
+  params.samples_per_burst = 300;
+  params.sampling_interval = base::TimeDelta::FromMilliseconds(100);
+  return params;
+}
+
 }  // namespace
 
 namespace chrome_browser {
@@ -569,11 +582,25 @@ ChromeBrowserMainParts::ChromeBrowserMainParts(
       startup_watcher_(new StartupTimeBomb()),
       shutdown_watcher_(new ShutdownWatcherHelper()),
       browser_field_trials_(parameters.command_line),
+      sampling_profiler_(
+          base::PlatformThread::CurrentId(),
+          GetStartupSamplingParams(),
+          metrics::CallStackProfileMetricsProvider::GetProfilerCallback(
+              metrics::CallStackProfileMetricsProvider::Params(
+                  metrics::CallStackProfileMetricsProvider::PROCESS_STARTUP,
+                  false))),
       profile_(NULL),
       run_message_loop_(true),
       notify_result_(ProcessSingleton::PROCESS_NONE),
       local_state_(NULL),
       restart_last_session_(false) {
+  const version_info::Channel channel = chrome::GetChannel();
+  if (channel == version_info::Channel::UNKNOWN ||
+      channel == version_info::Channel::CANARY ||
+      channel == version_info::Channel::DEV) {
+    sampling_profiler_.Start();
+  }
+
   // If we're running tests (ui_task is non-null).
   if (parameters.ui_task)
     browser_defaults::enable_help_app = false;
@@ -637,7 +664,8 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
 #if defined(FIELDTRIAL_TESTING_ENABLED)
   if (!command_line->HasSwitch(switches::kDisableFieldTrialTestingConfig) &&
       !command_line->HasSwitch(switches::kForceFieldTrials) &&
-      !command_line->HasSwitch(switches::kVariationsServerURL))
+      !command_line->HasSwitch(
+          chrome_variations::switches::kVariationsServerURL))
     chrome_variations::AssociateDefaultFieldTrialConfig();
 #endif  // defined(FIELDTRIAL_TESTING_ENABLED)
 
@@ -717,30 +745,17 @@ void ChromeBrowserMainParts::RecordBrowserStartupTime() {
   if (startup_metric_utils::WasNonBrowserUIDisplayed())
     return;
 
-#if defined(OS_ANDROID)
-  // On Android the first run is handled in Java code, and the C++ side of
-  // Chrome doesn't know if this is the first run. This will cause some
-  // inaccuracy in the UMA statistics, but this should be minor (first runs are
-  // rare).
   bool is_first_run = false;
-#else
-  bool is_first_run = first_run::IsChromeFirstRun();
+#if !defined(OS_ANDROID)
+  // On Android, first run is handled in Java code, and the C++ side of Chrome
+  // doesn't know if this is the first run. This will cause some inaccuracy in
+  // the UMA statistics, but this should be minor (first runs are rare).
+  is_first_run = first_run::IsChromeFirstRun();
 #endif  // defined(OS_ANDROID)
 
-// CurrentProcessInfo::CreationTime() is currently only implemented on some
-// platforms.
-#if defined(OS_MACOSX) || defined(OS_WIN) || defined(OS_LINUX)
-  const base::Time process_creation_time =
-      base::CurrentProcessInfo::CreationTime();
-
-  if (!is_first_run && !process_creation_time.is_null()) {
-    base::TimeDelta delay = base::Time::Now() - process_creation_time;
-    UMA_HISTOGRAM_LONG_TIMES_100("Startup.BrowserMessageLoopStartTime", delay);
-  }
-#endif  // defined(OS_MACOSX) || defined(OS_WIN) || defined(OS_LINUX)
-
   // Record collected startup metrics.
-  startup_metric_utils::OnBrowserStartupComplete(is_first_run);
+  startup_metric_utils::RecordBrowserMainMessageLoopStart(base::Time::Now(),
+                                                          is_first_run);
 }
 
 // -----------------------------------------------------------------------------
@@ -896,6 +911,18 @@ int ChromeBrowserMainParts::PreCreateThreadsImpl() {
   }
 #endif  // !defined(OS_CHROMEOS)
 
+#if defined(OS_WIN)
+  // This is needed to enable ETW exporting when requested in about:flags.
+  // Normally, we enable it in ContentMainRunnerImpl::Initialize when the flag
+  // is present on the command line but flags in about:flags are converted only
+  // after this function runs. Note that this starts exporting later which
+  // affects tracing the browser startup. Also, this is only relevant for the
+  // browser process, as other processes will get all the flags on their command
+  // line regardless of the origin (command line or about:flags).
+  if (parsed_command_line().HasSwitch(switches::kTraceExportEventsToETW))
+    base::trace_event::TraceEventETWExport::EnableETWExport();
+#endif  // OS_WIN
+
   local_state_->UpdateCommandLinePrefStore(
       new CommandLinePrefStore(base::CommandLine::ForCurrentProcess()));
 
@@ -978,22 +1005,24 @@ int ChromeBrowserMainParts::PreCreateThreadsImpl() {
     if (!master_prefs_->variations_seed.empty() ||
         !master_prefs_->compressed_variations_seed.empty()) {
       if (!master_prefs_->variations_seed.empty()) {
-        local_state_->SetString(prefs::kVariationsSeed,
-                              master_prefs_->variations_seed);
+        local_state_->SetString(chrome_variations::prefs::kVariationsSeed,
+                                master_prefs_->variations_seed);
       }
       if (!master_prefs_->compressed_variations_seed.empty()) {
-        local_state_->SetString(prefs::kVariationsCompressedSeed,
-                                master_prefs_->compressed_variations_seed);
+        local_state_->SetString(
+            chrome_variations::prefs::kVariationsCompressedSeed,
+            master_prefs_->compressed_variations_seed);
       }
       if (!master_prefs_->variations_seed_signature.empty()) {
-        local_state_->SetString(prefs::kVariationsSeedSignature,
-                                master_prefs_->variations_seed_signature);
+        local_state_->SetString(
+            chrome_variations::prefs::kVariationsSeedSignature,
+            master_prefs_->variations_seed_signature);
       }
       // Set the variation seed date to the current system time. If the user's
       // clock is incorrect, this may cause some field trial expiry checks to
       // not do the right thing until the next seed update from the server,
       // when this value will be updated.
-      local_state_->SetInt64(prefs::kVariationsSeedDate,
+      local_state_->SetInt64(chrome_variations::prefs::kVariationsSeedDate,
                              base::Time::Now().ToInternalValue());
     }
 
@@ -1596,13 +1625,12 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
 
   // We are in regular browser boot sequence. Open initial tabs and enter the
   // main message loop.
-#if defined(OS_CHROMEOS)
+  std::vector<Profile*> last_opened_profiles;
+#if !defined(OS_CHROMEOS)
   // On ChromeOS multiple profiles doesn't apply, and will break if we load
   // them this early as the cryptohome hasn't yet been mounted (which happens
-  // only once we log in.
-  std::vector<Profile*> last_opened_profiles;
-#else
-  std::vector<Profile*> last_opened_profiles =
+  // only once we log in).
+  last_opened_profiles =
       g_browser_process->profile_manager()->GetLastOpenedProfiles();
 #endif  // defined(OS_CHROMEOS)
 
@@ -1611,7 +1639,7 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
 
   // This step is costly and is already measured in
   // Startup.StartupBrowserCreator_Start.
-  bool started = browser_creator_->Start(
+  const bool started = browser_creator_->Start(
       parsed_command_line(), base::FilePath(), profile_, last_opened_profiles);
   const base::TimeTicks start_time_step3 = base::TimeTicks::Now();
   if (started) {
@@ -1641,8 +1669,8 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
       parameters().autorelease_pool->Recycle();
 #endif  // defined(OS_MACOSX)
 
-    base::TimeDelta delay = base::TimeTicks::Now() - browser_open_start;
-    UMA_HISTOGRAM_LONG_TIMES_100("Startup.BrowserOpenTabs", delay);
+    const base::TimeDelta delta = base::TimeTicks::Now() - browser_open_start;
+    startup_metric_utils::RecordBrowserOpenTabsDelta(delta);
 
     // If we're running tests (ui_task is non-null), then we don't want to
     // call RequestLanguageList or StartRepeatedVariationsSeedFetch or
@@ -1651,22 +1679,14 @@ int ChromeBrowserMainParts::PreMainMessageLoopRunImpl() {
       // Request new variations seed information from server.
       chrome_variations::VariationsService* variations_service =
           browser_process_->variations_service();
-      if (variations_service) {
-        variations_service->StartRepeatedVariationsSeedFetch();
-
-#if defined(OS_WIN)
-        variations_service->StartGoogleUpdateRegistrySync();
-#endif  // defined(OS_WIN)
-      }
+      if (variations_service)
+        variations_service->PerformPreMainMessageLoopStartup();
 
       translate::TranslateDownloadManager::RequestLanguageList(
           profile_->GetPrefs());
     }
-
-    run_message_loop_ = true;
-  } else {
-    run_message_loop_ = false;
   }
+  run_message_loop_ = started;
   browser_creator_.reset();
 
 #if !defined(OS_LINUX) || defined(OS_CHROMEOS)  // http://crbug.com/426393

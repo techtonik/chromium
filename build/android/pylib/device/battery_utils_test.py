@@ -21,11 +21,6 @@ from pylib.device import device_utils
 from pylib.device import device_utils_test
 from pylib.utils import mock_calls
 
-# RunCommand from third_party/android_testrunner/run_command.py is mocked
-# below, so its path needs to be in sys.path.
-sys.path.append(os.path.join(
-    constants.DIR_SOURCE_ROOT, 'third_party', 'android_testrunner'))
-
 sys.path.append(os.path.join(
     constants.DIR_SOURCE_ROOT, 'third_party', 'pymock'))
 import mock # pylint: disable=F0401
@@ -116,10 +111,8 @@ class BatteryUtilsSetChargingTest(BatteryUtilsTest):
     self.battery._cache['profile'] = self._NEXUS_5
     with self.assertCalls(
         (self.call.device.RunShellCommand(
-            mock.ANY, check_return=True, as_root=True), []),
+            mock.ANY, check_return=True, as_root=True, large_output=True), []),
         (self.call.battery.GetCharging(), False),
-        (self.call.device.RunShellCommand(
-            mock.ANY, check_return=True, as_root=True), []),
         (self.call.battery.GetCharging(), True)):
       self.battery.SetCharging(True)
 
@@ -127,7 +120,7 @@ class BatteryUtilsSetChargingTest(BatteryUtilsTest):
     self.battery._cache['profile'] = self._NEXUS_5
     with self.assertCalls(
         (self.call.device.RunShellCommand(
-            mock.ANY, check_return=True, as_root=True), []),
+            mock.ANY, check_return=True, as_root=True, large_output=True), []),
         (self.call.battery.GetCharging(), True)):
       self.battery.SetCharging(True)
 
@@ -136,10 +129,8 @@ class BatteryUtilsSetChargingTest(BatteryUtilsTest):
     self.battery._cache['profile'] = self._NEXUS_5
     with self.assertCalls(
         (self.call.device.RunShellCommand(
-            mock.ANY, check_return=True, as_root=True), []),
+            mock.ANY, check_return=True, as_root=True, large_output=True), []),
         (self.call.battery.GetCharging(), True),
-        (self.call.device.RunShellCommand(
-            mock.ANY, check_return=True, as_root=True), []),
         (self.call.battery.GetCharging(), False)):
       self.battery.SetCharging(False)
 
@@ -196,8 +187,9 @@ class BatteryUtilsGetPowerData(BatteryUtilsTest):
   def testGetPowerData(self):
     with self.assertCalls(
         (self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '-c'], check_return=True),
-            _DUMPSYS_OUTPUT)):
+            ['dumpsys', 'batterystats', '-c'],
+            check_return=True, large_output=True),
+         _DUMPSYS_OUTPUT)):
       data = self.battery.GetPowerData()
       check = {
           'test_package1': {'uid': '1000', 'data': [1.0]},
@@ -208,9 +200,10 @@ class BatteryUtilsGetPowerData(BatteryUtilsTest):
   def testGetPowerData_packageCollisionSame(self):
       self.battery._cache['uids'] = {'test_package1': '1000'}
       with self.assertCall(
-        self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '-c'], check_return=True),
-            _DUMPSYS_OUTPUT):
+          self.call.device.RunShellCommand(
+              ['dumpsys', 'batterystats', '-c'],
+              check_return=True, large_output=True),
+          _DUMPSYS_OUTPUT):
         data = self.battery.GetPowerData()
         check = {
             'test_package1': {'uid': '1000', 'data': [1.0]},
@@ -221,17 +214,19 @@ class BatteryUtilsGetPowerData(BatteryUtilsTest):
   def testGetPowerData_packageCollisionDifferent(self):
       self.battery._cache['uids'] = {'test_package1': '1'}
       with self.assertCall(
-        self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '-c'], check_return=True),
-            _DUMPSYS_OUTPUT):
+          self.call.device.RunShellCommand(
+              ['dumpsys', 'batterystats', '-c'],
+              check_return=True, large_output=True),
+          _DUMPSYS_OUTPUT):
         with self.assertRaises(device_errors.CommandFailedError):
           self.battery.GetPowerData()
 
   def testGetPowerData_cacheCleared(self):
     with self.assertCalls(
         (self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '-c'], check_return=True),
-            _DUMPSYS_OUTPUT)):
+            ['dumpsys', 'batterystats', '-c'],
+            check_return=True, large_output=True),
+         _DUMPSYS_OUTPUT)):
       self.battery._cache.clear()
       data = self.battery.GetPowerData()
       check = {
@@ -243,16 +238,18 @@ class BatteryUtilsGetPowerData(BatteryUtilsTest):
   def testGetPackagePowerData(self):
     with self.assertCalls(
         (self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '-c'], check_return=True),
-            _DUMPSYS_OUTPUT)):
+            ['dumpsys', 'batterystats', '-c'],
+            check_return=True, large_output=True),
+         _DUMPSYS_OUTPUT)):
       data = self.battery.GetPackagePowerData('test_package2')
       self.assertEqual(data, {'uid': '1001', 'data': [2.0]})
 
   def testGetPackagePowerData_badPackage(self):
     with self.assertCalls(
         (self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '-c'], check_return=True),
-            _DUMPSYS_OUTPUT)):
+            ['dumpsys', 'batterystats', '-c'],
+            check_return=True, large_output=True),
+         _DUMPSYS_OUTPUT)):
       data = self.battery.GetPackagePowerData('not_a_package')
       self.assertEqual(data, None)
 
@@ -266,6 +263,62 @@ class BatteryUtilsChargeDevice(BatteryUtilsTest):
         (self.call.battery.GetBatteryInfo(), {'level': '50'}),
         (self.call.battery.GetBatteryInfo(), {'level': '100'})):
       self.battery.ChargeDeviceToLevel(95)
+
+
+class BatteryUtilsDischargeDevice(BatteryUtilsTest):
+
+  @mock.patch('time.sleep', mock.Mock())
+  def testDischargeDevice_exact(self):
+    with self.assertCalls(
+        (self.call.battery.GetBatteryInfo(), {'level': '100'}),
+        (self.call.battery.SetCharging(False)),
+        (self.call.battery.SetCharging(True)),
+        (self.call.battery.GetBatteryInfo(), {'level': '99'})):
+      self.battery._DischargeDevice(1)
+
+  @mock.patch('time.sleep', mock.Mock())
+  def testDischargeDevice_over(self):
+    with self.assertCalls(
+        (self.call.battery.GetBatteryInfo(), {'level': '100'}),
+        (self.call.battery.SetCharging(False)),
+        (self.call.battery.SetCharging(True)),
+        (self.call.battery.GetBatteryInfo(), {'level': '50'})):
+      self.battery._DischargeDevice(1)
+
+  @mock.patch('time.sleep', mock.Mock())
+  def testDischargeDevice_takeslong(self):
+    with self.assertCalls(
+        (self.call.battery.GetBatteryInfo(), {'level': '100'}),
+        (self.call.battery.SetCharging(False)),
+        (self.call.battery.SetCharging(True)),
+        (self.call.battery.GetBatteryInfo(), {'level': '100'}),
+        (self.call.battery.SetCharging(False)),
+        (self.call.battery.SetCharging(True)),
+        (self.call.battery.GetBatteryInfo(), {'level': '99'}),
+        (self.call.battery.SetCharging(False)),
+        (self.call.battery.SetCharging(True)),
+        (self.call.battery.GetBatteryInfo(), {'level': '98'}),
+        (self.call.battery.SetCharging(False)),
+        (self.call.battery.SetCharging(True)),
+        (self.call.battery.GetBatteryInfo(), {'level': '97'})):
+      self.battery._DischargeDevice(3)
+
+  @mock.patch('time.sleep', mock.Mock())
+  def testDischargeDevice_dischargeTooClose(self):
+    with self.assertCalls(
+        (self.call.battery.GetBatteryInfo(), {'level': '100'})):
+      self.battery._DischargeDevice(99)
+
+  @mock.patch('time.sleep', mock.Mock())
+  def testDischargeDevice_percentageOutOfBounds(self):
+    with self.assertCalls(
+        (self.call.battery.GetBatteryInfo(), {'level': '100'})):
+      with self.assertRaises(ValueError):
+          self.battery._DischargeDevice(100)
+    with self.assertCalls(
+        (self.call.battery.GetBatteryInfo(), {'level': '100'})):
+      with self.assertRaises(ValueError):
+          self.battery._DischargeDevice(0)
 
 
 class BatteryUtilsGetBatteryInfoTest(BatteryUtilsTest):
@@ -330,8 +383,9 @@ class BatteryUtilsGetNetworkDataTest(BatteryUtilsTest):
   def testGetNetworkData_noDataUsage(self):
     with self.assertCalls(
         (self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '-c'], check_return=True),
-            _DUMPSYS_OUTPUT),
+            ['dumpsys', 'batterystats', '-c'],
+            check_return=True, large_output=True),
+         _DUMPSYS_OUTPUT),
         (self.call.device.ReadFile('/proc/uid_stat/1000/tcp_snd'),
             self.ShellError()),
         (self.call.device.ReadFile('/proc/uid_stat/1000/tcp_rcv'),
@@ -341,15 +395,17 @@ class BatteryUtilsGetNetworkDataTest(BatteryUtilsTest):
   def testGetNetworkData_badPackage(self):
     with self.assertCall(
         self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '-c'], check_return=True),
-            _DUMPSYS_OUTPUT):
+            ['dumpsys', 'batterystats', '-c'],
+            check_return=True, large_output=True),
+        _DUMPSYS_OUTPUT):
       self.assertEqual(self.battery.GetNetworkData('asdf'), None)
 
   def testGetNetworkData_packageNotCached(self):
     with self.assertCalls(
         (self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '-c'], check_return=True),
-            _DUMPSYS_OUTPUT),
+            ['dumpsys', 'batterystats', '-c'],
+            check_return=True, large_output=True),
+         _DUMPSYS_OUTPUT),
         (self.call.device.ReadFile('/proc/uid_stat/1000/tcp_snd'), 1),
         (self.call.device.ReadFile('/proc/uid_stat/1000/tcp_rcv'), 2)):
       self.assertEqual(self.battery.GetNetworkData('test_package1'), (1,2))
@@ -364,8 +420,9 @@ class BatteryUtilsGetNetworkDataTest(BatteryUtilsTest):
   def testGetNetworkData_clearedCache(self):
     with self.assertCalls(
         (self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '-c'], check_return=True),
-            _DUMPSYS_OUTPUT),
+            ['dumpsys', 'batterystats', '-c'],
+            check_return=True, large_output=True),
+         _DUMPSYS_OUTPUT),
         (self.call.device.ReadFile('/proc/uid_stat/1000/tcp_snd'), 1),
         (self.call.device.ReadFile('/proc/uid_stat/1000/tcp_rcv'), 2)):
       self.battery._cache.clear()
@@ -376,6 +433,7 @@ class BatteryUtilsLetBatteryCoolToTemperatureTest(BatteryUtilsTest):
 
   @mock.patch('time.sleep', mock.Mock())
   def testLetBatteryCoolToTemperature_startUnder(self):
+    self.battery._cache['profile'] = self._NEXUS_6
     with self.assertCalls(
         (self.call.battery.EnableBatteryUpdates(), []),
         (self.call.battery.GetBatteryInfo(), {'temperature': '500'})):
@@ -383,11 +441,31 @@ class BatteryUtilsLetBatteryCoolToTemperatureTest(BatteryUtilsTest):
 
   @mock.patch('time.sleep', mock.Mock())
   def testLetBatteryCoolToTemperature_startOver(self):
+    self.battery._cache['profile'] = self._NEXUS_6
     with self.assertCalls(
         (self.call.battery.EnableBatteryUpdates(), []),
         (self.call.battery.GetBatteryInfo(), {'temperature': '500'}),
         (self.call.battery.GetBatteryInfo(), {'temperature': '400'})):
       self.battery.LetBatteryCoolToTemperature(400)
+
+  @mock.patch('time.sleep', mock.Mock())
+  def testLetBatteryCoolToTemperature_nexus5Hot(self):
+    self.battery._cache['profile'] = self._NEXUS_5
+    with self.assertCalls(
+        (self.call.battery.EnableBatteryUpdates(), []),
+        (self.call.battery.GetBatteryInfo(), {'temperature': '500'}),
+        (self.call.battery._DischargeDevice(1), []),
+        (self.call.battery.GetBatteryInfo(), {'temperature': '400'})):
+      self.battery.LetBatteryCoolToTemperature(400)
+
+  @mock.patch('time.sleep', mock.Mock())
+  def testLetBatteryCoolToTemperature_nexus5Cool(self):
+    self.battery._cache['profile'] = self._NEXUS_5
+    with self.assertCalls(
+        (self.call.battery.EnableBatteryUpdates(), []),
+        (self.call.battery.GetBatteryInfo(), {'temperature': '400'})):
+      self.battery.LetBatteryCoolToTemperature(400)
+
 
 class BatteryUtilsSupportsFuelGaugeTest(BatteryUtilsTest):
 
@@ -444,7 +522,6 @@ class BatteryUtilsTieredSetCharging(BatteryUtilsTest):
     with self.assertCalls(
         (self.call.battery.GetCharging(), True),
         (self.call.battery._ClearPowerData(), True),
-        (self.call.battery._ClearPowerData(), True),
         (self.call.device.RunShellCommand(
             ['dumpsys', 'battery', 'set', 'ac', '0'], check_return=True), []),
         (self.call.device.RunShellCommand(
@@ -497,7 +574,6 @@ class BatteryUtilsPowerMeasurement(BatteryUtilsTest):
     with self.assertCalls(
         (self.call.battery.GetCharging(), True),
         (self.call.battery._ClearPowerData(), True),
-        (self.call.battery._ClearPowerData(), True),
         (self.call.device.RunShellCommand(
             ['dumpsys', 'battery', 'set', 'ac', '0'], check_return=True), []),
         (self.call.device.RunShellCommand(
@@ -548,7 +624,7 @@ class BatteryUtilsClearPowerData(BatteryUtilsTest):
         (self.call.device.RunShellCommand(
             ['dumpsys', 'batterystats', '--reset'], check_return=True), []),
         (self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '--charged', '--checkin'],
+            ['dumpsys', 'batterystats', '--charged', '-c'],
             check_return=True, large_output=True), []),
         (self.call.device.RunShellCommand(
             ['dumpsys', 'battery', 'reset'], check_return=True), [])):
@@ -565,7 +641,7 @@ class BatteryUtilsClearPowerData(BatteryUtilsTest):
         (self.call.device.RunShellCommand(
             ['dumpsys', 'batterystats', '--reset'], check_return=True), []),
         (self.call.device.RunShellCommand(
-            ['dumpsys', 'batterystats', '--charged', '--checkin'],
+            ['dumpsys', 'batterystats', '--charged', '-c'],
             check_return=True, large_output=True),
             ['9,1000,l,pwi,uid,0.0327']),
         (self.call.device.RunShellCommand(

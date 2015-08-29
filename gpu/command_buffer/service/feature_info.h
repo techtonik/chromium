@@ -58,6 +58,7 @@ class GPU_EXPORT FeatureInfo : public base::RefCounted<FeatureInfo> {
     bool use_arb_occlusion_query2_for_occlusion_query_boolean;
     bool use_arb_occlusion_query_for_occlusion_query_boolean;
     bool native_vertex_array_object;
+    bool ext_texture_format_astc;
     bool ext_texture_format_atc;
     bool ext_texture_format_bgra8888;
     bool ext_texture_format_dxt1;
@@ -79,6 +80,7 @@ class GPU_EXPORT FeatureInfo : public base::RefCounted<FeatureInfo> {
     bool blend_equation_advanced;
     bool blend_equation_advanced_coherent;
     bool ext_texture_rg;
+    bool chromium_image_ycbcr_422;
     bool enable_subscribe_uniform;
     bool emulate_primitive_restart_fixed_index;
     bool ext_render_buffer_format_bgra8888;

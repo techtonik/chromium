@@ -18,7 +18,6 @@ from telemetry.internal.browser import browser_info as browser_info_module
 from telemetry.internal.platform.profiler import profiler_finder
 from telemetry.internal.util import exception_formatter
 from telemetry.internal.util import file_handle
-from telemetry.page import action_runner as action_runner_module
 from telemetry.page import page_test
 from telemetry import story
 from telemetry.util import wpr_modes
@@ -77,7 +76,7 @@ class SharedPageState(story.SharedState):
     self._current_tab = None
     self._migrated_profile = None
 
-    self._pregenerated_profile_archive = None
+    self._pregenerated_profile_archive_dir = None
     self._test.SetOptions(self._finder_options)
 
   @property
@@ -274,22 +273,18 @@ class SharedPageState(story.SharedState):
     if self._test.clear_cache_before_each_run:
       self._current_tab.ClearCache(force=True)
 
-  def _ImplicitPageNavigation(self):
-    """Executes the implicit navigation that occurs for every page iteration.
+  @property
+  def current_tab(self):
+    return self._current_tab
 
-    This function will be called once per page before any actions are executed.
-    """
-    self._test.WillNavigateToPage(self._current_page, self._current_tab)
-    self._test.RunNavigateSteps(self._current_page, self._current_tab)
-    self._test.DidNavigateToPage(self._current_page, self._current_tab)
+  @property
+  def page_test(self):
+    return self._test
 
   def RunStory(self, results):
     try:
       self._PreparePage()
-      self._ImplicitPageNavigation()
-      action_runner = action_runner_module.ActionRunner(
-          self._current_tab, skip_waits=self._current_page.skip_waits)
-      self._current_page.RunPageInteractions(action_runner)
+      self._current_page.Run(self)
       self._test.ValidateAndMeasurePage(
           self._current_page, self._current_tab, results)
     except exceptions.Error:
@@ -379,10 +374,10 @@ class SharedPageState(story.SharedState):
     logging.info("Finished migration of pregenerated profile to %s",
         self._migrated_profile)
 
-  def GetPregeneratedProfileArchive(self):
-    return self._pregenerated_profile_archive
+  def GetPregeneratedProfileArchiveDir(self):
+    return self._pregenerated_profile_archive_dir
 
-  def SetPregeneratedProfileArchive(self, archive):
+  def SetPregeneratedProfileArchiveDir(self, archive_path):
     """
     Benchmarks can set a pre-generated profile archive to indicate that when
     Chrome is launched, it should have a --user-data-dir set to the
@@ -391,12 +386,12 @@ class SharedPageState(story.SharedState):
     If the benchmark is invoked with the option --profile-dir=<dir>, that
     option overrides this value.
     """
-    self._pregenerated_profile_archive = archive
+    self._pregenerated_profile_archive_dir = archive_path
 
   def _ShouldDownloadPregeneratedProfileArchive(self):
     """Whether to download a pre-generated profile archive."""
     # There is no pre-generated profile archive.
-    if not self.GetPregeneratedProfileArchive():
+    if not self.GetPregeneratedProfileArchiveDir():
       return False
 
     # If profile dir is specified on command line, use that instead.
@@ -419,12 +414,7 @@ class SharedPageState(story.SharedState):
     the directory of the extracted profile.
     """
     # Download profile directory from cloud storage.
-    test_data_dir = os.path.join(util.GetChromiumSrcDir(), 'tools', 'perf',
-        'generated_profiles',
-        self._possible_browser.target_os)
-    archive_name = self.GetPregeneratedProfileArchive()
-    generated_profile_archive_path = os.path.normpath(
-        os.path.join(test_data_dir, archive_name))
+    generated_profile_archive_path = self.GetPregeneratedProfileArchiveDir()
 
     try:
       cloud_storage.GetIfChanged(generated_profile_archive_path,

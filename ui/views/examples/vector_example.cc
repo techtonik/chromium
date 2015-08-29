@@ -10,6 +10,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "ui/gfx/paint_vector_icon.h"
 #include "ui/gfx/vector_icons_public2.h"
+#include "ui/views/border.h"
 #include "ui/views/controls/button/blue_button.h"
 #include "ui/views/controls/button/button.h"
 #include "ui/views/controls/image_view.h"
@@ -30,16 +31,33 @@ class VectorIconGallery : public View,
  public:
   VectorIconGallery()
       : image_view_(new ImageView()),
+        image_view_container_(new views::View()),
         size_input_(new Textfield()),
         color_input_(new Textfield()),
         file_chooser_(new Textfield()),
         file_go_button_(new BlueButton(this, base::ASCIIToUTF16("Render"))),
         vector_id_(0),
-        size_(32),
+        // 36dp is one of the natural sizes for MD icons, and corresponds
+        // roughly to a 32dp usable area.
+        size_(36),
         color_(SK_ColorRED) {
     AddChildView(size_input_);
     AddChildView(color_input_);
-    AddChildView(image_view_);
+
+    image_view_container_->AddChildView(image_view_);
+    BoxLayout* image_layout = new BoxLayout(BoxLayout::kHorizontal, 0, 0, 0);
+    image_layout->set_cross_axis_alignment(
+        BoxLayout::CROSS_AXIS_ALIGNMENT_CENTER);
+    image_layout->set_main_axis_alignment(
+        BoxLayout::MAIN_AXIS_ALIGNMENT_CENTER);
+    image_view_container_->SetLayoutManager(image_layout);
+    image_view_->SetBorder(
+        Border::CreateSolidSidedBorder(1, 1, 1, 1, SK_ColorBLACK));
+    AddChildView(image_view_container_);
+
+    BoxLayout* box = new BoxLayout(BoxLayout::kVertical, 10, 10, 10);
+    SetLayoutManager(box);
+    box->SetFlexForView(image_view_container_, 1);
 
     file_chooser_->set_placeholder_text(
         base::ASCIIToUTF16("Or enter a file to read"));
@@ -56,9 +74,6 @@ class VectorIconGallery : public View,
     color_input_->set_placeholder_text(base::ASCIIToUTF16("Color (AARRGGBB)"));
     color_input_->set_controller(this);
 
-    BoxLayout* box = new BoxLayout(BoxLayout::kVertical, 10, 10, 10);
-    SetLayoutManager(box);
-    box->SetFlexForView(image_view_, 1);
     UpdateImage();
   }
 
@@ -66,9 +81,10 @@ class VectorIconGallery : public View,
 
   // View implementation.
   bool OnMousePressed(const ui::MouseEvent& event) override {
-    if (GetEventHandlerForPoint(event.location()) == image_view_) {
-      vector_id_ = ((vector_id_ + 1) %
-                    static_cast<int>(gfx::VectorIconId::VECTOR_ICON_NONE));
+    if (GetEventHandlerForPoint(event.location()) == image_view_container_) {
+      int increment = event.IsOnlyRightMouseButton() ? -1 : 1;
+      int icon_count = static_cast<int>(gfx::VectorIconId::VECTOR_ICON_NONE);
+      vector_id_ = (icon_count + vector_id_ + increment) % icon_count;
       UpdateImage();
       return true;
     }
@@ -115,10 +131,12 @@ class VectorIconGallery : public View,
   void UpdateImage() {
     image_view_->SetImage(gfx::CreateVectorIcon(
         static_cast<gfx::VectorIconId>(vector_id_), size_, color_));
+    Layout();
   }
 
  private:
   ImageView* image_view_;
+  View* image_view_container_;
   Textfield* size_input_;
   Textfield* color_input_;
   Textfield* file_chooser_;

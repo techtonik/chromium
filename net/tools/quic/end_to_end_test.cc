@@ -257,11 +257,8 @@ class EndToEndTest : public ::testing::TestWithParam<TestParams> {
 
   QuicTestClient* CreateQuicClient(QuicPacketWriterWrapper* writer) {
     QuicTestClient* client = new QuicTestClient(
-        server_address_,
-        server_hostname_,
-        false,  // not secure
-        client_config_,
-        client_supported_versions_);
+        server_address_, server_hostname_,
+        /*secure=*/true, client_config_, client_supported_versions_);
     client->UseWriter(writer);
     client->Connect();
     return client;
@@ -351,11 +348,10 @@ class EndToEndTest : public ::testing::TestWithParam<TestParams> {
   }
 
   void StartServer() {
-    server_thread_.reset(
-        new ServerThread(
-            new QuicServer(server_config_, server_supported_versions_),
-            server_address_,
-            strike_register_no_startup_period_));
+    server_thread_.reset(new ServerThread(
+        new QuicServer(server_config_, server_supported_versions_),
+        /*is_secure=*/true, server_address_,
+        strike_register_no_startup_period_));
     server_thread_->Initialize();
     server_address_ = IPEndPoint(server_address_.address(),
                                  server_thread_->GetPort());
@@ -884,6 +880,32 @@ TEST_P(EndToEndTest, StatelessRejectWithPacketLoss) {
   // should succeed.
   server_writer_->set_fake_drop_first_n_packets(1);
   ASSERT_EQ(!BothSidesSupportStatelessRejects(), Initialize());
+}
+
+TEST_P(EndToEndTest, SetInitialReceivedConnectionOptions) {
+  QuicTagVector initial_received_options;
+  initial_received_options.push_back(kTBBR);
+  initial_received_options.push_back(kIW10);
+  initial_received_options.push_back(kPRST);
+  EXPECT_TRUE(server_config_.SetInitialReceivedConnectionOptions(
+      initial_received_options));
+
+  ASSERT_TRUE(Initialize());
+  client_->client()->WaitForCryptoHandshakeConfirmed();
+  server_thread_->WaitForCryptoHandshakeConfirmed();
+
+  EXPECT_FALSE(server_config_.SetInitialReceivedConnectionOptions(
+      initial_received_options));
+
+  // Verify that server's configuration is correct.
+  server_thread_->Pause();
+  EXPECT_TRUE(server_config_.HasReceivedConnectionOptions());
+  EXPECT_TRUE(
+      ContainsQuicTag(server_config_.ReceivedConnectionOptions(), kTBBR));
+  EXPECT_TRUE(
+      ContainsQuicTag(server_config_.ReceivedConnectionOptions(), kIW10));
+  EXPECT_TRUE(
+      ContainsQuicTag(server_config_.ReceivedConnectionOptions(), kPRST));
 }
 
 TEST_P(EndToEndTest, CorrectlyConfiguredFec) {
@@ -1643,7 +1665,7 @@ TEST_P(EndToEndTest, ServerSendPublicResetWithDifferentConnectionId) {
   header.public_header.connection_id = incorrect_connection_id;
   header.public_header.reset_flag = true;
   header.public_header.version_flag = false;
-  header.rejected_sequence_number = 10101;
+  header.rejected_packet_number = 10101;
   QuicFramer framer(server_supported_versions_, QuicTime::Zero(),
                     Perspective::IS_SERVER);
   scoped_ptr<QuicEncryptedPacket> packet(framer.BuildPublicResetPacket(header));
@@ -1678,7 +1700,7 @@ TEST_P(EndToEndTest, ClientSendPublicResetWithDifferentConnectionId) {
   header.public_header.connection_id = incorrect_connection_id;
   header.public_header.reset_flag = true;
   header.public_header.version_flag = false;
-  header.rejected_sequence_number = 10101;
+  header.rejected_packet_number = 10101;
   QuicFramer framer(server_supported_versions_, QuicTime::Zero(),
                     Perspective::IS_CLIENT);
   scoped_ptr<QuicEncryptedPacket> packet(framer.BuildPublicResetPacket(header));
@@ -1820,7 +1842,7 @@ TEST_P(EndToEndTest, BadEncryptedData) {
   scoped_ptr<QuicEncryptedPacket> packet(ConstructEncryptedPacket(
       client_->client()->session()->connection()->connection_id(), false, false,
       1, "At least 20 characters.", PACKET_8BYTE_CONNECTION_ID,
-      PACKET_6BYTE_SEQUENCE_NUMBER));
+      PACKET_6BYTE_PACKET_NUMBER));
   // Damage the encrypted data.
   string damaged_packet(packet->data(), packet->length());
   damaged_packet[30] ^= 0x01;

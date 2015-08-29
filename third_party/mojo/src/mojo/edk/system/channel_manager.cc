@@ -57,7 +57,7 @@ void ChannelManager::ShutdownOnIOThread() {
   // consistency.
   ChannelIdToChannelMap channels;
   {
-    base::AutoLock locker(lock_);
+    MutexLocker locker(&mutex_);
     channels.swap(channels_);
   }
 
@@ -87,6 +87,13 @@ scoped_refptr<MessagePipeDispatcher> ChannelManager::CreateChannelOnIOThread(
   return dispatcher;
 }
 
+scoped_refptr<Channel> ChannelManager::CreateChannelWithoutBootstrapOnIOThread(
+    ChannelId channel_id,
+    embedder::ScopedPlatformHandle platform_handle) {
+  return CreateChannelOnIOThreadHelper(channel_id, platform_handle.Pass(),
+                                       nullptr);
+}
+
 scoped_refptr<MessagePipeDispatcher> ChannelManager::CreateChannel(
     ChannelId channel_id,
     embedder::ScopedPlatformHandle platform_handle,
@@ -110,7 +117,7 @@ scoped_refptr<MessagePipeDispatcher> ChannelManager::CreateChannel(
 }
 
 scoped_refptr<Channel> ChannelManager::GetChannel(ChannelId channel_id) const {
-  base::AutoLock locker(lock_);
+  MutexLocker locker(&mutex_);
   auto it = channels_.find(channel_id);
   DCHECK(it != channels_.end());
   return it->second;
@@ -123,7 +130,7 @@ void ChannelManager::WillShutdownChannel(ChannelId channel_id) {
 void ChannelManager::ShutdownChannelOnIOThread(ChannelId channel_id) {
   scoped_refptr<Channel> channel;
   {
-    base::AutoLock locker(lock_);
+    MutexLocker locker(&mutex_);
     auto it = channels_.find(channel_id);
     DCHECK(it != channels_.end());
     channel.swap(it->second);
@@ -138,7 +145,7 @@ void ChannelManager::ShutdownChannel(
     scoped_refptr<base::TaskRunner> callback_thread_task_runner) {
   scoped_refptr<Channel> channel;
   {
-    base::AutoLock locker(lock_);
+    MutexLocker locker(&mutex_);
     auto it = channels_.find(channel_id);
     DCHECK(it != channels_.end());
     channel.swap(it->second);
@@ -163,26 +170,27 @@ void ChannelManager::ShutdownHelper(
   }
 }
 
-void ChannelManager::CreateChannelOnIOThreadHelper(
+scoped_refptr<Channel> ChannelManager::CreateChannelOnIOThreadHelper(
     ChannelId channel_id,
     embedder::ScopedPlatformHandle platform_handle,
     scoped_refptr<system::ChannelEndpoint> bootstrap_channel_endpoint) {
   DCHECK_NE(channel_id, kInvalidChannelId);
   DCHECK(platform_handle.is_valid());
-  DCHECK(bootstrap_channel_endpoint);
 
   // Create and initialize a |system::Channel|.
   scoped_refptr<system::Channel> channel =
       new system::Channel(platform_support_);
   channel->Init(system::RawChannel::Create(platform_handle.Pass()));
-  channel->SetBootstrapEndpoint(bootstrap_channel_endpoint);
+  if (bootstrap_channel_endpoint)
+    channel->SetBootstrapEndpoint(bootstrap_channel_endpoint);
 
   {
-    base::AutoLock locker(lock_);
+    MutexLocker locker(&mutex_);
     CHECK(channels_.find(channel_id) == channels_.end());
     channels_[channel_id] = channel;
   }
   channel->SetChannelManager(this);
+  return channel;
 }
 
 void ChannelManager::CreateChannelHelper(

@@ -15,8 +15,15 @@
 
 class GoogleServiceAuthError;
 
+namespace syncer {
+class BaseTransaction;
+struct UserShare;
+}
+
 namespace sync_driver {
 
+class DataTypeController;
+class LocalDeviceInfoProvider;
 class OpenTabsUIDelegate;
 
 class SyncService : public DataTypeEncryptionHandler {
@@ -168,6 +175,9 @@ class SyncService : public DataTypeEncryptionHandler {
   // after calling this to force the encryption to occur.
   virtual void EnableEncryptEverything() = 0;
 
+  // Returns true if we are currently set to encrypt all the sync data.
+  virtual bool EncryptEverythingEnabled() const = 0;
+
   // Asynchronously sets the passphrase to |passphrase| for encryption. |type|
   // specifies whether the passphrase is a custom passphrase or the GAIA
   // password being reused as a passphrase.
@@ -181,6 +191,36 @@ class SyncService : public DataTypeEncryptionHandler {
   // copy of encrypted keys; returns true otherwise.
   virtual bool SetDecryptionPassphrase(const std::string& passphrase)
       WARN_UNUSED_RESULT = 0;
+
+  // Checks whether the Cryptographer is ready to encrypt and decrypt updates
+  // for sensitive data types. Caller must be holding a
+  // syncapi::BaseTransaction to ensure thread safety.
+  virtual bool IsCryptographerReady(
+      const syncer::BaseTransaction* trans) const = 0;
+
+  // TODO(akalin): This is called mostly by ModelAssociators and
+  // tests.  Figure out how to pass the handle to the ModelAssociators
+  // directly, figure out how to expose this to tests, and remove this
+  // function.
+  virtual syncer::UserShare* GetUserShare() const = 0;
+
+  // Returns DeviceInfo provider for the local device.
+  virtual LocalDeviceInfoProvider* GetLocalDeviceInfoProvider() const = 0;
+
+  // Registers a data type controller with the sync service.  This
+  // makes the data type controller available for use, it does not
+  // enable or activate the synchronization of the data type (see
+  // ActivateDataType).  Takes ownership of the pointer.
+  virtual void RegisterDataTypeController(
+      DataTypeController* data_type_controller) = 0;
+
+  // Called to re-enable a type disabled by DisableDatatype(..). Note, this does
+  // not change the preferred state of a datatype, and is not persisted across
+  // restarts.
+  virtual void ReenableDatatype(syncer::ModelType type) = 0;
+
+  // TODO(zea): Remove these and have the dtc's call directly into the SBH.
+  virtual void DeactivateDataType(syncer::ModelType type) = 0;
 
  protected:
   SyncService() {}

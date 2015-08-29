@@ -35,6 +35,19 @@ gypi_values = exec_script("//build/gypi_to_gn.py",
                           "scope",
                           [ "../chrome_browser.gypi" ])
 
+if (is_win) {
+  # This is in a separate config so the flags can be applied to dependents.
+  # ldflags in GN aren't automatically inherited.
+  config("browser_win_linker_flags") {
+    libs = [
+      "credui.lib",
+      "netapi32.lib",
+      "ndfapi.lib",  # Used by browser/net/net_error_diagnostics_dialog_win.h
+    ]
+    ldflags = [ "/DELAYLOAD:ndfapi.dll" ]
+  }
+}
+
 if (is_desktop_linux) {
   # Gnome-keyring is normally dynamically loaded. The gnome_keyring config
   # will set this up.
@@ -89,13 +102,13 @@ source_set("browser") {
     "//chrome/browser/ssl:cert_logger_proto",
     "//chrome/browser/ui",
     "//chrome/common",
-    "//chrome/common/net",
     "//components/autofill/core/browser",
     "//components/bookmarks/browser",
     "//components/bookmarks/managed",
     "//components/captive_portal",
     "//components/cloud_devices/common",
     "//components/component_updater",
+    "//components/compression",
     "//components/content_settings/content/common",
     "//components/content_settings/core/browser",
     "//components/content_settings/core/common",
@@ -142,9 +155,10 @@ source_set("browser") {
     "//components/strings",
     "//components/suggestions",
     "//components/sync_driver",
+    "//components/tracing:startup_tracing",
     "//components/translate/core/browser",
     "//components/translate/core/common",
-    "//components/ui/zoom:ui_zoom",
+    "//components/ui/zoom",
     "//components/undo",
     "//components/update_client",
     "//components/url_formatter",
@@ -152,6 +166,7 @@ source_set("browser") {
     "//components/user_prefs/tracked:user_prefs_tracked",
     "//components/variations",
     "//components/variations/net",
+    "//components/variations/service",
     "//components/webdata/common",
     "//components/webdata_services",
     "//components/web_resource",
@@ -252,7 +267,9 @@ source_set("browser") {
       "//chrome/app/theme:theme_resources",
       "//chrome/browser/devtools",
       "//chrome/browser/resources:component_extension_resources",
+      "//chrome/common/net",
       "//chrome/installer/util",
+      "//components/about_handler",
       "//components/app_modal",
       "//components/autofill/content/browser",
       "//components/browsing_data",
@@ -329,6 +346,9 @@ source_set("browser") {
   if (is_win || is_mac) {
     sources +=
         rebase_path(gypi_values.chrome_browser_win_mac_sources, ".", "//chrome")
+  }
+  if (!is_win && !is_mac && !is_ios) {
+    sources += [ "net/net_error_diagnostics_dialog_generic.cc" ]
   }
   if (!is_android && !is_ios && !is_chromeos && enable_configuration_policy) {
     sources += [
@@ -473,11 +493,13 @@ source_set("browser") {
   }
 
   if (is_linux) {
-    deps += [
-      "//device/media_transfer_protocol",
-      "//device/udev_linux",
-    ]
+    deps += [ "//device/media_transfer_protocol" ]
   }
+
+  if (use_udev) {
+    deps += [ "//device/udev_linux" ]
+  }
+
   if (is_linux && !is_chromeos) {
     deps += [ "//third_party/speech-dispatcher" ]
   }
@@ -587,7 +609,7 @@ source_set("browser") {
                            "//chrome")
     deps += [
       "//printing",
-      "//components/printing/browser:printing_browser",
+      "//components/printing/browser",
     ]
 
     if (is_win) {
@@ -736,10 +758,9 @@ source_set("browser") {
       "//ui/metro_viewer",
       "//win8:metro_viewer",
     ]
-    libs += [
-      "credui.lib",
-      "netapi32.lib",
-    ]
+
+    all_dependent_configs = [ ":browser_win_linker_flags" ]
+
     if (!is_chrome_branded) {
       deps -= [ "//google_update" ]
       sources -= [
@@ -974,6 +995,8 @@ source_set("test_support") {
   sources = [
     "browsing_data/mock_browsing_data_appcache_helper.cc",
     "browsing_data/mock_browsing_data_appcache_helper.h",
+    "browsing_data/mock_browsing_data_cache_storage_helper.cc",
+    "browsing_data/mock_browsing_data_cache_storage_helper.h",
     "browsing_data/mock_browsing_data_channel_id_helper.cc",
     "browsing_data/mock_browsing_data_channel_id_helper.h",
     "browsing_data/mock_browsing_data_cookie_helper.cc",

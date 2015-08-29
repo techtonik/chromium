@@ -67,6 +67,9 @@ enum VideoCodecProfile {
   VIDEO_CODEC_PROFILE_MAX = VP9PROFILE_MAX,
 };
 
+MEDIA_EXPORT VideoCodec
+VideoCodecProfileToVideoCodec(VideoCodecProfile profile);
+
 class MEDIA_EXPORT VideoDecoderConfig {
  public:
   // Constructs an uninitialized object. Clients should call Initialize() with
@@ -98,8 +101,7 @@ class MEDIA_EXPORT VideoDecoderConfig {
                   const gfx::Size& natural_size,
                   const uint8* extra_data,
                   size_t extra_data_size,
-                  bool is_encrypted,
-                  bool record_stats);
+                  bool is_encrypted);
 
   // Returns true if this object has appropriate configuration values, false
   // otherwise.

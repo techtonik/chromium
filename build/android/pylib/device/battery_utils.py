@@ -237,7 +237,8 @@ class BatteryUtils(object):
     if 'uids' not in self._cache:
       self._cache['uids'] = {}
     dumpsys_output = self._device.RunShellCommand(
-        ['dumpsys', 'batterystats', '-c'], check_return=True)
+        ['dumpsys', 'batterystats', '-c'],
+        check_return=True, large_output=True)
     csvreader = csv.reader(dumpsys_output)
     pwi_entries = collections.defaultdict(list)
     for entry in csvreader:
@@ -349,11 +350,12 @@ class BatteryUtils(object):
     else:
       command = self._cache['profile']['disable_command']
 
-    def set_and_verify_charging():
-      self._device.RunShellCommand(command, check_return=True, as_root=True)
+    def verify_charging():
       return self.GetCharging() == enabled
 
-    timeout_retry.WaitFor(set_and_verify_charging, wait_period=1)
+    self._device.RunShellCommand(
+        command, check_return=True, as_root=True, large_output=True)
+    timeout_retry.WaitFor(verify_charging, wait_period=1)
 
   # TODO(rnephew): Make private when all use cases can use the context manager.
   @decorators.WithTimeoutAndRetriesFromInstance()
@@ -433,6 +435,40 @@ class BatteryUtils(object):
     finally:
       self.EnableBatteryUpdates(timeout=timeout, retries=retries)
 
+  def _DischargeDevice(self, percent, wait_period=120):
+    """Disables charging and waits for device to discharge given amount
+
+    Args:
+      percent: level of charge to discharge.
+
+    Raises:
+      ValueError: If percent is not between 1 and 99.
+    """
+    battery_level = int(self.GetBatteryInfo().get('level'))
+    if not 0 < percent < 100:
+      raise ValueError('Discharge amount(%s) must be between 1 and 99'
+                       % percent)
+    if battery_level is None:
+      logging.warning('Unable to find current battery level. Cannot discharge.')
+      return
+    # Do not discharge if it would make battery level too low.
+    if percent >= battery_level - 10:
+      logging.warning('Battery is too low or discharge amount requested is too '
+                      'high. Cannot discharge phone %s percent.', percent)
+      return
+
+    self.SetCharging(False)
+    def device_discharged():
+      self.SetCharging(True)
+      current_level = int(self.GetBatteryInfo().get('level'))
+      logging.info('current battery level: %s', current_level)
+      if battery_level - current_level >= percent:
+        return True
+      self.SetCharging(False)
+      return False
+
+    timeout_retry.WaitFor(device_discharged, wait_period=wait_period)
+
   def ChargeDeviceToLevel(self, level, wait_period=60):
     """Enables charging and waits for device to be charged to given level.
 
@@ -467,7 +503,14 @@ class BatteryUtils(object):
         temp = 0
       else:
         logging.info('Current battery temperature: %s', temp)
-      return int(temp) <= target_temp
+      if int(temp) <= target_temp:
+        return True
+      else:
+        if self._cache['profile']['name'] == 'Nexus 5':
+          self._DischargeDevice(1)
+        return False
+
+    self._DiscoverDeviceProfile()
     self.EnableBatteryUpdates()
     logging.info('Waiting for the device to cool down to %s (0.1 C)',
                  target_temp)
@@ -487,20 +530,21 @@ class BatteryUtils(object):
       logging.warning('Device charging already in expected state: %s', enabled)
       return
 
+    self._DiscoverDeviceProfile()
     if enabled:
-      try:
+      if self._cache['profile']['enable_command']:
         self.SetCharging(enabled)
-      except device_errors.CommandFailedError:
-        logging.info('Unable to enable charging via hardware.'
-                     ' Falling back to software enabling.')
+      else:
+        logging.info('Unable to enable charging via hardware. '
+                     'Falling back to software enabling.')
         self.EnableBatteryUpdates()
     else:
-      try:
+      if self._cache['profile']['enable_command']:
         self._ClearPowerData()
         self.SetCharging(enabled)
-      except device_errors.CommandFailedError:
-        logging.info('Unable to disable charging via hardware.'
-                     ' Falling back to software disabling.')
+      else:
+        logging.info('Unable to disable charging via hardware. '
+                     'Falling back to software disabling.')
         self.DisableBatteryUpdates()
 
   @contextlib.contextmanager
@@ -555,7 +599,7 @@ class BatteryUtils(object):
     self._device.RunShellCommand(
         ['dumpsys', 'batterystats', '--reset'], check_return=True)
     battery_data = self._device.RunShellCommand(
-        ['dumpsys', 'batterystats', '--charged', '--checkin'],
+        ['dumpsys', 'batterystats', '--charged', '-c'],
         check_return=True, large_output=True)
     for line in battery_data:
       l = line.split(',')

@@ -57,7 +57,7 @@ class LayerTreeHostImpl;
 class LayerTreeImpl;
 class MicroBenchmarkImpl;
 class Occlusion;
-class OpacityTree;
+class EffectTree;
 class PrioritizedTile;
 class RenderPass;
 class RenderPassId;
@@ -162,8 +162,8 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   void SetClipTreeIndex(int index);
   int clip_tree_index() const { return clip_tree_index_; }
 
-  void SetOpacityTreeIndex(int index);
-  int opacity_tree_index() const { return opacity_tree_index_; }
+  void SetEffectTreeIndex(int index);
+  int effect_tree_index() const { return effect_tree_index_; }
 
   void set_offset_to_transform_parent(const gfx::Vector2dF& offset) {
     offset_to_transform_parent_ = offset;
@@ -326,6 +326,13 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
 
   void SetBlendMode(SkXfermode::Mode);
   SkXfermode::Mode blend_mode() const { return blend_mode_; }
+  void set_draw_blend_mode(SkXfermode::Mode blend_mode) {
+    if (draw_blend_mode_ == blend_mode)
+      return;
+    draw_blend_mode_ = blend_mode;
+    SetNeedsPushProperties();
+  }
+  SkXfermode::Mode draw_blend_mode() const { return draw_blend_mode_; }
   bool uses_default_blend_mode() const {
     return blend_mode_ == SkXfermode::kSrcOver_Mode;
   }
@@ -382,12 +389,8 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
 
   RenderSurfaceImpl* render_surface() const { return render_surface_.get(); }
 
-  DrawProperties<LayerImpl>& draw_properties() {
-    return draw_properties_;
-  }
-  const DrawProperties<LayerImpl>& draw_properties() const {
-    return draw_properties_;
-  }
+  DrawProperties& draw_properties() { return draw_properties_; }
+  const DrawProperties& draw_properties() const { return draw_properties_; }
 
   // The following are shortcut accessors to get various information from
   // draw_properties_
@@ -398,9 +401,6 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
     return draw_properties_.screen_space_transform;
   }
   float draw_opacity() const { return draw_properties_.opacity; }
-  SkXfermode::Mode draw_blend_mode() const {
-    return draw_properties_.blend_mode;
-  }
   bool screen_space_transform_is_animating() const {
     return draw_properties_.screen_space_transform_is_animating;
   }
@@ -567,11 +567,10 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
 
   // Note this rect is in layer space (not content space).
   void SetUpdateRect(const gfx::Rect& update_rect);
-  gfx::Rect update_rect() const { return update_rect_; }
+  const gfx::Rect& update_rect() const { return update_rect_; }
 
-  void AddDamageRect(const gfx::RectF& damage_rect);
-
-  const gfx::RectF& damage_rect() const { return damage_rect_; }
+  void AddDamageRect(const gfx::Rect& damage_rect);
+  const gfx::Rect& damage_rect() const { return damage_rect_; }
 
   virtual base::DictionaryValue* LayerTreeAsJson() const;
 
@@ -761,7 +760,6 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
 
   gfx::Vector2dF offset_to_transform_parent_;
 
-  bool scrollable_ : 1;
   bool should_scroll_on_main_thread_ : 1;
   bool have_wheel_event_handlers_ : 1;
   bool have_scroll_event_handlers_ : 1;
@@ -802,6 +800,9 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
 
   float opacity_;
   SkXfermode::Mode blend_mode_;
+  // draw_blend_mode may be different than blend_mode_,
+  // when a RenderSurface re-parents the layer's blend_mode.
+  SkXfermode::Mode draw_blend_mode_;
   gfx::PointF position_;
   gfx::Transform transform_;
 
@@ -814,7 +815,7 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   gfx::Rect visible_rect_from_property_trees_;
   gfx::Rect clip_rect_in_target_space_from_property_trees_;
   int transform_tree_index_;
-  int opacity_tree_index_;
+  int effect_tree_index_;
   int clip_tree_index_;
 
   // The global depth value of the center of the layer. This value is used
@@ -846,11 +847,12 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
  private:
   // Rect indicating what was repainted/updated during update.
   // Note that plugin layers bypass this and leave it empty.
-  // Uses layer (not content) space.
+  // This is in the layer's space.
   gfx::Rect update_rect_;
 
-  // This rect is in layer space.
-  gfx::RectF damage_rect_;
+  // Denotes an area that is damaged and needs redraw. This is in the layer's
+  // space.
+  gfx::Rect damage_rect_;
 
   // Manages animations for this layer.
   scoped_refptr<LayerAnimationController> layer_animation_controller_;
@@ -864,7 +866,7 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
 
   // Group of properties that need to be computed based on the layer tree
   // hierarchy before layers can be drawn.
-  DrawProperties<LayerImpl> draw_properties_;
+  DrawProperties draw_properties_;
 
   scoped_refptr<base::trace_event::ConvertableToTraceFormat> debug_info_;
   scoped_ptr<RenderSurfaceImpl> render_surface_;

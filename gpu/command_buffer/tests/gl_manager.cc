@@ -28,6 +28,7 @@
 #include "gpu/command_buffer/service/image_manager.h"
 #include "gpu/command_buffer/service/mailbox_manager_impl.h"
 #include "gpu/command_buffer/service/memory_tracking.h"
+#include "gpu/command_buffer/service/transfer_buffer_manager.h"
 #include "gpu/command_buffer/service/valuebuffer_manager.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/gfx/buffer_format_util.h"
@@ -39,78 +40,6 @@
 
 namespace gpu {
 namespace {
-
-size_t SubsamplingFactor(gfx::BufferFormat format, int plane) {
-  switch (format) {
-    case gfx::BufferFormat::ATC:
-    case gfx::BufferFormat::ATCIA:
-    case gfx::BufferFormat::DXT1:
-    case gfx::BufferFormat::DXT5:
-    case gfx::BufferFormat::ETC1:
-    case gfx::BufferFormat::R_8:
-    case gfx::BufferFormat::RGBA_4444:
-    case gfx::BufferFormat::RGBA_8888:
-    case gfx::BufferFormat::RGBX_8888:
-    case gfx::BufferFormat::BGRA_8888:
-      return 1;
-    case gfx::BufferFormat::YUV_420: {
-      static size_t factor[] = {1, 2, 2};
-      DCHECK_LT(static_cast<size_t>(plane), arraysize(factor));
-      return factor[plane];
-    }
-    case gfx::BufferFormat::YUV_420_BIPLANAR: {
-      static size_t factor[] = {1, 2};
-      DCHECK_LT(static_cast<size_t>(plane), arraysize(factor));
-      return factor[plane];
-    }
-  }
-  NOTREACHED();
-  return 0;
-}
-
-size_t StrideInBytes(size_t width, gfx::BufferFormat format, int plane) {
-  switch (format) {
-    case gfx::BufferFormat::ATCIA:
-    case gfx::BufferFormat::DXT5:
-      DCHECK_EQ(plane, 0);
-      return width;
-    case gfx::BufferFormat::ATC:
-    case gfx::BufferFormat::DXT1:
-    case gfx::BufferFormat::ETC1:
-      DCHECK_EQ(plane, 0);
-      DCHECK_EQ(width % 2, 0U);
-      return width / 2;
-    case gfx::BufferFormat::R_8:
-      return (width + 3) & ~0x3;
-    case gfx::BufferFormat::RGBA_4444:
-      DCHECK_EQ(plane, 0);
-      return width * 2;
-    case gfx::BufferFormat::RGBA_8888:
-    case gfx::BufferFormat::BGRA_8888:
-      DCHECK_EQ(plane, 0);
-      return width * 4;
-    case gfx::BufferFormat::RGBX_8888:
-      NOTREACHED();
-      return 0;
-    case gfx::BufferFormat::YUV_420:
-      return width / SubsamplingFactor(format, plane);
-    case gfx::BufferFormat::YUV_420_BIPLANAR:
-      return width;
-  }
-
-  NOTREACHED();
-  return 0;
-}
-
-size_t BufferSizeInBytes(const gfx::Size& size, gfx::BufferFormat format) {
-  size_t size_in_bytes = 0;
-  size_t num_planes = gfx::NumberOfPlanesForBufferFormat(format);
-  for (size_t i = 0; i < num_planes; ++i) {
-    size_in_bytes += StrideInBytes(size.width(), format, i) *
-                     (size.height() / SubsamplingFactor(format, i));
-  }
-  return size_in_bytes;
-}
 
 class GpuMemoryBufferImpl : public gfx::GpuMemoryBuffer {
  public:
@@ -129,8 +58,9 @@ class GpuMemoryBufferImpl : public gfx::GpuMemoryBuffer {
     size_t num_planes = gfx::NumberOfPlanesForBufferFormat(format_);
     for (size_t i = 0; i < num_planes; ++i) {
       data[i] = reinterpret_cast<uint8*>(&bytes_->data().front()) + offset;
-      offset += StrideInBytes(size_.width(), format_, i) *
-                (size_.height() / SubsamplingFactor(format_, i));
+      offset +=
+          gfx::RowSizeForBufferFormat(size_.width(), format_, i) *
+          (size_.height() / gfx::SubsamplingFactorForBufferFormat(format_, i));
     }
     mapped_ = true;
     return true;
@@ -141,11 +71,11 @@ class GpuMemoryBufferImpl : public gfx::GpuMemoryBuffer {
   void GetStride(int* stride) const override {
     size_t num_planes = gfx::NumberOfPlanesForBufferFormat(format_);
     for (size_t i = 0; i < num_planes; ++i)
-      stride[i] = StrideInBytes(size_.width(), format_, i);
+      stride[i] = gfx::RowSizeForBufferFormat(size_.width(), format_, i);
   }
   gfx::GpuMemoryBufferId GetId() const override {
     NOTREACHED();
-    return 0;
+    return gfx::GpuMemoryBufferId(0);
   }
   gfx::GpuMemoryBufferHandle GetHandle() const override {
     NOTREACHED();
@@ -208,7 +138,7 @@ GLManager::~GLManager() {
 scoped_ptr<gfx::GpuMemoryBuffer> GLManager::CreateGpuMemoryBuffer(
     const gfx::Size& size,
     gfx::BufferFormat format) {
-  std::vector<unsigned char> data(BufferSizeInBytes(size, format), 0);
+  std::vector<uint8> data(gfx::BufferSizeForBufferFormat(size, format), 0);
   scoped_refptr<base::RefCountedBytes> bytes(new base::RefCountedBytes(data));
   return make_scoped_ptr<gfx::GpuMemoryBuffer>(
       new GpuMemoryBufferImpl(bytes.get(), size, format));
@@ -275,14 +205,10 @@ void GLManager::InitializeWithCommandLine(const GLManager::Options& options,
     scoped_refptr<gles2::FeatureInfo> feature_info;
     if (command_line)
       feature_info = new gles2::FeatureInfo(*command_line);
-    context_group =
-        new gles2::ContextGroup(mailbox_manager_.get(),
-                                NULL,
-                                new gpu::gles2::ShaderTranslatorCache,
-                                feature_info,
-                                NULL,
-                                NULL,
-                                options.bind_generates_resource);
+    context_group = new gles2::ContextGroup(
+        mailbox_manager_.get(), NULL, new gpu::gles2::ShaderTranslatorCache,
+        new gpu::gles2::FramebufferCompletenessCache, feature_info, NULL, NULL,
+        options.bind_generates_resource);
   }
 
   decoder_.reset(::gpu::gles2::GLES2Decoder::Create(context_group));

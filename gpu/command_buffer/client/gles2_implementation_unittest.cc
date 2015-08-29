@@ -137,6 +137,8 @@ class MockTransferBuffer : public TransferBufferInterface {
   RingBuffer::Offset GetOffset(void* pointer) const override;
   void DiscardBlock(void* p) override;
   void FreePendingToken(void* p, unsigned int /* token */) override;
+  unsigned int GetSize() const override;
+  unsigned int GetFreeSize() const override;
 
   size_t MaxTransferBufferSize() {
     return size_ - result_size_;
@@ -307,6 +309,14 @@ void MockTransferBuffer::DiscardBlock(void* p) {
 void MockTransferBuffer::FreePendingToken(void* p, unsigned int /* token */) {
   EXPECT_EQ(last_alloc_, p);
   last_alloc_ = NULL;
+}
+
+unsigned int MockTransferBuffer::GetSize() const {
+  return 0;
+}
+
+unsigned int MockTransferBuffer::GetFreeSize() const {
+  return 0;
 }
 
 // API wrapper for Buffers.
@@ -542,6 +552,10 @@ class GLES2ImplementationTest : public testing::Test {
 
   QueryTracker::Query* GetQuery(GLuint id) {
     return gl_->query_tracker_->GetQuery(id);
+  }
+
+  QueryTracker* GetQueryTracker() {
+    return gl_->query_tracker_.get();
   }
 
   struct ContextInitOptions {
@@ -2209,6 +2223,42 @@ TEST_F(GLES2ImplementationTest, GetIntegerCacheRead) {
   EXPECT_EQ(static_cast<GLenum>(GL_NO_ERROR), gl_->GetError());
 }
 
+TEST_F(GLES2ImplementationTest, GetIntegerDisjointValue) {
+  ExpectedMemoryInfo mem = GetExpectedMappedMemory(sizeof(DisjointValueSync));
+  gl_->SetDisjointValueSyncCHROMIUM();
+  ASSERT_EQ(mem.id, GetQueryTracker()->DisjointCountSyncShmID());
+  ASSERT_EQ(mem.offset, GetQueryTracker()->DisjointCountSyncShmOffset());
+  DisjointValueSync* disjoint_sync =
+      reinterpret_cast<DisjointValueSync*>(mem.ptr);
+
+  ClearCommands();
+  GLint disjoint_value = -1;
+  gl_->GetIntegerv(GL_GPU_DISJOINT_EXT, &disjoint_value);
+  EXPECT_TRUE(NoCommandsWritten());
+  EXPECT_EQ(0, disjoint_value);
+
+  // After setting disjoint, it should be true.
+  disjoint_value = -1;
+  disjoint_sync->SetDisjointCount(1);
+  gl_->GetIntegerv(GL_GPU_DISJOINT_EXT, &disjoint_value);
+  EXPECT_TRUE(NoCommandsWritten());
+  EXPECT_EQ(1, disjoint_value);
+
+  // After checking disjoint, it should be false again.
+  disjoint_value = -1;
+  gl_->GetIntegerv(GL_GPU_DISJOINT_EXT, &disjoint_value);
+  EXPECT_TRUE(NoCommandsWritten());
+  EXPECT_EQ(0, disjoint_value);
+
+  // Check for errors.
+  ExpectedMemoryInfo result1 =
+      GetExpectedResultMemory(sizeof(cmds::GetError::Result));
+  EXPECT_CALL(*command_buffer(), OnFlush())
+      .WillOnce(SetMemory(result1.ptr, GLuint(GL_NO_ERROR)))
+      .RetiresOnSaturation();
+  EXPECT_EQ(static_cast<GLenum>(GL_NO_ERROR), gl_->GetError());
+}
+
 TEST_F(GLES2ImplementationTest, GetIntegerCacheWrite) {
   struct PNameValue {
     GLenum pname;
@@ -2590,15 +2640,6 @@ TEST_F(GLES2ImplementationTest, TextureInvalidArguments) {
   gl_->TexImage2D(
       kTarget, kLevel, kFormat, kWidth, kHeight, kInvalidBorder, kFormat, kType,
       pixels);
-
-  EXPECT_TRUE(NoCommandsWritten());
-  EXPECT_EQ(GL_INVALID_VALUE, CheckError());
-
-  ClearCommands();
-
-  gl_->AsyncTexImage2DCHROMIUM(
-      kTarget, kLevel, kFormat, kWidth, kHeight, kInvalidBorder, kFormat, kType,
-      NULL);
 
   EXPECT_TRUE(NoCommandsWritten());
   EXPECT_EQ(GL_INVALID_VALUE, CheckError());
@@ -3258,6 +3299,21 @@ TEST_F(GLES2ImplementationManualInitTest, BadQueryTargets) {
   EXPECT_EQ(nullptr, GetQuery(id));
 }
 
+TEST_F(GLES2ImplementationTest, SetDisjointSync) {
+  struct SetDisjointSyncCmd {
+    cmds::SetDisjointValueSyncCHROMIUM disjoint_sync;
+  };
+  SetDisjointSyncCmd expected_disjoint_sync_cmd;
+  const void* commands = GetPut();
+  gl_->SetDisjointValueSyncCHROMIUM();
+  expected_disjoint_sync_cmd.disjoint_sync.Init(
+      GetQueryTracker()->DisjointCountSyncShmID(),
+      GetQueryTracker()->DisjointCountSyncShmOffset());
+
+  EXPECT_EQ(0, memcmp(&expected_disjoint_sync_cmd, commands,
+                      sizeof(expected_disjoint_sync_cmd)));
+}
+
 TEST_F(GLES2ImplementationTest, QueryCounterEXT) {
   GLuint expected_ids[2] = { 1, 2 }; // These must match what's actually genned.
   struct GenCmds {
@@ -3272,6 +3328,10 @@ TEST_F(GLES2ImplementationTest, QueryCounterEXT) {
       &expected_gen_cmds, commands_, sizeof(expected_gen_cmds)));
   GLuint id1 = ids[0];
   GLuint id2 = ids[1];
+  ClearCommands();
+
+  // Make sure disjoint value is synchronized already.
+  gl_->SetDisjointValueSyncCHROMIUM();
   ClearCommands();
 
   // Test QueryCounterEXT fails if id = 0.

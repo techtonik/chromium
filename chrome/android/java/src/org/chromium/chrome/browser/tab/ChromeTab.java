@@ -15,8 +15,6 @@ import android.os.Handler;
 import android.os.Message;
 import android.text.TextUtils;
 import android.util.Pair;
-import android.view.ActionMode;
-import android.view.ContextMenu;
 import android.view.KeyEvent;
 import android.view.View;
 
@@ -29,11 +27,9 @@ import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.ChromeApplication;
 import org.chromium.chrome.browser.ChromeWebContentsDelegateAndroid;
 import org.chromium.chrome.browser.FrozenNativePage;
-import org.chromium.chrome.browser.IntentHandler.TabOpenType;
 import org.chromium.chrome.browser.NativePage;
 import org.chromium.chrome.browser.TabState;
 import org.chromium.chrome.browser.contextmenu.ChromeContextMenuPopulator;
-import org.chromium.chrome.browser.contextmenu.ContextMenuParams;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulator;
 import org.chromium.chrome.browser.contextualsearch.ContextualSearchTabHelper;
 import org.chromium.chrome.browser.crash.MinidumpUploadService;
@@ -46,7 +42,7 @@ import org.chromium.chrome.browser.externalnav.ExternalNavigationHandler;
 import org.chromium.chrome.browser.externalnav.ExternalNavigationHandler.OverrideUrlLoadingResult;
 import org.chromium.chrome.browser.externalnav.ExternalNavigationParams;
 import org.chromium.chrome.browser.fullscreen.FullscreenManager;
-import org.chromium.chrome.browser.media.MediaNotificationService;
+import org.chromium.chrome.browser.media.MediaCaptureNotificationService;
 import org.chromium.chrome.browser.media.ui.MediaSessionTabHelper;
 import org.chromium.chrome.browser.net.spdyproxy.DataReductionProxySettings;
 import org.chromium.chrome.browser.ntp.NativePageAssassin;
@@ -57,6 +53,7 @@ import org.chromium.chrome.browser.policy.PolicyAuditor.AuditEvent;
 import org.chromium.chrome.browser.preferences.PrefServiceBridge;
 import org.chromium.chrome.browser.rlz.RevenueStats;
 import org.chromium.chrome.browser.search_engines.TemplateUrlService;
+import org.chromium.chrome.browser.snackbar.SnackbarManager;
 import org.chromium.chrome.browser.tab.TabUma.TabCreationState;
 import org.chromium.chrome.browser.tabmodel.TabCreatorManager.TabCreator;
 import org.chromium.chrome.browser.tabmodel.TabModel;
@@ -71,8 +68,6 @@ import org.chromium.content.browser.ActivityContentVideoViewClient;
 import org.chromium.content.browser.ContentVideoViewClient;
 import org.chromium.content.browser.ContentViewClient;
 import org.chromium.content.browser.ContentViewCore;
-import org.chromium.content.browser.SelectActionMode;
-import org.chromium.content.browser.SelectActionModeCallback.ActionHandler;
 import org.chromium.content.browser.crypto.CipherFactory;
 import org.chromium.content_public.browser.GestureStateListener;
 import org.chromium.content_public.browser.InvalidateTypes;
@@ -369,8 +364,8 @@ public class ChromeTab extends Tab {
 
             // TODO(dfalcantara): Re-remove this once crbug.com/508366 is fixed.
             TabCreator tabCreator = mActivity.getTabCreator(isIncognito());
-            assert tabCreator != null;
-            if (tabCreator.createsTabsAsynchronously()) {
+
+            if (tabCreator != null && tabCreator.createsTabsAsynchronously()) {
                 DocumentWebContentsDelegate.getInstance().attachDelegate(newWebContents);
             }
         }
@@ -420,9 +415,14 @@ public class ChromeTab extends Tab {
             TabModel model = getTabModel();
             int index = model.indexOf(ChromeTab.this);
             if (index == TabModel.INVALID_TAB_INDEX) return;
-
             TabModelUtils.setIndex(model, index);
+            bringActivityToForeground();
+        }
 
+        /**
+         * Brings chrome's Activity to foreground, if it is not so.
+         */
+        protected void bringActivityToForeground() {
             // This intent is sent in order to get the activity back to the foreground if it was
             // not already. The previous call will activate the right tab in the context of the
             // TabModel but will only show the tab to the user if Chrome was already in the
@@ -433,12 +433,7 @@ public class ChromeTab extends Tab {
             // Note that calling only the intent in order to activate the tab is slightly slower
             // because it will change the tab when the intent is handled, which happens after
             // Chrome gets back to the foreground.
-            Intent newIntent = new Intent();
-            newIntent.setAction(Intent.ACTION_MAIN);
-            newIntent.setPackage(mActivity.getPackageName());
-            newIntent.putExtra(TabOpenType.BRING_TAB_TO_FRONT.name(),
-                               ChromeTab.this.getId());
-
+            Intent newIntent = Tab.createBringTabToFrontIntent(ChromeTab.this.getId());
             newIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
             getApplicationContext().startActivity(newIntent);
@@ -447,9 +442,9 @@ public class ChromeTab extends Tab {
         @Override
         public void navigationStateChanged(int flags) {
             if ((flags & InvalidateTypes.TAB) != 0) {
-                MediaNotificationService.updateMediaNotificationForTab(
+                MediaCaptureNotificationService.updateMediaNotificationForTab(
                         getApplicationContext(), getId(), isCapturingAudio(),
-                        isCapturingVideo(), false, getUrl());
+                        isCapturingVideo(), getUrl());
             }
             super.navigationStateChanged(flags);
         }
@@ -552,14 +547,6 @@ public class ChromeTab extends Tab {
             return !isClosing()
                     && ChromeWebContentsDelegateAndroid.nativeIsCapturingVideo(getWebContents());
         }
-
-        /**
-         * @return Whether audio is being played.
-         */
-        private boolean hasAudibleAudio() {
-            return !isClosing()
-                    && ChromeWebContentsDelegateAndroid.nativeHasAudibleAudio(getWebContents());
-        }
     }
 
     /**
@@ -573,14 +560,6 @@ public class ChromeTab extends Tab {
     }
 
     private class ChromeTabChromeContextMenuItemDelegate extends TabChromeContextMenuItemDelegate {
-        private boolean mIsImage;
-        private boolean mIsVideo;
-
-        public void setParamsInfo(boolean isImage, boolean isVideo) {
-            mIsImage = isImage;
-            mIsVideo = isVideo;
-        }
-
         @Override
         public boolean isIncognitoSupported() {
             return PrefServiceBridge.getInstance().isIncognitoModeEnabled();
@@ -598,46 +577,14 @@ public class ChromeTab extends Tab {
 
         @Override
         public boolean startDownload(String url, boolean isLink) {
-            if (isLink) {
-                RecordUserAction.record("MobileContextMenuDownloadLink");
-                if (shouldInterceptContextMenuDownload(url)) {
-                    return false;
-                }
-            } else if (mIsImage) {
-                RecordUserAction.record("MobileContextMenuDownloadImage");
-            } else if (mIsVideo) {
-                RecordUserAction.record("MobileContextMenuDownloadVideo");
+            if (isLink && shouldInterceptContextMenuDownload(url)) {
+                return false;
             }
             return true;
         }
 
         @Override
-        public void onSaveToClipboard(String text, int clipboardType) {
-            switch (clipboardType) {
-                case CLIPBOARD_TYPE_LINK_URL:
-                    RecordUserAction.record("MobileContextMenuCopyLinkAddress");
-                    break;
-                case CLIPBOARD_TYPE_LINK_TEXT:
-                    RecordUserAction.record("MobileContextMenuCopyLinkText");
-                    break;
-                case CLIPBOARD_TYPE_IMAGE_URL:
-                    RecordUserAction.record("MobileContextMenuCopyImageLinkAddress");
-                    break;
-                default:
-                    assert false;
-            }
-            super.onSaveToClipboard(text, clipboardType);
-        }
-
-        @Override
-        public void onSaveImageToClipboard(String url) {
-            RecordUserAction.record("MobileContextMenuSaveImage");
-            super.onSaveImageToClipboard(url);
-        }
-
-        @Override
         public void onOpenInNewTab(String url, Referrer referrer) {
-            RecordUserAction.record("MobileContextMenuOpenLinkInNewTab");
             RecordUserAction.record("MobileNewTabOpened");
             LoadUrlParams loadUrlParams = new LoadUrlParams(url);
             loadUrlParams.setReferrer(referrer);
@@ -647,75 +594,25 @@ public class ChromeTab extends Tab {
 
         @Override
         public void onOpenInNewIncognitoTab(String url) {
-            RecordUserAction.record("MobileContextMenuOpenLinkInIncognito");
             RecordUserAction.record("MobileNewTabOpened");
             mActivity.getTabModelSelector().openNewTab(new LoadUrlParams(url),
                     TabLaunchType.FROM_LONGPRESS_FOREGROUND, ChromeTab.this, true);
         }
 
         @Override
-        public void onOpenImageUrl(String url, Referrer referrer) {
-            RecordUserAction.record("MobileContextMenuViewImage");
-            super.onOpenImageUrl(url, referrer);
-        }
-
-        @Override
         public void onOpenImageInNewTab(String url, Referrer referrer) {
             boolean useOriginal = isSpdyProxyEnabledForUrl(url);
-            RecordUserAction.record("MobileContextMenuOpenImageInNewTab");
-            if (useOriginal) {
-                RecordUserAction.record("MobileContextMenuOpenOriginalImageInNewTab");
-            }
-
             LoadUrlParams loadUrlParams = new LoadUrlParams(url);
             loadUrlParams.setVerbatimHeaders(useOriginal ? PAGESPEED_PASSTHROUGH_HEADERS : null);
             loadUrlParams.setReferrer(referrer);
             mActivity.getTabModelSelector().openNewTab(loadUrlParams,
                     TabLaunchType.FROM_LONGPRESS_BACKGROUND, ChromeTab.this, isIncognito());
         }
-
-        @Override
-        public void onSearchByImageInNewTab() {
-            RecordUserAction.record("MobileContextMenuSearchByImage");
-            super.onSearchByImageInNewTab();
-        }
-    }
-
-    /**
-     * This class is solely to track UMA stats.  When we upstream UMA stats we can remove this.
-     */
-    private static class ChromeTabChromeContextMenuPopulator extends ChromeContextMenuPopulator {
-        private final ChromeTabChromeContextMenuItemDelegate mDelegate;
-
-        public ChromeTabChromeContextMenuPopulator(
-                ChromeTabChromeContextMenuItemDelegate delegate) {
-            super(delegate);
-
-            mDelegate = delegate;
-        }
-
-        @Override
-        public void buildContextMenu(ContextMenu menu, Context context,
-                ContextMenuParams params) {
-            if (params.isAnchor()) {
-                RecordUserAction.record("MobileContextMenuLink");
-            } else if (params.isImage()) {
-                RecordUserAction.record("MobileContextMenuImage");
-            } else if (params.isSelectedText()) {
-                RecordUserAction.record("MobileContextMenuText");
-            } else if (params.isVideo()) {
-                RecordUserAction.record("MobileContextMenuVideo");
-            }
-
-            mDelegate.setParamsInfo(params.isImage(), params.isVideo());
-            super.buildContextMenu(menu, context, params);
-        }
     }
 
     @Override
     protected ContextMenuPopulator createContextMenuPopulator() {
-        return new ChromeTabChromeContextMenuPopulator(
-                new ChromeTabChromeContextMenuItemDelegate());
+        return new ChromeContextMenuPopulator(new ChromeTabChromeContextMenuItemDelegate());
     }
 
     @VisibleForTesting
@@ -759,21 +656,6 @@ public class ChromeTab extends Tab {
             @Override
             public boolean doesPerformWebSearch() {
                 return true;
-            }
-
-            @Override
-            public SelectActionMode startActionMode(
-                    View view, ActionHandler actionHandler, boolean floating) {
-                if (floating) return null;
-                ChromeSelectActionModeCallback callback =
-                        new ChromeSelectActionModeCallback(view.getContext(), actionHandler);
-                ActionMode actionMode = view.startActionMode(callback);
-                return actionMode != null ? new SelectActionMode(actionMode) : null;
-            }
-
-            @Override
-            public boolean supportsFloatingActionMode() {
-                return false;
             }
 
             @Override
@@ -894,8 +776,8 @@ public class ChromeTab extends Tab {
 
             @Override
             public void destroy() {
-                MediaNotificationService.updateMediaNotificationForTab(
-                        getApplicationContext(), getId(), false, false, false, getUrl());
+                MediaCaptureNotificationService.updateMediaNotificationForTab(
+                        getApplicationContext(), getId(), false, false, getUrl());
                 super.destroy();
             }
         };
@@ -1367,5 +1249,10 @@ public class ChromeTab extends Tab {
     @VisibleForTesting
     public OverrideUrlLoadingResult getLastOverrideUrlLoadingResultForTests() {
         return mLastOverrideUrlLoadingResult;
+    }
+
+    @Override
+    public SnackbarManager getSnackbarManager() {
+        return mActivity.getSnackbarManager();
     }
 }

@@ -27,7 +27,6 @@ struct ShortcutInfo {
     SOURCE_COUNT = 5
   };
 
-  ShortcutInfo();
   explicit ShortcutInfo(const GURL& shortcut_url);
   ~ShortcutInfo();
 
@@ -41,10 +40,11 @@ struct ShortcutInfo {
   base::string16 user_title;
   base::string16 name;
   base::string16 short_name;
-  content::Manifest::DisplayMode display;
+  blink::WebDisplayMode display;
   blink::WebScreenOrientationLockType orientation;
   Source source;
   int64_t theme_color;
+  int64_t background_color;
 };
 
 #endif  // CHROME_BROWSER_ANDROID_SHORTCUT_INFO_H_

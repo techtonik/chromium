@@ -43,6 +43,8 @@
       'common/common_param_traits.cc',
       'common/common_param_traits.h',
       'common/common_param_traits_macros.h',
+      'common/component_flash_hint_file_linux.h',
+      'common/component_flash_hint_file_linux.cc',
       'common/content_restriction.h',
       'common/content_settings_pattern_serializer.cc',
       'common/content_settings_pattern_serializer.h',
@@ -51,8 +53,6 @@
       'common/custom_handlers/protocol_handler.cc',
       'common/custom_handlers/protocol_handler.h',
       'common/descriptors_android.h',
-      'common/gcm_desktop_util.cc',
-      'common/gcm_desktop_util.h',
       'common/icon_with_badge_image_source.cc',
       'common/icon_with_badge_image_source.h',
       'common/ini_parser.cc',
@@ -119,8 +119,6 @@
       'common/url_constants.h',
       'common/v8_breakpad_support_win.cc',
       'common/v8_breakpad_support_win.h',
-      'common/variations/experiment_labels.cc',
-      'common/variations/experiment_labels.h',
       'common/variations/variations_util.cc',
       'common/variations/variations_util.h',
       'common/web_application_info.cc',
@@ -321,7 +319,6 @@
         # TODO(gregoryd): chrome_resources and chrome_strings could be
         #  shared with the 64-bit target, but it does not work due to a gyp
         # issue.
-        'common_net',
         'installer_util',
         'safe_browsing_proto',
         '<(DEPTH)/base/base.gyp:base',
@@ -336,6 +333,7 @@
         '<(DEPTH)/components/components.gyp:cloud_devices_common',
         '<(DEPTH)/components/components.gyp:component_updater',
         '<(DEPTH)/components/components.gyp:content_settings_core_common',
+        '<(DEPTH)/components/components.gyp:crash_keys',
         '<(DEPTH)/components/components.gyp:favicon_base',
         '<(DEPTH)/components/components.gyp:gcm_driver_common',
         '<(DEPTH)/components/components.gyp:json_schema',
@@ -502,7 +500,6 @@
             'common/extensions/manifest_handlers/minimum_chrome_version_checker.cc',
             'common/icon_with_badge_image_source.cc',
             'common/media_galleries/metadata_types.h',
-            'common/net/url_util.cc',
           ],
         }, {
           # Non-Android.
@@ -568,8 +565,6 @@
       'sources': [
         'common/net/net_resource_provider.cc',
         'common/net/net_resource_provider.h',
-        'common/net/url_util.cc',
-        'common/net/url_util.h',
         'common/net/x509_certificate_model.cc',
         'common/net/x509_certificate_model.h',
         'common/net/x509_certificate_model_nss.cc',

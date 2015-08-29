@@ -56,6 +56,7 @@
         "proximity_auth/connection.h",
         "proximity_auth/connection_finder.h",
         "proximity_auth/connection_observer.h",
+        "proximity_auth/controller.h",
         "proximity_auth/device_to_device_authenticator.cc",
         "proximity_auth/device_to_device_authenticator.h",
         "proximity_auth/device_to_device_initiator_operations.cc",
@@ -83,6 +84,8 @@
         "proximity_auth/switches.h",
         "proximity_auth/throttled_bluetooth_connection_finder.cc",
         "proximity_auth/throttled_bluetooth_connection_finder.h",
+        "proximity_auth/unlock_manager.cc",
+        "proximity_auth/unlock_manager.h",
         "proximity_auth/wire_message.cc",
         "proximity_auth/wire_message.h",
       ],
@@ -100,10 +103,13 @@
       'dependencies': [
         ':cryptauth_test_support',
         '../base/base.gyp:base',
+        '../testing/gmock.gyp:gmock',
       ],
       'sources': [
         "proximity_auth/device_to_device_responder_operations.cc",
         "proximity_auth/device_to_device_responder_operations.h",
+        "proximity_auth/mock_proximity_auth_client.cc",
+        "proximity_auth/mock_proximity_auth_client.h",
       ],
     },
     {
@@ -229,11 +235,8 @@
         '..',
       ],
       'sources': [
-        'proximity_auth/webui/cryptauth_enroller_factory_impl.cc',
-        'proximity_auth/webui/cryptauth_enroller_factory_impl.h',
         'proximity_auth/webui/proximity_auth_ui.cc',
         'proximity_auth/webui/proximity_auth_ui.h',
-        'proximity_auth/webui/proximity_auth_ui_delegate.h',
         'proximity_auth/webui/proximity_auth_webui_handler.cc',
         'proximity_auth/webui/proximity_auth_webui_handler.h',
         'proximity_auth/webui/reachable_phone_flow.cc',

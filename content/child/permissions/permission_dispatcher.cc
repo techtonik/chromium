@@ -27,6 +27,10 @@ PermissionName GetPermissionName(blink::WebPermissionType type) {
       return PERMISSION_NAME_PUSH_NOTIFICATIONS;
     case blink::WebPermissionTypeMidiSysEx:
       return PERMISSION_NAME_MIDI_SYSEX;
+    case blink::WebPermissionTypeDurableStorage:
+        return PERMISSION_NAME_DURABLE_STORAGE;
+    case blink::WebPermissionTypeMidi:
+      return PERMISSION_NAME_MIDI;
     default:
       // The default statement is only there to prevent compilation failures if
       // WebPermissionType enum gets extended.

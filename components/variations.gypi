@@ -16,7 +16,11 @@
         # adding extra dependencies without first checking with OWNERS.
         '../base/base.gyp:base',
         '../base/base.gyp:base_prefs',
+        '../crypto/crypto.gyp:crypto',
         '../third_party/mt19937ar/mt19937ar.gyp:mt19937ar',
+        '../third_party/protobuf/protobuf.gyp:protobuf_lite',
+        'compression',
+        'crash_keys',
       ],
       'sources': [
         # Note: sources list duplicated in GN build.
@@ -30,6 +34,8 @@
         'variations/caching_permuted_entropy_provider.h',
         'variations/entropy_provider.cc',
         'variations/entropy_provider.h',
+        'variations/experiment_labels.cc',
+        'variations/experiment_labels.h',
         'variations/metrics_util.cc',
         'variations/metrics_util.h',
         'variations/pref_names.cc',
@@ -44,12 +50,24 @@
         'variations/study_filtering.h',
         'variations/variations_associated_data.cc',
         'variations/variations_associated_data.h',
+        'variations/variations_experiment_util.cc',
+        'variations/variations_experiment_util.h',
+        'variations/variations_request_scheduler.cc',
+        'variations/variations_request_scheduler.h',
+        'variations/variations_request_scheduler_mobile.cc',
+        'variations/variations_request_scheduler_mobile.h',
         'variations/variations_seed_processor.cc',
         'variations/variations_seed_processor.h',
         'variations/variations_seed_simulator.cc',
         'variations/variations_seed_simulator.h',
+        'variations/variations_seed_store.cc',
+        'variations/variations_seed_store.h',
+        'variations/variations_switches.cc',
+        'variations/variations_switches.h',
         'variations/variations_url_constants.cc',
         'variations/variations_url_constants.h',
+        'variations/variations_util.cc',
+        'variations/variations_util.h',
       ],
       'variables': {
         'proto_in_dir': 'variations/proto',
@@ -62,6 +80,28 @@
             'variations_jni_headers',
           ],
         }],
+        ['OS!="android" and OS!="ios"', {
+          'sources!': [
+            'variations/variations_request_scheduler_mobile.cc',
+          ],
+        }],
+      ],
+    },
+    {
+      # GN version: //components/variations/service
+      'target_name': 'variations_service',
+
+      # TODO(blundell): Change to static_library once it has code in it.
+      'type': 'none',
+      'include_dirs': [
+        '..',
+      ],
+      'dependencies': [
+        '../base/base.gyp:base',
+        'version_info',
+      ],
+      'sources': [
+        'variations/service/variations_service_client.h',
       ],
     },
     {
@@ -76,11 +116,11 @@
         '../net/net.gyp:net',
         '../url/url.gyp:url_lib',
         'components.gyp:google_core_browser',
-        "components.gyp:metrics",
+        'components.gyp:metrics',
         'variations',
       ],
       'export_dependent_settings': [
-        "components.gyp:metrics",
+        'components.gyp:metrics',
       ],
       'sources': [
         'variations/net/variations_http_header_provider.cc',

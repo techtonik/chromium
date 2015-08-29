@@ -5,12 +5,15 @@
 #include "components/view_manager/view_manager_app.h"
 
 #include "base/command_line.h"
+#include "base/stl_util.h"
 #include "components/view_manager/client_connection.h"
 #include "components/view_manager/connection_manager.h"
+#include "components/view_manager/gles2/gpu_impl.h"
 #include "components/view_manager/public/cpp/args.h"
-#include "components/view_manager/view_manager_root_connection.h"
-#include "components/view_manager/view_manager_root_impl.h"
-#include "components/view_manager/view_manager_service_impl.h"
+#include "components/view_manager/surfaces/surfaces_scheduler.h"
+#include "components/view_manager/view_tree_host_connection.h"
+#include "components/view_manager/view_tree_host_impl.h"
+#include "components/view_manager/view_tree_impl.h"
 #include "mojo/application/public/cpp/application_connection.h"
 #include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/application/public/cpp/application_runner.h"
@@ -25,12 +28,13 @@ using mojo::ApplicationConnection;
 using mojo::ApplicationImpl;
 using mojo::Gpu;
 using mojo::InterfaceRequest;
-using mojo::ViewManagerRoot;
-using mojo::ViewManagerService;
+using mojo::ViewTreeHostFactory;
 
 namespace view_manager {
 
-ViewManagerApp::ViewManagerApp() : app_impl_(nullptr), is_headless_(false) {
+ViewManagerApp::ViewManagerApp()
+    : app_impl_(nullptr),
+      is_headless_(false) {
 }
 
 ViewManagerApp::~ViewManagerApp() {
@@ -41,6 +45,7 @@ ViewManagerApp::~ViewManagerApp() {
 void ViewManagerApp::Initialize(ApplicationImpl* app) {
   app_impl_ = app;
   tracing_.Initialize(app);
+  surfaces_state_ = new surfaces::SurfacesState;
 
 #if !defined(OS_ANDROID)
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
@@ -56,14 +61,15 @@ void ViewManagerApp::Initialize(ApplicationImpl* app) {
 
   if (!gpu_state_.get())
     gpu_state_ = new gles2::GpuState;
-  connection_manager_.reset(new ConnectionManager(this));
+  connection_manager_.reset(new ConnectionManager(this, surfaces_state_));
 }
 
 bool ViewManagerApp::ConfigureIncomingConnection(
     ApplicationConnection* connection) {
-  connection->AddService<ViewManagerRoot>(this);
+  // ViewManager
+  connection->AddService<ViewTreeHostFactory>(this);
+  // GPU
   connection->AddService<Gpu>(this);
-
   return true;
 }
 
@@ -73,47 +79,35 @@ void ViewManagerApp::OnNoMoreRootConnections() {
 
 ClientConnection* ViewManagerApp::CreateClientConnectionForEmbedAtView(
     ConnectionManager* connection_manager,
-    mojo::InterfaceRequest<mojo::ViewManagerService> service_request,
+    mojo::InterfaceRequest<mojo::ViewTree> tree_request,
     mojo::ConnectionSpecificId creator_id,
     mojo::URLRequestPtr request,
     const ViewId& root_id) {
-  mojo::ViewManagerClientPtr client;
+  mojo::ViewTreeClientPtr client;
   app_impl_->ConnectToService(request.Pass(), &client);
 
-  scoped_ptr<ViewManagerServiceImpl> service(
-      new ViewManagerServiceImpl(connection_manager, creator_id, root_id));
+  scoped_ptr<ViewTreeImpl> service(
+      new ViewTreeImpl(connection_manager, creator_id, root_id));
   return new DefaultClientConnection(service.Pass(), connection_manager,
-                                     service_request.Pass(), client.Pass());
+                                     tree_request.Pass(), client.Pass());
 }
 
 ClientConnection* ViewManagerApp::CreateClientConnectionForEmbedAtView(
     ConnectionManager* connection_manager,
-    mojo::InterfaceRequest<mojo::ViewManagerService> service_request,
+    mojo::InterfaceRequest<mojo::ViewTree> tree_request,
     mojo::ConnectionSpecificId creator_id,
     const ViewId& root_id,
-    mojo::ViewManagerClientPtr view_manager_client) {
-  scoped_ptr<ViewManagerServiceImpl> service(
-      new ViewManagerServiceImpl(connection_manager, creator_id, root_id));
+    mojo::ViewTreeClientPtr client) {
+  scoped_ptr<ViewTreeImpl> service(
+      new ViewTreeImpl(connection_manager, creator_id, root_id));
   return new DefaultClientConnection(service.Pass(), connection_manager,
-                                     service_request.Pass(),
-                                     view_manager_client.Pass());
+                                     tree_request.Pass(),
+                                     client.Pass());
 }
 
 void ViewManagerApp::Create(ApplicationConnection* connection,
-                            InterfaceRequest<ViewManagerRoot> request) {
-  DCHECK(connection_manager_.get());
-  // TODO(fsamuel): We need to make sure that only the window manager can create
-  // new roots.
-  ViewManagerRootImpl* view_manager_root = new ViewManagerRootImpl(
-      connection_manager_.get(), is_headless_, app_impl_, gpu_state_);
-
-  mojo::ViewManagerClientPtr client;
-  connection->ConnectToService(&client);
-
-  // ViewManagerRootConnection manages its own lifetime.
-  view_manager_root->Init(new ViewManagerRootConnectionImpl(
-      request.Pass(), make_scoped_ptr(view_manager_root), client.Pass(),
-      connection_manager_.get()));
+                            InterfaceRequest<ViewTreeHostFactory> request) {
+  factory_bindings_.AddBinding(this, request.Pass());
 }
 
 void ViewManagerApp::Create(
@@ -122,6 +116,24 @@ void ViewManagerApp::Create(
   if (!gpu_state_.get())
     gpu_state_ = new gles2::GpuState;
   new gles2::GpuImpl(request.Pass(), gpu_state_);
+}
+
+void ViewManagerApp::CreateViewTreeHost(
+    mojo::InterfaceRequest<mojo::ViewTreeHost> host,
+    mojo::ViewTreeHostClientPtr host_client,
+    mojo::ViewTreeClientPtr tree_client) {
+  DCHECK(connection_manager_.get());
+
+  // TODO(fsamuel): We need to make sure that only the window manager can create
+  // new roots.
+  ViewTreeHostImpl* host_impl = new ViewTreeHostImpl(
+      host_client.Pass(), connection_manager_.get(), is_headless_, app_impl_,
+      gpu_state_, surfaces_state_);
+
+  // ViewTreeHostConnection manages its own lifetime.
+  host_impl->Init(new ViewTreeHostConnectionImpl(
+      host.Pass(), make_scoped_ptr(host_impl), tree_client.Pass(),
+      connection_manager_.get()));
 }
 
 }  // namespace view_manager

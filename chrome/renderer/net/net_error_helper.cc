@@ -41,12 +41,12 @@
 #include "url/gurl.h"
 
 using base::JSONWriter;
-using chrome_common_net::DnsProbeStatus;
 using content::DocumentState;
-using content::kUnreachableWebDataURL;
 using content::RenderFrame;
 using content::RenderFrameObserver;
 using content::RenderThread;
+using content::kUnreachableWebDataURL;
+using error_page::DnsProbeStatus;
 using error_page::DnsProbeStatusToString;
 using error_page::ErrorPageParams;
 using error_page::NetErrorHelperCore;
@@ -55,7 +55,7 @@ namespace {
 
 // Number of seconds to wait for the navigation correction service to return
 // suggestions.  If it takes too long, just use the local error page.
-static const int kNavigationCorrectionFetchTimeoutSec = 3;
+const int kNavigationCorrectionFetchTimeoutSec = 3;
 
 NetErrorHelperCore::PageType GetLoadingPageType(const blink::WebFrame* frame) {
   GURL url = frame->provisionalDataSource()->request().url();
@@ -94,9 +94,7 @@ NetErrorHelper::~NetErrorHelper() {
 
 void NetErrorHelper::ButtonPressed(
     error_page::NetErrorHelperCore::Button button) {
-  GURL url = render_frame()->GetWebFrame()->document().url();
-  bool is_error_page = (url == GURL(content::kUnreachableWebDataURL));
-  core_->ExecuteButtonPress(is_error_page, button);
+  core_->ExecuteButtonPress(button);
 }
 
 void NetErrorHelper::TrackClick(int tracking_id) {
@@ -176,7 +174,6 @@ void NetErrorHelper::GenerateLocalizedErrorPage(
     bool* reload_button_shown,
     bool* show_saved_copy_button_shown,
     bool* show_cached_copy_button_shown,
-    bool* show_cached_page_button_shown,
     std::string* error_html) const {
   error_html->clear();
 
@@ -195,23 +192,11 @@ void NetErrorHelper::GenerateLocalizedErrorPage(
                                render_frame()->GetRenderView()->
                                    GetAcceptLanguages(),
                                params.Pass(), &error_strings);
-    *reload_button_shown = error_strings.Get("reloadButton", NULL);
+    *reload_button_shown = error_strings.Get("reloadButton", nullptr);
     *show_saved_copy_button_shown =
-        error_strings.Get("showSavedCopyButton", NULL);
-
-    bool show_cache_copy_button_default_label;
-    bool showing_cache_copy_experiment =
-        error_strings.GetBoolean("cacheButton.defaultLabel",
-        &show_cache_copy_button_default_label);
-    if (showing_cache_copy_experiment) {
-      if (show_cache_copy_button_default_label) {
-        *show_cached_copy_button_shown = false;
-        *show_cached_page_button_shown = true;
-      } else {
-        *show_cached_page_button_shown = false;
-        *show_cached_copy_button_shown = true;
-      }
-    }
+        error_strings.Get("showSavedCopyButton", nullptr);
+    *show_cached_copy_button_shown =
+        error_strings.Get("cacheButton", nullptr);
     // "t" is the id of the template's root node.
     *error_html = webui::GetTemplatesHtml(template_html, &error_strings, "t");
   }
@@ -338,7 +323,7 @@ void NetErrorHelper::DiagnoseError(const GURL& page_url) {
 }
 
 void NetErrorHelper::OnNetErrorInfo(int status_num) {
-  DCHECK(status_num >= 0 && status_num < chrome_common_net::DNS_PROBE_MAX);
+  DCHECK(status_num >= 0 && status_num < error_page::DNS_PROBE_MAX);
 
   DVLOG(1) << "Received status " << DnsProbeStatusToString(status_num);
 

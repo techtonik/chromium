@@ -102,13 +102,10 @@ void Display::InitializeRenderer() {
   if (resource_provider_)
     return;
 
-  // Display does not use GpuMemoryBuffers, so persistent map is not relevant.
-  bool use_persistent_map_for_gpu_memory_buffers = false;
   scoped_ptr<ResourceProvider> resource_provider = ResourceProvider::Create(
       output_surface_.get(), bitmap_manager_, gpu_memory_buffer_manager_,
       nullptr, settings_.highp_threshold_min, settings_.use_rgba_4444_textures,
       settings_.texture_id_allocation_chunk_size,
-      use_persistent_map_for_gpu_memory_buffers,
       std::vector<unsigned>(static_cast<size_t>(gfx::BufferFormat::LAST) + 1,
                             GL_TEXTURE_2D));
   if (!resource_provider)
@@ -235,13 +232,16 @@ bool Display::DrawAndSwap() {
   if (should_swap) {
     swapped_since_resize_ = true;
     for (auto& latency : frame->metadata.latency_info) {
-      TRACE_EVENT_FLOW_STEP0("input,benchmark", "LatencyInfo.Flow",
-                             TRACE_ID_DONT_MANGLE(latency.trace_id()),
-                             "Display::DrawAndSwap");
+      TRACE_EVENT_WITH_FLOW1("input,benchmark", "LatencyInfo.Flow",
+          TRACE_ID_DONT_MANGLE(latency.trace_id()),
+          TRACE_EVENT_FLAG_FLOW_IN | TRACE_EVENT_FLAG_FLOW_OUT,
+          "step", "Display::DrawAndSwap");
     }
     benchmark_instrumentation::IssueDisplayRenderingStatsEvent();
     renderer_->SwapBuffers(frame->metadata);
   } else {
+    if (have_damage && !size_matches)
+      aggregator_->SetFullDamageForSurface(current_surface_id_);
     TRACE_EVENT_INSTANT0("cc", "Swap skipped.", TRACE_EVENT_SCOPE_THREAD);
     stored_latency_info_.insert(stored_latency_info_.end(),
                                 frame->metadata.latency_info.begin(),

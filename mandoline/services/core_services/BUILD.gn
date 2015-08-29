@@ -46,12 +46,12 @@ source_set("sources") {
     "//base",
     "//components/clipboard:lib",
     "//components/filesystem:lib",
-    "//components/view_manager/surfaces:lib",
-    "//mandoline/ui/browser:lib",
+    "//mandoline/tab:lib",
     "//mojo/application/public/cpp",
     "//mojo/common:tracing_impl",
     "//mojo/message_pump",
     "//mojo/services/tracing:lib",
+    "//third_party/icu",
     "//third_party/mojo/src/mojo/public/cpp/bindings",
     "//url",
   ]
@@ -74,6 +74,7 @@ source_set("sources") {
   if (use_aura) {
     deps += [
       "//components/view_manager/public/cpp",
+      "//mandoline/ui/desktop_ui:lib",
       "//mandoline/ui/omnibox:lib",
     ]
     sources += [ "application_delegate_factory_aura.cc" ]

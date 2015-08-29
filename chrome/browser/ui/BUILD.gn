@@ -46,7 +46,6 @@ source_set("ui") {
     "//chrome/browser/net:encrypted_cert_logger_proto",
     "//chrome/browser/ssl:cert_logger_proto",
     "//chrome/common",
-    "//chrome/common/net",
     "//components/app_modal",
     "//components/auto_login_parser",
     "//components/dom_distiller/webui",
@@ -89,8 +88,10 @@ source_set("ui") {
       "//chrome/browser/devtools",
       "//chrome/browser/ui/views",
       "//chrome/browser/ui/webui/omnibox:mojo_bindings",
+      "//chrome/common/net",
       "//chrome/installer/util",
       "//components/autofill/content/browser:risk_proto",
+      "//components/bubble:bubble",
       "//components/power",
       "//components/suggestions/proto",
       "//components/url_formatter",
@@ -180,6 +181,7 @@ source_set("ui") {
     sources += rebase_path(gypi_values.chrome_browser_ui_non_chromeos_sources,
                            ".",
                            "//chrome")
+    defines += [ "FRAME_AVATAR_BUTTON=1" ]
   }
   if (use_cups) {
     configs += [ "//printing:cups" ]
@@ -230,16 +232,6 @@ source_set("ui") {
                 ".",
                 "//chrome")
       }
-      if (is_chromeos) {
-        # TODO(GYP): crbug.com/481629. These files should probably not be
-        # a part of ui_views_non_mac_sources at all.
-        sources -= [
-          "views/frame/opaque_browser_frame_view.cc",
-          "views/frame/opaque_browser_frame_view.h",
-          "views/frame/opaque_browser_frame_view_linux.cc",
-          "views/frame/opaque_browser_frame_view_linux.h",
-        ]
-      }
     }
     if (use_ash) {
       sources += rebase_path(gypi_values.chrome_browser_ui_ash_views_sources,
@@ -249,7 +241,7 @@ source_set("ui") {
   }
   if (use_aura && !use_ozone && is_desktop_linux) {
     deps += [
-      "//build/config/linux:gio",
+      "//build/linux:gio",
 
       # gtk2 is the only component that can interact with gtk2 in our new
       # world.
@@ -395,7 +387,6 @@ source_set("ui") {
     sources += rebase_path(gypi_values.chrome_browser_ui_linux_sources,
                            ".",
                            "//chrome")
-    deps += [ "//device/udev_linux" ]
     if (use_aura) {
       configs += [ "//build/config/linux:fontconfig" ]
       deps += [ "//dbus" ]
@@ -410,6 +401,10 @@ source_set("ui") {
         sources -= [ "views/tabs/window_finder_x11.cc" ]
       }
     }
+  }
+
+  if (use_udev) {
+    deps += [ "//device/udev_linux" ]
   }
 
   if (enable_app_list) {

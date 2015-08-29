@@ -49,9 +49,7 @@ class NetErrorHelperCore {
     MORE_BUTTON,
     EASTER_EGG,
     SHOW_CACHED_COPY_BUTTON,  // "Google cached copy" button label experiment.
-    SHOW_CACHED_PAGE_BUTTON,  // "Google cached page" button label experiment.
     DIAGNOSE_ERROR,
-    BUTTON_MAX,
   };
 
   // The Delegate handles all interaction with the RenderView, WebFrame, and
@@ -63,11 +61,10 @@ class NetErrorHelperCore {
         const blink::WebURLError& error,
         bool is_failed_post,
         bool can_show_network_diagnostics_dialog,
-        scoped_ptr<error_page::ErrorPageParams> params,
+        scoped_ptr<ErrorPageParams> params,
         bool* reload_button_shown,
         bool* show_saved_copy_button_shown,
         bool* show_cached_copy_button_shown,
-        bool* show_cached_page_button_shown,
         std::string* html) const = 0;
 
     // Loads the given HTML in the main frame for use as an error page.
@@ -165,7 +162,7 @@ class NetErrorHelperCore {
 
   // Notifies |this| that network error information from the browser process
   // has been received.
-  void OnNetErrorInfo(chrome_common_net::DnsProbeStatus status);
+  void OnNetErrorInfo(DnsProbeStatus status);
 
   // Notifies |this| if it can use a local error diagnostics service through its
   // delegate.
@@ -201,11 +198,7 @@ class NetErrorHelperCore {
   // Execute the effect of pressing the specified button.
   // Note that the visual effects of the 'MORE' button are taken
   // care of in JavaScript.
-  //
-  // |is_error_page| indicates if the button press came from an actual error
-  // page or some other source. It should always be true, but may not be.
-  // Included as part of an investigation into http://crbug.com/500556.
-  void ExecuteButtonPress(bool is_error_page, Button button);
+  void ExecuteButtonPress(Button button);
 
   // Reports to the correction service that the link with the given tracking
   // ID was clicked.  Only pages generated with information from the service
@@ -240,7 +233,7 @@ class NetErrorHelperCore {
   Delegate* delegate_;
 
   // The last DnsProbeStatus received from the browser.
-  chrome_common_net::DnsProbeStatus last_probe_status_;
+  DnsProbeStatus last_probe_status_;
 
   // Information for the provisional / "pre-provisional" error page.  NULL when
   // there's no page pending, or the pending page is not an error page.

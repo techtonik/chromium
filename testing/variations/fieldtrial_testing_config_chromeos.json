@@ -1,4 +1,9 @@
 {
+    "CaptivePortalInterstitial": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
     "ReportCertificateErrors": [
         {
             "group_name": "ShowAndPossiblySend",
@@ -49,6 +54,27 @@
     "UseDelayAgnosticAEC": [
         {
             "group_name": "DefaultEnabled"
+        }
+    ],
+    "QUIC": [
+        {
+            "group_name": "Enabled",
+            "params": {
+              "alternate_protocol_probability_threshold": "0.01"
+            }
+        }
+    ],
+    "TabSyncByRecency": [
+        {
+            "group_name": "Enabled"
+        }
+    ],
+    "VarationsServiceControl": [
+        {
+            "group_name": "Interval_30min",
+            "params": {
+                "fetch_period_min": "30"
+            }
         }
     ]
 }

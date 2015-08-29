@@ -35,21 +35,6 @@ namespace media_router {
 
 namespace {
 
-void HandleRouteResponseForPresentationApi(
-    scoped_ptr<CreatePresentationSessionRequest> presentation_request,
-    const MediaRoute* route,
-    const std::string& presentation_id,
-    const std::string& error) {
-  DCHECK(presentation_request);
-  if (!route) {
-    presentation_request->MaybeInvokeErrorCallback(
-        content::PresentationError(content::PRESENTATION_ERROR_UNKNOWN, error));
-  } else {
-    presentation_request->MaybeInvokeSuccessCallback(presentation_id,
-                                                     route->media_route_id());
-  }
-}
-
 std::string GetHostFromURL(const GURL& gurl) {
   if (gurl.is_empty())
     return std::string();
@@ -102,7 +87,7 @@ class MediaRouterUI::UIMediaRoutesObserver : public MediaRoutesObserver {
 
 MediaRouterUI::MediaRouterUI(content::WebUI* web_ui)
     : ConstrainedWebDialogUI(web_ui),
-      handler_(new MediaRouterWebUIMessageHandler()),
+      handler_(new MediaRouterWebUIMessageHandler(this)),
       ui_initialized_(false),
       has_pending_route_request_(false),
       requesting_route_for_default_source_(false),
@@ -119,7 +104,6 @@ MediaRouterUI::MediaRouterUI(content::WebUI* web_ui)
 
   router_ = static_cast<MediaRouterMojoImpl*>(
       MediaRouterFactory::GetApiForBrowserContext(wc->GetBrowserContext()));
-  DCHECK(router_);
 
   // Allows UI to load extensionview.
   // TODO(haibinlu): limit object-src to current extension once crbug/514866
@@ -182,6 +166,7 @@ void MediaRouterUI::InitCommon(content::WebContents* initiator,
                                const MediaSource& default_source,
                                const GURL& default_frame_url) {
   DCHECK(initiator);
+  DCHECK(router_);
 
   // Register for Issue and MediaRoute updates.
   issues_observer_.reset(new UIIssuesObserver(router_, this));
@@ -350,7 +335,7 @@ bool MediaRouterUI::DoCreateRoute(const MediaSink::Id& sink_id,
       // |presentation_request_| will be nullptr after this call, as the
       // object will be transferred to the callback.
       route_response_callbacks.push_back(
-          base::Bind(&HandleRouteResponseForPresentationApi,
+          base::Bind(&CreatePresentationSessionRequest::HandleRouteResponse,
                      base::Passed(&presentation_request_)));
     } else if (presentation_service_delegate_) {
       route_response_callbacks.push_back(

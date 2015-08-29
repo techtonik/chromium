@@ -14,12 +14,14 @@
 #include "base/trace_event/trace_event.h"
 #include "content/browser/gpu/gpu_process_host.h"
 #include "content/common/child_process_host_impl.h"
+#include "content/common/generic_shared_memory_id_generator.h"
 #include "content/common/gpu/client/gpu_memory_buffer_impl.h"
 #include "content/common/gpu/client/gpu_memory_buffer_impl_shared_memory.h"
 #include "content/common/gpu/gpu_memory_buffer_factory_shared_memory.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/common/content_switches.h"
 #include "gpu/GLES2/gl2extchromium.h"
+#include "ui/gfx/buffer_format_util.h"
 #include "ui/gl/gl_switches.h"
 
 #if defined(OS_MACOSX)
@@ -115,8 +117,8 @@ GetSupportedGpuMemoryBufferConfigurations(gfx::GpuMemoryBufferType type) {
         {gfx::BufferFormat::RGBA_8888, gfx::BufferUsage::PERSISTENT_MAP},
         {gfx::BufferFormat::BGRA_8888, gfx::BufferUsage::MAP},
         {gfx::BufferFormat::BGRA_8888, gfx::BufferUsage::PERSISTENT_MAP},
-        {gfx::BufferFormat::YUV_420_BIPLANAR, gfx::BufferUsage::MAP},
-        {gfx::BufferFormat::YUV_420_BIPLANAR, gfx::BufferUsage::PERSISTENT_MAP},
+        {gfx::BufferFormat::UYVY_422, gfx::BufferUsage::MAP},
+        {gfx::BufferFormat::UYVY_422, gfx::BufferUsage::PERSISTENT_MAP},
     };
     for (auto& configuration : kNativeConfigurations) {
       if (IsGpuMemoryBufferFactoryConfigurationSupported(type, configuration))
@@ -127,8 +129,8 @@ GetSupportedGpuMemoryBufferConfigurations(gfx::GpuMemoryBufferType type) {
 #if defined(USE_OZONE) || defined(OS_MACOSX)
   const GpuMemoryBufferFactory::Configuration kScanoutConfigurations[] = {
       {gfx::BufferFormat::BGRA_8888, gfx::BufferUsage::SCANOUT},
-      {gfx::BufferFormat::RGBX_8888, gfx::BufferUsage::SCANOUT},
-      {gfx::BufferFormat::YUV_420_BIPLANAR, gfx::BufferUsage::SCANOUT},
+      {gfx::BufferFormat::BGRX_8888, gfx::BufferUsage::SCANOUT},
+      {gfx::BufferFormat::UYVY_422, gfx::BufferUsage::SCANOUT},
   };
   for (auto& configuration : kScanoutConfigurations) {
     if (IsGpuMemoryBufferFactoryConfigurationSupported(type, configuration))
@@ -140,9 +142,6 @@ GetSupportedGpuMemoryBufferConfigurations(gfx::GpuMemoryBufferType type) {
 }
 
 BrowserGpuMemoryBufferManager* g_gpu_memory_buffer_manager = nullptr;
-
-// Global atomic to generate gpu memory buffer unique IDs.
-base::StaticAtomicSequenceNumber g_next_gpu_memory_buffer_id;
 
 }  // namespace
 
@@ -234,6 +233,7 @@ BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferForScanout(
 }
 
 void BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferForChildProcess(
+    gfx::GpuMemoryBufferId id,
     const gfx::Size& size,
     gfx::BufferFormat format,
     gfx::BufferUsage usage,
@@ -242,11 +242,9 @@ void BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferForChildProcess(
     const AllocationCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
 
-  gfx::GpuMemoryBufferId new_id = g_next_gpu_memory_buffer_id.GetNext();
-
   // Use service side allocation if this is a supported configuration.
   if (IsGpuMemoryBufferConfigurationSupported(format, usage)) {
-    AllocateGpuMemoryBufferOnIO(new_id, size, format, usage, child_client_id, 0,
+    AllocateGpuMemoryBufferOnIO(id, size, format, usage, child_client_id, 0,
                                 false, callback);
     return;
   }
@@ -260,13 +258,19 @@ void BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferForChildProcess(
   }
 
   BufferMap& buffers = clients_[child_client_id];
-  DCHECK(buffers.find(new_id) == buffers.end());
 
   // Allocate shared memory buffer as fallback.
-  buffers[new_id] =
-      BufferInfo(size, gfx::SHARED_MEMORY_BUFFER, format, usage, 0);
+  auto insert_result = buffers.insert(std::make_pair(
+      id, BufferInfo(size, gfx::SHARED_MEMORY_BUFFER, format, usage, 0)));
+  if (!insert_result.second) {
+    DLOG(ERROR) << "Child process attempted to allocate a GpuMemoryBuffer with "
+                   "an existing ID.";
+    callback.Run(gfx::GpuMemoryBufferHandle());
+    return;
+  }
+
   callback.Run(GpuMemoryBufferImplSharedMemory::AllocateForChildProcess(
-      new_id, size, format, child_process_handle));
+      id, size, format, child_process_handle));
 }
 
 gfx::GpuMemoryBuffer*
@@ -297,18 +301,12 @@ bool BrowserGpuMemoryBufferManager::OnMemoryDump(
       gfx::GpuMemoryBufferId buffer_id = buffer.first;
       base::trace_event::MemoryAllocatorDump* dump =
           pmd->CreateAllocatorDump(base::StringPrintf(
-              "gpumemorybuffer/client_%d/buffer_%d", client_id, buffer_id));
+              "gpumemorybuffer/client_%d/buffer_%d", client_id, buffer_id.id));
       if (!dump)
         return false;
 
-      size_t buffer_size_in_bytes = 0;
-      // Note: BufferSizeInBytes returns an approximated size for the buffer
-      // but the factory can be made to return the exact size if this
-      // approximation is not good enough.
-      bool valid_size = GpuMemoryBufferImpl::BufferSizeInBytes(
-          buffer.second.size, buffer.second.format, &buffer_size_in_bytes);
-      DCHECK(valid_size);
-
+      size_t buffer_size_in_bytes = gfx::BufferSizeForBufferFormat(
+          buffer.second.size, buffer.second.format);
       dump->AddScalar(base::trace_event::MemoryAllocatorDump::kNameSize,
                       base::trace_event::MemoryAllocatorDump::kUnitsBytes,
                       buffer_size_in_bytes);
@@ -404,7 +402,7 @@ void BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferForSurfaceOnIO(
     AllocateGpuMemoryBufferRequest* request) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
 
-  gfx::GpuMemoryBufferId new_id = g_next_gpu_memory_buffer_id.GetNext();
+  gfx::GpuMemoryBufferId new_id = content::GetNextGenericSharedMemoryId();
 
   // Use service side allocation if this is a supported configuration.
   if (IsGpuMemoryBufferConfigurationSupported(request->format,
@@ -426,11 +424,13 @@ void BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferForSurfaceOnIO(
       << static_cast<int>(request->usage);
 
   BufferMap& buffers = clients_[request->client_id];
-  DCHECK(buffers.find(new_id) == buffers.end());
 
   // Allocate shared memory buffer as fallback.
-  buffers[new_id] = BufferInfo(request->size, gfx::SHARED_MEMORY_BUFFER,
-                               request->format, request->usage, 0);
+  auto insert_result = buffers.insert(std::make_pair(
+      new_id, BufferInfo(request->size, gfx::SHARED_MEMORY_BUFFER,
+                         request->format, request->usage, 0)));
+  DCHECK(insert_result.second);
+
   // Note: Unretained is safe as IO thread is stopped before manager is
   // destroyed.
   request->result = GpuMemoryBufferImplSharedMemory::Create(
@@ -477,9 +477,6 @@ void BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferOnIO(
     const AllocationCallback& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
 
-  BufferMap& buffers = clients_[client_id];
-  DCHECK(buffers.find(id) == buffers.end());
-
   GpuProcessHost* host = GpuProcessHost::FromID(gpu_host_id_);
   if (!host) {
     host = GpuProcessHost::Get(GpuProcessHost::GPU_PROCESS_KIND_SANDBOXED,
@@ -504,10 +501,19 @@ void BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferOnIO(
     reused_gpu_process = true;
   }
 
+  BufferMap& buffers = clients_[client_id];
+
   // Note: Handling of cases where the client is removed before the allocation
   // completes is less subtle if we set the buffer type to EMPTY_BUFFER here
   // and verify that this has not changed when allocation completes.
-  buffers[id] = BufferInfo(size, gfx::EMPTY_BUFFER, format, usage, 0);
+  auto insert_result = buffers.insert(std::make_pair(
+      id, BufferInfo(size, gfx::EMPTY_BUFFER, format, usage, 0)));
+  if (!insert_result.second) {
+    DLOG(ERROR) << "Child process attempted to allocate a GpuMemoryBuffer with "
+                   "an existing ID.";
+    callback.Run(gfx::GpuMemoryBufferHandle());
+    return;
+  }
 
   // Note: Unretained is safe as IO thread is stopped before manager is
   // destroyed.

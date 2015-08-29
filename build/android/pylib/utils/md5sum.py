@@ -5,6 +5,7 @@
 import collections
 import logging
 import os
+import posixpath
 import re
 import tempfile
 import types
@@ -12,13 +13,10 @@ import types
 from pylib import cmd_helper
 from pylib import constants
 from pylib.utils import device_temp_file
+from pylib.device import device_errors
 
 MD5SUM_DEVICE_LIB_PATH = '/data/local/tmp/md5sum/'
 MD5SUM_DEVICE_BIN_PATH = MD5SUM_DEVICE_LIB_PATH + 'md5sum_bin'
-
-MD5SUM_DEVICE_SCRIPT_FORMAT = (
-    'test -f {path} -o -d {path} '
-    '&& LD_LIBRARY_PATH={md5sum_lib} {md5sum_bin} {path}')
 
 _STARTS_WITH_CHECKSUM_RE = re.compile(r'^\s*[0-9a-fA-F]{32}\s+')
 
@@ -57,29 +55,50 @@ def CalculateDeviceMd5Sums(paths, device):
   Returns:
     A dict mapping file paths to their respective md5sum checksums.
   """
+  if not paths:
+    return {}
+
   if isinstance(paths, basestring):
     paths = [paths]
+  # Allow generators
+  paths = list(paths)
 
-  if not device.FileExists(MD5SUM_DEVICE_BIN_PATH):
-    md5sum_dist_path = os.path.join(constants.GetOutDirectory(), 'md5sum_dist')
-    if not os.path.exists(md5sum_dist_path):
-      raise IOError('File not built: %s' % md5sum_dist_path)
-    device.adb.Push(md5sum_dist_path, MD5SUM_DEVICE_LIB_PATH)
+  md5sum_dist_path = os.path.join(constants.GetOutDirectory(), 'md5sum_dist')
+  md5sum_dist_bin_path = os.path.join(md5sum_dist_path, 'md5sum_bin')
 
-  out = []
+  if not os.path.exists(md5sum_dist_path):
+    raise IOError('File not built: %s' % md5sum_dist_path)
+  md5sum_file_size = os.path.getsize(md5sum_dist_bin_path)
 
-  with tempfile.NamedTemporaryFile() as md5sum_script_file:
-    with device_temp_file.DeviceTempFile(
-        device.adb) as md5sum_device_script_file:
-      md5sum_script = (
-          MD5SUM_DEVICE_SCRIPT_FORMAT.format(
-              path=p, md5sum_lib=MD5SUM_DEVICE_LIB_PATH,
-              md5sum_bin=MD5SUM_DEVICE_BIN_PATH)
-          for p in paths)
-      md5sum_script_file.write('; '.join(md5sum_script))
-      md5sum_script_file.flush()
-      device.adb.Push(md5sum_script_file.name, md5sum_device_script_file.name)
-      out = device.RunShellCommand(['sh', md5sum_device_script_file.name])
+  # For better performance, make the script as small as possible to try and
+  # avoid needing to write to an intermediary file (which RunShellCommand will
+  # do if necessary).
+  md5sum_script = 'a=%s;' % MD5SUM_DEVICE_BIN_PATH
+  # Check if the binary is missing or has changed (using its file size as an
+  # indicator), and trigger a (re-)push via the exit code.
+  md5sum_script += '! [[ $(ls -l $a) = *%d* ]]&&exit 2;' % md5sum_file_size
+  # Make sure it can find libbase.so
+  md5sum_script += 'export LD_LIBRARY_PATH=%s;' % MD5SUM_DEVICE_LIB_PATH
+  if len(paths) > 1:
+    prefix = posixpath.commonprefix(paths)
+    if len(prefix) > 4:
+      md5sum_script += 'p="%s";' % prefix
+      paths = ['$p"%s"' % p[len(prefix):] for p in paths]
+
+  md5sum_script += ';'.join('$a %s' % p for p in paths)
+  # Don't fail the script if the last md5sum fails (due to file not found)
+  # Note: ":" is equivalent to "true".
+  md5sum_script += ';:'
+  try:
+    out = device.RunShellCommand(md5sum_script, check_return=True)
+  except device_errors.AdbShellCommandFailedError as e:
+    # Push the binary only if it is found to not exist
+    # (faster than checking up-front).
+    if e.status == 2:
+      device.adb.Push(md5sum_dist_path, MD5SUM_DEVICE_LIB_PATH)
+      out = device.RunShellCommand(md5sum_script, check_return=True)
+    else:
+      raise
 
   return _ParseMd5SumOutput(out)
 

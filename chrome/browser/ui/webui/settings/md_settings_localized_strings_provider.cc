@@ -97,6 +97,9 @@ void AddCertificateManagerStrings(content::WebUIDataSource* html_source) {
       IDS_SETTINGS_CERTIFICATE_MANAGER_YOU_HAVE_CERTIFICATES);
   html_source->AddLocalizedString("certificateManagerServers",
                                   IDS_SETTINGS_CERTIFICATE_MANAGER_SERVERS);
+  html_source->AddLocalizedString(
+      "certificateManagerServersSubtitle",
+      IDS_SETTINGS_CERTIFICATE_MANAGER_SERVERS_IDENTIFY);
   html_source->AddLocalizedString("certificateManagerAuthorities",
                                   IDS_SETTINGS_CERTIFICATE_MANAGER_AUTHORITIES);
   html_source->AddLocalizedString(
@@ -154,6 +157,8 @@ void AddInternetStrings(content::WebUIDataSource* html_source) {
       "internetPageTitle", IDS_SETTINGS_INTERNET);
   html_source->AddLocalizedString(
       "internetDetailPageTitle", IDS_SETTINGS_INTERNET_DETAIL);
+  html_source->AddLocalizedString("internetKnownNetworksPageTitle",
+                                  IDS_SETTINGS_INTERNET_KNOWN_NETWORKS);
 
   // Required by cr_network_list_item.js. TODO(stevenjb): Add to
   // settings_strings.grdp or provide an alternative translation method.
@@ -173,6 +178,36 @@ void AddInternetStrings(content::WebUIDataSource* html_source) {
   html_source->AddLocalizedString("OncTypeWimax", IDS_NETWORK_TYPE_WIMAX);
 }
 #endif
+
+void AddOnStartupStrings(content::WebUIDataSource* html_source) {
+  html_source->AddLocalizedString(
+      "onStartup",
+      IDS_SETTINGS_ON_STARTUP);
+  html_source->AddLocalizedString(
+      "onStartupOpenNewTab",
+      IDS_SETTINGS_ON_STARTUP_OPEN_NEW_TAB);
+  html_source->AddLocalizedString(
+      "onStartupContinue",
+      IDS_SETTINGS_ON_STARTUP_CONTINUE);
+  html_source->AddLocalizedString(
+      "onStartupOpenSpecific",
+      IDS_SETTINGS_ON_STARTUP_OPEN_SPECIFIC);
+  html_source->AddLocalizedString(
+      "onStartupAddPage",
+      IDS_SETTINGS_ON_STARTUP_ADD_PAGE);
+  html_source->AddLocalizedString(
+      "onStartupSetPages",
+      IDS_SETTINGS_ON_STARTUP_SET_PAGES);
+  html_source->AddLocalizedString(
+      "onStartupUseCurrent",
+      IDS_SETTINGS_ON_STARTUP_USE_CURRENT);
+  html_source->AddLocalizedString(
+      "onStartupAddNewPage",
+      IDS_SETTINGS_ON_STARTUP_ADD_NEW_PAGE);
+  html_source->AddLocalizedString(
+      "onStartupEnterUrl",
+      IDS_SETTINGS_ON_STARTUP_ENTER_URL);
+}
 
 void AddPrivacyStrings(content::WebUIDataSource* html_source) {
   html_source->AddLocalizedString("privacyPageTitle",
@@ -210,6 +245,8 @@ void AddPrivacyStrings(content::WebUIDataSource* html_source) {
                                   IDS_SETTINGS_SITE_SETTINGS);
   html_source->AddLocalizedString("clearBrowsingData",
                                   IDS_SETTINGS_CLEAR_DATA);
+  html_source->AddLocalizedString("titleAndCount",
+                                  IDS_SETTINGS_TITLE_AND_COUNT);
 }
 
 void AddSearchStrings(content::WebUIDataSource* html_source) {
@@ -373,6 +410,7 @@ void AddLocalizedStrings(content::WebUIDataSource* html_source) {
 #if defined(OS_CHROMEOS)
   AddInternetStrings(html_source);
 #endif
+  AddOnStartupStrings(html_source);
   AddPrivacyStrings(html_source);
   AddSearchStrings(html_source);
   AddSearchEnginesStrings(html_source);

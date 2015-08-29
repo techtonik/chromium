@@ -82,6 +82,8 @@ const QuicTag kTIME = TAG('T', 'I', 'M', 'E');   // Time based loss detection
 const QuicTag kMIN1 = TAG('M', 'I', 'N', '1');   // Min CWND of 1 packet
 const QuicTag kMIN4 = TAG('M', 'I', 'N', '4');   // Min CWND of 4 packets,
                                                  // with a min rate of 1 BDP.
+const QuicTag kTLPR = TAG('T', 'L', 'P', 'R');   // Tail loss probe delay of
+                                                 // 0.5RTT.
 
 // Optional support of truncated Connection IDs.  If sent by a peer, the value
 // is the minimum number of bytes allowed for the connection ID sent to the
@@ -93,6 +95,9 @@ const QuicTag kFHDR = TAG('F', 'H', 'D', 'R');   // FEC protect headers
 const QuicTag kFSTR = TAG('F', 'S', 'T', 'R');   // FEC protect all streams
 // Set FecSendPolicy for sending FEC packet only when FEC alarm goes off.
 const QuicTag kFSPA = TAG('F', 'S', 'P', 'A');
+// Run an experiment that sets FecTimeOut alarm to 0.25RTT.
+// TODO(rtenneti): Delete it after the experiment.
+const QuicTag kFRTT = TAG('F', 'R', 'T', 'T');
 
 // Enable bandwidth resumption experiment.
 const QuicTag kBWRE = TAG('B', 'W', 'R', 'E');  // Bandwidth resumption.
@@ -155,7 +160,7 @@ const QuicTag kCIDS = TAG('C', 'I', 'D', 'S');   // ChannelID signature
 
 // Public reset tags
 const QuicTag kRNON = TAG('R', 'N', 'O', 'N');   // Public reset nonce proof
-const QuicTag kRSEQ = TAG('R', 'S', 'E', 'Q');   // Rejected sequence number
+const QuicTag kRSEQ = TAG('R', 'S', 'E', 'Q');   // Rejected packet number
 
 // Universal tags
 const QuicTag kPAD  = TAG('P', 'A', 'D', '\0');  // Padding

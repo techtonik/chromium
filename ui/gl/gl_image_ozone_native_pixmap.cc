@@ -27,7 +27,7 @@ bool ValidInternalFormat(unsigned internalformat) {
 bool ValidFormat(gfx::BufferFormat format) {
   switch (format) {
     case BufferFormat::BGRA_8888:
-    case BufferFormat::RGBX_8888:
+    case BufferFormat::BGRX_8888:
       return true;
     case BufferFormat::ATC:
     case BufferFormat::ATCIA:
@@ -38,7 +38,7 @@ bool ValidFormat(gfx::BufferFormat format) {
     case BufferFormat::RGBA_4444:
     case BufferFormat::RGBA_8888:
     case BufferFormat::YUV_420:
-    case BufferFormat::YUV_420_BIPLANAR:
+    case BufferFormat::UYVY_422:
       return false;
   }
 
@@ -50,7 +50,7 @@ EGLint FourCC(gfx::BufferFormat format) {
   switch (format) {
     case BufferFormat::BGRA_8888:
       return DRM_FORMAT_ARGB8888;
-    case BufferFormat::RGBX_8888:
+    case BufferFormat::BGRX_8888:
       return DRM_FORMAT_XRGB8888;
     case BufferFormat::ATC:
     case BufferFormat::ATCIA:
@@ -61,7 +61,7 @@ EGLint FourCC(gfx::BufferFormat format) {
     case BufferFormat::RGBA_4444:
     case BufferFormat::RGBA_8888:
     case BufferFormat::YUV_420:
-    case BufferFormat::YUV_420_BIPLANAR:
+    case BufferFormat::UYVY_422:
       NOTREACHED();
       return 0;
   }
@@ -139,6 +139,13 @@ bool GLImageOzoneNativePixmap::ScheduleOverlayPlane(AcceleratedWidget widget,
   DCHECK(pixmap_);
   return pixmap_->ScheduleOverlayPlane(widget, z_order, transform, bounds_rect,
                                        crop_rect);
+}
+
+void GLImageOzoneNativePixmap::OnMemoryDump(
+    base::trace_event::ProcessMemoryDump* pmd,
+    uint64_t process_tracing_id,
+    const std::string& dump_name) {
+  // TODO(ericrk): Implement GLImage OnMemoryDump. crbug.com/514914
 }
 
 }  // namespace gfx

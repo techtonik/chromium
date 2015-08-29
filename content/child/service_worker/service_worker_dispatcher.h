@@ -12,10 +12,10 @@
 #include "base/memory/ref_counted.h"
 #include "base/strings/string16.h"
 #include "content/child/worker_task_runner.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerError.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerProvider.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerRegistration.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerState.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerError.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerProvider.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerRegistration.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerState.h"
 
 class GURL;
 
@@ -37,6 +37,7 @@ namespace content {
 
 class ServiceWorkerMessageFilter;
 class ServiceWorkerProviderContext;
+class ServiceWorkerRegistrationHandleReference;
 class ThreadSafeSender;
 class WebServiceWorkerImpl;
 class WebServiceWorkerRegistrationImpl;
@@ -91,10 +92,9 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
       int64 registration_id,
       WebServiceWorkerUnregistrationCallbacks* callbacks);
   // Corresponds to navigator.serviceWorker.getRegistration().
-  void GetRegistration(
-      int provider_id,
-      const GURL& document_url,
-      WebServiceWorkerRegistrationCallbacks* callbacks);
+  void GetRegistration(int provider_id,
+                       const GURL& document_url,
+                       WebServiceWorkerGetRegistrationCallbacks* callbacks);
   // Corresponds to navigator.serviceWorker.getRegistrations().
   void GetRegistrations(
       int provider_id,
@@ -134,13 +134,13 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
       const ServiceWorkerObjectInfo& info,
       bool adopt_handle);
 
-  // Creates a WebServiceWorkerRegistrationImpl for the specified registration
-  // and transfers its ownership to the caller. If |adopt_handle| is true, a
-  // ServiceWorkerRegistrationHandleReference will be adopted for the
-  // registration.
-  WebServiceWorkerRegistrationImpl* CreateServiceWorkerRegistration(
+  // Returns a new registration filled in with version attributes.
+  scoped_ptr<WebServiceWorkerRegistrationImpl> CreateRegistration(
       const ServiceWorkerRegistrationObjectInfo& info,
-      bool adopt_handle);
+      const ServiceWorkerVersionAttributes& attrs);
+  scoped_ptr<WebServiceWorkerRegistrationImpl> AdoptRegistration(
+      const ServiceWorkerRegistrationObjectInfo& info,
+      const ServiceWorkerVersionAttributes& attrs);
 
   static ServiceWorkerDispatcher* GetOrCreateThreadSpecificInstance(
       ThreadSafeSender* thread_safe_sender,
@@ -265,14 +265,10 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
   void RemoveServiceWorkerRegistration(
       int registration_handle_id);
 
-  // Returns an existing registration or new one filled in with version
-  // attributes. This function assumes given |info| and |attrs| retain handle
-  // references and always adopts them.
-  // TODO(nhiroki): This assumption seems to impair readability. We could
-  // explictly pass ServiceWorker(Registration)HandleReference instead.
-  WebServiceWorkerRegistrationImpl* FindOrCreateRegistration(
-      const ServiceWorkerRegistrationObjectInfo& info,
-      const ServiceWorkerVersionAttributes& attrs);
+  scoped_ptr<WebServiceWorkerRegistrationImpl> CreateRegistrationInternal(
+      scoped_ptr<ServiceWorkerRegistrationHandleReference> handle_ref,
+      const ServiceWorkerVersionAttributes& attrs,
+      bool adopt_handle);
 
   RegistrationCallbackMap pending_registration_callbacks_;
   UpdateCallbackMap pending_update_callbacks_;

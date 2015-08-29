@@ -36,7 +36,8 @@ input[type='checkbox']:checked {
       -1px -1px;
 }
 
-paper-ripple {
+paper-ripple,
+paper-button::shadow paper-ripple {
   color: black;
 }
 
@@ -54,7 +55,7 @@ paper-slider::shadow .expand:not(.pin) > #sliderKnob > #sliderKnobInner {
 }
 
 .gallery,
-.gallery .content {
+.gallery > .content {
   bottom: 0;
   left: 0;
   overflow: hidden;
@@ -197,6 +198,7 @@ paper-slider::shadow .expand:not(.pin) > #sliderKnob > #sliderKnobInner {
 .gallery > .toolbar.bottom {
   bottom: 0;
   height: 48px;
+  overflow: visible; /* For overwrite original bubble. */
 }
 
 .gallery > .toolbar.bottom > .slide-mode-toolbar {
@@ -336,7 +338,7 @@ paper-slider::shadow .expand:not(.pin) > #sliderKnob > #sliderKnobInner {
 .gallery .toolbar .bubble {
   bottom: 65px;
   font-size: 85%;
-  left: 50px;
+  left: 20px;
   position: absolute;
   width: 220px;
 }
@@ -366,22 +368,25 @@ paper-slider::shadow .expand:not(.pin) > #sliderKnob > #sliderKnobInner {
 /* Thumbnails */
 
 .gallery .ribbon-spacer {
-  height: 55px;
+  height: 48px;
   position: relative;
 }
 
 .gallery .toolbar .ribbon {
   display: flex;
-  height: 100%;
   justify-content: center;
-  margin: 0 auto;
   overflow: hidden;
+  padding: 4px 0;
   position: absolute;
-  top: 4px;
+  top: 0;
   transition: opacity 180ms linear, visibility 0ms linear;
   white-space: nowrap;
   width: 100%;
   z-index: 0;
+}
+
+.gallery .toolbar .ribbon:focus {
+  outline: none;
 }
 
 .gallery[editing] .toolbar .ribbon {
@@ -445,14 +450,33 @@ paper-slider::shadow .expand:not(.pin) > #sliderKnob > #sliderKnobInner {
 
 /* Editor toolbar. */
 
-.gallery .edit-mode-toolbar .options {
+.gallery .edit-mode-toolbar .options,
+.gallery .edit-mode-toolbar .exit-button-spacer {
   align-items: center;
   display: flex;
   height: 100%;
   opacity: 0;
+  pointer-events: none;
   position: absolute;
+  top: 0;
   visibility: hidden;
   width: 100%;
+}
+
+.gallery .edit-mode-toolbar .options > *,
+.gallery .edit-mode-toolbar .exit-button-spacer > * {
+  pointer-events: auto;
+}
+
+.gallery .edit-mode-toolbar .exit-button-spacer {
+  justify-content: flex-end;
+}
+
+.gallery .edit-mode-toolbar .exit-button-spacer paper-button {
+  -webkit-margin-end: 8px;
+  color: white;
+  font-weight: bold;
+  text-transform: uppercase;
 }
 
 .gallery .edit-mode-toolbar .edit-bar-spacer {
@@ -463,26 +487,32 @@ paper-slider::shadow .expand:not(.pin) > #sliderKnob > #sliderKnobInner {
   visibility: hidden;
 }
 
-.gallery[editing] .edit-mode-toolbar .options {
+.gallery[editing] .edit-mode-toolbar .options,
+.gallery[editing] .edit-mode-toolbar .exit-button-spacer {
   opacity: 1;
   visibility: visible;
 }
 
-.gallery .edit-mode-toolbar .overwrite-original {
+.edit-mode-toolbar .overwrite-original {
   -webkit-margin-start: 16px;
 }
 
-.gallery .edit-mode-toolbar .overwrite-original::shadow #checkboxContainer {
+.edit-mode-toolbar .overwrite-original::shadow #checkboxContainer {
   transform: scale(0.78, 0.78); /* Make box size to 14px. */
 }
 
-.gallery .edit-mode-toolbar .overwrite-original::shadow #ink {
+.edit-mode-toolbar .overwrite-original::shadow #ink {
   left: -10px;
   top: -10px;
 }
 
-.gallery .edit-mode-toolbar .overwrite-original::shadow #checkboxLabel {
+.edit-mode-toolbar .overwrite-original::shadow #checkboxLabel {
   padding-left: 6px;
+}
+
+.edit-mode-toolbar .overwrite-original[disabled]::shadow #checkbox,
+.edit-mode-toolbar .overwrite-original[disabled]::shadow #checkboxLabel {
+  opacity: 0.2;
 }
 
 .gallery .edit-mode-toolbar .saved {
@@ -529,10 +559,14 @@ paper-slider::shadow .expand:not(.pin) > #sliderKnob > #sliderKnobInner {
 
 .gallery > .toolbar paper-button,
 .gallery > .toolbar button {
+  border-radius: 2px;
+  margin: 0 8px;
+}
+
+.gallery > .toolbar .icon-button {
   background-position: center;
   background-repeat: no-repeat;
   height: 32px;
-  margin: 0 8px;
   min-width: 32px;
   width: 32px;
 }
@@ -551,6 +585,10 @@ paper-slider::shadow .expand:not(.pin) > #sliderKnob > #sliderKnobInner {
 
 .gallery > .toolbar button:focus {
   outline: none;
+}
+
+.gallery > .toolbar button.using-mouse:focus {
+  background-color: transparent;
 }
 
 .gallery > .toolbar button > .icon {
@@ -650,6 +688,10 @@ button[disabled] {
 }
 
 /* Edit main toolbar. */
+.gallery > .toolbar .edit-main button {
+  border-radius: 1px;
+}
+
 .edit-main button.autofix .icon {
   background-image: -webkit-image-set(
       url(../images/100/auto_fix.png) 1x,
@@ -718,7 +760,7 @@ button[disabled] {
 }
 
 .edit-modal-wrapper .container,
-.edit-modal-wrapper .done-button {
+.edit-modal-wrapper .action-buttons {
   align-items: center;
   display: flex;
   height: 100%;
@@ -729,7 +771,7 @@ button[disabled] {
   justify-content: center;
 }
 
-.edit-modal-wrapper .done-button {
+.edit-modal-wrapper .action-buttons {
   justify-content: flex-end;
   left: 0;
   position: absolute;
@@ -755,17 +797,18 @@ button[disabled] {
   display: block;
 }
 
-/* Done button */
-.edit-modal button.done {
+/* Action buttons */
+.edit-modal-wrapper .action-buttons button {
   -webkit-margin-end: 8px;
   align-items: center;
   display: flex;
   height: 32px;
   justify-content: center;
+  outline: none;
   width: 70px;
 }
 
-.edit-modal button.done .label {
+.edit-modal-wrapper .action-buttons button .label {
   font-weight: bold;
 }
 
@@ -1030,8 +1073,7 @@ paper-slider::shadow paper-progress::shadow #progressContainer {
 /* Load spinner and error banner. */
 
 .gallery .spinner {
-  background-image:
-      url(chrome://resources/images/throbber.svg);
+  background-image: url(chrome://resources/images/throbber_medium.svg);
   background-size: 100%;
   height: 32px;
   left: 50%;
@@ -1305,6 +1347,10 @@ html[dir='ltr'] .thumbnail-view .thumbnail {
 
 html[dir='rtl'] .thumbnail-view .thumbnail {
   float: right;
+}
+
+.thumbnail-view .thumbnail.selected:focus {
+  outline: none;
 }
 
 .thumbnail-view::-webkit-scrollbar {

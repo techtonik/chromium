@@ -124,11 +124,6 @@ using FormsPredictionsMap =
 // (including in a different frame).
 IPC_MESSAGE_ROUTED0(AutofillMsg_FirstUserGestureObservedInTab)
 
-// Instructs the renderer to immediately return an IPC acknowledging the ping.
-// This is used to correctly sequence events, since IPCs are guaranteed to be
-// processed in order.
-IPC_MESSAGE_ROUTED0(AutofillMsg_Ping)
-
 // Instructs the renderer to fill the active form with the given form data.
 IPC_MESSAGE_ROUTED2(AutofillMsg_FillForm,
                     int /* query_id */,
@@ -310,6 +305,11 @@ IPC_MESSAGE_ROUTED0(AutofillHostMsg_DidEndTextFieldEditing)
 
 // Instructs the browser to hide the Autofill popup if it is open.
 IPC_MESSAGE_ROUTED0(AutofillHostMsg_HidePopup)
+
+// Instructs the browser that generation is available for this particular form.
+// This is used for UMA stats.
+IPC_MESSAGE_ROUTED1(AutofillHostMsg_GenerationAvailableForForm,
+                    autofill::PasswordForm)
 
 // Instructs the browser to show the password generation popup at the
 // specified location. This location should be specified in the renderers

@@ -16,6 +16,7 @@
         'apk_name': 'AndroidWebView',
         'java_in_dir': 'test/shell',
         'native_lib_target': 'libstandalonelibwebviewchromium',
+        'native_lib_version_name': '<(version_full)',
         'resource_dir': 'test/shell/res',
         'extensions_to_not_compress': '.lpak,.pak,.dat,.bin',
         'asset_location': '<(PRODUCT_DIR)/android_webview_apk/assets',
@@ -72,12 +73,15 @@
           ],
         },
       ],
-      'includes': [ '../build/java_apk.gypi' ],
+      'includes': [
+        '../build/java_apk.gypi',
+        '../build/util/version.gypi',
+      ],
     },
     {
       # android_webview_apk creates a .jar as a side effect. Any java
       # targets that need that .jar in their classpath should depend on this
-      # target. For more details see the chrome_shell_apk_java target.
+      # target. For more details see the content_shell_apk_java target.
       'target_name': 'android_webview_apk_java',
       'type': 'none',
       'dependencies': [

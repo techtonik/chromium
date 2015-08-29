@@ -103,7 +103,7 @@ void PopulateNetworkSessionParams(
   params->net_log = context->net_log();
   // TODO(sgurun) remove once crbug.com/329681 is fixed.
   params->next_protos = net::NextProtosSpdy31();
-  params->use_alternate_protocols = true;
+  params->use_alternative_services = true;
 
   ApplyCmdlineOverridesToNetworkSessionParams(params);
 }
@@ -112,31 +112,35 @@ scoped_ptr<net::URLRequestJobFactory> CreateJobFactory(
     content::ProtocolHandlerMap* protocol_handlers,
     content::URLRequestInterceptorScopedVector request_interceptors) {
   scoped_ptr<AwURLRequestJobFactory> aw_job_factory(new AwURLRequestJobFactory);
+  // Note that the registered schemes must also be specified in
+  // AwContentBrowserClient::IsHandledURL.
   bool set_protocol = aw_job_factory->SetProtocolHandler(
       url::kFileScheme,
-      new net::FileProtocolHandler(
-          content::BrowserThread::GetBlockingPool()->
-              GetTaskRunnerWithShutdownBehavior(
-                  base::SequencedWorkerPool::SKIP_ON_SHUTDOWN)));
+      make_scoped_ptr(new net::FileProtocolHandler(
+          content::BrowserThread::GetBlockingPool()
+              ->GetTaskRunnerWithShutdownBehavior(
+                  base::SequencedWorkerPool::SKIP_ON_SHUTDOWN))));
   DCHECK(set_protocol);
   set_protocol = aw_job_factory->SetProtocolHandler(
-      url::kDataScheme, new net::DataProtocolHandler());
+      url::kDataScheme, make_scoped_ptr(new net::DataProtocolHandler()));
   DCHECK(set_protocol);
   set_protocol = aw_job_factory->SetProtocolHandler(
       url::kBlobScheme,
-      (*protocol_handlers)[url::kBlobScheme].release());
+      make_scoped_ptr((*protocol_handlers)[url::kBlobScheme].release()));
   DCHECK(set_protocol);
   set_protocol = aw_job_factory->SetProtocolHandler(
       url::kFileSystemScheme,
-      (*protocol_handlers)[url::kFileSystemScheme].release());
+      make_scoped_ptr((*protocol_handlers)[url::kFileSystemScheme].release()));
   DCHECK(set_protocol);
   set_protocol = aw_job_factory->SetProtocolHandler(
       content::kChromeUIScheme,
-      (*protocol_handlers)[content::kChromeUIScheme].release());
+      make_scoped_ptr(
+          (*protocol_handlers)[content::kChromeUIScheme].release()));
   DCHECK(set_protocol);
   set_protocol = aw_job_factory->SetProtocolHandler(
       content::kChromeDevToolsScheme,
-      (*protocol_handlers)[content::kChromeDevToolsScheme].release());
+      make_scoped_ptr(
+          (*protocol_handlers)[content::kChromeDevToolsScheme].release()));
   DCHECK(set_protocol);
   protocol_handlers->clear();
 

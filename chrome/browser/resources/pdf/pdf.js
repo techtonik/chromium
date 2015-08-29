@@ -26,7 +26,9 @@ function getScrollbarWidth() {
  * @return {string} The filename component.
  */
 function getFilenameFromURL(url) {
-  var components = url.split(/\/|\\/);
+  // Ignore the query and fragment.
+  var mainUrl = url.split(/#|\?/)[0];
+  var components = mainUrl.split(/\/|\\/);
   return components[components.length - 1];
 }
 
@@ -83,7 +85,7 @@ PDFViewer.MIN_TOOLBAR_OFFSET = 15;
  * The height of the toolbar along the top of the page. The document will be
  * shifted down by this much in the viewport.
  */
-PDFViewer.MATERIAL_TOOLBAR_HEIGHT = 64;
+PDFViewer.MATERIAL_TOOLBAR_HEIGHT = 56;
 
 /**
  * Creates a new PDFViewer. There should only be one of these objects per
@@ -95,6 +97,7 @@ function PDFViewer(browserApi) {
   this.browserApi_ = browserApi;
   this.loadState_ = LoadState.LOADING;
   this.parentWindow_ = null;
+  this.parentOrigin_ = null;
 
   this.delayedScriptingMessages_ = [];
 
@@ -113,6 +116,8 @@ function PDFViewer(browserApi) {
   this.passwordScreen_.addEventListener('password-submitted',
                                         this.onPasswordSubmitted_.bind(this));
   this.errorScreen_ = $('error-screen');
+  if (chrome.tabs)
+    this.errorScreen_.reloadFn = chrome.tabs.reload;
 
   // Create the viewport.
   var topToolbarHeight =
@@ -144,8 +149,6 @@ function PDFViewer(browserApi) {
   window.addEventListener('message', this.handleScriptingMessage.bind(this),
                           false);
 
-  document.title = decodeURIComponent(
-      getFilenameFromURL(this.browserApi_.getStreamInfo().originalUrl));
   this.plugin_.setAttribute('src',
                             this.browserApi_.getStreamInfo().originalUrl);
   this.plugin_.setAttribute('stream-url',
@@ -193,7 +196,6 @@ function PDFViewer(browserApi) {
         this.viewport_.zoomOut.bind(this.viewport_));
 
     this.materialToolbar_ = $('material-toolbar');
-    this.materialToolbar_.docTitle = document.title;
     this.materialToolbar_.addEventListener('save', this.save_.bind(this));
     this.materialToolbar_.addEventListener('print', this.print_.bind(this));
     this.materialToolbar_.addEventListener('rotate-right',
@@ -279,9 +281,11 @@ PDFViewer.prototype = {
 
     switch (e.keyCode) {
       case 27:  // Escape key.
-        if (this.isMaterial_)
+        if (this.isMaterial_ && !this.isPrintPreview) {
           this.toolbarManager_.hideSingleToolbarLayer();
-        return;
+          return;
+        }
+        break;  // Ensure escape falls through to the print-preview handler.
       case 32:  // Space key.
         if (e.shiftKey)
           pageUpHandler();
@@ -484,7 +488,7 @@ PDFViewer.prototype = {
 
     if (progress == -1) {
       // Document load failed.
-      this.errorScreen_.style.visibility = 'visible';
+      this.errorScreen_.show();
       this.sizer_.style.display = 'none';
       if (!this.isMaterial_)
         this.toolbar_.style.visibility = 'hidden';
@@ -600,10 +604,18 @@ PDFViewer.prototype = {
       case 'cancelStreamUrl':
         chrome.mimeHandlerPrivate.abortStream();
         break;
-      case 'bookmarks':
+      case 'metadata':
+        if (message.data.title) {
+          document.title = message.data.title;
+        } else {
+          document.title = decodeURIComponent(
+              getFilenameFromURL(this.browserApi_.getStreamInfo().originalUrl));
+        }
         this.bookmarks_ = message.data.bookmarks;
-        if (this.isMaterial_ && this.bookmarks_.length !== 0)
+        if (this.isMaterial_) {
+          this.materialToolbar_.docTitle = document.title;
           this.materialToolbar_.bookmarks = this.bookmarks;
+        }
         break;
       case 'setIsSelecting':
         this.viewportScroller_.setEnableScrolling(message.data.isSelecting);
@@ -634,8 +646,6 @@ PDFViewer.prototype = {
   afterZoom_: function() {
     var position = this.viewport_.position;
     var zoom = this.viewport_.zoom;
-    if (this.isMaterial_)
-      this.zoomToolbar_.zoomValue = 100 * zoom;
     this.plugin_.postMessage({
       type: 'viewport',
       zoom: zoom,
@@ -720,6 +730,7 @@ PDFViewer.prototype = {
   handleScriptingMessage: function(message) {
     if (this.parentWindow_ != message.source) {
       this.parentWindow_ = message.source;
+      this.parentOrigin_ = message.origin;
       // Ensure that we notify the embedder if the document is loaded.
       if (this.loadState_ != LoadState.LOADING)
         this.sendDocumentLoadedMessage_();
@@ -806,10 +817,21 @@ PDFViewer.prototype = {
    * @param {Object} message the message to send.
    */
   sendScriptingMessage_: function(message) {
-    if (this.parentWindow_)
-      this.parentWindow_.postMessage(message, '*');
+    if (this.parentWindow_ && this.parentOrigin_) {
+      var targetOrigin;
+      // Only send data back to the embedder if it is from the same origin,
+      // unless we're sending it to ourselves (which could happen in the case
+      // of tests). We also allow documentLoaded messages through as this won't
+      // leak important information.
+      if (this.parentOrigin_ == window.location.origin)
+        targetOrigin = this.parentOrigin_;
+      else if (message.type == 'documentLoaded')
+        targetOrigin = '*';
+      else
+        targetOrigin = this.browserApi_.getStreamInfo().originalUrl;
+      this.parentWindow_.postMessage(message, targetOrigin);
+    }
   },
-
 
   /**
    * @type {Viewport} the viewport of the PDF viewer.

@@ -12,7 +12,6 @@
  * @param {!ThumbnailModel} thumbnailModel
  * @extends {HTMLDivElement}
  * @constructor
- * @suppress {checkStructDictInheritance}
  * @struct
  */
 function Ribbon(
@@ -24,6 +23,8 @@ function Ribbon(
 
   this.__proto__ = Ribbon.prototype;
   this.className = 'ribbon';
+  this.setAttribute('role', 'listbox');
+  this.tabIndex = 0;
 
   /**
    * @private {!Window}
@@ -91,6 +92,11 @@ function Ribbon(
    */
   this.removeTimeout_ = null;
 
+  /**
+   * @private {number}
+   */
+  this.thumbnailElementId_ = 0;
+
   this.targetWindow_.addEventListener(
       'resize', this.onWindowResize_.bind(this));
 
@@ -109,10 +115,16 @@ Ribbon.prototype.__proto__ = HTMLDivElement.prototype;
 Ribbon.MARGIN = 2; // px
 
 /**
- * Width of thumbnail.
+ * Width of thumbnail on the ribbon.
  * @const {number}
  */
 Ribbon.THUMBNAIL_WIDTH = 71; // px
+
+/**
+ * Height of thumbnail on the ribbon.
+ * @const {number}
+ */
+Ribbon.THUMBNAIL_HEIGHT = 40; // px
 
 /**
  * Returns number of items in the viewport.
@@ -336,17 +348,20 @@ Ribbon.prototype.onSelection_ = function() {
       }, 0);
     }
 
-    ImageUtil.setClass(this, 'fade-left',
-        firstIndex > 0 && selectedIndex != firstIndex);
-
-    ImageUtil.setClass(this, 'fade-right',
-        lastIndex < length - 1 && selectedIndex != lastIndex);
-
     this.firstVisibleIndex_ = firstIndex;
     this.lastVisibleIndex_ = lastIndex;
 
     this.scheduleRemove_();
   }
+
+  ImageUtil.setClass(
+      this,
+      'fade-left',
+      firstIndex > 0 && selectedIndex !== firstIndex);
+  ImageUtil.setClass(
+      this,
+      'fade-right',
+      lastIndex < length - 1 && selectedIndex !== lastIndex);
 
   var oldSelected = this.querySelector('[selected]');
   if (oldSelected)
@@ -356,7 +371,8 @@ Ribbon.prototype.onSelection_ = function() {
       this.renderCache_[this.dataModel_.item(selectedIndex).getEntry().toURL()];
   if (newSelected) {
     newSelected.setAttribute('selected', true);
-    newSelected.focus();
+    this.setAttribute('aria-activedescendant', newSelected.id);
+    this.focus();
   }
 };
 
@@ -411,8 +427,9 @@ Ribbon.prototype.renderThumbnail_ = function(index) {
 
   var thumbnail = assertInstanceof(this.ownerDocument.createElement('div'),
       HTMLDivElement);
+  thumbnail.id = `thumbnail-${this.thumbnailElementId_++}`;
   thumbnail.className = 'ribbon-image';
-  thumbnail.tabIndex = 1;
+  thumbnail.setAttribute('role', 'listitem');
   thumbnail.addEventListener('click', function() {
     var index = this.dataModel_.indexOf(item);
     this.selectionModel_.unselectAll();
@@ -439,7 +456,6 @@ Ribbon.prototype.renderThumbnail_ = function(index) {
  * @private
  */
 Ribbon.prototype.setThumbnailImage_ = function(thumbnail, item) {
-  thumbnail.setAttribute('aria-label', item.getFileName());
   thumbnail.setAttribute('title', item.getFileName());
 
   if (!item.getThumbnailMetadataItem())
@@ -460,7 +476,9 @@ Ribbon.prototype.setThumbnailImage_ = function(thumbnail, item) {
         undefined /* opt_onSuccess */,
         undefined /* opt_onError */,
         undefined /* opt_onGeneric */,
-        0.35 /* opt_autoFillThreshold */);
+        0.35 /* opt_autoFillThreshold */,
+        Ribbon.THUMBNAIL_WIDTH /* opt_boxWidth */,
+        Ribbon.THUMBNAIL_HEIGHT /* opt_boxHeight */);
   });
 };
 

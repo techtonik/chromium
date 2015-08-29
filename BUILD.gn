@@ -12,6 +12,7 @@ import("//build/config/crypto.gni")
 import("//build/config/features.gni")
 import("//build/config/ui.gni")
 import("//build/module_args/v8.gni")
+import("//media/media_options.gni")
 
 if (is_android) {
   import("//build/config/android/config.gni")
@@ -65,7 +66,12 @@ group("both_gn_and_gyp") {
   testonly = true
   deps = [
     "//base:base_unittests",
+    "//chrome/installer",
+    "//net:net_unittests",
+    "//skia:skia_unittests",
     "//sql:sql_unittests",
+    "//ui/base:ui_base_unittests",
+    "//url:url_unittests",
   ]
 
   if (!is_ios) {
@@ -105,7 +111,6 @@ group("both_gn_and_gyp") {
       "//net:hpack_fuzz_mutator",
       "//net:hpack_fuzz_wrapper",
       "//net:net_perftests",
-      "//net:net_unittests",
       "//ppapi:ppapi_unittests",
       "//ppapi/examples/2d",
       "//ppapi/examples/audio",
@@ -136,7 +141,6 @@ group("both_gn_and_gyp") {
       "//ppapi/examples/video_effects",
       "//ppapi/examples/video_encode",
       "//printing:printing_unittests",
-      "//skia:skia_unittests",
       "//sync:sync_unit_tests",
       "//third_party/WebKit/Source/platform:heap_unittests",
       "//third_party/WebKit/Source/platform:platform_unittests",
@@ -158,13 +162,11 @@ group("both_gn_and_gyp") {
       "//tools/telemetry:bitmaptools($host_toolchain)",
       "//ui/accessibility:accessibility_unittests",
       "//ui/app_list:app_list_unittests",
-      "//ui/base:ui_base_unittests",
       "//ui/display:display_unittests",
       "//ui/events:events_unittests",
       "//ui/gfx:gfx_unittests",
       "//ui/gl:gl_unittests",
       "//ui/touch_selection:ui_touch_selection_unittests",
-      "//url:url_unittests",
     ]
   }
 
@@ -390,7 +392,6 @@ group("both_gn_and_gyp") {
       "//gpu:gpu_perftests",
       "//gpu:gl_tests",
       "//ipc:ipc_perftests",
-      "//media:ffmpeg_regression_tests",  # TODO(GYP) this should be conditional on media_use_ffmpeg
       "//media:media_perftests",
       "//media/cast:generate_barcode_video",
       "//media/cast:generate_timecode_audio",
@@ -422,8 +423,8 @@ group("both_gn_and_gyp") {
       deps += [ "//components/nacl:nacl_loader_unittests" ]
     }
 
-    if (enable_nacl && enable_remoting) {
-      deps += [ "//remoting:remoting_key_tester" ]
+    if (media_use_ffmpeg) {
+      deps += [ "//media:ffmpeg_regression_tests" ]
     }
 
     if (use_ash) {
@@ -513,7 +514,7 @@ group("both_gn_and_gyp") {
     # are pulled in automatically.
     deps += [
       "//cc/blink",
-      "//components/ui/zoom:ui_zoom",
+      "//components/ui/zoom",
       "//content",
       "//content/test:test_support",
       "//device/battery",
@@ -533,6 +534,7 @@ group("both_gn_and_gyp") {
       "//third_party/qcms",
       "//third_party/smhasher:murmurhash3",
       "//third_party/webrtc/system_wrappers",
+      "//ui/app_list:app_list_unittests",
       "//ui/gfx:gfx_unittests",
       "//ui/native_theme",
       "//ui/snapshot",
@@ -560,7 +562,6 @@ group("both_gn_and_gyp") {
       "//third_party/WebKit/Source/platform:heap_unittests",
       "//third_party/WebKit/Source/platform:platform_unittests",
       "//third_party/WebKit/Source/web:webkit_unit_tests",
-      "//ui/app_list:app_list_unittests",  # TODO(GYP)
     ]
   }
 
@@ -794,6 +795,10 @@ if (!is_ios) {
       deps += [ "//breakpad:dump_syms($host_toolchain)" ]
     }
   }
+}
+
+# Add a dummy target for compatibility w/ GYP
+group("chromium_swarm_tests") {
 }
 
 if (is_linux) {

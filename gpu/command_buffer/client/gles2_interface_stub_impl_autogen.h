@@ -787,12 +787,19 @@ void GLES2InterfaceStub::EndTransformFeedback() {}
 void GLES2InterfaceStub::GetQueryivEXT(GLenum /* target */,
                                        GLenum /* pname */,
                                        GLint* /* params */) {}
+void GLES2InterfaceStub::GetQueryObjectivEXT(GLuint /* id */,
+                                             GLenum /* pname */,
+                                             GLint* /* params */) {}
 void GLES2InterfaceStub::GetQueryObjectuivEXT(GLuint /* id */,
                                               GLenum /* pname */,
                                               GLuint* /* params */) {}
+void GLES2InterfaceStub::GetQueryObjecti64vEXT(GLuint /* id */,
+                                               GLenum /* pname */,
+                                               GLint64* /* params */) {}
 void GLES2InterfaceStub::GetQueryObjectui64vEXT(GLuint /* id */,
                                                 GLenum /* pname */,
                                                 GLuint64* /* params */) {}
+void GLES2InterfaceStub::SetDisjointValueSyncCHROMIUM() {}
 void GLES2InterfaceStub::InsertEventMarkerEXT(GLsizei /* length */,
                                               const GLchar* /* marker */) {}
 void GLES2InterfaceStub::PushGroupMarkerEXT(GLsizei /* length */,
@@ -932,6 +939,16 @@ void GLES2InterfaceStub::CopySubTextureCHROMIUM(
 void GLES2InterfaceStub::CompressedCopyTextureCHROMIUM(GLenum /* target */,
                                                        GLenum /* source_id */,
                                                        GLenum /* dest_id */) {}
+void GLES2InterfaceStub::CompressedCopySubTextureCHROMIUM(
+    GLenum /* target */,
+    GLenum /* source_id */,
+    GLenum /* dest_id */,
+    GLint /* xoffset */,
+    GLint /* yoffset */,
+    GLint /* x */,
+    GLint /* y */,
+    GLsizei /* width */,
+    GLsizei /* height */) {}
 void GLES2InterfaceStub::DrawArraysInstancedANGLE(GLenum /* mode */,
                                                   GLint /* first */,
                                                   GLsizei /* count */,
@@ -985,26 +1002,6 @@ void GLES2InterfaceStub::ReleaseTexImage2DCHROMIUM(GLenum /* target */,
 void GLES2InterfaceStub::TraceBeginCHROMIUM(const char* /* category_name */,
                                             const char* /* trace_name */) {}
 void GLES2InterfaceStub::TraceEndCHROMIUM() {}
-void GLES2InterfaceStub::AsyncTexSubImage2DCHROMIUM(GLenum /* target */,
-                                                    GLint /* level */,
-                                                    GLint /* xoffset */,
-                                                    GLint /* yoffset */,
-                                                    GLsizei /* width */,
-                                                    GLsizei /* height */,
-                                                    GLenum /* format */,
-                                                    GLenum /* type */,
-                                                    const void* /* data */) {}
-void GLES2InterfaceStub::AsyncTexImage2DCHROMIUM(GLenum /* target */,
-                                                 GLint /* level */,
-                                                 GLenum /* internalformat */,
-                                                 GLsizei /* width */,
-                                                 GLsizei /* height */,
-                                                 GLint /* border */,
-                                                 GLenum /* format */,
-                                                 GLenum /* type */,
-                                                 const void* /* pixels */) {}
-void GLES2InterfaceStub::WaitAsyncTexImage2DCHROMIUM(GLenum /* target */) {}
-void GLES2InterfaceStub::WaitAllAsyncTexImage2DCHROMIUM() {}
 void GLES2InterfaceStub::DiscardFramebufferEXT(
     GLenum /* target */,
     GLsizei /* count */,

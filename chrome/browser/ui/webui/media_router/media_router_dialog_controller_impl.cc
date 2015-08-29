@@ -33,7 +33,7 @@ using content::WebUIMessageHandler;
 using ui::WebDialogDelegate;
 
 namespace {
-const int kMaxHeight = 260;
+const int kMaxHeight = 300;
 #if !defined(OS_MACOSX)
 const int kMinHeight = 130;
 #endif  // !defined(OS_MACOSX)
@@ -261,7 +261,7 @@ void MediaRouterDialogControllerImpl::PopulateDialog(
   }
 
   scoped_ptr<CreatePresentationSessionRequest> presentation_request(
-      PassPresentationRequest());
+      TakePresentationRequest());
   // TODO(imcheng): Don't create PresentationServiceDelegateImpl if it doesn't
   // exist (crbug.com/508695).
   base::WeakPtr<PresentationServiceDelegateImpl> delegate =

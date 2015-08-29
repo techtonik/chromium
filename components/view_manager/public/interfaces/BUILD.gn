@@ -8,17 +8,14 @@ mojom("interfaces") {
   sources = [
     "animations.mojom",
     "command_buffer.mojom",
-    "context_provider.mojom",
-    "display.mojom",
+    "compositor_frame.mojom",
     "gpu.mojom",
     "gpu_capabilities.mojom",
     "quads.mojom",
     "surface_id.mojom",
-    "surfaces.mojom",
-    "view_manager.mojom",
     "view_manager_constants.mojom",
-    "view_manager_root.mojom",
-    "viewport_parameter_listener.mojom",
+    "view_tree.mojom",
+    "view_tree_host.mojom",
   ]
 
   import_dirs = [

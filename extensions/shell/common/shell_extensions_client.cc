@@ -42,9 +42,9 @@ class ShellPermissionMessageProvider : public PermissionMessageProvider {
   ~ShellPermissionMessageProvider() override {}
 
   // PermissionMessageProvider implementation.
-  CoalescedPermissionMessages GetPermissionMessages(
+  PermissionMessages GetPermissionMessages(
       const PermissionIDSet& permissions) const override {
-    return CoalescedPermissionMessages();
+    return PermissionMessages();
   }
 
   bool IsPrivilegeIncrease(const PermissionSet* old_permissions,
@@ -137,13 +137,6 @@ ShellExtensionsClient::CreateFeatureProviderSource(
     source.reset();
   }
   return source.Pass();
-}
-
-void ShellExtensionsClient::FilterHostPermissions(
-    const URLPatternSet& hosts,
-    URLPatternSet* new_hosts,
-    std::set<PermissionMessage>* messages) const {
-  NOTIMPLEMENTED();
 }
 
 void ShellExtensionsClient::FilterHostPermissions(

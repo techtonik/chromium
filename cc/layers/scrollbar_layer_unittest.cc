@@ -121,7 +121,6 @@ class ScrollbarLayerTest : public testing::Test {
   ScrollbarLayerTest() : fake_client_(FakeLayerTreeHostClient::DIRECT_3D) {
     layer_tree_settings_.single_thread_proxy_scheduler = false;
     layer_tree_settings_.use_zero_copy = true;
-    layer_tree_settings_.use_one_copy = false;
 
     LayerTreeHost::InitParams params;
     params.client = &fake_client_;
@@ -713,10 +712,7 @@ class ScrollbarLayerTestResourceCreationAndRelease : public ScrollbarLayerTest {
     layer_tree_root->SetScrollOffset(gfx::ScrollOffset(10, 20));
     layer_tree_root->SetBounds(gfx::Size(100, 200));
     content_layer->SetBounds(gfx::Size(100, 200));
-    scrollbar_layer->draw_properties().visible_layer_rect =
-        gfx::Rect(0, 0, 100, 200);
-    scrollbar_layer->CreateRenderSurface();
-    scrollbar_layer->draw_properties().render_target = scrollbar_layer.get();
+    scrollbar_layer->set_visible_layer_rect(gfx::Rect(0, 0, 100, 200));
 
     testing::Mock::VerifyAndClearExpectations(layer_tree_host_.get());
     EXPECT_EQ(scrollbar_layer->layer_tree_host(), layer_tree_host_.get());
@@ -731,8 +727,6 @@ class ScrollbarLayerTestResourceCreationAndRelease : public ScrollbarLayerTest {
     EXPECT_EQ(expected_deleted, layer_tree_host_->TotalUIResourceDeleted());
 
     testing::Mock::VerifyAndClearExpectations(layer_tree_host_.get());
-
-    scrollbar_layer->ClearRenderSurface();
   }
 };
 
@@ -775,12 +769,7 @@ TEST_F(ScrollbarLayerTestResourceCreationAndRelease, TestResourceUpdate) {
   scrollbar_layer->SetPosition(scrollbar_location);
   layer_tree_root->SetBounds(gfx::Size(100, 200));
   content_layer->SetBounds(gfx::Size(100, 200));
-
-  scrollbar_layer->draw_properties().visible_layer_rect =
-      gfx::Rect(0, 0, 100, 200);
-
-  scrollbar_layer->CreateRenderSurface();
-  scrollbar_layer->draw_properties().render_target = scrollbar_layer.get();
+  scrollbar_layer->set_visible_layer_rect(gfx::Rect(0, 0, 100, 200));
 
   testing::Mock::VerifyAndClearExpectations(layer_tree_host_.get());
   EXPECT_EQ(scrollbar_layer->layer_tree_host(), layer_tree_host_.get());
@@ -886,7 +875,6 @@ TEST_F(ScrollbarLayerTestResourceCreationAndRelease, TestResourceUpdate) {
   EXPECT_EQ(expected_deleted, layer_tree_host_->TotalUIResourceDeleted());
 
   testing::Mock::VerifyAndClearExpectations(layer_tree_host_.get());
-  scrollbar_layer->ClearRenderSurface();
 }
 
 class ScaledScrollbarLayerTestResourceCreation : public ScrollbarLayerTest {
@@ -909,10 +897,8 @@ class ScaledScrollbarLayerTestResourceCreation : public ScrollbarLayerTest {
     scrollbar_layer->SetPosition(scrollbar_location);
     layer_tree_root->SetBounds(gfx::Size(100, 200));
     content_layer->SetBounds(gfx::Size(100, 200));
-    scrollbar_layer->draw_properties().visible_layer_rect =
-        gfx::Rect(scrollbar_location, scrollbar_layer->bounds());
-    scrollbar_layer->CreateRenderSurface();
-    scrollbar_layer->draw_properties().render_target = scrollbar_layer.get();
+    scrollbar_layer->set_visible_layer_rect(
+        gfx::Rect(scrollbar_location, scrollbar_layer->bounds()));
 
     testing::Mock::VerifyAndClearExpectations(layer_tree_host_.get());
     EXPECT_EQ(scrollbar_layer->layer_tree_host(), layer_tree_host_.get());
@@ -940,8 +926,6 @@ class ScaledScrollbarLayerTestResourceCreation : public ScrollbarLayerTest {
               scrollbar_layer->internal_content_bounds().height());
 
     testing::Mock::VerifyAndClearExpectations(layer_tree_host_.get());
-
-    scrollbar_layer->ClearRenderSurface();
   }
 };
 
@@ -971,7 +955,7 @@ class ScaledScrollbarLayerTestScaledRasterization : public ScrollbarLayerTest {
     scrollbar_layer->SetPosition(scrollbar_rect.origin());
     scrollbar_layer->fake_scrollbar()->set_location(scrollbar_rect.origin());
     scrollbar_layer->fake_scrollbar()->set_track_rect(scrollbar_rect);
-    scrollbar_layer->draw_properties().visible_layer_rect = scrollbar_rect;
+    scrollbar_layer->set_visible_layer_rect(scrollbar_rect);
 
     layer_tree_host_->SetDeviceScaleFactor(test_scale);
 

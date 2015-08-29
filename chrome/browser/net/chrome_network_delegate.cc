@@ -33,7 +33,7 @@
 #include "chrome/browser/net/request_source_bandwidth_histograms.h"
 #include "chrome/browser/net/safe_search_util.h"
 #include "chrome/browser/profiles/profile_manager.h"
-#include "chrome/browser/task_manager/task_manager.h"
+#include "chrome/browser/task_management/task_manager_interface.h"
 #include "chrome/common/pref_names.h"
 #include "components/content_settings/core/browser/cookie_settings.h"
 #include "components/domain_reliability/monitor.h"
@@ -106,6 +106,7 @@ void ForceGoogleSafeSearchCallbackWrapper(
 
 #if defined(OS_ANDROID)
 void RecordPrecacheStatsOnUIThread(const GURL& url,
+                                   const GURL& referrer,
                                    base::TimeDelta latency,
                                    const base::Time& fetch_time,
                                    int64 size,
@@ -120,11 +121,11 @@ void RecordPrecacheStatsOnUIThread(const GURL& url,
   precache::PrecacheManager* precache_manager =
       precache::PrecacheManagerFactory::GetForBrowserContext(profile);
   // |precache_manager| could be NULL if the profile is off the record.
-  if (!precache_manager || !precache_manager->WouldRun())
+  if (!precache_manager || !precache_manager->IsPrecachingAllowed())
     return;
 
-  precache_manager->RecordStatsForFetch(url, latency, fetch_time, size,
-                                        was_cached);
+  precache_manager->RecordStatsForFetch(url, referrer, latency, fetch_time,
+                                        size, was_cached);
 }
 #endif  // defined(OS_ANDROID)
 
@@ -477,13 +478,14 @@ void ChromeNetworkDelegate::OnResponseStarted(net::URLRequest* request) {
   extensions_delegate_->OnResponseStarted(request);
 }
 
-void ChromeNetworkDelegate::OnRawBytesRead(const net::URLRequest& request,
-                                           int bytes_read) {
+void ChromeNetworkDelegate::OnNetworkBytesReceived(
+    const net::URLRequest& request,
+    int64_t bytes_received) {
 #if defined(ENABLE_TASK_MANAGER)
-  // This is not completely accurate, but as a first approximation ignore
-  // requests that are served from the cache. See bug 330931 for more info.
-  if (!request.was_cached())
-    TaskManager::GetInstance()->model()->NotifyBytesRead(request, bytes_read);
+  // Note: Currently, OnNetworkBytesReceived is only implemented for HTTP jobs,
+  // not FTP or other types, so those kinds of bytes will not be reported here.
+  task_management::TaskManagerInterface::OnRawBytesRead(request,
+                                                        bytes_received);
 #endif  // defined(ENABLE_TASK_MANAGER)
 }
 
@@ -509,9 +511,9 @@ void ChromeNetworkDelegate::OnCompleted(net::URLRequest* request,
     // precaching is allowed.
     BrowserThread::PostTask(
         BrowserThread::UI, FROM_HERE,
-        base::Bind(&RecordPrecacheStatsOnUIThread, request->url(), latency,
-                   base::Time::Now(), received_content_length,
-                   request->was_cached(), profile_));
+        base::Bind(&RecordPrecacheStatsOnUIThread, request->url(),
+                   GURL(request->referrer()), latency, base::Time::Now(),
+                   received_content_length, request->was_cached(), profile_));
 #endif  // defined(OS_ANDROID)
     extensions_delegate_->OnCompleted(request, started);
   } else if (request->status().status() == net::URLRequestStatus::FAILED ||

@@ -10,6 +10,7 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/safe_browsing/safe_browsing_blocking_page.h"
 #include "chrome/browser/safe_browsing/safe_browsing_service.h"
+#include "chrome/browser/ssl/bad_clock_blocking_page.h"
 #include "chrome/browser/ssl/ssl_blocking_page.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/grit/browser_resources.h"
@@ -51,20 +52,36 @@ class InterstitialHTMLSource : public content::URLDataSource {
 };
 
 #if defined(ENABLE_CAPTIVE_PORTAL_DETECTION)
-class FakeConnectionInfoDelegate : public CaptivePortalBlockingPage::Delegate {
+// Provides fake connection information to the captive portal blocking page so
+// that both Wi-Fi and non Wi-Fi blocking pages can be displayed.
+class CaptivePortalBlockingPageWithNetInfo : public CaptivePortalBlockingPage {
  public:
-  FakeConnectionInfoDelegate(bool is_wifi_connection, std::string wifi_ssid)
-      : is_wifi_connection_(is_wifi_connection), wifi_ssid_(wifi_ssid) {}
-  ~FakeConnectionInfoDelegate() override {}
-
-  bool IsWifiConnection() const override { return is_wifi_connection_; }
-  std::string GetWiFiSSID() const override { return wifi_ssid_; }
+  CaptivePortalBlockingPageWithNetInfo(
+      content::WebContents* web_contents,
+      const GURL& request_url,
+      const GURL& login_url,
+      const net::SSLInfo& ssl_info,
+      const base::Callback<void(bool)>& callback,
+      bool is_wifi,
+      const std::string& wifi_ssid)
+      : CaptivePortalBlockingPage(web_contents,
+                                  request_url,
+                                  login_url,
+                                  nullptr,
+                                  ssl_info,
+                                  callback),
+        is_wifi_(is_wifi),
+        wifi_ssid_(wifi_ssid) {}
 
  private:
-  bool is_wifi_connection_;
+  // CaptivePortalBlockingPage methods:
+  bool IsWifiConnection() const override { return is_wifi_; }
+  std::string GetWiFiSSID() const override { return wifi_ssid_; }
+
+  const bool is_wifi_;
   const std::string wifi_ssid_;
 
-  DISALLOW_COPY_AND_ASSIGN(FakeConnectionInfoDelegate);
+  DISALLOW_COPY_AND_ASSIGN(CaptivePortalBlockingPageWithNetInfo);
 };
 #endif
 
@@ -94,17 +111,6 @@ SSLBlockingPage* CreateSSLBlockingPage(content::WebContents* web_contents) {
                                  &strict_enforcement_param)) {
     strict_enforcement = strict_enforcement_param == "1";
   }
-  std::string clock_manipulation_param;
-  if (net::GetValueForKeyInQuery(web_contents->GetURL(), "clock_manipulation",
-                                 &clock_manipulation_param) == 1) {
-    cert_error = net::ERR_CERT_DATE_INVALID;
-    int time_offset;
-    if (base::StringToInt(clock_manipulation_param, &time_offset)) {
-      time_triggered_ += base::TimeDelta::FromDays(365 * time_offset);
-    } else {
-      time_triggered_ += base::TimeDelta::FromDays(365 * 2);
-    }
-  }
   net::SSLInfo ssl_info;
   ssl_info.cert = new net::X509Certificate(
       request_url.host(), "CA", base::Time::Max(), base::Time::Max());
@@ -117,6 +123,54 @@ SSLBlockingPage* CreateSSLBlockingPage(content::WebContents* web_contents) {
   return new SSLBlockingPage(web_contents, cert_error, ssl_info, request_url,
                              options_mask, time_triggered_, nullptr,
                              base::Callback<void(bool)>());
+}
+
+BadClockBlockingPage* CreateBadClockBlockingPage(
+    content::WebContents* web_contents) {
+  // Set up a fake clock error.
+  int cert_error = net::ERR_CERT_DATE_INVALID;
+  GURL request_url("https://example.com");
+  bool overridable = false;
+  bool strict_enforcement = false;
+  std::string url_param;
+  if (net::GetValueForKeyInQuery(web_contents->GetURL(), "url", &url_param) &&
+      GURL(url_param).is_valid()) {
+    request_url = GURL(url_param);
+  }
+  std::string overridable_param;
+  if (net::GetValueForKeyInQuery(web_contents->GetURL(), "overridable",
+                                 &overridable_param)) {
+    overridable = overridable_param == "1";
+  }
+  std::string strict_enforcement_param;
+  if (net::GetValueForKeyInQuery(web_contents->GetURL(), "strict_enforcement",
+                                 &strict_enforcement_param)) {
+    strict_enforcement = strict_enforcement_param == "1";
+  }
+
+  // Determine whether to change the clock to be ahead or behind.
+  base::Time time_triggered_ = base::Time::NowFromSystemTime();
+  std::string clock_manipulation_param;
+  if (net::GetValueForKeyInQuery(web_contents->GetURL(), "clock_manipulation",
+                                 &clock_manipulation_param)) {
+    int time_offset;
+    if (!base::StringToInt(clock_manipulation_param, &time_offset))
+      time_offset = 2;
+    time_triggered_ += base::TimeDelta::FromDays(365 * time_offset);
+  }
+
+  net::SSLInfo ssl_info;
+  ssl_info.cert = new net::X509Certificate(
+      request_url.host(), "CA", base::Time::Max(), base::Time::Max());
+  // This delegate doesn't create an interstitial.
+  int options_mask = 0;
+  if (overridable)
+    options_mask |= SSLBlockingPage::OVERRIDABLE;
+  if (strict_enforcement)
+    options_mask |= SSLBlockingPage::STRICT_ENFORCEMENT;
+  return new BadClockBlockingPage(web_contents, cert_error, ssl_info,
+                                  request_url, time_triggered_,
+                                  base::Callback<void(bool)>());
 }
 
 SafeBrowsingBlockingPage* CreateSafeBrowsingBlockingPage(
@@ -193,15 +247,13 @@ CaptivePortalBlockingPage* CreateCaptivePortalBlockingPage(
                                  &wifi_ssid_param)) {
     wifi_ssid = wifi_ssid_param;
   }
-  FakeConnectionInfoDelegate* delegate =
-      new FakeConnectionInfoDelegate(is_wifi_connection, wifi_ssid);
   net::SSLInfo ssl_info;
   ssl_info.cert = new net::X509Certificate(
       request_url.host(), "CA", base::Time::Max(), base::Time::Max());
-  CaptivePortalBlockingPage* blocking_page = new CaptivePortalBlockingPage(
-      web_contents, request_url, landing_url, nullptr, ssl_info,
-      base::Callback<void(bool)>());
-  blocking_page->SetDelegate(delegate);
+  CaptivePortalBlockingPage* blocking_page =
+      new CaptivePortalBlockingPageWithNetInfo(
+          web_contents, request_url, landing_url, ssl_info,
+          base::Callback<void(bool)>(), is_wifi_connection, wifi_ssid);
   return blocking_page;
 }
 #endif
@@ -254,6 +306,8 @@ void InterstitialHTMLSource::StartDataRequest(
   } else if (base::StartsWith(path, "safebrowsing",
                               base::CompareCase::SENSITIVE)) {
     interstitial_delegate.reset(CreateSafeBrowsingBlockingPage(web_contents_));
+  } else if (base::StartsWith(path, "clock", base::CompareCase::SENSITIVE)) {
+    interstitial_delegate.reset(CreateBadClockBlockingPage(web_contents_));
   }
 #if defined(ENABLE_CAPTIVE_PORTAL_DETECTION)
   else if (base::StartsWith(path, "captiveportal",

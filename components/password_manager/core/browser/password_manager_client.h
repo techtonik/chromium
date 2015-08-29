@@ -8,8 +8,8 @@
 #include "base/callback.h"
 #include "base/memory/scoped_vector.h"
 #include "components/autofill/core/common/password_form.h"
+#include "components/password_manager/core/browser/credentials_filter.h"
 #include "components/password_manager/core/browser/password_store.h"
-#include "components/password_manager/core/browser/store_result_filter.h"
 
 class PrefService;
 
@@ -73,6 +73,18 @@ class PasswordManagerClient {
   // password store if the user allows it. The embedder is not required to
   // prompt the user if it decides that this form doesn't need to be saved or
   // updated. Returns true if the prompt was indeed displayed.
+  // There are 3 different cases when |update_password| == true:
+  // 1.A change password form was submitted and the user has only one stored
+  // credential. Then form_to_save.pending_credentials() should correspond to
+  // the unique element from |form_to_save.best_matches_|.
+  // 2.A change password form was submitted and the user has more than one
+  // stored credential. Then we shouldn't expect anything from
+  // form_to_save.pending_credentials() except correct origin, since we don't
+  // know which credentials should be updated.
+  // 3.A sign-in password form was submitted with a password different from
+  // the stored one. In this case form_to_save.password_overridden() == true
+  // and form_to_save.pending_credentials() should correspond to the credential
+  // that was overidden.
   virtual bool PromptUserToSaveOrUpdatePassword(
       scoped_ptr<PasswordFormManager> form_to_save,
       CredentialSourceType type,
@@ -173,7 +185,7 @@ class PasswordManagerClient {
   // Creates a filter for PasswordFormManager to process password store
   // response. One filter should be created for every batch of store results for
   // a single observed form. The filter results should not be cached.
-  virtual scoped_ptr<password_manager::StoreResultFilter>
+  virtual scoped_ptr<password_manager::CredentialsFilter>
   CreateStoreResultFilter() const = 0;
 
  private:

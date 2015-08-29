@@ -275,6 +275,11 @@ class UserManagerScreenHandler::ProfileUpdateObserver
     user_manager_handler_->SendUserList();
   }
 
+  void OnProfileIsOmittedChanged(
+      const base::FilePath& profile_path) override {
+    user_manager_handler_->SendUserList();
+  }
+
   ProfileManager* profile_manager_;
 
   UserManagerScreenHandler* user_manager_handler_;  // Weak; owns us.
@@ -630,7 +635,7 @@ void UserManagerScreenHandler::GetLocalizedValues(
   localized_strings->SetString("signOutUser",
       l10n_util::GetStringUTF16(IDS_SCREEN_LOCK_SIGN_OUT));
   localized_strings->SetString("addSupervisedUser",
-      l10n_util::GetStringUTF16(IDS_CREATE_SUPERVISED_USER_MENU_LABEL));
+      l10n_util::GetStringUTF16(IDS_CREATE_LEGACY_SUPERVISED_USER_MENU_LABEL));
 
   // For AccountPickerScreen.
   localized_strings->SetString("screenType", "login-add-user");
@@ -660,7 +665,8 @@ void UserManagerScreenHandler::GetLocalizedValues(
   localized_strings->SetString("removeLegacySupervisedUserWarningText",
       l10n_util::GetStringFUTF16(
           IDS_LOGIN_POD_LEGACY_SUPERVISED_USER_REMOVE_WARNING,
-          base::UTF8ToUTF16(chrome::kSupervisedUserManagementDisplayURL)));
+          base::UTF8ToUTF16(
+              chrome::kLegacySupervisedUserManagementDisplayURL)));
 
   // Strings needed for the User Manager tutorial slides.
   localized_strings->SetString("tutorialNext",
@@ -730,6 +736,11 @@ void UserManagerScreenHandler::SendUserList() {
 #endif
 
   for (size_t i = 0; i < info_cache->GetNumberOfProfiles(); ++i) {
+    // Don't show profiles still in the middle of being set up as new legacy
+    // supervised users.
+    if (info_cache->IsOmittedProfileAtIndex(i))
+      continue;
+
     base::DictionaryValue* profile_value = new base::DictionaryValue();
     base::FilePath profile_path = info_cache->GetPathOfProfileAtIndex(i);
 

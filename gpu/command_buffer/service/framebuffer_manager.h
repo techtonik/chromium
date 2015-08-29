@@ -18,6 +18,7 @@
 namespace gpu {
 namespace gles2 {
 
+class FramebufferCompletenessCache;
 class FramebufferManager;
 class Renderbuffer;
 class RenderbufferManager;
@@ -149,6 +150,9 @@ class GPU_EXPORT Framebuffer : public base::RefCounted<Framebuffer> {
   // PrepareDrawBuffersForClear().
   void RestoreDrawBuffersAfterClear() const;
 
+  // Clear all the active INT or UINT type color buffers to (0, 0, 0, 0).
+  void ClearIntegerBuffers();
+
   // Return true if any draw buffers has an alpha channel.
   bool HasAlphaMRT() const;
 
@@ -156,15 +160,12 @@ class GPU_EXPORT Framebuffer : public base::RefCounted<Framebuffer> {
   // formats.
   bool HasSameInternalFormatsMRT() const;
 
-  static void ClearFramebufferCompleteComboMap();
-
-  static bool AllowFramebufferComboCompleteMapForTesting() {
-    return allow_framebuffer_combo_complete_map_;
-  }
-
   void OnTextureRefDetached(TextureRef* texture);
-  void OnWillRenderTo() const;
-  void OnDidRenderTo() const;
+
+  // If attachment is 0, apply to all attachments; otherwise, apply only to
+  // the specified attachment.
+  void OnWillRenderTo(GLenum attachment) const;
+  void OnDidRenderTo(GLenum attachment) const;
 
   void set_read_buffer(GLenum read_buffer) {
     read_buffer_ = read_buffer;
@@ -217,12 +218,6 @@ class GPU_EXPORT Framebuffer : public base::RefCounted<Framebuffer> {
   typedef base::hash_map<GLenum, scoped_refptr<Attachment> > AttachmentMap;
   AttachmentMap attachments_;
 
-  // A map of successful frame buffer combos. If it's in the map
-  // it should be FRAMEBUFFER_COMPLETE.
-  typedef base::hash_map<std::string, bool> FramebufferComboCompleteMap;
-  static FramebufferComboCompleteMap* framebuffer_combo_complete_map_;
-  static bool allow_framebuffer_combo_complete_map_;
-
   scoped_ptr<GLenum[]> draw_buffers_;
 
   GLenum read_buffer_;
@@ -258,8 +253,11 @@ class GPU_EXPORT FramebufferManager {
     DISALLOW_COPY_AND_ASSIGN(TextureDetachObserver);
   };
 
-  FramebufferManager(uint32 max_draw_buffers, uint32 max_color_attachments,
-                     ContextGroup::ContextType context_type);
+  FramebufferManager(uint32 max_draw_buffers,
+                     uint32 max_color_attachments,
+                     ContextGroup::ContextType context_type,
+                     const scoped_refptr<FramebufferCompletenessCache>&
+                         framebuffer_combo_complete_cache);
   ~FramebufferManager();
 
   // Must call before destruction.
@@ -316,6 +314,10 @@ class GPU_EXPORT FramebufferManager {
 
   void OnTextureRefDetached(TextureRef* texture);
 
+  FramebufferCompletenessCache* GetFramebufferComboCompleteCache() {
+    return framebuffer_combo_complete_cache_.get();
+  }
+
   // Info for each framebuffer in the system.
   typedef base::hash_map<GLuint, scoped_refptr<Framebuffer> >
       FramebufferMap;
@@ -338,6 +340,8 @@ class GPU_EXPORT FramebufferManager {
 
   typedef std::vector<TextureDetachObserver*> TextureDetachObserverVector;
   TextureDetachObserverVector texture_detach_observers_;
+
+  scoped_refptr<FramebufferCompletenessCache> framebuffer_combo_complete_cache_;
 
   DISALLOW_COPY_AND_ASSIGN(FramebufferManager);
 };

@@ -8,7 +8,7 @@
 #include "base/macros.h"
 #include "content/browser/service_worker/service_worker_database.h"
 #include "content/common/service_worker/service_worker_types.h"
-#include "third_party/WebKit/public/platform/WebServiceWorkerResponseError.h"
+#include "third_party/WebKit/public/platform/modules/serviceworker/WebServiceWorkerResponseError.h"
 
 class GURL;
 
@@ -83,6 +83,15 @@ class ServiceWorkerMetrics {
     NUM_EVENT_TYPES
   };
 
+  // Used for UMA. Append only.
+  enum class Site { OTHER, NEW_TAB_PAGE, NUM_TYPES };
+
+  // Excludes NTP scope from UMA for now as it tends to dominate the stats and
+  // makes the results largely skewed. Some metrics don't follow this policy
+  // and hence don't call this function.
+  static bool ShouldExcludeSiteFromHistogram(Site site);
+  static bool ShouldExcludeURLFromHistogram(const GURL& url);
+
   // Used for ServiceWorkerDiskCache.
   static void CountInitDiskCacheResult(bool result);
   static void CountReadResponseResult(ReadResponseResult result);
@@ -123,8 +132,7 @@ class ServiceWorkerMetrics {
 
   // Records how much of dispatched events are handled while a Service
   // Worker is awake (i.e. after it is woken up until it gets stopped).
-  static void RecordEventHandledRatio(const GURL& scope,
-                                      EventType event,
+  static void RecordEventHandledRatio(EventType event,
                                       size_t handled_events,
                                       size_t fired_events);
 
@@ -150,6 +158,11 @@ class ServiceWorkerMetrics {
 
   // Records the mode of request that was fallbacked to the network.
   static void RecordFallbackedRequestMode(FetchRequestMode mode);
+
+  // Called at the beginning of each ServiceWorkerVersion::Dispatch*Event
+  // function. Records the time elapsed since idle (generally the time since the
+  // previous event ended).
+  static void RecordTimeBetweenEvents(const base::TimeDelta& time);
 
  private:
   DISALLOW_IMPLICIT_CONSTRUCTORS(ServiceWorkerMetrics);

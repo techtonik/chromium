@@ -1,4 +1,12 @@
 {
+  "Android Tests (trial)(dbg)": {
+    "scripts": [
+      {
+        "name": "telemetry_unittests",
+        "script": "telemetry_unittests.py"
+      }
+    ]
+  },
   "Browser Side Navigation Linux": {
     "gtest_tests": [
       {
@@ -643,6 +651,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true
         },
@@ -799,7 +813,13 @@
         "test": "views_unittests"
       },
       {
+        "test": "webkit_unit_tests"
+      },
+      {
         "test": "wm_unittests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ],
     "scripts": [
@@ -825,6 +845,12 @@
           "can_use_on_swarming_builders": true
         },
         "test": "base_unittests"
+      },
+      {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
       },
       {
         "swarming": {
@@ -951,6 +977,12 @@
       },
       {
         "test": "url_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -971,6 +1003,12 @@
           "shards": 5
         },
         "test": "base_unittests"
+      },
+      {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
       },
       {
         "swarming": {
@@ -1118,6 +1156,12 @@
       },
       {
         "test": "url_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ],
     "scripts": [
@@ -1157,6 +1201,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -1300,6 +1350,12 @@
       },
       {
         "test": "url_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ],
     "scripts": [
@@ -1333,6 +1389,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -1458,6 +1520,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -1473,6 +1541,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -1598,6 +1672,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -1613,6 +1693,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -1738,6 +1824,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -1753,6 +1845,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -1878,6 +1976,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -1893,6 +1997,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -2018,6 +2128,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -2033,6 +2149,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -2170,6 +2292,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -2549,6 +2677,200 @@
       }
     ]
   },
+  "CrWinAsanCov tester": {
+    "gtest_tests": [
+      {
+        "test": "angle_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "base_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true,
+          "shards": 10
+        },
+        "test": "browser_tests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "cacheinvalidation_unittests"
+      },
+      {
+        "test": "chrome_elf_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "components_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "content_browsertests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "content_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "courgette_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "crypto_unittests"
+      },
+      {
+        "test": "device_unittests"
+      },
+      {
+        "test": "extensions_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "gcm_unit_tests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "google_apis_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "gpu_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "installer_util_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "ipc_tests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "jingle_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "media_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "midi_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "net_unittests"
+      },
+      {
+        "test": "ppapi_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "printing_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "remoting_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "sbox_integration_tests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "sbox_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "sbox_validation_tests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "setup_unittests"
+      },
+      {
+        "test": "skia_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "sql_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "sync_unit_tests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "ui_base_unittests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "unit_tests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
+        "test": "url_unittests"
+      },
+      {
+        "test": "views_unittests"
+      }
+    ]
+  },
   "CrWinClang tester": {
     "gtest_tests": [
       {
@@ -2559,6 +2881,12 @@
           "can_use_on_swarming_builders": true
         },
         "test": "base_unittests"
+      },
+      {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
       },
       {
         "swarming": {
@@ -2686,6 +3014,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -2701,6 +3035,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -2826,6 +3166,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -2841,6 +3187,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -2966,6 +3318,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -2981,6 +3339,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -3106,6 +3470,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -3116,6 +3486,12 @@
       },
       {
         "test": "base_unittests"
+      },
+      {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
       },
       {
         "test": "browser_tests"
@@ -3221,6 +3597,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -3236,6 +3618,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -3361,6 +3749,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -3376,6 +3770,12 @@
         "test": "base_unittests"
       },
       {
+        "test": "blink_heap_unittests"
+      },
+      {
+        "test": "blink_platform_unittests"
+      },
+      {
         "swarming": {
           "can_use_on_swarming_builders": true,
           "shards": 10
@@ -3501,6 +3901,12 @@
       },
       {
         "test": "views_unittests"
+      },
+      {
+        "test": "webkit_unit_tests"
+      },
+      {
+        "test": "wtf_unittests"
       }
     ]
   },
@@ -4478,7 +4884,7 @@
       {
         "args": [
           "--site-per-process",
-          "--gtest_filter=-*.PreventSpoofFromSubframeAndReplace:SessionHistoryTest.CrossFrameFormBackForward:SessionHistoryTest.FrameBackForward:*.SupportCrossProcessPostMessageWithMessagePort:DevToolsProtocolTest.NavigationPreservesMessages:NavigationControllerBrowserTest.ReloadOriginalRequest"
+          "--gtest_filter=-*.PreventSpoofFromSubframeAndReplace:SessionHistoryTest.CrossFrameFormBackForward:SessionHistoryTest.FrameBackForward:DevToolsProtocolTest.NavigationPreservesMessages:NavigationControllerBrowserTest.ReloadOriginalRequest"
         ],
         "test": "content_browsertests"
       },
@@ -4509,7 +4915,7 @@
       {
         "args": [
           "--site-per-process",
-          "--gtest_filter=-*.PreventSpoofFromSubframeAndReplace:SessionHistoryTest.CrossFrameFormBackForward:SessionHistoryTest.FrameBackForward:*.SupportCrossProcessPostMessageWithMessagePort:DevToolsProtocolTest.NavigationPreservesMessages:NavigationControllerBrowserTest.ReloadOriginalRequest"
+          "--gtest_filter=-*.PreventSpoofFromSubframeAndReplace:SessionHistoryTest.CrossFrameFormBackForward:SessionHistoryTest.FrameBackForward:DevToolsProtocolTest.NavigationPreservesMessages:NavigationControllerBrowserTest.ReloadOriginalRequest"
         ],
         "test": "content_browsertests"
       },
@@ -4525,13 +4931,6 @@
           "--gtest_filter=-CaptivePortalTabHelperTest.HttpsSubframe*"
         ],
         "test": "unit_tests"
-      }
-    ]
-  },
-  "Win7 Tests (ANGLE)": {
-    "gtest_tests": [
-      {
-        "test": "angle_unittests"
       }
     ]
   }

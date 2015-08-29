@@ -4,6 +4,8 @@
 
 #include "content/browser/compositor/browser_compositor_overlay_candidate_validator_mac.h"
 
+#include "cc/output/overlay_strategy_sandwich.h"
+
 namespace content {
 
 BrowserCompositorOverlayCandidateValidatorMac::
@@ -17,6 +19,12 @@ BrowserCompositorOverlayCandidateValidatorMac::
     ~BrowserCompositorOverlayCandidateValidatorMac() {
 }
 
+void BrowserCompositorOverlayCandidateValidatorMac::GetStrategies(
+    cc::OverlayProcessor::StrategyList* strategies) {
+  strategies->push_back(scoped_ptr<cc::OverlayProcessor::Strategy>(
+      new cc::OverlayStrategyCommon(this, new cc::OverlayStrategySandwich)));
+}
+
 void BrowserCompositorOverlayCandidateValidatorMac::CheckOverlaySupport(
     cc::OverlayCandidateList* surfaces) {
   // SW mirroring copies out of the framebuffer, so we can't remove any
@@ -24,7 +32,10 @@ void BrowserCompositorOverlayCandidateValidatorMac::CheckOverlaySupport(
   if (software_mirror_active_)
     return;
 
-  // TODO(andresantoso): Enable video overlay when it's ready.
+  for (size_t i = 0; i < surfaces->size(); ++i) {
+    if (surfaces->at(i).plane_z_order > 0)
+      surfaces->at(i).overlay_handled = true;
+  }
 }
 
 void BrowserCompositorOverlayCandidateValidatorMac::SetSoftwareMirrorMode(

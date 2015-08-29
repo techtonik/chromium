@@ -331,6 +331,7 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
 
   bool HasAcceleratedSurface(const gfx::Size& desired_size) override;
   void GetScreenInfo(blink::WebScreenInfo* results) override;
+  bool GetScreenColorProfile(std::vector<char>* color_profile) override;
   gfx::Rect GetBoundsInRootWindow() override;
   gfx::GLSurfaceHandle GetCompositingSurface() override;
 
@@ -361,6 +362,9 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   void PluginImeCompositionCompleted(const base::string16& text, int plugin_id);
 
   const std::string& selected_text() const { return selected_text_; }
+  const gfx::Range& composition_range() const { return composition_range_; }
+  const base::string16& selection_text() const { return selection_text_; }
+  size_t selection_text_offset() const { return selection_text_offset_; }
 
   // Returns true and stores first rectangle for character range if the
   // requested |range| is already cached, otherwise returns false.
@@ -466,8 +470,9 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   // The scale factor for the screen that the view is currently on.
   float ViewScaleFactor() const;
 
-  // Update the scale factor for the backing store and for any CALayers.
-  void UpdateBackingStoreScaleFactor();
+  // Update properties, such as the scale factor for the backing store
+  // and for any CALayers, and the screen color profile.
+  void UpdateBackingStoreProperties();
 
   // Ensure that the display link is associated with the correct display.
   void UpdateDisplayLink();
@@ -496,7 +501,8 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
   // AcceleratedWidgetMacNSView implementation.
   NSView* AcceleratedWidgetGetNSView() const override;
   bool AcceleratedWidgetShouldIgnoreBackpressure() const override;
-  uint32_t AcceleratedWidgetGetDisplayIDForVSync() const override;
+  void AcceleratedWidgetGetVSyncParameters(
+      base::TimeTicks* timebase, base::TimeDelta* interval) const override;
   void AcceleratedWidgetSwapCompleted(
       const std::vector<ui::LatencyInfo>& latency_info) override;
   void AcceleratedWidgetHitError() override;
@@ -583,6 +589,9 @@ class CONTENT_EXPORT RenderWidgetHostViewMac
 
   // The current caret bounds.
   gfx::Rect caret_rect_;
+
+  // The current first selection bounds.
+  gfx::Rect first_selection_rect_;
 
   // Factory used to safely scope delayed calls to ShutdownHost().
   base::WeakPtrFactory<RenderWidgetHostViewMac> weak_factory_;

@@ -6,6 +6,8 @@
 #define CONTENT_BROWSER_PRESENTATION_PRESENTATION_SERVICE_IMPL_H_
 
 #include <deque>
+#include <map>
+#include <string>
 
 #include "base/basictypes.h"
 #include "base/compiler_specific.h"
@@ -24,6 +26,7 @@
 #include "content/public/browser/presentation_service_delegate.h"
 #include "content/public/browser/web_contents_observer.h"
 #include "content/public/common/frame_navigate_params.h"
+#include "third_party/mojo/src/mojo/public/cpp/bindings/binding.h"
 
 namespace content {
 
@@ -46,7 +49,6 @@ using NewSessionMojoCallback = mojo::Callback<
 // from the renderer when the first presentation API request is handled.
 class CONTENT_EXPORT PresentationServiceImpl
     : public NON_EXPORTED_BASE(presentation::PresentationService),
-      public mojo::ErrorHandler,
       public WebContentsObserver,
       public PresentationServiceDelegate::Observer {
  public:
@@ -196,10 +198,6 @@ class CONTENT_EXPORT PresentationServiceImpl
   // Creates a binding between this object and |request|.
   void Bind(mojo::InterfaceRequest<presentation::PresentationService> request);
 
-  // mojo::ErrorHandler override.
-  // Note that this is called when the RenderFrameHost is deleted.
-  void OnConnectionError() override;
-
   // WebContentsObserver override.
   void DidNavigateAnyFrame(
       content::RenderFrameHost* render_frame_host,
@@ -246,7 +244,8 @@ class CONTENT_EXPORT PresentationServiceImpl
   // later invocation when session messages arrive.
   void OnSessionMessages(
       const content::PresentationSessionInfo& session,
-      const ScopedVector<PresentationSessionMessage>& messages);
+      const ScopedVector<PresentationSessionMessage>& messages,
+      bool pass_ownership);
 
   // Associates a JoinSession |callback| with a unique request ID and
   // stores it in a map.

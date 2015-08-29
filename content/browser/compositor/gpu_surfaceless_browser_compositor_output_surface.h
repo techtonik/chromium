@@ -18,6 +18,7 @@ class GpuSurfacelessBrowserCompositorOutputSurface
  public:
   GpuSurfacelessBrowserCompositorOutputSurface(
       const scoped_refptr<ContextProviderCommandBuffer>& context,
+      const scoped_refptr<ContextProviderCommandBuffer>& worker_context,
       int surface_id,
       const scoped_refptr<ui::CompositorVSyncManager>& vsync_manager,
       scoped_ptr<BrowserCompositorOverlayCandidateValidator>
@@ -33,6 +34,7 @@ class GpuSurfacelessBrowserCompositorOutputSurface
   void OnSwapBuffersComplete() override;
   void BindFramebuffer() override;
   void Reshape(const gfx::Size& size, float scale_factor) override;
+  unsigned GetOverlayTextureId() const override;
 
   void OnSwapBuffersCompleted(const std::vector<ui::LatencyInfo>& latency_info,
                               gfx::SwapResult result) override;

@@ -30,7 +30,6 @@
 #include "chrome/browser/sync/abstract_profile_sync_service_test.h"
 #include "chrome/browser/sync/glue/autofill_data_type_controller.h"
 #include "chrome/browser/sync/glue/autofill_profile_data_type_controller.h"
-#include "chrome/browser/sync/profile_sync_components_factory.h"
 #include "chrome/browser/sync/profile_sync_service.h"
 #include "chrome/browser/sync/profile_sync_service_factory.h"
 #include "chrome/browser/sync/profile_sync_test_util.h"
@@ -51,6 +50,7 @@
 #include "components/signin/core/browser/fake_profile_oauth2_token_service.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/sync_driver/data_type_controller.h"
+#include "components/sync_driver/fake_sync_client.h"
 #include "components/webdata/common/web_database.h"
 #include "components/webdata_services/web_data_service_test_util.h"
 #include "content/public/test/test_browser_thread.h"
@@ -105,10 +105,6 @@ using testing::Not;
 using testing::SetArgumentPointee;
 using testing::Return;
 
-namespace syncable {
-class Id;
-}
-
 namespace {
 
 const char kTestProfileName[] = "test-profile";
@@ -122,7 +118,7 @@ void RunAndSignal(const base::Closure& cb, WaitableEvent* event) {
 
 class AutofillTableMock : public AutofillTable {
  public:
-  AutofillTableMock() : AutofillTable("en-US") {}
+  AutofillTableMock() {}
   MOCK_METHOD2(RemoveFormElement,
                bool(const base::string16& name,
                     const base::string16& value));  // NOLINT
@@ -148,6 +144,38 @@ class AutofillTableMock : public AutofillTable {
 MATCHER_P(MatchProfiles, profile, "") {
   return (profile.Compare(arg) == 0);
 }
+
+class TestSyncClient : public sync_driver::FakeSyncClient {
+ public:
+  TestSyncClient(PersonalDataManager* pdm,
+                 const scoped_refptr<AutofillWebDataService>& web_data_service)
+      : pdm_(pdm),
+        web_data_service_(web_data_service) {}
+  ~TestSyncClient() override {}
+
+  // FakeSyncClient overrides.
+  autofill::PersonalDataManager* GetPersonalDataManager() override {
+    return pdm_;
+  }
+  scoped_refptr<autofill::AutofillWebDataService> GetWebDataService() override {
+    return web_data_service_;
+  }
+  base::WeakPtr<syncer::SyncableService> GetSyncableServiceForType(
+      syncer::ModelType type) override {
+    DCHECK(type == AUTOFILL || type == AUTOFILL_PROFILE);
+    if (type == AUTOFILL) {
+      return AutocompleteSyncableService::FromWebDataService(
+          web_data_service_.get())->AsWeakPtr();
+    } else {
+      return AutofillProfileSyncableService::FromWebDataService(
+          web_data_service_.get())->AsWeakPtr();
+    }
+  }
+
+ private:
+  PersonalDataManager* pdm_;
+  scoped_refptr<AutofillWebDataService> web_data_service_;
+};
 
 class WebDatabaseFake : public WebDatabase {
  public:
@@ -360,63 +388,6 @@ ACTION_P(ReturnNewDataTypeManagerWithDebugListener, debug_listener) {
       arg4);
 }
 
-ACTION_P(MakeAutofillProfileSyncComponents, wds) {
-  EXPECT_TRUE(BrowserThread::CurrentlyOn(BrowserThread::DB));
-  if (!BrowserThread::CurrentlyOn(BrowserThread::DB))
-    return base::WeakPtr<syncer::SyncableService>();
-  return AutofillProfileSyncableService::FromWebDataService(wds)->AsWeakPtr();
-}
-
-class AbstractAutofillFactory {
- public:
-  virtual DataTypeController* CreateDataTypeController(
-      ProfileSyncComponentsFactory* factory,
-      TestingProfile* profile,
-      ProfileSyncService* service) = 0;
-  virtual void SetExpectation(ProfileSyncComponentsFactoryMock* factory,
-                              ProfileSyncService* service,
-                              AutofillWebDataService* wds,
-                              DataTypeController* dtc) = 0;
-  virtual ~AbstractAutofillFactory() {}
-};
-
-class AutofillEntryFactory : public AbstractAutofillFactory {
- public:
-  DataTypeController* CreateDataTypeController(
-      ProfileSyncComponentsFactory* factory,
-      TestingProfile* profile,
-      ProfileSyncService* service) override {
-    return new AutofillDataTypeController(factory, profile);
-  }
-
-  void SetExpectation(ProfileSyncComponentsFactoryMock* factory,
-                      ProfileSyncService* service,
-                      AutofillWebDataService* wds,
-                      DataTypeController* dtc) override {
-    EXPECT_CALL(*factory, GetSyncableServiceForType(syncer::AUTOFILL)).
-        WillOnce(MakeAutocompleteSyncComponents(wds));
-  }
-};
-
-class AutofillProfileFactory : public AbstractAutofillFactory {
- public:
-  DataTypeController* CreateDataTypeController(
-      ProfileSyncComponentsFactory* factory,
-      TestingProfile* profile,
-      ProfileSyncService* service) override {
-    return new AutofillProfileDataTypeController(factory, profile);
-  }
-
-  void SetExpectation(ProfileSyncComponentsFactoryMock* factory,
-                      ProfileSyncService* service,
-                      AutofillWebDataService* wds,
-                      DataTypeController* dtc) override {
-    EXPECT_CALL(*factory,
-        GetSyncableServiceForType(syncer::AUTOFILL_PROFILE)).
-        WillOnce(MakeAutofillProfileSyncComponents(wds));
-  }
-};
-
 class MockPersonalDataManager : public PersonalDataManager {
  public:
   MockPersonalDataManager() : PersonalDataManager("en-US") {}
@@ -433,8 +404,8 @@ class MockPersonalDataManager : public PersonalDataManager {
 template <class T> class AddAutofillHelper;
 
 class ProfileSyncServiceAutofillTest
-   : public AbstractProfileSyncServiceTest,
-     public syncer::DataTypeDebugInfoListener {
+    : public AbstractProfileSyncServiceTest,
+      public syncer::DataTypeDebugInfoListener {
  public:
   // DataTypeDebugInfoListener implementation.
   void OnDataTypeConfigureComplete(const std::vector<
@@ -449,20 +420,6 @@ class ProfileSyncServiceAutofillTest
         debug_ptr_factory_(this) {
   }
   ~ProfileSyncServiceAutofillTest() override {}
-
-  AutofillProfileFactory profile_factory_;
-  AutofillEntryFactory entry_factory_;
-
-  AbstractAutofillFactory* GetFactory(syncer::ModelType type) {
-    if (type == syncer::AUTOFILL) {
-      return &entry_factory_;
-    } else if (type == syncer::AUTOFILL_PROFILE) {
-      return &profile_factory_;
-    } else {
-      NOTREACHED();
-      return NULL;
-    }
-  }
 
   void SetUp() override {
     AbstractProfileSyncServiceTest::SetUp();
@@ -504,6 +461,9 @@ class ProfileSyncServiceAutofillTest
 
     web_data_service_->StartSyncableService();
 
+    sync_client_.reset(new TestSyncClient(personal_data_manager_,
+                                          web_data_service_));
+
     // When UpdateAutofillEntries() is called with an empty list, the return
     // value should be |true|, rather than the default of |false|.
     std::vector<AutofillEntry> empty;
@@ -535,7 +495,6 @@ class ProfileSyncServiceAutofillTest
   void StartSyncService(const base::Closure& callback,
                         bool will_fail_association,
                         syncer::ModelType type) {
-    AbstractAutofillFactory* factory = GetFactory(type);
     SigninManagerBase* signin = SigninManagerFactory::GetForProfile(profile_);
     signin->SetAuthenticatedAccountInfo("12345", "test_user@gmail.com");
     sync_service_ = TestProfileSyncService::BuildAutoStartAsyncInit(profile_,
@@ -543,12 +502,6 @@ class ProfileSyncServiceAutofillTest
 
     ProfileSyncComponentsFactoryMock* components =
         sync_service_->components_factory_mock();
-    DataTypeController* data_type_controller =
-        factory->CreateDataTypeController(components, profile_, sync_service_);
-    factory->SetExpectation(components,
-                            sync_service_,
-                            web_data_service_.get(),
-                            data_type_controller);
 
     EXPECT_CALL(*components, CreateDataTypeManager(_, _, _, _, _)).
         WillOnce(ReturnNewDataTypeManagerWithDebugListener(
@@ -562,7 +515,7 @@ class ProfileSyncServiceAutofillTest
         ->UpdateCredentials(signin->GetAuthenticatedAccountId(),
                             "oauth2_login_token");
 
-    sync_service_->RegisterDataTypeController(data_type_controller);
+    sync_service_->RegisterDataTypeController(CreateDataTypeController(type));
     sync_service_->Initialize();
     base::MessageLoop::current()->Run();
 
@@ -707,6 +660,14 @@ class ProfileSyncServiceAutofillTest
     return MakeAutofillEntry(name, value, time_shift, -1);
   }
 
+  DataTypeController* CreateDataTypeController(syncer::ModelType type) {
+    DCHECK(type == AUTOFILL || type == AUTOFILL_PROFILE);
+    if (type == AUTOFILL)
+      return new AutofillDataTypeController(sync_client_.get());
+    else
+      return new AutofillProfileDataTypeController(sync_client_.get());
+  }
+
   friend class AddAutofillHelper<AutofillEntry>;
   friend class AddAutofillHelper<AutofillProfile>;
   friend class FakeServerUpdater;
@@ -719,6 +680,7 @@ class ProfileSyncServiceAutofillTest
   MockPersonalDataManager* personal_data_manager_;
   syncer::DataTypeAssociationStats association_stats_;
   base::WeakPtrFactory<DataTypeDebugInfoListener> debug_ptr_factory_;
+  scoped_ptr<TestSyncClient> sync_client_;
 };
 
 template <class T>

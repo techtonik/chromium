@@ -53,15 +53,6 @@
 
 namespace content {
 
-namespace {
-
-// TODO(posciak): remove once we update linux-headers.
-#ifndef V4L2_EVENT_RESOLUTION_CHANGE
-#define V4L2_EVENT_RESOLUTION_CHANGE 5
-#endif
-
-}  // anonymous namespace
-
 struct V4L2VideoDecodeAccelerator::BitstreamBufferRef {
   BitstreamBufferRef(
       base::WeakPtr<Client>& client,
@@ -277,7 +268,7 @@ bool V4L2VideoDecodeAccelerator::Initialize(media::VideoCodecProfile profile,
   // Subscribe to the resolution change event.
   struct v4l2_event_subscription sub;
   memset(&sub, 0, sizeof(sub));
-  sub.type = V4L2_EVENT_RESOLUTION_CHANGE;
+  sub.type = V4L2_EVENT_SOURCE_CHANGE;
   IOCTL_OR_ERROR_RETURN_FALSE(VIDIOC_SUBSCRIBE_EVENT, &sub);
 
   if (video_profile_ >= media::H264PROFILE_MIN &&
@@ -322,10 +313,13 @@ void V4L2VideoDecodeAccelerator::AssignPictureBuffers(
   DVLOG(3) << "AssignPictureBuffers(): buffer_count=" << buffers.size();
   DCHECK(child_task_runner_->BelongsToCurrentThread());
 
-  if (buffers.size() != output_buffer_map_.size()) {
+  const uint32_t req_buffer_count =
+      output_dpb_size_ + kDpbOutputBufferExtraCount;
+
+  if (buffers.size() < req_buffer_count) {
     LOG(ERROR) << "AssignPictureBuffers(): Failed to provide requested picture"
                   " buffers. (Got " << buffers.size()
-               << ", requested " << output_buffer_map_.size() << ")";
+               << ", requested " << req_buffer_count << ")";
     NOTIFY_ERROR(INVALID_ARGUMENT);
     return;
   }
@@ -340,6 +334,23 @@ void V4L2VideoDecodeAccelerator::AssignPictureBuffers(
 
   // It's safe to manipulate all the buffer state here, because the decoder
   // thread is waiting on pictures_assigned_.
+
+  // Allocate the output buffers.
+  struct v4l2_requestbuffers reqbufs;
+  memset(&reqbufs, 0, sizeof(reqbufs));
+  reqbufs.count  = buffers.size();
+  reqbufs.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
+  reqbufs.memory = V4L2_MEMORY_MMAP;
+  IOCTL_OR_ERROR_RETURN(VIDIOC_REQBUFS, &reqbufs);
+
+  if (reqbufs.count != buffers.size()) {
+    DLOG(ERROR) << "Could not allocate enough output buffers";
+    NOTIFY_ERROR(PLATFORM_FAILURE);
+    return;
+  }
+
+  output_buffer_map_.resize(buffers.size());
+
   DCHECK(free_output_buffers_.empty());
   for (size_t i = 0; i < output_buffer_map_.size(); ++i) {
     DCHECK(buffers[i].size() == coded_size_);
@@ -1012,10 +1023,19 @@ bool V4L2VideoDecodeAccelerator::DequeueResolutionChangeEvent() {
   memset(&ev, 0, sizeof(ev));
 
   while (device_->Ioctl(VIDIOC_DQEVENT, &ev) == 0) {
-    if (ev.type == V4L2_EVENT_RESOLUTION_CHANGE) {
-      DVLOG(3)
-          << "DequeueResolutionChangeEvent(): got resolution change event.";
-      return true;
+    if (ev.type == V4L2_EVENT_SOURCE_CHANGE) {
+      uint32_t changes = ev.u.src_change.changes;
+      // We used to define source change was always resolution change. The union
+      // |ev.u| is not used and it is zero by default. When using the upstream
+      // version of the resolution event change, we also need to check
+      // |ev.u.src_change.changes| to know what is changed. For API backward
+      // compatibility, event is treated as resolution change when all bits in
+      // |ev.u.src_change.changes| are cleared.
+      if (changes == 0 || (changes & V4L2_EVENT_SRC_CH_RESOLUTION)) {
+        DVLOG(3)
+            << "DequeueResolutionChangeEvent(): got resolution change event.";
+        return true;
+      }
     } else {
       LOG(ERROR) << "DequeueResolutionChangeEvent(): got an event (" << ev.type
                  << ") we haven't subscribed to.";
@@ -1861,22 +1881,13 @@ bool V4L2VideoDecodeAccelerator::CreateOutputBuffers() {
 
   // Output format setup in Initialize().
 
-  // Allocate the output buffers.
-  struct v4l2_requestbuffers reqbufs;
-  memset(&reqbufs, 0, sizeof(reqbufs));
-  reqbufs.count  = output_dpb_size_ + kDpbOutputBufferExtraCount;
-  reqbufs.type   = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-  reqbufs.memory = V4L2_MEMORY_MMAP;
-  IOCTL_OR_ERROR_RETURN_FALSE(VIDIOC_REQBUFS, &reqbufs);
-
-  output_buffer_map_.resize(reqbufs.count);
-
+  const uint32_t buffer_count = output_dpb_size_ + kDpbOutputBufferExtraCount;
   DVLOG(3) << "CreateOutputBuffers(): ProvidePictureBuffers(): "
-           << "buffer_count=" << output_buffer_map_.size()
+           << "buffer_count=" << buffer_count
            << ", coded_size=" << coded_size_.ToString();
   child_task_runner_->PostTask(
       FROM_HERE, base::Bind(&Client::ProvidePictureBuffers, client_,
-                            output_buffer_map_.size(), coded_size_,
+                            buffer_count, coded_size_,
                             device_->GetTextureTarget()));
 
   // Wait for the client to call AssignPictureBuffers() on the Child thread.

@@ -68,6 +68,13 @@ IPC_STRUCT_TRAITS_BEGIN(gfx::GpuMemoryBufferHandle)
   IPC_STRUCT_TRAITS_MEMBER(id)
   IPC_STRUCT_TRAITS_MEMBER(type)
   IPC_STRUCT_TRAITS_MEMBER(handle)
+#if defined(USE_OZONE)
+  IPC_STRUCT_TRAITS_MEMBER(native_pixmap_handle)
+#endif
+IPC_STRUCT_TRAITS_END()
+
+IPC_STRUCT_TRAITS_BEGIN(gfx::GpuMemoryBufferId)
+  IPC_STRUCT_TRAITS_MEMBER(id)
 IPC_STRUCT_TRAITS_END()
 
 #undef IPC_MESSAGE_EXPORT
@@ -185,7 +192,8 @@ IPC_MESSAGE_CONTROL1(ChildProcessHostMsg_TcmallocStats,
 #endif
 
 // Asks the browser to create a gpu memory buffer.
-IPC_SYNC_MESSAGE_CONTROL4_1(ChildProcessHostMsg_SyncAllocateGpuMemoryBuffer,
+IPC_SYNC_MESSAGE_CONTROL5_1(ChildProcessHostMsg_SyncAllocateGpuMemoryBuffer,
+                            gfx::GpuMemoryBufferId /* new_id */,
                             uint32 /* width */,
                             uint32 /* height */,
                             gfx::BufferFormat,

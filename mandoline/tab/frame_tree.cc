@@ -12,7 +12,8 @@ namespace mandoline {
 FrameTree::FrameTree(mojo::View* view,
                      FrameTreeDelegate* delegate,
                      FrameTreeClient* root_client,
-                     scoped_ptr<FrameUserData> user_data)
+                     scoped_ptr<FrameUserData> user_data,
+                     const Frame::ClientPropertyMap& client_properties)
     : view_(view),
       delegate_(delegate),
       root_(this,
@@ -21,7 +22,7 @@ FrameTree::FrameTree(mojo::View* view,
             ViewOwnership::DOESNT_OWN_VIEW,
             root_client,
             user_data.Pass(),
-            Frame::ClientPropertyMap()),
+            client_properties),
       progress_(0.f),
       change_id_(1u) {
   root_.Init(nullptr);
@@ -36,24 +37,6 @@ Frame* FrameTree::CreateAndAddFrame(mojo::View* view,
                                     scoped_ptr<FrameUserData> user_data) {
   return CreateAndAddFrameImpl(view, view->id(), parent, client,
                                user_data.Pass(), Frame::ClientPropertyMap());
-}
-
-Frame* FrameTree::CreateOrReplaceFrame(Frame* frame,
-                                       mojo::View* view,
-                                       FrameTreeClient* frame_tree_client,
-                                       scoped_ptr<FrameUserData> user_data) {
-  DCHECK(frame && frame->HasAncestor(&root_));
-
-  if (frame->view() == view) {
-    // It's important we Swap() here rather than destroy as otherwise the
-    // clients see a destroy followed by a new frame, which confuses html
-    // viewer.
-    DCHECK(frame != &root_);
-    frame->Swap(frame_tree_client, user_data.Pass());
-    return frame;
-  }
-
-  return CreateAndAddFrame(view, frame, frame_tree_client, user_data.Pass());
 }
 
 void FrameTree::CreateSharedFrame(

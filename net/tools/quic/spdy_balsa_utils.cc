@@ -258,7 +258,7 @@ void SpdyHeadersToBalsaHeaders(const SpdyHeaderBlock& block,
                                BalsaHeaders* headers,
                                QuicVersion quic_version,
                                SpdyHeaderValidatorType type) {
-  if (type == SpdyHeaderValidatorType::RESPONSE) {
+  if (type == SpdyHeaderValidatorType::RESPONSE_HEADER) {
     SpdyHeadersToResponseHeaders(block, headers, quic_version);
     return;
   }
@@ -304,14 +304,6 @@ SpdyHeaderBlock SpdyBalsaUtils::RequestHeadersToSpdyHeaders(
     PopulateSpdy4RequestHeaderBlock(request_headers, scheme, host_and_port,
                                     path, &block);
   }
-  if (!FLAGS_spdy_strip_invalid_headers) {
-    if (block.find("host") != block.end()) {
-      block.erase(block.find("host"));
-    }
-    if (block.find("connection") != block.end()) {
-      block.erase(block.find("connection"));
-    }
-  }
   return block;
 }
 
@@ -341,7 +333,7 @@ void SpdyBalsaUtils::SpdyHeadersToResponseHeaders(const SpdyHeaderBlock& block,
                                                   BalsaHeaders* headers,
                                                   QuicVersion quic_version) {
   SpdyHeadersToBalsaHeaders(block, headers, quic_version,
-                            SpdyHeaderValidatorType::RESPONSE);
+                            SpdyHeaderValidatorType::RESPONSE_HEADER);
 }
 
 // static

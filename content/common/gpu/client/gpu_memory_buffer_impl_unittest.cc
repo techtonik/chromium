@@ -50,7 +50,7 @@ class GpuMemoryBufferImplTest
 };
 
 TEST_P(GpuMemoryBufferImplTest, CreateFromHandle) {
-  const int kBufferId = 1;
+  const gfx::GpuMemoryBufferId kBufferId(1);
 
   gfx::Size buffer_size(8, 8);
 
@@ -73,7 +73,7 @@ TEST_P(GpuMemoryBufferImplTest, CreateFromHandle) {
 }
 
 TEST_P(GpuMemoryBufferImplTest, Map) {
-  const int kBufferId = 1;
+  const gfx::GpuMemoryBufferId kBufferId(1);
 
   // Use a multiple of 4 for both dimensions to support compressed formats.
   gfx::Size buffer_size(4, 4);
@@ -108,7 +108,7 @@ TEST_P(GpuMemoryBufferImplTest, Map) {
     // Copy and compare mapped buffers.
     for (size_t plane = 0; plane < num_planes; ++plane) {
       size_t row_size_in_bytes = 0;
-      EXPECT_TRUE(GpuMemoryBufferImpl::RowSizeInBytes(
+      EXPECT_TRUE(gfx::RowSizeForBufferFormatChecked(
           buffer_size.width(), configuration.format, plane,
           &row_size_in_bytes));
       EXPECT_GT(row_size_in_bytes, 0u);
@@ -118,7 +118,7 @@ TEST_P(GpuMemoryBufferImplTest, Map) {
 
       size_t height =
           buffer_size.height() /
-          GpuMemoryBufferImpl::SubsamplingFactor(configuration.format, plane);
+          gfx::SubsamplingFactorForBufferFormat(configuration.format, plane);
       for (size_t y = 0; y < height; ++y) {
         memcpy(static_cast<char*>(mapped_buffers[plane]) + y * strides[plane],
                data.get(), row_size_in_bytes);
@@ -135,7 +135,7 @@ TEST_P(GpuMemoryBufferImplTest, Map) {
 }
 
 TEST_P(GpuMemoryBufferImplTest, PersistentMap) {
-  const int kBufferId = 1;
+  const gfx::GpuMemoryBufferId kBufferId(1);
 
   // Use a multiple of 4 for both dimensions to support compressed formats.
   gfx::Size buffer_size(4, 4);
@@ -170,7 +170,7 @@ TEST_P(GpuMemoryBufferImplTest, PersistentMap) {
     // Copy and compare mapped buffers.
     for (size_t plane = 0; plane < num_planes; ++plane) {
       size_t row_size_in_bytes;
-      EXPECT_TRUE(GpuMemoryBufferImpl::RowSizeInBytes(
+      EXPECT_TRUE(gfx::RowSizeForBufferFormatChecked(
           buffer_size.width(), configuration.format, plane,
           &row_size_in_bytes));
 
@@ -179,7 +179,7 @@ TEST_P(GpuMemoryBufferImplTest, PersistentMap) {
 
       size_t height =
           buffer_size.height() /
-          GpuMemoryBufferImpl::SubsamplingFactor(configuration.format, plane);
+          gfx::SubsamplingFactorForBufferFormat(configuration.format, plane);
       for (size_t y = 0; y < height; ++y) {
         memcpy(static_cast<char*>(mapped_buffers[plane]) + y * strides[plane],
                data.get(), row_size_in_bytes);
@@ -202,7 +202,7 @@ TEST_P(GpuMemoryBufferImplTest, PersistentMap) {
 
     for (size_t plane = 0; plane < num_planes; ++plane) {
       size_t row_size_in_bytes;
-      EXPECT_TRUE(GpuMemoryBufferImpl::RowSizeInBytes(
+      EXPECT_TRUE(gfx::RowSizeForBufferFormatChecked(
           buffer_size.width(), configuration.format, plane,
           &row_size_in_bytes));
 
@@ -211,7 +211,7 @@ TEST_P(GpuMemoryBufferImplTest, PersistentMap) {
 
       size_t height =
           buffer_size.height() /
-          GpuMemoryBufferImpl::SubsamplingFactor(configuration.format, plane);
+          gfx::SubsamplingFactorForBufferFormat(configuration.format, plane);
       for (size_t y = 0; y < height; ++y) {
         EXPECT_EQ(memcmp(static_cast<char*>(mapped_buffers[plane]) +
                              y * strides[plane],

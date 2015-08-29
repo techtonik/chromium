@@ -61,6 +61,7 @@ class SCHEDULER_EXPORT TaskQueueImpl final : public TaskQueue {
   };
 
   // TaskQueue implementation.
+  void UnregisterTaskQueue() override;
   bool RunsTasksOnCurrentThread() const override;
   bool PostDelayedTask(const tracked_objects::Location& from_here,
                        const base::Closure& task,
@@ -77,6 +78,9 @@ class SCHEDULER_EXPORT TaskQueueImpl final : public TaskQueue {
   void SetQueuePriority(QueuePriority priority) override;
   void PumpQueue() override;
   void SetPumpPolicy(PumpPolicy pump_policy) override;
+  void AddTaskObserver(base::MessageLoop::TaskObserver* task_observer) override;
+  void RemoveTaskObserver(
+      base::MessageLoop::TaskObserver* task_observer) override;
 
   bool NextPendingDelayedTaskRunTime(
       base::TimeTicks* next_pending_delayed_task);
@@ -85,8 +89,6 @@ class SCHEDULER_EXPORT TaskQueueImpl final : public TaskQueue {
                        bool should_trigger_wakeup,
                        const Task* previous_task);
   Task TakeTaskFromWorkQueue();
-
-  void WillDeleteTaskQueueManager();
 
   std::queue<Task>& work_queue() { return work_queue_; }
 
@@ -111,9 +113,13 @@ class SCHEDULER_EXPORT TaskQueueImpl final : public TaskQueue {
   bool GetQuiescenceMonitored() const { return should_monitor_quiescence_; }
   bool GetShouldNotifyObservers() const { return should_notify_observers_; }
 
+  void NotifyWillProcessTask(const base::PendingTask& pending_task);
+  void NotifyDidProcessTask(const base::PendingTask& pending_task);
+
   // Delayed task posted to the underlying run loop, which locks |lock_| and
   // calls MoveReadyDelayedTasksToIncomingQueueLocked to process dealyed tasks
-  // that need to be run now.
+  // that need to be run now.  Thread safe, but in practice it's always called
+  // from the main thread.
   void MoveReadyDelayedTasksToIncomingQueue(LazyNow* lazy_now);
 
   // Test support functions.  These should not be used in production code.
@@ -184,7 +190,6 @@ class SCHEDULER_EXPORT TaskQueueImpl final : public TaskQueue {
   std::queue<Task> incoming_queue_;
   PumpPolicy pump_policy_;
   std::priority_queue<Task> delayed_task_queue_;
-  std::set<base::TimeTicks> in_flight_kick_delayed_tasks_;
 
   const char* name_;
   const char* disabled_by_default_tracing_category_;
@@ -192,6 +197,7 @@ class SCHEDULER_EXPORT TaskQueueImpl final : public TaskQueue {
 
   base::ThreadChecker main_thread_checker_;
   std::queue<Task> work_queue_;
+  base::ObserverList<base::MessageLoop::TaskObserver> task_observers_;
   WakeupPolicy wakeup_policy_;
   size_t set_index_;
   bool should_monitor_quiescence_;

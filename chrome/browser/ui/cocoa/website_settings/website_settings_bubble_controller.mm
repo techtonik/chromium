@@ -8,11 +8,13 @@
 
 #import <AppKit/AppKit.h>
 
+#include "base/i18n/rtl.h"
 #include "base/mac/bind_objc_block.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/sys_string_conversions.h"
 #import "chrome/browser/certificate_viewer.h"
 #include "chrome/browser/infobars/infobar_service.h"
+#include "chrome/browser/ui/browser_dialogs.h"
 #import "chrome/browser/ui/cocoa/browser_window_controller.h"
 #import "chrome/browser/ui/cocoa/info_bubble_view.h"
 #import "chrome/browser/ui/cocoa/info_bubble_window.h"
@@ -35,6 +37,7 @@
 #import "ui/base/cocoa/flipped_view.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/resource/resource_bundle.h"
+#import "ui/gfx/mac/coordinate_conversion.h"
 #include "ui/gfx/scoped_ns_graphics_context_save_gstate_mac.h"
 
 namespace {
@@ -104,15 +107,24 @@ const CGFloat kTabLabelTopPadding = 6;
 // The amount of padding to leave on either side of the tab label.
 const CGFloat kTabLabelXPadding = 12;
 
-// Return the text color to use for the identity status when the site's
-// identity has been verified.
-NSColor* IdentityVerifiedTextColor() {
-  // RGB components are specified using integer RGB [0-255] values for easy
-  // comparison to other platforms.
-  return [NSColor colorWithCalibratedRed:0x07/255.0
-                                   green:0x95/255.0
-                                    blue:0
-                                   alpha:1.0];
+// The amount of padding to *remove* when placing
+// |IDS_WEBSITE_SETTINGS_{FIRST,THIRD}_PARTY_SITE_DATA| next to each other.
+const CGFloat kTextLabelXPadding = 5;
+
+// Takes in the parent window, which should be a BrowserWindow, and gets the
+// proper anchor point for the bubble. The returned point is in screen
+// coordinates.
+NSPoint AnchorPointForWindow(NSWindow* parent) {
+  BrowserWindowController* controller = [parent windowController];
+  NSPoint origin = NSZeroPoint;
+  if ([controller isKindOfClass:[BrowserWindowController class]]) {
+    LocationBarViewMac* location_bar = [controller locationBarBridge];
+    if (location_bar) {
+      NSPoint bubble_point = location_bar->GetPageInfoBubblePoint();
+      origin = [parent convertBaseToScreen:bubble_point];
+    }
+  }
+  return origin;
 }
 
 }  // namespace
@@ -516,15 +528,6 @@ NSColor* IdentityVerifiedTextColor() {
   [contentView addSubview:cookiesView_];
   [contentView addSubview:permissionsView_];
 
-  // Create the link button to view cookies and site data. Its position will be
-  // set in performLayout.
-  NSString* cookieButtonText = l10n_util::GetNSString(
-      IDS_WEBSITE_SETTINGS_SHOW_SITE_DATA);
-  cookiesButton_ = [self addLinkButtonWithText:cookieButtonText
-                                        toView:contentView];
-  [cookiesButton_ setTarget:self];
-  [cookiesButton_ setAction:@selector(showCookiesAndSiteData:)];
-
   // Create the link button to view site settings. Its position will be set in
   // performLayout.
   NSString* siteSettingsButtonText =
@@ -676,13 +679,9 @@ NSColor* IdentityVerifiedTextColor() {
 
   yPos = [self setYPositionOfView:cookiesView_ to:kFramePadding];
 
-  // Put the link button for cookies and site data just below the cookie info.
-  [cookiesButton_ setFrameOrigin:NSMakePoint(kFramePadding, yPos)];
-
   // Put the permission info just below the link button.
-  yPos =
-      [self setYPositionOfView:permissionsView_
-                            to:NSMaxY([cookiesButton_ frame]) + kFramePadding];
+  yPos = [self setYPositionOfView:permissionsView_
+                               to:NSMaxY([cookiesView_ frame]) + kFramePadding];
 
   // Put the link button for site settings just below the permissions.
   [siteSettingsButton_ setFrameOrigin:NSMakePoint(kFramePadding, yPos)];
@@ -764,27 +763,7 @@ NSColor* IdentityVerifiedTextColor() {
                   animate:[[self window] isVisible]];
 
   // Adjust the anchor for the bubble.
-  NSPoint anchorPoint =
-      [self anchorPointForWindowWithHeight:NSHeight(windowFrame)
-                              parentWindow:[self parentWindow]];
-  [self setAnchorPoint:anchorPoint];
-}
-
-// Takes in the bubble's height and the parent window, which should be a
-// BrowserWindow, and gets the proper anchor point for the bubble. The returned
-// point is in screen coordinates.
-- (NSPoint)anchorPointForWindowWithHeight:(CGFloat)bubbleHeight
-                             parentWindow:(NSWindow*)parent {
-  BrowserWindowController* controller = [parent windowController];
-  NSPoint origin = NSZeroPoint;
-  if ([controller isKindOfClass:[BrowserWindowController class]]) {
-    LocationBarViewMac* locationBar = [controller locationBarBridge];
-    if (locationBar) {
-      NSPoint bubblePoint = locationBar->GetPageInfoBubblePoint();
-      origin = [parent convertBaseToScreen:bubblePoint];
-    }
-  }
-  return origin;
+  [self setAnchorPoint:AnchorPointForWindow([self parentWindow])];
 }
 
 // Sets properties on the given |field| to act as the title or description
@@ -1030,50 +1009,13 @@ NSColor* IdentityVerifiedTextColor() {
   [imageView setFrame:frame];
 }
 
-- (CGFloat)addCookieInfo:
-    (const WebsiteSettingsUI::CookieInfo&)cookieInfo
-                  toView:(NSView*)view
-                 atPoint:(NSPoint)point {
-  WebsiteSettingsUI::PermissionInfo info;
-  info.type = CONTENT_SETTINGS_TYPE_COOKIES;
-  info.setting = CONTENT_SETTING_ALLOW;
-  NSImage* image = WebsiteSettingsUI::GetPermissionIcon(info).ToNSImage();
-  NSImageView* imageView = [self addImageWithSize:[image size]
-                                           toView:view
-                                          atPoint:point];
-  [imageView setImage:image];
-  point.x += kPermissionImageSize + kPermissionImageSpacing;
-
-  base::string16 labelText = l10n_util::GetStringFUTF16(
-      IDS_WEBSITE_SETTINGS_SITE_DATA_STATS_LINE,
-      base::UTF8ToUTF16(cookieInfo.cookie_source),
-      base::IntToString16(cookieInfo.allowed),
-      base::IntToString16(cookieInfo.blocked));
-
-  NSTextField* label = [self addText:labelText
-                            withSize:[NSFont smallSystemFontSize]
-                                bold:NO
-                              toView:view
-                             atPoint:point];
-
-  // Align the icon with the text.
-  [self alignPermissionIcon:imageView withTextField:label];
-
-  return NSHeight([label frame]);
-}
-
 // Set the content of the identity and identity status fields.
 - (void)setIdentityInfo:(const WebsiteSettingsUI::IdentityInfo&)identityInfo {
   [identityField_ setStringValue:
       base::SysUTF8ToNSString(identityInfo.site_identity)];
-  [identityStatusField_ setStringValue:
-      base::SysUTF16ToNSString(identityInfo.GetIdentityStatusText())];
+  [identityStatusField_ setStringValue:base::SysUTF16ToNSString(
+                                           identityInfo.GetSecuritySummary())];
 
-  WebsiteSettings::SiteIdentityStatus status = identityInfo.identity_status;
-  if (status == WebsiteSettings::SITE_IDENTITY_STATUS_CERT ||
-      status == WebsiteSettings::SITE_IDENTITY_STATUS_EV_CERT) {
-    [identityStatusField_ setTextColor:IdentityVerifiedTextColor()];
-  }
   // If there is a certificate, add a button for viewing the certificate info.
   certificateId_ = identityInfo.cert_id;
   if (certificateId_) {
@@ -1130,18 +1072,59 @@ NSColor* IdentityVerifiedTextColor() {
                                toView:cookiesView_
                               atPoint:controlOrigin];
   controlOrigin.y += NSHeight([header frame]) + kPermissionsHeadlineSpacing;
+  controlOrigin.y += kPermissionsTabSpacing;
 
-  for (CookieInfoList::const_iterator it = cookieInfoList.begin();
-       it != cookieInfoList.end();
-       ++it) {
-    controlOrigin.y += kPermissionsTabSpacing;
-    CGFloat rowHeight = [self addCookieInfo:*it
-                                     toView:cookiesView_
-                                    atPoint:controlOrigin];
-    controlOrigin.y += rowHeight;
+  // |cookieInfoList| should only ever have 2 items: first- and third-party
+  // cookies.
+  DCHECK_EQ(cookieInfoList.size(), 2u);
+  base::string16 firstPartyLabelText;
+  base::string16 thirdPartyLabelText;
+  for (const auto& i : cookieInfoList) {
+    if (i.is_first_party) {
+      firstPartyLabelText =
+          l10n_util::GetStringFUTF16(IDS_WEBSITE_SETTINGS_FIRST_PARTY_SITE_DATA,
+                                     base::IntToString16(i.allowed));
+    } else {
+      thirdPartyLabelText =
+          l10n_util::GetStringFUTF16(IDS_WEBSITE_SETTINGS_THIRD_PARTY_SITE_DATA,
+                                     base::IntToString16(i.allowed));
+    }
   }
 
-  controlOrigin.y += kPermissionsTabSpacing;
+  WebsiteSettingsUI::PermissionInfo info;
+  info.type = CONTENT_SETTINGS_TYPE_COOKIES;
+  info.setting = CONTENT_SETTING_ALLOW;
+  NSImage* image = WebsiteSettingsUI::GetPermissionIcon(info).ToNSImage();
+  NSImageView* imageView = [self addImageWithSize:[image size]
+                                           toView:cookiesView_
+                                          atPoint:controlOrigin];
+  [imageView setImage:image];
+  controlOrigin.x += kPermissionImageSize + kPermissionImageSpacing;
+
+  base::string16 comma = base::ASCIIToUTF16(", ");
+  NSString* cookieButtonText = base::SysUTF16ToNSString(firstPartyLabelText);
+  NSButton* cookiesButton =
+      [self addLinkButtonWithText:cookieButtonText toView:cookiesView_];
+  [cookiesButton setTarget:self];
+  [cookiesButton setAction:@selector(showCookiesAndSiteData:)];
+  [cookiesButton setFrameOrigin:controlOrigin];
+
+  controlOrigin.x += NSWidth([cookiesButton frame]) - kTextLabelXPadding;
+
+  bool is_rtl = base::i18n::RIGHT_TO_LEFT ==
+                base::i18n::GetStringDirection(firstPartyLabelText);
+  NSTextField* label = [self addText:is_rtl ? thirdPartyLabelText + comma
+                                            : comma + thirdPartyLabelText
+                            withSize:[NSFont smallSystemFontSize]
+                                bold:NO
+                              toView:cookiesView_
+                             atPoint:controlOrigin];
+
+  // Align the icon with the text.
+  [self alignPermissionIcon:imageView withTextField:label];
+
+  controlOrigin.y += NSHeight([label frame]) + kPermissionsTabSpacing;
+
   [cookiesView_ setFrameSize:
       NSMakeSize(NSWidth([cookiesView_ frame]), controlOrigin.y)];
 
@@ -1189,9 +1172,11 @@ NSColor* IdentityVerifiedTextColor() {
 
 @end
 
-WebsiteSettingsUIBridge::WebsiteSettingsUIBridge()
-  : bubble_controller_(nil) {
-}
+WebsiteSettingsUIBridge::WebsiteSettingsUIBridge(
+    content::WebContents* web_contents)
+    : content::WebContentsObserver(web_contents),
+      web_contents_(web_contents),
+      bubble_controller_(nil) {}
 
 WebsiteSettingsUIBridge::~WebsiteSettingsUIBridge() {
 }
@@ -1206,10 +1191,17 @@ void WebsiteSettingsUIBridge::Show(gfx::NativeWindow parent,
                                    content::WebContents* web_contents,
                                    const GURL& url,
                                    const content::SSLStatus& ssl) {
+  if (chrome::ToolkitViewsDialogsEnabled()) {
+    chrome::ShowWebsiteSettingsBubbleViewsAtPoint(
+        gfx::ScreenPointFromNSPoint(AnchorPointForWindow(parent)), profile,
+        web_contents, url, ssl);
+    return;
+  }
+
   bool is_internal_page = InternalChromePage(url);
 
   // Create the bridge. This will be owned by the bubble controller.
-  WebsiteSettingsUIBridge* bridge = new WebsiteSettingsUIBridge();
+  WebsiteSettingsUIBridge* bridge = new WebsiteSettingsUIBridge(web_contents);
 
   // Create the bubble controller. It will dealloc itself when it closes.
   WebsiteSettingsBubbleController* bubble_controller =
@@ -1223,13 +1215,9 @@ void WebsiteSettingsUIBridge::Show(gfx::NativeWindow parent,
     // Initialize the presenter, which holds the model and controls the UI.
     // This is also owned by the bubble controller.
     WebsiteSettings* presenter = new WebsiteSettings(
-        bridge,
-        profile,
-        TabSpecificContentSettings::FromWebContents(web_contents),
-        InfoBarService::FromWebContents(web_contents),
-        url,
-        ssl,
-        content::CertStore::GetInstance());
+        bridge, profile,
+        TabSpecificContentSettings::FromWebContents(web_contents), web_contents,
+        url, ssl, content::CertStore::GetInstance());
     [bubble_controller setPresenter:presenter];
   }
 
@@ -1239,6 +1227,13 @@ void WebsiteSettingsUIBridge::Show(gfx::NativeWindow parent,
 void WebsiteSettingsUIBridge::SetIdentityInfo(
     const WebsiteSettingsUI::IdentityInfo& identity_info) {
   [bubble_controller_ setIdentityInfo:identity_info];
+}
+
+void WebsiteSettingsUIBridge::RenderFrameDeleted(
+    content::RenderFrameHost* render_frame_host) {
+  if (render_frame_host == web_contents_->GetMainFrame()) {
+    [bubble_controller_ close];
+  }
 }
 
 void WebsiteSettingsUIBridge::SetCookieInfo(

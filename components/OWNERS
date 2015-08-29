@@ -12,7 +12,6 @@ per-file audio_modem.gypi=xiyuan@chromium.org
 # Can not match autofill* due to crbug.com/397984
 per-file autofill.gypi=estade@chromium.org
 per-file autofill.gypi=isherman@chromium.org
-per-file autofill_scaled_resources.grdp=estade@chromium.org
 per-file autofill_strings.grdp=estade@chromium.org
 per-file autofill_strings.grdp=isherman@chromium.org
 
@@ -23,6 +22,11 @@ per-file browsing_data.gypi=markusheintz@chromium.org
 per-file browsing_data.gypi=mkwst@chromium.org
 per-file browsing_data.gypi=bauerb@chromium.org
 per-file browsing_data.gypi=michaeln@chromium.org
+
+per-file bubble.gypi=groby@chromium.org
+per-file bubble.gypi=hcarmona@chromium.org
+per-file bubble.gypi=msw@chromium.org
+per-file bubble.gypi=rouslan@chromium.org
 
 per-file cdm.gypi=ddorwin@chromium.org
 per-file cdm.gypi=xhwang@chromium.org
@@ -51,6 +55,8 @@ per-file crash.gypi=mark@chromium.org
 per-file crash.gypi=rsesek@chromium.org
 per-file crash.gypi=scottmg@chromium.org
 per-file crash.gypi=thestig@chromium.org
+
+per-file crash_keys.gypi=rsesek@chromium.org
 
 per-file cronet*=mef@chromium.org
 per-file cronet*=mmenke@chromium.org
@@ -144,10 +150,13 @@ per-file leveldb_proto*=mathp@chromium.org
 
 per-file login*=alemate@chromium.org
 per-file login*=antrim@chromium.org
-per-file login*=dpolukhin@chromium.org
 per-file login*=dzhioev@chromium.org
 per-file login*=nkostylev@chromium.org
 per-file login*=achuith@chromium.org
+
+per-file memory_pressure*=chrisha@chromium.org
+per-file memory_pressure*=shrike@chromium.org
+per-file memory_pressure*=skuhne@chromium.org
 
 per-file metrics*=asvitkine@chromium.org
 per-file metrics*=mpearson@chromium.org
@@ -180,7 +189,6 @@ per-file onc.gypi=stevenjb@chromium.org
 per-file open_from_clipboard.gypi=jif@chromium.org
 
 per-file ownership.gypi=alemate@chromium.org
-per-file ownership.gypi=dpolukhin@chromium.org
 
 per-file packed_ct_ev_whitelist.gypi=eranm@chromium.org
 per-file packed_ct_ev_whitelist.gypi=rsleevi@chromium.org
@@ -189,11 +197,14 @@ per-file pairing.gypi=achuith@chromium.org
 per-file pairing.gypi=dzhioev@chromium.org
 per-file pairing.gypi=zork@chromium.org
 
+per-file password_manager*=dvadym@chromium.org
+per-file password_manager*=engedy@chromium.org
 per-file password_manager*=gcasto@chromium.org
 per-file password_manager*=isherman@chromium.org
 per-file password_manager*=mkwst@chromium.org
 per-file password_manager*=stuartmorgan@chromium.org
 per-file password_manager*=vabr@chromium.org
+per-file password_manager*=vasilii@chromium.org
 
 per-file pdf.gypi=gene@chromium.org
 per-file pdf.gypi=jam@chromium.org
@@ -212,7 +223,6 @@ per-file printing*=gene@chromium.org
 per-file printing*=thestig@chromium.org
 per-file printing*=vitalybuka@chromium.org
 
-per-file policy*=mnissler@chromium.org
 per-file policy*=bartfab@chromium.org
 per-file policy*=atwilson@chromium.org
 per-file policy*=pneubeck@chromium.org
@@ -222,7 +232,6 @@ per-file proximity_auth*=tbarzic@chromium.org
 per-file proximity_auth*=tengs@chromium.org
 per-file proximity_auth*=xiyuan@chromium.org
 
-per-file proxy_config*=mnissler@chromium.org
 per-file proxy_config*=pneubeck@chromium.org
 per-file proxy_config*=stevenjb@chromium.org
 
@@ -248,7 +257,6 @@ per-file search_provider_logos*=newt@chromium.org
 per-file search_provider_logos*=justincohen@chromium.org
 
 per-file session_manager.gypi=antrim@chromium.org
-per-file session_manager.gypi=dpolukhin@chromium.org
 per-file session_manager.gypi=dzhioev@chromium.org
 per-file session_manager.gypi=nkostylev@chromium.org
 
@@ -276,6 +284,8 @@ per-file timers*=derat@chromium.org
 
 per-file tracing*=jbauman@chromium.org
 per-file tracing*=nduca@chromium.org
+per-file tracing*=dsinclair@chromium.org
+per-file tracing*=simonhatch@chromium.org
 
 per-file translate.gypi=andrewhayden@chromium.org
 per-file translate.gypi=droger@chromium.org
@@ -294,7 +304,6 @@ per-file undo_strings.grdp=sky@chromium.org
 per-file undo_strings.grdp=tom.cassiotis@gmail.com
 
 per-file user_manager.gypi=antrim@chromium.org
-per-file user_manager.gypi=dpolukhin@chromium.org
 per-file user_manager.gypi=dzhioev@chromium.org
 per-file user_manager.gypi=nkostylev@chromium.org
 
@@ -302,7 +311,7 @@ per-file url_formatter.gypi=pkasting@chromium.org
 
 per-file user_prefs.gypi=battre@chromium.org
 per-file user_prefs.gypi=bauerb@chromium.org
-per-file user_prefs.gypi=mnissler@chromium.org
+per-file user_prefs.gypi=gab@chromium.org
 per-file user_prefs.gypi=pam@chromium.org
 
 per-file variations.gypi=asvitkine@chromium.org

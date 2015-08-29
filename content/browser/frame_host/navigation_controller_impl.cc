@@ -537,12 +537,11 @@ void NavigationControllerImpl::SetScreenshotManager(
 }
 
 bool NavigationControllerImpl::CanGoBack() const {
-  return entries_.size() > 1 && GetCurrentEntryIndex() > 0;
+  return CanGoToOffset(-1);
 }
 
 bool NavigationControllerImpl::CanGoForward() const {
-  int index = GetCurrentEntryIndex();
-  return index >= 0 && index < (static_cast<int>(entries_.size()) - 1);
+  return CanGoToOffset(1);
 }
 
 bool NavigationControllerImpl::CanGoToOffset(int offset) const {
@@ -901,7 +900,10 @@ bool NavigationControllerImpl::RendererDidNavigate(
     // Update the frame-specific PageState.
     FrameNavigationEntry* frame_entry =
         active_entry->GetFrameEntry(rfh->frame_tree_node());
-    frame_entry->set_page_state(params.page_state);
+    // We may not find a frame_entry in some cases; ignore the PageState if so.
+    // TODO(creis): Remove the "if" once https://crbug.com/522193 is fixed.
+    if (frame_entry)
+      frame_entry->set_page_state(params.page_state);
   } else {
     active_entry->SetPageState(params.page_state);
   }
@@ -1243,7 +1245,11 @@ void NavigationControllerImpl::RendererDidNavigateNewSubframe(
         rfh->GetSiteInstance(), params.url, params.referrer);
     new_entry = GetLastCommittedEntry()->CloneAndReplace(rfh->frame_tree_node(),
                                                          frame_entry);
-    CHECK(frame_entry->HasOneRef());
+
+    // TODO(creis): Make sure the last committed entry always has the subframe
+    // entry to replace, and CHECK(frame_entry->HasOneRef).  For now, we might
+    // not find the entry to replace, and new_entry will be deleted when it goes
+    // out of scope.  See https://crbug.com/522193.
   } else {
     new_entry = GetLastCommittedEntry()->Clone();
   }
@@ -1725,7 +1731,7 @@ void NavigationControllerImpl::NavigateToPendingEntry(ReloadType reload_type) {
 
   // For session history navigations only the pending_entry_index_ is set.
   if (!pending_entry_) {
-    DCHECK_NE(pending_entry_index_, -1);
+    CHECK_NE(pending_entry_index_, -1);
     pending_entry_ = entries_[pending_entry_index_];
   }
 
@@ -1869,8 +1875,16 @@ void NavigationControllerImpl::LoadIfNecessary() {
   // Calling Reload() results in ignoring state, and not loading.
   // Explicitly use NavigateToPendingEntry so that the renderer uses the
   // cached state.
-  pending_entry_index_ = last_committed_entry_index_;
-  NavigateToPendingEntry(NO_RELOAD);
+  if (pending_entry_) {
+    NavigateToPendingEntry(NO_RELOAD);
+  } else if (last_committed_entry_index_ != -1) {
+    pending_entry_index_ = last_committed_entry_index_;
+    NavigateToPendingEntry(NO_RELOAD);
+  } else {
+    // If there is something to reload, the successful reload will clear the
+    // |needs_reload_| flag. Otherwise, just do it here.
+    needs_reload_ = false;
+  }
 }
 
 void NavigationControllerImpl::NotifyEntryChanged(

@@ -23,6 +23,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/thread_task_runner_handle.h"
 #include "base/time/time.h"
+#include "device/core/device_client.h"
 #include "device/usb/usb_device.h"
 #include "device/usb/usb_device_handle.h"
 #include "device/usb/usb_service.h"
@@ -192,7 +193,7 @@ class UsbGadgetFactory : public UsbService::Observer,
  public:
   UsbGadgetFactory(scoped_refptr<base::SingleThreadTaskRunner> io_task_runner)
       : observer_(this), weak_factory_(this) {
-    usb_service_ = UsbService::GetInstance(io_task_runner);
+    usb_service_ = DeviceClient::Get()->GetUsbService();
     request_context_getter_ = new URLRequestContextGetter(io_task_runner);
 
     static uint32 next_session_id;
@@ -399,7 +400,7 @@ class DeviceAddListener : public UsbService::Observer {
         weak_factory_(this) {
     observer_.Add(usb_service_);
   }
-  virtual ~DeviceAddListener() {}
+  ~DeviceAddListener() override {}
 
   scoped_refptr<UsbDevice> WaitForAdd() {
     usb_service_->GetDevices(base::Bind(&DeviceAddListener::OnDevicesEnumerated,
@@ -465,7 +466,7 @@ class DeviceRemoveListener : public UsbService::Observer {
         weak_factory_(this) {
     observer_.Add(usb_service_);
   }
-  virtual ~DeviceRemoveListener() {}
+  ~DeviceRemoveListener() override {}
 
   void WaitForRemove() {
     usb_service_->GetDevices(

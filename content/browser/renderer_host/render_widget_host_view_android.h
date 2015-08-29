@@ -135,6 +135,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
       const base::Callback<void(bool)>& callback) override;
   bool CanCopyToVideoFrame() const override;
   void GetScreenInfo(blink::WebScreenInfo* results) override;
+  bool GetScreenColorProfile(std::vector<char>* color_profile) override;
   gfx::Rect GetBoundsInRootWindow() override;
   gfx::GLSurfaceHandle GetCompositingSurface() override;
   void ProcessAckedTouchEvent(const TouchEventWithLatencyInfo& touch,
@@ -260,7 +261,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
 
   void DestroyDelegatedContent();
   void CheckOutputSurfaceChanged(uint32 output_surface_id);
-  void SubmitFrame(scoped_ptr<cc::CompositorFrame> frame_data);
+  void SubmitCompositorFrame(scoped_ptr<cc::CompositorFrame> frame_data);
   void SwapDelegatedFrame(uint32 output_surface_id,
                           scoped_ptr<cc::CompositorFrame> frame_data);
   void SendDelegatedFrameAck(uint32 output_surface_id);
@@ -268,7 +269,6 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
 
   void OnFrameMetadataUpdated(
       const cc::CompositorFrameMetadata& frame_metadata);
-  void ComputeContentsSize(const cc::CompositorFrameMetadata& frame_metadata);
 
   void ShowInternal();
   void HideInternal(bool hide_frontbuffer, bool stop_observing_root_window);
@@ -357,12 +357,11 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
   cc::SurfaceId surface_id_;
   gfx::Size current_surface_size_;
   cc::ReturnedResourceArray surface_returned_resources_;
+  gfx::Vector2dF location_bar_content_translation_;
+  cc::ViewportSelection current_viewport_selection_;
 
   // The most recent texture size that was pushed to the texture layer.
   gfx::Size texture_size_in_layer_;
-
-  // The most recent content size that was pushed to the texture layer.
-  gfx::Size content_size_in_layer_;
 
   // The output surface id of the last received frame.
   uint32_t last_output_surface_id_;

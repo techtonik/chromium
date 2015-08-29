@@ -39,8 +39,6 @@
       'renderer/plugins/non_loadable_plugin_placeholder.h',
       'renderer/plugins/plugin_uma.cc',
       'renderer/plugins/plugin_uma.h',
-      'renderer/plugins/shadow_dom_plugin_placeholder.cc',
-      'renderer/plugins/shadow_dom_plugin_placeholder.h',
       'renderer/prerender/prerender_dispatcher.cc',
       'renderer/prerender/prerender_dispatcher.h',
       'renderer/prerender/prerender_extra_data.cc',
@@ -156,10 +154,6 @@
       'renderer/resources/extensions/tts_custom_bindings.js',
       'renderer/resources/extensions/tts_engine_custom_bindings.js',
     ],
-    'chrome_renderer_non_android_sources': [
-      'renderer/prerender/prerender_media_load_deferrer.cc',
-      'renderer/prerender/prerender_media_load_deferrer.h',
-    ],
     'chrome_renderer_plugin_sources': [
       'renderer/pepper/chrome_renderer_pepper_host_factory.cc',
       'renderer/pepper/chrome_renderer_pepper_host_factory.h',
@@ -244,7 +238,6 @@
       'dependencies': [
         'common',
         'common_mojo_bindings',
-        'common_net',
         'chrome_resources.gyp:chrome_resources',
         'chrome_resources.gyp:chrome_strings',
         '../third_party/re2/re2.gyp:re2',
@@ -282,6 +275,11 @@
         '<@(chrome_renderer_sources)',
       ],
       'conditions': [
+        ['OS != "ios"', {
+          'dependencies': [
+            'common_net',
+          ],
+        }],
         ['disable_nacl!=1', {
           'dependencies': [
             '../components/nacl.gyp:nacl',
@@ -381,11 +379,6 @@
         ['enable_print_preview==1', {
           'sources': [
             '<@(chrome_renderer_full_printing_sources)',
-          ],
-        }],
-        ['OS!="android"', {
-          'sources': [
-            '<@(chrome_renderer_non_android_sources)',
           ],
         }],
         ['OS=="win"', {

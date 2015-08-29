@@ -407,6 +407,7 @@ public class BookmarksBridge {
      */
     public void setBookmarkUrl(BookmarkId id, String url) {
         assert mIsNativeBookmarkModelLoaded;
+        assert id.getType() == BookmarkType.NORMAL;
         nativeSetBookmarkUrl(mNativeBookmarksBridge, id.getId(), id.getType(), url);
     }
 
@@ -561,17 +562,28 @@ public class BookmarksBridge {
         return nativeIsEditBookmarksEnabled(mNativeBookmarksBridge);
     }
 
-    public static boolean isEnhancedBookmarksEnabled(Profile profile) {
-        return nativeIsEnhancedBookmarksFeatureEnabled(profile);
+    public static boolean isEnhancedBookmarksEnabled() {
+        return nativeIsEnhancedBookmarksFeatureEnabled();
+    }
+
+    /**
+     * Notifies the observer that bookmark model has been loaded.
+     */
+    protected void notifyBookmarkModelLoaded() {
+        // Call isBookmarkModelLoaded() to do the check since it could be overridden by the child
+        // class to add the addition logic.
+        if (isBookmarkModelLoaded()) {
+            for (BookmarkModelObserver observer : mObservers) {
+                observer.bookmarkModelLoaded();
+            }
+        }
     }
 
     @CalledByNative
     private void bookmarkModelLoaded() {
         mIsNativeBookmarkModelLoaded = true;
 
-        for (BookmarkModelObserver observer : mObservers) {
-            observer.bookmarkModelLoaded();
-        }
+        notifyBookmarkModelLoaded();
 
         if (!mDelayedBookmarkCallbacks.isEmpty()) {
             for (int i = 0; i < mDelayedBookmarkCallbacks.size(); i++) {
@@ -744,7 +756,7 @@ public class BookmarksBridge {
     private native void nativeUndo(long nativeBookmarksBridge);
     private native void nativeStartGroupingUndos(long nativeBookmarksBridge);
     private native void nativeEndGroupingUndos(long nativeBookmarksBridge);
-    private static native boolean nativeIsEnhancedBookmarksFeatureEnabled(Profile profile);
+    private static native boolean nativeIsEnhancedBookmarksFeatureEnabled();
     private native void nativeLoadEmptyPartnerBookmarkShimForTesting(long nativeBookmarksBridge);
     private native void nativeSearchBookmarks(long nativeBookmarksBridge,
             List<BookmarkMatch> bookmarkMatches, String query, int maxNumber);
@@ -805,6 +817,16 @@ public class BookmarksBridge {
         /** @return Whether this bookmark can be edited. */
         public boolean isEditable() {
             return mIsEditable;
+        }
+
+        /**@return Whether this bookmark's URL can be edited */
+        public boolean isUrlEditable() {
+            return isEditable() && mId.getType() == BookmarkType.NORMAL;
+        }
+
+        /**@return Whether this bookmark can be moved */
+        public boolean isMovable() {
+            return isEditable() && mId.getType() == BookmarkType.NORMAL;
         }
 
         /** @return Whether this is a managed bookmark. */
